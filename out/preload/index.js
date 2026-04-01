@@ -1,11 +1,33 @@
 "use strict";
 const electron = require("electron");
+const listenerMap = /* @__PURE__ */ new Map();
+const validChannels = [
+  "file:open",
+  "case:new",
+  "settings:open",
+  "workflow:stateChanged",
+  "workflow:stageChanged",
+  "agent:message",
+  "agent:statusChanged",
+  "tool:executionComplete",
+  "evidence:eventAdded",
+  "llm:stream",
+  "window:maximized-changed"
+];
+const isValidChannel = (channel) => {
+  return validChannels.includes(channel);
+};
 const electronAPI = {
   // 平台信息
   platform: process.platform,
   isMac: process.platform === "darwin",
   isWindows: process.platform === "win32",
   isLinux: process.platform === "linux",
+  appMeta: {
+    get: () => {
+      return electron.ipcRenderer.invoke("app:getMeta");
+    }
+  },
   // 文件操作
   selectRdcFiles: () => {
     return electron.ipcRenderer.invoke("dialog:selectRdcFiles");
@@ -85,26 +107,36 @@ const electronAPI = {
       return electron.ipcRenderer.invoke("settings:set", settings);
     }
   },
+  windowControls: {
+    minimize: () => {
+      return electron.ipcRenderer.invoke("window:minimize");
+    },
+    toggleMaximize: () => {
+      return electron.ipcRenderer.invoke("window:toggleMaximize");
+    },
+    close: () => {
+      return electron.ipcRenderer.invoke("window:close");
+    },
+    isMaximized: () => {
+      return electron.ipcRenderer.invoke("window:isMaximized");
+    }
+  },
   // 事件监听
   on: (channel, callback) => {
-    const validChannels = [
-      "file:open",
-      "case:new",
-      "settings:open",
-      "workflow:stateChanged",
-      "workflow:stageChanged",
-      "agent:message",
-      "agent:statusChanged",
-      "tool:executionComplete",
-      "evidence:eventAdded",
-      "llm:stream"
-    ];
-    if (validChannels.includes(channel)) {
-      electron.ipcRenderer.on(channel, (_event, ...args) => callback(...args));
+    if (isValidChannel(channel)) {
+      const wrappedCallback = (_event, ...args) => callback(...args);
+      const channelListeners = listenerMap.get(channel) ?? /* @__PURE__ */ new Map();
+      channelListeners.set(callback, wrappedCallback);
+      listenerMap.set(channel, channelListeners);
+      electron.ipcRenderer.on(channel, wrappedCallback);
     }
   },
   off: (channel, callback) => {
-    electron.ipcRenderer.removeListener(channel, callback);
+    const wrappedCallback = listenerMap.get(channel)?.get(callback);
+    if (wrappedCallback) {
+      electron.ipcRenderer.removeListener(channel, wrappedCallback);
+      listenerMap.get(channel)?.delete(callback);
+    }
   }
 };
 electron.contextBridge.exposeInMainWorld("electronAPI", electronAPI);

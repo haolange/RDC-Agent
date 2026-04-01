@@ -6966,99 +6966,6 @@ var m = reactDomExports;
   client.createRoot = m.createRoot;
   client.hydrateRoot = m.hydrateRoot;
 }
-const STAGE_DISPLAY_NAMES = {
-  "preflight_pending": "Preflight",
-  "intent_gate_passed": "Intent Gate",
-  "entry_gate_passed": "Entry Gate",
-  "accepted_intake_initialized": "Intake Initialized",
-  "intake_gate_passed": "Intake Gate",
-  "waiting_for_specialist_brief": "Waiting for Specialist",
-  "specialist_briefs_collected": "Briefs Collected",
-  "expert_investigation_complete": "Investigation Complete",
-  "fix_verification_complete": "Fix Verification",
-  "skeptic_ready": "Skeptic Ready",
-  "curator_ready": "Curator Ready",
-  "finalized": "Finalized",
-  "validation_blocked": "Blocked",
-  "awaiting_user_input": "Awaiting Input"
-};
-const STAGE_GROUPS = {
-  intake: ["preflight_pending", "intent_gate_passed", "entry_gate_passed", "accepted_intake_initialized", "intake_gate_passed"],
-  investigation: ["waiting_for_specialist_brief", "specialist_briefs_collected", "expert_investigation_complete"],
-  verification: ["fix_verification_complete", "skeptic_ready"],
-  finalization: ["curator_ready", "finalized"]
-};
-const SIMPLIFIED_STAGES = [
-  { id: "intake", name: "Intake", stages: STAGE_GROUPS.intake },
-  { id: "investigation", name: "Investigation", stages: STAGE_GROUPS.investigation },
-  { id: "verification", name: "Verification", stages: STAGE_GROUPS.verification },
-  { id: "finalization", name: "Final", stages: STAGE_GROUPS.finalization }
-];
-const WorkflowPanel = () => {
-  const [currentStage, setCurrentStage] = reactExports.useState("preflight_pending");
-  const [eventCount, setEventCount] = reactExports.useState(0);
-  const [blockerCount, setBlockerCount] = reactExports.useState(0);
-  reactExports.useEffect(() => {
-    if (window.electronAPI) {
-      window.electronAPI.on("workflow:stateChanged", (state) => {
-        const workflowState = state;
-        setCurrentStage(workflowState.currentStage);
-        setBlockerCount(workflowState.blockers?.length || 0);
-      });
-      window.electronAPI.on("evidence:eventAdded", () => {
-        setEventCount((prev) => prev + 1);
-      });
-    }
-    return () => {
-    };
-  }, []);
-  const getStageIndex = (stage) => {
-    for (let i = 0; i < SIMPLIFIED_STAGES.length; i++) {
-      if (SIMPLIFIED_STAGES[i].stages.includes(stage)) {
-        return i;
-      }
-    }
-    return 0;
-  };
-  const currentStageIndex = getStageIndex(currentStage);
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "workflow-panel", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "workflow-stages", children: SIMPLIFIED_STAGES.map((stage, index) => {
-      const isActive = index === currentStageIndex;
-      const isCompleted = index < currentStageIndex;
-      const isBlocked = currentStage === "validation_blocked" && isActive;
-      return /* @__PURE__ */ jsxRuntimeExports.jsxs(
-        "div",
-        {
-          className: `workflow-stage ${isActive ? "active" : ""} ${isCompleted ? "completed" : ""} ${isBlocked ? "blocked" : ""}`,
-          children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "stage-indicator", children: isCompleted ? /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "20 6 9 17 4 12" }) }) : isBlocked ? /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "12", cy: "12", r: "10" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "15", y1: "9", x2: "9", y2: "15" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "9", y1: "9", x2: "15", y2: "15" })
-            ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "stage-number", children: index + 1 }) }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "stage-name", children: stage.name }),
-            index < SIMPLIFIED_STAGES.length - 1 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `stage-connector ${isCompleted ? "completed" : ""}` })
-          ]
-        },
-        stage.id
-      );
-    }) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "workflow-info", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "info-item", children: [
-        "Stage: ",
-        /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: STAGE_DISPLAY_NAMES[currentStage] })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "info-item", children: [
-        "Events: ",
-        /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: eventCount })
-      ] }),
-      blockerCount > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "info-item blocker", children: [
-        "Blockers: ",
-        /* @__PURE__ */ jsxRuntimeExports.jsx("strong", { children: blockerCount })
-      ] })
-    ] })
-  ] });
-};
 const AGENT_DISPLAY_NAMES = {
   "rdc-debugger": "RDC Debugger",
   "triage_agent": "Triage Agent",
@@ -7070,450 +6977,1428 @@ const AGENT_DISPLAY_NAMES = {
   "skeptic_agent": "Skeptic Agent",
   "curator_agent": "Curator Agent"
 };
+const UI_STAGES = [
+  {
+    id: "preflight",
+    label: "Preflight",
+    description: "Environment checks and initial intent validation before intake begins.",
+    stages: ["preflight_pending", "intent_gate_passed"],
+    icon: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "12", cy: "12", r: "10" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 6v6l4 2" })
+    ] })
+  },
+  {
+    id: "intake",
+    label: "Intake",
+    description: "Capture acceptance, case creation, and intake gate validation.",
+    stages: ["entry_gate_passed", "accepted_intake_initialized", "intake_gate_passed"],
+    icon: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "14 2 14 8 20 8" })
+    ] })
+  },
+  {
+    id: "dispatch",
+    label: "Dispatch",
+    description: "Specialist goals are prepared and dispatched into the workspace.",
+    stages: ["waiting_for_specialist_brief"],
+    icon: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M22 2 11 13" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M22 2 15 22 11 13 2 9 22 2z" })
+    ] })
+  },
+  {
+    id: "specialist",
+    label: "Specialist",
+    description: "Briefs are collected and handed off to the right investigator agents.",
+    stages: ["specialist_briefs_collected"],
+    icon: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "9", cy: "7", r: "4" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M23 21v-2a4 4 0 0 0-3-3.87" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M16 3.13a4 4 0 0 1 0 7.75" })
+    ] })
+  },
+  {
+    id: "investigation",
+    label: "Investigation",
+    description: "Experts gather evidence, run tools, and assemble the technical narrative.",
+    stages: ["expert_investigation_complete"],
+    icon: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "11", cy: "11", r: "8" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "m21 21-4.35-4.35" })
+    ] })
+  },
+  {
+    id: "verify",
+    label: "Verify",
+    description: "Fix verification and skeptical review confirm the evidence chain.",
+    stages: ["fix_verification_complete", "skeptic_ready"],
+    icon: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M9 12l2 2 4-4" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "12", cy: "12", r: "10" })
+    ] })
+  },
+  {
+    id: "final",
+    label: "Final",
+    description: "Final report packaging, curation, and workflow completion.",
+    stages: ["curator_ready", "finalized"],
+    icon: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M4 4h10l-1 5h7l-3 6h-6l-1 5H4V4z" }) })
+  }
+];
+const resolveUiStageIndex = (workflowState) => {
+  if (!workflowState) return 0;
+  const stageToResolve = workflowState.currentStage === "validation_blocked" || workflowState.currentStage === "awaiting_user_input" ? [...workflowState.previousStages].reverse().find(
+    (stage) => stage !== "validation_blocked" && stage !== "awaiting_user_input"
+  ) || "preflight_pending" : workflowState.currentStage;
+  const stageIndex = UI_STAGES.findIndex((stage) => stage.stages.includes(stageToResolve));
+  return stageIndex >= 0 ? stageIndex : 0;
+};
+const buildAgentMessage = (agent) => {
+  switch (agent.status) {
+    case "thinking":
+      return "Thinking through the next step";
+    case "executing":
+      return "Executing tools and collecting evidence";
+    case "waiting":
+      return "Waiting on workflow or user input";
+    case "complete":
+      return "Completed current assignment";
+    case "error":
+      return agent.error || "Agent reported an error";
+    default:
+      return "Standing by";
+  }
+};
+const WorkflowPanel = () => {
+  const [workflowState, setWorkflowState] = reactExports.useState(null);
+  const [eventCount, setEventCount] = reactExports.useState(0);
+  const [activeAgents, setActiveAgents] = reactExports.useState([]);
+  const electronAPI = typeof window !== "undefined" ? window.electronAPI : void 0;
+  reactExports.useEffect(() => {
+    const loadInitialState = async () => {
+      if (!electronAPI) return;
+      try {
+        const [nextWorkflowState, evidenceChain, allAgents] = await Promise.all([
+          electronAPI.workflow.getState().catch(() => null),
+          electronAPI.evidence.getChain().catch(() => ({ events: [] })),
+          electronAPI.agent.getAllStates().catch(() => [])
+        ]);
+        if (nextWorkflowState) {
+          setWorkflowState(nextWorkflowState);
+        }
+        setEventCount(evidenceChain.events.length);
+        const activeAgentStates = allAgents.filter((agent) => agent.status !== "idle").map((agent) => ({
+          role: agent.agentId,
+          status: agent.status,
+          message: buildAgentMessage(agent)
+        }));
+        setActiveAgents(activeAgentStates);
+      } catch (error) {
+        console.warn("Failed to load workflow panel state:", error);
+      }
+    };
+    loadInitialState();
+  }, [electronAPI]);
+  reactExports.useEffect(() => {
+    if (!electronAPI) return;
+    const handleWorkflowStateChanged = (state) => {
+      setWorkflowState(state);
+    };
+    const handleEvidenceEventAdded = () => {
+      setEventCount((current) => current + 1);
+    };
+    const handleAgentStatusChanged = (payload) => {
+      const nextPayload = payload;
+      setActiveAgents((current) => {
+        const nextAgents = [...current];
+        const index = nextAgents.findIndex((agent) => agent.role === nextPayload.agentId);
+        if (nextPayload.status === "idle") {
+          if (index >= 0) nextAgents.splice(index, 1);
+          return nextAgents;
+        }
+        const nextAgent = {
+          role: nextPayload.agentId,
+          status: nextPayload.status,
+          message: nextPayload.message || buildAgentMessage({
+            agentId: nextPayload.agentId,
+            status: nextPayload.status
+          })
+        };
+        if (index >= 0) {
+          nextAgents[index] = nextAgent;
+        } else {
+          nextAgents.push(nextAgent);
+        }
+        return nextAgents;
+      });
+    };
+    electronAPI.on("workflow:stateChanged", handleWorkflowStateChanged);
+    electronAPI.on("evidence:eventAdded", handleEvidenceEventAdded);
+    electronAPI.on("agent:statusChanged", handleAgentStatusChanged);
+    return () => {
+      electronAPI.off("workflow:stateChanged", handleWorkflowStateChanged);
+      electronAPI.off("evidence:eventAdded", handleEvidenceEventAdded);
+      electronAPI.off("agent:statusChanged", handleAgentStatusChanged);
+    };
+  }, [electronAPI]);
+  const currentIndex = reactExports.useMemo(() => resolveUiStageIndex(workflowState), [workflowState]);
+  const isBlocked = workflowState?.currentStage === "validation_blocked";
+  const isWaitingForInput = workflowState?.currentStage === "awaiting_user_input";
+  const blockerCount = workflowState?.blockers.length || 0;
+  const progress = reactExports.useMemo(() => {
+    if (!workflowState) return 0;
+    return Math.min(100, (currentIndex + (workflowState.currentStage === "finalized" ? 1 : 0)) / UI_STAGES.length * 100);
+  }, [currentIndex, workflowState]);
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "workflow-panel", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "workflow-panel-topline", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "workflow-kicker", children: "Workflow Timeline" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "workflow-heading", children: "Debugger Coordination Flow" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "workflow-summary", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "badge badge-default", children: [
+          eventCount,
+          " events"
+        ] }),
+        blockerCount > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "badge badge-error", children: [
+          blockerCount,
+          " blockers"
+        ] }),
+        isWaitingForInput && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "badge badge-warning", children: "Awaiting input" })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "workflow-timeline", children: UI_STAGES.map((stage, index) => {
+      let stageState = "pending";
+      if (index < currentIndex) {
+        stageState = "completed";
+      } else if (index === currentIndex) {
+        if (isBlocked) {
+          stageState = "blocked";
+        } else if (isWaitingForInput) {
+          stageState = "warning";
+        } else {
+          stageState = "active";
+        }
+      }
+      return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `workflow-stage ${stageState}`, children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "stage-node", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "stage-node-icon", children: stage.icon }) }),
+        index < UI_STAGES.length - 1 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "stage-connector" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "stage-label", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "stage-name", children: stage.label }),
+          index === currentIndex && workflowState && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "stage-status", children: isBlocked ? "Blocked" : isWaitingForInput ? "Waiting for input" : "Active" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "stage-detail", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "stage-detail-title", children: stage.label }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "stage-detail-description", children: stage.description })
+        ] })
+      ] }, stage.id);
+    }) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "workflow-progress", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "progress-bar", children: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "progress-fill", style: { width: `${progress}%` } }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "progress-text", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: workflowState ? UI_STAGES[currentIndex]?.label || "Preflight" : "Preflight" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+          Math.round(progress),
+          "%"
+        ] })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "workflow-info-bar", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "info-item", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "info-item-label", children: "Current Stage:" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `info-item-value ${isBlocked ? "error" : isWaitingForInput ? "warning" : "highlight"}`, children: workflowState ? UI_STAGES[currentIndex]?.label || "Preflight" : "Preflight" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "info-item", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "info-item-label", children: "Events:" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "info-item-value success", children: eventCount })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "info-item", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "info-item-label", children: "Blockers:" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `info-item-value ${blockerCount > 0 ? "error" : "highlight"}`, children: blockerCount })
+      ] }),
+      activeAgents.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "workflow-active-agents", children: activeAgents.slice(0, 2).map((agent) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "agent-activity", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `agent-activity-avatar ${agent.role.replace(/(_agent|rdc-)/g, "").replace(/_/g, "-")}`, children: AGENT_DISPLAY_NAMES[agent.role].charAt(0) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "agent-activity-info", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "agent-activity-name", children: AGENT_DISPLAY_NAMES[agent.role] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "agent-activity-status", children: agent.message })
+        ] }),
+        (agent.status === "thinking" || agent.status === "executing") && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "agent-activity-indicator", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", {}),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", {}),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", {})
+        ] })
+      ] }, agent.role)) })
+    ] })
+  ] });
+};
+const QUICK_ACTIONS = [
+  { icon: "Investigate", label: "Trace pipeline state", prompt: "Trace the pipeline state around the failing draw call." },
+  { icon: "Compare", label: "Compare captures", prompt: "Compare the anomalous capture against the baseline and summarize differences." },
+  { icon: "Hypothesis", label: "Form hypotheses", prompt: "List the most likely hypotheses and the evidence needed to verify each one." },
+  { icon: "Report", label: "Summarize evidence", prompt: "Summarize the current evidence chain and remaining gaps." }
+];
+const SUGGESTIONS = [
+  "What is the first suspicious render event in this capture?",
+  "Which pipeline state differences are most likely to explain the artifact?",
+  "Check whether the issue is shader, resource, or pass-order related.",
+  "Summarize the next three investigation steps."
+];
+const createSystemMessage = (activeAgent, content) => ({
+  id: `sys-${Date.now()}`,
+  agentId: activeAgent,
+  role: "system",
+  content,
+  timestamp: Date.now()
+});
 const AgentChat = ({ initialAgent = "rdc-debugger" }) => {
   const [messages, setMessages] = reactExports.useState([]);
   const [inputValue, setInputValue] = reactExports.useState("");
   const [activeAgent] = reactExports.useState(initialAgent);
   const [isTyping, setIsTyping] = reactExports.useState(false);
+  const [showSuggestions, setShowSuggestions] = reactExports.useState(true);
   const messagesEndRef = reactExports.useRef(null);
+  const inputRef = reactExports.useRef(null);
+  const electronAPI = typeof window !== "undefined" ? window.electronAPI : void 0;
   const scrollToBottom = reactExports.useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
   reactExports.useEffect(() => {
     scrollToBottom();
-  }, [messages, scrollToBottom]);
+  }, [messages, isTyping, scrollToBottom]);
   reactExports.useEffect(() => {
-    if (window.electronAPI) {
-      window.electronAPI.on("agent:message", (msg) => {
-        const message = msg;
-        setMessages((prev) => [...prev, message]);
-        setIsTyping(false);
-      });
-      window.electronAPI.on("agent:statusChanged", (data) => {
-        const { status } = data;
-        if (status === "thinking") {
-          setIsTyping(true);
-        }
-      });
-    }
-  }, []);
-  const handleSend = reactExports.useCallback(async () => {
-    if (!inputValue.trim()) return;
-    const userMessage = {
-      id: `msg-${Date.now()}`,
-      agentId: activeAgent,
-      role: "user",
-      content: inputValue.trim(),
-      timestamp: Date.now()
+    if (!electronAPI) return;
+    const handleAgentMessage = (payload) => {
+      setMessages((current) => [...current, payload]);
+      setIsTyping(false);
+      setShowSuggestions(false);
     };
-    setMessages((prev) => [...prev, userMessage]);
+    const handleAgentStatusChanged = (payload) => {
+      const nextPayload = payload;
+      setIsTyping(nextPayload.status === "thinking" || nextPayload.status === "executing");
+    };
+    electronAPI.on("agent:message", handleAgentMessage);
+    electronAPI.on("agent:statusChanged", handleAgentStatusChanged);
+    return () => {
+      electronAPI.off("agent:message", handleAgentMessage);
+      electronAPI.off("agent:statusChanged", handleAgentStatusChanged);
+    };
+  }, [electronAPI]);
+  const submitMessage = reactExports.useCallback(
+    async (content) => {
+      const trimmedContent = content.trim();
+      if (!trimmedContent) return;
+      const userMessage = {
+        id: `user-${Date.now()}`,
+        agentId: activeAgent,
+        role: "user",
+        content: trimmedContent,
+        timestamp: Date.now()
+      };
+      setMessages((current) => [...current, userMessage]);
+      setInputValue("");
+      setShowSuggestions(false);
+      setIsTyping(true);
+      if (!electronAPI?.agent?.sendMessage) {
+        setMessages((current) => [
+          ...current,
+          createSystemMessage(activeAgent, "Agent backend is unavailable. Launch the chat from the Electron shell to send messages.")
+        ]);
+        setIsTyping(false);
+        return;
+      }
+      try {
+        const result = await electronAPI.agent.sendMessage(activeAgent, trimmedContent);
+        if (result.error) {
+          setMessages((current) => [...current, createSystemMessage(activeAgent, result.error || "Agent request failed.")]);
+          setIsTyping(false);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Agent request failed.";
+        setMessages((current) => [...current, createSystemMessage(activeAgent, message)]);
+        setIsTyping(false);
+      }
+    },
+    [activeAgent, electronAPI]
+  );
+  const handleSend = reactExports.useCallback(async () => {
+    await submitMessage(inputValue);
+  }, [inputValue, submitMessage]);
+  const handleKeyDown = reactExports.useCallback(
+    (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        void handleSend();
+      }
+    },
+    [handleSend]
+  );
+  const handleSuggestionClick = reactExports.useCallback((suggestion) => {
+    setInputValue(suggestion);
+    inputRef.current?.focus();
+  }, []);
+  const handleQuickAction = reactExports.useCallback(
+    async (prompt) => {
+      await submitMessage(prompt);
+    },
+    [submitMessage]
+  );
+  const formatTime = (timestamp) => {
+    return new Date(timestamp).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
+  const getAgentInitial = (agentId) => {
+    return AGENT_DISPLAY_NAMES[agentId]?.charAt(0) || "A";
+  };
+  const clearConversation = reactExports.useCallback(() => {
+    setMessages([]);
     setInputValue("");
-    setIsTyping(true);
-    if (window.electronAPI) {
-      await window.electronAPI.agent.sendMessage(activeAgent, userMessage.content);
-    }
-  }, [inputValue, activeAgent]);
-  const handleKeyDown = reactExports.useCallback((e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  }, [handleSend]);
+    setShowSuggestions(true);
+    setIsTyping(false);
+  }, []);
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "agent-chat", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "chat-messages", children: [
-      messages.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "chat-empty", children: /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Start a conversation with the agent..." }) }) : messages.map((msg) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `chat-message ${msg.role}`, children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "message-header", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "message-agent", children: msg.role === "user" ? "You" : AGENT_DISPLAY_NAMES[msg.agentId] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "message-time", children: new Date(msg.timestamp).toLocaleTimeString() })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "message-content", children: msg.content }),
-        msg.toolCalls && msg.toolCalls.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "message-tools", children: msg.toolCalls.map((tool, idx) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "tool-call", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "tool-name", children: tool.name }),
-          tool.result !== void 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "tool-result", children: "✓" })
-        ] }, idx)) })
-      ] }, msg.id)),
-      isTyping && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "chat-message assistant typing", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "message-header", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "message-agent", children: AGENT_DISPLAY_NAMES[activeAgent] }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "message-content typing-indicator", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", {}),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", {}),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", {})
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "chat-header", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "chat-header-left", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "chat-agent-selector", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "chat-agent-avatar debugger", children: getAgentInitial(activeAgent) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "chat-agent-info", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "chat-agent-name", children: AGENT_DISPLAY_NAMES[activeAgent] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "chat-agent-role", children: "Primary debugger orchestrator" })
+        ] })
+      ] }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "chat-header-actions", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button tooltip", "data-tooltip": "Clear chat", onClick: clearConversation, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M3 6h18" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" })
+      ] }) }) })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "chat-messages scrollbar-thin", children: [
+      messages.length === 0 && showSuggestions ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "chat-empty-state", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "chat-empty-icon", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { className: "chat-empty-title", children: "Start a focused debugger conversation" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "chat-empty-description", children: "Ask for stage guidance, evidence review, capture comparison, or root-cause hypotheses." }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "chat-empty-suggestions", children: SUGGESTIONS.map((suggestion) => /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "chat-suggestion-chip", onClick: () => handleSuggestionClick(suggestion), children: suggestion }, suggestion)) })
+      ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+        messages.map((message, index) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "div",
+          {
+            className: `chat-message ${message.role === "assistant" ? "assistant" : message.role === "user" ? "user" : "system"}`,
+            style: { animationDelay: `${index * 40}ms` },
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `message-avatar ${message.role === "assistant" ? "assistant" : message.role === "user" ? "user" : "system"}`, children: message.role === "user" ? /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "12", cy: "7", r: "4" })
+              ] }) : message.role === "system" ? "!" : getAgentInitial(message.agentId) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "message-content-wrapper", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "message-header", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "message-author", children: message.role === "user" ? "You" : message.role === "system" ? "System" : AGENT_DISPLAY_NAMES[message.agentId] }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "message-time", children: formatTime(message.timestamp) })
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `message-bubble ${message.role === "assistant" ? "assistant" : message.role === "user" ? "user" : "system"}`, children: message.content }),
+                message.toolCalls && message.toolCalls.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "message-tools", children: message.toolCalls.map((toolCall) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "tool-call", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "tool-call-icon", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" }) }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "tool-call-name", children: toolCall.name }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `tool-call-status ${toolCall.result !== void 0 ? "success" : "running"}`, children: toolCall.result !== void 0 ? "Done" : "Running" })
+                ] }, toolCall.id)) })
+              ] })
+            ]
+          },
+          message.id
+        )),
+        isTyping && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "typing-indicator", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "message-avatar assistant", children: getAgentInitial(activeAgent) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "typing-bubble", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", {}),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", {}),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", {})
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "typing-text", children: [
+            AGENT_DISPLAY_NAMES[activeAgent],
+            " is reasoning..."
+          ] })
         ] })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsx("div", { ref: messagesEndRef })
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "chat-input", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx(
-        "textarea",
-        {
-          value: inputValue,
-          onChange: (e) => setInputValue(e.target.value),
-          onKeyDown: handleKeyDown,
-          placeholder: "Type your message...",
-          rows: 3
-        }
-      ),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "input-actions", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
-        "button",
-        {
-          className: "button button-primary",
-          onClick: handleSend,
-          disabled: !inputValue.trim() || isTyping,
-          children: "Send"
-        }
-      ) })
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "chat-quick-actions", children: QUICK_ACTIONS.map((action) => /* @__PURE__ */ jsxRuntimeExports.jsxs("button", { className: "quick-action", onClick: () => void handleQuickAction(action.prompt), children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "quick-action-copy", children: action.icon }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: action.label })
+    ] }, action.label)) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "chat-input-container", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "chat-input-wrapper", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "textarea",
+          {
+            ref: inputRef,
+            className: "chat-input",
+            value: inputValue,
+            onChange: (event) => setInputValue(event.target.value),
+            onKeyDown: handleKeyDown,
+            placeholder: "Ask the debugger to inspect, compare, or summarize the current evidence...",
+            rows: 1
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "chat-input-actions", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "chat-send-button", onClick: () => void handleSend(), disabled: !inputValue.trim() || isTyping, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "22", y1: "2", x2: "11", y2: "13" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("polygon", { points: "22 2 15 22 11 13 2 9 22 2" })
+        ] }) }) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "chat-input-hint", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("kbd", { children: "Enter" }),
+          " send"
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("kbd", { children: "Shift" }),
+          " + ",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("kbd", { children: "Enter" }),
+          " newline"
+        ] })
+      ] })
     ] })
   ] });
+};
+const EVENT_TYPE_CONFIG = {
+  dispatch: { label: "Dispatch", dotClass: "dispatch" },
+  tool_execution: { label: "Tool", dotClass: "tool_execution" },
+  artifact_write: { label: "Artifact", dotClass: "artifact_write" },
+  quality_check: { label: "Quality", dotClass: "quality_check" },
+  workflow_stage_transition: { label: "Stage", dotClass: "workflow_stage_transition" },
+  process_deviation: { label: "Deviation", dotClass: "process_deviation" },
+  counterfactual_submitted: { label: "Counter", dotClass: "counterfactual_submitted" },
+  counterfactual_reviewed: { label: "Review", dotClass: "counterfactual_reviewed" },
+  conflict_resolved: { label: "Conflict", dotClass: "conflict_resolved" }
+};
+const FILTER_OPTIONS = [
+  { type: "all", label: "All" },
+  { type: "dispatch", label: "Dispatch" },
+  { type: "tool_execution", label: "Tools" },
+  { type: "artifact_write", label: "Artifacts" },
+  { type: "quality_check", label: "Quality" },
+  { type: "workflow_stage_transition", label: "Stages" },
+  { type: "process_deviation", label: "Deviations" }
+];
+const toEventTitle = (event) => {
+  switch (event.event_type) {
+    case "dispatch":
+      return `Dispatch to ${String(event.payload.target_agent || event.agent_id)}`;
+    case "tool_execution":
+      return `Tool execution: ${String(event.payload.tool_name || "unknown tool")}`;
+    case "artifact_write":
+      return `Artifact write: ${String(event.payload.artifact_name || event.payload.path || "artifact")}`;
+    case "workflow_stage_transition":
+      return `Transition to ${String(event.payload.to_stage || "next stage")}`;
+    case "process_deviation":
+      return `Deviation: ${String(event.payload.reason || "workflow exception")}`;
+    case "quality_check":
+      return `Quality check: ${String(event.payload.check || event.status)}`;
+    default:
+      return EVENT_TYPE_CONFIG[event.event_type]?.label || event.event_type;
+  }
 };
 const EvidencePanel = ({ filterType }) => {
   const [events, setEvents] = reactExports.useState([]);
   const [selectedEvent, setSelectedEvent] = reactExports.useState(null);
+  const [activeFilter, setActiveFilter] = reactExports.useState(filterType ?? "all");
+  const electronAPI = typeof window !== "undefined" ? window.electronAPI : void 0;
+  reactExports.useEffect(() => {
+    setActiveFilter(filterType ?? "all");
+  }, [filterType]);
   reactExports.useEffect(() => {
     const loadEvidence = async () => {
-      if (window.electronAPI) {
-        const chain = await window.electronAPI.evidence.getChain();
-        let filteredEvents = chain.events || [];
-        if (filterType) {
-          filteredEvents = filteredEvents.filter((e) => e.event_type === filterType);
-        }
-        setEvents(filteredEvents);
+      if (!electronAPI?.evidence?.getChain) return;
+      try {
+        const chain = await electronAPI.evidence.getChain();
+        setEvents(chain.events || []);
+      } catch (error) {
+        console.warn("Failed to load evidence chain:", error);
       }
     };
     loadEvidence();
-    if (window.electronAPI) {
-      window.electronAPI.on("evidence:eventAdded", () => {
-        loadEvidence();
-      });
-    }
-  }, [filterType]);
-  const getEventTypeColor = (type) => {
-    const colors = {
-      dispatch: "#3b82f6",
-      tool_execution: "#10b981",
-      artifact_write: "#8b5cf6",
-      quality_check: "#f59e0b",
-      workflow_stage_transition: "#6366f1",
-      process_deviation: "#ef4444",
-      counterfactual_submitted: "#ec4899",
-      counterfactual_reviewed: "#14b8a6",
-      conflict_resolved: "#f97316"
+  }, [electronAPI]);
+  reactExports.useEffect(() => {
+    if (!electronAPI) return;
+    const handleEvidenceAdded = (nextEvent) => {
+      setEvents((current) => [...current, nextEvent]);
     };
-    return colors[type] || "#6b6b80";
-  };
-  const formatTime = (ts) => {
-    return new Date(ts).toLocaleTimeString("en-US", {
+    electronAPI.on("evidence:eventAdded", handleEvidenceAdded);
+    return () => {
+      electronAPI.off("evidence:eventAdded", handleEvidenceAdded);
+    };
+  }, [electronAPI]);
+  const filteredEvents = reactExports.useMemo(() => {
+    if (activeFilter === "all") return events;
+    return events.filter((event) => event.event_type === activeFilter);
+  }, [activeFilter, events]);
+  const groupedEvents = reactExports.useMemo(() => {
+    return filteredEvents.reduce((groups, event) => {
+      const dateLabel = new Date(event.ts_ms).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric"
+      });
+      groups[dateLabel] ??= [];
+      groups[dateLabel].push(event);
+      return groups;
+    }, {});
+  }, [filteredEvents]);
+  const formatTime = (timestamp) => {
+    return new Date(timestamp).toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit"
     });
   };
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "evidence-panel panel", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "panel-header", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Evidence Chain" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "event-count", children: [
-        events.length,
-        " events"
-      ] })
-    ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "panel-content", children: events.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "empty-state", children: /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "No evidence events recorded" }) }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "event-timeline", children: events.map((event) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
-      "div",
-      {
-        className: `event-item ${selectedEvent?.event_id === event.event_id ? "selected" : ""}`,
-        onClick: () => setSelectedEvent(event),
-        children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "div",
-            {
-              className: "event-type-badge",
-              style: { backgroundColor: getEventTypeColor(event.event_type) },
-              children: event.event_type.replace(/_/g, " ").slice(0, 3).toUpperCase()
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "event-info", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "event-agent", children: event.agent_id }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "event-time", children: formatTime(event.ts_ms) })
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `event-status ${event.status}`, children: event.status })
-        ]
-      },
-      event.event_id
-    )) }) }),
-    selectedEvent && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "event-detail", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "detail-header", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Event Detail" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "close-btn", onClick: () => setSelectedEvent(null), children: "×" })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "detail-content", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "detail-row", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "label", children: "Event ID:" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "value code", children: selectedEvent.event_id })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "detail-row", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "label", children: "Type:" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "value", children: selectedEvent.event_type })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "detail-row", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "label", children: "Agent:" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "value", children: selectedEvent.agent_id })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "detail-row", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "label", children: "Status:" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `value status-${selectedEvent.status}`, children: selectedEvent.status })
-        ] }),
-        Object.keys(selectedEvent.payload).length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "detail-payload", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "label", children: "Payload:" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("pre", { children: JSON.stringify(selectedEvent.payload, null, 2) })
-        ] })
-      ] })
-    ] })
-  ] });
-};
-const ArtifactViewer = () => {
-  const [artifacts, setArtifacts] = reactExports.useState([]);
-  const [selectedArtifact, setSelectedArtifact] = reactExports.useState(null);
-  const [content, setContent] = reactExports.useState("");
-  reactExports.useEffect(() => {
-    setArtifacts([
-      { name: "entry_gate.yaml", path: "artifacts/entry_gate.yaml", type: "yaml", size: 1024, modified: "2024-01-01" },
-      { name: "intake_gate.yaml", path: "artifacts/intake_gate.yaml", type: "yaml", size: 512, modified: "2024-01-01" },
-      { name: "runtime_topology.yaml", path: "artifacts/runtime_topology.yaml", type: "yaml", size: 2048, modified: "2024-01-01" },
-      { name: "hypothesis_board.yaml", path: "notes/hypothesis_board.yaml", type: "yaml", size: 1536, modified: "2024-01-01" }
-    ]);
-  }, []);
-  const loadContent = async (artifact) => {
-    setSelectedArtifact(artifact);
-    setContent(`# ${artifact.name}
-
-Content will be loaded from file system...`);
-  };
-  const getFileIcon = (type) => {
-    switch (type) {
-      case "yaml":
-      case "json":
-        return /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "evidence-panel", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "evidence-panel-header", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "evidence-panel-title", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "evidence-panel-title-icon", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "14 2 14 8 20 8" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "16", y1: "13", x2: "8", y2: "13" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "16", y1: "17", x2: "8", y2: "17" })
-        ] });
-      case "md":
-        return /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "14 2 14 8 20 8" })
-        ] });
-      case "image":
-        return /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2", ry: "2" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "8.5", cy: "8.5", r: "1.5" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "21 15 16 10 5 21" })
-        ] });
-      default:
-        return /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "13 2 13 9 20 9" })
-        ] });
-    }
-  };
-  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "artifact-viewer panel", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "panel-header", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Artifacts" }) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "panel-content", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "artifact-list", children: artifacts.map((artifact) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Evidence Chain" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "evidence-count", children: filteredEvents.length })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button tooltip", "data-tooltip": "Export unavailable", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "7 10 12 15 17 10" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "12", y1: "15", x2: "12", y2: "3" })
+      ] }) })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "evidence-filter-bar", children: FILTER_OPTIONS.map((option) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "button",
+      {
+        className: `filter-chip ${activeFilter === option.type ? "active" : ""}`,
+        onClick: () => setActiveFilter(option.type),
+        children: [
+          option.type !== "all" && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `filter-chip-dot ${EVENT_TYPE_CONFIG[option.type].dotClass}` }),
+          option.label
+        ]
+      },
+      option.type
+    )) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "evidence-timeline scrollbar-thin", children: filteredEvents.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "evidence-empty-state", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "evidence-empty-icon", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "14 2 14 8 20 8" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "evidence-empty-title", children: "No evidence events yet" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "evidence-empty-description", children: "Workflow actions, tool runs, and stage transitions will appear here." })
+    ] }) : Object.entries(groupedEvents).map(([dateLabel, dateEvents]) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "timeline-date-group", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "timeline-date-header", children: dateLabel }),
+      dateEvents.map((event, index) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
         "div",
         {
-          className: `artifact-item ${selectedArtifact?.path === artifact.path ? "selected" : ""}`,
-          onClick: () => loadContent(artifact),
+          className: `event-item ${EVENT_TYPE_CONFIG[event.event_type].dotClass} ${selectedEvent?.event_id === event.event_id ? "selected" : ""}`,
+          onClick: () => setSelectedEvent(event),
           children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "artifact-icon", children: getFileIcon(artifact.type) }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "artifact-name", children: artifact.name })
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "event-timeline-line", children: [
+              index > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "event-timeline-connector" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "event-timeline-dot" }),
+              index < dateEvents.length - 1 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "event-timeline-connector" })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "event-content", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "event-header", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `event-type-badge ${EVENT_TYPE_CONFIG[event.event_type].dotClass}`, children: EVENT_TYPE_CONFIG[event.event_type].label }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "event-time", children: formatTime(event.ts_ms) })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "event-title", children: toEventTitle(event) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "event-agent", children: event.agent_id }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `event-status ${event.status}`, children: event.status })
+            ] })
           ]
         },
-        artifact.path
-      )) }),
-      selectedArtifact && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "artifact-preview", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "preview-header", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: selectedArtifact.name }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "preview-size", children: [
-            selectedArtifact.size,
-            " bytes"
-          ] })
+        event.event_id
+      ))
+    ] }, dateLabel)) }),
+    selectedEvent && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "event-detail-panel", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "event-detail-header", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "event-detail-title", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "12", cy: "12", r: "10" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "12", y1: "16", x2: "12", y2: "12" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "12", y1: "8", x2: "12.01", y2: "8" })
+          ] }),
+          "Event Details"
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "preview-content", children: /* @__PURE__ */ jsxRuntimeExports.jsx("pre", { children: content }) })
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "event-detail-close", onClick: () => setSelectedEvent(null), children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "18", y1: "6", x2: "6", y2: "18" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "6", y1: "6", x2: "18", y2: "18" })
+        ] }) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "event-detail-content", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "detail-row", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "detail-label", children: "Event" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "detail-value", children: selectedEvent.event_id })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "detail-row", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "detail-label", children: "Type" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "detail-value highlight", children: EVENT_TYPE_CONFIG[selectedEvent.event_type].label })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "detail-row", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "detail-label", children: "Agent" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "detail-value", children: selectedEvent.agent_id })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "detail-row", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "detail-label", children: "Status" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `detail-value ${selectedEvent.status}`, children: selectedEvent.status })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "detail-row", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "detail-label", children: "Timestamp" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "detail-value", children: new Date(selectedEvent.ts_ms).toLocaleString() })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "detail-payload", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "detail-payload-label", children: "Payload" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "detail-payload-content", children: /* @__PURE__ */ jsxRuntimeExports.jsx("pre", { children: JSON.stringify(selectedEvent.payload, null, 2) }) })
+        ] })
       ] })
     ] })
   ] });
 };
-const DebuggerPage = () => {
+const inferFileType = (path) => {
+  const extension = path.split(".").pop()?.toLowerCase();
+  if (!extension) return "other";
+  if (extension === "yaml" || extension === "yml") return "yaml";
+  if (extension === "json" || extension === "jsonl") return "json";
+  if (extension === "md") return "md";
+  if (["png", "jpg", "jpeg", "webp", "bmp"].includes(extension)) return "image";
+  return "other";
+};
+const getArtifactPath = (event) => {
+  return String(
+    event.payload.path || event.payload.artifact_path || event.payload.output_path || event.payload.url || event.payload.artifact_name || "unknown-artifact"
+  );
+};
+const getArtifactName = (path) => {
+  const name = path.split(/[/\\]/).pop();
+  return name || path;
+};
+const FILE_ICONS = {
+  yaml: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "14 2 14 8 20 8" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 12h8" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 16h6" })
+  ] }),
+  json: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "14 2 14 8 20 8" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M8 12h.01" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M12 12h.01" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M16 12h.01" })
+  ] }),
+  md: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "14 2 14 8 20 8" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M9 12h6" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M9 16h6" })
+  ] }),
+  image: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2", ry: "2" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "8.5", cy: "8.5", r: "1.5" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "21 15 16 10 5 21" })
+  ] }),
+  other: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "14 2 14 8 20 8" })
+  ] })
+};
+const ArtifactViewer = () => {
+  const [artifactEvents, setArtifactEvents] = reactExports.useState([]);
+  const [selectedArtifactId, setSelectedArtifactId] = reactExports.useState(null);
+  const [viewMode, setViewMode] = reactExports.useState("list");
+  const [searchQuery, setSearchQuery] = reactExports.useState("");
+  const electronAPI = typeof window !== "undefined" ? window.electronAPI : void 0;
+  reactExports.useEffect(() => {
+    const loadArtifacts = async () => {
+      if (!electronAPI?.evidence?.getChain) return;
+      try {
+        const evidenceChain = await electronAPI.evidence.getChain();
+        setArtifactEvents(evidenceChain.events.filter((event) => event.event_type === "artifact_write"));
+      } catch (error) {
+        console.warn("Failed to load artifact events:", error);
+      }
+    };
+    loadArtifacts();
+  }, [electronAPI]);
+  reactExports.useEffect(() => {
+    if (!electronAPI) return;
+    const handleEvidenceAdded = (payload) => {
+      const nextEvent = payload;
+      if (nextEvent.event_type === "artifact_write") {
+        setArtifactEvents((current) => [...current, nextEvent]);
+      }
+    };
+    electronAPI.on("evidence:eventAdded", handleEvidenceAdded);
+    return () => {
+      electronAPI.off("evidence:eventAdded", handleEvidenceAdded);
+    };
+  }, [electronAPI]);
+  const artifacts = reactExports.useMemo(() => {
+    const byPath = /* @__PURE__ */ new Map();
+    artifactEvents.forEach((event) => {
+      const path = getArtifactPath(event);
+      const nextArtifact = {
+        id: event.event_id,
+        name: getArtifactName(path),
+        path,
+        type: inferFileType(path),
+        size: typeof event.payload.size_bytes === "number" ? event.payload.size_bytes : void 0,
+        modified: event.ts_ms,
+        payload: event.payload
+      };
+      const currentArtifact = byPath.get(path);
+      if (!currentArtifact || currentArtifact.modified < nextArtifact.modified) {
+        byPath.set(path, nextArtifact);
+      }
+    });
+    return Array.from(byPath.values()).sort((left, right) => right.modified - left.modified);
+  }, [artifactEvents]);
+  const filteredArtifacts = reactExports.useMemo(() => {
+    return artifacts.filter((artifact) => artifact.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [artifacts, searchQuery]);
+  const selectedArtifact = reactExports.useMemo(
+    () => filteredArtifacts.find((artifact) => artifact.id === selectedArtifactId) ?? artifacts.find((artifact) => artifact.id === selectedArtifactId) ?? null,
+    [artifacts, filteredArtifacts, selectedArtifactId]
+  );
+  const formatFileSize = (size) => {
+    if (!size) return "--";
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  };
+  const formatDate = (timestamp) => {
+    return new Date(timestamp).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "artifact-viewer", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "artifact-viewer-header", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "artifact-viewer-title", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "artifact-viewer-title-icon", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Artifacts" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "artifact-viewer-actions", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "view-mode-toggle", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: `view-mode-btn ${viewMode === "grid" ? "active" : ""}`, onClick: () => setViewMode("grid"), children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "3", y: "3", width: "7", height: "7" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "14", y: "3", width: "7", height: "7" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "14", y: "14", width: "7", height: "7" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("rect", { x: "3", y: "14", width: "7", height: "7" })
+        ] }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: `view-mode-btn ${viewMode === "list" ? "active" : ""}`, onClick: () => setViewMode("list"), children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "8", y1: "6", x2: "21", y2: "6" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "8", y1: "12", x2: "21", y2: "12" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "8", y1: "18", x2: "21", y2: "18" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "3", y1: "6", x2: "3.01", y2: "6" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "3", y1: "12", x2: "3.01", y2: "12" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "3", y1: "18", x2: "3.01", y2: "18" })
+        ] }) })
+      ] }) })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "artifact-toolbar", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "artifact-breadcrumb", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "breadcrumb-item", children: "workspace" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "breadcrumb-item", children: "current_case" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "breadcrumb-item", children: "artifacts" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "artifact-search", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "artifact-search-icon", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "11", cy: "11", r: "8" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "m21 21-4.35-4.35" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "input",
+          {
+            type: "text",
+            value: searchQuery,
+            onChange: (event) => setSearchQuery(event.target.value),
+            placeholder: "Search artifacts..."
+          }
+        )
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "artifact-viewer-content", children: selectedArtifact ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "file-preview", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "file-preview-header", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "file-preview-info", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "file-preview-name", children: selectedArtifact.name }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "file-preview-meta", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: formatFileSize(selectedArtifact.size) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "•" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: formatDate(selectedArtifact.modified) })
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button", onClick: () => setSelectedArtifactId(null), children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "18", y1: "6", x2: "6", y2: "18" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "6", y1: "6", x2: "18", y2: "18" })
+        ] }) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "file-preview-content", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "artifact-preview-meta", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "artifact-preview-row", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "artifact-preview-label", children: "Path" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "artifact-preview-value", children: selectedArtifact.path })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "artifact-preview-row", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "artifact-preview-label", children: "Type" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "artifact-preview-value", children: selectedArtifact.type })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "artifact-preview-row", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "artifact-preview-label", children: "Preview" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "artifact-preview-value", children: "File system preview is not exposed yet. Showing evidence payload." })
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "code-preview", children: /* @__PURE__ */ jsxRuntimeExports.jsx("pre", { children: JSON.stringify(selectedArtifact.payload, null, 2) }) })
+      ] })
+    ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "file-list", children: filteredArtifacts.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "artifact-empty-state", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "artifact-empty-icon", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "artifact-empty-title", children: "No artifacts available" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "artifact-empty-description", children: "Artifact cards will appear here once the workflow writes outputs into the evidence chain." })
+    ] }) : viewMode === "grid" ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "file-list-grid", children: filteredArtifacts.map((artifact) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "file-card", onClick: () => setSelectedArtifactId(artifact.id), children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: `file-card-icon ${artifact.type}`, children: FILE_ICONS[artifact.type] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "file-card-name", children: artifact.name }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "file-card-meta", children: formatFileSize(artifact.size) })
+    ] }, artifact.id)) }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("table", { className: "file-list-table", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("thead", { children: /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("th", { children: "Name" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("th", { children: "Size" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("th", { children: "Modified" })
+      ] }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("tbody", { children: filteredArtifacts.map((artifact) => /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { className: "file-list-row", onClick: () => setSelectedArtifactId(artifact.id), children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("td", { children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "file-list-cell-name", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `file-list-cell-icon file-${artifact.type}`, children: FILE_ICONS[artifact.type] }),
+          artifact.name
+        ] }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("td", { children: formatFileSize(artifact.size) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("td", { children: formatDate(artifact.modified) })
+      ] }, artifact.id)) })
+    ] }) }) })
+  ] });
+};
+const addUniquePaths = (currentPaths, nextPaths) => {
+  const existing = new Set(currentPaths);
+  const merged = [...currentPaths];
+  nextPaths.forEach((path) => {
+    if (!existing.has(path)) {
+      existing.add(path);
+      merged.push(path);
+    }
+  });
+  return merged;
+};
+const getPathFileName = (path) => {
+  return path.split(/[/\\]/).pop() || path;
+};
+const DebuggerPage = ({
+  importRequest,
+  openPickerSignal = 0,
+  resetSignal = 0,
+  onSessionStateChange,
+  onError
+}) => {
   const [hasStarted, setHasStarted] = reactExports.useState(false);
   const [capturePaths, setCapturePaths] = reactExports.useState([]);
-  const handleFileSelect = reactExports.useCallback(async () => {
-    if (window.electronAPI) {
-      const paths = await window.electronAPI.selectRdcFiles();
-      if (paths && paths.length > 0) {
-        setCapturePaths(paths);
+  const [isDragging, setIsDragging] = reactExports.useState(false);
+  const [isStarting, setIsStarting] = reactExports.useState(false);
+  const [startError, setStartError] = reactExports.useState(null);
+  const [browserModeNotice, setBrowserModeNotice] = reactExports.useState(null);
+  const electronAPI = typeof window !== "undefined" ? window.electronAPI : void 0;
+  const syncFooterState = reactExports.useCallback(
+    (state) => {
+      onSessionStateChange?.({
+        contextLabel: state?.caseId ? `Case ${state.caseId}` : "--",
+        sessionLabel: state?.sessionId ? state.sessionId : "--"
+      });
+    },
+    [onSessionStateChange]
+  );
+  reactExports.useEffect(() => {
+    const hydrateWorkflow = async () => {
+      if (!electronAPI?.workflow?.getState) return;
+      try {
+        const workflowState = await electronAPI.workflow.getState();
+        if (!workflowState?.sessionId) return;
+        setHasStarted(true);
+        syncFooterState({
+          caseId: workflowState.caseId,
+          sessionId: workflowState.sessionId
+        });
+      } catch (error) {
+        console.warn("Failed to hydrate workflow state:", error);
       }
-    }
-  }, []);
-  const handleStart = reactExports.useCallback(async () => {
-    if (capturePaths.length === 0) {
-      alert("Please select at least one .rdc file");
+    };
+    hydrateWorkflow();
+  }, [electronAPI, syncFooterState]);
+  reactExports.useEffect(() => {
+    if (!importRequest?.files?.length) return;
+    setCapturePaths((current) => addUniquePaths(current, importRequest.files));
+    setStartError(null);
+  }, [importRequest]);
+  reactExports.useEffect(() => {
+    if (openPickerSignal === 0) return;
+    void (async () => {
+      if (!electronAPI?.selectRdcFiles) {
+        const message = "File selection is only available inside the Electron shell.";
+        setBrowserModeNotice(message);
+        onError?.(message);
+        return;
+      }
+      try {
+        const selectedPaths = await electronAPI.selectRdcFiles();
+        if (selectedPaths?.length) {
+          setCapturePaths((current) => addUniquePaths(current, selectedPaths));
+          setStartError(null);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to select .rdc files.";
+        setStartError(message);
+        onError?.(message);
+      }
+    })();
+  }, [electronAPI, onError, openPickerSignal]);
+  reactExports.useEffect(() => {
+    if (resetSignal === 0) return;
+    setHasStarted(false);
+    setCapturePaths([]);
+    setIsDragging(false);
+    setIsStarting(false);
+    setStartError(null);
+    setBrowserModeNotice(null);
+    syncFooterState();
+  }, [resetSignal, syncFooterState]);
+  const handleFileSelect = reactExports.useCallback(async () => {
+    if (!electronAPI?.selectRdcFiles) {
+      const message = "File selection is only available inside the Electron shell.";
+      setBrowserModeNotice(message);
+      onError?.(message);
       return;
     }
-    if (window.electronAPI) {
-      await window.electronAPI.workflow.start(capturePaths, "Debug rendering issue");
+    try {
+      const selectedPaths = await electronAPI.selectRdcFiles();
+      if (selectedPaths?.length) {
+        setCapturePaths((current) => addUniquePaths(current, selectedPaths));
+        setStartError(null);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to select .rdc files.";
+      setStartError(message);
+      onError?.(message);
+    }
+  }, [electronAPI, onError]);
+  const handleStart = reactExports.useCallback(async () => {
+    if (capturePaths.length === 0 || !electronAPI?.workflow?.start) {
+      const message = "Workflow backend is unavailable. Start this UI from the Electron app.";
+      setStartError(message);
+      onError?.(message);
+      return;
+    }
+    setIsStarting(true);
+    setStartError(null);
+    try {
+      const result = await electronAPI.workflow.start(capturePaths, "Debug rendering issue");
+      if (!result.success) {
+        const message = result.error || "Failed to start debug session.";
+        setStartError(message);
+        onError?.(message);
+        return;
+      }
       setHasStarted(true);
+      syncFooterState({
+        caseId: result.caseId,
+        sessionId: "sessionId" in result && typeof result.sessionId === "string" ? result.sessionId : void 0
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to start debug session.";
+      setStartError(message);
+      onError?.(message);
+    } finally {
+      setIsStarting(false);
     }
-  }, [capturePaths]);
-  const handleDrop = reactExports.useCallback((e) => {
-    e.preventDefault();
-    const files = Array.from(e.dataTransfer.files).filter((f2) => f2.name.endsWith(".rdc")).map((f2) => f2.path);
-    if (files.length > 0) {
-      setCapturePaths((prev) => [...prev, ...files]);
+  }, [capturePaths, electronAPI, onError, syncFooterState]);
+  const handleRemoveFile = reactExports.useCallback((pathToRemove) => {
+    setCapturePaths((current) => current.filter((path) => path !== pathToRemove));
+  }, []);
+  const handleDrop = reactExports.useCallback((event) => {
+    event.preventDefault();
+    setIsDragging(false);
+    const nextPaths = Array.from(event.dataTransfer.files).map((file) => {
+      const fileWithPath = file;
+      return fileWithPath.path || file.name;
+    }).filter((path) => path.toLowerCase().endsWith(".rdc"));
+    if (nextPaths.length > 0) {
+      setCapturePaths((current) => addUniquePaths(current, nextPaths));
+      setStartError(null);
     }
   }, []);
-  const handleDragOver = reactExports.useCallback((e) => {
-    e.preventDefault();
+  const handleDragOver = reactExports.useCallback((event) => {
+    event.preventDefault();
+    setIsDragging(true);
   }, []);
+  const handleDragLeave = reactExports.useCallback((event) => {
+    event.preventDefault();
+    setIsDragging(false);
+  }, []);
+  const selectedFiles = reactExports.useMemo(
+    () => capturePaths.map((path) => ({
+      path,
+      name: getPathFileName(path)
+    })),
+    [capturePaths]
+  );
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "debugger-page", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx(WorkflowPanel, {}),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "debugger-main", children: !hasStarted ? (
-      // 欢迎/初始化界面
-      /* @__PURE__ */ jsxRuntimeExports.jsx(
-        "div",
-        {
-          className: "welcome-container",
-          onDrop: handleDrop,
-          onDragOver: handleDragOver,
-          children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "welcome-content", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { children: "Welcome to RdcAgent" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Upload a RenderDoc capture file to start debugging" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "upload-area", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "upload-icon", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "48", height: "48", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", children: [
+    !hasStarted ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "welcome-screen", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "welcome-backdrop" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "welcome-grid" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "welcome-content", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "welcome-logo", children: "RD" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "welcome-kicker", children: "Debugger Workspace" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("h1", { className: "welcome-title", children: [
+          "Welcome to ",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "RDC Agent" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "welcome-subtitle", children: "Upload one or more RenderDoc captures, then launch a guided multi-agent debug workflow." }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "div",
+          {
+            className: `upload-zone ${isDragging ? "drag-over" : ""}`,
+            onDrop: handleDrop,
+            onDragOver: handleDragOver,
+            onDragLeave: handleDragLeave,
+            onClick: () => {
+              void handleFileSelect();
+            },
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { className: "upload-zone-icon", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "17 8 12 3 7 8" }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "12", y1: "3", x2: "12", y2: "15" })
-              ] }) }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Drag & drop .rdc files here" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button button-primary", onClick: handleFileSelect, children: "Select Files" })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "upload-zone-text", children: isDragging ? "Drop .rdc captures here" : "Drag and drop .rdc captures" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "upload-zone-hint", children: "or click to browse your workspace" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                "button",
+                {
+                  className: "button button-primary upload-zone-button",
+                  onClick: (event) => {
+                    event.stopPropagation();
+                    void handleFileSelect();
+                  },
+                  children: "Select Files"
+                }
+              )
+            ]
+          }
+        ),
+        browserModeNotice && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "debugger-inline-notice", children: browserModeNotice }),
+        startError && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "debugger-inline-error", children: startError }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "welcome-lower", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "selected-files", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "selected-files-header", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "selected-files-title", children: "Selected Files" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "selected-files-count", children: selectedFiles.length })
             ] }),
-            capturePaths.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "selected-files", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("h3", { children: "Selected Files:" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("ul", { children: capturePaths.map((path, index) => /* @__PURE__ */ jsxRuntimeExports.jsx("li", { children: path.split(/[/\\]/).pop() }, index)) }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button button-primary", onClick: handleStart, children: "Start Debug Session" })
-            ] })
+            selectedFiles.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "selected-files-empty", children: "No capture files selected yet. Add anomalous and baseline captures to begin." }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "file-list", children: selectedFiles.map((file) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "file-item", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "file-item-icon", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("polyline", { points: "14 2 14 8 20 8" })
+              ] }) }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "file-item-info", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "file-item-name", children: file.name }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "file-item-path", children: file.path })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "file-item-remove", onClick: () => handleRemoveFile(file.path), children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "18", y1: "6", x2: "6", y2: "18" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "6", y1: "6", x2: "18", y2: "18" })
+              ] }) })
+            ] }, file.path)) })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "start-session-btn", onClick: () => void handleStart(), disabled: capturePaths.length === 0 || isStarting, children: isStarting ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "start-session-spinner" }),
+            "Starting Session..."
+          ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { className: "start-session-btn-icon", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: /* @__PURE__ */ jsxRuntimeExports.jsx("polygon", { points: "5 3 19 12 5 21 5 3" }) }),
+            "Start Debug Session"
+          ] }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "recent-sessions", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "recent-sessions-title", children: "Recent Sessions" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "recent-sessions-empty", children: "Recent session history is not wired yet. New sessions will appear here once persistence is available." })
           ] })
-        }
-      )
-    ) : (
-      // 调试界面
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "debugger-workspace", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "workspace-left", children: /* @__PURE__ */ jsxRuntimeExports.jsx(AgentChat, {}) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "workspace-right", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(EvidencePanel, {}),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(ArtifactViewer, {})
         ] })
       ] })
-    ) })
+    ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "debugger-workspace", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "workspace-main", children: /* @__PURE__ */ jsxRuntimeExports.jsx(AgentChat, {}) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "workspace-center", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "workspace-center-panel", children: /* @__PURE__ */ jsxRuntimeExports.jsx(EvidencePanel, {}) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "workspace-center-panel workspace-center-panel-bottom", children: /* @__PURE__ */ jsxRuntimeExports.jsx(ArtifactViewer, {}) })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "workspace-right", children: /* @__PURE__ */ jsxRuntimeExports.jsx(ArtifactViewer, {}) })
+    ] })
   ] });
 };
 const AnalyzerPage = () => {
-  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "placeholder-page", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "placeholder-content", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "placeholder-icon", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "64", height: "64", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" }) }) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { children: "Analyzer" }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Capture analysis and pipeline reconstruction" }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "placeholder-status", children: "Coming Soon" })
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "feature-placeholder", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "feature-placeholder-card", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "feature-placeholder-icon", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "34", height: "34", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" }) }) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "feature-placeholder-title", children: "Analyzer" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "feature-placeholder-description", children: "Pipeline reconstruction, capture correlation, and bottleneck surfacing will land here next." }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "feature-placeholder-status", children: "Coming Soon" })
   ] }) });
 };
 const OptimizerPage = () => {
-  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "placeholder-page", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "placeholder-content", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "placeholder-icon", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "64", height: "64", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M13 10V3L4 14h7v7l9-11h-7z" }) }) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { children: "Optimizer" }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Performance analysis and bottleneck identification" }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "placeholder-status", children: "Coming Soon" })
+  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "feature-placeholder", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "feature-placeholder-card", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "feature-placeholder-icon", children: /* @__PURE__ */ jsxRuntimeExports.jsx("svg", { width: "34", height: "34", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", children: /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M13 10V3L4 14h7v7l9-11h-7z" }) }) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "feature-placeholder-title", children: "Optimizer" }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "feature-placeholder-description", children: "Performance diagnosis, render cost ranking, and action-ready tuning guidance will be introduced here." }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "feature-placeholder-status", children: "Coming Soon" })
   ] }) });
 };
+const TABS = [
+  { id: "debugger", label: "Debugger", badge: "Active" },
+  { id: "analyzer", label: "Analyzer", disabled: true },
+  { id: "optimizer", label: "Optimizer", disabled: true }
+];
 const App = () => {
   const [activeTab, setActiveTab] = reactExports.useState("debugger");
   const [isLoading, setIsLoading] = reactExports.useState(true);
+  const [connectionStatus, setConnectionStatus] = reactExports.useState("offline");
+  const [appVersion, setAppVersion] = reactExports.useState("1.0.0");
+  const [llmProvider, setLlmProvider] = reactExports.useState("OpenRouter");
+  const [windowMaximized, setWindowMaximized] = reactExports.useState(false);
+  const [shellNotice, setShellNotice] = reactExports.useState(null);
+  const [debuggerImportRequest, setDebuggerImportRequest] = reactExports.useState(null);
+  const [debuggerPickerSignal, setDebuggerPickerSignal] = reactExports.useState(0);
+  const [debuggerResetSignal, setDebuggerResetSignal] = reactExports.useState(0);
+  const [footerState, setFooterState] = reactExports.useState({
+    contextLabel: "--",
+    sessionLabel: "--"
+  });
+  const electronAPI = typeof window !== "undefined" ? window.electronAPI : void 0;
+  const showNotice = reactExports.useCallback((message) => {
+    setShellNotice(message);
+  }, []);
+  reactExports.useEffect(() => {
+    if (!shellNotice) return;
+    const timeoutId = window.setTimeout(() => {
+      setShellNotice(null);
+    }, 3200);
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [shellNotice]);
   reactExports.useEffect(() => {
     const initApp = async () => {
       try {
-        if (window.electronAPI) {
-          console.log("Electron API available");
-          const settings = await window.electronAPI.settings.get();
-          console.log("Settings loaded:", settings);
+        if (electronAPI) {
+          const [settings, appMeta, isMaximized] = await Promise.all([
+            electronAPI.settings.get(),
+            electronAPI.appMeta.get(),
+            electronAPI.windowControls.isMaximized()
+          ]);
+          setLlmProvider(settings.llm.defaultProvider || "OpenRouter");
+          setAppVersion(appMeta.version || "1.0.0");
+          setWindowMaximized(isMaximized);
+          setConnectionStatus("connected");
+        } else {
+          setConnectionStatus("offline");
         }
       } catch (error) {
-        console.error("Failed to initialize app:", error);
+        console.error("Failed to initialize app shell:", error);
+        setConnectionStatus("degraded");
       } finally {
-        setIsLoading(false);
+        window.setTimeout(() => setIsLoading(false), 320);
       }
     };
     initApp();
+  }, [electronAPI]);
+  reactExports.useEffect(() => {
+    if (!electronAPI) return;
+    const handleFileOpen = (paths) => {
+      if (!Array.isArray(paths) || paths.length === 0) return;
+      setActiveTab("debugger");
+      setDebuggerImportRequest({
+        id: Date.now(),
+        files: paths.filter((path) => typeof path === "string")
+      });
+    };
+    const handleCaseNew = () => {
+      setActiveTab("debugger");
+      setDebuggerImportRequest(null);
+      setDebuggerResetSignal((value) => value + 1);
+      setFooterState({ contextLabel: "--", sessionLabel: "--" });
+      showNotice("Started a fresh debug workspace.");
+    };
+    const handleSettingsOpen = () => {
+      showNotice("Settings panel is not implemented yet.");
+    };
+    const handleWindowStateChange = (isMaximized) => {
+      setWindowMaximized(Boolean(isMaximized));
+    };
+    electronAPI.on("file:open", handleFileOpen);
+    electronAPI.on("case:new", handleCaseNew);
+    electronAPI.on("settings:open", handleSettingsOpen);
+    electronAPI.on("window:maximized-changed", handleWindowStateChange);
+    return () => {
+      electronAPI.off("file:open", handleFileOpen);
+      electronAPI.off("case:new", handleCaseNew);
+      electronAPI.off("settings:open", handleSettingsOpen);
+      electronAPI.off("window:maximized-changed", handleWindowStateChange);
+    };
+  }, [electronAPI, showNotice]);
+  const connectionMeta = reactExports.useMemo(() => {
+    if (connectionStatus === "connected") {
+      return { label: "Connected", dotClass: "status-dot-info" };
+    }
+    if (connectionStatus === "degraded") {
+      return { label: "Degraded", dotClass: "status-dot-warning" };
+    }
+    return { label: "Offline", dotClass: "status-dot-pending" };
+  }, [connectionStatus]);
+  const handleOpenCapture = reactExports.useCallback(() => {
+    setActiveTab("debugger");
+    setDebuggerPickerSignal((value) => value + 1);
+  }, []);
+  const handleNewCase = reactExports.useCallback(() => {
+    setActiveTab("debugger");
+    setDebuggerImportRequest(null);
+    setDebuggerResetSignal((value) => value + 1);
+    setFooterState({ contextLabel: "--", sessionLabel: "--" });
+  }, []);
+  const handleSettings = reactExports.useCallback(() => {
+    showNotice("Settings panel is not implemented yet.");
+  }, [showNotice]);
+  const handleHelp = reactExports.useCallback(() => {
+    window.open("https://github.com/rdc-agent/docs");
+  }, []);
+  const handleWindowMinimize = reactExports.useCallback(async () => {
+    await electronAPI?.windowControls.minimize();
+  }, [electronAPI]);
+  const handleWindowToggleMaximize = reactExports.useCallback(async () => {
+    if (!electronAPI) return;
+    const nextState = await electronAPI.windowControls.toggleMaximize();
+    setWindowMaximized(nextState);
+  }, [electronAPI]);
+  const handleWindowClose = reactExports.useCallback(async () => {
+    await electronAPI?.windowControls.close();
+  }, [electronAPI]);
+  const handleDebuggerSessionChange = reactExports.useCallback((nextState) => {
+    setFooterState(nextState);
   }, []);
   const renderContent = () => {
     switch (activeTab) {
       case "debugger":
-        return /* @__PURE__ */ jsxRuntimeExports.jsx(DebuggerPage, {});
+        return /* @__PURE__ */ jsxRuntimeExports.jsx(
+          DebuggerPage,
+          {
+            importRequest: debuggerImportRequest,
+            openPickerSignal: debuggerPickerSignal,
+            resetSignal: debuggerResetSignal,
+            onSessionStateChange: handleDebuggerSessionChange,
+            onError: showNotice
+          }
+        );
       case "analyzer":
         return /* @__PURE__ */ jsxRuntimeExports.jsx(AnalyzerPage, {});
       case "optimizer":
         return /* @__PURE__ */ jsxRuntimeExports.jsx(OptimizerPage, {});
       default:
-        return /* @__PURE__ */ jsxRuntimeExports.jsx(DebuggerPage, {});
+        return null;
     }
   };
   if (isLoading) {
     return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "loading-screen", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "loading-spinner" }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Loading RdcAgent..." })
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "loading-logo", children: "RD" }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "loading-text", children: "Loading RDC Agent shell..." }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "loading-bar" })
     ] });
   }
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "app-container", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("header", { className: "app-header", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "app-title", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "logo", children: "RdcAgent" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "subtitle", children: "RenderDoc Debug Agent" })
-      ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("nav", { className: "tab-nav", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "button",
-          {
-            className: `tab-button ${activeTab === "debugger" ? "active" : ""}`,
-            onClick: () => setActiveTab("debugger"),
-            children: "Debugger"
-          }
-        ),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "button",
-          {
-            className: `tab-button ${activeTab === "analyzer" ? "active" : ""}`,
-            onClick: () => setActiveTab("analyzer"),
-            disabled: true,
-            title: "Coming Soon",
-            children: "Analyzer"
-          }
-        ),
-        /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "button",
-          {
-            className: `tab-button ${activeTab === "optimizer" ? "active" : ""}`,
-            onClick: () => setActiveTab("optimizer"),
-            disabled: true,
-            title: "Coming Soon",
-            children: "Optimizer"
-          }
-        )
+      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "app-brand", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "app-logo", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "app-logo-icon", children: "RD" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "app-logo-copy", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "app-logo-text", children: "RDC Agent" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "app-logo-subtitle", children: "RenderDoc Debug Agent" })
+        ] })
+      ] }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("nav", { className: "tab-nav", children: TABS.map((tab) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        "button",
+        {
+          className: `tab-button ${activeTab === tab.id ? "active" : ""}`,
+          onClick: () => !tab.disabled && setActiveTab(tab.id),
+          disabled: tab.disabled,
+          children: [
+            tab.label,
+            tab.badge && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "tab-badge", children: tab.badge })
+          ]
+        },
+        tab.id
+      )) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "header-right", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "header-actions", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button button-secondary button-sm", onClick: handleOpenCapture, children: "Open Capture" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "button button-ghost button-sm", onClick: handleNewCase, children: "New Case" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button tooltip", "data-tooltip": "Settings", onClick: handleSettings, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "12", cy: "12", r: "3" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" })
+          ] }) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "icon-button tooltip", "data-tooltip": "Help", onClick: handleHelp, children: /* @__PURE__ */ jsxRuntimeExports.jsxs("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("circle", { cx: "12", cy: "12", r: "10" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("path", { d: "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("line", { x1: "12", y1: "17", x2: "12.01", y2: "17" })
+          ] }) })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "window-controls", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "window-control tooltip", "data-tooltip": "Minimize", onClick: handleWindowMinimize, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", {}) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              className: "window-control tooltip",
+              "data-tooltip": windowMaximized ? "Restore" : "Maximize",
+              onClick: handleWindowToggleMaximize,
+              children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: windowMaximized ? "restore" : "maximize" })
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { className: "window-control close tooltip", "data-tooltip": "Close", onClick: handleWindowClose, children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "close-mark" }) })
+        ] })
       ] })
     ] }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("main", { className: "app-content", children: renderContent() }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("main", { className: "app-content", children: [
+      shellNotice && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "shell-notice", children: shellNotice }),
+      renderContent()
+    ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs("footer", { className: "app-footer", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "status-left", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "status-item", children: "Context: --" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "status-item", children: "Session: --" })
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "footer-left", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "footer-item", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `status-dot ${connectionMeta.dotClass}` }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: connectionMeta.label })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "footer-separator" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "footer-item", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+          "Context: ",
+          footerState.contextLabel
+        ] }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "footer-item", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+          "Session: ",
+          footerState.sessionLabel
+        ] }) })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "status-right", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "status-item", children: "LLM: --" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "status-item", children: "v1.0.0" })
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "footer-right", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "footer-item", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+          "LLM: ",
+          llmProvider
+        ] }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "footer-separator" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "footer-item", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { children: [
+          "v",
+          appVersion
+        ] }) })
       ] })
     ] })
   ] });

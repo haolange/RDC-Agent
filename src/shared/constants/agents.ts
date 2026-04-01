@@ -104,3 +104,16 @@ export const AGENT_NOTE_FILES: Record<AgentRole, string> = {
 
 // 默认TTL（秒）
 export const DEFAULT_TOKEN_TTL_SECONDS = 1800;
+
+// Agent Colors for UI
+export const AGENT_COLORS: Record<AgentRole, string> = {
+  'rdc-debugger': '#6366f1',
+  'triage_agent': '#a855f7',
+  'capture_repro_agent': '#3b82f6',
+  'pass_graph_pipeline_agent': '#06b6d4',
+  'pixel_forensics_agent': '#10b981',
+  'shader_ir_agent': '#f59e0b',
+  'driver_device_agent': '#ef4444',
+  'skeptic_agent': '#ec4899',
+  'curator_agent': '#8b5cf6',
+};

@@ -1,1 +1,48 @@
 # RDC-Agent
+
+`RDC-Agent` 是一个面向 `RenderDoc` `.rdc` capture 的桌面调试代理框架，使用 `Electron + React + TypeScript` 构建。
+
+它的目标不是做一个通用聊天客户端，而是把一次图形渲染问题排查拆成可编排的多角色协作流程。当前仓库已经实现了基本的 `Debugger` 入口、工作流引擎、Agent 编排层和证据/Artifact 展示框架。
+
+## 它能做什么
+
+- 导入或拖入一个或多个 `.rdc` 文件。
+- 启动一个围绕渲染问题的调试会话。
+- 通过多个专门角色进行协作分析，例如 triage、pixel forensics、shader IR、driver/device、skeptic 和 curator。
+- 用工作流状态机控制阶段推进、阻断处理和受控回转。
+- 在界面中展示会话状态、证据链和中间产物。
+
+## 目前的界面
+
+- `Debugger`：主入口，支持选择 `.rdc` 文件并启动会话。
+- `Analyzer`：预留入口，当前仍是占位。
+- `Optimizer`：预留入口，当前仍是占位。
+
+## 代码结构
+
+- `src/main`：Electron 主进程，负责窗口、菜单、IPC 和工作流编排。
+- `src/preload`：预加载层，向渲染进程暴露受控 API。
+- `src/renderer`：前端界面，包括页面、组件和样式。
+- `src/shared`：跨层共享的常量、类型和工具函数。
+- `docs`：设计说明、流程说明和演示文档。
+
+## 开发运行
+
+```bash
+npm install
+npm run dev
+```
+
+常用脚本：
+
+- `npm run build`：构建开发产物。
+- `npm run pack`：生成未打包安装目录。
+- `npm run dist`：生成安装包。
+- `npm run typecheck`：TypeScript 类型检查。
+- `npm run lint`：代码风格检查。
+
+## 当前状态
+
+这个仓库看起来更像一个垂直领域的调试框架原型，核心重点在 `Debugger` 流程和多 Agent 编排。`Analyzer` 和 `Optimizer` 已经在导航里出现，但还没有完成实际功能。
+
+如果你想继续，我可以下一步把 `docs/` 里的设计文档也整理成一份更像“项目总览”的说明，或者直接补一版更细的开发约定。
