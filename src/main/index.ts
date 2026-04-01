@@ -6,8 +6,7 @@ import { app, BrowserWindow, dialog, Menu, shell } from 'electron';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
-// Import IPC handlers
-import './ipc/handlers';
+import { registerIPCHandlers, setMainWindow } from './ipc/handlers';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -16,6 +15,50 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
 // 主窗口引用
 let mainWindow: BrowserWindow | null = null;
+
+function emitWindowMaximizedState(): void {
+  if (!mainWindow) return;
+  mainWindow.webContents.send('window:maximized-changed', mainWindow.isMaximized());
+}
+
+async function openRdcFiles(): Promise<void> {
+  const result = await dialog.showOpenDialog({
+    filters: [
+      { name: 'RenderDoc Capture', extensions: ['rdc'] },
+    ],
+    properties: ['openFile', 'multiSelections'],
+  });
+
+  if (!result.canceled && result.filePaths.length > 0) {
+    mainWindow?.webContents.send('file:open', result.filePaths);
+  }
+}
+
+function setupKeyboardShortcuts(window: BrowserWindow): void {
+  window.webContents.on('before-input-event', async (event, input) => {
+    const commandOrControl = input.control || input.meta;
+    if (!commandOrControl || input.type !== 'keyDown') return;
+
+    const key = input.key.toLowerCase();
+
+    if (key === 'o') {
+      event.preventDefault();
+      await openRdcFiles();
+      return;
+    }
+
+    if (key === 'n') {
+      event.preventDefault();
+      window.webContents.send('case:new');
+      return;
+    }
+
+    if (key === ',') {
+      event.preventDefault();
+      window.webContents.send('settings:open');
+    }
+  });
+}
 
 /**
  * 创建主窗口
@@ -35,16 +78,20 @@ function createMainWindow(): void {
       sandbox: false,
     },
     // 窗口样式
-    frame: true,
-    titleBarStyle: 'default',
-    backgroundColor: '#1a1a2e',
+    frame: false,
+    autoHideMenuBar: true,
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
+    backgroundColor: '#08080c',
   });
 
   // 加载页面
   if (isDev) {
-    // 开发模式：加载Vite开发服务器
-    mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
+    const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
+    if (rendererUrl) {
+      mainWindow.loadURL(rendererUrl);
+    } else {
+      mainWindow.loadURL('http://localhost:5173');
+    }
   } else {
     // 生产模式：加载打包后的文件
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
@@ -54,6 +101,11 @@ function createMainWindow(): void {
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
   });
+
+  mainWindow.on('maximize', emitWindowMaximizedState);
+  mainWindow.on('unmaximize', emitWindowMaximizedState);
+  mainWindow.on('enter-full-screen', emitWindowMaximizedState);
+  mainWindow.on('leave-full-screen', emitWindowMaximizedState);
 
   // 窗口关闭处理
   mainWindow.on('closed', () => {
@@ -68,7 +120,9 @@ function createMainWindow(): void {
     return { action: 'deny' };
   });
 
-  // 设置菜单
+  // 设置窗口控制与快捷键
+  setMainWindow(mainWindow);
+  setupKeyboardShortcuts(mainWindow);
   setupMenu();
 }
 
@@ -76,105 +130,82 @@ function createMainWindow(): void {
  * 设置应用菜单
  */
 function setupMenu(): void {
-  const template: Electron.MenuItemConstructorOptions[] = [
-    {
-      label: 'File',
-      submenu: [
-        {
-          label: 'Open .rdc File',
-          accelerator: 'CmdOrCtrl+O',
-          click: async () => {
-            const result = await dialog.showOpenDialog({
-              filters: [
-                { name: 'RenderDoc Capture', extensions: ['rdc'] },
-              ],
-              properties: ['openFile', 'multiSelections'],
-            });
-            if (!result.canceled && result.filePaths.length > 0) {
-              mainWindow?.webContents.send('file:open', result.filePaths);
-            }
+  if (process.platform === 'darwin') {
+    const template: Electron.MenuItemConstructorOptions[] = [
+      { role: 'appMenu' },
+      {
+        label: 'File',
+        submenu: [
+          {
+            label: 'Open .rdc File',
+            accelerator: 'CmdOrCtrl+O',
+            click: async () => openRdcFiles(),
           },
-        },
-        { type: 'separator' },
-        {
-          label: 'New Case',
-          accelerator: 'CmdOrCtrl+N',
-          click: () => {
-            mainWindow?.webContents.send('case:new');
+          {
+            label: 'New Case',
+            accelerator: 'CmdOrCtrl+N',
+            click: () => mainWindow?.webContents.send('case:new'),
           },
-        },
-        { type: 'separator' },
-        {
-          label: 'Settings',
-          accelerator: 'CmdOrCtrl+,',
-          click: () => {
-            mainWindow?.webContents.send('settings:open');
+          {
+            label: 'Settings',
+            accelerator: 'CmdOrCtrl+,',
+            click: () => mainWindow?.webContents.send('settings:open'),
           },
-        },
-        { type: 'separator' },
-        { role: 'quit' },
-      ],
-    },
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectAll' },
-      ],
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'reload' },
-        { role: 'forceReload' },
-        { role: 'toggleDevTools' },
-        { type: 'separator' },
-        { role: 'resetZoom' },
-        { role: 'zoomIn' },
-        { role: 'zoomOut' },
-        { type: 'separator' },
-        { role: 'togglefullscreen' },
-      ],
-    },
-    {
-      label: 'Window',
-      submenu: [
-        { role: 'minimize' },
-        { role: 'close' },
-      ],
-    },
-    {
-      label: 'Help',
-      submenu: [
-        {
-          label: 'Documentation',
-          click: () => {
-            shell.openExternal('https://github.com/rdc-agent/docs');
+          { type: 'separator' },
+          { role: 'close' },
+        ],
+      },
+      {
+        label: 'Edit',
+        submenu: [
+          { role: 'undo' },
+          { role: 'redo' },
+          { type: 'separator' },
+          { role: 'cut' },
+          { role: 'copy' },
+          { role: 'paste' },
+          { role: 'selectAll' },
+        ],
+      },
+      {
+        label: 'View',
+        submenu: [
+          { role: 'reload' },
+          { role: 'forceReload' },
+          { role: 'toggleDevTools' },
+          { type: 'separator' },
+          { role: 'togglefullscreen' },
+        ],
+      },
+      {
+        label: 'Help',
+        submenu: [
+          {
+            label: 'Documentation',
+            click: () => {
+              shell.openExternal('https://github.com/rdc-agent/docs');
+            },
           },
-        },
-        {
-          label: 'Report Issue',
-          click: () => {
-            shell.openExternal('https://github.com/rdc-agent/issues');
+          {
+            label: 'Report Issue',
+            click: () => {
+              shell.openExternal('https://github.com/rdc-agent/issues');
+            },
           },
-        },
-        { type: 'separator' },
-        { role: 'about' },
-      ],
-    },
-  ];
+        ],
+      },
+    ];
 
-  const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+    return;
+  }
+
+  Menu.setApplicationMenu(null);
 }
 
 // 应用就绪
 app.whenReady().then(() => {
+  registerIPCHandlers();
   createMainWindow();
 
   // macOS: 点击dock图标时重新创建窗口
