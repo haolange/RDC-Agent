@@ -2,7 +2,7 @@
   "name": "rdc-agent",
   "version": "1.0.0",
   "description": "RenderDoc Debug Agent - Vertical Framework",
-  "main": "dist/main/index.js",
+  "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
@@ -40,7 +40,7 @@
       "output": "release"
     },
     "files": [
-      "dist/**/*",
+      "out/**/*",
       "resources/**/*"
     ],
     "extraResources": [
