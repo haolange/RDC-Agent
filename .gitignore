@@ -1,5 +1,27 @@
 intermediate/**
 !intermediate/**/.gitkeep
+
+# Node / Electron dependencies and build outputs
+node_modules/
+out/
+dist/
+release/
+.vite/
+.electron-vite/
+*.tsbuildinfo
+
+# Packaging and local cache artifacts
+.cache/
+.turbo/
+coverage/
+
+# Local tool / IDE metadata
+.codex/
+.qoder/
+.idea/
+.vscode/
+
+# Python local environment
 .venv
 .pytest_cache
 *.egg-info

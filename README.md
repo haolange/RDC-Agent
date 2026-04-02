@@ -41,6 +41,13 @@ npm run dev
 - `npm run typecheck`：TypeScript 类型检查。
 - `npm run lint`：代码风格检查。
 
+## Git 与本地产物约定
+
+- 克隆仓库后先执行 `npm install`，`node_modules/` 不会随 Git 分发。
+- `out/`、`dist/`、`release/` 等构建与打包产物属于本地可再生文件，不应提交到仓库。
+- 仓库启用了 Git LFS，前端大图、`.rdc` 样本以及二进制资源应通过 LFS 管理；开发机在首次拉取前应完成 `git lfs install`。
+- 若后续新增 `resources/` 下的工具或静态大文件，应优先复用现有 LFS 规则，不要直接把大体积二进制以普通 Git blob 提交。
+
 ## 当前状态
 
 这个仓库看起来更像一个垂直领域的调试框架原型，核心重点在 `Debugger` 流程和多 Agent 编排。`Analyzer` 和 `Optimizer` 已经在导航里出现，但还没有完成实际功能。

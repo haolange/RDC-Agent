@@ -77,3 +77,121 @@ export interface GateResult {
   paths: Record<string, string>;
   extra?: Record<string, unknown>;
 }
+
+// ============================================
+// LangGraph GraphState（工作流图状态）
+// ============================================
+
+/** Capture 元数据 */
+export interface CaptureMetadata {
+  api: string;
+  device: string;
+  driverVersion: string;
+  frameCount: number;
+  eventCount: number;
+  captureDate: string;
+  fileSize: number;
+  features: string[];
+}
+
+/** Replay 会话 */
+export interface ReplaySession {
+  sessionId: string;
+  currentFrame: number;
+  selectedEvent: number;
+}
+
+/** Capture 信息 */
+export interface CaptureInfo {
+  fileId: string;
+  filePath: string;
+  metadata: CaptureMetadata;
+}
+
+/** Specialist 状态 */
+export interface SpecialistState {
+  agentId: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'timeout';
+  brief?: string;
+  artifacts: string[];
+  startedAt?: string;
+  completedAt?: string;
+  error?: string;
+  retryCount: number;
+}
+
+/** 最终报告 */
+export interface Report {
+  title: string;
+  summary: string;
+  rootCause: string;
+  fixDescription: string;
+  evidenceSummary: string[];
+  recommendations: string[];
+  confidence: number;
+  generatedAt: string;
+  curatorAgentId: string;
+}
+
+/** LangGraph 工作流图状态 — StateGraph 的完整状态 */
+export interface GraphState {
+  // 身份
+  caseId: string;
+  runId: string;
+  sessionId: string;
+
+  // 阶段
+  currentStage: WorkflowStage;
+  stageHistory: WorkflowStage[];
+
+  // 用户输入
+  userGoal: string;
+  capturePaths: string[];
+
+  // RDC 上下文
+  captureInfo?: CaptureInfo;
+  replaySession?: ReplaySession;
+
+  // 证据链
+  evidenceChain: Array<{
+    eventId: string;
+    eventType: string;
+    agentId: string;
+    status: string;
+    timestamp: number;
+    payload: Record<string, unknown>;
+  }>;
+  artifacts: Array<{
+    id: string;
+    type: string;
+    path: string;
+    agentId: string;
+    createdAt: string;
+  }>;
+
+  // Specialist 追踪
+  activeSpecialists: Record<string, SpecialistState>;
+  pendingBriefs: string[];
+  collectedBriefs: Record<string, string>;
+
+  // 阻断/等待
+  blockers: Blocker[];
+  interruptReason?: string;
+
+  // 回转追踪
+  backtrackCount: Record<string, number>;
+
+  // 结果
+  finalReport?: Report;
+  fixVerified: boolean;
+
+  // 元数据
+  entryMode: 'cli' | 'mcp';
+  backend: 'local' | 'remote';
+  orchestrationMode: 'multi_agent';
+  coordinationMode: 'staged_handoff';
+  lastUpdated: string;
+}
+
+/** 从 GraphState 投影到 IPC WorkflowState 的转换函数类型 */
+export type GraphStateProjection = (graphState: GraphState) => WorkflowState;
