@@ -2,7 +2,7 @@
  * IPC Handlers - 注册所有IPC处理器
  */
 
-import { ipcMain, dialog, BrowserWindow } from 'electron';
+import { app, ipcMain, dialog, BrowserWindow } from 'electron';
 
 // 导入服务
 import { toolBridge } from '../services/ToolBridge';
@@ -34,6 +34,38 @@ export function registerIPCHandlers(): void {
       properties: ['openDirectory', 'createDirectory'],
     });
     return result.canceled ? null : result.filePaths[0];
+  });
+
+  ipcMain.handle('window:minimize', async (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.minimize();
+  });
+
+  ipcMain.handle('window:toggleMaximize', async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) return false;
+
+    if (window.isMaximized()) {
+      window.unmaximize();
+      return false;
+    }
+
+    window.maximize();
+    return true;
+  });
+
+  ipcMain.handle('window:close', async (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.close();
+  });
+
+  ipcMain.handle('window:isMaximized', async (event) => {
+    return BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false;
+  });
+
+  ipcMain.handle('app:getMeta', async () => {
+    return {
+      version: app.getVersion(),
+      productName: app.getName(),
+    };
   });
 
   // ========== 工作流操作 ==========
