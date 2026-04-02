@@ -2,11 +2,11 @@
  * Electron API Type Declarations
  */
 
-import type { WorkflowStage, WorkflowState, Blocker, BacktrackTrigger } from './shared/types/workflow';
-import type { AgentRole, AgentState, AgentConfig, AgentMessage } from './shared/types/agent';
-import type { ActionEvent, EventType } from './shared/types/evidence';
-import type { ToolCallRequest, ToolCallResult, ToolCatalog } from './shared/types/tool';
-import type { LLMConfig, LLMResponse } from './shared/types/llm';
+import type { WorkflowStage, WorkflowState, BacktrackTrigger } from '../shared/types/workflow';
+import type { AgentRole, AgentState, AgentConfig } from '../shared/types/agent';
+import type { ActionEvent, EventType } from '../shared/types/evidence';
+import type { ToolCallResult, ToolCatalog } from '../shared/types/tool';
+import type { LLMConfig } from '../shared/types/llm';
 
 export interface ElectronAPI {
   // Platform info
@@ -14,6 +14,13 @@ export interface ElectronAPI {
   isMac: boolean;
   isWindows: boolean;
   isLinux: boolean;
+
+  appMeta: {
+    get: () => Promise<{
+      version: string;
+      productName: string;
+    }>;
+  };
 
   // File operations
   selectRdcFiles: () => Promise<string[] | null>;
@@ -26,6 +33,7 @@ export interface ElectronAPI {
       success: boolean;
       caseId?: string;
       runId?: string;
+      sessionId?: string;
       error?: string;
     }>;
     advanceStage: () => Promise<{
@@ -98,6 +106,13 @@ export interface ElectronAPI {
       agents: Record<AgentRole, Partial<AgentConfig>>;
     }>;
     set: (settings: Record<string, unknown>) => Promise<void>;
+  };
+
+  windowControls: {
+    minimize: () => Promise<void>;
+    toggleMaximize: () => Promise<boolean>;
+    close: () => Promise<void>;
+    isMaximized: () => Promise<boolean>;
   };
 
   // Event listeners

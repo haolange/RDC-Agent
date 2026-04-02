@@ -4,6 +4,26 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 
+const listenerMap = new Map<string, Map<(...args: unknown[]) => void, (...args: unknown[]) => void>>();
+
+const validChannels = [
+  'file:open',
+  'case:new',
+  'settings:open',
+  'workflow:stateChanged',
+  'workflow:stageChanged',
+  'agent:message',
+  'agent:statusChanged',
+  'tool:executionComplete',
+  'evidence:eventAdded',
+  'llm:stream',
+  'window:maximized-changed',
+] as const;
+
+const isValidChannel = (channel: string): channel is (typeof validChannels)[number] => {
+  return validChannels.includes(channel as (typeof validChannels)[number]);
+};
+
 // 暴露给渲染进程的API
 const electronAPI = {
   // 平台信息
@@ -11,6 +31,12 @@ const electronAPI = {
   isMac: process.platform === 'darwin',
   isWindows: process.platform === 'win32',
   isLinux: process.platform === 'linux',
+
+  appMeta: {
+    get: (): Promise<{ version: string; productName: string }> => {
+      return ipcRenderer.invoke('app:getMeta');
+    },
+  },
 
   // 文件操作
   selectRdcFiles: (): Promise<string[] | null> => {
@@ -99,27 +125,38 @@ const electronAPI = {
     },
   },
 
+  windowControls: {
+    minimize: (): Promise<void> => {
+      return ipcRenderer.invoke('window:minimize');
+    },
+    toggleMaximize: (): Promise<boolean> => {
+      return ipcRenderer.invoke('window:toggleMaximize');
+    },
+    close: (): Promise<void> => {
+      return ipcRenderer.invoke('window:close');
+    },
+    isMaximized: (): Promise<boolean> => {
+      return ipcRenderer.invoke('window:isMaximized');
+    },
+  },
+
   // 事件监听
   on: (channel: string, callback: (...args: unknown[]) => void) => {
-    const validChannels = [
-      'file:open',
-      'case:new',
-      'settings:open',
-      'workflow:stateChanged',
-      'workflow:stageChanged',
-      'agent:message',
-      'agent:statusChanged',
-      'tool:executionComplete',
-      'evidence:eventAdded',
-      'llm:stream',
-    ];
-    if (validChannels.includes(channel)) {
-      ipcRenderer.on(channel, (_event, ...args) => callback(...args));
+    if (isValidChannel(channel)) {
+      const wrappedCallback = (_event: unknown, ...args: unknown[]) => callback(...args);
+      const channelListeners = listenerMap.get(channel) ?? new Map();
+      channelListeners.set(callback, wrappedCallback);
+      listenerMap.set(channel, channelListeners);
+      ipcRenderer.on(channel, wrappedCallback);
     }
   },
 
   off: (channel: string, callback: (...args: unknown[]) => void) => {
-    ipcRenderer.removeListener(channel, callback as Parameters<typeof ipcRenderer.removeListener>[1]);
+    const wrappedCallback = listenerMap.get(channel)?.get(callback);
+    if (wrappedCallback) {
+      ipcRenderer.removeListener(channel, wrappedCallback as Parameters<typeof ipcRenderer.removeListener>[1]);
+      listenerMap.get(channel)?.delete(callback);
+    }
   },
 };
 

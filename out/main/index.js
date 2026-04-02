@@ -316,7 +316,7 @@ class ToolBridge {
     this.activeProcesses.clear();
   }
 }
-new ToolBridge();
+const toolBridge = new ToolBridge();
 function readYaml(filePath) {
   try {
     if (!fs__namespace.existsSync(filePath)) {
@@ -1964,10 +1964,264 @@ class AgentOrchestrator {
     }
   }
 }
-new AgentOrchestrator();
+const agentOrchestrator = new AgentOrchestrator();
+function registerIPCHandlers() {
+  storageAdapter.initializeWorkspace().catch(console.error);
+  electron.ipcMain.handle("dialog:selectRdcFiles", async () => {
+    const result = await electron.dialog.showOpenDialog({
+      filters: [{ name: "RenderDoc Capture", extensions: ["rdc"] }],
+      properties: ["openFile", "multiSelections"]
+    });
+    return result.canceled ? null : result.filePaths;
+  });
+  electron.ipcMain.handle("dialog:selectDirectory", async () => {
+    const result = await electron.dialog.showOpenDialog({
+      properties: ["openDirectory", "createDirectory"]
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
+  electron.ipcMain.handle("window:minimize", async (event) => {
+    electron.BrowserWindow.fromWebContents(event.sender)?.minimize();
+  });
+  electron.ipcMain.handle("window:toggleMaximize", async (event) => {
+    const window = electron.BrowserWindow.fromWebContents(event.sender);
+    if (!window) return false;
+    if (window.isMaximized()) {
+      window.unmaximize();
+      return false;
+    }
+    window.maximize();
+    return true;
+  });
+  electron.ipcMain.handle("window:close", async (event) => {
+    electron.BrowserWindow.fromWebContents(event.sender)?.close();
+  });
+  electron.ipcMain.handle("window:isMaximized", async (event) => {
+    return electron.BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false;
+  });
+  electron.ipcMain.handle("app:getMeta", async () => {
+    return {
+      version: electron.app.getVersion(),
+      productName: electron.app.getName()
+    };
+  });
+  electron.ipcMain.handle("workflow:getState", async () => {
+    return workflowEngine.getState();
+  });
+  electron.ipcMain.handle("workflow:start", async (_event, capturePaths, userGoal) => {
+    try {
+      const gateResult = await harnessController.executeEntryGate({
+        capturePaths,
+        platform: "rdc-agent",
+        entryMode: "cli",
+        backend: "local"
+      });
+      if (gateResult.status === "blocked") {
+        return {
+          success: false,
+          error: gateResult.blockers.map((b) => b.reason).join("; ")
+        };
+      }
+      const caseId = await storageAdapter.createCase({
+        userGoal,
+        symptomSummary: userGoal
+      });
+      const { runId, sessionId } = await storageAdapter.createRun({
+        caseId,
+        capturePaths
+      });
+      await workflowEngine.initialize({ caseId, runId, sessionId });
+      const caseInput = {
+        session: { mode: "single", goal: userGoal },
+        symptom: { summary: userGoal },
+        captures: capturePaths.map((_p, i) => ({
+          capture_id: `cap-${i === 0 ? "anomalous" : "baseline"}-${i}`,
+          capture_role: i === 0 ? "anomalous" : "baseline"
+        }))
+      };
+      const intakeResult = await harnessController.executeIntakeGate(caseId, runId, {
+        caseInput,
+        captureRefs: caseInput.captures
+      });
+      if (intakeResult.status === "blocked") {
+        return {
+          success: false,
+          error: intakeResult.blockers.map((b) => b.reason).join("; ")
+        };
+      }
+      return { success: true, caseId, runId, sessionId };
+    } catch (error) {
+      console.error("Failed to start workflow:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("workflow:advanceStage", async () => {
+    const result = await workflowEngine.advanceStage();
+    return {
+      success: result.status === "passed",
+      currentStage: workflowEngine.getState()?.currentStage,
+      error: result.status === "blocked" ? result.blockers.map((b) => b.reason).join("; ") : void 0
+    };
+  });
+  electron.ipcMain.handle("workflow:backtrack", async (_event, reason, trigger) => {
+    const result = await workflowEngine.backtrack({
+      reason,
+      trigger
+    });
+    return {
+      success: result.status === "passed",
+      error: result.status === "blocked" ? result.blockers.map((b) => b.reason).join("; ") : void 0
+    };
+  });
+  electron.ipcMain.handle("workflow:dispatchSpecialist", async (_event, agentId, objective) => {
+    const state = workflowEngine.getState();
+    if (!state) {
+      return { success: false, error: "No active workflow" };
+    }
+    return agentOrchestrator.dispatchSpecialist(agentId, objective, {
+      caseId: state.caseId,
+      runId: state.runId,
+      sessionId: state.sessionId
+    });
+  });
+  electron.ipcMain.handle("agent:sendMessage", async (_event, agentId, content) => {
+    try {
+      const state = workflowEngine.getState();
+      const response = await agentOrchestrator.sendMessage(agentId, content, state ? {
+        caseId: state.caseId,
+        runId: state.runId,
+        sessionId: state.sessionId
+      } : void 0);
+      return { response };
+    } catch (error) {
+      return {
+        response: void 0,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("agent:getState", async (_event, agentId) => {
+    return agentOrchestrator.getAgentState(agentId);
+  });
+  electron.ipcMain.handle("agent:getAllStates", async () => {
+    return agentOrchestrator.getAllAgentStates();
+  });
+  electron.ipcMain.handle("agent:configure", async (_event, agentId, config) => {
+    try {
+      agentOrchestrator.configureAgent(agentId, config);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("tool:getCatalog", async () => {
+    try {
+      return await toolBridge.loadCatalog();
+    } catch {
+      return { tools: [], namespaces: {} };
+    }
+  });
+  electron.ipcMain.handle("tool:execute", async (_event, toolName, args) => {
+    return toolBridge.call({
+      toolName,
+      args
+    });
+  });
+  electron.ipcMain.handle("evidence:getChain", async () => {
+    const sessionId = await storageAdapter.getCurrentSessionId();
+    if (!sessionId) {
+      return { sessionId: "", runId: "", events: [], isValid: true };
+    }
+    const events = await storageAdapter.readActionChain(sessionId);
+    return {
+      sessionId,
+      runId: workflowEngine.getState()?.runId || "",
+      events,
+      isValid: true
+    };
+  });
+  electron.ipcMain.handle("evidence:getEvents", async (_event, eventType) => {
+    const sessionId = await storageAdapter.getCurrentSessionId();
+    if (!sessionId) return [];
+    const events = await storageAdapter.readActionChain(sessionId);
+    if (eventType) {
+      return events.filter((e) => e.event_type === eventType);
+    }
+    return events;
+  });
+  electron.ipcMain.handle("llm:configure", async (_event, config) => {
+    llmAdapter.configure(config);
+    return;
+  });
+  electron.ipcMain.handle("llm:testConnection", async (_event, provider) => {
+    return llmAdapter.testConnection(provider);
+  });
+  electron.ipcMain.handle("llm:getAvailableModels", async (_event, provider) => {
+    return llmAdapter.getAvailableModels(provider);
+  });
+  electron.ipcMain.handle("settings:get", async () => {
+    return {
+      theme: "dark",
+      llm: {
+        defaultProvider: llmAdapter.getDefaultProvider()
+      },
+      agents: {}
+    };
+  });
+  electron.ipcMain.handle("settings:set", async (_event, settings) => {
+    console.log("Set settings:", settings);
+    return;
+  });
+}
+function setMainWindow(window) {
+  workflowEngine.setMainWindow(window);
+  agentOrchestrator.setMainWindow(window);
+}
 const __dirname$1 = path__namespace.dirname(url.fileURLToPath(require("url").pathToFileURL(__filename).href));
 const isDev = process.env.NODE_ENV === "development" || !electron.app.isPackaged;
 let mainWindow = null;
+function emitWindowMaximizedState() {
+  if (!mainWindow) return;
+  mainWindow.webContents.send("window:maximized-changed", mainWindow.isMaximized());
+}
+async function openRdcFiles() {
+  const result = await electron.dialog.showOpenDialog({
+    filters: [
+      { name: "RenderDoc Capture", extensions: ["rdc"] }
+    ],
+    properties: ["openFile", "multiSelections"]
+  });
+  if (!result.canceled && result.filePaths.length > 0) {
+    mainWindow?.webContents.send("file:open", result.filePaths);
+  }
+}
+function setupKeyboardShortcuts(window) {
+  window.webContents.on("before-input-event", async (event, input) => {
+    const commandOrControl = input.control || input.meta;
+    if (!commandOrControl || input.type !== "keyDown") return;
+    const key = input.key.toLowerCase();
+    if (key === "o") {
+      event.preventDefault();
+      await openRdcFiles();
+      return;
+    }
+    if (key === "n") {
+      event.preventDefault();
+      window.webContents.send("case:new");
+      return;
+    }
+    if (key === ",") {
+      event.preventDefault();
+      window.webContents.send("settings:open");
+    }
+  });
+}
 function createMainWindow() {
   mainWindow = new electron.BrowserWindow({
     width: 1400,
@@ -1983,19 +2237,28 @@ function createMainWindow() {
       sandbox: false
     },
     // 窗口样式
-    frame: true,
-    titleBarStyle: "default",
-    backgroundColor: "#1a1a2e"
+    frame: false,
+    autoHideMenuBar: true,
+    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "hidden",
+    backgroundColor: "#08080c"
   });
   if (isDev) {
-    mainWindow.loadURL("http://localhost:5173");
-    mainWindow.webContents.openDevTools();
+    const rendererUrl = process.env["ELECTRON_RENDERER_URL"];
+    if (rendererUrl) {
+      mainWindow.loadURL(rendererUrl);
+    } else {
+      mainWindow.loadURL("http://localhost:5173");
+    }
   } else {
     mainWindow.loadFile(path__namespace.join(__dirname$1, "../renderer/index.html"));
   }
   mainWindow.once("ready-to-show", () => {
     mainWindow?.show();
   });
+  mainWindow.on("maximize", emitWindowMaximizedState);
+  mainWindow.on("unmaximize", emitWindowMaximizedState);
+  mainWindow.on("enter-full-screen", emitWindowMaximizedState);
+  mainWindow.on("leave-full-screen", emitWindowMaximizedState);
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
@@ -2005,105 +2268,83 @@ function createMainWindow() {
     }
     return { action: "deny" };
   });
+  setMainWindow(mainWindow);
+  setupKeyboardShortcuts(mainWindow);
   setupMenu();
 }
 function setupMenu() {
-  const template = [
-    {
-      label: "File",
-      submenu: [
-        {
-          label: "Open .rdc File",
-          accelerator: "CmdOrCtrl+O",
-          click: async () => {
-            const result = await electron.dialog.showOpenDialog({
-              filters: [
-                { name: "RenderDoc Capture", extensions: ["rdc"] }
-              ],
-              properties: ["openFile", "multiSelections"]
-            });
-            if (!result.canceled && result.filePaths.length > 0) {
-              mainWindow?.webContents.send("file:open", result.filePaths);
+  if (process.platform === "darwin") {
+    const template = [
+      { role: "appMenu" },
+      {
+        label: "File",
+        submenu: [
+          {
+            label: "Open .rdc File",
+            accelerator: "CmdOrCtrl+O",
+            click: async () => openRdcFiles()
+          },
+          {
+            label: "New Case",
+            accelerator: "CmdOrCtrl+N",
+            click: () => mainWindow?.webContents.send("case:new")
+          },
+          {
+            label: "Settings",
+            accelerator: "CmdOrCtrl+,",
+            click: () => mainWindow?.webContents.send("settings:open")
+          },
+          { type: "separator" },
+          { role: "close" }
+        ]
+      },
+      {
+        label: "Edit",
+        submenu: [
+          { role: "undo" },
+          { role: "redo" },
+          { type: "separator" },
+          { role: "cut" },
+          { role: "copy" },
+          { role: "paste" },
+          { role: "selectAll" }
+        ]
+      },
+      {
+        label: "View",
+        submenu: [
+          { role: "reload" },
+          { role: "forceReload" },
+          { role: "toggleDevTools" },
+          { type: "separator" },
+          { role: "togglefullscreen" }
+        ]
+      },
+      {
+        label: "Help",
+        submenu: [
+          {
+            label: "Documentation",
+            click: () => {
+              electron.shell.openExternal("https://github.com/rdc-agent/docs");
+            }
+          },
+          {
+            label: "Report Issue",
+            click: () => {
+              electron.shell.openExternal("https://github.com/rdc-agent/issues");
             }
           }
-        },
-        { type: "separator" },
-        {
-          label: "New Case",
-          accelerator: "CmdOrCtrl+N",
-          click: () => {
-            mainWindow?.webContents.send("case:new");
-          }
-        },
-        { type: "separator" },
-        {
-          label: "Settings",
-          accelerator: "CmdOrCtrl+,",
-          click: () => {
-            mainWindow?.webContents.send("settings:open");
-          }
-        },
-        { type: "separator" },
-        { role: "quit" }
-      ]
-    },
-    {
-      label: "Edit",
-      submenu: [
-        { role: "undo" },
-        { role: "redo" },
-        { type: "separator" },
-        { role: "cut" },
-        { role: "copy" },
-        { role: "paste" },
-        { role: "selectAll" }
-      ]
-    },
-    {
-      label: "View",
-      submenu: [
-        { role: "reload" },
-        { role: "forceReload" },
-        { role: "toggleDevTools" },
-        { type: "separator" },
-        { role: "resetZoom" },
-        { role: "zoomIn" },
-        { role: "zoomOut" },
-        { type: "separator" },
-        { role: "togglefullscreen" }
-      ]
-    },
-    {
-      label: "Window",
-      submenu: [
-        { role: "minimize" },
-        { role: "close" }
-      ]
-    },
-    {
-      label: "Help",
-      submenu: [
-        {
-          label: "Documentation",
-          click: () => {
-            electron.shell.openExternal("https://github.com/rdc-agent/docs");
-          }
-        },
-        {
-          label: "Report Issue",
-          click: () => {
-            electron.shell.openExternal("https://github.com/rdc-agent/issues");
-          }
-        },
-        { type: "separator" },
-        { role: "about" }
-      ]
-    }
-  ];
-  const menu = electron.Menu.buildFromTemplate(template);
-  electron.Menu.setApplicationMenu(menu);
+        ]
+      }
+    ];
+    electron.Menu.setApplicationMenu(electron.Menu.buildFromTemplate(template));
+    return;
+  }
+  electron.Menu.setApplicationMenu(null);
 }
 electron.app.whenReady().then(() => {
+  registerIPCHandlers();
   createMainWindow();
   electron.app.on("activate", () => {
     if (electron.BrowserWindow.getAllWindows().length === 0) {

@@ -1,0 +1,356 @@
+/**
+ * Design System - RDC-Agent "Deep Debug"
+ * A professional debugging interface design system
+ * Inspired by Linear, VS Code, and cyberpunk tech aesthetics
+ */
+
+/* ========== CSS Custom Properties ========== */
+
+:root {
+  /* Primary Color Scale - Indigo/Cyan tech gradient */
+  --color-primary-50: 235 241 255;
+  --color-primary-100: 215 228 255;
+  --color-primary-200: 180 205 255;
+  --color-primary-300: 130 172 255;
+  --color-primary-400: 80 135 255;
+  --color-primary-500: 59 99 255;
+  --color-primary-600: 48 79 255;
+  --color-primary-700: 45 62 230;
+  --color-primary-800: 38 53 184;
+  --color-primary-900: 35 49 144;
+
+  /* Cyan Accent - For highlights and active states */
+  --color-accent-50: 236 253 255;
+  --color-accent-100: 207 250 255;
+  --color-accent-200: 165 243 252;
+  --color-accent-300: 103 232 249;
+  --color-accent-400: 34 211 238;
+  --color-accent-500: 6 182 212;
+  --color-accent-600: 8 145 178;
+  --color-accent-700: 14 116 144;
+  --color-accent-800: 21 94 117;
+  --color-accent-900: 22 78 99;
+
+  /* Background Scale - Deep space dark */
+  --color-bg-0: 8 8 12;
+  --color-bg-1: 13 13 20;
+  --color-bg-2: 18 18 28;
+  --color-bg-3: 24 24 38;
+  --color-bg-4: 32 32 48;
+  --color-bg-5: 40 40 60;
+
+  /* Text Colors */
+  --color-text-primary: 250 250 252;
+  --color-text-secondary: 180 180 195;
+  --color-text-tertiary: 120 120 140;
+  --color-text-muted: 80 80 100;
+  --color-text-disabled: 60 60 75;
+
+  /* Semantic Colors */
+  --color-success: 34 197 94;
+  --color-warning: 251 191 36;
+  --color-error: 248 113 113;
+  --color-info: 56 189 248;
+  --color-purple: 168 85 247;
+  --color-pink: 236 72 153;
+  --color-orange: 251 146 60;
+
+  /* Border Colors */
+  --color-border-subtle: 255 255 255 / 0.06;
+  --color-border-default: 255 255 255 / 0.1;
+  --color-border-strong: 255 255 255 / 0.15;
+  --color-border-focus: rgb(var(--color-accent-500));
+
+  /* Spacing Scale - 4px base */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  /* Border Radius */
+  --radius-none: 0;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-full: 9999px;
+
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+
+  /* Font Sizes */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 20px;
+  --text-3xl: 24px;
+  --text-4xl: 32px;
+
+  /* Font Weights */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+
+  /* Line Heights */
+  --leading-none: 1;
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.4);
+  --shadow-glow: 0 0 20px rgb(var(--color-accent-500) / 0.3);
+  --shadow-glow-strong: 0 0 30px rgb(var(--color-accent-500) / 0.5);
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slower: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Z-Index Scale */
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-fixed: 300;
+  --z-modal-backdrop: 400;
+  --z-modal: 500;
+  --z-popover: 600;
+  --z-tooltip: 700;
+
+  /* Layout */
+  --header-height: 52px;
+  --footer-height: 28px;
+  --panel-width: 360px;
+  --sidebar-width: 240px;
+}
+
+/* ========== Animation Keyframes ========== */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgb(var(--color-accent-500) / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgb(var(--color-accent-500) / 0.6);
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+@keyframes progress-stripes {
+  from { background-position: 0 0; }
+  to { background-position: 20px 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* ========== Utility Classes ========== */
+
+/* Animations */
+.animate-fadeIn { animation: fadeIn var(--transition-base) forwards; }
+.animate-fadeInUp { animation: fadeInUp var(--transition-base) forwards; }
+.animate-fadeInScale { animation: fadeInScale var(--transition-base) forwards; }
+.animate-slideInRight { animation: slideInRight var(--transition-base) forwards; }
+.animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+.animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+.animate-spin { animation: spin 1s linear infinite; }
+.animate-float { animation: float 3s ease-in-out infinite; }
+
+/* Stagger delays */
+.stagger-1 { animation-delay: 50ms; }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }
+
+/* Glass morphism */
+.glass {
+  background: rgb(var(--color-bg-2) / 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-strong {
+  background: rgb(var(--color-bg-2) / 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Gradient borders */
+.gradient-border {
+  position: relative;
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgb(var(--color-accent-500)), rgb(var(--color-primary-500)));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Glow effects */
+.glow-accent {
+  box-shadow: 0 0 20px rgb(var(--color-accent-500) / 0.3);
+}
+
+.glow-primary {
+  box-shadow: 0 0 20px rgb(var(--color-primary-500) / 0.3);
+}
+
+.glow-success {
+  box-shadow: 0 0 20px rgb(var(--color-success) / 0.3);
+}
+
+.glow-error {
+  box-shadow: 0 0 20px rgb(var(--color-error) / 0.3);
+}
+
+/* Text gradients */
+.text-gradient {
+  background: linear-gradient(135deg, rgb(var(--color-accent-400)), rgb(var(--color-primary-400)));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-subtle {
+  background: linear-gradient(135deg, rgb(var(--color-text-primary)), rgb(var(--color-text-secondary)));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Status indicators */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+}
+
+.status-dot-success { background: rgb(var(--color-success)); box-shadow: 0 0 8px rgb(var(--color-success) / 0.6); }
+.status-dot-warning { background: rgb(var(--color-warning)); box-shadow: 0 0 8px rgb(var(--color-warning) / 0.6); }
+.status-dot-error { background: rgb(var(--color-error)); box-shadow: 0 0 8px rgb(var(--color-error) / 0.6); }
+.status-dot-info { background: rgb(var(--color-info)); box-shadow: 0 0 8px rgb(var(--color-info) / 0.6); }
+.status-dot-pending { background: rgb(var(--color-text-muted)); }
+
+/* Focus states */
+.focus-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--color-bg-0)), 0 0 0 4px rgb(var(--color-accent-500) / 0.5);
+}
+
+/* Scrollbar styling */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--color-bg-5)) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgb(var(--color-bg-5));
+  border-radius: var(--radius-full);
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--color-text-muted));
+}
+
+/* Selection */
+::selection {
+  background: rgb(var(--color-accent-500) / 0.3);
+  color: rgb(var(--color-text-primary));
+}
