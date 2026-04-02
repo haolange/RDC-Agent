@@ -118,3 +118,35 @@ export interface MCPResponse {
     data?: unknown;
   };
 }
+
+// ============================================
+// Tool 分层架构类型
+// ============================================
+
+/** 工具层级 */
+export type ToolLayer = 'rdc' | 'system' | 'skill' | 'mcp';
+
+/** 系统工具名称 */
+export type SystemToolName =
+  | 'fs.read' | 'fs.glob' | 'fs.grep'
+  | 'web.fetch' | 'web.search'
+  | 'bash.exec'
+  | 'task.create' | 'task.update' | 'task.list';
+
+/** 分层工具定义 */
+export interface LayeredToolDefinition extends ToolDefinition {
+  layer: ToolLayer;
+  /** MCP 来源（仅 layer='mcp' 时有值） */
+  mcpServer?: string;
+  /** Skill 名称（仅 layer='skill' 时有值） */
+  skillName?: string;
+}
+
+/** 工具注册表条目 */
+export interface ToolRegistryEntry {
+  name: string;
+  layer: ToolLayer;
+  group: string;
+  description: string;
+  available: boolean;
+}

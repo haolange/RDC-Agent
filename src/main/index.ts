@@ -6,7 +6,9 @@ import { app, BrowserWindow, dialog, Menu, shell } from 'electron';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
-import { registerIPCHandlers, setMainWindow } from './ipc/handlers';
+import { registerIPCHandlers, setMainWindow, initWorkflowGraph } from './ipc/handlers';
+import { storageAdapter } from './services/StorageAdapter';
+import { rdcToolAdapter } from './tools/RDCToolAdapter';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -204,8 +206,12 @@ function setupMenu(): void {
 }
 
 // 应用就绪
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   registerIPCHandlers();
+  
+  // 初始化服务
+  await initializeServices();
+  
   createMainWindow();
 
   // macOS: 点击dock图标时重新创建窗口
@@ -232,6 +238,26 @@ app.on('web-contents-created', (_event, contents) => {
     }
   });
 });
+
+/**
+ * 初始化服务
+ */
+async function initializeServices(): Promise<void> {
+  try {
+    // 获取 workspace 路径
+    const workspacePath = storageAdapter.getWorkspacePath();
+    
+    // 初始化 RDC 工具适配器
+    await rdcToolAdapter.initialize();
+    console.log('[Main] RDCToolAdapter initialized');
+    
+    // 初始化 WorkflowGraph
+    initWorkflowGraph(workspacePath);
+    console.log('[Main] WorkflowGraph initialized');
+  } catch (error) {
+    console.error('[Main] Failed to initialize services:', error);
+  }
+}
 
 // 导出窗口引用供IPC使用
 export function getMainWindow(): BrowserWindow | null {

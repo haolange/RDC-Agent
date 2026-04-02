@@ -3,14 +3,79 @@
  */
 
 import { app, ipcMain, dialog, BrowserWindow } from 'electron';
+import { Command } from '@langchain/langgraph';
 
 // 导入服务
 import { toolBridge } from '../services/ToolBridge';
 import { storageAdapter } from '../services/StorageAdapter';
-import { workflowEngine } from '../services/WorkflowEngine';
+// import { workflowEngine } from '../services/WorkflowEngine'; // 已迁移到 WorkflowGraph
 import { harnessController } from '../services/HarnessController';
 import { agentOrchestrator } from '../services/AgentOrchestrator';
 import { llmAdapter } from '../adapters/LLMAdapter';
+
+// WorkflowGraph 相关导入
+import { createWorkflowGraph } from '../services/WorkflowGraph';
+import { projectToWorkflowState } from '../services/NodeFunctions/utils';
+import { FileCheckpointSaver } from '../services/CheckpointSaver';
+import { rdcToolAdapter } from '../tools/RDCToolAdapter';
+import type { WorkflowStateType } from '../services/WorkflowGraph';
+
+// 模块级变量
+let compiledGraph: ReturnType<typeof createWorkflowGraph> | null = null;
+let checkpointSaver: FileCheckpointSaver | null = null;
+let currentSessionId: string | null = null;
+let mainWindow: BrowserWindow | null = null;
+
+/**
+ * 初始化 WorkflowGraph
+ * 从 index.ts 调用
+ */
+export function initWorkflowGraph(workspacePath: string): void {
+  checkpointSaver = new FileCheckpointSaver(workspacePath);
+  compiledGraph = createWorkflowGraph({ checkpointer: checkpointSaver });
+}
+
+/**
+ * 获取当前 thread_id (使用 sessionId)
+ */
+function getThreadId(): string {
+  return currentSessionId || 'default-thread';
+}
+
+/**
+ * 检查 graph 是否已初始化
+ */
+function ensureGraphInitialized(): boolean {
+  if (!compiledGraph) {
+    console.error('[IPC] WorkflowGraph not initialized');
+    return false;
+  }
+  return true;
+}
+
+/**
+ * 通知渲染层状态变化
+ */
+function notifyWorkflowStateChanged(graphState: WorkflowStateType): void {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const workflowState = projectToWorkflowState(graphState as unknown as import('../../shared/types/workflow').GraphState);
+    mainWindow.webContents.send('workflow:stateChanged', workflowState);
+    mainWindow.webContents.send('workflow:stageChanged', {
+      stage: graphState.currentStage,
+      blockers: graphState.blockers,
+    });
+  }
+}
+
+/**
+ * 检查是否是 interrupt 结果
+ */
+function isInterrupted(result: unknown): result is { __interrupt__: unknown[] } {
+  return result !== null && 
+         typeof result === 'object' && 
+         '__interrupt__' in result && 
+         Array.isArray((result as Record<string, unknown>).__interrupt__);
+}
 
 /**
  * 注册所有IPC处理器
@@ -18,6 +83,9 @@ import { llmAdapter } from '../adapters/LLMAdapter';
 export function registerIPCHandlers(): void {
   // 初始化存储
   storageAdapter.initializeWorkspace().catch(console.error);
+  
+  // 初始化 RDC 工具适配器
+  rdcToolAdapter.initialize().catch(console.error);
 
   // ========== 对话框操作 ==========
 
@@ -71,11 +139,34 @@ export function registerIPCHandlers(): void {
   // ========== 工作流操作 ==========
 
   ipcMain.handle('workflow:getState', async () => {
-    return workflowEngine.getState();
+    if (!ensureGraphInitialized()) {
+      return null;
+    }
+
+    try {
+      // 从 checkpoint 获取最新状态
+      const config = { configurable: { thread_id: getThreadId() } };
+      const state = await compiledGraph!.getState(config);
+      
+      if (state && state.values) {
+        return projectToWorkflowState(state.values as unknown as import('../../shared/types/workflow').GraphState);
+      }
+      return null;
+    } catch (error) {
+      console.error('[IPC] Failed to get workflow state:', error);
+      return null;
+    }
   });
 
   ipcMain.handle('workflow:start', async (_event, capturePaths: string[], userGoal: string) => {
     try {
+      if (!ensureGraphInitialized()) {
+        return {
+          success: false,
+          error: 'WorkflowGraph not initialized',
+        };
+      }
+
       // 执行entry gate
       const gateResult = await harnessController.executeEntryGate({
         capturePaths,
@@ -102,29 +193,52 @@ export function registerIPCHandlers(): void {
         capturePaths,
       });
 
-      // 初始化工作流
-      await workflowEngine.initialize({ caseId, runId, sessionId });
+      // 设置当前 sessionId 作为 thread_id
+      currentSessionId = sessionId;
 
-      // 执行intake gate
-      const caseInput = {
-        session: { mode: 'single', goal: userGoal },
-        symptom: { summary: userGoal },
-        captures: capturePaths.map((_p, i) => ({
-          capture_id: `cap-${i === 0 ? 'anomalous' : 'baseline'}-${i}`,
-          capture_role: i === 0 ? 'anomalous' : 'baseline',
-        })),
+      // 使用 graph.invoke() 启动工作流
+      const config = { configurable: { thread_id: sessionId } };
+      
+      const initialState = {
+        caseId,
+        runId,
+        sessionId,
+        userGoal,
+        capturePaths,
+        currentStage: 'preflight_pending' as const,
+        stageHistory: [],
+        evidenceChain: [],
+        artifacts: [],
+        activeSpecialists: {},
+        pendingBriefs: [],
+        collectedBriefs: {},
+        blockers: [],
+        backtrackCount: {},
+        fixVerified: false,
+        entryMode: 'cli' as const,
+        backend: 'local' as const,
+        orchestrationMode: 'multi_agent' as const,
+        coordinationMode: 'staged_handoff' as const,
+        lastUpdated: new Date().toISOString(),
       };
 
-      const intakeResult = await harnessController.executeIntakeGate(caseId, runId, {
-        caseInput,
-        captureRefs: caseInput.captures,
-      });
+      const result = await compiledGraph!.invoke(initialState, config);
 
-      if (intakeResult.status === 'blocked') {
-        return {
-          success: false,
-          error: intakeResult.blockers.map(b => b.reason).join('; '),
-        };
+      // 检查是否被中断
+      if (isInterrupted(result)) {
+        const interruptData = result.__interrupt__[0];
+        console.log('[IPC] Workflow interrupted:', interruptData);
+        
+        // 通知渲染层阻断状态
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('workflow:blocked', {
+            type: (interruptData as Record<string, unknown>)?.type || 'unknown',
+            data: interruptData,
+          });
+        }
+      } else {
+        // 正常完成，通知状态变化
+        notifyWorkflowStateChanged(result);
       }
 
       return { success: true, caseId, runId, sessionId };
@@ -138,48 +252,172 @@ export function registerIPCHandlers(): void {
   });
 
   ipcMain.handle('workflow:advanceStage', async () => {
-    const result = await workflowEngine.advanceStage();
-    return {
-      success: result.status === 'passed',
-      currentStage: workflowEngine.getState()?.currentStage,
-      error: result.status === 'blocked' ? result.blockers.map(b => b.reason).join('; ') : undefined,
-    };
+    if (!ensureGraphInitialized()) {
+      return {
+        success: false,
+        error: 'WorkflowGraph not initialized',
+      };
+    }
+
+    try {
+      // 使用 Command.resume 从 checkpoint 恢复继续执行
+      const config = { configurable: { thread_id: getThreadId() } };
+      
+      // 发送 resume 命令继续执行
+      const result = await compiledGraph!.invoke(
+        new Command({ resume: { action: 'advance' } }),
+        config
+      );
+
+      // 检查是否被中断
+      if (isInterrupted(result)) {
+        const interruptData = result.__interrupt__[0];
+        return {
+          success: false,
+          currentStage: (interruptData as Record<string, unknown>)?.currentStage,
+          error: `Workflow blocked: ${(interruptData as Record<string, unknown>)?.message || 'Unknown reason'}`,
+        };
+      }
+
+      // 通知状态变化
+      notifyWorkflowStateChanged(result);
+
+      return {
+        success: true,
+        currentStage: result.currentStage,
+      };
+    } catch (error) {
+      console.error('[IPC] Failed to advance stage:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   });
 
   ipcMain.handle('workflow:backtrack', async (_event, reason: string, trigger: string) => {
-    const result = await workflowEngine.backtrack({
-      reason,
-      trigger: trigger as 'specialist_timeout' | 'skeptic_rejected' | 'triage_low_confidence',
-    });
-    return {
-      success: result.status === 'passed',
-      error: result.status === 'blocked' ? result.blockers.map(b => b.reason).join('; ') : undefined,
-    };
+    if (!ensureGraphInitialized()) {
+      return {
+        success: false,
+        error: 'WorkflowGraph not initialized',
+      };
+    }
+
+    try {
+      // 使用 Command.resume 带 backtrack 上下文恢复
+      const config = { configurable: { thread_id: getThreadId() } };
+      
+      const result = await compiledGraph!.invoke(
+        new Command({ 
+          resume: { 
+            action: 'backtrack',
+            reason,
+            trigger,
+          } 
+        }),
+        config
+      );
+
+      // 检查是否被中断
+      if (isInterrupted(result)) {
+        const interruptData = result.__interrupt__[0];
+        return {
+          success: false,
+          error: `Backtrack blocked: ${(interruptData as Record<string, unknown>)?.message || 'Unknown reason'}`,
+        };
+      }
+
+      // 通知状态变化
+      notifyWorkflowStateChanged(result);
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      console.error('[IPC] Failed to backtrack:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   });
 
   ipcMain.handle('workflow:dispatchSpecialist', async (_event, agentId: string, objective: string) => {
-    const state = workflowEngine.getState();
-    if (!state) {
-      return { success: false, error: 'No active workflow' };
+    if (!ensureGraphInitialized()) {
+      return { success: false, error: 'WorkflowGraph not initialized' };
     }
 
-    return agentOrchestrator.dispatchSpecialist(agentId as any, objective, {
-      caseId: state.caseId,
-      runId: state.runId,
-      sessionId: state.sessionId,
-    });
+    try {
+      // 获取当前状态
+      const config = { configurable: { thread_id: getThreadId() } };
+      const currentState = await compiledGraph!.getState(config);
+      
+      if (!currentState || !currentState.values) {
+        return { success: false, error: 'No active workflow' };
+      }
+
+      const state = currentState.values as unknown as WorkflowStateType;
+
+      // 使用 Command 触发 specialist dispatch
+      const result = await compiledGraph!.invoke(
+        new Command({ 
+          resume: { 
+            action: 'dispatchSpecialist',
+            agentId,
+            objective,
+          } 
+        }),
+        config
+      );
+
+      // 检查是否被中断
+      if (isInterrupted(result)) {
+        const interruptData = result.__interrupt__[0];
+        return {
+          success: false,
+          error: `Dispatch blocked: ${(interruptData as Record<string, unknown>)?.message || 'Unknown reason'}`,
+        };
+      }
+
+      // 通知状态变化
+      notifyWorkflowStateChanged(result);
+
+      // 同时调用 agentOrchestrator 保持兼容性
+      return agentOrchestrator.dispatchSpecialist(agentId as any, objective, {
+        caseId: state.caseId,
+        runId: state.runId,
+        sessionId: state.sessionId,
+      });
+    } catch (error) {
+      console.error('[IPC] Failed to dispatch specialist:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   });
 
   // ========== Agent操作 ==========
 
   ipcMain.handle('agent:sendMessage', async (_event, agentId: string, content: string) => {
     try {
-      const state = workflowEngine.getState();
-      const response = await agentOrchestrator.sendMessage(agentId as any, content, state ? {
-        caseId: state.caseId,
-        runId: state.runId,
-        sessionId: state.sessionId,
-      } : undefined);
+      // 从 WorkflowGraph 获取状态
+      let context: { caseId?: string; runId?: string; sessionId?: string } | undefined;
+      
+      if (compiledGraph && currentSessionId) {
+        const config = { configurable: { thread_id: currentSessionId } };
+        const state = await compiledGraph.getState(config);
+        if (state && state.values) {
+          const values = state.values as unknown as WorkflowStateType;
+          context = {
+            caseId: values.caseId,
+            runId: values.runId,
+            sessionId: values.sessionId,
+          };
+        }
+      }
+      
+      const response = await agentOrchestrator.sendMessage(agentId as any, content, context);
       return { response };
     } catch (error) {
       return {
@@ -235,9 +473,21 @@ export function registerIPCHandlers(): void {
     }
 
     const events = await storageAdapter.readActionChain(sessionId);
+    
+    // 从 WorkflowGraph 获取 runId
+    let runId = '';
+    if (compiledGraph && currentSessionId) {
+      const config = { configurable: { thread_id: currentSessionId } };
+      const state = await compiledGraph.getState(config);
+      if (state && state.values) {
+        const values = state.values as unknown as WorkflowStateType;
+        runId = values.runId;
+      }
+    }
+    
     return {
       sessionId,
-      runId: workflowEngine.getState()?.runId || '',
+      runId: runId || '',
       events,
       isValid: true,
     };
@@ -293,6 +543,7 @@ export function registerIPCHandlers(): void {
  * 设置主窗口引用（用于通知UI）
  */
 export function setMainWindow(window: BrowserWindow): void {
-  workflowEngine.setMainWindow(window);
+  mainWindow = window;
+  // workflowEngine.setMainWindow(window); // 已迁移到 WorkflowGraph
   agentOrchestrator.setMainWindow(window);
 }
