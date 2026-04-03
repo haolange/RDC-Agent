@@ -19,12 +19,13 @@ const getRemoteStatusIcon = (status?: string) => {
 export const ContextInfo: React.FC = () => {
   const contextSnapshot = useSessionStore((s) => s.contextSnapshot);
   const currentRun = useSessionStore((s) => s.currentRun);
+  const openedCapture = useSessionStore((s) => s.openedCapture);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).catch(() => undefined);
   };
 
-  if (!contextSnapshot && !currentRun) {
+  if (!contextSnapshot && !currentRun && !openedCapture) {
     return (
       <div className="context-info">
         <div className="context-empty" style={{ padding: '12px 0', textAlign: 'center', fontSize: 'var(--text-xs)', color: 'rgb(var(--color-text-3))' }}>
@@ -36,6 +37,48 @@ export const ContextInfo: React.FC = () => {
 
   return (
     <div className="context-info">
+      {openedCapture && (
+        <div className="context-section">
+          <div className="context-section-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+            <span>Opened Capture</span>
+          </div>
+          <div className="context-section-content">
+            <div className="context-item">
+              <span className="context-item-label">Input ID</span>
+              <span className="context-item-value mono" title={openedCapture.inputId}>
+                {openedCapture.inputId ? `${openedCapture.inputId.slice(0, 12)}…` : '--'}
+              </span>
+            </div>
+            <div className="context-item">
+              <span className="context-item-label">Capture</span>
+              <span className="context-item-value mono" title={openedCapture.filePath}>
+                {openedCapture.filePath.split(/[\\/]/).pop() ?? openedCapture.filePath}
+              </span>
+            </div>
+            <div className="context-item">
+              <span className="context-item-label">Device</span>
+              <span className="context-item-value">{openedCapture.deviceLabel}</span>
+            </div>
+            <div className="context-item">
+              <span className="context-item-label">Backend</span>
+              <span className="context-item-value">
+                <span className={`context-badge ${openedCapture.backend}`}>{openedCapture.backend}</span>
+              </span>
+            </div>
+            <div className="context-item">
+              <span className="context-item-label">Status</span>
+              <span className={`context-item-value ${openedCapture.status === 'open' ? 'active' : ''}`}>
+                {openedCapture.status}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {currentRun && (
         <div className="context-section">
           <div className="context-section-header">
@@ -127,6 +170,9 @@ export const ContextInfo: React.FC = () => {
             window.electronAPI?.context.get()
               .then((snapshot) => useSessionStore.getState().setContextSnapshot(snapshot))
               .catch(() => undefined);
+            window.electronAPI?.capture.getOpenedState()
+              .then((state) => useSessionStore.getState().setOpenedCapture(state))
+              .catch(() => undefined);
           }}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -138,7 +184,22 @@ export const ContextInfo: React.FC = () => {
         <button
           className="context-action-btn"
           onClick={() => {
-            const id = contextSnapshot?.contextId || currentRun?.sessionId;
+            window.electronAPI.capture.clearOpenedState()
+              .then(() => useSessionStore.getState().setOpenedCapture(null))
+              .catch(() => undefined);
+          }}
+          disabled={!openedCapture}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+          <span>Clear Open</span>
+        </button>
+        <button
+          className="context-action-btn"
+          onClick={() => {
+            const id = openedCapture?.contextId || contextSnapshot?.contextId || currentRun?.sessionId;
             if (id) copyToClipboard(id);
           }}
         >

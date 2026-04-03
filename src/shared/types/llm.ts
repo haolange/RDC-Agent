@@ -2,6 +2,9 @@
  * LLM Types - LLM集成相关类型定义
  */
 
+import type { AgentRole } from './agent';
+import type { LlmProviderId, LlmProviderKind } from './settings';
+
 // 内容块类型
 export type ContentBlockType = 'text' | 'image' | 'tool_use' | 'tool_result';
 
@@ -85,34 +88,26 @@ export interface LLMProvider {
 }
 
 // LLM配置
+export interface LLMProviderConfig {
+  id: LlmProviderId;
+  kind: LlmProviderKind;
+  label: string;
+  enabled: boolean;
+  apiKey: string;
+  baseUrl?: string;
+  models: string[];
+  docsUrl?: string;
+}
+
+export interface LLMAgentRouteConfig {
+  agentId: AgentRole;
+  providerId: LlmProviderId;
+  modelId: string;
+}
+
 export interface LLMConfig {
-  defaultProvider: string;
-  openai?: {
-    apiKey: string;
-    baseUrl?: string;
-  };
-  anthropic?: {
-    apiKey: string;
-    baseUrl?: string;
-  };
-  openrouter?: {
-    apiKey: string;
-    baseUrl?: string;
-    defaultModel?: string;
-    agentModelOverrides?: Record<string, string>;
-    temperature?: number;
-  };
-  gemini?: {
-    apiKey: string;
-  };
-  kimi?: {
-    apiKey: string;
-    baseUrl?: string;
-  };
-  xai?: {
-    apiKey: string;
-    baseUrl?: string;
-  };
+  providers: LLMProviderConfig[];
+  agentRoutes: LLMAgentRouteConfig[];
 }
 
 // 流式响应回调

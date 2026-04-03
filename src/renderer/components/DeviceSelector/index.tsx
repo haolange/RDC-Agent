@@ -26,7 +26,31 @@ const StatusText: Record<ReplayDeviceEntry['status'], string> = {
   loading: 'Loading',
   connected: 'Connected',
   online: 'Online',
+  recoverable: 'Recoverable',
 };
+
+function getBootstrapSummary(device: ReplayDeviceEntry): string | null {
+  if (device.type !== 'android' || !device.bootstrap) {
+    return null;
+  }
+
+  const summary: string[] = [];
+  if (device.bootstrap.packageName) {
+    summary.push(device.bootstrap.packageName);
+  }
+  if (device.bootstrap.installMode === 'force_replace') {
+    summary.push('APK force replaced');
+  } else if (device.bootstrap.installedApk) {
+    summary.push('APK installed');
+  } else if (device.bootstrap.packageName) {
+    summary.push('APK verified');
+  }
+  if (device.bootstrap.abi) {
+    summary.push(device.bootstrap.abi);
+  }
+
+  return summary.length > 0 ? summary.join(' · ') : null;
+}
 
 const DeviceStatusIcon: React.FC<{ device: ReplayDeviceEntry }> = ({ device }) => {
   if (device.status === 'online') {
@@ -34,6 +58,9 @@ const DeviceStatusIcon: React.FC<{ device: ReplayDeviceEntry }> = ({ device }) =
   }
   if (device.status === 'connected') {
     return <span className="device-status-icon connected">Connected</span>;
+  }
+  if (device.status === 'recoverable') {
+    return <span className="device-status-icon recoverable">Resume</span>;
   }
   if (device.status === 'loading') {
     return <span className="device-status-icon loading" aria-hidden="true" />;
@@ -47,6 +74,12 @@ export const DeviceSelector: React.FC = () => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selectedEntry = devices.find((device) => device.id === selectedDevice) ?? devices[0];
+  const selectedSummary = selectedEntry?.type === 'local'
+    ? 'Local Replay'
+    : (selectedEntry?.label ?? 'No Device');
+  const selectedStatus = selectedEntry
+    ? StatusText[selectedEntry.status]
+    : 'Offline';
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -73,8 +106,12 @@ export const DeviceSelector: React.FC = () => {
       return;
     }
 
-    if (device.status === 'offline') {
-      await activateDevice(device.id);
+    if (device.status === 'offline' || device.status === 'recoverable') {
+      const activated = await activateDevice(device.id);
+      if (activated && (activated.status === 'connected' || activated.status === 'online')) {
+        setSelectedDevice(activated.id);
+        setIsOpen(false);
+      }
       return;
     }
 
@@ -90,28 +127,35 @@ export const DeviceSelector: React.FC = () => {
     <div className="device-selector-container" ref={dropdownRef}>
       <div className="device-selector-group">
         <button
-          className="device-selector-trigger"
+          className="device-selector-trigger footer-entry"
           onClick={handleToggleOpen}
           aria-expanded={isOpen}
           aria-haspopup="listbox"
         >
-          <div className="device-selector-copy">
-            <span className="device-selector-label">Replay Device</span>
-            <span className="device-selector-summary">
-              {selectedEntry?.type === 'local'
-                ? 'Local Replay'
-                : `${selectedEntry?.label ?? 'No Device'} · ${selectedEntry ? StatusText[selectedEntry.status] : 'Offline'}`}
+          <div className="device-selector-trigger-main">
+            <span className={`device-selector-trigger-icon ${selectedEntry?.type === 'android' ? 'android' : 'local'}`}>
+              <DeviceTypeIcon type={selectedEntry?.type ?? 'local'} />
             </span>
+            <div className="device-selector-copy footer-entry-copy">
+              <span className="device-selector-label footer-entry-label">Replay Device</span>
+              <span className="device-selector-summary footer-entry-title">{selectedSummary}</span>
+            </div>
           </div>
-          <svg className={`device-selector-arrow ${isOpen ? 'open' : ''}`} viewBox="0 0 12 12" fill="currentColor">
-            <path d="M6 8L1 3h10l-5 5z" />
-          </svg>
+          <div className="device-selector-trigger-meta">
+            <span className={`device-selector-trigger-status ${selectedEntry?.status ?? 'offline'}`}>
+              {selectedStatus}
+            </span>
+            <svg className={`device-selector-arrow footer-entry-chevron ${isOpen ? 'open' : ''}`} viewBox="0 0 12 12" fill="currentColor">
+              <path d="M6 8L1 3h10l-5 5z" />
+            </svg>
+          </div>
         </button>
 
         {isOpen && (
           <div className="device-selector-dropdown" role="listbox">
             {devices.map((device) => {
               const selectable = device.type === 'local' || device.status === 'connected' || device.status === 'online';
+              const bootstrapSummary = getBootstrapSummary(device);
               return (
                 <button
                   key={device.id}
@@ -134,6 +178,7 @@ export const DeviceSelector: React.FC = () => {
                     </div>
                   </div>
                   {device.serial && <div className="device-option-meta">{device.serial}</div>}
+                  {bootstrapSummary && <div className="device-option-bootstrap">{bootstrapSummary}</div>}
                   {!selectable && device.lastError && <div className="device-option-error">{device.lastError}</div>}
                 </button>
               );

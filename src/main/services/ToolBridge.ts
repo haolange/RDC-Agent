@@ -10,6 +10,13 @@ import { app } from 'electron';
 import type { ToolCallRequest, ToolCallResult, ToolCatalog, CLIResult } from '@shared/types/tool';
 import { nowMs, generateEventId } from '@shared/utils/id';
 
+interface WindowsLauncherSpec {
+  powershellPath: string;
+  launcherScriptPath: string;
+  systemRoot: string;
+  comSpec: string;
+}
+
 export class ToolBridge {
   private toolsPath: string;
   private catalog: ToolCatalog | null = null;
@@ -39,12 +46,47 @@ export class ToolBridge {
     return path.join(this.toolsPath, 'rdx.bat');
   }
 
+  private resolveWindowsLauncher(): WindowsLauncherSpec {
+    const toolsRoot = path.resolve(this.toolsPath);
+    if (!fs.existsSync(toolsRoot)) {
+      throw new Error(`RDX tools root not found: ${toolsRoot}`);
+    }
+
+    const launcherScriptPath = path.join(toolsRoot, 'scripts', 'rdx_bat_launcher.ps1');
+    if (!fs.existsSync(launcherScriptPath)) {
+      throw new Error(`RDX launcher script not found: ${launcherScriptPath}`);
+    }
+
+    const systemRoot = process.env.SystemRoot?.trim()
+      || process.env.windir?.trim()
+      || 'C:\\Windows';
+    const powershellPath = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+    if (!fs.existsSync(powershellPath)) {
+      throw new Error(`Windows PowerShell launcher not found: ${powershellPath}`);
+    }
+
+    return {
+      powershellPath,
+      launcherScriptPath,
+      systemRoot,
+      comSpec: process.env.ComSpec?.trim() || path.join(systemRoot, 'System32', 'cmd.exe'),
+    };
+  }
+
   /**
    * 检查工具是否可用
    */
   isAvailable(): boolean {
-    const rdxPath = this.getRdxPath();
-    return fs.existsSync(rdxPath);
+    if (process.platform !== 'win32') {
+      return false;
+    }
+
+    try {
+      const launcher = this.resolveWindowsLauncher();
+      return fs.existsSync(launcher.launcherScriptPath);
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -86,18 +128,53 @@ export class ToolBridge {
     } = {}
   ): Promise<CLIResult> {
     const startTime = nowMs();
-    const rdxPath = this.getRdxPath();
+
+    if (process.platform !== 'win32') {
+      return {
+        exitCode: 2,
+        stdout: '',
+        stderr: 'RDC-Agent currently supports the bundled Windows launcher only.',
+        duration_ms: nowMs() - startTime,
+      };
+    }
+
+    let launcher: WindowsLauncherSpec;
+    try {
+      launcher = this.resolveWindowsLauncher();
+    } catch (error) {
+      return {
+        exitCode: 2,
+        stdout: '',
+        stderr: error instanceof Error ? error.message : String(error),
+        duration_ms: nowMs() - startTime,
+      };
+    }
 
     return new Promise((resolve, reject) => {
       const proc = spawn(
-        'cmd.exe',
-        ['/c', rdxPath, '--non-interactive', 'cli', command, ...args],
+        launcher.powershellPath,
+        [
+          '-NoProfile',
+          '-NoLogo',
+          '-NonInteractive',
+          '-ExecutionPolicy',
+          'Bypass',
+          '-File',
+          launcher.launcherScriptPath,
+          '--non-interactive',
+          'cli',
+          command,
+          ...args,
+        ],
         {
           cwd: options.cwd || this.toolsPath,
           env: {
             ...process.env,
             ...options.env,
+            RDX_TOOLS_ROOT: this.toolsPath,
             PYTHONIOENCODING: 'utf-8',
+            SystemRoot: launcher.systemRoot,
+            ComSpec: launcher.comSpec,
           },
           windowsHide: true,
         }
@@ -141,7 +218,12 @@ export class ToolBridge {
       proc.on('error', (error) => {
         if (timeoutId) clearTimeout(timeoutId);
         this.activeProcesses.delete(procId);
-        reject(error);
+        resolve({
+          exitCode: 2,
+          stdout,
+          stderr: error instanceof Error ? error.message : String(error),
+          duration_ms: nowMs() - startTime,
+        });
       });
     });
   }

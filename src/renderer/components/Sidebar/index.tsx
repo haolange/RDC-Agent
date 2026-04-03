@@ -1,112 +1,287 @@
-﻿import React, { useState } from 'react';
-import { NavMenu, NavItemKey } from './NavMenu';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useSessionStore } from '../../stores/sessionStore';
-import type { RunSummary } from '@shared/types/session';
+import { useI18n } from '../../i18n';
+import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import './Sidebar.css';
 
-const STATUS_CLASS: Record<string, string> = {
-  running: 'in-progress',
-  completed: 'completed',
-  failed: 'error',
-  cancelled: 'error',
-};
+interface SidebarProps {
+  collapsed?: boolean;
+}
 
-const MODE_LABELS: Record<string, string> = {
-  debugger: 'Debugger',
-  analyzer: 'Analyzer',
-  optimizer: 'Optimizer',
-};
+export const Sidebar: React.FC<SidebarProps> = ({
+  collapsed = false,
+}) => {
+  const { t } = useI18n();
+  const [isBusy, setIsBusy] = useState(false);
 
-const formatTime = (ts: number): string => {
-  const diff = Date.now() - ts;
-  if (diff < 60_000) return '\u521a\u521a';
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} \u5206\u949f\u524d`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} \u5c0f\u65f6\u524d`;
-  return `${Math.floor(diff / 86_400_000)} \u5929\u524d`;
-};
+  const projects = useSessionStore((state) => state.projects);
+  const sessions = useSessionStore((state) => state.sessions);
+  const currentProject = useSessionStore((state) => state.currentProject);
+  const currentSession = useSessionStore((state) => state.currentSession);
+  const setProjects = useSessionStore((state) => state.setProjects);
+  const setSessions = useSessionStore((state) => state.setSessions);
+  const setCurrentProject = useSessionStore((state) => state.setCurrentProject);
+  const setCurrentSession = useSessionStore((state) => state.setCurrentSession);
+  const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
+  const setRuns = useSessionStore((state) => state.setRuns);
+  const setCaptures = useSessionStore((state) => state.setCaptures);
+  const setProjectInputs = useSessionStore((state) => state.setProjectInputs);
 
-export const Sidebar: React.FC = () => {
-  const [activeNavKey, setActiveNavKey] = useState<NavItemKey>('new-task');
-  const recentRuns = useSessionStore((s) => s.recentRuns);
-  const setCurrentRun = useSessionStore((s) => s.setCurrentRun);
-  const currentRun = useSessionStore((s) => s.currentRun);
+  const loadRuns = useCallback(async (sessionId: string) => {
+    const result = await window.electronAPI.run.list(sessionId);
+    setRuns(result.runs ?? []);
+    return result.runs ?? [];
+  }, [setRuns]);
 
-  const handleNavSelect = (key: NavItemKey) => {
-    setActiveNavKey(key);
-    if (key === 'new-task') {
-      useSessionStore.getState().reset();
+  const selectSession = useCallback(async (sessionId: string) => {
+    const result = await window.electronAPI.session.select(sessionId);
+    if (!result.success || !result.session) {
+      return;
     }
-  };
 
-  const handleRunSelect = async (run: RunSummary) => {
+    setCurrentSession(result.session);
+    setCurrentRun(result.currentRun ?? null);
+    setCaptures(result.currentRun?.captures ?? []);
+    await loadRuns(sessionId);
+  }, [loadRuns, setCaptures, setCurrentRun, setCurrentSession]);
+
+  const loadSessions = useCallback(async (project: ProjectRecord, preferredSessionId?: string | null) => {
+    const result = await window.electronAPI.session.list(project.projectId);
+    const nextSessions = result.sessions ?? [];
+    setSessions(nextSessions);
+    setCurrentProject(project);
+    setProjectInputs(project.inputs ?? []);
+
+    const targetSessionId = preferredSessionId
+      || project.lastSessionId
+      || nextSessions[0]?.sessionId
+      || null;
+
+    if (!targetSessionId) {
+      setCurrentSession(null);
+      setCurrentRun(null);
+      setCaptures([]);
+      setRuns([]);
+      return;
+    }
+
+    await selectSession(targetSessionId);
+  }, [selectSession, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setProjectInputs, setRuns, setSessions]);
+
+  const loadProjects = useCallback(async (preferredProjectId?: string | null, preferredSessionId?: string | null) => {
+    const result = await window.electronAPI.project.list();
+    const nextProjects = result.projects ?? [];
+    setProjects(nextProjects);
+
+    const targetProject = nextProjects.find((project) => project.projectId === preferredProjectId)
+      || nextProjects[0]
+      || null;
+
+    if (!targetProject) {
+      setCurrentProject(null);
+      setCurrentSession(null);
+      setCurrentRun(null);
+      setProjectInputs([]);
+      setCaptures([]);
+      setSessions([]);
+      setRuns([]);
+      return;
+    }
+
+    await loadSessions(targetProject, preferredSessionId);
+  }, [loadSessions, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setProjectInputs, setProjects, setRuns, setSessions]);
+
+  useEffect(() => {
+    void loadProjects();
+  }, [loadProjects]);
+
+  const handleAddProject = useCallback(async () => {
+    const rootPath = await window.electronAPI.selectDirectory();
+    if (!rootPath) return;
+
+    setIsBusy(true);
     try {
-      await window.electronAPI.session.select(run.sessionId);
-      setCurrentRun(run);
-    } catch {
-      /* ignore */
+      const result = await window.electronAPI.project.add(rootPath);
+      if (!result.success || !result.project) {
+        return;
+      }
+
+      await loadProjects(result.project.projectId);
+    } finally {
+      setIsBusy(false);
     }
-  };
+  }, [loadProjects]);
+
+  const handleRemoveProject = useCallback(async () => {
+    if (!currentProject) return;
+
+    setIsBusy(true);
+    try {
+      await window.electronAPI.project.remove(currentProject.projectId);
+      await loadProjects();
+    } finally {
+      setIsBusy(false);
+    }
+  }, [currentProject, loadProjects]);
+
+  const handleProjectSelect = useCallback(async (project: ProjectRecord) => {
+    setIsBusy(true);
+    try {
+      await loadSessions(project);
+    } finally {
+      setIsBusy(false);
+    }
+  }, [loadSessions]);
+
+  const handleSessionCreate = useCallback(async () => {
+    if (!currentProject) return;
+
+    setIsBusy(true);
+    try {
+      const result = await window.electronAPI.session.create(currentProject.projectId);
+      if (!result.success || !result.session) {
+        return;
+      }
+
+      await loadProjects(currentProject.projectId, result.session.sessionId);
+    } finally {
+      setIsBusy(false);
+    }
+  }, [currentProject, loadProjects]);
+
+  const handleSessionSelect = useCallback(async (session: SessionRecord) => {
+    setIsBusy(true);
+    try {
+      await selectSession(session.sessionId);
+    } finally {
+      setIsBusy(false);
+    }
+  }, [selectSession]);
 
   return (
-    <div className="sidebar-content">
-      <NavMenu activeKey={activeNavKey} onSelect={handleNavSelect} />
+    <div className={`sidebar-content ${collapsed ? 'collapsed' : ''}`}>
+      <div className="sidebar-scroll">
+        <div className={`session-section ${collapsed ? 'hidden' : ''}`}>
+          <div className="session-section-header">
+            <div className="session-section-heading">
+              <span className="session-section-title">{t('sidebar.projects')}</span>
+              {projects.length > 0 && (
+                <span className="session-section-count">{projects.length}</span>
+              )}
+            </div>
+            <div className="session-section-actions">
+              {currentProject && (
+                <button
+                  type="button"
+                  className="session-section-action"
+                  title={t('sidebar.removeProject')}
+                  onClick={() => void handleRemoveProject()}
+                  disabled={isBusy}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4h8v2" />
+                    <path d="M19 6l-1 14H6L5 6" />
+                  </svg>
+                </button>
+              )}
+              <button
+                type="button"
+                className="session-section-action"
+                title={t('sidebar.addProject')}
+                onClick={() => void handleAddProject()}
+                disabled={isBusy}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
+                </svg>
+              </button>
+            </div>
+          </div>
 
-      <div className="session-section">
-        <div className="session-section-header">
-          <span className="session-section-title">\u5386\u53f2\u8bb0\u5f55</span>
-          <button
-            type="button"
-            className="session-section-action"
-            title="\u5237\u65b0"
-            onClick={() => {
-              window.electronAPI?.workflow.listRuns()
-                .then((r) => useSessionStore.getState().setRecentRuns(r.runs ?? []))
-                .catch(() => undefined);
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M13.65 2.35A8 8 0 1 0 15.94 7H8V9H13.91A6 6 0 1 1 11.13 3.13L8 6.25V2H12L13.65 2.35Z"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
+          {projects.length === 0 ? (
+            <div className="session-empty">
+              <div className="session-empty-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2h6.5A2.5 2.5 0 0 1 21 9.5v8A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z" />
+                </svg>
+              </div>
+              <div className="session-empty-text">{t('sidebar.noProjects')}</div>
+              <div className="session-empty-hint">{t('sidebar.noProjectsHint')}</div>
+            </div>
+          ) : (
+            <div className="session-list project-list">
+              {projects.map((project) => (
+                <button
+                  key={project.projectId}
+                  type="button"
+                  className={`session-item project-item ${currentProject?.projectId === project.projectId ? 'active' : ''}`}
+                  onClick={() => void handleProjectSelect(project)}
+                >
+                  <div className="session-item-header">
+                    <span className="session-item-title">{project.name}</span>
+                  </div>
+                  <span className="session-item-time">{project.rootPath}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {recentRuns.length === 0 ? (
-          <div className="session-empty">
-            <div className="session-empty-icon">
-              <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2 2" />
-                <path d="M5 8H11M8 5V11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray="2 2" />
-              </svg>
+        <div className={`session-section ${collapsed ? 'hidden' : ''}`}>
+          <div className="session-section-header">
+            <div className="session-section-heading">
+              <span className="session-section-title">{t('sidebar.sessions')}</span>
+              {sessions.length > 0 && (
+                <span className="session-section-count">{sessions.length}</span>
+              )}
             </div>
-            <div className="session-empty-text">\u6682\u65e0\u5386\u53f2 Run</div>
-            <div className="session-empty-hint">\u5b8c\u6210\u4e00\u6b21\u8c03\u8bd5\u540e\u5c06\u663e\u793a\u5728\u8fd9\u91cc</div>
-          </div>
-        ) : (
-          <div className="session-list">
-            {recentRuns.slice(0, 8).map((run) => (
+            <div className="session-section-actions">
               <button
-                key={run.runId}
                 type="button"
-                className={`session-item ${currentRun?.runId === run.runId ? 'active' : ''}`}
-                onClick={() => void handleRunSelect(run)}
+                className="session-section-action"
+                title={t('sidebar.addSession')}
+                onClick={() => void handleSessionCreate()}
+                disabled={isBusy || !currentProject}
               >
-                <div className="session-item-header">
-                  <span className="session-item-title">{run.goal || run.runId.slice(0, 12)}</span>
-                  <span className={`session-item-status ${STATUS_CLASS[run.status] ?? 'completed'}`} />
-                </div>
-                <span className="session-item-time">
-                  {MODE_LABELS[run.mode] ?? run.mode} · {formatTime(run.startedAt)}
-                </span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
+                </svg>
               </button>
-            ))}
+            </div>
           </div>
-        )}
+
+          {!currentProject ? (
+            <div className="session-empty compact">
+              <div className="session-empty-text">{t('sidebar.projectRequired')}</div>
+            </div>
+          ) : sessions.length === 0 ? (
+            <div className="session-empty compact">
+              <div className="session-empty-text">{t('sidebar.noSessions')}</div>
+              <div className="session-empty-hint">{t('sidebar.noSessionsHint')}</div>
+            </div>
+          ) : (
+            <div className="session-list">
+              {sessions.map((session) => (
+                <button
+                  key={session.sessionId}
+                  type="button"
+                  className={`session-item ${currentSession?.sessionId === session.sessionId ? 'active' : ''}`}
+                  onClick={() => void handleSessionSelect(session)}
+                >
+                  <div className="session-item-header">
+                    <span className="session-item-title">{session.title}</span>
+                  </div>
+                  <span className="session-item-time">
+                    {session.goal ? session.goal : new Date(session.updatedAt).toLocaleString()}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

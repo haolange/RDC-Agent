@@ -6,7 +6,11 @@
 
 ## 它能做什么
 
-- 导入或拖入一个或多个 `.rdc` 文件。
+- 将项目目录接入到 `Project` 体系，并自动使用 `<project-root>/.resource/` 作为项目资源目录。
+- 在右侧栏浏览、导入和打开 `<project-root>/.resource/inputs/` 下的 `.rdc` 文件。
+- 按当前 `Replay Device` 打开单个 `.rdc`，由 app 内部维护活动 `contextId` / capture session。
+- 在设置中心把 `workspace` 配置为单一工作根目录，并由它统一派生 `settings.json`、日志和运行数据目录。
+- 在模型设置页管理 `provider`、启用模型清单以及 `Agent -> provider/model` 路由。
 - 启动一个围绕渲染问题的调试会话。
 - 通过多个专门角色进行协作分析，例如 triage、pixel forensics、shader IR、driver/device、skeptic 和 curator。
 - 用工作流状态机控制阶段推进、阻断处理和受控回转。
@@ -14,7 +18,7 @@
 
 ## 目前的界面
 
-- `Debugger`：主入口，支持选择 `.rdc` 文件并启动会话。
+- `Debugger`：主入口，顶部 titlebar 中央切换模式，右侧栏负责 `Project Inputs`、`Capture Control` 和 `Context Info`。
 - `Analyzer`：预留入口，当前仍是占位。
 - `Optimizer`：预留入口，当前仍是占位。
 
@@ -25,6 +29,27 @@
 - `src/renderer`：前端界面，包括页面、组件和样式。
 - `src/shared`：跨层共享的常量、类型和工具函数。
 - `docs`：设计说明、流程说明和演示文档。
+
+## 数据结构
+
+- `Project`：用户手动添加的本地项目根目录。
+- `Project Resource`：
+  - `project knowledge`：位于项目根目录下的 `.resource/knowledge/`
+  - `project inputs`：位于项目根目录下的 `.resource/inputs/`
+- `Session`：项目下的问题线程，每个线程拥有独立目录。
+- `Run`：线程下的一次实际调试执行。
+- `Knowledge`：
+  - `global knowledge`：位于应用 `userData` 目录，由安装包内置 seed 首次复制生成
+
+运行期数据现在统一存放在设置中心配置的 `workspace root` 下，默认会落到系统 `appData/rdc-agent` 目录，并派生出：
+
+- `<workspace-root>/settings.json`
+- `<workspace-root>/logs/rdc-agent.log`
+- `<workspace-root>/projects/`
+- `<workspace-root>/knowledge/`
+- `<workspace-root>/migration-orphans/`
+
+`session/run` 主数据仍然不写回项目源码目录，也不再放回仓库根目录的 `workspace/` 中。
 
 ## 开发运行
 

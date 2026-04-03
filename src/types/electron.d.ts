@@ -7,8 +7,19 @@ import type { AgentRole, AgentState, AgentConfig } from '../shared/types/agent';
 import type { ActionEvent, EventType } from '../shared/types/evidence';
 import type { ToolCallResult, ToolCatalog } from '../shared/types/tool';
 import type { LLMConfig } from '../shared/types/llm';
-import type { DebugSessionStartRequest, RunSummary, CaptureDescriptor, ContextSnapshot } from '../shared/types/session';
+import type {
+  DebugSessionStartRequest,
+  RunSummary,
+  CaptureDescriptor,
+  ContextSnapshot,
+  OpenedCaptureState,
+  OpenProjectInputRequest,
+  ProjectInputRecord,
+  ProjectRecord,
+  SessionRecord,
+} from '../shared/types/session';
 import type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from '../shared/types/device';
+import type { AppSettings, AppSettingsPatch, ResolvedTheme } from '../shared/types/settings';
 
 export interface ElectronAPI {
   platform: NodeJS.Platform;
@@ -20,6 +31,18 @@ export interface ElectronAPI {
     get: () => Promise<{
       version: string;
       productName: string;
+      systemTheme: ResolvedTheme;
+    }>;
+  };
+
+  appShell: {
+    selectAvatar: () => Promise<string | null>;
+    openPath: (targetPath: string) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    copyText: (text: string) => Promise<{
+      success: boolean;
     }>;
   };
 
@@ -95,15 +118,30 @@ export interface ElectronAPI {
   };
 
   settings: {
-    get: () => Promise<{
-      theme: string;
-      llm: {
-        defaultProvider: string;
-      };
-      agents: Record<AgentRole, Partial<AgentConfig>>;
-      openRouter?: unknown;
+    get: () => Promise<AppSettings>;
+    set: (settings: AppSettingsPatch) => Promise<AppSettings>;
+  };
+
+  project: {
+    list: () => Promise<{ projects: ProjectRecord[] }>;
+    add: (rootPath: string) => Promise<{
+      success: boolean;
+      project?: ProjectRecord;
+      error?: string;
     }>;
-    set: (settings: Record<string, unknown>) => Promise<void>;
+    remove: (projectId: string) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
+    inputs: {
+      list: (projectId: string) => Promise<{ inputs: ProjectInputRecord[] }>;
+      refresh: (projectId: string) => Promise<{ inputs: ProjectInputRecord[] }>;
+      import: (projectId: string) => Promise<{
+        success: boolean;
+        inputs: ProjectInputRecord[];
+        error?: string;
+      }>;
+    };
   };
 
   device: {
@@ -113,8 +151,22 @@ export interface ElectronAPI {
   };
 
   session: {
-    list: () => Promise<{ sessions: unknown[] }>;
-    select: (id: string) => Promise<{ success: boolean }>;
+    list: (projectId?: string) => Promise<{ sessions: SessionRecord[] }>;
+    create: (projectId: string, title?: string) => Promise<{
+      success: boolean;
+      session?: SessionRecord;
+      error?: string;
+    }>;
+    select: (id: string) => Promise<{
+      success: boolean;
+      session?: SessionRecord;
+      currentRun?: RunSummary | null;
+      error?: string;
+    }>;
+  };
+
+  run: {
+    list: (sessionId: string) => Promise<{ runs: RunSummary[] }>;
   };
 
   capture: {
@@ -123,6 +175,18 @@ export interface ElectronAPI {
     select: (captureId: string) => Promise<{
       success: boolean;
       error?: string;
+    }>;
+    openProjectInput: (
+      request: Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string }
+    ) => Promise<{
+      success: boolean;
+      openedCapture?: OpenedCaptureState;
+      contextSnapshot?: ContextSnapshot;
+      error?: string;
+    }>;
+    getOpenedState: () => Promise<OpenedCaptureState | null>;
+    clearOpenedState: () => Promise<{
+      success: boolean;
     }>;
   };
 
@@ -140,6 +204,9 @@ export interface ElectronAPI {
     onDeviceStatusChanged: (callback: (status: ReplayDeviceStatusChangedPayload) => void) => void;
     onCaptureStatusChanged: (callback: (status: unknown) => void) => void;
     onContextChanged: (callback: (snapshot: ContextSnapshot) => void) => void;
+    onProjectInputsChanged: (callback: (payload: { projectId: string; inputs: ProjectInputRecord[] }) => void) => void;
+    onOpenedCaptureStateChanged: (callback: (state: OpenedCaptureState | null) => void) => void;
+    onAppThemeChanged: (callback: (theme: ResolvedTheme) => void) => void;
     removeAllListeners: (channel: string) => void;
   };
 

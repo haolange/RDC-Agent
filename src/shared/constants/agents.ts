@@ -133,13 +133,13 @@ export const AGENT_MODES: ModeConfig[] = [
     label: 'Analyzer',
     icon: 'chart',
     description: 'Analyze performance and resource usage',
-    disabled: true,
+    disabled: false,
   },
   {
     id: 'optimizer',
     label: 'Optimizer',
     icon: 'zap',
     description: 'Optimize shaders and draw calls',
-    disabled: true,
+    disabled: false,
   },
 ];

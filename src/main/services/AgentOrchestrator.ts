@@ -25,6 +25,7 @@ import { llmAdapter } from '../adapters/LLMAdapter';
 import { storageAdapter } from './StorageAdapter';
 import { harnessController } from './HarnessController';
 import { generateEventId, nowMs, nowIso } from '@shared/utils/id';
+import type { LLMConfig } from '@shared/types/llm';
 
 // ============================================
 // Specialist 工具绑定（Task 4b）
@@ -196,6 +197,19 @@ export class AgentOrchestrator {
    */
   getAgentConfig(agentId: AgentRole): AgentConfig | null {
     return this.agentConfigs.get(agentId) || null;
+  }
+
+  applyLlmConfig(config: LLMConfig): void {
+    const routeMap = new Map(config.agentRoutes.map((route) => [route.agentId, route]));
+    for (const [agentId, agentConfig] of this.agentConfigs.entries()) {
+      const fallback = DEFAULT_MODEL_ROUTING[agentId];
+      const route = routeMap.get(agentId);
+      this.agentConfigs.set(agentId, {
+        ...agentConfig,
+        modelProvider: route?.providerId ?? fallback.provider,
+        modelName: route?.modelId ?? fallback.model,
+      });
+    }
   }
 
   /**

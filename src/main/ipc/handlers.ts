@@ -2,7 +2,8 @@
  * IPC Handlers - 注册所有IPC处理�?
  */
 
-import { app, ipcMain, dialog, BrowserWindow } from 'electron';
+import fs from 'fs';
+import { app, ipcMain, dialog, BrowserWindow, clipboard, nativeTheme, shell } from 'electron';
 import { Command } from '@langchain/langgraph';
 
 // 导入服务
@@ -15,19 +16,23 @@ import { llmAdapter } from '../adapters/LLMAdapter';
 import { settingsService } from '../services/SettingsService';
 import { replayDeviceService } from '../services/ReplayDeviceService';
 import { rdxSessionService } from '../index';
-import type { DebugSessionStartRequest, RunSummary } from '@shared/types/session';
+import { appPathService } from '../services/AppPathService';
+import type { DebugSessionStartRequest, OpenProjectInputRequest, RunSummary } from '@shared/types/session';
 
 // WorkflowGraph 相关导入
 import { createWorkflowGraph } from '../services/WorkflowGraph';
 import { projectToWorkflowState } from '../services/NodeFunctions/utils';
 import { FileCheckpointSaver } from '../services/CheckpointSaver';
-import { rdcToolAdapter } from '../tools/RDCToolAdapter';
 import type { WorkflowStateType } from '../services/WorkflowGraph';
+import type { AppSettingsPatch } from '@shared/types/settings';
+import type { SessionRecord } from '@shared/types/session';
 
 // 模块级变�?
 let compiledGraph: ReturnType<typeof createWorkflowGraph> | null = null;
 let checkpointSaver: FileCheckpointSaver | null = null;
 let currentSessionId: string | null = null;
+let currentProjectId: string | null = null;
+let currentRunId: string | null = null;
 let mainWindow: BrowserWindow | null = null;
 
 /**
@@ -40,9 +45,11 @@ export async function initWorkflowGraph(workspacePath: string): Promise<void> {
 
   try {
     currentSessionId = await storageAdapter.getCurrentSessionId();
+    currentProjectId = storageAdapter.getCurrentProjectId();
   } catch (error) {
     console.warn('[IPC] Failed to restore current session id:', error);
     currentSessionId = null;
+    currentProjectId = null;
   }
 }
 
@@ -51,6 +58,15 @@ export async function initWorkflowGraph(workspacePath: string): Promise<void> {
  */
 function getThreadId(): string {
   return currentSessionId || 'default-thread';
+}
+
+function getGraphConfig(): { configurable: { thread_id: string; checkpoint_ns?: string } } {
+  return {
+    configurable: {
+      thread_id: getThreadId(),
+      checkpoint_ns: currentRunId || undefined,
+    },
+  };
 }
 
 /**
@@ -104,24 +120,14 @@ function isInterrupted(result: unknown): result is { __interrupt__: unknown[] } 
  * 注册所有IPC处理�?
  */
 export function registerIPCHandlers(): void {
-  // 初始化存�?
-  storageAdapter.initializeWorkspace().catch(console.error);
-  
-  // 初始�?RDC 工具适配�?
-  rdcToolAdapter.initialize().catch(console.error);
-
-  // Load OpenRouter config from persistent settings and apply to LLMAdapter
+  // Load persisted LLM config and apply to runtime
   try {
-    const orConfig = settingsService.getOpenRouterConfig();
-    if (orConfig.apiKey) {
-      llmAdapter.configure({
-        defaultProvider: 'openrouter',
-        openrouter: { apiKey: orConfig.apiKey, baseUrl: orConfig.baseUrl },
-      });
-      console.log('[IPC] Loaded OpenRouter config from persistent settings');
-    }
+    const llmConfig = settingsService.getLlmConfig();
+    llmAdapter.configure(llmConfig);
+    agentOrchestrator.applyLlmConfig(llmConfig);
+    console.log('[IPC] Loaded persisted LLM config');
   } catch (err) {
-    console.warn('[IPC] Failed to preload OpenRouter config:', err);
+    console.warn('[IPC] Failed to preload LLM config:', err);
   }
 
   // ========== 对话框操�?==========
@@ -170,7 +176,36 @@ export function registerIPCHandlers(): void {
     return {
       version: app.getVersion(),
       productName: app.getName(),
+      systemTheme: nativeTheme.shouldUseDarkColors ? 'dark' : 'light',
     };
+  });
+
+  ipcMain.handle('app:selectAvatar', async () => {
+    const result = await dialog.showOpenDialog({
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }],
+      properties: ['openFile'],
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
+
+  ipcMain.handle('app:openPath', async (_event, targetPath: string) => {
+    if (!targetPath) return { success: false, error: 'path is required' };
+    try {
+      const stats = fs.existsSync(targetPath) ? fs.statSync(targetPath) : null;
+      if (stats?.isDirectory()) {
+        await shell.openPath(targetPath);
+      } else {
+        shell.showItemInFolder(targetPath);
+      }
+    } catch {
+      shell.showItemInFolder(targetPath);
+    }
+    return { success: true };
+  });
+
+  ipcMain.handle('app:copyText', async (_event, text: string) => {
+    clipboard.writeText(text ?? '');
+    return { success: true };
   });
 
   // ========== 工作流操�?==========
@@ -182,7 +217,7 @@ export function registerIPCHandlers(): void {
 
     try {
       // �?checkpoint 获取最新状�?
-      const config = { configurable: { thread_id: getThreadId() } };
+      const config = getGraphConfig();
       const state = await compiledGraph!.getState(config);
       
       if (state && state.values) {
@@ -200,6 +235,8 @@ export function registerIPCHandlers(): void {
       // 从 storageAdapter 加载指定 session 并恢复 context
       if (sessionId) {
         currentSessionId = sessionId;
+        await storageAdapter.setCurrentSessionId(sessionId);
+        currentRunId = storageAdapter.getLatestRun(sessionId)?.runId || null;
       }
       return { success: true };
     } catch (err) {
@@ -208,16 +245,105 @@ export function registerIPCHandlers(): void {
   });
 
   ipcMain.handle('workflow:listRuns', async () => {
-    return { runs: [] as RunSummary[] };
+    if (!currentSessionId) {
+      return { runs: [] as RunSummary[] };
+    }
+    return { runs: storageAdapter.listRuns(currentSessionId) };
   });
 
-  ipcMain.handle('session:list', async () => {
-    return { sessions: [] };
+  ipcMain.handle('project:list', async () => {
+    return { projects: storageAdapter.listProjects() };
+  });
+
+  ipcMain.handle('project:add', async (_event, rootPath: string) => {
+    try {
+      const project = storageAdapter.createProject(rootPath);
+      currentProjectId = project.projectId;
+      return { success: true, project };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('project:remove', async (_event, projectId: string) => {
+    try {
+      storageAdapter.removeProject(projectId);
+      if (currentProjectId === projectId) {
+        currentProjectId = null;
+        currentSessionId = null;
+        currentRunId = null;
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('project:inputs:list', async (_event, projectId: string) => {
+    return { inputs: storageAdapter.listProjectInputs(projectId) };
+  });
+
+  ipcMain.handle('project:inputs:refresh', async (_event, projectId: string) => {
+    const inputs = storageAdapter.refreshProjectInputs(projectId);
+    broadcastToRenderer('project:inputsChanged', { projectId, inputs });
+    return { inputs };
+  });
+
+  ipcMain.handle('project:inputs:import', async (_event, projectId: string) => {
+    const result = await dialog.showOpenDialog({
+      filters: [{ name: 'RenderDoc Capture', extensions: ['rdc'] }],
+      properties: ['openFile', 'multiSelections'],
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: true, inputs: storageAdapter.listProjectInputs(projectId) };
+    }
+
+    const inputs = storageAdapter.importProjectInputs(projectId, result.filePaths);
+    broadcastToRenderer('project:inputsChanged', { projectId, inputs });
+    return { success: true, inputs };
+  });
+
+  ipcMain.handle('session:list', async (_event, projectId?: string) => {
+    const resolvedProjectId = projectId || currentProjectId;
+    if (!resolvedProjectId) {
+      return { sessions: [] as SessionRecord[] };
+    }
+    return { sessions: storageAdapter.listSessions(resolvedProjectId) };
+  });
+
+  ipcMain.handle('session:create', async (_event, projectId: string, title?: string) => {
+    try {
+      const session = storageAdapter.createSession(projectId, title);
+      currentProjectId = session.projectId;
+      currentSessionId = session.sessionId;
+      currentRunId = null;
+      await storageAdapter.setCurrentSessionId(session.sessionId);
+      return { success: true, session };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
   });
 
   ipcMain.handle('session:select', async (_event, id: string) => {
+    const session = storageAdapter.readSession(id);
+    if (!session) {
+      return { success: false, error: `Session not found: ${id}` };
+    }
+
     currentSessionId = id;
-    return { success: true };
+    currentProjectId = session.projectId;
+    currentRunId = session.lastRunId || null;
+    await storageAdapter.setCurrentSessionId(id);
+    return {
+      success: true,
+      session,
+      currentRun: storageAdapter.getLatestRun(id),
+    };
+  });
+
+  ipcMain.handle('run:list', async (_event, sessionId: string) => {
+    return { runs: storageAdapter.listRuns(sessionId) };
   });
 
   ipcMain.handle('context:get', async () => {
@@ -238,6 +364,48 @@ export function registerIPCHandlers(): void {
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
     }
+  });
+
+  ipcMain.handle(
+    'capture:openProjectInput',
+    async (_event, request: Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string }) => {
+      try {
+        const input = storageAdapter.listProjectInputs(request.projectId)
+          .find((entry) => entry.inputId === request.inputId && entry.filePath === request.filePath);
+        if (!input) {
+          return { success: false, error: `Project input not found: ${request.inputId}` };
+        }
+
+        const replayDevice = replayDeviceService.getDeviceById(request.replayDeviceId);
+        if (!replayDevice) {
+          return { success: false, error: `Replay device not found: ${request.replayDeviceId}` };
+        }
+
+        const openedCapture = await rdxSessionService.openProjectInput({
+          projectId: request.projectId,
+          inputId: input.inputId,
+          filePath: input.filePath,
+          replayDevice,
+        });
+        const contextSnapshot = rdxSessionService.snapshotContext();
+        broadcastToRenderer('capture:openedStateChanged', openedCapture);
+        broadcastToRenderer('context:changed', contextSnapshot);
+        return { success: true, openedCapture, contextSnapshot };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    },
+  );
+
+  ipcMain.handle('capture:getOpenedState', async () => {
+    return rdxSessionService.snapshotOpenedCapture();
+  });
+
+  ipcMain.handle('capture:clearOpenedState', async () => {
+    await rdxSessionService.closeOrReplaceOpenedCapture();
+    broadcastToRenderer('capture:openedStateChanged', null);
+    broadcastToRenderer('context:changed', rdxSessionService.snapshotContext());
+    return { success: true };
   });
 
   ipcMain.handle('capture:select', async (_event, captureId: string) => {
@@ -272,6 +440,7 @@ export function registerIPCHandlers(): void {
         try {
           contextSnapshot = await rdxSessionService.bootstrap(request);
           broadcastToRenderer('context:changed', contextSnapshot);
+          broadcastToRenderer('capture:openedStateChanged', rdxSessionService.snapshotOpenedCapture());
         } catch (bootstrapErr) {
           const message = bootstrapErr instanceof Error ? bootstrapErr.message : String(bootstrapErr);
           console.warn('[IPC] rdxSessionService bootstrap failed:', bootstrapErr);
@@ -303,21 +472,59 @@ export function registerIPCHandlers(): void {
       }
 
       // 创建case和run
-      const caseId = await storageAdapter.createCase({
-        userGoal: goal,
-        symptomSummary: goal,
-      });
+      let caseId: string;
+      if (isNewRequest) {
+        caseId = request.sessionId || await storageAdapter.createCase({
+          projectId: request.projectId,
+          userGoal: goal,
+          symptomSummary: goal,
+        });
+      } else {
+        const projectId = currentProjectId || storageAdapter.getCurrentProjectId();
+        if (!projectId) {
+          return {
+            success: false,
+            error: 'Project is required before starting a workflow.',
+          };
+        }
+
+        caseId = await storageAdapter.createCase({
+          projectId,
+          userGoal: goal,
+          symptomSummary: goal,
+        });
+      }
 
       const { runId, sessionId } = await storageAdapter.createRun({
         caseId,
         capturePaths,
+        mode: isNewRequest ? request.mode : 'debugger',
+        goal,
+        captures: isNewRequest ? request.captures : undefined,
+        backend: isNewRequest
+          ? (request.captures.some((capture) => capture.backendHint === 'remote') ? 'remote' : 'local')
+          : 'local',
       });
 
       // 设置当前 sessionId 作为 thread_id
       currentSessionId = sessionId;
+      currentRunId = runId;
+      if (isNewRequest) {
+        currentProjectId = request.projectId;
+      }
+      await storageAdapter.setCurrentSessionId(sessionId);
+      if (contextSnapshot) {
+        await storageAdapter.updateRun(sessionId, runId, {
+          runtime: {
+            context_id: contextSnapshot.contextId,
+            runtime_owner: contextSnapshot.runtimeOwner,
+            session_id: sessionId,
+          },
+        });
+      }
 
       // 使用 graph.invoke() 启动工作�?
-      const config = { configurable: { thread_id: sessionId } };
+      const config = getGraphConfig();
       
       const initialState = {
         caseId,
@@ -336,7 +543,14 @@ export function registerIPCHandlers(): void {
         backtrackCount: {},
         fixVerified: false,
         entryMode: 'cli' as const,
-        backend: 'local' as const,
+        backend: isNewRequest
+          ? (request.captures.some((capture) => capture.backendHint === 'remote') ? 'remote' as const : 'local' as const)
+          : 'local' as const,
+        mode: isNewRequest ? request.mode : 'debugger',
+        goal,
+        captures: isNewRequest ? request.captures : [],
+        primaryCaptureId: isNewRequest ? request.primaryCaptureId : '',
+        replayDevice: isNewRequest ? request.replayDevice : null,
         orchestrationMode: 'multi_agent' as const,
         coordinationMode: 'staged_handoff' as const,
         lastUpdated: new Date().toISOString(),
@@ -381,7 +595,7 @@ export function registerIPCHandlers(): void {
 
     try {
       // 使用 Command.resume �?checkpoint 恢复继续执行
-      const config = { configurable: { thread_id: getThreadId() } };
+      const config = getGraphConfig();
       
       // 发�?resume 命令继续执行
       const result = await compiledGraph!.invoke(
@@ -425,7 +639,7 @@ export function registerIPCHandlers(): void {
 
     try {
       // 使用 Command.resume �?backtrack 上下文恢�?
-      const config = { configurable: { thread_id: getThreadId() } };
+      const config = getGraphConfig();
       
       const result = await compiledGraph!.invoke(
         new Command({ 
@@ -469,7 +683,7 @@ export function registerIPCHandlers(): void {
 
     try {
       // 获取当前状�?
-      const config = { configurable: { thread_id: getThreadId() } };
+      const config = getGraphConfig();
       const currentState = await compiledGraph!.getState(config);
       
       if (!currentState || !currentState.values) {
@@ -525,7 +739,7 @@ export function registerIPCHandlers(): void {
       let context: { caseId?: string; runId?: string; sessionId?: string } | undefined;
       
       if (compiledGraph && currentSessionId) {
-        const config = { configurable: { thread_id: currentSessionId } };
+        const config = getGraphConfig();
         const state = await compiledGraph.getState(config);
         if (state && state.values) {
           const values = state.values as unknown as WorkflowStateType;
@@ -593,21 +807,10 @@ export function registerIPCHandlers(): void {
     }
 
     const events = await storageAdapter.readActionChain(sessionId);
-    
-    // �?WorkflowGraph 获取 runId
-    let runId = '';
-    if (compiledGraph && currentSessionId) {
-      const config = { configurable: { thread_id: currentSessionId } };
-      const state = await compiledGraph.getState(config);
-      if (state && state.values) {
-        const values = state.values as unknown as WorkflowStateType;
-        runId = values.runId;
-      }
-    }
-    
+
     return {
       sessionId,
-      runId: runId || '',
+      runId: currentRunId || storageAdapter.getLatestRun(sessionId)?.runId || '',
       events,
       isValid: true,
     };
@@ -642,30 +845,28 @@ export function registerIPCHandlers(): void {
   // ========== 设置操作 ==========
 
   ipcMain.handle('settings:get', async () => {
-    const appSettings = settingsService.getAll();
-    return {
-      theme: 'dark',
-      llm: {
-        defaultProvider: llmAdapter.getDefaultProvider(),
-      },
-      agents: {},
-      openRouter: appSettings.openRouter,
-    };
+    const paths = appPathService.getWorkspacePaths();
+    return settingsService.getAll({
+      workspaceRoot: paths.workspaceRoot,
+      defaultWorkspaceRoot: paths.defaultWorkspaceRoot,
+      settingsPath: paths.settingsPath,
+      logsPath: paths.logsPath,
+      logPath: paths.logPath,
+      projectsPath: paths.projectsPath,
+      knowledgePath: paths.knowledgePath,
+      migrationOrphansPath: paths.migrationOrphansPath,
+    });
   });
 
   ipcMain.handle('settings:set', async (_event, settings: unknown) => {
-    const s = settings as Record<string, unknown>;
-    // 写入 app-global 设置
-    if (s.openRouter !== undefined) {
-      settingsService.setOpenRouterConfig(s.openRouter as Parameters<typeof settingsService.setOpenRouterConfig>[0]);
-      // 同步更新 LLMAdapter
-      const orConfig = settingsService.getOpenRouterConfig();
-      llmAdapter.configure({
-        defaultProvider: 'openrouter',
-        openrouter: { apiKey: orConfig.apiKey, baseUrl: orConfig.baseUrl },
-      });
-    }
-    return;
+    const nextSettings = settingsService.setAll(settings as AppSettingsPatch, appPathService.getWorkspacePaths());
+    storageAdapter.setWorkspaceRoot(nextSettings.workspace.rootPath);
+    await storageAdapter.initializeWorkspace();
+    await initWorkflowGraph(storageAdapter.getWorkspacePath());
+    const llmConfig = settingsService.getLlmConfig();
+    llmAdapter.configure(llmConfig);
+    agentOrchestrator.applyLlmConfig(llmConfig);
+    return nextSettings;
   });
 
   // ========== 设备操作 ==========
@@ -680,6 +881,10 @@ export function registerIPCHandlers(): void {
 
   ipcMain.handle('device:activate', async (_event, deviceId: string) => {
     return replayDeviceService.activateDevice(deviceId);
+  });
+
+  nativeTheme.on('updated', () => {
+    broadcastToRenderer('app:themeChanged', nativeTheme.shouldUseDarkColors ? 'dark' : 'light');
   });
 }
 

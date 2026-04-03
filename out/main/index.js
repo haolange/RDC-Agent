@@ -25,9 +25,9 @@ Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 const electron = require("electron");
 const path = require("path");
 const url = require("url");
+const fs = require("fs");
 const langgraph = require("@langchain/langgraph");
 const child_process = require("child_process");
-const fs = require("fs");
 const uuid = require("uuid");
 const yaml = require("yaml");
 const Store = require("electron-store");
@@ -61,17 +61,9 @@ function generateShortId() {
 function generateEventId(prefix = "evt") {
   return `${prefix}-${generateShortId()}-${Date.now()}`;
 }
-function generateCaseId() {
-  const timestamp = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10).replace(/-/g, "");
-  const random = Math.random().toString(36).slice(2, 6);
-  return `case_${timestamp}_${random}`;
-}
 function generateRunId() {
   const random = Math.random().toString(36).slice(2, 6);
   return `run_${random}`;
-}
-function generateSessionId(caseId, runId) {
-  return `sess_${sanitizeToken(caseId)}_${sanitizeToken(runId)}`;
 }
 function sanitizeToken(value) {
   const text = value.split("").map((ch) => ch.isAlphanumeric() || ch === "_" || ch === "-" ? ch : "-").join("").replace(/^-+|-+$/g, "");
@@ -109,12 +101,40 @@ class ToolBridge {
   getRdxPath() {
     return path__namespace.join(this.toolsPath, "rdx.bat");
   }
+  resolveWindowsLauncher() {
+    const toolsRoot = path__namespace.resolve(this.toolsPath);
+    if (!fs__namespace.existsSync(toolsRoot)) {
+      throw new Error(`RDX tools root not found: ${toolsRoot}`);
+    }
+    const launcherScriptPath = path__namespace.join(toolsRoot, "scripts", "rdx_bat_launcher.ps1");
+    if (!fs__namespace.existsSync(launcherScriptPath)) {
+      throw new Error(`RDX launcher script not found: ${launcherScriptPath}`);
+    }
+    const systemRoot = process.env.SystemRoot?.trim() || process.env.windir?.trim() || "C:\\Windows";
+    const powershellPath = path__namespace.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+    if (!fs__namespace.existsSync(powershellPath)) {
+      throw new Error(`Windows PowerShell launcher not found: ${powershellPath}`);
+    }
+    return {
+      powershellPath,
+      launcherScriptPath,
+      systemRoot,
+      comSpec: process.env.ComSpec?.trim() || path__namespace.join(systemRoot, "System32", "cmd.exe")
+    };
+  }
   /**
    * 检查工具是否可用
    */
   isAvailable() {
-    const rdxPath = this.getRdxPath();
-    return fs__namespace.existsSync(rdxPath);
+    if (process.platform !== "win32") {
+      return false;
+    }
+    try {
+      const launcher = this.resolveWindowsLauncher();
+      return fs__namespace.existsSync(launcher.launcherScriptPath);
+    } catch {
+      return false;
+    }
   }
   /**
    * 加载工具目录
@@ -144,17 +164,50 @@ class ToolBridge {
    */
   async executeCLI(command, args = [], options = {}) {
     const startTime = nowMs();
-    const rdxPath = this.getRdxPath();
+    if (process.platform !== "win32") {
+      return {
+        exitCode: 2,
+        stdout: "",
+        stderr: "RDC-Agent currently supports the bundled Windows launcher only.",
+        duration_ms: nowMs() - startTime
+      };
+    }
+    let launcher;
+    try {
+      launcher = this.resolveWindowsLauncher();
+    } catch (error) {
+      return {
+        exitCode: 2,
+        stdout: "",
+        stderr: error instanceof Error ? error.message : String(error),
+        duration_ms: nowMs() - startTime
+      };
+    }
     return new Promise((resolve, reject) => {
       const proc = child_process.spawn(
-        "cmd.exe",
-        ["/c", rdxPath, "--non-interactive", "cli", command, ...args],
+        launcher.powershellPath,
+        [
+          "-NoProfile",
+          "-NoLogo",
+          "-NonInteractive",
+          "-ExecutionPolicy",
+          "Bypass",
+          "-File",
+          launcher.launcherScriptPath,
+          "--non-interactive",
+          "cli",
+          command,
+          ...args
+        ],
         {
           cwd: options.cwd || this.toolsPath,
           env: {
             ...process.env,
             ...options.env,
-            PYTHONIOENCODING: "utf-8"
+            RDX_TOOLS_ROOT: this.toolsPath,
+            PYTHONIOENCODING: "utf-8",
+            SystemRoot: launcher.systemRoot,
+            ComSpec: launcher.comSpec
           },
           windowsHide: true
         }
@@ -190,7 +243,12 @@ class ToolBridge {
       proc.on("error", (error) => {
         if (timeoutId) clearTimeout(timeoutId);
         this.activeProcesses.delete(procId);
-        reject(error);
+        resolve({
+          exitCode: 2,
+          stdout,
+          stderr: error instanceof Error ? error.message : String(error),
+          duration_ms: nowMs() - startTime
+        });
       });
     });
   }
@@ -367,37 +425,6 @@ class ToolBridge {
   }
 }
 const toolBridge = new ToolBridge();
-function readYaml(filePath) {
-  try {
-    if (!fs__namespace.existsSync(filePath)) {
-      return null;
-    }
-    const content = fs__namespace.readFileSync(filePath, "utf-8");
-    return yaml.parse(content);
-  } catch (error) {
-    console.error(`Failed to read YAML file: ${filePath}`, error);
-    return null;
-  }
-}
-function writeYaml(filePath, data) {
-  try {
-    const dir = path__namespace.dirname(filePath);
-    if (!fs__namespace.existsSync(dir)) {
-      fs__namespace.mkdirSync(dir, { recursive: true });
-    }
-    const content = yaml.stringify(data, {
-      indent: 2,
-      lineWidth: 0,
-      defaultStringType: "QUOTE_DOUBLE",
-      defaultKeyType: "PLAIN"
-    });
-    fs__namespace.writeFileSync(filePath, content, "utf-8");
-    return true;
-  } catch (error) {
-    console.error(`Failed to write YAML file: ${filePath}`, error);
-    return false;
-  }
-}
 function readJsonl(filePath) {
   try {
     if (!fs__namespace.existsSync(filePath)) {
@@ -444,153 +471,492 @@ function appendJsonl(filePath, data) {
     return false;
   }
 }
-class StorageAdapter {
-  workspacePath;
-  constructor() {
-    if (electron.app.isPackaged) {
-      this.workspacePath = path__namespace.join(path__namespace.dirname(electron.app.getPath("exe")), "workspace");
+function readYaml(filePath) {
+  try {
+    if (!fs__namespace.existsSync(filePath)) {
+      return null;
+    }
+    const content = fs__namespace.readFileSync(filePath, "utf-8");
+    return yaml.parse(content);
+  } catch (error) {
+    console.error(`Failed to read YAML file: ${filePath}`, error);
+    return null;
+  }
+}
+function writeYaml(filePath, data) {
+  try {
+    const dir = path__namespace.dirname(filePath);
+    if (!fs__namespace.existsSync(dir)) {
+      fs__namespace.mkdirSync(dir, { recursive: true });
+    }
+    const content = yaml.stringify(data, {
+      indent: 2,
+      lineWidth: 0,
+      defaultStringType: "QUOTE_DOUBLE",
+      defaultKeyType: "PLAIN"
+    });
+    fs__namespace.writeFileSync(filePath, content, "utf-8");
+    return true;
+  } catch (error) {
+    console.error(`Failed to write YAML file: ${filePath}`, error);
+    return false;
+  }
+}
+const SETTINGS_FILE_NAME = "settings.json";
+const LOG_FILE_NAME = "rdc-agent.log";
+const normalizePath = (targetPath) => path.resolve(targetPath);
+const isSamePath = (left, right) => {
+  const normalizedLeft = normalizePath(left);
+  const normalizedRight = normalizePath(right);
+  return process.platform === "win32" ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase() : normalizedLeft === normalizedRight;
+};
+class AppPathService {
+  workspaceRootCache = null;
+  getBootstrapDir() {
+    return path.join(electron.app.getPath("appData"), "RdcAgent");
+  }
+  getBootstrapPath() {
+    return path.join(this.getBootstrapDir(), "workspace-bootstrap.json");
+  }
+  getDefaultWorkspaceRoot() {
+    return normalizePath(path.join(electron.app.getPath("appData"), "rdc-agent"));
+  }
+  getWorkspaceRoot() {
+    if (this.workspaceRootCache) {
+      return this.workspaceRootCache;
+    }
+    const bootstrapState = this.readBootstrapState();
+    const workspaceRoot = normalizePath(bootstrapState.workspaceRoot || this.getDefaultWorkspaceRoot());
+    this.workspaceRootCache = workspaceRoot;
+    return workspaceRoot;
+  }
+  getWorkspacePaths(workspaceRoot = this.getWorkspaceRoot()) {
+    const root = normalizePath(workspaceRoot);
+    const logsPath = path.join(root, "logs");
+    return {
+      workspaceRoot: root,
+      defaultWorkspaceRoot: this.getDefaultWorkspaceRoot(),
+      settingsPath: path.join(root, SETTINGS_FILE_NAME),
+      logsPath,
+      logPath: path.join(logsPath, LOG_FILE_NAME),
+      projectsPath: path.join(root, "projects"),
+      knowledgePath: path.join(root, "knowledge"),
+      migrationOrphansPath: path.join(root, "migration-orphans")
+    };
+  }
+  initializeWorkspaceRoot() {
+    const workspaceRoot = this.getWorkspaceRoot();
+    const paths = this.getWorkspacePaths(workspaceRoot);
+    this.ensureWorkspaceStructure(paths);
+    this.copyLegacyData(paths.workspaceRoot);
+    this.writeBootstrapState({ workspaceRoot: paths.workspaceRoot });
+    return paths;
+  }
+  setWorkspaceRoot(nextRoot) {
+    const currentRoot = this.getWorkspaceRoot();
+    const resolvedRoot = normalizePath(nextRoot || this.getDefaultWorkspaceRoot());
+    if (!isSamePath(currentRoot, resolvedRoot)) {
+      this.ensureWorkspaceStructure(this.getWorkspacePaths(resolvedRoot));
+      this.copyWorkspaceData(currentRoot, resolvedRoot);
+      this.copyLegacyData(resolvedRoot);
     } else {
-      this.workspacePath = path__namespace.join(electron.app.getAppPath(), "workspace");
+      this.ensureWorkspaceStructure(this.getWorkspacePaths(resolvedRoot));
+      this.copyLegacyData(resolvedRoot);
+    }
+    this.workspaceRootCache = resolvedRoot;
+    this.writeBootstrapState({ workspaceRoot: resolvedRoot });
+    return this.getWorkspacePaths(resolvedRoot);
+  }
+  resetWorkspaceRoot() {
+    return this.setWorkspaceRoot(this.getDefaultWorkspaceRoot());
+  }
+  readBootstrapState() {
+    const bootstrapPath = this.getBootstrapPath();
+    try {
+      if (!fs.existsSync(bootstrapPath)) {
+        return {};
+      }
+      return JSON.parse(fs.readFileSync(bootstrapPath, "utf8"));
+    } catch (error) {
+      console.warn("[AppPathService] Failed to read bootstrap state:", error);
+      return {};
     }
   }
-  /**
-   * 获取workspace路径
-   */
+  writeBootstrapState(state) {
+    const bootstrapPath = this.getBootstrapPath();
+    fs.mkdirSync(path.dirname(bootstrapPath), { recursive: true });
+    fs.writeFileSync(bootstrapPath, JSON.stringify(state, null, 2), "utf8");
+  }
+  ensureWorkspaceStructure(paths) {
+    fs.mkdirSync(paths.workspaceRoot, { recursive: true });
+    fs.mkdirSync(paths.logsPath, { recursive: true });
+    fs.mkdirSync(paths.projectsPath, { recursive: true });
+    fs.mkdirSync(paths.knowledgePath, { recursive: true });
+    fs.mkdirSync(paths.migrationOrphansPath, { recursive: true });
+  }
+  copyLegacyData(targetRoot) {
+    const legacyUserDataRoot = electron.app.getPath("userData");
+    const legacySettingsRoot = path.join(electron.app.getPath("appData"), "RdcAgent");
+    const legacyDevWorkspace = path.join(electron.app.getAppPath(), "workspace");
+    const legacyPackagedWorkspace = path.join(path.dirname(electron.app.getPath("exe")), "workspace");
+    const legacyDevLog = path.join(electron.app.getAppPath(), "dev-stdout.log");
+    this.copyWorkspaceData(legacyUserDataRoot, targetRoot);
+    this.copyWorkspaceData(legacySettingsRoot, targetRoot);
+    this.copyWorkspaceData(legacyDevWorkspace, targetRoot);
+    this.copyWorkspaceData(legacyPackagedWorkspace, targetRoot);
+    this.copyLogFile(legacyDevLog, this.getWorkspacePaths(targetRoot).logPath);
+  }
+  copyWorkspaceData(sourceRoot, targetRoot) {
+    if (!sourceRoot || !fs.existsSync(sourceRoot) || isSamePath(sourceRoot, targetRoot)) {
+      return;
+    }
+    const targetPaths = this.getWorkspacePaths(targetRoot);
+    this.copyFileIfMissing(path.join(sourceRoot, SETTINGS_FILE_NAME), targetPaths.settingsPath);
+    this.copyDirContents(path.join(sourceRoot, "projects"), targetPaths.projectsPath);
+    this.copyDirContents(path.join(sourceRoot, "knowledge"), targetPaths.knowledgePath);
+    this.copyDirContents(path.join(sourceRoot, "migration-orphans"), targetPaths.migrationOrphansPath);
+    this.copyDirContents(path.join(sourceRoot, "logs"), targetPaths.logsPath);
+    this.copyLogFile(path.join(sourceRoot, LOG_FILE_NAME), targetPaths.logPath);
+    this.copyLogFile(path.join(sourceRoot, "dev-stdout.log"), targetPaths.logPath);
+  }
+  copyDirContents(sourceDir, targetDir) {
+    if (!fs.existsSync(sourceDir) || !fs.statSync(sourceDir).isDirectory()) {
+      return;
+    }
+    fs.mkdirSync(targetDir, { recursive: true });
+    for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+      const sourcePath = path.join(sourceDir, entry.name);
+      const targetPath = path.join(targetDir, entry.name);
+      if (entry.isDirectory()) {
+        this.copyDirContents(sourcePath, targetPath);
+        continue;
+      }
+      this.copyFileIfMissing(sourcePath, targetPath);
+    }
+  }
+  copyLogFile(sourcePath, targetPath) {
+    this.copyFileIfMissing(sourcePath, targetPath);
+  }
+  copyFileIfMissing(sourcePath, targetPath) {
+    if (!fs.existsSync(sourcePath) || fs.existsSync(targetPath)) {
+      return;
+    }
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    fs.copyFileSync(sourcePath, targetPath);
+  }
+}
+const appPathService = new AppPathService();
+class StorageAdapter {
+  dataRootPath = "";
+  projectsRootPath = "";
+  globalKnowledgePath = "";
+  migrationOrphansPath = "";
+  registryPath = "";
+  selectionPath = "";
+  constructor() {
+    this.syncWorkspacePaths();
+  }
   getWorkspacePath() {
-    return this.workspacePath;
+    this.syncWorkspacePaths();
+    return this.dataRootPath;
   }
-  /**
-   * 初始化workspace目录结构
-   */
+  getGlobalKnowledgePath() {
+    this.syncWorkspacePaths();
+    return this.globalKnowledgePath;
+  }
   async initializeWorkspace() {
-    const dirs = [
-      this.workspacePath,
-      path__namespace.join(this.workspacePath, "cases"),
-      path__namespace.join(this.workspacePath, "common", "knowledge", "library", "sessions"),
-      path__namespace.join(this.workspacePath, "common", "knowledge", "library", "bugcards"),
-      path__namespace.join(this.workspacePath, "common", "knowledge", "library", "bugfull"),
-      path__namespace.join(this.workspacePath, "common", "knowledge", "spec", "objects", "taxonomy"),
-      path__namespace.join(this.workspacePath, "common", "knowledge", "spec", "objects", "sops"),
-      path__namespace.join(this.workspacePath, "common", "knowledge", "spec", "registry"),
-      path__namespace.join(this.workspacePath, "common", "config"),
-      path__namespace.join(this.workspacePath, "common", "skills")
-    ];
-    for (const dir of dirs) {
-      if (!fs__namespace.existsSync(dir)) {
-        await fs__namespace.promises.mkdir(dir, { recursive: true });
-      }
+    this.syncWorkspacePaths();
+    this.ensureDir(this.dataRootPath);
+    this.ensureDir(this.projectsRootPath);
+    this.ensureDir(this.migrationOrphansPath);
+    this.ensureRegistry();
+    this.ensureSelection();
+    this.bootstrapGlobalKnowledge();
+    this.migrateLegacyWorkspace();
+  }
+  setWorkspaceRoot(workspaceRoot) {
+    appPathService.setWorkspaceRoot(workspaceRoot);
+    this.syncWorkspacePaths();
+  }
+  listProjects() {
+    return this.readRegistry().projects.slice().sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+  createProject(rootPath) {
+    const normalizedRootPath = path__namespace.resolve(rootPath);
+    if (!fs__namespace.existsSync(normalizedRootPath) || !fs__namespace.statSync(normalizedRootPath).isDirectory()) {
+      throw new Error(`Project root is not a directory: ${normalizedRootPath}`);
+    }
+    const registry = this.readRegistry();
+    const existing = registry.projects.find((project2) => project2.rootPath === normalizedRootPath);
+    if (existing) {
+      this.setCurrentProjectId(existing.projectId);
+      return existing;
+    }
+    const projectName = path__namespace.basename(normalizedRootPath) || normalizedRootPath;
+    const slug = this.createUniqueProjectSlug(projectName, registry.projects);
+    const { resourcePath, knowledgePath, inputsPath } = this.ensureProjectResourceLayout(normalizedRootPath);
+    const inputs = this.collectProjectInputs(inputsPath);
+    const timestamp = nowMs();
+    const project = {
+      projectId: `proj_${generateShortId()}`,
+      name: projectName,
+      rootPath: normalizedRootPath,
+      slug,
+      resourcePath,
+      knowledgePath,
+      inputsPath,
+      inputs,
+      inputsUpdatedAt: timestamp,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    registry.projects.push(project);
+    this.writeRegistry(registry);
+    this.ensureDir(this.getProjectDataPath(project));
+    this.ensureDir(this.getProjectSessionsRoot(project));
+    this.writeProjectMetadata(project);
+    this.setCurrentProjectId(project.projectId);
+    return project;
+  }
+  removeProject(projectId) {
+    const registry = this.readRegistry();
+    const target = registry.projects.find((project) => project.projectId === projectId);
+    if (!target) return;
+    registry.projects = registry.projects.filter((project) => project.projectId !== projectId);
+    this.writeRegistry(registry);
+    const projectPath = this.getProjectDataPath(target);
+    if (fs__namespace.existsSync(projectPath)) {
+      fs__namespace.rmSync(projectPath, { recursive: true, force: true });
+    }
+    const selection = this.readSelection();
+    if (selection.projectId === projectId) {
+      selection.projectId = null;
+      selection.sessionId = null;
+      this.writeSelection(selection);
     }
   }
-  // ========== Case 管理 ==========
-  /**
-   * 获取case目录路径
-   */
+  getProjectById(projectId) {
+    return this.readRegistry().projects.find((project) => project.projectId === projectId) || null;
+  }
+  listProjectInputs(projectId) {
+    const project = this.getProjectById(projectId);
+    if (!project) return [];
+    return this.refreshProjectInputs(projectId);
+  }
+  refreshProjectInputs(projectId) {
+    const project = this.getProjectById(projectId);
+    if (!project) return [];
+    const normalizedProject = this.normalizeProjectRecord(project);
+    const inputs = this.collectProjectInputs(normalizedProject.inputsPath);
+    const nextProject = {
+      ...normalizedProject,
+      inputs,
+      inputsUpdatedAt: nowMs()
+    };
+    this.persistProject(nextProject);
+    return nextProject.inputs;
+  }
+  importProjectInputs(projectId, filePaths) {
+    const project = this.getProjectById(projectId);
+    if (!project) {
+      throw new Error(`Project not found: ${projectId}`);
+    }
+    const normalizedProject = this.normalizeProjectRecord(project);
+    this.ensureDir(normalizedProject.inputsPath);
+    for (const filePath of filePaths) {
+      const sourcePath = path__namespace.resolve(filePath);
+      if (!fs__namespace.existsSync(sourcePath) || !fs__namespace.statSync(sourcePath).isFile()) {
+        continue;
+      }
+      if (path__namespace.extname(sourcePath).toLowerCase() !== ".rdc") {
+        continue;
+      }
+      const targetPath = this.resolveImportedInputPath(normalizedProject.inputsPath, path__namespace.basename(sourcePath));
+      fs__namespace.copyFileSync(sourcePath, targetPath);
+    }
+    return this.refreshProjectInputs(projectId);
+  }
+  listSessions(projectId) {
+    const project = this.getProjectById(projectId);
+    if (!project) return [];
+    const sessionsRoot = this.getProjectSessionsRoot(project);
+    if (!fs__namespace.existsSync(sessionsRoot)) {
+      return [];
+    }
+    return fs__namespace.readdirSync(sessionsRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => this.readJson(path__namespace.join(sessionsRoot, entry.name, "session.json"))).filter((session) => session !== null).sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+  createSession(projectId, title, goal = "") {
+    const project = this.getProjectById(projectId);
+    if (!project) {
+      throw new Error(`Project not found: ${projectId}`);
+    }
+    const timestamp = nowMs();
+    const session = {
+      sessionId: `sess_${generateShortId()}`,
+      projectId,
+      title: this.normalizeSessionTitle(title),
+      goal,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    const sessionPath = path__namespace.join(this.getProjectSessionsRoot(project), session.sessionId);
+    this.ensureDir(sessionPath);
+    this.ensureDir(path__namespace.join(sessionPath, "timeline"));
+    this.ensureDir(path__namespace.join(sessionPath, "runs"));
+    this.writeJson(path__namespace.join(sessionPath, "session.json"), session);
+    this.touchProject(project.projectId, session.sessionId, timestamp);
+    this.setCurrentProjectId(projectId);
+    this.setCurrentSessionId(session.sessionId);
+    return session;
+  }
+  readSession(sessionId) {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) return null;
+    return this.readJson(path__namespace.join(location.sessionPath, "session.json"));
+  }
+  updateSession(sessionId, patch) {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) return null;
+    const existing = this.readJson(path__namespace.join(location.sessionPath, "session.json"));
+    if (!existing) return null;
+    const nextSession = {
+      ...existing,
+      ...patch,
+      sessionId: existing.sessionId,
+      projectId: existing.projectId,
+      updatedAt: nowMs()
+    };
+    this.writeJson(path__namespace.join(location.sessionPath, "session.json"), nextSession);
+    this.touchProject(existing.projectId, nextSession.sessionId, nextSession.updatedAt);
+    return nextSession;
+  }
+  listRuns(sessionId) {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) return [];
+    const runsRoot = path__namespace.join(location.sessionPath, "runs");
+    if (!fs__namespace.existsSync(runsRoot)) {
+      return [];
+    }
+    return fs__namespace.readdirSync(runsRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => this.readPersistedRun(sessionId, entry.name)).filter((run) => run !== null).sort((a, b) => b.startedAt - a.startedAt).map((run) => this.toRunSummary(run));
+  }
+  getLatestRun(sessionId) {
+    return this.listRuns(sessionId)[0] ?? null;
+  }
   getCasePath(caseId) {
-    return path__namespace.join(this.workspacePath, "cases", caseId);
-  }
-  /**
-   * 创建新的case
-   */
-  async createCase(input) {
-    const caseId = input.caseId || generateCaseId();
-    const casePath = this.getCasePath(caseId);
-    const dirs = [
-      casePath,
-      path__namespace.join(casePath, "artifacts"),
-      path__namespace.join(casePath, "inputs", "captures"),
-      path__namespace.join(casePath, "inputs", "references"),
-      path__namespace.join(casePath, "runs")
-    ];
-    for (const dir of dirs) {
-      if (!fs__namespace.existsSync(dir)) {
-        await fs__namespace.promises.mkdir(dir, { recursive: true });
-      }
+    const location = this.findSessionLocation(caseId);
+    if (!location) {
+      throw new Error(`Session not found for case lookup: ${caseId}`);
     }
-    const caseData = {
-      case_id: caseId,
-      created_at: nowIso$1(),
-      user_goal: input.userGoal,
-      symptom_summary: input.symptomSummary,
-      current_run: null
-    };
-    await writeYaml(path__namespace.join(casePath, "case.yaml"), caseData);
-    return caseId;
+    return location.sessionPath;
   }
-  /**
-   * 读取case数据
-   */
-  async readCase(caseId) {
-    const casePath = path__namespace.join(this.getCasePath(caseId), "case.yaml");
-    return readYaml(casePath);
-  }
-  /**
-   * 更新case数据
-   */
-  async updateCase(caseId, data) {
-    const existing = await this.readCase(caseId) || {};
-    const casePath = path__namespace.join(this.getCasePath(caseId), "case.yaml");
-    await writeYaml(casePath, { ...existing, ...data, updated_at: nowIso$1() });
-  }
-  // ========== Run 管理 ==========
-  /**
-   * 获取run目录路径
-   */
   getRunPath(caseId, runId) {
-    return path__namespace.join(this.getCasePath(caseId), "runs", runId);
+    const location = this.findSessionLocation(caseId);
+    if (!location) {
+      throw new Error(`Session not found for run lookup: ${caseId}`);
+    }
+    return path__namespace.join(location.sessionPath, "runs", runId);
   }
-  /**
-   * 创建新的run
-   */
-  async createRun(input) {
-    const runId = input.runId || generateRunId();
-    const sessionId = input.sessionId || generateSessionId(input.caseId, runId);
-    const runPath = this.getRunPath(input.caseId, runId);
-    const dirs = [
-      runPath,
-      path__namespace.join(runPath, "artifacts"),
-      path__namespace.join(runPath, "artifacts", "runtime_batons"),
-      path__namespace.join(runPath, "artifacts", "capability_tokens"),
-      path__namespace.join(runPath, "artifacts", "runtime_locks"),
-      path__namespace.join(runPath, "notes"),
-      path__namespace.join(runPath, "screenshots"),
-      path__namespace.join(runPath, "reports"),
-      path__namespace.join(runPath, "logs")
-    ];
-    for (const dir of dirs) {
-      if (!fs__namespace.existsSync(dir)) {
-        await fs__namespace.promises.mkdir(dir, { recursive: true });
+  async createCase(input) {
+    const projectId = input.projectId || this.getCurrentProjectId();
+    if (!projectId) {
+      throw new Error("Project is required before creating a session.");
+    }
+    if (input.caseId) {
+      const existingSession = this.readSession(input.caseId);
+      if (existingSession) {
+        return existingSession.sessionId;
       }
     }
-    const runData = {
-      run_id: runId,
-      session_id: sessionId,
-      case_id: input.caseId,
-      created_at: nowIso$1(),
-      coordination_mode: "staged_handoff",
-      orchestration_mode: "multi_agent",
+    const session = this.createSession(
+      projectId,
+      input.userGoal || input.symptomSummary,
+      input.userGoal || input.symptomSummary
+    );
+    return session.sessionId;
+  }
+  async readCase(caseId) {
+    const session = this.readSession(caseId);
+    if (!session) return null;
+    return {
+      case_id: session.sessionId,
+      project_id: session.projectId,
+      title: session.title,
+      user_goal: session.goal,
+      current_run: session.lastRunId ?? null,
+      created_at: new Date(session.createdAt).toISOString(),
+      updated_at: new Date(session.updatedAt).toISOString()
+    };
+  }
+  async updateCase(caseId, data) {
+    const title = typeof data.title === "string" ? data.title : typeof data.symptom_summary === "string" ? data.symptom_summary : void 0;
+    const goal = typeof data.user_goal === "string" ? data.user_goal : void 0;
+    const lastRunId = typeof data.current_run === "string" ? data.current_run : void 0;
+    this.updateSession(caseId, {
+      title,
+      goal,
+      lastRunId
+    });
+  }
+  async createRun(input) {
+    const sessionId = input.sessionId || input.caseId;
+    const session = this.readSession(sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+    const runId = input.runId || generateRunId();
+    const runPath = this.getRunPath(sessionId, runId);
+    this.ensureDir(runPath);
+    this.ensureDir(path__namespace.join(runPath, "artifacts"));
+    this.ensureDir(path__namespace.join(runPath, "notes"));
+    this.ensureDir(path__namespace.join(runPath, "reports"));
+    this.ensureDir(path__namespace.join(runPath, "logs"));
+    this.ensureDir(path__namespace.join(runPath, "screenshots"));
+    this.ensureDir(path__namespace.join(runPath, "checkpoints"));
+    const captures = input.captures && input.captures.length > 0 ? input.captures : input.capturePaths.map((filePath, index) => ({
+      id: `cap-${index}`,
+      filePath,
+      role: index === 0 ? "primary" : "reference",
+      backendHint: "local",
+      status: "pending"
+    }));
+    const backend = input.backend || (captures.some((capture) => capture.backendHint === "remote") ? "remote" : "local");
+    const startedAt = nowMs();
+    const persistedRun = {
+      runId,
+      projectId: session.projectId,
+      sessionId,
+      caseId: sessionId,
+      mode: input.mode || "debugger",
+      goal: input.goal || session.goal,
+      captures,
+      startedAt,
+      status: "running",
+      lastStage: "preflight_pending",
+      backend,
+      createdAt: startedAt,
+      updatedAt: startedAt,
       runtime: {
-        backend: "local",
+        backend,
         entry_mode: "cli",
-        context_id: "ctx-orchestrator",
-        runtime_owner: "rdc-debugger",
+        context_id: null,
+        runtime_owner: null,
         session_id: sessionId,
-        workflow_stage: "accepted_intake_initialized"
+        workflow_stage: "preflight_pending"
       }
     };
-    await writeYaml(path__namespace.join(runPath, "run.yaml"), runData);
-    const captureRefs = {
-      captures: input.capturePaths.map((p, i) => ({
-        capture_id: `cap-${i === 0 ? "anomalous" : i === 1 ? "baseline" : "fixed"}-${String(i + 1).padStart(3, "0")}`,
-        capture_role: i === 0 ? "anomalous" : i === 1 ? "baseline" : "fixed",
-        source_path: p
+    this.writeRunFiles(persistedRun);
+    writeYaml(path__namespace.join(runPath, "capture_refs.yaml"), {
+      captures: captures.map((capture, index) => ({
+        capture_id: capture.id || `cap-${index}`,
+        capture_role: capture.role,
+        source_path: capture.filePath
       }))
-    };
-    await writeYaml(path__namespace.join(runPath, "capture_refs.yaml"), captureRefs);
-    const hypothesisBoard = {
+    });
+    writeYaml(path__namespace.join(runPath, "notes", "hypothesis_board.yaml"), {
       hypothesis_board: {
         session_id: sessionId,
         entry_skill: "rdc-debugger",
-        user_goal: "",
+        user_goal: persistedRun.goal,
         intake_state: "handoff_ready",
         current_phase: "intake",
         current_task: "",
@@ -602,88 +968,70 @@ class StorageAdapter {
         last_updated: nowIso$1(),
         hypotheses: []
       }
-    };
-    await writeYaml(path__namespace.join(runPath, "notes", "hypothesis_board.yaml"), hypothesisBoard);
-    await this.updateCase(input.caseId, { current_run: runId });
-    const sessionMarkerPath = path__namespace.join(
-      this.workspacePath,
-      "common",
-      "knowledge",
-      "library",
-      "sessions",
-      ".current_session"
-    );
-    await fs__namespace.promises.writeFile(sessionMarkerPath, `${sessionId}
-`, "utf-8");
+    });
+    this.updateSession(sessionId, {
+      goal: persistedRun.goal,
+      lastRunId: runId
+    });
+    this.touchProject(session.projectId, sessionId);
+    this.setCurrentProjectId(session.projectId);
+    this.setCurrentSessionId(sessionId);
     return { runId, sessionId };
   }
-  /**
-   * 读取run数据
-   */
   async readRun(caseId, runId) {
-    const runPath = path__namespace.join(this.getRunPath(caseId, runId), "run.yaml");
-    return readYaml(runPath);
+    const run = this.readPersistedRun(caseId, runId);
+    return run ? run : null;
   }
-  /**
-   * 更新run数据
-   */
   async updateRun(caseId, runId, data) {
-    const existing = await this.readRun(caseId, runId) || {};
-    const runPath = path__namespace.join(this.getRunPath(caseId, runId), "run.yaml");
-    await writeYaml(runPath, { ...existing, ...data, updated_at: nowIso$1() });
+    const existing = this.readPersistedRun(caseId, runId);
+    if (!existing) {
+      return;
+    }
+    const merged = this.deepMerge(
+      existing,
+      data
+    );
+    const workflowStage = merged.runtime?.workflow_stage || existing.runtime.workflow_stage;
+    merged.runtime = {
+      ...existing.runtime,
+      ...merged.runtime || {},
+      workflow_stage: workflowStage
+    };
+    merged.lastStage = workflowStage;
+    merged.updatedAt = nowMs();
+    if (workflowStage === "finalized" && merged.status === "running") {
+      merged.status = "completed";
+      merged.finishedAt = merged.finishedAt || merged.updatedAt;
+    }
+    this.writeRunFiles(merged);
+    this.updateSession(caseId, {
+      lastRunId: runId
+    });
   }
-  // ========== Artifact 管理 ==========
-  /**
-   * 写入artifact
-   */
   async writeArtifact(caseId, runId, artifactName, data) {
     const artifactPath = path__namespace.join(this.getRunPath(caseId, runId), "artifacts", artifactName);
-    await writeYaml(artifactPath, data);
+    writeYaml(artifactPath, data);
     return artifactPath;
   }
-  /**
-   * 读取artifact
-   */
   async readArtifact(caseId, runId, artifactName) {
     const artifactPath = path__namespace.join(this.getRunPath(caseId, runId), "artifacts", artifactName);
     return readYaml(artifactPath);
   }
-  // ========== Action Chain ==========
-  /**
-   * 获取action_chain路径
-   */
   getActionChainPath(sessionId) {
-    return path__namespace.join(
-      this.workspacePath,
-      "common",
-      "knowledge",
-      "library",
-      "sessions",
-      sessionId,
-      "action_chain.jsonl"
-    );
-  }
-  /**
-   * 追加事件到action_chain
-   */
-  async appendActionEvent(sessionId, event) {
-    const chainPath = this.getActionChainPath(sessionId);
-    const dir = path__namespace.dirname(chainPath);
-    if (!fs__namespace.existsSync(dir)) {
-      await fs__namespace.promises.mkdir(dir, { recursive: true });
+    const location = this.findSessionLocation(sessionId);
+    if (!location) {
+      throw new Error(`Session not found for action chain: ${sessionId}`);
     }
-    await appendJsonl(chainPath, event);
+    return path__namespace.join(location.sessionPath, "timeline", "action_chain.jsonl");
   }
-  /**
-   * 读取action_chain
-   */
+  async appendActionEvent(sessionId, event) {
+    appendJsonl(this.getActionChainPath(sessionId), event);
+    this.updateSession(sessionId, {});
+  }
   async readActionChain(sessionId) {
-    const chainPath = this.getActionChainPath(sessionId);
-    return readJsonl(chainPath);
+    const actionChainPath = this.getActionChainPath(sessionId);
+    return readJsonl(actionChainPath);
   }
-  /**
-   * 创建新的事件
-   */
   createActionEvent(input) {
     return {
       schema_version: "2",
@@ -699,83 +1047,447 @@ class StorageAdapter {
       payload: input.payload
     };
   }
-  // ========== Workflow State ==========
-  /**
-   * 获取workflow状�?
-   */
   async getWorkflowState(caseId, runId) {
-    const runData = await this.readRun(caseId, runId);
-    if (!runData) return null;
-    const runtime = runData.runtime || {};
+    const run = this.readPersistedRun(caseId, runId);
+    if (!run) return null;
     return {
       caseId,
       runId,
-      sessionId: runtime.session_id || "",
-      currentStage: runtime.workflow_stage || "preflight_pending",
+      sessionId: run.sessionId,
+      currentStage: run.runtime.workflow_stage,
       previousStages: [],
-      entryMode: runtime.entry_mode || "cli",
-      backend: runtime.backend || "local",
+      entryMode: run.runtime.entry_mode,
+      backend: run.runtime.backend,
       orchestrationMode: "multi_agent",
       coordinationMode: "staged_handoff",
       blockers: [],
-      lastUpdated: nowIso$1()
+      lastUpdated: new Date(run.updatedAt).toISOString()
     };
   }
-  /**
-   * 更新workflow状�?
-   */
   async updateWorkflowStage(caseId, runId, stage, blockers = []) {
-    await this.updateRun(caseId, runId, {
-      runtime: {
-        workflow_stage: stage
-      }
-    });
+    const run = this.readPersistedRun(caseId, runId);
+    if (!run) return;
+    run.runtime.workflow_stage = stage;
+    run.lastStage = stage;
+    run.updatedAt = nowMs();
+    if (stage === "finalized") {
+      run.status = "completed";
+      run.finishedAt = run.finishedAt || run.updatedAt;
+    }
+    this.writeRunFiles(run);
     if (blockers.length > 0) {
       const boardPath = path__namespace.join(this.getRunPath(caseId, runId), "notes", "hypothesis_board.yaml");
       const board = readYaml(boardPath) || {};
-      if (board.hypothesis_board) {
-        board.hypothesis_board.blocking_issues = blockers;
-        board.hypothesis_board.last_updated = nowIso$1();
-        await writeYaml(boardPath, board);
+      const hypothesisBoard = board.hypothesis_board || {};
+      hypothesisBoard.blocking_issues = blockers;
+      hypothesisBoard.last_updated = nowIso$1();
+      board.hypothesis_board = hypothesisBoard;
+      writeYaml(boardPath, board);
+    }
+  }
+  getCurrentProjectId() {
+    return this.readSelection().projectId;
+  }
+  setCurrentProjectId(projectId) {
+    const selection = this.readSelection();
+    selection.projectId = projectId;
+    if (!projectId) {
+      selection.sessionId = null;
+    }
+    this.writeSelection(selection);
+  }
+  async getCurrentSessionId() {
+    return this.readSelection().sessionId;
+  }
+  async setCurrentSessionId(sessionId) {
+    const selection = this.readSelection();
+    selection.sessionId = sessionId;
+    if (sessionId) {
+      const session = this.readSession(sessionId);
+      if (session) {
+        selection.projectId = session.projectId;
       }
     }
+    this.writeSelection(selection);
   }
-  // ========== Session Marker ==========
-  /**
-   * 获取当前session ID
-   */
-  async getCurrentSessionId() {
-    const markerPath = path__namespace.join(
-      this.workspacePath,
-      "common",
-      "knowledge",
-      "library",
-      "sessions",
-      ".current_session"
-    );
-    if (!fs__namespace.existsSync(markerPath)) return null;
-    const content = await fs__namespace.promises.readFile(markerPath, "utf-8");
-    const sessionId = content.trim();
-    return sessionId || null;
-  }
-  /**
-   * 设置当前session ID
-   */
-  async setCurrentSessionId(sessionId) {
-    const markerPath = path__namespace.join(
-      this.workspacePath,
-      "common",
-      "knowledge",
-      "library",
-      "sessions",
-      ".current_session"
-    );
-    const dir = path__namespace.dirname(markerPath);
-    if (!fs__namespace.existsSync(dir)) {
-      await fs__namespace.promises.mkdir(dir, { recursive: true });
+  bootstrapGlobalKnowledge() {
+    this.syncWorkspacePaths();
+    this.ensureDir(this.globalKnowledgePath);
+    this.ensureDir(path__namespace.join(this.globalKnowledgePath, "library"));
+    this.ensureDir(path__namespace.join(this.globalKnowledgePath, "spec"));
+    const seededMarker = path__namespace.join(this.globalKnowledgePath, ".seeded");
+    if (fs__namespace.existsSync(seededMarker)) {
+      return;
     }
-    await fs__namespace.promises.writeFile(markerPath, `${sessionId}
-`, "utf-8");
+    const seedPath = path__namespace.join(electron.app.getAppPath(), "resources", "knowledge", "seed");
+    if (fs__namespace.existsSync(seedPath)) {
+      this.copyDirectoryContents(seedPath, this.globalKnowledgePath, false);
+    }
+    fs__namespace.writeFileSync(seededMarker, nowIso$1(), "utf-8");
+  }
+  migrateLegacyWorkspace() {
+    for (const legacyRoot of this.getLegacyWorkspacePaths()) {
+      if (!legacyRoot || !fs__namespace.existsSync(legacyRoot) || legacyRoot === this.dataRootPath) {
+        continue;
+      }
+      const legacyKnowledge = path__namespace.join(legacyRoot, "common", "knowledge");
+      if (fs__namespace.existsSync(legacyKnowledge)) {
+        this.copyDirectoryContents(legacyKnowledge, this.globalKnowledgePath, false);
+      }
+      const legacyCases = path__namespace.join(legacyRoot, "cases");
+      if (fs__namespace.existsSync(legacyCases)) {
+        this.copyDirectoryContents(legacyCases, path__namespace.join(this.migrationOrphansPath, "cases"), false);
+      }
+      const legacyCheckpoints = path__namespace.join(legacyRoot, "checkpoints");
+      if (fs__namespace.existsSync(legacyCheckpoints)) {
+        this.copyDirectoryContents(legacyCheckpoints, path__namespace.join(this.migrationOrphansPath, "checkpoints"), false);
+      }
+      const legacyCommon = path__namespace.join(legacyRoot, "common");
+      if (fs__namespace.existsSync(legacyCommon)) {
+        const configPath = path__namespace.join(legacyCommon, "config");
+        const skillsPath = path__namespace.join(legacyCommon, "skills");
+        if (fs__namespace.existsSync(configPath)) {
+          this.copyDirectoryContents(configPath, path__namespace.join(this.migrationOrphansPath, "common", "config"), false);
+        }
+        if (fs__namespace.existsSync(skillsPath)) {
+          this.copyDirectoryContents(skillsPath, path__namespace.join(this.migrationOrphansPath, "common", "skills"), false);
+        }
+      }
+      fs__namespace.rmSync(legacyRoot, { recursive: true, force: true });
+    }
+  }
+  getLegacyWorkspacePaths() {
+    const devWorkspace = path__namespace.join(electron.app.getAppPath(), "workspace");
+    const packagedWorkspace = path__namespace.join(path__namespace.dirname(electron.app.getPath("exe")), "workspace");
+    return [.../* @__PURE__ */ new Set([devWorkspace, packagedWorkspace])];
+  }
+  syncWorkspacePaths() {
+    const paths = appPathService.getWorkspacePaths();
+    this.dataRootPath = paths.workspaceRoot;
+    this.projectsRootPath = paths.projectsPath;
+    this.globalKnowledgePath = paths.knowledgePath;
+    this.migrationOrphansPath = paths.migrationOrphansPath;
+    this.registryPath = path__namespace.join(this.projectsRootPath, "registry.json");
+    this.selectionPath = path__namespace.join(this.projectsRootPath, "selection.json");
+  }
+  ensureRegistry() {
+    if (fs__namespace.existsSync(this.registryPath)) {
+      return;
+    }
+    this.writeJson(this.registryPath, {
+      schemaVersion: "1",
+      projects: []
+    });
+  }
+  ensureSelection() {
+    if (fs__namespace.existsSync(this.selectionPath)) {
+      return;
+    }
+    this.writeJson(this.selectionPath, {
+      projectId: null,
+      sessionId: null
+    });
+  }
+  readRegistry() {
+    const registry = this.readJson(this.registryPath) || {
+      schemaVersion: "1",
+      projects: []
+    };
+    const normalizedProjects = registry.projects.map((project) => this.normalizeProjectRecord(project));
+    const changed = JSON.stringify(normalizedProjects) !== JSON.stringify(registry.projects);
+    if (changed) {
+      registry.projects = normalizedProjects;
+      this.writeRegistry(registry);
+    } else {
+      registry.projects = normalizedProjects;
+    }
+    return registry;
+  }
+  writeRegistry(registry) {
+    this.writeJson(this.registryPath, registry);
+  }
+  readSelection() {
+    return this.readJson(this.selectionPath) || {
+      projectId: null,
+      sessionId: null
+    };
+  }
+  writeSelection(selection) {
+    this.writeJson(this.selectionPath, selection);
+  }
+  writeProjectMetadata(project) {
+    const normalizedProject = this.normalizeProjectRecord(project);
+    this.ensureDir(this.getProjectDataPath(normalizedProject));
+    this.writeJson(path__namespace.join(this.getProjectDataPath(normalizedProject), "project.json"), normalizedProject);
+  }
+  writeRunFiles(run) {
+    const runPath = this.getRunPath(run.sessionId, run.runId);
+    this.ensureDir(runPath);
+    this.writeJson(path__namespace.join(runPath, "run.json"), run);
+    writeYaml(path__namespace.join(runPath, "run.yaml"), {
+      run_id: run.runId,
+      session_id: run.sessionId,
+      case_id: run.caseId,
+      project_id: run.projectId,
+      created_at: new Date(run.createdAt).toISOString(),
+      updated_at: new Date(run.updatedAt).toISOString(),
+      mode: run.mode,
+      goal: run.goal,
+      status: run.status,
+      last_stage: run.lastStage,
+      coordination_mode: "staged_handoff",
+      orchestration_mode: "multi_agent",
+      runtime: run.runtime,
+      captures: run.captures
+    });
+  }
+  touchProject(projectId, lastSessionId, updatedAt = nowMs()) {
+    const registry = this.readRegistry();
+    const nextProjects = registry.projects.map((project2) => {
+      if (project2.projectId !== projectId) return project2;
+      return {
+        ...project2,
+        updatedAt,
+        lastSessionId: lastSessionId || project2.lastSessionId
+      };
+    });
+    registry.projects = nextProjects;
+    this.writeRegistry(registry);
+    const project = registry.projects.find((item) => item.projectId === projectId);
+    if (project) {
+      this.writeProjectMetadata(project);
+    }
+  }
+  getProjectDataPath(project) {
+    const target = typeof project === "string" ? this.getProjectById(project) : project;
+    if (!target) {
+      throw new Error(`Project not found: ${project}`);
+    }
+    return path__namespace.join(this.projectsRootPath, target.slug);
+  }
+  getProjectSessionsRoot(project) {
+    return path__namespace.join(this.getProjectDataPath(project), "sessions");
+  }
+  findSessionLocation(sessionId) {
+    for (const project of this.listProjects()) {
+      const sessionPath = path__namespace.join(this.getProjectSessionsRoot(project), sessionId);
+      if (fs__namespace.existsSync(path__namespace.join(sessionPath, "session.json"))) {
+        return { project, sessionPath };
+      }
+    }
+    return null;
+  }
+  readPersistedRun(sessionId, runId) {
+    const runJsonPath = path__namespace.join(this.getRunPath(sessionId, runId), "run.json");
+    const runJson = this.readJson(runJsonPath);
+    if (runJson) {
+      return runJson;
+    }
+    const runYaml = readYaml(path__namespace.join(this.getRunPath(sessionId, runId), "run.yaml"));
+    if (!runYaml) {
+      return null;
+    }
+    return {
+      runId,
+      projectId: String(runYaml.project_id || ""),
+      sessionId,
+      caseId: String(runYaml.case_id || sessionId),
+      mode: runYaml.mode || "debugger",
+      goal: String(runYaml.goal || ""),
+      captures: runYaml.captures || [],
+      startedAt: Date.parse(String(runYaml.created_at || nowIso$1())),
+      finishedAt: runYaml.finished_at ? Date.parse(String(runYaml.finished_at)) : void 0,
+      status: runYaml.status || "running",
+      lastStage: String(runYaml.last_stage || "preflight_pending"),
+      backend: runYaml.runtime?.backend || "local",
+      createdAt: Date.parse(String(runYaml.created_at || nowIso$1())),
+      updatedAt: Date.parse(String(runYaml.updated_at || runYaml.created_at || nowIso$1())),
+      runtime: {
+        backend: runYaml.runtime?.backend || "local",
+        entry_mode: runYaml.runtime?.entry_mode || "cli",
+        context_id: runYaml.runtime?.context_id || null,
+        runtime_owner: runYaml.runtime?.runtime_owner || null,
+        session_id: String(runYaml.runtime?.session_id || sessionId),
+        workflow_stage: runYaml.runtime?.workflow_stage || "preflight_pending"
+      }
+    };
+  }
+  toRunSummary(run) {
+    return {
+      runId: run.runId,
+      projectId: run.projectId,
+      sessionId: run.sessionId,
+      caseId: run.caseId,
+      mode: run.mode,
+      goal: run.goal,
+      captures: run.captures,
+      startedAt: run.startedAt,
+      finishedAt: run.finishedAt,
+      status: run.status,
+      lastStage: run.lastStage,
+      backend: run.backend
+    };
+  }
+  normalizeSessionTitle(title) {
+    const normalized = title?.trim();
+    if (normalized) {
+      return normalized.slice(0, 80);
+    }
+    const timestamp = /* @__PURE__ */ new Date();
+    return `Session ${timestamp.getFullYear()}-${String(timestamp.getMonth() + 1).padStart(2, "0")}-${String(timestamp.getDate()).padStart(2, "0")} ${String(timestamp.getHours()).padStart(2, "0")}:${String(timestamp.getMinutes()).padStart(2, "0")}`;
+  }
+  createUniqueProjectSlug(projectName, existingProjects) {
+    const baseSlug = sanitizeToken(projectName.toLowerCase());
+    const existingSlugs = new Set(existingProjects.map((project) => project.slug));
+    if (!existingSlugs.has(baseSlug)) {
+      return baseSlug;
+    }
+    let counter = 2;
+    while (existingSlugs.has(`${baseSlug}-${counter}`)) {
+      counter += 1;
+    }
+    return `${baseSlug}-${counter}`;
+  }
+  ensureDir(dirPath) {
+    if (!fs__namespace.existsSync(dirPath)) {
+      fs__namespace.mkdirSync(dirPath, { recursive: true });
+    }
+  }
+  copyDirectoryContents(sourceDir, targetDir, overwrite) {
+    if (!fs__namespace.existsSync(sourceDir)) return;
+    this.ensureDir(targetDir);
+    for (const entry of fs__namespace.readdirSync(sourceDir, { withFileTypes: true })) {
+      const sourcePath = path__namespace.join(sourceDir, entry.name);
+      const targetPath = path__namespace.join(targetDir, entry.name);
+      if (entry.isDirectory()) {
+        this.copyDirectoryContents(sourcePath, targetPath, overwrite);
+        continue;
+      }
+      if (!overwrite && fs__namespace.existsSync(targetPath)) {
+        continue;
+      }
+      this.ensureDir(path__namespace.dirname(targetPath));
+      fs__namespace.copyFileSync(sourcePath, targetPath);
+    }
+  }
+  readJson(filePath) {
+    try {
+      if (!fs__namespace.existsSync(filePath)) {
+        return null;
+      }
+      return JSON.parse(fs__namespace.readFileSync(filePath, "utf-8"));
+    } catch (error) {
+      console.error(`Failed to read JSON file: ${filePath}`, error);
+      return null;
+    }
+  }
+  writeJson(filePath, data) {
+    this.ensureDir(path__namespace.dirname(filePath));
+    fs__namespace.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+  }
+  deepMerge(base, patch) {
+    const output = { ...base };
+    for (const [key, value] of Object.entries(patch)) {
+      if (Array.isArray(value)) {
+        output[key] = value;
+        continue;
+      }
+      if (value && typeof value === "object") {
+        const existingValue = output[key];
+        output[key] = this.deepMerge(
+          existingValue && typeof existingValue === "object" && !Array.isArray(existingValue) ? existingValue : {},
+          value
+        );
+        continue;
+      }
+      output[key] = value;
+    }
+    return output;
+  }
+  persistProject(project) {
+    const registry = this.readRegistry();
+    registry.projects = registry.projects.map((entry) => entry.projectId === project.projectId ? project : entry);
+    this.writeRegistry(registry);
+    this.writeProjectMetadata(project);
+  }
+  buildProjectPaths(rootPath) {
+    const resourcePath = path__namespace.join(rootPath, ".resource");
+    return {
+      resourcePath,
+      knowledgePath: path__namespace.join(resourcePath, "knowledge"),
+      inputsPath: path__namespace.join(resourcePath, "inputs")
+    };
+  }
+  ensureProjectResourceLayout(rootPath) {
+    const paths = this.buildProjectPaths(rootPath);
+    this.ensureDir(paths.resourcePath);
+    this.ensureDir(paths.knowledgePath);
+    this.ensureDir(paths.inputsPath);
+    const legacyKnowledgePath = path__namespace.join(rootPath, ".rdc-agent", "knowledge");
+    if (fs__namespace.existsSync(legacyKnowledgePath)) {
+      this.copyDirectoryContents(legacyKnowledgePath, paths.knowledgePath, false);
+    }
+    return paths;
+  }
+  normalizeProjectRecord(project) {
+    const rootPath = path__namespace.resolve(project.rootPath);
+    const { resourcePath, knowledgePath, inputsPath } = this.ensureProjectResourceLayout(rootPath);
+    const inputs = this.collectProjectInputs(inputsPath);
+    return {
+      ...project,
+      rootPath,
+      resourcePath,
+      knowledgePath,
+      inputsPath,
+      inputs,
+      inputsUpdatedAt: project.inputsUpdatedAt || nowMs()
+    };
+  }
+  collectProjectInputs(inputsPath) {
+    if (!fs__namespace.existsSync(inputsPath)) {
+      return [];
+    }
+    const records = [];
+    const walk = (dirPath) => {
+      for (const entry of fs__namespace.readdirSync(dirPath, { withFileTypes: true })) {
+        const fullPath = path__namespace.join(dirPath, entry.name);
+        if (entry.isDirectory()) {
+          walk(fullPath);
+          continue;
+        }
+        if (path__namespace.extname(entry.name).toLowerCase() !== ".rdc") {
+          continue;
+        }
+        const stats = fs__namespace.statSync(fullPath);
+        records.push({
+          inputId: this.createProjectInputId(inputsPath, fullPath),
+          fileName: path__namespace.basename(fullPath),
+          filePath: fullPath,
+          source: "project_resource",
+          discoveredAt: stats.birthtimeMs || stats.ctimeMs || stats.mtimeMs,
+          lastModifiedAt: stats.mtimeMs,
+          size: stats.size
+        });
+      }
+    };
+    walk(inputsPath);
+    return records.sort((a, b) => a.fileName.localeCompare(b.fileName));
+  }
+  createProjectInputId(inputsPath, filePath) {
+    const relativePath = path__namespace.relative(inputsPath, filePath).replace(/[\\/]+/g, "_");
+    const sanitized = sanitizeToken(relativePath.toLowerCase().replace(/\.rdc$/i, ""));
+    return `input_${sanitized}`;
+  }
+  resolveImportedInputPath(inputsPath, fileName) {
+    const extension = path__namespace.extname(fileName);
+    const baseName = path__namespace.basename(fileName, extension);
+    let candidate = path__namespace.join(inputsPath, fileName);
+    let counter = 2;
+    while (fs__namespace.existsSync(candidate)) {
+      candidate = path__namespace.join(inputsPath, `${baseName}-${counter}${extension}`);
+      counter += 1;
+    }
+    return candidate;
   }
 }
 const storageAdapter = new StorageAdapter();
@@ -1064,66 +1776,558 @@ class WorkflowEngine {
   }
 }
 const workflowEngine = new WorkflowEngine();
-const DEFAULTS = {
-  openRouter: {
-    apiKey: "",
-    defaultModel: "anthropic/claude-sonnet-4-20250514"
-  },
-  remoteTargets: []
+const DEFAULT_MODEL_ROUTING = {
+  "rdc-debugger": { provider: "openrouter", model: "anthropic/claude-3-opus" },
+  "triage_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  "capture_repro_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  "pass_graph_pipeline_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  "pixel_forensics_agent": { provider: "openrouter", model: "google/gemini-pro-1.5" },
+  "shader_ir_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  "driver_device_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  "skeptic_agent": { provider: "openrouter", model: "openai/gpt-4o" },
+  "curator_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" }
 };
-class SettingsService {
-  store;
-  constructor() {
-    this.store = new Store({
-      name: "rdc-agent-settings",
-      defaults: DEFAULTS
+const LEFT_SIDEBAR_DEFAULT_WIDTH = 280;
+const LEFT_SIDEBAR_MIN_WIDTH = 220;
+const LEFT_SIDEBAR_MAX_WIDTH = 420;
+const LEFT_SIDEBAR_COLLAPSED_WIDTH = 56;
+const RIGHT_PANEL_DEFAULT_WIDTH = 340;
+const RIGHT_PANEL_MIN_WIDTH = 280;
+const RIGHT_PANEL_MAX_WIDTH = 520;
+const RIGHT_PANEL_COLLAPSED_WIDTH = 44;
+const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
+  {
+    id: "openrouter",
+    kind: "openrouter",
+    label: "OpenRouter",
+    enabled: true,
+    baseUrl: "https://openrouter.ai/api/v1",
+    recommendedModels: [
+      "anthropic/claude-sonnet-4.5",
+      "anthropic/claude-opus-4.1",
+      "moonshotai/kimi-k2.5",
+      "openai/gpt-5.2"
+    ],
+    defaultModels: [
+      "anthropic/claude-3-opus",
+      "anthropic/claude-3-sonnet",
+      "google/gemini-pro-1.5",
+      "openai/gpt-4o"
+    ],
+    docsUrl: "https://openrouter.ai/keys"
+  },
+  {
+    id: "minimax",
+    kind: "openai-compatible",
+    label: "MiniMax",
+    enabled: false,
+    baseUrl: "https://api.minimax.chat/v1",
+    recommendedModels: ["MiniMax-M1", "abab6.5s-chat"],
+    docsUrl: "https://platform.minimaxi.com/"
+  },
+  {
+    id: "zai",
+    kind: "openai-compatible",
+    label: "Z.ai",
+    enabled: false,
+    baseUrl: "https://api.z.ai/api/paas/v4",
+    recommendedModels: ["glm-4.6", "glm-4.5-air"],
+    docsUrl: "https://platform.z.ai/"
+  },
+  {
+    id: "volcengine",
+    kind: "openai-compatible",
+    label: "Volcengine",
+    enabled: false,
+    baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+    recommendedModels: ["doubao-seed-1-6", "doubao-pro-32k"],
+    docsUrl: "https://www.volcengine.com/docs/82379"
+  },
+  {
+    id: "302ai",
+    kind: "openai-compatible",
+    label: "302.AI",
+    enabled: false,
+    baseUrl: "https://api.302.ai/v1",
+    recommendedModels: ["gpt-4o", "claude-3-7-sonnet"],
+    docsUrl: "https://302.ai/"
+  },
+  {
+    id: "ollama",
+    kind: "ollama",
+    label: "Ollama",
+    enabled: false,
+    baseUrl: "http://127.0.0.1:11434/v1",
+    recommendedModels: ["qwen2.5-coder:14b", "llama3.1:8b"],
+    docsUrl: "https://ollama.com/download"
+  },
+  {
+    id: "siliconflow",
+    kind: "openai-compatible",
+    label: "SiliconFlow",
+    enabled: false,
+    baseUrl: "https://api.siliconflow.cn/v1",
+    recommendedModels: ["Qwen/Qwen3-32B", "deepseek-ai/DeepSeek-V3"],
+    docsUrl: "https://siliconflow.cn/"
+  },
+  {
+    id: "openai",
+    kind: "openai-compatible",
+    label: "OpenAI",
+    enabled: false,
+    baseUrl: "https://api.openai.com/v1",
+    recommendedModels: ["gpt-4o", "gpt-4.1"],
+    docsUrl: "https://platform.openai.com/api-keys"
+  },
+  {
+    id: "anthropic",
+    kind: "anthropic",
+    label: "Anthropic",
+    enabled: false,
+    baseUrl: "https://api.anthropic.com/v1",
+    recommendedModels: ["claude-3-7-sonnet-latest", "claude-3-5-sonnet-latest"],
+    docsUrl: "https://console.anthropic.com/settings/keys"
+  }
+];
+const toModels = (modelIds) => Array.from(new Set(modelIds)).map((modelId) => ({
+  id: modelId,
+  label: modelId,
+  enabled: true
+}));
+const createBuiltinProviderEntry = (id) => {
+  const definition = BUILTIN_LLM_PROVIDER_DEFINITIONS.find((entry) => entry.id === id);
+  if (!definition) {
+    throw new Error(`Unknown builtin provider: ${id}`);
+  }
+  const defaultModels = definition.defaultModels ?? [];
+  return {
+    id: definition.id,
+    kind: definition.kind,
+    label: definition.label,
+    enabled: definition.enabled,
+    apiKey: "",
+    baseUrl: definition.baseUrl,
+    models: toModels(defaultModels),
+    recommendedModels: definition.recommendedModels,
+    docsUrl: definition.docsUrl,
+    isConfigured: false
+  };
+};
+const createBuiltinProviderEntries = () => BUILTIN_LLM_PROVIDER_DEFINITIONS.map((entry) => createBuiltinProviderEntry(entry.id));
+const LEFT_DEFAULTS = {
+  width: LEFT_SIDEBAR_DEFAULT_WIDTH,
+  min: LEFT_SIDEBAR_MIN_WIDTH,
+  max: LEFT_SIDEBAR_MAX_WIDTH,
+  collapsedWidth: LEFT_SIDEBAR_COLLAPSED_WIDTH
+};
+const RIGHT_DEFAULTS = {
+  width: RIGHT_PANEL_DEFAULT_WIDTH,
+  min: RIGHT_PANEL_MIN_WIDTH,
+  max: RIGHT_PANEL_MAX_WIDTH,
+  collapsedWidth: RIGHT_PANEL_COLLAPSED_WIDTH
+};
+const EMPTY_PATHS = {
+  workspaceRoot: "",
+  defaultWorkspaceRoot: "",
+  settingsPath: "",
+  logsPath: "",
+  logPath: "",
+  projectsPath: "",
+  knowledgePath: "",
+  migrationOrphansPath: ""
+};
+const DEFAULT_APPEARANCE = {
+  theme: "dark",
+  language: "zh-CN",
+  fontScale: "medium"
+};
+const DEFAULT_LAYOUT = {
+  leftSidebar: {
+    collapsed: false,
+    width: LEFT_DEFAULTS.width,
+    expandedWidth: LEFT_DEFAULTS.width
+  },
+  rightPanel: {
+    collapsed: false,
+    width: RIGHT_DEFAULTS.width,
+    expandedWidth: RIGHT_DEFAULTS.width
+  }
+};
+const DEFAULT_PROFILE = {
+  nickname: "RDC Operator",
+  avatarPath: ""
+};
+const VALID_THEMES = ["dark", "light", "system"];
+const VALID_LANGUAGES = ["zh-CN", "en"];
+const VALID_FONT_SCALES = ["small", "medium", "large"];
+const VALID_PROVIDER_KINDS = ["openrouter", "openai-compatible", "anthropic", "ollama"];
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const pickEnum = (value, allowed, fallback) => {
+  return typeof value === "string" && allowed.includes(value) ? value : fallback;
+};
+const dedupeStrings = (values) => Array.from(new Set(values.filter(Boolean)));
+const sanitizeSidebar = (input, defaults, fallback) => {
+  const candidate = input ?? {};
+  const expandedWidth = clamp(
+    typeof candidate.expandedWidth === "number" ? candidate.expandedWidth : fallback.expandedWidth,
+    defaults.min,
+    defaults.max
+  );
+  return {
+    collapsed: typeof candidate.collapsed === "boolean" ? candidate.collapsed : fallback.collapsed,
+    expandedWidth,
+    width: clamp(
+      typeof candidate.width === "number" ? candidate.width : fallback.collapsed ? defaults.collapsedWidth : expandedWidth,
+      defaults.collapsedWidth,
+      defaults.max
+    )
+  };
+};
+const createDefaultAgentRoutes = () => Object.entries(DEFAULT_MODEL_ROUTING).map(([agentId, route]) => ({
+  agentId,
+  providerId: route.provider,
+  modelId: route.model
+}));
+const createDefaultSettings = () => ({
+  appearance: DEFAULT_APPEARANCE,
+  layout: DEFAULT_LAYOUT,
+  profile: DEFAULT_PROFILE,
+  workspace: {
+    rootPath: appPathService.getWorkspaceRoot()
+  },
+  llm: {
+    providers: createBuiltinProviderEntries(),
+    agentRoutes: createDefaultAgentRoutes()
+  },
+  paths: EMPTY_PATHS
+});
+const toModelId = (value) => value.trim();
+const sanitizeModels = (models, fallback = []) => {
+  const candidates = Array.isArray(models) ? models : [];
+  const normalized = candidates.map((entry) => {
+    if (typeof entry === "string") {
+      const modelId2 = toModelId(entry);
+      return modelId2 ? { id: modelId2, label: modelId2, enabled: true } : null;
+    }
+    if (!entry || typeof entry !== "object") {
+      return null;
+    }
+    const candidate = entry;
+    const modelId = typeof candidate.id === "string" ? toModelId(candidate.id) : "";
+    if (!modelId) {
+      return null;
+    }
+    return {
+      id: modelId,
+      label: typeof candidate.label === "string" && candidate.label.trim() ? candidate.label.trim() : modelId,
+      enabled: candidate.enabled !== false
+    };
+  }).filter((entry) => entry !== null);
+  const merged = dedupeStrings([
+    ...normalized.filter((entry) => entry.enabled).map((entry) => entry.id),
+    ...fallback
+  ]);
+  return merged.map((modelId) => {
+    const existing = normalized.find((entry) => entry.id === modelId);
+    return existing ?? {
+      id: modelId,
+      label: modelId,
+      enabled: true
+    };
+  });
+};
+const getBuiltinDefinition = (providerId) => BUILTIN_LLM_PROVIDER_DEFINITIONS.find((entry) => entry.id === providerId);
+const getProviderConfigState = (provider) => {
+  if (!provider.enabled) return false;
+  if (provider.kind === "ollama") return true;
+  return Boolean(provider.apiKey.trim());
+};
+const sanitizeProvider = (entry, fallback) => {
+  const builtin = getBuiltinDefinition(typeof entry.id === "string" ? entry.id : fallback?.id ?? "");
+  const providerId = typeof entry.id === "string" && entry.id.trim() || fallback?.id || builtin?.id || "custom-provider";
+  const recommendedModels = dedupeStrings([
+    ...Array.isArray(entry.recommendedModels) ? entry.recommendedModels.filter((value) => typeof value === "string") : [],
+    ...fallback?.recommendedModels ?? [],
+    ...builtin?.recommendedModels ?? []
+  ]);
+  const models = sanitizeModels(
+    entry.models,
+    dedupeStrings([
+      ...(fallback?.models ?? []).filter((model) => model.enabled).map((model) => model.id),
+      ...builtin?.defaultModels ?? []
+    ])
+  );
+  const resolved = {
+    id: providerId,
+    kind: pickEnum(
+      entry.kind,
+      VALID_PROVIDER_KINDS,
+      fallback?.kind ?? builtin?.kind ?? "openai-compatible"
+    ),
+    label: typeof entry.label === "string" && entry.label.trim() ? entry.label.trim() : fallback?.label ?? builtin?.label ?? providerId,
+    enabled: typeof entry.enabled === "boolean" ? entry.enabled : fallback?.enabled ?? builtin?.enabled ?? false,
+    apiKey: typeof entry.apiKey === "string" ? entry.apiKey.trim() : fallback?.apiKey ?? "",
+    baseUrl: typeof entry.baseUrl === "string" && entry.baseUrl.trim() ? entry.baseUrl.trim() : fallback?.baseUrl ?? builtin?.baseUrl,
+    models,
+    recommendedModels,
+    docsUrl: typeof entry.docsUrl === "string" && entry.docsUrl.trim() ? entry.docsUrl.trim() : fallback?.docsUrl ?? builtin?.docsUrl,
+    isConfigured: false
+  };
+  resolved.isConfigured = getProviderConfigState(resolved);
+  return resolved;
+};
+const importLegacyCredentials = (settings) => {
+  const credentials = Array.isArray(settings.llm?.credentials) ? settings.llm?.credentials : [];
+  const imported = /* @__PURE__ */ new Map();
+  for (const credential of credentials) {
+    const providerId = typeof credential.provider === "string" ? credential.provider : "";
+    if (!providerId || !credential.apiKey?.trim()) {
+      continue;
+    }
+    const current = imported.get(providerId);
+    if (!current || credential.isDefault) {
+      imported.set(providerId, credential);
+    }
+  }
+  return Array.from(imported.entries()).map(([providerId, credential]) => {
+    const builtinFallback = createBuiltinProviderEntries().find((entry) => entry.id === providerId);
+    return sanitizeProvider({
+      id: providerId,
+      label: credential.label || builtinFallback?.label || providerId,
+      enabled: true,
+      apiKey: credential.apiKey,
+      baseUrl: credential.baseUrl,
+      models: builtinFallback?.models ?? [],
+      recommendedModels: builtinFallback?.recommendedModels ?? [],
+      docsUrl: builtinFallback?.docsUrl,
+      kind: builtinFallback?.kind ?? "openai-compatible"
+    }, builtinFallback);
+  });
+};
+const mergeProviders = (rawProviders, legacySettings, legacyStore) => {
+  const builtinProviders = createBuiltinProviderEntries();
+  const providerMap = /* @__PURE__ */ new Map();
+  for (const provider of builtinProviders) {
+    providerMap.set(provider.id, provider);
+  }
+  const importedProviders = Array.isArray(rawProviders) ? rawProviders.map((entry) => sanitizeProvider(entry, providerMap.get(entry.id))) : [];
+  for (const provider of importedProviders) {
+    providerMap.set(provider.id, provider);
+  }
+  for (const provider of importLegacyCredentials(legacySettings)) {
+    const fallback = providerMap.get(provider.id);
+    providerMap.set(provider.id, sanitizeProvider(provider, fallback));
+  }
+  if (legacyStore.openRouter?.apiKey) {
+    const fallback = providerMap.get("openrouter");
+    providerMap.set("openrouter", sanitizeProvider({
+      id: "openrouter",
+      enabled: true,
+      apiKey: legacyStore.openRouter.apiKey,
+      baseUrl: legacyStore.openRouter.baseUrl,
+      models: fallback?.models ?? [],
+      recommendedModels: fallback?.recommendedModels ?? [],
+      docsUrl: fallback?.docsUrl,
+      kind: "openrouter",
+      label: fallback?.label ?? "OpenRouter"
+    }, fallback));
+  }
+  return Array.from(providerMap.values()).map((provider) => sanitizeProvider(provider, providerMap.get(provider.id)));
+};
+const ensureRouteModel = (provider, modelId) => {
+  if (!modelId) {
+    return provider;
+  }
+  if (provider.models.some((model) => model.id === modelId)) {
+    return provider;
+  }
+  return {
+    ...provider,
+    models: [...provider.models, { id: modelId, label: modelId, enabled: true }]
+  };
+};
+const sanitizeAgentRoutes = (rawRoutes, providers) => {
+  const providerMap = new Map(providers.map((provider) => [provider.id, provider]));
+  const providedRoutes = Array.isArray(rawRoutes) ? rawRoutes.filter((entry) => Boolean(entry && typeof entry === "object" && "agentId" in entry)) : [];
+  const routeMap = new Map(providedRoutes.map((route) => [route.agentId, route]));
+  const normalizedRoutes = [];
+  for (const [agentId, fallback] of Object.entries(DEFAULT_MODEL_ROUTING)) {
+    const candidate = routeMap.get(agentId);
+    const providerId = candidate?.providerId || fallback.provider;
+    const preferredModelId = candidate?.modelId || fallback.model;
+    const initialProvider = providerMap.get(providerId) || providerMap.get(fallback.provider) || providers[0];
+    if (!initialProvider) {
+      continue;
+    }
+    const providerWithModel = ensureRouteModel(initialProvider, preferredModelId);
+    providerMap.set(providerWithModel.id, providerWithModel);
+    normalizedRoutes.push({
+      agentId,
+      providerId: providerWithModel.id,
+      modelId: preferredModelId
     });
   }
-  // ── OpenRouter 配置 ──
-  getOpenRouterConfig() {
-    return this.store.get("openRouter");
-  }
-  setOpenRouterConfig(config) {
-    const current = this.getOpenRouterConfig();
-    this.store.set("openRouter", { ...current, ...config });
-  }
-  hasOpenRouterKey() {
-    const config = this.getOpenRouterConfig();
-    return !!config.apiKey && config.apiKey.length > 0;
-  }
-  // ── Remote Targets ──
-  getRemoteTargets() {
-    return this.store.get("remoteTargets");
-  }
-  saveRemoteTarget(target) {
-    const targets = this.getRemoteTargets();
-    const idx = targets.findIndex((t) => t.id === target.id);
-    if (idx >= 0) {
-      targets[idx] = target;
-    } else {
-      targets.push(target);
+  return {
+    providers: Array.from(providerMap.values()).map((provider) => sanitizeProvider(provider, provider)),
+    routes: normalizedRoutes
+  };
+};
+const sanitizeSettings = (raw, legacyStore, workspaceRoot) => {
+  const fallback = createDefaultSettings();
+  const candidate = raw ?? {};
+  const appearance = candidate.appearance ?? {};
+  const profile = candidate.profile ?? {};
+  const resolvedWorkspaceRoot = candidate.workspace?.rootPath?.trim() || workspaceRoot;
+  const providers = mergeProviders(candidate.llm?.providers, candidate, legacyStore);
+  const { providers: normalizedProviders, routes } = sanitizeAgentRoutes(candidate.llm?.agentRoutes, providers);
+  return {
+    appearance: {
+      theme: pickEnum(appearance.theme, VALID_THEMES, fallback.appearance.theme),
+      language: pickEnum(appearance.language, VALID_LANGUAGES, fallback.appearance.language),
+      fontScale: pickEnum(appearance.fontScale, VALID_FONT_SCALES, fallback.appearance.fontScale)
+    },
+    layout: {
+      leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout.leftSidebar),
+      rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout.rightPanel)
+    },
+    profile: {
+      nickname: typeof profile.nickname === "string" && profile.nickname.trim().length > 0 ? profile.nickname.trim() : fallback.profile.nickname,
+      avatarPath: typeof profile.avatarPath === "string" ? profile.avatarPath : fallback.profile.avatarPath
+    },
+    workspace: {
+      rootPath: resolvedWorkspaceRoot
+    },
+    llm: {
+      providers: normalizedProviders,
+      agentRoutes: routes
+    },
+    paths: EMPTY_PATHS
+  };
+};
+const mergeSettings = (current, patch, legacyStore, workspaceRoot) => sanitizeSettings({
+  ...current,
+  appearance: {
+    ...current.appearance,
+    ...patch.appearance ?? {}
+  },
+  layout: {
+    leftSidebar: {
+      ...current.layout.leftSidebar,
+      ...patch.layout?.leftSidebar ?? {}
+    },
+    rightPanel: {
+      ...current.layout.rightPanel,
+      ...patch.layout?.rightPanel ?? {}
     }
-    this.store.set("remoteTargets", targets);
+  },
+  profile: {
+    ...current.profile,
+    ...patch.profile ?? {}
+  },
+  workspace: {
+    ...current.workspace,
+    ...patch.workspace ?? {}
+  },
+  llm: {
+    providers: patch.llm?.providers ?? current.llm.providers,
+    agentRoutes: patch.llm?.agentRoutes ?? current.llm.agentRoutes
   }
-  removeRemoteTarget(targetId) {
-    const targets = this.getRemoteTargets().filter((t) => t.id !== targetId);
-    this.store.set("remoteTargets", targets);
+}, legacyStore, workspaceRoot);
+class SettingsService {
+  legacyStore;
+  initialized = false;
+  constructor() {
+    this.legacyStore = new Store({
+      name: "rdc-agent-settings"
+    });
   }
-  // ── 全量读写（供 IPC settings:get / settings:set 使用） ──
-  getAll() {
-    return this.store.store;
+  initialize() {
+    const runtimePaths = appPathService.initializeWorkspaceRoot();
+    const settings = this.readSettings(runtimePaths.workspaceRoot);
+    this.writeSettings(settings, runtimePaths.workspaceRoot);
+    this.initialized = true;
+    return this.getAll(runtimePaths);
   }
-  setAll(partial) {
-    if (partial.openRouter !== void 0) {
-      this.setOpenRouterConfig(partial.openRouter);
+  ensureInitialized() {
+    if (!this.initialized) {
+      this.initialize();
     }
-    if (partial.remoteTargets !== void 0) {
-      this.store.set("remoteTargets", partial.remoteTargets);
-    }
   }
-  // ── 重置 ──
-  reset() {
-    this.store.clear();
+  readSettings(workspaceRoot) {
+    const settingsPath = appPathService.getWorkspacePaths(workspaceRoot).settingsPath;
+    const legacySettingsPath = path.join(electron.app.getPath("appData"), "RdcAgent", "settings.json");
+    let rawSettings = null;
+    try {
+      if (fs.existsSync(settingsPath)) {
+        rawSettings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+      } else if (fs.existsSync(legacySettingsPath)) {
+        rawSettings = JSON.parse(fs.readFileSync(legacySettingsPath, "utf8"));
+      }
+    } catch (error) {
+      console.warn("[SettingsService] Failed to read settings file:", error);
+    }
+    return sanitizeSettings(rawSettings, this.legacyStore.store, workspaceRoot);
+  }
+  writeSettings(settings, workspaceRoot = settings.workspace.rootPath) {
+    const settingsPath = appPathService.getWorkspacePaths(workspaceRoot).settingsPath;
+    const persisted = {
+      ...settings,
+      workspace: {
+        rootPath: workspaceRoot
+      },
+      paths: EMPTY_PATHS
+    };
+    fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+    fs.writeFileSync(settingsPath, JSON.stringify(persisted, null, 2), "utf8");
+  }
+  getAll(runtimePaths) {
+    this.ensureInitialized();
+    const paths = appPathService.getWorkspacePaths();
+    const settings = this.readSettings(paths.workspaceRoot);
+    const nextSettings = {
+      ...settings,
+      workspace: {
+        rootPath: paths.workspaceRoot
+      },
+      paths: {
+        ...paths,
+        ...runtimePaths ?? {}
+      }
+    };
+    this.writeSettings(nextSettings, paths.workspaceRoot);
+    return nextSettings;
+  }
+  setAll(patch, runtimePaths) {
+    this.ensureInitialized();
+    const currentSettings = this.getAll(runtimePaths);
+    const requestedRoot = patch.workspace?.rootPath?.trim() || currentSettings.workspace.rootPath;
+    const nextPaths = appPathService.setWorkspaceRoot(requestedRoot);
+    const nextSettings = mergeSettings(currentSettings, patch, this.legacyStore.store, nextPaths.workspaceRoot);
+    this.writeSettings(nextSettings, nextPaths.workspaceRoot);
+    return this.getAll(nextPaths);
+  }
+  getLlmConfig() {
+    const settings = this.getAll();
+    const providers = settings.llm.providers.map((provider) => ({
+      id: provider.id,
+      kind: provider.kind,
+      label: provider.label,
+      enabled: provider.enabled,
+      apiKey: provider.apiKey,
+      baseUrl: provider.baseUrl,
+      models: provider.models.filter((model) => model.enabled).map((model) => model.id),
+      docsUrl: provider.docsUrl
+    }));
+    return {
+      providers,
+      agentRoutes: settings.llm.agentRoutes
+    };
+  }
+  hasConfiguredProvider() {
+    return this.getAll().llm.providers.some((provider) => provider.isConfigured);
+  }
+  getSettingsPath() {
+    return appPathService.getWorkspacePaths().settingsPath;
   }
 }
 const settingsService = new SettingsService();
@@ -1163,11 +2367,11 @@ class HarnessController {
     }
     if (input.backend === "remote") ;
     if (input.mode === "debugger") {
-      if (!settingsService.hasOpenRouterKey()) {
+      if (!settingsService.hasConfiguredProvider()) {
         blockers.push(this.createBlocker(
           "LLM_KEY_MISSING",
-          "OpenRouter API key is required for Debugger mode",
-          ["settings:openRouter.apiKey"]
+          "At least one configured provider is required for Debugger mode",
+          ["settings:models"]
         ));
       }
     }
@@ -1449,17 +2653,6 @@ class HarnessController {
   }
 }
 const harnessController = new HarnessController();
-const DEFAULT_MODEL_ROUTING = {
-  "rdc-debugger": { provider: "openrouter", model: "anthropic/claude-3-opus" },
-  "triage_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "capture_repro_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "pass_graph_pipeline_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "pixel_forensics_agent": { provider: "openrouter", model: "google/gemini-pro-1.5" },
-  "shader_ir_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "driver_device_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "skeptic_agent": { provider: "openrouter", model: "openai/gpt-4o" },
-  "curator_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" }
-};
 const AGENT_DISPLAY_NAMES = {
   "rdc-debugger": "RDC Debugger",
   "triage_agent": "Triage Agent",
@@ -1493,28 +2686,52 @@ const INVESTIGATOR_AGENTS = [
 const VERIFIER_AGENTS = ["skeptic_agent"];
 const REPORTER_AGENTS = ["curator_agent"];
 const DEFAULT_TOKEN_TTL_SECONDS = 1800;
+const toContentBlocks = (messages) => messages.map((message) => {
+  if (typeof message.content === "string") {
+    return { role: message.role, content: message.content };
+  }
+  const content = message.content.map((block) => {
+    if (block.type === "text") {
+      return { type: "text", text: block.text };
+    }
+    if (block.type === "image" && block.source) {
+      return {
+        type: "image_url",
+        image_url: {
+          url: `data:${block.source.media_type};base64,${block.source.data}`
+        }
+      };
+    }
+    return { type: "text", text: "" };
+  });
+  return { role: message.role, content };
+});
 class OpenRouterProvider {
-  name = "openrouter";
+  name;
   apiKey = "";
   baseUrl = "https://openrouter.ai/api/v1";
+  models = [];
+  constructor(name) {
+    this.name = name;
+  }
   configure(config) {
     this.apiKey = config.apiKey;
-    if (config.baseUrl) {
-      this.baseUrl = config.baseUrl;
-    }
+    this.baseUrl = config.baseUrl || "https://openrouter.ai/api/v1";
+    this.models = config.models;
   }
   async chat(request) {
+    const model = request.model || this.models[0] || "anthropic/claude-3-opus";
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${this.apiKey}`,
+        Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
         "HTTP-Referer": "https://rdcagent.local",
         "X-Title": "RdcAgent"
       },
       body: JSON.stringify({
-        model: request.model || "anthropic/claude-3-opus",
-        messages: this.normalizeMessages(request.messages),
+        model,
+        messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
         tools: request.tools,
@@ -1522,104 +2739,9 @@ class OpenRouterProvider {
       })
     });
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`OpenRouter API error: ${response.status} - ${error}`);
+      throw new Error(`OpenRouter API error: ${response.status} - ${await response.text()}`);
     }
     const data = await response.json();
-    return this.normalizeResponse(data, request.model || "anthropic/claude-3-opus");
-  }
-  async streamChat(request, onChunk) {
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://rdcagent.local",
-        "X-Title": "RdcAgent"
-      },
-      body: JSON.stringify({
-        model: request.model || "anthropic/claude-3-opus",
-        messages: this.normalizeMessages(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        stream: true
-      })
-    });
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`OpenRouter API error: ${response.status} - ${error}`);
-    }
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-    let fullContent = "";
-    while (reader) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value);
-      const lines = chunk.split("\n").filter((line) => line.startsWith("data:"));
-      for (const line of lines) {
-        const data = line.slice(5).trim();
-        if (data === "[DONE]") continue;
-        try {
-          const parsed = JSON.parse(data);
-          const content = parsed.choices?.[0]?.delta?.content || "";
-          if (content) {
-            fullContent += content;
-            onChunk(content);
-          }
-        } catch {
-        }
-      }
-    }
-    return {
-      id: `or-${Date.now()}`,
-      model: request.model || "anthropic/claude-3-opus",
-      content: fullContent,
-      usage: { inputTokens: 0, outputTokens: 0 },
-      stopReason: "end_turn"
-    };
-  }
-  async isAvailable() {
-    return !!this.apiKey;
-  }
-  getModels() {
-    return [
-      "anthropic/claude-3-opus",
-      "anthropic/claude-3-sonnet",
-      "anthropic/claude-3-haiku",
-      "openai/gpt-4o",
-      "openai/gpt-4-turbo",
-      "openai/gpt-3.5-turbo",
-      "google/gemini-pro-1.5",
-      "google/gemini-flash-1.5",
-      "x-ai/grok-beta",
-      "moonshot/kimi-latest",
-      "meta-llama/llama-3-70b-instruct"
-    ];
-  }
-  normalizeMessages(messages) {
-    return messages.map((msg) => {
-      if (typeof msg.content === "string") {
-        return { role: msg.role, content: msg.content };
-      }
-      const content = msg.content.map((block) => {
-        if (block.type === "text") {
-          return { type: "text", text: block.text };
-        }
-        if (block.type === "image" && block.source) {
-          return {
-            type: "image_url",
-            image_url: {
-              url: `data:${block.source.media_type};base64,${block.source.data}`
-            }
-          };
-        }
-        return { type: "text", text: "" };
-      });
-      return { role: msg.role, content };
-    });
-  }
-  normalizeResponse(data, model) {
     const choice = data.choices?.[0];
     return {
       id: data.id || `or-${Date.now()}`,
@@ -1633,69 +2755,97 @@ class OpenRouterProvider {
       stopReason: choice?.finish_reason === "tool_calls" ? "tool_use" : "end_turn"
     };
   }
+  async streamChat(request, onChunk) {
+    const response = await this.chat(request);
+    onChunk(typeof response.content === "string" ? response.content : JSON.stringify(response.content));
+    return response;
+  }
+  async isAvailable() {
+    return Boolean(this.apiKey);
+  }
+  getModels() {
+    return this.models;
+  }
 }
-class OpenAIProvider {
-  name = "openai";
+class OpenAICompatibleProvider {
+  name;
   apiKey = "";
   baseUrl = "https://api.openai.com/v1";
+  models = [];
+  requireApiKey = true;
+  constructor(name, requireApiKey = true) {
+    this.name = name;
+    this.requireApiKey = requireApiKey;
+  }
   configure(config) {
     this.apiKey = config.apiKey;
-    if (config.baseUrl) {
-      this.baseUrl = config.baseUrl;
-    }
+    this.baseUrl = config.baseUrl || this.baseUrl;
+    this.models = config.models;
   }
   async chat(request) {
+    const model = request.model || this.models[0] || "gpt-4o";
+    const headers = {
+      "Content-Type": "application/json"
+    };
+    if (this.apiKey) {
+      headers.Authorization = `Bearer ${this.apiKey}`;
+    }
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: "POST",
-      headers: {
-        "Authorization": `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json"
-      },
+      headers,
       body: JSON.stringify({
-        model: request.model || "gpt-4o",
+        model,
         messages: request.messages,
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7
       })
     });
+    if (!response.ok) {
+      throw new Error(`${this.name} API error: ${response.status} - ${await response.text()}`);
+    }
     const data = await response.json();
     const choice = data.choices?.[0];
     return {
-      id: data.id,
-      model: data.model,
+      id: data.id || `${this.name}-${Date.now()}`,
+      model: data.model || model,
       content: choice?.message?.content || "",
+      toolCalls: choice?.message?.tool_calls,
       usage: {
         inputTokens: data.usage?.prompt_tokens || 0,
         outputTokens: data.usage?.completion_tokens || 0
       },
-      stopReason: choice?.finish_reason === "stop" ? "end_turn" : "max_tokens"
+      stopReason: choice?.finish_reason === "tool_calls" ? "tool_use" : choice?.finish_reason === "stop" ? "end_turn" : "max_tokens"
     };
   }
   async streamChat(request, onChunk) {
-    const result = await this.chat(request);
-    onChunk(result.content);
-    return result;
+    const response = await this.chat(request);
+    onChunk(typeof response.content === "string" ? response.content : JSON.stringify(response.content));
+    return response;
   }
   async isAvailable() {
-    return !!this.apiKey;
+    return this.requireApiKey ? Boolean(this.apiKey) : true;
   }
   getModels() {
-    return ["gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo"];
+    return this.models;
   }
 }
 class AnthropicProvider {
-  name = "anthropic";
+  name;
   apiKey = "";
   baseUrl = "https://api.anthropic.com/v1";
+  models = [];
+  constructor(name) {
+    this.name = name;
+  }
   configure(config) {
     this.apiKey = config.apiKey;
-    if (config.baseUrl) {
-      this.baseUrl = config.baseUrl;
-    }
+    this.baseUrl = config.baseUrl || "https://api.anthropic.com/v1";
+    this.models = config.models;
   }
   async chat(request) {
-    const systemMessage = request.messages.find((m) => m.role === "system");
-    const otherMessages = request.messages.filter((m) => m.role !== "system");
+    const model = request.model || this.models[0] || "claude-3-7-sonnet-latest";
+    const systemMessage = request.messages.find((message) => message.role === "system");
+    const otherMessages = request.messages.filter((message) => message.role !== "system");
     const response = await fetch(`${this.baseUrl}/messages`, {
       method: "POST",
       headers: {
@@ -1704,19 +2854,22 @@ class AnthropicProvider {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: request.model || "claude-3-opus-20240229",
+        model,
         max_tokens: request.maxTokens || 4096,
-        system: systemMessage?.content,
-        messages: otherMessages.map((m) => ({
-          role: m.role === "assistant" ? "assistant" : "user",
-          content: m.content
+        system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
+        messages: otherMessages.map((message) => ({
+          role: message.role === "assistant" ? "assistant" : "user",
+          content: message.content
         }))
       })
     });
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.status} - ${await response.text()}`);
+    }
     const data = await response.json();
     return {
-      id: data.id,
-      model: data.model,
+      id: data.id || `anthropic-${Date.now()}`,
+      model: data.model || model,
       content: data.content?.[0]?.text || "",
       usage: {
         inputTokens: data.usage?.input_tokens || 0,
@@ -1726,92 +2879,94 @@ class AnthropicProvider {
     };
   }
   async streamChat(request, onChunk) {
-    const result = await this.chat(request);
-    onChunk(result.content);
-    return result;
+    const response = await this.chat(request);
+    onChunk(typeof response.content === "string" ? response.content : JSON.stringify(response.content));
+    return response;
   }
   async isAvailable() {
-    return !!this.apiKey;
+    return Boolean(this.apiKey);
   }
   getModels() {
-    return ["claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"];
+    return this.models;
   }
 }
+const createProviderByKind = (providerId, kind) => {
+  if (kind === "openrouter") {
+    return new OpenRouterProvider(providerId);
+  }
+  if (kind === "anthropic") {
+    return new AnthropicProvider(providerId);
+  }
+  if (kind === "ollama") {
+    return new OpenAICompatibleProvider(providerId, false);
+  }
+  return new OpenAICompatibleProvider(providerId, true);
+};
 class LLMAdapter {
   providers = /* @__PURE__ */ new Map();
-  defaultProvider = "openrouter";
-  constructor() {
-    this.providers.set("openrouter", new OpenRouterProvider());
-    this.providers.set("openai", new OpenAIProvider());
-    this.providers.set("anthropic", new AnthropicProvider());
-  }
-  /**
-   * 配置LLM
-   */
+  fallbackProviderId = null;
   configure(config) {
-    this.defaultProvider = config.defaultProvider || "openrouter";
-    if (config.openrouter) {
-      this.providers.get("openrouter")?.configure(config.openrouter);
-    }
-    if (config.openai) {
-      this.providers.get("openai")?.configure(config.openai);
-    }
-    if (config.anthropic) {
-      this.providers.get("anthropic")?.configure(config.anthropic);
+    this.providers.clear();
+    this.fallbackProviderId = null;
+    for (const providerConfig of config.providers) {
+      const provider = createProviderByKind(providerConfig.id, providerConfig.kind);
+      if ("configure" in provider && typeof provider.configure === "function") {
+        provider.configure(providerConfig);
+      }
+      this.providers.set(providerConfig.id, {
+        config: providerConfig,
+        provider
+      });
+      if (!this.fallbackProviderId && providerConfig.enabled) {
+        this.fallbackProviderId = providerConfig.id;
+      }
     }
   }
-  /**
-   * 发送聊天请求
-   */
-  async chat(request, provider) {
-    const providerName = provider || this.defaultProvider;
-    const p = this.providers.get(providerName);
-    if (!p) {
-      throw new Error(`Provider not found: ${providerName}`);
+  async chat(request, providerId) {
+    const resolvedProviderId = providerId || this.fallbackProviderId;
+    if (!resolvedProviderId) {
+      throw new Error("No LLM provider configured");
     }
-    if (!await p.isAvailable()) {
-      throw new Error(`Provider not configured: ${providerName}`);
+    const runtimeProvider = this.providers.get(resolvedProviderId);
+    if (!runtimeProvider) {
+      throw new Error(`Provider not found: ${resolvedProviderId}`);
     }
-    return p.chat(request);
+    if (!runtimeProvider.config.enabled) {
+      throw new Error(`Provider disabled: ${resolvedProviderId}`);
+    }
+    if (!await runtimeProvider.provider.isAvailable()) {
+      throw new Error(`Provider not configured: ${resolvedProviderId}`);
+    }
+    return runtimeProvider.provider.chat(request);
   }
-  /**
-   * 流式聊天
-   */
-  async streamChat(request, onChunk, provider) {
-    const providerName = provider || this.defaultProvider;
-    const p = this.providers.get(providerName);
-    if (!p) {
-      throw new Error(`Provider not found: ${providerName}`);
+  async streamChat(request, onChunk, providerId) {
+    const resolvedProviderId = providerId || this.fallbackProviderId;
+    if (!resolvedProviderId) {
+      throw new Error("No LLM provider configured");
     }
-    return p.streamChat(request, onChunk);
+    const runtimeProvider = this.providers.get(resolvedProviderId);
+    if (!runtimeProvider) {
+      throw new Error(`Provider not found: ${resolvedProviderId}`);
+    }
+    return runtimeProvider.provider.streamChat(request, onChunk);
   }
-  /**
-   * 测试连接
-   */
-  async testConnection(provider) {
-    const p = this.providers.get(provider);
-    if (!p) {
-      return { success: false, error: `Provider not found: ${provider}` };
+  async testConnection(providerId) {
+    const runtimeProvider = this.providers.get(providerId);
+    if (!runtimeProvider) {
+      return { success: false, error: `Provider not found: ${providerId}` };
     }
     try {
-      const available = await p.isAvailable();
+      const available = await runtimeProvider.provider.isAvailable();
       return { success: available, error: available ? void 0 : "Provider not configured" };
     } catch (error) {
       return { success: false, error: String(error) };
     }
   }
-  /**
-   * 获取可用模型列表
-   */
-  getAvailableModels(provider) {
-    const p = this.providers.get(provider);
-    return p?.getModels() || [];
+  getAvailableModels(providerId) {
+    return this.providers.get(providerId)?.config.models || [];
   }
-  /**
-   * 获取默认provider
-   */
   getDefaultProvider() {
-    return this.defaultProvider;
+    return this.fallbackProviderId || "openrouter";
   }
 }
 const llmAdapter = new LLMAdapter();
@@ -1944,6 +3099,18 @@ class AgentOrchestrator {
    */
   getAgentConfig(agentId) {
     return this.agentConfigs.get(agentId) || null;
+  }
+  applyLlmConfig(config) {
+    const routeMap = new Map(config.agentRoutes.map((route) => [route.agentId, route]));
+    for (const [agentId, agentConfig] of this.agentConfigs.entries()) {
+      const fallback = DEFAULT_MODEL_ROUTING[agentId];
+      const route = routeMap.get(agentId);
+      this.agentConfigs.set(agentId, {
+        ...agentConfig,
+        modelProvider: route?.providerId ?? fallback.provider,
+        modelName: route?.modelId ?? fallback.model
+      });
+    }
   }
   /**
    * 加载Agent System Prompt
@@ -2172,6 +3339,8 @@ class AgentOrchestrator {
 const agentOrchestrator = new AgentOrchestrator();
 const POLL_INTERVAL_MS = 5e3;
 const ACTIVATE_TIMEOUT_MS = 25e3;
+const RECOVERY_PROBE_TIMEOUT_MS = 12e3;
+const PREPARED_REMOTE_TTL_MS = 10 * 60 * 1e3;
 const LOCAL_DEVICE = {
   id: "local",
   label: "Local",
@@ -2183,8 +3352,181 @@ const LOCAL_DEVICE = {
 function sanitizeDeviceId(value) {
   return value.replace(/[^a-zA-Z0-9_-]/g, "-");
 }
-function isToolError(result, fallback) {
-  return result.error?.message ?? fallback;
+function adbUnavailableMessage() {
+  return "adb executable not found. Configure RDX_ANDROID_ADB_PATH or install Android platform-tools.";
+}
+function candidateAdbPaths() {
+  const candidates = [];
+  const push = (value) => {
+    const trimmed = value?.trim();
+    if (trimmed) {
+      candidates.push(trimmed);
+    }
+  };
+  push(process.env.RDX_ANDROID_ADB_PATH);
+  push(process.env.ADB);
+  for (const envName of ["ANDROID_SDK_ROOT", "ANDROID_HOME"]) {
+    const root = process.env[envName]?.trim();
+    if (!root) {
+      continue;
+    }
+    push(path__namespace.join(root, "platform-tools", "adb.exe"));
+    push(path__namespace.join(root, "platform-tools", "adb"));
+  }
+  const localAppData = process.env.LOCALAPPDATA?.trim();
+  if (localAppData) {
+    push(path__namespace.join(localAppData, "Android", "Sdk", "platform-tools", "adb.exe"));
+  }
+  return candidates;
+}
+function resolveAdbExecutable() {
+  for (const candidate of candidateAdbPaths()) {
+    if (fs__namespace.existsSync(candidate)) {
+      return path__namespace.resolve(candidate);
+    }
+  }
+  for (const entry of (process.env.PATH ?? "").split(path__namespace.delimiter)) {
+    const trimmed = entry.trim();
+    if (!trimmed) {
+      continue;
+    }
+    for (const adbName of ["adb.exe", "adb"]) {
+      const candidate = path__namespace.join(trimmed, adbName);
+      if (fs__namespace.existsSync(candidate)) {
+        return path__namespace.resolve(candidate);
+      }
+    }
+  }
+  throw new Error(adbUnavailableMessage());
+}
+function normalizeString(value) {
+  return typeof value === "string" && value.trim() ? value.trim() : void 0;
+}
+function normalizeBoolean(value) {
+  return typeof value === "boolean" ? value : void 0;
+}
+function normalizeNumber(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : void 0;
+}
+function parseAndroidBootstrapMetadata(payload) {
+  if (!payload || typeof payload !== "object") {
+    return void 0;
+  }
+  const record = payload;
+  const cleanupActions = Array.isArray(record.cleanup_actions) ? record.cleanup_actions.filter((item) => typeof item === "string") : void 0;
+  const metadata = {
+    packageName: normalizeString(record.package_name),
+    activityName: normalizeString(record.activity_name),
+    abi: normalizeString(record.abi),
+    apkPath: normalizeString(record.apk_path),
+    host: normalizeString(record.host),
+    port: normalizeNumber(record.port),
+    remotePort: normalizeNumber(record.remote_port),
+    forwardSpec: normalizeString(record.forward_spec),
+    configRemotePath: normalizeString(record.config_remote_path),
+    cleanupActions,
+    installedApk: normalizeBoolean(record.installed_apk),
+    pushedConfig: normalizeBoolean(record.pushed_config),
+    startedActivity: normalizeBoolean(record.started_activity),
+    createdForward: normalizeBoolean(record.created_forward),
+    installMode: record.install_mode === "upgrade" || record.install_mode === "force_replace" ? record.install_mode : void 0,
+    installReason: record.install_reason === "fresh_install" || record.install_reason === "mismatched_existing_apk" || record.install_reason === "version_downgrade" || record.install_reason === "signature_mismatch" ? record.install_reason : void 0,
+    uninstalledExisting: normalizeBoolean(record.uninstalled_existing)
+  };
+  return Object.values(metadata).some((value) => value !== void 0) ? metadata : void 0;
+}
+function parsePersistedAndroidBootstrapMetadata(payload) {
+  if (!payload || typeof payload !== "object") {
+    return void 0;
+  }
+  const record = payload;
+  const cleanupActions = Array.isArray(record.cleanupActions) ? record.cleanupActions.filter((item) => typeof item === "string") : void 0;
+  const metadata = {
+    packageName: normalizeString(record.packageName),
+    activityName: normalizeString(record.activityName),
+    abi: normalizeString(record.abi),
+    apkPath: normalizeString(record.apkPath),
+    host: normalizeString(record.host),
+    port: normalizeNumber(record.port),
+    remotePort: normalizeNumber(record.remotePort),
+    forwardSpec: normalizeString(record.forwardSpec),
+    configRemotePath: normalizeString(record.configRemotePath),
+    cleanupActions,
+    installedApk: normalizeBoolean(record.installedApk),
+    pushedConfig: normalizeBoolean(record.pushedConfig),
+    startedActivity: normalizeBoolean(record.startedActivity),
+    createdForward: normalizeBoolean(record.createdForward),
+    installMode: record.installMode === "upgrade" || record.installMode === "force_replace" ? record.installMode : void 0,
+    installReason: record.installReason === "fresh_install" || record.installReason === "mismatched_existing_apk" || record.installReason === "version_downgrade" || record.installReason === "signature_mismatch" ? record.installReason : void 0,
+    uninstalledExisting: normalizeBoolean(record.uninstalledExisting)
+  };
+  return Object.values(metadata).some((value) => value !== void 0) ? metadata : void 0;
+}
+function parseResumeCacheRecord(payload) {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  const record = payload;
+  const deviceId = normalizeString(record.deviceId);
+  const serial = normalizeString(record.serial);
+  const label = normalizeString(record.label);
+  const transport = record.transport === "local" || record.transport === "adb_android" ? record.transport : void 0;
+  const lastValidatedAt = normalizeNumber(record.lastValidatedAt);
+  if (!deviceId || !serial || !label || !transport || !lastValidatedAt) {
+    return null;
+  }
+  return {
+    deviceId,
+    serial,
+    label,
+    transport,
+    lastValidatedAt,
+    bootstrap: parsePersistedAndroidBootstrapMetadata(record.bootstrap)
+  };
+}
+function buildRemoteReadyText(bootstrap) {
+  if (!bootstrap) {
+    return "Remote server ready";
+  }
+  const suffix = [];
+  if (bootstrap.installMode === "force_replace") {
+    suffix.push("APK force replaced");
+  } else if (bootstrap.installedApk && bootstrap.installReason === "fresh_install") {
+    suffix.push("APK installed");
+  } else if (bootstrap.installedApk) {
+    suffix.push("APK upgraded");
+  } else if (bootstrap.packageName) {
+    suffix.push("APK verified");
+  }
+  if (bootstrap.abi) {
+    suffix.push(bootstrap.abi);
+  }
+  if (bootstrap.forwardSpec) {
+    suffix.push(bootstrap.forwardSpec);
+  }
+  return suffix.length > 0 ? `Remote server ready · ${suffix.join(" · ")}` : "Remote server ready";
+}
+function buildRecoveryReadyText(bootstrap) {
+  const readyText = buildRemoteReadyText(bootstrap);
+  return readyText.replace("Remote server ready", "Remote server ready to resume");
+}
+function parseToolError(result, fallbackMessage) {
+  return {
+    message: result.error?.message ?? fallbackMessage,
+    code: result.error?.code
+  };
+}
+function applyActivationFailure(device, phase, message, code) {
+  return {
+    ...device,
+    status: "offline",
+    detailText: message,
+    lastError: message,
+    activationPhase: phase,
+    activationErrorCode: code,
+    activationErrorMessage: message,
+    activationUpdatedAt: Date.now()
+  };
 }
 function parseAdbDeviceLine(line) {
   const trimmed = line.trim();
@@ -2246,6 +3588,10 @@ class ReplayDeviceService {
   refreshPromise = null;
   activationPromises = /* @__PURE__ */ new Map();
   probeContexts = /* @__PURE__ */ new Map();
+  preparedRemotes = /* @__PURE__ */ new Map();
+  recoveryProbePromises = /* @__PURE__ */ new Map();
+  recoveryProbeAttempted = /* @__PURE__ */ new Set();
+  resumeCache = null;
   setMainWindow(window) {
     this.mainWindow = window;
   }
@@ -2254,6 +3600,7 @@ class ReplayDeviceService {
       return;
     }
     this.initialized = true;
+    await this.loadResumeCache();
     await this.refreshDevices();
     this.pollTimer = setInterval(() => {
       void this.refreshDevices().catch((error) => {
@@ -2269,6 +3616,9 @@ class ReplayDeviceService {
   }
   listDevices() {
     return this.getSortedDevices();
+  }
+  getDeviceById(deviceId) {
+    return this.devices.get(deviceId) ?? null;
   }
   async refreshDevices() {
     if (this.refreshPromise) {
@@ -2292,31 +3642,194 @@ class ReplayDeviceService {
     this.activationPromises.set(deviceId, activationPromise);
     return activationPromise;
   }
+  peekPreparedRemote(deviceId) {
+    const prepared = this.resolvePreparedRemote(deviceId);
+    return prepared ? { ...prepared } : null;
+  }
+  consumePreparedRemote(deviceId) {
+    const prepared = this.resolvePreparedRemote(deviceId);
+    if (!prepared) {
+      return null;
+    }
+    this.preparedRemotes.delete(deviceId);
+    return { ...prepared };
+  }
+  invalidatePreparedRemote(deviceId) {
+    this.preparedRemotes.delete(deviceId);
+    const device = this.devices.get(deviceId);
+    if (!device || device.status !== "recoverable") {
+      return;
+    }
+    this.updateDevice({
+      ...device,
+      status: "offline",
+      remoteId: void 0,
+      detailText: "Ready to start remote server",
+      lastError: void 0,
+      recoverySource: "cache"
+    });
+  }
+  async probeRecovery(deviceId) {
+    const existingPromise = this.recoveryProbePromises.get(deviceId);
+    if (existingPromise) {
+      return existingPromise;
+    }
+    const recoveryPromise = this.performRecoveryProbe(deviceId).finally(() => {
+      this.recoveryProbePromises.delete(deviceId);
+    });
+    this.recoveryProbePromises.set(deviceId, recoveryPromise);
+    return recoveryPromise;
+  }
+  getResumeCachePath() {
+    return path__namespace.join(storageAdapter.getWorkspacePath(), "common", "config", "device_resume.json");
+  }
+  async loadResumeCache() {
+    try {
+      const cachePath = this.getResumeCachePath();
+      if (!fs__namespace.existsSync(cachePath)) {
+        this.resumeCache = null;
+        return;
+      }
+      const content = await fs__namespace.promises.readFile(cachePath, "utf-8");
+      const parsed = JSON.parse(content);
+      this.resumeCache = parseResumeCacheRecord(parsed.lastDevice);
+    } catch (error) {
+      console.warn("[ReplayDeviceService] Failed to read device resume cache:", error);
+      this.resumeCache = null;
+    }
+  }
+  async persistResumeCache(device, validatedAt) {
+    if (device.type !== "android" || !device.serial) {
+      return;
+    }
+    const nextRecord = {
+      deviceId: device.id,
+      serial: device.serial,
+      label: device.label,
+      transport: device.transport,
+      bootstrap: device.bootstrap,
+      lastValidatedAt: validatedAt
+    };
+    this.resumeCache = nextRecord;
+    try {
+      const cachePath = this.getResumeCachePath();
+      await fs__namespace.promises.mkdir(path__namespace.dirname(cachePath), { recursive: true });
+      await fs__namespace.promises.writeFile(
+        cachePath,
+        JSON.stringify({ lastDevice: nextRecord }, null, 2),
+        "utf-8"
+      );
+    } catch (error) {
+      console.warn("[ReplayDeviceService] Failed to persist device resume cache:", error);
+    }
+  }
+  resolvePreparedRemote(deviceId) {
+    const prepared = this.preparedRemotes.get(deviceId);
+    if (!prepared) {
+      return null;
+    }
+    const currentDevice = this.devices.get(deviceId);
+    const expired = Date.now() - prepared.validatedAt > PREPARED_REMOTE_TTL_MS;
+    const serialMismatch = Boolean(currentDevice?.serial && currentDevice.serial !== prepared.serial);
+    if (expired || serialMismatch) {
+      this.preparedRemotes.delete(deviceId);
+      return null;
+    }
+    return prepared;
+  }
+  shouldPreserveTransientState(device) {
+    if (device.status === "recoverable") {
+      return this.resolvePreparedRemote(device.id) !== null;
+    }
+    return device.status !== "offline";
+  }
+  matchesResumeCache(device) {
+    return Boolean(
+      device.type === "android" && device.serial && this.resumeCache && this.resumeCache.serial === device.serial
+    );
+  }
+  maybeAnnotateRecovery(device) {
+    if (!this.matchesResumeCache(device)) {
+      return device;
+    }
+    return {
+      ...device,
+      recoveryEligible: true,
+      recoverySource: device.recoverySource ?? "cache",
+      recoveryValidatedAt: device.recoveryValidatedAt ?? this.resumeCache?.lastValidatedAt,
+      bootstrap: device.bootstrap ?? this.resumeCache?.bootstrap
+    };
+  }
+  maybeScheduleRecoveryProbe(devices) {
+    const cached = this.resumeCache;
+    if (!cached) {
+      return;
+    }
+    const candidate = devices.find(
+      (device) => device.type === "android" && device.serial === cached.serial && device.status === "offline" && device.lastError === void 0
+    );
+    if (!candidate) {
+      return;
+    }
+    if (this.recoveryProbeAttempted.has(candidate.id) || this.resolvePreparedRemote(candidate.id)) {
+      return;
+    }
+    this.recoveryProbeAttempted.add(candidate.id);
+    void this.probeRecovery(candidate.id).catch((error) => {
+      console.warn("[ReplayDeviceService] Recovery probe failed:", error);
+    });
+  }
   async performRefresh() {
     const detectedDevices = await this.detectAdbDevices();
     const now = Date.now();
     const nextDevices = /* @__PURE__ */ new Map([[LOCAL_DEVICE.id, { ...LOCAL_DEVICE, lastSeen: now }]]);
     const detectedIds = /* @__PURE__ */ new Set(["local"]);
     for (const detected of detectedDevices) {
-      detectedIds.add(detected.id);
-      const previous = this.devices.get(detected.id);
-      if (previous && previous.status !== "offline" && detected.lastError === void 0) {
+      const annotatedDetected = this.maybeAnnotateRecovery(detected);
+      detectedIds.add(annotatedDetected.id);
+      const previous = this.devices.get(annotatedDetected.id);
+      if (previous && this.shouldPreserveTransientState(previous) && annotatedDetected.lastError === void 0) {
         nextDevices.set(detected.id, {
-          ...detected,
+          ...annotatedDetected,
           status: previous.status,
-          detailText: previous.detailText ?? detected.detailText,
+          detailText: previous.detailText ?? annotatedDetected.detailText,
           lastError: previous.lastError,
           remoteId: previous.remoteId,
-          lastSeen: detected.lastSeen ?? previous.lastSeen
+          bootstrap: previous.bootstrap ?? annotatedDetected.bootstrap,
+          activationPhase: previous.activationPhase,
+          activationErrorCode: previous.activationErrorCode,
+          activationErrorMessage: previous.activationErrorMessage,
+          activationUpdatedAt: previous.activationUpdatedAt,
+          lastSeen: annotatedDetected.lastSeen ?? previous.lastSeen,
+          recoveryEligible: previous.recoveryEligible ?? annotatedDetected.recoveryEligible,
+          recoveryValidatedAt: previous.recoveryValidatedAt ?? annotatedDetected.recoveryValidatedAt,
+          recoverySource: previous.recoverySource ?? annotatedDetected.recoverySource
+        });
+      } else if (previous && previous.activationErrorMessage && previous.lastError && annotatedDetected.status === "offline" && annotatedDetected.lastError === void 0) {
+        nextDevices.set(detected.id, {
+          ...annotatedDetected,
+          detailText: previous.detailText ?? previous.activationErrorMessage,
+          lastError: previous.lastError,
+          remoteId: previous.remoteId,
+          bootstrap: previous.bootstrap ?? annotatedDetected.bootstrap,
+          activationPhase: previous.activationPhase,
+          activationErrorCode: previous.activationErrorCode,
+          activationErrorMessage: previous.activationErrorMessage,
+          activationUpdatedAt: previous.activationUpdatedAt,
+          lastSeen: annotatedDetected.lastSeen ?? previous.lastSeen,
+          recoveryEligible: previous.recoveryEligible ?? annotatedDetected.recoveryEligible,
+          recoveryValidatedAt: previous.recoveryValidatedAt ?? annotatedDetected.recoveryValidatedAt,
+          recoverySource: previous.recoverySource ?? annotatedDetected.recoverySource
         });
       } else {
-        nextDevices.set(detected.id, detected);
+        nextDevices.set(annotatedDetected.id, annotatedDetected);
       }
     }
     for (const [deviceId, device] of this.devices.entries()) {
       if (detectedIds.has(deviceId) || deviceId === "local") {
         continue;
       }
+      this.preparedRemotes.delete(deviceId);
       nextDevices.set(deviceId, {
         ...device,
         status: "offline",
@@ -2324,7 +3837,9 @@ class ReplayDeviceService {
         lastError: "ADB device not detected."
       });
     }
-    return this.replaceDevices(nextDevices);
+    const devices = this.replaceDevices(nextDevices);
+    this.maybeScheduleRecoveryProbe(devices);
+    return devices;
   }
   async detectAdbDevices() {
     try {
@@ -2338,6 +3853,7 @@ class ReplayDeviceService {
         detailText: message,
         lastError: message
       }));
+      this.preparedRemotes.clear();
       const fallbackDevices = /* @__PURE__ */ new Map([[LOCAL_DEVICE.id, LOCAL_DEVICE]]);
       for (const device of offlineDevices) {
         fallbackDevices.set(device.id, device);
@@ -2359,57 +3875,131 @@ class ReplayDeviceService {
       });
       return this.devices.get(deviceId);
     }
+    const isRecoverable = device.status === "recoverable";
     this.updateDevice({
       ...device,
       status: "loading",
-      detailText: "Running remote server command...",
-      lastError: void 0
+      detailText: isRecoverable ? "Resuming remote server..." : "Preparing Android remote server...",
+      lastError: void 0,
+      activationPhase: "daemon",
+      activationErrorCode: void 0,
+      activationErrorMessage: void 0,
+      activationUpdatedAt: Date.now()
     });
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error("Timed out while starting the remote server.")), ACTIVATE_TIMEOUT_MS);
     });
     try {
       const activated = await Promise.race([
-        this.activateRemoteDevice(deviceId),
+        isRecoverable ? this.resumePreparedRemote(deviceId) : this.activateRemoteDevice(deviceId),
         timeoutPromise
       ]);
       this.updateDevice(activated);
       return activated;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const failedDevice = {
-        ...this.devices.get(deviceId) ?? device,
-        status: "offline",
-        detailText: message,
-        lastError: message
-      };
+      const currentDevice = this.devices.get(deviceId) ?? device;
+      const failedDevice = applyActivationFailure(
+        currentDevice,
+        currentDevice.activationPhase ?? "connect",
+        message,
+        currentDevice.activationErrorCode
+      );
       this.updateDevice(failedDevice);
       return failedDevice;
     }
   }
-  async activateRemoteDevice(deviceId) {
+  async performRecoveryProbe(deviceId) {
     const device = this.devices.get(deviceId);
-    if (!device?.serial) {
+    if (!device || device.type !== "android" || !device.serial) {
+      return;
+    }
+    this.updateDevice({
+      ...device,
+      status: "loading",
+      detailText: "Validating remote server for resume...",
+      lastError: void 0,
+      activationPhase: "context",
+      activationErrorCode: void 0,
+      activationErrorMessage: void 0,
+      activationUpdatedAt: Date.now(),
+      recoveryEligible: true,
+      recoverySource: "startup_probe"
+    });
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Timed out while probing remote recovery.")), RECOVERY_PROBE_TIMEOUT_MS);
+    });
+    try {
+      await Promise.race([
+        this.probeRemoteSurface(device),
+        timeoutPromise
+      ]);
+    } catch (error) {
+      this.preparedRemotes.delete(deviceId);
+      const current = this.devices.get(deviceId) ?? device;
+      this.updateDevice({
+        ...current,
+        status: "offline",
+        detailText: "Ready to start remote server",
+        lastError: void 0,
+        activationPhase: "idle",
+        activationErrorCode: void 0,
+        activationErrorMessage: void 0,
+        activationUpdatedAt: Date.now(),
+        recoveryEligible: true,
+        recoverySource: "cache"
+      });
+      console.warn("[ReplayDeviceService] Recovery probe did not prepare a resumable surface:", error);
+    }
+  }
+  async probeRemoteSurface(device) {
+    if (!device.serial) {
       throw new Error("Android device serial is missing.");
     }
     await this.ensureDaemonReady();
-    const contextId = `ctx-device-${sanitizeDeviceId(device.serial)}-${generateShortId()}`;
-    this.probeContexts.set(deviceId, contextId);
+    const contextId = `ctx-device-resume-${sanitizeDeviceId(device.serial)}`;
+    this.probeContexts.set(device.id, contextId);
+    await toolBridge.call({
+      toolName: "rd.session.clear_context",
+      args: { target_context_id: contextId }
+    });
     const contextResult = await toolBridge.call({
       toolName: "rd.session.create_context",
       args: { context_id: contextId }
     });
     if (!contextResult.ok) {
-      throw new Error(isToolError(contextResult, "Failed to create a replay device context."));
+      const parsedError = parseToolError(contextResult, "Failed to create a recovery probe context.");
+      throw new Error(parsedError.message);
     }
+    this.updateDevice({
+      ...device,
+      status: "loading",
+      detailText: "Validating remote server for resume...",
+      lastError: void 0,
+      activationPhase: "init",
+      activationUpdatedAt: Date.now(),
+      recoveryEligible: true,
+      recoverySource: "startup_probe"
+    });
     const initResult = await toolBridge.call({
       toolName: "rd.core.init",
       args: {},
       contextId
     });
     if (!initResult.ok) {
-      throw new Error(isToolError(initResult, "Failed to initialize remote capability."));
+      const parsedError = parseToolError(initResult, "Failed to initialize recovery probe capability.");
+      throw new Error(parsedError.message);
     }
+    this.updateDevice({
+      ...device,
+      status: "loading",
+      detailText: "Validating remote server for resume...",
+      lastError: void 0,
+      activationPhase: "connect",
+      activationUpdatedAt: Date.now(),
+      recoveryEligible: true,
+      recoverySource: "startup_probe"
+    });
     const connectResult = await toolBridge.call({
       toolName: "rd.remote.connect",
       args: {
@@ -2422,18 +4012,199 @@ class ReplayDeviceService {
       contextId
     });
     if (!connectResult.ok) {
-      throw new Error(isToolError(connectResult, "Failed to connect to the Android RenderDoc server."));
+      const parsedError = parseToolError(connectResult, "Failed to connect to the Android RenderDoc server.");
+      throw new Error(parsedError.message);
+    }
+    const remoteId = typeof connectResult.data?.remote_id === "string" ? connectResult.data.remote_id : void 0;
+    if (!remoteId) {
+      throw new Error("Remote recovery probe did not return a remote_id.");
+    }
+    const bootstrap = parseAndroidBootstrapMetadata(
+      connectResult.data?.detail && typeof connectResult.data.detail === "object" ? connectResult.data.detail.bootstrap : void 0
+    );
+    const pingResult = await toolBridge.call({
+      toolName: "rd.remote.ping",
+      args: { remote_id: remoteId },
+      contextId
+    });
+    if (!pingResult.ok) {
+      const parsedError = parseToolError(pingResult, "Remote server recovery ping failed.");
+      throw new Error(parsedError.message);
+    }
+    const targetsResult = await toolBridge.call({
+      toolName: "rd.remote.list_targets",
+      args: { remote_id: remoteId },
+      contextId
+    });
+    if (!targetsResult.ok) {
+      const parsedError = parseToolError(targetsResult, "Remote recovery target discovery failed.");
+      throw new Error(parsedError.message);
+    }
+    const validatedAt = Date.now();
+    this.preparedRemotes.set(device.id, {
+      deviceId: device.id,
+      serial: device.serial,
+      contextId,
+      remoteId,
+      validatedAt,
+      bootstrap
+    });
+    await this.persistResumeCache({
+      ...device,
+      bootstrap
+    }, validatedAt);
+    this.updateDevice({
+      ...device,
+      status: "recoverable",
+      remoteId,
+      bootstrap,
+      detailText: buildRecoveryReadyText(bootstrap),
+      lastError: void 0,
+      activationPhase: "ready",
+      activationErrorCode: void 0,
+      activationErrorMessage: void 0,
+      activationUpdatedAt: validatedAt,
+      lastSeen: Date.now(),
+      recoveryEligible: true,
+      recoveryValidatedAt: validatedAt,
+      recoverySource: "startup_probe"
+    });
+  }
+  async resumePreparedRemote(deviceId) {
+    const device = this.devices.get(deviceId);
+    if (!device?.serial) {
+      throw new Error("Android device serial is missing.");
+    }
+    const prepared = this.resolvePreparedRemote(deviceId);
+    if (!prepared) {
+      return this.activateRemoteDevice(deviceId);
+    }
+    if (prepared.serial !== device.serial) {
+      this.invalidatePreparedRemote(deviceId);
+      return this.activateRemoteDevice(deviceId);
+    }
+    await this.ensureDaemonReady();
+    this.updateDevice({
+      ...device,
+      status: "loading",
+      detailText: "Resuming remote server...",
+      lastError: void 0,
+      activationPhase: "ping",
+      activationUpdatedAt: Date.now(),
+      recoveryEligible: true,
+      recoverySource: "prepared_surface"
+    });
+    const pingResult = await toolBridge.call({
+      toolName: "rd.remote.ping",
+      args: { remote_id: prepared.remoteId },
+      contextId: prepared.contextId
+    });
+    if (!pingResult.ok) {
+      this.invalidatePreparedRemote(deviceId);
+      return this.activateRemoteDevice(deviceId);
+    }
+    return {
+      ...device,
+      status: "online",
+      remoteId: prepared.remoteId,
+      bootstrap: prepared.bootstrap ?? device.bootstrap,
+      detailText: buildRemoteReadyText(prepared.bootstrap ?? device.bootstrap),
+      lastError: void 0,
+      activationPhase: "ready",
+      activationErrorCode: void 0,
+      activationErrorMessage: void 0,
+      activationUpdatedAt: Date.now(),
+      lastSeen: Date.now(),
+      recoveryEligible: true,
+      recoveryValidatedAt: prepared.validatedAt,
+      recoverySource: "prepared_surface"
+    };
+  }
+  async activateRemoteDevice(deviceId) {
+    const device = this.devices.get(deviceId);
+    if (!device?.serial) {
+      throw new Error("Android device serial is missing.");
+    }
+    await this.ensureDaemonReady();
+    this.updateDevice({
+      ...device,
+      status: "loading",
+      detailText: "Allocating remote context...",
+      lastError: void 0,
+      activationPhase: "context",
+      activationUpdatedAt: Date.now()
+    });
+    const contextId = `ctx-device-${sanitizeDeviceId(device.serial)}-${generateShortId()}`;
+    this.probeContexts.set(deviceId, contextId);
+    const contextResult = await toolBridge.call({
+      toolName: "rd.session.create_context",
+      args: { context_id: contextId }
+    });
+    if (!contextResult.ok) {
+      const parsedError = parseToolError(contextResult, "Failed to create a replay device context.");
+      this.updateDevice(applyActivationFailure(device, "context", parsedError.message, parsedError.code));
+      throw new Error(parsedError.message);
+    }
+    this.updateDevice({
+      ...device,
+      status: "loading",
+      detailText: "Initializing remote capability...",
+      lastError: void 0,
+      activationPhase: "init",
+      activationUpdatedAt: Date.now()
+    });
+    const initResult = await toolBridge.call({
+      toolName: "rd.core.init",
+      args: {},
+      contextId
+    });
+    if (!initResult.ok) {
+      const parsedError = parseToolError(initResult, "Failed to initialize remote capability.");
+      this.updateDevice(applyActivationFailure(device, "init", parsedError.message, parsedError.code));
+      throw new Error(parsedError.message);
+    }
+    this.updateDevice({
+      ...device,
+      status: "loading",
+      detailText: "Connecting to Android RenderDoc server...",
+      lastError: void 0,
+      activationPhase: "connect",
+      activationUpdatedAt: Date.now()
+    });
+    const connectResult = await toolBridge.call({
+      toolName: "rd.remote.connect",
+      args: {
+        timeout_ms: 5e3,
+        options: {
+          transport: "adb_android",
+          device_serial: device.serial
+        }
+      },
+      contextId
+    });
+    if (!connectResult.ok) {
+      const parsedError = parseToolError(connectResult, "Failed to connect to the Android RenderDoc server.");
+      this.updateDevice(applyActivationFailure(device, "connect", parsedError.message, parsedError.code));
+      throw new Error(parsedError.message);
     }
     const remoteId = typeof connectResult.data?.remote_id === "string" ? connectResult.data.remote_id : void 0;
     if (!remoteId) {
       throw new Error("Remote connect did not return a remote_id.");
     }
+    const bootstrap = parseAndroidBootstrapMetadata(
+      connectResult.data?.detail && typeof connectResult.data.detail === "object" ? connectResult.data.detail.bootstrap : void 0
+    );
     this.updateDevice({
       ...device,
       status: "connected",
       remoteId,
-      detailText: "Remote server connected",
+      bootstrap,
+      detailText: buildRemoteReadyText(bootstrap),
       lastError: void 0,
+      activationPhase: "ping",
+      activationErrorCode: void 0,
+      activationErrorMessage: void 0,
+      activationUpdatedAt: Date.now(),
       lastSeen: Date.now()
     });
     const pingResult = await toolBridge.call({
@@ -2442,23 +4213,59 @@ class ReplayDeviceService {
       contextId
     });
     if (!pingResult.ok) {
-      throw new Error(isToolError(pingResult, "Remote server ping failed."));
+      const parsedError = parseToolError(pingResult, "Remote server ping failed.");
+      this.updateDevice(applyActivationFailure({ ...device, remoteId, bootstrap }, "ping", parsedError.message, parsedError.code));
+      throw new Error(parsedError.message);
     }
+    this.updateDevice({
+      ...device,
+      status: "connected",
+      remoteId,
+      bootstrap,
+      detailText: buildRemoteReadyText(bootstrap),
+      lastError: void 0,
+      activationPhase: "targets",
+      activationUpdatedAt: Date.now(),
+      lastSeen: Date.now()
+    });
     const targetsResult = await toolBridge.call({
       toolName: "rd.remote.list_targets",
       args: { remote_id: remoteId },
       contextId
     });
     if (!targetsResult.ok) {
-      throw new Error(isToolError(targetsResult, "Remote target discovery failed."));
+      const parsedError = parseToolError(targetsResult, "Remote target discovery failed.");
+      this.updateDevice(applyActivationFailure({ ...device, remoteId, bootstrap }, "targets", parsedError.message, parsedError.code));
+      throw new Error(parsedError.message);
     }
+    const validatedAt = Date.now();
+    this.preparedRemotes.set(deviceId, {
+      deviceId,
+      serial: device.serial,
+      contextId,
+      remoteId,
+      validatedAt,
+      bootstrap
+    });
+    await this.persistResumeCache({
+      ...device,
+      bootstrap
+    }, validatedAt);
     return {
       ...device,
       status: "online",
       remoteId,
-      detailText: "Remote server ready",
+      bootstrap,
+      detailText: buildRemoteReadyText(bootstrap),
       lastError: void 0,
-      lastSeen: Date.now()
+      activationPhase: "ready",
+      activationErrorCode: void 0,
+      activationErrorMessage: void 0,
+      activationUpdatedAt: validatedAt,
+      lastSeen: Date.now(),
+      recoveryEligible: true,
+      recoveryValidatedAt: validatedAt,
+      recoverySource: "prepared_surface"
     };
   }
   async ensureDaemonReady() {
@@ -2473,8 +4280,9 @@ class ReplayDeviceService {
     }
   }
   async runAdbCommand(args) {
+    const adbPath = resolveAdbExecutable();
     return new Promise((resolve, reject) => {
-      const proc = child_process.spawn("adb", args, {
+      const proc = child_process.spawn(adbPath, args, {
         windowsHide: true,
         stdio: ["ignore", "pipe", "pipe"]
       });
@@ -5219,6 +7027,689 @@ class FileCheckpointSaver extends langgraphCheckpoint.BaseCheckpointSaver {
     }
   }
 }
+let compiledGraph = null;
+let checkpointSaver = null;
+let currentSessionId = null;
+let currentProjectId = null;
+let currentRunId = null;
+let mainWindow$1 = null;
+async function initWorkflowGraph(workspacePath) {
+  checkpointSaver = new FileCheckpointSaver(workspacePath);
+  compiledGraph = createWorkflowGraph({ checkpointer: checkpointSaver });
+  try {
+    currentSessionId = await storageAdapter.getCurrentSessionId();
+    currentProjectId = storageAdapter.getCurrentProjectId();
+  } catch (error) {
+    console.warn("[IPC] Failed to restore current session id:", error);
+    currentSessionId = null;
+    currentProjectId = null;
+  }
+}
+function getThreadId() {
+  return currentSessionId || "default-thread";
+}
+function getGraphConfig() {
+  return {
+    configurable: {
+      thread_id: getThreadId(),
+      checkpoint_ns: currentRunId || void 0
+    }
+  };
+}
+function ensureGraphInitialized() {
+  if (!compiledGraph) {
+    console.error("[IPC] WorkflowGraph not initialized");
+    return false;
+  }
+  return true;
+}
+function notifyWorkflowStateChanged(graphState) {
+  if (mainWindow$1 && !mainWindow$1.isDestroyed()) {
+    const workflowState = projectToWorkflowState(graphState);
+    mainWindow$1.webContents.send("workflow:stateChanged", workflowState);
+    mainWindow$1.webContents.send("workflow:stageChanged", {
+      stage: graphState.currentStage,
+      blockers: graphState.blockers
+    });
+  }
+}
+function broadcastToRenderer(channel, ...args) {
+  const windows = electron.BrowserWindow.getAllWindows();
+  for (const win of windows) {
+    if (!win.isDestroyed()) {
+      win.webContents.send(channel, ...args);
+    }
+  }
+}
+function isInterrupted(result) {
+  return result !== null && typeof result === "object" && "__interrupt__" in result && Array.isArray(result.__interrupt__);
+}
+function registerIPCHandlers() {
+  try {
+    const llmConfig = settingsService.getLlmConfig();
+    llmAdapter.configure(llmConfig);
+    agentOrchestrator.applyLlmConfig(llmConfig);
+    console.log("[IPC] Loaded persisted LLM config");
+  } catch (err) {
+    console.warn("[IPC] Failed to preload LLM config:", err);
+  }
+  electron.ipcMain.handle("dialog:selectRdcFiles", async () => {
+    const result = await electron.dialog.showOpenDialog({
+      filters: [{ name: "RenderDoc Capture", extensions: ["rdc"] }],
+      properties: ["openFile", "multiSelections"]
+    });
+    return result.canceled ? null : result.filePaths;
+  });
+  electron.ipcMain.handle("dialog:selectDirectory", async () => {
+    const result = await electron.dialog.showOpenDialog({
+      properties: ["openDirectory", "createDirectory"]
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
+  electron.ipcMain.handle("window:minimize", async (event) => {
+    electron.BrowserWindow.fromWebContents(event.sender)?.minimize();
+  });
+  electron.ipcMain.handle("window:toggleMaximize", async (event) => {
+    const window = electron.BrowserWindow.fromWebContents(event.sender);
+    if (!window) return false;
+    if (window.isMaximized()) {
+      window.unmaximize();
+      return false;
+    }
+    window.maximize();
+    return true;
+  });
+  electron.ipcMain.handle("window:close", async (event) => {
+    electron.BrowserWindow.fromWebContents(event.sender)?.close();
+  });
+  electron.ipcMain.handle("window:isMaximized", async (event) => {
+    return electron.BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false;
+  });
+  electron.ipcMain.handle("app:getMeta", async () => {
+    return {
+      version: electron.app.getVersion(),
+      productName: electron.app.getName(),
+      systemTheme: electron.nativeTheme.shouldUseDarkColors ? "dark" : "light"
+    };
+  });
+  electron.ipcMain.handle("app:selectAvatar", async () => {
+    const result = await electron.dialog.showOpenDialog({
+      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
+      properties: ["openFile"]
+    });
+    return result.canceled ? null : result.filePaths[0];
+  });
+  electron.ipcMain.handle("app:openPath", async (_event, targetPath) => {
+    if (!targetPath) return { success: false, error: "path is required" };
+    try {
+      const stats = fs.existsSync(targetPath) ? fs.statSync(targetPath) : null;
+      if (stats?.isDirectory()) {
+        await electron.shell.openPath(targetPath);
+      } else {
+        electron.shell.showItemInFolder(targetPath);
+      }
+    } catch {
+      electron.shell.showItemInFolder(targetPath);
+    }
+    return { success: true };
+  });
+  electron.ipcMain.handle("app:copyText", async (_event, text) => {
+    electron.clipboard.writeText(text ?? "");
+    return { success: true };
+  });
+  electron.ipcMain.handle("workflow:getState", async () => {
+    if (!ensureGraphInitialized()) {
+      return null;
+    }
+    try {
+      const config = getGraphConfig();
+      const state = await compiledGraph.getState(config);
+      if (state && state.values) {
+        return projectToWorkflowState(state.values);
+      }
+      return null;
+    } catch (error) {
+      console.error("[IPC] Failed to get workflow state:", error);
+      return null;
+    }
+  });
+  electron.ipcMain.handle("workflow:resume", async (_event, sessionId) => {
+    try {
+      if (sessionId) {
+        currentSessionId = sessionId;
+        await storageAdapter.setCurrentSessionId(sessionId);
+        currentRunId = storageAdapter.getLatestRun(sessionId)?.runId || null;
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+  electron.ipcMain.handle("workflow:listRuns", async () => {
+    if (!currentSessionId) {
+      return { runs: [] };
+    }
+    return { runs: storageAdapter.listRuns(currentSessionId) };
+  });
+  electron.ipcMain.handle("project:list", async () => {
+    return { projects: storageAdapter.listProjects() };
+  });
+  electron.ipcMain.handle("project:add", async (_event, rootPath) => {
+    try {
+      const project = storageAdapter.createProject(rootPath);
+      currentProjectId = project.projectId;
+      return { success: true, project };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  electron.ipcMain.handle("project:remove", async (_event, projectId) => {
+    try {
+      storageAdapter.removeProject(projectId);
+      if (currentProjectId === projectId) {
+        currentProjectId = null;
+        currentSessionId = null;
+        currentRunId = null;
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  electron.ipcMain.handle("project:inputs:list", async (_event, projectId) => {
+    return { inputs: storageAdapter.listProjectInputs(projectId) };
+  });
+  electron.ipcMain.handle("project:inputs:refresh", async (_event, projectId) => {
+    const inputs = storageAdapter.refreshProjectInputs(projectId);
+    broadcastToRenderer("project:inputsChanged", { projectId, inputs });
+    return { inputs };
+  });
+  electron.ipcMain.handle("project:inputs:import", async (_event, projectId) => {
+    const result = await electron.dialog.showOpenDialog({
+      filters: [{ name: "RenderDoc Capture", extensions: ["rdc"] }],
+      properties: ["openFile", "multiSelections"]
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: true, inputs: storageAdapter.listProjectInputs(projectId) };
+    }
+    const inputs = storageAdapter.importProjectInputs(projectId, result.filePaths);
+    broadcastToRenderer("project:inputsChanged", { projectId, inputs });
+    return { success: true, inputs };
+  });
+  electron.ipcMain.handle("session:list", async (_event, projectId) => {
+    const resolvedProjectId = projectId || currentProjectId;
+    if (!resolvedProjectId) {
+      return { sessions: [] };
+    }
+    return { sessions: storageAdapter.listSessions(resolvedProjectId) };
+  });
+  electron.ipcMain.handle("session:create", async (_event, projectId, title) => {
+    try {
+      const session = storageAdapter.createSession(projectId, title);
+      currentProjectId = session.projectId;
+      currentSessionId = session.sessionId;
+      currentRunId = null;
+      await storageAdapter.setCurrentSessionId(session.sessionId);
+      return { success: true, session };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  electron.ipcMain.handle("session:select", async (_event, id) => {
+    const session = storageAdapter.readSession(id);
+    if (!session) {
+      return { success: false, error: `Session not found: ${id}` };
+    }
+    currentSessionId = id;
+    currentProjectId = session.projectId;
+    currentRunId = session.lastRunId || null;
+    await storageAdapter.setCurrentSessionId(id);
+    return {
+      success: true,
+      session,
+      currentRun: storageAdapter.getLatestRun(id)
+    };
+  });
+  electron.ipcMain.handle("run:list", async (_event, sessionId) => {
+    return { runs: storageAdapter.listRuns(sessionId) };
+  });
+  electron.ipcMain.handle("context:get", async () => {
+    return rdxSessionService.snapshotContext();
+  });
+  electron.ipcMain.handle("capture:list", async () => {
+    return { captures: rdxSessionService.getCaptureDescriptors() };
+  });
+  electron.ipcMain.handle("capture:open", async (_event, filePath) => {
+    try {
+      if (!filePath) {
+        return { success: false, error: "filePath is required for capture:open" };
+      }
+      return { success: false, error: "capture:open is not yet implemented" };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  electron.ipcMain.handle(
+    "capture:openProjectInput",
+    async (_event, request) => {
+      try {
+        const input = storageAdapter.listProjectInputs(request.projectId).find((entry) => entry.inputId === request.inputId && entry.filePath === request.filePath);
+        if (!input) {
+          return { success: false, error: `Project input not found: ${request.inputId}` };
+        }
+        const replayDevice = replayDeviceService.getDeviceById(request.replayDeviceId);
+        if (!replayDevice) {
+          return { success: false, error: `Replay device not found: ${request.replayDeviceId}` };
+        }
+        const openedCapture = await rdxSessionService.openProjectInput({
+          projectId: request.projectId,
+          inputId: input.inputId,
+          filePath: input.filePath,
+          replayDevice
+        });
+        const contextSnapshot = rdxSessionService.snapshotContext();
+        broadcastToRenderer("capture:openedStateChanged", openedCapture);
+        broadcastToRenderer("context:changed", contextSnapshot);
+        return { success: true, openedCapture, contextSnapshot };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    }
+  );
+  electron.ipcMain.handle("capture:getOpenedState", async () => {
+    return rdxSessionService.snapshotOpenedCapture();
+  });
+  electron.ipcMain.handle("capture:clearOpenedState", async () => {
+    await rdxSessionService.closeOrReplaceOpenedCapture();
+    broadcastToRenderer("capture:openedStateChanged", null);
+    broadcastToRenderer("context:changed", rdxSessionService.snapshotContext());
+    return { success: true };
+  });
+  electron.ipcMain.handle("capture:select", async (_event, captureId) => {
+    try {
+      await rdxSessionService.switchActiveCapture(captureId);
+      broadcastToRenderer("capture:statusChanged", { captureId, status: "selected" });
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+  electron.ipcMain.handle("workflow:start", async (_event, request, userGoal) => {
+    const isNewRequest = !Array.isArray(request);
+    const capturePaths = isNewRequest ? request.captures.map((c) => c.filePath) : request;
+    const goal = isNewRequest ? request.goal : userGoal ?? "";
+    try {
+      if (!ensureGraphInitialized()) {
+        return {
+          success: false,
+          error: "WorkflowGraph not initialized"
+        };
+      }
+      let contextSnapshot;
+      if (isNewRequest) {
+        try {
+          contextSnapshot = await rdxSessionService.bootstrap(request);
+          broadcastToRenderer("context:changed", contextSnapshot);
+          broadcastToRenderer("capture:openedStateChanged", rdxSessionService.snapshotOpenedCapture());
+        } catch (bootstrapErr) {
+          const message = bootstrapErr instanceof Error ? bootstrapErr.message : String(bootstrapErr);
+          console.warn("[IPC] rdxSessionService bootstrap failed:", bootstrapErr);
+          return {
+            success: false,
+            error: message
+          };
+        }
+      }
+      const gateResult = await harnessController.executeEntryGate({
+        capturePaths,
+        platform: "rdc-agent",
+        entryMode: "cli",
+        backend: isNewRequest ? request.captures.some((c) => c.backendHint === "remote") ? "remote" : "local" : "local",
+        mode: isNewRequest ? request.mode : "debugger",
+        captures: isNewRequest ? request.captures : void 0,
+        replayDevice: isNewRequest ? request.replayDevice : void 0
+      });
+      if (gateResult.status === "blocked") {
+        return {
+          success: false,
+          error: gateResult.blockers.map((b) => b.reason).join("; ")
+        };
+      }
+      let caseId;
+      if (isNewRequest) {
+        caseId = request.sessionId || await storageAdapter.createCase({
+          projectId: request.projectId,
+          userGoal: goal,
+          symptomSummary: goal
+        });
+      } else {
+        const projectId = currentProjectId || storageAdapter.getCurrentProjectId();
+        if (!projectId) {
+          return {
+            success: false,
+            error: "Project is required before starting a workflow."
+          };
+        }
+        caseId = await storageAdapter.createCase({
+          projectId,
+          userGoal: goal,
+          symptomSummary: goal
+        });
+      }
+      const { runId, sessionId } = await storageAdapter.createRun({
+        caseId,
+        capturePaths,
+        mode: isNewRequest ? request.mode : "debugger",
+        goal,
+        captures: isNewRequest ? request.captures : void 0,
+        backend: isNewRequest ? request.captures.some((capture) => capture.backendHint === "remote") ? "remote" : "local" : "local"
+      });
+      currentSessionId = sessionId;
+      currentRunId = runId;
+      if (isNewRequest) {
+        currentProjectId = request.projectId;
+      }
+      await storageAdapter.setCurrentSessionId(sessionId);
+      if (contextSnapshot) {
+        await storageAdapter.updateRun(sessionId, runId, {
+          runtime: {
+            context_id: contextSnapshot.contextId,
+            runtime_owner: contextSnapshot.runtimeOwner,
+            session_id: sessionId
+          }
+        });
+      }
+      const config = getGraphConfig();
+      const initialState = {
+        caseId,
+        runId,
+        sessionId,
+        userGoal: goal,
+        capturePaths,
+        currentStage: "preflight_pending",
+        stageHistory: [],
+        evidenceChain: [],
+        artifacts: [],
+        activeSpecialists: {},
+        pendingBriefs: [],
+        collectedBriefs: {},
+        blockers: [],
+        backtrackCount: {},
+        fixVerified: false,
+        entryMode: "cli",
+        backend: isNewRequest ? request.captures.some((capture) => capture.backendHint === "remote") ? "remote" : "local" : "local",
+        mode: isNewRequest ? request.mode : "debugger",
+        goal,
+        captures: isNewRequest ? request.captures : [],
+        primaryCaptureId: isNewRequest ? request.primaryCaptureId : "",
+        replayDevice: isNewRequest ? request.replayDevice : null,
+        orchestrationMode: "multi_agent",
+        coordinationMode: "staged_handoff",
+        lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
+      };
+      const result = await compiledGraph.invoke(initialState, config);
+      if (isInterrupted(result)) {
+        const interruptData = result.__interrupt__[0];
+        console.log("[IPC] Workflow interrupted:", interruptData);
+        if (mainWindow$1 && !mainWindow$1.isDestroyed()) {
+          mainWindow$1.webContents.send("workflow:blocked", {
+            type: interruptData?.type || "unknown",
+            data: interruptData
+          });
+        }
+      } else {
+        notifyWorkflowStateChanged(result);
+      }
+      return { success: true, caseId, runId, sessionId, contextSnapshot };
+    } catch (error) {
+      console.error("Failed to start workflow:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("workflow:advanceStage", async () => {
+    if (!ensureGraphInitialized()) {
+      return {
+        success: false,
+        error: "WorkflowGraph not initialized"
+      };
+    }
+    try {
+      const config = getGraphConfig();
+      const result = await compiledGraph.invoke(
+        new langgraph.Command({ resume: { action: "advance" } }),
+        config
+      );
+      if (isInterrupted(result)) {
+        const interruptData = result.__interrupt__[0];
+        return {
+          success: false,
+          currentStage: interruptData?.currentStage,
+          error: `Workflow blocked: ${interruptData?.message || "Unknown reason"}`
+        };
+      }
+      notifyWorkflowStateChanged(result);
+      return {
+        success: true,
+        currentStage: result.currentStage
+      };
+    } catch (error) {
+      console.error("[IPC] Failed to advance stage:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("workflow:backtrack", async (_event, reason, trigger) => {
+    if (!ensureGraphInitialized()) {
+      return {
+        success: false,
+        error: "WorkflowGraph not initialized"
+      };
+    }
+    try {
+      const config = getGraphConfig();
+      const result = await compiledGraph.invoke(
+        new langgraph.Command({
+          resume: {
+            action: "backtrack",
+            reason,
+            trigger
+          }
+        }),
+        config
+      );
+      if (isInterrupted(result)) {
+        const interruptData = result.__interrupt__[0];
+        return {
+          success: false,
+          error: `Backtrack blocked: ${interruptData?.message || "Unknown reason"}`
+        };
+      }
+      notifyWorkflowStateChanged(result);
+      return {
+        success: true
+      };
+    } catch (error) {
+      console.error("[IPC] Failed to backtrack:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("workflow:dispatchSpecialist", async (_event, agentId, objective) => {
+    if (!ensureGraphInitialized()) {
+      return { success: false, error: "WorkflowGraph not initialized" };
+    }
+    try {
+      const config = getGraphConfig();
+      const currentState = await compiledGraph.getState(config);
+      if (!currentState || !currentState.values) {
+        return { success: false, error: "No active workflow" };
+      }
+      const state = currentState.values;
+      const result = await compiledGraph.invoke(
+        new langgraph.Command({
+          resume: {
+            action: "dispatchSpecialist",
+            agentId,
+            objective
+          }
+        }),
+        config
+      );
+      if (isInterrupted(result)) {
+        const interruptData = result.__interrupt__[0];
+        return {
+          success: false,
+          error: `Dispatch blocked: ${interruptData?.message || "Unknown reason"}`
+        };
+      }
+      notifyWorkflowStateChanged(result);
+      return agentOrchestrator.dispatchSpecialist(agentId, objective, {
+        caseId: state.caseId,
+        runId: state.runId,
+        sessionId: state.sessionId
+      });
+    } catch (error) {
+      console.error("[IPC] Failed to dispatch specialist:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("agent:sendMessage", async (_event, agentId, content) => {
+    try {
+      let context;
+      if (compiledGraph && currentSessionId) {
+        const config = getGraphConfig();
+        const state = await compiledGraph.getState(config);
+        if (state && state.values) {
+          const values = state.values;
+          context = {
+            caseId: values.caseId,
+            runId: values.runId,
+            sessionId: values.sessionId
+          };
+        }
+      }
+      const response = await agentOrchestrator.sendMessage(agentId, content, context);
+      return { response };
+    } catch (error) {
+      return {
+        response: void 0,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("agent:getState", async (_event, agentId) => {
+    return agentOrchestrator.getAgentState(agentId);
+  });
+  electron.ipcMain.handle("agent:getAllStates", async () => {
+    return agentOrchestrator.getAllAgentStates();
+  });
+  electron.ipcMain.handle("agent:configure", async (_event, agentId, config) => {
+    try {
+      agentOrchestrator.configureAgent(agentId, config);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("tool:getCatalog", async () => {
+    try {
+      return await toolBridge.loadCatalog();
+    } catch {
+      return { tools: [], namespaces: {} };
+    }
+  });
+  electron.ipcMain.handle("tool:execute", async (_event, toolName, args) => {
+    return toolBridge.call({
+      toolName,
+      args
+    });
+  });
+  electron.ipcMain.handle("evidence:getChain", async () => {
+    const sessionId = await storageAdapter.getCurrentSessionId();
+    if (!sessionId) {
+      return { sessionId: "", runId: "", events: [], isValid: true };
+    }
+    const events = await storageAdapter.readActionChain(sessionId);
+    return {
+      sessionId,
+      runId: currentRunId || storageAdapter.getLatestRun(sessionId)?.runId || "",
+      events,
+      isValid: true
+    };
+  });
+  electron.ipcMain.handle("evidence:getEvents", async (_event, eventType) => {
+    const sessionId = await storageAdapter.getCurrentSessionId();
+    if (!sessionId) return [];
+    const events = await storageAdapter.readActionChain(sessionId);
+    if (eventType) {
+      return events.filter((e) => e.event_type === eventType);
+    }
+    return events;
+  });
+  electron.ipcMain.handle("llm:configure", async (_event, config) => {
+    llmAdapter.configure(config);
+    return;
+  });
+  electron.ipcMain.handle("llm:testConnection", async (_event, provider) => {
+    return llmAdapter.testConnection(provider);
+  });
+  electron.ipcMain.handle("llm:getAvailableModels", async (_event, provider) => {
+    return llmAdapter.getAvailableModels(provider);
+  });
+  electron.ipcMain.handle("settings:get", async () => {
+    const paths = appPathService.getWorkspacePaths();
+    return settingsService.getAll({
+      workspaceRoot: paths.workspaceRoot,
+      defaultWorkspaceRoot: paths.defaultWorkspaceRoot,
+      settingsPath: paths.settingsPath,
+      logsPath: paths.logsPath,
+      logPath: paths.logPath,
+      projectsPath: paths.projectsPath,
+      knowledgePath: paths.knowledgePath,
+      migrationOrphansPath: paths.migrationOrphansPath
+    });
+  });
+  electron.ipcMain.handle("settings:set", async (_event, settings) => {
+    const nextSettings = settingsService.setAll(settings, appPathService.getWorkspacePaths());
+    storageAdapter.setWorkspaceRoot(nextSettings.workspace.rootPath);
+    await storageAdapter.initializeWorkspace();
+    await initWorkflowGraph(storageAdapter.getWorkspacePath());
+    const llmConfig = settingsService.getLlmConfig();
+    llmAdapter.configure(llmConfig);
+    agentOrchestrator.applyLlmConfig(llmConfig);
+    return nextSettings;
+  });
+  electron.ipcMain.handle("device:list", async () => {
+    return replayDeviceService.listDevices();
+  });
+  electron.ipcMain.handle("device:refresh", async () => {
+    return replayDeviceService.refreshDevices();
+  });
+  electron.ipcMain.handle("device:activate", async (_event, deviceId) => {
+    return replayDeviceService.activateDevice(deviceId);
+  });
+  electron.nativeTheme.on("updated", () => {
+    broadcastToRenderer("app:themeChanged", electron.nativeTheme.shouldUseDarkColors ? "dark" : "light");
+  });
+}
+function setMainWindow(window) {
+  mainWindow$1 = window;
+  replayDeviceService.setMainWindow(window);
+  agentOrchestrator.setMainWindow(window);
+}
 const RDC_TOOL_GROUPS = [
   "core",
   "capture",
@@ -5397,506 +7888,6 @@ class RDCToolAdapter {
   }
 }
 const rdcToolAdapter = new RDCToolAdapter();
-let compiledGraph = null;
-let checkpointSaver = null;
-let currentSessionId = null;
-let mainWindow$1 = null;
-async function initWorkflowGraph(workspacePath) {
-  checkpointSaver = new FileCheckpointSaver(workspacePath);
-  compiledGraph = createWorkflowGraph({ checkpointer: checkpointSaver });
-  try {
-    currentSessionId = await storageAdapter.getCurrentSessionId();
-  } catch (error) {
-    console.warn("[IPC] Failed to restore current session id:", error);
-    currentSessionId = null;
-  }
-}
-function getThreadId() {
-  return currentSessionId || "default-thread";
-}
-function ensureGraphInitialized() {
-  if (!compiledGraph) {
-    console.error("[IPC] WorkflowGraph not initialized");
-    return false;
-  }
-  return true;
-}
-function notifyWorkflowStateChanged(graphState) {
-  if (mainWindow$1 && !mainWindow$1.isDestroyed()) {
-    const workflowState = projectToWorkflowState(graphState);
-    mainWindow$1.webContents.send("workflow:stateChanged", workflowState);
-    mainWindow$1.webContents.send("workflow:stageChanged", {
-      stage: graphState.currentStage,
-      blockers: graphState.blockers
-    });
-  }
-}
-function broadcastToRenderer(channel, ...args) {
-  const windows = electron.BrowserWindow.getAllWindows();
-  for (const win of windows) {
-    if (!win.isDestroyed()) {
-      win.webContents.send(channel, ...args);
-    }
-  }
-}
-function isInterrupted(result) {
-  return result !== null && typeof result === "object" && "__interrupt__" in result && Array.isArray(result.__interrupt__);
-}
-function registerIPCHandlers() {
-  storageAdapter.initializeWorkspace().catch(console.error);
-  rdcToolAdapter.initialize().catch(console.error);
-  try {
-    const orConfig = settingsService.getOpenRouterConfig();
-    if (orConfig.apiKey) {
-      llmAdapter.configure({
-        defaultProvider: "openrouter",
-        openrouter: { apiKey: orConfig.apiKey, baseUrl: orConfig.baseUrl }
-      });
-      console.log("[IPC] Loaded OpenRouter config from persistent settings");
-    }
-  } catch (err) {
-    console.warn("[IPC] Failed to preload OpenRouter config:", err);
-  }
-  electron.ipcMain.handle("dialog:selectRdcFiles", async () => {
-    const result = await electron.dialog.showOpenDialog({
-      filters: [{ name: "RenderDoc Capture", extensions: ["rdc"] }],
-      properties: ["openFile", "multiSelections"]
-    });
-    return result.canceled ? null : result.filePaths;
-  });
-  electron.ipcMain.handle("dialog:selectDirectory", async () => {
-    const result = await electron.dialog.showOpenDialog({
-      properties: ["openDirectory", "createDirectory"]
-    });
-    return result.canceled ? null : result.filePaths[0];
-  });
-  electron.ipcMain.handle("window:minimize", async (event) => {
-    electron.BrowserWindow.fromWebContents(event.sender)?.minimize();
-  });
-  electron.ipcMain.handle("window:toggleMaximize", async (event) => {
-    const window = electron.BrowserWindow.fromWebContents(event.sender);
-    if (!window) return false;
-    if (window.isMaximized()) {
-      window.unmaximize();
-      return false;
-    }
-    window.maximize();
-    return true;
-  });
-  electron.ipcMain.handle("window:close", async (event) => {
-    electron.BrowserWindow.fromWebContents(event.sender)?.close();
-  });
-  electron.ipcMain.handle("window:isMaximized", async (event) => {
-    return electron.BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false;
-  });
-  electron.ipcMain.handle("app:getMeta", async () => {
-    return {
-      version: electron.app.getVersion(),
-      productName: electron.app.getName()
-    };
-  });
-  electron.ipcMain.handle("workflow:getState", async () => {
-    if (!ensureGraphInitialized()) {
-      return null;
-    }
-    try {
-      const config = { configurable: { thread_id: getThreadId() } };
-      const state = await compiledGraph.getState(config);
-      if (state && state.values) {
-        return projectToWorkflowState(state.values);
-      }
-      return null;
-    } catch (error) {
-      console.error("[IPC] Failed to get workflow state:", error);
-      return null;
-    }
-  });
-  electron.ipcMain.handle("workflow:resume", async (_event, sessionId) => {
-    try {
-      if (sessionId) {
-        currentSessionId = sessionId;
-      }
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: err.message };
-    }
-  });
-  electron.ipcMain.handle("workflow:listRuns", async () => {
-    return { runs: [] };
-  });
-  electron.ipcMain.handle("session:list", async () => {
-    return { sessions: [] };
-  });
-  electron.ipcMain.handle("session:select", async (_event, id) => {
-    currentSessionId = id;
-    return { success: true };
-  });
-  electron.ipcMain.handle("context:get", async () => {
-    return rdxSessionService.snapshotContext();
-  });
-  electron.ipcMain.handle("capture:list", async () => {
-    return { captures: rdxSessionService.getCaptureDescriptors() };
-  });
-  electron.ipcMain.handle("capture:open", async (_event, filePath) => {
-    try {
-      if (!filePath) {
-        return { success: false, error: "filePath is required for capture:open" };
-      }
-      return { success: false, error: "capture:open is not yet implemented" };
-    } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  });
-  electron.ipcMain.handle("capture:select", async (_event, captureId) => {
-    try {
-      await rdxSessionService.switchActiveCapture(captureId);
-      broadcastToRenderer("capture:statusChanged", { captureId, status: "selected" });
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: err.message };
-    }
-  });
-  electron.ipcMain.handle("workflow:start", async (_event, request, userGoal) => {
-    const isNewRequest = !Array.isArray(request);
-    const capturePaths = isNewRequest ? request.captures.map((c) => c.filePath) : request;
-    const goal = isNewRequest ? request.goal : userGoal ?? "";
-    try {
-      if (!ensureGraphInitialized()) {
-        return {
-          success: false,
-          error: "WorkflowGraph not initialized"
-        };
-      }
-      let contextSnapshot;
-      if (isNewRequest) {
-        try {
-          contextSnapshot = await rdxSessionService.bootstrap(request);
-          broadcastToRenderer("context:changed", contextSnapshot);
-        } catch (bootstrapErr) {
-          const message = bootstrapErr instanceof Error ? bootstrapErr.message : String(bootstrapErr);
-          console.warn("[IPC] rdxSessionService bootstrap failed:", bootstrapErr);
-          return {
-            success: false,
-            error: message
-          };
-        }
-      }
-      const gateResult = await harnessController.executeEntryGate({
-        capturePaths,
-        platform: "rdc-agent",
-        entryMode: "cli",
-        backend: isNewRequest ? request.captures.some((c) => c.backendHint === "remote") ? "remote" : "local" : "local",
-        mode: isNewRequest ? request.mode : "debugger",
-        captures: isNewRequest ? request.captures : void 0,
-        replayDevice: isNewRequest ? request.replayDevice : void 0
-      });
-      if (gateResult.status === "blocked") {
-        return {
-          success: false,
-          error: gateResult.blockers.map((b) => b.reason).join("; ")
-        };
-      }
-      const caseId = await storageAdapter.createCase({
-        userGoal: goal,
-        symptomSummary: goal
-      });
-      const { runId, sessionId } = await storageAdapter.createRun({
-        caseId,
-        capturePaths
-      });
-      currentSessionId = sessionId;
-      const config = { configurable: { thread_id: sessionId } };
-      const initialState = {
-        caseId,
-        runId,
-        sessionId,
-        userGoal: goal,
-        capturePaths,
-        currentStage: "preflight_pending",
-        stageHistory: [],
-        evidenceChain: [],
-        artifacts: [],
-        activeSpecialists: {},
-        pendingBriefs: [],
-        collectedBriefs: {},
-        blockers: [],
-        backtrackCount: {},
-        fixVerified: false,
-        entryMode: "cli",
-        backend: "local",
-        orchestrationMode: "multi_agent",
-        coordinationMode: "staged_handoff",
-        lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
-      };
-      const result = await compiledGraph.invoke(initialState, config);
-      if (isInterrupted(result)) {
-        const interruptData = result.__interrupt__[0];
-        console.log("[IPC] Workflow interrupted:", interruptData);
-        if (mainWindow$1 && !mainWindow$1.isDestroyed()) {
-          mainWindow$1.webContents.send("workflow:blocked", {
-            type: interruptData?.type || "unknown",
-            data: interruptData
-          });
-        }
-      } else {
-        notifyWorkflowStateChanged(result);
-      }
-      return { success: true, caseId, runId, sessionId, contextSnapshot };
-    } catch (error) {
-      console.error("Failed to start workflow:", error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("workflow:advanceStage", async () => {
-    if (!ensureGraphInitialized()) {
-      return {
-        success: false,
-        error: "WorkflowGraph not initialized"
-      };
-    }
-    try {
-      const config = { configurable: { thread_id: getThreadId() } };
-      const result = await compiledGraph.invoke(
-        new langgraph.Command({ resume: { action: "advance" } }),
-        config
-      );
-      if (isInterrupted(result)) {
-        const interruptData = result.__interrupt__[0];
-        return {
-          success: false,
-          currentStage: interruptData?.currentStage,
-          error: `Workflow blocked: ${interruptData?.message || "Unknown reason"}`
-        };
-      }
-      notifyWorkflowStateChanged(result);
-      return {
-        success: true,
-        currentStage: result.currentStage
-      };
-    } catch (error) {
-      console.error("[IPC] Failed to advance stage:", error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("workflow:backtrack", async (_event, reason, trigger) => {
-    if (!ensureGraphInitialized()) {
-      return {
-        success: false,
-        error: "WorkflowGraph not initialized"
-      };
-    }
-    try {
-      const config = { configurable: { thread_id: getThreadId() } };
-      const result = await compiledGraph.invoke(
-        new langgraph.Command({
-          resume: {
-            action: "backtrack",
-            reason,
-            trigger
-          }
-        }),
-        config
-      );
-      if (isInterrupted(result)) {
-        const interruptData = result.__interrupt__[0];
-        return {
-          success: false,
-          error: `Backtrack blocked: ${interruptData?.message || "Unknown reason"}`
-        };
-      }
-      notifyWorkflowStateChanged(result);
-      return {
-        success: true
-      };
-    } catch (error) {
-      console.error("[IPC] Failed to backtrack:", error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("workflow:dispatchSpecialist", async (_event, agentId, objective) => {
-    if (!ensureGraphInitialized()) {
-      return { success: false, error: "WorkflowGraph not initialized" };
-    }
-    try {
-      const config = { configurable: { thread_id: getThreadId() } };
-      const currentState = await compiledGraph.getState(config);
-      if (!currentState || !currentState.values) {
-        return { success: false, error: "No active workflow" };
-      }
-      const state = currentState.values;
-      const result = await compiledGraph.invoke(
-        new langgraph.Command({
-          resume: {
-            action: "dispatchSpecialist",
-            agentId,
-            objective
-          }
-        }),
-        config
-      );
-      if (isInterrupted(result)) {
-        const interruptData = result.__interrupt__[0];
-        return {
-          success: false,
-          error: `Dispatch blocked: ${interruptData?.message || "Unknown reason"}`
-        };
-      }
-      notifyWorkflowStateChanged(result);
-      return agentOrchestrator.dispatchSpecialist(agentId, objective, {
-        caseId: state.caseId,
-        runId: state.runId,
-        sessionId: state.sessionId
-      });
-    } catch (error) {
-      console.error("[IPC] Failed to dispatch specialist:", error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("agent:sendMessage", async (_event, agentId, content) => {
-    try {
-      let context;
-      if (compiledGraph && currentSessionId) {
-        const config = { configurable: { thread_id: currentSessionId } };
-        const state = await compiledGraph.getState(config);
-        if (state && state.values) {
-          const values = state.values;
-          context = {
-            caseId: values.caseId,
-            runId: values.runId,
-            sessionId: values.sessionId
-          };
-        }
-      }
-      const response = await agentOrchestrator.sendMessage(agentId, content, context);
-      return { response };
-    } catch (error) {
-      return {
-        response: void 0,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("agent:getState", async (_event, agentId) => {
-    return agentOrchestrator.getAgentState(agentId);
-  });
-  electron.ipcMain.handle("agent:getAllStates", async () => {
-    return agentOrchestrator.getAllAgentStates();
-  });
-  electron.ipcMain.handle("agent:configure", async (_event, agentId, config) => {
-    try {
-      agentOrchestrator.configureAgent(agentId, config);
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("tool:getCatalog", async () => {
-    try {
-      return await toolBridge.loadCatalog();
-    } catch {
-      return { tools: [], namespaces: {} };
-    }
-  });
-  electron.ipcMain.handle("tool:execute", async (_event, toolName, args) => {
-    return toolBridge.call({
-      toolName,
-      args
-    });
-  });
-  electron.ipcMain.handle("evidence:getChain", async () => {
-    const sessionId = await storageAdapter.getCurrentSessionId();
-    if (!sessionId) {
-      return { sessionId: "", runId: "", events: [], isValid: true };
-    }
-    const events = await storageAdapter.readActionChain(sessionId);
-    let runId = "";
-    if (compiledGraph && currentSessionId) {
-      const config = { configurable: { thread_id: currentSessionId } };
-      const state = await compiledGraph.getState(config);
-      if (state && state.values) {
-        const values = state.values;
-        runId = values.runId;
-      }
-    }
-    return {
-      sessionId,
-      runId: runId || "",
-      events,
-      isValid: true
-    };
-  });
-  electron.ipcMain.handle("evidence:getEvents", async (_event, eventType) => {
-    const sessionId = await storageAdapter.getCurrentSessionId();
-    if (!sessionId) return [];
-    const events = await storageAdapter.readActionChain(sessionId);
-    if (eventType) {
-      return events.filter((e) => e.event_type === eventType);
-    }
-    return events;
-  });
-  electron.ipcMain.handle("llm:configure", async (_event, config) => {
-    llmAdapter.configure(config);
-    return;
-  });
-  electron.ipcMain.handle("llm:testConnection", async (_event, provider) => {
-    return llmAdapter.testConnection(provider);
-  });
-  electron.ipcMain.handle("llm:getAvailableModels", async (_event, provider) => {
-    return llmAdapter.getAvailableModels(provider);
-  });
-  electron.ipcMain.handle("settings:get", async () => {
-    const appSettings = settingsService.getAll();
-    return {
-      theme: "dark",
-      llm: {
-        defaultProvider: llmAdapter.getDefaultProvider()
-      },
-      agents: {},
-      openRouter: appSettings.openRouter
-    };
-  });
-  electron.ipcMain.handle("settings:set", async (_event, settings) => {
-    const s = settings;
-    if (s.openRouter !== void 0) {
-      settingsService.setOpenRouterConfig(s.openRouter);
-      const orConfig = settingsService.getOpenRouterConfig();
-      llmAdapter.configure({
-        defaultProvider: "openrouter",
-        openrouter: { apiKey: orConfig.apiKey, baseUrl: orConfig.baseUrl }
-      });
-    }
-    return;
-  });
-  electron.ipcMain.handle("device:list", async () => {
-    return replayDeviceService.listDevices();
-  });
-  electron.ipcMain.handle("device:refresh", async () => {
-    return replayDeviceService.refreshDevices();
-  });
-  electron.ipcMain.handle("device:activate", async (_event, deviceId) => {
-    return replayDeviceService.activateDevice(deviceId);
-  });
-}
-function setMainWindow(window) {
-  mainWindow$1 = window;
-  replayDeviceService.setMainWindow(window);
-  agentOrchestrator.setMainWindow(window);
-}
 class RdxSessionService {
   toolBridge;
   contextId = null;
@@ -5908,27 +7899,67 @@ class RdxSessionService {
   replayDevice = null;
   remoteStatus = "disconnected";
   remoteId = null;
+  openedCapture = null;
   constructor(toolBridge2) {
     this.toolBridge = toolBridge2;
   }
   async bootstrap(request) {
+    if (this.canReuseOpenedCapture(request)) {
+      this.captures = request.captures.map((capture) => capture.id === request.primaryCaptureId && this.openedCapture ? {
+        ...capture,
+        status: "open",
+        sessionId: this.openedCapture.sessionId,
+        replaySessionId: this.openedCapture.replaySessionId,
+        contextId: this.openedCapture.contextId
+      } : { ...capture });
+      this.activeCaptureId = request.primaryCaptureId;
+      return this.snapshotContext();
+    }
     await this.ensureRuntimeReady();
-    this.contextId = await this.allocateContext();
-    await this.initializeContextRuntime();
-    const ownerResult = await this.claimOwner(this.contextId);
-    this.runtimeOwner = ownerResult.owner;
-    this.ownerLeaseId = ownerResult.leaseId;
     this.captures = request.captures.map((capture) => ({ ...capture }));
     this.replayDevice = request.replayDevice;
     this.deviceLabel = request.replayDevice.label;
     this.remoteId = null;
     this.remoteStatus = "disconnected";
     const hasRemoteCapture = this.captures.some((capture) => capture.backendHint === "remote");
+    let reusedPreparedRemote = false;
     if (hasRemoteCapture) {
       if (request.replayDevice.type === "local" || request.replayDevice.status !== "online") {
         throw new Error("Remote capture requires an online Replay Device.");
       }
-      await this.ensureRemoteConnection(request.replayDevice);
+      reusedPreparedRemote = await this.tryAdoptPreparedRemote(request.replayDevice);
+    }
+    if (!reusedPreparedRemote) {
+      await this.prepareFreshContext();
+    }
+    try {
+      const ownerResult = await this.claimOwner(this.contextId);
+      this.runtimeOwner = ownerResult.owner;
+      this.ownerLeaseId = ownerResult.leaseId;
+    } catch (error) {
+      if (!reusedPreparedRemote) {
+        throw error;
+      }
+      this.resetRemoteConnectionState();
+      await this.prepareFreshContext();
+      const ownerResult = await this.claimOwner(this.contextId);
+      this.runtimeOwner = ownerResult.owner;
+      this.ownerLeaseId = ownerResult.leaseId;
+      reusedPreparedRemote = false;
+    }
+    if (hasRemoteCapture) {
+      if (reusedPreparedRemote) {
+        const preparedRemoteStillValid = await this.validatePreparedRemoteHandle();
+        if (!preparedRemoteStillValid) {
+          this.remoteId = null;
+          this.remoteStatus = "disconnected";
+          await this.ensureRemoteConnection(request.replayDevice);
+        } else {
+          this.remoteStatus = "online";
+        }
+      } else {
+        await this.ensureRemoteConnection(request.replayDevice);
+      }
     }
     const primaryCapture = this.captures.find((capture) => capture.id === request.primaryCaptureId);
     if (!primaryCapture) {
@@ -5936,7 +7967,55 @@ class RdxSessionService {
     }
     await this.ensureCaptureSession(primaryCapture);
     this.activeCaptureId = primaryCapture.id;
+    this.openedCapture = null;
     return this.snapshotContext();
+  }
+  async openProjectInput(request) {
+    await this.closeOrReplaceOpenedCapture();
+    await this.ensureRuntimeReady();
+    const capture = {
+      id: request.inputId,
+      filePath: request.filePath,
+      role: "primary",
+      backendHint: request.replayDevice.type === "local" ? "local" : "remote",
+      status: "pending"
+    };
+    this.captures = [capture];
+    this.activeCaptureId = capture.id;
+    this.replayDevice = request.replayDevice;
+    this.deviceLabel = request.replayDevice.label;
+    this.remoteId = null;
+    this.remoteStatus = "disconnected";
+    await this.prepareFreshContext();
+    const ownerResult = await this.claimOwner(this.contextId);
+    this.runtimeOwner = ownerResult.owner;
+    this.ownerLeaseId = ownerResult.leaseId;
+    if (capture.backendHint === "remote") {
+      if (request.replayDevice.type === "local" || !["connected", "online"].includes(request.replayDevice.status)) {
+        throw new Error("Remote capture requires an available Replay Device.");
+      }
+      await this.ensureRemoteConnection(request.replayDevice);
+    }
+    await this.ensureCaptureSession(capture);
+    const openedCapture = this.createOpenedCaptureState(request.projectId, request.inputId, request.filePath, request.replayDevice);
+    this.openedCapture = openedCapture;
+    return openedCapture;
+  }
+  async closeOrReplaceOpenedCapture() {
+    this.openedCapture = null;
+    this.contextId = null;
+    this.runtimeOwner = null;
+    this.ownerLeaseId = null;
+    this.captures = [];
+    this.activeCaptureId = null;
+    this.deviceLabel = "Local";
+    this.replayDevice = null;
+    this.remoteStatus = "disconnected";
+    this.remoteId = null;
+  }
+  async prepareFreshContext() {
+    this.contextId = await this.allocateContext();
+    await this.initializeContextRuntime();
   }
   async ensureRuntimeReady() {
     const statusResult = await this.toolBridge.executeCLI("daemon", ["status"]);
@@ -6064,7 +8143,12 @@ class RdxSessionService {
     });
     if (!connectResult.ok) {
       this.remoteStatus = "error";
-      throw new Error(`Remote connect failed (hard fail): ${connectResult.error?.message ?? "unknown"}`);
+      const detail = [
+        device.activationPhase ? `phase=${device.activationPhase}` : "",
+        device.activationErrorCode ? `code=${device.activationErrorCode}` : ""
+      ].filter(Boolean).join(" ");
+      const suffix = detail ? ` (${detail})` : "";
+      throw new Error(`Remote connect failed (hard fail): ${connectResult.error?.message ?? device.activationErrorMessage ?? "unknown"}${suffix}`);
     }
     const remoteId = connectResult.data?.remote_id;
     if (!remoteId) {
@@ -6080,9 +8164,48 @@ class RdxSessionService {
     });
     if (!pingResult.ok) {
       this.remoteStatus = "error";
-      throw new Error(`Remote ping failed (hard fail): ${pingResult.error?.message ?? "unknown"}`);
+      throw new Error(`Remote ping failed (hard fail): ${pingResult.error?.message ?? device.activationErrorMessage ?? "unknown"}`);
     }
     this.remoteStatus = "online";
+  }
+  async tryAdoptPreparedRemote(device) {
+    const prepared = replayDeviceService.consumePreparedRemote(device.id);
+    if (!prepared) {
+      return false;
+    }
+    if (!device.serial || prepared.serial !== device.serial) {
+      replayDeviceService.invalidatePreparedRemote(device.id);
+      return false;
+    }
+    this.adoptPreparedRemote(prepared);
+    return true;
+  }
+  adoptPreparedRemote(prepared) {
+    this.contextId = prepared.contextId;
+    this.remoteId = prepared.remoteId;
+    this.remoteStatus = "connected";
+  }
+  async validatePreparedRemoteHandle() {
+    if (!this.contextId || !this.remoteId) {
+      return false;
+    }
+    const pingResult = await this.toolBridge.call({
+      toolName: "rd.remote.ping",
+      args: { remote_id: this.remoteId },
+      contextId: this.contextId,
+      runtimeOwner: this.runtimeOwner ?? void 0
+    });
+    if (!pingResult.ok) {
+      return false;
+    }
+    return true;
+  }
+  resetRemoteConnectionState() {
+    this.contextId = null;
+    this.runtimeOwner = null;
+    this.ownerLeaseId = null;
+    this.remoteId = null;
+    this.remoteStatus = "disconnected";
   }
   snapshotContext() {
     const activeCapture = this.captures.find((capture) => capture.id === this.activeCaptureId);
@@ -6098,6 +8221,12 @@ class RdxSessionService {
       deviceLabel: this.deviceLabel
     };
   }
+  snapshotOpenedCapture() {
+    return this.openedCapture ? { ...this.openedCapture } : null;
+  }
+  clearOpenedCapture() {
+    this.openedCapture = null;
+  }
   getCaptureDescriptors() {
     return [...this.captures];
   }
@@ -6109,6 +8238,32 @@ class RdxSessionService {
   }
   getOwnerLeaseId() {
     return this.ownerLeaseId;
+  }
+  createOpenedCaptureState(projectId, inputId, filePath, replayDevice) {
+    const activeCapture = this.captures.find((capture) => capture.id === this.activeCaptureId) ?? this.captures[0];
+    return {
+      projectId,
+      inputId,
+      filePath,
+      captureId: activeCapture?.id ?? inputId,
+      sessionId: activeCapture?.sessionId ?? "",
+      contextId: this.contextId ?? "",
+      replaySessionId: activeCapture?.replaySessionId ?? "",
+      backend: activeCapture?.backendHint ?? "local",
+      deviceId: replayDevice.id,
+      deviceLabel: replayDevice.label,
+      status: activeCapture?.status === "error" ? "error" : "open",
+      openedAt: Date.now()
+    };
+  }
+  canReuseOpenedCapture(request) {
+    const primaryCapture = request.captures.find((capture) => capture.id === request.primaryCaptureId);
+    if (!primaryCapture || !this.openedCapture) {
+      return false;
+    }
+    return Boolean(
+      this.contextId && this.runtimeOwner && this.ownerLeaseId && this.openedCapture.status === "open" && primaryCapture.id === this.openedCapture.inputId && primaryCapture.filePath === this.openedCapture.filePath && primaryCapture.backendHint === this.openedCapture.backend && request.replayDevice.id === this.openedCapture.deviceId
+    );
   }
 }
 const rdxSessionService = new RdxSessionService(toolBridge);
@@ -6292,6 +8447,8 @@ function setupMenu() {
   electron.Menu.setApplicationMenu(null);
 }
 electron.app.whenReady().then(async () => {
+  settingsService.initialize();
+  await storageAdapter.initializeWorkspace();
   registerIPCHandlers();
   await initializeServices();
   createMainWindow();
@@ -6322,8 +8479,8 @@ electron.app.on("web-contents-created", (_event, contents) => {
 async function initializeServices() {
   try {
     const workspacePath = storageAdapter.getWorkspacePath();
-    const hasApiKey = settingsService.hasOpenRouterKey();
-    console.log("[Main] SettingsService initialized, hasApiKey:", hasApiKey);
+    const hasConfiguredProvider = settingsService.hasConfiguredProvider();
+    console.log("[Main] SettingsService initialized, hasConfiguredProvider:", hasConfiguredProvider);
     await rdcToolAdapter.initialize();
     console.log("[Main] RDCToolAdapter initialized");
     await initWorkflowGraph(workspacePath);
