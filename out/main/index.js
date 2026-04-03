@@ -30,9 +30,10 @@ const child_process = require("child_process");
 const fs = require("fs");
 const uuid = require("uuid");
 const yaml = require("yaml");
-const load = require("@langchain/core/load");
+const Store = require("electron-store");
 const tools = require("@langchain/core/tools");
 const zod = require("zod");
+const langgraphCheckpoint = require("@langchain/langgraph-checkpoint");
 function _interopNamespaceDefault(e) {
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
   if (e) {
@@ -51,6 +52,9 @@ function _interopNamespaceDefault(e) {
 }
 const path__namespace = /* @__PURE__ */ _interopNamespaceDefault(path);
 const fs__namespace = /* @__PURE__ */ _interopNamespaceDefault(fs);
+function generateId() {
+  return uuid.v4();
+}
 function generateShortId() {
   return uuid.v4().replace(/-/g, "").slice(0, 12);
 }
@@ -88,9 +92,9 @@ class ToolBridge {
   activeProcesses = /* @__PURE__ */ new Map();
   constructor() {
     if (electron.app.isPackaged) {
-      this.toolsPath = path__namespace.join(path__namespace.dirname(electron.app.getPath("exe")), "resources", "tools");
+      this.toolsPath = path__namespace.join(process.resourcesPath, "tools");
     } else {
-      this.toolsPath = path__namespace.resolve(__dirname, "../../../../resources/tools");
+      this.toolsPath = path__namespace.join(electron.app.getAppPath(), "resources", "tools");
     }
   }
   /**
@@ -121,28 +125,40 @@ class ToolBridge {
     }
     const catalogPath = path__namespace.join(this.toolsPath, "spec", "tool_catalog.json");
     if (!fs__namespace.existsSync(catalogPath)) {
-      throw new Error(`Tool catalog not found at: ${catalogPath}`);
+      console.warn("[ToolBridge] Tool catalog not found, starting with empty RDC tool catalog: " + catalogPath);
+      this.catalog = {
+        schema_version: "1",
+        tools: [],
+        namespaces: {}
+      };
+      return this.catalog;
     }
     const content = await fs__namespace.promises.readFile(catalogPath, "utf-8");
     this.catalog = JSON.parse(content);
     return this.catalog;
   }
   /**
-   * 执行CLI命令
+   * 执行CLI命令（参数数组模式，避免命令字符串注入风险）
+   * command: 子命令名称，如 'call', 'daemon'
+   * args: 子命令参数数组
    */
   async executeCLI(command, args = [], options = {}) {
     const startTime = nowMs();
     const rdxPath = this.getRdxPath();
     return new Promise((resolve, reject) => {
-      const proc = child_process.spawn("cmd.exe", ["/c", rdxPath, "--non-interactive", "cli", command, ...args], {
-        cwd: options.cwd || this.toolsPath,
-        env: {
-          ...process.env,
-          ...options.env,
-          PYTHONIOENCODING: "utf-8"
-        },
-        windowsHide: true
-      });
+      const proc = child_process.spawn(
+        "cmd.exe",
+        ["/c", rdxPath, "--non-interactive", "cli", command, ...args],
+        {
+          cwd: options.cwd || this.toolsPath,
+          env: {
+            ...process.env,
+            ...options.env,
+            PYTHONIOENCODING: "utf-8"
+          },
+          windowsHide: true
+        }
+      );
       const procId = generateEventId("proc");
       this.activeProcesses.set(procId, proc);
       let stdout = "";
@@ -180,29 +196,29 @@ class ToolBridge {
   }
   /**
    * 调用rd.*工具
+   * 使用参数数组模式，避免命令字符串拼接注入风险
    */
   async call(request) {
     const startTime = nowMs();
     try {
-      const args = ["call", request.toolName];
+      const cliArgs = [request.toolName];
       if (request.args && Object.keys(request.args).length > 0) {
-        const argsJson = JSON.stringify(request.args);
-        args.push("--args-json", argsJson);
+        cliArgs.push("--args-json", JSON.stringify(request.args));
       }
-      const result = await this.executeCLI(args.join(" "), [], {
+      if (request.contextId) {
+        cliArgs.push("--context-id", request.contextId);
+      }
+      if (request.runtimeOwner) {
+        cliArgs.push("--runtime-owner", request.runtimeOwner);
+      }
+      const result = await this.executeCLI("call", cliArgs, {
         timeout: 6e4
         // 60秒超时
       });
-      if (result.exitCode === 0 && result.stdout) {
+      if (result.exitCode === 0 && result.stdout.trim()) {
+        let parsed;
         try {
-          const parsed = JSON.parse(result.stdout);
-          return {
-            ok: parsed.ok ?? true,
-            data: parsed.data || parsed,
-            artifacts: parsed.artifacts,
-            duration_ms: nowMs() - startTime,
-            trace_id: generateEventId("tool")
-          };
+          parsed = JSON.parse(result.stdout);
         } catch {
           return {
             ok: true,
@@ -211,22 +227,52 @@ class ToolBridge {
             trace_id: generateEventId("tool")
           };
         }
-      } else {
+        if (parsed.ok === false) {
+          const errObj = parsed.error ?? {};
+          return {
+            ok: false,
+            data: null,
+            artifacts: [],
+            error: {
+              code: errObj.code ?? "TOOL_ERROR",
+              message: errObj.message ?? "Tool returned ok:false",
+              category: errObj.category ?? "execution",
+              details: errObj.details ?? void 0
+            },
+            duration_ms: nowMs() - startTime,
+            trace_id: generateEventId("tool")
+          };
+        }
         return {
-          ok: false,
-          error: {
-            code: "CLI_ERROR",
-            message: result.stderr || `Exit code: ${result.exitCode}`,
-            category: "execution",
-            details: { stdout: result.stdout, stderr: result.stderr }
-          },
+          ok: true,
+          data: parsed.data ?? parsed,
+          artifacts: parsed.artifacts,
           duration_ms: nowMs() - startTime,
           trace_id: generateEventId("tool")
         };
       }
+      return {
+        ok: false,
+        data: null,
+        artifacts: [],
+        error: {
+          code: "CLI_ERROR",
+          message: result.stderr.trim() || `Exit code: ${result.exitCode}`,
+          category: "execution",
+          details: {
+            stdout: result.stdout,
+            stderr: result.stderr,
+            exitCode: result.exitCode
+          }
+        },
+        duration_ms: nowMs() - startTime,
+        trace_id: generateEventId("tool")
+      };
     } catch (error) {
       return {
         ok: false,
+        data: null,
+        artifacts: [],
         error: {
           code: "EXECUTION_ERROR",
           message: error instanceof Error ? error.message : String(error),
@@ -404,7 +450,7 @@ class StorageAdapter {
     if (electron.app.isPackaged) {
       this.workspacePath = path__namespace.join(path__namespace.dirname(electron.app.getPath("exe")), "workspace");
     } else {
-      this.workspacePath = path__namespace.resolve(__dirname, "../../../../workspace");
+      this.workspacePath = path__namespace.join(electron.app.getAppPath(), "workspace");
     }
   }
   /**
@@ -655,7 +701,7 @@ class StorageAdapter {
   }
   // ========== Workflow State ==========
   /**
-   * 获取workflow状态
+   * 获取workflow状�?
    */
   async getWorkflowState(caseId, runId) {
     const runData = await this.readRun(caseId, runId);
@@ -676,7 +722,7 @@ class StorageAdapter {
     };
   }
   /**
-   * 更新workflow状态
+   * 更新workflow状�?
    */
   async updateWorkflowStage(caseId, runId, stage, blockers = []) {
     await this.updateRun(caseId, runId, {
@@ -1018,6 +1064,69 @@ class WorkflowEngine {
   }
 }
 const workflowEngine = new WorkflowEngine();
+const DEFAULTS = {
+  openRouter: {
+    apiKey: "",
+    defaultModel: "anthropic/claude-sonnet-4-20250514"
+  },
+  remoteTargets: []
+};
+class SettingsService {
+  store;
+  constructor() {
+    this.store = new Store({
+      name: "rdc-agent-settings",
+      defaults: DEFAULTS
+    });
+  }
+  // ── OpenRouter 配置 ──
+  getOpenRouterConfig() {
+    return this.store.get("openRouter");
+  }
+  setOpenRouterConfig(config) {
+    const current = this.getOpenRouterConfig();
+    this.store.set("openRouter", { ...current, ...config });
+  }
+  hasOpenRouterKey() {
+    const config = this.getOpenRouterConfig();
+    return !!config.apiKey && config.apiKey.length > 0;
+  }
+  // ── Remote Targets ──
+  getRemoteTargets() {
+    return this.store.get("remoteTargets");
+  }
+  saveRemoteTarget(target) {
+    const targets = this.getRemoteTargets();
+    const idx = targets.findIndex((t) => t.id === target.id);
+    if (idx >= 0) {
+      targets[idx] = target;
+    } else {
+      targets.push(target);
+    }
+    this.store.set("remoteTargets", targets);
+  }
+  removeRemoteTarget(targetId) {
+    const targets = this.getRemoteTargets().filter((t) => t.id !== targetId);
+    this.store.set("remoteTargets", targets);
+  }
+  // ── 全量读写（供 IPC settings:get / settings:set 使用） ──
+  getAll() {
+    return this.store.store;
+  }
+  setAll(partial) {
+    if (partial.openRouter !== void 0) {
+      this.setOpenRouterConfig(partial.openRouter);
+    }
+    if (partial.remoteTargets !== void 0) {
+      this.store.set("remoteTargets", partial.remoteTargets);
+    }
+  }
+  // ── 重置 ──
+  reset() {
+    this.store.clear();
+  }
+}
+const settingsService = new SettingsService();
 class HarnessController {
   _enabled = true;
   /**
@@ -1053,6 +1162,25 @@ class HarnessController {
       }
     }
     if (input.backend === "remote") ;
+    if (input.mode === "debugger") {
+      if (!settingsService.hasOpenRouterKey()) {
+        blockers.push(this.createBlocker(
+          "LLM_KEY_MISSING",
+          "OpenRouter API key is required for Debugger mode",
+          ["settings:openRouter.apiKey"]
+        ));
+      }
+    }
+    if (input.captures && input.captures.length > 0) {
+      const hasRemoteCapture = input.captures.some((c) => c.backendHint === "remote");
+      if (hasRemoteCapture && (!input.replayDevice || input.replayDevice.type === "local" || input.replayDevice.status !== "online")) {
+        blockers.push(this.createBlocker(
+          "REMOTE_CONFIG_MISSING",
+          "Remote capture requires an online Replay Device",
+          []
+        ));
+      }
+    }
     return this.createGateResult("entry_gate", blockers);
   }
   /**
@@ -1687,6 +1815,42 @@ class LLMAdapter {
   }
 }
 const llmAdapter = new LLMAdapter();
+const SPECIALIST_TOOL_BINDINGS = {
+  triage_agent: [
+    "rd.session.get_context",
+    "rd.event.get_action_tree",
+    "rd.macro.summarize_frame"
+  ],
+  capture_repro_agent: [
+    "rd.capture.get_info",
+    "rd.capture.list_frames",
+    "rd.context.snapshot"
+  ],
+  pass_graph_pipeline_agent: [
+    "rd.pipeline.get_state_summary",
+    "rd.pipeline.get_output_targets",
+    "rd.macro.find_state_change_point"
+  ],
+  pixel_forensics_agent: [
+    "rd.macro.explain_pixel",
+    "rd.texture.get_pixel_value",
+    "rd.export.screenshot"
+  ],
+  shader_ir_agent: [
+    "rd.shader.get_disassembly",
+    "rd.shader.debug_start"
+  ],
+  driver_device_agent: [
+    "rd.session.get_context",
+    "rd.remote.connect",
+    "rd.remote.ping",
+    "rd.remote.list_devices"
+  ],
+  // skeptic_agent 和 curator_agent 不直接使用 live tool
+  skeptic_agent: [],
+  curator_agent: []
+};
+const SHADER_EDIT_TOOLS = ["rd.shader.edit_and_replace", "rd.macro.shader_hotfix_validate"];
 class AgentOrchestrator {
   agentStates = /* @__PURE__ */ new Map();
   agentConfigs = /* @__PURE__ */ new Map();
@@ -1866,6 +2030,40 @@ class AgentOrchestrator {
     }
   }
   /**
+   * 获取 Specialist 可用工具清单（Task 4b）
+   * 根据角色过滤可用工具，确保 skeptic_agent 和 curator_agent 不接收任何 live tool
+   */
+  getToolsForRole(agentId) {
+    if (agentId === "skeptic_agent") {
+      return [];
+    }
+    if (agentId === "curator_agent") {
+      return [];
+    }
+    return SPECIALIST_TOOL_BINDINGS[agentId] ?? [];
+  }
+  /**
+   * 检查工具是否允许被指定角色使用（Task 4b）
+   * shader 编辑工具默认只读，不在任何 specialist 的工具清单中
+   */
+  isToolAllowedForRole(toolName, agentId) {
+    if (SHADER_EDIT_TOOLS.includes(toolName)) {
+      return false;
+    }
+    const allowedTools = this.getToolsForRole(agentId);
+    for (const pattern of allowedTools) {
+      if (pattern.endsWith(".*")) {
+        const prefix = pattern.slice(0, -2);
+        if (toolName.startsWith(prefix + ".")) {
+          return true;
+        }
+      } else if (toolName === pattern) {
+        return true;
+      }
+    }
+    return false;
+  }
+  /**
    * 分派Specialist
    */
   async dispatchSpecialist(agentId, objective, context) {
@@ -1887,6 +2085,8 @@ class AgentOrchestrator {
         error: gateResult.blockers.map((b) => b.reason).join("; ")
       };
     }
+    const allowedTools = this.getToolsForRole(agentId);
+    console.log(`[AgentOrchestrator] Dispatching ${agentId} with ${allowedTools.length} allowed tools:`, allowedTools);
     const tokenId = generateEventId("tok");
     const event = storageAdapter.createActionEvent({
       runId: context.runId,
@@ -1970,6 +2170,371 @@ class AgentOrchestrator {
   }
 }
 const agentOrchestrator = new AgentOrchestrator();
+const POLL_INTERVAL_MS = 5e3;
+const ACTIVATE_TIMEOUT_MS = 25e3;
+const LOCAL_DEVICE = {
+  id: "local",
+  label: "Local",
+  type: "local",
+  status: "online",
+  transport: "local",
+  detailText: "Local replay ready"
+};
+function sanitizeDeviceId(value) {
+  return value.replace(/[^a-zA-Z0-9_-]/g, "-");
+}
+function isToolError(result, fallback) {
+  return result.error?.message ?? fallback;
+}
+function parseAdbDeviceLine(line) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith("List of devices attached")) {
+    return null;
+  }
+  const parts = trimmed.split(/\s+/);
+  if (parts.length < 2) {
+    return null;
+  }
+  const serial = parts[0];
+  const adbState = parts[1];
+  const metadata = /* @__PURE__ */ new Map();
+  for (const token of parts.slice(2)) {
+    const separatorIndex = token.indexOf(":");
+    if (separatorIndex > 0) {
+      metadata.set(token.slice(0, separatorIndex), token.slice(separatorIndex + 1));
+    }
+  }
+  const model = metadata.get("model");
+  const deviceName = metadata.get("device");
+  const transportId = metadata.get("transport_id");
+  const label = model ?? deviceName ?? serial;
+  let detailText = "Ready to start remote server";
+  let lastError;
+  let status = "offline";
+  if (adbState === "device") {
+    status = "offline";
+  } else if (adbState === "offline") {
+    detailText = "ADB reports this device as offline.";
+    lastError = detailText;
+  } else if (adbState === "unauthorized") {
+    detailText = "ADB authorization required on the device.";
+    lastError = detailText;
+  } else {
+    detailText = `ADB state: ${adbState}`;
+    lastError = detailText;
+  }
+  if (transportId) {
+    detailText = `${detailText}${detailText.endsWith(".") ? "" : "."} transport ${transportId}`;
+  }
+  return {
+    id: `android-${sanitizeDeviceId(serial)}`,
+    label,
+    serial,
+    type: "android",
+    status,
+    transport: "adb_android",
+    detailText,
+    lastError,
+    lastSeen: Date.now()
+  };
+}
+class ReplayDeviceService {
+  devices = /* @__PURE__ */ new Map([[LOCAL_DEVICE.id, LOCAL_DEVICE]]);
+  pollTimer = null;
+  mainWindow = null;
+  initialized = false;
+  refreshPromise = null;
+  activationPromises = /* @__PURE__ */ new Map();
+  probeContexts = /* @__PURE__ */ new Map();
+  setMainWindow(window) {
+    this.mainWindow = window;
+  }
+  async initialize() {
+    if (this.initialized) {
+      return;
+    }
+    this.initialized = true;
+    await this.refreshDevices();
+    this.pollTimer = setInterval(() => {
+      void this.refreshDevices().catch((error) => {
+        console.warn("[ReplayDeviceService] Poll refresh failed:", error);
+      });
+    }, POLL_INTERVAL_MS);
+  }
+  dispose() {
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
+  }
+  listDevices() {
+    return this.getSortedDevices();
+  }
+  async refreshDevices() {
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+    this.refreshPromise = this.performRefresh();
+    try {
+      return await this.refreshPromise;
+    } finally {
+      this.refreshPromise = null;
+    }
+  }
+  async activateDevice(deviceId) {
+    const existingPromise = this.activationPromises.get(deviceId);
+    if (existingPromise) {
+      return existingPromise;
+    }
+    const activationPromise = this.performActivation(deviceId).finally(() => {
+      this.activationPromises.delete(deviceId);
+    });
+    this.activationPromises.set(deviceId, activationPromise);
+    return activationPromise;
+  }
+  async performRefresh() {
+    const detectedDevices = await this.detectAdbDevices();
+    const now = Date.now();
+    const nextDevices = /* @__PURE__ */ new Map([[LOCAL_DEVICE.id, { ...LOCAL_DEVICE, lastSeen: now }]]);
+    const detectedIds = /* @__PURE__ */ new Set(["local"]);
+    for (const detected of detectedDevices) {
+      detectedIds.add(detected.id);
+      const previous = this.devices.get(detected.id);
+      if (previous && previous.status !== "offline" && detected.lastError === void 0) {
+        nextDevices.set(detected.id, {
+          ...detected,
+          status: previous.status,
+          detailText: previous.detailText ?? detected.detailText,
+          lastError: previous.lastError,
+          remoteId: previous.remoteId,
+          lastSeen: detected.lastSeen ?? previous.lastSeen
+        });
+      } else {
+        nextDevices.set(detected.id, detected);
+      }
+    }
+    for (const [deviceId, device] of this.devices.entries()) {
+      if (detectedIds.has(deviceId) || deviceId === "local") {
+        continue;
+      }
+      nextDevices.set(deviceId, {
+        ...device,
+        status: "offline",
+        detailText: "ADB device not detected.",
+        lastError: "ADB device not detected."
+      });
+    }
+    return this.replaceDevices(nextDevices);
+  }
+  async detectAdbDevices() {
+    try {
+      const lines = await this.runAdbCommand(["devices", "-l"]);
+      return lines.map((line) => parseAdbDeviceLine(line)).filter((device) => device !== null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const offlineDevices = this.getSortedDevices().filter((device) => device.id !== "local").map((device) => ({
+        ...device,
+        status: "offline",
+        detailText: message,
+        lastError: message
+      }));
+      const fallbackDevices = /* @__PURE__ */ new Map([[LOCAL_DEVICE.id, LOCAL_DEVICE]]);
+      for (const device of offlineDevices) {
+        fallbackDevices.set(device.id, device);
+      }
+      return this.replaceDevices(fallbackDevices);
+    }
+  }
+  async performActivation(deviceId) {
+    const device = this.devices.get(deviceId);
+    if (!device) {
+      throw new Error(`Replay device ${deviceId} not found.`);
+    }
+    if (device.type === "local") {
+      this.updateDevice({
+        ...device,
+        status: "online",
+        detailText: "Local replay ready",
+        lastError: void 0
+      });
+      return this.devices.get(deviceId);
+    }
+    this.updateDevice({
+      ...device,
+      status: "loading",
+      detailText: "Running remote server command...",
+      lastError: void 0
+    });
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Timed out while starting the remote server.")), ACTIVATE_TIMEOUT_MS);
+    });
+    try {
+      const activated = await Promise.race([
+        this.activateRemoteDevice(deviceId),
+        timeoutPromise
+      ]);
+      this.updateDevice(activated);
+      return activated;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const failedDevice = {
+        ...this.devices.get(deviceId) ?? device,
+        status: "offline",
+        detailText: message,
+        lastError: message
+      };
+      this.updateDevice(failedDevice);
+      return failedDevice;
+    }
+  }
+  async activateRemoteDevice(deviceId) {
+    const device = this.devices.get(deviceId);
+    if (!device?.serial) {
+      throw new Error("Android device serial is missing.");
+    }
+    await this.ensureDaemonReady();
+    const contextId = `ctx-device-${sanitizeDeviceId(device.serial)}-${generateShortId()}`;
+    this.probeContexts.set(deviceId, contextId);
+    const contextResult = await toolBridge.call({
+      toolName: "rd.session.create_context",
+      args: { context_id: contextId }
+    });
+    if (!contextResult.ok) {
+      throw new Error(isToolError(contextResult, "Failed to create a replay device context."));
+    }
+    const initResult = await toolBridge.call({
+      toolName: "rd.core.init",
+      args: {},
+      contextId
+    });
+    if (!initResult.ok) {
+      throw new Error(isToolError(initResult, "Failed to initialize remote capability."));
+    }
+    const connectResult = await toolBridge.call({
+      toolName: "rd.remote.connect",
+      args: {
+        timeout_ms: 5e3,
+        options: {
+          transport: "adb_android",
+          device_serial: device.serial
+        }
+      },
+      contextId
+    });
+    if (!connectResult.ok) {
+      throw new Error(isToolError(connectResult, "Failed to connect to the Android RenderDoc server."));
+    }
+    const remoteId = typeof connectResult.data?.remote_id === "string" ? connectResult.data.remote_id : void 0;
+    if (!remoteId) {
+      throw new Error("Remote connect did not return a remote_id.");
+    }
+    this.updateDevice({
+      ...device,
+      status: "connected",
+      remoteId,
+      detailText: "Remote server connected",
+      lastError: void 0,
+      lastSeen: Date.now()
+    });
+    const pingResult = await toolBridge.call({
+      toolName: "rd.remote.ping",
+      args: { remote_id: remoteId },
+      contextId
+    });
+    if (!pingResult.ok) {
+      throw new Error(isToolError(pingResult, "Remote server ping failed."));
+    }
+    const targetsResult = await toolBridge.call({
+      toolName: "rd.remote.list_targets",
+      args: { remote_id: remoteId },
+      contextId
+    });
+    if (!targetsResult.ok) {
+      throw new Error(isToolError(targetsResult, "Remote target discovery failed."));
+    }
+    return {
+      ...device,
+      status: "online",
+      remoteId,
+      detailText: "Remote server ready",
+      lastError: void 0,
+      lastSeen: Date.now()
+    };
+  }
+  async ensureDaemonReady() {
+    const statusResult = await toolBridge.executeCLI("daemon", ["status"]);
+    if (statusResult.exitCode === 0) {
+      return;
+    }
+    const startResult = await toolBridge.executeCLI("daemon", ["start"]);
+    if (startResult.exitCode !== 0) {
+      const stderr = startResult.stderr.trim();
+      throw new Error(stderr || "Failed to start the rdx daemon.");
+    }
+  }
+  async runAdbCommand(args) {
+    return new Promise((resolve, reject) => {
+      const proc = child_process.spawn("adb", args, {
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "pipe"]
+      });
+      let stdout = "";
+      let stderr = "";
+      proc.stdout.on("data", (chunk) => {
+        stdout += chunk.toString("utf-8");
+      });
+      proc.stderr.on("data", (chunk) => {
+        stderr += chunk.toString("utf-8");
+      });
+      proc.on("error", (error) => {
+        reject(error);
+      });
+      proc.on("close", (code) => {
+        if (code !== 0) {
+          reject(new Error(stderr.trim() || `adb exited with code ${code ?? -1}.`));
+          return;
+        }
+        resolve(stdout.split(/\r?\n/));
+      });
+    });
+  }
+  updateDevice(device) {
+    this.devices.set(device.id, device);
+    this.broadcast({
+      device,
+      devices: this.getSortedDevices()
+    });
+  }
+  replaceDevices(nextDevices) {
+    const previous = this.getSortedDevices();
+    this.devices = nextDevices;
+    const devices = this.getSortedDevices();
+    const changedDevice = devices.find((device, index) => JSON.stringify(device) !== JSON.stringify(previous[index]));
+    const hasLengthChange = previous.length !== devices.length;
+    if (changedDevice || hasLengthChange) {
+      this.broadcast({
+        device: changedDevice ?? devices[0] ?? LOCAL_DEVICE,
+        devices
+      });
+    }
+    return devices;
+  }
+  broadcast(payload) {
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) {
+      return;
+    }
+    this.mainWindow.webContents.send("device:statusChanged", payload);
+  }
+  getSortedDevices() {
+    const devices = Array.from(this.devices.values());
+    return devices.sort((a, b) => {
+      if (a.id === "local") return -1;
+      if (b.id === "local") return 1;
+      return a.label.localeCompare(b.label);
+    });
+  }
+}
+const replayDeviceService = new ReplayDeviceService();
 const BLOCKER_CODES = {
   // Capture相关
   BLOCKED_MISSING_CAPTURE: {
@@ -4114,7 +4679,8 @@ function createSpecialistSubgraph(config) {
     ...config.skillTools
   ];
   async function llmCallNode(state) {
-    const agentConfig = config.agentConfigs[state.agentRole];
+    const agentRole = state.agentRole;
+    const agentConfig = config.agentConfigs[agentRole];
     if (!agentConfig) {
       return {
         status: "failed",
@@ -4286,6 +4852,32 @@ const WorkflowAnnotation = langgraph.Annotation.Root({
     reducer: (a, b) => [...a, ...b],
     default: () => []
   }),
+  // === 新增 Session 相关字段（Task 4a）===
+  /** 当前 run 的 captures 列表 */
+  captures: langgraph.Annotation({
+    reducer: (_, b) => b,
+    default: () => []
+  }),
+  /** Primary capture ID */
+  primaryCaptureId: langgraph.Annotation({
+    reducer: (_, b) => b,
+    default: () => ""
+  }),
+  /** 当前 Replay Device */
+  replayDevice: langgraph.Annotation({
+    reducer: (_, b) => b,
+    default: () => null
+  }),
+  /** 当前模式 */
+  mode: langgraph.Annotation({
+    reducer: (_, b) => b,
+    default: () => "debugger"
+  }),
+  /** 调试目标描述 */
+  goal: langgraph.Annotation({
+    reducer: (_, b) => b,
+    default: () => ""
+  }),
   // RDC 上下文 - last-write-wins
   captureInfo: langgraph.Annotation({
     reducer: (_, b) => b,
@@ -4444,208 +5036,7 @@ function createWorkflowGraph(config = {}) {
     checkpointer: config.checkpointer || new langgraph.MemorySaver()
   });
 }
-var LIMIT_REPLACE_NODE = "[...]";
-var CIRCULAR_REPLACE_NODE = "[Circular]";
-var arr = [];
-var replacerStack = [];
-function defaultOptions() {
-  return {
-    depthLimit: Number.MAX_SAFE_INTEGER,
-    edgesLimit: Number.MAX_SAFE_INTEGER
-  };
-}
-function stringify(obj, replacer, spacer, options) {
-  if (typeof options === "undefined") options = defaultOptions();
-  decirc(obj, "", 0, [], void 0, 0, options);
-  var res;
-  try {
-    if (replacerStack.length === 0) res = JSON.stringify(obj, replacer, spacer);
-    else res = JSON.stringify(obj, replaceGetterValues(replacer), spacer);
-  } catch (_) {
-    return JSON.stringify("[unable to serialize, circular reference is too complex to analyze]");
-  } finally {
-    while (arr.length !== 0) {
-      var part = arr.pop();
-      if (part.length === 4) Object.defineProperty(part[0], part[1], part[3]);
-      else part[0][part[1]] = part[2];
-    }
-  }
-  return res;
-}
-function setReplace(replace, val, k, parent) {
-  var propertyDescriptor = Object.getOwnPropertyDescriptor(parent, k);
-  if (propertyDescriptor.get !== void 0) if (propertyDescriptor.configurable) {
-    Object.defineProperty(parent, k, { value: replace });
-    arr.push([
-      parent,
-      k,
-      val,
-      propertyDescriptor
-    ]);
-  } else replacerStack.push([
-    val,
-    k,
-    replace
-  ]);
-  else {
-    parent[k] = replace;
-    arr.push([
-      parent,
-      k,
-      val
-    ]);
-  }
-}
-function decirc(val, k, edgeIndex, stack, parent, depth, options) {
-  depth += 1;
-  var i;
-  if (typeof val === "object" && val !== null) {
-    for (i = 0; i < stack.length; i++) if (stack[i] === val) {
-      setReplace(CIRCULAR_REPLACE_NODE, val, k, parent);
-      return;
-    }
-    if (typeof options.depthLimit !== "undefined" && depth > options.depthLimit) {
-      setReplace(LIMIT_REPLACE_NODE, val, k, parent);
-      return;
-    }
-    if (typeof options.edgesLimit !== "undefined" && edgeIndex + 1 > options.edgesLimit) {
-      setReplace(LIMIT_REPLACE_NODE, val, k, parent);
-      return;
-    }
-    stack.push(val);
-    if (Array.isArray(val)) for (i = 0; i < val.length; i++) decirc(val[i], i, i, stack, val, depth, options);
-    else {
-      var keys = Object.keys(val);
-      for (i = 0; i < keys.length; i++) {
-        var key = keys[i];
-        decirc(val[key], key, i, stack, val, depth, options);
-      }
-    }
-    stack.pop();
-  }
-}
-function replaceGetterValues(replacer) {
-  replacer = typeof replacer !== "undefined" ? replacer : function(k, v) {
-    return v;
-  };
-  return function(key, val) {
-    if (replacerStack.length > 0) for (var i = 0; i < replacerStack.length; i++) {
-      var part = replacerStack[i];
-      if (part[1] === key && part[0] === val) {
-        val = part[2];
-        replacerStack.splice(i, 1);
-        break;
-      }
-    }
-    return replacer.call(this, key, val);
-  };
-}
-function isLangChainSerializedObject(value) {
-  return value !== null && value.lc === 1 && value.type === "constructor" && Array.isArray(value.id);
-}
-async function _reviver(value) {
-  if (value && typeof value === "object") if (Array.isArray(value)) return await Promise.all(value.map((item) => _reviver(item)));
-  else {
-    const revivedObj = {};
-    for (const [k, v] of Object.entries(value)) revivedObj[k] = await _reviver(v);
-    if (revivedObj.lc === 2 && revivedObj.type === "undefined") return;
-    else if (revivedObj.lc === 2 && revivedObj.type === "constructor" && Array.isArray(revivedObj.id)) try {
-      const constructorName = revivedObj.id[revivedObj.id.length - 1];
-      let constructor;
-      switch (constructorName) {
-        case "Set":
-          constructor = Set;
-          break;
-        case "Map":
-          constructor = Map;
-          break;
-        case "RegExp":
-          constructor = RegExp;
-          break;
-        case "Error":
-          constructor = Error;
-          break;
-        case "Uint8Array":
-          constructor = Uint8Array;
-          break;
-        default:
-          return revivedObj;
-      }
-      if (revivedObj.method) return constructor[revivedObj.method](...revivedObj.args || []);
-      else return new constructor(...revivedObj.args || []);
-    } catch (error) {
-      return revivedObj;
-    }
-    else if (isLangChainSerializedObject(revivedObj)) return load.load(JSON.stringify(revivedObj));
-    return revivedObj;
-  }
-  return value;
-}
-function _encodeConstructorArgs(constructor, method, args, kwargs) {
-  return {
-    lc: 2,
-    type: "constructor",
-    id: [constructor.name],
-    method: method ?? null,
-    args: args ?? [],
-    kwargs: kwargs ?? {}
-  };
-}
-function _default(obj) {
-  if (obj === void 0) return {
-    lc: 2,
-    type: "undefined"
-  };
-  else if (obj instanceof Set || obj instanceof Map) return _encodeConstructorArgs(obj.constructor, void 0, [Array.from(obj)]);
-  else if (obj instanceof RegExp) return _encodeConstructorArgs(RegExp, void 0, [obj.source, obj.flags]);
-  else if (obj instanceof Error) return _encodeConstructorArgs(obj.constructor, void 0, [obj.message]);
-  else if (obj?.lg_name === "Send") return {
-    node: obj.node,
-    args: obj.args
-  };
-  else if (obj instanceof Uint8Array) return _encodeConstructorArgs(Uint8Array, "from", [Array.from(obj)]);
-  else return obj;
-}
-var JsonPlusSerializer = class {
-  _dumps(obj) {
-    return new TextEncoder().encode(stringify(obj, (_, value) => {
-      return _default(value);
-    }));
-  }
-  async dumpsTyped(obj) {
-    if (obj instanceof Uint8Array) return ["bytes", obj];
-    else return ["json", this._dumps(obj)];
-  }
-  async _loads(data) {
-    return _reviver(JSON.parse(data));
-  }
-  async loadsTyped(type, data) {
-    if (type === "bytes") return typeof data === "string" ? new TextEncoder().encode(data) : data;
-    else if (type === "json") return this._loads(typeof data === "string" ? data : new TextDecoder().decode(data));
-    else throw new Error(`Unknown serialization type: ${type}`);
-  }
-};
-var BaseCheckpointSaver = class {
-  serde = new JsonPlusSerializer();
-  constructor(serde) {
-    this.serde = serde || this.serde;
-  }
-  async get(config) {
-    const value = await this.getTuple(config);
-    return value ? value.checkpoint : void 0;
-  }
-  /**
-  * Generate the next version ID for a channel.
-  *
-  * Default is to use integer versions, incrementing by 1. If you override, you can use str/int/float versions,
-  * as long as they are monotonically increasing.
-  */
-  getNextVersion(current) {
-    if (typeof current === "string") throw new Error("Please override this method to use string versions.");
-    return current !== void 0 && typeof current === "number" ? current + 1 : 1;
-  }
-};
-class FileCheckpointSaver extends BaseCheckpointSaver {
+class FileCheckpointSaver extends langgraphCheckpoint.BaseCheckpointSaver {
   basePath;
   constructor(workspacePath) {
     super();
@@ -5010,9 +5401,15 @@ let compiledGraph = null;
 let checkpointSaver = null;
 let currentSessionId = null;
 let mainWindow$1 = null;
-function initWorkflowGraph(workspacePath) {
+async function initWorkflowGraph(workspacePath) {
   checkpointSaver = new FileCheckpointSaver(workspacePath);
   compiledGraph = createWorkflowGraph({ checkpointer: checkpointSaver });
+  try {
+    currentSessionId = await storageAdapter.getCurrentSessionId();
+  } catch (error) {
+    console.warn("[IPC] Failed to restore current session id:", error);
+    currentSessionId = null;
+  }
 }
 function getThreadId() {
   return currentSessionId || "default-thread";
@@ -5034,12 +5431,32 @@ function notifyWorkflowStateChanged(graphState) {
     });
   }
 }
+function broadcastToRenderer(channel, ...args) {
+  const windows = electron.BrowserWindow.getAllWindows();
+  for (const win of windows) {
+    if (!win.isDestroyed()) {
+      win.webContents.send(channel, ...args);
+    }
+  }
+}
 function isInterrupted(result) {
   return result !== null && typeof result === "object" && "__interrupt__" in result && Array.isArray(result.__interrupt__);
 }
 function registerIPCHandlers() {
   storageAdapter.initializeWorkspace().catch(console.error);
   rdcToolAdapter.initialize().catch(console.error);
+  try {
+    const orConfig = settingsService.getOpenRouterConfig();
+    if (orConfig.apiKey) {
+      llmAdapter.configure({
+        defaultProvider: "openrouter",
+        openrouter: { apiKey: orConfig.apiKey, baseUrl: orConfig.baseUrl }
+      });
+      console.log("[IPC] Loaded OpenRouter config from persistent settings");
+    }
+  } catch (err) {
+    console.warn("[IPC] Failed to preload OpenRouter config:", err);
+  }
   electron.ipcMain.handle("dialog:selectRdcFiles", async () => {
     const result = await electron.dialog.showOpenDialog({
       filters: [{ name: "RenderDoc Capture", extensions: ["rdc"] }],
@@ -5094,7 +5511,55 @@ function registerIPCHandlers() {
       return null;
     }
   });
-  electron.ipcMain.handle("workflow:start", async (_event, capturePaths, userGoal) => {
+  electron.ipcMain.handle("workflow:resume", async (_event, sessionId) => {
+    try {
+      if (sessionId) {
+        currentSessionId = sessionId;
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+  electron.ipcMain.handle("workflow:listRuns", async () => {
+    return { runs: [] };
+  });
+  electron.ipcMain.handle("session:list", async () => {
+    return { sessions: [] };
+  });
+  electron.ipcMain.handle("session:select", async (_event, id) => {
+    currentSessionId = id;
+    return { success: true };
+  });
+  electron.ipcMain.handle("context:get", async () => {
+    return rdxSessionService.snapshotContext();
+  });
+  electron.ipcMain.handle("capture:list", async () => {
+    return { captures: rdxSessionService.getCaptureDescriptors() };
+  });
+  electron.ipcMain.handle("capture:open", async (_event, filePath) => {
+    try {
+      if (!filePath) {
+        return { success: false, error: "filePath is required for capture:open" };
+      }
+      return { success: false, error: "capture:open is not yet implemented" };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  electron.ipcMain.handle("capture:select", async (_event, captureId) => {
+    try {
+      await rdxSessionService.switchActiveCapture(captureId);
+      broadcastToRenderer("capture:statusChanged", { captureId, status: "selected" });
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+  electron.ipcMain.handle("workflow:start", async (_event, request, userGoal) => {
+    const isNewRequest = !Array.isArray(request);
+    const capturePaths = isNewRequest ? request.captures.map((c) => c.filePath) : request;
+    const goal = isNewRequest ? request.goal : userGoal ?? "";
     try {
       if (!ensureGraphInitialized()) {
         return {
@@ -5102,11 +5567,28 @@ function registerIPCHandlers() {
           error: "WorkflowGraph not initialized"
         };
       }
+      let contextSnapshot;
+      if (isNewRequest) {
+        try {
+          contextSnapshot = await rdxSessionService.bootstrap(request);
+          broadcastToRenderer("context:changed", contextSnapshot);
+        } catch (bootstrapErr) {
+          const message = bootstrapErr instanceof Error ? bootstrapErr.message : String(bootstrapErr);
+          console.warn("[IPC] rdxSessionService bootstrap failed:", bootstrapErr);
+          return {
+            success: false,
+            error: message
+          };
+        }
+      }
       const gateResult = await harnessController.executeEntryGate({
         capturePaths,
         platform: "rdc-agent",
         entryMode: "cli",
-        backend: "local"
+        backend: isNewRequest ? request.captures.some((c) => c.backendHint === "remote") ? "remote" : "local" : "local",
+        mode: isNewRequest ? request.mode : "debugger",
+        captures: isNewRequest ? request.captures : void 0,
+        replayDevice: isNewRequest ? request.replayDevice : void 0
       });
       if (gateResult.status === "blocked") {
         return {
@@ -5115,8 +5597,8 @@ function registerIPCHandlers() {
         };
       }
       const caseId = await storageAdapter.createCase({
-        userGoal,
-        symptomSummary: userGoal
+        userGoal: goal,
+        symptomSummary: goal
       });
       const { runId, sessionId } = await storageAdapter.createRun({
         caseId,
@@ -5128,7 +5610,7 @@ function registerIPCHandlers() {
         caseId,
         runId,
         sessionId,
-        userGoal,
+        userGoal: goal,
         capturePaths,
         currentStage: "preflight_pending",
         stageHistory: [],
@@ -5159,7 +5641,7 @@ function registerIPCHandlers() {
       } else {
         notifyWorkflowStateChanged(result);
       }
-      return { success: true, caseId, runId, sessionId };
+      return { success: true, caseId, runId, sessionId, contextSnapshot };
     } catch (error) {
       console.error("Failed to start workflow:", error);
       return {
@@ -5378,26 +5860,268 @@ function registerIPCHandlers() {
     return llmAdapter.getAvailableModels(provider);
   });
   electron.ipcMain.handle("settings:get", async () => {
+    const appSettings = settingsService.getAll();
     return {
       theme: "dark",
       llm: {
         defaultProvider: llmAdapter.getDefaultProvider()
       },
-      agents: {}
+      agents: {},
+      openRouter: appSettings.openRouter
     };
   });
   electron.ipcMain.handle("settings:set", async (_event, settings) => {
-    console.log("Set settings:", settings);
+    const s = settings;
+    if (s.openRouter !== void 0) {
+      settingsService.setOpenRouterConfig(s.openRouter);
+      const orConfig = settingsService.getOpenRouterConfig();
+      llmAdapter.configure({
+        defaultProvider: "openrouter",
+        openrouter: { apiKey: orConfig.apiKey, baseUrl: orConfig.baseUrl }
+      });
+    }
     return;
+  });
+  electron.ipcMain.handle("device:list", async () => {
+    return replayDeviceService.listDevices();
+  });
+  electron.ipcMain.handle("device:refresh", async () => {
+    return replayDeviceService.refreshDevices();
+  });
+  electron.ipcMain.handle("device:activate", async (_event, deviceId) => {
+    return replayDeviceService.activateDevice(deviceId);
   });
 }
 function setMainWindow(window) {
   mainWindow$1 = window;
+  replayDeviceService.setMainWindow(window);
   agentOrchestrator.setMainWindow(window);
 }
+class RdxSessionService {
+  toolBridge;
+  contextId = null;
+  runtimeOwner = null;
+  ownerLeaseId = null;
+  captures = [];
+  activeCaptureId = null;
+  deviceLabel = "Local";
+  replayDevice = null;
+  remoteStatus = "disconnected";
+  remoteId = null;
+  constructor(toolBridge2) {
+    this.toolBridge = toolBridge2;
+  }
+  async bootstrap(request) {
+    await this.ensureRuntimeReady();
+    this.contextId = await this.allocateContext();
+    await this.initializeContextRuntime();
+    const ownerResult = await this.claimOwner(this.contextId);
+    this.runtimeOwner = ownerResult.owner;
+    this.ownerLeaseId = ownerResult.leaseId;
+    this.captures = request.captures.map((capture) => ({ ...capture }));
+    this.replayDevice = request.replayDevice;
+    this.deviceLabel = request.replayDevice.label;
+    this.remoteId = null;
+    this.remoteStatus = "disconnected";
+    const hasRemoteCapture = this.captures.some((capture) => capture.backendHint === "remote");
+    if (hasRemoteCapture) {
+      if (request.replayDevice.type === "local" || request.replayDevice.status !== "online") {
+        throw new Error("Remote capture requires an online Replay Device.");
+      }
+      await this.ensureRemoteConnection(request.replayDevice);
+    }
+    const primaryCapture = this.captures.find((capture) => capture.id === request.primaryCaptureId);
+    if (!primaryCapture) {
+      throw new Error(`Primary capture ${request.primaryCaptureId} not found in captures list`);
+    }
+    await this.ensureCaptureSession(primaryCapture);
+    this.activeCaptureId = primaryCapture.id;
+    return this.snapshotContext();
+  }
+  async ensureRuntimeReady() {
+    const statusResult = await this.toolBridge.executeCLI("daemon", ["status"]);
+    if (statusResult.exitCode === 0) {
+      return;
+    }
+    const startResult = await this.toolBridge.executeCLI("daemon", ["start"]);
+    if (startResult.exitCode !== 0) {
+      const message = startResult.stderr.trim() || `Exit code: ${startResult.exitCode}`;
+      throw new Error(`Failed to start rdx daemon: ${message}`);
+    }
+  }
+  async allocateContext() {
+    const contextId = `ctx-${generateShortId()}`;
+    const result = await this.toolBridge.call({
+      toolName: "rd.session.create_context",
+      args: { context_id: contextId },
+      contextId
+    });
+    if (!result.ok) {
+      throw new Error(`Failed to allocate context: ${result.error?.message ?? "unknown"}`);
+    }
+    return contextId;
+  }
+  async initializeContextRuntime() {
+    const result = await this.toolBridge.call({
+      toolName: "rd.core.init",
+      args: {},
+      contextId: this.contextId
+    });
+    if (!result.ok) {
+      throw new Error(`Failed to initialize runtime context: ${result.error?.message ?? "unknown"}`);
+    }
+  }
+  async claimOwner(contextId) {
+    const owner = `rdc-agent-${generateShortId()}`;
+    const leaseId = generateId();
+    const result = await this.toolBridge.call({
+      toolName: "rd.session.claim_owner",
+      args: { context_id: contextId, owner, lease_id: leaseId },
+      contextId,
+      runtimeOwner: owner
+    });
+    if (!result.ok) {
+      throw new Error(`Failed to claim owner: ${result.error?.message ?? "unknown"}`);
+    }
+    return { owner, leaseId };
+  }
+  async ensureCaptureSession(capture) {
+    const captureIndex = this.captures.findIndex((item) => item.id === capture.id);
+    if (captureIndex < 0) {
+      throw new Error(`Capture ${capture.id} not in captures list`);
+    }
+    this.captures[captureIndex] = { ...this.captures[captureIndex], status: "opening" };
+    try {
+      const openResult = await this.toolBridge.call({
+        toolName: "rd.capture.open_file",
+        args: { file_path: capture.filePath },
+        contextId: this.contextId,
+        runtimeOwner: this.runtimeOwner
+      });
+      if (!openResult.ok) {
+        throw new Error(`Failed to open capture file: ${openResult.error?.message ?? "unknown"}`);
+      }
+      const replayArgs = {
+        capture_file_id: openResult.data?.capture_file_id ?? capture.id
+      };
+      if (capture.backendHint === "remote") {
+        if (!this.remoteId) {
+          throw new Error("Remote replay requested but remote connection is not ready.");
+        }
+        replayArgs.remote_id = this.remoteId;
+      }
+      const replayResult = await this.toolBridge.call({
+        toolName: "rd.capture.open_replay",
+        args: replayArgs,
+        contextId: this.contextId,
+        runtimeOwner: this.runtimeOwner
+      });
+      if (!replayResult.ok) {
+        if (capture.backendHint === "remote") {
+          throw new Error(`Remote replay failed (hard fail, no local fallback): ${replayResult.error?.message ?? "unknown"}`);
+        }
+        throw new Error(`Failed to open replay session: ${replayResult.error?.message ?? "unknown"}`);
+      }
+      this.captures[captureIndex] = {
+        ...this.captures[captureIndex],
+        status: "open",
+        sessionId: replayResult.data?.session_id,
+        replaySessionId: replayResult.data?.replay_session_id,
+        contextId: this.contextId
+      };
+    } catch (error) {
+      this.captures[captureIndex] = { ...this.captures[captureIndex], status: "error" };
+      throw error;
+    }
+  }
+  async switchActiveCapture(captureId) {
+    const capture = this.captures.find((item) => item.id === captureId);
+    if (!capture) {
+      throw new Error(`Capture ${captureId} not found`);
+    }
+    if (capture.status === "pending") {
+      await this.ensureCaptureSession(capture);
+    }
+    this.activeCaptureId = captureId;
+  }
+  async ensureRemoteConnection(device) {
+    if (!device.serial) {
+      throw new Error("Replay Device is missing an Android serial number.");
+    }
+    this.replayDevice = device;
+    this.remoteStatus = "connected";
+    const connectResult = await this.toolBridge.call({
+      toolName: "rd.remote.connect",
+      args: {
+        timeout_ms: 5e3,
+        options: {
+          transport: "adb_android",
+          device_serial: device.serial
+        }
+      },
+      contextId: this.contextId,
+      runtimeOwner: this.runtimeOwner
+    });
+    if (!connectResult.ok) {
+      this.remoteStatus = "error";
+      throw new Error(`Remote connect failed (hard fail): ${connectResult.error?.message ?? "unknown"}`);
+    }
+    const remoteId = connectResult.data?.remote_id;
+    if (!remoteId) {
+      this.remoteStatus = "error";
+      throw new Error("Remote connect did not return a remote_id.");
+    }
+    this.remoteId = remoteId;
+    const pingResult = await this.toolBridge.call({
+      toolName: "rd.remote.ping",
+      args: { remote_id: remoteId },
+      contextId: this.contextId,
+      runtimeOwner: this.runtimeOwner
+    });
+    if (!pingResult.ok) {
+      this.remoteStatus = "error";
+      throw new Error(`Remote ping failed (hard fail): ${pingResult.error?.message ?? "unknown"}`);
+    }
+    this.remoteStatus = "online";
+  }
+  snapshotContext() {
+    const activeCapture = this.captures.find((capture) => capture.id === this.activeCaptureId);
+    return {
+      contextId: this.contextId ?? "",
+      sessionId: activeCapture?.sessionId ?? "",
+      backend: activeCapture?.backendHint ?? "local",
+      remoteStatus: this.replayDevice?.type === "android" ? this.remoteStatus : void 0,
+      runtimeOwner: this.runtimeOwner ?? "",
+      ownerLeaseId: this.ownerLeaseId ?? "",
+      captureDescriptors: [...this.captures],
+      activeCapture: this.activeCaptureId ?? "",
+      deviceLabel: this.deviceLabel
+    };
+  }
+  getCaptureDescriptors() {
+    return [...this.captures];
+  }
+  getContextId() {
+    return this.contextId;
+  }
+  getRuntimeOwner() {
+    return this.runtimeOwner;
+  }
+  getOwnerLeaseId() {
+    return this.ownerLeaseId;
+  }
+}
+const rdxSessionService = new RdxSessionService(toolBridge);
 const __dirname$1 = path__namespace.dirname(url.fileURLToPath(require("url").pathToFileURL(__filename).href));
 const isDev = process.env.NODE_ENV === "development" || !electron.app.isPackaged;
 let mainWindow = null;
+const allowedNavigationOrigins = /* @__PURE__ */ new Set();
+function registerAllowedOrigin(url2) {
+  try {
+    allowedNavigationOrigins.add(new URL(url2).origin);
+  } catch {
+  }
+}
 function emitWindowMaximizedState() {
   if (!mainWindow) return;
   mainWindow.webContents.send("window:maximized-changed", mainWindow.isMaximized());
@@ -5448,18 +6172,21 @@ function createMainWindow() {
       contextIsolation: true,
       sandbox: false
     },
-    // 窗口样式
+    // 绐楀彛鏍峰紡
     frame: false,
     autoHideMenuBar: true,
-    titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "hidden",
+    titleBarStyle: "hidden",
     backgroundColor: "#08080c"
   });
   if (isDev) {
     const rendererUrl = process.env["ELECTRON_RENDERER_URL"];
     if (rendererUrl) {
+      registerAllowedOrigin(rendererUrl);
       mainWindow.loadURL(rendererUrl);
     } else {
-      mainWindow.loadURL("http://localhost:5173");
+      const fallbackUrl = "http://localhost:5173";
+      registerAllowedOrigin(fallbackUrl);
+      mainWindow.loadURL(fallbackUrl);
     }
   } else {
     mainWindow.loadFile(path__namespace.join(__dirname$1, "../renderer/index.html"));
@@ -5473,6 +6200,15 @@ function createMainWindow() {
   mainWindow.on("leave-full-screen", emitWindowMaximizedState);
   mainWindow.on("closed", () => {
     mainWindow = null;
+  });
+  mainWindow.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+    console.log("[RendererConsole]", { level, message, line, sourceId });
+  });
+  mainWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+    console.error("[RendererLoadFailed]", { errorCode, errorDescription, validatedURL });
+  });
+  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+    console.error("[RendererProcessGone]", details);
   });
   mainWindow.webContents.setWindowOpenHandler(({ url: url2 }) => {
     if (url2.startsWith("http://") || url2.startsWith("https://")) {
@@ -5566,14 +6302,19 @@ electron.app.whenReady().then(async () => {
   });
 });
 electron.app.on("window-all-closed", () => {
+  replayDeviceService.dispose();
   if (process.platform !== "darwin") {
     electron.app.quit();
   }
 });
+electron.app.on("before-quit", () => {
+  replayDeviceService.dispose();
+});
 electron.app.on("web-contents-created", (_event, contents) => {
   contents.on("will-navigate", (event, navigationUrl) => {
     const parsedUrl = new URL(navigationUrl);
-    if (parsedUrl.origin !== "http://localhost:5173" && parsedUrl.protocol !== "file:") {
+    const isAllowedDevOrigin = allowedNavigationOrigins.has(parsedUrl.origin);
+    if (!isAllowedDevOrigin && parsedUrl.protocol !== "file:") {
       event.preventDefault();
     }
   });
@@ -5581,10 +6322,14 @@ electron.app.on("web-contents-created", (_event, contents) => {
 async function initializeServices() {
   try {
     const workspacePath = storageAdapter.getWorkspacePath();
+    const hasApiKey = settingsService.hasOpenRouterKey();
+    console.log("[Main] SettingsService initialized, hasApiKey:", hasApiKey);
     await rdcToolAdapter.initialize();
     console.log("[Main] RDCToolAdapter initialized");
-    initWorkflowGraph(workspacePath);
+    await initWorkflowGraph(workspacePath);
     console.log("[Main] WorkflowGraph initialized");
+    await replayDeviceService.initialize();
+    console.log("[Main] ReplayDeviceService initialized");
   } catch (error) {
     console.error("[Main] Failed to initialize services:", error);
   }
@@ -5593,3 +6338,4 @@ function getMainWindow() {
   return mainWindow;
 }
 exports.getMainWindow = getMainWindow;
+exports.rdxSessionService = rdxSessionService;

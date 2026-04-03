@@ -26,6 +26,26 @@ export interface SubTask {
 // 内存存储
 const taskStore = new Map<string, SubTask>();
 
+interface TaskCreateInput {
+  title: string;
+  description: string;
+  assignee?: string;
+  parentTaskId?: string;
+}
+
+interface TaskUpdateInput {
+  taskId: string;
+  status: TaskStatus;
+  result?: string;
+}
+
+interface TaskListInput {
+  filter?: TaskStatus | 'all';
+  parentTaskId?: string;
+  limit?: number;
+}
+
+
 /**
  * 生成任务 ID
  */
@@ -55,7 +75,7 @@ export function createTaskTools(): DynamicStructuredTool[] {
         assignee: z.string().optional().describe('Optional assignee identifier'),
         parentTaskId: z.string().optional().describe('Optional parent task ID'),
       }),
-      func: async ({ title, description, assignee, parentTaskId }) => {
+      func: async ({ title, description, assignee, parentTaskId }: TaskCreateInput) => {
         try {
           // 验证父任务是否存在
           if (parentTaskId && !taskStore.has(parentTaskId)) {
@@ -118,7 +138,7 @@ export function createTaskTools(): DynamicStructuredTool[] {
         status: z.enum(['pending', 'in_progress', 'completed', 'failed', 'cancelled']).describe('New status'),
         result: z.string().optional().describe('Optional result/description'),
       }),
-      func: async ({ taskId, status, result }) => {
+      func: async ({ taskId, status, result }: TaskUpdateInput) => {
         try {
           const task = taskStore.get(taskId);
           
@@ -176,7 +196,7 @@ export function createTaskTools(): DynamicStructuredTool[] {
         parentTaskId: z.string().optional().describe('Filter by parent task ID'),
         limit: z.number().int().min(1).max(100).optional().default(50).describe('Maximum number of results'),
       }),
-      func: async ({ filter, parentTaskId, limit }) => {
+      func: async ({ filter = 'all', parentTaskId, limit = 50 }: TaskListInput) => {
         try {
           let tasks = Array.from(taskStore.values());
           

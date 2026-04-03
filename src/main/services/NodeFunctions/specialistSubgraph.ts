@@ -1,6 +1,6 @@
 /**
  * specialistSubgraph.ts - Specialist Agent 子图
- * 每个 Specialist 运行独立的 LLM loop + tool calling
+ * 每个 Specialist 运行独立�?LLM loop + tool calling
  */
 
 import { StateGraph, Annotation, START, END } from '@langchain/langgraph';
@@ -37,7 +37,7 @@ export interface SpecialistInput {
   };
 }
 
-/** Specialist 子图状态 */
+/** Specialist 子图状�?*/
 interface SpecialistSubgraphState {
   agentRole: AgentRole;
   objective: string;
@@ -51,60 +51,63 @@ interface SpecialistSubgraphState {
   error?: string;
 }
 
-/** 子图状态注解 */
+type SpecialistMessage = SpecialistSubgraphState['messages'][number];
+type AgentModelConfig = SpecialistSubgraphConfig['agentConfigs'][AgentRole];
+
+/** 子图状态注�?*/
 const SpecialistAnnotation = Annotation.Root({
   agentRole: Annotation<AgentRole>({
-    reducer: (_, b) => b,
+    reducer: (_: AgentRole, b: AgentRole) => b,
     default: () => 'triage_agent' as AgentRole,
   }),
   objective: Annotation<string>({
-    reducer: (_, b) => b,
+    reducer: (_: string, b: string) => b,
     default: () => '',
   }),
   context: Annotation<SpecialistInput['context']>({
-    reducer: (_, b) => b,
+    reducer: (_: SpecialistInput['context'], b: SpecialistInput['context']) => b,
     default: () => ({ caseId: '', runId: '', sessionId: '' }),
   }),
   messages: Annotation<SpecialistSubgraphState['messages']>({
-    reducer: (a, b) => [...a, ...b],
+    reducer: (a: SpecialistSubgraphState['messages'], b: SpecialistSubgraphState['messages']) => [...a, ...b],
     default: () => [],
   }),
   toolCalls: Annotation<SpecialistSubgraphState['toolCalls']>({
-    reducer: (a, b) => [...a, ...b],
+    reducer: (a: SpecialistSubgraphState['toolCalls'], b: SpecialistSubgraphState['toolCalls']) => [...a, ...b],
     default: () => [],
   }),
   iterationCount: Annotation<number>({
-    reducer: (_, b) => b,
+    reducer: (_: number, b: number) => b,
     default: () => 0,
   }),
   brief: Annotation<string>({
-    reducer: (_, b) => b,
+    reducer: (_: string, b: string) => b,
     default: () => '',
   }),
   artifacts: Annotation<string[]>({
-    reducer: (a, b) => [...a, ...b],
+    reducer: (a: string[], b: string[]) => [...a, ...b],
     default: () => [],
   }),
   status: Annotation<SpecialistSubgraphState['status']>({
-    reducer: (_, b) => b,
+    reducer: (_: SpecialistSubgraphState['status'], b: SpecialistSubgraphState['status']) => b,
     default: () => 'running',
   }),
   error: Annotation<string | undefined>({
-    reducer: (_, b) => b,
+    reducer: (_: string | undefined, b: string | undefined) => b,
     default: () => undefined,
   }),
 });
 
 export type SpecialistSubgraphStateType = typeof SpecialistAnnotation.State;
 
-/** 最大迭代次数 */
+/** 最大迭代次�?*/
 const MAX_ITERATIONS = 10;
 
 /**
  * 创建 Specialist 子图
  */
 export function createSpecialistSubgraph(config: SpecialistSubgraphConfig) {
-  // 合并所有可用工具
+  // 合并所有可用工�?
   const allTools = [
     ...config.rdcTools,
     ...config.systemTools,
@@ -113,7 +116,8 @@ export function createSpecialistSubgraph(config: SpecialistSubgraphConfig) {
 
   // 工具调用节点
   async function llmCallNode(state: SpecialistSubgraphStateType): Promise<Partial<SpecialistSubgraphStateType>> {
-    const agentConfig = config.agentConfigs[state.agentRole];
+    const agentRole = state.agentRole as AgentRole;
+    const agentConfig: AgentModelConfig | undefined = config.agentConfigs[agentRole];
     if (!agentConfig) {
       return {
         status: 'failed',
@@ -133,7 +137,7 @@ export function createSpecialistSubgraph(config: SpecialistSubgraphConfig) {
     try {
       // 构建 LLM 请求
       const request: LLMRequest = {
-        messages: messages.map(m => ({
+        messages: messages.map((m: SpecialistMessage) => ({
           role: m.role === 'tool' ? 'assistant' : m.role,
           content: m.content,
         })),
@@ -176,7 +180,7 @@ export function createSpecialistSubgraph(config: SpecialistSubgraphConfig) {
         };
       }
 
-      // 没有工具调用，任务完成
+      // 没有工具调用，任务完�?
       return {
         messages: [{ role: 'assistant', content }],
         brief: content,
@@ -225,7 +229,7 @@ export function createSpecialistSubgraph(config: SpecialistSubgraphConfig) {
               artifacts.push(parsed.artifactPath);
             }
           } catch {
-            // 不是 JSON，忽略
+            // 不是 JSON，忽�?
           }
         }
       } catch (error) {
@@ -247,19 +251,19 @@ export function createSpecialistSubgraph(config: SpecialistSubgraphConfig) {
     };
   }
 
-  // 条件路由：检查是否需要继续迭代
-  function routeAfterLLMCall(state: SpecialistSubgraphStateType): string {
-    // 检查是否失败
+  // 条件路由：检查是否需要继续迭�?
+  function routeAfterLLMCall(state: SpecialistSubgraphStateType): 'tool_execution' | 'timeout' | 'llm_call' | typeof END {
+    // 检查是否失�?
     if (state.status === 'failed') {
       return END;
     }
 
-    // 检查是否完成
+    // 检查是否完�?
     if (state.status === 'completed') {
       return END;
     }
 
-    // 检查是否超时（迭代次数过多）
+    // 检查是否超时（迭代次数过多�?
     if (state.iterationCount >= MAX_ITERATIONS) {
       return 'timeout';
     }
@@ -335,3 +339,4 @@ export async function runSpecialistSubgraph(
     error: result.error,
   };
 }
+

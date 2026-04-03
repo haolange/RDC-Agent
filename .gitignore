@@ -27,3 +27,8 @@ coverage/
 *.egg-info
 __pycache__
 *.pyc
+
+# E2E test artifacts
+e2e/fixtures/*.rdc
+test-results/
+playwright-report/

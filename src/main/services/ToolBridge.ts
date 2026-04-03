@@ -18,10 +18,10 @@ export class ToolBridge {
   constructor() {
     // 确定工具路径
     if (app.isPackaged) {
-      this.toolsPath = path.join(path.dirname(app.getPath('exe')), 'resources', 'tools');
+      this.toolsPath = path.join(process.resourcesPath, 'tools');
     } else {
       // 开发模式：相对于项目根目录
-      this.toolsPath = path.resolve(__dirname, '../../../../resources/tools');
+      this.toolsPath = path.join(app.getAppPath(), 'resources', 'tools');
     }
   }
 
@@ -57,7 +57,13 @@ export class ToolBridge {
 
     const catalogPath = path.join(this.toolsPath, 'spec', 'tool_catalog.json');
     if (!fs.existsSync(catalogPath)) {
-      throw new Error(`Tool catalog not found at: ${catalogPath}`);
+      console.warn('[ToolBridge] Tool catalog not found, starting with empty RDC tool catalog: ' + catalogPath);
+      this.catalog = {
+        schema_version: '1',
+        tools: [],
+        namespaces: {} as ToolCatalog['namespaces'],
+      };
+      return this.catalog;
     }
 
     const content = await fs.promises.readFile(catalogPath, 'utf-8');
@@ -66,7 +72,9 @@ export class ToolBridge {
   }
 
   /**
-   * 执行CLI命令
+   * 执行CLI命令（参数数组模式，避免命令字符串注入风险）
+   * command: 子命令名称，如 'call', 'daemon'
+   * args: 子命令参数数组
    */
   async executeCLI(
     command: string,
@@ -81,15 +89,19 @@ export class ToolBridge {
     const rdxPath = this.getRdxPath();
 
     return new Promise((resolve, reject) => {
-      const proc = spawn('cmd.exe', ['/c', rdxPath, '--non-interactive', 'cli', command, ...args], {
-        cwd: options.cwd || this.toolsPath,
-        env: {
-          ...process.env,
-          ...options.env,
-          PYTHONIOENCODING: 'utf-8',
-        },
-        windowsHide: true,
-      });
+      const proc = spawn(
+        'cmd.exe',
+        ['/c', rdxPath, '--non-interactive', 'cli', command, ...args],
+        {
+          cwd: options.cwd || this.toolsPath,
+          env: {
+            ...process.env,
+            ...options.env,
+            PYTHONIOENCODING: 'utf-8',
+          },
+          windowsHide: true,
+        }
+      );
 
       const procId = generateEventId('proc');
       this.activeProcesses.set(procId, proc);
@@ -136,36 +148,37 @@ export class ToolBridge {
 
   /**
    * 调用rd.*工具
+   * 使用参数数组模式，避免命令字符串拼接注入风险
    */
   async call(request: ToolCallRequest): Promise<ToolCallResult> {
     const startTime = nowMs();
 
     try {
-      // 构建CLI命令
-      const args = ['call', request.toolName];
+      // 参数数组模式：'call' <toolName> [--args-json <json>] [--context-id <id>] [--runtime-owner <owner>]
+      const cliArgs: string[] = [request.toolName];
 
       if (request.args && Object.keys(request.args).length > 0) {
-        const argsJson = JSON.stringify(request.args);
-        args.push('--args-json', argsJson);
+        cliArgs.push('--args-json', JSON.stringify(request.args));
       }
 
-      const result = await this.executeCLI(args.join(' '), [], {
+      if (request.contextId) {
+        cliArgs.push('--context-id', request.contextId);
+      }
+      if (request.runtimeOwner) {
+        cliArgs.push('--runtime-owner', request.runtimeOwner);
+      }
+
+      const result = await this.executeCLI('call', cliArgs, {
         timeout: 60000, // 60秒超时
       });
 
-      // 解析结果
-      if (result.exitCode === 0 && result.stdout) {
+      // 解析 canonical JSON
+      if (result.exitCode === 0 && result.stdout.trim()) {
+        let parsed: Record<string, unknown>;
         try {
-          const parsed = JSON.parse(result.stdout);
-          return {
-            ok: parsed.ok ?? true,
-            data: parsed.data || parsed,
-            artifacts: parsed.artifacts,
-            duration_ms: nowMs() - startTime,
-            trace_id: generateEventId('tool'),
-          };
+          parsed = JSON.parse(result.stdout);
         } catch {
-          // 如果不是JSON，返回原始输出
+          // stdout 不是 JSON，视为裸文本成功
           return {
             ok: true,
             data: { raw: result.stdout },
@@ -173,22 +186,57 @@ export class ToolBridge {
             trace_id: generateEventId('tool'),
           };
         }
-      } else {
+
+        if (parsed.ok === false) {
+          // CLI 层返回结构化错误
+          const errObj = (parsed.error ?? {}) as Record<string, unknown>;
+          return {
+            ok: false,
+            data: null as unknown as Record<string, unknown>,
+            artifacts: [],
+            error: {
+              code: (errObj.code as string) ?? 'TOOL_ERROR',
+              message: (errObj.message as string) ?? 'Tool returned ok:false',
+              category: (errObj.category as string) ?? 'execution',
+              details: (errObj.details as Record<string, unknown>) ?? undefined,
+            },
+            duration_ms: nowMs() - startTime,
+            trace_id: generateEventId('tool'),
+          };
+        }
+
         return {
-          ok: false,
-          error: {
-            code: 'CLI_ERROR',
-            message: result.stderr || `Exit code: ${result.exitCode}`,
-            category: 'execution',
-            details: { stdout: result.stdout, stderr: result.stderr },
-          },
+          ok: true,
+          data: (parsed.data as Record<string, unknown>) ?? parsed,
+          artifacts: parsed.artifacts as ToolCallResult['artifacts'],
           duration_ms: nowMs() - startTime,
           trace_id: generateEventId('tool'),
         };
       }
+
+      // 非零退出码或空 stdout — 结构化错误
+      return {
+        ok: false,
+        data: null as unknown as Record<string, unknown>,
+        artifacts: [],
+        error: {
+          code: 'CLI_ERROR',
+          message: result.stderr.trim() || `Exit code: ${result.exitCode}`,
+          category: 'execution',
+          details: {
+            stdout: result.stdout,
+            stderr: result.stderr,
+            exitCode: result.exitCode,
+          },
+        },
+        duration_ms: nowMs() - startTime,
+        trace_id: generateEventId('tool'),
+      };
     } catch (error) {
       return {
         ok: false,
+        data: null as unknown as Record<string, unknown>,
+        artifacts: [],
         error: {
           code: 'EXECUTION_ERROR',
           message: error instanceof Error ? error.message : String(error),

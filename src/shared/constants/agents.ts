@@ -3,6 +3,7 @@
  */
 
 import type { AgentRole, AgentCategory, WriteScope } from '../types/agent';
+import type { ModeConfig } from '../types/layout';
 import { DEFAULT_MODEL_ROUTING } from '../types/agent';
 
 // 重新导出 DEFAULT_MODEL_ROUTING
@@ -117,3 +118,28 @@ export const AGENT_COLORS: Record<AgentRole, string> = {
   'skeptic_agent': '#ec4899',
   'curator_agent': '#8b5cf6',
 };
+
+// Agent 工作模式配置
+export const AGENT_MODES: ModeConfig[] = [
+  {
+    id: 'debugger',
+    label: 'Debugger',
+    icon: 'bug',
+    description: 'Debug and diagnose rendering issues',
+    disabled: false,
+  },
+  {
+    id: 'analyzer',
+    label: 'Analyzer',
+    icon: 'chart',
+    description: 'Analyze performance and resource usage',
+    disabled: true,
+  },
+  {
+    id: 'optimizer',
+    label: 'Optimizer',
+    icon: 'zap',
+    description: 'Optimize shaders and draw calls',
+    disabled: true,
+  },
+];

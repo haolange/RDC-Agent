@@ -113,3 +113,20 @@ export const AGENT_CATEGORY_MAP: Record<AgentRole, AgentCategory> = {
   'skeptic_agent': 'verifier',
   'curator_agent': 'reporter',
 };
+
+// ============================================
+// Agent Timeline 类型
+// ============================================
+
+import type { ToolTraceEntry } from './tool';
+
+/** Agent 时间线条目 */
+export interface AgentTimelineEntry {
+  id: string;
+  type: 'user' | 'agent' | 'tool_call' | 'blocker' | 'system';
+  agentRole?: AgentRole;
+  content: string;
+  toolTrace?: ToolTraceEntry;
+  timestamp: number;
+  refs?: string[];
+}

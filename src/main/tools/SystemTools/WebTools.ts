@@ -9,6 +9,18 @@ import * as https from 'https';
 import * as http from 'http';
 import { URL } from 'url';
 
+interface WebFetchInput {
+  url: string;
+  headers?: Record<string, string>;
+  maxLength?: number;
+}
+
+interface WebSearchInput {
+  query: string;
+  maxResults?: number;
+}
+
+
 const MAX_RESPONSE_LENGTH = 100000; // 最大响应长度限制
 
 /**
@@ -117,7 +129,7 @@ export function createWebTools(): DynamicStructuredTool[] {
         headers: z.record(z.string(), z.string()).optional().describe('Optional HTTP headers'),
         maxLength: z.number().int().min(100).max(500000).optional().default(MAX_RESPONSE_LENGTH).describe('Maximum response length'),
       }),
-      func: async ({ url, headers, maxLength }) => {
+      func: async ({ url, headers, maxLength = MAX_RESPONSE_LENGTH }: WebFetchInput) => {
         try {
           const response = await httpGet(url, headers);
           
@@ -173,7 +185,7 @@ export function createWebTools(): DynamicStructuredTool[] {
         query: z.string().describe('Search query'),
         maxResults: z.number().int().min(1).max(20).optional().default(5).describe('Maximum number of results'),
       }),
-      func: async ({ query, maxResults }) => {
+      func: async ({ query, maxResults = 5 }: WebSearchInput) => {
         // 这是一个占位实现
         // 实际实现需要接入搜索引擎 API（如 Google Custom Search、Bing Search 等）
         

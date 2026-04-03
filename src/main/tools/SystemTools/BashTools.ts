@@ -8,6 +8,13 @@ import { z } from 'zod';
 import { spawn } from 'child_process';
 import * as path from 'path';
 
+interface BashExecInput {
+  command: string;
+  cwd?: string;
+  timeout?: number;
+}
+
+
 const DEFAULT_TIMEOUT = 30000; // 默认 30 秒超时
 const MAX_OUTPUT_LENGTH = 50000; // 最大输出长度
 
@@ -220,7 +227,7 @@ export function createBashTools(workspacePath: string): DynamicStructuredTool[] 
         cwd: z.string().optional().describe('Working directory relative to workspace'),
         timeout: z.number().int().min(1000).max(300000).optional().default(DEFAULT_TIMEOUT).describe('Timeout in milliseconds (max 5 minutes)'),
       }),
-      func: async ({ command, cwd, timeout }) => {
+      func: async ({ command, cwd, timeout }: BashExecInput) => {
         try {
           // 安全检查
           const safetyCheck = isDangerousCommand(command);
@@ -249,7 +256,7 @@ export function createBashTools(workspacePath: string): DynamicStructuredTool[] 
           }
           
           // 执行命令
-          const result = await executeCommand(command, resolvedCwd, timeout);
+          const result = await executeCommand(command, resolvedCwd, timeout ?? DEFAULT_TIMEOUT);
           
           // 截断输出
           const truncatedStdout = truncateOutput(result.stdout);
@@ -266,7 +273,7 @@ export function createBashTools(workspacePath: string): DynamicStructuredTool[] 
               stdoutTruncated: truncatedStdout.truncated,
               stderrTruncated: truncatedStderr.truncated,
               timedOut: result.timedOut,
-              executionTime: timeout
+              executionTime: timeout ?? DEFAULT_TIMEOUT
             }
           });
         } catch (error) {

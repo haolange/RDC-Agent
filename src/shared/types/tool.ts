@@ -150,3 +150,18 @@ export interface ToolRegistryEntry {
   description: string;
   available: boolean;
 }
+
+// ============================================
+// Tool 追踪类型
+// ============================================
+
+/** 工具追踪条目 */
+export interface ToolTraceEntry {
+  traceId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  result: ToolCallResult;
+  timestamp: number;
+  contextId: string;
+  runtimeOwner: string;
+}

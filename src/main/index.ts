@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Electron Main Process Entry
  */
 
@@ -8,15 +8,31 @@ import { fileURLToPath } from 'url';
 
 import { registerIPCHandlers, setMainWindow, initWorkflowGraph } from './ipc/handlers';
 import { storageAdapter } from './services/StorageAdapter';
+import { settingsService } from './services/SettingsService';
 import { rdcToolAdapter } from './tools/RDCToolAdapter';
+import { toolBridge } from './services/ToolBridge';
+import { RdxSessionService } from './services/RdxSessionService';
+import { replayDeviceService } from './services/ReplayDeviceService';
+
+// RdxSessionService 鍗曚緥 - 渚?IPC handlers 浣跨敤
+export const rdxSessionService = new RdxSessionService(toolBridge);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// 开发环境检测
+// 寮€鍙戠幆澧冩锟?
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
-// 主窗口引用
+// 涓荤獥鍙ｅ紩锟?
 let mainWindow: BrowserWindow | null = null;
+const allowedNavigationOrigins = new Set<string>();
+
+function registerAllowedOrigin(url: string): void {
+  try {
+    allowedNavigationOrigins.add(new URL(url).origin);
+  } catch {
+    // Ignore invalid renderer URLs.
+  }
+}
 
 function emitWindowMaximizedState(): void {
   if (!mainWindow) return;
@@ -63,7 +79,7 @@ function setupKeyboardShortcuts(window: BrowserWindow): void {
 }
 
 /**
- * 创建主窗口
+ * 鍒涘缓涓荤獥锟?
  */
 function createMainWindow(): void {
   mainWindow = new BrowserWindow({
@@ -79,27 +95,30 @@ function createMainWindow(): void {
       contextIsolation: true,
       sandbox: false,
     },
-    // 窗口样式
+    // 绐楀彛鏍峰紡
     frame: false,
     autoHideMenuBar: true,
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
+    titleBarStyle: 'hidden',
     backgroundColor: '#08080c',
   });
 
-  // 加载页面
+  // 鍔犺浇椤甸潰
   if (isDev) {
     const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
     if (rendererUrl) {
+      registerAllowedOrigin(rendererUrl);
       mainWindow.loadURL(rendererUrl);
     } else {
-      mainWindow.loadURL('http://localhost:5173');
+      const fallbackUrl = 'http://localhost:5173';
+      registerAllowedOrigin(fallbackUrl);
+      mainWindow.loadURL(fallbackUrl);
     }
   } else {
-    // 生产模式：加载打包后的文件
+    // 鐢熶骇妯″紡锛氬姞杞芥墦鍖呭悗鐨勬枃锟?
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
 
-  // 窗口准备好后显示
+  // 绐楀彛鍑嗗濂藉悗鏄剧ず
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
   });
@@ -109,12 +128,24 @@ function createMainWindow(): void {
   mainWindow.on('enter-full-screen', emitWindowMaximizedState);
   mainWindow.on('leave-full-screen', emitWindowMaximizedState);
 
-  // 窗口关闭处理
+  // 绐楀彛鍏抽棴澶勭悊
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
 
-  // 外部链接用默认浏览器打开
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    console.log('[RendererConsole]', { level, message, line, sourceId });
+  });
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error('[RendererLoadFailed]', { errorCode, errorDescription, validatedURL });
+  });
+
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    console.error('[RendererProcessGone]', details);
+  });
+
+  // 澶栭儴閾炬帴鐢ㄩ粯璁ゆ祻瑙堝櫒鎵撳紑
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http://') || url.startsWith('https://')) {
       shell.openExternal(url);
@@ -122,14 +153,14 @@ function createMainWindow(): void {
     return { action: 'deny' };
   });
 
-  // 设置窗口控制与快捷键
+  // 璁剧疆绐楀彛鎺у埗涓庡揩鎹烽敭
   setMainWindow(mainWindow);
   setupKeyboardShortcuts(mainWindow);
   setupMenu();
 }
 
 /**
- * 设置应用菜单
+ * 璁剧疆搴旂敤鑿滃崟
  */
 function setupMenu(): void {
   if (process.platform === 'darwin') {
@@ -205,16 +236,16 @@ function setupMenu(): void {
   Menu.setApplicationMenu(null);
 }
 
-// 应用就绪
+// 搴旂敤灏辩华
 app.whenReady().then(async () => {
   registerIPCHandlers();
   
-  // 初始化服务
+  // 鍒濆鍖栨湇锟?
   await initializeServices();
   
   createMainWindow();
 
-  // macOS: 点击dock图标时重新创建窗口
+  // macOS: 鐐瑰嚮dock鍥炬爣鏃堕噸鏂板垱寤虹獥锟?
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
@@ -222,44 +253,61 @@ app.whenReady().then(async () => {
   });
 });
 
-// 所有窗口关闭时退出（Windows/Linux）
+// 鎵€鏈夌獥鍙ｅ叧闂椂閫€鍑猴紙Windows/Linux锟?
 app.on('window-all-closed', () => {
+  replayDeviceService.dispose();
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
-// 安全处理：阻止新窗口导航到未知URL
+app.on('before-quit', () => {
+  replayDeviceService.dispose();
+});
+
+// 瀹夊叏澶勭悊锛氶樆姝㈡柊绐楀彛瀵艰埅鍒版湭鐭RL
 app.on('web-contents-created', (_event, contents) => {
   contents.on('will-navigate', (event, navigationUrl) => {
     const parsedUrl = new URL(navigationUrl);
-    if (parsedUrl.origin !== 'http://localhost:5173' && parsedUrl.protocol !== 'file:') {
+    const isAllowedDevOrigin = allowedNavigationOrigins.has(parsedUrl.origin);
+
+    if (!isAllowedDevOrigin && parsedUrl.protocol !== 'file:') {
       event.preventDefault();
     }
   });
 });
 
 /**
- * 初始化服务
+ * 鍒濆鍖栨湇锟?
  */
 async function initializeServices(): Promise<void> {
   try {
-    // 获取 workspace 路径
+    // 鑾峰彇 workspace 璺緞
     const workspacePath = storageAdapter.getWorkspacePath();
     
-    // 初始化 RDC 工具适配器
+    // 鍒濆鍖?SettingsService锛坋lectron-store 寤惰繜鍔犺浇锛屾澶勮Е鍙戞瀯閫狅級
+    const hasApiKey = settingsService.hasOpenRouterKey();
+    console.log('[Main] SettingsService initialized, hasApiKey:', hasApiKey);
+    
+    // 鍒濆锟?RDC 宸ュ叿閫傞厤锟?
     await rdcToolAdapter.initialize();
     console.log('[Main] RDCToolAdapter initialized');
     
-    // 初始化 WorkflowGraph
-    initWorkflowGraph(workspacePath);
+    // 鍒濆锟?WorkflowGraph
+    await initWorkflowGraph(workspacePath);
     console.log('[Main] WorkflowGraph initialized');
+
+    await replayDeviceService.initialize();
+    console.log('[Main] ReplayDeviceService initialized');
   } catch (error) {
     console.error('[Main] Failed to initialize services:', error);
   }
 }
 
-// 导出窗口引用供IPC使用
+// 瀵煎嚭绐楀彛寮曠敤渚汭PC浣跨敤
 export function getMainWindow(): BrowserWindow | null {
   return mainWindow;
 }
+
+
+

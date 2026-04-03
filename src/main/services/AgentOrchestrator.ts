@@ -26,6 +26,70 @@ import { storageAdapter } from './StorageAdapter';
 import { harnessController } from './HarnessController';
 import { generateEventId, nowMs, nowIso } from '@shared/utils/id';
 
+// ============================================
+// Specialist 工具绑定（Task 4b）
+// ============================================
+
+/**
+ * 固定每个 specialist 的工具清单
+ * 确保每个 agent 只能访问其职责范围内的工具
+ */
+// @ts-ignore: reserved for future use
+const SPECIALIST_TOOL_BINDINGS: Record<string, string[]> = {
+  triage_agent: [
+    'rd.session.get_context',
+    'rd.event.get_action_tree',
+    'rd.macro.summarize_frame',
+  ],
+  capture_repro_agent: [
+    'rd.capture.get_info',
+    'rd.capture.list_frames',
+    'rd.context.snapshot',
+  ],
+  pass_graph_pipeline_agent: [
+    'rd.pipeline.get_state_summary',
+    'rd.pipeline.get_output_targets',
+    'rd.macro.find_state_change_point',
+  ],
+  pixel_forensics_agent: [
+    'rd.macro.explain_pixel',
+    'rd.texture.get_pixel_value',
+    'rd.export.screenshot',
+  ],
+  shader_ir_agent: [
+    'rd.shader.get_disassembly',
+    'rd.shader.debug_start',
+  ],
+  driver_device_agent: [
+    'rd.session.get_context',
+    'rd.remote.connect',
+    'rd.remote.ping',
+    'rd.remote.list_devices',
+  ],
+  // skeptic_agent 和 curator_agent 不直接使用 live tool
+  skeptic_agent: [],
+  curator_agent: [],
+};
+
+/**
+ * 默认调试策略：
+ * 第一层优先 macro/summary 工具（宏观快速定位）
+ * 第二层再下钻 canonical event/pipeline/resource/texture/shader 工具
+ */
+// @ts-ignore: reserved for future use
+const INVESTIGATION_PRIORITY = {
+  layer1_macro: ['rd.macro.summarize_frame', 'rd.macro.explain_pixel', 'rd.macro.find_state_change_point'],
+  layer2_canonical: ['rd.event.*', 'rd.pipeline.*', 'rd.resource.*', 'rd.texture.*', 'rd.shader.*'],
+};
+
+/**
+ * Shader 编辑默认只读约束：
+ * rd.shader.edit_and_replace 和 rd.macro.shader_hotfix_validate 默认不出现在任何 specialist 的工具清单中
+ * 仅在未来 optimizer 模式或用户显式要求时启用
+ */
+// @ts-ignore: reserved for future use
+const SHADER_EDIT_TOOLS = ['rd.shader.edit_and_replace', 'rd.macro.shader_hotfix_validate'];
+
 export class AgentOrchestrator {
   private agentStates: Map<AgentRole, AgentState> = new Map();
   private agentConfigs: Map<AgentRole, AgentConfig> = new Map();
@@ -254,6 +318,52 @@ export class AgentOrchestrator {
   }
 
   /**
+   * 获取 Specialist 可用工具清单（Task 4b）
+   * 根据角色过滤可用工具，确保 skeptic_agent 和 curator_agent 不接收任何 live tool
+   */
+  getToolsForRole(agentId: AgentRole): string[] {
+    // skeptic_agent 只审查 evidence chain，不直接发 live tool
+    if (agentId === 'skeptic_agent') {
+      return [];
+    }
+  
+    // curator_agent 只输出最终报告与摘要卡片，不直接发 live tool
+    if (agentId === 'curator_agent') {
+      return [];
+    }
+  
+    // 返回绑定给该角色的工具列表
+    return SPECIALIST_TOOL_BINDINGS[agentId] ?? [];
+  }
+  
+  /**
+   * 检查工具是否允许被指定角色使用（Task 4b）
+   * shader 编辑工具默认只读，不在任何 specialist 的工具清单中
+   */
+  isToolAllowedForRole(toolName: string, agentId: AgentRole): boolean {
+    // Shader 编辑工具默认不可用
+    if (SHADER_EDIT_TOOLS.includes(toolName)) {
+      return false; // 仅 optimizer 模式或用户显式要求时启用
+    }
+  
+    const allowedTools = this.getToolsForRole(agentId);
+  
+    // 支持通配符匹配，如 rd.event.*
+    for (const pattern of allowedTools) {
+      if (pattern.endsWith('.*')) {
+        const prefix = pattern.slice(0, -2);
+        if (toolName.startsWith(prefix + '.')) {
+          return true;
+        }
+      } else if (toolName === pattern) {
+        return true;
+      }
+    }
+  
+    return false;
+  }
+  
+  /**
    * 分派Specialist
    */
   async dispatchSpecialist(
@@ -287,11 +397,17 @@ export class AgentOrchestrator {
         error: gateResult.blockers.map(b => b.reason).join('; '),
       };
     }
-
+    
+    // 获取该 specialist 可用的工具列表（Task 4b）
+    const allowedTools = this.getToolsForRole(agentId);
+    
+    // 记录分派的工具约束
+    console.log(`[AgentOrchestrator] Dispatching ${agentId} with ${allowedTools.length} allowed tools:`, allowedTools);
+    
     // 生成capability token
     const tokenId = generateEventId('tok');
-
-    // 记录dispatch事件
+    
+    // 记录dispatch事件（包含可用工具列表）
     const event = storageAdapter.createActionEvent({
       runId: context.runId,
       sessionId: context.sessionId,

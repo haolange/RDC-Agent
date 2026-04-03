@@ -189,7 +189,7 @@ export class MCPToolAdapter {
           if (enumValues.every((v) => typeof v === 'string')) {
             zodType = z.enum(enumValues as [string, ...string[]]);
           } else if (enumValues.every((v) => typeof v === 'number')) {
-            zodType = z.number().refine((val) => enumValues.includes(val));
+            zodType = z.number().refine((val: number) => enumValues.includes(val));
           } else {
             zodType = z.unknown();
           }
@@ -262,7 +262,7 @@ export class MCPToolAdapter {
       }
       if (propSchema.multipleOf !== undefined) {
         const multiple = propSchema.multipleOf as number;
-        zodType = (zodType as z.ZodNumber).refine((val) => val % multiple === 0);
+        zodType = (zodType as z.ZodNumber).refine((val: number) => val % multiple === 0);
       }
     }
 

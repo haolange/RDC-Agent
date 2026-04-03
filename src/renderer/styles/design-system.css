@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Design System - RDC-Agent "Deep Debug"
  * A professional debugging interface design system
  * Inspired by Linear, VS Code, and cyberpunk tech aesthetics
@@ -136,6 +136,7 @@
   --z-modal: 500;
   --z-popover: 600;
   --z-tooltip: 700;
+  --z-overlay: 900;
 
   /* Layout */
   --header-height: 52px;
@@ -354,3 +355,4 @@
   background: rgb(var(--color-accent-500) / 0.3);
   color: rgb(var(--color-text-primary));
 }
+
