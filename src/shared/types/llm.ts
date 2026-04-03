@@ -98,6 +98,9 @@ export interface LLMConfig {
   openrouter?: {
     apiKey: string;
     baseUrl?: string;
+    defaultModel?: string;
+    agentModelOverrides?: Record<string, string>;
+    temperature?: number;
   };
   gemini?: {
     apiKey: string;

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * HarnessController - Harness控制器
  * 核心改进：从"结尾审计器"升级为"过程控制器"
  * 实现：前置Gate层 + 运行时监控层
@@ -10,8 +10,13 @@ import type {
   Blocker,
 } from '@shared/types/workflow';
 import type { ActionEvent } from '@shared/types/evidence';
+// 导入新 Session 类型（Task 1 已完成）
+import type { CaptureDescriptor } from '@shared/types/session';
+import type { ReplayDeviceEntry } from '@shared/types/device';
 import { workflowEngine } from './WorkflowEngine';
 import { storageAdapter } from './StorageAdapter';
+// 导入 settingsService（Task 6 已完成）
+import { settingsService } from './SettingsService';
 import { nowIso, nowMs } from '@shared/utils/id';
 
 // Gate输入类型
@@ -20,6 +25,10 @@ interface EntryGateInput {
   platform: string;
   entryMode: 'cli' | 'mcp';
   backend: 'local' | 'remote';
+  // 新增字段（Task 4c）
+  mode?: 'debugger' | 'analyzer' | 'optimizer';
+  captures?: CaptureDescriptor[];
+  replayDevice?: ReplayDeviceEntry;
 }
 
 interface IntakeGateInput {
@@ -88,7 +97,33 @@ export class HarnessController {
       // Remote模式额外检查
       // TODO: 添加remote前置检查
     }
-
+  
+    // === Task 4c: LLM Key 检查（仅 debugger 模式）===
+    // Debugger 模式需要 LLM 可用；Analyzer/Optimizer 占位页不要求 LLM
+    if (input.mode === 'debugger') {
+      if (!settingsService.hasOpenRouterKey()) {
+        blockers.push(this.createBlocker(
+          'LLM_KEY_MISSING',
+          'OpenRouter API key is required for Debugger mode',
+          ['settings:openRouter.apiKey']
+        ));
+      }
+    }
+    // Analyzer/Optimizer 模式不要求 LLM key（当前为占位页）
+  
+    // === Task 4c: Remote Capture Blocker ===
+    // 检查是否有 remote capture 但缺少 remote device/配置
+    if (input.captures && input.captures.length > 0) {
+      const hasRemoteCapture = input.captures.some(c => c.backendHint === 'remote');
+      if (hasRemoteCapture && (!input.replayDevice || input.replayDevice.type === 'local' || input.replayDevice.status !== 'online')) {
+        blockers.push(this.createBlocker(
+          'REMOTE_CONFIG_MISSING',
+          'Remote capture requires an online Replay Device',
+          []
+        ));
+      }
+    }
+  
     return this.createGateResult('entry_gate', blockers);
   }
 
@@ -441,3 +476,6 @@ export class HarnessController {
 
 // 单例导出
 export const harnessController = new HarnessController();
+
+
+

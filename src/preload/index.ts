@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Electron Preload Script
  */
 
@@ -18,129 +18,127 @@ const validChannels = [
   'evidence:eventAdded',
   'llm:stream',
   'window:maximized-changed',
+  'device:statusChanged',
+  'capture:statusChanged',
+  'context:changed',
 ] as const;
 
 const isValidChannel = (channel: string): channel is (typeof validChannels)[number] => {
   return validChannels.includes(channel as (typeof validChannels)[number]);
 };
 
-// 暴露给渲染进程的API
 const electronAPI = {
-  // 平台信息
   platform: process.platform,
   isMac: process.platform === 'darwin',
   isWindows: process.platform === 'win32',
   isLinux: process.platform === 'linux',
 
   appMeta: {
-    get: (): Promise<{ version: string; productName: string }> => {
-      return ipcRenderer.invoke('app:getMeta');
-    },
+    get: (): Promise<{ version: string; productName: string }> => ipcRenderer.invoke('app:getMeta'),
   },
 
-  // 文件操作
-  selectRdcFiles: (): Promise<string[] | null> => {
-    return ipcRenderer.invoke('dialog:selectRdcFiles');
-  },
+  selectRdcFiles: (): Promise<string[] | null> => ipcRenderer.invoke('dialog:selectRdcFiles'),
+  selectDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectDirectory'),
 
-  selectDirectory: (): Promise<string | null> => {
-    return ipcRenderer.invoke('dialog:selectDirectory');
-  },
-
-  // 工作流操作
   workflow: {
-    getState: (): Promise<unknown> => {
-      return ipcRenderer.invoke('workflow:getState');
-    },
-    start: (capturePaths: string[], userGoal: string): Promise<unknown> => {
-      return ipcRenderer.invoke('workflow:start', capturePaths, userGoal);
-    },
-    advanceStage: (): Promise<unknown> => {
-      return ipcRenderer.invoke('workflow:advanceStage');
-    },
-    backtrack: (reason: string, trigger: string): Promise<unknown> => {
-      return ipcRenderer.invoke('workflow:backtrack', reason, trigger);
-    },
-    dispatchSpecialist: (agentId: string, objective: string): Promise<unknown> => {
-      return ipcRenderer.invoke('workflow:dispatchSpecialist', agentId, objective);
-    },
+    getState: (): Promise<unknown> => ipcRenderer.invoke('workflow:getState'),
+    start: (request: unknown): Promise<unknown> => ipcRenderer.invoke('workflow:start', request),
+    resume: (sessionId?: string): Promise<unknown> => ipcRenderer.invoke('workflow:resume', sessionId),
+    listRuns: (): Promise<unknown> => ipcRenderer.invoke('workflow:listRuns'),
+    advanceStage: (): Promise<unknown> => ipcRenderer.invoke('workflow:advanceStage'),
+    backtrack: (reason: string, trigger: string): Promise<unknown> => ipcRenderer.invoke('workflow:backtrack', reason, trigger),
+    dispatchSpecialist: (agentId: string, objective: string): Promise<unknown> => ipcRenderer.invoke('workflow:dispatchSpecialist', agentId, objective),
   },
 
-  // Agent操作
   agent: {
-    sendMessage: (agentId: string, content: string): Promise<unknown> => {
-      return ipcRenderer.invoke('agent:sendMessage', agentId, content);
-    },
-    getState: (agentId: string): Promise<unknown> => {
-      return ipcRenderer.invoke('agent:getState', agentId);
-    },
-    getAllStates: (): Promise<unknown> => {
-      return ipcRenderer.invoke('agent:getAllStates');
-    },
-    configure: (agentId: string, config: unknown): Promise<unknown> => {
-      return ipcRenderer.invoke('agent:configure', agentId, config);
-    },
+    sendMessage: (agentId: string, content: string): Promise<unknown> => ipcRenderer.invoke('agent:sendMessage', agentId, content),
+    getState: (agentId: string): Promise<unknown> => ipcRenderer.invoke('agent:getState', agentId),
+    getAllStates: (): Promise<unknown> => ipcRenderer.invoke('agent:getAllStates'),
+    configure: (agentId: string, config: unknown): Promise<unknown> => ipcRenderer.invoke('agent:configure', agentId, config),
   },
 
-  // 工具操作
   tool: {
-    getCatalog: (): Promise<unknown> => {
-      return ipcRenderer.invoke('tool:getCatalog');
-    },
-    execute: (toolName: string, args: unknown): Promise<unknown> => {
-      return ipcRenderer.invoke('tool:execute', toolName, args);
-    },
+    getCatalog: (): Promise<unknown> => ipcRenderer.invoke('tool:getCatalog'),
+    execute: (toolName: string, args: unknown): Promise<unknown> => ipcRenderer.invoke('tool:execute', toolName, args),
   },
 
-  // 证据链操作
   evidence: {
-    getChain: (): Promise<unknown> => {
-      return ipcRenderer.invoke('evidence:getChain');
-    },
-    getEvents: (eventType?: string): Promise<unknown> => {
-      return ipcRenderer.invoke('evidence:getEvents', eventType);
-    },
+    getChain: (): Promise<unknown> => ipcRenderer.invoke('evidence:getChain'),
+    getEvents: (eventType?: string): Promise<unknown> => ipcRenderer.invoke('evidence:getEvents', eventType),
   },
 
-  // LLM操作
   llm: {
-    configure: (config: unknown): Promise<void> => {
-      return ipcRenderer.invoke('llm:configure', config);
-    },
-    testConnection: (provider: string): Promise<unknown> => {
-      return ipcRenderer.invoke('llm:testConnection', provider);
-    },
-    getAvailableModels: (provider: string): Promise<unknown> => {
-      return ipcRenderer.invoke('llm:getAvailableModels', provider);
-    },
+    configure: (config: unknown): Promise<void> => ipcRenderer.invoke('llm:configure', config),
+    testConnection: (provider: string): Promise<unknown> => ipcRenderer.invoke('llm:testConnection', provider),
+    getAvailableModels: (provider: string): Promise<unknown> => ipcRenderer.invoke('llm:getAvailableModels', provider),
   },
 
-  // 设置操作
   settings: {
-    get: (): Promise<unknown> => {
-      return ipcRenderer.invoke('settings:get');
+    get: (): Promise<unknown> => ipcRenderer.invoke('settings:get'),
+    set: (settings: unknown): Promise<void> => ipcRenderer.invoke('settings:set', settings),
+  },
+
+  device: {
+    list: (): Promise<unknown> => ipcRenderer.invoke('device:list'),
+    refresh: (): Promise<unknown> => ipcRenderer.invoke('device:refresh'),
+    activate: (deviceId: string): Promise<unknown> => ipcRenderer.invoke('device:activate', deviceId),
+  },
+
+  session: {
+    list: (): Promise<unknown> => ipcRenderer.invoke('session:list'),
+    select: (id: string): Promise<unknown> => ipcRenderer.invoke('session:select', id),
+  },
+
+  capture: {
+    open: (filePath?: string): Promise<unknown> => ipcRenderer.invoke('capture:open', filePath),
+    list: (): Promise<unknown> => ipcRenderer.invoke('capture:list'),
+    select: (captureId: string): Promise<unknown> => ipcRenderer.invoke('capture:select', captureId),
+  },
+
+  context: {
+    get: (): Promise<unknown> => ipcRenderer.invoke('context:get'),
+  },
+
+  events: {
+    onWorkflowStateChanged: (callback: (state: unknown) => void): void => {
+      ipcRenderer.on('workflow:stateChanged', (_event, state) => callback(state));
     },
-    set: (settings: unknown): Promise<void> => {
-      return ipcRenderer.invoke('settings:set', settings);
+    onWorkflowStageChanged: (callback: (data: unknown) => void): void => {
+      ipcRenderer.on('workflow:stageChanged', (_event, data) => callback(data));
+    },
+    onAgentMessage: (callback: (msg: unknown) => void): void => {
+      ipcRenderer.on('agent:message', (_event, msg) => callback(msg));
+    },
+    onAgentStatusChanged: (callback: (state: unknown) => void): void => {
+      ipcRenderer.on('agent:statusChanged', (_event, state) => callback(state));
+    },
+    onToolExecutionComplete: (callback: (trace: unknown) => void): void => {
+      ipcRenderer.on('tool:executionComplete', (_event, trace) => callback(trace));
+    },
+    onEvidenceEventAdded: (callback: (event: unknown) => void): void => {
+      ipcRenderer.on('evidence:eventAdded', (_event, event) => callback(event));
+    },
+    onDeviceStatusChanged: (callback: (status: unknown) => void): void => {
+      ipcRenderer.on('device:statusChanged', (_event, status) => callback(status));
+    },
+    onCaptureStatusChanged: (callback: (status: unknown) => void): void => {
+      ipcRenderer.on('capture:statusChanged', (_event, status) => callback(status));
+    },
+    onContextChanged: (callback: (snapshot: unknown) => void): void => {
+      ipcRenderer.on('context:changed', (_event, snapshot) => callback(snapshot));
+    },
+    removeAllListeners: (channel: string): void => {
+      ipcRenderer.removeAllListeners(channel);
     },
   },
 
   windowControls: {
-    minimize: (): Promise<void> => {
-      return ipcRenderer.invoke('window:minimize');
-    },
-    toggleMaximize: (): Promise<boolean> => {
-      return ipcRenderer.invoke('window:toggleMaximize');
-    },
-    close: (): Promise<void> => {
-      return ipcRenderer.invoke('window:close');
-    },
-    isMaximized: (): Promise<boolean> => {
-      return ipcRenderer.invoke('window:isMaximized');
-    },
+    minimize: (): Promise<void> => ipcRenderer.invoke('window:minimize'),
+    toggleMaximize: (): Promise<boolean> => ipcRenderer.invoke('window:toggleMaximize'),
+    close: (): Promise<void> => ipcRenderer.invoke('window:close'),
+    isMaximized: (): Promise<boolean> => ipcRenderer.invoke('window:isMaximized'),
   },
 
-  // 事件监听
   on: (channel: string, callback: (...args: unknown[]) => void) => {
     if (isValidChannel(channel)) {
       const wrappedCallback = (_event: unknown, ...args: unknown[]) => callback(...args);
@@ -160,8 +158,6 @@ const electronAPI = {
   },
 };
 
-// 暴露API到渲染进程
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
 
-// 类型导出
 export type ElectronAPI = typeof electronAPI;

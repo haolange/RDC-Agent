@@ -1,11 +1,131 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
-import type { AgentMessage, AgentRole } from '@shared/types/agent';
+import type { AgentRole, AgentTimelineEntry } from '@shared/types/agent';
+import { useSessionStore } from '../../stores/sessionStore';
 import './AgentChat.css';
 
-interface AgentChatProps {
-  initialAgent?: AgentRole;
-}
+// ────────────────────────────────────────────────────────
+// Helpers
+// ────────────────────────────────────────────────────────
+
+const formatTime = (timestamp: number): string =>
+  new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+// ────────────────────────────────────────────────────────
+// Timeline entry renderers
+// ────────────────────────────────────────────────────────
+
+const UserEntry: React.FC<{ entry: AgentTimelineEntry }> = ({ entry }) => (
+  <div className="chat-message user">
+    <div className="message-avatar user">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
+      </svg>
+    </div>
+    <div className="message-content-wrapper">
+      <div className="message-header">
+        <span className="message-author">You</span>
+        <span className="message-time">{formatTime(entry.timestamp)}</span>
+      </div>
+      <div className="message-bubble user">{entry.content}</div>
+    </div>
+  </div>
+);
+
+const AgentEntry: React.FC<{ entry: AgentTimelineEntry }> = ({ entry }) => {
+  const role = entry.agentRole as AgentRole | undefined;
+  const initial = role ? (AGENT_DISPLAY_NAMES[role]?.charAt(0) ?? 'A') : 'A';
+  const name = role ? (AGENT_DISPLAY_NAMES[role] ?? role) : 'Agent';
+  return (
+    <div className="chat-message assistant">
+      <div className="message-avatar assistant">{initial}</div>
+      <div className="message-content-wrapper">
+        <div className="message-header">
+          <span className="message-author">{name}</span>
+          <span className="message-time">{formatTime(entry.timestamp)}</span>
+        </div>
+        <div className="message-bubble assistant">{entry.content}</div>
+      </div>
+    </div>
+  );
+};
+
+const ToolCallEntry: React.FC<{ entry: AgentTimelineEntry }> = ({ entry }) => {
+  const trace = entry.toolTrace;
+  const success = trace?.result?.ok !== false;
+  return (
+    <div className="chat-message system">
+      <div className="message-avatar system">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+        </svg>
+      </div>
+      <div className="message-content-wrapper">
+        <div className="message-header">
+          <span className="message-author">Tool</span>
+          <span className="message-time">{formatTime(entry.timestamp)}</span>
+        </div>
+        <div className="message-tools">
+          <div className="tool-call">
+            <svg className="tool-call-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+            </svg>
+            <span className="tool-call-name">{entry.content}</span>
+            <span className={`tool-call-status ${success ? 'success' : 'error'}`}>
+              {success ? 'Done' : 'Failed'}
+            </span>
+            {trace && (
+              <span className="tool-call-duration">{trace.result.duration_ms}ms</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const BlockerEntry: React.FC<{ entry: AgentTimelineEntry }> = ({ entry }) => (
+  <div className="chat-message system" style={{ '--blocker-accent': 'rgb(239,68,68)' } as React.CSSProperties}>
+    <div className="message-avatar system" style={{ background: 'rgb(239,68,68,0.15)', color: 'rgb(239,68,68)' }}>!</div>
+    <div className="message-content-wrapper">
+      <div className="message-header">
+        <span className="message-author" style={{ color: 'rgb(239,68,68)' }}>Blocker</span>
+        <span className="message-time">{formatTime(entry.timestamp)}</span>
+      </div>
+      <div className="message-bubble system" style={{ borderColor: 'rgb(239,68,68,0.3)' }}>
+        {entry.content}
+      </div>
+    </div>
+  </div>
+);
+
+const SystemEntry: React.FC<{ entry: AgentTimelineEntry }> = ({ entry }) => (
+  <div className="chat-message system">
+    <div className="message-avatar system">·</div>
+    <div className="message-content-wrapper">
+      <div className="message-header">
+        <span className="message-author">System</span>
+        <span className="message-time">{formatTime(entry.timestamp)}</span>
+      </div>
+      <div className="message-bubble system">{entry.content}</div>
+    </div>
+  </div>
+);
+
+const TimelineEntry: React.FC<{ entry: AgentTimelineEntry; index: number }> = ({ entry, index }) => (
+  <div style={{ animationDelay: `${index * 30}ms` }}>
+    {entry.type === 'user' && <UserEntry entry={entry} />}
+    {entry.type === 'agent' && <AgentEntry entry={entry} />}
+    {entry.type === 'tool_call' && <ToolCallEntry entry={entry} />}
+    {entry.type === 'blocker' && <BlockerEntry entry={entry} />}
+    {entry.type === 'system' && <SystemEntry entry={entry} />}
+  </div>
+);
+
+// ────────────────────────────────────────────────────────
+// Main component
+// ────────────────────────────────────────────────────────
 
 const QUICK_ACTIONS = [
   { icon: 'Investigate', label: 'Trace pipeline state', prompt: 'Trace the pipeline state around the failing draw call.' },
@@ -21,27 +141,16 @@ const SUGGESTIONS = [
   'Summarize the next three investigation steps.',
 ];
 
-const createSystemMessage = (activeAgent: AgentRole, content: string): AgentMessage => ({
-  id: `sys-${Date.now()}`,
-  agentId: activeAgent,
-  role: 'system',
-  content,
-  timestamp: Date.now(),
-});
+export const AgentChat: React.FC = () => {
+  const timeline = useSessionStore((s) => s.timeline);
+  const addTimelineEntry = useSessionStore((s) => s.addTimelineEntry);
 
-export const AgentChat: React.FC<AgentChatProps> = ({ initialAgent = 'rdc-debugger' }) => {
-  const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
-  const [activeAgent] = useState<AgentRole>(initialAgent);
   const [isTyping, setIsTyping] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  const electronAPI =
-    typeof window !== 'undefined'
-      ? (window as Window & { electronAPI?: Window['electronAPI'] }).electronAPI
-      : undefined;
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -49,112 +158,74 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialAgent = 'rdc-debugg
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isTyping, scrollToBottom]);
-
-  useEffect(() => {
-    if (!electronAPI) return;
-
-    const handleAgentMessage = (payload: unknown) => {
-      setMessages((current) => [...current, payload as AgentMessage]);
-      setIsTyping(false);
-      setShowSuggestions(false);
-    };
-
-    const handleAgentStatusChanged = (payload: unknown) => {
-      const nextPayload = payload as { status?: string };
-      setIsTyping(nextPayload.status === 'thinking' || nextPayload.status === 'executing');
-    };
-
-    electronAPI.on('agent:message', handleAgentMessage);
-    electronAPI.on('agent:statusChanged', handleAgentStatusChanged);
-
-    return () => {
-      electronAPI.off('agent:message', handleAgentMessage);
-      electronAPI.off('agent:statusChanged', handleAgentStatusChanged);
-    };
-  }, [electronAPI]);
+  }, [timeline, isTyping, scrollToBottom]);
 
   const submitMessage = useCallback(
     async (content: string) => {
-      const trimmedContent = content.trim();
-      if (!trimmedContent) return;
+      const trimmed = content.trim();
+      if (!trimmed) return;
 
-      const userMessage: AgentMessage = {
+      const userEntry: AgentTimelineEntry = {
         id: `user-${Date.now()}`,
-        agentId: activeAgent,
-        role: 'user',
-        content: trimmedContent,
+        type: 'user',
+        content: trimmed,
         timestamp: Date.now(),
       };
-
-      setMessages((current) => [...current, userMessage]);
+      addTimelineEntry(userEntry);
       setInputValue('');
       setShowSuggestions(false);
       setIsTyping(true);
 
+      const electronAPI = window.electronAPI;
       if (!electronAPI?.agent?.sendMessage) {
-        setMessages((current) => [
-          ...current,
-          createSystemMessage(activeAgent, 'Agent backend is unavailable. Launch the chat from the Electron shell to send messages.'),
-        ]);
+        addTimelineEntry({
+          id: `sys-${Date.now()}`,
+          type: 'system',
+          content: 'Agent backend is unavailable. Launch from the Electron shell to send messages.',
+          timestamp: Date.now(),
+        });
         setIsTyping(false);
         return;
       }
 
       try {
-        const result = await electronAPI.agent.sendMessage(activeAgent, trimmedContent);
+        const result = await electronAPI.agent.sendMessage('rdc-debugger', trimmed);
         if (result.error) {
-          setMessages((current) => [...current, createSystemMessage(activeAgent, result.error || 'Agent request failed.')]);
-          setIsTyping(false);
+          addTimelineEntry({
+            id: `sys-${Date.now()}`,
+            type: 'system',
+            content: result.error || 'Agent request failed.',
+            timestamp: Date.now(),
+          });
         }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Agent request failed.';
-        setMessages((current) => [...current, createSystemMessage(activeAgent, message)]);
+      } catch (err) {
+        addTimelineEntry({
+          id: `sys-${Date.now()}`,
+          type: 'system',
+          content: err instanceof Error ? err.message : 'Agent request failed.',
+          timestamp: Date.now(),
+        });
+      } finally {
         setIsTyping(false);
       }
     },
-    [activeAgent, electronAPI]
+    [addTimelineEntry]
   );
 
-  const handleSend = useCallback(async () => {
-    await submitMessage(inputValue);
-  }, [inputValue, submitMessage]);
+  const handleSend = useCallback(() => void submitMessage(inputValue), [inputValue, submitMessage]);
 
   const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
-        void handleSend();
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
       }
     },
     [handleSend]
   );
 
-  const handleSuggestionClick = useCallback((suggestion: string) => {
-    setInputValue(suggestion);
-    inputRef.current?.focus();
-  }, []);
-
-  const handleQuickAction = useCallback(
-    async (prompt: string) => {
-      await submitMessage(prompt);
-    },
-    [submitMessage]
-  );
-
-  const formatTime = (timestamp: number): string => {
-    return new Date(timestamp).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const getAgentInitial = (agentId: AgentRole): string => {
-    return AGENT_DISPLAY_NAMES[agentId]?.charAt(0) || 'A';
-  };
-
-  const clearConversation = useCallback(() => {
-    setMessages([]);
+  const clearTimeline = useCallback(() => {
+    useSessionStore.getState().setTimeline([]);
     setInputValue('');
     setShowSuggestions(true);
     setIsTyping(false);
@@ -165,16 +236,15 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialAgent = 'rdc-debugg
       <div className="chat-header">
         <div className="chat-header-left">
           <div className="chat-agent-selector">
-            <div className="chat-agent-avatar debugger">{getAgentInitial(activeAgent)}</div>
+            <div className="chat-agent-avatar debugger">R</div>
             <div className="chat-agent-info">
-              <span className="chat-agent-name">{AGENT_DISPLAY_NAMES[activeAgent]}</span>
-              <span className="chat-agent-role">Primary debugger orchestrator</span>
+              <span className="chat-agent-name">RDC Debugger</span>
+              <span className="chat-agent-role">Orchestration timeline</span>
             </div>
           </div>
         </div>
-
         <div className="chat-header-actions">
-          <button className="icon-button tooltip" data-tooltip="Clear chat" onClick={clearConversation}>
+          <button className="icon-button tooltip" data-tooltip="Clear timeline" onClick={clearTimeline}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 6h18" />
               <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
@@ -185,99 +255,53 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialAgent = 'rdc-debugg
       </div>
 
       <div className="chat-messages scrollbar-thin">
-        {messages.length === 0 && showSuggestions ? (
+        {timeline.length === 0 && showSuggestions ? (
           <div className="chat-empty-state">
             <svg className="chat-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
-            <h3 className="chat-empty-title">Start a focused debugger conversation</h3>
+            <h3 className="chat-empty-title">Orchestration timeline</h3>
             <p className="chat-empty-description">
-              Ask for stage guidance, evidence review, capture comparison, or root-cause hypotheses.
+              Agent messages, tool calls, blockers, and system events will stream here in real time.
             </p>
             <div className="chat-empty-suggestions">
-              {SUGGESTIONS.map((suggestion) => (
-                <button key={suggestion} className="chat-suggestion-chip" onClick={() => handleSuggestionClick(suggestion)}>
-                  {suggestion}
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  className="chat-suggestion-chip"
+                  onClick={() => setInputValue(s)}
+                >
+                  {s}
                 </button>
               ))}
             </div>
           </div>
         ) : (
           <>
-            {messages.map((message, index) => (
-              <div
-                key={message.id}
-                className={`chat-message ${message.role === 'assistant' ? 'assistant' : message.role === 'user' ? 'user' : 'system'}`}
-                style={{ animationDelay: `${index * 40}ms` }}
-              >
-                <div className={`message-avatar ${message.role === 'assistant' ? 'assistant' : message.role === 'user' ? 'user' : 'system'}`}>
-                  {message.role === 'user' ? (
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                      <circle cx="12" cy="7" r="4" />
-                    </svg>
-                  ) : message.role === 'system' ? (
-                    '!'
-                  ) : (
-                    getAgentInitial(message.agentId)
-                  )}
-                </div>
-
-                <div className="message-content-wrapper">
-                  <div className="message-header">
-                    <span className="message-author">
-                      {message.role === 'user'
-                        ? 'You'
-                        : message.role === 'system'
-                          ? 'System'
-                          : AGENT_DISPLAY_NAMES[message.agentId]}
-                    </span>
-                    <span className="message-time">{formatTime(message.timestamp)}</span>
-                  </div>
-
-                  <div className={`message-bubble ${message.role === 'assistant' ? 'assistant' : message.role === 'user' ? 'user' : 'system'}`}>
-                    {message.content}
-                  </div>
-
-                  {message.toolCalls && message.toolCalls.length > 0 && (
-                    <div className="message-tools">
-                      {message.toolCalls.map((toolCall) => (
-                        <div key={toolCall.id} className="tool-call">
-                          <svg className="tool-call-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-                          </svg>
-                          <span className="tool-call-name">{toolCall.name}</span>
-                          <span className={`tool-call-status ${toolCall.result !== undefined ? 'success' : 'running'}`}>
-                            {toolCall.result !== undefined ? 'Done' : 'Running'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
+            {timeline.map((entry, index) => (
+              <TimelineEntry key={entry.id} entry={entry} index={index} />
             ))}
-
             {isTyping && (
               <div className="typing-indicator">
-                <div className="message-avatar assistant">{getAgentInitial(activeAgent)}</div>
+                <div className="message-avatar assistant">R</div>
                 <div className="typing-bubble">
-                  <span />
-                  <span />
-                  <span />
+                  <span /><span /><span />
                 </div>
-                <span className="typing-text">{AGENT_DISPLAY_NAMES[activeAgent]} is reasoning...</span>
+                <span className="typing-text">RDC Debugger is reasoning...</span>
               </div>
             )}
           </>
         )}
-
         <div ref={messagesEndRef} />
       </div>
 
       <div className="chat-quick-actions">
         {QUICK_ACTIONS.map((action) => (
-          <button key={action.label} className="quick-action" onClick={() => void handleQuickAction(action.prompt)}>
+          <button
+            key={action.label}
+            className="quick-action"
+            onClick={() => void submitMessage(action.prompt)}
+          >
             <span className="quick-action-copy">{action.icon}</span>
             <span>{action.label}</span>
           </button>
@@ -290,14 +314,17 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialAgent = 'rdc-debugg
             ref={inputRef}
             className="chat-input"
             value={inputValue}
-            onChange={(event) => setInputValue(event.target.value)}
+            onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask the debugger to inspect, compare, or summarize the current evidence..."
             rows={1}
           />
-
           <div className="chat-input-actions">
-            <button className="chat-send-button" onClick={() => void handleSend()} disabled={!inputValue.trim() || isTyping}>
+            <button
+              className="chat-send-button"
+              onClick={handleSend}
+              disabled={!inputValue.trim() || isTyping}
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="22" y1="2" x2="11" y2="13" />
                 <polygon points="22 2 15 22 11 13 2 9 22 2" />
@@ -305,14 +332,9 @@ export const AgentChat: React.FC<AgentChatProps> = ({ initialAgent = 'rdc-debugg
             </button>
           </div>
         </div>
-
         <div className="chat-input-hint">
-          <span>
-            <kbd>Enter</kbd> send
-          </span>
-          <span>
-            <kbd>Shift</kbd> + <kbd>Enter</kbd> newline
-          </span>
+          <span><kbd>Enter</kbd> send</span>
+          <span><kbd>Shift</kbd> + <kbd>Enter</kbd> newline</span>
         </div>
       </div>
     </div>

@@ -106,12 +106,20 @@ const UI_STAGES: UiStageDefinition[] = [
   },
 ];
 
+const getPreviousStages = (workflowState: WorkflowState | null): WorkflowStage[] => {
+  return Array.isArray(workflowState?.previousStages) ? workflowState.previousStages : [];
+};
+
+const getBlockers = (workflowState: WorkflowState | null): WorkflowState['blockers'] => {
+  return Array.isArray(workflowState?.blockers) ? workflowState.blockers : [];
+};
+
 const resolveUiStageIndex = (workflowState: WorkflowState | null): number => {
   if (!workflowState) return 0;
 
   const stageToResolve =
     workflowState.currentStage === 'validation_blocked' || workflowState.currentStage === 'awaiting_user_input'
-      ? [...workflowState.previousStages].reverse().find(
+      ? [...getPreviousStages(workflowState)].reverse().find(
           (stage) => stage !== 'validation_blocked' && stage !== 'awaiting_user_input'
         ) || 'preflight_pending'
       : workflowState.currentStage;
@@ -158,13 +166,23 @@ export const WorkflowPanel: React.FC = () => {
           electronAPI.agent.getAllStates().catch(() => []),
         ]);
 
-        if (nextWorkflowState) {
-          setWorkflowState(nextWorkflowState);
+        const nextState = nextWorkflowState && typeof nextWorkflowState === 'object'
+          ? (nextWorkflowState as WorkflowState)
+          : null;
+        const nextEvents = evidenceChain && typeof evidenceChain === 'object' && Array.isArray((evidenceChain as { events?: unknown[] }).events)
+          ? (evidenceChain as { events: unknown[] }).events
+          : [];
+        const nextAgents = Array.isArray(allAgents)
+          ? (allAgents as AgentState[])
+          : [];
+
+        if (nextState) {
+          setWorkflowState(nextState);
         }
 
-        setEventCount(evidenceChain.events.length);
+        setEventCount(nextEvents.length);
 
-        const activeAgentStates = allAgents
+        const activeAgentStates = nextAgents
           .filter((agent) => agent.status !== 'idle')
           .map((agent) => ({
             role: agent.agentId,
@@ -178,7 +196,7 @@ export const WorkflowPanel: React.FC = () => {
       }
     };
 
-    loadInitialState();
+    void loadInitialState();
   }, [electronAPI]);
 
   useEffect(() => {
@@ -206,11 +224,13 @@ export const WorkflowPanel: React.FC = () => {
         const nextAgent: ActiveAgent = {
           role: nextPayload.agentId,
           status: nextPayload.status,
-          message: nextPayload.message || buildAgentMessage({
-            agentId: nextPayload.agentId,
-            status: nextPayload.status,
-            lastActivity: '',
-          }),
+          message:
+            nextPayload.message ||
+            buildAgentMessage({
+              agentId: nextPayload.agentId,
+              status: nextPayload.status,
+              lastActivity: '',
+            }),
         };
 
         if (index >= 0) {
@@ -238,7 +258,7 @@ export const WorkflowPanel: React.FC = () => {
 
   const isBlocked = workflowState?.currentStage === 'validation_blocked';
   const isWaitingForInput = workflowState?.currentStage === 'awaiting_user_input';
-  const blockerCount = workflowState?.blockers.length || 0;
+  const blockerCount = getBlockers(workflowState).length;
   const progress = useMemo(() => {
     if (!workflowState) return 0;
     return Math.min(100, ((currentIndex + (workflowState.currentStage === 'finalized' ? 1 : 0)) / UI_STAGES.length) * 100);
@@ -332,10 +352,10 @@ export const WorkflowPanel: React.FC = () => {
             {activeAgents.slice(0, 2).map((agent) => (
               <div key={agent.role} className="agent-activity">
                 <div className={`agent-activity-avatar ${agent.role.replace(/(_agent|rdc-)/g, '').replace(/_/g, '-')}`}>
-                  {AGENT_DISPLAY_NAMES[agent.role].charAt(0)}
+                  {(AGENT_DISPLAY_NAMES[agent.role] || agent.role).charAt(0)}
                 </div>
                 <div className="agent-activity-info">
-                  <span className="agent-activity-name">{AGENT_DISPLAY_NAMES[agent.role]}</span>
+                  <span className="agent-activity-name">{AGENT_DISPLAY_NAMES[agent.role] || agent.role}</span>
                   <span className="agent-activity-status">{agent.message}</span>
                 </div>
                 {(agent.status === 'thinking' || agent.status === 'executing') && (

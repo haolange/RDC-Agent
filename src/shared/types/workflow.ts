@@ -195,3 +195,16 @@ export interface GraphState {
 
 /** 从 GraphState 投影到 IPC WorkflowState 的转换函数类型 */
 export type GraphStateProjection = (graphState: GraphState) => WorkflowState;
+
+// ============================================
+// Mode Capabilities 类型
+// ============================================
+
+/** 模式能力定义 */
+export interface ModeCapabilities {
+  mode: 'debugger' | 'analyzer' | 'optimizer';
+  availableStages: WorkflowStage[];
+  requiresLLM: boolean;
+  isFullyImplemented: boolean;
+  disabledReason?: string;
+}

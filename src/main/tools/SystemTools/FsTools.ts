@@ -8,6 +8,23 @@ import { z } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
 
+interface FsReadInput {
+  path: string;
+  encoding?: 'utf-8' | 'base64' | 'latin1';
+}
+
+interface FsGlobInput {
+  pattern: string;
+  cwd?: string;
+}
+
+interface FsGrepInput {
+  pattern: string;
+  path: string;
+  recursive?: boolean;
+}
+
+
 /**
  * 验证并解析路径，确保在 workspace 范围内
  */
@@ -129,7 +146,7 @@ export function createFsTools(workspacePath: string): DynamicStructuredTool[] {
         path: z.string().describe('Relative or absolute path to the file within workspace'),
         encoding: z.enum(['utf-8', 'base64', 'latin1']).optional().default('utf-8').describe('File encoding'),
       }),
-      func: async ({ path: filePath, encoding }) => {
+      func: async ({ path: filePath, encoding }: FsReadInput) => {
         try {
           const resolvedPath = resolveSafePath(filePath, workspacePath);
           
@@ -178,7 +195,7 @@ export function createFsTools(workspacePath: string): DynamicStructuredTool[] {
         pattern: z.string().describe('Glob pattern to match (e.g., "*.ts", "**/*.json")'),
         cwd: z.string().optional().describe('Working directory relative to workspace'),
       }),
-      func: async ({ pattern, cwd }) => {
+      func: async ({ pattern, cwd }: FsGlobInput) => {
         try {
           const searchDir = cwd 
             ? resolveSafePath(cwd, workspacePath)
@@ -227,7 +244,7 @@ export function createFsTools(workspacePath: string): DynamicStructuredTool[] {
         path: z.string().describe('File or directory path relative to workspace'),
         recursive: z.boolean().optional().default(false).describe('Search recursively in directories'),
       }),
-      func: async ({ pattern, path: searchPath, recursive }) => {
+      func: async ({ pattern, path: searchPath, recursive = false }: FsGrepInput) => {
         try {
           const resolvedPath = resolveSafePath(searchPath, workspacePath);
           

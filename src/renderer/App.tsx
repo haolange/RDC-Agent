@@ -1,53 +1,27 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DebuggerPage } from './pages/Debugger';
 import { AnalyzerPage } from './pages/Analyzer';
 import { OptimizerPage } from './pages/Optimizer';
-
-type TabId = 'debugger' | 'analyzer' | 'optimizer';
-
-interface TabConfig {
-  id: TabId;
-  label: string;
-  badge?: string;
-  disabled?: boolean;
-}
-
-interface DebuggerImportRequest {
-  id: number;
-  files: string[];
-}
-
-interface SessionFooterState {
-  contextLabel: string;
-  sessionLabel: string;
-}
-
-const TABS: TabConfig[] = [
-  { id: 'debugger', label: 'Debugger', badge: 'Active' },
-  { id: 'analyzer', label: 'Analyzer', disabled: true },
-  { id: 'optimizer', label: 'Optimizer', disabled: true },
-];
+import { ControlPanel } from './components/ControlPanel';
+import { ModeSelector } from './components/ModeSelector';
+import { DeviceSelector } from './components/DeviceSelector';
+import { Sidebar } from './components/Sidebar';
+import { useLayoutStore } from './stores/layoutStore';
+import { useSessionStore } from './stores/sessionStore';
+import { useDeviceStore } from './stores/deviceStore';
+import type { AgentTimelineEntry } from '@shared/types/agent';
+import type { ToolTraceEntry } from '@shared/types/tool';
+import type { ReplayDeviceStatusChangedPayload } from '@shared/types/device';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabId>('debugger');
   const [isLoading, setIsLoading] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'degraded' | 'offline'>('offline');
   const [appVersion, setAppVersion] = useState('1.0.0');
   const [llmProvider, setLlmProvider] = useState('OpenRouter');
   const [windowMaximized, setWindowMaximized] = useState(false);
   const [shellNotice, setShellNotice] = useState<string | null>(null);
-  const [debuggerImportRequest, setDebuggerImportRequest] = useState<DebuggerImportRequest | null>(null);
-  const [debuggerPickerSignal, setDebuggerPickerSignal] = useState(0);
-  const [debuggerResetSignal, setDebuggerResetSignal] = useState(0);
-  const [footerState, setFooterState] = useState<SessionFooterState>({
-    contextLabel: '--',
-    sessionLabel: '--',
-  });
 
-  const electronAPI =
-    typeof window !== 'undefined'
-      ? (window as Window & { electronAPI?: Window['electronAPI'] }).electronAPI
-      : undefined;
+  const currentMode = useLayoutStore((s) => s.currentMode);
 
   const showNotice = useCallback((message: string) => {
     setShellNotice(message);
@@ -55,26 +29,20 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (!shellNotice) return;
-
-    const timeoutId = window.setTimeout(() => {
-      setShellNotice(null);
-    }, 3200);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
+    const timeoutId = window.setTimeout(() => setShellNotice(null), 3200);
+    return () => window.clearTimeout(timeoutId);
   }, [shellNotice]);
 
   useEffect(() => {
     const initApp = async () => {
       try {
+        const electronAPI = window.electronAPI;
         if (electronAPI) {
           const [settings, appMeta, isMaximized] = await Promise.all([
             electronAPI.settings.get(),
             electronAPI.appMeta.get(),
             electronAPI.windowControls.isMaximized(),
           ]);
-
           setLlmProvider(settings.llm.defaultProvider || 'OpenRouter');
           setAppVersion(appMeta.version || '1.0.0');
           setWindowMaximized(isMaximized);
@@ -90,33 +58,78 @@ const App: React.FC = () => {
       }
     };
 
-    initApp();
-  }, [electronAPI]);
+    void initApp();
+  }, []);
 
   useEffect(() => {
+    const electronAPI = window.electronAPI;
     if (!electronAPI) return;
+
+    electronAPI.events.onContextChanged((snapshot) => {
+      useSessionStore.getState().setContextSnapshot(snapshot);
+      useSessionStore.getState().setCaptures(snapshot.captureDescriptors ?? []);
+    });
+
+    electronAPI.events.onToolExecutionComplete((rawTrace) => {
+      const trace = rawTrace as ToolTraceEntry;
+      const entry: AgentTimelineEntry = {
+        id: trace.traceId,
+        type: 'tool_call',
+        content: trace.toolName,
+        toolTrace: trace,
+        timestamp: trace.timestamp,
+      };
+      useSessionStore.getState().addTimelineEntry(entry);
+    });
+
+    electronAPI.events.onAgentMessage((rawMsg) => {
+      const msg = rawMsg as { id?: string; agentRole?: AgentTimelineEntry['agentRole']; content?: string };
+      const entry: AgentTimelineEntry = {
+        id: msg.id || Date.now().toString(),
+        type: 'agent',
+        agentRole: msg.agentRole,
+        content: msg.content ?? '',
+        timestamp: Date.now(),
+      };
+      useSessionStore.getState().addTimelineEntry(entry);
+    });
+
+    electronAPI.events.onCaptureStatusChanged(() => {
+      electronAPI.context.get().then((snapshot) => {
+        useSessionStore.getState().setContextSnapshot(snapshot);
+        useSessionStore.getState().setCaptures(snapshot.captureDescriptors ?? []);
+      }).catch(() => undefined);
+    });
+
+    electronAPI.events.onWorkflowStateChanged(() => {
+      electronAPI.workflow.listRuns().then((result) => {
+        useSessionStore.getState().setRecentRuns(result.runs ?? []);
+      }).catch(() => undefined);
+    });
+
+    electronAPI.events.onDeviceStatusChanged((payload) => {
+      useDeviceStore.getState().applyStatusPayload(payload as ReplayDeviceStatusChangedPayload);
+    });
+
+    electronAPI.workflow.listRuns()
+      .then((result) => {
+        useSessionStore.getState().setRecentRuns(result.runs ?? []);
+      })
+      .catch(() => undefined);
+
+    void useDeviceStore.getState().loadDevices();
 
     const handleFileOpen = (paths: unknown) => {
       if (!Array.isArray(paths) || paths.length === 0) return;
-      setActiveTab('debugger');
-      setDebuggerImportRequest({
-        id: Date.now(),
-        files: paths.filter((path): path is string => typeof path === 'string'),
-      });
+      showNotice(`已接收 ${paths.length} 个文件，请在 Debugger 页面确认。`);
     };
-
     const handleCaseNew = () => {
-      setActiveTab('debugger');
-      setDebuggerImportRequest(null);
-      setDebuggerResetSignal((value) => value + 1);
-      setFooterState({ contextLabel: '--', sessionLabel: '--' });
-      showNotice('Started a fresh debug workspace.');
+      useSessionStore.getState().reset();
+      showNotice('已创建新的调试工作区。');
     };
-
     const handleSettingsOpen = () => {
       showNotice('Settings panel is not implemented yet.');
     };
-
     const handleWindowStateChange = (isMaximized: unknown) => {
       setWindowMaximized(Boolean(isMaximized));
     };
@@ -131,77 +144,53 @@ const App: React.FC = () => {
       electronAPI.off('case:new', handleCaseNew);
       electronAPI.off('settings:open', handleSettingsOpen);
       electronAPI.off('window:maximized-changed', handleWindowStateChange);
+      electronAPI.events.removeAllListeners('context:changed');
+      electronAPI.events.removeAllListeners('tool:executionComplete');
+      electronAPI.events.removeAllListeners('agent:message');
+      electronAPI.events.removeAllListeners('capture:statusChanged');
+      electronAPI.events.removeAllListeners('workflow:stateChanged');
+      electronAPI.events.removeAllListeners('device:statusChanged');
     };
-  }, [electronAPI, showNotice]);
+  }, [showNotice]);
 
   const connectionMeta = useMemo(() => {
-    if (connectionStatus === 'connected') {
-      return { label: 'Connected', dotClass: 'status-dot-info' };
-    }
-
-    if (connectionStatus === 'degraded') {
-      return { label: 'Degraded', dotClass: 'status-dot-warning' };
-    }
-
+    if (connectionStatus === 'connected') return { label: 'Connected', dotClass: 'status-dot-info' };
+    if (connectionStatus === 'degraded') return { label: 'Degraded', dotClass: 'status-dot-warning' };
     return { label: 'Offline', dotClass: 'status-dot-pending' };
   }, [connectionStatus]);
 
-  const handleOpenCapture = useCallback(() => {
-    setActiveTab('debugger');
-    setDebuggerPickerSignal((value) => value + 1);
-  }, []);
-
-  const handleNewCase = useCallback(() => {
-    setActiveTab('debugger');
-    setDebuggerImportRequest(null);
-    setDebuggerResetSignal((value) => value + 1);
-    setFooterState({ contextLabel: '--', sessionLabel: '--' });
-  }, []);
-
-  const handleSettings = useCallback(() => {
-    showNotice('Settings panel is not implemented yet.');
-  }, [showNotice]);
-
-  const handleHelp = useCallback(() => {
-    window.open('https://github.com/rdc-agent/docs');
-  }, []);
-
   const handleWindowMinimize = useCallback(async () => {
-    await electronAPI?.windowControls.minimize();
-  }, [electronAPI]);
+    await window.electronAPI?.windowControls.minimize();
+  }, []);
 
   const handleWindowToggleMaximize = useCallback(async () => {
+    const electronAPI = window.electronAPI;
     if (!electronAPI) return;
     const nextState = await electronAPI.windowControls.toggleMaximize();
     setWindowMaximized(nextState);
-  }, [electronAPI]);
-
-  const handleWindowClose = useCallback(async () => {
-    await electronAPI?.windowControls.close();
-  }, [electronAPI]);
-
-  const handleDebuggerSessionChange = useCallback((nextState: SessionFooterState) => {
-    setFooterState(nextState);
   }, []);
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'debugger':
-        return (
-          <DebuggerPage
-            importRequest={debuggerImportRequest}
-            openPickerSignal={debuggerPickerSignal}
-            resetSignal={debuggerResetSignal}
-            onSessionStateChange={handleDebuggerSessionChange}
-            onError={showNotice}
-          />
-        );
+  const handleWindowClose = useCallback(async () => {
+    await window.electronAPI?.windowControls.close();
+  }, []);
+
+  const renderMainPage = () => {
+    switch (currentMode) {
       case 'analyzer':
         return <AnalyzerPage />;
       case 'optimizer':
         return <OptimizerPage />;
+      case 'debugger':
       default:
-        return null;
+        return <DebuggerPage />;
+    }
+  };
+
+  const getSessionTitle = () => {
+    switch (currentMode) {
+      case 'analyzer': return 'Analyzer Session';
+      case 'optimizer': return 'Optimizer Session';
+      default: return 'Debug Session';
     }
   };
 
@@ -217,93 +206,97 @@ const App: React.FC = () => {
 
   return (
     <div className="app-container">
-      <header className="app-header">
-        <div className="app-brand">
+      <header className="app-titlebar">
+        <div className="app-titlebar-left no-drag">
           <div className="app-logo">
             <div className="app-logo-icon">RD</div>
             <div className="app-logo-copy">
               <span className="app-logo-text">RDC Agent</span>
-              <span className="app-logo-subtitle">RenderDoc Debug Agent</span>
             </div>
           </div>
         </div>
-
-        <nav className="tab-nav">
-          {TABS.map((tab) => (
+        <div className="app-titlebar-center">
+          <span className="app-titlebar-session">{getSessionTitle()}</span>
+        </div>
+        <div className="app-titlebar-right no-drag">
+          <div className="window-controls" role="group" aria-label="Window controls">
             <button
-              key={tab.id}
-              className={`tab-button ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => !tab.disabled && setActiveTab(tab.id)}
-              disabled={tab.disabled}
+              type="button"
+              className="window-control window-control-minimize tooltip"
+              data-tooltip="Minimize"
+              aria-label="Minimize window"
+              onClick={handleWindowMinimize}
             >
-              {tab.label}
-              {tab.badge && <span className="tab-badge">{tab.badge}</span>}
-            </button>
-          ))}
-        </nav>
-
-        <div className="header-right">
-          <div className="header-actions">
-            <button className="button button-secondary button-sm" onClick={handleOpenCapture}>
-              Open Capture
-            </button>
-            <button className="button button-ghost button-sm" onClick={handleNewCase}>
-              New Case
-            </button>
-            <button className="icon-button tooltip" data-tooltip="Settings" onClick={handleSettings}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </button>
-            <button className="icon-button tooltip" data-tooltip="Help" onClick={handleHelp}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="window-controls">
-            <button className="window-control tooltip" data-tooltip="Minimize" onClick={handleWindowMinimize}>
-              <span />
+              <span className="minimize" />
             </button>
             <button
-              className="window-control tooltip"
+              type="button"
+              className="window-control window-control-maximize tooltip"
               data-tooltip={windowMaximized ? 'Restore' : 'Maximize'}
+              aria-label={windowMaximized ? 'Restore window' : 'Maximize window'}
               onClick={handleWindowToggleMaximize}
             >
               <span className={windowMaximized ? 'restore' : 'maximize'} />
             </button>
-            <button className="window-control close tooltip" data-tooltip="Close" onClick={handleWindowClose}>
+            <button
+              type="button"
+              className="window-control close tooltip"
+              data-tooltip="Close"
+              aria-label="Close window"
+              onClick={handleWindowClose}
+            >
               <span className="close-mark" />
             </button>
           </div>
         </div>
       </header>
 
-      <main className="app-content">
-        {shellNotice && <div className="shell-notice">{shellNotice}</div>}
-        {renderContent()}
-      </main>
+      <div className="app-body">
+        <aside className="app-sidebar-left">
+          <nav className="sidebar-nav">
+            <Sidebar />
+          </nav>
+        </aside>
+
+        <main className="app-main">
+          <div className="main-header">
+            <div className="main-title">
+              <span className="session-title">{getSessionTitle()}</span>
+            </div>
+          </div>
+          <div className="main-content">
+            {shellNotice && <div className="shell-notice">{shellNotice}</div>}
+            {renderMainPage()}
+          </div>
+          <div className="main-input-bar">
+            <ModeSelector />
+            <div className="chat-input-wrapper">
+              <input
+                type="text"
+                className="chat-input"
+                placeholder="描述任务，调用技能与工具"
+              />
+              <button className="send-button">→</button>
+            </div>
+          </div>
+        </main>
+
+        <aside className="app-sidebar-right">
+          <ControlPanel />
+        </aside>
+      </div>
 
       <footer className="app-footer">
         <div className="footer-left">
+          <DeviceSelector />
+          <div className="footer-separator" />
+        </div>
+        <div className="footer-right">
           <div className="footer-item">
             <span className={`status-dot ${connectionMeta.dotClass}`} />
             <span>{connectionMeta.label}</span>
           </div>
           <div className="footer-separator" />
-          <div className="footer-item">
-            <span>Context: {footerState.contextLabel}</span>
-          </div>
-          <div className="footer-item">
-            <span>Session: {footerState.sessionLabel}</span>
-          </div>
-        </div>
-
-        <div className="footer-right">
           <div className="footer-item">
             <span>LLM: {llmProvider}</span>
           </div>
@@ -318,3 +311,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+

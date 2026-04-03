@@ -1,6 +1,6 @@
 /**
- * StorageAdapter - 存储适配器
- * 负责管理workspace目录结构和文件读写
+ * StorageAdapter - 存储适配�?
+ * 负责管理workspace目录结构和文件读�?
  */
 
 import * as path from 'path';
@@ -27,8 +27,8 @@ export class StorageAdapter {
     if (app.isPackaged) {
       this.workspacePath = path.join(path.dirname(app.getPath('exe')), 'workspace');
     } else {
-      // 开发模式
-      this.workspacePath = path.resolve(__dirname, '../../../../workspace');
+      // 开发模�?
+      this.workspacePath = path.join(app.getAppPath(), 'workspace');
     }
   }
 
@@ -347,7 +347,7 @@ export class StorageAdapter {
   // ========== Workflow State ==========
 
   /**
-   * 获取workflow状态
+   * 获取workflow状�?
    */
   async getWorkflowState(caseId: string, runId: string): Promise<WorkflowState | null> {
     const runData = await this.readRun(caseId, runId);
@@ -371,7 +371,7 @@ export class StorageAdapter {
   }
 
   /**
-   * 更新workflow状态
+   * 更新workflow状�?
    */
   async updateWorkflowStage(
     caseId: string,
@@ -439,3 +439,4 @@ export class StorageAdapter {
 
 // 单例导出
 export const storageAdapter = new StorageAdapter();
+

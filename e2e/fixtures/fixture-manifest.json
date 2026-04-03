@@ -1,0 +1,21 @@
+{
+  "description": "RDC-Agent E2E test fixtures. Source paths point to local .rdc files (not committed to repo).",
+  "captures": [
+    {
+      "name": "WhiteHair",
+      "fileName": "WhiteHair.rdc",
+      "sourcePath": "C:\\Users\\vulcangu\\Desktop\\WhiteHair.rdc",
+      "role": "primary",
+      "backendHint": "local",
+      "description": "Local primary capture for testing"
+    },
+    {
+      "name": "眼睛泪腺白点",
+      "fileName": "眼睛泪腺白点.rdc",
+      "sourcePath": "C:\\Users\\vulcangu\\Desktop\\眼睛泪腺白点.rdc",
+      "role": "baseline",
+      "backendHint": "remote",
+      "description": "Remote baseline capture (requires adb connection to Android device)"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
-/**
- * IPC Handlers - 注册所有IPC处理器
+﻿/**
+ * IPC Handlers - 注册所有IPC处理�?
  */
 
 import { app, ipcMain, dialog, BrowserWindow } from 'electron';
@@ -12,6 +12,10 @@ import { storageAdapter } from '../services/StorageAdapter';
 import { harnessController } from '../services/HarnessController';
 import { agentOrchestrator } from '../services/AgentOrchestrator';
 import { llmAdapter } from '../adapters/LLMAdapter';
+import { settingsService } from '../services/SettingsService';
+import { replayDeviceService } from '../services/ReplayDeviceService';
+import { rdxSessionService } from '../index';
+import type { DebugSessionStartRequest, RunSummary } from '@shared/types/session';
 
 // WorkflowGraph 相关导入
 import { createWorkflowGraph } from '../services/WorkflowGraph';
@@ -20,19 +24,26 @@ import { FileCheckpointSaver } from '../services/CheckpointSaver';
 import { rdcToolAdapter } from '../tools/RDCToolAdapter';
 import type { WorkflowStateType } from '../services/WorkflowGraph';
 
-// 模块级变量
+// 模块级变�?
 let compiledGraph: ReturnType<typeof createWorkflowGraph> | null = null;
 let checkpointSaver: FileCheckpointSaver | null = null;
 let currentSessionId: string | null = null;
 let mainWindow: BrowserWindow | null = null;
 
 /**
- * 初始化 WorkflowGraph
- * 从 index.ts 调用
+ * 初始�?WorkflowGraph
+ * �?index.ts 调用
  */
-export function initWorkflowGraph(workspacePath: string): void {
+export async function initWorkflowGraph(workspacePath: string): Promise<void> {
   checkpointSaver = new FileCheckpointSaver(workspacePath);
   compiledGraph = createWorkflowGraph({ checkpointer: checkpointSaver });
+
+  try {
+    currentSessionId = await storageAdapter.getCurrentSessionId();
+  } catch (error) {
+    console.warn('[IPC] Failed to restore current session id:', error);
+    currentSessionId = null;
+  }
 }
 
 /**
@@ -43,7 +54,7 @@ function getThreadId(): string {
 }
 
 /**
- * 检查 graph 是否已初始化
+ * 检�?graph 是否已初始化
  */
 function ensureGraphInitialized(): boolean {
   if (!compiledGraph) {
@@ -54,7 +65,7 @@ function ensureGraphInitialized(): boolean {
 }
 
 /**
- * 通知渲染层状态变化
+ * 通知渲染层状态变�?
  */
 function notifyWorkflowStateChanged(graphState: WorkflowStateType): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -64,6 +75,18 @@ function notifyWorkflowStateChanged(graphState: WorkflowStateType): void {
       stage: graphState.currentStage,
       blockers: graphState.blockers,
     });
+  }
+}
+
+/**
+ * 广播事件到所有渲染进程窗口
+ */
+function broadcastToRenderer(channel: string, ...args: unknown[]): void {
+  const windows = BrowserWindow.getAllWindows();
+  for (const win of windows) {
+    if (!win.isDestroyed()) {
+      win.webContents.send(channel, ...args);
+    }
   }
 }
 
@@ -78,16 +101,30 @@ function isInterrupted(result: unknown): result is { __interrupt__: unknown[] } 
 }
 
 /**
- * 注册所有IPC处理器
+ * 注册所有IPC处理�?
  */
 export function registerIPCHandlers(): void {
-  // 初始化存储
+  // 初始化存�?
   storageAdapter.initializeWorkspace().catch(console.error);
   
-  // 初始化 RDC 工具适配器
+  // 初始�?RDC 工具适配�?
   rdcToolAdapter.initialize().catch(console.error);
 
-  // ========== 对话框操作 ==========
+  // Load OpenRouter config from persistent settings and apply to LLMAdapter
+  try {
+    const orConfig = settingsService.getOpenRouterConfig();
+    if (orConfig.apiKey) {
+      llmAdapter.configure({
+        defaultProvider: 'openrouter',
+        openrouter: { apiKey: orConfig.apiKey, baseUrl: orConfig.baseUrl },
+      });
+      console.log('[IPC] Loaded OpenRouter config from persistent settings');
+    }
+  } catch (err) {
+    console.warn('[IPC] Failed to preload OpenRouter config:', err);
+  }
+
+  // ========== 对话框操�?==========
 
   ipcMain.handle('dialog:selectRdcFiles', async () => {
     const result = await dialog.showOpenDialog({
@@ -136,7 +173,7 @@ export function registerIPCHandlers(): void {
     };
   });
 
-  // ========== 工作流操作 ==========
+  // ========== 工作流操�?==========
 
   ipcMain.handle('workflow:getState', async () => {
     if (!ensureGraphInitialized()) {
@@ -144,7 +181,7 @@ export function registerIPCHandlers(): void {
     }
 
     try {
-      // 从 checkpoint 获取最新状态
+      // �?checkpoint 获取最新状�?
       const config = { configurable: { thread_id: getThreadId() } };
       const state = await compiledGraph!.getState(config);
       
@@ -158,7 +195,69 @@ export function registerIPCHandlers(): void {
     }
   });
 
-  ipcMain.handle('workflow:start', async (_event, capturePaths: string[], userGoal: string) => {
+  ipcMain.handle('workflow:resume', async (_event, sessionId?: string) => {
+    try {
+      // 从 storageAdapter 加载指定 session 并恢复 context
+      if (sessionId) {
+        currentSessionId = sessionId;
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  ipcMain.handle('workflow:listRuns', async () => {
+    return { runs: [] as RunSummary[] };
+  });
+
+  ipcMain.handle('session:list', async () => {
+    return { sessions: [] };
+  });
+
+  ipcMain.handle('session:select', async (_event, id: string) => {
+    currentSessionId = id;
+    return { success: true };
+  });
+
+  ipcMain.handle('context:get', async () => {
+    return rdxSessionService.snapshotContext();
+  });
+
+  ipcMain.handle('capture:list', async () => {
+    return { captures: rdxSessionService.getCaptureDescriptors() };
+  });
+
+  ipcMain.handle('capture:open', async (_event, filePath?: string) => {
+    try {
+      if (!filePath) {
+        return { success: false, error: 'filePath is required for capture:open' };
+      }
+      // TODO: 实现增量 capture 导入逻辑
+      return { success: false, error: 'capture:open is not yet implemented' };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('capture:select', async (_event, captureId: string) => {
+    try {
+      await rdxSessionService.switchActiveCapture(captureId);
+      broadcastToRenderer('capture:statusChanged', { captureId, status: 'selected' });
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  ipcMain.handle('workflow:start', async (_event, request: DebugSessionStartRequest | string[], userGoal?: string) => {
+    // 兼容新的 DebugSessionStartRequest 结构和旧的 (capturePaths, userGoal) 签名
+    const isNewRequest = !Array.isArray(request);
+    const capturePaths = isNewRequest
+      ? request.captures.map(c => c.filePath)
+      : (request as string[]);
+    const goal = isNewRequest ? request.goal : (userGoal ?? '');
+
     try {
       if (!ensureGraphInitialized()) {
         return {
@@ -167,12 +266,33 @@ export function registerIPCHandlers(): void {
         };
       }
 
+      // 若为新请求，先执行 rdxSessionService bootstrap
+      let contextSnapshot: import('@shared/types/session').ContextSnapshot | undefined;
+      if (isNewRequest) {
+        try {
+          contextSnapshot = await rdxSessionService.bootstrap(request);
+          broadcastToRenderer('context:changed', contextSnapshot);
+        } catch (bootstrapErr) {
+          const message = bootstrapErr instanceof Error ? bootstrapErr.message : String(bootstrapErr);
+          console.warn('[IPC] rdxSessionService bootstrap failed:', bootstrapErr);
+          return {
+            success: false,
+            error: message,
+          };
+        }
+      }
+
       // 执行entry gate
       const gateResult = await harnessController.executeEntryGate({
         capturePaths,
         platform: 'rdc-agent',
         entryMode: 'cli',
-        backend: 'local',
+        backend: isNewRequest
+          ? (request.captures.some((c: any) => c.backendHint === 'remote') ? 'remote' : 'local')
+          : 'local',
+        mode: isNewRequest ? request.mode : 'debugger',
+        captures: isNewRequest ? request.captures : undefined,
+        replayDevice: isNewRequest ? request.replayDevice : undefined,
       });
 
       if (gateResult.status === 'blocked') {
@@ -184,8 +304,8 @@ export function registerIPCHandlers(): void {
 
       // 创建case和run
       const caseId = await storageAdapter.createCase({
-        userGoal,
-        symptomSummary: userGoal,
+        userGoal: goal,
+        symptomSummary: goal,
       });
 
       const { runId, sessionId } = await storageAdapter.createRun({
@@ -196,14 +316,14 @@ export function registerIPCHandlers(): void {
       // 设置当前 sessionId 作为 thread_id
       currentSessionId = sessionId;
 
-      // 使用 graph.invoke() 启动工作流
+      // 使用 graph.invoke() 启动工作�?
       const config = { configurable: { thread_id: sessionId } };
       
       const initialState = {
         caseId,
         runId,
         sessionId,
-        userGoal,
+        userGoal: goal,
         capturePaths,
         currentStage: 'preflight_pending' as const,
         stageHistory: [],
@@ -229,7 +349,7 @@ export function registerIPCHandlers(): void {
         const interruptData = result.__interrupt__[0];
         console.log('[IPC] Workflow interrupted:', interruptData);
         
-        // 通知渲染层阻断状态
+        // 通知渲染层阻断状�?
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('workflow:blocked', {
             type: (interruptData as Record<string, unknown>)?.type || 'unknown',
@@ -237,11 +357,11 @@ export function registerIPCHandlers(): void {
           });
         }
       } else {
-        // 正常完成，通知状态变化
+        // 正常完成，通知状态变�?
         notifyWorkflowStateChanged(result);
       }
 
-      return { success: true, caseId, runId, sessionId };
+      return { success: true, caseId, runId, sessionId, contextSnapshot };
     } catch (error) {
       console.error('Failed to start workflow:', error);
       return {
@@ -260,10 +380,10 @@ export function registerIPCHandlers(): void {
     }
 
     try {
-      // 使用 Command.resume 从 checkpoint 恢复继续执行
+      // 使用 Command.resume �?checkpoint 恢复继续执行
       const config = { configurable: { thread_id: getThreadId() } };
       
-      // 发送 resume 命令继续执行
+      // 发�?resume 命令继续执行
       const result = await compiledGraph!.invoke(
         new Command({ resume: { action: 'advance' } }),
         config
@@ -279,7 +399,7 @@ export function registerIPCHandlers(): void {
         };
       }
 
-      // 通知状态变化
+      // 通知状态变�?
       notifyWorkflowStateChanged(result);
 
       return {
@@ -304,7 +424,7 @@ export function registerIPCHandlers(): void {
     }
 
     try {
-      // 使用 Command.resume 带 backtrack 上下文恢复
+      // 使用 Command.resume �?backtrack 上下文恢�?
       const config = { configurable: { thread_id: getThreadId() } };
       
       const result = await compiledGraph!.invoke(
@@ -327,7 +447,7 @@ export function registerIPCHandlers(): void {
         };
       }
 
-      // 通知状态变化
+      // 通知状态变�?
       notifyWorkflowStateChanged(result);
 
       return {
@@ -348,7 +468,7 @@ export function registerIPCHandlers(): void {
     }
 
     try {
-      // 获取当前状态
+      // 获取当前状�?
       const config = { configurable: { thread_id: getThreadId() } };
       const currentState = await compiledGraph!.getState(config);
       
@@ -379,10 +499,10 @@ export function registerIPCHandlers(): void {
         };
       }
 
-      // 通知状态变化
+      // 通知状态变�?
       notifyWorkflowStateChanged(result);
 
-      // 同时调用 agentOrchestrator 保持兼容性
+      // 同时调用 agentOrchestrator 保持兼容�?
       return agentOrchestrator.dispatchSpecialist(agentId as any, objective, {
         caseId: state.caseId,
         runId: state.runId,
@@ -401,7 +521,7 @@ export function registerIPCHandlers(): void {
 
   ipcMain.handle('agent:sendMessage', async (_event, agentId: string, content: string) => {
     try {
-      // 从 WorkflowGraph 获取状态
+      // �?WorkflowGraph 获取状�?
       let context: { caseId?: string; runId?: string; sessionId?: string } | undefined;
       
       if (compiledGraph && currentSessionId) {
@@ -464,7 +584,7 @@ export function registerIPCHandlers(): void {
     });
   });
 
-  // ========== 证据链操作 ==========
+  // ========== 证据链操�?==========
 
   ipcMain.handle('evidence:getChain', async () => {
     const sessionId = await storageAdapter.getCurrentSessionId();
@@ -474,7 +594,7 @@ export function registerIPCHandlers(): void {
 
     const events = await storageAdapter.readActionChain(sessionId);
     
-    // 从 WorkflowGraph 获取 runId
+    // �?WorkflowGraph 获取 runId
     let runId = '';
     if (compiledGraph && currentSessionId) {
       const config = { configurable: { thread_id: currentSessionId } };
@@ -522,20 +642,44 @@ export function registerIPCHandlers(): void {
   // ========== 设置操作 ==========
 
   ipcMain.handle('settings:get', async () => {
-    // TODO: 实现持久化settings
+    const appSettings = settingsService.getAll();
     return {
       theme: 'dark',
       llm: {
         defaultProvider: llmAdapter.getDefaultProvider(),
       },
       agents: {},
+      openRouter: appSettings.openRouter,
     };
   });
 
   ipcMain.handle('settings:set', async (_event, settings: unknown) => {
-    // TODO: 实现持久化settings
-    console.log('Set settings:', settings);
+    const s = settings as Record<string, unknown>;
+    // 写入 app-global 设置
+    if (s.openRouter !== undefined) {
+      settingsService.setOpenRouterConfig(s.openRouter as Parameters<typeof settingsService.setOpenRouterConfig>[0]);
+      // 同步更新 LLMAdapter
+      const orConfig = settingsService.getOpenRouterConfig();
+      llmAdapter.configure({
+        defaultProvider: 'openrouter',
+        openrouter: { apiKey: orConfig.apiKey, baseUrl: orConfig.baseUrl },
+      });
+    }
     return;
+  });
+
+  // ========== 设备操作 ==========
+
+  ipcMain.handle('device:list', async () => {
+    return replayDeviceService.listDevices();
+  });
+
+  ipcMain.handle('device:refresh', async () => {
+    return replayDeviceService.refreshDevices();
+  });
+
+  ipcMain.handle('device:activate', async (_event, deviceId: string) => {
+    return replayDeviceService.activateDevice(deviceId);
   });
 }
 
@@ -544,6 +688,11 @@ export function registerIPCHandlers(): void {
  */
 export function setMainWindow(window: BrowserWindow): void {
   mainWindow = window;
+  replayDeviceService.setMainWindow(window);
   // workflowEngine.setMainWindow(window); // 已迁移到 WorkflowGraph
   agentOrchestrator.setMainWindow(window);
 }
+
+
+
+
