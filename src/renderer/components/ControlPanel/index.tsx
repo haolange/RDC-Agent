@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { TaskMonitor } from './TaskMonitor';
 import { CaptureControl } from './CaptureControl';
 import { ContextInfo } from './ContextInfo';
+import { ProjectInputs } from './ProjectInputs';
+import { useI18n } from '../../i18n';
+import { useSessionStore } from '../../stores/sessionStore';
 import './ControlPanel.css';
 
 interface CollapsibleSectionProps {
@@ -46,10 +49,13 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
 };
 
 export const ControlPanel: React.FC = () => {
+  const { t } = useI18n();
+  const projectInputs = useSessionStore((state) => state.projectInputs);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     taskMonitor: true,
     captureControl: true,
     contextInfo: false,
+    projectInputs: true,
   });
 
   const toggleSection = (sectionId: string) => {
@@ -61,55 +67,10 @@ export const ControlPanel: React.FC = () => {
 
   return (
     <div className="control-panel">
-      {/* Panel Header */}
-      <div className="cp-header">
-        <span className="cp-header-title">控制面板</span>
-        <div className="cp-header-actions">
-          <button
-            className="cp-header-btn"
-            onClick={() => {
-              setExpandedSections({
-                taskMonitor: true,
-                captureControl: true,
-                contextInfo: true,
-              });
-            }}
-            title="Expand All"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="15 3 21 3 21 9" />
-              <polyline points="9 21 3 21 3 15" />
-              <line x1="21" y1="3" x2="14" y2="10" />
-              <line x1="3" y1="21" x2="10" y2="14" />
-            </svg>
-          </button>
-          <button
-            className="cp-header-btn"
-            onClick={() => {
-              setExpandedSections({
-                taskMonitor: false,
-                captureControl: false,
-                contextInfo: false,
-              });
-            }}
-            title="Collapse All"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="4 14 10 14 10 20" />
-              <polyline points="20 10 14 10 14 4" />
-              <line x1="14" y1="10" x2="21" y2="3" />
-              <line x1="3" y1="21" x2="10" y2="14" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      {/* Panel Content */}
       <div className="cp-content scrollbar-thin">
-        {/* Task Monitor Section */}
         <CollapsibleSection
           id="taskMonitor"
-          title="任务监控"
+          title={t('control.taskMonitor')}
           icon={
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
@@ -122,10 +83,9 @@ export const ControlPanel: React.FC = () => {
           <TaskMonitor />
         </CollapsibleSection>
 
-        {/* Capture Control Section */}
         <CollapsibleSection
           id="captureControl"
-          title="Capture 控制"
+          title={t('control.captureControl')}
           icon={
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -138,10 +98,9 @@ export const ControlPanel: React.FC = () => {
           <CaptureControl />
         </CollapsibleSection>
 
-        {/* Context Info Section */}
         <CollapsibleSection
           id="contextInfo"
-          title="Context 信息"
+          title={t('control.contextInfo')}
           icon={
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10" />
@@ -153,6 +112,22 @@ export const ControlPanel: React.FC = () => {
           onToggle={() => toggleSection('contextInfo')}
         >
           <ContextInfo />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          id="projectInputs"
+          title={t('control.projectInputs')}
+          icon={
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+          }
+          isExpanded={expandedSections.projectInputs}
+          onToggle={() => toggleSection('projectInputs')}
+          badge={projectInputs.length}
+        >
+          <ProjectInputs />
         </CollapsibleSection>
       </div>
     </div>

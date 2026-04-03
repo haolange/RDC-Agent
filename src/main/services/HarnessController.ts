@@ -101,11 +101,11 @@ export class HarnessController {
     // === Task 4c: LLM Key 检查（仅 debugger 模式）===
     // Debugger 模式需要 LLM 可用；Analyzer/Optimizer 占位页不要求 LLM
     if (input.mode === 'debugger') {
-      if (!settingsService.hasOpenRouterKey()) {
+      if (!settingsService.hasConfiguredProvider()) {
         blockers.push(this.createBlocker(
           'LLM_KEY_MISSING',
-          'OpenRouter API key is required for Debugger mode',
-          ['settings:openRouter.apiKey']
+          'At least one configured provider is required for Debugger mode',
+          ['settings:models']
         ));
       }
     }

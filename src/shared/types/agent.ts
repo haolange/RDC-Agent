@@ -2,6 +2,8 @@
  * Agent Types - Agent角色相关类型定义
  */
 
+import type { LlmProviderId } from './settings';
+
 // Agent角色
 export type AgentRole =
   | 'rdc-debugger'           // 主入口/Orchestrator
@@ -24,7 +26,7 @@ export type AgentStatus = 'idle' | 'thinking' | 'executing' | 'waiting' | 'compl
 export interface AgentConfig {
   agentId: AgentRole;
   systemPrompt: string;           // 可自定义System Prompt
-  modelProvider: string;          // openrouter, openai, anthropic, etc.
+  modelProvider: LlmProviderId;
   modelName: string;              // 具体模型名称
   temperature?: number;
   maxTokens?: number;
@@ -89,7 +91,7 @@ export interface AgentConversation {
 }
 
 // 默认模型路由
-export const DEFAULT_MODEL_ROUTING: Record<AgentRole, { provider: string; model: string }> = {
+export const DEFAULT_MODEL_ROUTING: Record<AgentRole, { provider: LlmProviderId; model: string }> = {
   'rdc-debugger': { provider: 'openrouter', model: 'anthropic/claude-3-opus' },
   'triage_agent': { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
   'capture_repro_agent': { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },

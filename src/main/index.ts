@@ -238,8 +238,11 @@ function setupMenu(): void {
 
 // 搴旂敤灏辩华
 app.whenReady().then(async () => {
+  settingsService.initialize();
+  await storageAdapter.initializeWorkspace();
+
   registerIPCHandlers();
-  
+
   // 鍒濆鍖栨湇锟?
   await initializeServices();
   
@@ -286,8 +289,8 @@ async function initializeServices(): Promise<void> {
     const workspacePath = storageAdapter.getWorkspacePath();
     
     // 鍒濆鍖?SettingsService锛坋lectron-store 寤惰繜鍔犺浇锛屾澶勮Е鍙戞瀯閫狅級
-    const hasApiKey = settingsService.hasOpenRouterKey();
-    console.log('[Main] SettingsService initialized, hasApiKey:', hasApiKey);
+    const hasConfiguredProvider = settingsService.hasConfiguredProvider();
+    console.log('[Main] SettingsService initialized, hasConfiguredProvider:', hasConfiguredProvider);
     
     // 鍒濆锟?RDC 宸ュ叿閫傞厤锟?
     await rdcToolAdapter.initialize();

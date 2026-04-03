@@ -1,209 +1,456 @@
 /**
- * StorageAdapter - 存储适配�?
- * 负责管理workspace目录结构和文件读�?
+ * StorageAdapter - Project / Session / Run 存储层
+ * 统一管理 userData 下的项目、会话、运行记录与全局 knowledge。
  */
 
-import * as path from 'path';
 import * as fs from 'fs';
+import * as path from 'path';
 import { app } from 'electron';
+import { appendJsonl, readJsonl } from '@shared/utils/jsonl';
 import { readYaml, writeYaml } from '@shared/utils/yaml';
-import { readJsonl, appendJsonl } from '@shared/utils/jsonl';
 import {
-  generateCaseId,
-  generateRunId,
-  generateSessionId,
   generateEventId,
+  generateRunId,
+  generateShortId,
   nowIso,
   nowMs,
+  sanitizeToken,
 } from '@shared/utils/id';
-import type { WorkflowState, WorkflowStage, Blocker } from '@shared/types/workflow';
 import type { ActionEvent } from '@shared/types/evidence';
+import type { WorkflowStage, WorkflowState, Blocker } from '@shared/types/workflow';
+import type {
+  AppMode,
+  CaptureDescriptor,
+  ProjectInputRecord,
+  ProjectRecord,
+  RunRecord,
+  RunSummary,
+  SessionRecord,
+} from '@shared/types/session';
+import { appPathService } from './AppPathService';
+
+interface ProjectRegistry {
+  schemaVersion: '1';
+  projects: ProjectRecord[];
+}
+
+interface SelectionState {
+  projectId: string | null;
+  sessionId: string | null;
+}
+
+interface PersistedRunRecord extends RunRecord {
+  createdAt: number;
+  updatedAt: number;
+  runtime: {
+    backend: 'local' | 'remote';
+    entry_mode: 'cli' | 'mcp';
+    context_id: string | null;
+    runtime_owner: string | null;
+    session_id: string;
+    workflow_stage: WorkflowStage;
+  };
+}
 
 export class StorageAdapter {
-  private workspacePath: string;
+  private dataRootPath = '';
+  private projectsRootPath = '';
+  private globalKnowledgePath = '';
+  private migrationOrphansPath = '';
+  private registryPath = '';
+  private selectionPath = '';
 
   constructor() {
-    // 确定workspace路径
-    if (app.isPackaged) {
-      this.workspacePath = path.join(path.dirname(app.getPath('exe')), 'workspace');
-    } else {
-      // 开发模�?
-      this.workspacePath = path.join(app.getAppPath(), 'workspace');
-    }
+    this.syncWorkspacePaths();
   }
 
-  /**
-   * 获取workspace路径
-   */
   getWorkspacePath(): string {
-    return this.workspacePath;
+    this.syncWorkspacePaths();
+    return this.dataRootPath;
   }
 
-  /**
-   * 初始化workspace目录结构
-   */
-  async initializeWorkspace(): Promise<void> {
-    const dirs = [
-      this.workspacePath,
-      path.join(this.workspacePath, 'cases'),
-      path.join(this.workspacePath, 'common', 'knowledge', 'library', 'sessions'),
-      path.join(this.workspacePath, 'common', 'knowledge', 'library', 'bugcards'),
-      path.join(this.workspacePath, 'common', 'knowledge', 'library', 'bugfull'),
-      path.join(this.workspacePath, 'common', 'knowledge', 'spec', 'objects', 'taxonomy'),
-      path.join(this.workspacePath, 'common', 'knowledge', 'spec', 'objects', 'sops'),
-      path.join(this.workspacePath, 'common', 'knowledge', 'spec', 'registry'),
-      path.join(this.workspacePath, 'common', 'config'),
-      path.join(this.workspacePath, 'common', 'skills'),
-    ];
+  getGlobalKnowledgePath(): string {
+    this.syncWorkspacePaths();
+    return this.globalKnowledgePath;
+  }
 
-    for (const dir of dirs) {
-      if (!fs.existsSync(dir)) {
-        await fs.promises.mkdir(dir, { recursive: true });
-      }
+  async initializeWorkspace(): Promise<void> {
+    this.syncWorkspacePaths();
+    this.ensureDir(this.dataRootPath);
+    this.ensureDir(this.projectsRootPath);
+    this.ensureDir(this.migrationOrphansPath);
+    this.ensureRegistry();
+    this.ensureSelection();
+    this.bootstrapGlobalKnowledge();
+    this.migrateLegacyWorkspace();
+  }
+
+  setWorkspaceRoot(workspaceRoot: string): void {
+    appPathService.setWorkspaceRoot(workspaceRoot);
+    this.syncWorkspacePaths();
+  }
+
+  listProjects(): ProjectRecord[] {
+    return this.readRegistry().projects
+      .slice()
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
+  createProject(rootPath: string): ProjectRecord {
+    const normalizedRootPath = path.resolve(rootPath);
+    if (!fs.existsSync(normalizedRootPath) || !fs.statSync(normalizedRootPath).isDirectory()) {
+      throw new Error(`Project root is not a directory: ${normalizedRootPath}`);
+    }
+
+    const registry = this.readRegistry();
+    const existing = registry.projects.find((project) => project.rootPath === normalizedRootPath);
+    if (existing) {
+      this.setCurrentProjectId(existing.projectId);
+      return existing;
+    }
+
+    const projectName = path.basename(normalizedRootPath) || normalizedRootPath;
+    const slug = this.createUniqueProjectSlug(projectName, registry.projects);
+    const { resourcePath, knowledgePath, inputsPath } = this.ensureProjectResourceLayout(normalizedRootPath);
+    const inputs = this.collectProjectInputs(inputsPath);
+
+    const timestamp = nowMs();
+    const project: ProjectRecord = {
+      projectId: `proj_${generateShortId()}`,
+      name: projectName,
+      rootPath: normalizedRootPath,
+      slug,
+      resourcePath,
+      knowledgePath,
+      inputsPath,
+      inputs,
+      inputsUpdatedAt: timestamp,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    registry.projects.push(project);
+    this.writeRegistry(registry);
+    this.ensureDir(this.getProjectDataPath(project));
+    this.ensureDir(this.getProjectSessionsRoot(project));
+    this.writeProjectMetadata(project);
+    this.setCurrentProjectId(project.projectId);
+
+    return project;
+  }
+
+  removeProject(projectId: string): void {
+    const registry = this.readRegistry();
+    const target = registry.projects.find((project) => project.projectId === projectId);
+    if (!target) return;
+
+    registry.projects = registry.projects.filter((project) => project.projectId !== projectId);
+    this.writeRegistry(registry);
+
+    const projectPath = this.getProjectDataPath(target);
+    if (fs.existsSync(projectPath)) {
+      fs.rmSync(projectPath, { recursive: true, force: true });
+    }
+
+    const selection = this.readSelection();
+    if (selection.projectId === projectId) {
+      selection.projectId = null;
+      selection.sessionId = null;
+      this.writeSelection(selection);
     }
   }
 
-  // ========== Case 管理 ==========
-
-  /**
-   * 获取case目录路径
-   */
-  getCasePath(caseId: string): string {
-    return path.join(this.workspacePath, 'cases', caseId);
+  getProjectById(projectId: string): ProjectRecord | null {
+    return this.readRegistry().projects.find((project) => project.projectId === projectId) || null;
   }
 
-  /**
-   * 创建新的case
-   */
+  listProjectInputs(projectId: string): ProjectInputRecord[] {
+    const project = this.getProjectById(projectId);
+    if (!project) return [];
+    return this.refreshProjectInputs(projectId);
+  }
+
+  refreshProjectInputs(projectId: string): ProjectInputRecord[] {
+    const project = this.getProjectById(projectId);
+    if (!project) return [];
+
+    const normalizedProject = this.normalizeProjectRecord(project);
+    const inputs = this.collectProjectInputs(normalizedProject.inputsPath);
+    const nextProject: ProjectRecord = {
+      ...normalizedProject,
+      inputs,
+      inputsUpdatedAt: nowMs(),
+    };
+    this.persistProject(nextProject);
+    return nextProject.inputs;
+  }
+
+  importProjectInputs(projectId: string, filePaths: string[]): ProjectInputRecord[] {
+    const project = this.getProjectById(projectId);
+    if (!project) {
+      throw new Error(`Project not found: ${projectId}`);
+    }
+
+    const normalizedProject = this.normalizeProjectRecord(project);
+    this.ensureDir(normalizedProject.inputsPath);
+
+    for (const filePath of filePaths) {
+      const sourcePath = path.resolve(filePath);
+      if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
+        continue;
+      }
+      if (path.extname(sourcePath).toLowerCase() !== '.rdc') {
+        continue;
+      }
+
+      const targetPath = this.resolveImportedInputPath(normalizedProject.inputsPath, path.basename(sourcePath));
+      fs.copyFileSync(sourcePath, targetPath);
+    }
+
+    return this.refreshProjectInputs(projectId);
+  }
+
+  listSessions(projectId: string): SessionRecord[] {
+    const project = this.getProjectById(projectId);
+    if (!project) return [];
+
+    const sessionsRoot = this.getProjectSessionsRoot(project);
+    if (!fs.existsSync(sessionsRoot)) {
+      return [];
+    }
+
+    return fs.readdirSync(sessionsRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => this.readJson<SessionRecord>(path.join(sessionsRoot, entry.name, 'session.json')))
+      .filter((session): session is SessionRecord => session !== null)
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
+  createSession(projectId: string, title?: string, goal: string = ''): SessionRecord {
+    const project = this.getProjectById(projectId);
+    if (!project) {
+      throw new Error(`Project not found: ${projectId}`);
+    }
+
+    const timestamp = nowMs();
+    const session: SessionRecord = {
+      sessionId: `sess_${generateShortId()}`,
+      projectId,
+      title: this.normalizeSessionTitle(title),
+      goal,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    const sessionPath = path.join(this.getProjectSessionsRoot(project), session.sessionId);
+    this.ensureDir(sessionPath);
+    this.ensureDir(path.join(sessionPath, 'timeline'));
+    this.ensureDir(path.join(sessionPath, 'runs'));
+    this.writeJson(path.join(sessionPath, 'session.json'), session);
+
+    this.touchProject(project.projectId, session.sessionId, timestamp);
+    this.setCurrentProjectId(projectId);
+    this.setCurrentSessionId(session.sessionId);
+
+    return session;
+  }
+
+  readSession(sessionId: string): SessionRecord | null {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) return null;
+    return this.readJson<SessionRecord>(path.join(location.sessionPath, 'session.json'));
+  }
+
+  updateSession(sessionId: string, patch: Partial<SessionRecord>): SessionRecord | null {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) return null;
+
+    const existing = this.readJson<SessionRecord>(path.join(location.sessionPath, 'session.json'));
+    if (!existing) return null;
+
+    const nextSession: SessionRecord = {
+      ...existing,
+      ...patch,
+      sessionId: existing.sessionId,
+      projectId: existing.projectId,
+      updatedAt: nowMs(),
+    };
+
+    this.writeJson(path.join(location.sessionPath, 'session.json'), nextSession);
+    this.touchProject(existing.projectId, nextSession.sessionId, nextSession.updatedAt);
+    return nextSession;
+  }
+
+  listRuns(sessionId: string): RunSummary[] {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) return [];
+
+    const runsRoot = path.join(location.sessionPath, 'runs');
+    if (!fs.existsSync(runsRoot)) {
+      return [];
+    }
+
+    return fs.readdirSync(runsRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => this.readPersistedRun(sessionId, entry.name))
+      .filter((run): run is PersistedRunRecord => run !== null)
+      .sort((a, b) => b.startedAt - a.startedAt)
+      .map((run) => this.toRunSummary(run));
+  }
+
+  getLatestRun(sessionId: string): RunSummary | null {
+    return this.listRuns(sessionId)[0] ?? null;
+  }
+
+  getCasePath(caseId: string): string {
+    const location = this.findSessionLocation(caseId);
+    if (!location) {
+      throw new Error(`Session not found for case lookup: ${caseId}`);
+    }
+    return location.sessionPath;
+  }
+
+  getRunPath(caseId: string, runId: string): string {
+    const location = this.findSessionLocation(caseId);
+    if (!location) {
+      throw new Error(`Session not found for run lookup: ${caseId}`);
+    }
+    return path.join(location.sessionPath, 'runs', runId);
+  }
+
   async createCase(input: {
     caseId?: string;
+    projectId?: string;
     userGoal: string;
     symptomSummary: string;
   }): Promise<string> {
-    const caseId = input.caseId || generateCaseId();
-    const casePath = this.getCasePath(caseId);
+    const projectId = input.projectId || this.getCurrentProjectId();
+    if (!projectId) {
+      throw new Error('Project is required before creating a session.');
+    }
 
-    // 创建case目录结构
-    const dirs = [
-      casePath,
-      path.join(casePath, 'artifacts'),
-      path.join(casePath, 'inputs', 'captures'),
-      path.join(casePath, 'inputs', 'references'),
-      path.join(casePath, 'runs'),
-    ];
-
-    for (const dir of dirs) {
-      if (!fs.existsSync(dir)) {
-        await fs.promises.mkdir(dir, { recursive: true });
+    if (input.caseId) {
+      const existingSession = this.readSession(input.caseId);
+      if (existingSession) {
+        return existingSession.sessionId;
       }
     }
 
-    // 创建case.yaml
-    const caseData = {
-      case_id: caseId,
-      created_at: nowIso(),
-      user_goal: input.userGoal,
-      symptom_summary: input.symptomSummary,
-      current_run: null,
-    };
-    await writeYaml(path.join(casePath, 'case.yaml'), caseData);
-
-    return caseId;
+    const session = this.createSession(
+      projectId,
+      input.userGoal || input.symptomSummary,
+      input.userGoal || input.symptomSummary,
+    );
+    return session.sessionId;
   }
 
-  /**
-   * 读取case数据
-   */
   async readCase(caseId: string): Promise<Record<string, unknown> | null> {
-    const casePath = path.join(this.getCasePath(caseId), 'case.yaml');
-    return readYaml(casePath);
+    const session = this.readSession(caseId);
+    if (!session) return null;
+
+    return {
+      case_id: session.sessionId,
+      project_id: session.projectId,
+      title: session.title,
+      user_goal: session.goal,
+      current_run: session.lastRunId ?? null,
+      created_at: new Date(session.createdAt).toISOString(),
+      updated_at: new Date(session.updatedAt).toISOString(),
+    };
   }
 
-  /**
-   * 更新case数据
-   */
   async updateCase(caseId: string, data: Record<string, unknown>): Promise<void> {
-    const existing = await this.readCase(caseId) || {};
-    const casePath = path.join(this.getCasePath(caseId), 'case.yaml');
-    await writeYaml(casePath, { ...existing, ...data, updated_at: nowIso() });
+    const title = typeof data.title === 'string'
+      ? data.title
+      : typeof data.symptom_summary === 'string'
+        ? data.symptom_summary
+        : undefined;
+    const goal = typeof data.user_goal === 'string' ? data.user_goal : undefined;
+    const lastRunId = typeof data.current_run === 'string' ? data.current_run : undefined;
+
+    this.updateSession(caseId, {
+      title,
+      goal,
+      lastRunId,
+    });
   }
 
-  // ========== Run 管理 ==========
-
-  /**
-   * 获取run目录路径
-   */
-  getRunPath(caseId: string, runId: string): string {
-    return path.join(this.getCasePath(caseId), 'runs', runId);
-  }
-
-  /**
-   * 创建新的run
-   */
   async createRun(input: {
     caseId: string;
     runId?: string;
     sessionId?: string;
     capturePaths: string[];
+    mode?: AppMode;
+    goal?: string;
+    captures?: CaptureDescriptor[];
+    backend?: 'local' | 'remote';
   }): Promise<{ runId: string; sessionId: string }> {
-    const runId = input.runId || generateRunId();
-    const sessionId = input.sessionId || generateSessionId(input.caseId, runId);
-    const runPath = this.getRunPath(input.caseId, runId);
-
-    // 创建run目录结构
-    const dirs = [
-      runPath,
-      path.join(runPath, 'artifacts'),
-      path.join(runPath, 'artifacts', 'runtime_batons'),
-      path.join(runPath, 'artifacts', 'capability_tokens'),
-      path.join(runPath, 'artifacts', 'runtime_locks'),
-      path.join(runPath, 'notes'),
-      path.join(runPath, 'screenshots'),
-      path.join(runPath, 'reports'),
-      path.join(runPath, 'logs'),
-    ];
-
-    for (const dir of dirs) {
-      if (!fs.existsSync(dir)) {
-        await fs.promises.mkdir(dir, { recursive: true });
-      }
+    const sessionId = input.sessionId || input.caseId;
+    const session = this.readSession(sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`);
     }
 
-    // 创建run.yaml
-    const runData = {
-      run_id: runId,
-      session_id: sessionId,
-      case_id: input.caseId,
-      created_at: nowIso(),
-      coordination_mode: 'staged_handoff',
-      orchestration_mode: 'multi_agent',
+    const runId = input.runId || generateRunId();
+    const runPath = this.getRunPath(sessionId, runId);
+    this.ensureDir(runPath);
+    this.ensureDir(path.join(runPath, 'artifacts'));
+    this.ensureDir(path.join(runPath, 'notes'));
+    this.ensureDir(path.join(runPath, 'reports'));
+    this.ensureDir(path.join(runPath, 'logs'));
+    this.ensureDir(path.join(runPath, 'screenshots'));
+    this.ensureDir(path.join(runPath, 'checkpoints'));
+
+    const captures = input.captures && input.captures.length > 0
+      ? input.captures
+      : input.capturePaths.map((filePath, index) => ({
+          id: `cap-${index}`,
+          filePath,
+          role: index === 0 ? ('primary' as const) : ('reference' as const),
+          backendHint: 'local' as const,
+          status: 'pending' as const,
+        }));
+
+    const backend = input.backend
+      || (captures.some((capture) => capture.backendHint === 'remote') ? 'remote' : 'local');
+    const startedAt = nowMs();
+    const persistedRun: PersistedRunRecord = {
+      runId,
+      projectId: session.projectId,
+      sessionId,
+      caseId: sessionId,
+      mode: input.mode || 'debugger',
+      goal: input.goal || session.goal,
+      captures,
+      startedAt,
+      status: 'running',
+      lastStage: 'preflight_pending',
+      backend,
+      createdAt: startedAt,
+      updatedAt: startedAt,
       runtime: {
-        backend: 'local',
+        backend,
         entry_mode: 'cli',
-        context_id: 'ctx-orchestrator',
-        runtime_owner: 'rdc-debugger',
+        context_id: null,
+        runtime_owner: null,
         session_id: sessionId,
-        workflow_stage: 'accepted_intake_initialized',
+        workflow_stage: 'preflight_pending',
       },
     };
-    await writeYaml(path.join(runPath, 'run.yaml'), runData);
 
-    // 创建capture_refs.yaml
-    const captureRefs = {
-      captures: input.capturePaths.map((p, i) => ({
-        capture_id: `cap-${i === 0 ? 'anomalous' : i === 1 ? 'baseline' : 'fixed'}-${String(i + 1).padStart(3, '0')}`,
-        capture_role: i === 0 ? 'anomalous' : i === 1 ? 'baseline' : 'fixed',
-        source_path: p,
+    this.writeRunFiles(persistedRun);
+    writeYaml(path.join(runPath, 'capture_refs.yaml'), {
+      captures: captures.map((capture, index) => ({
+        capture_id: capture.id || `cap-${index}`,
+        capture_role: capture.role,
+        source_path: capture.filePath,
       })),
-    };
-    await writeYaml(path.join(runPath, 'capture_refs.yaml'), captureRefs);
-
-    // 创建hypothesis_board.yaml
-    const hypothesisBoard = {
+    });
+    writeYaml(path.join(runPath, 'notes', 'hypothesis_board.yaml'), {
       hypothesis_board: {
         session_id: sessionId,
         entry_skill: 'rdc-debugger',
-        user_goal: '',
+        user_goal: persistedRun.goal,
         intake_state: 'handoff_ready',
         current_phase: 'intake',
         current_task: '',
@@ -215,111 +462,83 @@ export class StorageAdapter {
         last_updated: nowIso(),
         hypotheses: [],
       },
-    };
-    await writeYaml(path.join(runPath, 'notes', 'hypothesis_board.yaml'), hypothesisBoard);
+    });
 
-    // 更新case的current_run
-    await this.updateCase(input.caseId, { current_run: runId });
-
-    // 创建session marker
-    const sessionMarkerPath = path.join(
-      this.workspacePath,
-      'common',
-      'knowledge',
-      'library',
-      'sessions',
-      '.current_session'
-    );
-    await fs.promises.writeFile(sessionMarkerPath, `${sessionId}\n`, 'utf-8');
+    this.updateSession(sessionId, {
+      goal: persistedRun.goal,
+      lastRunId: runId,
+    });
+    this.touchProject(session.projectId, sessionId);
+    this.setCurrentProjectId(session.projectId);
+    this.setCurrentSessionId(sessionId);
 
     return { runId, sessionId };
   }
 
-  /**
-   * 读取run数据
-   */
   async readRun(caseId: string, runId: string): Promise<Record<string, unknown> | null> {
-    const runPath = path.join(this.getRunPath(caseId, runId), 'run.yaml');
-    return readYaml(runPath);
+    const run = this.readPersistedRun(caseId, runId);
+    return run ? run as unknown as Record<string, unknown> : null;
   }
 
-  /**
-   * 更新run数据
-   */
   async updateRun(caseId: string, runId: string, data: Record<string, unknown>): Promise<void> {
-    const existing = await this.readRun(caseId, runId) || {};
-    const runPath = path.join(this.getRunPath(caseId, runId), 'run.yaml');
-    await writeYaml(runPath, { ...existing, ...data, updated_at: nowIso() });
+    const existing = this.readPersistedRun(caseId, runId);
+    if (!existing) {
+      return;
+    }
+
+    const merged = this.deepMerge(
+      existing as unknown as Record<string, unknown>,
+      data,
+    ) as unknown as PersistedRunRecord;
+    const workflowStage = merged.runtime?.workflow_stage || existing.runtime.workflow_stage;
+    merged.runtime = {
+      ...existing.runtime,
+      ...(merged.runtime || {}),
+      workflow_stage: workflowStage,
+    };
+    merged.lastStage = workflowStage;
+    merged.updatedAt = nowMs();
+
+    if (workflowStage === 'finalized' && merged.status === 'running') {
+      merged.status = 'completed';
+      merged.finishedAt = merged.finishedAt || merged.updatedAt;
+    }
+
+    this.writeRunFiles(merged);
+    this.updateSession(caseId, {
+      lastRunId: runId,
+    });
   }
 
-  // ========== Artifact 管理 ==========
-
-  /**
-   * 写入artifact
-   */
-  async writeArtifact(
-    caseId: string,
-    runId: string,
-    artifactName: string,
-    data: unknown
-  ): Promise<string> {
+  async writeArtifact(caseId: string, runId: string, artifactName: string, data: unknown): Promise<string> {
     const artifactPath = path.join(this.getRunPath(caseId, runId), 'artifacts', artifactName);
-    await writeYaml(artifactPath, data);
+    writeYaml(artifactPath, data);
     return artifactPath;
   }
 
-  /**
-   * 读取artifact
-   */
-  async readArtifact(
-    caseId: string,
-    runId: string,
-    artifactName: string
-  ): Promise<Record<string, unknown> | null> {
+  async readArtifact(caseId: string, runId: string, artifactName: string): Promise<Record<string, unknown> | null> {
     const artifactPath = path.join(this.getRunPath(caseId, runId), 'artifacts', artifactName);
-    return readYaml(artifactPath);
+    return readYaml<Record<string, unknown>>(artifactPath);
   }
 
-  // ========== Action Chain ==========
-
-  /**
-   * 获取action_chain路径
-   */
   getActionChainPath(sessionId: string): string {
-    return path.join(
-      this.workspacePath,
-      'common',
-      'knowledge',
-      'library',
-      'sessions',
-      sessionId,
-      'action_chain.jsonl'
-    );
-  }
-
-  /**
-   * 追加事件到action_chain
-   */
-  async appendActionEvent(sessionId: string, event: ActionEvent): Promise<void> {
-    const chainPath = this.getActionChainPath(sessionId);
-    const dir = path.dirname(chainPath);
-    if (!fs.existsSync(dir)) {
-      await fs.promises.mkdir(dir, { recursive: true });
+    const location = this.findSessionLocation(sessionId);
+    if (!location) {
+      throw new Error(`Session not found for action chain: ${sessionId}`);
     }
-    await appendJsonl(chainPath, event);
+    return path.join(location.sessionPath, 'timeline', 'action_chain.jsonl');
   }
 
-  /**
-   * 读取action_chain
-   */
+  async appendActionEvent(sessionId: string, event: ActionEvent): Promise<void> {
+    appendJsonl(this.getActionChainPath(sessionId), event);
+    this.updateSession(sessionId, {});
+  }
+
   async readActionChain(sessionId: string): Promise<ActionEvent[]> {
-    const chainPath = this.getActionChainPath(sessionId);
-    return readJsonl<ActionEvent>(chainPath);
+    const actionChainPath = this.getActionChainPath(sessionId);
+    return readJsonl<ActionEvent>(actionChainPath);
   }
 
-  /**
-   * 创建新的事件
-   */
   createActionEvent(input: {
     runId: string;
     sessionId: string;
@@ -344,99 +563,531 @@ export class StorageAdapter {
     };
   }
 
-  // ========== Workflow State ==========
-
-  /**
-   * 获取workflow状�?
-   */
   async getWorkflowState(caseId: string, runId: string): Promise<WorkflowState | null> {
-    const runData = await this.readRun(caseId, runId);
-    if (!runData) return null;
-
-    const runtime = runData.runtime as Record<string, unknown> || {};
+    const run = this.readPersistedRun(caseId, runId);
+    if (!run) return null;
 
     return {
       caseId,
       runId,
-      sessionId: runtime.session_id as string || '',
-      currentStage: (runtime.workflow_stage as WorkflowStage) || 'preflight_pending',
+      sessionId: run.sessionId,
+      currentStage: run.runtime.workflow_stage,
       previousStages: [],
-      entryMode: (runtime.entry_mode as 'cli' | 'mcp') || 'cli',
-      backend: (runtime.backend as 'local' | 'remote') || 'local',
+      entryMode: run.runtime.entry_mode,
+      backend: run.runtime.backend,
       orchestrationMode: 'multi_agent',
       coordinationMode: 'staged_handoff',
       blockers: [],
-      lastUpdated: nowIso(),
+      lastUpdated: new Date(run.updatedAt).toISOString(),
     };
   }
 
-  /**
-   * 更新workflow状�?
-   */
-  async updateWorkflowStage(
-    caseId: string,
-    runId: string,
-    stage: WorkflowStage,
-    blockers: Blocker[] = []
-  ): Promise<void> {
-    await this.updateRun(caseId, runId, {
-      runtime: {
-        workflow_stage: stage,
-      },
-    });
+  async updateWorkflowStage(caseId: string, runId: string, stage: WorkflowStage, blockers: Blocker[] = []): Promise<void> {
+    const run = this.readPersistedRun(caseId, runId);
+    if (!run) return;
 
-    // 如果有blockers，更新hypothesis_board
+    run.runtime.workflow_stage = stage;
+    run.lastStage = stage;
+    run.updatedAt = nowMs();
+
+    if (stage === 'finalized') {
+      run.status = 'completed';
+      run.finishedAt = run.finishedAt || run.updatedAt;
+    }
+
+    this.writeRunFiles(run);
+
     if (blockers.length > 0) {
       const boardPath = path.join(this.getRunPath(caseId, runId), 'notes', 'hypothesis_board.yaml');
-      const board = readYaml(boardPath) as Record<string, unknown> || {};
-      if (board.hypothesis_board) {
-        (board.hypothesis_board as Record<string, unknown>).blocking_issues = blockers;
-        (board.hypothesis_board as Record<string, unknown>).last_updated = nowIso();
-        await writeYaml(boardPath, board);
+      const board = readYaml<Record<string, unknown>>(boardPath) || {};
+      const hypothesisBoard = (board.hypothesis_board as Record<string, unknown>) || {};
+      hypothesisBoard.blocking_issues = blockers;
+      hypothesisBoard.last_updated = nowIso();
+      board.hypothesis_board = hypothesisBoard;
+      writeYaml(boardPath, board);
+    }
+  }
+
+  getCurrentProjectId(): string | null {
+    return this.readSelection().projectId;
+  }
+
+  setCurrentProjectId(projectId: string | null): void {
+    const selection = this.readSelection();
+    selection.projectId = projectId;
+    if (!projectId) {
+      selection.sessionId = null;
+    }
+    this.writeSelection(selection);
+  }
+
+  async getCurrentSessionId(): Promise<string | null> {
+    return this.readSelection().sessionId;
+  }
+
+  async setCurrentSessionId(sessionId: string | null): Promise<void> {
+    const selection = this.readSelection();
+    selection.sessionId = sessionId;
+    if (sessionId) {
+      const session = this.readSession(sessionId);
+      if (session) {
+        selection.projectId = session.projectId;
       }
     }
+    this.writeSelection(selection);
   }
 
-  // ========== Session Marker ==========
+  private bootstrapGlobalKnowledge(): void {
+    this.syncWorkspacePaths();
+    this.ensureDir(this.globalKnowledgePath);
+    this.ensureDir(path.join(this.globalKnowledgePath, 'library'));
+    this.ensureDir(path.join(this.globalKnowledgePath, 'spec'));
 
-  /**
-   * 获取当前session ID
-   */
-  async getCurrentSessionId(): Promise<string | null> {
-    const markerPath = path.join(
-      this.workspacePath,
-      'common',
-      'knowledge',
-      'library',
-      'sessions',
-      '.current_session'
-    );
-    if (!fs.existsSync(markerPath)) return null;
-    const content = await fs.promises.readFile(markerPath, 'utf-8');
-    const sessionId = content.trim();
-    return sessionId || null;
-  }
-
-  /**
-   * 设置当前session ID
-   */
-  async setCurrentSessionId(sessionId: string): Promise<void> {
-    const markerPath = path.join(
-      this.workspacePath,
-      'common',
-      'knowledge',
-      'library',
-      'sessions',
-      '.current_session'
-    );
-    const dir = path.dirname(markerPath);
-    if (!fs.existsSync(dir)) {
-      await fs.promises.mkdir(dir, { recursive: true });
+    const seededMarker = path.join(this.globalKnowledgePath, '.seeded');
+    if (fs.existsSync(seededMarker)) {
+      return;
     }
-    await fs.promises.writeFile(markerPath, `${sessionId}\n`, 'utf-8');
+
+    const seedPath = path.join(app.getAppPath(), 'resources', 'knowledge', 'seed');
+    if (fs.existsSync(seedPath)) {
+      this.copyDirectoryContents(seedPath, this.globalKnowledgePath, false);
+    }
+
+    fs.writeFileSync(seededMarker, nowIso(), 'utf-8');
+  }
+
+  private migrateLegacyWorkspace(): void {
+    for (const legacyRoot of this.getLegacyWorkspacePaths()) {
+      if (!legacyRoot || !fs.existsSync(legacyRoot) || legacyRoot === this.dataRootPath) {
+        continue;
+      }
+
+      const legacyKnowledge = path.join(legacyRoot, 'common', 'knowledge');
+      if (fs.existsSync(legacyKnowledge)) {
+        this.copyDirectoryContents(legacyKnowledge, this.globalKnowledgePath, false);
+      }
+
+      const legacyCases = path.join(legacyRoot, 'cases');
+      if (fs.existsSync(legacyCases)) {
+        this.copyDirectoryContents(legacyCases, path.join(this.migrationOrphansPath, 'cases'), false);
+      }
+
+      const legacyCheckpoints = path.join(legacyRoot, 'checkpoints');
+      if (fs.existsSync(legacyCheckpoints)) {
+        this.copyDirectoryContents(legacyCheckpoints, path.join(this.migrationOrphansPath, 'checkpoints'), false);
+      }
+
+      const legacyCommon = path.join(legacyRoot, 'common');
+      if (fs.existsSync(legacyCommon)) {
+        const configPath = path.join(legacyCommon, 'config');
+        const skillsPath = path.join(legacyCommon, 'skills');
+        if (fs.existsSync(configPath)) {
+          this.copyDirectoryContents(configPath, path.join(this.migrationOrphansPath, 'common', 'config'), false);
+        }
+        if (fs.existsSync(skillsPath)) {
+          this.copyDirectoryContents(skillsPath, path.join(this.migrationOrphansPath, 'common', 'skills'), false);
+        }
+      }
+
+      fs.rmSync(legacyRoot, { recursive: true, force: true });
+    }
+  }
+
+  private getLegacyWorkspacePaths(): string[] {
+    const devWorkspace = path.join(app.getAppPath(), 'workspace');
+    const packagedWorkspace = path.join(path.dirname(app.getPath('exe')), 'workspace');
+    return [...new Set([devWorkspace, packagedWorkspace])];
+  }
+
+  private syncWorkspacePaths(): void {
+    const paths = appPathService.getWorkspacePaths();
+    this.dataRootPath = paths.workspaceRoot;
+    this.projectsRootPath = paths.projectsPath;
+    this.globalKnowledgePath = paths.knowledgePath;
+    this.migrationOrphansPath = paths.migrationOrphansPath;
+    this.registryPath = path.join(this.projectsRootPath, 'registry.json');
+    this.selectionPath = path.join(this.projectsRootPath, 'selection.json');
+  }
+
+  private ensureRegistry(): void {
+    if (fs.existsSync(this.registryPath)) {
+      return;
+    }
+
+    this.writeJson(this.registryPath, {
+      schemaVersion: '1',
+      projects: [],
+    } satisfies ProjectRegistry);
+  }
+
+  private ensureSelection(): void {
+    if (fs.existsSync(this.selectionPath)) {
+      return;
+    }
+
+    this.writeJson(this.selectionPath, {
+      projectId: null,
+      sessionId: null,
+    } satisfies SelectionState);
+  }
+
+  private readRegistry(): ProjectRegistry {
+    const registry = this.readJson<ProjectRegistry>(this.registryPath) || {
+      schemaVersion: '1',
+      projects: [],
+    };
+    const normalizedProjects = registry.projects.map((project) => this.normalizeProjectRecord(project));
+    const changed = JSON.stringify(normalizedProjects) !== JSON.stringify(registry.projects);
+
+    if (changed) {
+      registry.projects = normalizedProjects;
+      this.writeRegistry(registry);
+    } else {
+      registry.projects = normalizedProjects;
+    }
+
+    return registry;
+  }
+
+  private writeRegistry(registry: ProjectRegistry): void {
+    this.writeJson(this.registryPath, registry);
+  }
+
+  private readSelection(): SelectionState {
+    return this.readJson<SelectionState>(this.selectionPath) || {
+      projectId: null,
+      sessionId: null,
+    };
+  }
+
+  private writeSelection(selection: SelectionState): void {
+    this.writeJson(this.selectionPath, selection);
+  }
+
+  private writeProjectMetadata(project: ProjectRecord): void {
+    const normalizedProject = this.normalizeProjectRecord(project);
+    this.ensureDir(this.getProjectDataPath(normalizedProject));
+    this.writeJson(path.join(this.getProjectDataPath(normalizedProject), 'project.json'), normalizedProject);
+  }
+
+  private writeRunFiles(run: PersistedRunRecord): void {
+    const runPath = this.getRunPath(run.sessionId, run.runId);
+    this.ensureDir(runPath);
+    this.writeJson(path.join(runPath, 'run.json'), run);
+    writeYaml(path.join(runPath, 'run.yaml'), {
+      run_id: run.runId,
+      session_id: run.sessionId,
+      case_id: run.caseId,
+      project_id: run.projectId,
+      created_at: new Date(run.createdAt).toISOString(),
+      updated_at: new Date(run.updatedAt).toISOString(),
+      mode: run.mode,
+      goal: run.goal,
+      status: run.status,
+      last_stage: run.lastStage,
+      coordination_mode: 'staged_handoff',
+      orchestration_mode: 'multi_agent',
+      runtime: run.runtime,
+      captures: run.captures,
+    });
+  }
+
+  private touchProject(projectId: string, lastSessionId?: string, updatedAt: number = nowMs()): void {
+    const registry = this.readRegistry();
+    const nextProjects = registry.projects.map((project) => {
+      if (project.projectId !== projectId) return project;
+      return {
+        ...project,
+        updatedAt,
+        lastSessionId: lastSessionId || project.lastSessionId,
+      };
+    });
+
+    registry.projects = nextProjects;
+    this.writeRegistry(registry);
+
+    const project = registry.projects.find((item) => item.projectId === projectId);
+    if (project) {
+      this.writeProjectMetadata(project);
+    }
+  }
+
+  private getProjectDataPath(project: ProjectRecord | string): string {
+    const target = typeof project === 'string' ? this.getProjectById(project) : project;
+    if (!target) {
+      throw new Error(`Project not found: ${project}`);
+    }
+    return path.join(this.projectsRootPath, target.slug);
+  }
+
+  private getProjectSessionsRoot(project: ProjectRecord | string): string {
+    return path.join(this.getProjectDataPath(project), 'sessions');
+  }
+
+  private findSessionLocation(sessionId: string): { project: ProjectRecord; sessionPath: string } | null {
+    for (const project of this.listProjects()) {
+      const sessionPath = path.join(this.getProjectSessionsRoot(project), sessionId);
+      if (fs.existsSync(path.join(sessionPath, 'session.json'))) {
+        return { project, sessionPath };
+      }
+    }
+    return null;
+  }
+
+  private readPersistedRun(sessionId: string, runId: string): PersistedRunRecord | null {
+    const runJsonPath = path.join(this.getRunPath(sessionId, runId), 'run.json');
+    const runJson = this.readJson<PersistedRunRecord>(runJsonPath);
+    if (runJson) {
+      return runJson;
+    }
+
+    const runYaml = readYaml<Record<string, unknown>>(path.join(this.getRunPath(sessionId, runId), 'run.yaml'));
+    if (!runYaml) {
+      return null;
+    }
+
+    return {
+      runId,
+      projectId: String(runYaml.project_id || ''),
+      sessionId,
+      caseId: String(runYaml.case_id || sessionId),
+      mode: (runYaml.mode as AppMode) || 'debugger',
+      goal: String(runYaml.goal || ''),
+      captures: (runYaml.captures as CaptureDescriptor[]) || [],
+      startedAt: Date.parse(String(runYaml.created_at || nowIso())),
+      finishedAt: runYaml.finished_at ? Date.parse(String(runYaml.finished_at)) : undefined,
+      status: (runYaml.status as PersistedRunRecord['status']) || 'running',
+      lastStage: String(runYaml.last_stage || 'preflight_pending'),
+      backend: ((runYaml.runtime as Record<string, unknown>)?.backend as 'local' | 'remote') || 'local',
+      createdAt: Date.parse(String(runYaml.created_at || nowIso())),
+      updatedAt: Date.parse(String(runYaml.updated_at || runYaml.created_at || nowIso())),
+      runtime: {
+        backend: ((runYaml.runtime as Record<string, unknown>)?.backend as 'local' | 'remote') || 'local',
+        entry_mode: (((runYaml.runtime as Record<string, unknown>)?.entry_mode as 'cli' | 'mcp') || 'cli'),
+        context_id: ((runYaml.runtime as Record<string, unknown>)?.context_id as string | null) || null,
+        runtime_owner: ((runYaml.runtime as Record<string, unknown>)?.runtime_owner as string | null) || null,
+        session_id: String((runYaml.runtime as Record<string, unknown>)?.session_id || sessionId),
+        workflow_stage: (((runYaml.runtime as Record<string, unknown>)?.workflow_stage as WorkflowStage) || 'preflight_pending'),
+      },
+    };
+  }
+
+  private toRunSummary(run: PersistedRunRecord): RunSummary {
+    return {
+      runId: run.runId,
+      projectId: run.projectId,
+      sessionId: run.sessionId,
+      caseId: run.caseId,
+      mode: run.mode,
+      goal: run.goal,
+      captures: run.captures,
+      startedAt: run.startedAt,
+      finishedAt: run.finishedAt,
+      status: run.status,
+      lastStage: run.lastStage,
+      backend: run.backend,
+    };
+  }
+
+  private normalizeSessionTitle(title?: string): string {
+    const normalized = title?.trim();
+    if (normalized) {
+      return normalized.slice(0, 80);
+    }
+
+    const timestamp = new Date();
+    return `Session ${timestamp.getFullYear()}-${String(timestamp.getMonth() + 1).padStart(2, '0')}-${String(timestamp.getDate()).padStart(2, '0')} ${String(timestamp.getHours()).padStart(2, '0')}:${String(timestamp.getMinutes()).padStart(2, '0')}`;
+  }
+
+  private createUniqueProjectSlug(projectName: string, existingProjects: ProjectRecord[]): string {
+    const baseSlug = sanitizeToken(projectName.toLowerCase()) || 'project';
+    const existingSlugs = new Set(existingProjects.map((project) => project.slug));
+    if (!existingSlugs.has(baseSlug)) {
+      return baseSlug;
+    }
+
+    let counter = 2;
+    while (existingSlugs.has(`${baseSlug}-${counter}`)) {
+      counter += 1;
+    }
+    return `${baseSlug}-${counter}`;
+  }
+
+  private ensureDir(dirPath: string): void {
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+    }
+  }
+
+  private copyDirectoryContents(sourceDir: string, targetDir: string, overwrite: boolean): void {
+    if (!fs.existsSync(sourceDir)) return;
+    this.ensureDir(targetDir);
+
+    for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+      const sourcePath = path.join(sourceDir, entry.name);
+      const targetPath = path.join(targetDir, entry.name);
+
+      if (entry.isDirectory()) {
+        this.copyDirectoryContents(sourcePath, targetPath, overwrite);
+        continue;
+      }
+
+      if (!overwrite && fs.existsSync(targetPath)) {
+        continue;
+      }
+
+      this.ensureDir(path.dirname(targetPath));
+      fs.copyFileSync(sourcePath, targetPath);
+    }
+  }
+
+  private readJson<T>(filePath: string): T | null {
+    try {
+      if (!fs.existsSync(filePath)) {
+        return null;
+      }
+      return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T;
+    } catch (error) {
+      console.error(`Failed to read JSON file: ${filePath}`, error);
+      return null;
+    }
+  }
+
+  private writeJson(filePath: string, data: unknown): void {
+    this.ensureDir(path.dirname(filePath));
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  }
+
+  private deepMerge<T extends Record<string, unknown>>(base: T, patch: Record<string, unknown>): T {
+    const output: Record<string, unknown> = { ...base };
+
+    for (const [key, value] of Object.entries(patch)) {
+      if (Array.isArray(value)) {
+        output[key] = value;
+        continue;
+      }
+
+      if (value && typeof value === 'object') {
+        const existingValue = output[key];
+        output[key] = this.deepMerge(
+          (existingValue && typeof existingValue === 'object' && !Array.isArray(existingValue)
+            ? existingValue
+            : {}) as Record<string, unknown>,
+          value as Record<string, unknown>,
+        );
+        continue;
+      }
+
+      output[key] = value;
+    }
+
+    return output as T;
+  }
+
+  private persistProject(project: ProjectRecord): void {
+    const registry = this.readRegistry();
+    registry.projects = registry.projects.map((entry) => entry.projectId === project.projectId ? project : entry);
+    this.writeRegistry(registry);
+    this.writeProjectMetadata(project);
+  }
+
+  private buildProjectPaths(rootPath: string): {
+    resourcePath: string;
+    knowledgePath: string;
+    inputsPath: string;
+  } {
+    const resourcePath = path.join(rootPath, '.resource');
+    return {
+      resourcePath,
+      knowledgePath: path.join(resourcePath, 'knowledge'),
+      inputsPath: path.join(resourcePath, 'inputs'),
+    };
+  }
+
+  private ensureProjectResourceLayout(rootPath: string): {
+    resourcePath: string;
+    knowledgePath: string;
+    inputsPath: string;
+  } {
+    const paths = this.buildProjectPaths(rootPath);
+    this.ensureDir(paths.resourcePath);
+    this.ensureDir(paths.knowledgePath);
+    this.ensureDir(paths.inputsPath);
+
+    const legacyKnowledgePath = path.join(rootPath, '.rdc-agent', 'knowledge');
+    if (fs.existsSync(legacyKnowledgePath)) {
+      this.copyDirectoryContents(legacyKnowledgePath, paths.knowledgePath, false);
+    }
+
+    return paths;
+  }
+
+  private normalizeProjectRecord(project: ProjectRecord): ProjectRecord {
+    const rootPath = path.resolve(project.rootPath);
+    const { resourcePath, knowledgePath, inputsPath } = this.ensureProjectResourceLayout(rootPath);
+    const inputs = this.collectProjectInputs(inputsPath);
+    return {
+      ...project,
+      rootPath,
+      resourcePath,
+      knowledgePath,
+      inputsPath,
+      inputs,
+      inputsUpdatedAt: project.inputsUpdatedAt || nowMs(),
+    };
+  }
+
+  private collectProjectInputs(inputsPath: string): ProjectInputRecord[] {
+    if (!fs.existsSync(inputsPath)) {
+      return [];
+    }
+
+    const records: ProjectInputRecord[] = [];
+    const walk = (dirPath: string) => {
+      for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
+        const fullPath = path.join(dirPath, entry.name);
+        if (entry.isDirectory()) {
+          walk(fullPath);
+          continue;
+        }
+        if (path.extname(entry.name).toLowerCase() !== '.rdc') {
+          continue;
+        }
+
+        const stats = fs.statSync(fullPath);
+        records.push({
+          inputId: this.createProjectInputId(inputsPath, fullPath),
+          fileName: path.basename(fullPath),
+          filePath: fullPath,
+          source: 'project_resource',
+          discoveredAt: stats.birthtimeMs || stats.ctimeMs || stats.mtimeMs,
+          lastModifiedAt: stats.mtimeMs,
+          size: stats.size,
+        });
+      }
+    };
+
+    walk(inputsPath);
+    return records.sort((a, b) => a.fileName.localeCompare(b.fileName));
+  }
+
+  private createProjectInputId(inputsPath: string, filePath: string): string {
+    const relativePath = path.relative(inputsPath, filePath).replace(/[\\/]+/g, '_');
+    const sanitized = sanitizeToken(relativePath.toLowerCase().replace(/\.rdc$/i, ''));
+    return `input_${sanitized || generateShortId()}`;
+  }
+
+  private resolveImportedInputPath(inputsPath: string, fileName: string): string {
+    const extension = path.extname(fileName);
+    const baseName = path.basename(fileName, extension);
+    let candidate = path.join(inputsPath, fileName);
+    let counter = 2;
+    while (fs.existsSync(candidate)) {
+      candidate = path.join(inputsPath, `${baseName}-${counter}${extension}`);
+      counter += 1;
+    }
+    return candidate;
   }
 }
 
-// 单例导出
 export const storageAdapter = new StorageAdapter();
-

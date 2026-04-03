@@ -4,10 +4,13 @@
  */
 
 import { ToolBridge } from './ToolBridge';
+import { replayDeviceService, type PreparedRemoteSurface } from './ReplayDeviceService';
 import type {
   CaptureDescriptor,
   DebugSessionStartRequest,
   ContextSnapshot,
+  OpenedCaptureState,
+  OpenProjectInputRequest,
 } from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import type { ToolCallResult } from '@shared/types/tool';
@@ -24,20 +27,30 @@ export class RdxSessionService {
   private replayDevice: ReplayDeviceEntry | null = null;
   private remoteStatus: 'connected' | 'online' | 'disconnected' | 'error' = 'disconnected';
   private remoteId: string | null = null;
+  private openedCapture: OpenedCaptureState | null = null;
 
   constructor(toolBridge: ToolBridge) {
     this.toolBridge = toolBridge;
   }
 
   async bootstrap(request: DebugSessionStartRequest): Promise<ContextSnapshot> {
+    if (this.canReuseOpenedCapture(request)) {
+      this.captures = request.captures.map((capture) => (
+        capture.id === request.primaryCaptureId && this.openedCapture
+          ? {
+              ...capture,
+              status: 'open',
+              sessionId: this.openedCapture.sessionId,
+              replaySessionId: this.openedCapture.replaySessionId,
+              contextId: this.openedCapture.contextId,
+            }
+          : { ...capture }
+      ));
+      this.activeCaptureId = request.primaryCaptureId;
+      return this.snapshotContext();
+    }
+
     await this.ensureRuntimeReady();
-
-    this.contextId = await this.allocateContext();
-    await this.initializeContextRuntime();
-
-    const ownerResult = await this.claimOwner(this.contextId);
-    this.runtimeOwner = ownerResult.owner;
-    this.ownerLeaseId = ownerResult.leaseId;
 
     this.captures = request.captures.map((capture) => ({ ...capture }));
     this.replayDevice = request.replayDevice;
@@ -46,11 +59,48 @@ export class RdxSessionService {
     this.remoteStatus = 'disconnected';
 
     const hasRemoteCapture = this.captures.some((capture) => capture.backendHint === 'remote');
+    let reusedPreparedRemote = false;
     if (hasRemoteCapture) {
       if (request.replayDevice.type === 'local' || request.replayDevice.status !== 'online') {
         throw new Error('Remote capture requires an online Replay Device.');
       }
-      await this.ensureRemoteConnection(request.replayDevice);
+      reusedPreparedRemote = await this.tryAdoptPreparedRemote(request.replayDevice);
+    }
+
+    if (!reusedPreparedRemote) {
+      await this.prepareFreshContext();
+    }
+
+    try {
+      const ownerResult = await this.claimOwner(this.contextId!);
+      this.runtimeOwner = ownerResult.owner;
+      this.ownerLeaseId = ownerResult.leaseId;
+    } catch (error) {
+      if (!reusedPreparedRemote) {
+        throw error;
+      }
+
+      this.resetRemoteConnectionState();
+      await this.prepareFreshContext();
+      const ownerResult = await this.claimOwner(this.contextId!);
+      this.runtimeOwner = ownerResult.owner;
+      this.ownerLeaseId = ownerResult.leaseId;
+      reusedPreparedRemote = false;
+    }
+
+    if (hasRemoteCapture) {
+      if (reusedPreparedRemote) {
+        const preparedRemoteStillValid = await this.validatePreparedRemoteHandle();
+        if (!preparedRemoteStillValid) {
+          this.remoteId = null;
+          this.remoteStatus = 'disconnected';
+          await this.ensureRemoteConnection(request.replayDevice);
+        } else {
+          this.remoteStatus = 'online';
+        }
+      } else {
+        await this.ensureRemoteConnection(request.replayDevice);
+      }
     }
 
     const primaryCapture = this.captures.find((capture) => capture.id === request.primaryCaptureId);
@@ -60,8 +110,66 @@ export class RdxSessionService {
 
     await this.ensureCaptureSession(primaryCapture);
     this.activeCaptureId = primaryCapture.id;
+    this.openedCapture = null;
 
     return this.snapshotContext();
+  }
+
+  async openProjectInput(request: OpenProjectInputRequest): Promise<OpenedCaptureState> {
+    await this.closeOrReplaceOpenedCapture();
+    await this.ensureRuntimeReady();
+
+    const capture: CaptureDescriptor = {
+      id: request.inputId,
+      filePath: request.filePath,
+      role: 'primary',
+      backendHint: request.replayDevice.type === 'local' ? 'local' : 'remote',
+      status: 'pending',
+    };
+
+    this.captures = [capture];
+    this.activeCaptureId = capture.id;
+    this.replayDevice = request.replayDevice;
+    this.deviceLabel = request.replayDevice.label;
+    this.remoteId = null;
+    this.remoteStatus = 'disconnected';
+
+    await this.prepareFreshContext();
+
+    const ownerResult = await this.claimOwner(this.contextId!);
+    this.runtimeOwner = ownerResult.owner;
+    this.ownerLeaseId = ownerResult.leaseId;
+
+    if (capture.backendHint === 'remote') {
+      if (request.replayDevice.type === 'local' || !['connected', 'online'].includes(request.replayDevice.status)) {
+        throw new Error('Remote capture requires an available Replay Device.');
+      }
+      await this.ensureRemoteConnection(request.replayDevice);
+    }
+
+    await this.ensureCaptureSession(capture);
+
+    const openedCapture = this.createOpenedCaptureState(request.projectId, request.inputId, request.filePath, request.replayDevice);
+    this.openedCapture = openedCapture;
+    return openedCapture;
+  }
+
+  async closeOrReplaceOpenedCapture(): Promise<void> {
+    this.openedCapture = null;
+    this.contextId = null;
+    this.runtimeOwner = null;
+    this.ownerLeaseId = null;
+    this.captures = [];
+    this.activeCaptureId = null;
+    this.deviceLabel = 'Local';
+    this.replayDevice = null;
+    this.remoteStatus = 'disconnected';
+    this.remoteId = null;
+  }
+
+  private async prepareFreshContext(): Promise<void> {
+    this.contextId = await this.allocateContext();
+    await this.initializeContextRuntime();
   }
 
   private async ensureRuntimeReady(): Promise<void> {
@@ -206,7 +314,12 @@ export class RdxSessionService {
     });
     if (!connectResult.ok) {
       this.remoteStatus = 'error';
-      throw new Error(`Remote connect failed (hard fail): ${connectResult.error?.message ?? 'unknown'}`);
+      const detail = [
+        device.activationPhase ? `phase=${device.activationPhase}` : '',
+        device.activationErrorCode ? `code=${device.activationErrorCode}` : '',
+      ].filter(Boolean).join(' ');
+      const suffix = detail ? ` (${detail})` : '';
+      throw new Error(`Remote connect failed (hard fail): ${connectResult.error?.message ?? device.activationErrorMessage ?? 'unknown'}${suffix}`);
     }
 
     const remoteId = connectResult.data?.remote_id as string | undefined;
@@ -224,10 +337,57 @@ export class RdxSessionService {
     });
     if (!pingResult.ok) {
       this.remoteStatus = 'error';
-      throw new Error(`Remote ping failed (hard fail): ${pingResult.error?.message ?? 'unknown'}`);
+      throw new Error(`Remote ping failed (hard fail): ${pingResult.error?.message ?? device.activationErrorMessage ?? 'unknown'}`);
     }
 
     this.remoteStatus = 'online';
+  }
+
+  private async tryAdoptPreparedRemote(device: ReplayDeviceEntry): Promise<boolean> {
+    const prepared = replayDeviceService.consumePreparedRemote(device.id);
+    if (!prepared) {
+      return false;
+    }
+
+    if (!device.serial || prepared.serial !== device.serial) {
+      replayDeviceService.invalidatePreparedRemote(device.id);
+      return false;
+    }
+
+    this.adoptPreparedRemote(prepared);
+    return true;
+  }
+
+  private adoptPreparedRemote(prepared: PreparedRemoteSurface): void {
+    this.contextId = prepared.contextId;
+    this.remoteId = prepared.remoteId;
+    this.remoteStatus = 'connected';
+  }
+
+  private async validatePreparedRemoteHandle(): Promise<boolean> {
+    if (!this.contextId || !this.remoteId) {
+      return false;
+    }
+
+    const pingResult: ToolCallResult = await this.toolBridge.call({
+      toolName: 'rd.remote.ping',
+      args: { remote_id: this.remoteId },
+      contextId: this.contextId,
+      runtimeOwner: this.runtimeOwner ?? undefined,
+    });
+    if (!pingResult.ok) {
+      return false;
+    }
+
+    return true;
+  }
+
+  private resetRemoteConnectionState(): void {
+    this.contextId = null;
+    this.runtimeOwner = null;
+    this.ownerLeaseId = null;
+    this.remoteId = null;
+    this.remoteStatus = 'disconnected';
   }
 
   snapshotContext(): ContextSnapshot {
@@ -245,6 +405,14 @@ export class RdxSessionService {
     };
   }
 
+  snapshotOpenedCapture(): OpenedCaptureState | null {
+    return this.openedCapture ? { ...this.openedCapture } : null;
+  }
+
+  clearOpenedCapture(): void {
+    this.openedCapture = null;
+  }
+
   getCaptureDescriptors(): CaptureDescriptor[] {
     return [...this.captures];
   }
@@ -259,6 +427,47 @@ export class RdxSessionService {
 
   getOwnerLeaseId(): string | null {
     return this.ownerLeaseId;
+  }
+
+  private createOpenedCaptureState(
+    projectId: string,
+    inputId: string,
+    filePath: string,
+    replayDevice: ReplayDeviceEntry,
+  ): OpenedCaptureState {
+    const activeCapture = this.captures.find((capture) => capture.id === this.activeCaptureId) ?? this.captures[0];
+    return {
+      projectId,
+      inputId,
+      filePath,
+      captureId: activeCapture?.id ?? inputId,
+      sessionId: activeCapture?.sessionId ?? '',
+      contextId: this.contextId ?? '',
+      replaySessionId: activeCapture?.replaySessionId ?? '',
+      backend: activeCapture?.backendHint ?? 'local',
+      deviceId: replayDevice.id,
+      deviceLabel: replayDevice.label,
+      status: activeCapture?.status === 'error' ? 'error' : 'open',
+      openedAt: Date.now(),
+    };
+  }
+
+  private canReuseOpenedCapture(request: DebugSessionStartRequest): boolean {
+    const primaryCapture = request.captures.find((capture) => capture.id === request.primaryCaptureId);
+    if (!primaryCapture || !this.openedCapture) {
+      return false;
+    }
+
+    return Boolean(
+      this.contextId
+      && this.runtimeOwner
+      && this.ownerLeaseId
+      && this.openedCapture.status === 'open'
+      && primaryCapture.id === this.openedCapture.inputId
+      && primaryCapture.filePath === this.openedCapture.filePath
+      && primaryCapture.backendHint === this.openedCapture.backend
+      && request.replayDevice.id === this.openedCapture.deviceId,
+    );
   }
 }
 

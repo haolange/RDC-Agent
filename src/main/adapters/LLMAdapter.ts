@@ -1,6 +1,6 @@
 /**
- * LMAdapter - LLM统一适配层
- * 支持多个LLM服务商：OpenRouter（必须）、OpenAI、Anthropic、Gemini、Kimi、xAI等
+ * LLMAdapter - LLM统一适配层
+ * 基于 provider registry 动态装配可用的模型供应商。
  */
 
 import type {
@@ -11,35 +11,67 @@ import type {
   LLMMessage,
   ContentBlock,
   StreamCallback,
+  LLMProviderConfig,
 } from '@shared/types/llm';
+import type { LlmProviderKind } from '@shared/types/settings';
 
-/**
- * OpenRouter Provider - 必须支持
- */
-class OpenRouterProvider implements LLMProvider {
-  name = 'openrouter';
-  private apiKey: string = '';
-  private baseUrl = 'https://openrouter.ai/api/v1';
+const toContentBlocks = (
+  messages: LLMMessage[],
+): Array<{
+  role: string;
+  content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+}> => messages.map((message) => {
+  if (typeof message.content === 'string') {
+    return { role: message.role, content: message.content };
+  }
 
-  configure(config: { apiKey: string; baseUrl?: string }): void {
-    this.apiKey = config.apiKey;
-    if (config.baseUrl) {
-      this.baseUrl = config.baseUrl;
+  const content = (message.content as ContentBlock[]).map((block) => {
+    if (block.type === 'text') {
+      return { type: 'text', text: block.text };
     }
+    if (block.type === 'image' && block.source) {
+      return {
+        type: 'image_url',
+        image_url: {
+          url: `data:${block.source.media_type};base64,${block.source.data}`,
+        },
+      };
+    }
+    return { type: 'text', text: '' };
+  });
+
+  return { role: message.role, content };
+});
+
+class OpenRouterProvider implements LLMProvider {
+  name: string;
+  private apiKey = '';
+  private baseUrl = 'https://openrouter.ai/api/v1';
+  private models: string[] = [];
+
+  constructor(name: string) {
+    this.name = name;
+  }
+
+  configure(config: LLMProviderConfig): void {
+    this.apiKey = config.apiKey;
+    this.baseUrl = config.baseUrl || 'https://openrouter.ai/api/v1';
+    this.models = config.models;
   }
 
   async chat(request: LLMRequest): Promise<LLMResponse> {
+    const model = request.model || this.models[0] || 'anthropic/claude-3-opus';
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
+        Authorization: `Bearer ${this.apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://rdcagent.local',
         'X-Title': 'RdcAgent',
       },
       body: JSON.stringify({
-        model: request.model || 'anthropic/claude-3-opus',
-        messages: this.normalizeMessages(request.messages),
+        model,
+        messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
         tools: request.tools,
@@ -48,136 +80,12 @@ class OpenRouterProvider implements LLMProvider {
     });
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`OpenRouter API error: ${response.status} - ${error}`);
+      throw new Error(`OpenRouter API error: ${response.status} - ${await response.text()}`);
     }
 
     const data = await response.json();
-    return this.normalizeResponse(data, request.model || 'anthropic/claude-3-opus');
-  }
-
-  async streamChat(
-    request: LLMRequest,
-    onChunk: StreamCallback
-  ): Promise<LLMResponse> {
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://rdcagent.local',
-        'X-Title': 'RdcAgent',
-      },
-      body: JSON.stringify({
-        model: request.model || 'anthropic/claude-3-opus',
-        messages: this.normalizeMessages(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        stream: true,
-      }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`OpenRouter API error: ${response.status} - ${error}`);
-    }
-
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-    let fullContent = '';
-
-    while (reader) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n').filter(line => line.startsWith('data:'));
-
-      for (const line of lines) {
-        const data = line.slice(5).trim();
-        if (data === '[DONE]') continue;
-
-        try {
-          const parsed = JSON.parse(data);
-          const content = parsed.choices?.[0]?.delta?.content || '';
-          if (content) {
-            fullContent += content;
-            onChunk(content);
-          }
-        } catch {
-          // 忽略解析错误
-        }
-      }
-    }
-
-    return {
-      id: `or-${Date.now()}`,
-      model: request.model || 'anthropic/claude-3-opus',
-      content: fullContent,
-      usage: { inputTokens: 0, outputTokens: 0 },
-      stopReason: 'end_turn',
-    };
-  }
-
-  async isAvailable(): Promise<boolean> {
-    return !!this.apiKey;
-  }
-
-  getModels(): string[] {
-    return [
-      'anthropic/claude-3-opus',
-      'anthropic/claude-3-sonnet',
-      'anthropic/claude-3-haiku',
-      'openai/gpt-4o',
-      'openai/gpt-4-turbo',
-      'openai/gpt-3.5-turbo',
-      'google/gemini-pro-1.5',
-      'google/gemini-flash-1.5',
-      'x-ai/grok-beta',
-      'moonshot/kimi-latest',
-      'meta-llama/llama-3-70b-instruct',
-    ];
-  }
-
-  private normalizeMessages(messages: LLMMessage[]): Array<{
-    role: string;
-    content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
-  }> {
-    return messages.map(msg => {
-      if (typeof msg.content === 'string') {
-        return { role: msg.role, content: msg.content };
-      }
-
-      // 处理多模态内容
-      const content = (msg.content as ContentBlock[]).map(block => {
-        if (block.type === 'text') {
-          return { type: 'text', text: block.text };
-        }
-        if (block.type === 'image' && block.source) {
-          return {
-            type: 'image_url',
-            image_url: {
-              url: `data:${block.source.media_type};base64,${block.source.data}`,
-            },
-          };
-        }
-        return { type: 'text', text: '' };
-      });
-
-      return { role: msg.role, content };
-    });
-  }
-
-  private normalizeResponse(data: {
-    id: string;
-    model: string;
-    choices: Array<{
-      message: { content: string; tool_calls?: unknown[] };
-      finish_reason: string;
-    }>;
-    usage?: { prompt_tokens: number; completion_tokens: number };
-  }, model: string): LLMResponse {
     const choice = data.choices?.[0];
+
     return {
       id: data.id || `or-${Date.now()}`,
       model: data.model || model,
@@ -190,87 +98,120 @@ class OpenRouterProvider implements LLMProvider {
       stopReason: choice?.finish_reason === 'tool_calls' ? 'tool_use' : 'end_turn',
     };
   }
+
+  async streamChat(request: LLMRequest, onChunk: StreamCallback): Promise<LLMResponse> {
+    const response = await this.chat(request);
+    onChunk(typeof response.content === 'string' ? response.content : JSON.stringify(response.content));
+    return response;
+  }
+
+  async isAvailable(): Promise<boolean> {
+    return Boolean(this.apiKey);
+  }
+
+  getModels(): string[] {
+    return this.models;
+  }
 }
 
-/**
- * OpenAI Provider
- */
-class OpenAIProvider implements LLMProvider {
-  name = 'openai';
-  private apiKey: string = '';
+class OpenAICompatibleProvider implements LLMProvider {
+  name: string;
+  private apiKey = '';
   private baseUrl = 'https://api.openai.com/v1';
+  private models: string[] = [];
+  private requireApiKey = true;
 
-  configure(config: { apiKey: string; baseUrl?: string }): void {
+  constructor(name: string, requireApiKey = true) {
+    this.name = name;
+    this.requireApiKey = requireApiKey;
+  }
+
+  configure(config: LLMProviderConfig): void {
     this.apiKey = config.apiKey;
-    if (config.baseUrl) {
-      this.baseUrl = config.baseUrl;
-    }
+    this.baseUrl = config.baseUrl || this.baseUrl;
+    this.models = config.models;
   }
 
   async chat(request: LLMRequest): Promise<LLMResponse> {
+    const model = request.model || this.models[0] || 'gpt-4o';
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (this.apiKey) {
+      headers.Authorization = `Bearer ${this.apiKey}`;
+    }
+
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
-        model: request.model || 'gpt-4o',
+        model,
         messages: request.messages,
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
       }),
     });
 
+    if (!response.ok) {
+      throw new Error(`${this.name} API error: ${response.status} - ${await response.text()}`);
+    }
+
     const data = await response.json();
     const choice = data.choices?.[0];
 
     return {
-      id: data.id,
-      model: data.model,
+      id: data.id || `${this.name}-${Date.now()}`,
+      model: data.model || model,
       content: choice?.message?.content || '',
+      toolCalls: choice?.message?.tool_calls as LLMResponse['toolCalls'],
       usage: {
         inputTokens: data.usage?.prompt_tokens || 0,
         outputTokens: data.usage?.completion_tokens || 0,
       },
-      stopReason: choice?.finish_reason === 'stop' ? 'end_turn' : 'max_tokens',
+      stopReason: choice?.finish_reason === 'tool_calls'
+        ? 'tool_use'
+        : choice?.finish_reason === 'stop'
+          ? 'end_turn'
+          : 'max_tokens',
     };
   }
 
   async streamChat(request: LLMRequest, onChunk: StreamCallback): Promise<LLMResponse> {
-    // 简化实现，复用chat
-    const result = await this.chat(request);
-    onChunk(result.content as string);
-    return result;
+    const response = await this.chat(request);
+    onChunk(typeof response.content === 'string' ? response.content : JSON.stringify(response.content));
+    return response;
   }
 
   async isAvailable(): Promise<boolean> {
-    return !!this.apiKey;
+    return this.requireApiKey ? Boolean(this.apiKey) : true;
   }
 
   getModels(): string[] {
-    return ['gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo'];
+    return this.models;
   }
 }
 
-/**
- * Anthropic Provider
- */
 class AnthropicProvider implements LLMProvider {
-  name = 'anthropic';
-  private apiKey: string = '';
+  name: string;
+  private apiKey = '';
   private baseUrl = 'https://api.anthropic.com/v1';
+  private models: string[] = [];
 
-  configure(config: { apiKey: string; baseUrl?: string }): void {
+  constructor(name: string) {
+    this.name = name;
+  }
+
+  configure(config: LLMProviderConfig): void {
     this.apiKey = config.apiKey;
-    if (config.baseUrl) {
-      this.baseUrl = config.baseUrl;
-    }
+    this.baseUrl = config.baseUrl || 'https://api.anthropic.com/v1';
+    this.models = config.models;
   }
 
   async chat(request: LLMRequest): Promise<LLMResponse> {
-    const systemMessage = request.messages.find(m => m.role === 'system');
-    const otherMessages = request.messages.filter(m => m.role !== 'system');
+    const model = request.model || this.models[0] || 'claude-3-7-sonnet-latest';
+    const systemMessage = request.messages.find((message) => message.role === 'system');
+    const otherMessages = request.messages.filter((message) => message.role !== 'system');
 
     const response = await fetch(`${this.baseUrl}/messages`, {
       method: 'POST',
@@ -280,21 +221,25 @@ class AnthropicProvider implements LLMProvider {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: request.model || 'claude-3-opus-20240229',
+        model,
         max_tokens: request.maxTokens || 4096,
-        system: systemMessage?.content,
-        messages: otherMessages.map(m => ({
-          role: m.role === 'assistant' ? 'assistant' : 'user',
-          content: m.content,
+        system: typeof systemMessage?.content === 'string' ? systemMessage.content : undefined,
+        messages: otherMessages.map((message) => ({
+          role: message.role === 'assistant' ? 'assistant' : 'user',
+          content: message.content,
         })),
       }),
     });
 
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.status} - ${await response.text()}`);
+    }
+
     const data = await response.json();
 
     return {
-      id: data.id,
-      model: data.model,
+      id: data.id || `anthropic-${Date.now()}`,
+      model: data.model || model,
       content: data.content?.[0]?.text || '',
       usage: {
         inputTokens: data.usage?.input_tokens || 0,
@@ -305,120 +250,120 @@ class AnthropicProvider implements LLMProvider {
   }
 
   async streamChat(request: LLMRequest, onChunk: StreamCallback): Promise<LLMResponse> {
-    const result = await this.chat(request);
-    onChunk(result.content as string);
-    return result;
+    const response = await this.chat(request);
+    onChunk(typeof response.content === 'string' ? response.content : JSON.stringify(response.content));
+    return response;
   }
 
   async isAvailable(): Promise<boolean> {
-    return !!this.apiKey;
+    return Boolean(this.apiKey);
   }
 
   getModels(): string[] {
-    return ['claude-3-opus-20240229', 'claude-3-sonnet-20240229', 'claude-3-haiku-20240307'];
+    return this.models;
   }
 }
 
-/**
- * LLM Adapter - 统一入口
- */
+interface RuntimeProviderEntry {
+  config: LLMProviderConfig;
+  provider: LLMProvider;
+}
+
+const createProviderByKind = (providerId: string, kind: LlmProviderKind): LLMProvider => {
+  if (kind === 'openrouter') {
+    return new OpenRouterProvider(providerId);
+  }
+  if (kind === 'anthropic') {
+    return new AnthropicProvider(providerId);
+  }
+  if (kind === 'ollama') {
+    return new OpenAICompatibleProvider(providerId, false);
+  }
+  return new OpenAICompatibleProvider(providerId, true);
+};
+
 export class LLMAdapter {
-  private providers: Map<string, LLMProvider> = new Map();
-  private defaultProvider: string = 'openrouter';
+  private providers = new Map<string, RuntimeProviderEntry>();
+  private fallbackProviderId: string | null = null;
 
-  constructor() {
-    // 注册默认providers
-    this.providers.set('openrouter', new OpenRouterProvider());
-    this.providers.set('openai', new OpenAIProvider());
-    this.providers.set('anthropic', new AnthropicProvider());
-  }
-
-  /**
-   * 配置LLM
-   */
   configure(config: LLMConfig): void {
-    this.defaultProvider = config.defaultProvider || 'openrouter';
+    this.providers.clear();
+    this.fallbackProviderId = null;
 
-    // 配置各provider
-    if (config.openrouter) {
-      (this.providers.get('openrouter') as OpenRouterProvider)?.configure(config.openrouter);
-    }
-    if (config.openai) {
-      (this.providers.get('openai') as OpenAIProvider)?.configure(config.openai);
-    }
-    if (config.anthropic) {
-      (this.providers.get('anthropic') as AnthropicProvider)?.configure(config.anthropic);
+    for (const providerConfig of config.providers) {
+      const provider = createProviderByKind(providerConfig.id, providerConfig.kind);
+      if ('configure' in provider && typeof (provider as { configure?: (config: LLMProviderConfig) => void }).configure === 'function') {
+        (provider as { configure: (config: LLMProviderConfig) => void }).configure(providerConfig);
+      }
+
+      this.providers.set(providerConfig.id, {
+        config: providerConfig,
+        provider,
+      });
+
+      if (!this.fallbackProviderId && providerConfig.enabled) {
+        this.fallbackProviderId = providerConfig.id;
+      }
     }
   }
 
-  /**
-   * 发送聊天请求
-   */
-  async chat(request: LLMRequest, provider?: string): Promise<LLMResponse> {
-    const providerName = provider || this.defaultProvider;
-    const p = this.providers.get(providerName);
-
-    if (!p) {
-      throw new Error(`Provider not found: ${providerName}`);
+  async chat(request: LLMRequest, providerId?: string): Promise<LLMResponse> {
+    const resolvedProviderId = providerId || this.fallbackProviderId;
+    if (!resolvedProviderId) {
+      throw new Error('No LLM provider configured');
     }
 
-    if (!(await p.isAvailable())) {
-      throw new Error(`Provider not configured: ${providerName}`);
+    const runtimeProvider = this.providers.get(resolvedProviderId);
+    if (!runtimeProvider) {
+      throw new Error(`Provider not found: ${resolvedProviderId}`);
     }
 
-    return p.chat(request);
+    if (!runtimeProvider.config.enabled) {
+      throw new Error(`Provider disabled: ${resolvedProviderId}`);
+    }
+
+    if (!(await runtimeProvider.provider.isAvailable())) {
+      throw new Error(`Provider not configured: ${resolvedProviderId}`);
+    }
+
+    return runtimeProvider.provider.chat(request);
   }
 
-  /**
-   * 流式聊天
-   */
-  async streamChat(
-    request: LLMRequest,
-    onChunk: StreamCallback,
-    provider?: string
-  ): Promise<LLMResponse> {
-    const providerName = provider || this.defaultProvider;
-    const p = this.providers.get(providerName);
-
-    if (!p) {
-      throw new Error(`Provider not found: ${providerName}`);
+  async streamChat(request: LLMRequest, onChunk: StreamCallback, providerId?: string): Promise<LLMResponse> {
+    const resolvedProviderId = providerId || this.fallbackProviderId;
+    if (!resolvedProviderId) {
+      throw new Error('No LLM provider configured');
     }
 
-    return p.streamChat(request, onChunk);
+    const runtimeProvider = this.providers.get(resolvedProviderId);
+    if (!runtimeProvider) {
+      throw new Error(`Provider not found: ${resolvedProviderId}`);
+    }
+
+    return runtimeProvider.provider.streamChat(request, onChunk);
   }
 
-  /**
-   * 测试连接
-   */
-  async testConnection(provider: string): Promise<{ success: boolean; error?: string }> {
-    const p = this.providers.get(provider);
-    if (!p) {
-      return { success: false, error: `Provider not found: ${provider}` };
+  async testConnection(providerId: string): Promise<{ success: boolean; error?: string }> {
+    const runtimeProvider = this.providers.get(providerId);
+    if (!runtimeProvider) {
+      return { success: false, error: `Provider not found: ${providerId}` };
     }
 
     try {
-      const available = await p.isAvailable();
+      const available = await runtimeProvider.provider.isAvailable();
       return { success: available, error: available ? undefined : 'Provider not configured' };
     } catch (error) {
       return { success: false, error: String(error) };
     }
   }
 
-  /**
-   * 获取可用模型列表
-   */
-  getAvailableModels(provider: string): string[] {
-    const p = this.providers.get(provider);
-    return p?.getModels() || [];
+  getAvailableModels(providerId: string): string[] {
+    return this.providers.get(providerId)?.config.models || [];
   }
 
-  /**
-   * 获取默认provider
-   */
   getDefaultProvider(): string {
-    return this.defaultProvider;
+    return this.fallbackProviderId || 'openrouter';
   }
 }
 
-// 单例导出
 export const llmAdapter = new LLMAdapter();

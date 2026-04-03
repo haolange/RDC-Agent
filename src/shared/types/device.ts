@@ -2,9 +2,30 @@
  * Device Types - 设备管理相关类型定义
  */
 
-export type ReplayDeviceStatus = 'offline' | 'loading' | 'connected' | 'online';
+export type ReplayDeviceStatus = 'offline' | 'loading' | 'connected' | 'online' | 'recoverable';
 
 export type ReplayDeviceTransport = 'local' | 'adb_android';
+export type ReplayDeviceRecoverySource = 'cache' | 'startup_probe' | 'prepared_surface';
+
+export interface AndroidBootstrapMetadata {
+  packageName?: string;
+  activityName?: string;
+  abi?: string;
+  apkPath?: string;
+  host?: string;
+  port?: number;
+  remotePort?: number;
+  forwardSpec?: string;
+  configRemotePath?: string;
+  cleanupActions?: string[];
+  installedApk?: boolean;
+  pushedConfig?: boolean;
+  startedActivity?: boolean;
+  createdForward?: boolean;
+  installMode?: 'upgrade' | 'force_replace';
+  installReason?: 'fresh_install' | 'mismatched_existing_apk' | 'version_downgrade' | 'signature_mismatch';
+  uninstalledExisting?: boolean;
+}
 
 export interface ReplayDeviceEntry {
   id: string;
@@ -17,6 +38,14 @@ export interface ReplayDeviceEntry {
   lastError?: string;
   lastSeen?: number;
   remoteId?: string;
+  bootstrap?: AndroidBootstrapMetadata;
+  activationPhase?: 'idle' | 'daemon' | 'context' | 'init' | 'connect' | 'ping' | 'targets' | 'ready';
+  activationErrorCode?: string;
+  activationErrorMessage?: string;
+  activationUpdatedAt?: number;
+  recoveryEligible?: boolean;
+  recoveryValidatedAt?: number;
+  recoverySource?: ReplayDeviceRecoverySource;
 }
 
 export interface ReplayDeviceStatusChangedPayload {

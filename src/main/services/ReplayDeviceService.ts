@@ -1,12 +1,22 @@
-﻿import { BrowserWindow } from 'electron';
+import { BrowserWindow } from 'electron';
 import { spawn } from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
 import { toolBridge } from './ToolBridge';
-import type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from '@shared/types/device';
+import { storageAdapter } from './StorageAdapter';
+import type {
+  AndroidBootstrapMetadata,
+  ReplayDeviceEntry,
+  ReplayDeviceStatusChangedPayload,
+  ReplayDeviceTransport,
+} from '@shared/types/device';
 import { generateShortId } from '@shared/utils/id';
 import type { ToolCallResult } from '@shared/types/tool';
 
 const POLL_INTERVAL_MS = 5000;
 const ACTIVATE_TIMEOUT_MS = 25000;
+const RECOVERY_PROBE_TIMEOUT_MS = 12000;
+const PREPARED_REMOTE_TTL_MS = 10 * 60 * 1000;
 
 const LOCAL_DEVICE: ReplayDeviceEntry = {
   id: 'local',
@@ -17,12 +27,267 @@ const LOCAL_DEVICE: ReplayDeviceEntry = {
   detailText: 'Local replay ready',
 };
 
+interface DeviceResumeCacheRecord {
+  deviceId: string;
+  serial: string;
+  label: string;
+  transport: ReplayDeviceTransport;
+  bootstrap?: AndroidBootstrapMetadata;
+  lastValidatedAt: number;
+}
+
+interface DeviceResumeCachePayload {
+  lastDevice?: DeviceResumeCacheRecord;
+}
+
+export interface PreparedRemoteSurface {
+  deviceId: string;
+  serial: string;
+  contextId: string;
+  remoteId: string;
+  validatedAt: number;
+  bootstrap?: AndroidBootstrapMetadata;
+}
+
 function sanitizeDeviceId(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-');
 }
 
-function isToolError(result: ToolCallResult, fallback: string): string {
-  return result.error?.message ?? fallback;
+function adbUnavailableMessage(): string {
+  return 'adb executable not found. Configure RDX_ANDROID_ADB_PATH or install Android platform-tools.';
+}
+
+function candidateAdbPaths(): string[] {
+  const candidates: string[] = [];
+  const push = (value?: string) => {
+    const trimmed = value?.trim();
+    if (trimmed) {
+      candidates.push(trimmed);
+    }
+  };
+
+  push(process.env.RDX_ANDROID_ADB_PATH);
+  push(process.env.ADB);
+
+  for (const envName of ['ANDROID_SDK_ROOT', 'ANDROID_HOME']) {
+    const root = process.env[envName]?.trim();
+    if (!root) {
+      continue;
+    }
+    push(path.join(root, 'platform-tools', 'adb.exe'));
+    push(path.join(root, 'platform-tools', 'adb'));
+  }
+
+  const localAppData = process.env.LOCALAPPDATA?.trim();
+  if (localAppData) {
+    push(path.join(localAppData, 'Android', 'Sdk', 'platform-tools', 'adb.exe'));
+  }
+
+  return candidates;
+}
+
+function resolveAdbExecutable(): string {
+  for (const candidate of candidateAdbPaths()) {
+    if (fs.existsSync(candidate)) {
+      return path.resolve(candidate);
+    }
+  }
+
+  for (const entry of (process.env.PATH ?? '').split(path.delimiter)) {
+    const trimmed = entry.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    for (const adbName of ['adb.exe', 'adb']) {
+      const candidate = path.join(trimmed, adbName);
+      if (fs.existsSync(candidate)) {
+        return path.resolve(candidate);
+      }
+    }
+  }
+
+  throw new Error(adbUnavailableMessage());
+}
+
+function normalizeString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function normalizeBoolean(value: unknown): boolean | undefined {
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+function normalizeNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function parseAndroidBootstrapMetadata(payload: unknown): AndroidBootstrapMetadata | undefined {
+  if (!payload || typeof payload !== 'object') {
+    return undefined;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const cleanupActions = Array.isArray(record.cleanup_actions)
+    ? record.cleanup_actions.filter((item): item is string => typeof item === 'string')
+    : undefined;
+
+  const metadata: AndroidBootstrapMetadata = {
+    packageName: normalizeString(record.package_name),
+    activityName: normalizeString(record.activity_name),
+    abi: normalizeString(record.abi),
+    apkPath: normalizeString(record.apk_path),
+    host: normalizeString(record.host),
+    port: normalizeNumber(record.port),
+    remotePort: normalizeNumber(record.remote_port),
+    forwardSpec: normalizeString(record.forward_spec),
+    configRemotePath: normalizeString(record.config_remote_path),
+    cleanupActions,
+    installedApk: normalizeBoolean(record.installed_apk),
+    pushedConfig: normalizeBoolean(record.pushed_config),
+    startedActivity: normalizeBoolean(record.started_activity),
+    createdForward: normalizeBoolean(record.created_forward),
+    installMode: record.install_mode === 'upgrade' || record.install_mode === 'force_replace'
+      ? record.install_mode
+      : undefined,
+    installReason:
+      record.install_reason === 'fresh_install'
+      || record.install_reason === 'mismatched_existing_apk'
+      || record.install_reason === 'version_downgrade'
+      || record.install_reason === 'signature_mismatch'
+        ? record.install_reason
+        : undefined,
+    uninstalledExisting: normalizeBoolean(record.uninstalled_existing),
+  };
+
+  return Object.values(metadata).some((value) => value !== undefined) ? metadata : undefined;
+}
+
+function parsePersistedAndroidBootstrapMetadata(payload: unknown): AndroidBootstrapMetadata | undefined {
+  if (!payload || typeof payload !== 'object') {
+    return undefined;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const cleanupActions = Array.isArray(record.cleanupActions)
+    ? record.cleanupActions.filter((item): item is string => typeof item === 'string')
+    : undefined;
+
+  const metadata: AndroidBootstrapMetadata = {
+    packageName: normalizeString(record.packageName),
+    activityName: normalizeString(record.activityName),
+    abi: normalizeString(record.abi),
+    apkPath: normalizeString(record.apkPath),
+    host: normalizeString(record.host),
+    port: normalizeNumber(record.port),
+    remotePort: normalizeNumber(record.remotePort),
+    forwardSpec: normalizeString(record.forwardSpec),
+    configRemotePath: normalizeString(record.configRemotePath),
+    cleanupActions,
+    installedApk: normalizeBoolean(record.installedApk),
+    pushedConfig: normalizeBoolean(record.pushedConfig),
+    startedActivity: normalizeBoolean(record.startedActivity),
+    createdForward: normalizeBoolean(record.createdForward),
+    installMode: record.installMode === 'upgrade' || record.installMode === 'force_replace'
+      ? record.installMode
+      : undefined,
+    installReason:
+      record.installReason === 'fresh_install'
+      || record.installReason === 'mismatched_existing_apk'
+      || record.installReason === 'version_downgrade'
+      || record.installReason === 'signature_mismatch'
+        ? record.installReason
+        : undefined,
+    uninstalledExisting: normalizeBoolean(record.uninstalledExisting),
+  };
+
+  return Object.values(metadata).some((value) => value !== undefined) ? metadata : undefined;
+}
+
+function parseResumeCacheRecord(payload: unknown): DeviceResumeCacheRecord | null {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const record = payload as Record<string, unknown>;
+  const deviceId = normalizeString(record.deviceId);
+  const serial = normalizeString(record.serial);
+  const label = normalizeString(record.label);
+  const transport = record.transport === 'local' || record.transport === 'adb_android'
+    ? record.transport
+    : undefined;
+  const lastValidatedAt = normalizeNumber(record.lastValidatedAt);
+
+  if (!deviceId || !serial || !label || !transport || !lastValidatedAt) {
+    return null;
+  }
+
+  return {
+    deviceId,
+    serial,
+    label,
+    transport,
+    lastValidatedAt,
+    bootstrap: parsePersistedAndroidBootstrapMetadata(record.bootstrap),
+  };
+}
+
+function buildRemoteReadyText(bootstrap?: AndroidBootstrapMetadata): string {
+  if (!bootstrap) {
+    return 'Remote server ready';
+  }
+
+  const suffix: string[] = [];
+  if (bootstrap.installMode === 'force_replace') {
+    suffix.push('APK force replaced');
+  } else if (bootstrap.installedApk && bootstrap.installReason === 'fresh_install') {
+    suffix.push('APK installed');
+  } else if (bootstrap.installedApk) {
+    suffix.push('APK upgraded');
+  } else if (bootstrap.packageName) {
+    suffix.push('APK verified');
+  }
+  if (bootstrap.abi) {
+    suffix.push(bootstrap.abi);
+  }
+  if (bootstrap.forwardSpec) {
+    suffix.push(bootstrap.forwardSpec);
+  }
+
+  return suffix.length > 0 ? `Remote server ready · ${suffix.join(' · ')}` : 'Remote server ready';
+}
+
+function buildRecoveryReadyText(bootstrap?: AndroidBootstrapMetadata): string {
+  const readyText = buildRemoteReadyText(bootstrap);
+  return readyText.replace('Remote server ready', 'Remote server ready to resume');
+}
+
+function parseToolError(result: ToolCallResult, fallbackMessage: string): {
+  message: string;
+  code?: string;
+} {
+  return {
+    message: result.error?.message ?? fallbackMessage,
+    code: result.error?.code,
+  };
+}
+
+function applyActivationFailure(
+  device: ReplayDeviceEntry,
+  phase: ReplayDeviceEntry['activationPhase'],
+  message: string,
+  code?: string,
+): ReplayDeviceEntry {
+  return {
+    ...device,
+    status: 'offline',
+    detailText: message,
+    lastError: message,
+    activationPhase: phase,
+    activationErrorCode: code,
+    activationErrorMessage: message,
+    activationUpdatedAt: Date.now(),
+  };
 }
 
 function parseAdbDeviceLine(line: string): ReplayDeviceEntry | null {
@@ -93,6 +358,10 @@ export class ReplayDeviceService {
   private refreshPromise: Promise<ReplayDeviceEntry[]> | null = null;
   private activationPromises = new Map<string, Promise<ReplayDeviceEntry>>();
   private probeContexts = new Map<string, string>();
+  private preparedRemotes = new Map<string, PreparedRemoteSurface>();
+  private recoveryProbePromises = new Map<string, Promise<void>>();
+  private recoveryProbeAttempted = new Set<string>();
+  private resumeCache: DeviceResumeCacheRecord | null = null;
 
   setMainWindow(window: BrowserWindow): void {
     this.mainWindow = window;
@@ -104,6 +373,7 @@ export class ReplayDeviceService {
     }
 
     this.initialized = true;
+    await this.loadResumeCache();
     await this.refreshDevices();
     this.pollTimer = setInterval(() => {
       void this.refreshDevices().catch((error) => {
@@ -121,6 +391,10 @@ export class ReplayDeviceService {
 
   listDevices(): ReplayDeviceEntry[] {
     return this.getSortedDevices();
+  }
+
+  getDeviceById(deviceId: string): ReplayDeviceEntry | null {
+    return this.devices.get(deviceId) ?? null;
   }
 
   async refreshDevices(): Promise<ReplayDeviceEntry[]> {
@@ -151,6 +425,177 @@ export class ReplayDeviceService {
     return activationPromise;
   }
 
+  peekPreparedRemote(deviceId: string): PreparedRemoteSurface | null {
+    const prepared = this.resolvePreparedRemote(deviceId);
+    return prepared ? { ...prepared } : null;
+  }
+
+  consumePreparedRemote(deviceId: string): PreparedRemoteSurface | null {
+    const prepared = this.resolvePreparedRemote(deviceId);
+    if (!prepared) {
+      return null;
+    }
+
+    this.preparedRemotes.delete(deviceId);
+    return { ...prepared };
+  }
+
+  invalidatePreparedRemote(deviceId: string): void {
+    this.preparedRemotes.delete(deviceId);
+    const device = this.devices.get(deviceId);
+    if (!device || device.status !== 'recoverable') {
+      return;
+    }
+
+    this.updateDevice({
+      ...device,
+      status: 'offline',
+      remoteId: undefined,
+      detailText: 'Ready to start remote server',
+      lastError: undefined,
+      recoverySource: 'cache',
+    });
+  }
+
+  async probeRecovery(deviceId: string): Promise<void> {
+    const existingPromise = this.recoveryProbePromises.get(deviceId);
+    if (existingPromise) {
+      return existingPromise;
+    }
+
+    const recoveryPromise = this.performRecoveryProbe(deviceId)
+      .finally(() => {
+        this.recoveryProbePromises.delete(deviceId);
+      });
+
+    this.recoveryProbePromises.set(deviceId, recoveryPromise);
+    return recoveryPromise;
+  }
+
+  private getResumeCachePath(): string {
+    return path.join(storageAdapter.getWorkspacePath(), 'common', 'config', 'device_resume.json');
+  }
+
+  private async loadResumeCache(): Promise<void> {
+    try {
+      const cachePath = this.getResumeCachePath();
+      if (!fs.existsSync(cachePath)) {
+        this.resumeCache = null;
+        return;
+      }
+
+      const content = await fs.promises.readFile(cachePath, 'utf-8');
+      const parsed = JSON.parse(content) as DeviceResumeCachePayload;
+      this.resumeCache = parseResumeCacheRecord(parsed.lastDevice);
+    } catch (error) {
+      console.warn('[ReplayDeviceService] Failed to read device resume cache:', error);
+      this.resumeCache = null;
+    }
+  }
+
+  private async persistResumeCache(device: ReplayDeviceEntry, validatedAt: number): Promise<void> {
+    if (device.type !== 'android' || !device.serial) {
+      return;
+    }
+
+    const nextRecord: DeviceResumeCacheRecord = {
+      deviceId: device.id,
+      serial: device.serial,
+      label: device.label,
+      transport: device.transport,
+      bootstrap: device.bootstrap,
+      lastValidatedAt: validatedAt,
+    };
+
+    this.resumeCache = nextRecord;
+
+    try {
+      const cachePath = this.getResumeCachePath();
+      await fs.promises.mkdir(path.dirname(cachePath), { recursive: true });
+      await fs.promises.writeFile(
+        cachePath,
+        JSON.stringify({ lastDevice: nextRecord }, null, 2),
+        'utf-8',
+      );
+    } catch (error) {
+      console.warn('[ReplayDeviceService] Failed to persist device resume cache:', error);
+    }
+  }
+
+  private resolvePreparedRemote(deviceId: string): PreparedRemoteSurface | null {
+    const prepared = this.preparedRemotes.get(deviceId);
+    if (!prepared) {
+      return null;
+    }
+
+    const currentDevice = this.devices.get(deviceId);
+    const expired = Date.now() - prepared.validatedAt > PREPARED_REMOTE_TTL_MS;
+    const serialMismatch = Boolean(currentDevice?.serial && currentDevice.serial !== prepared.serial);
+    if (expired || serialMismatch) {
+      this.preparedRemotes.delete(deviceId);
+      return null;
+    }
+
+    return prepared;
+  }
+
+  private shouldPreserveTransientState(device: ReplayDeviceEntry): boolean {
+    if (device.status === 'recoverable') {
+      return this.resolvePreparedRemote(device.id) !== null;
+    }
+
+    return device.status !== 'offline';
+  }
+
+  private matchesResumeCache(device: ReplayDeviceEntry): boolean {
+    return Boolean(
+      device.type === 'android'
+      && device.serial
+      && this.resumeCache
+      && this.resumeCache.serial === device.serial,
+    );
+  }
+
+  private maybeAnnotateRecovery(device: ReplayDeviceEntry): ReplayDeviceEntry {
+    if (!this.matchesResumeCache(device)) {
+      return device;
+    }
+
+    return {
+      ...device,
+      recoveryEligible: true,
+      recoverySource: device.recoverySource ?? 'cache',
+      recoveryValidatedAt: device.recoveryValidatedAt ?? this.resumeCache?.lastValidatedAt,
+      bootstrap: device.bootstrap ?? this.resumeCache?.bootstrap,
+    };
+  }
+
+  private maybeScheduleRecoveryProbe(devices: ReplayDeviceEntry[]): void {
+    const cached = this.resumeCache;
+    if (!cached) {
+      return;
+    }
+
+    const candidate = devices.find((device) =>
+      device.type === 'android'
+      && device.serial === cached.serial
+      && device.status === 'offline'
+      && device.lastError === undefined,
+    );
+    if (!candidate) {
+      return;
+    }
+
+    if (this.recoveryProbeAttempted.has(candidate.id) || this.resolvePreparedRemote(candidate.id)) {
+      return;
+    }
+
+    this.recoveryProbeAttempted.add(candidate.id);
+    void this.probeRecovery(candidate.id).catch((error) => {
+      console.warn('[ReplayDeviceService] Recovery probe failed:', error);
+    });
+  }
+
   private async performRefresh(): Promise<ReplayDeviceEntry[]> {
     const detectedDevices = await this.detectAdbDevices();
     const now = Date.now();
@@ -158,19 +603,50 @@ export class ReplayDeviceService {
     const detectedIds = new Set<string>(['local']);
 
     for (const detected of detectedDevices) {
-      detectedIds.add(detected.id);
-      const previous = this.devices.get(detected.id);
-      if (previous && previous.status !== 'offline' && detected.lastError === undefined) {
+      const annotatedDetected = this.maybeAnnotateRecovery(detected);
+      detectedIds.add(annotatedDetected.id);
+      const previous = this.devices.get(annotatedDetected.id);
+      if (previous && this.shouldPreserveTransientState(previous) && annotatedDetected.lastError === undefined) {
         nextDevices.set(detected.id, {
-          ...detected,
+          ...annotatedDetected,
           status: previous.status,
-          detailText: previous.detailText ?? detected.detailText,
+          detailText: previous.detailText ?? annotatedDetected.detailText,
           lastError: previous.lastError,
           remoteId: previous.remoteId,
-          lastSeen: detected.lastSeen ?? previous.lastSeen,
+          bootstrap: previous.bootstrap ?? annotatedDetected.bootstrap,
+          activationPhase: previous.activationPhase,
+          activationErrorCode: previous.activationErrorCode,
+          activationErrorMessage: previous.activationErrorMessage,
+          activationUpdatedAt: previous.activationUpdatedAt,
+          lastSeen: annotatedDetected.lastSeen ?? previous.lastSeen,
+          recoveryEligible: previous.recoveryEligible ?? annotatedDetected.recoveryEligible,
+          recoveryValidatedAt: previous.recoveryValidatedAt ?? annotatedDetected.recoveryValidatedAt,
+          recoverySource: previous.recoverySource ?? annotatedDetected.recoverySource,
+        });
+      } else if (
+        previous
+        && previous.activationErrorMessage
+        && previous.lastError
+        && annotatedDetected.status === 'offline'
+        && annotatedDetected.lastError === undefined
+      ) {
+        nextDevices.set(detected.id, {
+          ...annotatedDetected,
+          detailText: previous.detailText ?? previous.activationErrorMessage,
+          lastError: previous.lastError,
+          remoteId: previous.remoteId,
+          bootstrap: previous.bootstrap ?? annotatedDetected.bootstrap,
+          activationPhase: previous.activationPhase,
+          activationErrorCode: previous.activationErrorCode,
+          activationErrorMessage: previous.activationErrorMessage,
+          activationUpdatedAt: previous.activationUpdatedAt,
+          lastSeen: annotatedDetected.lastSeen ?? previous.lastSeen,
+          recoveryEligible: previous.recoveryEligible ?? annotatedDetected.recoveryEligible,
+          recoveryValidatedAt: previous.recoveryValidatedAt ?? annotatedDetected.recoveryValidatedAt,
+          recoverySource: previous.recoverySource ?? annotatedDetected.recoverySource,
         });
       } else {
-        nextDevices.set(detected.id, detected);
+        nextDevices.set(annotatedDetected.id, annotatedDetected);
       }
     }
 
@@ -178,6 +654,8 @@ export class ReplayDeviceService {
       if (detectedIds.has(deviceId) || deviceId === 'local') {
         continue;
       }
+
+      this.preparedRemotes.delete(deviceId);
 
       nextDevices.set(deviceId, {
         ...device,
@@ -187,7 +665,9 @@ export class ReplayDeviceService {
       });
     }
 
-    return this.replaceDevices(nextDevices);
+    const devices = this.replaceDevices(nextDevices);
+    this.maybeScheduleRecoveryProbe(devices);
+    return devices;
   }
 
   private async detectAdbDevices(): Promise<ReplayDeviceEntry[]> {
@@ -206,6 +686,8 @@ export class ReplayDeviceService {
           detailText: message,
           lastError: message,
         }));
+
+      this.preparedRemotes.clear();
 
       const fallbackDevices = new Map<string, ReplayDeviceEntry>([[LOCAL_DEVICE.id, LOCAL_DEVICE]]);
       for (const device of offlineDevices) {
@@ -231,11 +713,16 @@ export class ReplayDeviceService {
       return this.devices.get(deviceId)!;
     }
 
+    const isRecoverable = device.status === 'recoverable';
     this.updateDevice({
       ...device,
       status: 'loading',
-      detailText: 'Running remote server command...',
+      detailText: isRecoverable ? 'Resuming remote server...' : 'Preparing Android remote server...',
       lastError: undefined,
+      activationPhase: 'daemon',
+      activationErrorCode: undefined,
+      activationErrorMessage: undefined,
+      activationUpdatedAt: Date.now(),
     });
 
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -244,42 +731,105 @@ export class ReplayDeviceService {
 
     try {
       const activated = await Promise.race([
-        this.activateRemoteDevice(deviceId),
+        isRecoverable ? this.resumePreparedRemote(deviceId) : this.activateRemoteDevice(deviceId),
         timeoutPromise,
       ]);
       this.updateDevice(activated);
       return activated;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      const failedDevice: ReplayDeviceEntry = {
-        ...(this.devices.get(deviceId) ?? device),
-        status: 'offline',
-        detailText: message,
-        lastError: message,
-      };
+      const currentDevice = this.devices.get(deviceId) ?? device;
+      const failedDevice = applyActivationFailure(
+        currentDevice,
+        currentDevice.activationPhase ?? 'connect',
+        message,
+        currentDevice.activationErrorCode,
+      );
       this.updateDevice(failedDevice);
       return failedDevice;
     }
   }
 
-  private async activateRemoteDevice(deviceId: string): Promise<ReplayDeviceEntry> {
+  private async performRecoveryProbe(deviceId: string): Promise<void> {
     const device = this.devices.get(deviceId);
-    if (!device?.serial) {
+    if (!device || device.type !== 'android' || !device.serial) {
+      return;
+    }
+
+    this.updateDevice({
+      ...device,
+      status: 'loading',
+      detailText: 'Validating remote server for resume...',
+      lastError: undefined,
+      activationPhase: 'context',
+      activationErrorCode: undefined,
+      activationErrorMessage: undefined,
+      activationUpdatedAt: Date.now(),
+      recoveryEligible: true,
+      recoverySource: 'startup_probe',
+    });
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Timed out while probing remote recovery.')), RECOVERY_PROBE_TIMEOUT_MS);
+    });
+
+    try {
+      await Promise.race([
+        this.probeRemoteSurface(device),
+        timeoutPromise,
+      ]);
+    } catch (error) {
+      this.preparedRemotes.delete(deviceId);
+      const current = this.devices.get(deviceId) ?? device;
+      this.updateDevice({
+        ...current,
+        status: 'offline',
+        detailText: 'Ready to start remote server',
+        lastError: undefined,
+        activationPhase: 'idle',
+        activationErrorCode: undefined,
+        activationErrorMessage: undefined,
+        activationUpdatedAt: Date.now(),
+        recoveryEligible: true,
+        recoverySource: 'cache',
+      });
+      console.warn('[ReplayDeviceService] Recovery probe did not prepare a resumable surface:', error);
+    }
+  }
+
+  private async probeRemoteSurface(device: ReplayDeviceEntry): Promise<void> {
+    if (!device.serial) {
       throw new Error('Android device serial is missing.');
     }
 
     await this.ensureDaemonReady();
+    const contextId = `ctx-device-resume-${sanitizeDeviceId(device.serial)}`;
+    this.probeContexts.set(device.id, contextId);
 
-    const contextId = `ctx-device-${sanitizeDeviceId(device.serial)}-${generateShortId()}`;
-    this.probeContexts.set(deviceId, contextId);
+    await toolBridge.call({
+      toolName: 'rd.session.clear_context',
+      args: { target_context_id: contextId },
+    });
 
     const contextResult = await toolBridge.call({
       toolName: 'rd.session.create_context',
       args: { context_id: contextId },
     });
     if (!contextResult.ok) {
-      throw new Error(isToolError(contextResult, 'Failed to create a replay device context.'));
+      const parsedError = parseToolError(contextResult, 'Failed to create a recovery probe context.');
+      throw new Error(parsedError.message);
     }
+
+    this.updateDevice({
+      ...device,
+      status: 'loading',
+      detailText: 'Validating remote server for resume...',
+      lastError: undefined,
+      activationPhase: 'init',
+      activationUpdatedAt: Date.now(),
+      recoveryEligible: true,
+      recoverySource: 'startup_probe',
+    });
 
     const initResult = await toolBridge.call({
       toolName: 'rd.core.init',
@@ -287,8 +837,20 @@ export class ReplayDeviceService {
       contextId,
     });
     if (!initResult.ok) {
-      throw new Error(isToolError(initResult, 'Failed to initialize remote capability.'));
+      const parsedError = parseToolError(initResult, 'Failed to initialize recovery probe capability.');
+      throw new Error(parsedError.message);
     }
+
+    this.updateDevice({
+      ...device,
+      status: 'loading',
+      detailText: 'Validating remote server for resume...',
+      lastError: undefined,
+      activationPhase: 'connect',
+      activationUpdatedAt: Date.now(),
+      recoveryEligible: true,
+      recoverySource: 'startup_probe',
+    });
 
     const connectResult = await toolBridge.call({
       toolName: 'rd.remote.connect',
@@ -302,7 +864,203 @@ export class ReplayDeviceService {
       contextId,
     });
     if (!connectResult.ok) {
-      throw new Error(isToolError(connectResult, 'Failed to connect to the Android RenderDoc server.'));
+      const parsedError = parseToolError(connectResult, 'Failed to connect to the Android RenderDoc server.');
+      throw new Error(parsedError.message);
+    }
+
+    const remoteId = typeof connectResult.data?.remote_id === 'string'
+      ? connectResult.data.remote_id
+      : undefined;
+    if (!remoteId) {
+      throw new Error('Remote recovery probe did not return a remote_id.');
+    }
+
+    const bootstrap = parseAndroidBootstrapMetadata(
+      connectResult.data?.detail && typeof connectResult.data.detail === 'object'
+        ? (connectResult.data.detail as Record<string, unknown>).bootstrap
+        : undefined,
+    );
+
+    const pingResult = await toolBridge.call({
+      toolName: 'rd.remote.ping',
+      args: { remote_id: remoteId },
+      contextId,
+    });
+    if (!pingResult.ok) {
+      const parsedError = parseToolError(pingResult, 'Remote server recovery ping failed.');
+      throw new Error(parsedError.message);
+    }
+
+    const targetsResult = await toolBridge.call({
+      toolName: 'rd.remote.list_targets',
+      args: { remote_id: remoteId },
+      contextId,
+    });
+    if (!targetsResult.ok) {
+      const parsedError = parseToolError(targetsResult, 'Remote recovery target discovery failed.');
+      throw new Error(parsedError.message);
+    }
+
+    const validatedAt = Date.now();
+    this.preparedRemotes.set(device.id, {
+      deviceId: device.id,
+      serial: device.serial,
+      contextId,
+      remoteId,
+      validatedAt,
+      bootstrap,
+    });
+
+    await this.persistResumeCache({
+      ...device,
+      bootstrap,
+    }, validatedAt);
+
+    this.updateDevice({
+      ...device,
+      status: 'recoverable',
+      remoteId,
+      bootstrap,
+      detailText: buildRecoveryReadyText(bootstrap),
+      lastError: undefined,
+      activationPhase: 'ready',
+      activationErrorCode: undefined,
+      activationErrorMessage: undefined,
+      activationUpdatedAt: validatedAt,
+      lastSeen: Date.now(),
+      recoveryEligible: true,
+      recoveryValidatedAt: validatedAt,
+      recoverySource: 'startup_probe',
+    });
+  }
+
+  private async resumePreparedRemote(deviceId: string): Promise<ReplayDeviceEntry> {
+    const device = this.devices.get(deviceId);
+    if (!device?.serial) {
+      throw new Error('Android device serial is missing.');
+    }
+
+    const prepared = this.resolvePreparedRemote(deviceId);
+    if (!prepared) {
+      return this.activateRemoteDevice(deviceId);
+    }
+
+    if (prepared.serial !== device.serial) {
+      this.invalidatePreparedRemote(deviceId);
+      return this.activateRemoteDevice(deviceId);
+    }
+
+    await this.ensureDaemonReady();
+    this.updateDevice({
+      ...device,
+      status: 'loading',
+      detailText: 'Resuming remote server...',
+      lastError: undefined,
+      activationPhase: 'ping',
+      activationUpdatedAt: Date.now(),
+      recoveryEligible: true,
+      recoverySource: 'prepared_surface',
+    });
+
+    const pingResult = await toolBridge.call({
+      toolName: 'rd.remote.ping',
+      args: { remote_id: prepared.remoteId },
+      contextId: prepared.contextId,
+    });
+    if (!pingResult.ok) {
+      this.invalidatePreparedRemote(deviceId);
+      return this.activateRemoteDevice(deviceId);
+    }
+
+    return {
+      ...device,
+      status: 'online',
+      remoteId: prepared.remoteId,
+      bootstrap: prepared.bootstrap ?? device.bootstrap,
+      detailText: buildRemoteReadyText(prepared.bootstrap ?? device.bootstrap),
+      lastError: undefined,
+      activationPhase: 'ready',
+      activationErrorCode: undefined,
+      activationErrorMessage: undefined,
+      activationUpdatedAt: Date.now(),
+      lastSeen: Date.now(),
+      recoveryEligible: true,
+      recoveryValidatedAt: prepared.validatedAt,
+      recoverySource: 'prepared_surface',
+    };
+  }
+
+  private async activateRemoteDevice(deviceId: string): Promise<ReplayDeviceEntry> {
+    const device = this.devices.get(deviceId);
+    if (!device?.serial) {
+      throw new Error('Android device serial is missing.');
+    }
+
+    await this.ensureDaemonReady();
+    this.updateDevice({
+      ...device,
+      status: 'loading',
+      detailText: 'Allocating remote context...',
+      lastError: undefined,
+      activationPhase: 'context',
+      activationUpdatedAt: Date.now(),
+    });
+
+    const contextId = `ctx-device-${sanitizeDeviceId(device.serial)}-${generateShortId()}`;
+    this.probeContexts.set(deviceId, contextId);
+
+    const contextResult = await toolBridge.call({
+      toolName: 'rd.session.create_context',
+      args: { context_id: contextId },
+    });
+    if (!contextResult.ok) {
+      const parsedError = parseToolError(contextResult, 'Failed to create a replay device context.');
+      this.updateDevice(applyActivationFailure(device, 'context', parsedError.message, parsedError.code));
+      throw new Error(parsedError.message);
+    }
+
+    this.updateDevice({
+      ...device,
+      status: 'loading',
+      detailText: 'Initializing remote capability...',
+      lastError: undefined,
+      activationPhase: 'init',
+      activationUpdatedAt: Date.now(),
+    });
+    const initResult = await toolBridge.call({
+      toolName: 'rd.core.init',
+      args: {},
+      contextId,
+    });
+    if (!initResult.ok) {
+      const parsedError = parseToolError(initResult, 'Failed to initialize remote capability.');
+      this.updateDevice(applyActivationFailure(device, 'init', parsedError.message, parsedError.code));
+      throw new Error(parsedError.message);
+    }
+
+    this.updateDevice({
+      ...device,
+      status: 'loading',
+      detailText: 'Connecting to Android RenderDoc server...',
+      lastError: undefined,
+      activationPhase: 'connect',
+      activationUpdatedAt: Date.now(),
+    });
+    const connectResult = await toolBridge.call({
+      toolName: 'rd.remote.connect',
+      args: {
+        timeout_ms: 5000,
+        options: {
+          transport: 'adb_android',
+          device_serial: device.serial,
+        },
+      },
+      contextId,
+    });
+    if (!connectResult.ok) {
+      const parsedError = parseToolError(connectResult, 'Failed to connect to the Android RenderDoc server.');
+      this.updateDevice(applyActivationFailure(device, 'connect', parsedError.message, parsedError.code));
+      throw new Error(parsedError.message);
     }
 
     const remoteId = typeof connectResult.data?.remote_id === 'string'
@@ -312,12 +1070,23 @@ export class ReplayDeviceService {
       throw new Error('Remote connect did not return a remote_id.');
     }
 
+    const bootstrap = parseAndroidBootstrapMetadata(
+      connectResult.data?.detail && typeof connectResult.data.detail === 'object'
+        ? (connectResult.data.detail as Record<string, unknown>).bootstrap
+        : undefined,
+    );
+
     this.updateDevice({
       ...device,
       status: 'connected',
       remoteId,
-      detailText: 'Remote server connected',
+      bootstrap,
+      detailText: buildRemoteReadyText(bootstrap),
       lastError: undefined,
+      activationPhase: 'ping',
+      activationErrorCode: undefined,
+      activationErrorMessage: undefined,
+      activationUpdatedAt: Date.now(),
       lastSeen: Date.now(),
     });
 
@@ -327,25 +1096,62 @@ export class ReplayDeviceService {
       contextId,
     });
     if (!pingResult.ok) {
-      throw new Error(isToolError(pingResult, 'Remote server ping failed.'));
+      const parsedError = parseToolError(pingResult, 'Remote server ping failed.');
+      this.updateDevice(applyActivationFailure({ ...device, remoteId, bootstrap }, 'ping', parsedError.message, parsedError.code));
+      throw new Error(parsedError.message);
     }
 
+    this.updateDevice({
+      ...device,
+      status: 'connected',
+      remoteId,
+      bootstrap,
+      detailText: buildRemoteReadyText(bootstrap),
+      lastError: undefined,
+      activationPhase: 'targets',
+      activationUpdatedAt: Date.now(),
+      lastSeen: Date.now(),
+    });
     const targetsResult = await toolBridge.call({
       toolName: 'rd.remote.list_targets',
       args: { remote_id: remoteId },
       contextId,
     });
     if (!targetsResult.ok) {
-      throw new Error(isToolError(targetsResult, 'Remote target discovery failed.'));
+      const parsedError = parseToolError(targetsResult, 'Remote target discovery failed.');
+      this.updateDevice(applyActivationFailure({ ...device, remoteId, bootstrap }, 'targets', parsedError.message, parsedError.code));
+      throw new Error(parsedError.message);
     }
+
+    const validatedAt = Date.now();
+    this.preparedRemotes.set(deviceId, {
+      deviceId,
+      serial: device.serial,
+      contextId,
+      remoteId,
+      validatedAt,
+      bootstrap,
+    });
+    await this.persistResumeCache({
+      ...device,
+      bootstrap,
+    }, validatedAt);
 
     return {
       ...device,
       status: 'online',
       remoteId,
-      detailText: 'Remote server ready',
+      bootstrap,
+      detailText: buildRemoteReadyText(bootstrap),
       lastError: undefined,
+      activationPhase: 'ready',
+      activationErrorCode: undefined,
+      activationErrorMessage: undefined,
+      activationUpdatedAt: validatedAt,
       lastSeen: Date.now(),
+      recoveryEligible: true,
+      recoveryValidatedAt: validatedAt,
+      recoverySource: 'prepared_surface',
     };
   }
 
@@ -363,8 +1169,10 @@ export class ReplayDeviceService {
   }
 
   private async runAdbCommand(args: string[]): Promise<string[]> {
+    const adbPath = resolveAdbExecutable();
+
     return new Promise((resolve, reject) => {
-      const proc = spawn('adb', args, {
+      const proc = spawn(adbPath, args, {
         windowsHide: true,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
@@ -439,6 +1247,3 @@ export class ReplayDeviceService {
 }
 
 export const replayDeviceService = new ReplayDeviceService();
-
-
-

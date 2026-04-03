@@ -127,27 +127,12 @@ const TimelineEntry: React.FC<{ entry: AgentTimelineEntry; index: number }> = ({
 // Main component
 // ────────────────────────────────────────────────────────
 
-const QUICK_ACTIONS = [
-  { icon: 'Investigate', label: 'Trace pipeline state', prompt: 'Trace the pipeline state around the failing draw call.' },
-  { icon: 'Compare', label: 'Compare captures', prompt: 'Compare the anomalous capture against the baseline and summarize differences.' },
-  { icon: 'Hypothesis', label: 'Form hypotheses', prompt: 'List the most likely hypotheses and the evidence needed to verify each one.' },
-  { icon: 'Report', label: 'Summarize evidence', prompt: 'Summarize the current evidence chain and remaining gaps.' },
-];
-
-const SUGGESTIONS = [
-  'What is the first suspicious render event in this capture?',
-  'Which pipeline state differences are most likely to explain the artifact?',
-  'Check whether the issue is shader, resource, or pass-order related.',
-  'Summarize the next three investigation steps.',
-];
-
 export const AgentChat: React.FC = () => {
   const timeline = useSessionStore((s) => s.timeline);
   const addTimelineEntry = useSessionStore((s) => s.addTimelineEntry);
 
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -173,7 +158,6 @@ export const AgentChat: React.FC = () => {
       };
       addTimelineEntry(userEntry);
       setInputValue('');
-      setShowSuggestions(false);
       setIsTyping(true);
 
       const electronAPI = window.electronAPI;
@@ -227,7 +211,6 @@ export const AgentChat: React.FC = () => {
   const clearTimeline = useCallback(() => {
     useSessionStore.getState().setTimeline([]);
     setInputValue('');
-    setShowSuggestions(true);
     setIsTyping(false);
   }, []);
 
@@ -239,7 +222,7 @@ export const AgentChat: React.FC = () => {
             <div className="chat-agent-avatar debugger">R</div>
             <div className="chat-agent-info">
               <span className="chat-agent-name">RDC Debugger</span>
-              <span className="chat-agent-role">Orchestration timeline</span>
+              <span className="chat-agent-role">Task Timeline</span>
             </div>
           </div>
         </div>
@@ -255,26 +238,15 @@ export const AgentChat: React.FC = () => {
       </div>
 
       <div className="chat-messages scrollbar-thin">
-        {timeline.length === 0 && showSuggestions ? (
+        {timeline.length === 0 ? (
           <div className="chat-empty-state">
             <svg className="chat-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
-            <h3 className="chat-empty-title">Orchestration timeline</h3>
+            <h3 className="chat-empty-title">Task timeline is waiting for the first event</h3>
             <p className="chat-empty-description">
-              Agent messages, tool calls, blockers, and system events will stream here in real time.
+              Agent reasoning, tool calls, blockers, and system messages will append here after the task starts running.
             </p>
-            <div className="chat-empty-suggestions">
-              {SUGGESTIONS.map((s) => (
-                <button
-                  key={s}
-                  className="chat-suggestion-chip"
-                  onClick={() => setInputValue(s)}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
           </div>
         ) : (
           <>
@@ -287,25 +259,12 @@ export const AgentChat: React.FC = () => {
                 <div className="typing-bubble">
                   <span /><span /><span />
                 </div>
-                <span className="typing-text">RDC Debugger is reasoning...</span>
+                <span className="typing-text">RDC Debugger is working...</span>
               </div>
             )}
           </>
         )}
         <div ref={messagesEndRef} />
-      </div>
-
-      <div className="chat-quick-actions">
-        {QUICK_ACTIONS.map((action) => (
-          <button
-            key={action.label}
-            className="quick-action"
-            onClick={() => void submitMessage(action.prompt)}
-          >
-            <span className="quick-action-copy">{action.icon}</span>
-            <span>{action.label}</span>
-          </button>
-        ))}
       </div>
 
       <div className="chat-input-container">

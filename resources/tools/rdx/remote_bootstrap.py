@@ -57,6 +57,9 @@ class AndroidBootstrapResult:
     installed_apk: bool = False
     pushed_config: bool = False
     created_forward: bool = False
+    install_mode: str = ""
+    install_reason: str = ""
+    uninstalled_existing: bool = False
     cleanup_actions: list[str] = field(default_factory=list)
 
 
@@ -66,6 +69,16 @@ class AndroidBootstrapOptions:
     local_port: int = 0
     install_apk: bool = True
     push_config: bool = True
+
+
+_INSTALL_OVERRIDE_HINTS = {
+    "INSTALL_FAILED_VERSION_DOWNGRADE": "version_downgrade",
+    "INSTALL_FAILED_UPDATE_INCOMPATIBLE": "signature_mismatch",
+    "INSTALL_FAILED_SHARED_USER_INCOMPATIBLE": "signature_mismatch",
+    "INSTALL_PARSE_FAILED_INCONSISTENT_CERTIFICATES": "signature_mismatch",
+    "INSTALL_FAILED_CONFLICTING_PROVIDER": "mismatched_existing_apk",
+    "INSTALL_FAILED_UID_CHANGED": "mismatched_existing_apk",
+}
 
 
 def _candidate_adb_paths() -> list[str]:
@@ -138,6 +151,88 @@ def _run_subprocess(
             details={"command": cmd, "returncode": proc.returncode},
         )
     return proc
+
+
+def _extract_install_reason(stderr: str) -> str:
+    text = str(stderr or "").strip()
+    for marker, reason in _INSTALL_OVERRIDE_HINTS.items():
+        if marker in text:
+            return reason
+    return ""
+
+
+def _should_force_replace_install(stderr: str) -> bool:
+    return bool(_extract_install_reason(stderr))
+
+
+def _run_install_command(adb_path: str, device_serial: str, apk_path: str, *, replace_existing: bool) -> subprocess.CompletedProcess[str]:
+    install_args = ["install"]
+    if replace_existing:
+        install_args.append("-r")
+    install_args.extend(["-g", "--force-queryable", str(apk_path)])
+    return subprocess.run(
+        _adb_base_cmd(adb_path, device_serial) + install_args,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=180.0,
+        check=False,
+    )
+
+
+def _ensure_android_helper_installed(adb_path: str, device_serial: str, package_name: str, apk_path: str, result: AndroidBootstrapResult) -> None:
+    proc = _run_install_command(adb_path, device_serial, apk_path, replace_existing=True)
+    if proc.returncode == 0:
+        result.installed_apk = True
+        result.install_mode = "upgrade"
+        result.install_reason = "fresh_install" if "Success" in str(proc.stdout or "") else "mismatched_existing_apk"
+        result.cleanup_actions.append("apk-installed")
+        return
+
+    stderr = (proc.stderr or proc.stdout or "").strip()
+    install_reason = _extract_install_reason(stderr)
+    if not _should_force_replace_install(stderr):
+        raise AndroidRemoteBootstrapError(
+            "android_apk_install_failed",
+            f"Failed to install RenderDocCmd APK {Path(apk_path).name}: {stderr or 'command failed'}",
+            details={
+                "command": _adb_base_cmd(adb_path, device_serial) + ["install", "-r", "-g", "--force-queryable", str(apk_path)],
+                "returncode": proc.returncode,
+            },
+        )
+
+    uninstall_proc = subprocess.run(
+        _adb_base_cmd(adb_path, device_serial) + ["uninstall", package_name],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=60.0,
+        check=False,
+    )
+    if uninstall_proc.returncode != 0:
+        uninstall_stderr = (uninstall_proc.stderr or uninstall_proc.stdout or "").strip()
+        raise AndroidRemoteBootstrapError(
+            "android_apk_force_replace_uninstall_failed",
+            f"Failed to uninstall mismatched RenderDocCmd package {package_name}: {uninstall_stderr or 'command failed'}",
+            details={"package_name": package_name, "reason": install_reason or "mismatched_existing_apk"},
+        )
+
+    result.uninstalled_existing = True
+    reinstall_proc = _run_install_command(adb_path, device_serial, apk_path, replace_existing=False)
+    if reinstall_proc.returncode != 0:
+        reinstall_stderr = (reinstall_proc.stderr or reinstall_proc.stdout or "").strip()
+        raise AndroidRemoteBootstrapError(
+            "android_apk_force_replace_reinstall_failed",
+            f"Failed to reinstall RenderDocCmd APK {Path(apk_path).name}: {reinstall_stderr or 'command failed'}",
+            details={"package_name": package_name, "reason": install_reason or "mismatched_existing_apk"},
+        )
+
+    result.installed_apk = True
+    result.install_mode = "force_replace"
+    result.install_reason = install_reason or "mismatched_existing_apk"
+    result.cleanup_actions.append("apk-force-replaced")
 
 
 def _adb_base_cmd(adb_path: str, device_serial: str = "") -> list[str]:
@@ -393,14 +488,7 @@ def bootstrap_android_remote(
     existing_socket_ports = _list_renderdoc_socket_ports(adb_path, device.serial)
 
     if opts.install_apk:
-        _run_subprocess(
-            _adb_base_cmd(adb_path, device.serial) + ["install", "-r", "-g", "--force-queryable", str(apk_path)],
-            timeout_s=180.0,
-            error_code="android_apk_install_failed",
-            error_message=f"Failed to install RenderDocCmd APK {apk_path.name}",
-        )
-        result.installed_apk = True
-        result.cleanup_actions.append("apk-installed")
+        _ensure_android_helper_installed(adb_path, device.serial, package_name, str(apk_path), result)
 
     if opts.push_config:
         config_path = _write_renderdoc_conf(package_name)
@@ -552,6 +640,13 @@ def describe_android_remote(result: AndroidBootstrapResult) -> dict[str, object]
         "remote_port": result.remote_port,
         "forward_spec": result.forward_spec,
         "config_remote_path": result.config_remote_path,
+        "installed_apk": result.installed_apk,
+        "pushed_config": result.pushed_config,
+        "started_activity": result.started_activity,
+        "created_forward": result.created_forward,
+        "install_mode": result.install_mode,
+        "install_reason": result.install_reason,
+        "uninstalled_existing": result.uninstalled_existing,
         "cleanup_actions": list(result.cleanup_actions),
     }
 

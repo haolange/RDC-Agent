@@ -5,6 +5,7 @@ const validChannels = [
   "file:open",
   "case:new",
   "settings:open",
+  "app:themeChanged",
   "workflow:stateChanged",
   "workflow:stageChanged",
   "agent:message",
@@ -15,7 +16,9 @@ const validChannels = [
   "window:maximized-changed",
   "device:statusChanged",
   "capture:statusChanged",
-  "context:changed"
+  "context:changed",
+  "project:inputsChanged",
+  "capture:openedStateChanged"
 ];
 const isValidChannel = (channel) => {
   return validChannels.includes(channel);
@@ -27,6 +30,11 @@ const electronAPI = {
   isLinux: process.platform === "linux",
   appMeta: {
     get: () => electron.ipcRenderer.invoke("app:getMeta")
+  },
+  appShell: {
+    selectAvatar: () => electron.ipcRenderer.invoke("app:selectAvatar"),
+    openPath: (targetPath) => electron.ipcRenderer.invoke("app:openPath", targetPath),
+    copyText: (text) => electron.ipcRenderer.invoke("app:copyText", text)
   },
   selectRdcFiles: () => electron.ipcRenderer.invoke("dialog:selectRdcFiles"),
   selectDirectory: () => electron.ipcRenderer.invoke("dialog:selectDirectory"),
@@ -62,19 +70,36 @@ const electronAPI = {
     get: () => electron.ipcRenderer.invoke("settings:get"),
     set: (settings) => electron.ipcRenderer.invoke("settings:set", settings)
   },
+  project: {
+    list: () => electron.ipcRenderer.invoke("project:list"),
+    add: (rootPath) => electron.ipcRenderer.invoke("project:add", rootPath),
+    remove: (projectId) => electron.ipcRenderer.invoke("project:remove", projectId),
+    inputs: {
+      list: (projectId) => electron.ipcRenderer.invoke("project:inputs:list", projectId),
+      refresh: (projectId) => electron.ipcRenderer.invoke("project:inputs:refresh", projectId),
+      import: (projectId) => electron.ipcRenderer.invoke("project:inputs:import", projectId)
+    }
+  },
   device: {
     list: () => electron.ipcRenderer.invoke("device:list"),
     refresh: () => electron.ipcRenderer.invoke("device:refresh"),
     activate: (deviceId) => electron.ipcRenderer.invoke("device:activate", deviceId)
   },
   session: {
-    list: () => electron.ipcRenderer.invoke("session:list"),
+    list: (projectId) => electron.ipcRenderer.invoke("session:list", projectId),
+    create: (projectId, title) => electron.ipcRenderer.invoke("session:create", projectId, title),
     select: (id) => electron.ipcRenderer.invoke("session:select", id)
+  },
+  run: {
+    list: (sessionId) => electron.ipcRenderer.invoke("run:list", sessionId)
   },
   capture: {
     open: (filePath) => electron.ipcRenderer.invoke("capture:open", filePath),
     list: () => electron.ipcRenderer.invoke("capture:list"),
-    select: (captureId) => electron.ipcRenderer.invoke("capture:select", captureId)
+    select: (captureId) => electron.ipcRenderer.invoke("capture:select", captureId),
+    openProjectInput: (request) => electron.ipcRenderer.invoke("capture:openProjectInput", request),
+    getOpenedState: () => electron.ipcRenderer.invoke("capture:getOpenedState"),
+    clearOpenedState: () => electron.ipcRenderer.invoke("capture:clearOpenedState")
   },
   context: {
     get: () => electron.ipcRenderer.invoke("context:get")
@@ -106,6 +131,15 @@ const electronAPI = {
     },
     onContextChanged: (callback) => {
       electron.ipcRenderer.on("context:changed", (_event, snapshot) => callback(snapshot));
+    },
+    onProjectInputsChanged: (callback) => {
+      electron.ipcRenderer.on("project:inputsChanged", (_event, payload) => callback(payload));
+    },
+    onOpenedCaptureStateChanged: (callback) => {
+      electron.ipcRenderer.on("capture:openedStateChanged", (_event, payload) => callback(payload));
+    },
+    onAppThemeChanged: (callback) => {
+      electron.ipcRenderer.on("app:themeChanged", (_event, theme) => callback(theme));
     },
     removeAllListeners: (channel) => {
       electron.ipcRenderer.removeAllListeners(channel);
