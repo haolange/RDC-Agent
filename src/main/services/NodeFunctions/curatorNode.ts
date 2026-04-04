@@ -50,16 +50,35 @@ Return the report as a JSON object matching the Report type structure.`;
 }
 
 /**
+ * 按 event type 的智能截断限制
+ * 高价值事件保留更多内容；元数据事件（stage transitions）大幅压缩
+ */
+const EVIDENCE_TYPE_LIMITS: Record<string, number> = {
+  expert_investigation_complete: 3000,
+  specialist_complete:           2000,
+  fix_verification_result:       2000,
+  skeptic_review_complete:       2000,
+  intent_analysis_complete:      1000,
+  specialist_briefs_summary:      500,
+  workflow_stage_transition:       150,
+  dispatch:                        200,
+};
+
+/**
  * 构建 curator 的用户提示
  */
 function buildCuratorPrompt(state: GraphState): string {
-  // 收集所有证据
+  // 按 event type 智能截断，替代之前的统一 500 chars 暴力截断
   const allEvidence = state.evidenceChain
-    .map(e => `[${e.eventType}] ${e.agentId}: ${JSON.stringify(e.payload).substring(0, 500)}`)
+    .map(e => {
+      const limit = EVIDENCE_TYPE_LIMITS[e.eventType] ?? 500;
+      return `[${e.eventType}] ${e.agentId}: ${JSON.stringify(e.payload).substring(0, limit)}`;
+    })
     .join('\n');
 
+  // 增大截断限制：briefs 从 2000 → 3000（最终报告需要完整 specialist 信息）
   const specialistBriefs = Object.entries(state.collectedBriefs)
-    .map(([agentId, brief]) => `### ${agentId}\n${brief.substring(0, 2000)}`)
+    .map(([agentId, brief]) => `### ${agentId}\n${brief.substring(0, 3000)}`)
     .join('\n\n');
 
   const artifacts = state.artifacts

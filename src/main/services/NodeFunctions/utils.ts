@@ -93,7 +93,7 @@ export function createDispatchEvidence(
     timestamp: Date.now(),
     payload: {
       targetAgent,
-      objective: objective.substring(0, 500), // 截断避免过大
+      objective: objective.substring(0, 1000), // 截断避免过大
       capabilityTokenId: tokenId,
       dispatchTime: new Date().toISOString(),
       runId: state.runId,
@@ -116,7 +116,7 @@ export function createSpecialistCompleteEvidence(
     status: 'ok',
     timestamp: Date.now(),
     payload: {
-      brief: brief.substring(0, 500),
+      brief: brief.substring(0, 1000),
       artifacts,
       completedAt: new Date().toISOString(),
       runId: state.runId,

@@ -72,11 +72,23 @@ User Goal: ${state.userGoal}
 Capture Files: ${state.capturePaths?.join(', ') || 'N/A'}
 `;
 
+  // 从 evidenceChain 提取 intent analysis 结果，丰富每个 specialist 的上下文
+  const intentEvent = state.evidenceChain.find(e => e.eventType === 'intent_analysis_complete');
+  const intentContext = intentEvent
+    ? `
+Problem Classification (from Intent Analysis):
+- Category: ${intentEvent.payload.category || 'unknown'}
+- Severity: ${intentEvent.payload.severity || 'unknown'}
+- Affected Subsystems: ${Array.isArray(intentEvent.payload.subsystems) ? (intentEvent.payload.subsystems as string[]).join(', ') : 'unknown'}
+- Keywords: ${Array.isArray(intentEvent.payload.keywords) ? (intentEvent.payload.keywords as string[]).join(', ') : 'unknown'}
+- Analysis Summary: ${((intentEvent.payload.summary as string) || '').substring(0, 300)}
+`
+    : '';
+
   const objectives: Record<AgentRole, string> = {
     triage_agent: `Analyze the problem and classify symptoms. Recommend investigation SOPs.
 
-${baseContext}
-
+${baseContext}${intentContext}
 Your task:
 1. Classify the symptom type (rendering, performance, crash, etc.)
 2. Identify potential root cause categories
@@ -85,8 +97,7 @@ Your task:
 
     capture_repro_agent: `Verify capture quality and establish baseline.
 
-${baseContext}
-
+${baseContext}${intentContext}
 Your task:
 1. Verify capture file integrity
 2. Check if the issue is reproducible
@@ -95,8 +106,7 @@ Your task:
 
     pass_graph_pipeline_agent: `Analyze render passes and pipeline dependencies.
 
-${baseContext}
-
+${baseContext}${intentContext}
 Your task:
 1. Analyze render pass structure
 2. Identify pipeline dependencies
@@ -105,8 +115,7 @@ Your task:
 
     pixel_forensics_agent: `Perform pixel-level evidence collection.
 
-${baseContext}
-
+${baseContext}${intentContext}
 Your task:
 1. Locate first-bad event/frame
 2. Analyze pixel value anomalies
@@ -115,8 +124,7 @@ Your task:
 
     shader_ir_agent: `Analyze shader source and IR evidence.
 
-${baseContext}
-
+${baseContext}${intentContext}
 Your task:
 1. Analyze shader source code
 2. Check IR compilation issues
@@ -125,8 +133,7 @@ Your task:
 
     driver_device_agent: `Perform cross-device attribution and platform checks.
 
-${baseContext}
-
+${baseContext}${intentContext}
 Your task:
 1. Check driver version compatibility
 2. Identify platform-specific issues

@@ -56,21 +56,34 @@ Provide your verification result:
  * 构建 verification 的用户提示
  */
 function buildVerificationPrompt(state: GraphState): string {
+  // 从 evidence payload 提取实际的 expert investigation 文本（而非仅元数据）
   const investigationEvidence = state.evidenceChain
     .filter(e => e.eventType === 'expert_investigation_complete')
-    .map(e => JSON.stringify(e.payload))
+    .map(e => {
+      const p = e.payload as Record<string, unknown>;
+      const summary = p.investigationSummary as string | undefined;
+      // 优先使用存储的完整分析文本，降级为 JSON 元数据
+      return summary || JSON.stringify(p);
+    })
     .join('\n');
 
+  // 增大截断限制：briefs 从 1000 → 2000（验证阶段需要足够信息做判断）
   const briefsSummary = Object.entries(state.collectedBriefs)
-    .map(([agentId, brief]) => `### ${agentId}\n${brief.substring(0, 1000)}`)
+    .map(([agentId, brief]) => `### ${agentId}\n${brief.substring(0, 2000)}`)
     .join('\n\n');
+
+  // 注入 prior Skeptic critique（如果有）
+  const priorSkepticCritiques = state.backtrackCritiques?.['skeptic'] || [];
+  const critiqueSection = priorSkepticCritiques.length > 0
+    ? `\n## Prior Skeptic Rejection Reasons\nA previous attempt at this fix was rejected by the Skeptic for the following reasons. Your fix MUST explicitly address each point:\n${priorSkepticCritiques.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n`
+    : '';
 
   return `
 ## Case Information
 - Case ID: ${state.caseId}
 - Run ID: ${state.runId}
 - User Goal: ${state.userGoal}
-
+${critiqueSection}
 ## Specialist Briefs Summary
 ${briefsSummary}
 
@@ -111,6 +124,7 @@ export async function fixVerificationNode(
 
   let fixVerified = false;
   let verificationStatus = 'pending';
+  const backtrackCritiques: GraphState['backtrackCritiques'] = {};
 
   try {
     // 构建 LLM 请求进行验证分析
@@ -166,6 +180,9 @@ export async function fixVerificationNode(
       const currentRetryCount = backtrackCount['fix_verification'] || 0;
       const maxRetries = config.maxRetries || 2;
 
+      // 存储拒绝原因到 backtrackCritiques，供 expertInvestigation 下一轮注入
+      backtrackCritiques['fix_verification'] = [verificationResult.substring(0, 800)];
+
       if (currentRetryCount >= maxRetries) {
         // 超过最大重试次数，创建 blocker
         blockers.push(
@@ -187,6 +204,7 @@ export async function fixVerificationNode(
       blockers: [...state.blockers, ...blockers],
       fixVerified,
       backtrackCount,
+      backtrackCritiques,
       lastUpdated: nowIso(),
     };
   } catch (error) {

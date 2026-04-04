@@ -181,6 +181,9 @@ export interface GraphState {
   // 回转追踪
   backtrackCount: Record<string, number>;
 
+  /** 回转批评记录 - 记录每次拒绝的失败原因，供后续节点注入以避免重复失败 */
+  backtrackCritiques: Record<string, string[]>;
+
   // 结果
   finalReport?: Report;
   fixVerified: boolean;

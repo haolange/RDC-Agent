@@ -210,6 +210,18 @@ const WorkflowAnnotation = Annotation.Root({
     default: () => ({}),
   }),
 
+  // 回转批评记录 - merge + append within keys
+  backtrackCritiques: Annotation<Record<string, string[]>>({
+    reducer: (a: Record<string, string[]>, b: Record<string, string[]>) => {
+      const merged = { ...a };
+      for (const [key, vals] of Object.entries(b)) {
+        merged[key] = [...(merged[key] || []), ...vals];
+      }
+      return merged;
+    },
+    default: () => ({}),
+  }),
+
   // 结果 - last-write-wins
   finalReport: Annotation<Report | undefined>({
     reducer: (_: Report | undefined, b: Report | undefined) => b,

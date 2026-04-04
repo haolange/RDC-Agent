@@ -49,13 +49,23 @@ Provide your analysis in the following structure:
  * 构建 investigation 的用户提示
  */
 function buildInvestigationPrompt(state: GraphState): string {
+  // 增大截断限制：briefs 从 2000 → 3000（investigation 阶段需要完整信息）
   const briefsSummary = Object.entries(state.collectedBriefs)
-    .map(([agentId, brief]) => `### ${agentId}\n${brief.substring(0, 2000)}`)
+    .map(([agentId, brief]) => `### ${agentId}\n${brief.substring(0, 3000)}`)
     .join('\n\n');
 
   const artifactsSummary = state.artifacts
     .map(a => `- ${a.type}: ${a.path}`)
     .join('\n');
+
+  // 注入 prior critique context（来自之前 Skeptic/FixVerification 的拒绝原因）
+  const priorCritiques = [
+    ...(state.backtrackCritiques?.['skeptic'] || []),
+    ...(state.backtrackCritiques?.['fix_verification'] || []),
+  ];
+  const critiqueSection = priorCritiques.length > 0
+    ? `\n## Prior Rejection Feedback\nPrevious validation rounds rejected your analysis for the following reasons. You MUST explicitly address each point in your revised diagnosis:\n${priorCritiques.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n`
+    : '';
 
   return `
 ## Case Information
@@ -63,7 +73,7 @@ function buildInvestigationPrompt(state: GraphState): string {
 - Run ID: ${state.runId}
 - User Goal: ${state.userGoal}
 - Capture Files: ${state.capturePaths?.join(', ') || 'N/A'}
-
+${critiqueSection}
 ## Specialist Briefs
 ${briefsSummary}
 
@@ -121,7 +131,7 @@ export async function expertInvestigationNode(
       ? response.content
       : JSON.stringify(response.content);
 
-    // 记录 LLM 调用证据
+    // 记录 LLM 调用证据，包含实际分析文本供下游节点使用
     evidenceChain.push({
       eventId: crypto.randomUUID(),
       eventType: 'expert_investigation_complete',
@@ -133,6 +143,8 @@ export async function expertInvestigationNode(
         provider: modelConfig.provider,
         briefsAnalyzed: Object.keys(state.collectedBriefs).length,
         resultLength: investigationResult.length,
+        // 存储实际分析文本，供 fixVerification / skeptic 注入 LLM prompt
+        investigationSummary: investigationResult.substring(0, 4000),
         runId: state.runId,
         sessionId: state.sessionId,
       },

@@ -46,9 +46,11 @@ Your role is to critically review the entire investigation and challenge weak cl
 ## Output Format
 Provide your review in the following structure:
 - **Review Status**: APPROVED / REJECTED / NEEDS_CLARIFICATION
-- **Critical Issues**: List any major problems found
-- **Recommendations**: Suggested improvements
-- **Confidence**: Your confidence in the investigation quality`;
+- **Critical Issues**: List each major problem found (numbered list, be specific and actionable)
+- **Recommendations**: Suggested improvements for the next investigation attempt
+- **Confidence**: Your confidence in the investigation quality (0-1)
+
+IMPORTANT: The "Critical Issues" section must contain specific, actionable issues that the expert investigation team can address in their next attempt. Vague issues are not helpful.`;
 }
 
 /**
@@ -61,8 +63,9 @@ function buildSkepticPrompt(state: GraphState): string {
     .map(e => `- ${e.payload?.fromStage} -> ${e.payload?.toStage}`)
     .join('\n');
 
+  // 增大截断限制：briefs 从 1500 → 2500（skeptic 需要完整信息做批判性评估）
   const specialistBriefs = Object.entries(state.collectedBriefs)
-    .map(([agentId, brief]) => `### ${agentId}\n${brief.substring(0, 1500)}`)
+    .map(([agentId, brief]) => `### ${agentId}\n${brief.substring(0, 2500)}`)
     .join('\n\n');
 
   const investigationResults = state.evidenceChain
@@ -106,6 +109,22 @@ Provide your independent assessment.`;
 }
 
 /**
+ * 从 Skeptic 的 LLM 响应中提取 "Critical Issues" 段落
+ * 用于注入到下一轮 expert investigation prompt，避免相同原因导致重复失败
+ */
+function extractCritique(response: string): string {
+  // 尝试提取 **Critical Issues** 段落内容
+  const criticalMatch = response.match(
+    /\*\*Critical Issues?\*\*:?([\s\S]*?)(?=\*\*Recommendations?\*\*|\*\*Confidence\*\*|$)/i
+  );
+  if (criticalMatch && criticalMatch[1].trim().length > 0) {
+    return criticalMatch[1].trim().substring(0, 800);
+  }
+  // 降级：取响应前 800 chars（包含状态行和关键信息）
+  return response.substring(0, 800);
+}
+
+/**
  * Skeptic 节点
  * 调用 skeptic_agent 进行独立验证
  */
@@ -132,6 +151,7 @@ export async function skepticNode(
 
   let skepticApproved = false;
   let reviewStatus = 'pending';
+  const backtrackCritiques: GraphState['backtrackCritiques'] = {};
 
   try {
     // 使用 skeptic_agent 的配置
@@ -187,6 +207,9 @@ export async function skepticNode(
       const currentRetryCount = backtrackCount['skeptic_rejected'] || 0;
       const maxRetries = config.maxRetries || 2;
 
+      // 提取并存储 critique 供下一轮 expert/fixVerification 注入
+      backtrackCritiques['skeptic'] = [extractCritique(skepticResult)];
+
       if (currentRetryCount >= maxRetries) {
         // 超过最大重试次数
         if (config.requiresUserConfirmation !== false) {
@@ -210,6 +233,7 @@ export async function skepticNode(
       evidenceChain,
       blockers: [...state.blockers, ...blockers],
       backtrackCount,
+      backtrackCritiques,
       lastUpdated: nowIso(),
     };
   } catch (error) {
