@@ -64,7 +64,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
     <div className="user-menu-backdrop">
       <div
         ref={menuRef}
-        className="user-menu-popover"
+        className="user-menu-popover visible"
         style={{ left: position.left, top: position.top }}
       >
         <div className="user-menu-header">

@@ -13,6 +13,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const { t } = useI18n();
   const [isBusy, setIsBusy] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const projects = useSessionStore((state) => state.projects);
   const sessions = useSessionStore((state) => state.sessions);
@@ -92,7 +93,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [loadSessions, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setProjectInputs, setProjects, setRuns, setSessions]);
 
   useEffect(() => {
-    void loadProjects();
+    void (async () => {
+      await loadProjects();
+      setIsLoading(false);
+    })();
   }, [loadProjects]);
 
   const handleAddProject = useCallback(async () => {
@@ -200,7 +204,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
-          {projects.length === 0 ? (
+          {isLoading ? (
+            <div className="session-list project-list">
+              <div className="ui-skeleton ui-skeleton--card" style={{ height: '56px', marginBottom: 'var(--space-2)' }} />
+              <div className="ui-skeleton ui-skeleton--card" style={{ height: '56px', marginBottom: 'var(--space-2)' }} />
+              <div className="ui-skeleton ui-skeleton--card" style={{ height: '56px' }} />
+            </div>
+          ) : projects.length === 0 ? (
             <div className="session-empty">
               <div className="session-empty-icon">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
@@ -253,7 +263,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
-          {!currentProject ? (
+          {isLoading ? (
+            <div className="session-list">
+              <div className="ui-skeleton ui-skeleton--card" style={{ height: '56px', marginBottom: 'var(--space-2)' }} />
+              <div className="ui-skeleton ui-skeleton--card" style={{ height: '56px' }} />
+            </div>
+          ) : !currentProject ? (
             <div className="session-empty compact">
               <div className="session-empty-text">{t('sidebar.projectRequired')}</div>
             </div>
