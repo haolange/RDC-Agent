@@ -25,7 +25,7 @@
 }
 
 .workflow-heading {
-  margin-top: 2px;
+  margin-top: var(--space-1);
   color: rgb(var(--color-text-primary));
   font-size: var(--text-lg);
   font-weight: var(--font-semibold);
@@ -160,9 +160,9 @@
 
 .stage-status {
   display: block;
-  margin-top: 2px;
+  margin-top: var(--space-1);
   color: rgb(var(--color-text-tertiary));
-  font-size: 10px;
+  font-size: var(--text-xs);
 }
 
 .workflow-progress {
@@ -172,7 +172,7 @@
 }
 
 .progress-bar {
-  height: 3px;
+  height: var(--space-1);
   border-radius: var(--radius-full);
   background: rgb(var(--color-bg-3));
   overflow: hidden;
@@ -190,7 +190,7 @@
   position: absolute;
   inset: 0;
   background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.3), transparent);
-  animation: shimmer 2s linear infinite;
+  animation: shimmer var(--animation-shimmer) var(--ease-standard) infinite;
 }
 
 .progress-text {
@@ -305,7 +305,7 @@
 .agent-activity-status {
   max-width: 220px;
   color: rgb(var(--color-text-tertiary));
-  font-size: 10px;
+  font-size: var(--text-xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -313,12 +313,12 @@
 
 .agent-activity-indicator {
   display: flex;
-  gap: 3px;
+  gap: var(--space-1);
 }
 
 .agent-activity-indicator span {
-  width: 4px;
-  height: 4px;
+  width: var(--space-1);
+  height: var(--space-1);
   border-radius: var(--radius-full);
   background: rgb(var(--color-accent-500));
   animation: typing 1.4s infinite both;
@@ -342,17 +342,21 @@
   border-radius: var(--radius-xl);
   background: rgb(var(--color-bg-2));
   box-shadow: var(--shadow-lg);
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(var(--space-2));
   opacity: 0;
   visibility: hidden;
-  transition: opacity var(--transition-fast), visibility var(--transition-fast), transform var(--transition-fast);
+  pointer-events: none;
+  transition: opacity var(--transition-base) var(--ease-decelerate),
+              visibility var(--transition-base) var(--ease-decelerate),
+              transform var(--transition-base) var(--ease-decelerate);
   z-index: var(--z-dropdown);
 }
 
 .workflow-stage:hover .stage-detail {
   opacity: 1;
   visibility: visible;
-  transform: translateX(-50%) translateY(2px);
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
 }
 
 .stage-detail-title {

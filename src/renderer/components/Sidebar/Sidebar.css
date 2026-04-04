@@ -3,7 +3,7 @@
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  transition: opacity var(--transition-base), transform var(--transition-base);
+  transition: all var(--transition-base) var(--ease-standard);
 }
 
 .sidebar-scroll {
@@ -12,8 +12,8 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding-bottom: 6px;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
 }
 
 .sidebar-content.collapsed .sidebar-scroll {
@@ -29,7 +29,7 @@
   border-top: 1px solid rgb(var(--color-border-subtle));
   opacity: 1;
   transform: translateX(0);
-  transition: opacity var(--transition-base), transform var(--transition-base), margin var(--transition-base);
+  transition: all var(--transition-base) var(--ease-standard);
 }
 
 .session-section:last-child {
@@ -59,7 +59,7 @@
 .session-section-heading {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .session-section-actions {
@@ -96,12 +96,12 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   border: 1px solid transparent;
   background: rgb(var(--color-bg-2));
   color: rgb(var(--color-text-tertiary));
   cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  transition: all var(--transition-base) var(--ease-standard);
 }
 
 .session-section-action:hover {
@@ -126,16 +126,16 @@
 .session-item {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   width: 100%;
   min-height: 56px;
-  padding: 12px;
+  padding: var(--space-3);
   border: 1px solid transparent;
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: rgb(var(--color-bg-2) / 0.7);
   text-align: left;
   cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
+  transition: all var(--transition-base) var(--ease-standard);
 }
 
 .project-item .session-item-time {
@@ -199,8 +199,8 @@
 
 .session-item-time {
   color: rgb(var(--color-text-muted));
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
 }
 
 .session-empty {
@@ -209,10 +209,16 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-6) var(--space-4);
-  border: 1px dashed rgb(var(--color-border-default));
-  border-radius: 18px;
-  background: rgb(var(--color-bg-2) / 0.5);
+  border: 1.5px dashed rgb(var(--color-accent-500) / 0.25);
+  border-radius: var(--radius-bubble);
+  background: rgb(var(--color-accent-500) / 0.03);
   text-align: center;
+  transition: all var(--transition-base) var(--ease-standard);
+}
+
+.session-empty:hover {
+  border-color: rgb(var(--color-accent-500) / 0.45);
+  background: rgb(var(--color-accent-500) / 0.06);
 }
 
 .session-empty.compact {
@@ -221,19 +227,19 @@
 }
 
 .session-empty-icon {
-  width: 40px;
-  height: 40px;
+  width: var(--space-10);
+  height: var(--space-10);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin-bottom: var(--space-3);
-  border-radius: 14px;
-  background: rgb(var(--color-bg-3));
-  color: rgb(var(--color-text-secondary));
+  border-radius: var(--radius-xl);
+  background: rgb(var(--color-accent-500) / 0.12);
+  color: rgb(var(--color-accent-500));
 }
 
 .session-empty-text {
-  color: rgb(var(--color-text-muted));
+  color: rgb(var(--color-text-secondary));
   font-size: var(--text-sm);
 }
 

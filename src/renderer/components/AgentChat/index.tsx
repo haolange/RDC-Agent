@@ -86,14 +86,14 @@ const ToolCallEntry: React.FC<{ entry: AgentTimelineEntry }> = ({ entry }) => {
 };
 
 const BlockerEntry: React.FC<{ entry: AgentTimelineEntry }> = ({ entry }) => (
-  <div className="chat-message system" style={{ '--blocker-accent': 'rgb(239,68,68)' } as React.CSSProperties}>
-    <div className="message-avatar system" style={{ background: 'rgb(239,68,68,0.15)', color: 'rgb(239,68,68)' }}>!</div>
+  <div className="chat-message system chat-message--blocker">
+    <div className="message-avatar system">!</div>
     <div className="message-content-wrapper">
       <div className="message-header">
-        <span className="message-author" style={{ color: 'rgb(239,68,68)' }}>Blocker</span>
+        <span className="message-author">Blocker</span>
         <span className="message-time">{formatTime(entry.timestamp)}</span>
       </div>
-      <div className="message-bubble system" style={{ borderColor: 'rgb(239,68,68,0.3)' }}>
+      <div className="message-bubble system">
         {entry.content}
       </div>
     </div>
@@ -114,7 +114,7 @@ const SystemEntry: React.FC<{ entry: AgentTimelineEntry }> = ({ entry }) => (
 );
 
 const TimelineEntry: React.FC<{ entry: AgentTimelineEntry; index: number }> = ({ entry, index }) => (
-  <div style={{ animationDelay: `${index * 30}ms` }}>
+  <div className="timeline-entry" style={{ animationDelay: `${index * 30}ms` }}>
     {entry.type === 'user' && <UserEntry entry={entry} />}
     {entry.type === 'agent' && <AgentEntry entry={entry} />}
     {entry.type === 'tool_call' && <ToolCallEntry entry={entry} />}

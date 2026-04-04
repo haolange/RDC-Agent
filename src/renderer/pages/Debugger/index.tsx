@@ -20,6 +20,7 @@ export const DebuggerPage: React.FC = () => {
         <section className="debugger-idle-simple">
           <div className="debugger-idle-emoji" aria-hidden="true">🙂</div>
           <h1 className="debugger-idle-simple-title">有什么能帮你？</h1>
+          <p className="debugger-idle-description">选择一个项目和 Capture，开始智能调试之旅</p>
         </section>
       </div>
     </div>

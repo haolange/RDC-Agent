@@ -28,7 +28,7 @@ export const ContextInfo: React.FC = () => {
   if (!contextSnapshot && !currentRun && !openedCapture) {
     return (
       <div className="context-info">
-        <div className="context-empty" style={{ padding: '12px 0', textAlign: 'center', fontSize: 'var(--text-xs)', color: 'rgb(var(--color-text-3))' }}>
+        <div className="context-empty">
           No active session
         </div>
       </div>

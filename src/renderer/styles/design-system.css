@@ -139,6 +139,27 @@
   --z-popover: 600;
   --z-tooltip: 700;
   --z-overlay: 900;
+  --z-notification: 1000;
+
+  /* Easing */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Animation Duration */
+  --animation-typing: 1.4s;
+  --animation-pulse: 2s;
+  --animation-shimmer: 2s;
+  --animation-float: 3s;
+  --animation-spin: 1s;
+  --animation-shake: 0.5s;
+
+  /* Semantic Border Radius */
+  --radius-card: var(--radius-xl);        /* 12px - 卡片 */
+  --radius-button: var(--radius-lg);      /* 8px - 按钮 */
+  --radius-input: var(--radius-md);       /* 6px - 输入框 */
+  --radius-bubble: 18px;                  /* 聊天气泡 */
+  --radius-bubble-tail: 4px;              /* 聊天气泡底角 */
 
   /* Layout */
   --header-height: 52px;
@@ -423,3 +444,161 @@
   color: rgb(var(--color-text-primary));
 }
 
+/* ─── Shared Component Utilities ─── */
+
+/* Badge */
+.ui-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-normal);
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.ui-badge--primary {
+  background: rgb(var(--color-primary-500) / 0.15);
+  color: rgb(var(--color-primary-400));
+}
+
+.ui-badge--accent {
+  background: rgb(var(--color-accent-500) / 0.15);
+  color: rgb(var(--color-accent-400));
+}
+
+.ui-badge--success {
+  background: rgb(var(--color-success) / 0.15);
+  color: rgb(var(--color-success));
+}
+
+.ui-badge--warning {
+  background: rgb(var(--color-warning) / 0.15);
+  color: rgb(var(--color-warning));
+}
+
+.ui-badge--error {
+  background: rgb(var(--color-error) / 0.15);
+  color: rgb(var(--color-error));
+}
+
+/* Status Dot */
+.ui-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.ui-status-dot--active {
+  background: rgb(var(--color-success));
+  box-shadow: 0 0 6px rgb(var(--color-success) / 0.4);
+}
+
+.ui-status-dot--idle {
+  background: rgb(var(--color-text-tertiary));
+}
+
+.ui-status-dot--error {
+  background: rgb(var(--color-error));
+  box-shadow: 0 0 6px rgb(var(--color-error) / 0.4);
+}
+
+.ui-status-dot--pulse {
+  animation: pulse-glow var(--animation-pulse) var(--ease-standard) infinite;
+}
+
+/* Icon Button */
+.ui-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--radius-button);
+  background: transparent;
+  color: rgb(var(--color-text-secondary));
+  cursor: pointer;
+  transition: all var(--transition-fast) var(--ease-standard);
+  flex-shrink: 0;
+}
+
+.ui-icon-btn:hover {
+  background: rgb(var(--color-bg-3));
+  color: rgb(var(--color-text-primary));
+}
+
+.ui-icon-btn:active {
+  transform: scale(0.95);
+}
+
+.ui-icon-btn--sm {
+  width: 24px;
+  height: 24px;
+}
+
+.ui-icon-btn--lg {
+  width: 40px;
+  height: 40px;
+}
+
+/* Avatar */
+.ui-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.ui-avatar--sm {
+  width: 24px;
+  height: 24px;
+  font-size: var(--text-xs);
+}
+
+.ui-avatar--lg {
+  width: 40px;
+  height: 40px;
+  font-size: var(--text-md);
+}
+
+/* Skeleton Loading */
+.ui-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--color-bg-3)) 25%,
+    rgb(var(--color-bg-2)) 50%,
+    rgb(var(--color-bg-3)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer var(--animation-shimmer) var(--ease-standard) infinite;
+  border-radius: var(--radius-md);
+}
+
+.ui-skeleton--text {
+  height: 14px;
+  margin-bottom: 8px;
+}
+
+.ui-skeleton--text-sm {
+  height: 10px;
+  margin-bottom: 6px;
+}
+
+.ui-skeleton--circle {
+  border-radius: var(--radius-full);
+}
+
+.ui-skeleton--card {
+  height: 56px;
+  border-radius: var(--radius-card);
+}
