@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { TaskMonitor } from './TaskMonitor';
-import { CaptureControl } from './CaptureControl';
-import { ContextInfo } from './ContextInfo';
-import { ProjectInputs } from './ProjectInputs';
+import { CaptureLibrary } from './CaptureLibrary';
+import { OpenedCapture } from './OpenedCapture';
+import { RuntimeContext } from './RuntimeContext';
 import { useI18n } from '../../i18n';
 import { useSessionStore } from '../../stores/sessionStore';
 import './ControlPanel.css';
@@ -59,9 +59,9 @@ export const ControlPanel: React.FC = () => {
   const projectInputs = useSessionStore((state) => state.projectInputs);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     taskMonitor: true,
-    captureControl: true,
-    contextInfo: false,
-    projectInputs: true,
+    captureLibrary: true,
+    openedCapture: true,
+    runtimeContext: false,
   });
 
   const toggleSection = (sectionId: string) => {
@@ -90,23 +90,38 @@ export const ControlPanel: React.FC = () => {
         </CollapsibleSection>
 
         <CollapsibleSection
-          id="captureControl"
-          title={t('control.captureControl')}
+          id="captureLibrary"
+          title={t('control.captureLibrary')}
+          icon={
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+            </svg>
+          }
+          isExpanded={expandedSections.captureLibrary}
+          onToggle={() => toggleSection('captureLibrary')}
+          badge={projectInputs.length}
+        >
+          <CaptureLibrary />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          id="openedCapture"
+          title={t('control.openedCapture')}
           icon={
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
             </svg>
           }
-          isExpanded={expandedSections.captureControl}
-          onToggle={() => toggleSection('captureControl')}
+          isExpanded={expandedSections.openedCapture}
+          onToggle={() => toggleSection('openedCapture')}
         >
-          <CaptureControl />
+          <OpenedCapture />
         </CollapsibleSection>
 
         <CollapsibleSection
-          id="contextInfo"
-          title={t('control.contextInfo')}
+          id="runtimeContext"
+          title={t('control.runtimeContext')}
           icon={
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10" />
@@ -114,26 +129,10 @@ export const ControlPanel: React.FC = () => {
               <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
           }
-          isExpanded={expandedSections.contextInfo}
-          onToggle={() => toggleSection('contextInfo')}
+          isExpanded={expandedSections.runtimeContext}
+          onToggle={() => toggleSection('runtimeContext')}
         >
-          <ContextInfo />
-        </CollapsibleSection>
-
-        <CollapsibleSection
-          id="projectInputs"
-          title={t('control.projectInputs')}
-          icon={
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 5v14" />
-              <path d="M5 12h14" />
-            </svg>
-          }
-          isExpanded={expandedSections.projectInputs}
-          onToggle={() => toggleSection('projectInputs')}
-          badge={projectInputs.length}
-        >
-          <ProjectInputs />
+          <RuntimeContext />
         </CollapsibleSection>
       </div>
     </div>

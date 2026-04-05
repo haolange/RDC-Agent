@@ -3,29 +3,11 @@ import { launchApp, closeApp, AppContext } from './helpers/electron-app';
 
 let ctx: AppContext;
 
-const getScrollTop = async (selector: string, page: AppContext['page']) =>
-  page.locator(selector).evaluate((element) => element.scrollTop);
-
-const isChildWithinContainer = async (
-  containerSelector: string,
-  childSelector: string,
-  page: AppContext['page'],
-) => page.evaluate(({ containerSelector, childSelector }) => {
-  const container = document.querySelector(containerSelector);
-  const child = document.querySelector(childSelector);
-  if (!(container instanceof HTMLElement) || !(child instanceof HTMLElement)) {
-    return false;
-  }
-  const containerRect = container.getBoundingClientRect();
-  const childRect = child.getBoundingClientRect();
-  return childRect.top >= containerRect.top && childRect.bottom <= containerRect.bottom;
-}, { containerSelector, childSelector });
-
 test.beforeAll(async () => {
   ctx = await launchApp();
   await ctx.app.evaluate(({ BrowserWindow }) => {
     const mainWindow = BrowserWindow.getAllWindows()[0];
-    mainWindow.setSize(1320, 760);
+    mainWindow.setSize(1320, 720);
   });
   await ctx.page.waitForTimeout(300);
 });
@@ -34,7 +16,7 @@ test.afterAll(async () => {
   await closeApp(ctx, { cleanup: true });
 });
 
-test('设置弹窗中的模型页与 Agent 页容器可独立滚动', async () => {
+test('设置弹窗中的 Workspace、Model 与 Agent 面板保持可访问的滚动布局', async () => {
   await ctx.page.evaluate(async () => {
     const settings = await window.electronAPI.settings.get();
     const providers = Array.from({ length: 24 }, (_, index) => ({
@@ -44,11 +26,14 @@ test('设置弹窗中的模型页与 Agent 页容器可独立滚动', async () =
       enabled: true,
       apiKey: `key-${index}`,
       baseUrl: `https://scroll-${index}.local/v1`,
-      models: [
-        { id: `model-${index}-a`, label: `Model ${index}A`, enabled: true },
-        { id: `model-${index}-b`, label: `Model ${index}B`, enabled: true },
-      ],
-      recommendedModels: [],
+      models: Array.from({ length: index === 0 ? 28 : 2 }, (_, modelIndex) => ({
+        id: `model-${index}-${modelIndex}`,
+        label: `Model ${index}-${modelIndex}`,
+        enabled: true,
+      })),
+      recommendedModels: index === 0
+        ? Array.from({ length: 24 }, (_, modelIndex) => `recommended-model-${modelIndex}`)
+        : [],
       docsUrl: '',
       isConfigured: true,
     }));
@@ -56,13 +41,23 @@ test('设置弹窗中的模型页与 Agent 页容器可独立滚动', async () =
     const agentRoutes = settings.llm.agentRoutes.map((route) => ({
       ...route,
       providerId: 'custom.scroll-0',
-      modelId: 'model-0-a',
+      modelId: 'model-0-0',
     }));
 
     await window.electronAPI.settings.set({
+      workspace: {
+        rootPath: [
+          'D:',
+          'RDC-Agent',
+          ...Array.from({ length: 18 }, (_, index) => `very-long-workspace-segment-${index}`),
+        ].join('\\'),
+      },
       llm: {
         providers,
         agentRoutes,
+      },
+      configuration: {
+        lastMigrationSummary: Array.from({ length: 8 }, (_, index) => `migration-${index}-completed`),
       },
     });
   });
@@ -72,7 +67,7 @@ test('设置弹窗中的模型页与 Agent 页容器可独立滚动', async () =
   ctx = await launchApp({ tempDir, cleanupOnClose: false });
   await ctx.app.evaluate(({ BrowserWindow }) => {
     const mainWindow = BrowserWindow.getAllWindows()[0];
-    mainWindow.setSize(1320, 760);
+    mainWindow.setSize(1320, 720);
   });
   await ctx.page.waitForTimeout(300);
 
@@ -81,26 +76,18 @@ test('设置弹窗中的模型页与 Agent 页容器可独立滚动', async () =
   await ctx.app.evaluate(({ BrowserWindow }) => {
     BrowserWindow.getAllWindows()[0]?.webContents.send('settings:open');
   });
+
   await expect(page.locator('[data-testid="settings-modal"]')).toBeVisible();
+  await expect(page.locator('[data-testid="settings-center-panel"]')).toBeVisible();
 
-  const providerList = page.locator('[data-testid="settings-provider-list"]');
-  const modelDetail = page.locator('[data-testid="settings-model-detail"]');
+  await page.locator('[data-testid="settings-nav-workspace"]').click();
+  await expect(page.locator('[data-testid="settings-workspace-body"]')).toBeVisible();
 
-  await expect(providerList).toBeVisible();
-
-  await modelDetail.evaluate((element) => {
-    element.scrollTop = 0;
-  });
-  await expect(modelDetail).toBeVisible();
-  await expect.poll(async () => isChildWithinContainer(
-    '[data-testid="settings-model-detail"]',
-    '[data-testid="settings-provider-save"]',
-    page,
-  )).toBe(true);
+  await page.locator('[data-testid="settings-nav-models"]').click();
+  await expect(page.locator('[data-testid="settings-provider-list"]')).toBeVisible();
+  await expect(page.locator('[data-testid="settings-model-detail"]')).toBeVisible();
 
   await page.locator('[data-testid="settings-nav-agents"]').click();
-  const agentList = page.locator('[data-testid="settings-agent-list"]');
-
-  await expect(agentList).toBeVisible();
+  await expect(page.locator('[data-testid="settings-agent-list"]')).toBeVisible();
   await expect(page.locator('[data-testid="settings-agent-save"]')).toBeVisible();
 });

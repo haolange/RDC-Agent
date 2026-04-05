@@ -18,7 +18,9 @@
 
 ## 当前界面
 
-- `Debugger`：唯一生产入口，顶部 titlebar 直接显示当前模式，右侧栏负责 `Project Inputs`、`Capture Control` 和 `Context Info`。
+- `Debugger`：唯一生产入口，顶部 titlebar 直接显示当前模式。
+- 右侧栏收敛为四个信息区块：`Task Monitor`、`Capture Library`、`Opened Capture` 和 `Runtime Context`。
+- `Capture Library` 负责项目内 `.rdc` 资源列表，`Opened Capture` 负责当前打开态与预览，`Runtime Context` 负责运行时上下文和会话归属。
 
 ## 代码结构
 

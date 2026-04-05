@@ -229,7 +229,8 @@ a {
 
 .app-sidebar-footer.collapsed {
   padding-inline: 6px;
-  gap: 0;
+  gap: 8px;
+  align-items: center;
 }
 
 .app-main {
@@ -775,6 +776,10 @@ a {
   width: 100%;
   max-width: none;
   min-width: 0;
+}
+
+.sidebar-footer-entry.collapsed {
+  width: 44px;
 }
 
 .sidebar-user-trigger {

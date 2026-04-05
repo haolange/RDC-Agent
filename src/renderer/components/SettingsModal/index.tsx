@@ -442,7 +442,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
             </button>
           </div>
 
-          <div className="settings-center-panel">
+          <div className="settings-center-panel" data-testid="settings-center-panel">
             {activeSection === 'account' && (
               <section className="settings-page settings-account-page">
                 <div className="settings-account-avatar-row">
@@ -538,29 +538,79 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
             )}
 
             {activeSection === 'workspace' && (
-              <section className="settings-page">
-                <div className="settings-workspace-hero">
-                  <div className="settings-field-label">{t('settings.workspaceRoot')}</div>
-                  <div className="settings-help-text">{t('settings.workspaceRootHint')}</div>
-                  <div className="settings-path-value">{workspaceDraft || settings.paths.defaultWorkspaceRoot}</div>
-                  <div className="settings-path-actions">
-                    <button type="button" className="button button-secondary" onClick={() => void handleWorkspacePick()}>
-                      {t('settings.chooseDirectory')}
-                    </button>
-                    <button
-                      type="button"
-                      className="button button-secondary"
-                      onClick={() => void window.electronAPI.appShell.openPath(workspaceDraft || settings.workspace.rootPath)}
-                    >
-                      {t('settings.reveal')}
-                    </button>
-                    <button
-                      type="button"
-                      className="button button-secondary"
-                      onClick={() => void window.electronAPI.appShell.copyText(workspaceDraft || settings.workspace.rootPath)}
-                    >
-                      {t('settings.copy')}
-                    </button>
+              <section className="settings-page settings-page-workspace">
+                <div className="settings-workspace-page scrollbar-thin" data-testid="settings-workspace-body">
+                  <div className="settings-workspace-hero">
+                    <div className="settings-field-label">{t('settings.workspaceRoot')}</div>
+                    <div className="settings-help-text">{t('settings.workspaceRootHint')}</div>
+                    <div className="settings-path-value">{workspaceDraft || settings.paths.defaultWorkspaceRoot}</div>
+                    <div className="settings-path-actions">
+                      <button type="button" className="button button-secondary" onClick={() => void handleWorkspacePick()}>
+                        {t('settings.chooseDirectory')}
+                      </button>
+                      <button
+                        type="button"
+                        className="button button-secondary"
+                        onClick={() => void window.electronAPI.appShell.openPath(workspaceDraft || settings.workspace.rootPath)}
+                      >
+                        {t('settings.reveal')}
+                      </button>
+                      <button
+                        type="button"
+                        className="button button-secondary"
+                        onClick={() => void window.electronAPI.appShell.copyText(workspaceDraft || settings.workspace.rootPath)}
+                      >
+                        {t('settings.copy')}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="settings-path-grid">
+                    {[
+                      { label: t('settings.settingsFile'), value: derivedPaths.settingsPath },
+                      { label: t('settings.logFile'), value: derivedPaths.logPath },
+                      { label: t('settings.projectsPath'), value: derivedPaths.projectsPath },
+                      { label: t('settings.knowledgePath'), value: derivedPaths.knowledgePath },
+                      { label: 'profiles/', value: derivedPaths.profilesPath },
+                      { label: 'policies/', value: derivedPaths.policiesPath },
+                    ].map((entry) => (
+                      <div key={entry.label} className="settings-path-card">
+                        <div className="settings-field-label">{entry.label}</div>
+                        <div className="settings-path-value">{entry.value}</div>
+                        <div className="settings-path-actions">
+                          <button
+                            type="button"
+                            className="button button-secondary"
+                            onClick={() => void window.electronAPI.appShell.openPath(entry.value)}
+                          >
+                            {t('settings.reveal')}
+                          </button>
+                          <button
+                            type="button"
+                            className="button button-secondary"
+                            onClick={() => void window.electronAPI.appShell.copyText(entry.value)}
+                          >
+                            {t('settings.copy')}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {settings.configuration.lastMigrationSummary.length > 0 && (
+                    <div className="settings-path-card">
+                      <div className="settings-field-label">Last migration</div>
+                      <div className="settings-help-text">{settings.configuration.lastMigrationSummary.join(' | ')}</div>
+                    </div>
+                  )}
+                  {settings.configuration.diagnostics.length > 0 && (
+                    <div className="settings-path-card">
+                      <div className="settings-field-label">Diagnostics</div>
+                      <div className="settings-help-text">
+                        {settings.configuration.diagnostics.map((diagnostic) => diagnostic.message).join(' | ')}
+                      </div>
+                    </div>
+                  )}
+                  <div className="settings-actions settings-workspace-footer-actions">
                     <button type="button" className="button button-secondary" onClick={() => void handleWorkspaceReset()}>
                       {t('settings.resetWorkspace')}
                     </button>
@@ -569,52 +619,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                     </button>
                   </div>
                 </div>
-
-                <div className="settings-path-grid">
-                  {[
-                    { label: t('settings.settingsFile'), value: derivedPaths.settingsPath },
-                    { label: t('settings.logFile'), value: derivedPaths.logPath },
-                    { label: t('settings.projectsPath'), value: derivedPaths.projectsPath },
-                    { label: t('settings.knowledgePath'), value: derivedPaths.knowledgePath },
-                    { label: 'profiles/', value: derivedPaths.profilesPath },
-                    { label: 'policies/', value: derivedPaths.policiesPath },
-                  ].map((entry) => (
-                    <div key={entry.label} className="settings-path-card">
-                      <div className="settings-field-label">{entry.label}</div>
-                      <div className="settings-path-value">{entry.value}</div>
-                      <div className="settings-path-actions">
-                        <button
-                          type="button"
-                          className="button button-secondary"
-                          onClick={() => void window.electronAPI.appShell.openPath(entry.value)}
-                        >
-                          {t('settings.reveal')}
-                        </button>
-                        <button
-                          type="button"
-                          className="button button-secondary"
-                          onClick={() => void window.electronAPI.appShell.copyText(entry.value)}
-                        >
-                          {t('settings.copy')}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {settings.configuration.lastMigrationSummary.length > 0 && (
-                  <div className="settings-path-card">
-                    <div className="settings-field-label">Last migration</div>
-                    <div className="settings-help-text">{settings.configuration.lastMigrationSummary.join(' | ')}</div>
-                  </div>
-                )}
-                {settings.configuration.diagnostics.length > 0 && (
-                  <div className="settings-path-card">
-                    <div className="settings-field-label">Diagnostics</div>
-                    <div className="settings-help-text">
-                      {settings.configuration.diagnostics.map((diagnostic) => diagnostic.message).join(' | ')}
-                    </div>
-                  </div>
-                )}
               </section>
             )}
 

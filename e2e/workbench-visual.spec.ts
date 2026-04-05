@@ -48,6 +48,45 @@ const isChildHorizontallyWithinContainer = async (
   return childRect.left >= containerRect.left - tolerance && childRect.right <= containerRect.right + tolerance;
 }, { containerSelector, childSelector });
 
+const isElementWithinViewport = async (page: Page, selector: string) => page.evaluate((targetSelector) => {
+  const element = document.querySelector(targetSelector);
+  if (!(element instanceof HTMLElement)) {
+    return false;
+  }
+
+  const rect = element.getBoundingClientRect();
+  const tolerance = 4;
+
+  return (
+    rect.left >= 0 - tolerance
+    && rect.top >= 0 - tolerance
+    && rect.right <= window.innerWidth + tolerance
+    && rect.bottom <= window.innerHeight + tolerance
+  );
+}, selector);
+
+const isElementDescendantOf = async (page: Page, selector: string, ancestorSelector: string) => page.evaluate((params) => {
+  const element = document.querySelector(params.selector);
+  const ancestor = document.querySelector(params.ancestorSelector);
+  if (!(element instanceof HTMLElement) || !(ancestor instanceof HTMLElement)) {
+    return false;
+  }
+
+  return ancestor.contains(element);
+}, { selector, ancestorSelector });
+
+const doesElementOverflowSidebar = async (page: Page, selector: string, sidebarSelector: string) => page.evaluate((params) => {
+  const element = document.querySelector(params.selector);
+  const sidebar = document.querySelector(params.sidebarSelector);
+  if (!(element instanceof HTMLElement) || !(sidebar instanceof HTMLElement)) {
+    return false;
+  }
+
+  const elementRect = element.getBoundingClientRect();
+  const sidebarRect = sidebar.getBoundingClientRect();
+  return elementRect.right > sidebarRect.right + 80;
+}, { selector, sidebarSelector });
+
 const configureVisualSettings = async (ctx: AppContext): Promise<AppContext> => {
   const tempDir = ctx.tempDir;
   await ctx.page.evaluate(async () => {
@@ -215,7 +254,7 @@ test.beforeEach(async () => {
     }).__RDC_AGENT_E2E__?.getWorkbenchState().projectInputs.length ?? 0
   ))).toBe(3);
   await expect(ctx.page.locator('text=custom').first()).toBeVisible();
-  await ctx.page.locator('[data-testid="cp-section-contextInfo"] .cp-section-header').click();
+  await ctx.page.locator('[data-testid="cp-section-runtimeContext"] .cp-section-header').click();
   await ctx.page.waitForTimeout(350);
 });
 
@@ -228,15 +267,14 @@ test('右栏窄态视觉回归', async () => {
   await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveScreenshot('right-panel-narrow.png');
 });
 
-test('Project Inputs 工具栏和操作按钮不会横向裁剪', async () => {
+test('Capture Library 工具栏和操作按钮不会横向裁剪', async () => {
   const page = ctx.page;
-  const toolbar = page.locator('[data-testid="project-inputs-toolbar"]');
-  const importButton = page.locator('[data-testid="project-inputs-import"]');
-  const openButton = page.locator('[data-testid="project-input-open-input-0"]');
-  const previewWindow = page.locator('[data-testid="project-preview-window"]');
-  const projectInputsSection = page.locator('[data-testid="cp-section-projectInputs"]');
+  const toolbar = page.locator('[data-testid="capture-library-toolbar"]');
+  const importButton = page.locator('[data-testid="capture-library-import"]');
+  const openButton = page.locator('[data-testid="capture-library-open-input-0"]');
+  const librarySection = page.locator('[data-testid="cp-section-captureLibrary"]');
 
-  await projectInputsSection.evaluate((element) => {
+  await librarySection.evaluate((element) => {
     element.scrollIntoView({ block: 'start', inline: 'nearest' });
   });
   await page.waitForTimeout(200);
@@ -244,29 +282,41 @@ test('Project Inputs 工具栏和操作按钮不会横向裁剪', async () => {
   await expect(toolbar).toBeVisible();
   await expect(importButton).toBeVisible();
   await expect(openButton).toBeVisible();
-  await expect(previewWindow).toBeVisible();
-  await expect(page.locator('[data-testid="project-input-import-input-0"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="capture-library-card-input-0"]')).toContainText('Opened');
 
   expect(await isChildFullyWithinContainer(
     page,
-    '[data-testid="project-inputs-toolbar"]',
-    '[data-testid="project-inputs-import"]',
+    '[data-testid="capture-library-toolbar"]',
+    '[data-testid="capture-library-import"]',
   )).toBe(true);
   expect(await isChildHorizontallyWithinContainer(
     page,
-    '[data-testid="project-input-card-input-0"]',
-    '[data-testid="project-input-actions-input-0"]',
+    '[data-testid="capture-library-card-input-0"]',
+    '[data-testid="capture-library-actions-input-0"]',
   )).toBe(true);
   expect(await isChildFullyWithinContainer(
     page,
-    '[data-testid="project-input-actions-input-0"]',
-    '[data-testid="project-input-open-input-0"]',
+    '[data-testid="capture-library-actions-input-0"]',
+    '[data-testid="capture-library-open-input-0"]',
   )).toBe(true);
 
-  await expect(projectInputsSection).toHaveScreenshot('project-inputs-section.png');
+  await expect(librarySection).toHaveScreenshot('capture-library-section.png');
 });
 
-test('运行中会禁用 Project Inputs 的打开按钮', async () => {
+test('Opened Capture 面板视觉回归', async () => {
+  const page = ctx.page;
+  const openedCaptureSection = page.locator('[data-testid="cp-section-openedCapture"]');
+
+  await openedCaptureSection.evaluate((element) => {
+    element.scrollIntoView({ block: 'start', inline: 'nearest' });
+  });
+  await page.waitForTimeout(200);
+
+  await expect(page.locator('[data-testid="opened-capture-preview-window"]')).toBeVisible();
+  await expect(openedCaptureSection).toHaveScreenshot('opened-capture-section.png');
+});
+
+test('运行中会禁用 Capture Library 的打开按钮，并禁止清理 opened capture', async () => {
   const page = ctx.page;
 
   await page.evaluate(() => {
@@ -299,8 +349,10 @@ test('运行中会禁用 Project Inputs 的打开按钮', async () => {
     });
   });
 
-  await expect(page.locator('[data-testid="project-input-open-input-0"]')).toBeDisabled();
-  await expect(page.locator('.project-inputs-run-lock')).toBeVisible();
+  await expect(page.locator('[data-testid="capture-library-open-input-0"]')).toBeDisabled();
+  await expect(page.locator('.capture-library-run-lock')).toBeVisible();
+  await expect(page.locator('[data-testid="opened-capture-clear"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="runtime-context-panel"]')).not.toContainText('HairSparkWhite.rdc');
 });
 
 test('Terminal drawer 展开后会显示日志并位于 prompt 下方', async () => {
@@ -336,4 +388,46 @@ test('Terminal drawer 展开后会显示日志并位于 prompt 下方', async ()
 test('左下 footer 视觉回归', async () => {
   const page = ctx.page;
   await expect(page.locator('[data-testid="sidebar-footer"]')).toHaveScreenshot('sidebar-footer.png');
+});
+
+test('左栏收起后 footer 仍保留用户与设备缩略入口', async () => {
+  const page = ctx.page;
+
+  await page.locator('[data-testid="app-sidebar-left"] .shell-panel-toggle').click();
+  await expect(page.locator('[data-testid="app-sidebar-left"]')).toHaveClass(/collapsed/);
+  await expect(page.locator('[data-testid="sidebar-user-settings-trigger"]')).toBeVisible();
+  await expect(page.locator('[data-testid="sidebar-device-selector-trigger"]')).toBeVisible();
+  await expect(page.locator('[data-testid="sidebar-footer"]')).toHaveScreenshot('sidebar-footer-collapsed.png');
+});
+
+test('左栏收起后用户菜单保持在窗口可视范围内', async () => {
+  const page = ctx.page;
+
+  await page.locator('[data-testid="app-sidebar-left"] .shell-panel-toggle').click();
+  await expect(page.locator('[data-testid="app-sidebar-left"]')).toHaveClass(/collapsed/);
+
+  await page.locator('[data-testid="sidebar-user-settings-trigger"]').click();
+  await expect(page.locator('[data-testid="sidebar-user-menu"]')).toBeVisible();
+  expect(await isElementWithinViewport(page, '[data-testid="sidebar-user-menu"]')).toBe(true);
+});
+
+test('左栏收起后设备菜单展开不越界', async () => {
+  const page = ctx.page;
+
+  await page.locator('[data-testid="app-sidebar-left"] .shell-panel-toggle').click();
+  await expect(page.locator('[data-testid="app-sidebar-left"]')).toHaveClass(/collapsed/);
+
+  await page.locator('[data-testid="sidebar-device-selector-trigger"]').click();
+  await expect(page.locator('[data-testid="sidebar-device-selector-dropdown"]')).toBeVisible();
+  expect(await isElementWithinViewport(page, '[data-testid="sidebar-device-selector-dropdown"]')).toBe(true);
+  expect(await isElementDescendantOf(
+    page,
+    '[data-testid="sidebar-device-selector-dropdown"]',
+    '[data-testid="app-sidebar-left"]',
+  )).toBe(false);
+  expect(await doesElementOverflowSidebar(
+    page,
+    '[data-testid="sidebar-device-selector-dropdown"]',
+    '[data-testid="app-sidebar-left"]',
+  )).toBe(true);
 });
