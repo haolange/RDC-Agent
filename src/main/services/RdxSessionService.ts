@@ -53,19 +53,22 @@ export class RdxSessionService {
     await this.ensureRuntimeReady();
 
     this.captures = request.captures.map((capture) => ({ ...capture }));
-    this.replayDevice = request.replayDevice;
-    this.deviceLabel = request.replayDevice.label;
     this.remoteId = null;
     this.remoteStatus = 'disconnected';
 
     const hasRemoteCapture = this.captures.some((capture) => capture.backendHint === 'remote');
+    let replayDevice = request.replayDevice;
     let reusedPreparedRemote = false;
     if (hasRemoteCapture) {
-      if (request.replayDevice.type === 'local' || request.replayDevice.status !== 'online') {
-        throw new Error('Remote capture requires an online Replay Device.');
+      if (replayDevice.type === 'local') {
+        throw new Error('Remote capture requires an Android Replay Device.');
       }
-      reusedPreparedRemote = await this.tryAdoptPreparedRemote(request.replayDevice);
+      replayDevice = await this.ensureReplayDeviceReady(replayDevice);
+      reusedPreparedRemote = await this.tryAdoptPreparedRemote(replayDevice);
     }
+
+    this.replayDevice = replayDevice;
+    this.deviceLabel = replayDevice.label;
 
     if (!reusedPreparedRemote) {
       await this.prepareFreshContext();
@@ -94,12 +97,12 @@ export class RdxSessionService {
         if (!preparedRemoteStillValid) {
           this.remoteId = null;
           this.remoteStatus = 'disconnected';
-          await this.ensureRemoteConnection(request.replayDevice);
+          await this.ensureRemoteConnection(replayDevice);
         } else {
           this.remoteStatus = 'online';
         }
       } else {
-        await this.ensureRemoteConnection(request.replayDevice);
+        await this.ensureRemoteConnection(replayDevice);
       }
     }
 
@@ -119,37 +122,76 @@ export class RdxSessionService {
     await this.closeOrReplaceOpenedCapture();
     await this.ensureRuntimeReady();
 
+    let replayDevice = request.replayDevice;
+    const isRemoteReplay = replayDevice.type === 'android';
+    if (isRemoteReplay) {
+      replayDevice = await this.ensureReplayDeviceReady(replayDevice);
+    }
+
     const capture: CaptureDescriptor = {
       id: request.inputId,
       filePath: request.filePath,
       role: 'primary',
-      backendHint: request.replayDevice.type === 'local' ? 'local' : 'remote',
+      backendHint: isRemoteReplay ? 'remote' : 'local',
       status: 'pending',
     };
 
     this.captures = [capture];
     this.activeCaptureId = capture.id;
-    this.replayDevice = request.replayDevice;
-    this.deviceLabel = request.replayDevice.label;
+    this.replayDevice = replayDevice;
+    this.deviceLabel = replayDevice.label;
     this.remoteId = null;
     this.remoteStatus = 'disconnected';
 
-    await this.prepareFreshContext();
+    let reusedPreparedRemote = false;
+    if (isRemoteReplay) {
+      reusedPreparedRemote = await this.tryAdoptPreparedRemote(replayDevice);
+    }
 
-    const ownerResult = await this.claimOwner(this.contextId!);
-    this.runtimeOwner = ownerResult.owner;
-    this.ownerLeaseId = ownerResult.leaseId;
+    if (!reusedPreparedRemote) {
+      await this.prepareFreshContext();
+    }
 
-    if (capture.backendHint === 'remote') {
-      if (request.replayDevice.type === 'local' || !['connected', 'online'].includes(request.replayDevice.status)) {
-        throw new Error('Remote capture requires an available Replay Device.');
+    try {
+      const ownerResult = await this.claimOwner(this.contextId!);
+      this.runtimeOwner = ownerResult.owner;
+      this.ownerLeaseId = ownerResult.leaseId;
+    } catch (error) {
+      if (!reusedPreparedRemote) {
+        throw error;
       }
-      await this.ensureRemoteConnection(request.replayDevice);
+
+      this.resetRemoteConnectionState();
+      await this.prepareFreshContext();
+      const ownerResult = await this.claimOwner(this.contextId!);
+      this.runtimeOwner = ownerResult.owner;
+      this.ownerLeaseId = ownerResult.leaseId;
+      reusedPreparedRemote = false;
+    }
+
+    if (isRemoteReplay) {
+      if (reusedPreparedRemote) {
+        const preparedRemoteStillValid = await this.validatePreparedRemoteHandle();
+        if (!preparedRemoteStillValid) {
+          this.remoteId = null;
+          this.remoteStatus = 'disconnected';
+          await this.ensureRemoteConnection(replayDevice);
+        } else {
+          this.remoteStatus = 'online';
+        }
+      } else {
+        await this.ensureRemoteConnection(replayDevice);
+      }
     }
 
     await this.ensureCaptureSession(capture);
 
-    const openedCapture = this.createOpenedCaptureState(request.projectId, request.inputId, request.filePath, request.replayDevice);
+    const openedCapture = this.createOpenedCaptureState(
+      request.projectId,
+      request.inputId,
+      request.filePath,
+      replayDevice,
+    );
     this.openedCapture = openedCapture;
     return openedCapture;
   }
@@ -341,6 +383,32 @@ export class RdxSessionService {
     }
 
     this.remoteStatus = 'online';
+  }
+
+  private async ensureReplayDeviceReady(device: ReplayDeviceEntry): Promise<ReplayDeviceEntry> {
+    if (device.type === 'local') {
+      return device;
+    }
+
+    const currentDevice = replayDeviceService.getDeviceById(device.id) ?? device;
+    if (currentDevice.type === 'local') {
+      return currentDevice;
+    }
+
+    if (['connected', 'online'].includes(currentDevice.status)) {
+      return currentDevice;
+    }
+
+    const activatedDevice = await replayDeviceService.activateDevice(currentDevice.id);
+    if (activatedDevice.type === 'local' || !['connected', 'online'].includes(activatedDevice.status)) {
+      throw new Error(
+        activatedDevice.activationErrorMessage
+        ?? activatedDevice.lastError
+        ?? `Failed to connect Replay Device ${activatedDevice.label}.`,
+      );
+    }
+
+    return activatedDevice;
   }
 
   private async tryAdoptPreparedRemote(device: ReplayDeviceEntry): Promise<boolean> {

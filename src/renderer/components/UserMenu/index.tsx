@@ -129,7 +129,12 @@ export const UserMenu: React.FC<UserMenuProps> = ({
           </div>
         </div>
 
-        <button type="button" className="user-menu-settings-button" onClick={onOpenSettings}>
+        <button
+          type="button"
+          className="user-menu-settings-button"
+          data-testid="open-settings-entry"
+          onClick={onOpenSettings}
+        >
           {t('userMenu.settings')}
         </button>
       </div>

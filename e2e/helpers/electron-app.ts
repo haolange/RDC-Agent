@@ -7,13 +7,21 @@ export interface AppContext {
   app: ElectronApplication;
   page: Page;
   tempDir: string;
+  userDataDir: string;
+  workspaceDir: string;
+  cleanupOnClose: boolean;
+}
+
+interface LaunchAppOptions {
+  tempDir?: string;
+  cleanupOnClose?: boolean;
 }
 
 /**
  * 启动 Electron app，使用临时 userData 和 workspace
  */
-export async function launchApp(): Promise<AppContext> {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-agent-e2e-'));
+export async function launchApp(options: LaunchAppOptions = {}): Promise<AppContext> {
+  const tempDir = options.tempDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-agent-e2e-'));
   const userDataDir = path.join(tempDir, 'userData');
   const workspaceDir = path.join(tempDir, 'workspace');
   fs.mkdirSync(userDataDir, { recursive: true });
@@ -26,7 +34,9 @@ export async function launchApp(): Promise<AppContext> {
     for (const fixture of manifest.captures ?? []) {
       if (fs.existsSync(fixture.sourcePath)) {
         const destPath = path.join(workspaceDir, path.basename(fixture.sourcePath));
-        fs.copyFileSync(fixture.sourcePath, destPath);
+        if (!fs.existsSync(destPath)) {
+          fs.copyFileSync(fixture.sourcePath, destPath);
+        }
       }
     }
   }
@@ -35,6 +45,7 @@ export async function launchApp(): Promise<AppContext> {
     args: [path.join(__dirname, '..', '..', 'out', 'main', 'index.js')],
     env: {
       ...process.env,
+      NODE_ENV: 'production',
       RDC_AGENT_TEST_MODE: '1',
       RDC_AGENT_USER_DATA: userDataDir,
       RDC_AGENT_WORKSPACE: workspaceDir,
@@ -44,18 +55,28 @@ export async function launchApp(): Promise<AppContext> {
   const page = await app.firstWindow();
   await page.waitForLoadState('domcontentloaded');
 
-  return { app, page, tempDir };
+  return {
+    app,
+    page,
+    tempDir,
+    userDataDir,
+    workspaceDir,
+    cleanupOnClose: options.cleanupOnClose ?? true,
+  };
 }
 
 /**
  * 关闭 app 并清理临时目录
  */
-export async function closeApp(ctx: AppContext): Promise<void> {
+export async function closeApp(ctx: AppContext, options?: { cleanup?: boolean }): Promise<void> {
   await ctx.app.close();
+  const shouldCleanup = options?.cleanup ?? ctx.cleanupOnClose;
   // 清理临时目录
-  try {
-    fs.rmSync(ctx.tempDir, { recursive: true, force: true });
-  } catch {
-    // ignore cleanup errors
+  if (shouldCleanup) {
+    try {
+      fs.rmSync(ctx.tempDir, { recursive: true, force: true });
+    } catch {
+      // ignore cleanup errors
+    }
   }
 }

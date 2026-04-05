@@ -14,8 +14,14 @@ import {
   LEFT_SIDEBAR_DEFAULT_WIDTH,
   RIGHT_PANEL_DEFAULT_WIDTH,
 } from '@shared/constants/layout';
-import { createBuiltinProviderEntries } from '@shared/constants/llm';
 import { DEFAULT_MODEL_ROUTING } from '@shared/types/agent';
+
+const createEmptyAgentRoutes = (): LlmAgentRoute[] =>
+  Object.keys(DEFAULT_MODEL_ROUTING).map((agentId) => ({
+    agentId: agentId as LlmAgentRoute['agentId'],
+    providerId: '',
+    modelId: '',
+  }));
 
 const DEFAULT_SETTINGS: AppSettings = {
   appearance: {
@@ -43,12 +49,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     rootPath: '',
   },
   llm: {
-    providers: createBuiltinProviderEntries(),
-    agentRoutes: Object.entries(DEFAULT_MODEL_ROUTING).map(([agentId, route]) => ({
-      agentId: agentId as LlmAgentRoute['agentId'],
-      providerId: route.provider,
-      modelId: route.model,
-    })),
+    providers: [],
+    agentRoutes: createEmptyAgentRoutes(),
   },
   paths: {
     workspaceRoot: '',

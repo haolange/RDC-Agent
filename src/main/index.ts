@@ -20,7 +20,7 @@ export const rdxSessionService = new RdxSessionService(toolBridge);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // 寮€鍙戠幆澧冩锟?
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const isDev = (process.env.NODE_ENV === 'development' || !app.isPackaged) && process.env.RDC_AGENT_TEST_MODE !== '1';
 
 // 涓荤獥鍙ｅ紩锟?
 let mainWindow: BrowserWindow | null = null;
