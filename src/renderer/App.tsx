@@ -891,7 +891,7 @@ const App: React.FC = () => {
                   </>
                 )}
               </button>
-              {!leftSidebarCollapsed && <DeviceSelector />}
+              <DeviceSelector collapsed={leftSidebarCollapsed} />
             </div>
           </aside>
 

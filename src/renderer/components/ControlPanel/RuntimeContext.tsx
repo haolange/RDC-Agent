@@ -1,5 +1,6 @@
 ﻿import React from 'react';
 import { useSessionStore } from '../../stores/sessionStore';
+import { useI18n } from '../../i18n';
 
 const getRemoteStatusIcon = (status?: string) => {
   switch (status) {
@@ -16,69 +17,28 @@ const getRemoteStatusIcon = (status?: string) => {
   }
 };
 
-export const ContextInfo: React.FC = () => {
+export const RuntimeContext: React.FC = () => {
+  const { t } = useI18n();
   const contextSnapshot = useSessionStore((s) => s.contextSnapshot);
   const currentRun = useSessionStore((s) => s.currentRun);
-  const openedCapture = useSessionStore((s) => s.openedCapture);
+  const setContextSnapshot = useSessionStore((s) => s.setContextSnapshot);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text).catch(() => undefined);
   };
 
-  if (!contextSnapshot && !currentRun && !openedCapture) {
+  if (!contextSnapshot && !currentRun) {
     return (
-      <div className="context-info">
+      <div className="runtime-context">
         <div className="context-empty">
-          No active session
+          {t('control.runtimeContextEmpty')}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="context-info">
-      {openedCapture && (
-        <div className="context-section">
-          <div className="context-section-header">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 5v14" />
-              <path d="M5 12h14" />
-            </svg>
-            <span>Opened Capture</span>
-          </div>
-          <div className="context-section-content">
-            <div className="context-item">
-              <span className="context-item-label">Input ID</span>
-              <span className="context-item-value mono" title={openedCapture.inputId}>
-                {openedCapture.inputId ? `${openedCapture.inputId.slice(0, 12)}…` : '--'}
-              </span>
-            </div>
-            <div className="context-item">
-              <span className="context-item-label">Capture</span>
-              <span className="context-item-value mono" title={openedCapture.filePath}>
-                {openedCapture.filePath.split(/[\\/]/).pop() ?? openedCapture.filePath}
-              </span>
-            </div>
-            <div className="context-item">
-              <span className="context-item-label">Device</span>
-              <span className="context-item-value">{openedCapture.deviceLabel}</span>
-            </div>
-            <div className="context-item">
-              <span className="context-item-label">Backend</span>
-              <span className="context-item-value">
-                <span className={`context-badge ${openedCapture.backend}`}>{openedCapture.backend}</span>
-              </span>
-            </div>
-            <div className="context-item">
-              <span className="context-item-label">Status</span>
-              <span className={`context-item-value ${openedCapture.status === 'open' ? 'active' : ''}`}>
-                {openedCapture.status}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
+    <div className="runtime-context" data-testid="runtime-context-panel">
       {currentRun && (
         <div className="context-section">
           <div className="context-section-header">
@@ -94,13 +54,13 @@ export const ContextInfo: React.FC = () => {
             <div className="context-item">
               <span className="context-item-label">Session ID</span>
               <span className="context-item-value mono" title={currentRun.sessionId}>
-                {currentRun.sessionId ? `${currentRun.sessionId.slice(0, 8)}…` : '--'}
+                {currentRun.sessionId || '--'}
               </span>
             </div>
             <div className="context-item">
               <span className="context-item-label">Case ID</span>
               <span className="context-item-value mono" title={currentRun.caseId}>
-                {currentRun.caseId ? `${currentRun.caseId.slice(0, 8)}…` : '--'}
+                {currentRun.caseId || '--'}
               </span>
             </div>
             <div className="context-item">
@@ -131,7 +91,13 @@ export const ContextInfo: React.FC = () => {
             <div className="context-item">
               <span className="context-item-label">Context ID</span>
               <span className="context-item-value mono" title={contextSnapshot.contextId}>
-                {contextSnapshot.contextId ? `${contextSnapshot.contextId.slice(0, 8)}…` : '--'}
+                {contextSnapshot.contextId || '--'}
+              </span>
+            </div>
+            <div className="context-item">
+              <span className="context-item-label">Replay Session</span>
+              <span className="context-item-value mono" title={contextSnapshot.sessionId}>
+                {contextSnapshot.sessionId || '--'}
               </span>
             </div>
             <div className="context-item">
@@ -152,7 +118,13 @@ export const ContextInfo: React.FC = () => {
             <div className="context-item">
               <span className="context-item-label">Owner</span>
               <span className="context-item-value mono" title={contextSnapshot.runtimeOwner}>
-                {contextSnapshot.runtimeOwner ? `${contextSnapshot.runtimeOwner.slice(0, 12)}…` : '--'}
+                {contextSnapshot.runtimeOwner || '--'}
+              </span>
+            </div>
+            <div className="context-item">
+              <span className="context-item-label">Owner Lease</span>
+              <span className="context-item-value mono" title={contextSnapshot.ownerLeaseId}>
+                {contextSnapshot.ownerLeaseId || '--'}
               </span>
             </div>
             <div className="context-item">
@@ -163,15 +135,14 @@ export const ContextInfo: React.FC = () => {
         </div>
       )}
 
-      <div className="context-actions">
+      <div className="runtime-context-actions">
         <button
-          className="context-action-btn"
+          type="button"
+          className="panel-action-btn"
+          data-testid="runtime-context-refresh"
           onClick={() => {
             window.electronAPI?.context.get()
-              .then((snapshot) => useSessionStore.getState().setContextSnapshot(snapshot))
-              .catch(() => undefined);
-            window.electronAPI?.capture.getOpenedState()
-              .then((state) => useSessionStore.getState().setOpenedCapture(state))
+              .then((snapshot) => setContextSnapshot(snapshot))
               .catch(() => undefined);
           }}
         >
@@ -179,39 +150,27 @@ export const ContextInfo: React.FC = () => {
             <polyline points="23 4 23 10 17 10" />
             <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
           </svg>
-          <span>Refresh</span>
+          <span>{t('control.runtimeRefresh')}</span>
         </button>
         <button
-          className="context-action-btn"
+          type="button"
+          className="panel-action-btn"
+          data-testid="runtime-context-copy-id"
           onClick={() => {
-            window.electronAPI.capture.clearOpenedState()
-              .then(() => useSessionStore.getState().setOpenedCapture(null))
-              .catch(() => undefined);
-          }}
-          disabled={!openedCapture}
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-          <span>Clear Open</span>
-        </button>
-        <button
-          className="context-action-btn"
-          onClick={() => {
-            const id = openedCapture?.contextId || contextSnapshot?.contextId || currentRun?.sessionId;
+            const id = contextSnapshot?.contextId;
             if (id) copyToClipboard(id);
           }}
+          disabled={!contextSnapshot?.contextId}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
           </svg>
-          <span>Copy ID</span>
+          <span>{t('control.copyContextId')}</span>
         </button>
       </div>
     </div>
   );
 };
 
-export default ContextInfo;
+export default RuntimeContext;

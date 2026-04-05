@@ -113,10 +113,29 @@ export type TranslationKey =
   | 'settings.discard'
   | 'settings.noSelection'
   | 'control.taskMonitor'
-  | 'control.captureControl'
-  | 'control.contextInfo'
-  | 'control.projectInputs'
-  | 'control.projectInputsLocked'
+  | 'control.captureLibrary'
+  | 'control.openedCapture'
+  | 'control.runtimeContext'
+  | 'control.captureSwitchLocked'
+  | 'control.captureLibraryProjectHint'
+  | 'control.captureLibraryEmpty'
+  | 'control.captureLibraryRefresh'
+  | 'control.captureLibraryRefreshing'
+  | 'control.captureLibraryImport'
+  | 'control.captureLibraryImporting'
+  | 'control.captureLibraryOpenedBadge'
+  | 'control.captureOpen'
+  | 'control.captureOpening'
+  | 'control.openedCaptureFile'
+  | 'control.openedCaptureSourceInput'
+  | 'control.openedCaptureStatus'
+  | 'control.openedCaptureOpenedAt'
+  | 'control.openedCaptureEmpty'
+  | 'control.openedCaptureEmptyHint'
+  | 'control.openedCaptureClear'
+  | 'control.runtimeContextEmpty'
+  | 'control.runtimeRefresh'
+  | 'control.copyContextId'
   | 'control.previewWindow'
   | 'control.previewEmpty'
   | 'control.previewEmptyHint'
@@ -260,11 +279,30 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
     'settings.discard': '放弃更改',
     'settings.noSelection': '请选择或新增一条配置。',
     'control.taskMonitor': '任务监控',
-    'control.captureControl': 'Capture 控制',
-    'control.contextInfo': 'Context 信息',
-    'control.projectInputs': 'Project Inputs',
-    'control.projectInputsLocked': '运行中的任务不能切换 .rdc，请先结束当前调试。',
-    'control.previewWindow': 'Preview Window',
+    'control.captureLibrary': 'Capture Library',
+    'control.openedCapture': 'Opened Capture',
+    'control.runtimeContext': 'Runtime Context',
+    'control.captureSwitchLocked': '运行中的任务不能切换或清理当前 .rdc，请先结束当前调试。',
+    'control.captureLibraryProjectHint': '请选择一个项目以查看 Capture Library。',
+    'control.captureLibraryEmpty': '<project-root>/.resource/inputs 下还没有 `.rdc` 文件。',
+    'control.captureLibraryRefresh': '刷新',
+    'control.captureLibraryRefreshing': '刷新中…',
+    'control.captureLibraryImport': '导入 .rdc',
+    'control.captureLibraryImporting': '导入中…',
+    'control.captureLibraryOpenedBadge': 'Opened',
+    'control.captureOpen': '打开',
+    'control.captureOpening': '打开中…',
+    'control.openedCaptureFile': 'Capture',
+    'control.openedCaptureSourceInput': 'Input ID',
+    'control.openedCaptureStatus': 'Status',
+    'control.openedCaptureOpenedAt': 'Opened At',
+    'control.openedCaptureEmpty': 'No Capture Opened',
+    'control.openedCaptureEmptyHint': '从 Capture Library 打开一个 `.rdc` 后，这里会显示当前打开状态和预览。',
+    'control.openedCaptureClear': 'Clear Open',
+    'control.runtimeContextEmpty': 'No active runtime context',
+    'control.runtimeRefresh': 'Refresh',
+    'control.copyContextId': 'Copy Context ID',
+    'control.previewWindow': 'Capture Preview',
     'control.previewEmpty': '无内容',
     'control.previewEmptyHint': '打开一个 `.rdc` 后，这里会显示当前 capture 的渲染结果预览。',
     'control.previewLoading': '正在生成预览…',
@@ -406,11 +444,30 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
     'settings.discard': 'Discard',
     'settings.noSelection': 'Select an entry or create a new one.',
     'control.taskMonitor': 'Task Monitor',
-    'control.captureControl': 'Capture Control',
-    'control.contextInfo': 'Context Info',
-    'control.projectInputs': 'Project Inputs',
-    'control.projectInputsLocked': 'Active runs cannot switch `.rdc` inputs. Finish or restart the current debug task first.',
-    'control.previewWindow': 'Preview Window',
+    'control.captureLibrary': 'Capture Library',
+    'control.openedCapture': 'Opened Capture',
+    'control.runtimeContext': 'Runtime Context',
+    'control.captureSwitchLocked': 'Active runs cannot switch or clear the current `.rdc`. Finish or restart the current debug task first.',
+    'control.captureLibraryProjectHint': 'Select a project to browse the Capture Library.',
+    'control.captureLibraryEmpty': 'No `.rdc` files were found under <project-root>/.resource/inputs yet.',
+    'control.captureLibraryRefresh': 'Refresh',
+    'control.captureLibraryRefreshing': 'Refreshing...',
+    'control.captureLibraryImport': 'Import .rdc',
+    'control.captureLibraryImporting': 'Importing...',
+    'control.captureLibraryOpenedBadge': 'Opened',
+    'control.captureOpen': 'Open',
+    'control.captureOpening': 'Opening...',
+    'control.openedCaptureFile': 'Capture',
+    'control.openedCaptureSourceInput': 'Input ID',
+    'control.openedCaptureStatus': 'Status',
+    'control.openedCaptureOpenedAt': 'Opened At',
+    'control.openedCaptureEmpty': 'No Capture Opened',
+    'control.openedCaptureEmptyHint': 'Open a `.rdc` from Capture Library to inspect its current opened state and preview here.',
+    'control.openedCaptureClear': 'Clear Open',
+    'control.runtimeContextEmpty': 'No active runtime context',
+    'control.runtimeRefresh': 'Refresh',
+    'control.copyContextId': 'Copy Context ID',
+    'control.previewWindow': 'Capture Preview',
     'control.previewEmpty': 'No content',
     'control.previewEmptyHint': 'Open a `.rdc` capture to show the current render preview here.',
     'control.previewLoading': 'Generating preview...',

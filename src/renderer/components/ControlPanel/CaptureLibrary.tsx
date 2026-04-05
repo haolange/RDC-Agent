@@ -1,9 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useDeviceStore } from '../../stores/deviceStore';
-import type { ProjectInputRecord } from '@shared/types/session';
+import type { OpenedCaptureState, ProjectInputRecord } from '@shared/types/session';
 import { useI18n } from '../../i18n';
-import { ProjectPreview } from './ProjectPreview';
 
 const formatSize = (size: number): string => {
   if (size >= 1024 * 1024) {
@@ -15,7 +14,27 @@ const formatSize = (size: number): string => {
   return `${size} B`;
 };
 
-export const ProjectInputs: React.FC = () => {
+const createOpeningState = (
+  input: ProjectInputRecord,
+  projectId: string,
+  device: { id: string; label: string; type: string },
+): OpenedCaptureState => ({
+  projectId,
+  inputId: input.inputId,
+  filePath: input.filePath,
+  captureId: input.inputId,
+  sessionId: '',
+  contextId: '',
+  replaySessionId: '',
+  backend: device.type === 'android' ? 'remote' : 'local',
+  deviceId: device.id,
+  deviceLabel: device.label,
+  status: 'opening',
+  openedAt: Date.now(),
+  preview: null,
+});
+
+export const CaptureLibrary: React.FC = () => {
   const { t } = useI18n();
   const currentRun = useSessionStore((state) => state.currentRun);
   const currentProject = useSessionStore((state) => state.currentProject);
@@ -69,16 +88,17 @@ export const ProjectInputs: React.FC = () => {
 
   const handleOpen = async (input: ProjectInputRecord) => {
     if (currentRun) {
-      setErrorMessage(t('control.projectInputsLocked'));
+      setErrorMessage(t('control.captureSwitchLocked'));
       return;
     }
     if (!currentProject || !selectedDeviceEntry) return;
     setOpeningId(input.inputId);
     try {
       await window.electronAPI.capture.clearOpenedState();
-      setOpenedCapture(null);
       setContextSnapshot(null);
       setCaptures([]);
+      setOpenedCapture(createOpeningState(input, currentProject.projectId, selectedDeviceEntry));
+      setErrorMessage(null);
 
       if (
         selectedDeviceEntry.type === 'android'
@@ -101,84 +121,89 @@ export const ProjectInputs: React.FC = () => {
         }
         setErrorMessage(null);
       } else {
+        setOpenedCapture(null);
         setErrorMessage(result.error ?? '打开失败。');
       }
+    } catch (error) {
+      setOpenedCapture(null);
+      setErrorMessage(error instanceof Error ? error.message : '打开失败。');
     } finally {
       setOpeningId(null);
     }
   };
 
   if (!currentProject) {
-    return <div className="project-inputs-empty">请选择一个项目以查看 `.resource/inputs`。</div>;
+    return <div className="capture-library-empty">{t('control.captureLibraryProjectHint')}</div>;
   }
 
   return (
-    <div className="project-inputs">
-      <div className="project-inputs-toolbar" data-testid="project-inputs-toolbar">
+    <div className="capture-library">
+      <div className="capture-library-toolbar" data-testid="capture-library-toolbar">
         <button
           type="button"
-          className="context-action-btn"
-          data-testid="project-inputs-refresh"
+          className="panel-action-btn"
+          data-testid="capture-library-refresh"
           onClick={() => void handleRefresh()}
           disabled={isRefreshing}
         >
-          <span>{isRefreshing ? '刷新中…' : '刷新'}</span>
+          <span>{isRefreshing ? t('control.captureLibraryRefreshing') : t('control.captureLibraryRefresh')}</span>
         </button>
         <button
           type="button"
-          className="context-action-btn"
-          data-testid="project-inputs-import"
+          className="panel-action-btn"
+          data-testid="capture-library-import"
           onClick={() => void handleImport()}
           disabled={isImporting}
         >
-          <span>{isImporting ? '导入中…' : '导入 .rdc'}</span>
+          <span>{isImporting ? t('control.captureLibraryImporting') : t('control.captureLibraryImport')}</span>
         </button>
       </div>
 
-      <ProjectPreview
-        openedCapture={activeOpenedCapture}
-        isLoading={Boolean(openingId)}
-      />
-
-      {errorMessage && <div className="project-inputs-error">{errorMessage}</div>}
-      {currentRun && <div className="project-inputs-run-lock">{t('control.projectInputsLocked')}</div>}
+      {errorMessage && <div className="capture-library-error">{errorMessage}</div>}
+      {currentRun && <div className="capture-library-run-lock">{t('control.captureSwitchLocked')}</div>}
 
       {projectInputs.length === 0 ? (
-        <div className="project-inputs-empty">
-          &lt;project-root&gt;/.resource/inputs 下还没有 `.rdc` 文件。
+        <div className="capture-library-empty">
+          {t('control.captureLibraryEmpty')}
         </div>
       ) : (
-        <div className="project-inputs-list">
+        <div className="capture-library-list">
           {projectInputs.map((input) => {
             const isOpened = activeOpenedCapture?.inputId === input.inputId && activeOpenedCapture.status === 'open';
             return (
               <div
                 key={input.inputId}
-                className={`project-input-item ${isOpened ? 'opened' : ''}`}
-                data-testid={`project-input-card-${input.inputId}`}
+                className={`capture-library-item ${isOpened ? 'opened' : ''}`}
+                data-testid={`capture-library-card-${input.inputId}`}
               >
-                <div className="project-input-item-main">
-                  <div className="project-input-item-copy">
-                    <div className="project-input-item-name">{input.fileName}</div>
-                    <div className="project-input-item-path" title={input.filePath}>{input.filePath}</div>
+                <div className="capture-library-item-main">
+                  <div className="capture-library-item-copy">
+                    <div className="capture-library-item-name">{input.fileName}</div>
+                    <div className="capture-library-item-path" title={input.filePath}>{input.filePath}</div>
                   </div>
-                  <div className="project-input-item-meta">
+                  <div className="capture-library-item-meta">
                     <span>{formatSize(input.size)}</span>
                     <span className="capture-item-separator">·</span>
                     <span>{new Date(input.lastModifiedAt).toLocaleDateString()}</span>
+                    {isOpened && (
+                      <>
+                        <span className="capture-item-separator">·</span>
+                        <span className="capture-library-opened-flag">{t('control.captureLibraryOpenedBadge')}</span>
+                      </>
+                    )}
                   </div>
                 </div>
 
-                <div className="project-input-item-actions" data-testid={`project-input-actions-${input.inputId}`}>
+                <div className="capture-library-item-actions" data-testid={`capture-library-actions-${input.inputId}`}>
                   <button
                     type="button"
                     className="button button-primary button-sm"
-                    data-testid={`project-input-open-${input.inputId}`}
+                    data-testid={`capture-library-open-${input.inputId}`}
                     onClick={() => void handleOpen(input)}
                     disabled={Boolean(currentRun) || openingId === input.inputId}
-                    title={currentRun ? t('control.projectInputsLocked') : undefined}
+                    title={currentRun ? t('control.captureSwitchLocked') : undefined}
                   >
-                    {openingId === input.inputId ? '打开中…' : '打开'}
+                    {openingId === input.inputId ? t('control.captureOpening') : t('control.captureOpen')}
                   </button>
                 </div>
               </div>
@@ -190,4 +215,4 @@ export const ProjectInputs: React.FC = () => {
   );
 };
 
-export default ProjectInputs;
+export default CaptureLibrary;

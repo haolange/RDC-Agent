@@ -11,7 +11,6 @@ const UI_STAGES: Array<{ id: string; label: string; stages: WorkflowStage[] }> =
 
 export const TaskMonitor: React.FC = () => {
   const currentRun = useSessionStore((state) => state.currentRun);
-  const contextSnapshot = useSessionStore((state) => state.contextSnapshot);
   const timeline = useSessionStore((state) => state.timeline);
 
   const currentStage = (currentRun?.lastStage as WorkflowStage | undefined) || 'preflight';
@@ -95,12 +94,6 @@ export const TaskMonitor: React.FC = () => {
       )}
 
       <div className="task-summary">
-        <div className="task-summary-item">
-          <span className="task-summary-label">Context</span>
-          <span className="task-summary-value mono" title={contextSnapshot?.contextId}>
-            {contextSnapshot?.contextId ? `${contextSnapshot.contextId.slice(0, 8)}…` : '--'}
-          </span>
-        </div>
         <div className="task-summary-item">
           <span className="task-summary-label">Blockers</span>
           <span className={`task-summary-value ${blockerCount > 0 ? 'error' : ''}`}>{blockerCount}</span>
