@@ -120,7 +120,8 @@ export const DeviceSelector: React.FC = () => {
     <div className="device-selector-container" ref={dropdownRef}>
       <div className="device-selector-group">
         <button
-          className="device-selector-trigger footer-entry"
+          className="device-selector-trigger footer-entry sidebar-footer-entry"
+          data-testid="sidebar-device-selector-trigger"
           onClick={handleToggleOpen}
           aria-expanded={isOpen}
           aria-haspopup="listbox"

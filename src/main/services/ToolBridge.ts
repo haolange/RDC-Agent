@@ -7,7 +7,7 @@ import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { app } from 'electron';
-import type { ToolCallRequest, ToolCallResult, ToolCatalog, CLIResult } from '@shared/types/tool';
+import type { ToolCallRequest, ToolCallResult, ToolCatalog, CLIResult, ToolTraceEntry } from '@shared/types/tool';
 import { nowMs, generateEventId } from '@shared/utils/id';
 
 interface WindowsLauncherSpec {
@@ -21,15 +21,34 @@ export class ToolBridge {
   private toolsPath: string;
   private catalog: ToolCatalog | null = null;
   private activeProcesses: Map<string, ChildProcess> = new Map();
+  private traceListeners = new Set<(trace: ToolTraceEntry) => void>();
 
   constructor() {
-    // 确定工具路径
-    if (app.isPackaged) {
-      this.toolsPath = path.join(process.resourcesPath, 'tools');
-    } else {
-      // 开发模式：相对于项目根目录
-      this.toolsPath = path.join(app.getAppPath(), 'resources', 'tools');
+    this.toolsPath = this.resolveToolsPath();
+  }
+
+  private resolveToolsPath(): string {
+    const appPath = app.getAppPath();
+    const candidates = app.isPackaged
+      ? [
+          path.join(process.resourcesPath, 'tools'),
+        ]
+      : [
+          path.join(appPath, 'resources', 'tools'),
+          path.join(appPath, '..', 'resources', 'tools'),
+          path.join(appPath, '..', '..', 'resources', 'tools'),
+          path.join(appPath, '..', '..', '..', 'resources', 'tools'),
+          path.join(process.cwd(), 'resources', 'tools'),
+        ];
+
+    for (const candidate of candidates) {
+      const resolved = path.resolve(candidate);
+      if (fs.existsSync(resolved)) {
+        return resolved;
+      }
     }
+
+    return path.resolve(candidates[0]);
   }
 
   /**
@@ -228,12 +247,37 @@ export class ToolBridge {
     });
   }
 
+  onToolTrace(listener: (trace: ToolTraceEntry) => void): () => void {
+    this.traceListeners.add(listener);
+    return () => {
+      this.traceListeners.delete(listener);
+    };
+  }
+
+  private emitToolTrace(request: ToolCallRequest, result: ToolCallResult): void {
+    const trace: ToolTraceEntry = {
+      traceId: result.trace_id || generateEventId('tool-trace'),
+      toolName: request.toolName,
+      args: request.args,
+      result,
+      timestamp: nowMs(),
+      contextId: request.contextId ?? '',
+      runtimeOwner: request.runtimeOwner ?? '',
+      ownerLeaseId: request.ownerLeaseId,
+    };
+
+    for (const listener of this.traceListeners) {
+      listener(trace);
+    }
+  }
+
   /**
    * 调用rd.*工具
    * 使用参数数组模式，避免命令字符串拼接注入风险
    */
   async call(request: ToolCallRequest): Promise<ToolCallResult> {
     const startTime = nowMs();
+    let response: ToolCallResult;
 
     try {
       // 参数数组模式：'call' <toolName> [--args-json <json>] [--context-id <id>] [--runtime-owner <owner>]
@@ -249,55 +293,68 @@ export class ToolBridge {
       if (request.runtimeOwner) {
         cliArgs.push('--runtime-owner', request.runtimeOwner);
       }
+      if (request.ownerLeaseId) {
+        cliArgs.push('--owner-lease-id', request.ownerLeaseId);
+      }
 
       const result = await this.executeCLI('call', cliArgs, {
         timeout: 60000, // 60秒超时
       });
 
-      // 解析 canonical JSON
-      if (result.exitCode === 0 && result.stdout.trim()) {
-        let parsed: Record<string, unknown>;
+      // 优先解析 canonical JSON，即使 CLI 以非零退出码返回也可能给出结构化错误
+      if (result.stdout.trim()) {
+        let parsed: Record<string, unknown> | null = null;
         try {
           parsed = JSON.parse(result.stdout);
         } catch {
-          // stdout 不是 JSON，视为裸文本成功
-          return {
+          if (result.exitCode === 0) {
+            // stdout 不是 JSON，视为裸文本成功
+            response = {
+              ok: true,
+              data: { raw: result.stdout },
+              duration_ms: nowMs() - startTime,
+              trace_id: generateEventId('tool'),
+            };
+            this.emitToolTrace(request, response);
+            return response;
+          }
+        }
+
+        if (parsed) {
+          if (parsed.ok === false) {
+            // CLI 层返回结构化错误
+            const errObj = (parsed.error ?? {}) as Record<string, unknown>;
+            response = {
+              ok: false,
+              data: null as unknown as Record<string, unknown>,
+              artifacts: [],
+              error: {
+                code: (errObj.code as string) ?? 'TOOL_ERROR',
+                message: (errObj.message as string) ?? 'Tool returned ok:false',
+                category: (errObj.category as string) ?? 'execution',
+                details: (errObj.details as Record<string, unknown>) ?? undefined,
+              },
+              duration_ms: nowMs() - startTime,
+              trace_id: generateEventId('tool'),
+            };
+            this.emitToolTrace(request, response);
+            return response;
+          }
+
+          response = {
             ok: true,
-            data: { raw: result.stdout },
+            data: (parsed.data as Record<string, unknown>) ?? parsed,
+            artifacts: parsed.artifacts as ToolCallResult['artifacts'],
             duration_ms: nowMs() - startTime,
             trace_id: generateEventId('tool'),
           };
+          this.emitToolTrace(request, response);
+          return response;
         }
-
-        if (parsed.ok === false) {
-          // CLI 层返回结构化错误
-          const errObj = (parsed.error ?? {}) as Record<string, unknown>;
-          return {
-            ok: false,
-            data: null as unknown as Record<string, unknown>,
-            artifacts: [],
-            error: {
-              code: (errObj.code as string) ?? 'TOOL_ERROR',
-              message: (errObj.message as string) ?? 'Tool returned ok:false',
-              category: (errObj.category as string) ?? 'execution',
-              details: (errObj.details as Record<string, unknown>) ?? undefined,
-            },
-            duration_ms: nowMs() - startTime,
-            trace_id: generateEventId('tool'),
-          };
-        }
-
-        return {
-          ok: true,
-          data: (parsed.data as Record<string, unknown>) ?? parsed,
-          artifacts: parsed.artifacts as ToolCallResult['artifacts'],
-          duration_ms: nowMs() - startTime,
-          trace_id: generateEventId('tool'),
-        };
       }
 
       // 非零退出码或空 stdout — 结构化错误
-      return {
+      response = {
         ok: false,
         data: null as unknown as Record<string, unknown>,
         artifacts: [],
@@ -314,8 +371,10 @@ export class ToolBridge {
         duration_ms: nowMs() - startTime,
         trace_id: generateEventId('tool'),
       };
+      this.emitToolTrace(request, response);
+      return response;
     } catch (error) {
-      return {
+      response = {
         ok: false,
         data: null as unknown as Record<string, unknown>,
         artifacts: [],
@@ -327,6 +386,8 @@ export class ToolBridge {
         duration_ms: nowMs() - startTime,
         trace_id: generateEventId('tool'),
       };
+      this.emitToolTrace(request, response);
+      return response;
     }
   }
 

@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useI18n } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
 import type {
   AppSettings,
+  BuiltinLlmProviderId,
   AppTheme,
   FontScale,
   LlmAgentRoute,
@@ -12,7 +13,7 @@ import type {
   LlmProviderKind,
 } from '@shared/types/settings';
 import { AGENT_DISPLAY_NAMES, AGENT_ROLES } from '@shared/constants/agents';
-import { BUILTIN_LLM_PROVIDER_DEFINITIONS } from '@shared/constants/llm';
+import { BUILTIN_LLM_PROVIDER_DEFINITIONS, createBuiltinProviderEntry } from '@shared/constants/llm';
 import './SettingsModal.css';
 
 interface SettingsModalProps {
@@ -38,11 +39,13 @@ const joinPath = (root: string, ...segments: string[]): string => {
 };
 
 const createCustomProvider = (): LlmProviderEntry => ({
-  id: `provider-${crypto.randomUUID()}`,
+  id: `custom.${crypto.randomUUID()}`,
   kind: 'openai-compatible',
   label: '',
   enabled: false,
   apiKey: '',
+  secretRef: '',
+  hasStoredSecret: false,
   baseUrl: '',
   models: [],
   recommendedModels: [],
@@ -61,7 +64,7 @@ const cloneRoute = (route: LlmAgentRoute): LlmAgentRoute => ({ ...route });
 const computeConfigured = (provider: LlmProviderEntry): boolean => {
   if (!provider.enabled) return false;
   if (provider.kind === 'ollama') return true;
-  return Boolean(provider.apiKey.trim());
+  return Boolean(provider.apiKey.trim() || provider.hasStoredSecret);
 };
 
 const getEnabledModels = (provider?: Pick<LlmProviderEntry, 'models'> | null) =>
@@ -93,10 +96,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   const [agentRouteDrafts, setAgentRouteDrafts] = useState<LlmAgentRoute[]>(settings.llm.agentRoutes.map(cloneRoute));
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(settings.llm.providers[0]?.id ?? null);
   const [newModelId, setNewModelId] = useState('');
-  const [showApiKey, setShowApiKey] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(true);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<BuiltinLlmProviderId>(BUILTIN_LLM_PROVIDER_DEFINITIONS[0]?.id ?? 'openrouter');
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      wasOpenRef.current = false;
+      return;
+    }
+    if (wasOpenRef.current) return;
+
+    wasOpenRef.current = true;
     setActiveSection('models');
     setAccountDraft(settings.profile);
     setWorkspaceDraft(settings.workspace.rootPath);
@@ -105,7 +116,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     setAgentRouteDrafts(settings.llm.agentRoutes.map(cloneRoute));
     setSelectedProviderId(providers[0]?.id ?? null);
     setNewModelId('');
-    setShowApiKey(false);
+    setShowApiKey(true);
+    setSelectedTemplateId(BUILTIN_LLM_PROVIDER_DEFINITIONS[0]?.id ?? 'openrouter');
   }, [open, settings]);
 
   useEffect(() => {
@@ -116,6 +128,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open || !selectedProviderId) return;
+
+    const selected = providerDrafts.find((provider) => provider.id === selectedProviderId);
+    if (!selected || selected.kind === 'ollama' || !selected.hasStoredSecret || selected.apiKey) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void window.electronAPI.settings.getProviderSecret(selectedProviderId).then((apiKey) => {
+      if (cancelled || !apiKey) return;
+      setProviderDrafts((current) => current.map((provider) => {
+        if (provider.id !== selectedProviderId || provider.apiKey) {
+          return provider;
+        }
+
+        const nextProvider = {
+          ...provider,
+          apiKey,
+        };
+
+        return {
+          ...nextProvider,
+          isConfigured: computeConfigured(nextProvider),
+        };
+      }));
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, providerDrafts, selectedProviderId]);
 
   const selectedProvider = useMemo(
     () => providerDrafts.find((provider) => provider.id === selectedProviderId) ?? null,
@@ -166,6 +212,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     logPath: joinPath(derivedRoot, 'logs', 'rdc-agent.log'),
     projectsPath: joinPath(derivedRoot, 'projects'),
     knowledgePath: joinPath(derivedRoot, 'knowledge'),
+    profilesPath: joinPath(derivedRoot, 'profiles'),
+    policiesPath: joinPath(derivedRoot, 'policies'),
   };
 
   const invalidAgentRoutes = useMemo(
@@ -224,12 +272,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     setSelectedProviderId(nextProvider.id);
   };
 
+  const handleAddBuiltinTemplate = () => {
+    const existing = providerDrafts.find((provider) => provider.id === selectedTemplateId);
+    if (existing) {
+      setSelectedProviderId(existing.id);
+      return;
+    }
+
+    const nextProvider = createBuiltinProviderEntry(selectedTemplateId);
+    setProviderDrafts((current) => [...current, nextProvider]);
+    setSelectedProviderId(nextProvider.id);
+  };
+
   const handleSaveProvider = async () => {
     if (!selectedProvider) return;
     const normalizedProvider = {
       ...selectedProvider,
       label: selectedProvider.label.trim(),
       apiKey: selectedProvider.apiKey.trim(),
+      secretRef: selectedProvider.secretRef,
+      hasStoredSecret: selectedProvider.hasStoredSecret,
       baseUrl: selectedProvider.baseUrl?.trim() || '',
       docsUrl: selectedProvider.docsUrl?.trim() || '',
       models: selectedProvider.models
@@ -247,6 +309,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
       provider.id === normalizedProvider.id ? normalizedProvider : provider
     )));
     await saveProvider(normalizedProvider);
+  };
+
+  const handleClearStoredSecret = () => {
+    if (!selectedProvider) return;
+    const nextProvider = {
+      ...selectedProvider,
+      apiKey: '',
+      hasStoredSecret: false,
+    };
+    setProviderDrafts((current) => current.map((provider) => (
+      provider.id === nextProvider.id
+        ? {
+            ...nextProvider,
+            isConfigured: computeConfigured(nextProvider),
+          }
+        : provider
+    )));
+    setShowApiKey(true);
   };
 
   const handleDeleteProvider = async () => {
@@ -496,6 +576,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                     { label: t('settings.logFile'), value: derivedPaths.logPath },
                     { label: t('settings.projectsPath'), value: derivedPaths.projectsPath },
                     { label: t('settings.knowledgePath'), value: derivedPaths.knowledgePath },
+                    { label: 'profiles/', value: derivedPaths.profilesPath },
+                    { label: 'policies/', value: derivedPaths.policiesPath },
                   ].map((entry) => (
                     <div key={entry.label} className="settings-path-card">
                       <div className="settings-field-label">{entry.label}</div>
@@ -519,6 +601,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                     </div>
                   ))}
                 </div>
+                {settings.configuration.lastMigrationSummary.length > 0 && (
+                  <div className="settings-path-card">
+                    <div className="settings-field-label">Last migration</div>
+                    <div className="settings-help-text">{settings.configuration.lastMigrationSummary.join(' | ')}</div>
+                  </div>
+                )}
+                {settings.configuration.diagnostics.length > 0 && (
+                  <div className="settings-path-card">
+                    <div className="settings-field-label">Diagnostics</div>
+                    <div className="settings-help-text">
+                      {settings.configuration.diagnostics.map((diagnostic) => diagnostic.message).join(' | ')}
+                    </div>
+                  </div>
+                )}
               </section>
             )}
 
@@ -528,35 +624,72 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 <aside className="settings-provider-column">
                   <div className="settings-model-sidebar-title">{t('settings.modelSettings')}</div>
                   <div className="settings-column-title">{t('settings.provider')}</div>
-                  <div className="settings-provider-list-wrap scrollbar-thin" data-testid="settings-provider-list">
-                    <div className="settings-provider-list">
-                      {providerDrafts.map((provider) => (
-                        <button
+                    <div className="settings-provider-list-wrap scrollbar-thin" data-testid="settings-provider-list">
+                      <div className="settings-provider-list">
+                        {providerDrafts.map((provider) => (
+                        <div
                           key={provider.id}
-                          type="button"
                           className={`settings-provider-item ${selectedProviderId === provider.id ? 'active' : ''}`}
-                          onClick={() => setSelectedProviderId(provider.id)}
+                          data-testid={`settings-provider-item-${provider.id}`}
                         >
-                          <div className="settings-provider-tile">
-                            <div className="settings-provider-icon-shell">
+                          <div
+                            className="settings-provider-tile"
+                            data-testid={`settings-provider-summary-${provider.id}`}
+                          >
+                            <div
+                              className="settings-provider-icon-shell"
+                              data-testid={`settings-provider-icon-${provider.id}`}
+                            >
                               <span className={`settings-provider-status ${provider.isConfigured ? 'configured' : 'pending'}`} />
                               <span className="settings-provider-icon">
                                 {getResolvedProviderLabel(provider).slice(0, 1).toUpperCase()}
                               </span>
                             </div>
-                            <span className="settings-provider-item-label">{getResolvedProviderLabel(provider)}</span>
+                            <span
+                              className="settings-provider-item-label"
+                              data-testid={`settings-provider-label-${provider.id}`}
+                            >
+                              {getResolvedProviderLabel(provider)}
+                            </span>
                           </div>
-                        </button>
+                          <button
+                            type="button"
+                            className="button button-secondary button-sm settings-provider-edit-button"
+                            data-testid={`settings-provider-edit-${provider.id}`}
+                            onClick={() => setSelectedProviderId(provider.id)}
+                          >
+                            {t('settings.edit')}
+                          </button>
+                        </div>
                       ))}
                     </div>
                   </div>
                   <div className="settings-provider-toolbar">
+                    <select
+                      className="input settings-provider-template-select"
+                      data-testid="settings-provider-template-select"
+                      value={selectedTemplateId}
+                      onChange={(event) => setSelectedTemplateId(event.target.value as BuiltinLlmProviderId)}
+                    >
+                      {BUILTIN_LLM_PROVIDER_DEFINITIONS.map((provider) => (
+                        <option key={provider.id} value={provider.id}>{provider.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      className="button button-secondary settings-provider-template-button"
+                      data-testid="settings-provider-add-template"
+                      onClick={handleAddBuiltinTemplate}
+                    >
+                      模板
+                    </button>
                     <button
                       type="button"
                       className="settings-sidebar-icon-button"
                       data-testid="settings-provider-add"
                       onClick={handleAddProvider}
-                      aria-label={t('settings.addProvider')}
+                      aria-label="新建自定义 Provider"
+                      title="新建自定义 Provider"
                     >
                       +
                     </button>
@@ -579,10 +712,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                       {providerDrafts.length === 0 ? (
                         <>
                           <div className="settings-field-label">{t('settings.emptyProvidersTitle')}</div>
-                          <div className="settings-help-text">{t('settings.emptyProvidersHint')}</div>
+                          <div className="settings-help-text">当前没有已保存的 Provider。内置厂商只作为模板，不会自动写入设置。</div>
+                          <div className="settings-template-picker">
+                            <select
+                              className="input"
+                              data-testid="settings-provider-template-select"
+                              value={selectedTemplateId}
+                              onChange={(event) => setSelectedTemplateId(event.target.value as BuiltinLlmProviderId)}
+                            >
+                              {BUILTIN_LLM_PROVIDER_DEFINITIONS.map((provider) => (
+                                <option key={provider.id} value={provider.id}>{provider.label}</option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              className="button button-secondary"
+                              data-testid="settings-provider-add-template"
+                              onClick={handleAddBuiltinTemplate}
+                            >
+                              从模板添加
+                            </button>
+                          </div>
                           <div className="settings-actions">
                             <button type="button" className="button button-primary" onClick={handleAddProvider}>
-                              {t('settings.addProvider')}
+                              新建自定义 Provider
                             </button>
                           </div>
                         </>
@@ -645,6 +798,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                             data-testid="settings-api-key-input"
                             type={showApiKey ? 'text' : 'password'}
                             value={selectedProvider.apiKey}
+                            placeholder=""
                             onChange={(event) => handleProviderDraftChange('apiKey', event.target.value)}
                           />
                           <button
@@ -653,10 +807,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                             data-testid="settings-api-key-toggle"
                             onClick={() => setShowApiKey((current) => !current)}
                             aria-label={showApiKey ? t('settings.hideSecret') : t('settings.showSecret')}
+                            disabled={!selectedProvider.apiKey}
                           >
                             {showApiKey ? t('settings.hideSecret') : t('settings.showSecret')}
                           </button>
                         </div>
+                        {selectedProvider.kind !== 'ollama' && selectedProvider.hasStoredSecret && (
+                          <div className="settings-secret-status">
+                            <div className="settings-secret-status-copy">
+                              <span className="settings-secret-badge">已存储</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="button button-secondary settings-secret-clear"
+                              onClick={handleClearStoredSecret}
+                            >
+                              清空已存储密钥
+                            </button>
+                          </div>
+                        )}
+                        {!!selectedProvider.apiKey && selectedProvider.kind !== 'ollama' && !selectedProvider.hasStoredSecret && (
+                          <div className="settings-help-text">
+                            保存后会把 API Key 写入系统凭据库。
+                          </div>
+                        )}
                       </label>
 
                       {selectedProvider.docsUrl && (
@@ -740,6 +914,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                   <div className="settings-agent-page-header">
                     <div className="settings-field-label">{t('settings.agentRouting')}</div>
                     <div className="settings-help-text">{t('settings.agentsHint')}</div>
+                    <div className="settings-help-text">
+                      Active mode profile: {settings.configuration.activeModeProfileId}
+                    </div>
                     {routableProviders.length === 0 && (
                       <div className="settings-help-text">{t('settings.noConfiguredProviders')}</div>
                     )}

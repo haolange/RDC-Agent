@@ -18,6 +18,7 @@ import {
 } from '@shared/utils/id';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { WorkflowStage, WorkflowState, Blocker } from '@shared/types/workflow';
+import { normalizeWorkflowStage } from '@shared/constants/stages';
 import type {
   AppMode,
   CaptureDescriptor,
@@ -424,7 +425,7 @@ export class StorageAdapter {
       captures,
       startedAt,
       status: 'running',
-      lastStage: 'preflight_pending',
+      lastStage: 'preflight',
       backend,
       createdAt: startedAt,
       updatedAt: startedAt,
@@ -434,7 +435,7 @@ export class StorageAdapter {
         context_id: null,
         runtime_owner: null,
         session_id: sessionId,
-        workflow_stage: 'preflight_pending',
+        workflow_stage: 'preflight',
       },
     };
 
@@ -499,7 +500,7 @@ export class StorageAdapter {
     merged.lastStage = workflowStage;
     merged.updatedAt = nowMs();
 
-    if (workflowStage === 'finalized' && merged.status === 'running') {
+    if (workflowStage === 'finalize' && merged.status === 'running') {
       merged.status = 'completed';
       merged.finishedAt = merged.finishedAt || merged.updatedAt;
     }
@@ -590,7 +591,7 @@ export class StorageAdapter {
     run.lastStage = stage;
     run.updatedAt = nowMs();
 
-    if (stage === 'finalized') {
+    if (stage === 'finalize') {
       run.status = 'completed';
       run.finishedAt = run.finishedAt || run.updatedAt;
     }
@@ -838,6 +839,8 @@ export class StorageAdapter {
     const runJsonPath = path.join(this.getRunPath(sessionId, runId), 'run.json');
     const runJson = this.readJson<PersistedRunRecord>(runJsonPath);
     if (runJson) {
+      runJson.lastStage = normalizeWorkflowStage(runJson.lastStage);
+      runJson.runtime.workflow_stage = normalizeWorkflowStage(runJson.runtime.workflow_stage);
       return runJson;
     }
 
@@ -857,7 +860,7 @@ export class StorageAdapter {
       startedAt: Date.parse(String(runYaml.created_at || nowIso())),
       finishedAt: runYaml.finished_at ? Date.parse(String(runYaml.finished_at)) : undefined,
       status: (runYaml.status as PersistedRunRecord['status']) || 'running',
-      lastStage: String(runYaml.last_stage || 'preflight_pending'),
+      lastStage: normalizeWorkflowStage(String(runYaml.last_stage || 'preflight')),
       backend: ((runYaml.runtime as Record<string, unknown>)?.backend as 'local' | 'remote') || 'local',
       createdAt: Date.parse(String(runYaml.created_at || nowIso())),
       updatedAt: Date.parse(String(runYaml.updated_at || runYaml.created_at || nowIso())),
@@ -867,7 +870,7 @@ export class StorageAdapter {
         context_id: ((runYaml.runtime as Record<string, unknown>)?.context_id as string | null) || null,
         runtime_owner: ((runYaml.runtime as Record<string, unknown>)?.runtime_owner as string | null) || null,
         session_id: String((runYaml.runtime as Record<string, unknown>)?.session_id || sessionId),
-        workflow_stage: (((runYaml.runtime as Record<string, unknown>)?.workflow_stage as WorkflowStage) || 'preflight_pending'),
+        workflow_stage: normalizeWorkflowStage((runYaml.runtime as Record<string, unknown>)?.workflow_stage as string | undefined),
       },
     };
   }

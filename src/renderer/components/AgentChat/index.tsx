@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import type { AgentRole, AgentTimelineEntry } from '@shared/types/agent';
 import { useSessionStore } from '../../stores/sessionStore';
@@ -129,93 +129,19 @@ const TimelineEntry: React.FC<{ entry: AgentTimelineEntry; index: number }> = ({
 
 export const AgentChat: React.FC = () => {
   const timeline = useSessionStore((s) => s.timeline);
-  const addTimelineEntry = useSessionStore((s) => s.addTimelineEntry);
-
-  const [inputValue, setInputValue] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [timeline, isTyping, scrollToBottom]);
-
-  const submitMessage = useCallback(
-    async (content: string) => {
-      const trimmed = content.trim();
-      if (!trimmed) return;
-
-      const userEntry: AgentTimelineEntry = {
-        id: `user-${Date.now()}`,
-        type: 'user',
-        content: trimmed,
-        timestamp: Date.now(),
-      };
-      addTimelineEntry(userEntry);
-      setInputValue('');
-      setIsTyping(true);
-
-      const electronAPI = window.electronAPI;
-      if (!electronAPI?.agent?.sendMessage) {
-        addTimelineEntry({
-          id: `sys-${Date.now()}`,
-          type: 'system',
-          content: 'Agent backend is unavailable. Launch from the Electron shell to send messages.',
-          timestamp: Date.now(),
-        });
-        setIsTyping(false);
-        return;
-      }
-
-      try {
-        const result = await electronAPI.agent.sendMessage('rdc-debugger', trimmed);
-        if (result.error) {
-          addTimelineEntry({
-            id: `sys-${Date.now()}`,
-            type: 'system',
-            content: result.error || 'Agent request failed.',
-            timestamp: Date.now(),
-          });
-        }
-      } catch (err) {
-        addTimelineEntry({
-          id: `sys-${Date.now()}`,
-          type: 'system',
-          content: err instanceof Error ? err.message : 'Agent request failed.',
-          timestamp: Date.now(),
-        });
-      } finally {
-        setIsTyping(false);
-      }
-    },
-    [addTimelineEntry]
-  );
-
-  const handleSend = useCallback(() => void submitMessage(inputValue), [inputValue, submitMessage]);
-
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-      }
-    },
-    [handleSend]
-  );
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [timeline]);
 
   const clearTimeline = useCallback(() => {
     useSessionStore.getState().setTimeline([]);
-    setInputValue('');
-    setIsTyping(false);
   }, []);
 
   return (
-    <div className="agent-chat">
+    <div className="agent-chat" data-testid="agent-chat">
       <div className="chat-header">
         <div className="chat-header-left">
           <div className="chat-agent-selector">
@@ -237,7 +163,7 @@ export const AgentChat: React.FC = () => {
         </div>
       </div>
 
-      <div className="chat-messages scrollbar-thin">
+      <div className="chat-messages scrollbar-thin" data-testid="chat-messages">
         {timeline.length === 0 ? (
           <div className="chat-empty-state">
             <svg className="chat-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -253,48 +179,9 @@ export const AgentChat: React.FC = () => {
             {timeline.map((entry, index) => (
               <TimelineEntry key={entry.id} entry={entry} index={index} />
             ))}
-            {isTyping && (
-              <div className="typing-indicator">
-                <div className="message-avatar assistant">R</div>
-                <div className="typing-bubble">
-                  <span /><span /><span />
-                </div>
-                <span className="typing-text">RDC Debugger is working...</span>
-              </div>
-            )}
           </>
         )}
         <div ref={messagesEndRef} />
-      </div>
-
-      <div className="chat-input-container">
-        <div className="chat-input-wrapper">
-          <textarea
-            ref={inputRef}
-            className="chat-input"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask the debugger to inspect, compare, or summarize the current evidence..."
-            rows={1}
-          />
-          <div className="chat-input-actions">
-            <button
-              className="chat-send-button"
-              onClick={handleSend}
-              disabled={!inputValue.trim() || isTyping}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="22" y1="2" x2="11" y2="13" />
-                <polygon points="22 2 15 22 11 13 2 9 22 2" />
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div className="chat-input-hint">
-          <span><kbd>Enter</kbd> send</span>
-          <span><kbd>Shift</kbd> + <kbd>Enter</kbd> newline</span>
-        </div>
       </div>
     </div>
   );

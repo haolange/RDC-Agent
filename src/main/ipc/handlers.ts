@@ -17,7 +17,9 @@ import { settingsService } from '../services/SettingsService';
 import { replayDeviceService } from '../services/ReplayDeviceService';
 import { rdxSessionService } from '../index';
 import { appPathService } from '../services/AppPathService';
+import { runtimeLogService } from '../services/RuntimeLogService';
 import type { DebugSessionStartRequest, OpenProjectInputRequest, RunSummary } from '@shared/types/session';
+import type { RuntimeLogScope } from '@shared/types/runtimeLog';
 
 // WorkflowGraph 相关导入
 import { createWorkflowGraph } from '../services/WorkflowGraph';
@@ -34,6 +36,7 @@ let currentSessionId: string | null = null;
 let currentProjectId: string | null = null;
 let currentRunId: string | null = null;
 let mainWindow: BrowserWindow | null = null;
+let toolTraceSubscribed = false;
 
 /**
  * 初始�?WorkflowGraph
@@ -120,6 +123,34 @@ function isInterrupted(result: unknown): result is { __interrupt__: unknown[] } 
  * 注册所有IPC处理�?
  */
 export function registerIPCHandlers(): void {
+  if (!toolTraceSubscribed) {
+    toolBridge.onToolTrace((trace) => {
+      broadcastToRenderer('tool:executionComplete', trace);
+      runtimeLogService.log({
+        scope: currentSessionId ? 'session' : 'app',
+        namespace: 'tool',
+        severity: trace.result.ok ? 'success' : 'error',
+        title: trace.toolName,
+        summary: trace.result.ok
+          ? '工具调用已完成。'
+          : trace.result.error?.message ?? '工具调用失败。',
+        detail: trace.result.duration_ms ? `${trace.result.duration_ms}ms` : undefined,
+        sessionId: currentSessionId,
+        projectId: currentProjectId,
+        runId: currentRunId,
+        raw: {
+          args: trace.args,
+          result: trace.result,
+          contextId: trace.contextId,
+          runtimeOwner: trace.runtimeOwner,
+          ownerLeaseId: trace.ownerLeaseId ?? null,
+        },
+        timestamp: trace.timestamp,
+      });
+    });
+    toolTraceSubscribed = true;
+  }
+
   // Load persisted LLM config and apply to runtime
   try {
     const llmConfig = settingsService.getLlmConfig();
@@ -325,6 +356,20 @@ export function registerIPCHandlers(): void {
     }
   });
 
+  ipcMain.handle('session:rename', async (_event, id: string, title: string) => {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      return { success: false, error: 'Session 名称不能为空。' };
+    }
+
+    const session = storageAdapter.updateSession(id, { title: trimmedTitle });
+    if (!session) {
+      return { success: false, error: `Session not found: ${id}` };
+    }
+
+    return { success: true, session };
+  });
+
   ipcMain.handle('session:select', async (_event, id: string) => {
     const session = storageAdapter.readSession(id);
     if (!session) {
@@ -346,6 +391,12 @@ export function registerIPCHandlers(): void {
     return { runs: storageAdapter.listRuns(sessionId) };
   });
 
+  ipcMain.handle('runtimeLog:list', async (_event, request: { scope: RuntimeLogScope; sessionId?: string | null }) => {
+    return {
+      entries: runtimeLogService.list(request.scope, request.sessionId),
+    };
+  });
+
   ipcMain.handle('context:get', async () => {
     return rdxSessionService.snapshotContext();
   });
@@ -354,22 +405,26 @@ export function registerIPCHandlers(): void {
     return { captures: rdxSessionService.getCaptureDescriptors() };
   });
 
-  ipcMain.handle('capture:open', async (_event, filePath?: string) => {
-    try {
-      if (!filePath) {
-        return { success: false, error: 'filePath is required for capture:open' };
-      }
-      // TODO: 实现增量 capture 导入逻辑
-      return { success: false, error: 'capture:open is not yet implemented' };
-    } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  });
-
   ipcMain.handle(
     'capture:openProjectInput',
     async (_event, request: Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string }) => {
       try {
+        runtimeLogService.log({
+          scope: currentSessionId ? 'session' : 'app',
+          namespace: 'capture',
+          severity: 'info',
+          title: 'Open project input',
+          summary: `开始打开 ${request.inputId}。`,
+          detail: request.filePath,
+          sessionId: currentSessionId,
+          projectId: request.projectId,
+          runId: currentRunId,
+          raw: {
+            inputId: request.inputId,
+            replayDeviceId: request.replayDeviceId,
+            filePath: request.filePath,
+          },
+        });
         const input = storageAdapter.listProjectInputs(request.projectId)
           .find((entry) => entry.inputId === request.inputId && entry.filePath === request.filePath);
         if (!input) {
@@ -390,8 +445,42 @@ export function registerIPCHandlers(): void {
         const contextSnapshot = rdxSessionService.snapshotContext();
         broadcastToRenderer('capture:openedStateChanged', openedCapture);
         broadcastToRenderer('context:changed', contextSnapshot);
+        runtimeLogService.log({
+          scope: currentSessionId ? 'session' : 'app',
+          namespace: 'capture',
+          severity: 'success',
+          title: 'Project input opened',
+          summary: `${input.fileName} 已打开。`,
+          detail: openedCapture.preview?.source === 'framebuffer_screenshot'
+            ? '预览来源：framebuffer'
+            : openedCapture.preview?.source === 'capture_thumbnail'
+              ? '预览来源：thumbnail'
+              : '当前无可用预览',
+          sessionId: currentSessionId,
+          projectId: request.projectId,
+          runId: currentRunId,
+          raw: {
+            openedCapture,
+            contextSnapshot,
+          },
+        });
         return { success: true, openedCapture, contextSnapshot };
       } catch (err) {
+        runtimeLogService.log({
+          scope: currentSessionId ? 'session' : 'app',
+          namespace: 'capture',
+          severity: 'error',
+          title: 'Project input open failed',
+          summary: err instanceof Error ? err.message : String(err),
+          sessionId: currentSessionId,
+          projectId: request.projectId,
+          runId: currentRunId,
+          raw: {
+            inputId: request.inputId,
+            replayDeviceId: request.replayDeviceId,
+            filePath: request.filePath,
+          },
+        });
         return { success: false, error: err instanceof Error ? err.message : String(err) };
       }
     },
@@ -405,6 +494,16 @@ export function registerIPCHandlers(): void {
     await rdxSessionService.closeOrReplaceOpenedCapture();
     broadcastToRenderer('capture:openedStateChanged', null);
     broadcastToRenderer('context:changed', rdxSessionService.snapshotContext());
+    runtimeLogService.log({
+      scope: currentSessionId ? 'session' : 'app',
+      namespace: 'capture',
+      severity: 'info',
+      title: 'Opened capture cleared',
+      summary: '当前打开的 capture 已清理。',
+      sessionId: currentSessionId,
+      projectId: currentProjectId,
+      runId: currentRunId,
+    });
     return { success: true };
   });
 
@@ -418,13 +517,9 @@ export function registerIPCHandlers(): void {
     }
   });
 
-  ipcMain.handle('workflow:start', async (_event, request: DebugSessionStartRequest | string[], userGoal?: string) => {
-    // 兼容新的 DebugSessionStartRequest 结构和旧的 (capturePaths, userGoal) 签名
-    const isNewRequest = !Array.isArray(request);
-    const capturePaths = isNewRequest
-      ? request.captures.map(c => c.filePath)
-      : (request as string[]);
-    const goal = isNewRequest ? request.goal : (userGoal ?? '');
+  ipcMain.handle('workflow:start', async (_event, request: DebugSessionStartRequest) => {
+    const capturePaths = request.captures.map((capture) => capture.filePath);
+    const goal = request.goal;
 
     try {
       if (!ensureGraphInitialized()) {
@@ -434,21 +529,18 @@ export function registerIPCHandlers(): void {
         };
       }
 
-      // 若为新请求，先执行 rdxSessionService bootstrap
       let contextSnapshot: import('@shared/types/session').ContextSnapshot | undefined;
-      if (isNewRequest) {
-        try {
-          contextSnapshot = await rdxSessionService.bootstrap(request);
-          broadcastToRenderer('context:changed', contextSnapshot);
-          broadcastToRenderer('capture:openedStateChanged', rdxSessionService.snapshotOpenedCapture());
-        } catch (bootstrapErr) {
-          const message = bootstrapErr instanceof Error ? bootstrapErr.message : String(bootstrapErr);
-          console.warn('[IPC] rdxSessionService bootstrap failed:', bootstrapErr);
-          return {
-            success: false,
-            error: message,
-          };
-        }
+      try {
+        contextSnapshot = await rdxSessionService.bootstrap(request);
+        broadcastToRenderer('context:changed', contextSnapshot);
+        broadcastToRenderer('capture:openedStateChanged', rdxSessionService.snapshotOpenedCapture());
+      } catch (bootstrapErr) {
+        const message = bootstrapErr instanceof Error ? bootstrapErr.message : String(bootstrapErr);
+        console.warn('[IPC] rdxSessionService bootstrap failed:', bootstrapErr);
+        return {
+          success: false,
+          error: message,
+        };
       }
 
       // 执行entry gate
@@ -456,12 +548,10 @@ export function registerIPCHandlers(): void {
         capturePaths,
         platform: 'rdc-agent',
         entryMode: 'cli',
-        backend: isNewRequest
-          ? (request.captures.some((c: any) => c.backendHint === 'remote') ? 'remote' : 'local')
-          : 'local',
-        mode: isNewRequest ? request.mode : 'debugger',
-        captures: isNewRequest ? request.captures : undefined,
-        replayDevice: isNewRequest ? request.replayDevice : undefined,
+        backend: request.captures.some((capture) => capture.backendHint === 'remote') ? 'remote' : 'local',
+        mode: request.mode,
+        captures: request.captures,
+        replayDevice: request.replayDevice,
       });
 
       if (gateResult.status === 'blocked') {
@@ -471,47 +561,25 @@ export function registerIPCHandlers(): void {
         };
       }
 
-      // 创建case和run
-      let caseId: string;
-      if (isNewRequest) {
-        caseId = request.sessionId || await storageAdapter.createCase({
-          projectId: request.projectId,
-          userGoal: goal,
-          symptomSummary: goal,
-        });
-      } else {
-        const projectId = currentProjectId || storageAdapter.getCurrentProjectId();
-        if (!projectId) {
-          return {
-            success: false,
-            error: 'Project is required before starting a workflow.',
-          };
-        }
-
-        caseId = await storageAdapter.createCase({
-          projectId,
-          userGoal: goal,
-          symptomSummary: goal,
-        });
-      }
+      const caseId = request.sessionId || await storageAdapter.createCase({
+        projectId: request.projectId,
+        userGoal: goal,
+        symptomSummary: goal,
+      });
 
       const { runId, sessionId } = await storageAdapter.createRun({
         caseId,
         capturePaths,
-        mode: isNewRequest ? request.mode : 'debugger',
+        mode: request.mode,
         goal,
-        captures: isNewRequest ? request.captures : undefined,
-        backend: isNewRequest
-          ? (request.captures.some((capture) => capture.backendHint === 'remote') ? 'remote' : 'local')
-          : 'local',
+        captures: request.captures,
+        backend: request.captures.some((capture) => capture.backendHint === 'remote') ? 'remote' : 'local',
       });
 
       // 设置当前 sessionId 作为 thread_id
       currentSessionId = sessionId;
       currentRunId = runId;
-      if (isNewRequest) {
-        currentProjectId = request.projectId;
-      }
+      currentProjectId = request.projectId;
       await storageAdapter.setCurrentSessionId(sessionId);
       if (contextSnapshot) {
         await storageAdapter.updateRun(sessionId, runId, {
@@ -526,13 +594,13 @@ export function registerIPCHandlers(): void {
       // 使用 graph.invoke() 启动工作�?
       const config = getGraphConfig();
       
-      const initialState = {
+      const initialState: Partial<WorkflowStateType> = {
         caseId,
         runId,
         sessionId,
         userGoal: goal,
         capturePaths,
-        currentStage: 'preflight_pending' as const,
+        currentStage: 'preflight' as const,
         stageHistory: [],
         evidenceChain: [],
         artifacts: [],
@@ -543,14 +611,12 @@ export function registerIPCHandlers(): void {
         backtrackCount: {},
         fixVerified: false,
         entryMode: 'cli' as const,
-        backend: isNewRequest
-          ? (request.captures.some((capture) => capture.backendHint === 'remote') ? 'remote' as const : 'local' as const)
-          : 'local' as const,
-        mode: isNewRequest ? request.mode : 'debugger',
+        backend: request.captures.some((capture) => capture.backendHint === 'remote') ? 'remote' as const : 'local' as const,
+        mode: request.mode,
         goal,
-        captures: isNewRequest ? request.captures : [],
-        primaryCaptureId: isNewRequest ? request.primaryCaptureId : '',
-        replayDevice: isNewRequest ? request.replayDevice : null,
+        captures: request.captures,
+        primaryCaptureId: request.primaryCaptureId,
+        replayDevice: request.replayDevice,
         orchestrationMode: 'multi_agent' as const,
         coordinationMode: 'staged_handoff' as const,
         lastUpdated: new Date().toISOString(),
@@ -855,7 +921,16 @@ export function registerIPCHandlers(): void {
       projectsPath: paths.projectsPath,
       knowledgePath: paths.knowledgePath,
       migrationOrphansPath: paths.migrationOrphansPath,
+      profilesPath: paths.profilesPath,
+      policiesPath: paths.policiesPath,
+      secretsPath: paths.secretsPath,
+      migrationReportsPath: paths.migrationReportsPath,
     });
+  });
+
+  ipcMain.handle('settings:getProviderSecret', async (_event, providerId: string) => {
+    const paths = appPathService.getWorkspacePaths();
+    return settingsService.getProviderSecret(providerId, paths.workspaceRoot);
   });
 
   ipcMain.handle('settings:set', async (_event, settings: unknown) => {

@@ -3,15 +3,16 @@
  * 基于收集到的 briefs，由 rdc-debugger 进行深入分析和诊断
  */
 
+import { randomUUID } from 'crypto';
 import type { GraphState } from '../../../shared/types/workflow';
 import type { LLMRequest } from '../../../shared/types/llm';
 import { llmAdapter } from '../../adapters/LLMAdapter';
-import { DEFAULT_MODEL_ROUTING } from '../../../shared/constants/agents';
 import {
   createStageTransitionEvidence,
   createToolExecutionEvidence,
   createArtifact,
   nowIso,
+  resolveAgentRuntimeConfig,
 } from './utils';
 
 /** Expert Investigation 节点配置 */
@@ -97,25 +98,25 @@ export async function expertInvestigationNode(
         runId: state.runId,
         currentStage: state.currentStage,
       },
-      'expert_investigation_complete'
+      'investigate'
     )
   );
 
   try {
     // 构建 LLM 请求
-    const modelConfig = DEFAULT_MODEL_ROUTING['rdc-debugger'];
+    const modelConfig = resolveAgentRuntimeConfig('rdc-debugger', 'investigate');
     const request: LLMRequest = {
       messages: [
         { role: 'system', content: buildExpertSystemPrompt() },
         { role: 'user', content: buildInvestigationPrompt(state) },
       ],
-      model: modelConfig.model,
+      model: modelConfig.modelId,
       maxTokens: 4096,
       temperature: 0.3, // 较低温度以获得更确定的分析
     };
 
     // 调用 LLM
-    const response = await llmAdapter.chat(request, modelConfig.provider);
+    const response = await llmAdapter.chat(request, modelConfig.providerId);
 
     const investigationResult = typeof response.content === 'string'
       ? response.content
@@ -123,14 +124,14 @@ export async function expertInvestigationNode(
 
     // 记录 LLM 调用证据
     evidenceChain.push({
-      eventId: crypto.randomUUID(),
+      eventId: randomUUID(),
       eventType: 'expert_investigation_complete',
       agentId: 'rdc-debugger',
       status: 'ok',
       timestamp: Date.now(),
       payload: {
-        model: modelConfig.model,
-        provider: modelConfig.provider,
+        model: modelConfig.modelId,
+        provider: modelConfig.providerId,
         briefsAnalyzed: Object.keys(state.collectedBriefs).length,
         resultLength: investigationResult.length,
         runId: state.runId,
@@ -162,7 +163,7 @@ export async function expertInvestigationNode(
     }
 
     return {
-      currentStage: 'expert_investigation_complete',
+      currentStage: 'investigate',
       stageHistory: [state.currentStage],
       evidenceChain,
       artifacts: [...state.artifacts, ...artifacts],
@@ -171,7 +172,7 @@ export async function expertInvestigationNode(
   } catch (error) {
     // 记录错误
     evidenceChain.push({
-      eventId: crypto.randomUUID(),
+      eventId: randomUUID(),
       eventType: 'expert_investigation_error',
       agentId: 'rdc-debugger',
       status: 'error',
@@ -184,7 +185,7 @@ export async function expertInvestigationNode(
     });
 
     return {
-      currentStage: 'expert_investigation_complete',
+      currentStage: 'investigate',
       stageHistory: [state.currentStage],
       evidenceChain,
       lastUpdated: nowIso(),
@@ -203,7 +204,7 @@ export function routeAfterExpertInvestigation(state: GraphState): string {
   );
 
   if (hasCriticalBlocker) {
-    return 'validation_blocked';
+    return 'blocked';
   }
 
   // 检查是否有足够的证据进入修复验证
@@ -216,10 +217,10 @@ export function routeAfterExpertInvestigation(state: GraphState): string {
     const retryCount = state.backtrackCount['expert_investigation'] || 0;
     if (retryCount < 2) {
       // 可以重试
-      return 'expert_investigation';
+      return 'investigate';
     }
   }
 
   // 正常流程：进入 fix_verification
-  return 'fix_verification';
+  return 'fix_verify';
 }

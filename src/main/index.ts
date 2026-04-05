@@ -13,6 +13,7 @@ import { rdcToolAdapter } from './tools/RDCToolAdapter';
 import { toolBridge } from './services/ToolBridge';
 import { RdxSessionService } from './services/RdxSessionService';
 import { replayDeviceService } from './services/ReplayDeviceService';
+import { runtimeLogService } from './services/RuntimeLogService';
 
 // RdxSessionService 鍗曚緥 - 渚?IPC handlers 浣跨敤
 export const rdxSessionService = new RdxSessionService(toolBridge);
@@ -21,6 +22,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // 寮€鍙戠幆澧冩锟?
 const isDev = (process.env.NODE_ENV === 'development' || !app.isPackaged) && process.env.RDC_AGENT_TEST_MODE !== '1';
+const isSettingsRebuildOnly = process.env.RDC_AGENT_REBUILD_SETTINGS_ONLY === '1';
 
 // 涓荤獥鍙ｅ紩锟?
 let mainWindow: BrowserWindow | null = null;
@@ -48,6 +50,16 @@ async function openRdcFiles(): Promise<void> {
   });
 
   if (!result.canceled && result.filePaths.length > 0) {
+    runtimeLogService.log({
+      scope: 'app',
+      namespace: 'system',
+      severity: 'info',
+      title: 'Open files',
+      summary: `已选择 ${result.filePaths.length} 个外部 .rdc 文件。`,
+      raw: {
+        filePaths: result.filePaths,
+      },
+    });
     mainWindow?.webContents.send('file:open', result.filePaths);
   }
 }
@@ -238,8 +250,30 @@ function setupMenu(): void {
 
 // 搴旂敤灏辩华
 app.whenReady().then(async () => {
-  settingsService.initialize();
+  const settings = settingsService.initialize();
+  if (isSettingsRebuildOnly) {
+    console.log('[SettingsRebuildOnly]', JSON.stringify({
+      workspaceRoot: settings.workspace.rootPath,
+      settingsPath: settings.paths.settingsPath,
+      providerIds: settings.llm.providers.map((provider) => provider.id),
+      lastMigrationReportPath: settings.configuration.lastMigrationReportPath ?? null,
+      migrationSummary: settings.configuration.lastMigrationSummary,
+    }));
+    app.exit(0);
+    return;
+  }
+
   await storageAdapter.initializeWorkspace();
+  runtimeLogService.log({
+    scope: 'app',
+    namespace: 'system',
+    severity: 'info',
+    title: 'App ready',
+    summary: 'RDC Agent 主进程已启动。',
+    raw: {
+      workspaceRoot: storageAdapter.getWorkspacePath(),
+    },
+  });
 
   registerIPCHandlers();
 
@@ -295,6 +329,13 @@ async function initializeServices(): Promise<void> {
     // 鍒濆锟?RDC 宸ュ叿閫傞厤锟?
     await rdcToolAdapter.initialize();
     console.log('[Main] RDCToolAdapter initialized');
+    runtimeLogService.log({
+      scope: 'app',
+      namespace: 'system',
+      severity: 'success',
+      title: 'Tool catalog ready',
+      summary: 'RDC 工具目录已加载。',
+    });
     
     // 鍒濆锟?WorkflowGraph
     await initWorkflowGraph(workspacePath);
@@ -302,8 +343,22 @@ async function initializeServices(): Promise<void> {
 
     await replayDeviceService.initialize();
     console.log('[Main] ReplayDeviceService initialized');
+    runtimeLogService.log({
+      scope: 'app',
+      namespace: 'system',
+      severity: 'success',
+      title: 'Services ready',
+      summary: '主进程服务初始化完成。',
+    });
   } catch (error) {
     console.error('[Main] Failed to initialize services:', error);
+    runtimeLogService.log({
+      scope: 'app',
+      namespace: 'system',
+      severity: 'error',
+      title: 'Service init failed',
+      summary: error instanceof Error ? error.message : String(error),
+    });
   }
 }
 

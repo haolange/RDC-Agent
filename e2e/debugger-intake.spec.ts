@@ -3,30 +3,47 @@ import { launchApp, closeApp, AppContext } from './helpers/electron-app';
 
 let ctx: AppContext;
 
-test.beforeAll(async () => {
+test.beforeEach(async () => {
   ctx = await launchApp();
 });
 
-test.afterAll(async () => {
+test.afterEach(async () => {
   await closeApp(ctx);
 });
 
-test('Debugger 启动表单初始状态', async () => {
+test('Debugger 空闲态没有旧 Start 按钮，而是统一输入条入口', async () => {
   const page = ctx.page;
-  // 确认在 Debugger 页面
-  await expect(page.locator('text=Debugger').first()).toBeVisible({ timeout: 10000 });
-  // 启动按钮应该存在
-  const startBtn = page.locator('button:has-text("Start")').first();
-  await expect(startBtn).toBeVisible();
+  await expect(page.locator('button:has-text("Start")')).toHaveCount(0);
+  await expect(page.locator('input.chat-input').first()).toBeVisible();
 });
 
-test('无 OpenRouter key 时显示 blocker', async () => {
+test('左侧栏展开时在用户卡片下显示 Replay Device，收起后隐藏', async () => {
   const page = ctx.page;
-  // 在测试模式下 OpenRouter key 为空，应该有某种提示
-  // 具体选择器取决于实际 UI 实现
-  const blockerOrWarning = page.locator('[data-testid="llm-blocker"], text=OpenRouter, text=API key').first();
-  // 这里只检查页面中是否有相关提示元素
-  const count = await blockerOrWarning.count();
-  // 如果元素存在则通过，如果不存在也不 fail（因为 UI 可能还在调整）
-  expect(count).toBeGreaterThanOrEqual(0);
+  const userTrigger = page.locator('[data-testid="sidebar-user-settings-trigger"]');
+  const deviceTrigger = page.locator('[data-testid="sidebar-device-selector-trigger"]');
+  const leftToggle = page.locator('.shell-panel-header-left .shell-panel-toggle');
+
+  await expect(userTrigger).toBeVisible();
+  await expect(deviceTrigger).toBeVisible();
+
+  const [userBox, deviceBox] = await Promise.all([
+    userTrigger.boundingBox(),
+    deviceTrigger.boundingBox(),
+  ]);
+
+  expect(userBox).not.toBeNull();
+  expect(deviceBox).not.toBeNull();
+  expect(Math.abs((userBox?.width ?? 0) - (deviceBox?.width ?? 0))).toBeLessThanOrEqual(1);
+  expect((deviceBox?.y ?? 0)).toBeGreaterThan((userBox?.y ?? 0) + (userBox?.height ?? 0) - 1);
+
+  await leftToggle.click();
+  await expect(deviceTrigger).toHaveCount(0);
+  await expect(userTrigger).toBeVisible();
+});
+
+test('未选择项目时尝试启动会得到明确提示', async () => {
+  const page = ctx.page;
+  await page.locator('input.chat-input').first().fill('请开始一次调试');
+  await page.locator('button.chat-send-button').first().click();
+  await expect(page.locator('.shell-notice')).toContainText('请先添加并选择一个项目');
 });

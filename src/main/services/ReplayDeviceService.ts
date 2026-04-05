@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { toolBridge } from './ToolBridge';
 import { storageAdapter } from './StorageAdapter';
+import { runtimeLogService } from './RuntimeLogService';
 import type {
   AndroidBootstrapMetadata,
   ReplayDeviceEntry,
@@ -14,7 +15,7 @@ import { generateShortId } from '@shared/utils/id';
 import type { ToolCallResult } from '@shared/types/tool';
 
 const POLL_INTERVAL_MS = 5000;
-const ACTIVATE_TIMEOUT_MS = 25000;
+const ACTIVATE_TIMEOUT_MS = 90000;
 const PREPARED_REMOTE_TTL_MS = 10 * 60 * 1000;
 
 const LOCAL_DEVICE: ReplayDeviceEntry = {
@@ -722,15 +723,25 @@ export class ReplayDeviceService {
       activationUpdatedAt: Date.now(),
     });
 
-    const contextId = `ctx-device-${sanitizeDeviceId(device.serial)}-${generateShortId()}`;
+    let contextId = `ctx-device-${sanitizeDeviceId(device.serial)}-${generateShortId()}`;
 
     const contextResult = await toolBridge.call({
       toolName: 'rd.session.create_context',
       args: { context_id: contextId },
     });
     if (!contextResult.ok) {
-      const parsedError = parseToolError(contextResult, 'Failed to create a replay device context.');
-      throw new Error(parsedError.message);
+      if (contextResult.error?.message?.includes('Context limit exceeded')) {
+        const reusableContextId = await this.resolveReusableContextId();
+        if (reusableContextId) {
+          contextId = reusableContextId;
+        } else {
+          const parsedError = parseToolError(contextResult, 'Failed to create a replay device context.');
+          throw new Error(parsedError.message);
+        }
+      } else {
+        const parsedError = parseToolError(contextResult, 'Failed to create a replay device context.');
+        throw new Error(parsedError.message);
+      }
     }
 
     this.updateDevice({
@@ -865,13 +876,34 @@ export class ReplayDeviceService {
   private async ensureDaemonReady(): Promise<void> {
     const statusResult = await toolBridge.executeCLI('daemon', ['status']);
     if (statusResult.exitCode === 0) {
-      return;
+      try {
+        const parsed = JSON.parse(statusResult.stdout) as { data?: { running?: boolean } };
+        if (parsed.data?.running === true) {
+          return;
+        }
+      } catch {
+        return;
+      }
     }
 
     const startResult = await toolBridge.executeCLI('daemon', ['start']);
     if (startResult.exitCode !== 0) {
       const stderr = startResult.stderr.trim();
       throw new Error(stderr || 'Failed to start the rdx daemon.');
+    }
+  }
+
+  private async resolveReusableContextId(): Promise<string | null> {
+    const daemonResult = await toolBridge.executeCLI('daemon', ['start']);
+    if (daemonResult.exitCode !== 0 || !daemonResult.stdout.trim()) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(daemonResult.stdout) as { data?: { state?: { context_id?: string } } };
+      return parsed.data?.state?.context_id ?? null;
+    } catch {
+      return null;
     }
   }
 
@@ -911,7 +943,36 @@ export class ReplayDeviceService {
   }
 
   private updateDevice(device: ReplayDeviceEntry): void {
+    const previous = this.devices.get(device.id);
     this.devices.set(device.id, device);
+    if (
+      !previous
+      || previous.status !== device.status
+      || previous.detailText !== device.detailText
+      || previous.activationPhase !== device.activationPhase
+    ) {
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'device',
+        severity: device.status === 'online'
+          ? 'success'
+          : device.status === 'offline'
+            ? 'warning'
+            : device.status === 'loading'
+              ? 'info'
+              : 'info',
+        title: device.label,
+        summary: `${device.type === 'local' ? '本地' : 'Android'} Replay Device 状态：${device.status}`,
+        detail: device.detailText,
+        raw: {
+          deviceId: device.id,
+          status: device.status,
+          activationPhase: device.activationPhase ?? null,
+          remoteId: device.remoteId ?? null,
+          lastError: device.lastError ?? null,
+        },
+      });
+    }
     this.broadcast({
       device,
       devices: this.getSortedDevices(),

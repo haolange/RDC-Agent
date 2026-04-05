@@ -103,6 +103,7 @@ export type TranslationKey =
   | 'settings.noConfiguredProviders'
   | 'settings.selectProviderPlaceholder'
   | 'settings.selectProviderFirst'
+  | 'settings.edit'
   | 'settings.routeReasonNoProvider'
   | 'settings.routeReasonProviderUnavailable'
   | 'settings.routeReasonNoModels'
@@ -114,7 +115,38 @@ export type TranslationKey =
   | 'control.taskMonitor'
   | 'control.captureControl'
   | 'control.contextInfo'
-  | 'control.projectInputs';
+  | 'control.projectInputs'
+  | 'control.projectInputsLocked'
+  | 'control.previewWindow'
+  | 'control.previewEmpty'
+  | 'control.previewEmptyHint'
+  | 'control.previewLoading'
+  | 'control.previewFallback'
+  | 'control.previewNoImage'
+  | 'control.previewSourceFramebuffer'
+  | 'control.previewSourceThumbnail'
+  | 'control.previewResolution'
+  | 'terminal.title'
+  | 'terminal.open'
+  | 'terminal.close'
+  | 'terminal.scope'
+  | 'terminal.scopeApp'
+  | 'terminal.scopeSession'
+  | 'terminal.namespace'
+  | 'terminal.namespaceAll'
+  | 'terminal.namespaceSystem'
+  | 'terminal.namespaceAgent'
+  | 'terminal.namespaceTool'
+  | 'terminal.namespaceDevice'
+  | 'terminal.namespaceCapture'
+  | 'terminal.detail'
+  | 'terminal.detailSummary'
+  | 'terminal.detailVerbose'
+  | 'terminal.detailRaw'
+  | 'terminal.loading'
+  | 'terminal.emptyApp'
+  | 'terminal.emptySession'
+  | 'terminal.emptySessionHint';
 
 const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
   'zh-CN': {
@@ -218,6 +250,7 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
     'settings.noConfiguredProviders': '先到模型页新增并保存一个可用 Provider',
     'settings.selectProviderPlaceholder': '选择供应商',
     'settings.selectProviderFirst': '先选择供应商',
+    'settings.edit': '编辑',
     'settings.routeReasonNoProvider': '未选择供应商',
     'settings.routeReasonProviderUnavailable': '所选供应商不可用',
     'settings.routeReasonNoModels': '当前供应商没有可用模型',
@@ -230,6 +263,37 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
     'control.captureControl': 'Capture 控制',
     'control.contextInfo': 'Context 信息',
     'control.projectInputs': 'Project Inputs',
+    'control.projectInputsLocked': '运行中的任务不能切换 .rdc，请先结束当前调试。',
+    'control.previewWindow': 'Preview Window',
+    'control.previewEmpty': '无内容',
+    'control.previewEmptyHint': '打开一个 `.rdc` 后，这里会显示当前 capture 的渲染结果预览。',
+    'control.previewLoading': '正在生成预览…',
+    'control.previewFallback': '回退预览',
+    'control.previewNoImage': '当前 capture 没有可用预览图像。',
+    'control.previewSourceFramebuffer': '最终 Framebuffer',
+    'control.previewSourceThumbnail': 'Capture Thumbnail',
+    'control.previewResolution': '分辨率',
+    'terminal.title': 'Runtime Terminal',
+    'terminal.open': '展开 Terminal',
+    'terminal.close': '收起 Terminal',
+    'terminal.scope': 'Scope',
+    'terminal.scopeApp': 'App 全局',
+    'terminal.scopeSession': '当前 Session',
+    'terminal.namespace': 'Namespace',
+    'terminal.namespaceAll': '全部',
+    'terminal.namespaceSystem': 'System',
+    'terminal.namespaceAgent': 'Agent',
+    'terminal.namespaceTool': 'Tool',
+    'terminal.namespaceDevice': 'Device',
+    'terminal.namespaceCapture': 'Capture',
+    'terminal.detail': 'Detail',
+    'terminal.detailSummary': 'Summary',
+    'terminal.detailVerbose': 'Verbose',
+    'terminal.detailRaw': 'Raw',
+    'terminal.loading': '正在加载运行日志…',
+    'terminal.emptyApp': '当前还没有可显示的应用运行日志。',
+    'terminal.emptySession': '当前 Session 还没有日志。',
+    'terminal.emptySessionHint': '切到 App 全局可以查看设备、工具和系统层面的运行信息。',
   },
   en: {
     'app.connected': 'Connected',
@@ -332,6 +396,7 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
     'settings.noConfiguredProviders': 'Create and save a usable provider in the Models page first',
     'settings.selectProviderPlaceholder': 'Select a provider',
     'settings.selectProviderFirst': 'Select a provider first',
+    'settings.edit': 'Edit',
     'settings.routeReasonNoProvider': 'No provider selected',
     'settings.routeReasonProviderUnavailable': 'Selected provider is unavailable',
     'settings.routeReasonNoModels': 'Selected provider has no enabled models',
@@ -344,6 +409,37 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
     'control.captureControl': 'Capture Control',
     'control.contextInfo': 'Context Info',
     'control.projectInputs': 'Project Inputs',
+    'control.projectInputsLocked': 'Active runs cannot switch `.rdc` inputs. Finish or restart the current debug task first.',
+    'control.previewWindow': 'Preview Window',
+    'control.previewEmpty': 'No content',
+    'control.previewEmptyHint': 'Open a `.rdc` capture to show the current render preview here.',
+    'control.previewLoading': 'Generating preview...',
+    'control.previewFallback': 'Fallback preview',
+    'control.previewNoImage': 'No preview image is available for the current capture.',
+    'control.previewSourceFramebuffer': 'Final Framebuffer',
+    'control.previewSourceThumbnail': 'Capture Thumbnail',
+    'control.previewResolution': 'Resolution',
+    'terminal.title': 'Runtime Terminal',
+    'terminal.open': 'Open Terminal',
+    'terminal.close': 'Close Terminal',
+    'terminal.scope': 'Scope',
+    'terminal.scopeApp': 'App Runtime',
+    'terminal.scopeSession': 'Current Session',
+    'terminal.namespace': 'Namespace',
+    'terminal.namespaceAll': 'All',
+    'terminal.namespaceSystem': 'System',
+    'terminal.namespaceAgent': 'Agent',
+    'terminal.namespaceTool': 'Tool',
+    'terminal.namespaceDevice': 'Device',
+    'terminal.namespaceCapture': 'Capture',
+    'terminal.detail': 'Detail',
+    'terminal.detailSummary': 'Summary',
+    'terminal.detailVerbose': 'Verbose',
+    'terminal.detailRaw': 'Raw',
+    'terminal.loading': 'Loading runtime logs...',
+    'terminal.emptyApp': 'No application runtime logs are available yet.',
+    'terminal.emptySession': 'No logs are available for the current session yet.',
+    'terminal.emptySessionHint': 'Switch to App Runtime to inspect device, tool, and system activity.',
   },
 };
 

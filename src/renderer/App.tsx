@@ -1,23 +1,32 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DebuggerPage } from './pages/Debugger';
-import { AnalyzerPage } from './pages/Analyzer';
-import { OptimizerPage } from './pages/Optimizer';
 import { ControlPanel } from './components/ControlPanel';
-import { ModeSelector } from './components/ModeSelector';
 import { DeviceSelector } from './components/DeviceSelector';
 import { Sidebar } from './components/Sidebar';
 import { UserMenu } from './components/UserMenu';
 import { SettingsModal } from './components/SettingsModal';
+import { TerminalDrawer } from './components/TerminalDrawer';
 import { useLayoutStore } from './stores/layoutStore';
 import { useSessionStore } from './stores/sessionStore';
 import { useDeviceStore } from './stores/deviceStore';
 import { useAppSettingsStore } from './stores/appSettingsStore';
+import { useTerminalStore } from './stores/terminalStore';
 import { useI18n } from './i18n';
 import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ToolTraceEntry } from '@shared/types/tool';
 import type { ReplayDeviceStatusChangedPayload } from '@shared/types/device';
+import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 import type { ResolvedTheme } from '@shared/types/settings';
-import type { DebugSessionStartRequest } from '@shared/types/session';
+import type {
+  CaptureDescriptor,
+  ContextSnapshot,
+  DebugSessionStartRequest,
+  OpenedCaptureState,
+  ProjectInputRecord,
+  ProjectRecord,
+  RunSummary,
+  SessionRecord,
+} from '@shared/types/session';
 import {
   APP_MIN_MAIN_WIDTH,
   APP_RESIZE_HANDLE_WIDTH,
@@ -30,6 +39,28 @@ import {
 } from '@shared/constants/layout';
 
 type DragSide = 'left' | 'right';
+
+interface WorkbenchSeedState {
+  projects: ProjectRecord[];
+  sessions: SessionRecord[];
+  currentProject: ProjectRecord | null;
+  currentSession: SessionRecord | null;
+  currentRun: RunSummary | null;
+  contextSnapshot: ContextSnapshot | null;
+  captures: CaptureDescriptor[];
+  projectInputs: ProjectInputRecord[];
+  openedCapture: OpenedCaptureState | null;
+  timeline: AgentTimelineEntry[];
+  runs?: RunSummary[];
+}
+
+type E2EWindow = Window & {
+  __RDC_AGENT_E2E__?: {
+    seedWorkbenchState: (state: WorkbenchSeedState) => void;
+    resetWorkbenchState: () => void;
+    getWorkbenchState: () => WorkbenchSeedState;
+  };
+};
 
 const reduceOverflow = (
   desired: number,
@@ -91,6 +122,29 @@ const resolveSidebarWidths = (
   };
 };
 
+const mergeCapturesWithSnapshot = (
+  currentCaptures: CaptureDescriptor[],
+  snapshot: ContextSnapshot,
+): CaptureDescriptor[] => {
+  if (!snapshot.captureDescriptors?.length) {
+    return currentCaptures;
+  }
+
+  const incomingById = new Map(snapshot.captureDescriptors.map((capture) => [capture.id, capture]));
+  const merged = currentCaptures.map((capture) => {
+    const incoming = incomingById.get(capture.id);
+    return incoming ? { ...capture, ...incoming } : capture;
+  });
+
+  snapshot.captureDescriptors.forEach((capture) => {
+    if (!merged.some((entry) => entry.id === capture.id)) {
+      merged.push(capture);
+    }
+  });
+
+  return merged;
+};
+
 const App: React.FC = () => {
   const { t } = useI18n();
   const [isLoading, setIsLoading] = useState(true);
@@ -107,7 +161,6 @@ const App: React.FC = () => {
   const appBodyRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{ side: DragSide; startX: number; startWidth: number } | null>(null);
 
-  const currentMode = useLayoutStore((state) => state.currentMode);
   const currentProject = useSessionStore((state) => state.currentProject);
   const currentSession = useSessionStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
@@ -135,8 +188,9 @@ const App: React.FC = () => {
     ? systemTheme
     : settings.appearance.theme;
   const nickname = settings.profile.nickname || t('sidebar.userName');
-  const isDebuggerMode = currentMode === 'debugger';
-  const showWorkbenchShell = isDebuggerMode;
+  const showWorkbenchShell = true;
+  const isTerminalOpen = useTerminalStore((state) => state.isOpen);
+  const toggleTerminalOpen = useTerminalStore((state) => state.toggleOpen);
 
   const showNotice = useCallback((message: string) => {
     setShellNotice(message);
@@ -149,12 +203,88 @@ const App: React.FC = () => {
   const setContextSnapshot = useSessionStore((state) => state.setContextSnapshot);
   const setCaptures = useSessionStore((state) => state.setCaptures);
   const addTimelineEntry = useSessionStore((state) => state.addTimelineEntry);
+  const setActiveTerminalSessionId = useTerminalStore((state) => state.setActiveSessionId);
+
+  const syncCapturesFromSnapshot = useCallback((snapshot: ContextSnapshot) => {
+    if (!snapshot.captureDescriptors?.length) {
+      return;
+    }
+
+    if (useSessionStore.getState().currentRun) {
+      useSessionStore.getState().setCaptures(snapshot.captureDescriptors ?? []);
+      return;
+    }
+
+    useSessionStore.getState().setCaptures(
+      mergeCapturesWithSnapshot(useSessionStore.getState().captures, snapshot),
+    );
+  }, []);
 
   useEffect(() => {
     if (!shellNotice) return;
     const timeoutId = window.setTimeout(() => setShellNotice(null), 3200);
     return () => window.clearTimeout(timeoutId);
   }, [shellNotice]);
+
+  useEffect(() => {
+    setActiveTerminalSessionId(currentSession?.sessionId ?? null);
+  }, [currentSession?.sessionId, setActiveTerminalSessionId]);
+
+  useEffect(() => {
+    if (!navigator.webdriver) return;
+
+    const target = window as E2EWindow;
+    target.__RDC_AGENT_E2E__ = {
+      seedWorkbenchState: (state) => {
+        const store = useSessionStore.getState();
+        store.setProjects(state.projects);
+        store.setSessions(state.sessions);
+        store.setCurrentProject(state.currentProject);
+        store.setCurrentSession(state.currentSession);
+        store.setCurrentRun(state.currentRun);
+        store.setContextSnapshot(state.contextSnapshot);
+        store.setCaptures(state.captures);
+        store.setProjectInputs(state.projectInputs);
+        store.setOpenedCapture(state.openedCapture);
+        store.setTimeline(state.timeline);
+        store.setRuns(state.runs ?? []);
+      },
+      resetWorkbenchState: () => {
+        const store = useSessionStore.getState();
+        store.setProjects([]);
+        store.setSessions([]);
+        store.setCurrentProject(null);
+        store.setCurrentSession(null);
+        store.setCurrentRun(null);
+        store.setContextSnapshot(null);
+        store.setCaptures([]);
+        store.setProjectInputs([]);
+        store.setOpenedCapture(null);
+        store.setTimeline([]);
+        store.setRuns([]);
+      },
+      getWorkbenchState: () => {
+        const store = useSessionStore.getState();
+        return {
+          projects: store.projects,
+          sessions: store.sessions,
+          currentProject: store.currentProject,
+          currentSession: store.currentSession,
+          currentRun: store.currentRun,
+          contextSnapshot: store.contextSnapshot,
+          captures: store.captures,
+          projectInputs: store.projectInputs,
+          openedCapture: store.openedCapture,
+          timeline: store.timeline,
+          runs: store.runs,
+        };
+      },
+    };
+
+    return () => {
+      delete target.__RDC_AGENT_E2E__;
+    };
+  }, []);
 
   useEffect(() => {
     if (!showWorkbenchShell) return;
@@ -216,9 +346,7 @@ const App: React.FC = () => {
 
     electronAPI.events.onContextChanged((snapshot) => {
       useSessionStore.getState().setContextSnapshot(snapshot);
-      if (useSessionStore.getState().currentRun && snapshot.captureDescriptors?.length) {
-        useSessionStore.getState().setCaptures(snapshot.captureDescriptors ?? []);
-      }
+      syncCapturesFromSnapshot(snapshot);
     });
 
     electronAPI.events.onToolExecutionComplete((rawTrace) => {
@@ -248,9 +376,7 @@ const App: React.FC = () => {
     electronAPI.events.onCaptureStatusChanged(() => {
       electronAPI.context.get().then((snapshot) => {
         useSessionStore.getState().setContextSnapshot(snapshot);
-        if (useSessionStore.getState().currentRun && snapshot.captureDescriptors?.length) {
-          useSessionStore.getState().setCaptures(snapshot.captureDescriptors ?? []);
-        }
+        syncCapturesFromSnapshot(snapshot);
       }).catch(() => undefined);
     });
 
@@ -293,6 +419,10 @@ const App: React.FC = () => {
 
     electronAPI.events.onOpenedCaptureStateChanged((state) => {
       useSessionStore.getState().setOpenedCapture(state);
+    });
+
+    electronAPI.events.onRuntimeLogAppended((entry) => {
+      useTerminalStore.getState().appendEntry(entry as RuntimeLogEntry);
     });
 
     electronAPI.events.onAppThemeChanged((theme) => {
@@ -341,13 +471,22 @@ const App: React.FC = () => {
       electronAPI.events.removeAllListeners('app:themeChanged');
       electronAPI.events.removeAllListeners('project:inputsChanged');
       electronAPI.events.removeAllListeners('capture:openedStateChanged');
+      electronAPI.events.removeAllListeners('runtime:logAppended');
     };
-  }, [setSystemTheme, showNotice, t]);
+  }, [setSystemTheme, showNotice, syncCapturesFromSnapshot, t]);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
     if (!currentProject) {
       useSessionStore.getState().setProjectInputs([]);
+      return;
+    }
+
+    if (navigator.webdriver) {
+      const seededInputs = currentProject.inputs?.length
+        ? currentProject.inputs
+        : useSessionStore.getState().projectInputs;
+      useSessionStore.getState().setProjectInputs(seededInputs);
       return;
     }
 
@@ -430,7 +569,7 @@ const App: React.FC = () => {
   const selectedDeviceEntry = devices.find((device) => device.id === selectedDevice);
   const primaryCapture = captures.find((descriptor) => descriptor.role === 'primary') ?? null;
   const hasRemoteCapture = captures.some((descriptor) => descriptor.backendHint === 'remote');
-  const showMainPromptBar = currentMode !== 'debugger' || !currentRun;
+  const showMainPromptBar = true;
 
   const resolvedWidths = useMemo(
     () => resolveSidebarWidths(
@@ -478,7 +617,7 @@ const App: React.FC = () => {
     const electronAPI = window.electronAPI;
     if (!electronAPI) return;
 
-    if (currentMode === 'debugger' && !currentRun) {
+    if (!currentRun) {
       if (!currentProject) {
         showNotice('请先添加并选择一个项目。');
         return;
@@ -490,7 +629,7 @@ const App: React.FC = () => {
       }
 
       if (captures.length === 0) {
-        showNotice('请先从右侧导入至少一个 capture。');
+        showNotice('请先打开或导入至少一个 capture。');
         return;
       }
 
@@ -545,7 +684,7 @@ const App: React.FC = () => {
           captures,
           startedAt: Date.now(),
           status: 'running',
-          lastStage: 'preflight_pending',
+          lastStage: 'preflight',
           backend: captures.some((descriptor) => descriptor.backendHint === 'remote') ? 'remote' : 'local',
         });
 
@@ -569,7 +708,7 @@ const App: React.FC = () => {
       }
     }
 
-    if (currentMode === 'debugger' && currentRun) {
+    if (currentRun) {
       setIsPromptSending(true);
       try {
         addTimelineEntry({
@@ -592,11 +731,9 @@ const App: React.FC = () => {
       return;
     }
 
-    showNotice('当前模式暂未接入 prompt 工作流。');
   }, [
     addTimelineEntry,
     captures,
-    currentMode,
     currentProject,
     currentRun,
     currentSession,
@@ -630,17 +767,7 @@ const App: React.FC = () => {
     setIsResizing(true);
   }, []);
 
-  const renderMainPage = () => {
-    switch (currentMode) {
-      case 'analyzer':
-        return <AnalyzerPage />;
-      case 'optimizer':
-        return <OptimizerPage />;
-      case 'debugger':
-      default:
-        return <DebuggerPage />;
-    }
-  };
+  const renderMainPage = () => <DebuggerPage />;
 
   if (isLoading) {
     return (
@@ -664,7 +791,7 @@ const App: React.FC = () => {
           </div>
         </div>
         <div className="app-titlebar-center no-drag">
-          <ModeSelector />
+          <div className="app-logo-text">Debugger</div>
         </div>
         <div className="app-titlebar-right no-drag">
           <div className="window-controls" role="group" aria-label="Window controls">
@@ -709,7 +836,10 @@ const App: React.FC = () => {
             ['--resize-handle-width' as string]: `${APP_RESIZE_HANDLE_WIDTH}px`,
           }}
         >
-          <aside className={`app-sidebar-left ${leftSidebarCollapsed ? 'collapsed' : ''}`}>
+          <aside
+            className={`app-sidebar-left ${leftSidebarCollapsed ? 'collapsed' : ''}`}
+            data-testid="app-sidebar-left"
+          >
             <div className="shell-panel-header shell-panel-header-left">
               <button
                 type="button"
@@ -732,10 +862,13 @@ const App: React.FC = () => {
             <nav className="sidebar-nav">
               <Sidebar collapsed={leftSidebarCollapsed} />
             </nav>
-            <div className={`app-sidebar-footer ${leftSidebarCollapsed ? 'collapsed' : ''}`}>
+            <div
+              className={`app-sidebar-footer ${leftSidebarCollapsed ? 'collapsed' : ''}`}
+              data-testid="sidebar-footer"
+            >
               <button
                 type="button"
-                className={`footer-entry footer-user-trigger sidebar-user-trigger ${leftSidebarCollapsed ? 'collapsed' : ''}`}
+                className={`footer-entry footer-user-trigger sidebar-user-trigger sidebar-footer-entry ${leftSidebarCollapsed ? 'collapsed' : ''}`}
                 data-testid="sidebar-user-settings-trigger"
                 onClick={handleUserMenuOpen}
                 title={t('sidebar.userSettings')}
@@ -758,6 +891,7 @@ const App: React.FC = () => {
                   </>
                 )}
               </button>
+              {!leftSidebarCollapsed && <DeviceSelector />}
             </div>
           </aside>
 
@@ -770,7 +904,26 @@ const App: React.FC = () => {
           <main className="app-main">
             <div className="main-content">
               {shellNotice && <div className="shell-notice">{shellNotice}</div>}
-              {renderMainPage()}
+              <div className="main-utility-bar">
+                <div className="main-utility-spacer" />
+                <button
+                  type="button"
+                  className={`main-utility-toggle ${isTerminalOpen ? 'active' : ''}`}
+                  onClick={() => toggleTerminalOpen()}
+                  data-testid="terminal-toggle"
+                  aria-label={isTerminalOpen ? t('terminal.close') : t('terminal.open')}
+                  title={isTerminalOpen ? t('terminal.close') : t('terminal.open')}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M4 17l6-6-6-6" />
+                    <path d="M12 19h8" />
+                  </svg>
+                  <span>{t('terminal.title')}</span>
+                </button>
+              </div>
+              <div className="main-page-shell">
+                {renderMainPage()}
+              </div>
             </div>
             {showMainPromptBar && (
               <div className="main-input-bar">
@@ -783,12 +936,23 @@ const App: React.FC = () => {
                     onKeyDown={handlePromptKeyDown}
                     placeholder={t('app.inputPlaceholder')}
                   />
-                  <button className="send-button" onClick={() => void handlePromptSend()} disabled={!promptValue.trim() || isPromptSending}>
-                    →
+                  <button
+                    className="chat-send-button"
+                    data-testid={currentRun ? 'debugger-send-button' : 'debugger-start-button'}
+                    onClick={() => void handlePromptSend()}
+                    disabled={!promptValue.trim() || isPromptSending}
+                    aria-label={currentRun ? 'Send debugger message' : 'Start debugger session'}
+                    title={currentRun ? '发送消息' : '启动 Debugger'}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="22" y1="2" x2="11" y2="13" />
+                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                    </svg>
                   </button>
                 </div>
               </div>
             )}
+            <TerminalDrawer />
           </main>
 
           <div
@@ -797,7 +961,10 @@ const App: React.FC = () => {
             aria-hidden="true"
           />
 
-          <aside className={`app-sidebar-right ${rightPanelCollapsed ? 'collapsed' : ''}`}>
+          <aside
+            className={`app-sidebar-right ${rightPanelCollapsed ? 'collapsed' : ''}`}
+            data-testid="app-sidebar-right"
+          >
             <div className="shell-panel-header shell-panel-header-right">
               <button
                 type="button"
@@ -817,44 +984,15 @@ const App: React.FC = () => {
                 </span>
               </button>
             </div>
-            <div className={`right-panel-body ${rightPanelCollapsed ? 'collapsed' : ''}`}>
+            <div
+              className={`right-panel-body ${rightPanelCollapsed ? 'collapsed' : ''}`}
+              data-testid="control-panel-scroll"
+            >
               <ControlPanel />
             </div>
           </aside>
         </div>
       )}
-
-      {!showWorkbenchShell && (
-        <div className="app-body-blank">
-          <main className="app-main app-main-blank">
-            <div className="main-content">
-              {shellNotice && <div className="shell-notice">{shellNotice}</div>}
-              {renderMainPage()}
-            </div>
-            {showMainPromptBar && (
-              <div className="main-input-bar">
-                <div className="chat-input-wrapper">
-                  <input
-                    type="text"
-                    className="chat-input"
-                    value={promptValue}
-                    onChange={(event) => setPromptValue(event.target.value)}
-                    onKeyDown={handlePromptKeyDown}
-                    placeholder={t('app.inputPlaceholder')}
-                  />
-                  <button className="send-button" onClick={() => void handlePromptSend()} disabled={!promptValue.trim() || isPromptSending}>
-                    →
-                  </button>
-                </div>
-              </div>
-            )}
-          </main>
-        </div>
-      )}
-
-      <footer className="app-footer">
-        <DeviceSelector />
-      </footer>
 
       <UserMenu
         anchorRect={userMenuAnchor}

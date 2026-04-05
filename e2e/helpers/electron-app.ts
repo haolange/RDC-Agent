@@ -54,6 +54,12 @@ export async function launchApp(options: LaunchAppOptions = {}): Promise<AppCont
 
   const page = await app.firstWindow();
   await page.waitForLoadState('domcontentloaded');
+  await page.locator('.app-titlebar').waitFor({ state: 'visible', timeout: 10000 });
+  const loadingScreen = page.locator('.loading-screen');
+  if (await loadingScreen.count()) {
+    await loadingScreen.first().waitFor({ state: 'detached', timeout: 10000 }).catch(() => undefined);
+  }
+  await page.waitForTimeout(300);
 
   return {
     app,

@@ -18,7 +18,8 @@ const validChannels = [
   "capture:statusChanged",
   "context:changed",
   "project:inputsChanged",
-  "capture:openedStateChanged"
+  "capture:openedStateChanged",
+  "runtime:logAppended"
 ];
 const isValidChannel = (channel) => {
   return validChannels.includes(channel);
@@ -68,6 +69,7 @@ const electronAPI = {
   },
   settings: {
     get: () => electron.ipcRenderer.invoke("settings:get"),
+    getProviderSecret: (providerId) => electron.ipcRenderer.invoke("settings:getProviderSecret", providerId),
     set: (settings) => electron.ipcRenderer.invoke("settings:set", settings)
   },
   project: {
@@ -88,13 +90,16 @@ const electronAPI = {
   session: {
     list: (projectId) => electron.ipcRenderer.invoke("session:list", projectId),
     create: (projectId, title) => electron.ipcRenderer.invoke("session:create", projectId, title),
+    rename: (id, title) => electron.ipcRenderer.invoke("session:rename", id, title),
     select: (id) => electron.ipcRenderer.invoke("session:select", id)
   },
   run: {
     list: (sessionId) => electron.ipcRenderer.invoke("run:list", sessionId)
   },
+  runtimeLog: {
+    list: (request) => electron.ipcRenderer.invoke("runtimeLog:list", request)
+  },
   capture: {
-    open: (filePath) => electron.ipcRenderer.invoke("capture:open", filePath),
     list: () => electron.ipcRenderer.invoke("capture:list"),
     select: (captureId) => electron.ipcRenderer.invoke("capture:select", captureId),
     openProjectInput: (request) => electron.ipcRenderer.invoke("capture:openProjectInput", request),
@@ -137,6 +142,9 @@ const electronAPI = {
     },
     onOpenedCaptureStateChanged: (callback) => {
       electron.ipcRenderer.on("capture:openedStateChanged", (_event, payload) => callback(payload));
+    },
+    onRuntimeLogAppended: (callback) => {
+      electron.ipcRenderer.on("runtime:logAppended", (_event, payload) => callback(payload));
     },
     onAppThemeChanged: (callback) => {
       electron.ipcRenderer.on("app:themeChanged", (_event, theme) => callback(theme));

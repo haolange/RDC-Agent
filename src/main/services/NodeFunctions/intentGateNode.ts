@@ -3,6 +3,7 @@
  * 解析 userGoal，分类问题类型，通过 LLM 分析用户意图
  */
 
+import { randomUUID } from 'crypto';
 import type { GraphState } from '../../../shared/types/workflow';
 import type { AgentRole } from '../../../shared/types/agent';
 import { llmAdapter } from '../../adapters/LLMAdapter';
@@ -12,6 +13,7 @@ import {
   createBlocker,
   createToolExecutionEvidence,
   nowIso,
+  resolveAgentRuntimeConfig,
 } from './utils';
 
 /** 意图分析结果 */
@@ -125,7 +127,7 @@ export async function intentGateNode(
   const evidenceChain: GraphState['evidenceChain'] = [];
   const blockers: GraphState['blockers'] = [];
 
-  // 记录进入 intent_gate 阶段
+  // 记录进入 plan 阶段
   evidenceChain.push(
     createStageTransitionEvidence(
       {
@@ -133,7 +135,7 @@ export async function intentGateNode(
         runId: state.runId,
         currentStage: state.currentStage,
       },
-      'intent_gate_passed'
+      'plan'
     )
   );
 
@@ -148,7 +150,7 @@ export async function intentGateNode(
     );
 
     return {
-      currentStage: 'intent_gate_passed',
+      currentStage: 'plan',
       stageHistory: [state.currentStage],
       evidenceChain,
       blockers: [...state.blockers, ...blockers],
@@ -158,7 +160,12 @@ export async function intentGateNode(
 
   try {
     // 分析用户意图
-    const analysisResult = await analyzeIntent(state.userGoal, config);
+    const runtimeConfig = resolveAgentRuntimeConfig('rdc-debugger', 'plan');
+    const analysisResult = await analyzeIntent(state.userGoal, {
+      ...config,
+      modelProvider: runtimeConfig.providerId,
+      modelName: runtimeConfig.modelId,
+    });
 
     // 检查置信度
     const minConfidence = config.minConfidence ?? 0.3;
@@ -185,7 +192,7 @@ export async function intentGateNode(
 
     // 记录分析结果
     evidenceChain.push({
-      eventId: crypto.randomUUID(),
+      eventId: randomUUID(),
       eventType: 'intent_analysis_complete',
       agentId: 'rdc-debugger',
       status: blockers.length === 0 ? 'ok' : 'blocked',
@@ -203,7 +210,7 @@ export async function intentGateNode(
     });
 
     return {
-      currentStage: 'intent_gate_passed',
+      currentStage: 'plan',
       stageHistory: [state.currentStage],
       evidenceChain,
       blockers: [...state.blockers, ...blockers],
@@ -228,7 +235,7 @@ export async function intentGateNode(
     console.warn('[intentGate] Analysis failed, continuing with default routing:', error);
 
     return {
-      currentStage: 'intent_gate_passed',
+      currentStage: 'plan',
       stageHistory: [state.currentStage],
       evidenceChain,
       lastUpdated: nowIso(),
@@ -246,9 +253,9 @@ export function routeAfterIntentGate(state: GraphState): string {
   );
 
   if (hasCriticalBlocker) {
-    return 'validation_blocked';
+    return 'blocked';
   }
 
-  // 正常流程：进入 entry_gate
-  return 'entry_gate';
+  // 正常流程：进入 speclist
+  return 'speclist';
 }

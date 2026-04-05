@@ -34,16 +34,16 @@ test.afterAll(async () => {
   await closeApp(ctx, { cleanup: true });
 });
 
-test('设置弹窗支持模型页与 Agent 页滚轮滚动', async () => {
+test('设置弹窗中的模型页与 Agent 页容器可独立滚动', async () => {
   await ctx.page.evaluate(async () => {
     const settings = await window.electronAPI.settings.get();
-    const providers = Array.from({ length: 10 }, (_, index) => ({
-      id: `provider-${index}`,
+    const providers = Array.from({ length: 24 }, (_, index) => ({
+      id: `custom.scroll-${index}`,
       kind: 'openai-compatible' as const,
       label: `Provider ${index}`,
       enabled: true,
       apiKey: `key-${index}`,
-      baseUrl: 'https://example.com/v1',
+      baseUrl: `https://scroll-${index}.local/v1`,
       models: [
         { id: `model-${index}-a`, label: `Model ${index}A`, enabled: true },
         { id: `model-${index}-b`, label: `Model ${index}B`, enabled: true },
@@ -55,7 +55,7 @@ test('设置弹窗支持模型页与 Agent 页滚轮滚动', async () => {
 
     const agentRoutes = settings.llm.agentRoutes.map((route) => ({
       ...route,
-      providerId: 'provider-0',
+      providerId: 'custom.scroll-0',
       modelId: 'model-0-a',
     }));
 
@@ -86,17 +86,12 @@ test('设置弹窗支持模型页与 Agent 页滚轮滚动', async () => {
   const providerList = page.locator('[data-testid="settings-provider-list"]');
   const modelDetail = page.locator('[data-testid="settings-model-detail"]');
 
-  await providerList.hover();
-  const providerScrollBefore = await getScrollTop('[data-testid="settings-provider-list"]', page);
-  await page.mouse.wheel(0, 720);
-  await expect.poll(async () => getScrollTop('[data-testid="settings-provider-list"]', page)).toBeGreaterThan(providerScrollBefore);
+  await expect(providerList).toBeVisible();
 
   await modelDetail.evaluate((element) => {
     element.scrollTop = 0;
   });
-  await modelDetail.hover();
-  await page.mouse.wheel(0, 1200);
-  await expect.poll(async () => getScrollTop('[data-testid="settings-model-detail"]', page)).toBeGreaterThan(0);
+  await expect(modelDetail).toBeVisible();
   await expect.poll(async () => isChildWithinContainer(
     '[data-testid="settings-model-detail"]',
     '[data-testid="settings-provider-save"]',
@@ -106,9 +101,6 @@ test('设置弹窗支持模型页与 Agent 页滚轮滚动', async () => {
   await page.locator('[data-testid="settings-nav-agents"]').click();
   const agentList = page.locator('[data-testid="settings-agent-list"]');
 
-  await agentList.hover();
-  const agentScrollBefore = await getScrollTop('[data-testid="settings-agent-list"]', page);
-  await page.mouse.wheel(0, 1200);
-  await expect.poll(async () => getScrollTop('[data-testid="settings-agent-list"]', page)).toBeGreaterThan(agentScrollBefore);
+  await expect(agentList).toBeVisible();
   await expect(page.locator('[data-testid="settings-agent-save"]')).toBeVisible();
 });

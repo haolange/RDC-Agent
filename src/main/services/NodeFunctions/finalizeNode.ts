@@ -3,6 +3,7 @@
  * 最终收尾节点，确认所有证据链完整，更新状态到 finalized
  */
 
+import { randomUUID } from 'crypto';
 import type { GraphState } from '../../../shared/types/workflow';
 import {
   createStageTransitionEvidence,
@@ -35,7 +36,7 @@ export async function finalizeNode(
         runId: state.runId,
         currentStage: state.currentStage,
       },
-      'finalized',
+      'finalize',
       'rdc-debugger'
     )
   );
@@ -55,7 +56,7 @@ export async function finalizeNode(
 
   // 记录最终总结证据
   evidenceChain.push({
-    eventId: crypto.randomUUID(),
+    eventId: randomUUID(),
     eventType: 'workflow_finalized',
     agentId: 'rdc-debugger',
     status: 'ok',
@@ -64,7 +65,7 @@ export async function finalizeNode(
       caseId: state.caseId,
       runId: state.runId,
       sessionId: state.sessionId,
-      finalStage: 'finalized',
+      finalStage: 'finalize',
       totalStages: stageTransitionCount,
       specialistCount,
       completedSpecialists,
@@ -82,7 +83,7 @@ export async function finalizeNode(
   // 如果有报告，记录报告摘要
   if (state.finalReport) {
     evidenceChain.push({
-      eventId: crypto.randomUUID(),
+      eventId: randomUUID(),
       eventType: 'final_report_summary',
       agentId: 'curator_agent',
       status: 'ok',
@@ -103,7 +104,8 @@ export async function finalizeNode(
   const evidenceTypes = new Set(state.evidenceChain.map(e => e.eventType));
   const requiredEvidenceTypes = [
     'workflow_stage_transition',
-    'specialist_dispatch_complete',
+    'speclist_complete',
+    'dispatch_complete',
     'specialist_complete',
     'expert_investigation_complete',
     'fix_verification_result',
@@ -116,7 +118,7 @@ export async function finalizeNode(
   );
 
   evidenceChain.push({
-    eventId: crypto.randomUUID(),
+    eventId: randomUUID(),
     eventType: 'evidence_chain_validation',
     agentId: 'rdc-debugger',
     status: missingEvidenceTypes.length === 0 ? 'ok' : 'warning',
@@ -132,7 +134,7 @@ export async function finalizeNode(
   });
 
   return {
-    currentStage: 'finalized',
+    currentStage: 'finalize',
     stageHistory: [state.currentStage],
     evidenceChain,
     lastUpdated: nowIso(),

@@ -3,14 +3,15 @@
  * 验证修复方案的有效性，调用相关工具确认修复
  */
 
+import { randomUUID } from 'crypto';
 import type { GraphState } from '../../../shared/types/workflow';
 import type { LLMRequest } from '../../../shared/types/llm';
 import { llmAdapter } from '../../adapters/LLMAdapter';
-import { DEFAULT_MODEL_ROUTING } from '../../../shared/constants/agents';
 import {
   createStageTransitionEvidence,
   createBlocker,
   nowIso,
+  resolveAgentRuntimeConfig,
 } from './utils';
 import { BLOCKER_CODES } from '../../../shared/constants/blockers';
 
@@ -105,7 +106,7 @@ export async function fixVerificationNode(
         runId: state.runId,
         currentStage: state.currentStage,
       },
-      'fix_verification_complete'
+      'fix_verify'
     )
   );
 
@@ -114,19 +115,19 @@ export async function fixVerificationNode(
 
   try {
     // 构建 LLM 请求进行验证分析
-    const modelConfig = DEFAULT_MODEL_ROUTING['rdc-debugger'];
+    const modelConfig = resolveAgentRuntimeConfig('rdc-debugger', 'fix_verify');
     const request: LLMRequest = {
       messages: [
         { role: 'system', content: buildVerificationSystemPrompt() },
         { role: 'user', content: buildVerificationPrompt(state) },
       ],
-      model: modelConfig.model,
+      model: modelConfig.modelId,
       maxTokens: 2048,
       temperature: 0.2,
     };
 
     // 调用 LLM
-    const response = await llmAdapter.chat(request, modelConfig.provider);
+    const response = await llmAdapter.chat(request, modelConfig.providerId);
 
     const verificationResult = typeof response.content === 'string'
       ? response.content
@@ -147,7 +148,7 @@ export async function fixVerificationNode(
 
     // 记录验证结果证据
     evidenceChain.push({
-      eventId: crypto.randomUUID(),
+      eventId: randomUUID(),
       eventType: 'fix_verification_result',
       agentId: 'rdc-debugger',
       status: fixVerified ? 'ok' : 'warning',
@@ -170,7 +171,7 @@ export async function fixVerificationNode(
         // 超过最大重试次数，创建 blocker
         blockers.push(
           createBlocker(
-            BLOCKER_CODES.BLOCKED_VALIDATION_FAILED.code,
+            BLOCKER_CODES.BLOCKED_FIX_VERIFICATION_FAILED.code,
             `Fix verification failed after ${maxRetries} attempts`,
             ['fix_verification']
           )
@@ -181,7 +182,7 @@ export async function fixVerificationNode(
     }
 
     return {
-      currentStage: 'fix_verification_complete',
+      currentStage: 'fix_verify',
       stageHistory: [state.currentStage],
       evidenceChain,
       blockers: [...state.blockers, ...blockers],
@@ -192,7 +193,7 @@ export async function fixVerificationNode(
   } catch (error) {
     // 记录错误
     evidenceChain.push({
-      eventId: crypto.randomUUID(),
+      eventId: randomUUID(),
       eventType: 'fix_verification_error',
       agentId: 'rdc-debugger',
       status: 'error',
@@ -205,7 +206,7 @@ export async function fixVerificationNode(
     });
 
     return {
-      currentStage: 'fix_verification_complete',
+      currentStage: 'fix_verify',
       stageHistory: [state.currentStage],
       evidenceChain,
       fixVerified: false,
@@ -225,7 +226,7 @@ export function routeAfterFixVerification(state: GraphState): string {
   );
 
   if (hasCriticalBlocker) {
-    return 'validation_blocked';
+    return 'blocked';
   }
 
   // 如果验证失败，检查是否需要 backtrack
@@ -233,10 +234,10 @@ export function routeAfterFixVerification(state: GraphState): string {
     const retryCount = state.backtrackCount['fix_verification'] || 0;
     if (retryCount < 2) {
       // Backtrack 到 expert_investigation 重新分析
-      return 'expert_investigation';
+      return 'investigate';
     }
   }
 
-  // 正常流程：进入 skeptic 验证
-  return 'skeptic';
+  // 正常流程：进入 skepti 验证
+  return 'skepti';
 }

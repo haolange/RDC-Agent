@@ -4,7 +4,7 @@
 
 import type { ReplayDeviceEntry } from './device';
 
-export type AppMode = 'debugger' | 'analyzer' | 'optimizer';
+export type AppMode = 'debugger';
 
 export interface ProjectInputRecord {
   inputId: string;
@@ -119,6 +119,15 @@ export interface ContextSnapshot {
   deviceLabel: string;
 }
 
+export interface OpenedCapturePreview {
+  imagePath: string;
+  imageUrl: string;
+  width: number;
+  height: number;
+  source: 'framebuffer_screenshot' | 'capture_thumbnail';
+  updatedAt: number;
+}
+
 export interface OpenedCaptureState {
   projectId: string;
   inputId: string;
@@ -132,6 +141,7 @@ export interface OpenedCaptureState {
   deviceLabel: string;
   status: 'opening' | 'open' | 'error' | 'closed';
   openedAt: number;
+  preview?: OpenedCapturePreview | null;
 }
 
 export interface OpenProjectInputRequest {

@@ -1,64 +1,96 @@
 /**
- * Workflow Stage Constants - 工作流阶段常量定义
+ * Workflow Stage Constants - Debugger 生产级阶段定义
  */
 
-import type { WorkflowStage } from '../types/workflow';
+import type { WorkflowPhase, WorkflowStage } from '../types/workflow';
 
-// 主流程阶段（固定顺序）
 export const MAIN_STAGES: WorkflowStage[] = [
-  'preflight_pending',
-  'intent_gate_passed',
-  'entry_gate_passed',
-  'accepted_intake_initialized',
-  'intake_gate_passed',
-  'waiting_for_specialist_brief',
-  'specialist_briefs_collected',
-  'expert_investigation_complete',
-  'fix_verification_complete',
-  'skeptic_ready',
-  'curator_ready',
-  'finalized',
+  'preflight',
+  'entry_gate',
+  'intake_gate',
+  'plan',
+  'speclist',
+  'dispatch',
+  'investigate',
+  'fix_verify',
+  'skepti',
+  'curate',
+  'finalize',
 ];
 
-// 特殊状态（非主流程）
 export const SPECIAL_STAGES: WorkflowStage[] = [
-  'validation_blocked',
+  'blocked',
   'awaiting_user_input',
 ];
 
-// 所有阶段
 export const ALL_STAGES: WorkflowStage[] = [...MAIN_STAGES, ...SPECIAL_STAGES];
 
-// 阶段显示名称
 export const STAGE_DISPLAY_NAMES: Record<WorkflowStage, string> = {
-  'preflight_pending': 'Preflight',
-  'intent_gate_passed': 'Intent Gate',
-  'entry_gate_passed': 'Entry Gate',
-  'accepted_intake_initialized': 'Intake Initialized',
-  'intake_gate_passed': 'Intake Gate',
-  'waiting_for_specialist_brief': 'Waiting for Specialist',
-  'specialist_briefs_collected': 'Briefs Collected',
-  'expert_investigation_complete': 'Investigation Complete',
-  'fix_verification_complete': 'Fix Verification',
-  'skeptic_ready': 'Skeptic Ready',
-  'curator_ready': 'Curator Ready',
-  'finalized': 'Finalized',
-  'validation_blocked': 'Blocked',
-  'awaiting_user_input': 'Awaiting Input',
+  preflight: 'Preflight',
+  entry_gate: 'Entry Gate',
+  intake_gate: 'Intake Gate',
+  plan: 'Plan',
+  speclist: 'Speclist',
+  dispatch: 'Dispatch',
+  investigate: 'Investigate',
+  fix_verify: 'Fix Verify',
+  skepti: 'Skepti',
+  curate: 'Curate',
+  finalize: 'Finalize',
+  blocked: 'Blocked',
+  awaiting_user_input: 'Awaiting Input',
 };
 
-// 阶段分组（用于UI显示）
+export const STAGE_PHASES: Record<WorkflowStage, WorkflowPhase> = {
+  preflight: 'planner',
+  entry_gate: 'planner',
+  intake_gate: 'planner',
+  plan: 'planner',
+  speclist: 'planner',
+  dispatch: 'generator',
+  investigate: 'generator',
+  fix_verify: 'evaluator',
+  skepti: 'evaluator',
+  curate: 'evaluator',
+  finalize: 'evaluator',
+  blocked: 'evaluator',
+  awaiting_user_input: 'planner',
+};
+
 export const STAGE_GROUPS: Record<string, WorkflowStage[]> = {
-  intake: ['preflight_pending', 'intent_gate_passed', 'entry_gate_passed', 'accepted_intake_initialized', 'intake_gate_passed'],
-  investigation: ['waiting_for_specialist_brief', 'specialist_briefs_collected', 'expert_investigation_complete'],
-  verification: ['fix_verification_complete', 'skeptic_ready'],
-  finalization: ['curator_ready', 'finalized'],
+  planner: ['preflight', 'entry_gate', 'intake_gate', 'plan', 'speclist'],
+  generator: ['dispatch', 'investigate'],
+  evaluator: ['fix_verify', 'skepti', 'curate', 'finalize'],
 };
 
-// 阶段显示顺序（简化版，用于WorkflowPanel）
 export const SIMPLIFIED_STAGES: Array<{ id: string; name: string; stages: WorkflowStage[] }> = [
-  { id: 'intake', name: 'Intake', stages: STAGE_GROUPS.intake },
-  { id: 'investigation', name: 'Investigation', stages: STAGE_GROUPS.investigation },
-  { id: 'verification', name: 'Verification', stages: STAGE_GROUPS.verification },
-  { id: 'finalization', name: 'Final', stages: STAGE_GROUPS.finalization },
+  { id: 'planner', name: 'Planner', stages: STAGE_GROUPS.planner },
+  { id: 'generator', name: 'Generator', stages: STAGE_GROUPS.generator },
+  { id: 'evaluator', name: 'Evaluator', stages: STAGE_GROUPS.evaluator },
 ];
+
+export const LEGACY_STAGE_MIGRATION: Record<string, WorkflowStage> = {
+  preflight_pending: 'preflight',
+  intent_gate_passed: 'plan',
+  entry_gate_passed: 'entry_gate',
+  accepted_intake_initialized: 'intake_gate',
+  intake_gate_passed: 'intake_gate',
+  waiting_for_specialist_brief: 'dispatch',
+  specialist_briefs_collected: 'dispatch',
+  expert_investigation_complete: 'investigate',
+  fix_verification_complete: 'fix_verify',
+  skeptic_ready: 'skepti',
+  curator_ready: 'curate',
+  finalized: 'finalize',
+  validation_blocked: 'blocked',
+};
+
+export const normalizeWorkflowStage = (stage: string | undefined | null): WorkflowStage => {
+  if (!stage) {
+    return 'preflight';
+  }
+  if (ALL_STAGES.includes(stage as WorkflowStage)) {
+    return stage as WorkflowStage;
+  }
+  return LEGACY_STAGE_MIGRATION[stage] || 'preflight';
+};

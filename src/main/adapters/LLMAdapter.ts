@@ -54,8 +54,8 @@ class OpenRouterProvider implements LLMProvider {
   }
 
   configure(config: LLMProviderConfig): void {
-    this.apiKey = config.apiKey;
-    this.baseUrl = config.baseUrl || 'https://openrouter.ai/api/v1';
+    this.apiKey = config.apiKey.trim();
+    this.baseUrl = (config.baseUrl || 'https://openrouter.ai/api/v1').trim();
     this.models = config.models;
   }
 
@@ -127,8 +127,8 @@ class OpenAICompatibleProvider implements LLMProvider {
   }
 
   configure(config: LLMProviderConfig): void {
-    this.apiKey = config.apiKey;
-    this.baseUrl = config.baseUrl || this.baseUrl;
+    this.apiKey = config.apiKey.trim();
+    this.baseUrl = (config.baseUrl || this.baseUrl).trim();
     this.models = config.models;
   }
 
@@ -203,8 +203,8 @@ class AnthropicProvider implements LLMProvider {
   }
 
   configure(config: LLMProviderConfig): void {
-    this.apiKey = config.apiKey;
-    this.baseUrl = config.baseUrl || 'https://api.anthropic.com/v1';
+    this.apiKey = config.apiKey.trim();
+    this.baseUrl = (config.baseUrl || 'https://api.anthropic.com/v1').trim();
     this.models = config.models;
   }
 
