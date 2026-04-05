@@ -15,6 +15,7 @@ export interface WorkspacePaths {
 
 interface BootstrapState {
   workspaceRoot?: string;
+  legacyMigrationCompleted?: boolean;
 }
 
 const SETTINGS_FILE_NAME = 'settings.json';
@@ -33,16 +34,24 @@ const isSamePath = (left: string, right: string): boolean => {
 export class AppPathService {
   private workspaceRootCache: string | null = null;
 
+  private getUserDataRoot(): string {
+    return normalizePath(process.env.RDC_AGENT_USER_DATA?.trim() || app.getPath('userData'));
+  }
+
   private getBootstrapDir(): string {
-    return path.join(app.getPath('appData'), 'RdcAgent');
+    return this.getUserDataRoot();
   }
 
   private getBootstrapPath(): string {
     return path.join(this.getBootstrapDir(), 'workspace-bootstrap.json');
   }
 
+  private getLegacyBootstrapPath(): string {
+    return path.join(app.getPath('appData'), 'RdcAgent', 'workspace-bootstrap.json');
+  }
+
   getDefaultWorkspaceRoot(): string {
-    return normalizePath(path.join(app.getPath('appData'), 'rdc-agent'));
+    return normalizePath(process.env.RDC_AGENT_WORKSPACE?.trim() || path.join(this.getUserDataRoot(), 'workspace'));
   }
 
   getWorkspaceRoot(): string {
@@ -73,30 +82,45 @@ export class AppPathService {
   }
 
   initializeWorkspaceRoot(): WorkspacePaths {
-    const workspaceRoot = this.getWorkspaceRoot();
+    const bootstrapState = this.readBootstrapState();
+    const workspaceRoot = normalizePath(bootstrapState.workspaceRoot || this.getDefaultWorkspaceRoot());
     const paths = this.getWorkspacePaths(workspaceRoot);
     this.ensureWorkspaceStructure(paths);
-    this.copyLegacyData(paths.workspaceRoot);
-    this.writeBootstrapState({ workspaceRoot: paths.workspaceRoot });
+
+    if (!bootstrapState.legacyMigrationCompleted && this.shouldImportLegacyData(paths.workspaceRoot)) {
+      this.copyLegacyData(paths.workspaceRoot);
+    }
+
+    this.workspaceRootCache = paths.workspaceRoot;
+    this.writeBootstrapState({
+      workspaceRoot: paths.workspaceRoot,
+      legacyMigrationCompleted: true,
+    });
     return paths;
   }
 
   setWorkspaceRoot(nextRoot: string): WorkspacePaths {
+    const bootstrapState = this.readBootstrapState();
     const currentRoot = this.getWorkspaceRoot();
     const resolvedRoot = normalizePath(nextRoot || this.getDefaultWorkspaceRoot());
+    const nextPaths = this.getWorkspacePaths(resolvedRoot);
+
+    this.ensureWorkspaceStructure(nextPaths);
 
     if (!isSamePath(currentRoot, resolvedRoot)) {
-      this.ensureWorkspaceStructure(this.getWorkspacePaths(resolvedRoot));
       this.copyWorkspaceData(currentRoot, resolvedRoot);
-      this.copyLegacyData(resolvedRoot);
-    } else {
-      this.ensureWorkspaceStructure(this.getWorkspacePaths(resolvedRoot));
+    }
+
+    if (!bootstrapState.legacyMigrationCompleted && this.shouldImportLegacyData(resolvedRoot)) {
       this.copyLegacyData(resolvedRoot);
     }
 
     this.workspaceRootCache = resolvedRoot;
-    this.writeBootstrapState({ workspaceRoot: resolvedRoot });
-    return this.getWorkspacePaths(resolvedRoot);
+    this.writeBootstrapState({
+      workspaceRoot: resolvedRoot,
+      legacyMigrationCompleted: true,
+    });
+    return nextPaths;
   }
 
   resetWorkspaceRoot(): WorkspacePaths {
@@ -104,16 +128,20 @@ export class AppPathService {
   }
 
   private readBootstrapState(): BootstrapState {
-    const bootstrapPath = this.getBootstrapPath();
-    try {
-      if (!fs.existsSync(bootstrapPath)) {
-        return {};
+    const candidates = [this.getBootstrapPath(), this.getLegacyBootstrapPath()];
+
+    for (const bootstrapPath of candidates) {
+      try {
+        if (!fs.existsSync(bootstrapPath)) {
+          continue;
+        }
+        return JSON.parse(fs.readFileSync(bootstrapPath, 'utf8')) as BootstrapState;
+      } catch (error) {
+        console.warn('[AppPathService] Failed to read bootstrap state:', error);
       }
-      return JSON.parse(fs.readFileSync(bootstrapPath, 'utf8')) as BootstrapState;
-    } catch (error) {
-      console.warn('[AppPathService] Failed to read bootstrap state:', error);
-      return {};
     }
+
+    return {};
   }
 
   private writeBootstrapState(state: BootstrapState): void {
@@ -130,18 +158,37 @@ export class AppPathService {
     fs.mkdirSync(paths.migrationOrphansPath, { recursive: true });
   }
 
-  private copyLegacyData(targetRoot: string): void {
-    const legacyUserDataRoot = app.getPath('userData');
-    const legacySettingsRoot = path.join(app.getPath('appData'), 'RdcAgent');
-    const legacyDevWorkspace = path.join(app.getAppPath(), 'workspace');
-    const legacyPackagedWorkspace = path.join(path.dirname(app.getPath('exe')), 'workspace');
-    const legacyDevLog = path.join(app.getAppPath(), 'dev-stdout.log');
+  private shouldImportLegacyData(targetRoot: string): boolean {
+    const paths = this.getWorkspacePaths(targetRoot);
+    return !fs.existsSync(paths.settingsPath)
+      && !this.hasDirectoryEntries(paths.projectsPath)
+      && !this.hasDirectoryEntries(paths.knowledgePath)
+      && !this.hasDirectoryEntries(paths.logsPath)
+      && !this.hasDirectoryEntries(paths.migrationOrphansPath);
+  }
 
-    this.copyWorkspaceData(legacyUserDataRoot, targetRoot);
-    this.copyWorkspaceData(legacySettingsRoot, targetRoot);
-    this.copyWorkspaceData(legacyDevWorkspace, targetRoot);
-    this.copyWorkspaceData(legacyPackagedWorkspace, targetRoot);
-    this.copyLogFile(legacyDevLog, this.getWorkspacePaths(targetRoot).logPath);
+  private hasDirectoryEntries(dirPath: string): boolean {
+    if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
+      return false;
+    }
+    return fs.readdirSync(dirPath).length > 0;
+  }
+
+  private copyLegacyData(targetRoot: string): void {
+    const targetPaths = this.getWorkspacePaths(targetRoot);
+    const legacyRoots = [
+      app.getPath('userData'),
+      path.join(app.getPath('appData'), 'RdcAgent'),
+      path.join(app.getPath('appData'), 'rdc-agent'),
+      path.join(app.getAppPath(), 'workspace'),
+      path.join(path.dirname(app.getPath('exe')), 'workspace'),
+    ];
+
+    for (const legacyRoot of legacyRoots) {
+      this.copyWorkspaceData(legacyRoot, targetRoot);
+    }
+
+    this.copyLogFile(path.join(app.getAppPath(), 'dev-stdout.log'), targetPaths.logPath);
   }
 
   private copyWorkspaceData(sourceRoot: string, targetRoot: string): void {
@@ -169,10 +216,12 @@ export class AppPathService {
     for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
       const sourcePath = path.join(sourceDir, entry.name);
       const targetPath = path.join(targetDir, entry.name);
+
       if (entry.isDirectory()) {
         this.copyDirContents(sourcePath, targetPath);
         continue;
       }
+
       this.copyFileIfMissing(sourcePath, targetPath);
     }
   }

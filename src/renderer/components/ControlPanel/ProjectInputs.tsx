@@ -76,6 +76,13 @@ export const ProjectInputs: React.FC = () => {
     if (!currentProject || !selectedDeviceEntry) return;
     setOpeningId(input.inputId);
     try {
+      if (
+        selectedDeviceEntry.type === 'android'
+        && !['connected', 'online'].includes(selectedDeviceEntry.status)
+      ) {
+        setErrorMessage('正在连接 Android RenderDoc…');
+      }
+
       const result = await window.electronAPI.capture.openProjectInput({
         projectId: currentProject.projectId,
         inputId: input.inputId,

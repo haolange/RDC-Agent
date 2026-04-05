@@ -94,8 +94,7 @@ const resolveSidebarWidths = (
 const App: React.FC = () => {
   const { t } = useI18n();
   const [isLoading, setIsLoading] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'degraded' | 'offline'>('offline');
-  const [appVersion, setAppVersion] = useState('1.0.0');
+  const [, setConnectionStatus] = useState<'connected' | 'degraded' | 'offline'>('offline');
   const [windowMaximized, setWindowMaximized] = useState(false);
   const [shellNotice, setShellNotice] = useState<string | null>(null);
   const [userMenuAnchor, setUserMenuAnchor] = useState<DOMRect | null>(null);
@@ -198,7 +197,6 @@ const App: React.FC = () => {
 
         hydrateSettings(appSettings, appMeta.systemTheme);
         hydrateLayout(appSettings);
-        setAppVersion(appMeta.version || '1.0.0');
         setWindowMaximized(isMaximized);
         setConnectionStatus('connected');
       } catch (error) {
@@ -427,27 +425,11 @@ const App: React.FC = () => {
     setRightPanelWidth,
   ]);
 
-  const connectionMeta = useMemo(() => {
-    if (connectionStatus === 'connected') return { label: t('app.connected'), dotClass: 'status-dot-info' };
-    if (connectionStatus === 'degraded') return { label: t('app.degraded'), dotClass: 'status-dot-warning' };
-    return { label: t('app.offline'), dotClass: 'status-dot-pending' };
-  }, [connectionStatus, t]);
-
-  const debuggerRoute = settings.llm.agentRoutes.find((route) => route.agentId === 'rdc-debugger');
-  const llmProviderLabel = settings.llm.providers.find((provider) => provider.id === debuggerRoute?.providerId)?.label
-    ?? debuggerRoute?.providerId
-    ?? 'LLM';
   const devices = useDeviceStore((state) => state.devices);
   const selectedDevice = useDeviceStore((state) => state.selectedDevice);
   const selectedDeviceEntry = devices.find((device) => device.id === selectedDevice);
   const primaryCapture = captures.find((descriptor) => descriptor.role === 'primary') ?? null;
   const hasRemoteCapture = captures.some((descriptor) => descriptor.backendHint === 'remote');
-  const remoteDeviceReady = Boolean(
-    selectedDeviceEntry
-      && selectedDeviceEntry.type === 'android'
-      && ['connected', 'online'].includes(selectedDeviceEntry.status),
-  );
-  const remoteReplayBlocked = hasRemoteCapture && !remoteDeviceReady;
   const showMainPromptBar = currentMode !== 'debugger' || !currentRun;
 
   const resolvedWidths = useMemo(
@@ -517,13 +499,21 @@ const App: React.FC = () => {
         return;
       }
 
-      if (remoteReplayBlocked) {
-        showNotice('当前远端 Replay Device 还未就绪。');
+      if (hasRemoteCapture && selectedDeviceEntry.type === 'local') {
+        showNotice('远端 capture 需要选择 Android Replay Device。');
         return;
       }
 
       setIsPromptSending(true);
       try {
+        if (
+          hasRemoteCapture
+          && selectedDeviceEntry.type === 'android'
+          && !['connected', 'online'].includes(selectedDeviceEntry.status)
+        ) {
+          showNotice('正在连接 Android RenderDoc…');
+        }
+
         const request: DebugSessionStartRequest = {
           projectId: currentProject.projectId,
           sessionId: currentSession?.sessionId,
@@ -610,10 +600,10 @@ const App: React.FC = () => {
     currentProject,
     currentRun,
     currentSession,
+    hasRemoteCapture,
     isPromptSending,
     primaryCapture,
     promptValue,
-    remoteReplayBlocked,
     selectedDeviceEntry,
     setCaptures,
     setContextSnapshot,
@@ -742,6 +732,33 @@ const App: React.FC = () => {
             <nav className="sidebar-nav">
               <Sidebar collapsed={leftSidebarCollapsed} />
             </nav>
+            <div className={`app-sidebar-footer ${leftSidebarCollapsed ? 'collapsed' : ''}`}>
+              <button
+                type="button"
+                className={`footer-entry footer-user-trigger sidebar-user-trigger ${leftSidebarCollapsed ? 'collapsed' : ''}`}
+                data-testid="sidebar-user-settings-trigger"
+                onClick={handleUserMenuOpen}
+                title={t('sidebar.userSettings')}
+                aria-label={t('sidebar.userSettings')}
+              >
+                <span className="footer-entry-avatar">
+                  {nickname.trim().slice(0, 2).toUpperCase()}
+                </span>
+                {!leftSidebarCollapsed && (
+                  <>
+                    <span className="footer-entry-copy">
+                      <span className="footer-entry-title">{nickname}</span>
+                      <span className="footer-entry-subtitle">{t('sidebar.userSubtitle')}</span>
+                    </span>
+                    <span className="footer-entry-chevron">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
           </aside>
 
           <div
@@ -836,42 +853,7 @@ const App: React.FC = () => {
       )}
 
       <footer className="app-footer">
-        <div className="footer-left">
-          <button
-            type="button"
-            className="footer-entry footer-user-trigger"
-            onClick={handleUserMenuOpen}
-            title={t('sidebar.userSettings')}
-          >
-            <span className="footer-entry-avatar">
-              {nickname.trim().slice(0, 2).toUpperCase()}
-            </span>
-            <span className="footer-entry-copy">
-              <span className="footer-entry-title">{nickname}</span>
-              <span className="footer-entry-subtitle">{t('sidebar.userSubtitle')}</span>
-            </span>
-            <span className="footer-entry-chevron">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </span>
-          </button>
-          <DeviceSelector />
-        </div>
-        <div className="footer-right">
-          <div className="footer-item">
-            <span className={`status-dot ${connectionMeta.dotClass}`} />
-            <span>{connectionMeta.label}</span>
-          </div>
-          <div className="footer-separator" />
-          <div className="footer-item">
-            <span>LLM: {llmProviderLabel}</span>
-          </div>
-          <div className="footer-separator" />
-          <div className="footer-item">
-            <span>v{appVersion}</span>
-          </div>
-        </div>
+        <DeviceSelector />
       </footer>
 
       <UserMenu

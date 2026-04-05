@@ -74,11 +74,13 @@ export type TranslationKey =
   | 'settings.agentsSubtitle'
   | 'settings.agentsHint'
   | 'settings.provider'
+  | 'settings.providerFieldLabel'
   | 'settings.providerKind'
   | 'settings.providerConfigured'
   | 'settings.providerUnconfigured'
   | 'settings.apiKeyList'
   | 'settings.add'
+  | 'settings.addProvider'
   | 'settings.unsaved'
   | 'settings.emptyCredentials'
   | 'settings.label'
@@ -91,9 +93,20 @@ export type TranslationKey =
   | 'settings.addModel'
   | 'settings.addModelPlaceholder'
   | 'settings.recommendedModels'
+  | 'settings.unnamedProvider'
+  | 'settings.emptyProvidersTitle'
+  | 'settings.emptyProvidersHint'
   | 'settings.agentRouting'
+  | 'settings.modelFieldLabel'
   | 'settings.invalidRoute'
   | 'settings.noModelsAvailable'
+  | 'settings.noConfiguredProviders'
+  | 'settings.selectProviderPlaceholder'
+  | 'settings.selectProviderFirst'
+  | 'settings.routeReasonNoProvider'
+  | 'settings.routeReasonProviderUnavailable'
+  | 'settings.routeReasonNoModels'
+  | 'settings.routeReasonModelInvalid'
   | 'settings.saveAgentRouting'
   | 'settings.delete'
   | 'settings.discard'
@@ -171,16 +184,18 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
     'settings.reveal': '打开位置',
     'settings.copy': '复制路径',
     'settings.modelsTitle': '模型',
-    'settings.modelsSubtitle': '管理 Provider 与模型清单。',
-    'settings.modelSettings': '模型设置',
+    'settings.modelsSubtitle': '管理 LLM Provider 与可用模型。',
+    'settings.modelSettings': 'Provider 配置',
     'settings.agentsSubtitle': '为每个 Agent 单独配置 Provider 与模型。',
-    'settings.agentsHint': '这里单独管理各 Agent 的模型路由，不再和 Provider 编辑混在同一页。',
+    'settings.agentsHint': '每个 Agent 先选择供应商，再选择该供应商下的具体模型。',
     'settings.provider': '供应商',
+    'settings.providerFieldLabel': '供应商',
     'settings.providerKind': '接入类型',
     'settings.providerConfigured': '已配置',
     'settings.providerUnconfigured': '未配置',
     'settings.apiKeyList': 'API Key List',
     'settings.add': '新增',
+    'settings.addProvider': '新增 Provider',
     'settings.unsaved': '未保存',
     'settings.emptyCredentials': '当前 Provider 还没有配置，先新增一条 API Key。',
     'settings.label': '标签',
@@ -193,9 +208,20 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
     'settings.addModel': '添加模型',
     'settings.addModelPlaceholder': '输入模型 ID',
     'settings.recommendedModels': '推荐模型（点击添加）',
-    'settings.agentRouting': 'Agent 配置',
+    'settings.unnamedProvider': '未命名 Provider',
+    'settings.emptyProvidersTitle': '还没有任何 Provider',
+    'settings.emptyProvidersHint': '点击下方按钮新增一个自定义 Provider，再填写 API Key、Base URL 和模型列表。',
+    'settings.agentRouting': 'Agent 模型路由',
+    'settings.modelFieldLabel': '模型',
     'settings.invalidRoute': '未就绪',
-    'settings.noModelsAvailable': '无可用模型',
+    'settings.noModelsAvailable': '当前供应商没有可用模型',
+    'settings.noConfiguredProviders': '先到模型页新增并保存一个可用 Provider',
+    'settings.selectProviderPlaceholder': '选择供应商',
+    'settings.selectProviderFirst': '先选择供应商',
+    'settings.routeReasonNoProvider': '未选择供应商',
+    'settings.routeReasonProviderUnavailable': '所选供应商不可用',
+    'settings.routeReasonNoModels': '当前供应商没有可用模型',
+    'settings.routeReasonModelInvalid': '所选模型已失效',
     'settings.saveAgentRouting': '保存 Agent 配置',
     'settings.delete': '删除',
     'settings.discard': '放弃更改',
@@ -272,16 +298,18 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
     'settings.reveal': 'Reveal',
     'settings.copy': 'Copy Path',
     'settings.modelsTitle': 'Models',
-    'settings.modelsSubtitle': 'Manage providers and enabled models.',
-    'settings.modelSettings': 'Model Settings',
+    'settings.modelsSubtitle': 'Manage LLM providers and enabled models.',
+    'settings.modelSettings': 'Provider Setup',
     'settings.agentsSubtitle': 'Configure provider/model routing for each agent separately.',
-    'settings.agentsHint': 'Agent routing is managed on its own page instead of being mixed into provider editing.',
+    'settings.agentsHint': 'Each agent chooses a provider first, then a concrete model under that provider.',
     'settings.provider': 'Provider',
+    'settings.providerFieldLabel': 'Provider',
     'settings.providerKind': 'Transport Kind',
     'settings.providerConfigured': 'Configured',
     'settings.providerUnconfigured': 'Unconfigured',
     'settings.apiKeyList': 'API Key List',
     'settings.add': 'Add',
+    'settings.addProvider': 'Add Provider',
     'settings.unsaved': 'Unsaved',
     'settings.emptyCredentials': 'No credentials for this provider yet. Add one to start.',
     'settings.label': 'Label',
@@ -294,9 +322,20 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
     'settings.addModel': 'Add Model',
     'settings.addModelPlaceholder': 'Enter model id',
     'settings.recommendedModels': 'Recommended Models',
-    'settings.agentRouting': 'Agent Routing',
+    'settings.unnamedProvider': 'Unnamed Provider',
+    'settings.emptyProvidersTitle': 'No providers yet',
+    'settings.emptyProvidersHint': 'Create a custom provider first, then fill in its API key, base URL, and model list.',
+    'settings.agentRouting': 'Agent Model Routing',
+    'settings.modelFieldLabel': 'Model',
     'settings.invalidRoute': 'Invalid',
     'settings.noModelsAvailable': 'No enabled models',
+    'settings.noConfiguredProviders': 'Create and save a usable provider in the Models page first',
+    'settings.selectProviderPlaceholder': 'Select a provider',
+    'settings.selectProviderFirst': 'Select a provider first',
+    'settings.routeReasonNoProvider': 'No provider selected',
+    'settings.routeReasonProviderUnavailable': 'Selected provider is unavailable',
+    'settings.routeReasonNoModels': 'Selected provider has no enabled models',
+    'settings.routeReasonModelInvalid': 'Selected model is no longer available',
     'settings.saveAgentRouting': 'Save Agent Routing',
     'settings.delete': 'Delete',
     'settings.discard': 'Discard',

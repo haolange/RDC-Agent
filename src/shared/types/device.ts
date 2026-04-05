@@ -2,10 +2,9 @@
  * Device Types - 设备管理相关类型定义
  */
 
-export type ReplayDeviceStatus = 'offline' | 'loading' | 'connected' | 'online' | 'recoverable';
+export type ReplayDeviceStatus = 'offline' | 'loading' | 'connected' | 'online';
 
 export type ReplayDeviceTransport = 'local' | 'adb_android';
-export type ReplayDeviceRecoverySource = 'cache' | 'startup_probe' | 'prepared_surface';
 
 export interface AndroidBootstrapMetadata {
   packageName?: string;
@@ -43,9 +42,6 @@ export interface ReplayDeviceEntry {
   activationErrorCode?: string;
   activationErrorMessage?: string;
   activationUpdatedAt?: number;
-  recoveryEligible?: boolean;
-  recoveryValidatedAt?: number;
-  recoverySource?: ReplayDeviceRecoverySource;
 }
 
 export interface ReplayDeviceStatusChangedPayload {

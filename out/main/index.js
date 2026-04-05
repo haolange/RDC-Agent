@@ -512,14 +512,20 @@ const isSamePath = (left, right) => {
 };
 class AppPathService {
   workspaceRootCache = null;
+  getUserDataRoot() {
+    return normalizePath(process.env.RDC_AGENT_USER_DATA?.trim() || electron.app.getPath("userData"));
+  }
   getBootstrapDir() {
-    return path.join(electron.app.getPath("appData"), "RdcAgent");
+    return this.getUserDataRoot();
   }
   getBootstrapPath() {
     return path.join(this.getBootstrapDir(), "workspace-bootstrap.json");
   }
+  getLegacyBootstrapPath() {
+    return path.join(electron.app.getPath("appData"), "RdcAgent", "workspace-bootstrap.json");
+  }
   getDefaultWorkspaceRoot() {
-    return normalizePath(path.join(electron.app.getPath("appData"), "rdc-agent"));
+    return normalizePath(process.env.RDC_AGENT_WORKSPACE?.trim() || path.join(this.getUserDataRoot(), "workspace"));
   }
   getWorkspaceRoot() {
     if (this.workspaceRootCache) {
@@ -545,42 +551,55 @@ class AppPathService {
     };
   }
   initializeWorkspaceRoot() {
-    const workspaceRoot = this.getWorkspaceRoot();
+    const bootstrapState = this.readBootstrapState();
+    const workspaceRoot = normalizePath(bootstrapState.workspaceRoot || this.getDefaultWorkspaceRoot());
     const paths = this.getWorkspacePaths(workspaceRoot);
     this.ensureWorkspaceStructure(paths);
-    this.copyLegacyData(paths.workspaceRoot);
-    this.writeBootstrapState({ workspaceRoot: paths.workspaceRoot });
+    if (!bootstrapState.legacyMigrationCompleted && this.shouldImportLegacyData(paths.workspaceRoot)) {
+      this.copyLegacyData(paths.workspaceRoot);
+    }
+    this.workspaceRootCache = paths.workspaceRoot;
+    this.writeBootstrapState({
+      workspaceRoot: paths.workspaceRoot,
+      legacyMigrationCompleted: true
+    });
     return paths;
   }
   setWorkspaceRoot(nextRoot) {
+    const bootstrapState = this.readBootstrapState();
     const currentRoot = this.getWorkspaceRoot();
     const resolvedRoot = normalizePath(nextRoot || this.getDefaultWorkspaceRoot());
+    const nextPaths = this.getWorkspacePaths(resolvedRoot);
+    this.ensureWorkspaceStructure(nextPaths);
     if (!isSamePath(currentRoot, resolvedRoot)) {
-      this.ensureWorkspaceStructure(this.getWorkspacePaths(resolvedRoot));
       this.copyWorkspaceData(currentRoot, resolvedRoot);
-      this.copyLegacyData(resolvedRoot);
-    } else {
-      this.ensureWorkspaceStructure(this.getWorkspacePaths(resolvedRoot));
+    }
+    if (!bootstrapState.legacyMigrationCompleted && this.shouldImportLegacyData(resolvedRoot)) {
       this.copyLegacyData(resolvedRoot);
     }
     this.workspaceRootCache = resolvedRoot;
-    this.writeBootstrapState({ workspaceRoot: resolvedRoot });
-    return this.getWorkspacePaths(resolvedRoot);
+    this.writeBootstrapState({
+      workspaceRoot: resolvedRoot,
+      legacyMigrationCompleted: true
+    });
+    return nextPaths;
   }
   resetWorkspaceRoot() {
     return this.setWorkspaceRoot(this.getDefaultWorkspaceRoot());
   }
   readBootstrapState() {
-    const bootstrapPath = this.getBootstrapPath();
-    try {
-      if (!fs.existsSync(bootstrapPath)) {
-        return {};
+    const candidates = [this.getBootstrapPath(), this.getLegacyBootstrapPath()];
+    for (const bootstrapPath of candidates) {
+      try {
+        if (!fs.existsSync(bootstrapPath)) {
+          continue;
+        }
+        return JSON.parse(fs.readFileSync(bootstrapPath, "utf8"));
+      } catch (error) {
+        console.warn("[AppPathService] Failed to read bootstrap state:", error);
       }
-      return JSON.parse(fs.readFileSync(bootstrapPath, "utf8"));
-    } catch (error) {
-      console.warn("[AppPathService] Failed to read bootstrap state:", error);
-      return {};
     }
+    return {};
   }
   writeBootstrapState(state) {
     const bootstrapPath = this.getBootstrapPath();
@@ -594,17 +613,29 @@ class AppPathService {
     fs.mkdirSync(paths.knowledgePath, { recursive: true });
     fs.mkdirSync(paths.migrationOrphansPath, { recursive: true });
   }
+  shouldImportLegacyData(targetRoot) {
+    const paths = this.getWorkspacePaths(targetRoot);
+    return !fs.existsSync(paths.settingsPath) && !this.hasDirectoryEntries(paths.projectsPath) && !this.hasDirectoryEntries(paths.knowledgePath) && !this.hasDirectoryEntries(paths.logsPath) && !this.hasDirectoryEntries(paths.migrationOrphansPath);
+  }
+  hasDirectoryEntries(dirPath) {
+    if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
+      return false;
+    }
+    return fs.readdirSync(dirPath).length > 0;
+  }
   copyLegacyData(targetRoot) {
-    const legacyUserDataRoot = electron.app.getPath("userData");
-    const legacySettingsRoot = path.join(electron.app.getPath("appData"), "RdcAgent");
-    const legacyDevWorkspace = path.join(electron.app.getAppPath(), "workspace");
-    const legacyPackagedWorkspace = path.join(path.dirname(electron.app.getPath("exe")), "workspace");
-    const legacyDevLog = path.join(electron.app.getAppPath(), "dev-stdout.log");
-    this.copyWorkspaceData(legacyUserDataRoot, targetRoot);
-    this.copyWorkspaceData(legacySettingsRoot, targetRoot);
-    this.copyWorkspaceData(legacyDevWorkspace, targetRoot);
-    this.copyWorkspaceData(legacyPackagedWorkspace, targetRoot);
-    this.copyLogFile(legacyDevLog, this.getWorkspacePaths(targetRoot).logPath);
+    const targetPaths = this.getWorkspacePaths(targetRoot);
+    const legacyRoots = [
+      electron.app.getPath("userData"),
+      path.join(electron.app.getPath("appData"), "RdcAgent"),
+      path.join(electron.app.getPath("appData"), "rdc-agent"),
+      path.join(electron.app.getAppPath(), "workspace"),
+      path.join(path.dirname(electron.app.getPath("exe")), "workspace")
+    ];
+    for (const legacyRoot of legacyRoots) {
+      this.copyWorkspaceData(legacyRoot, targetRoot);
+    }
+    this.copyLogFile(path.join(electron.app.getAppPath(), "dev-stdout.log"), targetPaths.logPath);
   }
   copyWorkspaceData(sourceRoot, targetRoot) {
     if (!sourceRoot || !fs.existsSync(sourceRoot) || isSamePath(sourceRoot, targetRoot)) {
@@ -1936,6 +1967,7 @@ const EMPTY_PATHS = {
   knowledgePath: "",
   migrationOrphansPath: ""
 };
+const EMPTY_LEGACY_STORE = {};
 const DEFAULT_APPEARANCE = {
   theme: "dark",
   language: "zh-CN",
@@ -1961,6 +1993,7 @@ const VALID_THEMES = ["dark", "light", "system"];
 const VALID_LANGUAGES = ["zh-CN", "en"];
 const VALID_FONT_SCALES = ["small", "medium", "large"];
 const VALID_PROVIDER_KINDS = ["openrouter", "openai-compatible", "anthropic", "ollama"];
+const KNOWN_AGENT_IDS = new Set(Object.keys(DEFAULT_MODEL_ROUTING));
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const pickEnum = (value, allowed, fallback) => {
   return typeof value === "string" && allowed.includes(value) ? value : fallback;
@@ -1983,58 +2016,52 @@ const sanitizeSidebar = (input, defaults, fallback) => {
     )
   };
 };
-const createDefaultAgentRoutes = () => Object.entries(DEFAULT_MODEL_ROUTING).map(([agentId, route]) => ({
+const createEmptyAgentRoutes = () => Object.keys(DEFAULT_MODEL_ROUTING).map((agentId) => ({
   agentId,
-  providerId: route.provider,
-  modelId: route.model
+  providerId: "",
+  modelId: ""
 }));
-const createDefaultSettings = () => ({
+const createDefaultSettings = (workspaceRoot = appPathService.getWorkspaceRoot()) => ({
   appearance: DEFAULT_APPEARANCE,
   layout: DEFAULT_LAYOUT,
   profile: DEFAULT_PROFILE,
   workspace: {
-    rootPath: appPathService.getWorkspaceRoot()
+    rootPath: workspaceRoot
   },
   llm: {
-    providers: createBuiltinProviderEntries(),
-    agentRoutes: createDefaultAgentRoutes()
+    providers: [],
+    agentRoutes: createEmptyAgentRoutes()
   },
   paths: EMPTY_PATHS
 });
 const toModelId = (value) => value.trim();
-const sanitizeModels = (models, fallback = []) => {
+const sanitizeModels = (models) => {
   const candidates = Array.isArray(models) ? models : [];
-  const normalized = candidates.map((entry) => {
+  const modelMap = /* @__PURE__ */ new Map();
+  for (const entry of candidates) {
     if (typeof entry === "string") {
       const modelId2 = toModelId(entry);
-      return modelId2 ? { id: modelId2, label: modelId2, enabled: true } : null;
+      if (!modelId2 || modelMap.has(modelId2)) {
+        continue;
+      }
+      modelMap.set(modelId2, { id: modelId2, label: modelId2, enabled: true });
+      continue;
     }
     if (!entry || typeof entry !== "object") {
-      return null;
+      continue;
     }
     const candidate = entry;
     const modelId = typeof candidate.id === "string" ? toModelId(candidate.id) : "";
-    if (!modelId) {
-      return null;
+    if (!modelId || modelMap.has(modelId)) {
+      continue;
     }
-    return {
+    modelMap.set(modelId, {
       id: modelId,
       label: typeof candidate.label === "string" && candidate.label.trim() ? candidate.label.trim() : modelId,
       enabled: candidate.enabled !== false
-    };
-  }).filter((entry) => entry !== null);
-  const merged = dedupeStrings([
-    ...normalized.filter((entry) => entry.enabled).map((entry) => entry.id),
-    ...fallback
-  ]);
-  return merged.map((modelId) => {
-    const existing = normalized.find((entry) => entry.id === modelId);
-    return existing ?? {
-      id: modelId,
-      label: modelId,
-      enabled: true
-    };
-  });
+    });
+  }
+  return Array.from(modelMap.values());
 };
 const getBuiltinDefinition = (providerId) => BUILTIN_LLM_PROVIDER_DEFINITIONS.find((entry) => entry.id === providerId);
 const getProviderConfigState = (provider) => {
@@ -2043,20 +2070,11 @@ const getProviderConfigState = (provider) => {
   return Boolean(provider.apiKey.trim());
 };
 const sanitizeProvider = (entry, fallback) => {
-  const builtin = getBuiltinDefinition(typeof entry.id === "string" ? entry.id : fallback?.id ?? "");
-  const providerId = typeof entry.id === "string" && entry.id.trim() || fallback?.id || builtin?.id || "custom-provider";
-  const recommendedModels = dedupeStrings([
-    ...Array.isArray(entry.recommendedModels) ? entry.recommendedModels.filter((value) => typeof value === "string") : [],
-    ...fallback?.recommendedModels ?? [],
-    ...builtin?.recommendedModels ?? []
-  ]);
-  const models = sanitizeModels(
-    entry.models,
-    dedupeStrings([
-      ...(fallback?.models ?? []).filter((model) => model.enabled).map((model) => model.id),
-      ...builtin?.defaultModels ?? []
-    ])
-  );
+  const fallbackId = typeof fallback?.id === "string" ? fallback.id : "";
+  const entryId = typeof entry.id === "string" ? entry.id.trim() : "";
+  const builtin = getBuiltinDefinition(entryId || fallbackId);
+  const providerId = entryId || fallbackId || builtin?.id || "custom-provider";
+  const models = sanitizeModels(entry.models ?? fallback?.models ?? []);
   const resolved = {
     id: providerId,
     kind: pickEnum(
@@ -2064,23 +2082,25 @@ const sanitizeProvider = (entry, fallback) => {
       VALID_PROVIDER_KINDS,
       fallback?.kind ?? builtin?.kind ?? "openai-compatible"
     ),
-    label: typeof entry.label === "string" && entry.label.trim() ? entry.label.trim() : fallback?.label ?? builtin?.label ?? providerId,
+    label: typeof entry.label === "string" ? entry.label.trim() : fallback?.label ?? builtin?.label ?? "",
     enabled: typeof entry.enabled === "boolean" ? entry.enabled : fallback?.enabled ?? builtin?.enabled ?? false,
     apiKey: typeof entry.apiKey === "string" ? entry.apiKey.trim() : fallback?.apiKey ?? "",
     baseUrl: typeof entry.baseUrl === "string" && entry.baseUrl.trim() ? entry.baseUrl.trim() : fallback?.baseUrl ?? builtin?.baseUrl,
     models,
-    recommendedModels,
+    recommendedModels: dedupeStrings(
+      Array.isArray(entry.recommendedModels) ? entry.recommendedModels.filter((value) => typeof value === "string") : fallback?.recommendedModels ?? builtin?.recommendedModels ?? []
+    ),
     docsUrl: typeof entry.docsUrl === "string" && entry.docsUrl.trim() ? entry.docsUrl.trim() : fallback?.docsUrl ?? builtin?.docsUrl,
     isConfigured: false
   };
   resolved.isConfigured = getProviderConfigState(resolved);
   return resolved;
 };
-const importLegacyCredentials = (settings) => {
-  const credentials = Array.isArray(settings.llm?.credentials) ? settings.llm?.credentials : [];
+const importLegacyCredentials = (settings, providerMap) => {
+  const credentials = Array.isArray(settings.llm?.credentials) ? settings.llm.credentials : [];
   const imported = /* @__PURE__ */ new Map();
   for (const credential of credentials) {
-    const providerId = typeof credential.provider === "string" ? credential.provider : "";
+    const providerId = typeof credential.provider === "string" ? credential.provider.trim() : "";
     if (!providerId || !credential.apiKey?.trim()) {
       continue;
     }
@@ -2090,96 +2110,106 @@ const importLegacyCredentials = (settings) => {
     }
   }
   return Array.from(imported.entries()).map(([providerId, credential]) => {
-    const builtinFallback = createBuiltinProviderEntries().find((entry) => entry.id === providerId);
+    const fallback = providerMap.get(providerId) || createBuiltinProviderEntries().find((entry) => entry.id === providerId);
     return sanitizeProvider({
       id: providerId,
-      label: credential.label || builtinFallback?.label || providerId,
+      label: credential.label || fallback?.label || providerId,
       enabled: true,
       apiKey: credential.apiKey,
       baseUrl: credential.baseUrl,
-      models: builtinFallback?.models ?? [],
-      recommendedModels: builtinFallback?.recommendedModels ?? [],
-      docsUrl: builtinFallback?.docsUrl,
-      kind: builtinFallback?.kind ?? "openai-compatible"
-    }, builtinFallback);
-  });
-};
-const mergeProviders = (rawProviders, legacySettings, legacyStore) => {
-  const builtinProviders = createBuiltinProviderEntries();
-  const providerMap = /* @__PURE__ */ new Map();
-  for (const provider of builtinProviders) {
-    providerMap.set(provider.id, provider);
-  }
-  const importedProviders = Array.isArray(rawProviders) ? rawProviders.map((entry) => sanitizeProvider(entry, providerMap.get(entry.id))) : [];
-  for (const provider of importedProviders) {
-    providerMap.set(provider.id, provider);
-  }
-  for (const provider of importLegacyCredentials(legacySettings)) {
-    const fallback = providerMap.get(provider.id);
-    providerMap.set(provider.id, sanitizeProvider(provider, fallback));
-  }
-  if (legacyStore.openRouter?.apiKey) {
-    const fallback = providerMap.get("openrouter");
-    providerMap.set("openrouter", sanitizeProvider({
-      id: "openrouter",
-      enabled: true,
-      apiKey: legacyStore.openRouter.apiKey,
-      baseUrl: legacyStore.openRouter.baseUrl,
       models: fallback?.models ?? [],
       recommendedModels: fallback?.recommendedModels ?? [],
       docsUrl: fallback?.docsUrl,
-      kind: "openrouter",
-      label: fallback?.label ?? "OpenRouter"
-    }, fallback));
-  }
-  return Array.from(providerMap.values()).map((provider) => sanitizeProvider(provider, providerMap.get(provider.id)));
+      kind: fallback?.kind ?? "openai-compatible"
+    }, fallback);
+  });
 };
-const ensureRouteModel = (provider, modelId) => {
-  if (!modelId) {
-    return provider;
-  }
-  if (provider.models.some((model) => model.id === modelId)) {
-    return provider;
-  }
-  return {
-    ...provider,
-    models: [...provider.models, { id: modelId, label: modelId, enabled: true }]
-  };
-};
-const sanitizeAgentRoutes = (rawRoutes, providers) => {
-  const providerMap = new Map(providers.map((provider) => [provider.id, provider]));
-  const providedRoutes = Array.isArray(rawRoutes) ? rawRoutes.filter((entry) => Boolean(entry && typeof entry === "object" && "agentId" in entry)) : [];
-  const routeMap = new Map(providedRoutes.map((route) => [route.agentId, route]));
-  const normalizedRoutes = [];
-  for (const [agentId, fallback] of Object.entries(DEFAULT_MODEL_ROUTING)) {
-    const candidate = routeMap.get(agentId);
-    const providerId = candidate?.providerId || fallback.provider;
-    const preferredModelId = candidate?.modelId || fallback.model;
-    const initialProvider = providerMap.get(providerId) || providerMap.get(fallback.provider) || providers[0];
-    if (!initialProvider) {
-      continue;
+const mergeProviders = (rawProviders, legacySettings, legacyStore, options) => {
+  const providerMap = /* @__PURE__ */ new Map();
+  if (options.seedBuiltins) {
+    for (const provider of createBuiltinProviderEntries()) {
+      providerMap.set(provider.id, provider);
     }
-    const providerWithModel = ensureRouteModel(initialProvider, preferredModelId);
-    providerMap.set(providerWithModel.id, providerWithModel);
-    normalizedRoutes.push({
-      agentId,
-      providerId: providerWithModel.id,
-      modelId: preferredModelId
-    });
+  }
+  if (Array.isArray(rawProviders)) {
+    for (const rawProvider of rawProviders) {
+      if (!rawProvider || typeof rawProvider !== "object") {
+        continue;
+      }
+      const entry = rawProvider;
+      const providerId = typeof entry.id === "string" ? entry.id.trim() : "";
+      const fallback = providerId ? providerMap.get(providerId) : void 0;
+      const provider = sanitizeProvider(entry, fallback);
+      providerMap.set(provider.id, provider);
+    }
+  }
+  if (options.importLegacy) {
+    for (const provider of importLegacyCredentials(legacySettings, providerMap)) {
+      const fallback = providerMap.get(provider.id);
+      providerMap.set(provider.id, sanitizeProvider(provider, fallback));
+    }
+    if (legacyStore.openRouter?.apiKey) {
+      const fallback = providerMap.get("openrouter");
+      providerMap.set("openrouter", sanitizeProvider({
+        id: "openrouter",
+        enabled: true,
+        apiKey: legacyStore.openRouter.apiKey,
+        baseUrl: legacyStore.openRouter.baseUrl,
+        models: fallback?.models ?? [],
+        recommendedModels: fallback?.recommendedModels ?? [],
+        docsUrl: fallback?.docsUrl,
+        kind: "openrouter",
+        label: fallback?.label ?? "OpenRouter"
+      }, fallback));
+    }
+  }
+  return Array.from(providerMap.values());
+};
+const sanitizeRoute = (entry) => {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+  const candidate = entry;
+  if (typeof candidate.agentId !== "string" || !KNOWN_AGENT_IDS.has(candidate.agentId)) {
+    return null;
   }
   return {
-    providers: Array.from(providerMap.values()).map((provider) => sanitizeProvider(provider, provider)),
-    routes: normalizedRoutes
+    agentId: candidate.agentId,
+    providerId: typeof candidate.providerId === "string" ? candidate.providerId.trim() : "",
+    modelId: typeof candidate.modelId === "string" ? candidate.modelId.trim() : ""
   };
 };
-const sanitizeSettings = (raw, legacyStore, workspaceRoot) => {
-  const fallback = createDefaultSettings();
+const sanitizeAgentRoutes = (rawRoutes, options) => {
+  if (options.seedDefaultRoutes) {
+    const routeMap2 = /* @__PURE__ */ new Map();
+    const providedRoutes2 = Array.isArray(rawRoutes) ? rawRoutes.map(sanitizeRoute).filter((route) => route !== null) : [];
+    for (const route of providedRoutes2) {
+      routeMap2.set(route.agentId, route);
+    }
+    return Object.entries(DEFAULT_MODEL_ROUTING).map(([agentId]) => {
+      const candidate = routeMap2.get(agentId);
+      return {
+        agentId,
+        providerId: candidate?.providerId ?? "",
+        modelId: candidate?.modelId ?? ""
+      };
+    }).filter((route) => route !== null);
+  }
+  const routeMap = /* @__PURE__ */ new Map();
+  const providedRoutes = Array.isArray(rawRoutes) ? rawRoutes.map(sanitizeRoute).filter((route) => route !== null) : [];
+  for (const route of providedRoutes) {
+    routeMap.set(route.agentId, route);
+  }
+  return Array.from(routeMap.values());
+};
+const sanitizeSettings = (raw, legacyStore, workspaceRoot, options) => {
+  const fallback = createDefaultSettings(workspaceRoot);
   const candidate = raw ?? {};
   const appearance = candidate.appearance ?? {};
   const profile = candidate.profile ?? {};
   const resolvedWorkspaceRoot = candidate.workspace?.rootPath?.trim() || workspaceRoot;
-  const providers = mergeProviders(candidate.llm?.providers, candidate, legacyStore);
-  const { providers: normalizedProviders, routes } = sanitizeAgentRoutes(candidate.llm?.agentRoutes, providers);
+  const providers = mergeProviders(candidate.llm?.providers, candidate, legacyStore, options);
+  const routes = sanitizeAgentRoutes(candidate.llm?.agentRoutes, options);
   return {
     appearance: {
       theme: pickEnum(appearance.theme, VALID_THEMES, fallback.appearance.theme),
@@ -2198,13 +2228,13 @@ const sanitizeSettings = (raw, legacyStore, workspaceRoot) => {
       rootPath: resolvedWorkspaceRoot
     },
     llm: {
-      providers: normalizedProviders,
+      providers,
       agentRoutes: routes
     },
     paths: EMPTY_PATHS
   };
 };
-const mergeSettings = (current, patch, legacyStore, workspaceRoot) => sanitizeSettings({
+const mergeSettings = (current, patch, workspaceRoot) => sanitizeSettings({
   ...current,
   appearance: {
     ...current.appearance,
@@ -2232,7 +2262,11 @@ const mergeSettings = (current, patch, legacyStore, workspaceRoot) => sanitizeSe
     providers: patch.llm?.providers ?? current.llm.providers,
     agentRoutes: patch.llm?.agentRoutes ?? current.llm.agentRoutes
   }
-}, legacyStore, workspaceRoot);
+}, EMPTY_LEGACY_STORE, workspaceRoot, {
+  seedBuiltins: false,
+  importLegacy: false,
+  seedDefaultRoutes: false
+});
 class SettingsService {
   legacyStore;
   initialized = false;
@@ -2243,8 +2277,10 @@ class SettingsService {
   }
   initialize() {
     const runtimePaths = appPathService.initializeWorkspaceRoot();
-    const settings = this.readSettings(runtimePaths.workspaceRoot);
-    this.writeSettings(settings, runtimePaths.workspaceRoot);
+    if (!this.hasPersistedSettings(runtimePaths.workspaceRoot)) {
+      const initialSettings = this.createInitialSettings(runtimePaths.workspaceRoot);
+      this.writeSettings(initialSettings, runtimePaths.workspaceRoot);
+    }
     this.initialized = true;
     return this.getAll(runtimePaths);
   }
@@ -2253,23 +2289,44 @@ class SettingsService {
       this.initialize();
     }
   }
-  readSettings(workspaceRoot) {
-    const settingsPath = appPathService.getWorkspacePaths(workspaceRoot).settingsPath;
-    const legacySettingsPath = path.join(electron.app.getPath("appData"), "RdcAgent", "settings.json");
-    let rawSettings = null;
+  getSettingsFilePath(workspaceRoot) {
+    return appPathService.getWorkspacePaths(workspaceRoot).settingsPath;
+  }
+  hasPersistedSettings(workspaceRoot) {
+    return fs.existsSync(this.getSettingsFilePath(workspaceRoot));
+  }
+  readJsonFile(filePath) {
     try {
-      if (fs.existsSync(settingsPath)) {
-        rawSettings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
-      } else if (fs.existsSync(legacySettingsPath)) {
-        rawSettings = JSON.parse(fs.readFileSync(legacySettingsPath, "utf8"));
+      if (!fs.existsSync(filePath)) {
+        return null;
       }
+      return JSON.parse(fs.readFileSync(filePath, "utf8"));
     } catch (error) {
       console.warn("[SettingsService] Failed to read settings file:", error);
+      return null;
     }
-    return sanitizeSettings(rawSettings, this.legacyStore.store, workspaceRoot);
+  }
+  readLegacySettings() {
+    return this.readJsonFile(path.join(electron.app.getPath("appData"), "RdcAgent", "settings.json"));
+  }
+  readPersistedSettings(workspaceRoot) {
+    const rawSettings = this.readJsonFile(this.getSettingsFilePath(workspaceRoot));
+    return sanitizeSettings(rawSettings, EMPTY_LEGACY_STORE, workspaceRoot, {
+      seedBuiltins: false,
+      importLegacy: false,
+      seedDefaultRoutes: false
+    });
+  }
+  createInitialSettings(workspaceRoot) {
+    const rawSettings = this.readLegacySettings();
+    return sanitizeSettings(rawSettings, this.legacyStore.store, workspaceRoot, {
+      seedBuiltins: false,
+      importLegacy: true,
+      seedDefaultRoutes: true
+    });
   }
   writeSettings(settings, workspaceRoot = settings.workspace.rootPath) {
-    const settingsPath = appPathService.getWorkspacePaths(workspaceRoot).settingsPath;
+    const settingsPath = this.getSettingsFilePath(workspaceRoot);
     const persisted = {
       ...settings,
       workspace: {
@@ -2283,8 +2340,8 @@ class SettingsService {
   getAll(runtimePaths) {
     this.ensureInitialized();
     const paths = appPathService.getWorkspacePaths();
-    const settings = this.readSettings(paths.workspaceRoot);
-    const nextSettings = {
+    const settings = this.hasPersistedSettings(paths.workspaceRoot) ? this.readPersistedSettings(paths.workspaceRoot) : this.createInitialSettings(paths.workspaceRoot);
+    return {
       ...settings,
       workspace: {
         rootPath: paths.workspaceRoot
@@ -2294,17 +2351,25 @@ class SettingsService {
         ...runtimePaths ?? {}
       }
     };
-    this.writeSettings(nextSettings, paths.workspaceRoot);
-    return nextSettings;
   }
   setAll(patch, runtimePaths) {
     this.ensureInitialized();
-    const currentSettings = this.getAll(runtimePaths);
-    const requestedRoot = patch.workspace?.rootPath?.trim() || currentSettings.workspace.rootPath;
+    const currentPaths = appPathService.getWorkspacePaths();
+    const currentSettings = this.hasPersistedSettings(currentPaths.workspaceRoot) ? this.readPersistedSettings(currentPaths.workspaceRoot) : this.createInitialSettings(currentPaths.workspaceRoot);
+    const requestedRoot = patch.workspace?.rootPath?.trim() || currentSettings.workspace.rootPath || currentPaths.workspaceRoot;
     const nextPaths = appPathService.setWorkspaceRoot(requestedRoot);
-    const nextSettings = mergeSettings(currentSettings, patch, this.legacyStore.store, nextPaths.workspaceRoot);
+    const baseSettings = this.hasPersistedSettings(nextPaths.workspaceRoot) ? this.readPersistedSettings(nextPaths.workspaceRoot) : {
+      ...currentSettings,
+      workspace: {
+        rootPath: nextPaths.workspaceRoot
+      }
+    };
+    const nextSettings = mergeSettings(baseSettings, patch, nextPaths.workspaceRoot);
     this.writeSettings(nextSettings, nextPaths.workspaceRoot);
-    return this.getAll(nextPaths);
+    return this.getAll({
+      ...nextPaths,
+      ...runtimePaths ?? {}
+    });
   }
   getLlmConfig() {
     const settings = this.getAll();
@@ -3107,8 +3172,8 @@ class AgentOrchestrator {
       const route = routeMap.get(agentId);
       this.agentConfigs.set(agentId, {
         ...agentConfig,
-        modelProvider: route?.providerId ?? fallback.provider,
-        modelName: route?.modelId ?? fallback.model
+        modelProvider: route ? route.providerId : fallback.provider,
+        modelName: route ? route.modelId : fallback.model
       });
     }
   }
@@ -3339,7 +3404,6 @@ class AgentOrchestrator {
 const agentOrchestrator = new AgentOrchestrator();
 const POLL_INTERVAL_MS = 5e3;
 const ACTIVATE_TIMEOUT_MS = 25e3;
-const RECOVERY_PROBE_TIMEOUT_MS = 12e3;
 const PREPARED_REMOTE_TTL_MS = 10 * 60 * 1e3;
 const LOCAL_DEVICE = {
   id: "local",
@@ -3484,9 +3548,14 @@ function parseResumeCacheRecord(payload) {
     bootstrap: parsePersistedAndroidBootstrapMetadata(record.bootstrap)
   };
 }
-function buildRemoteReadyText(bootstrap) {
+function hasBootstrapManagedLaunch(bootstrap) {
+  return Boolean(
+    bootstrap && (bootstrap.startedActivity || bootstrap.installedApk || bootstrap.installMode || bootstrap.uninstalledExisting)
+  );
+}
+function buildBootstrapDetailText(bootstrap) {
   if (!bootstrap) {
-    return "Remote server ready";
+    return [];
   }
   const suffix = [];
   if (bootstrap.installMode === "force_replace") {
@@ -3504,11 +3573,12 @@ function buildRemoteReadyText(bootstrap) {
   if (bootstrap.forwardSpec) {
     suffix.push(bootstrap.forwardSpec);
   }
-  return suffix.length > 0 ? `Remote server ready · ${suffix.join(" · ")}` : "Remote server ready";
+  return suffix;
 }
-function buildRecoveryReadyText(bootstrap) {
-  const readyText = buildRemoteReadyText(bootstrap);
-  return readyText.replace("Remote server ready", "Remote server ready to resume");
+function buildRemoteReadyText(bootstrap) {
+  const prefix = hasBootstrapManagedLaunch(bootstrap) ? "Started Android RenderDoc and connected" : "Connected to Android RenderDoc server";
+  const suffix = buildBootstrapDetailText(bootstrap);
+  return suffix.length > 0 ? `${prefix} · ${suffix.join(" · ")}` : prefix;
 }
 function parseToolError(result, fallbackMessage) {
   return {
@@ -3522,6 +3592,7 @@ function applyActivationFailure(device, phase, message, code) {
     status: "offline",
     detailText: message,
     lastError: message,
+    remoteId: void 0,
     activationPhase: phase,
     activationErrorCode: code,
     activationErrorMessage: message,
@@ -3550,7 +3621,7 @@ function parseAdbDeviceLine(line) {
   const deviceName = metadata.get("device");
   const transportId = metadata.get("transport_id");
   const label = model ?? deviceName ?? serial;
-  let detailText = "Ready to start remote server";
+  let detailText = "Ready to connect to Android RenderDoc server";
   let lastError;
   let status = "offline";
   if (adbState === "device") {
@@ -3587,10 +3658,7 @@ class ReplayDeviceService {
   initialized = false;
   refreshPromise = null;
   activationPromises = /* @__PURE__ */ new Map();
-  probeContexts = /* @__PURE__ */ new Map();
   preparedRemotes = /* @__PURE__ */ new Map();
-  recoveryProbePromises = /* @__PURE__ */ new Map();
-  recoveryProbeAttempted = /* @__PURE__ */ new Set();
   resumeCache = null;
   setMainWindow(window) {
     this.mainWindow = window;
@@ -3657,28 +3725,20 @@ class ReplayDeviceService {
   invalidatePreparedRemote(deviceId) {
     this.preparedRemotes.delete(deviceId);
     const device = this.devices.get(deviceId);
-    if (!device || device.status !== "recoverable") {
+    if (!device || device.type !== "android" || device.status === "offline") {
       return;
     }
     this.updateDevice({
       ...device,
       status: "offline",
       remoteId: void 0,
-      detailText: "Ready to start remote server",
+      detailText: "Ready to connect to Android RenderDoc server",
       lastError: void 0,
-      recoverySource: "cache"
+      activationPhase: "idle",
+      activationErrorCode: void 0,
+      activationErrorMessage: void 0,
+      activationUpdatedAt: Date.now()
     });
-  }
-  async probeRecovery(deviceId) {
-    const existingPromise = this.recoveryProbePromises.get(deviceId);
-    if (existingPromise) {
-      return existingPromise;
-    }
-    const recoveryPromise = this.performRecoveryProbe(deviceId).finally(() => {
-      this.recoveryProbePromises.delete(deviceId);
-    });
-    this.recoveryProbePromises.set(deviceId, recoveryPromise);
-    return recoveryPromise;
   }
   getResumeCachePath() {
     return path__namespace.join(storageAdapter.getWorkspacePath(), "common", "config", "device_resume.json");
@@ -3738,46 +3798,16 @@ class ReplayDeviceService {
     return prepared;
   }
   shouldPreserveTransientState(device) {
-    if (device.status === "recoverable") {
-      return this.resolvePreparedRemote(device.id) !== null;
-    }
     return device.status !== "offline";
   }
-  matchesResumeCache(device) {
-    return Boolean(
-      device.type === "android" && device.serial && this.resumeCache && this.resumeCache.serial === device.serial
-    );
-  }
-  maybeAnnotateRecovery(device) {
-    if (!this.matchesResumeCache(device)) {
+  maybeDecorateFromResumeCache(device) {
+    if (device.type !== "android" || !device.serial || !this.resumeCache || this.resumeCache.serial !== device.serial || device.bootstrap) {
       return device;
     }
     return {
       ...device,
-      recoveryEligible: true,
-      recoverySource: device.recoverySource ?? "cache",
-      recoveryValidatedAt: device.recoveryValidatedAt ?? this.resumeCache?.lastValidatedAt,
-      bootstrap: device.bootstrap ?? this.resumeCache?.bootstrap
+      bootstrap: this.resumeCache.bootstrap
     };
-  }
-  maybeScheduleRecoveryProbe(devices) {
-    const cached = this.resumeCache;
-    if (!cached) {
-      return;
-    }
-    const candidate = devices.find(
-      (device) => device.type === "android" && device.serial === cached.serial && device.status === "offline" && device.lastError === void 0
-    );
-    if (!candidate) {
-      return;
-    }
-    if (this.recoveryProbeAttempted.has(candidate.id) || this.resolvePreparedRemote(candidate.id)) {
-      return;
-    }
-    this.recoveryProbeAttempted.add(candidate.id);
-    void this.probeRecovery(candidate.id).catch((error) => {
-      console.warn("[ReplayDeviceService] Recovery probe failed:", error);
-    });
   }
   async performRefresh() {
     const detectedDevices = await this.detectAdbDevices();
@@ -3785,44 +3815,38 @@ class ReplayDeviceService {
     const nextDevices = /* @__PURE__ */ new Map([[LOCAL_DEVICE.id, { ...LOCAL_DEVICE, lastSeen: now }]]);
     const detectedIds = /* @__PURE__ */ new Set(["local"]);
     for (const detected of detectedDevices) {
-      const annotatedDetected = this.maybeAnnotateRecovery(detected);
-      detectedIds.add(annotatedDetected.id);
-      const previous = this.devices.get(annotatedDetected.id);
-      if (previous && this.shouldPreserveTransientState(previous) && annotatedDetected.lastError === void 0) {
-        nextDevices.set(detected.id, {
-          ...annotatedDetected,
+      const decoratedDevice = this.maybeDecorateFromResumeCache(detected);
+      detectedIds.add(decoratedDevice.id);
+      const previous = this.devices.get(decoratedDevice.id);
+      if (previous && this.shouldPreserveTransientState(previous) && decoratedDevice.lastError === void 0) {
+        nextDevices.set(decoratedDevice.id, {
+          ...decoratedDevice,
           status: previous.status,
-          detailText: previous.detailText ?? annotatedDetected.detailText,
+          detailText: previous.detailText ?? decoratedDevice.detailText,
           lastError: previous.lastError,
           remoteId: previous.remoteId,
-          bootstrap: previous.bootstrap ?? annotatedDetected.bootstrap,
+          bootstrap: previous.bootstrap ?? decoratedDevice.bootstrap,
           activationPhase: previous.activationPhase,
           activationErrorCode: previous.activationErrorCode,
           activationErrorMessage: previous.activationErrorMessage,
           activationUpdatedAt: previous.activationUpdatedAt,
-          lastSeen: annotatedDetected.lastSeen ?? previous.lastSeen,
-          recoveryEligible: previous.recoveryEligible ?? annotatedDetected.recoveryEligible,
-          recoveryValidatedAt: previous.recoveryValidatedAt ?? annotatedDetected.recoveryValidatedAt,
-          recoverySource: previous.recoverySource ?? annotatedDetected.recoverySource
+          lastSeen: decoratedDevice.lastSeen ?? previous.lastSeen
         });
-      } else if (previous && previous.activationErrorMessage && previous.lastError && annotatedDetected.status === "offline" && annotatedDetected.lastError === void 0) {
-        nextDevices.set(detected.id, {
-          ...annotatedDetected,
+      } else if (previous && previous.activationErrorMessage && previous.lastError && decoratedDevice.status === "offline" && decoratedDevice.lastError === void 0) {
+        nextDevices.set(decoratedDevice.id, {
+          ...decoratedDevice,
           detailText: previous.detailText ?? previous.activationErrorMessage,
           lastError: previous.lastError,
           remoteId: previous.remoteId,
-          bootstrap: previous.bootstrap ?? annotatedDetected.bootstrap,
+          bootstrap: previous.bootstrap ?? decoratedDevice.bootstrap,
           activationPhase: previous.activationPhase,
           activationErrorCode: previous.activationErrorCode,
           activationErrorMessage: previous.activationErrorMessage,
           activationUpdatedAt: previous.activationUpdatedAt,
-          lastSeen: annotatedDetected.lastSeen ?? previous.lastSeen,
-          recoveryEligible: previous.recoveryEligible ?? annotatedDetected.recoveryEligible,
-          recoveryValidatedAt: previous.recoveryValidatedAt ?? annotatedDetected.recoveryValidatedAt,
-          recoverySource: previous.recoverySource ?? annotatedDetected.recoverySource
+          lastSeen: decoratedDevice.lastSeen ?? previous.lastSeen
         });
       } else {
-        nextDevices.set(annotatedDetected.id, annotatedDetected);
+        nextDevices.set(decoratedDevice.id, decoratedDevice);
       }
     }
     for (const [deviceId, device] of this.devices.entries()) {
@@ -3837,9 +3861,7 @@ class ReplayDeviceService {
         lastError: "ADB device not detected."
       });
     }
-    const devices = this.replaceDevices(nextDevices);
-    this.maybeScheduleRecoveryProbe(devices);
-    return devices;
+    return this.replaceDevices(nextDevices);
   }
   async detectAdbDevices() {
     try {
@@ -3875,11 +3897,10 @@ class ReplayDeviceService {
       });
       return this.devices.get(deviceId);
     }
-    const isRecoverable = device.status === "recoverable";
     this.updateDevice({
       ...device,
       status: "loading",
-      detailText: isRecoverable ? "Resuming remote server..." : "Preparing Android remote server...",
+      detailText: "Connecting to Android RenderDoc...",
       lastError: void 0,
       activationPhase: "daemon",
       activationErrorCode: void 0,
@@ -3891,7 +3912,7 @@ class ReplayDeviceService {
     });
     try {
       const activated = await Promise.race([
-        isRecoverable ? this.resumePreparedRemote(deviceId) : this.activateRemoteDevice(deviceId),
+        this.activateRemoteDevice(deviceId),
         timeoutPromise
       ]);
       this.updateDevice(activated);
@@ -3909,217 +3930,6 @@ class ReplayDeviceService {
       return failedDevice;
     }
   }
-  async performRecoveryProbe(deviceId) {
-    const device = this.devices.get(deviceId);
-    if (!device || device.type !== "android" || !device.serial) {
-      return;
-    }
-    this.updateDevice({
-      ...device,
-      status: "loading",
-      detailText: "Validating remote server for resume...",
-      lastError: void 0,
-      activationPhase: "context",
-      activationErrorCode: void 0,
-      activationErrorMessage: void 0,
-      activationUpdatedAt: Date.now(),
-      recoveryEligible: true,
-      recoverySource: "startup_probe"
-    });
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error("Timed out while probing remote recovery.")), RECOVERY_PROBE_TIMEOUT_MS);
-    });
-    try {
-      await Promise.race([
-        this.probeRemoteSurface(device),
-        timeoutPromise
-      ]);
-    } catch (error) {
-      this.preparedRemotes.delete(deviceId);
-      const current = this.devices.get(deviceId) ?? device;
-      this.updateDevice({
-        ...current,
-        status: "offline",
-        detailText: "Ready to start remote server",
-        lastError: void 0,
-        activationPhase: "idle",
-        activationErrorCode: void 0,
-        activationErrorMessage: void 0,
-        activationUpdatedAt: Date.now(),
-        recoveryEligible: true,
-        recoverySource: "cache"
-      });
-      console.warn("[ReplayDeviceService] Recovery probe did not prepare a resumable surface:", error);
-    }
-  }
-  async probeRemoteSurface(device) {
-    if (!device.serial) {
-      throw new Error("Android device serial is missing.");
-    }
-    await this.ensureDaemonReady();
-    const contextId = `ctx-device-resume-${sanitizeDeviceId(device.serial)}`;
-    this.probeContexts.set(device.id, contextId);
-    await toolBridge.call({
-      toolName: "rd.session.clear_context",
-      args: { target_context_id: contextId }
-    });
-    const contextResult = await toolBridge.call({
-      toolName: "rd.session.create_context",
-      args: { context_id: contextId }
-    });
-    if (!contextResult.ok) {
-      const parsedError = parseToolError(contextResult, "Failed to create a recovery probe context.");
-      throw new Error(parsedError.message);
-    }
-    this.updateDevice({
-      ...device,
-      status: "loading",
-      detailText: "Validating remote server for resume...",
-      lastError: void 0,
-      activationPhase: "init",
-      activationUpdatedAt: Date.now(),
-      recoveryEligible: true,
-      recoverySource: "startup_probe"
-    });
-    const initResult = await toolBridge.call({
-      toolName: "rd.core.init",
-      args: {},
-      contextId
-    });
-    if (!initResult.ok) {
-      const parsedError = parseToolError(initResult, "Failed to initialize recovery probe capability.");
-      throw new Error(parsedError.message);
-    }
-    this.updateDevice({
-      ...device,
-      status: "loading",
-      detailText: "Validating remote server for resume...",
-      lastError: void 0,
-      activationPhase: "connect",
-      activationUpdatedAt: Date.now(),
-      recoveryEligible: true,
-      recoverySource: "startup_probe"
-    });
-    const connectResult = await toolBridge.call({
-      toolName: "rd.remote.connect",
-      args: {
-        timeout_ms: 5e3,
-        options: {
-          transport: "adb_android",
-          device_serial: device.serial
-        }
-      },
-      contextId
-    });
-    if (!connectResult.ok) {
-      const parsedError = parseToolError(connectResult, "Failed to connect to the Android RenderDoc server.");
-      throw new Error(parsedError.message);
-    }
-    const remoteId = typeof connectResult.data?.remote_id === "string" ? connectResult.data.remote_id : void 0;
-    if (!remoteId) {
-      throw new Error("Remote recovery probe did not return a remote_id.");
-    }
-    const bootstrap = parseAndroidBootstrapMetadata(
-      connectResult.data?.detail && typeof connectResult.data.detail === "object" ? connectResult.data.detail.bootstrap : void 0
-    );
-    const pingResult = await toolBridge.call({
-      toolName: "rd.remote.ping",
-      args: { remote_id: remoteId },
-      contextId
-    });
-    if (!pingResult.ok) {
-      const parsedError = parseToolError(pingResult, "Remote server recovery ping failed.");
-      throw new Error(parsedError.message);
-    }
-    const targetsResult = await toolBridge.call({
-      toolName: "rd.remote.list_targets",
-      args: { remote_id: remoteId },
-      contextId
-    });
-    if (!targetsResult.ok) {
-      const parsedError = parseToolError(targetsResult, "Remote recovery target discovery failed.");
-      throw new Error(parsedError.message);
-    }
-    const validatedAt = Date.now();
-    this.preparedRemotes.set(device.id, {
-      deviceId: device.id,
-      serial: device.serial,
-      contextId,
-      remoteId,
-      validatedAt,
-      bootstrap
-    });
-    await this.persistResumeCache({
-      ...device,
-      bootstrap
-    }, validatedAt);
-    this.updateDevice({
-      ...device,
-      status: "recoverable",
-      remoteId,
-      bootstrap,
-      detailText: buildRecoveryReadyText(bootstrap),
-      lastError: void 0,
-      activationPhase: "ready",
-      activationErrorCode: void 0,
-      activationErrorMessage: void 0,
-      activationUpdatedAt: validatedAt,
-      lastSeen: Date.now(),
-      recoveryEligible: true,
-      recoveryValidatedAt: validatedAt,
-      recoverySource: "startup_probe"
-    });
-  }
-  async resumePreparedRemote(deviceId) {
-    const device = this.devices.get(deviceId);
-    if (!device?.serial) {
-      throw new Error("Android device serial is missing.");
-    }
-    const prepared = this.resolvePreparedRemote(deviceId);
-    if (!prepared) {
-      return this.activateRemoteDevice(deviceId);
-    }
-    if (prepared.serial !== device.serial) {
-      this.invalidatePreparedRemote(deviceId);
-      return this.activateRemoteDevice(deviceId);
-    }
-    await this.ensureDaemonReady();
-    this.updateDevice({
-      ...device,
-      status: "loading",
-      detailText: "Resuming remote server...",
-      lastError: void 0,
-      activationPhase: "ping",
-      activationUpdatedAt: Date.now(),
-      recoveryEligible: true,
-      recoverySource: "prepared_surface"
-    });
-    const pingResult = await toolBridge.call({
-      toolName: "rd.remote.ping",
-      args: { remote_id: prepared.remoteId },
-      contextId: prepared.contextId
-    });
-    if (!pingResult.ok) {
-      this.invalidatePreparedRemote(deviceId);
-      return this.activateRemoteDevice(deviceId);
-    }
-    return {
-      ...device,
-      status: "online",
-      remoteId: prepared.remoteId,
-      bootstrap: prepared.bootstrap ?? device.bootstrap,
-      detailText: buildRemoteReadyText(prepared.bootstrap ?? device.bootstrap),
-      lastError: void 0,
-      activationPhase: "ready",
-      activationErrorCode: void 0,
-      activationErrorMessage: void 0,
-      activationUpdatedAt: Date.now(),
-      lastSeen: Date.now(),
-      recoveryEligible: true,
-      recoveryValidatedAt: prepared.validatedAt,
-      recoverySource: "prepared_surface"
-    };
-  }
   async activateRemoteDevice(deviceId) {
     const device = this.devices.get(deviceId);
     if (!device?.serial) {
@@ -4135,14 +3945,12 @@ class ReplayDeviceService {
       activationUpdatedAt: Date.now()
     });
     const contextId = `ctx-device-${sanitizeDeviceId(device.serial)}-${generateShortId()}`;
-    this.probeContexts.set(deviceId, contextId);
     const contextResult = await toolBridge.call({
       toolName: "rd.session.create_context",
       args: { context_id: contextId }
     });
     if (!contextResult.ok) {
       const parsedError = parseToolError(contextResult, "Failed to create a replay device context.");
-      this.updateDevice(applyActivationFailure(device, "context", parsedError.message, parsedError.code));
       throw new Error(parsedError.message);
     }
     this.updateDevice({
@@ -4160,7 +3968,6 @@ class ReplayDeviceService {
     });
     if (!initResult.ok) {
       const parsedError = parseToolError(initResult, "Failed to initialize remote capability.");
-      this.updateDevice(applyActivationFailure(device, "init", parsedError.message, parsedError.code));
       throw new Error(parsedError.message);
     }
     this.updateDevice({
@@ -4184,7 +3991,6 @@ class ReplayDeviceService {
     });
     if (!connectResult.ok) {
       const parsedError = parseToolError(connectResult, "Failed to connect to the Android RenderDoc server.");
-      this.updateDevice(applyActivationFailure(device, "connect", parsedError.message, parsedError.code));
       throw new Error(parsedError.message);
     }
     const remoteId = typeof connectResult.data?.remote_id === "string" ? connectResult.data.remote_id : void 0;
@@ -4214,7 +4020,6 @@ class ReplayDeviceService {
     });
     if (!pingResult.ok) {
       const parsedError = parseToolError(pingResult, "Remote server ping failed.");
-      this.updateDevice(applyActivationFailure({ ...device, remoteId, bootstrap }, "ping", parsedError.message, parsedError.code));
       throw new Error(parsedError.message);
     }
     this.updateDevice({
@@ -4235,7 +4040,6 @@ class ReplayDeviceService {
     });
     if (!targetsResult.ok) {
       const parsedError = parseToolError(targetsResult, "Remote target discovery failed.");
-      this.updateDevice(applyActivationFailure({ ...device, remoteId, bootstrap }, "targets", parsedError.message, parsedError.code));
       throw new Error(parsedError.message);
     }
     const validatedAt = Date.now();
@@ -4262,10 +4066,7 @@ class ReplayDeviceService {
       activationErrorCode: void 0,
       activationErrorMessage: void 0,
       activationUpdatedAt: validatedAt,
-      lastSeen: Date.now(),
-      recoveryEligible: true,
-      recoveryValidatedAt: validatedAt,
-      recoverySource: "prepared_surface"
+      lastSeen: Date.now()
     };
   }
   async ensureDaemonReady() {
@@ -7917,18 +7718,20 @@ class RdxSessionService {
     }
     await this.ensureRuntimeReady();
     this.captures = request.captures.map((capture) => ({ ...capture }));
-    this.replayDevice = request.replayDevice;
-    this.deviceLabel = request.replayDevice.label;
     this.remoteId = null;
     this.remoteStatus = "disconnected";
     const hasRemoteCapture = this.captures.some((capture) => capture.backendHint === "remote");
+    let replayDevice = request.replayDevice;
     let reusedPreparedRemote = false;
     if (hasRemoteCapture) {
-      if (request.replayDevice.type === "local" || request.replayDevice.status !== "online") {
-        throw new Error("Remote capture requires an online Replay Device.");
+      if (replayDevice.type === "local") {
+        throw new Error("Remote capture requires an Android Replay Device.");
       }
-      reusedPreparedRemote = await this.tryAdoptPreparedRemote(request.replayDevice);
+      replayDevice = await this.ensureReplayDeviceReady(replayDevice);
+      reusedPreparedRemote = await this.tryAdoptPreparedRemote(replayDevice);
     }
+    this.replayDevice = replayDevice;
+    this.deviceLabel = replayDevice.label;
     if (!reusedPreparedRemote) {
       await this.prepareFreshContext();
     }
@@ -7953,12 +7756,12 @@ class RdxSessionService {
         if (!preparedRemoteStillValid) {
           this.remoteId = null;
           this.remoteStatus = "disconnected";
-          await this.ensureRemoteConnection(request.replayDevice);
+          await this.ensureRemoteConnection(replayDevice);
         } else {
           this.remoteStatus = "online";
         }
       } else {
-        await this.ensureRemoteConnection(request.replayDevice);
+        await this.ensureRemoteConnection(replayDevice);
       }
     }
     const primaryCapture = this.captures.find((capture) => capture.id === request.primaryCaptureId);
@@ -7973,31 +7776,67 @@ class RdxSessionService {
   async openProjectInput(request) {
     await this.closeOrReplaceOpenedCapture();
     await this.ensureRuntimeReady();
+    let replayDevice = request.replayDevice;
+    const isRemoteReplay = replayDevice.type === "android";
+    if (isRemoteReplay) {
+      replayDevice = await this.ensureReplayDeviceReady(replayDevice);
+    }
     const capture = {
       id: request.inputId,
       filePath: request.filePath,
       role: "primary",
-      backendHint: request.replayDevice.type === "local" ? "local" : "remote",
+      backendHint: isRemoteReplay ? "remote" : "local",
       status: "pending"
     };
     this.captures = [capture];
     this.activeCaptureId = capture.id;
-    this.replayDevice = request.replayDevice;
-    this.deviceLabel = request.replayDevice.label;
+    this.replayDevice = replayDevice;
+    this.deviceLabel = replayDevice.label;
     this.remoteId = null;
     this.remoteStatus = "disconnected";
-    await this.prepareFreshContext();
-    const ownerResult = await this.claimOwner(this.contextId);
-    this.runtimeOwner = ownerResult.owner;
-    this.ownerLeaseId = ownerResult.leaseId;
-    if (capture.backendHint === "remote") {
-      if (request.replayDevice.type === "local" || !["connected", "online"].includes(request.replayDevice.status)) {
-        throw new Error("Remote capture requires an available Replay Device.");
+    let reusedPreparedRemote = false;
+    if (isRemoteReplay) {
+      reusedPreparedRemote = await this.tryAdoptPreparedRemote(replayDevice);
+    }
+    if (!reusedPreparedRemote) {
+      await this.prepareFreshContext();
+    }
+    try {
+      const ownerResult = await this.claimOwner(this.contextId);
+      this.runtimeOwner = ownerResult.owner;
+      this.ownerLeaseId = ownerResult.leaseId;
+    } catch (error) {
+      if (!reusedPreparedRemote) {
+        throw error;
       }
-      await this.ensureRemoteConnection(request.replayDevice);
+      this.resetRemoteConnectionState();
+      await this.prepareFreshContext();
+      const ownerResult = await this.claimOwner(this.contextId);
+      this.runtimeOwner = ownerResult.owner;
+      this.ownerLeaseId = ownerResult.leaseId;
+      reusedPreparedRemote = false;
+    }
+    if (isRemoteReplay) {
+      if (reusedPreparedRemote) {
+        const preparedRemoteStillValid = await this.validatePreparedRemoteHandle();
+        if (!preparedRemoteStillValid) {
+          this.remoteId = null;
+          this.remoteStatus = "disconnected";
+          await this.ensureRemoteConnection(replayDevice);
+        } else {
+          this.remoteStatus = "online";
+        }
+      } else {
+        await this.ensureRemoteConnection(replayDevice);
+      }
     }
     await this.ensureCaptureSession(capture);
-    const openedCapture = this.createOpenedCaptureState(request.projectId, request.inputId, request.filePath, request.replayDevice);
+    const openedCapture = this.createOpenedCaptureState(
+      request.projectId,
+      request.inputId,
+      request.filePath,
+      replayDevice
+    );
     this.openedCapture = openedCapture;
     return openedCapture;
   }
@@ -8168,6 +8007,25 @@ class RdxSessionService {
     }
     this.remoteStatus = "online";
   }
+  async ensureReplayDeviceReady(device) {
+    if (device.type === "local") {
+      return device;
+    }
+    const currentDevice = replayDeviceService.getDeviceById(device.id) ?? device;
+    if (currentDevice.type === "local") {
+      return currentDevice;
+    }
+    if (["connected", "online"].includes(currentDevice.status)) {
+      return currentDevice;
+    }
+    const activatedDevice = await replayDeviceService.activateDevice(currentDevice.id);
+    if (activatedDevice.type === "local" || !["connected", "online"].includes(activatedDevice.status)) {
+      throw new Error(
+        activatedDevice.activationErrorMessage ?? activatedDevice.lastError ?? `Failed to connect Replay Device ${activatedDevice.label}.`
+      );
+    }
+    return activatedDevice;
+  }
   async tryAdoptPreparedRemote(device) {
     const prepared = replayDeviceService.consumePreparedRemote(device.id);
     if (!prepared) {
@@ -8268,7 +8126,7 @@ class RdxSessionService {
 }
 const rdxSessionService = new RdxSessionService(toolBridge);
 const __dirname$1 = path__namespace.dirname(url.fileURLToPath(require("url").pathToFileURL(__filename).href));
-const isDev = process.env.NODE_ENV === "development" || !electron.app.isPackaged;
+const isDev = (process.env.NODE_ENV === "development" || !electron.app.isPackaged) && process.env.RDC_AGENT_TEST_MODE !== "1";
 let mainWindow = null;
 const allowedNavigationOrigins = /* @__PURE__ */ new Set();
 function registerAllowedOrigin(url2) {

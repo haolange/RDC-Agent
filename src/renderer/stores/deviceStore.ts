@@ -76,7 +76,10 @@ export const useDeviceStore = create<DeviceState>((set, get) => ({
     try {
       const device = await window.electronAPI.device.activate(deviceId);
       if (device) {
-        const devices = get().devices.map((entry) => entry.id === device.id ? device : entry);
+        const existing = get().devices.some((entry) => entry.id === device.id);
+        const devices = existing
+          ? get().devices.map((entry) => entry.id === device.id ? device : entry)
+          : [...get().devices, device];
         set((state) => normalizeDevices(devices, state.selectedDevice));
       }
       return device ?? null;

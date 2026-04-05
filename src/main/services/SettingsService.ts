@@ -67,6 +67,12 @@ interface LegacyAppGlobalSettings {
   openRouter?: LegacyOpenRouterSettings;
 }
 
+interface SanitizeSettingsOptions {
+  seedBuiltins: boolean;
+  importLegacy: boolean;
+  seedDefaultRoutes: boolean;
+}
+
 const LEFT_DEFAULTS = {
   width: LEFT_SIDEBAR_DEFAULT_WIDTH,
   min: LEFT_SIDEBAR_MIN_WIDTH,
@@ -91,6 +97,8 @@ const EMPTY_PATHS: AppRuntimePaths = {
   knowledgePath: '',
   migrationOrphansPath: '',
 };
+
+const EMPTY_LEGACY_STORE: LegacyAppGlobalSettings = {};
 
 const DEFAULT_APPEARANCE: UiPreferences = {
   theme: 'dark',
@@ -120,6 +128,7 @@ const VALID_THEMES: AppTheme[] = ['dark', 'light', 'system'];
 const VALID_LANGUAGES: AppLanguage[] = ['zh-CN', 'en'];
 const VALID_FONT_SCALES: FontScale[] = ['small', 'medium', 'large'];
 const VALID_PROVIDER_KINDS: LlmProviderKind[] = ['openrouter', 'openai-compatible', 'anthropic', 'ollama'];
+const KNOWN_AGENT_IDS = new Set(Object.keys(DEFAULT_MODEL_ROUTING));
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
@@ -156,69 +165,61 @@ const sanitizeSidebar = (
   };
 };
 
-const createDefaultAgentRoutes = (): LlmAgentRoute[] =>
-  Object.entries(DEFAULT_MODEL_ROUTING).map(([agentId, route]) => ({
+const createEmptyAgentRoutes = (): LlmAgentRoute[] =>
+  Object.keys(DEFAULT_MODEL_ROUTING).map((agentId) => ({
     agentId: agentId as LlmAgentRoute['agentId'],
-    providerId: route.provider,
-    modelId: route.model,
+    providerId: '',
+    modelId: '',
   }));
 
-const createDefaultSettings = (): AppSettings => ({
+const createDefaultSettings = (workspaceRoot = appPathService.getWorkspaceRoot()): AppSettings => ({
   appearance: DEFAULT_APPEARANCE,
   layout: DEFAULT_LAYOUT,
   profile: DEFAULT_PROFILE,
   workspace: {
-    rootPath: appPathService.getWorkspaceRoot(),
+    rootPath: workspaceRoot,
   },
   llm: {
-    providers: createBuiltinProviderEntries(),
-    agentRoutes: createDefaultAgentRoutes(),
+    providers: [],
+    agentRoutes: createEmptyAgentRoutes(),
   },
   paths: EMPTY_PATHS,
 });
 
 const toModelId = (value: string): string => value.trim();
 
-const sanitizeModels = (models: unknown, fallback: string[] = []): LlmProviderModel[] => {
+const sanitizeModels = (models: unknown): LlmProviderModel[] => {
   const candidates = Array.isArray(models) ? models : [];
-  const normalized = candidates
-    .map((entry) => {
-      if (typeof entry === 'string') {
-        const modelId = toModelId(entry);
-        return modelId ? { id: modelId, label: modelId, enabled: true } : null;
+  const modelMap = new Map<string, LlmProviderModel>();
+
+  for (const entry of candidates) {
+    if (typeof entry === 'string') {
+      const modelId = toModelId(entry);
+      if (!modelId || modelMap.has(modelId)) {
+        continue;
       }
+      modelMap.set(modelId, { id: modelId, label: modelId, enabled: true });
+      continue;
+    }
 
-      if (!entry || typeof entry !== 'object') {
-        return null;
-      }
+    if (!entry || typeof entry !== 'object') {
+      continue;
+    }
 
-      const candidate = entry as Partial<LlmProviderModel>;
-      const modelId = typeof candidate.id === 'string' ? toModelId(candidate.id) : '';
-      if (!modelId) {
-        return null;
-      }
+    const candidate = entry as Partial<LlmProviderModel>;
+    const modelId = typeof candidate.id === 'string' ? toModelId(candidate.id) : '';
+    if (!modelId || modelMap.has(modelId)) {
+      continue;
+    }
 
-      return {
-        id: modelId,
-        label: typeof candidate.label === 'string' && candidate.label.trim() ? candidate.label.trim() : modelId,
-        enabled: candidate.enabled !== false,
-      } satisfies LlmProviderModel;
-    })
-    .filter((entry): entry is LlmProviderModel => entry !== null);
-
-  const merged = dedupeStrings([
-    ...normalized.filter((entry) => entry.enabled).map((entry) => entry.id),
-    ...fallback,
-  ]);
-
-  return merged.map((modelId) => {
-    const existing = normalized.find((entry) => entry.id === modelId);
-    return existing ?? {
+    modelMap.set(modelId, {
       id: modelId,
-      label: modelId,
-      enabled: true,
-    };
-  });
+      label: typeof candidate.label === 'string' && candidate.label.trim() ? candidate.label.trim() : modelId,
+      enabled: candidate.enabled !== false,
+    });
+  }
+
+  return Array.from(modelMap.values());
 };
 
 const getBuiltinDefinition = (providerId: string) =>
@@ -230,21 +231,12 @@ const getProviderConfigState = (provider: Pick<LlmProviderEntry, 'enabled' | 'ki
   return Boolean(provider.apiKey.trim());
 };
 
-const sanitizeProvider = (entry: Partial<LlmProviderEntry>, fallback?: LlmProviderEntry): LlmProviderEntry => {
-  const builtin = getBuiltinDefinition(typeof entry.id === 'string' ? entry.id : fallback?.id ?? '');
-  const providerId = (typeof entry.id === 'string' && entry.id.trim()) || fallback?.id || builtin?.id || 'custom-provider';
-  const recommendedModels = dedupeStrings([
-    ...(Array.isArray(entry.recommendedModels) ? entry.recommendedModels.filter((value): value is string => typeof value === 'string') : []),
-    ...(fallback?.recommendedModels ?? []),
-    ...(builtin?.recommendedModels ?? []),
-  ]);
-  const models = sanitizeModels(
-    entry.models,
-    dedupeStrings([
-      ...(fallback?.models ?? []).filter((model) => model.enabled).map((model) => model.id),
-      ...(builtin?.defaultModels ?? []),
-    ]),
-  );
+const sanitizeProvider = (entry: Partial<LlmProviderEntry>, fallback?: Partial<LlmProviderEntry>): LlmProviderEntry => {
+  const fallbackId = typeof fallback?.id === 'string' ? fallback.id : '';
+  const entryId = typeof entry.id === 'string' ? entry.id.trim() : '';
+  const builtin = getBuiltinDefinition(entryId || fallbackId);
+  const providerId = entryId || fallbackId || builtin?.id || 'custom-provider';
+  const models = sanitizeModels(entry.models ?? fallback?.models ?? []);
   const resolved: LlmProviderEntry = {
     id: providerId,
     kind: pickEnum<LlmProviderKind>(
@@ -252,16 +244,20 @@ const sanitizeProvider = (entry: Partial<LlmProviderEntry>, fallback?: LlmProvid
       VALID_PROVIDER_KINDS,
       fallback?.kind ?? builtin?.kind ?? 'openai-compatible',
     ),
-    label: typeof entry.label === 'string' && entry.label.trim()
+    label: typeof entry.label === 'string'
       ? entry.label.trim()
-      : fallback?.label ?? builtin?.label ?? providerId,
+      : fallback?.label ?? builtin?.label ?? '',
     enabled: typeof entry.enabled === 'boolean' ? entry.enabled : fallback?.enabled ?? builtin?.enabled ?? false,
     apiKey: typeof entry.apiKey === 'string' ? entry.apiKey.trim() : fallback?.apiKey ?? '',
     baseUrl: typeof entry.baseUrl === 'string' && entry.baseUrl.trim()
       ? entry.baseUrl.trim()
       : fallback?.baseUrl ?? builtin?.baseUrl,
     models,
-    recommendedModels,
+    recommendedModels: dedupeStrings(
+      Array.isArray(entry.recommendedModels)
+        ? entry.recommendedModels.filter((value): value is string => typeof value === 'string')
+        : fallback?.recommendedModels ?? builtin?.recommendedModels ?? [],
+    ),
     docsUrl: typeof entry.docsUrl === 'string' && entry.docsUrl.trim()
       ? entry.docsUrl.trim()
       : fallback?.docsUrl ?? builtin?.docsUrl,
@@ -272,12 +268,15 @@ const sanitizeProvider = (entry: Partial<LlmProviderEntry>, fallback?: LlmProvid
   return resolved;
 };
 
-const importLegacyCredentials = (settings: LegacySettingsPayload): LlmProviderEntry[] => {
-  const credentials = Array.isArray(settings.llm?.credentials) ? settings.llm?.credentials : [];
+const importLegacyCredentials = (
+  settings: LegacySettingsPayload,
+  providerMap: Map<string, LlmProviderEntry>,
+): LlmProviderEntry[] => {
+  const credentials = Array.isArray(settings.llm?.credentials) ? settings.llm.credentials : [];
   const imported = new Map<string, LegacyLlmCredentialEntry>();
 
   for (const credential of credentials) {
-    const providerId = typeof credential.provider === 'string' ? credential.provider : '';
+    const providerId = typeof credential.provider === 'string' ? credential.provider.trim() : '';
     if (!providerId || !credential.apiKey?.trim()) {
       continue;
     }
@@ -289,120 +288,136 @@ const importLegacyCredentials = (settings: LegacySettingsPayload): LlmProviderEn
   }
 
   return Array.from(imported.entries()).map(([providerId, credential]) => {
-    const builtinFallback = createBuiltinProviderEntries().find((entry) => entry.id === providerId);
+    const fallback = providerMap.get(providerId) || createBuiltinProviderEntries().find((entry) => entry.id === providerId);
     return sanitizeProvider({
       id: providerId as LlmProviderId,
-      label: credential.label || builtinFallback?.label || providerId,
+      label: credential.label || fallback?.label || providerId,
       enabled: true,
       apiKey: credential.apiKey,
       baseUrl: credential.baseUrl,
-      models: builtinFallback?.models ?? [],
-      recommendedModels: builtinFallback?.recommendedModels ?? [],
-      docsUrl: builtinFallback?.docsUrl,
-      kind: builtinFallback?.kind ?? 'openai-compatible',
-    }, builtinFallback);
-  });
-};
-
-const mergeProviders = (rawProviders: unknown, legacySettings: LegacySettingsPayload, legacyStore: LegacyAppGlobalSettings): LlmProviderEntry[] => {
-  const builtinProviders = createBuiltinProviderEntries();
-  const providerMap = new Map<string, LlmProviderEntry>();
-
-  for (const provider of builtinProviders) {
-    providerMap.set(provider.id, provider);
-  }
-
-  const importedProviders = Array.isArray(rawProviders)
-    ? rawProviders.map((entry) => sanitizeProvider(entry as Partial<LlmProviderEntry>, providerMap.get((entry as LlmProviderEntry).id)))
-    : [];
-  for (const provider of importedProviders) {
-    providerMap.set(provider.id, provider);
-  }
-
-  for (const provider of importLegacyCredentials(legacySettings)) {
-    const fallback = providerMap.get(provider.id);
-    providerMap.set(provider.id, sanitizeProvider(provider, fallback));
-  }
-
-  if (legacyStore.openRouter?.apiKey) {
-    const fallback = providerMap.get('openrouter');
-    providerMap.set('openrouter', sanitizeProvider({
-      id: 'openrouter',
-      enabled: true,
-      apiKey: legacyStore.openRouter.apiKey,
-      baseUrl: legacyStore.openRouter.baseUrl,
       models: fallback?.models ?? [],
       recommendedModels: fallback?.recommendedModels ?? [],
       docsUrl: fallback?.docsUrl,
-      kind: 'openrouter',
-      label: fallback?.label ?? 'OpenRouter',
-    }, fallback));
-  }
-
-  return Array.from(providerMap.values()).map((provider) => sanitizeProvider(provider, providerMap.get(provider.id)));
+      kind: fallback?.kind ?? 'openai-compatible',
+    }, fallback);
+  });
 };
 
-const ensureRouteModel = (provider: LlmProviderEntry, modelId: string): LlmProviderEntry => {
-  if (!modelId) {
-    return provider;
+const mergeProviders = (
+  rawProviders: unknown,
+  legacySettings: LegacySettingsPayload,
+  legacyStore: LegacyAppGlobalSettings,
+  options: SanitizeSettingsOptions,
+): LlmProviderEntry[] => {
+  const providerMap = new Map<string, LlmProviderEntry>();
+
+  if (options.seedBuiltins) {
+    for (const provider of createBuiltinProviderEntries()) {
+      providerMap.set(provider.id, provider);
+    }
   }
 
-  if (provider.models.some((model) => model.id === modelId)) {
-    return provider;
+  if (Array.isArray(rawProviders)) {
+    for (const rawProvider of rawProviders) {
+      if (!rawProvider || typeof rawProvider !== 'object') {
+        continue;
+      }
+
+      const entry = rawProvider as Partial<LlmProviderEntry>;
+      const providerId = typeof entry.id === 'string' ? entry.id.trim() : '';
+      const fallback = providerId ? providerMap.get(providerId) : undefined;
+      const provider = sanitizeProvider(entry, fallback);
+      providerMap.set(provider.id, provider);
+    }
   }
 
-  return {
-    ...provider,
-    models: [...provider.models, { id: modelId, label: modelId, enabled: true }],
-  };
-};
-
-const sanitizeAgentRoutes = (rawRoutes: unknown, providers: LlmProviderEntry[]): { providers: LlmProviderEntry[]; routes: LlmAgentRoute[] } => {
-  const providerMap = new Map<string, LlmProviderEntry>(providers.map((provider) => [provider.id, provider]));
-  const providedRoutes = Array.isArray(rawRoutes)
-    ? rawRoutes.filter((entry): entry is LlmAgentRoute => Boolean(entry && typeof entry === 'object' && 'agentId' in entry))
-    : [];
-  const routeMap = new Map(providedRoutes.map((route) => [route.agentId, route]));
-  const normalizedRoutes: LlmAgentRoute[] = [];
-
-  for (const [agentId, fallback] of Object.entries(DEFAULT_MODEL_ROUTING)) {
-    const candidate = routeMap.get(agentId as LlmAgentRoute['agentId']);
-    const providerId = candidate?.providerId || fallback.provider;
-    const preferredModelId = candidate?.modelId || fallback.model;
-    const initialProvider = providerMap.get(providerId) || providerMap.get(fallback.provider) || providers[0];
-
-    if (!initialProvider) {
-      continue;
+  if (options.importLegacy) {
+    for (const provider of importLegacyCredentials(legacySettings, providerMap)) {
+      const fallback = providerMap.get(provider.id);
+      providerMap.set(provider.id, sanitizeProvider(provider, fallback));
     }
 
-    const providerWithModel = ensureRouteModel(initialProvider, preferredModelId);
-    providerMap.set(providerWithModel.id, providerWithModel);
+    if (legacyStore.openRouter?.apiKey) {
+      const fallback = providerMap.get('openrouter');
+      providerMap.set('openrouter', sanitizeProvider({
+        id: 'openrouter',
+        enabled: true,
+        apiKey: legacyStore.openRouter.apiKey,
+        baseUrl: legacyStore.openRouter.baseUrl,
+        models: fallback?.models ?? [],
+        recommendedModels: fallback?.recommendedModels ?? [],
+        docsUrl: fallback?.docsUrl,
+        kind: 'openrouter',
+        label: fallback?.label ?? 'OpenRouter',
+      }, fallback));
+    }
+  }
 
-    normalizedRoutes.push({
-      agentId: agentId as LlmAgentRoute['agentId'],
-      providerId: providerWithModel.id,
-      modelId: preferredModelId,
-    });
+  return Array.from(providerMap.values());
+};
+
+const sanitizeRoute = (entry: unknown): LlmAgentRoute | null => {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+
+  const candidate = entry as Partial<LlmAgentRoute>;
+  if (typeof candidate.agentId !== 'string' || !KNOWN_AGENT_IDS.has(candidate.agentId)) {
+    return null;
   }
 
   return {
-    providers: Array.from(providerMap.values()).map((provider) => sanitizeProvider(provider, provider)),
-    routes: normalizedRoutes,
+    agentId: candidate.agentId as LlmAgentRoute['agentId'],
+    providerId: typeof candidate.providerId === 'string' ? candidate.providerId.trim() : '',
+    modelId: typeof candidate.modelId === 'string' ? candidate.modelId.trim() : '',
   };
+};
+
+const sanitizeAgentRoutes = (
+  rawRoutes: unknown,
+  options: SanitizeSettingsOptions,
+): LlmAgentRoute[] => {
+  if (options.seedDefaultRoutes) {
+    const routeMap = new Map<string, LlmAgentRoute>();
+    const providedRoutes = Array.isArray(rawRoutes) ? rawRoutes.map(sanitizeRoute).filter((route): route is LlmAgentRoute => route !== null) : [];
+
+    for (const route of providedRoutes) {
+      routeMap.set(route.agentId, route);
+    }
+
+    return Object.entries(DEFAULT_MODEL_ROUTING)
+      .map(([agentId]) => {
+        const candidate = routeMap.get(agentId);
+        return {
+          agentId: agentId as LlmAgentRoute['agentId'],
+          providerId: candidate?.providerId ?? '',
+          modelId: candidate?.modelId ?? '',
+        };
+      })
+      .filter((route): route is LlmAgentRoute => route !== null);
+  }
+
+  const routeMap = new Map<string, LlmAgentRoute>();
+  const providedRoutes = Array.isArray(rawRoutes) ? rawRoutes.map(sanitizeRoute).filter((route): route is LlmAgentRoute => route !== null) : [];
+  for (const route of providedRoutes) {
+    routeMap.set(route.agentId, route);
+  }
+  return Array.from(routeMap.values());
 };
 
 const sanitizeSettings = (
   raw: unknown,
   legacyStore: LegacyAppGlobalSettings,
   workspaceRoot: string,
+  options: SanitizeSettingsOptions,
 ): AppSettings => {
-  const fallback = createDefaultSettings();
+  const fallback = createDefaultSettings(workspaceRoot);
   const candidate = (raw ?? {}) as LegacySettingsPayload;
   const appearance = (candidate.appearance ?? {}) as Partial<UiPreferences>;
   const profile = (candidate.profile ?? {}) as Partial<ProfileSettings>;
   const resolvedWorkspaceRoot = candidate.workspace?.rootPath?.trim() || workspaceRoot;
-  const providers = mergeProviders(candidate.llm?.providers, candidate, legacyStore);
-  const { providers: normalizedProviders, routes } = sanitizeAgentRoutes(candidate.llm?.agentRoutes, providers);
+  const providers = mergeProviders(candidate.llm?.providers, candidate, legacyStore, options);
+  const routes = sanitizeAgentRoutes(candidate.llm?.agentRoutes, options);
 
   return {
     appearance: {
@@ -424,7 +439,7 @@ const sanitizeSettings = (
       rootPath: resolvedWorkspaceRoot,
     },
     llm: {
-      providers: normalizedProviders,
+      providers,
       agentRoutes: routes,
     },
     paths: EMPTY_PATHS,
@@ -434,7 +449,6 @@ const sanitizeSettings = (
 const mergeSettings = (
   current: AppSettings,
   patch: AppSettingsPatch,
-  legacyStore: LegacyAppGlobalSettings,
   workspaceRoot: string,
 ): AppSettings => sanitizeSettings({
   ...current,
@@ -464,7 +478,11 @@ const mergeSettings = (
     providers: patch.llm?.providers ?? current.llm.providers,
     agentRoutes: patch.llm?.agentRoutes ?? current.llm.agentRoutes,
   },
-}, legacyStore, workspaceRoot);
+}, EMPTY_LEGACY_STORE, workspaceRoot, {
+  seedBuiltins: false,
+  importLegacy: false,
+  seedDefaultRoutes: false,
+});
 
 export class SettingsService {
   private legacyStore: Store<LegacyAppGlobalSettings>;
@@ -478,8 +496,10 @@ export class SettingsService {
 
   initialize(): AppSettings {
     const runtimePaths = appPathService.initializeWorkspaceRoot();
-    const settings = this.readSettings(runtimePaths.workspaceRoot);
-    this.writeSettings(settings, runtimePaths.workspaceRoot);
+    if (!this.hasPersistedSettings(runtimePaths.workspaceRoot)) {
+      const initialSettings = this.createInitialSettings(runtimePaths.workspaceRoot);
+      this.writeSettings(initialSettings, runtimePaths.workspaceRoot);
+    }
     this.initialized = true;
     return this.getAll(runtimePaths);
   }
@@ -490,26 +510,50 @@ export class SettingsService {
     }
   }
 
-  private readSettings(workspaceRoot: string): AppSettings {
-    const settingsPath = appPathService.getWorkspacePaths(workspaceRoot).settingsPath;
-    const legacySettingsPath = path.join(app.getPath('appData'), 'RdcAgent', 'settings.json');
-    let rawSettings: unknown = null;
+  private getSettingsFilePath(workspaceRoot: string): string {
+    return appPathService.getWorkspacePaths(workspaceRoot).settingsPath;
+  }
 
+  private hasPersistedSettings(workspaceRoot: string): boolean {
+    return fs.existsSync(this.getSettingsFilePath(workspaceRoot));
+  }
+
+  private readJsonFile(filePath: string): unknown | null {
     try {
-      if (fs.existsSync(settingsPath)) {
-        rawSettings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-      } else if (fs.existsSync(legacySettingsPath)) {
-        rawSettings = JSON.parse(fs.readFileSync(legacySettingsPath, 'utf8'));
+      if (!fs.existsSync(filePath)) {
+        return null;
       }
+      return JSON.parse(fs.readFileSync(filePath, 'utf8'));
     } catch (error) {
       console.warn('[SettingsService] Failed to read settings file:', error);
+      return null;
     }
+  }
 
-    return sanitizeSettings(rawSettings, this.legacyStore.store, workspaceRoot);
+  private readLegacySettings(): unknown | null {
+    return this.readJsonFile(path.join(app.getPath('appData'), 'RdcAgent', 'settings.json'));
+  }
+
+  private readPersistedSettings(workspaceRoot: string): AppSettings {
+    const rawSettings = this.readJsonFile(this.getSettingsFilePath(workspaceRoot));
+    return sanitizeSettings(rawSettings, EMPTY_LEGACY_STORE, workspaceRoot, {
+      seedBuiltins: false,
+      importLegacy: false,
+      seedDefaultRoutes: false,
+    });
+  }
+
+  private createInitialSettings(workspaceRoot: string): AppSettings {
+    const rawSettings = this.readLegacySettings();
+    return sanitizeSettings(rawSettings, this.legacyStore.store, workspaceRoot, {
+      seedBuiltins: false,
+      importLegacy: true,
+      seedDefaultRoutes: true,
+    });
   }
 
   private writeSettings(settings: AppSettings, workspaceRoot = settings.workspace.rootPath): void {
-    const settingsPath = appPathService.getWorkspacePaths(workspaceRoot).settingsPath;
+    const settingsPath = this.getSettingsFilePath(workspaceRoot);
     const persisted: AppSettings = {
       ...settings,
       workspace: {
@@ -524,8 +568,11 @@ export class SettingsService {
   getAll(runtimePaths?: Partial<AppRuntimePaths>): AppSettings {
     this.ensureInitialized();
     const paths = appPathService.getWorkspacePaths();
-    const settings = this.readSettings(paths.workspaceRoot);
-    const nextSettings: AppSettings = {
+    const settings = this.hasPersistedSettings(paths.workspaceRoot)
+      ? this.readPersistedSettings(paths.workspaceRoot)
+      : this.createInitialSettings(paths.workspaceRoot);
+
+    return {
       ...settings,
       workspace: {
         rootPath: paths.workspaceRoot,
@@ -535,19 +582,30 @@ export class SettingsService {
         ...(runtimePaths ?? {}),
       },
     };
-
-    this.writeSettings(nextSettings, paths.workspaceRoot);
-    return nextSettings;
   }
 
   setAll(patch: AppSettingsPatch, runtimePaths?: Partial<AppRuntimePaths>): AppSettings {
     this.ensureInitialized();
-    const currentSettings = this.getAll(runtimePaths);
-    const requestedRoot = patch.workspace?.rootPath?.trim() || currentSettings.workspace.rootPath;
+    const currentPaths = appPathService.getWorkspacePaths();
+    const currentSettings = this.hasPersistedSettings(currentPaths.workspaceRoot)
+      ? this.readPersistedSettings(currentPaths.workspaceRoot)
+      : this.createInitialSettings(currentPaths.workspaceRoot);
+    const requestedRoot = patch.workspace?.rootPath?.trim() || currentSettings.workspace.rootPath || currentPaths.workspaceRoot;
     const nextPaths = appPathService.setWorkspaceRoot(requestedRoot);
-    const nextSettings = mergeSettings(currentSettings, patch, this.legacyStore.store, nextPaths.workspaceRoot);
+    const baseSettings = this.hasPersistedSettings(nextPaths.workspaceRoot)
+      ? this.readPersistedSettings(nextPaths.workspaceRoot)
+      : {
+          ...currentSettings,
+          workspace: {
+            rootPath: nextPaths.workspaceRoot,
+          },
+        };
+    const nextSettings = mergeSettings(baseSettings, patch, nextPaths.workspaceRoot);
     this.writeSettings(nextSettings, nextPaths.workspaceRoot);
-    return this.getAll(nextPaths);
+    return this.getAll({
+      ...nextPaths,
+      ...(runtimePaths ?? {}),
+    });
   }
 
   getLlmConfig(): LLMConfig {

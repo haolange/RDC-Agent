@@ -26,7 +26,6 @@ const StatusText: Record<ReplayDeviceEntry['status'], string> = {
   loading: 'Loading',
   connected: 'Connected',
   online: 'Online',
-  recoverable: 'Recoverable',
 };
 
 function getBootstrapSummary(device: ReplayDeviceEntry): string | null {
@@ -59,9 +58,6 @@ const DeviceStatusIcon: React.FC<{ device: ReplayDeviceEntry }> = ({ device }) =
   if (device.status === 'connected') {
     return <span className="device-status-icon connected">Connected</span>;
   }
-  if (device.status === 'recoverable') {
-    return <span className="device-status-icon recoverable">Resume</span>;
-  }
   if (device.status === 'loading') {
     return <span className="device-status-icon loading" aria-hidden="true" />;
   }
@@ -77,9 +73,6 @@ export const DeviceSelector: React.FC = () => {
   const selectedSummary = selectedEntry?.type === 'local'
     ? 'Local Replay'
     : (selectedEntry?.label ?? 'No Device');
-  const selectedStatus = selectedEntry
-    ? StatusText[selectedEntry.status]
-    : 'Offline';
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -106,7 +99,7 @@ export const DeviceSelector: React.FC = () => {
       return;
     }
 
-    if (device.status === 'offline' || device.status === 'recoverable') {
+    if (device.status === 'offline') {
       const activated = await activateDevice(device.id);
       if (activated && (activated.status === 'connected' || activated.status === 'online')) {
         setSelectedDevice(activated.id);
@@ -142,9 +135,6 @@ export const DeviceSelector: React.FC = () => {
             </div>
           </div>
           <div className="device-selector-trigger-meta">
-            <span className={`device-selector-trigger-status ${selectedEntry?.status ?? 'offline'}`}>
-              {selectedStatus}
-            </span>
             <svg className={`device-selector-arrow footer-entry-chevron ${isOpen ? 'open' : ''}`} viewBox="0 0 12 12" fill="currentColor">
               <path d="M6 8L1 3h10l-5 5z" />
             </svg>

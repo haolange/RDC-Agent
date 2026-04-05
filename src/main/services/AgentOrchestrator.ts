@@ -206,8 +206,8 @@ export class AgentOrchestrator {
       const route = routeMap.get(agentId);
       this.agentConfigs.set(agentId, {
         ...agentConfig,
-        modelProvider: route?.providerId ?? fallback.provider,
-        modelName: route?.modelId ?? fallback.model,
+        modelProvider: route ? route.providerId : fallback.provider,
+        modelName: route ? route.modelId : fallback.model,
       });
     }
   }
