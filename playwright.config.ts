@@ -5,8 +5,16 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 60000,
   retries: 0,
+  expect: {
+    toHaveScreenshot: {
+      animations: 'disabled',
+      caret: 'hide',
+      scale: 'css',
+    },
+  },
   use: {
     trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
   },
   projects: [
     {

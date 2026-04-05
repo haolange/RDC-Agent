@@ -20,6 +20,7 @@ import type {
 } from '../shared/types/session';
 import type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from '../shared/types/device';
 import type { AppSettings, AppSettingsPatch, ResolvedTheme } from '../shared/types/settings';
+import type { RuntimeLogEntry, RuntimeLogScope } from '../shared/types/runtimeLog';
 
 export interface ElectronAPI {
   platform: NodeJS.Platform;
@@ -119,6 +120,7 @@ export interface ElectronAPI {
 
   settings: {
     get: () => Promise<AppSettings>;
+    getProviderSecret: (providerId: string) => Promise<string>;
     set: (settings: AppSettingsPatch) => Promise<AppSettings>;
   };
 
@@ -157,6 +159,11 @@ export interface ElectronAPI {
       session?: SessionRecord;
       error?: string;
     }>;
+    rename: (id: string, title: string) => Promise<{
+      success: boolean;
+      session?: SessionRecord;
+      error?: string;
+    }>;
     select: (id: string) => Promise<{
       success: boolean;
       session?: SessionRecord;
@@ -169,8 +176,13 @@ export interface ElectronAPI {
     list: (sessionId: string) => Promise<{ runs: RunSummary[] }>;
   };
 
+  runtimeLog: {
+    list: (request: { scope: RuntimeLogScope; sessionId?: string | null }) => Promise<{
+      entries: RuntimeLogEntry[];
+    }>;
+  };
+
   capture: {
-    open: (filePath?: string) => Promise<unknown>;
     list: () => Promise<{ captures: CaptureDescriptor[] }>;
     select: (captureId: string) => Promise<{
       success: boolean;
@@ -206,6 +218,7 @@ export interface ElectronAPI {
     onContextChanged: (callback: (snapshot: ContextSnapshot) => void) => void;
     onProjectInputsChanged: (callback: (payload: { projectId: string; inputs: ProjectInputRecord[] }) => void) => void;
     onOpenedCaptureStateChanged: (callback: (state: OpenedCaptureState | null) => void) => void;
+    onRuntimeLogAppended: (callback: (entry: RuntimeLogEntry) => void) => void;
     onAppThemeChanged: (callback: (theme: ResolvedTheme) => void) => void;
     removeAllListeners: (channel: string) => void;
   };

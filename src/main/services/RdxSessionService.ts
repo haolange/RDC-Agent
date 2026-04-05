@@ -3,13 +3,20 @@
  * ToolBridge 上层，负责 bootstrap、context 分配、owner claim 和 capture 会话管理
  */
 
+import fs from 'fs';
+import path from 'path';
+import { nativeImage } from 'electron';
+import { pathToFileURL } from 'url';
 import { ToolBridge } from './ToolBridge';
+import { appPathService } from './AppPathService';
 import { replayDeviceService, type PreparedRemoteSurface } from './ReplayDeviceService';
+import { runtimeLogService } from './RuntimeLogService';
 import type {
   CaptureDescriptor,
   DebugSessionStartRequest,
   ContextSnapshot,
   OpenedCaptureState,
+  OpenedCapturePreview,
   OpenProjectInputRequest,
 } from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
@@ -184,19 +191,24 @@ export class RdxSessionService {
       }
     }
 
-    await this.ensureCaptureSession(capture);
+    const preview = await this.ensureCaptureSession(capture, {
+      projectId: request.projectId,
+      inputId: request.inputId,
+    });
 
     const openedCapture = this.createOpenedCaptureState(
       request.projectId,
       request.inputId,
       request.filePath,
       replayDevice,
+      preview,
     );
     this.openedCapture = openedCapture;
     return openedCapture;
   }
 
   async closeOrReplaceOpenedCapture(): Promise<void> {
+    const previousCapture = this.openedCapture;
     this.openedCapture = null;
     this.contextId = null;
     this.runtimeOwner = null;
@@ -207,6 +219,17 @@ export class RdxSessionService {
     this.replayDevice = null;
     this.remoteStatus = 'disconnected';
     this.remoteId = null;
+    if (previousCapture) {
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'capture',
+        severity: 'info',
+        title: 'Capture replaced',
+        summary: `${previousCapture.inputId} 的打开态已清理。`,
+        projectId: previousCapture.projectId,
+        raw: previousCapture,
+      });
+    }
   }
 
   private async prepareFreshContext(): Promise<void> {
@@ -217,7 +240,14 @@ export class RdxSessionService {
   private async ensureRuntimeReady(): Promise<void> {
     const statusResult = await this.toolBridge.executeCLI('daemon', ['status']);
     if (statusResult.exitCode === 0) {
-      return;
+      try {
+        const parsed = JSON.parse(statusResult.stdout) as { data?: { running?: boolean } };
+        if (parsed.data?.running === true) {
+          return;
+        }
+      } catch {
+        return;
+      }
     }
 
     const startResult = await this.toolBridge.executeCLI('daemon', ['start']);
@@ -235,9 +265,29 @@ export class RdxSessionService {
       contextId,
     });
     if (!result.ok) {
+      if (result.error?.message?.includes('Context limit exceeded')) {
+        const reusableContextId = await this.resolveReusableContextId();
+        if (reusableContextId) {
+          return reusableContextId;
+        }
+      }
       throw new Error(`Failed to allocate context: ${result.error?.message ?? 'unknown'}`);
     }
     return contextId;
+  }
+
+  private async resolveReusableContextId(): Promise<string | null> {
+    const daemonResult = await this.toolBridge.executeCLI('daemon', ['start']);
+    if (daemonResult.exitCode !== 0 || !daemonResult.stdout.trim()) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(daemonResult.stdout) as { data?: { state?: { context_id?: string } } };
+      return parsed.data?.state?.context_id ?? null;
+    } catch {
+      return null;
+    }
   }
 
   private async initializeContextRuntime(): Promise<void> {
@@ -266,7 +316,20 @@ export class RdxSessionService {
     return { owner, leaseId };
   }
 
-  async ensureCaptureSession(capture: CaptureDescriptor): Promise<void> {
+  private buildClaimedToolRequest(toolName: string, args: Record<string, unknown>) {
+    return {
+      toolName,
+      args,
+      contextId: this.contextId!,
+      runtimeOwner: this.runtimeOwner!,
+      ownerLeaseId: this.ownerLeaseId ?? undefined,
+    };
+  }
+
+  async ensureCaptureSession(
+    capture: CaptureDescriptor,
+    previewContext?: { projectId: string; inputId: string },
+  ): Promise<OpenedCapturePreview | null> {
     const captureIndex = this.captures.findIndex((item) => item.id === capture.id);
     if (captureIndex < 0) {
       throw new Error(`Capture ${capture.id} not in captures list`);
@@ -275,32 +338,32 @@ export class RdxSessionService {
     this.captures[captureIndex] = { ...this.captures[captureIndex], status: 'opening' };
 
     try {
-      const openResult: ToolCallResult = await this.toolBridge.call({
-        toolName: 'rd.capture.open_file',
-        args: { file_path: capture.filePath },
-        contextId: this.contextId!,
-        runtimeOwner: this.runtimeOwner!,
-      });
+      const openResult: ToolCallResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+        'rd.capture.open_file',
+        { file_path: capture.filePath },
+      ));
       if (!openResult.ok) {
         throw new Error(`Failed to open capture file: ${openResult.error?.message ?? 'unknown'}`);
       }
 
+      const captureFileId = openResult.data?.capture_file_id as string | undefined;
+
       const replayArgs: Record<string, unknown> = {
-        capture_file_id: (openResult.data?.capture_file_id as string) ?? capture.id,
+        capture_file_id: captureFileId ?? capture.id,
       };
       if (capture.backendHint === 'remote') {
         if (!this.remoteId) {
           throw new Error('Remote replay requested but remote connection is not ready.');
         }
-        replayArgs.remote_id = this.remoteId;
+        replayArgs.options = {
+          remote_id: this.remoteId,
+        };
       }
 
-      const replayResult: ToolCallResult = await this.toolBridge.call({
-        toolName: 'rd.capture.open_replay',
-        args: replayArgs,
-        contextId: this.contextId!,
-        runtimeOwner: this.runtimeOwner!,
-      });
+      const replayResult: ToolCallResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+        'rd.capture.open_replay',
+        replayArgs,
+      ));
       if (!replayResult.ok) {
         if (capture.backendHint === 'remote') {
           throw new Error(`Remote replay failed (hard fail, no local fallback): ${replayResult.error?.message ?? 'unknown'}`);
@@ -315,6 +378,17 @@ export class RdxSessionService {
         replaySessionId: replayResult.data?.replay_session_id as string | undefined,
         contextId: this.contextId!,
       };
+
+      if (!previewContext || !captureFileId) {
+        return null;
+      }
+
+      return this.loadPreferredPreview(
+        previewContext.projectId,
+        previewContext.inputId,
+        this.captures[captureIndex].sessionId ?? '',
+        captureFileId,
+      );
     } catch (error) {
       this.captures[captureIndex] = { ...this.captures[captureIndex], status: 'error' };
       throw error;
@@ -342,18 +416,16 @@ export class RdxSessionService {
     this.replayDevice = device;
     this.remoteStatus = 'connected';
 
-    const connectResult: ToolCallResult = await this.toolBridge.call({
-      toolName: 'rd.remote.connect',
-      args: {
+    const connectResult: ToolCallResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+      'rd.remote.connect',
+      {
         timeout_ms: 5000,
         options: {
           transport: 'adb_android',
           device_serial: device.serial,
         },
       },
-      contextId: this.contextId!,
-      runtimeOwner: this.runtimeOwner!,
-    });
+    ));
     if (!connectResult.ok) {
       this.remoteStatus = 'error';
       const detail = [
@@ -371,12 +443,10 @@ export class RdxSessionService {
     }
     this.remoteId = remoteId;
 
-    const pingResult: ToolCallResult = await this.toolBridge.call({
-      toolName: 'rd.remote.ping',
-      args: { remote_id: remoteId },
-      contextId: this.contextId!,
-      runtimeOwner: this.runtimeOwner!,
-    });
+    const pingResult: ToolCallResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+      'rd.remote.ping',
+      { remote_id: remoteId },
+    ));
     if (!pingResult.ok) {
       this.remoteStatus = 'error';
       throw new Error(`Remote ping failed (hard fail): ${pingResult.error?.message ?? device.activationErrorMessage ?? 'unknown'}`);
@@ -442,6 +512,7 @@ export class RdxSessionService {
       args: { remote_id: this.remoteId },
       contextId: this.contextId,
       runtimeOwner: this.runtimeOwner ?? undefined,
+      ownerLeaseId: this.ownerLeaseId ?? undefined,
     });
     if (!pingResult.ok) {
       return false;
@@ -502,6 +573,7 @@ export class RdxSessionService {
     inputId: string,
     filePath: string,
     replayDevice: ReplayDeviceEntry,
+    preview: OpenedCapturePreview | null,
   ): OpenedCaptureState {
     const activeCapture = this.captures.find((capture) => capture.id === this.activeCaptureId) ?? this.captures[0];
     return {
@@ -517,6 +589,149 @@ export class RdxSessionService {
       deviceLabel: replayDevice.label,
       status: activeCapture?.status === 'error' ? 'error' : 'open',
       openedAt: Date.now(),
+      preview,
+    };
+  }
+
+  private async loadPreferredPreview(
+    projectId: string,
+    inputId: string,
+    sessionId: string,
+    captureFileId: string,
+  ): Promise<OpenedCapturePreview | null> {
+    const framebufferPreview = sessionId
+      ? await this.loadFramebufferPreview(projectId, inputId, sessionId)
+      : null;
+    if (framebufferPreview) {
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'capture',
+        severity: 'success',
+        title: 'Preview ready',
+        summary: `已加载 ${inputId} 的最终渲染预览。`,
+        detail: framebufferPreview.width > 0 && framebufferPreview.height > 0
+          ? `${framebufferPreview.width}x${framebufferPreview.height} · framebuffer`
+          : 'framebuffer',
+        projectId,
+      });
+      return framebufferPreview;
+    }
+
+    const thumbnailPreview = await this.loadCaptureThumbnail(captureFileId);
+    if (thumbnailPreview) {
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'capture',
+        severity: 'warning',
+        title: 'Preview fallback',
+        summary: `最终 framebuffer 不可用，已回退为 ${inputId} 的 capture thumbnail。`,
+        detail: thumbnailPreview.width > 0 && thumbnailPreview.height > 0
+          ? `${thumbnailPreview.width}x${thumbnailPreview.height} · thumbnail`
+          : 'thumbnail',
+        projectId,
+      });
+      return thumbnailPreview;
+    }
+
+    runtimeLogService.log({
+      scope: 'app',
+      namespace: 'capture',
+      severity: 'warning',
+      title: 'Preview unavailable',
+      summary: `已打开 ${inputId}，但当前没有可用预览内容。`,
+      projectId,
+    });
+    return null;
+  }
+
+  private async loadFramebufferPreview(
+    projectId: string,
+    inputId: string,
+    sessionId: string,
+  ): Promise<OpenedCapturePreview | null> {
+    const outputPath = appPathService.getCapturePreviewPath(projectId, inputId);
+    await fs.promises.mkdir(path.dirname(outputPath), { recursive: true });
+
+    const result: ToolCallResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+      'rd.export.screenshot',
+      {
+        session_id: sessionId,
+        output_path: outputPath,
+        file_format: 'png',
+        include_alpha: true,
+      },
+    ));
+    if (!result.ok) {
+      return null;
+    }
+
+    const imagePath = this.resolvePreviewPath(result, outputPath);
+    return imagePath
+      ? this.createPreviewFromPath(imagePath, 'framebuffer_screenshot')
+      : null;
+  }
+
+  private async loadCaptureThumbnail(captureFileId: string): Promise<OpenedCapturePreview | null> {
+    const result: ToolCallResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+      'rd.capture.get_thumbnail',
+      {
+        capture_file_id: captureFileId,
+        max_size_px: 640,
+      },
+    ));
+
+    if (!result.ok) {
+      return null;
+    }
+
+    const imagePath = this.resolvePreviewPath(result);
+    if (!imagePath) {
+      return null;
+    }
+
+    return this.createPreviewFromPath(
+      imagePath,
+      'capture_thumbnail',
+      typeof result.data?.width === 'number' ? result.data.width : undefined,
+      typeof result.data?.height === 'number' ? result.data.height : undefined,
+    );
+  }
+
+  private resolvePreviewPath(result: ToolCallResult, fallbackPath?: string): string | null {
+    const imagePath = typeof result.data?.image_path === 'string'
+      ? result.data.image_path
+      : typeof result.data?.saved_path === 'string'
+        ? result.data.saved_path
+        : typeof result.data?.artifact_path === 'string'
+          ? result.data.artifact_path
+          : typeof result.data?.path === 'string'
+            ? result.data.path
+            : result.artifacts?.[0]?.path ?? fallbackPath ?? null;
+
+    return imagePath ? path.resolve(imagePath) : null;
+  }
+
+  private createPreviewFromPath(
+    imagePath: string,
+    source: OpenedCapturePreview['source'],
+    fallbackWidth?: number,
+    fallbackHeight?: number,
+  ): OpenedCapturePreview | null {
+    const normalizedPath = path.resolve(imagePath);
+    if (!fs.existsSync(normalizedPath)) {
+      return null;
+    }
+
+    const image = nativeImage.createFromPath(normalizedPath);
+    const size = image.isEmpty() ? { width: 0, height: 0 } : image.getSize();
+
+    return {
+      imagePath: normalizedPath,
+      imageUrl: pathToFileURL(normalizedPath).toString(),
+      width: size.width || fallbackWidth || 0,
+      height: size.height || fallbackHeight || 0,
+      source,
+      updatedAt: Date.now(),
     };
   }
 

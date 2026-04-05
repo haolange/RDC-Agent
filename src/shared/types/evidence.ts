@@ -3,19 +3,20 @@
  */
 
 // 事件类型
-export type EventType =
-  | 'dispatch'
-  | 'tool_execution'
-  | 'artifact_write'
-  | 'quality_check'
-  | 'workflow_stage_transition'
-  | 'process_deviation'
-  | 'counterfactual_submitted'
-  | 'counterfactual_reviewed'
-  | 'conflict_resolved';
+export type EventType = string;
 
 // 事件状态
-export type EventStatus = 'ok' | 'error' | 'sent' | 'pass' | 'fail' | 'blocked' | 'entered';
+export type EventStatus =
+  | 'ok'
+  | 'error'
+  | 'sent'
+  | 'pass'
+  | 'fail'
+  | 'blocked'
+  | 'entered'
+  | 'warning'
+  | 'timeout'
+  | 'completed';
 
 // Action事件
 export interface ActionEvent {

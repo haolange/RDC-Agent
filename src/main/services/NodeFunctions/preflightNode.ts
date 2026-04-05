@@ -5,8 +5,10 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { randomUUID } from 'crypto';
 import type { WorkflowStage, GraphState } from '../../../shared/types/workflow';
 import { BLOCKER_CODES } from '../../../shared/constants/blockers';
+import { toolBridge } from '../ToolBridge';
 import {
   createStageTransitionEvidence,
   createBlocker,
@@ -32,7 +34,7 @@ export interface PreflightConfig {
 
 /**
  * Preflight 节点
- * 验证环境就绪，更新阶段到 preflight_pending
+ * 验证环境就绪，更新阶段到 preflight
  */
 export async function preflightNode(
   state: GraphState,
@@ -49,13 +51,13 @@ export async function preflightNode(
         runId: state.runId,
         currentStage: state.currentStage,
       },
-      'preflight_pending'
+      'preflight'
     )
   );
 
   // 检查 RDC-Agent-Tools 路径（如果配置要求）
   if (config.checkToolsPath !== false) {
-    const toolsPath = config.toolsPath || process.env.RDC_TOOLS_PATH;
+    const toolsPath = config.toolsPath || process.env.RDC_TOOLS_PATH || toolBridge.getToolsPath();
     
     if (!toolsPath) {
       blockers.push(
@@ -110,7 +112,7 @@ export async function preflightNode(
 
   // 记录 preflight 完成
   evidenceChain.push({
-    eventId: crypto.randomUUID(),
+    eventId: randomUUID(),
     eventType: 'preflight_complete',
     agentId: 'rdc-debugger',
     status: blockers.length === 0 ? 'ok' : 'blocked',
@@ -124,7 +126,7 @@ export async function preflightNode(
   });
 
   return {
-    currentStage: 'preflight_pending',
+    currentStage: 'preflight',
     stageHistory: [state.currentStage],
     evidenceChain,
     blockers: [...state.blockers, ...blockers],
@@ -143,9 +145,9 @@ export function routeAfterPreflight(state: GraphState): string {
   );
 
   if (hasCriticalBlocker) {
-    return 'validation_blocked';
+    return 'blocked';
   }
 
-  // 正常流程：进入 intent_gate
-  return 'intent_gate';
+  // 正常流程：进入 entry_gate
+  return 'entry_gate';
 }

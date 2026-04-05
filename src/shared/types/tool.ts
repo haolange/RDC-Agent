@@ -54,6 +54,7 @@ export interface ToolCallRequest {
   args: Record<string, unknown>;
   contextId?: string;
   runtimeOwner?: string;
+  ownerLeaseId?: string;
   captureRef?: string;
 }
 
@@ -164,4 +165,5 @@ export interface ToolTraceEntry {
   timestamp: number;
   contextId: string;
   runtimeOwner: string;
+  ownerLeaseId?: string;
 }

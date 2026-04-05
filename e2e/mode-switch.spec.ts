@@ -3,34 +3,24 @@ import { launchApp, closeApp, AppContext } from './helpers/electron-app';
 
 let ctx: AppContext;
 
-test.beforeAll(async () => {
+test.beforeEach(async () => {
   ctx = await launchApp();
 });
 
-test.afterAll(async () => {
+test.afterEach(async () => {
   await closeApp(ctx);
 });
 
-test('应用启动后默认显示 Debugger 页面', async () => {
-  // 检查页面中存在 Debugger 相关元素
+test('应用启动后默认显示 Debugger 壳层且只保留单一模式入口', async () => {
   const page = ctx.page;
   await expect(page.locator('text=Debugger').first()).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('text=Analyzer')).toHaveCount(0);
+  await expect(page.locator('text=Optimizer')).toHaveCount(0);
 });
 
-test('切换到 Analyzer 模式', async () => {
+test('空闲壳层仍保留 Debugger 启动输入条', async () => {
   const page = ctx.page;
-  await page.click('text=Analyzer');
-  await expect(page.locator('text=Analyzer Mode')).toBeVisible({ timeout: 5000 });
-});
-
-test('切换到 Optimizer 模式', async () => {
-  const page = ctx.page;
-  await page.click('text=Optimizer');
-  await expect(page.locator('text=Optimizer Mode')).toBeVisible({ timeout: 5000 });
-});
-
-test('切换回 Debugger 模式', async () => {
-  const page = ctx.page;
-  await page.click('text=Debugger');
-  await expect(page.locator('text=Debugger').first()).toBeVisible({ timeout: 5000 });
+  const promptInput = page.locator('input.chat-input').first();
+  await expect(promptInput).toBeVisible();
+  await expect(promptInput).toHaveValue('');
 });

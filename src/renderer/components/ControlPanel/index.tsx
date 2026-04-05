@@ -18,6 +18,7 @@ interface CollapsibleSectionProps {
 }
 
 const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
+  id,
   title,
   icon,
   isExpanded,
@@ -26,8 +27,11 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   badge,
 }) => {
   return (
-    <div className={`cp-section ${isExpanded ? 'expanded' : ''}`}>
-      <button className="cp-section-header" onClick={onToggle}>
+    <div
+      className={`cp-section ${isExpanded ? 'expanded' : ''}`}
+      data-testid={`cp-section-${id}`}
+    >
+      <button className="cp-section-header" onClick={onToggle} aria-expanded={isExpanded}>
         <div className="cp-section-title">
           <span className="cp-section-icon">{icon}</span>
           <span className="cp-section-label">{title}</span>
@@ -41,9 +45,11 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
           </svg>
         </span>
       </button>
-      <div className="cp-section-content">
-        <div className="cp-section-inner">{children}</div>
-      </div>
+      {isExpanded ? (
+        <div className="cp-section-content">
+          <div className="cp-section-inner">{children}</div>
+        </div>
+      ) : null}
     </div>
   );
 };

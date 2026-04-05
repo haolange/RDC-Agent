@@ -4,6 +4,7 @@
  * 检查 .rdc 文件存在性、平台兼容性
  */
 
+import { randomUUID } from 'crypto';
 import type { GraphState } from '../../../shared/types/workflow';
 import { harnessController } from '../HarnessController';
 import { BLOCKER_CODES } from '../../../shared/constants/blockers';
@@ -40,7 +41,7 @@ export async function entryGateNode(
         runId: state.runId,
         currentStage: state.currentStage,
       },
-      'entry_gate_passed'
+      'entry_gate'
     )
   );
 
@@ -88,7 +89,7 @@ export async function entryGateNode(
 
     // 记录 entry_gate 完成
     evidenceChain.push({
-      eventId: crypto.randomUUID(),
+      eventId: randomUUID(),
       eventType: 'entry_gate_complete',
       agentId: 'rdc-debugger',
       status: gateResult.status,
@@ -115,7 +116,7 @@ export async function entryGateNode(
     }
 
     return {
-      currentStage: 'entry_gate_passed',
+      currentStage: 'entry_gate',
       stageHistory: [state.currentStage],
       evidenceChain,
       blockers,
@@ -145,7 +146,7 @@ export async function entryGateNode(
     });
 
     return {
-      currentStage: 'entry_gate_passed',
+      currentStage: 'entry_gate',
       stageHistory: [state.currentStage],
       evidenceChain,
       blockers,
@@ -191,9 +192,9 @@ export function routeAfterEntryGate(state: GraphState): string {
   );
 
   if (hasCriticalBlocker) {
-    return 'validation_blocked';
+    return 'blocked';
   }
 
-  // 正常流程：进入 intake_init
-  return 'intake_init';
+  // 正常流程：进入 intake_gate
+  return 'intake_gate';
 }

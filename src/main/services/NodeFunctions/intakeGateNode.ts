@@ -6,6 +6,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { randomUUID } from 'crypto';
 import type { GraphState } from '../../../shared/types/workflow';
 import { storageAdapter } from '../StorageAdapter';
 import { harnessController } from '../HarnessController';
@@ -45,6 +46,27 @@ async function readCaseInput(
   }
 }
 
+function buildSyntheticCaseInput(state: GraphState): Record<string, unknown> {
+  return {
+    session: {
+      case_id: state.caseId,
+      run_id: state.runId,
+      session_id: state.sessionId,
+    },
+    symptom: {
+      description: state.userGoal,
+    },
+    captures: state.capturePaths.map((capturePath, index) => ({
+      capture_id: `capture-${index}`,
+      capture_role: index === 0 ? 'primary' : 'reference',
+      path: capturePath,
+    })),
+    reference_contract: {
+      source_refs: state.capturePaths.slice(1),
+    },
+  };
+}
+
 /**
  * 读取 capture_refs
  */
@@ -81,13 +103,13 @@ export async function intakeGateNode(
         runId: state.runId,
         currentStage: state.currentStage,
       },
-      'intake_gate_passed'
+      'intake_gate'
     )
   );
 
   try {
     // 读取 case_input
-    const caseInput = await readCaseInput(state.caseId, state.runId);
+    const caseInput = await readCaseInput(state.caseId, state.runId) ?? buildSyntheticCaseInput(state);
     const captureRefs = extractCaptureRefs(caseInput);
 
     // 调用 HarnessController 执行 IntakeGate 检查
@@ -132,8 +154,8 @@ export async function intakeGateNode(
       }
     }
 
-    // 额外的 fix_reference 检查（如果配置要求）
-    if (config.requireFixReference !== false) {
+    // fix_reference 只在显式要求时才作为硬阻断；单 capture Debugger 流默认允许继续
+    if (config.requireFixReference === true) {
       const referenceContract = caseInput?.reference_contract as Record<string, unknown> | undefined;
       if (!referenceContract || !referenceContract.source_refs) {
         const exists = blockers.some(
@@ -171,7 +193,7 @@ export async function intakeGateNode(
 
     // 记录 intake_gate 完成
     evidenceChain.push({
-      eventId: crypto.randomUUID(),
+      eventId: randomUUID(),
       eventType: 'intake_gate_complete',
       agentId: 'rdc-debugger',
       status: gateResult.status,
@@ -187,7 +209,7 @@ export async function intakeGateNode(
     });
 
     return {
-      currentStage: 'intake_gate_passed',
+      currentStage: 'intake_gate',
       stageHistory: [state.currentStage],
       evidenceChain,
       blockers,
@@ -217,7 +239,7 @@ export async function intakeGateNode(
     });
 
     return {
-      currentStage: 'intake_gate_passed',
+      currentStage: 'intake_gate',
       stageHistory: [state.currentStage],
       evidenceChain,
       blockers,
@@ -236,9 +258,9 @@ export function routeAfterIntakeGate(state: GraphState): string {
   );
 
   if (hasCriticalBlocker) {
-    return 'validation_blocked';
+    return 'blocked';
   }
 
-  // 正常流程：进入 specialist_dispatch
-  return 'specialist_dispatch';
+  // 正常流程：进入 plan
+  return 'plan';
 }

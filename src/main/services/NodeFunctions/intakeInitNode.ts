@@ -6,6 +6,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { randomUUID } from 'crypto';
 import type { GraphState, CaptureInfo, CaptureMetadata } from '../../../shared/types/workflow';
 import { storageAdapter } from '../StorageAdapter';
 import { BLOCKER_CODES } from '../../../shared/constants/blockers';
@@ -69,7 +70,7 @@ export async function intakeInitNode(
   const artifacts: GraphState['artifacts'] = [...state.artifacts];
   let captureInfo: CaptureInfo | undefined = state.captureInfo;
 
-  // 记录进入 intake_init 阶段
+  // intake_init 是 intake_gate 的内部准备步骤，不改变对外阶段语义
   evidenceChain.push(
     createStageTransitionEvidence(
       {
@@ -77,7 +78,7 @@ export async function intakeInitNode(
         runId: state.runId,
         currentStage: state.currentStage,
       },
-      'accepted_intake_initialized'
+      'intake_gate'
     )
   );
 
@@ -192,7 +193,7 @@ export async function intakeInitNode(
 
     // 记录 intake_init 完成
     evidenceChain.push({
-      eventId: crypto.randomUUID(),
+      eventId: randomUUID(),
       eventType: 'intake_init_complete',
       agentId: 'rdc-debugger',
       status: 'ok',
@@ -217,7 +218,7 @@ export async function intakeInitNode(
     });
 
     return {
-      currentStage: 'accepted_intake_initialized',
+      currentStage: 'intake_gate',
       stageHistory: [state.currentStage],
       evidenceChain,
       captureInfo,
@@ -249,7 +250,7 @@ export async function intakeInitNode(
     });
 
     return {
-      currentStage: 'accepted_intake_initialized',
+      currentStage: 'intake_gate',
       stageHistory: [state.currentStage],
       evidenceChain,
       blockers,
@@ -268,7 +269,7 @@ export function routeAfterIntakeInit(state: GraphState): string {
   );
 
   if (hasCriticalBlocker) {
-    return 'validation_blocked';
+    return 'blocked';
   }
 
   // 正常流程：进入 intake_gate

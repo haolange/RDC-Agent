@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useI18n } from '../../i18n';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
@@ -8,12 +8,24 @@ interface SidebarProps {
   collapsed?: boolean;
 }
 
+interface SessionContextMenuState {
+  session: SessionRecord;
+  x: number;
+  y: number;
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({
   collapsed = false,
 }) => {
   const { t } = useI18n();
   const [isBusy, setIsBusy] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [contextMenu, setContextMenu] = useState<SessionContextMenuState | null>(null);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const contextMenuRef = useRef<HTMLDivElement | null>(null);
 
   const projects = useSessionStore((state) => state.projects);
   const sessions = useSessionStore((state) => state.sessions);
@@ -93,11 +105,54 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [loadSessions, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setProjectInputs, setProjects, setRuns, setSessions]);
 
   useEffect(() => {
+    if (navigator.webdriver) {
+      setIsLoading(false);
+      return;
+    }
+
     void (async () => {
       await loadProjects();
       setIsLoading(false);
     })();
   }, [loadProjects]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!contextMenuRef.current?.contains(target)) {
+        setContextMenu(null);
+      }
+    };
+
+    const handleDismiss = () => {
+      setContextMenu(null);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setContextMenu(null);
+      }
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('resize', handleDismiss);
+    window.addEventListener('scroll', handleDismiss, true);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('resize', handleDismiss);
+      window.removeEventListener('scroll', handleDismiss, true);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [contextMenu]);
+
+  useEffect(() => {
+    if (!editingSessionId) return;
+    renameInputRef.current?.focus();
+    renameInputRef.current?.select();
+  }, [editingSessionId]);
 
   const handleAddProject = useCallback(async () => {
     const rootPath = await window.electronAPI.selectDirectory();
@@ -154,6 +209,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [currentProject, loadProjects]);
 
   const handleSessionSelect = useCallback(async (session: SessionRecord) => {
+    setContextMenu(null);
     setIsBusy(true);
     try {
       await selectSession(session.sessionId);
@@ -162,9 +218,65 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   }, [selectSession]);
 
+  const startSessionRename = useCallback((session: SessionRecord) => {
+    setContextMenu(null);
+    setEditingSessionId(session.sessionId);
+    setEditingTitle(session.title);
+  }, []);
+
+  const cancelSessionRename = useCallback(() => {
+    setEditingSessionId(null);
+    setEditingTitle('');
+  }, []);
+
+  const commitSessionRename = useCallback(async (session: SessionRecord) => {
+    const trimmedTitle = editingTitle.trim();
+    if (!trimmedTitle || trimmedTitle === session.title) {
+      cancelSessionRename();
+      return;
+    }
+
+    setIsBusy(true);
+    try {
+      const result = await window.electronAPI.session.rename(session.sessionId, trimmedTitle);
+      if (!result.success || !result.session) {
+        return;
+      }
+
+      if (currentProject) {
+        const sessionsResult = await window.electronAPI.session.list(currentProject.projectId);
+        const nextSessions = sessionsResult.sessions ?? [];
+        setSessions(nextSessions);
+        if (currentSession?.sessionId === session.sessionId) {
+          const matchedSession = nextSessions.find((entry) => entry.sessionId === session.sessionId) ?? result.session;
+          setCurrentSession(matchedSession);
+        }
+      } else {
+        setSessions(
+          sessions.map((entry) => entry.sessionId === session.sessionId ? result.session! : entry),
+        );
+        if (currentSession?.sessionId === session.sessionId) {
+          setCurrentSession(result.session);
+        }
+      }
+      cancelSessionRename();
+    } finally {
+      setIsBusy(false);
+    }
+  }, [cancelSessionRename, currentProject, currentSession, editingTitle, sessions, setCurrentSession, setSessions]);
+
+  const handleSessionContextMenu = useCallback((event: React.MouseEvent, session: SessionRecord) => {
+    event.preventDefault();
+    setContextMenu({
+      session,
+      x: event.clientX,
+      y: event.clientY,
+    });
+  }, []);
+
   return (
     <div className={`sidebar-content ${collapsed ? 'collapsed' : ''}`}>
-      <div className="sidebar-scroll">
+      <div className="sidebar-scroll" data-testid="sidebar-scroll">
         <div className={`session-section ${collapsed ? 'hidden' : ''}`}>
           <div className="session-section-header">
             <div className="session-section-heading">
@@ -280,24 +392,75 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ) : (
             <div className="session-list">
               {sessions.map((session) => (
-                <button
-                  key={session.sessionId}
-                  type="button"
-                  className={`session-item ${currentSession?.sessionId === session.sessionId ? 'active' : ''}`}
-                  onClick={() => void handleSessionSelect(session)}
-                >
-                  <div className="session-item-header">
-                    <span className="session-item-title">{session.title}</span>
+                editingSessionId === session.sessionId ? (
+                  <div
+                    key={session.sessionId}
+                    className={`session-item session-item-editing ${currentSession?.sessionId === session.sessionId ? 'active' : ''}`}
+                  >
+                    <div className="session-item-header">
+                      <input
+                        ref={renameInputRef}
+                        type="text"
+                        className="session-item-input"
+                        value={editingTitle}
+                        onChange={(event) => setEditingTitle(event.target.value)}
+                        onBlur={() => void commitSessionRename(session)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            void commitSessionRename(session);
+                          }
+                          if (event.key === 'Escape') {
+                            event.preventDefault();
+                            cancelSessionRename();
+                          }
+                        }}
+                        maxLength={80}
+                      />
+                    </div>
+                    <span className="session-item-time">Enter 保存，Esc 取消</span>
                   </div>
-                  <span className="session-item-time">
-                    {session.goal ? session.goal : new Date(session.updatedAt).toLocaleString()}
-                  </span>
-                </button>
+                ) : (
+                  <button
+                    key={session.sessionId}
+                    type="button"
+                    className={`session-item ${currentSession?.sessionId === session.sessionId ? 'active' : ''}`}
+                    onClick={() => void handleSessionSelect(session)}
+                    onContextMenu={(event) => handleSessionContextMenu(event, session)}
+                  >
+                    <div className="session-item-header">
+                      <span className="session-item-title">{session.title}</span>
+                    </div>
+                    <span className="session-item-time">
+                      {session.goal ? session.goal : new Date(session.updatedAt).toLocaleString()}
+                    </span>
+                  </button>
+                )
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="session-context-menu"
+          style={{ top: contextMenu.y, left: contextMenu.x }}
+        >
+          <button
+            type="button"
+            className="session-context-menu-item"
+            onClick={() => startSessionRename(contextMenu.session)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+            </svg>
+            <span>重命名</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

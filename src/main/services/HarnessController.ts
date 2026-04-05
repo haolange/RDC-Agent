@@ -13,7 +13,6 @@ import type { ActionEvent } from '@shared/types/evidence';
 // 导入新 Session 类型（Task 1 已完成）
 import type { CaptureDescriptor } from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
-import { workflowEngine } from './WorkflowEngine';
 import { storageAdapter } from './StorageAdapter';
 // 导入 settingsService（Task 6 已完成）
 import { settingsService } from './SettingsService';
@@ -436,16 +435,6 @@ export class HarnessController {
           'Run is frozen due to process deviation',
           freeze.blocking_codes || []
         ));
-      }
-    }
-
-    // 如果发现blockers，自动更新workflow状态
-    if (blockers.length > 0) {
-      const state = workflowEngine.getState();
-      if (state && state.currentStage !== 'validation_blocked') {
-        for (const blocker of blockers) {
-          await workflowEngine.enterBlockedState(blocker);
-        }
       }
     }
 

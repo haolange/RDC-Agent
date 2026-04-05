@@ -1,4 +1,5 @@
 import type { AgentRole } from './agent';
+import type { ExecutionModeProfileDescriptor } from './profile';
 
 export type AppTheme = 'dark' | 'light' | 'system';
 export type ResolvedTheme = 'dark' | 'light';
@@ -52,6 +53,10 @@ export interface AppRuntimePaths {
   projectsPath: string;
   knowledgePath: string;
   migrationOrphansPath: string;
+  profilesPath: string;
+  policiesPath: string;
+  secretsPath: string;
+  migrationReportsPath: string;
 }
 
 export interface LlmProviderModel {
@@ -66,6 +71,8 @@ export interface LlmProviderEntry {
   label: string;
   enabled: boolean;
   apiKey: string;
+  secretRef?: string;
+  hasStoredSecret: boolean;
   baseUrl?: string;
   models: LlmProviderModel[];
   recommendedModels: string[];
@@ -84,12 +91,28 @@ export interface LlmSettings {
   agentRoutes: LlmAgentRoute[];
 }
 
+export interface SettingsDiagnostic {
+  code: string;
+  severity: 'error' | 'warning' | 'info';
+  message: string;
+  path?: string;
+}
+
+export interface ConfigurationSettings {
+  activeModeProfileId: string;
+  availableModeProfiles: ExecutionModeProfileDescriptor[];
+  lastMigrationReportPath?: string;
+  lastMigrationSummary: string[];
+  diagnostics: SettingsDiagnostic[];
+}
+
 export interface AppSettings {
   appearance: UiPreferences;
   layout: LayoutPreferences;
   profile: ProfileSettings;
   workspace: WorkspaceSettings;
   llm: LlmSettings;
+  configuration: ConfigurationSettings;
   paths: AppRuntimePaths;
 }
 
@@ -105,4 +128,5 @@ export type AppSettingsPatch = Partial<{
     providers: LlmProviderEntry[];
     agentRoutes: LlmAgentRoute[];
   }>;
+  configuration: Partial<ConfigurationSettings>;
 }>;

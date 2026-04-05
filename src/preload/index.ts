@@ -5,6 +5,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { AppSettings, AppSettingsPatch } from '@shared/types/settings';
 import type { OpenedCaptureState, ProjectInputRecord, ProjectRecord, SessionRecord } from '@shared/types/session';
+import type { RuntimeLogEntry, RuntimeLogScope } from '@shared/types/runtimeLog';
 
 const listenerMap = new Map<string, Map<(...args: unknown[]) => void, (...args: unknown[]) => void>>();
 
@@ -26,6 +27,7 @@ const validChannels = [
   'context:changed',
   'project:inputsChanged',
   'capture:openedStateChanged',
+  'runtime:logAppended',
 ] as const;
 
 const isValidChannel = (channel: string): channel is (typeof validChannels)[number] => {
@@ -86,6 +88,7 @@ const electronAPI = {
 
   settings: {
     get: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
+    getProviderSecret: (providerId: string): Promise<string> => ipcRenderer.invoke('settings:getProviderSecret', providerId),
     set: (settings: AppSettingsPatch): Promise<AppSettings> => ipcRenderer.invoke('settings:set', settings),
   },
 
@@ -113,6 +116,8 @@ const electronAPI = {
     list: (projectId?: string): Promise<{ sessions: SessionRecord[] }> => ipcRenderer.invoke('session:list', projectId),
     create: (projectId: string, title?: string): Promise<{ success: boolean; session?: SessionRecord; error?: string }> =>
       ipcRenderer.invoke('session:create', projectId, title),
+    rename: (id: string, title: string): Promise<{ success: boolean; session?: SessionRecord; error?: string }> =>
+      ipcRenderer.invoke('session:rename', id, title),
     select: (id: string): Promise<unknown> => ipcRenderer.invoke('session:select', id),
   },
 
@@ -120,8 +125,12 @@ const electronAPI = {
     list: (sessionId: string): Promise<unknown> => ipcRenderer.invoke('run:list', sessionId),
   },
 
+  runtimeLog: {
+    list: (request: { scope: RuntimeLogScope; sessionId?: string | null }): Promise<{ entries: RuntimeLogEntry[] }> =>
+      ipcRenderer.invoke('runtimeLog:list', request),
+  },
+
   capture: {
-    open: (filePath?: string): Promise<unknown> => ipcRenderer.invoke('capture:open', filePath),
     list: (): Promise<unknown> => ipcRenderer.invoke('capture:list'),
     select: (captureId: string): Promise<unknown> => ipcRenderer.invoke('capture:select', captureId),
     openProjectInput: (
@@ -169,6 +178,9 @@ const electronAPI = {
     },
     onOpenedCaptureStateChanged: (callback: (state: OpenedCaptureState | null) => void): void => {
       ipcRenderer.on('capture:openedStateChanged', (_event, payload) => callback(payload));
+    },
+    onRuntimeLogAppended: (callback: (entry: RuntimeLogEntry) => void): void => {
+      ipcRenderer.on('runtime:logAppended', (_event, payload) => callback(payload));
     },
     onAppThemeChanged: (callback: (theme: 'dark' | 'light') => void): void => {
       ipcRenderer.on('app:themeChanged', (_event, theme) => callback(theme));

@@ -3,14 +3,15 @@
  * 调用 curator_agent 生成最终报告，汇总全部证据链
  */
 
+import { randomUUID } from 'crypto';
 import type { GraphState, Report } from '../../../shared/types/workflow';
 import type { LLMRequest } from '../../../shared/types/llm';
 import { llmAdapter } from '../../adapters/LLMAdapter';
-import { DEFAULT_MODEL_ROUTING } from '../../../shared/constants/agents';
 import {
   createStageTransitionEvidence,
   createArtifact,
   nowIso,
+  resolveAgentRuntimeConfig,
 } from './utils';
 
 /** Curator 节点配置 */
@@ -181,26 +182,26 @@ export async function curatorNode(
         runId: state.runId,
         currentStage: state.currentStage,
       },
-      'curator_ready',
+      'curate',
       'curator_agent'
     )
   );
 
   try {
     // 使用 curator_agent 的配置
-    const modelConfig = DEFAULT_MODEL_ROUTING['curator_agent'];
+    const modelConfig = resolveAgentRuntimeConfig('curator_agent', 'curate');
     const request: LLMRequest = {
       messages: [
         { role: 'system', content: buildCuratorSystemPrompt() },
         { role: 'user', content: buildCuratorPrompt(state) },
       ],
-      model: modelConfig.model,
+      model: modelConfig.modelId,
       maxTokens: 4096,
       temperature: 0.3,
     };
 
     // 调用 LLM
-    const response = await llmAdapter.chat(request, modelConfig.provider);
+    const response = await llmAdapter.chat(request, modelConfig.providerId);
 
     const reportContent = typeof response.content === 'string'
       ? response.content
@@ -219,7 +220,7 @@ export async function curatorNode(
 
     // 记录报告生成证据
     evidenceChain.push({
-      eventId: crypto.randomUUID(),
+      eventId: randomUUID(),
       eventType: 'curator_report_generated',
       agentId: 'curator_agent',
       status: 'ok',
@@ -235,7 +236,7 @@ export async function curatorNode(
     });
 
     return {
-      currentStage: 'curator_ready',
+      currentStage: 'curate',
       stageHistory: [state.currentStage],
       evidenceChain,
       artifacts: [...state.artifacts, ...artifacts],
@@ -245,7 +246,7 @@ export async function curatorNode(
   } catch (error) {
     // 记录错误
     evidenceChain.push({
-      eventId: crypto.randomUUID(),
+      eventId: randomUUID(),
       eventType: 'curator_report_error',
       agentId: 'curator_agent',
       status: 'error',
@@ -271,7 +272,7 @@ export async function curatorNode(
     };
 
     return {
-      currentStage: 'curator_ready',
+      currentStage: 'curate',
       stageHistory: [state.currentStage],
       evidenceChain,
       finalReport: errorReport,
@@ -291,13 +292,13 @@ export function routeAfterCurator(state: GraphState): string {
   );
 
   if (hasCriticalBlocker) {
-    return 'validation_blocked';
+    return 'blocked';
   }
 
   // 检查是否有最终报告
   if (!state.finalReport) {
     // 报告生成失败，可能需要重试
-    return 'curator';
+    return 'curate';
   }
 
   // 正常流程：进入 finalize

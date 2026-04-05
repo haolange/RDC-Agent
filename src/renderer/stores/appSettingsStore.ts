@@ -52,6 +52,12 @@ const DEFAULT_SETTINGS: AppSettings = {
     providers: [],
     agentRoutes: createEmptyAgentRoutes(),
   },
+  configuration: {
+    activeModeProfileId: 'debugger.default',
+    availableModeProfiles: [],
+    diagnostics: [],
+    lastMigrationSummary: [],
+  },
   paths: {
     workspaceRoot: '',
     defaultWorkspaceRoot: '',
@@ -61,6 +67,10 @@ const DEFAULT_SETTINGS: AppSettings = {
     projectsPath: '',
     knowledgePath: '',
     migrationOrphansPath: '',
+    profilesPath: '',
+    policiesPath: '',
+    secretsPath: '',
+    migrationReportsPath: '',
   },
 };
 

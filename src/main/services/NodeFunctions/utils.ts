@@ -3,14 +3,19 @@
  * 提供证据创建、状态投影、阻断检查等工具函数
  */
 
+import { randomUUID } from 'crypto';
 import type {
   GraphState,
   WorkflowStage,
+  WorkflowPhase,
   Blocker,
   WorkflowState,
   SpecialistState,
 } from '../../../shared/types/workflow';
 import type { AgentRole } from '../../../shared/types/agent';
+import type { EffectiveAgentRuntimeConfig } from '../../../shared/types/profile';
+import { settingsService } from '../SettingsService';
+import { executionProfileService } from '../ExecutionProfileService';
 
 /** 证据链事件 */
 export interface EvidenceEvent {
@@ -38,7 +43,7 @@ export function createStageTransitionEvidence(
   agentId: AgentRole = 'rdc-debugger'
 ): EvidenceEvent {
   return {
-    eventId: crypto.randomUUID(),
+    eventId: randomUUID(),
     eventType: 'workflow_stage_transition',
     agentId,
     status: 'ok',
@@ -61,7 +66,7 @@ export function createToolExecutionEvidence(
   agentId: AgentRole = 'rdc-debugger'
 ): EvidenceEvent {
   return {
-    eventId: crypto.randomUUID(),
+    eventId: randomUUID(),
     eventType: 'tool_execution',
     agentId,
     status: result.ok ? 'ok' : 'error',
@@ -86,7 +91,7 @@ export function createDispatchEvidence(
   agentId: AgentRole = 'rdc-debugger'
 ): EvidenceEvent {
   return {
-    eventId: crypto.randomUUID(),
+    eventId: randomUUID(),
     eventType: 'dispatch',
     agentId,
     status: 'sent',
@@ -110,7 +115,7 @@ export function createSpecialistCompleteEvidence(
   artifacts: string[]
 ): EvidenceEvent {
   return {
-    eventId: crypto.randomUUID(),
+    eventId: randomUUID(),
     eventType: 'specialist_complete',
     agentId,
     status: 'ok',
@@ -196,7 +201,7 @@ export function createArtifact(
   agentId: AgentRole
 ): Artifact {
   return {
-    id: crypto.randomUUID(),
+    id: randomUUID(),
     type,
     path,
     agentId,
@@ -221,20 +226,19 @@ export function generateEventId(prefix: string = 'evt'): string {
 
 /** 阶段转换映射（从 WorkflowEngine 迁移） */
 export const STAGE_TRANSITIONS: Record<WorkflowStage, WorkflowStage[]> = {
-  'preflight_pending': ['intent_gate_passed'],
-  'intent_gate_passed': ['entry_gate_passed'],
-  'entry_gate_passed': ['accepted_intake_initialized'],
-  'accepted_intake_initialized': ['intake_gate_passed'],
-  'intake_gate_passed': ['waiting_for_specialist_brief'],
-  'waiting_for_specialist_brief': ['specialist_briefs_collected', 'validation_blocked'],
-  'specialist_briefs_collected': ['expert_investigation_complete', 'waiting_for_specialist_brief'],
-  'expert_investigation_complete': ['fix_verification_complete', 'validation_blocked'],
-  'fix_verification_complete': ['skeptic_ready', 'validation_blocked'],
-  'skeptic_ready': ['curator_ready', 'fix_verification_complete'],
-  'curator_ready': ['finalized'],
-  'finalized': [],
-  'validation_blocked': ['expert_investigation_complete', 'fix_verification_complete'],
-  'awaiting_user_input': ['intake_gate_passed', 'waiting_for_specialist_brief'],
+  preflight: ['entry_gate'],
+  entry_gate: ['intake_gate'],
+  intake_gate: ['plan'],
+  plan: ['speclist'],
+  speclist: ['dispatch'],
+  dispatch: ['investigate', 'blocked'],
+  investigate: ['fix_verify', 'blocked'],
+  fix_verify: ['skepti', 'blocked'],
+  skepti: ['curate', 'fix_verify', 'blocked'],
+  curate: ['finalize', 'blocked'],
+  finalize: [],
+  blocked: ['investigate', 'fix_verify'],
+  awaiting_user_input: ['plan', 'dispatch'],
 };
 
 /** 获取下一个阶段 */
@@ -251,7 +255,7 @@ export function getNextStage(
   }
   
   // 返回第一个非阻断阶段
-  return allowed.find(s => s !== 'validation_blocked') || null;
+  return allowed.find((s) => s !== 'blocked') || null;
 }
 
 /** 检查阶段转换是否允许 */
@@ -261,4 +265,16 @@ export function isTransitionAllowed(
 ): boolean {
   const allowed = STAGE_TRANSITIONS[fromStage];
   return allowed?.includes(toStage) ?? false;
+}
+
+export function resolveAgentRuntimeConfig(
+  agentId: AgentRole,
+  stageId: WorkflowStage,
+): EffectiveAgentRuntimeConfig {
+  const settings = settingsService.getAll();
+  return executionProfileService.resolveAgentRuntimeProfile(settings, stageId, agentId);
+}
+
+export function resolveWorkflowPhase(stageId: WorkflowStage): WorkflowPhase {
+  return resolveAgentRuntimeConfig('rdc-debugger', stageId).phase;
 }

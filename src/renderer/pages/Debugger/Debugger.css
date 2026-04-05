@@ -1,7 +1,8 @@
 .debugger-page {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
   background:
     radial-gradient(circle at top, rgb(var(--color-accent-500) / 0.04), transparent 24%),
@@ -9,11 +10,17 @@
 }
 
 .debugger-workspace {
-  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .workspace-shell {
   position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   min-height: 100%;
   padding: 28px;
 }

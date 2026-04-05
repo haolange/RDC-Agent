@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useDeviceStore } from '../../stores/deviceStore';
-import type { CaptureDescriptor, ProjectInputRecord } from '@shared/types/session';
+import type { ProjectInputRecord } from '@shared/types/session';
+import { useI18n } from '../../i18n';
+import { ProjectPreview } from './ProjectPreview';
 
 const formatSize = (size: number): string => {
   if (size >= 1024 * 1024) {
@@ -13,21 +15,15 @@ const formatSize = (size: number): string => {
   return `${size} B`;
 };
 
-const createImportedCapture = (input: ProjectInputRecord, existingCount: number): CaptureDescriptor => ({
-  id: input.inputId,
-  filePath: input.filePath,
-  role: existingCount === 0 ? 'primary' : 'reference',
-  backendHint: 'local',
-  status: 'pending',
-});
-
 export const ProjectInputs: React.FC = () => {
+  const { t } = useI18n();
+  const currentRun = useSessionStore((state) => state.currentRun);
   const currentProject = useSessionStore((state) => state.currentProject);
   const projectInputs = useSessionStore((state) => state.projectInputs);
-  const captures = useSessionStore((state) => state.captures);
   const openedCapture = useSessionStore((state) => state.openedCapture);
-  const addCapture = useSessionStore((state) => state.addCapture);
+  const setCaptures = useSessionStore((state) => state.setCaptures);
   const setProjectInputs = useSessionStore((state) => state.setProjectInputs);
+  const setContextSnapshot = useSessionStore((state) => state.setContextSnapshot);
   const setOpenedCapture = useSessionStore((state) => state.setOpenedCapture);
 
   const selectedDevice = useDeviceStore((state) => state.selectedDevice);
@@ -42,6 +38,10 @@ export const ProjectInputs: React.FC = () => {
     () => devices.find((device) => device.id === selectedDevice) ?? devices[0] ?? null,
     [devices, selectedDevice],
   );
+
+  const activeOpenedCapture = currentProject && openedCapture?.projectId === currentProject.projectId
+    ? openedCapture
+    : null;
 
   const handleRefresh = async () => {
     if (!currentProject) return;
@@ -67,15 +67,19 @@ export const ProjectInputs: React.FC = () => {
     }
   };
 
-  const handleAddToSession = (input: ProjectInputRecord) => {
-    addCapture(createImportedCapture(input, captures.length));
-    setErrorMessage(null);
-  };
-
   const handleOpen = async (input: ProjectInputRecord) => {
+    if (currentRun) {
+      setErrorMessage(t('control.projectInputsLocked'));
+      return;
+    }
     if (!currentProject || !selectedDeviceEntry) return;
     setOpeningId(input.inputId);
     try {
+      await window.electronAPI.capture.clearOpenedState();
+      setOpenedCapture(null);
+      setContextSnapshot(null);
+      setCaptures([]);
+
       if (
         selectedDeviceEntry.type === 'android'
         && !['connected', 'online'].includes(selectedDeviceEntry.status)
@@ -91,6 +95,10 @@ export const ProjectInputs: React.FC = () => {
       });
       if (result.success) {
         setOpenedCapture(result.openedCapture ?? null);
+        if (result.contextSnapshot) {
+          setContextSnapshot(result.contextSnapshot);
+          setCaptures(result.contextSnapshot.captureDescriptors ?? []);
+        }
         setErrorMessage(null);
       } else {
         setErrorMessage(result.error ?? '打开失败。');
@@ -106,10 +114,11 @@ export const ProjectInputs: React.FC = () => {
 
   return (
     <div className="project-inputs">
-      <div className="project-inputs-toolbar">
+      <div className="project-inputs-toolbar" data-testid="project-inputs-toolbar">
         <button
           type="button"
           className="context-action-btn"
+          data-testid="project-inputs-refresh"
           onClick={() => void handleRefresh()}
           disabled={isRefreshing}
         >
@@ -118,6 +127,7 @@ export const ProjectInputs: React.FC = () => {
         <button
           type="button"
           className="context-action-btn"
+          data-testid="project-inputs-import"
           onClick={() => void handleImport()}
           disabled={isImporting}
         >
@@ -125,7 +135,13 @@ export const ProjectInputs: React.FC = () => {
         </button>
       </div>
 
+      <ProjectPreview
+        openedCapture={activeOpenedCapture}
+        isLoading={Boolean(openingId)}
+      />
+
       {errorMessage && <div className="project-inputs-error">{errorMessage}</div>}
+      {currentRun && <div className="project-inputs-run-lock">{t('control.projectInputsLocked')}</div>}
 
       {projectInputs.length === 0 ? (
         <div className="project-inputs-empty">
@@ -134,10 +150,13 @@ export const ProjectInputs: React.FC = () => {
       ) : (
         <div className="project-inputs-list">
           {projectInputs.map((input) => {
-            const imported = captures.some((capture) => capture.id === input.inputId);
-            const isOpened = openedCapture?.inputId === input.inputId && openedCapture.status === 'open';
+            const isOpened = activeOpenedCapture?.inputId === input.inputId && activeOpenedCapture.status === 'open';
             return (
-              <div key={input.inputId} className={`project-input-item ${isOpened ? 'opened' : ''}`}>
+              <div
+                key={input.inputId}
+                className={`project-input-item ${isOpened ? 'opened' : ''}`}
+                data-testid={`project-input-card-${input.inputId}`}
+              >
                 <div className="project-input-item-main">
                   <div className="project-input-item-copy">
                     <div className="project-input-item-name">{input.fileName}</div>
@@ -150,19 +169,14 @@ export const ProjectInputs: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="project-input-item-actions">
-                  <button
-                    type="button"
-                    className={`button button-sm ${imported ? 'button-secondary' : 'button-ghost'}`}
-                    onClick={() => handleAddToSession(input)}
-                  >
-                    {imported ? '已导入' : '导入'}
-                  </button>
+                <div className="project-input-item-actions" data-testid={`project-input-actions-${input.inputId}`}>
                   <button
                     type="button"
                     className="button button-primary button-sm"
+                    data-testid={`project-input-open-${input.inputId}`}
                     onClick={() => void handleOpen(input)}
-                    disabled={openingId === input.inputId}
+                    disabled={Boolean(currentRun) || openingId === input.inputId}
+                    title={currentRun ? t('control.projectInputsLocked') : undefined}
                   >
                     {openingId === input.inputId ? '打开中…' : '打开'}
                   </button>

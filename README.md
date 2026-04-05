@@ -2,7 +2,7 @@
 
 `RDC-Agent` 是一个面向 `RenderDoc` `.rdc` capture 的桌面调试代理框架，使用 `Electron + React + TypeScript` 构建。
 
-它的目标不是做一个通用聊天客户端，而是把一次图形渲染问题排查拆成可编排的多角色协作流程。当前仓库已经实现了基本的 `Debugger` 入口、工作流引擎、Agent 编排层和证据/Artifact 展示框架。
+它的目标不是做一个通用聊天客户端，而是把一次图形渲染问题排查拆成可编排的多角色协作流程。当前仓库已经收敛到单一 `Debugger` 入口，并围绕它实现工作流图、Agent 编排层和证据/Artifact 展示框架。
 
 ## 它能做什么
 
@@ -16,11 +16,9 @@
 - 用工作流状态机控制阶段推进、阻断处理和受控回转。
 - 在界面中展示会话状态、证据链和中间产物。
 
-## 目前的界面
+## 当前界面
 
-- `Debugger`：主入口，顶部 titlebar 中央切换模式，右侧栏负责 `Project Inputs`、`Capture Control` 和 `Context Info`。
-- `Analyzer`：预留入口，当前仍是占位。
-- `Optimizer`：预留入口，当前仍是占位。
+- `Debugger`：唯一生产入口，顶部 titlebar 直接显示当前模式，右侧栏负责 `Project Inputs`、`Capture Control` 和 `Context Info`。
 
 ## 代码结构
 
@@ -48,6 +46,10 @@
 - `<workspace-root>/projects/`
 - `<workspace-root>/knowledge/`
 - `<workspace-root>/migration-orphans/`
+- `<workspace-root>/profiles/`
+- `<workspace-root>/policies/`
+- `<workspace-root>/secrets/`
+- `<workspace-root>/migration-reports/`
 
 `session/run` 主数据仍然不写回项目源码目录，也不再放回仓库根目录的 `workspace/` 中。
 
@@ -75,6 +77,6 @@ npm run dev
 
 ## 当前状态
 
-这个仓库看起来更像一个垂直领域的调试框架原型，核心重点在 `Debugger` 流程和多 Agent 编排。`Analyzer` 和 `Optimizer` 已经在导航里出现，但还没有完成实际功能。
+这个仓库当前聚焦在 `Debugger` 生产链路和多 Agent 编排。`Analyzer` 和 `Optimizer` 不属于本轮交付范围，也不再作为可用模式对外暴露。
 
 如果你想继续，我可以下一步把 `docs/` 里的设计文档也整理成一份更像“项目总览”的说明，或者直接补一版更细的开发约定。

@@ -2,22 +2,29 @@
  * Workflow Types - 工作流状态机相关类型定义
  */
 
-// 工作流阶段（12阶段 + 新增阻断/等待阶段）
+import type { ReplayDeviceEntry } from './device';
+import type { AppMode, CaptureDescriptor } from './session';
+
+// Debugger 工作流阶段（生产级单一路径）
 export type WorkflowStage =
-  | 'preflight_pending'
-  | 'intent_gate_passed'
-  | 'entry_gate_passed'
-  | 'accepted_intake_initialized'
-  | 'intake_gate_passed'
-  | 'waiting_for_specialist_brief'
-  | 'specialist_briefs_collected'
-  | 'expert_investigation_complete'
-  | 'fix_verification_complete'
-  | 'skeptic_ready'
-  | 'curator_ready'
-  | 'finalized'
-  | 'validation_blocked'      // 新增：发现blocker时的阻断态
-  | 'awaiting_user_input';    // 新增：等待用户输入
+  | 'preflight'
+  | 'entry_gate'
+  | 'intake_gate'
+  | 'plan'
+  | 'speclist'
+  | 'dispatch'
+  | 'investigate'
+  | 'fix_verify'
+  | 'skepti'
+  | 'curate'
+  | 'finalize'
+  | 'blocked'
+  | 'awaiting_user_input';
+
+export type WorkflowPhase =
+  | 'planner'
+  | 'generator'
+  | 'evaluator';
 
 // 工作流状态
 export interface WorkflowState {
@@ -112,6 +119,7 @@ export interface CaptureInfo {
 export interface SpecialistState {
   agentId: string;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'timeout';
+  objective?: string;
   brief?: string;
   artifacts: string[];
   startedAt?: string;
@@ -147,6 +155,11 @@ export interface GraphState {
   // 用户输入
   userGoal: string;
   capturePaths: string[];
+  captures: CaptureDescriptor[];
+  primaryCaptureId: string;
+  replayDevice: ReplayDeviceEntry | null;
+  mode: AppMode;
+  goal: string;
 
   // RDC 上下文
   captureInfo?: CaptureInfo;
@@ -202,7 +215,7 @@ export type GraphStateProjection = (graphState: GraphState) => WorkflowState;
 
 /** 模式能力定义 */
 export interface ModeCapabilities {
-  mode: 'debugger' | 'analyzer' | 'optimizer';
+  mode: 'debugger';
   availableStages: WorkflowStage[];
   requiresLLM: boolean;
   isFullyImplemented: boolean;

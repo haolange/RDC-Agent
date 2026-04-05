@@ -111,6 +111,14 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
   },
 ];
 
+export function isBuiltinProviderId(id: string): id is BuiltinLlmProviderId {
+  return BUILTIN_LLM_PROVIDER_DEFINITIONS.some((entry) => entry.id === id);
+}
+
+export function getBuiltinProviderDefinition(id: string): BuiltinProviderDefinition | null {
+  return BUILTIN_LLM_PROVIDER_DEFINITIONS.find((entry) => entry.id === id) ?? null;
+}
+
 const toModels = (modelIds: string[]): LlmProviderModel[] =>
   Array.from(new Set(modelIds)).map((modelId) => ({
     id: modelId,
@@ -119,7 +127,7 @@ const toModels = (modelIds: string[]): LlmProviderModel[] =>
   }));
 
 export const createBuiltinProviderEntry = (id: BuiltinLlmProviderId): LlmProviderEntry => {
-  const definition = BUILTIN_LLM_PROVIDER_DEFINITIONS.find((entry) => entry.id === id);
+  const definition = getBuiltinProviderDefinition(id);
   if (!definition) {
     throw new Error(`Unknown builtin provider: ${id}`);
   }
@@ -132,6 +140,7 @@ export const createBuiltinProviderEntry = (id: BuiltinLlmProviderId): LlmProvide
     label: definition.label,
     enabled: definition.enabled,
     apiKey: '',
+    hasStoredSecret: false,
     baseUrl: definition.baseUrl,
     models: toModels(defaultModels),
     recommendedModels: definition.recommendedModels,

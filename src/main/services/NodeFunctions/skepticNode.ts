@@ -3,14 +3,15 @@
  * 调用 skeptic_agent 进行独立验证，审查整个调查过程和修复方案
  */
 
+import { randomUUID } from 'crypto';
 import type { GraphState } from '../../../shared/types/workflow';
 import type { LLMRequest } from '../../../shared/types/llm';
 import { llmAdapter } from '../../adapters/LLMAdapter';
-import { DEFAULT_MODEL_ROUTING } from '../../../shared/constants/agents';
 import {
   createStageTransitionEvidence,
   createBlocker,
   nowIso,
+  resolveAgentRuntimeConfig,
 } from './utils';
 import { BLOCKER_CODES } from '../../../shared/constants/blockers';
 
@@ -125,7 +126,7 @@ export async function skepticNode(
         runId: state.runId,
         currentStage: state.currentStage,
       },
-      'skeptic_ready',
+      'skepti',
       'skeptic_agent'
     )
   );
@@ -135,19 +136,19 @@ export async function skepticNode(
 
   try {
     // 使用 skeptic_agent 的配置
-    const modelConfig = DEFAULT_MODEL_ROUTING['skeptic_agent'];
+    const modelConfig = resolveAgentRuntimeConfig('skeptic_agent', 'skepti');
     const request: LLMRequest = {
       messages: [
         { role: 'system', content: buildSkepticSystemPrompt() },
         { role: 'user', content: buildSkepticPrompt(state) },
       ],
-      model: modelConfig.model,
+      model: modelConfig.modelId,
       maxTokens: 4096,
       temperature: 0.2, // 较低温度以获得更批判性的分析
     };
 
     // 调用 LLM
-    const response = await llmAdapter.chat(request, modelConfig.provider);
+    const response = await llmAdapter.chat(request, modelConfig.providerId);
 
     const skepticResult = typeof response.content === 'string'
       ? response.content
@@ -168,7 +169,7 @@ export async function skepticNode(
 
     // 记录 skeptic 审查结果证据
     evidenceChain.push({
-      eventId: crypto.randomUUID(),
+      eventId: randomUUID(),
       eventType: 'skeptic_review_complete',
       agentId: 'skeptic_agent',
       status: skepticApproved ? 'ok' : 'warning',
@@ -193,7 +194,7 @@ export async function skepticNode(
           // 需要用户确认
           blockers.push(
             createBlocker(
-              BLOCKER_CODES.BLOCKED_VALIDATION_FAILED.code,
+              BLOCKER_CODES.BLOCKED_SKEPTIC_SIGNOFF_REQUIRED.code,
               `Skeptic rejected the investigation after ${maxRetries} attempts. User confirmation required.`,
               ['skeptic_rejected']
             )
@@ -205,7 +206,7 @@ export async function skepticNode(
     }
 
     return {
-      currentStage: 'skeptic_ready',
+      currentStage: 'skepti',
       stageHistory: [state.currentStage],
       evidenceChain,
       blockers: [...state.blockers, ...blockers],
@@ -215,7 +216,7 @@ export async function skepticNode(
   } catch (error) {
     // 记录错误
     evidenceChain.push({
-      eventId: crypto.randomUUID(),
+      eventId: randomUUID(),
       eventType: 'skeptic_review_error',
       agentId: 'skeptic_agent',
       status: 'error',
@@ -228,7 +229,7 @@ export async function skepticNode(
     });
 
     return {
-      currentStage: 'skeptic_ready',
+      currentStage: 'skepti',
       stageHistory: [state.currentStage],
       evidenceChain,
       lastUpdated: nowIso(),
@@ -247,7 +248,7 @@ export function routeAfterSkeptic(state: GraphState): string {
   );
 
   if (hasCriticalBlocker) {
-    return 'validation_blocked';
+    return 'blocked';
   }
 
   // 检查 skeptic 审查结果
@@ -262,11 +263,11 @@ export function routeAfterSkeptic(state: GraphState): string {
       const retryCount = state.backtrackCount['skeptic_rejected'] || 0;
       if (retryCount < 2) {
         // Backtrack 到 fix_verification 重新验证
-        return 'fix_verification';
+        return 'fix_verify';
       }
     }
   }
 
   // 正常流程：进入 curator
-  return 'curator';
+  return 'curate';
 }

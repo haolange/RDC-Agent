@@ -4,8 +4,6 @@
  */
 
 import { BrowserWindow } from 'electron';
-import * as fs from 'fs';
-import * as path from 'path';
 import type {
   AgentRole,
   AgentConfig,
@@ -13,6 +11,7 @@ import type {
   AgentMessage,
   WriteScope,
 } from '@shared/types/agent';
+import type { WorkflowStage } from '@shared/types/workflow';
 import {
   AGENT_DISPLAY_NAMES,
   AGENT_DESCRIPTIONS,
@@ -26,6 +25,9 @@ import { storageAdapter } from './StorageAdapter';
 import { harnessController } from './HarnessController';
 import { generateEventId, nowMs, nowIso } from '@shared/utils/id';
 import type { LLMConfig } from '@shared/types/llm';
+import { executionProfileService } from './ExecutionProfileService';
+import { settingsService } from './SettingsService';
+import { runtimeLogService } from './RuntimeLogService';
 
 // ============================================
 // Specialist 工具绑定（Task 4b）
@@ -212,65 +214,9 @@ export class AgentOrchestrator {
     }
   }
 
-  /**
-   * 加载Agent System Prompt
-   */
-  async loadAgentPrompt(agentId: AgentRole): Promise<string> {
-    // 从原框架加载prompt模板
-    const promptPath = this.getPromptPath(agentId);
-    if (promptPath && fs.existsSync(promptPath)) {
-      return fs.readFileSync(promptPath, 'utf-8');
-    }
-
-    // 返回默认prompt
-    return this.getDefaultPrompt(agentId);
-  }
-
-  /**
-   * 获取Prompt文件路径
-   */
-  private getPromptPath(agentId: AgentRole): string | null {
-    const promptFiles: Record<AgentRole, string> = {
-      'rdc-debugger': 'common/skills/rdc-debugger/SKILL.md',
-      'triage_agent': 'common/agents/02_triage_taxonomy.md',
-      'capture_repro_agent': 'common/agents/03_capture_repro.md',
-      'pass_graph_pipeline_agent': 'common/agents/04_pass_graph_pipeline.md',
-      'pixel_forensics_agent': 'common/agents/05_pixel_value_forensics.md',
-      'shader_ir_agent': 'common/agents/06_shader_ir.md',
-      'driver_device_agent': 'common/agents/07_driver_device.md',
-      'skeptic_agent': 'common/agents/08_skeptic.md',
-      'curator_agent': 'common/agents/09_report_knowledge_curator.md',
-    };
-
-    const filename = promptFiles[agentId];
-    if (!filename) return null;
-
-    // 检查workspace和resources
-    const workspacePath = path.join(storageAdapter.getWorkspacePath(), '..', filename);
-    if (fs.existsSync(workspacePath)) {
-      return workspacePath;
-    }
-
-    return null;
-  }
-
-  /**
-   * 获取默认Prompt
-   */
-  private getDefaultPrompt(agentId: AgentRole): string {
-    const descriptions: Record<AgentRole, string> = {
-      'rdc-debugger': `You are the RDC Debugger Orchestrator. Your role is to coordinate the debugging workflow, manage gates, and orchestrate specialist agents. You are the main entry point for all debugging tasks.`,
-      'triage_agent': `You are the Triage Agent. Your role is to classify symptoms, match historical BugCards, and recommend SOPs for investigation.`,
-      'capture_repro_agent': `You are the Capture Repro Agent. Your role is to verify capture quality, establish baselines, and create capture anchors.`,
-      'pass_graph_pipeline_agent': `You are the Pass Graph Pipeline Agent. Your role is to analyze render passes and pipeline dependencies.`,
-      'pixel_forensics_agent': `You are the Pixel Forensics Agent. Your role is to perform pixel-level evidence collection and locate first-bad events.`,
-      'shader_ir_agent': `You are the Shader IR Agent. Your role is to analyze shader source code and IR evidence.`,
-      'driver_device_agent': `You are the Driver Device Agent. Your role is to perform cross-device attribution and platform-specific checks.`,
-      'skeptic_agent': `You are the Skeptic Agent. Your role is to challenge evidence chains and detect weak claims. You must verify all conclusions before signoff.`,
-      'curator_agent': `You are the Curator Agent. Your role is to generate final reports and maintain the knowledge library.`,
-    };
-
-    return descriptions[agentId] || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}`;
+  private resolveRuntimeProfile(agentId: AgentRole, stage?: WorkflowStage) {
+    const settings = settingsService.getAll();
+    return executionProfileService.resolveAgentRuntimeProfile(settings, stage || 'investigate', agentId);
   }
 
   /**
@@ -283,10 +229,11 @@ export class AgentOrchestrator {
       caseId?: string;
       runId?: string;
       sessionId?: string;
+      stageId?: WorkflowStage;
     }
   ): Promise<string> {
-    const config = this.agentConfigs.get(agentId);
-    if (!config) {
+    const fallbackConfig = this.agentConfigs.get(agentId);
+    if (!fallbackConfig) {
       throw new Error(`Agent not found: ${agentId}`);
     }
 
@@ -294,12 +241,19 @@ export class AgentOrchestrator {
     this.updateAgentStatus(agentId, 'thinking');
 
     try {
-      // 加载system prompt
-      const systemPrompt = await this.loadAgentPrompt(agentId);
+      const runtimeProfile = this.resolveRuntimeProfile(agentId, context?.stageId);
+      const config: AgentConfig = {
+        ...fallbackConfig,
+        systemPrompt: runtimeProfile.systemPrompt,
+        modelProvider: runtimeProfile.providerId,
+        modelName: runtimeProfile.modelId,
+        temperature: runtimeProfile.temperature ?? fallbackConfig.temperature,
+        maxTokens: runtimeProfile.maxTokens ?? fallbackConfig.maxTokens,
+      };
 
       // 构建消息
       const messages = [
-        { role: 'system' as const, content: systemPrompt },
+        { role: 'system' as const, content: config.systemPrompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}` },
         { role: 'user' as const, content },
       ];
 
@@ -336,17 +290,11 @@ export class AgentOrchestrator {
    * 根据角色过滤可用工具，确保 skeptic_agent 和 curator_agent 不接收任何 live tool
    */
   getToolsForRole(agentId: AgentRole): string[] {
-    // skeptic_agent 只审查 evidence chain，不直接发 live tool
-    if (agentId === 'skeptic_agent') {
-      return [];
+    const runtimeProfile = this.resolveRuntimeProfile(agentId);
+    const profileTools = runtimeProfile.toolAllowlist ?? [];
+    if (profileTools.length > 0) {
+      return profileTools;
     }
-  
-    // curator_agent 只输出最终报告与摘要卡片，不直接发 live tool
-    if (agentId === 'curator_agent') {
-      return [];
-    }
-  
-    // 返回绑定给该角色的工具列表
     return SPECIALIST_TOOL_BINDINGS[agentId] ?? [];
   }
   
@@ -480,6 +428,17 @@ export class AgentOrchestrator {
     if (state) {
       state.status = status;
       state.lastActivity = nowIso();
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'agent',
+        severity: status === 'error' ? 'error' : status === 'complete' ? 'success' : 'info',
+        title: AGENT_DISPLAY_NAMES[agentId] || agentId,
+        summary: `状态切换为 ${status}。`,
+        raw: {
+          agentId,
+          status,
+        },
+      });
       this.notifyAgentStateChanged(state);
     }
   }
@@ -504,7 +463,7 @@ export class AgentOrchestrator {
     };
 
     // 通知UI
-    this.notifyMessage(message);
+    this.notifyMessage(message, context?.sessionId);
   }
 
   /**
@@ -519,7 +478,22 @@ export class AgentOrchestrator {
   /**
    * 通知消息
    */
-  private notifyMessage(message: AgentMessage): void {
+  private notifyMessage(message: AgentMessage, sessionId?: string): void {
+    runtimeLogService.log({
+      scope: sessionId ? 'session' : 'app',
+      namespace: 'agent',
+      severity: message.role === 'system' ? 'warning' : 'info',
+      title: AGENT_DISPLAY_NAMES[message.agentId] || message.agentId,
+      summary: message.content.slice(0, 120) || '空消息',
+      sessionId,
+      raw: {
+        agentId: message.agentId,
+        role: message.role,
+        messageId: message.id,
+        content: message.content,
+      },
+      timestamp: message.timestamp,
+    });
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
       this.mainWindow.webContents.send('agent:message', message);
     }

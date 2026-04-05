@@ -1,7 +1,9 @@
 .agent-chat {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   background: rgb(var(--color-bg-0));
 }
 
@@ -81,8 +83,10 @@
 
 .chat-messages {
   flex: 1;
+  height: 0;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -293,6 +297,7 @@
 }
 
 .chat-input-container {
+  flex: 0 0 auto;
   padding: var(--space-3) var(--space-4);
   border-top: 1px solid rgb(var(--color-border-default));
   background: rgb(var(--color-bg-1));
@@ -333,30 +338,6 @@
 .chat-input-actions {
   display: flex;
   align-items: center;
-}
-
-.chat-send-button {
-  width: 36px;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-full);
-  background: linear-gradient(135deg, rgb(var(--color-accent-600)), rgb(var(--color-primary-600)));
-  color: white;
-  cursor: pointer;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
-}
-
-.chat-send-button:hover:not(:disabled) {
-  transform: translateY(-1px) scale(1.06);
-  box-shadow: var(--shadow-glow);
-  filter: brightness(1.1);
-}
-
-.chat-send-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .chat-input-hint {

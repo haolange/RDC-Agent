@@ -11,6 +11,10 @@ export interface WorkspacePaths {
   projectsPath: string;
   knowledgePath: string;
   migrationOrphansPath: string;
+  profilesPath: string;
+  policiesPath: string;
+  secretsPath: string;
+  migrationReportsPath: string;
 }
 
 interface BootstrapState {
@@ -20,6 +24,7 @@ interface BootstrapState {
 
 const SETTINGS_FILE_NAME = 'settings.json';
 const LOG_FILE_NAME = 'rdc-agent.log';
+const sanitizePathSegment = (value: string): string => value.replace(/[^a-zA-Z0-9_-]/g, '-');
 
 const normalizePath = (targetPath: string): string => path.resolve(targetPath);
 
@@ -33,6 +38,12 @@ const isSamePath = (left: string, right: string): boolean => {
 
 export class AppPathService {
   private workspaceRootCache: string | null = null;
+
+  private shouldSkipLegacyImport(): boolean {
+    return process.env.RDC_AGENT_TEST_MODE === '1'
+      || Boolean(process.env.RDC_AGENT_USER_DATA?.trim())
+      || Boolean(process.env.RDC_AGENT_WORKSPACE?.trim());
+  }
 
   private getUserDataRoot(): string {
     return normalizePath(process.env.RDC_AGENT_USER_DATA?.trim() || app.getPath('userData'));
@@ -78,6 +89,10 @@ export class AppPathService {
       projectsPath: path.join(root, 'projects'),
       knowledgePath: path.join(root, 'knowledge'),
       migrationOrphansPath: path.join(root, 'migration-orphans'),
+      profilesPath: path.join(root, 'profiles'),
+      policiesPath: path.join(root, 'policies'),
+      secretsPath: path.join(root, 'secrets'),
+      migrationReportsPath: path.join(root, 'migration-reports'),
     };
   }
 
@@ -87,7 +102,7 @@ export class AppPathService {
     const paths = this.getWorkspacePaths(workspaceRoot);
     this.ensureWorkspaceStructure(paths);
 
-    if (!bootstrapState.legacyMigrationCompleted && this.shouldImportLegacyData(paths.workspaceRoot)) {
+    if (!this.shouldSkipLegacyImport() && !bootstrapState.legacyMigrationCompleted && this.shouldImportLegacyData(paths.workspaceRoot)) {
       this.copyLegacyData(paths.workspaceRoot);
     }
 
@@ -111,7 +126,7 @@ export class AppPathService {
       this.copyWorkspaceData(currentRoot, resolvedRoot);
     }
 
-    if (!bootstrapState.legacyMigrationCompleted && this.shouldImportLegacyData(resolvedRoot)) {
+    if (!this.shouldSkipLegacyImport() && !bootstrapState.legacyMigrationCompleted && this.shouldImportLegacyData(resolvedRoot)) {
       this.copyLegacyData(resolvedRoot);
     }
 
@@ -127,8 +142,22 @@ export class AppPathService {
     return this.setWorkspaceRoot(this.getDefaultWorkspaceRoot());
   }
 
+  getCapturePreviewDir(projectId: string): string {
+    const paths = this.getWorkspacePaths();
+    return path.join(paths.logsPath, 'capture-previews', sanitizePathSegment(projectId || 'default'));
+  }
+
+  getCapturePreviewPath(projectId: string, inputId: string): string {
+    return path.join(
+      this.getCapturePreviewDir(projectId),
+      `${sanitizePathSegment(inputId || 'capture')}-latest.png`,
+    );
+  }
+
   private readBootstrapState(): BootstrapState {
-    const candidates = [this.getBootstrapPath(), this.getLegacyBootstrapPath()];
+    const candidates = this.shouldSkipLegacyImport()
+      ? [this.getBootstrapPath()]
+      : [this.getBootstrapPath(), this.getLegacyBootstrapPath()];
 
     for (const bootstrapPath of candidates) {
       try {
@@ -156,6 +185,10 @@ export class AppPathService {
     fs.mkdirSync(paths.projectsPath, { recursive: true });
     fs.mkdirSync(paths.knowledgePath, { recursive: true });
     fs.mkdirSync(paths.migrationOrphansPath, { recursive: true });
+    fs.mkdirSync(paths.profilesPath, { recursive: true });
+    fs.mkdirSync(paths.policiesPath, { recursive: true });
+    fs.mkdirSync(paths.secretsPath, { recursive: true });
+    fs.mkdirSync(paths.migrationReportsPath, { recursive: true });
   }
 
   private shouldImportLegacyData(targetRoot: string): boolean {
@@ -164,7 +197,11 @@ export class AppPathService {
       && !this.hasDirectoryEntries(paths.projectsPath)
       && !this.hasDirectoryEntries(paths.knowledgePath)
       && !this.hasDirectoryEntries(paths.logsPath)
-      && !this.hasDirectoryEntries(paths.migrationOrphansPath);
+      && !this.hasDirectoryEntries(paths.migrationOrphansPath)
+      && !this.hasDirectoryEntries(paths.profilesPath)
+      && !this.hasDirectoryEntries(paths.policiesPath)
+      && !this.hasDirectoryEntries(paths.secretsPath)
+      && !this.hasDirectoryEntries(paths.migrationReportsPath);
   }
 
   private hasDirectoryEntries(dirPath: string): boolean {
@@ -202,6 +239,10 @@ export class AppPathService {
     this.copyDirContents(path.join(sourceRoot, 'projects'), targetPaths.projectsPath);
     this.copyDirContents(path.join(sourceRoot, 'knowledge'), targetPaths.knowledgePath);
     this.copyDirContents(path.join(sourceRoot, 'migration-orphans'), targetPaths.migrationOrphansPath);
+    this.copyDirContents(path.join(sourceRoot, 'profiles'), targetPaths.profilesPath);
+    this.copyDirContents(path.join(sourceRoot, 'policies'), targetPaths.policiesPath);
+    this.copyDirContents(path.join(sourceRoot, 'secrets'), targetPaths.secretsPath);
+    this.copyDirContents(path.join(sourceRoot, 'migration-reports'), targetPaths.migrationReportsPath);
     this.copyDirContents(path.join(sourceRoot, 'logs'), targetPaths.logsPath);
     this.copyLogFile(path.join(sourceRoot, LOG_FILE_NAME), targetPaths.logPath);
     this.copyLogFile(path.join(sourceRoot, 'dev-stdout.log'), targetPaths.logPath);
