@@ -12,6 +12,7 @@ import type {
 } from '../shared/types/workflow';
 import type { AgentRole, AgentState, AgentConfig } from '../shared/types/agent';
 import type { ActionEvent, EventType } from '../shared/types/evidence';
+import type { ConversationMessage, ConversationSendRequest, ConversationTurnResult } from '../shared/types/conversation';
 import type { ToolCallResult, ToolCatalog } from '../shared/types/tool';
 import type { LLMConfig } from '../shared/types/llm';
 import type {
@@ -51,6 +52,13 @@ export interface ElectronAPI {
     }>;
     copyText: (text: string) => Promise<{
       success: boolean;
+    }>;
+  };
+
+  conversation: {
+    sendMessage: (request: ConversationSendRequest) => Promise<ConversationTurnResult>;
+    getHistory: (sessionId: string) => Promise<{
+      messages: ConversationMessage[];
     }>;
   };
 

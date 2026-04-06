@@ -81,6 +81,18 @@ interface ConfigureTestDebuggerRoutesOptions {
   modelId?: string;
 }
 
+const TEST_AGENT_IDS = [
+  'rdc-debugger',
+  'triage_agent',
+  'capture_repro_agent',
+  'pass_graph_pipeline_agent',
+  'pixel_forensics_agent',
+  'shader_ir_agent',
+  'driver_device_agent',
+  'skeptic_agent',
+  'curator_agent',
+] as const;
+
 export async function configureTestDebuggerRoutes(
   page: Page,
   options: ConfigureTestDebuggerRoutesOptions = {},
@@ -109,13 +121,30 @@ export async function configureTestDebuggerRoutes(
             isConfigured: true,
           },
         ],
-        agentRoutes: settings.llm.agentRoutes.map((route) => ({
+        agentRoutes: (settings.llm.agentRoutes.length > 0
+          ? settings.llm.agentRoutes
+          : TEST_AGENT_IDS.map((agentId) => ({
+              agentId,
+              providerId: '',
+              modelId: '',
+            }))).map((route) => ({
           ...route,
           providerId: nextWithRoutes ? nextProviderId : '',
           modelId: nextWithRoutes ? nextModelId : '',
         })),
       },
     });
+
+    const confirmed = await window.electronAPI.settings.get();
+    (window as typeof window & {
+      __RDC_AGENT_E2E__?: {
+        setAppSettings: (settings: unknown) => void;
+      };
+    }).__RDC_AGENT_E2E__?.setAppSettings(confirmed);
+    const debuggerRoute = confirmed.llm.agentRoutes.find((route) => route.agentId === 'rdc-debugger');
+    if (nextWithRoutes && (!debuggerRoute?.providerId || !debuggerRoute?.modelId)) {
+      throw new Error('Failed to persist debugger routes for E2E test setup');
+    }
   }, {
     nextProviderId: providerId,
     nextModelId: modelId,

@@ -15,7 +15,7 @@ import type {
 } from '@shared/types/workflow';
 import { normalizeWorkflowStage } from '@shared/constants/stages';
 import { BLOCKER_CODES } from '@shared/constants/blockers';
-import { nowIso } from '@shared/utils/id';
+import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
 import { storageAdapter, type PersistedPlanSnapshot } from './StorageAdapter';
 import { intakeContextResolver } from './IntakeContextResolver';
 import { planBuilder } from './PlanBuilder';
@@ -433,6 +433,15 @@ export class DebugWorkflowService {
 
     this.emitRunStatus(location.session.sessionId, runId, nextStatus, nextStage);
     this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, runId));
+    await this.appendAssistantConversationMessage(
+      location.session.sessionId,
+      runId,
+      nextPlan.strictReady
+        ? '收到，执行前置条件已经补齐。你现在可以批准这份计划，我再进入正式调试。'
+        : nextPlan.blockers.length > 0
+          ? nextPlan.blockers[0]?.reason || '当前还不能进入正式调试。'
+          : '收到，我已经更新了计划输入，不过还需要你继续补全剩余信息。',
+    );
 
     return {
       success: true,
@@ -533,6 +542,11 @@ export class DebugWorkflowService {
     });
     this.emitRunStatus(location.session.sessionId, runId, 'running', 'dispatch');
     this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, runId));
+    await this.appendAssistantConversationMessage(
+      location.session.sessionId,
+      runId,
+      '计划已批准，我现在开始正式调试，并按证据链推进后续分析。',
+    );
 
     runExecutionService.startRun({
       runId,
@@ -586,6 +600,11 @@ export class DebugWorkflowService {
     });
 
     this.emitWorkflowState(await this.getWorkflowState(sessionId, nextRunId));
+    await this.appendAssistantConversationMessage(
+      sessionId,
+      nextRunId,
+      '我已经为你重建了一次可继续的调试运行。确认计划后，我会从新的 run 继续推进。',
+    );
 
     return {
       success: true,
@@ -1021,6 +1040,11 @@ export class DebugWorkflowService {
         htmlPath: bundle.htmlPath,
       },
     }));
+    await this.appendAssistantConversationMessage(
+      location.session.sessionId,
+      location.run.runId,
+      `调试报告已生成：${bundle.htmlPath || bundle.markdownPath || 'reports ready'}`,
+    );
     this.emitRunStatus(location.session.sessionId, location.run.runId, 'completed', 'finalize');
     this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, location.run.runId));
   }
@@ -1153,6 +1177,11 @@ export class DebugWorkflowService {
         htmlPath: bundle.htmlPath,
       },
     }));
+    await this.appendAssistantConversationMessage(
+      location.session.sessionId,
+      location.run.runId,
+      `调试报告已生成：${bundle.htmlPath || bundle.markdownPath || 'reports ready'}`,
+    );
     this.emitRunStatus(location.session.sessionId, location.run.runId, 'completed', 'finalize');
     this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, location.run.runId));
   }
@@ -1479,6 +1508,23 @@ export class DebugWorkflowService {
         window.webContents.send('evidence:eventAdded', event);
       }
     }
+  }
+
+  private async appendAssistantConversationMessage(
+    sessionId: string,
+    runId: string | null,
+    content: string,
+  ): Promise<void> {
+    storageAdapter.appendConversationMessage(sessionId, {
+      id: generateEventId('msga'),
+      sessionId,
+      projectId: this.findRun(runId || '')?.session.projectId ?? null,
+      runId,
+      role: 'assistant',
+      agentId: 'rdc-debugger',
+      content,
+      createdAt: nowMs(),
+    });
   }
 
   private findRun(runId: string): RunLocation | null {

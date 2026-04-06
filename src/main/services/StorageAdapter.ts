@@ -17,6 +17,7 @@ import {
   sanitizeToken,
 } from '@shared/utils/id';
 import type { ActionEvent } from '@shared/types/evidence';
+import type { ConversationMessage } from '@shared/types/conversation';
 import type {
   AskUserPrompt,
   DebugPlan,
@@ -309,6 +310,9 @@ export class StorageAdapter {
     this.writeJson(path.join(sessionPath, 'session.json'), session);
     if (!fs.existsSync(path.join(sessionPath, 'action_chain.jsonl'))) {
       fs.writeFileSync(path.join(sessionPath, 'action_chain.jsonl'), '', 'utf-8');
+    }
+    if (!fs.existsSync(path.join(sessionPath, 'conversation.jsonl'))) {
+      fs.writeFileSync(path.join(sessionPath, 'conversation.jsonl'), '', 'utf-8');
     }
     this.syncSessionEvidence(session.sessionId, session.projectId);
 
@@ -603,6 +607,14 @@ export class StorageAdapter {
     return path.join(location.sessionPath, 'action_chain.jsonl');
   }
 
+  getConversationPath(sessionId: string): string {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) {
+      throw new Error(`Session not found for conversation history: ${sessionId}`);
+    }
+    return path.join(location.sessionPath, 'conversation.jsonl');
+  }
+
   getSessionEvidencePath(sessionId: string): string {
     const location = this.findSessionLocation(sessionId);
     if (!location) {
@@ -613,6 +625,15 @@ export class StorageAdapter {
 
   getDebugPlanPath(sessionId: string, runId: string): string {
     return path.join(this.getRunPath(sessionId, runId), 'notes', 'debug_plan.yaml');
+  }
+
+  readConversationHistory(sessionId: string): ConversationMessage[] {
+    return readJsonl<ConversationMessage>(this.getConversationPath(sessionId))
+      .sort((left, right) => left.createdAt - right.createdAt);
+  }
+
+  appendConversationMessage(sessionId: string, message: ConversationMessage): void {
+    appendJsonl(this.getConversationPath(sessionId), message);
   }
 
   readSessionEvidence(sessionId: string): SessionEvidenceRecord | null {

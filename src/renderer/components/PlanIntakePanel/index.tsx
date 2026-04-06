@@ -10,6 +10,7 @@ export const PlanIntakePanel: React.FC = () => {
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
   const setCurrentDebugPlan = useSessionStore((state) => state.setCurrentDebugPlan);
   const setPendingQuestions = useSessionStore((state) => state.setPendingQuestions);
+  const setConversationMessages = useSessionStore((state) => state.setConversationMessages);
 
   const [answers, setAnswers] = useState<Record<string, { selectedOptionId?: string; freeformText?: string }>>({});
   const [busyAction, setBusyAction] = useState<'submit' | 'approve' | 'restart' | null>(null);
@@ -38,6 +39,8 @@ export const PlanIntakePanel: React.FC = () => {
       if (result.success) {
         setCurrentDebugPlan(result.debugPlan ?? null);
         setPendingQuestions(result.pendingQuestions ?? null);
+        const history = await window.electronAPI.conversation.getHistory(currentRun.sessionId);
+        setConversationMessages(history.messages ?? []);
       }
     } finally {
       setBusyAction(null);
@@ -49,6 +52,8 @@ export const PlanIntakePanel: React.FC = () => {
     setBusyAction('approve');
     try {
       await window.electronAPI.workflow.approvePlan(currentRun.runId);
+      const history = await window.electronAPI.conversation.getHistory(currentRun.sessionId);
+      setConversationMessages(history.messages ?? []);
     } finally {
       setBusyAction(null);
     }
@@ -69,6 +74,8 @@ export const PlanIntakePanel: React.FC = () => {
         setCurrentDebugPlan(result.debugPlan ?? null);
         setPendingQuestions(result.pendingQuestions ?? null);
       }
+      const history = await window.electronAPI.conversation.getHistory(currentRun.sessionId);
+      setConversationMessages(history.messages ?? []);
     } finally {
       setBusyAction(null);
     }

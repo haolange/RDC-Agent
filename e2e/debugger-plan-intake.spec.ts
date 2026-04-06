@@ -76,10 +76,10 @@ test('Plan / Intake 自动发现任务文件、目标 capture 和 event，并在
   await expect(ctx.page.locator('[data-testid="plan-approve-button"]')).toBeEnabled();
 
   await ctx.page.locator('[data-testid="plan-approve-button"]').click();
-  await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('Dispatch', { timeout: 15000 });
+  await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('调试报告已生成', { timeout: 15000 });
 });
 
-test('provider 已配置但 route 缺失时，Debugger 会明确 blocker 并禁止批准', async () => {
+test('provider 已配置但 route 缺失时，Debugger 会先给自然语言兜底，不创建正式 run', async () => {
   const projectRoot = path.join(ctx.tempDir, 'plan-blocked-project');
   await seedProject(ctx.page, projectRoot);
   await configureTestDebuggerRoutes(ctx.page, { withRoutes: false });
@@ -94,9 +94,8 @@ test('provider 已配置但 route 缺失时，Debugger 会明确 blocker 并禁�
   await ctx.page.locator('input.chat-input').fill(taskFile);
   await ctx.page.locator('[data-testid="debugger-start-button"]').click();
 
-  await expect(ctx.page.locator('[data-testid="plan-intake-panel"]')).toBeVisible();
-  await expect(ctx.page.locator('[data-testid="plan-blockers"]')).toContainText('is not bound to a provider/model route');
-  await expect(ctx.page.locator('[data-testid="plan-approve-button"]')).toBeDisabled();
+  await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('当前调试链路还没绑定可用模型');
+  await expect(ctx.page.locator('[data-testid="plan-intake-panel"]')).toHaveCount(0);
 
   await expect.poll(async () => {
     return ctx.page.evaluate(() => (window as typeof window & {
@@ -104,5 +103,5 @@ test('provider 已配置但 route 缺失时，Debugger 会明确 blocker 并禁�
         getWorkbenchState: () => { currentRun: { status?: string } | null };
       };
     }).__RDC_AGENT_E2E__?.getWorkbenchState().currentRun?.status ?? null);
-  }, { timeout: 10000 }).toBe('failed');
+  }, { timeout: 10000 }).toBeNull();
 });

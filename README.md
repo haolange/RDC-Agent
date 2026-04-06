@@ -2,7 +2,7 @@
 
 `RDC-Agent` 是一个面向 `RenderDoc` `.rdc` capture 的桌面调试代理框架，使用 `Electron + React + TypeScript` 构建。
 
-它的目标不是做一个通用聊天客户端，而是把一次图形渲染问题排查拆成可编排的多角色协作流程。当前仓库以 `Debugger` 作为真实生产主链，并围绕它实现工作流图、Agent 编排层和证据/Artifact 展示框架。
+它的目标不是做一个无边界的通用聊天客户端，而是做成“体验先像正常协作助手，真正执行时再进入严格垂直流程”的 RenderDoc 调试产品。当前仓库以 `Debugger` 作为真实生产主链，并围绕它实现工作流图、Agent 编排层和证据 / Artifact 展示框架。
 
 ## 它能做什么
 
@@ -12,6 +12,7 @@
 - 在设置中心把 `workspace` 配置为单一工作根目录，并由它统一派生 `settings.json`、日志和运行数据目录。
 - 在模型设置页管理 `provider`、启用模型清单以及 `Agent -> provider/model` 路由。
 - 启动一个围绕渲染问题的调试会话，并严格走 `Plan / Intake -> 用户批准 -> execution loop -> verification / skeptic / curator -> report` 主链。
+- 在正式执行前，先以正常 assistant 对话方式做问题澄清、边界说明和 capture / 路由补齐。
 - 通过多个专门角色进行协作分析，例如 triage、pixel forensics、shader IR、driver/device、skeptic 和 curator。
 - 用工作流状态机控制阶段推进、阻断处理和受控回转。
 - 在界面中展示会话状态、证据链和中间产物。
@@ -83,6 +84,6 @@ npm run dev
 
 这个仓库当前聚焦在 `Debugger` 生产链路和多 Agent 编排。`Analyzer` 和 `Optimizer` 仍然保留为可见模式入口，但当前只是独立占位页。
 
-`Debugger` 不是“RenderDoc 本地工具壳 + 可选模型增强”。真实配置的 `provider/model/agent route` 属于主链的一部分；如果没有真实命中已绑定的 LLM provider/model，本次 run 视为未完成。
+`Debugger` 不是“RenderDoc 本地工具壳 + 可选模型增强”。真实配置的 `provider/model/agent route` 属于主链的一部分；如果没有真实命中已绑定的 LLM provider/model，本次 run 视为未完成。与此同时，缺少 capture 或模型链路时，assistant 仍应先给出自然语言说明，而不是把 blocker 直接当成主交互。
 
 如果你想继续，我可以下一步把 `docs/` 里的设计文档也整理成一份更像“项目总览”的说明，或者直接补一版更细的开发约定。

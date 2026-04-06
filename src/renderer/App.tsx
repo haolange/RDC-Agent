@@ -12,24 +12,24 @@ import { useDeviceStore } from './stores/deviceStore';
 import { useAppSettingsStore } from './stores/appSettingsStore';
 import { useTerminalStore } from './stores/terminalStore';
 import { useI18n } from './i18n';
-import type { AgentRole, AgentTimelineEntry } from '@shared/types/agent';
+import type { AgentTimelineEntry } from '@shared/types/agent';
+import type { ConversationMessage } from '@shared/types/conversation';
 import type { ToolTraceEntry } from '@shared/types/tool';
 import type { ReplayDeviceStatusChangedPayload } from '@shared/types/device';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
-import type { ResolvedTheme } from '@shared/types/settings';
+import type { AppSettings, ResolvedTheme } from '@shared/types/settings';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { AgentMode } from '@shared/types/layout';
 import type {
   CaptureDescriptor,
   ContextSnapshot,
-  DebugSessionStartRequest,
   OpenedCaptureState,
   ProjectInputRecord,
   ProjectRecord,
   RunSummary,
   SessionRecord,
 } from '@shared/types/session';
-import type { WorkflowStage, WorkflowState } from '@shared/types/workflow';
+import type { WorkflowState } from '@shared/types/workflow';
 import { AGENT_MODES } from '@shared/constants/agents';
 import {
   APP_MIN_MAIN_WIDTH,
@@ -54,6 +54,7 @@ interface WorkbenchSeedState {
   captures: CaptureDescriptor[];
   projectInputs: ProjectInputRecord[];
   openedCapture: OpenedCaptureState | null;
+  conversationMessages?: ConversationMessage[];
   timeline: AgentTimelineEntry[];
   actionEvents?: ActionEvent[];
   workflowState?: WorkflowState | null;
@@ -65,6 +66,7 @@ type E2EWindow = Window & {
     seedWorkbenchState: (state: WorkbenchSeedState) => void;
     resetWorkbenchState: () => void;
     getWorkbenchState: () => WorkbenchSeedState;
+    setAppSettings: (settings: AppSettings) => void;
   };
 };
 
@@ -216,6 +218,9 @@ const mergeCapturesWithSnapshot = (
 const mapActionEventToTimelineEntry = (event: ActionEvent): AgentTimelineEntry | null => {
   switch (event.event_type) {
     case 'user_message':
+      if (String(event.payload.role || 'user') !== 'user') {
+        return null;
+      }
       return {
         id: event.event_id,
         type: 'user',
@@ -223,95 +228,37 @@ const mapActionEventToTimelineEntry = (event: ActionEvent): AgentTimelineEntry |
         timestamp: event.ts_ms,
       };
     case 'agent_summary':
-      return {
-        id: event.event_id,
-        type: 'reasoning',
-        agentRole: event.agent_id as AgentTimelineEntry['agentRole'],
-        title: String(event.payload.stage || 'Reasoning'),
-        content: String(event.payload.summary || event.payload.content || ''),
-        reasoningSummary: {
-          summaryId: event.event_id,
-          stage: (String(event.payload.stage || 'dispatch') as WorkflowStage),
-          agentId: event.agent_id as AgentRole,
-          summary: String(event.payload.summary || event.payload.content || ''),
-          evidence: Array.isArray(event.payload.evidence) ? event.payload.evidence.map(String) : [],
-          nextStep: String(event.payload.next_step || event.payload.nextStep || ''),
-          confidence: typeof event.payload.confidence === 'number' ? event.payload.confidence : 0.5,
-          createdAt: new Date(event.ts_ms).toISOString(),
-        },
-        actionEvent: event,
-        timestamp: event.ts_ms,
-      };
-    case 'tool_execution':
-      return {
-        id: event.event_id,
-        type: 'tool_call',
-        status: event.status,
-        content: String(event.payload.tool_name || event.payload.toolName || 'tool_execution'),
-        actionEvent: event,
-        timestamp: event.ts_ms,
-      };
-    case 'workflow_stage_transition':
-      return {
-        id: event.event_id,
-        type: 'stage',
-        title: String(event.payload.toStage || 'Stage'),
-        content: `Stage: ${String(event.payload.fromStage || 'unknown')} -> ${String(event.payload.toStage || 'unknown')}`,
-        actionEvent: event,
-        timestamp: event.ts_ms,
-      };
-    case 'verification':
-      return {
-        id: event.event_id,
-        type: 'verification',
-        title: String(event.payload.verification_kind || 'verification'),
-        status: event.status,
-        content: String(event.payload.summary || event.payload.verdict || 'Verification updated'),
-        actionEvent: event,
-        timestamp: event.ts_ms,
-      };
-    case 'llm_call':
+      if (String(event.payload.role || '') === 'assistant') {
+        return {
+          id: event.event_id,
+          type: 'agent',
+          agentRole: event.agent_id as AgentTimelineEntry['agentRole'],
+          content: String(event.payload.content || event.payload.summary || ''),
+          actionEvent: event,
+          timestamp: event.ts_ms,
+        };
+      }
+      return null;
+    case 'system':
+      if (!event.payload.message) {
+        return null;
+      }
       return {
         id: event.event_id,
         type: 'system',
-        title: `LLM ${String(event.payload.agentId || event.agent_id)}`,
+        title: 'System',
         status: event.status,
-        content: `${String(event.payload.providerId || 'provider')}/${String(event.payload.modelId || 'model')} - ${String(event.payload.summary || event.payload.requestId || 'llm_call')}`,
+        content: String(event.payload.message || ''),
         actionEvent: event,
         timestamp: event.ts_ms,
       };
     case 'report_published':
       return {
         id: event.event_id,
-        type: 'report',
-        title: 'Report published',
-        content: `Report published: ${String(event.payload.htmlPath || event.payload.markdownPath || 'reports ready')}`,
-        actionEvent: event,
-        timestamp: event.ts_ms,
-      };
-    case 'dispatch':
-      return {
-        id: event.event_id,
-        type: 'dispatch',
-        title: String(event.payload.targetAgent || event.payload.target_agent || 'specialist'),
-        content: `Dispatch: ${String(event.payload.targetAgent || event.payload.target_agent || 'specialist')}`,
-        actionEvent: event,
-        timestamp: event.ts_ms,
-      };
-    case 'blocker':
-      return {
-        id: event.event_id,
-        type: 'blocker',
-        status: event.status,
-        content: String(event.payload.reason || event.payload.message || 'Blocker detected'),
-        actionEvent: event,
-        timestamp: event.ts_ms,
-      };
-    case 'system':
-      return {
-        id: event.event_id,
         type: 'system',
-        content: String(event.payload.message || ''),
+        title: 'Report',
+        content: `调试报告已生成：${String(event.payload.htmlPath || event.payload.markdownPath || 'reports ready')}`,
+        actionEvent: event,
         timestamp: event.ts_ms,
       };
     default:
@@ -349,7 +296,6 @@ const App: React.FC = () => {
   const currentProject = useSessionStore((state) => state.currentProject);
   const currentSession = useSessionStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
-  const captures = useSessionStore((state) => state.captures);
   const workflowState = useSessionStore((state) => state.workflowState);
   const currentMode = useLayoutStore((state) => state.currentMode);
   const leftSidebarCollapsed = useLayoutStore((state) => state.leftSidebarCollapsed);
@@ -377,6 +323,7 @@ const App: React.FC = () => {
     : settings.appearance.theme;
   const nickname = settings.profile.nickname || t('sidebar.userName');
   const showWorkbenchShell = currentMode === 'debugger';
+  const hasActiveDebugRun = Boolean(currentRun && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status));
   const isTerminalOpen = useTerminalStore((state) => state.isOpen);
   const toggleTerminalOpen = useTerminalStore((state) => state.toggleOpen);
 
@@ -388,14 +335,12 @@ const App: React.FC = () => {
   const setSessions = useSessionStore((state) => state.setSessions);
   const setCurrentSession = useSessionStore((state) => state.setCurrentSession);
   const setRuns = useSessionStore((state) => state.setRuns);
-  const setContextSnapshot = useSessionStore((state) => state.setContextSnapshot);
-  const setCaptures = useSessionStore((state) => state.setCaptures);
   const addActionEvent = useSessionStore((state) => state.addActionEvent);
   const setWorkflowState = useSessionStore((state) => state.setWorkflowState);
   const setCurrentDebugPlan = useSessionStore((state) => state.setCurrentDebugPlan);
   const setPendingQuestions = useSessionStore((state) => state.setPendingQuestions);
   const setReasoningSummaries = useSessionStore((state) => state.setReasoningSummaries);
-  const addTimelineEntry = useSessionStore((state) => state.addTimelineEntry);
+  const setConversationMessages = useSessionStore((state) => state.setConversationMessages);
   const setActiveTerminalSessionId = useTerminalStore((state) => state.setActiveSessionId);
 
   const syncCapturesFromSnapshot = useCallback((snapshot: ContextSnapshot) => {
@@ -440,6 +385,54 @@ const App: React.FC = () => {
   }, [currentSession?.sessionId, setActiveTerminalSessionId]);
 
   useEffect(() => {
+    const electronAPI = window.electronAPI;
+    if (!electronAPI) {
+      return;
+    }
+
+    if (!currentSession?.sessionId) {
+      setConversationMessages([]);
+      return;
+    }
+
+    void (async () => {
+      const result = await electronAPI.conversation.getHistory(currentSession.sessionId).catch(() => ({ messages: [] }));
+      setConversationMessages(result.messages ?? []);
+    })();
+  }, [currentSession?.sessionId, setConversationMessages]);
+
+  useEffect(() => {
+    const electronAPI = window.electronAPI;
+    if (!electronAPI || !currentSession?.sessionId) {
+      return;
+    }
+
+    const refreshHistory = async () => {
+      const result = await electronAPI.conversation.getHistory(currentSession.sessionId).catch(() => ({ messages: [] }));
+      setConversationMessages(result.messages ?? []);
+    };
+
+    const handleRunStatusChanged = (payload: { sessionId: string; status: string }) => {
+      if (payload.sessionId === currentSession.sessionId && ['running', 'completed', 'failed', 'awaiting_input', 'awaiting_approval'].includes(payload.status)) {
+        void refreshHistory();
+      }
+    };
+
+    const handleEvidenceEventAdded = (event: ActionEvent) => {
+      if (event.session_id === currentSession.sessionId && event.event_type === 'report_published') {
+        void refreshHistory();
+      }
+    };
+
+    electronAPI.on('workflow:runStatusChanged', handleRunStatusChanged as (...args: unknown[]) => void);
+    electronAPI.on('evidence:eventAdded', handleEvidenceEventAdded as (...args: unknown[]) => void);
+    return () => {
+      electronAPI.off('workflow:runStatusChanged', handleRunStatusChanged as (...args: unknown[]) => void);
+      electronAPI.off('evidence:eventAdded', handleEvidenceEventAdded as (...args: unknown[]) => void);
+    };
+  }, [currentSession?.sessionId, setConversationMessages]);
+
+  useEffect(() => {
     if (!navigator.webdriver) return;
 
     const target = window as E2EWindow;
@@ -455,6 +448,7 @@ const App: React.FC = () => {
         store.setCaptures(state.captures);
         store.setProjectInputs(state.projectInputs);
         store.setOpenedCapture(state.openedCapture);
+        store.setConversationMessages(state.conversationMessages ?? []);
         store.setTimeline(state.timeline);
         store.setActionEvents(state.actionEvents ?? []);
         store.setWorkflowState(state.workflowState ?? null);
@@ -474,6 +468,7 @@ const App: React.FC = () => {
         store.setCaptures([]);
         store.setProjectInputs([]);
         store.setOpenedCapture(null);
+        store.setConversationMessages([]);
         store.setTimeline([]);
         store.setActionEvents([]);
         store.setWorkflowState(null);
@@ -494,11 +489,15 @@ const App: React.FC = () => {
           captures: store.captures,
           projectInputs: store.projectInputs,
           openedCapture: store.openedCapture,
+          conversationMessages: store.conversationMessages,
           timeline: store.timeline,
           actionEvents: store.actionEvents,
           workflowState: store.workflowState,
           runs: store.runs,
         };
+      },
+      setAppSettings: (nextSettings) => {
+        useAppSettingsStore.getState().hydrate(nextSettings, useAppSettingsStore.getState().systemTheme);
       },
     };
 
@@ -910,8 +909,6 @@ const App: React.FC = () => {
   const devices = useDeviceStore((state) => state.devices);
   const selectedDevice = useDeviceStore((state) => state.selectedDevice);
   const selectedDeviceEntry = devices.find((device) => device.id === selectedDevice);
-  const primaryCapture = captures.find((descriptor) => descriptor.role === 'primary') ?? null;
-  const hasRemoteCapture = captures.some((descriptor) => descriptor.backendHint === 'remote');
   const showMainPromptBar = currentMode === 'debugger';
   const resolvedWidths = useMemo(
     () => resolveSidebarWidths(
@@ -979,131 +976,90 @@ const App: React.FC = () => {
     const electronAPI = window.electronAPI;
     if (!electronAPI) return;
 
-    if (!currentRun) {
-      if (!currentProject) {
-        showNotice('请先添加并选择一个项目。');
-        return;
+    setIsPromptSending(true);
+    try {
+      const result = await electronAPI.conversation.sendMessage({
+        projectId: currentProject?.projectId ?? null,
+        sessionId: currentSession?.sessionId ?? null,
+        currentRunId: currentRun?.runId ?? null,
+        replayDeviceId: selectedDeviceEntry?.id ?? null,
+        message: trimmed,
+      });
+
+      setPromptValue('');
+
+      if (result.session?.projectId && currentProject?.projectId !== result.session.projectId) {
+        const projectsResult = await electronAPI.project.list();
+        const nextProjects = projectsResult.projects ?? [];
+        useSessionStore.getState().setProjects(nextProjects);
+        const matchedProject = nextProjects.find((project) => project.projectId === result.session?.projectId) ?? null;
+        useSessionStore.getState().setCurrentProject(matchedProject);
       }
 
-      if (!selectedDeviceEntry) {
-        showNotice('请先选择 Replay Device。');
-        return;
+      if (result.session?.sessionId) {
+        setCurrentSession(result.session);
+        const sessionsResult = await electronAPI.session.list(result.session.projectId);
+        setSessions(sessionsResult.sessions ?? []);
+        const historyResult = await electronAPI.conversation.getHistory(result.session.sessionId);
+        setConversationMessages(historyResult.messages ?? []);
+      } else {
+        setConversationMessages((useSessionStore.getState().conversationMessages ?? []).concat([
+          result.userMessage,
+          result.assistantMessage,
+        ]));
       }
 
-      if (hasRemoteCapture && selectedDeviceEntry.type === 'local') {
-        showNotice('远端 capture 需要选择 Android Replay Device。');
-        return;
+      if (result.runUpdate) {
+        setCurrentRun(result.runUpdate);
+        const runsResult = await electronAPI.run.list(result.runUpdate.sessionId);
+        setRuns(runsResult.runs ?? []);
+      } else if (result.executionTransition.action !== 'started_run' && !hasActiveDebugRun) {
+        setCurrentRun(null);
       }
 
-      setIsPromptSending(true);
-      try {
-        if (
-          hasRemoteCapture
-          && selectedDeviceEntry.type === 'android'
-          && !['connected', 'online'].includes(selectedDeviceEntry.status)
-        ) {
-          showNotice('正在连接 Android RenderDoc…');
-        }
-
-        const request: DebugSessionStartRequest = {
-          projectId: currentProject.projectId,
-          sessionId: currentSession?.sessionId,
-          mode: 'debugger',
-          goal: trimmed,
-          captures: captures.length > 0 ? captures : undefined,
-          primaryCaptureId: primaryCapture?.id,
-          replayDevice: selectedDeviceEntry,
-        };
-
-        const result = await electronAPI.workflow.start(request);
-        if (!result.success) {
-          showNotice(result.error || 'Failed to start debug session.');
-          return;
-        }
-
-        setCurrentRun({
-          runId: result.runId ?? `run-${Date.now()}`,
-          projectId: currentProject.projectId,
-          caseId: result.caseId ?? '',
-          sessionId: result.sessionId ?? '',
-          mode: 'debugger',
-          goal: trimmed,
-          captures: captures.length > 0 ? captures : (result.debugPlanSummary?.targetCapture
-            ? [{
-                id: result.debugPlanSummary.targetCapture.captureId,
-                filePath: result.debugPlanSummary.targetCapture.filePath,
-                role: 'primary',
-                backendHint: 'local',
-                status: 'pending',
-              }]
-            : []),
-          startedAt: Date.now(),
-          status: result.status ?? 'planning',
-          lastStage: result.currentStage ?? 'plan',
-          backend: captures.some((descriptor) => descriptor.backendHint === 'remote') ? 'remote' : 'local',
-        });
-
-        if (result.sessionId) {
-          const sessionsResult = await electronAPI.session.list(currentProject.projectId);
-          const nextSessions = sessionsResult.sessions ?? [];
-          setSessions(nextSessions);
-          const matchedSession = nextSessions.find((session) => session.sessionId === result.sessionId) ?? null;
-          setCurrentSession(matchedSession);
-          const runsResult = await electronAPI.run.list(result.sessionId);
-          setRuns(runsResult.runs ?? []);
-        }
-
-        setPromptValue('');
-        return;
-      } catch (error) {
-        showNotice(error instanceof Error ? error.message : 'Failed to start debug session.');
-        return;
-      } finally {
-        setIsPromptSending(false);
-      }
-    }
-
-    if (currentRun) {
-      setIsPromptSending(true);
-      try {
-        addTimelineEntry({
-          id: `user-${Date.now()}`,
-          type: 'user',
+      setCurrentDebugPlan(result.debugPlanSummary ?? null);
+      setPendingQuestions(result.pendingQuestions ?? null);
+    } catch (error) {
+      const currentMessages = useSessionStore.getState().conversationMessages ?? [];
+      setConversationMessages(currentMessages.concat([
+        {
+          id: `local-user-${Date.now()}`,
+          sessionId: currentSession?.sessionId ?? null,
+          projectId: currentProject?.projectId ?? null,
+          runId: currentRun?.runId ?? null,
+          role: 'user',
           content: trimmed,
-          timestamp: Date.now(),
-        });
-        const result = await electronAPI.agent.sendMessage('rdc-debugger', trimmed);
-        if (result.error) {
-          showNotice(result.error);
-        } else {
-          setPromptValue('');
-        }
-      } catch (error) {
-        showNotice(error instanceof Error ? error.message : 'Agent request failed.');
-      } finally {
-        setIsPromptSending(false);
-      }
-      return;
+          createdAt: Date.now(),
+        },
+        {
+          id: `local-assistant-${Date.now()}`,
+          sessionId: currentSession?.sessionId ?? null,
+          projectId: currentProject?.projectId ?? null,
+          runId: currentRun?.runId ?? null,
+          role: 'assistant',
+          agentId: 'rdc-debugger',
+          content: error instanceof Error ? error.message : 'Conversation request failed.',
+          createdAt: Date.now(),
+        },
+      ]));
+    } finally {
+      setIsPromptSending(false);
     }
-
   }, [
-    addTimelineEntry,
-    captures,
     currentProject,
     currentRun,
     currentSession,
-    hasRemoteCapture,
+    hasActiveDebugRun,
     isPromptSending,
-    primaryCapture,
     promptValue,
     selectedDeviceEntry,
-    setCaptures,
-    setContextSnapshot,
+    setConversationMessages,
+    setCurrentDebugPlan,
     setCurrentRun,
     setCurrentSession,
+    setPendingQuestions,
     setRuns,
     setSessions,
-    showNotice,
   ]);
 
   const handlePromptKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -1308,14 +1264,14 @@ const App: React.FC = () => {
                     value={promptValue}
                     onChange={(event) => setPromptValue(event.target.value)}
                     onKeyDown={handlePromptKeyDown}
-                    placeholder={workflowState?.approvalState === 'pending_user'
+                    placeholder={hasActiveDebugRun && workflowState?.approvalState === 'pending_user'
                       ? 'Plan is ready. Approve it in the intake panel to start execution.'
                       : t('app.inputPlaceholder')}
-                    aria-label={workflowState?.approvalState === 'pending_user'
+                    aria-label={hasActiveDebugRun && workflowState?.approvalState === 'pending_user'
                       ? 'Plan is ready. Approve it in the intake panel to start execution.'
                       : t('app.inputPlaceholder')}
                   />
-                  {currentRun && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status) && (
+                  {hasActiveDebugRun && currentRun && (
                     <button
                       type="button"
                       className="chat-send-button chat-stop-button"
@@ -1333,11 +1289,11 @@ const App: React.FC = () => {
                   <button
                     type="button"
                     className="chat-send-button"
-                    data-testid={currentRun ? 'debugger-send-button' : 'debugger-start-button'}
+                    data-testid={hasActiveDebugRun ? 'debugger-send-button' : 'debugger-start-button'}
                     onClick={() => void handlePromptSend()}
                     disabled={!promptValue.trim() || isPromptSending}
-                    aria-label={currentRun ? 'Send debugger message' : 'Start debugger session'}
-                    title={currentRun ? '发送消息' : '启动 Debugger'}
+                    aria-label={hasActiveDebugRun ? 'Send debugger message' : 'Send debugger message'}
+                    title={hasActiveDebugRun ? '发送消息' : '发送消息'}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <line x1="22" y1="2" x2="11" y2="13" />

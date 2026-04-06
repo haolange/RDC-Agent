@@ -10,6 +10,7 @@ import type {
 } from '@shared/types/session';
 import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
+import type { ConversationMessage } from '@shared/types/conversation';
 import type {
   AskUserPrompt,
   DebugPlan,
@@ -27,6 +28,7 @@ interface SessionState {
   captures: CaptureDescriptor[];
   projectInputs: ProjectInputRecord[];
   openedCapture: OpenedCaptureState | null;
+  conversationMessages: ConversationMessage[];
   timeline: AgentTimelineEntry[];
   actionEvents: ActionEvent[];
   runs: RunSummary[];
@@ -49,6 +51,8 @@ interface SessionState {
   removeCapture: (captureId: string) => void;
   setProjectInputs: (inputs: ProjectInputRecord[]) => void;
   setOpenedCapture: (openedCapture: OpenedCaptureState | null) => void;
+  setConversationMessages: (messages: ConversationMessage[]) => void;
+  addConversationMessage: (message: ConversationMessage) => void;
   addTimelineEntry: (entry: AgentTimelineEntry) => void;
   setTimeline: (timeline: AgentTimelineEntry[]) => void;
   setActionEvents: (events: ActionEvent[]) => void;
@@ -72,6 +76,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   captures: [],
   projectInputs: [],
   openedCapture: null,
+  conversationMessages: [],
   timeline: [],
   actionEvents: [],
   runs: [],
@@ -101,6 +106,8 @@ export const useSessionStore = create<SessionState>((set) => ({
   })),
   setProjectInputs: (inputs) => set({ projectInputs: inputs }),
   setOpenedCapture: (openedCapture) => set({ openedCapture }),
+  setConversationMessages: (conversationMessages) => set({ conversationMessages }),
+  addConversationMessage: (message) => set((state) => ({ conversationMessages: [...state.conversationMessages, message] })),
   addTimelineEntry: (entry) => set((state) => ({ timeline: [...state.timeline, entry] })),
   setTimeline: (timeline) => set({ timeline }),
   setActionEvents: (events) => set({ actionEvents: events }),
@@ -118,6 +125,7 @@ export const useSessionStore = create<SessionState>((set) => ({
       contextSnapshot: null,
       captures: [],
       openedCapture: null,
+      conversationMessages: [],
       timeline: [],
       actionEvents: [],
       runs: [],

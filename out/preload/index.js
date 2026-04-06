@@ -39,6 +39,10 @@ const electronAPI = {
     openPath: (targetPath) => electron.ipcRenderer.invoke("app:openPath", targetPath),
     copyText: (text) => electron.ipcRenderer.invoke("app:copyText", text)
   },
+  conversation: {
+    sendMessage: (request) => electron.ipcRenderer.invoke("conversation:sendMessage", request),
+    getHistory: (sessionId) => electron.ipcRenderer.invoke("conversation:getHistory", sessionId)
+  },
   selectRdcFiles: () => electron.ipcRenderer.invoke("dialog:selectRdcFiles"),
   selectDirectory: () => electron.ipcRenderer.invoke("dialog:selectDirectory"),
   workflow: {

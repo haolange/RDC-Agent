@@ -289,6 +289,106 @@ export class AgentOrchestrator {
     }
   }
 
+  async sendCoworkMessage(
+    agentId: AgentRole,
+    content: string,
+    options?: {
+      sessionId?: string;
+      signal?: AbortSignal;
+      systemPrompt?: string;
+      maxTokens?: number;
+      temperature?: number;
+    },
+  ): Promise<string> {
+    const fallbackConfig = this.agentConfigs.get(agentId);
+    if (!fallbackConfig) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+
+    this.updateAgentStatus(agentId, 'thinking');
+
+    try {
+      const settings = settingsService.getAll();
+      const routeMap = new Map(settings.llm.agentRoutes.map((route) => [route.agentId, route]));
+      const route = routeMap.get(agentId);
+      const config: AgentConfig = {
+        ...fallbackConfig,
+        modelProvider: route?.providerId || fallbackConfig.modelProvider,
+        modelName: route?.modelId || fallbackConfig.modelName,
+        systemPrompt: options?.systemPrompt || fallbackConfig.systemPrompt,
+        temperature: options?.temperature ?? fallbackConfig.temperature,
+        maxTokens: options?.maxTokens ?? fallbackConfig.maxTokens,
+      };
+
+      if (process.env.RDC_AGENT_TEST_MODE === '1') {
+        let userMessage = content;
+        try {
+          const parsed = JSON.parse(content) as { effective_user_message?: string; user_message?: string };
+          userMessage = parsed.effective_user_message || parsed.user_message || content;
+        } catch {
+          userMessage = content;
+        }
+        const lower = userMessage.toLowerCase();
+        let stub = '我在。你可以先告诉我你遇到了什么现象，或者直接说你希望我现在正式开始调试。';
+        if (/ue4|unreal/i.test(userMessage)) {
+          stub = 'UE4 是 Unreal Engine 4。它是 Epic Games 的一代游戏引擎，常见于延迟渲染、材质系统、后处理链和 Shader 调试场景。';
+        } else if (/你好|您好|hello|hi/i.test(userMessage)) {
+          stub = '你好，我是 RDC Debugger。你可以先和我聊现象、问我能力范围，等你准备好 capture 后，我再进入正式的 RenderDoc 调试。';
+        } else if (/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower)) {
+          stub = '收到，我会先帮你整理正式调试前的关键信息，然后在条件满足时进入严格执行流程。';
+        }
+        this.updateAgentStatus(agentId, 'complete');
+        return `${stub}\n<control>{"intent":"${/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower) ? 'execute' : 'talk'}","safe_to_start":${/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower) ? 'true' : 'false'}}</control>`;
+      }
+
+      llmAdapter.configure(settingsService.getLlmConfig());
+
+      const response = await llmAdapter.chat(
+        {
+          messages: [
+            {
+              role: 'system',
+              content: config.systemPrompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}`,
+            },
+            {
+              role: 'user',
+              content,
+            },
+          ],
+          model: config.modelName,
+          maxTokens: config.maxTokens,
+          temperature: config.temperature,
+          signal: options?.signal,
+        },
+        config.modelProvider,
+      );
+
+      const responseContent = typeof response.content === 'string'
+        ? response.content
+        : JSON.stringify(response.content);
+
+      runtimeLogService.log({
+        scope: options?.sessionId ? 'session' : 'app',
+        namespace: 'agent',
+        severity: 'info',
+        title: `${AGENT_DISPLAY_NAMES[agentId] || agentId} cowork turn`,
+        summary: responseContent.slice(0, 160) || '空消息',
+        sessionId: options?.sessionId,
+        raw: {
+          agentId,
+          providerId: config.modelProvider,
+          modelId: config.modelName,
+        },
+      });
+
+      this.updateAgentStatus(agentId, 'complete');
+      return responseContent;
+    } catch (error) {
+      this.updateAgentStatus(agentId, 'error');
+      throw error;
+    }
+  }
+
   /**
    * 获取 Specialist 可用工具清单（Task 4b）
    * 根据角色过滤可用工具，确保 skeptic_agent 和 curator_agent 不接收任何 live tool

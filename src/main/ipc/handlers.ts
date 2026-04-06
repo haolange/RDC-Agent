@@ -19,8 +19,10 @@ import { appPathService } from '../services/AppPathService';
 import { runtimeLogService } from '../services/RuntimeLogService';
 import { runExecutionService } from '../services/RunExecutionService';
 import { debugWorkflowService } from '../services/DebugWorkflowService';
+import { conversationService } from '../services/ConversationService';
 import type { DebugSessionStartRequest, OpenProjectInputRequest, RunSummary } from '@shared/types/session';
 import type { RuntimeLogScope } from '@shared/types/runtimeLog';
+import type { ConversationSendRequest } from '@shared/types/conversation';
 
 // WorkflowGraph 相关导入
 import { createWorkflowGraph } from '../services/WorkflowGraph';
@@ -313,6 +315,37 @@ export function registerIPCHandlers(): void {
   ipcMain.handle('app:copyText', async (_event, text: string) => {
     clipboard.writeText(text ?? '');
     return { success: true };
+  });
+
+  ipcMain.handle('conversation:sendMessage', async (_event, request: ConversationSendRequest) => {
+    const result = await conversationService.sendMessage({
+      ...request,
+      fallbackProjectId: currentProjectId,
+      fallbackSessionId: currentSessionId,
+      fallbackRunId: currentRunId,
+    });
+
+    if (result.session?.projectId) {
+      currentProjectId = result.session.projectId;
+    }
+    if (result.session?.sessionId) {
+      currentSessionId = result.session.sessionId;
+      await storageAdapter.setCurrentSessionId(result.session.sessionId);
+    }
+    if (result.runUpdate?.runId) {
+      currentRunId = result.runUpdate.runId;
+    }
+
+    return result;
+  });
+
+  ipcMain.handle('conversation:getHistory', async (_event, sessionId: string) => {
+    if (!sessionId) {
+      return { messages: [] };
+    }
+    return {
+      messages: await conversationService.getHistory(sessionId),
+    };
   });
 
   // ========== 工作流操�?==========

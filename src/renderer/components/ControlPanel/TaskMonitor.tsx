@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { WorkflowStage } from '@shared/types/workflow';
-import { AGENT_DISPLAY_NAMES, AGENT_ROLES } from '@shared/constants/agents';
+import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import { useSessionStore } from '../../stores/sessionStore';
 
 const UI_STAGES: Array<{ id: string; label: string; stages: WorkflowStage[] }> = [
@@ -11,11 +11,11 @@ const UI_STAGES: Array<{ id: string; label: string; stages: WorkflowStage[] }> =
 
 export const TaskMonitor: React.FC = () => {
   const currentRun = useSessionStore((state) => state.currentRun);
-  const timeline = useSessionStore((state) => state.timeline);
+  const workflowState = useSessionStore((state) => state.workflowState);
+  const reasoningSummaries = useSessionStore((state) => state.reasoningSummaries);
 
-  const currentStage = (currentRun?.lastStage as WorkflowStage | undefined) || 'preflight';
-  const blockerEntries = timeline.filter((entry) => entry.type === 'blocker');
-  const blockerCount = blockerEntries.length;
+  const currentStage = (currentRun?.lastStage as WorkflowStage | undefined) || workflowState?.currentStage || 'preflight';
+  const blockerCount = workflowState?.blockers.length ?? 0;
 
   const currentIndex = useMemo(() => {
     const index = UI_STAGES.findIndex((stage) => stage.stages.includes(currentStage));
@@ -26,15 +26,7 @@ export const TaskMonitor: React.FC = () => {
     ? Math.min(100, ((currentIndex + (currentStage === 'finalize' ? 1 : 0)) / UI_STAGES.length) * 100)
     : 0;
 
-  const activeAgents = useMemo(() => {
-    return timeline
-      .filter((entry) => entry.type === 'agent' && entry.agentRole && AGENT_ROLES.includes(entry.agentRole))
-      .slice(-3)
-      .map((entry) => ({
-        role: entry.agentRole!,
-        content: entry.content,
-      }));
-  }, [timeline]);
+  const recentReasoning = reasoningSummaries.slice(-2).reverse();
 
   return (
     <div className="task-monitor">
@@ -60,32 +52,32 @@ export const TaskMonitor: React.FC = () => {
         })}
       </div>
 
-      {blockerEntries.length > 0 && (
+      {blockerCount > 0 && (
         <div className="task-blockers">
-          {blockerEntries.slice(-2).map((entry) => (
-            <div key={entry.id} className="task-blocker-item">
+          {(workflowState?.blockers ?? []).slice(0, 2).map((blocker) => (
+            <div key={`${blocker.code}-${blocker.detectedAt}`} className="task-blocker-item">
               <span className="status-icon-error">!</span>
-              <span>{entry.content}</span>
+              <span>{blocker.reason}</span>
             </div>
           ))}
         </div>
       )}
 
-      {activeAgents.length > 0 && (
+      {recentReasoning.length > 0 && (
         <div className="task-agents">
           <div className="task-agents-header">
-            <span>Recent Agents</span>
-            <span className="task-agents-count">{activeAgents.length}</span>
+            <span>Recent Reasoning</span>
+            <span className="task-agents-count">{recentReasoning.length}</span>
           </div>
           <div className="task-agents-list">
-            {activeAgents.map((agent, index) => (
-              <div key={`${agent.role}-${index}`} className="task-agent">
-                <div className={`task-agent-avatar ${agent.role.replace(/(_agent|rdc-)/g, '').replace(/_/g, '-')}`}>
-                  {(AGENT_DISPLAY_NAMES[agent.role] || agent.role).charAt(0)}
+            {recentReasoning.map((summary) => (
+              <div key={summary.summaryId} className="task-agent">
+                <div className={`task-agent-avatar ${summary.agentId.replace(/(_agent|rdc-)/g, '').replace(/_/g, '-')}`}>
+                  {(AGENT_DISPLAY_NAMES[summary.agentId] || summary.agentId).charAt(0)}
                 </div>
                 <div className="task-agent-info">
-                  <span className="task-agent-name">{AGENT_DISPLAY_NAMES[agent.role] || agent.role}</span>
-                  <span className="task-agent-status">{agent.content.slice(0, 60)}</span>
+                  <span className="task-agent-name">{AGENT_DISPLAY_NAMES[summary.agentId] || summary.agentId}</span>
+                  <span className="task-agent-status">{summary.summary.slice(0, 72)}</span>
                 </div>
               </div>
             ))}
