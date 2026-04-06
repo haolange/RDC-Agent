@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import type { AgentRole } from '@shared/types/agent';
 import type { ConversationMessage } from '@shared/types/conversation';
@@ -74,35 +74,8 @@ export const AgentChat: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversationMessages]);
 
-  const clearTimeline = useCallback(() => {
-    useSessionStore.getState().setConversationMessages([]);
-  }, []);
-
   return (
     <div className="agent-chat" data-testid="agent-chat">
-      <div className="chat-header">
-        <div className="chat-header-left">
-          <div className="chat-agent-selector">
-            <div className="chat-agent-avatar debugger">R</div>
-            <div className="chat-agent-info">
-              <span className="chat-agent-name">RDC Debugger</span>
-              <span className="chat-agent-role">Chat-first assistant, strict workflow when needed</span>
-            </div>
-          </div>
-        </div>
-        <div className="chat-header-actions">
-          <button
-            className="icon-button tooltip"
-            data-tooltip="Clear chat"
-            onClick={clearTimeline}
-            aria-label="Clear chat"
-            type="button"
-          >
-            Clear
-          </button>
-        </div>
-      </div>
-
       <div className="chat-messages scrollbar-thin" data-testid="chat-messages">
         {conversationMessages.length === 0 ? (
           <div className="chat-empty-state">
