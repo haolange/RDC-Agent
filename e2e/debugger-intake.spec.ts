@@ -17,7 +17,7 @@ test('Debugger 空闲态没有旧 Start 按钮，而是统一输入条入口', a
   await expect(page.locator('input.chat-input').first()).toBeVisible();
 });
 
-test('左侧栏展开时在用户卡片下显示 Replay Device，收起后隐藏', async () => {
+test('左侧栏展开时在用户卡片下显示 Replay Device，收起后保留紧凑入口', async () => {
   const page = ctx.page;
   const userTrigger = page.locator('[data-testid="sidebar-user-settings-trigger"]');
   const deviceTrigger = page.locator('[data-testid="sidebar-device-selector-trigger"]');
@@ -37,8 +37,17 @@ test('左侧栏展开时在用户卡片下显示 Replay Device，收起后隐藏
   expect((deviceBox?.y ?? 0)).toBeGreaterThan((userBox?.y ?? 0) + (userBox?.height ?? 0) - 1);
 
   await leftToggle.click();
-  await expect(deviceTrigger).toHaveCount(0);
+  await expect(deviceTrigger).toBeVisible();
   await expect(userTrigger).toBeVisible();
+
+  const [collapsedUserBox, collapsedDeviceBox] = await Promise.all([
+    userTrigger.boundingBox(),
+    deviceTrigger.boundingBox(),
+  ]);
+
+  expect(collapsedUserBox?.width ?? 0).toBeGreaterThanOrEqual(44);
+  expect(collapsedDeviceBox?.width ?? 0).toBeGreaterThanOrEqual(44);
+  expect(Math.abs((collapsedUserBox?.width ?? 0) - (collapsedDeviceBox?.width ?? 0))).toBeLessThanOrEqual(2);
 });
 
 test('未选择项目时尝试启动会得到明确提示', async () => {

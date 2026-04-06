@@ -1,5 +1,5 @@
 /**
- * Mode Capabilities Constants - Debugger only production mode
+ * Mode Capabilities Constants
  */
 
 import type { ModeCapabilities } from '../types/workflow';
@@ -23,6 +23,20 @@ export const MODE_CAPABILITIES: Record<string, ModeCapabilities> = {
     ],
     requiresLLM: true,
     isFullyImplemented: true,
+  },
+  analyzer: {
+    mode: 'analyzer',
+    availableStages: [],
+    requiresLLM: false,
+    isFullyImplemented: false,
+    disabledReason: 'Analyzer is not implemented yet.',
+  },
+  optimizer: {
+    mode: 'optimizer',
+    availableStages: [],
+    requiresLLM: false,
+    isFullyImplemented: false,
+    disabledReason: 'Optimizer is not implemented yet.',
   },
 };
 

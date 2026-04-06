@@ -17,6 +17,8 @@ import type { ToolTraceEntry } from '@shared/types/tool';
 import type { ReplayDeviceStatusChangedPayload } from '@shared/types/device';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 import type { ResolvedTheme } from '@shared/types/settings';
+import type { ActionEvent } from '@shared/types/evidence';
+import type { AgentMode } from '@shared/types/layout';
 import type {
   CaptureDescriptor,
   ContextSnapshot,
@@ -27,6 +29,7 @@ import type {
   RunSummary,
   SessionRecord,
 } from '@shared/types/session';
+import { AGENT_MODES } from '@shared/constants/agents';
 import {
   APP_MIN_MAIN_WIDTH,
   APP_RESIZE_HANDLE_WIDTH,
@@ -75,12 +78,74 @@ const reduceOverflow = (
   };
 };
 
+const getResponsiveMinMainWidth = (containerWidth: number): number => {
+  if (containerWidth <= 420) {
+    return 240;
+  }
+  if (containerWidth <= 720) {
+    return 280;
+  }
+  if (containerWidth <= 960) {
+    return 360;
+  }
+  return APP_MIN_MAIN_WIDTH;
+};
+
+const canFitLayout = (
+  containerWidth: number,
+  leftWidth: number,
+  rightWidth: number,
+  leftCollapsed: boolean,
+  rightCollapsed: boolean,
+  minMainWidth: number,
+): boolean => {
+  const desiredLeft = leftCollapsed ? LEFT_SIDEBAR_COLLAPSED_WIDTH : leftWidth;
+  const desiredRight = rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth;
+  const availableSidebarSpace = Math.max(0, containerWidth - minMainWidth - APP_RESIZE_HANDLE_WIDTH * 2);
+  return desiredLeft + desiredRight <= availableSidebarSpace;
+};
+
+const resolveResponsiveSidebarState = (
+  containerWidth: number,
+  leftWidth: number,
+  rightWidth: number,
+  leftCollapsed: boolean,
+  rightCollapsed: boolean,
+): { leftCollapsed: boolean; rightCollapsed: boolean; minMainWidth: number } => {
+  if (containerWidth <= 0) {
+    return {
+      leftCollapsed,
+      rightCollapsed,
+      minMainWidth: APP_MIN_MAIN_WIDTH,
+    };
+  }
+
+  const minMainWidth = getResponsiveMinMainWidth(containerWidth);
+  let nextLeftCollapsed = leftCollapsed;
+  let nextRightCollapsed = rightCollapsed;
+
+  if (!canFitLayout(containerWidth, leftWidth, rightWidth, nextLeftCollapsed, nextRightCollapsed, minMainWidth)) {
+    nextRightCollapsed = true;
+  }
+
+  if (!canFitLayout(containerWidth, leftWidth, rightWidth, nextLeftCollapsed, nextRightCollapsed, minMainWidth)) {
+    nextLeftCollapsed = true;
+  }
+
+  return {
+    leftCollapsed: nextLeftCollapsed,
+    rightCollapsed: nextRightCollapsed,
+    minMainWidth,
+  };
+};
+
 const resolveSidebarWidths = (
   containerWidth: number,
   leftWidth: number,
   rightWidth: number,
   leftCollapsed: boolean,
   rightCollapsed: boolean,
+  minMainWidth: number,
 ): { left: number; right: number } => {
   if (containerWidth <= 0) {
     return {
@@ -93,7 +158,7 @@ const resolveSidebarWidths = (
   const desiredRight = rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth;
   const minLeft = leftCollapsed ? LEFT_SIDEBAR_COLLAPSED_WIDTH : LEFT_SIDEBAR_MIN_WIDTH;
   const minRight = rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : RIGHT_PANEL_MIN_WIDTH;
-  const availableSidebarSpace = Math.max(0, containerWidth - APP_MIN_MAIN_WIDTH - APP_RESIZE_HANDLE_WIDTH * 2);
+  const availableSidebarSpace = Math.max(0, containerWidth - minMainWidth - APP_RESIZE_HANDLE_WIDTH * 2);
   const desiredTotal = desiredLeft + desiredRight;
 
   if (desiredTotal <= availableSidebarSpace) {
@@ -145,6 +210,81 @@ const mergeCapturesWithSnapshot = (
   return merged;
 };
 
+const mapActionEventToTimelineEntry = (event: ActionEvent): AgentTimelineEntry | null => {
+  switch (event.event_type) {
+    case 'user_message':
+      return {
+        id: event.event_id,
+        type: 'user',
+        content: String(event.payload.content || ''),
+        timestamp: event.ts_ms,
+      };
+    case 'agent_summary':
+      return {
+        id: event.event_id,
+        type: 'agent',
+        agentRole: event.agent_id as AgentTimelineEntry['agentRole'],
+        content: String(event.payload.content || ''),
+        timestamp: event.ts_ms,
+      };
+    case 'tool_execution':
+      return {
+        id: event.event_id,
+        type: 'tool_call',
+        content: String(event.payload.tool_name || event.payload.toolName || 'tool_execution'),
+        timestamp: event.ts_ms,
+      };
+    case 'workflow_stage_transition':
+      return {
+        id: event.event_id,
+        type: 'system',
+        content: `Stage: ${String(event.payload.fromStage || 'unknown')} -> ${String(event.payload.toStage || 'unknown')}`,
+        timestamp: event.ts_ms,
+      };
+    case 'report_published':
+      return {
+        id: event.event_id,
+        type: 'system',
+        content: `Report published: ${String(event.payload.htmlPath || event.payload.markdownPath || 'reports ready')}`,
+        timestamp: event.ts_ms,
+      };
+    case 'dispatch':
+      return {
+        id: event.event_id,
+        type: 'system',
+        content: `Dispatch: ${String(event.payload.targetAgent || event.payload.target_agent || 'specialist')}`,
+        timestamp: event.ts_ms,
+      };
+    case 'blocker':
+      return {
+        id: event.event_id,
+        type: 'blocker',
+        content: String(event.payload.reason || event.payload.message || 'Blocker detected'),
+        timestamp: event.ts_ms,
+      };
+    case 'system':
+      return {
+        id: event.event_id,
+        type: 'system',
+        content: String(event.payload.message || ''),
+        timestamp: event.ts_ms,
+      };
+    default:
+      return null;
+  }
+};
+
+const PlaceholderModePage: React.FC<{ mode: AgentMode }> = ({ mode }) => (
+  <div className="debugger-page debugger-workspace" data-testid={`${mode}-placeholder-page`}>
+    <div className="workspace-shell">
+      <section className="debugger-idle-simple">
+        <div className="debugger-idle-emoji" aria-hidden="true"> </div>
+        <h1 className="debugger-idle-simple-title">{mode === 'analyzer' ? 'Analyzer' : 'Optimizer'}</h1>
+      </section>
+    </div>
+  </div>
+);
+
 const App: React.FC = () => {
   const { t } = useI18n();
   const [isLoading, setIsLoading] = useState(true);
@@ -165,10 +305,12 @@ const App: React.FC = () => {
   const currentSession = useSessionStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
   const captures = useSessionStore((state) => state.captures);
+  const currentMode = useLayoutStore((state) => state.currentMode);
   const leftSidebarCollapsed = useLayoutStore((state) => state.leftSidebarCollapsed);
   const rightPanelCollapsed = useLayoutStore((state) => state.rightPanelCollapsed);
   const leftSidebarWidth = useLayoutStore((state) => state.leftSidebarWidth);
   const rightPanelWidth = useLayoutStore((state) => state.rightPanelWidth);
+  const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
   const setLeftSidebarWidth = useLayoutStore((state) => state.setLeftSidebarWidth);
   const setRightPanelWidth = useLayoutStore((state) => state.setRightPanelWidth);
   const toggleLeftSidebar = useLayoutStore((state) => state.toggleLeftSidebar);
@@ -188,7 +330,7 @@ const App: React.FC = () => {
     ? systemTheme
     : settings.appearance.theme;
   const nickname = settings.profile.nickname || t('sidebar.userName');
-  const showWorkbenchShell = true;
+  const showWorkbenchShell = currentMode === 'debugger';
   const isTerminalOpen = useTerminalStore((state) => state.isOpen);
   const toggleTerminalOpen = useTerminalStore((state) => state.toggleOpen);
 
@@ -219,6 +361,22 @@ const App: React.FC = () => {
       mergeCapturesWithSnapshot(useSessionStore.getState().captures, snapshot),
     );
   }, []);
+  const responsiveSidebarState = useMemo(
+    () => resolveResponsiveSidebarState(
+      appBodyWidth,
+      leftSidebarWidth,
+      rightPanelWidth,
+      leftSidebarCollapsed,
+      rightPanelCollapsed,
+    ),
+    [appBodyWidth, leftSidebarCollapsed, leftSidebarWidth, rightPanelCollapsed, rightPanelWidth],
+  );
+  const effectiveLeftCollapsed = responsiveSidebarState.leftCollapsed;
+  const effectiveRightCollapsed = responsiveSidebarState.rightCollapsed;
+  const leftAutoCollapsed = !leftSidebarCollapsed && effectiveLeftCollapsed;
+  const rightAutoCollapsed = !rightPanelCollapsed && effectiveRightCollapsed;
+  const leftToggleDisabled = leftAutoCollapsed;
+  const rightToggleDisabled = rightAutoCollapsed;
 
   useEffect(() => {
     if (!shellNotice) return;
@@ -291,16 +449,26 @@ const App: React.FC = () => {
     const node = appBodyRef.current;
     if (!node) return;
 
+    const syncAppBodyWidth = () => {
+      setAppBodyWidth(Math.max(0, Math.round(window.innerWidth)));
+    };
+
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (entry) {
-        setAppBodyWidth(entry.contentRect.width);
+        setAppBodyWidth(Math.max(0, Math.round(entry.contentRect.width)));
       }
     });
 
     observer.observe(node);
-    setAppBodyWidth(node.getBoundingClientRect().width);
-    return () => observer.disconnect();
+    syncAppBodyWidth();
+    window.addEventListener('resize', syncAppBodyWidth);
+    const intervalId = window.setInterval(syncAppBodyWidth, 160);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', syncAppBodyWidth);
+      window.clearInterval(intervalId);
+    };
   }, [showWorkbenchShell]);
 
   useEffect(() => {
@@ -351,14 +519,16 @@ const App: React.FC = () => {
 
     electronAPI.events.onToolExecutionComplete((rawTrace) => {
       const trace = rawTrace as ToolTraceEntry;
-      const entry: AgentTimelineEntry = {
-        id: trace.traceId,
-        type: 'tool_call',
-        content: trace.toolName,
-        toolTrace: trace,
-        timestamp: trace.timestamp,
-      };
-      useSessionStore.getState().addTimelineEntry(entry);
+      const lastEntry = useSessionStore.getState().timeline[useSessionStore.getState().timeline.length - 1];
+      if (lastEntry?.id !== trace.traceId) {
+        useSessionStore.getState().addTimelineEntry({
+          id: trace.traceId,
+          type: 'tool_call',
+          content: trace.toolName,
+          toolTrace: trace,
+          timestamp: trace.timestamp,
+        });
+      }
     });
 
     electronAPI.events.onAgentMessage((rawMsg) => {
@@ -378,6 +548,14 @@ const App: React.FC = () => {
         useSessionStore.getState().setContextSnapshot(snapshot);
         syncCapturesFromSnapshot(snapshot);
       }).catch(() => undefined);
+    });
+
+    electronAPI.events.onEvidenceEventAdded((rawEvent) => {
+      const event = rawEvent as ActionEvent;
+      const entry = mapActionEventToTimelineEntry(event);
+      if (entry) {
+        useSessionStore.getState().addTimelineEntry(entry);
+      }
     });
 
     electronAPI.events.onWorkflowStateChanged(() => {
@@ -403,6 +581,27 @@ const App: React.FC = () => {
             }
           })
           .catch(() => undefined);
+      }
+    });
+
+    electronAPI.events.onRunStatusChanged((rawPayload) => {
+      const payload = rawPayload as {
+        runId: string;
+        sessionId: string;
+        status: RunSummary['status'];
+        lastStage?: string;
+        stopReason?: string;
+      };
+      const store = useSessionStore.getState();
+      const current = store.currentRun;
+      if (current?.runId === payload.runId) {
+        store.setCurrentRun({
+          ...current,
+          status: payload.status,
+          lastStage: payload.lastStage || current.lastStage,
+          stopReason: payload.stopReason || current.stopReason,
+          stoppedAt: ['cancelled', 'interrupted'].includes(payload.status) ? Date.now() : current.stoppedAt,
+        });
       }
     });
 
@@ -467,6 +666,8 @@ const App: React.FC = () => {
       electronAPI.events.removeAllListeners('agent:message');
       electronAPI.events.removeAllListeners('capture:statusChanged');
       electronAPI.events.removeAllListeners('workflow:stateChanged');
+      electronAPI.events.removeAllListeners('workflow:runStatusChanged');
+      electronAPI.events.removeAllListeners('evidence:eventAdded');
       electronAPI.events.removeAllListeners('device:statusChanged');
       electronAPI.events.removeAllListeners('app:themeChanged');
       electronAPI.events.removeAllListeners('project:inputsChanged');
@@ -505,6 +706,29 @@ const App: React.FC = () => {
   }, [currentProject]);
 
   useEffect(() => {
+    const electronAPI = window.electronAPI;
+    if (navigator.webdriver) {
+      return;
+    }
+
+    if (!electronAPI || !currentSession) {
+      useSessionStore.getState().setTimeline([]);
+      return;
+    }
+
+    void electronAPI.evidence.getChain()
+      .then((result) => {
+        const timeline = (result.events ?? [])
+          .map((event) => mapActionEventToTimelineEntry(event as ActionEvent))
+          .filter((entry): entry is AgentTimelineEntry => entry !== null);
+        useSessionStore.getState().setTimeline(timeline);
+      })
+      .catch(() => {
+        useSessionStore.getState().setTimeline([]);
+      });
+  }, [currentSession?.sessionId]);
+
+  useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
       const dragState = dragStateRef.current;
       if (!dragState || !appBodyRef.current) return;
@@ -514,27 +738,28 @@ const App: React.FC = () => {
         containerWidth,
         leftSidebarWidth,
         rightPanelWidth,
-        leftSidebarCollapsed,
-        rightPanelCollapsed,
+        effectiveLeftCollapsed,
+        effectiveRightCollapsed,
+        getResponsiveMinMainWidth(containerWidth),
       );
 
-      if (dragState.side === 'left' && !leftSidebarCollapsed) {
+      if (dragState.side === 'left' && !effectiveLeftCollapsed) {
         const maxByMain = Math.max(
           LEFT_SIDEBAR_MIN_WIDTH,
           Math.min(
             LEFT_SIDEBAR_MAX_WIDTH,
-            containerWidth - APP_MIN_MAIN_WIDTH - APP_RESIZE_HANDLE_WIDTH * 2 - resolvedRight,
+            containerWidth - getResponsiveMinMainWidth(containerWidth) - APP_RESIZE_HANDLE_WIDTH * 2 - resolvedRight,
           ),
         );
         setLeftSidebarWidth(Math.min(maxByMain, dragState.startWidth + (event.clientX - dragState.startX)));
       }
 
-      if (dragState.side === 'right' && !rightPanelCollapsed) {
+      if (dragState.side === 'right' && !effectiveRightCollapsed) {
         const maxByMain = Math.max(
           RIGHT_PANEL_MIN_WIDTH,
           Math.min(
             RIGHT_PANEL_MAX_WIDTH,
-            containerWidth - APP_MIN_MAIN_WIDTH - APP_RESIZE_HANDLE_WIDTH * 2 - resolvedLeft,
+            containerWidth - getResponsiveMinMainWidth(containerWidth) - APP_RESIZE_HANDLE_WIDTH * 2 - resolvedLeft,
           ),
         );
         setRightPanelWidth(Math.min(maxByMain, dragState.startWidth - (event.clientX - dragState.startX)));
@@ -555,10 +780,10 @@ const App: React.FC = () => {
       window.removeEventListener('pointerup', handlePointerUp);
     };
   }, [
-    leftSidebarCollapsed,
+    effectiveLeftCollapsed,
     leftSidebarWidth,
     persistLayout,
-    rightPanelCollapsed,
+    effectiveRightCollapsed,
     rightPanelWidth,
     setLeftSidebarWidth,
     setRightPanelWidth,
@@ -569,17 +794,24 @@ const App: React.FC = () => {
   const selectedDeviceEntry = devices.find((device) => device.id === selectedDevice);
   const primaryCapture = captures.find((descriptor) => descriptor.role === 'primary') ?? null;
   const hasRemoteCapture = captures.some((descriptor) => descriptor.backendHint === 'remote');
-  const showMainPromptBar = true;
-
+  const showMainPromptBar = currentMode === 'debugger';
   const resolvedWidths = useMemo(
     () => resolveSidebarWidths(
       appBodyWidth,
       leftSidebarWidth,
       rightPanelWidth,
-      leftSidebarCollapsed,
-      rightPanelCollapsed,
+      effectiveLeftCollapsed,
+      effectiveRightCollapsed,
+      responsiveSidebarState.minMainWidth,
     ),
-    [appBodyWidth, leftSidebarCollapsed, leftSidebarWidth, rightPanelCollapsed, rightPanelWidth],
+    [
+      appBodyWidth,
+      effectiveLeftCollapsed,
+      effectiveRightCollapsed,
+      leftSidebarWidth,
+      responsiveSidebarState.minMainWidth,
+      rightPanelWidth,
+    ],
   );
 
   const handleWindowMinimize = useCallback(async () => {
@@ -609,6 +841,18 @@ const App: React.FC = () => {
     setUserMenuAnchor(null);
     setSettingsModalOpen(true);
   }, []);
+
+  const handleStopRun = useCallback(async () => {
+    const electronAPI = window.electronAPI;
+    if (!electronAPI || !currentRun) return;
+
+    try {
+      await electronAPI.workflow.stop(currentRun.runId);
+      showNotice('已请求停止当前调试任务。');
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : 'Failed to stop run.');
+    }
+  }, [currentRun, showNotice]);
 
   const handlePromptSend = useCallback(async () => {
     const trimmed = promptValue.trim();
@@ -683,7 +927,7 @@ const App: React.FC = () => {
           goal: trimmed,
           captures,
           startedAt: Date.now(),
-          status: 'running',
+          status: 'queued',
           lastStage: 'preflight',
           backend: captures.some((descriptor) => descriptor.backendHint === 'remote') ? 'remote' : 'local',
         });
@@ -767,7 +1011,7 @@ const App: React.FC = () => {
     setIsResizing(true);
   }, []);
 
-  const renderMainPage = () => <DebuggerPage />;
+  const renderMainPage = () => (currentMode === 'debugger' ? <DebuggerPage /> : <PlaceholderModePage mode={currentMode} />);
 
   if (isLoading) {
     return (
@@ -791,7 +1035,20 @@ const App: React.FC = () => {
           </div>
         </div>
         <div className="app-titlebar-center no-drag">
-          <div className="app-logo-text">Debugger</div>
+          <div className="mode-switcher" role="tablist" aria-label="Mode switcher">
+            {AGENT_MODES.map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                className={`mode-switcher-item ${currentMode === mode.id ? 'active' : ''}`}
+                role="tab"
+                aria-selected={currentMode === mode.id}
+                onClick={() => setCurrentMode(mode.id)}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="app-titlebar-right no-drag">
           <div className="window-controls" role="group" aria-label="Window controls">
@@ -826,7 +1083,7 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      {showWorkbenchShell && (
+      {showWorkbenchShell ? (
         <div
           ref={appBodyRef}
           className={`app-body ${isResizing ? 'is-resizing' : ''}`}
@@ -837,20 +1094,21 @@ const App: React.FC = () => {
           }}
         >
           <aside
-            className={`app-sidebar-left ${leftSidebarCollapsed ? 'collapsed' : ''}`}
+            className={`app-sidebar-left ${effectiveLeftCollapsed ? 'collapsed' : ''}`}
             data-testid="app-sidebar-left"
           >
             <div className="shell-panel-header shell-panel-header-left">
               <button
                 type="button"
                 className="shell-panel-toggle"
-                onClick={() => void toggleLeftSidebar()}
-                aria-label={leftSidebarCollapsed ? 'Expand left sidebar' : 'Collapse left sidebar'}
-                title={leftSidebarCollapsed ? '展开左侧栏' : '收起左侧栏'}
+                onClick={!leftToggleDisabled ? () => void toggleLeftSidebar() : undefined}
+                aria-label={effectiveLeftCollapsed ? 'Expand left sidebar' : 'Collapse left sidebar'}
+                title={leftToggleDisabled ? '窗口过窄，左侧栏已自动收起' : (effectiveLeftCollapsed ? '展开左侧栏' : '收起左侧栏')}
+                disabled={leftToggleDisabled}
               >
                 <span className="shell-panel-toggle-icon">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    {leftSidebarCollapsed ? (
+                    {effectiveLeftCollapsed ? (
                       <polyline points="9 18 15 12 9 6" />
                     ) : (
                       <polyline points="15 18 9 12 15 6" />
@@ -860,15 +1118,15 @@ const App: React.FC = () => {
               </button>
             </div>
             <nav className="sidebar-nav">
-              <Sidebar collapsed={leftSidebarCollapsed} />
+              <Sidebar collapsed={effectiveLeftCollapsed} />
             </nav>
             <div
-              className={`app-sidebar-footer ${leftSidebarCollapsed ? 'collapsed' : ''}`}
+              className={`app-sidebar-footer ${effectiveLeftCollapsed ? 'collapsed' : ''}`}
               data-testid="sidebar-footer"
             >
               <button
                 type="button"
-                className={`footer-entry footer-user-trigger sidebar-user-trigger sidebar-footer-entry ${leftSidebarCollapsed ? 'collapsed' : ''}`}
+                className={`footer-entry footer-user-trigger sidebar-user-trigger sidebar-footer-entry ${effectiveLeftCollapsed ? 'collapsed' : ''}`}
                 data-testid="sidebar-user-settings-trigger"
                 onClick={handleUserMenuOpen}
                 title={t('sidebar.userSettings')}
@@ -877,7 +1135,7 @@ const App: React.FC = () => {
                 <span className="footer-entry-avatar">
                   {nickname.trim().slice(0, 2).toUpperCase()}
                 </span>
-                {!leftSidebarCollapsed && (
+                {!effectiveLeftCollapsed && (
                   <>
                     <span className="footer-entry-copy">
                       <span className="footer-entry-title">{nickname}</span>
@@ -891,19 +1149,23 @@ const App: React.FC = () => {
                   </>
                 )}
               </button>
-              <DeviceSelector collapsed={leftSidebarCollapsed} />
+              <DeviceSelector collapsed={effectiveLeftCollapsed} />
             </div>
           </aside>
 
           <div
-            className={`panel-resize-handle ${leftSidebarCollapsed ? 'disabled' : ''}`}
-            onPointerDown={!leftSidebarCollapsed ? startDragging('left', resolvedWidths.left) : undefined}
+            className={`panel-resize-handle panel-resize-handle-left ${effectiveLeftCollapsed ? 'disabled' : ''}`}
+            onPointerDown={!effectiveLeftCollapsed ? startDragging('left', resolvedWidths.left) : undefined}
             aria-hidden="true"
           />
 
           <main className="app-main">
             <div className="main-content">
-              {shellNotice && <div className="shell-notice">{shellNotice}</div>}
+              {shellNotice && (
+                <div className="shell-notice" role="status" aria-live="polite">
+                  {shellNotice}
+                </div>
+              )}
               <div className="main-utility-bar">
                 <div className="main-utility-spacer" />
                 <button
@@ -931,12 +1193,30 @@ const App: React.FC = () => {
                   <input
                     type="text"
                     className="chat-input"
+                    name="debuggerPrompt"
                     value={promptValue}
                     onChange={(event) => setPromptValue(event.target.value)}
                     onKeyDown={handlePromptKeyDown}
                     placeholder={t('app.inputPlaceholder')}
+                    aria-label={t('app.inputPlaceholder')}
                   />
+                  {currentRun && ['queued', 'running', 'stopping'].includes(currentRun.status) && (
+                    <button
+                      type="button"
+                      className="chat-send-button chat-stop-button"
+                      data-testid="debugger-stop-button"
+                      onClick={() => void handleStopRun()}
+                      disabled={currentRun.status === 'stopping'}
+                      aria-label="Stop debugger run"
+                      title="停止当前调试"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <rect x="6" y="6" width="12" height="12" rx="1" />
+                      </svg>
+                    </button>
+                  )}
                   <button
+                    type="button"
                     className="chat-send-button"
                     data-testid={currentRun ? 'debugger-send-button' : 'debugger-start-button'}
                     onClick={() => void handlePromptSend()}
@@ -956,26 +1236,27 @@ const App: React.FC = () => {
           </main>
 
           <div
-            className={`panel-resize-handle ${rightPanelCollapsed ? 'disabled' : ''}`}
-            onPointerDown={!rightPanelCollapsed ? startDragging('right', resolvedWidths.right) : undefined}
+            className={`panel-resize-handle panel-resize-handle-right ${effectiveRightCollapsed ? 'disabled' : ''}`}
+            onPointerDown={!effectiveRightCollapsed ? startDragging('right', resolvedWidths.right) : undefined}
             aria-hidden="true"
           />
 
           <aside
-            className={`app-sidebar-right ${rightPanelCollapsed ? 'collapsed' : ''}`}
+            className={`app-sidebar-right ${effectiveRightCollapsed ? 'collapsed' : ''}`}
             data-testid="app-sidebar-right"
           >
             <div className="shell-panel-header shell-panel-header-right">
               <button
                 type="button"
                 className="shell-panel-toggle"
-                onClick={() => void toggleRightPanel()}
-                aria-label={rightPanelCollapsed ? 'Expand right panel' : 'Collapse right panel'}
-                title={rightPanelCollapsed ? '展开右侧栏' : '收起右侧栏'}
+                onClick={!rightToggleDisabled ? () => void toggleRightPanel() : undefined}
+                aria-label={effectiveRightCollapsed ? 'Expand right panel' : 'Collapse right panel'}
+                title={rightToggleDisabled ? '窗口过窄，右侧栏已自动收起' : (effectiveRightCollapsed ? '展开右侧栏' : '收起右侧栏')}
+                disabled={rightToggleDisabled}
               >
                 <span className="shell-panel-toggle-icon">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    {rightPanelCollapsed ? (
+                    {effectiveRightCollapsed ? (
                       <polyline points="9 18 15 12 9 6" />
                     ) : (
                       <polyline points="15 18 9 12 15 6" />
@@ -985,12 +1266,20 @@ const App: React.FC = () => {
               </button>
             </div>
             <div
-              className={`right-panel-body ${rightPanelCollapsed ? 'collapsed' : ''}`}
+              className={`right-panel-body ${effectiveRightCollapsed ? 'collapsed' : ''}`}
               data-testid="control-panel-scroll"
             >
               <ControlPanel />
             </div>
           </aside>
+        </div>
+      ) : (
+        <div className="app-main app-mode-placeholder">
+          <div className="main-content">
+            <div className="main-page-shell">
+              {renderMainPage()}
+            </div>
+          </div>
         </div>
       )}
 

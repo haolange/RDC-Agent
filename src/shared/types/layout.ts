@@ -3,7 +3,7 @@
  */
 
 // Agent 工作模式
-export type AgentMode = 'debugger';
+export type AgentMode = 'debugger' | 'analyzer' | 'optimizer';
 
 // 模式配置
 export interface ModeConfig {

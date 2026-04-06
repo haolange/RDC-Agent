@@ -45,7 +45,7 @@ export interface StagePolicy {
 export interface ModeProfile {
   id: string;
   label: string;
-  mode: 'debugger';
+  mode: import('./session').AppMode;
   stagePolicies: Partial<Record<WorkflowStage, string>>;
   defaultAgentPrompts: Partial<Record<AgentRole, string>>;
 }

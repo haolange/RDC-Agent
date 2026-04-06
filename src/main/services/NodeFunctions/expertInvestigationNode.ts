@@ -11,9 +11,11 @@ import {
   createStageTransitionEvidence,
   createToolExecutionEvidence,
   createArtifact,
+  ensureRunActive,
   nowIso,
   resolveAgentRuntimeConfig,
 } from './utils';
+import { runExecutionService } from '../RunExecutionService';
 
 /** Expert Investigation 节点配置 */
 export interface ExpertInvestigationConfig {
@@ -87,6 +89,7 @@ export async function expertInvestigationNode(
   state: GraphState,
   config: ExpertInvestigationConfig = {}
 ): Promise<Partial<GraphState>> {
+  ensureRunActive(state.runId);
   const evidenceChain: GraphState['evidenceChain'] = [];
   const artifacts: GraphState['artifacts'] = [];
 
@@ -113,10 +116,12 @@ export async function expertInvestigationNode(
       model: modelConfig.modelId,
       maxTokens: 4096,
       temperature: 0.3, // 较低温度以获得更确定的分析
+      signal: runExecutionService.getAbortSignal(state.runId) ?? undefined,
     };
 
     // 调用 LLM
     const response = await llmAdapter.chat(request, modelConfig.providerId);
+    ensureRunActive(state.runId);
 
     const investigationResult = typeof response.content === 'string'
       ? response.content

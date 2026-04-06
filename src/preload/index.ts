@@ -16,6 +16,8 @@ const validChannels = [
   'app:themeChanged',
   'workflow:stateChanged',
   'workflow:stageChanged',
+  'workflow:runStatusChanged',
+  'workflow:blocked',
   'agent:message',
   'agent:statusChanged',
   'tool:executionComplete',
@@ -57,7 +59,9 @@ const electronAPI = {
     getState: (): Promise<unknown> => ipcRenderer.invoke('workflow:getState'),
     start: (request: unknown): Promise<unknown> => ipcRenderer.invoke('workflow:start', request),
     resume: (sessionId?: string): Promise<unknown> => ipcRenderer.invoke('workflow:resume', sessionId),
+    stop: (runId?: string): Promise<unknown> => ipcRenderer.invoke('workflow:stop', runId),
     listRuns: (): Promise<unknown> => ipcRenderer.invoke('workflow:listRuns'),
+    listActiveRuns: (): Promise<unknown> => ipcRenderer.invoke('workflow:listActiveRuns'),
     advanceStage: (): Promise<unknown> => ipcRenderer.invoke('workflow:advanceStage'),
     backtrack: (reason: string, trigger: string): Promise<unknown> => ipcRenderer.invoke('workflow:backtrack', reason, trigger),
     dispatchSpecialist: (agentId: string, objective: string): Promise<unknown> => ipcRenderer.invoke('workflow:dispatchSpecialist', agentId, objective),
@@ -118,6 +122,8 @@ const electronAPI = {
       ipcRenderer.invoke('session:create', projectId, title),
     rename: (id: string, title: string): Promise<{ success: boolean; session?: SessionRecord; error?: string }> =>
       ipcRenderer.invoke('session:rename', id, title),
+    remove: (id: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('session:remove', id),
     select: (id: string): Promise<unknown> => ipcRenderer.invoke('session:select', id),
   },
 
@@ -151,6 +157,9 @@ const electronAPI = {
     },
     onWorkflowStageChanged: (callback: (data: unknown) => void): void => {
       ipcRenderer.on('workflow:stageChanged', (_event, data) => callback(data));
+    },
+    onRunStatusChanged: (callback: (data: unknown) => void): void => {
+      ipcRenderer.on('workflow:runStatusChanged', (_event, data) => callback(data));
     },
     onAgentMessage: (callback: (msg: unknown) => void): void => {
       ipcRenderer.on('agent:message', (_event, msg) => callback(msg));

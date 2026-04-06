@@ -4,7 +4,7 @@
 
 import type { ReplayDeviceEntry } from './device';
 
-export type AppMode = 'debugger';
+export type AppMode = 'debugger' | 'analyzer' | 'optimizer';
 
 export interface ProjectInputRecord {
   inputId: string;
@@ -36,9 +36,17 @@ export interface SessionRecord {
   projectId: string;
   title: string;
   goal: string;
+  sessionPath: string;
   createdAt: number;
   updatedAt: number;
   lastRunId?: string;
+}
+
+export interface RunReportPaths {
+  reportsDir: string;
+  markdownPath?: string;
+  jsonPath?: string;
+  htmlPath?: string;
 }
 
 export interface CaptureInfo {
@@ -100,9 +108,12 @@ export interface RunRecord {
   captures: CaptureDescriptor[];
   startedAt: number;
   finishedAt?: number;
-  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  stoppedAt?: number;
+  status: 'queued' | 'running' | 'stopping' | 'completed' | 'failed' | 'cancelled' | 'interrupted';
+  stopReason?: string;
   lastStage: string;
   backend: 'local' | 'remote';
+  reportPaths?: RunReportPaths;
 }
 
 export type RunSummary = RunRecord;

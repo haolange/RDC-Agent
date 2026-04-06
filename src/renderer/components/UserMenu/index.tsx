@@ -138,6 +138,9 @@ export const UserMenu: React.FC<UserMenuProps> = ({
         ref={menuRef}
         className="user-menu-popover visible"
         data-testid="sidebar-user-menu"
+        role="dialog"
+        aria-modal="false"
+        aria-label={t('sidebar.userSettings')}
         style={{
           left: position.left,
           top: position.top,

@@ -230,7 +230,10 @@ export class AgentOrchestrator {
       runId?: string;
       sessionId?: string;
       stageId?: WorkflowStage;
-    }
+    },
+    options?: {
+      signal?: AbortSignal;
+    },
   ): Promise<string> {
     const fallbackConfig = this.agentConfigs.get(agentId);
     if (!fallbackConfig) {
@@ -264,6 +267,7 @@ export class AgentOrchestrator {
           model: config.modelName,
           maxTokens: config.maxTokens,
           temperature: config.temperature,
+          signal: options?.signal,
         },
         config.modelProvider
       );
@@ -461,6 +465,21 @@ export class AgentOrchestrator {
       content,
       timestamp: nowMs(),
     };
+
+    if (context.runId) {
+      await storageAdapter.appendActionEvent(context.sessionId, storageAdapter.createActionEvent({
+        runId: context.runId,
+        sessionId: context.sessionId,
+        agentId,
+        eventType: role === 'user' ? 'user_message' : role === 'assistant' ? 'agent_summary' : 'system',
+        status: role === 'system' ? 'warning' : 'ok',
+        payload: {
+          role,
+          content,
+          message_id: message.id,
+        },
+      }));
+    }
 
     // 通知UI
     this.notifyMessage(message, context?.sessionId);

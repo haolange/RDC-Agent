@@ -69,6 +69,7 @@ class OpenRouterProvider implements LLMProvider {
         'HTTP-Referer': 'https://rdcagent.local',
         'X-Title': 'RdcAgent',
       },
+      signal: request.signal,
       body: JSON.stringify({
         model,
         messages: toContentBlocks(request.messages),
@@ -145,6 +146,7 @@ class OpenAICompatibleProvider implements LLMProvider {
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers,
+      signal: request.signal,
       body: JSON.stringify({
         model,
         messages: request.messages,
@@ -220,6 +222,7 @@ class AnthropicProvider implements LLMProvider {
         'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
+      signal: request.signal,
       body: JSON.stringify({
         model,
         max_tokens: request.maxTokens || 4096,

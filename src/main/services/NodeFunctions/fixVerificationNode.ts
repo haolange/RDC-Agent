@@ -10,10 +10,12 @@ import { llmAdapter } from '../../adapters/LLMAdapter';
 import {
   createStageTransitionEvidence,
   createBlocker,
+  ensureRunActive,
   nowIso,
   resolveAgentRuntimeConfig,
 } from './utils';
 import { BLOCKER_CODES } from '../../../shared/constants/blockers';
+import { runExecutionService } from '../RunExecutionService';
 
 /** Fix Verification 节点配置 */
 export interface FixVerificationConfig {
@@ -94,6 +96,7 @@ export async function fixVerificationNode(
   state: GraphState,
   config: FixVerificationConfig = {}
 ): Promise<Partial<GraphState>> {
+  ensureRunActive(state.runId);
   const evidenceChain: GraphState['evidenceChain'] = [];
   const blockers: GraphState['blockers'] = [];
   const backtrackCount: GraphState['backtrackCount'] = { ...state.backtrackCount };
@@ -124,10 +127,12 @@ export async function fixVerificationNode(
       model: modelConfig.modelId,
       maxTokens: 2048,
       temperature: 0.2,
+      signal: runExecutionService.getAbortSignal(state.runId) ?? undefined,
     };
 
     // 调用 LLM
     const response = await llmAdapter.chat(request, modelConfig.providerId);
+    ensureRunActive(state.runId);
 
     const verificationResult = typeof response.content === 'string'
       ? response.content
