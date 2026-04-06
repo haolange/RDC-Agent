@@ -17,7 +17,16 @@ import {
   sanitizeToken,
 } from '@shared/utils/id';
 import type { ActionEvent } from '@shared/types/evidence';
-import type { WorkflowStage, WorkflowState, Blocker } from '@shared/types/workflow';
+import type {
+  AskUserPrompt,
+  DebugPlan,
+  IntakeContext,
+  PlanApprovalState,
+  ReasoningSummary,
+  WorkflowStage,
+  WorkflowState,
+  Blocker,
+} from '@shared/types/workflow';
 import { normalizeWorkflowStage } from '@shared/constants/stages';
 import type {
   AppMode,
@@ -51,6 +60,36 @@ interface PersistedRunRecord extends RunRecord {
     session_id: string;
     workflow_stage: WorkflowStage;
   };
+}
+
+interface SessionEvidenceRecord {
+  schema_version: '1';
+  session_id: string;
+  project_id: string;
+  latest_run_id: string | null;
+  latest_run_status: RunRecord['status'] | null;
+  latest_stage: string | null;
+  updated_at: string;
+  debug_plan: {
+    plan_id: string;
+    readiness: string;
+    strict_ready: boolean;
+    target_capture: string | null;
+    target_scope: string | null;
+    deliverables: string[];
+  } | null;
+  event_counts: Record<string, number>;
+  active_blockers: Blocker[];
+  verification_summary: string[];
+  reasoning_summaries: ReasoningSummary[];
+  report_paths: RunRecord['reportPaths'] | null;
+}
+
+export interface PersistedPlanSnapshot {
+  debug_plan: DebugPlan | null;
+  pending_questions: AskUserPrompt | null;
+  approval_state: PlanApprovalState;
+  intake_context?: IntakeContext;
 }
 
 export class StorageAdapter {
@@ -268,6 +307,10 @@ export class StorageAdapter {
     this.ensureDir(path.join(sessionPath, 'timeline'));
     this.ensureDir(path.join(sessionPath, 'runs'));
     this.writeJson(path.join(sessionPath, 'session.json'), session);
+    if (!fs.existsSync(path.join(sessionPath, 'action_chain.jsonl'))) {
+      fs.writeFileSync(path.join(sessionPath, 'action_chain.jsonl'), '', 'utf-8');
+    }
+    this.syncSessionEvidence(session.sessionId, session.projectId);
 
     this.touchProject(project.projectId, session.sessionId, timestamp);
     this.setCurrentProjectId(projectId);
@@ -425,7 +468,7 @@ export class StorageAdapter {
     this.ensureDir(path.join(runPath, 'screenshots'));
     this.ensureDir(path.join(runPath, 'checkpoints'));
 
-    const captures = input.captures && input.captures.length > 0
+    const captures = input.captures
       ? input.captures
       : input.capturePaths.map((filePath, index) => ({
           id: `cap-${index}`,
@@ -470,6 +513,11 @@ export class StorageAdapter {
         source_path: capture.filePath,
       })),
     });
+    writeYaml(path.join(runPath, 'notes', 'debug_plan.yaml'), {
+      debug_plan: null,
+      pending_questions: null,
+      approval_state: 'not_requested',
+    } satisfies PersistedPlanSnapshot);
     writeYaml(path.join(runPath, 'notes', 'hypothesis_board.yaml'), {
       hypothesis_board: {
         session_id: sessionId,
@@ -492,6 +540,7 @@ export class StorageAdapter {
       goal: persistedRun.goal,
       lastRunId: runId,
     });
+    this.syncSessionEvidence(sessionId, session.projectId);
     this.touchProject(session.projectId, sessionId);
     this.setCurrentProjectId(session.projectId);
     this.setCurrentSessionId(sessionId);
@@ -532,6 +581,7 @@ export class StorageAdapter {
     this.updateSession(caseId, {
       lastRunId: runId,
     });
+    this.syncSessionEvidence(caseId, existing.projectId);
   }
 
   async writeArtifact(caseId: string, runId: string, artifactName: string, data: unknown): Promise<string> {
@@ -553,9 +603,60 @@ export class StorageAdapter {
     return path.join(location.sessionPath, 'action_chain.jsonl');
   }
 
+  getSessionEvidencePath(sessionId: string): string {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) {
+      throw new Error(`Session not found for session evidence: ${sessionId}`);
+    }
+    return path.join(location.sessionPath, 'session_evidence.yaml');
+  }
+
+  getDebugPlanPath(sessionId: string, runId: string): string {
+    return path.join(this.getRunPath(sessionId, runId), 'notes', 'debug_plan.yaml');
+  }
+
+  readSessionEvidence(sessionId: string): SessionEvidenceRecord | null {
+    return readYaml<SessionEvidenceRecord>(this.getSessionEvidencePath(sessionId));
+  }
+
+  readDebugPlan(sessionId: string, runId: string): DebugPlan | null {
+    const payload = readYaml<PersistedPlanSnapshot>(this.getDebugPlanPath(sessionId, runId));
+    return payload?.debug_plan ?? null;
+  }
+
+  writeDebugPlan(sessionId: string, runId: string, debugPlan: DebugPlan | null): void {
+    const existing = this.readPlanSnapshot(sessionId, runId);
+    writeYaml(this.getDebugPlanPath(sessionId, runId), {
+      debug_plan: debugPlan,
+      pending_questions: existing?.pending_questions ?? null,
+      approval_state: existing?.approval_state ?? 'not_requested',
+      intake_context: existing?.intake_context,
+    } satisfies PersistedPlanSnapshot);
+    const session = this.readSession(sessionId);
+    if (session) {
+      this.syncSessionEvidence(sessionId, session.projectId);
+    }
+  }
+
+  readPlanSnapshot(sessionId: string, runId: string): PersistedPlanSnapshot | null {
+    return readYaml<PersistedPlanSnapshot>(this.getDebugPlanPath(sessionId, runId));
+  }
+
+  writePlanSnapshot(sessionId: string, runId: string, snapshot: PersistedPlanSnapshot): void {
+    writeYaml(this.getDebugPlanPath(sessionId, runId), snapshot);
+    const session = this.readSession(sessionId);
+    if (session) {
+      this.syncSessionEvidence(sessionId, session.projectId);
+    }
+  }
+
   async appendActionEvent(sessionId: string, event: ActionEvent): Promise<void> {
     appendJsonl(this.getActionChainPath(sessionId), event);
     this.updateSession(sessionId, {});
+    const session = this.readSession(sessionId);
+    if (session) {
+      this.syncSessionEvidence(sessionId, session.projectId);
+    }
   }
 
   async readActionChain(sessionId: string): Promise<ActionEvent[]> {
@@ -659,6 +760,70 @@ export class StorageAdapter {
       }
     }
     this.writeSelection(selection);
+  }
+
+  private syncSessionEvidence(sessionId: string, projectId: string): void {
+    const latestRun = this.getLatestRun(sessionId);
+    const actionEvents = fs.existsSync(this.getActionChainPath(sessionId))
+      ? readJsonl<ActionEvent>(this.getActionChainPath(sessionId))
+      : [];
+    const eventCounts = actionEvents.reduce<Record<string, number>>((acc, event) => {
+      acc[event.event_type] = (acc[event.event_type] || 0) + 1;
+      return acc;
+    }, {});
+    const debugPlan = latestRun ? this.readDebugPlan(sessionId, latestRun.runId) : null;
+    const activeBlockers = actionEvents
+      .filter((event) => event.event_type === 'blocker')
+      .map((event) => ({
+        code: String(event.payload.code || 'BLOCKER'),
+        reason: String(event.payload.reason || event.payload.message || 'Blocker'),
+        refs: Array.isArray(event.refs) ? event.refs : [],
+        detectedAt: new Date(event.ts_ms).toISOString(),
+      }));
+    const verificationSummary = actionEvents
+      .filter((event) => event.event_type === 'verification')
+      .slice(-5)
+      .map((event) => String(event.payload.summary || event.payload.verdict || event.payload.verification_kind || 'verification'));
+    const reasoningSummaries = actionEvents
+      .filter((event) => event.event_type === 'agent_summary')
+      .slice(-10)
+      .map((event, index) => ({
+        summaryId: `summary-${index}-${event.event_id}`,
+        stage: normalizeWorkflowStage(String(event.payload.stage || latestRun?.lastStage || 'plan')),
+        agentId: String(event.agent_id) as ReasoningSummary['agentId'],
+        summary: String(event.payload.summary || event.payload.content || ''),
+        evidence: Array.isArray(event.payload.evidence) ? event.payload.evidence.map(String) : [],
+        nextStep: String(event.payload.next_step || event.payload.nextStep || ''),
+        confidence: typeof event.payload.confidence === 'number' ? event.payload.confidence : 0.5,
+        createdAt: new Date(event.ts_ms).toISOString(),
+      }));
+
+    const record: SessionEvidenceRecord = {
+      schema_version: '1',
+      session_id: sessionId,
+      project_id: projectId,
+      latest_run_id: latestRun?.runId || null,
+      latest_run_status: latestRun?.status || null,
+      latest_stage: latestRun?.lastStage || null,
+      updated_at: nowIso(),
+      debug_plan: debugPlan
+        ? {
+            plan_id: debugPlan.planId,
+            readiness: debugPlan.planReadiness,
+            strict_ready: debugPlan.strictReady,
+            target_capture: debugPlan.targetCapture?.fileName || null,
+            target_scope: debugPlan.targetFrameOrEvent?.scope || null,
+            deliverables: debugPlan.expectedDeliverables,
+          }
+        : null,
+      event_counts: eventCounts,
+      active_blockers: activeBlockers,
+      verification_summary: verificationSummary,
+      reasoning_summaries: reasoningSummaries,
+      report_paths: latestRun?.reportPaths || null,
+    };
+
+    writeYaml(this.getSessionEvidencePath(sessionId), record);
   }
 
   private bootstrapGlobalKnowledge(): void {
@@ -942,9 +1107,12 @@ export class StorageAdapter {
       captures: run.captures,
       startedAt: run.startedAt,
       finishedAt: run.finishedAt,
+      stoppedAt: run.stoppedAt,
       status: run.status,
+      stopReason: run.stopReason,
       lastStage: run.lastStage,
       backend: run.backend,
+      reportPaths: run.reportPaths,
     };
   }
 

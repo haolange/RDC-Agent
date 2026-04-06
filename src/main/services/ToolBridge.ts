@@ -17,6 +17,11 @@ interface WindowsLauncherSpec {
   comSpec: string;
 }
 
+interface DirectCliSpec {
+  pythonPath: string;
+  runCliPath: string;
+}
+
 export class ToolBridge {
   private toolsPath: string;
   private catalog: ToolCatalog | null = null;
@@ -63,6 +68,59 @@ export class ToolBridge {
    */
   getRdxPath(): string {
     return path.join(this.toolsPath, 'rdx.bat');
+  }
+
+  private resolveDirectCliSpec(): DirectCliSpec {
+    const pythonPath = path.join(this.toolsPath, 'binaries', 'windows', 'x64', 'python', 'python.exe');
+    const runCliPath = path.join(this.toolsPath, 'cli', 'run_cli.py');
+    if (!fs.existsSync(pythonPath)) {
+      throw new Error(`Bundled python not found: ${pythonPath}`);
+    }
+    if (!fs.existsSync(runCliPath)) {
+      throw new Error(`CLI launcher not found: ${runCliPath}`);
+    }
+    return {
+      pythonPath,
+      runCliPath,
+    };
+  }
+
+  private normalizeCliArgs(args: string[]): string[] {
+    const normalized: string[] = [];
+    for (let index = 0; index < args.length; index += 1) {
+      const current = args[index];
+      if (current === '--context-id') {
+        normalized.push('--daemon-context');
+        continue;
+      }
+      normalized.push(current);
+    }
+    return normalized;
+  }
+
+  private buildDirectCliArgs(command: string, args: string[]): string[] {
+    const normalized = this.normalizeCliArgs(args);
+    const globalArgs: string[] = [];
+    const commandArgs: string[] = [];
+
+    for (let index = 0; index < normalized.length; index += 1) {
+      const current = normalized[index];
+      if (current === '--daemon-context') {
+        const value = normalized[index + 1];
+        if (value) {
+          globalArgs.push(current, value);
+          index += 1;
+          continue;
+        }
+      }
+      commandArgs.push(current);
+    }
+
+    return [
+      ...globalArgs,
+      command,
+      ...commandArgs,
+    ];
   }
 
   private resolveWindowsLauncher(): WindowsLauncherSpec {
@@ -159,47 +217,77 @@ export class ToolBridge {
       };
     }
 
-    let launcher: WindowsLauncherSpec;
+    let directCli: DirectCliSpec | null = null;
     try {
-      launcher = this.resolveWindowsLauncher();
-    } catch (error) {
-      return {
-        exitCode: 2,
-        stdout: '',
-        stderr: error instanceof Error ? error.message : String(error),
-        duration_ms: nowMs() - startTime,
-      };
+      directCli = this.resolveDirectCliSpec();
+    } catch {
+      directCli = null;
     }
 
     return new Promise((resolve, reject) => {
-      const proc = spawn(
-        launcher.powershellPath,
-        [
-          '-NoProfile',
-          '-NoLogo',
-          '-NonInteractive',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-File',
-          launcher.launcherScriptPath,
-          '--non-interactive',
-          'cli',
-          command,
-          ...args,
-        ],
-        {
-          cwd: options.cwd || this.toolsPath,
-          env: {
-            ...process.env,
-            ...options.env,
-            RDX_TOOLS_ROOT: this.toolsPath,
-            PYTHONIOENCODING: 'utf-8',
-            SystemRoot: launcher.systemRoot,
-            ComSpec: launcher.comSpec,
+      let proc: ChildProcess;
+      if (directCli) {
+        proc = spawn(
+          directCli.pythonPath,
+          [
+            directCli.runCliPath,
+            ...this.buildDirectCliArgs(command, args),
+          ],
+          {
+            cwd: options.cwd || this.toolsPath,
+            env: {
+              ...process.env,
+              ...options.env,
+              RDX_TOOLS_ROOT: this.toolsPath,
+              PYTHONIOENCODING: 'utf-8',
+              RDX_LAUNCHER_PROG: 'rdx.bat --non-interactive cli',
+            },
+            windowsHide: true,
           },
-          windowsHide: true,
+        );
+      } else {
+        let launcher: WindowsLauncherSpec;
+        try {
+          launcher = this.resolveWindowsLauncher();
+        } catch (error) {
+          resolve({
+            exitCode: 2,
+            stdout: '',
+            stderr: error instanceof Error ? error.message : String(error),
+            duration_ms: nowMs() - startTime,
+          });
+          return;
         }
-      );
+
+        proc = spawn(
+          launcher.powershellPath,
+          [
+            '-NoProfile',
+            '-NoLogo',
+            '-NonInteractive',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-File',
+            launcher.launcherScriptPath,
+            '--non-interactive',
+            'cli',
+            command,
+            ...args,
+          ],
+          {
+            cwd: options.cwd || this.toolsPath,
+            env: {
+              ...process.env,
+              ...options.env,
+              RDX_TOOLS_ROOT: this.toolsPath,
+              PYTHONIOENCODING: 'utf-8',
+              SystemRoot: launcher.systemRoot,
+              ComSpec: launcher.comSpec,
+            },
+            windowsHide: true,
+          }
+        );
+      }
 
       const procId = generateEventId('proc');
       this.activeProcesses.set(procId, {
@@ -248,11 +336,11 @@ export class ToolBridge {
         }
       }
 
-      proc.stdout.on('data', (data) => {
+      proc.stdout?.on('data', (data) => {
         stdout += data.toString('utf-8');
       });
 
-      proc.stderr.on('data', (data) => {
+      proc.stderr?.on('data', (data) => {
         stderr += data.toString('utf-8');
       });
 
@@ -311,21 +399,27 @@ export class ToolBridge {
     try {
       // 参数数组模式：'call' <toolName> [--args-json <json>] [--context-id <id>] [--runtime-owner <owner>]
       const cliArgs: string[] = [request.toolName];
+      const effectiveArgs: Record<string, unknown> = {
+        ...(request.args || {}),
+      };
 
-      if (request.args && Object.keys(request.args).length > 0) {
-        cliArgs.push('--args-json', JSON.stringify(request.args));
+      if (request.contextId && effectiveArgs['context_id'] === undefined) {
+        effectiveArgs['context_id'] = request.contextId;
+      }
+      if (request.runtimeOwner && effectiveArgs['runtime_owner'] === undefined) {
+        effectiveArgs['runtime_owner'] = request.runtimeOwner;
+      }
+      if (request.ownerLeaseId && effectiveArgs['owner_lease_id'] === undefined) {
+        effectiveArgs['owner_lease_id'] = request.ownerLeaseId;
+      }
+
+      if (Object.keys(effectiveArgs).length > 0) {
+        cliArgs.push('--args-json', JSON.stringify(effectiveArgs));
       }
 
       if (request.contextId) {
-        cliArgs.push('--context-id', request.contextId);
+        cliArgs.push('--daemon-context', request.contextId);
       }
-      if (request.runtimeOwner) {
-        cliArgs.push('--runtime-owner', request.runtimeOwner);
-      }
-      if (request.ownerLeaseId) {
-        cliArgs.push('--owner-lease-id', request.ownerLeaseId);
-      }
-
       const result = await this.executeCLI('call', cliArgs, {
         timeout: 60000, // 60秒超时
         runId: request.runId,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { OpenedCaptureState } from '@shared/types/session';
 import { useI18n } from '../../i18n';
 
@@ -12,12 +12,18 @@ export const OpenedCapturePreview: React.FC<OpenedCapturePreviewProps> = ({
   isLoading,
 }) => {
   const { t } = useI18n();
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
 
   const preview = openedCapture?.preview ?? null;
+  const hasValidPreview = Boolean(preview && !imageLoadFailed);
   const previewTitle = openedCapture?.filePath.split(/[\\/]/).pop() || openedCapture?.inputId || t('control.previewWindow');
   const previewSourceLabel = preview?.source === 'framebuffer_screenshot'
     ? t('control.previewSourceFramebuffer')
     : t('control.previewSourceThumbnail');
+
+  useEffect(() => {
+    setImageLoadFailed(false);
+  }, [preview?.imageUrl, preview?.updatedAt]);
 
   if (isLoading) {
     return (
@@ -35,7 +41,7 @@ export const OpenedCapturePreview: React.FC<OpenedCapturePreviewProps> = ({
     );
   }
 
-  if (!preview) {
+  if (!hasValidPreview) {
     return (
       <div className="opened-capture-preview-window" data-testid="opened-capture-preview-window">
         <div className="opened-capture-preview-art">
@@ -54,24 +60,27 @@ export const OpenedCapturePreview: React.FC<OpenedCapturePreviewProps> = ({
     );
   }
 
+  const resolvedPreview = preview!;
+
   return (
     <div
-      className={`opened-capture-preview-window ${preview.source === 'capture_thumbnail' ? 'is-fallback' : 'is-ready'}`}
+      className={`opened-capture-preview-window ${resolvedPreview.source === 'capture_thumbnail' ? 'is-fallback' : 'is-ready'}`}
       data-testid="opened-capture-preview-window"
     >
       <div className="opened-capture-preview-media">
         <img
           className="opened-capture-preview-image"
-          src={preview.imageUrl}
+          src={resolvedPreview.imageUrl}
           alt={openedCapture?.filePath || t('control.previewWindow')}
+          onError={() => setImageLoadFailed(true)}
         />
       </div>
 
       <div className="opened-capture-preview-meta">
         <div className="opened-capture-preview-meta-topline">
-          <span className="opened-capture-preview-title">{previewTitle}</span>
-          <span className={`opened-capture-preview-badge ${preview.source}`}>
-            {preview.source === 'capture_thumbnail' ? t('control.previewFallback') : previewSourceLabel}
+          <span className="opened-capture-preview-title" title={previewTitle}>{previewTitle}</span>
+          <span className={`opened-capture-preview-badge ${resolvedPreview.source}`}>
+            {resolvedPreview.source === 'capture_thumbnail' ? t('control.previewFallback') : previewSourceLabel}
           </span>
         </div>
         <div className="opened-capture-preview-meta-subline">
@@ -80,7 +89,7 @@ export const OpenedCapturePreview: React.FC<OpenedCapturePreviewProps> = ({
           <span>
             {t('control.previewResolution')}
             {' '}
-            {preview.width > 0 && preview.height > 0 ? `${preview.width}×${preview.height}` : '--'}
+            {resolvedPreview.width > 0 && resolvedPreview.height > 0 ? `${resolvedPreview.width}×${resolvedPreview.height}` : '--'}
           </span>
         </div>
       </div>

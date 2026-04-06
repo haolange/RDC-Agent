@@ -80,6 +80,7 @@ export type ReplayBackendHint = 'local' | 'remote';
 export interface CaptureDescriptor {
   id: string;
   filePath: string;
+  captureFileId?: string;
   role: CaptureRole;
   backendHint: ReplayBackendHint;
   status: 'pending' | 'opening' | 'open' | 'error' | 'closed';
@@ -93,9 +94,9 @@ export interface DebugSessionStartRequest {
   sessionId?: string;
   mode: AppMode;
   goal: string;
-  captures: CaptureDescriptor[];
-  primaryCaptureId: string;
-  replayDevice: ReplayDeviceEntry;
+  captures?: CaptureDescriptor[];
+  primaryCaptureId?: string;
+  replayDevice?: ReplayDeviceEntry | null;
 }
 
 export interface RunRecord {
@@ -109,7 +110,17 @@ export interface RunRecord {
   startedAt: number;
   finishedAt?: number;
   stoppedAt?: number;
-  status: 'queued' | 'running' | 'stopping' | 'completed' | 'failed' | 'cancelled' | 'interrupted';
+  status:
+    | 'queued'
+    | 'planning'
+    | 'awaiting_input'
+    | 'awaiting_approval'
+    | 'running'
+    | 'stopping'
+    | 'completed'
+    | 'failed'
+    | 'cancelled'
+    | 'interrupted';
   stopReason?: string;
   lastStage: string;
   backend: 'local' | 'remote';
@@ -144,6 +155,7 @@ export interface OpenedCaptureState {
   inputId: string;
   filePath: string;
   captureId: string;
+  captureFileId?: string;
   sessionId: string;
   contextId: string;
   replaySessionId: string;

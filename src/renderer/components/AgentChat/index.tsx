@@ -4,25 +4,12 @@ import type { AgentRole, AgentTimelineEntry } from '@shared/types/agent';
 import { useSessionStore } from '../../stores/sessionStore';
 import './AgentChat.css';
 
-// ────────────────────────────────────────────────────────
-// Helpers
-// ────────────────────────────────────────────────────────
-
 const formatTime = (timestamp: number): string =>
   new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-// ────────────────────────────────────────────────────────
-// Timeline entry renderers
-// ────────────────────────────────────────────────────────
-
 const UserEntry: React.FC<{ entry: AgentTimelineEntry }> = ({ entry }) => (
   <div className="chat-message user">
-    <div className="message-avatar user">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-        <circle cx="12" cy="7" r="4" />
-      </svg>
-    </div>
+    <div className="message-avatar user">U</div>
     <div className="message-content-wrapper">
       <div className="message-header">
         <span className="message-author">You</span>
@@ -51,64 +38,42 @@ const AgentEntry: React.FC<{ entry: AgentTimelineEntry }> = ({ entry }) => {
   );
 };
 
-const ToolCallEntry: React.FC<{ entry: AgentTimelineEntry }> = ({ entry }) => {
-  const trace = entry.toolTrace;
-  const success = trace?.result?.ok !== false;
-  return (
-    <div className="chat-message system">
-      <div className="message-avatar system">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-        </svg>
-      </div>
-      <div className="message-content-wrapper">
-        <div className="message-header">
-          <span className="message-author">Tool</span>
-          <span className="message-time">{formatTime(entry.timestamp)}</span>
-        </div>
-        <div className="message-tools">
-          <div className="tool-call">
-            <svg className="tool-call-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-            </svg>
-            <span className="tool-call-name">{entry.content}</span>
-            <span className={`tool-call-status ${success ? 'success' : 'error'}`}>
-              {success ? 'Done' : 'Failed'}
-            </span>
-            {trace && (
-              <span className="tool-call-duration">{trace.result.duration_ms}ms</span>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const BlockerEntry: React.FC<{ entry: AgentTimelineEntry }> = ({ entry }) => (
-  <div className="chat-message system chat-message--blocker">
-    <div className="message-avatar system">!</div>
+const ToolCallEntry: React.FC<{ entry: AgentTimelineEntry }> = ({ entry }) => (
+  <div className="chat-message system">
+    <div className="message-avatar system">T</div>
     <div className="message-content-wrapper">
       <div className="message-header">
-        <span className="message-author">Blocker</span>
+        <span className="message-author">{entry.title || 'Tool'}</span>
         <span className="message-time">{formatTime(entry.timestamp)}</span>
       </div>
       <div className="message-bubble system">
         {entry.content}
+        {entry.status && <div className="tool-call-status">{entry.status}</div>}
       </div>
     </div>
   </div>
 );
 
-const SystemEntry: React.FC<{ entry: AgentTimelineEntry }> = ({ entry }) => (
-  <div className="chat-message system">
-    <div className="message-avatar system">·</div>
+const StructuredEntry: React.FC<{ entry: AgentTimelineEntry }> = ({ entry }) => (
+  <div className={`chat-message ${entry.type === 'reasoning' ? 'assistant' : 'system'} ${entry.type === 'blocker' ? 'chat-message--blocker' : ''}`}>
+    <div className="message-avatar system">
+      {entry.type === 'reasoning' ? 'R' : entry.type === 'stage' ? 'S' : entry.type === 'dispatch' ? 'D' : entry.type === 'verification' ? 'V' : entry.type === 'report' ? 'P' : '!'}
+    </div>
     <div className="message-content-wrapper">
       <div className="message-header">
-        <span className="message-author">System</span>
+        <span className="message-author">{entry.title || 'System'}</span>
         <span className="message-time">{formatTime(entry.timestamp)}</span>
       </div>
-      <div className="message-bubble system">{entry.content}</div>
+      <div className="message-bubble system">
+        {entry.content}
+        {entry.reasoningSummary && (
+          <div className="message-tools">
+            <div>Evidence: {(entry.reasoningSummary.evidence ?? []).join(' | ') || 'N/A'}</div>
+            <div>Next step: {entry.reasoningSummary.nextStep || 'N/A'}</div>
+            <div>Confidence: {Math.round((entry.reasoningSummary.confidence || 0) * 100)}%</div>
+          </div>
+        )}
+      </div>
     </div>
   </div>
 );
@@ -118,18 +83,14 @@ const TimelineEntry: React.FC<{ entry: AgentTimelineEntry; index: number }> = ({
     {entry.type === 'user' && <UserEntry entry={entry} />}
     {entry.type === 'agent' && <AgentEntry entry={entry} />}
     {entry.type === 'tool_call' && <ToolCallEntry entry={entry} />}
-    {entry.type === 'blocker' && <BlockerEntry entry={entry} />}
-    {entry.type === 'system' && <SystemEntry entry={entry} />}
+    {['reasoning', 'blocker', 'system', 'stage', 'dispatch', 'verification', 'report'].includes(entry.type) && (
+      <StructuredEntry entry={entry} />
+    )}
   </div>
 );
 
-// ────────────────────────────────────────────────────────
-// Main component
-// ────────────────────────────────────────────────────────
-
 export const AgentChat: React.FC = () => {
-  const timeline = useSessionStore((s) => s.timeline);
-
+  const timeline = useSessionStore((state) => state.timeline);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -151,7 +112,7 @@ export const AgentChat: React.FC = () => {
             <div className="chat-agent-avatar debugger">R</div>
             <div className="chat-agent-info">
               <span className="chat-agent-name">RDC Debugger</span>
-              <span className="chat-agent-role">Task Timeline</span>
+              <span className="chat-agent-role">Structured event flow</span>
             </div>
           </div>
         </div>
@@ -163,11 +124,7 @@ export const AgentChat: React.FC = () => {
             aria-label="Clear timeline"
             type="button"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 6h18" />
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-            </svg>
+            Clear
           </button>
         </div>
       </div>
@@ -175,21 +132,14 @@ export const AgentChat: React.FC = () => {
       <div className="chat-messages scrollbar-thin" data-testid="chat-messages">
         {timeline.length === 0 ? (
           <div className="chat-empty-state">
-            <svg className="chat-empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
             <h3 className="chat-empty-title">Task timeline is waiting for the first event</h3>
             <p className="chat-empty-description">
-              Agent reasoning, tool calls, blockers, and system messages will append here after the task starts running.
+              Plan, dispatch, tools, verification, and reports will appear here in order.
             </p>
           </div>
-        ) : (
-          <>
-            {timeline.map((entry, index) => (
-              <TimelineEntry key={entry.id} entry={entry} index={index} />
-            ))}
-          </>
-        )}
+        ) : timeline.map((entry, index) => (
+          <TimelineEntry key={entry.id} entry={entry} index={index} />
+        ))}
         <div ref={messagesEndRef} />
       </div>
     </div>

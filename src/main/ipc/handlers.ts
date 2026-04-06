@@ -10,7 +10,6 @@ import { Command } from '@langchain/langgraph';
 import { toolBridge } from '../services/ToolBridge';
 import { storageAdapter } from '../services/StorageAdapter';
 // import { workflowEngine } from '../services/WorkflowEngine'; // 已迁移到 WorkflowGraph
-import { harnessController } from '../services/HarnessController';
 import { agentOrchestrator } from '../services/AgentOrchestrator';
 import { llmAdapter } from '../adapters/LLMAdapter';
 import { settingsService } from '../services/SettingsService';
@@ -19,6 +18,7 @@ import { rdxSessionService } from '../index';
 import { appPathService } from '../services/AppPathService';
 import { runtimeLogService } from '../services/RuntimeLogService';
 import { runExecutionService } from '../services/RunExecutionService';
+import { debugWorkflowService } from '../services/DebugWorkflowService';
 import type { DebugSessionStartRequest, OpenProjectInputRequest, RunSummary } from '@shared/types/session';
 import type { RuntimeLogScope } from '@shared/types/runtimeLog';
 
@@ -57,7 +57,7 @@ export async function initWorkflowGraph(workspacePath: string): Promise<void> {
     currentProjectId = null;
   }
 
-  await recoverInterruptedRuns();
+  await debugWorkflowService.recoverInterruptedRuns();
 }
 
 /**
@@ -121,7 +121,6 @@ function broadcastRunStatusChanged(payload: {
   stopReason?: string;
 }): void {
   broadcastToRenderer('workflow:runStatusChanged', payload);
-  broadcastToRenderer('workflow:stateChanged', payload);
 }
 
 async function appendActionEvent(event: ActionEvent): Promise<void> {
@@ -168,30 +167,6 @@ async function setRunLifecycleState(
     lastStage: patch.lastStage,
     stopReason: patch.stopReason,
   });
-}
-
-async function recoverInterruptedRuns(): Promise<void> {
-  const projects = storageAdapter.listProjects();
-  for (const project of projects) {
-    const sessions = storageAdapter.listSessions(project.projectId);
-    for (const session of sessions) {
-      const runs = storageAdapter.listRuns(session.sessionId);
-      for (const run of runs) {
-        if (!['running', 'queued', 'stopping'].includes(run.status)) {
-          continue;
-        }
-        if (runExecutionService.listActiveRuns().some((active) => active.runId === run.runId)) {
-          continue;
-        }
-        await storageAdapter.updateRun(session.sessionId, run.runId, {
-          status: 'interrupted',
-          stopReason: 'Recovered after app restart',
-          stoppedAt: Date.now(),
-          finishedAt: Date.now(),
-        });
-      }
-    }
-  }
 }
 
 /**
@@ -343,19 +318,12 @@ export function registerIPCHandlers(): void {
   // ========== 工作流操�?==========
 
   ipcMain.handle('workflow:getState', async () => {
-    if (!ensureGraphInitialized()) {
+    if (!currentSessionId) {
       return null;
     }
 
     try {
-      // �?checkpoint 获取最新状�?
-      const config = getGraphConfig();
-      const state = await compiledGraph!.getState(config);
-      
-      if (state && state.values) {
-        return projectToWorkflowState(state.values as unknown as import('../../shared/types/workflow').GraphState);
-      }
-      return null;
+      return await debugWorkflowService.getWorkflowState(currentSessionId, currentRunId || undefined);
     } catch (error) {
       console.error('[IPC] Failed to get workflow state:', error);
       return null;
@@ -378,40 +346,13 @@ export function registerIPCHandlers(): void {
 
   ipcMain.handle('workflow:stop', async (_event, runId?: string) => {
     const targetRunId = runId || currentRunId;
-    const sessionId = currentSessionId;
-    if (!targetRunId || !sessionId) {
+    if (!targetRunId) {
       return { success: false, error: 'No active run.' };
     }
-
-    const targetRun = storageAdapter.listRuns(sessionId).find((run) => run.runId === targetRunId);
-    if (!targetRun) {
-      return { success: false, error: `Run not found: ${targetRunId}` };
-    }
-
-    await setRunLifecycleState(sessionId, targetRunId, {
-      status: 'stopping',
-      lastStage: targetRun.lastStage,
-      stopReason: 'Stopping requested',
-      stoppedAt: Date.now(),
-    });
-
-    const stopIssued = runExecutionService.stopRun(targetRunId);
-    toolBridge.abortRun(targetRunId);
-    await rdxSessionService.closeOrReplaceOpenedCapture();
+    const result = await debugWorkflowService.stopRun(targetRunId);
     broadcastToRenderer('capture:openedStateChanged', null);
     broadcastToRenderer('context:changed', rdxSessionService.snapshotContext());
-
-    if (!stopIssued) {
-      await setRunLifecycleState(sessionId, targetRunId, {
-        status: 'cancelled',
-        lastStage: targetRun.lastStage,
-        stopReason: 'Stopped without active controller',
-        stoppedAt: Date.now(),
-        finishedAt: Date.now(),
-      });
-    }
-
-    return { success: true };
+    return result;
   });
 
   ipcMain.handle('workflow:listRuns', async () => {
@@ -534,12 +475,19 @@ export function registerIPCHandlers(): void {
     }
 
     storageAdapter.removeSession(id);
+    const remainingSessions = storageAdapter.listSessions(session.projectId);
+    const nextSession = remainingSessions[0] || null;
+    let nextRun: RunSummary | null = null;
     if (currentSessionId === id) {
-      currentSessionId = null;
-      currentRunId = null;
+      currentSessionId = nextSession?.sessionId || null;
+      currentRunId = nextSession?.lastRunId || null;
+      if (currentSessionId) {
+        await storageAdapter.setCurrentSessionId(currentSessionId);
+        nextRun = storageAdapter.getLatestRun(currentSessionId);
+      }
     }
 
-    return { success: true };
+    return { success: true, nextSession, nextRun };
   });
 
   ipcMain.handle('session:select', async (_event, id: string) => {
@@ -690,199 +638,46 @@ export function registerIPCHandlers(): void {
   });
 
   ipcMain.handle('workflow:start', async (_event, request: DebugSessionStartRequest) => {
-    const capturePaths = request.captures.map((capture) => capture.filePath);
-    const goal = request.goal;
-
-    try {
-      if (!ensureGraphInitialized()) {
-        return {
-          success: false,
-          error: 'WorkflowGraph not initialized',
-        };
-      }
-
-      const gateResult = await harnessController.executeEntryGate({
-        capturePaths,
-        platform: 'rdc-agent',
-        entryMode: 'cli',
-        backend: request.captures.some((capture) => capture.backendHint === 'remote') ? 'remote' : 'local',
-        mode: request.mode,
-        captures: request.captures,
-        replayDevice: request.replayDevice,
-      });
-
-      if (gateResult.status === 'blocked') {
-        return {
-          success: false,
-          error: gateResult.blockers.map(b => b.reason).join('; '),
-        };
-      }
-
-      const caseId = request.sessionId || await storageAdapter.createCase({
-        projectId: request.projectId,
-        userGoal: goal,
-        symptomSummary: goal,
-      });
-
-      const { runId, sessionId } = await storageAdapter.createRun({
-        caseId,
-        capturePaths,
-        mode: request.mode,
-        goal,
-        captures: request.captures,
-        backend: request.captures.some((capture) => capture.backendHint === 'remote') ? 'remote' : 'local',
-        status: 'queued',
-      });
-
-      currentSessionId = sessionId;
-      currentRunId = runId;
+    const result = await debugWorkflowService.startPlan(request);
+    if (result.success) {
+      currentSessionId = result.sessionId || currentSessionId;
+      currentRunId = result.runId || currentRunId;
       currentProjectId = request.projectId;
-      await storageAdapter.setCurrentSessionId(sessionId);
-      await appendActionEvent(storageAdapter.createActionEvent({
-        runId,
-        sessionId,
-        agentId: 'rdc-debugger',
-        eventType: 'system',
-        status: 'ok',
-        payload: {
-          message: 'Run queued',
-          goal,
-          mode: request.mode,
-        },
-      }));
-
+      if (currentSessionId) {
+        await storageAdapter.setCurrentSessionId(currentSessionId);
+      }
       broadcastRunStatusChanged({
-        runId,
-        sessionId,
-        status: 'queued',
-        lastStage: 'preflight',
+        runId: result.runId || '',
+        sessionId: result.sessionId || '',
+        status: result.status || 'planning',
+        lastStage: result.currentStage || 'plan',
       });
-
-      runExecutionService.startRun(
-        {
-          runId,
-          sessionId,
-          projectId: request.projectId,
-        },
-        async (signal) => {
-          let contextSnapshot: import('@shared/types/session').ContextSnapshot | undefined;
-          try {
-            await setRunLifecycleState(sessionId, runId, {
-              status: 'running',
-              lastStage: 'preflight',
-            });
-
-            contextSnapshot = await rdxSessionService.bootstrap(request);
-            if (signal.aborted) {
-              throw new Error(`Run aborted: ${runId}`);
-            }
-
-            broadcastToRenderer('context:changed', contextSnapshot);
-            broadcastToRenderer('capture:openedStateChanged', rdxSessionService.snapshotOpenedCapture());
-
-            await storageAdapter.updateRun(sessionId, runId, {
-              runtime: {
-                context_id: contextSnapshot.contextId,
-                runtime_owner: contextSnapshot.runtimeOwner,
-                session_id: sessionId,
-              },
-            });
-
-            const config = getGraphConfig();
-            const initialState: Partial<WorkflowStateType> = {
-              caseId,
-              runId,
-              sessionId,
-              userGoal: goal,
-              capturePaths,
-              currentStage: 'preflight' as const,
-              stageHistory: [],
-              evidenceChain: [],
-              artifacts: [],
-              activeSpecialists: {},
-              pendingBriefs: [],
-              collectedBriefs: {},
-              blockers: [],
-              backtrackCount: {},
-              fixVerified: false,
-              entryMode: 'cli' as const,
-              backend: request.captures.some((capture) => capture.backendHint === 'remote') ? 'remote' as const : 'local' as const,
-              mode: request.mode,
-              goal,
-              captures: request.captures,
-              primaryCaptureId: request.primaryCaptureId,
-              replayDevice: request.replayDevice,
-              orchestrationMode: 'multi_agent' as const,
-              coordinationMode: 'staged_handoff' as const,
-              lastUpdated: new Date().toISOString(),
-            };
-
-            const result = await compiledGraph!.invoke(initialState, config);
-            if (signal.aborted) {
-              throw new Error(`Run aborted: ${runId}`);
-            }
-
-            if (isInterrupted(result)) {
-              const interruptData = result.__interrupt__[0];
-              await setRunLifecycleState(sessionId, runId, {
-                status: 'interrupted',
-                lastStage: (interruptData as Record<string, unknown>)?.currentStage as string | undefined || 'blocked',
-                stopReason: String((interruptData as Record<string, unknown>)?.type || 'Workflow interrupted'),
-                stoppedAt: Date.now(),
-                finishedAt: Date.now(),
-              });
-
-              if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.webContents.send('workflow:blocked', {
-                  type: (interruptData as Record<string, unknown>)?.type || 'unknown',
-                  data: interruptData,
-                });
-              }
-              return;
-            }
-
-            notifyWorkflowStateChanged(result);
-            await setRunLifecycleState(sessionId, runId, {
-              status: 'completed',
-              lastStage: result.currentStage,
-              finishedAt: Date.now(),
-            });
-          } catch (error) {
-            const aborted = signal.aborted;
-            await setRunLifecycleState(sessionId, runId, {
-              status: aborted ? 'cancelled' : 'failed',
-              lastStage: 'blocked',
-              stopReason: aborted
-                ? 'Stopped by user'
-                : (error instanceof Error ? error.message : String(error)),
-              stoppedAt: Date.now(),
-              finishedAt: Date.now(),
-            });
-
-            runtimeLogService.log({
-              scope: 'session',
-              namespace: 'system',
-              severity: aborted ? 'warning' : 'error',
-              title: aborted ? 'Run stopped' : 'Run failed',
-              summary: aborted
-                ? '调试任务已停止。'
-                : (error instanceof Error ? error.message : String(error)),
-              sessionId,
-              projectId: request.projectId,
-              runId,
-            });
-          }
-        },
-      );
-
-      return { success: true, caseId, runId, sessionId, status: 'queued' };
-    } catch (error) {
-      console.error('Failed to start workflow:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
     }
+    return result;
+  });
+
+  ipcMain.handle('workflow:getPlan', async (_event, runId: string) => {
+    return debugWorkflowService.getPlan(runId);
+  });
+
+  ipcMain.handle('workflow:submitQuestions', async (_event, runId: string, answers: unknown[]) => {
+    return debugWorkflowService.submitQuestions(runId, answers as import('@shared/types/workflow').AskUserAnswer[]);
+  });
+
+  ipcMain.handle('workflow:approvePlan', async (_event, runId: string) => {
+    return debugWorkflowService.approvePlan(runId);
+  });
+
+  ipcMain.handle('workflow:restartRun', async (_event, runId: string) => {
+    const result = await debugWorkflowService.restartRun(runId);
+    if (result.success) {
+      currentSessionId = result.sessionId || currentSessionId;
+      currentRunId = result.runId || currentRunId;
+      if (currentSessionId) {
+        await storageAdapter.setCurrentSessionId(currentSessionId);
+      }
+    }
+    return result;
   });
 
   ipcMain.handle('workflow:advanceStage', async () => {

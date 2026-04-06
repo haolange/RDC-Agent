@@ -2,7 +2,14 @@
  * Electron API Type Declarations
  */
 
-import type { WorkflowStage, WorkflowState, BacktrackTrigger } from '../shared/types/workflow';
+import type {
+  AskUserAnswer,
+  AskUserPrompt,
+  DebugPlan,
+  WorkflowStage,
+  WorkflowState,
+  BacktrackTrigger,
+} from '../shared/types/workflow';
 import type { AgentRole, AgentState, AgentConfig } from '../shared/types/agent';
 import type { ActionEvent, EventType } from '../shared/types/evidence';
 import type { ToolCallResult, ToolCatalog } from '../shared/types/tool';
@@ -57,8 +64,47 @@ export interface ElectronAPI {
       caseId?: string;
       runId?: string;
       sessionId?: string;
+      currentStage?: WorkflowStage;
       status?: RunSummary['status'];
-      contextSnapshot?: ContextSnapshot;
+      planStatus?: string;
+      pendingQuestions?: AskUserPrompt | null;
+      debugPlanSummary?: DebugPlan | null;
+      error?: string;
+    }>;
+    getPlan: (runId: string) => Promise<{
+      success: boolean;
+      runId?: string;
+      sessionId?: string;
+      debugPlan?: DebugPlan | null;
+      pendingQuestions?: AskUserPrompt | null;
+      approvalState?: string;
+      error?: string;
+    }>;
+    submitQuestions: (runId: string, answers: AskUserAnswer[]) => Promise<{
+      success: boolean;
+      runId?: string;
+      sessionId?: string;
+      debugPlan?: DebugPlan | null;
+      pendingQuestions?: AskUserPrompt | null;
+      approvalState?: string;
+      error?: string;
+    }>;
+    approvePlan: (runId: string) => Promise<{
+      success: boolean;
+      runId?: string;
+      sessionId?: string;
+      debugPlan?: DebugPlan | null;
+      pendingQuestions?: AskUserPrompt | null;
+      approvalState?: string;
+      error?: string;
+    }>;
+    restartRun: (runId: string) => Promise<{
+      success: boolean;
+      runId?: string;
+      sessionId?: string;
+      debugPlan?: DebugPlan | null;
+      pendingQuestions?: AskUserPrompt | null;
+      approvalState?: string;
       error?: string;
     }>;
     resume: (sessionId?: string) => Promise<{
@@ -172,6 +218,8 @@ export interface ElectronAPI {
     }>;
     remove: (id: string) => Promise<{
       success: boolean;
+      nextSession?: SessionRecord | null;
+      nextRun?: RunSummary | null;
       error?: string;
     }>;
     select: (id: string) => Promise<{

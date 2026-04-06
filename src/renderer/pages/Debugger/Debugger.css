@@ -135,3 +135,204 @@
     font-size: 46px;
   }
 }
+
+.plan-intake-panel {
+  margin: 20px 20px 0;
+  padding: 20px;
+  border: 1px solid rgb(var(--color-border-primary) / 0.7);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgb(var(--color-bg-1) / 0.94), rgb(var(--color-bg-0) / 0.96)),
+    rgb(var(--color-bg-0));
+  box-shadow: 0 20px 48px rgb(0 0 0 / 0.18);
+}
+
+.plan-intake-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.plan-intake-kicker {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgb(var(--color-accent-500));
+  margin-bottom: 6px;
+}
+
+.plan-intake-title {
+  margin: 0;
+  font-size: 20px;
+  color: rgb(var(--color-text-primary));
+}
+
+.plan-intake-status {
+  padding: 8px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  text-transform: uppercase;
+  background: rgb(var(--color-accent-500) / 0.12);
+  color: rgb(var(--color-accent-500));
+}
+
+.plan-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.plan-summary-card {
+  padding: 14px;
+  border-radius: 16px;
+  background: rgb(var(--color-bg-2) / 0.7);
+  border: 1px solid rgb(var(--color-border-secondary) / 0.6);
+}
+
+.plan-summary-label {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: rgb(var(--color-text-tertiary));
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.plan-summary-card p,
+.plan-summary-card ul {
+  margin: 0;
+  color: rgb(var(--color-text-primary));
+}
+
+.plan-summary-card ul {
+  padding-left: 18px;
+}
+
+.plan-callout {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+}
+
+.plan-callout-warning {
+  background: rgb(var(--color-warning) / 0.12);
+  border: 1px solid rgb(var(--color-warning) / 0.24);
+}
+
+.plan-callout-error {
+  background: rgb(var(--color-error) / 0.12);
+  border: 1px solid rgb(var(--color-error) / 0.24);
+}
+
+.plan-questions {
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgb(var(--color-bg-2) / 0.62);
+  border: 1px solid rgb(var(--color-border-secondary) / 0.6);
+}
+
+.plan-questions h3,
+.plan-questions p {
+  margin-top: 0;
+}
+
+.plan-question + .plan-question {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgb(var(--color-border-secondary) / 0.45);
+}
+
+.plan-question-prompt {
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.plan-question-options {
+  display: grid;
+  gap: 10px;
+}
+
+.plan-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgb(var(--color-bg-1) / 0.7);
+  border: 1px solid rgb(var(--color-border-secondary) / 0.5);
+}
+
+.plan-option.recommended {
+  border-color: rgb(var(--color-accent-500) / 0.55);
+}
+
+.plan-option-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.plan-option-label {
+  color: rgb(var(--color-text-primary));
+}
+
+.plan-option-description {
+  color: rgb(var(--color-text-tertiary));
+  font-size: 13px;
+}
+
+.plan-freeform-input {
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgb(var(--color-border-secondary) / 0.6);
+  background: rgb(var(--color-bg-1));
+  color: rgb(var(--color-text-primary));
+}
+
+.plan-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.plan-action-button {
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid rgb(var(--color-border-secondary) / 0.7);
+  background: rgb(var(--color-bg-2));
+  color: rgb(var(--color-text-primary));
+  cursor: pointer;
+}
+
+.plan-action-button.primary {
+  background: rgb(var(--color-accent-500));
+  color: rgb(var(--color-bg-0));
+  border-color: rgb(var(--color-accent-500));
+}
+
+.plan-action-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 900px) {
+  .plan-intake-panel {
+    margin: 14px 14px 0;
+    padding: 16px;
+  }
+
+  .plan-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-intake-header,
+  .plan-actions {
+    flex-direction: column;
+  }
+}

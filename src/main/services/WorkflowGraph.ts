@@ -309,15 +309,16 @@ export async function initializeWorkflowState(
   request: DebugSessionStartRequest,
 ): Promise<Partial<WorkflowStateType>> {
   await rdxSessionService.bootstrap(request);
+  const captures = request.captures ?? [];
 
   return {
-    captures: request.captures,
+    captures,
     primaryCaptureId: request.primaryCaptureId,
     replayDevice: request.replayDevice,
     mode: request.mode,
     goal: request.goal,
     userGoal: request.goal,
-    capturePaths: request.captures.map((capture) => capture.filePath),
+    capturePaths: captures.map((capture) => capture.filePath),
   };
 }
 

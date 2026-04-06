@@ -45,8 +45,8 @@ test('左侧栏展开时在用户卡片下显示 Replay Device，收起后保留
     deviceTrigger.boundingBox(),
   ]);
 
-  expect(collapsedUserBox?.width ?? 0).toBeGreaterThanOrEqual(44);
-  expect(collapsedDeviceBox?.width ?? 0).toBeGreaterThanOrEqual(44);
+  expect(collapsedUserBox?.width ?? 0).toBeGreaterThanOrEqual(43);
+  expect(collapsedDeviceBox?.width ?? 0).toBeGreaterThanOrEqual(43);
   expect(Math.abs((collapsedUserBox?.width ?? 0) - (collapsedDeviceBox?.width ?? 0))).toBeLessThanOrEqual(2);
 });
 

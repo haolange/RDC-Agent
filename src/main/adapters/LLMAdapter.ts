@@ -43,6 +43,14 @@ const toContentBlocks = (
   return { role: message.role, content };
 });
 
+const normalizeOpenRouterBaseUrl = (baseUrl: string): string => {
+  const trimmed = (baseUrl || 'https://openrouter.ai/api/v1').trim().replace(/\/+$/, '');
+  if (/^https:\/\/openrouter\.ai\/api$/i.test(trimmed)) {
+    return `${trimmed}/v1`;
+  }
+  return trimmed;
+};
+
 class OpenRouterProvider implements LLMProvider {
   name: string;
   private apiKey = '';
@@ -55,12 +63,15 @@ class OpenRouterProvider implements LLMProvider {
 
   configure(config: LLMProviderConfig): void {
     this.apiKey = config.apiKey.trim();
-    this.baseUrl = (config.baseUrl || 'https://openrouter.ai/api/v1').trim();
+    this.baseUrl = normalizeOpenRouterBaseUrl(config.baseUrl || 'https://openrouter.ai/api/v1');
     this.models = config.models;
   }
 
   async chat(request: LLMRequest): Promise<LLMResponse> {
-    const model = request.model || this.models[0] || 'anthropic/claude-3-opus';
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -76,6 +87,7 @@ class OpenRouterProvider implements LLMProvider {
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
         tools: request.tools,
+        response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
         stream: false,
       }),
     });
@@ -134,7 +146,10 @@ class OpenAICompatibleProvider implements LLMProvider {
   }
 
   async chat(request: LLMRequest): Promise<LLMResponse> {
-    const model = request.model || this.models[0] || 'gpt-4o';
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -149,9 +164,11 @@ class OpenAICompatibleProvider implements LLMProvider {
       signal: request.signal,
       body: JSON.stringify({
         model,
-        messages: request.messages,
+        messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
+        tools: request.tools,
+        response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
       }),
     });
 
@@ -211,7 +228,10 @@ class AnthropicProvider implements LLMProvider {
   }
 
   async chat(request: LLMRequest): Promise<LLMResponse> {
-    const model = request.model || this.models[0] || 'claude-3-7-sonnet-latest';
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
     const systemMessage = request.messages.find((message) => message.role === 'system');
     const otherMessages = request.messages.filter((message) => message.role !== 'system');
 
@@ -287,11 +307,9 @@ const createProviderByKind = (providerId: string, kind: LlmProviderKind): LLMPro
 
 export class LLMAdapter {
   private providers = new Map<string, RuntimeProviderEntry>();
-  private fallbackProviderId: string | null = null;
 
   configure(config: LLMConfig): void {
     this.providers.clear();
-    this.fallbackProviderId = null;
 
     for (const providerConfig of config.providers) {
       const provider = createProviderByKind(providerConfig.id, providerConfig.kind);
@@ -303,17 +321,13 @@ export class LLMAdapter {
         config: providerConfig,
         provider,
       });
-
-      if (!this.fallbackProviderId && providerConfig.enabled) {
-        this.fallbackProviderId = providerConfig.id;
-      }
     }
   }
 
   async chat(request: LLMRequest, providerId?: string): Promise<LLMResponse> {
-    const resolvedProviderId = providerId || this.fallbackProviderId;
+    const resolvedProviderId = providerId?.trim();
     if (!resolvedProviderId) {
-      throw new Error('No LLM provider configured');
+      throw new Error('No explicit LLM provider was supplied for this request.');
     }
 
     const runtimeProvider = this.providers.get(resolvedProviderId);
@@ -333,14 +347,22 @@ export class LLMAdapter {
   }
 
   async streamChat(request: LLMRequest, onChunk: StreamCallback, providerId?: string): Promise<LLMResponse> {
-    const resolvedProviderId = providerId || this.fallbackProviderId;
+    const resolvedProviderId = providerId?.trim();
     if (!resolvedProviderId) {
-      throw new Error('No LLM provider configured');
+      throw new Error('No explicit LLM provider was supplied for this request.');
     }
 
     const runtimeProvider = this.providers.get(resolvedProviderId);
     if (!runtimeProvider) {
       throw new Error(`Provider not found: ${resolvedProviderId}`);
+    }
+
+    if (!runtimeProvider.config.enabled) {
+      throw new Error(`Provider disabled: ${resolvedProviderId}`);
+    }
+
+    if (!(await runtimeProvider.provider.isAvailable())) {
+      throw new Error(`Provider not configured: ${resolvedProviderId}`);
     }
 
     return runtimeProvider.provider.streamChat(request, onChunk);
@@ -365,7 +387,7 @@ export class LLMAdapter {
   }
 
   getDefaultProvider(): string {
-    return this.fallbackProviderId || 'openrouter';
+    return '';
   }
 }
 

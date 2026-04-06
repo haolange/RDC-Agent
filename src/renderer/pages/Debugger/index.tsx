@@ -1,5 +1,6 @@
 import React from 'react';
 import { AgentChat } from '../../components/AgentChat';
+import { PlanIntakePanel } from '../../components/PlanIntakePanel';
 import { useSessionStore } from '../../stores/sessionStore';
 import './Debugger.css';
 
@@ -9,6 +10,7 @@ export const DebuggerPage: React.FC = () => {
   if (currentRun) {
     return (
       <div className="debugger-page">
+        <PlanIntakePanel />
         <AgentChat />
       </div>
     );
