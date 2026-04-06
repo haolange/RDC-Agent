@@ -128,4 +128,18 @@ export const AGENT_MODES: ModeConfig[] = [
     description: 'Debug and diagnose rendering issues',
     disabled: false,
   },
+  {
+    id: 'analyzer',
+    label: 'Analyzer',
+    icon: 'gauge',
+    description: 'Analyze rendering captures and performance',
+    disabled: false,
+  },
+  {
+    id: 'optimizer',
+    label: 'Optimizer',
+    icon: 'sparkles',
+    description: 'Generate optimization suggestions',
+    disabled: false,
+  },
 ];

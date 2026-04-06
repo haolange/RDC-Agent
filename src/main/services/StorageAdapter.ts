@@ -161,6 +161,23 @@ export class StorageAdapter {
     }
   }
 
+  removeSession(sessionId: string): void {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) return;
+
+    if (fs.existsSync(location.sessionPath)) {
+      fs.rmSync(location.sessionPath, { recursive: true, force: true });
+    }
+
+    const selection = this.readSelection();
+    if (selection.sessionId === sessionId) {
+      selection.sessionId = null;
+      this.writeSelection(selection);
+    }
+
+    this.touchProject(location.project.projectId);
+  }
+
   getProjectById(projectId: string): ProjectRecord | null {
     return this.readRegistry().projects.find((project) => project.projectId === projectId) || null;
   }
@@ -215,7 +232,7 @@ export class StorageAdapter {
     const project = this.getProjectById(projectId);
     if (!project) return [];
 
-    const sessionsRoot = this.getProjectSessionsRoot(project);
+    const sessionsRoot = this.ensureProjectSessionsRoot(project);
     if (!fs.existsSync(sessionsRoot)) {
       return [];
     }
@@ -224,6 +241,7 @@ export class StorageAdapter {
       .filter((entry) => entry.isDirectory())
       .map((entry) => this.readJson<SessionRecord>(path.join(sessionsRoot, entry.name, 'session.json')))
       .filter((session): session is SessionRecord => session !== null)
+      .map((session) => this.normalizeSessionRecord(session))
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
@@ -239,11 +257,13 @@ export class StorageAdapter {
       projectId,
       title: this.normalizeSessionTitle(title),
       goal,
+      sessionPath: '',
       createdAt: timestamp,
       updatedAt: timestamp,
     };
 
-    const sessionPath = path.join(this.getProjectSessionsRoot(project), session.sessionId);
+    const sessionPath = path.join(this.ensureProjectSessionsRoot(project), session.sessionId);
+    session.sessionPath = sessionPath;
     this.ensureDir(sessionPath);
     this.ensureDir(path.join(sessionPath, 'timeline'));
     this.ensureDir(path.join(sessionPath, 'runs'));
@@ -259,7 +279,8 @@ export class StorageAdapter {
   readSession(sessionId: string): SessionRecord | null {
     const location = this.findSessionLocation(sessionId);
     if (!location) return null;
-    return this.readJson<SessionRecord>(path.join(location.sessionPath, 'session.json'));
+    const session = this.readJson<SessionRecord>(path.join(location.sessionPath, 'session.json'));
+    return session ? this.normalizeSessionRecord(session, location.sessionPath) : null;
   }
 
   updateSession(sessionId: string, patch: Partial<SessionRecord>): SessionRecord | null {
@@ -270,10 +291,11 @@ export class StorageAdapter {
     if (!existing) return null;
 
     const nextSession: SessionRecord = {
-      ...existing,
+      ...this.normalizeSessionRecord(existing, location.sessionPath),
       ...patch,
       sessionId: existing.sessionId,
       projectId: existing.projectId,
+      sessionPath: location.sessionPath,
       updatedAt: nowMs(),
     };
 
@@ -385,6 +407,7 @@ export class StorageAdapter {
     goal?: string;
     captures?: CaptureDescriptor[];
     backend?: 'local' | 'remote';
+    status?: PersistedRunRecord['status'];
   }): Promise<{ runId: string; sessionId: string }> {
     const sessionId = input.sessionId || input.caseId;
     const session = this.readSession(sessionId);
@@ -424,7 +447,7 @@ export class StorageAdapter {
       goal: input.goal || session.goal,
       captures,
       startedAt,
-      status: 'running',
+      status: input.status || 'queued',
       lastStage: 'preflight',
       backend,
       createdAt: startedAt,
@@ -527,7 +550,7 @@ export class StorageAdapter {
     if (!location) {
       throw new Error(`Session not found for action chain: ${sessionId}`);
     }
-    return path.join(location.sessionPath, 'timeline', 'action_chain.jsonl');
+    return path.join(location.sessionPath, 'action_chain.jsonl');
   }
 
   async appendActionEvent(sessionId: string, event: ActionEvent): Promise<void> {
@@ -822,17 +845,50 @@ export class StorageAdapter {
   }
 
   private getProjectSessionsRoot(project: ProjectRecord | string): string {
+    const target = typeof project === 'string' ? this.getProjectById(project) : project;
+    if (!target) {
+      throw new Error(`Project not found: ${project}`);
+    }
+    return path.join(target.rootPath, 'sessions');
+  }
+
+  private getLegacyProjectSessionsRoot(project: ProjectRecord | string): string {
     return path.join(this.getProjectDataPath(project), 'sessions');
+  }
+
+  private ensureProjectSessionsRoot(project: ProjectRecord | string): string {
+    const target = typeof project === 'string' ? this.getProjectById(project) : project;
+    if (!target) {
+      throw new Error(`Project not found: ${project}`);
+    }
+
+    const sessionsRoot = this.getProjectSessionsRoot(target);
+    this.ensureDir(sessionsRoot);
+
+    const legacySessionsRoot = this.getLegacyProjectSessionsRoot(target);
+    if (fs.existsSync(legacySessionsRoot) && legacySessionsRoot !== sessionsRoot) {
+      this.copyDirectoryContents(legacySessionsRoot, sessionsRoot, false);
+    }
+
+    return sessionsRoot;
   }
 
   private findSessionLocation(sessionId: string): { project: ProjectRecord; sessionPath: string } | null {
     for (const project of this.listProjects()) {
-      const sessionPath = path.join(this.getProjectSessionsRoot(project), sessionId);
+      const sessionPath = path.join(this.ensureProjectSessionsRoot(project), sessionId);
       if (fs.existsSync(path.join(sessionPath, 'session.json'))) {
         return { project, sessionPath };
       }
     }
     return null;
+  }
+
+  private normalizeSessionRecord(session: SessionRecord, sessionPath?: string): SessionRecord {
+    const resolvedSessionPath = sessionPath || this.findSessionLocation(session.sessionId)?.sessionPath || session.sessionPath;
+    return {
+      ...session,
+      sessionPath: resolvedSessionPath || '',
+    };
   }
 
   private readPersistedRun(sessionId: string, runId: string): PersistedRunRecord | null {

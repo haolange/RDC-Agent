@@ -4,7 +4,7 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  transition: all var(--transition-base) var(--ease-standard);
+  transition: opacity var(--transition-base) var(--ease-standard);
 }
 
 .sidebar-scroll {
@@ -32,7 +32,13 @@
   border-top: 1px solid rgb(var(--color-border-subtle));
   opacity: 1;
   transform: translateX(0);
-  transition: all var(--transition-base) var(--ease-standard);
+  transition:
+    opacity var(--transition-base) var(--ease-standard),
+    transform var(--transition-base) var(--ease-standard),
+    border-top-color var(--transition-base) var(--ease-standard),
+    max-height var(--transition-base) var(--ease-standard),
+    margin-top var(--transition-base) var(--ease-standard),
+    padding-top var(--transition-base) var(--ease-standard);
 }
 
 .session-section:last-child {
@@ -96,14 +102,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-lg);
   border: 1px solid transparent;
   background: rgb(var(--color-bg-2));
   color: rgb(var(--color-text-tertiary));
   cursor: pointer;
-  transition: all var(--transition-base) var(--ease-standard);
+  transition:
+    background var(--transition-base) var(--ease-standard),
+    border-color var(--transition-base) var(--ease-standard),
+    color var(--transition-base) var(--ease-standard),
+    transform var(--transition-base) var(--ease-standard),
+    box-shadow var(--transition-base) var(--ease-standard);
 }
 
 .session-section-action:hover {
@@ -131,7 +142,11 @@
   background: rgb(var(--color-bg-2) / 0.7);
   text-align: left;
   cursor: pointer;
-  transition: all var(--transition-base) var(--ease-standard);
+  transition:
+    background var(--transition-base) var(--ease-standard),
+    border-color var(--transition-base) var(--ease-standard),
+    transform var(--transition-base) var(--ease-standard),
+    box-shadow var(--transition-base) var(--ease-standard);
 }
 
 .project-item .session-item-time {
@@ -209,7 +224,9 @@
   border-radius: var(--radius-bubble);
   background: rgb(var(--color-accent-500) / 0.03);
   text-align: center;
-  transition: all var(--transition-base) var(--ease-standard);
+  transition:
+    border-color var(--transition-base) var(--ease-standard),
+    background var(--transition-base) var(--ease-standard);
 }
 
 .session-empty:hover {

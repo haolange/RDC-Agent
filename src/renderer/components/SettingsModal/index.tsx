@@ -396,6 +396,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
       <div
         className="settings-modal settings-center"
         data-testid="settings-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-modal-title"
+        aria-describedby="settings-modal-subtitle"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="settings-center-sidebar">
@@ -425,8 +429,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
         <div className="settings-center-content">
           <div className="settings-modal-header">
             <div className="settings-modal-heading">
-              <div className="settings-modal-title">{sections.find((section) => section.id === activeSection)?.label}</div>
-              <div className="settings-modal-subtitle">
+              <div className="settings-modal-title" id="settings-modal-title">{sections.find((section) => section.id === activeSection)?.label}</div>
+              <div className="settings-modal-subtitle" id="settings-modal-subtitle">
                 {activeSection === 'account' && t('settings.accountSubtitle')}
                 {activeSection === 'general' && t('settings.generalSubtitle')}
                 {activeSection === 'workspace' && t('settings.workspaceSubtitle')}

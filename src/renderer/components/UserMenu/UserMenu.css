@@ -89,6 +89,7 @@
 }
 
 .user-menu-pill {
+  min-height: 44px;
   padding: var(--space-2) var(--space-3);
   border: 1px solid rgb(var(--color-border-default));
   border-radius: var(--radius-full);
@@ -112,6 +113,7 @@
 .user-menu-settings-button {
   width: 100%;
   margin-top: var(--space-4);
+  min-height: 44px;
   padding: var(--space-3) calc(var(--space-3) + 2px);
   border-radius: var(--radius-lg);
   border: 1px solid rgb(var(--color-border-default));

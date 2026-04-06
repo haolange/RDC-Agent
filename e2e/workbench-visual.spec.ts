@@ -124,6 +124,14 @@ const configureVisualSettings = async (ctx: AppContext): Promise<AppContext> => 
   return relaunched;
 };
 
+const setWindowSize = async (ctx: AppContext, width: number, height: number) => {
+  await ctx.app.evaluate(({ BrowserWindow }, size) => {
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+    mainWindow.setSize(size.width, size.height);
+  }, { width, height });
+  await ctx.page.waitForTimeout(350);
+};
+
 const seedVisualWorkbench = async (page: Page) => {
   const previewAssetPath = path.resolve('src/renderer/assets/images/hero-bg.png');
   const previewAssetUrl = pathToFileURL(previewAssetPath).toString();
@@ -254,8 +262,6 @@ test.beforeEach(async () => {
     }).__RDC_AGENT_E2E__?.getWorkbenchState().projectInputs.length ?? 0
   ))).toBe(3);
   await expect(ctx.page.locator('text=custom').first()).toBeVisible();
-  await ctx.page.locator('[data-testid="cp-section-runtimeContext"] .cp-section-header').click();
-  await ctx.page.waitForTimeout(350);
 });
 
 test.afterEach(async () => {
@@ -352,7 +358,6 @@ test('运行中会禁用 Capture Library 的打开按钮，并禁止清理 opene
   await expect(page.locator('[data-testid="capture-library-open-input-0"]')).toBeDisabled();
   await expect(page.locator('.capture-library-run-lock')).toBeVisible();
   await expect(page.locator('[data-testid="opened-capture-clear"]')).toBeDisabled();
-  await expect(page.locator('[data-testid="runtime-context-panel"]')).not.toContainText('HairSparkWhite.rdc');
 });
 
 test('Terminal drawer 展开后会显示日志并位于 prompt 下方', async () => {
@@ -430,4 +435,34 @@ test('左栏收起后设备菜单展开不越界', async () => {
     '[data-testid="sidebar-device-selector-dropdown"]',
     '[data-testid="app-sidebar-left"]',
   )).toBe(true);
+});
+
+test('768px 宽度下自动收起右栏，主内容保持可见', async () => {
+  const page = ctx.page;
+  await setWindowSize(ctx, 768, 900);
+
+  await expect(page.locator('.shell-panel-header-right .shell-panel-toggle')).toBeVisible();
+  await expect(page.locator('.main-input-bar')).toBeVisible();
+  await expect(page.locator('.debugger-idle-simple-title')).toBeVisible();
+  await expect(page.locator('.app-body')).toHaveScreenshot('tablet-layout-768.png');
+});
+
+test('375px 宽度下双侧栏自动收起，底部入口仍可达', async () => {
+  const page = ctx.page;
+  await setWindowSize(ctx, 375, 900);
+
+  await expect(page.locator('[data-testid="sidebar-user-settings-trigger"]')).toBeVisible();
+  await expect(page.locator('[data-testid="sidebar-device-selector-trigger"]')).toBeVisible();
+  await expect(page.locator('.main-input-bar')).toBeVisible();
+  await expect(page.locator('.app-body')).toHaveScreenshot('mobile-layout-375.png');
+});
+
+test('主输入条 focus 态保持清晰可见', async () => {
+  const page = ctx.page;
+  const input = page.locator('input.chat-input').first();
+
+  await input.focus();
+  await page.waitForTimeout(180);
+
+  await expect(page.locator('.main-input-bar')).toHaveScreenshot('main-input-focus.png');
 });

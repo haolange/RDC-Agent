@@ -56,6 +56,8 @@ export interface ToolCallRequest {
   runtimeOwner?: string;
   ownerLeaseId?: string;
   captureRef?: string;
+  runId?: string;
+  abortSignal?: AbortSignal;
 }
 
 // 工具调用结果

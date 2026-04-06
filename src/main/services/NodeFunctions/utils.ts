@@ -16,6 +16,7 @@ import type { AgentRole } from '../../../shared/types/agent';
 import type { EffectiveAgentRuntimeConfig } from '../../../shared/types/profile';
 import { settingsService } from '../SettingsService';
 import { executionProfileService } from '../ExecutionProfileService';
+import { runExecutionService } from '../RunExecutionService';
 
 /** 证据链事件 */
 export interface EvidenceEvent {
@@ -212,6 +213,12 @@ export function createArtifact(
 /** 获取当前 ISO 时间字符串 */
 export function nowIso(): string {
   return new Date().toISOString();
+}
+
+export function ensureRunActive(runId: string): void {
+  if (runExecutionService.isAbortRequested(runId)) {
+    throw new Error(`Run aborted: ${runId}`);
+  }
 }
 
 /** 获取当前毫秒时间戳 */

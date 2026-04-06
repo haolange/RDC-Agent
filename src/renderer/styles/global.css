@@ -15,6 +15,7 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  color-scheme: dark;
 }
 
 html, body, #root {
@@ -37,12 +38,14 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
 button {
   border: none;
+  touch-action: manipulation;
 }
 
 a {
@@ -123,6 +126,40 @@ a {
   justify-content: center;
   width: min(440px, calc(100% - 360px));
   z-index: 1;
+}
+
+.mode-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgb(var(--color-border-default));
+  border-radius: 999px;
+  background: rgb(var(--color-bg-2) / 0.92);
+}
+
+.mode-switcher-item {
+  min-width: 108px;
+  min-height: 34px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: transparent;
+  color: rgb(var(--color-text-tertiary));
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.mode-switcher-item:hover {
+  color: rgb(var(--color-text-primary));
+}
+
+.mode-switcher-item.active {
+  background: linear-gradient(135deg, rgb(var(--color-accent-500) / 0.18), rgb(var(--color-primary-500) / 0.18));
+  color: rgb(var(--color-text-primary));
+  box-shadow: inset 0 0 0 1px rgb(var(--color-accent-500) / 0.24);
 }
 
 .app-titlebar-session {
@@ -243,6 +280,11 @@ a {
   background: rgb(var(--color-bg-0) / 0.18);
 }
 
+.app-mode-placeholder {
+  flex: 1;
+  min-height: 0;
+}
+
 .main-header {
   display: flex;
   align-items: center;
@@ -307,7 +349,9 @@ a {
 .main-utility-toggle {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-2);
+  min-height: 44px;
   padding: 8px 12px;
   border: 1px solid rgb(var(--color-border-default));
   border-radius: 999px;
@@ -342,6 +386,10 @@ a {
   background: rgb(var(--color-bg-1) / 0.92);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+}
+
+.chat-stop-button {
+  color: rgb(var(--color-error));
 }
 
 .input-bar-placeholder {
@@ -401,8 +449,8 @@ a {
 }
 
 .shell-panel-toggle {
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -420,6 +468,16 @@ a {
 
 .shell-panel-toggle:active {
   transform: translateY(1px);
+}
+
+.shell-panel-toggle:disabled {
+  opacity: 0.56;
+  cursor: not-allowed;
+}
+
+.shell-panel-toggle:disabled:hover {
+  background: rgb(var(--color-bg-2));
+  box-shadow: none;
 }
 
 .shell-panel-toggle-icon {
@@ -704,7 +762,7 @@ a {
   align-items: center;
   gap: 10px;
   min-width: 0;
-  height: 42px;
+  min-height: 44px;
   border: 1px solid rgb(var(--color-border-default));
   border-radius: var(--radius-xl);
   background:
@@ -783,7 +841,7 @@ a {
 }
 
 .sidebar-user-trigger {
-  height: 70px;
+  min-height: 72px;
   padding: 12px 14px;
   justify-content: flex-start;
   border-radius: 16px;
@@ -914,6 +972,7 @@ a {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
+  min-height: 44px;
   padding: var(--space-2) var(--space-4);
   border: 1px solid rgb(var(--color-border-default));
   border-radius: var(--radius-md);
@@ -965,7 +1024,8 @@ a {
 }
 
 .button-sm {
-  padding: 6px 12px;
+  min-height: 44px;
+  padding: 8px 14px;
   font-size: var(--text-xs);
 }
 
@@ -975,8 +1035,8 @@ a {
 }
 
 .icon-button {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1007,7 +1067,7 @@ a {
   border-color: rgb(var(--color-border-strong));
 }
 
-.input:focus {
+.input:focus-visible {
   border-color: rgb(var(--color-accent-500));
   box-shadow: 0 0 0 3px rgb(var(--color-accent-500) / 0.12);
 }
@@ -1208,6 +1268,113 @@ a {
     radial-gradient(circle at top, rgb(var(--color-primary-300) / 0.14), transparent 28%),
     radial-gradient(circle at 80% 10%, rgb(var(--color-accent-300) / 0.12), transparent 24%),
     rgb(var(--color-bg-0));
+}
+
+:root[data-resolved-theme='light'] html {
+  color-scheme: light;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[role='button']:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px rgb(var(--color-bg-1)),
+    0 0 0 4px rgb(var(--color-accent-500) / 0.38);
+}
+
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+[role='button']:focus:not(:focus-visible) {
+  box-shadow: none;
+}
+
+/* Narrow workbench fallback for Electron resize. */
+@media (max-width: 900px) {
+  .app-body {
+    grid-template-columns:
+      minmax(220px, 280px)
+      var(--resize-handle-width, 8px)
+      minmax(0, 1fr)
+      0
+      44px;
+  }
+
+  .panel-resize-handle-right {
+    width: 0;
+    pointer-events: none;
+  }
+
+  .app-sidebar-right .right-panel-body {
+    opacity: 0;
+    transform: translateX(12px);
+    pointer-events: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-body {
+    grid-template-columns:
+      56px
+      0
+      minmax(0, 1fr)
+      0
+      44px;
+  }
+
+  .panel-resize-handle-left,
+  .panel-resize-handle-right {
+    width: 0;
+    pointer-events: none;
+  }
+
+  .app-sidebar-left .sidebar-nav {
+    padding-inline: 6px;
+  }
+
+  .app-sidebar-left .session-section {
+    opacity: 0;
+    transform: translateX(-12px);
+    pointer-events: none;
+    flex: 0;
+    max-height: 0;
+    margin-top: 0;
+    padding-top: 0;
+    overflow: hidden;
+    border-top-color: transparent;
+  }
+
+  .app-sidebar-footer {
+    padding-inline: 6px;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .sidebar-user-trigger,
+  .device-selector-trigger {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 14px;
+  }
+
+  .sidebar-user-trigger .footer-entry-copy,
+  .sidebar-user-trigger .footer-entry-chevron,
+  .device-selector-copy,
+  .device-selector-trigger-meta {
+    display: none;
+  }
+
+  .device-selector-trigger-main {
+    flex: 0 0 auto;
+    min-width: auto;
+  }
 }
 
 /* 鍝嶅簲寮忓竷灞€ */

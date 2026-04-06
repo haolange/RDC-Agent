@@ -189,7 +189,7 @@ const seedChatWorkbench = async (page: AppContext['page']) => {
     timestamp: now - (40 - index) * 1_000,
   }));
 
-  await page.evaluate(({ project, session, currentRun, timeline }) => {
+  await page.evaluate(async ({ project, session, currentRun, timeline }) => {
     const hook = (window as Window & {
       __RDC_AGENT_E2E__?: {
         seedWorkbenchState: (state: Record<string, unknown>) => void;
@@ -200,7 +200,7 @@ const seedChatWorkbench = async (page: AppContext['page']) => {
       throw new Error('Missing E2E state hook');
     }
 
-    hook.seedWorkbenchState({
+    const state = {
       projects: [project],
       sessions: [session],
       currentProject: project,
@@ -212,7 +212,11 @@ const seedChatWorkbench = async (page: AppContext['page']) => {
       contextSnapshot: null,
       timeline,
       runs: [currentRun],
-    });
+    };
+
+    hook.seedWorkbenchState(state);
+    await new Promise((resolve) => window.setTimeout(resolve, 32));
+    hook.seedWorkbenchState(state);
   }, { project, session, currentRun, timeline });
 };
 
@@ -241,7 +245,7 @@ test('主壳层左栏和右栏支持独立滚轮滚动', async () => {
   await page.mouse.wheel(0, 1200);
   await expect.poll(async () => getScrollTop('[data-testid="sidebar-scroll"]', page)).toBeGreaterThan(sidebarScrollBefore);
 
-  await page.locator('[data-testid="cp-section-contextInfo"] .cp-section-header').click();
+  await page.locator('[data-testid="cp-section-runtimeContext"] .cp-section-header').click();
   await page.waitForTimeout(400);
 
   const panelIsScrollable = await page.locator('[data-testid="control-panel-scroll"]').evaluate((element) => (

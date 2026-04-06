@@ -215,7 +215,7 @@ export type GraphStateProjection = (graphState: GraphState) => WorkflowState;
 
 /** 模式能力定义 */
 export interface ModeCapabilities {
-  mode: 'debugger';
+  mode: import('./session').AppMode;
   availableStages: WorkflowStage[];
   requiresLLM: boolean;
   isFullyImplemented: boolean;

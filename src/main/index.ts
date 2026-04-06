@@ -6,7 +6,7 @@ import { app, BrowserWindow, dialog, Menu, shell } from 'electron';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
-import { registerIPCHandlers, setMainWindow, initWorkflowGraph } from './ipc/handlers';
+import { registerIPCHandlers, setMainWindow, initWorkflowGraph, stopAllActiveRuns } from './ipc/handlers';
 import { storageAdapter } from './services/StorageAdapter';
 import { settingsService } from './services/SettingsService';
 import { rdcToolAdapter } from './tools/RDCToolAdapter';
@@ -97,8 +97,8 @@ function createMainWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
-    minWidth: 1000,
-    minHeight: 700,
+    minWidth: 360,
+    minHeight: 640,
     title: 'RdcAgent - RenderDoc Debug Agent',
     show: false,
     webPreferences: {
@@ -299,6 +299,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  void stopAllActiveRuns();
   replayDeviceService.dispose();
 });
 

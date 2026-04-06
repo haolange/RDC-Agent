@@ -230,16 +230,44 @@ class ToolBridge {
         }
       );
       const procId = generateEventId("proc");
-      this.activeProcesses.set(procId, proc);
+      this.activeProcesses.set(procId, {
+        process: proc,
+        runId: options.runId
+      });
       let stdout = "";
       let stderr = "";
       let timeoutId = null;
+      let settled = false;
+      const finalize = (result) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        if (timeoutId) clearTimeout(timeoutId);
+        this.activeProcesses.delete(procId);
+        if (options.abortSignal && abortHandler) {
+          options.abortSignal.removeEventListener("abort", abortHandler);
+        }
+        resolve(result);
+      };
       if (options.timeout) {
         timeoutId = setTimeout(() => {
           proc.kill();
-          this.activeProcesses.delete(procId);
           reject(new Error(`Process timeout after ${options.timeout}ms`));
         }, options.timeout);
+      }
+      const abortHandler = () => {
+        try {
+          proc.kill();
+        } catch {
+        }
+      };
+      if (options.abortSignal) {
+        if (options.abortSignal.aborted) {
+          abortHandler();
+        } else {
+          options.abortSignal.addEventListener("abort", abortHandler, { once: true });
+        }
       }
       proc.stdout.on("data", (data) => {
         stdout += data.toString("utf-8");
@@ -248,9 +276,7 @@ class ToolBridge {
         stderr += data.toString("utf-8");
       });
       proc.on("close", (code) => {
-        if (timeoutId) clearTimeout(timeoutId);
-        this.activeProcesses.delete(procId);
-        resolve({
+        finalize({
           exitCode: code || 0,
           stdout,
           stderr,
@@ -258,9 +284,7 @@ class ToolBridge {
         });
       });
       proc.on("error", (error) => {
-        if (timeoutId) clearTimeout(timeoutId);
-        this.activeProcesses.delete(procId);
-        resolve({
+        finalize({
           exitCode: 2,
           stdout,
           stderr: error instanceof Error ? error.message : String(error),
@@ -312,8 +336,10 @@ class ToolBridge {
         cliArgs.push("--owner-lease-id", request.ownerLeaseId);
       }
       const result = await this.executeCLI("call", cliArgs, {
-        timeout: 6e4
+        timeout: 6e4,
         // 60秒超时
+        runId: request.runId,
+        abortSignal: request.abortSignal
       });
       if (result.stdout.trim()) {
         let parsed = null;
@@ -397,6 +423,17 @@ class ToolBridge {
       return response;
     }
   }
+  abortRun(runId) {
+    for (const { process: process2, runId: activeRunId } of this.activeProcesses.values()) {
+      if (activeRunId !== runId) {
+        continue;
+      }
+      try {
+        process2.kill();
+      } catch {
+      }
+    }
+  }
   /**
    * 打开capture文件
    */
@@ -470,9 +507,9 @@ class ToolBridge {
    * 终止所有活动进程
    */
   terminateAll() {
-    for (const [id, proc] of this.activeProcesses) {
+    for (const [id, active] of this.activeProcesses) {
       try {
-        proc.kill();
+        active.process.kill();
       } catch (error) {
         console.error(`Failed to terminate process ${id}:`, error);
       }
@@ -905,6 +942,19 @@ class StorageAdapter {
       this.writeSelection(selection);
     }
   }
+  removeSession(sessionId) {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) return;
+    if (fs__namespace.existsSync(location.sessionPath)) {
+      fs__namespace.rmSync(location.sessionPath, { recursive: true, force: true });
+    }
+    const selection = this.readSelection();
+    if (selection.sessionId === sessionId) {
+      selection.sessionId = null;
+      this.writeSelection(selection);
+    }
+    this.touchProject(location.project.projectId);
+  }
   getProjectById(projectId) {
     return this.readRegistry().projects.find((project) => project.projectId === projectId) || null;
   }
@@ -949,11 +999,11 @@ class StorageAdapter {
   listSessions(projectId) {
     const project = this.getProjectById(projectId);
     if (!project) return [];
-    const sessionsRoot = this.getProjectSessionsRoot(project);
+    const sessionsRoot = this.ensureProjectSessionsRoot(project);
     if (!fs__namespace.existsSync(sessionsRoot)) {
       return [];
     }
-    return fs__namespace.readdirSync(sessionsRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => this.readJson(path__namespace.join(sessionsRoot, entry.name, "session.json"))).filter((session) => session !== null).sort((a, b) => b.updatedAt - a.updatedAt);
+    return fs__namespace.readdirSync(sessionsRoot, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => this.readJson(path__namespace.join(sessionsRoot, entry.name, "session.json"))).filter((session) => session !== null).map((session) => this.normalizeSessionRecord(session)).sort((a, b) => b.updatedAt - a.updatedAt);
   }
   createSession(projectId, title, goal = "") {
     const project = this.getProjectById(projectId);
@@ -966,10 +1016,12 @@ class StorageAdapter {
       projectId,
       title: this.normalizeSessionTitle(title),
       goal,
+      sessionPath: "",
       createdAt: timestamp,
       updatedAt: timestamp
     };
-    const sessionPath = path__namespace.join(this.getProjectSessionsRoot(project), session.sessionId);
+    const sessionPath = path__namespace.join(this.ensureProjectSessionsRoot(project), session.sessionId);
+    session.sessionPath = sessionPath;
     this.ensureDir(sessionPath);
     this.ensureDir(path__namespace.join(sessionPath, "timeline"));
     this.ensureDir(path__namespace.join(sessionPath, "runs"));
@@ -982,7 +1034,8 @@ class StorageAdapter {
   readSession(sessionId) {
     const location = this.findSessionLocation(sessionId);
     if (!location) return null;
-    return this.readJson(path__namespace.join(location.sessionPath, "session.json"));
+    const session = this.readJson(path__namespace.join(location.sessionPath, "session.json"));
+    return session ? this.normalizeSessionRecord(session, location.sessionPath) : null;
   }
   updateSession(sessionId, patch) {
     const location = this.findSessionLocation(sessionId);
@@ -990,10 +1043,11 @@ class StorageAdapter {
     const existing = this.readJson(path__namespace.join(location.sessionPath, "session.json"));
     if (!existing) return null;
     const nextSession = {
-      ...existing,
+      ...this.normalizeSessionRecord(existing, location.sessionPath),
       ...patch,
       sessionId: existing.sessionId,
       projectId: existing.projectId,
+      sessionPath: location.sessionPath,
       updatedAt: nowMs()
     };
     this.writeJson(path__namespace.join(location.sessionPath, "session.json"), nextSession);
@@ -1100,7 +1154,7 @@ class StorageAdapter {
       goal: input.goal || session.goal,
       captures,
       startedAt,
-      status: "running",
+      status: input.status || "queued",
       lastStage: "preflight",
       backend,
       createdAt: startedAt,
@@ -1192,7 +1246,7 @@ class StorageAdapter {
     if (!location) {
       throw new Error(`Session not found for action chain: ${sessionId}`);
     }
-    return path__namespace.join(location.sessionPath, "timeline", "action_chain.jsonl");
+    return path__namespace.join(location.sessionPath, "action_chain.jsonl");
   }
   async appendActionEvent(sessionId, event) {
     appendJsonl(this.getActionChainPath(sessionId), event);
@@ -1436,16 +1490,43 @@ class StorageAdapter {
     return path__namespace.join(this.projectsRootPath, target.slug);
   }
   getProjectSessionsRoot(project) {
+    const target = typeof project === "string" ? this.getProjectById(project) : project;
+    if (!target) {
+      throw new Error(`Project not found: ${project}`);
+    }
+    return path__namespace.join(target.rootPath, "sessions");
+  }
+  getLegacyProjectSessionsRoot(project) {
     return path__namespace.join(this.getProjectDataPath(project), "sessions");
+  }
+  ensureProjectSessionsRoot(project) {
+    const target = typeof project === "string" ? this.getProjectById(project) : project;
+    if (!target) {
+      throw new Error(`Project not found: ${project}`);
+    }
+    const sessionsRoot = this.getProjectSessionsRoot(target);
+    this.ensureDir(sessionsRoot);
+    const legacySessionsRoot = this.getLegacyProjectSessionsRoot(target);
+    if (fs__namespace.existsSync(legacySessionsRoot) && legacySessionsRoot !== sessionsRoot) {
+      this.copyDirectoryContents(legacySessionsRoot, sessionsRoot, false);
+    }
+    return sessionsRoot;
   }
   findSessionLocation(sessionId) {
     for (const project of this.listProjects()) {
-      const sessionPath = path__namespace.join(this.getProjectSessionsRoot(project), sessionId);
+      const sessionPath = path__namespace.join(this.ensureProjectSessionsRoot(project), sessionId);
       if (fs__namespace.existsSync(path__namespace.join(sessionPath, "session.json"))) {
         return { project, sessionPath };
       }
     }
     return null;
+  }
+  normalizeSessionRecord(session, sessionPath) {
+    const resolvedSessionPath = sessionPath || this.findSessionLocation(session.sessionId)?.sessionPath || session.sessionPath;
+    return {
+      ...session,
+      sessionPath: resolvedSessionPath || ""
+    };
   }
   readPersistedRun(sessionId, runId) {
     const runJsonPath = path__namespace.join(this.getRunPath(sessionId, runId), "run.json");
@@ -3274,6 +3355,7 @@ class OpenRouterProvider {
         "HTTP-Referer": "https://rdcagent.local",
         "X-Title": "RdcAgent"
       },
+      signal: request.signal,
       body: JSON.stringify({
         model,
         messages: toContentBlocks(request.messages),
@@ -3338,6 +3420,7 @@ class OpenAICompatibleProvider {
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: "POST",
       headers,
+      signal: request.signal,
       body: JSON.stringify({
         model,
         messages: request.messages,
@@ -3398,6 +3481,7 @@ class AnthropicProvider {
         "anthropic-version": "2023-06-01",
         "Content-Type": "application/json"
       },
+      signal: request.signal,
       body: JSON.stringify({
         model,
         max_tokens: request.maxTokens || 4096,
@@ -3718,7 +3802,7 @@ class AgentOrchestrator {
   /**
    * 发送消息给Agent
    */
-  async sendMessage(agentId, content, context) {
+  async sendMessage(agentId, content, context, options) {
     const fallbackConfig = this.agentConfigs.get(agentId);
     if (!fallbackConfig) {
       throw new Error(`Agent not found: ${agentId}`);
@@ -3743,7 +3827,8 @@ class AgentOrchestrator {
           messages,
           model: config.modelName,
           maxTokens: config.maxTokens,
-          temperature: config.temperature
+          temperature: config.temperature,
+          signal: options?.signal
         },
         config.modelProvider
       );
@@ -3888,6 +3973,20 @@ class AgentOrchestrator {
       content,
       timestamp: nowMs()
     };
+    if (context.runId) {
+      await storageAdapter.appendActionEvent(context.sessionId, storageAdapter.createActionEvent({
+        runId: context.runId,
+        sessionId: context.sessionId,
+        agentId,
+        eventType: role === "user" ? "user_message" : role === "assistant" ? "agent_summary" : "system",
+        status: role === "system" ? "warning" : "ok",
+        payload: {
+          role,
+          content,
+          message_id: message.id
+        }
+      }));
+    }
     this.notifyMessage(message, context?.sessionId);
   }
   /**
@@ -4712,6 +4811,67 @@ class ReplayDeviceService {
   }
 }
 const replayDeviceService = new ReplayDeviceService();
+class RunExecutionService {
+  activeRuns = /* @__PURE__ */ new Map();
+  startRun(context, executor) {
+    const existing = this.activeRuns.get(context.runId);
+    if (existing) {
+      return existing;
+    }
+    const abortController = new AbortController();
+    const controller = {
+      ...context,
+      startedAt: Date.now(),
+      abortController
+    };
+    controller.promise = executor(abortController.signal).finally(() => {
+      const active = this.activeRuns.get(context.runId);
+      if (active?.abortController === abortController) {
+        this.activeRuns.delete(context.runId);
+      }
+    });
+    this.activeRuns.set(context.runId, controller);
+    return controller;
+  }
+  listActiveRuns() {
+    return Array.from(this.activeRuns.values()).map((run) => ({
+      runId: run.runId,
+      sessionId: run.sessionId,
+      projectId: run.projectId,
+      startedAt: run.startedAt,
+      stage: run.stage
+    }));
+  }
+  getAbortSignal(runId) {
+    return this.activeRuns.get(runId)?.abortController.signal ?? null;
+  }
+  updateStage(runId, stage) {
+    const active = this.activeRuns.get(runId);
+    if (!active) {
+      return;
+    }
+    active.stage = stage;
+  }
+  isAbortRequested(runId) {
+    return this.activeRuns.get(runId)?.abortController.signal.aborted ?? false;
+  }
+  stopRun(runId) {
+    const active = this.activeRuns.get(runId);
+    if (!active) {
+      return false;
+    }
+    active.abortController.abort();
+    return true;
+  }
+  async stopAll() {
+    const runIds = Array.from(this.activeRuns.keys());
+    runIds.forEach((runId) => this.stopRun(runId));
+    await Promise.allSettled(
+      runIds.map((runId) => this.activeRuns.get(runId)?.promise)
+    );
+  }
+}
+const runExecutionService = new RunExecutionService();
 const BLOCKER_CODES = {
   // Capture相关
   BLOCKED_MISSING_CAPTURE: {
@@ -4946,6 +5106,11 @@ function createArtifact(type, path2, agentId) {
 }
 function nowIso() {
   return (/* @__PURE__ */ new Date()).toISOString();
+}
+function ensureRunActive(runId) {
+  if (runExecutionService.isAbortRequested(runId)) {
+    throw new Error(`Run aborted: ${runId}`);
+  }
 }
 function resolveAgentRuntimeConfig(agentId, stageId) {
   const settings = settingsService.getAll();
@@ -5912,6 +6077,7 @@ Analyze the above briefs and provide your expert diagnosis. Focus on:
 4. Suggesting verification steps`;
 }
 async function expertInvestigationNode(state, config = {}) {
+  ensureRunActive(state.runId);
   const evidenceChain = [];
   const artifacts = [];
   evidenceChain.push(
@@ -5933,10 +6099,12 @@ async function expertInvestigationNode(state, config = {}) {
       ],
       model: modelConfig.modelId,
       maxTokens: 4096,
-      temperature: 0.3
+      temperature: 0.3,
       // 较低温度以获得更确定的分析
+      signal: runExecutionService.getAbortSignal(state.runId) ?? void 0
     };
     const response = await llmAdapter.chat(request, modelConfig.providerId);
+    ensureRunActive(state.runId);
     const investigationResult = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
     evidenceChain.push({
       eventId: crypto.randomUUID(),
@@ -6066,6 +6234,7 @@ Verify the proposed fix based on the evidence above. Determine if:
 4. Any additional verification is needed`;
 }
 async function fixVerificationNode(state, config = {}) {
+  ensureRunActive(state.runId);
   const evidenceChain = [];
   const blockers = [];
   const backtrackCount = { ...state.backtrackCount };
@@ -6090,9 +6259,11 @@ async function fixVerificationNode(state, config = {}) {
       ],
       model: modelConfig.modelId,
       maxTokens: 2048,
-      temperature: 0.2
+      temperature: 0.2,
+      signal: runExecutionService.getAbortSignal(state.runId) ?? void 0
     };
     const response = await llmAdapter.chat(request, modelConfig.providerId);
+    ensureRunActive(state.runId);
     const verificationResult = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
     const resultLower = verificationResult.toLowerCase();
     if (resultLower.includes("verified") || resultLower.includes("approved")) {
@@ -6241,6 +6412,7 @@ Critically review the entire investigation. Look for:
 Provide your independent assessment.`;
 }
 async function skepticNode(state, config = {}) {
+  ensureRunActive(state.runId);
   const evidenceChain = [];
   const blockers = [];
   const backtrackCount = { ...state.backtrackCount };
@@ -6266,10 +6438,12 @@ async function skepticNode(state, config = {}) {
       ],
       model: modelConfig.modelId,
       maxTokens: 4096,
-      temperature: 0.2
+      temperature: 0.2,
       // 较低温度以获得更批判性的分析
+      signal: runExecutionService.getAbortSignal(state.runId) ?? void 0
     };
     const response = await llmAdapter.chat(request, modelConfig.providerId);
+    ensureRunActive(state.runId);
     const skepticResult = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
     const resultLower = skepticResult.toLowerCase();
     if (resultLower.includes("approved") || resultLower.includes("pass")) {
@@ -6363,6 +6537,209 @@ function routeAfterSkeptic(state) {
   }
   return "curate";
 }
+const escapeHtml = (value) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+class ReportBundleService {
+  publish(input) {
+    const reportsDir = path.join(
+      input.projectRoot,
+      "sessions",
+      input.sessionId,
+      "runs",
+      input.runId,
+      "reports"
+    );
+    fs.mkdirSync(reportsDir, { recursive: true });
+    const markdownPath = path.join(reportsDir, "report.md");
+    const jsonPath = path.join(reportsDir, "report.json");
+    const htmlPath = path.join(reportsDir, "visual_report.html");
+    const payload = {
+      sessionId: input.sessionId,
+      runId: input.runId,
+      goal: input.goal,
+      eventCount: input.eventCount ?? 0,
+      artifactPaths: input.artifactPaths ?? [],
+      evidenceSummary: input.evidenceSummary ?? input.report.evidenceSummary,
+      verificationSummary: input.verificationSummary ?? [],
+      report: input.report
+    };
+    fs.writeFileSync(markdownPath, this.buildMarkdown(payload), "utf8");
+    fs.writeFileSync(jsonPath, JSON.stringify(payload, null, 2), "utf8");
+    fs.writeFileSync(htmlPath, this.buildHtml(payload), "utf8");
+    return {
+      reportsDir,
+      markdownPath,
+      jsonPath,
+      htmlPath
+    };
+  }
+  buildMarkdown(payload) {
+    const lines = [
+      `# ${payload.report.title}`,
+      "",
+      "## Task Goal",
+      payload.goal || "N/A",
+      "",
+      "## Summary",
+      payload.report.summary || "N/A",
+      "",
+      "## Root Cause",
+      payload.report.rootCause || "N/A",
+      "",
+      "## Fix Verification",
+      payload.report.fixDescription || "N/A",
+      "",
+      "## Evidence Summary",
+      ...payload.evidenceSummary.length > 0 ? payload.evidenceSummary.map((item) => `- ${item}`) : ["- N/A"],
+      "",
+      "## Verification Notes",
+      ...payload.verificationSummary.length > 0 ? payload.verificationSummary.map((item) => `- ${item}`) : ["- N/A"],
+      "",
+      "## Recommendations",
+      ...payload.report.recommendations.length > 0 ? payload.report.recommendations.map((item) => `- ${item}`) : ["- N/A"],
+      "",
+      "## Run Metadata",
+      `- Session ID: ${payload.sessionId}`,
+      `- Run ID: ${payload.runId}`,
+      `- Event Count: ${payload.eventCount}`,
+      `- Confidence: ${payload.report.confidence}`,
+      "",
+      "## Related Artifacts",
+      ...payload.artifactPaths.length > 0 ? payload.artifactPaths.map((item) => `- ${item}`) : ["- N/A"],
+      ""
+    ];
+    return lines.join("\n");
+  }
+  buildHtml(payload) {
+    const evidenceItems = (payload.evidenceSummary.length > 0 ? payload.evidenceSummary : ["N/A"]).map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+    const verificationItems = (payload.verificationSummary.length > 0 ? payload.verificationSummary : ["N/A"]).map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+    const recommendationItems = (payload.report.recommendations.length > 0 ? payload.report.recommendations : ["N/A"]).map((item) => `<li>${escapeHtml(item)}</li>`).join("");
+    const artifactItems = (payload.artifactPaths.length > 0 ? payload.artifactPaths : ["N/A"]).map((item) => `<li><code>${escapeHtml(item)}</code></li>`).join("");
+    return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(payload.report.title)}</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --muted: #8b949e;
+      --text: #e6edf3;
+      --accent: #4cc2ff;
+      --border: #30363d;
+      --success: #3fb950;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "PingFang SC", sans-serif;
+      background: radial-gradient(circle at top, #162234, var(--bg) 55%);
+      color: var(--text);
+    }
+    .page {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 32px 24px 48px;
+    }
+    .hero, .section {
+      background: color-mix(in srgb, var(--panel) 92%, black);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    }
+    .eyebrow {
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    h1, h2 { margin: 0 0 12px; }
+    p { line-height: 1.6; color: var(--text); }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .meta-item {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .meta-item .label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+    .meta-item .value {
+      color: var(--text);
+      font-weight: 600;
+      word-break: break-word;
+    }
+    ul { margin: 0; padding-left: 20px; }
+    li { margin: 8px 0; color: var(--text); }
+    .confidence {
+      color: var(--success);
+      font-weight: 700;
+    }
+    code {
+      font-family: "JetBrains Mono", Consolas, monospace;
+      color: #9cdcfe;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="eyebrow">RDC Agent Report</div>
+      <h1>${escapeHtml(payload.report.title)}</h1>
+      <p>${escapeHtml(payload.report.summary || "N/A")}</p>
+      <div class="meta">
+        <div class="meta-item"><div class="label">Session</div><div class="value">${escapeHtml(payload.sessionId)}</div></div>
+        <div class="meta-item"><div class="label">Run</div><div class="value">${escapeHtml(payload.runId)}</div></div>
+        <div class="meta-item"><div class="label">Events</div><div class="value">${payload.eventCount}</div></div>
+        <div class="meta-item"><div class="label">Confidence</div><div class="value confidence">${escapeHtml(String(payload.report.confidence))}</div></div>
+      </div>
+    </section>
+    <section class="section">
+      <div class="eyebrow">Task Goal</div>
+      <p>${escapeHtml(payload.goal || "N/A")}</p>
+    </section>
+    <section class="section">
+      <div class="eyebrow">Root Cause</div>
+      <p>${escapeHtml(payload.report.rootCause || "N/A")}</p>
+    </section>
+    <section class="section">
+      <div class="eyebrow">Fix Verification</div>
+      <p>${escapeHtml(payload.report.fixDescription || "N/A")}</p>
+    </section>
+    <section class="section">
+      <div class="eyebrow">Evidence Summary</div>
+      <ul>${evidenceItems}</ul>
+    </section>
+    <section class="section">
+      <div class="eyebrow">Verification Notes</div>
+      <ul>${verificationItems}</ul>
+    </section>
+    <section class="section">
+      <div class="eyebrow">Recommendations</div>
+      <ul>${recommendationItems}</ul>
+    </section>
+    <section class="section">
+      <div class="eyebrow">Artifacts</div>
+      <ul>${artifactItems}</ul>
+    </section>
+  </main>
+</body>
+</html>`;
+  }
+}
+const reportBundleService = new ReportBundleService();
 function buildCuratorSystemPrompt() {
   return `You are the Curator Agent, responsible for generating the final investigation report.
 Your role is to synthesize all evidence into a clear, actionable report.
@@ -6468,6 +6845,7 @@ function parseReportFromResponse(content) {
   };
 }
 async function curatorNode(state, _config = {}) {
+  ensureRunActive(state.runId);
   const evidenceChain = [];
   const artifacts = [];
   evidenceChain.push(
@@ -6490,11 +6868,55 @@ async function curatorNode(state, _config = {}) {
       ],
       model: modelConfig.modelId,
       maxTokens: 4096,
-      temperature: 0.3
+      temperature: 0.3,
+      signal: runExecutionService.getAbortSignal(state.runId) ?? void 0
     };
     const response = await llmAdapter.chat(request, modelConfig.providerId);
+    ensureRunActive(state.runId);
     const reportContent = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
     const finalReport = parseReportFromResponse(reportContent);
+    const run = await storageAdapter.readRun(state.caseId, state.runId);
+    const session = storageAdapter.readSession(state.sessionId);
+    if (run && session) {
+      const project = run.projectId ? storageAdapter.getProjectById(run.projectId) : null;
+      if (project) {
+        const bundle = reportBundleService.publish({
+          projectRoot: project.rootPath,
+          sessionId: state.sessionId,
+          runId: state.runId,
+          goal: state.userGoal,
+          report: finalReport,
+          evidenceSummary: finalReport.evidenceSummary,
+          verificationSummary: [
+            state.fixVerified ? "Fix verification passed." : "Fix verification is not yet fully passed."
+          ],
+          eventCount: state.evidenceChain.length,
+          artifactPaths: state.artifacts.map((artifact) => artifact.path)
+        });
+        await storageAdapter.updateRun(state.caseId, state.runId, {
+          reportPaths: bundle
+        });
+        artifacts.push(
+          createArtifact("final_report_markdown", bundle.markdownPath, "curator_agent"),
+          createArtifact("final_report_json", bundle.jsonPath, "curator_agent"),
+          createArtifact("final_report_html", bundle.htmlPath, "curator_agent")
+        );
+        evidenceChain.push({
+          eventId: crypto.randomUUID(),
+          eventType: "report_published",
+          agentId: "curator_agent",
+          status: "ok",
+          timestamp: Date.now(),
+          payload: {
+            sessionId: state.sessionId,
+            runId: state.runId,
+            markdownPath: bundle.markdownPath,
+            jsonPath: bundle.jsonPath,
+            htmlPath: bundle.htmlPath
+          }
+        });
+      }
+    }
     const reportArtifact = createArtifact(
       "final_report",
       `reports/${state.runId}_final_report.json`,
@@ -6738,6 +7160,7 @@ async function persistNodePatch(state, patch) {
     }
   }
   const nextState = mergeGraphState(state, patch);
+  runExecutionService.updateStage(state.runId, nextState.currentStage);
   await storageAdapter.updateRun(state.caseId, state.runId, {
     lastStage: nextState.currentStage,
     runtime: {
@@ -6755,7 +7178,9 @@ async function persistNodePatch(state, patch) {
 }
 function wrapNode(nodeFn) {
   return async (state) => {
+    ensureRunActive(state.runId);
     const patch = await nodeFn(state);
+    ensureRunActive(state.runId);
     await persistNodePatch(state, patch);
     return patch;
   };
@@ -6815,6 +7240,9 @@ async function specialistExecNode(state) {
           caseId: state.caseId,
           runId: state.runId,
           sessionId: state.sessionId
+        },
+        {
+          signal: runExecutionService.getAbortSignal(state.runId) ?? void 0
         }
       );
       const notePath = path.join(storageAdapter.getRunPath(state.caseId, state.runId), "notes", `${specialist.agentId}.md`);
@@ -7108,6 +7536,7 @@ async function initWorkflowGraph(workspacePath) {
     currentSessionId = null;
     currentProjectId = null;
   }
+  await recoverInterruptedRuns();
 }
 function getThreadId() {
   return currentSessionId || "default-thread";
@@ -7145,6 +7574,65 @@ function broadcastToRenderer(channel, ...args) {
     }
   }
 }
+function broadcastRunStatusChanged(payload) {
+  broadcastToRenderer("workflow:runStatusChanged", payload);
+  broadcastToRenderer("workflow:stateChanged", payload);
+}
+async function appendActionEvent(event) {
+  await storageAdapter.appendActionEvent(event.session_id, event);
+  broadcastToRenderer("evidence:eventAdded", event);
+}
+async function setRunLifecycleState(sessionId, runId, patch) {
+  const updatePayload = {
+    status: patch.status
+  };
+  if (patch.lastStage) {
+    updatePayload.lastStage = patch.lastStage;
+    updatePayload.runtime = {
+      workflow_stage: patch.lastStage
+    };
+  }
+  if (patch.stopReason) {
+    updatePayload.stopReason = patch.stopReason;
+  }
+  if (patch.stoppedAt) {
+    updatePayload.stoppedAt = patch.stoppedAt;
+  }
+  if (patch.finishedAt) {
+    updatePayload.finishedAt = patch.finishedAt;
+  }
+  await storageAdapter.updateRun(sessionId, runId, updatePayload);
+  broadcastRunStatusChanged({
+    runId,
+    sessionId,
+    status: patch.status,
+    lastStage: patch.lastStage,
+    stopReason: patch.stopReason
+  });
+}
+async function recoverInterruptedRuns() {
+  const projects = storageAdapter.listProjects();
+  for (const project of projects) {
+    const sessions = storageAdapter.listSessions(project.projectId);
+    for (const session of sessions) {
+      const runs = storageAdapter.listRuns(session.sessionId);
+      for (const run of runs) {
+        if (!["running", "queued", "stopping"].includes(run.status)) {
+          continue;
+        }
+        if (runExecutionService.listActiveRuns().some((active) => active.runId === run.runId)) {
+          continue;
+        }
+        await storageAdapter.updateRun(session.sessionId, run.runId, {
+          status: "interrupted",
+          stopReason: "Recovered after app restart",
+          stoppedAt: Date.now(),
+          finishedAt: Date.now()
+        });
+      }
+    }
+  }
+}
 function isInterrupted(result) {
   return result !== null && typeof result === "object" && "__interrupt__" in result && Array.isArray(result.__interrupt__);
 }
@@ -7152,6 +7640,22 @@ function registerIPCHandlers() {
   if (!toolTraceSubscribed) {
     toolBridge.onToolTrace((trace) => {
       broadcastToRenderer("tool:executionComplete", trace);
+      if (currentSessionId && currentRunId) {
+        void appendActionEvent(storageAdapter.createActionEvent({
+          runId: currentRunId,
+          sessionId: currentSessionId,
+          agentId: trace.runtimeOwner || "rdc-debugger",
+          eventType: "tool_execution",
+          status: trace.result.ok ? "ok" : "error",
+          payload: {
+            tool_name: trace.toolName,
+            args: trace.args,
+            result: trace.result.ok ? "success" : "failed",
+            error: trace.result.error,
+            trace_id: trace.traceId
+          }
+        }));
+      }
       runtimeLogService.log({
         scope: currentSessionId ? "session" : "app",
         namespace: "tool",
@@ -7274,11 +7778,46 @@ function registerIPCHandlers() {
       return { success: false, error: err.message };
     }
   });
+  electron.ipcMain.handle("workflow:stop", async (_event, runId) => {
+    const targetRunId = runId || currentRunId;
+    const sessionId = currentSessionId;
+    if (!targetRunId || !sessionId) {
+      return { success: false, error: "No active run." };
+    }
+    const targetRun = storageAdapter.listRuns(sessionId).find((run) => run.runId === targetRunId);
+    if (!targetRun) {
+      return { success: false, error: `Run not found: ${targetRunId}` };
+    }
+    await setRunLifecycleState(sessionId, targetRunId, {
+      status: "stopping",
+      lastStage: targetRun.lastStage,
+      stopReason: "Stopping requested",
+      stoppedAt: Date.now()
+    });
+    const stopIssued = runExecutionService.stopRun(targetRunId);
+    toolBridge.abortRun(targetRunId);
+    await rdxSessionService.closeOrReplaceOpenedCapture();
+    broadcastToRenderer("capture:openedStateChanged", null);
+    broadcastToRenderer("context:changed", rdxSessionService.snapshotContext());
+    if (!stopIssued) {
+      await setRunLifecycleState(sessionId, targetRunId, {
+        status: "cancelled",
+        lastStage: targetRun.lastStage,
+        stopReason: "Stopped without active controller",
+        stoppedAt: Date.now(),
+        finishedAt: Date.now()
+      });
+    }
+    return { success: true };
+  });
   electron.ipcMain.handle("workflow:listRuns", async () => {
     if (!currentSessionId) {
       return { runs: [] };
     }
     return { runs: storageAdapter.listRuns(currentSessionId) };
+  });
+  electron.ipcMain.handle("workflow:listActiveRuns", async () => {
+    return { runs: runExecutionService.listActiveRuns() };
   });
   electron.ipcMain.handle("project:list", async () => {
     return { projects: storageAdapter.listProjects() };
@@ -7354,6 +7893,31 @@ function registerIPCHandlers() {
       return { success: false, error: `Session not found: ${id}` };
     }
     return { success: true, session };
+  });
+  electron.ipcMain.handle("session:remove", async (_event, id) => {
+    const session = storageAdapter.readSession(id);
+    if (!session) {
+      return { success: false, error: `Session not found: ${id}` };
+    }
+    const runs = storageAdapter.listRuns(id);
+    const activeRun = runs.find((run) => ["queued", "running", "stopping"].includes(run.status));
+    if (activeRun) {
+      runExecutionService.stopRun(activeRun.runId);
+      toolBridge.abortRun(activeRun.runId);
+      await setRunLifecycleState(id, activeRun.runId, {
+        status: "cancelled",
+        lastStage: activeRun.lastStage,
+        stopReason: "Session removed",
+        stoppedAt: Date.now(),
+        finishedAt: Date.now()
+      });
+    }
+    storageAdapter.removeSession(id);
+    if (currentSessionId === id) {
+      currentSessionId = null;
+      currentRunId = null;
+    }
+    return { success: true };
   });
   electron.ipcMain.handle("session:select", async (_event, id) => {
     const session = storageAdapter.readSession(id);
@@ -7495,19 +8059,6 @@ function registerIPCHandlers() {
           error: "WorkflowGraph not initialized"
         };
       }
-      let contextSnapshot;
-      try {
-        contextSnapshot = await rdxSessionService.bootstrap(request);
-        broadcastToRenderer("context:changed", contextSnapshot);
-        broadcastToRenderer("capture:openedStateChanged", rdxSessionService.snapshotOpenedCapture());
-      } catch (bootstrapErr) {
-        const message = bootstrapErr instanceof Error ? bootstrapErr.message : String(bootstrapErr);
-        console.warn("[IPC] rdxSessionService bootstrap failed:", bootstrapErr);
-        return {
-          success: false,
-          error: message
-        };
-      }
       const gateResult = await harnessController.executeEntryGate({
         capturePaths,
         platform: "rdc-agent",
@@ -7534,63 +8085,135 @@ function registerIPCHandlers() {
         mode: request.mode,
         goal,
         captures: request.captures,
-        backend: request.captures.some((capture) => capture.backendHint === "remote") ? "remote" : "local"
+        backend: request.captures.some((capture) => capture.backendHint === "remote") ? "remote" : "local",
+        status: "queued"
       });
       currentSessionId = sessionId;
       currentRunId = runId;
       currentProjectId = request.projectId;
       await storageAdapter.setCurrentSessionId(sessionId);
-      if (contextSnapshot) {
-        await storageAdapter.updateRun(sessionId, runId, {
-          runtime: {
-            context_id: contextSnapshot.contextId,
-            runtime_owner: contextSnapshot.runtimeOwner,
-            session_id: sessionId
-          }
-        });
-      }
-      const config = getGraphConfig();
-      const initialState = {
-        caseId,
+      await appendActionEvent(storageAdapter.createActionEvent({
         runId,
         sessionId,
-        userGoal: goal,
-        capturePaths,
-        currentStage: "preflight",
-        stageHistory: [],
-        evidenceChain: [],
-        artifacts: [],
-        activeSpecialists: {},
-        pendingBriefs: [],
-        collectedBriefs: {},
-        blockers: [],
-        backtrackCount: {},
-        fixVerified: false,
-        entryMode: "cli",
-        backend: request.captures.some((capture) => capture.backendHint === "remote") ? "remote" : "local",
-        mode: request.mode,
-        goal,
-        captures: request.captures,
-        primaryCaptureId: request.primaryCaptureId,
-        replayDevice: request.replayDevice,
-        orchestrationMode: "multi_agent",
-        coordinationMode: "staged_handoff",
-        lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
-      };
-      const result = await compiledGraph.invoke(initialState, config);
-      if (isInterrupted(result)) {
-        const interruptData = result.__interrupt__[0];
-        console.log("[IPC] Workflow interrupted:", interruptData);
-        if (mainWindow$1 && !mainWindow$1.isDestroyed()) {
-          mainWindow$1.webContents.send("workflow:blocked", {
-            type: interruptData?.type || "unknown",
-            data: interruptData
-          });
+        agentId: "rdc-debugger",
+        eventType: "system",
+        status: "ok",
+        payload: {
+          message: "Run queued",
+          goal,
+          mode: request.mode
         }
-      } else {
-        notifyWorkflowStateChanged(result);
-      }
-      return { success: true, caseId, runId, sessionId, contextSnapshot };
+      }));
+      broadcastRunStatusChanged({
+        runId,
+        sessionId,
+        status: "queued",
+        lastStage: "preflight"
+      });
+      runExecutionService.startRun(
+        {
+          runId,
+          sessionId,
+          projectId: request.projectId
+        },
+        async (signal) => {
+          let contextSnapshot;
+          try {
+            await setRunLifecycleState(sessionId, runId, {
+              status: "running",
+              lastStage: "preflight"
+            });
+            contextSnapshot = await rdxSessionService.bootstrap(request);
+            if (signal.aborted) {
+              throw new Error(`Run aborted: ${runId}`);
+            }
+            broadcastToRenderer("context:changed", contextSnapshot);
+            broadcastToRenderer("capture:openedStateChanged", rdxSessionService.snapshotOpenedCapture());
+            await storageAdapter.updateRun(sessionId, runId, {
+              runtime: {
+                context_id: contextSnapshot.contextId,
+                runtime_owner: contextSnapshot.runtimeOwner,
+                session_id: sessionId
+              }
+            });
+            const config = getGraphConfig();
+            const initialState = {
+              caseId,
+              runId,
+              sessionId,
+              userGoal: goal,
+              capturePaths,
+              currentStage: "preflight",
+              stageHistory: [],
+              evidenceChain: [],
+              artifacts: [],
+              activeSpecialists: {},
+              pendingBriefs: [],
+              collectedBriefs: {},
+              blockers: [],
+              backtrackCount: {},
+              fixVerified: false,
+              entryMode: "cli",
+              backend: request.captures.some((capture) => capture.backendHint === "remote") ? "remote" : "local",
+              mode: request.mode,
+              goal,
+              captures: request.captures,
+              primaryCaptureId: request.primaryCaptureId,
+              replayDevice: request.replayDevice,
+              orchestrationMode: "multi_agent",
+              coordinationMode: "staged_handoff",
+              lastUpdated: (/* @__PURE__ */ new Date()).toISOString()
+            };
+            const result = await compiledGraph.invoke(initialState, config);
+            if (signal.aborted) {
+              throw new Error(`Run aborted: ${runId}`);
+            }
+            if (isInterrupted(result)) {
+              const interruptData = result.__interrupt__[0];
+              await setRunLifecycleState(sessionId, runId, {
+                status: "interrupted",
+                lastStage: interruptData?.currentStage || "blocked",
+                stopReason: String(interruptData?.type || "Workflow interrupted"),
+                stoppedAt: Date.now(),
+                finishedAt: Date.now()
+              });
+              if (mainWindow$1 && !mainWindow$1.isDestroyed()) {
+                mainWindow$1.webContents.send("workflow:blocked", {
+                  type: interruptData?.type || "unknown",
+                  data: interruptData
+                });
+              }
+              return;
+            }
+            notifyWorkflowStateChanged(result);
+            await setRunLifecycleState(sessionId, runId, {
+              status: "completed",
+              lastStage: result.currentStage,
+              finishedAt: Date.now()
+            });
+          } catch (error) {
+            const aborted = signal.aborted;
+            await setRunLifecycleState(sessionId, runId, {
+              status: aborted ? "cancelled" : "failed",
+              lastStage: "blocked",
+              stopReason: aborted ? "Stopped by user" : error instanceof Error ? error.message : String(error),
+              stoppedAt: Date.now(),
+              finishedAt: Date.now()
+            });
+            runtimeLogService.log({
+              scope: "session",
+              namespace: "system",
+              severity: aborted ? "warning" : "error",
+              title: aborted ? "Run stopped" : "Run failed",
+              summary: aborted ? "调试任务已停止。" : error instanceof Error ? error.message : String(error),
+              sessionId,
+              projectId: request.projectId,
+              runId
+            });
+          }
+        }
+      );
+      return { success: true, caseId, runId, sessionId, status: "queued" };
     } catch (error) {
       console.error("Failed to start workflow:", error);
       return {
@@ -7728,7 +8351,9 @@ function registerIPCHandlers() {
           };
         }
       }
-      const response = await agentOrchestrator.sendMessage(agentId, content, context);
+      const response = await agentOrchestrator.sendMessage(agentId, content, context, {
+        signal: (context?.runId ? runExecutionService.getAbortSignal(context.runId) : null) ?? void 0
+      });
       return { response };
     } catch (error) {
       return {
@@ -7847,6 +8472,9 @@ function setMainWindow(window) {
   mainWindow$1 = window;
   replayDeviceService.setMainWindow(window);
   agentOrchestrator.setMainWindow(window);
+}
+async function stopAllActiveRuns() {
+  await runExecutionService.stopAll();
 }
 const RDC_TOOL_GROUPS = [
   "core",
@@ -8676,8 +9304,8 @@ function createMainWindow() {
   mainWindow = new electron.BrowserWindow({
     width: 1400,
     height: 900,
-    minWidth: 1e3,
-    minHeight: 700,
+    minWidth: 360,
+    minHeight: 640,
     title: "RdcAgent - RenderDoc Debug Agent",
     show: false,
     webPreferences: {
@@ -8845,6 +9473,7 @@ electron.app.on("window-all-closed", () => {
   }
 });
 electron.app.on("before-quit", () => {
+  void stopAllActiveRuns();
   replayDeviceService.dispose();
 });
 electron.app.on("web-contents-created", (_event, contents) => {

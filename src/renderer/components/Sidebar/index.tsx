@@ -224,6 +224,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setEditingTitle(session.title);
   }, []);
 
+  const handleSessionRemove = useCallback(async (session: SessionRecord) => {
+    setContextMenu(null);
+    setIsBusy(true);
+    try {
+      const result = await window.electronAPI.session.remove(session.sessionId);
+      if (!result.success) {
+        return;
+      }
+
+      if (currentProject) {
+        const sessionsResult = await window.electronAPI.session.list(currentProject.projectId);
+        const nextSessions = sessionsResult.sessions ?? [];
+        setSessions(nextSessions);
+        const nextSession = nextSessions[0] ?? null;
+        setCurrentSession(nextSession);
+        if (nextSession) {
+          await selectSession(nextSession.sessionId);
+        } else {
+          setCurrentRun(null);
+          setCaptures([]);
+          setRuns([]);
+          useSessionStore.getState().setTimeline([]);
+        }
+      }
+    } finally {
+      setIsBusy(false);
+    }
+  }, [currentProject, selectSession, setCaptures, setCurrentRun, setCurrentSession, setRuns, setSessions]);
+
   const cancelSessionRename = useCallback(() => {
     setEditingSessionId(null);
     setEditingTitle('');
@@ -458,6 +487,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
             </svg>
             <span>重命名</span>
+          </button>
+          <button
+            type="button"
+            className="session-context-menu-item"
+            onClick={() => void handleSessionRemove(contextMenu.session)}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 6h18" />
+              <path d="M8 6V4h8v2" />
+              <path d="M19 6l-1 14H6L5 6" />
+            </svg>
+            <span>删除</span>
           </button>
         </div>
       )}

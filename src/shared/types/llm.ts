@@ -60,6 +60,7 @@ export interface LLMRequest {
   temperature?: number;
   tools?: ToolDefinition[];
   stream?: boolean;
+  signal?: AbortSignal;
 }
 
 // LLM响应

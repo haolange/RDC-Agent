@@ -159,8 +159,12 @@ export const CaptureLibrary: React.FC = () => {
         </button>
       </div>
 
-      {errorMessage && <div className="capture-library-error">{errorMessage}</div>}
-      {currentRun && <div className="capture-library-run-lock">{t('control.captureSwitchLocked')}</div>}
+      {errorMessage && <div className="capture-library-error" role="alert">{errorMessage}</div>}
+      {currentRun && (
+        <div className="capture-library-run-lock" role="status" aria-live="polite">
+          {t('control.captureSwitchLocked')}
+        </div>
+      )}
 
       {projectInputs.length === 0 ? (
         <div className="capture-library-empty">

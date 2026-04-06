@@ -20,7 +20,7 @@ interface WindowsLauncherSpec {
 export class ToolBridge {
   private toolsPath: string;
   private catalog: ToolCatalog | null = null;
-  private activeProcesses: Map<string, ChildProcess> = new Map();
+  private activeProcesses: Map<string, { process: ChildProcess; runId?: string }> = new Map();
   private traceListeners = new Set<(trace: ToolTraceEntry) => void>();
 
   constructor() {
@@ -144,6 +144,8 @@ export class ToolBridge {
       timeout?: number;
       cwd?: string;
       env?: Record<string, string>;
+      runId?: string;
+      abortSignal?: AbortSignal;
     } = {}
   ): Promise<CLIResult> {
     const startTime = nowMs();
@@ -200,18 +202,50 @@ export class ToolBridge {
       );
 
       const procId = generateEventId('proc');
-      this.activeProcesses.set(procId, proc);
+      this.activeProcesses.set(procId, {
+        process: proc,
+        runId: options.runId,
+      });
 
       let stdout = '';
       let stderr = '';
       let timeoutId: NodeJS.Timeout | null = null;
+      let settled = false;
+
+      const finalize = (result: CLIResult) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        if (timeoutId) clearTimeout(timeoutId);
+        this.activeProcesses.delete(procId);
+        if (options.abortSignal && abortHandler) {
+          options.abortSignal.removeEventListener('abort', abortHandler);
+        }
+        resolve(result);
+      };
 
       if (options.timeout) {
         timeoutId = setTimeout(() => {
           proc.kill();
-          this.activeProcesses.delete(procId);
           reject(new Error(`Process timeout after ${options.timeout}ms`));
         }, options.timeout);
+      }
+
+      const abortHandler = () => {
+        try {
+          proc.kill();
+        } catch {
+          // noop
+        }
+      };
+
+      if (options.abortSignal) {
+        if (options.abortSignal.aborted) {
+          abortHandler();
+        } else {
+          options.abortSignal.addEventListener('abort', abortHandler, { once: true });
+        }
       }
 
       proc.stdout.on('data', (data) => {
@@ -223,10 +257,7 @@ export class ToolBridge {
       });
 
       proc.on('close', (code) => {
-        if (timeoutId) clearTimeout(timeoutId);
-        this.activeProcesses.delete(procId);
-
-        resolve({
+        finalize({
           exitCode: code || 0,
           stdout,
           stderr,
@@ -235,9 +266,7 @@ export class ToolBridge {
       });
 
       proc.on('error', (error) => {
-        if (timeoutId) clearTimeout(timeoutId);
-        this.activeProcesses.delete(procId);
-        resolve({
+        finalize({
           exitCode: 2,
           stdout,
           stderr: error instanceof Error ? error.message : String(error),
@@ -299,6 +328,8 @@ export class ToolBridge {
 
       const result = await this.executeCLI('call', cliArgs, {
         timeout: 60000, // 60秒超时
+        runId: request.runId,
+        abortSignal: request.abortSignal,
       });
 
       // 优先解析 canonical JSON，即使 CLI 以非零退出码返回也可能给出结构化错误
@@ -388,6 +419,20 @@ export class ToolBridge {
       };
       this.emitToolTrace(request, response);
       return response;
+    }
+  }
+
+  abortRun(runId: string): void {
+    for (const { process, runId: activeRunId } of this.activeProcesses.values()) {
+      if (activeRunId !== runId) {
+        continue;
+      }
+
+      try {
+        process.kill();
+      } catch {
+        // noop
+      }
     }
   }
 
@@ -483,9 +528,9 @@ export class ToolBridge {
    * 终止所有活动进程
    */
   terminateAll(): void {
-    for (const [id, proc] of this.activeProcesses) {
+    for (const [id, active] of this.activeProcesses) {
       try {
-        proc.kill();
+        active.process.kill();
       } catch (error) {
         console.error(`Failed to terminate process ${id}:`, error);
       }

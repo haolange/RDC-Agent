@@ -84,6 +84,7 @@
 
 .settings-center-nav-item {
   width: 100%;
+  min-height: 44px;
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-lg);
   background: transparent;
@@ -138,8 +139,8 @@
 }
 
 .settings-modal-close {
-  width: calc(var(--space-8) + 4px);
-  height: calc(var(--space-8) + 4px);
+  width: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -571,10 +572,10 @@
   background: rgb(var(--color-bg-3) / 0.7);
 }
 
-.settings-field .input:focus,
-.settings-option-block .input:focus,
-.settings-model-adder-row .input:focus,
-.settings-agent-grid .input:focus {
+.settings-field .input:focus-visible,
+.settings-option-block .input:focus-visible,
+.settings-model-adder-row .input:focus-visible,
+.settings-agent-grid .input:focus-visible {
   border-color: rgb(var(--color-accent-500) / 0.6);
   background: rgb(var(--color-bg-3));
   box-shadow: 0 0 0 3px rgb(var(--color-accent-500) / 0.15);
@@ -586,6 +587,7 @@
   top: 50%;
   right: var(--space-3);
   transform: translateY(-50%);
+  min-height: 36px;
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-md);
   background: transparent;
@@ -670,8 +672,8 @@
 }
 
 .settings-model-row-remove {
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -782,8 +784,8 @@
 }
 
 .settings-sidebar-icon-button {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

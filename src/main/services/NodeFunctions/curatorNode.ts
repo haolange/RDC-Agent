@@ -10,9 +10,13 @@ import { llmAdapter } from '../../adapters/LLMAdapter';
 import {
   createStageTransitionEvidence,
   createArtifact,
+  ensureRunActive,
   nowIso,
   resolveAgentRuntimeConfig,
 } from './utils';
+import { reportBundleService } from '../ReportBundleService';
+import { storageAdapter } from '../StorageAdapter';
+import { runExecutionService } from '../RunExecutionService';
 
 /** Curator 节点配置 */
 export interface CuratorConfig {
@@ -171,6 +175,7 @@ export async function curatorNode(
   state: GraphState,
   _config: CuratorConfig = {}
 ): Promise<Partial<GraphState>> {
+  ensureRunActive(state.runId);
   const evidenceChain: GraphState['evidenceChain'] = [];
   const artifacts: GraphState['artifacts'] = [];
 
@@ -198,10 +203,12 @@ export async function curatorNode(
       model: modelConfig.modelId,
       maxTokens: 4096,
       temperature: 0.3,
+      signal: runExecutionService.getAbortSignal(state.runId) ?? undefined,
     };
 
     // 调用 LLM
     const response = await llmAdapter.chat(request, modelConfig.providerId);
+    ensureRunActive(state.runId);
 
     const reportContent = typeof response.content === 'string'
       ? response.content
@@ -209,6 +216,52 @@ export async function curatorNode(
 
     // 解析报告
     const finalReport = parseReportFromResponse(reportContent);
+
+    const run = await storageAdapter.readRun(state.caseId, state.runId) as { projectId?: string } | null;
+    const session = storageAdapter.readSession(state.sessionId);
+    if (run && session) {
+      const project = run.projectId ? storageAdapter.getProjectById(run.projectId) : null;
+      if (project) {
+        const bundle = reportBundleService.publish({
+          projectRoot: project.rootPath,
+          sessionId: state.sessionId,
+          runId: state.runId,
+          goal: state.userGoal,
+          report: finalReport,
+          evidenceSummary: finalReport.evidenceSummary,
+          verificationSummary: [
+            state.fixVerified ? 'Fix verification passed.' : 'Fix verification is not yet fully passed.',
+          ],
+          eventCount: state.evidenceChain.length,
+          artifactPaths: state.artifacts.map((artifact) => artifact.path),
+        });
+
+        await storageAdapter.updateRun(state.caseId, state.runId, {
+          reportPaths: bundle,
+        });
+
+        artifacts.push(
+          createArtifact('final_report_markdown', bundle.markdownPath, 'curator_agent'),
+          createArtifact('final_report_json', bundle.jsonPath, 'curator_agent'),
+          createArtifact('final_report_html', bundle.htmlPath, 'curator_agent'),
+        );
+
+        evidenceChain.push({
+          eventId: randomUUID(),
+          eventType: 'report_published',
+          agentId: 'curator_agent',
+          status: 'ok',
+          timestamp: Date.now(),
+          payload: {
+            sessionId: state.sessionId,
+            runId: state.runId,
+            markdownPath: bundle.markdownPath,
+            jsonPath: bundle.jsonPath,
+            htmlPath: bundle.htmlPath,
+          },
+        });
+      }
+    }
 
     // 创建报告 artifact
     const reportArtifact = createArtifact(

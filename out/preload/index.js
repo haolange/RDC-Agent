@@ -8,6 +8,8 @@ const validChannels = [
   "app:themeChanged",
   "workflow:stateChanged",
   "workflow:stageChanged",
+  "workflow:runStatusChanged",
+  "workflow:blocked",
   "agent:message",
   "agent:statusChanged",
   "tool:executionComplete",
@@ -43,7 +45,9 @@ const electronAPI = {
     getState: () => electron.ipcRenderer.invoke("workflow:getState"),
     start: (request) => electron.ipcRenderer.invoke("workflow:start", request),
     resume: (sessionId) => electron.ipcRenderer.invoke("workflow:resume", sessionId),
+    stop: (runId) => electron.ipcRenderer.invoke("workflow:stop", runId),
     listRuns: () => electron.ipcRenderer.invoke("workflow:listRuns"),
+    listActiveRuns: () => electron.ipcRenderer.invoke("workflow:listActiveRuns"),
     advanceStage: () => electron.ipcRenderer.invoke("workflow:advanceStage"),
     backtrack: (reason, trigger) => electron.ipcRenderer.invoke("workflow:backtrack", reason, trigger),
     dispatchSpecialist: (agentId, objective) => electron.ipcRenderer.invoke("workflow:dispatchSpecialist", agentId, objective)
@@ -91,6 +95,7 @@ const electronAPI = {
     list: (projectId) => electron.ipcRenderer.invoke("session:list", projectId),
     create: (projectId, title) => electron.ipcRenderer.invoke("session:create", projectId, title),
     rename: (id, title) => electron.ipcRenderer.invoke("session:rename", id, title),
+    remove: (id) => electron.ipcRenderer.invoke("session:remove", id),
     select: (id) => electron.ipcRenderer.invoke("session:select", id)
   },
   run: {
@@ -115,6 +120,9 @@ const electronAPI = {
     },
     onWorkflowStageChanged: (callback) => {
       electron.ipcRenderer.on("workflow:stageChanged", (_event, data) => callback(data));
+    },
+    onRunStatusChanged: (callback) => {
+      electron.ipcRenderer.on("workflow:runStatusChanged", (_event, data) => callback(data));
     },
     onAgentMessage: (callback) => {
       electron.ipcRenderer.on("agent:message", (_event, msg) => callback(msg));

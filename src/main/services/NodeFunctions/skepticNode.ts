@@ -10,10 +10,12 @@ import { llmAdapter } from '../../adapters/LLMAdapter';
 import {
   createStageTransitionEvidence,
   createBlocker,
+  ensureRunActive,
   nowIso,
   resolveAgentRuntimeConfig,
 } from './utils';
 import { BLOCKER_CODES } from '../../../shared/constants/blockers';
+import { runExecutionService } from '../RunExecutionService';
 
 /** Skeptic 节点配置 */
 export interface SkepticConfig {
@@ -114,6 +116,7 @@ export async function skepticNode(
   state: GraphState,
   config: SkepticConfig = {}
 ): Promise<Partial<GraphState>> {
+  ensureRunActive(state.runId);
   const evidenceChain: GraphState['evidenceChain'] = [];
   const blockers: GraphState['blockers'] = [];
   const backtrackCount: GraphState['backtrackCount'] = { ...state.backtrackCount };
@@ -145,10 +148,12 @@ export async function skepticNode(
       model: modelConfig.modelId,
       maxTokens: 4096,
       temperature: 0.2, // 较低温度以获得更批判性的分析
+      signal: runExecutionService.getAbortSignal(state.runId) ?? undefined,
     };
 
     // 调用 LLM
     const response = await llmAdapter.chat(request, modelConfig.providerId);
+    ensureRunActive(state.runId);
 
     const skepticResult = typeof response.content === 'string'
       ? response.content

@@ -57,6 +57,7 @@ export interface ElectronAPI {
       caseId?: string;
       runId?: string;
       sessionId?: string;
+      status?: RunSummary['status'];
       contextSnapshot?: ContextSnapshot;
       error?: string;
     }>;
@@ -64,7 +65,12 @@ export interface ElectronAPI {
       success: boolean;
       error?: string;
     }>;
+    stop: (runId?: string) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
     listRuns: () => Promise<{ runs: RunSummary[] }>;
+    listActiveRuns: () => Promise<{ runs: Array<{ runId: string; sessionId: string; projectId: string; startedAt: number; stage?: string }> }>;
     advanceStage: () => Promise<{
       success: boolean;
       currentStage?: WorkflowStage;
@@ -164,6 +170,10 @@ export interface ElectronAPI {
       session?: SessionRecord;
       error?: string;
     }>;
+    remove: (id: string) => Promise<{
+      success: boolean;
+      error?: string;
+    }>;
     select: (id: string) => Promise<{
       success: boolean;
       session?: SessionRecord;
@@ -209,6 +219,7 @@ export interface ElectronAPI {
   events: {
     onWorkflowStateChanged: (callback: (state: WorkflowState) => void) => void;
     onWorkflowStageChanged: (callback: (data: { stage: WorkflowStage; blockers: unknown[] }) => void) => void;
+    onRunStatusChanged: (callback: (data: { runId: string; sessionId: string; status: RunSummary['status']; lastStage?: string; stopReason?: string }) => void) => void;
     onAgentMessage: (callback: (msg: unknown) => void) => void;
     onAgentStatusChanged: (callback: (state: AgentState) => void) => void;
     onToolExecutionComplete: (callback: (trace: unknown) => void) => void;

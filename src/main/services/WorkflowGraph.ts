@@ -13,13 +13,14 @@ import type {
   ReplaySession,
   Report,
 } from '../../shared/types/workflow';
-import type { CaptureDescriptor, DebugSessionStartRequest } from '@shared/types/session';
+import type { AppMode, CaptureDescriptor, DebugSessionStartRequest } from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { AgentRole } from '@shared/types/agent';
 import { rdxSessionService } from '../index';
 import { storageAdapter } from './StorageAdapter';
 import { agentOrchestrator } from './AgentOrchestrator';
+import { runExecutionService } from './RunExecutionService';
 import { preflightNode, routeAfterPreflight } from './NodeFunctions/preflightNode';
 import { entryGateNode, routeAfterEntryGate } from './NodeFunctions/entryGateNode';
 import { intakeGateNode, routeAfterIntakeGate } from './NodeFunctions/intakeGateNode';
@@ -36,6 +37,7 @@ import {
   createArtifact,
   createSpecialistCompleteEvidence,
   createStageTransitionEvidence,
+  ensureRunActive,
   nowIso,
   projectToWorkflowState,
 } from './NodeFunctions/utils';
@@ -84,7 +86,7 @@ const WorkflowAnnotation = Annotation.Root({
   captures: Annotation<CaptureDescriptor[]>({ reducer: (_a, b) => b, default: () => [] }),
   primaryCaptureId: Annotation<string>({ reducer: (_a, b) => b, default: () => '' }),
   replayDevice: Annotation<ReplayDeviceEntry | null>({ reducer: (_a, b) => b, default: () => null }),
-  mode: Annotation<'debugger'>({ reducer: (_a, b) => b, default: () => 'debugger' }),
+  mode: Annotation<AppMode>({ reducer: (_a, b) => b, default: () => 'debugger' }),
   goal: Annotation<string>({ reducer: (_a, b) => b, default: () => '' }),
   captureInfo: Annotation<CaptureInfo | undefined>({ reducer: (_a, b) => b, default: () => undefined }),
   replaySession: Annotation<ReplaySession | undefined>({ reducer: (_a, b) => b, default: () => undefined }),
@@ -148,6 +150,7 @@ async function persistNodePatch(state: WorkflowStateType, patch: Partial<Workflo
   }
 
   const nextState = mergeGraphState(state, patch);
+  runExecutionService.updateStage(state.runId, nextState.currentStage);
   await storageAdapter.updateRun(state.caseId, state.runId, {
     lastStage: nextState.currentStage,
     runtime: {
@@ -169,7 +172,9 @@ function wrapNode(
   nodeFn: (state: GraphState) => Promise<Partial<GraphState>>,
 ): (state: WorkflowStateType) => Promise<Partial<WorkflowStateType>> {
   return async (state: WorkflowStateType) => {
+    ensureRunActive(state.runId);
     const patch = await nodeFn(state as unknown as GraphState);
+    ensureRunActive(state.runId);
     await persistNodePatch(state, patch as Partial<WorkflowStateType>);
     return patch as Partial<WorkflowStateType>;
   };
@@ -239,6 +244,9 @@ async function specialistExecNode(state: WorkflowStateType): Promise<Partial<Wor
           caseId: state.caseId,
           runId: state.runId,
           sessionId: state.sessionId,
+        },
+        {
+          signal: runExecutionService.getAbortSignal(state.runId) ?? undefined,
         },
       );
 
