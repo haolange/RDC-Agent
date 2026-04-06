@@ -7,32 +7,6 @@
   background: rgb(var(--color-bg-0));
 }
 
-.chat-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
-  background: rgb(var(--color-bg-1));
-  border-bottom: 1px solid rgb(var(--color-border-default) / 0.5);
-}
-
-.chat-header-left,
-.chat-header-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.chat-agent-selector {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid rgb(var(--color-border-default));
-  border-radius: var(--radius-xl);
-  background: rgb(var(--color-bg-2));
-}
-
 .chat-agent-avatar,
 .message-avatar {
   width: 32px;
@@ -46,7 +20,6 @@
   flex-shrink: 0;
 }
 
-.chat-agent-avatar.debugger,
 .message-avatar.assistant {
   background: linear-gradient(135deg, rgb(var(--color-accent-600)), rgb(var(--color-primary-600)));
   color: white;
@@ -62,23 +35,6 @@
   background: rgb(var(--color-error) / 0.14);
   border: 1px solid rgb(var(--color-error) / 0.3);
   color: rgb(var(--color-error));
-}
-
-.chat-agent-info {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.chat-agent-name {
-  color: rgb(var(--color-text-primary));
-  font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
-}
-
-.chat-agent-role {
-  color: rgb(var(--color-text-tertiary));
-  font-size: var(--text-xs);
 }
 
 .chat-messages {
