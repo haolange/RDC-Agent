@@ -59,6 +59,7 @@ export interface LLMRequest {
   maxTokens?: number;
   temperature?: number;
   tools?: ToolDefinition[];
+  responseFormat?: 'json_object';
   stream?: boolean;
   signal?: AbortSignal;
 }

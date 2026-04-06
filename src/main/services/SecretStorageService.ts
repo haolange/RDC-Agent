@@ -54,7 +54,11 @@ export class SecretStorageService {
     }
 
     try {
-      if (entry.encoding === 'safeStorage' && safeStorage.isEncryptionAvailable()) {
+      if (entry.encoding === 'safeStorage') {
+        if (!safeStorage.isEncryptionAvailable()) {
+          console.warn('[SecretStorageService] safeStorage is unavailable for secret:', secretRef);
+          return '';
+        }
         return safeStorage.decryptString(Buffer.from(entry.payload, 'base64'));
       }
       return Buffer.from(entry.payload, 'base64').toString('utf8');

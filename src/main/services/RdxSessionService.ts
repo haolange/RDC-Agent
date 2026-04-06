@@ -41,11 +41,14 @@ export class RdxSessionService {
   }
 
   async bootstrap(request: DebugSessionStartRequest): Promise<ContextSnapshot> {
+    const requestedCaptures = request.captures ?? [];
+    const requestedReplayDevice = request.replayDevice ?? null;
     if (this.canReuseOpenedCapture(request)) {
-      this.captures = request.captures.map((capture) => (
+      this.captures = requestedCaptures.map((capture) => (
         capture.id === request.primaryCaptureId && this.openedCapture
           ? {
               ...capture,
+              captureFileId: this.openedCapture.captureFileId,
               status: 'open',
               sessionId: this.openedCapture.sessionId,
               replaySessionId: this.openedCapture.replaySessionId,
@@ -53,25 +56,33 @@ export class RdxSessionService {
             }
           : { ...capture }
       ));
-      this.activeCaptureId = request.primaryCaptureId;
+      this.activeCaptureId = request.primaryCaptureId || null;
       return this.snapshotContext();
+    }
+
+    if (this.contextId || this.captures.length > 0 || this.openedCapture) {
+      await this.closeOrReplaceOpenedCapture();
     }
 
     await this.ensureRuntimeReady();
 
-    this.captures = request.captures.map((capture) => ({ ...capture }));
+    this.captures = requestedCaptures.map((capture) => ({ ...capture }));
     this.remoteId = null;
     this.remoteStatus = 'disconnected';
 
     const hasRemoteCapture = this.captures.some((capture) => capture.backendHint === 'remote');
-    let replayDevice = request.replayDevice;
+    let replayDevice = requestedReplayDevice;
     let reusedPreparedRemote = false;
     if (hasRemoteCapture) {
-      if (replayDevice.type === 'local') {
+      if (!replayDevice || replayDevice.type === 'local') {
         throw new Error('Remote capture requires an Android Replay Device.');
       }
       replayDevice = await this.ensureReplayDeviceReady(replayDevice);
       reusedPreparedRemote = await this.tryAdoptPreparedRemote(replayDevice);
+    }
+
+    if (!replayDevice) {
+      throw new Error('Replay Device is required before bootstrap.');
     }
 
     this.replayDevice = replayDevice;
@@ -209,16 +220,8 @@ export class RdxSessionService {
 
   async closeOrReplaceOpenedCapture(): Promise<void> {
     const previousCapture = this.openedCapture;
-    this.openedCapture = null;
-    this.contextId = null;
-    this.runtimeOwner = null;
-    this.ownerLeaseId = null;
-    this.captures = [];
-    this.activeCaptureId = null;
-    this.deviceLabel = 'Local';
-    this.replayDevice = null;
-    this.remoteStatus = 'disconnected';
-    this.remoteId = null;
+    await this.teardownRuntime();
+    this.resetRuntimeState(previousCapture);
     if (previousCapture) {
       runtimeLogService.log({
         scope: 'app',
@@ -259,35 +262,40 @@ export class RdxSessionService {
 
   async allocateContext(): Promise<string> {
     const contextId = `ctx-${generateShortId()}`;
-    const result: ToolCallResult = await this.toolBridge.call({
+    let result: ToolCallResult = await this.toolBridge.call({
       toolName: 'rd.session.create_context',
       args: { context_id: contextId },
       contextId,
     });
     if (!result.ok) {
       if (result.error?.message?.includes('Context limit exceeded')) {
-        const reusableContextId = await this.resolveReusableContextId();
-        if (reusableContextId) {
-          return reusableContextId;
+        const daemonCleaned = await this.cleanupDaemonRuntimeState();
+        if (daemonCleaned) {
+          result = await this.toolBridge.call({
+            toolName: 'rd.session.create_context',
+            args: { context_id: contextId },
+            contextId,
+          });
+          if (result.ok) {
+            return contextId;
+          }
+        }
+
+        const cleanedCount = await this.cleanupStaleRdcAgentContexts();
+        if (cleanedCount > 0) {
+          result = await this.toolBridge.call({
+            toolName: 'rd.session.create_context',
+            args: { context_id: contextId },
+            contextId,
+          });
+          if (result.ok) {
+            return contextId;
+          }
         }
       }
       throw new Error(`Failed to allocate context: ${result.error?.message ?? 'unknown'}`);
     }
     return contextId;
-  }
-
-  private async resolveReusableContextId(): Promise<string | null> {
-    const daemonResult = await this.toolBridge.executeCLI('daemon', ['start']);
-    if (daemonResult.exitCode !== 0 || !daemonResult.stdout.trim()) {
-      return null;
-    }
-
-    try {
-      const parsed = JSON.parse(daemonResult.stdout) as { data?: { state?: { context_id?: string } } };
-      return parsed.data?.state?.context_id ?? null;
-    } catch {
-      return null;
-    }
   }
 
   private async initializeContextRuntime(): Promise<void> {
@@ -303,17 +311,29 @@ export class RdxSessionService {
 
   async claimOwner(contextId: string): Promise<{ owner: string; leaseId: string }> {
     const owner = `rdc-agent-${generateShortId()}`;
-    const leaseId = generateId();
     const result: ToolCallResult = await this.toolBridge.call({
-      toolName: 'rd.session.claim_owner',
-      args: { context_id: contextId, owner, lease_id: leaseId },
+      toolName: 'rd.session.claim_runtime_owner',
+      args: {
+        runtime_owner: owner,
+        entry_mode: 'cli',
+        backend: 'local',
+      },
       contextId,
-      runtimeOwner: owner,
     });
     if (!result.ok) {
       throw new Error(`Failed to claim owner: ${result.error?.message ?? 'unknown'}`);
     }
-    return { owner, leaseId };
+
+    const ownerInfo = (result.data?.runtime_owner as Record<string, unknown> | undefined)
+      || (result.data?.owner_lease as Record<string, unknown> | undefined);
+    const leaseId = typeof ownerInfo?.lease_id === 'string' && ownerInfo.lease_id
+      ? ownerInfo.lease_id
+      : generateId();
+    const resolvedOwner = typeof ownerInfo?.agent_id === 'string' && ownerInfo.agent_id
+      ? ownerInfo.agent_id
+      : owner;
+
+    return { owner: resolvedOwner, leaseId };
   }
 
   private buildClaimedToolRequest(toolName: string, args: Record<string, unknown>) {
@@ -373,6 +393,7 @@ export class RdxSessionService {
 
       this.captures[captureIndex] = {
         ...this.captures[captureIndex],
+        captureFileId,
         status: 'open',
         sessionId: replayResult.data?.session_id as string | undefined,
         replaySessionId: replayResult.data?.replay_session_id as string | undefined,
@@ -581,6 +602,7 @@ export class RdxSessionService {
       inputId,
       filePath,
       captureId: activeCapture?.id ?? inputId,
+      captureFileId: activeCapture?.captureFileId,
       sessionId: activeCapture?.sessionId ?? '',
       contextId: this.contextId ?? '',
       replaySessionId: activeCapture?.replaySessionId ?? '',
@@ -724,19 +746,25 @@ export class RdxSessionService {
 
     const image = nativeImage.createFromPath(normalizedPath);
     const size = image.isEmpty() ? { width: 0, height: 0 } : image.getSize();
+    const resolvedWidth = size.width || fallbackWidth || 0;
+    const resolvedHeight = size.height || fallbackHeight || 0;
+
+    if (resolvedWidth <= 0 || resolvedHeight <= 0) {
+      return null;
+    }
 
     return {
       imagePath: normalizedPath,
       imageUrl: pathToFileURL(normalizedPath).toString(),
-      width: size.width || fallbackWidth || 0,
-      height: size.height || fallbackHeight || 0,
+      width: resolvedWidth,
+      height: resolvedHeight,
       source,
       updatedAt: Date.now(),
     };
   }
 
   private canReuseOpenedCapture(request: DebugSessionStartRequest): boolean {
-    const primaryCapture = request.captures.find((capture) => capture.id === request.primaryCaptureId);
+    const primaryCapture = (request.captures ?? []).find((capture) => capture.id === request.primaryCaptureId);
     if (!primaryCapture || !this.openedCapture) {
       return false;
     }
@@ -749,8 +777,201 @@ export class RdxSessionService {
       && primaryCapture.id === this.openedCapture.inputId
       && primaryCapture.filePath === this.openedCapture.filePath
       && primaryCapture.backendHint === this.openedCapture.backend
-      && request.replayDevice.id === this.openedCapture.deviceId,
+      && request.replayDevice?.id === this.openedCapture.deviceId,
     );
+  }
+
+  private async teardownRuntime(): Promise<void> {
+    const contextId = this.contextId;
+    const runtimeOwner = this.runtimeOwner;
+    const ownerLeaseId = this.ownerLeaseId;
+    const replaySessionIds = Array.from(new Set(
+      this.captures
+        .map((capture) => capture.sessionId || capture.replaySessionId)
+        .filter((sessionId): sessionId is string => typeof sessionId === 'string' && Boolean(sessionId)),
+    ));
+    const captureFileIds = Array.from(new Set(
+      this.captures
+        .map((capture) => capture.captureFileId)
+        .filter((captureFileId): captureFileId is string => typeof captureFileId === 'string' && Boolean(captureFileId)),
+    ));
+
+    for (const sessionId of replaySessionIds) {
+      const result = await this.toolBridge.call({
+        toolName: 'rd.capture.close_replay',
+        args: { session_id: sessionId },
+        contextId: contextId ?? undefined,
+        runtimeOwner: runtimeOwner ?? undefined,
+        ownerLeaseId: ownerLeaseId ?? undefined,
+      });
+      if (!result.ok) {
+        runtimeLogService.log({
+          scope: 'app',
+          namespace: 'capture',
+          severity: 'warning',
+          title: 'Replay teardown warning',
+          summary: result.error?.message ?? `Failed to close replay ${sessionId}.`,
+          raw: {
+            sessionId,
+            contextId,
+          },
+        });
+      }
+    }
+
+    for (const captureFileId of captureFileIds) {
+      const result = await this.toolBridge.call({
+        toolName: 'rd.capture.close_file',
+        args: { capture_file_id: captureFileId },
+        contextId: contextId ?? undefined,
+        runtimeOwner: runtimeOwner ?? undefined,
+        ownerLeaseId: ownerLeaseId ?? undefined,
+      });
+      if (!result.ok) {
+        runtimeLogService.log({
+          scope: 'app',
+          namespace: 'capture',
+          severity: 'warning',
+          title: 'Capture teardown warning',
+          summary: result.error?.message ?? `Failed to close capture ${captureFileId}.`,
+          raw: {
+            captureFileId,
+            contextId,
+          },
+        });
+      }
+    }
+
+    if (contextId && runtimeOwner && ownerLeaseId) {
+      await this.toolBridge.call({
+        toolName: 'rd.session.release_runtime_owner',
+        args: {
+          runtime_owner: runtimeOwner,
+          owner_lease_id: ownerLeaseId,
+          force: true,
+        },
+        contextId,
+        runtimeOwner,
+        ownerLeaseId,
+      });
+    }
+
+    if (contextId) {
+      await this.toolBridge.call({
+        toolName: 'rd.session.clear_context',
+        args: {
+          target_context_id: contextId,
+        },
+        contextId,
+      });
+    }
+  }
+
+  private async cleanupStaleRdcAgentContexts(): Promise<number> {
+    const result = await this.toolBridge.call({
+      toolName: 'rd.session.list_contexts',
+      args: {},
+    });
+    if (!result.ok || !Array.isArray(result.data?.contexts)) {
+      return 0;
+    }
+
+    let cleanedCount = 0;
+    for (const contextEntry of result.data.contexts as Array<Record<string, unknown>>) {
+      const targetContextId = typeof contextEntry.context_id === 'string' ? contextEntry.context_id : '';
+      if (!targetContextId) {
+        continue;
+      }
+
+      const runtimeOwner = typeof contextEntry.runtime_owner === 'string'
+        ? contextEntry.runtime_owner
+        : typeof (contextEntry.runtime_owner as Record<string, unknown> | undefined)?.agent_id === 'string'
+          ? String((contextEntry.runtime_owner as Record<string, unknown>).agent_id)
+          : '';
+      const ownerLeaseId = typeof (contextEntry.owner_lease as Record<string, unknown> | undefined)?.lease_id === 'string'
+        ? String((contextEntry.owner_lease as Record<string, unknown>).lease_id)
+        : '';
+      const shouldClear = targetContextId.startsWith('ctx-') || runtimeOwner.startsWith('rdc-agent-');
+      if (!shouldClear) {
+        continue;
+      }
+
+      if (runtimeOwner && ownerLeaseId) {
+        await this.toolBridge.call({
+          toolName: 'rd.session.release_runtime_owner',
+          args: {
+            runtime_owner: runtimeOwner,
+            owner_lease_id: ownerLeaseId,
+            force: true,
+          },
+          contextId: targetContextId,
+          runtimeOwner,
+          ownerLeaseId,
+        });
+      }
+
+      const clearResult = await this.toolBridge.call({
+        toolName: 'rd.session.clear_context',
+        args: {
+          target_context_id: targetContextId,
+        },
+        contextId: targetContextId,
+      });
+      if (clearResult.ok) {
+        cleanedCount += 1;
+      }
+    }
+
+    return cleanedCount;
+  }
+
+  private async cleanupDaemonRuntimeState(): Promise<boolean> {
+    let cleaned = false;
+
+    const daemonCleanup = await this.toolBridge.executeCLI('daemon', ['cleanup']);
+    if (daemonCleanup.exitCode === 0) {
+      cleaned = true;
+    } else {
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'context',
+        severity: 'warning',
+        title: 'Daemon cleanup warning',
+        summary: daemonCleanup.stderr.trim() || daemonCleanup.stdout.trim() || 'Failed to cleanup stale daemon state.',
+      });
+    }
+
+    const contextClear = await this.toolBridge.executeCLI('context', ['clear']);
+    if (contextClear.exitCode === 0) {
+      cleaned = true;
+    } else {
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'context',
+        severity: 'warning',
+        title: 'Daemon context clear warning',
+        summary: contextClear.stderr.trim() || contextClear.stdout.trim() || 'Failed to clear default daemon context.',
+      });
+    }
+
+    return cleaned;
+  }
+
+  private resetRuntimeState(previousCapture: OpenedCaptureState | null): void {
+    this.openedCapture = null;
+    this.contextId = null;
+    this.runtimeOwner = null;
+    this.ownerLeaseId = null;
+    this.captures = [];
+    this.activeCaptureId = null;
+    this.deviceLabel = 'Local';
+    this.replayDevice = null;
+    this.remoteStatus = 'disconnected';
+    this.remoteId = null;
+
+    if (previousCapture) {
+      this.openedCapture = null;
+    }
   }
 }
 

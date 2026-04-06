@@ -20,8 +20,12 @@ export const rdxSessionService = new RdxSessionService(toolBridge);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+if (!process.env.RDC_AGENT_USER_DATA?.trim()) {
+  app.setPath('userData', path.join(app.getPath('appData'), 'rdc-agent'));
+}
+
 // 寮€鍙戠幆澧冩锟?
-const isDev = (process.env.NODE_ENV === 'development' || !app.isPackaged) && process.env.RDC_AGENT_TEST_MODE !== '1';
+const isDev = process.env.NODE_ENV === 'development' && process.env.RDC_AGENT_TEST_MODE !== '1';
 const isSettingsRebuildOnly = process.env.RDC_AGENT_REBUILD_SETTINGS_ONLY === '1';
 
 // 涓荤獥鍙ｅ紩锟?

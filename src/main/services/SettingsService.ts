@@ -468,9 +468,7 @@ function normalizeUserRoutes(
     const provider = providers.find((entry) => entry.id === incoming.providerId);
     const isValid = Boolean(
       provider
-      && provider.enabled
-      && provider.isConfigured
-      && provider.models.some((model) => model.enabled && model.id === incoming.modelId),
+      && provider.models.some((model) => model.id === incoming.modelId),
     );
 
     return isValid ? incoming : route;

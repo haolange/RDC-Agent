@@ -175,6 +175,14 @@
   gap: 6px;
 }
 
+.session-item-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .session-item-title {
   flex: 1;
   min-width: 0;
@@ -184,6 +192,54 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.session-item-action-hint {
+  color: rgb(var(--color-text-tertiary));
+  font-size: 10px;
+  opacity: 0;
+  transform: translateX(4px);
+  transition:
+    opacity var(--transition-base) var(--ease-standard),
+    transform var(--transition-base) var(--ease-standard);
+}
+
+.session-item:hover .session-item-action-hint,
+.session-item:focus-visible .session-item-action-hint,
+.session-item.active .session-item-action-hint {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.session-item-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  color: rgb(var(--color-text-tertiary));
+  opacity: 0;
+  transform: translateY(2px);
+  transition:
+    opacity var(--transition-base) var(--ease-standard),
+    transform var(--transition-base) var(--ease-standard),
+    background var(--transition-base) var(--ease-standard),
+    color var(--transition-base) var(--ease-standard);
+}
+
+.session-item:hover .session-item-icon-button,
+.session-item:focus-visible .session-item-icon-button,
+.session-item.active .session-item-icon-button {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.session-item-icon-button:hover,
+.session-item-icon-button:focus-visible {
+  background: rgb(var(--color-bg-3));
+  color: rgb(var(--color-text-primary));
+  outline: none;
 }
 
 .session-item-status {
@@ -260,4 +316,106 @@
   margin-top: var(--space-1);
   color: rgb(var(--color-text-tertiary));
   font-size: 10px;
+}
+
+.session-rename-popover {
+  position: fixed;
+  z-index: 40;
+  width: min(320px, calc(100vw - 24px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid rgb(var(--color-border-default));
+  border-radius: var(--radius-xl);
+  background:
+    linear-gradient(180deg, rgb(var(--color-accent-500) / 0.08), transparent 48%),
+    rgb(var(--color-bg-1));
+  box-shadow:
+    0 24px 48px rgb(0 0 0 / 0.28),
+    0 0 0 1px rgb(var(--color-accent-500) / 0.08);
+}
+
+.session-rename-popover-title {
+  color: rgb(var(--color-text-primary));
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.session-rename-popover-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid rgb(var(--color-border-default));
+  border-radius: var(--radius-lg);
+  background: rgb(var(--color-bg-2));
+  color: rgb(var(--color-text-primary));
+  font-size: var(--text-sm);
+  transition:
+    border-color var(--transition-base) var(--ease-standard),
+    box-shadow var(--transition-base) var(--ease-standard),
+    background var(--transition-base) var(--ease-standard);
+}
+
+.session-rename-popover-input:focus {
+  outline: none;
+  border-color: rgb(var(--color-accent-500) / 0.6);
+  box-shadow: 0 0 0 3px rgb(var(--color-accent-500) / 0.16);
+  background: rgb(var(--color-bg-1));
+}
+
+.session-rename-popover-input:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.session-rename-popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.session-rename-popover-button {
+  min-width: 72px;
+  height: 36px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition:
+    background var(--transition-base) var(--ease-standard),
+    border-color var(--transition-base) var(--ease-standard),
+    color var(--transition-base) var(--ease-standard),
+    transform var(--transition-base) var(--ease-standard);
+}
+
+.session-rename-popover-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.session-rename-popover-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.session-rename-popover-button-secondary {
+  background: rgb(var(--color-bg-2));
+  border-color: rgb(var(--color-border-default));
+  color: rgb(var(--color-text-secondary));
+}
+
+.session-rename-popover-button-secondary:hover:not(:disabled) {
+  background: rgb(var(--color-bg-3));
+  color: rgb(var(--color-text-primary));
+}
+
+.session-rename-popover-button-primary {
+  background: rgb(var(--color-accent-500));
+  color: rgb(var(--color-text-on-accent));
+}
+
+.session-rename-popover-button-primary:hover:not(:disabled) {
+  background: rgb(var(--color-accent-600));
 }

@@ -25,6 +25,11 @@ export type TranslationKey =
   | 'sidebar.noProjectsHint'
   | 'sidebar.sessions'
   | 'sidebar.addSession'
+  | 'sidebar.removeSession'
+  | 'sidebar.renameSession'
+  | 'sidebar.renameSessionTitle'
+  | 'sidebar.cancel'
+  | 'sidebar.save'
   | 'sidebar.noSessions'
   | 'sidebar.noSessionsHint'
   | 'sidebar.projectRequired'
@@ -191,6 +196,11 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
     'sidebar.noProjectsHint': '点击右上角添加本地项目目录',
     'sidebar.sessions': '线程',
     'sidebar.addSession': '新线程',
+    'sidebar.removeSession': '删除线程',
+    'sidebar.renameSession': '重命名线程',
+    'sidebar.renameSessionTitle': '重命名线程',
+    'sidebar.cancel': '取消',
+    'sidebar.save': '保存',
     'sidebar.noSessions': '暂无线程',
     'sidebar.noSessionsHint': '先创建线程或直接开始一次新的调试',
     'sidebar.projectRequired': '请先添加并选择一个项目',
@@ -356,6 +366,11 @@ const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
     'sidebar.noProjectsHint': 'Add a local project directory to begin.',
     'sidebar.sessions': 'Threads',
     'sidebar.addSession': 'New Session',
+    'sidebar.removeSession': 'Remove Session',
+    'sidebar.renameSession': 'Rename Session',
+    'sidebar.renameSessionTitle': 'Rename Session',
+    'sidebar.cancel': 'Cancel',
+    'sidebar.save': 'Save',
     'sidebar.noSessions': 'No sessions yet',
     'sidebar.noSessionsHint': 'Create one or start a debug run to generate it.',
     'sidebar.projectRequired': 'Add and select a project first',

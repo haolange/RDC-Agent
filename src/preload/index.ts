@@ -58,6 +58,10 @@ const electronAPI = {
   workflow: {
     getState: (): Promise<unknown> => ipcRenderer.invoke('workflow:getState'),
     start: (request: unknown): Promise<unknown> => ipcRenderer.invoke('workflow:start', request),
+    getPlan: (runId: string): Promise<unknown> => ipcRenderer.invoke('workflow:getPlan', runId),
+    submitQuestions: (runId: string, answers: unknown[]): Promise<unknown> => ipcRenderer.invoke('workflow:submitQuestions', runId, answers),
+    approvePlan: (runId: string): Promise<unknown> => ipcRenderer.invoke('workflow:approvePlan', runId),
+    restartRun: (runId: string): Promise<unknown> => ipcRenderer.invoke('workflow:restartRun', runId),
     resume: (sessionId?: string): Promise<unknown> => ipcRenderer.invoke('workflow:resume', sessionId),
     stop: (runId?: string): Promise<unknown> => ipcRenderer.invoke('workflow:stop', runId),
     listRuns: (): Promise<unknown> => ipcRenderer.invoke('workflow:listRuns'),

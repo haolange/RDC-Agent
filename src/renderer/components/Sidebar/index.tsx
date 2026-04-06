@@ -8,10 +8,11 @@ interface SidebarProps {
   collapsed?: boolean;
 }
 
-interface SessionContextMenuState {
+interface SessionRenamePopoverState {
   session: SessionRecord;
   x: number;
   y: number;
+  titleDraft: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -20,12 +21,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { t } = useI18n();
   const [isBusy, setIsBusy] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [contextMenu, setContextMenu] = useState<SessionContextMenuState | null>(null);
-  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState('');
+  const [renamePopover, setRenamePopover] = useState<SessionRenamePopoverState | null>(null);
 
   const renameInputRef = useRef<HTMLInputElement | null>(null);
-  const contextMenuRef = useRef<HTMLDivElement | null>(null);
+  const renamePopoverRef = useRef<HTMLDivElement | null>(null);
 
   const projects = useSessionStore((state) => state.projects);
   const sessions = useSessionStore((state) => state.sessions);
@@ -117,22 +116,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [loadProjects]);
 
   useEffect(() => {
-    if (!contextMenu) return;
+    if (!renamePopover) return;
 
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node | null;
-      if (!contextMenuRef.current?.contains(target)) {
-        setContextMenu(null);
+      if (!renamePopoverRef.current?.contains(target)) {
+        setRenamePopover(null);
       }
     };
 
     const handleDismiss = () => {
-      setContextMenu(null);
+      setRenamePopover(null);
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setContextMenu(null);
+        setRenamePopover(null);
       }
     };
 
@@ -146,13 +145,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
       window.removeEventListener('scroll', handleDismiss, true);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [contextMenu]);
+  }, [renamePopover]);
 
   useEffect(() => {
-    if (!editingSessionId) return;
+    if (!renamePopover) return;
     renameInputRef.current?.focus();
     renameInputRef.current?.select();
-  }, [editingSessionId]);
+  }, [renamePopover]);
+
+  const getRenamePopoverPosition = useCallback((x: number, y: number) => {
+    const width = 320;
+    const height = 168;
+    const gutter = 12;
+    const maxX = Math.max(gutter, window.innerWidth - width - gutter);
+    const maxY = Math.max(gutter, window.innerHeight - height - gutter);
+
+    return {
+      x: Math.min(Math.max(x, gutter), maxX),
+      y: Math.min(Math.max(y, gutter), maxY),
+    };
+  }, []);
 
   const handleAddProject = useCallback(async () => {
     const rootPath = await window.electronAPI.selectDirectory();
@@ -209,7 +221,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [currentProject, loadProjects]);
 
   const handleSessionSelect = useCallback(async (session: SessionRecord) => {
-    setContextMenu(null);
+    setRenamePopover(null);
     setIsBusy(true);
     try {
       await selectSession(session.sessionId);
@@ -218,14 +230,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   }, [selectSession]);
 
-  const startSessionRename = useCallback((session: SessionRecord) => {
-    setContextMenu(null);
-    setEditingSessionId(session.sessionId);
-    setEditingTitle(session.title);
-  }, []);
-
   const handleSessionRemove = useCallback(async (session: SessionRecord) => {
-    setContextMenu(null);
+    setRenamePopover(null);
     setIsBusy(true);
     try {
       const result = await window.electronAPI.session.remove(session.sessionId);
@@ -253,15 +259,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   }, [currentProject, selectSession, setCaptures, setCurrentRun, setCurrentSession, setRuns, setSessions]);
 
-  const cancelSessionRename = useCallback(() => {
-    setEditingSessionId(null);
-    setEditingTitle('');
+  const closeRenamePopover = useCallback(() => {
+    setRenamePopover(null);
   }, []);
 
-  const commitSessionRename = useCallback(async (session: SessionRecord) => {
-    const trimmedTitle = editingTitle.trim();
+  const commitSessionRename = useCallback(async () => {
+    if (!renamePopover) return;
+
+    const trimmedTitle = renamePopover.titleDraft.trim();
+    const { session } = renamePopover;
     if (!trimmedTitle || trimmedTitle === session.title) {
-      cancelSessionRename();
+      closeRenamePopover();
       return;
     }
 
@@ -288,20 +296,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
           setCurrentSession(result.session);
         }
       }
-      cancelSessionRename();
     } finally {
+      closeRenamePopover();
       setIsBusy(false);
     }
-  }, [cancelSessionRename, currentProject, currentSession, editingTitle, sessions, setCurrentSession, setSessions]);
+  }, [closeRenamePopover, currentProject, currentSession, renamePopover, sessions, setCurrentSession, setSessions]);
+
+  const openRenamePopover = useCallback((session: SessionRecord, x: number, y: number) => {
+    const position = getRenamePopoverPosition(x, y);
+    setRenamePopover({
+      session,
+      x: position.x,
+      y: position.y,
+      titleDraft: session.title,
+    });
+  }, [getRenamePopoverPosition]);
 
   const handleSessionContextMenu = useCallback((event: React.MouseEvent, session: SessionRecord) => {
     event.preventDefault();
-    setContextMenu({
-      session,
-      x: event.clientX,
-      y: event.clientY,
-    });
-  }, []);
+    openRenamePopover(session, event.clientX, event.clientY);
+  }, [openRenamePopover]);
+
+  const handleRenameButtonClick = useCallback((event: React.MouseEvent, session: SessionRecord) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    openRenamePopover(session, rect.right - 24, rect.bottom + 8);
+  }, [openRenamePopover]);
 
   return (
     <div className={`sidebar-content ${collapsed ? 'collapsed' : ''}`}>
@@ -389,6 +410,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
             </div>
             <div className="session-section-actions">
+              {currentSession && (
+                <button
+                  type="button"
+                  className="session-section-action"
+                  title={t('sidebar.removeSession')}
+                  onClick={() => void handleSessionRemove(currentSession)}
+                  disabled={isBusy}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4h8v2" />
+                    <path d="M19 6l-1 14H6L5 6" />
+                  </svg>
+                </button>
+              )}
               <button
                 type="button"
                 className="session-section-action"
@@ -421,85 +457,94 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ) : (
             <div className="session-list">
               {sessions.map((session) => (
-                editingSessionId === session.sessionId ? (
-                  <div
-                    key={session.sessionId}
-                    className={`session-item session-item-editing ${currentSession?.sessionId === session.sessionId ? 'active' : ''}`}
-                  >
-                    <div className="session-item-header">
-                      <input
-                        ref={renameInputRef}
-                        type="text"
-                        className="session-item-input"
-                        value={editingTitle}
-                        onChange={(event) => setEditingTitle(event.target.value)}
-                        onBlur={() => void commitSessionRename(session)}
+                <button
+                  key={session.sessionId}
+                  type="button"
+                  className={`session-item ${currentSession?.sessionId === session.sessionId ? 'active' : ''}`}
+                  onClick={() => void handleSessionSelect(session)}
+                  onContextMenu={(event) => handleSessionContextMenu(event, session)}
+                >
+                  <div className="session-item-header">
+                    <span className="session-item-title">{session.title}</span>
+                    <span className="session-item-actions">
+                      <span className="session-item-action-hint">{t('sidebar.renameSession')}</span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        className="session-item-icon-button"
+                        title={t('sidebar.renameSession')}
+                        onClick={(event) => handleRenameButtonClick(event, session)}
                         onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
+                          if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault();
-                            void commitSessionRename(session);
-                          }
-                          if (event.key === 'Escape') {
-                            event.preventDefault();
-                            cancelSessionRename();
+                            const rect = event.currentTarget.getBoundingClientRect();
+                            openRenamePopover(session, rect.right - 24, rect.bottom + 8);
                           }
                         }}
-                        maxLength={80}
-                      />
-                    </div>
-                    <span className="session-item-time">Enter 保存，Esc 取消</span>
-                  </div>
-                ) : (
-                  <button
-                    key={session.sessionId}
-                    type="button"
-                    className={`session-item ${currentSession?.sessionId === session.sessionId ? 'active' : ''}`}
-                    onClick={() => void handleSessionSelect(session)}
-                    onContextMenu={(event) => handleSessionContextMenu(event, session)}
-                  >
-                    <div className="session-item-header">
-                      <span className="session-item-title">{session.title}</span>
-                    </div>
-                    <span className="session-item-time">
-                      {session.goal ? session.goal : new Date(session.updatedAt).toLocaleString()}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 20h9" />
+                          <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+                        </svg>
+                      </span>
                     </span>
-                  </button>
-                )
+                  </div>
+                  <span className="session-item-time">
+                    {session.goal ? session.goal : new Date(session.updatedAt).toLocaleString()}
+                  </span>
+                </button>
               ))}
             </div>
           )}
         </div>
       </div>
 
-      {contextMenu && (
+      {renamePopover && (
         <div
-          ref={contextMenuRef}
-          className="session-context-menu"
-          style={{ top: contextMenu.y, left: contextMenu.x }}
+          ref={renamePopoverRef}
+          className="session-rename-popover"
+          style={{ top: renamePopover.y, left: renamePopover.x }}
         >
-          <button
-            type="button"
-            className="session-context-menu-item"
-            onClick={() => startSessionRename(contextMenu.session)}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 20h9" />
-              <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-            </svg>
-            <span>重命名</span>
-          </button>
-          <button
-            type="button"
-            className="session-context-menu-item"
-            onClick={() => void handleSessionRemove(contextMenu.session)}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 6h18" />
-              <path d="M8 6V4h8v2" />
-              <path d="M19 6l-1 14H6L5 6" />
-            </svg>
-            <span>删除</span>
-          </button>
+          <div className="session-rename-popover-title">{t('sidebar.renameSessionTitle')}</div>
+          <input
+            ref={renameInputRef}
+            type="text"
+            className="session-rename-popover-input"
+            value={renamePopover.titleDraft}
+            onChange={(event) => setRenamePopover((current) => (current
+              ? { ...current, titleDraft: event.target.value }
+              : current))}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                void commitSessionRename();
+              }
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                closeRenamePopover();
+              }
+            }}
+            maxLength={80}
+            disabled={isBusy}
+          />
+          <div className="session-rename-popover-actions">
+            <button
+              type="button"
+              className="session-rename-popover-button session-rename-popover-button-secondary"
+              onClick={closeRenamePopover}
+              disabled={isBusy}
+            >
+              {t('sidebar.cancel')}
+            </button>
+            <button
+              type="button"
+              className="session-rename-popover-button session-rename-popover-button-primary"
+              onClick={() => void commitSessionRename()}
+              disabled={isBusy}
+            >
+              {t('sidebar.save')}
+            </button>
+          </div>
         </div>
       )}
     </div>

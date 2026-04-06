@@ -59,6 +59,34 @@ export const BLOCKER_CODES: Record<string, BlockerCodeDef> = {
     severity: 'critical',
     description: 'Required artifact is missing',
   },
+  BLOCKED_LLM_ROUTE_MISSING: {
+    code: 'BLOCKED_LLM_ROUTE_MISSING',
+    category: 'gate',
+    severity: 'critical',
+    description: 'Agent route is missing a provider/model binding',
+    resolution: 'Bind the required agent to a provider/model in Settings -> Agent Routing',
+  },
+  BLOCKED_LLM_PROVIDER_MISSING: {
+    code: 'BLOCKED_LLM_PROVIDER_MISSING',
+    category: 'gate',
+    severity: 'critical',
+    description: 'Configured LLM provider cannot be resolved or is disabled',
+    resolution: 'Enable a valid provider for the bound agent route',
+  },
+  BLOCKED_LLM_SECRET_MISSING: {
+    code: 'BLOCKED_LLM_SECRET_MISSING',
+    category: 'gate',
+    severity: 'critical',
+    description: 'Configured LLM provider is missing a valid secret',
+    resolution: 'Save a valid provider secret in Settings -> Models',
+  },
+  BLOCKED_LLM_MODEL_MISSING: {
+    code: 'BLOCKED_LLM_MODEL_MISSING',
+    category: 'gate',
+    severity: 'critical',
+    description: 'Configured LLM model cannot be resolved for the provider route',
+    resolution: 'Enable the bound model for the provider in Settings -> Models',
+  },
 
   // Runtime相关
   BLOCKED_RUNTIME_OWNER_CONFLICT: {
@@ -78,6 +106,20 @@ export const BLOCKER_CODES: Record<string, BlockerCodeDef> = {
     category: 'runtime',
     severity: 'warning',
     description: 'Capability token has expired',
+  },
+  BLOCKED_LLM_PROVIDER_UNAVAILABLE: {
+    code: 'BLOCKED_LLM_PROVIDER_UNAVAILABLE',
+    category: 'runtime',
+    severity: 'critical',
+    description: 'Configured LLM provider is unavailable at runtime',
+    resolution: 'Check provider base URL, connectivity, and account availability',
+  },
+  BLOCKED_LLM_REQUEST_FAILED: {
+    code: 'BLOCKED_LLM_REQUEST_FAILED',
+    category: 'runtime',
+    severity: 'critical',
+    description: 'Runtime LLM request failed',
+    resolution: 'Inspect the recorded provider/model/request failure and fix the provider configuration before retrying',
   },
 
   // Specialist相关

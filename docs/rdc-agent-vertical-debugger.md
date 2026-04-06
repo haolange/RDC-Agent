@@ -10,7 +10,7 @@
 - **workflow_stage漂移**：停留在accepted_intake_initialized却已完成调查
 
 ### 解决方案
-构建垂直化DebugAgent桌面应用，将Harness控制从"事后审计"升级为"过程控制"，实现严格的状态机驱动和证据链闭环。
+构建垂直化DebugAgent桌面应用，将Harness控制从"事后审计"升级为"过程控制"，实现严格的状态机驱动和证据链闭环。`Debugger` 主链必须真实命中已绑定的 LLM provider/model；provider、secret、route、model、LLM request 任一环节无效都必须进入 blocker，不能 silent fallback 到 tool-only 路径。
 
 ### 技术选型
 - **桌面框架**: Electron

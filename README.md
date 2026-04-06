@@ -2,7 +2,7 @@
 
 `RDC-Agent` 是一个面向 `RenderDoc` `.rdc` capture 的桌面调试代理框架，使用 `Electron + React + TypeScript` 构建。
 
-它的目标不是做一个通用聊天客户端，而是把一次图形渲染问题排查拆成可编排的多角色协作流程。当前仓库已经收敛到单一 `Debugger` 入口，并围绕它实现工作流图、Agent 编排层和证据/Artifact 展示框架。
+它的目标不是做一个通用聊天客户端，而是把一次图形渲染问题排查拆成可编排的多角色协作流程。当前仓库以 `Debugger` 作为真实生产主链，并围绕它实现工作流图、Agent 编排层和证据/Artifact 展示框架。
 
 ## 它能做什么
 
@@ -11,14 +11,16 @@
 - 按当前 `Replay Device` 打开单个 `.rdc`，由 app 内部维护活动 `contextId` / capture session。
 - 在设置中心把 `workspace` 配置为单一工作根目录，并由它统一派生 `settings.json`、日志和运行数据目录。
 - 在模型设置页管理 `provider`、启用模型清单以及 `Agent -> provider/model` 路由。
-- 启动一个围绕渲染问题的调试会话。
+- 启动一个围绕渲染问题的调试会话，并严格走 `Plan / Intake -> 用户批准 -> execution loop -> verification / skeptic / curator -> report` 主链。
 - 通过多个专门角色进行协作分析，例如 triage、pixel forensics、shader IR、driver/device、skeptic 和 curator。
 - 用工作流状态机控制阶段推进、阻断处理和受控回转。
 - 在界面中展示会话状态、证据链和中间产物。
+- 只展示 reasoning summary，不暴露私有原始思维；如果 provider / secret / route / model / LLM request 任一环节无效，Debugger 会明确进入 blocker，而不是 silent fallback 到 tool-only 路径。
 
 ## 当前界面
 
-- `Debugger`：唯一生产入口，顶部 titlebar 直接显示当前模式。
+- `Debugger`：真实生产入口，顶部 titlebar 直接显示当前模式。
+- `Analyzer` / `Optimizer`：继续保留在顶部模式切换中，当前仍是独立占位页，不参与本轮主链执行。
 - 右侧栏收敛为四个信息区块：`Task Monitor`、`Capture Library`、`Opened Capture` 和 `Runtime Context`。
 - `Capture Library` 负责项目内 `.rdc` 资源列表，`Opened Capture` 负责当前打开态与预览，`Runtime Context` 负责运行时上下文和会话归属。
 
@@ -41,7 +43,7 @@
 - `Knowledge`：
   - `global knowledge`：位于应用 `userData` 目录，由安装包内置 seed 首次复制生成
 
-运行期数据现在统一存放在设置中心配置的 `workspace root` 下，默认会落到系统 `appData/rdc-agent` 目录，并派生出：
+运行期的应用级设置与日志统一存放在设置中心配置的 `workspace root` 下，默认会落到系统 `appData/rdc-agent` 目录，并派生出：
 
 - `<workspace-root>/settings.json`
 - `<workspace-root>/logs/rdc-agent.log`
@@ -53,7 +55,7 @@
 - `<workspace-root>/secrets/`
 - `<workspace-root>/migration-reports/`
 
-`session/run` 主数据仍然不写回项目源码目录，也不再放回仓库根目录的 `workspace/` 中。
+`session/run` 真相目录位于 `<project-root>/sessions/<sessionId>/...`，其中每次执行的报告、artifact 和 `action_chain.jsonl` 都以项目根目录下的 session 目录为准。
 
 ## 开发运行
 
@@ -79,6 +81,8 @@ npm run dev
 
 ## 当前状态
 
-这个仓库当前聚焦在 `Debugger` 生产链路和多 Agent 编排。`Analyzer` 和 `Optimizer` 不属于本轮交付范围，也不再作为可用模式对外暴露。
+这个仓库当前聚焦在 `Debugger` 生产链路和多 Agent 编排。`Analyzer` 和 `Optimizer` 仍然保留为可见模式入口，但当前只是独立占位页。
+
+`Debugger` 不是“RenderDoc 本地工具壳 + 可选模型增强”。真实配置的 `provider/model/agent route` 属于主链的一部分；如果没有真实命中已绑定的 LLM provider/model，本次 run 视为未完成。
 
 如果你想继续，我可以下一步把 `docs/` 里的设计文档也整理成一份更像“项目总览”的说明，或者直接补一版更细的开发约定。

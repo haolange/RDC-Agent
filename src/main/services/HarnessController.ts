@@ -16,6 +16,7 @@ import type { ReplayDeviceEntry } from '@shared/types/device';
 import { storageAdapter } from './StorageAdapter';
 // 导入 settingsService（Task 6 已完成）
 import { settingsService } from './SettingsService';
+import { debuggerLlmService } from './DebuggerLlmService';
 import { nowIso, nowMs } from '@shared/utils/id';
 
 // Gate输入类型
@@ -107,6 +108,8 @@ export class HarnessController {
           ['settings:models']
         ));
       }
+
+      blockers.push(...debuggerLlmService.getRouteBlockers(['rdc-debugger'], 'plan'));
     }
     // Analyzer/Optimizer 模式不要求 LLM key（当前为占位页）
   
@@ -382,6 +385,8 @@ export class HarnessController {
         tool_name: input.toolName,
         args: input.args,
         result: result.ok ? 'success' : 'failed',
+        data: result.ok ? result.data : undefined,
+        artifacts: result.ok ? (result as { artifacts?: unknown }).artifacts : undefined,
         error: result.error,
       },
     };

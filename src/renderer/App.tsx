@@ -12,7 +12,7 @@ import { useDeviceStore } from './stores/deviceStore';
 import { useAppSettingsStore } from './stores/appSettingsStore';
 import { useTerminalStore } from './stores/terminalStore';
 import { useI18n } from './i18n';
-import type { AgentTimelineEntry } from '@shared/types/agent';
+import type { AgentRole, AgentTimelineEntry } from '@shared/types/agent';
 import type { ToolTraceEntry } from '@shared/types/tool';
 import type { ReplayDeviceStatusChangedPayload } from '@shared/types/device';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
@@ -29,6 +29,7 @@ import type {
   RunSummary,
   SessionRecord,
 } from '@shared/types/session';
+import type { WorkflowStage, WorkflowState } from '@shared/types/workflow';
 import { AGENT_MODES } from '@shared/constants/agents';
 import {
   APP_MIN_MAIN_WIDTH,
@@ -54,6 +55,8 @@ interface WorkbenchSeedState {
   projectInputs: ProjectInputRecord[];
   openedCapture: OpenedCaptureState | null;
   timeline: AgentTimelineEntry[];
+  actionEvents?: ActionEvent[];
+  workflowState?: WorkflowState | null;
   runs?: RunSummary[];
 }
 
@@ -222,44 +225,86 @@ const mapActionEventToTimelineEntry = (event: ActionEvent): AgentTimelineEntry |
     case 'agent_summary':
       return {
         id: event.event_id,
-        type: 'agent',
+        type: 'reasoning',
         agentRole: event.agent_id as AgentTimelineEntry['agentRole'],
-        content: String(event.payload.content || ''),
+        title: String(event.payload.stage || 'Reasoning'),
+        content: String(event.payload.summary || event.payload.content || ''),
+        reasoningSummary: {
+          summaryId: event.event_id,
+          stage: (String(event.payload.stage || 'dispatch') as WorkflowStage),
+          agentId: event.agent_id as AgentRole,
+          summary: String(event.payload.summary || event.payload.content || ''),
+          evidence: Array.isArray(event.payload.evidence) ? event.payload.evidence.map(String) : [],
+          nextStep: String(event.payload.next_step || event.payload.nextStep || ''),
+          confidence: typeof event.payload.confidence === 'number' ? event.payload.confidence : 0.5,
+          createdAt: new Date(event.ts_ms).toISOString(),
+        },
+        actionEvent: event,
         timestamp: event.ts_ms,
       };
     case 'tool_execution':
       return {
         id: event.event_id,
         type: 'tool_call',
+        status: event.status,
         content: String(event.payload.tool_name || event.payload.toolName || 'tool_execution'),
+        actionEvent: event,
         timestamp: event.ts_ms,
       };
     case 'workflow_stage_transition':
       return {
         id: event.event_id,
-        type: 'system',
+        type: 'stage',
+        title: String(event.payload.toStage || 'Stage'),
         content: `Stage: ${String(event.payload.fromStage || 'unknown')} -> ${String(event.payload.toStage || 'unknown')}`,
+        actionEvent: event,
+        timestamp: event.ts_ms,
+      };
+    case 'verification':
+      return {
+        id: event.event_id,
+        type: 'verification',
+        title: String(event.payload.verification_kind || 'verification'),
+        status: event.status,
+        content: String(event.payload.summary || event.payload.verdict || 'Verification updated'),
+        actionEvent: event,
+        timestamp: event.ts_ms,
+      };
+    case 'llm_call':
+      return {
+        id: event.event_id,
+        type: 'system',
+        title: `LLM ${String(event.payload.agentId || event.agent_id)}`,
+        status: event.status,
+        content: `${String(event.payload.providerId || 'provider')}/${String(event.payload.modelId || 'model')} - ${String(event.payload.summary || event.payload.requestId || 'llm_call')}`,
+        actionEvent: event,
         timestamp: event.ts_ms,
       };
     case 'report_published':
       return {
         id: event.event_id,
-        type: 'system',
+        type: 'report',
+        title: 'Report published',
         content: `Report published: ${String(event.payload.htmlPath || event.payload.markdownPath || 'reports ready')}`,
+        actionEvent: event,
         timestamp: event.ts_ms,
       };
     case 'dispatch':
       return {
         id: event.event_id,
-        type: 'system',
+        type: 'dispatch',
+        title: String(event.payload.targetAgent || event.payload.target_agent || 'specialist'),
         content: `Dispatch: ${String(event.payload.targetAgent || event.payload.target_agent || 'specialist')}`,
+        actionEvent: event,
         timestamp: event.ts_ms,
       };
     case 'blocker':
       return {
         id: event.event_id,
         type: 'blocker',
+        status: event.status,
         content: String(event.payload.reason || event.payload.message || 'Blocker detected'),
+        actionEvent: event,
         timestamp: event.ts_ms,
       };
     case 'system':
@@ -305,6 +350,7 @@ const App: React.FC = () => {
   const currentSession = useSessionStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
   const captures = useSessionStore((state) => state.captures);
+  const workflowState = useSessionStore((state) => state.workflowState);
   const currentMode = useLayoutStore((state) => state.currentMode);
   const leftSidebarCollapsed = useLayoutStore((state) => state.leftSidebarCollapsed);
   const rightPanelCollapsed = useLayoutStore((state) => state.rightPanelCollapsed);
@@ -344,6 +390,11 @@ const App: React.FC = () => {
   const setRuns = useSessionStore((state) => state.setRuns);
   const setContextSnapshot = useSessionStore((state) => state.setContextSnapshot);
   const setCaptures = useSessionStore((state) => state.setCaptures);
+  const addActionEvent = useSessionStore((state) => state.addActionEvent);
+  const setWorkflowState = useSessionStore((state) => state.setWorkflowState);
+  const setCurrentDebugPlan = useSessionStore((state) => state.setCurrentDebugPlan);
+  const setPendingQuestions = useSessionStore((state) => state.setPendingQuestions);
+  const setReasoningSummaries = useSessionStore((state) => state.setReasoningSummaries);
   const addTimelineEntry = useSessionStore((state) => state.addTimelineEntry);
   const setActiveTerminalSessionId = useTerminalStore((state) => state.setActiveSessionId);
 
@@ -405,6 +456,11 @@ const App: React.FC = () => {
         store.setProjectInputs(state.projectInputs);
         store.setOpenedCapture(state.openedCapture);
         store.setTimeline(state.timeline);
+        store.setActionEvents(state.actionEvents ?? []);
+        store.setWorkflowState(state.workflowState ?? null);
+        store.setCurrentDebugPlan(state.workflowState?.debugPlan ?? null);
+        store.setPendingQuestions(state.workflowState?.pendingQuestions ?? null);
+        store.setReasoningSummaries(state.workflowState?.reasoningSummaries ?? []);
         store.setRuns(state.runs ?? []);
       },
       resetWorkbenchState: () => {
@@ -419,6 +475,11 @@ const App: React.FC = () => {
         store.setProjectInputs([]);
         store.setOpenedCapture(null);
         store.setTimeline([]);
+        store.setActionEvents([]);
+        store.setWorkflowState(null);
+        store.setCurrentDebugPlan(null);
+        store.setPendingQuestions(null);
+        store.setReasoningSummaries([]);
         store.setRuns([]);
       },
       getWorkbenchState: () => {
@@ -434,6 +495,8 @@ const App: React.FC = () => {
           projectInputs: store.projectInputs,
           openedCapture: store.openedCapture,
           timeline: store.timeline,
+          actionEvents: store.actionEvents,
+          workflowState: store.workflowState,
           runs: store.runs,
         };
       },
@@ -512,6 +575,26 @@ const App: React.FC = () => {
     const electronAPI = window.electronAPI;
     if (!electronAPI) return;
 
+    electronAPI.events.onRunStatusChanged((rawPayload) => {
+      const payload = rawPayload as {
+        runId: string;
+        sessionId: string;
+        status: RunSummary['status'];
+        lastStage?: string;
+        stopReason?: string;
+      };
+      const current = useSessionStore.getState().currentRun;
+      if (!current || current.runId !== payload.runId) {
+        return;
+      }
+      useSessionStore.getState().setCurrentRun({
+        ...current,
+        status: payload.status,
+        lastStage: payload.lastStage || current.lastStage,
+        stopReason: payload.stopReason || current.stopReason,
+      });
+    });
+
     electronAPI.events.onContextChanged((snapshot) => {
       useSessionStore.getState().setContextSnapshot(snapshot);
       syncCapturesFromSnapshot(snapshot);
@@ -552,13 +635,19 @@ const App: React.FC = () => {
 
     electronAPI.events.onEvidenceEventAdded((rawEvent) => {
       const event = rawEvent as ActionEvent;
+      addActionEvent(event);
       const entry = mapActionEventToTimelineEntry(event);
       if (entry) {
         useSessionStore.getState().addTimelineEntry(entry);
       }
     });
 
-    electronAPI.events.onWorkflowStateChanged(() => {
+    electronAPI.events.onWorkflowStateChanged((rawState) => {
+      const state = rawState as WorkflowState;
+      setWorkflowState(state);
+      setCurrentDebugPlan(state.debugPlan ?? null);
+      setPendingQuestions(state.pendingQuestions ?? null);
+      setReasoningSummaries(state.reasoningSummaries ?? []);
       const currentProject = useSessionStore.getState().currentProject;
       const currentSession = useSessionStore.getState().currentSession;
 
@@ -579,6 +668,16 @@ const App: React.FC = () => {
               useSessionStore.getState().setCurrentRun(activeRun);
               useSessionStore.getState().setCaptures(activeRun.captures ?? []);
             }
+          })
+          .catch(() => undefined);
+
+        electronAPI.evidence.getChain()
+          .then((result) => {
+            useSessionStore.getState().setActionEvents(result.events ?? []);
+            const timeline = (result.events ?? [])
+              .map((event) => mapActionEventToTimelineEntry(event as ActionEvent))
+              .filter((entry): entry is AgentTimelineEntry => entry !== null);
+            useSessionStore.getState().setTimeline(timeline);
           })
           .catch(() => undefined);
       }
@@ -718,14 +817,33 @@ const App: React.FC = () => {
 
     void electronAPI.evidence.getChain()
       .then((result) => {
+        useSessionStore.getState().setActionEvents(result.events ?? []);
         const timeline = (result.events ?? [])
           .map((event) => mapActionEventToTimelineEntry(event as ActionEvent))
           .filter((entry): entry is AgentTimelineEntry => entry !== null);
         useSessionStore.getState().setTimeline(timeline);
       })
       .catch(() => {
+        useSessionStore.getState().setActionEvents([]);
         useSessionStore.getState().setTimeline([]);
       });
+
+    void electronAPI.workflow.getState()
+      .then((state) => {
+        if (!state) {
+          useSessionStore.getState().setWorkflowState(null);
+          useSessionStore.getState().setCurrentDebugPlan(null);
+          useSessionStore.getState().setPendingQuestions(null);
+          useSessionStore.getState().setReasoningSummaries([]);
+          return;
+        }
+        const workflow = state as WorkflowState;
+        useSessionStore.getState().setWorkflowState(workflow);
+        useSessionStore.getState().setCurrentDebugPlan(workflow.debugPlan ?? null);
+        useSessionStore.getState().setPendingQuestions(workflow.pendingQuestions ?? null);
+        useSessionStore.getState().setReasoningSummaries(workflow.reasoningSummaries ?? []);
+      })
+      .catch(() => undefined);
   }, [currentSession?.sessionId]);
 
   useEffect(() => {
@@ -872,16 +990,6 @@ const App: React.FC = () => {
         return;
       }
 
-      if (captures.length === 0) {
-        showNotice('请先打开或导入至少一个 capture。');
-        return;
-      }
-
-      if (!primaryCapture) {
-        showNotice('请先为当前 session 设置 Primary capture。');
-        return;
-      }
-
       if (hasRemoteCapture && selectedDeviceEntry.type === 'local') {
         showNotice('远端 capture 需要选择 Android Replay Device。');
         return;
@@ -902,8 +1010,8 @@ const App: React.FC = () => {
           sessionId: currentSession?.sessionId,
           mode: 'debugger',
           goal: trimmed,
-          captures,
-          primaryCaptureId: primaryCapture.id,
+          captures: captures.length > 0 ? captures : undefined,
+          primaryCaptureId: primaryCapture?.id,
           replayDevice: selectedDeviceEntry,
         };
 
@@ -913,11 +1021,6 @@ const App: React.FC = () => {
           return;
         }
 
-        if (result.contextSnapshot) {
-          setContextSnapshot(result.contextSnapshot);
-          setCaptures(result.contextSnapshot.captureDescriptors ?? captures);
-        }
-
         setCurrentRun({
           runId: result.runId ?? `run-${Date.now()}`,
           projectId: currentProject.projectId,
@@ -925,10 +1028,18 @@ const App: React.FC = () => {
           sessionId: result.sessionId ?? '',
           mode: 'debugger',
           goal: trimmed,
-          captures,
+          captures: captures.length > 0 ? captures : (result.debugPlanSummary?.targetCapture
+            ? [{
+                id: result.debugPlanSummary.targetCapture.captureId,
+                filePath: result.debugPlanSummary.targetCapture.filePath,
+                role: 'primary',
+                backendHint: 'local',
+                status: 'pending',
+              }]
+            : []),
           startedAt: Date.now(),
-          status: 'queued',
-          lastStage: 'preflight',
+          status: result.status ?? 'planning',
+          lastStage: result.currentStage ?? 'plan',
           backend: captures.some((descriptor) => descriptor.backendHint === 'remote') ? 'remote' : 'local',
         });
 
@@ -1197,10 +1308,14 @@ const App: React.FC = () => {
                     value={promptValue}
                     onChange={(event) => setPromptValue(event.target.value)}
                     onKeyDown={handlePromptKeyDown}
-                    placeholder={t('app.inputPlaceholder')}
-                    aria-label={t('app.inputPlaceholder')}
+                    placeholder={workflowState?.approvalState === 'pending_user'
+                      ? 'Plan is ready. Approve it in the intake panel to start execution.'
+                      : t('app.inputPlaceholder')}
+                    aria-label={workflowState?.approvalState === 'pending_user'
+                      ? 'Plan is ready. Approve it in the intake panel to start execution.'
+                      : t('app.inputPlaceholder')}
                   />
-                  {currentRun && ['queued', 'running', 'stopping'].includes(currentRun.status) && (
+                  {currentRun && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status) && (
                     <button
                       type="button"
                       className="chat-send-button chat-stop-button"

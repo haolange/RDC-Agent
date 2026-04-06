@@ -9,6 +9,13 @@ import type {
   SessionRecord,
 } from '@shared/types/session';
 import type { AgentTimelineEntry } from '@shared/types/agent';
+import type { ActionEvent } from '@shared/types/evidence';
+import type {
+  AskUserPrompt,
+  DebugPlan,
+  ReasoningSummary,
+  WorkflowState,
+} from '@shared/types/workflow';
 
 interface SessionState {
   projects: ProjectRecord[];
@@ -21,7 +28,12 @@ interface SessionState {
   projectInputs: ProjectInputRecord[];
   openedCapture: OpenedCaptureState | null;
   timeline: AgentTimelineEntry[];
+  actionEvents: ActionEvent[];
   runs: RunSummary[];
+  workflowState: WorkflowState | null;
+  currentDebugPlan: DebugPlan | null;
+  pendingQuestions: AskUserPrompt | null;
+  reasoningSummaries: ReasoningSummary[];
   isLoading: boolean;
 
   // Actions
@@ -39,7 +51,13 @@ interface SessionState {
   setOpenedCapture: (openedCapture: OpenedCaptureState | null) => void;
   addTimelineEntry: (entry: AgentTimelineEntry) => void;
   setTimeline: (timeline: AgentTimelineEntry[]) => void;
+  setActionEvents: (events: ActionEvent[]) => void;
+  addActionEvent: (event: ActionEvent) => void;
   setRuns: (runs: RunSummary[]) => void;
+  setWorkflowState: (workflowState: WorkflowState | null) => void;
+  setCurrentDebugPlan: (debugPlan: DebugPlan | null) => void;
+  setPendingQuestions: (prompt: AskUserPrompt | null) => void;
+  setReasoningSummaries: (summaries: ReasoningSummary[]) => void;
   setLoading: (loading: boolean) => void;
   reset: () => void;
 }
@@ -55,7 +73,12 @@ export const useSessionStore = create<SessionState>((set) => ({
   projectInputs: [],
   openedCapture: null,
   timeline: [],
+  actionEvents: [],
   runs: [],
+  workflowState: null,
+  currentDebugPlan: null,
+  pendingQuestions: null,
+  reasoningSummaries: [],
   isLoading: false,
 
   setProjects: (projects) => set({ projects }),
@@ -80,7 +103,13 @@ export const useSessionStore = create<SessionState>((set) => ({
   setOpenedCapture: (openedCapture) => set({ openedCapture }),
   addTimelineEntry: (entry) => set((state) => ({ timeline: [...state.timeline, entry] })),
   setTimeline: (timeline) => set({ timeline }),
+  setActionEvents: (events) => set({ actionEvents: events }),
+  addActionEvent: (event) => set((state) => ({ actionEvents: [...state.actionEvents, event] })),
   setRuns: (runs) => set({ runs }),
+  setWorkflowState: (workflowState) => set({ workflowState }),
+  setCurrentDebugPlan: (currentDebugPlan) => set({ currentDebugPlan }),
+  setPendingQuestions: (pendingQuestions) => set({ pendingQuestions }),
+  setReasoningSummaries: (reasoningSummaries) => set({ reasoningSummaries }),
   setLoading: (loading) => set({ isLoading: loading }),
   reset: () =>
     set({
@@ -90,7 +119,12 @@ export const useSessionStore = create<SessionState>((set) => ({
       captures: [],
       openedCapture: null,
       timeline: [],
+      actionEvents: [],
       runs: [],
+      workflowState: null,
+      currentDebugPlan: null,
+      pendingQuestions: null,
+      reasoningSummaries: [],
       isLoading: false,
     }),
 }));

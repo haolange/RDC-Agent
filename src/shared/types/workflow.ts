@@ -4,6 +4,7 @@
 
 import type { ReplayDeviceEntry } from './device';
 import type { AppMode, CaptureDescriptor } from './session';
+import type { AgentRole } from './agent';
 
 // Debugger 工作流阶段（生产级单一路径）
 export type WorkflowStage =
@@ -26,6 +27,128 @@ export type WorkflowPhase =
   | 'generator'
   | 'evaluator';
 
+export type PlanReadiness =
+  | 'discovering'
+  | 'needs_user_input'
+  | 'ready_for_approval'
+  | 'strict_ready'
+  | 'blocked';
+
+export interface AskUserQuestionOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export interface AskUserQuestion {
+  id: string;
+  prompt: string;
+  recommendedOptionId?: string;
+  options: [
+    AskUserQuestionOption,
+    AskUserQuestionOption,
+    AskUserQuestionOption,
+    AskUserQuestionOption,
+  ];
+  freeformPlaceholder?: string;
+}
+
+export interface AskUserPrompt {
+  promptId: string;
+  title: string;
+  summary: string;
+  questions: AskUserQuestion[];
+  createdAt: string;
+}
+
+export interface AskUserAnswer {
+  questionId: string;
+  selectedOptionId?: string;
+  freeformText?: string;
+}
+
+export interface ReferenceContract {
+  taskSources: string[];
+  referenceCaptures: string[];
+  acceptanceNotes: string[];
+}
+
+export interface VerificationContract {
+  requiresFixValidation: boolean;
+  requiresScreenshotEvidence: boolean;
+  requiresShaderInspection: boolean;
+  requiresPixelEvidence: boolean;
+  requiresBaselineComparison: boolean;
+  targetEventIds: number[];
+  successCriteria: string[];
+}
+
+export interface DebugPlan {
+  planId: string;
+  planReadiness: PlanReadiness;
+  strictReady: boolean;
+  userGoal: string;
+  targetCapture: {
+    captureId: string;
+    fileName: string;
+    filePath: string;
+  } | null;
+  targetFrameOrEvent: {
+    scope: 'event' | 'frame' | 'capture';
+    frameIndex?: number;
+    eventId?: number;
+    eventLabel?: string;
+  } | null;
+  scope: string;
+  referenceContract: ReferenceContract;
+  verificationContract: VerificationContract;
+  expectedDeliverables: string[];
+  blockers: Blocker[];
+  missingInfo: string[];
+  recommendedSpecialists: AgentRole[];
+  notes: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReasoningSummary {
+  summaryId: string;
+  stage: WorkflowStage;
+  agentId: AgentRole;
+  summary: string;
+  evidence: string[];
+  nextStep: string;
+  confidence: number;
+  createdAt: string;
+}
+
+export interface RunRecoveryState {
+  restartedFromRunId?: string;
+  recoveredAt?: string;
+  recoveryReason?: string;
+  staleDetectedAt?: string;
+}
+
+export interface IntakeContext {
+  taskFilePath?: string;
+  taskFileContent?: string;
+  effectiveGoal: string;
+  discoveredProjectRoot?: string;
+  openedCaptureId?: string | null;
+  openedCapturePath?: string | null;
+  availableCaptureIds: string[];
+  providerId?: string;
+  modelId?: string;
+  replayDeviceId?: string | null;
+  replayDeviceLabel?: string | null;
+}
+
+export type PlanApprovalState =
+  | 'not_requested'
+  | 'pending_user'
+  | 'approved'
+  | 'rejected';
+
 // 工作流状态
 export interface WorkflowState {
   caseId: string;
@@ -38,6 +161,12 @@ export interface WorkflowState {
   orchestrationMode: 'multi_agent';  // 垂直简化：只支持multi_agent
   coordinationMode: 'staged_handoff'; // 垂直简化：只支持staged_handoff
   blockers: Blocker[];
+  planReadiness?: PlanReadiness;
+  approvalState?: PlanApprovalState;
+  debugPlan?: DebugPlan | null;
+  pendingQuestions?: AskUserPrompt | null;
+  reasoningSummaries?: ReasoningSummary[];
+  recoveryState?: RunRecoveryState | null;
   lastUpdated: string;
 }
 
@@ -160,6 +289,13 @@ export interface GraphState {
   replayDevice: ReplayDeviceEntry | null;
   mode: AppMode;
   goal: string;
+  intakeContext?: IntakeContext;
+  debugPlan?: DebugPlan;
+  pendingQuestions?: AskUserPrompt | null;
+  approvalState: PlanApprovalState;
+  questionAnswers: AskUserAnswer[];
+  reasoningSummaries: ReasoningSummary[];
+  recoveryState?: RunRecoveryState;
 
   // RDC 上下文
   captureInfo?: CaptureInfo;

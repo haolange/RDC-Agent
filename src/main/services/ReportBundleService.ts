@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { Report } from '@shared/types/workflow';
+import type { RunLlmExecutionSummary } from './DebuggerLlmService';
 
 export interface ReportBundleInput {
   projectRoot: string;
@@ -12,6 +13,7 @@ export interface ReportBundleInput {
   verificationSummary?: string[];
   eventCount?: number;
   artifactPaths?: string[];
+  llmExecution?: RunLlmExecutionSummary | null;
 }
 
 export interface ReportBundleResult {
@@ -52,6 +54,7 @@ export class ReportBundleService {
       artifactPaths: input.artifactPaths ?? [],
       evidenceSummary: input.evidenceSummary ?? input.report.evidenceSummary,
       verificationSummary: input.verificationSummary ?? [],
+      llmExecution: input.llmExecution ?? null,
       report: input.report,
     };
 
@@ -75,6 +78,7 @@ export class ReportBundleService {
     artifactPaths: string[];
     evidenceSummary: string[];
     verificationSummary: string[];
+    llmExecution: RunLlmExecutionSummary | null;
     report: Report;
   }): string {
     const lines: string[] = [
@@ -97,6 +101,18 @@ export class ReportBundleService {
       '',
       '## Verification Notes',
       ...(payload.verificationSummary.length > 0 ? payload.verificationSummary.map((item) => `- ${item}`) : ['- N/A']),
+      '',
+      '## LLM Execution',
+      ...(payload.llmExecution
+        ? [
+            `- Provider ID: ${payload.llmExecution.providerId}`,
+            `- Model ID: ${payload.llmExecution.modelId}`,
+            `- Successful Calls: ${payload.llmExecution.successfulCallCount}`,
+            `- Failed Calls: ${payload.llmExecution.failedCallCount}`,
+            `- First Request ID: ${payload.llmExecution.firstRequestId || 'N/A'}`,
+            `- Token Usage: input=${payload.llmExecution.totalInputTokens}, output=${payload.llmExecution.totalOutputTokens}`,
+          ]
+        : ['- N/A']),
       '',
       '## Recommendations',
       ...(payload.report.recommendations.length > 0 ? payload.report.recommendations.map((item) => `- ${item}`) : ['- N/A']),
@@ -123,6 +139,7 @@ export class ReportBundleService {
     artifactPaths: string[];
     evidenceSummary: string[];
     verificationSummary: string[];
+    llmExecution: RunLlmExecutionSummary | null;
     report: Report;
   }): string {
     const evidenceItems = (payload.evidenceSummary.length > 0 ? payload.evidenceSummary : ['N/A'])
@@ -137,6 +154,16 @@ export class ReportBundleService {
     const artifactItems = (payload.artifactPaths.length > 0 ? payload.artifactPaths : ['N/A'])
       .map((item) => `<li><code>${escapeHtml(item)}</code></li>`)
       .join('');
+    const llmItems = payload.llmExecution
+      ? [
+          `<li>Provider ID: <code>${escapeHtml(payload.llmExecution.providerId)}</code></li>`,
+          `<li>Model ID: <code>${escapeHtml(payload.llmExecution.modelId)}</code></li>`,
+          `<li>Successful Calls: ${payload.llmExecution.successfulCallCount}</li>`,
+          `<li>Failed Calls: ${payload.llmExecution.failedCallCount}</li>`,
+          `<li>First Request ID: <code>${escapeHtml(payload.llmExecution.firstRequestId || 'N/A')}</code></li>`,
+          `<li>Token Usage: input=${payload.llmExecution.totalInputTokens}, output=${payload.llmExecution.totalOutputTokens}</li>`,
+        ].join('')
+      : '<li>N/A</li>';
 
     return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -249,6 +276,10 @@ export class ReportBundleService {
     <section class="section">
       <div class="eyebrow">Verification Notes</div>
       <ul>${verificationItems}</ul>
+    </section>
+    <section class="section">
+      <div class="eyebrow">LLM Execution</div>
+      <ul>${llmItems}</ul>
     </section>
     <section class="section">
       <div class="eyebrow">Recommendations</div>

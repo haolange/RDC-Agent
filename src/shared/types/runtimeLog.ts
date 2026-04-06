@@ -4,7 +4,7 @@
 
 export type RuntimeLogScope = 'app' | 'session';
 
-export type RuntimeLogNamespace = 'system' | 'agent' | 'tool' | 'device' | 'capture';
+export type RuntimeLogNamespace = 'system' | 'agent' | 'tool' | 'device' | 'capture' | 'context' | 'llm';
 
 export type RuntimeLogSeverity = 'info' | 'success' | 'warning' | 'error';
 

@@ -44,6 +44,10 @@ const electronAPI = {
   workflow: {
     getState: () => electron.ipcRenderer.invoke("workflow:getState"),
     start: (request) => electron.ipcRenderer.invoke("workflow:start", request),
+    getPlan: (runId) => electron.ipcRenderer.invoke("workflow:getPlan", runId),
+    submitQuestions: (runId, answers) => electron.ipcRenderer.invoke("workflow:submitQuestions", runId, answers),
+    approvePlan: (runId) => electron.ipcRenderer.invoke("workflow:approvePlan", runId),
+    restartRun: (runId) => electron.ipcRenderer.invoke("workflow:restartRun", runId),
     resume: (sessionId) => electron.ipcRenderer.invoke("workflow:resume", sessionId),
     stop: (runId) => electron.ipcRenderer.invoke("workflow:stop", runId),
     listRuns: () => electron.ipcRenderer.invoke("workflow:listRuns"),

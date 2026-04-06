@@ -15,6 +15,9 @@ export interface AppContext {
 interface LaunchAppOptions {
   tempDir?: string;
   cleanupOnClose?: boolean;
+  testMode?: boolean;
+  userDataDir?: string;
+  workspaceDir?: string;
 }
 
 /**
@@ -22,8 +25,9 @@ interface LaunchAppOptions {
  */
 export async function launchApp(options: LaunchAppOptions = {}): Promise<AppContext> {
   const tempDir = options.tempDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-agent-e2e-'));
-  const userDataDir = path.join(tempDir, 'userData');
-  const workspaceDir = path.join(tempDir, 'workspace');
+  const userDataDir = options.userDataDir ?? path.join(tempDir, 'userData');
+  const workspaceDir = options.workspaceDir ?? path.join(tempDir, 'workspace');
+  const testMode = options.testMode !== false;
   fs.mkdirSync(userDataDir, { recursive: true });
   fs.mkdirSync(workspaceDir, { recursive: true });
 
@@ -46,9 +50,9 @@ export async function launchApp(options: LaunchAppOptions = {}): Promise<AppCont
     env: {
       ...process.env,
       NODE_ENV: 'production',
-      RDC_AGENT_TEST_MODE: '1',
-      RDC_AGENT_USER_DATA: userDataDir,
-      RDC_AGENT_WORKSPACE: workspaceDir,
+      ...(testMode ? { RDC_AGENT_TEST_MODE: '1' } : {}),
+      ...(options.userDataDir || testMode ? { RDC_AGENT_USER_DATA: userDataDir } : {}),
+      ...(options.workspaceDir || testMode ? { RDC_AGENT_WORKSPACE: workspaceDir } : {}),
     },
   });
 
@@ -69,6 +73,54 @@ export async function launchApp(options: LaunchAppOptions = {}): Promise<AppCont
     workspaceDir,
     cleanupOnClose: options.cleanupOnClose ?? true,
   };
+}
+
+interface ConfigureTestDebuggerRoutesOptions {
+  withRoutes?: boolean;
+  providerId?: string;
+  modelId?: string;
+}
+
+export async function configureTestDebuggerRoutes(
+  page: Page,
+  options: ConfigureTestDebuggerRoutesOptions = {},
+): Promise<void> {
+  const providerId = options.providerId ?? 'ollama-test-provider';
+  const modelId = options.modelId ?? 'debugger-test-model';
+  const withRoutes = options.withRoutes !== false;
+
+  await page.evaluate(async ({ nextProviderId, nextModelId, nextWithRoutes }) => {
+    const settings = await window.electronAPI.settings.get();
+    await window.electronAPI.settings.set({
+      llm: {
+        providers: [
+          {
+            id: nextProviderId,
+            kind: 'ollama',
+            label: 'Test Ollama',
+            enabled: true,
+            apiKey: '',
+            secretRef: `provider-${nextProviderId}-api-key`,
+            hasStoredSecret: true,
+            baseUrl: 'http://127.0.0.1:11434/v1',
+            models: [{ id: nextModelId, label: 'Debugger Test Model', enabled: true }],
+            recommendedModels: [nextModelId],
+            docsUrl: '',
+            isConfigured: true,
+          },
+        ],
+        agentRoutes: settings.llm.agentRoutes.map((route) => ({
+          ...route,
+          providerId: nextWithRoutes ? nextProviderId : '',
+          modelId: nextWithRoutes ? nextModelId : '',
+        })),
+      },
+    });
+  }, {
+    nextProviderId: providerId,
+    nextModelId: modelId,
+    nextWithRoutes: withRoutes,
+  });
 }
 
 /**

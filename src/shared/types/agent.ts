@@ -121,14 +121,31 @@ export const AGENT_CATEGORY_MAP: Record<AgentRole, AgentCategory> = {
 // ============================================
 
 import type { ToolTraceEntry } from './tool';
+import type { ActionEvent } from './evidence';
+import type { ReasoningSummary } from './workflow';
 
 /** Agent 时间线条目 */
 export interface AgentTimelineEntry {
   id: string;
-  type: 'user' | 'agent' | 'tool_call' | 'blocker' | 'system';
+  type:
+    | 'user'
+    | 'agent'
+    | 'tool_call'
+    | 'blocker'
+    | 'system'
+    | 'plan'
+    | 'stage'
+    | 'dispatch'
+    | 'verification'
+    | 'report'
+    | 'reasoning';
   agentRole?: AgentRole;
   content: string;
+  title?: string;
+  status?: string;
   toolTrace?: ToolTraceEntry;
+  actionEvent?: ActionEvent;
+  reasoningSummary?: ReasoningSummary;
   timestamp: number;
   refs?: string[];
 }
