@@ -51,6 +51,43 @@ const normalizeOpenRouterBaseUrl = (baseUrl: string): string => {
   return trimmed;
 };
 
+const extractMessageContent = (
+  payload: unknown,
+): string | ContentBlock[] => {
+  if (!payload || typeof payload !== 'object') {
+    return '';
+  }
+
+  const message = (payload as { message?: Record<string, unknown> }).message ?? null;
+  const messageContent = message?.content;
+  if (typeof messageContent === 'string' && messageContent.trim()) {
+    return messageContent;
+  }
+  if (Array.isArray(messageContent) && messageContent.length > 0) {
+    return messageContent as ContentBlock[];
+  }
+  if (messageContent && typeof messageContent === 'object') {
+    return JSON.stringify(messageContent);
+  }
+
+  const stringFallbacks = [
+    message?.output_text,
+    message?.reasoning_content,
+    message?.reasoning,
+    message?.refusal,
+    (payload as { text?: unknown }).text,
+    (payload as { output_text?: unknown }).output_text,
+  ];
+
+  for (const candidate of stringFallbacks) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate;
+    }
+  }
+
+  return '';
+};
+
 class OpenRouterProvider implements LLMProvider {
   name: string;
   private apiKey = '';
@@ -98,11 +135,12 @@ class OpenRouterProvider implements LLMProvider {
 
     const data = await response.json();
     const choice = data.choices?.[0];
+    const content = extractMessageContent(choice);
 
     return {
       id: data.id || `or-${Date.now()}`,
       model: data.model || model,
-      content: choice?.message?.content || '',
+      content,
       toolCalls: choice?.message?.tool_calls as LLMResponse['toolCalls'],
       usage: {
         inputTokens: data.usage?.prompt_tokens || 0,
@@ -178,11 +216,12 @@ class OpenAICompatibleProvider implements LLMProvider {
 
     const data = await response.json();
     const choice = data.choices?.[0];
+    const content = extractMessageContent(choice);
 
     return {
       id: data.id || `${this.name}-${Date.now()}`,
       model: data.model || model,
-      content: choice?.message?.content || '',
+      content,
       toolCalls: choice?.message?.tool_calls as LLMResponse['toolCalls'],
       usage: {
         inputTokens: data.usage?.prompt_tokens || 0,

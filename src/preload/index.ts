@@ -3,6 +3,7 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
+import type { ConversationMessage, ConversationSendRequest, ConversationTurnResult } from '@shared/types/conversation';
 import type { AppSettings, AppSettingsPatch } from '@shared/types/settings';
 import type { OpenedCaptureState, ProjectInputRecord, ProjectRecord, SessionRecord } from '@shared/types/session';
 import type { RuntimeLogEntry, RuntimeLogScope } from '@shared/types/runtimeLog';
@@ -50,6 +51,11 @@ const electronAPI = {
     selectAvatar: (): Promise<string | null> => ipcRenderer.invoke('app:selectAvatar'),
     openPath: (targetPath: string): Promise<{ success: boolean; error?: string }> => ipcRenderer.invoke('app:openPath', targetPath),
     copyText: (text: string): Promise<{ success: boolean }> => ipcRenderer.invoke('app:copyText', text),
+  },
+
+  conversation: {
+    sendMessage: (request: ConversationSendRequest): Promise<ConversationTurnResult> => ipcRenderer.invoke('conversation:sendMessage', request),
+    getHistory: (sessionId: string): Promise<{ messages: ConversationMessage[] }> => ipcRenderer.invoke('conversation:getHistory', sessionId),
   },
 
   selectRdcFiles: (): Promise<string[] | null> => ipcRenderer.invoke('dialog:selectRdcFiles'),

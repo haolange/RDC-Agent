@@ -1112,6 +1112,9 @@ class StorageAdapter {
     if (!fs__namespace.existsSync(path__namespace.join(sessionPath, "action_chain.jsonl"))) {
       fs__namespace.writeFileSync(path__namespace.join(sessionPath, "action_chain.jsonl"), "", "utf-8");
     }
+    if (!fs__namespace.existsSync(path__namespace.join(sessionPath, "conversation.jsonl"))) {
+      fs__namespace.writeFileSync(path__namespace.join(sessionPath, "conversation.jsonl"), "", "utf-8");
+    }
     this.syncSessionEvidence(session.sessionId, session.projectId);
     this.touchProject(project.projectId, session.sessionId, timestamp);
     this.setCurrentProjectId(projectId);
@@ -1342,6 +1345,13 @@ class StorageAdapter {
     }
     return path__namespace.join(location.sessionPath, "action_chain.jsonl");
   }
+  getConversationPath(sessionId) {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) {
+      throw new Error(`Session not found for conversation history: ${sessionId}`);
+    }
+    return path__namespace.join(location.sessionPath, "conversation.jsonl");
+  }
   getSessionEvidencePath(sessionId) {
     const location = this.findSessionLocation(sessionId);
     if (!location) {
@@ -1351,6 +1361,12 @@ class StorageAdapter {
   }
   getDebugPlanPath(sessionId, runId) {
     return path__namespace.join(this.getRunPath(sessionId, runId), "notes", "debug_plan.yaml");
+  }
+  readConversationHistory(sessionId) {
+    return readJsonl(this.getConversationPath(sessionId)).sort((left, right) => left.createdAt - right.createdAt);
+  }
+  appendConversationMessage(sessionId, message) {
+    appendJsonl(this.getConversationPath(sessionId), message);
   }
   readSessionEvidence(sessionId) {
     return readYaml(this.getSessionEvidencePath(sessionId));
@@ -2026,6 +2042,36 @@ const normalizeOpenRouterBaseUrl = (baseUrl) => {
   }
   return trimmed;
 };
+const extractMessageContent = (payload) => {
+  if (!payload || typeof payload !== "object") {
+    return "";
+  }
+  const message = payload.message ?? null;
+  const messageContent = message?.content;
+  if (typeof messageContent === "string" && messageContent.trim()) {
+    return messageContent;
+  }
+  if (Array.isArray(messageContent) && messageContent.length > 0) {
+    return messageContent;
+  }
+  if (messageContent && typeof messageContent === "object") {
+    return JSON.stringify(messageContent);
+  }
+  const stringFallbacks = [
+    message?.output_text,
+    message?.reasoning_content,
+    message?.reasoning,
+    message?.refusal,
+    payload.text,
+    payload.output_text
+  ];
+  for (const candidate of stringFallbacks) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate;
+    }
+  }
+  return "";
+};
 class OpenRouterProvider {
   name;
   apiKey = "";
@@ -2068,10 +2114,11 @@ class OpenRouterProvider {
     }
     const data = await response.json();
     const choice = data.choices?.[0];
+    const content = extractMessageContent(choice);
     return {
       id: data.id || `or-${Date.now()}`,
       model: data.model || model,
-      content: choice?.message?.content || "",
+      content,
       toolCalls: choice?.message?.tool_calls,
       usage: {
         inputTokens: data.usage?.prompt_tokens || 0,
@@ -2136,10 +2183,11 @@ class OpenAICompatibleProvider {
     }
     const data = await response.json();
     const choice = data.choices?.[0];
+    const content = extractMessageContent(choice);
     return {
       id: data.id || `${this.name}-${Date.now()}`,
       model: data.model || model,
-      content: choice?.message?.content || "",
+      content,
       toolCalls: choice?.message?.tool_calls,
       usage: {
         inputTokens: data.usage?.prompt_tokens || 0,
@@ -3839,6 +3887,17 @@ function shouldRetryStructuredLlmError(error) {
   const message = error instanceof Error ? error.message : String(error);
   return /LLM response was empty|did not contain valid JSON|Unexpected non-whitespace character after JSON|OpenRouter API error: 5\d\d|timed out|timeout/i.test(message);
 }
+function shouldUseNativeJsonObject(route) {
+  const providerKind = route.provider.kind;
+  const modelId = route.modelId.toLowerCase();
+  if (providerKind === "anthropic") {
+    return false;
+  }
+  if (/moonshot|kimi/.test(modelId)) {
+    return false;
+  }
+  return true;
+}
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -3987,6 +4046,7 @@ class DebuggerLlmService {
     const settings = settingsService.getAll();
     const route = this.resolveRoute(input.agentId, input.stage, settings);
     llmAdapter.configure(settingsService.getLlmConfig());
+    const useNativeJsonObject = shouldUseNativeJsonObject(route);
     let lastError;
     for (let attempt = 0; attempt < 4; attempt += 1) {
       try {
@@ -3995,7 +4055,7 @@ class DebuggerLlmService {
           model: route.modelId,
           maxTokens: input.maxTokens,
           temperature: input.temperature,
-          responseFormat: "json_object"
+          responseFormat: useNativeJsonObject ? "json_object" : void 0
         }, route.providerId);
         const text = extractTextContent(response.content);
         const data = input.parse(text);
@@ -4666,6 +4726,86 @@ class AgentOrchestrator {
       await this.recordMessage(agentId, "user", content, context);
       const responseContent = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
       await this.recordMessage(agentId, "assistant", responseContent, context);
+      this.updateAgentStatus(agentId, "complete");
+      return responseContent;
+    } catch (error) {
+      this.updateAgentStatus(agentId, "error");
+      throw error;
+    }
+  }
+  async sendCoworkMessage(agentId, content, options) {
+    const fallbackConfig = this.agentConfigs.get(agentId);
+    if (!fallbackConfig) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+    this.updateAgentStatus(agentId, "thinking");
+    try {
+      const settings = settingsService.getAll();
+      const routeMap = new Map(settings.llm.agentRoutes.map((route2) => [route2.agentId, route2]));
+      const route = routeMap.get(agentId);
+      const config = {
+        ...fallbackConfig,
+        modelProvider: route?.providerId || fallbackConfig.modelProvider,
+        modelName: route?.modelId || fallbackConfig.modelName,
+        systemPrompt: options?.systemPrompt || fallbackConfig.systemPrompt,
+        temperature: options?.temperature ?? fallbackConfig.temperature,
+        maxTokens: options?.maxTokens ?? fallbackConfig.maxTokens
+      };
+      if (process.env.RDC_AGENT_TEST_MODE === "1") {
+        let userMessage = content;
+        try {
+          const parsed = JSON.parse(content);
+          userMessage = parsed.effective_user_message || parsed.user_message || content;
+        } catch {
+          userMessage = content;
+        }
+        const lower = userMessage.toLowerCase();
+        let stub = "我在。你可以先告诉我你遇到了什么现象，或者直接说你希望我现在正式开始调试。";
+        if (/ue4|unreal/i.test(userMessage)) {
+          stub = "UE4 是 Unreal Engine 4。它是 Epic Games 的一代游戏引擎，常见于延迟渲染、材质系统、后处理链和 Shader 调试场景。";
+        } else if (/你好|您好|hello|hi/i.test(userMessage)) {
+          stub = "你好，我是 RDC Debugger。你可以先和我聊现象、问我能力范围，等你准备好 capture 后，我再进入正式的 RenderDoc 调试。";
+        } else if (/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower)) {
+          stub = "收到，我会先帮你整理正式调试前的关键信息，然后在条件满足时进入严格执行流程。";
+        }
+        this.updateAgentStatus(agentId, "complete");
+        return `${stub}
+<control>{"intent":"${/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower) ? "execute" : "talk"}","safe_to_start":${/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower) ? "true" : "false"}}</control>`;
+      }
+      llmAdapter.configure(settingsService.getLlmConfig());
+      const response = await llmAdapter.chat(
+        {
+          messages: [
+            {
+              role: "system",
+              content: config.systemPrompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}`
+            },
+            {
+              role: "user",
+              content
+            }
+          ],
+          model: config.modelName,
+          maxTokens: config.maxTokens,
+          temperature: config.temperature,
+          signal: options?.signal
+        },
+        config.modelProvider
+      );
+      const responseContent = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+      runtimeLogService.log({
+        scope: options?.sessionId ? "session" : "app",
+        namespace: "agent",
+        severity: "info",
+        title: `${AGENT_DISPLAY_NAMES[agentId] || agentId} cowork turn`,
+        summary: responseContent.slice(0, 160) || "空消息",
+        sessionId: options?.sessionId,
+        raw: {
+          agentId,
+          providerId: config.modelProvider,
+          modelId: config.modelName
+        }
+      });
       this.updateAgentStatus(agentId, "complete");
       return responseContent;
     } catch (error) {
@@ -5703,7 +5843,7 @@ class RunExecutionService {
   }
 }
 const runExecutionService = new RunExecutionService();
-const TASK_FILE_PATTERN = /([A-Za-z]:[\\/][^\r\n"]+?\.txt)/g;
+const TASK_FILE_PATTERN$1 = /([A-Za-z]:[\\/][^\r\n"]+?\.txt)/g;
 const CAPTURE_FILE_PATTERN = /([A-Za-z0-9_.-]+\.rdc)/gi;
 const EVENT_ID_PATTERN = /event\s*id\s*(?:是|:)?\s*(\d+)/i;
 function firstMatch(pattern, value) {
@@ -5712,7 +5852,7 @@ function firstMatch(pattern, value) {
   return match?.[1];
 }
 function parseTaskFilePath(goal) {
-  const match = goal.match(TASK_FILE_PATTERN);
+  const match = goal.match(TASK_FILE_PATTERN$1);
   return match?.[0] ? path.resolve(match[0]) : void 0;
 }
 function parseCaptureFileName(text) {
@@ -7168,6 +7308,11 @@ class DebugWorkflowService {
     }
     this.emitRunStatus(location.session.sessionId, runId, nextStatus, nextStage);
     this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, runId));
+    await this.appendAssistantConversationMessage(
+      location.session.sessionId,
+      runId,
+      nextPlan.strictReady ? "收到，执行前置条件已经补齐。你现在可以批准这份计划，我再进入正式调试。" : nextPlan.blockers.length > 0 ? nextPlan.blockers[0]?.reason || "当前还不能进入正式调试。" : "收到，我已经更新了计划输入，不过还需要你继续补全剩余信息。"
+    );
     return {
       success: true,
       runId,
@@ -7261,6 +7406,11 @@ class DebugWorkflowService {
     });
     this.emitRunStatus(location.session.sessionId, runId, "running", "dispatch");
     this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, runId));
+    await this.appendAssistantConversationMessage(
+      location.session.sessionId,
+      runId,
+      "计划已批准，我现在开始正式调试，并按证据链推进后续分析。"
+    );
     runExecutionService.startRun({
       runId,
       sessionId: location.session.sessionId,
@@ -7309,6 +7459,11 @@ class DebugWorkflowService {
       finishedAt: Date.now()
     });
     this.emitWorkflowState(await this.getWorkflowState(sessionId, nextRunId));
+    await this.appendAssistantConversationMessage(
+      sessionId,
+      nextRunId,
+      "我已经为你重建了一次可继续的调试运行。确认计划后，我会从新的 run 继续推进。"
+    );
     return {
       success: true,
       runId: nextRunId,
@@ -7692,6 +7847,11 @@ class DebugWorkflowService {
         htmlPath: bundle.htmlPath
       }
     }));
+    await this.appendAssistantConversationMessage(
+      location.session.sessionId,
+      location.run.runId,
+      `调试报告已生成：${bundle.htmlPath || bundle.markdownPath || "reports ready"}`
+    );
     this.emitRunStatus(location.session.sessionId, location.run.runId, "completed", "finalize");
     this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, location.run.runId));
   }
@@ -7797,6 +7957,11 @@ class DebugWorkflowService {
         htmlPath: bundle.htmlPath
       }
     }));
+    await this.appendAssistantConversationMessage(
+      location.session.sessionId,
+      location.run.runId,
+      `调试报告已生成：${bundle.htmlPath || bundle.markdownPath || "reports ready"}`
+    );
     this.emitRunStatus(location.session.sessionId, location.run.runId, "completed", "finalize");
     this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, location.run.runId));
   }
@@ -8059,6 +8224,18 @@ class DebugWorkflowService {
       }
     }
   }
+  async appendAssistantConversationMessage(sessionId, runId, content) {
+    storageAdapter.appendConversationMessage(sessionId, {
+      id: generateEventId("msga"),
+      sessionId,
+      projectId: this.findRun(runId || "")?.session.projectId ?? null,
+      runId,
+      role: "assistant",
+      agentId: "rdc-debugger",
+      content,
+      createdAt: nowMs()
+    });
+  }
   findRun(runId) {
     const projects = storageAdapter.listProjects();
     for (const project of projects) {
@@ -8098,6 +8275,361 @@ class DebugWorkflowService {
   }
 }
 const debugWorkflowService = new DebugWorkflowService();
+const EXECUTE_PATTERN = /开始|启动|执行|正式分析|直接分析|现在分析|run\b|start\b|debug\b|analy[sz]e\b|帮我调试|请调试|开始调试|开始分析/i;
+const TASK_FILE_PATTERN = /([A-Za-z]:[\\/][^\r\n"]+\.(txt|md))/i;
+function trimPathLabel(value) {
+  const normalized = value.replace(/\\/g, "/");
+  const parts = normalized.split("/");
+  return parts[parts.length - 1] || value;
+}
+function makeConversationMessage(role, content, options) {
+  return {
+    id: generateEventId(role === "user" ? "msgu" : role === "assistant" ? "msga" : "msgs"),
+    sessionId: options.sessionId ?? null,
+    projectId: options.projectId ?? null,
+    runId: options.runId ?? null,
+    role,
+    agentId: options.agentId,
+    content,
+    createdAt: nowMs()
+  };
+}
+function stripControlBlock(text) {
+  return text.replace(/<control>\s*[\s\S]*?<\/control>/i, "").trim();
+}
+function parseControlBlock(text) {
+  const match = text.match(/<control>\s*([\s\S]*?)\s*<\/control>/i);
+  if (!match?.[1]) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(match[1]);
+    const intent = parsed.intent;
+    if (intent !== "talk" && intent !== "intake" && intent !== "execute") {
+      return null;
+    }
+    return {
+      intent,
+      safe_to_start: parsed.safe_to_start === true,
+      needs_project: parsed.needs_project === true,
+      needs_capture: parsed.needs_capture === true,
+      needs_target_capture: parsed.needs_target_capture === true,
+      needs_route: parsed.needs_route === true,
+      reason: typeof parsed.reason === "string" ? parsed.reason : void 0
+    };
+  } catch {
+    return null;
+  }
+}
+function buildCoworkPrompt(context, history, message) {
+  const resolvedTaskFile = resolveTaskFileContext(message);
+  const recentHistory = history.slice(-6).map((entry) => ({
+    role: entry.role,
+    content: entry.content
+  }));
+  return JSON.stringify({
+    user_message: message,
+    effective_user_message: resolvedTaskFile.effectiveMessage,
+    task_file_path: resolvedTaskFile.taskFilePath,
+    task_file_content: resolvedTaskFile.taskFileContent,
+    current_project_id: context.projectId,
+    current_session_id: context.session?.sessionId ?? null,
+    active_run_id: context.currentRun?.runId ?? null,
+    opened_capture: context.openedCapturePath,
+    project_inputs: context.projectInputs.slice(0, 8).map((entry) => entry.fileName),
+    recent_history: recentHistory
+  }, null, 2);
+}
+function resolveTaskFileContext(message) {
+  const match = message.match(TASK_FILE_PATTERN);
+  const taskFilePath = match?.[1] ? path.resolve(match[1]) : null;
+  if (!taskFilePath || !fs.existsSync(taskFilePath) || !fs.statSync(taskFilePath).isFile()) {
+    return {
+      taskFilePath: null,
+      taskFileContent: null,
+      effectiveMessage: message
+    };
+  }
+  const taskFileContent = fs.readFileSync(taskFilePath, "utf-8").trim();
+  return {
+    taskFilePath,
+    taskFileContent,
+    effectiveMessage: [message, taskFileContent].filter(Boolean).join("\n\n")
+  };
+}
+function buildCoworkSystemPrompt() {
+  return [
+    "你是 RDC Debugger，一个面向 RenderDoc 调试场景的 Cowork Agent。",
+    "要求：",
+    "1. 始终先用自然中文正常回答用户，不要像审批流或工单流。",
+    "2. 如果用户问通用知识、产品能力、技术概念，直接回答，不要强行往调试执行上拐。",
+    "3. 没有正式进入调试 run 前，不要假装自己已经分析过 capture。",
+    "4. 只有当用户明确表达“现在开始正式调试/执行分析”，并且条件足够时，才把 intent 标成 execute。",
+    "5. 回复正文结束后，必须额外附加一个 <control>{...}</control> 块，且 control JSON 只能包含字段：intent, safe_to_start, needs_project, needs_capture, needs_target_capture, needs_route, reason。",
+    "6. 如果你不确定，就把 intent 设为 talk 或 intake，safe_to_start 设为 false。",
+    "7. 控制块不要在正文里解释给用户。"
+  ].join("\n");
+}
+function hasUsableDebuggerRoute() {
+  const settings = settingsService.getAll();
+  const route = settings.llm.agentRoutes.find((entry) => entry.agentId === "rdc-debugger");
+  if (!route?.providerId || !route.modelId) {
+    return false;
+  }
+  const provider = settings.llm.providers.find((entry) => entry.id === route.providerId);
+  if (!provider || !provider.enabled) {
+    return false;
+  }
+  return provider.models.some((entry) => entry.id === route.modelId && entry.enabled);
+}
+function inferExplicitCapture(message, projectInputs) {
+  return projectInputs.find((entry) => message.includes(entry.fileName)) ?? null;
+}
+function resolveCaptureGuards(message, context) {
+  const explicitCapture = inferExplicitCapture(message, context.projectInputs);
+  if (context.openedCapturePath || explicitCapture) {
+    return { ready: true };
+  }
+  if (context.projectInputs.length === 0) {
+    return {
+      ready: false,
+      needsCapture: true,
+      reason: "我可以先帮你梳理问题，但正式分析需要一个 .rdc capture。你可以先描述现象，或直接打开一个 capture。"
+    };
+  }
+  if (context.projectInputs.length > 1) {
+    const captureLabels = context.projectInputs.slice(0, 3).map((entry) => trimPathLabel(entry.fileName));
+    return {
+      ready: false,
+      needsTargetCapture: true,
+      reason: `我看到项目里有多个 capture：${captureLabels.join("、")}。你先告诉我这次要看哪一个，我再进入正式分析。`
+    };
+  }
+  return { ready: true };
+}
+function createFallbackAssistantReply(message, context) {
+  if (!context.projectId && EXECUTE_PATTERN.test(message)) {
+    return "我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。";
+  }
+  if (!hasUsableDebuggerRoute()) {
+    if (/你好|您好|hello|hi/i.test(message)) {
+      return "你好，我是 RDC Debugger。当前核心模型链路还没准备好，所以我暂时只能做基础接待；等你配置好 `rdc-debugger` 的 provider / model route 后，我再继续正常协作。";
+    }
+    if (EXECUTE_PATTERN.test(message)) {
+      return "当前调试链路还没绑定可用模型，所以我不能开始正式执行；不过我可以先帮你确认问题范围和所需 capture。";
+    }
+    return "我现在拿不到核心模型回复，所以没法像正常 Cowork Agent 一样继续对话。你先检查 `rdc-debugger` 的 provider / model route。";
+  }
+  return "我刚才没能稳定产出这轮对话回复。你可以重试一次；如果问题持续，优先检查当前 `rdc-debugger` 的模型链路。";
+}
+function buildWorkflowUpgradeReply(result) {
+  if (!result.success) {
+    return result.error ? `我刚才尝试进入正式调试，但没有成功：${result.error}` : "我刚才尝试进入正式调试，但没有成功。";
+  }
+  if (result.debugPlanSummary?.blockers?.length) {
+    const blocker = result.debugPlanSummary.blockers[0];
+    if (blocker?.code === "BLOCKED_LLM_ROUTE_MISSING" || blocker?.code === "BLOCKED_LLM_PROVIDER_MISSING" || blocker?.code === "BLOCKED_LLM_SECRET_MISSING" || blocker?.code === "BLOCKED_LLM_MODEL_MISSING" || blocker?.code === "BLOCKED_LLM_PROVIDER_UNAVAILABLE") {
+      return "当前调试链路还没绑定可用模型，所以我不能开始正式执行；不过我可以先帮你确认问题范围和所需 capture。";
+    }
+    if (blocker?.code === "BLOCKED_MISSING_CAPTURE") {
+      return "我可以先帮你梳理问题，但正式分析需要一个 .rdc capture。你可以先描述现象，或直接打开一个 capture。";
+    }
+    return blocker?.reason || "当前还不能进入正式调试。";
+  }
+  if (result.pendingQuestions?.questions.some((question) => question.id === "target_capture")) {
+    return "我已经开始整理正式执行计划了，不过当前还需要你明确这次要分析的 capture。";
+  }
+  if (result.status === "awaiting_approval") {
+    return "我已经整理好正式执行计划了。你先确认下方计划卡片，批准后我再进入严格调试流程。";
+  }
+  return "我已经开始正式调试。接下来会按严格证据链推进分析。";
+}
+class ConversationService {
+  async getHistory(sessionId) {
+    return storageAdapter.readConversationHistory(sessionId);
+  }
+  async sendMessage(input) {
+    const context = await this.resolveContext(input);
+    const userMessage = makeConversationMessage("user", input.message.trim(), {
+      sessionId: context.session?.sessionId ?? null,
+      projectId: context.projectId,
+      runId: context.currentRun?.runId ?? null
+    });
+    if (context.session) {
+      storageAdapter.appendConversationMessage(context.session.sessionId, userMessage);
+    }
+    if (context.currentRun && ["planning", "awaiting_input", "awaiting_approval", "queued", "running", "stopping"].includes(context.currentRun.status)) {
+      return this.handleActiveDebugTurn(context, userMessage);
+    }
+    return this.handleCoworkTurn(context, userMessage, input.message.trim());
+  }
+  async resolveContext(input) {
+    const projectId = input.projectId ?? input.fallbackProjectId ?? storageAdapter.getCurrentProjectId() ?? null;
+    const persistedSessionId = await storageAdapter.getCurrentSessionId();
+    const resolvedSessionId = input.sessionId ?? input.fallbackSessionId ?? persistedSessionId ?? null;
+    const session = resolvedSessionId ? storageAdapter.readSession(resolvedSessionId) : null;
+    const currentRun = resolvedSessionId ? storageAdapter.listRuns(resolvedSessionId).find((entry) => entry.runId === (input.currentRunId ?? input.fallbackRunId)) ?? storageAdapter.getLatestRun(resolvedSessionId) : null;
+    const projectInputs = projectId ? storageAdapter.listProjectInputs(projectId) : [];
+    const openedCapture = rdxSessionService.snapshotOpenedCapture();
+    const replayDevice = replayDeviceService.getDeviceById(input.replayDeviceId || "local") ?? replayDeviceService.getDeviceById("local");
+    return {
+      projectId,
+      session,
+      currentRun,
+      projectInputs,
+      openedCapturePath: openedCapture?.filePath ?? null,
+      replayDevice
+    };
+  }
+  async handleActiveDebugTurn(context, userMessage) {
+    let assistantContent;
+    try {
+      assistantContent = await agentOrchestrator.sendMessage("rdc-debugger", userMessage.content, {
+        caseId: context.session?.sessionId,
+        runId: context.currentRun?.runId,
+        sessionId: context.session?.sessionId
+      });
+    } catch (error) {
+      assistantContent = error instanceof Error ? `我刚才处理这条消息时失败了：${error.message}` : "我刚才处理这条消息时失败了。";
+    }
+    const assistantMessage = makeConversationMessage("assistant", assistantContent, {
+      sessionId: context.session?.sessionId ?? null,
+      projectId: context.projectId,
+      runId: context.currentRun?.runId ?? null,
+      agentId: "rdc-debugger"
+    });
+    if (context.session) {
+      storageAdapter.appendConversationMessage(context.session.sessionId, assistantMessage);
+    }
+    return {
+      session: context.session,
+      mode: "active_debug",
+      userMessage,
+      assistantMessage,
+      executionTransition: { action: "none" },
+      runUpdate: context.currentRun
+    };
+  }
+  async handleCoworkTurn(context, userMessage, rawMessage) {
+    const taskFileContext = resolveTaskFileContext(rawMessage);
+    const effectiveMessage = taskFileContext.effectiveMessage;
+    let workingSession = context.session;
+    if (!workingSession && context.projectId) {
+      workingSession = storageAdapter.createSession(context.projectId, rawMessage.slice(0, 80));
+      storageAdapter.appendConversationMessage(workingSession.sessionId, userMessage);
+      userMessage.sessionId = workingSession.sessionId;
+    }
+    const history = workingSession ? storageAdapter.readConversationHistory(workingSession.sessionId) : [];
+    let assistantContent = "";
+    let control = null;
+    let errorViewModel = null;
+    try {
+      const response = await agentOrchestrator.sendCoworkMessage(
+        "rdc-debugger",
+        buildCoworkPrompt({
+          ...context,
+          session: workingSession
+        }, history, rawMessage),
+        {
+          sessionId: workingSession?.sessionId,
+          systemPrompt: buildCoworkSystemPrompt(),
+          maxTokens: 1200,
+          temperature: 0.35
+        }
+      );
+      assistantContent = stripControlBlock(response);
+      control = parseControlBlock(response);
+    } catch (error) {
+      assistantContent = createFallbackAssistantReply(effectiveMessage, {
+        ...context
+      });
+      errorViewModel = {
+        code: "CONVERSATION_LLM_UNAVAILABLE",
+        message: assistantContent,
+        technicalMessage: error instanceof Error ? error.message : String(error)
+      };
+    }
+    let mode = control?.intent === "intake" ? "intake" : "talk";
+    let executionTransition = { action: "none" };
+    let runUpdate = null;
+    let debugPlanSummary;
+    let pendingQuestions;
+    let uiHints = {};
+    if ((control?.intent === "execute" || EXECUTE_PATTERN.test(effectiveMessage)) && control?.safe_to_start) {
+      if (!context.projectId) {
+        mode = "intake";
+        assistantContent = "我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。";
+        uiHints.highlightProjectPicker = true;
+      } else {
+        const captureGuard = resolveCaptureGuards(effectiveMessage, {
+          ...context
+        });
+        if (!captureGuard.ready) {
+          mode = "intake";
+          assistantContent = captureGuard.reason || assistantContent;
+          uiHints.highlightCaptureLibrary = true;
+        } else {
+          const workflowResult = await debugWorkflowService.startPlan({
+            projectId: context.projectId,
+            sessionId: workingSession?.sessionId,
+            mode: "debugger",
+            goal: rawMessage,
+            replayDevice: context.replayDevice
+          });
+          mode = "execute_upgrade";
+          assistantContent = assistantContent ? `${assistantContent}
+
+${buildWorkflowUpgradeReply(workflowResult)}` : buildWorkflowUpgradeReply(workflowResult);
+          const hasBlockingPlanFailure = Boolean(workflowResult.debugPlanSummary?.blockers?.length);
+          debugPlanSummary = hasBlockingPlanFailure ? null : workflowResult.debugPlanSummary ?? null;
+          pendingQuestions = hasBlockingPlanFailure ? null : workflowResult.pendingQuestions ?? null;
+          uiHints.showPlanIntake = !hasBlockingPlanFailure && Boolean(debugPlanSummary || pendingQuestions);
+          executionTransition = workflowResult.success && workflowResult.runId && !hasBlockingPlanFailure ? {
+            action: "started_run",
+            runId: workflowResult.runId,
+            sessionId: workflowResult.sessionId
+          } : { action: "none" };
+          if (workflowResult.sessionId) {
+            runUpdate = hasBlockingPlanFailure ? null : storageAdapter.getLatestRun(workflowResult.sessionId);
+            if (!workingSession) {
+              workingSession = storageAdapter.readSession(workflowResult.sessionId);
+            }
+          }
+        }
+      }
+    } else if (control?.intent === "intake") {
+      mode = "intake";
+      uiHints.highlightCaptureLibrary = control.needs_capture || control.needs_target_capture;
+      uiHints.highlightProjectPicker = control.needs_project;
+      uiHints.highlightSettingsRoute = control.needs_route;
+    }
+    const assistantMessage = makeConversationMessage("assistant", assistantContent, {
+      sessionId: workingSession?.sessionId ?? null,
+      projectId: context.projectId,
+      runId: runUpdate?.runId ?? null,
+      agentId: "rdc-debugger"
+    });
+    if (workingSession) {
+      storageAdapter.appendConversationMessage(workingSession.sessionId, assistantMessage);
+    }
+    return {
+      session: workingSession,
+      mode,
+      userMessage: {
+        ...userMessage,
+        sessionId: workingSession?.sessionId ?? userMessage.sessionId
+      },
+      assistantMessage,
+      executionTransition,
+      runUpdate,
+      debugPlanSummary,
+      pendingQuestions,
+      uiHints,
+      errorViewModel
+    };
+  }
+}
+const conversationService = new ConversationService();
 function createStageTransitionEvidence(state, newStage, agentId = "rdc-debugger") {
   return {
     eventId: crypto.randomUUID(),
@@ -10622,6 +11154,33 @@ function registerIPCHandlers() {
   electron.ipcMain.handle("app:copyText", async (_event, text) => {
     electron.clipboard.writeText(text ?? "");
     return { success: true };
+  });
+  electron.ipcMain.handle("conversation:sendMessage", async (_event, request) => {
+    const result = await conversationService.sendMessage({
+      ...request,
+      fallbackProjectId: currentProjectId,
+      fallbackSessionId: currentSessionId,
+      fallbackRunId: currentRunId
+    });
+    if (result.session?.projectId) {
+      currentProjectId = result.session.projectId;
+    }
+    if (result.session?.sessionId) {
+      currentSessionId = result.session.sessionId;
+      await storageAdapter.setCurrentSessionId(result.session.sessionId);
+    }
+    if (result.runUpdate?.runId) {
+      currentRunId = result.runUpdate.runId;
+    }
+    return result;
+  });
+  electron.ipcMain.handle("conversation:getHistory", async (_event, sessionId) => {
+    if (!sessionId) {
+      return { messages: [] };
+    }
+    return {
+      messages: await conversationService.getHistory(sessionId)
+    };
   });
   electron.ipcMain.handle("workflow:getState", async () => {
     if (!currentSessionId) {

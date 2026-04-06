@@ -10,7 +10,7 @@ import { settingsService } from './SettingsService';
 import { runtimeLogService } from './RuntimeLogService';
 import { storageAdapter } from './StorageAdapter';
 
-export type LlmAuditStage = WorkflowStage | 'plan' | 'skeptic' | 'curate' | 'report' | 'dispatch';
+export type LlmAuditStage = WorkflowStage | 'plan' | 'skeptic' | 'curate' | 'report' | 'dispatch' | 'cowork';
 
 export interface ResolvedDebuggerRoute {
   agentId: AgentRole;
@@ -204,6 +204,21 @@ function shouldRetryStructuredLlmError(error: unknown): boolean {
   return /LLM response was empty|did not contain valid JSON|Unexpected non-whitespace character after JSON|OpenRouter API error: 5\d\d|timed out|timeout/i.test(message);
 }
 
+function shouldUseNativeJsonObject(route: ResolvedDebuggerRoute): boolean {
+  const providerKind = route.provider.kind;
+  const modelId = route.modelId.toLowerCase();
+
+  if (providerKind === 'anthropic') {
+    return false;
+  }
+
+  if (/moonshot|kimi/.test(modelId)) {
+    return false;
+  }
+
+  return true;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -381,6 +396,7 @@ export class DebuggerLlmService {
     const settings = settingsService.getAll();
     const route = this.resolveRoute(input.agentId, input.stage, settings);
     llmAdapter.configure(settingsService.getLlmConfig());
+    const useNativeJsonObject = shouldUseNativeJsonObject(route);
 
     let lastError: unknown;
     for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -390,7 +406,7 @@ export class DebuggerLlmService {
           model: route.modelId,
           maxTokens: input.maxTokens,
           temperature: input.temperature,
-          responseFormat: 'json_object',
+          responseFormat: useNativeJsonObject ? 'json_object' : undefined,
         }, route.providerId);
         const text = extractTextContent(response.content);
         const data = input.parse(text);
