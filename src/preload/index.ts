@@ -4,6 +4,7 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import type { ConversationMessage, ConversationSendRequest, ConversationTurnResult } from '@shared/types/conversation';
+import type { ElectronAPI } from '@shared/types/electron';
 import type { AppSettings, AppSettingsPatch } from '@shared/types/settings';
 import type { OpenedCaptureState, ProjectInputRecord, ProjectRecord, SessionRecord } from '@shared/types/session';
 import type { RuntimeLogEntry, RuntimeLogScope } from '@shared/types/runtimeLog';
@@ -233,8 +234,6 @@ const electronAPI = {
       listenerMap.get(channel)?.delete(callback);
     }
   },
-};
+} as ElectronAPI;
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
-
-export type ElectronAPI = typeof electronAPI;
