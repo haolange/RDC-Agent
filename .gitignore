@@ -1,25 +1,30 @@
-intermediate/**
-!intermediate/**/.gitkeep
-
 # Node / Electron dependencies and build outputs
 node_modules/
 out/
 dist/
 release/
+.eslintcache
 .vite/
 .electron-vite/
 *.tsbuildinfo
+*.log
+*.tmp
+*.temp
+*.bak
+*.orig
 
 # Packaging and local cache artifacts
 .cache/
 .turbo/
 coverage/
+build/
 
 # Local tool / IDE metadata
 .codex/
 .qoder/
 .idea/
 .vscode/
+.vs/
 
 # Python local environment
 .venv
@@ -32,3 +37,20 @@ __pycache__
 e2e/fixtures/*.rdc
 test-results/
 playwright-report/
+
+# Runtime workspace and local app data
+workspace/
+logs/
+settings.json
+migration-orphans/
+migration-reports/
+profiles/
+policies/
+secrets/
+projects/
+knowledge/
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
