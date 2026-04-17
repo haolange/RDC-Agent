@@ -1515,11 +1515,13 @@ export class DebugWorkflowService {
     runId: string | null,
     content: string,
   ): Promise<void> {
+    const runLocation = this.findRun(runId || '');
     storageAdapter.appendConversationMessage(sessionId, {
       id: generateEventId('msga'),
       sessionId,
-      projectId: this.findRun(runId || '')?.session.projectId ?? null,
+      projectId: runLocation?.session.projectId ?? null,
       runId,
+      modeContext: runLocation?.run.mode ?? 'debugger',
       role: 'assistant',
       agentId: 'rdc-debugger',
       content,

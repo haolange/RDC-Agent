@@ -2,517 +2,338 @@ import { useMemo } from 'react';
 import type { AppLanguage } from '@shared/types/settings';
 import { useAppSettingsStore } from './stores/appSettingsStore';
 
-export type TranslationKey =
-  | 'app.connected'
-  | 'app.degraded'
-  | 'app.offline'
-  | 'app.inputPlaceholder'
-  | 'app.notice.filesReceived'
-  | 'app.notice.newWorkspace'
-  | 'mode.debugger'
-  | 'mode.analyzer'
-  | 'mode.optimizer'
-  | 'sidebar.newTask'
-  | 'sidebar.sessionHistory'
-  | 'sidebar.history'
-  | 'sidebar.refresh'
-  | 'sidebar.noRuns'
-  | 'sidebar.noRunsHint'
-  | 'sidebar.projects'
-  | 'sidebar.addProject'
-  | 'sidebar.removeProject'
-  | 'sidebar.noProjects'
-  | 'sidebar.noProjectsHint'
-  | 'sidebar.sessions'
-  | 'sidebar.addSession'
-  | 'sidebar.removeSession'
-  | 'sidebar.renameSession'
-  | 'sidebar.renameSessionTitle'
-  | 'sidebar.cancel'
-  | 'sidebar.save'
-  | 'sidebar.noSessions'
-  | 'sidebar.noSessionsHint'
-  | 'sidebar.projectRequired'
-  | 'sidebar.userName'
-  | 'sidebar.userSubtitle'
-  | 'sidebar.userSettings'
-  | 'userMenu.language'
-  | 'userMenu.theme'
-  | 'userMenu.fontScale'
-  | 'userMenu.settings'
-  | 'theme.dark'
-  | 'theme.light'
-  | 'theme.system'
-  | 'font.small'
-  | 'font.medium'
-  | 'font.large'
-  | 'settings.title'
-  | 'settings.account'
-  | 'settings.general'
-  | 'settings.workspace'
-  | 'settings.models'
-  | 'settings.agents'
-  | 'settings.accountTitle'
-  | 'settings.accountSubtitle'
-  | 'settings.avatar'
-  | 'settings.avatarHint'
-  | 'settings.uploadAvatar'
-  | 'settings.nickname'
-  | 'settings.save'
-  | 'settings.generalTitle'
-  | 'settings.generalSubtitle'
-  | 'settings.workspaceTitle'
-  | 'settings.workspaceSubtitle'
-  | 'settings.workspaceRoot'
-  | 'settings.workspaceRootHint'
-  | 'settings.chooseDirectory'
-  | 'settings.resetWorkspace'
-  | 'settings.settingsFile'
-  | 'settings.logFile'
-  | 'settings.projectsPath'
-  | 'settings.knowledgePath'
-  | 'settings.reveal'
-  | 'settings.copy'
-  | 'settings.modelsTitle'
-  | 'settings.modelsSubtitle'
-  | 'settings.modelSettings'
-  | 'settings.agentsSubtitle'
-  | 'settings.agentsHint'
-  | 'settings.provider'
-  | 'settings.providerFieldLabel'
-  | 'settings.providerKind'
-  | 'settings.providerConfigured'
-  | 'settings.providerUnconfigured'
-  | 'settings.apiKeyList'
-  | 'settings.add'
-  | 'settings.addProvider'
-  | 'settings.unsaved'
-  | 'settings.emptyCredentials'
-  | 'settings.label'
-  | 'settings.apiKey'
-  | 'settings.getApiKey'
-  | 'settings.showSecret'
-  | 'settings.hideSecret'
-  | 'settings.baseUrl'
-  | 'settings.modelsEnabled'
-  | 'settings.addModel'
-  | 'settings.addModelPlaceholder'
-  | 'settings.recommendedModels'
-  | 'settings.unnamedProvider'
-  | 'settings.emptyProvidersTitle'
-  | 'settings.emptyProvidersHint'
-  | 'settings.agentRouting'
-  | 'settings.modelFieldLabel'
-  | 'settings.invalidRoute'
-  | 'settings.noModelsAvailable'
-  | 'settings.noConfiguredProviders'
-  | 'settings.selectProviderPlaceholder'
-  | 'settings.selectProviderFirst'
-  | 'settings.edit'
-  | 'settings.routeReasonNoProvider'
-  | 'settings.routeReasonProviderUnavailable'
-  | 'settings.routeReasonNoModels'
-  | 'settings.routeReasonModelInvalid'
-  | 'settings.saveAgentRouting'
-  | 'settings.delete'
-  | 'settings.discard'
-  | 'settings.noSelection'
-  | 'control.taskMonitor'
-  | 'control.captureLibrary'
-  | 'control.openedCapture'
-  | 'control.runtimeContext'
-  | 'control.captureSwitchLocked'
-  | 'control.captureLibraryProjectHint'
-  | 'control.captureLibraryEmpty'
-  | 'control.captureLibraryRefresh'
-  | 'control.captureLibraryRefreshing'
-  | 'control.captureLibraryImport'
-  | 'control.captureLibraryImporting'
-  | 'control.captureLibraryOpenedBadge'
-  | 'control.captureOpen'
-  | 'control.captureOpening'
-  | 'control.openedCaptureFile'
-  | 'control.openedCaptureSourceInput'
-  | 'control.openedCaptureStatus'
-  | 'control.openedCaptureOpenedAt'
-  | 'control.openedCaptureEmpty'
-  | 'control.openedCaptureEmptyHint'
-  | 'control.openedCaptureClear'
-  | 'control.runtimeContextEmpty'
-  | 'control.runtimeRefresh'
-  | 'control.copyContextId'
-  | 'control.previewWindow'
-  | 'control.previewEmpty'
-  | 'control.previewEmptyHint'
-  | 'control.previewLoading'
-  | 'control.previewFallback'
-  | 'control.previewNoImage'
-  | 'control.previewSourceFramebuffer'
-  | 'control.previewSourceThumbnail'
-  | 'control.previewResolution'
-  | 'terminal.title'
-  | 'terminal.open'
-  | 'terminal.close'
-  | 'terminal.scope'
-  | 'terminal.scopeApp'
-  | 'terminal.scopeSession'
-  | 'terminal.namespace'
-  | 'terminal.namespaceAll'
-  | 'terminal.namespaceSystem'
-  | 'terminal.namespaceAgent'
-  | 'terminal.namespaceTool'
-  | 'terminal.namespaceDevice'
-  | 'terminal.namespaceCapture'
-  | 'terminal.detail'
-  | 'terminal.detailSummary'
-  | 'terminal.detailVerbose'
-  | 'terminal.detailRaw'
-  | 'terminal.loading'
-  | 'terminal.emptyApp'
-  | 'terminal.emptySession'
-  | 'terminal.emptySessionHint';
+const englishTranslations = {
+  'app.connected': 'Connected',
+  'app.degraded': 'Degraded',
+  'app.offline': 'Offline',
+  'app.inputPlaceholder': 'Describe a task, invoke skills and tools',
+  'app.notice.filesReceived': 'Received {count} files. Confirm them in the Debugger page.',
+  'app.notice.newWorkspace': 'Created a new debug workspace.',
+  'mode.debugger': 'Debugger',
+  'mode.analyzer': 'Analyzer',
+  'mode.optimizer': 'Optimizer',
+  'sidebar.newTask': 'New Task',
+  'sidebar.sessionHistory': 'Session History',
+  'sidebar.history': 'History',
+  'sidebar.refresh': 'Refresh',
+  'sidebar.noRuns': 'No runs yet',
+  'sidebar.noRunsHint': 'Completed debug sessions will appear here.',
+  'sidebar.projects': 'Projects',
+  'sidebar.addProject': 'Add Project',
+  'sidebar.removeProject': 'Remove Project',
+  'sidebar.noProjects': 'No projects yet',
+  'sidebar.noProjectsHint': 'Add a local project directory to begin.',
+  'sidebar.sessions': 'Threads',
+  'sidebar.addSession': 'New Session',
+  'sidebar.removeSession': 'Remove Session',
+  'sidebar.renameSession': 'Rename Session',
+  'sidebar.renameSessionTitle': 'Rename Session',
+  'sidebar.cancel': 'Cancel',
+  'sidebar.save': 'Save',
+  'sidebar.noSessions': 'No sessions yet',
+  'sidebar.noSessionsHint': 'Create one or start a debug run to generate it.',
+  'sidebar.projectRequired': 'Add and select a project first',
+  'sidebar.userName': 'RDC Operator',
+  'sidebar.userSubtitle': 'Desktop config',
+  'sidebar.userSettings': 'User settings',
+  'userMenu.language': 'Language',
+  'userMenu.theme': 'Theme',
+  'userMenu.fontScale': 'Font Size',
+  'userMenu.settings': 'Settings Center',
+  'theme.dark': 'Dark',
+  'theme.light': 'Light',
+  'theme.system': 'System',
+  'font.small': 'Small',
+  'font.medium': 'Medium',
+  'font.large': 'Large',
+  'settings.title': 'Settings',
+  'settings.account': 'Account',
+  'settings.general': 'General',
+  'settings.workspace': 'Workspace',
+  'settings.models': 'Models',
+  'settings.agents': 'Agents',
+  'settings.accountTitle': 'Account',
+  'settings.accountSubtitle': 'Manage local profile information.',
+  'settings.avatar': 'Avatar',
+  'settings.avatarHint': 'Upload a local avatar image. A square image works best.',
+  'settings.uploadAvatar': 'Upload Avatar',
+  'settings.nickname': 'Nickname',
+  'settings.save': 'Save',
+  'settings.generalTitle': 'General',
+  'settings.generalSubtitle': 'Configure theme, language, and interface sizing.',
+  'settings.workspaceTitle': 'Workspace',
+  'settings.workspaceSubtitle': 'Set the single workspace root and review all derived runtime paths.',
+  'settings.workspaceRoot': 'Workspace Root',
+  'settings.workspaceRootHint': 'Runtime data, settings.json, and logs are all derived from this directory.',
+  'settings.chooseDirectory': 'Choose Directory',
+  'settings.resetWorkspace': 'Reset Default',
+  'settings.settingsFile': 'settings.json',
+  'settings.logFile': 'Log File',
+  'settings.projectsPath': 'Projects',
+  'settings.knowledgePath': 'Knowledge',
+  'settings.reveal': 'Reveal',
+  'settings.copy': 'Copy Path',
+  'settings.modelsTitle': 'Models',
+  'settings.modelsSubtitle': 'Manage LLM providers and enabled models.',
+  'settings.modelSettings': 'Provider Setup',
+  'settings.agentsSubtitle': 'Configure provider/model routing for each agent separately.',
+  'settings.agentsHint': 'Each agent chooses a provider first, then a concrete model under that provider.',
+  'settings.provider': 'Provider',
+  'settings.providerFieldLabel': 'Provider',
+  'settings.providerKind': 'Transport Kind',
+  'settings.providerConfigured': 'Configured',
+  'settings.providerUnconfigured': 'Unconfigured',
+  'settings.apiKeyList': 'API Key List',
+  'settings.add': 'Add',
+  'settings.addProvider': 'Add Provider',
+  'settings.unsaved': 'Unsaved',
+  'settings.emptyCredentials': 'No credentials for this provider yet. Add one to start.',
+  'settings.label': 'Label',
+  'settings.apiKey': 'API Key',
+  'settings.getApiKey': 'Get API Key',
+  'settings.showSecret': 'Show secret',
+  'settings.hideSecret': 'Hide secret',
+  'settings.baseUrl': 'API Base URL',
+  'settings.modelsEnabled': 'Models',
+  'settings.addModel': 'Add Model',
+  'settings.addModelPlaceholder': 'Enter model id',
+  'settings.recommendedModels': 'Recommended Models',
+  'settings.unnamedProvider': 'Unnamed Provider',
+  'settings.emptyProvidersTitle': 'No providers yet',
+  'settings.emptyProvidersHint': 'Create a custom provider first, then fill in its API key, base URL, and model list.',
+  'settings.agentRouting': 'Agent Model Routing',
+  'settings.modelFieldLabel': 'Model',
+  'settings.invalidRoute': 'Invalid',
+  'settings.noModelsAvailable': 'No enabled models',
+  'settings.noConfiguredProviders': 'Create and save a usable provider in the Models page first',
+  'settings.selectProviderPlaceholder': 'Select a provider',
+  'settings.selectProviderFirst': 'Select a provider first',
+  'settings.edit': 'Edit',
+  'settings.routeReasonNoProvider': 'No provider selected',
+  'settings.routeReasonProviderUnavailable': 'Selected provider is unavailable',
+  'settings.routeReasonNoModels': 'Selected provider has no enabled models',
+  'settings.routeReasonModelInvalid': 'Selected model is no longer available',
+  'settings.saveAgentRouting': 'Save Agent Routing',
+  'settings.delete': 'Delete',
+  'settings.discard': 'Discard',
+  'settings.noSelection': 'Select an entry or create a new one.',
+  'control.taskMonitor': 'Task Monitor',
+  'control.captureLibrary': 'Capture Library',
+  'control.openedCapture': 'Opened Capture',
+  'control.runtimeContext': 'Runtime Context',
+  'control.captureSwitchLocked': 'Active runs cannot switch or clear the current `.rdc`. Finish or restart the current debug task first.',
+  'control.captureLibraryProjectHint': 'Select a project to browse the Capture Library.',
+  'control.captureLibraryEmpty': 'No `.rdc` files were found under <project-root>/.resource/inputs yet.',
+  'control.captureLibraryRefresh': 'Refresh',
+  'control.captureLibraryRefreshing': 'Refreshing...',
+  'control.captureLibraryImport': 'Import .rdc',
+  'control.captureLibraryImporting': 'Importing...',
+  'control.captureLibraryOpenedBadge': 'Opened',
+  'control.captureOpen': 'Open',
+  'control.captureOpening': 'Opening...',
+  'control.openedCaptureFile': 'Capture',
+  'control.openedCaptureSourceInput': 'Input ID',
+  'control.openedCaptureStatus': 'Status',
+  'control.openedCaptureOpenedAt': 'Opened At',
+  'control.openedCaptureEmpty': 'No Capture Opened',
+  'control.openedCaptureEmptyHint': 'Open a `.rdc` from Capture Library to inspect its current opened state and preview here.',
+  'control.openedCaptureClear': 'Clear Open',
+  'control.runtimeContextEmpty': 'No active runtime context',
+  'control.runtimeRefresh': 'Refresh',
+  'control.copyContextId': 'Copy Context ID',
+  'control.previewWindow': 'Capture Preview',
+  'control.previewEmpty': 'No content',
+  'control.previewEmptyHint': 'Open a `.rdc` capture to show the current render preview here.',
+  'control.previewLoading': 'Generating preview...',
+  'control.previewFallback': 'Fallback preview',
+  'control.previewNoImage': 'No preview image is available for the current capture.',
+  'control.previewSourceFramebuffer': 'Final Framebuffer',
+  'control.previewSourceThumbnail': 'Capture Thumbnail',
+  'control.previewResolution': 'Resolution',
+  'terminal.title': 'Runtime Terminal',
+  'terminal.open': 'Open Terminal',
+  'terminal.close': 'Close Terminal',
+  'terminal.scope': 'Scope',
+  'terminal.scopeApp': 'App Runtime',
+  'terminal.scopeSession': 'Current Session',
+  'terminal.namespace': 'Namespace',
+  'terminal.namespaceAll': 'All',
+  'terminal.namespaceSystem': 'System',
+  'terminal.namespaceAgent': 'Agent',
+  'terminal.namespaceTool': 'Tool',
+  'terminal.namespaceDevice': 'Device',
+  'terminal.namespaceCapture': 'Capture',
+  'terminal.detail': 'Detail',
+  'terminal.detailSummary': 'Summary',
+  'terminal.detailVerbose': 'Verbose',
+  'terminal.detailRaw': 'Raw',
+  'terminal.loading': 'Loading runtime logs...',
+  'terminal.emptyApp': 'No application runtime logs are available yet.',
+  'terminal.emptySession': 'No logs are available for the current session yet.',
+  'terminal.emptySessionHint': 'Switch to App Runtime to inspect device, tool, and system activity.',
+} satisfies Record<string, string>;
+
+export type TranslationKey = keyof typeof englishTranslations;
+
+const zhCnOverrides: Partial<Record<TranslationKey, string>> = {
+  'app.connected': '已连接',
+  'app.degraded': '连接降级',
+  'app.offline': '离线',
+  'app.inputPlaceholder': '描述任务，调用技能与工具',
+  'app.notice.filesReceived': '已接收 {count} 个文件，请在 Debugger 页面确认。',
+  'app.notice.newWorkspace': '已创建新的调试工作区。',
+  'sidebar.newTask': '新任务',
+  'sidebar.sessionHistory': '会话历史',
+  'sidebar.history': '历史记录',
+  'sidebar.refresh': '刷新',
+  'sidebar.noRuns': '暂无运行记录',
+  'sidebar.noRunsHint': '完成的调试会话会显示在这里。',
+  'sidebar.projects': '项目',
+  'sidebar.addProject': '添加项目',
+  'sidebar.removeProject': '移除项目',
+  'sidebar.noProjects': '暂无项目',
+  'sidebar.noProjectsHint': '添加本地项目目录后即可开始。',
+  'sidebar.sessions': '线程',
+  'sidebar.addSession': '新建会话',
+  'sidebar.removeSession': '删除会话',
+  'sidebar.renameSession': '重命名会话',
+  'sidebar.renameSessionTitle': '重命名会话',
+  'sidebar.cancel': '取消',
+  'sidebar.save': '保存',
+  'sidebar.noSessions': '暂无会话',
+  'sidebar.noSessionsHint': '先创建一个会话，或直接开始一次调试。',
+  'sidebar.projectRequired': '请先添加并选择一个项目',
+  'sidebar.userSettings': '用户设置',
+  'userMenu.language': '语言',
+  'userMenu.theme': '主题',
+  'userMenu.fontScale': '字体大小',
+  'userMenu.settings': '设置中心',
+  'settings.title': '设置',
+  'settings.account': '账户',
+  'settings.general': '通用',
+  'settings.workspace': '工作区',
+  'settings.models': '模型',
+  'settings.agents': 'Agents',
+  'settings.accountTitle': '账户',
+  'settings.accountSubtitle': '管理本地资料和显示名称。',
+  'settings.avatar': '头像',
+  'settings.avatarHint': '上传本地头像图片，建议使用方形图片。',
+  'settings.uploadAvatar': '上传头像',
+  'settings.nickname': '昵称',
+  'settings.save': '保存',
+  'settings.generalTitle': '通用',
+  'settings.generalSubtitle': '配置主题、语言和界面字号。',
+  'settings.workspaceTitle': '工作区',
+  'settings.workspaceSubtitle': '设置唯一工作目录，并查看其派生的数据路径。',
+  'settings.workspaceRoot': '工作目录',
+  'settings.workspaceRootHint': '运行数据、settings.json 和日志都从这个目录派生。',
+  'settings.chooseDirectory': '选择目录',
+  'settings.resetWorkspace': '恢复默认',
+  'settings.logFile': '日志文件',
+  'settings.projectsPath': '项目目录',
+  'settings.knowledgePath': '知识目录',
+  'settings.reveal': '打开位置',
+  'settings.copy': '复制路径',
+  'settings.modelsTitle': '模型',
+  'settings.modelsSubtitle': '管理 LLM Provider 与启用的模型。',
+  'settings.modelSettings': 'Provider 配置',
+  'settings.agentsSubtitle': '为每个 Agent 单独配置 Provider 与模型路由。',
+  'settings.agentsHint': '每个 Agent 先选择 Provider，再选择该 Provider 下的具体模型。',
+  'settings.provider': 'Provider',
+  'settings.providerFieldLabel': 'Provider',
+  'settings.providerKind': '接入类型',
+  'settings.providerConfigured': '已配置',
+  'settings.providerUnconfigured': '未配置',
+  'settings.add': '新增',
+  'settings.addProvider': '新增 Provider',
+  'settings.unsaved': '未保存',
+  'settings.emptyCredentials': '当前 Provider 还没有凭据，先新增一条开始配置。',
+  'settings.label': '标签',
+  'settings.apiKey': 'API 密钥',
+  'settings.getApiKey': '获取 API 密钥',
+  'settings.showSecret': '显示密钥',
+  'settings.hideSecret': '隐藏密钥',
+  'settings.baseUrl': 'API Base URL',
+  'settings.modelsEnabled': '模型',
+  'settings.addModel': '添加模型',
+  'settings.addModelPlaceholder': '输入模型 ID',
+  'settings.recommendedModels': '推荐模型',
+  'settings.unnamedProvider': '未命名 Provider',
+  'settings.emptyProvidersTitle': '暂无 Provider',
+  'settings.emptyProvidersHint': '先创建一个自定义 Provider，再填写 API Key、Base URL 和模型列表。',
+  'settings.agentRouting': 'Agent 模型路由',
+  'settings.modelFieldLabel': '模型',
+  'settings.invalidRoute': '未就绪',
+  'settings.noModelsAvailable': '暂无可用模型',
+  'settings.noConfiguredProviders': '请先在模型页创建并保存一个可用 Provider',
+  'settings.selectProviderPlaceholder': '选择 Provider',
+  'settings.selectProviderFirst': '请先选择 Provider',
+  'settings.edit': '编辑',
+  'settings.routeReasonNoProvider': '未选择 Provider',
+  'settings.routeReasonProviderUnavailable': '所选 Provider 当前不可用',
+  'settings.routeReasonNoModels': '所选 Provider 没有启用模型',
+  'settings.routeReasonModelInvalid': '所选模型已失效',
+  'settings.saveAgentRouting': '保存 Agent 配置',
+  'settings.delete': '删除',
+  'settings.discard': '放弃更改',
+  'settings.noSelection': '请选择一项，或新建一项配置。',
+  'control.taskMonitor': '任务监控',
+  'control.captureLibrary': 'Capture Library',
+  'control.openedCapture': 'Opened Capture',
+  'control.runtimeContext': 'Runtime Context',
+  'control.captureSwitchLocked': '运行中的任务不能切换或清理当前 `.rdc`，请先结束当前调试。',
+  'control.captureLibraryProjectHint': '请选择一个项目以查看 Capture Library。',
+  'control.captureLibraryEmpty': '<project-root>/.resource/inputs 下还没有 `.rdc` 文件。',
+  'control.captureLibraryRefresh': '刷新',
+  'control.captureLibraryRefreshing': '刷新中...',
+  'control.captureLibraryImport': '导入 .rdc',
+  'control.captureLibraryImporting': '导入中...',
+  'control.captureLibraryOpenedBadge': '已打开',
+  'control.captureOpen': '打开',
+  'control.captureOpening': '打开中...',
+  'control.openedCaptureFile': 'Capture',
+  'control.openedCaptureSourceInput': 'Input ID',
+  'control.openedCaptureStatus': '状态',
+  'control.openedCaptureOpenedAt': '打开时间',
+  'control.openedCaptureEmpty': '未打开 Capture',
+  'control.openedCaptureEmptyHint': '从 Capture Library 打开一个 `.rdc` 后，这里会显示当前状态和预览。',
+  'control.openedCaptureClear': '清空打开状态',
+  'control.runtimeContextEmpty': '当前没有活动的运行时上下文',
+  'control.runtimeRefresh': '刷新',
+  'control.copyContextId': '复制 Context ID',
+  'control.previewWindow': 'Capture Preview',
+  'control.previewEmpty': '无内容',
+  'control.previewEmptyHint': '打开一个 `.rdc` 后，这里会显示当前 capture 的渲染预览。',
+  'control.previewLoading': '正在生成预览...',
+  'control.previewFallback': '回退预览',
+  'control.previewNoImage': '当前 capture 没有可用预览图像。',
+  'control.previewSourceFramebuffer': '最终 Framebuffer',
+  'control.previewSourceThumbnail': 'Capture Thumbnail',
+  'control.previewResolution': '分辨率',
+  'terminal.title': 'Runtime Terminal',
+  'terminal.open': '打开 Terminal',
+  'terminal.close': '关闭 Terminal',
+  'terminal.scope': '范围',
+  'terminal.scopeApp': '应用级',
+  'terminal.scopeSession': '当前会话',
+  'terminal.namespace': '命名空间',
+  'terminal.namespaceAll': '全部',
+  'terminal.detail': '详情',
+  'terminal.detailSummary': '概要',
+  'terminal.detailVerbose': '详细',
+  'terminal.detailRaw': '原始数据',
+  'terminal.loading': '正在加载运行日志...',
+  'terminal.emptyApp': '当前还没有可显示的应用运行日志。',
+  'terminal.emptySession': '当前会话还没有日志。',
+  'terminal.emptySessionHint': '切到应用级范围后，可以查看设备、工具和系统活动。',
+};
 
 const translations: Record<AppLanguage, Record<TranslationKey, string>> = {
   'zh-CN': {
-    'app.connected': 'Connected',
-    'app.degraded': 'Degraded',
-    'app.offline': 'Offline',
-    'app.inputPlaceholder': '描述任务，调用技能与工具',
-    'app.notice.filesReceived': '已接收 {count} 个文件，请在 Debugger 页面确认。',
-    'app.notice.newWorkspace': '已创建新的调试工作区。',
-    'mode.debugger': 'Debugger',
-    'mode.analyzer': 'Analyzer',
-    'mode.optimizer': 'Optimizer',
-    'sidebar.newTask': '新任务',
-    'sidebar.sessionHistory': 'Session历史',
-    'sidebar.history': '历史记录',
-    'sidebar.refresh': '刷新',
-    'sidebar.noRuns': '暂无历史 Run',
-    'sidebar.noRunsHint': '完成一次调试后会显示在这里',
-    'sidebar.projects': '项目',
-    'sidebar.addProject': '添加项目',
-    'sidebar.removeProject': '移除项目',
-    'sidebar.noProjects': '暂无项目',
-    'sidebar.noProjectsHint': '点击右上角添加本地项目目录',
-    'sidebar.sessions': '线程',
-    'sidebar.addSession': '新线程',
-    'sidebar.removeSession': '删除线程',
-    'sidebar.renameSession': '重命名线程',
-    'sidebar.renameSessionTitle': '重命名线程',
-    'sidebar.cancel': '取消',
-    'sidebar.save': '保存',
-    'sidebar.noSessions': '暂无线程',
-    'sidebar.noSessionsHint': '先创建线程或直接开始一次新的调试',
-    'sidebar.projectRequired': '请先添加并选择一个项目',
-    'sidebar.userName': 'RDC Operator',
-    'sidebar.userSubtitle': 'Desktop config',
-    'sidebar.userSettings': '用户设置',
-    'userMenu.language': '语言',
-    'userMenu.theme': '主题',
-    'userMenu.fontScale': '字体大小',
-    'userMenu.settings': '设置中心',
-    'theme.dark': 'Dark',
-    'theme.light': 'Light',
-    'theme.system': 'System',
-    'font.small': 'Small',
-    'font.medium': 'Medium',
-    'font.large': 'Large',
-    'settings.title': '设置',
-    'settings.account': '账号',
-    'settings.general': '通用',
-    'settings.workspace': '工作区',
-    'settings.models': '模型',
-    'settings.agents': 'Agent',
-    'settings.accountTitle': '账号',
-    'settings.accountSubtitle': '管理本地资料与显示名称。',
-    'settings.avatar': '头像',
-    'settings.avatarHint': '点击上传本地头像，建议使用正方形图片。',
-    'settings.uploadAvatar': '上传头像',
-    'settings.nickname': '昵称',
-    'settings.save': '保存',
-    'settings.generalTitle': '通用',
-    'settings.generalSubtitle': '配置主题、语言和界面字号。',
-    'settings.workspaceTitle': '工作区',
-    'settings.workspaceSubtitle': '设置唯一工作目录，并查看其派生的数据路径。',
-    'settings.workspaceRoot': '工作目录',
-    'settings.workspaceRootHint': '运行数据、settings.json 和日志都从这个目录派生。',
-    'settings.chooseDirectory': '选择目录',
-    'settings.resetWorkspace': '恢复默认',
-    'settings.settingsFile': 'settings.json',
-    'settings.logFile': '日志文件',
-    'settings.projectsPath': '项目目录',
-    'settings.knowledgePath': '知识库目录',
-    'settings.reveal': '打开位置',
-    'settings.copy': '复制路径',
-    'settings.modelsTitle': '模型',
-    'settings.modelsSubtitle': '管理 LLM Provider 与可用模型。',
-    'settings.modelSettings': 'Provider 配置',
-    'settings.agentsSubtitle': '为每个 Agent 单独配置 Provider 与模型。',
-    'settings.agentsHint': '每个 Agent 先选择供应商，再选择该供应商下的具体模型。',
-    'settings.provider': '供应商',
-    'settings.providerFieldLabel': '供应商',
-    'settings.providerKind': '接入类型',
-    'settings.providerConfigured': '已配置',
-    'settings.providerUnconfigured': '未配置',
-    'settings.apiKeyList': 'API Key List',
-    'settings.add': '新增',
-    'settings.addProvider': '新增 Provider',
-    'settings.unsaved': '未保存',
-    'settings.emptyCredentials': '当前 Provider 还没有配置，先新增一条 API Key。',
-    'settings.label': '标签',
-    'settings.apiKey': 'API 密钥',
-    'settings.getApiKey': '获取 API 密钥',
-    'settings.showSecret': '显示密钥',
-    'settings.hideSecret': '隐藏密钥',
-    'settings.baseUrl': 'API Base URL',
-    'settings.modelsEnabled': '模型',
-    'settings.addModel': '添加模型',
-    'settings.addModelPlaceholder': '输入模型 ID',
-    'settings.recommendedModels': '推荐模型（点击添加）',
-    'settings.unnamedProvider': '未命名 Provider',
-    'settings.emptyProvidersTitle': '还没有任何 Provider',
-    'settings.emptyProvidersHint': '点击下方按钮新增一个自定义 Provider，再填写 API Key、Base URL 和模型列表。',
-    'settings.agentRouting': 'Agent 模型路由',
-    'settings.modelFieldLabel': '模型',
-    'settings.invalidRoute': '未就绪',
-    'settings.noModelsAvailable': '当前供应商没有可用模型',
-    'settings.noConfiguredProviders': '先到模型页新增并保存一个可用 Provider',
-    'settings.selectProviderPlaceholder': '选择供应商',
-    'settings.selectProviderFirst': '先选择供应商',
-    'settings.edit': '编辑',
-    'settings.routeReasonNoProvider': '未选择供应商',
-    'settings.routeReasonProviderUnavailable': '所选供应商不可用',
-    'settings.routeReasonNoModels': '当前供应商没有可用模型',
-    'settings.routeReasonModelInvalid': '所选模型已失效',
-    'settings.saveAgentRouting': '保存 Agent 配置',
-    'settings.delete': '删除',
-    'settings.discard': '放弃更改',
-    'settings.noSelection': '请选择或新增一条配置。',
-    'control.taskMonitor': '任务监控',
-    'control.captureLibrary': 'Capture Library',
-    'control.openedCapture': 'Opened Capture',
-    'control.runtimeContext': 'Runtime Context',
-    'control.captureSwitchLocked': '运行中的任务不能切换或清理当前 .rdc，请先结束当前调试。',
-    'control.captureLibraryProjectHint': '请选择一个项目以查看 Capture Library。',
-    'control.captureLibraryEmpty': '<project-root>/.resource/inputs 下还没有 `.rdc` 文件。',
-    'control.captureLibraryRefresh': '刷新',
-    'control.captureLibraryRefreshing': '刷新中…',
-    'control.captureLibraryImport': '导入 .rdc',
-    'control.captureLibraryImporting': '导入中…',
-    'control.captureLibraryOpenedBadge': 'Opened',
-    'control.captureOpen': '打开',
-    'control.captureOpening': '打开中…',
-    'control.openedCaptureFile': 'Capture',
-    'control.openedCaptureSourceInput': 'Input ID',
-    'control.openedCaptureStatus': 'Status',
-    'control.openedCaptureOpenedAt': 'Opened At',
-    'control.openedCaptureEmpty': 'No Capture Opened',
-    'control.openedCaptureEmptyHint': '从 Capture Library 打开一个 `.rdc` 后，这里会显示当前打开状态和预览。',
-    'control.openedCaptureClear': 'Clear Open',
-    'control.runtimeContextEmpty': 'No active runtime context',
-    'control.runtimeRefresh': 'Refresh',
-    'control.copyContextId': 'Copy Context ID',
-    'control.previewWindow': 'Capture Preview',
-    'control.previewEmpty': '无内容',
-    'control.previewEmptyHint': '打开一个 `.rdc` 后，这里会显示当前 capture 的渲染结果预览。',
-    'control.previewLoading': '正在生成预览…',
-    'control.previewFallback': '回退预览',
-    'control.previewNoImage': '当前 capture 没有可用预览图像。',
-    'control.previewSourceFramebuffer': '最终 Framebuffer',
-    'control.previewSourceThumbnail': 'Capture Thumbnail',
-    'control.previewResolution': '分辨率',
-    'terminal.title': 'Runtime Terminal',
-    'terminal.open': '展开 Terminal',
-    'terminal.close': '收起 Terminal',
-    'terminal.scope': 'Scope',
-    'terminal.scopeApp': 'App 全局',
-    'terminal.scopeSession': '当前 Session',
-    'terminal.namespace': 'Namespace',
-    'terminal.namespaceAll': '全部',
-    'terminal.namespaceSystem': 'System',
-    'terminal.namespaceAgent': 'Agent',
-    'terminal.namespaceTool': 'Tool',
-    'terminal.namespaceDevice': 'Device',
-    'terminal.namespaceCapture': 'Capture',
-    'terminal.detail': 'Detail',
-    'terminal.detailSummary': 'Summary',
-    'terminal.detailVerbose': 'Verbose',
-    'terminal.detailRaw': 'Raw',
-    'terminal.loading': '正在加载运行日志…',
-    'terminal.emptyApp': '当前还没有可显示的应用运行日志。',
-    'terminal.emptySession': '当前 Session 还没有日志。',
-    'terminal.emptySessionHint': '切到 App 全局可以查看设备、工具和系统层面的运行信息。',
+    ...englishTranslations,
+    ...zhCnOverrides,
   },
-  en: {
-    'app.connected': 'Connected',
-    'app.degraded': 'Degraded',
-    'app.offline': 'Offline',
-    'app.inputPlaceholder': 'Describe a task, invoke skills and tools',
-    'app.notice.filesReceived': 'Received {count} files. Confirm them in the Debugger page.',
-    'app.notice.newWorkspace': 'Created a new debug workspace.',
-    'mode.debugger': 'Debugger',
-    'mode.analyzer': 'Analyzer',
-    'mode.optimizer': 'Optimizer',
-    'sidebar.newTask': 'New Task',
-    'sidebar.sessionHistory': 'Session History',
-    'sidebar.history': 'History',
-    'sidebar.refresh': 'Refresh',
-    'sidebar.noRuns': 'No runs yet',
-    'sidebar.noRunsHint': 'Completed debug sessions will appear here.',
-    'sidebar.projects': 'Projects',
-    'sidebar.addProject': 'Add Project',
-    'sidebar.removeProject': 'Remove Project',
-    'sidebar.noProjects': 'No projects yet',
-    'sidebar.noProjectsHint': 'Add a local project directory to begin.',
-    'sidebar.sessions': 'Threads',
-    'sidebar.addSession': 'New Session',
-    'sidebar.removeSession': 'Remove Session',
-    'sidebar.renameSession': 'Rename Session',
-    'sidebar.renameSessionTitle': 'Rename Session',
-    'sidebar.cancel': 'Cancel',
-    'sidebar.save': 'Save',
-    'sidebar.noSessions': 'No sessions yet',
-    'sidebar.noSessionsHint': 'Create one or start a debug run to generate it.',
-    'sidebar.projectRequired': 'Add and select a project first',
-    'sidebar.userName': 'RDC Operator',
-    'sidebar.userSubtitle': 'Desktop config',
-    'sidebar.userSettings': 'User settings',
-    'userMenu.language': 'Language',
-    'userMenu.theme': 'Theme',
-    'userMenu.fontScale': 'Font Size',
-    'userMenu.settings': 'Settings Center',
-    'theme.dark': 'Dark',
-    'theme.light': 'Light',
-    'theme.system': 'System',
-    'font.small': 'Small',
-    'font.medium': 'Medium',
-    'font.large': 'Large',
-    'settings.title': 'Settings',
-    'settings.account': 'Account',
-    'settings.general': 'General',
-    'settings.workspace': 'Workspace',
-    'settings.models': 'Models',
-    'settings.agents': 'Agents',
-    'settings.accountTitle': 'Account',
-    'settings.accountSubtitle': 'Manage local profile information.',
-    'settings.avatar': 'Avatar',
-    'settings.avatarHint': 'Upload a local avatar image. A square image works best.',
-    'settings.uploadAvatar': 'Upload Avatar',
-    'settings.nickname': 'Nickname',
-    'settings.save': 'Save',
-    'settings.generalTitle': 'General',
-    'settings.generalSubtitle': 'Configure theme, language, and interface sizing.',
-    'settings.workspaceTitle': 'Workspace',
-    'settings.workspaceSubtitle': 'Set the single workspace root and review all derived runtime paths.',
-    'settings.workspaceRoot': 'Workspace Root',
-    'settings.workspaceRootHint': 'Runtime data, settings.json, and logs are all derived from this directory.',
-    'settings.chooseDirectory': 'Choose Directory',
-    'settings.resetWorkspace': 'Reset Default',
-    'settings.settingsFile': 'settings.json',
-    'settings.logFile': 'Log File',
-    'settings.projectsPath': 'Projects',
-    'settings.knowledgePath': 'Knowledge',
-    'settings.reveal': 'Reveal',
-    'settings.copy': 'Copy Path',
-    'settings.modelsTitle': 'Models',
-    'settings.modelsSubtitle': 'Manage LLM providers and enabled models.',
-    'settings.modelSettings': 'Provider Setup',
-    'settings.agentsSubtitle': 'Configure provider/model routing for each agent separately.',
-    'settings.agentsHint': 'Each agent chooses a provider first, then a concrete model under that provider.',
-    'settings.provider': 'Provider',
-    'settings.providerFieldLabel': 'Provider',
-    'settings.providerKind': 'Transport Kind',
-    'settings.providerConfigured': 'Configured',
-    'settings.providerUnconfigured': 'Unconfigured',
-    'settings.apiKeyList': 'API Key List',
-    'settings.add': 'Add',
-    'settings.addProvider': 'Add Provider',
-    'settings.unsaved': 'Unsaved',
-    'settings.emptyCredentials': 'No credentials for this provider yet. Add one to start.',
-    'settings.label': 'Label',
-    'settings.apiKey': 'API Key',
-    'settings.getApiKey': 'Get API Key',
-    'settings.showSecret': 'Show secret',
-    'settings.hideSecret': 'Hide secret',
-    'settings.baseUrl': 'API Base URL',
-    'settings.modelsEnabled': 'Models',
-    'settings.addModel': 'Add Model',
-    'settings.addModelPlaceholder': 'Enter model id',
-    'settings.recommendedModels': 'Recommended Models',
-    'settings.unnamedProvider': 'Unnamed Provider',
-    'settings.emptyProvidersTitle': 'No providers yet',
-    'settings.emptyProvidersHint': 'Create a custom provider first, then fill in its API key, base URL, and model list.',
-    'settings.agentRouting': 'Agent Model Routing',
-    'settings.modelFieldLabel': 'Model',
-    'settings.invalidRoute': 'Invalid',
-    'settings.noModelsAvailable': 'No enabled models',
-    'settings.noConfiguredProviders': 'Create and save a usable provider in the Models page first',
-    'settings.selectProviderPlaceholder': 'Select a provider',
-    'settings.selectProviderFirst': 'Select a provider first',
-    'settings.edit': 'Edit',
-    'settings.routeReasonNoProvider': 'No provider selected',
-    'settings.routeReasonProviderUnavailable': 'Selected provider is unavailable',
-    'settings.routeReasonNoModels': 'Selected provider has no enabled models',
-    'settings.routeReasonModelInvalid': 'Selected model is no longer available',
-    'settings.saveAgentRouting': 'Save Agent Routing',
-    'settings.delete': 'Delete',
-    'settings.discard': 'Discard',
-    'settings.noSelection': 'Select an entry or create a new one.',
-    'control.taskMonitor': 'Task Monitor',
-    'control.captureLibrary': 'Capture Library',
-    'control.openedCapture': 'Opened Capture',
-    'control.runtimeContext': 'Runtime Context',
-    'control.captureSwitchLocked': 'Active runs cannot switch or clear the current `.rdc`. Finish or restart the current debug task first.',
-    'control.captureLibraryProjectHint': 'Select a project to browse the Capture Library.',
-    'control.captureLibraryEmpty': 'No `.rdc` files were found under <project-root>/.resource/inputs yet.',
-    'control.captureLibraryRefresh': 'Refresh',
-    'control.captureLibraryRefreshing': 'Refreshing...',
-    'control.captureLibraryImport': 'Import .rdc',
-    'control.captureLibraryImporting': 'Importing...',
-    'control.captureLibraryOpenedBadge': 'Opened',
-    'control.captureOpen': 'Open',
-    'control.captureOpening': 'Opening...',
-    'control.openedCaptureFile': 'Capture',
-    'control.openedCaptureSourceInput': 'Input ID',
-    'control.openedCaptureStatus': 'Status',
-    'control.openedCaptureOpenedAt': 'Opened At',
-    'control.openedCaptureEmpty': 'No Capture Opened',
-    'control.openedCaptureEmptyHint': 'Open a `.rdc` from Capture Library to inspect its current opened state and preview here.',
-    'control.openedCaptureClear': 'Clear Open',
-    'control.runtimeContextEmpty': 'No active runtime context',
-    'control.runtimeRefresh': 'Refresh',
-    'control.copyContextId': 'Copy Context ID',
-    'control.previewWindow': 'Capture Preview',
-    'control.previewEmpty': 'No content',
-    'control.previewEmptyHint': 'Open a `.rdc` capture to show the current render preview here.',
-    'control.previewLoading': 'Generating preview...',
-    'control.previewFallback': 'Fallback preview',
-    'control.previewNoImage': 'No preview image is available for the current capture.',
-    'control.previewSourceFramebuffer': 'Final Framebuffer',
-    'control.previewSourceThumbnail': 'Capture Thumbnail',
-    'control.previewResolution': 'Resolution',
-    'terminal.title': 'Runtime Terminal',
-    'terminal.open': 'Open Terminal',
-    'terminal.close': 'Close Terminal',
-    'terminal.scope': 'Scope',
-    'terminal.scopeApp': 'App Runtime',
-    'terminal.scopeSession': 'Current Session',
-    'terminal.namespace': 'Namespace',
-    'terminal.namespaceAll': 'All',
-    'terminal.namespaceSystem': 'System',
-    'terminal.namespaceAgent': 'Agent',
-    'terminal.namespaceTool': 'Tool',
-    'terminal.namespaceDevice': 'Device',
-    'terminal.namespaceCapture': 'Capture',
-    'terminal.detail': 'Detail',
-    'terminal.detailSummary': 'Summary',
-    'terminal.detailVerbose': 'Verbose',
-    'terminal.detailRaw': 'Raw',
-    'terminal.loading': 'Loading runtime logs...',
-    'terminal.emptyApp': 'No application runtime logs are available yet.',
-    'terminal.emptySession': 'No logs are available for the current session yet.',
-    'terminal.emptySessionHint': 'Switch to App Runtime to inspect device, tool, and system activity.',
-  },
+  en: englishTranslations,
 };
 
 export const translate = (

@@ -1106,6 +1106,7 @@ class StorageAdapter {
     const sessionPath = path__namespace.join(this.ensureProjectSessionsRoot(project), session.sessionId);
     session.sessionPath = sessionPath;
     this.ensureDir(sessionPath);
+    this.ensureDir(path__namespace.join(sessionPath, "attachments"));
     this.ensureDir(path__namespace.join(sessionPath, "timeline"));
     this.ensureDir(path__namespace.join(sessionPath, "runs"));
     this.writeJson(path__namespace.join(sessionPath, "session.json"), session);
@@ -1114,6 +1115,9 @@ class StorageAdapter {
     }
     if (!fs__namespace.existsSync(path__namespace.join(sessionPath, "conversation.jsonl"))) {
       fs__namespace.writeFileSync(path__namespace.join(sessionPath, "conversation.jsonl"), "", "utf-8");
+    }
+    if (!fs__namespace.existsSync(path__namespace.join(sessionPath, "attachments.json"))) {
+      this.writeJson(path__namespace.join(sessionPath, "attachments.json"), []);
     }
     this.syncSessionEvidence(session.sessionId, session.projectId);
     this.touchProject(project.projectId, session.sessionId, timestamp);
@@ -1352,6 +1356,22 @@ class StorageAdapter {
     }
     return path__namespace.join(location.sessionPath, "conversation.jsonl");
   }
+  getSessionAttachmentsDir(sessionId) {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) {
+      throw new Error(`Session not found for attachments: ${sessionId}`);
+    }
+    const attachmentsDir = path__namespace.join(location.sessionPath, "attachments");
+    this.ensureDir(attachmentsDir);
+    return attachmentsDir;
+  }
+  getSessionAttachmentsManifestPath(sessionId) {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) {
+      throw new Error(`Session not found for attachment manifest: ${sessionId}`);
+    }
+    return path__namespace.join(location.sessionPath, "attachments.json");
+  }
   getSessionEvidencePath(sessionId) {
     const location = this.findSessionLocation(sessionId);
     if (!location) {
@@ -1367,6 +1387,43 @@ class StorageAdapter {
   }
   appendConversationMessage(sessionId, message) {
     appendJsonl(this.getConversationPath(sessionId), message);
+  }
+  listSessionAttachments(sessionId) {
+    return this.readSessionAttachments(sessionId).slice().sort((left, right) => left.createdAt - right.createdAt);
+  }
+  importSessionAttachments(sessionId, filePaths) {
+    const session = this.readSession(sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+    const attachmentsDir = this.getSessionAttachmentsDir(sessionId);
+    const existing = this.readSessionAttachments(sessionId);
+    const imported = [];
+    for (const filePath of filePaths) {
+      const sourcePath = path__namespace.resolve(filePath);
+      if (!fs__namespace.existsSync(sourcePath) || !fs__namespace.statSync(sourcePath).isFile()) {
+        continue;
+      }
+      const targetPath = this.resolveImportedFilePath(attachmentsDir, path__namespace.basename(sourcePath));
+      fs__namespace.copyFileSync(sourcePath, targetPath);
+      const stats = fs__namespace.statSync(targetPath);
+      imported.push({
+        attachmentId: `att_${generateShortId()}`,
+        sessionId,
+        projectId: session.projectId,
+        kind: this.inferAttachmentKind(targetPath),
+        fileName: path__namespace.basename(targetPath),
+        filePath: targetPath,
+        mimeType: this.inferMimeType(targetPath),
+        size: stats.size,
+        createdAt: stats.birthtimeMs || stats.ctimeMs || nowMs()
+      });
+    }
+    if (imported.length > 0) {
+      this.writeSessionAttachments(sessionId, existing.concat(imported));
+      this.touchProject(session.projectId, session.sessionId);
+    }
+    return imported;
   }
   readSessionEvidence(sessionId) {
     return readYaml(this.getSessionEvidencePath(sessionId));
@@ -1948,6 +2005,46 @@ class StorageAdapter {
     }
     return candidate;
   }
+  readSessionAttachments(sessionId) {
+    return this.readJson(this.getSessionAttachmentsManifestPath(sessionId)) ?? [];
+  }
+  writeSessionAttachments(sessionId, attachments) {
+    this.writeJson(this.getSessionAttachmentsManifestPath(sessionId), attachments);
+  }
+  resolveImportedFilePath(dirPath, fileName) {
+    const extension = path__namespace.extname(fileName);
+    const baseName = path__namespace.basename(fileName, extension);
+    let candidate = path__namespace.join(dirPath, fileName);
+    let counter = 2;
+    while (fs__namespace.existsSync(candidate)) {
+      candidate = path__namespace.join(dirPath, `${baseName}-${counter}${extension}`);
+      counter += 1;
+    }
+    return candidate;
+  }
+  inferAttachmentKind(filePath) {
+    return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(filePath) ? "image" : "file";
+  }
+  inferMimeType(filePath) {
+    const extension = path__namespace.extname(filePath).toLowerCase();
+    const mimeByExtension = {
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".gif": "image/gif",
+      ".webp": "image/webp",
+      ".bmp": "image/bmp",
+      ".svg": "image/svg+xml",
+      ".pdf": "application/pdf",
+      ".txt": "text/plain",
+      ".md": "text/markdown",
+      ".json": "application/json",
+      ".zip": "application/zip",
+      ".7z": "application/x-7z-compressed",
+      ".log": "text/plain"
+    };
+    return mimeByExtension[extension] || "application/octet-stream";
+  }
 }
 const storageAdapter = new StorageAdapter();
 const DEFAULT_MODEL_ROUTING = {
@@ -2015,6 +2112,48 @@ const AGENT_WRITE_SCOPES = {
   "skeptic_agent": ["session_signoff"],
   "curator_agent": ["workspace_reports", "session_artifacts", "knowledge_library"]
 };
+const AGENT_MODES = [
+  {
+    id: "debugger",
+    label: "Debugger",
+    icon: "crosshair-bug",
+    description: "Debug and diagnose rendering issues",
+    accentColor: "#33d1ff",
+    emptyTitle: "从异常现象开始，逐步定位 GPU 问题。",
+    emptySubtitle: "面向 RenderDoc 与 .rdc capture 的调试工作台。",
+    helperCopy: "描述异常、附加图片或文件，或者直接导入 .rdc capture 开始排查。",
+    disabled: false
+  },
+  {
+    id: "analyzer",
+    label: "Analyzer",
+    icon: "waveform-gauge",
+    description: "Analyze rendering captures and performance",
+    accentColor: "#8d8bff",
+    emptyTitle: "把线索拆开看，把证据串起来。",
+    emptySubtitle: "聚焦现象分解、证据整理与多模态分析组合。",
+    helperCopy: "贴问题、附上下文素材或 capture 线索，我会先帮你拆结构、找证据和判断方向。",
+    disabled: false
+  },
+  {
+    id: "optimizer",
+    label: "Optimizer",
+    icon: "spark-tuning",
+    description: "Generate optimization suggestions",
+    accentColor: "#4ee3a0",
+    emptyTitle: "先看瓶颈，再给出可执行的优化路径。",
+    emptySubtitle: "适合评估性能、成本和渲染管线的收敛空间。",
+    helperCopy: "可以附性能截图、日志或参考素材，我会按收益、风险和验证路径组织建议。",
+    disabled: false
+  }
+];
+AGENT_MODES.reduce(
+  (accumulator, mode) => {
+    accumulator[mode.id] = mode;
+    return accumulator;
+  },
+  {}
+);
 const toContentBlocks = (messages) => messages.map((message) => {
   if (typeof message.content === "string") {
     return { role: message.role, content: message.content };
@@ -8225,11 +8364,13 @@ class DebugWorkflowService {
     }
   }
   async appendAssistantConversationMessage(sessionId, runId, content) {
+    const runLocation = this.findRun(runId || "");
     storageAdapter.appendConversationMessage(sessionId, {
       id: generateEventId("msga"),
       sessionId,
-      projectId: this.findRun(runId || "")?.session.projectId ?? null,
+      projectId: runLocation?.session.projectId ?? null,
       runId,
+      modeContext: runLocation?.run.mode ?? "debugger",
       role: "assistant",
       agentId: "rdc-debugger",
       content,
@@ -8288,11 +8429,25 @@ function makeConversationMessage(role, content, options) {
     sessionId: options.sessionId ?? null,
     projectId: options.projectId ?? null,
     runId: options.runId ?? null,
+    modeContext: options.modeContext,
     role,
     agentId: options.agentId,
     content,
+    attachments: options.attachments,
     createdAt: nowMs()
   };
+}
+function composeMessageForAgent(entry) {
+  const attachmentLines = (entry.attachments ?? []).map((attachment) => `- ${attachment.fileName}`);
+  if (attachmentLines.length === 0) {
+    return entry.content;
+  }
+  const suffix = `
+
+Attached files:
+${attachmentLines.join("\n")}`;
+  return entry.content ? `${entry.content}${suffix}` : `Attached files:
+${attachmentLines.join("\n")}`;
 }
 function stripControlBlock(text) {
   return text.replace(/<control>\s*[\s\S]*?<\/control>/i, "").trim();
@@ -8321,13 +8476,15 @@ function parseControlBlock(text) {
     return null;
   }
 }
-function buildCoworkPrompt(context, history, message) {
+function buildCoworkPrompt(context, history, mode, message, attachments) {
   const resolvedTaskFile = resolveTaskFileContext(message);
   const recentHistory = history.slice(-6).map((entry) => ({
     role: entry.role,
     content: entry.content
   }));
   return JSON.stringify({
+    requested_mode: mode,
+    requested_mode_label: mode === "debugger" ? "Debugger" : mode === "analyzer" ? "Analyzer" : "Optimizer",
     user_message: message,
     effective_user_message: resolvedTaskFile.effectiveMessage,
     task_file_path: resolvedTaskFile.taskFilePath,
@@ -8337,6 +8494,11 @@ function buildCoworkPrompt(context, history, message) {
     active_run_id: context.currentRun?.runId ?? null,
     opened_capture: context.openedCapturePath,
     project_inputs: context.projectInputs.slice(0, 8).map((entry) => entry.fileName),
+    incoming_attachments: attachments.map((entry) => ({
+      file_name: entry.fileName,
+      kind: entry.kind,
+      mime_type: entry.mimeType
+    })),
     recent_history: recentHistory
   }, null, 2);
 }
@@ -8367,7 +8529,8 @@ function buildCoworkSystemPrompt() {
     "4. 只有当用户明确表达“现在开始正式调试/执行分析”，并且条件足够时，才把 intent 标成 execute。",
     "5. 回复正文结束后，必须额外附加一个 <control>{...}</control> 块，且 control JSON 只能包含字段：intent, safe_to_start, needs_project, needs_capture, needs_target_capture, needs_route, reason。",
     "6. 如果你不确定，就把 intent 设为 talk 或 intake，safe_to_start 设为 false。",
-    "7. 控制块不要在正文里解释给用户。"
+    "7. 控制块不要在正文里解释给用户。",
+    "8. requested_mode 表示当前 UI 模式。Debugger 侧重定位与排障，Analyzer 侧重拆解与证据整理，Optimizer 侧重瓶颈判断与优化建议；回答结构要随 mode 调整。"
   ].join("\n");
 }
 function hasUsableDebuggerRoute() {
@@ -8450,18 +8613,10 @@ class ConversationService {
   }
   async sendMessage(input) {
     const context = await this.resolveContext(input);
-    const userMessage = makeConversationMessage("user", input.message.trim(), {
-      sessionId: context.session?.sessionId ?? null,
-      projectId: context.projectId,
-      runId: context.currentRun?.runId ?? null
-    });
-    if (context.session) {
-      storageAdapter.appendConversationMessage(context.session.sessionId, userMessage);
-    }
     if (context.currentRun && ["planning", "awaiting_input", "awaiting_approval", "queued", "running", "stopping"].includes(context.currentRun.status)) {
-      return this.handleActiveDebugTurn(context, userMessage);
+      return this.handleActiveDebugTurn(context, input.mode, input.message.trim(), input.attachments ?? []);
     }
-    return this.handleCoworkTurn(context, userMessage, input.message.trim());
+    return this.handleCoworkTurn(context, input.mode, input.message.trim(), input.attachments ?? []);
   }
   async resolveContext(input) {
     const projectId = input.projectId ?? input.fallbackProjectId ?? storageAdapter.getCurrentProjectId() ?? null;
@@ -8481,10 +8636,24 @@ class ConversationService {
       replayDevice
     };
   }
-  async handleActiveDebugTurn(context, userMessage) {
+  async handleActiveDebugTurn(context, requestedMode, rawMessage, pendingAttachments) {
+    const attachments = context.session ? storageAdapter.importSessionAttachments(
+      context.session.sessionId,
+      pendingAttachments.map((entry) => entry.sourcePath)
+    ) : [];
+    const userMessage = makeConversationMessage("user", rawMessage, {
+      sessionId: context.session?.sessionId ?? null,
+      projectId: context.projectId,
+      runId: context.currentRun?.runId ?? null,
+      modeContext: requestedMode,
+      attachments
+    });
+    if (context.session) {
+      storageAdapter.appendConversationMessage(context.session.sessionId, userMessage);
+    }
     let assistantContent;
     try {
-      assistantContent = await agentOrchestrator.sendMessage("rdc-debugger", userMessage.content, {
+      assistantContent = await agentOrchestrator.sendMessage("rdc-debugger", composeMessageForAgent(userMessage), {
         caseId: context.session?.sessionId,
         runId: context.currentRun?.runId,
         sessionId: context.session?.sessionId
@@ -8496,6 +8665,7 @@ class ConversationService {
       sessionId: context.session?.sessionId ?? null,
       projectId: context.projectId,
       runId: context.currentRun?.runId ?? null,
+      modeContext: requestedMode,
       agentId: "rdc-debugger"
     });
     if (context.session) {
@@ -8510,14 +8680,26 @@ class ConversationService {
       runUpdate: context.currentRun
     };
   }
-  async handleCoworkTurn(context, userMessage, rawMessage) {
+  async handleCoworkTurn(context, requestedMode, rawMessage, pendingAttachments) {
     const taskFileContext = resolveTaskFileContext(rawMessage);
     const effectiveMessage = taskFileContext.effectiveMessage;
     let workingSession = context.session;
     if (!workingSession && context.projectId) {
       workingSession = storageAdapter.createSession(context.projectId, rawMessage.slice(0, 80));
+    }
+    const importedAttachments = workingSession ? storageAdapter.importSessionAttachments(
+      workingSession.sessionId,
+      pendingAttachments.map((entry) => entry.sourcePath)
+    ) : [];
+    const userMessage = makeConversationMessage("user", rawMessage, {
+      sessionId: workingSession?.sessionId ?? null,
+      projectId: context.projectId,
+      runId: context.currentRun?.runId ?? null,
+      modeContext: requestedMode,
+      attachments: importedAttachments
+    });
+    if (workingSession) {
       storageAdapter.appendConversationMessage(workingSession.sessionId, userMessage);
-      userMessage.sessionId = workingSession.sessionId;
     }
     const history = workingSession ? storageAdapter.readConversationHistory(workingSession.sessionId) : [];
     let assistantContent = "";
@@ -8529,7 +8711,7 @@ class ConversationService {
         buildCoworkPrompt({
           ...context,
           session: workingSession
-        }, history, rawMessage),
+        }, history, requestedMode, rawMessage, importedAttachments),
         {
           sessionId: workingSession?.sessionId,
           systemPrompt: buildCoworkSystemPrompt(),
@@ -8549,7 +8731,7 @@ class ConversationService {
         technicalMessage: error instanceof Error ? error.message : String(error)
       };
     }
-    let mode = control?.intent === "intake" ? "intake" : "talk";
+    let conversationMode = control?.intent === "intake" ? "intake" : "talk";
     let executionTransition = { action: "none" };
     let runUpdate = null;
     let debugPlanSummary;
@@ -8557,7 +8739,7 @@ class ConversationService {
     let uiHints = {};
     if ((control?.intent === "execute" || EXECUTE_PATTERN.test(effectiveMessage)) && control?.safe_to_start) {
       if (!context.projectId) {
-        mode = "intake";
+        conversationMode = "intake";
         assistantContent = "我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。";
         uiHints.highlightProjectPicker = true;
       } else {
@@ -8565,7 +8747,7 @@ class ConversationService {
           ...context
         });
         if (!captureGuard.ready) {
-          mode = "intake";
+          conversationMode = "intake";
           assistantContent = captureGuard.reason || assistantContent;
           uiHints.highlightCaptureLibrary = true;
         } else {
@@ -8576,7 +8758,7 @@ class ConversationService {
             goal: rawMessage,
             replayDevice: context.replayDevice
           });
-          mode = "execute_upgrade";
+          conversationMode = "execute_upgrade";
           assistantContent = assistantContent ? `${assistantContent}
 
 ${buildWorkflowUpgradeReply(workflowResult)}` : buildWorkflowUpgradeReply(workflowResult);
@@ -8598,7 +8780,7 @@ ${buildWorkflowUpgradeReply(workflowResult)}` : buildWorkflowUpgradeReply(workfl
         }
       }
     } else if (control?.intent === "intake") {
-      mode = "intake";
+      conversationMode = "intake";
       uiHints.highlightCaptureLibrary = control.needs_capture || control.needs_target_capture;
       uiHints.highlightProjectPicker = control.needs_project;
       uiHints.highlightSettingsRoute = control.needs_route;
@@ -8607,6 +8789,7 @@ ${buildWorkflowUpgradeReply(workflowResult)}` : buildWorkflowUpgradeReply(workfl
       sessionId: workingSession?.sessionId ?? null,
       projectId: context.projectId,
       runId: runUpdate?.runId ?? null,
+      modeContext: requestedMode,
       agentId: "rdc-debugger"
     });
     if (workingSession) {
@@ -8614,11 +8797,8 @@ ${buildWorkflowUpgradeReply(workflowResult)}` : buildWorkflowUpgradeReply(workfl
     }
     return {
       session: workingSession,
-      mode,
-      userMessage: {
-        ...userMessage,
-        sessionId: workingSession?.sessionId ?? userMessage.sessionId
-      },
+      mode: conversationMode,
+      userMessage,
       assistantMessage,
       executionTransition,
       runUpdate,
@@ -8630,6 +8810,133 @@ ${buildWorkflowUpgradeReply(workflowResult)}` : buildWorkflowUpgradeReply(workfl
   }
 }
 const conversationService = new ConversationService();
+const DEFAULT_COLS = 120;
+const DEFAULT_ROWS = 32;
+function resolvePowerShellPath() {
+  const systemRoot = process.env.SystemRoot?.trim() || "C:\\Windows";
+  const candidate = path__namespace.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  return candidate;
+}
+function buildTabTitle(cwd) {
+  return `PowerShell: ${cwd}`;
+}
+class TerminalSessionService {
+  tabs = /* @__PURE__ */ new Map();
+  listTabs() {
+    return Array.from(this.tabs.values()).map((entry) => entry.record).sort((left, right) => left.createdAt - right.createdAt);
+  }
+  createTab(options) {
+    const cwd = options?.cwd?.trim() || storageAdapter.getWorkspacePath();
+    const tabId = `term_${generateShortId()}`;
+    const shellPath = resolvePowerShellPath();
+    const child = child_process.spawn(shellPath, ["-NoLogo"], {
+      cwd,
+      stdio: "pipe",
+      windowsHide: true,
+      env: {
+        ...process.env,
+        TERM: "xterm-256color"
+      }
+    });
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    const record = {
+      tabId,
+      kind: "shell",
+      title: buildTabTitle(cwd),
+      cwd,
+      status: "running",
+      createdAt: nowMs()
+    };
+    const tabState = {
+      record,
+      process: child,
+      cols: DEFAULT_COLS,
+      rows: DEFAULT_ROWS
+    };
+    child.stdout.on("data", (chunk) => {
+      this.broadcastData({ tabId, data: chunk });
+    });
+    child.stderr.on("data", (chunk) => {
+      this.broadcastData({ tabId, data: chunk });
+    });
+    child.on("close", (exitCode) => {
+      const current = this.tabs.get(tabId);
+      if (!current) {
+        return;
+      }
+      current.record = {
+        ...current.record,
+        status: "exited",
+        exitCode
+      };
+      this.broadcastExit({ tabId, exitCode });
+      this.broadcastTabsChanged();
+    });
+    this.tabs.set(tabId, tabState);
+    this.broadcastTabsChanged();
+    return record;
+  }
+  closeTab(tabId) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) {
+      return this.listTabs();
+    }
+    if (tab.record.status === "running") {
+      tab.process.stdin.write("exit\r\n");
+      tab.process.kill();
+    }
+    this.tabs.delete(tabId);
+    this.broadcastTabsChanged();
+    return this.listTabs();
+  }
+  activateTab(_tabId) {
+    return this.listTabs();
+  }
+  write(tabId, data) {
+    const tab = this.tabs.get(tabId);
+    if (!tab || tab.record.status !== "running") {
+      return;
+    }
+    tab.process.stdin.write(data);
+  }
+  resize(tabId, cols, rows) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) {
+      return;
+    }
+    tab.cols = cols;
+    tab.rows = rows;
+  }
+  disposeAll() {
+    for (const tabId of Array.from(this.tabs.keys())) {
+      this.closeTab(tabId);
+    }
+  }
+  broadcastData(payload) {
+    for (const win of electron.BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send("terminal:data", payload);
+      }
+    }
+  }
+  broadcastExit(payload) {
+    for (const win of electron.BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send("terminal:exit", payload);
+      }
+    }
+  }
+  broadcastTabsChanged() {
+    const tabs = this.listTabs();
+    for (const win of electron.BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send("terminal:tabsChanged", { tabs });
+      }
+    }
+  }
+}
+const terminalSessionService = new TerminalSessionService();
 function createStageTransitionEvidence(state, newStage, agentId = "rdc-debugger") {
   return {
     eventId: crypto.randomUUID(),
@@ -11098,6 +11405,12 @@ function registerIPCHandlers() {
     });
     return result.canceled ? null : result.filePaths;
   });
+  electron.ipcMain.handle("dialog:selectFiles", async () => {
+    const result = await electron.dialog.showOpenDialog({
+      properties: ["openFile", "multiSelections"]
+    });
+    return result.canceled ? null : result.filePaths;
+  });
   electron.ipcMain.handle("dialog:selectDirectory", async () => {
     const result = await electron.dialog.showOpenDialog({
       properties: ["openDirectory", "createDirectory"]
@@ -11269,6 +11582,19 @@ function registerIPCHandlers() {
     broadcastToRenderer("project:inputsChanged", { projectId, inputs });
     return { success: true, inputs };
   });
+  electron.ipcMain.handle("project:inputs:importPaths", async (_event, projectId, filePaths) => {
+    try {
+      const inputs = storageAdapter.importProjectInputs(projectId, filePaths ?? []);
+      broadcastToRenderer("project:inputsChanged", { projectId, inputs });
+      return { success: true, inputs };
+    } catch (error) {
+      return {
+        success: false,
+        inputs: [],
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
   electron.ipcMain.handle("session:list", async (_event, projectId) => {
     const resolvedProjectId = projectId || currentProjectId;
     if (!resolvedProjectId) {
@@ -11346,6 +11672,25 @@ function registerIPCHandlers() {
       currentRun: storageAdapter.getLatestRun(id)
     };
   });
+  electron.ipcMain.handle("session:attachments:list", async (_event, sessionId) => {
+    return {
+      attachments: storageAdapter.listSessionAttachments(sessionId)
+    };
+  });
+  electron.ipcMain.handle("session:attachments:import", async (_event, sessionId, filePaths) => {
+    try {
+      return {
+        success: true,
+        attachments: storageAdapter.importSessionAttachments(sessionId, filePaths ?? [])
+      };
+    } catch (error) {
+      return {
+        success: false,
+        attachments: [],
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
   electron.ipcMain.handle("run:list", async (_event, sessionId) => {
     return { runs: storageAdapter.listRuns(sessionId) };
   });
@@ -11353,6 +11698,69 @@ function registerIPCHandlers() {
     return {
       entries: runtimeLogService.list(request.scope, request.sessionId)
     };
+  });
+  electron.ipcMain.handle("terminal:listTabs", async () => {
+    return {
+      tabs: terminalSessionService.listTabs()
+    };
+  });
+  electron.ipcMain.handle("terminal:createTab", async (_event, request) => {
+    try {
+      const tab = terminalSessionService.createTab(request);
+      return {
+        success: true,
+        tab,
+        tabs: terminalSessionService.listTabs()
+      };
+    } catch (error) {
+      return {
+        success: false,
+        tabs: terminalSessionService.listTabs(),
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("terminal:closeTab", async (_event, tabId) => {
+    try {
+      return {
+        success: true,
+        tabs: terminalSessionService.closeTab(tabId)
+      };
+    } catch (error) {
+      return {
+        success: false,
+        tabs: terminalSessionService.listTabs(),
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("terminal:activateTab", async (_event, tabId) => {
+    return {
+      success: true,
+      tabs: terminalSessionService.activateTab(tabId)
+    };
+  });
+  electron.ipcMain.handle("terminal:write", async (_event, tabId, data) => {
+    try {
+      terminalSessionService.write(tabId, data);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("terminal:resize", async (_event, tabId, cols, rows) => {
+    try {
+      terminalSessionService.resize(tabId, cols, rows);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
   });
   electron.ipcMain.handle("context:get", async () => {
     return rdxSessionService.snapshotContext();

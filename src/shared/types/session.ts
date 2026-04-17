@@ -42,6 +42,20 @@ export interface SessionRecord {
   lastRunId?: string;
 }
 
+export type SessionAttachmentKind = 'image' | 'file';
+
+export interface SessionAttachmentRecord {
+  attachmentId: string;
+  sessionId: string;
+  projectId: string;
+  kind: SessionAttachmentKind;
+  fileName: string;
+  filePath: string;
+  mimeType: string;
+  size: number;
+  createdAt: number;
+}
+
 export interface RunReportPaths {
   reportsDir: string;
   markdownPath?: string;

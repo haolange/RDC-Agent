@@ -66,7 +66,7 @@ test('Plan / Intake 自动发现任务文件、目标 capture 和 event，并在
     '目标：确认白色亮点根因，并验证 fix，最后给完整 report。',
   ].join('\n'), 'utf8');
 
-  await ctx.page.locator('input.chat-input').fill(taskFile);
+await ctx.page.locator('textarea.chat-input').fill(taskFile);
   await ctx.page.locator('[data-testid="debugger-start-button"]').click();
 
   await expect(ctx.page.locator('[data-testid="plan-intake-panel"]')).toBeVisible();
@@ -91,7 +91,7 @@ test('provider 已配置但 route 缺失时，Debugger 会先给自然语言兜�
     '目标：确认白色亮点根因，并验证 fix，最后给完整 report。',
   ].join('\n'), 'utf8');
 
-  await ctx.page.locator('input.chat-input').fill(taskFile);
+await ctx.page.locator('textarea.chat-input').fill(taskFile);
   await ctx.page.locator('[data-testid="debugger-start-button"]').click();
 
   await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('当前调试链路还没绑定可用模型');

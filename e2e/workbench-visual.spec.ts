@@ -459,7 +459,7 @@ test('375px 宽度下双侧栏自动收起，底部入口仍可达', async () =>
 
 test('主输入条 focus 态保持清晰可见', async () => {
   const page = ctx.page;
-  const input = page.locator('input.chat-input').first();
+const input = page.locator('textarea.chat-input').first();
 
   await input.focus();
   await page.waitForTimeout(180);

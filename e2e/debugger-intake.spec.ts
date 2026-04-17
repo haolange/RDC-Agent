@@ -14,7 +14,7 @@ test.afterEach(async () => {
 test('Debugger 空闲态没有旧 Start 按钮，而是统一输入条入口', async () => {
   const page = ctx.page;
   await expect(page.locator('button:has-text("Start")')).toHaveCount(0);
-  await expect(page.locator('input.chat-input').first()).toBeVisible();
+await expect(page.locator('textarea.chat-input').first()).toBeVisible();
 });
 
 test('左侧栏展开时在用户卡片下显示 Replay Device，收起后保留紧凑入口', async () => {
@@ -52,7 +52,7 @@ test('左侧栏展开时在用户卡片下显示 Replay Device，收起后保留
 
 test('未选择项目时尝试启动会得到明确提示', async () => {
   const page = ctx.page;
-  await page.locator('input.chat-input').first().fill('你好');
+await page.locator('textarea.chat-input').first().fill('你好');
   await page.locator('button.chat-send-button').first().click();
   await expect(page.locator('[data-testid="chat-messages"]')).toContainText('你好，我是 RDC Debugger');
   await expect(page.locator('[data-testid="plan-intake-panel"]')).toHaveCount(0);
@@ -60,7 +60,7 @@ test('未选择项目时尝试启动会得到明确提示', async () => {
 
 test('未选择项目时表达调试意图，会先得到自然语言边界说明而不是直接进流程', async () => {
   const page = ctx.page;
-  await page.locator('input.chat-input').first().fill('请开始一次调试');
+await page.locator('textarea.chat-input').first().fill('请开始一次调试');
   await page.locator('button.chat-send-button').first().click();
   await expect(page.locator('[data-testid="chat-messages"]')).toContainText('正式调试要先选一个项目');
   await expect(page.locator('[data-testid="plan-intake-panel"]')).toHaveCount(0);

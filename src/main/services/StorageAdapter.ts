@@ -36,6 +36,7 @@ import type {
   ProjectRecord,
   RunRecord,
   RunSummary,
+  SessionAttachmentRecord,
   SessionRecord,
 } from '@shared/types/session';
 import { appPathService } from './AppPathService';
@@ -305,6 +306,7 @@ export class StorageAdapter {
     const sessionPath = path.join(this.ensureProjectSessionsRoot(project), session.sessionId);
     session.sessionPath = sessionPath;
     this.ensureDir(sessionPath);
+    this.ensureDir(path.join(sessionPath, 'attachments'));
     this.ensureDir(path.join(sessionPath, 'timeline'));
     this.ensureDir(path.join(sessionPath, 'runs'));
     this.writeJson(path.join(sessionPath, 'session.json'), session);
@@ -313,6 +315,9 @@ export class StorageAdapter {
     }
     if (!fs.existsSync(path.join(sessionPath, 'conversation.jsonl'))) {
       fs.writeFileSync(path.join(sessionPath, 'conversation.jsonl'), '', 'utf-8');
+    }
+    if (!fs.existsSync(path.join(sessionPath, 'attachments.json'))) {
+      this.writeJson(path.join(sessionPath, 'attachments.json'), [] satisfies SessionAttachmentRecord[]);
     }
     this.syncSessionEvidence(session.sessionId, session.projectId);
 
@@ -615,6 +620,24 @@ export class StorageAdapter {
     return path.join(location.sessionPath, 'conversation.jsonl');
   }
 
+  getSessionAttachmentsDir(sessionId: string): string {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) {
+      throw new Error(`Session not found for attachments: ${sessionId}`);
+    }
+    const attachmentsDir = path.join(location.sessionPath, 'attachments');
+    this.ensureDir(attachmentsDir);
+    return attachmentsDir;
+  }
+
+  getSessionAttachmentsManifestPath(sessionId: string): string {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) {
+      throw new Error(`Session not found for attachment manifest: ${sessionId}`);
+    }
+    return path.join(location.sessionPath, 'attachments.json');
+  }
+
   getSessionEvidencePath(sessionId: string): string {
     const location = this.findSessionLocation(sessionId);
     if (!location) {
@@ -634,6 +657,52 @@ export class StorageAdapter {
 
   appendConversationMessage(sessionId: string, message: ConversationMessage): void {
     appendJsonl(this.getConversationPath(sessionId), message);
+  }
+
+  listSessionAttachments(sessionId: string): SessionAttachmentRecord[] {
+    return this.readSessionAttachments(sessionId)
+      .slice()
+      .sort((left, right) => left.createdAt - right.createdAt);
+  }
+
+  importSessionAttachments(sessionId: string, filePaths: string[]): SessionAttachmentRecord[] {
+    const session = this.readSession(sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+
+    const attachmentsDir = this.getSessionAttachmentsDir(sessionId);
+    const existing = this.readSessionAttachments(sessionId);
+    const imported: SessionAttachmentRecord[] = [];
+
+    for (const filePath of filePaths) {
+      const sourcePath = path.resolve(filePath);
+      if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
+        continue;
+      }
+
+      const targetPath = this.resolveImportedFilePath(attachmentsDir, path.basename(sourcePath));
+      fs.copyFileSync(sourcePath, targetPath);
+      const stats = fs.statSync(targetPath);
+      imported.push({
+        attachmentId: `att_${generateShortId()}`,
+        sessionId,
+        projectId: session.projectId,
+        kind: this.inferAttachmentKind(targetPath),
+        fileName: path.basename(targetPath),
+        filePath: targetPath,
+        mimeType: this.inferMimeType(targetPath),
+        size: stats.size,
+        createdAt: stats.birthtimeMs || stats.ctimeMs || nowMs(),
+      });
+    }
+
+    if (imported.length > 0) {
+      this.writeSessionAttachments(sessionId, existing.concat(imported));
+      this.touchProject(session.projectId, session.sessionId);
+    }
+
+    return imported;
   }
 
   readSessionEvidence(sessionId: string): SessionEvidenceRecord | null {
@@ -1335,6 +1404,51 @@ export class StorageAdapter {
       counter += 1;
     }
     return candidate;
+  }
+
+  private readSessionAttachments(sessionId: string): SessionAttachmentRecord[] {
+    return this.readJson<SessionAttachmentRecord[]>(this.getSessionAttachmentsManifestPath(sessionId)) ?? [];
+  }
+
+  private writeSessionAttachments(sessionId: string, attachments: SessionAttachmentRecord[]): void {
+    this.writeJson(this.getSessionAttachmentsManifestPath(sessionId), attachments);
+  }
+
+  private resolveImportedFilePath(dirPath: string, fileName: string): string {
+    const extension = path.extname(fileName);
+    const baseName = path.basename(fileName, extension);
+    let candidate = path.join(dirPath, fileName);
+    let counter = 2;
+    while (fs.existsSync(candidate)) {
+      candidate = path.join(dirPath, `${baseName}-${counter}${extension}`);
+      counter += 1;
+    }
+    return candidate;
+  }
+
+  private inferAttachmentKind(filePath: string): SessionAttachmentRecord['kind'] {
+    return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(filePath) ? 'image' : 'file';
+  }
+
+  private inferMimeType(filePath: string): string {
+    const extension = path.extname(filePath).toLowerCase();
+    const mimeByExtension: Record<string, string> = {
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.bmp': 'image/bmp',
+      '.svg': 'image/svg+xml',
+      '.pdf': 'application/pdf',
+      '.txt': 'text/plain',
+      '.md': 'text/markdown',
+      '.json': 'application/json',
+      '.zip': 'application/zip',
+      '.7z': 'application/x-7z-compressed',
+      '.log': 'text/plain',
+    };
+    return mimeByExtension[extension] || 'application/octet-stream';
   }
 }
 

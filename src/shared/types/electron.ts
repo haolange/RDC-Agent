@@ -26,8 +26,10 @@ import type {
   ProjectInputRecord,
   ProjectRecord,
   RunSummary,
+  SessionAttachmentRecord,
   SessionRecord,
 } from './session';
+import type { TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from './terminal';
 import type { ToolCallResult, ToolCatalog } from './tool';
 
 export interface ElectronAPI {
@@ -62,6 +64,7 @@ export interface ElectronAPI {
     }>;
   };
 
+  selectFiles: () => Promise<string[] | null>;
   selectRdcFiles: () => Promise<string[] | null>;
   selectDirectory: () => Promise<string | null>;
 
@@ -203,6 +206,11 @@ export interface ElectronAPI {
         inputs: ProjectInputRecord[];
         error?: string;
       }>;
+      importPaths: (projectId: string, filePaths: string[]) => Promise<{
+        success: boolean;
+        inputs: ProjectInputRecord[];
+        error?: string;
+      }>;
     };
   };
 
@@ -236,6 +244,16 @@ export interface ElectronAPI {
       currentRun?: RunSummary | null;
       error?: string;
     }>;
+    attachments: {
+      list: (sessionId: string) => Promise<{
+        attachments: SessionAttachmentRecord[];
+      }>;
+      import: (sessionId: string, filePaths: string[]) => Promise<{
+        success: boolean;
+        attachments: SessionAttachmentRecord[];
+        error?: string;
+      }>;
+    };
   };
 
   run: {
@@ -246,6 +264,15 @@ export interface ElectronAPI {
     list: (request: { scope: RuntimeLogScope; sessionId?: string | null }) => Promise<{
       entries: RuntimeLogEntry[];
     }>;
+  };
+
+  terminal: {
+    listTabs: () => Promise<{ tabs: TerminalTabRecord[] }>;
+    createTab: (request?: { cwd?: string | null }) => Promise<{ success: boolean; tab?: TerminalTabRecord; tabs: TerminalTabRecord[]; error?: string }>;
+    closeTab: (tabId: string) => Promise<{ success: boolean; tabs: TerminalTabRecord[]; error?: string }>;
+    activateTab: (tabId: string) => Promise<{ success: boolean; tabs: TerminalTabRecord[]; error?: string }>;
+    write: (tabId: string, data: string) => Promise<{ success: boolean; error?: string }>;
+    resize: (tabId: string, cols: number, rows: number) => Promise<{ success: boolean; error?: string }>;
   };
 
   capture: {
@@ -286,6 +313,9 @@ export interface ElectronAPI {
     onProjectInputsChanged: (callback: (payload: { projectId: string; inputs: ProjectInputRecord[] }) => void) => void;
     onOpenedCaptureStateChanged: (callback: (state: OpenedCaptureState | null) => void) => void;
     onRuntimeLogAppended: (callback: (entry: RuntimeLogEntry) => void) => void;
+    onTerminalData: (callback: (event: TerminalDataEvent) => void) => void;
+    onTerminalExit: (callback: (event: TerminalExitEvent) => void) => void;
+    onTerminalTabsChanged: (callback: (payload: { tabs: TerminalTabRecord[] }) => void) => void;
     onAppThemeChanged: (callback: (theme: ResolvedTheme) => void) => void;
     removeAllListeners: (channel: string) => void;
   };

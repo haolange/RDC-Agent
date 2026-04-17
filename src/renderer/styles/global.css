@@ -351,8 +351,8 @@ a {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  min-height: 44px;
-  padding: 8px 12px;
+  min-height: 42px;
+  padding: 0 14px;
   border: 1px solid rgb(var(--color-border-default));
   border-radius: 999px;
   background: rgb(var(--color-bg-2) / 0.92);
@@ -380,12 +380,287 @@ a {
   color: rgb(var(--color-accent-400));
 }
 
+.main-utility-toggle.terminal-pill {
+  min-width: 70px;
+  gap: 0;
+}
+
 .main-input-bar {
-  padding: 14px 16px;
-  border-top: 1px solid rgb(var(--color-border-default));
-  background: rgb(var(--color-bg-1) / 0.92);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  padding: 10px 18px 16px;
+  border-top: none;
+  background: transparent;
+}
+
+.main-input-bar.disabled {
+  border-top-color: transparent;
+}
+
+.composer-shell {
+  --composer-mode-accent: #33d1ff;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  min-height: 108px;
+  padding: 18px 18px 16px;
+  border: 1px solid rgb(var(--color-border-default) / 0.92);
+  border-radius: 30px;
+  background: rgb(var(--color-bg-2) / 0.94);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.02),
+    0 10px 28px rgb(0 0 0 / 0.16);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+}
+
+.composer-shell:focus-within {
+  border-color: color-mix(in srgb, var(--composer-mode-accent) 28%, rgb(var(--color-border-strong)));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.03),
+    0 0 0 1px color-mix(in srgb, var(--composer-mode-accent) 12%, transparent);
+}
+
+.composer-shell.is-disabled {
+  opacity: 0.94;
+}
+
+.composer-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.composer-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  max-width: min(320px, 100%);
+  padding: 6px 10px;
+  border-radius: 14px;
+  border: 1px solid rgb(var(--color-border-default));
+  background: rgb(var(--color-bg-1) / 0.9);
+}
+
+.composer-attachment-chip-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgb(var(--color-accent-500) / 0.15);
+  color: rgb(var(--color-accent-300));
+  font-size: 9px;
+  font-weight: var(--font-bold);
+  letter-spacing: 0.08em;
+  flex-shrink: 0;
+}
+
+.composer-attachment-chip.image .composer-attachment-chip-icon {
+  background: rgb(var(--color-primary-500) / 0.16);
+  color: rgb(var(--color-primary-200));
+}
+
+.composer-attachment-chip-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.composer-attachment-chip-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: rgb(var(--color-text-primary));
+  font-size: var(--text-sm);
+}
+
+.composer-attachment-chip-meta {
+  color: rgb(var(--color-text-tertiary));
+  font-size: 11px;
+}
+
+.composer-attachment-chip-remove {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: transparent;
+  color: rgb(var(--color-text-tertiary));
+  cursor: pointer;
+}
+
+.composer-attachment-chip-remove:hover {
+  background: rgb(var(--color-bg-3));
+  color: rgb(var(--color-text-primary));
+}
+
+.composer-input-row {
+  display: flex;
+  min-width: 0;
+  padding-right: 54px;
+}
+
+.composer-attach-button {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgb(var(--color-text-secondary));
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.composer-attach-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--composer-mode-accent) 10%, rgb(var(--color-bg-3)));
+  border-color: color-mix(in srgb, var(--composer-mode-accent) 22%, rgb(var(--color-border-default)));
+  color: var(--composer-mode-accent);
+}
+
+.composer-attach-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.composer-textarea {
+  width: 100%;
+  min-height: 28px;
+  max-height: 180px;
+  padding: 0 0 34px;
+  resize: none;
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+.composer-toolbar-row {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.composer-toolbar-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.composer-toolbar-group-right {
+  margin-left: auto;
+}
+
+.composer-agent-menu {
+  position: relative;
+}
+
+.composer-agent-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgb(var(--color-border-default));
+  background: rgb(var(--color-bg-3) / 0.52);
+  color: rgb(var(--color-text-primary));
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
+}
+
+.composer-agent-pill:hover,
+.composer-agent-pill.open {
+  border-color: color-mix(in srgb, var(--composer-mode-accent) 24%, rgb(var(--color-border-strong)));
+  background: color-mix(in srgb, var(--composer-mode-accent) 8%, rgb(var(--color-bg-3)));
+}
+
+.composer-agent-pill-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--composer-mode-accent);
+}
+
+.composer-agent-pill-label {
+  font-size: 13px;
+  font-weight: var(--font-semibold);
+}
+
+.composer-agent-pill-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgb(var(--color-text-tertiary));
+}
+
+.composer-agent-menu-popup {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: var(--z-dropdown);
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid rgb(var(--color-border-default));
+  border-radius: 14px;
+  background: rgb(var(--color-bg-1) / 0.98);
+  box-shadow: 0 18px 36px rgb(0 0 0 / 0.24);
+}
+
+.composer-agent-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: transparent;
+  color: rgb(var(--color-text-secondary));
+  cursor: pointer;
+  text-align: left;
+}
+
+.composer-agent-menu-item:hover,
+.composer-agent-menu-item.active {
+  background: rgb(var(--color-bg-3));
+  color: rgb(var(--color-text-primary));
+}
+
+.composer-agent-menu-item-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.composer-agent-menu-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.composer-agent-menu-item-label {
+  font-size: 13px;
+}
+
+.composer-agent-menu-item-check {
+  font-size: 10px;
+  color: rgb(var(--color-accent-300));
 }
 
 .chat-input-wrapper {
@@ -436,8 +711,37 @@ a {
   flex: 0 0 auto;
 }
 
+.chat-send-button {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--color-border-default));
+  background: rgb(160 164 171 / 0.18);
+  color: rgb(var(--color-text-primary));
+  box-shadow: none;
+  cursor: pointer;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast), filter var(--transition-fast);
+}
+
+.chat-send-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: rgb(185 190 198 / 0.24);
+}
+
+.chat-send-button:disabled {
+  opacity: 0.72;
+  filter: saturate(0.8);
+  cursor: not-allowed;
+}
+
 .chat-stop-button {
+  background: rgb(var(--color-bg-2));
+  border-color: rgb(var(--color-error) / 0.26);
   color: rgb(var(--color-error));
+  box-shadow: none;
 }
 
 .input-bar-placeholder {
@@ -1451,6 +1755,11 @@ select:focus:not(:focus-visible),
   .main-header {
     padding: 8px 12px;
   }
+
+  .composer-toolbar-row,
+  .composer-meta-row {
+    flex-wrap: wrap;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1463,7 +1772,3 @@ select:focus:not(:focus-visible),
     scroll-behavior: auto !important;
   }
 }
-
-
-
-

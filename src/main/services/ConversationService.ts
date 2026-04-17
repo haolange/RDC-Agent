@@ -1,7 +1,13 @@
 import fs from 'fs';
 import path from 'path';
-import type { ConversationControl, ConversationMessage, ConversationSendRequest, ConversationTurnResult } from '@shared/types/conversation';
-import type { ProjectInputRecord, RunSummary, SessionRecord } from '@shared/types/session';
+import type {
+  ConversationAttachmentInput,
+  ConversationControl,
+  ConversationMessage,
+  ConversationSendRequest,
+  ConversationTurnResult,
+} from '@shared/types/conversation';
+import type { AppMode, ProjectInputRecord, RunSummary, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { agentOrchestrator } from './AgentOrchestrator';
@@ -42,7 +48,9 @@ function makeConversationMessage(
     sessionId?: string | null;
     projectId?: string | null;
     runId?: string | null;
+    modeContext?: AppMode;
     agentId?: ConversationMessage['agentId'];
+    attachments?: SessionAttachmentRecord[];
   },
 ): ConversationMessage {
   return {
@@ -50,11 +58,23 @@ function makeConversationMessage(
     sessionId: options.sessionId ?? null,
     projectId: options.projectId ?? null,
     runId: options.runId ?? null,
+    modeContext: options.modeContext,
     role,
     agentId: options.agentId,
     content,
+    attachments: options.attachments,
     createdAt: nowMs(),
   };
+}
+
+function composeMessageForAgent(entry: ConversationMessage): string {
+  const attachmentLines = (entry.attachments ?? []).map((attachment) => `- ${attachment.fileName}`);
+  if (attachmentLines.length === 0) {
+    return entry.content;
+  }
+
+  const suffix = `\n\nAttached files:\n${attachmentLines.join('\n')}`;
+  return entry.content ? `${entry.content}${suffix}` : `Attached files:\n${attachmentLines.join('\n')}`;
 }
 
 function stripControlBlock(text: string): string {
@@ -88,7 +108,13 @@ function parseControlBlock(text: string): ConversationControl | null {
   }
 }
 
-function buildCoworkPrompt(context: ResolvedConversationContext, history: ConversationMessage[], message: string): string {
+function buildCoworkPrompt(
+  context: ResolvedConversationContext,
+  history: ConversationMessage[],
+  mode: AppMode,
+  message: string,
+  attachments: SessionAttachmentRecord[],
+): string {
   const resolvedTaskFile = resolveTaskFileContext(message);
   const recentHistory = history.slice(-6).map((entry) => ({
     role: entry.role,
@@ -96,6 +122,12 @@ function buildCoworkPrompt(context: ResolvedConversationContext, history: Conver
   }));
 
   return JSON.stringify({
+    requested_mode: mode,
+    requested_mode_label: mode === 'debugger'
+      ? 'Debugger'
+      : mode === 'analyzer'
+        ? 'Analyzer'
+        : 'Optimizer',
     user_message: message,
     effective_user_message: resolvedTaskFile.effectiveMessage,
     task_file_path: resolvedTaskFile.taskFilePath,
@@ -105,6 +137,11 @@ function buildCoworkPrompt(context: ResolvedConversationContext, history: Conver
     active_run_id: context.currentRun?.runId ?? null,
     opened_capture: context.openedCapturePath,
     project_inputs: context.projectInputs.slice(0, 8).map((entry) => entry.fileName),
+    incoming_attachments: attachments.map((entry) => ({
+      file_name: entry.fileName,
+      kind: entry.kind,
+      mime_type: entry.mimeType,
+    })),
     recent_history: recentHistory,
   }, null, 2);
 }
@@ -143,6 +180,7 @@ function buildCoworkSystemPrompt(): string {
     '5. 回复正文结束后，必须额外附加一个 <control>{...}</control> 块，且 control JSON 只能包含字段：intent, safe_to_start, needs_project, needs_capture, needs_target_capture, needs_route, reason。',
     '6. 如果你不确定，就把 intent 设为 talk 或 intake，safe_to_start 设为 false。',
     '7. 控制块不要在正文里解释给用户。',
+    '8. requested_mode 表示当前 UI 模式。Debugger 侧重定位与排障，Analyzer 侧重拆解与证据整理，Optimizer 侧重瓶颈判断与优化建议；回答结构要随 mode 调整。',
   ].join('\n');
 }
 
@@ -254,21 +292,11 @@ export class ConversationService {
 
   async sendMessage(input: ConversationContextInput): Promise<ConversationTurnResult> {
     const context = await this.resolveContext(input);
-    const userMessage = makeConversationMessage('user', input.message.trim(), {
-      sessionId: context.session?.sessionId ?? null,
-      projectId: context.projectId,
-      runId: context.currentRun?.runId ?? null,
-    });
-
-    if (context.session) {
-      storageAdapter.appendConversationMessage(context.session.sessionId, userMessage);
-    }
-
     if (context.currentRun && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(context.currentRun.status)) {
-      return this.handleActiveDebugTurn(context, userMessage);
+      return this.handleActiveDebugTurn(context, input.mode, input.message.trim(), input.attachments ?? []);
     }
 
-    return this.handleCoworkTurn(context, userMessage, input.message.trim());
+    return this.handleCoworkTurn(context, input.mode, input.message.trim(), input.attachments ?? []);
   }
 
   private async resolveContext(input: ConversationContextInput): Promise<ResolvedConversationContext> {
@@ -296,12 +324,32 @@ export class ConversationService {
 
   private async handleActiveDebugTurn(
     context: ResolvedConversationContext,
-    userMessage: ConversationMessage,
+    requestedMode: AppMode,
+    rawMessage: string,
+    pendingAttachments: ConversationAttachmentInput[],
   ): Promise<ConversationTurnResult> {
+    const attachments = context.session
+      ? storageAdapter.importSessionAttachments(
+        context.session.sessionId,
+        pendingAttachments.map((entry) => entry.sourcePath),
+      )
+      : [];
+    const userMessage = makeConversationMessage('user', rawMessage, {
+      sessionId: context.session?.sessionId ?? null,
+      projectId: context.projectId,
+      runId: context.currentRun?.runId ?? null,
+      modeContext: requestedMode,
+      attachments,
+    });
+
+    if (context.session) {
+      storageAdapter.appendConversationMessage(context.session.sessionId, userMessage);
+    }
+
     let assistantContent: string;
 
     try {
-      assistantContent = await agentOrchestrator.sendMessage('rdc-debugger', userMessage.content, {
+      assistantContent = await agentOrchestrator.sendMessage('rdc-debugger', composeMessageForAgent(userMessage), {
         caseId: context.session?.sessionId,
         runId: context.currentRun?.runId,
         sessionId: context.session?.sessionId,
@@ -316,6 +364,7 @@ export class ConversationService {
       sessionId: context.session?.sessionId ?? null,
       projectId: context.projectId,
       runId: context.currentRun?.runId ?? null,
+      modeContext: requestedMode,
       agentId: 'rdc-debugger',
     });
 
@@ -335,16 +384,33 @@ export class ConversationService {
 
   private async handleCoworkTurn(
     context: ResolvedConversationContext,
-    userMessage: ConversationMessage,
+    requestedMode: AppMode,
     rawMessage: string,
+    pendingAttachments: ConversationAttachmentInput[],
   ): Promise<ConversationTurnResult> {
     const taskFileContext = resolveTaskFileContext(rawMessage);
     const effectiveMessage = taskFileContext.effectiveMessage;
     let workingSession = context.session;
     if (!workingSession && context.projectId) {
       workingSession = storageAdapter.createSession(context.projectId, rawMessage.slice(0, 80));
+    }
+
+    const importedAttachments = workingSession
+      ? storageAdapter.importSessionAttachments(
+        workingSession.sessionId,
+        pendingAttachments.map((entry) => entry.sourcePath),
+      )
+      : [];
+    const userMessage = makeConversationMessage('user', rawMessage, {
+      sessionId: workingSession?.sessionId ?? null,
+      projectId: context.projectId,
+      runId: context.currentRun?.runId ?? null,
+      modeContext: requestedMode,
+      attachments: importedAttachments,
+    });
+
+    if (workingSession) {
       storageAdapter.appendConversationMessage(workingSession.sessionId, userMessage);
-      userMessage.sessionId = workingSession.sessionId;
     }
 
     const history = workingSession ? storageAdapter.readConversationHistory(workingSession.sessionId) : [];
@@ -358,7 +424,7 @@ export class ConversationService {
         buildCoworkPrompt({
           ...context,
           session: workingSession,
-        }, history, rawMessage),
+        }, history, requestedMode, rawMessage, importedAttachments),
         {
           sessionId: workingSession?.sessionId,
           systemPrompt: buildCoworkSystemPrompt(),
@@ -380,7 +446,7 @@ export class ConversationService {
       };
     }
 
-    let mode: ConversationTurnResult['mode'] = control?.intent === 'intake' ? 'intake' : 'talk';
+    let conversationMode: ConversationTurnResult['mode'] = control?.intent === 'intake' ? 'intake' : 'talk';
     let executionTransition: ConversationTurnResult['executionTransition'] = { action: 'none' };
     let runUpdate: RunSummary | null = null;
     let debugPlanSummary: ConversationTurnResult['debugPlanSummary'];
@@ -389,7 +455,7 @@ export class ConversationService {
 
     if ((control?.intent === 'execute' || EXECUTE_PATTERN.test(effectiveMessage)) && control?.safe_to_start) {
       if (!context.projectId) {
-        mode = 'intake';
+        conversationMode = 'intake';
         assistantContent = '我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。';
         uiHints.highlightProjectPicker = true;
       } else {
@@ -399,7 +465,7 @@ export class ConversationService {
         });
 
         if (!captureGuard.ready) {
-          mode = 'intake';
+          conversationMode = 'intake';
           assistantContent = captureGuard.reason || assistantContent;
           uiHints.highlightCaptureLibrary = true;
         } else {
@@ -411,7 +477,7 @@ export class ConversationService {
             replayDevice: context.replayDevice,
           });
 
-          mode = 'execute_upgrade';
+          conversationMode = 'execute_upgrade';
           assistantContent = assistantContent
             ? `${assistantContent}\n\n${buildWorkflowUpgradeReply(workflowResult)}`
             : buildWorkflowUpgradeReply(workflowResult);
@@ -435,7 +501,7 @@ export class ConversationService {
         }
       }
     } else if (control?.intent === 'intake') {
-      mode = 'intake';
+      conversationMode = 'intake';
       uiHints.highlightCaptureLibrary = control.needs_capture || control.needs_target_capture;
       uiHints.highlightProjectPicker = control.needs_project;
       uiHints.highlightSettingsRoute = control.needs_route;
@@ -445,6 +511,7 @@ export class ConversationService {
       sessionId: workingSession?.sessionId ?? null,
       projectId: context.projectId,
       runId: runUpdate?.runId ?? null,
+      modeContext: requestedMode,
       agentId: 'rdc-debugger',
     });
 
@@ -454,11 +521,8 @@ export class ConversationService {
 
     return {
       session: workingSession,
-      mode,
-      userMessage: {
-        ...userMessage,
-        sessionId: workingSession?.sessionId ?? userMessage.sessionId,
-      },
+      mode: conversationMode,
+      userMessage,
       assistantMessage,
       executionTransition,
       runUpdate,

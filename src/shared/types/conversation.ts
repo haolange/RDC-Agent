@@ -1,6 +1,6 @@
 import type { AgentRole } from './agent';
 import type { DebugPlan, AskUserPrompt } from './workflow';
-import type { RunSummary, SessionRecord } from './session';
+import type { AppMode, RunSummary, SessionAttachmentRecord, SessionRecord } from './session';
 
 export type ConversationMode = 'talk' | 'intake' | 'active_debug' | 'execute_upgrade';
 
@@ -11,10 +11,19 @@ export interface ConversationMessage {
   sessionId: string | null;
   projectId: string | null;
   runId?: string | null;
+  modeContext?: AppMode;
   role: ConversationRole;
   agentId?: AgentRole;
   content: string;
+  attachments?: SessionAttachmentRecord[];
   createdAt: number;
+}
+
+export interface ConversationAttachmentInput {
+  sourcePath: string;
+  fileName: string;
+  mimeType?: string | null;
+  size?: number | null;
 }
 
 export interface ConversationControl {
@@ -51,7 +60,9 @@ export interface ConversationSendRequest {
   sessionId?: string | null;
   currentRunId?: string | null;
   replayDeviceId?: string | null;
+  mode: AppMode;
   message: string;
+  attachments?: ConversationAttachmentInput[];
 }
 
 export interface ConversationTurnResult {
