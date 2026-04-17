@@ -124,22 +124,46 @@ export const AGENT_MODES: ModeConfig[] = [
   {
     id: 'debugger',
     label: 'Debugger',
-    icon: 'bug',
+    icon: 'crosshair-bug',
     description: 'Debug and diagnose rendering issues',
+    accentColor: '#33d1ff',
+    emptyTitle: '从异常现象开始，逐步定位 GPU 问题。',
+    emptySubtitle: '面向 RenderDoc 与 .rdc capture 的调试工作台。',
+    helperCopy: '描述异常、附加图片或文件，或者直接导入 .rdc capture 开始排查。',
     disabled: false,
   },
   {
     id: 'analyzer',
     label: 'Analyzer',
-    icon: 'gauge',
+    icon: 'waveform-gauge',
     description: 'Analyze rendering captures and performance',
+    accentColor: '#8d8bff',
+    emptyTitle: '把线索拆开看，把证据串起来。',
+    emptySubtitle: '聚焦现象分解、证据整理与多模态分析组合。',
+    helperCopy: '贴问题、附上下文素材或 capture 线索，我会先帮你拆结构、找证据和判断方向。',
     disabled: false,
   },
   {
     id: 'optimizer',
     label: 'Optimizer',
-    icon: 'sparkles',
+    icon: 'spark-tuning',
     description: 'Generate optimization suggestions',
+    accentColor: '#4ee3a0',
+    emptyTitle: '先看瓶颈，再给出可执行的优化路径。',
+    emptySubtitle: '适合评估性能、成本和渲染管线的收敛空间。',
+    helperCopy: '可以附性能截图、日志或参考素材，我会按收益、风险和验证路径组织建议。',
     disabled: false,
   },
 ];
+
+export const AGENT_MODE_MAP: Record<ModeConfig['id'], ModeConfig> = AGENT_MODES.reduce(
+  (accumulator, mode) => {
+    accumulator[mode.id] = mode;
+    return accumulator;
+  },
+  {} as Record<ModeConfig['id'], ModeConfig>,
+);
+
+export function getAgentModeConfig(modeId: ModeConfig['id']): ModeConfig {
+  return AGENT_MODE_MAP[modeId];
+}

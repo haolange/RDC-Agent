@@ -1,0 +1,167 @@
+import { BrowserWindow } from 'electron';
+import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
+import * as path from 'path';
+import { generateShortId, nowMs } from '@shared/utils/id';
+import type { TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
+import { storageAdapter } from './StorageAdapter';
+
+interface ShellTabState {
+  record: TerminalTabRecord;
+  process: ChildProcessWithoutNullStreams;
+  cols: number;
+  rows: number;
+}
+
+const DEFAULT_COLS = 120;
+const DEFAULT_ROWS = 32;
+
+function resolvePowerShellPath(): string {
+  const systemRoot = process.env.SystemRoot?.trim() || 'C:\\Windows';
+  const candidate = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+  return candidate;
+}
+
+function buildTabTitle(cwd: string): string {
+  return `PowerShell: ${cwd}`;
+}
+
+export class TerminalSessionService {
+  private tabs = new Map<string, ShellTabState>();
+
+  listTabs(): TerminalTabRecord[] {
+    return Array.from(this.tabs.values())
+      .map((entry) => entry.record)
+      .sort((left, right) => left.createdAt - right.createdAt);
+  }
+
+  createTab(options?: { cwd?: string | null }): TerminalTabRecord {
+    const cwd = options?.cwd?.trim() || storageAdapter.getWorkspacePath();
+    const tabId = `term_${generateShortId()}`;
+    const shellPath = resolvePowerShellPath();
+    const child = spawn(shellPath, ['-NoLogo'], {
+      cwd,
+      stdio: 'pipe',
+      windowsHide: true,
+      env: {
+        ...process.env,
+        TERM: 'xterm-256color',
+      },
+    });
+
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+
+    const record: TerminalTabRecord = {
+      tabId,
+      kind: 'shell',
+      title: buildTabTitle(cwd),
+      cwd,
+      status: 'running',
+      createdAt: nowMs(),
+    };
+
+    const tabState: ShellTabState = {
+      record,
+      process: child,
+      cols: DEFAULT_COLS,
+      rows: DEFAULT_ROWS,
+    };
+
+    child.stdout.on('data', (chunk: string) => {
+      this.broadcastData({ tabId, data: chunk });
+    });
+
+    child.stderr.on('data', (chunk: string) => {
+      this.broadcastData({ tabId, data: chunk });
+    });
+
+    child.on('close', (exitCode) => {
+      const current = this.tabs.get(tabId);
+      if (!current) {
+        return;
+      }
+
+      current.record = {
+        ...current.record,
+        status: 'exited',
+        exitCode,
+      };
+      this.broadcastExit({ tabId, exitCode });
+      this.broadcastTabsChanged();
+    });
+
+    this.tabs.set(tabId, tabState);
+    this.broadcastTabsChanged();
+    return record;
+  }
+
+  closeTab(tabId: string): TerminalTabRecord[] {
+    const tab = this.tabs.get(tabId);
+    if (!tab) {
+      return this.listTabs();
+    }
+
+    if (tab.record.status === 'running') {
+      tab.process.stdin.write('exit\r\n');
+      tab.process.kill();
+    }
+
+    this.tabs.delete(tabId);
+    this.broadcastTabsChanged();
+    return this.listTabs();
+  }
+
+  activateTab(_tabId: string): TerminalTabRecord[] {
+    return this.listTabs();
+  }
+
+  write(tabId: string, data: string): void {
+    const tab = this.tabs.get(tabId);
+    if (!tab || tab.record.status !== 'running') {
+      return;
+    }
+    tab.process.stdin.write(data);
+  }
+
+  resize(tabId: string, cols: number, rows: number): void {
+    const tab = this.tabs.get(tabId);
+    if (!tab) {
+      return;
+    }
+    tab.cols = cols;
+    tab.rows = rows;
+  }
+
+  disposeAll(): void {
+    for (const tabId of Array.from(this.tabs.keys())) {
+      this.closeTab(tabId);
+    }
+  }
+
+  private broadcastData(payload: TerminalDataEvent): void {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send('terminal:data', payload);
+      }
+    }
+  }
+
+  private broadcastExit(payload: TerminalExitEvent): void {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send('terminal:exit', payload);
+      }
+    }
+  }
+
+  private broadcastTabsChanged(): void {
+    const tabs = this.listTabs();
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send('terminal:tabsChanged', { tabs });
+      }
+    }
+  }
+}
+
+export const terminalSessionService = new TerminalSessionService();

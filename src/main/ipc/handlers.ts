@@ -20,7 +20,14 @@ import { runtimeLogService } from '../services/RuntimeLogService';
 import { runExecutionService } from '../services/RunExecutionService';
 import { debugWorkflowService } from '../services/DebugWorkflowService';
 import { conversationService } from '../services/ConversationService';
-import type { DebugSessionStartRequest, OpenProjectInputRequest, RunSummary } from '@shared/types/session';
+import { terminalSessionService } from '../services/TerminalSessionService';
+import type {
+  DebugSessionStartRequest,
+  OpenProjectInputRequest,
+  ProjectInputRecord,
+  RunSummary,
+  SessionAttachmentRecord,
+} from '@shared/types/session';
 import type { RuntimeLogScope } from '@shared/types/runtimeLog';
 import type { ConversationSendRequest } from '@shared/types/conversation';
 
@@ -249,6 +256,13 @@ export function registerIPCHandlers(): void {
     return result.canceled ? null : result.filePaths;
   });
 
+  ipcMain.handle('dialog:selectFiles', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile', 'multiSelections'],
+    });
+    return result.canceled ? null : result.filePaths;
+  });
+
   ipcMain.handle('dialog:selectDirectory', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory', 'createDirectory'],
@@ -452,6 +466,20 @@ export function registerIPCHandlers(): void {
     return { success: true, inputs };
   });
 
+  ipcMain.handle('project:inputs:importPaths', async (_event, projectId: string, filePaths: string[]) => {
+    try {
+      const inputs = storageAdapter.importProjectInputs(projectId, filePaths ?? []);
+      broadcastToRenderer('project:inputsChanged', { projectId, inputs });
+      return { success: true, inputs };
+    } catch (error) {
+      return {
+        success: false,
+        inputs: [] as ProjectInputRecord[],
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+
   ipcMain.handle('session:list', async (_event, projectId?: string) => {
     const resolvedProjectId = projectId || currentProjectId;
     if (!resolvedProjectId) {
@@ -540,6 +568,27 @@ export function registerIPCHandlers(): void {
     };
   });
 
+  ipcMain.handle('session:attachments:list', async (_event, sessionId: string) => {
+    return {
+      attachments: storageAdapter.listSessionAttachments(sessionId),
+    };
+  });
+
+  ipcMain.handle('session:attachments:import', async (_event, sessionId: string, filePaths: string[]) => {
+    try {
+      return {
+        success: true,
+        attachments: storageAdapter.importSessionAttachments(sessionId, filePaths ?? []),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        attachments: [] as SessionAttachmentRecord[],
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+
   ipcMain.handle('run:list', async (_event, sessionId: string) => {
     return { runs: storageAdapter.listRuns(sessionId) };
   });
@@ -548,6 +597,75 @@ export function registerIPCHandlers(): void {
     return {
       entries: runtimeLogService.list(request.scope, request.sessionId),
     };
+  });
+
+  ipcMain.handle('terminal:listTabs', async () => {
+    return {
+      tabs: terminalSessionService.listTabs(),
+    };
+  });
+
+  ipcMain.handle('terminal:createTab', async (_event, request?: { cwd?: string | null }) => {
+    try {
+      const tab = terminalSessionService.createTab(request);
+      return {
+        success: true,
+        tab,
+        tabs: terminalSessionService.listTabs(),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        tabs: terminalSessionService.listTabs(),
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+
+  ipcMain.handle('terminal:closeTab', async (_event, tabId: string) => {
+    try {
+      return {
+        success: true,
+        tabs: terminalSessionService.closeTab(tabId),
+      };
+    } catch (error) {
+      return {
+        success: false,
+        tabs: terminalSessionService.listTabs(),
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+
+  ipcMain.handle('terminal:activateTab', async (_event, tabId: string) => {
+    return {
+      success: true,
+      tabs: terminalSessionService.activateTab(tabId),
+    };
+  });
+
+  ipcMain.handle('terminal:write', async (_event, tabId: string, data: string) => {
+    try {
+      terminalSessionService.write(tabId, data);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+
+  ipcMain.handle('terminal:resize', async (_event, tabId: string, cols: number, rows: number) => {
+    try {
+      terminalSessionService.resize(tabId, cols, rows);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   });
 
   ipcMain.handle('context:get', async () => {
@@ -1040,7 +1158,4 @@ export function setMainWindow(window: BrowserWindow): void {
 export async function stopAllActiveRuns(): Promise<void> {
   await runExecutionService.stopAll();
 }
-
-
-
 

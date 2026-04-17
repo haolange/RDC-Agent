@@ -54,7 +54,7 @@ test.describe('live debugger mainchain', () => {
         };
       }, LIVE_PROJECT_ROOT);
 
-      await ctx.page.locator('input.chat-input').fill(LIVE_TASK_PATH);
+await ctx.page.locator('textarea.chat-input').fill(LIVE_TASK_PATH);
       await ctx.page.locator('[data-testid="debugger-start-button"]').click();
       await expect(ctx.page.locator('[data-testid="plan-intake-panel"]')).toContainText('Character_EyeSpark_Desktop.rdc', { timeout: 180000 });
       await expect(ctx.page.locator('[data-testid="plan-approve-button"]')).toBeEnabled({ timeout: 60000 });

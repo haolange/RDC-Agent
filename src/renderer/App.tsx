@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DebuggerPage } from './pages/Debugger';
 import { ControlPanel } from './components/ControlPanel';
 import { DeviceSelector } from './components/DeviceSelector';
@@ -6,6 +6,7 @@ import { Sidebar } from './components/Sidebar';
 import { UserMenu } from './components/UserMenu';
 import { SettingsModal } from './components/SettingsModal';
 import { TerminalDrawer } from './components/TerminalDrawer';
+import { ModeGlyph } from './components/ModeGlyph';
 import { useLayoutStore } from './stores/layoutStore';
 import { useSessionStore } from './stores/sessionStore';
 import { useDeviceStore } from './stores/deviceStore';
@@ -13,13 +14,12 @@ import { useAppSettingsStore } from './stores/appSettingsStore';
 import { useTerminalStore } from './stores/terminalStore';
 import { useI18n } from './i18n';
 import type { AgentTimelineEntry } from '@shared/types/agent';
-import type { ConversationMessage } from '@shared/types/conversation';
+import type { ConversationAttachmentInput, ConversationMessage } from '@shared/types/conversation';
 import type { ToolTraceEntry } from '@shared/types/tool';
 import type { ReplayDeviceStatusChangedPayload } from '@shared/types/device';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 import type { AppSettings, ResolvedTheme } from '@shared/types/settings';
 import type { ActionEvent } from '@shared/types/evidence';
-import type { AgentMode } from '@shared/types/layout';
 import type {
   CaptureDescriptor,
   ContextSnapshot,
@@ -27,6 +27,7 @@ import type {
   ProjectInputRecord,
   ProjectRecord,
   RunSummary,
+  SessionAttachmentRecord,
   SessionRecord,
 } from '@shared/types/session';
 import type { WorkflowState } from '@shared/types/workflow';
@@ -43,6 +44,12 @@ import {
 } from '@shared/constants/layout';
 
 type DragSide = 'left' | 'right';
+
+interface PendingAttachmentDraft extends ConversationAttachmentInput {
+  id: string;
+  kind: SessionAttachmentRecord['kind'];
+  isCapture: boolean;
+}
 
 interface WorkbenchSeedState {
   projects: ProjectRecord[];
@@ -67,6 +74,11 @@ type E2EWindow = Window & {
     resetWorkbenchState: () => void;
     getWorkbenchState: () => WorkbenchSeedState;
     setAppSettings: (settings: AppSettings) => void;
+    setComposerDraftState: (state: {
+      promptValue?: string;
+      pendingAttachments?: PendingAttachmentDraft[];
+      currentMode?: 'debugger' | 'analyzer' | 'optimizer';
+    }) => void;
   };
 };
 
@@ -257,7 +269,7 @@ const mapActionEventToTimelineEntry = (event: ActionEvent): AgentTimelineEntry |
         id: event.event_id,
         type: 'system',
         title: 'Report',
-        content: `调试报告已生成：${String(event.payload.htmlPath || event.payload.markdownPath || 'reports ready')}`,
+        content: `璋冭瘯鎶ュ憡宸茬敓鎴愶細${String(event.payload.htmlPath || event.payload.markdownPath || 'reports ready')}`,
         actionEvent: event,
         timestamp: event.ts_ms,
       };
@@ -266,16 +278,45 @@ const mapActionEventToTimelineEntry = (event: ActionEvent): AgentTimelineEntry |
   }
 };
 
-const PlaceholderModePage: React.FC<{ mode: AgentMode }> = ({ mode }) => (
-  <div className="debugger-page debugger-workspace" data-testid={`${mode}-placeholder-page`}>
-    <div className="workspace-shell">
-      <section className="debugger-idle-simple">
-        <div className="debugger-idle-emoji" aria-hidden="true"> </div>
-        <h1 className="debugger-idle-simple-title">{mode === 'analyzer' ? 'Analyzer' : 'Optimizer'}</h1>
-      </section>
-    </div>
-  </div>
-);
+const inferAttachmentKind = (filePath: string): SessionAttachmentRecord['kind'] =>
+  /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(filePath) ? 'image' : 'file';
+
+const inferAttachmentMimeType = (filePath: string): string => {
+  const extension = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
+  const mimeByExtension: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.bmp': 'image/bmp',
+    '.svg': 'image/svg+xml',
+    '.pdf': 'application/pdf',
+    '.txt': 'text/plain',
+    '.md': 'text/markdown',
+    '.json': 'application/json',
+    '.zip': 'application/zip',
+    '.7z': 'application/x-7z-compressed',
+    '.log': 'text/plain',
+    '.rdc': 'application/octet-stream',
+  };
+
+  return mimeByExtension[extension] || 'application/octet-stream';
+};
+
+const formatBytes = (size: number | null | undefined): string => {
+  if (!size || size <= 0) {
+    return '';
+  }
+
+  if (size < 1024) {
+    return `${size} B`;
+  }
+  if (size < 1024 * 1024) {
+    return `${Math.round(size / 1024)} KB`;
+  }
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 const App: React.FC = () => {
   const { t } = useI18n();
@@ -289,14 +330,17 @@ const App: React.FC = () => {
   const [isResizing, setIsResizing] = useState(false);
   const [promptValue, setPromptValue] = useState('');
   const [isPromptSending, setIsPromptSending] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachmentDraft[]>([]);
+  const [modeMenuOpen, setModeMenuOpen] = useState(false);
 
   const appBodyRef = useRef<HTMLDivElement>(null);
+  const promptInputRef = useRef<HTMLTextAreaElement>(null);
+  const modeMenuRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{ side: DragSide; startX: number; startWidth: number } | null>(null);
 
   const currentProject = useSessionStore((state) => state.currentProject);
   const currentSession = useSessionStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
-  const workflowState = useSessionStore((state) => state.workflowState);
   const currentMode = useLayoutStore((state) => state.currentMode);
   const leftSidebarCollapsed = useLayoutStore((state) => state.leftSidebarCollapsed);
   const rightPanelCollapsed = useLayoutStore((state) => state.rightPanelCollapsed);
@@ -322,7 +366,7 @@ const App: React.FC = () => {
     ? systemTheme
     : settings.appearance.theme;
   const nickname = settings.profile.nickname || t('sidebar.userName');
-  const showWorkbenchShell = currentMode === 'debugger';
+  const showWorkbenchShell = true;
   const hasActiveDebugRun = Boolean(currentRun && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status));
   const isTerminalOpen = useTerminalStore((state) => state.isOpen);
   const toggleTerminalOpen = useTerminalStore((state) => state.toggleOpen);
@@ -379,6 +423,46 @@ const App: React.FC = () => {
     const timeoutId = window.setTimeout(() => setShellNotice(null), 3200);
     return () => window.clearTimeout(timeoutId);
   }, [shellNotice]);
+
+  useEffect(() => {
+    setPendingAttachments([]);
+  }, [currentProject?.projectId]);
+
+  useEffect(() => {
+    if (!modeMenuOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!modeMenuRef.current?.contains(target)) {
+        setModeMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setModeMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [modeMenuOpen]);
+
+  useEffect(() => {
+    const textarea = promptInputRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = '0px';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+  }, [currentMode, promptValue]);
 
   useEffect(() => {
     setActiveTerminalSessionId(currentSession?.sessionId ?? null);
@@ -498,6 +582,17 @@ const App: React.FC = () => {
       },
       setAppSettings: (nextSettings) => {
         useAppSettingsStore.getState().hydrate(nextSettings, useAppSettingsStore.getState().systemTheme);
+      },
+      setComposerDraftState: (state) => {
+        if (typeof state.promptValue === 'string') {
+          setPromptValue(state.promptValue);
+        }
+        if (Array.isArray(state.pendingAttachments)) {
+          setPendingAttachments(state.pendingAttachments);
+        }
+        if (state.currentMode) {
+          useLayoutStore.getState().setCurrentMode(state.currentMode);
+        }
       },
     };
 
@@ -909,7 +1004,11 @@ const App: React.FC = () => {
   const devices = useDeviceStore((state) => state.devices);
   const selectedDevice = useDeviceStore((state) => state.selectedDevice);
   const selectedDeviceEntry = devices.find((device) => device.id === selectedDevice);
-  const showMainPromptBar = currentMode === 'debugger';
+  const showMainPromptBar = true;
+  const hasMessageContent = Boolean(promptValue.trim());
+  const hasPendingAttachments = pendingAttachments.length > 0;
+  const currentModeConfig = AGENT_MODES.find((mode) => mode.id === currentMode) ?? AGENT_MODES[0];
+  const promptPlaceholder = `向 ${currentModeConfig.label} 输入问题或附加素材`;
   const resolvedWidths = useMemo(
     () => resolveSidebarWidths(
       appBodyWidth,
@@ -963,15 +1062,72 @@ const App: React.FC = () => {
 
     try {
       await electronAPI.workflow.stop(currentRun.runId);
-      showNotice('已请求停止当前调试任务。');
+      showNotice('Stop request sent for the current debugger run.');
     } catch (error) {
       showNotice(error instanceof Error ? error.message : 'Failed to stop run.');
     }
   }, [currentRun, showNotice]);
 
+  const handleAttachmentSelect = useCallback(async () => {
+    const electronAPI = window.electronAPI;
+    if (!electronAPI) {
+      return;
+    }
+
+    if (!currentProject) {
+      if (effectiveLeftCollapsed && !leftToggleDisabled) {
+        void toggleLeftSidebar();
+      }
+      showNotice('请先选择一个项目，再附加图片、文件或 .rdc capture。');
+      return;
+    }
+
+    const filePaths = await electronAPI.selectFiles();
+    if (!filePaths?.length) {
+      return;
+    }
+
+    const capturePaths = filePaths.filter((filePath) => /\.rdc$/i.test(filePath));
+    const regularPaths = filePaths.filter((filePath) => !/\.rdc$/i.test(filePath));
+
+    if (capturePaths.length > 0) {
+      const importResult = await electronAPI.project.inputs.importPaths(currentProject.projectId, capturePaths);
+      if (!importResult.success) {
+        showNotice(importResult.error || 'Failed to import .rdc files.');
+      } else {
+        showNotice(`Imported ${capturePaths.length} capture file${capturePaths.length > 1 ? 's' : ''} into this project.`);
+      }
+    }
+
+    if (regularPaths.length > 0) {
+      setPendingAttachments((current) => {
+        const existingByPath = new Set(current.map((entry) => entry.sourcePath));
+        const nextEntries = regularPaths
+          .filter((filePath) => !existingByPath.has(filePath))
+          .map<PendingAttachmentDraft>((filePath) => ({
+            id: `draft-${filePath}-${Date.now()}`,
+            sourcePath: filePath,
+            fileName: filePath.split(/[\\/]/).pop() || filePath,
+            mimeType: inferAttachmentMimeType(filePath),
+            size: null,
+            kind: inferAttachmentKind(filePath),
+            isCapture: false,
+          }));
+        return current.concat(nextEntries);
+      });
+      showNotice(`Staged ${regularPaths.length} file${regularPaths.length > 1 ? 's' : ''} for this message.`);
+    }
+  }, [currentProject, effectiveLeftCollapsed, leftToggleDisabled, showNotice, toggleLeftSidebar]);
+
+  const handlePendingAttachmentRemove = useCallback((attachmentId: string) => {
+    setPendingAttachments((current) => current.filter((entry) => entry.id !== attachmentId));
+  }, []);
+
   const handlePromptSend = useCallback(async () => {
     const trimmed = promptValue.trim();
-    if (!trimmed || isPromptSending) return;
+    if ((!trimmed && pendingAttachments.length === 0) || isPromptSending) {
+      return;
+    }
 
     const electronAPI = window.electronAPI;
     if (!electronAPI) return;
@@ -983,10 +1139,18 @@ const App: React.FC = () => {
         sessionId: currentSession?.sessionId ?? null,
         currentRunId: currentRun?.runId ?? null,
         replayDeviceId: selectedDeviceEntry?.id ?? null,
+        mode: currentMode,
         message: trimmed,
+        attachments: pendingAttachments.map<ConversationAttachmentInput>((attachment) => ({
+          sourcePath: attachment.sourcePath,
+          fileName: attachment.fileName,
+          mimeType: attachment.mimeType,
+          size: attachment.size,
+        })),
       });
 
       setPromptValue('');
+      setPendingAttachments([]);
 
       if (result.session?.projectId && currentProject?.projectId !== result.session.projectId) {
         const projectsResult = await electronAPI.project.list();
@@ -1027,8 +1191,20 @@ const App: React.FC = () => {
           sessionId: currentSession?.sessionId ?? null,
           projectId: currentProject?.projectId ?? null,
           runId: currentRun?.runId ?? null,
+          modeContext: currentMode,
           role: 'user',
           content: trimmed,
+          attachments: pendingAttachments.map((attachment) => ({
+            attachmentId: `local-${attachment.id}`,
+            sessionId: currentSession?.sessionId ?? '',
+            projectId: currentProject?.projectId ?? '',
+            kind: attachment.kind,
+            fileName: attachment.fileName,
+            filePath: attachment.sourcePath,
+            mimeType: attachment.mimeType || 'application/octet-stream',
+            size: attachment.size || 0,
+            createdAt: Date.now(),
+          })),
           createdAt: Date.now(),
         },
         {
@@ -1036,6 +1212,7 @@ const App: React.FC = () => {
           sessionId: currentSession?.sessionId ?? null,
           projectId: currentProject?.projectId ?? null,
           runId: currentRun?.runId ?? null,
+          modeContext: currentMode,
           role: 'assistant',
           agentId: 'rdc-debugger',
           content: error instanceof Error ? error.message : 'Conversation request failed.',
@@ -1047,10 +1224,12 @@ const App: React.FC = () => {
     }
   }, [
     currentProject,
+    currentMode,
     currentRun,
     currentSession,
     hasActiveDebugRun,
     isPromptSending,
+    pendingAttachments,
     promptValue,
     selectedDeviceEntry,
     setConversationMessages,
@@ -1062,8 +1241,8 @@ const App: React.FC = () => {
     setSessions,
   ]);
 
-  const handlePromptKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
+  const handlePromptKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       void handlePromptSend();
     }
@@ -1078,7 +1257,7 @@ const App: React.FC = () => {
     setIsResizing(true);
   }, []);
 
-  const renderMainPage = () => (currentMode === 'debugger' ? <DebuggerPage /> : <PlaceholderModePage mode={currentMode} />);
+  const renderMainPage = () => <DebuggerPage mode={currentMode} />;
 
   if (isLoading) {
     return (
@@ -1099,22 +1278,6 @@ const App: React.FC = () => {
             <div className="app-logo-copy">
               <span className="app-logo-text">RDC Agent</span>
             </div>
-          </div>
-        </div>
-        <div className="app-titlebar-center no-drag">
-          <div className="mode-switcher" role="tablist" aria-label="Mode switcher">
-            {AGENT_MODES.map((mode) => (
-              <button
-                key={mode.id}
-                type="button"
-                className={`mode-switcher-item ${currentMode === mode.id ? 'active' : ''}`}
-                role="tab"
-                aria-selected={currentMode === mode.id}
-                onClick={() => setCurrentMode(mode.id)}
-              >
-                {mode.label}
-              </button>
-            ))}
           </div>
         </div>
         <div className="app-titlebar-right no-drag">
@@ -1170,7 +1333,7 @@ const App: React.FC = () => {
                 className="shell-panel-toggle"
                 onClick={!leftToggleDisabled ? () => void toggleLeftSidebar() : undefined}
                 aria-label={effectiveLeftCollapsed ? 'Expand left sidebar' : 'Collapse left sidebar'}
-                title={leftToggleDisabled ? '窗口过窄，左侧栏已自动收起' : (effectiveLeftCollapsed ? '展开左侧栏' : '收起左侧栏')}
+                title={leftToggleDisabled ? 'Auto-collapsed at this width.' : (effectiveLeftCollapsed ? 'Expand left sidebar' : 'Collapse left sidebar')}
                 disabled={leftToggleDisabled}
               >
                 <span className="shell-panel-toggle-icon">
@@ -1226,7 +1389,7 @@ const App: React.FC = () => {
             aria-hidden="true"
           />
 
-          <main className="app-main">
+          <main className={`app-main ${isTerminalOpen ? 'terminal-open' : ''}`}>
             <div className="main-content">
               {shellNotice && (
                 <div className="shell-notice" role="status" aria-live="polite">
@@ -1237,7 +1400,7 @@ const App: React.FC = () => {
                 <div className="main-utility-spacer" />
                 <button
                   type="button"
-                  className={`main-utility-toggle ${isTerminalOpen ? 'active' : ''}`}
+                  className={`main-utility-toggle terminal-pill ${isTerminalOpen ? 'active' : ''}`}
                   onClick={() => toggleTerminalOpen()}
                   data-testid="terminal-toggle"
                   aria-label={isTerminalOpen ? t('terminal.close') : t('terminal.open')}
@@ -1247,7 +1410,6 @@ const App: React.FC = () => {
                     <path d="M4 17l6-6-6-6" />
                     <path d="M12 19h8" />
                   </svg>
-                  <span>{t('terminal.title')}</span>
                 </button>
               </div>
               <div className="main-page-shell">
@@ -1256,50 +1418,141 @@ const App: React.FC = () => {
             </div>
             {showMainPromptBar && (
               <div className="main-input-bar">
-                <div className="chat-input-wrapper">
-                  <input
-                    type="text"
-                    className="chat-input"
-                    name="debuggerPrompt"
-                    value={promptValue}
-                    onChange={(event) => setPromptValue(event.target.value)}
-                    onKeyDown={handlePromptKeyDown}
-                    placeholder={hasActiveDebugRun && workflowState?.approvalState === 'pending_user'
-                      ? 'Plan is ready. Approve it in the intake panel to start execution.'
-                      : t('app.inputPlaceholder')}
-                    aria-label={hasActiveDebugRun && workflowState?.approvalState === 'pending_user'
-                      ? 'Plan is ready. Approve it in the intake panel to start execution.'
-                      : t('app.inputPlaceholder')}
-                  />
-                  {hasActiveDebugRun && currentRun && (
-                    <button
-                      type="button"
-                      className="chat-send-button chat-stop-button"
-                      data-testid="debugger-stop-button"
-                      onClick={() => void handleStopRun()}
-                      disabled={currentRun.status === 'stopping'}
-                      aria-label="Stop debugger run"
-                      title="停止当前调试"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <rect x="6" y="6" width="12" height="12" rx="1" />
-                      </svg>
-                    </button>
+                <div
+                  className="composer-shell"
+                  style={{ ['--composer-mode-accent' as string]: currentModeConfig.accentColor }}
+                >
+                  {pendingAttachments.length > 0 && (
+                    <div className="composer-attachments" data-testid="composer-attachments">
+                      {pendingAttachments.map((attachment) => (
+                        <div key={attachment.id} className={`composer-attachment-chip ${attachment.kind}`}>
+                          <span className="composer-attachment-chip-icon" aria-hidden="true">
+                            {attachment.kind === 'image' ? 'IMG' : 'FILE'}
+                          </span>
+                          <span className="composer-attachment-chip-copy">
+                            <span className="composer-attachment-chip-name">{attachment.fileName}</span>
+                            <span className="composer-attachment-chip-meta">{formatBytes(attachment.size)}</span>
+                          </span>
+                          <button
+                            type="button"
+                            className="composer-attachment-chip-remove"
+                            onClick={() => handlePendingAttachmentRemove(attachment.id)}
+                            aria-label={`Remove ${attachment.fileName}`}
+                          >
+                            x
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   )}
-                  <button
-                    type="button"
-                    className="chat-send-button"
-                    data-testid={hasActiveDebugRun ? 'debugger-send-button' : 'debugger-start-button'}
-                    onClick={() => void handlePromptSend()}
-                    disabled={!promptValue.trim() || isPromptSending}
-                    aria-label={hasActiveDebugRun ? 'Send debugger message' : 'Send debugger message'}
-                    title={hasActiveDebugRun ? '发送消息' : '发送消息'}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <line x1="22" y1="2" x2="11" y2="13" />
-                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                    </svg>
-                  </button>
+                  <div className="composer-input-row">
+                    <textarea
+                      ref={promptInputRef}
+                      className="chat-input composer-textarea"
+                      name="debuggerPrompt"
+                      value={promptValue}
+                      onChange={(event) => setPromptValue(event.target.value)}
+                      onKeyDown={handlePromptKeyDown}
+                      placeholder={promptPlaceholder}
+                      aria-label={promptPlaceholder}
+                      rows={1}
+                    />
+                  </div>
+                  <div className="composer-toolbar-row">
+                    <div className="composer-toolbar-group">
+                      <button
+                        type="button"
+                        className="composer-attach-button"
+                        data-testid="composer-attach-button"
+                        onClick={() => void handleAttachmentSelect()}
+                        disabled={isPromptSending}
+                        title={!currentProject ? '选择项目后可附加图片、文件或 .rdc capture' : '添加图片、文件或 .rdc capture'}
+                        aria-label={!currentProject ? '选择项目后可附加图片、文件或 .rdc capture' : '添加图片、文件或 .rdc capture'}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M12 5v14" />
+                          <path d="M5 12h14" />
+                        </svg>
+                      </button>
+                      <div ref={modeMenuRef} className="composer-agent-menu">
+                        <button
+                          type="button"
+                          className={`composer-agent-pill ${modeMenuOpen ? 'open' : ''}`}
+                          data-testid="composer-mode-pill"
+                          onClick={() => setModeMenuOpen((current) => !current)}
+                          aria-haspopup="menu"
+                          aria-expanded={modeMenuOpen}
+                        >
+                          <span className="composer-agent-pill-icon" aria-hidden="true">
+                            <ModeGlyph mode={currentMode} size={15} strokeWidth={1.9} />
+                          </span>
+                          <span className="composer-agent-pill-label">{currentModeConfig.label}</span>
+                          <span className="composer-agent-pill-caret" aria-hidden="true">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                          </span>
+                        </button>
+                        {modeMenuOpen && (
+                          <div className="composer-agent-menu-popup" role="menu">
+                            {AGENT_MODES.map((mode) => (
+                              <button
+                                key={mode.id}
+                                type="button"
+                                className={`composer-agent-menu-item ${currentMode === mode.id ? 'active' : ''}`}
+                                data-testid={`mode-menu-item-${mode.id}`}
+                                role="menuitemradio"
+                                aria-checked={currentMode === mode.id}
+                                onClick={() => {
+                                  setCurrentMode(mode.id);
+                                  setModeMenuOpen(false);
+                                }}
+                              >
+                                <span className="composer-agent-menu-item-copy">
+                                  <span className="composer-agent-menu-item-icon" aria-hidden="true">
+                                    <ModeGlyph mode={mode.id} size={15} strokeWidth={1.9} />
+                                  </span>
+                                  <span className="composer-agent-menu-item-label">{mode.label}</span>
+                                </span>
+                                {currentMode === mode.id ? <span className="composer-agent-menu-item-check">●</span> : null}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="composer-toolbar-group composer-toolbar-group-right">
+                      {hasActiveDebugRun && currentRun && (
+                        <button
+                          type="button"
+                          className="chat-send-button chat-stop-button"
+                          data-testid="debugger-stop-button"
+                          onClick={() => void handleStopRun()}
+                          disabled={currentRun.status === 'stopping'}
+                          aria-label="Stop debugger run"
+                          title="Stop debugger run"
+                        >
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="6" y="6" width="12" height="12" rx="1" />
+                          </svg>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="chat-send-button"
+                        data-testid={hasActiveDebugRun ? 'debugger-send-button' : 'debugger-start-button'}
+                        onClick={() => void handlePromptSend()}
+                        disabled={(!hasMessageContent && !hasPendingAttachments) || isPromptSending}
+                        aria-label={`Send ${currentModeConfig.label} message`}
+                        title={`Send ${currentModeConfig.label} message`}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <line x1="22" y1="2" x2="11" y2="13" />
+                          <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1322,7 +1575,7 @@ const App: React.FC = () => {
                 className="shell-panel-toggle"
                 onClick={!rightToggleDisabled ? () => void toggleRightPanel() : undefined}
                 aria-label={effectiveRightCollapsed ? 'Expand right panel' : 'Collapse right panel'}
-                title={rightToggleDisabled ? '窗口过窄，右侧栏已自动收起' : (effectiveRightCollapsed ? '展开右侧栏' : '收起右侧栏')}
+                title={rightToggleDisabled ? 'Auto-collapsed at this width.' : (effectiveRightCollapsed ? 'Expand right panel' : 'Collapse right panel')}
                 disabled={rightToggleDisabled}
               >
                 <span className="shell-panel-toggle-icon">
@@ -1375,3 +1628,5 @@ const App: React.FC = () => {
 };
 
 export default App;
+
+

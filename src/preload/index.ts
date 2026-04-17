@@ -6,7 +6,14 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { ConversationMessage, ConversationSendRequest, ConversationTurnResult } from '@shared/types/conversation';
 import type { ElectronAPI } from '@shared/types/electron';
 import type { AppSettings, AppSettingsPatch } from '@shared/types/settings';
-import type { OpenedCaptureState, ProjectInputRecord, ProjectRecord, SessionRecord } from '@shared/types/session';
+import type {
+  OpenedCaptureState,
+  ProjectInputRecord,
+  ProjectRecord,
+  SessionAttachmentRecord,
+  SessionRecord,
+} from '@shared/types/session';
+import type { TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
 import type { RuntimeLogEntry, RuntimeLogScope } from '@shared/types/runtimeLog';
 
 const listenerMap = new Map<string, Map<(...args: unknown[]) => void, (...args: unknown[]) => void>>();
@@ -32,6 +39,9 @@ const validChannels = [
   'project:inputsChanged',
   'capture:openedStateChanged',
   'runtime:logAppended',
+  'terminal:data',
+  'terminal:exit',
+  'terminal:tabsChanged',
 ] as const;
 
 const isValidChannel = (channel: string): channel is (typeof validChannels)[number] => {
@@ -59,6 +69,7 @@ const electronAPI = {
     getHistory: (sessionId: string): Promise<{ messages: ConversationMessage[] }> => ipcRenderer.invoke('conversation:getHistory', sessionId),
   },
 
+  selectFiles: (): Promise<string[] | null> => ipcRenderer.invoke('dialog:selectFiles'),
   selectRdcFiles: (): Promise<string[] | null> => ipcRenderer.invoke('dialog:selectRdcFiles'),
   selectDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectDirectory'),
 
@@ -118,6 +129,8 @@ const electronAPI = {
       refresh: (projectId: string): Promise<{ inputs: ProjectInputRecord[] }> => ipcRenderer.invoke('project:inputs:refresh', projectId),
       import: (projectId: string): Promise<{ success: boolean; inputs: ProjectInputRecord[]; error?: string }> =>
         ipcRenderer.invoke('project:inputs:import', projectId),
+      importPaths: (projectId: string, filePaths: string[]): Promise<{ success: boolean; inputs: ProjectInputRecord[]; error?: string }> =>
+        ipcRenderer.invoke('project:inputs:importPaths', projectId, filePaths),
     },
   },
 
@@ -136,6 +149,12 @@ const electronAPI = {
     remove: (id: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('session:remove', id),
     select: (id: string): Promise<unknown> => ipcRenderer.invoke('session:select', id),
+    attachments: {
+      list: (sessionId: string): Promise<{ attachments: SessionAttachmentRecord[] }> =>
+        ipcRenderer.invoke('session:attachments:list', sessionId),
+      import: (sessionId: string, filePaths: string[]): Promise<{ success: boolean; attachments: SessionAttachmentRecord[]; error?: string }> =>
+        ipcRenderer.invoke('session:attachments:import', sessionId, filePaths),
+    },
   },
 
   run: {
@@ -145,6 +164,20 @@ const electronAPI = {
   runtimeLog: {
     list: (request: { scope: RuntimeLogScope; sessionId?: string | null }): Promise<{ entries: RuntimeLogEntry[] }> =>
       ipcRenderer.invoke('runtimeLog:list', request),
+  },
+
+  terminal: {
+    listTabs: (): Promise<{ tabs: TerminalTabRecord[] }> => ipcRenderer.invoke('terminal:listTabs'),
+    createTab: (request?: { cwd?: string | null }): Promise<{ success: boolean; tab?: TerminalTabRecord; tabs: TerminalTabRecord[]; error?: string }> =>
+      ipcRenderer.invoke('terminal:createTab', request),
+    closeTab: (tabId: string): Promise<{ success: boolean; tabs: TerminalTabRecord[]; error?: string }> =>
+      ipcRenderer.invoke('terminal:closeTab', tabId),
+    activateTab: (tabId: string): Promise<{ success: boolean; tabs: TerminalTabRecord[]; error?: string }> =>
+      ipcRenderer.invoke('terminal:activateTab', tabId),
+    write: (tabId: string, data: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('terminal:write', tabId, data),
+    resize: (tabId: string, cols: number, rows: number): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('terminal:resize', tabId, cols, rows),
   },
 
   capture: {
@@ -201,6 +234,15 @@ const electronAPI = {
     },
     onRuntimeLogAppended: (callback: (entry: RuntimeLogEntry) => void): void => {
       ipcRenderer.on('runtime:logAppended', (_event, payload) => callback(payload));
+    },
+    onTerminalData: (callback: (event: TerminalDataEvent) => void): void => {
+      ipcRenderer.on('terminal:data', (_event, payload) => callback(payload));
+    },
+    onTerminalExit: (callback: (event: TerminalExitEvent) => void): void => {
+      ipcRenderer.on('terminal:exit', (_event, payload) => callback(payload));
+    },
+    onTerminalTabsChanged: (callback: (payload: { tabs: TerminalTabRecord[] }) => void): void => {
+      ipcRenderer.on('terminal:tabsChanged', (_event, payload) => callback(payload));
     },
     onAppThemeChanged: (callback: (theme: 'dark' | 'light') => void): void => {
       ipcRenderer.on('app:themeChanged', (_event, theme) => callback(theme));

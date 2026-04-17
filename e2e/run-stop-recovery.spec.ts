@@ -51,7 +51,7 @@ test('运行中的 Debugger 任务可停止并最终转为 cancelled', async () 
     const seeded = await seedProject(ctx.page, projectRoot, 'Stop Session');
     await configureTestDebuggerRoutes(ctx.page);
 
-    await ctx.page.locator('input.chat-input').fill('slow-run 调试 Character_EyeSpark_Desktop.rdc，Event ID 6152');
+await ctx.page.locator('textarea.chat-input').fill('slow-run 调试 Character_EyeSpark_Desktop.rdc，Event ID 6152');
     await ctx.page.locator('[data-testid="debugger-start-button"]').click();
     await expect(ctx.page.locator('[data-testid="plan-approve-button"]')).toBeEnabled();
     await ctx.page.locator('[data-testid="plan-approve-button"]').click();
@@ -80,7 +80,7 @@ test('stale run 在应用重启后会被恢复为 interrupted，并支持 Restar
   const seeded = await seedProject(ctx.page, projectRoot, 'Recovery Session');
   await configureTestDebuggerRoutes(ctx.page);
 
-  await ctx.page.locator('input.chat-input').fill('调试 Character_EyeSpark_Desktop.rdc，Event ID 6152');
+await ctx.page.locator('textarea.chat-input').fill('调试 Character_EyeSpark_Desktop.rdc，Event ID 6152');
   await ctx.page.locator('[data-testid="debugger-start-button"]').click();
 
   const runMeta = await ctx.page.evaluate(() => (window as typeof window & {

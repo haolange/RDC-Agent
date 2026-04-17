@@ -1,0 +1,208 @@
+.empty-workbench-prompt {
+  --empty-mode-accent: #33d1ff;
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 18%, color-mix(in srgb, var(--empty-mode-accent) 18%, transparent), transparent 26%),
+    rgb(var(--color-bg-0));
+}
+
+.empty-workbench-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.03) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: linear-gradient(180deg, transparent, black 12%, black 88%, transparent);
+  opacity: 0.55;
+}
+
+.empty-workbench-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  width: min(760px, calc(100% - 72px));
+  text-align: center;
+}
+
+.empty-workbench-monument {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-workbench-monument-glow {
+  position: absolute;
+  width: 186px;
+  height: 186px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--empty-mode-accent) 24%, transparent);
+  opacity: 0.56;
+}
+
+.empty-workbench-monument-orbit,
+.empty-workbench-monument-beam {
+  position: absolute;
+  border-radius: 999px;
+}
+
+.empty-workbench-monument-orbit {
+  border: 1px solid color-mix(in srgb, var(--empty-mode-accent) 22%, transparent);
+}
+
+.empty-workbench-monument-orbit.orbit-a {
+  width: 138px;
+  height: 138px;
+}
+
+.empty-workbench-monument-orbit.orbit-b {
+  width: 168px;
+  height: 168px;
+  opacity: 0.64;
+}
+
+.empty-workbench-monument-beam {
+  width: 214px;
+  height: 10px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--empty-mode-accent) 36%, transparent), transparent);
+  transform: rotate(-22deg);
+  filter: blur(1px);
+  opacity: 0.88;
+}
+
+.empty-workbench-monument-core {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  border-radius: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 34% 32%, color-mix(in srgb, var(--empty-mode-accent) 62%, white 20%), transparent 30%),
+    linear-gradient(160deg, rgb(var(--color-bg-1)), rgb(var(--color-bg-3)));
+  border: 1px solid color-mix(in srgb, var(--empty-mode-accent) 34%, transparent);
+  box-shadow:
+    inset 0 0 0 1px rgb(255 255 255 / 0.03),
+    0 0 32px color-mix(in srgb, var(--empty-mode-accent) 18%, transparent);
+}
+
+.empty-workbench-monument-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-workbench-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(640px, 100%);
+}
+
+.empty-workbench-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--empty-mode-accent) 24%, rgb(var(--color-border-default)));
+  background: rgb(var(--color-bg-1) / 0.8);
+  color: rgb(var(--color-text-secondary));
+  font-size: 12px;
+  font-weight: var(--font-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.empty-workbench-kicker-icon {
+  display: inline-flex;
+}
+
+.empty-workbench-title {
+  margin: 0;
+  color: rgb(var(--color-text-primary));
+  font-size: clamp(28px, 3.2vw, 42px);
+  font-weight: var(--font-semibold);
+  line-height: 1.06;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+
+.empty-workbench-subtitle,
+.empty-workbench-helper {
+  margin: 0;
+  max-width: 600px;
+  text-wrap: balance;
+}
+
+.empty-workbench-subtitle {
+  color: rgb(var(--color-text-secondary));
+  font-size: clamp(15px, 1.5vw, 18px);
+  line-height: 1.5;
+}
+
+.empty-workbench-helper {
+  color: rgb(var(--color-text-tertiary));
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.app-main.terminal-open .empty-workbench-content {
+  transform: translateY(-14px) scale(0.94);
+  transform-origin: center center;
+}
+
+.app-main.terminal-open .empty-workbench-title {
+  font-size: clamp(24px, 2.8vw, 34px);
+}
+
+@media (max-width: 960px) {
+  .empty-workbench-content {
+    width: min(100%, calc(100% - 40px));
+    gap: 18px;
+  }
+
+  .empty-workbench-monument {
+    width: 128px;
+    height: 128px;
+  }
+
+  .empty-workbench-monument-glow {
+    width: 156px;
+    height: 156px;
+  }
+
+  .empty-workbench-monument-core {
+    width: 76px;
+    height: 76px;
+    border-radius: 24px;
+  }
+
+  .empty-workbench-title {
+    font-size: clamp(22px, 6.5vw, 30px);
+  }
+
+  .empty-workbench-subtitle {
+    font-size: 14px;
+  }
+
+  .empty-workbench-helper {
+    font-size: 12px;
+  }
+}

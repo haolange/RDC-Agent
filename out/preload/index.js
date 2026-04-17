@@ -21,7 +21,10 @@ const validChannels = [
   "context:changed",
   "project:inputsChanged",
   "capture:openedStateChanged",
-  "runtime:logAppended"
+  "runtime:logAppended",
+  "terminal:data",
+  "terminal:exit",
+  "terminal:tabsChanged"
 ];
 const isValidChannel = (channel) => {
   return validChannels.includes(channel);
@@ -43,6 +46,7 @@ const electronAPI = {
     sendMessage: (request) => electron.ipcRenderer.invoke("conversation:sendMessage", request),
     getHistory: (sessionId) => electron.ipcRenderer.invoke("conversation:getHistory", sessionId)
   },
+  selectFiles: () => electron.ipcRenderer.invoke("dialog:selectFiles"),
   selectRdcFiles: () => electron.ipcRenderer.invoke("dialog:selectRdcFiles"),
   selectDirectory: () => electron.ipcRenderer.invoke("dialog:selectDirectory"),
   workflow: {
@@ -91,7 +95,8 @@ const electronAPI = {
     inputs: {
       list: (projectId) => electron.ipcRenderer.invoke("project:inputs:list", projectId),
       refresh: (projectId) => electron.ipcRenderer.invoke("project:inputs:refresh", projectId),
-      import: (projectId) => electron.ipcRenderer.invoke("project:inputs:import", projectId)
+      import: (projectId) => electron.ipcRenderer.invoke("project:inputs:import", projectId),
+      importPaths: (projectId, filePaths) => electron.ipcRenderer.invoke("project:inputs:importPaths", projectId, filePaths)
     }
   },
   device: {
@@ -104,13 +109,25 @@ const electronAPI = {
     create: (projectId, title) => electron.ipcRenderer.invoke("session:create", projectId, title),
     rename: (id, title) => electron.ipcRenderer.invoke("session:rename", id, title),
     remove: (id) => electron.ipcRenderer.invoke("session:remove", id),
-    select: (id) => electron.ipcRenderer.invoke("session:select", id)
+    select: (id) => electron.ipcRenderer.invoke("session:select", id),
+    attachments: {
+      list: (sessionId) => electron.ipcRenderer.invoke("session:attachments:list", sessionId),
+      import: (sessionId, filePaths) => electron.ipcRenderer.invoke("session:attachments:import", sessionId, filePaths)
+    }
   },
   run: {
     list: (sessionId) => electron.ipcRenderer.invoke("run:list", sessionId)
   },
   runtimeLog: {
     list: (request) => electron.ipcRenderer.invoke("runtimeLog:list", request)
+  },
+  terminal: {
+    listTabs: () => electron.ipcRenderer.invoke("terminal:listTabs"),
+    createTab: (request) => electron.ipcRenderer.invoke("terminal:createTab", request),
+    closeTab: (tabId) => electron.ipcRenderer.invoke("terminal:closeTab", tabId),
+    activateTab: (tabId) => electron.ipcRenderer.invoke("terminal:activateTab", tabId),
+    write: (tabId, data) => electron.ipcRenderer.invoke("terminal:write", tabId, data),
+    resize: (tabId, cols, rows) => electron.ipcRenderer.invoke("terminal:resize", tabId, cols, rows)
   },
   capture: {
     list: () => electron.ipcRenderer.invoke("capture:list"),
@@ -161,6 +178,15 @@ const electronAPI = {
     },
     onRuntimeLogAppended: (callback) => {
       electron.ipcRenderer.on("runtime:logAppended", (_event, payload) => callback(payload));
+    },
+    onTerminalData: (callback) => {
+      electron.ipcRenderer.on("terminal:data", (_event, payload) => callback(payload));
+    },
+    onTerminalExit: (callback) => {
+      electron.ipcRenderer.on("terminal:exit", (_event, payload) => callback(payload));
+    },
+    onTerminalTabsChanged: (callback) => {
+      electron.ipcRenderer.on("terminal:tabsChanged", (_event, payload) => callback(payload));
     },
     onAppThemeChanged: (callback) => {
       electron.ipcRenderer.on("app:themeChanged", (_event, theme) => callback(theme));

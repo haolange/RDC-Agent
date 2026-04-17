@@ -51,7 +51,7 @@ test('配置好 route 后，普通寒暄会走 cowork agent 而不创建 run', a
   await seedProject(ctx.page, projectRoot);
   await configureTestDebuggerRoutes(ctx.page);
 
-  await ctx.page.locator('input.chat-input').fill('你好');
+await ctx.page.locator('textarea.chat-input').fill('你好');
   await ctx.page.locator('[data-testid="debugger-start-button"]').click();
 
   await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('你好，我是 RDC Debugger');
@@ -70,7 +70,7 @@ test('配置好 route 后，通用技术问题会得到正常回答，而不是 
   await seedProject(ctx.page, projectRoot);
   await configureTestDebuggerRoutes(ctx.page);
 
-  await ctx.page.locator('input.chat-input').fill('你知道什么是UE4么');
+await ctx.page.locator('textarea.chat-input').fill('你知道什么是UE4么');
   await ctx.page.locator('[data-testid="debugger-start-button"]').click();
 
   await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('Unreal Engine 4');

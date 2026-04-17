@@ -41,10 +41,6 @@
     padding-top var(--transition-base) var(--ease-standard);
 }
 
-.session-section:last-child {
-  flex: 0 0 auto;
-}
-
 .session-section.hidden {
   opacity: 0;
   transform: translateX(-12px);
@@ -57,14 +53,17 @@
   border-top-color: transparent;
 }
 
-.session-section-header {
+.session-section-header,
+.project-sessions-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   padding: 0 var(--space-2);
 }
 
-.session-section-heading {
+.session-section-heading,
+.project-sessions-heading {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -76,7 +75,8 @@
   gap: 6px;
 }
 
-.session-section-title {
+.session-section-title,
+.project-sessions-title {
   font-size: var(--text-xs);
   font-weight: var(--font-semibold);
   color: rgb(var(--color-text-tertiary));
@@ -130,6 +130,32 @@
   padding: 0;
 }
 
+.project-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.project-stack-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.project-stack-item.active {
+  padding: 10px;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgb(var(--color-accent-500) / 0.06), transparent 84%),
+    rgb(var(--color-bg-1) / 0.76);
+  border: 1px solid rgb(var(--color-border-default));
+}
+
+.project-list,
+.nested-session-list {
+  padding: 0;
+}
+
 .session-item {
   display: flex;
   flex-direction: column;
@@ -167,6 +193,17 @@
     linear-gradient(180deg, rgb(var(--color-accent-500) / 0.08), transparent 72%),
     rgb(var(--color-bg-2));
   box-shadow: inset 0 0 0 1px rgb(var(--color-accent-500) / 0.12);
+}
+
+.project-sessions-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.session-subitem {
+  min-height: 52px;
+  background: rgb(var(--color-bg-2) / 0.72);
 }
 
 .session-item-header {
@@ -242,28 +279,6 @@
   outline: none;
 }
 
-.session-item-status {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
-}
-
-.session-item-status.completed {
-  background: rgb(var(--color-success));
-  box-shadow: 0 0 6px rgb(var(--color-success) / 0.5);
-}
-
-.session-item-status.in-progress {
-  background: rgb(var(--color-info));
-  box-shadow: 0 0 6px rgb(var(--color-info) / 0.5);
-}
-
-.session-item-status.error {
-  background: rgb(var(--color-error));
-  box-shadow: 0 0 6px rgb(var(--color-error) / 0.5);
-}
-
 .session-item-time {
   color: rgb(var(--color-text-muted));
   font-size: var(--text-xs);
@@ -293,6 +308,10 @@
 .session-empty.compact {
   padding: var(--space-4) var(--space-3);
   align-items: flex-start;
+}
+
+.session-empty.compact.nested {
+  width: 100%;
 }
 
 .session-empty-icon {

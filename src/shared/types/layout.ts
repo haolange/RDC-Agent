@@ -1,20 +1,26 @@
 /**
- * Layout Types - 布局与模式类型定义
+ * Layout Types - Layout and mode-related type definitions
  */
 
-// Agent 工作模式
+// Agent work modes
 export type AgentMode = 'debugger' | 'analyzer' | 'optimizer';
 
-// 模式配置
+export type ModeIconKey = 'crosshair-bug' | 'waveform-gauge' | 'spark-tuning';
+
+// Mode configuration
 export interface ModeConfig {
   id: AgentMode;
   label: string;
-  icon: string;           // 图标标识
-  description: string;    // 简要说明
-  disabled: boolean;      // 是否禁用（Coming Soon）
+  icon: ModeIconKey;
+  description: string;
+  accentColor: string;
+  emptyTitle: string;
+  emptySubtitle: string;
+  helperCopy: string;
+  disabled: boolean;
 }
 
-// 面板状态
+// Panel state
 export interface PanelState {
   leftSidebarCollapsed: boolean;
   rightPanelCollapsed: boolean;
