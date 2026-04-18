@@ -50,6 +50,7 @@ test('共享工作台在三种模式下都可交互，空状态保持紧凑', as
   expect(titleBox).not.toBeNull();
   expect(titleBox!.height).toBeLessThan(140);
   expect(titleBox!.width).toBeLessThan(viewport.width * 0.8);
+  await expect(page.locator('.agent-chat')).toHaveClass(/is-empty/);
   await expect(page.locator('.empty-workbench-step')).toHaveCount(0);
 
   await page.locator('[data-testid="composer-mode-pill"]').click();

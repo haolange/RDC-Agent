@@ -120,13 +120,13 @@ const configureVisualSettings = async (ctx: AppContext): Promise<AppContext> => 
       layout: {
         leftSidebar: {
           collapsed: false,
-          width: 280,
-          expandedWidth: 280,
+          width: 256,
+          expandedWidth: 256,
         },
         rightPanel: {
           collapsed: false,
-          width: 280,
-          expandedWidth: 280,
+          width: 312,
+          expandedWidth: 312,
         },
       },
     });
@@ -334,7 +334,7 @@ const seedVisualWorkbench = async (page: Page) => {
 test.beforeEach(async () => {
   ctx = await launchApp();
   ctx = await configureVisualSettings(ctx);
-  await expect(ctx.page.locator('.session-empty').first()).toBeVisible();
+  await expect(ctx.page.locator('.session-section-header').first()).toBeVisible();
   await seedVisualWorkbench(ctx.page);
   await expect.poll(async () => ctx.page.evaluate(() => (
     (window as Window & {
@@ -355,6 +355,25 @@ test.beforeEach(async () => {
 
 test.afterEach(async () => {
   await closeApp(ctx);
+});
+
+test('empty workbench keeps a continuous background and centered focus', async () => {
+  const page = ctx.page;
+  const emptyPrompt = page.locator('[data-testid="empty-workbench-prompt"]');
+  const mainShell = page.locator('.main-page-shell');
+
+  await expect(emptyPrompt).toBeVisible();
+  await expect(page.locator('.agent-chat')).toHaveClass(/is-empty/);
+
+  const centerDelta = await getCenterDelta(page, '.chat-messages', '.empty-workbench-content');
+  expect(centerDelta).not.toBeNull();
+  expect(centerDelta?.deltaX ?? 99).toBeLessThanOrEqual(2);
+  expect(centerDelta?.deltaY ?? 99).toBeLessThanOrEqual(2);
+
+  const mainShellWidth = await mainShell.evaluate((element) => element.getBoundingClientRect().width);
+  expect(mainShellWidth).toBeGreaterThan(480);
+
+  await expect(emptyPrompt).toHaveScreenshot('empty-workbench.png');
 });
 
 test('右栏窄态视觉回归', async () => {

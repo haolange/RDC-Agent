@@ -365,17 +365,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="ui-skeleton ui-skeleton--card" style={{ height: '56px', marginBottom: 'var(--space-2)' }} />
               <div className="ui-skeleton ui-skeleton--card" style={{ height: '56px' }} />
             </div>
-          ) : projects.length === 0 ? (
-            <div className="session-empty">
-              <div className="session-empty-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2h6.5A2.5 2.5 0 0 1 21 9.5v8A2.5 2.5 0 0 1 18.5 20h-13A2.5 2.5 0 0 1 3 17.5z" />
-                </svg>
-              </div>
-              <div className="session-empty-text">{t('sidebar.noProjects')}</div>
-              <div className="session-empty-hint">{t('sidebar.noProjectsHint')}</div>
-            </div>
-          ) : (
+          ) : projects.length > 0 ? (
             <div className="project-stack">
               {projects.map((project) => {
                 const isActive = currentProject?.projectId === project.projectId;
@@ -484,7 +474,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 );
               })}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
 
