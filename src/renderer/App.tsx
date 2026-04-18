@@ -1279,8 +1279,46 @@ const App: React.FC = () => {
               <span className="app-logo-text">RDC Agent</span>
             </div>
           </div>
+          <button
+            type="button"
+            className="shell-panel-toggle titlebar-panel-toggle"
+            data-testid="titlebar-left-panel-toggle"
+            onClick={!leftToggleDisabled ? () => void toggleLeftSidebar() : undefined}
+            aria-label={effectiveLeftCollapsed ? 'Expand left sidebar' : 'Collapse left sidebar'}
+            title={leftToggleDisabled ? 'Auto-collapsed at this width.' : (effectiveLeftCollapsed ? 'Expand left sidebar' : 'Collapse left sidebar')}
+            disabled={leftToggleDisabled}
+          >
+            <span className="shell-panel-toggle-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                {effectiveLeftCollapsed ? (
+                  <polyline points="9 18 15 12 9 6" />
+                ) : (
+                  <polyline points="15 6 9 12 15 18" />
+                )}
+              </svg>
+            </span>
+          </button>
         </div>
         <div className="app-titlebar-right no-drag">
+          <button
+            type="button"
+            className="shell-panel-toggle titlebar-panel-toggle"
+            data-testid="titlebar-right-panel-toggle"
+            onClick={!rightToggleDisabled ? () => void toggleRightPanel() : undefined}
+            aria-label={effectiveRightCollapsed ? 'Expand right panel' : 'Collapse right panel'}
+            title={rightToggleDisabled ? 'Auto-collapsed at this width.' : (effectiveRightCollapsed ? 'Expand right panel' : 'Collapse right panel')}
+            disabled={rightToggleDisabled}
+          >
+            <span className="shell-panel-toggle-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                {effectiveRightCollapsed ? (
+                  <polyline points="9 18 15 12 9 6" />
+                ) : (
+                  <polyline points="15 18 9 12 15 6" />
+                )}
+              </svg>
+            </span>
+          </button>
           <div className="window-controls" role="group" aria-label="Window controls">
             <button
               type="button"
@@ -1327,26 +1365,6 @@ const App: React.FC = () => {
             className={`app-sidebar-left ${effectiveLeftCollapsed ? 'collapsed' : ''}`}
             data-testid="app-sidebar-left"
           >
-            <div className="shell-panel-header shell-panel-header-left">
-              <button
-                type="button"
-                className="shell-panel-toggle"
-                onClick={!leftToggleDisabled ? () => void toggleLeftSidebar() : undefined}
-                aria-label={effectiveLeftCollapsed ? 'Expand left sidebar' : 'Collapse left sidebar'}
-                title={leftToggleDisabled ? 'Auto-collapsed at this width.' : (effectiveLeftCollapsed ? 'Expand left sidebar' : 'Collapse left sidebar')}
-                disabled={leftToggleDisabled}
-              >
-                <span className="shell-panel-toggle-icon">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    {effectiveLeftCollapsed ? (
-                      <polyline points="9 18 15 12 9 6" />
-                    ) : (
-                      <polyline points="15 18 9 12 15 6" />
-                    )}
-                  </svg>
-                </span>
-              </button>
-            </div>
             <nav className="sidebar-nav">
               <Sidebar collapsed={effectiveLeftCollapsed} />
             </nav>
@@ -1396,8 +1414,7 @@ const App: React.FC = () => {
                   {shellNotice}
                 </div>
               )}
-              <div className="main-utility-bar">
-                <div className="main-utility-spacer" />
+              <div className="main-floating-utilities">
                 <button
                   type="button"
                   className={`main-utility-toggle terminal-pill ${isTerminalOpen ? 'active' : ''}`}
@@ -1569,26 +1586,6 @@ const App: React.FC = () => {
             className={`app-sidebar-right ${effectiveRightCollapsed ? 'collapsed' : ''}`}
             data-testid="app-sidebar-right"
           >
-            <div className="shell-panel-header shell-panel-header-right">
-              <button
-                type="button"
-                className="shell-panel-toggle"
-                onClick={!rightToggleDisabled ? () => void toggleRightPanel() : undefined}
-                aria-label={effectiveRightCollapsed ? 'Expand right panel' : 'Collapse right panel'}
-                title={rightToggleDisabled ? 'Auto-collapsed at this width.' : (effectiveRightCollapsed ? 'Expand right panel' : 'Collapse right panel')}
-                disabled={rightToggleDisabled}
-              >
-                <span className="shell-panel-toggle-icon">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    {effectiveRightCollapsed ? (
-                      <polyline points="9 18 15 12 9 6" />
-                    ) : (
-                      <polyline points="15 18 9 12 15 6" />
-                    )}
-                  </svg>
-                </span>
-              </button>
-            </div>
             <div
               className={`right-panel-body ${effectiveRightCollapsed ? 'collapsed' : ''}`}
               data-testid="control-panel-scroll"
@@ -1628,5 +1625,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
-
