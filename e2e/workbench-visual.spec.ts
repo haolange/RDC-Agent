@@ -398,7 +398,7 @@ test('左下 footer 视觉回归', async () => {
 test('左栏收起后 footer 仍保留用户与设备缩略入口', async () => {
   const page = ctx.page;
 
-  await page.locator('[data-testid="app-sidebar-left"] .shell-panel-toggle').click();
+  await page.locator('[data-testid="titlebar-left-panel-toggle"]').click();
   await expect(page.locator('[data-testid="app-sidebar-left"]')).toHaveClass(/collapsed/);
   await expect(page.locator('[data-testid="sidebar-user-settings-trigger"]')).toBeVisible();
   await expect(page.locator('[data-testid="sidebar-device-selector-trigger"]')).toBeVisible();
@@ -408,7 +408,7 @@ test('左栏收起后 footer 仍保留用户与设备缩略入口', async () => 
 test('左栏收起后用户菜单保持在窗口可视范围内', async () => {
   const page = ctx.page;
 
-  await page.locator('[data-testid="app-sidebar-left"] .shell-panel-toggle').click();
+  await page.locator('[data-testid="titlebar-left-panel-toggle"]').click();
   await expect(page.locator('[data-testid="app-sidebar-left"]')).toHaveClass(/collapsed/);
 
   await page.locator('[data-testid="sidebar-user-settings-trigger"]').click();
@@ -419,7 +419,7 @@ test('左栏收起后用户菜单保持在窗口可视范围内', async () => {
 test('左栏收起后设备菜单展开不越界', async () => {
   const page = ctx.page;
 
-  await page.locator('[data-testid="app-sidebar-left"] .shell-panel-toggle').click();
+  await page.locator('[data-testid="titlebar-left-panel-toggle"]').click();
   await expect(page.locator('[data-testid="app-sidebar-left"]')).toHaveClass(/collapsed/);
 
   await page.locator('[data-testid="sidebar-device-selector-trigger"]').click();
@@ -441,7 +441,7 @@ test('768px 宽度下自动收起右栏，主内容保持可见', async () => {
   const page = ctx.page;
   await setWindowSize(ctx, 768, 900);
 
-  await expect(page.locator('.shell-panel-header-right .shell-panel-toggle')).toBeVisible();
+  await expect(page.locator('[data-testid="titlebar-right-panel-toggle"]')).toBeVisible();
   await expect(page.locator('.main-input-bar')).toBeVisible();
   await expect(page.locator('.debugger-idle-simple-title')).toBeVisible();
   await expect(page.locator('.app-body')).toHaveScreenshot('tablet-layout-768.png');

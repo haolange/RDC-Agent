@@ -21,7 +21,7 @@ test('左侧栏展开时在用户卡片下显示 Replay Device，收起后保留
   const page = ctx.page;
   const userTrigger = page.locator('[data-testid="sidebar-user-settings-trigger"]');
   const deviceTrigger = page.locator('[data-testid="sidebar-device-selector-trigger"]');
-  const leftToggle = page.locator('.shell-panel-header-left .shell-panel-toggle');
+  const leftToggle = page.locator('[data-testid="titlebar-left-panel-toggle"]');
 
   await expect(userTrigger).toBeVisible();
   await expect(deviceTrigger).toBeVisible();
