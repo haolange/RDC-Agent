@@ -322,18 +322,19 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
   };
 
   const renderedMessages = useMemo(() => deferredMessages, [deferredMessages]);
+  const isEmpty = renderedMessages.length === 0;
 
   return (
-    <div className="agent-chat" data-testid="agent-chat">
+    <div className={`agent-chat ${isEmpty ? 'is-empty' : ''}`} data-testid="agent-chat">
       <div className="chat-top-hard-stop" aria-hidden="true" />
       <div className="chat-top-transition-fade" aria-hidden="true" />
       <div
         ref={scrollContainerRef}
-        className={`chat-messages scrollbar-thin ${renderedMessages.length === 0 ? 'chat-messages-empty' : ''}`}
+        className={`chat-messages scrollbar-thin ${isEmpty ? 'chat-messages-empty' : ''}`}
         data-testid="chat-messages"
         onScroll={handleScroll}
       >
-        {renderedMessages.length === 0 ? (
+        {isEmpty ? (
           <EmptyWorkbenchPrompt mode={mode} />
         ) : renderedMessages.map((entry, index) => (
           <TimelineEntry

@@ -8,19 +8,8 @@
   justify-content: center;
   overflow: hidden;
   background:
-    radial-gradient(circle at 50% 16%, color-mix(in srgb, var(--empty-mode-accent) 14%, transparent), transparent 24%),
+    radial-gradient(circle at 50% 18%, color-mix(in srgb, var(--empty-mode-accent) 13%, transparent), transparent 24%),
     rgb(var(--color-bg-0));
-}
-
-.empty-workbench-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgb(255 255 255 / 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 0.03) 1px, transparent 1px);
-  background-size: 46px 46px;
-  mask-image: linear-gradient(180deg, transparent, black 12%, black 88%, transparent);
-  opacity: 0.34;
 }
 
 .empty-workbench-content {
@@ -30,15 +19,15 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  width: min(620px, calc(100% - 72px));
+  gap: 14px;
+  width: min(560px, calc(100% - 72px));
   text-align: center;
 }
 
 .empty-workbench-monument {
   position: relative;
-  width: 118px;
-  height: 118px;
+  width: 96px;
+  height: 96px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -46,11 +35,11 @@
 
 .empty-workbench-monument-glow {
   position: absolute;
-  width: 142px;
-  height: 142px;
+  width: 120px;
+  height: 120px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--empty-mode-accent) 18%, transparent);
-  opacity: 0.46;
+  opacity: 0.4;
 }
 
 .empty-workbench-monument-orbit,
@@ -64,30 +53,30 @@
 }
 
 .empty-workbench-monument-orbit.orbit-a {
-  width: 108px;
-  height: 108px;
+  width: 86px;
+  height: 86px;
 }
 
 .empty-workbench-monument-orbit.orbit-b {
-  width: 132px;
-  height: 132px;
-  opacity: 0.46;
+  width: 108px;
+  height: 108px;
+  opacity: 0.42;
 }
 
 .empty-workbench-monument-beam {
-  width: 168px;
-  height: 8px;
+  width: 138px;
+  height: 7px;
   background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--empty-mode-accent) 26%, transparent), transparent);
   transform: rotate(-22deg);
   filter: blur(1px);
-  opacity: 0.72;
+  opacity: 0.62;
 }
 
 .empty-workbench-monument-core {
   position: relative;
-  width: 70px;
-  height: 70px;
-  border-radius: 22px;
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -110,8 +99,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  width: min(520px, 100%);
+  gap: 9px;
+  width: min(480px, 100%);
 }
 
 .empty-workbench-kicker {
@@ -138,7 +127,7 @@
   margin: 0;
   color: rgb(var(--color-text-primary));
   max-width: 12ch;
-  font-size: clamp(22px, 2.7vw, 32px);
+  font-size: clamp(20px, 2.2vw, 28px);
   font-weight: var(--font-semibold);
   line-height: 1.08;
   letter-spacing: -0.04em;
@@ -147,7 +136,7 @@
 
 .empty-workbench-subtitle {
   margin: 0;
-  max-width: 32ch;
+  max-width: 28ch;
   color: rgb(var(--color-text-secondary));
   font-size: clamp(14px, 1.35vw, 16px);
   line-height: 1.55;
@@ -160,29 +149,29 @@
 }
 
 .app-main.terminal-open .empty-workbench-title {
-  font-size: clamp(21px, 2.5vw, 30px);
+  font-size: clamp(19px, 2vw, 26px);
 }
 
 @media (max-width: 960px) {
   .empty-workbench-content {
     width: min(100%, calc(100% - 40px));
-    gap: 14px;
+    gap: 12px;
   }
 
   .empty-workbench-monument {
-    width: 102px;
-    height: 102px;
+    width: 88px;
+    height: 88px;
   }
 
   .empty-workbench-monument-glow {
-    width: 124px;
-    height: 124px;
+    width: 106px;
+    height: 106px;
   }
 
   .empty-workbench-monument-core {
-    width: 62px;
-    height: 62px;
-    border-radius: 20px;
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
   }
 
   .empty-workbench-title {

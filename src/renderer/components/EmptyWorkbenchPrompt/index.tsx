@@ -17,7 +17,6 @@ export const EmptyWorkbenchPrompt: React.FC<EmptyWorkbenchPromptProps> = ({ mode
       data-testid="empty-workbench-prompt"
       style={{ ['--empty-mode-accent' as string]: modeConfig.accentColor }}
     >
-      <div className="empty-workbench-grid" aria-hidden="true" />
       <div className="empty-workbench-content">
         <div className="empty-workbench-monument" aria-hidden="true">
           <div className="empty-workbench-monument-glow" />

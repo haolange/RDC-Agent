@@ -181,11 +181,11 @@ a {
   flex: 1;
   display: grid;
   grid-template-columns:
-    var(--left-sidebar-width, 280px)
+    var(--left-sidebar-width, 256px)
     var(--resize-handle-width, 8px)
     minmax(0, 1fr)
     var(--resize-handle-width, 8px)
-    var(--right-panel-width, 340px);
+    var(--right-panel-width, 312px);
   min-height: 0;
   overflow: hidden;
   transition: grid-template-columns 240ms cubic-bezier(0.2, 0.9, 0.2, 1);
@@ -401,7 +401,7 @@ a {
 }
 
 .main-input-bar {
-  padding: 12px 20px 18px;
+  padding: 10px 16px 16px;
   border-top: none;
   background: transparent;
 }
@@ -418,9 +418,9 @@ a {
   gap: 12px;
   min-width: 0;
   min-height: 0;
-  padding: 14px 16px;
+  padding: 12px 14px;
   border: 1px solid rgb(var(--color-border-default));
-  border-radius: 24px;
+  border-radius: 20px;
   background:
     linear-gradient(180deg, rgb(255 255 255 / 0.03), transparent 60%),
     rgb(var(--color-bg-2) / 0.96);
@@ -552,7 +552,7 @@ a {
 
 .composer-textarea {
   width: 100%;
-  min-height: 88px;
+  min-height: 72px;
   max-height: 180px;
   padding: 4px 0 6px;
   resize: none;
@@ -940,8 +940,8 @@ a {
 }
 
 .shell-panel-toggle {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
