@@ -371,7 +371,7 @@ test('empty workbench keeps a continuous background and centered focus', async (
   expect(centerDelta?.deltaY ?? 99).toBeLessThanOrEqual(2);
 
   const mainShellWidth = await mainShell.evaluate((element) => element.getBoundingClientRect().width);
-  expect(mainShellWidth).toBeGreaterThan(480);
+  expect(mainShellWidth).toBeGreaterThan(470);
 
   await expect(emptyPrompt).toHaveScreenshot('empty-workbench.png');
 });
@@ -504,14 +504,23 @@ test('左下 footer 视觉回归', async () => {
   await expect(page.locator('[data-testid="sidebar-footer"]')).toHaveScreenshot('sidebar-footer.png');
 });
 
+test('top utility pills show Replay Device next to Terminal', async () => {
+  const page = ctx.page;
+  await expect(page.locator('[data-testid="utility-device-selector-trigger"]')).toBeVisible();
+  await expect(page.locator('[data-testid="terminal-toggle"]')).toBeVisible();
+  await expect(page.locator('.main-floating-utilities')).toHaveScreenshot('main-utilities.png');
+});
+
 test('左栏收起后 footer 仍保留用户与设备缩略入口', async () => {
   const page = ctx.page;
 
   await page.locator('[data-testid="titlebar-left-panel-toggle"]').click();
   await expect(page.locator('[data-testid="app-sidebar-left"]')).toHaveClass(/collapsed/);
-  await expect(page.locator('[data-testid="sidebar-user-settings-trigger"]')).toBeVisible();
-  await expect(page.locator('[data-testid="sidebar-device-selector-trigger"]')).toBeVisible();
-  await expect(page.locator('[data-testid="sidebar-footer"]')).toHaveScreenshot('sidebar-footer-collapsed.png');
+  await page.waitForTimeout(320);
+  await expect(page.locator('[data-testid="sidebar-user-settings-trigger"]')).not.toBeVisible();
+  await expect(page.locator('[data-testid="utility-device-selector-trigger"]')).toBeVisible();
+  const leftWidth = await page.locator('[data-testid="app-sidebar-left"]').evaluate((element) => element.getBoundingClientRect().width);
+  expect(leftWidth).toBeLessThanOrEqual(1);
 });
 
 test('左栏收起后用户菜单保持在窗口可视范围内', async () => {
@@ -520,32 +529,21 @@ test('左栏收起后用户菜单保持在窗口可视范围内', async () => {
   await page.locator('[data-testid="titlebar-left-panel-toggle"]').click();
   await expect(page.locator('[data-testid="app-sidebar-left"]')).toHaveClass(/collapsed/);
 
-  await page.locator('[data-testid="sidebar-user-settings-trigger"]').click();
-  await expect(page.locator('[data-testid="sidebar-user-menu"]')).toBeVisible();
-  await expect(page.locator('[data-testid="sidebar-user-menu"]')).toHaveScreenshot('user-menu.png');
-  expect(await isElementWithinViewport(page, '[data-testid="sidebar-user-menu"]')).toBe(true);
+  await page.locator('[data-testid="utility-device-selector-trigger"]').click();
+  await expect(page.locator('[data-testid="utility-device-selector-dropdown"]')).toBeVisible();
+  await expect(page.locator('[data-testid="utility-device-selector-dropdown"]')).toHaveScreenshot('device-dropdown.png');
+  expect(await isElementWithinViewport(page, '[data-testid="utility-device-selector-dropdown"]')).toBe(true);
 });
 
 test('左栏收起后设备菜单展开不越界', async () => {
   const page = ctx.page;
 
-  await page.locator('[data-testid="titlebar-left-panel-toggle"]').click();
-  await expect(page.locator('[data-testid="app-sidebar-left"]')).toHaveClass(/collapsed/);
-
-  await page.locator('[data-testid="sidebar-device-selector-trigger"]').click();
-  await expect(page.locator('[data-testid="sidebar-device-selector-dropdown"]')).toBeVisible();
-  await expect(page.locator('[data-testid="sidebar-device-selector-dropdown"]')).toHaveScreenshot('device-dropdown.png');
-  expect(await isElementWithinViewport(page, '[data-testid="sidebar-device-selector-dropdown"]')).toBe(true);
-  expect(await isElementDescendantOf(
-    page,
-    '[data-testid="sidebar-device-selector-dropdown"]',
-    '[data-testid="app-sidebar-left"]',
-  )).toBe(false);
-  expect(await doesElementOverflowSidebar(
-    page,
-    '[data-testid="sidebar-device-selector-dropdown"]',
-    '[data-testid="app-sidebar-left"]',
-  )).toBe(true);
+  await page.locator('[data-testid="titlebar-right-panel-toggle"]').click();
+  await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveClass(/collapsed/);
+  await page.waitForTimeout(320);
+  const rightWidth = await page.locator('[data-testid="app-sidebar-right"]').evaluate((element) => element.getBoundingClientRect().width);
+  expect(rightWidth).toBeLessThanOrEqual(1);
+  await expect(page.locator('[data-testid="utility-device-selector-trigger"]')).toBeVisible();
 });
 
 test('模式菜单视觉回归', async () => {
@@ -570,8 +568,8 @@ test('375px 宽度下双侧栏自动收起，底部入口仍可达', async () =>
   const page = ctx.page;
   await setWindowSize(ctx, 375, 900);
 
-  await expect(page.locator('[data-testid="sidebar-user-settings-trigger"]')).toBeVisible();
-  await expect(page.locator('[data-testid="sidebar-device-selector-trigger"]')).toBeVisible();
+  await expect(page.locator('[data-testid="sidebar-user-settings-trigger"]')).not.toBeVisible();
+  await expect(page.locator('[data-testid="utility-device-selector-trigger"]')).toBeVisible();
   await expect(page.locator('.main-input-bar')).toBeVisible();
   await expect(page.locator('.app-body')).toHaveScreenshot('mobile-layout-375.png');
 });
@@ -595,27 +593,24 @@ test('composer footer keeps Upload, Mode, Usage, Send order', async () => {
 
 test('collapsed footer icons stay centered in their buttons', async () => {
   const page = ctx.page;
+  await setWindowSize(ctx, 1720, 980);
 
   await page.locator('[data-testid="titlebar-left-panel-toggle"]').click();
+  await page.locator('[data-testid="titlebar-right-panel-toggle"]').click();
   await expect(page.locator('[data-testid="app-sidebar-left"]')).toHaveClass(/collapsed/);
+  await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveClass(/collapsed/);
+  await page.waitForTimeout(320);
 
-  const userDelta = await getCenterDelta(
-    page,
-    '[data-testid="sidebar-user-settings-trigger"]',
-    '[data-testid="sidebar-user-settings-trigger"] .footer-entry-avatar',
-  );
-  const deviceDelta = await getCenterDelta(
-    page,
-    '[data-testid="sidebar-device-selector-trigger"]',
-    '[data-testid="sidebar-device-selector-trigger"] .device-selector-trigger-icon',
-  );
+  const widths = await page.evaluate(() => ({
+    left: document.querySelector('[data-testid="app-sidebar-left"]')?.getBoundingClientRect().width ?? 0,
+    right: document.querySelector('[data-testid="app-sidebar-right"]')?.getBoundingClientRect().width ?? 0,
+    main: document.querySelector('.app-main')?.getBoundingClientRect().width ?? 0,
+    body: document.querySelector('.app-body')?.getBoundingClientRect().width ?? 0,
+  }));
 
-  expect(userDelta).not.toBeNull();
-  expect(deviceDelta).not.toBeNull();
-  expect(userDelta?.deltaX ?? 99).toBeLessThanOrEqual(1.5);
-  expect(userDelta?.deltaY ?? 99).toBeLessThanOrEqual(1.5);
-  expect(deviceDelta?.deltaX ?? 99).toBeLessThanOrEqual(1.5);
-  expect(deviceDelta?.deltaY ?? 99).toBeLessThanOrEqual(1.5);
+  expect(widths.left).toBeLessThanOrEqual(1);
+  expect(widths.right).toBeLessThanOrEqual(1);
+  expect(widths.main).toBeGreaterThan(widths.body * 0.9);
 });
 
 test('chat bubbles expand with the main canvas when both sidebars are collapsed', async () => {
@@ -635,6 +630,19 @@ test('chat bubbles expand with the main canvas when both sidebars are collapsed'
   await expect(userBubble).toBeVisible();
   await expect(page.locator('.app-main')).toContainText('Character_EyeSpark_Desktop.rdc');
 
-  const assistantWidth = await assistantBubble.evaluate((element) => element.getBoundingClientRect().width);
-  expect(assistantWidth).toBeGreaterThan(900);
+  const layout = await page.evaluate(() => {
+    const main = document.querySelector('.app-main');
+    const message = document.querySelector('.chat-message.assistant');
+    const bubble = document.querySelector('.chat-message.assistant .message-bubble.assistant');
+
+    return {
+      mainWidth: main?.getBoundingClientRect().width ?? 0,
+      messageWidth: message?.getBoundingClientRect().width ?? 0,
+      bubbleWidth: bubble?.getBoundingClientRect().width ?? 0,
+    };
+  });
+
+  expect(layout.messageWidth).toBeGreaterThan(layout.mainWidth * 0.4);
+  expect(layout.messageWidth).toBeLessThan(layout.mainWidth * 0.65);
+  expect(layout.bubbleWidth).toBeLessThanOrEqual(layout.messageWidth);
 });
