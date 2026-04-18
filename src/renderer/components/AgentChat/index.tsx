@@ -1,13 +1,19 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { AGENT_DISPLAY_NAMES, getAgentModeConfig } from '@shared/constants/agents';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentMode } from '@shared/types/layout';
-import type { ConversationMessage } from '@shared/types/conversation';
+import type {
+  ConversationMessage,
+  ConversationReasoningStep,
+  ConversationReasoningTrace,
+} from '@shared/types/conversation';
 import type { SessionAttachmentRecord } from '@shared/types/session';
 import { useSessionStore } from '../../stores/sessionStore';
 import { EmptyWorkbenchPrompt } from '../EmptyWorkbenchPrompt';
 import { ModeGlyph } from '../ModeGlyph';
 import './AgentChat.css';
+
+const STICKY_SCROLL_THRESHOLD = 96;
 
 const formatTime = (timestamp: number): string =>
   new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -25,13 +31,43 @@ const formatAttachmentSize = (size: number): string => {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-const MessageAttachments: React.FC<{ attachments: SessionAttachmentRecord[] }> = ({ attachments }) => {
+const formatDuration = (startedAt: number, completedAt?: number): string | null => {
+  if (!completedAt || completedAt <= startedAt) {
+    return null;
+  }
+  const durationMs = completedAt - startedAt;
+  if (durationMs < 1000) {
+    return `${durationMs}ms`;
+  }
+  return `${(durationMs / 1000).toFixed(1)}s`;
+};
+
+const getTraceStepCount = (trace: ConversationReasoningTrace | null | undefined) => trace?.steps.length ?? 0;
+
+const getTraceToolCount = (trace: ConversationReasoningTrace | null | undefined) => (
+  trace?.steps.reduce((count, step) => count + step.toolCalls.length, 0) ?? 0
+);
+
+const getReasoningSummary = (entry: ConversationMessage): string => {
+  if (entry.reasoningTrace?.summary) {
+    return entry.reasoningTrace.summary;
+  }
+  if (entry.status === 'streaming' || entry.status === 'draft') {
+    return '正在思考';
+  }
+  return '推理轨迹';
+};
+
+const MessageAttachments: React.FC<{
+  attachments: SessionAttachmentRecord[];
+  align?: 'left' | 'right';
+}> = ({ attachments, align = 'left' }) => {
   if (attachments.length === 0) {
     return null;
   }
 
   return (
-    <div className="message-attachments">
+    <div className={`message-attachments align-${align}`}>
       {attachments.map((attachment) => (
         <button
           key={attachment.attachmentId}
@@ -66,26 +102,111 @@ const MessageModeBadge: React.FC<{ mode: AgentMode }> = ({ mode }) => {
   );
 };
 
+const StepStatusBadge: React.FC<{ status: ConversationReasoningStep['status'] }> = ({ status }) => (
+  <span className={`reasoning-step-status status-${status}`}>
+    {status === 'pending' && 'Pending'}
+    {status === 'running' && 'Running'}
+    {status === 'complete' && 'Done'}
+    {status === 'error' && 'Error'}
+  </span>
+);
+
+const ReasoningPanel: React.FC<{ trace: ConversationReasoningTrace }> = ({ trace }) => (
+  <div className="reasoning-panel" data-testid="assistant-reasoning-panel">
+    {trace.steps.map((step) => {
+      const duration = formatDuration(step.startedAt, step.completedAt);
+      return (
+        <div key={step.id} className={`reasoning-step status-${step.status}`}>
+          <div className="reasoning-step-header">
+            <div className="reasoning-step-title-row">
+              <span className="reasoning-step-title">{step.title}</span>
+              <StepStatusBadge status={step.status} />
+            </div>
+            <div className="reasoning-step-meta">
+              {step.stage ? <span className="reasoning-step-stage">{step.stage}</span> : null}
+              {duration ? <span className="reasoning-step-duration">{duration}</span> : null}
+            </div>
+          </div>
+          {step.summary ? <div className="reasoning-step-summary">{step.summary}</div> : null}
+          {step.detail ? <div className="reasoning-step-detail">{step.detail}</div> : null}
+          {step.toolCalls.length > 0 ? (
+            <div className="reasoning-tool-list">
+              {step.toolCalls.map((toolCall) => (
+                <div key={toolCall.id} className={`reasoning-tool-call status-${toolCall.status}`}>
+                  <div className="reasoning-tool-header">
+                    <span className="reasoning-tool-name">{toolCall.toolName}</span>
+                    <span className={`reasoning-tool-status status-${toolCall.status}`}>{toolCall.status}</span>
+                  </div>
+                  {toolCall.argsPreview ? <pre className="reasoning-tool-block">{toolCall.argsPreview}</pre> : null}
+                  {toolCall.resultPreview ? <pre className="reasoning-tool-block">{toolCall.resultPreview}</pre> : null}
+                  {toolCall.error ? <div className="reasoning-tool-error">{toolCall.error}</div> : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      );
+    })}
+  </div>
+);
+
+const ReasoningRail: React.FC<{
+  entry: ConversationMessage;
+  expanded: boolean;
+  onToggle: () => void;
+}> = ({ entry, expanded, onToggle }) => {
+  const stepCount = getTraceStepCount(entry.reasoningTrace);
+  const toolCount = getTraceToolCount(entry.reasoningTrace);
+  const railLabel = entry.status === 'streaming' || entry.status === 'draft' ? '正在思考' : '推理轨迹';
+
+  return (
+    <button
+      type="button"
+      className={`reasoning-rail ${expanded ? 'expanded' : ''} ${entry.status === 'streaming' ? 'is-streaming' : ''}`}
+      data-testid="assistant-reasoning-toggle"
+      onClick={onToggle}
+      aria-expanded={expanded}
+    >
+      <span className="reasoning-rail-leading">
+        <span className="reasoning-rail-label">{railLabel}</span>
+        <span className="reasoning-rail-summary">{getReasoningSummary(entry)}</span>
+      </span>
+      <span className="reasoning-rail-meta">
+        <span>{stepCount} steps</span>
+        <span>{toolCount} tools</span>
+        <span className="reasoning-rail-caret" aria-hidden="true">
+          {expanded ? '–' : '+'}
+        </span>
+      </span>
+    </button>
+  );
+};
+
 const UserEntry: React.FC<{ entry: ConversationMessage; fallbackMode: AgentMode }> = ({ entry, fallbackMode }) => {
   const mode = resolveEntryMode(entry, fallbackMode);
 
   return (
     <div className="chat-message user">
       <div className="message-avatar user">U</div>
-    <div className="message-content-wrapper">
-      <div className="message-header">
-        <span className="message-author">You</span>
-        <MessageModeBadge mode={mode} />
-        <span className="message-time">{formatTime(entry.createdAt)}</span>
+      <div className="message-content-wrapper">
+        <div className="message-header">
+          <span className="message-author">You</span>
+          <MessageModeBadge mode={mode} />
+          <span className="message-time">{formatTime(entry.createdAt)}</span>
+        </div>
+        {entry.content ? <div className="message-bubble user">{entry.content}</div> : null}
+        <MessageAttachments attachments={entry.attachments ?? []} align="right" />
       </div>
-      {entry.content ? <div className="message-bubble user">{entry.content}</div> : null}
-      <MessageAttachments attachments={entry.attachments ?? []} />
     </div>
-  </div>
   );
 };
 
-const AssistantEntry: React.FC<{ entry: ConversationMessage; fallbackMode: AgentMode }> = ({ entry, fallbackMode }) => {
+const AssistantEntry: React.FC<{
+  entry: ConversationMessage;
+  fallbackMode: AgentMode;
+  expanded: boolean;
+  onToggle: () => void;
+}> = ({ entry, fallbackMode, expanded, onToggle }) => {
   const role = entry.agentId as AgentRole | undefined;
   const mode = resolveEntryMode(entry, fallbackMode);
   const modeConfig = getAgentModeConfig(mode);
@@ -94,6 +215,7 @@ const AssistantEntry: React.FC<{ entry: ConversationMessage; fallbackMode: Agent
     : role
       ? (AGENT_DISPLAY_NAMES[role] ?? role)
       : modeConfig.label;
+  const hasReasoning = Boolean(entry.reasoningTrace && entry.reasoningTrace.steps.length > 0);
 
   return (
     <div className="chat-message assistant">
@@ -109,8 +231,18 @@ const AssistantEntry: React.FC<{ entry: ConversationMessage; fallbackMode: Agent
           <MessageModeBadge mode={mode} />
           <span className="message-time">{formatTime(entry.createdAt)}</span>
         </div>
-        {entry.content ? <div className="message-bubble assistant">{entry.content}</div> : null}
-        <MessageAttachments attachments={entry.attachments ?? []} />
+
+        {hasReasoning ? (
+          <div className="message-reasoning-shell">
+            <ReasoningRail entry={entry} expanded={expanded} onToggle={onToggle} />
+            {expanded ? <ReasoningPanel trace={entry.reasoningTrace!} /> : null}
+          </div>
+        ) : null}
+
+        {entry.content || entry.status === 'streaming' ? (
+          <div className={`message-bubble assistant ${entry.content ? '' : 'is-empty'}`}>{entry.content}</div>
+        ) : null}
+        <MessageAttachments attachments={entry.attachments ?? []} align="left" />
       </div>
     </div>
   );
@@ -130,41 +262,89 @@ const SystemEntry: React.FC<{ entry: ConversationMessage }> = ({ entry }) => (
   </div>
 );
 
-const TimelineEntry: React.FC<{ entry: ConversationMessage; index: number; fallbackMode: AgentMode }> = ({
+const TimelineEntry: React.FC<{
+  entry: ConversationMessage;
+  index: number;
+  fallbackMode: AgentMode;
+  expanded: boolean;
+  onToggle: () => void;
+}> = ({
   entry,
   index,
   fallbackMode,
+  expanded,
+  onToggle,
 }) => (
-  <div className="timeline-entry" style={{ animationDelay: `${index * 30}ms` }}>
+  <div className={`timeline-entry role-${entry.role}`} style={{ animationDelay: `${index * 30}ms` }}>
     {entry.role === 'user' && <UserEntry entry={entry} fallbackMode={fallbackMode} />}
-    {entry.role === 'assistant' && <AssistantEntry entry={entry} fallbackMode={fallbackMode} />}
+    {entry.role === 'assistant' && (
+      <AssistantEntry entry={entry} fallbackMode={fallbackMode} expanded={expanded} onToggle={onToggle} />
+    )}
     {entry.role === 'system' && <SystemEntry entry={entry} />}
   </div>
 );
 
 export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
   const conversationMessages = useSessionStore((state) => state.conversationMessages);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const deferredMessages = useDeferredValue(conversationMessages);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const shouldStickToBottomRef = useRef(true);
+  const [expandedById, setExpandedById] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (navigator.webdriver) {
       return;
     }
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [conversationMessages]);
+    const container = scrollContainerRef.current;
+    if (!container || !shouldStickToBottomRef.current) {
+      return;
+    }
+    container.scrollTo({
+      top: container.scrollHeight,
+      behavior: 'smooth',
+    });
+  }, [deferredMessages]);
+
+  const handleScroll = () => {
+    const container = scrollContainerRef.current;
+    if (!container) {
+      return;
+    }
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    shouldStickToBottomRef.current = distanceFromBottom < STICKY_SCROLL_THRESHOLD;
+  };
+
+  const toggleExpanded = (messageId: string) => {
+    setExpandedById((current) => ({
+      ...current,
+      [messageId]: !current[messageId],
+    }));
+  };
+
+  const renderedMessages = useMemo(() => deferredMessages, [deferredMessages]);
 
   return (
     <div className="agent-chat" data-testid="agent-chat">
+      <div className="chat-top-hard-stop" aria-hidden="true" />
+      <div className="chat-top-transition-fade" aria-hidden="true" />
       <div
-        className={`chat-messages scrollbar-thin ${conversationMessages.length === 0 ? 'chat-messages-empty' : ''}`}
+        ref={scrollContainerRef}
+        className={`chat-messages scrollbar-thin ${renderedMessages.length === 0 ? 'chat-messages-empty' : ''}`}
         data-testid="chat-messages"
+        onScroll={handleScroll}
       >
-        {conversationMessages.length === 0 ? (
+        {renderedMessages.length === 0 ? (
           <EmptyWorkbenchPrompt mode={mode} />
-        ) : conversationMessages.map((entry, index) => (
-          <TimelineEntry key={entry.id} entry={entry} index={index} fallbackMode={mode} />
+        ) : renderedMessages.map((entry, index) => (
+          <TimelineEntry
+            key={entry.id}
+            entry={entry}
+            index={index}
+            fallbackMode={mode}
+            expanded={Boolean(expandedById[entry.id])}
+            onToggle={() => toggleExpanded(entry.id)}
+          />
         ))}
-        <div ref={messagesEndRef} />
       </div>
     </div>
   );

@@ -246,6 +246,9 @@ function sanitizeModels(models: unknown): LlmProviderModel[] {
       id: modelId,
       label: typeof candidate.label === 'string' && candidate.label.trim() ? candidate.label.trim() : modelId,
       enabled: candidate.enabled !== false,
+      contextWindowTokens: typeof candidate.contextWindowTokens === 'number' && Number.isFinite(candidate.contextWindowTokens)
+        ? Math.max(0, Math.round(candidate.contextWindowTokens))
+        : null,
     });
   }
 
@@ -332,17 +335,22 @@ function isBuiltinProviderExplicitlyCustomized(provider: Partial<LlmProviderEntr
   }
 
   const builtin = createBuiltinProviderEntry(id);
-  const providerModels = sanitizeModels(provider.models).map((model) => model.id);
-  const builtinModels = builtin.models.map((model) => model.id);
+  const providerModels = sanitizeModels(provider.models);
+  const builtinModels = sanitizeModels(builtin.models);
   const recommendedModels = Array.isArray(provider.recommendedModels)
     ? provider.recommendedModels.filter((value): value is string => typeof value === 'string').map((value) => value.trim()).filter(Boolean)
     : [];
+  const hasCustomizedModelWindow = providerModels.some((model, index) => (
+    model.id !== builtinModels[index]?.id
+    || (model.contextWindowTokens ?? null) !== (builtinModels[index]?.contextWindowTokens ?? null)
+  ));
 
   return (
     (typeof provider.label === 'string' && provider.label.trim() && provider.label.trim() !== builtin.label)
     || (typeof provider.baseUrl === 'string' && provider.baseUrl.trim() && provider.baseUrl.trim() !== (builtin.baseUrl || ''))
     || (typeof provider.docsUrl === 'string' && provider.docsUrl.trim() && provider.docsUrl.trim() !== (builtin.docsUrl || ''))
-    || !arraysEqual(providerModels, builtinModels)
+    || !arraysEqual(providerModels.map((model) => model.id), builtinModels.map((model) => model.id))
+    || hasCustomizedModelWindow
     || (recommendedModels.length > 0 && !arraysEqual(recommendedModels, builtin.recommendedModels))
   );
 }

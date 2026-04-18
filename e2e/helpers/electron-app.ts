@@ -115,7 +115,7 @@ export async function configureTestDebuggerRoutes(
             secretRef: `provider-${nextProviderId}-api-key`,
             hasStoredSecret: true,
             baseUrl: 'http://127.0.0.1:11434/v1',
-            models: [{ id: nextModelId, label: 'Debugger Test Model', enabled: true }],
+            models: [{ id: nextModelId, label: 'Debugger Test Model', enabled: true, contextWindowTokens: 8192 }],
             recommendedModels: [nextModelId],
             docsUrl: '',
             isConfigured: true,

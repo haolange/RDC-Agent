@@ -56,6 +56,7 @@ await ctx.page.locator('textarea.chat-input').fill('slow-run 调试 Character_Ey
     await expect(ctx.page.locator('[data-testid="plan-approve-button"]')).toBeEnabled();
     await ctx.page.locator('[data-testid="plan-approve-button"]').click();
 
+    await expect(ctx.page.locator('[data-testid="composer-usage-indicator"]')).toBeVisible();
     await expect(ctx.page.locator('[data-testid="debugger-stop-button"]')).toBeVisible();
     await ctx.page.locator('[data-testid="debugger-stop-button"]').click();
 

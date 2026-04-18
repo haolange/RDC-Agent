@@ -17,6 +17,12 @@ const getRemoteStatusIcon = (status?: string) => {
   }
 };
 
+const formatBackendLabel = (backend?: string): string => {
+  if (backend === 'local') return '本地';
+  if (backend === 'remote') return '远端';
+  return backend || '--';
+};
+
 export const RuntimeContext: React.FC = () => {
   const { t } = useI18n();
   const contextSnapshot = useSessionStore((s) => s.contextSnapshot);
@@ -48,11 +54,11 @@ export const RuntimeContext: React.FC = () => {
               <line x1="8" y1="2" x2="8" y2="6" />
               <line x1="3" y1="10" x2="21" y2="10" />
             </svg>
-            <span>Session</span>
+            <span>当前会话</span>
           </div>
           <div className="context-section-content">
             <div className="context-item">
-              <span className="context-item-label">Session ID</span>
+              <span className="context-item-label">会话 ID</span>
               <span className="context-item-value mono" title={currentRun.sessionId}>
                 {currentRun.sessionId || '--'}
               </span>
@@ -64,13 +70,13 @@ export const RuntimeContext: React.FC = () => {
               </span>
             </div>
             <div className="context-item">
-              <span className="context-item-label">Mode</span>
+              <span className="context-item-label">模式</span>
               <span className="context-item-value">
                 <span className={`context-badge ${currentRun.mode}`}>{currentRun.mode}</span>
               </span>
             </div>
             <div className="context-item">
-              <span className="context-item-label">Status</span>
+              <span className="context-item-label">运行状态</span>
               <span className={`context-item-value ${currentRun.status === 'running' ? 'active' : ''}`}>
                 {currentRun.status}
               </span>
@@ -85,7 +91,7 @@ export const RuntimeContext: React.FC = () => {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polygon points="5 3 19 12 5 21 5 3" />
             </svg>
-            <span>Replay Context</span>
+            <span>回放上下文</span>
           </div>
           <div className="context-section-content">
             <div className="context-item">
@@ -101,14 +107,14 @@ export const RuntimeContext: React.FC = () => {
               </span>
             </div>
             <div className="context-item">
-              <span className="context-item-label">Backend</span>
+              <span className="context-item-label">回放后端</span>
               <span className="context-item-value">
-                <span className={`context-badge ${contextSnapshot.backend}`}>{contextSnapshot.backend}</span>
+                <span className={`context-badge ${contextSnapshot.backend}`}>{formatBackendLabel(contextSnapshot.backend)}</span>
               </span>
             </div>
             {contextSnapshot.backend === 'remote' && (
               <div className="context-item">
-                <span className="context-item-label">Remote</span>
+                <span className="context-item-label">远端状态</span>
                 <span className="context-item-value context-status">
                   {getRemoteStatusIcon(contextSnapshot.remoteStatus)}
                   <span className="context-status-text">{contextSnapshot.remoteStatus ?? 'unknown'}</span>
@@ -116,7 +122,7 @@ export const RuntimeContext: React.FC = () => {
               </div>
             )}
             <div className="context-item">
-              <span className="context-item-label">Owner</span>
+              <span className="context-item-label">Runtime Owner</span>
               <span className="context-item-value mono" title={contextSnapshot.runtimeOwner}>
                 {contextSnapshot.runtimeOwner || '--'}
               </span>
@@ -128,7 +134,7 @@ export const RuntimeContext: React.FC = () => {
               </span>
             </div>
             <div className="context-item">
-              <span className="context-item-label">Device</span>
+              <span className="context-item-label">回放设备</span>
               <span className="context-item-value">{contextSnapshot.deviceLabel || '--'}</span>
             </div>
           </div>

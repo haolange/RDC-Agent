@@ -80,14 +80,17 @@ test('设置弹窗中的 Workspace、Model 与 Agent 面板保持可访问的滚
   await expect(page.locator('[data-testid="settings-modal"]')).toBeVisible();
   await expect(page.locator('[data-testid="settings-center-panel"]')).toBeVisible();
 
-  await page.locator('[data-testid="settings-nav-workspace"]').click();
-  await expect(page.locator('[data-testid="settings-workspace-body"]')).toBeVisible();
-
   await page.locator('[data-testid="settings-nav-models"]').click();
   await expect(page.locator('[data-testid="settings-provider-list"]')).toBeVisible();
   await expect(page.locator('[data-testid="settings-model-detail"]')).toBeVisible();
+  await expect(page.locator('[data-testid="settings-modal"]')).toHaveScreenshot('settings-models.png');
+
+  await page.locator('[data-testid="settings-nav-workspace"]').click();
+  await expect(page.locator('[data-testid="settings-workspace-body"]')).toBeVisible();
+  await expect(page.locator('[data-testid="settings-modal"]')).toHaveScreenshot('settings-workspace.png');
 
   await page.locator('[data-testid="settings-nav-agents"]').click();
   await expect(page.locator('[data-testid="settings-agent-list"]')).toBeVisible();
   await expect(page.locator('[data-testid="settings-agent-save"]')).toBeVisible();
+  await expect(page.locator('[data-testid="settings-modal"]')).toHaveScreenshot('settings-agents.png');
 });

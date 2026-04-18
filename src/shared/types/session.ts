@@ -106,6 +106,7 @@ export interface CaptureDescriptor {
 export interface DebugSessionStartRequest {
   projectId: string;
   sessionId?: string;
+  turnId?: string;
   mode: AppMode;
   goal: string;
   captures?: CaptureDescriptor[];
@@ -115,6 +116,7 @@ export interface DebugSessionStartRequest {
 
 export interface RunRecord {
   runId: string;
+  turnId?: string;
   projectId: string;
   sessionId: string;
   caseId: string;
@@ -142,6 +144,18 @@ export interface RunRecord {
 }
 
 export type RunSummary = RunRecord;
+
+export interface RunContextUsageSummary {
+  runId: string;
+  providerId: string;
+  modelId: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  contextWindowTokens: number | null;
+  usagePercent: number;
+  hasConfiguredContextWindow: boolean;
+}
 
 export interface ContextSnapshot {
   contextId: string;

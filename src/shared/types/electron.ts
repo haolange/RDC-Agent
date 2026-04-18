@@ -8,7 +8,12 @@ import type {
 } from './workflow';
 import type { AgentConfig, AgentRole, AgentState } from './agent';
 import type { ActionEvent, EventType } from './evidence';
-import type { ConversationMessage, ConversationSendRequest, ConversationTurnResult } from './conversation';
+import type {
+  ConversationMessage,
+  ConversationSendRequest,
+  ConversationStreamEvent,
+  ConversationTurnResult,
+} from './conversation';
 import type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from './device';
 import type { LLMConfig } from './llm';
 import type { RuntimeLogEntry, RuntimeLogScope } from './runtimeLog';
@@ -25,6 +30,7 @@ import type {
   OpenedCaptureState,
   ProjectInputRecord,
   ProjectRecord,
+  RunContextUsageSummary,
   RunSummary,
   SessionAttachmentRecord,
   SessionRecord,
@@ -62,6 +68,8 @@ export interface ElectronAPI {
     getHistory: (sessionId: string) => Promise<{
       messages: ConversationMessage[];
     }>;
+    onEvent: (callback: (event: ConversationStreamEvent) => void) => void;
+    offEvent: (callback: (event: ConversationStreamEvent) => void) => void;
   };
 
   selectFiles: () => Promise<string[] | null>;
@@ -125,6 +133,9 @@ export interface ElectronAPI {
     stop: (runId?: string) => Promise<{
       success: boolean;
       error?: string;
+    }>;
+    getRunUsage: (runId?: string) => Promise<{
+      usage: RunContextUsageSummary | null;
     }>;
     listRuns: () => Promise<{ runs: RunSummary[] }>;
     listActiveRuns: () => Promise<{ runs: Array<{ runId: string; sessionId: string; projectId: string; startedAt: number; stage?: string }> }>;
@@ -303,6 +314,7 @@ export interface ElectronAPI {
     onWorkflowStateChanged: (callback: (state: WorkflowState) => void) => void;
     onWorkflowStageChanged: (callback: (data: { stage: WorkflowStage; blockers: unknown[] }) => void) => void;
     onRunStatusChanged: (callback: (data: { runId: string; sessionId: string; status: RunSummary['status']; lastStage?: string; stopReason?: string }) => void) => void;
+    onRunUsageChanged: (callback: (summary: RunContextUsageSummary) => void) => void;
     onAgentMessage: (callback: (msg: unknown) => void) => void;
     onAgentStatusChanged: (callback: (state: AgentState) => void) => void;
     onToolExecutionComplete: (callback: (trace: unknown) => void) => void;

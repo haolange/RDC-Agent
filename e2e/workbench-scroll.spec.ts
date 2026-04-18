@@ -181,15 +181,20 @@ const seedChatWorkbench = async (page: AppContext['page']) => {
     backend: 'remote' as const,
   };
 
-  const timeline = Array.from({ length: 40 }, (_, index) => ({
-    id: `timeline-${index}`,
-    type: index % 2 === 0 ? 'agent' as const : 'user' as const,
-    agentRole: 'rdc-debugger' as const,
+  const conversationMessages = Array.from({ length: 40 }, (_, index) => ({
+    id: `message-${index}`,
+    sessionId: session.sessionId,
+    projectId: project.projectId,
+    runId: currentRun.runId,
+    modeContext: 'debugger' as const,
+    role: index % 2 === 0 ? 'assistant' as const : 'user' as const,
+    agentId: index % 2 === 0 ? 'rdc-debugger' as const : undefined,
     content: `Timeline entry ${index} `.repeat(6),
-    timestamp: now - (40 - index) * 1_000,
+    attachments: [],
+    createdAt: now - (40 - index) * 1_000,
   }));
 
-  await page.evaluate(async ({ project, session, currentRun, timeline }) => {
+  await page.evaluate(async ({ project, session, currentRun, conversationMessages }) => {
     const hook = (window as Window & {
       __RDC_AGENT_E2E__?: {
         seedWorkbenchState: (state: Record<string, unknown>) => void;
@@ -210,14 +215,15 @@ const seedChatWorkbench = async (page: AppContext['page']) => {
       projectInputs: [],
       openedCapture: null,
       contextSnapshot: null,
-      timeline,
+      conversationMessages,
+      timeline: [],
       runs: [currentRun],
     };
 
     hook.seedWorkbenchState(state);
     await new Promise((resolve) => window.setTimeout(resolve, 32));
     hook.seedWorkbenchState(state);
-  }, { project, session, currentRun, timeline });
+  }, { project, session, currentRun, conversationMessages });
 };
 
 test.beforeEach(async () => {

@@ -150,15 +150,12 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
     const state = get();
     if (state.tabs.length > 0) {
-      if (state.activeTabId === TERMINAL_LOGS_TAB_ID) {
-        set({ activeTabId: state.tabs[0].tabId });
-      }
       return;
     }
 
     const result = await electronAPI.terminal.createTab({ cwd: cwd ?? null });
     get().syncTabs(result.tabs ?? []);
-    if (result.tab) {
+    if (result.tab && get().activeTabId !== TERMINAL_LOGS_TAB_ID) {
       set({ activeTabId: result.tab.tabId });
     }
   },

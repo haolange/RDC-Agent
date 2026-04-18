@@ -2,6 +2,7 @@ import path from 'path';
 import { BrowserWindow } from 'electron';
 import type { AgentRole } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
+import type { ConversationMessage, ConversationStreamEvent } from '@shared/types/conversation';
 import type { DebugSessionStartRequest, RunSummary, SessionRecord } from '@shared/types/session';
 import type {
   AskUserAnswer,
@@ -160,6 +161,7 @@ export class DebugWorkflowService {
       });
       const { runId, sessionId } = await storageAdapter.createRun({
         caseId,
+        turnId: request.turnId,
         capturePaths: resolved.captures.map((capture) => capture.filePath),
         mode: request.mode,
         goal: resolved.goalText,
@@ -633,7 +635,7 @@ export class DebugWorkflowService {
       finishedAt: active && process.env.RDC_AGENT_TEST_MODE !== '1' ? undefined : Date.now(),
     });
 
-    await storageAdapter.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
+    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
       runId,
       sessionId: location.session.sessionId,
       agentId: 'rdc-debugger',
@@ -747,7 +749,7 @@ export class DebugWorkflowService {
             stoppedAt: Date.now(),
             finishedAt: Date.now(),
           });
-          await storageAdapter.appendActionEvent(session.sessionId, storageAdapter.createActionEvent({
+          await this.appendActionEvent(session.sessionId, storageAdapter.createActionEvent({
             runId: run.runId,
             sessionId: session.sessionId,
             agentId: 'rdc-debugger',
@@ -812,6 +814,7 @@ export class DebugWorkflowService {
 
       const runtimeContext = {
         runId: location.run.runId,
+        turnId: location.run.turnId,
         sessionId: location.session.sessionId,
         caseId: location.run.caseId,
         contextId: rdxSessionService.getContextId() || '',
@@ -1054,6 +1057,7 @@ export class DebugWorkflowService {
     debugPlan: DebugPlan,
     runtimeContext: {
       runId: string;
+      turnId?: string;
       sessionId: string;
       caseId: string;
       contextId: string;
@@ -1246,6 +1250,7 @@ export class DebugWorkflowService {
   private async executeVerification(
     runtimeContext: {
       runId: string;
+      turnId?: string;
       sessionId: string;
       caseId: string;
       contextId: string;
@@ -1274,6 +1279,7 @@ export class DebugWorkflowService {
       agentId: 'rdc-debugger',
       sessionId: runtimeContext.sessionId,
       runId: runtimeContext.runId,
+      turnId: runtimeContext.turnId,
       execute: () => toolBridge.call({
         toolName: 'rd.export.screenshot',
         args: {
@@ -1286,6 +1292,7 @@ export class DebugWorkflowService {
           owner_lease_id: runtimeContext.ownerLeaseId,
         },
         contextId: runtimeContext.contextId,
+        turnId: runtimeContext.turnId,
         runtimeOwner: runtimeContext.runtimeOwner,
         ownerLeaseId: runtimeContext.ownerLeaseId,
         runId: runtimeContext.runId,
@@ -1502,6 +1509,12 @@ export class DebugWorkflowService {
   }
 
   private async appendActionEvent(sessionId: string, event: ActionEvent): Promise<void> {
+    if (!event.turn_id && event.run_id) {
+      const location = this.findRun(event.run_id);
+      if (location?.run.turnId) {
+        event.turn_id = location.run.turnId;
+      }
+    }
     await storageAdapter.appendActionEvent(sessionId, event);
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) {
@@ -1516,8 +1529,9 @@ export class DebugWorkflowService {
     content: string,
   ): Promise<void> {
     const runLocation = this.findRun(runId || '');
-    storageAdapter.appendConversationMessage(sessionId, {
+    const message: ConversationMessage = {
       id: generateEventId('msga'),
+      turnId: runLocation?.run.turnId || generateEventId('turn'),
       sessionId,
       projectId: runLocation?.session.projectId ?? null,
       runId,
@@ -1525,7 +1539,17 @@ export class DebugWorkflowService {
       role: 'assistant',
       agentId: 'rdc-debugger',
       content,
+      status: 'complete',
+      updatedAt: nowMs(),
+      reasoningTrace: null,
       createdAt: nowMs(),
+    };
+    storageAdapter.appendConversationMessage(sessionId, message);
+    this.emitConversationEvent({
+      type: 'message_completed',
+      sessionId,
+      turnId: message.turnId,
+      message,
     });
   }
 
@@ -1571,6 +1595,14 @@ export class DebugWorkflowService {
           lastStage,
           stopReason,
         });
+      }
+    }
+  }
+
+  private emitConversationEvent(event: ConversationStreamEvent): void {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) {
+        window.webContents.send('conversation:event', event);
       }
     }
   }

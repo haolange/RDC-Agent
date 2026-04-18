@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useI18n } from '../../i18n';
 import type { TranslationKey } from '../../i18n';
+import DropdownSelect, { type DropdownOption } from '../DropdownSelect';
 import type {
   AppSettings,
   BuiltinLlmProviderId,
@@ -96,7 +97,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   const [agentRouteDrafts, setAgentRouteDrafts] = useState<LlmAgentRoute[]>(settings.llm.agentRoutes.map(cloneRoute));
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(settings.llm.providers[0]?.id ?? null);
   const [newModelId, setNewModelId] = useState('');
-  const [showApiKey, setShowApiKey] = useState(true);
+  const [showApiKey, setShowApiKey] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<BuiltinLlmProviderId>(BUILTIN_LLM_PROVIDER_DEFINITIONS[0]?.id ?? 'openrouter');
   const wasOpenRef = useRef(false);
 
@@ -116,7 +117,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     setAgentRouteDrafts(settings.llm.agentRoutes.map(cloneRoute));
     setSelectedProviderId(providers[0]?.id ?? null);
     setNewModelId('');
-    setShowApiKey(true);
+    setShowApiKey(false);
     setSelectedTemplateId(BUILTIN_LLM_PROVIDER_DEFINITIONS[0]?.id ?? 'openrouter');
   }, [open, settings]);
 
@@ -215,6 +216,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     profilesPath: joinPath(derivedRoot, 'profiles'),
     policiesPath: joinPath(derivedRoot, 'policies'),
   };
+  const derivedPathEntries = [
+    { label: t('settings.settingsFile'), value: derivedPaths.settingsPath },
+    { label: t('settings.logFile'), value: derivedPaths.logPath },
+    { label: t('settings.projectsPath'), value: derivedPaths.projectsPath },
+    { label: t('settings.knowledgePath'), value: derivedPaths.knowledgePath },
+    { label: 'profiles/', value: derivedPaths.profilesPath },
+    { label: 'policies/', value: derivedPaths.policiesPath },
+  ];
 
   const invalidAgentRoutes = useMemo(
     () => agentRouteDrafts.filter((route) => resolveAgentRouteStatus(route).issue !== null),
@@ -326,7 +335,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
           }
         : provider
     )));
-    setShowApiKey(true);
+    setShowApiKey(false);
   };
 
   const handleDeleteProvider = async () => {
@@ -545,10 +554,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
               <section className="settings-page settings-page-workspace">
                 <div className="settings-workspace-page scrollbar-thin" data-testid="settings-workspace-body">
                   <div className="settings-workspace-hero">
-                    <div className="settings-field-label">{t('settings.workspaceRoot')}</div>
-                    <div className="settings-help-text">{t('settings.workspaceRootHint')}</div>
-                    <div className="settings-path-value">{workspaceDraft || settings.paths.defaultWorkspaceRoot}</div>
-                    <div className="settings-path-actions">
+                    <div className="settings-workspace-hero-copy">
+                      <div className="settings-field-label">{t('settings.workspaceRoot')}</div>
+                      <div className="settings-help-text">{t('settings.workspaceRootHint')}</div>
+                    </div>
+                    <div className="settings-path-value settings-workspace-root-value">{workspaceDraft || settings.paths.defaultWorkspaceRoot}</div>
+                    <div className="settings-path-actions settings-workspace-root-actions">
                       <button type="button" className="button button-secondary" onClick={() => void handleWorkspacePick()}>
                         {t('settings.chooseDirectory')}
                       </button>
@@ -569,49 +580,65 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                     </div>
                   </div>
 
-                  <div className="settings-path-grid">
-                    {[
-                      { label: t('settings.settingsFile'), value: derivedPaths.settingsPath },
-                      { label: t('settings.logFile'), value: derivedPaths.logPath },
-                      { label: t('settings.projectsPath'), value: derivedPaths.projectsPath },
-                      { label: t('settings.knowledgePath'), value: derivedPaths.knowledgePath },
-                      { label: 'profiles/', value: derivedPaths.profilesPath },
-                      { label: 'policies/', value: derivedPaths.policiesPath },
-                    ].map((entry) => (
-                      <div key={entry.label} className="settings-path-card">
-                        <div className="settings-field-label">{entry.label}</div>
-                        <div className="settings-path-value">{entry.value}</div>
-                        <div className="settings-path-actions">
-                          <button
-                            type="button"
-                            className="button button-secondary"
-                            onClick={() => void window.electronAPI.appShell.openPath(entry.value)}
-                          >
-                            {t('settings.reveal')}
-                          </button>
-                          <button
-                            type="button"
-                            className="button button-secondary"
-                            onClick={() => void window.electronAPI.appShell.copyText(entry.value)}
-                          >
-                            {t('settings.copy')}
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {settings.configuration.lastMigrationSummary.length > 0 && (
-                    <div className="settings-path-card">
-                      <div className="settings-field-label">Last migration</div>
-                      <div className="settings-help-text">{settings.configuration.lastMigrationSummary.join(' | ')}</div>
+                  <div className="settings-path-card settings-derived-paths-card">
+                    <div className="settings-derived-paths-header">
+                      <div className="settings-field-label">Derived Paths</div>
+                      <div className="settings-help-text">Runtime files and folders derived from the workspace root.</div>
                     </div>
-                  )}
-                  {settings.configuration.diagnostics.length > 0 && (
-                    <div className="settings-path-card">
-                      <div className="settings-field-label">Diagnostics</div>
-                      <div className="settings-help-text">
-                        {settings.configuration.diagnostics.map((diagnostic) => diagnostic.message).join(' | ')}
-                      </div>
+                    <div className="settings-derived-path-list">
+                      {derivedPathEntries.map((entry) => (
+                        <div key={entry.label} className="settings-derived-path-row">
+                          <div className="settings-derived-path-copy">
+                            <div className="settings-derived-path-label">{entry.label}</div>
+                            <div className="settings-derived-path-value">{entry.value}</div>
+                          </div>
+                          <div className="settings-derived-path-actions">
+                            <button
+                              type="button"
+                              className="button button-secondary settings-derived-path-button"
+                              onClick={() => void window.electronAPI.appShell.openPath(entry.value)}
+                            >
+                              {t('settings.reveal')}
+                            </button>
+                            <button
+                              type="button"
+                              className="button button-secondary settings-derived-path-button"
+                              onClick={() => void window.electronAPI.appShell.copyText(entry.value)}
+                            >
+                              {t('settings.copy')}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {(settings.configuration.lastMigrationSummary.length > 0 || settings.configuration.diagnostics.length > 0) && (
+                    <div className="settings-workspace-meta-grid">
+                      {settings.configuration.lastMigrationSummary.length > 0 && (
+                        <div className="settings-path-card settings-workspace-note-card">
+                          <div className="settings-field-label">Last migration</div>
+                          <div className="settings-workspace-note-list">
+                            {settings.configuration.lastMigrationSummary.map((summary, index) => (
+                              <div key={`${summary}-${index}`} className="settings-workspace-note-item">
+                                {summary}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {settings.configuration.diagnostics.length > 0 && (
+                        <div className="settings-path-card settings-workspace-note-card">
+                          <div className="settings-field-label">Diagnostics</div>
+                          <div className="settings-workspace-note-list">
+                            {settings.configuration.diagnostics.map((diagnostic, index) => (
+                              <div key={`${diagnostic.message}-${index}`} className="settings-workspace-note-item">
+                                {diagnostic.message}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className="settings-actions settings-workspace-footer-actions">
@@ -635,10 +662,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                     <div className="settings-provider-list-wrap scrollbar-thin" data-testid="settings-provider-list">
                       <div className="settings-provider-list">
                         {providerDrafts.map((provider) => (
-                        <div
+                        <button
                           key={provider.id}
+                          type="button"
                           className={`settings-provider-item ${selectedProviderId === provider.id ? 'active' : ''}`}
                           data-testid={`settings-provider-item-${provider.id}`}
+                          aria-pressed={selectedProviderId === provider.id}
+                          onClick={() => setSelectedProviderId(provider.id)}
                         >
                           <div
                             className="settings-provider-tile"
@@ -660,29 +690,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                               {getResolvedProviderLabel(provider)}
                             </span>
                           </div>
-                          <button
-                            type="button"
-                            className="button button-secondary button-sm settings-provider-edit-button"
-                            data-testid={`settings-provider-edit-${provider.id}`}
-                            onClick={() => setSelectedProviderId(provider.id)}
-                          >
-                            {t('settings.edit')}
-                          </button>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
                   <div className="settings-provider-toolbar">
-                    <select
-                      className="input settings-provider-template-select"
-                      data-testid="settings-provider-template-select"
+                    <DropdownSelect
+                      className="settings-provider-template-select"
+                      triggerClassName="settings-select-trigger"
+                      menuClassName="settings-select-menu"
+                      dataTestId="settings-provider-template-select"
                       value={selectedTemplateId}
-                      onChange={(event) => setSelectedTemplateId(event.target.value as BuiltinLlmProviderId)}
-                    >
-                      {BUILTIN_LLM_PROVIDER_DEFINITIONS.map((provider) => (
-                        <option key={provider.id} value={provider.id}>{provider.label}</option>
-                      ))}
-                    </select>
+                      options={BUILTIN_LLM_PROVIDER_DEFINITIONS.map<DropdownOption>((provider) => ({
+                        value: provider.id,
+                        label: provider.label,
+                      }))}
+                      onChange={(nextValue) => setSelectedTemplateId(nextValue as BuiltinLlmProviderId)}
+                    />
                     <button
                       type="button"
                       className="button button-secondary settings-provider-template-button"
@@ -716,22 +740,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
                 <div className="settings-model-detail scrollbar-thin" data-testid="settings-model-detail">
                   {!selectedProvider ? (
-                    <div className="settings-credential-empty settings-empty-state">
+                    <div className="settings-model-detail-body settings-credential-empty settings-empty-state" data-testid="settings-model-detail-body">
                       {providerDrafts.length === 0 ? (
                         <>
                           <div className="settings-field-label">{t('settings.emptyProvidersTitle')}</div>
                           <div className="settings-help-text">当前没有已保存的 Provider。内置厂商只作为模板，不会自动写入设置。</div>
                           <div className="settings-template-picker">
-                            <select
-                              className="input"
-                              data-testid="settings-provider-template-select"
+                            <DropdownSelect
+                              triggerClassName="settings-select-trigger"
+                              menuClassName="settings-select-menu"
+                              dataTestId="settings-provider-template-select"
                               value={selectedTemplateId}
-                              onChange={(event) => setSelectedTemplateId(event.target.value as BuiltinLlmProviderId)}
-                            >
-                              {BUILTIN_LLM_PROVIDER_DEFINITIONS.map((provider) => (
-                                <option key={provider.id} value={provider.id}>{provider.label}</option>
-                              ))}
-                            </select>
+                              options={BUILTIN_LLM_PROVIDER_DEFINITIONS.map<DropdownOption>((provider) => ({
+                                value: provider.id,
+                                label: provider.label,
+                              }))}
+                              onChange={(nextValue) => setSelectedTemplateId(nextValue as BuiltinLlmProviderId)}
+                            />
                             <button
                               type="button"
                               className="button button-secondary"
@@ -753,6 +778,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                     </div>
                   ) : (
                     <>
+                      <div className="settings-model-detail-body" data-testid="settings-model-detail-body">
                       <div className="settings-provider-header">
                         <div>
                           <div className="settings-provider-title">{getResolvedProviderLabel(selectedProvider)}</div>
@@ -785,15 +811,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
                           <label className="settings-field">
                             <span className="settings-field-label">{t('settings.providerKind')}</span>
-                            <select
-                              className="input"
+                            <DropdownSelect
+                              triggerClassName="settings-select-trigger"
+                              menuClassName="settings-select-menu"
+                              dataTestId="settings-provider-kind"
                               value={selectedProvider.kind}
-                              onChange={(event) => handleProviderDraftChange('kind', event.target.value as LlmProviderKind)}
-                            >
-                              {PROVIDER_KIND_OPTIONS.map((kind) => (
-                                <option key={kind} value={kind}>{kind}</option>
-                              ))}
-                            </select>
+                              options={PROVIDER_KIND_OPTIONS.map<DropdownOption>((kind) => ({
+                                value: kind,
+                                label: kind,
+                              }))}
+                              onChange={(nextValue) => handleProviderDraftChange('kind', nextValue as LlmProviderKind)}
+                            />
                           </label>
                         </div>
                       )}
@@ -821,13 +849,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                           </button>
                         </div>
                         {selectedProvider.kind !== 'ollama' && selectedProvider.hasStoredSecret && (
-                          <div className="settings-secret-status">
+                          <div className="settings-secret-status" data-testid="settings-provider-auth-status">
                             <div className="settings-secret-status-copy">
                               <span className="settings-secret-badge">已存储</span>
                             </div>
                             <button
                               type="button"
                               className="button button-secondary settings-secret-clear"
+                              data-testid="settings-provider-clear-secret"
                               onClick={handleClearStoredSecret}
                             >
                               清空已存储密钥
@@ -899,7 +928,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                         </div>
                       </div>
 
-                      <div className="settings-actions">
+                      </div>
+
+                      <div className="settings-actions settings-provider-savebar" data-testid="settings-provider-savebar">
                         <button
                           type="button"
                           className="button button-primary"
@@ -953,12 +984,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                           <div className="settings-agent-grid">
                             <label className="settings-field">
                               <span className="settings-field-label">{t('settings.providerFieldLabel')}</span>
-                              <select
-                                className="input"
-                                data-testid={`settings-agent-provider-${agentId}`}
+                              <DropdownSelect
+                                triggerClassName="settings-select-trigger"
+                                menuClassName="settings-select-menu"
+                                dataTestId={`settings-agent-provider-${agentId}`}
                                 value={providerValue}
-                                onChange={(event) => {
-                                  const nextProviderId = event.target.value;
+                                options={routableProviders.map<DropdownOption>((entry) => ({
+                                  value: entry.id,
+                                  label: getResolvedProviderLabel(entry),
+                                }))}
+                                placeholder={routableProviders.length === 0
+                                  ? t('settings.noConfiguredProviders')
+                                  : t('settings.selectProviderPlaceholder')}
+                                onChange={(nextProviderId) => {
                                   if (!nextProviderId) {
                                     handleRouteChange(agentId, { providerId: '', modelId: '' });
                                     return;
@@ -971,34 +1009,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                                     modelId: getEnabledModels(nextProvider)[0]?.id ?? '',
                                   });
                                 }}
-                              >
-                                <option value="">
-                                  {routableProviders.length === 0
-                                    ? t('settings.noConfiguredProviders')
-                                    : t('settings.selectProviderPlaceholder')}
-                                </option>
-                                {routableProviders.map((entry) => (
-                                  <option key={entry.id} value={entry.id}>{getResolvedProviderLabel(entry)}</option>
-                                ))}
-                              </select>
+                                disabled={routableProviders.length === 0}
+                              />
                             </label>
                             <label className="settings-field">
                               <span className="settings-field-label">{t('settings.modelFieldLabel')}</span>
-                              <select
-                                className="input"
-                                data-testid={`settings-agent-model-${agentId}`}
+                              <DropdownSelect
+                                triggerClassName="settings-select-trigger"
+                                menuClassName="settings-select-menu"
+                                dataTestId={`settings-agent-model-${agentId}`}
                                 value={modelValue}
-                                onChange={(event) => handleRouteChange(agentId, { modelId: event.target.value })}
+                                options={availableModels.map<DropdownOption>((model) => ({
+                                  value: model.id,
+                                  label: model.label,
+                                }))}
+                                placeholder={!selectedRouteProvider
+                                  ? t('settings.selectProviderFirst')
+                                  : t('settings.noModelsAvailable')}
+                                onChange={(nextModelId) => handleRouteChange(agentId, { modelId: nextModelId })}
                                 disabled={!selectedRouteProvider || availableModels.length === 0}
-                              >
-                                {!selectedRouteProvider && <option value="">{t('settings.selectProviderFirst')}</option>}
-                                {selectedRouteProvider && availableModels.length === 0 && (
-                                  <option value="">{t('settings.noModelsAvailable')}</option>
-                                )}
-                                {availableModels.map((model) => (
-                                  <option key={model.id} value={model.id}>{model.label}</option>
-                                ))}
-                              </select>
+                              />
                             </label>
                           </div>
                         </div>

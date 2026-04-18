@@ -63,6 +63,7 @@ export interface LlmProviderModel {
   id: string;
   label: string;
   enabled: boolean;
+  contextWindowTokens?: number | null;
 }
 
 export interface LlmProviderEntry {

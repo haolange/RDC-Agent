@@ -1,15 +1,13 @@
 /**
- * Agent Constants - Agent角色常量定义
+ * Agent Constants
  */
 
 import type { AgentRole, AgentCategory, WriteScope } from '../types/agent';
 import type { ModeConfig } from '../types/layout';
 import { DEFAULT_MODEL_ROUTING } from '../types/agent';
 
-// 重新导出 DEFAULT_MODEL_ROUTING
 export { DEFAULT_MODEL_ROUTING };
 
-// 所有Agent角色
 export const AGENT_ROLES: AgentRole[] = [
   'rdc-debugger',
   'triage_agent',
@@ -22,7 +20,6 @@ export const AGENT_ROLES: AgentRole[] = [
   'curator_agent',
 ];
 
-// Agent显示名称
 export const AGENT_DISPLAY_NAMES: Record<AgentRole, string> = {
   'rdc-debugger': 'RDC Debugger',
   'triage_agent': 'Triage Agent',
@@ -35,7 +32,6 @@ export const AGENT_DISPLAY_NAMES: Record<AgentRole, string> = {
   'curator_agent': 'Curator Agent',
 };
 
-// Agent描述
 export const AGENT_DESCRIPTIONS: Record<AgentRole, string> = {
   'rdc-debugger': 'Main orchestrator responsible for workflow coordination, gates, and stage progression',
   'triage_agent': 'Symptom classification and SOP recommendation',
@@ -48,7 +44,6 @@ export const AGENT_DESCRIPTIONS: Record<AgentRole, string> = {
   'curator_agent': 'Final report generation and knowledge library curation',
 };
 
-// Agent类别
 export const AGENT_CATEGORIES: Record<AgentRole, AgentCategory> = {
   'rdc-debugger': 'orchestrator',
   'triage_agent': 'investigator',
@@ -61,7 +56,6 @@ export const AGENT_CATEGORIES: Record<AgentRole, AgentCategory> = {
   'curator_agent': 'reporter',
 };
 
-// Investigator Agents（需要dispatch的specialists）
 export const INVESTIGATOR_AGENTS: AgentRole[] = [
   'triage_agent',
   'capture_repro_agent',
@@ -71,13 +65,10 @@ export const INVESTIGATOR_AGENTS: AgentRole[] = [
   'driver_device_agent',
 ];
 
-// Verifier Agents
 export const VERIFIER_AGENTS: AgentRole[] = ['skeptic_agent'];
 
-// Reporter Agents
 export const REPORTER_AGENTS: AgentRole[] = ['curator_agent'];
 
-// Agent写入范围
 export const AGENT_WRITE_SCOPES: Record<AgentRole, WriteScope[]> = {
   'rdc-debugger': ['workspace_control'],
   'triage_agent': ['workspace_notes'],
@@ -90,7 +81,6 @@ export const AGENT_WRITE_SCOPES: Record<AgentRole, WriteScope[]> = {
   'curator_agent': ['workspace_reports', 'session_artifacts', 'knowledge_library'],
 };
 
-// Agent笔记文件名
 export const AGENT_NOTE_FILES: Record<AgentRole, string> = {
   'rdc-debugger': '',
   'triage_agent': 'triage.md',
@@ -103,10 +93,8 @@ export const AGENT_NOTE_FILES: Record<AgentRole, string> = {
   'curator_agent': 'curator.md',
 };
 
-// 默认TTL（秒）
 export const DEFAULT_TOKEN_TTL_SECONDS = 1800;
 
-// Agent Colors for UI
 export const AGENT_COLORS: Record<AgentRole, string> = {
   'rdc-debugger': '#6366f1',
   'triage_agent': '#a855f7',
@@ -119,39 +107,38 @@ export const AGENT_COLORS: Record<AgentRole, string> = {
   'curator_agent': '#8b5cf6',
 };
 
-// Agent 工作模式配置
 export const AGENT_MODES: ModeConfig[] = [
   {
     id: 'debugger',
     label: 'Debugger',
     icon: 'crosshair-bug',
-    description: 'Debug and diagnose rendering issues',
+    description: '定位异常与验证修复',
     accentColor: '#33d1ff',
-    emptyTitle: '从异常现象开始，逐步定位 GPU 问题。',
-    emptySubtitle: '面向 RenderDoc 与 .rdc capture 的调试工作台。',
-    helperCopy: '描述异常、附加图片或文件，或者直接导入 .rdc capture 开始排查。',
+    emptyTitle: '从异常现象出发，定位 GPU 问题',
+    emptySubtitle: '围绕 `.rdc` Capture、截图与线索快速展开排查。',
+    helperCopy: '补充异常、截图或 `.rdc` Capture，直接开始定位。',
     disabled: false,
   },
   {
     id: 'analyzer',
     label: 'Analyzer',
     icon: 'waveform-gauge',
-    description: 'Analyze rendering captures and performance',
+    description: '拆解现象并收敛证据',
     accentColor: '#8d8bff',
-    emptyTitle: '把线索拆开看，把证据串起来。',
-    emptySubtitle: '聚焦现象分解、证据整理与多模态分析组合。',
-    helperCopy: '贴问题、附上下文素材或 capture 线索，我会先帮你拆结构、找证据和判断方向。',
+    emptyTitle: '拆开线索，串起证据',
+    emptySubtitle: '适合对比现象、梳理上下文与收敛判断方向。',
+    helperCopy: '贴出问题与素材，我会先整理结构和证据。',
     disabled: false,
   },
   {
     id: 'optimizer',
     label: 'Optimizer',
     icon: 'spark-tuning',
-    description: 'Generate optimization suggestions',
+    description: '判断瓶颈与优化顺序',
     accentColor: '#4ee3a0',
-    emptyTitle: '先看瓶颈，再给出可执行的优化路径。',
-    emptySubtitle: '适合评估性能、成本和渲染管线的收敛空间。',
-    helperCopy: '可以附性能截图、日志或参考素材，我会按收益、风险和验证路径组织建议。',
+    emptyTitle: '先找瓶颈，再排优化顺序',
+    emptySubtitle: '适合评估性能收益、成本与验证优先级。',
+    helperCopy: '补充性能线索后，我会按收益和风险整理建议。',
     disabled: false,
   },
 ];

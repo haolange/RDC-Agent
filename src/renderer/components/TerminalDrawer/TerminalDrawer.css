@@ -191,16 +191,22 @@
   font-size: 12px;
 }
 
-.runtime-terminal-select span {
+.runtime-terminal-select > span {
   color: rgb(var(--color-text-tertiary));
 }
 
-.runtime-terminal-select select {
-  min-width: 88px;
-  border: none;
-  outline: none;
-  background: transparent;
+.runtime-terminal-select .dropdown-select {
+  flex: 1;
+  min-width: 96px;
+}
+
+.runtime-terminal-select .dropdown-select-trigger.variant-inline {
+  width: 100%;
   color: rgb(var(--color-text-primary));
+}
+
+.runtime-terminal-select .dropdown-select-menu {
+  min-width: 180px;
 }
 
 .runtime-terminal-logs-body {

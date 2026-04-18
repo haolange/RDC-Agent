@@ -52,6 +52,7 @@ export interface ToolReturn {
 export interface ToolCallRequest {
   toolName: string;
   args: Record<string, unknown>;
+  turnId?: string;
   contextId?: string;
   runtimeOwner?: string;
   ownerLeaseId?: string;
@@ -161,6 +162,7 @@ export interface ToolRegistryEntry {
 /** 工具追踪条目 */
 export interface ToolTraceEntry {
   traceId: string;
+  turnId?: string;
   toolName: string;
   args: Record<string, unknown>;
   result: ToolCallResult;

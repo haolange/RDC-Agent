@@ -7,44 +7,45 @@
 /* ========== CSS Custom Properties ========== */
 
 :root {
-  /* Primary Color Scale - Indigo/Cyan tech gradient */
-  --color-primary-50: 235 241 255;
-  --color-primary-100: 215 228 255;
-  --color-primary-200: 180 205 255;
-  --color-primary-300: 130 172 255;
-  --color-primary-400: 80 135 255;
-  --color-primary-500: 59 99 255;
-  --color-primary-600: 48 79 255;
-  --color-primary-700: 45 62 230;
-  --color-primary-800: 38 53 184;
-  --color-primary-900: 35 49 144;
+  /* Primary Color Scale - calmer workstation blue */
+  --color-primary-50: 233 242 255;
+  --color-primary-100: 213 229 255;
+  --color-primary-200: 180 208 255;
+  --color-primary-300: 137 177 255;
+  --color-primary-400: 91 145 249;
+  --color-primary-500: 63 112 230;
+  --color-primary-600: 53 93 198;
+  --color-primary-700: 47 77 163;
+  --color-primary-800: 43 65 132;
+  --color-primary-900: 37 54 110;
 
-  /* Cyan Accent - For highlights and active states */
-  --color-accent-50: 236 253 255;
-  --color-accent-100: 207 250 255;
-  --color-accent-200: 165 243 252;
-  --color-accent-300: 103 232 249;
-  --color-accent-400: 34 211 238;
-  --color-accent-500: 6 182 212;
-  --color-accent-600: 8 145 178;
-  --color-accent-700: 14 116 144;
-  --color-accent-800: 21 94 117;
-  --color-accent-900: 22 78 99;
+  /* Accent Scale - retained cyan emphasis, less neon */
+  --color-accent-50: 236 251 255;
+  --color-accent-100: 212 245 255;
+  --color-accent-200: 175 234 250;
+  --color-accent-300: 122 214 242;
+  --color-accent-400: 72 190 226;
+  --color-accent-500: 33 163 204;
+  --color-accent-600: 25 133 170;
+  --color-accent-700: 24 108 138;
+  --color-accent-800: 24 88 112;
+  --color-accent-900: 24 72 91;
 
-  /* Background Scale - Deep space dark */
-  --color-bg-0: 8 8 12;
-  --color-bg-1: 13 13 20;
-  --color-bg-2: 18 18 28;
-  --color-bg-3: 24 24 38;
-  --color-bg-4: 32 32 48;
-  --color-bg-5: 40 40 60;
+  /* Background Scale - quiet graphite surfaces */
+  --color-bg-0: 9 10 16;
+  --color-bg-1: 14 16 24;
+  --color-bg-2: 19 22 31;
+  --color-bg-3: 26 30 41;
+  --color-bg-4: 34 39 53;
+  --color-bg-5: 46 52 69;
 
   /* Text Colors */
   --color-text-primary: 250 250 252;
-  --color-text-secondary: 180 180 195;
-  --color-text-tertiary: 120 120 140;
-  --color-text-muted: 80 80 100;
+  --color-text-secondary: 190 194 207;
+  --color-text-tertiary: 139 145 163;
+  --color-text-muted: 96 103 124;
   --color-text-disabled: 60 60 75;
+  --color-text-on-accent: 248 251 255;
 
   /* Semantic Colors */
   --color-success: 34 197 94;
@@ -60,6 +61,18 @@
   --color-border-default: 255 255 255 / 0.1;
   --color-border-strong: 255 255 255 / 0.15;
   --color-border-focus: rgb(var(--color-accent-500));
+  --color-border-primary: 255 255 255 / 0.14;
+  --color-border-secondary: 255 255 255 / 0.08;
+
+  /* Surface helpers */
+  --surface-shell: rgb(var(--color-bg-1) / 0.94);
+  --surface-panel: rgb(var(--color-bg-2) / 0.94);
+  --surface-panel-strong: rgb(var(--color-bg-2) / 0.98);
+  --surface-panel-muted: rgb(var(--color-bg-1) / 0.82);
+  --surface-card: rgb(var(--color-bg-3) / 0.84);
+  --surface-card-hover: rgb(var(--color-bg-3) / 0.96);
+  --surface-elevated: linear-gradient(180deg, rgb(255 255 255 / 0.04), transparent 58%), rgb(var(--color-bg-2) / 0.96);
+  --surface-active: linear-gradient(180deg, rgb(var(--color-accent-500) / 0.1), transparent 74%), rgb(var(--color-bg-2));
 
   /* Spacing Scale - 4px base */
   --space-0: 0;
@@ -92,13 +105,13 @@
   /* Font Sizes */
   --text-xs: 11px;
   --text-sm: 12px;
-  --text-base: 13px;
-  --text-md: 14px;
-  --text-lg: 16px;
-  --text-xl: 18px;
-  --text-2xl: 20px;
-  --text-3xl: 24px;
-  --text-4xl: 32px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 17px;
+  --text-xl: 19px;
+  --text-2xl: 22px;
+  --text-3xl: 28px;
+  --text-4xl: 36px;
 
   /* Font Weights */
   --font-normal: 400;
@@ -114,14 +127,14 @@
   --leading-relaxed: 1.625;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.22);
-  --shadow-md: 0 8px 18px rgb(0 0 0 / 0.24);
-  --shadow-lg: 0 16px 36px rgb(0 0 0 / 0.28);
-  --shadow-xl: 0 22px 52px rgb(0 0 0 / 0.32);
-  --shadow-panel: 0 10px 28px rgb(0 0 0 / 0.18);
-  --shadow-panel-hover: 0 16px 34px rgb(0 0 0 / 0.24);
-  --shadow-glow: 0 0 16px rgb(var(--color-accent-500) / 0.16);
-  --shadow-glow-strong: 0 0 24px rgb(var(--color-accent-500) / 0.22);
+  --shadow-sm: 0 2px 4px rgb(0 0 0 / 0.18);
+  --shadow-md: 0 10px 22px rgb(0 0 0 / 0.2);
+  --shadow-lg: 0 18px 38px rgb(0 0 0 / 0.24);
+  --shadow-xl: 0 26px 52px rgb(0 0 0 / 0.3);
+  --shadow-panel: 0 12px 30px rgb(0 0 0 / 0.2);
+  --shadow-panel-hover: 0 18px 38px rgb(0 0 0 / 0.26);
+  --shadow-glow: 0 0 14px rgb(var(--color-accent-500) / 0.1);
+  --shadow-glow-strong: 0 0 22px rgb(var(--color-accent-500) / 0.16);
 
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -191,46 +204,48 @@
   --color-accent-800: 30 82 103;
   --color-accent-900: 38 68 84;
 
-  --color-bg-0: 241 244 250;
+  --color-bg-0: 242 245 250;
   --color-bg-1: 248 250 253;
-  --color-bg-2: 236 240 247;
+  --color-bg-2: 238 242 248;
   --color-bg-3: 226 232 241;
-  --color-bg-4: 208 217 231;
-  --color-bg-5: 182 193 210;
+  --color-bg-4: 209 217 229;
+  --color-bg-5: 186 196 210;
 
   --color-text-primary: 16 23 34;
-  --color-text-secondary: 72 83 102;
-  --color-text-tertiary: 104 116 136;
-  --color-text-muted: 132 143 160;
+  --color-text-secondary: 76 88 107;
+  --color-text-tertiary: 106 118 136;
+  --color-text-muted: 132 143 159;
   --color-text-disabled: 160 169 183;
 
   --color-border-subtle: 15 23 42 / 0.06;
   --color-border-default: 15 23 42 / 0.1;
   --color-border-strong: 15 23 42 / 0.16;
+  --color-border-primary: 15 23 42 / 0.14;
+  --color-border-secondary: 15 23 42 / 0.08;
 }
 
 :root[data-font-scale='small'] {
   --text-xs: 10px;
   --text-sm: 11px;
-  --text-base: 12px;
-  --text-md: 13px;
-  --text-lg: 15px;
-  --text-xl: 17px;
-  --text-2xl: 19px;
-  --text-3xl: 22px;
-  --text-4xl: 30px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 20px;
+  --text-3xl: 24px;
+  --text-4xl: 32px;
 }
 
 :root[data-font-scale='large'] {
   --text-xs: 12px;
   --text-sm: 13px;
-  --text-base: 14px;
-  --text-md: 15px;
-  --text-lg: 17px;
-  --text-xl: 20px;
-  --text-2xl: 22px;
-  --text-3xl: 26px;
-  --text-4xl: 36px;
+  --text-base: 15px;
+  --text-md: 16px;
+  --text-lg: 18px;
+  --text-xl: 21px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --text-4xl: 40px;
 }
 
 /* ========== Animation Keyframes ========== */

@@ -374,6 +374,7 @@ export class ToolBridge {
   private emitToolTrace(request: ToolCallRequest, result: ToolCallResult): void {
     const trace: ToolTraceEntry = {
       traceId: result.trace_id || generateEventId('tool-trace'),
+      turnId: request.turnId,
       toolName: request.toolName,
       args: request.args,
       result,

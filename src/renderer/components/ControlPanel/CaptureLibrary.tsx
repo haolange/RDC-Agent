@@ -61,6 +61,7 @@ export const CaptureLibrary: React.FC = () => {
   const activeOpenedCapture = currentProject && openedCapture?.projectId === currentProject.projectId
     ? openedCapture
     : null;
+  const currentDeviceLabel = selectedDeviceEntry?.label ?? 'Local Replay';
 
   const handleRefresh = async () => {
     if (!currentProject) return;
@@ -157,6 +158,12 @@ export const CaptureLibrary: React.FC = () => {
         >
           <span>{isImporting ? t('control.captureLibraryImporting') : t('control.captureLibraryImport')}</span>
         </button>
+      </div>
+
+      <div className="capture-library-context-note">
+        当前回放设备：
+        {' '}
+        <strong>{currentDeviceLabel}</strong>
       </div>
 
       {errorMessage && <div className="capture-library-error" role="alert">{errorMessage}</div>}

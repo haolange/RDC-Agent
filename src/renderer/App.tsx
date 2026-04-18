@@ -14,7 +14,12 @@ import { useAppSettingsStore } from './stores/appSettingsStore';
 import { useTerminalStore } from './stores/terminalStore';
 import { useI18n } from './i18n';
 import type { AgentTimelineEntry } from '@shared/types/agent';
-import type { ConversationAttachmentInput, ConversationMessage } from '@shared/types/conversation';
+import type {
+  ConversationAttachmentInput,
+  ConversationMessage,
+  ConversationReasoningTrace,
+  ConversationStreamEvent,
+} from '@shared/types/conversation';
 import type { ToolTraceEntry } from '@shared/types/tool';
 import type { ReplayDeviceStatusChangedPayload } from '@shared/types/device';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
@@ -26,6 +31,7 @@ import type {
   OpenedCaptureState,
   ProjectInputRecord,
   ProjectRecord,
+  RunContextUsageSummary,
   RunSummary,
   SessionAttachmentRecord,
   SessionRecord,
@@ -57,6 +63,7 @@ interface WorkbenchSeedState {
   currentProject: ProjectRecord | null;
   currentSession: SessionRecord | null;
   currentRun: RunSummary | null;
+  currentRunUsage?: RunContextUsageSummary | null;
   contextSnapshot: ContextSnapshot | null;
   captures: CaptureDescriptor[];
   projectInputs: ProjectInputRecord[];
@@ -278,6 +285,203 @@ const mapActionEventToTimelineEntry = (event: ActionEvent): AgentTimelineEntry |
   }
 };
 
+const cloneReasoningTrace = (trace: ConversationReasoningTrace | null | undefined): ConversationReasoningTrace => (
+  trace
+    ? {
+        ...trace,
+        steps: trace.steps.map((step) => ({
+          ...step,
+          toolCalls: step.toolCalls.map((toolCall) => ({ ...toolCall })),
+        })),
+      }
+    : {
+        status: 'idle',
+        steps: [],
+        updatedAt: Date.now(),
+      }
+);
+
+const upsertReasoningStep = (
+  trace: ConversationReasoningTrace | null | undefined,
+  stepId: string,
+  patch: {
+    title: string;
+    stage?: string;
+    status: 'pending' | 'running' | 'complete' | 'error';
+    summary?: string;
+    detail?: string;
+    completedAt?: number;
+  },
+): ConversationReasoningTrace => {
+  const nextTrace = cloneReasoningTrace(trace);
+  const nextIndex = nextTrace.steps.findIndex((step) => step.id === stepId);
+  if (nextIndex >= 0) {
+    nextTrace.steps[nextIndex] = {
+      ...nextTrace.steps[nextIndex],
+      ...patch,
+    };
+  } else {
+    nextTrace.steps.push({
+      id: stepId,
+      title: patch.title,
+      stage: patch.stage,
+      status: patch.status,
+      summary: patch.summary,
+      detail: patch.detail,
+      toolCalls: [],
+      startedAt: Date.now(),
+      completedAt: patch.completedAt,
+    });
+  }
+  nextTrace.status = patch.status === 'error' ? 'error' : 'running';
+  nextTrace.updatedAt = Date.now();
+  return nextTrace;
+};
+
+const applyToolTraceToMessage = (message: ConversationMessage, trace: ToolTraceEntry): ConversationMessage => {
+  const nextTrace = upsertReasoningStep(message.reasoningTrace, 'tool-execution', {
+    title: '工具调用',
+    stage: 'investigate',
+    status: trace.result.ok ? 'running' : 'error',
+    summary: trace.result.ok ? '正在执行工具调用。' : '工具调用失败。',
+  });
+  const step = nextTrace.steps.find((entry) => entry.id === 'tool-execution');
+  if (step) {
+    const existingIndex = step.toolCalls.findIndex((toolCall) => toolCall.id === trace.traceId);
+    const nextToolCall = {
+      id: trace.traceId,
+      toolName: trace.toolName,
+      status: trace.result.ok ? 'complete' as const : 'error' as const,
+      argsPreview: JSON.stringify(trace.args, null, 2),
+      resultPreview: trace.result.ok
+        ? JSON.stringify(trace.result.data ?? trace.result.artifacts ?? {}, null, 2)
+        : trace.result.error?.message,
+      error: trace.result.error?.message,
+      startedAt: trace.timestamp,
+      completedAt: trace.timestamp + trace.result.duration_ms,
+    };
+
+    if (existingIndex >= 0) {
+      step.toolCalls[existingIndex] = nextToolCall;
+    } else {
+      step.toolCalls.push(nextToolCall);
+    }
+    step.status = step.toolCalls.some((toolCall) => toolCall.status === 'error') ? 'error' : 'complete';
+    step.summary = step.status === 'error'
+      ? '工具调用中出现错误。'
+      : `已记录 ${step.toolCalls.length} 个工具调用。`;
+    step.completedAt = Date.now();
+  }
+
+  nextTrace.status = step?.status === 'error' ? 'error' : 'running';
+
+  return {
+    ...message,
+    reasoningTrace: nextTrace,
+    updatedAt: Date.now(),
+  };
+};
+
+const applyActionEventToMessage = (message: ConversationMessage, event: ActionEvent): ConversationMessage => {
+  if (!event.turn_id || message.turnId !== event.turn_id || message.role !== 'assistant') {
+    return message;
+  }
+
+  const nextTrace = cloneReasoningTrace(message.reasoningTrace);
+  const eventTime = event.ts_ms;
+
+  if (event.event_type === 'tool_execution') {
+    const stepTrace = upsertReasoningStep(nextTrace, 'tool-execution', {
+      title: '工具调用',
+      stage: 'investigate',
+      status: event.status === 'error' ? 'error' : 'running',
+      summary: event.status === 'error' ? '工具调用失败。' : '正在记录工具调用。',
+    });
+    const step = stepTrace.steps.find((entry) => entry.id === 'tool-execution');
+    if (step) {
+      const toolName = String(event.payload.tool_name || 'unknown_tool');
+      const existingIndex = step.toolCalls.findIndex((toolCall) => toolCall.id === event.event_id);
+      const nextToolCall = {
+        id: event.event_id,
+        toolName,
+        status: event.status === 'error' ? 'error' as const : 'complete' as const,
+        argsPreview: JSON.stringify(event.payload.args ?? {}, null, 2),
+        resultPreview: event.status === 'error'
+          ? String((event.payload.error as { message?: string } | undefined)?.message || event.payload.error || 'Tool execution failed')
+          : JSON.stringify(event.payload.data ?? event.payload.result ?? {}, null, 2),
+        error: event.status === 'error'
+          ? String((event.payload.error as { message?: string } | undefined)?.message || event.payload.error || 'Tool execution failed')
+          : undefined,
+        startedAt: eventTime,
+        completedAt: eventTime + event.duration_ms,
+      };
+      if (existingIndex >= 0) {
+        step.toolCalls[existingIndex] = nextToolCall;
+      } else {
+        step.toolCalls.push(nextToolCall);
+      }
+      step.status = step.toolCalls.some((toolCall) => toolCall.status === 'error') ? 'error' : 'complete';
+      step.summary = step.status === 'error'
+        ? '工具调用中出现错误。'
+        : `已记录 ${step.toolCalls.length} 个工具调用。`;
+      step.completedAt = eventTime + event.duration_ms;
+    }
+    return {
+      ...message,
+      reasoningTrace: stepTrace,
+      updatedAt: Date.now(),
+    };
+  }
+
+  const stage = typeof event.payload.toStage === 'string'
+    ? event.payload.toStage
+    : typeof event.payload.stage === 'string'
+      ? event.payload.stage
+      : undefined;
+  const stepId = `${event.event_type}:${stage || event.event_id}`;
+  const summary = String(
+    event.payload.summary
+    || event.payload.reason
+    || event.payload.objective
+    || event.payload.content
+    || event.payload.verdict
+    || event.payload.toStage
+    || event.event_type,
+  );
+  const nextStepTrace = upsertReasoningStep(nextTrace, stepId, {
+    title: stage ? `阶段：${stage}` : event.event_type,
+    stage,
+    status: event.status === 'error' || event.status === 'blocked' || event.status === 'fail'
+      ? 'error'
+      : 'complete',
+    summary,
+    detail: JSON.stringify(event.payload, null, 2),
+    completedAt: eventTime + event.duration_ms,
+  });
+  nextStepTrace.status = event.status === 'error' || event.status === 'blocked' || event.status === 'fail'
+    ? 'error'
+    : 'running';
+
+  return {
+    ...message,
+    reasoningTrace: nextStepTrace,
+    updatedAt: Date.now(),
+  };
+};
+
+const hydrateMessagesWithActionEvents = (
+  messages: ConversationMessage[],
+  events: ActionEvent[],
+): ConversationMessage[] => {
+  const sortedEvents = events
+    .slice()
+    .sort((left, right) => left.ts_ms - right.ts_ms);
+
+  return messages.map((message) => (
+    sortedEvents.reduce((currentMessage, event) => applyActionEventToMessage(currentMessage, event), message)
+  ));
+};
+
 const inferAttachmentKind = (filePath: string): SessionAttachmentRecord['kind'] =>
   /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(filePath) ? 'image' : 'file';
 
@@ -318,8 +522,83 @@ const formatBytes = (size: number | null | undefined): string => {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const formatTokenCount = (value: number): string => new Intl.NumberFormat('en-US').format(value);
+
+const buildUsageCopy = (
+  usage: RunContextUsageSummary | null,
+  language: string,
+): { ariaLabel: string; lineOne: string; lineTwo: string } => {
+  const usagePercent = usage?.usagePercent ?? 0;
+  const inputTokens = usage?.inputTokens ?? 0;
+  const outputTokens = usage?.outputTokens ?? 0;
+  const totalTokens = usage?.totalTokens ?? 0;
+
+  if (language === 'zh-CN') {
+    return {
+      ariaLabel: usage?.hasConfiguredContextWindow
+        ? `上下文窗口已用 ${usagePercent}%，输入 ${formatTokenCount(inputTokens)}，输出 ${formatTokenCount(outputTokens)}，总计 ${formatTokenCount(totalTokens)}，窗口上限 ${formatTokenCount(usage.contextWindowTokens ?? 0)}`
+        : `上下文窗口已用 ${usagePercent}%，输入 ${formatTokenCount(inputTokens)}，输出 ${formatTokenCount(outputTokens)}，总计 ${formatTokenCount(totalTokens)}，当前模型未配置窗口上限`,
+      lineOne: usage?.hasConfiguredContextWindow
+        ? `已用 ${usagePercent}% · 窗口 ${formatTokenCount(usage.contextWindowTokens ?? 0)}`
+        : `已用 ${usagePercent}% · 窗口未配置`,
+      lineTwo: `输入 ${formatTokenCount(inputTokens)} · 输出 ${formatTokenCount(outputTokens)} · 总计 ${formatTokenCount(totalTokens)}`,
+    };
+  }
+
+  return {
+    ariaLabel: usage?.hasConfiguredContextWindow
+      ? `Context window ${usagePercent}% used. Input ${formatTokenCount(inputTokens)}, output ${formatTokenCount(outputTokens)}, total ${formatTokenCount(totalTokens)}, window ${formatTokenCount(usage.contextWindowTokens ?? 0)}.`
+      : `Context window ${usagePercent}% used. Input ${formatTokenCount(inputTokens)}, output ${formatTokenCount(outputTokens)}, total ${formatTokenCount(totalTokens)}. No context window configured for this model.`,
+    lineOne: usage?.hasConfiguredContextWindow
+      ? `${usagePercent}% used · window ${formatTokenCount(usage.contextWindowTokens ?? 0)}`
+      : `${usagePercent}% used · window not set`,
+    lineTwo: `In ${formatTokenCount(inputTokens)} · Out ${formatTokenCount(outputTokens)} · Total ${formatTokenCount(totalTokens)}`,
+  };
+};
+
+const ContextUsageIndicator: React.FC<{
+  usage: RunContextUsageSummary | null;
+  language: string;
+}> = ({ usage, language }) => {
+  const usagePercent = usage?.usagePercent ?? 0;
+  const normalizedPercent = Math.max(0, Math.min(100, usagePercent));
+  const radius = 18;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - (normalizedPercent / 100));
+  const copy = buildUsageCopy(usage, language);
+
+  return (
+    <div
+      className={`composer-usage-indicator ${usage?.hasConfiguredContextWindow ? 'is-configured' : 'is-unconfigured'}`}
+      data-testid="composer-usage-indicator"
+      tabIndex={0}
+      role="img"
+      aria-label={copy.ariaLabel}
+    >
+      <svg className="composer-usage-ring" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">
+        <circle className="composer-usage-ring-track" cx="22" cy="22" r={radius} />
+        <circle
+          className="composer-usage-ring-progress"
+          cx="22"
+          cy="22"
+          r={radius}
+          style={{
+            strokeDasharray: `${circumference} ${circumference}`,
+            strokeDashoffset: dashOffset,
+          }}
+        />
+      </svg>
+      <span className="composer-usage-value">{normalizedPercent}%</span>
+      <div className="composer-usage-tooltip" role="tooltip">
+        <div className="composer-usage-tooltip-line composer-usage-tooltip-line-strong">{copy.lineOne}</div>
+        <div className="composer-usage-tooltip-line">{copy.lineTwo}</div>
+      </div>
+    </div>
+  );
+};
+
 const App: React.FC = () => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [isLoading, setIsLoading] = useState(true);
   const [, setConnectionStatus] = useState<'connected' | 'degraded' | 'offline'>('offline');
   const [windowMaximized, setWindowMaximized] = useState(false);
@@ -341,6 +620,7 @@ const App: React.FC = () => {
   const currentProject = useSessionStore((state) => state.currentProject);
   const currentSession = useSessionStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
+  const currentRunUsage = useSessionStore((state) => state.currentRunUsage);
   const currentMode = useLayoutStore((state) => state.currentMode);
   const leftSidebarCollapsed = useLayoutStore((state) => state.leftSidebarCollapsed);
   const rightPanelCollapsed = useLayoutStore((state) => state.rightPanelCollapsed);
@@ -376,6 +656,7 @@ const App: React.FC = () => {
   }, []);
 
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
+  const setCurrentRunUsage = useSessionStore((state) => state.setCurrentRunUsage);
   const setSessions = useSessionStore((state) => state.setSessions);
   const setCurrentSession = useSessionStore((state) => state.setCurrentSession);
   const setRuns = useSessionStore((state) => state.setRuns);
@@ -385,6 +666,7 @@ const App: React.FC = () => {
   const setPendingQuestions = useSessionStore((state) => state.setPendingQuestions);
   const setReasoningSummaries = useSessionStore((state) => state.setReasoningSummaries);
   const setConversationMessages = useSessionStore((state) => state.setConversationMessages);
+  const upsertConversationMessages = useSessionStore((state) => state.upsertConversationMessages);
   const setActiveTerminalSessionId = useTerminalStore((state) => state.setActiveSessionId);
 
   const syncCapturesFromSnapshot = useCallback((snapshot: ContextSnapshot) => {
@@ -480,40 +762,15 @@ const App: React.FC = () => {
     }
 
     void (async () => {
-      const result = await electronAPI.conversation.getHistory(currentSession.sessionId).catch(() => ({ messages: [] }));
-      setConversationMessages(result.messages ?? []);
+      const [historyResult, evidenceResult] = await Promise.all([
+        electronAPI.conversation.getHistory(currentSession.sessionId).catch(() => ({ messages: [] })),
+        electronAPI.evidence.getChain().catch(() => ({ events: [] as ActionEvent[] })),
+      ]);
+      setConversationMessages(hydrateMessagesWithActionEvents(
+        historyResult.messages ?? [],
+        (evidenceResult.events ?? []) as ActionEvent[],
+      ));
     })();
-  }, [currentSession?.sessionId, setConversationMessages]);
-
-  useEffect(() => {
-    const electronAPI = window.electronAPI;
-    if (!electronAPI || !currentSession?.sessionId) {
-      return;
-    }
-
-    const refreshHistory = async () => {
-      const result = await electronAPI.conversation.getHistory(currentSession.sessionId).catch(() => ({ messages: [] }));
-      setConversationMessages(result.messages ?? []);
-    };
-
-    const handleRunStatusChanged = (payload: { sessionId: string; status: string }) => {
-      if (payload.sessionId === currentSession.sessionId && ['running', 'completed', 'failed', 'awaiting_input', 'awaiting_approval'].includes(payload.status)) {
-        void refreshHistory();
-      }
-    };
-
-    const handleEvidenceEventAdded = (event: ActionEvent) => {
-      if (event.session_id === currentSession.sessionId && event.event_type === 'report_published') {
-        void refreshHistory();
-      }
-    };
-
-    electronAPI.on('workflow:runStatusChanged', handleRunStatusChanged as (...args: unknown[]) => void);
-    electronAPI.on('evidence:eventAdded', handleEvidenceEventAdded as (...args: unknown[]) => void);
-    return () => {
-      electronAPI.off('workflow:runStatusChanged', handleRunStatusChanged as (...args: unknown[]) => void);
-      electronAPI.off('evidence:eventAdded', handleEvidenceEventAdded as (...args: unknown[]) => void);
-    };
   }, [currentSession?.sessionId, setConversationMessages]);
 
   useEffect(() => {
@@ -528,6 +785,7 @@ const App: React.FC = () => {
         store.setCurrentProject(state.currentProject);
         store.setCurrentSession(state.currentSession);
         store.setCurrentRun(state.currentRun);
+        store.setCurrentRunUsage(state.currentRunUsage ?? null);
         store.setContextSnapshot(state.contextSnapshot);
         store.setCaptures(state.captures);
         store.setProjectInputs(state.projectInputs);
@@ -548,6 +806,7 @@ const App: React.FC = () => {
         store.setCurrentProject(null);
         store.setCurrentSession(null);
         store.setCurrentRun(null);
+        store.setCurrentRunUsage(null);
         store.setContextSnapshot(null);
         store.setCaptures([]);
         store.setProjectInputs([]);
@@ -569,6 +828,7 @@ const App: React.FC = () => {
           currentProject: store.currentProject,
           currentSession: store.currentSession,
           currentRun: store.currentRun,
+          currentRunUsage: store.currentRunUsage,
           contextSnapshot: store.contextSnapshot,
           captures: store.captures,
           projectInputs: store.projectInputs,
@@ -667,6 +927,35 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
+    if (!electronAPI || !currentRun?.runId || !hasActiveDebugRun) {
+      setCurrentRunUsage(null);
+      return;
+    }
+
+    if (navigator.webdriver && currentRunUsage?.runId === currentRun.runId) {
+      return;
+    }
+
+    let cancelled = false;
+    void electronAPI.workflow.getRunUsage(currentRun.runId)
+      .then((result) => {
+        if (!cancelled) {
+          setCurrentRunUsage(result.usage ?? null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCurrentRunUsage(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRun?.runId, currentRunUsage?.runId, hasActiveDebugRun, setCurrentRunUsage]);
+
+  useEffect(() => {
+    const electronAPI = window.electronAPI;
     if (!electronAPI) return;
 
     electronAPI.events.onRunStatusChanged((rawPayload) => {
@@ -687,12 +976,33 @@ const App: React.FC = () => {
         lastStage: payload.lastStage || current.lastStage,
         stopReason: payload.stopReason || current.stopReason,
       });
+      if (!['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(payload.status)) {
+        useSessionStore.getState().setCurrentRunUsage(null);
+      }
+    });
+
+    electronAPI.events.onRunUsageChanged((summary) => {
+      const activeRun = useSessionStore.getState().currentRun;
+      if (activeRun?.runId === summary.runId) {
+        useSessionStore.getState().setCurrentRunUsage(summary);
+      }
     });
 
     electronAPI.events.onContextChanged((snapshot) => {
       useSessionStore.getState().setContextSnapshot(snapshot);
       syncCapturesFromSnapshot(snapshot);
     });
+
+    const handleConversationEvent = (event: ConversationStreamEvent) => {
+      const store = useSessionStore.getState();
+      if (event.type === 'run_linked') {
+        store.patchAssistantMessageByTurnId(event.turnId, { runId: event.runId });
+        return;
+      }
+      store.upsertConversationMessage(event.message);
+    };
+
+    electronAPI.conversation.onEvent(handleConversationEvent);
 
     electronAPI.events.onToolExecutionComplete((rawTrace) => {
       const trace = rawTrace as ToolTraceEntry;
@@ -705,6 +1015,9 @@ const App: React.FC = () => {
           toolTrace: trace,
           timestamp: trace.timestamp,
         });
+      }
+      if (trace.turnId) {
+        useSessionStore.getState().updateAssistantMessageByTurnId(trace.turnId, (message) => applyToolTraceToMessage(message, trace));
       }
     });
 
@@ -734,6 +1047,9 @@ const App: React.FC = () => {
       if (entry) {
         useSessionStore.getState().addTimelineEntry(entry);
       }
+      if (event.turn_id) {
+        useSessionStore.getState().updateAssistantMessageByTurnId(event.turn_id, (message) => applyActionEventToMessage(message, event));
+      }
     });
 
     electronAPI.events.onWorkflowStateChanged((rawState) => {
@@ -755,7 +1071,8 @@ const App: React.FC = () => {
         electronAPI.run.list(currentSession.sessionId)
           .then((result) => {
             useSessionStore.getState().setRuns(result.runs ?? []);
-            const activeRun = result.runs?.find((run) => run.runId === useSessionStore.getState().currentRun?.runId)
+            const targetRunId = state.runId || useSessionStore.getState().currentRun?.runId;
+            const activeRun = result.runs?.find((run) => run.runId === targetRunId)
               ?? result.runs?.[0]
               ?? null;
             if (activeRun) {
@@ -772,6 +1089,12 @@ const App: React.FC = () => {
               .map((event) => mapActionEventToTimelineEntry(event as ActionEvent))
               .filter((entry): entry is AgentTimelineEntry => entry !== null);
             useSessionStore.getState().setTimeline(timeline);
+            useSessionStore.getState().setConversationMessages(
+              hydrateMessagesWithActionEvents(
+                useSessionStore.getState().conversationMessages,
+                (result.events ?? []) as ActionEvent[],
+              ),
+            );
           })
           .catch(() => undefined);
       }
@@ -795,6 +1118,9 @@ const App: React.FC = () => {
           stopReason: payload.stopReason || current.stopReason,
           stoppedAt: ['cancelled', 'interrupted'].includes(payload.status) ? Date.now() : current.stoppedAt,
         });
+        if (!['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(payload.status)) {
+          store.setCurrentRunUsage(null);
+        }
       }
     });
 
@@ -850,6 +1176,7 @@ const App: React.FC = () => {
     electronAPI.on('window:maximized-changed', handleWindowStateChange);
 
     return () => {
+      electronAPI.conversation.offEvent(handleConversationEvent);
       electronAPI.off('file:open', handleFileOpen);
       electronAPI.off('case:new', handleCaseNew);
       electronAPI.off('settings:open', handleSettingsOpen);
@@ -860,12 +1187,14 @@ const App: React.FC = () => {
       electronAPI.events.removeAllListeners('capture:statusChanged');
       electronAPI.events.removeAllListeners('workflow:stateChanged');
       electronAPI.events.removeAllListeners('workflow:runStatusChanged');
+      electronAPI.events.removeAllListeners('workflow:runUsageChanged');
       electronAPI.events.removeAllListeners('evidence:eventAdded');
       electronAPI.events.removeAllListeners('device:statusChanged');
       electronAPI.events.removeAllListeners('app:themeChanged');
       electronAPI.events.removeAllListeners('project:inputsChanged');
       electronAPI.events.removeAllListeners('capture:openedStateChanged');
       electronAPI.events.removeAllListeners('runtime:logAppended');
+      electronAPI.events.removeAllListeners('conversation:event');
     };
   }, [setSystemTheme, showNotice, syncCapturesFromSnapshot, t]);
 
@@ -916,6 +1245,12 @@ const App: React.FC = () => {
           .map((event) => mapActionEventToTimelineEntry(event as ActionEvent))
           .filter((entry): entry is AgentTimelineEntry => entry !== null);
         useSessionStore.getState().setTimeline(timeline);
+        useSessionStore.getState().setConversationMessages(
+          hydrateMessagesWithActionEvents(
+            useSessionStore.getState().conversationMessages,
+            (result.events ?? []) as ActionEvent[],
+          ),
+        );
       })
       .catch(() => {
         useSessionStore.getState().setActionEvents([]);
@@ -1008,7 +1343,23 @@ const App: React.FC = () => {
   const hasMessageContent = Boolean(promptValue.trim());
   const hasPendingAttachments = pendingAttachments.length > 0;
   const currentModeConfig = AGENT_MODES.find((mode) => mode.id === currentMode) ?? AGENT_MODES[0];
-  const promptPlaceholder = `向 ${currentModeConfig.label} 输入问题或附加素材`;
+  const promptPlaceholder = language === 'zh-CN'
+    ? `向 ${currentModeConfig.label} 描述目标、异常或验证需求`
+    : `Describe the goal, anomaly, or verification request for ${currentModeConfig.label}`;
+  const attachButtonLabel = !currentProject
+    ? (language === 'zh-CN'
+      ? '选择项目后可附加图片、文件或 .rdc Capture'
+      : 'Select a project before attaching images, files, or .rdc captures')
+    : (language === 'zh-CN'
+      ? '附加图片、文件或 .rdc Capture'
+      : 'Attach images, files, or .rdc captures');
+  const sendButtonLabel = hasActiveDebugRun
+    ? (language === 'zh-CN' ? '发送' : 'Send')
+    : (language === 'zh-CN' ? '开始' : 'Start');
+  const sendButtonDescription = language === 'zh-CN'
+    ? `${sendButtonLabel}${currentModeConfig.label}消息`
+    : `${sendButtonLabel} ${currentModeConfig.label} message`;
+  const stopButtonLabel = language === 'zh-CN' ? '停止' : 'Stop';
   const resolvedWidths = useMemo(
     () => resolveSidebarWidths(
       appBodyWidth,
@@ -1164,36 +1515,37 @@ const App: React.FC = () => {
         setCurrentSession(result.session);
         const sessionsResult = await electronAPI.session.list(result.session.projectId);
         setSessions(sessionsResult.sessions ?? []);
-        const historyResult = await electronAPI.conversation.getHistory(result.session.sessionId);
-        setConversationMessages(historyResult.messages ?? []);
-      } else {
-        setConversationMessages((useSessionStore.getState().conversationMessages ?? []).concat([
-          result.userMessage,
-          result.assistantMessage,
-        ]));
       }
+
+      upsertConversationMessages([
+        result.userMessage,
+        result.assistantDraftMessage,
+      ]);
 
       if (result.runUpdate) {
         setCurrentRun(result.runUpdate);
         const runsResult = await electronAPI.run.list(result.runUpdate.sessionId);
         setRuns(runsResult.runs ?? []);
-      } else if (result.executionTransition.action !== 'started_run' && !hasActiveDebugRun) {
-        setCurrentRun(null);
       }
 
       setCurrentDebugPlan(result.debugPlanSummary ?? null);
       setPendingQuestions(result.pendingQuestions ?? null);
     } catch (error) {
       const currentMessages = useSessionStore.getState().conversationMessages ?? [];
+      const turnId = `local-turn-${Date.now()}`;
       setConversationMessages(currentMessages.concat([
         {
           id: `local-user-${Date.now()}`,
+          turnId,
           sessionId: currentSession?.sessionId ?? null,
           projectId: currentProject?.projectId ?? null,
           runId: currentRun?.runId ?? null,
           modeContext: currentMode,
           role: 'user',
           content: trimmed,
+          status: 'complete',
+          updatedAt: Date.now(),
+          reasoningTrace: null,
           attachments: pendingAttachments.map((attachment) => ({
             attachmentId: `local-${attachment.id}`,
             sessionId: currentSession?.sessionId ?? '',
@@ -1209,6 +1561,7 @@ const App: React.FC = () => {
         },
         {
           id: `local-assistant-${Date.now()}`,
+          turnId,
           sessionId: currentSession?.sessionId ?? null,
           projectId: currentProject?.projectId ?? null,
           runId: currentRun?.runId ?? null,
@@ -1216,6 +1569,14 @@ const App: React.FC = () => {
           role: 'assistant',
           agentId: 'rdc-debugger',
           content: error instanceof Error ? error.message : 'Conversation request failed.',
+          status: 'error',
+          updatedAt: Date.now(),
+          reasoningTrace: {
+            status: 'error',
+            summary: 'Conversation request failed.',
+            steps: [],
+            updatedAt: Date.now(),
+          },
           createdAt: Date.now(),
         },
       ]));
@@ -1239,6 +1600,7 @@ const App: React.FC = () => {
     setPendingQuestions,
     setRuns,
     setSessions,
+    upsertConversationMessages,
   ]);
 
   const handlePromptKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1380,21 +1742,25 @@ const App: React.FC = () => {
                 title={t('sidebar.userSettings')}
                 aria-label={t('sidebar.userSettings')}
               >
-                <span className="footer-entry-avatar">
-                  {nickname.trim().slice(0, 2).toUpperCase()}
-                </span>
-                {!effectiveLeftCollapsed && (
-                  <>
+                <span className="footer-entry-main">
+                  <span className="footer-entry-avatar">
+                    {nickname.trim().slice(0, 2).toUpperCase()}
+                  </span>
+                  {!effectiveLeftCollapsed && (
                     <span className="footer-entry-copy">
                       <span className="footer-entry-title">{nickname}</span>
                       <span className="footer-entry-subtitle">{t('sidebar.userSubtitle')}</span>
                     </span>
+                  )}
+                </span>
+                {!effectiveLeftCollapsed && (
+                  <span className="footer-entry-trailing">
                     <span className="footer-entry-chevron">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <polyline points="6 9 12 15 18 9" />
                       </svg>
                     </span>
-                  </>
+                  </span>
                 )}
               </button>
               <DeviceSelector collapsed={effectiveLeftCollapsed} />
@@ -1475,18 +1841,18 @@ const App: React.FC = () => {
                       rows={1}
                     />
                   </div>
-                  <div className="composer-toolbar-row">
-                    <div className="composer-toolbar-group">
+                  <div className="composer-footer-bar" data-testid="composer-footer-bar">
+                    <div className="composer-toolbar-group composer-toolbar-group-left">
                       <button
                         type="button"
                         className="composer-attach-button"
                         data-testid="composer-attach-button"
                         onClick={() => void handleAttachmentSelect()}
                         disabled={isPromptSending}
-                        title={!currentProject ? '选择项目后可附加图片、文件或 .rdc capture' : '添加图片、文件或 .rdc capture'}
-                        aria-label={!currentProject ? '选择项目后可附加图片、文件或 .rdc capture' : '添加图片、文件或 .rdc capture'}
+                        title={attachButtonLabel}
+                        aria-label={attachButtonLabel}
                       >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M12 5v14" />
                           <path d="M5 12h14" />
                         </svg>
@@ -1539,6 +1905,7 @@ const App: React.FC = () => {
                       </div>
                     </div>
                     <div className="composer-toolbar-group composer-toolbar-group-right">
+                      <ContextUsageIndicator usage={hasActiveDebugRun ? currentRunUsage : null} language={language} />
                       {hasActiveDebugRun && currentRun && (
                         <button
                           type="button"
@@ -1552,16 +1919,17 @@ const App: React.FC = () => {
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                             <rect x="6" y="6" width="12" height="12" rx="1" />
                           </svg>
+                          <span className="chat-send-button-label">{stopButtonLabel}</span>
                         </button>
                       )}
                       <button
                         type="button"
-                        className="chat-send-button"
+                        className="chat-send-button primary"
                         data-testid={hasActiveDebugRun ? 'debugger-send-button' : 'debugger-start-button'}
                         onClick={() => void handlePromptSend()}
                         disabled={(!hasMessageContent && !hasPendingAttachments) || isPromptSending}
-                        aria-label={`Send ${currentModeConfig.label} message`}
-                        title={`Send ${currentModeConfig.label} message`}
+                        aria-label={sendButtonDescription}
+                        title={sendButtonDescription}
                       >
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <line x1="22" y1="2" x2="11" y2="13" />
