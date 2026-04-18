@@ -450,7 +450,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 <div className="session-item-header">
                                   <span className="session-item-title">{session.title}</span>
                                   <span className="session-item-actions">
-                                    <span className="session-item-action-hint">{t('sidebar.renameSession')}</span>
                                     <span
                                       role="button"
                                       tabIndex={0}

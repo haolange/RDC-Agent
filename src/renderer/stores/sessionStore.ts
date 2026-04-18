@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type {
   RunSummary,
+  RunContextUsageSummary,
   ContextSnapshot,
   CaptureDescriptor,
   OpenedCaptureState,
@@ -18,12 +19,41 @@ import type {
   WorkflowState,
 } from '@shared/types/workflow';
 
+const sortConversationMessages = (messages: ConversationMessage[]): ConversationMessage[] =>
+  messages
+    .slice()
+    .sort((left, right) => {
+      if (left.createdAt !== right.createdAt) {
+        return left.createdAt - right.createdAt;
+      }
+      const leftUpdatedAt = left.updatedAt ?? left.createdAt;
+      const rightUpdatedAt = right.updatedAt ?? right.createdAt;
+      return leftUpdatedAt - rightUpdatedAt;
+    });
+
+const mergeConversationMessages = (
+  currentMessages: ConversationMessage[],
+  nextMessages: ConversationMessage[],
+): ConversationMessage[] => {
+  const byId = new Map(currentMessages.map((message) => [message.id, message]));
+  for (const message of nextMessages) {
+    const existing = byId.get(message.id);
+    const existingUpdatedAt = existing?.updatedAt ?? existing?.createdAt ?? 0;
+    const nextUpdatedAt = message.updatedAt ?? message.createdAt;
+    if (!existing || nextUpdatedAt >= existingUpdatedAt) {
+      byId.set(message.id, message);
+    }
+  }
+  return sortConversationMessages(Array.from(byId.values()));
+};
+
 interface SessionState {
   projects: ProjectRecord[];
   sessions: SessionRecord[];
   currentProject: ProjectRecord | null;
   currentSession: SessionRecord | null;
   currentRun: RunSummary | null;
+  currentRunUsage: RunContextUsageSummary | null;
   contextSnapshot: ContextSnapshot | null;
   captures: CaptureDescriptor[];
   projectInputs: ProjectInputRecord[];
@@ -44,6 +74,7 @@ interface SessionState {
   setCurrentProject: (project: ProjectRecord | null) => void;
   setCurrentSession: (session: SessionRecord | null) => void;
   setCurrentRun: (run: RunSummary | null) => void;
+  setCurrentRunUsage: (usage: RunContextUsageSummary | null) => void;
   setContextSnapshot: (snapshot: ContextSnapshot | null) => void;
   setCaptures: (captures: CaptureDescriptor[]) => void;
   addCapture: (capture: CaptureDescriptor) => void;
@@ -53,6 +84,13 @@ interface SessionState {
   setOpenedCapture: (openedCapture: OpenedCaptureState | null) => void;
   setConversationMessages: (messages: ConversationMessage[]) => void;
   addConversationMessage: (message: ConversationMessage) => void;
+  upsertConversationMessage: (message: ConversationMessage) => void;
+  upsertConversationMessages: (messages: ConversationMessage[]) => void;
+  patchAssistantMessageByTurnId: (turnId: string, patch: Partial<ConversationMessage>) => void;
+  updateAssistantMessageByTurnId: (
+    turnId: string,
+    updater: (message: ConversationMessage) => ConversationMessage
+  ) => void;
   addTimelineEntry: (entry: AgentTimelineEntry) => void;
   setTimeline: (timeline: AgentTimelineEntry[]) => void;
   setActionEvents: (events: ActionEvent[]) => void;
@@ -72,6 +110,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   currentProject: null,
   currentSession: null,
   currentRun: null,
+  currentRunUsage: null,
   contextSnapshot: null,
   captures: [],
   projectInputs: [],
@@ -91,6 +130,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   setCurrentProject: (project) => set({ currentProject: project }),
   setCurrentSession: (session) => set({ currentSession: session }),
   setCurrentRun: (run) => set({ currentRun: run }),
+  setCurrentRunUsage: (currentRunUsage) => set({ currentRunUsage }),
   setContextSnapshot: (snapshot) => set({ contextSnapshot: snapshot }),
   setCaptures: (captures) => set({ captures }),
   addCapture: (capture) => set((state) => ({
@@ -106,8 +146,34 @@ export const useSessionStore = create<SessionState>((set) => ({
   })),
   setProjectInputs: (inputs) => set({ projectInputs: inputs }),
   setOpenedCapture: (openedCapture) => set({ openedCapture }),
-  setConversationMessages: (conversationMessages) => set({ conversationMessages }),
-  addConversationMessage: (message) => set((state) => ({ conversationMessages: [...state.conversationMessages, message] })),
+  setConversationMessages: (conversationMessages) => set({ conversationMessages: sortConversationMessages(conversationMessages) }),
+  addConversationMessage: (message) => set((state) => ({
+    conversationMessages: mergeConversationMessages(state.conversationMessages, [message]),
+  })),
+  upsertConversationMessage: (message) => set((state) => ({
+    conversationMessages: mergeConversationMessages(state.conversationMessages, [message]),
+  })),
+  upsertConversationMessages: (messages) => set((state) => ({
+    conversationMessages: mergeConversationMessages(state.conversationMessages, messages),
+  })),
+  patchAssistantMessageByTurnId: (turnId, patch) => set((state) => ({
+    conversationMessages: sortConversationMessages(
+      state.conversationMessages.map((message) => (
+        message.turnId === turnId && message.role === 'assistant'
+          ? { ...message, ...patch, updatedAt: Date.now() }
+          : message
+      )),
+    ),
+  })),
+  updateAssistantMessageByTurnId: (turnId, updater) => set((state) => ({
+    conversationMessages: sortConversationMessages(
+      state.conversationMessages.map((message) => (
+        message.turnId === turnId && message.role === 'assistant'
+          ? updater(message)
+          : message
+      )),
+    ),
+  })),
   addTimelineEntry: (entry) => set((state) => ({ timeline: [...state.timeline, entry] })),
   setTimeline: (timeline) => set({ timeline }),
   setActionEvents: (events) => set({ actionEvents: events }),
@@ -122,6 +188,7 @@ export const useSessionStore = create<SessionState>((set) => ({
     set({
       currentSession: null,
       currentRun: null,
+      currentRunUsage: null,
       contextSnapshot: null,
       captures: [],
       openedCapture: null,

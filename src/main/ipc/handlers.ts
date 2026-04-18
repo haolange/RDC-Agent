@@ -20,11 +20,13 @@ import { runtimeLogService } from '../services/RuntimeLogService';
 import { runExecutionService } from '../services/RunExecutionService';
 import { debugWorkflowService } from '../services/DebugWorkflowService';
 import { conversationService } from '../services/ConversationService';
+import { debuggerLlmService } from '../services/DebuggerLlmService';
 import { terminalSessionService } from '../services/TerminalSessionService';
 import type {
   DebugSessionStartRequest,
   OpenProjectInputRequest,
   ProjectInputRecord,
+  RunContextUsageSummary,
   RunSummary,
   SessionAttachmentRecord,
 } from '@shared/types/session';
@@ -202,6 +204,7 @@ export function registerIPCHandlers(): void {
           agentId: trace.runtimeOwner || 'rdc-debugger',
           eventType: 'tool_execution',
           status: trace.result.ok ? 'ok' : 'error',
+          turnId: trace.turnId,
           payload: {
             tool_name: trace.toolName,
             args: trace.args,
@@ -400,6 +403,17 @@ export function registerIPCHandlers(): void {
     broadcastToRenderer('capture:openedStateChanged', null);
     broadcastToRenderer('context:changed', rdxSessionService.snapshotContext());
     return result;
+  });
+
+  ipcMain.handle('workflow:getRunUsage', async (_event, runId?: string) => {
+    const targetRunId = runId || currentRunId;
+    if (!targetRunId) {
+      return { usage: null as RunContextUsageSummary | null };
+    }
+
+    return {
+      usage: debuggerLlmService.getRunContextUsage(targetRunId),
+    };
   });
 
   ipcMain.handle('workflow:listRuns', async () => {
@@ -1158,4 +1172,3 @@ export function setMainWindow(window: BrowserWindow): void {
 export async function stopAllActiveRuns(): Promise<void> {
   await runExecutionService.stopAll();
 }
-

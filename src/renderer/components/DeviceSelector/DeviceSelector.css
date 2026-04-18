@@ -8,7 +8,8 @@
 }
 
 .device-selector-container.collapsed {
-  width: 100%;
+  width: auto;
+  align-self: center;
 }
 
 .device-selector-group {
@@ -19,27 +20,45 @@
   width: 100%;
 }
 
+.device-selector-container.collapsed .device-selector-group {
+  width: auto;
+}
+
 .device-selector-trigger {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
   width: 100%;
-  min-height: 44px;
-  padding: 8px 12px;
+  min-height: 58px;
+  padding: 12px 14px;
   color: rgb(var(--color-text-primary));
   cursor: pointer;
   text-align: left;
-  border-radius: 12px;
 }
 
 .device-selector-trigger.collapsed {
   width: 44px;
+  min-width: 44px;
+  max-width: 44px;
   height: 44px;
   min-height: 44px;
   padding: 0;
+  flex: 0 0 44px;
+  display: flex;
+  align-items: center;
   justify-content: center;
   border-radius: 14px;
+}
+
+.device-selector-trigger.collapsed .footer-entry-main {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: auto;
+  margin: 0;
+  justify-content: center;
+  gap: 0;
 }
 
 .device-selector-trigger-main,
@@ -49,7 +68,7 @@
 }
 
 .device-selector-trigger-main {
-  gap: 8px;
+  gap: 12px;
   min-width: 0;
   flex: 1;
 }
@@ -57,15 +76,16 @@
 .device-selector-trigger.collapsed .device-selector-trigger-main {
   flex: 0 0 auto;
   min-width: auto;
+  gap: 0;
 }
 
 .device-selector-trigger-icon {
-  width: 20px;
-  height: 20px;
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
+  border-radius: 9px;
   background:
     linear-gradient(180deg, rgb(255 255 255 / 0.06), transparent 60%),
     rgb(var(--color-bg-3) / 0.95);
@@ -92,30 +112,31 @@
   align-items: flex-start;
   justify-content: center;
   min-width: 0;
-  gap: 1px;
-}
-
-.device-selector-label {
-  margin-bottom: 0;
-  font-size: 9px;
-  line-height: 1.2;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  gap: 2px;
 }
 
 .device-selector-summary {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 12px;
-  font-weight: var(--font-semibold);
-  line-height: 1.1;
+  line-height: 1.15;
+}
+
+.device-selector-subtitle {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .device-selector-trigger-meta {
-  gap: 6px;
+  gap: 10px;
   flex-shrink: 0;
   align-self: center;
+}
+
+.device-selector-trigger-status {
+  min-width: 48px;
+  justify-content: center;
 }
 
 .device-selector-arrow {
@@ -135,10 +156,10 @@
   width: 100%;
   max-height: min(420px, calc(100vh - 96px));
   overflow-y: auto;
-  padding: var(--space-2);
-  border-radius: var(--radius-card);
-  border: 1px solid rgb(var(--color-border-default));
-  background: rgb(var(--color-bg-1) / 0.98);
+  padding: 10px;
+  border-radius: 20px;
+  border: 1px solid rgb(var(--color-border-secondary));
+  background: rgb(var(--color-bg-1) / 0.97);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   box-shadow: var(--shadow-lg);
@@ -166,11 +187,11 @@
 .device-selector-option {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
   width: 100%;
-  padding: 10px 12px;
+  padding: 12px;
   border: none;
-  border-radius: 14px;
+  border-radius: 16px;
   background: transparent;
   color: rgb(var(--color-text-secondary));
   text-align: left;
@@ -179,14 +200,14 @@
 }
 
 .device-selector-option:hover {
-  background: rgb(var(--color-bg-3));
+  background: rgb(var(--color-bg-3) / 0.82);
   color: rgb(var(--color-text-primary));
   transform: translateY(-1px);
 }
 
 .device-selector-option.selected {
   background:
-    linear-gradient(180deg, rgb(var(--color-accent-500) / 0.08), transparent 72%),
+    linear-gradient(180deg, rgb(var(--color-accent-500) / 0.1), transparent 72%),
     rgb(var(--color-bg-2));
   box-shadow: inset 0 0 0 1px rgb(var(--color-accent-500) / 0.16);
 }
@@ -215,7 +236,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--text-md);
+  font-size: 14px;
   font-weight: var(--font-semibold);
   color: rgb(var(--color-text-primary));
 }
@@ -224,7 +245,7 @@
 .device-option-meta,
 .device-option-bootstrap,
 .device-option-error {
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.4;
 }
 

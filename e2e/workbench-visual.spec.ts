@@ -87,6 +87,24 @@ const doesElementOverflowSidebar = async (page: Page, selector: string, sidebarS
   return elementRect.right > sidebarRect.right + 80;
 }, { selector, sidebarSelector });
 
+const assertComposerFooterOrder = async (page: Page) => {
+  const selectors = [
+    '[data-testid="composer-attach-button"]',
+    '[data-testid="composer-mode-pill"]',
+    '[data-testid="composer-usage-indicator"]',
+    '[data-testid="debugger-start-button"]',
+  ];
+  const boxes = await Promise.all(selectors.map(async (selector) => page.locator(selector).boundingBox()));
+
+  for (const box of boxes) {
+    expect(box).not.toBeNull();
+  }
+
+  expect(boxes[0]!.x).toBeLessThan(boxes[1]!.x);
+  expect(boxes[1]!.x).toBeLessThan(boxes[2]!.x);
+  expect(boxes[2]!.x).toBeLessThan(boxes[3]!.x);
+};
+
 const configureVisualSettings = async (ctx: AppContext): Promise<AppContext> => {
   const tempDir = ctx.tempDir;
   await ctx.page.evaluate(async () => {
@@ -131,6 +149,77 @@ const setWindowSize = async (ctx: AppContext, width: number, height: number) => 
   }, { width, height });
   await ctx.page.waitForTimeout(350);
 };
+
+const seedConversationPreview = async (page: Page) => {
+  await page.evaluate(({ fixedNow }) => {
+    const hook = (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        getWorkbenchState: () => Record<string, unknown>;
+        seedWorkbenchState: (state: Record<string, unknown>) => void;
+      };
+    }).__RDC_AGENT_E2E__;
+
+    if (!hook) {
+      throw new Error('Missing E2E state hook');
+    }
+
+    const state = hook.getWorkbenchState() as {
+      currentProject: { projectId: string } | null;
+      currentSession: { sessionId: string } | null;
+    };
+
+    if (!state.currentProject || !state.currentSession) {
+      throw new Error('Missing project or session state');
+    }
+
+    hook.seedWorkbenchState({
+      ...state,
+      conversationMessages: [
+        {
+          id: 'message-assistant-wide',
+          sessionId: state.currentSession.sessionId,
+          projectId: state.currentProject.projectId,
+          runId: 'run-wide-preview',
+          modeContext: 'debugger',
+          role: 'assistant',
+          agentId: 'rdc-debugger',
+          status: 'complete',
+          content: '你好！我在呢。咱们已经在项目里了，手头有 Character_EyeSpark_Desktop.rdc 和 HairSparkWhite.rdc 这两个 Capture 文件。如果是双侧栏都收起的大画布场景，聊天气泡应该能继续放宽，而不是停留在过窄的固定宽度上。这里我故意把文本拉成长段落，用来验证 assistant 气泡是否会随着主区域变宽而继续扩展，避免左右留出过多无意义的黑边，并且确保一条较长的连续段落能把新的宽度上限真正利用起来。',
+          attachments: [],
+          createdAt: fixedNow - 2000,
+        },
+        {
+          id: 'message-user-wide',
+          sessionId: state.currentSession.sessionId,
+          projectId: state.currentProject.projectId,
+          runId: 'run-wide-preview',
+          modeContext: 'debugger',
+          role: 'user',
+          status: 'complete',
+          content: 'hello?',
+          attachments: [],
+          createdAt: fixedNow - 1000,
+        },
+      ],
+    });
+  }, { fixedNow: FIXED_NOW });
+};
+
+const getCenterDelta = async (page: Page, outerSelector: string, innerSelector: string) => page.evaluate((params) => {
+  const outer = document.querySelector(params.outerSelector);
+  const inner = document.querySelector(params.innerSelector);
+  if (!(outer instanceof HTMLElement) || !(inner instanceof HTMLElement)) {
+    return null;
+  }
+
+  const outerRect = outer.getBoundingClientRect();
+  const innerRect = inner.getBoundingClientRect();
+
+  return {
+    deltaX: Math.abs((outerRect.left + outerRect.width / 2) - (innerRect.left + innerRect.width / 2)),
+    deltaY: Math.abs((outerRect.top + outerRect.height / 2) - (innerRect.top + innerRect.height / 2)),
+  };
+}, { outerSelector, innerSelector });
 
 const seedVisualWorkbench = async (page: Page) => {
   const previewAssetPath = path.resolve('src/renderer/assets/images/hero-bg.png');
@@ -288,7 +377,7 @@ test('Capture Library 工具栏和操作按钮不会横向裁剪', async () => {
   await expect(toolbar).toBeVisible();
   await expect(importButton).toBeVisible();
   await expect(openButton).toBeVisible();
-  await expect(page.locator('[data-testid="capture-library-card-input-0"]')).toContainText('Opened');
+  await expect(page.locator('[data-testid="capture-library-card-input-0"]')).toContainText('已打开');
 
   expect(await isChildFullyWithinContainer(
     page,
@@ -364,7 +453,8 @@ test('Terminal drawer 展开后会显示日志并位于 prompt 下方', async ()
   const page = ctx.page;
 
   await page.locator('[data-testid="terminal-toggle"]').click();
-  await page.locator('[data-testid="runtime-terminal-scope"]').selectOption('app');
+  await page.locator('[data-testid="runtime-terminal-scope"]').click();
+  await page.locator('[data-testid="runtime-terminal-scope-option-app"]').click();
 
   const promptBar = page.locator('.main-input-bar');
   const terminal = page.locator('[data-testid="runtime-terminal"]');
@@ -413,6 +503,7 @@ test('左栏收起后用户菜单保持在窗口可视范围内', async () => {
 
   await page.locator('[data-testid="sidebar-user-settings-trigger"]').click();
   await expect(page.locator('[data-testid="sidebar-user-menu"]')).toBeVisible();
+  await expect(page.locator('[data-testid="sidebar-user-menu"]')).toHaveScreenshot('user-menu.png');
   expect(await isElementWithinViewport(page, '[data-testid="sidebar-user-menu"]')).toBe(true);
 });
 
@@ -424,6 +515,7 @@ test('左栏收起后设备菜单展开不越界', async () => {
 
   await page.locator('[data-testid="sidebar-device-selector-trigger"]').click();
   await expect(page.locator('[data-testid="sidebar-device-selector-dropdown"]')).toBeVisible();
+  await expect(page.locator('[data-testid="sidebar-device-selector-dropdown"]')).toHaveScreenshot('device-dropdown.png');
   expect(await isElementWithinViewport(page, '[data-testid="sidebar-device-selector-dropdown"]')).toBe(true);
   expect(await isElementDescendantOf(
     page,
@@ -435,6 +527,14 @@ test('左栏收起后设备菜单展开不越界', async () => {
     '[data-testid="sidebar-device-selector-dropdown"]',
     '[data-testid="app-sidebar-left"]',
   )).toBe(true);
+});
+
+test('模式菜单视觉回归', async () => {
+  const page = ctx.page;
+
+  await page.locator('[data-testid="composer-mode-pill"]').click();
+  await expect(page.locator('.composer-agent-menu-popup')).toBeVisible();
+  await expect(page.locator('.composer-agent-menu-popup')).toHaveScreenshot('mode-menu.png');
 });
 
 test('768px 宽度下自动收起右栏，主内容保持可见', async () => {
@@ -465,4 +565,57 @@ const input = page.locator('textarea.chat-input').first();
   await page.waitForTimeout(180);
 
   await expect(page.locator('.main-input-bar')).toHaveScreenshot('main-input-focus.png');
+});
+
+test('composer footer keeps Upload, Mode, Usage, Send order', async () => {
+  const page = ctx.page;
+
+  await expect(page.locator('[data-testid="composer-usage-indicator"]')).toContainText('0%');
+  await assertComposerFooterOrder(page);
+});
+
+test('collapsed footer icons stay centered in their buttons', async () => {
+  const page = ctx.page;
+
+  await page.locator('[data-testid="titlebar-left-panel-toggle"]').click();
+  await expect(page.locator('[data-testid="app-sidebar-left"]')).toHaveClass(/collapsed/);
+
+  const userDelta = await getCenterDelta(
+    page,
+    '[data-testid="sidebar-user-settings-trigger"]',
+    '[data-testid="sidebar-user-settings-trigger"] .footer-entry-avatar',
+  );
+  const deviceDelta = await getCenterDelta(
+    page,
+    '[data-testid="sidebar-device-selector-trigger"]',
+    '[data-testid="sidebar-device-selector-trigger"] .device-selector-trigger-icon',
+  );
+
+  expect(userDelta).not.toBeNull();
+  expect(deviceDelta).not.toBeNull();
+  expect(userDelta?.deltaX ?? 99).toBeLessThanOrEqual(1.5);
+  expect(userDelta?.deltaY ?? 99).toBeLessThanOrEqual(1.5);
+  expect(deviceDelta?.deltaX ?? 99).toBeLessThanOrEqual(1.5);
+  expect(deviceDelta?.deltaY ?? 99).toBeLessThanOrEqual(1.5);
+});
+
+test('chat bubbles expand with the main canvas when both sidebars are collapsed', async () => {
+  const page = ctx.page;
+  await setWindowSize(ctx, 1720, 980);
+  await seedConversationPreview(page);
+
+  await page.locator('[data-testid="titlebar-left-panel-toggle"]').click();
+  await page.locator('[data-testid="titlebar-right-panel-toggle"]').click();
+  await expect(page.locator('[data-testid="app-sidebar-left"]')).toHaveClass(/collapsed/);
+  await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveClass(/collapsed/);
+
+  const assistantBubble = page.locator('.chat-message.assistant .message-bubble.assistant').first();
+  const userBubble = page.locator('.chat-message.user .message-bubble.user').first();
+
+  await expect(assistantBubble).toBeVisible();
+  await expect(userBubble).toBeVisible();
+  await expect(page.locator('.app-main')).toContainText('Character_EyeSpark_Desktop.rdc');
+
+  const assistantWidth = await assistantBubble.evaluate((element) => element.getBoundingClientRect().width);
+  expect(assistantWidth).toBeGreaterThan(900);
 });

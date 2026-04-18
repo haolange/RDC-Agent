@@ -4,10 +4,26 @@ import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import { useSessionStore } from '../../stores/sessionStore';
 
 const UI_STAGES: Array<{ id: string; label: string; stages: WorkflowStage[] }> = [
-  { id: 'planner', label: 'Planner', stages: ['preflight', 'entry_gate', 'intake_gate', 'plan', 'speclist'] },
-  { id: 'generator', label: 'Generator', stages: ['dispatch', 'investigate'] },
-  { id: 'evaluator', label: 'Evaluator', stages: ['fix_verify', 'skepti', 'curate', 'finalize'] },
+  { id: 'planner', label: '规划', stages: ['preflight', 'entry_gate', 'intake_gate', 'plan', 'speclist'] },
+  { id: 'generator', label: '执行', stages: ['dispatch', 'investigate'] },
+  { id: 'evaluator', label: '验证', stages: ['fix_verify', 'skepti', 'curate', 'finalize'] },
 ];
+
+const STAGE_LABELS: Partial<Record<WorkflowStage, string>> = {
+  preflight: '预检',
+  entry_gate: '入口校验',
+  intake_gate: '任务 intake',
+  plan: '计划审批',
+  speclist: '任务拆分',
+  dispatch: '分派 specialists',
+  investigate: '证据调查',
+  fix_verify: '修复验证',
+  skepti: '质疑复核',
+  curate: '整理交付',
+  finalize: '完成',
+  blocked: '阻塞',
+  awaiting_user_input: '等待用户输入',
+};
 
 export const TaskMonitor: React.FC = () => {
   const currentRun = useSessionStore((state) => state.currentRun);
@@ -27,6 +43,7 @@ export const TaskMonitor: React.FC = () => {
     : 0;
 
   const recentReasoning = reasoningSummaries.slice(-2).reverse();
+  const currentStageLabel = currentRun ? (STAGE_LABELS[currentStage] ?? currentStage) : '待命';
 
   return (
     <div className="task-monitor">
@@ -66,7 +83,7 @@ export const TaskMonitor: React.FC = () => {
       {recentReasoning.length > 0 && (
         <div className="task-agents">
           <div className="task-agents-header">
-            <span>Recent Reasoning</span>
+            <span>最近推理</span>
             <span className="task-agents-count">{recentReasoning.length}</span>
           </div>
           <div className="task-agents-list">
@@ -77,7 +94,7 @@ export const TaskMonitor: React.FC = () => {
                 </div>
                 <div className="task-agent-info">
                   <span className="task-agent-name">{AGENT_DISPLAY_NAMES[summary.agentId] || summary.agentId}</span>
-                  <span className="task-agent-status">{summary.summary.slice(0, 72)}</span>
+                  <span className="task-agent-status">{summary.summary.slice(0, 56)}</span>
                 </div>
               </div>
             ))}
@@ -87,12 +104,12 @@ export const TaskMonitor: React.FC = () => {
 
       <div className="task-summary">
         <div className="task-summary-item">
-          <span className="task-summary-label">Blockers</span>
+          <span className="task-summary-label">阻塞项</span>
           <span className={`task-summary-value ${blockerCount > 0 ? 'error' : ''}`}>{blockerCount}</span>
         </div>
         <div className="task-summary-item">
-          <span className="task-summary-label">Stage</span>
-          <span className="task-summary-value active">{currentRun ? currentStage : 'idle'}</span>
+          <span className="task-summary-label">当前阶段</span>
+          <span className="task-summary-value active">{currentStageLabel}</span>
         </div>
       </div>
     </div>

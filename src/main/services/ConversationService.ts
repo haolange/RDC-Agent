@@ -1,13 +1,23 @@
 import fs from 'fs';
 import path from 'path';
+import { BrowserWindow } from 'electron';
 import type {
   ConversationAttachmentInput,
   ConversationControl,
   ConversationMessage,
+  ConversationReasoningStep,
+  ConversationReasoningTrace,
   ConversationSendRequest,
+  ConversationStreamEvent,
   ConversationTurnResult,
 } from '@shared/types/conversation';
-import type { AppMode, ProjectInputRecord, RunSummary, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
+import type {
+  AppMode,
+  ProjectInputRecord,
+  RunSummary,
+  SessionAttachmentRecord,
+  SessionRecord,
+} from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { agentOrchestrator } from './AgentOrchestrator';
@@ -34,6 +44,16 @@ interface ResolvedConversationContext {
 
 const EXECUTE_PATTERN = /开始|启动|执行|正式分析|直接分析|现在分析|run\b|start\b|debug\b|analy[sz]e\b|帮我调试|请调试|开始调试|开始分析/i;
 const TASK_FILE_PATTERN = /([A-Za-z]:[\\/][^\r\n"]+\.(txt|md))/i;
+const CONTROL_OPEN_TAG = '<control>';
+
+const ACTIVE_RUN_STATUSES: Array<RunSummary['status']> = [
+  'planning',
+  'awaiting_input',
+  'awaiting_approval',
+  'queued',
+  'running',
+  'stopping',
+];
 
 function trimPathLabel(value: string): string {
   const normalized = value.replace(/\\/g, '/');
@@ -41,20 +61,99 @@ function trimPathLabel(value: string): string {
   return parts[parts.length - 1] || value;
 }
 
+function createReasoningStep(id: string, title: string, stage?: string): ConversationReasoningStep {
+  return {
+    id,
+    title,
+    stage,
+    status: 'pending',
+    toolCalls: [],
+    startedAt: nowMs(),
+  };
+}
+
+function createDraftReasoningTrace(summary: string, steps: ConversationReasoningStep[]): ConversationReasoningTrace {
+  return {
+    status: 'running',
+    summary,
+    steps,
+    updatedAt: nowMs(),
+  };
+}
+
+function cloneTrace(trace: ConversationReasoningTrace | null | undefined): ConversationReasoningTrace {
+  return trace
+    ? {
+        ...trace,
+        steps: trace.steps.map((step) => ({
+          ...step,
+          toolCalls: step.toolCalls.map((toolCall) => ({ ...toolCall })),
+        })),
+      }
+    : {
+        status: 'idle',
+        steps: [],
+        updatedAt: nowMs(),
+      };
+}
+
+function upsertTraceStep(
+  trace: ConversationReasoningTrace | null | undefined,
+  stepId: string,
+  patch: Partial<ConversationReasoningStep>,
+): ConversationReasoningTrace {
+  const nextTrace = cloneTrace(trace);
+  const stepIndex = nextTrace.steps.findIndex((step) => step.id === stepId);
+  if (stepIndex >= 0) {
+    nextTrace.steps[stepIndex] = {
+      ...nextTrace.steps[stepIndex],
+      ...patch,
+      toolCalls: patch.toolCalls
+        ? patch.toolCalls.map((toolCall) => ({ ...toolCall }))
+        : nextTrace.steps[stepIndex].toolCalls.map((toolCall) => ({ ...toolCall })),
+    };
+  } else {
+    nextTrace.steps.push({
+      ...createReasoningStep(stepId, patch.title || stepId, patch.stage),
+      ...patch,
+      toolCalls: patch.toolCalls ? patch.toolCalls.map((toolCall) => ({ ...toolCall })) : [],
+    });
+  }
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+
+function finalizeTrace(
+  trace: ConversationReasoningTrace | null | undefined,
+  status: ConversationReasoningTrace['status'],
+  summary?: string,
+): ConversationReasoningTrace {
+  const nextTrace = cloneTrace(trace);
+  nextTrace.status = status;
+  nextTrace.summary = summary ?? nextTrace.summary;
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+
 function makeConversationMessage(
   role: ConversationMessage['role'],
   content: string,
   options: {
+    turnId: string;
     sessionId?: string | null;
     projectId?: string | null;
     runId?: string | null;
     modeContext?: AppMode;
     agentId?: ConversationMessage['agentId'];
     attachments?: SessionAttachmentRecord[];
+    status?: ConversationMessage['status'];
+    reasoningTrace?: ConversationReasoningTrace | null;
   },
 ): ConversationMessage {
+  const createdAt = nowMs();
   return {
     id: generateEventId(role === 'user' ? 'msgu' : role === 'assistant' ? 'msga' : 'msgs'),
+    turnId: options.turnId,
     sessionId: options.sessionId ?? null,
     projectId: options.projectId ?? null,
     runId: options.runId ?? null,
@@ -62,8 +161,11 @@ function makeConversationMessage(
     role,
     agentId: options.agentId,
     content,
+    status: options.status ?? (role === 'assistant' ? 'draft' : 'complete'),
+    updatedAt: createdAt,
+    reasoningTrace: options.reasoningTrace ?? null,
     attachments: options.attachments,
-    createdAt: nowMs(),
+    createdAt,
   };
 }
 
@@ -108,6 +210,29 @@ function parseControlBlock(text: string): ConversationControl | null {
   }
 }
 
+function resolveTaskFileContext(message: string): {
+  taskFilePath: string | null;
+  taskFileContent: string | null;
+  effectiveMessage: string;
+} {
+  const match = message.match(TASK_FILE_PATTERN);
+  const taskFilePath = match?.[1] ? path.resolve(match[1]) : null;
+  if (!taskFilePath || !fs.existsSync(taskFilePath) || !fs.statSync(taskFilePath).isFile()) {
+    return {
+      taskFilePath: null,
+      taskFileContent: null,
+      effectiveMessage: message,
+    };
+  }
+
+  const taskFileContent = fs.readFileSync(taskFilePath, 'utf-8').trim();
+  return {
+    taskFilePath,
+    taskFileContent,
+    effectiveMessage: [message, taskFileContent].filter(Boolean).join('\n\n'),
+  };
+}
+
 function buildCoworkPrompt(
   context: ResolvedConversationContext,
   history: ConversationMessage[],
@@ -146,41 +271,18 @@ function buildCoworkPrompt(
   }, null, 2);
 }
 
-function resolveTaskFileContext(message: string): {
-  taskFilePath: string | null;
-  taskFileContent: string | null;
-  effectiveMessage: string;
-} {
-  const match = message.match(TASK_FILE_PATTERN);
-  const taskFilePath = match?.[1] ? path.resolve(match[1]) : null;
-  if (!taskFilePath || !fs.existsSync(taskFilePath) || !fs.statSync(taskFilePath).isFile()) {
-    return {
-      taskFilePath: null,
-      taskFileContent: null,
-      effectiveMessage: message,
-    };
-  }
-
-  const taskFileContent = fs.readFileSync(taskFilePath, 'utf-8').trim();
-  return {
-    taskFilePath,
-    taskFileContent,
-    effectiveMessage: [message, taskFileContent].filter(Boolean).join('\n\n'),
-  };
-}
-
 function buildCoworkSystemPrompt(): string {
   return [
     '你是 RDC Debugger，一个面向 RenderDoc 调试场景的 Cowork Agent。',
     '要求：',
-    '1. 始终先用自然中文正常回答用户，不要像审批流或工单流。',
-    '2. 如果用户问通用知识、产品能力、技术概念，直接回答，不要强行往调试执行上拐。',
+    '1. 始终先用自然中文正常回复用户，不要像审批流或工单流。',
+    '2. 如果用户问通用知识、产品能力、技术概念，直接回答，不要强行转成调试执行。',
     '3. 没有正式进入调试 run 前，不要假装自己已经分析过 capture。',
     '4. 只有当用户明确表达“现在开始正式调试/执行分析”，并且条件足够时，才把 intent 标成 execute。',
-    '5. 回复正文结束后，必须额外附加一个 <control>{...}</control> 块，且 control JSON 只能包含字段：intent, safe_to_start, needs_project, needs_capture, needs_target_capture, needs_route, reason。',
+    '5. 回复正文结束后，必须额外附加一个 <control>{...}</control> 块，control JSON 只允许包含 intent, safe_to_start, needs_project, needs_capture, needs_target_capture, needs_route, reason。',
     '6. 如果你不确定，就把 intent 设为 talk 或 intake，safe_to_start 设为 false。',
     '7. 控制块不要在正文里解释给用户。',
-    '8. requested_mode 表示当前 UI 模式。Debugger 侧重定位与排障，Analyzer 侧重拆解与证据整理，Optimizer 侧重瓶颈判断与优化建议；回答结构要随 mode 调整。',
+    '8. requested_mode 表示当前 UI 模式，Debugger 偏重定位与排障，Analyzer 偏重拆解与证据整理，Optimizer 偏重瓶颈判断与优化建议；回答结构要随 mode 调整。',
   ].join('\n');
 }
 
@@ -218,7 +320,7 @@ function resolveCaptureGuards(message: string, context: ResolvedConversationCont
     return {
       ready: false,
       needsCapture: true,
-      reason: '我可以先帮你梳理问题，但正式分析需要一个 .rdc capture。你可以先描述现象，或直接打开一个 capture。',
+      reason: '我可以先帮你梳理问题，但正式分析需要一个 .rdc capture。你可以先描述现象，或者直接打开一个 capture。',
     };
   }
 
@@ -269,7 +371,7 @@ function buildWorkflowUpgradeReply(result: Awaited<ReturnType<typeof debugWorkfl
       return '当前调试链路还没绑定可用模型，所以我不能开始正式执行；不过我可以先帮你确认问题范围和所需 capture。';
     }
     if (blocker?.code === 'BLOCKED_MISSING_CAPTURE') {
-      return '我可以先帮你梳理问题，但正式分析需要一个 .rdc capture。你可以先描述现象，或直接打开一个 capture。';
+      return '我可以先帮你梳理问题，但正式分析需要一个 .rdc capture。你可以先描述现象，或者直接打开一个 capture。';
     }
     return blocker?.reason || '当前还不能进入正式调试。';
   }
@@ -285,6 +387,25 @@ function buildWorkflowUpgradeReply(result: Awaited<ReturnType<typeof debugWorkfl
   return '我已经开始正式调试。接下来会按严格证据链推进分析。';
 }
 
+function computeVisibleAssistantText(raw: string): string {
+  const controlIndex = raw.indexOf(CONTROL_OPEN_TAG);
+  if (controlIndex >= 0) {
+    return raw.slice(0, controlIndex);
+  }
+
+  let partialMatchLength = 0;
+  for (let index = CONTROL_OPEN_TAG.length - 1; index > 0; index -= 1) {
+    if (raw.endsWith(CONTROL_OPEN_TAG.slice(0, index))) {
+      partialMatchLength = index;
+      break;
+    }
+  }
+
+  return partialMatchLength > 0
+    ? raw.slice(0, raw.length - partialMatchLength)
+    : raw;
+}
+
 export class ConversationService {
   async getHistory(sessionId: string): Promise<ConversationMessage[]> {
     return storageAdapter.readConversationHistory(sessionId);
@@ -292,11 +413,11 @@ export class ConversationService {
 
   async sendMessage(input: ConversationContextInput): Promise<ConversationTurnResult> {
     const context = await this.resolveContext(input);
-    if (context.currentRun && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(context.currentRun.status)) {
-      return this.handleActiveDebugTurn(context, input.mode, input.message.trim(), input.attachments ?? []);
+    if (context.currentRun && ACTIVE_RUN_STATUSES.includes(context.currentRun.status)) {
+      return this.startActiveDebugTurn(context, input.mode, input.message.trim(), input.attachments ?? []);
     }
 
-    return this.handleCoworkTurn(context, input.mode, input.message.trim(), input.attachments ?? []);
+    return this.startCoworkTurn(context, input.mode, input.message.trim(), input.attachments ?? []);
   }
 
   private async resolveContext(input: ConversationContextInput): Promise<ResolvedConversationContext> {
@@ -322,215 +443,461 @@ export class ConversationService {
     };
   }
 
-  private async handleActiveDebugTurn(
+  private async startActiveDebugTurn(
     context: ResolvedConversationContext,
     requestedMode: AppMode,
     rawMessage: string,
     pendingAttachments: ConversationAttachmentInput[],
   ): Promise<ConversationTurnResult> {
+    const turnId = generateEventId('turn');
     const attachments = context.session
       ? storageAdapter.importSessionAttachments(
-        context.session.sessionId,
-        pendingAttachments.map((entry) => entry.sourcePath),
-      )
+          context.session.sessionId,
+          pendingAttachments.map((entry) => entry.sourcePath),
+        )
       : [];
     const userMessage = makeConversationMessage('user', rawMessage, {
+      turnId,
       sessionId: context.session?.sessionId ?? null,
       projectId: context.projectId,
       runId: context.currentRun?.runId ?? null,
       modeContext: requestedMode,
       attachments,
+      status: 'complete',
     });
-
-    if (context.session) {
-      storageAdapter.appendConversationMessage(context.session.sessionId, userMessage);
-    }
-
-    let assistantContent: string;
-
-    try {
-      assistantContent = await agentOrchestrator.sendMessage('rdc-debugger', composeMessageForAgent(userMessage), {
-        caseId: context.session?.sessionId,
-        runId: context.currentRun?.runId,
-        sessionId: context.session?.sessionId,
-      });
-    } catch (error) {
-      assistantContent = error instanceof Error
-        ? `我刚才处理这条消息时失败了：${error.message}`
-        : '我刚才处理这条消息时失败了。';
-    }
-
-    const assistantMessage = makeConversationMessage('assistant', assistantContent, {
+    const assistantDraftMessage = makeConversationMessage('assistant', '', {
+      turnId,
       sessionId: context.session?.sessionId ?? null,
       projectId: context.projectId,
       runId: context.currentRun?.runId ?? null,
       modeContext: requestedMode,
       agentId: 'rdc-debugger',
+      status: 'streaming',
+      reasoningTrace: createDraftReasoningTrace('正在思考', [
+        createReasoningStep('active-debug-reply', '生成调试回复', 'investigate'),
+      ]),
     });
 
-    if (context.session) {
-      storageAdapter.appendConversationMessage(context.session.sessionId, assistantMessage);
-    }
+    this.persistConversationSnapshot(context.session?.sessionId ?? null, userMessage);
+    this.persistConversationSnapshot(context.session?.sessionId ?? null, assistantDraftMessage);
+
+    void this.completeActiveDebugTurn({
+      context,
+      requestedMode,
+      userMessage,
+      assistantDraftMessage,
+    });
 
     return {
       session: context.session,
       mode: 'active_debug',
       userMessage,
-      assistantMessage,
+      assistantDraftMessage,
       executionTransition: { action: 'none' },
       runUpdate: context.currentRun,
+      errorViewModel: null,
     };
   }
 
-  private async handleCoworkTurn(
+  private async completeActiveDebugTurn(input: {
+    context: ResolvedConversationContext;
+    requestedMode: AppMode;
+    userMessage: ConversationMessage;
+    assistantDraftMessage: ConversationMessage;
+  }) {
+    let assistantMessage = input.assistantDraftMessage;
+    const sessionId = input.context.session?.sessionId ?? null;
+
+    const commitAssistantMessage = (type: ConversationStreamEvent['type'], patch: Partial<ConversationMessage>) => {
+      assistantMessage = {
+        ...assistantMessage,
+        ...patch,
+        updatedAt: nowMs(),
+      };
+      this.persistConversationSnapshot(sessionId, assistantMessage);
+      this.emitConversationEvent({
+        type,
+        sessionId: sessionId ?? '',
+        turnId: assistantMessage.turnId,
+        message: assistantMessage,
+      } as ConversationStreamEvent);
+    };
+
+    commitAssistantMessage('message_patched', {
+      reasoningTrace: upsertTraceStep(
+        assistantMessage.reasoningTrace,
+        'active-debug-reply',
+        {
+          title: '生成调试回复',
+          stage: 'investigate',
+          status: 'running',
+          summary: 'Debugger 正在结合当前 run 上下文生成回复。',
+          startedAt: nowMs(),
+        },
+      ),
+    });
+
+    try {
+      const responseText = await agentOrchestrator.sendMessage(
+        'rdc-debugger',
+        composeMessageForAgent(input.userMessage),
+        {
+          caseId: input.context.session?.sessionId,
+          runId: input.context.currentRun?.runId ?? undefined,
+          sessionId: input.context.session?.sessionId ?? undefined,
+          turnId: assistantMessage.turnId,
+        },
+        {
+          onChunk: (chunk) => {
+            commitAssistantMessage('message_patched', {
+              status: 'streaming',
+              content: `${assistantMessage.content}${chunk}`,
+            });
+          },
+        },
+      );
+
+      commitAssistantMessage('message_completed', {
+        status: 'complete',
+        content: responseText,
+        reasoningTrace: finalizeTrace(
+          upsertTraceStep(
+            assistantMessage.reasoningTrace,
+            'active-debug-reply',
+            {
+              status: 'complete',
+              summary: '调试回复已生成。',
+              completedAt: nowMs(),
+            },
+          ),
+          'complete',
+          '回复已完成',
+        ),
+      });
+    } catch (error) {
+      const message = error instanceof Error
+        ? `我刚才处理这条消息时失败了：${error.message}`
+        : '我刚才处理这条消息时失败了。';
+      commitAssistantMessage('message_errored', {
+        status: 'error',
+        content: assistantMessage.content || message,
+        reasoningTrace: finalizeTrace(
+          upsertTraceStep(
+            assistantMessage.reasoningTrace,
+            'active-debug-reply',
+            {
+              status: 'error',
+              summary: message,
+              completedAt: nowMs(),
+            },
+          ),
+          'error',
+          '回复生成失败',
+        ),
+      });
+    }
+  }
+
+  private async startCoworkTurn(
     context: ResolvedConversationContext,
     requestedMode: AppMode,
     rawMessage: string,
     pendingAttachments: ConversationAttachmentInput[],
   ): Promise<ConversationTurnResult> {
-    const taskFileContext = resolveTaskFileContext(rawMessage);
-    const effectiveMessage = taskFileContext.effectiveMessage;
     let workingSession = context.session;
     if (!workingSession && context.projectId) {
       workingSession = storageAdapter.createSession(context.projectId, rawMessage.slice(0, 80));
     }
 
+    const turnId = generateEventId('turn');
     const importedAttachments = workingSession
       ? storageAdapter.importSessionAttachments(
-        workingSession.sessionId,
-        pendingAttachments.map((entry) => entry.sourcePath),
-      )
+          workingSession.sessionId,
+          pendingAttachments.map((entry) => entry.sourcePath),
+        )
       : [];
     const userMessage = makeConversationMessage('user', rawMessage, {
+      turnId,
       sessionId: workingSession?.sessionId ?? null,
       projectId: context.projectId,
       runId: context.currentRun?.runId ?? null,
       modeContext: requestedMode,
       attachments: importedAttachments,
+      status: 'complete',
     });
-
-    if (workingSession) {
-      storageAdapter.appendConversationMessage(workingSession.sessionId, userMessage);
-    }
-
-    const history = workingSession ? storageAdapter.readConversationHistory(workingSession.sessionId) : [];
-    let assistantContent = '';
-    let control: ConversationControl | null = null;
-    let errorViewModel: ConversationTurnResult['errorViewModel'] = null;
-
-    try {
-      const response = await agentOrchestrator.sendCoworkMessage(
-        'rdc-debugger',
-        buildCoworkPrompt({
-          ...context,
-          session: workingSession,
-        }, history, requestedMode, rawMessage, importedAttachments),
-        {
-          sessionId: workingSession?.sessionId,
-          systemPrompt: buildCoworkSystemPrompt(),
-          maxTokens: 1200,
-          temperature: 0.35,
-        },
-      );
-      assistantContent = stripControlBlock(response);
-      control = parseControlBlock(response);
-    } catch (error) {
-      assistantContent = createFallbackAssistantReply(effectiveMessage, {
-        ...context,
-        session: workingSession,
-      });
-      errorViewModel = {
-        code: 'CONVERSATION_LLM_UNAVAILABLE',
-        message: assistantContent,
-        technicalMessage: error instanceof Error ? error.message : String(error),
-      };
-    }
-
-    let conversationMode: ConversationTurnResult['mode'] = control?.intent === 'intake' ? 'intake' : 'talk';
-    let executionTransition: ConversationTurnResult['executionTransition'] = { action: 'none' };
-    let runUpdate: RunSummary | null = null;
-    let debugPlanSummary: ConversationTurnResult['debugPlanSummary'];
-    let pendingQuestions: ConversationTurnResult['pendingQuestions'];
-    let uiHints: ConversationTurnResult['uiHints'] = {};
-
-    if ((control?.intent === 'execute' || EXECUTE_PATTERN.test(effectiveMessage)) && control?.safe_to_start) {
-      if (!context.projectId) {
-        conversationMode = 'intake';
-        assistantContent = '我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。';
-        uiHints.highlightProjectPicker = true;
-      } else {
-        const captureGuard = resolveCaptureGuards(effectiveMessage, {
-          ...context,
-          session: workingSession,
-        });
-
-        if (!captureGuard.ready) {
-          conversationMode = 'intake';
-          assistantContent = captureGuard.reason || assistantContent;
-          uiHints.highlightCaptureLibrary = true;
-        } else {
-          const workflowResult = await debugWorkflowService.startPlan({
-            projectId: context.projectId,
-            sessionId: workingSession?.sessionId,
-            mode: 'debugger',
-            goal: rawMessage,
-            replayDevice: context.replayDevice,
-          });
-
-          conversationMode = 'execute_upgrade';
-          assistantContent = assistantContent
-            ? `${assistantContent}\n\n${buildWorkflowUpgradeReply(workflowResult)}`
-            : buildWorkflowUpgradeReply(workflowResult);
-          const hasBlockingPlanFailure = Boolean(workflowResult.debugPlanSummary?.blockers?.length);
-          debugPlanSummary = hasBlockingPlanFailure ? null : (workflowResult.debugPlanSummary ?? null);
-          pendingQuestions = hasBlockingPlanFailure ? null : (workflowResult.pendingQuestions ?? null);
-          uiHints.showPlanIntake = !hasBlockingPlanFailure && Boolean(debugPlanSummary || pendingQuestions);
-          executionTransition = workflowResult.success && workflowResult.runId && !hasBlockingPlanFailure
-            ? {
-                action: 'started_run',
-                runId: workflowResult.runId,
-                sessionId: workflowResult.sessionId,
-              }
-            : { action: 'none' };
-          if (workflowResult.sessionId) {
-            runUpdate = hasBlockingPlanFailure ? null : storageAdapter.getLatestRun(workflowResult.sessionId);
-            if (!workingSession) {
-              workingSession = storageAdapter.readSession(workflowResult.sessionId);
-            }
-          }
-        }
-      }
-    } else if (control?.intent === 'intake') {
-      conversationMode = 'intake';
-      uiHints.highlightCaptureLibrary = control.needs_capture || control.needs_target_capture;
-      uiHints.highlightProjectPicker = control.needs_project;
-      uiHints.highlightSettingsRoute = control.needs_route;
-    }
-
-    const assistantMessage = makeConversationMessage('assistant', assistantContent, {
+    const assistantDraftMessage = makeConversationMessage('assistant', '', {
+      turnId,
       sessionId: workingSession?.sessionId ?? null,
       projectId: context.projectId,
-      runId: runUpdate?.runId ?? null,
+      runId: context.currentRun?.runId ?? null,
       modeContext: requestedMode,
       agentId: 'rdc-debugger',
+      status: 'streaming',
+      reasoningTrace: createDraftReasoningTrace('正在思考', [
+        createReasoningStep('cowork-route', '检查上下文与路由', 'intake_gate'),
+        createReasoningStep('cowork-reply', '生成协作回复', 'plan'),
+      ]),
     });
 
-    if (workingSession) {
-      storageAdapter.appendConversationMessage(workingSession.sessionId, assistantMessage);
-    }
+    this.persistConversationSnapshot(workingSession?.sessionId ?? null, userMessage);
+    this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
+
+    void this.completeCoworkTurn({
+      context: {
+        ...context,
+        session: workingSession,
+      },
+      requestedMode,
+      rawMessage,
+      importedAttachments,
+      userMessage,
+      assistantDraftMessage,
+    });
 
     return {
       session: workingSession,
-      mode: conversationMode,
+      mode: 'talk',
       userMessage,
-      assistantMessage,
-      executionTransition,
-      runUpdate,
-      debugPlanSummary,
-      pendingQuestions,
-      uiHints,
-      errorViewModel,
+      assistantDraftMessage,
+      executionTransition: { action: 'none' },
+      runUpdate: null,
+      errorViewModel: null,
     };
+  }
+
+  private async completeCoworkTurn(input: {
+    context: ResolvedConversationContext;
+    requestedMode: AppMode;
+    rawMessage: string;
+    importedAttachments: SessionAttachmentRecord[];
+    userMessage: ConversationMessage;
+    assistantDraftMessage: ConversationMessage;
+  }) {
+    let assistantMessage = input.assistantDraftMessage;
+    const sessionId = input.context.session?.sessionId ?? null;
+
+    const commitAssistantMessage = (type: ConversationStreamEvent['type'], patch: Partial<ConversationMessage>) => {
+      assistantMessage = {
+        ...assistantMessage,
+        ...patch,
+        updatedAt: nowMs(),
+      };
+      this.persistConversationSnapshot(sessionId, assistantMessage);
+      this.emitConversationEvent({
+        type,
+        sessionId: sessionId ?? '',
+        turnId: assistantMessage.turnId,
+        message: assistantMessage,
+      } as ConversationStreamEvent);
+    };
+
+    let followupContent = '';
+
+    const appendAssistantText = (text: string) => {
+      if (!text) {
+        return;
+      }
+      followupContent += text;
+      commitAssistantMessage('message_patched', {
+        status: 'streaming',
+        content: `${assistantMessage.content}${text}`,
+      });
+    };
+
+    commitAssistantMessage('message_patched', {
+      reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, 'cowork-route', {
+        status: 'running',
+        summary: '正在检查项目、capture 与调试路由。',
+        startedAt: nowMs(),
+      }),
+    });
+
+    const history = input.context.session
+      ? storageAdapter.readConversationHistory(input.context.session.sessionId).filter((entry) => entry.id !== assistantMessage.id)
+      : [];
+
+    let rawResponse = '';
+    let visibleResponse = '';
+    let errorViewModel: ConversationTurnResult['errorViewModel'] = null;
+
+    try {
+      commitAssistantMessage('message_patched', {
+        reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, 'cowork-reply', {
+          status: 'running',
+          summary: '正在生成协作回复。',
+          startedAt: nowMs(),
+        }),
+      });
+
+      const response = await agentOrchestrator.sendCoworkMessage(
+        'rdc-debugger',
+        buildCoworkPrompt(
+          input.context,
+          history,
+          input.requestedMode,
+          input.rawMessage,
+          input.importedAttachments,
+        ),
+        {
+          sessionId: input.context.session?.sessionId,
+          turnId: assistantMessage.turnId,
+          systemPrompt: buildCoworkSystemPrompt(),
+          maxTokens: 1200,
+          temperature: 0.35,
+          onChunk: (chunk) => {
+            rawResponse += chunk;
+            const nextVisible = computeVisibleAssistantText(rawResponse);
+            if (nextVisible.length > visibleResponse.length) {
+              const delta = nextVisible.slice(visibleResponse.length);
+              visibleResponse = nextVisible;
+              appendAssistantText(delta);
+            }
+          },
+        },
+      );
+
+      if (!rawResponse) {
+        rawResponse = response;
+      }
+    } catch (error) {
+      const fallbackReply = createFallbackAssistantReply(resolveTaskFileContext(input.rawMessage).effectiveMessage, input.context);
+      errorViewModel = {
+        code: 'CONVERSATION_LLM_UNAVAILABLE',
+        message: fallbackReply,
+        technicalMessage: error instanceof Error ? error.message : String(error),
+      };
+      rawResponse = fallbackReply;
+      visibleResponse = fallbackReply;
+      commitAssistantMessage('message_patched', {
+        content: fallbackReply,
+      });
+    }
+
+    const assistantContent = stripControlBlock(rawResponse);
+    const control = parseControlBlock(rawResponse);
+    let finalStatus: ConversationMessage['status'] = errorViewModel ? 'error' : 'complete';
+    let traceStatus: ConversationReasoningTrace['status'] = errorViewModel ? 'error' : 'complete';
+
+    commitAssistantMessage('message_patched', {
+      content: assistantContent,
+      reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, 'cowork-route', {
+        status: 'complete',
+        summary: '上下文检查完成。',
+        completedAt: nowMs(),
+      }),
+    });
+
+    const effectiveMessage = resolveTaskFileContext(input.rawMessage).effectiveMessage;
+    if (!input.context.projectId && EXECUTE_PATTERN.test(effectiveMessage)) {
+      const boundaryReply = '我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。';
+      commitAssistantMessage('message_completed', {
+        status: 'complete',
+        content: boundaryReply,
+        reasoningTrace: finalizeTrace(
+          upsertTraceStep(
+            upsertTraceStep(assistantMessage.reasoningTrace, 'cowork-route', {
+              status: 'complete',
+              summary: '当前还没有可用项目。',
+              completedAt: nowMs(),
+            }),
+            'cowork-upgrade',
+            {
+              title: '升级到正式调试',
+              stage: 'plan',
+              status: 'complete',
+              summary: '已拦截正式调试请求，等待选择项目。',
+              completedAt: nowMs(),
+            },
+          ),
+          'complete',
+          '等待选择项目',
+        ),
+      });
+      return;
+    }
+
+    if ((control?.intent === 'execute' || EXECUTE_PATTERN.test(effectiveMessage)) && control?.safe_to_start) {
+      commitAssistantMessage('message_patched', {
+        reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, 'cowork-upgrade', {
+          title: '升级到正式调试',
+          stage: 'plan',
+          status: 'running',
+          summary: '正在准备正式调试计划。',
+          startedAt: nowMs(),
+        }),
+      });
+
+      if (!input.context.projectId) {
+        appendAssistantText(`\n\n我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。`);
+      } else {
+        const captureGuard = resolveCaptureGuards(effectiveMessage, input.context);
+        if (!captureGuard.ready) {
+          appendAssistantText(`\n\n${captureGuard.reason || '当前还不能进入正式分析。'}`);
+        } else if (!hasUsableDebuggerRoute()) {
+          appendAssistantText('\n\n当前调试链路还没绑定可用模型，所以我不能开始正式执行；不过我可以先帮你确认问题范围和所需 capture。');
+        } else {
+          const workflowResult = await debugWorkflowService.startPlan({
+            projectId: input.context.projectId,
+            sessionId: input.context.session?.sessionId,
+            turnId: assistantMessage.turnId,
+            mode: 'debugger',
+            goal: input.rawMessage,
+            replayDevice: input.context.replayDevice,
+          });
+
+          const upgradeReply = buildWorkflowUpgradeReply(workflowResult);
+          appendAssistantText(`\n\n${upgradeReply}`);
+
+          if (workflowResult.runId) {
+            commitAssistantMessage('message_patched', {
+              runId: workflowResult.runId,
+            });
+            this.emitConversationEvent({
+              type: 'run_linked',
+              sessionId: input.context.session?.sessionId ?? '',
+              turnId: assistantMessage.turnId,
+              runId: workflowResult.runId,
+            });
+          }
+        }
+      }
+
+      commitAssistantMessage('message_patched', {
+        reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, 'cowork-upgrade', {
+          status: 'complete',
+          summary: '正式调试升级判断已完成。',
+          completedAt: nowMs(),
+        }),
+      });
+    }
+
+    commitAssistantMessage(finalStatus === 'error' ? 'message_errored' : 'message_completed', {
+      status: finalStatus,
+      content: `${assistantContent}${followupContent}`,
+      reasoningTrace: finalizeTrace(
+        upsertTraceStep(assistantMessage.reasoningTrace, 'cowork-reply', {
+          status: errorViewModel ? 'error' : 'complete',
+          summary: errorViewModel ? '协作回复生成失败，已降级到本地兜底回复。' : '协作回复已完成。',
+          completedAt: nowMs(),
+        }),
+        traceStatus,
+        finalStatus === 'error' ? '回复失败' : '回复已完成',
+      ),
+    });
+  }
+
+  private persistConversationSnapshot(sessionId: string | null | undefined, message: ConversationMessage) {
+    if (sessionId) {
+      storageAdapter.appendConversationMessage(sessionId, message);
+    }
+  }
+
+  private emitConversationEvent(event: ConversationStreamEvent) {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) {
+        window.webContents.send('conversation:event', event);
+      }
+    }
   }
 }
 

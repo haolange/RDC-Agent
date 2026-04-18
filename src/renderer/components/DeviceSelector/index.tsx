@@ -96,6 +96,12 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({ collapsed = fals
   const selectedSummary = selectedEntry?.type === 'local'
     ? 'Local Replay'
     : (selectedEntry?.label ?? 'No Device');
+  const selectedSubtitle = selectedEntry?.type === 'local'
+    ? 'Replay Device'
+    : 'Android Replay';
+  const selectedStatus = selectedEntry?.type === 'local'
+    ? 'Local'
+    : StatusText[selectedEntry?.status ?? 'offline'];
   const triggerTitle = `Replay Device: ${selectedSummary}`;
 
   useEffect(() => {
@@ -225,19 +231,24 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({ collapsed = fals
           aria-label={triggerTitle}
           title={triggerTitle}
         >
-          <div className="device-selector-trigger-main">
-            <span className={`device-selector-trigger-icon ${selectedEntry?.type === 'android' ? 'android' : 'local'}`}>
-              <DeviceTypeIcon type={selectedEntry?.type ?? 'local'} />
-            </span>
-            {!collapsed && (
-              <div className="device-selector-copy footer-entry-copy">
-                <span className="device-selector-label footer-entry-label">Replay Device</span>
-                <span className="device-selector-summary footer-entry-title">{selectedSummary}</span>
-              </div>
-            )}
+          <div className="footer-entry-main">
+            <div className="device-selector-trigger-main">
+              <span className={`device-selector-trigger-icon ${selectedEntry?.type === 'android' ? 'android' : 'local'}`}>
+                <DeviceTypeIcon type={selectedEntry?.type ?? 'local'} />
+              </span>
+              {!collapsed && (
+                <div className="device-selector-copy footer-entry-copy">
+                  <span className="device-selector-summary footer-entry-title">{selectedSummary}</span>
+                  <span className="device-selector-subtitle footer-entry-subtitle">{selectedSubtitle}</span>
+                </div>
+              )}
+            </div>
           </div>
           {!collapsed && (
-            <div className="device-selector-trigger-meta">
+            <div className="device-selector-trigger-meta footer-entry-trailing">
+              <span className={`device-selector-trigger-status footer-entry-status ${selectedEntry?.type === 'local' || selectedEntry?.status === 'connected' || selectedEntry?.status === 'online' ? 'accent' : ''}`}>
+                {selectedStatus}
+              </span>
               <svg className={`device-selector-arrow footer-entry-chevron ${isOpen ? 'open' : ''}`} viewBox="0 0 12 12" fill="currentColor">
                 <path d="M6 8L1 3h10l-5 5z" />
               </svg>

@@ -8,6 +8,14 @@ const formatOpenedAt = (timestamp?: number): string => {
   return new Date(timestamp).toLocaleString();
 };
 
+const formatStatusLabel = (status?: string): string => {
+  if (!status) return '--';
+  if (status === 'open') return '已打开';
+  if (status === 'opening') return '打开中';
+  if (status === 'error') return '异常';
+  return status;
+};
+
 export const OpenedCapture: React.FC = () => {
   const { t } = useI18n();
   const currentProject = useSessionStore((s) => s.currentProject);
@@ -62,7 +70,7 @@ export const OpenedCapture: React.FC = () => {
           <div className="opened-capture-item">
             <span className="opened-capture-label">{t('control.openedCaptureStatus')}</span>
             <span className={`opened-capture-value ${activeOpenedCapture.status === 'open' ? 'active' : ''}`}>
-              {activeOpenedCapture.status}
+              {formatStatusLabel(activeOpenedCapture.status)}
             </span>
           </div>
           <div className="opened-capture-item">

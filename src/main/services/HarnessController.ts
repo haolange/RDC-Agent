@@ -360,6 +360,7 @@ export class HarnessController {
     agentId: string;
     sessionId: string;
     runId: string;
+    turnId?: string;
     execute: () => Promise<{ ok: boolean; data?: unknown; error?: unknown }>;
   }): Promise<{ ok: boolean; data?: unknown; error?: unknown }> {
     const startTime = nowMs();
@@ -373,6 +374,7 @@ export class HarnessController {
     const event: ActionEvent = {
       schema_version: '2',
       event_id: `evt-tool-${nowMs()}`,
+      turn_id: input.turnId,
       ts_ms: startTime,
       run_id: input.runId,
       session_id: input.sessionId,

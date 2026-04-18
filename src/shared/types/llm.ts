@@ -52,6 +52,12 @@ export interface ToolCall {
   arguments: Record<string, unknown>;
 }
 
+export interface LLMToolCallDelta {
+  id: string;
+  name?: string;
+  argumentsText?: string;
+}
+
 // LLM请求
 export interface LLMRequest {
   messages: LLMMessage[];
@@ -77,13 +83,30 @@ export interface LLMResponse {
   stopReason: 'end_turn' | 'tool_use' | 'max_tokens';
 }
 
+export type LLMStreamEvent =
+  | {
+      type: 'text-delta';
+      text: string;
+    }
+  | {
+      type: 'tool-call-delta';
+      toolCall: LLMToolCallDelta;
+    }
+  | {
+      type: 'done';
+    }
+  | {
+      type: 'error';
+      error: string;
+    };
+
 // LLM Provider接口
 export interface LLMProvider {
   name: string;
   chat(request: LLMRequest): Promise<LLMResponse>;
   streamChat(
     request: LLMRequest,
-    onChunk: (chunk: string) => void
+    onChunk: (chunk: LLMStreamEvent) => void
   ): Promise<LLMResponse>;
   isAvailable(): Promise<boolean>;
   getModels(): string[];
@@ -113,4 +136,4 @@ export interface LLMConfig {
 }
 
 // 流式响应回调
-export type StreamCallback = (chunk: string) => void;
+export type StreamCallback = (chunk: LLMStreamEvent) => void;

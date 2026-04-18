@@ -2,6 +2,7 @@ import { BrowserWindow } from 'electron';
 import type { AgentRole } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { LLMMessage, LLMRequest, LLMResponse } from '@shared/types/llm';
+import type { RunContextUsageSummary } from '@shared/types/session';
 import type { Blocker, WorkflowStage } from '@shared/types/workflow';
 import { BLOCKER_CODES } from '@shared/constants/blockers';
 import type { LlmProviderEntry } from '@shared/types/settings';
@@ -228,6 +229,7 @@ export class DebuggerLlmService {
 
   resetRunSummary(runId: string): void {
     this.runSummaries.delete(runId);
+    this.broadcastRunUsage(runId);
   }
 
   getRunSummary(runId: string): RunLlmExecutionSummary | null {
@@ -239,6 +241,35 @@ export class DebuggerLlmService {
     return {
       ...summary,
       routesUsed: summary.routesUsed.map((entry) => ({ ...entry })),
+    };
+  }
+
+  getRunContextUsage(runId: string): RunContextUsageSummary | null {
+    const summary = this.runSummaries.get(runId);
+    if (!summary) {
+      return null;
+    }
+
+    const settings = settingsService.getAll();
+    const provider = settings.llm.providers.find((entry) => entry.id === summary.providerId);
+    const model = provider?.models.find((entry) => entry.id === summary.modelId) ?? null;
+    const contextWindowTokens = typeof model?.contextWindowTokens === 'number' && model.contextWindowTokens > 0
+      ? model.contextWindowTokens
+      : null;
+    const totalTokens = summary.totalInputTokens + summary.totalOutputTokens;
+
+    return {
+      runId,
+      providerId: summary.providerId,
+      modelId: summary.modelId,
+      inputTokens: summary.totalInputTokens,
+      outputTokens: summary.totalOutputTokens,
+      totalTokens,
+      contextWindowTokens,
+      usagePercent: contextWindowTokens
+        ? Math.min(100, Math.max(0, Math.round((totalTokens / contextWindowTokens) * 100)))
+        : 0,
+      hasConfiguredContextWindow: Boolean(contextWindowTokens),
     };
   }
 
@@ -598,6 +629,21 @@ export class DebuggerLlmService {
       status,
     });
     this.runSummaries.set(context.runId, existing);
+    this.broadcastRunUsage(context.runId);
+  }
+
+  private broadcastRunUsage(runId: string): void {
+    const usage = this.getRunContextUsage(runId);
+    if (!usage) {
+      return;
+    }
+
+    const windows = BrowserWindow.getAllWindows();
+    for (const window of windows) {
+      if (!window.isDestroyed()) {
+        window.webContents.send('workflow:runUsageChanged', usage);
+      }
+    }
   }
 
   private async appendBroadcastEvent(sessionId: string, event: ActionEvent): Promise<void> {

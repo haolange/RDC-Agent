@@ -24,7 +24,7 @@ import { llmAdapter } from '../adapters/LLMAdapter';
 import { storageAdapter } from './StorageAdapter';
 import { harnessController } from './HarnessController';
 import { generateEventId, nowMs, nowIso } from '@shared/utils/id';
-import type { LLMConfig } from '@shared/types/llm';
+import type { LLMConfig, LLMStreamEvent } from '@shared/types/llm';
 import { executionProfileService } from './ExecutionProfileService';
 import { settingsService } from './SettingsService';
 import { runtimeLogService } from './RuntimeLogService';
@@ -219,6 +219,23 @@ export class AgentOrchestrator {
     return executionProfileService.resolveAgentRuntimeProfile(settings, stage || 'investigate', agentId);
   }
 
+  private async finalizeRecordedAssistantMessage(
+    agentId: AgentRole,
+    streamedContent: string,
+    fallbackContent: string,
+    context?: {
+      caseId?: string;
+      runId?: string;
+      sessionId?: string;
+      stageId?: WorkflowStage;
+      turnId?: string;
+    },
+  ): Promise<string> {
+    const finalContent = streamedContent || fallbackContent;
+    await this.recordMessage(agentId, 'assistant', finalContent, context);
+    return finalContent;
+  }
+
   /**
    * 发送消息给Agent
    */
@@ -230,9 +247,12 @@ export class AgentOrchestrator {
       runId?: string;
       sessionId?: string;
       stageId?: WorkflowStage;
+      turnId?: string;
     },
     options?: {
       signal?: AbortSignal;
+      onChunk?: (text: string) => void;
+      onStreamEvent?: (event: LLMStreamEvent) => void;
     },
   ): Promise<string> {
     const fallbackConfig = this.agentConfigs.get(agentId);
@@ -260,8 +280,10 @@ export class AgentOrchestrator {
         { role: 'user' as const, content },
       ];
 
-      // 调用LLM
-      const response = await llmAdapter.chat(
+      await this.recordMessage(agentId, 'user', content, context);
+
+      let streamedContent = '';
+      const response = await llmAdapter.streamChat(
         {
           messages,
           model: config.modelName,
@@ -269,20 +291,30 @@ export class AgentOrchestrator {
           temperature: config.temperature,
           signal: options?.signal,
         },
+        (event) => {
+          options?.onStreamEvent?.(event);
+          if (event.type === 'text-delta') {
+            streamedContent += event.text;
+            options?.onChunk?.(event.text);
+          }
+        },
         config.modelProvider
       );
 
-      // 记录消息
-      await this.recordMessage(agentId, 'user', content, context);
-      const responseContent = typeof response.content === 'string'
+      const fallbackContent = typeof response.content === 'string'
         ? response.content
         : JSON.stringify(response.content);
-      await this.recordMessage(agentId, 'assistant', responseContent, context);
+      const finalContent = await this.finalizeRecordedAssistantMessage(
+        agentId,
+        streamedContent,
+        fallbackContent,
+        context,
+      );
 
       // 更新状态
       this.updateAgentStatus(agentId, 'complete');
 
-      return responseContent;
+      return finalContent;
     } catch (error) {
       this.updateAgentStatus(agentId, 'error');
       throw error;
@@ -298,6 +330,9 @@ export class AgentOrchestrator {
       systemPrompt?: string;
       maxTokens?: number;
       temperature?: number;
+      turnId?: string;
+      onChunk?: (text: string) => void;
+      onStreamEvent?: (event: LLMStreamEvent) => void;
     },
   ): Promise<string> {
     const fallbackConfig = this.agentConfigs.get(agentId);
@@ -338,12 +373,20 @@ export class AgentOrchestrator {
           stub = '收到，我会先帮你整理正式调试前的关键信息，然后在条件满足时进入严格执行流程。';
         }
         this.updateAgentStatus(agentId, 'complete');
-        return `${stub}\n<control>{"intent":"${/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower) ? 'execute' : 'talk'}","safe_to_start":${/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower) ? 'true' : 'false'}}</control>`;
+        const finalStub = `${stub}\n<control>{"intent":"${/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower) ? 'execute' : 'talk'}","safe_to_start":${/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower) ? 'true' : 'false'}}</control>`;
+        if (options?.onChunk) {
+          const midpoint = Math.max(1, Math.ceil(finalStub.length / 2));
+          options.onChunk(finalStub.slice(0, midpoint));
+          await Promise.resolve();
+          options.onChunk(finalStub.slice(midpoint));
+        }
+        return finalStub;
       }
 
       llmAdapter.configure(settingsService.getLlmConfig());
 
-      const response = await llmAdapter.chat(
+      let streamedContent = '';
+      const response = await llmAdapter.streamChat(
         {
           messages: [
             {
@@ -360,19 +403,27 @@ export class AgentOrchestrator {
           temperature: config.temperature,
           signal: options?.signal,
         },
+        (event) => {
+          options?.onStreamEvent?.(event);
+          if (event.type === 'text-delta') {
+            streamedContent += event.text;
+            options?.onChunk?.(event.text);
+          }
+        },
         config.modelProvider,
       );
 
-      const responseContent = typeof response.content === 'string'
+      const fallbackContent = typeof response.content === 'string'
         ? response.content
         : JSON.stringify(response.content);
+      const finalContent = streamedContent || fallbackContent;
 
       runtimeLogService.log({
         scope: options?.sessionId ? 'session' : 'app',
         namespace: 'agent',
         severity: 'info',
         title: `${AGENT_DISPLAY_NAMES[agentId] || agentId} cowork turn`,
-        summary: responseContent.slice(0, 160) || '空消息',
+        summary: finalContent.slice(0, 160) || '空消息',
         sessionId: options?.sessionId,
         raw: {
           agentId,
@@ -382,7 +433,7 @@ export class AgentOrchestrator {
       });
 
       this.updateAgentStatus(agentId, 'complete');
-      return responseContent;
+      return finalContent;
     } catch (error) {
       this.updateAgentStatus(agentId, 'error');
       throw error;
@@ -554,7 +605,7 @@ export class AgentOrchestrator {
     agentId: AgentRole,
     role: 'user' | 'assistant' | 'system',
     content: string,
-    context?: { caseId?: string; runId?: string; sessionId?: string }
+    context?: { caseId?: string; runId?: string; sessionId?: string; turnId?: string }
   ): Promise<void> {
     if (!context?.sessionId) return;
 
@@ -573,6 +624,7 @@ export class AgentOrchestrator {
         agentId,
         eventType: role === 'user' ? 'user_message' : role === 'assistant' ? 'agent_summary' : 'system',
         status: role === 'system' ? 'warning' : 'ok',
+        turnId: context.turnId,
         payload: {
           role,
           content,

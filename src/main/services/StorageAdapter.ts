@@ -454,6 +454,7 @@ export class StorageAdapter {
     caseId: string;
     runId?: string;
     sessionId?: string;
+    turnId?: string;
     capturePaths: string[];
     mode?: AppMode;
     goal?: string;
@@ -492,6 +493,7 @@ export class StorageAdapter {
     const startedAt = nowMs();
     const persistedRun: PersistedRunRecord = {
       runId,
+      turnId: input.turnId,
       projectId: session.projectId,
       sessionId,
       caseId: sessionId,
@@ -651,7 +653,19 @@ export class StorageAdapter {
   }
 
   readConversationHistory(sessionId: string): ConversationMessage[] {
-    return readJsonl<ConversationMessage>(this.getConversationPath(sessionId))
+    const snapshots = readJsonl<ConversationMessage>(this.getConversationPath(sessionId));
+    const latestById = new Map<string, ConversationMessage>();
+
+    for (const snapshot of snapshots) {
+      const existing = latestById.get(snapshot.id);
+      const existingUpdatedAt = existing?.updatedAt ?? existing?.createdAt ?? 0;
+      const nextUpdatedAt = snapshot.updatedAt ?? snapshot.createdAt;
+      if (!existing || nextUpdatedAt >= existingUpdatedAt) {
+        latestById.set(snapshot.id, snapshot);
+      }
+    }
+
+    return Array.from(latestById.values())
       .sort((left, right) => left.createdAt - right.createdAt);
   }
 
@@ -761,11 +775,13 @@ export class StorageAdapter {
     eventType: ActionEvent['event_type'];
     status: ActionEvent['status'];
     payload: Record<string, unknown>;
+    turnId?: string;
     refs?: string[];
   }): ActionEvent {
     return {
       schema_version: '2',
       event_id: generateEventId('evt'),
+      turn_id: input.turnId,
       ts_ms: nowMs(),
       run_id: input.runId,
       session_id: input.sessionId,
@@ -1055,6 +1071,7 @@ export class StorageAdapter {
     this.writeJson(path.join(runPath, 'run.json'), run);
     writeYaml(path.join(runPath, 'run.yaml'), {
       run_id: run.runId,
+      turn_id: run.turnId,
       session_id: run.sessionId,
       case_id: run.caseId,
       project_id: run.projectId,
@@ -1162,6 +1179,7 @@ export class StorageAdapter {
 
     return {
       runId,
+      turnId: typeof runYaml.turn_id === 'string' ? runYaml.turn_id : undefined,
       projectId: String(runYaml.project_id || ''),
       sessionId,
       caseId: String(runYaml.case_id || sessionId),
@@ -1189,6 +1207,7 @@ export class StorageAdapter {
   private toRunSummary(run: PersistedRunRecord): RunSummary {
     return {
       runId: run.runId,
+      turnId: run.turnId,
       projectId: run.projectId,
       sessionId: run.sessionId,
       caseId: run.caseId,

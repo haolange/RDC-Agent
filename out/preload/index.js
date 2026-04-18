@@ -9,6 +9,7 @@ const validChannels = [
   "workflow:stateChanged",
   "workflow:stageChanged",
   "workflow:runStatusChanged",
+  "workflow:runUsageChanged",
   "workflow:blocked",
   "agent:message",
   "agent:statusChanged",
@@ -24,10 +25,25 @@ const validChannels = [
   "runtime:logAppended",
   "terminal:data",
   "terminal:exit",
-  "terminal:tabsChanged"
+  "terminal:tabsChanged",
+  "conversation:event"
 ];
 const isValidChannel = (channel) => {
   return validChannels.includes(channel);
+};
+const registerTrackedListener = (channel, callback) => {
+  const wrappedCallback = (_event, ...args) => callback(...args);
+  const channelListeners = listenerMap.get(channel) ?? /* @__PURE__ */ new Map();
+  channelListeners.set(callback, wrappedCallback);
+  listenerMap.set(channel, channelListeners);
+  electron.ipcRenderer.on(channel, wrappedCallback);
+};
+const removeTrackedListener = (channel, callback) => {
+  const wrappedCallback = listenerMap.get(channel)?.get(callback);
+  if (wrappedCallback) {
+    electron.ipcRenderer.removeListener(channel, wrappedCallback);
+    listenerMap.get(channel)?.delete(callback);
+  }
 };
 const electronAPI = {
   platform: process.platform,
@@ -44,7 +60,13 @@ const electronAPI = {
   },
   conversation: {
     sendMessage: (request) => electron.ipcRenderer.invoke("conversation:sendMessage", request),
-    getHistory: (sessionId) => electron.ipcRenderer.invoke("conversation:getHistory", sessionId)
+    getHistory: (sessionId) => electron.ipcRenderer.invoke("conversation:getHistory", sessionId),
+    onEvent: (callback) => {
+      registerTrackedListener("conversation:event", (payload) => callback(payload));
+    },
+    offEvent: (callback) => {
+      removeTrackedListener("conversation:event", callback);
+    }
   },
   selectFiles: () => electron.ipcRenderer.invoke("dialog:selectFiles"),
   selectRdcFiles: () => electron.ipcRenderer.invoke("dialog:selectRdcFiles"),
@@ -58,6 +80,7 @@ const electronAPI = {
     restartRun: (runId) => electron.ipcRenderer.invoke("workflow:restartRun", runId),
     resume: (sessionId) => electron.ipcRenderer.invoke("workflow:resume", sessionId),
     stop: (runId) => electron.ipcRenderer.invoke("workflow:stop", runId),
+    getRunUsage: (runId) => electron.ipcRenderer.invoke("workflow:getRunUsage", runId),
     listRuns: () => electron.ipcRenderer.invoke("workflow:listRuns"),
     listActiveRuns: () => electron.ipcRenderer.invoke("workflow:listActiveRuns"),
     advanceStage: () => electron.ipcRenderer.invoke("workflow:advanceStage"),
@@ -149,6 +172,9 @@ const electronAPI = {
     onRunStatusChanged: (callback) => {
       electron.ipcRenderer.on("workflow:runStatusChanged", (_event, data) => callback(data));
     },
+    onRunUsageChanged: (callback) => {
+      electron.ipcRenderer.on("workflow:runUsageChanged", (_event, summary) => callback(summary));
+    },
     onAgentMessage: (callback) => {
       electron.ipcRenderer.on("agent:message", (_event, msg) => callback(msg));
     },
@@ -203,19 +229,11 @@ const electronAPI = {
   },
   on: (channel, callback) => {
     if (isValidChannel(channel)) {
-      const wrappedCallback = (_event, ...args) => callback(...args);
-      const channelListeners = listenerMap.get(channel) ?? /* @__PURE__ */ new Map();
-      channelListeners.set(callback, wrappedCallback);
-      listenerMap.set(channel, channelListeners);
-      electron.ipcRenderer.on(channel, wrappedCallback);
+      registerTrackedListener(channel, callback);
     }
   },
   off: (channel, callback) => {
-    const wrappedCallback = listenerMap.get(channel)?.get(callback);
-    if (wrappedCallback) {
-      electron.ipcRenderer.removeListener(channel, wrappedCallback);
-      listenerMap.get(channel)?.delete(callback);
-    }
+    removeTrackedListener(channel, callback);
   }
 };
 electron.contextBridge.exposeInMainWorld("electronAPI", electronAPI);

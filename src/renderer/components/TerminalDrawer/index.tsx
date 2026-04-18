@@ -7,6 +7,7 @@ import type { TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@s
 import { useI18n } from '../../i18n';
 import { useSessionStore } from '../../stores/sessionStore';
 import { TERMINAL_LOGS_TAB_ID, useTerminalStore } from '../../stores/terminalStore';
+import DropdownSelect, { type DropdownOption } from '../DropdownSelect';
 import './TerminalDrawer.css';
 
 const formatTimestamp = (timestamp: number): string =>
@@ -69,6 +70,28 @@ export const TerminalDrawer: React.FC = () => {
       ? entries
       : entries.filter((entry) => entry.namespace === namespace)
   ), [entries, namespace]);
+
+  const scopeOptions = useMemo<DropdownOption[]>(() => ([
+    { value: 'session', label: t('terminal.scopeSession') },
+    { value: 'app', label: t('terminal.scopeApp') },
+  ]), [t]);
+
+  const namespaceOptions = useMemo<DropdownOption[]>(() => ([
+    { value: 'all', label: t('terminal.namespaceAll') },
+    { value: 'system', label: t('terminal.namespaceSystem') },
+    { value: 'agent', label: t('terminal.namespaceAgent') },
+    { value: 'tool', label: t('terminal.namespaceTool') },
+    { value: 'device', label: t('terminal.namespaceDevice') },
+    { value: 'capture', label: t('terminal.namespaceCapture') },
+    { value: 'context', label: 'Context' },
+    { value: 'llm', label: 'LLM' },
+  ]), [t]);
+
+  const detailOptions = useMemo<DropdownOption[]>(() => ([
+    { value: 'summary', label: t('terminal.detailSummary') },
+    { value: 'verbose', label: t('terminal.detailVerbose') },
+    { value: 'raw', label: t('terminal.detailRaw') },
+  ]), [t]);
 
   const shellTabs = useMemo(
     () => tabs.filter((tab) => tab.kind === 'shell'),
@@ -359,45 +382,35 @@ export const TerminalDrawer: React.FC = () => {
           <div className="runtime-terminal-logs-controls">
             <label className="runtime-terminal-select">
               <span>{t('terminal.scope')}</span>
-              <select
+              <DropdownSelect
+                variant="inline"
                 value={scope}
-                onChange={(event) => setScope(event.target.value as 'app' | 'session')}
-                data-testid="runtime-terminal-scope"
-              >
-                <option value="session">{t('terminal.scopeSession')}</option>
-                <option value="app">{t('terminal.scopeApp')}</option>
-              </select>
+                options={scopeOptions}
+                dataTestId="runtime-terminal-scope"
+                onChange={(nextValue) => setScope(nextValue as 'app' | 'session')}
+              />
             </label>
 
             <label className="runtime-terminal-select">
               <span>{t('terminal.namespace')}</span>
-              <select
+              <DropdownSelect
+                variant="inline"
                 value={namespace}
-                onChange={(event) => setNamespace(event.target.value as typeof namespace)}
-                data-testid="runtime-terminal-namespace"
-              >
-                <option value="all">{t('terminal.namespaceAll')}</option>
-                <option value="system">{t('terminal.namespaceSystem')}</option>
-                <option value="agent">{t('terminal.namespaceAgent')}</option>
-                <option value="tool">{t('terminal.namespaceTool')}</option>
-                <option value="device">{t('terminal.namespaceDevice')}</option>
-                <option value="capture">{t('terminal.namespaceCapture')}</option>
-                <option value="context">Context</option>
-                <option value="llm">LLM</option>
-              </select>
+                options={namespaceOptions}
+                dataTestId="runtime-terminal-namespace"
+                onChange={(nextValue) => setNamespace(nextValue as typeof namespace)}
+              />
             </label>
 
             <label className="runtime-terminal-select">
               <span>{t('terminal.detail')}</span>
-              <select
+              <DropdownSelect
+                variant="inline"
                 value={detailLevel}
-                onChange={(event) => setDetailLevel(event.target.value as typeof detailLevel)}
-                data-testid="runtime-terminal-detail"
-              >
-                <option value="summary">{t('terminal.detailSummary')}</option>
-                <option value="verbose">{t('terminal.detailVerbose')}</option>
-                <option value="raw">{t('terminal.detailRaw')}</option>
-              </select>
+                options={detailOptions}
+                dataTestId="runtime-terminal-detail"
+                onChange={(nextValue) => setDetailLevel(nextValue as typeof detailLevel)}
+              />
             </label>
           </div>
 

@@ -12,6 +12,7 @@ import { debuggerLlmService } from './DebuggerLlmService';
 
 export interface SpecialistRunContext {
   runId: string;
+  turnId?: string;
   sessionId: string;
   caseId: string;
   contextId: string;
@@ -561,6 +562,7 @@ export class SpecialistRecipeRunner {
       agentId,
       sessionId: context.sessionId,
       runId: context.runId,
+      turnId: context.turnId,
       execute: () => toolBridge.call({
         toolName,
         args: {
@@ -570,6 +572,7 @@ export class SpecialistRecipeRunner {
           owner_lease_id: context.ownerLeaseId,
         },
         contextId: context.contextId,
+        turnId: context.turnId,
         runtimeOwner: context.runtimeOwner,
         ownerLeaseId: context.ownerLeaseId,
         runId: context.runId,

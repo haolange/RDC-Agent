@@ -1,12 +1,12 @@
 /**
- * JSONL Utilities - JSONL (JSON Lines) 读写工具
+ * JSONL Utilities - JSONL (JSON Lines) read/write helpers.
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 
 /**
- * 读取JSONL文件，返回所有事件
+ * Read all JSON records from a JSONL file.
  */
 export function readJsonl<T = unknown>(filePath: string): T[] {
   try {
@@ -22,7 +22,6 @@ export function readJsonl<T = unknown>(filePath: string): T[] {
       try {
         results.push(JSON.parse(trimmed) as T);
       } catch {
-        // 跳过解析失败的行
         continue;
       }
     }
@@ -34,7 +33,7 @@ export function readJsonl<T = unknown>(filePath: string): T[] {
 }
 
 /**
- * 追加一行JSON到JSONL文件
+ * Append one JSON record to a JSONL file.
  */
 export function appendJsonl(filePath: string, data: unknown): boolean {
   try {
@@ -45,19 +44,14 @@ export function appendJsonl(filePath: string, data: unknown): boolean {
 
     const serialized = JSON.stringify(data, null, 0);
 
-    // 检查是否已存在（避免重复）
     if (fs.existsSync(filePath)) {
       const existing = fs.readFileSync(filePath, 'utf-8');
-      if (existing.includes(serialized)) {
-        return true; // 已存在，跳过
-      }
-      // 确保文件以换行结尾
       if (existing && !existing.endsWith('\n')) {
         fs.appendFileSync(filePath, '\n', 'utf-8');
       }
     }
 
-    fs.appendFileSync(filePath, serialized + '\n', 'utf-8');
+    fs.appendFileSync(filePath, `${serialized}\n`, 'utf-8');
     return true;
   } catch (error) {
     console.error(`Failed to append to JSONL file: ${filePath}`, error);
@@ -66,7 +60,7 @@ export function appendJsonl(filePath: string, data: unknown): boolean {
 }
 
 /**
- * 写入完整的JSONL文件（覆盖）
+ * Overwrite a JSONL file with the provided records.
  */
 export function writeJsonl(filePath: string, items: unknown[]): boolean {
   try {
@@ -75,8 +69,8 @@ export function writeJsonl(filePath: string, items: unknown[]): boolean {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    const lines = items.map(item => JSON.stringify(item, null, 0));
-    fs.writeFileSync(filePath, lines.join('\n') + '\n', 'utf-8');
+    const lines = items.map((item) => JSON.stringify(item, null, 0));
+    fs.writeFileSync(filePath, `${lines.join('\n')}\n`, 'utf-8');
     return true;
   } catch (error) {
     console.error(`Failed to write JSONL file: ${filePath}`, error);
@@ -85,7 +79,7 @@ export function writeJsonl(filePath: string, items: unknown[]): boolean {
 }
 
 /**
- * 过滤JSONL中的事件
+ * Filter JSONL records using a predicate.
  */
 export function filterJsonl<T = unknown>(
   filePath: string,
@@ -96,7 +90,7 @@ export function filterJsonl<T = unknown>(
 }
 
 /**
- * 统计JSONL中的事件数量
+ * Count JSONL records.
  */
 export function countJsonl(filePath: string): number {
   return readJsonl(filePath).length;

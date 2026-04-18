@@ -379,6 +379,7 @@ class ToolBridge {
   emitToolTrace(request, result) {
     const trace = {
       traceId: result.trace_id || generateEventId("tool-trace"),
+      turnId: request.turnId,
       toolName: request.toolName,
       args: request.args,
       result,
@@ -633,14 +634,12 @@ function appendJsonl(filePath, data) {
     const serialized = JSON.stringify(data, null, 0);
     if (fs__namespace.existsSync(filePath)) {
       const existing = fs__namespace.readFileSync(filePath, "utf-8");
-      if (existing.includes(serialized)) {
-        return true;
-      }
       if (existing && !existing.endsWith("\n")) {
         fs__namespace.appendFileSync(filePath, "\n", "utf-8");
       }
     }
-    fs__namespace.appendFileSync(filePath, serialized + "\n", "utf-8");
+    fs__namespace.appendFileSync(filePath, `${serialized}
+`, "utf-8");
     return true;
   } catch (error) {
     console.error(`Failed to append to JSONL file: ${filePath}`, error);
@@ -1241,6 +1240,7 @@ class StorageAdapter {
     const startedAt = nowMs();
     const persistedRun = {
       runId,
+      turnId: input.turnId,
       projectId: session.projectId,
       sessionId,
       caseId: sessionId,
@@ -1383,7 +1383,17 @@ class StorageAdapter {
     return path__namespace.join(this.getRunPath(sessionId, runId), "notes", "debug_plan.yaml");
   }
   readConversationHistory(sessionId) {
-    return readJsonl(this.getConversationPath(sessionId)).sort((left, right) => left.createdAt - right.createdAt);
+    const snapshots = readJsonl(this.getConversationPath(sessionId));
+    const latestById = /* @__PURE__ */ new Map();
+    for (const snapshot of snapshots) {
+      const existing = latestById.get(snapshot.id);
+      const existingUpdatedAt = existing?.updatedAt ?? existing?.createdAt ?? 0;
+      const nextUpdatedAt = snapshot.updatedAt ?? snapshot.createdAt;
+      if (!existing || nextUpdatedAt >= existingUpdatedAt) {
+        latestById.set(snapshot.id, snapshot);
+      }
+    }
+    return Array.from(latestById.values()).sort((left, right) => left.createdAt - right.createdAt);
   }
   appendConversationMessage(sessionId, message) {
     appendJsonl(this.getConversationPath(sessionId), message);
@@ -1471,6 +1481,7 @@ class StorageAdapter {
     return {
       schema_version: "2",
       event_id: generateEventId("evt"),
+      turn_id: input.turnId,
       ts_ms: nowMs(),
       run_id: input.runId,
       session_id: input.sessionId,
@@ -1710,6 +1721,7 @@ class StorageAdapter {
     this.writeJson(path__namespace.join(runPath, "run.json"), run);
     writeYaml(path__namespace.join(runPath, "run.yaml"), {
       run_id: run.runId,
+      turn_id: run.turnId,
       session_id: run.sessionId,
       case_id: run.caseId,
       project_id: run.projectId,
@@ -1802,6 +1814,7 @@ class StorageAdapter {
     }
     return {
       runId,
+      turnId: typeof runYaml.turn_id === "string" ? runYaml.turn_id : void 0,
       projectId: String(runYaml.project_id || ""),
       sessionId,
       caseId: String(runYaml.case_id || sessionId),
@@ -1828,6 +1841,7 @@ class StorageAdapter {
   toRunSummary(run) {
     return {
       runId: run.runId,
+      turnId: run.turnId,
       projectId: run.projectId,
       sessionId: run.sessionId,
       caseId: run.caseId,
@@ -2117,33 +2131,33 @@ const AGENT_MODES = [
     id: "debugger",
     label: "Debugger",
     icon: "crosshair-bug",
-    description: "Debug and diagnose rendering issues",
+    description: "定位异常与验证修复",
     accentColor: "#33d1ff",
-    emptyTitle: "从异常现象开始，逐步定位 GPU 问题。",
-    emptySubtitle: "面向 RenderDoc 与 .rdc capture 的调试工作台。",
-    helperCopy: "描述异常、附加图片或文件，或者直接导入 .rdc capture 开始排查。",
+    emptyTitle: "从异常现象出发，定位 GPU 问题",
+    emptySubtitle: "围绕 `.rdc` Capture、截图与线索快速展开排查。",
+    helperCopy: "补充异常、截图或 `.rdc` Capture，直接开始定位。",
     disabled: false
   },
   {
     id: "analyzer",
     label: "Analyzer",
     icon: "waveform-gauge",
-    description: "Analyze rendering captures and performance",
+    description: "拆解现象并收敛证据",
     accentColor: "#8d8bff",
-    emptyTitle: "把线索拆开看，把证据串起来。",
-    emptySubtitle: "聚焦现象分解、证据整理与多模态分析组合。",
-    helperCopy: "贴问题、附上下文素材或 capture 线索，我会先帮你拆结构、找证据和判断方向。",
+    emptyTitle: "拆开线索，串起证据",
+    emptySubtitle: "适合对比现象、梳理上下文与收敛判断方向。",
+    helperCopy: "贴出问题与素材，我会先整理结构和证据。",
     disabled: false
   },
   {
     id: "optimizer",
     label: "Optimizer",
     icon: "spark-tuning",
-    description: "Generate optimization suggestions",
+    description: "判断瓶颈与优化顺序",
     accentColor: "#4ee3a0",
-    emptyTitle: "先看瓶颈，再给出可执行的优化路径。",
-    emptySubtitle: "适合评估性能、成本和渲染管线的收敛空间。",
-    helperCopy: "可以附性能截图、日志或参考素材，我会按收益、风险和验证路径组织建议。",
+    emptyTitle: "先找瓶颈，再排优化顺序",
+    emptySubtitle: "适合评估性能收益、成本与验证优先级。",
+    helperCopy: "补充性能线索后，我会按收益和风险整理建议。",
     disabled: false
   }
 ];
@@ -2211,13 +2225,179 @@ const extractMessageContent = (payload) => {
   }
   return "";
 };
-class OpenRouterProvider {
+const createAccumulator = (model) => ({
+  id: `stream-${Date.now()}`,
+  model,
+  content: "",
+  toolCalls: [],
+  inputTokens: 0,
+  outputTokens: 0,
+  stopReason: "end_turn"
+});
+const ensureToolCall = (toolCalls, index, id) => {
+  while (toolCalls.length <= index) {
+    toolCalls.push({
+      id: id || `tool-call-${index}`,
+      name: "",
+      argumentsText: ""
+    });
+  }
+  const existing = toolCalls[index];
+  if (id && !existing.id) {
+    existing.id = id;
+  }
+  return existing;
+};
+const parseToolArguments = (argumentsText) => {
+  if (!argumentsText.trim()) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(argumentsText);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch {
+  }
+  return {
+    raw: argumentsText
+  };
+};
+const buildResponseFromAccumulator = (accumulator) => {
+  const toolCalls = accumulator.toolCalls.filter((toolCall) => toolCall.id || toolCall.name || toolCall.argumentsText).map((toolCall) => ({
+    id: toolCall.id,
+    name: toolCall.name,
+    arguments: parseToolArguments(toolCall.argumentsText)
+  }));
+  return {
+    id: accumulator.id,
+    model: accumulator.model,
+    content: accumulator.content,
+    toolCalls: toolCalls.length > 0 ? toolCalls : void 0,
+    usage: {
+      inputTokens: accumulator.inputTokens,
+      outputTokens: accumulator.outputTokens
+    },
+    stopReason: accumulator.stopReason
+  };
+};
+const emitTextChunk = (text, onChunk) => {
+  if (!text) {
+    return;
+  }
+  onChunk({
+    type: "text-delta",
+    text
+  });
+};
+const emitToolCallDelta = (toolCall, onChunk) => {
+  onChunk({
+    type: "tool-call-delta",
+    toolCall
+  });
+};
+const emitFallbackChunks = (text, onChunk) => {
+  const chunks = text.split(/(?<=[.!?。！？\n])|(?<=,|，)\s+/).map((chunk) => chunk.trim()).filter(Boolean);
+  if (chunks.length === 0 && text) {
+    emitTextChunk(text, onChunk);
+    return;
+  }
+  for (const chunk of chunks) {
+    emitTextChunk(chunk, onChunk);
+  }
+};
+const tryParseJson = (value) => {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
+const mapFinishReason = (finishReason) => {
+  if (finishReason === "tool_calls" || finishReason === "tool_use") {
+    return "tool_use";
+  }
+  if (finishReason === "length" || finishReason === "max_tokens") {
+    return "max_tokens";
+  }
+  return "end_turn";
+};
+const readSseStream = async (response, onEvent) => {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("Streaming response body is unavailable.");
+  }
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let eventName = "message";
+  let dataLines = [];
+  const flush = () => {
+    if (dataLines.length === 0) {
+      eventName = "message";
+      return;
+    }
+    const payload = dataLines.join("\n");
+    dataLines = [];
+    onEvent(eventName, payload);
+    eventName = "message";
+  };
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    let newlineIndex = buffer.indexOf("\n");
+    while (newlineIndex >= 0) {
+      const rawLine = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+      const line = rawLine.replace(/\r$/, "");
+      if (!line) {
+        flush();
+      } else if (line.startsWith("event:")) {
+        eventName = line.slice(6).trim();
+      } else if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5).trimStart());
+      }
+      newlineIndex = buffer.indexOf("\n");
+    }
+    if (done) {
+      break;
+    }
+  }
+  if (buffer.trim()) {
+    const line = buffer.replace(/\r$/, "");
+    if (line.startsWith("data:")) {
+      dataLines.push(line.slice(5).trimStart());
+    }
+  }
+  flush();
+};
+class BaseStreamingProvider {
   name;
+  constructor(name) {
+    this.name = name;
+  }
+  async streamChat(request, onChunk) {
+    try {
+      const response = await this.performStreamingChat(request, onChunk);
+      onChunk({ type: "done" });
+      return response;
+    } catch (error) {
+      if (request.signal?.aborted) {
+        throw error;
+      }
+      const fallbackResponse = await this.chat(request);
+      const fallbackText = typeof fallbackResponse.content === "string" ? fallbackResponse.content : JSON.stringify(fallbackResponse.content);
+      emitFallbackChunks(fallbackText, onChunk);
+      onChunk({ type: "done" });
+      return fallbackResponse;
+    }
+  }
+}
+class OpenRouterProvider extends BaseStreamingProvider {
   apiKey = "";
   baseUrl = "https://openrouter.ai/api/v1";
   models = [];
   constructor(name) {
-    this.name = name;
+    super(name);
   }
   configure(config) {
     this.apiKey = config.apiKey.trim();
@@ -2263,13 +2443,80 @@ class OpenRouterProvider {
         inputTokens: data.usage?.prompt_tokens || 0,
         outputTokens: data.usage?.completion_tokens || 0
       },
-      stopReason: choice?.finish_reason === "tool_calls" ? "tool_use" : "end_turn"
+      stopReason: mapFinishReason(choice?.finish_reason)
     };
   }
-  async streamChat(request, onChunk) {
-    const response = await this.chat(request);
-    onChunk(typeof response.content === "string" ? response.content : JSON.stringify(response.content));
-    return response;
+  async performStreamingChat(request, onChunk) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://rdcagent.local",
+        "X-Title": "RdcAgent"
+      },
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        messages: toContentBlocks(request.messages),
+        max_tokens: request.maxTokens || 4096,
+        temperature: request.temperature ?? 0.7,
+        tools: request.tools,
+        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
+        stream: true
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`OpenRouter API error: ${response.status} - ${await response.text()}`);
+    }
+    const accumulator = createAccumulator(model);
+    await readSseStream(response, (_eventName, data) => {
+      if (!data || data === "[DONE]") {
+        return;
+      }
+      const payload = tryParseJson(data);
+      if (!payload) {
+        return;
+      }
+      accumulator.id = String(payload.id || accumulator.id);
+      accumulator.model = String(payload.model || accumulator.model);
+      const choice = payload.choices?.[0];
+      const delta = choice?.delta ?? {};
+      const text = typeof delta.content === "string" ? delta.content : "";
+      if (text) {
+        accumulator.content += text;
+        emitTextChunk(text, onChunk);
+      }
+      const toolCalls = Array.isArray(delta.tool_calls) ? delta.tool_calls : [];
+      for (const toolCallDelta of toolCalls) {
+        const index = typeof toolCallDelta.index === "number" ? toolCallDelta.index : 0;
+        const functionDelta = typeof toolCallDelta.function === "object" && toolCallDelta.function ? toolCallDelta.function : {};
+        const toolCall = ensureToolCall(
+          accumulator.toolCalls,
+          index,
+          typeof toolCallDelta.id === "string" ? toolCallDelta.id : void 0
+        );
+        if (typeof functionDelta.name === "string") {
+          toolCall.name = functionDelta.name;
+        }
+        if (typeof functionDelta.arguments === "string") {
+          toolCall.argumentsText += functionDelta.arguments;
+        }
+        emitToolCallDelta({
+          id: toolCall.id,
+          name: toolCall.name,
+          argumentsText: toolCall.argumentsText
+        }, onChunk);
+      }
+      accumulator.stopReason = mapFinishReason(
+        typeof choice?.finish_reason === "string" ? choice.finish_reason : void 0
+      );
+    });
+    return buildResponseFromAccumulator(accumulator);
   }
   async isAvailable() {
     return Boolean(this.apiKey);
@@ -2278,19 +2525,18 @@ class OpenRouterProvider {
     return this.models;
   }
 }
-class OpenAICompatibleProvider {
-  name;
+class OpenAICompatibleProvider extends BaseStreamingProvider {
   apiKey = "";
   baseUrl = "https://api.openai.com/v1";
   models = [];
   requireApiKey = true;
   constructor(name, requireApiKey = true) {
-    this.name = name;
+    super(name);
     this.requireApiKey = requireApiKey;
   }
   configure(config) {
     this.apiKey = config.apiKey.trim();
-    this.baseUrl = (config.baseUrl || this.baseUrl).trim();
+    this.baseUrl = (config.baseUrl || this.baseUrl).trim().replace(/\/+$/, "");
     this.models = config.models;
   }
   async chat(request) {
@@ -2332,13 +2578,81 @@ class OpenAICompatibleProvider {
         inputTokens: data.usage?.prompt_tokens || 0,
         outputTokens: data.usage?.completion_tokens || 0
       },
-      stopReason: choice?.finish_reason === "tool_calls" ? "tool_use" : choice?.finish_reason === "stop" ? "end_turn" : "max_tokens"
+      stopReason: mapFinishReason(choice?.finish_reason)
     };
   }
-  async streamChat(request, onChunk) {
-    const response = await this.chat(request);
-    onChunk(typeof response.content === "string" ? response.content : JSON.stringify(response.content));
-    return response;
+  async performStreamingChat(request, onChunk) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const headers = {
+      "Content-Type": "application/json"
+    };
+    if (this.apiKey) {
+      headers.Authorization = `Bearer ${this.apiKey}`;
+    }
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers,
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        messages: toContentBlocks(request.messages),
+        max_tokens: request.maxTokens || 4096,
+        temperature: request.temperature ?? 0.7,
+        tools: request.tools,
+        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
+        stream: true
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`${this.name} API error: ${response.status} - ${await response.text()}`);
+    }
+    const accumulator = createAccumulator(model);
+    await readSseStream(response, (_eventName, data) => {
+      if (!data || data === "[DONE]") {
+        return;
+      }
+      const payload = tryParseJson(data);
+      if (!payload) {
+        return;
+      }
+      accumulator.id = String(payload.id || accumulator.id);
+      accumulator.model = String(payload.model || accumulator.model);
+      const choice = payload.choices?.[0];
+      const delta = choice?.delta ?? {};
+      const text = typeof delta.content === "string" ? delta.content : "";
+      if (text) {
+        accumulator.content += text;
+        emitTextChunk(text, onChunk);
+      }
+      const toolCalls = Array.isArray(delta.tool_calls) ? delta.tool_calls : [];
+      for (const toolCallDelta of toolCalls) {
+        const index = typeof toolCallDelta.index === "number" ? toolCallDelta.index : 0;
+        const functionDelta = typeof toolCallDelta.function === "object" && toolCallDelta.function ? toolCallDelta.function : {};
+        const toolCall = ensureToolCall(
+          accumulator.toolCalls,
+          index,
+          typeof toolCallDelta.id === "string" ? toolCallDelta.id : void 0
+        );
+        if (typeof functionDelta.name === "string") {
+          toolCall.name = functionDelta.name;
+        }
+        if (typeof functionDelta.arguments === "string") {
+          toolCall.argumentsText += functionDelta.arguments;
+        }
+        emitToolCallDelta({
+          id: toolCall.id,
+          name: toolCall.name,
+          argumentsText: toolCall.argumentsText
+        }, onChunk);
+      }
+      accumulator.stopReason = mapFinishReason(
+        typeof choice?.finish_reason === "string" ? choice.finish_reason : void 0
+      );
+    });
+    return buildResponseFromAccumulator(accumulator);
   }
   async isAvailable() {
     return this.requireApiKey ? Boolean(this.apiKey) : true;
@@ -2347,17 +2661,16 @@ class OpenAICompatibleProvider {
     return this.models;
   }
 }
-class AnthropicProvider {
-  name;
+class AnthropicProvider extends BaseStreamingProvider {
   apiKey = "";
   baseUrl = "https://api.anthropic.com/v1";
   models = [];
   constructor(name) {
-    this.name = name;
+    super(name);
   }
   configure(config) {
     this.apiKey = config.apiKey.trim();
-    this.baseUrl = (config.baseUrl || "https://api.anthropic.com/v1").trim();
+    this.baseUrl = (config.baseUrl || "https://api.anthropic.com/v1").trim().replace(/\/+$/, "");
     this.models = config.models;
   }
   async chat(request) {
@@ -2397,13 +2710,71 @@ class AnthropicProvider {
         inputTokens: data.usage?.input_tokens || 0,
         outputTokens: data.usage?.output_tokens || 0
       },
-      stopReason: data.stop_reason === "end_turn" ? "end_turn" : "max_tokens"
+      stopReason: mapFinishReason(data.stop_reason)
     };
   }
-  async streamChat(request, onChunk) {
-    const response = await this.chat(request);
-    onChunk(typeof response.content === "string" ? response.content : JSON.stringify(response.content));
-    return response;
+  async performStreamingChat(request, onChunk) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const systemMessage = request.messages.find((message) => message.role === "system");
+    const otherMessages = request.messages.filter((message) => message.role !== "system");
+    const response = await fetch(`${this.baseUrl}/messages`, {
+      method: "POST",
+      headers: {
+        "x-api-key": this.apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json"
+      },
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        max_tokens: request.maxTokens || 4096,
+        stream: true,
+        system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
+        messages: otherMessages.map((message) => ({
+          role: message.role === "assistant" ? "assistant" : "user",
+          content: message.content
+        }))
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.status} - ${await response.text()}`);
+    }
+    const accumulator = createAccumulator(model);
+    await readSseStream(response, (eventName, data) => {
+      if (!data) {
+        return;
+      }
+      const payload = tryParseJson(data);
+      if (!payload) {
+        return;
+      }
+      if (eventName === "message_start") {
+        const message = payload.message;
+        accumulator.id = String(message?.id || accumulator.id);
+        accumulator.model = String(message?.model || accumulator.model);
+        const usage = message?.usage;
+        accumulator.inputTokens = typeof usage?.input_tokens === "number" ? usage.input_tokens : accumulator.inputTokens;
+      }
+      if (eventName === "content_block_delta") {
+        const delta = payload.delta;
+        if (delta?.type === "text_delta" && typeof delta.text === "string") {
+          accumulator.content += delta.text;
+          emitTextChunk(delta.text, onChunk);
+        }
+      }
+      if (eventName === "message_delta") {
+        const delta = payload.delta;
+        const usage = payload.usage;
+        accumulator.outputTokens = typeof usage?.output_tokens === "number" ? usage.output_tokens : accumulator.outputTokens;
+        accumulator.stopReason = mapFinishReason(
+          typeof delta?.stop_reason === "string" ? delta.stop_reason : void 0
+        );
+      }
+    });
+    return buildResponseFromAccumulator(accumulator);
   }
   async isAvailable() {
     return Boolean(this.apiKey);
@@ -3154,7 +3525,8 @@ function sanitizeModels(models) {
     modelMap.set(modelId, {
       id: modelId,
       label: typeof candidate.label === "string" && candidate.label.trim() ? candidate.label.trim() : modelId,
-      enabled: candidate.enabled !== false
+      enabled: candidate.enabled !== false,
+      contextWindowTokens: typeof candidate.contextWindowTokens === "number" && Number.isFinite(candidate.contextWindowTokens) ? Math.max(0, Math.round(candidate.contextWindowTokens)) : null
     });
   }
   return Array.from(modelMap.values());
@@ -3230,10 +3602,11 @@ function isBuiltinProviderExplicitlyCustomized(provider) {
     return false;
   }
   const builtin = createBuiltinProviderEntry(id);
-  const providerModels = sanitizeModels(provider.models).map((model) => model.id);
-  const builtinModels = builtin.models.map((model) => model.id);
+  const providerModels = sanitizeModels(provider.models);
+  const builtinModels = sanitizeModels(builtin.models);
   const recommendedModels = Array.isArray(provider.recommendedModels) ? provider.recommendedModels.filter((value) => typeof value === "string").map((value) => value.trim()).filter(Boolean) : [];
-  return typeof provider.label === "string" && provider.label.trim() && provider.label.trim() !== builtin.label || typeof provider.baseUrl === "string" && provider.baseUrl.trim() && provider.baseUrl.trim() !== (builtin.baseUrl || "") || typeof provider.docsUrl === "string" && provider.docsUrl.trim() && provider.docsUrl.trim() !== (builtin.docsUrl || "") || !arraysEqual(providerModels, builtinModels) || recommendedModels.length > 0 && !arraysEqual(recommendedModels, builtin.recommendedModels);
+  const hasCustomizedModelWindow = providerModels.some((model, index) => model.id !== builtinModels[index]?.id || (model.contextWindowTokens ?? null) !== (builtinModels[index]?.contextWindowTokens ?? null));
+  return typeof provider.label === "string" && provider.label.trim() && provider.label.trim() !== builtin.label || typeof provider.baseUrl === "string" && provider.baseUrl.trim() && provider.baseUrl.trim() !== (builtin.baseUrl || "") || typeof provider.docsUrl === "string" && provider.docsUrl.trim() && provider.docsUrl.trim() !== (builtin.docsUrl || "") || !arraysEqual(providerModels.map((model) => model.id), builtinModels.map((model) => model.id)) || hasCustomizedModelWindow || recommendedModels.length > 0 && !arraysEqual(recommendedModels, builtin.recommendedModels);
 }
 function isFixtureProvider(provider) {
   const id = typeof provider.id === "string" ? provider.id.trim() : "";
@@ -4044,6 +4417,7 @@ class DebuggerLlmService {
   runSummaries = /* @__PURE__ */ new Map();
   resetRunSummary(runId) {
     this.runSummaries.delete(runId);
+    this.broadcastRunUsage(runId);
   }
   getRunSummary(runId) {
     const summary = this.runSummaries.get(runId);
@@ -4053,6 +4427,28 @@ class DebuggerLlmService {
     return {
       ...summary,
       routesUsed: summary.routesUsed.map((entry) => ({ ...entry }))
+    };
+  }
+  getRunContextUsage(runId) {
+    const summary = this.runSummaries.get(runId);
+    if (!summary) {
+      return null;
+    }
+    const settings = settingsService.getAll();
+    const provider = settings.llm.providers.find((entry) => entry.id === summary.providerId);
+    const model = provider?.models.find((entry) => entry.id === summary.modelId) ?? null;
+    const contextWindowTokens = typeof model?.contextWindowTokens === "number" && model.contextWindowTokens > 0 ? model.contextWindowTokens : null;
+    const totalTokens = summary.totalInputTokens + summary.totalOutputTokens;
+    return {
+      runId,
+      providerId: summary.providerId,
+      modelId: summary.modelId,
+      inputTokens: summary.totalInputTokens,
+      outputTokens: summary.totalOutputTokens,
+      totalTokens,
+      contextWindowTokens,
+      usagePercent: contextWindowTokens ? Math.min(100, Math.max(0, Math.round(totalTokens / contextWindowTokens * 100))) : 0,
+      hasConfiguredContextWindow: Boolean(contextWindowTokens)
     };
   }
   getRouteBlockers(agentIds, stage, settings = settingsService.getAll()) {
@@ -4354,6 +4750,19 @@ class DebuggerLlmService {
       status
     });
     this.runSummaries.set(context.runId, existing);
+    this.broadcastRunUsage(context.runId);
+  }
+  broadcastRunUsage(runId) {
+    const usage = this.getRunContextUsage(runId);
+    if (!usage) {
+      return;
+    }
+    const windows = electron.BrowserWindow.getAllWindows();
+    for (const window of windows) {
+      if (!window.isDestroyed()) {
+        window.webContents.send("workflow:runUsageChanged", usage);
+      }
+    }
   }
   async appendBroadcastEvent(sessionId, event) {
     await storageAdapter.appendActionEvent(sessionId, event);
@@ -4605,6 +5014,7 @@ class HarnessController {
     const event = {
       schema_version: "2",
       event_id: `evt-tool-${nowMs()}`,
+      turn_id: input.turnId,
       ts_ms: startTime,
       run_id: input.runId,
       session_id: input.sessionId,
@@ -4829,6 +5239,11 @@ class AgentOrchestrator {
     const settings = settingsService.getAll();
     return executionProfileService.resolveAgentRuntimeProfile(settings, stage || "investigate", agentId);
   }
+  async finalizeRecordedAssistantMessage(agentId, streamedContent, fallbackContent, context) {
+    const finalContent = streamedContent || fallbackContent;
+    await this.recordMessage(agentId, "assistant", finalContent, context);
+    return finalContent;
+  }
   /**
    * 发送消息给Agent
    */
@@ -4852,7 +5267,9 @@ class AgentOrchestrator {
         { role: "system", content: config.systemPrompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}` },
         { role: "user", content }
       ];
-      const response = await llmAdapter.chat(
+      await this.recordMessage(agentId, "user", content, context);
+      let streamedContent = "";
+      const response = await llmAdapter.streamChat(
         {
           messages,
           model: config.modelName,
@@ -4860,13 +5277,24 @@ class AgentOrchestrator {
           temperature: config.temperature,
           signal: options?.signal
         },
+        (event) => {
+          options?.onStreamEvent?.(event);
+          if (event.type === "text-delta") {
+            streamedContent += event.text;
+            options?.onChunk?.(event.text);
+          }
+        },
         config.modelProvider
       );
-      await this.recordMessage(agentId, "user", content, context);
-      const responseContent = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
-      await this.recordMessage(agentId, "assistant", responseContent, context);
+      const fallbackContent = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+      const finalContent = await this.finalizeRecordedAssistantMessage(
+        agentId,
+        streamedContent,
+        fallbackContent,
+        context
+      );
       this.updateAgentStatus(agentId, "complete");
-      return responseContent;
+      return finalContent;
     } catch (error) {
       this.updateAgentStatus(agentId, "error");
       throw error;
@@ -4908,11 +5336,19 @@ class AgentOrchestrator {
           stub = "收到，我会先帮你整理正式调试前的关键信息，然后在条件满足时进入严格执行流程。";
         }
         this.updateAgentStatus(agentId, "complete");
-        return `${stub}
+        const finalStub = `${stub}
 <control>{"intent":"${/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower) ? "execute" : "talk"}","safe_to_start":${/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower) ? "true" : "false"}}</control>`;
+        if (options?.onChunk) {
+          const midpoint = Math.max(1, Math.ceil(finalStub.length / 2));
+          options.onChunk(finalStub.slice(0, midpoint));
+          await Promise.resolve();
+          options.onChunk(finalStub.slice(midpoint));
+        }
+        return finalStub;
       }
       llmAdapter.configure(settingsService.getLlmConfig());
-      const response = await llmAdapter.chat(
+      let streamedContent = "";
+      const response = await llmAdapter.streamChat(
         {
           messages: [
             {
@@ -4929,15 +5365,23 @@ class AgentOrchestrator {
           temperature: config.temperature,
           signal: options?.signal
         },
+        (event) => {
+          options?.onStreamEvent?.(event);
+          if (event.type === "text-delta") {
+            streamedContent += event.text;
+            options?.onChunk?.(event.text);
+          }
+        },
         config.modelProvider
       );
-      const responseContent = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+      const fallbackContent = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+      const finalContent = streamedContent || fallbackContent;
       runtimeLogService.log({
         scope: options?.sessionId ? "session" : "app",
         namespace: "agent",
         severity: "info",
         title: `${AGENT_DISPLAY_NAMES[agentId] || agentId} cowork turn`,
-        summary: responseContent.slice(0, 160) || "空消息",
+        summary: finalContent.slice(0, 160) || "空消息",
         sessionId: options?.sessionId,
         raw: {
           agentId,
@@ -4946,7 +5390,7 @@ class AgentOrchestrator {
         }
       });
       this.updateAgentStatus(agentId, "complete");
-      return responseContent;
+      return finalContent;
     } catch (error) {
       this.updateAgentStatus(agentId, "error");
       throw error;
@@ -5090,6 +5534,7 @@ class AgentOrchestrator {
         agentId,
         eventType: role === "user" ? "user_message" : role === "assistant" ? "agent_summary" : "system",
         status: role === "system" ? "warning" : "ok",
+        turnId: context.turnId,
         payload: {
           role,
           content,
@@ -6699,6 +7144,7 @@ class SpecialistRecipeRunner {
       agentId,
       sessionId: context.sessionId,
       runId: context.runId,
+      turnId: context.turnId,
       execute: () => toolBridge.call({
         toolName,
         args: {
@@ -6708,6 +7154,7 @@ class SpecialistRecipeRunner {
           owner_lease_id: context.ownerLeaseId
         },
         contextId: context.contextId,
+        turnId: context.turnId,
         runtimeOwner: context.runtimeOwner,
         ownerLeaseId: context.ownerLeaseId,
         runId: context.runId,
@@ -7218,6 +7665,7 @@ class DebugWorkflowService {
       });
       const { runId, sessionId } = await storageAdapter.createRun({
         caseId,
+        turnId: request.turnId,
         capturePaths: resolved.captures.map((capture) => capture.filePath),
         mode: request.mode,
         goal: resolved.goalText,
@@ -7626,7 +8074,7 @@ class DebugWorkflowService {
       stoppedAt: Date.now(),
       finishedAt: active && process.env.RDC_AGENT_TEST_MODE !== "1" ? void 0 : Date.now()
     });
-    await storageAdapter.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
+    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
       runId,
       sessionId: location.session.sessionId,
       agentId: "rdc-debugger",
@@ -7725,7 +8173,7 @@ class DebugWorkflowService {
             stoppedAt: Date.now(),
             finishedAt: Date.now()
           });
-          await storageAdapter.appendActionEvent(session.sessionId, storageAdapter.createActionEvent({
+          await this.appendActionEvent(session.sessionId, storageAdapter.createActionEvent({
             runId: run.runId,
             sessionId: session.sessionId,
             agentId: "rdc-debugger",
@@ -7782,6 +8230,7 @@ class DebugWorkflowService {
       });
       const runtimeContext = {
         runId: location.run.runId,
+        turnId: location.run.turnId,
         sessionId: location.session.sessionId,
         caseId: location.run.caseId,
         contextId: rdxSessionService.getContextId() || "",
@@ -8167,6 +8616,7 @@ class DebugWorkflowService {
       agentId: "rdc-debugger",
       sessionId: runtimeContext.sessionId,
       runId: runtimeContext.runId,
+      turnId: runtimeContext.turnId,
       execute: () => toolBridge.call({
         toolName: "rd.export.screenshot",
         args: {
@@ -8179,6 +8629,7 @@ class DebugWorkflowService {
           owner_lease_id: runtimeContext.ownerLeaseId
         },
         contextId: runtimeContext.contextId,
+        turnId: runtimeContext.turnId,
         runtimeOwner: runtimeContext.runtimeOwner,
         ownerLeaseId: runtimeContext.ownerLeaseId,
         runId: runtimeContext.runId,
@@ -8356,6 +8807,12 @@ class DebugWorkflowService {
     };
   }
   async appendActionEvent(sessionId, event) {
+    if (!event.turn_id && event.run_id) {
+      const location = this.findRun(event.run_id);
+      if (location?.run.turnId) {
+        event.turn_id = location.run.turnId;
+      }
+    }
     await storageAdapter.appendActionEvent(sessionId, event);
     for (const window of electron.BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) {
@@ -8365,8 +8822,9 @@ class DebugWorkflowService {
   }
   async appendAssistantConversationMessage(sessionId, runId, content) {
     const runLocation = this.findRun(runId || "");
-    storageAdapter.appendConversationMessage(sessionId, {
+    const message = {
       id: generateEventId("msga"),
+      turnId: runLocation?.run.turnId || generateEventId("turn"),
       sessionId,
       projectId: runLocation?.session.projectId ?? null,
       runId,
@@ -8374,7 +8832,17 @@ class DebugWorkflowService {
       role: "assistant",
       agentId: "rdc-debugger",
       content,
+      status: "complete",
+      updatedAt: nowMs(),
+      reasoningTrace: null,
       createdAt: nowMs()
+    };
+    storageAdapter.appendConversationMessage(sessionId, message);
+    this.emitConversationEvent({
+      type: "message_completed",
+      sessionId,
+      turnId: message.turnId,
+      message
     });
   }
   findRun(runId) {
@@ -8414,18 +8882,93 @@ class DebugWorkflowService {
       }
     }
   }
+  emitConversationEvent(event) {
+    for (const window of electron.BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) {
+        window.webContents.send("conversation:event", event);
+      }
+    }
+  }
 }
 const debugWorkflowService = new DebugWorkflowService();
 const EXECUTE_PATTERN = /开始|启动|执行|正式分析|直接分析|现在分析|run\b|start\b|debug\b|analy[sz]e\b|帮我调试|请调试|开始调试|开始分析/i;
 const TASK_FILE_PATTERN = /([A-Za-z]:[\\/][^\r\n"]+\.(txt|md))/i;
+const CONTROL_OPEN_TAG = "<control>";
+const ACTIVE_RUN_STATUSES = [
+  "planning",
+  "awaiting_input",
+  "awaiting_approval",
+  "queued",
+  "running",
+  "stopping"
+];
 function trimPathLabel(value) {
   const normalized = value.replace(/\\/g, "/");
   const parts = normalized.split("/");
   return parts[parts.length - 1] || value;
 }
+function createReasoningStep(id, title, stage) {
+  return {
+    id,
+    title,
+    stage,
+    status: "pending",
+    toolCalls: [],
+    startedAt: nowMs()
+  };
+}
+function createDraftReasoningTrace(summary, steps) {
+  return {
+    status: "running",
+    summary,
+    steps,
+    updatedAt: nowMs()
+  };
+}
+function cloneTrace(trace) {
+  return trace ? {
+    ...trace,
+    steps: trace.steps.map((step) => ({
+      ...step,
+      toolCalls: step.toolCalls.map((toolCall) => ({ ...toolCall }))
+    }))
+  } : {
+    status: "idle",
+    steps: [],
+    updatedAt: nowMs()
+  };
+}
+function upsertTraceStep(trace, stepId, patch) {
+  const nextTrace = cloneTrace(trace);
+  const stepIndex = nextTrace.steps.findIndex((step) => step.id === stepId);
+  if (stepIndex >= 0) {
+    nextTrace.steps[stepIndex] = {
+      ...nextTrace.steps[stepIndex],
+      ...patch,
+      toolCalls: patch.toolCalls ? patch.toolCalls.map((toolCall) => ({ ...toolCall })) : nextTrace.steps[stepIndex].toolCalls.map((toolCall) => ({ ...toolCall }))
+    };
+  } else {
+    nextTrace.steps.push({
+      ...createReasoningStep(stepId, patch.title || stepId, patch.stage),
+      ...patch,
+      toolCalls: patch.toolCalls ? patch.toolCalls.map((toolCall) => ({ ...toolCall })) : []
+    });
+  }
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+function finalizeTrace(trace, status, summary) {
+  const nextTrace = cloneTrace(trace);
+  nextTrace.status = status;
+  nextTrace.summary = summary ?? nextTrace.summary;
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
 function makeConversationMessage(role, content, options) {
+  const createdAt = nowMs();
   return {
     id: generateEventId(role === "user" ? "msgu" : role === "assistant" ? "msga" : "msgs"),
+    turnId: options.turnId,
     sessionId: options.sessionId ?? null,
     projectId: options.projectId ?? null,
     runId: options.runId ?? null,
@@ -8433,8 +8976,11 @@ function makeConversationMessage(role, content, options) {
     role,
     agentId: options.agentId,
     content,
+    status: options.status ?? (role === "assistant" ? "draft" : "complete"),
+    updatedAt: createdAt,
+    reasoningTrace: options.reasoningTrace ?? null,
     attachments: options.attachments,
-    createdAt: nowMs()
+    createdAt
   };
 }
 function composeMessageForAgent(entry) {
@@ -8476,6 +9022,23 @@ function parseControlBlock(text) {
     return null;
   }
 }
+function resolveTaskFileContext(message) {
+  const match = message.match(TASK_FILE_PATTERN);
+  const taskFilePath = match?.[1] ? path.resolve(match[1]) : null;
+  if (!taskFilePath || !fs.existsSync(taskFilePath) || !fs.statSync(taskFilePath).isFile()) {
+    return {
+      taskFilePath: null,
+      taskFileContent: null,
+      effectiveMessage: message
+    };
+  }
+  const taskFileContent = fs.readFileSync(taskFilePath, "utf-8").trim();
+  return {
+    taskFilePath,
+    taskFileContent,
+    effectiveMessage: [message, taskFileContent].filter(Boolean).join("\n\n")
+  };
+}
 function buildCoworkPrompt(context, history, mode, message, attachments) {
   const resolvedTaskFile = resolveTaskFileContext(message);
   const recentHistory = history.slice(-6).map((entry) => ({
@@ -8502,35 +9065,18 @@ function buildCoworkPrompt(context, history, mode, message, attachments) {
     recent_history: recentHistory
   }, null, 2);
 }
-function resolveTaskFileContext(message) {
-  const match = message.match(TASK_FILE_PATTERN);
-  const taskFilePath = match?.[1] ? path.resolve(match[1]) : null;
-  if (!taskFilePath || !fs.existsSync(taskFilePath) || !fs.statSync(taskFilePath).isFile()) {
-    return {
-      taskFilePath: null,
-      taskFileContent: null,
-      effectiveMessage: message
-    };
-  }
-  const taskFileContent = fs.readFileSync(taskFilePath, "utf-8").trim();
-  return {
-    taskFilePath,
-    taskFileContent,
-    effectiveMessage: [message, taskFileContent].filter(Boolean).join("\n\n")
-  };
-}
 function buildCoworkSystemPrompt() {
   return [
     "你是 RDC Debugger，一个面向 RenderDoc 调试场景的 Cowork Agent。",
     "要求：",
-    "1. 始终先用自然中文正常回答用户，不要像审批流或工单流。",
-    "2. 如果用户问通用知识、产品能力、技术概念，直接回答，不要强行往调试执行上拐。",
+    "1. 始终先用自然中文正常回复用户，不要像审批流或工单流。",
+    "2. 如果用户问通用知识、产品能力、技术概念，直接回答，不要强行转成调试执行。",
     "3. 没有正式进入调试 run 前，不要假装自己已经分析过 capture。",
     "4. 只有当用户明确表达“现在开始正式调试/执行分析”，并且条件足够时，才把 intent 标成 execute。",
-    "5. 回复正文结束后，必须额外附加一个 <control>{...}</control> 块，且 control JSON 只能包含字段：intent, safe_to_start, needs_project, needs_capture, needs_target_capture, needs_route, reason。",
+    "5. 回复正文结束后，必须额外附加一个 <control>{...}</control> 块，control JSON 只允许包含 intent, safe_to_start, needs_project, needs_capture, needs_target_capture, needs_route, reason。",
     "6. 如果你不确定，就把 intent 设为 talk 或 intake，safe_to_start 设为 false。",
     "7. 控制块不要在正文里解释给用户。",
-    "8. requested_mode 表示当前 UI 模式。Debugger 侧重定位与排障，Analyzer 侧重拆解与证据整理，Optimizer 侧重瓶颈判断与优化建议；回答结构要随 mode 调整。"
+    "8. requested_mode 表示当前 UI 模式，Debugger 偏重定位与排障，Analyzer 偏重拆解与证据整理，Optimizer 偏重瓶颈判断与优化建议；回答结构要随 mode 调整。"
   ].join("\n");
 }
 function hasUsableDebuggerRoute() {
@@ -8557,7 +9103,7 @@ function resolveCaptureGuards(message, context) {
     return {
       ready: false,
       needsCapture: true,
-      reason: "我可以先帮你梳理问题，但正式分析需要一个 .rdc capture。你可以先描述现象，或直接打开一个 capture。"
+      reason: "我可以先帮你梳理问题，但正式分析需要一个 .rdc capture。你可以先描述现象，或者直接打开一个 capture。"
     };
   }
   if (context.projectInputs.length > 1) {
@@ -8595,7 +9141,7 @@ function buildWorkflowUpgradeReply(result) {
       return "当前调试链路还没绑定可用模型，所以我不能开始正式执行；不过我可以先帮你确认问题范围和所需 capture。";
     }
     if (blocker?.code === "BLOCKED_MISSING_CAPTURE") {
-      return "我可以先帮你梳理问题，但正式分析需要一个 .rdc capture。你可以先描述现象，或直接打开一个 capture。";
+      return "我可以先帮你梳理问题，但正式分析需要一个 .rdc capture。你可以先描述现象，或者直接打开一个 capture。";
     }
     return blocker?.reason || "当前还不能进入正式调试。";
   }
@@ -8607,16 +9153,30 @@ function buildWorkflowUpgradeReply(result) {
   }
   return "我已经开始正式调试。接下来会按严格证据链推进分析。";
 }
+function computeVisibleAssistantText(raw) {
+  const controlIndex = raw.indexOf(CONTROL_OPEN_TAG);
+  if (controlIndex >= 0) {
+    return raw.slice(0, controlIndex);
+  }
+  let partialMatchLength = 0;
+  for (let index = CONTROL_OPEN_TAG.length - 1; index > 0; index -= 1) {
+    if (raw.endsWith(CONTROL_OPEN_TAG.slice(0, index))) {
+      partialMatchLength = index;
+      break;
+    }
+  }
+  return partialMatchLength > 0 ? raw.slice(0, raw.length - partialMatchLength) : raw;
+}
 class ConversationService {
   async getHistory(sessionId) {
     return storageAdapter.readConversationHistory(sessionId);
   }
   async sendMessage(input) {
     const context = await this.resolveContext(input);
-    if (context.currentRun && ["planning", "awaiting_input", "awaiting_approval", "queued", "running", "stopping"].includes(context.currentRun.status)) {
-      return this.handleActiveDebugTurn(context, input.mode, input.message.trim(), input.attachments ?? []);
+    if (context.currentRun && ACTIVE_RUN_STATUSES.includes(context.currentRun.status)) {
+      return this.startActiveDebugTurn(context, input.mode, input.message.trim(), input.attachments ?? []);
     }
-    return this.handleCoworkTurn(context, input.mode, input.message.trim(), input.attachments ?? []);
+    return this.startCoworkTurn(context, input.mode, input.message.trim(), input.attachments ?? []);
   }
   async resolveContext(input) {
     const projectId = input.projectId ?? input.fallbackProjectId ?? storageAdapter.getCurrentProjectId() ?? null;
@@ -8636,177 +9196,403 @@ class ConversationService {
       replayDevice
     };
   }
-  async handleActiveDebugTurn(context, requestedMode, rawMessage, pendingAttachments) {
+  async startActiveDebugTurn(context, requestedMode, rawMessage, pendingAttachments) {
+    const turnId = generateEventId("turn");
     const attachments = context.session ? storageAdapter.importSessionAttachments(
       context.session.sessionId,
       pendingAttachments.map((entry) => entry.sourcePath)
     ) : [];
     const userMessage = makeConversationMessage("user", rawMessage, {
+      turnId,
       sessionId: context.session?.sessionId ?? null,
       projectId: context.projectId,
       runId: context.currentRun?.runId ?? null,
       modeContext: requestedMode,
-      attachments
+      attachments,
+      status: "complete"
     });
-    if (context.session) {
-      storageAdapter.appendConversationMessage(context.session.sessionId, userMessage);
-    }
-    let assistantContent;
-    try {
-      assistantContent = await agentOrchestrator.sendMessage("rdc-debugger", composeMessageForAgent(userMessage), {
-        caseId: context.session?.sessionId,
-        runId: context.currentRun?.runId,
-        sessionId: context.session?.sessionId
-      });
-    } catch (error) {
-      assistantContent = error instanceof Error ? `我刚才处理这条消息时失败了：${error.message}` : "我刚才处理这条消息时失败了。";
-    }
-    const assistantMessage = makeConversationMessage("assistant", assistantContent, {
+    const assistantDraftMessage = makeConversationMessage("assistant", "", {
+      turnId,
       sessionId: context.session?.sessionId ?? null,
       projectId: context.projectId,
       runId: context.currentRun?.runId ?? null,
       modeContext: requestedMode,
-      agentId: "rdc-debugger"
+      agentId: "rdc-debugger",
+      status: "streaming",
+      reasoningTrace: createDraftReasoningTrace("正在思考", [
+        createReasoningStep("active-debug-reply", "生成调试回复", "investigate")
+      ])
     });
-    if (context.session) {
-      storageAdapter.appendConversationMessage(context.session.sessionId, assistantMessage);
-    }
+    this.persistConversationSnapshot(context.session?.sessionId ?? null, userMessage);
+    this.persistConversationSnapshot(context.session?.sessionId ?? null, assistantDraftMessage);
+    void this.completeActiveDebugTurn({
+      context,
+      requestedMode,
+      userMessage,
+      assistantDraftMessage
+    });
     return {
       session: context.session,
       mode: "active_debug",
       userMessage,
-      assistantMessage,
+      assistantDraftMessage,
       executionTransition: { action: "none" },
-      runUpdate: context.currentRun
+      runUpdate: context.currentRun,
+      errorViewModel: null
     };
   }
-  async handleCoworkTurn(context, requestedMode, rawMessage, pendingAttachments) {
-    const taskFileContext = resolveTaskFileContext(rawMessage);
-    const effectiveMessage = taskFileContext.effectiveMessage;
+  async completeActiveDebugTurn(input) {
+    let assistantMessage = input.assistantDraftMessage;
+    const sessionId = input.context.session?.sessionId ?? null;
+    const commitAssistantMessage = (type, patch) => {
+      assistantMessage = {
+        ...assistantMessage,
+        ...patch,
+        updatedAt: nowMs()
+      };
+      this.persistConversationSnapshot(sessionId, assistantMessage);
+      this.emitConversationEvent({
+        type,
+        sessionId: sessionId ?? "",
+        turnId: assistantMessage.turnId,
+        message: assistantMessage
+      });
+    };
+    commitAssistantMessage("message_patched", {
+      reasoningTrace: upsertTraceStep(
+        assistantMessage.reasoningTrace,
+        "active-debug-reply",
+        {
+          title: "生成调试回复",
+          stage: "investigate",
+          status: "running",
+          summary: "Debugger 正在结合当前 run 上下文生成回复。",
+          startedAt: nowMs()
+        }
+      )
+    });
+    try {
+      const responseText = await agentOrchestrator.sendMessage(
+        "rdc-debugger",
+        composeMessageForAgent(input.userMessage),
+        {
+          caseId: input.context.session?.sessionId,
+          runId: input.context.currentRun?.runId ?? void 0,
+          sessionId: input.context.session?.sessionId ?? void 0,
+          turnId: assistantMessage.turnId
+        },
+        {
+          onChunk: (chunk) => {
+            commitAssistantMessage("message_patched", {
+              status: "streaming",
+              content: `${assistantMessage.content}${chunk}`
+            });
+          }
+        }
+      );
+      commitAssistantMessage("message_completed", {
+        status: "complete",
+        content: responseText,
+        reasoningTrace: finalizeTrace(
+          upsertTraceStep(
+            assistantMessage.reasoningTrace,
+            "active-debug-reply",
+            {
+              status: "complete",
+              summary: "调试回复已生成。",
+              completedAt: nowMs()
+            }
+          ),
+          "complete",
+          "回复已完成"
+        )
+      });
+    } catch (error) {
+      const message = error instanceof Error ? `我刚才处理这条消息时失败了：${error.message}` : "我刚才处理这条消息时失败了。";
+      commitAssistantMessage("message_errored", {
+        status: "error",
+        content: assistantMessage.content || message,
+        reasoningTrace: finalizeTrace(
+          upsertTraceStep(
+            assistantMessage.reasoningTrace,
+            "active-debug-reply",
+            {
+              status: "error",
+              summary: message,
+              completedAt: nowMs()
+            }
+          ),
+          "error",
+          "回复生成失败"
+        )
+      });
+    }
+  }
+  async startCoworkTurn(context, requestedMode, rawMessage, pendingAttachments) {
     let workingSession = context.session;
     if (!workingSession && context.projectId) {
       workingSession = storageAdapter.createSession(context.projectId, rawMessage.slice(0, 80));
     }
+    const turnId = generateEventId("turn");
     const importedAttachments = workingSession ? storageAdapter.importSessionAttachments(
       workingSession.sessionId,
       pendingAttachments.map((entry) => entry.sourcePath)
     ) : [];
     const userMessage = makeConversationMessage("user", rawMessage, {
+      turnId,
       sessionId: workingSession?.sessionId ?? null,
       projectId: context.projectId,
       runId: context.currentRun?.runId ?? null,
       modeContext: requestedMode,
-      attachments: importedAttachments
+      attachments: importedAttachments,
+      status: "complete"
     });
-    if (workingSession) {
-      storageAdapter.appendConversationMessage(workingSession.sessionId, userMessage);
-    }
-    const history = workingSession ? storageAdapter.readConversationHistory(workingSession.sessionId) : [];
-    let assistantContent = "";
-    let control = null;
+    const assistantDraftMessage = makeConversationMessage("assistant", "", {
+      turnId,
+      sessionId: workingSession?.sessionId ?? null,
+      projectId: context.projectId,
+      runId: context.currentRun?.runId ?? null,
+      modeContext: requestedMode,
+      agentId: "rdc-debugger",
+      status: "streaming",
+      reasoningTrace: createDraftReasoningTrace("正在思考", [
+        createReasoningStep("cowork-route", "检查上下文与路由", "intake_gate"),
+        createReasoningStep("cowork-reply", "生成协作回复", "plan")
+      ])
+    });
+    this.persistConversationSnapshot(workingSession?.sessionId ?? null, userMessage);
+    this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
+    void this.completeCoworkTurn({
+      context: {
+        ...context,
+        session: workingSession
+      },
+      requestedMode,
+      rawMessage,
+      importedAttachments,
+      userMessage,
+      assistantDraftMessage
+    });
+    return {
+      session: workingSession,
+      mode: "talk",
+      userMessage,
+      assistantDraftMessage,
+      executionTransition: { action: "none" },
+      runUpdate: null,
+      errorViewModel: null
+    };
+  }
+  async completeCoworkTurn(input) {
+    let assistantMessage = input.assistantDraftMessage;
+    const sessionId = input.context.session?.sessionId ?? null;
+    const commitAssistantMessage = (type, patch) => {
+      assistantMessage = {
+        ...assistantMessage,
+        ...patch,
+        updatedAt: nowMs()
+      };
+      this.persistConversationSnapshot(sessionId, assistantMessage);
+      this.emitConversationEvent({
+        type,
+        sessionId: sessionId ?? "",
+        turnId: assistantMessage.turnId,
+        message: assistantMessage
+      });
+    };
+    let followupContent = "";
+    const appendAssistantText = (text) => {
+      if (!text) {
+        return;
+      }
+      followupContent += text;
+      commitAssistantMessage("message_patched", {
+        status: "streaming",
+        content: `${assistantMessage.content}${text}`
+      });
+    };
+    commitAssistantMessage("message_patched", {
+      reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-route", {
+        status: "running",
+        summary: "正在检查项目、capture 与调试路由。",
+        startedAt: nowMs()
+      })
+    });
+    const history = input.context.session ? storageAdapter.readConversationHistory(input.context.session.sessionId).filter((entry) => entry.id !== assistantMessage.id) : [];
+    let rawResponse = "";
+    let visibleResponse = "";
     let errorViewModel = null;
     try {
+      commitAssistantMessage("message_patched", {
+        reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
+          status: "running",
+          summary: "正在生成协作回复。",
+          startedAt: nowMs()
+        })
+      });
       const response = await agentOrchestrator.sendCoworkMessage(
         "rdc-debugger",
-        buildCoworkPrompt({
-          ...context,
-          session: workingSession
-        }, history, requestedMode, rawMessage, importedAttachments),
+        buildCoworkPrompt(
+          input.context,
+          history,
+          input.requestedMode,
+          input.rawMessage,
+          input.importedAttachments
+        ),
         {
-          sessionId: workingSession?.sessionId,
+          sessionId: input.context.session?.sessionId,
+          turnId: assistantMessage.turnId,
           systemPrompt: buildCoworkSystemPrompt(),
           maxTokens: 1200,
-          temperature: 0.35
-        }
-      );
-      assistantContent = stripControlBlock(response);
-      control = parseControlBlock(response);
-    } catch (error) {
-      assistantContent = createFallbackAssistantReply(effectiveMessage, {
-        ...context
-      });
-      errorViewModel = {
-        code: "CONVERSATION_LLM_UNAVAILABLE",
-        message: assistantContent,
-        technicalMessage: error instanceof Error ? error.message : String(error)
-      };
-    }
-    let conversationMode = control?.intent === "intake" ? "intake" : "talk";
-    let executionTransition = { action: "none" };
-    let runUpdate = null;
-    let debugPlanSummary;
-    let pendingQuestions;
-    let uiHints = {};
-    if ((control?.intent === "execute" || EXECUTE_PATTERN.test(effectiveMessage)) && control?.safe_to_start) {
-      if (!context.projectId) {
-        conversationMode = "intake";
-        assistantContent = "我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。";
-        uiHints.highlightProjectPicker = true;
-      } else {
-        const captureGuard = resolveCaptureGuards(effectiveMessage, {
-          ...context
-        });
-        if (!captureGuard.ready) {
-          conversationMode = "intake";
-          assistantContent = captureGuard.reason || assistantContent;
-          uiHints.highlightCaptureLibrary = true;
-        } else {
-          const workflowResult = await debugWorkflowService.startPlan({
-            projectId: context.projectId,
-            sessionId: workingSession?.sessionId,
-            mode: "debugger",
-            goal: rawMessage,
-            replayDevice: context.replayDevice
-          });
-          conversationMode = "execute_upgrade";
-          assistantContent = assistantContent ? `${assistantContent}
-
-${buildWorkflowUpgradeReply(workflowResult)}` : buildWorkflowUpgradeReply(workflowResult);
-          const hasBlockingPlanFailure = Boolean(workflowResult.debugPlanSummary?.blockers?.length);
-          debugPlanSummary = hasBlockingPlanFailure ? null : workflowResult.debugPlanSummary ?? null;
-          pendingQuestions = hasBlockingPlanFailure ? null : workflowResult.pendingQuestions ?? null;
-          uiHints.showPlanIntake = !hasBlockingPlanFailure && Boolean(debugPlanSummary || pendingQuestions);
-          executionTransition = workflowResult.success && workflowResult.runId && !hasBlockingPlanFailure ? {
-            action: "started_run",
-            runId: workflowResult.runId,
-            sessionId: workflowResult.sessionId
-          } : { action: "none" };
-          if (workflowResult.sessionId) {
-            runUpdate = hasBlockingPlanFailure ? null : storageAdapter.getLatestRun(workflowResult.sessionId);
-            if (!workingSession) {
-              workingSession = storageAdapter.readSession(workflowResult.sessionId);
+          temperature: 0.35,
+          onChunk: (chunk) => {
+            rawResponse += chunk;
+            const nextVisible = computeVisibleAssistantText(rawResponse);
+            if (nextVisible.length > visibleResponse.length) {
+              const delta = nextVisible.slice(visibleResponse.length);
+              visibleResponse = nextVisible;
+              appendAssistantText(delta);
             }
           }
         }
+      );
+      if (!rawResponse) {
+        rawResponse = response;
       }
-    } else if (control?.intent === "intake") {
-      conversationMode = "intake";
-      uiHints.highlightCaptureLibrary = control.needs_capture || control.needs_target_capture;
-      uiHints.highlightProjectPicker = control.needs_project;
-      uiHints.highlightSettingsRoute = control.needs_route;
+    } catch (error) {
+      const fallbackReply = createFallbackAssistantReply(resolveTaskFileContext(input.rawMessage).effectiveMessage, input.context);
+      errorViewModel = {
+        code: "CONVERSATION_LLM_UNAVAILABLE",
+        message: fallbackReply,
+        technicalMessage: error instanceof Error ? error.message : String(error)
+      };
+      rawResponse = fallbackReply;
+      visibleResponse = fallbackReply;
+      commitAssistantMessage("message_patched", {
+        content: fallbackReply
+      });
     }
-    const assistantMessage = makeConversationMessage("assistant", assistantContent, {
-      sessionId: workingSession?.sessionId ?? null,
-      projectId: context.projectId,
-      runId: runUpdate?.runId ?? null,
-      modeContext: requestedMode,
-      agentId: "rdc-debugger"
+    const assistantContent = stripControlBlock(rawResponse);
+    const control = parseControlBlock(rawResponse);
+    let finalStatus = errorViewModel ? "error" : "complete";
+    let traceStatus = errorViewModel ? "error" : "complete";
+    commitAssistantMessage("message_patched", {
+      content: assistantContent,
+      reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-route", {
+        status: "complete",
+        summary: "上下文检查完成。",
+        completedAt: nowMs()
+      })
     });
-    if (workingSession) {
-      storageAdapter.appendConversationMessage(workingSession.sessionId, assistantMessage);
+    const effectiveMessage = resolveTaskFileContext(input.rawMessage).effectiveMessage;
+    if (!input.context.projectId && EXECUTE_PATTERN.test(effectiveMessage)) {
+      const boundaryReply = "我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。";
+      commitAssistantMessage("message_completed", {
+        status: "complete",
+        content: boundaryReply,
+        reasoningTrace: finalizeTrace(
+          upsertTraceStep(
+            upsertTraceStep(assistantMessage.reasoningTrace, "cowork-route", {
+              status: "complete",
+              summary: "当前还没有可用项目。",
+              completedAt: nowMs()
+            }),
+            "cowork-upgrade",
+            {
+              title: "升级到正式调试",
+              stage: "plan",
+              status: "complete",
+              summary: "已拦截正式调试请求，等待选择项目。",
+              completedAt: nowMs()
+            }
+          ),
+          "complete",
+          "等待选择项目"
+        )
+      });
+      return;
     }
-    return {
-      session: workingSession,
-      mode: conversationMode,
-      userMessage,
-      assistantMessage,
-      executionTransition,
-      runUpdate,
-      debugPlanSummary,
-      pendingQuestions,
-      uiHints,
-      errorViewModel
-    };
+    if ((control?.intent === "execute" || EXECUTE_PATTERN.test(effectiveMessage)) && control?.safe_to_start) {
+      commitAssistantMessage("message_patched", {
+        reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-upgrade", {
+          title: "升级到正式调试",
+          stage: "plan",
+          status: "running",
+          summary: "正在准备正式调试计划。",
+          startedAt: nowMs()
+        })
+      });
+      if (!input.context.projectId) {
+        appendAssistantText(`
+
+我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。`);
+      } else {
+        const captureGuard = resolveCaptureGuards(effectiveMessage, input.context);
+        if (!captureGuard.ready) {
+          appendAssistantText(`
+
+${captureGuard.reason || "当前还不能进入正式分析。"}`);
+        } else if (!hasUsableDebuggerRoute()) {
+          appendAssistantText("\n\n当前调试链路还没绑定可用模型，所以我不能开始正式执行；不过我可以先帮你确认问题范围和所需 capture。");
+        } else {
+          const workflowResult = await debugWorkflowService.startPlan({
+            projectId: input.context.projectId,
+            sessionId: input.context.session?.sessionId,
+            turnId: assistantMessage.turnId,
+            mode: "debugger",
+            goal: input.rawMessage,
+            replayDevice: input.context.replayDevice
+          });
+          const upgradeReply = buildWorkflowUpgradeReply(workflowResult);
+          appendAssistantText(`
+
+${upgradeReply}`);
+          if (workflowResult.runId) {
+            commitAssistantMessage("message_patched", {
+              runId: workflowResult.runId
+            });
+            this.emitConversationEvent({
+              type: "run_linked",
+              sessionId: input.context.session?.sessionId ?? "",
+              turnId: assistantMessage.turnId,
+              runId: workflowResult.runId
+            });
+          }
+        }
+      }
+      commitAssistantMessage("message_patched", {
+        reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-upgrade", {
+          status: "complete",
+          summary: "正式调试升级判断已完成。",
+          completedAt: nowMs()
+        })
+      });
+    }
+    commitAssistantMessage(finalStatus === "error" ? "message_errored" : "message_completed", {
+      status: finalStatus,
+      content: `${assistantContent}${followupContent}`,
+      reasoningTrace: finalizeTrace(
+        upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
+          status: errorViewModel ? "error" : "complete",
+          summary: errorViewModel ? "协作回复生成失败，已降级到本地兜底回复。" : "协作回复已完成。",
+          completedAt: nowMs()
+        }),
+        traceStatus,
+        finalStatus === "error" ? "回复失败" : "回复已完成"
+      )
+    });
+  }
+  persistConversationSnapshot(sessionId, message) {
+    if (sessionId) {
+      storageAdapter.appendConversationMessage(sessionId, message);
+    }
+  }
+  emitConversationEvent(event) {
+    for (const window of electron.BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) {
+        window.webContents.send("conversation:event", event);
+      }
+    }
   }
 }
 const conversationService = new ConversationService();
@@ -11359,6 +12145,7 @@ function registerIPCHandlers() {
           agentId: trace.runtimeOwner || "rdc-debugger",
           eventType: "tool_execution",
           status: trace.result.ok ? "ok" : "error",
+          turnId: trace.turnId,
           payload: {
             tool_name: trace.toolName,
             args: trace.args,
@@ -11527,6 +12314,15 @@ function registerIPCHandlers() {
     broadcastToRenderer("capture:openedStateChanged", null);
     broadcastToRenderer("context:changed", rdxSessionService.snapshotContext());
     return result;
+  });
+  electron.ipcMain.handle("workflow:getRunUsage", async (_event, runId) => {
+    const targetRunId = runId || currentRunId;
+    if (!targetRunId) {
+      return { usage: null };
+    }
+    return {
+      usage: debuggerLlmService.getRunContextUsage(targetRunId)
+    };
   });
   electron.ipcMain.handle("workflow:listRuns", async () => {
     if (!currentSessionId) {

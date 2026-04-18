@@ -22,6 +22,7 @@ export type EventStatus =
 export interface ActionEvent {
   schema_version: string;
   event_id: string;
+  turn_id?: string;
   ts_ms: number;
   run_id: string;
   session_id: string;

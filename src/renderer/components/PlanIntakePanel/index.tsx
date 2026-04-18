@@ -1,6 +1,35 @@
 import React, { useMemo, useState } from 'react';
 import type { AskUserAnswer } from '@shared/types/workflow';
+import type { RunSummary } from '@shared/types/session';
 import { useSessionStore } from '../../stores/sessionStore';
+
+const nextRunStateAfterQuestions = (
+  currentRun: RunSummary,
+  strictReady: boolean,
+  hasBlockers: boolean,
+): RunSummary => {
+  if (hasBlockers) {
+    return {
+      ...currentRun,
+      status: 'failed',
+      lastStage: 'plan',
+    };
+  }
+
+  if (strictReady) {
+    return {
+      ...currentRun,
+      status: 'awaiting_approval',
+      lastStage: 'plan',
+    };
+  }
+
+  return {
+    ...currentRun,
+    status: 'awaiting_input',
+    lastStage: 'awaiting_user_input',
+  };
+};
 
 export const PlanIntakePanel: React.FC = () => {
   const currentRun = useSessionStore((state) => state.currentRun);
@@ -10,37 +39,59 @@ export const PlanIntakePanel: React.FC = () => {
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
   const setCurrentDebugPlan = useSessionStore((state) => state.setCurrentDebugPlan);
   const setPendingQuestions = useSessionStore((state) => state.setPendingQuestions);
-  const setConversationMessages = useSessionStore((state) => state.setConversationMessages);
 
   const [answers, setAnswers] = useState<Record<string, { selectedOptionId?: string; freeformText?: string }>>({});
   const [busyAction, setBusyAction] = useState<'submit' | 'approve' | 'restart' | null>(null);
 
-  const canApprove = Boolean(currentRun && debugPlan?.strictReady && workflowState?.approvalState !== 'approved');
-  const blockers = debugPlan?.blockers ?? [];
-  const missingInfo = debugPlan?.missingInfo ?? [];
+  const effectiveDebugPlan = debugPlan ?? workflowState?.debugPlan ?? null;
+  const effectivePendingQuestions = pendingQuestions ?? workflowState?.pendingQuestions ?? null;
+  const approvalState = workflowState?.approvalState
+    ?? (effectiveDebugPlan?.strictReady ? 'pending_user' : 'not_requested');
+  const recoveryState = workflowState?.recoveryState ?? null;
+  const canApprove = Boolean(currentRun && effectiveDebugPlan?.strictReady && approvalState !== 'approved');
+  const blockers = effectiveDebugPlan?.blockers ?? [];
+  const missingInfo = effectiveDebugPlan?.missingInfo ?? [];
+  const shouldRender = Boolean(
+    currentRun
+    && (
+      effectiveDebugPlan
+      || effectivePendingQuestions
+      || recoveryState
+      || currentRun.status === 'interrupted'
+    ),
+  );
 
   const answerPayload = useMemo<AskUserAnswer[]>(() => (
-    pendingQuestions?.questions.map((question) => ({
+    effectivePendingQuestions?.questions.map((question) => ({
       questionId: question.id,
       selectedOptionId: answers[question.id]?.selectedOptionId,
       freeformText: answers[question.id]?.freeformText,
     })) ?? []
-  ), [answers, pendingQuestions]);
+  ), [answers, effectivePendingQuestions]);
 
-  if (!currentRun || (!debugPlan && !pendingQuestions && !workflowState?.recoveryState && currentRun.status !== 'interrupted')) {
+  if (!currentRun || !shouldRender) {
     return null;
   }
 
   const handleSubmitAnswers = async () => {
-    if (!currentRun) return;
     setBusyAction('submit');
     try {
       const result = await window.electronAPI.workflow.submitQuestions(currentRun.runId, answerPayload);
-      if (result.success) {
+      if (result.debugPlan !== undefined) {
         setCurrentDebugPlan(result.debugPlan ?? null);
+      }
+      if (result.pendingQuestions !== undefined) {
         setPendingQuestions(result.pendingQuestions ?? null);
-        const history = await window.electronAPI.conversation.getHistory(currentRun.sessionId);
-        setConversationMessages(history.messages ?? []);
+      }
+      if (result.success && result.debugPlan) {
+        setCurrentRun(nextRunStateAfterQuestions(
+          {
+            ...currentRun,
+            runId: result.runId ?? currentRun.runId,
+          },
+          Boolean(result.debugPlan.strictReady),
+          (result.debugPlan.blockers?.length ?? 0) > 0,
+        ));
       }
     } finally {
       setBusyAction(null);
@@ -48,34 +99,43 @@ export const PlanIntakePanel: React.FC = () => {
   };
 
   const handleApprove = async () => {
-    if (!currentRun) return;
     setBusyAction('approve');
     try {
-      await window.electronAPI.workflow.approvePlan(currentRun.runId);
-      const history = await window.electronAPI.conversation.getHistory(currentRun.sessionId);
-      setConversationMessages(history.messages ?? []);
+      const result = await window.electronAPI.workflow.approvePlan(currentRun.runId);
+      if (result.debugPlan !== undefined) {
+        setCurrentDebugPlan(result.debugPlan ?? null);
+      }
+      setPendingQuestions(result.pendingQuestions ?? null);
+      if (result.success) {
+        setCurrentRun({
+          ...currentRun,
+          runId: result.runId ?? currentRun.runId,
+          status: 'running',
+          lastStage: 'dispatch',
+        });
+      }
     } finally {
       setBusyAction(null);
     }
   };
 
   const handleRestart = async () => {
-    if (!currentRun) return;
     setBusyAction('restart');
     try {
       const result = await window.electronAPI.workflow.restartRun(currentRun.runId);
+      if (result.debugPlan !== undefined) {
+        setCurrentDebugPlan(result.debugPlan ?? null);
+      }
+      setPendingQuestions(result.pendingQuestions ?? null);
       if (result.success && result.runId) {
         setCurrentRun({
           ...currentRun,
           runId: result.runId,
           status: 'awaiting_approval',
           lastStage: 'plan',
+          stopReason: undefined,
         });
-        setCurrentDebugPlan(result.debugPlan ?? null);
-        setPendingQuestions(result.pendingQuestions ?? null);
       }
-      const history = await window.electronAPI.conversation.getHistory(currentRun.sessionId);
-      setConversationMessages(history.messages ?? []);
     } finally {
       setBusyAction(null);
     }
@@ -85,32 +145,32 @@ export const PlanIntakePanel: React.FC = () => {
     <section className="plan-intake-panel" data-testid="plan-intake-panel">
       <div className="plan-intake-header">
         <div>
-          <div className="plan-intake-kicker">Plan / Intake</div>
-          <h2 className="plan-intake-title">Debugger execution is gated by an approved debug plan</h2>
+          <div className="plan-intake-kicker">任务审批</div>
+          <h2 className="plan-intake-title">执行前需要确认调试计划与关键输入</h2>
         </div>
-        <div className={`plan-intake-status status-${workflowState?.approvalState || 'idle'}`}>
-          {workflowState?.approvalState || debugPlan?.planReadiness || currentRun.status}
+        <div className={`plan-intake-status status-${approvalState || 'idle'}`}>
+          {approvalState || effectiveDebugPlan?.planReadiness || currentRun.status}
         </div>
       </div>
 
-      {debugPlan && (
+      {effectiveDebugPlan && (
         <div className="plan-summary-grid">
           <div className="plan-summary-card">
-            <span className="plan-summary-label">Goal</span>
-            <p>{debugPlan.userGoal}</p>
+            <span className="plan-summary-label">目标</span>
+            <p>{effectiveDebugPlan.userGoal}</p>
           </div>
           <div className="plan-summary-card">
-            <span className="plan-summary-label">Target Capture</span>
-            <p>{debugPlan.targetCapture?.fileName || 'Pending selection'}</p>
+            <span className="plan-summary-label">目标 Capture</span>
+            <p>{effectiveDebugPlan.targetCapture?.fileName || 'Pending selection'}</p>
           </div>
           <div className="plan-summary-card">
-            <span className="plan-summary-label">Scope</span>
-            <p>{debugPlan.targetFrameOrEvent?.eventLabel || debugPlan.scope}</p>
+            <span className="plan-summary-label">范围</span>
+            <p>{effectiveDebugPlan.targetFrameOrEvent?.eventLabel || effectiveDebugPlan.scope}</p>
           </div>
           <div className="plan-summary-card">
-            <span className="plan-summary-label">Deliverables</span>
+            <span className="plan-summary-label">交付物</span>
             <ul>
-              {debugPlan.expectedDeliverables.map((item) => (
+              {effectiveDebugPlan.expectedDeliverables.map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>
@@ -120,7 +180,7 @@ export const PlanIntakePanel: React.FC = () => {
 
       {missingInfo.length > 0 && (
         <div className="plan-callout plan-callout-warning" data-testid="plan-missing-info">
-          Missing info: {missingInfo.join(', ')}
+          待补信息：{missingInfo.join('、')}
         </div>
       )}
 
@@ -130,11 +190,11 @@ export const PlanIntakePanel: React.FC = () => {
         </div>
       )}
 
-      {pendingQuestions && (
+      {effectivePendingQuestions && (
         <div className="plan-questions" data-testid="plan-questions">
-          <h3>{pendingQuestions.title}</h3>
-          <p>{pendingQuestions.summary}</p>
-          {pendingQuestions.questions.map((question) => (
+          <h3>{effectivePendingQuestions.title}</h3>
+          <p>{effectivePendingQuestions.summary}</p>
+          {effectivePendingQuestions.questions.map((question) => (
             <div key={question.id} className="plan-question" data-testid={`plan-question-${question.id}`}>
               <div className="plan-question-prompt">{question.prompt}</div>
               <div className="plan-question-options">
@@ -161,7 +221,7 @@ export const PlanIntakePanel: React.FC = () => {
               </div>
               <input
                 className="plan-freeform-input"
-                placeholder={question.freeformPlaceholder || 'Optional freeform input'}
+                placeholder={question.freeformPlaceholder || '可补充说明'}
                 value={answers[question.id]?.freeformText || ''}
                 onChange={(event) => setAnswers((current) => ({
                   ...current,
@@ -181,7 +241,7 @@ export const PlanIntakePanel: React.FC = () => {
               onClick={() => void handleSubmitAnswers()}
               disabled={busyAction !== null}
             >
-              {busyAction === 'submit' ? 'Submitting…' : 'Submit Answers'}
+              {busyAction === 'submit' ? '提交中…' : '提交回答'}
             </button>
           </div>
         </div>
@@ -195,9 +255,9 @@ export const PlanIntakePanel: React.FC = () => {
           onClick={() => void handleApprove()}
           disabled={!canApprove || busyAction !== null}
         >
-          {busyAction === 'approve' ? 'Approving…' : 'Approve & Run'}
+          {busyAction === 'approve' ? '确认中…' : '确认并执行'}
         </button>
-        {(workflowState?.recoveryState || currentRun.status === 'interrupted') && (
+        {(recoveryState || currentRun.status === 'interrupted') && (
           <button
             type="button"
             className="plan-action-button"
@@ -205,7 +265,7 @@ export const PlanIntakePanel: React.FC = () => {
             onClick={() => void handleRestart()}
             disabled={busyAction !== null}
           >
-            {busyAction === 'restart' ? 'Restarting…' : 'Restart Run'}
+            {busyAction === 'restart' ? '重启中…' : '重新开始'}
           </button>
         )}
       </div>

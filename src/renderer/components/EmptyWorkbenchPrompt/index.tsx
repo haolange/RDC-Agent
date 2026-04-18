@@ -33,9 +33,8 @@ export const EmptyWorkbenchPrompt: React.FC<EmptyWorkbenchPromptProps> = ({ mode
             <ModeGlyph mode={mode} className="empty-workbench-kicker-icon" size={14} strokeWidth={1.9} />
             <span>{modeConfig.label}</span>
           </div>
-          <h1 className="empty-workbench-title">{modeConfig.emptyTitle}</h1>
-          <p className="empty-workbench-subtitle">{modeConfig.emptySubtitle}</p>
-          <p className="empty-workbench-helper">{modeConfig.helperCopy}</p>
+          <h1 className="empty-workbench-title debugger-idle-simple-title">{modeConfig.emptyTitle}</h1>
+          <p className="empty-workbench-subtitle debugger-idle-description">{modeConfig.emptySubtitle}</p>
         </div>
       </div>
     </section>

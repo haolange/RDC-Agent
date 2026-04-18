@@ -6,8 +6,45 @@ export type ConversationMode = 'talk' | 'intake' | 'active_debug' | 'execute_upg
 
 export type ConversationRole = 'user' | 'assistant' | 'system';
 
+export type ConversationMessageStatus = 'draft' | 'streaming' | 'complete' | 'error';
+
+export type ConversationReasoningStepStatus = 'pending' | 'running' | 'complete' | 'error';
+
+export type ConversationToolCallStatus = 'pending' | 'running' | 'complete' | 'error';
+
+export interface ConversationToolCall {
+  id: string;
+  toolName: string;
+  status: ConversationToolCallStatus;
+  argsPreview?: string;
+  resultPreview?: string;
+  error?: string;
+  startedAt: number;
+  completedAt?: number;
+}
+
+export interface ConversationReasoningStep {
+  id: string;
+  title: string;
+  stage?: string;
+  status: ConversationReasoningStepStatus;
+  summary?: string;
+  detail?: string;
+  toolCalls: ConversationToolCall[];
+  startedAt: number;
+  completedAt?: number;
+}
+
+export interface ConversationReasoningTrace {
+  status: 'idle' | 'running' | 'complete' | 'error';
+  summary?: string;
+  steps: ConversationReasoningStep[];
+  updatedAt: number;
+}
+
 export interface ConversationMessage {
   id: string;
+  turnId: string;
   sessionId: string | null;
   projectId: string | null;
   runId?: string | null;
@@ -15,6 +52,9 @@ export interface ConversationMessage {
   role: ConversationRole;
   agentId?: AgentRole;
   content: string;
+  status?: ConversationMessageStatus;
+  updatedAt?: number;
+  reasoningTrace?: ConversationReasoningTrace | null;
   attachments?: SessionAttachmentRecord[];
   createdAt: number;
 }
@@ -69,7 +109,7 @@ export interface ConversationTurnResult {
   session: SessionRecord | null;
   mode: ConversationMode;
   userMessage: ConversationMessage;
-  assistantMessage: ConversationMessage;
+  assistantDraftMessage: ConversationMessage;
   executionTransition: ConversationExecutionTransition;
   runUpdate?: RunSummary | null;
   debugPlanSummary?: DebugPlan | null;
@@ -77,3 +117,37 @@ export interface ConversationTurnResult {
   uiHints?: ConversationUiHints;
   errorViewModel?: ConversationErrorViewModel | null;
 }
+
+export interface ConversationMessagePatchedEvent {
+  type: 'message_patched';
+  sessionId: string;
+  turnId: string;
+  message: ConversationMessage;
+}
+
+export interface ConversationMessageCompletedEvent {
+  type: 'message_completed';
+  sessionId: string;
+  turnId: string;
+  message: ConversationMessage;
+}
+
+export interface ConversationMessageErroredEvent {
+  type: 'message_errored';
+  sessionId: string;
+  turnId: string;
+  message: ConversationMessage;
+}
+
+export interface ConversationRunLinkedEvent {
+  type: 'run_linked';
+  sessionId: string;
+  turnId: string;
+  runId: string;
+}
+
+export type ConversationStreamEvent =
+  | ConversationMessagePatchedEvent
+  | ConversationMessageCompletedEvent
+  | ConversationMessageErroredEvent
+  | ConversationRunLinkedEvent;

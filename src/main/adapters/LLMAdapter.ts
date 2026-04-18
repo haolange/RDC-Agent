@@ -1,17 +1,17 @@
 /**
- * LLMAdapter - LLM统一适配层
- * 基于 provider registry 动态装配可用的模型供应商。
+ * LLMAdapter - unified provider adapter with real streaming support.
  */
 
 import type {
-  LLMProvider,
+  ContentBlock,
   LLMConfig,
+  LLMMessage,
+  LLMProvider,
+  LLMProviderConfig,
   LLMRequest,
   LLMResponse,
-  LLMMessage,
-  ContentBlock,
   StreamCallback,
-  LLMProviderConfig,
+  ToolCall,
 } from '@shared/types/llm';
 import type { LlmProviderKind } from '@shared/types/settings';
 
@@ -88,14 +88,253 @@ const extractMessageContent = (
   return '';
 };
 
-class OpenRouterProvider implements LLMProvider {
+interface StreamingAccumulator {
+  id: string;
+  model: string;
+  content: string;
+  toolCalls: Array<{
+    id: string;
+    name: string;
+    argumentsText: string;
+  }>;
+  inputTokens: number;
+  outputTokens: number;
+  stopReason: LLMResponse['stopReason'];
+}
+
+const createAccumulator = (model: string): StreamingAccumulator => ({
+  id: `stream-${Date.now()}`,
+  model,
+  content: '',
+  toolCalls: [],
+  inputTokens: 0,
+  outputTokens: 0,
+  stopReason: 'end_turn',
+});
+
+const ensureToolCall = (
+  toolCalls: StreamingAccumulator['toolCalls'],
+  index: number,
+  id?: string,
+): StreamingAccumulator['toolCalls'][number] => {
+  while (toolCalls.length <= index) {
+    toolCalls.push({
+      id: id || `tool-call-${index}`,
+      name: '',
+      argumentsText: '',
+    });
+  }
+
+  const existing = toolCalls[index];
+  if (id && !existing.id) {
+    existing.id = id;
+  }
+  return existing;
+};
+
+const parseToolArguments = (argumentsText: string): Record<string, unknown> => {
+  if (!argumentsText.trim()) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(argumentsText);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Fall through to raw payload.
+  }
+
+  return {
+    raw: argumentsText,
+  };
+};
+
+const buildResponseFromAccumulator = (accumulator: StreamingAccumulator): LLMResponse => {
+  const toolCalls: ToolCall[] = accumulator.toolCalls
+    .filter((toolCall) => toolCall.id || toolCall.name || toolCall.argumentsText)
+    .map((toolCall) => ({
+      id: toolCall.id,
+      name: toolCall.name,
+      arguments: parseToolArguments(toolCall.argumentsText),
+    }));
+
+  return {
+    id: accumulator.id,
+    model: accumulator.model,
+    content: accumulator.content,
+    toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+    usage: {
+      inputTokens: accumulator.inputTokens,
+      outputTokens: accumulator.outputTokens,
+    },
+    stopReason: accumulator.stopReason,
+  };
+};
+
+const emitTextChunk = (text: string, onChunk: StreamCallback) => {
+  if (!text) {
+    return;
+  }
+  onChunk({
+    type: 'text-delta',
+    text,
+  });
+};
+
+const emitToolCallDelta = (
+  toolCall: {
+    id: string;
+    name?: string;
+    argumentsText?: string;
+  },
+  onChunk: StreamCallback,
+) => {
+  onChunk({
+    type: 'tool-call-delta',
+    toolCall,
+  });
+};
+
+const emitFallbackChunks = (text: string, onChunk: StreamCallback) => {
+  const chunks = text
+    .split(/(?<=[.!?。！？\n])|(?<=,|，)\s+/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean);
+
+  if (chunks.length === 0 && text) {
+    emitTextChunk(text, onChunk);
+    return;
+  }
+
+  for (const chunk of chunks) {
+    emitTextChunk(chunk, onChunk);
+  }
+};
+
+const tryParseJson = <T = unknown>(value: string): T | null => {
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
+};
+
+const mapFinishReason = (finishReason: string | null | undefined): LLMResponse['stopReason'] => {
+  if (finishReason === 'tool_calls' || finishReason === 'tool_use') {
+    return 'tool_use';
+  }
+  if (finishReason === 'length' || finishReason === 'max_tokens') {
+    return 'max_tokens';
+  }
+  return 'end_turn';
+};
+
+const readSseStream = async (
+  response: Response,
+  onEvent: (eventName: string, data: string) => void,
+) => {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error('Streaming response body is unavailable.');
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let eventName = 'message';
+  let dataLines: string[] = [];
+
+  const flush = () => {
+    if (dataLines.length === 0) {
+      eventName = 'message';
+      return;
+    }
+    const payload = dataLines.join('\n');
+    dataLines = [];
+    onEvent(eventName, payload);
+    eventName = 'message';
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+    let newlineIndex = buffer.indexOf('\n');
+    while (newlineIndex >= 0) {
+      const rawLine = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+      const line = rawLine.replace(/\r$/, '');
+
+      if (!line) {
+        flush();
+      } else if (line.startsWith('event:')) {
+        eventName = line.slice(6).trim();
+      } else if (line.startsWith('data:')) {
+        dataLines.push(line.slice(5).trimStart());
+      }
+
+      newlineIndex = buffer.indexOf('\n');
+    }
+
+    if (done) {
+      break;
+    }
+  }
+
+  if (buffer.trim()) {
+    const line = buffer.replace(/\r$/, '');
+    if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).trimStart());
+    }
+  }
+
+  flush();
+};
+
+abstract class BaseStreamingProvider implements LLMProvider {
   name: string;
+
+  protected constructor(name: string) {
+    this.name = name;
+  }
+
+  abstract chat(request: LLMRequest): Promise<LLMResponse>;
+
+  async streamChat(request: LLMRequest, onChunk: StreamCallback): Promise<LLMResponse> {
+    try {
+      const response = await this.performStreamingChat(request, onChunk);
+      onChunk({ type: 'done' });
+      return response;
+    } catch (error) {
+      if (request.signal?.aborted) {
+        throw error;
+      }
+
+      const fallbackResponse = await this.chat(request);
+      const fallbackText = typeof fallbackResponse.content === 'string'
+        ? fallbackResponse.content
+        : JSON.stringify(fallbackResponse.content);
+      emitFallbackChunks(fallbackText, onChunk);
+      onChunk({ type: 'done' });
+      return fallbackResponse;
+    }
+  }
+
+  protected abstract performStreamingChat(request: LLMRequest, onChunk: StreamCallback): Promise<LLMResponse>;
+
+  abstract isAvailable(): Promise<boolean>;
+
+  abstract getModels(): string[];
+}
+
+class OpenRouterProvider extends BaseStreamingProvider {
   private apiKey = '';
   private baseUrl = 'https://openrouter.ai/api/v1';
   private models: string[] = [];
 
   constructor(name: string) {
-    this.name = name;
+    super(name);
   }
 
   configure(config: LLMProviderConfig): void {
@@ -146,14 +385,92 @@ class OpenRouterProvider implements LLMProvider {
         inputTokens: data.usage?.prompt_tokens || 0,
         outputTokens: data.usage?.completion_tokens || 0,
       },
-      stopReason: choice?.finish_reason === 'tool_calls' ? 'tool_use' : 'end_turn',
+      stopReason: mapFinishReason(choice?.finish_reason),
     };
   }
 
-  async streamChat(request: LLMRequest, onChunk: StreamCallback): Promise<LLMResponse> {
-    const response = await this.chat(request);
-    onChunk(typeof response.content === 'string' ? response.content : JSON.stringify(response.content));
-    return response;
+  protected async performStreamingChat(request: LLMRequest, onChunk: StreamCallback): Promise<LLMResponse> {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://rdcagent.local',
+        'X-Title': 'RdcAgent',
+      },
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        messages: toContentBlocks(request.messages),
+        max_tokens: request.maxTokens || 4096,
+        temperature: request.temperature ?? 0.7,
+        tools: request.tools,
+        response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenRouter API error: ${response.status} - ${await response.text()}`);
+    }
+
+    const accumulator = createAccumulator(model);
+
+    await readSseStream(response, (_eventName, data) => {
+      if (!data || data === '[DONE]') {
+        return;
+      }
+
+      const payload = tryParseJson<Record<string, unknown>>(data);
+      if (!payload) {
+        return;
+      }
+
+      accumulator.id = String(payload.id || accumulator.id);
+      accumulator.model = String(payload.model || accumulator.model);
+      const choice = (payload.choices as Array<Record<string, unknown>> | undefined)?.[0];
+      const delta = (choice?.delta as Record<string, unknown> | undefined) ?? {};
+      const text = typeof delta.content === 'string' ? delta.content : '';
+      if (text) {
+        accumulator.content += text;
+        emitTextChunk(text, onChunk);
+      }
+
+      const toolCalls = Array.isArray(delta.tool_calls) ? delta.tool_calls : [];
+      for (const toolCallDelta of toolCalls) {
+        const index = typeof toolCallDelta.index === 'number' ? toolCallDelta.index : 0;
+        const functionDelta = typeof toolCallDelta.function === 'object' && toolCallDelta.function
+          ? toolCallDelta.function as Record<string, unknown>
+          : {};
+        const toolCall = ensureToolCall(
+          accumulator.toolCalls,
+          index,
+          typeof toolCallDelta.id === 'string' ? toolCallDelta.id : undefined,
+        );
+        if (typeof functionDelta.name === 'string') {
+          toolCall.name = functionDelta.name;
+        }
+        if (typeof functionDelta.arguments === 'string') {
+          toolCall.argumentsText += functionDelta.arguments;
+        }
+        emitToolCallDelta({
+          id: toolCall.id,
+          name: toolCall.name,
+          argumentsText: toolCall.argumentsText,
+        }, onChunk);
+      }
+
+      accumulator.stopReason = mapFinishReason(
+        typeof choice?.finish_reason === 'string' ? choice.finish_reason : undefined,
+      );
+    });
+
+    return buildResponseFromAccumulator(accumulator);
   }
 
   async isAvailable(): Promise<boolean> {
@@ -165,21 +482,20 @@ class OpenRouterProvider implements LLMProvider {
   }
 }
 
-class OpenAICompatibleProvider implements LLMProvider {
-  name: string;
+class OpenAICompatibleProvider extends BaseStreamingProvider {
   private apiKey = '';
   private baseUrl = 'https://api.openai.com/v1';
   private models: string[] = [];
   private requireApiKey = true;
 
   constructor(name: string, requireApiKey = true) {
-    this.name = name;
+    super(name);
     this.requireApiKey = requireApiKey;
   }
 
   configure(config: LLMProviderConfig): void {
     this.apiKey = config.apiKey.trim();
-    this.baseUrl = (config.baseUrl || this.baseUrl).trim();
+    this.baseUrl = (config.baseUrl || this.baseUrl).trim().replace(/\/+$/, '');
     this.models = config.models;
   }
 
@@ -227,18 +543,96 @@ class OpenAICompatibleProvider implements LLMProvider {
         inputTokens: data.usage?.prompt_tokens || 0,
         outputTokens: data.usage?.completion_tokens || 0,
       },
-      stopReason: choice?.finish_reason === 'tool_calls'
-        ? 'tool_use'
-        : choice?.finish_reason === 'stop'
-          ? 'end_turn'
-          : 'max_tokens',
+      stopReason: mapFinishReason(choice?.finish_reason),
     };
   }
 
-  async streamChat(request: LLMRequest, onChunk: StreamCallback): Promise<LLMResponse> {
-    const response = await this.chat(request);
-    onChunk(typeof response.content === 'string' ? response.content : JSON.stringify(response.content));
-    return response;
+  protected async performStreamingChat(request: LLMRequest, onChunk: StreamCallback): Promise<LLMResponse> {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (this.apiKey) {
+      headers.Authorization = `Bearer ${this.apiKey}`;
+    }
+
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers,
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        messages: toContentBlocks(request.messages),
+        max_tokens: request.maxTokens || 4096,
+        temperature: request.temperature ?? 0.7,
+        tools: request.tools,
+        response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`${this.name} API error: ${response.status} - ${await response.text()}`);
+    }
+
+    const accumulator = createAccumulator(model);
+
+    await readSseStream(response, (_eventName, data) => {
+      if (!data || data === '[DONE]') {
+        return;
+      }
+
+      const payload = tryParseJson<Record<string, unknown>>(data);
+      if (!payload) {
+        return;
+      }
+
+      accumulator.id = String(payload.id || accumulator.id);
+      accumulator.model = String(payload.model || accumulator.model);
+
+      const choice = (payload.choices as Array<Record<string, unknown>> | undefined)?.[0];
+      const delta = (choice?.delta as Record<string, unknown> | undefined) ?? {};
+      const text = typeof delta.content === 'string' ? delta.content : '';
+      if (text) {
+        accumulator.content += text;
+        emitTextChunk(text, onChunk);
+      }
+
+      const toolCalls = Array.isArray(delta.tool_calls) ? delta.tool_calls : [];
+      for (const toolCallDelta of toolCalls) {
+        const index = typeof toolCallDelta.index === 'number' ? toolCallDelta.index : 0;
+        const functionDelta = typeof toolCallDelta.function === 'object' && toolCallDelta.function
+          ? toolCallDelta.function as Record<string, unknown>
+          : {};
+        const toolCall = ensureToolCall(
+          accumulator.toolCalls,
+          index,
+          typeof toolCallDelta.id === 'string' ? toolCallDelta.id : undefined,
+        );
+        if (typeof functionDelta.name === 'string') {
+          toolCall.name = functionDelta.name;
+        }
+        if (typeof functionDelta.arguments === 'string') {
+          toolCall.argumentsText += functionDelta.arguments;
+        }
+        emitToolCallDelta({
+          id: toolCall.id,
+          name: toolCall.name,
+          argumentsText: toolCall.argumentsText,
+        }, onChunk);
+      }
+
+      accumulator.stopReason = mapFinishReason(
+        typeof choice?.finish_reason === 'string' ? choice.finish_reason : undefined,
+      );
+    });
+
+    return buildResponseFromAccumulator(accumulator);
   }
 
   async isAvailable(): Promise<boolean> {
@@ -250,19 +644,18 @@ class OpenAICompatibleProvider implements LLMProvider {
   }
 }
 
-class AnthropicProvider implements LLMProvider {
-  name: string;
+class AnthropicProvider extends BaseStreamingProvider {
   private apiKey = '';
   private baseUrl = 'https://api.anthropic.com/v1';
   private models: string[] = [];
 
   constructor(name: string) {
-    this.name = name;
+    super(name);
   }
 
   configure(config: LLMProviderConfig): void {
     this.apiKey = config.apiKey.trim();
-    this.baseUrl = (config.baseUrl || 'https://api.anthropic.com/v1').trim();
+    this.baseUrl = (config.baseUrl || 'https://api.anthropic.com/v1').trim().replace(/\/+$/, '');
     this.models = config.models;
   }
 
@@ -307,14 +700,81 @@ class AnthropicProvider implements LLMProvider {
         inputTokens: data.usage?.input_tokens || 0,
         outputTokens: data.usage?.output_tokens || 0,
       },
-      stopReason: data.stop_reason === 'end_turn' ? 'end_turn' : 'max_tokens',
+      stopReason: mapFinishReason(data.stop_reason),
     };
   }
 
-  async streamChat(request: LLMRequest, onChunk: StreamCallback): Promise<LLMResponse> {
-    const response = await this.chat(request);
-    onChunk(typeof response.content === 'string' ? response.content : JSON.stringify(response.content));
-    return response;
+  protected async performStreamingChat(request: LLMRequest, onChunk: StreamCallback): Promise<LLMResponse> {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const systemMessage = request.messages.find((message) => message.role === 'system');
+    const otherMessages = request.messages.filter((message) => message.role !== 'system');
+
+    const response = await fetch(`${this.baseUrl}/messages`, {
+      method: 'POST',
+      headers: {
+        'x-api-key': this.apiKey,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        max_tokens: request.maxTokens || 4096,
+        stream: true,
+        system: typeof systemMessage?.content === 'string' ? systemMessage.content : undefined,
+        messages: otherMessages.map((message) => ({
+          role: message.role === 'assistant' ? 'assistant' : 'user',
+          content: message.content,
+        })),
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.status} - ${await response.text()}`);
+    }
+
+    const accumulator = createAccumulator(model);
+
+    await readSseStream(response, (eventName, data) => {
+      if (!data) {
+        return;
+      }
+
+      const payload = tryParseJson<Record<string, unknown>>(data);
+      if (!payload) {
+        return;
+      }
+
+      if (eventName === 'message_start') {
+        const message = payload.message as Record<string, unknown> | undefined;
+        accumulator.id = String(message?.id || accumulator.id);
+        accumulator.model = String(message?.model || accumulator.model);
+        const usage = message?.usage as Record<string, unknown> | undefined;
+        accumulator.inputTokens = typeof usage?.input_tokens === 'number' ? usage.input_tokens : accumulator.inputTokens;
+      }
+
+      if (eventName === 'content_block_delta') {
+        const delta = payload.delta as Record<string, unknown> | undefined;
+        if (delta?.type === 'text_delta' && typeof delta.text === 'string') {
+          accumulator.content += delta.text;
+          emitTextChunk(delta.text, onChunk);
+        }
+      }
+
+      if (eventName === 'message_delta') {
+        const delta = payload.delta as Record<string, unknown> | undefined;
+        const usage = payload.usage as Record<string, unknown> | undefined;
+        accumulator.outputTokens = typeof usage?.output_tokens === 'number' ? usage.output_tokens : accumulator.outputTokens;
+        accumulator.stopReason = mapFinishReason(
+          typeof delta?.stop_reason === 'string' ? delta.stop_reason : undefined,
+        );
+      }
+    });
+
+    return buildResponseFromAccumulator(accumulator);
   }
 
   async isAvailable(): Promise<boolean> {
@@ -352,8 +812,8 @@ export class LLMAdapter {
 
     for (const providerConfig of config.providers) {
       const provider = createProviderByKind(providerConfig.id, providerConfig.kind);
-      if ('configure' in provider && typeof (provider as { configure?: (config: LLMProviderConfig) => void }).configure === 'function') {
-        (provider as { configure: (config: LLMProviderConfig) => void }).configure(providerConfig);
+      if ('configure' in provider && typeof (provider as { configure?: (next: LLMProviderConfig) => void }).configure === 'function') {
+        (provider as { configure: (next: LLMProviderConfig) => void }).configure(providerConfig);
       }
 
       this.providers.set(providerConfig.id, {
