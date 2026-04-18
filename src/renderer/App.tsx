@@ -115,6 +115,29 @@ const getResponsiveMinMainWidth = (containerWidth: number): number => {
   return APP_MIN_MAIN_WIDTH;
 };
 
+const getWorkbenchRailMaxWidth = (
+  leftCollapsed: boolean,
+  rightCollapsed: boolean,
+): string => {
+  if (leftCollapsed && rightCollapsed) {
+    return 'min(1180px, 64%)';
+  }
+
+  if (leftCollapsed || rightCollapsed) {
+    return 'min(1320px, 88%)';
+  }
+
+  return 'min(1440px, 96%)';
+};
+
+const getResizeHandleAllowance = (
+  leftCollapsed: boolean,
+  rightCollapsed: boolean,
+): number => (
+  (leftCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH)
+  + (rightCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH)
+);
+
 const canFitLayout = (
   containerWidth: number,
   leftWidth: number,
@@ -125,7 +148,10 @@ const canFitLayout = (
 ): boolean => {
   const desiredLeft = leftCollapsed ? LEFT_SIDEBAR_COLLAPSED_WIDTH : leftWidth;
   const desiredRight = rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth;
-  const availableSidebarSpace = Math.max(0, containerWidth - minMainWidth - APP_RESIZE_HANDLE_WIDTH * 2);
+  const availableSidebarSpace = Math.max(
+    0,
+    containerWidth - minMainWidth - getResizeHandleAllowance(leftCollapsed, rightCollapsed),
+  );
   return desiredLeft + desiredRight <= availableSidebarSpace;
 };
 
@@ -182,7 +208,10 @@ const resolveSidebarWidths = (
   const desiredRight = rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth;
   const minLeft = leftCollapsed ? LEFT_SIDEBAR_COLLAPSED_WIDTH : LEFT_SIDEBAR_MIN_WIDTH;
   const minRight = rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : RIGHT_PANEL_MIN_WIDTH;
-  const availableSidebarSpace = Math.max(0, containerWidth - minMainWidth - APP_RESIZE_HANDLE_WIDTH * 2);
+  const availableSidebarSpace = Math.max(
+    0,
+    containerWidth - minMainWidth - getResizeHandleAllowance(leftCollapsed, rightCollapsed),
+  );
   const desiredTotal = desiredLeft + desiredRight;
 
   if (desiredTotal <= availableSidebarSpace) {
@@ -695,6 +724,8 @@ const App: React.FC = () => {
   );
   const effectiveLeftCollapsed = responsiveSidebarState.leftCollapsed;
   const effectiveRightCollapsed = responsiveSidebarState.rightCollapsed;
+  const bothSidebarsCollapsed = effectiveLeftCollapsed && effectiveRightCollapsed;
+  const workbenchRailMaxWidth = getWorkbenchRailMaxWidth(effectiveLeftCollapsed, effectiveRightCollapsed);
   const leftAutoCollapsed = !leftSidebarCollapsed && effectiveLeftCollapsed;
   const rightAutoCollapsed = !rightPanelCollapsed && effectiveRightCollapsed;
   const leftToggleDisabled = leftAutoCollapsed;
@@ -1674,9 +1705,9 @@ const App: React.FC = () => {
             <span className="shell-panel-toggle-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 {effectiveRightCollapsed ? (
-                  <polyline points="9 18 15 12 9 6" />
-                ) : (
                   <polyline points="15 18 9 12 15 6" />
+                ) : (
+                  <polyline points="9 18 15 12 9 6" />
                 )}
               </svg>
             </span>
@@ -1720,7 +1751,10 @@ const App: React.FC = () => {
           style={{
             ['--left-sidebar-width' as string]: `${resolvedWidths.left}px`,
             ['--right-panel-width' as string]: `${resolvedWidths.right}px`,
-            ['--resize-handle-width' as string]: `${APP_RESIZE_HANDLE_WIDTH}px`,
+            ['--left-resize-handle-width' as string]: `${effectiveLeftCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH}px`,
+            ['--right-resize-handle-width' as string]: `${effectiveRightCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH}px`,
+            ['--workbench-rail-max-width' as string]: workbenchRailMaxWidth,
+            ['--workbench-inline-mode' as string]: bothSidebarsCollapsed ? 'dual-collapsed' : 'sidebar-open',
           }}
         >
           <aside
@@ -1730,30 +1764,28 @@ const App: React.FC = () => {
             <nav className="sidebar-nav">
               <Sidebar collapsed={effectiveLeftCollapsed} />
             </nav>
-            <div
-              className={`app-sidebar-footer ${effectiveLeftCollapsed ? 'collapsed' : ''}`}
-              data-testid="sidebar-footer"
-            >
-              <button
-                type="button"
-                className={`footer-entry footer-user-trigger sidebar-user-trigger sidebar-footer-entry ${effectiveLeftCollapsed ? 'collapsed' : ''}`}
-                data-testid="sidebar-user-settings-trigger"
-                onClick={handleUserMenuOpen}
-                title={t('sidebar.userSettings')}
-                aria-label={t('sidebar.userSettings')}
+            {!effectiveLeftCollapsed && (
+              <div
+                className="app-sidebar-footer"
+                data-testid="sidebar-footer"
               >
-                <span className="footer-entry-main">
-                  <span className="footer-entry-avatar">
-                    {nickname.trim().slice(0, 2).toUpperCase()}
-                  </span>
-                  {!effectiveLeftCollapsed && (
+                <button
+                  type="button"
+                  className="footer-entry footer-user-trigger sidebar-user-trigger sidebar-footer-entry"
+                  data-testid="sidebar-user-settings-trigger"
+                  onClick={handleUserMenuOpen}
+                  title={t('sidebar.userSettings')}
+                  aria-label={t('sidebar.userSettings')}
+                >
+                  <span className="footer-entry-main">
+                    <span className="footer-entry-avatar">
+                      {nickname.trim().slice(0, 2).toUpperCase()}
+                    </span>
                     <span className="footer-entry-copy">
                       <span className="footer-entry-title">{nickname}</span>
                       <span className="footer-entry-subtitle">{t('sidebar.userSubtitle')}</span>
                     </span>
-                  )}
-                </span>
-                {!effectiveLeftCollapsed && (
+                  </span>
                   <span className="footer-entry-trailing">
                     <span className="footer-entry-chevron">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1761,10 +1793,9 @@ const App: React.FC = () => {
                       </svg>
                     </span>
                   </span>
-                )}
-              </button>
-              <DeviceSelector collapsed={effectiveLeftCollapsed} />
-            </div>
+                </button>
+              </div>
+            )}
           </aside>
 
           <div
@@ -1781,6 +1812,7 @@ const App: React.FC = () => {
                 </div>
               )}
               <div className="main-floating-utilities">
+                <DeviceSelector variant="utility" />
                 <button
                   type="button"
                   className={`main-utility-toggle terminal-pill ${isTerminalOpen ? 'active' : ''}`}

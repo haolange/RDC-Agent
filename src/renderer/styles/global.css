@@ -182,9 +182,9 @@ a {
   display: grid;
   grid-template-columns:
     var(--left-sidebar-width, 256px)
-    var(--resize-handle-width, 8px)
+    var(--left-resize-handle-width, 8px)
     minmax(0, 1fr)
-    var(--resize-handle-width, 8px)
+    var(--right-resize-handle-width, 8px)
     var(--right-panel-width, 312px);
   min-height: 0;
   overflow: hidden;
@@ -255,9 +255,22 @@ a {
   padding: 14px;
 }
 
+.app-sidebar-left.collapsed,
+.app-sidebar-right.collapsed {
+  background: transparent;
+  border-color: transparent;
+}
+
 .app-sidebar-left.collapsed .sidebar-nav,
-.app-sidebar-right.collapsed .sidebar-nav {
-  padding-inline: 6px;
+.app-sidebar-left.collapsed .app-sidebar-footer,
+.app-sidebar-right.collapsed .right-panel-body {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-sidebar-left.collapsed .sidebar-nav,
+.app-sidebar-left.collapsed .app-sidebar-footer {
+  transform: translateX(-12px);
 }
 
 .app-sidebar-footer {
@@ -343,7 +356,9 @@ a {
 .main-floating-utilities {
   position: absolute;
   top: var(--workbench-top-utility-offset);
-  right: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(var(--workbench-rail-max-width, 100%), calc(100% - 36px));
   z-index: 4;
   display: flex;
   align-items: center;
@@ -354,6 +369,8 @@ a {
 
 .main-page-shell {
   flex: 1;
+  width: min(var(--workbench-rail-max-width, 100%), 100%);
+  margin-inline: auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -401,6 +418,10 @@ a {
 }
 
 .main-input-bar {
+  display: flex;
+  width: min(var(--workbench-rail-max-width, 100%), 100%);
+  margin-inline: auto;
+  justify-content: stretch;
   padding: 10px 16px 16px;
   border-top: none;
   background: transparent;
@@ -416,6 +437,8 @@ a {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  width: 100%;
+  max-width: none;
   min-width: 0;
   min-height: 0;
   padding: 12px 14px;
@@ -565,7 +588,7 @@ a {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .composer-footer-bar {
@@ -987,7 +1010,8 @@ a {
 /* Enhanced resize handle with visual feedback */
 .panel-resize-handle {
   position: relative;
-  width: 8px;
+  width: 100%;
+  min-width: 0;
   cursor: col-resize;
   background: transparent;
   transition: background var(--transition-fast) var(--ease-standard);
@@ -1837,10 +1861,10 @@ select:focus:not(:focus-visible),
   .app-body {
     grid-template-columns:
       minmax(220px, 280px)
-      var(--resize-handle-width, 8px)
+      var(--left-resize-handle-width, 8px)
       minmax(0, 1fr)
       0
-      44px;
+      0;
   }
 
   .panel-resize-handle-right {
@@ -1858,11 +1882,11 @@ select:focus:not(:focus-visible),
 @media (max-width: 560px) {
   .app-body {
     grid-template-columns:
-      56px
+      0
       0
       minmax(0, 1fr)
       0
-      44px;
+      0;
   }
 
   .panel-resize-handle-left,
@@ -1888,36 +1912,20 @@ select:focus:not(:focus-visible),
   }
 
   .app-sidebar-footer {
-    padding-inline: 6px;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .sidebar-user-trigger,
-  .device-selector-trigger {
-    width: 44px;
-    height: 44px;
-    min-height: 44px;
-    padding: 0;
-    justify-content: center;
-    border-radius: 14px;
-  }
-
-  .sidebar-user-trigger .footer-entry-copy,
-  .sidebar-user-trigger .footer-entry-chevron,
-  .device-selector-copy,
-  .device-selector-trigger-meta {
     display: none;
-  }
-
-  .device-selector-trigger-main {
-    flex: 0 0 auto;
-    min-width: auto;
   }
 }
 
 /* 鍝嶅簲寮忓竷灞€ */
 @media (max-width: 900px) {
+  .main-floating-utilities {
+    width: calc(100% - 28px);
+  }
+
+  .main-page-shell {
+    width: 100%;
+  }
+
   .app-titlebar {
     padding-left: 12px;
   }
@@ -1944,6 +1952,7 @@ select:focus:not(:focus-visible),
   }
 
   .main-input-bar {
+    width: 100%;
     padding: 10px 14px 14px;
   }
 
@@ -1953,16 +1962,18 @@ select:focus:not(:focus-visible),
   }
 
   .composer-footer-bar {
-    align-items: flex-start;
-    flex-wrap: wrap;
+    align-items: center;
+    flex-wrap: nowrap;
   }
 
-  .composer-toolbar-group-left,
-  .composer-toolbar-group-right {
-    width: 100%;
+  .composer-toolbar-group-left {
+    width: auto;
+    flex: 1 1 auto;
   }
 
   .composer-toolbar-group-right {
+    width: auto;
+    flex: 0 0 auto;
     justify-content: flex-end;
   }
 }
@@ -1978,7 +1989,7 @@ select:focus:not(:focus-visible),
   }
 
   .composer-textarea {
-    min-height: 64px;
+    min-height: 52px;
     font-size: 14px;
   }
 
