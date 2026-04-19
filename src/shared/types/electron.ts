@@ -205,6 +205,11 @@ export interface ElectronAPI {
       project?: ProjectRecord;
       error?: string;
     }>;
+    rename: (projectId: string, newName: string) => Promise<{
+      success: boolean;
+      project?: ProjectRecord;
+      error?: string;
+    }>;
     remove: (projectId: string) => Promise<{
       success: boolean;
       error?: string;

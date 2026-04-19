@@ -114,6 +114,7 @@ const electronAPI = {
   project: {
     list: () => electron.ipcRenderer.invoke("project:list"),
     add: (rootPath) => electron.ipcRenderer.invoke("project:add", rootPath),
+    rename: (projectId, newName) => electron.ipcRenderer.invoke("project:rename", projectId, newName),
     remove: (projectId) => electron.ipcRenderer.invoke("project:remove", projectId),
     inputs: {
       list: (projectId) => electron.ipcRenderer.invoke("project:inputs:list", projectId),
