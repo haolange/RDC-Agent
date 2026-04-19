@@ -221,8 +221,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     { label: t('settings.logFile'), value: derivedPaths.logPath },
     { label: t('settings.projectsPath'), value: derivedPaths.projectsPath },
     { label: t('settings.knowledgePath'), value: derivedPaths.knowledgePath },
-    { label: 'profiles/', value: derivedPaths.profilesPath },
-    { label: 'policies/', value: derivedPaths.policiesPath },
+    { label: t('settings.profilesPath'), value: derivedPaths.profilesPath },
+    { label: t('settings.policiesPath'), value: derivedPaths.policiesPath },
   ];
 
   const invalidAgentRoutes = useMemo(
@@ -447,7 +447,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 {activeSection === 'agents' && t('settings.agentsSubtitle')}
               </div>
             </div>
-            <button type="button" className="settings-modal-close" onClick={onClose} aria-label="Close settings">
+            <button type="button" className="settings-modal-close" onClick={onClose} aria-label={t('settings.close')}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="18" y1="6" x2="6" y2="18" />
                 <line x1="6" y1="6" x2="18" y2="18" />
@@ -582,8 +582,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
                   <div className="settings-path-card settings-derived-paths-card">
                     <div className="settings-derived-paths-header">
-                      <div className="settings-field-label">Derived Paths</div>
-                      <div className="settings-help-text">Runtime files and folders derived from the workspace root.</div>
+                      <div className="settings-field-label">{t('settings.derivedPathsTitle')}</div>
+                      <div className="settings-help-text">{t('settings.derivedPathsHint')}</div>
                     </div>
                     <div className="settings-derived-path-list">
                       {derivedPathEntries.map((entry) => (
@@ -617,7 +617,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                     <div className="settings-workspace-meta-grid">
                       {settings.configuration.lastMigrationSummary.length > 0 && (
                         <div className="settings-path-card settings-workspace-note-card">
-                          <div className="settings-field-label">Last migration</div>
+                          <div className="settings-field-label">{t('settings.lastMigration')}</div>
                           <div className="settings-workspace-note-list">
                             {settings.configuration.lastMigrationSummary.map((summary, index) => (
                               <div key={`${summary}-${index}`} className="settings-workspace-note-item">
@@ -629,7 +629,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                       )}
                       {settings.configuration.diagnostics.length > 0 && (
                         <div className="settings-path-card settings-workspace-note-card">
-                          <div className="settings-field-label">Diagnostics</div>
+                          <div className="settings-field-label">{t('settings.diagnostics')}</div>
                           <div className="settings-workspace-note-list">
                             {settings.configuration.diagnostics.map((diagnostic, index) => (
                               <div key={`${diagnostic.message}-${index}`} className="settings-workspace-note-item">
@@ -713,15 +713,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                       data-testid="settings-provider-add-template"
                       onClick={handleAddBuiltinTemplate}
                     >
-                      模板
+                      {t('settings.addFromTemplate')}
                     </button>
                     <button
                       type="button"
                       className="settings-sidebar-icon-button"
                       data-testid="settings-provider-add"
                       onClick={handleAddProvider}
-                      aria-label="新建自定义 Provider"
-                      title="新建自定义 Provider"
+                      aria-label={t('settings.newCustomProvider')}
+                      title={t('settings.newCustomProvider')}
                     >
                       +
                     </button>
@@ -744,7 +744,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                       {providerDrafts.length === 0 ? (
                         <>
                           <div className="settings-field-label">{t('settings.emptyProvidersTitle')}</div>
-                          <div className="settings-help-text">当前没有已保存的 Provider。内置厂商只作为模板，不会自动写入设置。</div>
+                          <div className="settings-help-text">{t('settings.emptyProvidersTemplateHint')}</div>
                           <div className="settings-template-picker">
                             <DropdownSelect
                               triggerClassName="settings-select-trigger"
@@ -763,12 +763,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                               data-testid="settings-provider-add-template"
                               onClick={handleAddBuiltinTemplate}
                             >
-                              从模板添加
+                              {t('settings.addFromTemplate')}
                             </button>
                           </div>
                           <div className="settings-actions">
                             <button type="button" className="button button-primary" onClick={handleAddProvider}>
-                              新建自定义 Provider
+                              {t('settings.newCustomProvider')}
                             </button>
                           </div>
                         </>
@@ -851,7 +851,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                         {selectedProvider.kind !== 'ollama' && selectedProvider.hasStoredSecret && (
                           <div className="settings-secret-status" data-testid="settings-provider-auth-status">
                             <div className="settings-secret-status-copy">
-                              <span className="settings-secret-badge">已存储</span>
+                              <span className="settings-secret-badge">{t('settings.storedSecret')}</span>
                             </div>
                             <button
                               type="button"
@@ -859,7 +859,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                               data-testid="settings-provider-clear-secret"
                               onClick={handleClearStoredSecret}
                             >
-                              清空已存储密钥
+                              {t('settings.clearStoredSecret')}
                             </button>
                           </div>
                         )}
@@ -954,7 +954,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                     <div className="settings-field-label">{t('settings.agentRouting')}</div>
                     <div className="settings-help-text">{t('settings.agentsHint')}</div>
                     <div className="settings-help-text">
-                      Active mode profile: {settings.configuration.activeModeProfileId}
+                      {t('settings.activeModeProfile')}: {settings.configuration.activeModeProfileId}
                     </div>
                     {routableProviders.length === 0 && (
                       <div className="settings-help-text">{t('settings.noConfiguredProviders')}</div>

@@ -8,6 +8,7 @@ import type {
   ConversationReasoningTrace,
 } from '@shared/types/conversation';
 import type { SessionAttachmentRecord } from '@shared/types/session';
+import { useI18n } from '../../i18n';
 import { useSessionStore } from '../../stores/sessionStore';
 import { EmptyWorkbenchPrompt } from '../EmptyWorkbenchPrompt';
 import { ModeGlyph } from '../ModeGlyph';
@@ -15,8 +16,11 @@ import './AgentChat.css';
 
 const STICKY_SCROLL_THRESHOLD = 96;
 
-const formatTime = (timestamp: number): string =>
-  new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+const formatTime = (timestamp: number, language: string): string =>
+  new Date(timestamp).toLocaleTimeString(language === 'zh-CN' ? 'zh-CN' : 'en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 
 const formatAttachmentSize = (size: number): string => {
   if (!size) {
@@ -48,14 +52,18 @@ const getTraceToolCount = (trace: ConversationReasoningTrace | null | undefined)
   trace?.steps.reduce((count, step) => count + step.toolCalls.length, 0) ?? 0
 );
 
-const getReasoningSummary = (entry: ConversationMessage): string => {
+const getReasoningSummary = (
+  entry: ConversationMessage,
+  fallbackThinking: string,
+  fallbackReasoning: string,
+): string => {
   if (entry.reasoningTrace?.summary) {
     return entry.reasoningTrace.summary;
   }
   if (entry.status === 'streaming' || entry.status === 'draft') {
-    return '正在思考';
+    return fallbackThinking;
   }
-  return '推理轨迹';
+  return fallbackReasoning;
 };
 
 const MessageAttachments: React.FC<{
@@ -92,24 +100,29 @@ const resolveEntryMode = (entry: ConversationMessage, fallbackMode: AgentMode): 
   entry.modeContext ?? fallbackMode;
 
 const MessageModeBadge: React.FC<{ mode: AgentMode }> = ({ mode }) => {
+  const { t } = useI18n();
   const modeConfig = getAgentModeConfig(mode);
 
   return (
     <span className="message-mode-badge" style={{ ['--message-mode-accent' as string]: modeConfig.accentColor }}>
       <ModeGlyph mode={mode} className="message-mode-badge-icon" size={12} strokeWidth={1.9} />
-      <span>{modeConfig.label}</span>
+      <span>{t(`mode.${mode}`)}</span>
     </span>
   );
 };
 
-const StepStatusBadge: React.FC<{ status: ConversationReasoningStep['status'] }> = ({ status }) => (
-  <span className={`reasoning-step-status status-${status}`}>
-    {status === 'pending' && 'Pending'}
-    {status === 'running' && 'Running'}
-    {status === 'complete' && 'Done'}
-    {status === 'error' && 'Error'}
-  </span>
-);
+const StepStatusBadge: React.FC<{ status: ConversationReasoningStep['status'] }> = ({ status }) => {
+  const { t } = useI18n();
+
+  return (
+    <span className={`reasoning-step-status status-${status}`}>
+      {status === 'pending' && t('chat.statusPending')}
+      {status === 'running' && t('chat.statusRunning')}
+      {status === 'complete' && t('chat.statusComplete')}
+      {status === 'error' && t('chat.statusError')}
+    </span>
+  );
+};
 
 const ReasoningPanel: React.FC<{ trace: ConversationReasoningTrace }> = ({ trace }) => (
   <div className="reasoning-panel" data-testid="assistant-reasoning-panel">
@@ -155,9 +168,12 @@ const ReasoningRail: React.FC<{
   expanded: boolean;
   onToggle: () => void;
 }> = ({ entry, expanded, onToggle }) => {
+  const { t } = useI18n();
   const stepCount = getTraceStepCount(entry.reasoningTrace);
   const toolCount = getTraceToolCount(entry.reasoningTrace);
-  const railLabel = entry.status === 'streaming' || entry.status === 'draft' ? '正在思考' : '推理轨迹';
+  const railLabel = entry.status === 'streaming' || entry.status === 'draft'
+    ? t('chat.thinking')
+    : t('chat.reasoningTrace');
 
   return (
     <button
@@ -169,11 +185,11 @@ const ReasoningRail: React.FC<{
     >
       <span className="reasoning-rail-leading">
         <span className="reasoning-rail-label">{railLabel}</span>
-        <span className="reasoning-rail-summary">{getReasoningSummary(entry)}</span>
+        <span className="reasoning-rail-summary">{getReasoningSummary(entry, t('chat.thinking'), t('chat.reasoningTrace'))}</span>
       </span>
       <span className="reasoning-rail-meta">
-        <span>{stepCount} steps</span>
-        <span>{toolCount} tools</span>
+        <span>{t('chat.stepCount', { count: stepCount })}</span>
+        <span>{t('chat.toolCount', { count: toolCount })}</span>
         <span className="reasoning-rail-caret" aria-hidden="true">
           {expanded ? '–' : '+'}
         </span>
@@ -183,6 +199,7 @@ const ReasoningRail: React.FC<{
 };
 
 const UserEntry: React.FC<{ entry: ConversationMessage; fallbackMode: AgentMode }> = ({ entry, fallbackMode }) => {
+  const { language, t } = useI18n();
   const mode = resolveEntryMode(entry, fallbackMode);
 
   return (
@@ -190,9 +207,9 @@ const UserEntry: React.FC<{ entry: ConversationMessage; fallbackMode: AgentMode 
       <div className="message-avatar user">U</div>
       <div className="message-content-wrapper">
         <div className="message-header">
-          <span className="message-author">You</span>
+          <span className="message-author">{t('chat.you')}</span>
           <MessageModeBadge mode={mode} />
-          <span className="message-time">{formatTime(entry.createdAt)}</span>
+          <span className="message-time">{formatTime(entry.createdAt, language)}</span>
         </div>
         {entry.content ? <div className="message-bubble user">{entry.content}</div> : null}
         <MessageAttachments attachments={entry.attachments ?? []} align="right" />
@@ -207,14 +224,16 @@ const AssistantEntry: React.FC<{
   expanded: boolean;
   onToggle: () => void;
 }> = ({ entry, fallbackMode, expanded, onToggle }) => {
+  const { language, t } = useI18n();
   const role = entry.agentId as AgentRole | undefined;
   const mode = resolveEntryMode(entry, fallbackMode);
   const modeConfig = getAgentModeConfig(mode);
+  const modeLabel = t(`mode.${mode}`);
   const name = role === 'rdc-debugger'
-    ? modeConfig.label
+    ? modeLabel
     : role
       ? (AGENT_DISPLAY_NAMES[role] ?? role)
-      : modeConfig.label;
+      : modeLabel;
   const hasReasoning = Boolean(entry.reasoningTrace && entry.reasoningTrace.steps.length > 0);
 
   return (
@@ -229,7 +248,7 @@ const AssistantEntry: React.FC<{
         <div className="message-header">
           <span className="message-author">{name}</span>
           <MessageModeBadge mode={mode} />
-          <span className="message-time">{formatTime(entry.createdAt)}</span>
+          <span className="message-time">{formatTime(entry.createdAt, language)}</span>
         </div>
 
         {hasReasoning ? (
@@ -248,19 +267,23 @@ const AssistantEntry: React.FC<{
   );
 };
 
-const SystemEntry: React.FC<{ entry: ConversationMessage }> = ({ entry }) => (
-  <div className="chat-message system">
-    <div className="message-avatar system">!</div>
-    <div className="message-content-wrapper">
-      <div className="message-header">
-        <span className="message-author">System</span>
-        <span className="message-time">{formatTime(entry.createdAt)}</span>
+const SystemEntry: React.FC<{ entry: ConversationMessage }> = ({ entry }) => {
+  const { language, t } = useI18n();
+
+  return (
+    <div className="chat-message system">
+      <div className="message-avatar system">!</div>
+      <div className="message-content-wrapper">
+        <div className="message-header">
+          <span className="message-author">{t('chat.system')}</span>
+          <span className="message-time">{formatTime(entry.createdAt, language)}</span>
+        </div>
+        {entry.content ? <div className="message-bubble system">{entry.content}</div> : null}
+        <MessageAttachments attachments={entry.attachments ?? []} />
       </div>
-      {entry.content ? <div className="message-bubble system">{entry.content}</div> : null}
-      <MessageAttachments attachments={entry.attachments ?? []} />
     </div>
-  </div>
-);
+  );
+};
 
 const TimelineEntry: React.FC<{
   entry: ConversationMessage;

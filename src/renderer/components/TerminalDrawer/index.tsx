@@ -5,6 +5,7 @@ import '@xterm/xterm/css/xterm.css';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 import type { TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
 import { useI18n } from '../../i18n';
+import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { TERMINAL_LOGS_TAB_ID, useTerminalStore } from '../../stores/terminalStore';
 import DropdownSelect, { type DropdownOption } from '../DropdownSelect';
@@ -34,6 +35,9 @@ const formatTabLabel = (tab: TerminalTabRecord): string => {
 
 export const TerminalDrawer: React.FC = () => {
   const { t } = useI18n();
+  const fontScale = useAppSettingsStore((state) => state.settings.appearance.fontScale);
+  const themeSetting = useAppSettingsStore((state) => state.settings.appearance.theme);
+  const systemTheme = useAppSettingsStore((state) => state.systemTheme);
   const terminalHostRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -41,6 +45,53 @@ export const TerminalDrawer: React.FC = () => {
   const activeTabIdRef = useRef<string | null>(null);
 
   const currentProject = useSessionStore((state) => state.currentProject);
+  const resolvedTheme = themeSetting === 'system' ? systemTheme : themeSetting;
+  const terminalFontSize = fontScale === 'small' ? 13 : fontScale === 'large' ? 15 : 14;
+  const terminalTheme = useMemo(() => (
+    resolvedTheme === 'light'
+      ? {
+          background: '#f4f7fb',
+          foreground: '#1a2333',
+          cursor: '#0f8fcb',
+          black: '#dfe6ef',
+          brightBlack: '#718096',
+          red: '#d64545',
+          brightRed: '#ea6b6b',
+          green: '#2f8c57',
+          brightGreen: '#4daf77',
+          yellow: '#a46c00',
+          brightYellow: '#c48a13',
+          blue: '#2b6dd8',
+          brightBlue: '#5b8ff0',
+          magenta: '#8f52d1',
+          brightMagenta: '#b57df0',
+          cyan: '#0b86a8',
+          brightCyan: '#37a9cc',
+          white: '#1a2333',
+          brightWhite: '#0f1723',
+        }
+      : {
+          background: '#18181f',
+          foreground: '#f0f3f8',
+          cursor: '#7dd3fc',
+          black: '#111318',
+          brightBlack: '#7b8193',
+          red: '#f87171',
+          brightRed: '#fca5a5',
+          green: '#4ade80',
+          brightGreen: '#86efac',
+          yellow: '#facc15',
+          brightYellow: '#fde047',
+          blue: '#60a5fa',
+          brightBlue: '#93c5fd',
+          magenta: '#c084fc',
+          brightMagenta: '#d8b4fe',
+          cyan: '#22d3ee',
+          brightCyan: '#67e8f9',
+          white: '#e5e7eb',
+          brightWhite: '#ffffff',
+        }
+  ), [resolvedTheme]);
 
   const isOpen = useTerminalStore((state) => state.isOpen);
   const scope = useTerminalStore((state) => state.scope);
@@ -83,8 +134,8 @@ export const TerminalDrawer: React.FC = () => {
     { value: 'tool', label: t('terminal.namespaceTool') },
     { value: 'device', label: t('terminal.namespaceDevice') },
     { value: 'capture', label: t('terminal.namespaceCapture') },
-    { value: 'context', label: 'Context' },
-    { value: 'llm', label: 'LLM' },
+    { value: 'context', label: t('terminal.namespaceContext') },
+    { value: 'llm', label: t('terminal.namespaceLlm') },
   ]), [t]);
 
   const detailOptions = useMemo<DropdownOption[]>(() => ([
@@ -180,30 +231,10 @@ export const TerminalDrawer: React.FC = () => {
     const terminal = new Terminal({
       cursorBlink: true,
       fontFamily: 'Consolas, "SFMono-Regular", ui-monospace, monospace',
-      fontSize: 14,
+      fontSize: terminalFontSize,
       lineHeight: 1.25,
       letterSpacing: 0.2,
-      theme: {
-        background: '#18181f',
-        foreground: '#f0f3f8',
-        cursor: '#7dd3fc',
-        black: '#111318',
-        brightBlack: '#7b8193',
-        red: '#f87171',
-        brightRed: '#fca5a5',
-        green: '#4ade80',
-        brightGreen: '#86efac',
-        yellow: '#facc15',
-        brightYellow: '#fde047',
-        blue: '#60a5fa',
-        brightBlue: '#93c5fd',
-        magenta: '#c084fc',
-        brightMagenta: '#d8b4fe',
-        cyan: '#22d3ee',
-        brightCyan: '#67e8f9',
-        white: '#e5e7eb',
-        brightWhite: '#ffffff',
-      },
+      theme: terminalTheme,
     });
 
     const fitAddon = new FitAddon();
@@ -229,7 +260,17 @@ export const TerminalDrawer: React.FC = () => {
       terminalRef.current = null;
       renderedStateRef.current = { tabId: null, length: 0 };
     };
-  }, [isOpen]);
+  }, [isOpen, terminalFontSize, terminalTheme]);
+
+  useEffect(() => {
+    if (!terminalRef.current) {
+      return;
+    }
+
+    terminalRef.current.options.fontSize = terminalFontSize;
+    terminalRef.current.options.theme = terminalTheme;
+    fitAddonRef.current?.fit();
+  }, [terminalFontSize, terminalTheme]);
 
   useEffect(() => {
     if (!isOpen || !terminalHostRef.current || !terminalRef.current || !fitAddonRef.current) {
@@ -303,7 +344,7 @@ export const TerminalDrawer: React.FC = () => {
       aria-hidden={!isOpen}
     >
       <div className="runtime-terminal-workspace-header">
-        <div className="runtime-terminal-tabs" role="tablist" aria-label="Runtime terminal tabs">
+        <div className="runtime-terminal-tabs" role="tablist" aria-label={t('terminal.tabs')}>
           {shellTabs.map((tab) => (
             <div
               key={tab.tabId}
@@ -323,7 +364,7 @@ export const TerminalDrawer: React.FC = () => {
               <button
                 type="button"
                 className="runtime-terminal-tab-close"
-                aria-label={`Close ${formatTabLabel(tab)}`}
+                aria-label={t('terminal.closeTab', { label: formatTabLabel(tab) })}
                 onClick={() => void closeShellTab(tab.tabId)}
               >
                 ×
@@ -339,14 +380,14 @@ export const TerminalDrawer: React.FC = () => {
             onClick={() => void activateTab(TERMINAL_LOGS_TAB_ID)}
           >
             <span className="runtime-terminal-tab-icon" aria-hidden="true">≡</span>
-            <span className="runtime-terminal-tab-label">Logs</span>
+            <span className="runtime-terminal-tab-label">{t('terminal.logsTab')}</span>
           </button>
 
           <button
             type="button"
             className="runtime-terminal-add-tab"
-            aria-label="New terminal tab"
-            title="New terminal tab"
+            aria-label={t('terminal.newTab')}
+            title={t('terminal.newTab')}
             onClick={() => void createShellTab(currentProject?.rootPath ?? null)}
           >
             +

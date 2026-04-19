@@ -1397,9 +1397,15 @@ const App: React.FC = () => {
   const hasMessageContent = Boolean(promptValue.trim());
   const hasPendingAttachments = pendingAttachments.length > 0;
   const currentModeConfig = AGENT_MODES.find((mode) => mode.id === currentMode) ?? AGENT_MODES[0];
+  const modeLabels = useMemo(() => ({
+    debugger: t('mode.debugger'),
+    analyzer: t('mode.analyzer'),
+    optimizer: t('mode.optimizer'),
+  }), [t]);
+  const currentModeLabel = modeLabels[currentMode];
   const promptPlaceholder = language === 'zh-CN'
-    ? `向 ${currentModeConfig.label} 描述目标、异常或验证需求`
-    : `Describe the goal, anomaly, or verification request for ${currentModeConfig.label}`;
+    ? `向 ${currentModeLabel} 描述目标、异常或验证需求`
+    : `Describe the goal, anomaly, or verification request for ${currentModeLabel}`;
   const attachButtonLabel = !currentProject
     ? (language === 'zh-CN'
       ? '选择项目后可附加图片、文件或 .rdc Capture'
@@ -1411,9 +1417,12 @@ const App: React.FC = () => {
     ? (language === 'zh-CN' ? '发送' : 'Send')
     : (language === 'zh-CN' ? '开始' : 'Start');
   const sendButtonDescription = language === 'zh-CN'
-    ? `${sendButtonLabel}${currentModeConfig.label}消息`
-    : `${sendButtonLabel} ${currentModeConfig.label} message`;
+    ? `${sendButtonLabel}${currentModeLabel}消息`
+    : `${sendButtonLabel} ${currentModeLabel} message`;
   const stopButtonLabel = language === 'zh-CN' ? '停止' : 'Stop';
+  const leftPanelToggleLabel = effectiveLeftCollapsed ? t('app.leftSidebarExpand') : t('app.leftSidebarCollapse');
+  const rightPanelToggleLabel = effectiveRightCollapsed ? t('app.rightPanelExpand') : t('app.rightPanelCollapse');
+  const autoCollapsedTitle = t('app.panelAutoCollapsed');
   const resolvedWidths = useMemo(
     () => resolveSidebarWidths(
       appBodyWidth,
@@ -1469,11 +1478,11 @@ const App: React.FC = () => {
 
     try {
       await electronAPI.workflow.stop(currentRun.runId);
-      showNotice('Stop request sent for the current debugger run.');
+      showNotice(t('app.stopRunSent'));
     } catch (error) {
-      showNotice(error instanceof Error ? error.message : 'Failed to stop run.');
+      showNotice(error instanceof Error ? error.message : t('app.stopRunFailed'));
     }
-  }, [currentRun, showNotice]);
+  }, [currentRun, showNotice, t]);
 
   const handleAttachmentSelect = useCallback(async () => {
     const electronAPI = window.electronAPI;
@@ -1485,7 +1494,7 @@ const App: React.FC = () => {
       if (effectiveLeftCollapsed && !leftToggleDisabled) {
         void toggleLeftSidebar();
       }
-      showNotice('请先选择一个项目，再附加图片、文件或 .rdc capture。');
+      showNotice(t('app.attachProjectRequired'));
       return;
     }
 
@@ -1500,9 +1509,9 @@ const App: React.FC = () => {
     if (capturePaths.length > 0) {
       const importResult = await electronAPI.project.inputs.importPaths(currentProject.projectId, capturePaths);
       if (!importResult.success) {
-        showNotice(importResult.error || 'Failed to import .rdc files.');
+        showNotice(importResult.error || t('app.importCaptureFailed'));
       } else {
-        showNotice(`Imported ${capturePaths.length} capture file${capturePaths.length > 1 ? 's' : ''} into this project.`);
+        showNotice(t('app.importCaptureSuccess', { count: capturePaths.length }));
       }
     }
 
@@ -1522,9 +1531,9 @@ const App: React.FC = () => {
           }));
         return current.concat(nextEntries);
       });
-      showNotice(`Staged ${regularPaths.length} file${regularPaths.length > 1 ? 's' : ''} for this message.`);
+      showNotice(t('app.stageFilesSuccess', { count: regularPaths.length }));
     }
-  }, [currentProject, effectiveLeftCollapsed, leftToggleDisabled, showNotice, toggleLeftSidebar]);
+  }, [currentProject, effectiveLeftCollapsed, leftToggleDisabled, showNotice, t, toggleLeftSidebar]);
 
   const handlePendingAttachmentRemove = useCallback((attachmentId: string) => {
     setPendingAttachments((current) => current.filter((entry) => entry.id !== attachmentId));
@@ -1624,12 +1633,12 @@ const App: React.FC = () => {
           modeContext: currentMode,
           role: 'assistant',
           agentId: 'rdc-debugger',
-          content: error instanceof Error ? error.message : 'Conversation request failed.',
+          content: error instanceof Error ? error.message : t('app.conversationRequestFailed'),
           status: 'error',
           updatedAt: Date.now(),
           reasoningTrace: {
             status: 'error',
-            summary: 'Conversation request failed.',
+            summary: t('app.conversationRequestFailed'),
             steps: [],
             updatedAt: Date.now(),
           },
@@ -1656,6 +1665,7 @@ const App: React.FC = () => {
     setPendingQuestions,
     setRuns,
     setSessions,
+    t,
     upsertConversationMessages,
   ]);
 
@@ -1681,7 +1691,7 @@ const App: React.FC = () => {
     return (
       <div className="loading-screen">
         <div className="loading-logo">RD</div>
-        <div className="loading-text">Loading RDC Agent shell...</div>
+        <div className="loading-text">{t('app.loadingShell')}</div>
         <div className="loading-bar" />
       </div>
     );
@@ -1702,8 +1712,8 @@ const App: React.FC = () => {
             className="shell-panel-toggle titlebar-panel-toggle"
             data-testid="titlebar-left-panel-toggle"
             onClick={!leftToggleDisabled ? () => void toggleLeftSidebar() : undefined}
-            aria-label={effectiveLeftCollapsed ? 'Expand left sidebar' : 'Collapse left sidebar'}
-            title={leftToggleDisabled ? 'Auto-collapsed at this width.' : (effectiveLeftCollapsed ? 'Expand left sidebar' : 'Collapse left sidebar')}
+            aria-label={leftPanelToggleLabel}
+            title={leftToggleDisabled ? autoCollapsedTitle : leftPanelToggleLabel}
             disabled={leftToggleDisabled}
           >
             <span className="shell-panel-toggle-icon">
@@ -1724,8 +1734,8 @@ const App: React.FC = () => {
               className="shell-panel-toggle titlebar-panel-toggle"
               data-testid="titlebar-right-panel-toggle"
               onClick={!rightToggleDisabled ? () => void toggleRightPanel() : undefined}
-              aria-label={effectiveRightCollapsed ? 'Expand right panel' : 'Collapse right panel'}
-              title={rightToggleDisabled ? 'Auto-collapsed at this width.' : (effectiveRightCollapsed ? 'Expand right panel' : 'Collapse right panel')}
+              aria-label={rightPanelToggleLabel}
+              title={rightToggleDisabled ? autoCollapsedTitle : rightPanelToggleLabel}
               disabled={rightToggleDisabled}
             >
               <span className="shell-panel-toggle-icon">
@@ -1739,12 +1749,12 @@ const App: React.FC = () => {
               </span>
             </button>
           )}
-          <div className="window-controls" role="group" aria-label="Window controls">
+          <div className="window-controls" role="group" aria-label={t('app.windowControls')}>
             <button
               type="button"
               className="window-control window-control-minimize tooltip"
-              data-tooltip="Minimize"
-              aria-label="Minimize window"
+              data-tooltip={t('app.windowMinimize')}
+              aria-label={t('app.windowMinimize')}
               onClick={handleWindowMinimize}
             >
               <span className="minimize" />
@@ -1752,8 +1762,8 @@ const App: React.FC = () => {
             <button
               type="button"
               className="window-control window-control-maximize tooltip"
-              data-tooltip={windowMaximized ? 'Restore' : 'Maximize'}
-              aria-label={windowMaximized ? 'Restore window' : 'Maximize window'}
+              data-tooltip={windowMaximized ? t('app.windowRestore') : t('app.windowMaximize')}
+              aria-label={windowMaximized ? t('app.windowRestore') : t('app.windowMaximize')}
               onClick={handleWindowToggleMaximize}
             >
               <span className={windowMaximized ? 'restore' : 'maximize'} />
@@ -1761,8 +1771,8 @@ const App: React.FC = () => {
             <button
               type="button"
               className="window-control close tooltip"
-              data-tooltip="Close"
-              aria-label="Close window"
+              data-tooltip={t('app.windowClose')}
+              aria-label={t('app.windowClose')}
               onClick={handleWindowClose}
             >
               <span className="close-mark" />
@@ -1879,7 +1889,7 @@ const App: React.FC = () => {
                             type="button"
                             className="composer-attachment-chip-remove"
                             onClick={() => handlePendingAttachmentRemove(attachment.id)}
-                            aria-label={`Remove ${attachment.fileName}`}
+                            aria-label={t('app.removeAttachment', { fileName: attachment.fileName })}
                           >
                             x
                           </button>
@@ -1928,7 +1938,7 @@ const App: React.FC = () => {
                           <span className="composer-agent-pill-icon" aria-hidden="true">
                             <ModeGlyph mode={currentMode} size={15} strokeWidth={1.9} />
                           </span>
-                          <span className="composer-agent-pill-label">{currentModeConfig.label}</span>
+                          <span className="composer-agent-pill-label">{currentModeLabel}</span>
                           <span className="composer-agent-pill-caret" aria-hidden="true">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                               <polyline points="6 9 12 15 18 9" />
@@ -1954,7 +1964,7 @@ const App: React.FC = () => {
                                   <span className="composer-agent-menu-item-icon" aria-hidden="true">
                                     <ModeGlyph mode={mode.id} size={15} strokeWidth={1.9} />
                                   </span>
-                                  <span className="composer-agent-menu-item-label">{mode.label}</span>
+                                  <span className="composer-agent-menu-item-label">{modeLabels[mode.id]}</span>
                                 </span>
                                 {currentMode === mode.id ? <span className="composer-agent-menu-item-check">●</span> : null}
                               </button>
@@ -1972,8 +1982,8 @@ const App: React.FC = () => {
                           data-testid="debugger-stop-button"
                           onClick={() => void handleStopRun()}
                           disabled={currentRun.status === 'stopping'}
-                          aria-label="Stop debugger run"
-                          title="Stop debugger run"
+                          aria-label={stopButtonLabel}
+                          title={stopButtonLabel}
                         >
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                             <rect x="6" y="6" width="12" height="12" rx="1" />

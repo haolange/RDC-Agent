@@ -1,6 +1,7 @@
 import React from 'react';
 import type { AgentMode } from '@shared/types/layout';
 import { getAgentModeConfig } from '@shared/constants/agents';
+import { useI18n } from '../../i18n';
 import { ModeGlyph } from '../ModeGlyph';
 import './EmptyWorkbenchPrompt.css';
 
@@ -9,7 +10,11 @@ interface EmptyWorkbenchPromptProps {
 }
 
 export const EmptyWorkbenchPrompt: React.FC<EmptyWorkbenchPromptProps> = ({ mode }) => {
+  const { t } = useI18n();
   const modeConfig = getAgentModeConfig(mode);
+  const modeLabel = t(`mode.${mode}`);
+  const emptyTitle = t(`mode.${mode}EmptyTitle`);
+  const emptySubtitle = t(`mode.${mode}EmptySubtitle`);
 
   return (
     <section
@@ -30,10 +35,10 @@ export const EmptyWorkbenchPrompt: React.FC<EmptyWorkbenchPromptProps> = ({ mode
         <div className="empty-workbench-copy">
           <div className="empty-workbench-kicker">
             <ModeGlyph mode={mode} className="empty-workbench-kicker-icon" size={14} strokeWidth={1.9} />
-            <span>{modeConfig.label}</span>
+            <span>{modeLabel}</span>
           </div>
-          <h1 className="empty-workbench-title debugger-idle-simple-title">{modeConfig.emptyTitle}</h1>
-          <p className="empty-workbench-subtitle debugger-idle-description">{modeConfig.emptySubtitle}</p>
+          <h1 className="empty-workbench-title debugger-idle-simple-title">{emptyTitle}</h1>
+          <p className="empty-workbench-subtitle debugger-idle-description">{emptySubtitle}</p>
         </div>
       </div>
     </section>

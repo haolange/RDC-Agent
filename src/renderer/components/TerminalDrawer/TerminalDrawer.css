@@ -1,4 +1,4 @@
-.runtime-terminal-workspace {
+﻿.runtime-terminal-workspace {
   flex: 0 0 auto;
   max-height: 0;
   overflow: hidden;
@@ -68,7 +68,7 @@
 
 .runtime-terminal-tab-icon {
   color: rgb(var(--color-accent-400));
-  font-size: 11px;
+  font-size: var(--text-xs);
   font-family: var(--font-mono);
   flex: 0 0 auto;
 }
@@ -78,7 +78,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .runtime-terminal-tab-close,
@@ -188,7 +188,7 @@
   border-radius: 12px;
   background: rgb(var(--color-bg-2));
   color: rgb(var(--color-text-secondary));
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .runtime-terminal-select > span {
@@ -226,7 +226,7 @@
   justify-content: center;
   min-height: 100%;
   color: rgb(var(--color-text-tertiary));
-  font-size: 14px;
+  font-size: var(--text-base);
   text-align: center;
 }
 
@@ -243,7 +243,7 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 8px;
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .runtime-terminal-entry-time {
@@ -264,14 +264,14 @@
 
 .runtime-terminal-entry-summary {
   color: rgb(var(--color-text-secondary));
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.6;
 }
 
 .runtime-terminal-entry-detail {
   margin-top: 8px;
   color: rgb(var(--color-text-tertiary));
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.6;
 }
 
@@ -281,7 +281,7 @@
   border-radius: 10px;
   background: rgb(var(--color-bg-0));
   color: rgb(var(--color-text-secondary));
-  font-size: 12px;
+  font-size: var(--text-sm);
   overflow-x: auto;
   white-space: pre-wrap;
   word-break: break-word;
@@ -317,3 +317,4 @@
     height: 288px;
   }
 }
+

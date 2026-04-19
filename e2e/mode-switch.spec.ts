@@ -62,7 +62,7 @@ test('共享工作台在三种模式下都可交互，空状态保持紧凑', as
   await expect(page.locator('[data-testid="analyzer-workbench-page"]')).toBeVisible();
   await expect(page.locator('textarea.chat-input')).toBeVisible();
   await expect(page.locator('[data-testid="app-sidebar-left"]')).toBeVisible();
-  await expect(page.locator('[data-testid="app-sidebar-right"]')).toBeVisible();
+  await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveCount(0);
   await expect(page.locator('.empty-workbench-kicker')).toContainText('Analyzer');
 
   await switchMode(page, 'optimizer');
