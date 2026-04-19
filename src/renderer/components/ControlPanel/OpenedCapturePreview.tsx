@@ -85,11 +85,11 @@ export const OpenedCapturePreview: React.FC<OpenedCapturePreviewProps> = ({
         </div>
         <div className="opened-capture-preview-meta-subline">
           <span>{previewSourceLabel}</span>
-          <span className="capture-item-separator">·</span>
+          <span className="capture-item-separator">/</span>
           <span>
             {t('control.previewResolution')}
             {' '}
-            {resolvedPreview.width > 0 && resolvedPreview.height > 0 ? `${resolvedPreview.width}×${resolvedPreview.height}` : '--'}
+            {resolvedPreview.width > 0 && resolvedPreview.height > 0 ? `${resolvedPreview.width}x${resolvedPreview.height}` : '--'}
           </span>
         </div>
       </div>

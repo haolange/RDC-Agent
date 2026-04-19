@@ -251,7 +251,7 @@ test('主壳层左栏和右栏支持独立滚轮滚动', async () => {
   await page.mouse.wheel(0, 1200);
   await expect.poll(async () => getScrollTop('[data-testid="sidebar-scroll"]', page)).toBeGreaterThan(sidebarScrollBefore);
 
-  await page.locator('[data-testid="cp-section-runtimeContext"] .cp-section-header').click();
+  await page.locator('[data-testid="cp-section-sessionContext"] .cp-section-header').click();
   await page.waitForTimeout(400);
 
   const panelIsScrollable = await page.locator('[data-testid="control-panel-scroll"]').evaluate((element) => (

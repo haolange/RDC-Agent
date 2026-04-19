@@ -50,6 +50,7 @@ import {
 } from '@shared/constants/layout';
 
 type DragSide = 'left' | 'right';
+type RightRailMode = 'hidden' | 'project' | 'session';
 
 interface PendingAttachmentDraft extends ConversationAttachmentInput {
   id: string;
@@ -118,7 +119,12 @@ const getResponsiveMinMainWidth = (containerWidth: number): number => {
 const getWorkbenchRailMaxWidth = (
   leftCollapsed: boolean,
   rightCollapsed: boolean,
+  rightVisible: boolean,
 ): string => {
+  if (!rightVisible) {
+    return leftCollapsed ? 'min(1400px, 94%)' : 'min(1520px, 100%)';
+  }
+
   if (leftCollapsed && rightCollapsed) {
     return 'min(1180px, 64%)';
   }
@@ -133,9 +139,10 @@ const getWorkbenchRailMaxWidth = (
 const getResizeHandleAllowance = (
   leftCollapsed: boolean,
   rightCollapsed: boolean,
+  rightVisible: boolean,
 ): number => (
   (leftCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH)
-  + (rightCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH)
+  + (!rightVisible || rightCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH)
 );
 
 const canFitLayout = (
@@ -145,12 +152,13 @@ const canFitLayout = (
   leftCollapsed: boolean,
   rightCollapsed: boolean,
   minMainWidth: number,
+  rightVisible: boolean,
 ): boolean => {
   const desiredLeft = leftCollapsed ? LEFT_SIDEBAR_COLLAPSED_WIDTH : leftWidth;
-  const desiredRight = rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth;
+  const desiredRight = !rightVisible ? 0 : (rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth);
   const availableSidebarSpace = Math.max(
     0,
-    containerWidth - minMainWidth - getResizeHandleAllowance(leftCollapsed, rightCollapsed),
+    containerWidth - minMainWidth - getResizeHandleAllowance(leftCollapsed, rightCollapsed, rightVisible),
   );
   return desiredLeft + desiredRight <= availableSidebarSpace;
 };
@@ -161,6 +169,7 @@ const resolveResponsiveSidebarState = (
   rightWidth: number,
   leftCollapsed: boolean,
   rightCollapsed: boolean,
+  rightVisible: boolean,
 ): { leftCollapsed: boolean; rightCollapsed: boolean; minMainWidth: number } => {
   if (containerWidth <= 0) {
     return {
@@ -172,13 +181,13 @@ const resolveResponsiveSidebarState = (
 
   const minMainWidth = getResponsiveMinMainWidth(containerWidth);
   let nextLeftCollapsed = leftCollapsed;
-  let nextRightCollapsed = rightCollapsed;
+  let nextRightCollapsed = rightVisible ? rightCollapsed : true;
 
-  if (!canFitLayout(containerWidth, leftWidth, rightWidth, nextLeftCollapsed, nextRightCollapsed, minMainWidth)) {
+  if (!canFitLayout(containerWidth, leftWidth, rightWidth, nextLeftCollapsed, nextRightCollapsed, minMainWidth, rightVisible)) {
     nextRightCollapsed = true;
   }
 
-  if (!canFitLayout(containerWidth, leftWidth, rightWidth, nextLeftCollapsed, nextRightCollapsed, minMainWidth)) {
+  if (!canFitLayout(containerWidth, leftWidth, rightWidth, nextLeftCollapsed, nextRightCollapsed, minMainWidth, rightVisible)) {
     nextLeftCollapsed = true;
   }
 
@@ -196,21 +205,22 @@ const resolveSidebarWidths = (
   leftCollapsed: boolean,
   rightCollapsed: boolean,
   minMainWidth: number,
+  rightVisible: boolean,
 ): { left: number; right: number } => {
   if (containerWidth <= 0) {
     return {
       left: leftCollapsed ? LEFT_SIDEBAR_COLLAPSED_WIDTH : leftWidth,
-      right: rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth,
+      right: !rightVisible ? 0 : (rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth),
     };
   }
 
   const desiredLeft = leftCollapsed ? LEFT_SIDEBAR_COLLAPSED_WIDTH : leftWidth;
-  const desiredRight = rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth;
+  const desiredRight = !rightVisible ? 0 : (rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth);
   const minLeft = leftCollapsed ? LEFT_SIDEBAR_COLLAPSED_WIDTH : LEFT_SIDEBAR_MIN_WIDTH;
-  const minRight = rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : RIGHT_PANEL_MIN_WIDTH;
+  const minRight = !rightVisible ? 0 : (rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : RIGHT_PANEL_MIN_WIDTH);
   const availableSidebarSpace = Math.max(
     0,
-    containerWidth - minMainWidth - getResizeHandleAllowance(leftCollapsed, rightCollapsed),
+    containerWidth - minMainWidth - getResizeHandleAllowance(leftCollapsed, rightCollapsed, rightVisible),
   );
   const desiredTotal = desiredLeft + desiredRight;
 
@@ -677,6 +687,12 @@ const App: React.FC = () => {
   const nickname = settings.profile.nickname || t('sidebar.userName');
   const showWorkbenchShell = true;
   const hasActiveDebugRun = Boolean(currentRun && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status));
+  const rightRailMode: RightRailMode = !currentProject
+    ? 'hidden'
+    : currentSession
+      ? 'session'
+      : 'project';
+  const isRightRailVisible = rightRailMode !== 'hidden';
   const isTerminalOpen = useTerminalStore((state) => state.isOpen);
   const toggleTerminalOpen = useTerminalStore((state) => state.toggleOpen);
 
@@ -719,17 +735,22 @@ const App: React.FC = () => {
       rightPanelWidth,
       leftSidebarCollapsed,
       rightPanelCollapsed,
+      isRightRailVisible,
     ),
-    [appBodyWidth, leftSidebarCollapsed, leftSidebarWidth, rightPanelCollapsed, rightPanelWidth],
+    [appBodyWidth, isRightRailVisible, leftSidebarCollapsed, leftSidebarWidth, rightPanelCollapsed, rightPanelWidth],
   );
   const effectiveLeftCollapsed = responsiveSidebarState.leftCollapsed;
-  const effectiveRightCollapsed = responsiveSidebarState.rightCollapsed;
-  const bothSidebarsCollapsed = effectiveLeftCollapsed && effectiveRightCollapsed;
-  const workbenchRailMaxWidth = getWorkbenchRailMaxWidth(effectiveLeftCollapsed, effectiveRightCollapsed);
+  const effectiveRightCollapsed = isRightRailVisible ? responsiveSidebarState.rightCollapsed : true;
+  const bothSidebarsCollapsed = effectiveLeftCollapsed && (!isRightRailVisible || effectiveRightCollapsed);
+  const workbenchRailMaxWidth = getWorkbenchRailMaxWidth(
+    effectiveLeftCollapsed,
+    effectiveRightCollapsed,
+    isRightRailVisible,
+  );
   const leftAutoCollapsed = !leftSidebarCollapsed && effectiveLeftCollapsed;
-  const rightAutoCollapsed = !rightPanelCollapsed && effectiveRightCollapsed;
+  const rightAutoCollapsed = isRightRailVisible && !rightPanelCollapsed && effectiveRightCollapsed;
   const leftToggleDisabled = leftAutoCollapsed;
-  const rightToggleDisabled = rightAutoCollapsed;
+  const rightToggleDisabled = !isRightRailVisible || rightAutoCollapsed;
 
   useEffect(() => {
     if (!shellNotice) return;
@@ -1319,6 +1340,7 @@ const App: React.FC = () => {
         effectiveLeftCollapsed,
         effectiveRightCollapsed,
         getResponsiveMinMainWidth(containerWidth),
+        isRightRailVisible,
       );
 
       if (dragState.side === 'left' && !effectiveLeftCollapsed) {
@@ -1362,6 +1384,7 @@ const App: React.FC = () => {
     leftSidebarWidth,
     persistLayout,
     effectiveRightCollapsed,
+    isRightRailVisible,
     rightPanelWidth,
     setLeftSidebarWidth,
     setRightPanelWidth,
@@ -1399,11 +1422,13 @@ const App: React.FC = () => {
       effectiveLeftCollapsed,
       effectiveRightCollapsed,
       responsiveSidebarState.minMainWidth,
+      isRightRailVisible,
     ),
     [
       appBodyWidth,
       effectiveLeftCollapsed,
       effectiveRightCollapsed,
+      isRightRailVisible,
       leftSidebarWidth,
       responsiveSidebarState.minMainWidth,
       rightPanelWidth,
@@ -1693,25 +1718,27 @@ const App: React.FC = () => {
           </button>
         </div>
         <div className="app-titlebar-right no-drag">
-          <button
-            type="button"
-            className="shell-panel-toggle titlebar-panel-toggle"
-            data-testid="titlebar-right-panel-toggle"
-            onClick={!rightToggleDisabled ? () => void toggleRightPanel() : undefined}
-            aria-label={effectiveRightCollapsed ? 'Expand right panel' : 'Collapse right panel'}
-            title={rightToggleDisabled ? 'Auto-collapsed at this width.' : (effectiveRightCollapsed ? 'Expand right panel' : 'Collapse right panel')}
-            disabled={rightToggleDisabled}
-          >
-            <span className="shell-panel-toggle-icon">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                {effectiveRightCollapsed ? (
-                  <polyline points="15 18 9 12 15 6" />
-                ) : (
-                  <polyline points="9 18 15 12 9 6" />
-                )}
-              </svg>
-            </span>
-          </button>
+          {isRightRailVisible && (
+            <button
+              type="button"
+              className="shell-panel-toggle titlebar-panel-toggle"
+              data-testid="titlebar-right-panel-toggle"
+              onClick={!rightToggleDisabled ? () => void toggleRightPanel() : undefined}
+              aria-label={effectiveRightCollapsed ? 'Expand right panel' : 'Collapse right panel'}
+              title={rightToggleDisabled ? 'Auto-collapsed at this width.' : (effectiveRightCollapsed ? 'Expand right panel' : 'Collapse right panel')}
+              disabled={rightToggleDisabled}
+            >
+              <span className="shell-panel-toggle-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  {effectiveRightCollapsed ? (
+                    <polyline points="15 18 9 12 15 6" />
+                  ) : (
+                    <polyline points="9 18 15 12 9 6" />
+                  )}
+                </svg>
+              </span>
+            </button>
+          )}
           <div className="window-controls" role="group" aria-label="Window controls">
             <button
               type="button"
@@ -1752,7 +1779,7 @@ const App: React.FC = () => {
             ['--left-sidebar-width' as string]: `${resolvedWidths.left}px`,
             ['--right-panel-width' as string]: `${resolvedWidths.right}px`,
             ['--left-resize-handle-width' as string]: `${effectiveLeftCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH}px`,
-            ['--right-resize-handle-width' as string]: `${effectiveRightCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH}px`,
+            ['--right-resize-handle-width' as string]: `${!isRightRailVisible || effectiveRightCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH}px`,
             ['--workbench-rail-max-width' as string]: workbenchRailMaxWidth,
             ['--workbench-inline-mode' as string]: bothSidebarsCollapsed ? 'dual-collapsed' : 'sidebar-open',
           }}
@@ -1976,23 +2003,27 @@ const App: React.FC = () => {
             <TerminalDrawer />
           </main>
 
-          <div
-            className={`panel-resize-handle panel-resize-handle-right ${effectiveRightCollapsed ? 'disabled' : ''}`}
-            onPointerDown={!effectiveRightCollapsed ? startDragging('right', resolvedWidths.right) : undefined}
-            aria-hidden="true"
-          />
+          {isRightRailVisible && (
+            <>
+              <div
+                className={`panel-resize-handle panel-resize-handle-right ${effectiveRightCollapsed ? 'disabled' : ''}`}
+                onPointerDown={!effectiveRightCollapsed ? startDragging('right', resolvedWidths.right) : undefined}
+                aria-hidden="true"
+              />
 
-          <aside
-            className={`app-sidebar-right ${effectiveRightCollapsed ? 'collapsed' : ''}`}
-            data-testid="app-sidebar-right"
-          >
-            <div
-              className={`right-panel-body ${effectiveRightCollapsed ? 'collapsed' : ''}`}
-              data-testid="control-panel-scroll"
-            >
-              <ControlPanel />
-            </div>
-          </aside>
+              <aside
+                className={`app-sidebar-right ${effectiveRightCollapsed ? 'collapsed' : ''}`}
+                data-testid="app-sidebar-right"
+              >
+                <div
+                  className={`right-panel-body ${effectiveRightCollapsed ? 'collapsed' : ''}`}
+                  data-testid="control-panel-scroll"
+                >
+                  <ControlPanel />
+                </div>
+              </aside>
+            </>
+          )}
         </div>
       ) : (
         <div className="app-main app-mode-placeholder">

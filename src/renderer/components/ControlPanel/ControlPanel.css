@@ -76,6 +76,61 @@
   gap: var(--space-2);
 }
 
+.cp-section-trailing {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cp-section-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: rgb(var(--color-text-secondary));
+}
+
+.cp-section-summary-main {
+  min-width: 0;
+  font-size: 12px;
+  color: rgb(var(--color-text-secondary));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cp-section-summary-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--color-border-default) / 0.55);
+  background: rgb(var(--color-bg-2) / 0.88);
+  color: rgb(var(--color-text-primary));
+  font-size: 11px;
+  font-weight: var(--font-semibold);
+}
+
+.cp-section-session {
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.05), transparent 64%),
+    rgb(var(--color-bg-1) / 0.98);
+}
+
+.cp-section-session .cp-section-header {
+  min-height: 72px;
+  padding: 16px 16px 14px;
+}
+
+.cp-section-session .cp-section-label {
+  font-size: 14px;
+}
+
 .cp-section-icon {
   display: flex;
   align-items: center;
@@ -1004,6 +1059,370 @@
   line-height: var(--leading-relaxed);
 }
 
+/* ============================================
+ * Session rail cards
+ * ============================================ */
+
+.session-progress-panel,
+.session-working-folder-panel,
+.session-context-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.session-context-opened-state {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.session-progress-hero,
+.session-context-summary-card,
+.session-working-folder-path-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgb(var(--color-border-secondary));
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.04), transparent 70%),
+    rgb(var(--color-bg-2) / 0.88);
+}
+
+.session-progress-hero {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.session-progress-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.session-progress-kicker,
+.session-context-label,
+.session-working-folder-label,
+.session-progress-fact-label,
+.session-working-folder-stat-label {
+  font-size: 11px;
+  color: rgb(var(--color-text-tertiary));
+}
+
+.session-progress-headline,
+.session-context-primary,
+.session-working-folder-name {
+  font-size: 15px;
+  font-weight: var(--font-semibold);
+  color: rgb(var(--color-text-primary));
+}
+
+.session-progress-description,
+.session-context-secondary,
+.session-working-folder-path,
+.session-progress-update-copy,
+.session-progress-empty,
+.session-working-folder-empty,
+.session-context-empty,
+.session-context-capture-path {
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgb(var(--color-text-tertiary));
+}
+
+.session-context-secondary,
+.session-working-folder-path,
+.session-context-capture-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-progress-meter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  border: 1px solid rgb(var(--color-accent-500) / 0.24);
+  background:
+    radial-gradient(circle at 30% 30%, rgb(var(--color-accent-500) / 0.18), transparent 60%),
+    rgb(var(--color-bg-1));
+  color: rgb(var(--color-text-primary));
+  font-size: 15px;
+  font-weight: var(--font-semibold);
+  box-shadow: inset 0 0 0 1px rgb(var(--color-border-default) / 0.4);
+}
+
+.session-progress-idle-state,
+.session-working-folder-idle-state {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgb(var(--color-border-secondary));
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.04), transparent 70%),
+    rgb(var(--color-bg-2) / 0.82);
+}
+
+.session-progress-idle-steps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.session-progress-idle-step {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgb(var(--color-border-strong));
+  background: transparent;
+}
+
+.session-progress-idle-step.completed {
+  border-color: rgb(var(--color-border-default));
+  background: rgb(var(--color-bg-3));
+  box-shadow: inset 0 0 0 1px rgb(var(--color-border-default) / 0.5);
+}
+
+.session-progress-idle-link {
+  width: 20px;
+  height: 1px;
+  background: rgb(var(--color-border-default));
+}
+
+.session-progress-idle-copy,
+.session-working-folder-idle-copy {
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgb(var(--color-text-tertiary));
+}
+
+.session-working-folder-idle-icon {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 6px;
+  width: 72px;
+  min-height: 48px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgb(var(--color-border-secondary));
+  background: rgb(var(--color-bg-3) / 0.72);
+}
+
+.session-working-folder-idle-icon span {
+  display: block;
+  width: 8px;
+  border-radius: 3px;
+  background: rgb(var(--color-text-muted));
+}
+
+.session-working-folder-idle-icon span:nth-child(1) {
+  height: 26px;
+}
+
+.session-working-folder-idle-icon span:nth-child(2) {
+  height: 34px;
+}
+
+.session-working-folder-idle-icon span:nth-child(3) {
+  height: 40px;
+}
+
+.session-progress-stage-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.session-progress-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgb(var(--color-border-secondary));
+  background: rgb(var(--color-bg-3) / 0.65);
+}
+
+.session-progress-stage.completed {
+  border-color: rgb(var(--color-success) / 0.24);
+}
+
+.session-progress-stage.active {
+  border-color: rgb(var(--color-accent-500) / 0.28);
+  background: rgb(var(--color-accent-500) / 0.08);
+}
+
+.session-progress-stage-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgb(var(--color-text-muted));
+}
+
+.session-progress-stage.completed .session-progress-stage-dot {
+  background: rgb(var(--color-success));
+  box-shadow: 0 0 8px rgb(var(--color-success) / 0.4);
+}
+
+.session-progress-stage.active .session-progress-stage-dot {
+  background: rgb(var(--color-accent-500));
+  box-shadow: 0 0 8px rgb(var(--color-accent-500) / 0.4);
+}
+
+.session-progress-stage-label {
+  min-width: 0;
+  font-size: 12px;
+  color: rgb(var(--color-text-secondary));
+}
+
+.session-progress-facts,
+.session-context-facts,
+.session-working-folder-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.session-progress-fact,
+.session-context-fact,
+.session-working-folder-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgb(var(--color-border-secondary));
+  background: rgb(var(--color-bg-3) / 0.6);
+}
+
+.session-progress-fact-value,
+.session-context-value,
+.session-working-folder-stat-value {
+  min-width: 0;
+  color: rgb(var(--color-text-primary));
+  font-size: 13px;
+  font-weight: var(--font-semibold);
+}
+
+.session-context-value.active {
+  color: rgb(var(--color-accent-500));
+}
+
+.session-progress-fact-value.warning {
+  color: rgb(var(--color-warning));
+}
+
+.session-context-value.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-progress-updates {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.session-progress-updates-title,
+.session-context-capture-name {
+  font-size: 12px;
+  font-weight: var(--font-semibold);
+  color: rgb(var(--color-text-primary));
+}
+
+.session-progress-update-list,
+.session-context-capture-list,
+.session-working-folder-paths {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.session-progress-update {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgb(var(--color-border-secondary));
+  background: rgb(var(--color-bg-3) / 0.6);
+}
+
+.session-progress-update-agent {
+  font-size: 11px;
+  font-weight: var(--font-semibold);
+  color: rgb(var(--color-accent-400));
+}
+
+.session-working-folder-actions,
+.session-context-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.session-context-clear-btn {
+  grid-column: 1 / -1;
+}
+
+.session-context-open-btn {
+  min-height: 44px;
+  min-width: 104px;
+}
+
+.session-context-picker-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.session-context-capture-select {
+  min-width: 0;
+}
+
+.session-context-capture-select-trigger {
+  min-height: 44px;
+  border-radius: 14px;
+  border-color: rgb(var(--color-border-secondary));
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.03), transparent 56%),
+    rgb(var(--color-bg-2) / 0.92);
+}
+
+.session-context-capture-select-trigger:hover:not(:disabled),
+.session-context-capture-select.open .session-context-capture-select-trigger {
+  border-color: rgb(var(--color-border-strong));
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.04), transparent 56%),
+    rgb(var(--color-bg-2));
+  box-shadow: 0 12px 24px rgb(0 0 0 / 0.08);
+}
+
+.session-context-capture-select-menu {
+  min-width: 280px;
+}
+
+.session-context-capture-select-option .dropdown-select-option-label {
+  font-size: 13px;
+}
+
 @container (max-width: 380px) {
   .cp-content {
     padding: var(--space-2);
@@ -1021,13 +1440,38 @@
   .runtime-context-actions,
   .opened-capture-actions,
   .capture-library-toolbar,
-  .capture-library-item-actions {
+  .capture-library-item-actions,
+  .session-working-folder-actions,
+  .session-progress-facts,
+  .session-working-folder-stats {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
   }
 
   .capture-library-item {
     padding: var(--space-3);
+  }
+
+  .cp-section-session .cp-section-header {
+    min-height: 64px;
+    padding: 14px;
+  }
+
+  .cp-section-summary {
+    max-width: 132px;
+  }
+
+  .session-progress-hero {
+    grid-template-columns: minmax(0, 1fr);
+    display: grid;
+  }
+
+  .session-progress-stage-strip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .session-context-picker-row {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

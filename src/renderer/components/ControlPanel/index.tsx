@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
-import { TaskMonitor } from './TaskMonitor';
-import { CaptureLibrary } from './CaptureLibrary';
-import { OpenedCapture } from './OpenedCapture';
-import { RuntimeContext } from './RuntimeContext';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../../i18n';
 import { useSessionStore } from '../../stores/sessionStore';
+import { CaptureLibrary } from './CaptureLibrary';
+import { getSessionContextSummary, SessionContextPanel } from './SessionContextPanel';
+import { getSessionProgressSnapshot, SessionProgressPanel } from './SessionProgressPanel';
+import { SessionWorkingFolderPanel } from './SessionWorkingFolderPanel';
 import './ControlPanel.css';
+
+type RightRailMode = 'hidden' | 'project' | 'session';
 
 interface CollapsibleSectionProps {
   id: string;
@@ -15,6 +17,8 @@ interface CollapsibleSectionProps {
   onToggle: () => void;
   children: React.ReactNode;
   badge?: string | number;
+  summary?: React.ReactNode;
+  variant?: 'project' | 'session';
 }
 
 const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
@@ -25,10 +29,14 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   onToggle,
   children,
   badge,
+  summary,
+  variant = 'project',
 }) => {
+  const sessionVariant = variant === 'session';
+
   return (
     <div
-      className={`cp-section ${isExpanded ? 'expanded' : ''}`}
+      className={`cp-section ${isExpanded ? 'expanded' : ''} ${sessionVariant ? 'cp-section-session' : ''}`}
       data-testid={`cp-section-${id}`}
     >
       <button className="cp-section-header" onClick={onToggle} aria-expanded={isExpanded}>
@@ -39,11 +47,14 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
             <span className="cp-section-badge">{badge}</span>
           )}
         </div>
-        <span className={`cp-section-arrow ${isExpanded ? 'expanded' : ''}`}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </span>
+        <div className="cp-section-trailing">
+          {summary ? <div className="cp-section-summary">{summary}</div> : null}
+          <span className={`cp-section-arrow ${isExpanded ? 'expanded' : ''}`}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </span>
+        </div>
       </button>
       {isExpanded ? (
         <div className="cp-section-content">
@@ -54,14 +65,11 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({
   );
 };
 
-export const ControlPanel: React.FC = () => {
+const ProjectControlPanel: React.FC = () => {
   const { t } = useI18n();
   const projectInputs = useSessionStore((state) => state.projectInputs);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    taskMonitor: true,
     captureLibrary: true,
-    openedCapture: true,
-    runtimeContext: false,
   });
 
   const toggleSection = (sectionId: string) => {
@@ -75,68 +83,158 @@ export const ControlPanel: React.FC = () => {
     <div className="control-panel">
       <div className="cp-content scrollbar-thin">
         <CollapsibleSection
-          id="taskMonitor"
-          title={t('control.taskMonitor')}
-          icon={
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-              <polyline points="22 4 12 14.01 9 11.01" />
-            </svg>
-          }
-          isExpanded={expandedSections.taskMonitor}
-          onToggle={() => toggleSection('taskMonitor')}
-        >
-          <TaskMonitor />
-        </CollapsibleSection>
-
-        <CollapsibleSection
           id="captureLibrary"
           title={t('control.captureLibrary')}
-          icon={
+          icon={(
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
             </svg>
-          }
+          )}
           isExpanded={expandedSections.captureLibrary}
           onToggle={() => toggleSection('captureLibrary')}
           badge={projectInputs.length}
         >
           <CaptureLibrary />
         </CollapsibleSection>
+      </div>
+    </div>
+  );
+};
 
+const SessionControlPanel: React.FC = () => {
+  const { t } = useI18n();
+  const currentRun = useSessionStore((state) => state.currentRun);
+  const workflowState = useSessionStore((state) => state.workflowState);
+  const reasoningSummaries = useSessionStore((state) => state.reasoningSummaries);
+  const currentSession = useSessionStore((state) => state.currentSession);
+  const openedCapture = useSessionStore((state) => state.openedCapture);
+  const projectInputs = useSessionStore((state) => state.projectInputs);
+  const actionEvents = useSessionStore((state) => state.actionEvents);
+  const progressSnapshot = useMemo(
+    () => getSessionProgressSnapshot(currentRun, workflowState, reasoningSummaries, t),
+    [currentRun, reasoningSummaries, t, workflowState],
+  );
+  const hasWorkingFolderActivity = Boolean(currentRun) || actionEvents.length > 0;
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => ({
+    sessionProgress: false,
+    sessionWorkingFolder: false,
+    sessionContext: !currentRun,
+  }));
+  const lastSessionIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const sessionId = currentSession?.sessionId ?? null;
+    if (sessionId === lastSessionIdRef.current) {
+      return;
+    }
+
+    lastSessionIdRef.current = sessionId;
+    setExpandedSections({
+      sessionProgress: false,
+      sessionWorkingFolder: false,
+      sessionContext: !currentRun,
+    });
+  }, [currentRun, currentSession?.sessionId]);
+
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [sectionId]: !prev[sectionId],
+    }));
+  };
+
+  const sessionFolderName = currentSession?.sessionPath.split(/[\\/]/).filter(Boolean).pop() || currentSession?.title || '--';
+  const contextSummary = getSessionContextSummary(openedCapture?.filePath, projectInputs.length, t);
+
+  return (
+    <div className="control-panel">
+      <div className="cp-content scrollbar-thin">
         <CollapsibleSection
-          id="openedCapture"
-          title={t('control.openedCapture')}
-          icon={
+          id="sessionProgress"
+          title={t('control.sessionProgress')}
+          icon={(
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
             </svg>
-          }
-          isExpanded={expandedSections.openedCapture}
-          onToggle={() => toggleSection('openedCapture')}
+          )}
+          variant="session"
+          isExpanded={expandedSections.sessionProgress}
+          onToggle={() => toggleSection('sessionProgress')}
+          summary={progressSnapshot.isIdle ? undefined : (
+            <>
+              <span className="cp-section-summary-main">{progressSnapshot.statusLabel}</span>
+              <span className="cp-section-summary-badge">{progressSnapshot.progress}%</span>
+            </>
+          )}
         >
-          <OpenedCapture />
+          <SessionProgressPanel />
         </CollapsibleSection>
 
         <CollapsibleSection
-          id="runtimeContext"
-          title={t('control.runtimeContext')}
-          icon={
+          id="sessionWorkingFolder"
+          title={t('control.sessionWorkingFolder')}
+          icon={(
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+            </svg>
+          )}
+          variant="session"
+          isExpanded={expandedSections.sessionWorkingFolder}
+          onToggle={() => toggleSection('sessionWorkingFolder')}
+          summary={hasWorkingFolderActivity ? <span className="cp-section-summary-main">{sessionFolderName}</span> : undefined}
+        >
+          <SessionWorkingFolderPanel />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          id="sessionContext"
+          title={t('control.sessionContext')}
+          icon={(
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="16" x2="12" y2="12" />
               <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
-          }
-          isExpanded={expandedSections.runtimeContext}
-          onToggle={() => toggleSection('runtimeContext')}
+          )}
+          variant="session"
+          isExpanded={expandedSections.sessionContext}
+          onToggle={() => toggleSection('sessionContext')}
+          summary={<span className="cp-section-summary-main">{contextSummary}</span>}
         >
-          <RuntimeContext />
+          <SessionContextPanel />
         </CollapsibleSection>
       </div>
     </div>
   );
+};
+
+export const ControlPanel: React.FC = () => {
+  const currentProject = useSessionStore((state) => state.currentProject);
+  const currentSession = useSessionStore((state) => state.currentSession);
+  const currentRun = useSessionStore((state) => state.currentRun);
+  const openedCapture = useSessionStore((state) => state.openedCapture);
+
+  const rightRailMode: RightRailMode = !currentProject
+    ? 'hidden'
+    : currentSession
+      ? 'session'
+      : 'project';
+
+  if (rightRailMode === 'hidden') {
+    return null;
+  }
+
+  if (rightRailMode === 'session') {
+    const sessionRailKey = [
+      currentSession?.sessionId ?? 'no-session',
+      currentRun?.runId ?? 'no-run',
+      openedCapture?.inputId ?? 'no-capture',
+    ].join(':');
+    return <SessionControlPanel key={sessionRailKey} />;
+  }
+
+  return <ProjectControlPanel />;
 };
 
 export default ControlPanel;
