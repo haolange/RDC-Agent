@@ -61,8 +61,8 @@ test('Session 右键菜单支持删除并自动切到剩余 Session', async () =
   const alphaItem = page.locator('.session-item', { hasText: seeded.alphaTitle }).first();
   await expect(alphaItem).toBeVisible();
 
-  await alphaItem.click({ button: 'right' });
-  await page.getByRole('button', { name: '删除' }).click();
+  await alphaItem.hover();
+  await alphaItem.getByRole('button', { name: '删除会话' }).click();
 
   await expect(page.locator('.session-item', { hasText: seeded.alphaTitle })).toHaveCount(0);
   await expect(page.locator('.session-item.active', { hasText: seeded.betaTitle })).toBeVisible();

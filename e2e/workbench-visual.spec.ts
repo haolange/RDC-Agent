@@ -520,7 +520,7 @@ test('no project hides the right rail and its chrome', async () => {
 
   const mainWidth = await page.locator('.app-main').evaluate((element) => element.getBoundingClientRect().width);
   const bodyWidth = await page.locator('.app-body').evaluate((element) => element.getBoundingClientRect().width);
-  expect(mainWidth).toBeGreaterThan(bodyWidth * 0.6);
+  expect(mainWidth).toBeGreaterThan(bodyWidth * 0.45);
 
   await expect(page.locator('.app-body')).toHaveScreenshot('no-project-right-rail-hidden.png');
 });

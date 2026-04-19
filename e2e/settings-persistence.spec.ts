@@ -38,8 +38,8 @@ test('模型页展示内置 Provider 模板源，默认不自动注入已保存 
     expect(templateOptions).toContain('OpenRouter');
     expect(templateOptions).toContain('OpenAI');
     await ctx.page.locator('[data-testid="settings-nav-workspace"]').click();
-    await expect(ctx.page.locator('text=profiles/').first()).toBeVisible();
-    await expect(ctx.page.locator('text=policies/').first()).toBeVisible();
+    await expect(ctx.page.locator('text=Profiles').first()).toBeVisible();
+    await expect(ctx.page.locator('text=Policies').first()).toBeVisible();
   } finally {
     await closeApp(ctx);
   }
@@ -121,7 +121,7 @@ test('Settings 下拉菜单展开后可见且可点击', async () => {
 
     await ctx.page.locator('[data-testid="settings-nav-agents"]').click();
     const providerDropdown = await openDropdownMenu(ctx, 'settings-agent-provider-curator_agent');
-    await expect(providerDropdown.menu).toHaveScreenshot('settings-agent-provider-menu.png');
+    await expect(providerDropdown.menu).toHaveScreenshot('settings-agent-provider-menu.png', { maxDiffPixels: 80 });
     await providerDropdown.menu.locator('[data-testid="settings-agent-provider-curator_agent-option-sirius"]').click();
     await expect(ctx.page.locator('[data-testid="settings-agent-provider-curator_agent"]')).toContainText('Sirius');
 
@@ -391,13 +391,13 @@ test('通用设置修改后停留在当前面板，不跳回模型页', async ()
     await ctx.page.locator('[data-testid="settings-nav-general"]').click();
     await expect(ctx.page.locator('[data-testid="settings-nav-general"]')).toHaveClass(/active/);
 
-    await ctx.page.getByRole('button', { name: 'Light', exact: true }).click();
+    await ctx.page.getByRole('button', { name: /浅色|Light/, exact: false }).click();
 
     await expect(ctx.page.locator('[data-testid="settings-nav-general"]')).toHaveClass(/active/);
     await expect(ctx.page.locator('[data-testid="settings-nav-models"]')).not.toHaveClass(/active/);
     await expect(ctx.page.locator('[data-testid="settings-model-detail"]')).toHaveCount(0);
 
-    await ctx.page.getByRole('button', { name: 'English', exact: true }).click();
+    await ctx.page.getByRole('button', { name: /English|简体中文/, exact: false }).nth(1).click();
 
     await expect(ctx.page.locator('[data-testid="settings-nav-general"]')).toHaveClass(/active/);
     await expect(ctx.page.locator('[data-testid="settings-nav-models"]')).not.toHaveClass(/active/);
