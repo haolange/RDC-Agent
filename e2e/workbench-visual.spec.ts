@@ -1,7 +1,7 @@
-import { test, expect, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import path from 'path';
 import { pathToFileURL } from 'url';
-import { launchApp, closeApp, type AppContext } from './helpers/electron-app';
+import { closeApp, launchApp, type AppContext } from './helpers/electron-app';
 
 let ctx: AppContext;
 
@@ -65,28 +65,6 @@ const isElementWithinViewport = async (page: Page, selector: string) => page.eva
   );
 }, selector);
 
-const isElementDescendantOf = async (page: Page, selector: string, ancestorSelector: string) => page.evaluate((params) => {
-  const element = document.querySelector(params.selector);
-  const ancestor = document.querySelector(params.ancestorSelector);
-  if (!(element instanceof HTMLElement) || !(ancestor instanceof HTMLElement)) {
-    return false;
-  }
-
-  return ancestor.contains(element);
-}, { selector, ancestorSelector });
-
-const doesElementOverflowSidebar = async (page: Page, selector: string, sidebarSelector: string) => page.evaluate((params) => {
-  const element = document.querySelector(params.selector);
-  const sidebar = document.querySelector(params.sidebarSelector);
-  if (!(element instanceof HTMLElement) || !(sidebar instanceof HTMLElement)) {
-    return false;
-  }
-
-  const elementRect = element.getBoundingClientRect();
-  const sidebarRect = sidebar.getBoundingClientRect();
-  return elementRect.right > sidebarRect.right + 80;
-}, { selector, sidebarSelector });
-
 const assertComposerFooterOrder = async (page: Page) => {
   const selectors = [
     '[data-testid="composer-attach-button"]',
@@ -105,9 +83,9 @@ const assertComposerFooterOrder = async (page: Page) => {
   expect(boxes[2]!.x).toBeLessThan(boxes[3]!.x);
 };
 
-const configureVisualSettings = async (ctx: AppContext): Promise<AppContext> => {
-  const tempDir = ctx.tempDir;
-  await ctx.page.evaluate(async () => {
+const configureVisualSettings = async (appContext: AppContext): Promise<AppContext> => {
+  const tempDir = appContext.tempDir;
+  await appContext.page.evaluate(async () => {
     await window.electronAPI.settings.set({
       appearance: {
         theme: 'dark',
@@ -132,7 +110,7 @@ const configureVisualSettings = async (ctx: AppContext): Promise<AppContext> => 
     });
   });
 
-  await closeApp(ctx, { cleanup: false });
+  await closeApp(appContext, { cleanup: false });
   const relaunched = await launchApp({ tempDir, cleanupOnClose: true });
   await relaunched.app.evaluate(({ BrowserWindow }) => {
     const mainWindow = BrowserWindow.getAllWindows()[0];
@@ -142,12 +120,12 @@ const configureVisualSettings = async (ctx: AppContext): Promise<AppContext> => 
   return relaunched;
 };
 
-const setWindowSize = async (ctx: AppContext, width: number, height: number) => {
-  await ctx.app.evaluate(({ BrowserWindow }, size) => {
+const setWindowSize = async (appContext: AppContext, width: number, height: number) => {
+  await appContext.app.evaluate(({ BrowserWindow }, size) => {
     const mainWindow = BrowserWindow.getAllWindows()[0];
     mainWindow.setSize(size.width, size.height);
   }, { width, height });
-  await ctx.page.waitForTimeout(350);
+  await appContext.page.waitForTimeout(350);
 };
 
 const seedConversationPreview = async (page: Page) => {
@@ -184,7 +162,7 @@ const seedConversationPreview = async (page: Page) => {
           role: 'assistant',
           agentId: 'rdc-debugger',
           status: 'complete',
-          content: '你好！我在呢。咱们已经在项目里了，手头有 Character_EyeSpark_Desktop.rdc 和 HairSparkWhite.rdc 这两个 Capture 文件。如果是双侧栏都收起的大画布场景，聊天气泡应该能继续放宽，而不是停留在过窄的固定宽度上。这里我故意把文本拉成长段落，用来验证 assistant 气泡是否会随着主区域变宽而继续扩展，避免左右留出过多无意义的黑边，并且确保一条较长的连续段落能把新的宽度上限真正利用起来。',
+          content: 'Both sidebars are collapsed in this preview. The assistant bubble should expand with the main canvas instead of staying inside the old narrow layout.',
           attachments: [],
           createdAt: fixedNow - 2000,
         },
@@ -256,6 +234,7 @@ const seedVisualWorkbench = async (page: Page) => {
     projectId: project.projectId,
     title: 'HairSpark',
     goal: '',
+    sessionPath: 'D:/Utility/DebugTest/custom/sessions/session-visual',
     createdAt: FIXED_NOW,
     updatedAt: FIXED_NOW,
     lastRunId: undefined,
@@ -295,6 +274,8 @@ const seedVisualWorkbench = async (page: Page) => {
       projectInputs,
       timeline: [],
       runs: [],
+      actionEvents: [],
+      workflowState: null,
       contextSnapshot: {
         contextId: 'ctx-device-visual',
         sessionId: 'replay-session-visual',
@@ -329,6 +310,159 @@ const seedVisualWorkbench = async (page: Page) => {
       },
     });
   }, { project, session, projectInputs, captures, previewAssetPath, previewAssetUrl, fixedNow: FIXED_NOW });
+};
+
+const resetWorkbenchState = async (page: Page) => {
+  await page.evaluate(() => {
+    const hook = (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        resetWorkbenchState: () => void;
+      };
+    }).__RDC_AGENT_E2E__;
+
+    if (!hook) {
+      throw new Error('Missing E2E state hook');
+    }
+
+    hook.resetWorkbenchState();
+  });
+};
+
+const seedProjectOnlyWorkbench = async (page: Page) => {
+  await seedVisualWorkbench(page);
+  await page.evaluate(() => {
+    const hook = (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        getWorkbenchState: () => Record<string, unknown>;
+        seedWorkbenchState: (state: Record<string, unknown>) => void;
+      };
+    }).__RDC_AGENT_E2E__;
+
+    if (!hook) {
+      throw new Error('Missing E2E state hook');
+    }
+
+    const state = hook.getWorkbenchState();
+    hook.seedWorkbenchState({
+      ...state,
+      currentSession: null,
+      currentRun: null,
+      conversationMessages: [],
+      timeline: [],
+      actionEvents: [],
+      workflowState: null,
+      runs: [],
+    });
+  });
+};
+
+const seedSessionWorkbenchWithoutCapture = async (page: Page) => {
+  await seedVisualWorkbench(page);
+  await page.evaluate(() => {
+    const hook = (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        getWorkbenchState: () => Record<string, unknown>;
+        seedWorkbenchState: (state: Record<string, unknown>) => void;
+      };
+    }).__RDC_AGENT_E2E__;
+
+    if (!hook) {
+      throw new Error('Missing E2E state hook');
+    }
+
+    const state = hook.getWorkbenchState();
+    hook.seedWorkbenchState({
+      ...state,
+      captures: [],
+      contextSnapshot: null,
+      openedCapture: null,
+      currentRun: null,
+      workflowState: null,
+      runs: [],
+    });
+  });
+};
+
+const seedRunningSessionWorkbench = async (page: Page) => {
+  await seedVisualWorkbench(page);
+  await page.evaluate(({ fixedNow }) => {
+    const hook = (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        getWorkbenchState: () => Record<string, unknown>;
+        seedWorkbenchState: (state: Record<string, unknown>) => void;
+      };
+    }).__RDC_AGENT_E2E__;
+
+    if (!hook) {
+      throw new Error('Missing E2E state hook');
+    }
+
+    const state = hook.getWorkbenchState() as {
+      captures: unknown[];
+    };
+
+    const activeRun = {
+      runId: 'run-visual',
+      projectId: 'project-visual',
+      sessionId: 'session-visual',
+      caseId: 'session-visual',
+      mode: 'debugger' as const,
+      goal: 'Inspect current capture',
+      captures: state.captures,
+      startedAt: fixedNow,
+      status: 'running' as const,
+      lastStage: 'investigate',
+      backend: 'local' as const,
+    };
+
+    hook.seedWorkbenchState({
+      ...state,
+      currentRun: activeRun,
+      runs: [activeRun],
+      workflowState: {
+        caseId: 'session-visual',
+        runId: 'run-visual',
+        sessionId: 'session-visual',
+        currentStage: 'investigate',
+        previousStages: ['preflight', 'entry_gate', 'intake_gate', 'plan', 'dispatch'],
+        entryMode: 'cli',
+        backend: 'local',
+        orchestrationMode: 'multi_agent',
+        coordinationMode: 'staged_handoff',
+        blockers: [
+          {
+            code: 'waiting-for-frame-annotation',
+            reason: 'Waiting for the user to confirm the problematic frame.',
+            refs: ['frame-327'],
+            detectedAt: new Date(fixedNow).toISOString(),
+          },
+        ],
+        reasoningSummaries: [
+          {
+            summaryId: 'summary-triage',
+            stage: 'investigate',
+            agentId: 'triage_agent',
+            summary: 'Potential DrawCall isolated. Verifying the runtime context next.',
+            evidence: ['capture:frame-327'],
+            nextStep: 'Wait for frame confirmation before branching the analysis.',
+            confidence: 0.82,
+            createdAt: new Date(fixedNow).toISOString(),
+          },
+          {
+            summaryId: 'summary-driver',
+            stage: 'investigate',
+            agentId: 'driver_device_agent',
+            summary: 'Device and replay runtime connection are healthy.',
+            evidence: ['device:local'],
+            nextStep: 'Continue narrowing the issue down to the shader path.',
+            confidence: 0.91,
+            createdAt: new Date(fixedNow + 1_000).toISOString(),
+          },
+        ],
+        lastUpdated: new Date(fixedNow + 1_000).toISOString(),
+      },
+    });
+  }, { fixedNow: FIXED_NOW });
 };
 
 test.beforeEach(async () => {
@@ -376,16 +510,37 @@ test('empty workbench keeps a continuous background and centered focus', async (
   await expect(emptyPrompt).toHaveScreenshot('empty-workbench.png');
 });
 
-test('右栏窄态视觉回归', async () => {
+test('no project hides the right rail and its chrome', async () => {
   const page = ctx.page;
-  await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveScreenshot('right-panel-narrow.png');
+  await resetWorkbenchState(page);
+
+  await expect(page.locator('[data-testid="titlebar-right-panel-toggle"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveCount(0);
+  await expect(page.locator('.panel-resize-handle-right')).toHaveCount(0);
+
+  const mainWidth = await page.locator('.app-main').evaluate((element) => element.getBoundingClientRect().width);
+  const bodyWidth = await page.locator('.app-body').evaluate((element) => element.getBoundingClientRect().width);
+  expect(mainWidth).toBeGreaterThan(bodyWidth * 0.6);
+
+  await expect(page.locator('.app-body')).toHaveScreenshot('no-project-right-rail-hidden.png');
 });
 
-test('Capture Library 工具栏和操作按钮不会横向裁剪', async () => {
+test('project mode keeps only Capture Library on the right rail', async () => {
   const page = ctx.page;
+  await seedProjectOnlyWorkbench(page);
+
+  await expect(page.locator('[data-testid="titlebar-right-panel-toggle"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-captureLibrary"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-openedCapture"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="cp-section-runtimeContext"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid^="capture-library-open-"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveScreenshot('right-panel-project.png');
+});
+
+test('Capture Library toolbar and cards do not clip horizontally', async () => {
+  const page = ctx.page;
+  await seedProjectOnlyWorkbench(page);
   const toolbar = page.locator('[data-testid="capture-library-toolbar"]');
-  const importButton = page.locator('[data-testid="capture-library-import"]');
-  const openButton = page.locator('[data-testid="capture-library-open-input-0"]');
   const librarySection = page.locator('[data-testid="cp-section-captureLibrary"]');
 
   await librarySection.evaluate((element) => {
@@ -394,81 +549,119 @@ test('Capture Library 工具栏和操作按钮不会横向裁剪', async () => {
   await page.waitForTimeout(200);
 
   await expect(toolbar).toBeVisible();
-  await expect(importButton).toBeVisible();
-  await expect(openButton).toBeVisible();
-  await expect(page.locator('[data-testid="capture-library-card-input-0"]')).toContainText('已打开');
+  await expect(page.locator('[data-testid="capture-library-import"]')).toBeVisible();
+  await expect(page.locator('[data-testid="capture-library-refresh"]')).toBeVisible();
+  await expect(page.locator('[data-testid="capture-library-card-input-0"]')).toBeVisible();
+  await expect(page.locator('[data-testid^="capture-library-open-"]')).toHaveCount(0);
 
   expect(await isChildFullyWithinContainer(
     page,
     '[data-testid="capture-library-toolbar"]',
     '[data-testid="capture-library-import"]',
   )).toBe(true);
+  expect(await isChildFullyWithinContainer(
+    page,
+    '[data-testid="capture-library-toolbar"]',
+    '[data-testid="capture-library-refresh"]',
+  )).toBe(true);
   expect(await isChildHorizontallyWithinContainer(
     page,
     '[data-testid="capture-library-card-input-0"]',
-    '[data-testid="capture-library-actions-input-0"]',
-  )).toBe(true);
-  expect(await isChildFullyWithinContainer(
-    page,
-    '[data-testid="capture-library-actions-input-0"]',
-    '[data-testid="capture-library-open-input-0"]',
+    '.capture-library-item-meta',
   )).toBe(true);
 
   await expect(librarySection).toHaveScreenshot('capture-library-section.png');
 });
 
-test('Opened Capture 面板视觉回归', async () => {
+test('session mode shows opened capture context inside Context panel', async () => {
   const page = ctx.page;
-  const openedCaptureSection = page.locator('[data-testid="cp-section-openedCapture"]');
+  const contextSection = page.locator('[data-testid="cp-section-sessionContext"]');
 
-  await openedCaptureSection.evaluate((element) => {
+  await contextSection.evaluate((element) => {
     element.scrollIntoView({ block: 'start', inline: 'nearest' });
   });
   await page.waitForTimeout(200);
 
   await expect(page.locator('[data-testid="opened-capture-preview-window"]')).toBeVisible();
-  await expect(openedCaptureSection).toHaveScreenshot('opened-capture-section.png');
+  await expect(page.locator('[data-testid="session-context-copy-id"]')).toBeVisible();
+  await expect(page.locator('[data-testid="session-context-clear-opened"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-captureLibrary"]')).toHaveCount(0);
+  await expect(contextSection).toContainText('HairSparkWhite.rdc');
+  await expect(contextSection).toContainText('local-runtime');
+  await expect(contextSection).toContainText('ctx-device-visual');
+  await expect(contextSection).toHaveScreenshot('session-context-opened.png');
 });
 
-test('运行中会禁用 Capture Library 的打开按钮，并禁止清理 opened capture', async () => {
+test('session mode shows task-first cards and quick capture entry when nothing is opened', async () => {
   const page = ctx.page;
+  await seedSessionWorkbenchWithoutCapture(page);
 
-  await page.evaluate(() => {
-    const hook = (window as Window & {
-      __RDC_AGENT_E2E__?: {
-        getWorkbenchState: () => Record<string, unknown>;
-        seedWorkbenchState: (state: Record<string, unknown>) => void;
-      };
-    }).__RDC_AGENT_E2E__;
-    if (!hook) {
-      throw new Error('Missing E2E state hook');
-    }
-
-    const state = hook.getWorkbenchState();
-    hook.seedWorkbenchState({
-      ...state,
-      currentRun: {
-        runId: 'run-visual',
-        projectId: 'project-visual',
-        sessionId: 'session-visual',
-        caseId: 'session-visual',
-        mode: 'debugger',
-        goal: 'Inspect current capture',
-        captures: state.captures,
-        startedAt: Date.now(),
-        status: 'running',
-        lastStage: 'investigate',
-        backend: 'local',
-      },
-    });
-  });
-
-  await expect(page.locator('[data-testid="capture-library-open-input-0"]')).toBeDisabled();
-  await expect(page.locator('.capture-library-run-lock')).toBeVisible();
-  await expect(page.locator('[data-testid="opened-capture-clear"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="cp-section-sessionProgress"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-sessionWorkingFolder"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-sessionContext"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-captureLibrary"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="cp-section-sessionContext"] .cp-section-content')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-sessionProgress"] .cp-section-content')).toHaveCount(0);
+  await expect(page.locator('[data-testid="cp-section-sessionWorkingFolder"] .cp-section-content')).toHaveCount(0);
+  await expect(page.locator('[data-testid="session-context-capture-select"]')).toBeVisible();
+  await expect(page.locator('[data-testid="session-context-open-selected"]')).toBeVisible();
+  await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveScreenshot('right-panel-session-empty.png');
+  await page.locator('[data-testid="session-context-capture-select"]').click();
+  await expect(page.locator('[data-testid="session-context-capture-select-menu"]')).toBeVisible();
+  await expect(page.locator('[data-testid="session-context-capture-option-input-0"]')).toBeVisible();
+  await expect(page.locator('[data-testid="session-context-capture-option-input-1"]')).toBeVisible();
 });
 
-test('Terminal drawer 展开后会显示日志并位于 prompt 下方', async () => {
+test('session Context can be collapsed after the default idle expansion', async () => {
+  const page = ctx.page;
+  await seedSessionWorkbenchWithoutCapture(page);
+
+  const contextSection = page.locator('[data-testid="cp-section-sessionContext"]');
+  await expect(contextSection.locator('.cp-section-content')).toBeVisible();
+
+  await contextSection.locator('.cp-section-header').click();
+  await expect(contextSection.locator('.cp-section-content')).toHaveCount(0);
+});
+
+test('session mode reflects an active run without falling back to project panels', async () => {
+  const page = ctx.page;
+  await seedRunningSessionWorkbench(page);
+
+  await expect(page.locator('[data-testid="cp-section-sessionProgress"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-captureLibrary"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="cp-section-sessionProgress"]')).toContainText('33%');
+  await page.locator('[data-testid="cp-section-sessionProgress"] .cp-section-header').click();
+  await page.locator('[data-testid="cp-section-sessionContext"] .cp-section-header').click();
+  await expect(page.locator('[data-testid="cp-section-sessionContext"]')).toContainText('HairSparkWhite.rdc');
+  await expect(page.locator('[data-testid="session-context-clear-opened"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveScreenshot('right-panel-session-running.png');
+});
+
+test('session Context stays readable in a narrow visible right rail', async () => {
+  const page = ctx.page;
+  await setWindowSize(ctx, 980, 900);
+
+  const contextSection = page.locator('[data-testid="cp-section-sessionContext"]');
+  await contextSection.evaluate((element) => {
+    element.scrollIntoView({ block: 'start', inline: 'nearest' });
+  });
+  await page.waitForTimeout(200);
+
+  await expect(page.locator('[data-testid="opened-capture-preview-window"]')).toBeVisible();
+  expect(await isChildHorizontallyWithinContainer(
+    page,
+    '[data-testid="cp-section-sessionContext"]',
+    '[data-testid="opened-capture-preview-window"]',
+  )).toBe(true);
+  expect(await isChildHorizontallyWithinContainer(
+    page,
+    '[data-testid="cp-section-sessionContext"]',
+    '[data-testid="session-context-clear-opened"]',
+  )).toBe(true);
+  await expect(contextSection).toHaveScreenshot('session-context-narrow.png');
+});
+
+test('Terminal drawer appears below the prompt bar when opened', async () => {
   const page = ctx.page;
 
   await page.locator('[data-testid="terminal-toggle"]').click();
@@ -499,7 +692,7 @@ test('Terminal drawer 展开后会显示日志并位于 prompt 下方', async ()
   await expect(page.locator('.app-main')).toHaveScreenshot('runtime-terminal-open.png');
 });
 
-test('左下 footer 视觉回归', async () => {
+test('sidebar footer remains visually stable', async () => {
   const page = ctx.page;
   await expect(page.locator('[data-testid="sidebar-footer"]')).toHaveScreenshot('sidebar-footer.png');
 });
@@ -511,7 +704,7 @@ test('top utility pills show Replay Device next to Terminal', async () => {
   await expect(page.locator('.main-floating-utilities')).toHaveScreenshot('main-utilities.png');
 });
 
-test('左栏收起后 footer 仍保留用户与设备缩略入口', async () => {
+test('collapsed left sidebar keeps footer utilities reachable', async () => {
   const page = ctx.page;
 
   await page.locator('[data-testid="titlebar-left-panel-toggle"]').click();
@@ -523,7 +716,7 @@ test('左栏收起后 footer 仍保留用户与设备缩略入口', async () => 
   expect(leftWidth).toBeLessThanOrEqual(1);
 });
 
-test('左栏收起后用户菜单保持在窗口可视范围内', async () => {
+test('device dropdown stays within the viewport when the left sidebar is collapsed', async () => {
   const page = ctx.page;
 
   await page.locator('[data-testid="titlebar-left-panel-toggle"]').click();
@@ -535,7 +728,7 @@ test('左栏收起后用户菜单保持在窗口可视范围内', async () => {
   expect(await isElementWithinViewport(page, '[data-testid="utility-device-selector-dropdown"]')).toBe(true);
 });
 
-test('左栏收起后设备菜单展开不越界', async () => {
+test('collapsing the right rail does not break the device utility entry', async () => {
   const page = ctx.page;
 
   await page.locator('[data-testid="titlebar-right-panel-toggle"]').click();
@@ -546,7 +739,7 @@ test('左栏收起后设备菜单展开不越界', async () => {
   await expect(page.locator('[data-testid="utility-device-selector-trigger"]')).toBeVisible();
 });
 
-test('模式菜单视觉回归', async () => {
+test('mode menu remains visually stable', async () => {
   const page = ctx.page;
 
   await page.locator('[data-testid="composer-mode-pill"]').click();
@@ -554,7 +747,7 @@ test('模式菜单视觉回归', async () => {
   await expect(page.locator('.composer-agent-menu-popup')).toHaveScreenshot('mode-menu.png');
 });
 
-test('768px 宽度下自动收起右栏，主内容保持可见', async () => {
+test('the right rail auto-collapses at 768px while keeping the main surface readable', async () => {
   const page = ctx.page;
   await setWindowSize(ctx, 768, 900);
 
@@ -564,7 +757,7 @@ test('768px 宽度下自动收起右栏，主内容保持可见', async () => {
   await expect(page.locator('.app-body')).toHaveScreenshot('tablet-layout-768.png');
 });
 
-test('375px 宽度下双侧栏自动收起，底部入口仍可达', async () => {
+test('both sidebars auto-collapse at 375px and the bottom entry points remain reachable', async () => {
   const page = ctx.page;
   await setWindowSize(ctx, 375, 900);
 
@@ -574,9 +767,9 @@ test('375px 宽度下双侧栏自动收起，底部入口仍可达', async () =>
   await expect(page.locator('.app-body')).toHaveScreenshot('mobile-layout-375.png');
 });
 
-test('主输入条 focus 态保持清晰可见', async () => {
+test('the main input bar keeps a clear focus state', async () => {
   const page = ctx.page;
-const input = page.locator('textarea.chat-input').first();
+  const input = page.locator('textarea.chat-input').first();
 
   await input.focus();
   await page.waitForTimeout(180);
@@ -628,7 +821,7 @@ test('chat bubbles expand with the main canvas when both sidebars are collapsed'
 
   await expect(assistantBubble).toBeVisible();
   await expect(userBubble).toBeVisible();
-  await expect(page.locator('.app-main')).toContainText('Character_EyeSpark_Desktop.rdc');
+  await expect(page.locator('.app-main')).toContainText('Both sidebars are collapsed in this preview.');
 
   const layout = await page.evaluate(() => {
     const main = document.querySelector('.app-main');
