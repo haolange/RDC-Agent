@@ -441,6 +441,15 @@ export function registerIPCHandlers(): void {
     }
   });
 
+  ipcMain.handle('project:rename', async (_event, projectId: string, newName: string) => {
+    try {
+      const project = storageAdapter.renameProject(projectId, newName);
+      return { success: true, project };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
   ipcMain.handle('project:remove', async (_event, projectId: string) => {
     try {
       storageAdapter.removeProject(projectId);

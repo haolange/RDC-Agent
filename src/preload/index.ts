@@ -153,6 +153,8 @@ const electronAPI = {
     list: (): Promise<{ projects: ProjectRecord[] }> => ipcRenderer.invoke('project:list'),
     add: (rootPath: string): Promise<{ success: boolean; project?: ProjectRecord; error?: string }> =>
       ipcRenderer.invoke('project:add', rootPath),
+    rename: (projectId: string, newName: string): Promise<{ success: boolean; project?: ProjectRecord; error?: string }> =>
+      ipcRenderer.invoke('project:rename', projectId, newName),
     remove: (projectId: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('project:remove', projectId),
     inputs: {
