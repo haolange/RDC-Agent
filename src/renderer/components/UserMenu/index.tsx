@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { createPortal } from 'react-dom';
 import type { AppLanguage, AppSettings, AppTheme, FontScale } from '@shared/types/settings';
 import { useI18n } from '../../i18n';
+import { ProfileAvatar } from '../ProfileAvatar';
 import './UserMenu.css';
 
 interface UserMenuProps {
@@ -148,9 +149,11 @@ export const UserMenu: React.FC<UserMenuProps> = ({
         }}
       >
         <div className="user-menu-header">
-          <div className="user-menu-avatar">
-            {(settings.profile.nickname || 'RA').trim().slice(0, 2).toUpperCase()}
-          </div>
+          <ProfileAvatar
+            className="user-menu-avatar"
+            avatarPath={settings.profile.avatarPath}
+            nickname={settings.profile.nickname}
+          />
           <div className="user-menu-header-copy">
             <div className="user-menu-name">{settings.profile.nickname}</div>
             <div className="user-menu-subtitle">{t('sidebar.userSubtitle')}</div>

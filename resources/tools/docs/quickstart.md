@@ -207,7 +207,7 @@ rdx.bat --non-interactive cli --daemon-context smoke daemon status
 - 当 live remote handle 仍被 replay lease 时，`rd.remote.disconnect` 预期返回 `remote_handle_in_use`；应先关闭相关 replay session。
 - daemon / worker 重启后，平台会优先使用持久化 remote 元数据恢复同一个 `session_id`；只有 endpoint 真断开、bootstrap 失败或恢复元数据不足时，才需要重新执行 `rd.remote.connect -> rd.remote.ping -> rd.capture.open_replay`。
 - 对 event-bound 链路，优先显式传入 `event_id`，并检查返回里的 `resolved_event_id`；`rd.shader.debug_start`、`rd.export.shader_bundle`、`rd.pipeline.get_shader`、`rd.shader.get_reflection`、`rd.shader.get_disassembly`、`rd.texture.get_pixel_value` 都不应再静默回退到别的 event。
-- `rd.pipeline.get_state_summary` / `rd.pipeline.get_output_targets` 会返回 `selected_visual_target` 与 `export_target_available`；`rd.export.screenshot`、`rd.texture.get_data`、`rd.texture.get_pixel_value` 与 shader replacement 后的观察链现在共用同一套 event target 解析。
+- `rd.pipeline.get_state_summary` / `rd.pipeline.get_output_targets` 会返回 `selected_visual_target` 与 `export_target_available`；`rd.export.screenshot target.semantic="event_output"`、`rd.texture.get_data`、`rd.texture.get_pixel_value` 与 shader replacement 后的观察链共用同一套 event target 解析。静态 `Capture Preview` 默认改用 `rd.export.screenshot target.semantic="swapchain"`，优先观察最终 `Present` / swapchain backbuffer。
 - `rd.shader.compile` 需要基于当前 replay backend 选择真实可接受的 `source_encoding`；不要假设 Android remote Vulkan session 仍接受 `hlsl`，应检查 `supported_source_encodings`。
 - 若当前任务改动了 preview 的几何适配、跟随语义或窗口行为，除分层命令验证外，建议补跑 `python scripts/preview_geometry_smoke.py --local-rdc "<local.rdc>" --remote-rdc "<remote.rdc>" --transport both`。
 

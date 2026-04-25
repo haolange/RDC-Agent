@@ -564,6 +564,20 @@ def test_capture_close_file_rejects_unknown_handle() -> None:
     assert payload["error_message"] == "Unknown capture_file_id: capf_missing"
 
 
+def test_capture_get_thumbnail_returns_unavailable_error() -> None:
+    _seed_capture()
+
+    payload = json.loads(
+        asyncio.run(server._dispatch_capture("get_thumbnail", {"capture_file_id": "capf_demo", "max_size_px": 640}))
+    )
+
+    assert payload["success"] is False
+    assert payload["code"] == "thumbnail_unavailable"
+    assert payload["category"] == "runtime"
+    assert payload["details"]["capture_file_id"] == "capf_demo"
+    assert payload["details"]["max_size_px"] == 640
+
+
 
 def test_capture_close_file_rejects_when_replay_depends_on_capture() -> None:
     _seed_capture()
@@ -702,9 +716,18 @@ def test_export_screenshot_forwards_requested_event(monkeypatch: pytest.MonkeyPa
             }
         )
 
+    async def _fake_event_truth_metadata(session_id: str, event_id: int) -> dict[str, object]:
+        return {
+            "binding_truth_level": "binding_verified",
+            "visual_truth_level": "visual_valid",
+            "evidence_truth_level": "visual_evidence_only",
+            "summary_degraded_reasons": [],
+        }
+
     monkeypatch.setattr(server.server_runtime, "_ensure_event", _fake_ensure_event)
     monkeypatch.setattr(server.server_runtime, "_output_target_resource_ids", _fake_output_target_resource_ids)
     monkeypatch.setattr(server.server_runtime, "_get_texture_descriptor", _fake_get_texture_descriptor)
+    monkeypatch.setattr(server.server_runtime, "_event_truth_metadata", _fake_event_truth_metadata)
     monkeypatch.setattr(server.server_runtime, "_binding_name_index_for_event", lambda session_id, event_id: asyncio.sleep(0, result={}))
     monkeypatch.setattr(server.server_runtime, "_dispatch_texture", _fake_dispatch_texture)
     monkeypatch.setattr(server.server_runtime, "_recommend_formats_for_texture", lambda texture_desc, name_info, for_screenshot=False: ["png"])

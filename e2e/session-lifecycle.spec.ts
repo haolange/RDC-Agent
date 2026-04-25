@@ -186,6 +186,98 @@ const clickSessionRemove = async (page: Page, title: string) => {
   }, title);
 };
 
+const clickSessionRename = async (page: Page, title: string) => {
+  await page.evaluate((targetTitle) => {
+    const item = Array.from(document.querySelectorAll<HTMLElement>('.session-subitem'))
+      .find((element) => element.textContent?.includes(targetTitle));
+    const button = Array.from(item?.querySelectorAll<HTMLElement>('.session-item-icon-button') ?? [])
+      .find((candidate) => !candidate.classList.contains('danger'));
+    if (!button) {
+      throw new Error(`Session rename button not found: ${targetTitle}`);
+    }
+    button.click();
+  }, title);
+};
+
+test('Project 和 Session Rename 输入逐字符键入时保留完整文本', async () => {
+  const page = ctx.page;
+  const projectRoot = path.join(ctx.tempDir, 'rename-regression');
+
+  fs.mkdirSync(path.join(projectRoot, '.resource', 'inputs'), { recursive: true });
+  fs.mkdirSync(path.join(projectRoot, '.resource', 'knowledge'), { recursive: true });
+
+  const seeded = await page.evaluate(async (rootPath) => {
+    const projectResult = await window.electronAPI.project.add(rootPath);
+    if (!projectResult.success || !projectResult.project) {
+      throw new Error(projectResult.error || 'Failed to create project');
+    }
+
+    const sessionResult = await window.electronAPI.session.create(projectResult.project.projectId, 'Initial Session');
+    if (!sessionResult.success || !sessionResult.session) {
+      throw new Error(sessionResult.error || 'Failed to create session');
+    }
+
+    const sessionsResult = await window.electronAPI.session.list(projectResult.project.projectId);
+    const hook = (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        seedWorkbenchState: (state: Record<string, unknown>) => void;
+      };
+    }).__RDC_AGENT_E2E__;
+    if (!hook) {
+      throw new Error('Missing E2E hook');
+    }
+
+    hook.seedWorkbenchState({
+      projects: [projectResult.project],
+      sessions: sessionsResult.sessions,
+      currentProject: projectResult.project,
+      currentSession: sessionResult.session,
+      rightRailTarget: 'session',
+      currentRun: null,
+      currentRunUsage: null,
+      contextSnapshot: null,
+      captures: [],
+      projectInputs: projectResult.project.inputs,
+      openedCapture: null,
+      conversationMessages: [],
+      timeline: [],
+      actionEvents: [],
+      workflowState: null,
+      runs: [],
+    });
+
+    return {
+      projectName: projectResult.project.name,
+    };
+  }, projectRoot);
+
+  const initialProjectItem = page.locator('.project-item', { hasText: seeded.projectName }).first();
+  await expect(initialProjectItem.locator('.project-item-title')).toHaveText(seeded.projectName);
+  await expect(initialProjectItem.locator('.project-item-origin-name')).toHaveCount(0);
+  await expect(page.locator('.session-subitem', { hasText: 'Initial Session' })).toBeVisible();
+
+  const sessionTitle = 'Render Target Check';
+  await clickSessionRename(page, 'Initial Session');
+  const sessionInput = page.locator('.session-rename-popover-input');
+  await expect(sessionInput).toBeVisible();
+  await sessionInput.pressSequentially(sessionTitle);
+  await expect(sessionInput).toHaveValue(sessionTitle);
+  await page.locator('.session-rename-popover-button-primary').click();
+  await waitForSessionList(page, { includes: [sessionTitle], excludes: ['Initial Session'] });
+
+  const projectName = 'Character Preview Project';
+  await openProjectMenu(page, seeded.projectName);
+  await page.locator('.sidebar-context-menu-item').nth(1).click();
+  const projectInput = page.locator('.session-rename-popover-input');
+  await expect(projectInput).toBeVisible();
+  await projectInput.pressSequentially(projectName);
+  await expect(projectInput).toHaveValue(projectName);
+  await page.locator('.session-rename-popover-button-primary').click();
+  const renamedProjectItem = page.locator('.project-item', { hasText: projectName }).first();
+  await expect(renamedProjectItem.locator('.project-item-title')).toHaveText(projectName);
+  await expect(renamedProjectItem.locator('.project-item-origin-name')).toHaveText('/ rename-regression');
+});
+
 test('Session 右键菜单支持删除并自动切到剩余 Session', async () => {
   const page = ctx.page;
   const projectRoot = path.join(ctx.tempDir, 'sample-project');

@@ -20,7 +20,7 @@ import type {
   SessionAttachmentRecord,
   SessionRecord,
 } from '@shared/types/session';
-import type { TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
+import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
 import type { RuntimeLogEntry, RuntimeLogScope } from '@shared/types/runtimeLog';
 
 const listenerMap = new Map<string, Map<(...args: unknown[]) => void, (...args: unknown[]) => void>>();
@@ -86,6 +86,7 @@ const electronAPI = {
 
   appShell: {
     selectAvatar: (): Promise<string | null> => ipcRenderer.invoke('app:selectAvatar'),
+    getAvatarDataUrl: (avatarPath: string): Promise<string | null> => ipcRenderer.invoke('app:getAvatarDataUrl', avatarPath),
     openPath: (targetPath: string): Promise<{ success: boolean; error?: string }> => ipcRenderer.invoke('app:openPath', targetPath),
     copyText: (text: string): Promise<{ success: boolean }> => ipcRenderer.invoke('app:copyText', text),
   },
@@ -211,7 +212,7 @@ const electronAPI = {
 
   terminal: {
     listTabs: (): Promise<{ tabs: TerminalTabRecord[] }> => ipcRenderer.invoke('terminal:listTabs'),
-    createTab: (request?: { cwd?: string | null }): Promise<{ success: boolean; tab?: TerminalTabRecord; tabs: TerminalTabRecord[]; error?: string }> =>
+    createTab: (request?: TerminalCreateTabRequest): Promise<{ success: boolean; tab?: TerminalTabRecord; tabs: TerminalTabRecord[]; error?: string }> =>
       ipcRenderer.invoke('terminal:createTab', request),
     closeTab: (tabId: string): Promise<{ success: boolean; tabs: TerminalTabRecord[]; error?: string }> =>
       ipcRenderer.invoke('terminal:closeTab', tabId),

@@ -2942,6 +2942,9 @@ const RIGHT_PANEL_DEFAULT_WIDTH = 312;
 const RIGHT_PANEL_MIN_WIDTH = 280;
 const RIGHT_PANEL_MAX_WIDTH = 520;
 const RIGHT_PANEL_COLLAPSED_WIDTH = 0;
+const TERMINAL_DEFAULT_HEIGHT = 328;
+const TERMINAL_MIN_HEIGHT = 180;
+const TERMINAL_MAX_HEIGHT = 720;
 const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
   {
     id: "openrouter",
@@ -3511,6 +3514,9 @@ const DEFAULT_LAYOUT = {
     collapsed: false,
     width: RIGHT_DEFAULTS.width,
     expandedWidth: RIGHT_DEFAULTS.width
+  },
+  terminal: {
+    height: TERMINAL_DEFAULT_HEIGHT
   }
 };
 const DEFAULT_PROFILE = {
@@ -3577,6 +3583,16 @@ function sanitizeSidebar(input, defaults, fallback) {
       typeof candidate.width === "number" ? candidate.width : fallback.collapsed ? defaults.collapsedWidth : expandedWidth,
       defaults.collapsedWidth,
       defaults.max
+    )
+  };
+}
+function sanitizeTerminal(input, fallback = DEFAULT_LAYOUT.terminal) {
+  const candidate = input ?? {};
+  return {
+    height: clamp(
+      typeof candidate.height === "number" ? candidate.height : fallback.height,
+      TERMINAL_MIN_HEIGHT,
+      TERMINAL_MAX_HEIGHT
     )
   };
 }
@@ -3878,7 +3894,8 @@ class SettingsService {
       },
       layout: {
         leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
-        rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel)
+        rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
+        terminal: sanitizeTerminal(candidate.layout?.terminal, fallback.layout?.terminal ?? DEFAULT_LAYOUT.terminal)
       },
       profile: {
         nickname: typeof candidate.profile?.nickname === "string" && candidate.profile.nickname.trim() ? candidate.profile.nickname.trim() : DEFAULT_PROFILE.nickname,
@@ -3919,7 +3936,8 @@ class SettingsService {
       },
       layout: {
         leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
-        rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel)
+        rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
+        terminal: sanitizeTerminal(candidate.layout?.terminal, fallback.layout?.terminal ?? DEFAULT_LAYOUT.terminal)
       },
       profile: {
         nickname: typeof candidate.profile?.nickname === "string" && candidate.profile.nickname.trim() ? candidate.profile.nickname.trim() : DEFAULT_PROFILE.nickname,
@@ -4080,6 +4098,13 @@ class SettingsService {
           },
           RIGHT_DEFAULTS,
           DEFAULT_LAYOUT.rightPanel
+        ),
+        terminal: sanitizeTerminal(
+          {
+            ...currentPersisted.layout?.terminal ?? DEFAULT_LAYOUT.terminal,
+            ...patch.layout?.terminal ?? {}
+          },
+          DEFAULT_LAYOUT.terminal
         )
       },
       profile: {
@@ -9728,7 +9753,10 @@ class TerminalSessionService {
       title: buildTabTitle(cwd),
       cwd,
       status: "running",
-      createdAt: nowMs()
+      createdAt: nowMs(),
+      sessionId: options?.sessionId ?? null,
+      projectId: options?.projectId ?? null,
+      runId: options?.runId ?? null
     };
     const tabState = {
       record,
@@ -12155,6 +12183,45 @@ class FileCheckpointSaver extends langgraphCheckpoint.BaseCheckpointSaver {
     }
   }
 }
+const AVATAR_MIME_BY_EXTENSION = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".bmp": "image/bmp"
+};
+function getAvatarMimeType(filePath) {
+  return AVATAR_MIME_BY_EXTENSION[path.extname(filePath).toLowerCase()] ?? null;
+}
+function isSameFilePath(left, right) {
+  const normalizedLeft = path.resolve(left);
+  const normalizedRight = path.resolve(right);
+  return process.platform === "win32" ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase() : normalizedLeft === normalizedRight;
+}
+function copyAvatarToWorkspace(sourcePath) {
+  const mimeType = getAvatarMimeType(sourcePath);
+  if (!mimeType || !fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
+    return null;
+  }
+  const paths = appPathService.getWorkspacePaths();
+  const avatarDir = path.join(paths.profilesPath, "avatar");
+  const extension = path.extname(sourcePath).toLowerCase();
+  const avatarPath = path.join(avatarDir, `profile-avatar${extension}`);
+  fs.mkdirSync(avatarDir, { recursive: true });
+  if (!isSameFilePath(sourcePath, avatarPath)) {
+    fs.copyFileSync(sourcePath, avatarPath);
+  }
+  return avatarPath;
+}
+function readAvatarDataUrl(avatarPath) {
+  const mimeType = getAvatarMimeType(avatarPath);
+  if (!mimeType || !fs.existsSync(avatarPath) || !fs.statSync(avatarPath).isFile()) {
+    return null;
+  }
+  const content = fs.readFileSync(avatarPath);
+  return `data:${mimeType};base64,${content.toString("base64")}`;
+}
 let compiledGraph = null;
 let checkpointSaver = null;
 let currentSessionId = null;
@@ -12383,10 +12450,29 @@ function registerIPCHandlers() {
   });
   electron.ipcMain.handle("app:selectAvatar", async () => {
     const result = await electron.dialog.showOpenDialog({
-      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
+      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp"] }],
       properties: ["openFile"]
     });
-    return result.canceled ? null : result.filePaths[0];
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+    try {
+      return copyAvatarToWorkspace(result.filePaths[0]);
+    } catch (error) {
+      console.warn("[IPC] Failed to import avatar:", error);
+      return null;
+    }
+  });
+  electron.ipcMain.handle("app:getAvatarDataUrl", async (_event, avatarPath) => {
+    if (!avatarPath) {
+      return null;
+    }
+    try {
+      return readAvatarDataUrl(avatarPath);
+    } catch (error) {
+      console.warn("[IPC] Failed to read avatar:", error);
+      return null;
+    }
   });
   electron.ipcMain.handle("app:openPath", async (_event, targetPath) => {
     if (!targetPath) return { success: false, error: "path is required" };
@@ -12786,7 +12872,7 @@ function registerIPCHandlers() {
           severity: "success",
           title: "Project input opened",
           summary: `${input.fileName} 已打开。`,
-          detail: openedCapture.preview?.source === "framebuffer_screenshot" ? "预览来源：framebuffer" : openedCapture.preview?.source === "capture_thumbnail" ? "预览来源：thumbnail" : "当前无可用预览",
+          detail: openedCapture.preview?.source === "framebuffer_screenshot" ? "预览来源：framebuffer" : openedCapture.preview?.source === "capture_thumbnail" ? "预览来源：thumbnail" : openedCapture.previewError?.code ? `当前无可用预览：${openedCapture.previewError.code}` : "当前无可用预览",
           sessionId: currentSessionId,
           projectId: request.projectId,
           runId: currentRunId,
@@ -13314,6 +13400,11 @@ class RDCToolAdapter {
   }
 }
 const rdcToolAdapter = new RDCToolAdapter();
+const emptyPreviewLoadResult = () => ({
+  preview: null,
+  error: null,
+  attempts: []
+});
 class RdxSessionService {
   toolBridge;
   contextId = null;
@@ -13464,7 +13555,7 @@ class RdxSessionService {
         await this.ensureRemoteConnection(replayDevice);
       }
     }
-    const preview = await this.ensureCaptureSession(capture, {
+    const previewResult = await this.ensureCaptureSession(capture, {
       projectId: request.projectId,
       inputId: request.inputId
     });
@@ -13473,7 +13564,7 @@ class RdxSessionService {
       request.inputId,
       request.filePath,
       replayDevice,
-      preview
+      previewResult
     );
     this.openedCapture = openedCapture;
     return openedCapture;
@@ -13635,7 +13726,7 @@ class RdxSessionService {
         contextId: this.contextId
       };
       if (!previewContext || !captureFileId) {
-        return null;
+        return emptyPreviewLoadResult();
       }
       return this.loadPreferredPreview(
         previewContext.projectId,
@@ -13790,7 +13881,7 @@ class RdxSessionService {
   getOwnerLeaseId() {
     return this.ownerLeaseId;
   }
-  createOpenedCaptureState(projectId, inputId, filePath, replayDevice, preview) {
+  createOpenedCaptureState(projectId, inputId, filePath, replayDevice, previewResult) {
     const activeCapture = this.captures.find((capture) => capture.id === this.activeCaptureId) ?? this.captures[0];
     return {
       projectId,
@@ -13806,11 +13897,14 @@ class RdxSessionService {
       deviceLabel: replayDevice.label,
       status: activeCapture?.status === "error" ? "error" : "open",
       openedAt: Date.now(),
-      preview
+      preview: previewResult.preview,
+      previewError: previewResult.error,
+      previewAttempts: previewResult.attempts
     };
   }
   async loadPreferredPreview(projectId, inputId, sessionId, captureFileId) {
-    const framebufferPreview = sessionId ? await this.loadFramebufferPreview(projectId, inputId, sessionId) : null;
+    const attempts = [];
+    const framebufferPreview = sessionId ? await this.loadFramebufferPreview(projectId, inputId, sessionId, attempts) : null;
     if (framebufferPreview) {
       runtimeLogService.log({
         scope: "app",
@@ -13818,12 +13912,13 @@ class RdxSessionService {
         severity: "success",
         title: "Preview ready",
         summary: `已加载 ${inputId} 的最终渲染预览。`,
-        detail: framebufferPreview.width > 0 && framebufferPreview.height > 0 ? `${framebufferPreview.width}x${framebufferPreview.height} · framebuffer` : "framebuffer",
-        projectId
+        detail: framebufferPreview.width > 0 && framebufferPreview.height > 0 ? `${framebufferPreview.width}x${framebufferPreview.height} · framebuffer · event=${framebufferPreview.resolvedEventId ?? "-"} · target=${framebufferPreview.targetSource ?? "-"}` : `framebuffer · event=${framebufferPreview.resolvedEventId ?? "-"} · target=${framebufferPreview.targetSource ?? "-"}`,
+        projectId,
+        raw: { preview: framebufferPreview, attempts }
       });
-      return framebufferPreview;
+      return { preview: framebufferPreview, error: null, attempts };
     }
-    const thumbnailPreview = await this.loadCaptureThumbnail(captureFileId);
+    const thumbnailPreview = await this.loadCaptureThumbnail(captureFileId, attempts);
     if (thumbnailPreview) {
       runtimeLogService.log({
         scope: "app",
@@ -13832,39 +13927,150 @@ class RdxSessionService {
         title: "Preview fallback",
         summary: `最终 framebuffer 不可用，已回退为 ${inputId} 的 capture thumbnail。`,
         detail: thumbnailPreview.width > 0 && thumbnailPreview.height > 0 ? `${thumbnailPreview.width}x${thumbnailPreview.height} · thumbnail` : "thumbnail",
-        projectId
+        projectId,
+        raw: { preview: thumbnailPreview, attempts }
       });
-      return thumbnailPreview;
+      return { preview: thumbnailPreview, error: null, attempts };
     }
+    const error = this.createPreviewError(attempts);
     runtimeLogService.log({
       scope: "app",
       namespace: "capture",
       severity: "warning",
       title: "Preview unavailable",
-      summary: `已打开 ${inputId}，但当前没有可用预览内容。`,
-      projectId
+      summary: `已打开 ${inputId}，但当前没有可用预览内容：${error.message}`,
+      projectId,
+      raw: { error, attempts }
     });
-    return null;
+    return { preview: null, error, attempts };
   }
-  async loadFramebufferPreview(projectId, inputId, sessionId) {
+  async loadFramebufferPreview(projectId, inputId, sessionId, attempts) {
     const outputPath = appPathService.getCapturePreviewPath(projectId, inputId);
     await fs.promises.mkdir(path.dirname(outputPath), { recursive: true });
+    const swapchainPreview = await this.loadFramebufferPreviewAtEvent(
+      sessionId,
+      outputPath,
+      attempts,
+      void 0,
+      "swapchain"
+    );
+    if (swapchainPreview) {
+      return swapchainPreview;
+    }
+    const candidateEventIds = await this.listPreviewCandidateEvents(sessionId);
+    const eventAttempts = candidateEventIds.slice().reverse().filter((eventId, index, values) => values.indexOf(eventId) === index);
+    for (const eventId of eventAttempts) {
+      const preview = await this.loadFramebufferPreviewAtEvent(
+        sessionId,
+        outputPath,
+        attempts,
+        eventId,
+        "event_output"
+      );
+      if (preview) {
+        return preview;
+      }
+    }
+    return null;
+  }
+  async loadFramebufferPreviewAtEvent(sessionId, outputPath, attempts, eventId, targetSemantic = "swapchain") {
+    const args = {
+      session_id: sessionId,
+      output_path: outputPath,
+      file_format: "png",
+      include_alpha: false,
+      target: {
+        semantic: targetSemantic
+      }
+    };
+    if (eventId !== void 0) {
+      args.event_id = eventId;
+    }
     const result = await this.toolBridge.call(this.buildClaimedToolRequest(
       "rd.export.screenshot",
-      {
-        session_id: sessionId,
-        output_path: outputPath,
-        file_format: "png",
-        include_alpha: true
-      }
+      args
     ));
-    if (!result.ok) {
+    if (!result.ok || result.data?.success === false) {
+      attempts.push({
+        source: "framebuffer_screenshot",
+        status: "failed",
+        eventId,
+        message: this.describeToolFailure(result, "rd.export.screenshot did not return a preview image."),
+        code: this.readToolFailureCode(result),
+        targetSemantic,
+        details: this.readToolFailureDetails(result)
+      });
       return null;
     }
     const imagePath = this.resolvePreviewPath(result, outputPath);
-    return imagePath ? this.createPreviewFromPath(imagePath, "framebuffer_screenshot") : null;
+    const metadata = this.extractPreviewMetadata(result);
+    const preview = imagePath ? this.createPreviewFromPath(imagePath, "framebuffer_screenshot", void 0, void 0, metadata) : null;
+    if (!preview) {
+      attempts.push({
+        source: "framebuffer_screenshot",
+        status: "failed",
+        eventId,
+        message: imagePath ? `rd.export.screenshot produced an unreadable image: ${imagePath}` : "rd.export.screenshot succeeded without image_path, saved_path, artifact_path, or artifact path.",
+        code: "preview_image_unreadable",
+        imagePath: imagePath ?? void 0,
+        targetSemantic,
+        details: this.readToolFailureDetails(result),
+        ...metadata
+      });
+      return null;
+    }
+    attempts.push({
+      source: "framebuffer_screenshot",
+      status: "success",
+      eventId,
+      imagePath: preview.imagePath,
+      resolvedEventId: preview.resolvedEventId,
+      presentEventId: preview.presentEventId,
+      textureId: preview.textureId,
+      targetSource: preview.targetSource,
+      targetSemantic: preview.targetSemantic ?? targetSemantic,
+      fallbackReason: preview.fallbackReason,
+      details: result.data?.swapchain_error
+    });
+    return preview;
   }
-  async loadCaptureThumbnail(captureFileId) {
+  async listPreviewCandidateEvents(sessionId) {
+    const result = await this.toolBridge.call(this.buildClaimedToolRequest(
+      "rd.event.get_actions",
+      {
+        session_id: sessionId,
+        include_markers: true,
+        include_drawcalls: true,
+        max_nodes: 2e4
+      }
+    ));
+    if (!result.ok || result.data?.success === false || !Array.isArray(result.data?.actions)) {
+      return [];
+    }
+    const eventIds = [];
+    const visit = (node) => {
+      const flags = typeof node.flags === "object" && node.flags !== null ? node.flags : {};
+      const isPreviewable = flags.is_draw === true || flags.is_dispatch === true || flags.is_pass_boundary === true;
+      const eventId = typeof node.event_id === "number" ? node.event_id : Number(node.event_id);
+      if (isPreviewable && Number.isFinite(eventId) && eventId > 0) {
+        eventIds.push(eventId);
+      }
+      if (Array.isArray(node.children)) {
+        for (const child of node.children) {
+          if (typeof child === "object" && child !== null) {
+            visit(child);
+          }
+        }
+      }
+    };
+    for (const action of result.data.actions) {
+      if (typeof action === "object" && action !== null) {
+        visit(action);
+      }
+    }
+    return Array.from(new Set(eventIds));
+  }
+  async loadCaptureThumbnail(captureFileId, attempts) {
     const result = await this.toolBridge.call(this.buildClaimedToolRequest(
       "rd.capture.get_thumbnail",
       {
@@ -13873,29 +14079,60 @@ class RdxSessionService {
       }
     ));
     if (!result.ok) {
+      attempts.push({
+        source: "capture_thumbnail",
+        status: "failed",
+        message: this.describeToolFailure(result, "rd.capture.get_thumbnail did not return a thumbnail."),
+        code: this.readToolFailureCode(result)
+      });
       return null;
     }
     const imagePath = this.resolvePreviewPath(result);
     if (!imagePath) {
+      attempts.push({
+        source: "capture_thumbnail",
+        status: "failed",
+        message: "rd.capture.get_thumbnail succeeded without image_path, saved_path, artifact_path, or artifact path.",
+        code: "thumbnail_path_missing"
+      });
       return null;
     }
-    return this.createPreviewFromPath(
+    const preview = this.createPreviewFromPath(
       imagePath,
       "capture_thumbnail",
       typeof result.data?.width === "number" ? result.data.width : void 0,
       typeof result.data?.height === "number" ? result.data.height : void 0
     );
+    if (!preview) {
+      attempts.push({
+        source: "capture_thumbnail",
+        status: "failed",
+        message: `rd.capture.get_thumbnail produced an unreadable image: ${imagePath}`,
+        code: "thumbnail_image_unreadable",
+        imagePath
+      });
+      return null;
+    }
+    attempts.push({
+      source: "capture_thumbnail",
+      status: "success",
+      imagePath: preview.imagePath
+    });
+    return preview;
   }
   resolvePreviewPath(result, fallbackPath) {
     const imagePath = typeof result.data?.image_path === "string" ? result.data.image_path : typeof result.data?.saved_path === "string" ? result.data.saved_path : typeof result.data?.artifact_path === "string" ? result.data.artifact_path : typeof result.data?.path === "string" ? result.data.path : result.artifacts?.[0]?.path ?? fallbackPath ?? null;
     return imagePath ? path.resolve(imagePath) : null;
   }
-  createPreviewFromPath(imagePath, source, fallbackWidth, fallbackHeight) {
+  createPreviewFromPath(imagePath, source, fallbackWidth, fallbackHeight, metadata = {}) {
     const normalizedPath = path.resolve(imagePath);
     if (!fs.existsSync(normalizedPath)) {
       return null;
     }
     const image = electron.nativeImage.createFromPath(normalizedPath);
+    if (image.isEmpty()) {
+      return null;
+    }
     const size = image.isEmpty() ? { width: 0, height: 0 } : image.getSize();
     const resolvedWidth = size.width || fallbackWidth || 0;
     const resolvedHeight = size.height || fallbackHeight || 0;
@@ -13904,11 +14141,53 @@ class RdxSessionService {
     }
     return {
       imagePath: normalizedPath,
-      imageUrl: url.pathToFileURL(normalizedPath).toString(),
+      imageUrl: image.toDataURL(),
       width: resolvedWidth,
       height: resolvedHeight,
       source,
+      ...metadata,
       updatedAt: Date.now()
+    };
+  }
+  extractPreviewMetadata(result) {
+    return {
+      resolvedEventId: typeof result.data?.resolved_event_id === "number" ? result.data.resolved_event_id : void 0,
+      presentEventId: typeof result.data?.present_event_id === "number" ? result.data.present_event_id : void 0,
+      textureId: typeof result.data?.texture_id === "string" ? result.data.texture_id : void 0,
+      targetSource: typeof result.data?.target_source === "string" ? result.data.target_source : void 0,
+      targetSemantic: typeof result.data?.requested_semantic === "string" ? result.data.requested_semantic : void 0,
+      fallbackReason: typeof result.data?.fallback_reason === "string" ? result.data.fallback_reason : void 0,
+      summaryDegraded: typeof result.data?.summary_degraded === "boolean" ? result.data.summary_degraded : void 0
+    };
+  }
+  describeToolFailure(result, fallback) {
+    if (result.error?.message) {
+      return result.error.message;
+    }
+    if (typeof result.data?.error_message === "string" && result.data.error_message) {
+      return result.data.error_message;
+    }
+    return fallback;
+  }
+  readToolFailureCode(result) {
+    if (result.error?.code) {
+      return result.error.code;
+    }
+    return typeof result.data?.code === "string" ? result.data.code : void 0;
+  }
+  readToolFailureDetails(result) {
+    if (result.error?.details) {
+      return result.error.details;
+    }
+    return result.data?.details;
+  }
+  createPreviewError(attempts) {
+    const failedAttempts = attempts.filter((attempt) => attempt.status === "failed");
+    const lastFailure = failedAttempts[failedAttempts.length - 1];
+    return {
+      message: lastFailure?.message ?? "No preview attempt produced a readable image.",
+      code: lastFailure?.code,
+      attempts: [...attempts]
     };
   }
   canReuseOpenedCapture(request) {

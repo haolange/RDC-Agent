@@ -24,9 +24,14 @@ export interface SidebarLayoutPreference {
   expandedWidth: number;
 }
 
+export interface TerminalLayoutPreference {
+  height: number;
+}
+
 export interface LayoutPreferences {
   leftSidebar: SidebarLayoutPreference;
   rightPanel: SidebarLayoutPreference;
+  terminal: TerminalLayoutPreference;
 }
 
 export interface UiPreferences {
@@ -122,6 +127,7 @@ export type AppSettingsPatch = Partial<{
   layout: Partial<{
     leftSidebar: Partial<SidebarLayoutPreference>;
     rightPanel: Partial<SidebarLayoutPreference>;
+    terminal: Partial<TerminalLayoutPreference>;
   }>;
   profile: Partial<ProfileSettings>;
   workspace: Partial<WorkspaceSettings>;

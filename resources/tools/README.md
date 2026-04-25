@@ -37,6 +37,9 @@
 - preview 固定跟随当前 context 的 `current_session_id + active_event_id`，不是 `qrenderdoc` 替身，也不是 fix verification / evidence 输入。
 - preview 默认显示当前 event 对应的完整 framebuffer / RT，不按 viewport 裁小；若当前 event 存在 viewport / scissor，会以区域标识叠加到完整 framebuffer 上。
 - `rd.session.get_context.preview.display` 会返回人类观察面使用的几何元数据，例如 `output_slot`、`texture_id`、`texture_format`、`framebuffer_extent`、`viewport_rect`、`scissor_rect`、`effective_region_rect`、`window_rect`、`fit_mode` 与 `screen_cap_ratio`。
+- 静态图片预览应优先走 `rd.export.screenshot`：未显式指定 `target.texture_id` / `target.rt_index` 时默认 `target.semantic="swapchain"`，优先导出最终 `Present` / swapchain backbuffer；需要旧的 event 输出观察时显式传 `target.semantic="event_output"`。
+- `rd.export.screenshot` 成功时必须返回可落盘读取的 `image_path` / `saved_path`、`resolved_event_id`、`present_event_id`、`texture_id`、`target_source`、`chosen_output_slot` 与 truth/degrade metadata；若 swapchain 解析失败后降级到 event output，必须返回 `target_source="event_output_fallback"`、`fallback_reason` 与 `summary_degraded_reasons`；失败时必须返回 `code`、`category` 与包含 `failure_stage` 的 `details`。
+- `rd.capture.get_thumbnail` 只能作为静态预览 fallback；当前 capture 没有可读缩略图时返回 `thumbnail_unavailable`，不得返回空成功结果。
 - `rd.texture.get_data` 的默认语义是数值 readback 容器，不是图片导出。
 - 需要直接打开的纹理图片时，统一使用 `rd.export.texture`。
 - `runtime_mode_truth.json` 只定义 transport/runtime ceiling，不定义平台是否具备 team agents。
@@ -153,6 +156,7 @@ rdx.bat --non-interactive mcp --ensure-env --daemon-context smoke-test
 - preview 不允许 silent fallback：不能悄悄从 remote 掉回 local，也不能悄悄从 `active_event` 退回 frame-end framebuffer 或导出轮询。
 - 当 preview 已 enabled 时，`rd.event.set_active`、`rd.replay.set_frame`、`rd.session.select_session` 与 `rd.session.resume` 会在返回前至少完成一次 preview 同步刷新尝试；若刷新失败，只更新 `rd.session.get_context.preview` 的状态与错误，不回滚 canonical runtime truth。
 - preview 窗口会按当前 framebuffer 几何自动调整大小，并把默认上限限制在当前屏幕工作区的 `50%`；若用户手动拖拽过窗口，在 framebuffer 几何不变时不会被持续抢改。
+- 静态 `Capture Preview` 图片不是 `rd.session.open_preview` 的 live 窗口；它默认通过 `rd.export.screenshot target.semantic="swapchain"` 展示最终 `Present` / swapchain backbuffer，并通过 `rd.capture.get_thumbnail` 作为最后 fallback；如果只能导出 event output，UI 必须明确标注 fallback 来源。
 - 一个 context 现在可持有多条本地 session 记录；`rd.session.get_context` 会同时返回 `current_session_id`、`sessions`、`recovery`、`limits` 与 `recent_operations`。
 - 现已公开 `rd.session.create_context`、`rd.session.list_contexts`、`rd.session.select_context`、`rd.session.clear_context`，把 multi-context 变成正式 public surface，而不是 CLI 侧隐式约定。
 - 现已公开 `rd.session.claim_runtime_owner` / `rd.session.release_runtime_owner`；当 context 已 claim owner 时，live `rd.*` 调用必须提供匹配的 `runtime_owner` 与 `owner_lease_id`，否则返回 `runtime_owner_conflict`。
@@ -164,7 +168,7 @@ rdx.bat --non-interactive mcp --ensure-env --daemon-context smoke-test
 - `active_event_id` 与对外暴露的 canonical `event_id` 只表示可被 `rd.event.get_action_details` round-trip 的 action event；对 `rd.resource.get_usage` / `rd.resource.get_history` 中不可 round-trip 的底层记录，应查看 `raw_event_id` 与 `event_resolvable`。
 - event-bound `rd.pipeline.*`、`rd.shader.*`、`rd.texture.get_pixel_value`、`rd.export.shader_bundle` 与 `rd.shader.debug_start` 会返回 `resolved_event_id`；若 backend 不能精确绑定请求 event，运行时会显式失败，不做 silent fallback。
 - `rd.pipeline.get_state` / `rd.pipeline.get_state_summary` / `rd.pipeline.get_output_targets` / `rd.export.screenshot` / `rd.texture.get_data` 会返回 truth/degrade 元数据，用于区分 `visual_evidence_only`、`binding degraded`、`summary partial` 与 `api_summary_untrusted`。
-- `rd.pipeline.get_state_summary` / `rd.pipeline.get_output_targets` 现在会额外返回 `selected_visual_target` 与 `export_target_available`；`rd.export.screenshot` 与 event-bound texture readback 会共享同一套 event target 解析链，避免“pipeline 说无输出但 screenshot 又静默导出 RT0”的分叉。
+- `rd.pipeline.get_state_summary` / `rd.pipeline.get_output_targets` 现在会额外返回 `selected_visual_target` 与 `export_target_available`；`rd.export.screenshot target.semantic="event_output"` 与 event-bound texture readback 会共享同一套 event target 解析链，默认静态预览则优先走 `target.semantic="swapchain"`。
 - `rd.shader.edit_and_replace` 现在要么执行真实 runtime shader replacement，要么返回明确的 capability/runtime 失败；不会再返回 `mock_applied` 一类伪成功状态。
 - `rd.shader.edit_and_replace` 只有在 replacement 应用后重新绑定目标 `event_id` 成功时，才会返回 `status="applied"`；返回中会保留 `replacement_id`、`resolved_event_id`、`original_shader_id`、`applied_to_shader_hash` 与 `original_shader_hash`，供后续 screenshot / readback / revert 做同链路核对。
 - `rd.shader.edit_and_replace` / patch engine 的错误面现在会显式区分绑定失败、stage mismatch、build failed、apply failed、backend unsupported 与 source hash mismatch，而不再把多阶段失败全部折叠成 `shader_not_bound`。

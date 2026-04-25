@@ -9,7 +9,17 @@ export interface TerminalTabRecord {
   cwd: string;
   status: TerminalTabStatus;
   createdAt: number;
+  sessionId?: string | null;
+  projectId?: string | null;
+  runId?: string | null;
   exitCode?: number | null;
+}
+
+export interface TerminalCreateTabRequest {
+  cwd?: string | null;
+  sessionId?: string | null;
+  projectId?: string | null;
+  runId?: string | null;
 }
 
 export interface TerminalDataEvent {

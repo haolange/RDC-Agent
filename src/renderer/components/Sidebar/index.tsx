@@ -58,6 +58,12 @@ interface SelectionSnapshot {
   runs: ReturnType<typeof useSessionStore.getState>['runs'];
 }
 
+const getProjectOriginName = (project: ProjectRecord): string => {
+  const normalizedRootPath = project.rootPath.trim().replace(/[\\/]+$/, '');
+  const segments = normalizedRootPath.split(/[\\/]+/).filter(Boolean);
+  return segments[segments.length - 1] || project.rootPath;
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({
   collapsed = false,
 }) => {
@@ -74,10 +80,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const renamePopoverRef = useRef<HTMLDivElement | null>(null);
+  const initializedRenameTargetRef = useRef<string | null>(null);
   
   const projectMenuRef = useRef<HTMLDivElement | null>(null);
   const projectRenameRef = useRef<HTMLDivElement | null>(null);
   const projectRenameInputRef = useRef<HTMLInputElement | null>(null);
+  const initializedProjectRenameTargetRef = useRef<string | null>(null);
   const selectionRequestRef = useRef(0);
   const didRunInitialLoadRef = useRef(false);
 
@@ -347,18 +355,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [renamePopover, projectMenuPopover, projectRenamePopover]);
 
   useEffect(() => {
-    if (renamePopover) {
+    const targetSessionId = renamePopover?.session.sessionId ?? null;
+    if (!targetSessionId) {
+      initializedRenameTargetRef.current = null;
+      return;
+    }
+    if (initializedRenameTargetRef.current !== targetSessionId) {
+      initializedRenameTargetRef.current = targetSessionId;
       renameInputRef.current?.focus();
       renameInputRef.current?.select();
     }
-  }, [renamePopover]);
+  }, [renamePopover?.session.sessionId]);
 
   useEffect(() => {
-    if (projectRenamePopover) {
+    const targetProjectId = projectRenamePopover?.project.projectId ?? null;
+    if (!targetProjectId) {
+      initializedProjectRenameTargetRef.current = null;
+      return;
+    }
+    if (initializedProjectRenameTargetRef.current !== targetProjectId) {
+      initializedProjectRenameTargetRef.current = targetProjectId;
       projectRenameInputRef.current?.focus();
       projectRenameInputRef.current?.select();
     }
-  }, [projectRenamePopover]);
+  }, [projectRenamePopover?.project.projectId]);
 
   useEffect(() => {
     if (currentProject?.projectId) {
@@ -757,6 +777,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 const visibleSessions = hasOverflowSessions && !showAllSessions
                   ? projectSessions.slice(0, 5)
                   : projectSessions;
+                const projectOriginName = getProjectOriginName(project);
+                const shouldShowProjectOriginName = project.name.trim() !== projectOriginName.trim();
                 return (
                   <section
                     key={project.projectId}
@@ -792,7 +814,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               <path d="M9 6l6 6-6 6" />
                             </svg>
                           </button>
-                          <span className="session-item-title project-item-title">{project.name}</span>
+                          <span
+                            className="project-item-title-wrap"
+                            title={shouldShowProjectOriginName ? `${project.name} / ${projectOriginName}` : project.name}
+                          >
+                            <span className="project-item-title">{project.name}</span>
+                            {shouldShowProjectOriginName && (
+                              <span className="project-item-origin-name">/ {projectOriginName}</span>
+                            )}
+                          </span>
                         </span>
                         {isCurrentProject && (
                           <span className="session-item-actions">

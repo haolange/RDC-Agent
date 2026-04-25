@@ -182,9 +182,35 @@
   padding: 10px 11px;
 }
 
-.project-item-title,
-.project-item .session-item-title {
+.project-item-title-wrap {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.project-item-title {
+  min-width: 0;
+  overflow: hidden;
+  color: rgb(var(--color-text-primary));
   font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-item-origin-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: rgb(var(--color-text-tertiary) / 0.72);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .session-item:hover {

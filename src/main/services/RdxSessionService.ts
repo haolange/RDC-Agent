@@ -6,7 +6,6 @@
 import fs from 'fs';
 import path from 'path';
 import { nativeImage } from 'electron';
-import { pathToFileURL } from 'url';
 import { ToolBridge } from './ToolBridge';
 import { appPathService } from './AppPathService';
 import { replayDeviceService, type PreparedRemoteSurface } from './ReplayDeviceService';
@@ -17,11 +16,41 @@ import type {
   ContextSnapshot,
   OpenedCaptureState,
   OpenedCapturePreview,
+  OpenedCapturePreviewAttempt,
+  OpenedCapturePreviewError,
   OpenProjectInputRequest,
 } from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import type { ToolCallResult } from '@shared/types/tool';
 import { generateId, generateShortId } from '@shared/utils/id';
+
+interface PreviewActionNode {
+  event_id?: unknown;
+  flags?: unknown;
+  children?: unknown;
+}
+
+interface PreviewLoadResult {
+  preview: OpenedCapturePreview | null;
+  error: OpenedCapturePreviewError | null;
+  attempts: OpenedCapturePreviewAttempt[];
+}
+
+interface PreviewMetadata {
+  resolvedEventId?: number;
+  presentEventId?: number;
+  textureId?: string;
+  targetSource?: string;
+  targetSemantic?: string;
+  fallbackReason?: string;
+  summaryDegraded?: boolean;
+}
+
+const emptyPreviewLoadResult = (): PreviewLoadResult => ({
+  preview: null,
+  error: null,
+  attempts: [],
+});
 
 export class RdxSessionService {
   private toolBridge: ToolBridge;
@@ -202,7 +231,7 @@ export class RdxSessionService {
       }
     }
 
-    const preview = await this.ensureCaptureSession(capture, {
+    const previewResult = await this.ensureCaptureSession(capture, {
       projectId: request.projectId,
       inputId: request.inputId,
     });
@@ -212,7 +241,7 @@ export class RdxSessionService {
       request.inputId,
       request.filePath,
       replayDevice,
-      preview,
+      previewResult,
     );
     this.openedCapture = openedCapture;
     return openedCapture;
@@ -349,7 +378,7 @@ export class RdxSessionService {
   async ensureCaptureSession(
     capture: CaptureDescriptor,
     previewContext?: { projectId: string; inputId: string },
-  ): Promise<OpenedCapturePreview | null> {
+  ): Promise<PreviewLoadResult> {
     const captureIndex = this.captures.findIndex((item) => item.id === capture.id);
     if (captureIndex < 0) {
       throw new Error(`Capture ${capture.id} not in captures list`);
@@ -401,7 +430,7 @@ export class RdxSessionService {
       };
 
       if (!previewContext || !captureFileId) {
-        return null;
+        return emptyPreviewLoadResult();
       }
 
       return this.loadPreferredPreview(
@@ -594,7 +623,7 @@ export class RdxSessionService {
     inputId: string,
     filePath: string,
     replayDevice: ReplayDeviceEntry,
-    preview: OpenedCapturePreview | null,
+    previewResult: PreviewLoadResult,
   ): OpenedCaptureState {
     const activeCapture = this.captures.find((capture) => capture.id === this.activeCaptureId) ?? this.captures[0];
     return {
@@ -611,7 +640,9 @@ export class RdxSessionService {
       deviceLabel: replayDevice.label,
       status: activeCapture?.status === 'error' ? 'error' : 'open',
       openedAt: Date.now(),
-      preview,
+      preview: previewResult.preview,
+      previewError: previewResult.error,
+      previewAttempts: previewResult.attempts,
     };
   }
 
@@ -620,9 +651,10 @@ export class RdxSessionService {
     inputId: string,
     sessionId: string,
     captureFileId: string,
-  ): Promise<OpenedCapturePreview | null> {
+  ): Promise<PreviewLoadResult> {
+    const attempts: OpenedCapturePreviewAttempt[] = [];
     const framebufferPreview = sessionId
-      ? await this.loadFramebufferPreview(projectId, inputId, sessionId)
+      ? await this.loadFramebufferPreview(projectId, inputId, sessionId, attempts)
       : null;
     if (framebufferPreview) {
       runtimeLogService.log({
@@ -632,14 +664,15 @@ export class RdxSessionService {
         title: 'Preview ready',
         summary: `已加载 ${inputId} 的最终渲染预览。`,
         detail: framebufferPreview.width > 0 && framebufferPreview.height > 0
-          ? `${framebufferPreview.width}x${framebufferPreview.height} · framebuffer`
-          : 'framebuffer',
+          ? `${framebufferPreview.width}x${framebufferPreview.height} · framebuffer · event=${framebufferPreview.resolvedEventId ?? '-'} · target=${framebufferPreview.targetSource ?? '-'}`
+          : `framebuffer · event=${framebufferPreview.resolvedEventId ?? '-'} · target=${framebufferPreview.targetSource ?? '-'}`,
         projectId,
+        raw: { preview: framebufferPreview, attempts },
       });
-      return framebufferPreview;
+      return { preview: framebufferPreview, error: null, attempts };
     }
 
-    const thumbnailPreview = await this.loadCaptureThumbnail(captureFileId);
+    const thumbnailPreview = await this.loadCaptureThumbnail(captureFileId, attempts);
     if (thumbnailPreview) {
       runtimeLogService.log({
         scope: 'app',
@@ -651,49 +684,186 @@ export class RdxSessionService {
           ? `${thumbnailPreview.width}x${thumbnailPreview.height} · thumbnail`
           : 'thumbnail',
         projectId,
+        raw: { preview: thumbnailPreview, attempts },
       });
-      return thumbnailPreview;
+      return { preview: thumbnailPreview, error: null, attempts };
     }
 
+    const error = this.createPreviewError(attempts);
     runtimeLogService.log({
       scope: 'app',
       namespace: 'capture',
       severity: 'warning',
       title: 'Preview unavailable',
-      summary: `已打开 ${inputId}，但当前没有可用预览内容。`,
+      summary: `已打开 ${inputId}，但当前没有可用预览内容：${error.message}`,
       projectId,
+      raw: { error, attempts },
     });
-    return null;
+    return { preview: null, error, attempts };
   }
 
   private async loadFramebufferPreview(
     projectId: string,
     inputId: string,
     sessionId: string,
+    attempts: OpenedCapturePreviewAttempt[],
   ): Promise<OpenedCapturePreview | null> {
     const outputPath = appPathService.getCapturePreviewPath(projectId, inputId);
     await fs.promises.mkdir(path.dirname(outputPath), { recursive: true });
 
+    const swapchainPreview = await this.loadFramebufferPreviewAtEvent(
+      sessionId,
+      outputPath,
+      attempts,
+      undefined,
+      'swapchain',
+    );
+    if (swapchainPreview) {
+      return swapchainPreview;
+    }
+
+    const candidateEventIds = await this.listPreviewCandidateEvents(sessionId);
+    const eventAttempts = candidateEventIds.slice().reverse()
+      .filter((eventId, index, values) => values.indexOf(eventId) === index);
+
+    for (const eventId of eventAttempts) {
+      const preview = await this.loadFramebufferPreviewAtEvent(
+        sessionId,
+        outputPath,
+        attempts,
+        eventId,
+        'event_output',
+      );
+      if (preview) {
+        return preview;
+      }
+    }
+
+    return null;
+  }
+
+  private async loadFramebufferPreviewAtEvent(
+    sessionId: string,
+    outputPath: string,
+    attempts: OpenedCapturePreviewAttempt[],
+    eventId?: number,
+    targetSemantic: 'swapchain' | 'event_output' = 'swapchain',
+  ): Promise<OpenedCapturePreview | null> {
+    const args: Record<string, unknown> = {
+      session_id: sessionId,
+      output_path: outputPath,
+      file_format: 'png',
+      include_alpha: false,
+      target: {
+        semantic: targetSemantic,
+      },
+    };
+    if (eventId !== undefined) {
+      args.event_id = eventId;
+    }
+
     const result: ToolCallResult = await this.toolBridge.call(this.buildClaimedToolRequest(
       'rd.export.screenshot',
-      {
-        session_id: sessionId,
-        output_path: outputPath,
-        file_format: 'png',
-        include_alpha: true,
-      },
+      args,
     ));
-    if (!result.ok) {
+    if (!result.ok || result.data?.success === false) {
+      attempts.push({
+        source: 'framebuffer_screenshot',
+        status: 'failed',
+        eventId,
+        message: this.describeToolFailure(result, 'rd.export.screenshot did not return a preview image.'),
+        code: this.readToolFailureCode(result),
+        targetSemantic,
+        details: this.readToolFailureDetails(result),
+      });
       return null;
     }
 
     const imagePath = this.resolvePreviewPath(result, outputPath);
-    return imagePath
-      ? this.createPreviewFromPath(imagePath, 'framebuffer_screenshot')
+    const metadata = this.extractPreviewMetadata(result);
+    const preview = imagePath
+      ? this.createPreviewFromPath(imagePath, 'framebuffer_screenshot', undefined, undefined, metadata)
       : null;
+    if (!preview) {
+      attempts.push({
+        source: 'framebuffer_screenshot',
+        status: 'failed',
+        eventId,
+        message: imagePath
+          ? `rd.export.screenshot produced an unreadable image: ${imagePath}`
+          : 'rd.export.screenshot succeeded without image_path, saved_path, artifact_path, or artifact path.',
+        code: 'preview_image_unreadable',
+        imagePath: imagePath ?? undefined,
+        targetSemantic,
+        details: this.readToolFailureDetails(result),
+        ...metadata,
+      });
+      return null;
+    }
+
+    attempts.push({
+      source: 'framebuffer_screenshot',
+      status: 'success',
+      eventId,
+      imagePath: preview.imagePath,
+      resolvedEventId: preview.resolvedEventId,
+      presentEventId: preview.presentEventId,
+      textureId: preview.textureId,
+      targetSource: preview.targetSource,
+      targetSemantic: preview.targetSemantic ?? targetSemantic,
+      fallbackReason: preview.fallbackReason,
+      details: result.data?.swapchain_error,
+    });
+    return preview;
   }
 
-  private async loadCaptureThumbnail(captureFileId: string): Promise<OpenedCapturePreview | null> {
+  private async listPreviewCandidateEvents(sessionId: string): Promise<number[]> {
+    const result: ToolCallResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+      'rd.event.get_actions',
+      {
+        session_id: sessionId,
+        include_markers: true,
+        include_drawcalls: true,
+        max_nodes: 20000,
+      },
+    ));
+    if (!result.ok || result.data?.success === false || !Array.isArray(result.data?.actions)) {
+      return [];
+    }
+
+    const eventIds: number[] = [];
+    const visit = (node: PreviewActionNode) => {
+      const flags = typeof node.flags === 'object' && node.flags !== null
+        ? node.flags as Record<string, unknown>
+        : {};
+      const isPreviewable = flags.is_draw === true || flags.is_dispatch === true || flags.is_pass_boundary === true;
+      const eventId = typeof node.event_id === 'number' ? node.event_id : Number(node.event_id);
+      if (isPreviewable && Number.isFinite(eventId) && eventId > 0) {
+        eventIds.push(eventId);
+      }
+
+      if (Array.isArray(node.children)) {
+        for (const child of node.children) {
+          if (typeof child === 'object' && child !== null) {
+            visit(child as PreviewActionNode);
+          }
+        }
+      }
+    };
+
+    for (const action of result.data.actions) {
+      if (typeof action === 'object' && action !== null) {
+        visit(action as PreviewActionNode);
+      }
+    }
+
+    return Array.from(new Set(eventIds));
+  }
+
+  private async loadCaptureThumbnail(
+    captureFileId: string,
+    attempts: OpenedCapturePreviewAttempt[],
+  ): Promise<OpenedCapturePreview | null> {
     const result: ToolCallResult = await this.toolBridge.call(this.buildClaimedToolRequest(
       'rd.capture.get_thumbnail',
       {
@@ -703,20 +873,49 @@ export class RdxSessionService {
     ));
 
     if (!result.ok) {
+      attempts.push({
+        source: 'capture_thumbnail',
+        status: 'failed',
+        message: this.describeToolFailure(result, 'rd.capture.get_thumbnail did not return a thumbnail.'),
+        code: this.readToolFailureCode(result),
+      });
       return null;
     }
 
     const imagePath = this.resolvePreviewPath(result);
     if (!imagePath) {
+      attempts.push({
+        source: 'capture_thumbnail',
+        status: 'failed',
+        message: 'rd.capture.get_thumbnail succeeded without image_path, saved_path, artifact_path, or artifact path.',
+        code: 'thumbnail_path_missing',
+      });
       return null;
     }
 
-    return this.createPreviewFromPath(
+    const preview = this.createPreviewFromPath(
       imagePath,
       'capture_thumbnail',
       typeof result.data?.width === 'number' ? result.data.width : undefined,
       typeof result.data?.height === 'number' ? result.data.height : undefined,
     );
+    if (!preview) {
+      attempts.push({
+        source: 'capture_thumbnail',
+        status: 'failed',
+        message: `rd.capture.get_thumbnail produced an unreadable image: ${imagePath}`,
+        code: 'thumbnail_image_unreadable',
+        imagePath,
+      });
+      return null;
+    }
+
+    attempts.push({
+      source: 'capture_thumbnail',
+      status: 'success',
+      imagePath: preview.imagePath,
+    });
+    return preview;
   }
 
   private resolvePreviewPath(result: ToolCallResult, fallbackPath?: string): string | null {
@@ -738,6 +937,7 @@ export class RdxSessionService {
     source: OpenedCapturePreview['source'],
     fallbackWidth?: number,
     fallbackHeight?: number,
+    metadata: PreviewMetadata = {},
   ): OpenedCapturePreview | null {
     const normalizedPath = path.resolve(imagePath);
     if (!fs.existsSync(normalizedPath)) {
@@ -745,6 +945,9 @@ export class RdxSessionService {
     }
 
     const image = nativeImage.createFromPath(normalizedPath);
+    if (image.isEmpty()) {
+      return null;
+    }
     const size = image.isEmpty() ? { width: 0, height: 0 } : image.getSize();
     const resolvedWidth = size.width || fallbackWidth || 0;
     const resolvedHeight = size.height || fallbackHeight || 0;
@@ -755,11 +958,58 @@ export class RdxSessionService {
 
     return {
       imagePath: normalizedPath,
-      imageUrl: pathToFileURL(normalizedPath).toString(),
+      imageUrl: image.toDataURL(),
       width: resolvedWidth,
       height: resolvedHeight,
       source,
+      ...metadata,
       updatedAt: Date.now(),
+    };
+  }
+
+  private extractPreviewMetadata(result: ToolCallResult): PreviewMetadata {
+    return {
+      resolvedEventId: typeof result.data?.resolved_event_id === 'number' ? result.data.resolved_event_id : undefined,
+      presentEventId: typeof result.data?.present_event_id === 'number' ? result.data.present_event_id : undefined,
+      textureId: typeof result.data?.texture_id === 'string' ? result.data.texture_id : undefined,
+      targetSource: typeof result.data?.target_source === 'string' ? result.data.target_source : undefined,
+      targetSemantic: typeof result.data?.requested_semantic === 'string' ? result.data.requested_semantic : undefined,
+      fallbackReason: typeof result.data?.fallback_reason === 'string' ? result.data.fallback_reason : undefined,
+      summaryDegraded: typeof result.data?.summary_degraded === 'boolean' ? result.data.summary_degraded : undefined,
+    };
+  }
+
+  private describeToolFailure(result: ToolCallResult, fallback: string): string {
+    if (result.error?.message) {
+      return result.error.message;
+    }
+    if (typeof result.data?.error_message === 'string' && result.data.error_message) {
+      return result.data.error_message;
+    }
+    return fallback;
+  }
+
+  private readToolFailureCode(result: ToolCallResult): string | undefined {
+    if (result.error?.code) {
+      return result.error.code;
+    }
+    return typeof result.data?.code === 'string' ? result.data.code : undefined;
+  }
+
+  private readToolFailureDetails(result: ToolCallResult): unknown {
+    if (result.error?.details) {
+      return result.error.details;
+    }
+    return result.data?.details;
+  }
+
+  private createPreviewError(attempts: OpenedCapturePreviewAttempt[]): OpenedCapturePreviewError {
+    const failedAttempts = attempts.filter((attempt) => attempt.status === 'failed');
+    const lastFailure = failedAttempts[failedAttempts.length - 1];
+    return {
+      message: lastFailure?.message ?? 'No preview attempt produced a readable image.',
+      code: lastFailure?.code,
+      attempts: [...attempts],
     };
   }
 

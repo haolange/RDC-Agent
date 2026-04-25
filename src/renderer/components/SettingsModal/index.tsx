@@ -15,6 +15,7 @@ import type {
 } from '@shared/types/settings';
 import { AGENT_DISPLAY_NAMES, AGENT_ROLES } from '@shared/constants/agents';
 import { BUILTIN_LLM_PROVIDER_DEFINITIONS, createBuiltinProviderEntry } from '@shared/constants/llm';
+import { ProfileAvatar } from '../ProfileAvatar';
 import './SettingsModal.css';
 
 interface SettingsModalProps {
@@ -26,11 +27,6 @@ interface SettingsModalProps {
 type SettingsSection = 'general' | 'workspace' | 'models' | 'agents';
 
 const PROVIDER_KIND_OPTIONS: LlmProviderKind[] = ['openrouter', 'openai-compatible', 'anthropic', 'ollama'];
-
-const toFileUrl = (filePath?: string): string | undefined => {
-  if (!filePath) return undefined;
-  return `file:///${filePath.replace(/\\/g, '/')}`;
-};
 
 const joinPath = (root: string, ...segments: string[]): string => {
   const separator = root.includes('\\') ? '\\' : '/';
@@ -496,13 +492,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
                   <div className="settings-profile-row">
                     <div className="settings-account-avatar-shell">
-                      {accountDraft.avatarPath ? (
-                        <img className="settings-account-avatar" src={toFileUrl(accountDraft.avatarPath)} alt="avatar" />
-                      ) : (
-                        <div className="settings-account-avatar settings-account-avatar-fallback">
-                          {(accountDraft.nickname || 'RA').trim().slice(0, 2).toUpperCase()}
-                        </div>
-                      )}
+                      <ProfileAvatar
+                        className="settings-account-avatar"
+                        fallbackClassName="settings-account-avatar-fallback"
+                        avatarPath={accountDraft.avatarPath}
+                        nickname={accountDraft.nickname}
+                      />
                     </div>
                     <div className="settings-profile-fields">
                       <label className="settings-field">

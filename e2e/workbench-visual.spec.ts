@@ -1,7 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
-import { pathToFileURL } from 'url';
 import { closeApp, launchApp, type AppContext } from './helpers/electron-app';
 
 let ctx: AppContext;
@@ -202,7 +201,7 @@ const getCenterDelta = async (page: Page, outerSelector: string, innerSelector: 
 
 const seedVisualWorkbench = async (page: Page) => {
   const previewAssetPath = path.resolve('src/renderer/assets/images/hero-bg.png');
-  const previewAssetUrl = pathToFileURL(previewAssetPath).toString();
+  const previewAssetUrl = `data:image/png;base64,${fs.readFileSync(previewAssetPath).toString('base64')}`;
   const projectInputs = Array.from({ length: 3 }, (_, index) => ({
     inputId: `input-${index}`,
     fileName: index === 0 ? 'HairSparkWhite.rdc' : `Capture-${index}.rdc`,
@@ -306,8 +305,26 @@ const seedVisualWorkbench = async (page: Page) => {
           width: 1280,
           height: 720,
           source: 'framebuffer_screenshot',
+          resolvedEventId: 1847,
+          presentEventId: 1847,
+          textureId: 'ResourceId::3410',
+          targetSource: 'swapchain_present',
+          targetSemantic: 'swapchain',
           updatedAt: fixedNow,
         },
+        previewError: null,
+        previewAttempts: [
+          {
+            source: 'framebuffer_screenshot',
+            status: 'success',
+            resolvedEventId: 1847,
+            presentEventId: 1847,
+            textureId: 'ResourceId::3410',
+            targetSource: 'swapchain_present',
+            targetSemantic: 'swapchain',
+            imagePath: previewAssetPath,
+          },
+        ],
       },
     });
   }, { project, session, projectInputs, captures, previewAssetPath, previewAssetUrl, fixedNow: FIXED_NOW });
@@ -825,6 +842,110 @@ test('session mode shows opened capture context inside Context panel', async () 
   await expect(contextSection).toHaveScreenshot('session-context-opened.png');
 });
 
+test('session mode renders framebuffer preview image for opened capture', async () => {
+  const page = ctx.page;
+  const previewWindow = page.locator('[data-testid="opened-capture-preview-window"]');
+  const previewImage = previewWindow.locator('img.opened-capture-preview-image');
+
+  await expect(previewWindow).toBeVisible();
+  await expect(previewImage).toBeVisible();
+  await expect(previewImage).toHaveAttribute('src', /^data:image\/png;base64,/);
+  await expect(previewWindow.locator('.opened-capture-preview-badge.framebuffer_screenshot')).toContainText(/Swapchain \/ Present/);
+});
+
+test('session mode labels event output fallback preview explicitly', async () => {
+  const page = ctx.page;
+  await page.evaluate(() => {
+    const hook = (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        getWorkbenchState: () => Record<string, unknown>;
+        seedWorkbenchState: (state: Record<string, unknown>) => void;
+      };
+    }).__RDC_AGENT_E2E__;
+
+    if (!hook) {
+      throw new Error('Missing E2E state hook');
+    }
+
+    const state = hook.getWorkbenchState();
+    hook.seedWorkbenchState({
+      ...state,
+      openedCapture: state.openedCapture
+        ? {
+            ...state.openedCapture,
+            preview: {
+              ...(state.openedCapture as { preview: Record<string, unknown> }).preview,
+              targetSource: 'event_output_fallback',
+              targetSemantic: 'swapchain',
+              fallbackReason: 'swapchain_target_unavailable',
+              summaryDegraded: true,
+            },
+          }
+        : null,
+    });
+  });
+
+  const previewWindow = page.locator('[data-testid="opened-capture-preview-window"]');
+  await expect(previewWindow).toBeVisible();
+  await expect(previewWindow.locator('.opened-capture-preview-badge.event_output_fallback')).toContainText(/Fallback RT/);
+  await expect(previewWindow).toContainText(/Swapchain unavailable|未能解析 Swapchain/);
+});
+
+test('session mode shows structured preview failure for opened capture', async () => {
+  const page = ctx.page;
+  await page.evaluate(() => {
+    const hook = (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        getWorkbenchState: () => Record<string, unknown>;
+        seedWorkbenchState: (state: Record<string, unknown>) => void;
+      };
+    }).__RDC_AGENT_E2E__;
+
+    if (!hook) {
+      throw new Error('Missing E2E state hook');
+    }
+
+    const state = hook.getWorkbenchState() as { openedCapture?: Record<string, unknown> | null };
+    hook.seedWorkbenchState({
+      ...state,
+      openedCapture: state.openedCapture
+        ? {
+            ...state.openedCapture,
+            preview: null,
+            previewError: {
+              message: 'Active event 1847 does not expose a previewable output target',
+              code: 'preview_event_output_unavailable',
+              attempts: [
+                {
+                  source: 'framebuffer_screenshot',
+                  status: 'failed',
+                  eventId: 1847,
+                  message: 'Active event 1847 does not expose a previewable output target',
+                  code: 'preview_event_output_unavailable',
+                },
+              ],
+            },
+            previewAttempts: [
+              {
+                source: 'framebuffer_screenshot',
+                status: 'failed',
+                eventId: 1847,
+                message: 'Active event 1847 does not expose a previewable output target',
+                code: 'preview_event_output_unavailable',
+              },
+            ],
+          }
+        : null,
+    });
+  });
+
+  const previewWindow = page.locator('[data-testid="opened-capture-preview-window"]');
+  await expect(previewWindow).toBeVisible();
+  await expect(previewWindow.locator('img.opened-capture-preview-image')).toHaveCount(0);
+  await expect(previewWindow).toContainText('preview_event_output_unavailable');
+  await expect(previewWindow).toContainText('Active event 1847 does not expose a previewable output target');
+});
+
 test('session mode shows task-first cards and quick capture entry when nothing is opened', async () => {
   const page = ctx.page;
   await seedSessionWorkbenchWithoutCapture(page);
@@ -898,8 +1019,17 @@ test('Terminal drawer appears below the prompt bar when opened', async () => {
   const page = ctx.page;
 
   await page.locator('[data-testid="terminal-toggle"]').click();
+  await expect(page.locator('[data-testid="runtime-terminal-activity-pane"]')).toBeVisible();
+  await expect(page.locator('.runtime-terminal-shell-tab')).toHaveCount(0);
   await page.locator('[data-testid="runtime-terminal-scope"]').click();
   await page.locator('[data-testid="runtime-terminal-scope-option-app"]').click();
+  await page.locator('[data-testid="runtime-terminal-filter-toggle"]').click();
+  await page.locator('[data-testid="runtime-terminal-severity"]').click();
+  await page.locator('[data-testid="runtime-terminal-severity-option-success"]').click();
+  await expect(page.locator('.runtime-terminal-entry.severity-success')).toHaveCount(2);
+  await page.locator('[data-testid="runtime-terminal-severity"]').click();
+  await page.locator('[data-testid="runtime-terminal-severity-option-all"]').click();
+  await page.locator('[data-testid="runtime-terminal-filter-toggle"]').click();
 
   const promptBar = page.locator('.main-input-bar');
   const terminal = page.locator('[data-testid="runtime-terminal"]');

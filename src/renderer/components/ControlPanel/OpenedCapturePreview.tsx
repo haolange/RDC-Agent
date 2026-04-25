@@ -20,6 +20,20 @@ export const OpenedCapturePreview: React.FC<OpenedCapturePreviewProps> = ({
   const previewSourceLabel = preview?.source === 'framebuffer_screenshot'
     ? t('control.previewSourceFramebuffer')
     : t('control.previewSourceThumbnail');
+  const previewTargetLabel = preview?.source === 'framebuffer_screenshot'
+    ? preview.targetSource === 'swapchain_present'
+      ? t('control.previewSourceSwapchain')
+      : preview.targetSource === 'event_output_fallback'
+        ? t('control.previewSourceFallbackRt')
+        : preview.targetSource === 'explicit_resource'
+          ? t('control.previewSourceTexture')
+          : previewSourceLabel
+    : t('control.previewFallback');
+  const isDegradedPreview = preview?.source === 'framebuffer_screenshot'
+    && (preview.targetSource === 'event_output_fallback' || preview.summaryDegraded === true);
+  const previewFailureText = imageLoadFailed
+    ? t('control.previewImageLoadFailed')
+    : openedCapture?.previewError?.message;
 
   useEffect(() => {
     setImageLoadFailed(false);
@@ -53,7 +67,8 @@ export const OpenedCapturePreview: React.FC<OpenedCapturePreviewProps> = ({
           <div className="opened-capture-preview-title">{t('control.previewWindow')}</div>
           <div className="opened-capture-preview-status">{t('control.previewEmpty')}</div>
           <div className="opened-capture-preview-description">
-            {openedCapture ? t('control.previewNoImage') : t('control.previewEmptyHint')}
+            {previewFailureText ?? (openedCapture ? t('control.previewNoImage') : t('control.previewEmptyHint'))}
+            {openedCapture?.previewError?.code ? ` (${openedCapture.previewError.code})` : ''}
           </div>
         </div>
       </div>
@@ -79,18 +94,24 @@ export const OpenedCapturePreview: React.FC<OpenedCapturePreviewProps> = ({
       <div className="opened-capture-preview-meta">
         <div className="opened-capture-preview-meta-topline">
           <span className="opened-capture-preview-title" title={previewTitle}>{previewTitle}</span>
-          <span className={`opened-capture-preview-badge ${resolvedPreview.source}`}>
-            {resolvedPreview.source === 'capture_thumbnail' ? t('control.previewFallback') : previewSourceLabel}
+          <span className={`opened-capture-preview-badge ${resolvedPreview.source} ${resolvedPreview.targetSource ?? ''}`}>
+            {previewTargetLabel}
           </span>
         </div>
         <div className="opened-capture-preview-meta-subline">
-          <span>{previewSourceLabel}</span>
+          <span>{previewTargetLabel}</span>
           <span className="capture-item-separator">/</span>
           <span>
             {t('control.previewResolution')}
             {' '}
             {resolvedPreview.width > 0 && resolvedPreview.height > 0 ? `${resolvedPreview.width}x${resolvedPreview.height}` : '--'}
           </span>
+          {isDegradedPreview ? (
+            <>
+              <span className="capture-item-separator">/</span>
+              <span>{t('control.previewFallbackWarning')}</span>
+            </>
+          ) : null}
         </div>
       </div>
     </div>

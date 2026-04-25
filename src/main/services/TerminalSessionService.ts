@@ -3,7 +3,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateShortId, nowMs } from '@shared/utils/id';
-import type { TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
+import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
 import { storageAdapter } from './StorageAdapter';
 
 interface ShellTabState {
@@ -66,7 +66,7 @@ export class TerminalSessionService {
       .sort((left, right) => left.createdAt - right.createdAt);
   }
 
-  createTab(options?: { cwd?: string | null }): TerminalTabRecord {
+  createTab(options?: TerminalCreateTabRequest): TerminalTabRecord {
     const cwd = resolveTerminalCwd(options?.cwd);
     const tabId = `term_${generateShortId()}`;
     const shellPath = resolvePowerShellPath();
@@ -90,6 +90,9 @@ export class TerminalSessionService {
       cwd,
       status: 'running',
       createdAt: nowMs(),
+      sessionId: options?.sessionId ?? null,
+      projectId: options?.projectId ?? null,
+      runId: options?.runId ?? null,
     };
 
     const tabState: ShellTabState = {
