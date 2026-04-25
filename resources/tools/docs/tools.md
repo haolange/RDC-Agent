@@ -115,8 +115,12 @@
 - `rd.pipeline.*` 的同次调用内，snapshot 与 live pipeline 读取共享同一个已解析 event 上下文，不允许前后错位。
 - event-bound `rd.pipeline.*`、`rd.shader.*`、`rd.texture.get_pixel_value`、`rd.export.shader_bundle` 与 `rd.shader.debug_start` 会返回 `resolved_event_id`；如果 backend 不能精确绑定请求 event，必须显式失败，不允许 silent fallback。
 - `rd.pipeline.get_state` / `rd.pipeline.get_state_summary` / `rd.pipeline.get_output_targets` 会返回 truth/degrade 元数据，至少区分 `summary_status`、`summary_degraded_reasons`、`binding_truth_level` 与 `evidence_truth_level`。
-- `rd.pipeline.get_state_summary` / `rd.pipeline.get_output_targets` 还会返回 `selected_visual_target` 与 `export_target_available`；`rd.export.screenshot`、`rd.texture.get_data` 与 `rd.texture.get_pixel_value` 会和它们共享同一套 event output 解析。
+- `rd.pipeline.get_state_summary` / `rd.pipeline.get_output_targets` 还会返回 `selected_visual_target` 与 `export_target_available`；`rd.export.screenshot target.semantic="event_output"`、`rd.texture.get_data` 与 `rd.texture.get_pixel_value` 会和它们共享同一套 event output 解析。
 - `rd.texture.get_data` / `rd.texture.get_pixel_value` / `rd.export.screenshot` 也会带 `resolved_event_id`、target metadata 与 truth/degrade 标记；readback 或 screenshot 看起来“有结果”不等于绑定真相已验证。
+- `rd.export.screenshot` 在未显式传 `target.texture_id` / `target.rt_index` 时默认使用 `target.semantic="swapchain"`，优先导出最终 `Present` / swapchain backbuffer；如果需要旧的当前 event 输出观察，应显式传 `target.semantic="event_output"`。
+- 当 swapchain 目标无法由 `RenderDoc` resource usage 解析时，`rd.export.screenshot` 才降级到 event output，并用 `target_source="event_output_fallback"`、`fallback_reason` 与 `summary_degraded_reasons` 标明降级；显式传入的 `target.rt_index` 不存在时，仍返回结构化失败。
+- `rd.export.screenshot` 失败时应返回 `code`、`category` 与 `details.failure_stage`，并在 `details` 中保留 `session_id`、`event_id`、`texture_id`、`target_source` 等已解析上下文；不得返回空成功结果。
+- `rd.capture.get_thumbnail` 只有在 `RenderDoc` runtime 能读取并落盘缩略图时才返回 `image_path`、`width` 与 `height`；若当前 capture 没有可读缩略图，必须返回 `thumbnail_unavailable`，不得返回 `success=true` 且 `image_path=null`。
 - `rd.resource.get_usage` / `rd.resource.get_history` 会同时暴露：
   - canonical `event_id`
   - `raw_event_id`

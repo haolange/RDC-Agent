@@ -108,7 +108,7 @@
 - 对 event-bound pipeline / shader / texture / export / debug 调用，显式传入 `event_id` 并检查返回中的 `resolved_event_id`。
   - 如果 backend 不支持精确 event-bound debug 或 shader 绑定，运行时现在会显式失败，而不是静默回退到别的 event。
   - `rd.pipeline.get_state` / `rd.pipeline.get_state_summary` / `rd.pipeline.get_output_targets` / `rd.texture.get_data` / `rd.export.screenshot` 会返回 truth/degrade 元数据；上层应把这些字段当作证据可信度的一部分，而不是只看主 payload 非空。
-  - `rd.pipeline.get_state_summary` / `rd.pipeline.get_output_targets` 还会返回 `selected_visual_target` 与 `export_target_available`；若 replacement 后 screenshot/readback 没变化，应先用这些字段判断是 replacement 未生效、event 绑定错位，还是该 event 本就不会影响目标像素。
+  - `rd.pipeline.get_state_summary` / `rd.pipeline.get_output_targets` 还会返回 `selected_visual_target` 与 `export_target_available`；若 replacement 后 screenshot/readback 没变化，应先用这些字段判断是 replacement 未生效、event 绑定错位，还是该 event 本就不会影响目标像素。需要 event 输出观察时显式使用 `rd.export.screenshot target.semantic="event_output"`；静态 `Capture Preview` 默认使用 `target.semantic="swapchain"`。
 - 把 handle 当作短生命周期引用。
   - 上层如需缓存，必须准备重建 session 的恢复路径，而不是把 handle 当成永久主键。
 - 先读 catalog 的 `prerequisites`，再决定 tool 序列。

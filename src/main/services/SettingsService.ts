@@ -30,6 +30,9 @@ import {
   RIGHT_PANEL_DEFAULT_WIDTH,
   RIGHT_PANEL_MAX_WIDTH,
   RIGHT_PANEL_MIN_WIDTH,
+  TERMINAL_DEFAULT_HEIGHT,
+  TERMINAL_MAX_HEIGHT,
+  TERMINAL_MIN_HEIGHT,
 } from '@shared/constants/layout';
 import {
   createBuiltinProviderEntry,
@@ -135,6 +138,9 @@ const DEFAULT_LAYOUT: LayoutPreferences = {
     width: RIGHT_DEFAULTS.width,
     expandedWidth: RIGHT_DEFAULTS.width,
   },
+  terminal: {
+    height: TERMINAL_DEFAULT_HEIGHT,
+  },
 };
 
 const DEFAULT_PROFILE: ProfileSettings = {
@@ -223,6 +229,17 @@ function sanitizeSidebar(
           : expandedWidth,
       defaults.collapsedWidth,
       defaults.max,
+    ),
+  };
+}
+
+function sanitizeTerminal(input: unknown, fallback = DEFAULT_LAYOUT.terminal): LayoutPreferences['terminal'] {
+  const candidate = (input ?? {}) as Partial<LayoutPreferences['terminal']>;
+  return {
+    height: clamp(
+      typeof candidate.height === 'number' ? candidate.height : fallback.height,
+      TERMINAL_MIN_HEIGHT,
+      TERMINAL_MAX_HEIGHT,
     ),
   };
 }
@@ -631,6 +648,7 @@ export class SettingsService {
       layout: {
         leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
         rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
+        terminal: sanitizeTerminal(candidate.layout?.terminal, fallback.layout?.terminal ?? DEFAULT_LAYOUT.terminal),
       },
       profile: {
         nickname: typeof candidate.profile?.nickname === 'string' && candidate.profile.nickname.trim()
@@ -680,6 +698,7 @@ export class SettingsService {
       layout: {
         leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
         rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
+        terminal: sanitizeTerminal(candidate.layout?.terminal, fallback.layout?.terminal ?? DEFAULT_LAYOUT.terminal),
       },
       profile: {
         nickname: typeof candidate.profile?.nickname === 'string' && candidate.profile.nickname.trim()
@@ -869,6 +888,13 @@ export class SettingsService {
           },
           RIGHT_DEFAULTS,
           DEFAULT_LAYOUT.rightPanel,
+        ),
+        terminal: sanitizeTerminal(
+          {
+            ...(currentPersisted.layout?.terminal ?? DEFAULT_LAYOUT.terminal),
+            ...(patch.layout?.terminal ?? {}),
+          },
+          DEFAULT_LAYOUT.terminal,
         ),
       },
       profile: {

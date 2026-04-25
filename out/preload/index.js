@@ -56,6 +56,7 @@ const electronAPI = {
   },
   appShell: {
     selectAvatar: () => electron.ipcRenderer.invoke("app:selectAvatar"),
+    getAvatarDataUrl: (avatarPath) => electron.ipcRenderer.invoke("app:getAvatarDataUrl", avatarPath),
     openPath: (targetPath) => electron.ipcRenderer.invoke("app:openPath", targetPath),
     copyText: (text) => electron.ipcRenderer.invoke("app:copyText", text)
   },

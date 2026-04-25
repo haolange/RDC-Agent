@@ -1,0 +1,9 @@
+.profile-avatar-image.profile-avatar-image {
+  display: block;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.profile-avatar-fallback.profile-avatar-fallback {
+  overflow: hidden;
+}

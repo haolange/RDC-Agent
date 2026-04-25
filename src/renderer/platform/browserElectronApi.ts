@@ -28,7 +28,7 @@ import type {
   SessionAttachmentRecord,
   SessionRecord,
 } from '@shared/types/session';
-import type { TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
+import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
 import type { ToolCatalog, ToolNamespace } from '@shared/types/tool';
 import type {
   AskUserPrompt,
@@ -39,6 +39,7 @@ import type { ElectronAPI } from '@shared/types/electron';
 import {
   LEFT_SIDEBAR_DEFAULT_WIDTH,
   RIGHT_PANEL_DEFAULT_WIDTH,
+  TERMINAL_DEFAULT_HEIGHT,
 } from '@shared/constants/layout';
 
 const FALLBACK_MARKER = '__RDC_AGENT_BROWSER_ELECTRON_API_FALLBACK__';
@@ -103,6 +104,9 @@ const createSettings = (): AppSettings => {
         collapsed: false,
         width: RIGHT_PANEL_DEFAULT_WIDTH,
         expandedWidth: RIGHT_PANEL_DEFAULT_WIDTH,
+      },
+      terminal: {
+        height: TERMINAL_DEFAULT_HEIGHT,
       },
     },
     profile: {
@@ -381,28 +385,48 @@ class BrowserElectronApiFallback {
   private openedCapture: OpenedCaptureState | null = createOpenedCaptureState('open');
   private contextSnapshot: ContextSnapshot | null = createContextSnapshot();
   private devices: ReplayDeviceEntry[] = [previewDevice];
-  private terminalTabs: TerminalTabRecord[] = [
-    {
-      tabId: 'browser-preview-terminal',
-      kind: 'logs',
-      title: 'Browser Preview Log',
-      cwd: this.settings.workspace.rootPath,
-      status: 'running',
-      createdAt: NOW - 1000 * 60 * 8,
-    },
-  ];
+  private terminalTabs: TerminalTabRecord[] = [];
   private runtimeLogs: RuntimeLogEntry[] = [
     {
       id: 'browser-preview-log-1',
       timestamp: NOW - 1000 * 60 * 7,
+      scope: 'session',
+      namespace: 'capture',
+      severity: 'info',
+      title: 'Capture context loaded',
+      summary: 'Browser preview capture is ready for inspection.',
+      projectId: previewProject.projectId,
+      sessionId: previewSessions[0].sessionId,
+      runId: 'browser-preview-run-1',
+    },
+    {
+      id: 'browser-preview-log-2',
+      timestamp: NOW - 1000 * 60 * 6,
+      scope: 'session',
+      namespace: 'tool',
+      severity: 'warning',
+      title: 'Tool retry scheduled',
+      summary: 'rd.inspect will retry with browser-preview fallback arguments.',
+      detail: 'The first preview tool route did not provide enough metadata.',
+      projectId: previewProject.projectId,
+      sessionId: previewSessions[0].sessionId,
+      runId: 'browser-preview-run-1',
+      raw: {
+        tool: 'rd.inspect',
+        mode: 'browser-preview',
+      },
+    },
+    {
+      id: 'browser-preview-log-3',
+      timestamp: NOW - 1000 * 60 * 5,
       scope: 'app',
       namespace: 'system',
       severity: 'info',
       title: 'Browser preview fallback active',
       summary: 'Renderer is using an in-memory Electron API mock.',
       projectId: previewProject.projectId,
-      sessionId: previewSessions[0].sessionId,
-      runId: 'browser-preview-run-1',
+      sessionId: null,
+      runId: null,
     },
   ];
   private conversations = new Map<string, ConversationMessage[]>([
@@ -440,6 +464,7 @@ class BrowserElectronApiFallback {
 
     appShell: {
       selectAvatar: async () => null,
+      getAvatarDataUrl: async () => null,
       openPath: async () => ({ success: true }),
       copyText: async (text) => {
         await navigator.clipboard?.writeText(text).catch(() => undefined);
@@ -611,7 +636,7 @@ class BrowserElectronApiFallback {
 
     terminal: {
       listTabs: async () => ({ tabs: this.terminalTabs }),
-      createTab: async (request) => this.createTerminalTab(request?.cwd),
+      createTab: async (request) => this.createTerminalTab(request),
       closeTab: async (tabId) => this.closeTerminalTab(tabId),
       activateTab: async (tabId) => ({ success: this.terminalTabs.some((tab) => tab.tabId === tabId), tabs: this.terminalTabs }),
       write: async (tabId, data) => {
@@ -706,16 +731,20 @@ class BrowserElectronApiFallback {
         ...current.appearance,
         ...patch.appearance,
       },
-      layout: {
-        leftSidebar: {
-          ...current.layout.leftSidebar,
-          ...patch.layout?.leftSidebar,
+        layout: {
+          leftSidebar: {
+            ...current.layout.leftSidebar,
+            ...patch.layout?.leftSidebar,
+          },
+          rightPanel: {
+            ...current.layout.rightPanel,
+            ...patch.layout?.rightPanel,
+          },
+          terminal: {
+            ...current.layout.terminal,
+            ...patch.layout?.terminal,
+          },
         },
-        rightPanel: {
-          ...current.layout.rightPanel,
-          ...patch.layout?.rightPanel,
-        },
-      },
       profile: {
         ...current.profile,
         ...patch.profile,
@@ -1106,17 +1135,25 @@ class BrowserElectronApiFallback {
   }
 
   private matchesLogScope(entry: RuntimeLogEntry, scope: RuntimeLogScope, sessionId?: string | null): boolean {
-    return entry.scope === scope && (!sessionId || entry.sessionId === sessionId);
+    if (scope === 'session') {
+      return entry.scope === 'session' && Boolean(sessionId) && entry.sessionId === sessionId;
+    }
+
+    return true;
   }
 
-  private async createTerminalTab(cwd?: string | null) {
+  private async createTerminalTab(request?: TerminalCreateTabRequest) {
+    const cwd = request?.cwd ?? this.settings.workspace.rootPath;
     const tab: TerminalTabRecord = {
       tabId: createId('browser-preview-terminal'),
       kind: 'shell',
       title: 'Browser Preview Shell',
-      cwd: cwd ?? this.settings.workspace.rootPath,
+      cwd,
       status: 'running',
       createdAt: Date.now(),
+      sessionId: request?.sessionId ?? this.currentSessionId,
+      projectId: request?.projectId ?? this.currentProjectId,
+      runId: request?.runId ?? this.workflowState.runId,
     };
     this.terminalTabs = [...this.terminalTabs, tab];
     this.emit('terminal:tabsChanged', { tabs: this.terminalTabs });

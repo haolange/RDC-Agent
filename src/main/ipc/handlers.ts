@@ -3,6 +3,7 @@
  */
 
 import fs from 'fs';
+import path from 'path';
 import { app, ipcMain, dialog, BrowserWindow, clipboard, nativeTheme, shell } from 'electron';
 import { Command } from '@langchain/langgraph';
 
@@ -31,6 +32,7 @@ import type {
   SessionAttachmentRecord,
 } from '@shared/types/session';
 import type { RuntimeLogScope } from '@shared/types/runtimeLog';
+import type { TerminalCreateTabRequest } from '@shared/types/terminal';
 import type { ConversationSendRequest } from '@shared/types/conversation';
 
 // WorkflowGraph 相关导入
@@ -43,6 +45,56 @@ import type { SessionRecord } from '@shared/types/session';
 import type { ActionEvent } from '@shared/types/evidence';
 
 // 模块级变�?
+const AVATAR_MIME_BY_EXTENSION: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.bmp': 'image/bmp',
+};
+
+function getAvatarMimeType(filePath: string): string | null {
+  return AVATAR_MIME_BY_EXTENSION[path.extname(filePath).toLowerCase()] ?? null;
+}
+
+function isSameFilePath(left: string, right: string): boolean {
+  const normalizedLeft = path.resolve(left);
+  const normalizedRight = path.resolve(right);
+  return process.platform === 'win32'
+    ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+    : normalizedLeft === normalizedRight;
+}
+
+function copyAvatarToWorkspace(sourcePath: string): string | null {
+  const mimeType = getAvatarMimeType(sourcePath);
+  if (!mimeType || !fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
+    return null;
+  }
+
+  const paths = appPathService.getWorkspacePaths();
+  const avatarDir = path.join(paths.profilesPath, 'avatar');
+  const extension = path.extname(sourcePath).toLowerCase();
+  const avatarPath = path.join(avatarDir, `profile-avatar${extension}`);
+
+  fs.mkdirSync(avatarDir, { recursive: true });
+  if (!isSameFilePath(sourcePath, avatarPath)) {
+    fs.copyFileSync(sourcePath, avatarPath);
+  }
+
+  return avatarPath;
+}
+
+function readAvatarDataUrl(avatarPath: string): string | null {
+  const mimeType = getAvatarMimeType(avatarPath);
+  if (!mimeType || !fs.existsSync(avatarPath) || !fs.statSync(avatarPath).isFile()) {
+    return null;
+  }
+
+  const content = fs.readFileSync(avatarPath);
+  return `data:${mimeType};base64,${content.toString('base64')}`;
+}
+
 let compiledGraph: ReturnType<typeof createWorkflowGraph> | null = null;
 let checkpointSaver: FileCheckpointSaver | null = null;
 let currentSessionId: string | null = null;
@@ -352,10 +404,32 @@ export function registerIPCHandlers(): void {
 
   ipcMain.handle('app:selectAvatar', async () => {
     const result = await dialog.showOpenDialog({
-      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }],
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
       properties: ['openFile'],
     });
-    return result.canceled ? null : result.filePaths[0];
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+
+    try {
+      return copyAvatarToWorkspace(result.filePaths[0]);
+    } catch (error) {
+      console.warn('[IPC] Failed to import avatar:', error);
+      return null;
+    }
+  });
+
+  ipcMain.handle('app:getAvatarDataUrl', async (_event, avatarPath: string) => {
+    if (!avatarPath) {
+      return null;
+    }
+
+    try {
+      return readAvatarDataUrl(avatarPath);
+    } catch (error) {
+      console.warn('[IPC] Failed to read avatar:', error);
+      return null;
+    }
   });
 
   ipcMain.handle('app:openPath', async (_event, targetPath: string) => {
@@ -693,7 +767,7 @@ export function registerIPCHandlers(): void {
     };
   });
 
-  ipcMain.handle('terminal:createTab', async (_event, request?: { cwd?: string | null }) => {
+  ipcMain.handle('terminal:createTab', async (_event, request?: TerminalCreateTabRequest) => {
     try {
       const tab = terminalSessionService.createTab(request);
       return {
@@ -814,7 +888,9 @@ export function registerIPCHandlers(): void {
             ? '预览来源：framebuffer'
             : openedCapture.preview?.source === 'capture_thumbnail'
               ? '预览来源：thumbnail'
-              : '当前无可用预览',
+              : openedCapture.previewError?.code
+                ? `当前无可用预览：${openedCapture.previewError.code}`
+                : '当前无可用预览',
           sessionId: currentSessionId,
           projectId: request.projectId,
           runId: currentRunId,

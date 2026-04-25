@@ -10,6 +10,9 @@ import {
   RIGHT_PANEL_DEFAULT_WIDTH,
   RIGHT_PANEL_MAX_WIDTH,
   RIGHT_PANEL_MIN_WIDTH,
+  TERMINAL_DEFAULT_HEIGHT,
+  TERMINAL_MAX_HEIGHT,
+  TERMINAL_MIN_HEIGHT,
 } from '@shared/constants/layout';
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
@@ -22,12 +25,14 @@ interface LayoutState {
   rightPanelWidth: number;
   leftSidebarExpandedWidth: number;
   rightPanelExpandedWidth: number;
+  terminalHeight: number;
   hydrateFromSettings: (settings: AppSettings) => void;
   setCurrentMode: (mode: AgentMode) => void;
   toggleLeftSidebar: () => Promise<void>;
   toggleRightPanel: () => Promise<void>;
   setLeftSidebarWidth: (width: number) => void;
   setRightPanelWidth: (width: number) => void;
+  setTerminalHeight: (height: number) => void;
   persistLayout: () => Promise<void>;
 }
 
@@ -39,6 +44,7 @@ const persistLayout = async (state: Pick<
   | 'rightPanelWidth'
   | 'leftSidebarExpandedWidth'
   | 'rightPanelExpandedWidth'
+  | 'terminalHeight'
 >): Promise<void> => {
   await window.electronAPI.settings.set({
     layout: {
@@ -52,6 +58,9 @@ const persistLayout = async (state: Pick<
         width: state.rightPanelWidth,
         expandedWidth: state.rightPanelExpandedWidth,
       },
+      terminal: {
+        height: state.terminalHeight,
+      },
     },
   });
 };
@@ -64,6 +73,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   rightPanelWidth: RIGHT_PANEL_DEFAULT_WIDTH,
   leftSidebarExpandedWidth: LEFT_SIDEBAR_DEFAULT_WIDTH,
   rightPanelExpandedWidth: RIGHT_PANEL_DEFAULT_WIDTH,
+  terminalHeight: TERMINAL_DEFAULT_HEIGHT,
   hydrateFromSettings: (settings) => set({
     leftSidebarCollapsed: settings.layout.leftSidebar.collapsed,
     rightPanelCollapsed: settings.layout.rightPanel.collapsed,
@@ -82,6 +92,11 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       settings.layout.rightPanel.expandedWidth,
       RIGHT_PANEL_MIN_WIDTH,
       RIGHT_PANEL_MAX_WIDTH,
+    ),
+    terminalHeight: clamp(
+      settings.layout.terminal?.height ?? TERMINAL_DEFAULT_HEIGHT,
+      TERMINAL_MIN_HEIGHT,
+      TERMINAL_MAX_HEIGHT,
     ),
   }),
   setCurrentMode: (mode) => set({ currentMode: mode }),
@@ -118,6 +133,9 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
     rightPanelCollapsed: false,
     rightPanelWidth: clamp(width, RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH),
     rightPanelExpandedWidth: clamp(width, RIGHT_PANEL_MIN_WIDTH, RIGHT_PANEL_MAX_WIDTH),
+  }),
+  setTerminalHeight: (height) => set({
+    terminalHeight: clamp(height, TERMINAL_MIN_HEIGHT, TERMINAL_MAX_HEIGHT),
   }),
   persistLayout: async () => {
     const state = get();

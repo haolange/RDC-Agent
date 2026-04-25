@@ -1,99 +1,157 @@
 import { create } from 'zustand';
 import type {
-  RuntimeLogDetailLevel,
   RuntimeLogEntry,
   RuntimeLogNamespace,
-  RuntimeLogScope,
+  RuntimeLogSeverity,
 } from '@shared/types/runtimeLog';
 import type {
+  TerminalCreateTabRequest,
   TerminalDataEvent,
   TerminalExitEvent,
   TerminalTabRecord,
 } from '@shared/types/terminal';
 
-export const TERMINAL_LOGS_TAB_ID = 'terminal-logs';
+export type TerminalView = 'activity' | 'shell';
+export type TerminalScopeFilter = 'current-session' | 'current-run' | 'app' | 'all-sessions';
+export type RuntimeNamespaceFilter = RuntimeLogNamespace | 'all';
+export type RuntimeSeverityFilter = RuntimeLogSeverity | 'all';
+export type TerminalDensity = 'compact' | 'expanded';
 
-type RuntimeNamespaceFilter = RuntimeLogNamespace | 'all';
+interface TerminalContext {
+  sessionId: string | null;
+  projectId: string | null;
+  runId: string | null;
+}
 
-interface TerminalState {
+interface TerminalState extends TerminalContext {
   isOpen: boolean;
-  activeSessionId: string | null;
-  scope: RuntimeLogScope;
-  namespace: RuntimeNamespaceFilter;
-  detailLevel: RuntimeLogDetailLevel;
+  view: TerminalView;
+  scopeFilter: TerminalScopeFilter;
+  namespaceFilter: RuntimeNamespaceFilter;
+  severityFilter: RuntimeSeverityFilter;
+  density: TerminalDensity;
+  query: string;
+  followOutput: boolean;
+  expandedEntryIds: string[];
   entries: RuntimeLogEntry[];
   isLoading: boolean;
   tabs: TerminalTabRecord[];
-  activeTabId: string;
+  activeTabId: string | null;
   shellBuffers: Record<string, string>;
 
   setOpen: (open: boolean) => void;
   toggleOpen: () => void;
+  setView: (view: TerminalView) => void;
+  setActiveContext: (context: Partial<TerminalContext>) => void;
   setActiveSessionId: (sessionId: string | null) => void;
-  setScope: (scope: RuntimeLogScope) => void;
-  setNamespace: (namespace: RuntimeNamespaceFilter) => void;
-  setDetailLevel: (detailLevel: RuntimeLogDetailLevel) => void;
+  setScopeFilter: (scopeFilter: TerminalScopeFilter) => void;
+  setNamespaceFilter: (namespaceFilter: RuntimeNamespaceFilter) => void;
+  setSeverityFilter: (severityFilter: RuntimeSeverityFilter) => void;
+  setDensity: (density: TerminalDensity) => void;
+  setQuery: (query: string) => void;
+  setFollowOutput: (followOutput: boolean) => void;
+  toggleEntryExpanded: (entryId: string) => void;
   appendEntry: (entry: RuntimeLogEntry) => void;
   refreshEntries: () => Promise<void>;
   syncTabs: (tabs: TerminalTabRecord[]) => void;
   refreshTabs: () => Promise<void>;
-  ensureShellTab: (cwd?: string | null) => Promise<void>;
-  createShellTab: (cwd?: string | null) => Promise<void>;
+  createShellTab: (request?: TerminalCreateTabRequest) => Promise<void>;
   activateTab: (tabId: string) => Promise<void>;
   closeShellTab: (tabId: string) => Promise<void>;
+  clearShellBuffer: (tabId: string) => void;
   appendTerminalData: (payload: TerminalDataEvent) => void;
   markTerminalExit: (payload: TerminalExitEvent) => void;
 }
 
-const shouldAppendEntry = (
-  scope: RuntimeLogScope,
-  activeSessionId: string | null,
+const resolveRuntimeLogRequest = (
+  scopeFilter: TerminalScopeFilter,
+  sessionId: string | null,
+): { scope: 'app' | 'session'; sessionId?: string | null } => {
+  if ((scopeFilter === 'current-session' || scopeFilter === 'current-run') && sessionId) {
+    return { scope: 'session', sessionId };
+  }
+
+  return { scope: 'app', sessionId: null };
+};
+
+const matchesScopeFilter = (
   entry: RuntimeLogEntry,
+  scopeFilter: TerminalScopeFilter,
+  context: TerminalContext,
 ): boolean => {
-  if (scope === 'app') {
+  if (scopeFilter === 'app') {
     return entry.scope === 'app';
   }
 
-  return entry.scope === 'session' && entry.sessionId === activeSessionId;
+  if (scopeFilter === 'all-sessions') {
+    return true;
+  }
+
+  if (!context.sessionId || entry.scope !== 'session' || entry.sessionId !== context.sessionId) {
+    return false;
+  }
+
+  if (scopeFilter === 'current-run') {
+    return Boolean(context.runId) && entry.runId === context.runId;
+  }
+
+  return true;
 };
 
 const resolveNextActiveTabId = (
-  currentActiveTabId: string,
+  currentActiveTabId: string | null,
   nextTabs: TerminalTabRecord[],
-): string => {
-  if (currentActiveTabId === TERMINAL_LOGS_TAB_ID) {
-    return TERMINAL_LOGS_TAB_ID;
-  }
-
-  if (nextTabs.some((tab) => tab.tabId === currentActiveTabId)) {
+): string | null => {
+  if (currentActiveTabId && nextTabs.some((tab) => tab.tabId === currentActiveTabId)) {
     return currentActiveTabId;
   }
 
-  return nextTabs[0]?.tabId ?? TERMINAL_LOGS_TAB_ID;
+  return nextTabs.find((tab) => tab.kind === 'shell')?.tabId ?? null;
 };
 
 export const useTerminalStore = create<TerminalState>((set, get) => ({
   isOpen: false,
-  activeSessionId: null,
-  scope: 'session',
-  namespace: 'all',
-  detailLevel: 'summary',
+  view: 'activity',
+  scopeFilter: 'current-session',
+  namespaceFilter: 'all',
+  severityFilter: 'all',
+  density: 'compact',
+  query: '',
+  followOutput: true,
+  expandedEntryIds: [],
+  sessionId: null,
+  projectId: null,
+  runId: null,
   entries: [],
   isLoading: false,
   tabs: [],
-  activeTabId: TERMINAL_LOGS_TAB_ID,
+  activeTabId: null,
   shellBuffers: {},
 
   setOpen: (open) => set({ isOpen: open }),
   toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
-  setActiveSessionId: (activeSessionId) => set({ activeSessionId }),
-  setScope: (scope) => set({ scope }),
-  setNamespace: (namespace) => set({ namespace }),
-  setDetailLevel: (detailLevel) => set({ detailLevel }),
+  setView: (view) => set({ view }),
+  setActiveContext: (context) => set((state) => ({
+    sessionId: Object.prototype.hasOwnProperty.call(context, 'sessionId') ? context.sessionId ?? null : state.sessionId,
+    projectId: Object.prototype.hasOwnProperty.call(context, 'projectId') ? context.projectId ?? null : state.projectId,
+    runId: Object.prototype.hasOwnProperty.call(context, 'runId') ? context.runId ?? null : state.runId,
+  })),
+  setActiveSessionId: (sessionId) => set({ sessionId }),
+  setScopeFilter: (scopeFilter) => set({ scopeFilter, expandedEntryIds: [] }),
+  setNamespaceFilter: (namespaceFilter) => set({ namespaceFilter }),
+  setSeverityFilter: (severityFilter) => set({ severityFilter }),
+  setDensity: (density) => set({ density }),
+  setQuery: (query) => set({ query }),
+  setFollowOutput: (followOutput) => set({ followOutput }),
+  toggleEntryExpanded: (entryId) => set((state) => ({
+    expandedEntryIds: state.expandedEntryIds.includes(entryId)
+      ? state.expandedEntryIds.filter((id) => id !== entryId)
+      : [...state.expandedEntryIds, entryId],
+  })),
 
   appendEntry: (entry) => {
     const state = get();
-    if (!shouldAppendEntry(state.scope, state.activeSessionId, entry)) {
+    if (!matchesScopeFilter(entry, state.scopeFilter, state)) {
       return;
     }
 
@@ -108,15 +166,18 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       return;
     }
 
-    const { scope, activeSessionId } = get();
+    const state = get();
+    const request = resolveRuntimeLogRequest(state.scopeFilter, state.sessionId);
     set({ isLoading: true });
     try {
-      const result = await electronAPI.runtimeLog.list({
-        scope,
-        sessionId: scope === 'session' ? activeSessionId : null,
-      });
+      const result = await electronAPI.runtimeLog.list(request);
+      const context = {
+        sessionId: get().sessionId,
+        projectId: get().projectId,
+        runId: get().runId,
+      };
       set({
-        entries: result.entries ?? [],
+        entries: (result.entries ?? []).filter((entry) => matchesScopeFilter(entry, get().scopeFilter, context)),
         isLoading: false,
       });
     } catch {
@@ -142,43 +203,26 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     get().syncTabs(result.tabs ?? []);
   },
 
-  ensureShellTab: async (cwd) => {
+  createShellTab: async (request) => {
     const electronAPI = window.electronAPI;
     if (!electronAPI) {
       return;
     }
 
     const state = get();
-    if (state.tabs.length > 0) {
-      return;
-    }
-
-    const result = await electronAPI.terminal.createTab({ cwd: cwd ?? null });
-    get().syncTabs(result.tabs ?? []);
-    if (result.tab && get().activeTabId !== TERMINAL_LOGS_TAB_ID) {
-      set({ activeTabId: result.tab.tabId });
-    }
-  },
-
-  createShellTab: async (cwd) => {
-    const electronAPI = window.electronAPI;
-    if (!electronAPI) {
-      return;
-    }
-
-    const result = await electronAPI.terminal.createTab({ cwd: cwd ?? null });
+    const result = await electronAPI.terminal.createTab({
+      cwd: request?.cwd ?? null,
+      sessionId: request?.sessionId ?? state.sessionId,
+      projectId: request?.projectId ?? state.projectId,
+      runId: request?.runId ?? state.runId,
+    });
     get().syncTabs(result.tabs ?? []);
     if (result.tab) {
-      set({ activeTabId: result.tab.tabId });
+      set({ activeTabId: result.tab.tabId, view: 'shell' });
     }
   },
 
   activateTab: async (tabId) => {
-    if (tabId === TERMINAL_LOGS_TAB_ID) {
-      set({ activeTabId: tabId });
-      return;
-    }
-
     const electronAPI = window.electronAPI;
     if (!electronAPI) {
       return;
@@ -205,6 +249,13 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     });
     get().syncTabs(result.tabs ?? []);
   },
+
+  clearShellBuffer: (tabId) => set((state) => ({
+    shellBuffers: {
+      ...state.shellBuffers,
+      [tabId]: '',
+    },
+  })),
 
   appendTerminalData: ({ tabId, data }) => set((state) => ({
     shellBuffers: {

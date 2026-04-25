@@ -10,3 +10,7 @@ export const RIGHT_PANEL_COLLAPSED_WIDTH = 0;
 
 export const APP_MIN_MAIN_WIDTH = 480;
 export const APP_RESIZE_HANDLE_WIDTH = 8;
+
+export const TERMINAL_DEFAULT_HEIGHT = 328;
+export const TERMINAL_MIN_HEIGHT = 180;
+export const TERMINAL_MAX_HEIGHT = 720;

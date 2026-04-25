@@ -175,7 +175,36 @@ export interface OpenedCapturePreview {
   width: number;
   height: number;
   source: 'framebuffer_screenshot' | 'capture_thumbnail';
+  resolvedEventId?: number;
+  presentEventId?: number;
+  textureId?: string;
+  targetSource?: string;
+  targetSemantic?: string;
+  fallbackReason?: string;
+  summaryDegraded?: boolean;
   updatedAt: number;
+}
+
+export interface OpenedCapturePreviewAttempt {
+  source: OpenedCapturePreview['source'];
+  status: 'success' | 'failed';
+  eventId?: number;
+  message?: string;
+  code?: string;
+  imagePath?: string;
+  resolvedEventId?: number;
+  presentEventId?: number;
+  textureId?: string;
+  targetSource?: string;
+  targetSemantic?: string;
+  fallbackReason?: string;
+  details?: unknown;
+}
+
+export interface OpenedCapturePreviewError {
+  message: string;
+  code?: string;
+  attempts: OpenedCapturePreviewAttempt[];
 }
 
 export interface OpenedCaptureState {
@@ -193,6 +222,8 @@ export interface OpenedCaptureState {
   status: 'opening' | 'open' | 'error' | 'closed';
   openedAt: number;
   preview?: OpenedCapturePreview | null;
+  previewError?: OpenedCapturePreviewError | null;
+  previewAttempts?: OpenedCapturePreviewAttempt[];
 }
 
 export interface OpenProjectInputRequest {

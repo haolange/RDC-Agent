@@ -1520,6 +1520,7 @@ async def _choose_visual_output_target(
     requested_rt_index_raw = parsed_target.get("rt_index")
     if requested_rt_index_raw is None:
         requested_rt_index_raw = parsed_target.get("rtIndex")
+    has_requested_rt_index = requested_rt_index_raw is not None
     requested_rt_index = _as_int(requested_rt_index_raw, 0 if not explicit_target else -1)
     chosen_output_slot: Optional[int] = None
     best_texture_desc: Optional[Any] = None
@@ -1549,7 +1550,7 @@ async def _choose_visual_output_target(
         )
         return target_texture_id, texture_desc, chosen_output_slot, best_target_source
 
-    if output_targets and requested_rt_index >= 0:
+    if output_targets and requested_rt_index >= 0 and has_requested_rt_index:
         available_slots = [int(slot) for _, slot in output_targets]
         raise _preview_error(
             "preview_event_output_slot_unavailable",
@@ -1693,6 +1694,177 @@ async def _choose_visual_output_target(
     return target_texture_id, texture_desc, chosen_output_slot, best_target_source
 
 
+def _has_explicit_visual_target(target: Optional[Dict[str, Any]]) -> bool:
+    parsed = target or {}
+    return bool(
+        parsed.get("texture_id")
+        or parsed.get("textureId")
+        or parsed.get("rt_index") is not None
+        or parsed.get("rtIndex") is not None
+    )
+
+
+def _requested_visual_target_semantic(target: Optional[Dict[str, Any]]) -> str:
+    parsed = target or {}
+    raw = parsed.get("semantic")
+    if raw is None:
+        raw = parsed.get("target_semantic")
+    if raw is None:
+        raw = parsed.get("targetSemantic")
+    semantic = str(raw or "").strip().lower()
+    if semantic:
+        return semantic
+    return "event_output" if _has_explicit_visual_target(parsed) else "swapchain"
+
+
+def _is_present_action(action: Any) -> bool:
+    flags = _map_action_flags(getattr(action, "flags", 0))
+    if flags.get("is_pass_boundary"):
+        return True
+    name = _action_name(action).lower()
+    return "present" in name or "swapchain" in name
+
+
+def _usage_event_id(entry: Any) -> int:
+    return int(
+        getattr(
+            entry,
+            "eventId",
+            getattr(entry, "event_id", getattr(entry, "raw_event_id", 0)),
+        )
+        or 0
+    )
+
+
+def _usage_text(entry: Any) -> str:
+    usage = getattr(entry, "usage", "")
+    try:
+        name = getattr(usage, "name", None)
+        if name:
+            return str(name)
+    except Exception:
+        pass
+    return str(usage or "")
+
+
+def _texture_area(texture_desc: Any) -> int:
+    try:
+        width = int(getattr(texture_desc, "width", 0) or 0)
+        height = int(getattr(texture_desc, "height", 0) or 0)
+        return max(0, width) * max(0, height)
+    except Exception:
+        return 0
+
+
+def _looks_like_depth_texture(texture_desc: Any) -> bool:
+    name = str(getattr(texture_desc, "name", "") or "").lower()
+    fmt = _texture_format_name(texture_desc).lower()
+    if any(hint in name for hint in ("depth", "stencil", "shadow", "zbuffer", "z-buffer")):
+        return True
+    return any(hint in fmt for hint in ("d16", "d24", "d32", "depth", "stencil"))
+
+
+async def _resolve_swapchain_present_target(
+    session_id: str,
+    requested_event_id: int,
+) -> Tuple[Any, Optional[Any], Dict[str, Any]]:
+    controller = await _get_controller(session_id)
+    _, flat_actions, _ = await _load_action_index(session_id, controller=controller)
+    present_actions = [
+        action
+        for action in flat_actions
+        if int(getattr(action, "eventId", 0) or 0) > 0 and _is_present_action(action)
+    ]
+    if not present_actions:
+        raise _preview_error(
+            "swapchain_present_event_unavailable",
+            "Capture action tree does not expose a Present / PassBoundary event",
+            context_id=_runtime_context_id(),
+            session_id=session_id,
+            event_id=int(requested_event_id or 0),
+            backend=str(_context_state(_runtime_context_id()).get("backend") or "local"),
+        )
+
+    requested = int(requested_event_id or 0)
+    eligible_present_actions = [
+        action
+        for action in present_actions
+        if requested <= 0 or int(getattr(action, "eventId", 0) or 0) <= requested
+    ]
+    if not eligible_present_actions:
+        eligible_present_actions = present_actions
+    present_action = max(eligible_present_actions, key=lambda action: int(getattr(action, "eventId", 0) or 0))
+    present_event_id = int(getattr(present_action, "eventId", 0) or 0)
+    present_name = _action_name(present_action)
+
+    textures = await _offload(controller.GetTextures)
+    candidates: List[Tuple[int, int, Any, Any, str]] = []
+    inspected = 0
+    for texture_desc in textures:
+        rid = getattr(texture_desc, "resourceId", None)
+        if rid is None or _looks_like_depth_texture(texture_desc):
+            continue
+        inspected += 1
+        try:
+            usage_entries = await _offload(controller.GetUsage, rid)
+        except Exception:
+            continue
+        best_usage_event = 0
+        best_usage_text = ""
+        saw_present_usage = False
+        for entry in usage_entries or []:
+            usage_event = _usage_event_id(entry)
+            usage_text = _usage_text(entry)
+            if usage_event <= 0:
+                continue
+            is_present_usage = "present" in usage_text.lower() or usage_event == present_event_id
+            if not is_present_usage:
+                continue
+            saw_present_usage = saw_present_usage or "present" in usage_text.lower()
+            if usage_event > best_usage_event and usage_event <= present_event_id:
+                best_usage_event = usage_event
+                best_usage_text = usage_text
+        if best_usage_event <= 0:
+            continue
+        score = best_usage_event * 1000 + min(_texture_area(texture_desc), 64_000_000)
+        if saw_present_usage:
+            score += 100_000_000
+        candidates.append((score, best_usage_event, rid, texture_desc, best_usage_text))
+
+    if not candidates:
+        err = _preview_error(
+            "swapchain_target_unavailable",
+            "RenderDoc did not expose a texture resource usage entry for the selected Present event",
+            context_id=_runtime_context_id(),
+            session_id=session_id,
+            event_id=present_event_id,
+            backend=str(_context_state(_runtime_context_id()).get("backend") or "local"),
+        )
+        err.details.update(
+            {
+                "present_event_id": present_event_id,
+                "present_action_name": present_name,
+                "inspected_texture_count": inspected,
+            }
+        )
+        raise err
+
+    _, usage_event_id, texture_id, texture_desc, usage_name = max(candidates, key=lambda item: item[0])
+    texture_id, texture_desc = await _get_texture_descriptor(session_id, texture_id, event_id=present_event_id)
+    payload = {
+        "texture_id": str(texture_id),
+        "output_slot": None,
+        "target_source": "swapchain_present",
+        "texture_format": _texture_format_name(texture_desc),
+        "resolved_event_id": int(present_event_id),
+        "present_event_id": int(present_event_id),
+        "present_action_name": present_name,
+        "present_usage_event_id": int(usage_event_id),
+        "present_usage": str(usage_name or ""),
+    }
+    return texture_id, texture_desc, payload
+
+
 async def _resolve_visual_target_for_event(
     session_id: str,
     event_id: int,
@@ -1700,6 +1872,48 @@ async def _resolve_visual_target_for_event(
     target: Optional[Dict[str, Any]] = None,
     allow_framebuffer_fallback: bool = True,
 ) -> Tuple[Any, Optional[Any], Dict[str, Any], Dict[str, Any]]:
+    parsed_target = target or {}
+    semantic = _requested_visual_target_semantic(parsed_target)
+    if semantic not in {"swapchain", "event_output"}:
+        err = _preview_error(
+            "preview_target_semantic_invalid",
+            f"Unsupported screenshot target semantic: {semantic}",
+            context_id=_runtime_context_id(),
+            session_id=session_id,
+            event_id=int(event_id),
+            backend=str(_context_state(_runtime_context_id()).get("backend") or "local"),
+        )
+        err.details.update(
+            {
+                "requested_semantic": semantic,
+                "supported_semantics": ["swapchain", "event_output"],
+            }
+        )
+        raise err
+
+    swapchain_error: Optional[CoreError] = None
+    if semantic == "swapchain" and not _has_explicit_visual_target(parsed_target):
+        try:
+            texture_id, texture_desc, target_payload = await _resolve_swapchain_present_target(
+                session_id,
+                int(event_id),
+            )
+            resolved_event_id = int(target_payload.get("resolved_event_id") or event_id)
+            truth_meta = dict(await _event_truth_metadata(session_id, resolved_event_id))
+            target_payload["requested_semantic"] = semantic
+            return texture_id, texture_desc, target_payload, truth_meta
+        except CoreError as exc:
+            swapchain_error = exc
+        except Exception as exc:
+            swapchain_error = _preview_error(
+                "swapchain_target_unavailable",
+                f"Failed to resolve swapchain Present target: {exc}",
+                context_id=_runtime_context_id(),
+                session_id=session_id,
+                event_id=int(event_id),
+                backend=str(_context_state(_runtime_context_id()).get("backend") or "local"),
+            )
+
     texture_id, texture_desc, chosen_output_slot, target_source = await _choose_visual_output_target(
         session_id,
         event_id,
@@ -1708,6 +1922,18 @@ async def _resolve_visual_target_for_event(
     )
     truth_meta = dict(await _event_truth_metadata(session_id, int(event_id)))
     reasons = list(truth_meta.get("summary_degraded_reasons") or [])
+    if semantic == "swapchain" and swapchain_error is not None:
+        if "swapchain_target_unavailable" not in reasons:
+            reasons.append("swapchain_target_unavailable")
+        truth_meta["binding_truth_level"] = "binding_degraded"
+        truth_meta["evidence_truth_level"] = "visual_evidence_only"
+        target_source = "event_output_fallback"
+        truth_meta["swapchain_error"] = {
+            "code": swapchain_error.code,
+            "category": swapchain_error.category,
+            "message": swapchain_error.message,
+            "details": dict(swapchain_error.details),
+        }
     if str(target_source or "").startswith("event_binding_"):
         if "visual_target_binding_fallback" not in reasons:
             reasons.append("visual_target_binding_fallback")
@@ -1724,7 +1950,17 @@ async def _resolve_visual_target_for_event(
         "output_slot": int(chosen_output_slot) if chosen_output_slot is not None else None,
         "target_source": str(target_source or ""),
         "texture_format": _texture_format_name(texture_desc),
+        "resolved_event_id": int(event_id),
+        "requested_semantic": semantic,
     }
+    if swapchain_error is not None:
+        target_payload["fallback_reason"] = "swapchain_target_unavailable"
+        target_payload["swapchain_error"] = {
+            "code": swapchain_error.code,
+            "category": swapchain_error.category,
+            "message": swapchain_error.message,
+            "details": dict(swapchain_error.details),
+        }
     return texture_id, texture_desc, target_payload, truth_meta
 
 
@@ -6821,10 +7057,21 @@ async def _dispatch_capture(action: str, args: Dict[str, Any]) -> str:
 
     if action == "get_thumbnail":
         _require(args, "capture_file_id")
-        handle = _runtime.captures.get(str(args["capture_file_id"]))
+        capture_file_id = str(args["capture_file_id"])
+        handle = _runtime.captures.get(capture_file_id)
         if handle is None:
             return _err(f"Unknown capture_file_id: {args['capture_file_id']}")
-        return _ok(image_path=None, width=None, height=None)
+        return _err(
+            f"Capture thumbnail is unavailable for capture_file_id: {capture_file_id}",
+            code="thumbnail_unavailable",
+            category="runtime",
+            details={
+                "capture_file_id": capture_file_id,
+                "file_path": str(handle.file_path),
+                "max_size_px": _as_int(args.get("max_size_px"), 256),
+                "source": "renderdoc_runtime",
+            },
+        )
 
     if action == "list_frames":
         _require(args, "capture_file_id")
@@ -10431,15 +10678,41 @@ async def _dispatch_export(action: str, args: Dict[str, Any]) -> str:
         if event_id <= 0:
             event_id = await _ensure_event(session_id, None)
         explicit_target = target.get("texture_id") or target.get("textureId")
-        target_texture_id, texture_desc, visual_target_payload, truth_meta = await _resolve_visual_target_for_event(
-            session_id,
-            event_id,
-            target=target,
-            allow_framebuffer_fallback=True,
-        )
+        try:
+            target_texture_id, texture_desc, visual_target_payload, truth_meta = await _resolve_visual_target_for_event(
+                session_id,
+                event_id,
+                target=target,
+                allow_framebuffer_fallback=True,
+            )
+        except CoreError as exc:
+            details = dict(exc.details)
+            details.setdefault("session_id", session_id)
+            details.setdefault("event_id", int(event_id))
+            details.setdefault("failure_stage", "resolve_visual_target")
+            return _err(exc.message, code=exc.code, category=exc.category, details=details)
+        except Exception as exc:
+            return _err(
+                f"Failed to resolve screenshot target: {exc}",
+                code="screenshot_target_unavailable",
+                category="runtime",
+                details={
+                    "session_id": session_id,
+                    "event_id": int(event_id),
+                    "failure_stage": "resolve_visual_target",
+                },
+            )
         chosen_output_slot = visual_target_payload.get("output_slot") if isinstance(visual_target_payload, dict) else None
         target_source = str(visual_target_payload.get("target_source") or "") if isinstance(visual_target_payload, dict) else ""
-        binding_index = await _binding_name_index_for_event(session_id, event_id)
+        resolved_event_id = _as_int(
+            visual_target_payload.get("resolved_event_id") if isinstance(visual_target_payload, dict) else None,
+            int(event_id),
+        )
+        present_event_id = _as_int(
+            visual_target_payload.get("present_event_id") if isinstance(visual_target_payload, dict) else None,
+            0,
+        )
+        binding_index = await _binding_name_index_for_event(session_id, resolved_event_id)
         name_info = _compose_texture_name_info(
             target_texture_id,
             resource_name=str(getattr(texture_desc, "name", "")) if texture_desc is not None else "",
@@ -10469,7 +10742,7 @@ async def _dispatch_export(action: str, args: Dict[str, Any]) -> str:
             role_stem = f"framebuffer_rt{chosen_output_slot}"
         else:
             role_stem = "framebuffer"
-        base_name_stem = _safe_name_token(f"ev{event_id}_{role_stem}_{name_info['name_stem']}")
+        base_name_stem = _safe_name_token(f"ev{resolved_event_id}_{role_stem}_{name_info['name_stem']}")
         multi_export = len(valid_formats) > 1
         include_alpha = _as_bool(args.get("include_alpha"), False)
         exports: List[Dict[str, Any]] = []
@@ -10485,7 +10758,7 @@ async def _dispatch_export(action: str, args: Dict[str, Any]) -> str:
                 {
                     "session_id": session_id,
                     "texture_id": str(target_texture_id),
-                    "event_id": event_id,
+                    "event_id": resolved_event_id,
                     "overlay": args.get("overlay", "none"),
                     "output_path": resolved_output_path,
                     "file_format": export_format,
@@ -10494,7 +10767,24 @@ async def _dispatch_export(action: str, args: Dict[str, Any]) -> str:
             )
             payload = json.loads(response)
             if not payload.get("success"):
-                return response
+                details = _as_dict(payload.get("details"), default={})
+                details.setdefault("session_id", session_id)
+                details.setdefault("event_id", int(resolved_event_id))
+                details.setdefault("requested_event_id", int(event_id))
+                details.setdefault("texture_id", str(target_texture_id))
+                details.setdefault("target_source", target_source)
+                details.setdefault("chosen_output_slot", chosen_output_slot)
+                if present_event_id > 0:
+                    details.setdefault("present_event_id", int(present_event_id))
+                if isinstance(visual_target_payload, dict) and visual_target_payload.get("swapchain_error"):
+                    details.setdefault("swapchain_error", visual_target_payload.get("swapchain_error"))
+                details.setdefault("failure_stage", "save_texture")
+                return _err(
+                    str(payload.get("error_message") or "rd.export.screenshot failed while saving the selected texture"),
+                    code=str(payload.get("code") or "screenshot_save_texture_failed"),
+                    category=str(payload.get("category") or "runtime"),
+                    details=details,
+                )
             exports.append(
                 {
                     "file_format": export_format,
@@ -10510,12 +10800,19 @@ async def _dispatch_export(action: str, args: Dict[str, Any]) -> str:
             )
         if not multi_export:
             single = exports[0]
+            degraded_reasons = list(truth_meta.get("summary_degraded_reasons") or [])
             return _ok(
                 artifact_path=single["artifact_path"],
                 saved_path=single["saved_path"],
                 image_path=single["image_path"],
                 meta=single["meta"],
-                resolved_event_id=int(event_id),
+                width=int(getattr(texture_desc, "width", 0) or 0) if texture_desc is not None else 0,
+                height=int(getattr(texture_desc, "height", 0) or 0) if texture_desc is not None else 0,
+                resolved_event_id=int(resolved_event_id),
+                requested_event_id=int(event_id),
+                present_event_id=int(present_event_id) if present_event_id > 0 else None,
+                present_action_name=visual_target_payload.get("present_action_name") if isinstance(visual_target_payload, dict) else None,
+                present_usage=visual_target_payload.get("present_usage") if isinstance(visual_target_payload, dict) else None,
                 selected_formats=valid_formats,
                 requested_formats=requested_formats,
                 recommended_formats=recommended_formats,
@@ -10524,16 +10821,27 @@ async def _dispatch_export(action: str, args: Dict[str, Any]) -> str:
                 chosen_output_slot=chosen_output_slot,
                 texture_id=str(target_texture_id),
                 target_source=target_source,
+                requested_semantic=visual_target_payload.get("requested_semantic") if isinstance(visual_target_payload, dict) else None,
+                fallback_reason=visual_target_payload.get("fallback_reason") if isinstance(visual_target_payload, dict) else None,
+                swapchain_error=visual_target_payload.get("swapchain_error") if isinstance(visual_target_payload, dict) else None,
                 binding_truth_level=truth_meta.get("binding_truth_level"),
                 visual_truth_level=single.get("visual_truth_level") or truth_meta.get("visual_truth_level"),
                 evidence_truth_level=single.get("evidence_truth_level") or truth_meta.get("evidence_truth_level"),
-                summary_degraded_reasons=list(truth_meta.get("summary_degraded_reasons") or []),
+                summary_degraded=bool(degraded_reasons),
+                summary_degraded_reasons=degraded_reasons,
             )
+        degraded_reasons = list(truth_meta.get("summary_degraded_reasons") or [])
         return _ok(
             exports=exports,
             saved_paths=[item["saved_path"] for item in exports],
             image_paths=[item["image_path"] for item in exports],
-            resolved_event_id=int(event_id),
+            width=int(getattr(texture_desc, "width", 0) or 0) if texture_desc is not None else 0,
+            height=int(getattr(texture_desc, "height", 0) or 0) if texture_desc is not None else 0,
+            resolved_event_id=int(resolved_event_id),
+            requested_event_id=int(event_id),
+            present_event_id=int(present_event_id) if present_event_id > 0 else None,
+            present_action_name=visual_target_payload.get("present_action_name") if isinstance(visual_target_payload, dict) else None,
+            present_usage=visual_target_payload.get("present_usage") if isinstance(visual_target_payload, dict) else None,
             selected_formats=valid_formats,
             requested_formats=requested_formats,
             recommended_formats=recommended_formats,
@@ -10542,10 +10850,14 @@ async def _dispatch_export(action: str, args: Dict[str, Any]) -> str:
             chosen_output_slot=chosen_output_slot,
             texture_id=str(target_texture_id),
             target_source=target_source,
+            requested_semantic=visual_target_payload.get("requested_semantic") if isinstance(visual_target_payload, dict) else None,
+            fallback_reason=visual_target_payload.get("fallback_reason") if isinstance(visual_target_payload, dict) else None,
+            swapchain_error=visual_target_payload.get("swapchain_error") if isinstance(visual_target_payload, dict) else None,
             binding_truth_level=truth_meta.get("binding_truth_level"),
             visual_truth_level=exports[0].get("visual_truth_level") if exports else truth_meta.get("visual_truth_level"),
             evidence_truth_level=exports[0].get("evidence_truth_level") if exports else truth_meta.get("evidence_truth_level"),
-            summary_degraded_reasons=list(truth_meta.get("summary_degraded_reasons") or []),
+            summary_degraded=bool(degraded_reasons),
+            summary_degraded_reasons=degraded_reasons,
         )
     if action == "texture":
         return await _export_texture_file({"session_id": session_id, **dict(args or {})})

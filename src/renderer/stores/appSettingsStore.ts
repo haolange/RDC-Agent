@@ -13,6 +13,7 @@ import type {
 import {
   LEFT_SIDEBAR_DEFAULT_WIDTH,
   RIGHT_PANEL_DEFAULT_WIDTH,
+  TERMINAL_DEFAULT_HEIGHT,
 } from '@shared/constants/layout';
 import { DEFAULT_MODEL_ROUTING } from '@shared/types/agent';
 
@@ -39,6 +40,9 @@ const DEFAULT_SETTINGS: AppSettings = {
       collapsed: false,
       width: RIGHT_PANEL_DEFAULT_WIDTH,
       expandedWidth: RIGHT_PANEL_DEFAULT_WIDTH,
+    },
+    terminal: {
+      height: TERMINAL_DEFAULT_HEIGHT,
     },
   },
   profile: {

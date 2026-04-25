@@ -103,6 +103,19 @@ rdx.bat --non-interactive mcp --ensure-env
 
 因此，`preview.state=failed|stale` 时，应优先修 session / event / backend 条件，而不是把窗口输出当成平台主真相。
 
+## `rd.export.screenshot` 或静态 preview 没有图片
+
+静态图片预览通常先走 `rd.export.screenshot target.semantic="swapchain"`，优先导出最终 `Present` / swapchain backbuffer；只有导出不可用时才尝试 `rd.capture.get_thumbnail`。排查时优先看每次 tool 调用的失败码和 `details.failure_stage`：
+
+- `resolve_visual_target` 表示截图目标选择失败；swapchain 模式下应先检查 `present_event_id`、`target_source`、`fallback_reason` 与 `swapchain_error`，再检查 `event_id`、`target.rt_index`、`rd.pipeline.get_output_targets` 与 event bindings。
+- `save_texture` 表示目标已解析，但 `RenderDoc` 保存图片阶段失败，应检查 `details.texture_id`、`details.target_source`、输出路径与格式。
+- 未显式传 `target.texture_id` / `target.rt_index` 时，`rd.export.screenshot` 默认使用 `target.semantic="swapchain"`；如果返回 `target_source="event_output_fallback"`，表示最终图来自 event output 降级路径，不能把它误认为 swapchain backbuffer。
+- 需要旧的当前 event 输出观察时，应显式传 `target.semantic="event_output"`；这时才会优先 RT0，并在 RT0 不存在时继续选择其他 output target 或 event binding。
+- 显式传了 `target.rt_index` 且该 slot 不存在时，运行时会返回 `preview_event_output_slot_unavailable`，不会自动改用其他 slot。
+- `rd.capture.get_thumbnail` 返回 `thumbnail_unavailable` 表示当前 capture 没有可读内嵌缩略图；这不是成功结果，上层应继续展示明确失败原因。
+
+因此，上层 UI 不应只显示“无内容”。至少应保留 `session_id`、`event_id`、`code`、`failure_stage`、`target_source` 与导出路径，便于判断是 event 选择、目标选择、保存阶段还是 thumbnail fallback 失败。
+
 ## preview 看着不全、留黑边或像是畸形
 
 优先检查：

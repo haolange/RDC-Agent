@@ -55,5 +55,6 @@
 
 - 代码改动后执行一次 `npm run typecheck`。
 - 入口、构建或窗口逻辑改动后，再补一次 `npm run build` 或等价打包检查。
+- 运行 Electron E2E 前必须先执行 `npm run build`，因为 `e2e/helpers/electron-app.ts` 启动的是 `out/main/index.js` 与 `out/renderer` 的构建产物；不要直接用旧的 `out/` 结果验证最新源码改动。
 - 涉及工作台交互、页面结构、样式引用或共享契约的改动后，至少补一次关键 E2E smoke 或等价人工回归，确认主界面、关键面板和主要交互未退化。
 - 仅文档改动时，检查术语、路径和描述是否与当前仓库结构一致。

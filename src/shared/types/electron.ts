@@ -35,7 +35,7 @@ import type {
   SessionAttachmentRecord,
   SessionRecord,
 } from './session';
-import type { TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from './terminal';
+import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from './terminal';
 import type { ToolCallResult, ToolCatalog } from './tool';
 
 export interface ElectronAPI {
@@ -54,6 +54,7 @@ export interface ElectronAPI {
 
   appShell: {
     selectAvatar: () => Promise<string | null>;
+    getAvatarDataUrl: (avatarPath: string) => Promise<string | null>;
     openPath: (targetPath: string) => Promise<{
       success: boolean;
       error?: string;
@@ -291,7 +292,7 @@ export interface ElectronAPI {
 
   terminal: {
     listTabs: () => Promise<{ tabs: TerminalTabRecord[] }>;
-    createTab: (request?: { cwd?: string | null }) => Promise<{ success: boolean; tab?: TerminalTabRecord; tabs: TerminalTabRecord[]; error?: string }>;
+    createTab: (request?: TerminalCreateTabRequest) => Promise<{ success: boolean; tab?: TerminalTabRecord; tabs: TerminalTabRecord[]; error?: string }>;
     closeTab: (tabId: string) => Promise<{ success: boolean; tabs: TerminalTabRecord[]; error?: string }>;
     activateTab: (tabId: string) => Promise<{ success: boolean; tabs: TerminalTabRecord[]; error?: string }>;
     write: (tabId: string, data: string) => Promise<{ success: boolean; error?: string }>;

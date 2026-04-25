@@ -7,6 +7,7 @@ import { UserMenu } from './components/UserMenu';
 import { SettingsModal } from './components/SettingsModal';
 import { TerminalDrawer } from './components/TerminalDrawer';
 import { ModeGlyph } from './components/ModeGlyph';
+import { ProfileAvatar } from './components/ProfileAvatar';
 import { useLayoutStore } from './stores/layoutStore';
 import { useSessionStore, type RightRailTarget } from './stores/sessionStore';
 import { useDeviceStore } from './stores/deviceStore';
@@ -687,6 +688,7 @@ const App: React.FC = () => {
     ? systemTheme
     : settings.appearance.theme;
   const nickname = settings.profile.nickname || t('sidebar.userName');
+  const avatarPath = settings.profile.avatarPath;
   const showWorkbenchShell = true;
   const hasActiveDebugRun = Boolean(currentRun && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status));
   const rightRailMode: RightRailMode = !currentProject
@@ -697,6 +699,7 @@ const App: React.FC = () => {
   const isRightRailVisible = rightRailMode !== 'hidden';
   const isTerminalOpen = useTerminalStore((state) => state.isOpen);
   const toggleTerminalOpen = useTerminalStore((state) => state.toggleOpen);
+  const terminalEntries = useTerminalStore((state) => state.entries);
 
   const showNotice = useCallback((message: string) => {
     setShellNotice(message);
@@ -714,7 +717,7 @@ const App: React.FC = () => {
   const setReasoningSummaries = useSessionStore((state) => state.setReasoningSummaries);
   const setConversationMessages = useSessionStore((state) => state.setConversationMessages);
   const upsertConversationMessages = useSessionStore((state) => state.upsertConversationMessages);
-  const setActiveTerminalSessionId = useTerminalStore((state) => state.setActiveSessionId);
+  const setActiveTerminalContext = useTerminalStore((state) => state.setActiveContext);
 
   const syncCapturesFromSnapshot = useCallback((snapshot: ContextSnapshot) => {
     if (!snapshot.captureDescriptors?.length) {
@@ -801,8 +804,12 @@ const App: React.FC = () => {
   }, [currentMode, promptValue]);
 
   useEffect(() => {
-    setActiveTerminalSessionId(currentSession?.sessionId ?? null);
-  }, [currentSession?.sessionId, setActiveTerminalSessionId]);
+    setActiveTerminalContext({
+      sessionId: currentSession?.sessionId ?? null,
+      projectId: currentProject?.projectId ?? null,
+      runId: currentRun?.runId ?? null,
+    });
+  }, [currentProject?.projectId, currentRun?.runId, currentSession?.sessionId, setActiveTerminalContext]);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
@@ -1401,6 +1408,13 @@ const App: React.FC = () => {
     ? `${sendButtonLabel}${currentModeLabel}消息`
     : `${sendButtonLabel} ${currentModeLabel} message`;
   const stopButtonLabel = language === 'zh-CN' ? '停止' : 'Stop';
+  const terminalAlertSeverity = terminalEntries.some((entry) => entry.severity === 'error')
+    ? 'error'
+    : terminalEntries.some((entry) => entry.severity === 'warning')
+      ? 'warning'
+      : hasActiveDebugRun
+        ? 'running'
+        : null;
   const leftPanelToggleLabel = effectiveLeftCollapsed ? t('app.leftSidebarExpand') : t('app.leftSidebarCollapse');
   const rightPanelToggleLabel = effectiveRightCollapsed ? t('app.rightPanelExpand') : t('app.rightPanelCollapse');
   const autoCollapsedTitle = t('app.panelAutoCollapsed');
@@ -1796,9 +1810,11 @@ const App: React.FC = () => {
                   aria-label={t('sidebar.userSettings')}
                 >
                   <span className="footer-entry-main">
-                    <span className="footer-entry-avatar">
-                      {nickname.trim().slice(0, 2).toUpperCase()}
-                    </span>
+                    <ProfileAvatar
+                      className="footer-entry-avatar"
+                      avatarPath={avatarPath}
+                      nickname={nickname}
+                    />
                     <span className="footer-entry-copy">
                       <span className="footer-entry-title">{nickname}</span>
                       <span className="footer-entry-subtitle">{t('sidebar.userSubtitle')}</span>
@@ -1833,7 +1849,7 @@ const App: React.FC = () => {
                 <DeviceSelector variant="utility" />
                 <button
                   type="button"
-                  className={`main-utility-toggle terminal-pill ${isTerminalOpen ? 'active' : ''}`}
+                  className={`main-utility-toggle terminal-pill ${isTerminalOpen ? 'active' : ''} ${terminalAlertSeverity ? `terminal-${terminalAlertSeverity}` : ''}`}
                   onClick={() => toggleTerminalOpen()}
                   data-testid="terminal-toggle"
                   aria-label={isTerminalOpen ? t('terminal.close') : t('terminal.open')}
@@ -1843,6 +1859,12 @@ const App: React.FC = () => {
                     <path d="M4 17l6-6-6-6" />
                     <path d="M12 19h8" />
                   </svg>
+                  {terminalAlertSeverity && (
+                    <span
+                      className={`terminal-status-badge ${terminalAlertSeverity}`}
+                      aria-hidden="true"
+                    />
+                  )}
                 </button>
               </div>
               <div className="main-page-shell">
