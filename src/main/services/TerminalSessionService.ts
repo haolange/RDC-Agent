@@ -1,5 +1,6 @@
-import { BrowserWindow } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
+import * as fs from 'fs';
 import * as path from 'path';
 import { generateShortId, nowMs } from '@shared/utils/id';
 import type { TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
@@ -16,9 +17,40 @@ const DEFAULT_COLS = 120;
 const DEFAULT_ROWS = 32;
 
 function resolvePowerShellPath(): string {
-  const systemRoot = process.env.SystemRoot?.trim() || 'C:\\Windows';
-  const candidate = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
-  return candidate;
+  const systemRoot = process.env.SystemRoot?.trim() || process.env.windir?.trim() || 'C:\\Windows';
+  const candidates = [
+    path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+    path.join(systemRoot, 'Sysnative', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+  ];
+
+  const resolved = candidates.find((candidate) => fs.existsSync(candidate));
+  return resolved ?? 'powershell.exe';
+}
+
+function isDirectory(targetPath: string): boolean {
+  try {
+    return fs.statSync(targetPath).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+function resolveTerminalCwd(requestedCwd?: string | null): string {
+  const candidates = [
+    requestedCwd?.trim(),
+    storageAdapter.getWorkspacePath(),
+    app.getPath('userData'),
+    process.cwd(),
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  for (const candidate of candidates) {
+    const resolved = path.resolve(candidate);
+    if (isDirectory(resolved)) {
+      return resolved;
+    }
+  }
+
+  return process.cwd();
 }
 
 function buildTabTitle(cwd: string): string {
@@ -35,7 +67,7 @@ export class TerminalSessionService {
   }
 
   createTab(options?: { cwd?: string | null }): TerminalTabRecord {
-    const cwd = options?.cwd?.trim() || storageAdapter.getWorkspacePath();
+    const cwd = resolveTerminalCwd(options?.cwd);
     const tabId = `term_${generateShortId()}`;
     const shellPath = resolvePowerShellPath();
     const child = spawn(shellPath, ['-NoLogo'], {
@@ -73,6 +105,25 @@ export class TerminalSessionService {
 
     child.stderr.on('data', (chunk: string) => {
       this.broadcastData({ tabId, data: chunk });
+    });
+
+    child.on('error', (error) => {
+      const current = this.tabs.get(tabId);
+      if (!current) {
+        return;
+      }
+
+      current.record = {
+        ...current.record,
+        status: 'exited',
+        exitCode: null,
+      };
+      this.broadcastData({
+        tabId,
+        data: `\r\n[terminal failed to start: ${error.message}]\r\n`,
+      });
+      this.broadcastExit({ tabId, exitCode: null });
+      this.broadcastTabsChanged();
     });
 
     child.on('close', (exitCode) => {

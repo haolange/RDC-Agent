@@ -14,9 +14,6 @@ export interface ModeConfig {
   icon: ModeIconKey;
   description: string;
   accentColor: string;
-  emptyTitle: string;
-  emptySubtitle: string;
-  helperCopy: string;
   disabled: boolean;
 }
 

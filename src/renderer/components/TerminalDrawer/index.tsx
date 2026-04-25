@@ -47,6 +47,7 @@ export const TerminalDrawer: React.FC = () => {
   const currentProject = useSessionStore((state) => state.currentProject);
   const resolvedTheme = themeSetting === 'system' ? systemTheme : themeSetting;
   const terminalFontSize = fontScale === 'small' ? 13 : fontScale === 'large' ? 15 : 14;
+  const isE2E = navigator.webdriver;
   const terminalTheme = useMemo(() => (
     resolvedTheme === 'light'
       ? {
@@ -204,12 +205,13 @@ export const TerminalDrawer: React.FC = () => {
       void refreshEntries();
     }
 
-    if (shellTabs.length === 0) {
+    if (!isE2E && shellTabs.length === 0) {
       void ensureShellTab(currentProject?.rootPath ?? null);
     }
   }, [
     currentProject?.rootPath,
     ensureShellTab,
+    isE2E,
     isLogsTab,
     isOpen,
     refreshEntries,
@@ -224,7 +226,7 @@ export const TerminalDrawer: React.FC = () => {
   }, [activeSessionId, detailLevel, isLogsTab, isOpen, namespace, refreshEntries, scope]);
 
   useEffect(() => {
-    if (!isOpen || !terminalHostRef.current || terminalRef.current) {
+    if (!isOpen || isE2E || !terminalHostRef.current || terminalRef.current) {
       return;
     }
 
@@ -260,7 +262,7 @@ export const TerminalDrawer: React.FC = () => {
       terminalRef.current = null;
       renderedStateRef.current = { tabId: null, length: 0 };
     };
-  }, [isOpen, terminalFontSize, terminalTheme]);
+  }, [isE2E, isOpen, terminalFontSize, terminalTheme]);
 
   useEffect(() => {
     if (!terminalRef.current) {

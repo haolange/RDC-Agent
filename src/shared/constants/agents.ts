@@ -114,9 +114,6 @@ export const AGENT_MODES: ModeConfig[] = [
     icon: 'crosshair-bug',
     description: '定位异常与验证修复',
     accentColor: '#33d1ff',
-    emptyTitle: '从异常现象出发，定位 GPU 问题',
-    emptySubtitle: '围绕 `.rdc` Capture、截图与线索快速展开排查。',
-    helperCopy: '补充异常、截图或 `.rdc` Capture，直接开始定位。',
     disabled: false,
   },
   {
@@ -125,9 +122,6 @@ export const AGENT_MODES: ModeConfig[] = [
     icon: 'waveform-gauge',
     description: '拆解现象并收敛证据',
     accentColor: '#8d8bff',
-    emptyTitle: '拆开线索，串起证据',
-    emptySubtitle: '适合对比现象、梳理上下文与收敛判断方向。',
-    helperCopy: '贴出问题与素材，我会先整理结构和证据。',
     disabled: false,
   },
   {
@@ -136,9 +130,6 @@ export const AGENT_MODES: ModeConfig[] = [
     icon: 'spark-tuning',
     description: '判断瓶颈与优化顺序',
     accentColor: '#4ee3a0',
-    emptyTitle: '先找瓶颈，再排优化顺序',
-    emptySubtitle: '适合评估性能收益、成本与验证优先级。',
-    helperCopy: '补充性能线索后，我会按收益和风险整理建议。',
     disabled: false,
   },
 ];
