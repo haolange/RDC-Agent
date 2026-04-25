@@ -1,11 +1,9 @@
 .workflow-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-6);
-  background:
-    linear-gradient(180deg, rgb(var(--color-bg-1)), rgb(var(--color-bg-0))),
-    rgb(var(--color-bg-1));
+  gap: 14px;
+  padding: 14px 20px;
+  background: rgb(var(--color-bg-1));
   border-bottom: 1px solid rgb(var(--color-border-default));
 }
 
@@ -57,7 +55,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid rgb(var(--color-border-default));
+  border: 1px solid rgb(var(--color-border-default));
   border-radius: var(--radius-full);
   background: rgb(var(--color-bg-3));
   position: relative;
@@ -83,8 +81,8 @@
 .workflow-stage.active .stage-node {
   background: rgb(var(--color-bg-0));
   border-color: rgb(var(--color-accent-500));
-  box-shadow: 0 0 0 4px rgb(var(--color-accent-500) / 0.12), var(--shadow-glow);
-  animation: pulse-glow 2.2s ease-in-out infinite;
+  box-shadow: 0 0 0 3px rgb(var(--color-accent-500) / 0.12);
+  animation: none;
 }
 
 .workflow-stage.active .stage-node-icon {
@@ -103,7 +101,7 @@
 .workflow-stage.blocked .stage-node {
   background: rgb(var(--color-error) / 0.12);
   border-color: rgb(var(--color-error));
-  animation: shake 0.45s ease-in-out;
+  animation: none;
 }
 
 .workflow-stage.blocked .stage-node-icon {
@@ -256,8 +254,8 @@
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border: 1px solid rgb(var(--color-border-default));
-  border-radius: var(--radius-xl);
-  background: rgb(var(--color-bg-2));
+  border-radius: 8px;
+  background: rgb(var(--color-bg-1));
 }
 
 .agent-activity-avatar {

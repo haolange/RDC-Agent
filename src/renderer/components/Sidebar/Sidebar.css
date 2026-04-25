@@ -15,8 +15,8 @@
   overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding-bottom: var(--space-3);
+  gap: 10px;
+  padding-bottom: 10px;
 }
 
 .sidebar-content.collapsed .sidebar-scroll {
@@ -27,8 +27,8 @@
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  padding-top: var(--space-2);
+  gap: 10px;
+  padding-top: 4px;
   border-top: 1px solid rgb(var(--color-border-subtle));
   opacity: 1;
   transform: translateX(0);
@@ -102,11 +102,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   border: 1px solid rgb(var(--color-border-secondary));
-  background: rgb(var(--color-bg-2) / 0.9);
+  background: rgb(var(--color-bg-2) / 0.72);
   color: rgb(var(--color-text-tertiary));
   cursor: pointer;
   transition:
@@ -133,7 +133,7 @@
 .project-stack {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .project-stack-item {
@@ -152,13 +152,11 @@
   flex-direction: column;
   gap: 0;
   width: 100%;
-  min-height: 50px;
-  padding: 12px;
+  min-height: 42px;
+  padding: 9px 10px;
   border: 1px solid rgb(var(--color-border-secondary));
-  border-radius: 16px;
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.025), transparent 60%),
-    rgb(var(--color-bg-2) / 0.7);
+  border-radius: 9px;
+  background: transparent;
   text-align: left;
   cursor: pointer;
   transition:
@@ -169,48 +167,42 @@
 }
 
 .project-item {
-  padding: 14px 16px 14px 14px;
+  padding: 10px 11px;
 }
 
 .project-item-title,
 .project-item .session-item-title {
-  font-size: 16px;
+  font-size: var(--text-base);
 }
 
 .session-item:hover {
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.035), transparent 60%),
-    rgb(var(--color-bg-2) / 0.92);
+  background: rgb(var(--color-bg-2) / 0.7);
   border-color: rgb(var(--color-border-default));
-  transform: translateY(-1px);
-  box-shadow: 0 10px 20px rgb(0 0 0 / 0.14);
+  transform: none;
+  box-shadow: none;
 }
 
 .session-item.active {
-  border-color: rgb(var(--color-accent-500) / 0.28);
-  background:
-    linear-gradient(180deg, rgb(var(--color-accent-500) / 0.1), transparent 72%),
-    rgb(var(--color-bg-2));
-  box-shadow: inset 0 0 0 1px rgb(var(--color-accent-500) / 0.14), 0 12px 24px rgb(0 0 0 / 0.14);
+  border-color: rgb(var(--color-accent-500) / 0.32);
+  background: rgb(var(--color-accent-500) / 0.09);
+  box-shadow: inset 2px 0 0 rgb(var(--color-accent-500));
 }
 
 .project-sessions-panel {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   margin-left: 4px;
   padding-top: 0;
-  padding-left: 12px;
+  padding-left: 10px;
   border-left: 1px solid rgb(var(--color-border-secondary));
 }
 
 .session-subitem {
-  min-height: 48px;
-  padding: 12px 16px 12px 14px;
-  border-radius: 16px;
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.018), transparent 58%),
-    rgb(var(--color-bg-2) / 0.54);
+  min-height: 38px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: transparent;
   box-shadow: none;
 }
 
@@ -237,16 +229,16 @@
 
 .project-item-chevron,
 .session-item-gutter {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
 }
 
 .project-item-chevron {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 7px;
   color: rgb(var(--color-text-tertiary));
   transition:
     color var(--transition-base) var(--ease-standard),
@@ -313,7 +305,7 @@
   flex: 1;
   min-width: 0;
   color: rgb(var(--color-text-primary));
-  font-size: 16px;
+  font-size: var(--text-base);
   font-weight: var(--font-semibold);
   white-space: nowrap;
   overflow: hidden;
@@ -324,8 +316,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--radius-md);
   color: rgb(var(--color-text-tertiary));
   opacity: 0;
@@ -370,10 +362,8 @@
   justify-content: center;
   padding: 24px 18px;
   border: 1px dashed rgb(var(--color-accent-500) / 0.24);
-  border-radius: 20px;
-  background:
-    linear-gradient(180deg, rgb(var(--color-accent-500) / 0.06), transparent 70%),
-    rgb(var(--color-bg-1) / 0.8);
+  border-radius: 10px;
+  background: rgb(var(--color-bg-2) / 0.52);
   text-align: center;
   transition:
     border-color var(--transition-base) var(--ease-standard),
@@ -428,13 +418,9 @@
   gap: 14px;
   padding: 16px;
   border: 1px solid rgb(var(--color-border-default));
-  border-radius: 18px;
-  background:
-    linear-gradient(180deg, rgb(var(--color-accent-500) / 0.08), transparent 48%),
-    rgb(var(--color-bg-1));
-  box-shadow:
-    0 24px 48px rgb(0 0 0 / 0.28),
-    0 0 0 1px rgb(var(--color-accent-500) / 0.08);
+  border-radius: 12px;
+  background: rgb(var(--color-bg-1));
+  box-shadow: var(--shadow-lg);
 }
 
 .session-rename-popover-title {
@@ -529,12 +515,10 @@
   width: 180px;
   padding: 6px;
   border-radius: 12px;
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.05), transparent 100%),
-    rgb(var(--color-bg-2) / 0.95);
+  background: rgb(var(--color-bg-2));
   border: 1px solid rgb(var(--color-border-secondary));
-  box-shadow: 0 16px 32px rgb(0 0 0 / 0.24);
-  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: none;
 }
 
 .sidebar-context-menu-item {
@@ -562,4 +546,3 @@
   background: rgb(var(--color-border-secondary));
   margin: 4px 6px;
 }
-

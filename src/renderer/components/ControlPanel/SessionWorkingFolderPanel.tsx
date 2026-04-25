@@ -23,7 +23,15 @@ export const SessionWorkingFolderPanel: React.FC = () => {
       };
     }
 
-    void window.electronAPI.session.attachments.list(currentSession.sessionId)
+    const electronAPI = window.electronAPI;
+    if (!electronAPI) {
+      setAttachmentCount(0);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void electronAPI.session.attachments.list(currentSession.sessionId)
       .then((result) => {
         if (!cancelled) {
           setAttachmentCount(result.attachments.length);
@@ -53,7 +61,7 @@ export const SessionWorkingFolderPanel: React.FC = () => {
   }
 
   const openPath = async (targetPath: string) => {
-    await window.electronAPI.appShell.openPath(targetPath);
+    await window.electronAPI?.appShell.openPath(targetPath);
   };
 
   return (
