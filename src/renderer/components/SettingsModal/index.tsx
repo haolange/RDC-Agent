@@ -23,7 +23,7 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-type SettingsSection = 'account' | 'general' | 'workspace' | 'models';
+type SettingsSection = 'general' | 'workspace' | 'models' | 'agents';
 
 const PROVIDER_KIND_OPTIONS: LlmProviderKind[] = ['openrouter', 'openai-compatible', 'anthropic', 'ollama'];
 
@@ -76,7 +76,14 @@ const getProviderDisplayLabel = (
   fallbackLabel: string,
 ): string => provider.label.trim() || fallbackLabel;
 
-type ExtendedSettingsSection = SettingsSection | 'agents';
+const hasOpenRouterBaseUrlMismatch = (provider: LlmProviderEntry): boolean => {
+  const baseUrl = provider.baseUrl?.trim();
+  return Boolean(
+    provider.kind === 'openrouter'
+    && baseUrl
+    && !baseUrl.replace(/\/+$/, '').endsWith('/api/v1'),
+  );
+};
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, onClose }) => {
   const { t } = useI18n();
@@ -90,7 +97,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   const removeProvider = useAppSettingsStore((state) => state.removeProvider);
   const saveAgentRoute = useAppSettingsStore((state) => state.saveAgentRoute);
 
-  const [activeSection, setActiveSection] = useState<ExtendedSettingsSection>('models');
+  const [activeSection, setActiveSection] = useState<SettingsSection>('general');
   const [accountDraft, setAccountDraft] = useState(settings.profile);
   const [workspaceDraft, setWorkspaceDraft] = useState(settings.workspace.rootPath);
   const [providerDrafts, setProviderDrafts] = useState<LlmProviderEntry[]>(settings.llm.providers.map(cloneProvider));
@@ -109,7 +116,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     if (wasOpenRef.current) return;
 
     wasOpenRef.current = true;
-    setActiveSection('models');
+    setActiveSection('general');
     setAccountDraft(settings.profile);
     setWorkspaceDraft(settings.workspace.rootPath);
     const providers = settings.llm.providers.map(cloneProvider);
@@ -178,6 +185,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   const isBuiltinSelectedProvider = selectedProvider ? builtinProviderIds.has(selectedProvider.id) : false;
   const routableProviders = useMemo(
     () => providerDrafts.filter((provider) => provider.enabled && provider.isConfigured && getEnabledModels(provider).length > 0),
+    [providerDrafts],
+  );
+  const configuredProvidersWithoutEnabledModels = useMemo(
+    () => providerDrafts.filter((provider) => provider.enabled && provider.isConfigured && getEnabledModels(provider).length === 0),
     [providerDrafts],
   );
 
@@ -298,6 +309,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
   const handleSaveProvider = async () => {
     if (!selectedProvider) return;
+    const pendingModelId = newModelId.trim();
+    const modelsWithPending = pendingModelId && !selectedProvider.models.some((model) => model.id === pendingModelId)
+      ? [
+          ...selectedProvider.models,
+          { id: pendingModelId, label: pendingModelId, enabled: true },
+        ]
+      : selectedProvider.models;
     const normalizedProvider = {
       ...selectedProvider,
       label: selectedProvider.label.trim(),
@@ -306,7 +324,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
       hasStoredSecret: selectedProvider.hasStoredSecret,
       baseUrl: selectedProvider.baseUrl?.trim() || '',
       docsUrl: selectedProvider.docsUrl?.trim() || '',
-      models: selectedProvider.models
+      models: modelsWithPending
         .filter((model) => model.id.trim())
         .map((model) => ({
           ...model,
@@ -320,7 +338,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     setProviderDrafts((current) => current.map((provider) => (
       provider.id === normalizedProvider.id ? normalizedProvider : provider
     )));
-    await saveProvider(normalizedProvider);
+    const nextSettings = await saveProvider(normalizedProvider);
+    const nextProviders = nextSettings.llm.providers.map(cloneProvider);
+    setProviderDrafts(nextProviders);
+    setAgentRouteDrafts(nextSettings.llm.agentRoutes.map(cloneRoute));
+    setSelectedProviderId(
+      nextProviders.some((provider) => provider.id === normalizedProvider.id)
+        ? normalizedProvider.id
+        : nextProviders[0]?.id ?? null,
+    );
+    setNewModelId('');
   };
 
   const handleClearStoredSecret = () => {
@@ -395,8 +422,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     }
   };
 
-  const sections: Array<{ id: ExtendedSettingsSection; label: string }> = [
-    { id: 'account', label: t('settings.account') },
+  const sections: Array<{ id: SettingsSection; label: string }> = [
     { id: 'general', label: t('settings.general') },
     { id: 'workspace', label: t('settings.workspace') },
     { id: 'models', label: t('settings.models') },
@@ -443,7 +469,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
             <div className="settings-modal-heading">
               <div className="settings-modal-title" id="settings-modal-title">{sections.find((section) => section.id === activeSection)?.label}</div>
               <div className="settings-modal-subtitle" id="settings-modal-subtitle">
-                {activeSection === 'account' && t('settings.accountSubtitle')}
                 {activeSection === 'general' && t('settings.generalSubtitle')}
                 {activeSection === 'workspace' && t('settings.workspaceSubtitle')}
                 {activeSection === 'models' && t('settings.modelsSubtitle')}
@@ -459,46 +484,54 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
           </div>
 
           <div className="settings-center-panel" data-testid="settings-center-panel">
-            {activeSection === 'account' && (
-              <section className="settings-page settings-account-page">
-                <div className="settings-account-avatar-row">
-                  <div className="settings-account-avatar-shell">
-                    {accountDraft.avatarPath ? (
-                      <img className="settings-account-avatar" src={toFileUrl(accountDraft.avatarPath)} alt="avatar" />
-                    ) : (
-                      <div className="settings-account-avatar settings-account-avatar-fallback">
-                        {(accountDraft.nickname || 'RA').trim().slice(0, 2).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <div className="settings-account-avatar-copy">
-                    <div className="settings-field-label">{t('settings.avatar')}</div>
-                    <div className="settings-help-text">{t('settings.avatarHint')}</div>
-                    <button type="button" className="button button-secondary" onClick={() => void handleAvatarSelect()}>
-                      {t('settings.uploadAvatar')}
-                    </button>
-                  </div>
-                </div>
-
-                <label className="settings-field">
-                  <span className="settings-field-label">{t('settings.nickname')}</span>
-                  <input
-                    className="input"
-                    value={accountDraft.nickname}
-                    onChange={(event) => setAccountDraft((current) => ({ ...current, nickname: event.target.value }))}
-                  />
-                </label>
-
-                <div className="settings-actions">
-                  <button type="button" className="button button-primary" onClick={() => void handleAccountSave()}>
-                    {t('settings.save')}
-                  </button>
-                </div>
-              </section>
-            )}
-
             {activeSection === 'general' && (
-              <section className="settings-page">
+              <section className="settings-page settings-page-general">
+                <div className="settings-section">
+                  <div className="settings-section-header">
+                    <div>
+                      <div className="settings-section-title">{t('settings.profile')}</div>
+                      <div className="settings-section-subtitle">{t('settings.profileHint')}</div>
+                    </div>
+                  </div>
+
+                  <div className="settings-profile-row">
+                    <div className="settings-account-avatar-shell">
+                      {accountDraft.avatarPath ? (
+                        <img className="settings-account-avatar" src={toFileUrl(accountDraft.avatarPath)} alt="avatar" />
+                      ) : (
+                        <div className="settings-account-avatar settings-account-avatar-fallback">
+                          {(accountDraft.nickname || 'RA').trim().slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <div className="settings-profile-fields">
+                      <label className="settings-field">
+                        <span className="settings-field-label">{t('settings.nickname')}</span>
+                        <input
+                          className="input"
+                          value={accountDraft.nickname}
+                          onChange={(event) => setAccountDraft((current) => ({ ...current, nickname: event.target.value }))}
+                        />
+                      </label>
+                      <div className="settings-profile-actions">
+                        <button type="button" className="button button-secondary" onClick={() => void handleAvatarSelect()}>
+                          {t('settings.uploadAvatar')}
+                        </button>
+                        <button type="button" className="button button-primary" onClick={() => void handleAccountSave()}>
+                          {t('settings.save')}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-section">
+                  <div className="settings-section-header">
+                    <div>
+                      <div className="settings-section-title">{t('settings.appearance')}</div>
+                      <div className="settings-section-subtitle">{t('settings.appearanceHint')}</div>
+                    </div>
+                  </div>
                 <div className="settings-option-block">
                   <div className="settings-field-label">{t('userMenu.theme')}</div>
                   <div className="user-menu-pill-group settings-inline-pills">
@@ -523,7 +556,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                       className={`user-menu-pill ${settings.appearance.language === 'zh-CN' ? 'active' : ''}`}
                       onClick={() => void setLanguage('zh-CN')}
                     >
-                      简体中文
+                      {t('language.zh')}
                     </button>
                     <button
                       type="button"
@@ -549,6 +582,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                       </button>
                     ))}
                   </div>
+                </div>
                 </div>
               </section>
             )}
@@ -686,11 +720,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                                 {getResolvedProviderLabel(provider).slice(0, 1).toUpperCase()}
                               </span>
                             </div>
-                            <span
-                              className="settings-provider-item-label"
-                              data-testid={`settings-provider-label-${provider.id}`}
-                            >
-                              {getResolvedProviderLabel(provider)}
+                            <span className="settings-provider-item-copy">
+                              <span
+                                className="settings-provider-item-label"
+                                data-testid={`settings-provider-label-${provider.id}`}
+                              >
+                                {getResolvedProviderLabel(provider)}
+                              </span>
+                              <span className="settings-provider-item-meta">
+                                {provider.enabled ? t('settings.providerEnabled') : t('settings.providerDisabled')}
+                                {' · '}
+                                {t('settings.providerModelCount', { count: getEnabledModels(provider).length })}
+                              </span>
                             </span>
                           </div>
                         </button>
@@ -868,7 +909,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                         )}
                         {!!selectedProvider.apiKey && selectedProvider.kind !== 'ollama' && !selectedProvider.hasStoredSecret && (
                           <div className="settings-help-text">
-                            保存后会把 API Key 写入系统凭据库。
+                            {t('settings.apiKeySaveHint')}
                           </div>
                         )}
                       </label>
@@ -886,6 +927,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                           value={selectedProvider.baseUrl ?? ''}
                           onChange={(event) => handleProviderDraftChange('baseUrl', event.target.value)}
                         />
+                        {hasOpenRouterBaseUrlMismatch(selectedProvider) && (
+                          <span className="settings-help-text settings-help-text-warning">
+                            {t('settings.openRouterBaseUrlHint')}
+                          </span>
+                        )}
                       </label>
 
                       <div className="settings-model-section">
@@ -904,20 +950,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                           />
                         </div>
 
-                        <div className="settings-model-list">
+                        <div className="settings-model-list" data-empty-label={t('settings.noEnabledModels')}>
                           {selectedProvider.models.map((model) => (
                             <div key={model.id} className="settings-model-row">
-                              <span className="settings-model-row-check">✓</span>
+                              <span className="settings-model-row-check">OK</span>
                               <span className="settings-model-row-label">{model.label}</span>
                               <button type="button" className="settings-model-row-remove" onClick={() => handleRemoveModel(model.id)}>
-                                ×
+                                x
                               </button>
                             </div>
                           ))}
                         </div>
 
                         <div className="settings-recommend-header">{t('settings.recommendedModels')}</div>
-                        <div className="settings-model-recommend-list">
+                        <div className="settings-model-recommend-list" data-empty-label={t('settings.noRecommendedModels')}>
                           {selectedProvider.recommendedModels.map((modelId) => (
                             <button
                               key={modelId}
@@ -962,6 +1008,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                     {routableProviders.length === 0 && (
                       <div className="settings-help-text">{t('settings.noConfiguredProviders')}</div>
                     )}
+                    {configuredProvidersWithoutEnabledModels.length > 0 && (
+                      <div className="settings-help-text settings-help-text-warning" data-testid="settings-agent-no-enabled-models">
+                        {t('settings.configuredProvidersWithoutModels', {
+                          providers: configuredProvidersWithoutEnabledModels.map((provider) => getResolvedProviderLabel(provider)).join(', '),
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="settings-agent-grid-header" aria-hidden="true">
+                    <span>{t('settings.agentRouting')}</span>
+                    <span>{t('settings.providerFieldLabel')}</span>
+                    <span>{t('settings.modelFieldLabel')}</span>
                   </div>
 
                   <div className="settings-agent-list scrollbar-thin" data-testid="settings-agent-list">
@@ -984,55 +1043,53 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                             <span>{AGENT_DISPLAY_NAMES[agentId]}</span>
                             {routeStatus.issue && <span className="settings-agent-warning">{t(routeStatus.issue)}</span>}
                           </div>
-                          <div className="settings-agent-grid">
-                            <label className="settings-field">
-                              <span className="settings-field-label">{t('settings.providerFieldLabel')}</span>
-                              <DropdownSelect
-                                triggerClassName="settings-select-trigger"
-                                menuClassName="settings-select-menu"
-                                dataTestId={`settings-agent-provider-${agentId}`}
-                                value={providerValue}
-                                options={routableProviders.map<DropdownOption>((entry) => ({
-                                  value: entry.id,
-                                  label: getResolvedProviderLabel(entry),
-                                }))}
-                                placeholder={routableProviders.length === 0
-                                  ? t('settings.noConfiguredProviders')
-                                  : t('settings.selectProviderPlaceholder')}
-                                onChange={(nextProviderId) => {
-                                  if (!nextProviderId) {
-                                    handleRouteChange(agentId, { providerId: '', modelId: '' });
-                                    return;
-                                  }
+                          <div className="settings-agent-route-control">
+                            <DropdownSelect
+                              triggerClassName="settings-select-trigger settings-agent-select-trigger"
+                              menuClassName="settings-select-menu"
+                              dataTestId={`settings-agent-provider-${agentId}`}
+                              ariaLabel={`${AGENT_DISPLAY_NAMES[agentId]} ${t('settings.providerFieldLabel')}`}
+                              value={providerValue}
+                              options={routableProviders.map<DropdownOption>((entry) => ({
+                                value: entry.id,
+                                label: getResolvedProviderLabel(entry),
+                              }))}
+                              placeholder={routableProviders.length === 0
+                                ? t('settings.noConfiguredProviders')
+                                : t('settings.selectProviderPlaceholder')}
+                              onChange={(nextProviderId) => {
+                                if (!nextProviderId) {
+                                  handleRouteChange(agentId, { providerId: '', modelId: '' });
+                                  return;
+                                }
 
-                                  const nextProvider = routableProviders.find((entry) => entry.id === nextProviderId)
-                                    ?? providerDrafts.find((entry) => entry.id === nextProviderId);
-                                  handleRouteChange(agentId, {
-                                    providerId: nextProviderId,
-                                    modelId: getEnabledModels(nextProvider)[0]?.id ?? '',
-                                  });
-                                }}
-                                disabled={routableProviders.length === 0}
-                              />
-                            </label>
-                            <label className="settings-field">
-                              <span className="settings-field-label">{t('settings.modelFieldLabel')}</span>
-                              <DropdownSelect
-                                triggerClassName="settings-select-trigger"
-                                menuClassName="settings-select-menu"
-                                dataTestId={`settings-agent-model-${agentId}`}
-                                value={modelValue}
-                                options={availableModels.map<DropdownOption>((model) => ({
-                                  value: model.id,
-                                  label: model.label,
-                                }))}
-                                placeholder={!selectedRouteProvider
-                                  ? t('settings.selectProviderFirst')
-                                  : t('settings.noModelsAvailable')}
-                                onChange={(nextModelId) => handleRouteChange(agentId, { modelId: nextModelId })}
-                                disabled={!selectedRouteProvider || availableModels.length === 0}
-                              />
-                            </label>
+                                const nextProvider = routableProviders.find((entry) => entry.id === nextProviderId)
+                                  ?? providerDrafts.find((entry) => entry.id === nextProviderId);
+                                handleRouteChange(agentId, {
+                                  providerId: nextProviderId,
+                                  modelId: getEnabledModels(nextProvider)[0]?.id ?? '',
+                                });
+                              }}
+                              disabled={routableProviders.length === 0}
+                            />
+                          </div>
+                          <div className="settings-agent-route-control">
+                            <DropdownSelect
+                              triggerClassName="settings-select-trigger settings-agent-select-trigger"
+                              menuClassName="settings-select-menu"
+                              dataTestId={`settings-agent-model-${agentId}`}
+                              ariaLabel={`${AGENT_DISPLAY_NAMES[agentId]} ${t('settings.modelFieldLabel')}`}
+                              value={modelValue}
+                              options={availableModels.map<DropdownOption>((model) => ({
+                                value: model.id,
+                                label: model.label,
+                              }))}
+                              placeholder={!selectedRouteProvider
+                                ? t('settings.selectProviderFirst')
+                                : t('settings.noModelsAvailable')}
+                              onChange={(nextModelId) => handleRouteChange(agentId, { modelId: nextModelId })}
+                              disabled={!selectedRouteProvider || availableModels.length === 0}
+                            />
                           </div>
                         </div>
                       );

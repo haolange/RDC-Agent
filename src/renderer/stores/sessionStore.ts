@@ -19,6 +19,8 @@ import type {
   WorkflowState,
 } from '@shared/types/workflow';
 
+export type RightRailTarget = 'project' | 'session';
+
 const sortConversationMessages = (messages: ConversationMessage[]): ConversationMessage[] =>
   messages
     .slice()
@@ -52,6 +54,7 @@ interface SessionState {
   sessions: SessionRecord[];
   currentProject: ProjectRecord | null;
   currentSession: SessionRecord | null;
+  rightRailTarget: RightRailTarget;
   currentRun: RunSummary | null;
   currentRunUsage: RunContextUsageSummary | null;
   contextSnapshot: ContextSnapshot | null;
@@ -73,6 +76,7 @@ interface SessionState {
   setSessions: (sessions: SessionRecord[]) => void;
   setCurrentProject: (project: ProjectRecord | null) => void;
   setCurrentSession: (session: SessionRecord | null) => void;
+  setRightRailTarget: (target: RightRailTarget) => void;
   setCurrentRun: (run: RunSummary | null) => void;
   setCurrentRunUsage: (usage: RunContextUsageSummary | null) => void;
   setContextSnapshot: (snapshot: ContextSnapshot | null) => void;
@@ -109,6 +113,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   sessions: [],
   currentProject: null,
   currentSession: null,
+  rightRailTarget: 'project',
   currentRun: null,
   currentRunUsage: null,
   contextSnapshot: null,
@@ -129,6 +134,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   setSessions: (sessions) => set({ sessions }),
   setCurrentProject: (project) => set({ currentProject: project }),
   setCurrentSession: (session) => set({ currentSession: session }),
+  setRightRailTarget: (rightRailTarget) => set({ rightRailTarget }),
   setCurrentRun: (run) => set({ currentRun: run }),
   setCurrentRunUsage: (currentRunUsage) => set({ currentRunUsage }),
   setContextSnapshot: (snapshot) => set({ contextSnapshot: snapshot }),
@@ -187,6 +193,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   reset: () =>
     set({
       currentSession: null,
+      rightRailTarget: 'project',
       currentRun: null,
       currentRunUsage: null,
       contextSnapshot: null,

@@ -31,6 +31,7 @@ test('模型页展示内置 Provider 模板源，默认不自动注入已保存 
 
   try {
     await openSettings(ctx);
+    await ctx.page.locator('[data-testid="settings-nav-models"]').click();
     const providerList = ctx.page.locator('[data-testid="settings-provider-list"]');
     await expect(providerList).not.toContainText('OpenRouter');
     await expect(providerList).not.toContainText('OpenAI');
@@ -107,6 +108,7 @@ test('Settings 下拉菜单展开后可见且可点击', async () => {
     await ctx.page.waitForTimeout(300);
 
     await openSettings(ctx);
+    await ctx.page.locator('[data-testid="settings-nav-models"]').click();
 
     const providerTemplateDropdown = await openDropdownMenu(ctx, 'settings-provider-template-select');
     await expect(providerTemplateDropdown.menu).toHaveScreenshot('settings-provider-template-menu.png');
@@ -189,6 +191,7 @@ test('Models 已配置态在长字段场景下保持稳定布局', async () => {
     await ctx.page.waitForTimeout(300);
 
     await openSettings(ctx);
+    await ctx.page.locator('[data-testid="settings-nav-models"]').click();
 
     const modal = ctx.page.locator('[data-testid="settings-modal"]');
     const detail = ctx.page.locator('[data-testid="settings-model-detail"]');
@@ -252,6 +255,7 @@ test('自定义 Provider 会持久化，API key 不再明文出现在 settings.g
     expect(persistedSettings.llm.providers).toHaveLength(1);
 
     await openSettings(ctx);
+    await ctx.page.locator('[data-testid="settings-nav-models"]').click();
     await expect(ctx.page.locator('[data-testid="settings-provider-list"]')).toContainText('Sirius');
     await ctx.page.locator('[data-testid="settings-provider-item-sirius"]').click();
     await expect(ctx.page.locator('[data-testid="settings-model-detail"]')).toContainText('已存储');
@@ -315,6 +319,7 @@ test('点击 Provider 行会直接切换详情', async () => {
     ctx = await launchApp({ tempDir, cleanupOnClose: false });
 
     await openSettings(ctx);
+    await ctx.page.locator('[data-testid="settings-nav-models"]').click();
 
     const modelDetail = ctx.page.locator('[data-testid="settings-model-detail"]');
     await expect(modelDetail).toContainText('Alpha');
@@ -406,7 +411,7 @@ test('通用设置修改后停留在当前面板，不跳回模型页', async ()
   }
 });
 
-test('Account、Workspace、Models 写回设置后都停留在当前面板', async () => {
+test('General、Workspace、Models 写回设置后都停留在当前面板', async () => {
   let ctx = await launchApp({ cleanupOnClose: false });
   const tempDir = ctx.tempDir;
 
@@ -448,11 +453,11 @@ test('Account、Workspace、Models 写回设置后都停留在当前面板', asy
 
     await openSettings(ctx);
 
-    await ctx.page.locator('[data-testid="settings-nav-account"]').click();
-    await expect(ctx.page.locator('[data-testid="settings-nav-account"]')).toHaveClass(/active/);
-    await ctx.page.locator('input').first().fill('Operator Prime');
+    await ctx.page.locator('[data-testid="settings-nav-general"]').click();
+    await expect(ctx.page.locator('[data-testid="settings-nav-general"]')).toHaveClass(/active/);
+    await ctx.page.locator('.settings-page-general input').first().fill('Operator Prime');
     await ctx.page.getByRole('button', { name: '保存', exact: true }).click();
-    await expect(ctx.page.locator('[data-testid="settings-nav-account"]')).toHaveClass(/active/);
+    await expect(ctx.page.locator('[data-testid="settings-nav-general"]')).toHaveClass(/active/);
     await expect(ctx.page.locator('[data-testid="settings-nav-models"]')).not.toHaveClass(/active/);
 
     await ctx.page.locator('[data-testid="settings-nav-workspace"]').click();
@@ -525,5 +530,102 @@ test('Agent 保存后停留在 Agent 面板，不跳回模型页', async () => {
     await expect(ctx.page.locator('[data-testid="settings-model-detail"]')).toHaveCount(0);
   } finally {
     await closeApp(ctx, { cleanup: true });
+  }
+});
+
+test('Provider 保存时会提交模型输入框中的待添加模型，并让 Agents 可选择', async () => {
+  const ctx = await launchApp();
+
+  try {
+    await ctx.page.evaluate(async () => {
+      const settings = await window.electronAPI.settings.get();
+      await window.electronAPI.settings.set({
+        llm: {
+          providers: [
+            {
+              id: 'sirius',
+              kind: 'ollama',
+              label: 'Sirius',
+              enabled: true,
+              apiKey: '',
+              secretRef: 'provider-sirius-api-key',
+              hasStoredSecret: true,
+              baseUrl: 'http://127.0.0.1:11434/v1',
+              models: [],
+              recommendedModels: [],
+              docsUrl: '',
+              isConfigured: true,
+            },
+          ],
+          agentRoutes: settings.llm.agentRoutes,
+        },
+      });
+      const confirmed = await window.electronAPI.settings.get();
+      (window as typeof window & {
+        __RDC_AGENT_E2E__?: {
+          setAppSettings: (settings: unknown) => void;
+        };
+      }).__RDC_AGENT_E2E__?.setAppSettings(confirmed);
+    });
+
+    await openSettings(ctx);
+    await ctx.page.locator('[data-testid="settings-nav-models"]').click();
+    await ctx.page.locator('[data-testid="settings-provider-item-sirius"]').click();
+    await ctx.page.locator('.settings-model-adder-row .input').fill('sirius-model');
+    await ctx.page.locator('[data-testid="settings-provider-save"]').click();
+
+    await ctx.page.locator('[data-testid="settings-nav-agents"]').click();
+    const providerDropdown = await openDropdownMenu(ctx, 'settings-agent-provider-curator_agent');
+    await expect(providerDropdown.menu.locator('[data-testid="settings-agent-provider-curator_agent-option-sirius"]')).toBeVisible();
+    await providerDropdown.menu.locator('[data-testid="settings-agent-provider-curator_agent-option-sirius"]').click();
+
+    const modelDropdown = await openDropdownMenu(ctx, 'settings-agent-model-curator_agent');
+    await expect(modelDropdown.menu.locator('[data-testid="settings-agent-model-curator_agent-option-sirius-model"]')).toBeVisible();
+  } finally {
+    await closeApp(ctx);
+  }
+});
+
+test('已配置 Provider 没有启用模型时 Agents 页显示明确提示且不可保存', async () => {
+  const ctx = await launchApp();
+
+  try {
+    await ctx.page.evaluate(async () => {
+      const settings = await window.electronAPI.settings.get();
+      await window.electronAPI.settings.set({
+        llm: {
+          providers: [
+            {
+              id: 'sirius',
+              kind: 'ollama',
+              label: 'Sirius',
+              enabled: true,
+              apiKey: '',
+              secretRef: 'provider-sirius-api-key',
+              hasStoredSecret: true,
+              baseUrl: 'http://127.0.0.1:11434/v1',
+              models: [],
+              recommendedModels: [],
+              docsUrl: '',
+              isConfigured: true,
+            },
+          ],
+          agentRoutes: settings.llm.agentRoutes,
+        },
+      });
+      const confirmed = await window.electronAPI.settings.get();
+      (window as typeof window & {
+        __RDC_AGENT_E2E__?: {
+          setAppSettings: (settings: unknown) => void;
+        };
+      }).__RDC_AGENT_E2E__?.setAppSettings(confirmed);
+    });
+
+    await openSettings(ctx);
+    await ctx.page.locator('[data-testid="settings-nav-agents"]').click();
+    await expect(ctx.page.locator('[data-testid="settings-agent-no-enabled-models"]')).toContainText('Sirius');
+    await expect(ctx.page.locator('[data-testid="settings-agent-save"]')).toBeDisabled();
+  } finally {
+    await closeApp(ctx);
   }
 });

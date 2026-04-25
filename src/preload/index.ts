@@ -16,6 +16,7 @@ import type {
   ProjectInputRecord,
   ProjectRecord,
   RunContextUsageSummary,
+  RunSummary,
   SessionAttachmentRecord,
   SessionRecord,
 } from '@shared/types/session';
@@ -179,7 +180,7 @@ const electronAPI = {
       ipcRenderer.invoke('session:create', projectId, title),
     rename: (id: string, title: string): Promise<{ success: boolean; session?: SessionRecord; error?: string }> =>
       ipcRenderer.invoke('session:rename', id, title),
-    remove: (id: string): Promise<{ success: boolean; error?: string }> =>
+    remove: (id: string): Promise<{ success: boolean; nextSession?: SessionRecord | null; nextRun?: RunSummary | null; error?: string }> =>
       ipcRenderer.invoke('session:remove', id),
     select: (id: string): Promise<unknown> => ipcRenderer.invoke('session:select', id),
     attachments: {

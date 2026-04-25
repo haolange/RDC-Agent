@@ -94,7 +94,7 @@ interface AppSettingsState {
   updateProfile: (profile: Partial<ProfileSettings>) => Promise<void>;
   updateWorkspaceRoot: (rootPath: string) => Promise<void>;
   resetWorkspaceRoot: () => Promise<void>;
-  saveProvider: (provider: LlmProviderEntry) => Promise<void>;
+  saveProvider: (provider: LlmProviderEntry) => Promise<AppSettings>;
   removeProvider: (providerId: string) => Promise<void>;
   saveAgentRoute: (route: LlmAgentRoute) => Promise<void>;
 }
@@ -129,7 +129,7 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
     await get().patchSettings({ workspace: { rootPath: '' } });
   },
   saveProvider: async (provider) => {
-    await get().patchSettings({
+    return get().patchSettings({
       llm: {
         providers: upsertProvider(get().settings.llm.providers, provider),
       },

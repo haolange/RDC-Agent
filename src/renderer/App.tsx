@@ -8,7 +8,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { TerminalDrawer } from './components/TerminalDrawer';
 import { ModeGlyph } from './components/ModeGlyph';
 import { useLayoutStore } from './stores/layoutStore';
-import { useSessionStore } from './stores/sessionStore';
+import { useSessionStore, type RightRailTarget } from './stores/sessionStore';
 import { useDeviceStore } from './stores/deviceStore';
 import { useAppSettingsStore } from './stores/appSettingsStore';
 import { useTerminalStore } from './stores/terminalStore';
@@ -63,6 +63,7 @@ interface WorkbenchSeedState {
   sessions: SessionRecord[];
   currentProject: ProjectRecord | null;
   currentSession: SessionRecord | null;
+  rightRailTarget?: RightRailTarget;
   currentRun: RunSummary | null;
   currentRunUsage?: RunContextUsageSummary | null;
   contextSnapshot: ContextSnapshot | null;
@@ -658,6 +659,7 @@ const App: React.FC = () => {
 
   const currentProject = useSessionStore((state) => state.currentProject);
   const currentSession = useSessionStore((state) => state.currentSession);
+  const rightRailTarget = useSessionStore((state) => state.rightRailTarget);
   const currentRun = useSessionStore((state) => state.currentRun);
   const currentRunUsage = useSessionStore((state) => state.currentRunUsage);
   const currentMode = useLayoutStore((state) => state.currentMode);
@@ -689,7 +691,7 @@ const App: React.FC = () => {
   const hasActiveDebugRun = Boolean(currentRun && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status));
   const rightRailMode: RightRailMode = !currentProject
     ? 'hidden'
-    : currentSession
+    : rightRailTarget === 'session' && currentSession
       ? 'session'
       : 'project';
   const isRightRailVisible = rightRailMode !== 'hidden';
@@ -836,6 +838,7 @@ const App: React.FC = () => {
         store.setSessions(state.sessions);
         store.setCurrentProject(state.currentProject);
         store.setCurrentSession(state.currentSession);
+        store.setRightRailTarget(state.rightRailTarget ?? (state.currentSession ? 'session' : 'project'));
         store.setCurrentRun(state.currentRun);
         store.setCurrentRunUsage(state.currentRunUsage ?? null);
         store.setContextSnapshot(state.contextSnapshot);
@@ -857,6 +860,7 @@ const App: React.FC = () => {
         store.setSessions([]);
         store.setCurrentProject(null);
         store.setCurrentSession(null);
+        store.setRightRailTarget('project');
         store.setCurrentRun(null);
         store.setCurrentRunUsage(null);
         store.setContextSnapshot(null);
@@ -879,6 +883,7 @@ const App: React.FC = () => {
           sessions: store.sessions,
           currentProject: store.currentProject,
           currentSession: store.currentSession,
+          rightRailTarget: store.rightRailTarget,
           currentRun: store.currentRun,
           currentRunUsage: store.currentRunUsage,
           contextSnapshot: store.contextSnapshot,
