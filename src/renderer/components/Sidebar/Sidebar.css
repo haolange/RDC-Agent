@@ -167,6 +167,8 @@
   border: 1px solid rgb(var(--color-border-secondary));
   border-radius: 9px;
   background: transparent;
+  color: inherit;
+  font: inherit;
   text-align: left;
   cursor: pointer;
   transition:
@@ -248,8 +250,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  border: 0;
   border-radius: 7px;
+  background: transparent;
   color: rgb(var(--color-text-tertiary));
+  cursor: pointer;
   transition:
     color var(--transition-base) var(--ease-standard),
     background var(--transition-base) var(--ease-standard);
@@ -328,8 +334,12 @@
   justify-content: center;
   width: 24px;
   height: 24px;
+  padding: 0;
+  border: 0;
   border-radius: var(--radius-md);
+  background: transparent;
   color: rgb(var(--color-text-tertiary));
+  cursor: pointer;
   opacity: 0;
   transform: translateY(2px);
   transition:

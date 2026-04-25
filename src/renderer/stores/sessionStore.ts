@@ -49,6 +49,21 @@ const mergeConversationMessages = (
   return sortConversationMessages(Array.from(byId.values()));
 };
 
+const areProjectInputsEqual = (
+  leftInputs: ProjectInputRecord[],
+  rightInputs: ProjectInputRecord[],
+): boolean => (
+  leftInputs.length === rightInputs.length
+  && leftInputs.every((leftInput, index) => {
+    const rightInput = rightInputs[index];
+    return Boolean(rightInput)
+      && leftInput.inputId === rightInput.inputId
+      && leftInput.filePath === rightInput.filePath
+      && leftInput.lastModifiedAt === rightInput.lastModifiedAt
+      && leftInput.size === rightInput.size;
+  })
+);
+
 interface SessionState {
   projects: ProjectRecord[];
   sessions: SessionRecord[];
@@ -85,6 +100,7 @@ interface SessionState {
   updateCapture: (captureId: string, patch: Partial<CaptureDescriptor>) => void;
   removeCapture: (captureId: string) => void;
   setProjectInputs: (inputs: ProjectInputRecord[]) => void;
+  updateProjectInputs: (projectId: string, inputs: ProjectInputRecord[]) => void;
   setOpenedCapture: (openedCapture: OpenedCaptureState | null) => void;
   setConversationMessages: (messages: ConversationMessage[]) => void;
   addConversationMessage: (message: ConversationMessage) => void;
@@ -151,6 +167,47 @@ export const useSessionStore = create<SessionState>((set) => ({
     captures: state.captures.filter((entry) => entry.id !== captureId),
   })),
   setProjectInputs: (inputs) => set({ projectInputs: inputs }),
+  updateProjectInputs: (projectId, inputs) => set((state) => {
+    const inputsUpdatedAt = Date.now();
+    const shouldUpdateProjectInputs = state.currentProject?.projectId === projectId
+      && !areProjectInputsEqual(state.projectInputs, inputs);
+    const shouldUpdateCurrentProject = state.currentProject?.projectId === projectId
+      && !areProjectInputsEqual(state.currentProject.inputs ?? [], inputs);
+    let didUpdateProjectList = false;
+    const projects = state.projects.map((project) => {
+      if (project.projectId !== projectId) {
+        return project;
+      }
+      if (areProjectInputsEqual(project.inputs ?? [], inputs)) {
+        return project;
+      }
+      didUpdateProjectList = true;
+      return {
+        ...project,
+        inputs,
+        inputsUpdatedAt,
+      };
+    });
+
+    if (!shouldUpdateProjectInputs && !shouldUpdateCurrentProject && !didUpdateProjectList) {
+      return state;
+    }
+
+    return {
+      ...state,
+      projectInputs: shouldUpdateProjectInputs
+        ? inputs
+        : state.projectInputs,
+      currentProject: shouldUpdateCurrentProject && state.currentProject
+        ? {
+            ...state.currentProject,
+            inputs,
+            inputsUpdatedAt,
+          }
+        : state.currentProject,
+      projects,
+    };
+  }, true),
   setOpenedCapture: (openedCapture) => set({ openedCapture }),
   setConversationMessages: (conversationMessages) => set({ conversationMessages: sortConversationMessages(conversationMessages) }),
   addConversationMessage: (message) => set((state) => ({

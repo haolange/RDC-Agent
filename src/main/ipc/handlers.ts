@@ -180,6 +180,50 @@ async function setRunLifecycleState(
   });
 }
 
+async function selectCurrentProject(projectId: string | null): Promise<{
+  project: ReturnType<typeof storageAdapter.getProjectById>;
+  currentSession: SessionRecord | null;
+  currentRun: RunSummary | null;
+}> {
+  if (!projectId) {
+    currentProjectId = null;
+    currentSessionId = null;
+    currentRunId = null;
+    storageAdapter.setCurrentProjectId(null);
+    return {
+      project: null,
+      currentSession: null,
+      currentRun: null,
+    };
+  }
+
+  const project = storageAdapter.getProjectById(projectId);
+  if (!project) {
+    return {
+      project: null,
+      currentSession: null,
+      currentRun: null,
+    };
+  }
+
+  currentProjectId = projectId;
+  const selectedSession = currentSessionId ? storageAdapter.readSession(currentSessionId) : null;
+  if (!selectedSession || selectedSession.projectId !== projectId) {
+    currentSessionId = null;
+    currentRunId = null;
+    await storageAdapter.setCurrentSessionId(null);
+  } else {
+    currentRunId = selectedSession.lastRunId || currentRunId;
+  }
+  storageAdapter.setCurrentProjectId(projectId);
+
+  return {
+    project,
+    currentSession: selectedSession?.projectId === projectId ? selectedSession : null,
+    currentRun: currentSessionId ? storageAdapter.getLatestRun(currentSessionId) : null,
+  };
+}
+
 /**
  * 检查是否是 interrupt 结果
  */
@@ -434,8 +478,25 @@ export function registerIPCHandlers(): void {
   ipcMain.handle('project:add', async (_event, rootPath: string) => {
     try {
       const project = storageAdapter.createProject(rootPath);
-      currentProjectId = project.projectId;
+      await selectCurrentProject(project.projectId);
       return { success: true, project };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('project:select', async (_event, projectId: string) => {
+    try {
+      const selection = await selectCurrentProject(projectId);
+      if (!selection.project) {
+        return { success: false, error: `Project not found: ${projectId}` };
+      }
+      return {
+        success: true,
+        project: selection.project,
+        currentSession: selection.currentSession,
+        currentRun: selection.currentRun,
+      };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
     }
@@ -565,9 +626,13 @@ export function registerIPCHandlers(): void {
     if (currentSessionId === id) {
       currentSessionId = nextSession?.sessionId || null;
       currentRunId = nextSession?.lastRunId || null;
+      currentProjectId = session.projectId;
       if (currentSessionId) {
         await storageAdapter.setCurrentSessionId(currentSessionId);
         nextRun = storageAdapter.getLatestRun(currentSessionId);
+      } else {
+        await storageAdapter.setCurrentSessionId(null);
+        storageAdapter.setCurrentProjectId(session.projectId);
       }
     }
 

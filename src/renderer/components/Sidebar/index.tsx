@@ -34,6 +34,7 @@ interface LoadSessionsOptions {
   autoSelectSession?: boolean;
   rightRailTarget?: RightRailTarget;
   requestId?: number;
+  rollbackState?: SelectionSnapshot;
 }
 
 interface LoadProjectsOptions {
@@ -45,6 +46,16 @@ interface LoadProjectsOptions {
 interface SelectSessionOptions {
   optimisticSession?: SessionRecord;
   requestId?: number;
+  rollbackState?: SelectionSnapshot;
+}
+
+interface SelectionSnapshot {
+  currentProject: ProjectRecord | null;
+  currentSession: SessionRecord | null;
+  rightRailTarget: RightRailTarget;
+  currentRun: ReturnType<typeof useSessionStore.getState>['currentRun'];
+  captures: ReturnType<typeof useSessionStore.getState>['captures'];
+  runs: ReturnType<typeof useSessionStore.getState>['runs'];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -68,6 +79,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const projectRenameRef = useRef<HTMLDivElement | null>(null);
   const projectRenameInputRef = useRef<HTMLInputElement | null>(null);
   const selectionRequestRef = useRef(0);
+  const didRunInitialLoadRef = useRef(false);
 
   const projects = useSessionStore((state) => state.projects);
   const sessions = useSessionStore((state) => state.sessions);
@@ -81,6 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const setRuns = useSessionStore((state) => state.setRuns);
   const setCaptures = useSessionStore((state) => state.setCaptures);
   const setProjectInputs = useSessionStore((state) => state.setProjectInputs);
+  const updateProjectInputs = useSessionStore((state) => state.updateProjectInputs);
   const rightRailTarget = useSessionStore((state) => state.rightRailTarget);
   const setRightRailTarget = useSessionStore((state) => state.setRightRailTarget);
 
@@ -114,7 +127,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return result.runs ?? [];
   }, []);
 
-  const selectSession = useCallback(async (sessionId: string, options: SelectSessionOptions = {}) => {
+  const captureSelectionSnapshot = useCallback((): SelectionSnapshot => {
+    const state = useSessionStore.getState();
+    return {
+      currentProject: state.currentProject,
+      currentSession: state.currentSession,
+      rightRailTarget: state.rightRailTarget,
+      currentRun: state.currentRun,
+      captures: state.captures,
+      runs: state.runs,
+    };
+  }, []);
+
+  const restoreSelectionSnapshot = useCallback((snapshot: SelectionSnapshot) => {
+    setCurrentProject(snapshot.currentProject);
+    setCurrentSession(snapshot.currentSession);
+    setRightRailTarget(snapshot.rightRailTarget);
+    setCurrentRun(snapshot.currentRun);
+    setCaptures(snapshot.captures);
+    setRuns(snapshot.runs);
+  }, [setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setRightRailTarget, setRuns]);
+
+  const selectSession = useCallback(async (sessionId: string, options: SelectSessionOptions = {}): Promise<boolean> => {
+    const rollbackState = options.rollbackState ?? captureSelectionSnapshot();
     if (options.optimisticSession) {
       setCurrentSession(options.optimisticSession);
       setRightRailTarget('session');
@@ -123,12 +158,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setRuns([]);
     }
 
-    const result = await window.electronAPI.session.select(sessionId);
+    const result = await window.electronAPI.session.select(sessionId).catch((error) => ({
+      success: false,
+      session: undefined,
+      currentRun: null,
+      error: error instanceof Error ? error.message : String(error),
+    }));
     if (!isLatestSelectionRequest(options.requestId)) {
-      return;
+      return false;
     }
     if (!result.success || !result.session) {
-      return;
+      restoreSelectionSnapshot(rollbackState);
+      setSidebarError(result.error || t('sidebar.selectSessionFailed'));
+      if (options.optimisticSession?.projectId) {
+        await loadProjectSessionList(options.optimisticSession.projectId).catch(() => undefined);
+      }
+      return false;
     }
 
     setCurrentSession(result.session);
@@ -137,26 +182,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setCaptures(result.currentRun?.captures ?? []);
     const nextRuns = await loadRuns(sessionId);
     if (!isLatestSelectionRequest(options.requestId)) {
-      return;
+      return false;
     }
     setRuns(nextRuns);
-  }, [isLatestSelectionRequest, loadRuns, setCaptures, setCurrentRun, setCurrentSession, setRightRailTarget, setRuns]);
+    return true;
+  }, [captureSelectionSnapshot, isLatestSelectionRequest, loadProjectSessionList, loadRuns, restoreSelectionSnapshot, setCaptures, setCurrentRun, setCurrentSession, setRightRailTarget, setRuns, t]);
 
   const loadSessions = useCallback(async (project: ProjectRecord, options: LoadSessionsOptions = {}) => {
     const autoSelectSession = options.autoSelectSession !== false;
-    const nextSessions = await loadProjectSessionList(project.projectId);
+    const projectSelection = await window.electronAPI.project.select(project.projectId).catch((error) => ({
+      success: false,
+      project: undefined,
+      currentSession: null,
+      currentRun: null,
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    if (!isLatestSelectionRequest(options.requestId)) {
+      return;
+    }
+    if (!projectSelection.success || !projectSelection.project) {
+      setSidebarError(projectSelection.error || t('sidebar.selectProjectFailed'));
+      return;
+    }
+
+    const selectedProject = projectSelection.project;
+    const nextSessions = await loadProjectSessionList(selectedProject.projectId);
     if (!isLatestSelectionRequest(options.requestId)) {
       return;
     }
 
     setSessions(nextSessions);
-    setCurrentProject(project);
-    setProjectInputs(project.inputs ?? []);
-    ensureProjectExpanded(project.projectId);
+    setCurrentProject(selectedProject);
+    updateProjectInputs(selectedProject.projectId, selectedProject.inputs ?? []);
+    ensureProjectExpanded(selectedProject.projectId);
 
     if (!autoSelectSession) {
       setRightRailTarget(options.rightRailTarget ?? 'project');
-      if (currentSession?.projectId && currentSession.projectId !== project.projectId) {
+      if (currentSession?.projectId && currentSession.projectId !== selectedProject.projectId) {
         setCurrentSession(null);
         setCurrentRun(null);
         setCaptures([]);
@@ -166,7 +228,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
 
     const targetSessionId = options.preferredSessionId
-      || project.lastSessionId
+      || selectedProject.lastSessionId
       || nextSessions[0]?.sessionId
       || null;
 
@@ -183,8 +245,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     await selectSession(targetSessionId, {
       optimisticSession,
       requestId: options.requestId,
+      rollbackState: options.rollbackState,
     });
-  }, [currentSession, ensureProjectExpanded, isLatestSelectionRequest, loadProjectSessionList, selectSession, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setProjectInputs, setRightRailTarget, setRuns, setSessions]);
+  }, [currentSession, ensureProjectExpanded, isLatestSelectionRequest, loadProjectSessionList, selectSession, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setRightRailTarget, setRuns, setSessions, t, updateProjectInputs]);
 
   const loadProjects = useCallback(async (preferredProjectId?: string | null, preferredSessionId?: string | null, options: LoadProjectsOptions = {}) => {
     const result = await window.electronAPI.project.list();
@@ -230,10 +293,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [isLatestSelectionRequest, loadSessions, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setProjectInputs, setProjects, setRightRailTarget, setRuns, setSessions]);
 
   useEffect(() => {
-    if (navigator.webdriver) {
-      setIsLoading(false);
+    if (didRunInitialLoadRef.current) {
       return;
     }
+    didRunInitialLoadRef.current = true;
 
     void (async () => {
       await loadProjects();
@@ -361,7 +424,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setSidebarError(null);
     const requestId = beginSelectionRequest();
     setCurrentProject(project);
-    setProjectInputs(project.inputs ?? []);
+    updateProjectInputs(project.projectId, project.inputs ?? []);
     setRightRailTarget('project');
     ensureProjectExpanded(project.projectId);
     if (currentSession?.projectId && currentSession.projectId !== project.projectId) {
@@ -381,7 +444,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     } finally {
       setIsBusy(false);
     }
-  }, [beginSelectionRequest, currentSession, ensureProjectExpanded, loadSessions, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setProjectInputs, setRightRailTarget, setRuns]);
+  }, [beginSelectionRequest, currentSession, ensureProjectExpanded, loadSessions, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setRightRailTarget, setRuns, updateProjectInputs]);
 
   const handleSessionCreate = useCallback(async (project?: ProjectRecord) => {
     setSidebarError(null);
@@ -596,6 +659,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const handleSessionActivate = useCallback(async (project: ProjectRecord, session: SessionRecord) => {
     setSidebarError(null);
     const requestId = beginSelectionRequest();
+    const rollbackState = captureSelectionSnapshot();
     setRenamePopover(null);
     setCurrentProject(project);
     setCurrentSession(session);
@@ -612,6 +676,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           autoSelectSession: true,
           rightRailTarget: 'session',
           requestId,
+          rollbackState,
         });
         return;
       }
@@ -619,11 +684,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       await selectSession(session.sessionId, {
         optimisticSession: session,
         requestId,
+        rollbackState,
       });
     } finally {
       setIsBusy(false);
     }
-  }, [beginSelectionRequest, currentProject, ensureProjectExpanded, loadSessions, selectSession, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setRightRailTarget, setRuns]);
+  }, [beginSelectionRequest, captureSelectionSnapshot, currentProject, ensureProjectExpanded, loadSessions, selectSession, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setRightRailTarget, setRuns]);
 
   return (
     <div className={`sidebar-content ${collapsed ? 'collapsed' : ''}`}>
@@ -696,16 +762,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     key={project.projectId}
                     className={`project-stack-item ${isCurrentProject ? 'current' : ''} ${isProjectRailActive ? 'active' : ''} ${isExpanded ? 'expanded' : ''}`}
                   >
-                    <button
-                      type="button"
+                    <div
+                      role="button"
+                      tabIndex={0}
                       className={`session-item project-item ${isProjectRailActive ? 'active' : ''}`}
                       onClick={() => void handleProjectSelect(project)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          void handleProjectSelect(project);
+                        }
+                      }}
                     >
                       <div className="session-item-header">
                         <span className="project-item-leading">
-                          <span
-                            role="button"
-                            tabIndex={0}
+                          <button
+                            type="button"
                             className={`project-item-chevron ${isExpanded ? 'expanded' : ''}`}
                             onClick={(event) => void handleProjectChevronClick(event, project)}
                             onKeyDown={(event) => {
@@ -719,14 +791,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                               <path d="M9 6l6 6-6 6" />
                             </svg>
-                          </span>
+                          </button>
                           <span className="session-item-title project-item-title">{project.name}</span>
                         </span>
                         {isCurrentProject && (
                           <span className="session-item-actions">
-                            <span
-                              role="button"
-                              tabIndex={0}
+                            <button
+                              type="button"
                               className="session-item-icon-button"
                               title={t('sidebar.menu')}
                               onClick={(e) => {
@@ -736,6 +807,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               }}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
                                   e.stopPropagation();
                                   const rect = e.currentTarget.getBoundingClientRect();
                                   openProjectMenuPopover(project, rect.right, rect.bottom + 8);
@@ -747,11 +819,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 <circle cx="19" cy="12" r="1.5" />
                                 <circle cx="5" cy="12" r="1.5" />
                               </svg>
-                            </span>
+                            </button>
                           </span>
                         )}
                       </div>
-                    </button>
+                    </div>
 
                     {isExpanded && (
                       <div className="project-sessions-panel">
@@ -760,11 +832,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             {visibleSessions.map((session) => {
                               const isSessionRailActive = rightRailTarget === 'session' && currentSession?.sessionId === session.sessionId;
                               return (
-                              <button
+                              <div
                                 key={session.sessionId}
-                                type="button"
+                                role="button"
+                                tabIndex={0}
                                 className={`session-item session-subitem ${isSessionRailActive ? 'active' : ''}`}
                                 onClick={() => void handleSessionActivate(project, session)}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault();
+                                    void handleSessionActivate(project, session);
+                                  }
+                                }}
                                 onContextMenu={(event) => handleSessionContextMenu(event, session)}
                               >
                                 <div className="session-item-header">
@@ -778,15 +857,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                     <span className="session-item-title">{session.title}</span>
                                   </span>
                                   <span className="session-item-actions">
-                                    <span
-                                      role="button"
-                                      tabIndex={0}
+                                    <button
+                                      type="button"
                                       className="session-item-icon-button"
                                       title={t('sidebar.renameSession')}
                                       onClick={(event) => handleRenameButtonClick(event, session)}
                                       onKeyDown={(event) => {
                                         if (event.key === 'Enter' || event.key === ' ') {
                                           event.preventDefault();
+                                          event.stopPropagation();
                                           const rect = event.currentTarget.getBoundingClientRect();
                                           openRenamePopover(session, rect.right - 24, rect.bottom + 8);
                                         }
@@ -796,10 +875,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         <path d="M12 20h9" />
                                         <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
                                       </svg>
-                                    </span>
-                                    <span
-                                      role="button"
-                                      tabIndex={0}
+                                    </button>
+                                    <button
+                                      type="button"
                                       className="session-item-icon-button danger"
                                       title={t('sidebar.removeSession')}
                                       onClick={(event) => handleRemoveButtonClick(event, session)}
@@ -816,10 +894,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                         <path d="M8 6V4h8v2" />
                                         <path d="M19 6l-1 14H6L5 6" />
                                       </svg>
-                                    </span>
+                                    </button>
                                   </span>
                                 </div>
-                              </button>
+                              </div>
                               );
                             })}
                             {hasOverflowSessions && (

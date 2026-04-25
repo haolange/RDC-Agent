@@ -256,7 +256,7 @@ const readSseStream = async (
     eventName = 'message';
   };
 
-  while (true) {
+  for (;;) {
     const { done, value } = await reader.read();
     buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
 
