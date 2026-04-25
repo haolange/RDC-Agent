@@ -52,6 +52,10 @@ test('共享工作台在三种模式下都可交互，空状态保持紧凑', as
   expect(titleBox!.width).toBeLessThan(viewport.width * 0.8);
   await expect(page.locator('.agent-chat')).toHaveClass(/is-empty/);
   await expect(page.locator('.empty-workbench-step')).toHaveCount(0);
+  await expect(page.locator('.empty-workbench-title')).toContainText('三大工具，全面助力研发');
+  await expect(page.locator('[data-testid="empty-workbench-tool-debugger"]')).toContainText('从异常现象出发');
+  await expect(page.locator('[data-testid="empty-workbench-tool-analyzer"]')).toContainText('拆开线索');
+  await expect(page.locator('[data-testid="empty-workbench-tool-optimizer"]')).toContainText('先找瓶颈');
 
   await page.locator('[data-testid="composer-mode-pill"]').click();
   await expect(page.locator('.composer-agent-menu-popup')).toBeVisible();
@@ -63,12 +67,18 @@ test('共享工作台在三种模式下都可交互，空状态保持紧凑', as
   await expect(page.locator('textarea.chat-input')).toBeVisible();
   await expect(page.locator('[data-testid="app-sidebar-left"]')).toBeVisible();
   await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveCount(0);
-  await expect(page.locator('.empty-workbench-kicker')).toContainText('Analyzer');
+  await expect(page.locator('.empty-workbench-title')).toContainText('三大工具，全面助力研发');
+  await expect(page.locator('[data-testid="empty-workbench-tool-debugger"]')).toContainText('Debugger');
+  await expect(page.locator('[data-testid="empty-workbench-tool-analyzer"]')).toContainText('Analyzer');
+  await expect(page.locator('[data-testid="empty-workbench-tool-optimizer"]')).toContainText('Optimizer');
 
   await switchMode(page, 'optimizer');
   await expect(page.locator('[data-testid="optimizer-workbench-page"]')).toBeVisible();
   await expect(page.locator('textarea.chat-input')).toBeVisible();
-  await expect(page.locator('.empty-workbench-kicker')).toContainText('Optimizer');
+  await expect(page.locator('.empty-workbench-title')).toContainText('三大工具，全面助力研发');
+  await expect(page.locator('[data-testid="empty-workbench-tool-debugger"]')).toContainText('Debugger');
+  await expect(page.locator('[data-testid="empty-workbench-tool-analyzer"]')).toContainText('Analyzer');
+  await expect(page.locator('[data-testid="empty-workbench-tool-optimizer"]')).toContainText('Optimizer');
 });
 
 test('无项目时点击加号会给出提示，有附件时切换模式不丢失', async () => {

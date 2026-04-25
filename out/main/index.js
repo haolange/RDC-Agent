@@ -2207,9 +2207,6 @@ const AGENT_MODES = [
     icon: "crosshair-bug",
     description: "定位异常与验证修复",
     accentColor: "#33d1ff",
-    emptyTitle: "从异常现象出发，定位 GPU 问题",
-    emptySubtitle: "围绕 `.rdc` Capture、截图与线索快速展开排查。",
-    helperCopy: "补充异常、截图或 `.rdc` Capture，直接开始定位。",
     disabled: false
   },
   {
@@ -2218,9 +2215,6 @@ const AGENT_MODES = [
     icon: "waveform-gauge",
     description: "拆解现象并收敛证据",
     accentColor: "#8d8bff",
-    emptyTitle: "拆开线索，串起证据",
-    emptySubtitle: "适合对比现象、梳理上下文与收敛判断方向。",
-    helperCopy: "贴出问题与素材，我会先整理结构和证据。",
     disabled: false
   },
   {
@@ -2229,9 +2223,6 @@ const AGENT_MODES = [
     icon: "spark-tuning",
     description: "判断瓶颈与优化顺序",
     accentColor: "#4ee3a0",
-    emptyTitle: "先找瓶颈，再排优化顺序",
-    emptySubtitle: "适合评估性能收益、成本与验证优先级。",
-    helperCopy: "补充性能线索后，我会按收益和风险整理建议。",
     disabled: false
   }
 ];
@@ -9673,9 +9664,35 @@ const conversationService = new ConversationService();
 const DEFAULT_COLS = 120;
 const DEFAULT_ROWS = 32;
 function resolvePowerShellPath() {
-  const systemRoot = process.env.SystemRoot?.trim() || "C:\\Windows";
-  const candidate = path__namespace.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-  return candidate;
+  const systemRoot = process.env.SystemRoot?.trim() || process.env.windir?.trim() || "C:\\Windows";
+  const candidates = [
+    path__namespace.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+    path__namespace.join(systemRoot, "Sysnative", "WindowsPowerShell", "v1.0", "powershell.exe")
+  ];
+  const resolved = candidates.find((candidate) => fs__namespace.existsSync(candidate));
+  return resolved ?? "powershell.exe";
+}
+function isDirectory(targetPath) {
+  try {
+    return fs__namespace.statSync(targetPath).isDirectory();
+  } catch {
+    return false;
+  }
+}
+function resolveTerminalCwd(requestedCwd) {
+  const candidates = [
+    requestedCwd?.trim(),
+    storageAdapter.getWorkspacePath(),
+    electron.app.getPath("userData"),
+    process.cwd()
+  ].filter((candidate) => Boolean(candidate));
+  for (const candidate of candidates) {
+    const resolved = path__namespace.resolve(candidate);
+    if (isDirectory(resolved)) {
+      return resolved;
+    }
+  }
+  return process.cwd();
 }
 function buildTabTitle(cwd) {
   return `PowerShell: ${cwd}`;
@@ -9686,7 +9703,7 @@ class TerminalSessionService {
     return Array.from(this.tabs.values()).map((entry) => entry.record).sort((left, right) => left.createdAt - right.createdAt);
   }
   createTab(options) {
-    const cwd = options?.cwd?.trim() || storageAdapter.getWorkspacePath();
+    const cwd = resolveTerminalCwd(options?.cwd);
     const tabId = `term_${generateShortId()}`;
     const shellPath = resolvePowerShellPath();
     const child = child_process.spawn(shellPath, ["-NoLogo"], {
@@ -9719,6 +9736,25 @@ class TerminalSessionService {
     });
     child.stderr.on("data", (chunk) => {
       this.broadcastData({ tabId, data: chunk });
+    });
+    child.on("error", (error) => {
+      const current = this.tabs.get(tabId);
+      if (!current) {
+        return;
+      }
+      current.record = {
+        ...current.record,
+        status: "exited",
+        exitCode: null
+      };
+      this.broadcastData({
+        tabId,
+        data: `\r
+[terminal failed to start: ${error.message}]\r
+`
+      });
+      this.broadcastExit({ tabId, exitCode: null });
+      this.broadcastTabsChanged();
     });
     child.on("close", (exitCode) => {
       const current = this.tabs.get(tabId);

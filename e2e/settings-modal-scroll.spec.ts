@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import path from 'path';
 import { launchApp, closeApp, AppContext } from './helpers/electron-app';
 
 let ctx: AppContext;
@@ -17,7 +18,13 @@ test.afterAll(async () => {
 });
 
 test('设置弹窗中的 Workspace、Model 与 Agent 面板保持可访问的滚动布局', async () => {
-  await ctx.page.evaluate(async () => {
+  const longWorkspaceRoot = path.join(
+    ctx.tempDir,
+    'rdc-agent-long-workspace',
+    ...Array.from({ length: 18 }, (_, index) => `very-long-workspace-segment-${index}`),
+  );
+
+  await ctx.page.evaluate(async ({ workspaceRoot }) => {
     const settings = await window.electronAPI.settings.get();
     const providers = Array.from({ length: 24 }, (_, index) => ({
       id: `custom.scroll-${index}`,
@@ -46,11 +53,7 @@ test('设置弹窗中的 Workspace、Model 与 Agent 面板保持可访问的滚
 
     await window.electronAPI.settings.set({
       workspace: {
-        rootPath: [
-          'D:',
-          'RDC-Agent',
-          ...Array.from({ length: 18 }, (_, index) => `very-long-workspace-segment-${index}`),
-        ].join('\\'),
+        rootPath: workspaceRoot,
       },
       llm: {
         providers,
@@ -60,7 +63,7 @@ test('设置弹窗中的 Workspace、Model 与 Agent 面板保持可访问的滚
         lastMigrationSummary: Array.from({ length: 8 }, (_, index) => `migration-${index}-completed`),
       },
     });
-  });
+  }, { workspaceRoot: longWorkspaceRoot });
 
   const tempDir = ctx.tempDir;
   await closeApp(ctx, { cleanup: false });
@@ -87,7 +90,13 @@ test('设置弹窗中的 Workspace、Model 与 Agent 面板保持可访问的滚
 
   await page.locator('[data-testid="settings-nav-workspace"]').click();
   await expect(page.locator('[data-testid="settings-workspace-body"]')).toBeVisible();
-  await expect(page.locator('[data-testid="settings-modal"]')).toHaveScreenshot('settings-workspace.png');
+  await expect(page.locator('.settings-workspace-root-value')).toContainText('very-long-workspace-segment-17');
+  await expect(page.locator('[data-testid="settings-modal"]')).toHaveScreenshot('settings-workspace.png', {
+    mask: [
+      page.locator('.settings-workspace-root-value'),
+      page.locator('.settings-derived-path-value'),
+    ],
+  });
 
   await page.locator('[data-testid="settings-nav-agents"]').click();
   await expect(page.locator('[data-testid="settings-agent-list"]')).toBeVisible();
