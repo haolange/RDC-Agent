@@ -57,12 +57,13 @@ const isValidChannel = (channel: string): channel is (typeof validChannels)[numb
   return validChannels.includes(channel as (typeof validChannels)[number]);
 };
 
-const registerTrackedListener = (channel: string, callback: (...args: unknown[]) => void) => {
+const registerTrackedListener = (channel: string, callback: (...args: unknown[]) => void): (() => void) => {
   const wrappedCallback = (_event: unknown, ...args: unknown[]) => callback(...args);
   const channelListeners = listenerMap.get(channel) ?? new Map();
   channelListeners.set(callback, wrappedCallback);
   listenerMap.set(channel, channelListeners);
   ipcRenderer.on(channel, wrappedCallback);
+  return () => removeTrackedListener(channel, callback);
 };
 
 const removeTrackedListener = (channel: string, callback: (...args: unknown[]) => void) => {
@@ -154,6 +155,13 @@ const electronAPI = {
     list: (): Promise<{ projects: ProjectRecord[] }> => ipcRenderer.invoke('project:list'),
     add: (rootPath: string): Promise<{ success: boolean; project?: ProjectRecord; error?: string }> =>
       ipcRenderer.invoke('project:add', rootPath),
+    select: (projectId: string): Promise<{
+      success: boolean;
+      project?: ProjectRecord;
+      currentSession?: SessionRecord | null;
+      currentRun?: RunSummary | null;
+      error?: string;
+    }> => ipcRenderer.invoke('project:select', projectId),
     rename: (projectId: string, newName: string): Promise<{ success: boolean; project?: ProjectRecord; error?: string }> =>
       ipcRenderer.invoke('project:rename', projectId, newName),
     remove: (projectId: string): Promise<{ success: boolean; error?: string }> =>
@@ -182,7 +190,8 @@ const electronAPI = {
       ipcRenderer.invoke('session:rename', id, title),
     remove: (id: string): Promise<{ success: boolean; nextSession?: SessionRecord | null; nextRun?: RunSummary | null; error?: string }> =>
       ipcRenderer.invoke('session:remove', id),
-    select: (id: string): Promise<unknown> => ipcRenderer.invoke('session:select', id),
+    select: (id: string): Promise<{ success: boolean; session?: SessionRecord; currentRun?: RunSummary | null; error?: string }> =>
+      ipcRenderer.invoke('session:select', id),
     attachments: {
       list: (sessionId: string): Promise<{ attachments: SessionAttachmentRecord[] }> =>
         ipcRenderer.invoke('session:attachments:list', sessionId),
@@ -230,60 +239,42 @@ const electronAPI = {
   },
 
   events: {
-    onWorkflowStateChanged: (callback: (state: unknown) => void): void => {
-      ipcRenderer.on('workflow:stateChanged', (_event, state) => callback(state));
-    },
-    onWorkflowStageChanged: (callback: (data: unknown) => void): void => {
-      ipcRenderer.on('workflow:stageChanged', (_event, data) => callback(data));
-    },
-    onRunStatusChanged: (callback: (data: unknown) => void): void => {
-      ipcRenderer.on('workflow:runStatusChanged', (_event, data) => callback(data));
-    },
-    onRunUsageChanged: (callback: (summary: RunContextUsageSummary) => void): void => {
-      ipcRenderer.on('workflow:runUsageChanged', (_event, summary) => callback(summary));
-    },
-    onAgentMessage: (callback: (msg: unknown) => void): void => {
-      ipcRenderer.on('agent:message', (_event, msg) => callback(msg));
-    },
-    onAgentStatusChanged: (callback: (state: unknown) => void): void => {
-      ipcRenderer.on('agent:statusChanged', (_event, state) => callback(state));
-    },
-    onToolExecutionComplete: (callback: (trace: unknown) => void): void => {
-      ipcRenderer.on('tool:executionComplete', (_event, trace) => callback(trace));
-    },
-    onEvidenceEventAdded: (callback: (event: unknown) => void): void => {
-      ipcRenderer.on('evidence:eventAdded', (_event, event) => callback(event));
-    },
-    onDeviceStatusChanged: (callback: (status: unknown) => void): void => {
-      ipcRenderer.on('device:statusChanged', (_event, status) => callback(status));
-    },
-    onCaptureStatusChanged: (callback: (status: unknown) => void): void => {
-      ipcRenderer.on('capture:statusChanged', (_event, status) => callback(status));
-    },
-    onContextChanged: (callback: (snapshot: unknown) => void): void => {
-      ipcRenderer.on('context:changed', (_event, snapshot) => callback(snapshot));
-    },
-    onProjectInputsChanged: (callback: (payload: { projectId: string; inputs: ProjectInputRecord[] }) => void): void => {
-      ipcRenderer.on('project:inputsChanged', (_event, payload) => callback(payload));
-    },
-    onOpenedCaptureStateChanged: (callback: (state: OpenedCaptureState | null) => void): void => {
-      ipcRenderer.on('capture:openedStateChanged', (_event, payload) => callback(payload));
-    },
-    onRuntimeLogAppended: (callback: (entry: RuntimeLogEntry) => void): void => {
-      ipcRenderer.on('runtime:logAppended', (_event, payload) => callback(payload));
-    },
-    onTerminalData: (callback: (event: TerminalDataEvent) => void): void => {
-      ipcRenderer.on('terminal:data', (_event, payload) => callback(payload));
-    },
-    onTerminalExit: (callback: (event: TerminalExitEvent) => void): void => {
-      ipcRenderer.on('terminal:exit', (_event, payload) => callback(payload));
-    },
-    onTerminalTabsChanged: (callback: (payload: { tabs: TerminalTabRecord[] }) => void): void => {
-      ipcRenderer.on('terminal:tabsChanged', (_event, payload) => callback(payload));
-    },
-    onAppThemeChanged: (callback: (theme: 'dark' | 'light') => void): void => {
-      ipcRenderer.on('app:themeChanged', (_event, theme) => callback(theme));
-    },
+    onWorkflowStateChanged: (callback: (state: unknown) => void): (() => void) =>
+      registerTrackedListener('workflow:stateChanged', (state) => callback(state)),
+    onWorkflowStageChanged: (callback: (data: unknown) => void): (() => void) =>
+      registerTrackedListener('workflow:stageChanged', (data) => callback(data)),
+    onRunStatusChanged: (callback: (data: unknown) => void): (() => void) =>
+      registerTrackedListener('workflow:runStatusChanged', (data) => callback(data)),
+    onRunUsageChanged: (callback: (summary: RunContextUsageSummary) => void): (() => void) =>
+      registerTrackedListener('workflow:runUsageChanged', (summary) => callback(summary as RunContextUsageSummary)),
+    onAgentMessage: (callback: (msg: unknown) => void): (() => void) =>
+      registerTrackedListener('agent:message', (msg) => callback(msg)),
+    onAgentStatusChanged: (callback: (state: unknown) => void): (() => void) =>
+      registerTrackedListener('agent:statusChanged', (state) => callback(state)),
+    onToolExecutionComplete: (callback: (trace: unknown) => void): (() => void) =>
+      registerTrackedListener('tool:executionComplete', (trace) => callback(trace)),
+    onEvidenceEventAdded: (callback: (event: unknown) => void): (() => void) =>
+      registerTrackedListener('evidence:eventAdded', (event) => callback(event)),
+    onDeviceStatusChanged: (callback: (status: unknown) => void): (() => void) =>
+      registerTrackedListener('device:statusChanged', (status) => callback(status)),
+    onCaptureStatusChanged: (callback: (status: unknown) => void): (() => void) =>
+      registerTrackedListener('capture:statusChanged', (status) => callback(status)),
+    onContextChanged: (callback: (snapshot: unknown) => void): (() => void) =>
+      registerTrackedListener('context:changed', (snapshot) => callback(snapshot)),
+    onProjectInputsChanged: (callback: (payload: { projectId: string; inputs: ProjectInputRecord[] }) => void): (() => void) =>
+      registerTrackedListener('project:inputsChanged', (payload) => callback(payload as { projectId: string; inputs: ProjectInputRecord[] })),
+    onOpenedCaptureStateChanged: (callback: (state: OpenedCaptureState | null) => void): (() => void) =>
+      registerTrackedListener('capture:openedStateChanged', (payload) => callback(payload as OpenedCaptureState | null)),
+    onRuntimeLogAppended: (callback: (entry: RuntimeLogEntry) => void): (() => void) =>
+      registerTrackedListener('runtime:logAppended', (payload) => callback(payload as RuntimeLogEntry)),
+    onTerminalData: (callback: (event: TerminalDataEvent) => void): (() => void) =>
+      registerTrackedListener('terminal:data', (payload) => callback(payload as TerminalDataEvent)),
+    onTerminalExit: (callback: (event: TerminalExitEvent) => void): (() => void) =>
+      registerTrackedListener('terminal:exit', (payload) => callback(payload as TerminalExitEvent)),
+    onTerminalTabsChanged: (callback: (payload: { tabs: TerminalTabRecord[] }) => void): (() => void) =>
+      registerTrackedListener('terminal:tabsChanged', (payload) => callback(payload as { tabs: TerminalTabRecord[] })),
+    onAppThemeChanged: (callback: (theme: 'dark' | 'light') => void): (() => void) =>
+      registerTrackedListener('app:themeChanged', (theme) => callback(theme as 'dark' | 'light')),
     removeAllListeners: (channel: string): void => {
       ipcRenderer.removeAllListeners(channel);
     },

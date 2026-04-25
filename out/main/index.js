@@ -1547,6 +1547,11 @@ class StorageAdapter {
     selection.projectId = projectId;
     if (!projectId) {
       selection.sessionId = null;
+    } else if (selection.sessionId) {
+      const selectedSession = this.readSession(selection.sessionId);
+      if (!selectedSession || selectedSession.projectId !== projectId) {
+        selection.sessionId = null;
+      }
     }
     this.writeSelection(selection);
   }
@@ -2406,7 +2411,7 @@ const readSseStream = async (response, onEvent) => {
     onEvent(eventName, payload);
     eventName = "message";
   };
-  while (true) {
+  for (; ; ) {
     const { done, value } = await reader.read();
     buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
     let newlineIndex = buffer.indexOf("\n");
@@ -12241,6 +12246,42 @@ async function setRunLifecycleState(sessionId, runId, patch) {
     stopReason: patch.stopReason
   });
 }
+async function selectCurrentProject(projectId) {
+  if (!projectId) {
+    currentProjectId = null;
+    currentSessionId = null;
+    currentRunId = null;
+    storageAdapter.setCurrentProjectId(null);
+    return {
+      project: null,
+      currentSession: null,
+      currentRun: null
+    };
+  }
+  const project = storageAdapter.getProjectById(projectId);
+  if (!project) {
+    return {
+      project: null,
+      currentSession: null,
+      currentRun: null
+    };
+  }
+  currentProjectId = projectId;
+  const selectedSession = currentSessionId ? storageAdapter.readSession(currentSessionId) : null;
+  if (!selectedSession || selectedSession.projectId !== projectId) {
+    currentSessionId = null;
+    currentRunId = null;
+    await storageAdapter.setCurrentSessionId(null);
+  } else {
+    currentRunId = selectedSession.lastRunId || currentRunId;
+  }
+  storageAdapter.setCurrentProjectId(projectId);
+  return {
+    project,
+    currentSession: selectedSession?.projectId === projectId ? selectedSession : null,
+    currentRun: currentSessionId ? storageAdapter.getLatestRun(currentSessionId) : null
+  };
+}
 function isInterrupted(result) {
   return result !== null && typeof result === "object" && "__interrupt__" in result && Array.isArray(result.__interrupt__);
 }
@@ -12449,8 +12490,24 @@ function registerIPCHandlers() {
   electron.ipcMain.handle("project:add", async (_event, rootPath) => {
     try {
       const project = storageAdapter.createProject(rootPath);
-      currentProjectId = project.projectId;
+      await selectCurrentProject(project.projectId);
       return { success: true, project };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  electron.ipcMain.handle("project:select", async (_event, projectId) => {
+    try {
+      const selection = await selectCurrentProject(projectId);
+      if (!selection.project) {
+        return { success: false, error: `Project not found: ${projectId}` };
+      }
+      return {
+        success: true,
+        project: selection.project,
+        currentSession: selection.currentSession,
+        currentRun: selection.currentRun
+      };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
     }
@@ -12564,9 +12621,13 @@ function registerIPCHandlers() {
     if (currentSessionId === id) {
       currentSessionId = nextSession?.sessionId || null;
       currentRunId = nextSession?.lastRunId || null;
+      currentProjectId = session.projectId;
       if (currentSessionId) {
         await storageAdapter.setCurrentSessionId(currentSessionId);
         nextRun = storageAdapter.getLatestRun(currentSessionId);
+      } else {
+        await storageAdapter.setCurrentSessionId(null);
+        storageAdapter.setCurrentProjectId(session.projectId);
       }
     }
     return { success: true, nextSession, nextRun };

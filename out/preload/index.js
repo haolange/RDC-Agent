@@ -37,6 +37,7 @@ const registerTrackedListener = (channel, callback) => {
   channelListeners.set(callback, wrappedCallback);
   listenerMap.set(channel, channelListeners);
   electron.ipcRenderer.on(channel, wrappedCallback);
+  return () => removeTrackedListener(channel, callback);
 };
 const removeTrackedListener = (channel, callback) => {
   const wrappedCallback = listenerMap.get(channel)?.get(callback);
@@ -114,6 +115,7 @@ const electronAPI = {
   project: {
     list: () => electron.ipcRenderer.invoke("project:list"),
     add: (rootPath) => electron.ipcRenderer.invoke("project:add", rootPath),
+    select: (projectId) => electron.ipcRenderer.invoke("project:select", projectId),
     rename: (projectId, newName) => electron.ipcRenderer.invoke("project:rename", projectId, newName),
     remove: (projectId) => electron.ipcRenderer.invoke("project:remove", projectId),
     inputs: {
@@ -164,60 +166,24 @@ const electronAPI = {
     get: () => electron.ipcRenderer.invoke("context:get")
   },
   events: {
-    onWorkflowStateChanged: (callback) => {
-      electron.ipcRenderer.on("workflow:stateChanged", (_event, state) => callback(state));
-    },
-    onWorkflowStageChanged: (callback) => {
-      electron.ipcRenderer.on("workflow:stageChanged", (_event, data) => callback(data));
-    },
-    onRunStatusChanged: (callback) => {
-      electron.ipcRenderer.on("workflow:runStatusChanged", (_event, data) => callback(data));
-    },
-    onRunUsageChanged: (callback) => {
-      electron.ipcRenderer.on("workflow:runUsageChanged", (_event, summary) => callback(summary));
-    },
-    onAgentMessage: (callback) => {
-      electron.ipcRenderer.on("agent:message", (_event, msg) => callback(msg));
-    },
-    onAgentStatusChanged: (callback) => {
-      electron.ipcRenderer.on("agent:statusChanged", (_event, state) => callback(state));
-    },
-    onToolExecutionComplete: (callback) => {
-      electron.ipcRenderer.on("tool:executionComplete", (_event, trace) => callback(trace));
-    },
-    onEvidenceEventAdded: (callback) => {
-      electron.ipcRenderer.on("evidence:eventAdded", (_event, event) => callback(event));
-    },
-    onDeviceStatusChanged: (callback) => {
-      electron.ipcRenderer.on("device:statusChanged", (_event, status) => callback(status));
-    },
-    onCaptureStatusChanged: (callback) => {
-      electron.ipcRenderer.on("capture:statusChanged", (_event, status) => callback(status));
-    },
-    onContextChanged: (callback) => {
-      electron.ipcRenderer.on("context:changed", (_event, snapshot) => callback(snapshot));
-    },
-    onProjectInputsChanged: (callback) => {
-      electron.ipcRenderer.on("project:inputsChanged", (_event, payload) => callback(payload));
-    },
-    onOpenedCaptureStateChanged: (callback) => {
-      electron.ipcRenderer.on("capture:openedStateChanged", (_event, payload) => callback(payload));
-    },
-    onRuntimeLogAppended: (callback) => {
-      electron.ipcRenderer.on("runtime:logAppended", (_event, payload) => callback(payload));
-    },
-    onTerminalData: (callback) => {
-      electron.ipcRenderer.on("terminal:data", (_event, payload) => callback(payload));
-    },
-    onTerminalExit: (callback) => {
-      electron.ipcRenderer.on("terminal:exit", (_event, payload) => callback(payload));
-    },
-    onTerminalTabsChanged: (callback) => {
-      electron.ipcRenderer.on("terminal:tabsChanged", (_event, payload) => callback(payload));
-    },
-    onAppThemeChanged: (callback) => {
-      electron.ipcRenderer.on("app:themeChanged", (_event, theme) => callback(theme));
-    },
+    onWorkflowStateChanged: (callback) => registerTrackedListener("workflow:stateChanged", (state) => callback(state)),
+    onWorkflowStageChanged: (callback) => registerTrackedListener("workflow:stageChanged", (data) => callback(data)),
+    onRunStatusChanged: (callback) => registerTrackedListener("workflow:runStatusChanged", (data) => callback(data)),
+    onRunUsageChanged: (callback) => registerTrackedListener("workflow:runUsageChanged", (summary) => callback(summary)),
+    onAgentMessage: (callback) => registerTrackedListener("agent:message", (msg) => callback(msg)),
+    onAgentStatusChanged: (callback) => registerTrackedListener("agent:statusChanged", (state) => callback(state)),
+    onToolExecutionComplete: (callback) => registerTrackedListener("tool:executionComplete", (trace) => callback(trace)),
+    onEvidenceEventAdded: (callback) => registerTrackedListener("evidence:eventAdded", (event) => callback(event)),
+    onDeviceStatusChanged: (callback) => registerTrackedListener("device:statusChanged", (status) => callback(status)),
+    onCaptureStatusChanged: (callback) => registerTrackedListener("capture:statusChanged", (status) => callback(status)),
+    onContextChanged: (callback) => registerTrackedListener("context:changed", (snapshot) => callback(snapshot)),
+    onProjectInputsChanged: (callback) => registerTrackedListener("project:inputsChanged", (payload) => callback(payload)),
+    onOpenedCaptureStateChanged: (callback) => registerTrackedListener("capture:openedStateChanged", (payload) => callback(payload)),
+    onRuntimeLogAppended: (callback) => registerTrackedListener("runtime:logAppended", (payload) => callback(payload)),
+    onTerminalData: (callback) => registerTrackedListener("terminal:data", (payload) => callback(payload)),
+    onTerminalExit: (callback) => registerTrackedListener("terminal:exit", (payload) => callback(payload)),
+    onTerminalTabsChanged: (callback) => registerTrackedListener("terminal:tabsChanged", (payload) => callback(payload)),
+    onAppThemeChanged: (callback) => registerTrackedListener("app:themeChanged", (theme) => callback(theme)),
     removeAllListeners: (channel) => {
       electron.ipcRenderer.removeAllListeners(channel);
     }

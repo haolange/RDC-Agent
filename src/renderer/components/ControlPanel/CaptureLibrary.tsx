@@ -17,7 +17,7 @@ export const CaptureLibrary: React.FC = () => {
   const currentProject = useSessionStore((state) => state.currentProject);
   const projectInputs = useSessionStore((state) => state.projectInputs);
   const openedCapture = useSessionStore((state) => state.openedCapture);
-  const setProjectInputs = useSessionStore((state) => state.setProjectInputs);
+  const updateProjectInputs = useSessionStore((state) => state.updateProjectInputs);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -33,7 +33,7 @@ export const CaptureLibrary: React.FC = () => {
     setIsRefreshing(true);
     try {
       const result = await electronAPI.project.inputs.refresh(currentProject.projectId);
-      setProjectInputs(result.inputs ?? []);
+      updateProjectInputs(currentProject.projectId, result.inputs ?? []);
       setErrorMessage(null);
     } finally {
       setIsRefreshing(false);
@@ -47,7 +47,7 @@ export const CaptureLibrary: React.FC = () => {
     setIsImporting(true);
     try {
       const result = await electronAPI.project.inputs.import(currentProject.projectId);
-      setProjectInputs(result.inputs ?? []);
+      updateProjectInputs(currentProject.projectId, result.inputs ?? []);
       setErrorMessage(result.error ?? null);
     } finally {
       setIsImporting(false);

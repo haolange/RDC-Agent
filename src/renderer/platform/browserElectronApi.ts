@@ -375,6 +375,8 @@ class BrowserElectronApiFallback {
   private projects: ProjectRecord[] = [previewProject];
   private sessions: SessionRecord[] = previewSessions;
   private runs: RunSummary[] = [createRun()];
+  private currentProjectId: string | null = previewProject.projectId;
+  private currentSessionId: string | null = previewSessions[0].sessionId;
   private workflowState: WorkflowState = createWorkflowState();
   private openedCapture: OpenedCaptureState | null = createOpenedCaptureState('open');
   private contextSnapshot: ContextSnapshot | null = createContextSnapshot();
@@ -562,6 +564,7 @@ class BrowserElectronApiFallback {
     project: {
       list: async () => ({ projects: this.projects }),
       add: async (rootPath) => this.addProject(rootPath),
+      select: async (projectId) => this.selectProject(projectId),
       rename: async (projectId, newName) => this.renameProject(projectId, newName),
       remove: async (projectId) => this.removeProject(projectId),
       inputs: {
@@ -668,10 +671,11 @@ class BrowserElectronApiFallback {
     off: (channel, callback) => this.off(channel, callback),
   };
 
-  private on(channel: string, callback: EventCallback): void {
+  private on(channel: string, callback: EventCallback): (() => void) {
     const listeners = this.listeners.get(channel) ?? new Set<EventCallback>();
     listeners.add(callback);
     this.listeners.set(channel, listeners);
+    return () => this.off(channel, callback);
   }
 
   private off(channel: string, callback: EventCallback): void {
@@ -754,7 +758,44 @@ class BrowserElectronApiFallback {
       lastSessionId: undefined,
     };
     this.projects = [...this.projects, project];
+    this.currentProjectId = project.projectId;
+    this.currentSessionId = null;
     return { success: true, project };
+  }
+
+  private async selectProject(projectId: string): Promise<{
+    success: boolean;
+    project?: ProjectRecord;
+    currentSession?: SessionRecord | null;
+    currentRun?: RunSummary | null;
+    error?: string;
+  }> {
+    const project = this.projects.find((entry) => entry.projectId === projectId);
+    if (!project) {
+      return { success: false, error: 'Project not found' };
+    }
+
+    this.currentProjectId = projectId;
+    const selectedSession = this.currentSessionId
+      ? this.sessions.find((entry) => entry.sessionId === this.currentSessionId) ?? null
+      : null;
+    if (!selectedSession || selectedSession.projectId !== projectId) {
+      this.currentSessionId = null;
+      return {
+        success: true,
+        project,
+        currentSession: null,
+        currentRun: null,
+      };
+    }
+
+    const currentRun = this.runs.find((run) => run.sessionId === selectedSession.sessionId) ?? null;
+    return {
+      success: true,
+      project,
+      currentSession: selectedSession,
+      currentRun,
+    };
   }
 
   private async renameProject(projectId: string, newName: string): Promise<{ success: boolean; project?: ProjectRecord; error?: string }> {
@@ -773,6 +814,10 @@ class BrowserElectronApiFallback {
     this.projects = this.projects.filter((project) => project.projectId !== projectId);
     this.sessions = this.sessions.filter((session) => session.projectId !== projectId);
     this.runs = this.runs.filter((run) => run.projectId !== projectId);
+    if (this.currentProjectId === projectId) {
+      this.currentProjectId = null;
+      this.currentSessionId = null;
+    }
     return { success: true };
   }
 
@@ -814,6 +859,8 @@ class BrowserElectronApiFallback {
     this.projects = this.projects.map((project) => (
       project.projectId === projectId ? { ...project, lastSessionId: session.sessionId, updatedAt: Date.now() } : project
     ));
+    this.currentProjectId = projectId;
+    this.currentSessionId = session.sessionId;
     return { success: true, session };
   }
 
@@ -840,6 +887,10 @@ class BrowserElectronApiFallback {
     this.runs = this.runs.filter((run) => run.sessionId !== id);
     const nextSession = removed ? this.getSessions(removed.projectId)[0] ?? null : null;
     const nextRun = nextSession ? this.runs.find((run) => run.sessionId === nextSession.sessionId) ?? null : null;
+    if (removed && this.currentSessionId === id) {
+      this.currentProjectId = removed.projectId;
+      this.currentSessionId = nextSession?.sessionId ?? null;
+    }
     return { success: true, nextSession, nextRun };
   }
 
@@ -849,6 +900,8 @@ class BrowserElectronApiFallback {
       return { success: false, error: 'Session not found' };
     }
     const currentRun = this.runs.find((run) => run.sessionId === id) ?? null;
+    this.currentProjectId = session.projectId;
+    this.currentSessionId = session.sessionId;
     return { success: true, session, currentRun };
   }
 

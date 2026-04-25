@@ -854,6 +854,11 @@ export class StorageAdapter {
     selection.projectId = projectId;
     if (!projectId) {
       selection.sessionId = null;
+    } else if (selection.sessionId) {
+      const selectedSession = this.readSession(selection.sessionId);
+      if (!selectedSession || selectedSession.projectId !== projectId) {
+        selection.sessionId = null;
+      }
     }
     this.writeSelection(selection);
   }

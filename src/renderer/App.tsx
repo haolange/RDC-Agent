@@ -844,6 +844,9 @@ const App: React.FC = () => {
         store.setContextSnapshot(state.contextSnapshot);
         store.setCaptures(state.captures);
         store.setProjectInputs(state.projectInputs);
+        if (state.currentProject) {
+          store.updateProjectInputs(state.currentProject.projectId, state.projectInputs);
+        }
         store.setOpenedCapture(state.openedCapture);
         store.setConversationMessages(state.conversationMessages ?? []);
         store.setTimeline(state.timeline);
@@ -1015,37 +1018,14 @@ const App: React.FC = () => {
     const electronAPI = window.electronAPI;
     if (!electronAPI) return;
 
-    electronAPI.events.onRunStatusChanged((rawPayload) => {
-      const payload = rawPayload as {
-        runId: string;
-        sessionId: string;
-        status: RunSummary['status'];
-        lastStage?: string;
-        stopReason?: string;
-      };
-      const current = useSessionStore.getState().currentRun;
-      if (!current || current.runId !== payload.runId) {
-        return;
-      }
-      useSessionStore.getState().setCurrentRun({
-        ...current,
-        status: payload.status,
-        lastStage: payload.lastStage || current.lastStage,
-        stopReason: payload.stopReason || current.stopReason,
-      });
-      if (!['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(payload.status)) {
-        useSessionStore.getState().setCurrentRunUsage(null);
-      }
-    });
-
-    electronAPI.events.onRunUsageChanged((summary) => {
+    const unsubscribeRunUsageChanged = electronAPI.events.onRunUsageChanged((summary) => {
       const activeRun = useSessionStore.getState().currentRun;
       if (activeRun?.runId === summary.runId) {
         useSessionStore.getState().setCurrentRunUsage(summary);
       }
     });
 
-    electronAPI.events.onContextChanged((snapshot) => {
+    const unsubscribeContextChanged = electronAPI.events.onContextChanged((snapshot) => {
       useSessionStore.getState().setContextSnapshot(snapshot);
       syncCapturesFromSnapshot(snapshot);
     });
@@ -1061,7 +1041,7 @@ const App: React.FC = () => {
 
     electronAPI.conversation.onEvent(handleConversationEvent);
 
-    electronAPI.events.onToolExecutionComplete((rawTrace) => {
+    const unsubscribeToolExecutionComplete = electronAPI.events.onToolExecutionComplete((rawTrace) => {
       const trace = rawTrace as ToolTraceEntry;
       const lastEntry = useSessionStore.getState().timeline[useSessionStore.getState().timeline.length - 1];
       if (lastEntry?.id !== trace.traceId) {
@@ -1078,7 +1058,7 @@ const App: React.FC = () => {
       }
     });
 
-    electronAPI.events.onAgentMessage((rawMsg) => {
+    const unsubscribeAgentMessage = electronAPI.events.onAgentMessage((rawMsg) => {
       const msg = rawMsg as { id?: string; agentRole?: AgentTimelineEntry['agentRole']; content?: string };
       const entry: AgentTimelineEntry = {
         id: msg.id || Date.now().toString(),
@@ -1090,14 +1070,14 @@ const App: React.FC = () => {
       useSessionStore.getState().addTimelineEntry(entry);
     });
 
-    electronAPI.events.onCaptureStatusChanged(() => {
+    const unsubscribeCaptureStatusChanged = electronAPI.events.onCaptureStatusChanged(() => {
       electronAPI.context.get().then((snapshot) => {
         useSessionStore.getState().setContextSnapshot(snapshot);
         syncCapturesFromSnapshot(snapshot);
       }).catch(() => undefined);
     });
 
-    electronAPI.events.onEvidenceEventAdded((rawEvent) => {
+    const unsubscribeEvidenceEventAdded = electronAPI.events.onEvidenceEventAdded((rawEvent) => {
       const event = rawEvent as ActionEvent;
       addActionEvent(event);
       const entry = mapActionEventToTimelineEntry(event);
@@ -1109,7 +1089,7 @@ const App: React.FC = () => {
       }
     });
 
-    electronAPI.events.onWorkflowStateChanged((rawState) => {
+    const unsubscribeWorkflowStateChanged = electronAPI.events.onWorkflowStateChanged((rawState) => {
       const state = rawState as WorkflowState;
       setWorkflowState(state);
       setCurrentDebugPlan(state.debugPlan ?? null);
@@ -1157,7 +1137,7 @@ const App: React.FC = () => {
       }
     });
 
-    electronAPI.events.onRunStatusChanged((rawPayload) => {
+    const unsubscribeRunStatusChanged = electronAPI.events.onRunStatusChanged((rawPayload) => {
       const payload = rawPayload as {
         runId: string;
         sessionId: string;
@@ -1181,26 +1161,23 @@ const App: React.FC = () => {
       }
     });
 
-    electronAPI.events.onDeviceStatusChanged((payload) => {
+    const unsubscribeDeviceStatusChanged = electronAPI.events.onDeviceStatusChanged((payload) => {
       useDeviceStore.getState().applyStatusPayload(payload as ReplayDeviceStatusChangedPayload);
     });
 
-    electronAPI.events.onProjectInputsChanged((payload) => {
-      const activeProject = useSessionStore.getState().currentProject;
-      if (activeProject?.projectId === payload.projectId) {
-        useSessionStore.getState().setProjectInputs(payload.inputs);
-      }
+    const unsubscribeProjectInputsChanged = electronAPI.events.onProjectInputsChanged((payload) => {
+      useSessionStore.getState().updateProjectInputs(payload.projectId, payload.inputs);
     });
 
-    electronAPI.events.onOpenedCaptureStateChanged((state) => {
+    const unsubscribeOpenedCaptureStateChanged = electronAPI.events.onOpenedCaptureStateChanged((state) => {
       useSessionStore.getState().setOpenedCapture(state);
     });
 
-    electronAPI.events.onRuntimeLogAppended((entry) => {
+    const unsubscribeRuntimeLogAppended = electronAPI.events.onRuntimeLogAppended((entry) => {
       useTerminalStore.getState().appendEntry(entry as RuntimeLogEntry);
     });
 
-    electronAPI.events.onAppThemeChanged((theme) => {
+    const unsubscribeAppThemeChanged = electronAPI.events.onAppThemeChanged((theme) => {
       setSystemTheme(theme);
     });
 
@@ -1233,25 +1210,24 @@ const App: React.FC = () => {
     electronAPI.on('window:maximized-changed', handleWindowStateChange);
 
     return () => {
+      unsubscribeRunUsageChanged();
+      unsubscribeContextChanged();
+      unsubscribeToolExecutionComplete();
+      unsubscribeAgentMessage();
+      unsubscribeCaptureStatusChanged();
+      unsubscribeEvidenceEventAdded();
+      unsubscribeWorkflowStateChanged();
+      unsubscribeRunStatusChanged();
+      unsubscribeDeviceStatusChanged();
+      unsubscribeProjectInputsChanged();
+      unsubscribeOpenedCaptureStateChanged();
+      unsubscribeRuntimeLogAppended();
+      unsubscribeAppThemeChanged();
       electronAPI.conversation.offEvent(handleConversationEvent);
       electronAPI.off('file:open', handleFileOpen);
       electronAPI.off('case:new', handleCaseNew);
       electronAPI.off('settings:open', handleSettingsOpen);
       electronAPI.off('window:maximized-changed', handleWindowStateChange);
-      electronAPI.events.removeAllListeners('context:changed');
-      electronAPI.events.removeAllListeners('tool:executionComplete');
-      electronAPI.events.removeAllListeners('agent:message');
-      electronAPI.events.removeAllListeners('capture:statusChanged');
-      electronAPI.events.removeAllListeners('workflow:stateChanged');
-      electronAPI.events.removeAllListeners('workflow:runStatusChanged');
-      electronAPI.events.removeAllListeners('workflow:runUsageChanged');
-      electronAPI.events.removeAllListeners('evidence:eventAdded');
-      electronAPI.events.removeAllListeners('device:statusChanged');
-      electronAPI.events.removeAllListeners('app:themeChanged');
-      electronAPI.events.removeAllListeners('project:inputsChanged');
-      electronAPI.events.removeAllListeners('capture:openedStateChanged');
-      electronAPI.events.removeAllListeners('runtime:logAppended');
-      electronAPI.events.removeAllListeners('conversation:event');
     };
   }, [setSystemTheme, showNotice, syncCapturesFromSnapshot, t]);
 
@@ -1266,21 +1242,21 @@ const App: React.FC = () => {
       const seededInputs = currentProject.inputs?.length
         ? currentProject.inputs
         : useSessionStore.getState().projectInputs;
-      useSessionStore.getState().setProjectInputs(seededInputs);
+      useSessionStore.getState().updateProjectInputs(currentProject.projectId, seededInputs);
       return;
     }
 
     if (!electronAPI) {
-      useSessionStore.getState().setProjectInputs(currentProject.inputs ?? []);
+      useSessionStore.getState().updateProjectInputs(currentProject.projectId, currentProject.inputs ?? []);
       return;
     }
 
     void electronAPI.project.inputs.list(currentProject.projectId)
       .then((result) => {
-        useSessionStore.getState().setProjectInputs(result.inputs ?? []);
+        useSessionStore.getState().updateProjectInputs(currentProject.projectId, result.inputs ?? []);
       })
       .catch(() => {
-        useSessionStore.getState().setProjectInputs(currentProject.inputs ?? []);
+        useSessionStore.getState().updateProjectInputs(currentProject.projectId, currentProject.inputs ?? []);
       });
   }, [currentProject]);
 

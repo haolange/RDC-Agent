@@ -378,3 +378,96 @@ test('session remove failure keeps list intact and shows an error', async () => 
   await waitForSessionList(page, { includes: [only.title] });
   await waitForActiveSession(page, only.title);
 });
+
+const stubProjectAndCaptureDialogs = async (
+  app: AppContext['app'],
+  projectRoot: string,
+  capturePath: string,
+) => {
+  await app.evaluate(({ dialog }, payload) => {
+    dialog.showOpenDialog = async (...args: unknown[]) => {
+      const options = (args.length > 1 ? args[1] : args[0]) as { properties?: string[] } | undefined;
+      const properties = options?.properties ?? [];
+      if (properties.includes('openDirectory')) {
+        return { canceled: false, filePaths: [payload.projectRoot] };
+      }
+      return { canceled: false, filePaths: [payload.capturePath] };
+    };
+  }, { projectRoot, capturePath });
+};
+
+const openProjectMenu = async (page: Page, projectName: string) => {
+  const projectItem = page.locator('.project-item', { hasText: projectName }).first();
+  await projectItem.hover();
+  await projectItem.locator('.session-item-icon-button').first().click();
+};
+
+const createSessionFromProjectMenu = async (page: Page, projectName: string) => {
+  await openProjectMenu(page, projectName);
+  await page.getByRole('button', { name: /新建会话|New Session/ }).click();
+};
+
+test('real UI sidebar project and session lifecycle has stable rails and no browser errors', async () => {
+  const page = ctx.page;
+  const consoleErrors: string[] = [];
+  const pageErrors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      consoleErrors.push(message.text());
+    }
+  });
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  const projectRoot = path.join(ctx.tempDir, 'real-ui-sidebar-project');
+  const capturePath = path.join(ctx.tempDir, 'fixture-capture.rdc');
+  fs.mkdirSync(projectRoot, { recursive: true });
+  fs.writeFileSync(capturePath, 'RDC fixture', 'utf-8');
+  await stubProjectAndCaptureDialogs(ctx.app, projectRoot, capturePath);
+
+  await page.getByTitle(/添加项目|Add Project/).click();
+  await expect(page.locator('.project-item-title', { hasText: 'real-ui-sidebar-project' })).toBeVisible();
+  await waitForRailSections(page, { captureLibrary: true, sessionContext: false });
+  await expect(page.getByTestId('capture-library-toolbar')).toBeVisible();
+
+  await page.getByTestId('capture-library-import').click();
+  await expect(page.locator('.capture-library-item-name', { hasText: 'fixture-capture.rdc' })).toBeVisible();
+
+  await createSessionFromProjectMenu(page, 'real-ui-sidebar-project');
+  await createSessionFromProjectMenu(page, 'real-ui-sidebar-project');
+  await createSessionFromProjectMenu(page, 'real-ui-sidebar-project');
+  await waitForSessionList(page, { includes: ['new session 0', 'new session 1', 'new session 2'] });
+  await waitForActiveSession(page, 'new session 2');
+  await waitForRailSections(page, { captureLibrary: false, sessionContext: true });
+
+  await page.locator('.project-item', { hasText: 'real-ui-sidebar-project' }).first().click();
+  await waitForProjectActiveCount(page, 1);
+  await waitForActiveSession(page, null);
+  await waitForRailSections(page, { captureLibrary: true, sessionContext: false });
+  await expect(page.locator('.capture-library-item-name', { hasText: 'fixture-capture.rdc' })).toBeVisible();
+
+  await clickSessionByTitle(page, 'new session 1');
+  await waitForActiveSession(page, 'new session 1');
+  await waitForRailSections(page, { captureLibrary: false, sessionContext: true });
+
+  await clickSessionByTitle(page, 'new session 2');
+  await waitForActiveSession(page, 'new session 2');
+  await waitForRailSections(page, { captureLibrary: false, sessionContext: true });
+
+  await clickSessionRemove(page, 'new session 0');
+  await expect(page.locator('.session-subitem')).toHaveCount(2);
+  await waitForActiveSession(page, 'new session 1');
+
+  await clickSessionRemove(page, 'new session 1');
+  await expect(page.locator('.session-subitem')).toHaveCount(1);
+  await waitForActiveSession(page, 'new session 0');
+  await waitForRailSections(page, { captureLibrary: false, sessionContext: true });
+
+  await clickSessionRemove(page, 'new session 0');
+  await waitForSessionList(page, { empty: true });
+  await waitForActiveSession(page, null);
+  await waitForProjectActiveCount(page, 1);
+  await waitForRailSections(page, { captureLibrary: true, sessionContext: false });
+  await expect(page.locator('.capture-library-item-name', { hasText: 'fixture-capture.rdc' })).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  expect([...consoleErrors, ...pageErrors]).toEqual([]);
+});

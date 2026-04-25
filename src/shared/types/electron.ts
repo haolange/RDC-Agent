@@ -205,6 +205,13 @@ export interface ElectronAPI {
       project?: ProjectRecord;
       error?: string;
     }>;
+    select: (projectId: string) => Promise<{
+      success: boolean;
+      project?: ProjectRecord;
+      currentSession?: SessionRecord | null;
+      currentRun?: RunSummary | null;
+      error?: string;
+    }>;
     rename: (projectId: string, newName: string) => Promise<{
       success: boolean;
       project?: ProjectRecord;
@@ -316,24 +323,24 @@ export interface ElectronAPI {
   };
 
   events: {
-    onWorkflowStateChanged: (callback: (state: WorkflowState) => void) => void;
-    onWorkflowStageChanged: (callback: (data: { stage: WorkflowStage; blockers: unknown[] }) => void) => void;
-    onRunStatusChanged: (callback: (data: { runId: string; sessionId: string; status: RunSummary['status']; lastStage?: string; stopReason?: string }) => void) => void;
-    onRunUsageChanged: (callback: (summary: RunContextUsageSummary) => void) => void;
-    onAgentMessage: (callback: (msg: unknown) => void) => void;
-    onAgentStatusChanged: (callback: (state: AgentState) => void) => void;
-    onToolExecutionComplete: (callback: (trace: unknown) => void) => void;
-    onEvidenceEventAdded: (callback: (event: ActionEvent) => void) => void;
-    onDeviceStatusChanged: (callback: (status: ReplayDeviceStatusChangedPayload) => void) => void;
-    onCaptureStatusChanged: (callback: (status: unknown) => void) => void;
-    onContextChanged: (callback: (snapshot: ContextSnapshot) => void) => void;
-    onProjectInputsChanged: (callback: (payload: { projectId: string; inputs: ProjectInputRecord[] }) => void) => void;
-    onOpenedCaptureStateChanged: (callback: (state: OpenedCaptureState | null) => void) => void;
-    onRuntimeLogAppended: (callback: (entry: RuntimeLogEntry) => void) => void;
-    onTerminalData: (callback: (event: TerminalDataEvent) => void) => void;
-    onTerminalExit: (callback: (event: TerminalExitEvent) => void) => void;
-    onTerminalTabsChanged: (callback: (payload: { tabs: TerminalTabRecord[] }) => void) => void;
-    onAppThemeChanged: (callback: (theme: ResolvedTheme) => void) => void;
+    onWorkflowStateChanged: (callback: (state: WorkflowState) => void) => () => void;
+    onWorkflowStageChanged: (callback: (data: { stage: WorkflowStage; blockers: unknown[] }) => void) => () => void;
+    onRunStatusChanged: (callback: (data: { runId: string; sessionId: string; status: RunSummary['status']; lastStage?: string; stopReason?: string }) => void) => () => void;
+    onRunUsageChanged: (callback: (summary: RunContextUsageSummary) => void) => () => void;
+    onAgentMessage: (callback: (msg: unknown) => void) => () => void;
+    onAgentStatusChanged: (callback: (state: AgentState) => void) => () => void;
+    onToolExecutionComplete: (callback: (trace: unknown) => void) => () => void;
+    onEvidenceEventAdded: (callback: (event: ActionEvent) => void) => () => void;
+    onDeviceStatusChanged: (callback: (status: ReplayDeviceStatusChangedPayload) => void) => () => void;
+    onCaptureStatusChanged: (callback: (status: unknown) => void) => () => void;
+    onContextChanged: (callback: (snapshot: ContextSnapshot) => void) => () => void;
+    onProjectInputsChanged: (callback: (payload: { projectId: string; inputs: ProjectInputRecord[] }) => void) => () => void;
+    onOpenedCaptureStateChanged: (callback: (state: OpenedCaptureState | null) => void) => () => void;
+    onRuntimeLogAppended: (callback: (entry: RuntimeLogEntry) => void) => () => void;
+    onTerminalData: (callback: (event: TerminalDataEvent) => void) => () => void;
+    onTerminalExit: (callback: (event: TerminalExitEvent) => void) => () => void;
+    onTerminalTabsChanged: (callback: (payload: { tabs: TerminalTabRecord[] }) => void) => () => void;
+    onAppThemeChanged: (callback: (theme: ResolvedTheme) => void) => () => void;
     removeAllListeners: (channel: string) => void;
   };
 
