@@ -69,7 +69,7 @@
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid rgb(var(--color-border-default));
-  background: rgb(var(--color-bg-0));
+  background: rgb(var(--color-bg-1));
 }
 
 .artifact-breadcrumb {
@@ -154,18 +154,18 @@
   gap: var(--space-2);
   padding: var(--space-4);
   border: 1px solid rgb(var(--color-border-default));
-  border-radius: var(--radius-xl);
-  background: rgb(var(--color-bg-2));
+  border-radius: 9px;
+  background: rgb(var(--color-bg-2) / 0.58);
   cursor: pointer;
   text-align: center;
   transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .file-card:hover {
-  background: rgb(var(--color-bg-3));
+  background: rgb(var(--color-bg-2));
   border-color: rgb(var(--color-accent-500) / 0.3);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
+  transform: none;
+  box-shadow: none;
 }
 
 .file-card-icon {
@@ -174,7 +174,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-xl);
+  border-radius: 8px;
 }
 
 .file-card-icon.yaml,
@@ -350,7 +350,7 @@
 .code-preview {
   padding: var(--space-4);
   border: 1px solid rgb(var(--color-border-default));
-  border-radius: var(--radius-xl);
+  border-radius: 8px;
   background: rgb(var(--color-bg-2));
 }
 

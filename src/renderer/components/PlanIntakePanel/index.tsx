@@ -74,9 +74,11 @@ export const PlanIntakePanel: React.FC = () => {
   }
 
   const handleSubmitAnswers = async () => {
+    const electronAPI = window.electronAPI;
+    if (!electronAPI) return;
     setBusyAction('submit');
     try {
-      const result = await window.electronAPI.workflow.submitQuestions(currentRun.runId, answerPayload);
+      const result = await electronAPI.workflow.submitQuestions(currentRun.runId, answerPayload);
       if (result.debugPlan !== undefined) {
         setCurrentDebugPlan(result.debugPlan ?? null);
       }
@@ -99,9 +101,11 @@ export const PlanIntakePanel: React.FC = () => {
   };
 
   const handleApprove = async () => {
+    const electronAPI = window.electronAPI;
+    if (!electronAPI) return;
     setBusyAction('approve');
     try {
-      const result = await window.electronAPI.workflow.approvePlan(currentRun.runId);
+      const result = await electronAPI.workflow.approvePlan(currentRun.runId);
       if (result.debugPlan !== undefined) {
         setCurrentDebugPlan(result.debugPlan ?? null);
       }
@@ -120,9 +124,11 @@ export const PlanIntakePanel: React.FC = () => {
   };
 
   const handleRestart = async () => {
+    const electronAPI = window.electronAPI;
+    if (!electronAPI) return;
     setBusyAction('restart');
     try {
-      const result = await window.electronAPI.workflow.restartRun(currentRun.runId);
+      const result = await electronAPI.workflow.restartRun(currentRun.runId);
       if (result.debugPlan !== undefined) {
         setCurrentDebugPlan(result.debugPlan ?? null);
       }

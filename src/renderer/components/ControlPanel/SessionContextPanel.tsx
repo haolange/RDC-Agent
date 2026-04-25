@@ -125,9 +125,12 @@ export const SessionContextPanel: React.FC = () => {
   };
 
   const handleRefresh = async () => {
+    const electronAPI = window.electronAPI;
+    if (!electronAPI) return;
+
     const [nextOpenedCapture, nextContext] = await Promise.all([
-      window.electronAPI.capture.getOpenedState().catch(() => null),
-      window.electronAPI.context.get().catch(() => null),
+      electronAPI.capture.getOpenedState().catch(() => null),
+      electronAPI.context.get().catch(() => null),
     ]);
 
     setOpenedCapture(nextOpenedCapture);
@@ -135,7 +138,8 @@ export const SessionContextPanel: React.FC = () => {
   };
 
   const handleClear = async () => {
-    await window.electronAPI.capture.clearOpenedState().catch(() => undefined);
+    const electronAPI = window.electronAPI;
+    await electronAPI?.capture.clearOpenedState().catch(() => undefined);
     setOpenedCapture(null);
     setContextSnapshot(null);
     setCaptures([]);

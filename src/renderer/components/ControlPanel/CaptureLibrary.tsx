@@ -28,9 +28,11 @@ export const CaptureLibrary: React.FC = () => {
 
   const handleRefresh = async () => {
     if (!currentProject) return;
+    const electronAPI = window.electronAPI;
+    if (!electronAPI) return;
     setIsRefreshing(true);
     try {
-      const result = await window.electronAPI.project.inputs.refresh(currentProject.projectId);
+      const result = await electronAPI.project.inputs.refresh(currentProject.projectId);
       setProjectInputs(result.inputs ?? []);
       setErrorMessage(null);
     } finally {
@@ -40,9 +42,11 @@ export const CaptureLibrary: React.FC = () => {
 
   const handleImport = async () => {
     if (!currentProject) return;
+    const electronAPI = window.electronAPI;
+    if (!electronAPI) return;
     setIsImporting(true);
     try {
-      const result = await window.electronAPI.project.inputs.import(currentProject.projectId);
+      const result = await electronAPI.project.inputs.import(currentProject.projectId);
       setProjectInputs(result.inputs ?? []);
       setErrorMessage(result.error ?? null);
     } finally {

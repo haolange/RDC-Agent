@@ -2010,6 +2010,259 @@ select:focus:not(:focus-visible),
   }
 }
 
+/* Professional workstation polish */
+body {
+  background: rgb(var(--color-bg-0));
+}
+
+.app-container {
+  background: rgb(var(--color-bg-0));
+}
+
+.app-titlebar {
+  min-height: 48px;
+  padding: 0 2px 0 12px;
+  border-bottom-color: rgb(var(--color-border-secondary));
+  background: rgb(var(--color-bg-1) / 0.98);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.app-titlebar-left {
+  gap: 8px;
+}
+
+.app-logo {
+  gap: 10px;
+}
+
+.app-logo-icon,
+.loading-logo {
+  border-radius: 7px;
+  background: rgb(var(--color-primary-500));
+  box-shadow: none;
+}
+
+.app-logo-icon {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+
+.app-logo-text {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  letter-spacing: -0.02em;
+}
+
+.shell-panel-toggle,
+.titlebar-panel-toggle,
+.window-control {
+  border-radius: 8px;
+  color: rgb(var(--color-text-tertiary));
+}
+
+.shell-panel-toggle:hover:not(:disabled),
+.titlebar-panel-toggle:hover:not(:disabled),
+.window-control:hover {
+  background: rgb(var(--color-bg-3) / 0.78);
+  color: rgb(var(--color-text-primary));
+}
+
+.app-body {
+  background: rgb(var(--color-bg-0));
+}
+
+.app-sidebar-left,
+.app-sidebar-right,
+.right-panel-body,
+.control-panel {
+  background: rgb(var(--color-bg-1));
+}
+
+.app-sidebar-left {
+  border-right-color: rgb(var(--color-border-secondary));
+}
+
+.app-sidebar-right {
+  border-left: 1px solid rgb(var(--color-border-secondary));
+}
+
+.sidebar-nav {
+  padding: 12px;
+}
+
+.app-sidebar-footer {
+  padding: 10px 12px 12px;
+  background: rgb(var(--color-bg-1));
+  border-top-color: rgb(var(--color-border-secondary));
+}
+
+.app-main,
+.debugger-page,
+.agent-chat {
+  background: rgb(var(--color-bg-0));
+}
+
+.main-floating-utilities {
+  top: 14px;
+}
+
+.main-utility-toggle,
+.device-selector-trigger-utility {
+  min-height: 36px;
+  border-radius: 10px;
+  border-color: rgb(var(--color-border-secondary));
+  background: rgb(var(--color-bg-1));
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.02) inset;
+}
+
+.main-utility-toggle:hover,
+.device-selector-trigger-utility:hover {
+  background: rgb(var(--color-bg-2));
+  border-color: rgb(var(--color-border-default));
+}
+
+.main-input-bar {
+  padding: 10px 16px 14px;
+}
+
+.composer-shell {
+  gap: 10px;
+  padding: 11px 12px 12px;
+  border-radius: 12px;
+  border-color: rgb(var(--color-border-default));
+  background: rgb(var(--color-bg-1));
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.025) inset,
+    0 8px 22px rgb(0 0 0 / 0.18);
+}
+
+.composer-shell:focus-within {
+  border-color: color-mix(in srgb, var(--composer-mode-accent) 34%, rgb(var(--color-border-default)));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--composer-mode-accent) 12%, transparent),
+    0 10px 24px rgb(0 0 0 / 0.2);
+}
+
+.composer-textarea {
+  min-height: 58px;
+  font-size: var(--text-base);
+}
+
+.composer-attach-button,
+.composer-agent-pill,
+.composer-usage-indicator,
+.chat-send-button {
+  border-radius: 9px;
+}
+
+.composer-attach-button,
+.composer-agent-pill,
+.composer-usage-indicator {
+  border-color: rgb(var(--color-border-secondary));
+  background: rgb(var(--color-bg-2));
+}
+
+.chat-send-button.primary,
+.button-primary,
+.user-menu-settings-button {
+  background: rgb(var(--color-accent-600));
+  border-color: rgb(var(--color-accent-600));
+  color: rgb(var(--color-text-on-accent));
+  box-shadow: none;
+}
+
+.chat-send-button.primary:hover:not(:disabled),
+.button-primary:hover:not(:disabled),
+.user-menu-settings-button:hover {
+  background: rgb(var(--color-accent-500));
+  box-shadow: none;
+}
+
+.button,
+.input,
+.panel {
+  border-color: rgb(var(--color-border-secondary));
+  background: rgb(var(--color-bg-2));
+}
+
+.button {
+  min-height: 40px;
+  border-radius: 8px;
+}
+
+.button-sm {
+  min-height: 34px;
+}
+
+.input {
+  border-radius: 7px;
+}
+
+.panel {
+  border-radius: 10px;
+}
+
+.footer-entry,
+.sidebar-user-trigger {
+  min-height: 50px;
+  border-radius: 10px;
+  background: rgb(var(--color-bg-2) / 0.7);
+  border-color: rgb(var(--color-border-secondary));
+  box-shadow: none;
+}
+
+.footer-entry:hover {
+  background: rgb(var(--color-bg-2));
+  border-color: rgb(var(--color-border-default));
+  box-shadow: none;
+}
+
+.footer-entry-avatar {
+  background: rgb(var(--color-primary-500));
+  color: rgb(var(--color-text-on-accent));
+  box-shadow: none;
+}
+
+.tooltip::after,
+.composer-usage-tooltip,
+.composer-agent-menu-popup,
+.shell-notice {
+  border-radius: 10px;
+  background: rgb(var(--color-bg-2));
+  border-color: rgb(var(--color-border-default));
+  box-shadow: var(--shadow-md);
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[role='button']:focus-visible {
+  box-shadow:
+    0 0 0 2px rgb(var(--color-bg-0)),
+    0 0 0 4px rgb(var(--color-accent-500) / 0.28);
+}
+
+:root[data-resolved-theme='light'] body,
+:root[data-resolved-theme='light'] .app-container,
+:root[data-resolved-theme='light'] .app-body,
+:root[data-resolved-theme='light'] .debugger-page,
+:root[data-resolved-theme='light'] .agent-chat {
+  background: rgb(var(--color-bg-0));
+}
+
+:root[data-resolved-theme='light'] .app-titlebar,
+:root[data-resolved-theme='light'] .app-sidebar-left,
+:root[data-resolved-theme='light'] .app-sidebar-right,
+:root[data-resolved-theme='light'] .right-panel-body,
+:root[data-resolved-theme='light'] .control-panel,
+:root[data-resolved-theme='light'] .composer-shell {
+  background: rgb(var(--color-bg-1));
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -2020,4 +2273,3 @@ select:focus:not(:focus-visible),
     scroll-behavior: auto !important;
   }
 }
-

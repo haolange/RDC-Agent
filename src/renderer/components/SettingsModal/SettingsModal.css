@@ -1482,3 +1482,102 @@
   }
 }
 
+/* Professional workstation settings polish */
+.settings-modal-backdrop {
+  background: rgb(0 0 0 / 0.48);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.settings-center {
+  border-radius: 12px;
+  background: rgb(var(--color-bg-1));
+  box-shadow: var(--shadow-xl);
+}
+
+.settings-center-sidebar,
+.settings-modal-header,
+.settings-center-panel,
+.settings-provider-column,
+.settings-model-detail {
+  background: rgb(var(--color-bg-1));
+}
+
+.settings-center-sidebar {
+  padding: 18px 14px;
+}
+
+.settings-center-brand-icon,
+.settings-provider-icon {
+  border-radius: 8px;
+  background: rgb(var(--color-primary-500));
+  color: rgb(var(--color-text-on-accent));
+  box-shadow: none;
+  text-shadow: none;
+}
+
+.settings-center-nav-item,
+.settings-modal-close,
+.settings-provider-item,
+.settings-provider-section,
+.settings-model-section,
+.settings-agent-card,
+.settings-workspace-hero,
+.settings-path-card,
+.settings-agent-column,
+.settings-model-detail,
+.settings-provider-overview,
+.settings-derived-path-row,
+.settings-credential-empty,
+.settings-secret-status,
+.settings-model-row,
+.settings-model-recommend-row {
+  border-radius: 9px;
+}
+
+.settings-center-nav-item {
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.settings-center-nav-item.active,
+.settings-provider-item.active {
+  background: rgb(var(--color-accent-500) / 0.09);
+  box-shadow: inset 2px 0 0 rgb(var(--color-accent-500));
+}
+
+.settings-workspace-hero,
+.settings-path-card,
+.settings-agent-column,
+.settings-provider-column,
+.settings-model-detail,
+.settings-provider-section,
+.settings-model-section,
+.settings-provider-overview,
+.settings-agent-card {
+  background: rgb(var(--color-bg-2) / 0.46);
+  box-shadow: none;
+}
+
+.settings-provider-item {
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-provider-item:hover {
+  background: rgb(var(--color-bg-2) / 0.7);
+  box-shadow: none;
+}
+
+.settings-provider-title {
+  font-size: var(--text-2xl);
+}
+
+.settings-switch-track {
+  box-shadow: none;
+}
+
+.settings-switch input:checked + .settings-switch-track {
+  background: rgb(var(--color-accent-600));
+  box-shadow: none;
+}

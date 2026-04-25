@@ -318,3 +318,38 @@
   }
 }
 
+/* Professional workstation terminal polish */
+.runtime-terminal-workspace {
+  background: rgb(var(--color-bg-1));
+}
+
+.runtime-terminal-workspace.open {
+  border-top-color: rgb(var(--color-border-secondary));
+}
+
+.runtime-terminal-tab,
+.runtime-terminal-add-tab,
+.runtime-terminal-close-workspace,
+.runtime-terminal-select,
+.runtime-terminal-entry,
+.runtime-terminal-entry-raw {
+  border-radius: 8px;
+}
+
+.runtime-terminal-tab {
+  background: rgb(var(--color-bg-2) / 0.72);
+}
+
+.runtime-terminal-tab.active {
+  border-color: rgb(var(--color-accent-500) / 0.28);
+  background: rgb(var(--color-accent-500) / 0.08);
+}
+
+.runtime-terminal-entry {
+  background: rgb(var(--color-bg-1));
+  border-color: rgb(var(--color-border-secondary));
+}
+
+.runtime-terminal-entry-namespace {
+  border-radius: 6px;
+}

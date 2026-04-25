@@ -140,7 +140,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
     let cancelled = false;
 
-    void window.electronAPI.settings.getProviderSecret(selectedProviderId).then((apiKey) => {
+    const electronAPI = window.electronAPI;
+    if (!electronAPI) return;
+
+    void electronAPI.settings.getProviderSecret(selectedProviderId).then((apiKey) => {
       if (cancelled || !apiKey) return;
       setProviderDrafts((current) => current.map((provider) => {
         if (provider.id !== selectedProviderId || provider.apiKey) {
@@ -233,7 +236,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   if (!open) return null;
 
   const handleAvatarSelect = async () => {
-    const avatarPath = await window.electronAPI.appShell.selectAvatar();
+    const avatarPath = await window.electronAPI?.appShell.selectAvatar();
     if (!avatarPath) return;
     setAccountDraft((current) => ({ ...current, avatarPath }));
   };
@@ -243,7 +246,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   };
 
   const handleWorkspacePick = async () => {
-    const nextRoot = await window.electronAPI.selectDirectory();
+    const nextRoot = await window.electronAPI?.selectDirectory();
     if (nextRoot) {
       setWorkspaceDraft(nextRoot);
     }
