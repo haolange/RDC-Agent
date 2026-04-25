@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import { closeApp, launchApp, type AppContext } from './helpers/electron-app';
@@ -328,6 +329,116 @@ const resetWorkbenchState = async (page: Page) => {
   });
 };
 
+const seedPersistedSessionWorkbench = async (page: Page, projectRoot: string) => {
+  fs.mkdirSync(path.join(projectRoot, '.resource', 'inputs'), { recursive: true });
+  fs.writeFileSync(path.join(projectRoot, '.resource', 'inputs', 'RightRail_Main.rdc'), 'fixture', 'utf8');
+
+  return page.evaluate(async (rootPath) => {
+    const projectResult = await window.electronAPI.project.add(rootPath);
+    if (!projectResult.success || !projectResult.project) {
+      throw new Error(projectResult.error || 'Failed to create project');
+    }
+
+    const sessionResult = await window.electronAPI.session.create(projectResult.project.projectId, 'Right Rail Session');
+    if (!sessionResult.success || !sessionResult.session) {
+      throw new Error(sessionResult.error || 'Failed to create session');
+    }
+
+    const sessions = await window.electronAPI.session.list(projectResult.project.projectId);
+    const hook = (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        seedWorkbenchState: (state: Record<string, unknown>) => void;
+      };
+    }).__RDC_AGENT_E2E__;
+
+    if (!hook) {
+      throw new Error('Missing E2E state hook');
+    }
+
+    hook.seedWorkbenchState({
+      projects: [projectResult.project],
+      sessions: sessions.sessions,
+      currentProject: projectResult.project,
+      currentSession: sessionResult.session,
+      rightRailTarget: 'session',
+      currentRun: null,
+      currentRunUsage: null,
+      contextSnapshot: null,
+      captures: [],
+      projectInputs: projectResult.project.inputs,
+      openedCapture: null,
+      conversationMessages: [],
+      timeline: [],
+      actionEvents: [],
+      workflowState: null,
+      runs: [],
+    });
+
+    return {
+      projectId: projectResult.project.projectId,
+      sessionId: sessionResult.session.sessionId,
+    };
+  }, projectRoot);
+};
+
+const seedMultiSessionWorkbench = async (page: Page, projectRoot: string) => {
+  fs.mkdirSync(path.join(projectRoot, '.resource', 'inputs'), { recursive: true });
+  fs.writeFileSync(path.join(projectRoot, '.resource', 'inputs', 'MultiSession_Main.rdc'), 'fixture', 'utf8');
+
+  return page.evaluate(async (rootPath) => {
+    const projectResult = await window.electronAPI.project.add(rootPath);
+    if (!projectResult.success || !projectResult.project) {
+      throw new Error(projectResult.error || 'Failed to create project');
+    }
+
+    const alpha = await window.electronAPI.session.create(projectResult.project.projectId, 'Alpha Session');
+    const beta = await window.electronAPI.session.create(projectResult.project.projectId, 'Beta Session');
+    if (!alpha.success || !alpha.session || !beta.success || !beta.session) {
+      throw new Error('Failed to create sessions');
+    }
+
+    const projects = await window.electronAPI.project.list();
+    const project = projects.projects.find((entry) => entry.projectId === projectResult.project?.projectId) ?? projectResult.project;
+    const sessions = await window.electronAPI.session.list(project.projectId);
+    const hook = (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        seedWorkbenchState: (state: Record<string, unknown>) => void;
+      };
+    }).__RDC_AGENT_E2E__;
+
+    if (!hook) {
+      throw new Error('Missing E2E state hook');
+    }
+
+    hook.seedWorkbenchState({
+      projects: [project],
+      sessions: sessions.sessions,
+      currentProject: project,
+      currentSession: alpha.session,
+      rightRailTarget: 'session',
+      currentRun: null,
+      currentRunUsage: null,
+      contextSnapshot: null,
+      captures: [],
+      projectInputs: project.inputs,
+      openedCapture: null,
+      conversationMessages: [],
+      timeline: [],
+      actionEvents: [],
+      workflowState: null,
+      runs: [],
+    });
+
+    return {
+      projectId: project.projectId,
+      alphaSessionId: alpha.session.sessionId,
+      betaSessionId: beta.session.sessionId,
+      alphaTitle: alpha.session.title,
+      betaTitle: beta.session.title,
+    };
+  }, projectRoot);
+};
+
 const seedProjectOnlyWorkbench = async (page: Page) => {
   await seedVisualWorkbench(page);
   await page.evaluate(() => {
@@ -535,6 +646,128 @@ test('project mode keeps only Capture Library on the right rail', async () => {
   await expect(page.locator('[data-testid="cp-section-runtimeContext"]')).toHaveCount(0);
   await expect(page.locator('[data-testid^="capture-library-open-"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveScreenshot('right-panel-project.png');
+});
+
+test('clicking project switches the right rail to project mode without clearing the active session', async () => {
+  const page = ctx.page;
+  const seeded = await seedPersistedSessionWorkbench(page, path.join(ctx.tempDir, 'right-rail-project'));
+
+  await expect(page.locator('[data-testid="cp-section-sessionContext"]')).toBeVisible();
+
+  await page.locator('.project-item-title').first().click();
+  await expect.poll(async () => page.evaluate(() => (
+    (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        getWorkbenchState: () => { rightRailTarget?: string };
+      };
+    }).__RDC_AGENT_E2E__?.getWorkbenchState().rightRailTarget ?? null
+  ))).toBe('project');
+  await expect(page.locator('[data-testid="cp-section-captureLibrary"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-sessionContext"]')).toHaveCount(0);
+
+  const currentSessionId = await page.evaluate(() => (
+    (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        getWorkbenchState: () => { currentSession: { sessionId: string } | null };
+      };
+    }).__RDC_AGENT_E2E__?.getWorkbenchState().currentSession?.sessionId ?? null
+  ));
+  expect(currentSessionId).toBe(seeded.sessionId);
+
+  await page.locator('.session-subitem').first().click();
+  await expect(page.locator('[data-testid="cp-section-sessionContext"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-captureLibrary"]')).toHaveCount(0);
+});
+
+test('clicking project after creating a session keeps the latest project selection in the right rail', async () => {
+  const page = ctx.page;
+  const seeded = await seedPersistedSessionWorkbench(page, path.join(ctx.tempDir, 'right-rail-after-create'));
+
+  await page.evaluate(async ({ projectId }) => {
+    const created = await window.electronAPI.session.create(projectId, 'Fresh Session');
+    if (!created.success || !created.session) {
+      throw new Error(created.error || 'Failed to create session');
+    }
+
+    const projects = await window.electronAPI.project.list();
+    const project = projects.projects.find((entry) => entry.projectId === projectId);
+    const sessions = await window.electronAPI.session.list(projectId);
+    const hook = (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        seedWorkbenchState: (state: Record<string, unknown>) => void;
+      };
+    }).__RDC_AGENT_E2E__;
+
+    if (!project || !hook) {
+      throw new Error('Missing project or E2E hook');
+    }
+
+    hook.seedWorkbenchState({
+      projects: [project],
+      sessions: sessions.sessions,
+      currentProject: project,
+      currentSession: created.session,
+      rightRailTarget: 'session',
+      currentRun: null,
+      currentRunUsage: null,
+      contextSnapshot: null,
+      captures: [],
+      projectInputs: project.inputs,
+      openedCapture: null,
+      conversationMessages: [],
+      timeline: [],
+      actionEvents: [],
+      workflowState: null,
+      runs: [],
+    });
+  }, { projectId: seeded.projectId });
+
+  await expect(page.locator('[data-testid="cp-section-sessionContext"]')).toBeVisible();
+  await expect(page.locator('.session-subitem.active')).toHaveCount(1);
+
+  await page.locator('.project-item').first().click();
+
+  await expect.poll(async () => page.evaluate(() => (
+    (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        getWorkbenchState: () => { rightRailTarget?: string };
+      };
+    }).__RDC_AGENT_E2E__?.getWorkbenchState().rightRailTarget ?? null
+  ))).toBe('project');
+  await expect(page.locator('[data-testid="cp-section-captureLibrary"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-sessionContext"]')).toHaveCount(0);
+  await expect(page.locator('.project-item.active')).toHaveCount(1);
+  await expect(page.locator('.session-subitem.active')).toHaveCount(0);
+});
+
+test('clicking sessions in the same project updates the active session highlight and keeps session rail mode', async () => {
+  const page = ctx.page;
+  const seeded = await seedMultiSessionWorkbench(page, path.join(ctx.tempDir, 'right-rail-multi-session'));
+
+  const alphaItem = page.locator('.session-subitem', { hasText: seeded.alphaTitle }).first();
+  const betaItem = page.locator('.session-subitem', { hasText: seeded.betaTitle }).first();
+
+  await expect(page.locator('[data-testid="cp-section-sessionContext"]')).toBeVisible();
+  await expect(alphaItem).toHaveClass(/active/);
+  await expect(betaItem).not.toHaveClass(/active/);
+  await expect(page.locator('.project-item.active')).toHaveCount(0);
+
+  await betaItem.click();
+
+  await expect.poll(async () => page.evaluate(() => {
+    const state = (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        getWorkbenchState: () => { currentSession: { sessionId: string } | null; rightRailTarget?: string };
+      };
+    }).__RDC_AGENT_E2E__?.getWorkbenchState();
+    return `${state?.rightRailTarget ?? ''}:${state?.currentSession?.sessionId ?? ''}`;
+  })).toBe(`session:${seeded.betaSessionId}`);
+  await expect(page.locator('[data-testid="cp-section-sessionContext"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-captureLibrary"]')).toHaveCount(0);
+  await expect(alphaItem).not.toHaveClass(/active/);
+  await expect(betaItem).toHaveClass(/active/);
+  await expect(page.locator('.session-subitem.active')).toHaveCount(1);
+  await expect(page.locator('.project-item.active')).toHaveCount(0);
 });
 
 test('Capture Library toolbar and cards do not clip horizontally', async () => {

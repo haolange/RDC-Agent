@@ -101,5 +101,26 @@ test('设置弹窗中的 Workspace、Model 与 Agent 面板保持可访问的滚
   await page.locator('[data-testid="settings-nav-agents"]').click();
   await expect(page.locator('[data-testid="settings-agent-list"]')).toBeVisible();
   await expect(page.locator('[data-testid="settings-agent-save"]')).toBeVisible();
+  await expect(page.locator('.settings-agent-grid-header')).toBeVisible();
+  const firstAgentCard = page.locator('[data-testid^="settings-agent-card-"]').first();
+  await expect(firstAgentCard.locator('.settings-field-label')).toHaveCount(0);
+  const agentRowLayout = await firstAgentCard.evaluate((element) => {
+    const controls = Array.from(element.querySelectorAll('.settings-agent-route-control'));
+    const head = element.querySelector('.settings-agent-card-head');
+    const headBox = head?.getBoundingClientRect();
+    const providerBox = controls[0]?.getBoundingClientRect();
+    const modelBox = controls[1]?.getBoundingClientRect();
+
+    return {
+      controlCount: controls.length,
+      providerY: providerBox?.y ?? 0,
+      modelY: modelBox?.y ?? 99,
+      headCenterY: headBox ? headBox.y + headBox.height / 2 : 0,
+      providerCenterY: providerBox ? providerBox.y + providerBox.height / 2 : 99,
+    };
+  });
+  expect(agentRowLayout.controlCount).toBe(2);
+  expect(Math.abs(agentRowLayout.providerY - agentRowLayout.modelY)).toBeLessThanOrEqual(2);
+  expect(Math.abs(agentRowLayout.headCenterY - agentRowLayout.providerCenterY)).toBeLessThanOrEqual(14);
   await expect(page.locator('[data-testid="settings-modal"]')).toHaveScreenshot('settings-agents.png');
 });

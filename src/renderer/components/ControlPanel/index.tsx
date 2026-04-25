@@ -212,12 +212,13 @@ const SessionControlPanel: React.FC = () => {
 export const ControlPanel: React.FC = () => {
   const currentProject = useSessionStore((state) => state.currentProject);
   const currentSession = useSessionStore((state) => state.currentSession);
+  const rightRailTarget = useSessionStore((state) => state.rightRailTarget);
   const currentRun = useSessionStore((state) => state.currentRun);
   const openedCapture = useSessionStore((state) => state.openedCapture);
 
   const rightRailMode: RightRailMode = !currentProject
     ? 'hidden'
-    : currentSession
+    : rightRailTarget === 'session' && currentSession
       ? 'session'
       : 'project';
 

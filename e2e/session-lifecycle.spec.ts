@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { launchApp, closeApp, AppContext } from './helpers/electron-app';
 
 let ctx: AppContext;
@@ -12,6 +12,179 @@ test.beforeEach(async () => {
 test.afterEach(async () => {
   await closeApp(ctx);
 });
+
+interface PersistedSessionSeed {
+  projectId: string;
+  projectName: string;
+  sessions: Array<{
+    sessionId: string;
+    title: string;
+  }>;
+}
+
+const createPersistedWorkbench = async (
+  page: Page,
+  projectRoot: string,
+  sessionTitles: string[],
+): Promise<PersistedSessionSeed> => {
+  fs.mkdirSync(path.join(projectRoot, '.resource', 'inputs'), { recursive: true });
+  fs.mkdirSync(path.join(projectRoot, '.resource', 'knowledge'), { recursive: true });
+
+  const seeded = await page.evaluate(async ({ rootPath, titles }) => {
+    const projectResult = await window.electronAPI.project.add(rootPath);
+    if (!projectResult.success || !projectResult.project) {
+      throw new Error(projectResult.error || 'Failed to create project');
+    }
+
+    const sessions: Array<{ sessionId: string; title: string }> = [];
+    for (const title of titles) {
+      const result = await window.electronAPI.session.create(projectResult.project.projectId, title);
+      if (!result.success || !result.session) {
+        throw new Error(result.error || `Failed to create session: ${title}`);
+      }
+      sessions.push({
+        sessionId: result.session.sessionId,
+        title: result.session.title,
+      });
+    }
+
+    const projectsResult = await window.electronAPI.project.list();
+    const project = projectsResult.projects.find((entry) => entry.projectId === projectResult.project?.projectId)
+      ?? projectResult.project;
+    const sessionsResult = await window.electronAPI.session.list(project.projectId);
+    const currentSession = sessionsResult.sessions.find((session) => session.sessionId === sessions[sessions.length - 1].sessionId)
+      ?? sessionsResult.sessions[0]
+      ?? null;
+    const hook = (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        seedWorkbenchState: (state: Record<string, unknown>) => void;
+      };
+    }).__RDC_AGENT_E2E__;
+
+    if (!hook || !currentSession) {
+      throw new Error('Missing E2E hook or current session');
+    }
+
+    hook.seedWorkbenchState({
+      projects: [project],
+      sessions: sessionsResult.sessions,
+      currentProject: project,
+      currentSession,
+      rightRailTarget: 'session',
+      currentRun: null,
+      currentRunUsage: null,
+      contextSnapshot: null,
+      captures: [],
+      projectInputs: project.inputs,
+      openedCapture: null,
+      conversationMessages: [],
+      timeline: [],
+      actionEvents: [],
+      workflowState: null,
+      runs: [],
+    });
+
+    return {
+      projectId: projectResult.project.projectId,
+      projectName: project.name,
+      sessions,
+    };
+  }, { rootPath: projectRoot, titles: sessionTitles });
+
+  await expect(page.locator('.project-item-title', { hasText: seeded.projectName })).toBeVisible();
+  await expect(page.locator('.session-subitem', { hasText: seeded.sessions[seeded.sessions.length - 1].title })).toBeVisible();
+  await page.waitForFunction((sessionId) => {
+    const state = (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        getWorkbenchState: () => {
+          currentSession: { sessionId: string } | null;
+          rightRailTarget?: string;
+        };
+      };
+    }).__RDC_AGENT_E2E__?.getWorkbenchState();
+    return state?.currentSession?.sessionId === sessionId && state.rightRailTarget === 'session';
+  }, seeded.sessions[seeded.sessions.length - 1].sessionId, { timeout: 10000 });
+  return seeded;
+};
+
+const getWorkbenchSelection = async (page: Page) => page.evaluate(() => {
+  const state = (window as Window & {
+    __RDC_AGENT_E2E__?: {
+      getWorkbenchState: () => {
+        currentSession: { sessionId: string } | null;
+        rightRailTarget?: string;
+      };
+    };
+  }).__RDC_AGENT_E2E__?.getWorkbenchState();
+
+  return {
+    currentSessionId: state?.currentSession?.sessionId ?? null,
+    rightRailTarget: state?.rightRailTarget ?? null,
+  };
+});
+
+const waitForActiveSession = async (page: Page, title: string | null) => {
+  await page.waitForFunction((targetTitle) => {
+    const activeTexts = Array.from(document.querySelectorAll('.session-subitem.active'))
+      .map((element) => element.textContent ?? '');
+    return targetTitle === null
+      ? activeTexts.length === 0
+      : activeTexts.length === 1 && activeTexts[0].includes(targetTitle);
+  }, title, { timeout: 10000 });
+};
+
+const waitForProjectActiveCount = async (page: Page, count: number) => {
+  await page.waitForFunction((expectedCount) => (
+    document.querySelectorAll('.project-item.active').length === expectedCount
+  ), count, { timeout: 10000 });
+};
+
+const waitForRailSections = async (
+  page: Page,
+  expected: { captureLibrary: boolean; sessionContext: boolean },
+) => {
+  await page.waitForFunction(({ captureLibrary, sessionContext }) => (
+    Boolean(document.querySelector('[data-testid="cp-section-captureLibrary"]')) === captureLibrary
+    && Boolean(document.querySelector('[data-testid="cp-section-sessionContext"]')) === sessionContext
+  ), expected, { timeout: 10000 });
+};
+
+const waitForSessionList = async (
+  page: Page,
+  expected: { includes?: string[]; excludes?: string[]; empty?: boolean },
+) => {
+  await page.waitForFunction(({ includes = [], excludes = [], empty = false }) => {
+    const copy = Array.from(document.querySelectorAll('.session-subitem'))
+      .map((element) => element.textContent ?? '')
+      .join('\n');
+    return (!empty || copy.length === 0)
+      && includes.every((title) => copy.includes(title))
+      && excludes.every((title) => !copy.includes(title));
+  }, expected, { timeout: 10000 });
+};
+
+const clickSessionByTitle = async (page: Page, title: string) => {
+  await page.evaluate((targetTitle) => {
+    const item = Array.from(document.querySelectorAll<HTMLButtonElement>('.session-subitem'))
+      .find((element) => element.textContent?.includes(targetTitle));
+    if (!item) {
+      throw new Error(`Session item not found: ${targetTitle}`);
+    }
+    item.click();
+  }, title);
+};
+
+const clickSessionRemove = async (page: Page, title: string) => {
+  await page.evaluate((targetTitle) => {
+    const item = Array.from(document.querySelectorAll<HTMLElement>('.session-subitem'))
+      .find((element) => element.textContent?.includes(targetTitle));
+    const button = item?.querySelector<HTMLElement>('.session-item-icon-button.danger');
+    if (!button) {
+      throw new Error(`Session remove button not found: ${targetTitle}`);
+    }
+    button.click();
+  }, title);
+};
 
 test('Session 右键菜单支持删除并自动切到剩余 Session', async () => {
   const page = ctx.page;
@@ -66,4 +239,142 @@ test('Session 右键菜单支持删除并自动切到剩余 Session', async () =
 
   await expect(page.locator('.session-item', { hasText: seeded.alphaTitle })).toHaveCount(0);
   await expect(page.locator('.session-item.active', { hasText: seeded.betaTitle })).toBeVisible();
+});
+
+test('real IPC session click switches active highlight and session rail', async () => {
+  const page = ctx.page;
+  const seeded = await createPersistedWorkbench(page, path.join(ctx.tempDir, 'real-ipc-session-click'), [
+    'Beta Session',
+    'Alpha Session',
+  ]);
+  const beta = seeded.sessions[0];
+  const alpha = seeded.sessions[1];
+
+  await expect(page.locator('[data-testid="cp-section-sessionContext"]')).toBeVisible();
+  await waitForActiveSession(page, alpha.title);
+  await waitForProjectActiveCount(page, 0);
+  await waitForRailSections(page, { captureLibrary: false, sessionContext: true });
+
+  await clickSessionByTitle(page, beta.title);
+
+  await expect.poll(async () => getWorkbenchSelection(page)).toEqual({
+    currentSessionId: beta.sessionId,
+    rightRailTarget: 'session',
+  });
+  await waitForActiveSession(page, beta.title);
+  await waitForProjectActiveCount(page, 0);
+  await waitForRailSections(page, { captureLibrary: false, sessionContext: true });
+});
+
+test('real IPC project click switches rail without clearing active session', async () => {
+  const page = ctx.page;
+  const seeded = await createPersistedWorkbench(page, path.join(ctx.tempDir, 'real-ipc-project-click'), [
+    'Beta Session',
+    'Alpha Session',
+  ]);
+  const alpha = seeded.sessions[1];
+
+  await expect(page.locator('[data-testid="cp-section-sessionContext"]')).toBeVisible();
+  await waitForActiveSession(page, alpha.title);
+
+  await page.locator('.project-item').first().click();
+
+  await expect.poll(async () => getWorkbenchSelection(page)).toEqual({
+    currentSessionId: alpha.sessionId,
+    rightRailTarget: 'project',
+  });
+  await waitForActiveSession(page, null);
+  await waitForProjectActiveCount(page, 1);
+  await waitForRailSections(page, { captureLibrary: true, sessionContext: false });
+
+  await clickSessionByTitle(page, alpha.title);
+
+  await expect.poll(async () => getWorkbenchSelection(page)).toEqual({
+    currentSessionId: alpha.sessionId,
+    rightRailTarget: 'session',
+  });
+  await waitForActiveSession(page, alpha.title);
+  await waitForProjectActiveCount(page, 0);
+  await waitForRailSections(page, { captureLibrary: false, sessionContext: true });
+});
+
+test('real IPC removing active session selects remaining session', async () => {
+  const page = ctx.page;
+  const seeded = await createPersistedWorkbench(page, path.join(ctx.tempDir, 'real-ipc-remove-active'), [
+    'Beta Session',
+    'Alpha Session',
+  ]);
+  const beta = seeded.sessions[0];
+  const alpha = seeded.sessions[1];
+
+  await clickSessionRemove(page, alpha.title);
+
+  await expect.poll(async () => getWorkbenchSelection(page)).toEqual({
+    currentSessionId: beta.sessionId,
+    rightRailTarget: 'session',
+  });
+  await waitForSessionList(page, { includes: [beta.title], excludes: [alpha.title] });
+  await waitForActiveSession(page, beta.title);
+  await waitForRailSections(page, { captureLibrary: false, sessionContext: true });
+});
+
+test('real IPC removing last active session returns to project rail', async () => {
+  const page = ctx.page;
+  const seeded = await createPersistedWorkbench(page, path.join(ctx.tempDir, 'real-ipc-remove-last'), [
+    'Only Session',
+  ]);
+  const only = seeded.sessions[0];
+
+  await clickSessionRemove(page, only.title);
+
+  await expect.poll(async () => getWorkbenchSelection(page)).toEqual({
+    currentSessionId: null,
+    rightRailTarget: 'project',
+  });
+  await waitForSessionList(page, { empty: true });
+  await waitForActiveSession(page, null);
+  await waitForRailSections(page, { captureLibrary: true, sessionContext: false });
+});
+
+test('real IPC removing inactive session preserves current session and rail target', async () => {
+  const page = ctx.page;
+  const seeded = await createPersistedWorkbench(page, path.join(ctx.tempDir, 'real-ipc-remove-inactive'), [
+    'Gamma Session',
+    'Beta Session',
+    'Alpha Session',
+  ]);
+  const beta = seeded.sessions[1];
+  const alpha = seeded.sessions[2];
+
+  await clickSessionRemove(page, beta.title);
+
+  await expect.poll(async () => getWorkbenchSelection(page)).toEqual({
+    currentSessionId: alpha.sessionId,
+    rightRailTarget: 'session',
+  });
+  await waitForSessionList(page, { includes: [alpha.title, 'Gamma Session'], excludes: [beta.title] });
+  await waitForActiveSession(page, alpha.title);
+  await waitForRailSections(page, { captureLibrary: false, sessionContext: true });
+});
+
+test('session remove failure keeps list intact and shows an error', async () => {
+  const page = ctx.page;
+  const seeded = await createPersistedWorkbench(page, path.join(ctx.tempDir, 'real-ipc-remove-failure'), [
+    'Only Session',
+  ]);
+  const only = seeded.sessions[0];
+
+  await page.evaluate(async (sessionId) => {
+    await window.electronAPI.session.remove(sessionId);
+  }, only.sessionId);
+
+  await clickSessionRemove(page, only.title);
+
+  await expect(page.getByRole('alert')).toContainText('Session not found');
+  await expect.poll(async () => getWorkbenchSelection(page)).toEqual({
+    currentSessionId: only.sessionId,
+    rightRailTarget: 'session',
+  });
+  await waitForSessionList(page, { includes: [only.title] });
+  await waitForActiveSession(page, only.title);
 });

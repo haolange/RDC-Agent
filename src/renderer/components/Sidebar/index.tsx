@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useI18n } from '../../i18n';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
+import type { RightRailTarget } from '../../stores/sessionStore';
 import './Sidebar.css';
 
 interface SidebarProps {
@@ -28,6 +29,24 @@ interface ProjectRenamePopoverState {
   titleDraft: string;
 }
 
+interface LoadSessionsOptions {
+  preferredSessionId?: string | null;
+  autoSelectSession?: boolean;
+  rightRailTarget?: RightRailTarget;
+  requestId?: number;
+}
+
+interface LoadProjectsOptions {
+  autoSelectSession?: boolean;
+  rightRailTarget?: RightRailTarget;
+  requestId?: number;
+}
+
+interface SelectSessionOptions {
+  optimisticSession?: SessionRecord;
+  requestId?: number;
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({
   collapsed = false,
 }) => {
@@ -40,6 +59,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [renamePopover, setRenamePopover] = useState<SessionRenamePopoverState | null>(null);
   const [projectMenuPopover, setProjectMenuPopover] = useState<ProjectMenuPopoverState | null>(null);
   const [projectRenamePopover, setProjectRenamePopover] = useState<ProjectRenamePopoverState | null>(null);
+  const [sidebarError, setSidebarError] = useState<string | null>(null);
 
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const renamePopoverRef = useRef<HTMLDivElement | null>(null);
@@ -47,6 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const projectMenuRef = useRef<HTMLDivElement | null>(null);
   const projectRenameRef = useRef<HTMLDivElement | null>(null);
   const projectRenameInputRef = useRef<HTMLInputElement | null>(null);
+  const selectionRequestRef = useRef(0);
 
   const projects = useSessionStore((state) => state.projects);
   const sessions = useSessionStore((state) => state.sessions);
@@ -60,6 +81,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const setRuns = useSessionStore((state) => state.setRuns);
   const setCaptures = useSessionStore((state) => state.setCaptures);
   const setProjectInputs = useSessionStore((state) => state.setProjectInputs);
+  const rightRailTarget = useSessionStore((state) => state.rightRailTarget);
+  const setRightRailTarget = useSessionStore((state) => state.setRightRailTarget);
+
+  const beginSelectionRequest = useCallback(() => {
+    selectionRequestRef.current += 1;
+    return selectionRequestRef.current;
+  }, []);
+
+  const isLatestSelectionRequest = useCallback((requestId?: number) => (
+    requestId === undefined || selectionRequestRef.current === requestId
+  ), []);
 
   const ensureProjectExpanded = useCallback((projectId: string) => {
     setExpandedProjectIds((current) => (
@@ -79,35 +111,67 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const loadRuns = useCallback(async (sessionId: string) => {
     const result = await window.electronAPI.run.list(sessionId);
-    setRuns(result.runs ?? []);
     return result.runs ?? [];
-  }, [setRuns]);
+  }, []);
 
-  const selectSession = useCallback(async (sessionId: string) => {
+  const selectSession = useCallback(async (sessionId: string, options: SelectSessionOptions = {}) => {
+    if (options.optimisticSession) {
+      setCurrentSession(options.optimisticSession);
+      setRightRailTarget('session');
+      setCurrentRun(null);
+      setCaptures([]);
+      setRuns([]);
+    }
+
     const result = await window.electronAPI.session.select(sessionId);
+    if (!isLatestSelectionRequest(options.requestId)) {
+      return;
+    }
     if (!result.success || !result.session) {
       return;
     }
 
     setCurrentSession(result.session);
+    setRightRailTarget('session');
     setCurrentRun(result.currentRun ?? null);
     setCaptures(result.currentRun?.captures ?? []);
-    await loadRuns(sessionId);
-  }, [loadRuns, setCaptures, setCurrentRun, setCurrentSession]);
+    const nextRuns = await loadRuns(sessionId);
+    if (!isLatestSelectionRequest(options.requestId)) {
+      return;
+    }
+    setRuns(nextRuns);
+  }, [isLatestSelectionRequest, loadRuns, setCaptures, setCurrentRun, setCurrentSession, setRightRailTarget, setRuns]);
 
-  const loadSessions = useCallback(async (project: ProjectRecord, preferredSessionId?: string | null) => {
+  const loadSessions = useCallback(async (project: ProjectRecord, options: LoadSessionsOptions = {}) => {
+    const autoSelectSession = options.autoSelectSession !== false;
     const nextSessions = await loadProjectSessionList(project.projectId);
+    if (!isLatestSelectionRequest(options.requestId)) {
+      return;
+    }
+
     setSessions(nextSessions);
     setCurrentProject(project);
     setProjectInputs(project.inputs ?? []);
     ensureProjectExpanded(project.projectId);
 
-    const targetSessionId = preferredSessionId
+    if (!autoSelectSession) {
+      setRightRailTarget(options.rightRailTarget ?? 'project');
+      if (currentSession?.projectId && currentSession.projectId !== project.projectId) {
+        setCurrentSession(null);
+        setCurrentRun(null);
+        setCaptures([]);
+        setRuns([]);
+      }
+      return;
+    }
+
+    const targetSessionId = options.preferredSessionId
       || project.lastSessionId
       || nextSessions[0]?.sessionId
       || null;
 
     if (!targetSessionId) {
+      setRightRailTarget(options.rightRailTarget ?? 'project');
       setCurrentSession(null);
       setCurrentRun(null);
       setCaptures([]);
@@ -115,11 +179,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return;
     }
 
-    await selectSession(targetSessionId);
-  }, [ensureProjectExpanded, loadProjectSessionList, selectSession, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setProjectInputs, setRuns, setSessions]);
+    const optimisticSession = nextSessions.find((session) => session.sessionId === targetSessionId);
+    await selectSession(targetSessionId, {
+      optimisticSession,
+      requestId: options.requestId,
+    });
+  }, [currentSession, ensureProjectExpanded, isLatestSelectionRequest, loadProjectSessionList, selectSession, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setProjectInputs, setRightRailTarget, setRuns, setSessions]);
 
-  const loadProjects = useCallback(async (preferredProjectId?: string | null, preferredSessionId?: string | null) => {
+  const loadProjects = useCallback(async (preferredProjectId?: string | null, preferredSessionId?: string | null, options: LoadProjectsOptions = {}) => {
     const result = await window.electronAPI.project.list();
+    if (!isLatestSelectionRequest(options.requestId)) {
+      return;
+    }
+
     const nextProjects = result.projects ?? [];
     setProjects(nextProjects);
     const visibleProjectIds = new Set(nextProjects.map((project) => project.projectId));
@@ -138,6 +210,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (!targetProject) {
       setCurrentProject(null);
       setCurrentSession(null);
+      setRightRailTarget('project');
       setCurrentRun(null);
       setProjectInputs([]);
       setShowAllSessionsByProject({});
@@ -148,8 +221,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return;
     }
 
-    await loadSessions(targetProject, preferredSessionId);
-  }, [loadSessions, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setProjectInputs, setProjects, setRuns, setSessions]);
+    await loadSessions(targetProject, {
+      preferredSessionId,
+      autoSelectSession: options.autoSelectSession,
+      rightRailTarget: options.rightRailTarget,
+      requestId: options.requestId,
+    });
+  }, [isLatestSelectionRequest, loadSessions, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setProjectInputs, setProjects, setRightRailTarget, setRuns, setSessions]);
 
   useEffect(() => {
     if (navigator.webdriver) {
@@ -239,9 +317,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, []);
 
   const handleAddProject = useCallback(async () => {
+    setSidebarError(null);
     const rootPath = await window.electronAPI.selectDirectory();
     if (!rootPath) return;
 
+    const requestId = beginSelectionRequest();
     setIsBusy(true);
     try {
       const result = await window.electronAPI.project.add(rootPath);
@@ -249,13 +329,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         return;
       }
 
-      await loadProjects(result.project.projectId);
+      await loadProjects(result.project.projectId, null, {
+        autoSelectSession: false,
+        rightRailTarget: 'project',
+        requestId,
+      });
     } finally {
       setIsBusy(false);
     }
-  }, [loadProjects]);
+  }, [beginSelectionRequest, loadProjects]);
 
   const handleRemoveProject = useCallback(async (project?: ProjectRecord) => {
+    setSidebarError(null);
     const targetProject = project || currentProject;
     if (!targetProject) return;
 
@@ -273,15 +358,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, [currentProject, loadProjects, projectMenuPopover]);
 
   const handleProjectSelect = useCallback(async (project: ProjectRecord) => {
+    setSidebarError(null);
+    const requestId = beginSelectionRequest();
+    setCurrentProject(project);
+    setProjectInputs(project.inputs ?? []);
+    setRightRailTarget('project');
+    ensureProjectExpanded(project.projectId);
+    if (currentSession?.projectId && currentSession.projectId !== project.projectId) {
+      setCurrentSession(null);
+      setCurrentRun(null);
+      setCaptures([]);
+      setRuns([]);
+    }
+
     setIsBusy(true);
     try {
-      await loadSessions(project);
+      await loadSessions(project, {
+        autoSelectSession: false,
+        rightRailTarget: 'project',
+        requestId,
+      });
     } finally {
       setIsBusy(false);
     }
-  }, [loadSessions]);
+  }, [beginSelectionRequest, currentSession, ensureProjectExpanded, loadSessions, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setProjectInputs, setRightRailTarget, setRuns]);
 
   const handleSessionCreate = useCallback(async (project?: ProjectRecord) => {
+    setSidebarError(null);
     const targetProject = project || currentProject;
     if (!targetProject) return;
 
@@ -289,6 +392,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setProjectMenuPopover(null);
     }
 
+    const requestId = beginSelectionRequest();
     setIsBusy(true);
     try {
       const result = await window.electronAPI.session.create(targetProject.projectId);
@@ -296,11 +400,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
         return;
       }
 
-      await loadProjects(targetProject.projectId, result.session.sessionId);
+      if (!isLatestSelectionRequest(requestId)) {
+        return;
+      }
+
+      setCurrentProject(targetProject);
+      setCurrentSession(result.session);
+      setRightRailTarget('session');
+      setCurrentRun(null);
+      setCaptures([]);
+      setRuns([]);
+      ensureProjectExpanded(targetProject.projectId);
+      await loadProjects(targetProject.projectId, result.session.sessionId, {
+        autoSelectSession: true,
+        rightRailTarget: 'session',
+        requestId,
+      });
     } finally {
       setIsBusy(false);
     }
-  }, [currentProject, loadProjects, projectMenuPopover]);
+  }, [beginSelectionRequest, currentProject, ensureProjectExpanded, isLatestSelectionRequest, loadProjects, projectMenuPopover, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setRightRailTarget, setRuns]);
 
   const handleOpenExplorer = useCallback(async (project: ProjectRecord) => {
     if (projectMenuPopover) {
@@ -323,31 +442,55 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setIsBusy(true);
       try {
         await window.electronAPI.project.rename(projectRenamePopover.project.projectId, newName);
-        await loadProjects(currentProject?.projectId, currentSession?.sessionId);
+        await loadProjects(currentProject?.projectId, currentSession?.sessionId, {
+          autoSelectSession: rightRailTarget === 'session',
+          rightRailTarget,
+        });
       } finally {
         setIsBusy(false);
       }
     }
     setProjectRenamePopover(null);
-  }, [projectRenamePopover, loadProjects, currentProject, currentSession]);
+  }, [projectRenamePopover, loadProjects, currentProject, currentSession, rightRailTarget]);
 
   const handleSessionRemove = useCallback(async (session: SessionRecord) => {
+    setSidebarError(null);
     setRenamePopover(null);
+    const requestId = beginSelectionRequest();
+    const isRemovingCurrentSession = currentSession?.sessionId === session.sessionId;
     setIsBusy(true);
     try {
       const result = await window.electronAPI.session.remove(session.sessionId);
       if (!result.success) {
+        setSidebarError(result.error || t('sidebar.removeSessionFailed'));
         return;
       }
 
       const nextSessions = await loadProjectSessionList(session.projectId);
+      if (!isLatestSelectionRequest(requestId)) {
+        return;
+      }
+
       if (currentProject?.projectId === session.projectId) {
         setSessions(nextSessions);
-        const nextSession = nextSessions[0] ?? null;
+
+        if (!isRemovingCurrentSession) {
+          return;
+        }
+
+        const nextSession = result.nextSession ?? nextSessions[0] ?? null;
         setCurrentSession(nextSession);
         if (nextSession) {
-          await selectSession(nextSession.sessionId);
+          setRightRailTarget('session');
+          setCurrentRun(result.nextRun ?? null);
+          setCaptures(result.nextRun?.captures ?? []);
+          const nextRuns = await loadRuns(nextSession.sessionId);
+          if (!isLatestSelectionRequest(requestId)) {
+            return;
+          }
+          setRuns(nextRuns);
         } else {
+          setRightRailTarget('project');
           setCurrentRun(null);
           setCaptures([]);
           setRuns([]);
@@ -357,7 +500,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     } finally {
       setIsBusy(false);
     }
-  }, [currentProject, loadProjectSessionList, selectSession, setCaptures, setCurrentRun, setCurrentSession, setRuns, setSessions]);
+  }, [beginSelectionRequest, currentProject, currentSession, isLatestSelectionRequest, loadProjectSessionList, loadRuns, setCaptures, setCurrentRun, setCurrentSession, setRightRailTarget, setRuns, setSessions, t]);
 
   const closeRenamePopover = useCallback(() => {
     setRenamePopover(null);
@@ -451,19 +594,36 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, []);
 
   const handleSessionActivate = useCallback(async (project: ProjectRecord, session: SessionRecord) => {
+    setSidebarError(null);
+    const requestId = beginSelectionRequest();
     setRenamePopover(null);
+    setCurrentProject(project);
+    setCurrentSession(session);
+    setRightRailTarget('session');
+    setCurrentRun(null);
+    setCaptures([]);
+    setRuns([]);
+    ensureProjectExpanded(project.projectId);
     setIsBusy(true);
     try {
       if (currentProject?.projectId !== project.projectId) {
-        await loadSessions(project, session.sessionId);
+        await loadSessions(project, {
+          preferredSessionId: session.sessionId,
+          autoSelectSession: true,
+          rightRailTarget: 'session',
+          requestId,
+        });
         return;
       }
 
-      await selectSession(session.sessionId);
+      await selectSession(session.sessionId, {
+        optimisticSession: session,
+        requestId,
+      });
     } finally {
       setIsBusy(false);
     }
-  }, [currentProject, loadSessions, selectSession]);
+  }, [beginSelectionRequest, currentProject, ensureProjectExpanded, loadSessions, selectSession, setCaptures, setCurrentProject, setCurrentRun, setCurrentSession, setRightRailTarget, setRuns]);
 
   return (
     <div className={`sidebar-content ${collapsed ? 'collapsed' : ''}`}>
@@ -515,11 +675,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           ) : projects.length > 0 ? (
             <div className="project-stack">
+              {sidebarError && (
+                <div className="sidebar-inline-error" role="alert">
+                  {sidebarError}
+                </div>
+              )}
               {projects.map((project) => {
-                const isActive = currentProject?.projectId === project.projectId;
+                const isCurrentProject = currentProject?.projectId === project.projectId;
+                const isProjectRailActive = isCurrentProject && rightRailTarget === 'project';
                 const isExpanded = expandedProjectIds.includes(project.projectId);
                 const projectSessions = projectSessionsByProject[project.projectId]
-                  ?? (isActive ? sessions : []);
+                  ?? (isCurrentProject ? sessions : []);
                 const showAllSessions = showAllSessionsByProject[project.projectId] ?? false;
                 const hasOverflowSessions = projectSessions.length > 5;
                 const visibleSessions = hasOverflowSessions && !showAllSessions
@@ -528,11 +694,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 return (
                   <section
                     key={project.projectId}
-                    className={`project-stack-item ${isActive ? 'active' : ''} ${isExpanded ? 'expanded' : ''}`}
+                    className={`project-stack-item ${isCurrentProject ? 'current' : ''} ${isProjectRailActive ? 'active' : ''} ${isExpanded ? 'expanded' : ''}`}
                   >
                     <button
                       type="button"
-                      className={`session-item project-item ${isActive ? 'active' : ''}`}
+                      className={`session-item project-item ${isProjectRailActive ? 'active' : ''}`}
                       onClick={() => void handleProjectSelect(project)}
                     >
                       <div className="session-item-header">
@@ -556,7 +722,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           </span>
                           <span className="session-item-title project-item-title">{project.name}</span>
                         </span>
-                        {isActive && (
+                        {isCurrentProject && (
                           <span className="session-item-actions">
                             <span
                               role="button"
@@ -591,11 +757,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <div className="project-sessions-panel">
                         {projectSessions.length > 0 ? (
                           <div className="session-list nested-session-list">
-                            {visibleSessions.map((session) => (
+                            {visibleSessions.map((session) => {
+                              const isSessionRailActive = rightRailTarget === 'session' && currentSession?.sessionId === session.sessionId;
+                              return (
                               <button
                                 key={session.sessionId}
                                 type="button"
-                                className={`session-item session-subitem ${currentSession?.sessionId === session.sessionId ? 'active' : ''}`}
+                                className={`session-item session-subitem ${isSessionRailActive ? 'active' : ''}`}
                                 onClick={() => void handleSessionActivate(project, session)}
                                 onContextMenu={(event) => handleSessionContextMenu(event, session)}
                               >
@@ -652,7 +820,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                   </span>
                                 </div>
                               </button>
-                            ))}
+                              );
+                            })}
                             {hasOverflowSessions && (
                               <button
                                 type="button"
