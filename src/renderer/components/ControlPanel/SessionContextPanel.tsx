@@ -35,6 +35,17 @@ const formatBackendLabel = (
   return backend || '--';
 };
 
+const formatHumanPreviewLabel = (
+  status: string | undefined,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+): string => {
+  if (status === 'open') return t('control.humanPreviewOpen');
+  if (status === 'opening') return t('control.humanPreviewOpening');
+  if (status === 'error') return t('control.humanPreviewError');
+  if (status === 'unavailable') return t('control.humanPreviewUnavailable');
+  return t('control.humanPreviewClosed');
+};
+
 export const getSessionContextSummary = (
   openedCapturePath: string | null | undefined,
   inputCount: number,
@@ -69,6 +80,7 @@ export const SessionContextPanel: React.FC = () => {
   const devices = useDeviceStore((state) => state.devices);
 
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedInputId, setSelectedInputId] = useState<string>('');
 
@@ -146,6 +158,57 @@ export const SessionContextPanel: React.FC = () => {
     setErrorMessage(null);
   };
 
+  const handleOpenHumanPreview = async () => {
+    const electronAPI = window.electronAPI;
+    if (!electronAPI) return;
+    setPreviewBusy(true);
+    const result = await electronAPI.context.openHumanPreview({
+      sessionId: contextSnapshot?.sessionId ?? activeOpenedCapture?.replaySessionId,
+    }).catch((error) => ({
+      success: false,
+      contextSnapshot: undefined,
+      error: error instanceof Error ? error.message : String(error),
+    }));
+    if (result.contextSnapshot) {
+      setContextSnapshot(result.contextSnapshot);
+    }
+    if (!result.success && result.error) {
+      setErrorMessage(result.error);
+    }
+    setPreviewBusy(false);
+  };
+
+  const handleCloseHumanPreview = async () => {
+    const electronAPI = window.electronAPI;
+    if (!electronAPI) return;
+    setPreviewBusy(true);
+    const result = await electronAPI.context.closeHumanPreview()
+      .catch((error) => ({
+        success: false,
+        contextSnapshot: undefined,
+        error: error instanceof Error ? error.message : String(error),
+      }));
+    if (result.contextSnapshot) {
+      setContextSnapshot(result.contextSnapshot);
+    }
+    if (!result.success && result.error) {
+      setErrorMessage(result.error);
+    }
+    setPreviewBusy(false);
+  };
+
+  const humanPreview = contextSnapshot?.humanPreview;
+  const previewSessionId = contextSnapshot?.sessionId ?? activeOpenedCapture?.replaySessionId;
+  const previewDisabledReason = !contextSnapshot?.contextId
+    ? t('control.humanPreviewMissingContext')
+    : !previewSessionId
+      ? t('control.humanPreviewMissingSession')
+      : !contextSnapshot?.runtimeOwner || !contextSnapshot?.ownerLeaseId
+        ? t('control.humanPreviewMissingOwner')
+        : '';
+  const canControlHumanPreview = !previewDisabledReason && !previewBusy;
+  const isHumanPreviewOpen = humanPreview?.status === 'open' || humanPreview?.status === 'opening';
+
   return (
     <div className="session-context-panel" data-testid="session-context-panel">
       {activeOpenedCapture ? (
@@ -215,6 +278,32 @@ export const SessionContextPanel: React.FC = () => {
                 </span>
               </div>
             )}
+          </div>
+
+          <div className="session-human-preview-card" data-testid="session-human-preview-status">
+            <div className="session-human-preview-main">
+              <span className={`session-human-preview-dot ${humanPreview?.status ?? 'closed'}`} />
+              <span className="session-human-preview-copy">
+                <span className="session-human-preview-title">{t('control.humanPreviewTitle')}</span>
+                <span className="session-human-preview-detail">
+                  {formatHumanPreviewLabel(humanPreview?.status, t)}
+                  {humanPreview?.boundEventId ? ` · Event ${humanPreview.boundEventId}` : ''}
+                </span>
+                {humanPreview?.lastError || previewDisabledReason ? (
+                  <span className="session-human-preview-error">{humanPreview?.lastError ?? previewDisabledReason}</span>
+                ) : null}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="panel-action-btn session-human-preview-button"
+              data-testid={isHumanPreviewOpen ? 'session-context-close-human-preview' : 'session-context-open-human-preview'}
+              onClick={() => void (isHumanPreviewOpen ? handleCloseHumanPreview() : handleOpenHumanPreview())}
+              disabled={!canControlHumanPreview}
+              title={previewDisabledReason || undefined}
+            >
+              <span>{isHumanPreviewOpen ? t('control.humanPreviewClose') : t('control.humanPreviewOpenAction')}</span>
+            </button>
           </div>
         </div>
       ) : (

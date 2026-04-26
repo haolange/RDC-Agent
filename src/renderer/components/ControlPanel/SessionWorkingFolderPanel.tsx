@@ -1,23 +1,29 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import type { SessionOutputRecord } from '@shared/types/session';
 import { useI18n } from '../../i18n';
 import { useSessionStore } from '../../stores/sessionStore';
 
 const getLeafName = (value: string): string => value.split(/[\\/]/).filter(Boolean).pop() || value;
 
+const formatFileSize = (bytes?: number): string => {
+  if (!bytes || bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
 export const SessionWorkingFolderPanel: React.FC = () => {
   const { t } = useI18n();
-  const currentProject = useSessionStore((state) => state.currentProject);
   const currentSession = useSessionStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
-  const conversationMessages = useSessionStore((state) => state.conversationMessages);
   const actionEvents = useSessionStore((state) => state.actionEvents);
-  const [attachmentCount, setAttachmentCount] = useState(0);
+  const [outputs, setOutputs] = useState<SessionOutputRecord[]>([]);
 
   useEffect(() => {
     let cancelled = false;
 
     if (!currentSession?.sessionId) {
-      setAttachmentCount(0);
+      setOutputs([]);
       return () => {
         cancelled = true;
       };
@@ -25,38 +31,33 @@ export const SessionWorkingFolderPanel: React.FC = () => {
 
     const electronAPI = window.electronAPI;
     if (!electronAPI) {
-      setAttachmentCount(0);
+      setOutputs([]);
       return () => {
         cancelled = true;
       };
     }
 
-    void electronAPI.session.attachments.list(currentSession.sessionId)
+    void electronAPI.session.outputs.list(currentSession.sessionId, currentRun?.runId)
       .then((result) => {
         if (!cancelled) {
-          setAttachmentCount(result.attachments.length);
+          setOutputs(result.outputs);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setAttachmentCount(0);
+          setOutputs([]);
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [currentSession?.sessionId]);
+  }, [actionEvents.length, currentRun?.runId, currentSession?.sessionId]);
 
-  const stats = useMemo(() => [
-    { label: t('control.sessionWorkingFolderAttachments'), value: attachmentCount },
-    { label: t('control.sessionWorkingFolderMessages'), value: conversationMessages.length },
-    { label: t('control.sessionWorkingFolderEvents'), value: actionEvents.length },
-  ], [actionEvents.length, attachmentCount, conversationMessages.length, t]);
+  const visibleOutputs = useMemo(() => outputs.slice(0, 18), [outputs]);
+  const hasTaskMaterial = Boolean(currentRun) || outputs.length > 0 || actionEvents.length > 0;
 
-  const hasTaskMaterial = Boolean(currentRun) || attachmentCount > 0 || actionEvents.length > 0;
-
-  if (!currentProject || !currentSession) {
+  if (!currentSession) {
     return <div className="session-working-folder-empty">{t('control.sessionWorkingFolderUnavailable')}</div>;
   }
 
@@ -79,43 +80,36 @@ export const SessionWorkingFolderPanel: React.FC = () => {
         <>
           <div className="session-working-folder-paths">
             <div className="session-working-folder-path-card">
-              <span className="session-working-folder-label">{t('control.sessionWorkingFolderSessionPath')}</span>
+              <span className="session-working-folder-label">{t('control.sessionWorkingFolderDefaultPath')}</span>
               <span className="session-working-folder-name">{getLeafName(currentSession.sessionPath)}</span>
               <span className="session-working-folder-path" title={currentSession.sessionPath}>{currentSession.sessionPath}</span>
             </div>
-            <div className="session-working-folder-path-card">
-              <span className="session-working-folder-label">{t('control.sessionWorkingFolderProjectRoot')}</span>
-              <span className="session-working-folder-name">{currentProject.name}</span>
-              <span className="session-working-folder-path" title={currentProject.rootPath}>{currentProject.rootPath}</span>
-            </div>
           </div>
 
-          <div className="session-working-folder-stats">
-            {stats.map((entry) => (
-              <div key={entry.label} className="session-working-folder-stat">
-                <span className="session-working-folder-stat-value">{entry.value}</span>
-                <span className="session-working-folder-stat-label">{entry.label}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="session-working-folder-actions">
-            <button
-              type="button"
-              className="panel-action-btn"
-              data-testid="session-working-folder-open-session"
-              onClick={() => void openPath(currentSession.sessionPath)}
-            >
-              <span>{t('control.sessionWorkingFolderOpenSession')}</span>
-            </button>
-            <button
-              type="button"
-              className="panel-action-btn"
-              data-testid="session-working-folder-open-project"
-              onClick={() => void openPath(currentProject.rootPath)}
-            >
-              <span>{t('control.sessionWorkingFolderOpenProject')}</span>
-            </button>
+          <div className="session-output-list" data-testid="session-output-list">
+            <span className="session-output-list-title">{t('control.sessionOutputsWorkingFiles')}</span>
+            {visibleOutputs.length > 0 ? (
+              visibleOutputs.map((output) => (
+                <button
+                  type="button"
+                  key={output.id}
+                  className="session-output-item"
+                  onClick={() => void openPath(output.filePath)}
+                  title={output.filePath}
+                >
+                  <span className={`session-output-kind ${output.kind}`}>{output.fileName.slice(0, 2).toUpperCase()}</span>
+                  <span className="session-output-copy">
+                    <span className="session-output-title">{output.title}</span>
+                    <span className="session-output-meta">
+                      {output.source}
+                      {formatFileSize(output.sizeBytes) ? ` · ${formatFileSize(output.sizeBytes)}` : ''}
+                    </span>
+                  </span>
+                </button>
+              ))
+            ) : (
+              <span className="session-working-folder-empty">{t('control.sessionOutputsEmpty')}</span>
+            )}
           </div>
         </>
       )}

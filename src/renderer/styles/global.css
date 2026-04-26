@@ -454,6 +454,8 @@ a {
 
 .main-input-bar {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
   width: min(var(--workbench-rail-max-width, 100%), 100%);
   margin-inline: auto;
   justify-content: stretch;
@@ -940,6 +942,17 @@ a {
     color-mix(in srgb, var(--composer-mode-accent) 92%, rgb(var(--color-primary-500))),
     color-mix(in srgb, var(--composer-mode-accent) 26%, rgb(var(--color-primary-500)))
   );
+}
+
+.chat-send-button.primary.is-stop {
+  background: rgb(var(--color-bg-1));
+  border-color: rgb(var(--color-error) / 0.32);
+  color: rgb(var(--color-error));
+}
+
+.chat-send-button.primary.is-stop:hover:not(:disabled) {
+  background: rgb(var(--color-error) / 0.1);
+  border-color: rgb(var(--color-error) / 0.46);
 }
 
 .chat-send-button.icon-only {

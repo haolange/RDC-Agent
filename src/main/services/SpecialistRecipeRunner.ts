@@ -215,6 +215,8 @@ export class SpecialistRecipeRunner {
         );
       }
 
+      await this.openHumanPreviewSafe(existingReplaySessionId);
+
       return {
         captureFileId: existingCapture?.captureFileId || existingCapture?.id || context.debugPlan.targetCapture?.captureId || 'target_capture',
         replaySessionId: existingReplaySessionId,
@@ -279,6 +281,8 @@ export class SpecialistRecipeRunner {
       );
     }
 
+    await this.openHumanPreviewSafe(replaySessionId);
+
     return {
       captureFileId: String(captureFileId),
       replaySessionId: String(replaySessionId),
@@ -306,6 +310,10 @@ export class SpecialistRecipeRunner {
     }
 
     throw new Error(`Unsupported specialist recipe: ${agentId}`);
+  }
+
+  private async openHumanPreviewSafe(sessionId: string): Promise<void> {
+    await rdxSessionService.openHumanPreviewWindow({ sessionId }).catch(() => undefined);
   }
 
   private async runTriage(context: SpecialistRunContext, surface: SurfaceHandle): Promise<SpecialistRecipeResult> {

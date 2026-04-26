@@ -74,8 +74,12 @@ await ctx.page.locator('textarea.chat-input').fill(taskFile);
   await expect(ctx.page.locator('[data-testid="plan-intake-panel"]')).toContainText('Event 6152');
   await expect(ctx.page.locator('[data-testid="plan-questions"]')).toHaveCount(0);
   await expect(ctx.page.locator('[data-testid="plan-approve-button"]')).toBeEnabled();
+  await expect(ctx.page.locator('[data-testid="phase-trace-plan"]')).toBeVisible();
+  await expect(ctx.page.locator('[data-testid="phase-trace-plan"]')).toContainText('Plan Phase');
 
   await ctx.page.locator('[data-testid="plan-approve-button"]').click();
+  await expect(ctx.page.locator('[data-testid="phase-trace-execution"]')).toBeVisible({ timeout: 10000 });
+  await expect(ctx.page.locator('[data-testid="phase-trace-execution"]')).toContainText('Execution Phase');
   await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('调试报告已生成', { timeout: 15000 });
 });
 

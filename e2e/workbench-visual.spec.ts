@@ -285,6 +285,11 @@ const seedVisualWorkbench = async (page: Page) => {
         captureDescriptors: captures,
         activeCapture: captures[0].id,
         deviceLabel: 'Local',
+        humanPreview: {
+          status: 'closed',
+          sessionId: 'replay-session-visual',
+          updatedAt: fixedNow,
+        },
       },
       openedCapture: {
         projectId: project.projectId,
@@ -839,6 +844,8 @@ test('session mode shows opened capture context inside Context panel', async () 
   await expect(contextSection).toContainText('HairSparkWhite.rdc');
   await expect(contextSection).toContainText('local-runtime');
   await expect(contextSection).toContainText('ctx-device-visual');
+  await expect(page.locator('[data-testid="session-human-preview-status"]')).toBeVisible();
+  await expect(page.locator('[data-testid="session-human-preview-status"]')).toContainText(/Live|观察窗口/);
   await expect(contextSection).toHaveScreenshot('session-context-opened.png');
 });
 
@@ -952,11 +959,13 @@ test('session mode shows task-first cards and quick capture entry when nothing i
 
   await expect(page.locator('[data-testid="cp-section-sessionProgress"]')).toBeVisible();
   await expect(page.locator('[data-testid="cp-section-sessionWorkingFolder"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-sessionCapabilities"]')).toBeVisible();
   await expect(page.locator('[data-testid="cp-section-sessionContext"]')).toBeVisible();
   await expect(page.locator('[data-testid="cp-section-captureLibrary"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="cp-section-sessionContext"] .cp-section-content')).toBeVisible();
-  await expect(page.locator('[data-testid="cp-section-sessionProgress"] .cp-section-content')).toHaveCount(0);
-  await expect(page.locator('[data-testid="cp-section-sessionWorkingFolder"] .cp-section-content')).toHaveCount(0);
+  await expect(page.locator('[data-testid="cp-section-sessionProgress"] .cp-section-content')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-sessionWorkingFolder"] .cp-section-content')).toBeVisible();
+  await expect(page.locator('[data-testid="session-capabilities-panel"]')).toBeVisible();
   await expect(page.locator('[data-testid="session-context-capture-select"]')).toBeVisible();
   await expect(page.locator('[data-testid="session-context-open-selected"]')).toBeVisible();
   await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveScreenshot('right-panel-session-empty.png');
@@ -982,10 +991,14 @@ test('session mode reflects an active run without falling back to project panels
   await seedRunningSessionWorkbench(page);
 
   await expect(page.locator('[data-testid="cp-section-sessionProgress"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-taskBoard"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="cp-section-sessionWorkingFolder"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-sessionCapabilities"]')).toBeVisible();
+  await expect(page.locator('[data-testid="cp-section-sessionContext"]')).toBeVisible();
   await expect(page.locator('[data-testid="cp-section-captureLibrary"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="cp-section-sessionProgress"]')).toContainText('33%');
-  await page.locator('[data-testid="cp-section-sessionProgress"] .cp-section-header').click();
-  await page.locator('[data-testid="cp-section-sessionContext"] .cp-section-header').click();
+  await expect(page.locator('[data-testid="session-capability-cli-runtime"]')).toBeVisible();
+  await expect(page.locator('[data-testid="session-human-preview-status"]')).toBeVisible();
   await expect(page.locator('[data-testid="cp-section-sessionContext"]')).toContainText('HairSparkWhite.rdc');
   await expect(page.locator('[data-testid="session-context-clear-opened"]')).toBeDisabled();
   await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveScreenshot('right-panel-session-running.png');
@@ -1174,7 +1187,7 @@ test('collapsed footer icons stay centered in their buttons', async () => {
   expect(widths.main).toBeGreaterThan(widths.body * 0.9);
 });
 
-test('chat bubbles expand with the main canvas when both sidebars are collapsed', async () => {
+test('chat document flow expands with the main canvas when both sidebars are collapsed', async () => {
   const page = ctx.page;
   await setWindowSize(ctx, 1720, 980);
   await seedConversationPreview(page);
@@ -1184,26 +1197,26 @@ test('chat bubbles expand with the main canvas when both sidebars are collapsed'
   await expect(page.locator('[data-testid="app-sidebar-left"]')).toHaveClass(/collapsed/);
   await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveClass(/collapsed/);
 
-  const assistantBubble = page.locator('.chat-message.assistant .message-bubble.assistant').first();
+  const assistantDocument = page.locator('.chat-message.assistant .assistant-document').first();
   const userBubble = page.locator('.chat-message.user .message-bubble.user').first();
 
-  await expect(assistantBubble).toBeVisible();
+  await expect(assistantDocument).toBeVisible();
   await expect(userBubble).toBeVisible();
   await expect(page.locator('.app-main')).toContainText('Both sidebars are collapsed in this preview.');
 
   const layout = await page.evaluate(() => {
     const main = document.querySelector('.app-main');
     const message = document.querySelector('.chat-message.assistant');
-    const bubble = document.querySelector('.chat-message.assistant .message-bubble.assistant');
+    const documentBlock = document.querySelector('.chat-message.assistant .assistant-document');
 
     return {
       mainWidth: main?.getBoundingClientRect().width ?? 0,
       messageWidth: message?.getBoundingClientRect().width ?? 0,
-      bubbleWidth: bubble?.getBoundingClientRect().width ?? 0,
+      documentWidth: documentBlock?.getBoundingClientRect().width ?? 0,
     };
   });
 
   expect(layout.messageWidth).toBeGreaterThan(layout.mainWidth * 0.4);
   expect(layout.messageWidth).toBeLessThan(layout.mainWidth * 0.65);
-  expect(layout.bubbleWidth).toBeLessThanOrEqual(layout.messageWidth);
+  expect(layout.documentWidth).toBeLessThanOrEqual(layout.messageWidth);
 });

@@ -4,6 +4,7 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { CaptureLibrary } from './CaptureLibrary';
 import { getSessionContextSummary, SessionContextPanel } from './SessionContextPanel';
 import { getSessionProgressSnapshot, SessionProgressPanel } from './SessionProgressPanel';
+import { SessionCapabilitiesPanel } from './SessionCapabilitiesPanel';
 import { SessionWorkingFolderPanel } from './SessionWorkingFolderPanel';
 import './ControlPanel.css';
 
@@ -105,6 +106,7 @@ const SessionControlPanel: React.FC = () => {
   const { t } = useI18n();
   const currentRun = useSessionStore((state) => state.currentRun);
   const workflowState = useSessionStore((state) => state.workflowState);
+  const currentDebugPlan = useSessionStore((state) => state.currentDebugPlan);
   const reasoningSummaries = useSessionStore((state) => state.reasoningSummaries);
   const currentSession = useSessionStore((state) => state.currentSession);
   const openedCapture = useSessionStore((state) => state.openedCapture);
@@ -114,11 +116,13 @@ const SessionControlPanel: React.FC = () => {
     () => getSessionProgressSnapshot(currentRun, workflowState, reasoningSummaries, t),
     [currentRun, reasoningSummaries, t, workflowState],
   );
+  const capabilitySummary = (currentDebugPlan ?? workflowState?.debugPlan ?? null)?.recommendedSpecialists.length ?? 0;
   const hasWorkingFolderActivity = Boolean(currentRun) || actionEvents.length > 0;
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => ({
-    sessionProgress: false,
-    sessionWorkingFolder: false,
-    sessionContext: !currentRun,
+    sessionProgress: true,
+    sessionWorkingFolder: true,
+    sessionCapabilities: true,
+    sessionContext: true,
   }));
   const lastSessionIdRef = useRef<string | null>(null);
 
@@ -130,11 +134,12 @@ const SessionControlPanel: React.FC = () => {
 
     lastSessionIdRef.current = sessionId;
     setExpandedSections({
-      sessionProgress: false,
-      sessionWorkingFolder: false,
-      sessionContext: !currentRun,
+      sessionProgress: true,
+      sessionWorkingFolder: true,
+      sessionCapabilities: true,
+      sessionContext: true,
     });
-  }, [currentRun, currentSession?.sessionId]);
+  }, [currentSession?.sessionId]);
 
   const toggleSection = (sectionId: string) => {
     setExpandedSections((prev) => ({
@@ -151,7 +156,7 @@ const SessionControlPanel: React.FC = () => {
       <div className="cp-content scrollbar-thin">
         <CollapsibleSection
           id="sessionProgress"
-          title={t('control.sessionProgress')}
+          title={t('control.sessionTaskMonitor')}
           icon={(
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
@@ -173,7 +178,7 @@ const SessionControlPanel: React.FC = () => {
 
         <CollapsibleSection
           id="sessionWorkingFolder"
-          title={t('control.sessionWorkingFolder')}
+          title={t('control.sessionOutputs')}
           icon={(
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
@@ -185,6 +190,33 @@ const SessionControlPanel: React.FC = () => {
           summary={hasWorkingFolderActivity ? <span className="cp-section-summary-main">{sessionFolderName}</span> : undefined}
         >
           <SessionWorkingFolderPanel />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          id="sessionCapabilities"
+          title={t('control.sessionCapabilities')}
+          icon={(
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M14 7h7" />
+              <path d="M14 12h7" />
+              <path d="M14 17h7" />
+              <path d="M4 7h6" />
+              <path d="M4 12h6" />
+              <path d="M4 17h6" />
+              <path d="M7 4v6" />
+              <path d="M17 9v6" />
+            </svg>
+          )}
+          variant="session"
+          isExpanded={expandedSections.sessionCapabilities}
+          onToggle={() => toggleSection('sessionCapabilities')}
+          summary={capabilitySummary > 0 ? (
+            <span className="cp-section-summary-main">
+              {t('control.sessionCapabilitiesSpecialistCount', { count: capabilitySummary })}
+            </span>
+          ) : undefined}
+        >
+          <SessionCapabilitiesPanel />
         </CollapsibleSection>
 
         <CollapsibleSection

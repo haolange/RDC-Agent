@@ -4,6 +4,8 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import type {
+  ConversationCancelActiveTurnRequest,
+  ConversationCancelActiveTurnResult,
   ConversationMessage,
   ConversationSendRequest,
   ConversationStreamEvent,
@@ -18,6 +20,7 @@ import type {
   RunContextUsageSummary,
   RunSummary,
   SessionAttachmentRecord,
+  SessionOutputRecord,
   SessionRecord,
 } from '@shared/types/session';
 import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
@@ -93,6 +96,8 @@ const electronAPI = {
 
   conversation: {
     sendMessage: (request: ConversationSendRequest): Promise<ConversationTurnResult> => ipcRenderer.invoke('conversation:sendMessage', request),
+    cancelActiveTurn: (request?: ConversationCancelActiveTurnRequest): Promise<ConversationCancelActiveTurnResult> =>
+      ipcRenderer.invoke('conversation:cancelActiveTurn', request),
     getHistory: (sessionId: string): Promise<{ messages: ConversationMessage[] }> => ipcRenderer.invoke('conversation:getHistory', sessionId),
     onEvent: (callback: (event: ConversationStreamEvent) => void): void => {
       registerTrackedListener('conversation:event', (payload) => callback(payload as ConversationStreamEvent));
@@ -132,6 +137,7 @@ const electronAPI = {
 
   tool: {
     getCatalog: (): Promise<unknown> => ipcRenderer.invoke('tool:getCatalog'),
+    getRuntimeSummary: (): Promise<unknown> => ipcRenderer.invoke('tool:getRuntimeSummary'),
     execute: (toolName: string, args: unknown): Promise<unknown> => ipcRenderer.invoke('tool:execute', toolName, args),
   },
 
@@ -199,6 +205,10 @@ const electronAPI = {
       import: (sessionId: string, filePaths: string[]): Promise<{ success: boolean; attachments: SessionAttachmentRecord[]; error?: string }> =>
         ipcRenderer.invoke('session:attachments:import', sessionId, filePaths),
     },
+    outputs: {
+      list: (sessionId: string, runId?: string): Promise<{ outputs: SessionOutputRecord[] }> =>
+        ipcRenderer.invoke('session:outputs:list', sessionId, runId),
+    },
   },
 
   run: {
@@ -237,6 +247,9 @@ const electronAPI = {
 
   context: {
     get: (): Promise<unknown> => ipcRenderer.invoke('context:get'),
+    openHumanPreview: (request?: { sessionId?: string }): Promise<unknown> =>
+      ipcRenderer.invoke('context:openHumanPreview', request),
+    closeHumanPreview: (): Promise<unknown> => ipcRenderer.invoke('context:closeHumanPreview'),
   },
 
   events: {

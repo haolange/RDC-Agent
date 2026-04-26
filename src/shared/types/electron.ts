@@ -9,6 +9,8 @@ import type {
 import type { AgentConfig, AgentRole, AgentState } from './agent';
 import type { ActionEvent, EventType } from './evidence';
 import type {
+  ConversationCancelActiveTurnRequest,
+  ConversationCancelActiveTurnResult,
   ConversationMessage,
   ConversationSendRequest,
   ConversationStreamEvent,
@@ -33,10 +35,11 @@ import type {
   RunContextUsageSummary,
   RunSummary,
   SessionAttachmentRecord,
+  SessionOutputRecord,
   SessionRecord,
 } from './session';
 import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from './terminal';
-import type { ToolCallResult, ToolCatalog } from './tool';
+import type { ToolCallResult, ToolCatalog, ToolRuntimeSummary } from './tool';
 
 export interface ElectronAPI {
   platform: NodeJS.Platform;
@@ -66,6 +69,7 @@ export interface ElectronAPI {
 
   conversation: {
     sendMessage: (request: ConversationSendRequest) => Promise<ConversationTurnResult>;
+    cancelActiveTurn: (request?: ConversationCancelActiveTurnRequest) => Promise<ConversationCancelActiveTurnResult>;
     getHistory: (sessionId: string) => Promise<{
       messages: ConversationMessage[];
     }>;
@@ -171,6 +175,7 @@ export interface ElectronAPI {
 
   tool: {
     getCatalog: () => Promise<ToolCatalog>;
+    getRuntimeSummary: () => Promise<ToolRuntimeSummary>;
     execute: (toolName: string, args: Record<string, unknown>) => Promise<ToolCallResult>;
   };
 
@@ -278,6 +283,11 @@ export interface ElectronAPI {
         error?: string;
       }>;
     };
+    outputs: {
+      list: (sessionId: string, runId?: string) => Promise<{
+        outputs: SessionOutputRecord[];
+      }>;
+    };
   };
 
   run: {
@@ -321,6 +331,16 @@ export interface ElectronAPI {
 
   context: {
     get: () => Promise<ContextSnapshot>;
+    openHumanPreview: (request?: { sessionId?: string }) => Promise<{
+      success: boolean;
+      contextSnapshot?: ContextSnapshot;
+      error?: string;
+    }>;
+    closeHumanPreview: () => Promise<{
+      success: boolean;
+      contextSnapshot?: ContextSnapshot;
+      error?: string;
+    }>;
   };
 
   events: {

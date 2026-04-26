@@ -5,6 +5,7 @@
 import type { ReplayDeviceEntry } from './device';
 import type { AppMode, CaptureDescriptor } from './session';
 import type { AgentRole } from './agent';
+import type { HarnessTask } from './harness';
 
 // Debugger 工作流阶段（生产级单一路径）
 export type WorkflowStage =
@@ -164,6 +165,7 @@ export interface WorkflowState {
   planReadiness?: PlanReadiness;
   approvalState?: PlanApprovalState;
   debugPlan?: DebugPlan | null;
+  harnessTasks?: HarnessTask[];
   pendingQuestions?: AskUserPrompt | null;
   reasoningSummaries?: ReasoningSummary[];
   recoveryState?: RunRecoveryState | null;

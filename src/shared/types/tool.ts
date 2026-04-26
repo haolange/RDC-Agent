@@ -92,14 +92,47 @@ export interface ToolArtifact {
 // 工具目录
 export interface ToolCatalog {
   schema_version: string;
+  source_path?: string;
+  tool_count?: number;
+  generated_at?: string;
   tools: ToolDefinition[];
   namespaces: Record<ToolNamespace, {
     description: string;
     groups: string[];
   }>;
+  runtime?: ToolRuntimeMetadata;
+}
+
+export type ToolRuntimeSource = 'external' | 'bundled';
+
+export interface ToolRuntimeMetadata {
+  source: ToolRuntimeSource;
+  toolsRoot: string;
+  version: string | null;
+  catalog: {
+    path: string;
+    exists: boolean;
+    schemaVersion: string | null;
+    generatedAt: string | null;
+    toolCount: number | null;
+  };
 }
 
 // CLI执行结果
+export interface ToolRuntimeSummary {
+  runtime: ToolRuntimeMetadata;
+  cli: {
+    available: boolean;
+    unavailableReason?: string;
+  };
+  namespaces: Array<{
+    namespace: string;
+    toolCount: number;
+    available: boolean;
+  }>;
+  recommendedSpecialists: string[];
+}
+
 export interface CLIResult {
   exitCode: number;
   stdout: string;

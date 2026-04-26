@@ -56,6 +56,22 @@ export interface SessionAttachmentRecord {
   createdAt: number;
 }
 
+export type SessionOutputKind = 'attachment' | 'artifact' | 'report' | 'action_artifact';
+
+export interface SessionOutputRecord {
+  id: string;
+  kind: SessionOutputKind;
+  title: string;
+  fileName: string;
+  filePath: string;
+  source: string;
+  runId?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
 export interface RunReportPaths {
   reportsDir: string;
   markdownPath?: string;
@@ -157,6 +173,14 @@ export interface RunContextUsageSummary {
   hasConfiguredContextWindow: boolean;
 }
 
+export interface HumanPreviewSnapshot {
+  status: 'unavailable' | 'closed' | 'opening' | 'open' | 'error';
+  sessionId?: string;
+  boundEventId?: number;
+  lastError?: string;
+  updatedAt: number;
+}
+
 export interface ContextSnapshot {
   contextId: string;
   sessionId: string;
@@ -167,6 +191,7 @@ export interface ContextSnapshot {
   captureDescriptors: CaptureDescriptor[];
   activeCapture: string;
   deviceLabel: string;
+  humanPreview?: HumanPreviewSnapshot;
 }
 
 export interface OpenedCapturePreview {
