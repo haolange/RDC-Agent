@@ -1,4 +1,5 @@
 import React from 'react';
+import type { HarnessTask } from '@shared/types/harness';
 import type { ReasoningSummary, WorkflowStage, WorkflowState } from '@shared/types/workflow';
 import type { RunSummary } from '@shared/types/session';
 import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
@@ -51,6 +52,97 @@ export interface SessionProgressSnapshot {
     status: 'completed' | 'active' | 'pending';
   }>;
 }
+
+type TaskMonitorStatus = 'completed' | 'active' | 'pending' | 'blocked' | 'cancelled';
+
+interface TaskMonitorItem {
+  id: string;
+  title: string;
+  detail?: string;
+  meta?: string;
+  status: TaskMonitorStatus;
+}
+
+const mapTaskStatus = (task: HarnessTask): TaskMonitorStatus => {
+  if (task.status === 'completed') return 'completed';
+  if (task.status === 'in_progress') return 'active';
+  if (task.status === 'blocked' || task.status === 'rejected') return 'blocked';
+  if (task.status === 'cancelled') return 'cancelled';
+  return 'pending';
+};
+
+const buildTaskMonitorItems = (
+  currentRun: RunSummary | null,
+  workflowState: WorkflowState | null,
+  reasoningSummaries: ReasoningSummary[],
+): TaskMonitorItem[] => {
+  const debugPlan = workflowState?.debugPlan ?? null;
+  const harnessTasks = workflowState?.harnessTasks ?? [];
+  const items: TaskMonitorItem[] = harnessTasks.map((task) => ({
+    id: task.taskId,
+    title: task.title,
+    detail: task.acceptanceCriteria[0] ?? task.objective,
+    meta: `${task.evidenceRefs.length} evidence · ${task.userApproval}`,
+    status: mapTaskStatus(task),
+  }));
+
+  if (items.length === 0 && debugPlan?.expectedDeliverables.length) {
+    debugPlan.expectedDeliverables.forEach((deliverable, index) => {
+      items.push({
+        id: `deliverable-${index}`,
+        title: deliverable,
+        detail: index === 0 ? debugPlan.scope : undefined,
+        meta: debugPlan.recommendedSpecialists.length > 0
+          ? debugPlan.recommendedSpecialists.join(' · ')
+          : undefined,
+        status: currentRun?.status === 'completed'
+          ? 'completed'
+          : currentRun && ACTIVE_RUN_STATUSES.includes(currentRun.status) && index === 0
+            ? 'active'
+            : 'pending',
+      });
+    });
+  }
+
+  if (items.length === 0 && currentRun) {
+    items.push({
+      id: `run-${currentRun.runId}`,
+      title: STAGE_LABELS[(currentRun.lastStage as WorkflowStage) || 'preflight'] ?? currentRun.lastStage,
+      detail: currentRun.goal,
+      meta: currentRun.status,
+      status: currentRun.status === 'completed'
+        ? 'completed'
+        : currentRun.status === 'cancelled'
+          ? 'cancelled'
+          : ACTIVE_RUN_STATUSES.includes(currentRun.status)
+            ? 'active'
+            : 'pending',
+    });
+  }
+
+  for (const blocker of workflowState?.blockers ?? []) {
+    items.push({
+      id: `blocker-${blocker.code}-${items.length}`,
+      title: blocker.code,
+      detail: blocker.reason,
+      meta: blocker.refs.join(' · '),
+      status: 'blocked',
+    });
+  }
+
+  const latestReasoning = reasoningSummaries[reasoningSummaries.length - 1];
+  if (latestReasoning && items.length > 0) {
+    items.push({
+      id: `reasoning-${latestReasoning.summaryId}`,
+      title: AGENT_DISPLAY_NAMES[latestReasoning.agentId] || latestReasoning.agentId,
+      detail: latestReasoning.summary,
+      meta: STAGE_LABELS[latestReasoning.stage] ?? latestReasoning.stage,
+      status: currentRun && ACTIVE_RUN_STATUSES.includes(currentRun.status) ? 'active' : 'completed',
+    });
+  }
+
+  return items.slice(0, 12);
+};
 
 export const getSessionProgressSnapshot = (
   currentRun: RunSummary | null,
@@ -106,6 +198,7 @@ export const SessionProgressPanel: React.FC = () => {
   const workflowState = useSessionStore((state) => state.workflowState);
   const reasoningSummaries = useSessionStore((state) => state.reasoningSummaries);
   const snapshot = getSessionProgressSnapshot(currentRun, workflowState, reasoningSummaries, t);
+  const taskItems = buildTaskMonitorItems(currentRun, workflowState, reasoningSummaries);
 
   return (
     <div className="session-progress-panel" data-testid="session-progress-panel">
@@ -121,60 +214,28 @@ export const SessionProgressPanel: React.FC = () => {
           <div className="session-progress-idle-copy">{t('control.sessionProgressIdleCompact')}</div>
         </div>
       ) : (
-        <>
-          <div className="session-progress-hero">
-            <div className="session-progress-hero-copy">
-              <span className="session-progress-kicker">{t('control.sessionProgressStatus')}</span>
-              <strong className="session-progress-headline">{snapshot.statusLabel}</strong>
-              <span className="session-progress-description">
-                {snapshot.isActive ? t('control.sessionProgressActiveHint') : t('control.sessionProgressIdleHint')}
-              </span>
-            </div>
-            <div className="session-progress-meter" aria-label={`${snapshot.progress}%`}>
-              <span>{snapshot.progress}%</span>
-            </div>
+        <div className="session-task-monitor" data-testid="session-task-monitor">
+          <div className="session-task-monitor-summary">
+            <span className={`session-task-monitor-dot ${snapshot.blockerCount > 0 ? 'blocked' : snapshot.isActive ? 'active' : ''}`} />
+            <span className="session-task-monitor-title">{snapshot.statusLabel}</span>
+            <span className="session-task-monitor-meta">{snapshot.progress}%</span>
           </div>
-
-          <div className="session-progress-stage-strip">
-            {snapshot.stages.map((stage) => (
-              <div key={stage.id} className={`session-progress-stage ${stage.status}`}>
-                <span className="session-progress-stage-dot" />
-                <span className="session-progress-stage-label">{stage.label}</span>
+          <div className="session-task-monitor-list">
+            {taskItems.map((item) => (
+              <div key={item.id} className={`session-task-monitor-item ${item.status}`}>
+                <span className="session-task-monitor-marker" aria-hidden="true" />
+                <span className="session-task-monitor-copy">
+                  <span className="session-task-monitor-item-title">{item.title}</span>
+                  {item.detail ? <span className="session-task-monitor-item-detail">{item.detail}</span> : null}
+                  {item.meta ? <span className="session-task-monitor-item-meta">{item.meta}</span> : null}
+                </span>
               </div>
             ))}
           </div>
-
-          <div className="session-progress-facts">
-            <div className="session-progress-fact">
-              <span className="session-progress-fact-label">{t('control.sessionProgressCurrentStage')}</span>
-              <span className="session-progress-fact-value">{snapshot.currentStageLabel}</span>
-            </div>
-            <div className="session-progress-fact">
-              <span className="session-progress-fact-label">{t('control.sessionProgressBlockers')}</span>
-              <span className={`session-progress-fact-value ${snapshot.blockerCount > 0 ? 'warning' : ''}`}>
-                {snapshot.blockerCount}
-              </span>
-            </div>
-          </div>
-
-          {snapshot.recentReasoning.length > 0 ? (
-            <div className="session-progress-updates">
-              <div className="session-progress-updates-title">{t('control.sessionProgressRecentUpdates')}</div>
-              <div className="session-progress-update-list">
-                {snapshot.recentReasoning.map((summary) => (
-                  <div key={summary.summaryId} className="session-progress-update">
-                    <span className="session-progress-update-agent">
-                      {AGENT_DISPLAY_NAMES[summary.agentId] || summary.agentId}
-                    </span>
-                    <span className="session-progress-update-copy">{summary.summary}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
+          {taskItems.length === 0 ? (
             <div className="session-progress-empty">{t('control.sessionProgressNoUpdates')}</div>
-          )}
-        </>
+          ) : null}
+        </div>
       )}
     </div>
   );

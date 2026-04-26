@@ -3,6 +3,8 @@ import path from 'path';
 import { BrowserWindow } from 'electron';
 import type {
   ConversationAttachmentInput,
+  ConversationCancelActiveTurnRequest,
+  ConversationCancelActiveTurnResult,
   ConversationControl,
   ConversationMessage,
   ConversationReasoningStep,
@@ -40,6 +42,14 @@ interface ResolvedConversationContext {
   projectInputs: ProjectInputRecord[];
   openedCapturePath: string | null;
   replayDevice: ReplayDeviceEntry | null;
+}
+
+interface ActiveConversationTurn {
+  turnId: string;
+  sessionId: string | null;
+  startedAt: number;
+  abortController: AbortController;
+  stop: () => void;
 }
 
 const EXECUTE_PATTERN = /开始|启动|执行|正式分析|直接分析|现在分析|run\b|start\b|debug\b|analy[sz]e\b|帮我调试|请调试|开始调试|开始分析/i;
@@ -407,8 +417,40 @@ function computeVisibleAssistantText(raw: string): string {
 }
 
 export class ConversationService {
+  private activeTurns = new Map<string, ActiveConversationTurn>();
+
   async getHistory(sessionId: string): Promise<ConversationMessage[]> {
     return storageAdapter.readConversationHistory(sessionId);
+  }
+
+  async cancelActiveTurn(
+    request: ConversationCancelActiveTurnRequest = {},
+  ): Promise<ConversationCancelActiveTurnResult> {
+    const candidates = Array.from(this.activeTurns.values())
+      .filter((turn) => !request.turnId || turn.turnId === request.turnId)
+      .filter((turn) => !request.sessionId || turn.sessionId === request.sessionId)
+      .sort((left, right) => right.startedAt - left.startedAt);
+    const target = candidates[0];
+    if (!target) {
+      return { success: false, error: 'No active conversation turn.' };
+    }
+
+    target.stop();
+    return {
+      success: true,
+      cancelledTurnId: target.turnId,
+    };
+  }
+
+  private registerActiveTurn(turn: ActiveConversationTurn): void {
+    this.activeTurns.set(turn.turnId, turn);
+  }
+
+  private clearActiveTurn(turnId: string, controller: AbortController): void {
+    const active = this.activeTurns.get(turnId);
+    if (active?.abortController === controller) {
+      this.activeTurns.delete(turnId);
+    }
   }
 
   async sendMessage(input: ConversationContextInput): Promise<ConversationTurnResult> {
@@ -507,8 +549,12 @@ export class ConversationService {
   }) {
     let assistantMessage = input.assistantDraftMessage;
     const sessionId = input.context.session?.sessionId ?? null;
+    const abortController = new AbortController();
 
     const commitAssistantMessage = (type: ConversationStreamEvent['type'], patch: Partial<ConversationMessage>) => {
+      if (abortController.signal.aborted && patch.status !== 'stopped') {
+        return;
+      }
       assistantMessage = {
         ...assistantMessage,
         ...patch,
@@ -522,6 +568,35 @@ export class ConversationService {
         message: assistantMessage,
       } as ConversationStreamEvent);
     };
+
+    const commitStoppedMessage = () => {
+      commitAssistantMessage('message_completed', {
+        status: 'stopped',
+        content: assistantMessage.content || '当前请求已停止。',
+        reasoningTrace: finalizeTrace(
+          upsertTraceStep(assistantMessage.reasoningTrace, 'active-debug-reply', {
+            status: 'complete',
+            summary: '用户已停止当前请求。',
+            completedAt: nowMs(),
+          }),
+          'stopped',
+          '请求已停止',
+        ),
+      });
+    };
+
+    this.registerActiveTurn({
+      turnId: assistantMessage.turnId,
+      sessionId,
+      startedAt: nowMs(),
+      abortController,
+      stop: () => {
+        if (!abortController.signal.aborted) {
+          abortController.abort();
+          commitStoppedMessage();
+        }
+      },
+    });
 
     commitAssistantMessage('message_patched', {
       reasoningTrace: upsertTraceStep(
@@ -554,6 +629,7 @@ export class ConversationService {
               content: `${assistantMessage.content}${chunk}`,
             });
           },
+          signal: abortController.signal,
         },
       );
 
@@ -595,6 +671,8 @@ export class ConversationService {
           '回复生成失败',
         ),
       });
+    } finally {
+      this.clearActiveTurn(assistantMessage.turnId, abortController);
     }
   }
 
@@ -675,8 +753,12 @@ export class ConversationService {
   }) {
     let assistantMessage = input.assistantDraftMessage;
     const sessionId = input.context.session?.sessionId ?? null;
+    const abortController = new AbortController();
 
     const commitAssistantMessage = (type: ConversationStreamEvent['type'], patch: Partial<ConversationMessage>) => {
+      if (abortController.signal.aborted && patch.status !== 'stopped') {
+        return;
+      }
       assistantMessage = {
         ...assistantMessage,
         ...patch,
@@ -691,17 +773,50 @@ export class ConversationService {
       } as ConversationStreamEvent);
     };
 
-    let followupContent = '';
+    const commitStoppedMessage = () => {
+      commitAssistantMessage('message_completed', {
+        status: 'stopped',
+        content: assistantMessage.content || '当前请求已停止。',
+        reasoningTrace: finalizeTrace(
+          upsertTraceStep(assistantMessage.reasoningTrace, 'cowork-reply', {
+            status: 'complete',
+            summary: '用户已停止当前请求。',
+            completedAt: nowMs(),
+          }),
+          'stopped',
+          '请求已停止',
+        ),
+      });
+    };
 
-    const appendAssistantText = (text: string) => {
+    this.registerActiveTurn({
+      turnId: assistantMessage.turnId,
+      sessionId,
+      startedAt: nowMs(),
+      abortController,
+      stop: () => {
+        if (!abortController.signal.aborted) {
+          abortController.abort();
+          commitStoppedMessage();
+        }
+      },
+    });
+
+    let systemAppendix = '';
+
+    const commitVisibleAssistantText = () => {
+      commitAssistantMessage('message_patched', {
+        status: 'streaming',
+        content: `${visibleResponse}${systemAppendix}`,
+      });
+    };
+
+    const appendSystemAppendix = (text: string) => {
       if (!text) {
         return;
       }
-      followupContent += text;
-      commitAssistantMessage('message_patched', {
-        status: 'streaming',
-        content: `${assistantMessage.content}${text}`,
-      });
+      systemAppendix += text;
+      commitVisibleAssistantText();
     };
 
     commitAssistantMessage('message_patched', {
@@ -744,13 +859,13 @@ export class ConversationService {
           systemPrompt: buildCoworkSystemPrompt(),
           maxTokens: 1200,
           temperature: 0.35,
+          signal: abortController.signal,
           onChunk: (chunk) => {
             rawResponse += chunk;
             const nextVisible = computeVisibleAssistantText(rawResponse);
             if (nextVisible.length > visibleResponse.length) {
-              const delta = nextVisible.slice(visibleResponse.length);
               visibleResponse = nextVisible;
-              appendAssistantText(delta);
+              commitVisibleAssistantText();
             }
           },
         },
@@ -768,24 +883,33 @@ export class ConversationService {
       };
       rawResponse = fallbackReply;
       visibleResponse = fallbackReply;
-      commitAssistantMessage('message_patched', {
-        content: fallbackReply,
-      });
+      commitVisibleAssistantText();
+    }
+
+    if (abortController.signal.aborted) {
+      this.clearActiveTurn(assistantMessage.turnId, abortController);
+      return;
     }
 
     const assistantContent = stripControlBlock(rawResponse);
+    visibleResponse = assistantContent;
     const control = parseControlBlock(rawResponse);
     let finalStatus: ConversationMessage['status'] = errorViewModel ? 'error' : 'complete';
     let traceStatus: ConversationReasoningTrace['status'] = errorViewModel ? 'error' : 'complete';
 
     commitAssistantMessage('message_patched', {
-      content: assistantContent,
+      content: `${visibleResponse}${systemAppendix}`,
       reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, 'cowork-route', {
         status: 'complete',
         summary: '上下文检查完成。',
         completedAt: nowMs(),
       }),
     });
+
+    if (abortController.signal.aborted) {
+      this.clearActiveTurn(assistantMessage.turnId, abortController);
+      return;
+    }
 
     const effectiveMessage = resolveTaskFileContext(input.rawMessage).effectiveMessage;
     if (!input.context.projectId && EXECUTE_PATTERN.test(effectiveMessage)) {
@@ -813,6 +937,7 @@ export class ConversationService {
           '等待选择项目',
         ),
       });
+      this.clearActiveTurn(assistantMessage.turnId, abortController);
       return;
     }
 
@@ -828,14 +953,18 @@ export class ConversationService {
       });
 
       if (!input.context.projectId) {
-        appendAssistantText(`\n\n我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。`);
+        appendSystemAppendix(`\n\n我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。`);
       } else {
         const captureGuard = resolveCaptureGuards(effectiveMessage, input.context);
         if (!captureGuard.ready) {
-          appendAssistantText(`\n\n${captureGuard.reason || '当前还不能进入正式分析。'}`);
+          appendSystemAppendix(`\n\n${captureGuard.reason || '当前还不能进入正式分析。'}`);
         } else if (!hasUsableDebuggerRoute()) {
-          appendAssistantText('\n\n当前调试链路还没绑定可用模型，所以我不能开始正式执行；不过我可以先帮你确认问题范围和所需 capture。');
+          appendSystemAppendix('\n\n当前调试链路还没绑定可用模型，所以我不能开始正式执行；不过我可以先帮你确认问题范围和所需 capture。');
         } else {
+          if (abortController.signal.aborted) {
+            this.clearActiveTurn(assistantMessage.turnId, abortController);
+            return;
+          }
           const workflowResult = await debugWorkflowService.startPlan({
             projectId: input.context.projectId,
             sessionId: input.context.session?.sessionId,
@@ -845,8 +974,13 @@ export class ConversationService {
             replayDevice: input.context.replayDevice,
           });
 
+          if (abortController.signal.aborted) {
+            this.clearActiveTurn(assistantMessage.turnId, abortController);
+            return;
+          }
+
           const upgradeReply = buildWorkflowUpgradeReply(workflowResult);
-          appendAssistantText(`\n\n${upgradeReply}`);
+          appendSystemAppendix(`\n\n${upgradeReply}`);
 
           if (workflowResult.runId) {
             commitAssistantMessage('message_patched', {
@@ -873,7 +1007,7 @@ export class ConversationService {
 
     commitAssistantMessage(finalStatus === 'error' ? 'message_errored' : 'message_completed', {
       status: finalStatus,
-      content: `${assistantContent}${followupContent}`,
+      content: `${assistantContent}${systemAppendix}`,
       reasoningTrace: finalizeTrace(
         upsertTraceStep(assistantMessage.reasoningTrace, 'cowork-reply', {
           status: errorViewModel ? 'error' : 'complete',
@@ -884,6 +1018,7 @@ export class ConversationService {
         finalStatus === 'error' ? '回复失败' : '回复已完成',
       ),
     });
+    this.clearActiveTurn(assistantMessage.turnId, abortController);
   }
 
   private persistConversationSnapshot(sessionId: string | null | undefined, message: ConversationMessage) {

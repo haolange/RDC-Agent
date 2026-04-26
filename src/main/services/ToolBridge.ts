@@ -7,7 +7,15 @@ import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { app } from 'electron';
-import type { ToolCallRequest, ToolCallResult, ToolCatalog, CLIResult, ToolTraceEntry } from '@shared/types/tool';
+import type {
+  ToolCallRequest,
+  ToolCallResult,
+  ToolCatalog,
+  ToolRuntimeSummary,
+  ToolRuntimeMetadata,
+  CLIResult,
+  ToolTraceEntry,
+} from '@shared/types/tool';
 import { nowMs, generateEventId } from '@shared/utils/id';
 
 interface WindowsLauncherSpec {
@@ -22,20 +30,44 @@ interface DirectCliSpec {
   runCliPath: string;
 }
 
+interface ToolRuntimeResolution {
+  source: ToolRuntimeMetadata['source'];
+  toolsRoot: string;
+  version: string | null;
+  catalogPath: string;
+}
+
 export class ToolBridge {
   private toolsPath: string;
+  private runtime: ToolRuntimeResolution;
   private catalog: ToolCatalog | null = null;
   private activeProcesses: Map<string, { process: ChildProcess; runId?: string }> = new Map();
   private traceListeners = new Set<(trace: ToolTraceEntry) => void>();
 
   constructor() {
-    this.toolsPath = this.resolveToolsPath();
+    this.runtime = this.resolveToolRuntime();
+    this.toolsPath = this.runtime.toolsRoot;
   }
 
-  private resolveToolsPath(): string {
+  private resolveToolRuntime(): ToolRuntimeResolution {
+    const externalRoot = !app.isPackaged ? process.env.RDX_TOOLS_ROOT?.trim() : undefined;
+    const toolsRoot = externalRoot
+      ? path.resolve(externalRoot)
+      : this.resolveBundledToolsRoot();
+
+    return {
+      source: externalRoot ? 'external' : 'bundled',
+      toolsRoot,
+      version: this.readRuntimeVersion(toolsRoot),
+      catalogPath: path.join(toolsRoot, 'spec', 'tool_catalog.json'),
+    };
+  }
+
+  private resolveBundledToolsRoot(): string {
     const appPath = app.getAppPath();
     const candidates = app.isPackaged
       ? [
+          path.join(process.resourcesPath, 'resources', 'tools'),
           path.join(process.resourcesPath, 'tools'),
         ]
       : [
@@ -56,6 +88,36 @@ export class ToolBridge {
     return path.resolve(candidates[0]);
   }
 
+  private readRuntimeVersion(toolsRoot: string): string | null {
+    const pyprojectPath = path.join(toolsRoot, 'pyproject.toml');
+    if (!fs.existsSync(pyprojectPath)) {
+      return null;
+    }
+
+    try {
+      const content = fs.readFileSync(pyprojectPath, 'utf-8');
+      const match = content.match(/^\s*version\s*=\s*"([^"]+)"/m);
+      return match?.[1] ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  private createRuntimeMetadata(catalog?: Partial<ToolCatalog>): ToolRuntimeMetadata {
+    return {
+      source: this.runtime.source,
+      toolsRoot: this.runtime.toolsRoot,
+      version: this.runtime.version,
+      catalog: {
+        path: this.runtime.catalogPath,
+        exists: fs.existsSync(this.runtime.catalogPath),
+        schemaVersion: catalog?.schema_version ?? null,
+        generatedAt: catalog?.generated_at ?? null,
+        toolCount: catalog?.tool_count ?? (Array.isArray(catalog?.tools) ? catalog.tools.length : null),
+      },
+    };
+  }
+
   /**
    * 获取工具目录路径
    */
@@ -70,11 +132,15 @@ export class ToolBridge {
     return path.join(this.toolsPath, 'rdx.bat');
   }
 
+  getRuntimeMetadata(): ToolRuntimeMetadata {
+    return this.createRuntimeMetadata(this.catalog ?? undefined);
+  }
+
   private resolveDirectCliSpec(): DirectCliSpec {
     const pythonPath = path.join(this.toolsPath, 'binaries', 'windows', 'x64', 'python', 'python.exe');
     const runCliPath = path.join(this.toolsPath, 'cli', 'run_cli.py');
     if (!fs.existsSync(pythonPath)) {
-      throw new Error(`Bundled python not found: ${pythonPath}`);
+      throw new Error(`RDX python runtime not found: ${pythonPath}`);
     }
     if (!fs.existsSync(runCliPath)) {
       throw new Error(`CLI launcher not found: ${runCliPath}`);
@@ -166,6 +232,19 @@ export class ToolBridge {
     }
   }
 
+  private getAvailabilityFailure(): string | undefined {
+    if (process.platform !== 'win32') {
+      return 'RDX CLI is available only through the bundled Windows launcher in this app.';
+    }
+
+    try {
+      this.resolveWindowsLauncher();
+      return undefined;
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+  }
+
   /**
    * 加载工具目录
    */
@@ -174,20 +253,59 @@ export class ToolBridge {
       return this.catalog;
     }
 
-    const catalogPath = path.join(this.toolsPath, 'spec', 'tool_catalog.json');
+    const catalogPath = this.runtime.catalogPath;
     if (!fs.existsSync(catalogPath)) {
       console.warn('[ToolBridge] Tool catalog not found, starting with empty RDC tool catalog: ' + catalogPath);
       this.catalog = {
         schema_version: '1',
         tools: [],
         namespaces: {} as ToolCatalog['namespaces'],
+        runtime: this.createRuntimeMetadata(),
       };
       return this.catalog;
     }
 
     const content = await fs.promises.readFile(catalogPath, 'utf-8');
-    this.catalog = JSON.parse(content);
+    const catalog = JSON.parse(content) as ToolCatalog;
+    this.catalog = {
+      ...catalog,
+      runtime: this.createRuntimeMetadata(catalog),
+    };
     return this.catalog!;
+  }
+
+  async getRuntimeSummary(): Promise<ToolRuntimeSummary> {
+    const catalog = await this.loadCatalog();
+    const namespaceCounts = new Map<string, number>();
+    for (const tool of catalog.tools ?? []) {
+      namespaceCounts.set(tool.namespace, (namespaceCounts.get(tool.namespace) ?? 0) + 1);
+    }
+
+    const namespaces = Object.keys(catalog.namespaces ?? {})
+      .sort()
+      .map((namespace) => ({
+        namespace: `rd.${namespace}.*`,
+        toolCount: namespaceCounts.get(namespace) ?? 0,
+        available: (namespaceCounts.get(namespace) ?? 0) > 0,
+      }));
+
+    return {
+      runtime: this.createRuntimeMetadata(catalog),
+      cli: {
+        available: this.isAvailable(),
+        unavailableReason: this.getAvailabilityFailure(),
+      },
+      namespaces,
+      recommendedSpecialists: [
+        'triage_agent',
+        'capture_repro_agent',
+        'pass_graph_pipeline_agent',
+        'pixel_forensics_agent',
+        'shader_ir_agent',
+        'skeptic_agent',
+        'curator_agent',
+      ],
+    };
   }
 
   /**

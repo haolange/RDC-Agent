@@ -1,5 +1,6 @@
 import type { AgentRole, AgentState } from '@shared/types/agent';
 import type {
+  ConversationCancelActiveTurnRequest,
   ConversationMessage,
   ConversationSendRequest,
   ConversationStreamEvent,
@@ -26,10 +27,11 @@ import type {
   RunContextUsageSummary,
   RunSummary,
   SessionAttachmentRecord,
+  SessionOutputRecord,
   SessionRecord,
 } from '@shared/types/session';
 import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
-import type { ToolCatalog, ToolNamespace } from '@shared/types/tool';
+import type { ToolCatalog, ToolNamespace, ToolRuntimeSummary } from '@shared/types/tool';
 import type {
   AskUserPrompt,
   DebugPlan,
@@ -260,6 +262,10 @@ const createContextSnapshot = (): ContextSnapshot => ({
   captureDescriptors: [createCaptureDescriptor('open')],
   activeCapture: previewInput.inputId,
   deviceLabel: previewDevice.label,
+  humanPreview: {
+    status: 'closed',
+    updatedAt: Date.now(),
+  },
 });
 
 const createDebugPlan = (): DebugPlan => ({
@@ -474,6 +480,7 @@ class BrowserElectronApiFallback {
 
     conversation: {
       sendMessage: async (request) => this.sendConversationMessage(request),
+      cancelActiveTurn: async (request?: ConversationCancelActiveTurnRequest) => this.cancelActiveTurn(request),
       getHistory: async (sessionId) => ({
         messages: this.conversations.get(sessionId) ?? [],
       }),
@@ -552,6 +559,7 @@ class BrowserElectronApiFallback {
 
     tool: {
       getCatalog: async () => this.createToolCatalog(),
+      getRuntimeSummary: async () => this.createToolRuntimeSummary(),
       execute: async (toolName, _args) => ({
         ok: true,
         data: { toolName, mode: 'browser-preview' },
@@ -615,14 +623,19 @@ class BrowserElectronApiFallback {
       rename: async (id, title) => this.renameSession(id, title),
       remove: async (id) => this.removeSession(id),
       select: async (id) => this.selectSession(id),
-      attachments: {
+    attachments: {
         list: async (sessionId) => ({ attachments: this.createAttachments(sessionId) }),
-        import: async (sessionId, filePaths) => ({
-          success: true,
-          attachments: filePaths.map((filePath) => this.createAttachment(sessionId, filePath)),
-        }),
-      },
+      import: async (sessionId, filePaths) => ({
+        success: true,
+        attachments: filePaths.map((filePath) => this.createAttachment(sessionId, filePath)),
+      }),
     },
+    outputs: {
+      list: async (sessionId, runId) => ({
+        outputs: this.createOutputs(sessionId, runId),
+      }),
+    },
+  },
 
     run: {
       list: async (sessionId) => ({ runs: this.runs.filter((run) => run.sessionId === sessionId) }),
@@ -661,6 +674,8 @@ class BrowserElectronApiFallback {
 
     context: {
       get: async () => this.contextSnapshot ?? createContextSnapshot(),
+      openHumanPreview: async (request) => this.openHumanPreview(request?.sessionId),
+      closeHumanPreview: async () => this.closeHumanPreview(),
     },
 
     events: {
@@ -955,6 +970,93 @@ class BrowserElectronApiFallback {
     ];
   }
 
+  private createOutputs(sessionId: string, runId?: string): SessionOutputRecord[] {
+    const run = this.runs.find((entry) => entry.runId === runId)
+      ?? this.runs.find((entry) => entry.sessionId === sessionId);
+    const now = Date.now();
+    return [
+      ...this.createAttachments(sessionId).map<SessionOutputRecord>((attachment) => ({
+        id: attachment.attachmentId,
+        kind: 'attachment',
+        title: attachment.fileName,
+        fileName: attachment.fileName,
+        filePath: attachment.filePath,
+        source: 'session attachment',
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.size,
+        createdAt: attachment.createdAt,
+        updatedAt: attachment.createdAt,
+      })),
+      ...(run ? [
+        {
+          id: `${run.runId}:report:markdown`,
+          kind: 'report' as const,
+          title: 'report.md',
+          fileName: 'report.md',
+          filePath: `H:\\rdx\\RDC-Agent\\.browser-preview\\sessions\\${sessionId}\\runs\\${run.runId}\\reports\\report.md`,
+          source: 'run report',
+          runId: run.runId,
+          mimeType: 'text/markdown',
+          sizeBytes: 4096,
+          createdAt: now - 1000 * 60 * 2,
+          updatedAt: now - 1000 * 60,
+        },
+        {
+          id: `${run.runId}:artifact:preview-frame`,
+          kind: 'artifact' as const,
+          title: 'preview-frame.png',
+          fileName: 'preview-frame.png',
+          filePath: `H:\\rdx\\RDC-Agent\\.browser-preview\\sessions\\${sessionId}\\runs\\${run.runId}\\artifacts\\preview-frame.png`,
+          source: 'artifact store',
+          runId: run.runId,
+          mimeType: 'image/png',
+          sizeBytes: 32768,
+          createdAt: now - 1000 * 60 * 3,
+          updatedAt: now - 1000 * 60 * 3,
+        },
+      ] : []),
+    ];
+  }
+
+  private async cancelActiveTurn(request?: ConversationCancelActiveTurnRequest) {
+    const sessionId = request?.sessionId ?? this.currentSessionId ?? previewSessions[0].sessionId;
+    const messages = this.conversations.get(sessionId) ?? [];
+    const index = [...messages]
+      .reverse()
+      .findIndex((message) => (
+        message.role === 'assistant'
+        && typeof message.status === 'string'
+        && ['draft', 'streaming'].includes(message.status)
+      ));
+    if (index < 0) {
+      return { success: false, error: 'No active conversation turn.' };
+    }
+    const actualIndex = messages.length - 1 - index;
+    const message = messages[actualIndex];
+    if (!message) {
+      return { success: false, error: 'No active conversation turn.' };
+    }
+    const stoppedMessage: ConversationMessage = {
+      ...message,
+      status: 'stopped',
+      content: message.content || '当前请求已停止。',
+      updatedAt: Date.now(),
+      reasoningTrace: message.reasoningTrace
+        ? { ...message.reasoningTrace, status: 'stopped', summary: '请求已停止。', updatedAt: Date.now() }
+        : undefined,
+    };
+    const nextMessages = [...messages];
+    nextMessages[actualIndex] = stoppedMessage;
+    this.conversations.set(sessionId, nextMessages);
+    this.emit('conversation:event', {
+      type: 'message_completed',
+      sessionId,
+      turnId: stoppedMessage.turnId,
+      message: stoppedMessage,
+    } satisfies ConversationStreamEvent);
+    return { success: true, cancelledTurnId: stoppedMessage.turnId };
+  }
+
   private async sendConversationMessage(request: ConversationSendRequest): Promise<ConversationTurnResult> {
     const session = this.sessions.find((entry) => entry.sessionId === request.sessionId)
       ?? this.sessions.find((entry) => entry.projectId === request.projectId)
@@ -1113,6 +1215,32 @@ class BrowserElectronApiFallback {
     };
   }
 
+  private createToolRuntimeSummary(): ToolRuntimeSummary {
+    return {
+      runtime: {
+        source: 'bundled',
+        toolsRoot: 'H:\\rdx\\RDC-Agent\\resources\\tools',
+        version: 'browser-preview',
+        catalog: {
+          path: 'H:\\rdx\\RDC-Agent\\resources\\tools\\catalog.json',
+          exists: true,
+          schemaVersion: 'browser-preview',
+          generatedAt: new Date(NOW).toISOString(),
+          toolCount: 24,
+        },
+      },
+      cli: {
+        available: true,
+      },
+      namespaces: [
+        { namespace: 'rd.event.*', toolCount: 4, available: true },
+        { namespace: 'rd.export.*', toolCount: 3, available: true },
+        { namespace: 'rd.session.*', toolCount: 5, available: true },
+      ],
+      recommendedSpecialists: ['triage_agent', 'pixel_forensics_agent', 'curator_agent'],
+    };
+  }
+
   private createActionEvents(): ActionEvent[] {
     return [
       {
@@ -1167,6 +1295,34 @@ class BrowserElectronApiFallback {
     return { success: true, tabs: this.terminalTabs };
   }
 
+  private async openHumanPreview(sessionId?: string) {
+    const contextSnapshot: ContextSnapshot = {
+      ...(this.contextSnapshot ?? createContextSnapshot()),
+      humanPreview: {
+        status: 'open',
+        sessionId: sessionId ?? this.contextSnapshot?.sessionId ?? this.workflowState.sessionId,
+        boundEventId: 6152,
+        updatedAt: Date.now(),
+      },
+    };
+    this.contextSnapshot = contextSnapshot;
+    this.emit('context:changed', contextSnapshot);
+    return { success: true, contextSnapshot };
+  }
+
+  private async closeHumanPreview() {
+    const contextSnapshot: ContextSnapshot = {
+      ...(this.contextSnapshot ?? createContextSnapshot()),
+      humanPreview: {
+        status: 'closed',
+        updatedAt: Date.now(),
+      },
+    };
+    this.contextSnapshot = contextSnapshot;
+    this.emit('context:changed', contextSnapshot);
+    return { success: true, contextSnapshot };
+  }
+
   private async openProjectInput(request: Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string }) {
     const project = this.projects.find((entry) => entry.projectId === request.projectId);
     const input = project?.inputs.find((entry) => entry.inputId === request.inputId);
@@ -1212,6 +1368,10 @@ class BrowserElectronApiFallback {
       ],
       activeCapture: input.inputId,
       deviceLabel: device.label,
+      humanPreview: this.contextSnapshot?.humanPreview ?? {
+        status: 'closed',
+        updatedAt: Date.now(),
+      },
     };
     this.openedCapture = openedCapture;
     this.contextSnapshot = contextSnapshot;

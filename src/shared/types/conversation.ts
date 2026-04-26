@@ -6,7 +6,7 @@ export type ConversationMode = 'talk' | 'intake' | 'active_debug' | 'execute_upg
 
 export type ConversationRole = 'user' | 'assistant' | 'system';
 
-export type ConversationMessageStatus = 'draft' | 'streaming' | 'complete' | 'error';
+export type ConversationMessageStatus = 'draft' | 'streaming' | 'complete' | 'error' | 'stopped';
 
 export type ConversationReasoningStepStatus = 'pending' | 'running' | 'complete' | 'error';
 
@@ -36,7 +36,7 @@ export interface ConversationReasoningStep {
 }
 
 export interface ConversationReasoningTrace {
-  status: 'idle' | 'running' | 'complete' | 'error';
+  status: 'idle' | 'running' | 'complete' | 'error' | 'stopped';
   summary?: string;
   steps: ConversationReasoningStep[];
   updatedAt: number;
@@ -103,6 +103,17 @@ export interface ConversationSendRequest {
   mode: AppMode;
   message: string;
   attachments?: ConversationAttachmentInput[];
+}
+
+export interface ConversationCancelActiveTurnRequest {
+  sessionId?: string;
+  turnId?: string;
+}
+
+export interface ConversationCancelActiveTurnResult {
+  success: boolean;
+  cancelledTurnId?: string;
+  error?: string;
 }
 
 export interface ConversationTurnResult {

@@ -8,6 +8,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { TerminalDrawer } from './components/TerminalDrawer';
 import { ModeGlyph } from './components/ModeGlyph';
 import { ProfileAvatar } from './components/ProfileAvatar';
+import { PlanIntakePanel } from './components/PlanIntakePanel';
 import { useLayoutStore } from './stores/layoutStore';
 import { useSessionStore, type RightRailTarget } from './stores/sessionStore';
 import { useDeviceStore } from './stores/deviceStore';
@@ -663,6 +664,7 @@ const App: React.FC = () => {
   const rightRailTarget = useSessionStore((state) => state.rightRailTarget);
   const currentRun = useSessionStore((state) => state.currentRun);
   const currentRunUsage = useSessionStore((state) => state.currentRunUsage);
+  const conversationMessages = useSessionStore((state) => state.conversationMessages);
   const currentMode = useLayoutStore((state) => state.currentMode);
   const leftSidebarCollapsed = useLayoutStore((state) => state.leftSidebarCollapsed);
   const rightPanelCollapsed = useLayoutStore((state) => state.rightPanelCollapsed);
@@ -691,6 +693,10 @@ const App: React.FC = () => {
   const avatarPath = settings.profile.avatarPath;
   const showWorkbenchShell = true;
   const hasActiveDebugRun = Boolean(currentRun && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status));
+  const hasActiveConversationTurn = conversationMessages.some(
+    (message) => message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming'),
+  );
+  const isComposerBusy = isPromptSending || hasActiveConversationTurn || hasActiveDebugRun;
   const rightRailMode: RightRailMode = !currentProject
     ? 'hidden'
     : rightRailTarget === 'session' && currentSession
@@ -1401,13 +1407,20 @@ const App: React.FC = () => {
     : (language === 'zh-CN'
       ? '附加图片、文件或 .rdc Capture'
       : 'Attach images, files, or .rdc captures');
-  const sendButtonLabel = hasActiveDebugRun
-    ? (language === 'zh-CN' ? '发送' : 'Send')
-    : (language === 'zh-CN' ? '开始' : 'Start');
-  const sendButtonDescription = language === 'zh-CN'
-    ? `${sendButtonLabel}${currentModeLabel}消息`
-    : `${sendButtonLabel} ${currentModeLabel} message`;
-  const stopButtonLabel = language === 'zh-CN' ? '停止' : 'Stop';
+  const sendButtonLabel = language === 'zh-CN' ? '发送' : 'Send';
+  const startButtonLabel = language === 'zh-CN' ? '开始' : 'Start';
+  const stopButtonLabel = hasActiveDebugRun
+    ? (language === 'zh-CN' ? '停止当前调试' : 'Stop current debug run')
+    : (language === 'zh-CN' ? '停止当前请求' : 'Stop current request');
+  const primaryButtonLabel = isComposerBusy ? stopButtonLabel : (hasActiveDebugRun ? sendButtonLabel : startButtonLabel);
+  const primaryButtonDescription = isComposerBusy
+    ? stopButtonLabel
+    : language === 'zh-CN'
+      ? `${primaryButtonLabel}${currentModeLabel}消息`
+      : `${primaryButtonLabel} ${currentModeLabel} message`;
+  const primaryButtonDisabled = isComposerBusy
+    ? currentRun?.status === 'stopping' && !hasActiveConversationTurn && !isPromptSending
+    : (!hasMessageContent && !hasPendingAttachments);
   const terminalAlertSeverity = terminalEntries.some((entry) => entry.severity === 'error')
     ? 'error'
     : terminalEntries.some((entry) => entry.severity === 'warning')
@@ -1467,17 +1480,39 @@ const App: React.FC = () => {
     setSettingsModalOpen(true);
   }, []);
 
-  const handleStopRun = useCallback(async () => {
+  const handlePrimaryStop = useCallback(async () => {
     const electronAPI = window.electronAPI;
-    if (!electronAPI || !currentRun) return;
+    if (!electronAPI) return;
 
     try {
-      await electronAPI.workflow.stop(currentRun.runId);
+      const stopPromises: Array<Promise<{ success: boolean; error?: string }>> = [
+        electronAPI.conversation.cancelActiveTurn({
+          sessionId: currentSession?.sessionId,
+        }),
+      ];
+
+      if (currentRun && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running'].includes(currentRun.status)) {
+        setCurrentRun({
+          ...currentRun,
+          status: 'stopping',
+        });
+        stopPromises.push(electronAPI.workflow.stop(currentRun.runId));
+      }
+
+      const results = await Promise.allSettled(stopPromises);
+      const failures = results
+        .map((result) => (result.status === 'fulfilled' ? result.value : { success: false, error: String(result.reason) }))
+        .filter((result) => !result.success);
+      setIsPromptSending(false);
+      if (failures.length > 0 && failures.some((failure) => failure.error && !failure.error.includes('No active conversation'))) {
+        showNotice(failures.find((failure) => failure.error)?.error ?? t('app.stopRunFailed'));
+        return;
+      }
       showNotice(t('app.stopRunSent'));
     } catch (error) {
       showNotice(error instanceof Error ? error.message : t('app.stopRunFailed'));
     }
-  }, [currentRun, showNotice, t]);
+  }, [currentRun, currentSession?.sessionId, setCurrentRun, showNotice, t]);
 
   const handleAttachmentSelect = useCallback(async () => {
     const electronAPI = window.electronAPI;
@@ -1536,7 +1571,7 @@ const App: React.FC = () => {
 
   const handlePromptSend = useCallback(async () => {
     const trimmed = promptValue.trim();
-    if ((!trimmed && pendingAttachments.length === 0) || isPromptSending) {
+    if ((!trimmed && pendingAttachments.length === 0) || isComposerBusy) {
       return;
     }
 
@@ -1648,8 +1683,7 @@ const App: React.FC = () => {
     currentMode,
     currentRun,
     currentSession,
-    hasActiveDebugRun,
-    isPromptSending,
+    isComposerBusy,
     pendingAttachments,
     promptValue,
     selectedDeviceEntry,
@@ -1873,6 +1907,7 @@ const App: React.FC = () => {
             </div>
             {showMainPromptBar && (
               <div className="main-input-bar">
+                <PlanIntakePanel />
                 <div
                   className="composer-shell"
                   style={{ ['--composer-mode-accent' as string]: currentModeConfig.accentColor }}
@@ -1920,7 +1955,7 @@ const App: React.FC = () => {
                         className="composer-attach-button"
                         data-testid="composer-attach-button"
                         onClick={() => void handleAttachmentSelect()}
-                        disabled={isPromptSending}
+                        disabled={isComposerBusy}
                         title={attachButtonLabel}
                         aria-label={attachButtonLabel}
                       >
@@ -1978,35 +2013,25 @@ const App: React.FC = () => {
                     </div>
                     <div className="composer-toolbar-group composer-toolbar-group-right">
                       <ContextUsageIndicator usage={hasActiveDebugRun ? currentRunUsage : null} language={language} />
-                      {hasActiveDebugRun && currentRun && (
-                        <button
-                          type="button"
-                          className="chat-send-button chat-stop-button"
-                          data-testid="debugger-stop-button"
-                          onClick={() => void handleStopRun()}
-                          disabled={currentRun.status === 'stopping'}
-                          aria-label={stopButtonLabel}
-                          title={stopButtonLabel}
-                        >
+                      <button
+                        type="button"
+                        className={`chat-send-button primary ${isComposerBusy ? 'is-stop' : ''}`}
+                        data-testid={isComposerBusy ? 'debugger-stop-button' : 'debugger-start-button'}
+                        onClick={() => void (isComposerBusy ? handlePrimaryStop() : handlePromptSend())}
+                        disabled={primaryButtonDisabled}
+                        aria-label={primaryButtonDescription}
+                        title={primaryButtonDescription}
+                      >
+                        {isComposerBusy ? (
                           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                             <rect x="6" y="6" width="12" height="12" rx="1" />
                           </svg>
-                          <span className="chat-send-button-label">{stopButtonLabel}</span>
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="chat-send-button primary"
-                        data-testid={hasActiveDebugRun ? 'debugger-send-button' : 'debugger-start-button'}
-                        onClick={() => void handlePromptSend()}
-                        disabled={(!hasMessageContent && !hasPendingAttachments) || isPromptSending}
-                        aria-label={sendButtonDescription}
-                        title={sendButtonDescription}
-                      >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <line x1="22" y1="2" x2="11" y2="13" />
-                          <polygon points="22 2 15 22 11 13 2 9 22 2" />
-                        </svg>
+                        ) : (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <line x1="22" y1="2" x2="11" y2="13" />
+                            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                          </svg>
+                        )}
                       </button>
                     </div>
                   </div>

@@ -62,6 +62,7 @@ const electronAPI = {
   },
   conversation: {
     sendMessage: (request) => electron.ipcRenderer.invoke("conversation:sendMessage", request),
+    cancelActiveTurn: (request) => electron.ipcRenderer.invoke("conversation:cancelActiveTurn", request),
     getHistory: (sessionId) => electron.ipcRenderer.invoke("conversation:getHistory", sessionId),
     onEvent: (callback) => {
       registerTrackedListener("conversation:event", (payload) => callback(payload));
@@ -97,6 +98,7 @@ const electronAPI = {
   },
   tool: {
     getCatalog: () => electron.ipcRenderer.invoke("tool:getCatalog"),
+    getRuntimeSummary: () => electron.ipcRenderer.invoke("tool:getRuntimeSummary"),
     execute: (toolName, args) => electron.ipcRenderer.invoke("tool:execute", toolName, args)
   },
   evidence: {
@@ -140,6 +142,9 @@ const electronAPI = {
     attachments: {
       list: (sessionId) => electron.ipcRenderer.invoke("session:attachments:list", sessionId),
       import: (sessionId, filePaths) => electron.ipcRenderer.invoke("session:attachments:import", sessionId, filePaths)
+    },
+    outputs: {
+      list: (sessionId, runId) => electron.ipcRenderer.invoke("session:outputs:list", sessionId, runId)
     }
   },
   run: {
@@ -164,7 +169,9 @@ const electronAPI = {
     clearOpenedState: () => electron.ipcRenderer.invoke("capture:clearOpenedState")
   },
   context: {
-    get: () => electron.ipcRenderer.invoke("context:get")
+    get: () => electron.ipcRenderer.invoke("context:get"),
+    openHumanPreview: (request) => electron.ipcRenderer.invoke("context:openHumanPreview", request),
+    closeHumanPreview: () => electron.ipcRenderer.invoke("context:closeHumanPreview")
   },
   events: {
     onWorkflowStateChanged: (callback) => registerTrackedListener("workflow:stateChanged", (state) => callback(state)),

@@ -81,15 +81,28 @@ function nowIso$2() {
 }
 class ToolBridge {
   toolsPath;
+  runtime;
   catalog = null;
   activeProcesses = /* @__PURE__ */ new Map();
   traceListeners = /* @__PURE__ */ new Set();
   constructor() {
-    this.toolsPath = this.resolveToolsPath();
+    this.runtime = this.resolveToolRuntime();
+    this.toolsPath = this.runtime.toolsRoot;
   }
-  resolveToolsPath() {
+  resolveToolRuntime() {
+    const externalRoot = !electron.app.isPackaged ? process.env.RDX_TOOLS_ROOT?.trim() : void 0;
+    const toolsRoot = externalRoot ? path__namespace.resolve(externalRoot) : this.resolveBundledToolsRoot();
+    return {
+      source: externalRoot ? "external" : "bundled",
+      toolsRoot,
+      version: this.readRuntimeVersion(toolsRoot),
+      catalogPath: path__namespace.join(toolsRoot, "spec", "tool_catalog.json")
+    };
+  }
+  resolveBundledToolsRoot() {
     const appPath = electron.app.getAppPath();
     const candidates = electron.app.isPackaged ? [
+      path__namespace.join(process.resourcesPath, "resources", "tools"),
       path__namespace.join(process.resourcesPath, "tools")
     ] : [
       path__namespace.join(appPath, "resources", "tools"),
@@ -106,6 +119,33 @@ class ToolBridge {
     }
     return path__namespace.resolve(candidates[0]);
   }
+  readRuntimeVersion(toolsRoot) {
+    const pyprojectPath = path__namespace.join(toolsRoot, "pyproject.toml");
+    if (!fs__namespace.existsSync(pyprojectPath)) {
+      return null;
+    }
+    try {
+      const content = fs__namespace.readFileSync(pyprojectPath, "utf-8");
+      const match = content.match(/^\s*version\s*=\s*"([^"]+)"/m);
+      return match?.[1] ?? null;
+    } catch {
+      return null;
+    }
+  }
+  createRuntimeMetadata(catalog) {
+    return {
+      source: this.runtime.source,
+      toolsRoot: this.runtime.toolsRoot,
+      version: this.runtime.version,
+      catalog: {
+        path: this.runtime.catalogPath,
+        exists: fs__namespace.existsSync(this.runtime.catalogPath),
+        schemaVersion: catalog?.schema_version ?? null,
+        generatedAt: catalog?.generated_at ?? null,
+        toolCount: catalog?.tool_count ?? (Array.isArray(catalog?.tools) ? catalog.tools.length : null)
+      }
+    };
+  }
   /**
    * 获取工具目录路径
    */
@@ -118,11 +158,14 @@ class ToolBridge {
   getRdxPath() {
     return path__namespace.join(this.toolsPath, "rdx.bat");
   }
+  getRuntimeMetadata() {
+    return this.createRuntimeMetadata(this.catalog ?? void 0);
+  }
   resolveDirectCliSpec() {
     const pythonPath = path__namespace.join(this.toolsPath, "binaries", "windows", "x64", "python", "python.exe");
     const runCliPath = path__namespace.join(this.toolsPath, "cli", "run_cli.py");
     if (!fs__namespace.existsSync(pythonPath)) {
-      throw new Error(`Bundled python not found: ${pythonPath}`);
+      throw new Error(`RDX python runtime not found: ${pythonPath}`);
     }
     if (!fs__namespace.existsSync(runCliPath)) {
       throw new Error(`CLI launcher not found: ${runCliPath}`);
@@ -201,6 +244,17 @@ class ToolBridge {
       return false;
     }
   }
+  getAvailabilityFailure() {
+    if (process.platform !== "win32") {
+      return "RDX CLI is available only through the bundled Windows launcher in this app.";
+    }
+    try {
+      this.resolveWindowsLauncher();
+      return void 0;
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+  }
   /**
    * 加载工具目录
    */
@@ -208,19 +262,53 @@ class ToolBridge {
     if (this.catalog) {
       return this.catalog;
     }
-    const catalogPath = path__namespace.join(this.toolsPath, "spec", "tool_catalog.json");
+    const catalogPath = this.runtime.catalogPath;
     if (!fs__namespace.existsSync(catalogPath)) {
       console.warn("[ToolBridge] Tool catalog not found, starting with empty RDC tool catalog: " + catalogPath);
       this.catalog = {
         schema_version: "1",
         tools: [],
-        namespaces: {}
+        namespaces: {},
+        runtime: this.createRuntimeMetadata()
       };
       return this.catalog;
     }
     const content = await fs__namespace.promises.readFile(catalogPath, "utf-8");
-    this.catalog = JSON.parse(content);
+    const catalog = JSON.parse(content);
+    this.catalog = {
+      ...catalog,
+      runtime: this.createRuntimeMetadata(catalog)
+    };
     return this.catalog;
+  }
+  async getRuntimeSummary() {
+    const catalog = await this.loadCatalog();
+    const namespaceCounts = /* @__PURE__ */ new Map();
+    for (const tool of catalog.tools ?? []) {
+      namespaceCounts.set(tool.namespace, (namespaceCounts.get(tool.namespace) ?? 0) + 1);
+    }
+    const namespaces = Object.keys(catalog.namespaces ?? {}).sort().map((namespace) => ({
+      namespace: `rd.${namespace}.*`,
+      toolCount: namespaceCounts.get(namespace) ?? 0,
+      available: (namespaceCounts.get(namespace) ?? 0) > 0
+    }));
+    return {
+      runtime: this.createRuntimeMetadata(catalog),
+      cli: {
+        available: this.isAvailable(),
+        unavailableReason: this.getAvailabilityFailure()
+      },
+      namespaces,
+      recommendedSpecialists: [
+        "triage_agent",
+        "capture_repro_agent",
+        "pass_graph_pipeline_agent",
+        "pixel_forensics_agent",
+        "shader_ir_agent",
+        "skeptic_agent",
+        "curator_agent"
+      ]
+    };
   }
   /**
    * 执行CLI命令（参数数组模式，避免命令字符串注入风险）
@@ -643,6 +731,21 @@ function appendJsonl(filePath, data) {
     return true;
   } catch (error) {
     console.error(`Failed to append to JSONL file: ${filePath}`, error);
+    return false;
+  }
+}
+function writeJsonl(filePath, items) {
+  try {
+    const dir = path__namespace.dirname(filePath);
+    if (!fs__namespace.existsSync(dir)) {
+      fs__namespace.mkdirSync(dir, { recursive: true });
+    }
+    const lines = items.map((item) => JSON.stringify(item, null, 0));
+    fs__namespace.writeFileSync(filePath, `${lines.join("\n")}
+`, "utf-8");
+    return true;
+  } catch (error) {
+    console.error(`Failed to write JSONL file: ${filePath}`, error);
     return false;
   }
 }
@@ -2140,6 +2243,126 @@ class StorageAdapter {
   }
 }
 const storageAdapter = new StorageAdapter();
+class RunScopedStore {
+  getRunRoot(sessionId, runId) {
+    return storageAdapter.getRunPath(sessionId, runId);
+  }
+  readJson(sessionId, runId, relativePath, fallback) {
+    const filePath = this.resolveRunPath(sessionId, runId, relativePath);
+    if (!fs__namespace.existsSync(filePath)) {
+      return fallback;
+    }
+    try {
+      return JSON.parse(fs__namespace.readFileSync(filePath, "utf-8"));
+    } catch (error) {
+      console.error(`[RunScopedStore] Failed to read ${filePath}`, error);
+      return fallback;
+    }
+  }
+  writeJson(sessionId, runId, relativePath, data) {
+    const filePath = this.resolveRunPath(sessionId, runId, relativePath);
+    fs__namespace.mkdirSync(path__namespace.dirname(filePath), { recursive: true });
+    fs__namespace.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+    return filePath;
+  }
+  readJsonl(sessionId, runId, relativePath) {
+    return readJsonl(this.resolveRunPath(sessionId, runId, relativePath));
+  }
+  writeJsonl(sessionId, runId, relativePath, items) {
+    const filePath = this.resolveRunPath(sessionId, runId, relativePath);
+    writeJsonl(filePath, items);
+    return filePath;
+  }
+  appendJsonl(sessionId, runId, relativePath, item) {
+    const items = this.readJsonl(sessionId, runId, relativePath);
+    items.push(item);
+    return this.writeJsonl(sessionId, runId, relativePath, items);
+  }
+  resolveRunPath(sessionId, runId, relativePath) {
+    const runRoot = this.getRunRoot(sessionId, runId);
+    const targetPath = path__namespace.resolve(runRoot, relativePath);
+    if (!this.isPathInside(runRoot, targetPath)) {
+      throw new Error(`Run-scoped write escaped run directory: ${relativePath}`);
+    }
+    return targetPath;
+  }
+  isPathInside(rootPath, targetPath) {
+    const relative = path__namespace.relative(path__namespace.resolve(rootPath), path__namespace.resolve(targetPath));
+    return relative === "" || !relative.startsWith("..") && !path__namespace.isAbsolute(relative);
+  }
+}
+const runScopedStore = new RunScopedStore();
+const STORE_PATH = "artifact_store.json";
+class ArtifactStore {
+  read(sessionId, runId) {
+    return runScopedStore.readJson(
+      sessionId,
+      runId,
+      STORE_PATH,
+      {
+        schemaVersion: "1",
+        runId,
+        sessionId,
+        artifacts: [],
+        updatedAt: nowIso$2()
+      }
+    );
+  }
+  list(sessionId, runId) {
+    return this.read(sessionId, runId).artifacts;
+  }
+  get(sessionId, runId, artifactId) {
+    return this.list(sessionId, runId).find((artifact) => artifact.artifactId === artifactId) ?? null;
+  }
+  register(sessionId, runId, record) {
+    this.assertRunBinding(sessionId, runId, record);
+    const scopedPath = this.resolveArtifactPath(sessionId, runId, record.filePath);
+    const stat = fs__namespace.existsSync(scopedPath) ? fs__namespace.statSync(scopedPath) : null;
+    const now = nowIso$2();
+    const nextRecord = {
+      ...record,
+      filePath: scopedPath,
+      sizeBytes: stat?.size ?? record.sizeBytes,
+      createdAt: record.createdAt || now,
+      updatedAt: now
+    };
+    const snapshot = this.read(sessionId, runId);
+    const existingIndex = snapshot.artifacts.findIndex((artifact) => artifact.artifactId === record.artifactId);
+    const artifacts = [...snapshot.artifacts];
+    if (existingIndex >= 0) {
+      artifacts[existingIndex] = {
+        ...artifacts[existingIndex],
+        ...nextRecord,
+        createdAt: artifacts[existingIndex].createdAt
+      };
+    } else {
+      artifacts.push(nextRecord);
+    }
+    this.write({
+      ...snapshot,
+      artifacts,
+      updatedAt: now
+    });
+    return existingIndex >= 0 ? artifacts[existingIndex] : nextRecord;
+  }
+  write(snapshot) {
+    runScopedStore.writeJson(snapshot.sessionId, snapshot.runId, STORE_PATH, snapshot);
+  }
+  resolveArtifactPath(sessionId, runId, filePath) {
+    const runRoot = runScopedStore.getRunRoot(sessionId, runId);
+    const resolvedPath = path__namespace.isAbsolute(filePath) ? path__namespace.resolve(filePath) : path__namespace.resolve(runRoot, "artifacts", filePath);
+    if (!runScopedStore.isPathInside(runRoot, resolvedPath)) {
+      throw new Error(`Artifact path escaped run directory: ${filePath}`);
+    }
+    return resolvedPath;
+  }
+  assertRunBinding(sessionId, runId, value) {
+    if (value.sessionId !== sessionId || value.runId !== runId) {
+      throw new Error(`Run binding mismatch for ${value.sessionId}/${value.runId}`);
+    }
+  }
+}
+const artifactStore = new ArtifactStore();
 const DEFAULT_MODEL_ROUTING = {
   "rdc-debugger": { provider: "openrouter", model: "anthropic/claude-3-opus" },
   "triage_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
@@ -6947,6 +7170,7 @@ class SpecialistRecipeRunner {
           context
         );
       }
+      await this.openHumanPreviewSafe(existingReplaySessionId);
       return {
         captureFileId: existingCapture?.captureFileId || existingCapture?.id || context.debugPlan.targetCapture?.captureId || "target_capture",
         replaySessionId: existingReplaySessionId
@@ -7000,6 +7224,7 @@ class SpecialistRecipeRunner {
         context
       );
     }
+    await this.openHumanPreviewSafe(replaySessionId);
     return {
       captureFileId: String(captureFileId),
       replaySessionId: String(replaySessionId)
@@ -7025,6 +7250,9 @@ class SpecialistRecipeRunner {
       return this.runDriverDevice(context);
     }
     throw new Error(`Unsupported specialist recipe: ${agentId}`);
+  }
+  async openHumanPreviewSafe(sessionId) {
+    await rdxSessionService.openHumanPreviewWindow({ sessionId }).catch(() => void 0);
   }
   async runTriage(context, surface) {
     const eventId = getActiveEventId(context.debugPlan);
@@ -7696,6 +7924,209 @@ class ReportBundleService {
   }
 }
 const reportBundleService = new ReportBundleService();
+const EVIDENCE_PATH = "evidence-ledger.jsonl";
+const VERIFICATION_PATH = "verification_results.jsonl";
+class EvidenceLedger {
+  appendEvidence(sessionId, runId, record) {
+    this.assertRunBinding(sessionId, runId, record);
+    const nextRecord = {
+      ...record,
+      createdAt: record.createdAt || nowIso$2()
+    };
+    runScopedStore.appendJsonl(sessionId, runId, EVIDENCE_PATH, nextRecord);
+    return nextRecord;
+  }
+  listEvidence(sessionId, runId) {
+    return runScopedStore.readJsonl(sessionId, runId, EVIDENCE_PATH);
+  }
+  findEvidence(sessionId, runId, evidenceId) {
+    return this.listEvidence(sessionId, runId).find((record) => record.evidenceId === evidenceId) ?? null;
+  }
+  appendVerificationResult(sessionId, runId, result) {
+    this.assertRunBinding(sessionId, runId, result);
+    const nextResult = {
+      ...result,
+      createdAt: result.createdAt || nowIso$2()
+    };
+    runScopedStore.appendJsonl(sessionId, runId, VERIFICATION_PATH, nextResult);
+    return nextResult;
+  }
+  listVerificationResults(sessionId, runId) {
+    return runScopedStore.readJsonl(sessionId, runId, VERIFICATION_PATH);
+  }
+  assertRunBinding(sessionId, runId, value) {
+    if (value.sessionId !== sessionId || value.runId !== runId) {
+      throw new Error(`Run binding mismatch for ${value.sessionId}/${value.runId}`);
+    }
+  }
+}
+const evidenceLedger = new EvidenceLedger();
+const BOARD_PATH = "task-board.json";
+class TaskBoard {
+  read(sessionId, runId) {
+    return runScopedStore.readJson(
+      sessionId,
+      runId,
+      BOARD_PATH,
+      {
+        schemaVersion: "1",
+        runId,
+        sessionId,
+        tasks: [],
+        mutations: [],
+        updatedAt: nowIso$2()
+      }
+    );
+  }
+  listTasks(sessionId, runId) {
+    return this.read(sessionId, runId).tasks;
+  }
+  getTask(sessionId, runId, taskId) {
+    return this.read(sessionId, runId).tasks.find((task) => task.taskId === taskId) ?? null;
+  }
+  upsertTask(sessionId, runId, task) {
+    this.assertRunBinding(sessionId, runId, task);
+    const snapshot = this.read(sessionId, runId);
+    const existingIndex = snapshot.tasks.findIndex((item) => item.taskId === task.taskId);
+    const nextTask = {
+      ...task,
+      updatedAt: nowIso$2()
+    };
+    const tasks = [...snapshot.tasks];
+    if (existingIndex >= 0) {
+      tasks[existingIndex] = {
+        ...tasks[existingIndex],
+        ...nextTask,
+        createdAt: tasks[existingIndex].createdAt
+      };
+    } else {
+      tasks.push(nextTask);
+    }
+    this.write({
+      ...snapshot,
+      tasks,
+      updatedAt: nowIso$2()
+    });
+    return existingIndex >= 0 ? tasks[existingIndex] : nextTask;
+  }
+  mutateTask(sessionId, runId, mutation) {
+    this.assertRunBinding(sessionId, runId, mutation);
+    const snapshot = this.read(sessionId, runId);
+    const task = snapshot.tasks.find((item) => item.taskId === mutation.taskId);
+    if (!task) {
+      throw new Error(`Harness task not found: ${mutation.taskId}`);
+    }
+    const updatedTask = {
+      ...task,
+      ...mutation.patch,
+      taskId: task.taskId,
+      runId,
+      sessionId,
+      createdAt: task.createdAt,
+      updatedAt: nowIso$2(),
+      completedAt: mutation.patch.status === "completed" ? nowIso$2() : mutation.patch.completedAt
+    };
+    this.write({
+      ...snapshot,
+      tasks: snapshot.tasks.map((item) => item.taskId === task.taskId ? updatedTask : item),
+      mutations: [
+        ...snapshot.mutations,
+        {
+          ...mutation,
+          mutationId: mutation.mutationId || generateEventId("task-mutation"),
+          reason: mutation.reason,
+          createdAt: mutation.createdAt || nowIso$2()
+        }
+      ],
+      updatedAt: nowIso$2()
+    });
+    return updatedTask;
+  }
+  write(snapshot) {
+    runScopedStore.writeJson(snapshot.sessionId, snapshot.runId, BOARD_PATH, snapshot);
+  }
+  assertRunBinding(sessionId, runId, value) {
+    if (value.sessionId !== sessionId || value.runId !== runId) {
+      throw new Error(`Run binding mismatch for ${value.sessionId}/${value.runId}`);
+    }
+  }
+}
+const taskBoard = new TaskBoard();
+const PLAN_PATH = "plan_contract.json";
+const CONTEXT_PACKETS_PATH = "context_packets.jsonl";
+const RESULT_CARDS_PATH = "agent_result_cards.jsonl";
+const CAPSULE_PATH = "run_capsule.json";
+class ContextService {
+  readPlanContract(sessionId, runId) {
+    return runScopedStore.readJson(sessionId, runId, PLAN_PATH, null);
+  }
+  writePlanContract(sessionId, runId, contract) {
+    this.assertRunBinding(sessionId, runId, contract);
+    const nextContract = {
+      ...contract,
+      updatedAt: nowIso$2()
+    };
+    runScopedStore.writeJson(sessionId, runId, PLAN_PATH, nextContract);
+    return nextContract;
+  }
+  appendContextPacket(sessionId, runId, packet) {
+    this.assertRunBinding(sessionId, runId, packet);
+    const nextPacket = {
+      ...packet,
+      packetId: packet.packetId || generateEventId("context-packet"),
+      createdAt: packet.createdAt || nowIso$2()
+    };
+    runScopedStore.appendJsonl(sessionId, runId, CONTEXT_PACKETS_PATH, nextPacket);
+    return nextPacket;
+  }
+  listContextPackets(sessionId, runId) {
+    return runScopedStore.readJsonl(sessionId, runId, CONTEXT_PACKETS_PATH);
+  }
+  appendAgentResultCard(sessionId, runId, card) {
+    this.assertRunBinding(sessionId, runId, card);
+    const now = nowIso$2();
+    const nextCard = {
+      ...card,
+      cardId: card.cardId || generateEventId("agent-result-card"),
+      createdAt: card.createdAt || now,
+      updatedAt: now
+    };
+    runScopedStore.appendJsonl(sessionId, runId, RESULT_CARDS_PATH, nextCard);
+    return nextCard;
+  }
+  listAgentResultCards(sessionId, runId) {
+    return runScopedStore.readJsonl(sessionId, runId, RESULT_CARDS_PATH);
+  }
+  buildRunCapsule(sessionId, runId) {
+    const now = nowIso$2();
+    return {
+      schemaVersion: "1",
+      capsuleId: generateEventId("run-capsule"),
+      runId,
+      sessionId,
+      planContract: this.readPlanContract(sessionId, runId) ?? void 0,
+      contextPackets: this.listContextPackets(sessionId, runId),
+      tasks: taskBoard.listTasks(sessionId, runId),
+      evidence: evidenceLedger.listEvidence(sessionId, runId),
+      artifacts: artifactStore.list(sessionId, runId),
+      verificationResults: evidenceLedger.listVerificationResults(sessionId, runId),
+      agentResultCards: this.listAgentResultCards(sessionId, runId),
+      createdAt: now,
+      updatedAt: now
+    };
+  }
+  writeRunCapsule(sessionId, runId) {
+    const capsule = this.buildRunCapsule(sessionId, runId);
+    runScopedStore.writeJson(sessionId, runId, CAPSULE_PATH, capsule);
+    return capsule;
+  }
+  assertRunBinding(sessionId, runId, value) {
+    if (value.sessionId !== sessionId || value.runId !== runId) {
+      throw new Error(`Run binding mismatch for ${value.sessionId}/${value.runId}`);
+    }
+  }
+}
+const contextService = new ContextService();
 function latestStageHistory(events) {
   return events.filter((event) => event.event_type === "workflow_stage_transition").map((event) => normalizeWorkflowStage(String(event.payload.toStage || "preflight")));
 }
@@ -7808,6 +8239,14 @@ class DebugWorkflowService {
         pending_questions: pendingQuestions,
         approval_state: approvalState,
         intake_context: resolved.intakeContext
+      });
+      this.seedHarnessPlan({
+        sessionId,
+        runId,
+        mode: request.mode,
+        captures: resolved.captures,
+        debugPlan,
+        pendingQuestions
       });
       await storageAdapter.updateRun(sessionId, runId, {
         status: blockers.length > 0 ? "failed" : pendingQuestions ? "awaiting_input" : "awaiting_approval",
@@ -8068,6 +8507,9 @@ class DebugWorkflowService {
       approval_state: "approved",
       pending_questions: null
     });
+    this.applyTaskMutation(location.session.sessionId, runId, "plan", "completed", "User approved the Debugger plan.");
+    this.applyTaskMutation(location.session.sessionId, runId, "speclist", "in_progress", "Task breakdown started after plan approval.");
+    contextService.writeRunCapsule(location.session.sessionId, runId);
     await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
       runId,
       sessionId: location.session.sessionId,
@@ -8240,6 +8682,7 @@ class DebugWorkflowService {
       planReadiness: snapshot?.debug_plan?.strictReady ? "ready_for_approval" : snapshot?.debug_plan?.planReadiness,
       approvalState: snapshot?.approval_state,
       debugPlan: snapshot?.debug_plan ?? null,
+      harnessTasks: taskBoard.listTasks(sessionId, run.runId),
       pendingQuestions: snapshot?.pending_questions ?? null,
       reasoningSummaries,
       recoveryState: run.status === "interrupted" ? {
@@ -8282,6 +8725,310 @@ class DebugWorkflowService {
         }
       }
     }
+  }
+  seedHarnessPlan(input) {
+    const now = nowIso$2();
+    const tasks = this.createHarnessTasks(input.sessionId, input.runId, input.debugPlan, now);
+    for (const task of tasks) {
+      taskBoard.upsertTask(input.sessionId, input.runId, task);
+    }
+    const planContract = {
+      schemaVersion: "1",
+      planId: input.debugPlan.planId,
+      runId: input.runId,
+      sessionId: input.sessionId,
+      mode: input.mode,
+      goal: input.debugPlan.userGoal,
+      status: input.pendingQuestions ? "blocked" : input.debugPlan.strictReady ? "ready" : input.debugPlan.blockers.length > 0 ? "blocked" : "pending",
+      captures: input.captures ?? [],
+      tasks,
+      verificationContract: {
+        contractId: `${input.debugPlan.planId}-verification`,
+        runId: input.runId,
+        sessionId: input.sessionId,
+        requiredMethods: this.getRequiredVerificationMethods(input.debugPlan),
+        targetRefs: [
+          input.debugPlan.targetCapture?.captureId,
+          input.debugPlan.targetCapture?.filePath,
+          input.debugPlan.targetFrameOrEvent?.eventLabel
+        ].filter((entry) => Boolean(entry)),
+        successCriteria: input.debugPlan.verificationContract.successCriteria,
+        evidenceRequirements: [
+          input.debugPlan.verificationContract.requiresScreenshotEvidence ? "screenshot" : "",
+          input.debugPlan.verificationContract.requiresShaderInspection ? "shader" : "",
+          input.debugPlan.verificationContract.requiresPixelEvidence ? "pixel" : "",
+          input.debugPlan.verificationContract.requiresBaselineComparison ? "baseline" : ""
+        ].filter(Boolean),
+        blockerCodes: input.debugPlan.blockers.map((blocker) => blocker.code),
+        createdAt: now,
+        updatedAt: now
+      },
+      questionRequests: input.pendingQuestions ? input.pendingQuestions.questions.map((question) => ({
+        questionId: question.id,
+        runId: input.runId,
+        sessionId: input.sessionId,
+        prompt: question.prompt,
+        reason: input.pendingQuestions.summary,
+        options: question.options.map((option) => ({
+          optionId: option.id,
+          label: option.label,
+          description: option.description
+        })),
+        allowFreeform: Boolean(question.freeformPlaceholder),
+        requestedBy: "harness",
+        createdAt: input.pendingQuestions.createdAt
+      })) : [],
+      questionAnswers: [],
+      revisions: [],
+      capabilityProfiles: [],
+      createdAt: now,
+      updatedAt: now
+    };
+    contextService.writePlanContract(input.sessionId, input.runId, planContract);
+    contextService.appendContextPacket(input.sessionId, input.runId, {
+      packetId: generateEventId("context-packet"),
+      runId: input.runId,
+      sessionId: input.sessionId,
+      kind: "plan",
+      source: "harness",
+      title: "Debugger plan contract",
+      summary: input.debugPlan.scope,
+      content: JSON.stringify({
+        goal: input.debugPlan.userGoal,
+        targetCapture: input.debugPlan.targetCapture,
+        targetFrameOrEvent: input.debugPlan.targetFrameOrEvent,
+        deliverables: input.debugPlan.expectedDeliverables
+      }),
+      refs: planContract.verificationContract.targetRefs,
+      taskIds: tasks.map((task) => task.taskId),
+      evidenceIds: [],
+      artifactIds: [],
+      createdAt: now
+    });
+    contextService.writeRunCapsule(input.sessionId, input.runId);
+    return planContract;
+  }
+  createHarnessTasks(sessionId, runId, debugPlan, createdAt) {
+    const base = {
+      runId,
+      sessionId,
+      priority: "normal",
+      dependsOn: [],
+      evidenceRefs: [],
+      artifactRefs: [],
+      blockerRefs: [],
+      source: "plan",
+      userApproval: "not_required",
+      createdAt,
+      updatedAt: createdAt
+    };
+    return [
+      {
+        ...base,
+        taskId: "plan",
+        title: "Plan",
+        intent: "context",
+        objective: debugPlan.scope,
+        status: debugPlan.blockers.length > 0 ? "blocked" : "pending",
+        owner: "rdc-debugger",
+        stage: "plan",
+        acceptanceCriteria: ["Target capture, scope, specialists, deliverables, and verification criteria are explicit."]
+      },
+      {
+        ...base,
+        taskId: "speclist",
+        title: "Task breakdown",
+        intent: "hypothesis",
+        objective: "Seed the Debugger task board from the approved plan.",
+        status: "pending",
+        owner: "rdc-debugger",
+        stage: "speclist",
+        dependsOn: ["plan"],
+        acceptanceCriteria: debugPlan.expectedDeliverables
+      },
+      {
+        ...base,
+        taskId: "dispatch",
+        title: "Specialist dispatch",
+        intent: "investigation",
+        objective: `Dispatch ${debugPlan.recommendedSpecialists.length || 1} Debugger investigation lane(s).`,
+        status: "pending",
+        owner: "rdc-debugger",
+        stage: "dispatch",
+        dependsOn: ["speclist"],
+        acceptanceCriteria: ["Every selected specialist returns an AgentResultCard with evidence references."]
+      },
+      {
+        ...base,
+        taskId: "investigate",
+        title: "Evidence investigation",
+        intent: "investigation",
+        objective: debugPlan.targetFrameOrEvent?.eventLabel ?? debugPlan.scope,
+        status: "pending",
+        owner: "rdc-debugger",
+        stage: "investigate",
+        dependsOn: ["dispatch"],
+        acceptanceCriteria: ["Investigation summary is grounded in EvidenceLedger records."]
+      },
+      {
+        ...base,
+        taskId: "fix_verify",
+        title: "Verification",
+        intent: "verification",
+        objective: "Validate the leading finding against the verification contract.",
+        status: "pending",
+        owner: "skeptic_agent",
+        stage: "fix_verify",
+        dependsOn: ["investigate"],
+        acceptanceCriteria: debugPlan.verificationContract.successCriteria
+      },
+      {
+        ...base,
+        taskId: "curate",
+        title: "Curation",
+        intent: "report",
+        objective: "Publish a report bundle grounded in accepted evidence.",
+        status: "pending",
+        owner: "curator_agent",
+        stage: "curate",
+        dependsOn: ["fix_verify"],
+        acceptanceCriteria: debugPlan.expectedDeliverables
+      }
+    ];
+  }
+  getRequiredVerificationMethods(debugPlan) {
+    const methods = /* @__PURE__ */ new Set(["tool", "llm_review"]);
+    if (debugPlan.verificationContract.requiresScreenshotEvidence) methods.add("screenshot");
+    if (debugPlan.verificationContract.requiresPixelEvidence) methods.add("pixel");
+    if (debugPlan.verificationContract.requiresShaderInspection) methods.add("shader");
+    if (debugPlan.verificationContract.requiresBaselineComparison) methods.add("baseline");
+    return Array.from(methods);
+  }
+  applyTaskMutation(sessionId, runId, taskId, status, reason, refs = {}) {
+    const existing = taskBoard.getTask(sessionId, runId, taskId);
+    if (!existing) {
+      return;
+    }
+    taskBoard.mutateTask(sessionId, runId, {
+      mutationId: generateEventId("task-mutation"),
+      taskId,
+      runId,
+      sessionId,
+      type: status === "completed" ? "update_status" : "update_status",
+      actor: "harness",
+      patch: {
+        status,
+        evidenceRefs: refs.evidenceRefs ?? existing.evidenceRefs,
+        artifactRefs: refs.artifactRefs ?? existing.artifactRefs,
+        blockerRefs: refs.blockerRefs ?? existing.blockerRefs,
+        completedAt: status === "completed" ? nowIso$2() : existing.completedAt
+      },
+      reason,
+      requiresUserApproval: false,
+      createdAt: nowIso$2()
+    });
+  }
+  persistAgentResult(sessionId, runId, result) {
+    const artifactIds = result.artifacts.map((artifactPath) => {
+      const artifactId = generateEventId("artifact");
+      const record = {
+        artifactId,
+        runId,
+        sessionId,
+        kind: artifactPath.toLowerCase().endsWith(".png") ? "screenshot" : "data",
+        title: `${result.agentId} artifact`,
+        filePath: artifactPath,
+        mimeType: artifactPath.toLowerCase().endsWith(".png") ? "image/png" : "application/json",
+        sizeBytes: 0,
+        taskId: "dispatch",
+        evidenceIds: [],
+        metadata: {
+          agentId: result.agentId
+        },
+        createdAt: nowIso$2(),
+        updatedAt: nowIso$2()
+      };
+      artifactStore.register(sessionId, runId, record);
+      return artifactId;
+    });
+    const evidenceId = generateEventId("evidence");
+    const evidenceRecord = {
+      evidenceId,
+      runId,
+      sessionId,
+      kind: "analysis",
+      title: `${result.agentId} finding`,
+      summary: result.reasoningSummary.summary,
+      refs: result.reasoningSummary.evidence,
+      taskId: "dispatch",
+      agentId: result.agentId,
+      artifactIds,
+      strength: result.reasoningSummary.confidence >= 0.75 ? "strong" : "supporting",
+      metadata: {
+        nextStep: result.reasoningSummary.nextStep,
+        confidence: result.reasoningSummary.confidence
+      },
+      createdAt: nowIso$2()
+    };
+    evidenceLedger.appendEvidence(sessionId, runId, evidenceRecord);
+    const card = {
+      cardId: generateEventId("agent-card"),
+      runId,
+      sessionId,
+      agentId: result.agentId,
+      taskId: "dispatch",
+      status: "completed",
+      summary: result.reasoningSummary.summary,
+      evidenceIds: [evidenceId],
+      artifactIds,
+      verificationResultIds: [],
+      nextActions: [result.reasoningSummary.nextStep].filter(Boolean),
+      createdAt: nowIso$2(),
+      updatedAt: nowIso$2()
+    };
+    const storedCard = contextService.appendAgentResultCard(sessionId, runId, card);
+    contextService.writeRunCapsule(sessionId, runId);
+    return storedCard;
+  }
+  persistVerificationResult(sessionId, runId, debugPlan, verification, skeptic, evidenceIds) {
+    const rejected = skeptic.payload.verdict === "rejected";
+    const verificationResult = {
+      resultId: generateEventId("verification"),
+      contractId: `${debugPlan.planId}-verification`,
+      runId,
+      sessionId,
+      status: rejected ? "failed" : verification.status === "ok" ? "passed" : "inconclusive",
+      proposedRoute: rejected ? "generator" : "curator",
+      method: "llm_review",
+      summary: String(skeptic.payload.summary || verification.payload.summary || ""),
+      failedCriteria: rejected ? debugPlan.verificationContract.successCriteria : [],
+      evidenceGaps: rejected ? ["Verifier rejected the available evidence chain."] : [],
+      rejectedClaims: rejected ? [String(verification.payload.summary || "Rejected verification claim")] : [],
+      taskMutations: rejected ? [{
+        mutationId: generateEventId("task-mutation"),
+        taskId: "fix_verify",
+        runId,
+        sessionId,
+        type: "update_status",
+        actor: "skeptic_agent",
+        patch: {
+          status: "blocked",
+          blockerRefs: ["SKEPTIC_REJECTED"]
+        },
+        reason: String(skeptic.payload.summary || "Skeptic rejected the evidence chain."),
+        requiresUserApproval: false,
+        createdAt: nowIso$2()
+      }] : [],
+      evidenceIds,
+      artifactIds: [],
+      blockers: rejected ? ["SKEPTIC_REJECTED"] : [],
+      confidence: rejected ? 0.35 : verification.status === "ok" ? 0.82 : 0.64,
+      loopCount: 0,
+      createdAt: nowIso$2()
+    };
+    evidenceLedger.appendVerificationResult(sessionId, runId, verificationResult);
+    contextService.writeRunCapsule(sessionId, runId);
+    return verificationResult;
   }
   async executeApprovedRun(location, debugPlan, signal) {
     const project = storageAdapter.getProjectById(location.run.projectId);
@@ -8348,6 +9095,27 @@ class DebugWorkflowService {
         }
       });
       const surface = await specialistRecipeRunner.prepareSurface(runtimeContext);
+      this.applyTaskMutation(location.session.sessionId, location.run.runId, "speclist", "completed", "Task board seeded for the approved plan.");
+      this.applyTaskMutation(location.session.sessionId, location.run.runId, "dispatch", "in_progress", "Specialist dispatch started.");
+      contextService.appendContextPacket(location.session.sessionId, location.run.runId, {
+        packetId: generateEventId("context-packet"),
+        runId: location.run.runId,
+        sessionId: location.session.sessionId,
+        kind: "handoff",
+        source: "harness",
+        title: "Specialist dispatch context",
+        summary: debugPlan.scope,
+        content: JSON.stringify({
+          targetCapture: debugPlan.targetCapture,
+          targetFrameOrEvent: debugPlan.targetFrameOrEvent,
+          specialists: debugPlan.recommendedSpecialists
+        }),
+        refs: [debugPlan.targetCapture.filePath],
+        taskIds: ["dispatch"],
+        evidenceIds: [],
+        artifactIds: [],
+        createdAt: nowIso$2()
+      });
       const specialistResults = [];
       for (const specialist of debugPlan.recommendedSpecialists) {
         if (signal.aborted) {
@@ -8366,6 +9134,7 @@ class DebugWorkflowService {
         }));
         const result = await specialistRecipeRunner.run(specialist, runtimeContext, surface);
         specialistResults.push(result);
+        this.persistAgentResult(location.session.sessionId, location.run.runId, result);
         await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
           runId: location.run.runId,
           sessionId: location.session.sessionId,
@@ -8382,6 +9151,7 @@ class DebugWorkflowService {
           }
         }));
       }
+      this.applyTaskMutation(location.session.sessionId, location.run.runId, "dispatch", "completed", "Specialist dispatch completed.");
       await this.persistInvestigationAndReport(location, debugPlan, runtimeContext, surface.replaySessionId, specialistResults);
     } catch (error) {
       const aborted = signal.aborted;
@@ -8424,6 +9194,8 @@ class DebugWorkflowService {
   async executeMockRun(location, debugPlan, signal, projectRoot) {
     const slowRun = /stop-test|slow-run/i.test(debugPlan.userGoal);
     const specialistAgents = debugPlan.recommendedSpecialists.length > 0 ? debugPlan.recommendedSpecialists : ["triage_agent", "pixel_forensics_agent", "shader_ir_agent"];
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, "speclist", "completed", "Mock task board seeded.");
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, "dispatch", "in_progress", "Mock specialist dispatch started.");
     for (const specialist of specialistAgents) {
       if (signal.aborted) {
         throw new Error(`Run aborted: ${location.run.runId}`);
@@ -8464,7 +9236,43 @@ class DebugWorkflowService {
           confidence: 0.7
         }
       }));
+      const evidenceId = generateEventId("evidence");
+      evidenceLedger.appendEvidence(location.session.sessionId, location.run.runId, {
+        evidenceId,
+        runId: location.run.runId,
+        sessionId: location.session.sessionId,
+        kind: "analysis",
+        title: `${specialist} mock finding`,
+        summary: `${specialist} completed deterministic mock analysis.`,
+        refs: [`mock:${specialist}`],
+        taskId: "dispatch",
+        agentId: specialist,
+        artifactIds: [],
+        strength: "supporting",
+        metadata: {
+          confidence: 0.7
+        },
+        createdAt: nowIso$2()
+      });
+      contextService.appendAgentResultCard(location.session.sessionId, location.run.runId, {
+        cardId: generateEventId("agent-card"),
+        runId: location.run.runId,
+        sessionId: location.session.sessionId,
+        agentId: specialist,
+        taskId: "dispatch",
+        status: "completed",
+        summary: `${specialist} completed deterministic mock analysis.`,
+        evidenceIds: [evidenceId],
+        artifactIds: [],
+        verificationResultIds: [],
+        nextActions: ["Continue through the debugger main chain."],
+        createdAt: nowIso$2(),
+        updatedAt: nowIso$2()
+      });
     }
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, "dispatch", "completed", "Mock specialist dispatch completed.");
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, "investigate", "completed", "Mock investigation completed.");
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, "fix_verify", "completed", "Mock verification completed.");
     if (slowRun) {
       await new Promise((resolve, reject) => {
         const timeout = setTimeout(resolve, 1800);
@@ -8518,6 +9326,8 @@ class DebugWorkflowService {
         workflow_stage: "finalize"
       }
     });
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, "curate", "completed", "Mock report bundle published.");
+    contextService.writeRunCapsule(location.session.sessionId, location.run.runId);
     await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
       runId: location.run.runId,
       sessionId: location.session.sessionId,
@@ -8539,6 +9349,7 @@ class DebugWorkflowService {
     this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, location.run.runId));
   }
   async persistInvestigationAndReport(location, debugPlan, runtimeContext, replaySessionId, specialistResults) {
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, "investigate", "in_progress", "Investigation synthesis started.");
     await storageAdapter.updateRun(location.session.sessionId, location.run.runId, {
       lastStage: "investigate",
       runtime: {
@@ -8557,6 +9368,33 @@ class DebugWorkflowService {
       }
     }));
     const investigationSummary = await this.buildInvestigationSummary(location, debugPlan, specialistResults);
+    const investigationEvidenceId = generateEventId("evidence");
+    evidenceLedger.appendEvidence(location.session.sessionId, location.run.runId, {
+      evidenceId: investigationEvidenceId,
+      runId: location.run.runId,
+      sessionId: location.session.sessionId,
+      kind: "analysis",
+      title: "Debugger investigation summary",
+      summary: investigationSummary.summary,
+      refs: investigationSummary.evidence,
+      taskId: "investigate",
+      agentId: "rdc-debugger",
+      artifactIds: [],
+      strength: investigationSummary.confidence >= 0.75 ? "strong" : "supporting",
+      metadata: {
+        nextStep: investigationSummary.nextStep,
+        confidence: investigationSummary.confidence
+      },
+      createdAt: nowIso$2()
+    });
+    this.applyTaskMutation(
+      location.session.sessionId,
+      location.run.runId,
+      "investigate",
+      "completed",
+      "Investigation summary recorded in EvidenceLedger.",
+      { evidenceRefs: [investigationEvidenceId] }
+    );
     await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
       runId: location.run.runId,
       sessionId: location.session.sessionId,
@@ -8571,6 +9409,7 @@ class DebugWorkflowService {
         confidence: investigationSummary.confidence
       }
     }));
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, "fix_verify", "in_progress", "Verification started.");
     const verification = await this.executeVerification(runtimeContext, replaySessionId, investigationSummary);
     await storageAdapter.updateRun(location.session.sessionId, location.run.runId, {
       lastStage: "fix_verify",
@@ -8587,6 +9426,14 @@ class DebugWorkflowService {
       payload: verification.payload
     }));
     const skeptic = await this.executeSkepticReview(location, debugPlan, investigationSummary, verification);
+    const verificationResult = this.persistVerificationResult(
+      location.session.sessionId,
+      location.run.runId,
+      debugPlan,
+      verification,
+      skeptic,
+      [investigationEvidenceId]
+    );
     await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
       runId: location.run.runId,
       sessionId: location.session.sessionId,
@@ -8596,8 +9443,43 @@ class DebugWorkflowService {
       payload: skeptic.payload
     }));
     if (skeptic.payload.verdict === "rejected") {
-      throw new Error(String(skeptic.payload.summary || "Skeptic rejected the evidence chain."));
+      this.applyTaskMutation(
+        location.session.sessionId,
+        location.run.runId,
+        "fix_verify",
+        "blocked",
+        String(skeptic.payload.summary || "Skeptic rejected the evidence chain."),
+        { evidenceRefs: verificationResult.evidenceIds }
+      );
+      await storageAdapter.updateRun(location.session.sessionId, location.run.runId, {
+        status: "failed",
+        stopReason: String(skeptic.payload.summary || "Skeptic rejected the evidence chain."),
+        stoppedAt: Date.now(),
+        finishedAt: Date.now(),
+        lastStage: "fix_verify",
+        runtime: {
+          workflow_stage: "fix_verify"
+        }
+      });
+      this.emitRunStatus(
+        location.session.sessionId,
+        location.run.runId,
+        "failed",
+        "fix_verify",
+        String(skeptic.payload.summary || "Skeptic rejected the evidence chain.")
+      );
+      this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, location.run.runId));
+      return;
     }
+    this.applyTaskMutation(
+      location.session.sessionId,
+      location.run.runId,
+      "fix_verify",
+      "completed",
+      "Verifier accepted the evidence chain.",
+      { evidenceRefs: verificationResult.evidenceIds }
+    );
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, "curate", "in_progress", "Curator report generation started.");
     const project = storageAdapter.getProjectById(location.run.projectId);
     if (!project) {
       throw new Error(`Project not found: ${location.run.projectId}`);
@@ -8628,6 +9510,8 @@ class DebugWorkflowService {
         workflow_stage: "finalize"
       }
     });
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, "curate", "completed", "Report bundle published.");
+    contextService.writeRunCapsule(location.session.sessionId, location.run.runId);
     await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
       runId: location.run.runId,
       sessionId: location.session.sessionId,
@@ -9263,8 +10147,30 @@ function computeVisibleAssistantText(raw) {
   return partialMatchLength > 0 ? raw.slice(0, raw.length - partialMatchLength) : raw;
 }
 class ConversationService {
+  activeTurns = /* @__PURE__ */ new Map();
   async getHistory(sessionId) {
     return storageAdapter.readConversationHistory(sessionId);
+  }
+  async cancelActiveTurn(request = {}) {
+    const candidates = Array.from(this.activeTurns.values()).filter((turn) => !request.turnId || turn.turnId === request.turnId).filter((turn) => !request.sessionId || turn.sessionId === request.sessionId).sort((left, right) => right.startedAt - left.startedAt);
+    const target = candidates[0];
+    if (!target) {
+      return { success: false, error: "No active conversation turn." };
+    }
+    target.stop();
+    return {
+      success: true,
+      cancelledTurnId: target.turnId
+    };
+  }
+  registerActiveTurn(turn) {
+    this.activeTurns.set(turn.turnId, turn);
+  }
+  clearActiveTurn(turnId, controller) {
+    const active = this.activeTurns.get(turnId);
+    if (active?.abortController === controller) {
+      this.activeTurns.delete(turnId);
+    }
   }
   async sendMessage(input) {
     const context = await this.resolveContext(input);
@@ -9339,7 +10245,11 @@ class ConversationService {
   async completeActiveDebugTurn(input) {
     let assistantMessage = input.assistantDraftMessage;
     const sessionId = input.context.session?.sessionId ?? null;
+    const abortController = new AbortController();
     const commitAssistantMessage = (type, patch) => {
+      if (abortController.signal.aborted && patch.status !== "stopped") {
+        return;
+      }
       assistantMessage = {
         ...assistantMessage,
         ...patch,
@@ -9353,6 +10263,33 @@ class ConversationService {
         message: assistantMessage
       });
     };
+    const commitStoppedMessage = () => {
+      commitAssistantMessage("message_completed", {
+        status: "stopped",
+        content: assistantMessage.content || "当前请求已停止。",
+        reasoningTrace: finalizeTrace(
+          upsertTraceStep(assistantMessage.reasoningTrace, "active-debug-reply", {
+            status: "complete",
+            summary: "用户已停止当前请求。",
+            completedAt: nowMs()
+          }),
+          "stopped",
+          "请求已停止"
+        )
+      });
+    };
+    this.registerActiveTurn({
+      turnId: assistantMessage.turnId,
+      sessionId,
+      startedAt: nowMs(),
+      abortController,
+      stop: () => {
+        if (!abortController.signal.aborted) {
+          abortController.abort();
+          commitStoppedMessage();
+        }
+      }
+    });
     commitAssistantMessage("message_patched", {
       reasoningTrace: upsertTraceStep(
         assistantMessage.reasoningTrace,
@@ -9382,7 +10319,8 @@ class ConversationService {
               status: "streaming",
               content: `${assistantMessage.content}${chunk}`
             });
-          }
+          },
+          signal: abortController.signal
         }
       );
       commitAssistantMessage("message_completed", {
@@ -9421,6 +10359,8 @@ class ConversationService {
           "回复生成失败"
         )
       });
+    } finally {
+      this.clearActiveTurn(assistantMessage.turnId, abortController);
     }
   }
   async startCoworkTurn(context, requestedMode, rawMessage, pendingAttachments) {
@@ -9481,7 +10421,11 @@ class ConversationService {
   async completeCoworkTurn(input) {
     let assistantMessage = input.assistantDraftMessage;
     const sessionId = input.context.session?.sessionId ?? null;
+    const abortController = new AbortController();
     const commitAssistantMessage = (type, patch) => {
+      if (abortController.signal.aborted && patch.status !== "stopped") {
+        return;
+      }
       assistantMessage = {
         ...assistantMessage,
         ...patch,
@@ -9495,16 +10439,46 @@ class ConversationService {
         message: assistantMessage
       });
     };
-    let followupContent = "";
-    const appendAssistantText = (text) => {
+    const commitStoppedMessage = () => {
+      commitAssistantMessage("message_completed", {
+        status: "stopped",
+        content: assistantMessage.content || "当前请求已停止。",
+        reasoningTrace: finalizeTrace(
+          upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
+            status: "complete",
+            summary: "用户已停止当前请求。",
+            completedAt: nowMs()
+          }),
+          "stopped",
+          "请求已停止"
+        )
+      });
+    };
+    this.registerActiveTurn({
+      turnId: assistantMessage.turnId,
+      sessionId,
+      startedAt: nowMs(),
+      abortController,
+      stop: () => {
+        if (!abortController.signal.aborted) {
+          abortController.abort();
+          commitStoppedMessage();
+        }
+      }
+    });
+    let systemAppendix = "";
+    const commitVisibleAssistantText = () => {
+      commitAssistantMessage("message_patched", {
+        status: "streaming",
+        content: `${visibleResponse}${systemAppendix}`
+      });
+    };
+    const appendSystemAppendix = (text) => {
       if (!text) {
         return;
       }
-      followupContent += text;
-      commitAssistantMessage("message_patched", {
-        status: "streaming",
-        content: `${assistantMessage.content}${text}`
-      });
+      systemAppendix += text;
+      commitVisibleAssistantText();
     };
     commitAssistantMessage("message_patched", {
       reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-route", {
@@ -9540,13 +10514,13 @@ class ConversationService {
           systemPrompt: buildCoworkSystemPrompt(),
           maxTokens: 1200,
           temperature: 0.35,
+          signal: abortController.signal,
           onChunk: (chunk) => {
             rawResponse += chunk;
             const nextVisible = computeVisibleAssistantText(rawResponse);
             if (nextVisible.length > visibleResponse.length) {
-              const delta = nextVisible.slice(visibleResponse.length);
               visibleResponse = nextVisible;
-              appendAssistantText(delta);
+              commitVisibleAssistantText();
             }
           }
         }
@@ -9563,22 +10537,29 @@ class ConversationService {
       };
       rawResponse = fallbackReply;
       visibleResponse = fallbackReply;
-      commitAssistantMessage("message_patched", {
-        content: fallbackReply
-      });
+      commitVisibleAssistantText();
+    }
+    if (abortController.signal.aborted) {
+      this.clearActiveTurn(assistantMessage.turnId, abortController);
+      return;
     }
     const assistantContent = stripControlBlock(rawResponse);
+    visibleResponse = assistantContent;
     const control = parseControlBlock(rawResponse);
     let finalStatus = errorViewModel ? "error" : "complete";
     let traceStatus = errorViewModel ? "error" : "complete";
     commitAssistantMessage("message_patched", {
-      content: assistantContent,
+      content: `${visibleResponse}${systemAppendix}`,
       reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-route", {
         status: "complete",
         summary: "上下文检查完成。",
         completedAt: nowMs()
       })
     });
+    if (abortController.signal.aborted) {
+      this.clearActiveTurn(assistantMessage.turnId, abortController);
+      return;
+    }
     const effectiveMessage = resolveTaskFileContext(input.rawMessage).effectiveMessage;
     if (!input.context.projectId && EXECUTE_PATTERN.test(effectiveMessage)) {
       const boundaryReply = "我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。";
@@ -9605,6 +10586,7 @@ class ConversationService {
           "等待选择项目"
         )
       });
+      this.clearActiveTurn(assistantMessage.turnId, abortController);
       return;
     }
     if ((control?.intent === "execute" || EXECUTE_PATTERN.test(effectiveMessage)) && control?.safe_to_start) {
@@ -9618,18 +10600,22 @@ class ConversationService {
         })
       });
       if (!input.context.projectId) {
-        appendAssistantText(`
+        appendSystemAppendix(`
 
 我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。`);
       } else {
         const captureGuard = resolveCaptureGuards(effectiveMessage, input.context);
         if (!captureGuard.ready) {
-          appendAssistantText(`
+          appendSystemAppendix(`
 
 ${captureGuard.reason || "当前还不能进入正式分析。"}`);
         } else if (!hasUsableDebuggerRoute()) {
-          appendAssistantText("\n\n当前调试链路还没绑定可用模型，所以我不能开始正式执行；不过我可以先帮你确认问题范围和所需 capture。");
+          appendSystemAppendix("\n\n当前调试链路还没绑定可用模型，所以我不能开始正式执行；不过我可以先帮你确认问题范围和所需 capture。");
         } else {
+          if (abortController.signal.aborted) {
+            this.clearActiveTurn(assistantMessage.turnId, abortController);
+            return;
+          }
           const workflowResult = await debugWorkflowService.startPlan({
             projectId: input.context.projectId,
             sessionId: input.context.session?.sessionId,
@@ -9638,8 +10624,12 @@ ${captureGuard.reason || "当前还不能进入正式分析。"}`);
             goal: input.rawMessage,
             replayDevice: input.context.replayDevice
           });
+          if (abortController.signal.aborted) {
+            this.clearActiveTurn(assistantMessage.turnId, abortController);
+            return;
+          }
           const upgradeReply = buildWorkflowUpgradeReply(workflowResult);
-          appendAssistantText(`
+          appendSystemAppendix(`
 
 ${upgradeReply}`);
           if (workflowResult.runId) {
@@ -9665,7 +10655,7 @@ ${upgradeReply}`);
     }
     commitAssistantMessage(finalStatus === "error" ? "message_errored" : "message_completed", {
       status: finalStatus,
-      content: `${assistantContent}${followupContent}`,
+      content: `${assistantContent}${systemAppendix}`,
       reasoningTrace: finalizeTrace(
         upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
           status: errorViewModel ? "error" : "complete",
@@ -9676,6 +10666,7 @@ ${upgradeReply}`);
         finalStatus === "error" ? "回复失败" : "回复已完成"
       )
     });
+    this.clearActiveTurn(assistantMessage.turnId, abortController);
   }
   persistConversationSnapshot(sessionId, message) {
     if (sessionId) {
@@ -12222,6 +13213,193 @@ function readAvatarDataUrl(avatarPath) {
   const content = fs.readFileSync(avatarPath);
   return `data:${mimeType};base64,${content.toString("base64")}`;
 }
+const ACTION_ARTIFACT_KEYS = [
+  "artifactPath",
+  "artifact_path",
+  "filePath",
+  "file_path",
+  "imagePath",
+  "image_path",
+  "outputPath",
+  "output_path",
+  "reportPath",
+  "report_path",
+  "savedPath",
+  "saved_path",
+  "path"
+];
+function inferMimeType(filePath) {
+  const extension = path.extname(filePath).toLowerCase();
+  const table = {
+    ".md": "text/markdown",
+    ".txt": "text/plain",
+    ".log": "text/plain",
+    ".json": "application/json",
+    ".html": "text/html",
+    ".htm": "text/html",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+    ".csv": "text/csv"
+  };
+  return table[extension];
+}
+function readFileTimestamps(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return {};
+    }
+    const stat = fs.statSync(filePath);
+    if (!stat.isFile()) {
+      return {};
+    }
+    return {
+      sizeBytes: stat.size,
+      createdAt: stat.birthtimeMs,
+      updatedAt: stat.mtimeMs
+    };
+  } catch {
+    return {};
+  }
+}
+function parseTimestamp(value) {
+  if (typeof value === "number") {
+    return value;
+  }
+  if (!value) {
+    return void 0;
+  }
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : void 0;
+}
+function outputKey(filePath) {
+  const resolved = path.resolve(filePath);
+  return process.platform === "win32" ? resolved.toLowerCase() : resolved;
+}
+function addSessionOutput(outputs, seen, output) {
+  const key = outputKey(output.filePath);
+  if (seen.has(key)) {
+    return;
+  }
+  seen.add(key);
+  outputs.push(output);
+}
+function isLikelyFilePath(value) {
+  return /[\\/]/.test(value) || /\.(md|txt|log|json|html?|png|jpe?g|webp|gif|csv)$/i.test(value);
+}
+function collectActionArtifactPaths(value, results = /* @__PURE__ */ new Set()) {
+  if (Array.isArray(value)) {
+    value.forEach((entry) => collectActionArtifactPaths(entry, results));
+    return results;
+  }
+  if (!value || typeof value !== "object") {
+    return results;
+  }
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry === "string" && ACTION_ARTIFACT_KEYS.includes(key) && isLikelyFilePath(entry)) {
+      results.add(entry);
+      continue;
+    }
+    if (entry && typeof entry === "object") {
+      collectActionArtifactPaths(entry, results);
+    }
+  }
+  return results;
+}
+function resolveActionArtifactPath(sessionId, runId, filePath) {
+  if (path.isAbsolute(filePath)) {
+    return path.resolve(filePath);
+  }
+  try {
+    return path.resolve(storageAdapter.getRunPath(sessionId, runId), filePath);
+  } catch {
+    return path.resolve(filePath);
+  }
+}
+async function buildSessionOutputs(sessionId, runId) {
+  const outputs = [];
+  const seen = /* @__PURE__ */ new Set();
+  const targetRuns = runId ? storageAdapter.listRuns(sessionId).filter((run) => run.runId === runId) : storageAdapter.listRuns(sessionId);
+  for (const attachment of storageAdapter.listSessionAttachments(sessionId)) {
+    addSessionOutput(outputs, seen, {
+      id: attachment.attachmentId,
+      kind: "attachment",
+      title: attachment.fileName,
+      fileName: attachment.fileName,
+      filePath: attachment.filePath,
+      source: "session attachment",
+      mimeType: attachment.mimeType,
+      sizeBytes: attachment.size,
+      createdAt: attachment.createdAt,
+      updatedAt: attachment.createdAt
+    });
+  }
+  for (const run of targetRuns) {
+    const reportEntries = [
+      { id: "markdown", title: "report.md", filePath: run.reportPaths?.markdownPath },
+      { id: "json", title: "report.json", filePath: run.reportPaths?.jsonPath },
+      { id: "html", title: "visual_report.html", filePath: run.reportPaths?.htmlPath }
+    ].filter((entry) => Boolean(entry.filePath));
+    for (const report of reportEntries) {
+      addSessionOutput(outputs, seen, {
+        id: `${run.runId}:report:${report.id}`,
+        kind: "report",
+        title: report.title,
+        fileName: path.basename(report.filePath),
+        filePath: report.filePath,
+        source: "run report",
+        runId: run.runId,
+        mimeType: inferMimeType(report.filePath),
+        ...readFileTimestamps(report.filePath)
+      });
+    }
+    for (const artifact of artifactStore.list(sessionId, run.runId)) {
+      addSessionOutput(outputs, seen, {
+        id: artifact.artifactId,
+        kind: "artifact",
+        title: artifact.title || path.basename(artifact.filePath),
+        fileName: path.basename(artifact.filePath),
+        filePath: artifact.filePath,
+        source: "artifact store",
+        runId: artifact.runId,
+        mimeType: artifact.mimeType,
+        sizeBytes: artifact.sizeBytes,
+        createdAt: parseTimestamp(artifact.createdAt),
+        updatedAt: parseTimestamp(artifact.updatedAt)
+      });
+    }
+  }
+  const targetRunIds = new Set(targetRuns.map((run) => run.runId));
+  try {
+    const actionEvents = await storageAdapter.readActionChain(sessionId);
+    for (const event of actionEvents) {
+      if (runId && !targetRunIds.has(event.run_id)) {
+        continue;
+      }
+      const artifactPaths = collectActionArtifactPaths(event.payload);
+      for (const artifactPath of artifactPaths) {
+        const resolvedPath = resolveActionArtifactPath(sessionId, event.run_id, artifactPath);
+        addSessionOutput(outputs, seen, {
+          id: `${event.event_id}:${outputKey(resolvedPath)}`,
+          kind: "action_artifact",
+          title: path.basename(resolvedPath),
+          fileName: path.basename(resolvedPath),
+          filePath: resolvedPath,
+          source: event.event_type,
+          runId: event.run_id,
+          mimeType: inferMimeType(resolvedPath),
+          createdAt: event.ts_ms,
+          updatedAt: event.ts_ms,
+          ...readFileTimestamps(resolvedPath)
+        });
+      }
+    }
+  } catch {
+  }
+  return outputs.sort((left, right) => (right.updatedAt ?? right.createdAt ?? 0) - (left.updatedAt ?? left.createdAt ?? 0));
+}
 let compiledGraph = null;
 let checkpointSaver = null;
 let currentSessionId = null;
@@ -12519,6 +13697,9 @@ function registerIPCHandlers() {
       messages: await conversationService.getHistory(sessionId)
     };
   });
+  electron.ipcMain.handle("conversation:cancelActiveTurn", async (_event, request) => {
+    return conversationService.cancelActiveTurn(request);
+  });
   electron.ipcMain.handle("workflow:getState", async () => {
     if (!currentSessionId) {
       return null;
@@ -12738,6 +13919,14 @@ function registerIPCHandlers() {
       attachments: storageAdapter.listSessionAttachments(sessionId)
     };
   });
+  electron.ipcMain.handle("session:outputs:list", async (_event, sessionId, runId) => {
+    if (!sessionId) {
+      return { outputs: [] };
+    }
+    return {
+      outputs: await buildSessionOutputs(sessionId, runId)
+    };
+  });
   electron.ipcMain.handle("session:attachments:import", async (_event, sessionId, filePaths) => {
     try {
       return {
@@ -12825,6 +14014,43 @@ function registerIPCHandlers() {
   });
   electron.ipcMain.handle("context:get", async () => {
     return rdxSessionService.snapshotContext();
+  });
+  electron.ipcMain.handle("context:openHumanPreview", async (_event, request) => {
+    try {
+      const contextSnapshot = await rdxSessionService.openHumanPreviewWindow(request);
+      broadcastToRenderer("context:changed", contextSnapshot);
+      const preview = contextSnapshot.humanPreview;
+      return {
+        success: preview?.status === "open" || preview?.status === "opening",
+        contextSnapshot,
+        error: preview?.lastError
+      };
+    } catch (error) {
+      const contextSnapshot = rdxSessionService.snapshotContext();
+      return {
+        success: false,
+        contextSnapshot,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("context:closeHumanPreview", async () => {
+    try {
+      const contextSnapshot = await rdxSessionService.closeHumanPreviewWindow();
+      broadcastToRenderer("context:changed", contextSnapshot);
+      return {
+        success: contextSnapshot.humanPreview?.status === "closed",
+        contextSnapshot,
+        error: contextSnapshot.humanPreview?.lastError
+      };
+    } catch (error) {
+      const contextSnapshot = rdxSessionService.snapshotContext();
+      return {
+        success: false,
+        contextSnapshot,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
   });
   electron.ipcMain.handle("capture:list", async () => {
     return { captures: rdxSessionService.getCaptureDescriptors() };
@@ -13132,6 +14358,9 @@ function registerIPCHandlers() {
       return { tools: [], namespaces: {} };
     }
   });
+  electron.ipcMain.handle("tool:getRuntimeSummary", async () => {
+    return toolBridge.getRuntimeSummary();
+  });
   electron.ipcMain.handle("tool:execute", async (_event, toolName, args) => {
     return toolBridge.call({
       toolName,
@@ -13417,6 +14646,10 @@ class RdxSessionService {
   remoteStatus = "disconnected";
   remoteId = null;
   openedCapture = null;
+  humanPreview = {
+    status: "closed",
+    updatedAt: Date.now()
+  };
   constructor(toolBridge2) {
     this.toolBridge = toolBridge2;
   }
@@ -13584,6 +14817,89 @@ class RdxSessionService {
         raw: previousCapture
       });
     }
+  }
+  async openHumanPreviewWindow(request = {}) {
+    const replaySessionId = request.sessionId || this.snapshotContext().sessionId;
+    if (!this.contextId || !this.runtimeOwner || !this.ownerLeaseId || !replaySessionId) {
+      this.setHumanPreview({
+        status: "unavailable",
+        sessionId: replaySessionId || void 0,
+        lastError: "Runtime context, owner lease, or replay session is not available."
+      });
+      return this.snapshotContext();
+    }
+    this.setHumanPreview({
+      status: "opening",
+      sessionId: replaySessionId
+    });
+    const result = await this.toolBridge.call({
+      toolName: "rd.session.open_preview",
+      args: {
+        session_id: replaySessionId,
+        context_id: this.contextId,
+        runtime_owner: this.runtimeOwner,
+        owner_lease_id: this.ownerLeaseId
+      },
+      contextId: this.contextId,
+      runtimeOwner: this.runtimeOwner,
+      ownerLeaseId: this.ownerLeaseId
+    });
+    if (!result.ok) {
+      const message = result.error?.message ?? "rd.session.open_preview failed.";
+      this.setHumanPreview({
+        status: "error",
+        sessionId: replaySessionId,
+        lastError: message
+      });
+      runtimeLogService.log({
+        scope: "app",
+        namespace: "context",
+        severity: "warning",
+        title: "Human preview unavailable",
+        summary: message,
+        raw: { result }
+      });
+      return this.snapshotContext();
+    }
+    this.setHumanPreview(this.extractHumanPreview(result, "open", replaySessionId));
+    return this.snapshotContext();
+  }
+  async closeHumanPreviewWindow() {
+    if (!this.contextId || !this.runtimeOwner || !this.ownerLeaseId) {
+      this.setHumanPreview({ status: "closed" });
+      return this.snapshotContext();
+    }
+    const result = await this.toolBridge.call({
+      toolName: "rd.session.close_preview",
+      args: {
+        context_id: this.contextId,
+        runtime_owner: this.runtimeOwner,
+        owner_lease_id: this.ownerLeaseId
+      },
+      contextId: this.contextId,
+      runtimeOwner: this.runtimeOwner,
+      ownerLeaseId: this.ownerLeaseId
+    });
+    if (!result.ok) {
+      const message = result.error?.message ?? "rd.session.close_preview failed.";
+      this.setHumanPreview({
+        status: "error",
+        sessionId: this.humanPreview.sessionId,
+        boundEventId: this.humanPreview.boundEventId,
+        lastError: message
+      });
+      runtimeLogService.log({
+        scope: "app",
+        namespace: "context",
+        severity: "warning",
+        title: "Human preview close warning",
+        summary: message,
+        raw: { result }
+      });
+      return this.snapshotContext();
+    }
+    this.setHumanPreview(this.extractHumanPreview(result, "closed", this.humanPreview.sessionId));
+    return this.snapshotContext();
   }
   async prepareFreshContext() {
     this.contextId = await this.allocateContext();
@@ -13860,7 +15176,8 @@ class RdxSessionService {
       ownerLeaseId: this.ownerLeaseId ?? "",
       captureDescriptors: [...this.captures],
       activeCapture: this.activeCaptureId ?? "",
-      deviceLabel: this.deviceLabel
+      deviceLabel: this.deviceLabel,
+      humanPreview: { ...this.humanPreview }
     };
   }
   snapshotOpenedCapture() {
@@ -13880,6 +15197,81 @@ class RdxSessionService {
   }
   getOwnerLeaseId() {
     return this.ownerLeaseId;
+  }
+  setHumanPreview(patch) {
+    this.humanPreview = {
+      ...patch,
+      updatedAt: patch.updatedAt ?? Date.now()
+    };
+    this.broadcastContextChanged();
+  }
+  broadcastContextChanged() {
+    const snapshot = this.snapshotContext();
+    for (const window of electron.BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) {
+        window.webContents.send("context:changed", snapshot);
+      }
+    }
+  }
+  extractHumanPreview(result, fallbackStatus, fallbackSessionId) {
+    const preview = result.data?.preview && typeof result.data.preview === "object" ? result.data.preview : {};
+    const enabled = typeof preview.enabled === "boolean" ? preview.enabled : fallbackStatus === "open";
+    const status = fallbackStatus === "closed" ? "closed" : enabled ? "open" : "error";
+    const sessionId = this.readPreviewString(preview, ["session_id", "current_session_id", "bound_session_id"]) ?? this.readPreviewString(result.data, ["current_session_id", "session_id"]) ?? fallbackSessionId;
+    const boundEventId = this.readPreviewNumber(preview, ["active_event_id", "bound_event_id", "event_id"]) ?? this.readPreviewNumber(result.data, ["active_event_id", "bound_event_id", "event_id"]);
+    const lastError = this.readPreviewError(preview) ?? this.readPreviewError(result.data) ?? (enabled || fallbackStatus === "closed" ? void 0 : "Preview is not enabled.");
+    return {
+      status,
+      sessionId,
+      boundEventId,
+      lastError
+    };
+  }
+  readPreviewString(source, keys) {
+    if (!source) {
+      return void 0;
+    }
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === "string" && value.trim()) {
+        return value;
+      }
+    }
+    return void 0;
+  }
+  readPreviewNumber(source, keys) {
+    if (!source) {
+      return void 0;
+    }
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === "string") {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+          return parsed;
+        }
+      }
+    }
+    return void 0;
+  }
+  readPreviewError(source) {
+    if (!source) {
+      return void 0;
+    }
+    const direct = source.last_error ?? source.error ?? source.error_message;
+    if (typeof direct === "string" && direct.trim()) {
+      return direct;
+    }
+    if (direct && typeof direct === "object") {
+      const message = direct.message;
+      if (typeof message === "string" && message.trim()) {
+        return message;
+      }
+    }
+    return void 0;
   }
   createOpenedCaptureState(projectId, inputId, filePath, replayDevice, previewResult) {
     const activeCapture = this.captures.find((capture) => capture.id === this.activeCaptureId) ?? this.captures[0];
@@ -14203,6 +15595,17 @@ class RdxSessionService {
     const contextId = this.contextId;
     const runtimeOwner = this.runtimeOwner;
     const ownerLeaseId = this.ownerLeaseId;
+    if (contextId && runtimeOwner && ownerLeaseId && this.humanPreview.status !== "closed") {
+      await this.closeHumanPreviewWindow().catch((error) => {
+        runtimeLogService.log({
+          scope: "app",
+          namespace: "context",
+          severity: "warning",
+          title: "Human preview teardown warning",
+          summary: error instanceof Error ? error.message : String(error)
+        });
+      });
+    }
     const replaySessionIds = Array.from(new Set(
       this.captures.map((capture) => capture.sessionId || capture.replaySessionId).filter((sessionId) => typeof sessionId === "string" && Boolean(sessionId))
     ));
@@ -14361,6 +15764,10 @@ class RdxSessionService {
     this.replayDevice = null;
     this.remoteStatus = "disconnected";
     this.remoteId = null;
+    this.humanPreview = {
+      status: "closed",
+      updatedAt: Date.now()
+    };
     if (previousCapture) {
       this.openedCapture = null;
     }

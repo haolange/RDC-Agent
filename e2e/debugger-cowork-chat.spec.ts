@@ -95,21 +95,38 @@ test('发送后用户消息立即入流、assistant 先出现 reasoning rail，�
   }, { timeout: 5000 }).toBe(2);
 
   await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('你好');
+  await expect(ctx.page.locator('[data-testid="conversation-turn"]')).toHaveCount(1);
+  await expect(ctx.page.locator('[data-testid="conversation-user-brief"]')).toHaveCount(1);
   await expect(ctx.page.locator('[data-testid="assistant-reasoning-toggle"]')).toHaveCount(1);
-  await expect(ctx.page.locator('[data-testid="assistant-reasoning-panel"]')).toHaveCount(0);
+  await expect(ctx.page.locator('[data-testid="assistant-reasoning-panel"]')).toHaveCount(1);
+  await expect(ctx.page.locator('[data-testid="assistant-document-flow"]')).toHaveCount(1);
 
   const userBubble = ctx.page.locator('.chat-message.user .message-bubble').first();
-  const assistantRail = ctx.page.locator('[data-testid="assistant-reasoning-toggle"]').first();
-  const [userBox, railBox] = await Promise.all([
+  const userBrief = ctx.page.locator('[data-testid="conversation-user-brief"]').first();
+  const assistantCard = ctx.page.locator('[data-testid="conversation-assistant-card"]').first();
+  const [userBox, userBriefBox, assistantBox] = await Promise.all([
     userBubble.boundingBox(),
-    assistantRail.boundingBox(),
+    userBrief.boundingBox(),
+    assistantCard.boundingBox(),
   ]);
 
   expect(userBox).not.toBeNull();
-  expect(railBox).not.toBeNull();
-  expect((userBox?.x ?? 0) + (userBox?.width ?? 0)).toBeGreaterThan((railBox?.x ?? 0) + 24);
+  expect(userBriefBox).not.toBeNull();
+  expect(assistantBox).not.toBeNull();
+  expect((userBriefBox?.x ?? 0)).toBeGreaterThan((assistantBox?.x ?? 0) + 80);
+  expect((userBriefBox?.width ?? 0)).toBeLessThan((assistantBox?.width ?? 0));
+  await expect.poll(async () => userBubble.evaluate((element) => getComputedStyle(element).textAlign)).toBe('left');
 
   await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('RDC Debugger');
+  const reasoningBox = await ctx.page.locator('[data-testid="assistant-reasoning-toggle"]').first().boundingBox();
+  const assistantDocBox = await ctx.page.locator('[data-testid="conversation-assistant-card"]').first().boundingBox();
+  expect(reasoningBox).not.toBeNull();
+  expect(assistantDocBox).not.toBeNull();
+  expect(reasoningBox?.y ?? 0).toBeLessThan(assistantDocBox?.y ?? 0);
+  await expect.poll(async () => ctx.page.locator('[data-testid="assistant-document-flow"]').first().evaluate((element) => {
+    const text = element.textContent ?? '';
+    return (text.match(/RDC Debugger/g) ?? []).length;
+  })).toBe(1);
   await expect.poll(async () => {
     return ctx.page.evaluate(() => (window as typeof window & {
       __RDC_AGENT_E2E__?: {
@@ -118,6 +135,7 @@ test('发送后用户消息立即入流、assistant 先出现 reasoning rail，�
     }).__RDC_AGENT_E2E__?.getWorkbenchState().conversationMessages.length ?? 0);
   }, { timeout: 5000 }).toBe(2);
 
-  await assistantRail.click();
-  await expect(ctx.page.locator('[data-testid="assistant-reasoning-panel"]')).toHaveCount(1);
+  const panelBox = await ctx.page.locator('[data-testid="assistant-reasoning-panel"]').first().boundingBox();
+  expect(panelBox).not.toBeNull();
+  expect(panelBox?.height ?? 0).toBeGreaterThan(24);
 });

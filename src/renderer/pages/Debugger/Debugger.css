@@ -31,6 +31,41 @@
   box-shadow: 0 18px 40px rgb(0 0 0 / 0.18);
 }
 
+.main-input-bar .plan-intake-panel {
+  margin: 0;
+  max-height: min(48vh, 420px);
+  overflow: auto;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgb(var(--color-bg-1));
+  box-shadow:
+    0 1px 0 rgb(255 255 255 / 0.025) inset,
+    0 8px 22px rgb(0 0 0 / 0.18);
+}
+
+.main-input-bar .plan-intake-header {
+  margin-bottom: 12px;
+}
+
+.main-input-bar .plan-intake-title {
+  font-size: var(--text-md);
+  letter-spacing: 0;
+}
+
+.main-input-bar .plan-summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.main-input-bar .plan-summary-card {
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.main-input-bar .plan-questions {
+  padding: 12px;
+  border-radius: 10px;
+}
+
 .plan-intake-header {
   display: flex;
   justify-content: space-between;
@@ -216,6 +251,10 @@
   }
 
   .plan-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .main-input-bar .plan-summary-grid {
     grid-template-columns: 1fr;
   }
 

@@ -5,7 +5,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { nativeImage } from 'electron';
+import { BrowserWindow, nativeImage } from 'electron';
 import { ToolBridge } from './ToolBridge';
 import { appPathService } from './AppPathService';
 import { replayDeviceService, type PreparedRemoteSurface } from './ReplayDeviceService';
@@ -14,6 +14,7 @@ import type {
   CaptureDescriptor,
   DebugSessionStartRequest,
   ContextSnapshot,
+  HumanPreviewSnapshot,
   OpenedCaptureState,
   OpenedCapturePreview,
   OpenedCapturePreviewAttempt,
@@ -64,6 +65,10 @@ export class RdxSessionService {
   private remoteStatus: 'connected' | 'online' | 'disconnected' | 'error' = 'disconnected';
   private remoteId: string | null = null;
   private openedCapture: OpenedCaptureState | null = null;
+  private humanPreview: HumanPreviewSnapshot = {
+    status: 'closed',
+    updatedAt: Date.now(),
+  };
 
   constructor(toolBridge: ToolBridge) {
     this.toolBridge = toolBridge;
@@ -262,6 +267,98 @@ export class RdxSessionService {
         raw: previousCapture,
       });
     }
+  }
+
+  async openHumanPreviewWindow(request: { sessionId?: string } = {}): Promise<ContextSnapshot> {
+    const replaySessionId = request.sessionId || this.snapshotContext().sessionId;
+    if (!this.contextId || !this.runtimeOwner || !this.ownerLeaseId || !replaySessionId) {
+      this.setHumanPreview({
+        status: 'unavailable',
+        sessionId: replaySessionId || undefined,
+        lastError: 'Runtime context, owner lease, or replay session is not available.',
+      });
+      return this.snapshotContext();
+    }
+
+    this.setHumanPreview({
+      status: 'opening',
+      sessionId: replaySessionId,
+    });
+
+    const result = await this.toolBridge.call({
+      toolName: 'rd.session.open_preview',
+      args: {
+        session_id: replaySessionId,
+        context_id: this.contextId,
+        runtime_owner: this.runtimeOwner,
+        owner_lease_id: this.ownerLeaseId,
+      },
+      contextId: this.contextId,
+      runtimeOwner: this.runtimeOwner,
+      ownerLeaseId: this.ownerLeaseId,
+    });
+
+    if (!result.ok) {
+      const message = result.error?.message ?? 'rd.session.open_preview failed.';
+      this.setHumanPreview({
+        status: 'error',
+        sessionId: replaySessionId,
+        lastError: message,
+      });
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'context',
+        severity: 'warning',
+        title: 'Human preview unavailable',
+        summary: message,
+        raw: { result },
+      });
+      return this.snapshotContext();
+    }
+
+    this.setHumanPreview(this.extractHumanPreview(result, 'open', replaySessionId));
+    return this.snapshotContext();
+  }
+
+  async closeHumanPreviewWindow(): Promise<ContextSnapshot> {
+    if (!this.contextId || !this.runtimeOwner || !this.ownerLeaseId) {
+      this.setHumanPreview({ status: 'closed' });
+      return this.snapshotContext();
+    }
+
+    const result = await this.toolBridge.call({
+      toolName: 'rd.session.close_preview',
+      args: {
+        context_id: this.contextId,
+        runtime_owner: this.runtimeOwner,
+        owner_lease_id: this.ownerLeaseId,
+      },
+      contextId: this.contextId,
+      runtimeOwner: this.runtimeOwner,
+      ownerLeaseId: this.ownerLeaseId,
+    });
+
+    if (!result.ok) {
+      const message = result.error?.message ?? 'rd.session.close_preview failed.';
+      this.setHumanPreview({
+        status: 'error',
+        sessionId: this.humanPreview.sessionId,
+        boundEventId: this.humanPreview.boundEventId,
+        lastError: message,
+      });
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'context',
+        severity: 'warning',
+        title: 'Human preview close warning',
+        summary: message,
+        raw: { result },
+      });
+      return this.snapshotContext();
+    }
+
+    this.setHumanPreview(this.extractHumanPreview(result, 'closed', this.humanPreview.sessionId));
+    return this.snapshotContext();
   }
 
   private async prepareFreshContext(): Promise<void> {
@@ -591,6 +688,7 @@ export class RdxSessionService {
       captureDescriptors: [...this.captures],
       activeCapture: this.activeCaptureId ?? '',
       deviceLabel: this.deviceLabel,
+      humanPreview: { ...this.humanPreview },
     };
   }
 
@@ -616,6 +714,103 @@ export class RdxSessionService {
 
   getOwnerLeaseId(): string | null {
     return this.ownerLeaseId;
+  }
+
+  private setHumanPreview(patch: Omit<HumanPreviewSnapshot, 'updatedAt'> & { updatedAt?: number }): void {
+    this.humanPreview = {
+      ...patch,
+      updatedAt: patch.updatedAt ?? Date.now(),
+    };
+    this.broadcastContextChanged();
+  }
+
+  private broadcastContextChanged(): void {
+    const snapshot = this.snapshotContext();
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) {
+        window.webContents.send('context:changed', snapshot);
+      }
+    }
+  }
+
+  private extractHumanPreview(
+    result: ToolCallResult,
+    fallbackStatus: HumanPreviewSnapshot['status'],
+    fallbackSessionId?: string,
+  ): Omit<HumanPreviewSnapshot, 'updatedAt'> {
+    const preview = result.data?.preview && typeof result.data.preview === 'object'
+      ? result.data.preview as Record<string, unknown>
+      : {};
+    const enabled = typeof preview.enabled === 'boolean' ? preview.enabled : fallbackStatus === 'open';
+    const status: HumanPreviewSnapshot['status'] = fallbackStatus === 'closed'
+      ? 'closed'
+      : enabled
+        ? 'open'
+        : 'error';
+    const sessionId = this.readPreviewString(preview, ['session_id', 'current_session_id', 'bound_session_id'])
+      ?? this.readPreviewString(result.data, ['current_session_id', 'session_id'])
+      ?? fallbackSessionId;
+    const boundEventId = this.readPreviewNumber(preview, ['active_event_id', 'bound_event_id', 'event_id'])
+      ?? this.readPreviewNumber(result.data, ['active_event_id', 'bound_event_id', 'event_id']);
+    const lastError = this.readPreviewError(preview)
+      ?? this.readPreviewError(result.data)
+      ?? (enabled || fallbackStatus === 'closed' ? undefined : 'Preview is not enabled.');
+
+    return {
+      status,
+      sessionId,
+      boundEventId,
+      lastError,
+    };
+  }
+
+  private readPreviewString(source: Record<string, unknown> | undefined, keys: string[]): string | undefined {
+    if (!source) {
+      return undefined;
+    }
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === 'string' && value.trim()) {
+        return value;
+      }
+    }
+    return undefined;
+  }
+
+  private readPreviewNumber(source: Record<string, unknown> | undefined, keys: string[]): number | undefined {
+    if (!source) {
+      return undefined;
+    }
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === 'string') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+          return parsed;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private readPreviewError(source: Record<string, unknown> | undefined): string | undefined {
+    if (!source) {
+      return undefined;
+    }
+    const direct = source.last_error ?? source.error ?? source.error_message;
+    if (typeof direct === 'string' && direct.trim()) {
+      return direct;
+    }
+    if (direct && typeof direct === 'object') {
+      const message = (direct as Record<string, unknown>).message;
+      if (typeof message === 'string' && message.trim()) {
+        return message;
+      }
+    }
+    return undefined;
   }
 
   private createOpenedCaptureState(
@@ -1035,6 +1230,17 @@ export class RdxSessionService {
     const contextId = this.contextId;
     const runtimeOwner = this.runtimeOwner;
     const ownerLeaseId = this.ownerLeaseId;
+    if (contextId && runtimeOwner && ownerLeaseId && this.humanPreview.status !== 'closed') {
+      await this.closeHumanPreviewWindow().catch((error) => {
+        runtimeLogService.log({
+          scope: 'app',
+          namespace: 'context',
+          severity: 'warning',
+          title: 'Human preview teardown warning',
+          summary: error instanceof Error ? error.message : String(error),
+        });
+      });
+    }
     const replaySessionIds = Array.from(new Set(
       this.captures
         .map((capture) => capture.sessionId || capture.replaySessionId)
@@ -1218,6 +1424,10 @@ export class RdxSessionService {
     this.replayDevice = null;
     this.remoteStatus = 'disconnected';
     this.remoteId = null;
+    this.humanPreview = {
+      status: 'closed',
+      updatedAt: Date.now(),
+    };
 
     if (previousCapture) {
       this.openedCapture = null;

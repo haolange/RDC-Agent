@@ -3,6 +3,14 @@ import { BrowserWindow } from 'electron';
 import type { AgentRole } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage, ConversationStreamEvent } from '@shared/types/conversation';
+import type {
+  AgentResultCard,
+  ArtifactRecord,
+  EvidenceRecord,
+  HarnessTask,
+  PlanContract,
+  VerificationResult,
+} from '@shared/types/harness';
 import type { DebugSessionStartRequest, RunSummary, SessionRecord } from '@shared/types/session';
 import type {
   AskUserAnswer,
@@ -22,11 +30,15 @@ import { intakeContextResolver } from './IntakeContextResolver';
 import { planBuilder } from './PlanBuilder';
 import { runExecutionService } from './RunExecutionService';
 import { rdxSessionService } from '../index';
-import { specialistRecipeRunner } from './SpecialistRecipeRunner';
+import { specialistRecipeRunner, type SpecialistRecipeResult } from './SpecialistRecipeRunner';
 import { toolBridge } from './ToolBridge';
 import { harnessController } from './HarnessController';
 import { reportBundleService } from './ReportBundleService';
 import { debuggerLlmService } from './DebuggerLlmService';
+import { artifactStore } from './ArtifactStore';
+import { contextService } from './ContextService';
+import { evidenceLedger } from './EvidenceLedger';
+import { taskBoard } from './TaskBoard';
 
 export interface StartWorkflowResult {
   success: boolean;
@@ -220,6 +232,14 @@ export class DebugWorkflowService {
         approval_state: approvalState,
         intake_context: resolved.intakeContext,
       } satisfies PersistedPlanSnapshot);
+      this.seedHarnessPlan({
+        sessionId,
+        runId,
+        mode: request.mode,
+        captures: resolved.captures,
+        debugPlan,
+        pendingQuestions,
+      });
 
       await storageAdapter.updateRun(sessionId, runId, {
         status: blockers.length > 0
@@ -522,6 +542,9 @@ export class DebugWorkflowService {
       approval_state: 'approved',
       pending_questions: null,
     });
+    this.applyTaskMutation(location.session.sessionId, runId, 'plan', 'completed', 'User approved the Debugger plan.');
+    this.applyTaskMutation(location.session.sessionId, runId, 'speclist', 'in_progress', 'Task breakdown started after plan approval.');
+    contextService.writeRunCapsule(location.session.sessionId, runId);
 
     await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
       runId,
@@ -718,6 +741,7 @@ export class DebugWorkflowService {
         : snapshot?.debug_plan?.planReadiness,
       approvalState: snapshot?.approval_state,
       debugPlan: snapshot?.debug_plan ?? null,
+      harnessTasks: taskBoard.listTasks(sessionId, run.runId),
       pendingQuestions: snapshot?.pending_questions ?? null,
       reasoningSummaries,
       recoveryState: run.status === 'interrupted'
@@ -763,6 +787,358 @@ export class DebugWorkflowService {
         }
       }
     }
+  }
+
+  private seedHarnessPlan(input: {
+    sessionId: string;
+    runId: string;
+    mode: DebugSessionStartRequest['mode'];
+    captures: DebugSessionStartRequest['captures'];
+    debugPlan: DebugPlan;
+    pendingQuestions: AskUserPrompt | null;
+  }): PlanContract {
+    const now = nowIso();
+    const tasks = this.createHarnessTasks(input.sessionId, input.runId, input.debugPlan, now);
+    for (const task of tasks) {
+      taskBoard.upsertTask(input.sessionId, input.runId, task);
+    }
+
+    const planContract: PlanContract = {
+      schemaVersion: '1',
+      planId: input.debugPlan.planId,
+      runId: input.runId,
+      sessionId: input.sessionId,
+      mode: input.mode,
+      goal: input.debugPlan.userGoal,
+      status: input.pendingQuestions
+        ? 'blocked'
+        : input.debugPlan.strictReady
+          ? 'ready'
+          : input.debugPlan.blockers.length > 0
+            ? 'blocked'
+            : 'pending',
+      captures: input.captures ?? [],
+      tasks,
+      verificationContract: {
+        contractId: `${input.debugPlan.planId}-verification`,
+        runId: input.runId,
+        sessionId: input.sessionId,
+        requiredMethods: this.getRequiredVerificationMethods(input.debugPlan),
+        targetRefs: [
+          input.debugPlan.targetCapture?.captureId,
+          input.debugPlan.targetCapture?.filePath,
+          input.debugPlan.targetFrameOrEvent?.eventLabel,
+        ].filter((entry): entry is string => Boolean(entry)),
+        successCriteria: input.debugPlan.verificationContract.successCriteria,
+        evidenceRequirements: [
+          input.debugPlan.verificationContract.requiresScreenshotEvidence ? 'screenshot' : '',
+          input.debugPlan.verificationContract.requiresShaderInspection ? 'shader' : '',
+          input.debugPlan.verificationContract.requiresPixelEvidence ? 'pixel' : '',
+          input.debugPlan.verificationContract.requiresBaselineComparison ? 'baseline' : '',
+        ].filter(Boolean),
+        blockerCodes: input.debugPlan.blockers.map((blocker) => blocker.code),
+        createdAt: now,
+        updatedAt: now,
+      },
+      questionRequests: input.pendingQuestions
+        ? input.pendingQuestions.questions.map((question) => ({
+            questionId: question.id,
+            runId: input.runId,
+            sessionId: input.sessionId,
+            prompt: question.prompt,
+            reason: input.pendingQuestions!.summary,
+            options: question.options.map((option) => ({
+              optionId: option.id,
+              label: option.label,
+              description: option.description,
+            })),
+            allowFreeform: Boolean(question.freeformPlaceholder),
+            requestedBy: 'harness',
+            createdAt: input.pendingQuestions!.createdAt,
+          }))
+        : [],
+      questionAnswers: [],
+      revisions: [],
+      capabilityProfiles: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    contextService.writePlanContract(input.sessionId, input.runId, planContract);
+    contextService.appendContextPacket(input.sessionId, input.runId, {
+      packetId: generateEventId('context-packet'),
+      runId: input.runId,
+      sessionId: input.sessionId,
+      kind: 'plan',
+      source: 'harness',
+      title: 'Debugger plan contract',
+      summary: input.debugPlan.scope,
+      content: JSON.stringify({
+        goal: input.debugPlan.userGoal,
+        targetCapture: input.debugPlan.targetCapture,
+        targetFrameOrEvent: input.debugPlan.targetFrameOrEvent,
+        deliverables: input.debugPlan.expectedDeliverables,
+      }),
+      refs: planContract.verificationContract.targetRefs,
+      taskIds: tasks.map((task) => task.taskId),
+      evidenceIds: [],
+      artifactIds: [],
+      createdAt: now,
+    });
+    contextService.writeRunCapsule(input.sessionId, input.runId);
+    return planContract;
+  }
+
+  private createHarnessTasks(
+    sessionId: string,
+    runId: string,
+    debugPlan: DebugPlan,
+    createdAt: string,
+  ): HarnessTask[] {
+    const base = {
+      runId,
+      sessionId,
+      priority: 'normal' as const,
+      dependsOn: [] as string[],
+      evidenceRefs: [] as string[],
+      artifactRefs: [] as string[],
+      blockerRefs: [] as string[],
+      source: 'plan' as const,
+      userApproval: 'not_required' as const,
+      createdAt,
+      updatedAt: createdAt,
+    };
+
+    return [
+      {
+        ...base,
+        taskId: 'plan',
+        title: 'Plan',
+        intent: 'context',
+        objective: debugPlan.scope,
+        status: debugPlan.blockers.length > 0 ? 'blocked' : 'pending',
+        owner: 'rdc-debugger',
+        stage: 'plan',
+        acceptanceCriteria: ['Target capture, scope, specialists, deliverables, and verification criteria are explicit.'],
+      },
+      {
+        ...base,
+        taskId: 'speclist',
+        title: 'Task breakdown',
+        intent: 'hypothesis',
+        objective: 'Seed the Debugger task board from the approved plan.',
+        status: 'pending',
+        owner: 'rdc-debugger',
+        stage: 'speclist',
+        dependsOn: ['plan'],
+        acceptanceCriteria: debugPlan.expectedDeliverables,
+      },
+      {
+        ...base,
+        taskId: 'dispatch',
+        title: 'Specialist dispatch',
+        intent: 'investigation',
+        objective: `Dispatch ${debugPlan.recommendedSpecialists.length || 1} Debugger investigation lane(s).`,
+        status: 'pending',
+        owner: 'rdc-debugger',
+        stage: 'dispatch',
+        dependsOn: ['speclist'],
+        acceptanceCriteria: ['Every selected specialist returns an AgentResultCard with evidence references.'],
+      },
+      {
+        ...base,
+        taskId: 'investigate',
+        title: 'Evidence investigation',
+        intent: 'investigation',
+        objective: debugPlan.targetFrameOrEvent?.eventLabel ?? debugPlan.scope,
+        status: 'pending',
+        owner: 'rdc-debugger',
+        stage: 'investigate',
+        dependsOn: ['dispatch'],
+        acceptanceCriteria: ['Investigation summary is grounded in EvidenceLedger records.'],
+      },
+      {
+        ...base,
+        taskId: 'fix_verify',
+        title: 'Verification',
+        intent: 'verification',
+        objective: 'Validate the leading finding against the verification contract.',
+        status: 'pending',
+        owner: 'skeptic_agent',
+        stage: 'fix_verify',
+        dependsOn: ['investigate'],
+        acceptanceCriteria: debugPlan.verificationContract.successCriteria,
+      },
+      {
+        ...base,
+        taskId: 'curate',
+        title: 'Curation',
+        intent: 'report',
+        objective: 'Publish a report bundle grounded in accepted evidence.',
+        status: 'pending',
+        owner: 'curator_agent',
+        stage: 'curate',
+        dependsOn: ['fix_verify'],
+        acceptanceCriteria: debugPlan.expectedDeliverables,
+      },
+    ];
+  }
+
+  private getRequiredVerificationMethods(debugPlan: DebugPlan): Array<'tool' | 'screenshot' | 'pixel' | 'shader' | 'baseline' | 'manual' | 'llm_review'> {
+    const methods = new Set<Array<'tool' | 'screenshot' | 'pixel' | 'shader' | 'baseline' | 'manual' | 'llm_review'>[number]>(['tool', 'llm_review']);
+    if (debugPlan.verificationContract.requiresScreenshotEvidence) methods.add('screenshot');
+    if (debugPlan.verificationContract.requiresPixelEvidence) methods.add('pixel');
+    if (debugPlan.verificationContract.requiresShaderInspection) methods.add('shader');
+    if (debugPlan.verificationContract.requiresBaselineComparison) methods.add('baseline');
+    return Array.from(methods);
+  }
+
+  private applyTaskMutation(
+    sessionId: string,
+    runId: string,
+    taskId: string,
+    status: HarnessTask['status'],
+    reason: string,
+    refs: { evidenceRefs?: string[]; artifactRefs?: string[]; blockerRefs?: string[] } = {},
+  ): void {
+    const existing = taskBoard.getTask(sessionId, runId, taskId);
+    if (!existing) {
+      return;
+    }
+
+    taskBoard.mutateTask(sessionId, runId, {
+      mutationId: generateEventId('task-mutation'),
+      taskId,
+      runId,
+      sessionId,
+      type: status === 'completed' ? 'update_status' : 'update_status',
+      actor: 'harness',
+      patch: {
+        status,
+        evidenceRefs: refs.evidenceRefs ?? existing.evidenceRefs,
+        artifactRefs: refs.artifactRefs ?? existing.artifactRefs,
+        blockerRefs: refs.blockerRefs ?? existing.blockerRefs,
+        completedAt: status === 'completed' ? nowIso() : existing.completedAt,
+      },
+      reason,
+      requiresUserApproval: false,
+      createdAt: nowIso(),
+    });
+  }
+
+  private persistAgentResult(sessionId: string, runId: string, result: SpecialistRecipeResult): AgentResultCard {
+    const artifactIds = result.artifacts.map((artifactPath) => {
+      const artifactId = generateEventId('artifact');
+      const record: ArtifactRecord = {
+        artifactId,
+        runId,
+        sessionId,
+        kind: artifactPath.toLowerCase().endsWith('.png') ? 'screenshot' : 'data',
+        title: `${result.agentId} artifact`,
+        filePath: artifactPath,
+        mimeType: artifactPath.toLowerCase().endsWith('.png') ? 'image/png' : 'application/json',
+        sizeBytes: 0,
+        taskId: 'dispatch',
+        evidenceIds: [],
+        metadata: {
+          agentId: result.agentId,
+        },
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+      };
+      artifactStore.register(sessionId, runId, record);
+      return artifactId;
+    });
+
+    const evidenceId = generateEventId('evidence');
+    const evidenceRecord: EvidenceRecord = {
+      evidenceId,
+      runId,
+      sessionId,
+      kind: 'analysis',
+      title: `${result.agentId} finding`,
+      summary: result.reasoningSummary.summary,
+      refs: result.reasoningSummary.evidence,
+      taskId: 'dispatch',
+      agentId: result.agentId,
+      artifactIds,
+      strength: result.reasoningSummary.confidence >= 0.75 ? 'strong' : 'supporting',
+      metadata: {
+        nextStep: result.reasoningSummary.nextStep,
+        confidence: result.reasoningSummary.confidence,
+      },
+      createdAt: nowIso(),
+    };
+    evidenceLedger.appendEvidence(sessionId, runId, evidenceRecord);
+
+    const card: AgentResultCard = {
+      cardId: generateEventId('agent-card'),
+      runId,
+      sessionId,
+      agentId: result.agentId,
+      taskId: 'dispatch',
+      status: 'completed',
+      summary: result.reasoningSummary.summary,
+      evidenceIds: [evidenceId],
+      artifactIds,
+      verificationResultIds: [],
+      nextActions: [result.reasoningSummary.nextStep].filter(Boolean),
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+    const storedCard = contextService.appendAgentResultCard(sessionId, runId, card);
+    contextService.writeRunCapsule(sessionId, runId);
+    return storedCard;
+  }
+
+  private persistVerificationResult(
+    sessionId: string,
+    runId: string,
+    debugPlan: DebugPlan,
+    verification: { status: 'ok' | 'warning'; payload: Record<string, unknown> },
+    skeptic: { payload: Record<string, unknown> },
+    evidenceIds: string[],
+  ): VerificationResult {
+    const rejected = skeptic.payload.verdict === 'rejected';
+    const verificationResult: VerificationResult = {
+      resultId: generateEventId('verification'),
+      contractId: `${debugPlan.planId}-verification`,
+      runId,
+      sessionId,
+      status: rejected ? 'failed' : verification.status === 'ok' ? 'passed' : 'inconclusive',
+      proposedRoute: rejected ? 'generator' : 'curator',
+      method: 'llm_review',
+      summary: String(skeptic.payload.summary || verification.payload.summary || ''),
+      failedCriteria: rejected ? debugPlan.verificationContract.successCriteria : [],
+      evidenceGaps: rejected ? ['Verifier rejected the available evidence chain.'] : [],
+      rejectedClaims: rejected ? [String(verification.payload.summary || 'Rejected verification claim')] : [],
+      taskMutations: rejected
+        ? [{
+            mutationId: generateEventId('task-mutation'),
+            taskId: 'fix_verify',
+            runId,
+            sessionId,
+            type: 'update_status',
+            actor: 'skeptic_agent',
+            patch: {
+              status: 'blocked',
+              blockerRefs: ['SKEPTIC_REJECTED'],
+            },
+            reason: String(skeptic.payload.summary || 'Skeptic rejected the evidence chain.'),
+            requiresUserApproval: false,
+            createdAt: nowIso(),
+          }]
+        : [],
+      evidenceIds,
+      artifactIds: [],
+      blockers: rejected ? ['SKEPTIC_REJECTED'] : [],
+      confidence: rejected ? 0.35 : verification.status === 'ok' ? 0.82 : 0.64,
+      loopCount: 0,
+      createdAt: nowIso(),
+    };
+    evidenceLedger.appendVerificationResult(sessionId, runId, verificationResult);
+    contextService.writeRunCapsule(sessionId, runId);
+    return verificationResult;
   }
 
   private async executeApprovedRun(location: RunLocation, debugPlan: DebugPlan, signal: AbortSignal): Promise<void> {
@@ -840,6 +1216,27 @@ export class DebugWorkflowService {
       });
 
       const surface = await specialistRecipeRunner.prepareSurface(runtimeContext);
+      this.applyTaskMutation(location.session.sessionId, location.run.runId, 'speclist', 'completed', 'Task board seeded for the approved plan.');
+      this.applyTaskMutation(location.session.sessionId, location.run.runId, 'dispatch', 'in_progress', 'Specialist dispatch started.');
+      contextService.appendContextPacket(location.session.sessionId, location.run.runId, {
+        packetId: generateEventId('context-packet'),
+        runId: location.run.runId,
+        sessionId: location.session.sessionId,
+        kind: 'handoff',
+        source: 'harness',
+        title: 'Specialist dispatch context',
+        summary: debugPlan.scope,
+        content: JSON.stringify({
+          targetCapture: debugPlan.targetCapture,
+          targetFrameOrEvent: debugPlan.targetFrameOrEvent,
+          specialists: debugPlan.recommendedSpecialists,
+        }),
+        refs: [debugPlan.targetCapture.filePath],
+        taskIds: ['dispatch'],
+        evidenceIds: [],
+        artifactIds: [],
+        createdAt: nowIso(),
+      });
       const specialistResults: Array<{ reasoningSummary: ReasoningSummary; artifacts: string[] }> = [];
       for (const specialist of debugPlan.recommendedSpecialists) {
         if (signal.aborted) {
@@ -860,6 +1257,7 @@ export class DebugWorkflowService {
 
         const result = await specialistRecipeRunner.run(specialist, runtimeContext, surface);
         specialistResults.push(result);
+        this.persistAgentResult(location.session.sessionId, location.run.runId, result);
         await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
           runId: location.run.runId,
           sessionId: location.session.sessionId,
@@ -876,6 +1274,7 @@ export class DebugWorkflowService {
           },
         }));
       }
+      this.applyTaskMutation(location.session.sessionId, location.run.runId, 'dispatch', 'completed', 'Specialist dispatch completed.');
 
       await this.persistInvestigationAndReport(location, debugPlan, runtimeContext, surface.replaySessionId, specialistResults);
     } catch (error) {
@@ -929,6 +1328,8 @@ export class DebugWorkflowService {
     const specialistAgents = debugPlan.recommendedSpecialists.length > 0
       ? debugPlan.recommendedSpecialists
       : ['triage_agent', 'pixel_forensics_agent', 'shader_ir_agent'];
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, 'speclist', 'completed', 'Mock task board seeded.');
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, 'dispatch', 'in_progress', 'Mock specialist dispatch started.');
 
     for (const specialist of specialistAgents) {
       if (signal.aborted) {
@@ -970,7 +1371,43 @@ export class DebugWorkflowService {
           confidence: 0.7,
         },
       }));
+      const evidenceId = generateEventId('evidence');
+      evidenceLedger.appendEvidence(location.session.sessionId, location.run.runId, {
+        evidenceId,
+        runId: location.run.runId,
+        sessionId: location.session.sessionId,
+        kind: 'analysis',
+        title: `${specialist} mock finding`,
+        summary: `${specialist} completed deterministic mock analysis.`,
+        refs: [`mock:${specialist}`],
+        taskId: 'dispatch',
+        agentId: specialist as AgentRole,
+        artifactIds: [],
+        strength: 'supporting',
+        metadata: {
+          confidence: 0.7,
+        },
+        createdAt: nowIso(),
+      });
+      contextService.appendAgentResultCard(location.session.sessionId, location.run.runId, {
+        cardId: generateEventId('agent-card'),
+        runId: location.run.runId,
+        sessionId: location.session.sessionId,
+        agentId: specialist as AgentRole,
+        taskId: 'dispatch',
+        status: 'completed',
+        summary: `${specialist} completed deterministic mock analysis.`,
+        evidenceIds: [evidenceId],
+        artifactIds: [],
+        verificationResultIds: [],
+        nextActions: ['Continue through the debugger main chain.'],
+        createdAt: nowIso(),
+        updatedAt: nowIso(),
+      });
     }
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, 'dispatch', 'completed', 'Mock specialist dispatch completed.');
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, 'investigate', 'completed', 'Mock investigation completed.');
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, 'fix_verify', 'completed', 'Mock verification completed.');
 
     if (slowRun) {
       await new Promise<void>((resolve, reject) => {
@@ -1031,6 +1468,8 @@ export class DebugWorkflowService {
         workflow_stage: 'finalize',
       },
     });
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, 'curate', 'completed', 'Mock report bundle published.');
+    contextService.writeRunCapsule(location.session.sessionId, location.run.runId);
     await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
       runId: location.run.runId,
       sessionId: location.session.sessionId,
@@ -1071,6 +1510,7 @@ export class DebugWorkflowService {
     replaySessionId: string,
     specialistResults: Array<{ reasoningSummary: ReasoningSummary; artifacts: string[] }>,
   ): Promise<void> {
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, 'investigate', 'in_progress', 'Investigation synthesis started.');
     await storageAdapter.updateRun(location.session.sessionId, location.run.runId, {
       lastStage: 'investigate',
       runtime: {
@@ -1090,6 +1530,33 @@ export class DebugWorkflowService {
     }));
 
     const investigationSummary = await this.buildInvestigationSummary(location, debugPlan, specialistResults);
+    const investigationEvidenceId = generateEventId('evidence');
+    evidenceLedger.appendEvidence(location.session.sessionId, location.run.runId, {
+      evidenceId: investigationEvidenceId,
+      runId: location.run.runId,
+      sessionId: location.session.sessionId,
+      kind: 'analysis',
+      title: 'Debugger investigation summary',
+      summary: investigationSummary.summary,
+      refs: investigationSummary.evidence,
+      taskId: 'investigate',
+      agentId: 'rdc-debugger',
+      artifactIds: [],
+      strength: investigationSummary.confidence >= 0.75 ? 'strong' : 'supporting',
+      metadata: {
+        nextStep: investigationSummary.nextStep,
+        confidence: investigationSummary.confidence,
+      },
+      createdAt: nowIso(),
+    });
+    this.applyTaskMutation(
+      location.session.sessionId,
+      location.run.runId,
+      'investigate',
+      'completed',
+      'Investigation summary recorded in EvidenceLedger.',
+      { evidenceRefs: [investigationEvidenceId] },
+    );
     await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
       runId: location.run.runId,
       sessionId: location.session.sessionId,
@@ -1105,6 +1572,7 @@ export class DebugWorkflowService {
       },
     }));
 
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, 'fix_verify', 'in_progress', 'Verification started.');
     const verification = await this.executeVerification(runtimeContext, replaySessionId, investigationSummary);
     await storageAdapter.updateRun(location.session.sessionId, location.run.runId, {
       lastStage: 'fix_verify',
@@ -1122,6 +1590,14 @@ export class DebugWorkflowService {
     }));
 
     const skeptic = await this.executeSkepticReview(location, debugPlan, investigationSummary, verification);
+    const verificationResult = this.persistVerificationResult(
+      location.session.sessionId,
+      location.run.runId,
+      debugPlan,
+      verification,
+      skeptic,
+      [investigationEvidenceId],
+    );
     await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
       runId: location.run.runId,
       sessionId: location.session.sessionId,
@@ -1132,8 +1608,43 @@ export class DebugWorkflowService {
     }));
 
     if (skeptic.payload.verdict === 'rejected') {
-      throw new Error(String(skeptic.payload.summary || 'Skeptic rejected the evidence chain.'));
+      this.applyTaskMutation(
+        location.session.sessionId,
+        location.run.runId,
+        'fix_verify',
+        'blocked',
+        String(skeptic.payload.summary || 'Skeptic rejected the evidence chain.'),
+        { evidenceRefs: verificationResult.evidenceIds },
+      );
+      await storageAdapter.updateRun(location.session.sessionId, location.run.runId, {
+        status: 'failed',
+        stopReason: String(skeptic.payload.summary || 'Skeptic rejected the evidence chain.'),
+        stoppedAt: Date.now(),
+        finishedAt: Date.now(),
+        lastStage: 'fix_verify',
+        runtime: {
+          workflow_stage: 'fix_verify',
+        },
+      });
+      this.emitRunStatus(
+        location.session.sessionId,
+        location.run.runId,
+        'failed',
+        'fix_verify',
+        String(skeptic.payload.summary || 'Skeptic rejected the evidence chain.'),
+      );
+      this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, location.run.runId));
+      return;
     }
+    this.applyTaskMutation(
+      location.session.sessionId,
+      location.run.runId,
+      'fix_verify',
+      'completed',
+      'Verifier accepted the evidence chain.',
+      { evidenceRefs: verificationResult.evidenceIds },
+    );
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, 'curate', 'in_progress', 'Curator report generation started.');
 
     const project = storageAdapter.getProjectById(location.run.projectId);
     if (!project) {
@@ -1169,6 +1680,8 @@ export class DebugWorkflowService {
         workflow_stage: 'finalize',
       },
     });
+    this.applyTaskMutation(location.session.sessionId, location.run.runId, 'curate', 'completed', 'Report bundle published.');
+    contextService.writeRunCapsule(location.session.sessionId, location.run.runId);
     await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
       runId: location.run.runId,
       sessionId: location.session.sessionId,
