@@ -18,6 +18,14 @@ const readFontSize = async (appContext: AppContext, selector: string): Promise<n
   appContext.page.locator(selector).evaluate((node) => Number.parseFloat(getComputedStyle(node).fontSize))
 );
 
+const readUserMenuPillWidths = async (appContext: AppContext): Promise<number[][]> => (
+  appContext.page.locator('.user-menu-pill-group').evaluateAll((groups) => groups.map((group) => (
+    Array.from(group.querySelectorAll<HTMLElement>('.user-menu-pill')).map((button) => (
+      Math.round(button.getBoundingClientRect().width)
+    ))
+  )))
+);
+
 const setWindowSize = async (appContext: AppContext, width: number, height: number) => {
   await appContext.app.evaluate(({ BrowserWindow }, size) => {
     const mainWindow = BrowserWindow.getAllWindows()[0];
@@ -106,6 +114,21 @@ test.afterEach(async () => {
   await closeApp(ctx);
 });
 
+test('user menu preference buttons stay equal width within each group', async () => {
+  await openUserMenu(ctx);
+
+  const groupWidths = await readUserMenuPillWidths(ctx);
+
+  expect(groupWidths).toHaveLength(3);
+  for (const widths of groupWidths) {
+    expect(widths.length).toBeGreaterThan(1);
+    const [firstWidth] = widths;
+    for (const width of widths) {
+      expect(Math.abs(width - firstWidth)).toBeLessThanOrEqual(1);
+    }
+  }
+});
+
 test('font scale propagates through user menu, settings, sidebar, and composer', async () => {
   await openUserMenu(ctx);
   await ctx.page.getByRole('button', { name: '小', exact: true }).click();
@@ -147,7 +170,7 @@ test('language switching updates settings, empty workbench, and right rail copy 
   await ctx.page.waitForTimeout(160);
 
   await expect(ctx.page.locator('[data-testid="settings-nav-general"]')).toContainText('General');
-  await expect(ctx.page.locator('.debugger-idle-simple-title')).toContainText('Three tools for end-to-end development');
+  await expect(ctx.page.locator('.debugger-idle-simple-title')).toContainText('Three Orchestrators for end-to-end development');
   await expect(ctx.page.locator('[data-testid="cp-section-sessionProgress"] .cp-section-label')).toContainText('Progress');
   await expect(ctx.page.locator('[data-testid="cp-section-sessionWorkingFolder"] .cp-section-label')).toContainText('Working folder');
   await expect(ctx.page.locator('[data-testid="cp-section-sessionContext"] .cp-section-label')).toContainText('Context');
@@ -157,7 +180,7 @@ test('language switching updates settings, empty workbench, and right rail copy 
   await ctx.page.waitForTimeout(160);
 
   await expect(ctx.page.locator('[data-testid="settings-nav-general"]')).toContainText('通用');
-  await expect(ctx.page.locator('.debugger-idle-simple-title')).toContainText('三大工具，全面助力研发');
+  await expect(ctx.page.locator('.debugger-idle-simple-title')).toContainText('Orchestrator');
   await expect(ctx.page.locator('[data-testid="cp-section-sessionProgress"] .cp-section-label')).toContainText('进度');
   await expect(ctx.page.locator('[data-testid="cp-section-sessionWorkingFolder"] .cp-section-label')).toContainText('工作目录');
   await expect(ctx.page.locator('[data-testid="cp-section-sessionContext"] .cp-section-label')).toContainText('上下文');

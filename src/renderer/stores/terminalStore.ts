@@ -87,7 +87,11 @@ const matchesScopeFilter = (
     return true;
   }
 
-  if (!context.sessionId || entry.scope !== 'session' || entry.sessionId !== context.sessionId) {
+  if (!context.sessionId) {
+    return entry.scope === 'app';
+  }
+
+  if (entry.scope !== 'session' || entry.sessionId !== context.sessionId) {
     return false;
   }
 

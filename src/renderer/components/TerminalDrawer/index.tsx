@@ -166,11 +166,11 @@ export const TerminalDrawer: React.FC = () => {
   const terminalTheme = useMemo(() => (
     resolvedTheme === 'light'
       ? {
-          background: '#f4f7fb',
-          foreground: '#1a2333',
-          cursor: '#0f8fcb',
-          black: '#dfe6ef',
-          brightBlack: '#718096',
+          background: '#f8fafc',
+          foreground: '#182231',
+          cursor: '#1b9dcc',
+          black: '#e2e8f0',
+          brightBlack: '#64748b',
           red: '#d64545',
           brightRed: '#ea6b6b',
           green: '#2f8c57',
@@ -187,11 +187,11 @@ export const TerminalDrawer: React.FC = () => {
           brightWhite: '#0f1723',
         }
       : {
-          background: '#18181f',
-          foreground: '#f0f3f8',
-          cursor: '#7dd3fc',
-          black: '#111318',
-          brightBlack: '#7b8193',
+          background: '#0f1115',
+          foreground: '#e6edf3',
+          cursor: '#2fb0ca',
+          black: '#101318',
+          brightBlack: '#768292',
           red: '#f87171',
           brightRed: '#fca5a5',
           green: '#4ade80',
@@ -260,11 +260,18 @@ export const TerminalDrawer: React.FC = () => {
     });
   }, [entries, namespaceFilter, query, severityFilter]);
 
+  const effectiveScopeFilter = useMemo<TerminalScopeFilter>(() => {
+    if (!activeSessionId && (scopeFilter === 'current-session' || scopeFilter === 'current-run')) {
+      return 'app';
+    }
+    return scopeFilter;
+  }, [activeSessionId, scopeFilter]);
+
   const shellTabs = useMemo(
     () => tabs
       .filter((tab) => tab.kind === 'shell')
-      .filter((tab) => matchesShellScope(tab, scopeFilter, activeSessionId, activeRunId)),
-    [activeRunId, activeSessionId, scopeFilter, tabs],
+      .filter((tab) => matchesShellScope(tab, effectiveScopeFilter, activeSessionId, activeRunId)),
+    [activeRunId, activeSessionId, effectiveScopeFilter, tabs],
   );
 
   const activeShellTab = useMemo(
@@ -273,15 +280,15 @@ export const TerminalDrawer: React.FC = () => {
   );
 
   const activeShellBuffer = activeShellTab ? (shellBuffers[activeShellTab.tabId] ?? '') : '';
-  const scopeLabel = scopeOptions.find((option) => option.value === scopeFilter)?.label ?? t('terminal.scopeCurrentSession');
+  const scopeLabel = scopeOptions.find((option) => option.value === effectiveScopeFilter)?.label ?? t('terminal.scopeCurrentSession');
   const titleContext = (() => {
-    if (scopeFilter === 'app') {
+    if (effectiveScopeFilter === 'app') {
       return t('terminal.scopeApp');
     }
-    if (scopeFilter === 'all-sessions') {
+    if (effectiveScopeFilter === 'all-sessions') {
       return t('terminal.scopeAllSessions');
     }
-    if (scopeFilter === 'current-run') {
+    if (effectiveScopeFilter === 'current-run') {
       return activeRunId
         ? `${scopeLabel} · ${formatShortId(activeRunId)}`
         : scopeLabel;
@@ -292,13 +299,13 @@ export const TerminalDrawer: React.FC = () => {
   })();
 
   const emptyCopy = (() => {
-    if (scopeFilter === 'current-run') {
+    if (effectiveScopeFilter === 'current-run') {
       return activeRunId ? t('terminal.emptyRun') : t('terminal.emptyRunHint');
     }
-    if (scopeFilter === 'current-session') {
+    if (effectiveScopeFilter === 'current-session') {
       return activeSessionId ? t('terminal.emptySession') : t('terminal.emptySessionHint');
     }
-    if (scopeFilter === 'app') {
+    if (effectiveScopeFilter === 'app') {
       return t('terminal.emptyApp');
     }
     return t('terminal.emptyAllSessions');
@@ -598,7 +605,10 @@ export const TerminalDrawer: React.FC = () => {
 
       <div className="runtime-terminal-titlebar">
         <div className="runtime-terminal-title-group">
-          <div className="runtime-terminal-title">{t('terminal.title')}</div>
+          <div className="runtime-terminal-title">
+            <span className="runtime-terminal-title-glyph" aria-hidden="true">&gt;_</span>
+            <span>{t('terminal.title')}</span>
+          </div>
           <div className="runtime-terminal-subtitle">{titleContext}</div>
         </div>
 
@@ -608,7 +618,7 @@ export const TerminalDrawer: React.FC = () => {
           aria-label={t('terminal.close')}
           onClick={() => useTerminalStore.getState().toggleOpen()}
         >
-          x
+          <span className="runtime-terminal-close-mark" aria-hidden="true" />
         </button>
       </div>
 
@@ -641,7 +651,7 @@ export const TerminalDrawer: React.FC = () => {
             <span>{t('terminal.scope')}</span>
             <DropdownSelect
               variant="inline"
-              value={scopeFilter}
+              value={effectiveScopeFilter}
               options={scopeOptions}
               dataTestId="runtime-terminal-scope"
               onChange={(nextValue) => setScopeFilter(nextValue as TerminalScopeFilter)}

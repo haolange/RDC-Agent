@@ -1,5 +1,6 @@
 .runtime-terminal-workspace {
-  --runtime-terminal-row-height: 34px;
+  --runtime-terminal-row-height: 38px;
+  --runtime-terminal-inline-padding: 14px;
   position: relative;
   flex: 0 0 auto;
   height: 0;
@@ -9,11 +10,14 @@
   display: flex;
   flex-direction: column;
   border-top: 1px solid rgb(var(--color-border-default) / 0);
-  background: rgb(var(--color-bg-1));
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.018), transparent 42%),
+    rgb(var(--color-bg-0));
   transition:
     height var(--transition-slow),
     max-height var(--transition-slow),
-    border-color var(--transition-base);
+    border-color var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .runtime-terminal-workspace.open {
@@ -21,6 +25,9 @@
   max-height: var(--runtime-terminal-height, 328px);
   min-height: min(var(--runtime-terminal-height, 328px), 100%);
   border-top-color: rgb(var(--color-border-secondary));
+  box-shadow:
+    0 -18px 34px rgb(0 0 0 / 0.2),
+    inset 0 1px 0 rgb(var(--color-accent-500) / 0.1);
 }
 
 .runtime-terminal-workspace.resizing {
@@ -39,11 +46,11 @@
   content: '';
   position: absolute;
   left: 50%;
-  top: 3px;
-  width: 72px;
-  height: 3px;
+  top: 2px;
+  width: 84px;
+  height: 2px;
   border-radius: 999px;
-  background: rgb(var(--color-border-strong) / 0.42);
+  background: rgb(var(--color-border-strong) / 0.5);
   transform: translateX(-50%);
   opacity: 0;
   transition: opacity var(--transition-fast), background var(--transition-fast);
@@ -52,7 +59,7 @@
 .runtime-terminal-resize-handle:hover::before,
 .runtime-terminal-workspace.resizing .runtime-terminal-resize-handle::before {
   opacity: 1;
-  background: rgb(var(--color-accent-400) / 0.72);
+  background: rgb(var(--color-accent-400) / 0.82);
 }
 
 body.terminal-resizing {
@@ -64,24 +71,45 @@ body.terminal-resizing {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  min-height: 48px;
-  padding: 12px 14px 8px;
-  border-bottom: 1px solid rgb(var(--color-border-default) / 0.55);
-  background: rgb(var(--color-bg-1));
+  gap: 14px;
+  min-height: 42px;
+  padding: 8px var(--runtime-terminal-inline-padding) 6px;
+  border-bottom: 1px solid rgb(var(--color-border-secondary));
+  background:
+    linear-gradient(180deg, rgb(var(--color-bg-1) / 0.96), rgb(var(--color-bg-1) / 0.72));
 }
 
 .runtime-terminal-title-group {
   min-width: 0;
   display: flex;
-  align-items: baseline;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
 }
 
 .runtime-terminal-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: rgb(var(--color-text-primary));
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: 650;
+  line-height: 1;
+}
+
+.runtime-terminal-title-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgb(var(--color-accent-500) / 0.24);
+  border-radius: 7px;
+  background: rgb(var(--color-accent-500) / 0.1);
+  color: rgb(var(--color-accent-300));
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.03);
 }
 
 .runtime-terminal-subtitle {
@@ -90,6 +118,7 @@ body.terminal-resizing {
   color: rgb(var(--color-text-tertiary));
   font-family: var(--font-mono);
   font-size: var(--text-xs);
+  line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -99,14 +128,12 @@ body.terminal-resizing {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 8px;
   background: transparent;
   color: rgb(var(--color-text-tertiary));
   cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 
@@ -115,37 +142,67 @@ body.terminal-resizing {
   color: rgb(var(--color-text-primary));
 }
 
+.runtime-terminal-close-mark {
+  position: relative;
+  width: 12px;
+  height: 12px;
+}
+
+.runtime-terminal-close-mark::before,
+.runtime-terminal-close-mark::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 5px;
+  width: 1.5px;
+  height: 12px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.runtime-terminal-close-mark::before {
+  transform: rotate(45deg);
+}
+
+.runtime-terminal-close-mark::after {
+  transform: rotate(-45deg);
+}
+
 .runtime-terminal-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  min-height: 52px;
-  padding: 8px 14px;
-  border-bottom: 1px solid rgb(var(--color-border-default) / 0.5);
-  background: rgb(var(--color-bg-1));
+  gap: 10px;
+  min-height: 46px;
+  padding: 7px var(--runtime-terminal-inline-padding);
+  border-bottom: 1px solid rgb(var(--color-border-secondary));
+  background: rgb(var(--color-bg-1) / 0.82);
 }
 
 .runtime-terminal-view-tabs {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px;
-  border: 1px solid rgb(var(--color-border-default));
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid rgb(var(--color-border-secondary));
   border-radius: 8px;
-  background: rgb(var(--color-bg-0));
+  background: rgb(var(--color-bg-0) / 0.72);
 }
 
 .runtime-terminal-view-tab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 30px;
-  padding: 0 12px;
+  min-height: 28px;
+  min-width: 74px;
+  padding: 0 11px;
+  border: none;
   border-radius: 6px;
+  background: transparent;
   color: rgb(var(--color-text-tertiary));
   cursor: pointer;
   font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 
@@ -154,8 +211,9 @@ body.terminal-resizing {
 }
 
 .runtime-terminal-view-tab.active {
-  background: rgb(var(--color-accent-500) / 0.12);
+  background: rgb(var(--color-bg-3) / 0.86);
   color: rgb(var(--color-text-primary));
+  box-shadow: inset 0 0 0 1px rgb(var(--color-accent-500) / 0.18);
 }
 
 .runtime-terminal-tools {
@@ -163,7 +221,7 @@ body.terminal-resizing {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   flex: 1;
 }
@@ -171,12 +229,12 @@ body.terminal-resizing {
 .runtime-terminal-select {
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-height: 34px;
+  gap: 7px;
+  min-height: 32px;
   padding: 0 10px;
-  border: 1px solid rgb(var(--color-border-default));
+  border: 1px solid rgb(var(--color-border-secondary));
   border-radius: 8px;
-  background: rgb(var(--color-bg-2) / 0.72);
+  background: rgb(var(--color-bg-0) / 0.52);
   color: rgb(var(--color-text-secondary));
   font-size: var(--text-sm);
 }
@@ -188,9 +246,10 @@ body.terminal-resizing {
 .runtime-terminal-select.stacked {
   align-items: stretch;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
   min-height: auto;
   padding: 10px;
+  background: rgb(var(--color-bg-2) / 0.68);
 }
 
 .runtime-terminal-select > span {
@@ -221,12 +280,12 @@ body.terminal-resizing {
   display: grid;
   grid-template-columns: minmax(160px, 1fr);
   gap: 8px;
-  width: 220px;
+  width: 226px;
   padding: 8px;
   border: 1px solid rgb(var(--color-border-default));
-  border-radius: 10px;
-  background: rgb(var(--color-bg-1));
-  box-shadow: 0 18px 42px rgb(0 0 0 / 0.28);
+  border-radius: 12px;
+  background: rgb(var(--color-bg-1) / 0.98);
+  box-shadow: 0 18px 42px rgb(0 0 0 / 0.3);
 }
 
 .runtime-terminal-tool-button,
@@ -236,14 +295,15 @@ body.terminal-resizing {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 34px;
+  min-height: 32px;
   padding: 0 11px;
-  border: 1px solid rgb(var(--color-border-default));
+  border: 1px solid rgb(var(--color-border-secondary));
   border-radius: 8px;
-  background: rgb(var(--color-bg-2) / 0.72);
+  background: rgb(var(--color-bg-0) / 0.54);
   color: rgb(var(--color-text-secondary));
   cursor: pointer;
   font-size: var(--text-sm);
+  font-weight: var(--font-medium);
   transition:
     background var(--transition-fast),
     border-color var(--transition-fast),
@@ -260,8 +320,9 @@ body.terminal-resizing {
 
 .runtime-terminal-tool-button.active {
   border-color: rgb(var(--color-accent-500) / 0.32);
-  background: rgb(var(--color-accent-500) / 0.11);
+  background: rgb(var(--color-accent-500) / 0.12);
   color: rgb(var(--color-text-primary));
+  box-shadow: inset 0 0 0 1px rgb(var(--color-accent-500) / 0.08);
 }
 
 .runtime-terminal-shell-actions button:disabled {
@@ -277,11 +338,11 @@ body.terminal-resizing {
 
 .runtime-terminal-search input {
   width: 100%;
-  min-height: 34px;
-  padding: 0 11px;
-  border: 1px solid rgb(var(--color-border-default));
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgb(var(--color-border-secondary));
   border-radius: 8px;
-  background: rgb(var(--color-bg-0));
+  background: rgb(var(--color-bg-0) / 0.72);
   color: rgb(var(--color-text-primary));
   font-size: var(--text-sm);
   outline: none;
@@ -296,7 +357,9 @@ body.terminal-resizing {
   position: relative;
   flex: 1;
   min-height: 0;
-  background: rgb(var(--color-bg-0));
+  background:
+    linear-gradient(180deg, rgb(var(--color-bg-1) / 0.36), transparent 28%),
+    rgb(var(--color-bg-0));
 }
 
 .runtime-terminal-activity-pane,
@@ -321,7 +384,7 @@ body.terminal-resizing {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 10px 12px 14px;
+  padding: 10px var(--runtime-terminal-inline-padding) 14px;
   font-family: var(--font-mono);
 }
 
@@ -331,31 +394,68 @@ body.terminal-resizing {
   justify-content: center;
   min-height: 100%;
   color: rgb(var(--color-text-tertiary));
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   text-align: center;
 }
 
 .runtime-terminal-entry {
-  border-bottom: 1px solid rgb(var(--color-border-default) / 0.48);
+  position: relative;
+  border-bottom: 1px solid rgb(var(--color-border-secondary));
   color: rgb(var(--color-text-secondary));
+  transition: background var(--transition-fast);
+}
+
+.runtime-terminal-entry::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 999px;
+  background: transparent;
+  opacity: 0;
+  transition: opacity var(--transition-fast), background var(--transition-fast);
+}
+
+.runtime-terminal-entry:hover::before,
+.runtime-terminal-entry.expanded::before {
+  opacity: 1;
+}
+
+.runtime-terminal-entry.severity-error::before {
+  background: rgb(var(--color-error));
+}
+
+.runtime-terminal-entry.severity-warning::before {
+  background: rgb(var(--color-warning));
+}
+
+.runtime-terminal-entry.severity-success::before {
+  background: rgb(var(--color-success));
+}
+
+.runtime-terminal-entry.severity-info::before {
+  background: rgb(var(--color-info));
 }
 
 .runtime-terminal-entry-main {
   display: grid;
-  grid-template-columns: 78px 76px 82px minmax(150px, 0.9fr) minmax(220px, 1.6fr);
+  grid-template-columns: 78px 74px 82px minmax(160px, 0.9fr) minmax(220px, 1.6fr);
   align-items: center;
   gap: 10px;
   width: 100%;
   min-height: var(--runtime-terminal-row-height);
-  padding: 0 8px;
+  padding: 0 8px 0 12px;
   background: transparent;
   color: inherit;
   cursor: pointer;
   text-align: left;
+  border-radius: 8px;
 }
 
 .runtime-terminal-entry-main:hover {
-  background: rgb(var(--color-bg-2) / 0.72);
+  background: rgb(var(--color-bg-2) / 0.48);
 }
 
 .runtime-terminal-entry.expanded .runtime-terminal-entry-main {
@@ -375,39 +475,44 @@ body.terminal-resizing {
   align-items: center;
   justify-content: center;
   min-width: 0;
-  height: 20px;
-  padding: 0 7px;
+  height: 22px;
+  padding: 0 8px;
   border-radius: 6px;
   font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 650;
   line-height: 1;
   text-transform: uppercase;
   white-space: nowrap;
 }
 
 .runtime-terminal-severity.severity-error {
-  background: rgb(var(--color-error) / 0.16);
+  border: 1px solid rgb(var(--color-error) / 0.26);
+  background: rgb(var(--color-error) / 0.08);
   color: rgb(var(--color-error));
 }
 
 .runtime-terminal-severity.severity-warning {
-  background: rgb(var(--color-warning) / 0.16);
+  border: 1px solid rgb(var(--color-warning) / 0.26);
+  background: rgb(var(--color-warning) / 0.08);
   color: rgb(var(--color-warning));
 }
 
 .runtime-terminal-severity.severity-success {
-  background: rgb(var(--color-success) / 0.16);
+  border: 1px solid rgb(var(--color-success) / 0.22);
+  background: rgb(var(--color-success) / 0.08);
   color: rgb(var(--color-success));
 }
 
 .runtime-terminal-severity.severity-info {
-  background: rgb(var(--color-bg-4) / 0.76);
+  border: 1px solid rgb(var(--color-border-secondary));
+  background: rgb(var(--color-bg-2) / 0.62);
   color: rgb(var(--color-text-secondary));
 }
 
 .runtime-terminal-entry-namespace {
-  background: rgb(var(--color-bg-3) / 0.8);
+  border: 1px solid rgb(var(--color-border-secondary));
+  background: rgb(var(--color-bg-2) / 0.62);
   color: rgb(var(--color-text-tertiary));
 }
 
@@ -437,7 +542,7 @@ body.terminal-resizing {
 .runtime-terminal-entry-title {
   color: rgb(var(--color-text-primary));
   font-size: var(--text-sm);
-  font-weight: 600;
+  font-weight: 650;
 }
 
 .runtime-terminal-entry-summary {
@@ -453,8 +558,10 @@ body.terminal-resizing {
 .runtime-terminal-entry-details {
   display: grid;
   gap: 8px;
-  padding: 8px 8px 12px 246px;
-  background: rgb(var(--color-bg-1) / 0.48);
+  margin: 0 0 6px 0;
+  padding: 8px 8px 12px 256px;
+  border-radius: 8px;
+  background: rgb(var(--color-bg-1) / 0.54);
 }
 
 .runtime-terminal-entry-detail {
@@ -477,9 +584,9 @@ body.terminal-resizing {
   overflow: auto;
   margin: 0;
   padding: 10px 12px;
-  border: 1px solid rgb(var(--color-border-default) / 0.6);
+  border: 1px solid rgb(var(--color-border-secondary));
   border-radius: 8px;
-  background: rgb(var(--color-bg-0));
+  background: rgb(var(--color-bg-0) / 0.76);
   color: rgb(var(--color-text-secondary));
   font-size: var(--text-sm);
   white-space: pre-wrap;
@@ -502,16 +609,16 @@ body.terminal-resizing {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  min-height: 46px;
-  padding: 8px 12px;
-  border-bottom: 1px solid rgb(var(--color-border-default) / 0.5);
-  background: rgb(var(--color-bg-1));
+  min-height: 44px;
+  padding: 7px var(--runtime-terminal-inline-padding);
+  border-bottom: 1px solid rgb(var(--color-border-secondary));
+  background: rgb(var(--color-bg-1) / 0.72);
 }
 
 .runtime-terminal-shell-tabs {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
   overflow-x: auto;
 }
@@ -519,19 +626,20 @@ body.terminal-resizing {
 .runtime-terminal-shell-tab {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  min-height: 32px;
-  padding: 0 5px 0 9px;
-  border: 1px solid rgb(var(--color-border-default));
+  gap: 4px;
+  min-height: 30px;
+  padding: 0 4px 0 8px;
+  border: 1px solid rgb(var(--color-border-secondary));
   border-radius: 8px;
-  background: rgb(var(--color-bg-2) / 0.72);
+  background: rgb(var(--color-bg-0) / 0.6);
   color: rgb(var(--color-text-secondary));
 }
 
 .runtime-terminal-shell-tab.active {
   border-color: rgb(var(--color-accent-500) / 0.3);
-  background: rgb(var(--color-accent-500) / 0.1);
+  background: rgb(var(--color-bg-3) / 0.68);
   color: rgb(var(--color-text-primary));
+  box-shadow: inset 2px 0 0 rgb(var(--color-accent-500) / 0.72);
 }
 
 .runtime-terminal-shell-tab-trigger {
@@ -548,6 +656,7 @@ body.terminal-resizing {
   color: rgb(var(--color-accent-400));
   font-family: var(--font-mono);
   font-size: var(--text-xs);
+  font-weight: 700;
 }
 
 .runtime-terminal-tab-label {
@@ -561,13 +670,14 @@ body.terminal-resizing {
 
 .runtime-terminal-shell-status {
   height: 18px;
-  background: rgb(var(--color-bg-4) / 0.76);
+  border-color: transparent;
+  background: transparent;
   color: rgb(var(--color-text-tertiary));
   font-size: 10px;
 }
 
 .runtime-terminal-shell-status.running {
-  background: rgb(var(--color-success) / 0.14);
+  background: rgb(var(--color-success) / 0.1);
   color: rgb(var(--color-success));
 }
 
@@ -575,9 +685,9 @@ body.terminal-resizing {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 999px;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
   background: transparent;
   color: rgb(var(--color-text-tertiary));
   cursor: pointer;
@@ -601,9 +711,10 @@ body.terminal-resizing {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  min-height: 30px;
-  padding: 6px 12px;
-  border-bottom: 1px solid rgb(var(--color-border-default) / 0.4);
+  min-height: 32px;
+  padding: 6px var(--runtime-terminal-inline-padding);
+  border-bottom: 1px solid rgb(var(--color-border-secondary));
+  background: rgb(var(--color-bg-0) / 0.36);
   color: rgb(var(--color-text-tertiary));
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -613,11 +724,19 @@ body.terminal-resizing {
   flex: 1;
   min-height: 0;
   width: 100%;
-  background: rgb(var(--color-bg-0));
+  padding: 8px var(--runtime-terminal-inline-padding) 12px;
+  background:
+    linear-gradient(180deg, rgb(var(--color-bg-1) / 0.28), transparent 80px),
+    rgb(var(--color-bg-0));
 }
 
 .runtime-terminal-shell-host .xterm {
   height: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgb(var(--color-border-secondary));
+  border-radius: 9px;
+  background: rgb(var(--color-bg-1) / 0.7);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.02);
 }
 
 .runtime-terminal-shell-host .xterm-screen,
@@ -632,6 +751,10 @@ body.terminal-resizing {
   align-content: center;
   gap: 12px;
   flex: 1;
+  padding: 24px;
+  background:
+    linear-gradient(180deg, rgb(var(--color-bg-1) / 0.28), transparent 70%),
+    rgb(var(--color-bg-0));
   color: rgb(var(--color-text-tertiary));
   text-align: center;
 }
@@ -653,6 +776,10 @@ body.terminal-resizing {
     flex-direction: column;
   }
 
+  .runtime-terminal-view-tabs {
+    align-self: flex-start;
+  }
+
   .runtime-terminal-tools {
     width: 100%;
     justify-content: flex-start;
@@ -661,10 +788,12 @@ body.terminal-resizing {
 
   .runtime-terminal-entry-main {
     grid-template-columns: 72px 70px 76px minmax(120px, 1fr);
+    gap: 8px;
   }
 
   .runtime-terminal-entry-summary {
     grid-column: 4 / -1;
+    padding-bottom: 6px;
   }
 
   .runtime-terminal-entry-details {
