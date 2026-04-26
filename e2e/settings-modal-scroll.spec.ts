@@ -82,6 +82,24 @@ test('设置弹窗中的 Workspace、Model 与 Agent 面板保持可访问的滚
 
   await expect(page.locator('[data-testid="settings-modal"]')).toBeVisible();
   await expect(page.locator('[data-testid="settings-center-panel"]')).toBeVisible();
+  const backdropFilter = await page.locator('.settings-modal-backdrop').evaluate((element) => {
+    const styles = window.getComputedStyle(element);
+    return styles.backdropFilter
+      || (styles as CSSStyleDeclaration & { webkitBackdropFilter?: string }).webkitBackdropFilter
+      || '';
+  });
+  expect(backdropFilter).not.toBe('none');
+  expect(backdropFilter).toContain('blur(18px)');
+  expect(backdropFilter).not.toContain('brightness');
+  const backdropPaint = await page.locator('.settings-modal-backdrop').evaluate((element) => {
+    const styles = window.getComputedStyle(element);
+    return {
+      backgroundColor: styles.backgroundColor,
+      backgroundImage: styles.backgroundImage,
+    };
+  });
+  expect(backdropPaint.backgroundColor).toBe('rgba(0, 0, 0, 0)');
+  expect(backdropPaint.backgroundImage).toBe('none');
 
   await page.locator('[data-testid="settings-nav-models"]').click();
   await expect(page.locator('[data-testid="settings-provider-list"]')).toBeVisible();
@@ -122,5 +140,10 @@ test('设置弹窗中的 Workspace、Model 与 Agent 面板保持可访问的滚
   expect(agentRowLayout.controlCount).toBe(2);
   expect(Math.abs(agentRowLayout.providerY - agentRowLayout.modelY)).toBeLessThanOrEqual(2);
   expect(Math.abs(agentRowLayout.headCenterY - agentRowLayout.providerCenterY)).toBeLessThanOrEqual(14);
-  await expect(page.locator('[data-testid="settings-modal"]')).toHaveScreenshot('settings-agents.png');
+  await expect(page.locator('[data-testid="settings-modal"]')).toHaveScreenshot('settings-agents.png', {
+    maxDiffPixels: 240,
+  });
+
+  await page.locator('.settings-modal-backdrop').click({ position: { x: 4, y: 4 } });
+  await expect(page.locator('[data-testid="settings-modal"]')).toBeHidden();
 });

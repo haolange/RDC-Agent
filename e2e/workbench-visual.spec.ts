@@ -1053,6 +1053,11 @@ test('Terminal drawer appears below the prompt bar when opened', async () => {
   });
 
   await expect(page.locator('.app-main')).toHaveScreenshot('runtime-terminal-open.png');
+
+  await page.locator('[data-testid="runtime-terminal-shell-tab"]').click();
+  await expect(page.locator('[data-testid="runtime-terminal-shell-pane"]')).toBeVisible();
+  await expect(page.locator('.runtime-terminal-shell-empty')).toBeVisible();
+  await expect(page.locator('.app-main')).toHaveScreenshot('runtime-terminal-shell-empty.png');
 });
 
 test('sidebar footer remains visually stable', async () => {
