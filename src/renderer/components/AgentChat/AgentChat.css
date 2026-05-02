@@ -2,8 +2,8 @@
   --chat-top-hard-stop-height: var(--workbench-chat-top-hard-stop-height, 92px);
   --chat-top-transition-height: var(--workbench-chat-top-transition-height, 72px);
   --chat-top-safe-zone: calc(var(--chat-top-hard-stop-height) + var(--chat-top-transition-height));
-  --chat-inline-padding: 24px;
-  --chat-transcript-width: min(820px, calc(100vw - 360px));
+  --chat-inline-padding: var(--workbench-content-rail-gutter, 16px);
+  --chat-transcript-width: var(--workbench-content-rail-width, 1080px);
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -90,7 +90,7 @@
 }
 
 .conversation-turn {
-  width: var(--chat-transcript-width);
+  width: min(var(--chat-transcript-width), 100%);
   max-width: 100%;
   display: flex;
   flex-direction: column;
@@ -750,24 +750,6 @@
 .message-attachment-pill-meta {
   font-size: 11px;
   color: rgb(var(--color-text-tertiary));
-}
-
-@container (min-width: 1180px) {
-  .agent-chat {
-    --chat-transcript-width: min(860px, 72%);
-  }
-}
-
-@container (min-width: 1480px) {
-  .agent-chat {
-    --chat-transcript-width: min(920px, 68%);
-  }
-}
-
-@media (max-width: 1180px) {
-  .agent-chat {
-    --chat-transcript-width: min(820px, 100%);
-  }
 }
 
 @media (max-width: 760px) {
