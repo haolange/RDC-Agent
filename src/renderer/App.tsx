@@ -129,14 +129,34 @@ const getWorkbenchRailMaxWidth = (
   }
 
   if (leftCollapsed && rightCollapsed) {
-    return 'min(1180px, 64%)';
+    return 'min(1440px, 84%)';
   }
 
   if (leftCollapsed || rightCollapsed) {
     return 'min(1320px, 88%)';
   }
 
-  return 'min(1440px, 96%)';
+  return 'min(1440px, 100%)';
+};
+
+const getWorkbenchContentRailWidth = (
+  leftCollapsed: boolean,
+  rightCollapsed: boolean,
+  rightVisible: boolean,
+): string => {
+  if (!rightVisible) {
+    return '1180px';
+  }
+
+  if (leftCollapsed && rightCollapsed) {
+    return '1280px';
+  }
+
+  if (leftCollapsed || rightCollapsed) {
+    return '1180px';
+  }
+
+  return '1080px';
 };
 
 const getResizeHandleAllowance = (
@@ -754,6 +774,11 @@ const App: React.FC = () => {
   const effectiveRightCollapsed = isRightRailVisible ? responsiveSidebarState.rightCollapsed : true;
   const bothSidebarsCollapsed = effectiveLeftCollapsed && (!isRightRailVisible || effectiveRightCollapsed);
   const workbenchRailMaxWidth = getWorkbenchRailMaxWidth(
+    effectiveLeftCollapsed,
+    effectiveRightCollapsed,
+    isRightRailVisible,
+  );
+  const workbenchContentRailWidth = getWorkbenchContentRailWidth(
     effectiveLeftCollapsed,
     effectiveRightCollapsed,
     isRightRailVisible,
@@ -1820,6 +1845,7 @@ const App: React.FC = () => {
             ['--left-resize-handle-width' as string]: `${effectiveLeftCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH}px`,
             ['--right-resize-handle-width' as string]: `${!isRightRailVisible || effectiveRightCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH}px`,
             ['--workbench-rail-max-width' as string]: workbenchRailMaxWidth,
+            ['--workbench-content-rail-width' as string]: workbenchContentRailWidth,
             ['--workbench-inline-mode' as string]: bothSidebarsCollapsed ? 'dual-collapsed' : 'sidebar-open',
           }}
         >

@@ -199,6 +199,22 @@ const getCenterDelta = async (page: Page, outerSelector: string, innerSelector: 
   };
 }, { outerSelector, innerSelector });
 
+const getHorizontalEdgeDelta = async (page: Page, leftSelector: string, rightSelector: string) => page.evaluate((params) => {
+  const leftElement = document.querySelector(params.leftSelector);
+  const rightElement = document.querySelector(params.rightSelector);
+  if (!(leftElement instanceof HTMLElement) || !(rightElement instanceof HTMLElement)) {
+    return null;
+  }
+
+  const leftRect = leftElement.getBoundingClientRect();
+  const rightRect = rightElement.getBoundingClientRect();
+
+  return {
+    left: Math.abs(leftRect.left - rightRect.left),
+    right: Math.abs(leftRect.right - rightRect.right),
+  };
+}, { leftSelector, rightSelector });
+
 const seedVisualWorkbench = async (page: Page) => {
   const previewAssetPath = path.resolve('src/renderer/assets/images/hero-bg.png');
   const previewAssetUrl = `data:image/png;base64,${fs.readFileSync(previewAssetPath).toString('base64')}`;
@@ -1165,6 +1181,31 @@ test('composer footer keeps Upload, Mode, Usage, Send order', async () => {
   await assertComposerFooterOrder(page);
 });
 
+test('chat transcript and composer share the same content rail', async () => {
+  const page = ctx.page;
+  await setWindowSize(ctx, 1720, 980);
+  await seedConversationPreview(page);
+
+  await expect(page.locator('[data-testid="conversation-turn"]').first()).toBeVisible();
+  await expect(page.locator('.composer-shell')).toBeVisible();
+
+  const expandedDelta = await getHorizontalEdgeDelta(page, '[data-testid="conversation-turn"]', '.composer-shell');
+  expect(expandedDelta).not.toBeNull();
+  expect(expandedDelta?.left ?? 99).toBeLessThanOrEqual(4);
+  expect(expandedDelta?.right ?? 99).toBeLessThanOrEqual(4);
+  await expect.poll(async () => page.locator('.composer-shell').evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(1000);
+
+  await page.locator('[data-testid="titlebar-right-panel-toggle"]').click();
+  await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveClass(/collapsed/);
+  await page.waitForTimeout(320);
+
+  const rightCollapsedDelta = await getHorizontalEdgeDelta(page, '[data-testid="conversation-turn"]', '.composer-shell');
+  expect(rightCollapsedDelta).not.toBeNull();
+  expect(rightCollapsedDelta?.left ?? 99).toBeLessThanOrEqual(4);
+  expect(rightCollapsedDelta?.right ?? 99).toBeLessThanOrEqual(4);
+  await expect.poll(async () => page.locator('.composer-shell').evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThan(1120);
+});
+
 test('collapsed footer icons stay centered in their buttons', async () => {
   const page = ctx.page;
   await setWindowSize(ctx, 1720, 980);
@@ -1216,7 +1257,7 @@ test('chat document flow expands with the main canvas when both sidebars are col
     };
   });
 
-  expect(layout.messageWidth).toBeGreaterThan(layout.mainWidth * 0.4);
-  expect(layout.messageWidth).toBeLessThan(layout.mainWidth * 0.65);
+  expect(layout.messageWidth).toBeGreaterThan(layout.mainWidth * 0.55);
+  expect(layout.messageWidth).toBeLessThan(layout.mainWidth * 0.84);
   expect(layout.documentWidth).toBeLessThanOrEqual(layout.messageWidth);
 });

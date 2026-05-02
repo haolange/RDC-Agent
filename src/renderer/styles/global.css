@@ -453,13 +453,21 @@ a {
 }
 
 .main-input-bar {
+  --workbench-content-rail-gutter: 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: min(var(--workbench-rail-max-width, 100%), 100%);
+  width: min(
+    calc(
+      var(--workbench-content-rail-width, 1080px)
+      + var(--workbench-content-rail-gutter)
+      + var(--workbench-content-rail-gutter)
+    ),
+    100%
+  );
   margin-inline: auto;
   justify-content: stretch;
-  padding: 10px 16px 16px;
+  padding: 10px var(--workbench-content-rail-gutter) 16px;
   border-top: none;
   background: transparent;
 }
@@ -2000,8 +2008,9 @@ select:focus:not(:focus-visible),
   }
 
   .main-input-bar {
+    --workbench-content-rail-gutter: 14px;
     width: 100%;
-    padding: 10px 14px 14px;
+    padding: 10px var(--workbench-content-rail-gutter) 14px;
   }
 
   .composer-shell {
@@ -2173,7 +2182,7 @@ body {
 }
 
 .main-input-bar {
-  padding: 10px 16px 14px;
+  padding: 10px var(--workbench-content-rail-gutter, 16px) 14px;
 }
 
 .composer-shell {
