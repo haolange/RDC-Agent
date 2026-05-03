@@ -1,4 +1,4 @@
-import { _electron as electron, ElectronApplication, Page } from '@playwright/test';
+import { _electron as electron, ConsoleMessage, ElectronApplication, Page } from '@playwright/test';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -18,6 +18,8 @@ interface LaunchAppOptions {
   testMode?: boolean;
   userDataDir?: string;
   workspaceDir?: string;
+  onConsole?: (message: ConsoleMessage) => void;
+  onPageError?: (error: Error) => void;
 }
 
 /**
@@ -57,6 +59,12 @@ export async function launchApp(options: LaunchAppOptions = {}): Promise<AppCont
   });
 
   const page = await app.firstWindow();
+  if (options.onConsole) {
+    page.on('console', options.onConsole);
+  }
+  if (options.onPageError) {
+    page.on('pageerror', options.onPageError);
+  }
   await page.waitForLoadState('domcontentloaded');
   await page.locator('.app-titlebar').waitFor({ state: 'visible', timeout: 10000 });
   const loadingScreen = page.locator('.loading-screen');
