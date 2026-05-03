@@ -1,219 +1,295 @@
-import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { AGENT_DISPLAY_NAMES, getAgentModeConfig } from '@shared/constants/agents';
-import type { AgentRole } from '@shared/types/agent';
-import type { ConversationMessage, ConversationToolCall } from '@shared/types/conversation';
+import React, { useDeferredValue, useEffect, useMemo, useRef } from 'react';
+import type {
+  AgentEdge,
+  AgentNode,
+  AgentNodeStatus,
+  AgentRunPayload,
+  ArtifactPayload,
+  EvidencePayload,
+  GroupPayload,
+  StepPayload,
+  TimelineProjection,
+  ToolCallPayload,
+} from '@shared/types/agentTimeline';
+import type { ConversationMessage } from '@shared/types/conversation';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { AgentMode } from '@shared/types/layout';
-import type { SessionAttachmentRecord } from '@shared/types/session';
-import type { WorkflowStage, WorkflowState } from '@shared/types/workflow';
-import { useI18n } from '../../i18n';
+import type { DebugPlan, ReasoningSummary, WorkflowState } from '@shared/types/workflow';
+import type { HarnessTask } from '@shared/types/harness';
+import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import { useSessionStore } from '../../stores/sessionStore';
 import { EmptyWorkbenchPrompt } from '../EmptyWorkbenchPrompt';
-import { ModeGlyph } from '../ModeGlyph';
+import { AgentMessageTimeline } from '../AgentMessageTimeline';
 import './AgentChat.css';
 
 const STICKY_SCROLL_THRESHOLD = 96;
 
-type TraceStatus = 'pending' | 'running' | 'complete' | 'error';
-type TracePhase = 'conversation' | 'plan' | 'execution' | 'activity';
-type TraceSource = 'reasoning' | 'action-events' | 'workflow';
-
-interface TraceArtifactView {
-  id: string;
-  label: string;
-  path: string;
-  kind: 'image' | 'file';
+interface ProjectionBuilder {
+  projection: TimelineProjection;
+  addNode: <TPayload>(node: AgentNode<TPayload>) => AgentNode<TPayload>;
+  addChild: (parentId: string, childId: string, edgeType?: AgentEdge['type']) => void;
+  addEdge: (edge: AgentEdge) => void;
 }
 
-interface TraceStepView {
-  id: string;
-  title: string;
-  status: TraceStatus;
-  summary?: string;
-  detail?: string;
-  stage?: string;
-  agentId?: AgentRole | string;
-  duration?: string | null;
-  toolCalls: ConversationToolCall[];
-  artifacts: TraceArtifactView[];
-  isAgentRun?: boolean;
-}
-
-interface PhaseTraceView {
-  id: string;
-  title: string;
-  phase: TracePhase;
-  status: TraceStatus;
-  source: TraceSource;
-  steps: TraceStepView[];
-}
-
-interface ConversationTurnView {
+interface TurnInput {
   turnId: string;
   messages: ConversationMessage[];
   userMessage?: ConversationMessage;
   assistantMessages: ConversationMessage[];
-  systemMessages: ConversationMessage[];
-  phaseCards: PhaseTraceView[];
-  createdAt: number;
   runIds: string[];
+  createdAt: number;
 }
 
-const PLAN_STAGES = new Set<WorkflowStage>(['preflight', 'entry_gate', 'intake_gate', 'plan', 'speclist']);
-const EXECUTION_STAGES = new Set<WorkflowStage>(['dispatch', 'investigate', 'fix_verify', 'skepti', 'curate', 'finalize']);
+interface ToolSource {
+  id: string;
+  toolName: string;
+  status: AgentNodeStatus;
+  argumentsSummary: string;
+  resultSummary: string;
+  argumentsRaw?: unknown;
+  resultRaw?: unknown;
+  error?: string;
+  startedAt: number;
+  completedAt?: number;
+  durationMs?: number;
+}
 
-const formatTime = (timestamp: number, language: string): string =>
-  new Date(timestamp).toLocaleTimeString(language === 'zh-CN' ? 'zh-CN' : 'en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+interface ArtifactSource {
+  id: string;
+  name: string;
+  path?: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  artifactType: ArtifactPayload['artifactType'];
+}
 
-const formatAttachmentSize = (size: number): string => {
-  if (!size) {
+const sanitizeId = (value: string): string => value.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+const firstLine = (value: string | undefined, fallback: string): string => {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return fallback;
+  }
+  return trimmed.split(/\r?\n/)[0] || fallback;
+};
+
+const formatJsonPreview = (value: unknown): string => {
+  if (value === undefined || value === null || value === '') {
     return '';
   }
-  if (size < 1024) {
-    return `${size} B`;
-  }
-  if (size < 1024 * 1024) {
-    return `${Math.round(size / 1024)} KB`;
-  }
-  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-};
-
-const formatDuration = (startedAt: number, completedAt?: number): string | null => {
-  if (!completedAt || completedAt <= startedAt) {
-    return null;
-  }
-  const durationMs = completedAt - startedAt;
-  if (durationMs < 1000) {
-    return `${durationMs}ms`;
-  }
-  return `${(durationMs / 1000).toFixed(1)}s`;
-};
-
-const formatDurationMs = (durationMs: number): string | null => {
-  if (!Number.isFinite(durationMs) || durationMs <= 0) {
-    return null;
-  }
-  if (durationMs < 1000) {
-    return `${Math.round(durationMs)}ms`;
-  }
-  return `${(durationMs / 1000).toFixed(1)}s`;
-};
-
-const resolveEntryMode = (entry: ConversationMessage, fallbackMode: AgentMode): AgentMode =>
-  entry.modeContext ?? fallbackMode;
-
-const normalizeStatus = (status: string | undefined): TraceStatus => {
-  if (status === 'pending' || status === 'queued' || status === 'awaiting_approval' || status === 'awaiting_input') {
-    return 'pending';
-  }
-  if (status === 'running' || status === 'draft' || status === 'streaming' || status === 'entered' || status === 'sent') {
-    return 'running';
-  }
-  if (status === 'error' || status === 'fail' || status === 'failed' || status === 'blocked' || status === 'timeout') {
-    return 'error';
-  }
-  return 'complete';
-};
-
-const getStagePhase = (stage?: string | null): TracePhase => {
-  if (!stage) {
-    return 'activity';
-  }
-  if (PLAN_STAGES.has(stage as WorkflowStage)) {
-    return 'plan';
-  }
-  if (EXECUTION_STAGES.has(stage as WorkflowStage)) {
-    return 'execution';
-  }
-  return 'activity';
-};
-
-const getPhaseTitle = (phase: TracePhase): string => {
-  if (phase === 'plan') {
-    return '规划阶段轨迹 (Plan Phase)';
-  }
-  if (phase === 'execution') {
-    return '执行阶段轨迹 (Execution Phase)';
-  }
-  if (phase === 'conversation') {
-    return '协作消息轨迹 (Conversation Phase)';
-  }
-  return '活动记录 (Activity)';
-};
-
-const getPhaseStatus = (steps: TraceStepView[]): TraceStatus => {
-  if (steps.some((step) => step.status === 'error')) {
-    return 'error';
-  }
-  if (steps.some((step) => step.status === 'running')) {
-    return 'running';
-  }
-  if (steps.some((step) => step.status === 'pending')) {
-    return 'pending';
-  }
-  return 'complete';
-};
-
-const getPayloadString = (payload: Record<string, unknown>, keys: string[]): string | undefined => {
-  for (const key of keys) {
-    const value = payload[key];
-    if (typeof value === 'string' && value.trim()) {
-      return value;
-    }
-    if (typeof value === 'number') {
-      return String(value);
-    }
-  }
-  return undefined;
-};
-
-const isImagePath = (value: string): boolean => /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(value);
-
-const looksLikePath = (value: string): boolean =>
-  /^[a-zA-Z]:[\\/]/.test(value) || value.startsWith('/') || value.includes('\\') || value.includes('/');
-
-const extractArtifactsFromValue = (value: unknown, idPrefix: string, artifacts: TraceArtifactView[]) => {
   if (typeof value === 'string') {
-    if (!looksLikePath(value)) {
+    return value;
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+};
+
+const statusFromMessage = (message: ConversationMessage | undefined): AgentNodeStatus => {
+  if (!message?.status || message.status === 'complete') {
+    return 'succeeded';
+  }
+  if (message.status === 'draft' || message.status === 'streaming') {
+    return 'streaming';
+  }
+  if (message.status === 'error') {
+    return 'failed';
+  }
+  if (message.status === 'stopped') {
+    return 'cancelled';
+  }
+  return 'succeeded';
+};
+
+const statusFromEvent = (event: ActionEvent): AgentNodeStatus => {
+  if (event.status === 'error' || event.status === 'fail' || event.status === 'timeout') {
+    return 'failed';
+  }
+  if (event.status === 'blocked') {
+    return 'blocked';
+  }
+  if (event.status === 'sent' || event.status === 'entered') {
+    return 'running';
+  }
+  if (event.status === 'warning') {
+    return 'partial_succeeded';
+  }
+  return 'succeeded';
+};
+
+const statusFromHarness = (status: HarnessTask['status']): AgentNodeStatus => {
+  if (status === 'completed') {
+    return 'succeeded';
+  }
+  if (status === 'in_progress') {
+    return 'running';
+  }
+  if (status === 'blocked') {
+    return 'blocked';
+  }
+  if (status === 'rejected') {
+    return 'failed';
+  }
+  if (status === 'cancelled') {
+    return 'cancelled';
+  }
+  return 'pending';
+};
+
+const aggregateStatus = (statuses: AgentNodeStatus[]): AgentNodeStatus => {
+  if (statuses.length === 0) {
+    return 'pending';
+  }
+  if (statuses.every((status) => status === 'succeeded' || status === 'skipped')) {
+    return 'succeeded';
+  }
+  if (statuses.every((status) => status === 'failed' || status === 'blocked' || status === 'cancelled')) {
+    return 'failed';
+  }
+  if (statuses.some((status) => status === 'failed' || status === 'blocked' || status === 'cancelled' || status === 'partial_succeeded')) {
+    return 'partial_succeeded';
+  }
+  if (statuses.some((status) => status === 'running' || status === 'streaming' || status === 'waiting_tool' || status === 'merging')) {
+    return 'running';
+  }
+  return 'pending';
+};
+
+const createBuilder = (id: string, turnId: string, runId: string | undefined, messages: ConversationMessage[]): ProjectionBuilder => {
+  const projection: TimelineProjection = {
+    id,
+    turnId,
+    runId,
+    nodes: {},
+    edges: {},
+    rootNodeIds: [],
+    sourceMessages: messages,
+  };
+
+  const addNode = <TPayload,>(node: AgentNode<TPayload>): AgentNode<TPayload> => {
+    projection.nodes[node.id] = node as AgentNode;
+    if (!node.parentId && !projection.rootNodeIds.includes(node.id)) {
+      projection.rootNodeIds.push(node.id);
+    }
+    return node;
+  };
+
+  const addEdge = (edge: AgentEdge) => {
+    projection.edges[edge.id] = edge;
+  };
+
+  const addChild = (parentId: string, childId: string, edgeType: AgentEdge['type'] = 'contains') => {
+    const parent = projection.nodes[parentId];
+    const child = projection.nodes[childId];
+    if (!parent || !child) {
       return;
     }
-    const normalized = value.replace(/\\/g, '/');
-    const label = normalized.split('/').filter(Boolean).pop() ?? value;
-    artifacts.push({
-      id: `${idPrefix}-${artifacts.length}`,
-      label,
-      path: value,
-      kind: isImagePath(value) ? 'image' : 'file',
+    parent.children = [...(parent.children ?? []), childId];
+    child.parentId = parentId;
+    projection.rootNodeIds = projection.rootNodeIds.filter((idValue) => idValue !== childId);
+    addEdge({
+      id: `${parentId}-${edgeType}-${childId}`,
+      type: edgeType,
+      from: parentId,
+      to: childId,
+      createdAt: child.createdAt,
     });
-    return;
-  }
-  if (Array.isArray(value)) {
-    value.forEach((entry, index) => extractArtifactsFromValue(entry, `${idPrefix}-${index}`, artifacts));
-    return;
-  }
-  if (value && typeof value === 'object') {
-    const record = value as Record<string, unknown>;
-    const pathValue = record.path ?? record.filePath ?? record.output_path ?? record.htmlPath ?? record.markdownPath;
-    if (pathValue) {
-      extractArtifactsFromValue(pathValue, idPrefix, artifacts);
+  };
+
+  return { projection, addNode, addChild, addEdge };
+};
+
+const groupMessagesByTurn = (messages: ConversationMessage[]): TurnInput[] => {
+  const byTurn = new Map<string, TurnInput>();
+
+  for (const message of messages) {
+    const turnId = message.turnId || message.id;
+    const current = byTurn.get(turnId) ?? {
+      turnId,
+      messages: [],
+      assistantMessages: [],
+      runIds: [],
+      createdAt: message.createdAt,
+    };
+
+    current.messages.push(message);
+    current.createdAt = Math.min(current.createdAt, message.createdAt);
+    if (message.role === 'user' && !current.userMessage) {
+      current.userMessage = message;
     }
-    for (const [key, entry] of Object.entries(record)) {
-      if (/path|file|artifact|image|screenshot/i.test(key)) {
-        extractArtifactsFromValue(entry, `${idPrefix}-${key}`, artifacts);
+    if (message.role === 'assistant') {
+      current.assistantMessages.push(message);
+    }
+    if (message.runId && !current.runIds.includes(message.runId)) {
+      current.runIds.push(message.runId);
+    }
+    byTurn.set(turnId, current);
+  }
+
+  return Array.from(byTurn.values())
+    .map((turn) => ({
+      ...turn,
+      messages: turn.messages.slice().sort((left, right) => left.createdAt - right.createdAt),
+      assistantMessages: turn.assistantMessages.slice().sort((left, right) => left.createdAt - right.createdAt),
+    }))
+    .sort((left, right) => left.createdAt - right.createdAt);
+};
+
+const collectTurnEvents = (turn: TurnInput, actionEvents: ActionEvent[]): ActionEvent[] => {
+  const runIds = new Set(turn.runIds);
+  return actionEvents
+    .filter((event) => event.turn_id === turn.turnId || runIds.has(event.run_id))
+    .sort((left, right) => left.ts_ms - right.ts_ms);
+};
+
+const collectToolSources = (turn: TurnInput, events: ActionEvent[]): ToolSource[] => {
+  const tools: ToolSource[] = [];
+
+  for (const message of turn.assistantMessages) {
+    for (const step of message.reasoningTrace?.steps ?? []) {
+      for (const toolCall of step.toolCalls) {
+        tools.push({
+          id: `${message.id}-${toolCall.id}`,
+          toolName: toolCall.toolName,
+          status: toolCall.status === 'error' ? 'failed' : toolCall.status === 'running' ? 'running' : 'succeeded',
+          argumentsSummary: toolCall.argsPreview || '{}',
+          resultSummary: toolCall.error || toolCall.resultPreview || '工具调用已完成。',
+          argumentsRaw: toolCall.argsPreview,
+          resultRaw: toolCall.resultPreview,
+          error: toolCall.error,
+          startedAt: toolCall.startedAt,
+          completedAt: toolCall.completedAt,
+          durationMs: toolCall.completedAt ? toolCall.completedAt - toolCall.startedAt : undefined,
+        });
       }
     }
   }
-};
 
-const extractArtifactsFromPayload = (payload: Record<string, unknown>, idPrefix: string): TraceArtifactView[] => {
-  const artifacts: TraceArtifactView[] = [];
-  extractArtifactsFromValue(payload, idPrefix, artifacts);
+  for (const event of events.filter((entry) => entry.event_type === 'tool_execution')) {
+    const toolName = String(event.payload.tool_name || event.payload.toolName || 'tool');
+    const error = event.status === 'error' || event.status === 'fail'
+      ? formatJsonPreview(event.payload.error || event.payload.message || '工具调用失败。')
+      : undefined;
+    tools.push({
+      id: event.event_id,
+      toolName,
+      status: statusFromEvent(event),
+      argumentsSummary: formatJsonPreview(event.payload.args ?? event.payload.arguments ?? {}),
+      resultSummary: error || firstLine(formatJsonPreview(event.payload.data ?? event.payload.result), '工具调用已完成。'),
+      argumentsRaw: event.payload.args ?? event.payload.arguments,
+      resultRaw: event.payload.data ?? event.payload.result,
+      error,
+      startedAt: event.ts_ms,
+      completedAt: event.ts_ms + event.duration_ms,
+      durationMs: event.duration_ms,
+    });
+  }
+
   const seen = new Set<string>();
-  return artifacts.filter((artifact) => {
-    const key = `${artifact.kind}:${artifact.path}`;
+  return tools.filter((tool) => {
+    const key = `${tool.id}:${tool.toolName}`;
     if (seen.has(key)) {
       return false;
     }
@@ -222,649 +298,606 @@ const extractArtifactsFromPayload = (payload: Record<string, unknown>, idPrefix:
   });
 };
 
-const renderInlineSegments = (text: string, keyPrefix: string): React.ReactNode[] => {
-  const nodes: React.ReactNode[] = [];
-  const inlinePattern = /`([^`]+)`/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
+const looksLikePath = (value: string): boolean =>
+  /^[a-zA-Z]:[\\/]/.test(value) || value.startsWith('/') || value.includes('\\') || value.includes('/');
 
-  while ((match = inlinePattern.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      nodes.push(text.slice(lastIndex, match.index));
-    }
-    nodes.push(
-      <code key={`${keyPrefix}-code-${nodes.length}`} className="formatted-message-inline-code">
-        {match[1]}
-      </code>,
-    );
-    lastIndex = match.index + match[0].length;
-  }
-
-  if (lastIndex < text.length) {
-    nodes.push(text.slice(lastIndex));
-  }
-  return nodes;
-};
-
-const renderTextSegment = (segment: string, keyPrefix: string): React.ReactNode[] => {
-  const nodes: React.ReactNode[] = [];
-  const lines = segment.split(/\r?\n/);
-  let paragraph: string[] = [];
-  let listItems: Array<{ value: string; ordered: boolean }> = [];
-
-  const flushParagraph = () => {
-    if (paragraph.length === 0) {
+const collectArtifactPathValues = (value: unknown, artifacts: ArtifactSource[], idPrefix: string) => {
+  if (typeof value === 'string') {
+    if (!looksLikePath(value)) {
       return;
     }
-    const value = paragraph.join(' ');
-    nodes.push(
-      <p key={`${keyPrefix}-p-${nodes.length}`} className="formatted-message-paragraph">
-        {renderInlineSegments(value, `${keyPrefix}-p-${nodes.length}`)}
-      </p>,
-    );
-    paragraph = [];
-  };
+    const normalized = value.replace(/\\/g, '/');
+    const name = normalized.split('/').filter(Boolean).pop() ?? value;
+    const isImage = /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
+    artifacts.push({
+      id: `${idPrefix}-${artifacts.length}`,
+      name,
+      path: value,
+      artifactType: isImage ? 'image' : 'file',
+    });
+    return;
+  }
 
-  const flushList = () => {
-    if (listItems.length === 0) {
-      return;
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => collectArtifactPathValues(entry, artifacts, `${idPrefix}-${index}`));
+    return;
+  }
+
+  if (!value || typeof value !== 'object') {
+    return;
+  }
+
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    if (/path|file|artifact|image|screenshot|report|markdown|html/i.test(key)) {
+      collectArtifactPathValues(entry, artifacts, `${idPrefix}-${key}`);
     }
-    const ordered = listItems[0].ordered;
-    const Tag = ordered ? 'ol' : 'ul';
-    nodes.push(
-      <Tag key={`${keyPrefix}-list-${nodes.length}`} className="formatted-message-list">
-        {listItems.map((item, index) => (
-          <li key={`${keyPrefix}-li-${index}`}>
-            {renderInlineSegments(item.value, `${keyPrefix}-li-${index}`)}
-          </li>
-        ))}
-      </Tag>,
-    );
-    listItems = [];
-  };
+  }
+};
 
-  lines.forEach((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      flushParagraph();
-      flushList();
-      return;
+const collectArtifactSources = (turn: TurnInput, events: ActionEvent[]): ArtifactSource[] => {
+  const artifacts: ArtifactSource[] = [];
+
+  for (const message of turn.messages) {
+    for (const attachment of message.attachments ?? []) {
+      artifacts.push({
+        id: attachment.attachmentId,
+        name: attachment.fileName,
+        path: attachment.filePath,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.size,
+        artifactType: attachment.kind === 'image' ? 'image' : 'file',
+      });
     }
-
-    const bulletMatch = trimmed.match(/^[-*]\s+(.+)$/);
-    const orderedMatch = trimmed.match(/^\d+[.)]\s+(.+)$/);
-    if (bulletMatch || orderedMatch) {
-      flushParagraph();
-      const ordered = Boolean(orderedMatch);
-      if (listItems.length > 0 && listItems[0].ordered !== ordered) {
-        flushList();
-      }
-      listItems.push({ value: (bulletMatch?.[1] ?? orderedMatch?.[1] ?? '').trim(), ordered });
-      return;
-    }
-
-    flushList();
-    paragraph.push(trimmed);
-  });
-
-  flushParagraph();
-  flushList();
-  return nodes;
-};
-
-const FormattedMessageContent: React.FC<{ content: string }> = ({ content }) => {
-  const nodes: React.ReactNode[] = [];
-  const fencePattern = /```([a-zA-Z0-9_-]+)?\r?\n([\s\S]*?)```/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = fencePattern.exec(content)) !== null) {
-    nodes.push(...renderTextSegment(content.slice(lastIndex, match.index), `text-${nodes.length}`));
-    const language = match[1] ?? '';
-    nodes.push(
-      <pre key={`code-${nodes.length}`} className="formatted-message-code">
-        {language ? <span className="formatted-message-code-lang">{language}</span> : null}
-        <code>{match[2]}</code>
-      </pre>,
-    );
-    lastIndex = match.index + match[0].length;
   }
-
-  nodes.push(...renderTextSegment(content.slice(lastIndex), `text-${nodes.length}`));
-
-  return <div className="formatted-message-content">{nodes.length > 0 ? nodes : content}</div>;
-};
-
-const MessageModeBadge: React.FC<{ mode: AgentMode }> = ({ mode }) => {
-  const { t } = useI18n();
-  const modeConfig = getAgentModeConfig(mode);
-
-  return (
-    <span className="message-mode-badge" style={{ ['--message-mode-accent' as string]: modeConfig.accentColor }}>
-      <ModeGlyph mode={mode} className="message-mode-badge-icon" size={12} strokeWidth={1.9} />
-      <span>{t(`mode.${mode}`)}</span>
-    </span>
-  );
-};
-
-const MessageAttachments: React.FC<{ attachments: SessionAttachmentRecord[] }> = ({ attachments }) => {
-  if (attachments.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="message-attachments">
-      {attachments.map((attachment) => (
-        <button
-          key={attachment.attachmentId}
-          type="button"
-          className={`message-attachment-pill ${attachment.kind}`}
-          onClick={() => void window.electronAPI?.appShell.openPath(attachment.filePath)}
-        >
-          <span className="message-attachment-pill-icon" aria-hidden="true">
-            {attachment.kind === 'image' ? 'IMG' : 'FILE'}
-          </span>
-          <span className="message-attachment-pill-copy">
-            <span className="message-attachment-pill-name">{attachment.fileName}</span>
-            <span className="message-attachment-pill-meta">{formatAttachmentSize(attachment.size)}</span>
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-};
-
-const buildReasoningPhaseCards = (message: ConversationMessage): PhaseTraceView[] => {
-  const trace = message.reasoningTrace;
-  if (!trace || trace.steps.length === 0) {
-    return [];
-  }
-
-  const steps = trace.steps.map((step): TraceStepView => ({
-    id: `${message.id}-${step.id}`,
-    title: step.title,
-    status: normalizeStatus(step.status),
-    summary: step.summary,
-    detail: step.detail,
-    stage: step.stage,
-    agentId: message.agentId,
-    duration: formatDuration(step.startedAt, step.completedAt),
-    toolCalls: step.toolCalls,
-    artifacts: [],
-  }));
-
-  return [{
-    id: `${message.id}-reasoning`,
-    title: getPhaseTitle('conversation'),
-    phase: 'conversation',
-    status: normalizeStatus(trace.status),
-    source: 'reasoning',
-    steps,
-  }];
-};
-
-const buildActionEventPhaseCards = (turn: ConversationTurnView, actionEvents: ActionEvent[]): PhaseTraceView[] => {
-  const runIdSet = new Set(turn.runIds);
-  const events = actionEvents
-    .filter((event) => event.turn_id === turn.turnId || (event.run_id && runIdSet.has(event.run_id)))
-    .sort((left, right) => left.ts_ms - right.ts_ms);
-
-  if (events.length === 0) {
-    return [];
-  }
-
-  const grouped = new Map<TracePhase, TraceStepView[]>();
 
   for (const event of events) {
-    const stage = getPayloadString(event.payload, ['toStage', 'stage', 'workflow_stage']);
-    const phase = getStagePhase(stage);
-    const summary = getPayloadString(event.payload, [
-      'summary',
-      'reason',
-      'objective',
-      'content',
-      'verdict',
-      'message',
-      'toStage',
-      'tool_name',
-    ]) ?? event.event_type;
-    const detail = event.event_type === 'tool_execution'
-      ? undefined
-      : JSON.stringify(event.payload, null, 2);
-    const toolCalls: ConversationToolCall[] = event.event_type === 'tool_execution'
-      ? [{
-          id: event.event_id,
-          toolName: getPayloadString(event.payload, ['tool_name']) ?? 'tool',
-          status: normalizeStatus(event.status) === 'error' ? 'error' : 'complete',
-          argsPreview: event.payload.args ? JSON.stringify(event.payload.args, null, 2) : undefined,
-          resultPreview: event.payload.data || event.payload.result
-            ? JSON.stringify(event.payload.data ?? event.payload.result, null, 2)
-            : undefined,
-          error: event.status === 'error' ? getPayloadString(event.payload, ['error', 'message']) : undefined,
-          startedAt: event.ts_ms,
-          completedAt: event.ts_ms + event.duration_ms,
-        }]
-      : [];
-
-    const step: TraceStepView = {
-      id: event.event_id,
-      title: stage ? `阶段：${stage}` : event.event_type,
-      status: normalizeStatus(event.status),
-      summary,
-      detail,
-      stage,
-      agentId: event.agent_id,
-      duration: formatDurationMs(event.duration_ms),
-      toolCalls,
-      artifacts: extractArtifactsFromPayload(event.payload, event.event_id),
-      isAgentRun: event.agent_id !== 'rdc-debugger' || event.event_type.includes('specialist'),
-    };
-
-    grouped.set(phase, [...(grouped.get(phase) ?? []), step]);
+    collectArtifactPathValues(event.payload, artifacts, event.event_id);
   }
 
-  return Array.from(grouped.entries()).map(([phase, steps]) => ({
-    id: `${turn.turnId}-${phase}-events`,
-    title: getPhaseTitle(phase),
-    phase,
-    status: getPhaseStatus(steps),
-    source: 'action-events',
-    steps,
-  }));
+  const seen = new Set<string>();
+  return artifacts.filter((artifact) => {
+    const key = artifact.path || artifact.name;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 };
 
-const buildWorkflowPhaseCard = (turn: ConversationTurnView, workflowState: WorkflowState | null): PhaseTraceView[] => {
-  if (!workflowState || !turn.runIds.includes(workflowState.runId)) {
+const collectReasoningSummaries = (
+  runId: string | undefined,
+  workflowState: WorkflowState | null,
+): ReasoningSummary[] => {
+  if (!runId || workflowState?.runId !== runId) {
     return [];
   }
-
-  const stages = [...workflowState.previousStages, workflowState.currentStage];
-  const steps = stages.map((stage, index): TraceStepView => ({
-    id: `${workflowState.runId}-${stage}-${index}`,
-    title: `阶段：${stage}`,
-    status: stage === workflowState.currentStage ? normalizeStatus(workflowState.approvalState ?? 'running') : 'complete',
-    summary: stage === workflowState.currentStage ? '当前工作流阶段。' : '阶段已进入或完成。',
-    stage,
-    agentId: 'rdc-debugger',
-    duration: null,
-    toolCalls: [],
-    artifacts: [],
-  }));
-
-  const phase = getStagePhase(workflowState.currentStage);
-  return [{
-    id: `${workflowState.runId}-workflow-state`,
-    title: getPhaseTitle(phase),
-    phase,
-    status: normalizeStatus(workflowState.approvalState ?? 'running'),
-    source: 'workflow',
-    steps,
-  }];
+  return workflowState.reasoningSummaries ?? [];
 };
 
-const mergePhaseCards = (cards: PhaseTraceView[]): PhaseTraceView[] => {
-  const byKey = new Map<string, PhaseTraceView>();
-  for (const card of cards) {
-    const key = `${card.phase}:${card.title}`;
-    const existing = byKey.get(key);
-    if (!existing) {
-      byKey.set(key, { ...card, steps: [...card.steps] });
-      continue;
-    }
-    existing.steps.push(...card.steps);
-    existing.status = getPhaseStatus(existing.steps);
-    existing.source = existing.source === card.source ? existing.source : 'action-events';
+const collectHarnessTasks = (
+  runId: string | undefined,
+  workflowState: WorkflowState | null,
+): HarnessTask[] => {
+  if (!runId || workflowState?.runId !== runId) {
+    return [];
   }
-  const order: TracePhase[] = ['conversation', 'plan', 'execution', 'activity'];
-  return Array.from(byKey.values()).sort((left, right) => order.indexOf(left.phase) - order.indexOf(right.phase));
+  return workflowState.harnessTasks ?? [];
 };
 
-const buildConversationTurns = (
+const createToolNode = (
+  builder: ProjectionBuilder,
+  tool: ToolSource,
+  idPrefix: string,
+  order: number,
+  parentId?: string,
+): AgentNode<ToolCallPayload> => {
+  const node = builder.addNode<ToolCallPayload>({
+    id: `${idPrefix}-tool-${sanitizeId(tool.id)}`,
+    type: 'tool_call',
+    status: tool.status,
+    title: tool.toolName,
+    summary: firstLine(tool.resultSummary, '工具调用已完成。'),
+    parentId,
+    runId: builder.projection.runId,
+    turnId: builder.projection.turnId,
+    order,
+    createdAt: tool.startedAt,
+    completedAt: tool.completedAt,
+    expandable: true,
+    defaultExpanded: tool.status === 'failed' || tool.status === 'blocked',
+    metrics: {
+      durationMs: tool.durationMs,
+    },
+    payload: {
+      toolName: tool.toolName,
+      toolType: 'custom',
+      purpose: '执行外部能力并把结果回投到消息流。',
+      argumentsSummary: tool.argumentsSummary,
+      argumentsRaw: tool.argumentsRaw,
+      resultSummary: tool.resultSummary,
+      resultRaw: tool.resultRaw,
+      stderr: tool.error,
+    },
+  });
+  if (parentId) {
+    builder.addChild(parentId, node.id);
+  }
+  return node;
+};
+
+const hasReasoningTrace = (message: ConversationMessage): boolean =>
+  Boolean(message.reasoningTrace?.steps.some((step) => (
+    step.summary
+    || step.detail
+    || step.toolCalls.length > 0
+    || step.status === 'running'
+    || step.status === 'error'
+  )));
+
+const collectReasoningSteps = (turn: TurnInput): Array<{
+  messageId: string;
+  stepId: string;
+  title: string;
+  status: AgentNodeStatus;
+  summary?: string;
+  detail?: string;
+  stage?: string;
+  startedAt: number;
+  completedAt?: number;
+}> => {
+  const steps: Array<{
+    messageId: string;
+    stepId: string;
+    title: string;
+    status: AgentNodeStatus;
+    summary?: string;
+    detail?: string;
+    stage?: string;
+    startedAt: number;
+    completedAt?: number;
+  }> = [];
+
+  for (const message of turn.assistantMessages) {
+    for (const step of message.reasoningTrace?.steps ?? []) {
+      steps.push({
+        messageId: message.id,
+        stepId: step.id,
+        title: step.title,
+        status: step.status === 'error'
+          ? 'failed'
+          : step.status === 'running'
+            ? 'running'
+            : step.status === 'pending'
+              ? 'pending'
+              : 'succeeded',
+        summary: step.summary,
+        detail: step.detail,
+        stage: step.stage,
+        startedAt: step.startedAt,
+        completedAt: step.completedAt,
+      });
+    }
+  }
+
+  return steps.sort((left, right) => left.startedAt - right.startedAt);
+};
+
+const createGroupNode = (
+  builder: ProjectionBuilder,
+  id: string,
+  title: string,
+  summary: string,
+  order: number,
+  createdAt: number,
+  groupType: GroupPayload['groupType'],
+  status: AgentNodeStatus,
+  parentId: string,
+): AgentNode<GroupPayload> => {
+  const node = builder.addNode<GroupPayload>({
+    id,
+    type: 'group',
+    status,
+    title,
+    summary,
+    runId: builder.projection.runId,
+    turnId: builder.projection.turnId,
+    order,
+    createdAt,
+    expandable: true,
+    defaultExpanded: true,
+    payload: {
+      groupType,
+      strategy: 'collect',
+      objective: summary,
+    },
+  });
+  builder.addChild(parentId, node.id);
+  return node;
+};
+
+
+const buildTraceProjection = (
+  turn: TurnInput,
+  actionEvents: ActionEvent[],
+  workflowState: WorkflowState | null,
+  currentDebugPlan: DebugPlan | null,
+): TimelineProjection => {
+  const events = collectTurnEvents(turn, actionEvents);
+  const actualRunId = turn.runIds[0] ?? events[0]?.run_id;
+  const runId = actualRunId ?? `turn-${sanitizeId(turn.turnId)}`;
+  const builder = createBuilder(`projection-${sanitizeId(turn.turnId)}`, turn.turnId, runId, turn.messages);
+  const baseTime = turn.createdAt;
+  const assistantStatus = aggregateStatus(turn.assistantMessages.map(statusFromMessage));
+
+  if (turn.userMessage) {
+    builder.addNode({
+      id: `${turn.turnId}-user`,
+      type: 'user_message',
+      status: 'succeeded',
+      title: 'User Message',
+      summary: turn.userMessage.content,
+      turnId: turn.turnId,
+      order: 1,
+      createdAt: turn.userMessage.createdAt,
+    });
+  }
+
+  const toolSources = collectToolSources(turn, events);
+  const artifactSources = collectArtifactSources(turn, events);
+  const reasoningSteps = collectReasoningSteps(turn);
+  const reasoningSummaries = collectReasoningSummaries(actualRunId, workflowState);
+  const harnessTasks = collectHarnessTasks(actualRunId, workflowState);
+  const plan = actualRunId
+    ? (workflowState?.runId === actualRunId ? (workflowState.debugPlan ?? currentDebugPlan) : currentDebugPlan)
+    : undefined;
+  const traceMessages = turn.assistantMessages.filter(hasReasoningTrace);
+  const hasTraceDetails = Boolean(
+    traceMessages.length > 0
+    || events.length > 0
+    || toolSources.length > 0
+    || artifactSources.length > 0
+    || reasoningSummaries.length > 0
+    || harnessTasks.length > 0
+    || plan?.blockers?.length
+    || plan?.missingInfo?.length
+  );
+
+  if (hasTraceDetails) {
+    const runStatus = aggregateStatus([
+      assistantStatus,
+      ...events.map(statusFromEvent),
+      ...reasoningSteps.map((step) => step.status),
+      ...harnessTasks.map((task) => statusFromHarness(task.status)),
+    ]);
+    const traceNode = builder.addNode<AgentRunPayload>({
+      id: `${turn.turnId}-trace`,
+      type: 'agent_run',
+      status: runStatus,
+      title: runStatus === 'running' || runStatus === 'streaming' ? '正在思考' : '已完成思考',
+      summary: traceMessages[traceMessages.length - 1]?.reasoningTrace?.summary
+        ?? plan?.scope
+        ?? firstLine(turn.assistantMessages[0]?.content, 'Agent 轨迹'),
+      runId,
+      turnId: turn.turnId,
+      order: 2,
+      createdAt: traceMessages[0]?.reasoningTrace?.updatedAt ?? events[0]?.ts_ms ?? turn.assistantMessages[0]?.createdAt ?? baseTime,
+      expandable: true,
+      defaultExpanded: false,
+      metrics: {
+        durationMs: events.length > 0
+          ? Math.max(...events.map((event) => event.ts_ms + event.duration_ms)) - baseTime
+          : undefined,
+      },
+      payload: {
+        agentName: 'Agent',
+        objective: plan?.userGoal ?? turn.userMessage?.content ?? '处理当前请求。',
+        inputSummary: turn.userMessage?.content,
+        planSummary: plan?.scope,
+        executionMode: 'debugging',
+        progress: {
+          completed: reasoningSteps.filter((step) => step.status === 'succeeded').length
+            + toolSources.filter((tool) => tool.status === 'succeeded').length
+            + harnessTasks.filter((task) => task.status === 'completed').length,
+          total: Math.max(reasoningSteps.length + toolSources.length + harnessTasks.length, 1),
+        },
+      },
+    });
+
+    if (reasoningSteps.length > 0 || reasoningSummaries.length > 0 || events.some((event) => event.event_type !== 'tool_execution')) {
+      const thinkingGroup = createGroupNode(
+        builder,
+        `${turn.turnId}-thinking-group`,
+        '思考',
+        '来自真实 reasoning trace 和运行事件。',
+        1,
+        reasoningSteps[0]?.startedAt ?? events[0]?.ts_ms ?? traceNode.createdAt,
+        'section_group',
+        aggregateStatus([
+          ...reasoningSteps.map((step) => step.status),
+          ...events.filter((event) => event.event_type !== 'tool_execution').map(statusFromEvent),
+          ...reasoningSummaries.map(() => 'succeeded' as const),
+        ]),
+        traceNode.id,
+      );
+
+      reasoningSteps.forEach((step, index) => {
+        const nodeId = `${turn.turnId}-reasoning-${sanitizeId(step.messageId)}-${sanitizeId(step.stepId)}`;
+        builder.addNode<StepPayload>({
+          id: nodeId,
+          type: 'step',
+          status: step.status,
+          title: step.title,
+          summary: step.summary ?? step.detail ?? step.stage,
+          runId,
+          turnId: turn.turnId,
+          order: index + 1,
+          createdAt: step.startedAt,
+          completedAt: step.completedAt,
+          payload: {
+            objective: step.title,
+            actualOutput: step.detail,
+          },
+        });
+        builder.addChild(thinkingGroup.id, nodeId);
+      });
+
+      reasoningSummaries.forEach((summary, index) => {
+        const nodeId = `${turn.turnId}-summary-${sanitizeId(summary.summaryId)}`;
+        builder.addNode<StepPayload>({
+          id: nodeId,
+          type: 'step',
+          status: 'succeeded',
+          title: AGENT_DISPLAY_NAMES[summary.agentId] ?? summary.agentId,
+          summary: summary.summary,
+          runId,
+          turnId: turn.turnId,
+          order: reasoningSteps.length + index + 1,
+          createdAt: Date.parse(summary.createdAt) || traceNode.createdAt,
+          payload: {
+            objective: summary.stage,
+            actualOutput: summary.nextStep,
+          },
+        });
+        builder.addChild(thinkingGroup.id, nodeId);
+      });
+
+      events
+        .filter((event) => event.event_type !== 'tool_execution')
+        .forEach((event, index) => {
+          const nodeId = `${turn.turnId}-event-${sanitizeId(event.event_id)}`;
+          builder.addNode<StepPayload>({
+            id: nodeId,
+            type: 'step',
+            status: statusFromEvent(event),
+            title: event.agent_id ? `${event.agent_id} · ${event.event_type}` : event.event_type,
+            summary: firstLine(formatJsonPreview(event.payload.summary ?? event.payload.message ?? event.payload.reason ?? event.payload), event.event_type),
+            runId,
+            turnId: turn.turnId,
+            order: reasoningSteps.length + reasoningSummaries.length + index + 1,
+            createdAt: event.ts_ms,
+            completedAt: event.ts_ms + event.duration_ms,
+            payload: {
+              objective: event.event_type,
+              actualOutput: formatJsonPreview(event.payload),
+            },
+          });
+          builder.addChild(thinkingGroup.id, nodeId);
+        });
+    }
+
+    if (toolSources.length > 0) {
+      const toolGroup = createGroupNode(
+        builder,
+        `${turn.turnId}-tool-group`,
+        '工具',
+        `已记录 ${toolSources.length} 个工具调用。`,
+        2,
+        toolSources[0].startedAt,
+        'tool_group',
+        aggregateStatus(toolSources.map((tool) => tool.status)),
+        traceNode.id,
+      );
+      toolSources.forEach((tool, index) => createToolNode(builder, tool, `${turn.turnId}-tool`, index + 1, toolGroup.id));
+    }
+
+    if (harnessTasks.length > 0 || plan?.missingInfo?.length || plan?.blockers?.length) {
+      const questionGroup = createGroupNode(
+        builder,
+        `${turn.turnId}-question-group`,
+        '需要用户确认',
+        '来自计划、任务看板或阻塞状态。',
+        3,
+        traceNode.createdAt + 3,
+        'section_group',
+        aggregateStatus([
+          ...harnessTasks.map((task) => statusFromHarness(task.status)),
+          ...(plan?.blockers?.length ? ['blocked' as const] : []),
+        ]),
+        traceNode.id,
+      );
+
+      harnessTasks.forEach((task, index) => {
+        const nodeId = `${turn.turnId}-task-${sanitizeId(task.taskId)}`;
+        builder.addNode<StepPayload>({
+          id: nodeId,
+          type: 'step',
+          status: statusFromHarness(task.status),
+          title: task.title,
+          summary: task.objective,
+          runId,
+          turnId: turn.turnId,
+          order: index + 1,
+          createdAt: Date.parse(task.createdAt) || traceNode.createdAt,
+          completedAt: task.completedAt ? Date.parse(task.completedAt) : undefined,
+          payload: {
+            objective: task.intent,
+            actualOutput: task.acceptanceCriteria.join('\n'),
+          },
+        });
+        builder.addChild(questionGroup.id, nodeId);
+      });
+
+      [...(plan?.missingInfo ?? []), ...(plan?.blockers?.map((blocker) => blocker.reason) ?? [])]
+        .filter(Boolean)
+        .forEach((entry, index) => {
+          const nodeId = `${turn.turnId}-missing-${index}`;
+          builder.addNode<StepPayload>({
+            id: nodeId,
+            type: 'step',
+            status: 'blocked',
+            title: '待确认',
+            summary: entry,
+            runId,
+            turnId: turn.turnId,
+            order: harnessTasks.length + index + 1,
+            createdAt: traceNode.createdAt + index + 1,
+            payload: {
+              objective: '等待用户补充信息。',
+            },
+          });
+          builder.addChild(questionGroup.id, nodeId);
+        });
+    }
+
+    if (toolSources.length > 0 || artifactSources.length > 0) {
+      const evidenceGroup = createGroupNode(
+        builder,
+        `${turn.turnId}-evidence-group`,
+        '证据',
+        '本轮轨迹中可回溯的工具结果或产物来源。',
+        4,
+        traceNode.createdAt + 4,
+        'evidence_group',
+        'succeeded',
+        traceNode.id,
+      );
+
+      toolSources.slice(0, 6).forEach((tool, index) => {
+        const evidenceNode = builder.addNode<EvidencePayload>({
+          id: `${turn.turnId}-evidence-tool-${index + 1}`,
+          type: 'evidence',
+          status: tool.status === 'failed' ? 'partial_succeeded' : 'succeeded',
+          title: tool.toolName,
+          summary: tool.resultSummary,
+          runId,
+          turnId: turn.turnId,
+          order: index + 1,
+          createdAt: tool.completedAt ?? tool.startedAt,
+          payload: {
+            sourceNodeId: `${turn.turnId}-tool-tool-${sanitizeId(tool.id)}`,
+            sourceType: 'tool_result',
+            quote: tool.resultSummary,
+            confidence: tool.status === 'succeeded' ? 0.86 : 0.58,
+          },
+        });
+        builder.addChild(evidenceGroup.id, evidenceNode.id);
+      });
+
+      artifactSources.slice(0, 3).forEach((artifact, index) => {
+        const evidenceNode = builder.addNode<EvidencePayload>({
+          id: `${turn.turnId}-evidence-artifact-${index + 1}`,
+          type: 'evidence',
+          status: 'succeeded',
+          title: artifact.name,
+          summary: artifact.path ?? artifact.name,
+          runId,
+          turnId: turn.turnId,
+          order: toolSources.length + index + 1,
+          createdAt: traceNode.createdAt + 5 + index,
+          payload: {
+            sourceNodeId: `${turn.turnId}-artifact-${sanitizeId(artifact.id)}`,
+            sourceType: 'artifact',
+            quote: artifact.path ?? artifact.name,
+            confidence: 0.8,
+          },
+        });
+        builder.addChild(evidenceGroup.id, evidenceNode.id);
+      });
+    }
+
+    if (artifactSources.length > 0) {
+      const artifactGroup = createGroupNode(
+        builder,
+        `${turn.turnId}-artifact-group`,
+        '产物',
+        '本轮运行生成或引用的文件。',
+        5,
+        traceNode.createdAt + 5,
+        'artifact_group',
+        'succeeded',
+        traceNode.id,
+      );
+
+      artifactSources.forEach((artifact, index) => {
+        const artifactNode = builder.addNode<ArtifactPayload>({
+          id: `${turn.turnId}-artifact-${sanitizeId(artifact.id)}`,
+          type: 'artifact',
+          status: 'succeeded',
+          title: artifact.name,
+          summary: artifact.path ?? artifact.name,
+          runId,
+          turnId: turn.turnId,
+          order: index + 1,
+          createdAt: traceNode.createdAt + index + 1,
+          payload: {
+            artifactType: artifact.artifactType,
+            name: artifact.name,
+            path: artifact.path,
+            mimeType: artifact.mimeType,
+            sizeBytes: artifact.sizeBytes,
+          },
+        });
+        builder.addChild(artifactGroup.id, artifactNode.id);
+      });
+    }
+  }
+
+  turn.assistantMessages
+    .filter((message) => message.content.trim().length > 0)
+    .forEach((message, index) => {
+      builder.addNode({
+        id: `${message.id}-assistant`,
+        type: 'assistant_message',
+        status: statusFromMessage(message),
+        title: 'Assistant Message',
+        summary: message.content,
+        runId: message.runId ?? runId,
+        turnId: turn.turnId,
+        order: 3 + index,
+        createdAt: message.createdAt,
+      });
+    });
+
+  return builder.projection;
+};
+
+const buildTimelineProjections = (
   messages: ConversationMessage[],
   actionEvents: ActionEvent[],
   workflowState: WorkflowState | null,
-): ConversationTurnView[] => {
-  const byTurn = new Map<string, ConversationTurnView>();
-
-  for (const message of messages) {
-    const key = message.turnId || message.id;
-    const current = byTurn.get(key) ?? {
-      turnId: key,
-      messages: [],
-      assistantMessages: [],
-      systemMessages: [],
-      phaseCards: [],
-      createdAt: message.createdAt,
-      runIds: [],
-    };
-
-    current.messages.push(message);
-    current.createdAt = Math.min(current.createdAt, message.createdAt);
-    if (message.role === 'user' && !current.userMessage) {
-      current.userMessage = message;
-    } else if (message.role === 'assistant') {
-      current.assistantMessages.push(message);
-      if (message.runId && !current.runIds.includes(message.runId)) {
-        current.runIds.push(message.runId);
-      }
-    } else {
-      current.systemMessages.push(message);
-    }
-
-    if (message.runId && !current.runIds.includes(message.runId)) {
-      current.runIds.push(message.runId);
-    }
-
-    byTurn.set(key, current);
+  currentDebugPlan: DebugPlan | null,
+): TimelineProjection[] => {
+  const turns = groupMessagesByTurn(messages);
+  if (turns.length === 0) {
+    return [];
   }
-
-  const turns = Array.from(byTurn.values()).sort((left, right) => left.createdAt - right.createdAt);
-  return turns.map((turn) => {
-    const reasoningCards = turn.assistantMessages.flatMap(buildReasoningPhaseCards);
-    const eventCards = buildActionEventPhaseCards(turn, actionEvents);
-    const workflowCards = buildWorkflowPhaseCard(turn, workflowState);
-    return {
-      ...turn,
-      messages: turn.messages.slice().sort((left, right) => left.createdAt - right.createdAt),
-      assistantMessages: turn.assistantMessages.slice().sort((left, right) => left.createdAt - right.createdAt),
-      systemMessages: turn.systemMessages.slice().sort((left, right) => left.createdAt - right.createdAt),
-      phaseCards: mergePhaseCards([...reasoningCards, ...eventCards, ...workflowCards]),
-    };
-  });
-};
-
-const StatusBadge: React.FC<{ status: TraceStatus }> = ({ status }) => {
-  const { t } = useI18n();
-  return (
-    <span className={`flow-status status-${status}`}>
-      {status === 'pending' && t('chat.statusPending')}
-      {status === 'running' && t('chat.statusRunning')}
-      {status === 'complete' && t('chat.statusComplete')}
-      {status === 'error' && t('chat.statusError')}
-    </span>
-  );
-};
-
-const TaskBriefCard: React.FC<{ entry: ConversationMessage; fallbackMode: AgentMode }> = ({ entry, fallbackMode }) => {
-  const { language, t } = useI18n();
-  const mode = resolveEntryMode(entry, fallbackMode);
-  return (
-    <article className="transcript-message transcript-user chat-message user" data-testid="conversation-user-brief">
-      <header className="message-header">
-        <div className="message-header-main">
-          <span className="message-avatar user">U</span>
-          <span className="message-author">{t('chat.you')}</span>
-          <MessageModeBadge mode={mode} />
-        </div>
-        <span className="message-time">{formatTime(entry.createdAt, language)}</span>
-      </header>
-      {entry.content ? (
-        <div className="message-bubble user task-brief-content">
-          <FormattedMessageContent content={entry.content} />
-        </div>
-      ) : null}
-      <MessageAttachments attachments={entry.attachments ?? []} />
-    </article>
-  );
-};
-
-const AssistantDocumentCard: React.FC<{ entry: ConversationMessage; fallbackMode: AgentMode }> = ({ entry, fallbackMode }) => {
-  const { language, t } = useI18n();
-  const role = entry.agentId as AgentRole | undefined;
-  const mode = resolveEntryMode(entry, fallbackMode);
-  const modeConfig = getAgentModeConfig(mode);
-  const modeLabel = t(`mode.${mode}`);
-  const name = role === 'rdc-debugger'
-    ? modeLabel
-    : role
-      ? (AGENT_DISPLAY_NAMES[role] ?? role)
-      : modeLabel;
-
-  if (!entry.content && entry.status !== 'streaming' && entry.status !== 'draft') {
-    return null;
-  }
-
-  return (
-    <article className="transcript-message transcript-assistant chat-message assistant" data-testid="conversation-assistant-card">
-      <header className="message-header">
-        <div className="message-header-main">
-          <span
-            className={`message-avatar assistant mode-${mode}`}
-            style={{ ['--message-mode-accent' as string]: modeConfig.accentColor }}
-          >
-            <ModeGlyph mode={mode} size={16} strokeWidth={1.9} />
-          </span>
-          <span className="message-author">{name}</span>
-          <MessageModeBadge mode={mode} />
-        </div>
-        <span className="message-time">{formatTime(entry.createdAt, language)}</span>
-      </header>
-      <div className={`assistant-document ${entry.content ? '' : 'is-empty'}`} data-testid="assistant-document-flow">
-        {entry.content ? <FormattedMessageContent content={entry.content} /> : null}
-      </div>
-      <MessageAttachments attachments={entry.attachments ?? []} />
-    </article>
-  );
-};
-
-const ArtifactGrid: React.FC<{ artifacts: TraceArtifactView[] }> = ({ artifacts }) => {
-  if (artifacts.length === 0) {
-    return null;
-  }
-  return (
-    <div className="artifact-grid">
-      {artifacts.map((artifact) => (
-        <button
-          key={artifact.id}
-          type="button"
-          className={`artifact-card ${artifact.kind}`}
-          onClick={() => void window.electronAPI?.appShell.openPath(artifact.path)}
-        >
-          {artifact.kind === 'image' ? (
-            <span className="artifact-image-placeholder" aria-hidden="true">Image</span>
-          ) : (
-            <span className="artifact-file-icon" aria-hidden="true">FILE</span>
-          )}
-          <span className="artifact-label">{artifact.label}</span>
-        </button>
-      ))}
-    </div>
-  );
-};
-
-const ToolCallCard: React.FC<{ toolCall: ConversationToolCall }> = ({ toolCall }) => (
-  <div className={`reasoning-tool-call status-${toolCall.status}`} data-testid="assistant-tool-call-inline">
-    <div className="reasoning-tool-header">
-      <span className="reasoning-tool-name">{toolCall.toolName}</span>
-      <span className={`reasoning-tool-status status-${toolCall.status}`}>{toolCall.status}</span>
-    </div>
-    {toolCall.argsPreview ? <pre className="reasoning-tool-block">{toolCall.argsPreview}</pre> : null}
-    {toolCall.resultPreview ? <pre className="reasoning-tool-block">{toolCall.resultPreview}</pre> : null}
-    {toolCall.error ? <div className="reasoning-tool-error">{toolCall.error}</div> : null}
-  </div>
-);
-
-const AgentRunCard: React.FC<{ step: TraceStepView; index: number; expanded: boolean; onToggle: () => void }> = ({
-  step,
-  index,
-  expanded,
-  onToggle,
-}) => {
-  const agentName = step.agentId && AGENT_DISPLAY_NAMES[step.agentId as AgentRole]
-    ? AGENT_DISPLAY_NAMES[step.agentId as AgentRole]
-    : step.agentId ?? 'Agent';
-  const detailCount = step.toolCalls.length + step.artifacts.length + (step.detail ? 1 : 0);
-
-  return (
-    <div className={`agent-run-card status-${step.status}`} data-testid="agent-run-card">
-      <div className="agent-run-head">
-        <div className="agent-run-title">
-          <span className="agent-run-icon" aria-hidden="true">AG</span>
-          <span>{agentName}</span>
-        </div>
-        <span className="agent-run-index">{String(index + 1).padStart(2, '0')}</span>
-      </div>
-      <button type="button" className="trace-step-expand agent-run-objective" onClick={onToggle}>
-        <span>{step.title}</span>
-        {detailCount > 0 ? <span>{expanded ? '收起' : `查看 ${detailCount} 个步骤`}</span> : null}
-      </button>
-      {step.summary ? <div className="agent-run-summary">{step.summary}</div> : null}
-      {expanded ? (
-        <div className="trace-step-detail-block">
-          {step.detail ? <pre className="reasoning-tool-block">{step.detail}</pre> : null}
-          {step.toolCalls.map((toolCall) => <ToolCallCard key={toolCall.id} toolCall={toolCall} />)}
-          <ArtifactGrid artifacts={step.artifacts} />
-        </div>
-      ) : null}
-    </div>
-  );
-};
-
-const TraceStep: React.FC<{
-  step: TraceStepView;
-  index: number;
-  expanded: boolean;
-  onToggle: () => void;
-}> = ({ step, index, expanded, onToggle }) => {
-  const detailCount = step.toolCalls.length + step.artifacts.length + (step.detail ? 1 : 0);
-
-  if (step.isAgentRun) {
-    return <AgentRunCard step={step} index={index} expanded={expanded} onToggle={onToggle} />;
-  }
-
-  return (
-    <div className={`trace-step status-${step.status}`} data-testid="trace-step">
-      <div className="trace-step-marker" aria-hidden="true" />
-      <div className="trace-step-body">
-        <div className="trace-step-header">
-          <div className="trace-step-title-row">
-            <span className="trace-step-title">{step.title}</span>
-            <StatusBadge status={step.status} />
-          </div>
-          <div className="trace-step-meta">
-            {step.stage ? <span>{step.stage}</span> : null}
-            {step.duration ? <span>{step.duration}</span> : null}
-          </div>
-        </div>
-        {step.summary ? <div className="trace-step-summary">{step.summary}</div> : null}
-        {detailCount > 0 ? (
-          <button type="button" className="trace-step-expand" onClick={onToggle}>
-            <span>{expanded ? '收起步骤' : `查看 ${detailCount} 个步骤`}</span>
-          </button>
-        ) : null}
-        {expanded ? (
-          <div className="trace-step-detail-block">
-            {step.detail ? <pre className="reasoning-tool-block">{step.detail}</pre> : null}
-            {step.toolCalls.map((toolCall) => <ToolCallCard key={toolCall.id} toolCall={toolCall} />)}
-            <ArtifactGrid artifacts={step.artifacts} />
-          </div>
-        ) : null}
-      </div>
-    </div>
-  );
-};
-
-const PhaseTraceCard: React.FC<{
-  card: PhaseTraceView;
-  expanded: boolean;
-  expandedSteps: Record<string, boolean>;
-  onToggleCard: () => void;
-  onToggleStep: (stepId: string) => void;
-}> = ({ card, expanded, expandedSteps, onToggleCard, onToggleStep }) => (
-  <section className={`flow-card phase-trace-card phase-${card.phase} status-${card.status}`} data-testid={`phase-trace-${card.phase}`}>
-    <button
-      type="button"
-      className="phase-trace-header"
-      data-testid="assistant-reasoning-toggle"
-      aria-expanded={expanded}
-      onClick={onToggleCard}
-    >
-      <span className="phase-trace-title-wrap">
-        <span className="phase-trace-caret">{expanded ? '-' : '+'}</span>
-        <span className="phase-trace-title">{card.title}</span>
-        <span className="phase-trace-source">{card.source}</span>
-      </span>
-      <span className="phase-trace-meta">
-        <StatusBadge status={card.status} />
-        <span>{card.steps.length} 个步骤</span>
-      </span>
-    </button>
-    {expanded ? (
-      <div className="reasoning-panel phase-trace-steps" data-testid="assistant-reasoning-panel">
-        {card.steps.map((step, index) => (
-          <TraceStep
-            key={step.id}
-            step={step}
-            index={index}
-            expanded={expandedSteps[step.id] ?? false}
-            onToggle={() => onToggleStep(step.id)}
-          />
-        ))}
-      </div>
-    ) : null}
-  </section>
-);
-
-const SystemMessageCard: React.FC<{ entry: ConversationMessage }> = ({ entry }) => {
-  const { language, t } = useI18n();
-  return (
-    <article className="flow-card system-message-card chat-message system">
-      <header className="flow-card-header">
-        <div className="flow-card-title-row">
-          <span className="message-avatar system">!</span>
-          <span className="flow-card-title">{t('chat.system')}</span>
-        </div>
-        <span className="message-time">{formatTime(entry.createdAt, language)}</span>
-      </header>
-      {entry.content ? <div className="message-bubble system"><FormattedMessageContent content={entry.content} /></div> : null}
-      <MessageAttachments attachments={entry.attachments ?? []} />
-    </article>
-  );
-};
-
-const ConversationTurn: React.FC<{
-  turn: ConversationTurnView;
-  fallbackMode: AgentMode;
-  expandedCards: Record<string, boolean>;
-  expandedSteps: Record<string, boolean>;
-  onToggleCard: (id: string) => void;
-  onToggleStep: (id: string) => void;
-}> = ({ turn, fallbackMode, expandedCards, expandedSteps, onToggleCard, onToggleStep }) => {
-  const conversationPhaseCards = turn.phaseCards.filter((card) => card.phase === 'conversation');
-  const taskPhaseCards = turn.phaseCards.filter((card) => card.phase !== 'conversation');
-  const renderPhaseCard = (card: PhaseTraceView) => (
-    <PhaseTraceCard
-      key={card.id}
-      card={card}
-      expanded={expandedCards[card.id] ?? true}
-      expandedSteps={expandedSteps}
-      onToggleCard={() => onToggleCard(card.id)}
-      onToggleStep={onToggleStep}
-    />
-  );
-
-  return (
-    <div className="conversation-turn" data-testid="conversation-turn">
-      {turn.userMessage ? <TaskBriefCard entry={turn.userMessage} fallbackMode={fallbackMode} /> : null}
-      {conversationPhaseCards.map(renderPhaseCard)}
-      {turn.assistantMessages.map((entry) => (
-        <AssistantDocumentCard key={entry.id} entry={entry} fallbackMode={fallbackMode} />
-      ))}
-      {taskPhaseCards.map(renderPhaseCard)}
-      {turn.systemMessages.map((entry) => <SystemMessageCard key={entry.id} entry={entry} />)}
-    </div>
-  );
+  return turns.map((turn) => buildTraceProjection(turn, actionEvents, workflowState, currentDebugPlan));
 };
 
 export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
   const conversationMessages = useSessionStore((state) => state.conversationMessages);
   const actionEvents = useSessionStore((state) => state.actionEvents);
   const workflowState = useSessionStore((state) => state.workflowState);
+  const currentDebugPlan = useSessionStore((state) => state.currentDebugPlan);
   const deferredMessages = useDeferredValue(conversationMessages);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldStickToBottomRef = useRef(true);
-  const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
-  const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>({});
+
+  const projections = useMemo(
+    () => buildTimelineProjections(deferredMessages, actionEvents, workflowState, currentDebugPlan),
+    [deferredMessages, actionEvents, workflowState, currentDebugPlan],
+  );
 
   useEffect(() => {
     if (navigator.webdriver) {
@@ -878,7 +911,7 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
       top: container.scrollHeight,
       behavior: 'smooth',
     });
-  }, [deferredMessages, actionEvents, workflowState]);
+  }, [projections]);
 
   const handleScroll = () => {
     const container = scrollContainerRef.current;
@@ -889,19 +922,7 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
     shouldStickToBottomRef.current = distanceFromBottom < STICKY_SCROLL_THRESHOLD;
   };
 
-  const toggleCard = (id: string) => {
-    setExpandedCards((current) => ({ ...current, [id]: !(current[id] ?? true) }));
-  };
-
-  const toggleStep = (id: string) => {
-    setExpandedSteps((current) => ({ ...current, [id]: !current[id] }));
-  };
-
-  const turns = useMemo(
-    () => buildConversationTurns(deferredMessages, actionEvents, workflowState),
-    [deferredMessages, actionEvents, workflowState],
-  );
-  const isEmpty = turns.length === 0;
+  const isEmpty = projections.length === 0;
 
   return (
     <div className={`agent-chat ${isEmpty ? 'is-empty' : ''}`} data-testid="agent-chat">
@@ -913,19 +934,10 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
         data-testid="chat-messages"
         onScroll={handleScroll}
       >
-        {isEmpty ? (
-          <EmptyWorkbenchPrompt mode={mode} />
-        ) : turns.map((turn) => (
-          <ConversationTurn
-            key={turn.turnId}
-            turn={turn}
-            fallbackMode={mode}
-            expandedCards={expandedCards}
-            expandedSteps={expandedSteps}
-            onToggleCard={toggleCard}
-            onToggleStep={toggleStep}
-          />
-        ))}
+        <AgentMessageTimeline
+          projections={projections}
+          emptyState={<EmptyWorkbenchPrompt mode={mode} />}
+        />
       </div>
     </div>
   );
