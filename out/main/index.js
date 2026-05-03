@@ -10101,12 +10101,12 @@ function createFallbackAssistantReply(message, context) {
   }
   if (!hasUsableDebuggerRoute()) {
     if (/你好|您好|hello|hi/i.test(message)) {
-      return "你好，我是 RDC Debugger。当前核心模型链路还没准备好，所以我暂时只能做基础接待；等你配置好 `rdc-debugger` 的 provider / model route 后，我再继续正常协作。";
+      return "当前模型链路还没准备好。请先配置 `rdc-debugger` 的 provider / model route。";
     }
     if (EXECUTE_PATTERN.test(message)) {
       return "当前调试链路还没绑定可用模型，所以我不能开始正式执行；不过我可以先帮你确认问题范围和所需 capture。";
     }
-    return "我现在拿不到核心模型回复，所以没法像正常 Cowork Agent 一样继续对话。你先检查 `rdc-debugger` 的 provider / model route。";
+    return "当前拿不到核心模型回复。请检查 `rdc-debugger` 的 provider / model route。";
   }
   return "我刚才没能稳定产出这轮对话回复。你可以重试一次；如果问题持续，优先检查当前 `rdc-debugger` 的模型链路。";
 }

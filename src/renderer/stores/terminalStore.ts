@@ -4,14 +4,7 @@ import type {
   RuntimeLogNamespace,
   RuntimeLogSeverity,
 } from '@shared/types/runtimeLog';
-import type {
-  TerminalCreateTabRequest,
-  TerminalDataEvent,
-  TerminalExitEvent,
-  TerminalTabRecord,
-} from '@shared/types/terminal';
 
-export type TerminalView = 'activity' | 'shell';
 export type TerminalScopeFilter = 'current-session' | 'current-run' | 'app' | 'all-sessions';
 export type RuntimeNamespaceFilter = RuntimeLogNamespace | 'all';
 export type RuntimeSeverityFilter = RuntimeLogSeverity | 'all';
@@ -25,7 +18,6 @@ interface TerminalContext {
 
 interface TerminalState extends TerminalContext {
   isOpen: boolean;
-  view: TerminalView;
   scopeFilter: TerminalScopeFilter;
   namespaceFilter: RuntimeNamespaceFilter;
   severityFilter: RuntimeSeverityFilter;
@@ -35,13 +27,9 @@ interface TerminalState extends TerminalContext {
   expandedEntryIds: string[];
   entries: RuntimeLogEntry[];
   isLoading: boolean;
-  tabs: TerminalTabRecord[];
-  activeTabId: string | null;
-  shellBuffers: Record<string, string>;
 
   setOpen: (open: boolean) => void;
   toggleOpen: () => void;
-  setView: (view: TerminalView) => void;
   setActiveContext: (context: Partial<TerminalContext>) => void;
   setActiveSessionId: (sessionId: string | null) => void;
   setScopeFilter: (scopeFilter: TerminalScopeFilter) => void;
@@ -53,14 +41,6 @@ interface TerminalState extends TerminalContext {
   toggleEntryExpanded: (entryId: string) => void;
   appendEntry: (entry: RuntimeLogEntry) => void;
   refreshEntries: () => Promise<void>;
-  syncTabs: (tabs: TerminalTabRecord[]) => void;
-  refreshTabs: () => Promise<void>;
-  createShellTab: (request?: TerminalCreateTabRequest) => Promise<void>;
-  activateTab: (tabId: string) => Promise<void>;
-  closeShellTab: (tabId: string) => Promise<void>;
-  clearShellBuffer: (tabId: string) => void;
-  appendTerminalData: (payload: TerminalDataEvent) => void;
-  markTerminalExit: (payload: TerminalExitEvent) => void;
 }
 
 const resolveRuntimeLogRequest = (
@@ -102,20 +82,8 @@ const matchesScopeFilter = (
   return true;
 };
 
-const resolveNextActiveTabId = (
-  currentActiveTabId: string | null,
-  nextTabs: TerminalTabRecord[],
-): string | null => {
-  if (currentActiveTabId && nextTabs.some((tab) => tab.tabId === currentActiveTabId)) {
-    return currentActiveTabId;
-  }
-
-  return nextTabs.find((tab) => tab.kind === 'shell')?.tabId ?? null;
-};
-
 export const useTerminalStore = create<TerminalState>((set, get) => ({
   isOpen: false,
-  view: 'activity',
   scopeFilter: 'current-session',
   namespaceFilter: 'all',
   severityFilter: 'all',
@@ -128,13 +96,9 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   runId: null,
   entries: [],
   isLoading: false,
-  tabs: [],
-  activeTabId: null,
-  shellBuffers: {},
 
   setOpen: (open) => set({ isOpen: open }),
   toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
-  setView: (view) => set({ view }),
   setActiveContext: (context) => set((state) => ({
     sessionId: Object.prototype.hasOwnProperty.call(context, 'sessionId') ? context.sessionId ?? null : state.sessionId,
     projectId: Object.prototype.hasOwnProperty.call(context, 'projectId') ? context.projectId ?? null : state.projectId,
@@ -191,96 +155,4 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
       });
     }
   },
-
-  syncTabs: (tabs) => set((state) => ({
-    tabs,
-    activeTabId: resolveNextActiveTabId(state.activeTabId, tabs),
-  })),
-
-  refreshTabs: async () => {
-    const electronAPI = window.electronAPI;
-    if (!electronAPI) {
-      return;
-    }
-
-    const result = await electronAPI.terminal.listTabs();
-    get().syncTabs(result.tabs ?? []);
-  },
-
-  createShellTab: async (request) => {
-    const electronAPI = window.electronAPI;
-    if (!electronAPI) {
-      return;
-    }
-
-    const state = get();
-    const result = await electronAPI.terminal.createTab({
-      cwd: request?.cwd ?? null,
-      sessionId: request?.sessionId ?? state.sessionId,
-      projectId: request?.projectId ?? state.projectId,
-      runId: request?.runId ?? state.runId,
-    });
-    get().syncTabs(result.tabs ?? []);
-    if (result.tab) {
-      set({ activeTabId: result.tab.tabId, view: 'shell' });
-    }
-  },
-
-  activateTab: async (tabId) => {
-    const electronAPI = window.electronAPI;
-    if (!electronAPI) {
-      return;
-    }
-
-    const result = await electronAPI.terminal.activateTab(tabId);
-    get().syncTabs(result.tabs ?? []);
-    set({ activeTabId: tabId });
-  },
-
-  closeShellTab: async (tabId) => {
-    const electronAPI = window.electronAPI;
-    if (!electronAPI) {
-      return;
-    }
-
-    const result = await electronAPI.terminal.closeTab(tabId);
-    set((state) => {
-      const nextBuffers = { ...state.shellBuffers };
-      delete nextBuffers[tabId];
-      return {
-        shellBuffers: nextBuffers,
-      };
-    });
-    get().syncTabs(result.tabs ?? []);
-  },
-
-  clearShellBuffer: (tabId) => set((state) => ({
-    shellBuffers: {
-      ...state.shellBuffers,
-      [tabId]: '',
-    },
-  })),
-
-  appendTerminalData: ({ tabId, data }) => set((state) => ({
-    shellBuffers: {
-      ...state.shellBuffers,
-      [tabId]: `${state.shellBuffers[tabId] ?? ''}${data}`,
-    },
-  })),
-
-  markTerminalExit: ({ tabId, exitCode }) => set((state) => ({
-    tabs: state.tabs.map((tab) => (
-      tab.tabId === tabId
-        ? {
-          ...tab,
-          status: 'exited',
-          exitCode,
-        }
-        : tab
-    )),
-    shellBuffers: {
-      ...state.shellBuffers,
-      [tabId]: `${state.shellBuffers[tabId] ?? ''}\r\n[process exited${exitCode == null ? '' : `: ${exitCode}`}]\r\n`,
-    },
-  })),
 }));
