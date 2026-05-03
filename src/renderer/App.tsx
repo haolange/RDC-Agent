@@ -725,7 +725,7 @@ const App: React.FC = () => {
   const isRightRailVisible = rightRailMode !== 'hidden';
   const isTerminalOpen = useTerminalStore((state) => state.isOpen);
   const toggleTerminalOpen = useTerminalStore((state) => state.toggleOpen);
-  const terminalEntries = useTerminalStore((state) => state.entries);
+  const activityEntries = useTerminalStore((state) => state.entries);
 
   const showNotice = useCallback((message: string) => {
     setShellNotice(message);
@@ -1446,9 +1446,9 @@ const App: React.FC = () => {
   const primaryButtonDisabled = isComposerBusy
     ? currentRun?.status === 'stopping' && !hasActiveConversationTurn && !isPromptSending
     : (!hasMessageContent && !hasPendingAttachments);
-  const terminalAlertSeverity = terminalEntries.some((entry) => entry.severity === 'error')
+  const activityAlertSeverity = activityEntries.some((entry) => entry.severity === 'error')
     ? 'error'
-    : terminalEntries.some((entry) => entry.severity === 'warning')
+    : activityEntries.some((entry) => entry.severity === 'warning')
       ? 'warning'
       : hasActiveDebugRun
         ? 'running'
@@ -1909,7 +1909,7 @@ const App: React.FC = () => {
                 <DeviceSelector variant="utility" />
                 <button
                   type="button"
-                  className={`main-utility-toggle terminal-pill ${isTerminalOpen ? 'active' : ''} ${terminalAlertSeverity ? `terminal-${terminalAlertSeverity}` : ''}`}
+                  className={`main-utility-toggle terminal-pill ${isTerminalOpen ? 'active' : ''} ${activityAlertSeverity ? `terminal-${activityAlertSeverity}` : ''}`}
                   onClick={() => toggleTerminalOpen()}
                   data-testid="terminal-toggle"
                   aria-label={isTerminalOpen ? t('terminal.close') : t('terminal.open')}
@@ -1919,9 +1919,9 @@ const App: React.FC = () => {
                     <path d="M4 17l6-6-6-6" />
                     <path d="M12 19h8" />
                   </svg>
-                  {terminalAlertSeverity && (
+                  {activityAlertSeverity && (
                     <span
-                      className={`terminal-status-badge ${terminalAlertSeverity}`}
+                      className={`terminal-status-badge ${activityAlertSeverity}`}
                       aria-hidden="true"
                     />
                   )}

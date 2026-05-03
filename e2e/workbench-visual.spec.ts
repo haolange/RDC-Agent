@@ -1044,12 +1044,20 @@ test('session Context stays readable in a narrow visible right rail', async () =
   await expect(contextSection).toHaveScreenshot('session-context-narrow.png');
 });
 
-test('Terminal drawer appears below the prompt bar when opened', async () => {
+test('Agent activity drawer appears below the prompt bar when opened', async () => {
   const page = ctx.page;
 
   await page.locator('[data-testid="terminal-toggle"]').click();
   await expect(page.locator('[data-testid="runtime-terminal-activity-pane"]')).toBeVisible();
   await expect(page.locator('.runtime-terminal-shell-tab')).toHaveCount(0);
+  await expect(page.locator('[data-testid="runtime-terminal-shell-tab"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="runtime-terminal-shell-pane"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /New Shell/i })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Terminate/i })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Clear/i })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Copy cwd/i })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Open logs/i })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Open workspace/i })).toHaveCount(0);
   await page.locator('[data-testid="runtime-terminal-scope"]').click();
   await page.locator('[data-testid="runtime-terminal-scope-option-app"]').click();
   await page.locator('[data-testid="runtime-terminal-filter-toggle"]').click();
@@ -1081,12 +1089,7 @@ test('Terminal drawer appears below the prompt bar when opened', async () => {
     });
   });
 
-  await expect(page.locator('.app-main')).toHaveScreenshot('runtime-terminal-open.png');
-
-  await page.locator('[data-testid="runtime-terminal-shell-tab"]').click();
-  await expect(page.locator('[data-testid="runtime-terminal-shell-pane"]')).toBeVisible();
-  await expect(page.locator('.runtime-terminal-shell-empty')).toBeVisible();
-  await expect(page.locator('.app-main')).toHaveScreenshot('runtime-terminal-shell-empty.png');
+  await expect(page.locator('.app-main')).toHaveScreenshot('agent-activity-open.png');
 });
 
 test('sidebar footer remains visually stable', async () => {
@@ -1094,7 +1097,7 @@ test('sidebar footer remains visually stable', async () => {
   await expect(page.locator('[data-testid="sidebar-footer"]')).toHaveScreenshot('sidebar-footer.png');
 });
 
-test('top utility pills show Replay Device next to Terminal', async () => {
+test('top utility pills show Replay Device next to Agent Activity', async () => {
   const page = ctx.page;
   await expect(page.locator('[data-testid="utility-device-selector-trigger"]')).toBeVisible();
   await expect(page.locator('[data-testid="terminal-toggle"]')).toBeVisible();
