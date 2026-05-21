@@ -1,4 +1,3 @@
-import { BrowserWindow } from 'electron';
 import type { AgentRole } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { LLMMessage, LLMRequest, LLMResponse } from '@shared/types/llm';
@@ -10,6 +9,7 @@ import { llmAdapter } from '../adapters/LLMAdapter';
 import { settingsService } from './SettingsService';
 import { runtimeLogService } from './RuntimeLogService';
 import { storageAdapter } from './StorageAdapter';
+import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 
 export type LlmAuditStage = WorkflowStage | 'plan' | 'skeptic' | 'curate' | 'report' | 'dispatch' | 'cowork';
 
@@ -638,22 +638,12 @@ export class DebuggerLlmService {
       return;
     }
 
-    const windows = BrowserWindow.getAllWindows();
-    for (const window of windows) {
-      if (!window.isDestroyed()) {
-        window.webContents.send('workflow:runUsageChanged', usage);
-      }
-    }
+    workflowProjectionPublisher.publishRunUsage(usage);
   }
 
   private async appendBroadcastEvent(sessionId: string, event: ActionEvent): Promise<void> {
     await storageAdapter.appendActionEvent(sessionId, event);
-    const windows = BrowserWindow.getAllWindows();
-    for (const window of windows) {
-      if (!window.isDestroyed()) {
-        window.webContents.send('evidence:eventAdded', event);
-      }
-    }
+    workflowProjectionPublisher.publishEvidenceEvent(event);
   }
 }
 

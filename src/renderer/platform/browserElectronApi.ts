@@ -545,9 +545,6 @@ class BrowserElectronApiFallback {
             stage: run.lastStage,
           })),
       }),
-      advanceStage: async () => ({ success: true, currentStage: this.workflowState.currentStage }),
-      backtrack: async (_reason, _trigger) => ({ success: true }),
-      dispatchSpecialist: async (agentId) => ({ success: true, tokenId: `browser-preview-token-${agentId}` }),
     },
 
     agent: {

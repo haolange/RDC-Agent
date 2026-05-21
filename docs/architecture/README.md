@@ -1,5 +1,9 @@
 # Architecture Docs
 
+- `overview.md`：当前 Electron / React / Debugger 主链架构总览。
+- `data-flow.md`：Project、Session、Capture、Workflow、ToolBridge 等端到端数据流。
+- `module-map.md`：能力域到源码入口、共享类型、IPC/preload、UI 和测试入口的地图。
+- `codepilot-comparison.md`：CodePilot 架构参考项与 RDC-Agent 迁移边界。
 - `spec-driven-development.md`：跨层规范与执行约束。
 - `vertical-framework-implementation-plan.md`：垂直调试框架的实现规划。
 - `framework-improvement-notes.md`：框架收敛与改进方向记录。

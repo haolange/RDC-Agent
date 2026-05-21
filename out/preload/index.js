@@ -1,7 +1,6 @@
 "use strict";
 const electron = require("electron");
-const listenerMap = /* @__PURE__ */ new Map();
-const validChannels = [
+const PRELOAD_EVENT_CHANNELS = [
   "file:open",
   "case:new",
   "settings:open",
@@ -28,9 +27,31 @@ const validChannels = [
   "terminal:tabsChanged",
   "conversation:event"
 ];
-const isValidChannel = (channel) => {
-  return validChannels.includes(channel);
+const isPreloadEventChannel = (channel) => {
+  return PRELOAD_EVENT_CHANNELS.includes(channel);
 };
+const createAppMetaApi = () => ({
+  get: () => electron.ipcRenderer.invoke("app:getMeta")
+});
+const createAppShellApi = () => ({
+  selectAvatar: () => electron.ipcRenderer.invoke("app:selectAvatar"),
+  getAvatarDataUrl: (avatarPath) => electron.ipcRenderer.invoke("app:getAvatarDataUrl", avatarPath),
+  openPath: (targetPath) => electron.ipcRenderer.invoke("app:openPath", targetPath),
+  copyText: (text) => electron.ipcRenderer.invoke("app:copyText", text)
+});
+const createDialogApi = () => ({
+  selectFiles: () => electron.ipcRenderer.invoke("dialog:selectFiles"),
+  selectRdcFiles: () => electron.ipcRenderer.invoke("dialog:selectRdcFiles"),
+  selectDirectory: () => electron.ipcRenderer.invoke("dialog:selectDirectory")
+});
+const createWindowControlsApi = () => ({
+  minimize: () => electron.ipcRenderer.invoke("window:minimize"),
+  toggleMaximize: () => electron.ipcRenderer.invoke("window:toggleMaximize"),
+  close: () => electron.ipcRenderer.invoke("window:close"),
+  isMaximized: () => electron.ipcRenderer.invoke("window:isMaximized")
+});
+const listenerMap = /* @__PURE__ */ new Map();
+const dialogApi = createDialogApi();
 const registerTrackedListener = (channel, callback) => {
   const wrappedCallback = (_event, ...args) => callback(...args);
   const channelListeners = listenerMap.get(channel) ?? /* @__PURE__ */ new Map();
@@ -51,15 +72,8 @@ const electronAPI = {
   isMac: process.platform === "darwin",
   isWindows: process.platform === "win32",
   isLinux: process.platform === "linux",
-  appMeta: {
-    get: () => electron.ipcRenderer.invoke("app:getMeta")
-  },
-  appShell: {
-    selectAvatar: () => electron.ipcRenderer.invoke("app:selectAvatar"),
-    getAvatarDataUrl: (avatarPath) => electron.ipcRenderer.invoke("app:getAvatarDataUrl", avatarPath),
-    openPath: (targetPath) => electron.ipcRenderer.invoke("app:openPath", targetPath),
-    copyText: (text) => electron.ipcRenderer.invoke("app:copyText", text)
-  },
+  appMeta: createAppMetaApi(),
+  appShell: createAppShellApi(),
   conversation: {
     sendMessage: (request) => electron.ipcRenderer.invoke("conversation:sendMessage", request),
     cancelActiveTurn: (request) => electron.ipcRenderer.invoke("conversation:cancelActiveTurn", request),
@@ -71,9 +85,9 @@ const electronAPI = {
       removeTrackedListener("conversation:event", callback);
     }
   },
-  selectFiles: () => electron.ipcRenderer.invoke("dialog:selectFiles"),
-  selectRdcFiles: () => electron.ipcRenderer.invoke("dialog:selectRdcFiles"),
-  selectDirectory: () => electron.ipcRenderer.invoke("dialog:selectDirectory"),
+  selectFiles: dialogApi.selectFiles,
+  selectRdcFiles: dialogApi.selectRdcFiles,
+  selectDirectory: dialogApi.selectDirectory,
   workflow: {
     getState: () => electron.ipcRenderer.invoke("workflow:getState"),
     start: (request) => electron.ipcRenderer.invoke("workflow:start", request),
@@ -85,10 +99,7 @@ const electronAPI = {
     stop: (runId) => electron.ipcRenderer.invoke("workflow:stop", runId),
     getRunUsage: (runId) => electron.ipcRenderer.invoke("workflow:getRunUsage", runId),
     listRuns: () => electron.ipcRenderer.invoke("workflow:listRuns"),
-    listActiveRuns: () => electron.ipcRenderer.invoke("workflow:listActiveRuns"),
-    advanceStage: () => electron.ipcRenderer.invoke("workflow:advanceStage"),
-    backtrack: (reason, trigger) => electron.ipcRenderer.invoke("workflow:backtrack", reason, trigger),
-    dispatchSpecialist: (agentId, objective) => electron.ipcRenderer.invoke("workflow:dispatchSpecialist", agentId, objective)
+    listActiveRuns: () => electron.ipcRenderer.invoke("workflow:listActiveRuns")
   },
   agent: {
     sendMessage: (agentId, content) => electron.ipcRenderer.invoke("agent:sendMessage", agentId, content),
@@ -196,14 +207,9 @@ const electronAPI = {
       electron.ipcRenderer.removeAllListeners(channel);
     }
   },
-  windowControls: {
-    minimize: () => electron.ipcRenderer.invoke("window:minimize"),
-    toggleMaximize: () => electron.ipcRenderer.invoke("window:toggleMaximize"),
-    close: () => electron.ipcRenderer.invoke("window:close"),
-    isMaximized: () => electron.ipcRenderer.invoke("window:isMaximized")
-  },
+  windowControls: createWindowControlsApi(),
   on: (channel, callback) => {
-    if (isValidChannel(channel)) {
+    if (isPreloadEventChannel(channel)) {
       registerTrackedListener(channel, callback);
     }
   },

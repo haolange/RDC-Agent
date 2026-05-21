@@ -1,9 +1,8 @@
 /**
- * AgentOrchestrator - Agent编排器
- * 负责协调各Agent角色、管理System Prompt和Model配置
+ * AgentOrchestrator - Agent runner registry facade
+ * 只负责角色配置、路由和消息投影；顶层流程阶段和 gate 由 DebuggerRuntime 控制。
  */
 
-import { BrowserWindow } from 'electron';
 import type {
   AgentRole,
   AgentConfig,
@@ -20,83 +19,19 @@ import {
   VERIFIER_AGENTS,
   REPORTER_AGENTS,
 } from '@shared/constants/agents';
-import { llmAdapter } from '../adapters/LLMAdapter';
 import { storageAdapter } from './StorageAdapter';
-import { harnessController } from './HarnessController';
 import { generateEventId, nowMs, nowIso } from '@shared/utils/id';
 import type { LLMConfig, LLMStreamEvent } from '@shared/types/llm';
 import { executionProfileService } from './ExecutionProfileService';
 import { settingsService } from './SettingsService';
 import { runtimeLogService } from './RuntimeLogService';
-
-// ============================================
-// Specialist 工具绑定（Task 4b）
-// ============================================
-
-/**
- * 固定每个 specialist 的工具清单
- * 确保每个 agent 只能访问其职责范围内的工具
- */
-// @ts-ignore: reserved for future use
-const SPECIALIST_TOOL_BINDINGS: Record<string, string[]> = {
-  triage_agent: [
-    'rd.session.get_context',
-    'rd.event.get_action_tree',
-    'rd.macro.summarize_frame',
-  ],
-  capture_repro_agent: [
-    'rd.capture.get_info',
-    'rd.capture.list_frames',
-    'rd.context.snapshot',
-  ],
-  pass_graph_pipeline_agent: [
-    'rd.pipeline.get_state_summary',
-    'rd.pipeline.get_output_targets',
-    'rd.macro.find_state_change_point',
-  ],
-  pixel_forensics_agent: [
-    'rd.macro.explain_pixel',
-    'rd.texture.get_pixel_value',
-    'rd.export.screenshot',
-  ],
-  shader_ir_agent: [
-    'rd.shader.get_disassembly',
-    'rd.shader.debug_start',
-  ],
-  driver_device_agent: [
-    'rd.session.get_context',
-    'rd.remote.connect',
-    'rd.remote.ping',
-    'rd.remote.list_devices',
-  ],
-  // skeptic_agent 和 curator_agent 不直接使用 live tool
-  skeptic_agent: [],
-  curator_agent: [],
-};
-
-/**
- * 默认调试策略：
- * 第一层优先 macro/summary 工具（宏观快速定位）
- * 第二层再下钻 canonical event/pipeline/resource/texture/shader 工具
- */
-// @ts-ignore: reserved for future use
-const INVESTIGATION_PRIORITY = {
-  layer1_macro: ['rd.macro.summarize_frame', 'rd.macro.explain_pixel', 'rd.macro.find_state_change_point'],
-  layer2_canonical: ['rd.event.*', 'rd.pipeline.*', 'rd.resource.*', 'rd.texture.*', 'rd.shader.*'],
-};
-
-/**
- * Shader 编辑默认只读约束：
- * rd.shader.edit_and_replace 和 rd.macro.shader_hotfix_validate 默认不出现在任何 specialist 的工具清单中
- * 仅在未来 optimizer 模式或用户显式要求时启用
- */
-// @ts-ignore: reserved for future use
-const SHADER_EDIT_TOOLS = ['rd.shader.edit_and_replace', 'rd.macro.shader_hotfix_validate'];
+import { agentRunnerRegistry } from '../workflow/debugger/AgentRunnerRegistry';
+import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
+import { isToolAllowedForAgent, resolveAgentToolAllowlist } from '../workflow/debugger/DebuggerRuntimePolicy';
 
 export class AgentOrchestrator {
   private agentStates: Map<AgentRole, AgentState> = new Map();
   private agentConfigs: Map<AgentRole, AgentConfig> = new Map();
-  private mainWindow: BrowserWindow | null = null;
 
   constructor() {
     // 初始化所有Agent状态
@@ -106,8 +41,8 @@ export class AgentOrchestrator {
   /**
    * 设置主窗口引用
    */
-  setMainWindow(window: BrowserWindow): void {
-    this.mainWindow = window;
+  setMainWindow(_window: unknown): void {
+    // Renderer projection is owned by WorkflowProjectionPublisher.
   }
 
   /**
@@ -282,32 +217,28 @@ export class AgentOrchestrator {
 
       await this.recordMessage(agentId, 'user', content, context);
 
-      let streamedContent = '';
-      const response = await llmAdapter.streamChat(
-        {
-          messages,
-          model: config.modelName,
-          maxTokens: config.maxTokens,
-          temperature: config.temperature,
-          signal: options?.signal,
-        },
-        (event) => {
-          options?.onStreamEvent?.(event);
-          if (event.type === 'text-delta') {
-            streamedContent += event.text;
-            options?.onChunk?.(event.text);
-          }
-        },
-        config.modelProvider
-      );
-
-      const fallbackContent = typeof response.content === 'string'
-        ? response.content
-        : JSON.stringify(response.content);
+      const response = await agentRunnerRegistry.run({
+        agentId,
+        prompt: content,
+        systemPrompt: messages[0]?.content ?? '',
+        modelId: config.modelName,
+        providerId: config.modelProvider,
+        maxTokens: config.maxTokens,
+        temperature: config.temperature,
+        toolAllowlist: resolveAgentToolAllowlist(agentId, context?.stageId),
+        stage: context?.stageId,
+        caseId: context?.caseId,
+        runId: context?.runId,
+        sessionId: context?.sessionId,
+        turnId: context?.turnId,
+        signal: options?.signal,
+        onChunk: options?.onChunk,
+        onStreamEvent: options?.onStreamEvent,
+      });
       const finalContent = await this.finalizeRecordedAssistantMessage(
         agentId,
-        streamedContent,
-        fallbackContent,
+        response.text,
+        response.text,
         context,
       );
 
@@ -383,40 +314,23 @@ export class AgentOrchestrator {
         return finalStub;
       }
 
-      llmAdapter.configure(settingsService.getLlmConfig());
-
-      let streamedContent = '';
-      const response = await llmAdapter.streamChat(
-        {
-          messages: [
-            {
-              role: 'system',
-              content: config.systemPrompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}`,
-            },
-            {
-              role: 'user',
-              content,
-            },
-          ],
-          model: config.modelName,
-          maxTokens: config.maxTokens,
-          temperature: config.temperature,
-          signal: options?.signal,
-        },
-        (event) => {
-          options?.onStreamEvent?.(event);
-          if (event.type === 'text-delta') {
-            streamedContent += event.text;
-            options?.onChunk?.(event.text);
-          }
-        },
-        config.modelProvider,
-      );
-
-      const fallbackContent = typeof response.content === 'string'
-        ? response.content
-        : JSON.stringify(response.content);
-      const finalContent = streamedContent || fallbackContent;
+      const response = await agentRunnerRegistry.run({
+        agentId,
+        prompt: content,
+        systemPrompt: config.systemPrompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}`,
+        modelId: config.modelName,
+        providerId: config.modelProvider,
+        maxTokens: config.maxTokens,
+        temperature: config.temperature,
+        toolAllowlist: [],
+        stage: 'cowork',
+        sessionId: options?.sessionId,
+        turnId: options?.turnId,
+        signal: options?.signal,
+        onChunk: options?.onChunk,
+        onStreamEvent: options?.onStreamEvent,
+      });
+      const finalContent = response.text;
 
       runtimeLogService.log({
         scope: options?.sessionId ? 'session' : 'app',
@@ -427,8 +341,9 @@ export class AgentOrchestrator {
         sessionId: options?.sessionId,
         raw: {
           agentId,
-          providerId: config.modelProvider,
-          modelId: config.modelName,
+          providerId: response.providerId,
+          modelId: response.modelId,
+          adapter: response.trace?.adapter,
         },
       });
 
@@ -445,12 +360,7 @@ export class AgentOrchestrator {
    * 根据角色过滤可用工具，确保 skeptic_agent 和 curator_agent 不接收任何 live tool
    */
   getToolsForRole(agentId: AgentRole): string[] {
-    const runtimeProfile = this.resolveRuntimeProfile(agentId);
-    const profileTools = runtimeProfile.toolAllowlist ?? [];
-    if (profileTools.length > 0) {
-      return profileTools;
-    }
-    return SPECIALIST_TOOL_BINDINGS[agentId] ?? [];
+    return resolveAgentToolAllowlist(agentId);
   }
   
   /**
@@ -458,123 +368,9 @@ export class AgentOrchestrator {
    * shader 编辑工具默认只读，不在任何 specialist 的工具清单中
    */
   isToolAllowedForRole(toolName: string, agentId: AgentRole): boolean {
-    // Shader 编辑工具默认不可用
-    if (SHADER_EDIT_TOOLS.includes(toolName)) {
-      return false; // 仅 optimizer 模式或用户显式要求时启用
-    }
-  
-    const allowedTools = this.getToolsForRole(agentId);
-  
-    // 支持通配符匹配，如 rd.event.*
-    for (const pattern of allowedTools) {
-      if (pattern.endsWith('.*')) {
-        const prefix = pattern.slice(0, -2);
-        if (toolName.startsWith(prefix + '.')) {
-          return true;
-        }
-      } else if (toolName === pattern) {
-        return true;
-      }
-    }
-  
-    return false;
+    return isToolAllowedForAgent(toolName, agentId);
   }
   
-  /**
-   * 分派Specialist
-   */
-  async dispatchSpecialist(
-    agentId: AgentRole,
-    objective: string,
-    context: {
-      caseId: string;
-      runId: string;
-      sessionId: string;
-    }
-  ): Promise<{ success: boolean; tokenId?: string; error?: string }> {
-    // 验证是specialist agent
-    if (!INVESTIGATOR_AGENTS.includes(agentId) && !VERIFIER_AGENTS.includes(agentId)) {
-      return { success: false, error: `Cannot dispatch non-specialist agent: ${agentId}` };
-    }
-
-    // 执行dispatch gate检查
-    const gateResult = await harnessController.executeDispatchGate(
-      context.caseId,
-      context.runId,
-      {
-        targetAgent: agentId,
-        objective,
-        orchestrationMode: 'multi_agent',
-      }
-    );
-
-    if (gateResult.status === 'blocked') {
-      return {
-        success: false,
-        error: gateResult.blockers.map(b => b.reason).join('; '),
-      };
-    }
-    
-    // 获取该 specialist 可用的工具列表（Task 4b）
-    const allowedTools = this.getToolsForRole(agentId);
-    
-    // 记录分派的工具约束
-    console.log(`[AgentOrchestrator] Dispatching ${agentId} with ${allowedTools.length} allowed tools:`, allowedTools);
-    
-    // 生成capability token
-    const tokenId = generateEventId('tok');
-    
-    // 记录dispatch事件（包含可用工具列表）
-    const event = storageAdapter.createActionEvent({
-      runId: context.runId,
-      sessionId: context.sessionId,
-      agentId: 'rdc-debugger',
-      eventType: 'dispatch',
-      status: 'sent',
-      payload: {
-        target_agent: agentId,
-        objective,
-        capability_token_id: tokenId,
-        dispatch_time: nowIso(),
-      },
-    });
-
-    await storageAdapter.appendActionEvent(context.sessionId, event);
-
-    // 更新agent状态
-    this.updateAgentStatus(agentId, 'waiting');
-
-    // 发送任务给specialist
-    try {
-      const response = await this.sendMessage(agentId, objective, context);
-
-      // 记录完成
-      const completeEvent = storageAdapter.createActionEvent({
-        runId: context.runId,
-        sessionId: context.sessionId,
-        agentId,
-        eventType: 'artifact_write',
-        status: 'ok',
-        payload: {
-          brief: response.substring(0, 500),
-          completed_at: nowIso(),
-        },
-      });
-
-      await storageAdapter.appendActionEvent(context.sessionId, completeEvent);
-
-      this.updateAgentStatus(agentId, 'complete');
-
-      return { success: true, tokenId };
-    } catch (error) {
-      this.updateAgentStatus(agentId, 'error');
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  }
-
   /**
    * 更新Agent状态
    */
@@ -641,9 +437,7 @@ export class AgentOrchestrator {
    * 通知Agent状态变化
    */
   private notifyAgentStateChanged(state: AgentState): void {
-    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.mainWindow.webContents.send('agent:statusChanged', state);
-    }
+    workflowProjectionPublisher.publishAgentStatus(state);
   }
 
   /**
@@ -665,9 +459,7 @@ export class AgentOrchestrator {
       },
       timestamp: message.timestamp,
     });
-    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.mainWindow.webContents.send('agent:message', message);
-    }
+    workflowProjectionPublisher.publishAgentMessage(message);
   }
 }
 

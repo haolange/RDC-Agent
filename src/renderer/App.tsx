@@ -15,6 +15,14 @@ import { useDeviceStore } from './stores/deviceStore';
 import { useAppSettingsStore } from './stores/appSettingsStore';
 import { useTerminalStore } from './stores/terminalStore';
 import { useI18n } from './i18n';
+import { ContextUsageIndicator } from './patterns/ContextUsageIndicator';
+import {
+  getResponsiveMinMainWidth,
+  getWorkbenchContentRailWidth,
+  getWorkbenchRailMaxWidth,
+  resolveResponsiveSidebarState,
+  resolveSidebarWidths,
+} from './shell/layoutGeometry';
 import type { AgentTimelineEntry } from '@shared/types/agent';
 import type {
   ConversationAttachmentInput,
@@ -41,12 +49,9 @@ import type {
 import type { WorkflowState } from '@shared/types/workflow';
 import { AGENT_MODES } from '@shared/constants/agents';
 import {
-  APP_MIN_MAIN_WIDTH,
   APP_RESIZE_HANDLE_WIDTH,
-  LEFT_SIDEBAR_COLLAPSED_WIDTH,
   LEFT_SIDEBAR_MAX_WIDTH,
   LEFT_SIDEBAR_MIN_WIDTH,
-  RIGHT_PANEL_COLLAPSED_WIDTH,
   RIGHT_PANEL_MAX_WIDTH,
   RIGHT_PANEL_MIN_WIDTH,
 } from '@shared/constants/layout';
@@ -90,186 +95,6 @@ type E2EWindow = Window & {
       pendingAttachments?: PendingAttachmentDraft[];
       currentMode?: 'debugger' | 'analyzer' | 'optimizer';
     }) => void;
-  };
-};
-
-const reduceOverflow = (
-  desired: number,
-  minimum: number,
-  overflow: number,
-): { width: number; remainingOverflow: number } => {
-  const reducible = Math.max(0, desired - minimum);
-  const reduction = Math.min(reducible, overflow);
-  return {
-    width: desired - reduction,
-    remainingOverflow: overflow - reduction,
-  };
-};
-
-const getResponsiveMinMainWidth = (containerWidth: number): number => {
-  if (containerWidth <= 420) {
-    return 240;
-  }
-  if (containerWidth <= 720) {
-    return 280;
-  }
-  if (containerWidth <= 960) {
-    return 360;
-  }
-  return APP_MIN_MAIN_WIDTH;
-};
-
-const getWorkbenchRailMaxWidth = (
-  leftCollapsed: boolean,
-  rightCollapsed: boolean,
-  rightVisible: boolean,
-): string => {
-  if (!rightVisible) {
-    return leftCollapsed ? 'min(1400px, 94%)' : 'min(1520px, 100%)';
-  }
-
-  if (leftCollapsed && rightCollapsed) {
-    return 'min(1440px, 84%)';
-  }
-
-  if (leftCollapsed || rightCollapsed) {
-    return 'min(1320px, 88%)';
-  }
-
-  return 'min(1440px, 100%)';
-};
-
-const getWorkbenchContentRailWidth = (
-  leftCollapsed: boolean,
-  rightCollapsed: boolean,
-  rightVisible: boolean,
-): string => {
-  if (!rightVisible) {
-    return '1180px';
-  }
-
-  if (leftCollapsed && rightCollapsed) {
-    return '1280px';
-  }
-
-  if (leftCollapsed || rightCollapsed) {
-    return '1180px';
-  }
-
-  return '1080px';
-};
-
-const getResizeHandleAllowance = (
-  leftCollapsed: boolean,
-  rightCollapsed: boolean,
-  rightVisible: boolean,
-): number => (
-  (leftCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH)
-  + (!rightVisible || rightCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH)
-);
-
-const canFitLayout = (
-  containerWidth: number,
-  leftWidth: number,
-  rightWidth: number,
-  leftCollapsed: boolean,
-  rightCollapsed: boolean,
-  minMainWidth: number,
-  rightVisible: boolean,
-): boolean => {
-  const desiredLeft = leftCollapsed ? LEFT_SIDEBAR_COLLAPSED_WIDTH : leftWidth;
-  const desiredRight = !rightVisible ? 0 : (rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth);
-  const availableSidebarSpace = Math.max(
-    0,
-    containerWidth - minMainWidth - getResizeHandleAllowance(leftCollapsed, rightCollapsed, rightVisible),
-  );
-  return desiredLeft + desiredRight <= availableSidebarSpace;
-};
-
-const resolveResponsiveSidebarState = (
-  containerWidth: number,
-  leftWidth: number,
-  rightWidth: number,
-  leftCollapsed: boolean,
-  rightCollapsed: boolean,
-  rightVisible: boolean,
-): { leftCollapsed: boolean; rightCollapsed: boolean; minMainWidth: number } => {
-  if (containerWidth <= 0) {
-    return {
-      leftCollapsed,
-      rightCollapsed,
-      minMainWidth: APP_MIN_MAIN_WIDTH,
-    };
-  }
-
-  const minMainWidth = getResponsiveMinMainWidth(containerWidth);
-  let nextLeftCollapsed = leftCollapsed;
-  let nextRightCollapsed = rightVisible ? rightCollapsed : true;
-
-  if (!canFitLayout(containerWidth, leftWidth, rightWidth, nextLeftCollapsed, nextRightCollapsed, minMainWidth, rightVisible)) {
-    nextRightCollapsed = true;
-  }
-
-  if (!canFitLayout(containerWidth, leftWidth, rightWidth, nextLeftCollapsed, nextRightCollapsed, minMainWidth, rightVisible)) {
-    nextLeftCollapsed = true;
-  }
-
-  return {
-    leftCollapsed: nextLeftCollapsed,
-    rightCollapsed: nextRightCollapsed,
-    minMainWidth,
-  };
-};
-
-const resolveSidebarWidths = (
-  containerWidth: number,
-  leftWidth: number,
-  rightWidth: number,
-  leftCollapsed: boolean,
-  rightCollapsed: boolean,
-  minMainWidth: number,
-  rightVisible: boolean,
-): { left: number; right: number } => {
-  if (containerWidth <= 0) {
-    return {
-      left: leftCollapsed ? LEFT_SIDEBAR_COLLAPSED_WIDTH : leftWidth,
-      right: !rightVisible ? 0 : (rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth),
-    };
-  }
-
-  const desiredLeft = leftCollapsed ? LEFT_SIDEBAR_COLLAPSED_WIDTH : leftWidth;
-  const desiredRight = !rightVisible ? 0 : (rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : rightWidth);
-  const minLeft = leftCollapsed ? LEFT_SIDEBAR_COLLAPSED_WIDTH : LEFT_SIDEBAR_MIN_WIDTH;
-  const minRight = !rightVisible ? 0 : (rightCollapsed ? RIGHT_PANEL_COLLAPSED_WIDTH : RIGHT_PANEL_MIN_WIDTH);
-  const availableSidebarSpace = Math.max(
-    0,
-    containerWidth - minMainWidth - getResizeHandleAllowance(leftCollapsed, rightCollapsed, rightVisible),
-  );
-  const desiredTotal = desiredLeft + desiredRight;
-
-  if (desiredTotal <= availableSidebarSpace) {
-    return { left: desiredLeft, right: desiredRight };
-  }
-
-  let overflow = desiredTotal - availableSidebarSpace;
-  const leftPass = reduceOverflow(desiredLeft, minLeft, overflow);
-  overflow = leftPass.remainingOverflow;
-  const rightPass = reduceOverflow(desiredRight, minRight, overflow);
-  overflow = rightPass.remainingOverflow;
-
-  if (overflow > 0) {
-    const secondLeftPass = reduceOverflow(leftPass.width, minLeft, overflow);
-    overflow = secondLeftPass.remainingOverflow;
-    const secondRightPass = reduceOverflow(rightPass.width, minRight, overflow);
-    return {
-      left: Math.round(secondLeftPass.width),
-      right: Math.round(secondRightPass.width),
-    };
-  }
-
-  return {
-    left: Math.round(leftPass.width),
-    right: Math.round(rightPass.width),
   };
 };
 
@@ -582,81 +407,6 @@ const formatBytes = (size: number | null | undefined): string => {
     return `${Math.round(size / 1024)} KB`;
   }
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
-};
-
-const formatTokenCount = (value: number): string => new Intl.NumberFormat('en-US').format(value);
-
-const buildUsageCopy = (
-  usage: RunContextUsageSummary | null,
-  language: string,
-): { ariaLabel: string; lineOne: string; lineTwo: string } => {
-  const usagePercent = usage?.usagePercent ?? 0;
-  const inputTokens = usage?.inputTokens ?? 0;
-  const outputTokens = usage?.outputTokens ?? 0;
-  const totalTokens = usage?.totalTokens ?? 0;
-
-  if (language === 'zh-CN') {
-    return {
-      ariaLabel: usage?.hasConfiguredContextWindow
-        ? `上下文窗口已用 ${usagePercent}%，输入 ${formatTokenCount(inputTokens)}，输出 ${formatTokenCount(outputTokens)}，总计 ${formatTokenCount(totalTokens)}，窗口上限 ${formatTokenCount(usage.contextWindowTokens ?? 0)}`
-        : `上下文窗口已用 ${usagePercent}%，输入 ${formatTokenCount(inputTokens)}，输出 ${formatTokenCount(outputTokens)}，总计 ${formatTokenCount(totalTokens)}，当前模型未配置窗口上限`,
-      lineOne: usage?.hasConfiguredContextWindow
-        ? `已用 ${usagePercent}% · 窗口 ${formatTokenCount(usage.contextWindowTokens ?? 0)}`
-        : `已用 ${usagePercent}% · 窗口未配置`,
-      lineTwo: `输入 ${formatTokenCount(inputTokens)} · 输出 ${formatTokenCount(outputTokens)} · 总计 ${formatTokenCount(totalTokens)}`,
-    };
-  }
-
-  return {
-    ariaLabel: usage?.hasConfiguredContextWindow
-      ? `Context window ${usagePercent}% used. Input ${formatTokenCount(inputTokens)}, output ${formatTokenCount(outputTokens)}, total ${formatTokenCount(totalTokens)}, window ${formatTokenCount(usage.contextWindowTokens ?? 0)}.`
-      : `Context window ${usagePercent}% used. Input ${formatTokenCount(inputTokens)}, output ${formatTokenCount(outputTokens)}, total ${formatTokenCount(totalTokens)}. No context window configured for this model.`,
-    lineOne: usage?.hasConfiguredContextWindow
-      ? `${usagePercent}% used · window ${formatTokenCount(usage.contextWindowTokens ?? 0)}`
-      : `${usagePercent}% used · window not set`,
-    lineTwo: `In ${formatTokenCount(inputTokens)} · Out ${formatTokenCount(outputTokens)} · Total ${formatTokenCount(totalTokens)}`,
-  };
-};
-
-const ContextUsageIndicator: React.FC<{
-  usage: RunContextUsageSummary | null;
-  language: string;
-}> = ({ usage, language }) => {
-  const usagePercent = usage?.usagePercent ?? 0;
-  const normalizedPercent = Math.max(0, Math.min(100, usagePercent));
-  const radius = 18;
-  const circumference = 2 * Math.PI * radius;
-  const dashOffset = circumference * (1 - (normalizedPercent / 100));
-  const copy = buildUsageCopy(usage, language);
-
-  return (
-    <div
-      className={`composer-usage-indicator ${usage?.hasConfiguredContextWindow ? 'is-configured' : 'is-unconfigured'}`}
-      data-testid="composer-usage-indicator"
-      tabIndex={0}
-      role="img"
-      aria-label={copy.ariaLabel}
-    >
-      <svg className="composer-usage-ring" width="44" height="44" viewBox="0 0 44 44" aria-hidden="true">
-        <circle className="composer-usage-ring-track" cx="22" cy="22" r={radius} />
-        <circle
-          className="composer-usage-ring-progress"
-          cx="22"
-          cy="22"
-          r={radius}
-          style={{
-            strokeDasharray: `${circumference} ${circumference}`,
-            strokeDashoffset: dashOffset,
-          }}
-        />
-      </svg>
-      <span className="composer-usage-value">{normalizedPercent}%</span>
-      <div className="composer-usage-tooltip" role="tooltip">
-        <div className="composer-usage-tooltip-line composer-usage-tooltip-line-strong">{copy.lineOne}</div>
-        <div className="composer-usage-tooltip-line">{copy.lineTwo}</div>
-      </div>
-    </div>
-  );
 };
 
 const App: React.FC = () => {

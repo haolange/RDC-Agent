@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import { BrowserWindow } from 'electron';
 import type {
   ConversationAttachmentInput,
   ConversationCancelActiveTurnRequest,
@@ -23,11 +22,12 @@ import type {
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { agentOrchestrator } from './AgentOrchestrator';
-import { debugWorkflowService } from './DebugWorkflowService';
+import { debuggerRuntime } from '../workflow/debugger/DebuggerRuntime';
 import { replayDeviceService } from './ReplayDeviceService';
 import { rdxSessionService } from '../index';
 import { settingsService } from './SettingsService';
 import { storageAdapter } from './StorageAdapter';
+import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 
 interface ConversationContextInput extends ConversationSendRequest {
   fallbackProjectId?: string | null;
@@ -364,7 +364,7 @@ function createFallbackAssistantReply(message: string, context: ResolvedConversa
   return '我刚才没能稳定产出这轮对话回复。你可以重试一次；如果问题持续，优先检查当前 `rdc-debugger` 的模型链路。';
 }
 
-function buildWorkflowUpgradeReply(result: Awaited<ReturnType<typeof debugWorkflowService.startPlan>>): string {
+function buildWorkflowUpgradeReply(result: Awaited<ReturnType<typeof debuggerRuntime.startPlan>>): string {
   if (!result.success) {
     return result.error
       ? `我刚才尝试进入正式调试，但没有成功：${result.error}`
@@ -965,7 +965,9 @@ export class ConversationService {
             this.clearActiveTurn(assistantMessage.turnId, abortController);
             return;
           }
-          const workflowResult = await debugWorkflowService.startPlan({
+          const workflowResult = await debuggerRuntime.requestStartFromConversation({
+            source: 'conversation',
+            message: assistantMessage,
             projectId: input.context.projectId,
             sessionId: input.context.session?.sessionId,
             turnId: assistantMessage.turnId,
@@ -1028,11 +1030,7 @@ export class ConversationService {
   }
 
   private emitConversationEvent(event: ConversationStreamEvent) {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) {
-        window.webContents.send('conversation:event', event);
-      }
-    }
+    workflowProjectionPublisher.publishConversationEvent(event);
   }
 }
 

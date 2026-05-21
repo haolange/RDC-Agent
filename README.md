@@ -8,6 +8,8 @@
 - 在工作台内浏览、导入、打开和切换 capture。
 - 维护 `workspace root`，统一承载设置、日志和应用级运行数据。
 - 配置 `provider / model / agent route`，并把真实 LLM 路由视为 Debugger 主链的一部分。
+- 以自研 deterministic `DebuggerRuntime` 作为唯一顶层流程权威，控制 stage、gate、approval、state、evidence 和 finalization。
+- 通过 `AgentRunnerPort` 接入 OpenAI Agents SDK / Claude Agent SDK；SDK 只作为 stage 内 runner，凭据来自 Settings provider secret，不读取裸环境变量作为配置来源。
 - 执行 `Plan / Intake -> 用户批准 -> execution loop -> verification / skeptic / curator -> report` 主链。
 - 展示会话、运行状态、证据链、报告和中间产物。
 
@@ -81,5 +83,9 @@ npm run dev
 
 - [docs/README.md](./docs/README.md)：文档索引
 - [docs/product/vertical-debugger-overview.md](./docs/product/vertical-debugger-overview.md)：产品总览
+- [docs/architecture/overview.md](./docs/architecture/overview.md)：当前架构总览
+- [docs/architecture/module-map.md](./docs/architecture/module-map.md)：源码入口与能力地图
+- [docs/architecture/data-flow.md](./docs/architecture/data-flow.md)：端到端数据流
+- [docs/architecture/codepilot-comparison.md](./docs/architecture/codepilot-comparison.md)：CodePilot 对照与迁移边界
 - [docs/architecture/spec-driven-development.md](./docs/architecture/spec-driven-development.md)：规范宪章
 - [docs/ui/design-system.md](./docs/ui/design-system.md)：UI 设计系统

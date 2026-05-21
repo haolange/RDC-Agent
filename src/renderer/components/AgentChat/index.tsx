@@ -898,6 +898,9 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
     () => buildTimelineProjections(deferredMessages, actionEvents, workflowState, currentDebugPlan),
     [deferredMessages, actionEvents, workflowState, currentDebugPlan],
   );
+  const currentStage = workflowState?.currentStage;
+  const showPlanPhaseMarker = currentStage === 'plan' || workflowState?.approvalState === 'pending_user';
+  const showExecutionPhaseMarker = Boolean(currentStage && !['preflight', 'plan'].includes(currentStage));
 
   useEffect(() => {
     if (navigator.webdriver) {
@@ -934,6 +937,12 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
         data-testid="chat-messages"
         onScroll={handleScroll}
       >
+        {showPlanPhaseMarker ? (
+          <span className="phase-trace-compat-marker" data-testid="phase-trace-plan">Plan Phase</span>
+        ) : null}
+        {showExecutionPhaseMarker ? (
+          <span className="phase-trace-compat-marker" data-testid="phase-trace-execution">Execution Phase</span>
+        ) : null}
         <AgentMessageTimeline
           projections={projections}
           emptyState={<EmptyWorkbenchPrompt mode={mode} />}

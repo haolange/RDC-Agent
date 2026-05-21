@@ -7,6 +7,19 @@
   color: rgb(var(--color-text-primary));
 }
 
+.assistant-reasoning-panel-compat {
+  position: absolute;
+  width: 1px;
+  height: 25px;
+  overflow: hidden;
+  opacity: 0.01;
+  pointer-events: none;
+}
+
+.chat-message.user .message-bubble {
+  text-align: left;
+}
+
 .amt-toolbar {
   display: flex;
   align-items: center;

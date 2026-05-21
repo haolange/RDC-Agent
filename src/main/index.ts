@@ -6,10 +6,9 @@ import { app, BrowserWindow, dialog, Menu, shell } from 'electron';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
-import { registerIPCHandlers, setMainWindow, initWorkflowGraph, stopAllActiveRuns } from './ipc/handlers';
+import { registerIPCHandlers, setMainWindow, initializeIpcState, stopAllActiveRuns } from './ipc/handlers';
 import { storageAdapter } from './services/StorageAdapter';
 import { settingsService } from './services/SettingsService';
-import { rdcToolAdapter } from './tools/RDCToolAdapter';
 import { toolBridge } from './services/ToolBridge';
 import { RdxSessionService } from './services/RdxSessionService';
 import { replayDeviceService } from './services/ReplayDeviceService';
@@ -324,16 +323,12 @@ app.on('web-contents-created', (_event, contents) => {
  */
 async function initializeServices(): Promise<void> {
   try {
-    // 鑾峰彇 workspace 璺緞
-    const workspacePath = storageAdapter.getWorkspacePath();
-    
     // 鍒濆鍖?SettingsService锛坋lectron-store 寤惰繜鍔犺浇锛屾澶勮Е鍙戞瀯閫狅級
     const hasConfiguredProvider = settingsService.hasConfiguredProvider();
     console.log('[Main] SettingsService initialized, hasConfiguredProvider:', hasConfiguredProvider);
     
-    // 鍒濆锟?RDC 宸ュ叿閫傞厤锟?
-    await rdcToolAdapter.initialize();
-    console.log('[Main] RDCToolAdapter initialized');
+    await toolBridge.loadCatalog();
+    console.log('[Main] ToolBridge catalog initialized');
     runtimeLogService.log({
       scope: 'app',
       namespace: 'system',
@@ -342,9 +337,8 @@ async function initializeServices(): Promise<void> {
       summary: 'RDC 工具目录已加载。',
     });
     
-    // 鍒濆锟?WorkflowGraph
-    await initWorkflowGraph(workspacePath);
-    console.log('[Main] WorkflowGraph initialized');
+    await initializeIpcState();
+    console.log('[Main] DebuggerRuntime initialized');
 
     await replayDeviceService.initialize();
     console.log('[Main] ReplayDeviceService initialized');

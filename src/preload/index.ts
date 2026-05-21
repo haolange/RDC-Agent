@@ -25,40 +25,11 @@ import type {
 } from '@shared/types/session';
 import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
 import type { RuntimeLogEntry, RuntimeLogScope } from '@shared/types/runtimeLog';
+import { isPreloadEventChannel } from './api/channels';
+import { createAppMetaApi, createAppShellApi, createDialogApi, createWindowControlsApi } from './api/shell';
 
 const listenerMap = new Map<string, Map<(...args: unknown[]) => void, (...args: unknown[]) => void>>();
-
-const validChannels = [
-  'file:open',
-  'case:new',
-  'settings:open',
-  'app:themeChanged',
-  'workflow:stateChanged',
-  'workflow:stageChanged',
-  'workflow:runStatusChanged',
-  'workflow:runUsageChanged',
-  'workflow:blocked',
-  'agent:message',
-  'agent:statusChanged',
-  'tool:executionComplete',
-  'evidence:eventAdded',
-  'llm:stream',
-  'window:maximized-changed',
-  'device:statusChanged',
-  'capture:statusChanged',
-  'context:changed',
-  'project:inputsChanged',
-  'capture:openedStateChanged',
-  'runtime:logAppended',
-  'terminal:data',
-  'terminal:exit',
-  'terminal:tabsChanged',
-  'conversation:event',
-] as const;
-
-const isValidChannel = (channel: string): channel is (typeof validChannels)[number] => {
-  return validChannels.includes(channel as (typeof validChannels)[number]);
-};
+const dialogApi = createDialogApi();
 
 const registerTrackedListener = (channel: string, callback: (...args: unknown[]) => void): (() => void) => {
   const wrappedCallback = (_event: unknown, ...args: unknown[]) => callback(...args);
@@ -83,16 +54,9 @@ const electronAPI = {
   isWindows: process.platform === 'win32',
   isLinux: process.platform === 'linux',
 
-  appMeta: {
-    get: (): Promise<{ version: string; productName: string; systemTheme: 'dark' | 'light' }> => ipcRenderer.invoke('app:getMeta'),
-  },
+  appMeta: createAppMetaApi(),
 
-  appShell: {
-    selectAvatar: (): Promise<string | null> => ipcRenderer.invoke('app:selectAvatar'),
-    getAvatarDataUrl: (avatarPath: string): Promise<string | null> => ipcRenderer.invoke('app:getAvatarDataUrl', avatarPath),
-    openPath: (targetPath: string): Promise<{ success: boolean; error?: string }> => ipcRenderer.invoke('app:openPath', targetPath),
-    copyText: (text: string): Promise<{ success: boolean }> => ipcRenderer.invoke('app:copyText', text),
-  },
+  appShell: createAppShellApi(),
 
   conversation: {
     sendMessage: (request: ConversationSendRequest): Promise<ConversationTurnResult> => ipcRenderer.invoke('conversation:sendMessage', request),
@@ -107,9 +71,9 @@ const electronAPI = {
     },
   },
 
-  selectFiles: (): Promise<string[] | null> => ipcRenderer.invoke('dialog:selectFiles'),
-  selectRdcFiles: (): Promise<string[] | null> => ipcRenderer.invoke('dialog:selectRdcFiles'),
-  selectDirectory: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectDirectory'),
+  selectFiles: dialogApi.selectFiles,
+  selectRdcFiles: dialogApi.selectRdcFiles,
+  selectDirectory: dialogApi.selectDirectory,
 
   workflow: {
     getState: (): Promise<unknown> => ipcRenderer.invoke('workflow:getState'),
@@ -123,9 +87,6 @@ const electronAPI = {
     getRunUsage: (runId?: string): Promise<{ usage: RunContextUsageSummary | null }> => ipcRenderer.invoke('workflow:getRunUsage', runId),
     listRuns: (): Promise<unknown> => ipcRenderer.invoke('workflow:listRuns'),
     listActiveRuns: (): Promise<unknown> => ipcRenderer.invoke('workflow:listActiveRuns'),
-    advanceStage: (): Promise<unknown> => ipcRenderer.invoke('workflow:advanceStage'),
-    backtrack: (reason: string, trigger: string): Promise<unknown> => ipcRenderer.invoke('workflow:backtrack', reason, trigger),
-    dispatchSpecialist: (agentId: string, objective: string): Promise<unknown> => ipcRenderer.invoke('workflow:dispatchSpecialist', agentId, objective),
   },
 
   agent: {
@@ -294,15 +255,10 @@ const electronAPI = {
     },
   },
 
-  windowControls: {
-    minimize: (): Promise<void> => ipcRenderer.invoke('window:minimize'),
-    toggleMaximize: (): Promise<boolean> => ipcRenderer.invoke('window:toggleMaximize'),
-    close: (): Promise<void> => ipcRenderer.invoke('window:close'),
-    isMaximized: (): Promise<boolean> => ipcRenderer.invoke('window:isMaximized'),
-  },
+  windowControls: createWindowControlsApi(),
 
   on: (channel: string, callback: (...args: unknown[]) => void) => {
-    if (isValidChannel(channel)) {
+    if (isPreloadEventChannel(channel)) {
       registerTrackedListener(channel, callback);
     }
   },
