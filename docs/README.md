@@ -12,9 +12,25 @@
 ## 当前文档
 
 - `product/vertical-debugger-overview.md`
+- `architecture/overview.md`
+- `architecture/data-flow.md`
+- `architecture/module-map.md`
+- `architecture/codepilot-comparison.md`
 - `architecture/spec-driven-development.md`
 - `architecture/vertical-framework-implementation-plan.md`
 - `architecture/framework-improvement-notes.md`
 - `workflows/debugger-mainchain-demo.md`
 - `workflows/workflow-conformance-analysis.md`
 - `ui/design-system.md`
+
+## 推荐阅读顺序
+
+后续 agent 进入本仓库时，优先阅读：
+
+1. `README.md`
+2. `AGENTS.md`
+3. `docs/architecture/overview.md`
+4. `docs/architecture/module-map.md`
+5. `docs/architecture/data-flow.md`
+
+如果任务涉及结构升级或跨仓库对照，再阅读 `docs/architecture/codepilot-comparison.md`。

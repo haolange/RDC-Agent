@@ -1,5 +1,3 @@
-import type { WorkflowStateType } from './WorkflowGraph';
-
 export interface RunExecutionContext {
   runId: string;
   sessionId: string;
@@ -13,7 +11,7 @@ export interface ActiveRunSnapshot extends RunExecutionContext {
 
 interface ActiveRunController extends ActiveRunSnapshot {
   abortController: AbortController;
-  promise?: Promise<WorkflowStateType | void>;
+  promise?: Promise<unknown>;
 }
 
 export class RunExecutionService {
@@ -21,7 +19,7 @@ export class RunExecutionService {
 
   startRun(
     context: RunExecutionContext,
-    executor: (signal: AbortSignal) => Promise<WorkflowStateType | void>,
+    executor: (signal: AbortSignal) => Promise<unknown>,
   ): ActiveRunSnapshot {
     const existing = this.activeRuns.get(context.runId);
     if (existing) {

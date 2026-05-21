@@ -45,11 +45,11 @@
 │  用户交互层（Chat / UI / Report）                         │  表面：自然流畅
 │  ConversationService / renderer/components               │
 ├──────────────────────────────────────────────────────────┤
-│  工作流编排层（StateGraph / WorkflowGraph）               │  中间：规范化可控
-│  DebugWorkflowService / WorkflowGraph / HarnessController│
+│  工作流编排层（deterministic DebuggerRuntime）               │  中间：规范化可控
+│  DebuggerRuntime / DebugWorkflowService / HarnessController│
 ├──────────────────────────────────────────────────────────┤
 │  工具执行层（Tools / MCP / CLI）                          │  底层：可靠可审计
-│  ToolBridge / RDCToolAdapter / rdx.bat                   │
+│  ToolBridge / AgentToolPort / rdx.bat                   │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -58,7 +58,7 @@
 | 维度 | 通用 Agent | RDC-Agent |
 |------|-----------|-----------|
 | 用户界面 | 纯 Chat | Chat + Workflow + Report |
-| 执行控制 | LLM 自由决策 | StateGraph 强制路由 |
+| 执行控制 | LLM 自由决策 | DebuggerRuntime 强制路由 |
 | 工具访问 | 全量开放 | 按角色绑定 |
 | 可审计性 | 无 | 完整 ActionEvent 证据链 |
 | 失败处理 | 重试或放弃 | Blocker 机制 + Backtrack |
@@ -69,7 +69,7 @@
 **自主性与可控性的混合模式**
 
 - 12阶段为主干（Workflow），每阶段内允许 Agent 自主操作（Agentic）
-- LLM 只提供建议，StateGraph 决定路由
+- LLM 只提供建议，DebuggerRuntime 决定路由
 - `workflow/stage/blocker` 是 Agent 的内部操作系统，不是用户首先面对的产品本体
 - Agent 可以先聊天、先理解、先澄清、先建议，只有条件满足时才触发执行流程
 
@@ -216,11 +216,11 @@ START
   │ pass
   ▼
 [fix_verify] ──blocked──→ [blocked]
-  │           ──retry───→ [investigate] (backtrack)
+  │           ──retry───→ [investigate] (back-to-plan)
   │ pass
   ▼
 [skepti] ──blocked──→ [blocked]
-  │       ──rejected─→ [fix_verify] (backtrack)
+  │       ──rejected─→ [fix_verify] (back-to-plan)
   │ approved
   ▼
 [curate] ──blocked──→ [blocked]
@@ -281,7 +281,7 @@ END
 - `LLM_KEY_MISSING`：Debugger 模式缺少 LLM 配置
 - `REMOTE_CONFIG_MISSING`：Remote Capture 缺少在线设备
 
-**BacktrackRule**：无（Gate 失败直接 blocked）
+**RuntimeRevisionRule**：无（Gate 失败直接 blocked）
 
 ---
 
@@ -424,7 +424,7 @@ const SPECIALIST_TOOL_BINDINGS: Record<string, string[]> = {
 **Backtrack 规则**：
 
 ```typescript
-// BacktrackRule（概念性定义，实际由 WorkflowGraph 路由实现）
+// RuntimeRevisionRule（概念性定义，实际由 DebuggerRuntime policy 实现）
 {
   fromStage: 'dispatch',
   toStage: 'plan',
@@ -517,7 +517,7 @@ const SPECIALIST_TOOL_BINDINGS: Record<string, string[]> = {
 **入口条件**：fix_verify 通过
 
 **出口条件**：
-- `verdict` 为 'approved' 或 'approved_with_warning'（rejected 则 throw，触发 backtrack）
+- `verdict` 为 'approved' 或 'approved_with_warning'（rejected 则 throw，触发 back-to-plan）
 
 **LLM 输出结构**：
 
@@ -593,7 +593,7 @@ const SPECIALIST_TOOL_BINDINGS: Record<string, string[]> = {
 - reportPaths 写入（markdown / json / html）
 - ActionEvent(event_type='report_published') 写入证据链
 
-**错误处理**：finalize 只有 END，无 backtrack
+**错误处理**：finalize 只有 END，无 back-to-plan
 
 ---
 
@@ -720,7 +720,7 @@ export type SystemToolName =
   | 'task.create' | 'task.update' | 'task.list';
 ```
 
-**RDC 工具组定义**（来源：`src/main/tools/RDCToolAdapter.ts`）：
+**RDC 工具组定义**（来源：`src/main/services/ToolBridge.ts`）：
 
 ```typescript
 const RDC_TOOL_GROUPS = [
@@ -781,9 +781,9 @@ function buildCoworkPrompt(context, history, message): string {
 
 **结构化记忆模型**：
 
-- `GraphState.stageHistory`：已完成阶段历史（只追加）
-- `GraphState.evidenceChain`：ActionEvent 列表（只追加）
-- `GraphState.artifacts`：artifact 路径列表（只追加）
+- `WorkflowState projection.stageHistory`：已完成阶段历史（只追加）
+- `WorkflowState projection.evidenceChain`：ActionEvent 列表（只追加）
+- `WorkflowState projection.artifacts`：artifact 路径列表（只追加）
 
 **上下文压缩策略**：
 
@@ -791,7 +791,7 @@ function buildCoworkPrompt(context, history, message): string {
 - Overwrite reducer（`(_a, b) => b`）用于阶段状态字段，防止历史污染
 - Append reducer（`(a, b) => [...a, ...b]`）用于证据链和 artifact 列表
 
-**检查点持久化**（来源：`src/main/services/CheckpointSaver.ts`）：
+**检查点持久化**（来源：`StorageAdapter run/session state`）：
 
 ```
 workspace/checkpoints/{thread_id}/{checkpoint_ns}/{checkpoint_id}.json
@@ -807,14 +807,14 @@ workspace/checkpoints/{thread_id}/{checkpoint_ns}/index.json
 
 **工作流级强制**：
 
-- LLM 只建议（System Prompt 描述），StateGraph 决定路由（`WorkflowGraph.ts` 的条件边）
-- 所有路由函数返回值类型固定：`'blocked' | 'next_stage' | 'backtrack_target'`
-- 禁止任何代码绕过 `wrapNode()` 包装直接操作 GraphState
+- LLM 只建议（System Prompt 描述），DebuggerRuntime 决定路由（`DebuggerRuntime.ts` 的条件边）
+- 所有路由函数返回值类型固定：`'blocked' | 'next_stage' | 'back-to-plan_target'`
+- 禁止任何代码绕过 `wrapNode()` 包装直接操作 WorkflowState projection
 
 **Schema 验证**：
 
 ```
-调用前：Zod Schema 验证 ToolCallRequest 参数（RDCToolAdapter.buildZodSchema()）
+调用前：Zod Schema 验证 ToolCallRequest 参数（AgentToolPort schema adapter）
 调用后：ToolCallResult.ok 字段必须检查，error 必须处理
 Gate 前：HarnessController 各 Gate 方法在阶段入口强制执行
 ```
@@ -942,7 +942,7 @@ export interface ToolTraceEntry {
   → ToolCallResult.ok === false
   → Agent 读取 error.message
   → 在下一轮 LLM 调用中提供错误上下文
-  → 最多 2 次重试（由 backtrackCount 追踪）
+  → 最多 2 次重试（由 retry ledger 追踪）
   → 超出重试 → Blocker 写入 → blocked 状态
 ```
 
@@ -1086,7 +1086,7 @@ export const AGENT_CATEGORY_MAP: Record<AgentRole, AgentCategory> = {
 **工具范围**：`rd.core.*` / `rd.session.*` / `rd.capture.*` / `rd.remote.*`（全量）
 **关键约束**：
 - Cowork 模式不假装已分析 capture
-- 工作流模式只提建议，由 StateGraph 决定路由
+- 工作流模式只提建议，由 DebuggerRuntime 决定路由
 - 所有 LLM 输出必须有 deterministic fallback
 
 **协作协议**：与所有 specialist agents 均有 dispatch 关系；接收 skeptic/curator 的最终结论
@@ -1225,7 +1225,7 @@ rd.remote.list_devices
 **System Prompt 核心约束**："Challenge unsupported claims and reject conclusions not proven by the evidence chain."
 **工具范围**：无（不使用 live tool）
 **输出格式**：`{ verdict: 'approved' | 'approved_with_warning' | 'rejected', summary: string }`
-**协作协议**：`rejected` 触发 backtrack 到 fix_verify；`approved_with_warning` 允许继续但警告
+**协作协议**：`rejected` 触发 back-to-plan 到 fix_verify；`approved_with_warning` 允许继续但警告
 
 ---
 
@@ -1291,7 +1291,7 @@ npm run lint        # ESLint 代码规范检查
 - [ ] 是否只改了主进程没改渲染层入口或状态展示？
 - [ ] 是否引入了新的重复定义、旧命名或兼容分支？
 - [ ] 新增 IPC 事件是否同步更新了 `src/preload/index.ts` 和 renderer 订阅？
-- [ ] 新增 WorkflowStage 是否同步更新了 `WorkflowGraph.ts` 的节点和路由？
+- [ ] 新增 WorkflowStage 是否同步更新了 `DebuggerRuntime.ts` 的节点和路由？
 
 ### 8.2 E2E 测试要求
 
@@ -1316,7 +1316,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 **新增 WorkflowStage**：
 
 1. 更新 `src/shared/types/workflow.ts` 的 `WorkflowStage` 类型
-2. 在 `WorkflowGraph.ts` 中添加节点和边
+2. 在 `DebuggerRuntime.ts` 中添加节点和边
 3. 在 `ExecutionProfileService.ts` 中添加 `DEFAULT_STAGE_POLICIES` 条目
 4. 在本文档第3章补充阶段规范表格
 5. 运行 `npm run typecheck`
@@ -1362,7 +1362,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 
 #### M1-2 Context 压缩策略
 
-- 涉及文件：`src/main/services/ConversationService.ts`、`src/main/services/WorkflowGraph.ts`
+- 涉及文件：`src/main/services/ConversationService.ts`、`src/main/services/DebuggerRuntime.ts`
 - 任务：实现 Cowork 历史截断（已有 slice(-6)，验证其有效性）；已完成阶段 artifact 只保留摘要
 - 验收：长对话（> 20 轮）不触发 Token 超限错误
 
@@ -1374,9 +1374,9 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 
 #### M1-4 自纠正循环
 
-- 涉及文件：`src/main/services/WorkflowGraph.ts`（节点函数）
+- 涉及文件：`src/main/services/DebuggerRuntime.ts`（节点函数）
 - 任务：实现工具失败 → 错误上下文回注 → 重试 → 超限触发 Blocker 的完整循环
-- 验收：`backtrackCount` 正确追踪重试次数；超出 maxRetries 正确写 Blocker
+- 验收：`retry ledger` 正确追踪重试次数；超出 maxRetries 正确写 Blocker
 
 #### M1-5 超时策略统一
 
@@ -1445,8 +1445,8 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 
 #### M3-1 Backtrack 完整测试
 
-- 涉及文件：`e2e/run-stop-recovery.spec.ts`、新增 `e2e/backtrack.spec.ts`
-- 任务：覆盖所有 BacktrackTrigger（specialist_timeout / skeptic_rejected / triage_low_confidence / blocker_detected / user_requested）
+- 涉及文件：`e2e/run-stop-recovery.spec.ts`、新增 `e2e/back-to-plan.spec.ts`
+- 任务：覆盖所有 RuntimeRevisionTrigger（specialist_timeout / skeptic_rejected / triage_low_confidence / blocker_detected / user_requested）
 - 验收：5种触发条件的 E2E 测试全部通过
 
 #### M3-2 故障注入测试
@@ -1473,9 +1473,9 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 - 任务：按功能拆分 IPC handlers，每个域一个文件
 - 验收：单个 handler 文件 < 200 行
 
-#### M3-6 CheckpointSaver 并发安全
+#### M3-6 StorageAdapter 并发安全
 
-- 涉及文件：`src/main/services/CheckpointSaver.ts`
+- 涉及文件：`StorageAdapter run/session state`
 - 任务：添加写操作锁，防止多个 run 并发写入同一 checkpoint 目录
 - 验收：并发 run 测试不出现数据损坏
 
@@ -1550,7 +1550,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 一次修改内必须同步完成所有相关变更，不留"临时兼容"、"稍后补充"的残局。
 
 **5. 强制垂直推进**
-工作流阶段顺序不可跳跃。LLM 的建议必须经过 StateGraph 路由函数验证才能实际推进阶段。
+工作流阶段顺序不可跳跃。LLM 的建议必须经过 DebuggerRuntime 路由函数验证才能实际推进阶段。
 任何绕过 Gate 检查的代码是严重 Bug，必须修复。
 
 **6. 可验证交付**
@@ -1565,7 +1565,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 
 | 文件 | 内容 |
 |------|-----|
-| `src/shared/types/workflow.ts` | WorkflowStage / GraphState / Blocker / BacktrackRule / IntakeContext |
+| `src/shared/types/workflow.ts` | WorkflowStage / WorkflowState projection / Blocker / RuntimeRevisionRule / IntakeContext |
 | `src/shared/types/agent.ts` | AgentRole / DEFAULT_MODEL_ROUTING / AgentConfig |
 | `src/shared/types/tool.ts` | ToolDefinition / LayeredToolDefinition / ToolCallResult |
 | `src/shared/types/evidence.ts` | ActionEvent / EvidenceChain |
@@ -1578,21 +1578,21 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 
 | 文件 | 职责 |
 |------|-----|
-| `WorkflowGraph.ts` | StateGraph 定义、节点注册、边路由 |
+| `DebuggerRuntime.ts` | DebuggerRuntime 定义、节点注册、边路由 |
 | `DebugWorkflowService.ts` | 工作流编排、LLM 调用、run 生命周期管理 |
 | `AgentOrchestrator.ts` | Agent 配置、System Prompt 构建、消息发送 |
 | `ConversationService.ts` | Cowork 对话、意图识别、模式切换 |
 | `HarnessController.ts` | Gate 前置检查、工具调用包装、早期 Blocker 检测 |
 | `ToolBridge.ts` | rd.* 工具调用、CLI 执行、工具目录加载 |
 | `ExecutionProfileService.ts` | 执行特征文件、Agent Runtime Profile 解析 |
-| `CheckpointSaver.ts` | LangGraph 检查点持久化 |
+| `StorageAdapter.ts` | 会话、运行、事件和 Runtime projection 持久化 |
 | `StorageAdapter.ts` | 会话/运行/事件 持久化 |
 
 ### 主进程工具（`src/main/tools/`）
 
 | 文件 | 职责 |
 |------|-----|
-| `RDCToolAdapter.ts` | rd.* 工具适配为 LangGraph DynamicStructuredTool |
+| `ToolBridgeAgentToolPort.ts` | rd.* 工具适配为 AgentRunnerPort 可调用工具 |
 
 ### 工具目录（`resources/tools/`）
 

@@ -1,7 +1,6 @@
 import type {
   AskUserAnswer,
   AskUserPrompt,
-  BacktrackTrigger,
   DebugPlan,
   WorkflowStage,
   WorkflowState,
@@ -144,20 +143,6 @@ export interface ElectronAPI {
     }>;
     listRuns: () => Promise<{ runs: RunSummary[] }>;
     listActiveRuns: () => Promise<{ runs: Array<{ runId: string; sessionId: string; projectId: string; startedAt: number; stage?: string }> }>;
-    advanceStage: () => Promise<{
-      success: boolean;
-      currentStage?: WorkflowStage;
-      error?: string;
-    }>;
-    backtrack: (reason: string, trigger: BacktrackTrigger) => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
-    dispatchSpecialist: (agentId: AgentRole, objective: string) => Promise<{
-      success: boolean;
-      tokenId?: string;
-      error?: string;
-    }>;
   };
 
   agent: {

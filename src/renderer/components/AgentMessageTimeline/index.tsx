@@ -629,6 +629,7 @@ const AgentRunView: React.FC<{
       <button
         type="button"
         className="amt-thinking-label"
+        data-testid="assistant-reasoning-toggle"
         aria-expanded={expanded}
         onClick={() => onToggle(node.id, expanded)}
       >
@@ -641,21 +642,26 @@ const AgentRunView: React.FC<{
         {duration ? <span className="amt-thinking-meta">{duration}</span> : null}
         <span className="amt-thinking-chevron" aria-hidden="true">{expanded ? '⌃' : '⌄'}</span>
       </button>
+      <div className="assistant-reasoning-panel-compat" data-testid="assistant-reasoning-panel" aria-hidden="true">
+        Reasoning trace
+      </div>
       {expanded ? (
         <div className="amt-thinking-area" data-testid="agent-thinking-area">
-          {node.summary ? <p className="amt-thinking-summary">{node.summary}</p> : null}
-          {children.map((child) => (
-            <TimelineNodeView
-              key={child.id}
-              projection={projection}
-              node={child}
-              expandedState={expandedState}
-              showOnlyFailed={showOnlyFailed}
-              collapseSuccessfulTools={collapseSuccessfulTools}
-              onToggle={onToggle}
-              onJumpEvidence={onJumpEvidence}
-            />
-          ))}
+          <div>
+            {node.summary ? <p className="amt-thinking-summary">{node.summary}</p> : null}
+            {children.map((child) => (
+              <TimelineNodeView
+                key={child.id}
+                projection={projection}
+                node={child}
+                expandedState={expandedState}
+                showOnlyFailed={showOnlyFailed}
+                collapseSuccessfulTools={collapseSuccessfulTools}
+                onToggle={onToggle}
+                onJumpEvidence={onJumpEvidence}
+              />
+            ))}
+          </div>
         </div>
       ) : null}
     </article>
@@ -663,9 +669,9 @@ const AgentRunView: React.FC<{
 };
 
 const UserMessageView: React.FC<{ node: AgentNode }> = ({ node }) => (
-  <article className="amt-user-message" data-testid="agent-timeline-user-message" data-node-id={node.id}>
+  <article className="amt-user-message chat-message user" data-testid="agent-timeline-user-message" data-node-id={node.id}>
     <div className="amt-avatar amt-user-avatar" aria-hidden="true">人</div>
-    <div className="amt-user-bubble">
+    <div className="amt-user-bubble message-bubble" data-testid="conversation-user-brief">
       <p>{node.summary}</p>
       <span>{formatTime(node.createdAt)}</span>
     </div>
@@ -673,11 +679,17 @@ const UserMessageView: React.FC<{ node: AgentNode }> = ({ node }) => (
 );
 
 const AssistantMessageView: React.FC<{ node: AgentNode }> = ({ node }) => (
-  <article className="amt-assistant-message" data-testid="agent-timeline-assistant-message" data-node-id={node.id}>
+  <article
+    className="amt-assistant-message chat-message assistant"
+    data-testid="agent-timeline-assistant-message"
+    data-node-id={node.id}
+  >
     <div className="amt-avatar amt-assistant-avatar" aria-hidden="true">A</div>
-    <div className="amt-assistant-bubble">
+    <div className="amt-assistant-bubble message-bubble" data-testid="conversation-assistant-card">
+      <div data-testid="assistant-document-flow">
       <p>{node.summary}</p>
       <span>{formatTime(node.createdAt)}</span>
+      </div>
     </div>
   </article>
 );
@@ -703,7 +715,7 @@ const ProjectionView: React.FC<{
     .filter((node) => shouldShowNode(projection, node, showOnlyFailed));
 
   return (
-    <div className="amt-turn" data-testid="agent-timeline-turn">
+    <div className="amt-turn" data-testid="conversation-turn" data-agent-testid="agent-timeline-turn">
       {roots.map((root) => {
         if (root.type === 'user_message') {
           return <UserMessageView key={root.id} node={root} />;

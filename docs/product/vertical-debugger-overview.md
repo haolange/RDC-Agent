@@ -103,12 +103,12 @@ src/main/
 │   ├── tools.ts
 │   └── llm.ts
 ├── services/
-│   ├── WorkflowEngine.ts       # 工作流状态机（带受控回转）
+│   ├── DebuggerRuntime.ts      # 顶层 deterministic Debugger Runtime
 │   ├── HarnessController.ts    # 过程控制器（前置Gate）
 │   ├── ContextManager.ts       # Context统一管理
 │   ├── EvidenceChain.ts        # 证据链记录与验证
 │   ├── ToolBridge.ts           # 工具层桥接
-│   └── AgentOrchestrator.ts    # Agent编排
+│   └── AgentRunnerRegistry.ts  # Stage 内 Agent SDK runner 适配
 └── adapters/
     ├── LLMAdapter.ts           # LLM统一适配
     ├── providers/
@@ -269,8 +269,8 @@ RdcAgent/
 - [ ] workspace目录结构创建
 - [ ] YAML/JSONL读写工具
 
-### Phase 4: Workflow Engine (工作流引擎)
-- [ ] WorkflowEngine核心实现
+### Phase 4: Debugger Runtime (工作流引擎)
+- [ ] DebuggerRuntime 核心实现
 - [ ] 12阶段状态机
 - [ ] 受控回转逻辑（完整实现）
 - [ ] HarnessController（前置Gate + 运行时监控）
@@ -280,7 +280,7 @@ RdcAgent/
 - [ ] LLMAdapter核心
 - [ ] OpenRouterProvider（必须）
 - [ ] 其他Provider
-- [ ] AgentOrchestrator
+- [ ] AgentRunnerRegistry / AgentRunnerPort
 - [ ] Agent配置系统（System Prompt + Model选择）
 
 ### Phase 6: UI Implementation (UI实现)
@@ -302,10 +302,10 @@ RdcAgent/
 
 ### 需要新创建的核心文件
 1. `RdcAgent/src/main/services/HarnessController.ts` - 过程控制Harness
-2. `RdcAgent/src/main/services/WorkflowEngine.ts` - 带受控回转的状态机
+2. `RdcAgent/src/main/workflow/debugger/DebuggerRuntime.ts` - 顶层 deterministic Debugger Runtime
 3. `RdcAgent/src/main/adapters/LLMAdapter.ts` - LLM统一适配层
 4. `RdcAgent/src/main/adapters/providers/OpenRouterProvider.ts` - OpenRouter适配
-5. `RdcAgent/src/main/services/AgentOrchestrator.ts` - Agent编排器
+5. `RdcAgent/src/main/workflow/debugger/AgentRunnerRegistry.ts` - Agent SDK runner registry
 6. `RdcAgent/src/renderer/components/WorkflowPanel/index.tsx` - 工作流状态面板
 
 ### 需要复用的原框架文件
@@ -319,7 +319,7 @@ RdcAgent/
 ## Verification Plan
 
 ### 单元测试
-- [ ] WorkflowEngine状态转换测试
+- [ ] DebuggerRuntime 状态转换测试
 - [ ] HarnessController Gate校验测试
 - [ ] EvidenceChain事件记录测试
 - [ ] LLMAdapter各Provider测试

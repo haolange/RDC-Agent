@@ -1,5 +1,4 @@
 import path from 'path';
-import { BrowserWindow } from 'electron';
 import type { AgentRole } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage, ConversationStreamEvent } from '@shared/types/conversation';
@@ -39,6 +38,7 @@ import { artifactStore } from './ArtifactStore';
 import { contextService } from './ContextService';
 import { evidenceLedger } from './EvidenceLedger';
 import { taskBoard } from './TaskBoard';
+import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 
 export interface StartWorkflowResult {
   success: boolean;
@@ -2029,11 +2029,7 @@ export class DebugWorkflowService {
       }
     }
     await storageAdapter.appendActionEvent(sessionId, event);
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) {
-        window.webContents.send('evidence:eventAdded', event);
-      }
-    }
+    workflowProjectionPublisher.publishEvidenceEvent(event);
   }
 
   private async appendAssistantConversationMessage(
@@ -2081,15 +2077,7 @@ export class DebugWorkflowService {
   }
 
   private emitWorkflowState(state: WorkflowState): void {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) {
-        window.webContents.send('workflow:stateChanged', state);
-        window.webContents.send('workflow:stageChanged', {
-          stage: state.currentStage,
-          blockers: state.blockers,
-        });
-      }
-    }
+    workflowProjectionPublisher.publishWorkflowState(state);
   }
 
   private emitRunStatus(
@@ -2099,25 +2087,17 @@ export class DebugWorkflowService {
     lastStage?: string,
     stopReason?: string,
   ): void {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) {
-        window.webContents.send('workflow:runStatusChanged', {
-          sessionId,
-          runId,
-          status,
-          lastStage,
-          stopReason,
-        });
-      }
-    }
+    workflowProjectionPublisher.publishRunStatus({
+      sessionId,
+      runId,
+      status,
+      lastStage,
+      stopReason,
+    });
   }
 
   private emitConversationEvent(event: ConversationStreamEvent): void {
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) {
-        window.webContents.send('conversation:event', event);
-      }
-    }
+    workflowProjectionPublisher.publishConversationEvent(event);
   }
 }
 
