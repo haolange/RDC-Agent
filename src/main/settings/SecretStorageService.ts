@@ -43,6 +43,10 @@ export class SecretStorageService {
     return `provider-${sanitizeToken(providerId)}-api-key`;
   }
 
+  createProviderOAuthSecretRef(providerId: string): string {
+    return `provider-${sanitizeToken(providerId)}-oauth`;
+  }
+
   getSecret(secretRef: string | undefined, workspaceRoot?: string): string {
     if (!secretRef) {
       return '';

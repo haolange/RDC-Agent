@@ -8,6 +8,7 @@ import type {
   AppSettings,
   AppTheme,
   FontScale,
+  LlmProviderAccountStatus,
   LlmAgentRoute,
   LlmProviderEntry,
   LlmProviderModel,
@@ -28,12 +29,18 @@ type ProviderConnectionBusyState = 'idle' | 'testing' | 'saving';
 interface ProviderConnectionDraft {
   providerId: string;
   apiKey: string;
+  baseUrl: string;
   showApiKey: boolean;
+  usingStoredSecret: boolean;
   busy: ProviderConnectionBusyState;
   error: string;
   testedApiKey: string;
   models: LlmProviderModel[];
+  accountStatus?: LlmProviderAccountStatus;
+  authCode: string;
 }
+
+const STORED_SECRET_MASK = '••••••••••••••••••••••••';
 
 const joinPath = (root: string, ...segments: string[]): string => {
   const separator = root.includes('\\') ? '\\' : '/';
@@ -61,6 +68,7 @@ const getProviderDisplayLabel = (
 const getProviderGroupLabel = (provider: Pick<LlmProviderEntry, 'catalogGroup'>): string => {
   if (provider.catalogGroup === 'local') return 'Local';
   if (provider.catalogGroup === 'account') return 'Account';
+  if (provider.catalogGroup === 'environment') return 'Environment';
   return 'API Key';
 };
 
@@ -71,16 +79,25 @@ const getProviderStatusLabel = (provider: Pick<LlmProviderEntry, 'status' | 'isC
   return 'settings.providerUnconfigured';
 };
 
-const formatLastTested = (value?: string): string => {
-  if (!value) return '';
-  const timestamp = new Date(value).getTime();
-  if (!Number.isFinite(timestamp)) return '';
-  return new Intl.DateTimeFormat(undefined, {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(timestamp);
+const getModelSummary = (models: LlmProviderModel[], fallback: string): string => {
+  if (models.length === 0) return fallback;
+  if (models.length <= 2) return models.map((model) => model.label).join(', ');
+  return `${models.slice(0, 2).map((model) => model.label).join(', ')} +${models.length - 2}`;
+};
+
+const sortProvidersByLabel = (providers: LlmProviderEntry[]): LlmProviderEntry[] =>
+  [...providers].sort((left, right) => (
+    getProviderDisplayLabel(left, left.id).localeCompare(
+      getProviderDisplayLabel(right, right.id),
+      undefined,
+      { sensitivity: 'base' },
+    )
+  ));
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (typeof error === 'string' && error.trim()) return error;
+  return fallback;
 };
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, onClose }) => {
@@ -130,20 +147,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [open, onClose]);
 
-  const selectedProvider = useMemo(
-    () => providerDrafts.find((provider) => provider.id === selectedProviderId) ?? null,
-    [providerDrafts, selectedProviderId],
-  );
   const connectionProvider = useMemo(
     () => providerDrafts.find((provider) => provider.id === connectionDraft?.providerId) ?? null,
     [connectionDraft?.providerId, providerDrafts],
   );
   const routableProviders = useMemo(
-    () => providerDrafts.filter((provider) => provider.enabled && provider.isConfigured && getEnabledModels(provider).length > 0),
+    () => sortProvidersByLabel(providerDrafts.filter((provider) => provider.enabled && provider.isConfigured && getEnabledModels(provider).length > 0)),
+    [providerDrafts],
+  );
+  const accountProviders = useMemo(
+    () => sortProvidersByLabel(providerDrafts.filter((provider) => provider.authMode === 'account')),
+    [providerDrafts],
+  );
+  const providerCatalog = useMemo(
+    () => sortProvidersByLabel(providerDrafts.filter((provider) => provider.authMode !== 'account')),
     [providerDrafts],
   );
   const configuredProvidersWithoutEnabledModels = useMemo(
-    () => providerDrafts.filter((provider) => provider.enabled && provider.isConfigured && getEnabledModels(provider).length === 0),
+    () => sortProvidersByLabel(providerDrafts.filter((provider) => provider.enabled && provider.isConfigured && getEnabledModels(provider).length === 0)),
     [providerDrafts],
   );
 
@@ -199,6 +220,57 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     [agentRouteDrafts, providerDrafts],
   );
 
+  useEffect(() => {
+    if (
+      !open
+      || !connectionDraft
+      || connectionProvider?.authMode !== 'account'
+      || connectionDraft.accountStatus?.state !== 'pending'
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    const timer = window.setInterval(() => {
+      void (async () => {
+        const status = await window.electronAPI.llm.getProviderAccountStatus(connectionDraft.providerId);
+        if (cancelled) {
+          return;
+        }
+        if (status.connected) {
+          const nextSettings = await reloadSettings();
+          if (cancelled) {
+            return;
+          }
+          const nextProviders = nextSettings.llm.providers.map(cloneProvider);
+          setProviderDrafts(nextProviders);
+          setAgentRouteDrafts(nextSettings.llm.agentRoutes.map(cloneRoute));
+          setSelectedProviderId(
+            nextProviders.some((provider) => provider.id === connectionDraft.providerId)
+              ? connectionDraft.providerId
+              : nextProviders[0]?.id ?? null,
+          );
+          setConnectionDraft(null);
+          return;
+        }
+        setConnectionDraft((current) => current && current.providerId === connectionDraft.providerId
+          ? { ...current, accountStatus: status, error: status.error ?? '' }
+          : current);
+      })();
+    }, 1200);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [
+    connectionDraft?.accountStatus?.state,
+    connectionDraft?.providerId,
+    connectionProvider?.authMode,
+    open,
+    reloadSettings,
+  ]);
+
   if (!open) return null;
 
   const handleAvatarSelect = async () => {
@@ -243,17 +315,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   };
 
   const openProviderConnection = (provider: LlmProviderEntry) => {
-    if (provider.authMode === 'account' && !provider.accountLoginConfigured) {
-      return;
-    }
+    const models = getEnabledModels(provider);
     setConnectionDraft({
       providerId: provider.id,
       apiKey: '',
+      baseUrl: provider.baseUrl ?? '',
       showApiKey: false,
+      usingStoredSecret: provider.authMode === 'api-key' && provider.hasStoredSecret,
       busy: 'idle',
       error: '',
       testedApiKey: '',
-      models: [],
+      models,
+      accountStatus: provider.authMode === 'account' && provider.isConfigured
+        ? {
+          providerId: provider.id,
+          state: 'connected',
+          available: true,
+          connected: true,
+          accountLabel: provider.accountLabel,
+          planLabel: provider.planLabel,
+          expiresAt: provider.oauthExpiresAt,
+          models,
+        }
+        : undefined,
+      authCode: '',
     });
   };
 
@@ -264,60 +349,159 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   const handleTestProviderDraft = async () => {
     if (!connectionDraft) return;
     updateConnectionDraft({ busy: 'testing', error: '', models: [] });
-    const result = await window.electronAPI.llm.testProviderDraft({
-      providerId: connectionDraft.providerId,
-      apiKey: connectionDraft.apiKey,
-    });
-    if (!result.success) {
-      updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerTestFailed'), models: [] });
-      return;
+    try {
+      if (connectionProvider?.authMode === 'account') {
+        const result = await window.electronAPI.llm.refreshProviderModels(connectionDraft.providerId);
+        if (!result.success) {
+          updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerTestFailed'), models: [] });
+          return;
+        }
+        updateConnectionDraft({
+          busy: 'idle',
+          error: '',
+          models: result.models,
+        });
+        await refreshLocalSettings(connectionDraft.providerId);
+        return;
+      }
+      const result = await window.electronAPI.llm.testProviderDraft({
+        providerId: connectionDraft.providerId,
+        apiKey: connectionDraft.usingStoredSecret ? '' : connectionDraft.apiKey,
+        baseUrl: connectionDraft.baseUrl,
+      });
+      if (!result.success) {
+        updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerTestFailed'), models: [] });
+        return;
+      }
+      updateConnectionDraft({
+        busy: 'idle',
+        error: '',
+        testedApiKey: connectionDraft.apiKey,
+        models: result.models,
+      });
+    } catch (error) {
+      updateConnectionDraft({
+        busy: 'idle',
+        error: getErrorMessage(error, t('settings.providerTestFailed')),
+        models: [],
+      });
     }
-    updateConnectionDraft({
-      busy: 'idle',
-      error: '',
-      testedApiKey: connectionDraft.apiKey,
-      models: result.models,
-    });
   };
 
   const handleSaveProviderConnection = async () => {
     if (!connectionDraft) return;
     updateConnectionDraft({ busy: 'saving', error: '' });
-    const result = await window.electronAPI.llm.connectProvider({
-      providerId: connectionDraft.providerId,
-      apiKey: connectionDraft.apiKey,
-    });
-    if (!result.success) {
-      updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerSaveFailed'), models: [] });
-      return;
+    try {
+      if (connectionProvider?.authMode === 'account') {
+        if (connectionProvider.isConfigured && !connectionDraft.accountStatus?.requiresCodeInput) {
+          setConnectionDraft(null);
+          return;
+        }
+        const status = connectionDraft.accountStatus?.requiresCodeInput
+          ? await window.electronAPI.llm.finishProviderAccountLogin({
+            providerId: connectionDraft.providerId,
+            code: connectionDraft.authCode,
+          })
+          : await window.electronAPI.llm.startProviderAccountLogin(connectionDraft.providerId);
+        if (!status.connected && status.state !== 'pending') {
+          updateConnectionDraft({ busy: 'idle', error: status.error ?? status.message ?? t('settings.providerSaveFailed'), accountStatus: status });
+          return;
+        }
+        if (status.connected) {
+          await refreshLocalSettings(connectionDraft.providerId);
+          setConnectionDraft(null);
+          return;
+        }
+        updateConnectionDraft({ busy: 'idle', error: '', accountStatus: status });
+        return;
+      }
+      const result = await window.electronAPI.llm.connectProvider({
+        providerId: connectionDraft.providerId,
+        apiKey: connectionDraft.usingStoredSecret ? '' : connectionDraft.apiKey,
+        baseUrl: connectionDraft.baseUrl,
+      });
+      if (!result.success) {
+        updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerSaveFailed'), models: [] });
+        return;
+      }
+      await refreshLocalSettings(connectionDraft.providerId);
+      setConnectionDraft(null);
+    } catch (error) {
+      updateConnectionDraft({
+        busy: 'idle',
+        error: getErrorMessage(error, t('settings.providerSaveFailed')),
+      });
     }
-    await refreshLocalSettings(connectionDraft.providerId);
-    setConnectionDraft(null);
+  };
+
+  const handleStartAccountLogin = async () => {
+    if (!connectionDraft) return;
+    updateConnectionDraft({ busy: 'saving', error: '' });
+    try {
+      const status = await window.electronAPI.llm.startProviderAccountLogin(connectionDraft.providerId);
+      updateConnectionDraft({
+        busy: 'idle',
+        error: status.error ?? '',
+        accountStatus: status,
+      });
+      if (status.connected) {
+        await refreshLocalSettings(connectionDraft.providerId);
+        setConnectionDraft(null);
+      }
+    } catch (error) {
+      updateConnectionDraft({
+        busy: 'idle',
+        error: getErrorMessage(error, t('settings.providerSaveFailed')),
+      });
+    }
   };
 
   const handleRefreshProviderModels = async (provider: LlmProviderEntry) => {
     setProviderDrafts((current) => current.map((entry) => (
       entry.id === provider.id ? { ...entry, status: 'unconfigured', lastError: '' } : entry
     )));
-    const result = await window.electronAPI.llm.refreshProviderModels(provider.id);
-    if (!result.success) {
+    try {
+      const result = await window.electronAPI.llm.refreshProviderModels(provider.id);
+      if (!result.success) {
+        setProviderDrafts((current) => current.map((entry) => (
+          entry.id === provider.id ? { ...entry, status: 'failed', lastError: result.error } : entry
+        )));
+        return;
+      }
+      await refreshLocalSettings(provider.id);
+    } catch (error) {
       setProviderDrafts((current) => current.map((entry) => (
-        entry.id === provider.id ? { ...entry, status: 'failed', lastError: result.error } : entry
+        entry.id === provider.id ? { ...entry, status: 'failed', lastError: getErrorMessage(error, t('settings.providerTestFailed')) } : entry
       )));
-      return;
     }
-    await refreshLocalSettings(provider.id);
   };
 
   const handleDisconnectProvider = async (provider: LlmProviderEntry) => {
-    const result = await window.electronAPI.llm.disconnectProvider(provider.id);
-    if (!result.success) {
+    try {
+      if (provider.authMode === 'account') {
+        const status = await window.electronAPI.llm.logoutProviderAccount(provider.id);
+        if (status.error) {
+          setProviderDrafts((current) => current.map((entry) => (
+            entry.id === provider.id ? { ...entry, status: 'failed', lastError: status.error } : entry
+          )));
+          return;
+        }
+        await refreshLocalSettings(provider.id);
+        return;
+      }
+      const result = await window.electronAPI.llm.disconnectProvider(provider.id);
+      if (!result.success) {
+        setProviderDrafts((current) => current.map((entry) => (
+          entry.id === provider.id ? { ...entry, status: 'failed', lastError: result.error } : entry
+        )));
+        return;
+      }
+      await refreshLocalSettings(provider.id);
+    } catch (error) {
       setProviderDrafts((current) => current.map((entry) => (
-        entry.id === provider.id ? { ...entry, status: 'failed', lastError: result.error } : entry
+        entry.id === provider.id ? { ...entry, status: 'failed', lastError: getErrorMessage(error, t('settings.providerSaveFailed')) } : entry
       )));
-      return;
     }
-    await refreshLocalSettings(provider.id);
   };
 
   const handleRouteChange = (agentId: LlmAgentRoute['agentId'], patch: Partial<LlmAgentRoute>) => {
@@ -343,10 +527,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     && !connectionProvider.hasStoredSecret
     && !connectionDraft.apiKey.trim(),
   );
+  const connectionNeedsBaseUrl = Boolean(
+    connectionDraft
+    && connectionProvider?.baseUrlEditable
+    && !connectionDraft.baseUrl.trim(),
+  );
   const connectionHasFreshTest = Boolean(
     connectionDraft
     && connectionDraft.models.length > 0
     && connectionDraft.testedApiKey === connectionDraft.apiKey,
+  );
+  const connectionAccountConnected = Boolean(
+    connectionDraft
+    && connectionProvider?.authMode === 'account'
+    && connectionProvider.isConfigured
+    && connectionDraft.accountStatus?.connected,
   );
 
   const sections: Array<{ id: SettingsSection; label: string }> = [
@@ -355,6 +550,92 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     { id: 'models', label: t('settings.models') },
     { id: 'agents', label: t('settings.agents') },
   ];
+
+  const renderProviderRow = (provider: LlmProviderEntry, mode: 'account' | 'connected' | 'add') => {
+    const models = getEnabledModels(provider);
+    const connected = provider.isConfigured && provider.status === 'verified';
+    return (
+      <div
+        key={provider.id}
+        className={`settings-provider-row ${connected ? 'connected' : ''}`}
+        data-testid={`settings-${mode === 'account' ? 'oauth-row' : 'provider-row'}-${provider.id}`}
+      >
+        <div className="settings-provider-row-main">
+          <span className={`settings-provider-status ${connected ? 'configured' : 'pending'}`} />
+          <span className="settings-provider-icon">{getResolvedProviderLabel(provider).slice(0, 1).toUpperCase()}</span>
+          <span className="settings-provider-row-copy">
+            <span className="settings-provider-item-label">{getResolvedProviderLabel(provider)}</span>
+            <span className="settings-provider-item-meta">
+              {provider.authMode === 'account'
+                ? [
+                  t(getProviderStatusLabel(provider)),
+                  provider.accountLabel,
+                  provider.planLabel,
+                  getModelSummary(models, ''),
+                ].filter(Boolean).join(' · ')
+                : [
+                  getProviderGroupLabel(provider),
+                  connected ? t('settings.providerConnected') : t('settings.providerUnconfigured'),
+                  getModelSummary(models, t('settings.noEnabledModels')),
+                ].filter(Boolean).join(' · ')}
+            </span>
+          </span>
+        </div>
+        <div className="settings-provider-row-actions">
+          {(mode !== 'add' || provider.isConfigured) && (
+            <button
+              type="button"
+              className="button button-secondary settings-provider-row-button"
+              data-testid={`settings-provider-test-${provider.id}`}
+              onClick={() => void handleRefreshProviderModels(provider)}
+              disabled={!provider.isConfigured}
+            >
+              {t('settings.test')}
+            </button>
+          )}
+          {(mode !== 'add' || provider.isConfigured) && (
+            <button
+              type="button"
+              className="button button-secondary settings-provider-row-button"
+              data-testid={`settings-provider-disconnect-${provider.id}`}
+              onClick={() => void handleDisconnectProvider(provider)}
+              disabled={!provider.isConfigured}
+            >
+              {provider.authMode === 'account' ? t('settings.signOut') : t('settings.disconnect')}
+            </button>
+          )}
+          <button
+            type="button"
+            className="button button-primary settings-provider-row-button"
+            data-testid={`settings-provider-connect-${provider.id}`}
+            onClick={() => openProviderConnection(provider)}
+          >
+            {provider.isConfigured ? t('settings.edit') : t('settings.connect')}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderProviderGroup = (
+    title: string,
+    subtitle: string,
+    providers: LlmProviderEntry[],
+    testId: string,
+    mode: 'account' | 'connected' | 'add',
+  ) => (
+    <div className="settings-provider-section settings-provider-section-flat" data-testid={testId}>
+      <div className="settings-section-header">
+        <div>
+          <div className="settings-section-title">{title}</div>
+          <div className="settings-section-subtitle">{subtitle}</div>
+        </div>
+      </div>
+      <div className="settings-provider-row-list" data-empty-label={t('settings.noProvidersInGroup')}>
+        {providers.map((provider) => renderProviderRow(provider, mode))}
+      </div>
+    </div>
+  );
 
   return createPortal(
     <div className="settings-modal-backdrop" onClick={onClose}>
@@ -619,179 +900,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
             {activeSection === 'models' && (
               <section className="settings-page settings-page-models">
                 <div className="settings-models-page">
-                <aside className="settings-provider-column">
-                  <div className="settings-model-sidebar-title">{t('settings.providerCatalog')}</div>
-                  <div className="settings-column-title">{t('settings.providerCatalogHint')}</div>
-                    <div className="settings-provider-list-wrap scrollbar-thin" data-testid="settings-provider-list">
-                      <div className="settings-provider-list">
-                        {providerDrafts.map((provider) => (
-                        <button
-                          key={provider.id}
-                          type="button"
-                          className={`settings-provider-item ${selectedProviderId === provider.id ? 'active' : ''}`}
-                          data-testid={`settings-provider-item-${provider.id}`}
-                          aria-pressed={selectedProviderId === provider.id}
-                          onClick={() => setSelectedProviderId(provider.id)}
-                        >
-                          <div
-                            className="settings-provider-tile"
-                            data-testid={`settings-provider-summary-${provider.id}`}
-                          >
-                            <div
-                              className="settings-provider-icon-shell"
-                              data-testid={`settings-provider-icon-${provider.id}`}
-                            >
-                              <span className={`settings-provider-status ${provider.isConfigured ? 'configured' : 'pending'}`} />
-                              <span className="settings-provider-icon">
-                                {getResolvedProviderLabel(provider).slice(0, 1).toUpperCase()}
-                              </span>
-                            </div>
-                            <span className="settings-provider-item-copy">
-                              <span
-                                className="settings-provider-item-label"
-                                data-testid={`settings-provider-label-${provider.id}`}
-                              >
-                                {getResolvedProviderLabel(provider)}
-                              </span>
-                              <span className="settings-provider-item-meta">
-                                {getProviderGroupLabel(provider)}
-                                {' · '}
-                                {t(getProviderStatusLabel(provider))}
-                                {' · '}
-                                {t('settings.providerModelCount', { count: getEnabledModels(provider).length })}
-                              </span>
-                            </span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="settings-provider-toolbar settings-provider-toolbar-static">
-                    <div className="settings-provider-toolbar-note">
-                      {t('settings.providerCatalogCount', { count: providerDrafts.length })}
-                    </div>
-                  </div>
-                </aside>
-
-                <div className="settings-model-detail scrollbar-thin" data-testid="settings-model-detail">
-                  {!selectedProvider ? (
-                    <div className="settings-model-detail-body settings-credential-empty settings-empty-state" data-testid="settings-model-detail-body">
-                      <div>{t('settings.noSelection')}</div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="settings-model-detail-body" data-testid="settings-model-detail-body">
-                      <div className="settings-provider-header">
-                        <div>
-                          <div className="settings-provider-title">{getResolvedProviderLabel(selectedProvider)}</div>
-                          <div className="settings-provider-header-meta">
-                            {getProviderGroupLabel(selectedProvider)}
-                            {' · '}
-                            {selectedProvider.authMode === 'api-key' && t('settings.providerAuthApiKey')}
-                            {selectedProvider.authMode === 'local' && t('settings.providerAuthLocal')}
-                            {selectedProvider.authMode === 'account' && t('settings.providerAuthAccount')}
-                          </div>
-                          <div className="settings-provider-title-underline" />
-                        </div>
-                        <div className="settings-provider-header-state">
-                          <span className={`settings-provider-status ${selectedProvider.isConfigured ? 'configured' : 'pending'}`} />
-                          <span>{t(getProviderStatusLabel(selectedProvider))}</span>
-                        </div>
-                      </div>
-
-                      <div className="settings-provider-detail-grid">
-                        <div className="settings-provider-detail-card">
-                          <span className="settings-field-label">{t('settings.connectionState')}</span>
-                          <span className="settings-provider-detail-value">{t(getProviderStatusLabel(selectedProvider))}</span>
-                          <span className="settings-help-text">
-                            {selectedProvider.hasStoredSecret
-                              ? t('settings.providerSecretStored')
-                              : selectedProvider.authMode === 'local'
-                                ? t('settings.providerLocalNoSecret')
-                                : t('settings.providerSecretMissing')}
-                          </span>
-                        </div>
-                        <div className="settings-provider-detail-card">
-                          <span className="settings-field-label">{t('settings.discoveredModels')}</span>
-                          <span className="settings-provider-detail-value">{getEnabledModels(selectedProvider).length}</span>
-                          <span className="settings-help-text">{t('settings.discoveredModelsHint')}</span>
-                        </div>
-                        <div className="settings-provider-detail-card">
-                          <span className="settings-field-label">{t('settings.lastProviderTest')}</span>
-                          <span className="settings-provider-detail-value">
-                            {formatLastTested(selectedProvider.lastTestedAt) || t('settings.neverTested')}
-                          </span>
-                          <span className="settings-help-text">{t('settings.lastProviderTestHint')}</span>
-                        </div>
-                      </div>
-
-                      {selectedProvider.authMode === 'account' && selectedProvider.status === 'unavailable' && (
-                        <div className="settings-provider-notice" data-testid={`settings-provider-account-unavailable-${selectedProvider.id}`}>
-                          {selectedProvider.unavailableReason || t('settings.providerAccountUnavailable')}
-                        </div>
-                      )}
-
-                      {selectedProvider.lastError && (
-                        <div className="settings-provider-notice error" data-testid={`settings-provider-error-${selectedProvider.id}`}>
-                          {selectedProvider.lastError}
-                        </div>
-                      )}
-
-                      <div className="settings-model-section">
-                        <div className="settings-model-section-header">
-                          <span>{t('settings.discoveredModels')}</span>
-                          {selectedProvider.isConfigured && (
-                            <button
-                              type="button"
-                              className="settings-inline-link"
-                              data-testid={`settings-provider-test-${selectedProvider.id}`}
-                              onClick={() => void handleRefreshProviderModels(selectedProvider)}
-                            >
-                              {t('settings.test')}
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="settings-model-list" data-empty-label={t('settings.noEnabledModels')}>
-                          {getEnabledModels(selectedProvider).map((model) => (
-                            <div key={model.id} className="settings-model-row">
-                              <span className="settings-model-row-check">OK</span>
-                              <span className="settings-model-row-label">{model.label}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      </div>
-
-                      <div className="settings-actions settings-provider-savebar" data-testid="settings-provider-savebar">
-                        {selectedProvider.docsUrl && (
-                          <a className="settings-link" href={selectedProvider.docsUrl} target="_blank" rel="noreferrer">
-                            {selectedProvider.authMode === 'local' ? t('settings.providerDocs') : t('settings.getApiKey')}
-                          </a>
-                        )}
-                        <button
-                          type="button"
-                          className="button button-secondary"
-                          data-testid={`settings-provider-disconnect-${selectedProvider.id}`}
-                          onClick={() => void handleDisconnectProvider(selectedProvider)}
-                          disabled={!selectedProvider.isConfigured}
-                        >
-                          {t('settings.disconnect')}
-                        </button>
-                        <button
-                          type="button"
-                          className="button button-primary"
-                          data-testid={`settings-provider-connect-${selectedProvider.id}`}
-                          onClick={() => openProviderConnection(selectedProvider)}
-                          disabled={selectedProvider.authMode === 'account' && !selectedProvider.accountLoginConfigured}
-                        >
-                          {selectedProvider.isConfigured ? t('settings.edit') : t('settings.connect')}
-                        </button>
-                      </div>
-                    </>
+                  {renderProviderGroup(
+                    t('settings.oauthAccounts'),
+                    t('settings.oauthAccountsHint'),
+                    accountProviders,
+                    'settings-oauth-accounts',
+                    'account',
                   )}
-                </div>
+                  {renderProviderGroup(
+                    t('settings.addProvider'),
+                    t('settings.addProviderHint'),
+                    providerCatalog,
+                    'settings-add-provider',
+                    'add',
+                  )}
                 </div>
               </section>
             )}
@@ -951,37 +1073,69 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
             </div>
 
             {connectionProvider.authMode === 'api-key' && (
-              <label className="settings-field">
-                <span className="settings-field-label">{t('settings.apiKey')}</span>
-                <div className="settings-secret-field">
-                  <input
-                    className="input settings-secret-input"
-                    data-testid="settings-provider-connect-api-key"
-                    type={connectionDraft.showApiKey ? 'text' : 'password'}
-                    value={connectionDraft.apiKey}
-                    placeholder={connectionProvider.hasStoredSecret ? t('settings.apiKeyStoredPlaceholder') : ''}
-                    onChange={(event) => updateConnectionDraft({
-                      apiKey: event.target.value,
-                      error: '',
-                      testedApiKey: '',
-                      models: [],
-                    })}
-                  />
-                  <button
-                    type="button"
-                    className="settings-secret-toggle"
-                    data-testid="settings-provider-connect-api-key-toggle"
-                    onClick={() => updateConnectionDraft({ showApiKey: !connectionDraft.showApiKey })}
-                    aria-label={connectionDraft.showApiKey ? t('settings.hideSecret') : t('settings.showSecret')}
-                    disabled={!connectionDraft.apiKey}
-                  >
-                    {connectionDraft.showApiKey ? t('settings.hideSecret') : t('settings.showSecret')}
-                  </button>
-                </div>
-                <span className="settings-help-text">
-                  {connectionProvider.hasStoredSecret ? t('settings.apiKeyStoredHint') : t('settings.apiKeyConnectHint')}
-                </span>
-              </label>
+              <>
+                {connectionProvider.baseUrlEditable && (
+                  <label className="settings-field">
+                    <span className="settings-field-label">{t('settings.providerBaseUrl')}</span>
+                    <input
+                      className="input"
+                      data-testid="settings-provider-connect-base-url"
+                      value={connectionDraft.baseUrl}
+                      onChange={(event) => updateConnectionDraft({
+                        baseUrl: event.target.value,
+                        error: '',
+                        testedApiKey: '',
+                        models: [],
+                      })}
+                    />
+                  </label>
+                )}
+                <label className="settings-field">
+                  <span className="settings-field-label">{t('settings.apiKey')}</span>
+                  <div className="settings-secret-field">
+                    <input
+                      className="input settings-secret-input"
+                      data-testid="settings-provider-connect-api-key"
+                      type={connectionDraft.showApiKey && !connectionDraft.usingStoredSecret ? 'text' : 'password'}
+                      value={connectionDraft.usingStoredSecret ? STORED_SECRET_MASK : connectionDraft.apiKey}
+                      placeholder=""
+                      onFocus={() => {
+                        if (connectionDraft.usingStoredSecret) {
+                          updateConnectionDraft({ usingStoredSecret: false, apiKey: '', showApiKey: false });
+                        }
+                      }}
+                      onChange={(event) => updateConnectionDraft({
+                        apiKey: event.target.value,
+                        usingStoredSecret: false,
+                        error: '',
+                        testedApiKey: '',
+                        models: [],
+                      })}
+                    />
+                    <button
+                      type="button"
+                      className="settings-secret-toggle"
+                      data-testid="settings-provider-connect-api-key-toggle"
+                      onClick={() => {
+                        if (connectionDraft.usingStoredSecret) {
+                          updateConnectionDraft({ usingStoredSecret: false, apiKey: '', showApiKey: false });
+                          return;
+                        }
+                        updateConnectionDraft({ showApiKey: !connectionDraft.showApiKey });
+                      }}
+                      aria-label={connectionDraft.usingStoredSecret ? t('settings.replaceSecret') : connectionDraft.showApiKey ? t('settings.hideSecret') : t('settings.showSecret')}
+                      disabled={!connectionDraft.usingStoredSecret && !connectionDraft.apiKey}
+                    >
+                      {connectionDraft.usingStoredSecret
+                        ? t('settings.replaceSecret')
+                        : connectionDraft.showApiKey ? t('settings.hideSecret') : t('settings.showSecret')}
+                    </button>
+                  </div>
+                  <span className="settings-help-text">
+                    {connectionProvider.hasStoredSecret ? t('settings.apiKeyStoredHint') : t('settings.apiKeyConnectHint')}
+                  </span>
+                </label>
+              </>
             )}
 
             {connectionProvider.authMode === 'local' && (
@@ -990,9 +1144,65 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
               </div>
             )}
 
+            {connectionProvider.authMode === 'environment' && (
+              <div className="settings-provider-notice" data-testid="settings-provider-environment-notice">
+                {t('settings.environmentProviderConnectHint')}
+              </div>
+            )}
+
+            {connectionProvider.authMode === 'account' && (
+              <div className="settings-provider-oauth-panel">
+                <div className="settings-provider-notice">
+                  {connectionAccountConnected
+                    ? t('settings.oauthConnectedHint')
+                    : connectionDraft.accountStatus?.message || t('settings.oauthConnectHint')}
+                </div>
+                {connectionAccountConnected && (connectionDraft.accountStatus?.accountLabel || connectionDraft.accountStatus?.planLabel) && (
+                  <div className="settings-secret-status" data-testid="settings-provider-oauth-summary">
+                    <span>{[connectionDraft.accountStatus.accountLabel, connectionDraft.accountStatus.planLabel].filter(Boolean).join(' · ')}</span>
+                  </div>
+                )}
+                {!connectionAccountConnected && (
+                  <button
+                    type="button"
+                    className="button button-secondary"
+                    data-testid="settings-provider-oauth-start"
+                    onClick={() => void handleStartAccountLogin()}
+                    disabled={connectionDraft.busy !== 'idle'}
+                  >
+                    {t('settings.connect')}
+                  </button>
+                )}
+                {!connectionAccountConnected && connectionDraft.accountStatus?.authUrl && (
+                  <a className="settings-link" href={connectionDraft.accountStatus.authUrl} target="_blank" rel="noreferrer">
+                    {t('settings.openAuthPage')}
+                  </a>
+                )}
+                {!connectionAccountConnected && connectionDraft.accountStatus?.verificationUri && (
+                  <div className="settings-secret-status">
+                    <span>{connectionDraft.accountStatus.verificationUri}</span>
+                    <strong data-testid="settings-provider-oauth-device-code">
+                      {connectionDraft.accountStatus.userCode}
+                    </strong>
+                  </div>
+                )}
+                {!connectionAccountConnected && connectionDraft.accountStatus?.requiresCodeInput && (
+                  <label className="settings-field">
+                    <span className="settings-field-label">{t('settings.oauthCode')}</span>
+                    <input
+                      className="input"
+                      data-testid="settings-provider-oauth-code"
+                      value={connectionDraft.authCode}
+                      onChange={(event) => updateConnectionDraft({ authCode: event.target.value, error: '' })}
+                    />
+                  </label>
+                )}
+              </div>
+            )}
+
             {connectionProvider.docsUrl && (
               <a className="settings-link" href={connectionProvider.docsUrl} target="_blank" rel="noreferrer">
-                {connectionProvider.authMode === 'local' ? t('settings.providerDocs') : t('settings.getApiKey')}
+                {connectionProvider.authMode === 'local' || connectionProvider.authMode === 'account' || connectionProvider.authMode === 'environment' ? t('settings.providerDocs') : t('settings.getApiKey')}
               </a>
             )}
 
@@ -1002,9 +1212,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
               </div>
             )}
 
-            <div className="settings-model-section settings-provider-connect-models">
+            <div className="settings-model-section settings-provider-connect-models" data-testid="settings-provider-connect-models">
               <div className="settings-model-section-header">
-                <span>{t('settings.discoveredModels')}</span>
+                <span>{connectionProvider.modelDiscovery === 'anthropic-candidate-validation' || connectionProvider.modelDiscovery === 'azure-openai'
+                  ? t('settings.verifiedModels')
+                  : connectionProvider.modelDiscovery === 'static'
+                    ? t('settings.builtinModels')
+                    : t('settings.discoveredModels')}</span>
                 <span className="settings-help-text">
                   {t('settings.providerModelCount', { count: connectionDraft.models.length })}
                 </span>
@@ -1028,7 +1242,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 className="button button-secondary"
                 data-testid="settings-provider-connect-test"
                 onClick={() => void handleTestProviderDraft()}
-                disabled={connectionDraft.busy !== 'idle' || connectionNeedsApiKey}
+                disabled={connectionDraft.busy !== 'idle' || connectionNeedsApiKey || connectionNeedsBaseUrl}
               >
                 {connectionDraft.busy === 'testing' ? t('settings.testing') : t('settings.test')}
               </button>
@@ -1037,13 +1251,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 className="button button-primary"
                 data-testid="settings-provider-connect-save"
                 onClick={() => void handleSaveProviderConnection()}
-                disabled={connectionDraft.busy !== 'idle' || connectionNeedsApiKey}
+                disabled={connectionDraft.busy !== 'idle' || connectionNeedsApiKey || connectionNeedsBaseUrl}
               >
                 {connectionDraft.busy === 'saving'
                   ? t('settings.saving')
-                  : connectionHasFreshTest
+                  : connectionProvider.authMode === 'account'
+                    ? connectionProvider.isConfigured
+                      ? t('settings.save')
+                      : t('settings.connect')
+                    : connectionHasFreshTest
                     ? t('settings.save')
-                    : t('settings.testAndSave')}
+                    : t('settings.connect')}
               </button>
             </div>
           </div>

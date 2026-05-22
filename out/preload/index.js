@@ -160,6 +160,7 @@ const createLlmApi = () => ({
   disconnectProvider: (providerId) => electron.ipcRenderer.invoke("llm:disconnectProvider", providerId),
   startProviderAccountLogin: (providerId) => electron.ipcRenderer.invoke("llm:startProviderAccountLogin", providerId),
   getProviderAccountStatus: (providerId) => electron.ipcRenderer.invoke("llm:getProviderAccountStatus", providerId),
+  finishProviderAccountLogin: (request) => electron.ipcRenderer.invoke("llm:finishProviderAccountLogin", request),
   logoutProviderAccount: (providerId) => electron.ipcRenderer.invoke("llm:logoutProviderAccount", providerId)
 });
 const createSettingsApi = () => ({

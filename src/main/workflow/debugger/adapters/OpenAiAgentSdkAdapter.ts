@@ -39,7 +39,7 @@ export class OpenAiAgentSdkAdapter implements AgentSdkAdapter {
   canRun(request: AgentRunRequest): boolean {
     const settings = settingsService.getAll();
     const provider = settings.llm.providers.find((entry) => entry.id === request.providerId);
-    return provider?.id === 'openai' || provider?.kind === 'openai-compatible';
+    return provider?.authMode !== 'account' && (provider?.id === 'openai' || provider?.kind === 'openai-compatible');
   }
 
   async run(request: AgentRunRequest, tools: AgentToolPort): Promise<AgentRunResult> {

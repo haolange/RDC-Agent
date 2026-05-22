@@ -98,23 +98,59 @@ test('设置弹窗中的 Workspace、Model 与 Agent 面板保持可访问的滚
   expect(backdropPaint.backgroundImage).toBe('none');
 
   await page.locator('[data-testid="settings-nav-models"]').click();
-  await expect(page.locator('[data-testid="settings-provider-list"]')).toBeVisible();
-  await expect(page.locator('[data-testid="settings-model-detail"]')).toBeVisible();
+  await expect(page.locator('[data-testid="settings-oauth-accounts"]')).toBeVisible();
+  await expect(page.locator('[data-testid="settings-connected-providers"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="settings-add-provider"]')).toBeVisible();
   await expect(page.locator('[data-testid="settings-provider-template-select"]')).toHaveCount(0);
-  await expect(page.locator('[data-testid="settings-model-detail"]')).not.toContainText('API Base URL');
+  await expect(page.locator('[data-testid="settings-add-provider"]')).not.toContainText('API Base URL');
   const providerLayout = await page.locator('[data-testid="settings-modal"]').evaluate((modal) => {
-    const list = modal.querySelector('[data-testid="settings-provider-list"]')?.getBoundingClientRect();
-    const detail = modal.querySelector('[data-testid="settings-model-detail"]')?.getBoundingClientRect();
+    const oauth = modal.querySelector('[data-testid="settings-oauth-accounts"]')?.getBoundingClientRect();
+    const add = modal.querySelector('[data-testid="settings-add-provider"]')?.getBoundingClientRect();
     return {
-      listRight: list?.right ?? 0,
-      detailLeft: detail?.left ?? 0,
-      detailWidth: detail?.width ?? 0,
-      detailHeight: detail?.height ?? 0,
+      oauthTop: oauth?.top ?? 0,
+      addTop: add?.top ?? 0,
+      addWidth: add?.width ?? 0,
+      addHeight: add?.height ?? 0,
     };
   });
-  expect(providerLayout.detailLeft).toBeGreaterThan(providerLayout.listRight);
-  expect(providerLayout.detailWidth).toBeGreaterThan(360);
-  expect(providerLayout.detailHeight).toBeGreaterThan(420);
+  expect(providerLayout.addTop).toBeGreaterThan(providerLayout.oauthTop);
+  expect(providerLayout.addWidth).toBeGreaterThan(520);
+  expect(providerLayout.addHeight).toBeGreaterThan(120);
+
+  await ctx.app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0]?.setSize(760, 720);
+  });
+  await page.waitForTimeout(300);
+  await page.locator('[data-testid="settings-provider-connect-vertex"]').click();
+  const providerDialog = page.locator('[data-testid="settings-provider-connect-dialog"]');
+  await expect(providerDialog).toBeVisible();
+  await expect(page.locator('[data-testid="settings-provider-environment-notice"]')).toBeVisible();
+  const narrowProviderLayout = await providerDialog.evaluate((dialog) => {
+    const dialogBox = dialog.getBoundingClientRect();
+    const actions = Array.from(dialog.querySelectorAll('.settings-provider-connect-actions .button'))
+      .map((button) => button.getBoundingClientRect());
+    const sortedActions = [...actions].sort((left, right) => left.left - right.left);
+    return {
+      viewportWidth: window.innerWidth,
+      left: dialogBox.left,
+      right: dialogBox.right,
+      width: dialogBox.width,
+      actionCount: actions.length,
+      actionsWrapCleanly: actions.every((rect) => rect.width >= 44 && rect.left >= dialogBox.left - 1 && rect.right <= dialogBox.right + 1),
+      actionsDoNotOverlap: sortedActions.every((rect, index) => index === 0 || rect.left >= sortedActions[index - 1].right),
+    };
+  });
+  expect(narrowProviderLayout.left).toBeGreaterThanOrEqual(0);
+  expect(narrowProviderLayout.right).toBeLessThanOrEqual(narrowProviderLayout.viewportWidth);
+  expect(narrowProviderLayout.width).toBeGreaterThan(320);
+  expect(narrowProviderLayout.actionCount).toBe(3);
+  expect(narrowProviderLayout.actionsWrapCleanly).toBe(true);
+  expect(narrowProviderLayout.actionsDoNotOverlap).toBe(true);
+  await page.locator('[data-testid="settings-provider-connect-dialog"] .settings-modal-close').click();
+  await ctx.app.evaluate(({ BrowserWindow }) => {
+    BrowserWindow.getAllWindows()[0]?.setSize(1320, 720);
+  });
+  await page.waitForTimeout(300);
 
   await page.locator('[data-testid="settings-nav-workspace"]').click();
   await expect(page.locator('[data-testid="settings-workspace-body"]')).toBeVisible();

@@ -1,5 +1,10 @@
 import { ipcMain } from 'electron';
-import type { AppSettingsPatch, LlmProviderDraftRequest, LlmProviderId } from '@shared/types/settings';
+import type {
+  AppSettingsPatch,
+  LlmProviderAccountLoginFinishRequest,
+  LlmProviderDraftRequest,
+  LlmProviderId,
+} from '@shared/types/settings';
 import { appPathService } from '../runtime/AppPathService';
 import { llmAdapter } from '../settings/LLMAdapter';
 import { providerConnectionService } from '../settings/ProviderConnectionService';
@@ -57,8 +62,18 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return providerConnectionService.getProviderAccountStatus(providerId);
   });
 
+  ipcMain.handle('llm:finishProviderAccountLogin', async (_event, request: LlmProviderAccountLoginFinishRequest) => {
+    const result = await providerConnectionService.finishProviderAccountLogin(request);
+    if (result.connected) {
+      context.applyCurrentLlmConfig();
+    }
+    return result;
+  });
+
   ipcMain.handle('llm:logoutProviderAccount', async (_event, providerId: LlmProviderId) => {
-    return providerConnectionService.logoutProviderAccount(providerId);
+    const result = providerConnectionService.logoutProviderAccount(providerId);
+    context.applyCurrentLlmConfig();
+    return result;
   });
 
   ipcMain.handle('settings:get', async () => {

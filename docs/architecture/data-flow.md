@@ -128,6 +128,7 @@ flowchart LR
   API["electronAPI.settings / llm"]
   IPC["settings:* / llm:*"]
   SettingsSvc["SettingsService"]
+  AccountAuth["ProviderAccountAuthService"]
   SDK["AgentRunnerPort / OpenAI / Claude SDK adapter"]
   Adapter["LLMAdapter"]
   DebuggerLLM["DebuggerLlmService"]
@@ -137,6 +138,9 @@ flowchart LR
   SettingsUI --> API
   API --> IPC
   IPC --> SettingsSvc
+  IPC --> AccountAuth
+  AccountAuth --> Secrets
+  AccountAuth --> SettingsSvc
   SettingsSvc --> Secrets
   SettingsSvc --> Workspace
   IPC --> SDK
@@ -144,7 +148,9 @@ flowchart LR
   Adapter --> DebuggerLLM
 ```
 
-凭据来源固定为 Settings provider secret。SDK adapter 内部可以向 SDK 注入 key 或 client，但不能把裸 `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` 作为 RDC-Agent 的配置来源。
+凭据来源由 provider auth mode 决定。API Key provider 存储 provider-scoped key；账号登录 provider 通过 `ProviderAccountAuthService` 自研 OAuth/device-flow 获取 token bundle，`settings.json` 只保存账号摘要、状态和模型列表；Bedrock/Vertex 这类 environment provider 不保存密钥，只把运行环境凭据交给 SDK adapter 使用。SDK adapter 内部可以向 SDK 注入 key、client 或环境凭据信号，但不能把裸 `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` 作为 RDC-Agent 的通用配置来源。
+
+模型列表也属于 settings 边界。标准 Provider 通过真实 `/models` 或等价接口发现模型；没有标准模型列表的 Anthropic-compatible / Azure endpoint 只能保存逐候选轻量请求验证成功的模型；OAuth 账号登录如果模型发现失败或返回空列表，必须保持未配置并向 UI 返回错误，不能保存 fallback 模型。renderer 二次打开 API Key detail 时只接收 `hasStoredSecret` 状态并显示固定星号占位，不能读取已存明文密钥。
 
 ## ToolBridge / Evidence / Runtime Log
 

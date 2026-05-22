@@ -56,7 +56,8 @@ export class ClaudeAgentSdkAdapter implements AgentSdkAdapter {
   canRun(request: AgentRunRequest): boolean {
     const settings = settingsService.getAll();
     const provider = settings.llm.providers.find((entry) => entry.id === request.providerId);
-    return provider?.id === 'anthropic' || provider?.kind === 'anthropic';
+    return provider?.authMode !== 'account'
+      && (provider?.id === 'anthropic' || provider?.kind === 'anthropic' || provider?.kind === 'openrouter' || provider?.kind === 'bedrock' || provider?.kind === 'vertex');
   }
 
   async run(request: AgentRunRequest, tools: AgentToolPort): Promise<AgentRunResult> {
@@ -65,8 +66,10 @@ export class ClaudeAgentSdkAdapter implements AgentSdkAdapter {
     if (!provider) {
       throw new Error(`Claude provider not found: ${request.providerId}`);
     }
-    const apiKey = settingsService.getProviderSecret(provider.id, settings.workspace.rootPath);
-    if (!apiKey) {
+    const apiKey = provider.authMode === 'api-key'
+      ? settingsService.getProviderSecret(provider.id, settings.workspace.rootPath)
+      : '';
+    if (provider.authMode === 'api-key' && !apiKey) {
       throw new Error(`Claude provider secret is missing: ${provider.id}`);
     }
 
@@ -79,7 +82,16 @@ export class ClaudeAgentSdkAdapter implements AgentSdkAdapter {
 
     const env = {
       ...process.env,
-      ANTHROPIC_API_KEY: apiKey,
+      ...(apiKey ? { ANTHROPIC_API_KEY: apiKey } : {}),
+      ...(provider.baseUrl ? { ANTHROPIC_BASE_URL: provider.baseUrl } : {}),
+      ...(provider.kind === 'bedrock' ? {
+        CLAUDE_CODE_USE_BEDROCK: '1',
+        AWS_REGION: process.env.AWS_REGION || 'us-east-1',
+      } : {}),
+      ...(provider.kind === 'vertex' ? {
+        CLAUDE_CODE_USE_VERTEX: '1',
+        CLOUD_ML_REGION: process.env.CLOUD_ML_REGION || 'us-east5',
+      } : {}),
       CLAUDE_AGENT_SDK_CLIENT_APP: 'rdc-agent/1.0.0',
     };
     const preparedTools = prepareAgentTools(await tools.listTools(request.agentId), request.toolAllowlist);

@@ -31,6 +31,8 @@ const uuid = require("uuid");
 const yaml = require("yaml");
 const Store = require("electron-store");
 const zod = require("zod");
+const crypto = require("crypto");
+const http = require("http");
 function _interopNamespaceDefault(e) {
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
   if (e) {
@@ -3506,7 +3508,286 @@ const RIGHT_PANEL_COLLAPSED_WIDTH = 0;
 const TERMINAL_DEFAULT_HEIGHT = 328;
 const TERMINAL_MIN_HEIGHT = 180;
 const TERMINAL_MAX_HEIGHT = 720;
+const ANTHROPIC_ALIAS_MODELS = ["sonnet", "opus", "haiku"];
+const ANTHROPIC_FIRST_PARTY_MODELS = ["sonnet", "opus"];
+const OPENAI_CODE_MODELS = ["gpt-5.2", "gpt-4.1", "gpt-5-mini"];
 const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
+  {
+    id: "302ai",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "302.AI",
+    baseUrl: "https://api.302.ai/v1",
+    recommendedModels: ["gpt-4o", "claude-3-7-sonnet"],
+    docsUrl: "https://302.ai/"
+  },
+  {
+    id: "azure-openai",
+    kind: "azure-openai",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "azure-openai",
+    label: "Azure OpenAI",
+    baseUrl: "",
+    baseUrlEditable: true,
+    recommendedModels: ["gpt-4.1", "gpt-5-mini"],
+    docsUrl: "https://learn.microsoft.com/azure/ai-services/openai/"
+  },
+  {
+    id: "bailian",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Aliyun Bailian",
+    baseUrl: "https://coding.dashscope.aliyuncs.com/apps/anthropic",
+    recommendedModels: ["qwen3.6-plus", "qwen3-coder-next", "qwen3-coder-plus", "kimi-k2.5", "glm-5", "glm-4.7"],
+    docsUrl: "https://bailian.console.aliyun.com/"
+  },
+  {
+    id: "anthropic",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "anthropic",
+    label: "Anthropic",
+    baseUrl: "https://api.anthropic.com/v1",
+    recommendedModels: ANTHROPIC_FIRST_PARTY_MODELS,
+    docsUrl: "https://platform.claude.com/settings/keys"
+  },
+  {
+    id: "anthropic-thirdparty",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Anthropic Third-party API",
+    baseUrl: "",
+    baseUrlEditable: true,
+    recommendedModels: ANTHROPIC_ALIAS_MODELS,
+    docsUrl: "https://platform.claude.com/docs/en/api/overview"
+  },
+  {
+    id: "cerebras",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "Cerebras",
+    baseUrl: "https://api.cerebras.ai/v1",
+    recommendedModels: ["llama-4-scout-17b-16e-instruct", "qwen-3-coder-480b"],
+    docsUrl: "https://cloud.cerebras.ai/"
+  },
+  {
+    id: "bedrock",
+    kind: "bedrock",
+    authMode: "environment",
+    catalogGroup: "environment",
+    modelDiscovery: "static",
+    label: "AWS Bedrock",
+    recommendedModels: ANTHROPIC_ALIAS_MODELS,
+    docsUrl: "https://docs.anthropic.com/en/docs/claude-code/amazon-bedrock"
+  },
+  {
+    id: "custom-endpoint",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "Custom Endpoint",
+    baseUrl: "",
+    baseUrlEditable: true,
+    recommendedModels: ["gpt-4.1"],
+    docsUrl: "https://platform.openai.com/docs/api-reference"
+  },
+  {
+    id: "claude-account",
+    kind: "anthropic",
+    authMode: "account",
+    catalogGroup: "account",
+    modelDiscovery: null,
+    label: "Claude Account",
+    recommendedModels: ["claude-sonnet-4-5", "claude-opus-4-1"],
+    docsUrl: "https://claude.ai/",
+    accountLoginConfigured: true
+  },
+  {
+    id: "chatgpt-account",
+    kind: "openai-compatible",
+    authMode: "account",
+    catalogGroup: "account",
+    modelDiscovery: null,
+    label: "ChatGPT Account",
+    recommendedModels: ["gpt-5.2", "gpt-5-mini"],
+    docsUrl: "https://chatgpt.com/",
+    accountLoginConfigured: true
+  },
+  {
+    id: "deepseek",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "DeepSeek",
+    baseUrl: "https://api.deepseek.com/anthropic",
+    recommendedModels: ["deepseek-v4-pro", "deepseek-v4-flash"],
+    docsUrl: "https://platform.deepseek.com/api_keys"
+  },
+  {
+    id: "github-copilot",
+    kind: "openai-compatible",
+    authMode: "account",
+    catalogGroup: "account",
+    modelDiscovery: null,
+    label: "GitHub Copilot",
+    recommendedModels: ["gpt-4.1", "gpt-5-mini"],
+    docsUrl: "https://github.com/features/copilot",
+    accountLoginConfigured: true
+  },
+  {
+    id: "google-ai-studio",
+    kind: "google-ai-studio",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "google-ai-studio",
+    label: "Google AI Studio",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    recommendedModels: ["gemini-2.5-pro", "gemini-2.5-flash"],
+    docsUrl: "https://aistudio.google.com/app/apikey"
+  },
+  {
+    id: "groq",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "Groq",
+    baseUrl: "https://api.groq.com/openai/v1",
+    recommendedModels: ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"],
+    docsUrl: "https://console.groq.com/keys"
+  },
+  {
+    id: "glm-cn",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "GLM (CN)",
+    baseUrl: "https://open.bigmodel.cn/api/anthropic",
+    recommendedModels: ["sonnet", "opus", "haiku"],
+    docsUrl: "https://open.bigmodel.cn/"
+  },
+  {
+    id: "glm-global",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "GLM (Global)",
+    baseUrl: "https://api.z.ai/api/anthropic",
+    recommendedModels: ["sonnet", "opus", "haiku"],
+    docsUrl: "https://platform.z.ai/"
+  },
+  {
+    id: "huggingface",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "Hugging Face",
+    baseUrl: "https://router.huggingface.co/v1",
+    recommendedModels: ["openai/gpt-oss-120b", "Qwen/Qwen3-Coder-480B-A35B-Instruct"],
+    docsUrl: "https://huggingface.co/settings/tokens"
+  },
+  {
+    id: "vertex",
+    kind: "vertex",
+    authMode: "environment",
+    catalogGroup: "environment",
+    modelDiscovery: "static",
+    label: "Google Vertex",
+    recommendedModels: ANTHROPIC_ALIAS_MODELS,
+    docsUrl: "https://docs.anthropic.com/en/docs/claude-code/google-vertex-ai"
+  },
+  {
+    id: "kimi-coding-plan",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Kimi Coding Plan",
+    baseUrl: "https://api.kimi.com/coding/",
+    recommendedModels: ["sonnet"],
+    docsUrl: "https://www.kimi.com/code/console"
+  },
+  {
+    id: "litellm",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "LiteLLM",
+    baseUrl: "http://localhost:4000",
+    recommendedModels: ANTHROPIC_ALIAS_MODELS,
+    docsUrl: "https://docs.litellm.ai/docs/"
+  },
+  {
+    id: "manifest",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "Manifest",
+    baseUrl: "https://app.manifest.build/v1",
+    recommendedModels: ["gpt-4.1"],
+    docsUrl: "https://app.manifest.build/"
+  },
+  {
+    id: "minimax-cn",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "MiniMax (CN)",
+    baseUrl: "https://api.minimaxi.com/anthropic",
+    recommendedModels: ["MiniMax-M2.7"],
+    docsUrl: "https://platform.minimaxi.com/"
+  },
+  {
+    id: "minimax-global",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "MiniMax (Global)",
+    baseUrl: "https://api.minimax.io/anthropic",
+    recommendedModels: ["MiniMax-M2.7"],
+    docsUrl: "https://platform.minimaxi.com/"
+  },
+  {
+    id: "mistral",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "Mistral",
+    baseUrl: "https://api.mistral.ai/v1",
+    recommendedModels: ["mistral-large-latest", "codestral-latest"],
+    docsUrl: "https://console.mistral.ai/api-keys/"
+  },
+  {
+    id: "moonshot",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Moonshot",
+    baseUrl: "https://api.moonshot.cn/anthropic",
+    recommendedModels: ["sonnet"],
+    docsUrl: "https://platform.moonshot.cn/console/api-keys"
+  },
   {
     id: "openrouter",
     kind: "openrouter",
@@ -3515,12 +3796,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     modelDiscovery: "openai-compatible",
     label: "OpenRouter",
     baseUrl: "https://openrouter.ai/api/v1",
-    recommendedModels: [
-      "anthropic/claude-sonnet-4.5",
-      "anthropic/claude-opus-4.1",
-      "moonshotai/kimi-k2.5",
-      "openai/gpt-5.2"
-    ],
+    recommendedModels: ["anthropic/claude-haiku-latest", "anthropic/claude-sonnet-4.5", "openai/gpt-5.2"],
     docsUrl: "https://openrouter.ai/keys"
   },
   {
@@ -3531,85 +3807,30 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     modelDiscovery: "openai-compatible",
     label: "OpenAI",
     baseUrl: "https://api.openai.com/v1",
-    recommendedModels: ["gpt-5.2", "gpt-4.1"],
+    recommendedModels: OPENAI_CODE_MODELS,
     docsUrl: "https://platform.openai.com/api-keys"
   },
   {
-    id: "anthropic",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "anthropic",
-    label: "Anthropic",
-    baseUrl: "https://api.anthropic.com/v1",
-    recommendedModels: ["claude-sonnet-4-5", "claude-opus-4-1"],
-    docsUrl: "https://console.anthropic.com/settings/keys"
-  },
-  {
-    id: "deepseek",
+    id: "openai-eu",
     kind: "openai-compatible",
     authMode: "api-key",
     catalogGroup: "api-key",
     modelDiscovery: "openai-compatible",
-    label: "DeepSeek",
-    baseUrl: "https://api.deepseek.com/v1",
-    recommendedModels: ["deepseek-chat", "deepseek-reasoner"],
-    docsUrl: "https://platform.deepseek.com/api_keys"
+    label: "OpenAI EU",
+    baseUrl: "https://eu.api.openai.com/v1",
+    recommendedModels: OPENAI_CODE_MODELS,
+    docsUrl: "https://platform.openai.com/api-keys"
   },
   {
-    id: "gemini",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "gemini",
-    label: "Gemini",
-    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    recommendedModels: ["gemini-2.5-pro", "gemini-2.5-flash"],
-    docsUrl: "https://aistudio.google.com/app/apikey"
-  },
-  {
-    id: "xai",
+    id: "openai-us",
     kind: "openai-compatible",
     authMode: "api-key",
     catalogGroup: "api-key",
     modelDiscovery: "openai-compatible",
-    label: "xAI Grok",
-    baseUrl: "https://api.x.ai/v1",
-    recommendedModels: ["grok-4", "grok-3"],
-    docsUrl: "https://console.x.ai/"
-  },
-  {
-    id: "kimi",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "Kimi / Moonshot",
-    baseUrl: "https://api.moonshot.cn/v1",
-    recommendedModels: ["kimi-k2-0711-preview", "moonshot-v1-128k"],
-    docsUrl: "https://platform.kimi.ai/console/api-keys"
-  },
-  {
-    id: "minimax",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "MiniMax",
-    baseUrl: "https://api.minimax.chat/v1",
-    recommendedModels: ["MiniMax-M1", "abab6.5s-chat"],
-    docsUrl: "https://platform.minimaxi.com/"
-  },
-  {
-    id: "zai",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "GLM / Z.ai",
-    baseUrl: "https://api.z.ai/api/paas/v4",
-    recommendedModels: ["glm-4.6", "glm-4.5-air"],
-    docsUrl: "https://platform.z.ai/"
+    label: "OpenAI US",
+    baseUrl: "https://us.api.openai.com/v1",
+    recommendedModels: OPENAI_CODE_MODELS,
+    docsUrl: "https://platform.openai.com/api-keys"
   },
   {
     id: "qwen",
@@ -3623,28 +3844,6 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     docsUrl: "https://dashscope.console.aliyun.com/apiKey"
   },
   {
-    id: "volcengine",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "Doubao / Volcengine Ark",
-    baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
-    recommendedModels: ["doubao-seed-1-6", "doubao-pro-32k"],
-    docsUrl: "https://www.volcengine.com/docs/82379"
-  },
-  {
-    id: "302ai",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "302.AI",
-    baseUrl: "https://api.302.ai/v1",
-    recommendedModels: ["gpt-4o", "claude-3-7-sonnet"],
-    docsUrl: "https://302.ai/"
-  },
-  {
     id: "siliconflow",
     kind: "openai-compatible",
     authMode: "api-key",
@@ -3656,6 +3855,61 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     docsUrl: "https://siliconflow.cn/"
   },
   {
+    id: "volcengine",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Volcengine Ark",
+    baseUrl: "https://ark.cn-beijing.volces.com/api/coding",
+    recommendedModels: ["doubao-seed-1-6", "glm-4.6", "deepseek-v4-pro", "kimi-k2.5"],
+    docsUrl: "https://www.volcengine.com/docs/82379/1928262"
+  },
+  {
+    id: "vercel-ai-gateway",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "Vercel AI Gateway",
+    baseUrl: "https://ai-gateway.vercel.sh/v1",
+    recommendedModels: ["openai/gpt-5.2", "anthropic/claude-sonnet-4.5"],
+    docsUrl: "https://vercel.com/docs/ai-gateway"
+  },
+  {
+    id: "xai",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "xAI Grok",
+    baseUrl: "https://api.x.ai/v1",
+    recommendedModels: ["grok-4", "grok-3"],
+    docsUrl: "https://console.x.ai/"
+  },
+  {
+    id: "xiaomi-mimo",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Xiaomi MiMo",
+    baseUrl: "https://api.xiaomimimo.com/anthropic",
+    recommendedModels: ["mimo-v2.5-pro"],
+    docsUrl: "https://platform.xiaomimimo.com/#/console/api-keys"
+  },
+  {
+    id: "xiaomi-mimo-token-plan",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Xiaomi MiMo Token Plan",
+    baseUrl: "https://token-plan-cn.xiaomimimo.com/anthropic",
+    recommendedModels: ["mimo-v2.5-pro"],
+    docsUrl: "https://platform.xiaomimimo.com/#/console/plan-manage"
+  },
+  {
     id: "ollama",
     kind: "ollama",
     authMode: "local",
@@ -3665,42 +3919,6 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     baseUrl: "http://127.0.0.1:11434/v1",
     recommendedModels: ["qwen2.5-coder:14b", "llama3.1:8b"],
     docsUrl: "https://ollama.com/download"
-  },
-  {
-    id: "claude-account",
-    kind: "anthropic",
-    authMode: "account",
-    catalogGroup: "account",
-    modelDiscovery: null,
-    label: "Claude Account",
-    recommendedModels: [],
-    docsUrl: "https://claude.ai/",
-    accountLoginConfigured: false,
-    unavailableReason: "当前版本未配置登录通道"
-  },
-  {
-    id: "chatgpt-account",
-    kind: "openai-compatible",
-    authMode: "account",
-    catalogGroup: "account",
-    modelDiscovery: null,
-    label: "ChatGPT Account",
-    recommendedModels: [],
-    docsUrl: "https://chatgpt.com/",
-    accountLoginConfigured: false,
-    unavailableReason: "当前版本未配置登录通道"
-  },
-  {
-    id: "github-copilot",
-    kind: "openai-compatible",
-    authMode: "account",
-    catalogGroup: "account",
-    modelDiscovery: null,
-    label: "GitHub Copilot",
-    recommendedModels: [],
-    docsUrl: "https://github.com/features/copilot",
-    accountLoginConfigured: false,
-    unavailableReason: "当前版本未配置登录通道"
   }
 ];
 function isBuiltinProviderId(id) {
@@ -3728,12 +3946,13 @@ const createBuiltinProviderEntry = (id) => {
     label: definition.label,
     enabled: false,
     apiKey: "",
-    hasStoredSecret: definition.authMode === "local",
+    hasStoredSecret: definition.authMode === "local" || definition.authMode === "environment",
     baseUrl: definition.baseUrl,
-    models: toModels([]),
+    baseUrlEditable: definition.baseUrlEditable,
+    models: definition.modelDiscovery === "static" && definition.authMode === "environment" ? toModels(definition.recommendedModels) : toModels([]),
     recommendedModels: definition.recommendedModels,
     docsUrl: definition.docsUrl,
-    status: definition.authMode === "account" && definition.accountLoginConfigured !== true ? "unavailable" : "unconfigured",
+    status: "unconfigured",
     accountLoginConfigured: definition.accountLoginConfigured,
     unavailableReason: definition.unavailableReason,
     isConfigured: false
@@ -3764,6 +3983,9 @@ class SecretStorageService {
   }
   createProviderSecretRef(providerId) {
     return `provider-${sanitizeToken(providerId)}-api-key`;
+  }
+  createProviderOAuthSecretRef(providerId) {
+    return `provider-${sanitizeToken(providerId)}-oauth`;
   }
   getSecret(secretRef, workspaceRoot) {
     if (!secretRef) {
@@ -3923,6 +4145,33 @@ function getResolvedProviderSecret(providerId, secretRef, workspaceRoot) {
   const secret = secretStorageService.getSecret(secretRef, workspaceRoot).trim();
   return isVendorSecretUsable(providerId, secret) ? secret : "";
 }
+function resolveAccountRuntimeCredential(providerId, workspaceRoot) {
+  const raw = secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(providerId), workspaceRoot);
+  if (!raw) {
+    return { apiKey: "" };
+  }
+  try {
+    const bundle = JSON.parse(raw);
+    if (providerId === "github-copilot") {
+      return {
+        apiKey: bundle.copilotToken ?? "",
+        baseUrl: bundle.copilotApiBaseUrl ?? "https://api.githubcopilot.com"
+      };
+    }
+    if (providerId === "chatgpt-account") {
+      return {
+        apiKey: bundle.apiKey ?? bundle.accessToken ?? "",
+        baseUrl: "https://api.openai.com/v1"
+      };
+    }
+    return {
+      apiKey: bundle.accessToken ?? "",
+      baseUrl: "https://api.anthropic.com/v1"
+    };
+  } catch {
+    return { apiKey: "" };
+  }
+}
 function sanitizeSidebar(input, defaults, fallback) {
   const candidate = input ?? {};
   const expandedWidth = clamp(
@@ -4031,9 +4280,6 @@ function sanitizeRoute(entry) {
   };
 }
 function pickProviderStatus(provider, fallback, canUseProvider, models) {
-  if (fallback.status === "unavailable") {
-    return "unavailable";
-  }
   if (provider.status === "failed") {
     return "failed";
   }
@@ -4047,8 +4293,15 @@ function isFixtureProvider(provider) {
   const baseUrl = typeof provider.baseUrl === "string" ? provider.baseUrl.trim().toLowerCase() : "";
   return /^provider-\d+$/i.test(id) || id === "acme" || id === "vendorx" || baseUrl.includes("example.com") || baseUrl.includes("acme.local") || baseUrl.includes("vendorx.ai");
 }
+function normalizeLegacyProviderId(providerId) {
+  if (providerId === "gemini") return "vertex";
+  if (providerId === "kimi") return "kimi-coding-plan";
+  if (providerId === "minimax") return "minimax-global";
+  if (providerId === "zai") return "glm-global";
+  return providerId;
+}
 function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorkspaceRoot()) {
-  const rawId = typeof provider.id === "string" ? provider.id.trim() : "";
+  const rawId = normalizeLegacyProviderId(typeof provider.id === "string" ? provider.id.trim() : "");
   if (!rawId || !isBuiltinProviderId(rawId)) {
     return null;
   }
@@ -4057,9 +4310,10 @@ function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorksp
   const secretRef = provider.secretRef || secretStorageService.createProviderSecretRef(rawId);
   const kind = builtinFallback.kind;
   const models = sanitizeModels(provider.models ?? []);
-  const resolvedSecret = builtinFallback.authMode === "api-key" ? getResolvedProviderSecret(rawId, secretRef, workspaceRoot) : "";
-  const hasStoredSecret = builtinFallback.authMode === "local" || Boolean(resolvedSecret);
-  const canUseProvider = builtinFallback.authMode === "local" ? true : builtinFallback.authMode === "api-key" ? Boolean(resolvedSecret) : provider.status === "verified";
+  const oauthSecretRef = secretStorageService.createProviderOAuthSecretRef(rawId);
+  const resolvedSecret = builtinFallback.authMode === "api-key" ? getResolvedProviderSecret(rawId, secretRef, workspaceRoot) : builtinFallback.authMode === "account" ? secretStorageService.getSecret(oauthSecretRef, workspaceRoot) : "";
+  const hasStoredSecret = builtinFallback.authMode === "local" || builtinFallback.authMode === "environment" || Boolean(resolvedSecret);
+  const canUseProvider = builtinFallback.authMode === "local" || builtinFallback.authMode === "environment" ? true : builtinFallback.authMode === "api-key" ? Boolean(resolvedSecret) : Boolean(resolvedSecret);
   const status = pickProviderStatus(provider, builtinFallback, canUseProvider, models);
   const enabled = status === "verified" && models.length > 0;
   return {
@@ -4073,7 +4327,8 @@ function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorksp
     apiKey: "",
     secretRef,
     hasStoredSecret,
-    baseUrl: definition?.baseUrl,
+    baseUrl: definition?.baseUrlEditable ? typeof provider.baseUrl === "string" ? provider.baseUrl.trim() : definition.baseUrl : definition?.baseUrl,
+    baseUrlEditable: definition?.baseUrlEditable,
     models,
     recommendedModels: dedupeStrings(
       Array.isArray(provider.recommendedModels) ? provider.recommendedModels.filter((value) => typeof value === "string").map((value) => value.trim()) : builtinFallback.recommendedModels
@@ -4084,6 +4339,10 @@ function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorksp
     lastModelRefreshAt: typeof provider.lastModelRefreshAt === "string" ? provider.lastModelRefreshAt : void 0,
     lastError: status === "failed" && typeof provider.lastError === "string" ? provider.lastError : void 0,
     accountLoginConfigured: definition?.accountLoginConfigured,
+    accountLabel: typeof provider.accountLabel === "string" ? provider.accountLabel : void 0,
+    planLabel: typeof provider.planLabel === "string" ? provider.planLabel : void 0,
+    oauthExpiresAt: typeof provider.oauthExpiresAt === "string" ? provider.oauthExpiresAt : void 0,
+    oauthRefreshAvailable: typeof provider.oauthRefreshAvailable === "boolean" ? provider.oauthRefreshAvailable : void 0,
     unavailableReason: definition?.unavailableReason,
     isConfigured: status === "verified" && models.length > 0 && enabled
   };
@@ -4104,9 +4363,9 @@ function normalizeUserProviders(providers, workspaceRoot) {
 }
 function hydrateProviderSecrets(providers, workspaceRoot) {
   return providers.map((provider) => {
-    const resolvedSecret = provider.authMode === "api-key" ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot) : "";
-    const hasStoredSecret = provider.authMode === "local" || Boolean(resolvedSecret);
-    const canUseProvider = provider.authMode === "local" ? true : provider.authMode === "api-key" ? Boolean(resolvedSecret) : provider.status === "verified";
+    const resolvedSecret = provider.authMode === "api-key" ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot) : provider.authMode === "account" ? secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(provider.id), workspaceRoot) : "";
+    const hasStoredSecret = provider.authMode === "local" || provider.authMode === "environment" || Boolean(resolvedSecret);
+    const canUseProvider = provider.authMode === "local" || provider.authMode === "environment" ? true : provider.authMode === "api-key" ? Boolean(resolvedSecret) : Boolean(resolvedSecret);
     const status = provider.status === "unavailable" ? "unavailable" : provider.status === "verified" && canUseProvider && provider.models.length > 0 ? "verified" : provider.status === "failed" ? "failed" : "unconfigured";
     const isConfigured = status === "verified" && provider.models.length > 0;
     return {
@@ -4191,7 +4450,7 @@ class SettingsService {
         secretStorageService.deleteSecret(entry.secretRef, workspaceRoot);
         continue;
       }
-      const rawId = typeof entry.id === "string" ? entry.id.trim() : "";
+      const rawId = normalizeLegacyProviderId(typeof entry.id === "string" ? entry.id.trim() : "");
       if (!rawId) {
         fixes.push("Removed provider with empty id");
         continue;
@@ -4398,6 +4657,10 @@ class SettingsService {
     }
     return getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot);
   }
+  getProviderOAuthSecret(providerId, workspaceRoot = appPathService.getWorkspaceRoot()) {
+    this.ensureInitialized();
+    return secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(providerId), workspaceRoot);
+  }
   setAll(patch, runtimePaths) {
     this.ensureInitialized();
     const currentRuntime = this.getAll();
@@ -4487,7 +4750,7 @@ class SettingsService {
       ...runtimePaths ?? {}
     });
   }
-  saveProviderConnection(providerId, apiKey, models) {
+  saveProviderConnection(providerId, apiKey, models, baseUrl = "") {
     const current = this.getAll();
     const provider = current.llm.providers.find((entry) => entry.id === providerId);
     if (!provider || !isBuiltinProviderId(provider.id)) {
@@ -4502,12 +4765,51 @@ class SettingsService {
       ...provider,
       apiKey: apiKey.trim(),
       enabled: true,
-      hasStoredSecret: provider.authMode === "api-key" ? Boolean(apiKey.trim() || provider.hasStoredSecret) : provider.hasStoredSecret,
+      hasStoredSecret: provider.authMode === "api-key" ? Boolean(apiKey.trim() || provider.hasStoredSecret) : provider.authMode === "local" || provider.authMode === "environment" || provider.hasStoredSecret,
+      baseUrl: provider.baseUrlEditable ? baseUrl.trim() || provider.baseUrl : provider.baseUrl,
       models: discoveredModels.map((model) => ({ ...model, enabled: true })),
       status: "verified",
       lastTestedAt: timestamp,
       lastModelRefreshAt: timestamp,
       lastError: void 0,
+      isConfigured: true
+    };
+    return this.setAll({
+      llm: {
+        providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
+        agentRoutes: current.llm.agentRoutes
+      }
+    });
+  }
+  saveProviderAccountConnection(providerId, secretPayload, models, accountSummary = {}) {
+    const current = this.getAll();
+    const provider = current.llm.providers.find((entry) => entry.id === providerId);
+    if (!provider || !isBuiltinProviderId(provider.id) || provider.authMode !== "account") {
+      throw new Error(`Unknown account provider: ${providerId}`);
+    }
+    const discoveredModels = sanitizeModels(models);
+    if (discoveredModels.length === 0) {
+      throw new Error("Provider returned no usable models");
+    }
+    secretStorageService.setSecret(
+      secretStorageService.createProviderOAuthSecretRef(provider.id),
+      secretPayload,
+      current.workspace.rootPath
+    );
+    const timestamp = nowIso();
+    const nextProvider = {
+      ...provider,
+      enabled: true,
+      hasStoredSecret: true,
+      models: discoveredModels.map((model) => ({ ...model, enabled: true })),
+      status: "verified",
+      lastTestedAt: timestamp,
+      lastModelRefreshAt: timestamp,
+      lastError: void 0,
+      accountLabel: accountSummary.accountLabel,
+      planLabel: accountSummary.planLabel,
+      oauthExpiresAt: accountSummary.oauthExpiresAt,
+      oauthRefreshAvailable: accountSummary.oauthRefreshAvailable,
       isConfigured: true
     };
     return this.setAll({
@@ -4525,6 +4827,8 @@ class SettingsService {
     }
     if (provider.authMode === "api-key") {
       secretStorageService.deleteSecret(provider.secretRef, current.workspace.rootPath);
+    } else if (provider.authMode === "account") {
+      secretStorageService.deleteSecret(secretStorageService.createProviderOAuthSecretRef(provider.id), current.workspace.rootPath);
     }
     const fallback = createBuiltinProviderEntry(provider.id);
     const nextProvider = {
@@ -4535,6 +4839,10 @@ class SettingsService {
       enabled: false,
       status: fallback.status,
       lastError: void 0,
+      accountLabel: void 0,
+      planLabel: void 0,
+      oauthExpiresAt: void 0,
+      oauthRefreshAvailable: void 0,
       isConfigured: false
     };
     return this.setAll({
@@ -4546,16 +4854,20 @@ class SettingsService {
   }
   getLlmConfig() {
     const settings = this.getAll();
-    const providers = settings.llm.providers.filter((provider) => provider.enabled && provider.isConfigured && provider.status === "verified").map((provider) => ({
-      id: provider.id,
-      kind: provider.kind,
-      label: provider.label,
-      enabled: provider.enabled,
-      apiKey: provider.authMode === "api-key" ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.workspace.rootPath) : "",
-      baseUrl: provider.baseUrl,
-      models: provider.models.filter((model) => model.enabled).map((model) => model.id),
-      docsUrl: provider.docsUrl
-    })).filter((provider) => provider.models.length > 0);
+    const providers = settings.llm.providers.filter((provider) => provider.enabled && provider.isConfigured && provider.status === "verified").map((provider) => {
+      const accountCredential = provider.authMode === "account" ? resolveAccountRuntimeCredential(provider.id, settings.workspace.rootPath) : { apiKey: "", baseUrl: void 0 };
+      return {
+        id: provider.id,
+        kind: provider.kind,
+        label: provider.label,
+        enabled: provider.enabled,
+        apiKey: provider.authMode === "api-key" ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.workspace.rootPath) : provider.authMode === "account" ? accountCredential.apiKey : "",
+        baseUrl: accountCredential.baseUrl ?? provider.baseUrl,
+        authMode: provider.authMode,
+        models: provider.models.filter((model) => model.enabled).map((model) => model.id),
+        docsUrl: provider.docsUrl
+      };
+    }).filter((provider) => provider.models.length > 0);
     return {
       providers,
       agentRoutes: settings.llm.agentRoutes
@@ -4840,7 +5152,7 @@ class ClaudeAgentSdkAdapter {
   canRun(request) {
     const settings = settingsService.getAll();
     const provider = settings.llm.providers.find((entry) => entry.id === request.providerId);
-    return provider?.id === "anthropic" || provider?.kind === "anthropic";
+    return provider?.authMode !== "account" && (provider?.id === "anthropic" || provider?.kind === "anthropic" || provider?.kind === "openrouter" || provider?.kind === "bedrock" || provider?.kind === "vertex");
   }
   async run(request, tools) {
     const settings = settingsService.getAll();
@@ -4848,8 +5160,8 @@ class ClaudeAgentSdkAdapter {
     if (!provider) {
       throw new Error(`Claude provider not found: ${request.providerId}`);
     }
-    const apiKey = settingsService.getProviderSecret(provider.id, settings.workspace.rootPath);
-    if (!apiKey) {
+    const apiKey = provider.authMode === "api-key" ? settingsService.getProviderSecret(provider.id, settings.workspace.rootPath) : "";
+    if (provider.authMode === "api-key" && !apiKey) {
       throw new Error(`Claude provider secret is missing: ${provider.id}`);
     }
     const sdk = await import("@anthropic-ai/claude-agent-sdk");
@@ -4860,7 +5172,16 @@ class ClaudeAgentSdkAdapter {
     let text = "";
     const env = {
       ...process.env,
-      ANTHROPIC_API_KEY: apiKey,
+      ...apiKey ? { ANTHROPIC_API_KEY: apiKey } : {},
+      ...provider.baseUrl ? { ANTHROPIC_BASE_URL: provider.baseUrl } : {},
+      ...provider.kind === "bedrock" ? {
+        CLAUDE_CODE_USE_BEDROCK: "1",
+        AWS_REGION: process.env.AWS_REGION || "us-east-1"
+      } : {},
+      ...provider.kind === "vertex" ? {
+        CLAUDE_CODE_USE_VERTEX: "1",
+        CLOUD_ML_REGION: process.env.CLOUD_ML_REGION || "us-east5"
+      } : {},
       CLAUDE_AGENT_SDK_CLIENT_APP: "rdc-agent/1.0.0"
     };
     const preparedTools = prepareAgentTools(await tools.listTools(request.agentId), request.toolAllowlist);
@@ -5033,6 +5354,10 @@ const normalizeOpenRouterBaseUrl = (baseUrl) => {
     return `${trimmed}/v1`;
   }
   return trimmed;
+};
+const appendQueryParam$1 = (url2, key, value) => {
+  const separator = url2.includes("?") ? "&" : "?";
+  return `${url2}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
 };
 const extractMessageContent = (payload) => {
   if (!payload || typeof payload !== "object") {
@@ -5378,20 +5703,29 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
     this.baseUrl = (config.baseUrl || this.baseUrl).trim().replace(/\/+$/, "");
     this.models = config.models;
   }
-  async chat(request) {
-    const model = request.model?.trim();
-    if (!model) {
-      throw new Error(`${this.name} requires an explicit model selection.`);
-    }
+  createHeaders() {
     const headers = {
       "Content-Type": "application/json"
     };
     if (this.apiKey) {
       headers.Authorization = `Bearer ${this.apiKey}`;
     }
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+    return headers;
+  }
+  createChatCompletionsUrl() {
+    return `${this.baseUrl}/chat/completions`;
+  }
+  describeApiError(status, text) {
+    return `${this.name} API error: ${status} - ${text}`;
+  }
+  async chat(request) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const response = await fetch(this.createChatCompletionsUrl(), {
       method: "POST",
-      headers,
+      headers: this.createHeaders(),
       signal: request.signal,
       body: JSON.stringify({
         model,
@@ -5403,7 +5737,7 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
       })
     });
     if (!response.ok) {
-      throw new Error(`${this.name} API error: ${response.status} - ${await response.text()}`);
+      throw new Error(this.describeApiError(response.status, await response.text()));
     }
     const data = await response.json();
     const choice = data.choices?.[0];
@@ -5425,15 +5759,9 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
     if (!model) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
-    const headers = {
-      "Content-Type": "application/json"
-    };
-    if (this.apiKey) {
-      headers.Authorization = `Bearer ${this.apiKey}`;
-    }
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+    const response = await fetch(this.createChatCompletionsUrl(), {
       method: "POST",
-      headers,
+      headers: this.createHeaders(),
       signal: request.signal,
       body: JSON.stringify({
         model,
@@ -5446,7 +5774,7 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
       })
     });
     if (!response.ok) {
-      throw new Error(`${this.name} API error: ${response.status} - ${await response.text()}`);
+      throw new Error(this.describeApiError(response.status, await response.text()));
     }
     const accumulator = createAccumulator(model);
     await readSseStream(response, (_eventName, data) => {
@@ -5500,10 +5828,111 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
     return this.models;
   }
 }
+class GitHubCopilotProvider extends OpenAICompatibleProvider {
+  constructor(name) {
+    super(name, true);
+  }
+  createHeaders() {
+    return {
+      ...super.createHeaders(),
+      "Copilot-Integration-Id": "vscode-chat",
+      "Editor-Version": "RDC-Agent/1.0",
+      "Editor-Plugin-Version": "RDC-Agent/1.0"
+    };
+  }
+  describeApiError(status, text) {
+    if (status === 401) {
+      return `GitHub Copilot account token was rejected. Sign in again or check token policy. ${text}`;
+    }
+    if (status === 403) {
+      return `GitHub Copilot access was blocked by license, organization, or policy settings. ${text}`;
+    }
+    return `GitHub Copilot API error: ${status} - ${text}`;
+  }
+}
+class AzureOpenAIProvider extends OpenAICompatibleProvider {
+  createHeaders() {
+    return {
+      "api-key": this.apiKey,
+      "Content-Type": "application/json"
+    };
+  }
+  createChatCompletionsUrl() {
+    const base = this.baseUrl.endsWith("/chat/completions") ? this.baseUrl : `${this.baseUrl}/chat/completions`;
+    return appendQueryParam$1(base, "api-version", "2024-10-21");
+  }
+}
+class GoogleAiStudioProvider extends BaseStreamingProvider {
+  apiKey = "";
+  baseUrl = "https://generativelanguage.googleapis.com/v1beta";
+  models = [];
+  constructor(name) {
+    super(name);
+  }
+  configure(config) {
+    this.apiKey = config.apiKey.trim();
+    this.baseUrl = (config.baseUrl || this.baseUrl).trim().replace(/\/+$/, "");
+    this.models = config.models;
+  }
+  async chat(request) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const response = await fetch(appendQueryParam$1(`${this.baseUrl}/models/${model}:generateContent`, "key", this.apiKey), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      signal: request.signal,
+      body: JSON.stringify({
+        contents: request.messages.filter((message) => message.role !== "system").map((message) => ({
+          role: message.role === "assistant" ? "model" : "user",
+          parts: [{ text: typeof message.content === "string" ? message.content : JSON.stringify(message.content) }]
+        })),
+        generationConfig: {
+          maxOutputTokens: request.maxTokens || 4096,
+          temperature: request.temperature ?? 0.7
+        },
+        systemInstruction: request.messages.some((message) => message.role === "system") ? {
+          parts: request.messages.filter((message) => message.role === "system").map((message) => ({ text: typeof message.content === "string" ? message.content : JSON.stringify(message.content) }))
+        } : void 0
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`Google AI Studio API error: ${response.status} - ${await response.text()}`);
+    }
+    const data = await response.json();
+    const text = Array.isArray(data.candidates?.[0]?.content?.parts) ? data.candidates[0].content.parts.map((part) => typeof part.text === "string" ? part.text : "").join("") : "";
+    return {
+      id: data.responseId || `google-ai-studio-${Date.now()}`,
+      model,
+      content: text,
+      usage: {
+        inputTokens: data.usageMetadata?.promptTokenCount || 0,
+        outputTokens: data.usageMetadata?.candidatesTokenCount || 0
+      },
+      stopReason: "end_turn"
+    };
+  }
+  async performStreamingChat(request, onChunk) {
+    const response = await this.chat(request);
+    const text = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+    emitTextChunk(text, onChunk);
+    return response;
+  }
+  async isAvailable() {
+    return Boolean(this.apiKey);
+  }
+  getModels() {
+    return this.models;
+  }
+}
 class AnthropicProvider extends BaseStreamingProvider {
   apiKey = "";
   baseUrl = "https://api.anthropic.com/v1";
   models = [];
+  useBearerAuth = false;
   constructor(name) {
     super(name);
   }
@@ -5511,6 +5940,14 @@ class AnthropicProvider extends BaseStreamingProvider {
     this.apiKey = config.apiKey.trim();
     this.baseUrl = (config.baseUrl || "https://api.anthropic.com/v1").trim().replace(/\/+$/, "");
     this.models = config.models;
+    this.useBearerAuth = config.authMode === "account";
+  }
+  createHeaders() {
+    return {
+      ...this.useBearerAuth ? { Authorization: `Bearer ${this.apiKey}` } : { "x-api-key": this.apiKey },
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json"
+    };
   }
   async chat(request) {
     const model = request.model?.trim();
@@ -5521,11 +5958,7 @@ class AnthropicProvider extends BaseStreamingProvider {
     const otherMessages = request.messages.filter((message) => message.role !== "system");
     const response = await fetch(`${this.baseUrl}/messages`, {
       method: "POST",
-      headers: {
-        "x-api-key": this.apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json"
-      },
+      headers: this.createHeaders(),
       signal: request.signal,
       body: JSON.stringify({
         model,
@@ -5561,11 +5994,7 @@ class AnthropicProvider extends BaseStreamingProvider {
     const otherMessages = request.messages.filter((message) => message.role !== "system");
     const response = await fetch(`${this.baseUrl}/messages`, {
       method: "POST",
-      headers: {
-        "x-api-key": this.apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json"
-      },
+      headers: this.createHeaders(),
       signal: request.signal,
       body: JSON.stringify({
         model,
@@ -5623,6 +6052,9 @@ class AnthropicProvider extends BaseStreamingProvider {
   }
 }
 const createProviderByKind = (providerId, kind) => {
+  if (providerId === "github-copilot") {
+    return new GitHubCopilotProvider(providerId);
+  }
   if (kind === "openrouter") {
     return new OpenRouterProvider(providerId);
   }
@@ -5631,6 +6063,12 @@ const createProviderByKind = (providerId, kind) => {
   }
   if (kind === "ollama") {
     return new OpenAICompatibleProvider(providerId, false);
+  }
+  if (kind === "google-ai-studio") {
+    return new GoogleAiStudioProvider(providerId);
+  }
+  if (kind === "azure-openai") {
+    return new AzureOpenAIProvider(providerId);
   }
   return new OpenAICompatibleProvider(providerId, true);
 };
@@ -5763,7 +6201,7 @@ class OpenAiAgentSdkAdapter {
   canRun(request) {
     const settings = settingsService.getAll();
     const provider = settings.llm.providers.find((entry) => entry.id === request.providerId);
-    return provider?.id === "openai" || provider?.kind === "openai-compatible";
+    return provider?.authMode !== "account" && (provider?.id === "openai" || provider?.kind === "openai-compatible");
   }
   async run(request, tools) {
     const settings = settingsService.getAll();
@@ -5781,7 +6219,7 @@ class OpenAiAgentSdkAdapter {
     const traceId = `rdc-agent-${request.runId || request.turnId || Date.now().toString(36)}`;
     const workflowName = "RDC Agent SDK Runner";
     if (provider.baseUrl || provider.id !== "openai") {
-      const { default: OpenAI } = await Promise.resolve().then(() => require("./chunks/index-DjSBD69L.js"));
+      const { default: OpenAI } = await import("openai");
       sdk.setDefaultOpenAIClient?.(new OpenAI({
         apiKey,
         baseURL: provider.baseUrl
@@ -7103,7 +7541,7 @@ class DebuggerLlmService {
         [`agent:${agentId}`, `provider:${provider.id}`, `model:${route.modelId}`]
       ));
     }
-    const secret = provider.kind === "ollama" ? "ollama-local" : settingsService.getProviderSecret(provider.id, settings.workspace.rootPath);
+    const secret = provider.authMode === "local" ? "local-provider" : provider.authMode === "environment" ? "environment-provider" : provider.authMode === "account" ? settingsService.getProviderOAuthSecret(provider.id, settings.workspace.rootPath) : settingsService.getProviderSecret(provider.id, settings.workspace.rootPath);
     if (!secret.trim()) {
       throw new DebuggerLlmBlockerError(makeBlocker(
         BLOCKER_CODES.BLOCKED_LLM_SECRET_MISSING.code,
@@ -12151,12 +12589,609 @@ function registerRuntimeTerminalHandlers() {
     }
   });
 }
+const REQUEST_TIMEOUT_MS$1 = 2e4;
+const CHATGPT_CALLBACK_PORT = 1455;
+const CHATGPT_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
+const CLAUDE_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
+const GITHUB_COPILOT_CLIENT_ID = "Iv1.b507a08c87ecfe98";
+const pendingFlows = /* @__PURE__ */ new Map();
+const isAccountProviderId = (providerId) => providerId === "claude-account" || providerId === "chatgpt-account" || providerId === "github-copilot";
+const isTestMode = () => process.env.RDC_AGENT_TEST_MODE === "1";
+const base64Url = (buffer) => buffer.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const createPkce = () => {
+  const verifier = base64Url(crypto.randomBytes(32));
+  const challenge = base64Url(crypto.createHash("sha256").update(verifier).digest());
+  return { verifier, challenge };
+};
+const appendParams = (baseUrl, params) => {
+  const url2 = new URL(baseUrl);
+  for (const [key, value] of Object.entries(params)) {
+    url2.searchParams.set(key, value);
+  }
+  return url2.toString();
+};
+const normalizeAccountModels = (values) => {
+  const models = /* @__PURE__ */ new Map();
+  for (const value of values) {
+    const record = value && typeof value === "object" ? value : null;
+    const id = typeof value === "string" ? value.trim() : typeof record?.id === "string" ? record.id.trim() : typeof record?.name === "string" ? record.name.trim() : "";
+    if (!id || !isAgentRoutableAccountModel(id) || models.has(id)) {
+      continue;
+    }
+    models.set(id, {
+      id,
+      label: typeof record?.display_name === "string" && record.display_name.trim() ? record.display_name.trim() : id,
+      enabled: true
+    });
+  }
+  return Array.from(models.values()).sort((left, right) => left.id.localeCompare(right.id));
+};
+const isAgentRoutableAccountModel = (modelId) => {
+  const normalized = modelId.toLowerCase();
+  return !(normalized.includes("embedding") || normalized.includes("moderation") || normalized.includes("rerank") || normalized.includes("whisper") || normalized.includes("tts") || normalized.includes("dall-e") || normalized.includes("image") || normalized.includes("audio") || normalized.includes("realtime") || normalized.includes("transcribe"));
+};
+const parseProviderError$1 = (error) => {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return "Connection test timed out.";
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return "Provider connection failed.";
+};
+const isExpiringSoon = (expiresAt) => {
+  if (!expiresAt) {
+    return false;
+  }
+  const timestamp = new Date(expiresAt).getTime();
+  return Number.isFinite(timestamp) && timestamp <= Date.now() + 6e4;
+};
+const canRefreshBundle = (bundle) => Boolean(bundle.refreshToken || bundle.providerId === "github-copilot" && bundle.accessToken);
+const fetchJson = async (url2, init) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS$1);
+  try {
+    const response = await fetch(url2, {
+      ...init,
+      signal: controller.signal
+    });
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) : {};
+    if (!response.ok) {
+      const message = payload && typeof payload === "object" && typeof payload.error === "string" ? payload.error : `HTTP ${response.status}`;
+      throw new Error(message);
+    }
+    return payload;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+const parseModels = (payload) => {
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+  const data = payload.data ?? payload.models;
+  return Array.isArray(data) ? normalizeAccountModels(data) : [];
+};
+class ProviderAccountAuthService {
+  async startLogin(providerId) {
+    if (!isAccountProviderId(providerId)) {
+      return this.status(providerId, "Provider does not support account login.");
+    }
+    if (providerId === "claude-account") {
+      return this.startClaudeLogin();
+    }
+    if (providerId === "chatgpt-account") {
+      return this.startChatGptLogin();
+    }
+    return this.startGitHubCopilotLogin();
+  }
+  async finishLogin(request) {
+    if (!isAccountProviderId(request.providerId)) {
+      return this.status(request.providerId, "Provider does not support account login.");
+    }
+    const flow = this.findFlow(request.providerId, request.flowId);
+    if (!flow) {
+      return this.status(request.providerId, "Login flow expired or was not started.", "failed");
+    }
+    try {
+      if (request.providerId === "claude-account") {
+        const bundle2 = await this.exchangeClaudeCode(flow, request.code?.trim() ?? "");
+        return this.persistAccount(request.providerId, bundle2);
+      }
+      if (request.providerId === "chatgpt-account") {
+        const bundle2 = await this.exchangeChatGptCode(flow, request.code?.trim() ?? "");
+        return this.persistAccount(request.providerId, bundle2);
+      }
+      const bundle = await this.pollGitHubDevice(flow);
+      return this.persistAccount(request.providerId, bundle);
+    } catch (error) {
+      flow.error = parseProviderError$1(error);
+      return this.status(request.providerId, flow.error, "failed");
+    }
+  }
+  async test(providerId) {
+    if (!isAccountProviderId(providerId)) {
+      return this.status(providerId, "Provider does not support account login.");
+    }
+    const bundle = this.readBundle(providerId);
+    if (!bundle) {
+      return this.status(providerId, "Account is not connected.");
+    }
+    try {
+      const activeBundle = await this.refreshBundleIfNeeded(bundle);
+      const models = await this.discoverModels(activeBundle);
+      if (models.length === 0) {
+        throw new Error("Account provider returned no usable models.");
+      }
+      settingsService.saveProviderAccountConnection(
+        providerId,
+        JSON.stringify(activeBundle),
+        models,
+        {
+          accountLabel: activeBundle.accountLabel,
+          planLabel: activeBundle.planLabel,
+          oauthExpiresAt: activeBundle.expiresAt,
+          oauthRefreshAvailable: canRefreshBundle(activeBundle)
+        }
+      );
+      return this.status(providerId);
+    } catch (error) {
+      return this.status(providerId, parseProviderError$1(error), "failed");
+    }
+  }
+  status(providerId, message, forcedState) {
+    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+    const isAccount = isAccountProviderId(providerId);
+    const flow = isAccount ? this.findFlow(providerId) : null;
+    const connected = Boolean(provider?.isConfigured && provider.status === "verified");
+    const state2 = forcedState ?? (flow?.error ? "failed" : flow ? "pending" : connected ? "connected" : isAccount ? "signed-out" : "unavailable");
+    return {
+      providerId,
+      state: state2,
+      available: isAccount,
+      connected,
+      message: message ?? flow?.error ?? (connected ? "Connected" : flow ? "Waiting for authorization." : "Not connected"),
+      error: forcedState === "failed" ? message : flow?.error,
+      accountLabel: provider?.accountLabel,
+      planLabel: provider?.planLabel,
+      expiresAt: provider?.oauthExpiresAt,
+      authUrl: flow?.authUrl,
+      verificationUri: flow?.verificationUri,
+      userCode: flow?.userCode,
+      requiresCodeInput: Boolean(flow?.providerId === "claude-account" || isTestMode() && flow?.providerId === "chatgpt-account"),
+      models: provider?.models ?? []
+    };
+  }
+  logout(providerId) {
+    if (isAccountProviderId(providerId)) {
+      this.clearFlows(providerId);
+      settingsService.disconnectProvider(providerId);
+    }
+    return this.status(providerId);
+  }
+  startClaudeLogin() {
+    const { verifier, challenge } = createPkce();
+    const state2 = crypto.randomUUID();
+    const flow = {
+      providerId: "claude-account",
+      flowId: crypto.randomUUID(),
+      state: state2,
+      codeVerifier: verifier,
+      authUrl: appendParams("https://claude.ai/oauth/authorize", {
+        code: "true",
+        client_id: CLAUDE_CLIENT_ID,
+        response_type: "code",
+        redirect_uri: "https://console.anthropic.com/oauth/code/callback",
+        scope: "org:create_api_key user:profile user:inference",
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+        state: state2
+      }),
+      expiresAt: Date.now() + 10 * 60 * 1e3
+    };
+    this.setFlow(flow);
+    void this.openExternal(flow.authUrl);
+    return this.status(flow.providerId);
+  }
+  startChatGptLogin() {
+    const { verifier, challenge } = createPkce();
+    const state2 = crypto.randomUUID();
+    const flow = {
+      providerId: "chatgpt-account",
+      flowId: crypto.randomUUID(),
+      state: state2,
+      codeVerifier: verifier,
+      authUrl: appendParams("https://auth.openai.com/oauth/authorize", {
+        client_id: CHATGPT_CLIENT_ID,
+        response_type: "code",
+        redirect_uri: `http://localhost:${CHATGPT_CALLBACK_PORT}/auth/callback`,
+        scope: "openid profile email offline_access",
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+        state: state2,
+        codex_cli_simplified_flow: "true",
+        id_token_add_organizations: "true"
+      }),
+      expiresAt: Date.now() + 10 * 60 * 1e3
+    };
+    this.setFlow(flow);
+    if (!isTestMode()) {
+      this.startChatGptCallbackServer(flow);
+    }
+    void this.openExternal(flow.authUrl);
+    return this.status(flow.providerId);
+  }
+  async startGitHubCopilotLogin() {
+    const payload = await fetchJson("https://github.com/login/device/code", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        client_id: GITHUB_COPILOT_CLIENT_ID,
+        scope: "read:user"
+      })
+    });
+    const flow = {
+      providerId: "github-copilot",
+      flowId: crypto.randomUUID(),
+      state: crypto.randomUUID(),
+      deviceCode: payload.device_code,
+      userCode: payload.user_code,
+      verificationUri: payload.verification_uri,
+      intervalSeconds: payload.interval ?? 5,
+      expiresAt: Date.now() + (payload.expires_in ?? 900) * 1e3
+    };
+    this.setFlow(flow);
+    if (flow.verificationUri) {
+      void this.openExternal(flow.verificationUri);
+    }
+    void this.pollGitHubDevice(flow).then((bundle) => this.persistAccount("github-copilot", bundle)).catch((error) => {
+      flow.error = parseProviderError$1(error);
+    });
+    return this.status(flow.providerId);
+  }
+  async exchangeClaudeCode(flow, code) {
+    if (!code || !flow.codeVerifier) {
+      throw new Error("Authorization code is required.");
+    }
+    const payload = await fetchJson("https://platform.claude.com/v1/oauth/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "RDC-Agent"
+      },
+      body: JSON.stringify({
+        grant_type: "authorization_code",
+        client_id: CLAUDE_CLIENT_ID,
+        code,
+        redirect_uri: "https://console.anthropic.com/oauth/code/callback",
+        code_verifier: flow.codeVerifier,
+        state: flow.state
+      })
+    });
+    if (!payload.access_token) {
+      throw new Error("Claude OAuth did not return an access token.");
+    }
+    return {
+      providerId: "claude-account",
+      accessToken: payload.access_token,
+      refreshToken: payload.refresh_token,
+      expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1e3).toISOString(),
+      accountLabel: "Claude Account",
+      planLabel: payload.scope
+    };
+  }
+  async exchangeChatGptCode(flow, code) {
+    if (!code || !flow.codeVerifier) {
+      throw new Error("Authorization code is required.");
+    }
+    const tokenPayload = await fetchJson("https://auth.openai.com/oauth/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: CHATGPT_CLIENT_ID,
+        code,
+        redirect_uri: `http://localhost:${CHATGPT_CALLBACK_PORT}/auth/callback`,
+        code_verifier: flow.codeVerifier
+      }).toString()
+    });
+    let apiKey = tokenPayload.access_token;
+    if (tokenPayload.id_token) {
+      try {
+        const exchangePayload = await fetchJson("https://auth.openai.com/oauth/token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: new URLSearchParams({
+            grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
+            client_id: CHATGPT_CLIENT_ID,
+            subject_token: tokenPayload.id_token,
+            subject_token_type: "urn:ietf:params:oauth:token-type:id_token",
+            requested_token: "openai-api-key"
+          }).toString()
+        });
+        apiKey = exchangePayload.access_token ?? apiKey;
+      } catch {
+      }
+    }
+    if (!apiKey) {
+      throw new Error("OpenAI OAuth did not return a usable credential.");
+    }
+    return {
+      providerId: "chatgpt-account",
+      accessToken: tokenPayload.access_token,
+      refreshToken: tokenPayload.refresh_token,
+      apiKey,
+      expiresAt: new Date(Date.now() + (tokenPayload.expires_in ?? 3600) * 1e3).toISOString(),
+      accountLabel: "ChatGPT Account"
+    };
+  }
+  async pollGitHubDevice(flow) {
+    if (!flow.deviceCode) {
+      throw new Error("GitHub device code is missing.");
+    }
+    let intervalSeconds = flow.intervalSeconds ?? 5;
+    for (; ; ) {
+      if (Date.now() > flow.expiresAt) {
+        throw new Error("GitHub authorization code expired.");
+      }
+      if (!isTestMode()) {
+        await new Promise((resolve) => setTimeout(resolve, intervalSeconds * 1e3));
+      }
+      const payload = await fetchJson("https://github.com/login/oauth/access_token", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          client_id: GITHUB_COPILOT_CLIENT_ID,
+          device_code: flow.deviceCode,
+          grant_type: "urn:ietf:params:oauth:grant-type:device_code"
+        })
+      });
+      if (payload.error === "authorization_pending") {
+        if (isTestMode()) {
+          throw new Error("GitHub authorization is still pending.");
+        }
+        continue;
+      }
+      if (payload.error === "slow_down") {
+        intervalSeconds += 5;
+        continue;
+      }
+      if (payload.error) {
+        throw new Error(payload.error);
+      }
+      if (!payload.access_token) {
+        throw new Error("GitHub OAuth did not return an access token.");
+      }
+      const copilot = await fetchJson("https://api.github.com/copilot_internal/v2/token", {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `token ${payload.access_token}`,
+          "Editor-Version": "RDC-Agent/1.0",
+          "Editor-Plugin-Version": "RDC-Agent/1.0"
+        }
+      });
+      if (!copilot.token) {
+        throw new Error("GitHub Copilot did not return an API token.");
+      }
+      return {
+        providerId: "github-copilot",
+        accessToken: payload.access_token,
+        copilotToken: copilot.token,
+        copilotApiBaseUrl: copilot.endpoints?.api ?? "https://api.githubcopilot.com",
+        expiresAt: copilot.expires_at ? new Date(copilot.expires_at * 1e3).toISOString() : void 0,
+        accountLabel: "GitHub Copilot"
+      };
+    }
+  }
+  async persistAccount(providerId, bundle) {
+    const models = await this.discoverModels(bundle);
+    if (models.length === 0) {
+      throw new Error("Account provider returned no usable models.");
+    }
+    settingsService.saveProviderAccountConnection(
+      providerId,
+      JSON.stringify(bundle),
+      models,
+      {
+        accountLabel: bundle.accountLabel,
+        planLabel: bundle.planLabel,
+        oauthExpiresAt: bundle.expiresAt,
+        oauthRefreshAvailable: canRefreshBundle(bundle)
+      }
+    );
+    this.clearFlows(providerId);
+    return this.status(providerId);
+  }
+  async refreshBundleIfNeeded(bundle) {
+    if (!isExpiringSoon(bundle.expiresAt)) {
+      return bundle;
+    }
+    if (bundle.providerId === "github-copilot") {
+      if (!bundle.accessToken) {
+        return bundle;
+      }
+      const copilot = await fetchJson("https://api.github.com/copilot_internal/v2/token", {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `token ${bundle.accessToken}`,
+          "Editor-Version": "RDC-Agent/1.0",
+          "Editor-Plugin-Version": "RDC-Agent/1.0"
+        }
+      });
+      if (!copilot.token) {
+        throw new Error("GitHub Copilot did not return an API token.");
+      }
+      return {
+        ...bundle,
+        copilotToken: copilot.token,
+        copilotApiBaseUrl: copilot.endpoints?.api ?? bundle.copilotApiBaseUrl ?? "https://api.githubcopilot.com",
+        expiresAt: copilot.expires_at ? new Date(copilot.expires_at * 1e3).toISOString() : bundle.expiresAt
+      };
+    }
+    if (!bundle.refreshToken) {
+      return bundle;
+    }
+    if (bundle.providerId === "claude-account") {
+      const payload2 = await fetchJson("https://platform.claude.com/v1/oauth/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "RDC-Agent"
+        },
+        body: JSON.stringify({
+          grant_type: "refresh_token",
+          client_id: CLAUDE_CLIENT_ID,
+          refresh_token: bundle.refreshToken
+        })
+      });
+      if (!payload2.access_token) {
+        throw new Error("Claude OAuth refresh did not return an access token.");
+      }
+      return {
+        ...bundle,
+        accessToken: payload2.access_token,
+        refreshToken: payload2.refresh_token ?? bundle.refreshToken,
+        expiresAt: new Date(Date.now() + (payload2.expires_in ?? 3600) * 1e3).toISOString(),
+        planLabel: payload2.scope ?? bundle.planLabel
+      };
+    }
+    const payload = await fetchJson("https://auth.openai.com/oauth/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: CHATGPT_CLIENT_ID,
+        refresh_token: bundle.refreshToken
+      }).toString()
+    });
+    if (!payload.access_token) {
+      throw new Error("OpenAI OAuth refresh did not return an access token.");
+    }
+    return {
+      ...bundle,
+      accessToken: payload.access_token,
+      apiKey: payload.access_token,
+      refreshToken: payload.refresh_token ?? bundle.refreshToken,
+      expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1e3).toISOString()
+    };
+  }
+  async discoverModels(bundle) {
+    if (bundle.providerId === "claude-account") {
+      const payload2 = await fetchJson("https://api.anthropic.com/v1/models", {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${bundle.accessToken}`,
+          "anthropic-version": "2023-06-01"
+        }
+      });
+      return parseModels(payload2);
+    }
+    if (bundle.providerId === "github-copilot") {
+      const baseUrl = (bundle.copilotApiBaseUrl ?? "https://api.githubcopilot.com").replace(/\/+$/, "");
+      const payload2 = await fetchJson(`${baseUrl}/models`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${bundle.copilotToken}`,
+          "Content-Type": "application/json",
+          "Copilot-Integration-Id": "vscode-chat",
+          "Editor-Version": "RDC-Agent/1.0",
+          "Editor-Plugin-Version": "RDC-Agent/1.0"
+        }
+      });
+      return parseModels(payload2);
+    }
+    const payload = await fetchJson("https://api.openai.com/v1/models", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${bundle.apiKey ?? bundle.accessToken}`
+      }
+    });
+    return parseModels(payload);
+  }
+  readBundle(providerId) {
+    const raw = settingsService.getProviderOAuthSecret(providerId);
+    if (!raw) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed.providerId === providerId ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  findFlow(providerId, flowId) {
+    for (const flow of pendingFlows.values()) {
+      if (flow.providerId === providerId && (!flowId || flow.flowId === flowId) && Date.now() <= flow.expiresAt) {
+        return flow;
+      }
+    }
+    return null;
+  }
+  setFlow(flow) {
+    this.clearFlows(flow.providerId);
+    pendingFlows.set(flow.flowId, flow);
+  }
+  clearFlows(providerId) {
+    for (const [flowId, flow] of pendingFlows.entries()) {
+      if (flow.providerId === providerId) {
+        flow.server?.close();
+        pendingFlows.delete(flowId);
+      }
+    }
+  }
+  startChatGptCallbackServer(flow) {
+    const server = http.createServer((request, response) => {
+      const url2 = new URL(request.url ?? "/", `http://localhost:${CHATGPT_CALLBACK_PORT}`);
+      if (url2.pathname !== "/auth/callback" || url2.searchParams.get("state") !== flow.state) {
+        response.writeHead(400, { "Content-Type": "text/plain" });
+        response.end("Invalid OAuth callback.");
+        return;
+      }
+      const code = url2.searchParams.get("code") ?? "";
+      void this.finishLogin({ providerId: flow.providerId, flowId: flow.flowId, code }).then(() => {
+        response.writeHead(200, { "Content-Type": "text/html" });
+        response.end("<html><body>RDC Agent sign-in complete. You can return to the app.</body></html>");
+      }).catch((error) => {
+        response.writeHead(500, { "Content-Type": "text/plain" });
+        response.end(parseProviderError$1(error));
+      });
+    });
+    server.on("error", (error) => {
+      flow.error = parseProviderError$1(error);
+    });
+    server.listen(CHATGPT_CALLBACK_PORT, "127.0.0.1");
+    flow.server = server;
+  }
+  async openExternal(url2) {
+    if (!url2 || isTestMode()) {
+      return;
+    }
+    await electron.shell.openExternal(url2);
+  }
+}
+const providerAccountAuthService = new ProviderAccountAuthService();
 const REQUEST_TIMEOUT_MS = 2e4;
-function normalizeDiscoveredModels(values) {
+function normalizeDiscoveredModels(values, filterModelId = () => true) {
   const models = /* @__PURE__ */ new Map();
   for (const value of values) {
     const id = typeof value === "string" ? value.trim() : value && typeof value === "object" && typeof value.id === "string" ? value.id.trim() : value && typeof value === "object" && typeof value.name === "string" ? value.name.trim() : "";
-    if (!id || isDeprecatedModel(id) || models.has(id)) {
+    if (!id || isDeprecatedModel(id) || !filterModelId(id) || models.has(id)) {
       continue;
     }
     const label = value && typeof value === "object" && typeof value.display_name === "string" ? value.display_name.trim() || id : id;
@@ -12186,12 +13221,19 @@ const isDeprecatedModel = (modelId) => {
   const normalized = modelId.toLowerCase();
   return normalized.includes("deprecated") || normalized.startsWith("gpt-3.5") || normalized.startsWith("claude-2") || normalized.startsWith("claude-instant");
 };
+const isAgentRoutableOpenAiModel = (modelId) => {
+  const normalized = modelId.toLowerCase();
+  return !(normalized.includes("embedding") || normalized.includes("moderation") || normalized.includes("rerank") || normalized.includes("whisper") || normalized.includes("tts") || normalized.includes("dall-e") || normalized.includes("image") || normalized.includes("audio") || normalized.includes("realtime") || normalized.includes("transcribe") || normalized.includes("computer-use"));
+};
 const requireModels = (models) => {
   if (models.length === 0) {
-    throw new ProviderConnectionError("该 Provider 暂未返回可用模型");
+    throw new ProviderConnectionError("Provider 暂未返回可用于 Agent 路由的模型");
   }
   return models;
 };
+const toStaticModels = (modelIds) => requireModels(
+  normalizeDiscoveredModels(modelIds)
+);
 const getJson = async (url2, init) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -12221,6 +13263,10 @@ const formatHttpError = (status) => {
   return `连接测试失败（HTTP ${status}）`;
 };
 const appendPath = (baseUrl, path2) => `${baseUrl.trim().replace(/\/+$/, "")}/${path2.replace(/^\/+/, "")}`;
+const appendQueryParam = (url2, key, value) => {
+  const separator = url2.includes("?") ? "&" : "?";
+  return `${url2}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+};
 const parseModelsPayload = (strategy, payload) => {
   if (!payload || typeof payload !== "object") {
     return [];
@@ -12229,13 +13275,45 @@ const parseModelsPayload = (strategy, payload) => {
   if (strategy === "ollama-tags") {
     return Array.isArray(record.models) ? normalizeDiscoveredModels(record.models) : [];
   }
-  return Array.isArray(record.data) ? normalizeDiscoveredModels(record.data) : [];
+  if (strategy === "google-ai-studio") {
+    const googleModels = Array.isArray(record.models) ? record.models : [];
+    return normalizeDiscoveredModels(
+      googleModels.filter((value) => {
+        const methods = value && typeof value === "object" ? value.supportedGenerationMethods : null;
+        return !Array.isArray(methods) || methods.includes("generateContent");
+      }).map((value) => {
+        if (value && typeof value === "object" && typeof value.name === "string") {
+          return {
+            ...value,
+            id: value.name.replace(/^models\//, "")
+          };
+        }
+        return value;
+      }),
+      isAgentRoutableOpenAiModel
+    );
+  }
+  return Array.isArray(record.data) ? normalizeDiscoveredModels(record.data, isAgentRoutableOpenAiModel) : [];
 };
+const createTinyAnthropicProbeBody = (modelId) => JSON.stringify({
+  model: modelId,
+  max_tokens: 1,
+  messages: [{ role: "user", content: "ping" }]
+});
+const createTinyOpenAiProbeBody = (modelId) => JSON.stringify({
+  model: modelId,
+  max_tokens: 1,
+  messages: [{ role: "user", content: "ping" }]
+});
 class ProviderConnectionService {
   async testProviderDraft(request) {
     try {
       const provider = this.getProvider(request.providerId);
-      const models = await this.discoverModels(provider, request.apiKey?.trim() ?? "");
+      const models = await this.discoverModels(
+        provider,
+        request.apiKey?.trim() ?? "",
+        request.baseUrl?.trim() ?? ""
+      );
       return {
         success: true,
         provider,
@@ -12253,8 +13331,9 @@ class ProviderConnectionService {
     try {
       const provider = this.getProvider(request.providerId);
       const apiKey = request.apiKey?.trim() ?? "";
-      const models = await this.discoverModels(provider, apiKey);
-      const nextSettings = settingsService.saveProviderConnection(provider.id, apiKey, models);
+      const baseUrl = request.baseUrl?.trim() ?? "";
+      const models = await this.discoverModels(provider, apiKey, baseUrl);
+      const nextSettings = settingsService.saveProviderConnection(provider.id, apiKey, models, baseUrl);
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
       return {
         success: true,
@@ -12272,8 +13351,20 @@ class ProviderConnectionService {
   async refreshProviderModels(providerId) {
     try {
       const provider = this.getProvider(providerId);
-      const models = await this.discoverModels(provider, "");
-      const nextSettings = settingsService.saveProviderConnection(provider.id, "", models);
+      if (provider.authMode === "account") {
+        const status = await providerAccountAuthService.test(provider.id);
+        if (!status.connected) {
+          throw new ProviderConnectionError(status.error || status.message || "Account provider is not connected");
+        }
+        const nextProvider2 = settingsService.getAll().llm.providers.find((entry) => entry.id === provider.id);
+        return {
+          success: true,
+          provider: nextProvider2,
+          models: nextProvider2?.models ?? []
+        };
+      }
+      const models = await this.discoverModels(provider, "", "");
+      const nextSettings = settingsService.saveProviderConnection(provider.id, "", models, "");
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
       return {
         success: true,
@@ -12306,21 +13397,16 @@ class ProviderConnectionService {
     }
   }
   startProviderAccountLogin(providerId) {
-    return this.getProviderAccountStatus(providerId);
+    return providerAccountAuthService.startLogin(providerId);
+  }
+  finishProviderAccountLogin(request) {
+    return providerAccountAuthService.finishLogin(request);
   }
   getProviderAccountStatus(providerId) {
-    const definition = isBuiltinProviderId(providerId) ? getBuiltinProviderDefinition(providerId) : null;
-    const isAccountProvider = definition?.authMode === "account";
-    return {
-      providerId,
-      available: Boolean(isAccountProvider && definition?.accountLoginConfigured),
-      connected: false,
-      message: isAccountProvider ? definition?.unavailableReason ?? "当前版本未配置登录通道" : void 0,
-      error: isAccountProvider ? void 0 : "Provider 不支持账号登录"
-    };
+    return providerAccountAuthService.status(providerId);
   }
   logoutProviderAccount(providerId) {
-    return this.getProviderAccountStatus(providerId);
+    return providerAccountAuthService.logout(providerId);
   }
   getProvider(providerId) {
     const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
@@ -12329,12 +13415,12 @@ class ProviderConnectionService {
     }
     return provider;
   }
-  async discoverModels(provider, apiKeyDraft) {
+  async discoverModels(provider, apiKeyDraft, baseUrlDraft) {
     if (provider.authMode === "account") {
-      throw new ProviderConnectionError(provider.unavailableReason || "当前版本未配置登录通道");
+      throw new ProviderConnectionError("Account providers must be tested through the account login flow.");
     }
     const definition = getBuiltinProviderDefinition(provider.id);
-    if (!definition?.baseUrl || !definition.modelDiscovery) {
+    if (!definition?.modelDiscovery) {
       throw new ProviderConnectionError("Provider 缺少模型发现配置");
     }
     const apiKey = provider.authMode === "api-key" ? apiKeyDraft || settingsService.getProviderSecret(provider.id) : "";
@@ -12342,13 +13428,87 @@ class ProviderConnectionService {
       throw new ProviderConnectionError("请输入 API Key");
     }
     const strategy = definition.modelDiscovery;
-    const url2 = strategy === "ollama-tags" ? appendPath(new URL(definition.baseUrl).origin, "/api/tags") : appendPath(definition.baseUrl, "/models");
+    if (strategy === "static") {
+      return toStaticModels(definition.recommendedModels);
+    }
+    const baseUrl = (baseUrlDraft || provider.baseUrl || definition.baseUrl || "").trim().replace(/\/+$/, "");
+    if (!baseUrl) {
+      throw new ProviderConnectionError("请填写 Provider Base URL");
+    }
+    if (strategy === "anthropic-candidate-validation") {
+      return this.validateAnthropicCandidateModels(provider, apiKey, baseUrl, definition.recommendedModels);
+    }
+    if (strategy === "azure-openai") {
+      return this.validateAzureCandidateModels(apiKey, baseUrl, definition.recommendedModels);
+    }
+    if (strategy === "google-ai-studio") {
+      const payload2 = await getJson(appendQueryParam(appendPath(baseUrl, "/models"), "key", apiKey), {
+        method: "GET"
+      });
+      return requireModels(parseModelsPayload(strategy, payload2));
+    }
+    const url2 = strategy === "ollama-tags" ? appendPath(new URL(baseUrl).origin, "/api/tags") : appendPath(baseUrl, "/models");
     const headers = this.createHeaders(provider, apiKey);
     const payload = await getJson(url2, {
       method: "GET",
       headers
     });
     return requireModels(parseModelsPayload(strategy, payload));
+  }
+  async validateAnthropicCandidateModels(provider, apiKey, baseUrl, modelIds) {
+    const validModels = [];
+    const url2 = appendPath(baseUrl, "/messages");
+    const headers = this.createHeaders(provider, apiKey);
+    for (const modelId of modelIds) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        const response = await fetch(url2, {
+          method: "POST",
+          headers: {
+            ...headers,
+            "Content-Type": "application/json"
+          },
+          signal: controller.signal,
+          body: createTinyAnthropicProbeBody(modelId)
+        });
+        clearTimeout(timeout);
+        if (response.ok) {
+          validModels.push(modelId);
+        }
+      } catch {
+      }
+    }
+    return toStaticModels(validModels);
+  }
+  async validateAzureCandidateModels(apiKey, baseUrl, modelIds) {
+    const validModels = [];
+    const chatUrl = appendQueryParam(
+      baseUrl.endsWith("/chat/completions") ? baseUrl : appendPath(baseUrl, "/chat/completions"),
+      "api-version",
+      "2024-10-21"
+    );
+    for (const modelId of modelIds) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        const response = await fetch(chatUrl, {
+          method: "POST",
+          headers: {
+            "api-key": apiKey,
+            "Content-Type": "application/json"
+          },
+          signal: controller.signal,
+          body: createTinyOpenAiProbeBody(modelId)
+        });
+        clearTimeout(timeout);
+        if (response.ok) {
+          validModels.push(modelId);
+        }
+      } catch {
+      }
+    }
+    return toStaticModels(validModels);
   }
   createHeaders(provider, apiKey) {
     if (provider.authMode === "local") {
@@ -12407,8 +13567,17 @@ function registerSettingsLlmHandlers(context2) {
   electron.ipcMain.handle("llm:getProviderAccountStatus", async (_event, providerId) => {
     return providerConnectionService.getProviderAccountStatus(providerId);
   });
+  electron.ipcMain.handle("llm:finishProviderAccountLogin", async (_event, request) => {
+    const result = await providerConnectionService.finishProviderAccountLogin(request);
+    if (result.connected) {
+      context2.applyCurrentLlmConfig();
+    }
+    return result;
+  });
   electron.ipcMain.handle("llm:logoutProviderAccount", async (_event, providerId) => {
-    return providerConnectionService.logoutProviderAccount(providerId);
+    const result = providerConnectionService.logoutProviderAccount(providerId);
+    context2.applyCurrentLlmConfig();
+    return result;
   });
   electron.ipcMain.handle("settings:get", async () => {
     const paths = appPathService.getWorkspacePaths();

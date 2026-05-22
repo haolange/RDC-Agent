@@ -74,6 +74,7 @@ export const IPC_HANDLER_DOMAINS = {
     'llm:disconnectProvider',
     'llm:startProviderAccountLogin',
     'llm:getProviderAccountStatus',
+    'llm:finishProviderAccountLogin',
     'llm:logoutProviderAccount',
   ],
   toolsEvidenceRuntime: [

@@ -332,9 +332,13 @@ export class DebuggerLlmService {
       ));
     }
 
-    const secret = provider.kind === 'ollama'
-      ? 'ollama-local'
-      : settingsService.getProviderSecret(provider.id, settings.workspace.rootPath);
+    const secret = provider.authMode === 'local'
+      ? 'local-provider'
+      : provider.authMode === 'environment'
+        ? 'environment-provider'
+        : provider.authMode === 'account'
+          ? settingsService.getProviderOAuthSecret(provider.id, settings.workspace.rootPath)
+          : settingsService.getProviderSecret(provider.id, settings.workspace.rootPath);
     if (!secret.trim()) {
       throw new DebuggerLlmBlockerError(makeBlocker(
         BLOCKER_CODES.BLOCKED_LLM_SECRET_MISSING.code,

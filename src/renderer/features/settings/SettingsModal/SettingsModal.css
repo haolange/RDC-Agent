@@ -165,7 +165,6 @@
 }
 
 .settings-page-workspace,
-.settings-page-models,
 .settings-page-agents {
   height: 100%;
   overflow: hidden;
@@ -501,11 +500,10 @@
 }
 
 .settings-models-page {
-  height: 100%;
   min-height: 0;
-  display: grid;
-  grid-template-columns: 282px minmax(0, 1fr);
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .settings-provider-column,
@@ -514,6 +512,77 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.settings-provider-section-flat {
+  padding: 16px;
+  gap: 14px;
+  background: rgb(var(--color-bg-2) / 0.42);
+}
+
+.settings-provider-row-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-provider-row-list:empty::before {
+  content: attr(data-empty-label);
+  display: block;
+  padding: 12px;
+  border: 1px dashed rgb(var(--color-border-default) / 0.5);
+  border-radius: 8px;
+  color: rgb(var(--color-text-tertiary));
+  font-size: var(--text-sm);
+}
+
+.settings-provider-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-height: 54px;
+  padding: 9px 10px;
+  border: 1px solid rgb(var(--color-border-secondary));
+  border-radius: 8px;
+  background: rgb(var(--color-bg-3) / 0.28);
+}
+
+.settings-provider-row.connected {
+  background: rgb(var(--color-success) / 0.04);
+}
+
+.settings-provider-row-main,
+.settings-provider-row-actions,
+.settings-provider-oauth-panel {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-provider-row-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-provider-row-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.settings-provider-row-button {
+  min-height: 34px;
+  padding-inline: 12px;
+}
+
+.settings-provider-oauth-panel {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
 }
 
 .settings-provider-column {
@@ -1160,7 +1229,6 @@
   .settings-profile-fields,
   .settings-preference-row,
   .settings-workspace-hero,
-  .settings-models-page,
   .settings-field-grid,
   .settings-provider-detail-grid,
   .settings-agent-grid,
@@ -1171,12 +1239,16 @@
     grid-template-columns: 1fr;
   }
 
-  .settings-models-page {
-    overflow: auto;
-  }
-
   .settings-provider-column {
     max-height: 300px;
+  }
+
+  .settings-provider-row {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-provider-row-actions {
+    justify-content: flex-start;
   }
 
   .settings-derived-path-row {

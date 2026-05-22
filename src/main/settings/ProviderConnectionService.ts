@@ -1,5 +1,6 @@
 import { getBuiltinProviderDefinition, isBuiltinProviderId } from '@shared/constants/llm';
 import type {
+  LlmProviderAccountLoginFinishRequest,
   LlmProviderAccountStatus,
   LlmProviderConnectionResult,
   LlmProviderDraftRequest,
@@ -9,10 +10,14 @@ import type {
   LlmProviderModelDiscoveryStrategy,
 } from '@shared/types/settings';
 import { settingsService } from '../settings/SettingsService';
+import { providerAccountAuthService } from './ProviderAccountAuthService';
 
 const REQUEST_TIMEOUT_MS = 20000;
 
-export function normalizeDiscoveredModels(values: unknown[]): LlmProviderModel[] {
+export function normalizeDiscoveredModels(
+  values: unknown[],
+  filterModelId: (modelId: string) => boolean = () => true,
+): LlmProviderModel[] {
   const models = new Map<string, LlmProviderModel>();
   for (const value of values) {
     const id = typeof value === 'string'
@@ -22,7 +27,7 @@ export function normalizeDiscoveredModels(values: unknown[]): LlmProviderModel[]
         : value && typeof value === 'object' && typeof (value as { name?: unknown }).name === 'string'
           ? (value as { name: string }).name.trim()
           : '';
-    if (!id || isDeprecatedModel(id) || models.has(id)) {
+    if (!id || isDeprecatedModel(id) || !filterModelId(id) || models.has(id)) {
       continue;
     }
     const label = value && typeof value === 'object' && typeof (value as { display_name?: unknown }).display_name === 'string'
@@ -62,12 +67,33 @@ const isDeprecatedModel = (modelId: string): boolean => {
   );
 };
 
+const isAgentRoutableOpenAiModel = (modelId: string): boolean => {
+  const normalized = modelId.toLowerCase();
+  return !(
+    normalized.includes('embedding')
+    || normalized.includes('moderation')
+    || normalized.includes('rerank')
+    || normalized.includes('whisper')
+    || normalized.includes('tts')
+    || normalized.includes('dall-e')
+    || normalized.includes('image')
+    || normalized.includes('audio')
+    || normalized.includes('realtime')
+    || normalized.includes('transcribe')
+    || normalized.includes('computer-use')
+  );
+};
+
 const requireModels = (models: LlmProviderModel[]): LlmProviderModel[] => {
   if (models.length === 0) {
-    throw new ProviderConnectionError('该 Provider 暂未返回可用模型');
+    throw new ProviderConnectionError('Provider 暂未返回可用于 Agent 路由的模型');
   }
   return models;
 };
+
+const toStaticModels = (modelIds: string[]): LlmProviderModel[] => requireModels(
+  normalizeDiscoveredModels(modelIds),
+);
 
 const getJson = async (url: string, init: RequestInit): Promise<unknown> => {
   const controller = new AbortController();
@@ -102,6 +128,11 @@ const formatHttpError = (status: number): string => {
 const appendPath = (baseUrl: string, path: string): string =>
   `${baseUrl.trim().replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
 
+const appendQueryParam = (url: string, key: string, value: string): string => {
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+};
+
 const parseModelsPayload = (strategy: LlmProviderModelDiscoveryStrategy, payload: unknown): LlmProviderModel[] => {
   if (!payload || typeof payload !== 'object') {
     return [];
@@ -113,14 +144,54 @@ const parseModelsPayload = (strategy: LlmProviderModelDiscoveryStrategy, payload
   if (strategy === 'ollama-tags') {
     return Array.isArray(record.models) ? normalizeDiscoveredModels(record.models) : [];
   }
-  return Array.isArray(record.data) ? normalizeDiscoveredModels(record.data) : [];
+  if (strategy === 'google-ai-studio') {
+    const googleModels = Array.isArray(record.models) ? record.models : [];
+    return normalizeDiscoveredModels(
+      googleModels
+        .filter((value) => {
+          const methods = value && typeof value === 'object'
+            ? (value as { supportedGenerationMethods?: unknown }).supportedGenerationMethods
+            : null;
+          return !Array.isArray(methods) || methods.includes('generateContent');
+        })
+        .map((value) => {
+          if (value && typeof value === 'object' && typeof (value as { name?: unknown }).name === 'string') {
+            return {
+              ...(value as Record<string, unknown>),
+              id: (value as { name: string }).name.replace(/^models\//, ''),
+            };
+          }
+          return value;
+        }),
+      isAgentRoutableOpenAiModel,
+    );
+  }
+  return Array.isArray(record.data)
+    ? normalizeDiscoveredModels(record.data, isAgentRoutableOpenAiModel)
+    : [];
 };
+
+const createTinyAnthropicProbeBody = (modelId: string): string => JSON.stringify({
+  model: modelId,
+  max_tokens: 1,
+  messages: [{ role: 'user', content: 'ping' }],
+});
+
+const createTinyOpenAiProbeBody = (modelId: string): string => JSON.stringify({
+  model: modelId,
+  max_tokens: 1,
+  messages: [{ role: 'user', content: 'ping' }],
+});
 
 export class ProviderConnectionService {
   async testProviderDraft(request: LlmProviderDraftRequest): Promise<LlmProviderConnectionResult> {
     try {
       const provider = this.getProvider(request.providerId);
-      const models = await this.discoverModels(provider, request.apiKey?.trim() ?? '');
+      const models = await this.discoverModels(
+        provider,
+        request.apiKey?.trim() ?? '',
+        request.baseUrl?.trim() ?? '',
+      );
       return {
         success: true,
         provider,
@@ -139,8 +210,9 @@ export class ProviderConnectionService {
     try {
       const provider = this.getProvider(request.providerId);
       const apiKey = request.apiKey?.trim() ?? '';
-      const models = await this.discoverModels(provider, apiKey);
-      const nextSettings = settingsService.saveProviderConnection(provider.id, apiKey, models);
+      const baseUrl = request.baseUrl?.trim() ?? '';
+      const models = await this.discoverModels(provider, apiKey, baseUrl);
+      const nextSettings = settingsService.saveProviderConnection(provider.id, apiKey, models, baseUrl);
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
       return {
         success: true,
@@ -159,8 +231,20 @@ export class ProviderConnectionService {
   async refreshProviderModels(providerId: LlmProviderId): Promise<LlmProviderConnectionResult> {
     try {
       const provider = this.getProvider(providerId);
-      const models = await this.discoverModels(provider, '');
-      const nextSettings = settingsService.saveProviderConnection(provider.id, '', models);
+      if (provider.authMode === 'account') {
+        const status = await providerAccountAuthService.test(provider.id);
+        if (!status.connected) {
+          throw new ProviderConnectionError(status.error || status.message || 'Account provider is not connected');
+        }
+        const nextProvider = settingsService.getAll().llm.providers.find((entry) => entry.id === provider.id);
+        return {
+          success: true,
+          provider: nextProvider,
+          models: nextProvider?.models ?? [],
+        };
+      }
+      const models = await this.discoverModels(provider, '', '');
+      const nextSettings = settingsService.saveProviderConnection(provider.id, '', models, '');
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
       return {
         success: true,
@@ -194,24 +278,20 @@ export class ProviderConnectionService {
     }
   }
 
-  startProviderAccountLogin(providerId: LlmProviderId): LlmProviderAccountStatus {
-    return this.getProviderAccountStatus(providerId);
+  startProviderAccountLogin(providerId: LlmProviderId): Promise<LlmProviderAccountStatus> {
+    return providerAccountAuthService.startLogin(providerId);
+  }
+
+  finishProviderAccountLogin(request: LlmProviderAccountLoginFinishRequest): Promise<LlmProviderAccountStatus> {
+    return providerAccountAuthService.finishLogin(request);
   }
 
   getProviderAccountStatus(providerId: LlmProviderId): LlmProviderAccountStatus {
-    const definition = isBuiltinProviderId(providerId) ? getBuiltinProviderDefinition(providerId) : null;
-    const isAccountProvider = definition?.authMode === 'account';
-    return {
-      providerId,
-      available: Boolean(isAccountProvider && definition?.accountLoginConfigured),
-      connected: false,
-      message: isAccountProvider ? (definition?.unavailableReason ?? '当前版本未配置登录通道') : undefined,
-      error: isAccountProvider ? undefined : 'Provider 不支持账号登录',
-    };
+    return providerAccountAuthService.status(providerId);
   }
 
   logoutProviderAccount(providerId: LlmProviderId): LlmProviderAccountStatus {
-    return this.getProviderAccountStatus(providerId);
+    return providerAccountAuthService.logout(providerId);
   }
 
   private getProvider(providerId: LlmProviderId): LlmProviderEntry {
@@ -222,12 +302,12 @@ export class ProviderConnectionService {
     return provider;
   }
 
-  private async discoverModels(provider: LlmProviderEntry, apiKeyDraft: string): Promise<LlmProviderModel[]> {
+  private async discoverModels(provider: LlmProviderEntry, apiKeyDraft: string, baseUrlDraft: string): Promise<LlmProviderModel[]> {
     if (provider.authMode === 'account') {
-      throw new ProviderConnectionError(provider.unavailableReason || '当前版本未配置登录通道');
+      throw new ProviderConnectionError('Account providers must be tested through the account login flow.');
     }
     const definition = getBuiltinProviderDefinition(provider.id);
-    if (!definition?.baseUrl || !definition.modelDiscovery) {
+    if (!definition?.modelDiscovery) {
       throw new ProviderConnectionError('Provider 缺少模型发现配置');
     }
     const apiKey = provider.authMode === 'api-key'
@@ -238,15 +318,98 @@ export class ProviderConnectionService {
     }
 
     const strategy = definition.modelDiscovery;
+    if (strategy === 'static') {
+      return toStaticModels(definition.recommendedModels);
+    }
+    const baseUrl = (baseUrlDraft || provider.baseUrl || definition.baseUrl || '').trim().replace(/\/+$/, '');
+    if (!baseUrl) {
+      throw new ProviderConnectionError('请填写 Provider Base URL');
+    }
+    if (strategy === 'anthropic-candidate-validation') {
+      return this.validateAnthropicCandidateModels(provider, apiKey, baseUrl, definition.recommendedModels);
+    }
+    if (strategy === 'azure-openai') {
+      return this.validateAzureCandidateModels(apiKey, baseUrl, definition.recommendedModels);
+    }
+    if (strategy === 'google-ai-studio') {
+      const payload = await getJson(appendQueryParam(appendPath(baseUrl, '/models'), 'key', apiKey), {
+        method: 'GET',
+      });
+      return requireModels(parseModelsPayload(strategy, payload));
+    }
     const url = strategy === 'ollama-tags'
-      ? appendPath(new URL(definition.baseUrl).origin, '/api/tags')
-      : appendPath(definition.baseUrl, '/models');
+      ? appendPath(new URL(baseUrl).origin, '/api/tags')
+      : appendPath(baseUrl, '/models');
     const headers = this.createHeaders(provider, apiKey);
     const payload = await getJson(url, {
       method: 'GET',
       headers,
     });
     return requireModels(parseModelsPayload(strategy, payload));
+  }
+
+  private async validateAnthropicCandidateModels(
+    provider: LlmProviderEntry,
+    apiKey: string,
+    baseUrl: string,
+    modelIds: string[],
+  ): Promise<LlmProviderModel[]> {
+    const validModels: string[] = [];
+    const url = appendPath(baseUrl, '/messages');
+    const headers = this.createHeaders(provider, apiKey);
+    for (const modelId of modelIds) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+          body: createTinyAnthropicProbeBody(modelId),
+        });
+        clearTimeout(timeout);
+        if (response.ok) {
+          validModels.push(modelId);
+        }
+      } catch {
+        // Continue probing the remaining candidates.
+      }
+    }
+    return toStaticModels(validModels);
+  }
+
+  private async validateAzureCandidateModels(apiKey: string, baseUrl: string, modelIds: string[]): Promise<LlmProviderModel[]> {
+    const validModels: string[] = [];
+    const chatUrl = appendQueryParam(
+      baseUrl.endsWith('/chat/completions') ? baseUrl : appendPath(baseUrl, '/chat/completions'),
+      'api-version',
+      '2024-10-21',
+    );
+    for (const modelId of modelIds) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        const response = await fetch(chatUrl, {
+          method: 'POST',
+          headers: {
+            'api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+          body: createTinyOpenAiProbeBody(modelId),
+        });
+        clearTimeout(timeout);
+        if (response.ok) {
+          validModels.push(modelId);
+        }
+      } catch {
+        // Continue probing the remaining candidates.
+      }
+    }
+    return toStaticModels(validModels);
   }
 
   private createHeaders(provider: LlmProviderEntry, apiKey: string): HeadersInit {

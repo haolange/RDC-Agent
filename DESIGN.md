@@ -26,6 +26,7 @@
 - `src/main/workflow/debugger`：Debugger workflow facade、plan/intake、approval、execution lifecycle、LLM payload normalization、blocker normalization、workflow projection。
 - `src/main/sessions`：project/session/run repository、workspace layout、attachment/output store、legacy workspace migration、JSON/YAML file store。
 - `src/main/settings`：settings、provider connection、secret storage、LLM adapter、Debugger LLM route。
+- 模型服务商授权属于 settings 边界：API Key/local/environment provider 走 `ProviderConnectionService`，Claude/ChatGPT/GitHub Copilot 这类账号登录 provider 走本库自研 OAuth/device-flow 服务。API Key 和账号 token 只进 secret storage；Bedrock/Vertex 这类 environment provider 使用运行环境凭据，settings 只保存状态和模型列表。
 - `src/main/tools`：`ToolBridge`、tool catalog、runtime summary、RDX tool execution helpers。
 - `src/main/reports`：artifact store、evidence ledger、report bundle publication。
 - `src/main/runtime`：runtime log、terminal session、app path 和 workspace path runtime helpers。
@@ -38,6 +39,9 @@
 - `src/renderer/shell`：App shell、窗口控制、布局 sizing、session bootstrap、event subscriptions、composer/run action glue、E2E seed harness。
 - `src/renderer/features/debugger`：Debugger 业务 UI。
 - `src/renderer/features/settings`：settings/provider/model/profile/workspace UI。
+- Settings > Provider 必须把账号登录 Provider 单独展示；API Key/local/environment provider 使用单一 Provider 清单，已连接条目直接在原清单中呈现连接成功状态，不再单独拆出“已连接 Provider”区域。Provider 连接弹层必须保留明确的 `Connect` 与 `Test` 两个动作；已连接 OAuth detail 只展示账号/模型状态，不再显示启动授权的 `Connect`。
+- Settings > Provider 的模型列表必须区分真实来源：标准模型接口返回的列表显示为“已发现模型”，逐候选模型请求验证成功的列表显示为“已验证模型”；静态推荐只能作为内置候选，不得伪装成已发现模型保存到 route。
+- API Key 明文只进入 `SecretStorageService`，`settings:get` 和 detail 二次打开不得把已存密钥回传 renderer；UI 只能显示固定星号占位，输入新密钥后才允许显示/隐藏本次输入。
 - `src/renderer/features/projects`：project/session navigation。
 - `src/renderer/features/captures`：capture library、device selector、opened capture preview 和 context panels。
 - `src/renderer/features/terminal`：terminal drawer 和 terminal UI glue。
@@ -74,3 +78,4 @@
 - 构建检查：`npm run build`。
 - Electron E2E：运行前必须先 build，因为 E2E 启动 `out/main/index.js` 和 `out/renderer`。
 - 关键 E2E：`debugger-plan-intake.spec.ts`、`session-lifecycle.spec.ts`、`settings-persistence.spec.ts`、`workbench-visual.spec.ts`。
+- Provider/OAuth UI 改动：先用 mock E2E 验证分组、Connect/Test、token 状态和模型发现，再用内置浏览器检查 Settings > Provider 的视觉层级、弹层可读性、长文本和窄宽度布局；真实 OAuth 登录验证需要明确区分账号/组织策略失败与本地 UI/IPC 失败。
