@@ -25,8 +25,8 @@ Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 const electron = require("electron");
 const path = require("path");
 const url = require("url");
-const fs = require("fs");
 const child_process = require("child_process");
+const fs = require("fs");
 const uuid = require("uuid");
 const yaml = require("yaml");
 const Store = require("electron-store");
@@ -950,10 +950,10 @@ class AppPathService {
     }
     return {};
   }
-  writeBootstrapState(state) {
+  writeBootstrapState(state2) {
     const bootstrapPath = this.getBootstrapPath();
     fs.mkdirSync(path.dirname(bootstrapPath), { recursive: true });
-    fs.writeFileSync(bootstrapPath, JSON.stringify(state, null, 2), "utf8");
+    fs.writeFileSync(bootstrapPath, JSON.stringify(state2, null, 2), "utf8");
   }
   ensureWorkspaceStructure(paths) {
     fs.mkdirSync(paths.workspaceRoot, { recursive: true });
@@ -2239,1444 +2239,6 @@ class StorageAdapter {
   }
 }
 const storageAdapter = new StorageAdapter();
-class RunScopedStore {
-  getRunRoot(sessionId, runId) {
-    return storageAdapter.getRunPath(sessionId, runId);
-  }
-  readJson(sessionId, runId, relativePath, fallback) {
-    const filePath = this.resolveRunPath(sessionId, runId, relativePath);
-    if (!fs__namespace.existsSync(filePath)) {
-      return fallback;
-    }
-    try {
-      return JSON.parse(fs__namespace.readFileSync(filePath, "utf-8"));
-    } catch (error) {
-      console.error(`[RunScopedStore] Failed to read ${filePath}`, error);
-      return fallback;
-    }
-  }
-  writeJson(sessionId, runId, relativePath, data) {
-    const filePath = this.resolveRunPath(sessionId, runId, relativePath);
-    fs__namespace.mkdirSync(path__namespace.dirname(filePath), { recursive: true });
-    fs__namespace.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
-    return filePath;
-  }
-  readJsonl(sessionId, runId, relativePath) {
-    return readJsonl(this.resolveRunPath(sessionId, runId, relativePath));
-  }
-  writeJsonl(sessionId, runId, relativePath, items) {
-    const filePath = this.resolveRunPath(sessionId, runId, relativePath);
-    writeJsonl(filePath, items);
-    return filePath;
-  }
-  appendJsonl(sessionId, runId, relativePath, item) {
-    const items = this.readJsonl(sessionId, runId, relativePath);
-    items.push(item);
-    return this.writeJsonl(sessionId, runId, relativePath, items);
-  }
-  resolveRunPath(sessionId, runId, relativePath) {
-    const runRoot = this.getRunRoot(sessionId, runId);
-    const targetPath = path__namespace.resolve(runRoot, relativePath);
-    if (!this.isPathInside(runRoot, targetPath)) {
-      throw new Error(`Run-scoped write escaped run directory: ${relativePath}`);
-    }
-    return targetPath;
-  }
-  isPathInside(rootPath, targetPath) {
-    const relative = path__namespace.relative(path__namespace.resolve(rootPath), path__namespace.resolve(targetPath));
-    return relative === "" || !relative.startsWith("..") && !path__namespace.isAbsolute(relative);
-  }
-}
-const runScopedStore = new RunScopedStore();
-const STORE_PATH = "artifact_store.json";
-class ArtifactStore {
-  read(sessionId, runId) {
-    return runScopedStore.readJson(
-      sessionId,
-      runId,
-      STORE_PATH,
-      {
-        schemaVersion: "1",
-        runId,
-        sessionId,
-        artifacts: [],
-        updatedAt: nowIso$1()
-      }
-    );
-  }
-  list(sessionId, runId) {
-    return this.read(sessionId, runId).artifacts;
-  }
-  get(sessionId, runId, artifactId) {
-    return this.list(sessionId, runId).find((artifact) => artifact.artifactId === artifactId) ?? null;
-  }
-  register(sessionId, runId, record) {
-    this.assertRunBinding(sessionId, runId, record);
-    const scopedPath = this.resolveArtifactPath(sessionId, runId, record.filePath);
-    const stat = fs__namespace.existsSync(scopedPath) ? fs__namespace.statSync(scopedPath) : null;
-    const now = nowIso$1();
-    const nextRecord = {
-      ...record,
-      filePath: scopedPath,
-      sizeBytes: stat?.size ?? record.sizeBytes,
-      createdAt: record.createdAt || now,
-      updatedAt: now
-    };
-    const snapshot = this.read(sessionId, runId);
-    const existingIndex = snapshot.artifacts.findIndex((artifact) => artifact.artifactId === record.artifactId);
-    const artifacts = [...snapshot.artifacts];
-    if (existingIndex >= 0) {
-      artifacts[existingIndex] = {
-        ...artifacts[existingIndex],
-        ...nextRecord,
-        createdAt: artifacts[existingIndex].createdAt
-      };
-    } else {
-      artifacts.push(nextRecord);
-    }
-    this.write({
-      ...snapshot,
-      artifacts,
-      updatedAt: now
-    });
-    return existingIndex >= 0 ? artifacts[existingIndex] : nextRecord;
-  }
-  write(snapshot) {
-    runScopedStore.writeJson(snapshot.sessionId, snapshot.runId, STORE_PATH, snapshot);
-  }
-  resolveArtifactPath(sessionId, runId, filePath) {
-    const runRoot = runScopedStore.getRunRoot(sessionId, runId);
-    const resolvedPath = path__namespace.isAbsolute(filePath) ? path__namespace.resolve(filePath) : path__namespace.resolve(runRoot, "artifacts", filePath);
-    if (!runScopedStore.isPathInside(runRoot, resolvedPath)) {
-      throw new Error(`Artifact path escaped run directory: ${filePath}`);
-    }
-    return resolvedPath;
-  }
-  assertRunBinding(sessionId, runId, value) {
-    if (value.sessionId !== sessionId || value.runId !== runId) {
-      throw new Error(`Run binding mismatch for ${value.sessionId}/${value.runId}`);
-    }
-  }
-}
-const artifactStore = new ArtifactStore();
-const DEFAULT_MODEL_ROUTING = {
-  "rdc-debugger": { provider: "openrouter", model: "anthropic/claude-3-opus" },
-  "triage_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "capture_repro_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "pass_graph_pipeline_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "pixel_forensics_agent": { provider: "openrouter", model: "google/gemini-pro-1.5" },
-  "shader_ir_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "driver_device_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "skeptic_agent": { provider: "openrouter", model: "openai/gpt-4o" },
-  "curator_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" }
-};
-const AGENT_DISPLAY_NAMES = {
-  "rdc-debugger": "RDC Debugger",
-  "triage_agent": "Triage Agent",
-  "capture_repro_agent": "Capture Repro Agent",
-  "pass_graph_pipeline_agent": "Pass Graph Agent",
-  "pixel_forensics_agent": "Pixel Forensics Agent",
-  "shader_ir_agent": "Shader IR Agent",
-  "driver_device_agent": "Driver Device Agent",
-  "skeptic_agent": "Skeptic Agent",
-  "curator_agent": "Curator Agent"
-};
-const AGENT_DESCRIPTIONS = {
-  "rdc-debugger": "Main orchestrator responsible for workflow coordination, gates, and stage progression",
-  "triage_agent": "Symptom classification and SOP recommendation",
-  "capture_repro_agent": "Capture quality verification and baseline establishment",
-  "pass_graph_pipeline_agent": "Render pass and pipeline dependency analysis",
-  "pixel_forensics_agent": "Pixel-level evidence collection and first-bad event localization",
-  "shader_ir_agent": "Shader source and IR evidence analysis",
-  "driver_device_agent": "Cross-device attribution and platform-specific checks",
-  "skeptic_agent": "Evidence chain challenger and weak claim detector",
-  "curator_agent": "Final report generation and knowledge library curation"
-};
-const AGENT_CATEGORIES = {
-  "rdc-debugger": "orchestrator",
-  "triage_agent": "investigator",
-  "capture_repro_agent": "investigator",
-  "pass_graph_pipeline_agent": "investigator",
-  "pixel_forensics_agent": "investigator",
-  "shader_ir_agent": "investigator",
-  "driver_device_agent": "investigator",
-  "skeptic_agent": "verifier",
-  "curator_agent": "reporter"
-};
-const INVESTIGATOR_AGENTS = [
-  "triage_agent",
-  "capture_repro_agent",
-  "pass_graph_pipeline_agent",
-  "pixel_forensics_agent",
-  "shader_ir_agent",
-  "driver_device_agent"
-];
-const VERIFIER_AGENTS = ["skeptic_agent"];
-const REPORTER_AGENTS = ["curator_agent"];
-const AGENT_WRITE_SCOPES = {
-  "rdc-debugger": ["workspace_control"],
-  "triage_agent": ["workspace_notes"],
-  "capture_repro_agent": ["workspace_notes"],
-  "pass_graph_pipeline_agent": ["workspace_notes"],
-  "pixel_forensics_agent": ["workspace_notes"],
-  "shader_ir_agent": ["workspace_notes"],
-  "driver_device_agent": ["workspace_notes"],
-  "skeptic_agent": ["session_signoff"],
-  "curator_agent": ["workspace_reports", "session_artifacts", "knowledge_library"]
-};
-const AGENT_MODES = [
-  {
-    id: "debugger",
-    label: "Debugger",
-    icon: "crosshair-bug",
-    description: "定位异常与验证修复",
-    accentColor: "#33d1ff",
-    disabled: false
-  },
-  {
-    id: "analyzer",
-    label: "Analyzer",
-    icon: "waveform-gauge",
-    description: "拆解现象并收敛证据",
-    accentColor: "#8d8bff",
-    disabled: false
-  },
-  {
-    id: "optimizer",
-    label: "Optimizer",
-    icon: "spark-tuning",
-    description: "判断瓶颈与优化顺序",
-    accentColor: "#4ee3a0",
-    disabled: false
-  }
-];
-AGENT_MODES.reduce(
-  (accumulator, mode) => {
-    accumulator[mode.id] = mode;
-    return accumulator;
-  },
-  {}
-);
-const DEFAULT_MODE_PROFILE_ID = "debugger.default";
-const DEFAULT_AGENT_PROMPTS = {
-  "rdc-debugger": "You are the RDC Debugger orchestrator. Coordinate the workflow, keep the run truthful, and drive the next best debugging step.",
-  "triage_agent": "You are the triage specialist. Classify the rendering issue, narrow the symptom family, and suggest the right investigation surfaces.",
-  "capture_repro_agent": "You are the capture reproduction specialist. Validate capture quality, frame consistency, and reproducibility anchors.",
-  "pass_graph_pipeline_agent": "You are the pass/pipeline specialist. Analyze render-pass sequencing, pipeline state, and dependency shifts.",
-  "pixel_forensics_agent": "You are the pixel forensics specialist. Explain visible corruption with concrete pixel-, target-, and event-level evidence.",
-  "shader_ir_agent": "You are the shader IR specialist. Inspect shader source, compiled IR, and precision or replacement risks.",
-  "driver_device_agent": "You are the driver/device specialist. Compare backend, device, and driver specific behavior and identify remote-runtime risks.",
-  "skeptic_agent": "You are the skeptic. Challenge weak claims and reject conclusions not proven by the evidence chain.",
-  "curator_agent": "You are the curator. Turn accepted evidence into a structured final report and operator-ready summary."
-};
-const DEFAULT_AGENT_TOOLS = {
-  "rdc-debugger": ["rd.core.*", "rd.session.*", "rd.capture.*", "rd.remote.*"],
-  "triage_agent": ["rd.session.get_context", "rd.event.get_action_tree", "rd.macro.summarize_frame"],
-  "capture_repro_agent": ["rd.capture.get_info", "rd.capture.list_frames", "rd.context.snapshot"],
-  "pass_graph_pipeline_agent": ["rd.pipeline.get_state_summary", "rd.pipeline.get_output_targets", "rd.macro.find_state_change_point"],
-  "pixel_forensics_agent": ["rd.macro.explain_pixel", "rd.texture.get_pixel_value", "rd.export.screenshot"],
-  "shader_ir_agent": ["rd.shader.get_disassembly", "rd.shader.debug_start"],
-  "driver_device_agent": ["rd.session.get_context", "rd.remote.connect", "rd.remote.ping", "rd.remote.list_targets"],
-  "skeptic_agent": [],
-  "curator_agent": []
-};
-const DEFAULT_STAGE_POLICIES = [
-  {
-    id: "stage.preflight",
-    label: "Preflight",
-    stage: "preflight",
-    phase: "planner",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Verify runtime prerequisites, capture availability, and operator configuration before the run starts.",
-    notes: "Fail early on invalid runtime preconditions.",
-    toolPolicy: { allowGroups: ["core", "session", "capture", "remote"] }
-  },
-  {
-    id: "stage.entry_gate",
-    label: "Entry Gate",
-    stage: "entry_gate",
-    phase: "planner",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Validate entry contract, backend truth, and capture/device compatibility.",
-    notes: "Reject remote/local mismatches and missing providers.",
-    toolPolicy: { allowGroups: ["core", "session", "capture", "remote"] }
-  },
-  {
-    id: "stage.intake_gate",
-    label: "Intake Gate",
-    stage: "intake_gate",
-    phase: "planner",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Establish case input, capture references, and canonical intake state for downstream agents.",
-    notes: "Produce the durable intake truth object.",
-    toolPolicy: { allowGroups: ["capture", "session"] }
-  },
-  {
-    id: "stage.plan",
-    label: "Plan",
-    stage: "plan",
-    phase: "planner",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Expand the user goal into a structured investigation plan, hypotheses, and risk map.",
-    notes: "Planner phase.",
-    toolPolicy: { allowGroups: ["core", "session"] }
-  },
-  {
-    id: "stage.speclist",
-    label: "Speclist",
-    stage: "speclist",
-    phase: "planner",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Produce specialist briefs, ownership boundaries, and tool constraints for each investigator.",
-    notes: "Last planner step before specialist execution.",
-    toolPolicy: { allowGroups: ["core", "session"] }
-  },
-  {
-    id: "stage.dispatch",
-    label: "Dispatch",
-    stage: "dispatch",
-    phase: "generator",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Run specialist work, collect their briefs, and preserve every dispatch and tool trace.",
-    notes: "Generator phase.",
-    toolPolicy: { allowGroups: ["core", "session", "capture", "event", "pipeline", "texture", "shader", "remote", "macro"] }
-  },
-  {
-    id: "stage.investigate",
-    label: "Investigate",
-    stage: "investigate",
-    phase: "generator",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Synthesize specialist evidence into a concrete diagnosis and next verification target.",
-    notes: "Generator synthesis step.",
-    toolPolicy: { allowGroups: ["core", "session", "capture", "event", "pipeline", "texture", "shader", "remote", "macro"] }
-  },
-  {
-    id: "stage.fix_verify",
-    label: "Fix Verify",
-    stage: "fix_verify",
-    phase: "evaluator",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Verify the proposed fix against real tool evidence and return pass, retry, or blocked.",
-    notes: "Evaluator oracle step.",
-    toolPolicy: { allowGroups: ["core", "session", "capture", "event", "pipeline", "texture", "shader", "remote", "macro"] }
-  },
-  {
-    id: "stage.skepti",
-    label: "Skepti",
-    stage: "skepti",
-    phase: "evaluator",
-    agentPromptId: "agent.skeptic_agent",
-    systemPrompt: "Challenge unsupported claims and require hard evidence for every conclusion.",
-    notes: "Evaluator skeptic step.",
-    toolPolicy: { allowGroups: [] }
-  },
-  {
-    id: "stage.curate",
-    label: "Curate",
-    stage: "curate",
-    phase: "evaluator",
-    agentPromptId: "agent.curator_agent",
-    systemPrompt: "Compile the accepted investigation into a structured, operator-ready final report.",
-    notes: "Evaluator report step.",
-    toolPolicy: { allowGroups: [] }
-  },
-  {
-    id: "stage.finalize",
-    label: "Finalize",
-    stage: "finalize",
-    phase: "evaluator",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Finalize only when all gates, evidence, skeptic signoff, and backend truth checks pass.",
-    notes: "Strict close-out gate.",
-    toolPolicy: { allowGroups: ["core", "session"] }
-  }
-];
-const DEFAULT_MODE_PROFILE = {
-  id: DEFAULT_MODE_PROFILE_ID,
-  label: "Debugger Production",
-  mode: "debugger",
-  stagePolicies: {
-    preflight: "stage.preflight",
-    entry_gate: "stage.entry_gate",
-    intake_gate: "stage.intake_gate",
-    plan: "stage.plan",
-    speclist: "stage.speclist",
-    dispatch: "stage.dispatch",
-    investigate: "stage.investigate",
-    fix_verify: "stage.fix_verify",
-    skepti: "stage.skepti",
-    curate: "stage.curate",
-    finalize: "stage.finalize"
-  },
-  defaultAgentPrompts: {
-    "rdc-debugger": "agent.rdc-debugger",
-    "triage_agent": "agent.triage_agent",
-    "capture_repro_agent": "agent.capture_repro_agent",
-    "pass_graph_pipeline_agent": "agent.pass_graph_pipeline_agent",
-    "pixel_forensics_agent": "agent.pixel_forensics_agent",
-    "shader_ir_agent": "agent.shader_ir_agent",
-    "driver_device_agent": "agent.driver_device_agent",
-    "skeptic_agent": "agent.skeptic_agent",
-    "curator_agent": "agent.curator_agent"
-  }
-};
-const DEFAULT_AGENT_PROFILES = Object.entries(DEFAULT_MODEL_ROUTING).map(([agentId, routing]) => ({
-  id: `agent.${agentId}`,
-  label: agentId,
-  agentId,
-  systemPrompt: DEFAULT_AGENT_PROMPTS[agentId],
-  modelProvider: routing.provider,
-  modelName: routing.model,
-  temperature: ["skeptic_agent", "curator_agent"].includes(agentId) ? 0.2 : 0.3,
-  maxTokens: 4096,
-  toolPolicy: {
-    allowTools: DEFAULT_AGENT_TOOLS[agentId]
-  }
-}));
-class ExecutionProfileService {
-  getModeProfilesPath(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "modes");
-  }
-  getAgentProfilesPath(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "agents");
-  }
-  getStagePoliciesPath(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return path.join(appPathService.getWorkspacePaths(workspaceRoot).policiesPath, "stages");
-  }
-  ensureScaffold(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    fs.mkdirSync(this.getModeProfilesPath(workspaceRoot), { recursive: true });
-    fs.mkdirSync(this.getAgentProfilesPath(workspaceRoot), { recursive: true });
-    fs.mkdirSync(this.getStagePoliciesPath(workspaceRoot), { recursive: true });
-    this.writeJsonIfMissing(
-      path.join(this.getModeProfilesPath(workspaceRoot), `${DEFAULT_MODE_PROFILE.id}.json`),
-      DEFAULT_MODE_PROFILE
-    );
-    for (const profile of DEFAULT_AGENT_PROFILES) {
-      this.writeJsonIfMissing(
-        path.join(this.getAgentProfilesPath(workspaceRoot), `${profile.agentId}.json`),
-        profile
-      );
-    }
-    for (const stagePolicy of DEFAULT_STAGE_POLICIES) {
-      this.writeJsonIfMissing(
-        path.join(this.getStagePoliciesPath(workspaceRoot), `${stagePolicy.stage}.json`),
-        stagePolicy
-      );
-    }
-  }
-  normalizeConfiguration(configuration, workspaceRoot = appPathService.getWorkspaceRoot()) {
-    this.ensureScaffold(workspaceRoot);
-    const availableModeProfiles = this.listModeProfiles(workspaceRoot);
-    const hasActiveProfile = availableModeProfiles.some((profile) => profile.id === configuration.activeModeProfileId);
-    return {
-      ...configuration,
-      activeModeProfileId: hasActiveProfile ? configuration.activeModeProfileId : DEFAULT_MODE_PROFILE_ID,
-      availableModeProfiles
-    };
-  }
-  listModeProfiles(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    this.ensureScaffold(workspaceRoot);
-    return fs.readdirSync(this.getModeProfilesPath(workspaceRoot)).filter((entry) => entry.endsWith(".json")).map((entry) => this.readJson(path.join(this.getModeProfilesPath(workspaceRoot), entry))).filter((profile) => profile !== null).map((profile) => ({ id: profile.id, label: profile.label }));
-  }
-  resolveAgentRuntimeProfile(settings, stage, agentId) {
-    const workspaceRoot = settings.workspace.rootPath;
-    this.ensureScaffold(workspaceRoot);
-    const modeProfile = this.readJson(
-      path.join(this.getModeProfilesPath(workspaceRoot), `${settings.configuration.activeModeProfileId}.json`)
-    ) || DEFAULT_MODE_PROFILE;
-    const agentPromptId = modeProfile.defaultAgentPrompts[agentId] || `agent.${agentId}`;
-    const agentProfile = this.readJson(
-      path.join(this.getAgentProfilesPath(workspaceRoot), `${agentId}.json`)
-    ) || DEFAULT_AGENT_PROFILES.find((profile) => profile.agentId === agentId);
-    const stagePolicyId = modeProfile.stagePolicies[stage] || `stage.${stage}`;
-    const stagePolicy = this.readJson(
-      path.join(this.getStagePoliciesPath(workspaceRoot), `${stage}.json`)
-    ) || DEFAULT_STAGE_POLICIES.find((policy) => policy.stage === stage);
-    const route = this.resolveAgentRoute(settings.llm.agentRoutes, settings.llm.providers, agentId);
-    return {
-      agentId,
-      systemPrompt: [
-        agentProfile.systemPrompt,
-        stagePolicy.systemPrompt ? `
-
-Stage Policy:
-${stagePolicy.systemPrompt}` : ""
-      ].join("").trim(),
-      providerId: route?.providerId || "",
-      modelId: route?.modelId || "",
-      temperature: agentProfile.temperature,
-      maxTokens: agentProfile.maxTokens,
-      category: AGENT_CATEGORIES[agentId],
-      writeScope: AGENT_WRITE_SCOPES[agentId],
-      stage,
-      phase: stagePolicy.phase || STAGE_PHASES[stage],
-      toolAllowlist: Array.from(/* @__PURE__ */ new Set([
-        ...stagePolicy.toolPolicy?.allowTools ?? [],
-        ...agentProfile.toolPolicy?.allowTools ?? []
-      ])),
-      source: {
-        modeProfileId: modeProfile.id,
-        stagePolicyId,
-        agentProfileId: agentPromptId
-      }
-    };
-  }
-  getDiagnostics(settings) {
-    const diagnostics = [];
-    if (!settings.configuration.availableModeProfiles.length) {
-      diagnostics.push({
-        code: "missing_mode_profile",
-        severity: "warning",
-        message: "No execution mode profile found. Falling back to debugger.default."
-      });
-    }
-    if (!settings.llm.providers.some((provider) => provider.isConfigured)) {
-      diagnostics.push({
-        code: "missing_configured_provider",
-        severity: "warning",
-        message: "No configured provider available for Debugger mode."
-      });
-    }
-    return diagnostics;
-  }
-  resolveAgentRoute(routes, providers, agentId) {
-    const route = routes.find((entry) => entry.agentId === agentId) || null;
-    if (!route) {
-      return null;
-    }
-    const provider = providers.find((entry) => entry.id === route.providerId);
-    if (!provider || !provider.enabled || !provider.isConfigured) {
-      return null;
-    }
-    const modelExists = provider.models.some((model) => model.enabled && model.id === route.modelId);
-    return modelExists ? route : null;
-  }
-  readJson(filePath) {
-    try {
-      if (!fs.existsSync(filePath)) {
-        return null;
-      }
-      return JSON.parse(fs.readFileSync(filePath, "utf8"));
-    } catch (error) {
-      console.warn("[ExecutionProfileService] Failed to read JSON:", filePath, error);
-      return null;
-    }
-  }
-  writeJsonIfMissing(filePath, value) {
-    if (fs.existsSync(filePath)) {
-      return;
-    }
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(value, null, 2), "utf8");
-  }
-}
-const executionProfileService = new ExecutionProfileService();
-const LEFT_SIDEBAR_DEFAULT_WIDTH = 256;
-const LEFT_SIDEBAR_MIN_WIDTH = 220;
-const LEFT_SIDEBAR_MAX_WIDTH = 420;
-const LEFT_SIDEBAR_COLLAPSED_WIDTH = 0;
-const RIGHT_PANEL_DEFAULT_WIDTH = 312;
-const RIGHT_PANEL_MIN_WIDTH = 280;
-const RIGHT_PANEL_MAX_WIDTH = 520;
-const RIGHT_PANEL_COLLAPSED_WIDTH = 0;
-const TERMINAL_DEFAULT_HEIGHT = 328;
-const TERMINAL_MIN_HEIGHT = 180;
-const TERMINAL_MAX_HEIGHT = 720;
-const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
-  {
-    id: "openrouter",
-    kind: "openrouter",
-    label: "OpenRouter",
-    enabled: true,
-    baseUrl: "https://openrouter.ai/api/v1",
-    recommendedModels: [
-      "anthropic/claude-sonnet-4.5",
-      "anthropic/claude-opus-4.1",
-      "moonshotai/kimi-k2.5",
-      "openai/gpt-5.2"
-    ],
-    defaultModels: [
-      "anthropic/claude-3-opus",
-      "anthropic/claude-3-sonnet",
-      "google/gemini-pro-1.5",
-      "openai/gpt-4o"
-    ],
-    docsUrl: "https://openrouter.ai/keys"
-  },
-  {
-    id: "minimax",
-    kind: "openai-compatible",
-    label: "MiniMax",
-    enabled: false,
-    baseUrl: "https://api.minimax.chat/v1",
-    recommendedModels: ["MiniMax-M1", "abab6.5s-chat"],
-    docsUrl: "https://platform.minimaxi.com/"
-  },
-  {
-    id: "zai",
-    kind: "openai-compatible",
-    label: "Z.ai",
-    enabled: false,
-    baseUrl: "https://api.z.ai/api/paas/v4",
-    recommendedModels: ["glm-4.6", "glm-4.5-air"],
-    docsUrl: "https://platform.z.ai/"
-  },
-  {
-    id: "volcengine",
-    kind: "openai-compatible",
-    label: "Volcengine",
-    enabled: false,
-    baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
-    recommendedModels: ["doubao-seed-1-6", "doubao-pro-32k"],
-    docsUrl: "https://www.volcengine.com/docs/82379"
-  },
-  {
-    id: "302ai",
-    kind: "openai-compatible",
-    label: "302.AI",
-    enabled: false,
-    baseUrl: "https://api.302.ai/v1",
-    recommendedModels: ["gpt-4o", "claude-3-7-sonnet"],
-    docsUrl: "https://302.ai/"
-  },
-  {
-    id: "ollama",
-    kind: "ollama",
-    label: "Ollama",
-    enabled: false,
-    baseUrl: "http://127.0.0.1:11434/v1",
-    recommendedModels: ["qwen2.5-coder:14b", "llama3.1:8b"],
-    docsUrl: "https://ollama.com/download"
-  },
-  {
-    id: "siliconflow",
-    kind: "openai-compatible",
-    label: "SiliconFlow",
-    enabled: false,
-    baseUrl: "https://api.siliconflow.cn/v1",
-    recommendedModels: ["Qwen/Qwen3-32B", "deepseek-ai/DeepSeek-V3"],
-    docsUrl: "https://siliconflow.cn/"
-  },
-  {
-    id: "openai",
-    kind: "openai-compatible",
-    label: "OpenAI",
-    enabled: false,
-    baseUrl: "https://api.openai.com/v1",
-    recommendedModels: ["gpt-4o", "gpt-4.1"],
-    docsUrl: "https://platform.openai.com/api-keys"
-  },
-  {
-    id: "anthropic",
-    kind: "anthropic",
-    label: "Anthropic",
-    enabled: false,
-    baseUrl: "https://api.anthropic.com/v1",
-    recommendedModels: ["claude-3-7-sonnet-latest", "claude-3-5-sonnet-latest"],
-    docsUrl: "https://console.anthropic.com/settings/keys"
-  }
-];
-function isBuiltinProviderId(id) {
-  return BUILTIN_LLM_PROVIDER_DEFINITIONS.some((entry) => entry.id === id);
-}
-function getBuiltinProviderDefinition(id) {
-  return BUILTIN_LLM_PROVIDER_DEFINITIONS.find((entry) => entry.id === id) ?? null;
-}
-const toModels = (modelIds) => Array.from(new Set(modelIds)).map((modelId) => ({
-  id: modelId,
-  label: modelId,
-  enabled: true
-}));
-const createBuiltinProviderEntry = (id) => {
-  const definition = getBuiltinProviderDefinition(id);
-  if (!definition) {
-    throw new Error(`Unknown builtin provider: ${id}`);
-  }
-  const defaultModels = definition.defaultModels ?? [];
-  return {
-    id: definition.id,
-    kind: definition.kind,
-    label: definition.label,
-    enabled: definition.enabled,
-    apiKey: "",
-    hasStoredSecret: false,
-    baseUrl: definition.baseUrl,
-    models: toModels(defaultModels),
-    recommendedModels: definition.recommendedModels,
-    docsUrl: definition.docsUrl,
-    isConfigured: false
-  };
-};
-const SECRET_FILE_NAME = "provider-secrets.json";
-class SecretStorageService {
-  getSecretFilePath(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return path.join(appPathService.getWorkspacePaths(workspaceRoot).secretsPath, SECRET_FILE_NAME);
-  }
-  readSecretMap(workspaceRoot) {
-    const filePath = this.getSecretFilePath(workspaceRoot);
-    if (!fs.existsSync(filePath)) {
-      return {};
-    }
-    try {
-      return JSON.parse(fs.readFileSync(filePath, "utf8"));
-    } catch (error) {
-      console.warn("[SecretStorageService] Failed to read secrets file:", error);
-      return {};
-    }
-  }
-  writeSecretMap(secretMap, workspaceRoot) {
-    const filePath = this.getSecretFilePath(workspaceRoot);
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(secretMap, null, 2), "utf8");
-  }
-  createProviderSecretRef(providerId) {
-    return `provider-${sanitizeToken(providerId)}-api-key`;
-  }
-  getSecret(secretRef, workspaceRoot) {
-    if (!secretRef) {
-      return "";
-    }
-    const secretMap = this.readSecretMap(workspaceRoot);
-    const entry = secretMap[secretRef];
-    if (!entry) {
-      return "";
-    }
-    try {
-      if (entry.encoding === "safeStorage") {
-        if (!electron.safeStorage.isEncryptionAvailable()) {
-          console.warn("[SecretStorageService] safeStorage is unavailable for secret:", secretRef);
-          return "";
-        }
-        return electron.safeStorage.decryptString(Buffer.from(entry.payload, "base64"));
-      }
-      return Buffer.from(entry.payload, "base64").toString("utf8");
-    } catch (error) {
-      console.warn("[SecretStorageService] Failed to decrypt secret:", error);
-      return "";
-    }
-  }
-  setSecret(secretRef, plaintext, workspaceRoot) {
-    if (!secretRef) {
-      return;
-    }
-    const normalized = plaintext.trim();
-    const secretMap = this.readSecretMap(workspaceRoot);
-    if (!normalized) {
-      delete secretMap[secretRef];
-      this.writeSecretMap(secretMap, workspaceRoot);
-      return;
-    }
-    const encryptionAvailable = electron.safeStorage.isEncryptionAvailable();
-    secretMap[secretRef] = {
-      encoding: encryptionAvailable ? "safeStorage" : "base64",
-      payload: encryptionAvailable ? electron.safeStorage.encryptString(normalized).toString("base64") : Buffer.from(normalized, "utf8").toString("base64"),
-      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-    };
-    this.writeSecretMap(secretMap, workspaceRoot);
-  }
-  deleteSecret(secretRef, workspaceRoot) {
-    if (!secretRef) {
-      return;
-    }
-    const secretMap = this.readSecretMap(workspaceRoot);
-    if (!(secretRef in secretMap)) {
-      return;
-    }
-    delete secretMap[secretRef];
-    this.writeSecretMap(secretMap, workspaceRoot);
-  }
-  hasSecret(secretRef, workspaceRoot) {
-    return Boolean(secretRef && this.getSecret(secretRef, workspaceRoot));
-  }
-}
-const secretStorageService = new SecretStorageService();
-const LEFT_DEFAULTS = {
-  width: LEFT_SIDEBAR_DEFAULT_WIDTH,
-  min: LEFT_SIDEBAR_MIN_WIDTH,
-  max: LEFT_SIDEBAR_MAX_WIDTH,
-  collapsedWidth: LEFT_SIDEBAR_COLLAPSED_WIDTH
-};
-const RIGHT_DEFAULTS = {
-  width: RIGHT_PANEL_DEFAULT_WIDTH,
-  min: RIGHT_PANEL_MIN_WIDTH,
-  max: RIGHT_PANEL_MAX_WIDTH,
-  collapsedWidth: RIGHT_PANEL_COLLAPSED_WIDTH
-};
-const VALID_THEMES = ["dark", "light", "system"];
-const VALID_LANGUAGES = ["zh-CN", "en"];
-const VALID_FONT_SCALES = ["small", "medium", "large"];
-const VALID_PROVIDER_KINDS = ["openrouter", "openai-compatible", "anthropic", "ollama"];
-const KNOWN_AGENT_IDS = new Set(Object.keys(DEFAULT_MODEL_ROUTING));
-const EMPTY_PATHS = {
-  workspaceRoot: "",
-  defaultWorkspaceRoot: "",
-  settingsPath: "",
-  logsPath: "",
-  logPath: "",
-  projectsPath: "",
-  knowledgePath: "",
-  migrationOrphansPath: "",
-  profilesPath: "",
-  policiesPath: "",
-  secretsPath: "",
-  migrationReportsPath: ""
-};
-const DEFAULT_APPEARANCE = {
-  theme: "dark",
-  language: "zh-CN",
-  fontScale: "medium"
-};
-const DEFAULT_LAYOUT = {
-  leftSidebar: {
-    collapsed: false,
-    width: LEFT_DEFAULTS.width,
-    expandedWidth: LEFT_DEFAULTS.width
-  },
-  rightPanel: {
-    collapsed: false,
-    width: RIGHT_DEFAULTS.width,
-    expandedWidth: RIGHT_DEFAULTS.width
-  },
-  terminal: {
-    height: TERMINAL_DEFAULT_HEIGHT
-  }
-};
-const DEFAULT_PROFILE = {
-  nickname: "RDC Operator",
-  avatarPath: ""
-};
-const DEFAULT_CONFIGURATION = {
-  activeModeProfileId: "debugger.default"
-};
-function nowIso() {
-  return (/* @__PURE__ */ new Date()).toISOString();
-}
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-function pickEnum(value, allowed, fallback) {
-  return typeof value === "string" && allowed.includes(value) ? value : fallback;
-}
-function dedupeStrings(values) {
-  return Array.from(new Set(values.filter(Boolean)));
-}
-function readJsonFile(filePath) {
-  try {
-    if (!fs.existsSync(filePath)) {
-      return null;
-    }
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch (error) {
-    console.warn("[SettingsService] Failed to read JSON:", filePath, error);
-    return null;
-  }
-}
-function isVendorSecretUsable(providerId, secret) {
-  const normalized = secret.trim();
-  if (!normalized) {
-    return false;
-  }
-  if (providerId === "openrouter") {
-    return /^sk-or-/i.test(normalized);
-  }
-  if (providerId === "openai") {
-    return /^sk-/i.test(normalized);
-  }
-  if (providerId === "anthropic") {
-    return /^sk-ant-/i.test(normalized);
-  }
-  return true;
-}
-function getResolvedProviderSecret(providerId, secretRef, workspaceRoot) {
-  const secret = secretStorageService.getSecret(secretRef, workspaceRoot).trim();
-  return isVendorSecretUsable(providerId, secret) ? secret : "";
-}
-function sanitizeSidebar(input, defaults, fallback) {
-  const candidate = input ?? {};
-  const expandedWidth = clamp(
-    typeof candidate.expandedWidth === "number" ? candidate.expandedWidth : fallback.expandedWidth,
-    defaults.min,
-    defaults.max
-  );
-  return {
-    collapsed: typeof candidate.collapsed === "boolean" ? candidate.collapsed : fallback.collapsed,
-    expandedWidth,
-    width: clamp(
-      typeof candidate.width === "number" ? candidate.width : fallback.collapsed ? defaults.collapsedWidth : expandedWidth,
-      defaults.collapsedWidth,
-      defaults.max
-    )
-  };
-}
-function sanitizeTerminal(input, fallback = DEFAULT_LAYOUT.terminal) {
-  const candidate = input ?? {};
-  return {
-    height: clamp(
-      typeof candidate.height === "number" ? candidate.height : fallback.height,
-      TERMINAL_MIN_HEIGHT,
-      TERMINAL_MAX_HEIGHT
-    )
-  };
-}
-function sanitizeModels(models) {
-  const candidates = Array.isArray(models) ? models : [];
-  const modelMap = /* @__PURE__ */ new Map();
-  for (const entry of candidates) {
-    if (!entry || typeof entry !== "object") {
-      continue;
-    }
-    const candidate = entry;
-    const modelId = typeof candidate.id === "string" ? candidate.id.trim() : "";
-    if (!modelId || modelMap.has(modelId)) {
-      continue;
-    }
-    modelMap.set(modelId, {
-      id: modelId,
-      label: typeof candidate.label === "string" && candidate.label.trim() ? candidate.label.trim() : modelId,
-      enabled: candidate.enabled !== false,
-      contextWindowTokens: typeof candidate.contextWindowTokens === "number" && Number.isFinite(candidate.contextWindowTokens) ? Math.max(0, Math.round(candidate.contextWindowTokens)) : null
-    });
-  }
-  return Array.from(modelMap.values());
-}
-function createEmptyAgentRoutes() {
-  return Object.keys(DEFAULT_MODEL_ROUTING).map((agentId) => ({
-    agentId,
-    providerId: "",
-    modelId: ""
-  }));
-}
-function createDefaultPersistedSettings(workspaceRoot = appPathService.getWorkspaceRoot()) {
-  return {
-    appearance: DEFAULT_APPEARANCE,
-    layout: DEFAULT_LAYOUT,
-    profile: DEFAULT_PROFILE,
-    workspace: {
-      rootPath: workspaceRoot
-    },
-    llm: {
-      providers: [],
-      agentRoutes: createEmptyAgentRoutes()
-    },
-    configuration: DEFAULT_CONFIGURATION
-  };
-}
-function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspaceRoot()) {
-  const configuration = executionProfileService.normalizeConfiguration({
-    activeModeProfileId: DEFAULT_CONFIGURATION.activeModeProfileId || "debugger.default",
-    availableModeProfiles: [],
-    lastMigrationReportPath: void 0,
-    lastMigrationSummary: [],
-    diagnostics: []
-  }, workspaceRoot);
-  return {
-    appearance: DEFAULT_APPEARANCE,
-    layout: DEFAULT_LAYOUT,
-    profile: DEFAULT_PROFILE,
-    workspace: {
-      rootPath: workspaceRoot
-    },
-    llm: {
-      providers: [],
-      agentRoutes: createEmptyAgentRoutes()
-    },
-    configuration,
-    paths: EMPTY_PATHS
-  };
-}
-function sanitizeRoute(entry) {
-  if (!entry || typeof entry !== "object") {
-    return null;
-  }
-  const route = entry;
-  if (typeof route.agentId !== "string" || !KNOWN_AGENT_IDS.has(route.agentId)) {
-    return null;
-  }
-  return {
-    agentId: route.agentId,
-    providerId: typeof route.providerId === "string" ? route.providerId.trim() : "",
-    modelId: typeof route.modelId === "string" ? route.modelId.trim() : ""
-  };
-}
-function arraysEqual(left, right) {
-  if (left.length !== right.length) {
-    return false;
-  }
-  return left.every((value, index) => value === right[index]);
-}
-function isBuiltinProviderExplicitlyCustomized(provider) {
-  const id = typeof provider.id === "string" ? provider.id.trim() : "";
-  if (!id || !isBuiltinProviderId(id)) {
-    return false;
-  }
-  const builtin = createBuiltinProviderEntry(id);
-  const providerModels = sanitizeModels(provider.models);
-  const builtinModels = sanitizeModels(builtin.models);
-  const recommendedModels = Array.isArray(provider.recommendedModels) ? provider.recommendedModels.filter((value) => typeof value === "string").map((value) => value.trim()).filter(Boolean) : [];
-  const hasCustomizedModelWindow = providerModels.some((model, index) => model.id !== builtinModels[index]?.id || (model.contextWindowTokens ?? null) !== (builtinModels[index]?.contextWindowTokens ?? null));
-  return typeof provider.label === "string" && provider.label.trim() && provider.label.trim() !== builtin.label || typeof provider.baseUrl === "string" && provider.baseUrl.trim() && provider.baseUrl.trim() !== (builtin.baseUrl || "") || typeof provider.docsUrl === "string" && provider.docsUrl.trim() && provider.docsUrl.trim() !== (builtin.docsUrl || "") || !arraysEqual(providerModels.map((model) => model.id), builtinModels.map((model) => model.id)) || hasCustomizedModelWindow || recommendedModels.length > 0 && !arraysEqual(recommendedModels, builtin.recommendedModels);
-}
-function isFixtureProvider(provider) {
-  const id = typeof provider.id === "string" ? provider.id.trim() : "";
-  const baseUrl = typeof provider.baseUrl === "string" ? provider.baseUrl.trim().toLowerCase() : "";
-  return /^provider-\d+$/i.test(id) || id === "acme" || id === "vendorx" || baseUrl.includes("example.com") || baseUrl.includes("acme.local") || baseUrl.includes("vendorx.ai");
-}
-function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorkspaceRoot()) {
-  const rawId = typeof provider.id === "string" ? provider.id.trim() : "";
-  if (!rawId) {
-    return null;
-  }
-  const builtinFallback = isBuiltinProviderId(rawId) ? createBuiltinProviderEntry(rawId) : void 0;
-  const secretRef = provider.secretRef || secretStorageService.createProviderSecretRef(rawId);
-  const kind = pickEnum(provider.kind, VALID_PROVIDER_KINDS, builtinFallback?.kind ?? "openai-compatible");
-  const enabled = typeof provider.enabled === "boolean" ? provider.enabled : builtinFallback?.enabled ?? false;
-  const resolvedSecret = kind === "ollama" ? "" : getResolvedProviderSecret(rawId, secretRef, workspaceRoot);
-  const hasStoredSecret = kind === "ollama" ? true : Boolean(resolvedSecret);
-  return {
-    id: rawId,
-    kind,
-    label: typeof provider.label === "string" && provider.label.trim() ? provider.label.trim() : builtinFallback?.label ?? "",
-    enabled,
-    apiKey: "",
-    secretRef,
-    hasStoredSecret,
-    baseUrl: typeof provider.baseUrl === "string" && provider.baseUrl.trim() ? provider.baseUrl.trim() : builtinFallback?.baseUrl,
-    models: sanitizeModels(provider.models ?? builtinFallback?.models ?? []),
-    recommendedModels: dedupeStrings(
-      Array.isArray(provider.recommendedModels) ? provider.recommendedModels.filter((value) => typeof value === "string").map((value) => value.trim()) : builtinFallback?.recommendedModels ?? []
-    ),
-    docsUrl: typeof provider.docsUrl === "string" && provider.docsUrl.trim() ? provider.docsUrl.trim() : builtinFallback?.docsUrl,
-    isConfigured: enabled && (kind === "ollama" || Boolean(resolvedSecret))
-  };
-}
-function normalizeUserProviders(providers, workspaceRoot) {
-  const nextProviders = [];
-  const seenIds = /* @__PURE__ */ new Set();
-  for (const entry of Array.isArray(providers) ? providers : []) {
-    if (!entry || typeof entry !== "object") {
-      continue;
-    }
-    const provider = sanitizeUserProvider(entry, workspaceRoot);
-    if (!provider || seenIds.has(provider.id)) {
-      continue;
-    }
-    seenIds.add(provider.id);
-    nextProviders.push(provider);
-  }
-  return nextProviders;
-}
-function hydrateProviderSecrets(providers, workspaceRoot) {
-  return providers.map((provider) => {
-    const resolvedSecret = provider.kind === "ollama" ? "" : getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot);
-    return {
-      ...provider,
-      // The renderer only needs to know whether a secret exists.
-      // Keep plaintext secrets out of settings:get payloads.
-      apiKey: "",
-      hasStoredSecret: provider.kind === "ollama" ? true : Boolean(resolvedSecret),
-      isConfigured: provider.enabled && (provider.kind === "ollama" || Boolean(resolvedSecret))
-    };
-  });
-}
-function normalizeUserRoutes(routes, providers) {
-  const routeMap = /* @__PURE__ */ new Map();
-  for (const route of Array.isArray(routes) ? routes.map(sanitizeRoute) : []) {
-    if (!route) {
-      continue;
-    }
-    routeMap.set(route.agentId, route);
-  }
-  return createEmptyAgentRoutes().map((route) => {
-    const incoming = routeMap.get(route.agentId);
-    if (!incoming?.providerId || !incoming.modelId) {
-      return route;
-    }
-    const provider = providers.find((entry) => entry.id === incoming.providerId);
-    const isValid = Boolean(
-      provider && provider.models.some((model) => model.id === incoming.modelId)
-    );
-    return isValid ? incoming : route;
-  });
-}
-function parseMigrationSummary(reportPath) {
-  if (!reportPath || !fs.existsSync(reportPath)) {
-    return [];
-  }
-  try {
-    const content = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-    return [...content.fixes ?? [], ...content.warnings ?? []];
-  } catch (error) {
-    console.warn("[SettingsService] Failed to read migration report:", error);
-    return [];
-  }
-}
-class SettingsService {
-  legacyStore;
-  initialized = false;
-  constructor() {
-    this.legacyStore = new Store({
-      name: "rdc-agent-settings"
-    });
-  }
-  initialize() {
-    const runtimePaths = appPathService.initializeWorkspaceRoot();
-    executionProfileService.ensureScaffold(runtimePaths.workspaceRoot);
-    const rawPersisted = readJsonFile(runtimePaths.settingsPath);
-    const rebuildResult = this.rebuildPersistedSettings(rawPersisted, runtimePaths.workspaceRoot, true);
-    if (rebuildResult.changed || !fs.existsSync(runtimePaths.settingsPath)) {
-      this.persistHardRebuild(runtimePaths, rawPersisted, rebuildResult);
-    }
-    this.initialized = true;
-    return this.getAll(runtimePaths);
-  }
-  ensureInitialized() {
-    if (!this.initialized) {
-      this.initialize();
-    }
-  }
-  rebuildPersistedSettings(raw, workspaceRoot, includeLegacySecrets) {
-    const fallback = createDefaultPersistedSettings(workspaceRoot);
-    const candidate = raw ?? fallback;
-    const fixes = [];
-    const warnings = [];
-    const rawProviders = Array.isArray(candidate.llm?.providers) ? candidate.llm?.providers : [];
-    const rawRoutes = Array.isArray(candidate.llm?.agentRoutes) ? candidate.llm?.agentRoutes : [];
-    const routeRefs = new Set(
-      rawRoutes.map(sanitizeRoute).filter((route) => route !== null && Boolean(route.providerId)).map((route) => route.providerId)
-    );
-    const nextProviders = [];
-    for (const entry of rawProviders) {
-      if (isFixtureProvider(entry)) {
-        fixes.push(`Removed fixture provider ${entry.id}`);
-        secretStorageService.deleteSecret(entry.secretRef, workspaceRoot);
-        continue;
-      }
-      const rawId = typeof entry.id === "string" ? entry.id.trim() : "";
-      if (!rawId) {
-        fixes.push("Removed provider with empty id");
-        continue;
-      }
-      const secretRef = entry.secretRef || secretStorageService.createProviderSecretRef(rawId);
-      if (entry.apiKey?.trim()) {
-        secretStorageService.setSecret(secretRef, entry.apiKey.trim(), workspaceRoot);
-        fixes.push(`Migrated plaintext secret for ${rawId}`);
-      }
-      const sanitized = sanitizeUserProvider({ ...entry, secretRef }, workspaceRoot);
-      if (!sanitized) {
-        continue;
-      }
-      if (isBuiltinProviderId(sanitized.id)) {
-        const keepBuiltin = sanitized.isConfigured || isBuiltinProviderExplicitlyCustomized(entry) && routeRefs.has(sanitized.id);
-        if (!keepBuiltin) {
-          fixes.push(`Removed auto-injected builtin provider ${sanitized.id}`);
-          continue;
-        }
-      }
-      if (!nextProviders.some((provider) => provider.id === sanitized.id)) {
-        nextProviders.push(sanitized);
-      } else {
-        fixes.push(`Removed duplicated provider ${sanitized.id}`);
-      }
-    }
-    if (includeLegacySecrets) {
-      const legacyOpenRouter = this.legacyStore.get("openRouter");
-      if (legacyOpenRouter?.apiKey?.trim()) {
-        const secretRef = secretStorageService.createProviderSecretRef("openrouter");
-        secretStorageService.setSecret(secretRef, legacyOpenRouter.apiKey.trim(), workspaceRoot);
-        const sanitized = sanitizeUserProvider({
-          ...createBuiltinProviderEntry("openrouter"),
-          enabled: true,
-          secretRef,
-          baseUrl: legacyOpenRouter.baseUrl || createBuiltinProviderEntry("openrouter").baseUrl
-        }, workspaceRoot);
-        if (sanitized?.isConfigured && !nextProviders.some((provider) => provider.id === "openrouter")) {
-          nextProviders.push(sanitized);
-          fixes.push("Imported legacy OpenRouter provider");
-        }
-      }
-    }
-    const nextRoutes = normalizeUserRoutes(rawRoutes, nextProviders);
-    const incomingRoutes = Array.isArray(rawRoutes) ? rawRoutes.map(sanitizeRoute).filter((route) => route !== null) : [];
-    for (const route of incomingRoutes) {
-      const normalized = nextRoutes.find((entry) => entry.agentId === route.agentId);
-      if (!normalized || normalized.providerId !== route.providerId || normalized.modelId !== route.modelId) {
-        if (route.providerId || route.modelId) {
-          fixes.push(`Cleared invalid route for ${route.agentId}`);
-        }
-      }
-    }
-    if (!nextProviders.some((provider) => provider.isConfigured)) {
-      warnings.push("No configured provider available for Debugger mode.");
-    }
-    const nextSettings = {
-      appearance: {
-        theme: pickEnum(candidate.appearance?.theme, VALID_THEMES, fallback.appearance?.theme ?? "dark"),
-        language: pickEnum(candidate.appearance?.language, VALID_LANGUAGES, fallback.appearance?.language ?? "zh-CN"),
-        fontScale: pickEnum(candidate.appearance?.fontScale, VALID_FONT_SCALES, fallback.appearance?.fontScale ?? "medium")
-      },
-      layout: {
-        leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
-        rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
-        terminal: sanitizeTerminal(candidate.layout?.terminal, fallback.layout?.terminal ?? DEFAULT_LAYOUT.terminal)
-      },
-      profile: {
-        nickname: typeof candidate.profile?.nickname === "string" && candidate.profile.nickname.trim() ? candidate.profile.nickname.trim() : DEFAULT_PROFILE.nickname,
-        avatarPath: typeof candidate.profile?.avatarPath === "string" ? candidate.profile.avatarPath : DEFAULT_PROFILE.avatarPath
-      },
-      workspace: {
-        rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot
-      },
-      llm: {
-        providers: nextProviders.map((provider) => ({ ...provider, apiKey: "" })),
-        agentRoutes: nextRoutes
-      },
-      configuration: {
-        activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
-        lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath
-      }
-    };
-    return {
-      settings: nextSettings,
-      changed: JSON.stringify(candidate) !== JSON.stringify(nextSettings),
-      fixes,
-      warnings
-    };
-  }
-  normalizePersistedSettings(raw, workspaceRoot) {
-    const fallback = createDefaultPersistedSettings(workspaceRoot);
-    const candidate = raw ?? fallback;
-    const nextProviders = normalizeUserProviders(candidate.llm?.providers, workspaceRoot).map((provider) => ({
-      ...provider,
-      apiKey: ""
-    }));
-    const nextRoutes = normalizeUserRoutes(candidate.llm?.agentRoutes, nextProviders);
-    return {
-      appearance: {
-        theme: pickEnum(candidate.appearance?.theme, VALID_THEMES, fallback.appearance?.theme ?? "dark"),
-        language: pickEnum(candidate.appearance?.language, VALID_LANGUAGES, fallback.appearance?.language ?? "zh-CN"),
-        fontScale: pickEnum(candidate.appearance?.fontScale, VALID_FONT_SCALES, fallback.appearance?.fontScale ?? "medium")
-      },
-      layout: {
-        leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
-        rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
-        terminal: sanitizeTerminal(candidate.layout?.terminal, fallback.layout?.terminal ?? DEFAULT_LAYOUT.terminal)
-      },
-      profile: {
-        nickname: typeof candidate.profile?.nickname === "string" && candidate.profile.nickname.trim() ? candidate.profile.nickname.trim() : DEFAULT_PROFILE.nickname,
-        avatarPath: typeof candidate.profile?.avatarPath === "string" ? candidate.profile.avatarPath : DEFAULT_PROFILE.avatarPath
-      },
-      workspace: {
-        rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot
-      },
-      llm: {
-        providers: nextProviders,
-        agentRoutes: nextRoutes
-      },
-      configuration: {
-        activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
-        lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath
-      }
-    };
-  }
-  writeMigrationReport(paths, fixes, warnings) {
-    const reportPath = path.join(paths.migrationReportsPath, `settings-rebuild-${Date.now()}.json`);
-    fs.mkdirSync(paths.migrationReportsPath, { recursive: true });
-    fs.writeFileSync(reportPath, JSON.stringify({
-      generatedAt: nowIso(),
-      fixes,
-      warnings
-    }, null, 2), "utf8");
-    return reportPath;
-  }
-  persistHardRebuild(paths, previous, result) {
-    const nextSettings = {
-      ...result.settings,
-      configuration: {
-        ...result.settings.configuration
-      }
-    };
-    if (result.changed && previous && fs.existsSync(paths.settingsPath)) {
-      fs.mkdirSync(paths.migrationOrphansPath, { recursive: true });
-      const backupPath = path.join(paths.migrationOrphansPath, `settings.backup.${Date.now()}.json`);
-      fs.copyFileSync(paths.settingsPath, backupPath);
-    }
-    if (result.changed && (result.fixes.length > 0 || result.warnings.length > 0)) {
-      nextSettings.configuration = {
-        ...nextSettings.configuration,
-        lastMigrationReportPath: this.writeMigrationReport(paths, result.fixes, result.warnings)
-      };
-    }
-    this.writeSettings(nextSettings, paths.workspaceRoot);
-  }
-  toRuntimeSettings(persisted, runtimePaths) {
-    const workspaceRoot = persisted.workspace?.rootPath?.trim() || appPathService.getWorkspaceRoot();
-    const normalized = this.normalizePersistedSettings(persisted, workspaceRoot);
-    const hydratedProviders = hydrateProviderSecrets(normalized.llm.providers, workspaceRoot);
-    const paths = appPathService.getWorkspacePaths(workspaceRoot);
-    const configuration = executionProfileService.normalizeConfiguration({
-      activeModeProfileId: normalized.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId || "debugger.default",
-      availableModeProfiles: [],
-      lastMigrationReportPath: normalized.configuration?.lastMigrationReportPath,
-      lastMigrationSummary: parseMigrationSummary(normalized.configuration?.lastMigrationReportPath),
-      diagnostics: []
-    }, workspaceRoot);
-    const settings = {
-      ...createDefaultRuntimeSettings(workspaceRoot),
-      appearance: normalized.appearance,
-      layout: normalized.layout,
-      profile: normalized.profile,
-      workspace: {
-        rootPath: workspaceRoot
-      },
-      llm: {
-        providers: hydratedProviders,
-        agentRoutes: normalizeUserRoutes(normalized.llm?.agentRoutes ?? createEmptyAgentRoutes(), hydratedProviders)
-      },
-      configuration,
-      paths: {
-        ...paths,
-        ...runtimePaths ?? {}
-      }
-    };
-    settings.configuration.diagnostics = executionProfileService.getDiagnostics(settings);
-    return settings;
-  }
-  writeSettings(settings, workspaceRoot = settings.workspace?.rootPath || appPathService.getWorkspaceRoot()) {
-    const filePath = appPathService.getWorkspacePaths(workspaceRoot).settingsPath;
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), "utf8");
-  }
-  getAll(runtimePaths) {
-    this.ensureInitialized();
-    const paths = appPathService.getWorkspacePaths();
-    const persisted = readJsonFile(paths.settingsPath) ?? createDefaultPersistedSettings(paths.workspaceRoot);
-    return this.toRuntimeSettings(persisted, runtimePaths);
-  }
-  getProviderSecret(providerId, workspaceRoot = appPathService.getWorkspaceRoot()) {
-    this.ensureInitialized();
-    const persisted = this.normalizePersistedSettings(
-      readJsonFile(appPathService.getWorkspacePaths(workspaceRoot).settingsPath) ?? createDefaultPersistedSettings(workspaceRoot),
-      workspaceRoot
-    );
-    const provider = persisted.llm.providers.find((entry) => entry.id === providerId);
-    if (!provider || provider.kind === "ollama") {
-      return "";
-    }
-    return getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot);
-  }
-  setAll(patch, runtimePaths) {
-    this.ensureInitialized();
-    const currentRuntime = this.getAll();
-    const requestedRoot = patch.workspace?.rootPath?.trim() || currentRuntime.workspace.rootPath || appPathService.getWorkspacePaths().workspaceRoot;
-    const nextPaths = appPathService.setWorkspaceRoot(requestedRoot);
-    executionProfileService.ensureScaffold(nextPaths.workspaceRoot);
-    const currentPersisted = this.normalizePersistedSettings(
-      readJsonFile(nextPaths.settingsPath) ?? createDefaultPersistedSettings(nextPaths.workspaceRoot),
-      nextPaths.workspaceRoot
-    );
-    const nextProviders = (patch.llm?.providers ?? currentPersisted.llm?.providers ?? []).map((provider) => {
-      const secretRef = provider.secretRef || secretStorageService.createProviderSecretRef(provider.id);
-      if (provider.apiKey.trim()) {
-        secretStorageService.setSecret(secretRef, provider.apiKey.trim(), nextPaths.workspaceRoot);
-      } else if (!provider.hasStoredSecret) {
-        secretStorageService.deleteSecret(secretRef, nextPaths.workspaceRoot);
-      }
-      return sanitizeUserProvider({
-        ...provider,
-        secretRef
-      }, nextPaths.workspaceRoot);
-    }).filter((provider) => provider !== null);
-    const nextPersisted = {
-      appearance: {
-        theme: pickEnum(
-          patch.appearance?.theme ?? currentPersisted.appearance?.theme,
-          VALID_THEMES,
-          DEFAULT_APPEARANCE.theme
-        ),
-        language: pickEnum(
-          patch.appearance?.language ?? currentPersisted.appearance?.language,
-          VALID_LANGUAGES,
-          DEFAULT_APPEARANCE.language
-        ),
-        fontScale: pickEnum(
-          patch.appearance?.fontScale ?? currentPersisted.appearance?.fontScale,
-          VALID_FONT_SCALES,
-          DEFAULT_APPEARANCE.fontScale
-        )
-      },
-      layout: {
-        leftSidebar: sanitizeSidebar(
-          {
-            ...currentPersisted.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar,
-            ...patch.layout?.leftSidebar ?? {}
-          },
-          LEFT_DEFAULTS,
-          DEFAULT_LAYOUT.leftSidebar
-        ),
-        rightPanel: sanitizeSidebar(
-          {
-            ...currentPersisted.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel,
-            ...patch.layout?.rightPanel ?? {}
-          },
-          RIGHT_DEFAULTS,
-          DEFAULT_LAYOUT.rightPanel
-        ),
-        terminal: sanitizeTerminal(
-          {
-            ...currentPersisted.layout?.terminal ?? DEFAULT_LAYOUT.terminal,
-            ...patch.layout?.terminal ?? {}
-          },
-          DEFAULT_LAYOUT.terminal
-        )
-      },
-      profile: {
-        nickname: typeof patch.profile?.nickname === "string" && patch.profile.nickname.trim() ? patch.profile.nickname.trim() : currentPersisted.profile?.nickname || DEFAULT_PROFILE.nickname,
-        avatarPath: typeof patch.profile?.avatarPath === "string" ? patch.profile.avatarPath : currentPersisted.profile?.avatarPath || DEFAULT_PROFILE.avatarPath
-      },
-      workspace: {
-        rootPath: nextPaths.workspaceRoot
-      },
-      llm: {
-        providers: nextProviders.map((provider) => ({ ...provider, apiKey: "" })),
-        agentRoutes: normalizeUserRoutes(patch.llm?.agentRoutes ?? currentPersisted.llm?.agentRoutes ?? [], nextProviders)
-      },
-      configuration: {
-        activeModeProfileId: patch.configuration?.activeModeProfileId || currentPersisted.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId,
-        lastMigrationReportPath: currentPersisted.configuration?.lastMigrationReportPath
-      }
-    };
-    this.writeSettings(nextPersisted, nextPaths.workspaceRoot);
-    return this.getAll({
-      ...nextPaths,
-      ...runtimePaths ?? {}
-    });
-  }
-  getLlmConfig() {
-    const settings = this.getAll();
-    const providers = settings.llm.providers.map((provider) => ({
-      id: provider.id,
-      kind: provider.kind,
-      label: provider.label,
-      enabled: provider.enabled,
-      apiKey: provider.kind === "ollama" ? "" : provider.secretRef ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.workspace.rootPath) : "",
-      baseUrl: provider.baseUrl,
-      models: provider.models.filter((model) => model.enabled).map((model) => model.id),
-      docsUrl: provider.docsUrl
-    }));
-    return {
-      providers,
-      agentRoutes: settings.llm.agentRoutes
-    };
-  }
-  hasConfiguredProvider() {
-    return this.getAll().llm.providers.some((provider) => provider.isConfigured);
-  }
-  getSettingsPath() {
-    return appPathService.getWorkspacePaths().settingsPath;
-  }
-}
-const settingsService = new SettingsService();
 const APP_LOG_LIMIT = 1e3;
 const SESSION_LOG_LIMIT = 500;
 class RuntimeLogService {
@@ -3731,1586 +2293,6 @@ class RuntimeLogService {
   }
 }
 const runtimeLogService = new RuntimeLogService();
-class ToolBridgeAgentToolPort {
-  async listTools(_agentId) {
-    const catalog = await toolBridge.loadCatalog();
-    return catalog.tools ?? [];
-  }
-  execute(request) {
-    return toolBridge.call({
-      toolName: request.toolName,
-      args: request.args,
-      runId: request.runId,
-      turnId: request.turnId,
-      contextId: request.contextId,
-      runtimeOwner: request.runtimeOwner,
-      ownerLeaseId: request.ownerLeaseId,
-      abortSignal: request.signal
-    });
-  }
-}
-const toolBridgeAgentToolPort = new ToolBridgeAgentToolPort();
-function parameterSchema(parameter) {
-  if (parameter.enum?.length) {
-    return {
-      type: "string",
-      enum: parameter.enum,
-      description: parameter.description
-    };
-  }
-  if (parameter.type === "array") {
-    return {
-      type: "array",
-      items: {},
-      description: parameter.description
-    };
-  }
-  if (parameter.type === "object") {
-    return {
-      type: "object",
-      additionalProperties: true,
-      description: parameter.description
-    };
-  }
-  return {
-    type: parameter.type,
-    description: parameter.description
-  };
-}
-function buildToolJsonSchema(tool) {
-  const properties = {};
-  const required = [];
-  for (const parameter of tool.parameters ?? []) {
-    properties[parameter.name] = parameterSchema(parameter);
-    if (parameter.required) {
-      required.push(parameter.name);
-    }
-  }
-  return {
-    type: "object",
-    properties,
-    required,
-    additionalProperties: false
-  };
-}
-function toolMatchesPolicy(toolName, allowlist) {
-  if (!allowlist || allowlist.length === 0) {
-    return false;
-  }
-  for (const pattern of allowlist) {
-    if (pattern === "*" || pattern === toolName) {
-      return true;
-    }
-    if (pattern.endsWith(".*") && toolName.startsWith(pattern.slice(0, -1))) {
-      return true;
-    }
-  }
-  return false;
-}
-function sanitizeSdkToolName(toolName) {
-  const sanitized = toolName.replace(/[^a-zA-Z0-9_]/g, "_");
-  return /^[a-zA-Z_]/.test(sanitized) ? sanitized : `rdc_${sanitized}`;
-}
-function prepareAgentTools(tools, allowlist) {
-  const used = /* @__PURE__ */ new Set();
-  const prepared = [];
-  for (const definition of tools) {
-    if (!toolMatchesPolicy(definition.name, allowlist)) {
-      continue;
-    }
-    const baseName = sanitizeSdkToolName(definition.name);
-    let sdkName = baseName;
-    let index = 2;
-    while (used.has(sdkName)) {
-      sdkName = `${baseName}_${index}`;
-      index += 1;
-    }
-    used.add(sdkName);
-    prepared.push({
-      originalName: definition.name,
-      sdkName,
-      definition,
-      parameters: buildToolJsonSchema(definition)
-    });
-  }
-  return prepared;
-}
-function formatToolResult(result) {
-  return JSON.stringify({
-    ok: result.ok,
-    data: result.data,
-    error: result.error,
-    artifacts: result.artifacts,
-    duration_ms: result.duration_ms,
-    trace_id: result.trace_id
-  });
-}
-function zodParameter(parameter) {
-  let schema;
-  if (parameter.enum?.length) {
-    schema = zod.z.enum(parameter.enum);
-  } else if (parameter.type === "number") {
-    schema = zod.z.number();
-  } else if (parameter.type === "boolean") {
-    schema = zod.z.boolean();
-  } else if (parameter.type === "array") {
-    schema = zod.z.array(zod.z.unknown());
-  } else if (parameter.type === "object") {
-    schema = zod.z.record(zod.z.string(), zod.z.unknown());
-  } else {
-    schema = zod.z.string();
-  }
-  if (parameter.description) {
-    schema = schema.describe(parameter.description);
-  }
-  return parameter.required ? schema : schema.optional();
-}
-function zodRawShape(tool) {
-  const shape = {};
-  for (const parameter of tool.parameters ?? []) {
-    shape[parameter.name] = zodParameter(parameter);
-  }
-  return shape;
-}
-class ClaudeAgentSdkAdapter {
-  id = "claude-agent-sdk";
-  canRun(request) {
-    const settings = settingsService.getAll();
-    const provider = settings.llm.providers.find((entry) => entry.id === request.providerId);
-    return provider?.id === "anthropic" || provider?.kind === "anthropic";
-  }
-  async run(request, tools) {
-    const settings = settingsService.getAll();
-    const provider = settings.llm.providers.find((entry) => entry.id === request.providerId);
-    if (!provider) {
-      throw new Error(`Claude provider not found: ${request.providerId}`);
-    }
-    const apiKey = settingsService.getProviderSecret(provider.id, settings.workspace.rootPath);
-    if (!apiKey) {
-      throw new Error(`Claude provider secret is missing: ${provider.id}`);
-    }
-    const sdk = await import("@anthropic-ai/claude-agent-sdk");
-    const abortController = new AbortController();
-    request.signal?.addEventListener("abort", () => abortController.abort(), { once: true });
-    const messages = [];
-    const toolResults = [];
-    let text = "";
-    const env = {
-      ...process.env,
-      ANTHROPIC_API_KEY: apiKey
-    };
-    const preparedTools = prepareAgentTools(await tools.listTools(request.agentId), request.toolAllowlist);
-    const allowedToolNames = /* @__PURE__ */ new Set();
-    const sdkTools = preparedTools.map((tool) => {
-      allowedToolNames.add(tool.originalName);
-      allowedToolNames.add(tool.sdkName);
-      allowedToolNames.add(`mcp__rdc__${tool.sdkName}`);
-      return sdk.tool(
-        tool.sdkName,
-        `${tool.definition.description}
-
-RDC tool: ${tool.originalName}`,
-        zodRawShape(tool.definition),
-        async (args) => {
-          const result = await tools.execute({
-            toolName: tool.originalName,
-            args,
-            runId: request.runId,
-            turnId: request.turnId,
-            contextId: request.sessionId,
-            runtimeOwner: request.agentId,
-            signal: request.signal
-          });
-          toolResults.push({
-            toolName: tool.originalName,
-            result
-          });
-          return {
-            content: [{
-              type: "text",
-              text: formatToolResult(result)
-            }],
-            is_error: !result.ok
-          };
-        },
-        {
-          annotations: {
-            readOnlyHint: true
-          }
-        }
-      );
-    });
-    const rdcMcpServer = sdk.createSdkMcpServer({
-      name: "rdc",
-      version: "1.0.0",
-      instructions: "RDC ToolBridge proxy. All tool calls are executed by the deterministic DebuggerRuntime tool layer.",
-      tools: sdkTools,
-      alwaysLoad: sdkTools.length > 0
-    });
-    for await (const message of sdk.query({
-      prompt: request.prompt,
-      abortController,
-      options: {
-        model: request.modelId,
-        systemPrompt: request.systemPrompt,
-        maxTurns: 4,
-        tools: [],
-        mcpServers: sdkTools.length > 0 ? { rdc: rdcMcpServer } : {},
-        allowedTools: Array.from(allowedToolNames).filter((name) => name.startsWith("mcp__")),
-        canUseTool: async (toolName, _input, options) => allowedToolNames.has(toolName) ? { behavior: "allow", toolUseID: options.toolUseID } : {
-          behavior: "deny",
-          message: `Tool ${toolName} is not allowed by RDC DebuggerRuntime policy.`,
-          toolUseID: options.toolUseID
-        },
-        disallowedTools: ["Bash", "Edit", "Write", "Read", "WebSearch"],
-        permissionMode: "default",
-        env
-      }
-    })) {
-      messages.push(message);
-      if (message.type === "assistant" && message.message && typeof message.message === "object") {
-        const content = message.message.content;
-        if (Array.isArray(content)) {
-          const chunk = content.map((entry) => entry && typeof entry === "object" && typeof entry.text === "string" ? entry.text : "").join("");
-          if (chunk) {
-            text += chunk;
-            request.onChunk?.(chunk);
-          }
-        }
-      }
-      if (message.type === "result" && typeof message.result === "string") {
-        text = message.result;
-      }
-    }
-    return {
-      agentId: request.agentId,
-      providerId: request.providerId,
-      modelId: request.modelId,
-      text,
-      toolResults,
-      trace: {
-        adapter: this.id,
-        tools: preparedTools.map((tool) => ({
-          sdkName: tool.sdkName,
-          toolName: tool.originalName
-        })),
-        messages
-      }
-    };
-  }
-}
-const toContentBlocks = (messages) => messages.map((message) => {
-  if (typeof message.content === "string") {
-    return { role: message.role, content: message.content };
-  }
-  const content = message.content.map((block) => {
-    if (block.type === "text") {
-      return { type: "text", text: block.text };
-    }
-    if (block.type === "image" && block.source) {
-      return {
-        type: "image_url",
-        image_url: {
-          url: `data:${block.source.media_type};base64,${block.source.data}`
-        }
-      };
-    }
-    return { type: "text", text: "" };
-  });
-  return { role: message.role, content };
-});
-const normalizeOpenRouterBaseUrl = (baseUrl) => {
-  const trimmed = (baseUrl || "https://openrouter.ai/api/v1").trim().replace(/\/+$/, "");
-  if (/^https:\/\/openrouter\.ai\/api$/i.test(trimmed)) {
-    return `${trimmed}/v1`;
-  }
-  return trimmed;
-};
-const extractMessageContent = (payload) => {
-  if (!payload || typeof payload !== "object") {
-    return "";
-  }
-  const message = payload.message ?? null;
-  const messageContent = message?.content;
-  if (typeof messageContent === "string" && messageContent.trim()) {
-    return messageContent;
-  }
-  if (Array.isArray(messageContent) && messageContent.length > 0) {
-    return messageContent;
-  }
-  if (messageContent && typeof messageContent === "object") {
-    return JSON.stringify(messageContent);
-  }
-  const stringFallbacks = [
-    message?.output_text,
-    message?.reasoning_content,
-    message?.reasoning,
-    message?.refusal,
-    payload.text,
-    payload.output_text
-  ];
-  for (const candidate of stringFallbacks) {
-    if (typeof candidate === "string" && candidate.trim()) {
-      return candidate;
-    }
-  }
-  return "";
-};
-const createAccumulator = (model) => ({
-  id: `stream-${Date.now()}`,
-  model,
-  content: "",
-  toolCalls: [],
-  inputTokens: 0,
-  outputTokens: 0,
-  stopReason: "end_turn"
-});
-const ensureToolCall = (toolCalls, index, id) => {
-  while (toolCalls.length <= index) {
-    toolCalls.push({
-      id: id || `tool-call-${index}`,
-      name: "",
-      argumentsText: ""
-    });
-  }
-  const existing = toolCalls[index];
-  if (id && !existing.id) {
-    existing.id = id;
-  }
-  return existing;
-};
-const parseToolArguments = (argumentsText) => {
-  if (!argumentsText.trim()) {
-    return {};
-  }
-  try {
-    const parsed = JSON.parse(argumentsText);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed;
-    }
-  } catch {
-  }
-  return {
-    raw: argumentsText
-  };
-};
-const buildResponseFromAccumulator = (accumulator) => {
-  const toolCalls = accumulator.toolCalls.filter((toolCall) => toolCall.id || toolCall.name || toolCall.argumentsText).map((toolCall) => ({
-    id: toolCall.id,
-    name: toolCall.name,
-    arguments: parseToolArguments(toolCall.argumentsText)
-  }));
-  return {
-    id: accumulator.id,
-    model: accumulator.model,
-    content: accumulator.content,
-    toolCalls: toolCalls.length > 0 ? toolCalls : void 0,
-    usage: {
-      inputTokens: accumulator.inputTokens,
-      outputTokens: accumulator.outputTokens
-    },
-    stopReason: accumulator.stopReason
-  };
-};
-const emitTextChunk = (text, onChunk) => {
-  if (!text) {
-    return;
-  }
-  onChunk({
-    type: "text-delta",
-    text
-  });
-};
-const emitToolCallDelta = (toolCall, onChunk) => {
-  onChunk({
-    type: "tool-call-delta",
-    toolCall
-  });
-};
-const emitFallbackChunks = (text, onChunk) => {
-  const chunks = text.split(/(?<=[.!?。！？\n])|(?<=,|，)\s+/).map((chunk) => chunk.trim()).filter(Boolean);
-  if (chunks.length === 0 && text) {
-    emitTextChunk(text, onChunk);
-    return;
-  }
-  for (const chunk of chunks) {
-    emitTextChunk(chunk, onChunk);
-  }
-};
-const tryParseJson = (value) => {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-};
-const mapFinishReason = (finishReason) => {
-  if (finishReason === "tool_calls" || finishReason === "tool_use") {
-    return "tool_use";
-  }
-  if (finishReason === "length" || finishReason === "max_tokens") {
-    return "max_tokens";
-  }
-  return "end_turn";
-};
-const readSseStream = async (response, onEvent) => {
-  const reader = response.body?.getReader();
-  if (!reader) {
-    throw new Error("Streaming response body is unavailable.");
-  }
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let eventName = "message";
-  let dataLines = [];
-  const flush = () => {
-    if (dataLines.length === 0) {
-      eventName = "message";
-      return;
-    }
-    const payload = dataLines.join("\n");
-    dataLines = [];
-    onEvent(eventName, payload);
-    eventName = "message";
-  };
-  for (; ; ) {
-    const { done, value } = await reader.read();
-    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
-    let newlineIndex = buffer.indexOf("\n");
-    while (newlineIndex >= 0) {
-      const rawLine = buffer.slice(0, newlineIndex);
-      buffer = buffer.slice(newlineIndex + 1);
-      const line = rawLine.replace(/\r$/, "");
-      if (!line) {
-        flush();
-      } else if (line.startsWith("event:")) {
-        eventName = line.slice(6).trim();
-      } else if (line.startsWith("data:")) {
-        dataLines.push(line.slice(5).trimStart());
-      }
-      newlineIndex = buffer.indexOf("\n");
-    }
-    if (done) {
-      break;
-    }
-  }
-  if (buffer.trim()) {
-    const line = buffer.replace(/\r$/, "");
-    if (line.startsWith("data:")) {
-      dataLines.push(line.slice(5).trimStart());
-    }
-  }
-  flush();
-};
-class BaseStreamingProvider {
-  name;
-  constructor(name) {
-    this.name = name;
-  }
-  async streamChat(request, onChunk) {
-    try {
-      const response = await this.performStreamingChat(request, onChunk);
-      onChunk({ type: "done" });
-      return response;
-    } catch (error) {
-      if (request.signal?.aborted) {
-        throw error;
-      }
-      const fallbackResponse = await this.chat(request);
-      const fallbackText = typeof fallbackResponse.content === "string" ? fallbackResponse.content : JSON.stringify(fallbackResponse.content);
-      emitFallbackChunks(fallbackText, onChunk);
-      onChunk({ type: "done" });
-      return fallbackResponse;
-    }
-  }
-}
-class OpenRouterProvider extends BaseStreamingProvider {
-  apiKey = "";
-  baseUrl = "https://openrouter.ai/api/v1";
-  models = [];
-  constructor(name) {
-    super(name);
-  }
-  configure(config) {
-    this.apiKey = config.apiKey.trim();
-    this.baseUrl = normalizeOpenRouterBaseUrl(config.baseUrl || "https://openrouter.ai/api/v1");
-    this.models = config.models;
-  }
-  async chat(request) {
-    const model = request.model?.trim();
-    if (!model) {
-      throw new Error(`${this.name} requires an explicit model selection.`);
-    }
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://rdcagent.local",
-        "X-Title": "RdcAgent"
-      },
-      signal: request.signal,
-      body: JSON.stringify({
-        model,
-        messages: toContentBlocks(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        tools: request.tools,
-        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
-        stream: false
-      })
-    });
-    if (!response.ok) {
-      throw new Error(`OpenRouter API error: ${response.status} - ${await response.text()}`);
-    }
-    const data = await response.json();
-    const choice = data.choices?.[0];
-    const content = extractMessageContent(choice);
-    return {
-      id: data.id || `or-${Date.now()}`,
-      model: data.model || model,
-      content,
-      toolCalls: choice?.message?.tool_calls,
-      usage: {
-        inputTokens: data.usage?.prompt_tokens || 0,
-        outputTokens: data.usage?.completion_tokens || 0
-      },
-      stopReason: mapFinishReason(choice?.finish_reason)
-    };
-  }
-  async performStreamingChat(request, onChunk) {
-    const model = request.model?.trim();
-    if (!model) {
-      throw new Error(`${this.name} requires an explicit model selection.`);
-    }
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://rdcagent.local",
-        "X-Title": "RdcAgent"
-      },
-      signal: request.signal,
-      body: JSON.stringify({
-        model,
-        messages: toContentBlocks(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        tools: request.tools,
-        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
-        stream: true
-      })
-    });
-    if (!response.ok) {
-      throw new Error(`OpenRouter API error: ${response.status} - ${await response.text()}`);
-    }
-    const accumulator = createAccumulator(model);
-    await readSseStream(response, (_eventName, data) => {
-      if (!data || data === "[DONE]") {
-        return;
-      }
-      const payload = tryParseJson(data);
-      if (!payload) {
-        return;
-      }
-      accumulator.id = String(payload.id || accumulator.id);
-      accumulator.model = String(payload.model || accumulator.model);
-      const choice = payload.choices?.[0];
-      const delta = choice?.delta ?? {};
-      const text = typeof delta.content === "string" ? delta.content : "";
-      if (text) {
-        accumulator.content += text;
-        emitTextChunk(text, onChunk);
-      }
-      const toolCalls = Array.isArray(delta.tool_calls) ? delta.tool_calls : [];
-      for (const toolCallDelta of toolCalls) {
-        const index = typeof toolCallDelta.index === "number" ? toolCallDelta.index : 0;
-        const functionDelta = typeof toolCallDelta.function === "object" && toolCallDelta.function ? toolCallDelta.function : {};
-        const toolCall = ensureToolCall(
-          accumulator.toolCalls,
-          index,
-          typeof toolCallDelta.id === "string" ? toolCallDelta.id : void 0
-        );
-        if (typeof functionDelta.name === "string") {
-          toolCall.name = functionDelta.name;
-        }
-        if (typeof functionDelta.arguments === "string") {
-          toolCall.argumentsText += functionDelta.arguments;
-        }
-        emitToolCallDelta({
-          id: toolCall.id,
-          name: toolCall.name,
-          argumentsText: toolCall.argumentsText
-        }, onChunk);
-      }
-      accumulator.stopReason = mapFinishReason(
-        typeof choice?.finish_reason === "string" ? choice.finish_reason : void 0
-      );
-    });
-    return buildResponseFromAccumulator(accumulator);
-  }
-  async isAvailable() {
-    return Boolean(this.apiKey);
-  }
-  getModels() {
-    return this.models;
-  }
-}
-class OpenAICompatibleProvider extends BaseStreamingProvider {
-  apiKey = "";
-  baseUrl = "https://api.openai.com/v1";
-  models = [];
-  requireApiKey = true;
-  constructor(name, requireApiKey = true) {
-    super(name);
-    this.requireApiKey = requireApiKey;
-  }
-  configure(config) {
-    this.apiKey = config.apiKey.trim();
-    this.baseUrl = (config.baseUrl || this.baseUrl).trim().replace(/\/+$/, "");
-    this.models = config.models;
-  }
-  async chat(request) {
-    const model = request.model?.trim();
-    if (!model) {
-      throw new Error(`${this.name} requires an explicit model selection.`);
-    }
-    const headers = {
-      "Content-Type": "application/json"
-    };
-    if (this.apiKey) {
-      headers.Authorization = `Bearer ${this.apiKey}`;
-    }
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers,
-      signal: request.signal,
-      body: JSON.stringify({
-        model,
-        messages: toContentBlocks(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        tools: request.tools,
-        response_format: request.responseFormat ? { type: request.responseFormat } : void 0
-      })
-    });
-    if (!response.ok) {
-      throw new Error(`${this.name} API error: ${response.status} - ${await response.text()}`);
-    }
-    const data = await response.json();
-    const choice = data.choices?.[0];
-    const content = extractMessageContent(choice);
-    return {
-      id: data.id || `${this.name}-${Date.now()}`,
-      model: data.model || model,
-      content,
-      toolCalls: choice?.message?.tool_calls,
-      usage: {
-        inputTokens: data.usage?.prompt_tokens || 0,
-        outputTokens: data.usage?.completion_tokens || 0
-      },
-      stopReason: mapFinishReason(choice?.finish_reason)
-    };
-  }
-  async performStreamingChat(request, onChunk) {
-    const model = request.model?.trim();
-    if (!model) {
-      throw new Error(`${this.name} requires an explicit model selection.`);
-    }
-    const headers = {
-      "Content-Type": "application/json"
-    };
-    if (this.apiKey) {
-      headers.Authorization = `Bearer ${this.apiKey}`;
-    }
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers,
-      signal: request.signal,
-      body: JSON.stringify({
-        model,
-        messages: toContentBlocks(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        tools: request.tools,
-        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
-        stream: true
-      })
-    });
-    if (!response.ok) {
-      throw new Error(`${this.name} API error: ${response.status} - ${await response.text()}`);
-    }
-    const accumulator = createAccumulator(model);
-    await readSseStream(response, (_eventName, data) => {
-      if (!data || data === "[DONE]") {
-        return;
-      }
-      const payload = tryParseJson(data);
-      if (!payload) {
-        return;
-      }
-      accumulator.id = String(payload.id || accumulator.id);
-      accumulator.model = String(payload.model || accumulator.model);
-      const choice = payload.choices?.[0];
-      const delta = choice?.delta ?? {};
-      const text = typeof delta.content === "string" ? delta.content : "";
-      if (text) {
-        accumulator.content += text;
-        emitTextChunk(text, onChunk);
-      }
-      const toolCalls = Array.isArray(delta.tool_calls) ? delta.tool_calls : [];
-      for (const toolCallDelta of toolCalls) {
-        const index = typeof toolCallDelta.index === "number" ? toolCallDelta.index : 0;
-        const functionDelta = typeof toolCallDelta.function === "object" && toolCallDelta.function ? toolCallDelta.function : {};
-        const toolCall = ensureToolCall(
-          accumulator.toolCalls,
-          index,
-          typeof toolCallDelta.id === "string" ? toolCallDelta.id : void 0
-        );
-        if (typeof functionDelta.name === "string") {
-          toolCall.name = functionDelta.name;
-        }
-        if (typeof functionDelta.arguments === "string") {
-          toolCall.argumentsText += functionDelta.arguments;
-        }
-        emitToolCallDelta({
-          id: toolCall.id,
-          name: toolCall.name,
-          argumentsText: toolCall.argumentsText
-        }, onChunk);
-      }
-      accumulator.stopReason = mapFinishReason(
-        typeof choice?.finish_reason === "string" ? choice.finish_reason : void 0
-      );
-    });
-    return buildResponseFromAccumulator(accumulator);
-  }
-  async isAvailable() {
-    return this.requireApiKey ? Boolean(this.apiKey) : true;
-  }
-  getModels() {
-    return this.models;
-  }
-}
-class AnthropicProvider extends BaseStreamingProvider {
-  apiKey = "";
-  baseUrl = "https://api.anthropic.com/v1";
-  models = [];
-  constructor(name) {
-    super(name);
-  }
-  configure(config) {
-    this.apiKey = config.apiKey.trim();
-    this.baseUrl = (config.baseUrl || "https://api.anthropic.com/v1").trim().replace(/\/+$/, "");
-    this.models = config.models;
-  }
-  async chat(request) {
-    const model = request.model?.trim();
-    if (!model) {
-      throw new Error(`${this.name} requires an explicit model selection.`);
-    }
-    const systemMessage = request.messages.find((message) => message.role === "system");
-    const otherMessages = request.messages.filter((message) => message.role !== "system");
-    const response = await fetch(`${this.baseUrl}/messages`, {
-      method: "POST",
-      headers: {
-        "x-api-key": this.apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json"
-      },
-      signal: request.signal,
-      body: JSON.stringify({
-        model,
-        max_tokens: request.maxTokens || 4096,
-        system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
-        messages: otherMessages.map((message) => ({
-          role: message.role === "assistant" ? "assistant" : "user",
-          content: message.content
-        }))
-      })
-    });
-    if (!response.ok) {
-      throw new Error(`Anthropic API error: ${response.status} - ${await response.text()}`);
-    }
-    const data = await response.json();
-    return {
-      id: data.id || `anthropic-${Date.now()}`,
-      model: data.model || model,
-      content: data.content?.[0]?.text || "",
-      usage: {
-        inputTokens: data.usage?.input_tokens || 0,
-        outputTokens: data.usage?.output_tokens || 0
-      },
-      stopReason: mapFinishReason(data.stop_reason)
-    };
-  }
-  async performStreamingChat(request, onChunk) {
-    const model = request.model?.trim();
-    if (!model) {
-      throw new Error(`${this.name} requires an explicit model selection.`);
-    }
-    const systemMessage = request.messages.find((message) => message.role === "system");
-    const otherMessages = request.messages.filter((message) => message.role !== "system");
-    const response = await fetch(`${this.baseUrl}/messages`, {
-      method: "POST",
-      headers: {
-        "x-api-key": this.apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json"
-      },
-      signal: request.signal,
-      body: JSON.stringify({
-        model,
-        max_tokens: request.maxTokens || 4096,
-        stream: true,
-        system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
-        messages: otherMessages.map((message) => ({
-          role: message.role === "assistant" ? "assistant" : "user",
-          content: message.content
-        }))
-      })
-    });
-    if (!response.ok) {
-      throw new Error(`Anthropic API error: ${response.status} - ${await response.text()}`);
-    }
-    const accumulator = createAccumulator(model);
-    await readSseStream(response, (eventName, data) => {
-      if (!data) {
-        return;
-      }
-      const payload = tryParseJson(data);
-      if (!payload) {
-        return;
-      }
-      if (eventName === "message_start") {
-        const message = payload.message;
-        accumulator.id = String(message?.id || accumulator.id);
-        accumulator.model = String(message?.model || accumulator.model);
-        const usage = message?.usage;
-        accumulator.inputTokens = typeof usage?.input_tokens === "number" ? usage.input_tokens : accumulator.inputTokens;
-      }
-      if (eventName === "content_block_delta") {
-        const delta = payload.delta;
-        if (delta?.type === "text_delta" && typeof delta.text === "string") {
-          accumulator.content += delta.text;
-          emitTextChunk(delta.text, onChunk);
-        }
-      }
-      if (eventName === "message_delta") {
-        const delta = payload.delta;
-        const usage = payload.usage;
-        accumulator.outputTokens = typeof usage?.output_tokens === "number" ? usage.output_tokens : accumulator.outputTokens;
-        accumulator.stopReason = mapFinishReason(
-          typeof delta?.stop_reason === "string" ? delta.stop_reason : void 0
-        );
-      }
-    });
-    return buildResponseFromAccumulator(accumulator);
-  }
-  async isAvailable() {
-    return Boolean(this.apiKey);
-  }
-  getModels() {
-    return this.models;
-  }
-}
-const createProviderByKind = (providerId, kind) => {
-  if (kind === "openrouter") {
-    return new OpenRouterProvider(providerId);
-  }
-  if (kind === "anthropic") {
-    return new AnthropicProvider(providerId);
-  }
-  if (kind === "ollama") {
-    return new OpenAICompatibleProvider(providerId, false);
-  }
-  return new OpenAICompatibleProvider(providerId, true);
-};
-class LLMAdapter {
-  providers = /* @__PURE__ */ new Map();
-  configure(config) {
-    this.providers.clear();
-    for (const providerConfig of config.providers) {
-      const provider = createProviderByKind(providerConfig.id, providerConfig.kind);
-      if ("configure" in provider && typeof provider.configure === "function") {
-        provider.configure(providerConfig);
-      }
-      this.providers.set(providerConfig.id, {
-        config: providerConfig,
-        provider
-      });
-    }
-  }
-  async chat(request, providerId) {
-    const resolvedProviderId = providerId?.trim();
-    if (!resolvedProviderId) {
-      throw new Error("No explicit LLM provider was supplied for this request.");
-    }
-    const runtimeProvider = this.providers.get(resolvedProviderId);
-    if (!runtimeProvider) {
-      throw new Error(`Provider not found: ${resolvedProviderId}`);
-    }
-    if (!runtimeProvider.config.enabled) {
-      throw new Error(`Provider disabled: ${resolvedProviderId}`);
-    }
-    if (!await runtimeProvider.provider.isAvailable()) {
-      throw new Error(`Provider not configured: ${resolvedProviderId}`);
-    }
-    return runtimeProvider.provider.chat(request);
-  }
-  async streamChat(request, onChunk, providerId) {
-    const resolvedProviderId = providerId?.trim();
-    if (!resolvedProviderId) {
-      throw new Error("No explicit LLM provider was supplied for this request.");
-    }
-    const runtimeProvider = this.providers.get(resolvedProviderId);
-    if (!runtimeProvider) {
-      throw new Error(`Provider not found: ${resolvedProviderId}`);
-    }
-    if (!runtimeProvider.config.enabled) {
-      throw new Error(`Provider disabled: ${resolvedProviderId}`);
-    }
-    if (!await runtimeProvider.provider.isAvailable()) {
-      throw new Error(`Provider not configured: ${resolvedProviderId}`);
-    }
-    return runtimeProvider.provider.streamChat(request, onChunk);
-  }
-  async testConnection(providerId) {
-    const runtimeProvider = this.providers.get(providerId);
-    if (!runtimeProvider) {
-      return { success: false, error: `Provider not found: ${providerId}` };
-    }
-    try {
-      const available = await runtimeProvider.provider.isAvailable();
-      return { success: available, error: available ? void 0 : "Provider not configured" };
-    } catch (error) {
-      return { success: false, error: String(error) };
-    }
-  }
-  getAvailableModels(providerId) {
-    return this.providers.get(providerId)?.config.models || [];
-  }
-  getDefaultProvider() {
-    return "";
-  }
-}
-const llmAdapter = new LLMAdapter();
-class LlmAdapterAgentSdkAdapter {
-  id = "rdc-llm-adapter";
-  canRun(_request) {
-    return true;
-  }
-  async run(request, _tools) {
-    const messages = [
-      { role: "system", content: request.systemPrompt },
-      { role: "user", content: request.prompt }
-    ];
-    let streamedContent = "";
-    const response = await llmAdapter.streamChat(
-      {
-        messages,
-        model: request.modelId,
-        maxTokens: request.maxTokens,
-        temperature: request.temperature,
-        signal: request.signal
-      },
-      (event) => {
-        request.onStreamEvent?.(event);
-        if (event.type === "text-delta") {
-          streamedContent += event.text;
-          request.onChunk?.(event.text);
-        }
-      },
-      request.providerId
-    );
-    const fallbackContent = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
-    return {
-      agentId: request.agentId,
-      providerId: request.providerId,
-      modelId: request.modelId,
-      text: streamedContent || fallbackContent,
-      toolResults: [],
-      usage: response.usage,
-      trace: {
-        adapter: this.id,
-        responseId: response.id
-      }
-    };
-  }
-}
-function readFinalOutput(result) {
-  if (result && typeof result === "object") {
-    const record = result;
-    for (const key of ["finalOutput", "output", "text"]) {
-      const value = record[key];
-      if (typeof value === "string") {
-        return value;
-      }
-    }
-  }
-  return typeof result === "string" ? result : JSON.stringify(result);
-}
-class OpenAiAgentSdkAdapter {
-  id = "openai-agents-sdk";
-  canRun(request) {
-    const settings = settingsService.getAll();
-    const provider = settings.llm.providers.find((entry) => entry.id === request.providerId);
-    return provider?.id === "openai" || provider?.kind === "openai-compatible";
-  }
-  async run(request, tools) {
-    const settings = settingsService.getAll();
-    const provider = settings.llm.providers.find((entry) => entry.id === request.providerId);
-    if (!provider) {
-      throw new Error(`OpenAI provider not found: ${request.providerId}`);
-    }
-    const apiKey = settingsService.getProviderSecret(provider.id, settings.workspace.rootPath);
-    if (!apiKey) {
-      throw new Error(`OpenAI provider secret is missing: ${provider.id}`);
-    }
-    const sdk = await import("@openai/agents");
-    sdk.setDefaultOpenAIKey?.(apiKey);
-    if (provider.baseUrl || provider.id !== "openai") {
-      const { default: OpenAI } = await Promise.resolve().then(() => require("./chunks/index-BLjOS_pr.js"));
-      sdk.setDefaultOpenAIClient?.(new OpenAI({
-        apiKey,
-        baseURL: provider.baseUrl
-      }));
-      sdk.setOpenAIAPI?.(provider.id === "openai" ? "responses" : "chat_completions");
-    }
-    const toolResults = [];
-    const preparedTools = prepareAgentTools(await tools.listTools(request.agentId), request.toolAllowlist);
-    const openAiTools = preparedTools.map((tool) => sdk.tool({
-      name: tool.sdkName,
-      description: `${tool.definition.description}
-
-RDC tool: ${tool.originalName}`,
-      parameters: tool.parameters,
-      strict: false,
-      needsApproval: false,
-      execute: async (input) => {
-        const args = input && typeof input === "object" ? input : {};
-        const result2 = await tools.execute({
-          toolName: tool.originalName,
-          args,
-          runId: request.runId,
-          turnId: request.turnId,
-          contextId: request.sessionId,
-          runtimeOwner: request.agentId,
-          signal: request.signal
-        });
-        toolResults.push({
-          toolName: tool.originalName,
-          result: result2
-        });
-        return formatToolResult(result2);
-      }
-    }));
-    const agent = new sdk.Agent({
-      name: request.agentId,
-      instructions: request.systemPrompt,
-      model: request.modelId,
-      modelSettings: {
-        temperature: request.temperature,
-        maxTokens: request.maxTokens
-      },
-      tools: openAiTools
-    });
-    const result = await sdk.run(agent, request.prompt, {
-      signal: request.signal
-    });
-    const text = readFinalOutput(result);
-    request.onChunk?.(text);
-    return {
-      agentId: request.agentId,
-      providerId: request.providerId,
-      modelId: request.modelId,
-      text,
-      toolResults,
-      trace: {
-        adapter: this.id,
-        tools: preparedTools.map((tool) => ({
-          sdkName: tool.sdkName,
-          toolName: tool.originalName
-        }))
-      }
-    };
-  }
-}
-class AgentRunnerRegistry {
-  adapters = [
-    new OpenAiAgentSdkAdapter(),
-    new ClaudeAgentSdkAdapter(),
-    new LlmAdapterAgentSdkAdapter()
-  ];
-  async run(request) {
-    const settings = settingsService.getAll();
-    const provider = settings.llm.providers.find((entry) => entry.id === request.providerId);
-    if (!provider || !provider.enabled || !provider.isConfigured) {
-      throw new Error(`Agent provider is not configured: ${request.providerId}`);
-    }
-    const adapter = this.adapters.find((entry) => entry.canRun(request));
-    if (!adapter) {
-      throw new Error(`No AgentRunner adapter for provider: ${request.providerId}`);
-    }
-    runtimeLogService.log({
-      scope: request.sessionId ? "session" : "app",
-      namespace: "agent",
-      severity: "info",
-      title: "Agent runner selected",
-      summary: `${request.agentId} 使用 ${adapter.id} 执行 ${request.stage || "stage"}。`,
-      sessionId: request.sessionId,
-      runId: request.runId,
-      raw: {
-        agentId: request.agentId,
-        providerId: request.providerId,
-        modelId: request.modelId,
-        adapter: adapter.id
-      }
-    });
-    return adapter.run(request, toolBridgeAgentToolPort);
-  }
-}
-const agentRunnerRegistry = new AgentRunnerRegistry();
-class WorkflowProjectionPublisher {
-  publish(channel, ...args) {
-    for (const window of electron.BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) {
-        window.webContents.send(channel, ...args);
-      }
-    }
-  }
-  publishWorkflowState(state) {
-    this.publish("workflow:stateChanged", state);
-    this.publish("workflow:stageChanged", {
-      stage: state.currentStage,
-      blockers: state.blockers
-    });
-  }
-  publishRunStatus(payload) {
-    this.publish("workflow:runStatusChanged", payload);
-  }
-  publishRunUsage(usage) {
-    this.publish("workflow:runUsageChanged", usage);
-  }
-  publishEvidenceEvent(event) {
-    this.publish("evidence:eventAdded", event);
-  }
-  publishConversationEvent(event) {
-    this.publish("conversation:event", event);
-  }
-  publishAgentStatus(state) {
-    this.publish("agent:statusChanged", state);
-  }
-  publishAgentMessage(message) {
-    this.publish("agent:message", message);
-  }
-}
-const workflowProjectionPublisher = new WorkflowProjectionPublisher();
-const SPECIALIST_TOOL_BINDINGS = {
-  triage_agent: [
-    "rd.session.get_context",
-    "rd.event.get_action_tree",
-    "rd.macro.summarize_frame"
-  ],
-  capture_repro_agent: [
-    "rd.capture.get_info",
-    "rd.capture.list_frames",
-    "rd.context.snapshot"
-  ],
-  pass_graph_pipeline_agent: [
-    "rd.pipeline.get_state_summary",
-    "rd.pipeline.get_output_targets",
-    "rd.macro.find_state_change_point"
-  ],
-  pixel_forensics_agent: [
-    "rd.macro.explain_pixel",
-    "rd.texture.get_pixel_value",
-    "rd.export.screenshot"
-  ],
-  shader_ir_agent: [
-    "rd.shader.get_disassembly",
-    "rd.shader.debug_start"
-  ],
-  driver_device_agent: [
-    "rd.session.get_context",
-    "rd.remote.connect",
-    "rd.remote.ping",
-    "rd.remote.list_devices"
-  ],
-  skeptic_agent: [],
-  curator_agent: [],
-  "rdc-debugger": []
-};
-const SHADER_EDIT_TOOLS = ["rd.shader.edit_and_replace", "rd.macro.shader_hotfix_validate"];
-function resolveAgentToolAllowlist(agentId, stage) {
-  const settings = settingsService.getAll();
-  const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, stage || "investigate", agentId);
-  if (runtimeProfile.toolAllowlist?.length) {
-    return runtimeProfile.toolAllowlist;
-  }
-  return SPECIALIST_TOOL_BINDINGS[agentId] ?? [];
-}
-function isToolAllowedForAgent(toolName, agentId, stage) {
-  if (SHADER_EDIT_TOOLS.includes(toolName)) {
-    return false;
-  }
-  const allowlist = resolveAgentToolAllowlist(agentId, stage);
-  for (const pattern of allowlist) {
-    if (pattern === "*" || pattern === toolName) {
-      return true;
-    }
-    if (pattern.endsWith(".*") && toolName.startsWith(pattern.slice(0, -1))) {
-      return true;
-    }
-  }
-  return false;
-}
-class AgentOrchestrator {
-  agentStates = /* @__PURE__ */ new Map();
-  agentConfigs = /* @__PURE__ */ new Map();
-  constructor() {
-    this.initializeAgents();
-  }
-  /**
-   * 设置主窗口引用
-   */
-  setMainWindow(_window) {
-  }
-  /**
-   * 初始化所有Agent
-   */
-  initializeAgents() {
-    const allRoles = [
-      "rdc-debugger",
-      "triage_agent",
-      "capture_repro_agent",
-      "pass_graph_pipeline_agent",
-      "pixel_forensics_agent",
-      "shader_ir_agent",
-      "driver_device_agent",
-      "skeptic_agent",
-      "curator_agent"
-    ];
-    for (const role of allRoles) {
-      this.agentStates.set(role, {
-        agentId: role,
-        status: "idle",
-        lastActivity: nowIso$1()
-      });
-      const defaultRouting = DEFAULT_MODEL_ROUTING[role];
-      this.agentConfigs.set(role, {
-        agentId: role,
-        systemPrompt: "",
-        modelProvider: defaultRouting.provider,
-        modelName: defaultRouting.model,
-        temperature: 0.7,
-        maxTokens: 4096,
-        category: this.getAgentCategory(role),
-        writeScope: this.getAgentWriteScopes(role)
-      });
-    }
-  }
-  /**
-   * 获取Agent类别
-   */
-  getAgentCategory(role) {
-    if (role === "rdc-debugger") return "orchestrator";
-    if (INVESTIGATOR_AGENTS.includes(role)) return "investigator";
-    if (VERIFIER_AGENTS.includes(role)) return "verifier";
-    if (REPORTER_AGENTS.includes(role)) return "reporter";
-    return "investigator";
-  }
-  /**
-   * 获取Agent写入范围
-   */
-  getAgentWriteScopes(role) {
-    if (role === "rdc-debugger") return ["workspace_control"];
-    if (INVESTIGATOR_AGENTS.includes(role)) return ["workspace_notes"];
-    if (role === "skeptic_agent") return ["session_signoff"];
-    if (role === "curator_agent") return ["workspace_reports", "session_artifacts", "knowledge_library"];
-    return [];
-  }
-  /**
-   * 获取Agent状态
-   */
-  getAgentState(agentId) {
-    return this.agentStates.get(agentId) || null;
-  }
-  /**
-   * 获取所有Agent状态
-   */
-  getAllAgentStates() {
-    return Array.from(this.agentStates.values());
-  }
-  /**
-   * 配置Agent
-   */
-  configureAgent(agentId, config) {
-    const existing = this.agentConfigs.get(agentId);
-    if (existing) {
-      this.agentConfigs.set(agentId, { ...existing, ...config });
-    }
-  }
-  /**
-   * 获取Agent配置
-   */
-  getAgentConfig(agentId) {
-    return this.agentConfigs.get(agentId) || null;
-  }
-  applyLlmConfig(config) {
-    const routeMap = new Map(config.agentRoutes.map((route) => [route.agentId, route]));
-    for (const [agentId, agentConfig] of this.agentConfigs.entries()) {
-      const fallback = DEFAULT_MODEL_ROUTING[agentId];
-      const route = routeMap.get(agentId);
-      this.agentConfigs.set(agentId, {
-        ...agentConfig,
-        modelProvider: route ? route.providerId : fallback.provider,
-        modelName: route ? route.modelId : fallback.model
-      });
-    }
-  }
-  resolveRuntimeProfile(agentId, stage) {
-    const settings = settingsService.getAll();
-    return executionProfileService.resolveAgentRuntimeProfile(settings, stage || "investigate", agentId);
-  }
-  async finalizeRecordedAssistantMessage(agentId, streamedContent, fallbackContent, context) {
-    const finalContent = streamedContent || fallbackContent;
-    await this.recordMessage(agentId, "assistant", finalContent, context);
-    return finalContent;
-  }
-  /**
-   * 发送消息给Agent
-   */
-  async sendMessage(agentId, content, context, options) {
-    const fallbackConfig = this.agentConfigs.get(agentId);
-    if (!fallbackConfig) {
-      throw new Error(`Agent not found: ${agentId}`);
-    }
-    this.updateAgentStatus(agentId, "thinking");
-    try {
-      const runtimeProfile = this.resolveRuntimeProfile(agentId, context?.stageId);
-      const config = {
-        ...fallbackConfig,
-        systemPrompt: runtimeProfile.systemPrompt,
-        modelProvider: runtimeProfile.providerId,
-        modelName: runtimeProfile.modelId,
-        temperature: runtimeProfile.temperature ?? fallbackConfig.temperature,
-        maxTokens: runtimeProfile.maxTokens ?? fallbackConfig.maxTokens
-      };
-      const messages = [
-        { role: "system", content: config.systemPrompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}` },
-        { role: "user", content }
-      ];
-      await this.recordMessage(agentId, "user", content, context);
-      const response = await agentRunnerRegistry.run({
-        agentId,
-        prompt: content,
-        systemPrompt: messages[0]?.content ?? "",
-        modelId: config.modelName,
-        providerId: config.modelProvider,
-        maxTokens: config.maxTokens,
-        temperature: config.temperature,
-        toolAllowlist: resolveAgentToolAllowlist(agentId, context?.stageId),
-        stage: context?.stageId,
-        caseId: context?.caseId,
-        runId: context?.runId,
-        sessionId: context?.sessionId,
-        turnId: context?.turnId,
-        signal: options?.signal,
-        onChunk: options?.onChunk,
-        onStreamEvent: options?.onStreamEvent
-      });
-      const finalContent = await this.finalizeRecordedAssistantMessage(
-        agentId,
-        response.text,
-        response.text,
-        context
-      );
-      this.updateAgentStatus(agentId, "complete");
-      return finalContent;
-    } catch (error) {
-      this.updateAgentStatus(agentId, "error");
-      throw error;
-    }
-  }
-  async sendCoworkMessage(agentId, content, options) {
-    const fallbackConfig = this.agentConfigs.get(agentId);
-    if (!fallbackConfig) {
-      throw new Error(`Agent not found: ${agentId}`);
-    }
-    this.updateAgentStatus(agentId, "thinking");
-    try {
-      const settings = settingsService.getAll();
-      const routeMap = new Map(settings.llm.agentRoutes.map((route2) => [route2.agentId, route2]));
-      const route = routeMap.get(agentId);
-      const config = {
-        ...fallbackConfig,
-        modelProvider: route?.providerId || fallbackConfig.modelProvider,
-        modelName: route?.modelId || fallbackConfig.modelName,
-        systemPrompt: options?.systemPrompt || fallbackConfig.systemPrompt,
-        temperature: options?.temperature ?? fallbackConfig.temperature,
-        maxTokens: options?.maxTokens ?? fallbackConfig.maxTokens
-      };
-      if (process.env.RDC_AGENT_TEST_MODE === "1") {
-        let userMessage = content;
-        try {
-          const parsed = JSON.parse(content);
-          userMessage = parsed.effective_user_message || parsed.user_message || content;
-        } catch {
-          userMessage = content;
-        }
-        const lower = userMessage.toLowerCase();
-        let stub = "我在。你可以先告诉我你遇到了什么现象，或者直接说你希望我现在正式开始调试。";
-        if (/ue4|unreal/i.test(userMessage)) {
-          stub = "UE4 是 Unreal Engine 4。它是 Epic Games 的一代游戏引擎，常见于延迟渲染、材质系统、后处理链和 Shader 调试场景。";
-        } else if (/你好|您好|hello|hi/i.test(userMessage)) {
-          stub = "你好，我是 RDC Debugger。你可以先和我聊现象、问我能力范围，等你准备好 capture 后，我再进入正式的 RenderDoc 调试。";
-        } else if (/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower)) {
-          stub = "收到，我会先帮你整理正式调试前的关键信息，然后在条件满足时进入严格执行流程。";
-        }
-        this.updateAgentStatus(agentId, "complete");
-        const finalStub = `${stub}
-<control>{"intent":"${/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower) ? "execute" : "talk"}","safe_to_start":${/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower) ? "true" : "false"}}</control>`;
-        if (options?.onChunk) {
-          const midpoint = Math.max(1, Math.ceil(finalStub.length / 2));
-          options.onChunk(finalStub.slice(0, midpoint));
-          await Promise.resolve();
-          options.onChunk(finalStub.slice(midpoint));
-        }
-        return finalStub;
-      }
-      const response = await agentRunnerRegistry.run({
-        agentId,
-        prompt: content,
-        systemPrompt: config.systemPrompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}`,
-        modelId: config.modelName,
-        providerId: config.modelProvider,
-        maxTokens: config.maxTokens,
-        temperature: config.temperature,
-        toolAllowlist: [],
-        stage: "cowork",
-        sessionId: options?.sessionId,
-        turnId: options?.turnId,
-        signal: options?.signal,
-        onChunk: options?.onChunk,
-        onStreamEvent: options?.onStreamEvent
-      });
-      const finalContent = response.text;
-      runtimeLogService.log({
-        scope: options?.sessionId ? "session" : "app",
-        namespace: "agent",
-        severity: "info",
-        title: `${AGENT_DISPLAY_NAMES[agentId] || agentId} cowork turn`,
-        summary: finalContent.slice(0, 160) || "空消息",
-        sessionId: options?.sessionId,
-        raw: {
-          agentId,
-          providerId: response.providerId,
-          modelId: response.modelId,
-          adapter: response.trace?.adapter
-        }
-      });
-      this.updateAgentStatus(agentId, "complete");
-      return finalContent;
-    } catch (error) {
-      this.updateAgentStatus(agentId, "error");
-      throw error;
-    }
-  }
-  /**
-   * 获取 Specialist 可用工具清单（Task 4b）
-   * 根据角色过滤可用工具，确保 skeptic_agent 和 curator_agent 不接收任何 live tool
-   */
-  getToolsForRole(agentId) {
-    return resolveAgentToolAllowlist(agentId);
-  }
-  /**
-   * 检查工具是否允许被指定角色使用（Task 4b）
-   * shader 编辑工具默认只读，不在任何 specialist 的工具清单中
-   */
-  isToolAllowedForRole(toolName, agentId) {
-    return isToolAllowedForAgent(toolName, agentId);
-  }
-  /**
-   * 更新Agent状态
-   */
-  updateAgentStatus(agentId, status) {
-    const state = this.agentStates.get(agentId);
-    if (state) {
-      state.status = status;
-      state.lastActivity = nowIso$1();
-      runtimeLogService.log({
-        scope: "app",
-        namespace: "agent",
-        severity: status === "error" ? "error" : status === "complete" ? "success" : "info",
-        title: AGENT_DISPLAY_NAMES[agentId] || agentId,
-        summary: `状态切换为 ${status}。`,
-        raw: {
-          agentId,
-          status
-        }
-      });
-      this.notifyAgentStateChanged(state);
-    }
-  }
-  /**
-   * 记录消息
-   */
-  async recordMessage(agentId, role, content, context) {
-    if (!context?.sessionId) return;
-    const message = {
-      id: generateEventId("msg"),
-      agentId,
-      role,
-      content,
-      timestamp: nowMs()
-    };
-    if (context.runId) {
-      await storageAdapter.appendActionEvent(context.sessionId, storageAdapter.createActionEvent({
-        runId: context.runId,
-        sessionId: context.sessionId,
-        agentId,
-        eventType: role === "user" ? "user_message" : role === "assistant" ? "agent_summary" : "system",
-        status: role === "system" ? "warning" : "ok",
-        turnId: context.turnId,
-        payload: {
-          role,
-          content,
-          message_id: message.id
-        }
-      }));
-    }
-    this.notifyMessage(message, context?.sessionId);
-  }
-  /**
-   * 通知Agent状态变化
-   */
-  notifyAgentStateChanged(state) {
-    workflowProjectionPublisher.publishAgentStatus(state);
-  }
-  /**
-   * 通知消息
-   */
-  notifyMessage(message, sessionId) {
-    runtimeLogService.log({
-      scope: sessionId ? "session" : "app",
-      namespace: "agent",
-      severity: message.role === "system" ? "warning" : "info",
-      title: AGENT_DISPLAY_NAMES[message.agentId] || message.agentId,
-      summary: message.content.slice(0, 120) || "空消息",
-      sessionId,
-      raw: {
-        agentId: message.agentId,
-        role: message.role,
-        messageId: message.id,
-        content: message.content
-      },
-      timestamp: message.timestamp
-    });
-    workflowProjectionPublisher.publishAgentMessage(message);
-  }
-}
-const agentOrchestrator = new AgentOrchestrator();
 const POLL_INTERVAL_MS = 5e3;
 const ACTIVATE_TIMEOUT_MS = 9e4;
 const PREPARED_REMOTE_TTL_MS = 10 * 60 * 1e3;
@@ -6100,67 +3082,3298 @@ class ReplayDeviceService {
   }
 }
 const replayDeviceService = new ReplayDeviceService();
-class RunExecutionService {
-  activeRuns = /* @__PURE__ */ new Map();
-  startRun(context, executor) {
-    const existing = this.activeRuns.get(context.runId);
-    if (existing) {
-      return existing;
+const DEFAULT_MODEL_ROUTING = {
+  "rdc-debugger": { provider: "openrouter", model: "anthropic/claude-3-opus" },
+  "triage_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  "capture_repro_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  "pass_graph_pipeline_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  "pixel_forensics_agent": { provider: "openrouter", model: "google/gemini-pro-1.5" },
+  "shader_ir_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  "driver_device_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  "skeptic_agent": { provider: "openrouter", model: "openai/gpt-4o" },
+  "curator_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" }
+};
+const AGENT_DISPLAY_NAMES = {
+  "rdc-debugger": "RDC Debugger",
+  "triage_agent": "Triage Agent",
+  "capture_repro_agent": "Capture Repro Agent",
+  "pass_graph_pipeline_agent": "Pass Graph Agent",
+  "pixel_forensics_agent": "Pixel Forensics Agent",
+  "shader_ir_agent": "Shader IR Agent",
+  "driver_device_agent": "Driver Device Agent",
+  "skeptic_agent": "Skeptic Agent",
+  "curator_agent": "Curator Agent"
+};
+const AGENT_DESCRIPTIONS = {
+  "rdc-debugger": "Main orchestrator responsible for workflow coordination, gates, and stage progression",
+  "triage_agent": "Symptom classification and SOP recommendation",
+  "capture_repro_agent": "Capture quality verification and baseline establishment",
+  "pass_graph_pipeline_agent": "Render pass and pipeline dependency analysis",
+  "pixel_forensics_agent": "Pixel-level evidence collection and first-bad event localization",
+  "shader_ir_agent": "Shader source and IR evidence analysis",
+  "driver_device_agent": "Cross-device attribution and platform-specific checks",
+  "skeptic_agent": "Evidence chain challenger and weak claim detector",
+  "curator_agent": "Final report generation and knowledge library curation"
+};
+const AGENT_CATEGORIES = {
+  "rdc-debugger": "orchestrator",
+  "triage_agent": "investigator",
+  "capture_repro_agent": "investigator",
+  "pass_graph_pipeline_agent": "investigator",
+  "pixel_forensics_agent": "investigator",
+  "shader_ir_agent": "investigator",
+  "driver_device_agent": "investigator",
+  "skeptic_agent": "verifier",
+  "curator_agent": "reporter"
+};
+const INVESTIGATOR_AGENTS = [
+  "triage_agent",
+  "capture_repro_agent",
+  "pass_graph_pipeline_agent",
+  "pixel_forensics_agent",
+  "shader_ir_agent",
+  "driver_device_agent"
+];
+const VERIFIER_AGENTS = ["skeptic_agent"];
+const REPORTER_AGENTS = ["curator_agent"];
+const AGENT_WRITE_SCOPES = {
+  "rdc-debugger": ["workspace_control"],
+  "triage_agent": ["workspace_notes"],
+  "capture_repro_agent": ["workspace_notes"],
+  "pass_graph_pipeline_agent": ["workspace_notes"],
+  "pixel_forensics_agent": ["workspace_notes"],
+  "shader_ir_agent": ["workspace_notes"],
+  "driver_device_agent": ["workspace_notes"],
+  "skeptic_agent": ["session_signoff"],
+  "curator_agent": ["workspace_reports", "session_artifacts", "knowledge_library"]
+};
+const AGENT_MODES = [
+  {
+    id: "debugger",
+    label: "Debugger",
+    icon: "crosshair-bug",
+    description: "定位异常与验证修复",
+    accentColor: "#33d1ff",
+    disabled: false
+  },
+  {
+    id: "analyzer",
+    label: "Analyzer",
+    icon: "waveform-gauge",
+    description: "拆解现象并收敛证据",
+    accentColor: "#8d8bff",
+    disabled: false
+  },
+  {
+    id: "optimizer",
+    label: "Optimizer",
+    icon: "spark-tuning",
+    description: "判断瓶颈与优化顺序",
+    accentColor: "#4ee3a0",
+    disabled: false
+  }
+];
+AGENT_MODES.reduce(
+  (accumulator, mode) => {
+    accumulator[mode.id] = mode;
+    return accumulator;
+  },
+  {}
+);
+const DEFAULT_MODE_PROFILE_ID = "debugger.default";
+const DEFAULT_AGENT_PROMPTS = {
+  "rdc-debugger": "You are the RDC Debugger orchestrator. Coordinate the workflow, keep the run truthful, and drive the next best debugging step.",
+  "triage_agent": "You are the triage specialist. Classify the rendering issue, narrow the symptom family, and suggest the right investigation surfaces.",
+  "capture_repro_agent": "You are the capture reproduction specialist. Validate capture quality, frame consistency, and reproducibility anchors.",
+  "pass_graph_pipeline_agent": "You are the pass/pipeline specialist. Analyze render-pass sequencing, pipeline state, and dependency shifts.",
+  "pixel_forensics_agent": "You are the pixel forensics specialist. Explain visible corruption with concrete pixel-, target-, and event-level evidence.",
+  "shader_ir_agent": "You are the shader IR specialist. Inspect shader source, compiled IR, and precision or replacement risks.",
+  "driver_device_agent": "You are the driver/device specialist. Compare backend, device, and driver specific behavior and identify remote-runtime risks.",
+  "skeptic_agent": "You are the skeptic. Challenge weak claims and reject conclusions not proven by the evidence chain.",
+  "curator_agent": "You are the curator. Turn accepted evidence into a structured final report and operator-ready summary."
+};
+const DEFAULT_AGENT_TOOLS = {
+  "rdc-debugger": ["rd.core.*", "rd.session.*", "rd.capture.*", "rd.remote.*"],
+  "triage_agent": ["rd.session.get_context", "rd.event.get_action_tree", "rd.macro.summarize_frame"],
+  "capture_repro_agent": ["rd.capture.get_info", "rd.capture.list_frames", "rd.context.snapshot"],
+  "pass_graph_pipeline_agent": ["rd.pipeline.get_state_summary", "rd.pipeline.get_output_targets", "rd.macro.find_state_change_point"],
+  "pixel_forensics_agent": ["rd.macro.explain_pixel", "rd.texture.get_pixel_value", "rd.export.screenshot"],
+  "shader_ir_agent": ["rd.shader.get_disassembly", "rd.shader.debug_start"],
+  "driver_device_agent": ["rd.session.get_context", "rd.remote.connect", "rd.remote.ping", "rd.remote.list_targets"],
+  "skeptic_agent": [],
+  "curator_agent": []
+};
+const DEFAULT_STAGE_POLICIES = [
+  {
+    id: "stage.preflight",
+    label: "Preflight",
+    stage: "preflight",
+    phase: "planner",
+    agentPromptId: "agent.rdc-debugger",
+    systemPrompt: "Verify runtime prerequisites, capture availability, and operator configuration before the run starts.",
+    notes: "Fail early on invalid runtime preconditions.",
+    toolPolicy: { allowGroups: ["core", "session", "capture", "remote"] }
+  },
+  {
+    id: "stage.entry_gate",
+    label: "Entry Gate",
+    stage: "entry_gate",
+    phase: "planner",
+    agentPromptId: "agent.rdc-debugger",
+    systemPrompt: "Validate entry contract, backend truth, and capture/device compatibility.",
+    notes: "Reject remote/local mismatches and missing providers.",
+    toolPolicy: { allowGroups: ["core", "session", "capture", "remote"] }
+  },
+  {
+    id: "stage.intake_gate",
+    label: "Intake Gate",
+    stage: "intake_gate",
+    phase: "planner",
+    agentPromptId: "agent.rdc-debugger",
+    systemPrompt: "Establish case input, capture references, and canonical intake state for downstream agents.",
+    notes: "Produce the durable intake truth object.",
+    toolPolicy: { allowGroups: ["capture", "session"] }
+  },
+  {
+    id: "stage.plan",
+    label: "Plan",
+    stage: "plan",
+    phase: "planner",
+    agentPromptId: "agent.rdc-debugger",
+    systemPrompt: "Expand the user goal into a structured investigation plan, hypotheses, and risk map.",
+    notes: "Planner phase.",
+    toolPolicy: { allowGroups: ["core", "session"] }
+  },
+  {
+    id: "stage.speclist",
+    label: "Speclist",
+    stage: "speclist",
+    phase: "planner",
+    agentPromptId: "agent.rdc-debugger",
+    systemPrompt: "Produce specialist briefs, ownership boundaries, and tool constraints for each investigator.",
+    notes: "Last planner step before specialist execution.",
+    toolPolicy: { allowGroups: ["core", "session"] }
+  },
+  {
+    id: "stage.dispatch",
+    label: "Dispatch",
+    stage: "dispatch",
+    phase: "generator",
+    agentPromptId: "agent.rdc-debugger",
+    systemPrompt: "Run specialist work, collect their briefs, and preserve every dispatch and tool trace.",
+    notes: "Generator phase.",
+    toolPolicy: { allowGroups: ["core", "session", "capture", "event", "pipeline", "texture", "shader", "remote", "macro"] }
+  },
+  {
+    id: "stage.investigate",
+    label: "Investigate",
+    stage: "investigate",
+    phase: "generator",
+    agentPromptId: "agent.rdc-debugger",
+    systemPrompt: "Synthesize specialist evidence into a concrete diagnosis and next verification target.",
+    notes: "Generator synthesis step.",
+    toolPolicy: { allowGroups: ["core", "session", "capture", "event", "pipeline", "texture", "shader", "remote", "macro"] }
+  },
+  {
+    id: "stage.fix_verify",
+    label: "Fix Verify",
+    stage: "fix_verify",
+    phase: "evaluator",
+    agentPromptId: "agent.rdc-debugger",
+    systemPrompt: "Verify the proposed fix against real tool evidence and return pass, retry, or blocked.",
+    notes: "Evaluator oracle step.",
+    toolPolicy: { allowGroups: ["core", "session", "capture", "event", "pipeline", "texture", "shader", "remote", "macro"] }
+  },
+  {
+    id: "stage.skepti",
+    label: "Skepti",
+    stage: "skepti",
+    phase: "evaluator",
+    agentPromptId: "agent.skeptic_agent",
+    systemPrompt: "Challenge unsupported claims and require hard evidence for every conclusion.",
+    notes: "Evaluator skeptic step.",
+    toolPolicy: { allowGroups: [] }
+  },
+  {
+    id: "stage.curate",
+    label: "Curate",
+    stage: "curate",
+    phase: "evaluator",
+    agentPromptId: "agent.curator_agent",
+    systemPrompt: "Compile the accepted investigation into a structured, operator-ready final report.",
+    notes: "Evaluator report step.",
+    toolPolicy: { allowGroups: [] }
+  },
+  {
+    id: "stage.finalize",
+    label: "Finalize",
+    stage: "finalize",
+    phase: "evaluator",
+    agentPromptId: "agent.rdc-debugger",
+    systemPrompt: "Finalize only when all gates, evidence, skeptic signoff, and backend truth checks pass.",
+    notes: "Strict close-out gate.",
+    toolPolicy: { allowGroups: ["core", "session"] }
+  }
+];
+const DEFAULT_MODE_PROFILE = {
+  id: DEFAULT_MODE_PROFILE_ID,
+  label: "Debugger Production",
+  mode: "debugger",
+  stagePolicies: {
+    preflight: "stage.preflight",
+    entry_gate: "stage.entry_gate",
+    intake_gate: "stage.intake_gate",
+    plan: "stage.plan",
+    speclist: "stage.speclist",
+    dispatch: "stage.dispatch",
+    investigate: "stage.investigate",
+    fix_verify: "stage.fix_verify",
+    skepti: "stage.skepti",
+    curate: "stage.curate",
+    finalize: "stage.finalize"
+  },
+  defaultAgentPrompts: {
+    "rdc-debugger": "agent.rdc-debugger",
+    "triage_agent": "agent.triage_agent",
+    "capture_repro_agent": "agent.capture_repro_agent",
+    "pass_graph_pipeline_agent": "agent.pass_graph_pipeline_agent",
+    "pixel_forensics_agent": "agent.pixel_forensics_agent",
+    "shader_ir_agent": "agent.shader_ir_agent",
+    "driver_device_agent": "agent.driver_device_agent",
+    "skeptic_agent": "agent.skeptic_agent",
+    "curator_agent": "agent.curator_agent"
+  }
+};
+const DEFAULT_AGENT_PROFILES = Object.entries(DEFAULT_MODEL_ROUTING).map(([agentId, routing]) => ({
+  id: `agent.${agentId}`,
+  label: agentId,
+  agentId,
+  systemPrompt: DEFAULT_AGENT_PROMPTS[agentId],
+  modelProvider: routing.provider,
+  modelName: routing.model,
+  temperature: ["skeptic_agent", "curator_agent"].includes(agentId) ? 0.2 : 0.3,
+  maxTokens: 4096,
+  toolPolicy: {
+    allowTools: DEFAULT_AGENT_TOOLS[agentId]
+  }
+}));
+class ExecutionProfileService {
+  getModeProfilesPath(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    return path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "modes");
+  }
+  getAgentProfilesPath(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    return path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "agents");
+  }
+  getStagePoliciesPath(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    return path.join(appPathService.getWorkspacePaths(workspaceRoot).policiesPath, "stages");
+  }
+  ensureScaffold(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    fs.mkdirSync(this.getModeProfilesPath(workspaceRoot), { recursive: true });
+    fs.mkdirSync(this.getAgentProfilesPath(workspaceRoot), { recursive: true });
+    fs.mkdirSync(this.getStagePoliciesPath(workspaceRoot), { recursive: true });
+    this.writeJsonIfMissing(
+      path.join(this.getModeProfilesPath(workspaceRoot), `${DEFAULT_MODE_PROFILE.id}.json`),
+      DEFAULT_MODE_PROFILE
+    );
+    for (const profile of DEFAULT_AGENT_PROFILES) {
+      this.writeJsonIfMissing(
+        path.join(this.getAgentProfilesPath(workspaceRoot), `${profile.agentId}.json`),
+        profile
+      );
     }
-    const abortController = new AbortController();
-    const controller = {
-      ...context,
-      startedAt: Date.now(),
-      abortController
+    for (const stagePolicy of DEFAULT_STAGE_POLICIES) {
+      this.writeJsonIfMissing(
+        path.join(this.getStagePoliciesPath(workspaceRoot), `${stagePolicy.stage}.json`),
+        stagePolicy
+      );
+    }
+  }
+  normalizeConfiguration(configuration, workspaceRoot = appPathService.getWorkspaceRoot()) {
+    this.ensureScaffold(workspaceRoot);
+    const availableModeProfiles = this.listModeProfiles(workspaceRoot);
+    const hasActiveProfile = availableModeProfiles.some((profile) => profile.id === configuration.activeModeProfileId);
+    return {
+      ...configuration,
+      activeModeProfileId: hasActiveProfile ? configuration.activeModeProfileId : DEFAULT_MODE_PROFILE_ID,
+      availableModeProfiles
     };
-    controller.promise = executor(abortController.signal).finally(() => {
-      const active = this.activeRuns.get(context.runId);
-      if (active?.abortController === abortController) {
-        this.activeRuns.delete(context.runId);
+  }
+  listModeProfiles(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    this.ensureScaffold(workspaceRoot);
+    return fs.readdirSync(this.getModeProfilesPath(workspaceRoot)).filter((entry) => entry.endsWith(".json")).map((entry) => this.readJson(path.join(this.getModeProfilesPath(workspaceRoot), entry))).filter((profile) => profile !== null).map((profile) => ({ id: profile.id, label: profile.label }));
+  }
+  resolveAgentRuntimeProfile(settings, stage, agentId) {
+    const workspaceRoot = settings.workspace.rootPath;
+    this.ensureScaffold(workspaceRoot);
+    const modeProfile = this.readJson(
+      path.join(this.getModeProfilesPath(workspaceRoot), `${settings.configuration.activeModeProfileId}.json`)
+    ) || DEFAULT_MODE_PROFILE;
+    const agentPromptId = modeProfile.defaultAgentPrompts[agentId] || `agent.${agentId}`;
+    const agentProfile = this.readJson(
+      path.join(this.getAgentProfilesPath(workspaceRoot), `${agentId}.json`)
+    ) || DEFAULT_AGENT_PROFILES.find((profile) => profile.agentId === agentId);
+    const stagePolicyId = modeProfile.stagePolicies[stage] || `stage.${stage}`;
+    const stagePolicy = this.readJson(
+      path.join(this.getStagePoliciesPath(workspaceRoot), `${stage}.json`)
+    ) || DEFAULT_STAGE_POLICIES.find((policy) => policy.stage === stage);
+    const route = this.resolveAgentRoute(settings.llm.agentRoutes, settings.llm.providers, agentId);
+    return {
+      agentId,
+      systemPrompt: [
+        agentProfile.systemPrompt,
+        stagePolicy.systemPrompt ? `
+
+Stage Policy:
+${stagePolicy.systemPrompt}` : ""
+      ].join("").trim(),
+      providerId: route?.providerId || "",
+      modelId: route?.modelId || "",
+      temperature: agentProfile.temperature,
+      maxTokens: agentProfile.maxTokens,
+      category: AGENT_CATEGORIES[agentId],
+      writeScope: AGENT_WRITE_SCOPES[agentId],
+      stage,
+      phase: stagePolicy.phase || STAGE_PHASES[stage],
+      toolAllowlist: Array.from(/* @__PURE__ */ new Set([
+        ...stagePolicy.toolPolicy?.allowTools ?? [],
+        ...agentProfile.toolPolicy?.allowTools ?? []
+      ])),
+      source: {
+        modeProfileId: modeProfile.id,
+        stagePolicyId,
+        agentProfileId: agentPromptId
       }
-    });
-    this.activeRuns.set(context.runId, controller);
-    return controller;
+    };
   }
-  listActiveRuns() {
-    return Array.from(this.activeRuns.values()).map((run) => ({
-      runId: run.runId,
-      sessionId: run.sessionId,
-      projectId: run.projectId,
-      startedAt: run.startedAt,
-      stage: run.stage
-    }));
+  getDiagnostics(settings) {
+    const diagnostics = [];
+    if (!settings.configuration.availableModeProfiles.length) {
+      diagnostics.push({
+        code: "missing_mode_profile",
+        severity: "warning",
+        message: "No execution mode profile found. Falling back to debugger.default."
+      });
+    }
+    if (!settings.llm.providers.some((provider) => provider.isConfigured)) {
+      diagnostics.push({
+        code: "missing_configured_provider",
+        severity: "warning",
+        message: "No configured provider available for Debugger mode."
+      });
+    }
+    return diagnostics;
   }
-  getAbortSignal(runId) {
-    return this.activeRuns.get(runId)?.abortController.signal ?? null;
+  resolveAgentRoute(routes, providers, agentId) {
+    const route = routes.find((entry) => entry.agentId === agentId) || null;
+    if (!route) {
+      return null;
+    }
+    const provider = providers.find((entry) => entry.id === route.providerId);
+    if (!provider || !provider.enabled || !provider.isConfigured) {
+      return null;
+    }
+    const modelExists = provider.models.some((model) => model.enabled && model.id === route.modelId);
+    return modelExists ? route : null;
   }
-  updateStage(runId, stage) {
-    const active = this.activeRuns.get(runId);
-    if (!active) {
+  readJson(filePath) {
+    try {
+      if (!fs.existsSync(filePath)) {
+        return null;
+      }
+      return JSON.parse(fs.readFileSync(filePath, "utf8"));
+    } catch (error) {
+      console.warn("[ExecutionProfileService] Failed to read JSON:", filePath, error);
+      return null;
+    }
+  }
+  writeJsonIfMissing(filePath, value) {
+    if (fs.existsSync(filePath)) {
       return;
     }
-    active.stage = stage;
-  }
-  isAbortRequested(runId) {
-    return this.activeRuns.get(runId)?.abortController.signal.aborted ?? false;
-  }
-  stopRun(runId) {
-    const active = this.activeRuns.get(runId);
-    if (!active) {
-      return false;
-    }
-    active.abortController.abort();
-    return true;
-  }
-  async stopAll() {
-    const runIds = Array.from(this.activeRuns.keys());
-    runIds.forEach((runId) => this.stopRun(runId));
-    await Promise.allSettled(
-      runIds.map((runId) => this.activeRuns.get(runId)?.promise)
-    );
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(value, null, 2), "utf8");
   }
 }
-const runExecutionService = new RunExecutionService();
+const executionProfileService = new ExecutionProfileService();
+const LEFT_SIDEBAR_DEFAULT_WIDTH = 256;
+const LEFT_SIDEBAR_MIN_WIDTH = 220;
+const LEFT_SIDEBAR_MAX_WIDTH = 420;
+const LEFT_SIDEBAR_COLLAPSED_WIDTH = 0;
+const RIGHT_PANEL_DEFAULT_WIDTH = 312;
+const RIGHT_PANEL_MIN_WIDTH = 280;
+const RIGHT_PANEL_MAX_WIDTH = 520;
+const RIGHT_PANEL_COLLAPSED_WIDTH = 0;
+const TERMINAL_DEFAULT_HEIGHT = 328;
+const TERMINAL_MIN_HEIGHT = 180;
+const TERMINAL_MAX_HEIGHT = 720;
+const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
+  {
+    id: "openrouter",
+    kind: "openrouter",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "OpenRouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    recommendedModels: [
+      "anthropic/claude-sonnet-4.5",
+      "anthropic/claude-opus-4.1",
+      "moonshotai/kimi-k2.5",
+      "openai/gpt-5.2"
+    ],
+    docsUrl: "https://openrouter.ai/keys"
+  },
+  {
+    id: "openai",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "OpenAI",
+    baseUrl: "https://api.openai.com/v1",
+    recommendedModels: ["gpt-5.2", "gpt-4.1"],
+    docsUrl: "https://platform.openai.com/api-keys"
+  },
+  {
+    id: "anthropic",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "anthropic",
+    label: "Anthropic",
+    baseUrl: "https://api.anthropic.com/v1",
+    recommendedModels: ["claude-sonnet-4-5", "claude-opus-4-1"],
+    docsUrl: "https://console.anthropic.com/settings/keys"
+  },
+  {
+    id: "deepseek",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "DeepSeek",
+    baseUrl: "https://api.deepseek.com/v1",
+    recommendedModels: ["deepseek-chat", "deepseek-reasoner"],
+    docsUrl: "https://platform.deepseek.com/api_keys"
+  },
+  {
+    id: "gemini",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "gemini",
+    label: "Gemini",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
+    recommendedModels: ["gemini-2.5-pro", "gemini-2.5-flash"],
+    docsUrl: "https://aistudio.google.com/app/apikey"
+  },
+  {
+    id: "xai",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "xAI Grok",
+    baseUrl: "https://api.x.ai/v1",
+    recommendedModels: ["grok-4", "grok-3"],
+    docsUrl: "https://console.x.ai/"
+  },
+  {
+    id: "kimi",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "Kimi / Moonshot",
+    baseUrl: "https://api.moonshot.cn/v1",
+    recommendedModels: ["kimi-k2-0711-preview", "moonshot-v1-128k"],
+    docsUrl: "https://platform.kimi.ai/console/api-keys"
+  },
+  {
+    id: "minimax",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "MiniMax",
+    baseUrl: "https://api.minimax.chat/v1",
+    recommendedModels: ["MiniMax-M1", "abab6.5s-chat"],
+    docsUrl: "https://platform.minimaxi.com/"
+  },
+  {
+    id: "zai",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "GLM / Z.ai",
+    baseUrl: "https://api.z.ai/api/paas/v4",
+    recommendedModels: ["glm-4.6", "glm-4.5-air"],
+    docsUrl: "https://platform.z.ai/"
+  },
+  {
+    id: "qwen",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "Qwen / DashScope",
+    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    recommendedModels: ["qwen-plus", "qwen-max"],
+    docsUrl: "https://dashscope.console.aliyun.com/apiKey"
+  },
+  {
+    id: "volcengine",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "Doubao / Volcengine Ark",
+    baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+    recommendedModels: ["doubao-seed-1-6", "doubao-pro-32k"],
+    docsUrl: "https://www.volcengine.com/docs/82379"
+  },
+  {
+    id: "302ai",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "302.AI",
+    baseUrl: "https://api.302.ai/v1",
+    recommendedModels: ["gpt-4o", "claude-3-7-sonnet"],
+    docsUrl: "https://302.ai/"
+  },
+  {
+    id: "siliconflow",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "api-key",
+    modelDiscovery: "openai-compatible",
+    label: "SiliconFlow",
+    baseUrl: "https://api.siliconflow.cn/v1",
+    recommendedModels: ["Qwen/Qwen3-32B", "deepseek-ai/DeepSeek-V3"],
+    docsUrl: "https://siliconflow.cn/"
+  },
+  {
+    id: "ollama",
+    kind: "ollama",
+    authMode: "local",
+    catalogGroup: "local",
+    modelDiscovery: "ollama-tags",
+    label: "Ollama",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    recommendedModels: ["qwen2.5-coder:14b", "llama3.1:8b"],
+    docsUrl: "https://ollama.com/download"
+  },
+  {
+    id: "claude-account",
+    kind: "anthropic",
+    authMode: "account",
+    catalogGroup: "account",
+    modelDiscovery: null,
+    label: "Claude Account",
+    recommendedModels: [],
+    docsUrl: "https://claude.ai/",
+    accountLoginConfigured: false,
+    unavailableReason: "当前版本未配置登录通道"
+  },
+  {
+    id: "chatgpt-account",
+    kind: "openai-compatible",
+    authMode: "account",
+    catalogGroup: "account",
+    modelDiscovery: null,
+    label: "ChatGPT Account",
+    recommendedModels: [],
+    docsUrl: "https://chatgpt.com/",
+    accountLoginConfigured: false,
+    unavailableReason: "当前版本未配置登录通道"
+  },
+  {
+    id: "github-copilot",
+    kind: "openai-compatible",
+    authMode: "account",
+    catalogGroup: "account",
+    modelDiscovery: null,
+    label: "GitHub Copilot",
+    recommendedModels: [],
+    docsUrl: "https://github.com/features/copilot",
+    accountLoginConfigured: false,
+    unavailableReason: "当前版本未配置登录通道"
+  }
+];
+function isBuiltinProviderId(id) {
+  return BUILTIN_LLM_PROVIDER_DEFINITIONS.some((entry) => entry.id === id);
+}
+function getBuiltinProviderDefinition(id) {
+  return BUILTIN_LLM_PROVIDER_DEFINITIONS.find((entry) => entry.id === id) ?? null;
+}
+const toModels = (modelIds) => Array.from(new Set(modelIds)).map((modelId) => ({
+  id: modelId,
+  label: modelId,
+  enabled: true
+}));
+const createBuiltinProviderEntry = (id) => {
+  const definition = getBuiltinProviderDefinition(id);
+  if (!definition) {
+    throw new Error(`Unknown builtin provider: ${id}`);
+  }
+  return {
+    id: definition.id,
+    kind: definition.kind,
+    authMode: definition.authMode,
+    catalogGroup: definition.catalogGroup,
+    modelDiscovery: definition.modelDiscovery,
+    label: definition.label,
+    enabled: false,
+    apiKey: "",
+    hasStoredSecret: definition.authMode === "local",
+    baseUrl: definition.baseUrl,
+    models: toModels([]),
+    recommendedModels: definition.recommendedModels,
+    docsUrl: definition.docsUrl,
+    status: definition.authMode === "account" && definition.accountLoginConfigured !== true ? "unavailable" : "unconfigured",
+    accountLoginConfigured: definition.accountLoginConfigured,
+    unavailableReason: definition.unavailableReason,
+    isConfigured: false
+  };
+};
+const createBuiltinProviderEntries = () => BUILTIN_LLM_PROVIDER_DEFINITIONS.map((entry) => createBuiltinProviderEntry(entry.id));
+const SECRET_FILE_NAME = "provider-secrets.json";
+class SecretStorageService {
+  getSecretFilePath(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    return path.join(appPathService.getWorkspacePaths(workspaceRoot).secretsPath, SECRET_FILE_NAME);
+  }
+  readSecretMap(workspaceRoot) {
+    const filePath = this.getSecretFilePath(workspaceRoot);
+    if (!fs.existsSync(filePath)) {
+      return {};
+    }
+    try {
+      return JSON.parse(fs.readFileSync(filePath, "utf8"));
+    } catch (error) {
+      console.warn("[SecretStorageService] Failed to read secrets file:", error);
+      return {};
+    }
+  }
+  writeSecretMap(secretMap, workspaceRoot) {
+    const filePath = this.getSecretFilePath(workspaceRoot);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(secretMap, null, 2), "utf8");
+  }
+  createProviderSecretRef(providerId) {
+    return `provider-${sanitizeToken(providerId)}-api-key`;
+  }
+  getSecret(secretRef, workspaceRoot) {
+    if (!secretRef) {
+      return "";
+    }
+    const secretMap = this.readSecretMap(workspaceRoot);
+    const entry = secretMap[secretRef];
+    if (!entry) {
+      return "";
+    }
+    try {
+      if (entry.encoding === "safeStorage") {
+        if (!electron.safeStorage.isEncryptionAvailable()) {
+          console.warn("[SecretStorageService] safeStorage is unavailable for secret:", secretRef);
+          return "";
+        }
+        return electron.safeStorage.decryptString(Buffer.from(entry.payload, "base64"));
+      }
+      return Buffer.from(entry.payload, "base64").toString("utf8");
+    } catch (error) {
+      console.warn("[SecretStorageService] Failed to decrypt secret:", error);
+      return "";
+    }
+  }
+  setSecret(secretRef, plaintext, workspaceRoot) {
+    if (!secretRef) {
+      return;
+    }
+    const normalized = plaintext.trim();
+    const secretMap = this.readSecretMap(workspaceRoot);
+    if (!normalized) {
+      delete secretMap[secretRef];
+      this.writeSecretMap(secretMap, workspaceRoot);
+      return;
+    }
+    const encryptionAvailable = electron.safeStorage.isEncryptionAvailable();
+    secretMap[secretRef] = {
+      encoding: encryptionAvailable ? "safeStorage" : "base64",
+      payload: encryptionAvailable ? electron.safeStorage.encryptString(normalized).toString("base64") : Buffer.from(normalized, "utf8").toString("base64"),
+      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    this.writeSecretMap(secretMap, workspaceRoot);
+  }
+  deleteSecret(secretRef, workspaceRoot) {
+    if (!secretRef) {
+      return;
+    }
+    const secretMap = this.readSecretMap(workspaceRoot);
+    if (!(secretRef in secretMap)) {
+      return;
+    }
+    delete secretMap[secretRef];
+    this.writeSecretMap(secretMap, workspaceRoot);
+  }
+  hasSecret(secretRef, workspaceRoot) {
+    return Boolean(secretRef && this.getSecret(secretRef, workspaceRoot));
+  }
+}
+const secretStorageService = new SecretStorageService();
+const LEFT_DEFAULTS = {
+  width: LEFT_SIDEBAR_DEFAULT_WIDTH,
+  min: LEFT_SIDEBAR_MIN_WIDTH,
+  max: LEFT_SIDEBAR_MAX_WIDTH,
+  collapsedWidth: LEFT_SIDEBAR_COLLAPSED_WIDTH
+};
+const RIGHT_DEFAULTS = {
+  width: RIGHT_PANEL_DEFAULT_WIDTH,
+  min: RIGHT_PANEL_MIN_WIDTH,
+  max: RIGHT_PANEL_MAX_WIDTH,
+  collapsedWidth: RIGHT_PANEL_COLLAPSED_WIDTH
+};
+const VALID_THEMES = ["dark", "light", "system"];
+const VALID_LANGUAGES = ["zh-CN", "en"];
+const VALID_FONT_SCALES = ["small", "medium", "large"];
+const KNOWN_AGENT_IDS = new Set(Object.keys(DEFAULT_MODEL_ROUTING));
+const EMPTY_PATHS = {
+  workspaceRoot: "",
+  defaultWorkspaceRoot: "",
+  settingsPath: "",
+  logsPath: "",
+  logPath: "",
+  projectsPath: "",
+  knowledgePath: "",
+  migrationOrphansPath: "",
+  profilesPath: "",
+  policiesPath: "",
+  secretsPath: "",
+  migrationReportsPath: ""
+};
+const DEFAULT_APPEARANCE = {
+  theme: "dark",
+  language: "zh-CN",
+  fontScale: "medium"
+};
+const DEFAULT_LAYOUT = {
+  leftSidebar: {
+    collapsed: false,
+    width: LEFT_DEFAULTS.width,
+    expandedWidth: LEFT_DEFAULTS.width
+  },
+  rightPanel: {
+    collapsed: false,
+    width: RIGHT_DEFAULTS.width,
+    expandedWidth: RIGHT_DEFAULTS.width
+  },
+  terminal: {
+    height: TERMINAL_DEFAULT_HEIGHT
+  }
+};
+const DEFAULT_PROFILE = {
+  nickname: "RDC Operator",
+  avatarPath: ""
+};
+const DEFAULT_CONFIGURATION = {
+  activeModeProfileId: "debugger.default"
+};
+function nowIso() {
+  return (/* @__PURE__ */ new Date()).toISOString();
+}
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+function pickEnum(value, allowed, fallback) {
+  return typeof value === "string" && allowed.includes(value) ? value : fallback;
+}
+function dedupeStrings(values) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+function readJsonFile(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return null;
+    }
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch (error) {
+    console.warn("[SettingsService] Failed to read JSON:", filePath, error);
+    return null;
+  }
+}
+function isVendorSecretUsable(providerId, secret) {
+  const normalized = secret.trim();
+  if (!normalized) {
+    return false;
+  }
+  if (providerId === "openrouter") {
+    return /^sk-or-/i.test(normalized);
+  }
+  if (providerId === "openai") {
+    return /^sk-/i.test(normalized);
+  }
+  if (providerId === "anthropic") {
+    return /^sk-ant-/i.test(normalized);
+  }
+  return true;
+}
+function getResolvedProviderSecret(providerId, secretRef, workspaceRoot) {
+  const secret = secretStorageService.getSecret(secretRef, workspaceRoot).trim();
+  return isVendorSecretUsable(providerId, secret) ? secret : "";
+}
+function sanitizeSidebar(input, defaults, fallback) {
+  const candidate = input ?? {};
+  const expandedWidth = clamp(
+    typeof candidate.expandedWidth === "number" ? candidate.expandedWidth : fallback.expandedWidth,
+    defaults.min,
+    defaults.max
+  );
+  return {
+    collapsed: typeof candidate.collapsed === "boolean" ? candidate.collapsed : fallback.collapsed,
+    expandedWidth,
+    width: clamp(
+      typeof candidate.width === "number" ? candidate.width : fallback.collapsed ? defaults.collapsedWidth : expandedWidth,
+      defaults.collapsedWidth,
+      defaults.max
+    )
+  };
+}
+function sanitizeTerminal(input, fallback = DEFAULT_LAYOUT.terminal) {
+  const candidate = input ?? {};
+  return {
+    height: clamp(
+      typeof candidate.height === "number" ? candidate.height : fallback.height,
+      TERMINAL_MIN_HEIGHT,
+      TERMINAL_MAX_HEIGHT
+    )
+  };
+}
+function sanitizeModels(models) {
+  const candidates = Array.isArray(models) ? models : [];
+  const modelMap = /* @__PURE__ */ new Map();
+  for (const entry of candidates) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const candidate = entry;
+    const modelId = typeof candidate.id === "string" ? candidate.id.trim() : "";
+    if (!modelId || modelMap.has(modelId)) {
+      continue;
+    }
+    modelMap.set(modelId, {
+      id: modelId,
+      label: typeof candidate.label === "string" && candidate.label.trim() ? candidate.label.trim() : modelId,
+      enabled: candidate.enabled !== false,
+      contextWindowTokens: typeof candidate.contextWindowTokens === "number" && Number.isFinite(candidate.contextWindowTokens) ? Math.max(0, Math.round(candidate.contextWindowTokens)) : null
+    });
+  }
+  return Array.from(modelMap.values());
+}
+function createEmptyAgentRoutes() {
+  return Object.keys(DEFAULT_MODEL_ROUTING).map((agentId) => ({
+    agentId,
+    providerId: "",
+    modelId: ""
+  }));
+}
+function createDefaultPersistedSettings(workspaceRoot = appPathService.getWorkspaceRoot()) {
+  return {
+    appearance: DEFAULT_APPEARANCE,
+    layout: DEFAULT_LAYOUT,
+    profile: DEFAULT_PROFILE,
+    workspace: {
+      rootPath: workspaceRoot
+    },
+    llm: {
+      providers: [],
+      agentRoutes: createEmptyAgentRoutes()
+    },
+    configuration: DEFAULT_CONFIGURATION
+  };
+}
+function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspaceRoot()) {
+  const configuration = executionProfileService.normalizeConfiguration({
+    activeModeProfileId: DEFAULT_CONFIGURATION.activeModeProfileId || "debugger.default",
+    availableModeProfiles: [],
+    lastMigrationReportPath: void 0,
+    lastMigrationSummary: [],
+    diagnostics: []
+  }, workspaceRoot);
+  return {
+    appearance: DEFAULT_APPEARANCE,
+    layout: DEFAULT_LAYOUT,
+    profile: DEFAULT_PROFILE,
+    workspace: {
+      rootPath: workspaceRoot
+    },
+    llm: {
+      providers: [],
+      agentRoutes: createEmptyAgentRoutes()
+    },
+    configuration,
+    paths: EMPTY_PATHS
+  };
+}
+function sanitizeRoute(entry) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+  const route = entry;
+  if (typeof route.agentId !== "string" || !KNOWN_AGENT_IDS.has(route.agentId)) {
+    return null;
+  }
+  return {
+    agentId: route.agentId,
+    providerId: typeof route.providerId === "string" ? route.providerId.trim() : "",
+    modelId: typeof route.modelId === "string" ? route.modelId.trim() : ""
+  };
+}
+function pickProviderStatus(provider, fallback, canUseProvider, models) {
+  if (fallback.status === "unavailable") {
+    return "unavailable";
+  }
+  if (provider.status === "failed") {
+    return "failed";
+  }
+  if ((provider.status === "verified" || provider.isConfigured === true) && canUseProvider && models.length > 0) {
+    return "verified";
+  }
+  return "unconfigured";
+}
+function isFixtureProvider(provider) {
+  const id = typeof provider.id === "string" ? provider.id.trim() : "";
+  const baseUrl = typeof provider.baseUrl === "string" ? provider.baseUrl.trim().toLowerCase() : "";
+  return /^provider-\d+$/i.test(id) || id === "acme" || id === "vendorx" || baseUrl.includes("example.com") || baseUrl.includes("acme.local") || baseUrl.includes("vendorx.ai");
+}
+function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorkspaceRoot()) {
+  const rawId = typeof provider.id === "string" ? provider.id.trim() : "";
+  if (!rawId || !isBuiltinProviderId(rawId)) {
+    return null;
+  }
+  const builtinFallback = createBuiltinProviderEntry(rawId);
+  const definition = getBuiltinProviderDefinition(rawId);
+  const secretRef = provider.secretRef || secretStorageService.createProviderSecretRef(rawId);
+  const kind = builtinFallback.kind;
+  const models = sanitizeModels(provider.models ?? []);
+  const resolvedSecret = builtinFallback.authMode === "api-key" ? getResolvedProviderSecret(rawId, secretRef, workspaceRoot) : "";
+  const hasStoredSecret = builtinFallback.authMode === "local" || Boolean(resolvedSecret);
+  const canUseProvider = builtinFallback.authMode === "local" ? true : builtinFallback.authMode === "api-key" ? Boolean(resolvedSecret) : provider.status === "verified";
+  const status = pickProviderStatus(provider, builtinFallback, canUseProvider, models);
+  const enabled = status === "verified" && models.length > 0;
+  return {
+    id: rawId,
+    kind,
+    authMode: builtinFallback.authMode,
+    catalogGroup: builtinFallback.catalogGroup,
+    modelDiscovery: builtinFallback.modelDiscovery,
+    label: typeof provider.label === "string" && provider.label.trim() ? provider.label.trim() : builtinFallback.label,
+    enabled,
+    apiKey: "",
+    secretRef,
+    hasStoredSecret,
+    baseUrl: definition?.baseUrl,
+    models,
+    recommendedModels: dedupeStrings(
+      Array.isArray(provider.recommendedModels) ? provider.recommendedModels.filter((value) => typeof value === "string").map((value) => value.trim()) : builtinFallback.recommendedModels
+    ),
+    docsUrl: typeof provider.docsUrl === "string" && provider.docsUrl.trim() ? provider.docsUrl.trim() : builtinFallback.docsUrl,
+    status,
+    lastTestedAt: typeof provider.lastTestedAt === "string" ? provider.lastTestedAt : void 0,
+    lastModelRefreshAt: typeof provider.lastModelRefreshAt === "string" ? provider.lastModelRefreshAt : void 0,
+    lastError: status === "failed" && typeof provider.lastError === "string" ? provider.lastError : void 0,
+    accountLoginConfigured: definition?.accountLoginConfigured,
+    unavailableReason: definition?.unavailableReason,
+    isConfigured: status === "verified" && models.length > 0 && enabled
+  };
+}
+function normalizeUserProviders(providers, workspaceRoot) {
+  const persistedProviders = /* @__PURE__ */ new Map();
+  for (const entry of Array.isArray(providers) ? providers : []) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const provider = sanitizeUserProvider(entry, workspaceRoot);
+    if (!provider || persistedProviders.has(provider.id)) {
+      continue;
+    }
+    persistedProviders.set(provider.id, provider);
+  }
+  return createBuiltinProviderEntries().map((catalogProvider) => sanitizeUserProvider(persistedProviders.get(catalogProvider.id) ?? catalogProvider, workspaceRoot)).filter((provider) => provider !== null);
+}
+function hydrateProviderSecrets(providers, workspaceRoot) {
+  return providers.map((provider) => {
+    const resolvedSecret = provider.authMode === "api-key" ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot) : "";
+    const hasStoredSecret = provider.authMode === "local" || Boolean(resolvedSecret);
+    const canUseProvider = provider.authMode === "local" ? true : provider.authMode === "api-key" ? Boolean(resolvedSecret) : provider.status === "verified";
+    const status = provider.status === "unavailable" ? "unavailable" : provider.status === "verified" && canUseProvider && provider.models.length > 0 ? "verified" : provider.status === "failed" ? "failed" : "unconfigured";
+    const isConfigured = status === "verified" && provider.models.length > 0;
+    return {
+      ...provider,
+      // The renderer only needs to know whether a secret exists.
+      // Keep plaintext secrets out of settings:get payloads.
+      apiKey: "",
+      hasStoredSecret,
+      enabled: isConfigured,
+      status,
+      isConfigured
+    };
+  });
+}
+function normalizeUserRoutes(routes, providers) {
+  const routeMap = /* @__PURE__ */ new Map();
+  for (const route of Array.isArray(routes) ? routes.map(sanitizeRoute) : []) {
+    if (!route) {
+      continue;
+    }
+    routeMap.set(route.agentId, route);
+  }
+  return createEmptyAgentRoutes().map((route) => {
+    const incoming = routeMap.get(route.agentId);
+    if (!incoming?.providerId || !incoming.modelId) {
+      return route;
+    }
+    const provider = providers.find((entry) => entry.id === incoming.providerId);
+    const isValid = Boolean(
+      provider && provider.isConfigured && provider.models.some((model) => model.id === incoming.modelId && model.enabled !== false)
+    );
+    return isValid ? incoming : route;
+  });
+}
+function parseMigrationSummary(reportPath) {
+  if (!reportPath || !fs.existsSync(reportPath)) {
+    return [];
+  }
+  try {
+    const content = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+    return [...content.fixes ?? [], ...content.warnings ?? []];
+  } catch (error) {
+    console.warn("[SettingsService] Failed to read migration report:", error);
+    return [];
+  }
+}
+class SettingsService {
+  legacyStore;
+  initialized = false;
+  constructor() {
+    this.legacyStore = new Store({
+      name: "rdc-agent-settings"
+    });
+  }
+  initialize() {
+    const runtimePaths = appPathService.initializeWorkspaceRoot();
+    executionProfileService.ensureScaffold(runtimePaths.workspaceRoot);
+    const rawPersisted = readJsonFile(runtimePaths.settingsPath);
+    const rebuildResult = this.rebuildPersistedSettings(rawPersisted, runtimePaths.workspaceRoot, true);
+    if (rebuildResult.changed || !fs.existsSync(runtimePaths.settingsPath)) {
+      this.persistHardRebuild(runtimePaths, rawPersisted, rebuildResult);
+    }
+    this.initialized = true;
+    return this.getAll(runtimePaths);
+  }
+  ensureInitialized() {
+    if (!this.initialized) {
+      this.initialize();
+    }
+  }
+  rebuildPersistedSettings(raw, workspaceRoot, includeLegacySecrets) {
+    const fallback = createDefaultPersistedSettings(workspaceRoot);
+    const candidate = raw ?? fallback;
+    const fixes = [];
+    const warnings = [];
+    const rawProviders = Array.isArray(candidate.llm?.providers) ? candidate.llm?.providers : [];
+    const rawRoutes = Array.isArray(candidate.llm?.agentRoutes) ? candidate.llm?.agentRoutes : [];
+    const nextProviders = [];
+    for (const entry of rawProviders) {
+      if (isFixtureProvider(entry)) {
+        fixes.push(`Removed fixture provider ${entry.id}`);
+        secretStorageService.deleteSecret(entry.secretRef, workspaceRoot);
+        continue;
+      }
+      const rawId = typeof entry.id === "string" ? entry.id.trim() : "";
+      if (!rawId) {
+        fixes.push("Removed provider with empty id");
+        continue;
+      }
+      const secretRef = entry.secretRef || secretStorageService.createProviderSecretRef(rawId);
+      if (entry.apiKey?.trim()) {
+        secretStorageService.setSecret(secretRef, entry.apiKey.trim(), workspaceRoot);
+        fixes.push(`Migrated plaintext secret for ${rawId}`);
+      }
+      const sanitized = sanitizeUserProvider({ ...entry, secretRef }, workspaceRoot);
+      if (!sanitized) {
+        fixes.push(`Removed non-catalog provider ${rawId}`);
+        continue;
+      }
+      if (!nextProviders.some((provider) => provider.id === sanitized.id)) {
+        nextProviders.push(sanitized);
+      } else {
+        fixes.push(`Removed duplicated provider ${sanitized.id}`);
+      }
+    }
+    if (includeLegacySecrets) {
+      const legacyOpenRouter = this.legacyStore.get("openRouter");
+      if (legacyOpenRouter?.apiKey?.trim()) {
+        const secretRef = secretStorageService.createProviderSecretRef("openrouter");
+        secretStorageService.setSecret(secretRef, legacyOpenRouter.apiKey.trim(), workspaceRoot);
+        const sanitized = sanitizeUserProvider({
+          ...createBuiltinProviderEntry("openrouter"),
+          secretRef,
+          baseUrl: legacyOpenRouter.baseUrl || createBuiltinProviderEntry("openrouter").baseUrl
+        }, workspaceRoot);
+        if (sanitized?.isConfigured && !nextProviders.some((provider) => provider.id === "openrouter")) {
+          nextProviders.push(sanitized);
+          fixes.push("Imported legacy OpenRouter provider");
+        }
+      }
+    }
+    const catalogProviders = normalizeUserProviders(nextProviders, workspaceRoot);
+    const nextRoutes = normalizeUserRoutes(rawRoutes, catalogProviders);
+    const incomingRoutes = Array.isArray(rawRoutes) ? rawRoutes.map(sanitizeRoute).filter((route) => route !== null) : [];
+    for (const route of incomingRoutes) {
+      const normalized = nextRoutes.find((entry) => entry.agentId === route.agentId);
+      if (!normalized || normalized.providerId !== route.providerId || normalized.modelId !== route.modelId) {
+        if (route.providerId || route.modelId) {
+          fixes.push(`Cleared invalid route for ${route.agentId}`);
+        }
+      }
+    }
+    if (!catalogProviders.some((provider) => provider.isConfigured)) {
+      warnings.push("No configured provider available for Debugger mode.");
+    }
+    const nextSettings = {
+      appearance: {
+        theme: pickEnum(candidate.appearance?.theme, VALID_THEMES, fallback.appearance?.theme ?? "dark"),
+        language: pickEnum(candidate.appearance?.language, VALID_LANGUAGES, fallback.appearance?.language ?? "zh-CN"),
+        fontScale: pickEnum(candidate.appearance?.fontScale, VALID_FONT_SCALES, fallback.appearance?.fontScale ?? "medium")
+      },
+      layout: {
+        leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
+        rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
+        terminal: sanitizeTerminal(candidate.layout?.terminal, fallback.layout?.terminal ?? DEFAULT_LAYOUT.terminal)
+      },
+      profile: {
+        nickname: typeof candidate.profile?.nickname === "string" && candidate.profile.nickname.trim() ? candidate.profile.nickname.trim() : DEFAULT_PROFILE.nickname,
+        avatarPath: typeof candidate.profile?.avatarPath === "string" ? candidate.profile.avatarPath : DEFAULT_PROFILE.avatarPath
+      },
+      workspace: {
+        rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot
+      },
+      llm: {
+        providers: catalogProviders.map((provider) => ({ ...provider, apiKey: "" })),
+        agentRoutes: nextRoutes
+      },
+      configuration: {
+        activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
+        lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath
+      }
+    };
+    return {
+      settings: nextSettings,
+      changed: JSON.stringify(candidate) !== JSON.stringify(nextSettings),
+      fixes,
+      warnings
+    };
+  }
+  normalizePersistedSettings(raw, workspaceRoot) {
+    const fallback = createDefaultPersistedSettings(workspaceRoot);
+    const candidate = raw ?? fallback;
+    const nextProviders = normalizeUserProviders(candidate.llm?.providers, workspaceRoot).map((provider) => ({
+      ...provider,
+      apiKey: ""
+    }));
+    const nextRoutes = normalizeUserRoutes(candidate.llm?.agentRoutes, nextProviders);
+    return {
+      appearance: {
+        theme: pickEnum(candidate.appearance?.theme, VALID_THEMES, fallback.appearance?.theme ?? "dark"),
+        language: pickEnum(candidate.appearance?.language, VALID_LANGUAGES, fallback.appearance?.language ?? "zh-CN"),
+        fontScale: pickEnum(candidate.appearance?.fontScale, VALID_FONT_SCALES, fallback.appearance?.fontScale ?? "medium")
+      },
+      layout: {
+        leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
+        rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
+        terminal: sanitizeTerminal(candidate.layout?.terminal, fallback.layout?.terminal ?? DEFAULT_LAYOUT.terminal)
+      },
+      profile: {
+        nickname: typeof candidate.profile?.nickname === "string" && candidate.profile.nickname.trim() ? candidate.profile.nickname.trim() : DEFAULT_PROFILE.nickname,
+        avatarPath: typeof candidate.profile?.avatarPath === "string" ? candidate.profile.avatarPath : DEFAULT_PROFILE.avatarPath
+      },
+      workspace: {
+        rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot
+      },
+      llm: {
+        providers: nextProviders,
+        agentRoutes: nextRoutes
+      },
+      configuration: {
+        activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
+        lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath
+      }
+    };
+  }
+  writeMigrationReport(paths, fixes, warnings) {
+    const reportPath = path.join(paths.migrationReportsPath, `settings-rebuild-${Date.now()}.json`);
+    fs.mkdirSync(paths.migrationReportsPath, { recursive: true });
+    fs.writeFileSync(reportPath, JSON.stringify({
+      generatedAt: nowIso(),
+      fixes,
+      warnings
+    }, null, 2), "utf8");
+    return reportPath;
+  }
+  persistHardRebuild(paths, previous, result) {
+    const nextSettings = {
+      ...result.settings,
+      configuration: {
+        ...result.settings.configuration
+      }
+    };
+    if (result.changed && previous && fs.existsSync(paths.settingsPath)) {
+      fs.mkdirSync(paths.migrationOrphansPath, { recursive: true });
+      const backupPath = path.join(paths.migrationOrphansPath, `settings.backup.${Date.now()}.json`);
+      fs.copyFileSync(paths.settingsPath, backupPath);
+    }
+    if (result.changed && (result.fixes.length > 0 || result.warnings.length > 0)) {
+      nextSettings.configuration = {
+        ...nextSettings.configuration,
+        lastMigrationReportPath: this.writeMigrationReport(paths, result.fixes, result.warnings)
+      };
+    }
+    this.writeSettings(nextSettings, paths.workspaceRoot);
+  }
+  toRuntimeSettings(persisted, runtimePaths) {
+    const workspaceRoot = persisted.workspace?.rootPath?.trim() || appPathService.getWorkspaceRoot();
+    const normalized = this.normalizePersistedSettings(persisted, workspaceRoot);
+    const hydratedProviders = hydrateProviderSecrets(normalized.llm.providers, workspaceRoot);
+    const paths = appPathService.getWorkspacePaths(workspaceRoot);
+    const configuration = executionProfileService.normalizeConfiguration({
+      activeModeProfileId: normalized.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId || "debugger.default",
+      availableModeProfiles: [],
+      lastMigrationReportPath: normalized.configuration?.lastMigrationReportPath,
+      lastMigrationSummary: parseMigrationSummary(normalized.configuration?.lastMigrationReportPath),
+      diagnostics: []
+    }, workspaceRoot);
+    const settings = {
+      ...createDefaultRuntimeSettings(workspaceRoot),
+      appearance: normalized.appearance,
+      layout: normalized.layout,
+      profile: normalized.profile,
+      workspace: {
+        rootPath: workspaceRoot
+      },
+      llm: {
+        providers: hydratedProviders,
+        agentRoutes: normalizeUserRoutes(normalized.llm?.agentRoutes ?? createEmptyAgentRoutes(), hydratedProviders)
+      },
+      configuration,
+      paths: {
+        ...paths,
+        ...runtimePaths ?? {}
+      }
+    };
+    settings.configuration.diagnostics = executionProfileService.getDiagnostics(settings);
+    return settings;
+  }
+  writeSettings(settings, workspaceRoot = settings.workspace?.rootPath || appPathService.getWorkspaceRoot()) {
+    const filePath = appPathService.getWorkspacePaths(workspaceRoot).settingsPath;
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), "utf8");
+  }
+  getAll(runtimePaths) {
+    this.ensureInitialized();
+    const paths = appPathService.getWorkspacePaths();
+    const persisted = readJsonFile(paths.settingsPath) ?? createDefaultPersistedSettings(paths.workspaceRoot);
+    return this.toRuntimeSettings(persisted, runtimePaths);
+  }
+  getProviderSecret(providerId, workspaceRoot = appPathService.getWorkspaceRoot()) {
+    this.ensureInitialized();
+    const persisted = this.normalizePersistedSettings(
+      readJsonFile(appPathService.getWorkspacePaths(workspaceRoot).settingsPath) ?? createDefaultPersistedSettings(workspaceRoot),
+      workspaceRoot
+    );
+    const provider = persisted.llm.providers.find((entry) => entry.id === providerId);
+    if (!provider || provider.authMode !== "api-key") {
+      return "";
+    }
+    return getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot);
+  }
+  setAll(patch, runtimePaths) {
+    this.ensureInitialized();
+    const currentRuntime = this.getAll();
+    const requestedRoot = patch.workspace?.rootPath?.trim() || currentRuntime.workspace.rootPath || appPathService.getWorkspacePaths().workspaceRoot;
+    const nextPaths = appPathService.setWorkspaceRoot(requestedRoot);
+    executionProfileService.ensureScaffold(nextPaths.workspaceRoot);
+    const currentPersisted = this.normalizePersistedSettings(
+      readJsonFile(nextPaths.settingsPath) ?? createDefaultPersistedSettings(nextPaths.workspaceRoot),
+      nextPaths.workspaceRoot
+    );
+    const providerDrafts = (patch.llm?.providers ?? currentPersisted.llm?.providers ?? []).map((provider) => {
+      const secretRef = provider.secretRef || secretStorageService.createProviderSecretRef(provider.id);
+      const apiKey = provider.apiKey?.trim() ?? "";
+      if (provider.authMode === "api-key" && apiKey) {
+        secretStorageService.setSecret(secretRef, apiKey, nextPaths.workspaceRoot);
+      } else if (provider.authMode === "api-key" && !provider.hasStoredSecret) {
+        secretStorageService.deleteSecret(secretRef, nextPaths.workspaceRoot);
+      }
+      return sanitizeUserProvider({
+        ...provider,
+        secretRef
+      }, nextPaths.workspaceRoot);
+    }).filter((provider) => provider !== null);
+    const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.workspaceRoot);
+    const nextPersisted = {
+      appearance: {
+        theme: pickEnum(
+          patch.appearance?.theme ?? currentPersisted.appearance?.theme,
+          VALID_THEMES,
+          DEFAULT_APPEARANCE.theme
+        ),
+        language: pickEnum(
+          patch.appearance?.language ?? currentPersisted.appearance?.language,
+          VALID_LANGUAGES,
+          DEFAULT_APPEARANCE.language
+        ),
+        fontScale: pickEnum(
+          patch.appearance?.fontScale ?? currentPersisted.appearance?.fontScale,
+          VALID_FONT_SCALES,
+          DEFAULT_APPEARANCE.fontScale
+        )
+      },
+      layout: {
+        leftSidebar: sanitizeSidebar(
+          {
+            ...currentPersisted.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar,
+            ...patch.layout?.leftSidebar ?? {}
+          },
+          LEFT_DEFAULTS,
+          DEFAULT_LAYOUT.leftSidebar
+        ),
+        rightPanel: sanitizeSidebar(
+          {
+            ...currentPersisted.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel,
+            ...patch.layout?.rightPanel ?? {}
+          },
+          RIGHT_DEFAULTS,
+          DEFAULT_LAYOUT.rightPanel
+        ),
+        terminal: sanitizeTerminal(
+          {
+            ...currentPersisted.layout?.terminal ?? DEFAULT_LAYOUT.terminal,
+            ...patch.layout?.terminal ?? {}
+          },
+          DEFAULT_LAYOUT.terminal
+        )
+      },
+      profile: {
+        nickname: typeof patch.profile?.nickname === "string" && patch.profile.nickname.trim() ? patch.profile.nickname.trim() : currentPersisted.profile?.nickname || DEFAULT_PROFILE.nickname,
+        avatarPath: typeof patch.profile?.avatarPath === "string" ? patch.profile.avatarPath : currentPersisted.profile?.avatarPath || DEFAULT_PROFILE.avatarPath
+      },
+      workspace: {
+        rootPath: nextPaths.workspaceRoot
+      },
+      llm: {
+        providers: nextProviders.map((provider) => ({ ...provider, apiKey: "" })),
+        agentRoutes: normalizeUserRoutes(patch.llm?.agentRoutes ?? currentPersisted.llm?.agentRoutes ?? [], nextProviders)
+      },
+      configuration: {
+        activeModeProfileId: patch.configuration?.activeModeProfileId || currentPersisted.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId,
+        lastMigrationReportPath: currentPersisted.configuration?.lastMigrationReportPath
+      }
+    };
+    this.writeSettings(nextPersisted, nextPaths.workspaceRoot);
+    return this.getAll({
+      ...nextPaths,
+      ...runtimePaths ?? {}
+    });
+  }
+  saveProviderConnection(providerId, apiKey, models) {
+    const current = this.getAll();
+    const provider = current.llm.providers.find((entry) => entry.id === providerId);
+    if (!provider || !isBuiltinProviderId(provider.id)) {
+      throw new Error(`Unknown provider: ${providerId}`);
+    }
+    const discoveredModels = sanitizeModels(models);
+    if (discoveredModels.length === 0) {
+      throw new Error("该 Provider 暂未返回可用模型");
+    }
+    const timestamp = nowIso();
+    const nextProvider = {
+      ...provider,
+      apiKey: apiKey.trim(),
+      enabled: true,
+      hasStoredSecret: provider.authMode === "api-key" ? Boolean(apiKey.trim() || provider.hasStoredSecret) : provider.hasStoredSecret,
+      models: discoveredModels.map((model) => ({ ...model, enabled: true })),
+      status: "verified",
+      lastTestedAt: timestamp,
+      lastModelRefreshAt: timestamp,
+      lastError: void 0,
+      isConfigured: true
+    };
+    return this.setAll({
+      llm: {
+        providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
+        agentRoutes: current.llm.agentRoutes
+      }
+    });
+  }
+  disconnectProvider(providerId) {
+    const current = this.getAll();
+    const provider = current.llm.providers.find((entry) => entry.id === providerId);
+    if (!provider || !isBuiltinProviderId(provider.id)) {
+      throw new Error(`Unknown provider: ${providerId}`);
+    }
+    if (provider.authMode === "api-key") {
+      secretStorageService.deleteSecret(provider.secretRef, current.workspace.rootPath);
+    }
+    const fallback = createBuiltinProviderEntry(provider.id);
+    const nextProvider = {
+      ...provider,
+      apiKey: "",
+      hasStoredSecret: fallback.hasStoredSecret,
+      models: [],
+      enabled: false,
+      status: fallback.status,
+      lastError: void 0,
+      isConfigured: false
+    };
+    return this.setAll({
+      llm: {
+        providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
+        agentRoutes: current.llm.agentRoutes
+      }
+    });
+  }
+  getLlmConfig() {
+    const settings = this.getAll();
+    const providers = settings.llm.providers.filter((provider) => provider.enabled && provider.isConfigured && provider.status === "verified").map((provider) => ({
+      id: provider.id,
+      kind: provider.kind,
+      label: provider.label,
+      enabled: provider.enabled,
+      apiKey: provider.authMode === "api-key" ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.workspace.rootPath) : "",
+      baseUrl: provider.baseUrl,
+      models: provider.models.filter((model) => model.enabled).map((model) => model.id),
+      docsUrl: provider.docsUrl
+    })).filter((provider) => provider.models.length > 0);
+    return {
+      providers,
+      agentRoutes: settings.llm.agentRoutes
+    };
+  }
+  hasConfiguredProvider() {
+    return this.getAll().llm.providers.some((provider) => provider.isConfigured);
+  }
+  getSettingsPath() {
+    return appPathService.getWorkspacePaths().settingsPath;
+  }
+}
+const settingsService = new SettingsService();
+class ToolBridgeAgentToolPort {
+  async listTools(_agentId) {
+    const catalog = await toolBridge.loadCatalog();
+    return catalog.tools ?? [];
+  }
+  execute(request) {
+    return toolBridge.call({
+      toolName: request.toolName,
+      args: request.args,
+      runId: request.runId,
+      turnId: request.turnId,
+      contextId: request.contextId,
+      runtimeOwner: request.runtimeOwner,
+      ownerLeaseId: request.ownerLeaseId,
+      abortSignal: request.signal
+    });
+  }
+}
+const toolBridgeAgentToolPort = new ToolBridgeAgentToolPort();
+const MAX_TRACE_STRING_LENGTH = 512;
+const MAX_TRACE_ARRAY_LENGTH = 20;
+const MAX_TOOL_RESULT_LENGTH = 8e3;
+const SECRET_KEY_PATTERN = /(?:api[_-]?key|authorization|secret|token|credential|password)/i;
+const SECRET_VALUE_PATTERN = /\b(?:sk|ak|pk|rk|ds|or)-[a-z0-9._-]{8,}\b/gi;
+function createLocalTraceId(prefix) {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+function redactTraceText(text) {
+  const redacted = text.replace(SECRET_VALUE_PATTERN, "[REDACTED_SECRET]");
+  return redacted.length > MAX_TRACE_STRING_LENGTH ? `${redacted.slice(0, MAX_TRACE_STRING_LENGTH)}...[truncated]` : redacted;
+}
+function sanitizeTraceValue(value, depth = 0) {
+  if (value === null || value === void 0) {
+    return value;
+  }
+  if (typeof value === "string") {
+    return redactTraceText(value);
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (depth >= 4) {
+    return "[truncated]";
+  }
+  if (Array.isArray(value)) {
+    const entries = value.slice(0, MAX_TRACE_ARRAY_LENGTH).map((entry) => sanitizeTraceValue(entry, depth + 1));
+    return value.length > MAX_TRACE_ARRAY_LENGTH ? [...entries, { truncatedItems: value.length - MAX_TRACE_ARRAY_LENGTH }] : entries;
+  }
+  if (typeof value === "object") {
+    const output = {};
+    for (const [key, entry] of Object.entries(value)) {
+      output[key] = SECRET_KEY_PATTERN.test(key) ? "[REDACTED_SECRET]" : sanitizeTraceValue(entry, depth + 1);
+    }
+    return output;
+  }
+  return String(value);
+}
+function parameterSchema(parameter) {
+  if (parameter.enum?.length) {
+    return {
+      type: "string",
+      enum: parameter.enum,
+      description: parameter.description
+    };
+  }
+  if (parameter.type === "array") {
+    return {
+      type: "array",
+      items: {},
+      description: parameter.description
+    };
+  }
+  if (parameter.type === "object") {
+    return {
+      type: "object",
+      additionalProperties: true,
+      description: parameter.description
+    };
+  }
+  return {
+    type: parameter.type,
+    description: parameter.description
+  };
+}
+function buildToolJsonSchema(tool) {
+  const properties = {};
+  const required = [];
+  for (const parameter of tool.parameters ?? []) {
+    properties[parameter.name] = parameterSchema(parameter);
+    if (parameter.required) {
+      required.push(parameter.name);
+    }
+  }
+  return {
+    type: "object",
+    properties,
+    required,
+    additionalProperties: false
+  };
+}
+function toolMatchesPolicy(toolName, allowlist) {
+  if (!allowlist || allowlist.length === 0) {
+    return false;
+  }
+  for (const pattern of allowlist) {
+    if (pattern === "*" || pattern === toolName) {
+      return true;
+    }
+    if (pattern.endsWith(".*") && toolName.startsWith(pattern.slice(0, -1))) {
+      return true;
+    }
+  }
+  return false;
+}
+function sanitizeSdkToolName(toolName) {
+  const sanitized = toolName.replace(/[^a-zA-Z0-9_]/g, "_");
+  return /^[a-zA-Z_]/.test(sanitized) ? sanitized : `rdc_${sanitized}`;
+}
+function prepareAgentTools(tools, allowlist) {
+  const used = /* @__PURE__ */ new Set();
+  const prepared = [];
+  for (const definition of tools) {
+    if (!toolMatchesPolicy(definition.name, allowlist)) {
+      continue;
+    }
+    const baseName = sanitizeSdkToolName(definition.name);
+    let sdkName = baseName;
+    let index = 2;
+    while (used.has(sdkName)) {
+      sdkName = `${baseName}_${index}`;
+      index += 1;
+    }
+    used.add(sdkName);
+    prepared.push({
+      originalName: definition.name,
+      sdkName,
+      definition,
+      parameters: buildToolJsonSchema(definition)
+    });
+  }
+  return prepared;
+}
+function summarizePreparedTools(tools) {
+  return tools.map((tool) => ({
+    sdkName: tool.sdkName,
+    toolName: tool.originalName,
+    namespace: tool.definition.namespace,
+    group: tool.definition.group
+  }));
+}
+function summarizeSdkMessages(messages) {
+  return messages.slice(-MAX_TRACE_ARRAY_LENGTH).map((message) => ({
+    type: typeof message.type === "string" ? message.type : "unknown",
+    subtype: typeof message.subtype === "string" ? message.subtype : void 0,
+    sessionId: typeof message.session_id === "string" ? redactTraceText(message.session_id) : void 0,
+    resultLength: typeof message.result === "string" ? message.result.length : void 0,
+    isError: typeof message.is_error === "boolean" ? message.is_error : void 0,
+    hasMessage: Boolean(message.message)
+  }));
+}
+function summarizeToolResult(result) {
+  return {
+    ok: result.ok,
+    error: result.error ? {
+      code: result.error.code,
+      category: result.error.category,
+      message: redactTraceText(result.error.message)
+    } : void 0,
+    dataKeys: result.data ? Object.keys(result.data).slice(0, MAX_TRACE_ARRAY_LENGTH) : [],
+    artifactCount: result.artifacts?.length ?? 0,
+    duration_ms: result.duration_ms,
+    trace_id: result.trace_id
+  };
+}
+function createToolPolicyDeniedResult(toolName, reason) {
+  return {
+    ok: false,
+    error: {
+      code: "TOOL_DENIED_BY_RDC_POLICY",
+      category: "policy",
+      message: reason,
+      details: {
+        toolName
+      }
+    },
+    artifacts: [],
+    duration_ms: 0,
+    trace_id: createLocalTraceId("agent-tool-denied")
+  };
+}
+function buildAgentRunTrace(options) {
+  const allowlist = options.request.toolAllowlist ?? [];
+  return {
+    adapter: options.adapter,
+    providerId: options.request.providerId,
+    providerKind: options.providerKind ?? null,
+    modelId: options.request.modelId,
+    agentId: options.request.agentId,
+    stage: options.request.stage ?? null,
+    runId: options.request.runId ?? null,
+    sessionId: options.request.sessionId ?? null,
+    turnId: options.request.turnId ?? null,
+    tools: summarizePreparedTools(options.preparedTools),
+    policy: sanitizeTraceValue({
+      executionLayer: "ToolBridge",
+      failClosed: true,
+      allowlist,
+      allowedToolCount: options.preparedTools.length,
+      sandbox: {
+        enabled: false,
+        reason: "runtime_ownership_lease_not_configured"
+      },
+      ...options.policy
+    }),
+    guardrails: sanitizeTraceValue(options.guardrails ?? []),
+    handoffs: sanitizeTraceValue(options.handoffs ?? []),
+    sdkTrace: sanitizeTraceValue(options.sdkTrace ?? {})
+  };
+}
+function formatToolResult(result) {
+  const payload = sanitizeTraceValue({
+    ok: result.ok,
+    data: result.data,
+    error: result.error,
+    artifacts: result.artifacts,
+    duration_ms: result.duration_ms,
+    trace_id: result.trace_id
+  });
+  const formatted = JSON.stringify(payload);
+  if (formatted.length <= MAX_TOOL_RESULT_LENGTH) {
+    return formatted;
+  }
+  return JSON.stringify({
+    ...summarizeToolResult(result),
+    truncated: true
+  });
+}
+const CLAUDE_DENIED_BUILTIN_TOOLS = ["Bash", "Edit", "Write", "Read", "WebSearch"];
+const CLAUDE_PERMISSION_MODE = "dontAsk";
+function zodParameter(parameter) {
+  let schema;
+  if (parameter.enum?.length) {
+    schema = zod.z.enum(parameter.enum);
+  } else if (parameter.type === "number") {
+    schema = zod.z.number();
+  } else if (parameter.type === "boolean") {
+    schema = zod.z.boolean();
+  } else if (parameter.type === "array") {
+    schema = zod.z.array(zod.z.unknown());
+  } else if (parameter.type === "object") {
+    schema = zod.z.record(zod.z.string(), zod.z.unknown());
+  } else {
+    schema = zod.z.string();
+  }
+  if (parameter.description) {
+    schema = schema.describe(parameter.description);
+  }
+  return parameter.required ? schema : schema.optional();
+}
+function zodRawShape(tool) {
+  const shape = {};
+  for (const parameter of tool.parameters ?? []) {
+    shape[parameter.name] = zodParameter(parameter);
+  }
+  return shape;
+}
+class ClaudeAgentSdkAdapter {
+  id = "claude-agent-sdk";
+  canRun(request) {
+    const settings = settingsService.getAll();
+    const provider = settings.llm.providers.find((entry) => entry.id === request.providerId);
+    return provider?.id === "anthropic" || provider?.kind === "anthropic";
+  }
+  async run(request, tools) {
+    const settings = settingsService.getAll();
+    const provider = settings.llm.providers.find((entry) => entry.id === request.providerId);
+    if (!provider) {
+      throw new Error(`Claude provider not found: ${request.providerId}`);
+    }
+    const apiKey = settingsService.getProviderSecret(provider.id, settings.workspace.rootPath);
+    if (!apiKey) {
+      throw new Error(`Claude provider secret is missing: ${provider.id}`);
+    }
+    const sdk = await import("@anthropic-ai/claude-agent-sdk");
+    const abortController = new AbortController();
+    request.signal?.addEventListener("abort", () => abortController.abort(), { once: true });
+    const messages = [];
+    const toolResults = [];
+    let text = "";
+    const env = {
+      ...process.env,
+      ANTHROPIC_API_KEY: apiKey,
+      CLAUDE_AGENT_SDK_CLIENT_APP: "rdc-agent/1.0.0"
+    };
+    const preparedTools = prepareAgentTools(await tools.listTools(request.agentId), request.toolAllowlist);
+    const allowedMcpToolNames = /* @__PURE__ */ new Set();
+    const sdkTools = preparedTools.map((tool) => {
+      allowedMcpToolNames.add(`mcp__rdc__${tool.sdkName}`);
+      return sdk.tool(
+        tool.sdkName,
+        `${tool.definition.description}
+
+RDC tool: ${tool.originalName}`,
+        zodRawShape(tool.definition),
+        async (args) => {
+          if (!toolMatchesPolicy(tool.originalName, request.toolAllowlist)) {
+            const result2 = createToolPolicyDeniedResult(
+              tool.originalName,
+              `Tool ${tool.originalName} is not allowed by RDC DebuggerRuntime policy.`
+            );
+            toolResults.push({
+              toolName: tool.originalName,
+              result: result2
+            });
+            return {
+              content: [{
+                type: "text",
+                text: formatToolResult(result2)
+              }],
+              is_error: true
+            };
+          }
+          const result = await tools.execute({
+            toolName: tool.originalName,
+            args,
+            runId: request.runId,
+            turnId: request.turnId,
+            contextId: request.sessionId,
+            runtimeOwner: request.agentId,
+            signal: request.signal
+          });
+          toolResults.push({
+            toolName: tool.originalName,
+            result
+          });
+          return {
+            content: [{
+              type: "text",
+              text: formatToolResult(result)
+            }],
+            is_error: !result.ok
+          };
+        },
+        {
+          annotations: {
+            readOnlyHint: true
+          }
+        }
+      );
+    });
+    const rdcMcpServer = sdk.createSdkMcpServer({
+      name: "rdc",
+      version: "1.0.0",
+      instructions: "RDC ToolBridge proxy. All tool calls are executed by the deterministic DebuggerRuntime tool layer.",
+      tools: sdkTools,
+      alwaysLoad: sdkTools.length > 0
+    });
+    for await (const message of sdk.query({
+      prompt: request.prompt,
+      abortController,
+      options: {
+        model: request.modelId,
+        systemPrompt: request.systemPrompt,
+        maxTurns: 4,
+        tools: [],
+        mcpServers: sdkTools.length > 0 ? { rdc: rdcMcpServer } : {},
+        allowedTools: Array.from(allowedMcpToolNames),
+        canUseTool: async (toolName, _input, options) => allowedMcpToolNames.has(toolName) ? { behavior: "allow", toolUseID: options.toolUseID } : {
+          behavior: "deny",
+          message: `Tool ${toolName} is not allowed by RDC DebuggerRuntime policy.`,
+          toolUseID: options.toolUseID
+        },
+        disallowedTools: [...CLAUDE_DENIED_BUILTIN_TOOLS],
+        permissionMode: CLAUDE_PERMISSION_MODE,
+        env
+      }
+    })) {
+      messages.push(message);
+      if (message.type === "assistant" && message.message && typeof message.message === "object") {
+        const content = message.message.content;
+        if (Array.isArray(content)) {
+          const chunk = content.map((entry) => entry && typeof entry === "object" && typeof entry.text === "string" ? entry.text : "").join("");
+          if (chunk) {
+            text += chunk;
+            request.onChunk?.(chunk);
+          }
+        }
+      }
+      if (message.type === "result" && typeof message.result === "string") {
+        text = message.result;
+      }
+    }
+    return {
+      agentId: request.agentId,
+      providerId: request.providerId,
+      modelId: request.modelId,
+      text,
+      toolResults,
+      trace: buildAgentRunTrace({
+        adapter: this.id,
+        request,
+        providerKind: provider.kind,
+        preparedTools,
+        policy: {
+          permissionMode: CLAUDE_PERMISSION_MODE,
+          allowedTools: Array.from(allowedMcpToolNames),
+          disallowedTools: [...CLAUDE_DENIED_BUILTIN_TOOLS],
+          builtInTools: "disabled",
+          mcpServers: sdkTools.length > 0 ? ["rdc"] : []
+        },
+        guardrails: [
+          {
+            name: "claude-builtins-denied",
+            scope: "sdk-tools",
+            status: "enforced",
+            deniedTools: [...CLAUDE_DENIED_BUILTIN_TOOLS]
+          },
+          {
+            name: "claude-mcp-only",
+            scope: "tool-surface",
+            status: "enforced",
+            allowedTools: Array.from(allowedMcpToolNames)
+          },
+          {
+            name: "claude-permission-mode",
+            scope: "permissions",
+            status: "enforced",
+            mode: CLAUDE_PERMISSION_MODE
+          }
+        ],
+        sdkTrace: {
+          messageSummary: summarizeSdkMessages(messages),
+          messageCount: messages.length
+        }
+      })
+    };
+  }
+}
+const toContentBlocks = (messages) => messages.map((message) => {
+  if (typeof message.content === "string") {
+    return { role: message.role, content: message.content };
+  }
+  const content = message.content.map((block) => {
+    if (block.type === "text") {
+      return { type: "text", text: block.text };
+    }
+    if (block.type === "image" && block.source) {
+      return {
+        type: "image_url",
+        image_url: {
+          url: `data:${block.source.media_type};base64,${block.source.data}`
+        }
+      };
+    }
+    return { type: "text", text: "" };
+  });
+  return { role: message.role, content };
+});
+const normalizeOpenRouterBaseUrl = (baseUrl) => {
+  const trimmed = (baseUrl || "https://openrouter.ai/api/v1").trim().replace(/\/+$/, "");
+  if (/^https:\/\/openrouter\.ai\/api$/i.test(trimmed)) {
+    return `${trimmed}/v1`;
+  }
+  return trimmed;
+};
+const extractMessageContent = (payload) => {
+  if (!payload || typeof payload !== "object") {
+    return "";
+  }
+  const message = payload.message ?? null;
+  const messageContent = message?.content;
+  if (typeof messageContent === "string" && messageContent.trim()) {
+    return messageContent;
+  }
+  if (Array.isArray(messageContent) && messageContent.length > 0) {
+    return messageContent;
+  }
+  if (messageContent && typeof messageContent === "object") {
+    return JSON.stringify(messageContent);
+  }
+  const stringFallbacks = [
+    message?.output_text,
+    message?.reasoning_content,
+    message?.reasoning,
+    message?.refusal,
+    payload.text,
+    payload.output_text
+  ];
+  for (const candidate of stringFallbacks) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate;
+    }
+  }
+  return "";
+};
+const createAccumulator = (model) => ({
+  id: `stream-${Date.now()}`,
+  model,
+  content: "",
+  toolCalls: [],
+  inputTokens: 0,
+  outputTokens: 0,
+  stopReason: "end_turn"
+});
+const ensureToolCall = (toolCalls, index, id) => {
+  while (toolCalls.length <= index) {
+    toolCalls.push({
+      id: id || `tool-call-${index}`,
+      name: "",
+      argumentsText: ""
+    });
+  }
+  const existing = toolCalls[index];
+  if (id && !existing.id) {
+    existing.id = id;
+  }
+  return existing;
+};
+const parseToolArguments = (argumentsText) => {
+  if (!argumentsText.trim()) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(argumentsText);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch {
+  }
+  return {
+    raw: argumentsText
+  };
+};
+const buildResponseFromAccumulator = (accumulator) => {
+  const toolCalls = accumulator.toolCalls.filter((toolCall) => toolCall.id || toolCall.name || toolCall.argumentsText).map((toolCall) => ({
+    id: toolCall.id,
+    name: toolCall.name,
+    arguments: parseToolArguments(toolCall.argumentsText)
+  }));
+  return {
+    id: accumulator.id,
+    model: accumulator.model,
+    content: accumulator.content,
+    toolCalls: toolCalls.length > 0 ? toolCalls : void 0,
+    usage: {
+      inputTokens: accumulator.inputTokens,
+      outputTokens: accumulator.outputTokens
+    },
+    stopReason: accumulator.stopReason
+  };
+};
+const emitTextChunk = (text, onChunk) => {
+  if (!text) {
+    return;
+  }
+  onChunk({
+    type: "text-delta",
+    text
+  });
+};
+const emitToolCallDelta = (toolCall, onChunk) => {
+  onChunk({
+    type: "tool-call-delta",
+    toolCall
+  });
+};
+const emitFallbackChunks = (text, onChunk) => {
+  const chunks = text.split(/(?<=[.!?。！？\n])|(?<=,|，)\s+/).map((chunk) => chunk.trim()).filter(Boolean);
+  if (chunks.length === 0 && text) {
+    emitTextChunk(text, onChunk);
+    return;
+  }
+  for (const chunk of chunks) {
+    emitTextChunk(chunk, onChunk);
+  }
+};
+const tryParseJson = (value) => {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
+const mapFinishReason = (finishReason) => {
+  if (finishReason === "tool_calls" || finishReason === "tool_use") {
+    return "tool_use";
+  }
+  if (finishReason === "length" || finishReason === "max_tokens") {
+    return "max_tokens";
+  }
+  return "end_turn";
+};
+const readSseStream = async (response, onEvent) => {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("Streaming response body is unavailable.");
+  }
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let eventName = "message";
+  let dataLines = [];
+  const flush = () => {
+    if (dataLines.length === 0) {
+      eventName = "message";
+      return;
+    }
+    const payload = dataLines.join("\n");
+    dataLines = [];
+    onEvent(eventName, payload);
+    eventName = "message";
+  };
+  for (; ; ) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    let newlineIndex = buffer.indexOf("\n");
+    while (newlineIndex >= 0) {
+      const rawLine = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+      const line = rawLine.replace(/\r$/, "");
+      if (!line) {
+        flush();
+      } else if (line.startsWith("event:")) {
+        eventName = line.slice(6).trim();
+      } else if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5).trimStart());
+      }
+      newlineIndex = buffer.indexOf("\n");
+    }
+    if (done) {
+      break;
+    }
+  }
+  if (buffer.trim()) {
+    const line = buffer.replace(/\r$/, "");
+    if (line.startsWith("data:")) {
+      dataLines.push(line.slice(5).trimStart());
+    }
+  }
+  flush();
+};
+class BaseStreamingProvider {
+  name;
+  constructor(name) {
+    this.name = name;
+  }
+  async streamChat(request, onChunk) {
+    try {
+      const response = await this.performStreamingChat(request, onChunk);
+      onChunk({ type: "done" });
+      return response;
+    } catch (error) {
+      if (request.signal?.aborted) {
+        throw error;
+      }
+      const fallbackResponse = await this.chat(request);
+      const fallbackText = typeof fallbackResponse.content === "string" ? fallbackResponse.content : JSON.stringify(fallbackResponse.content);
+      emitFallbackChunks(fallbackText, onChunk);
+      onChunk({ type: "done" });
+      return fallbackResponse;
+    }
+  }
+}
+class OpenRouterProvider extends BaseStreamingProvider {
+  apiKey = "";
+  baseUrl = "https://openrouter.ai/api/v1";
+  models = [];
+  constructor(name) {
+    super(name);
+  }
+  configure(config) {
+    this.apiKey = config.apiKey.trim();
+    this.baseUrl = normalizeOpenRouterBaseUrl(config.baseUrl || "https://openrouter.ai/api/v1");
+    this.models = config.models;
+  }
+  async chat(request) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://rdcagent.local",
+        "X-Title": "RdcAgent"
+      },
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        messages: toContentBlocks(request.messages),
+        max_tokens: request.maxTokens || 4096,
+        temperature: request.temperature ?? 0.7,
+        tools: request.tools,
+        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
+        stream: false
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`OpenRouter API error: ${response.status} - ${await response.text()}`);
+    }
+    const data = await response.json();
+    const choice = data.choices?.[0];
+    const content = extractMessageContent(choice);
+    return {
+      id: data.id || `or-${Date.now()}`,
+      model: data.model || model,
+      content,
+      toolCalls: choice?.message?.tool_calls,
+      usage: {
+        inputTokens: data.usage?.prompt_tokens || 0,
+        outputTokens: data.usage?.completion_tokens || 0
+      },
+      stopReason: mapFinishReason(choice?.finish_reason)
+    };
+  }
+  async performStreamingChat(request, onChunk) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://rdcagent.local",
+        "X-Title": "RdcAgent"
+      },
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        messages: toContentBlocks(request.messages),
+        max_tokens: request.maxTokens || 4096,
+        temperature: request.temperature ?? 0.7,
+        tools: request.tools,
+        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
+        stream: true
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`OpenRouter API error: ${response.status} - ${await response.text()}`);
+    }
+    const accumulator = createAccumulator(model);
+    await readSseStream(response, (_eventName, data) => {
+      if (!data || data === "[DONE]") {
+        return;
+      }
+      const payload = tryParseJson(data);
+      if (!payload) {
+        return;
+      }
+      accumulator.id = String(payload.id || accumulator.id);
+      accumulator.model = String(payload.model || accumulator.model);
+      const choice = payload.choices?.[0];
+      const delta = choice?.delta ?? {};
+      const text = typeof delta.content === "string" ? delta.content : "";
+      if (text) {
+        accumulator.content += text;
+        emitTextChunk(text, onChunk);
+      }
+      const toolCalls = Array.isArray(delta.tool_calls) ? delta.tool_calls : [];
+      for (const toolCallDelta of toolCalls) {
+        const index = typeof toolCallDelta.index === "number" ? toolCallDelta.index : 0;
+        const functionDelta = typeof toolCallDelta.function === "object" && toolCallDelta.function ? toolCallDelta.function : {};
+        const toolCall = ensureToolCall(
+          accumulator.toolCalls,
+          index,
+          typeof toolCallDelta.id === "string" ? toolCallDelta.id : void 0
+        );
+        if (typeof functionDelta.name === "string") {
+          toolCall.name = functionDelta.name;
+        }
+        if (typeof functionDelta.arguments === "string") {
+          toolCall.argumentsText += functionDelta.arguments;
+        }
+        emitToolCallDelta({
+          id: toolCall.id,
+          name: toolCall.name,
+          argumentsText: toolCall.argumentsText
+        }, onChunk);
+      }
+      accumulator.stopReason = mapFinishReason(
+        typeof choice?.finish_reason === "string" ? choice.finish_reason : void 0
+      );
+    });
+    return buildResponseFromAccumulator(accumulator);
+  }
+  async isAvailable() {
+    return Boolean(this.apiKey);
+  }
+  getModels() {
+    return this.models;
+  }
+}
+class OpenAICompatibleProvider extends BaseStreamingProvider {
+  apiKey = "";
+  baseUrl = "https://api.openai.com/v1";
+  models = [];
+  requireApiKey = true;
+  constructor(name, requireApiKey = true) {
+    super(name);
+    this.requireApiKey = requireApiKey;
+  }
+  configure(config) {
+    this.apiKey = config.apiKey.trim();
+    this.baseUrl = (config.baseUrl || this.baseUrl).trim().replace(/\/+$/, "");
+    this.models = config.models;
+  }
+  async chat(request) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const headers = {
+      "Content-Type": "application/json"
+    };
+    if (this.apiKey) {
+      headers.Authorization = `Bearer ${this.apiKey}`;
+    }
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers,
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        messages: toContentBlocks(request.messages),
+        max_tokens: request.maxTokens || 4096,
+        temperature: request.temperature ?? 0.7,
+        tools: request.tools,
+        response_format: request.responseFormat ? { type: request.responseFormat } : void 0
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`${this.name} API error: ${response.status} - ${await response.text()}`);
+    }
+    const data = await response.json();
+    const choice = data.choices?.[0];
+    const content = extractMessageContent(choice);
+    return {
+      id: data.id || `${this.name}-${Date.now()}`,
+      model: data.model || model,
+      content,
+      toolCalls: choice?.message?.tool_calls,
+      usage: {
+        inputTokens: data.usage?.prompt_tokens || 0,
+        outputTokens: data.usage?.completion_tokens || 0
+      },
+      stopReason: mapFinishReason(choice?.finish_reason)
+    };
+  }
+  async performStreamingChat(request, onChunk) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const headers = {
+      "Content-Type": "application/json"
+    };
+    if (this.apiKey) {
+      headers.Authorization = `Bearer ${this.apiKey}`;
+    }
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers,
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        messages: toContentBlocks(request.messages),
+        max_tokens: request.maxTokens || 4096,
+        temperature: request.temperature ?? 0.7,
+        tools: request.tools,
+        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
+        stream: true
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`${this.name} API error: ${response.status} - ${await response.text()}`);
+    }
+    const accumulator = createAccumulator(model);
+    await readSseStream(response, (_eventName, data) => {
+      if (!data || data === "[DONE]") {
+        return;
+      }
+      const payload = tryParseJson(data);
+      if (!payload) {
+        return;
+      }
+      accumulator.id = String(payload.id || accumulator.id);
+      accumulator.model = String(payload.model || accumulator.model);
+      const choice = payload.choices?.[0];
+      const delta = choice?.delta ?? {};
+      const text = typeof delta.content === "string" ? delta.content : "";
+      if (text) {
+        accumulator.content += text;
+        emitTextChunk(text, onChunk);
+      }
+      const toolCalls = Array.isArray(delta.tool_calls) ? delta.tool_calls : [];
+      for (const toolCallDelta of toolCalls) {
+        const index = typeof toolCallDelta.index === "number" ? toolCallDelta.index : 0;
+        const functionDelta = typeof toolCallDelta.function === "object" && toolCallDelta.function ? toolCallDelta.function : {};
+        const toolCall = ensureToolCall(
+          accumulator.toolCalls,
+          index,
+          typeof toolCallDelta.id === "string" ? toolCallDelta.id : void 0
+        );
+        if (typeof functionDelta.name === "string") {
+          toolCall.name = functionDelta.name;
+        }
+        if (typeof functionDelta.arguments === "string") {
+          toolCall.argumentsText += functionDelta.arguments;
+        }
+        emitToolCallDelta({
+          id: toolCall.id,
+          name: toolCall.name,
+          argumentsText: toolCall.argumentsText
+        }, onChunk);
+      }
+      accumulator.stopReason = mapFinishReason(
+        typeof choice?.finish_reason === "string" ? choice.finish_reason : void 0
+      );
+    });
+    return buildResponseFromAccumulator(accumulator);
+  }
+  async isAvailable() {
+    return this.requireApiKey ? Boolean(this.apiKey) : true;
+  }
+  getModels() {
+    return this.models;
+  }
+}
+class AnthropicProvider extends BaseStreamingProvider {
+  apiKey = "";
+  baseUrl = "https://api.anthropic.com/v1";
+  models = [];
+  constructor(name) {
+    super(name);
+  }
+  configure(config) {
+    this.apiKey = config.apiKey.trim();
+    this.baseUrl = (config.baseUrl || "https://api.anthropic.com/v1").trim().replace(/\/+$/, "");
+    this.models = config.models;
+  }
+  async chat(request) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const systemMessage = request.messages.find((message) => message.role === "system");
+    const otherMessages = request.messages.filter((message) => message.role !== "system");
+    const response = await fetch(`${this.baseUrl}/messages`, {
+      method: "POST",
+      headers: {
+        "x-api-key": this.apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json"
+      },
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        max_tokens: request.maxTokens || 4096,
+        system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
+        messages: otherMessages.map((message) => ({
+          role: message.role === "assistant" ? "assistant" : "user",
+          content: message.content
+        }))
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.status} - ${await response.text()}`);
+    }
+    const data = await response.json();
+    return {
+      id: data.id || `anthropic-${Date.now()}`,
+      model: data.model || model,
+      content: data.content?.[0]?.text || "",
+      usage: {
+        inputTokens: data.usage?.input_tokens || 0,
+        outputTokens: data.usage?.output_tokens || 0
+      },
+      stopReason: mapFinishReason(data.stop_reason)
+    };
+  }
+  async performStreamingChat(request, onChunk) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const systemMessage = request.messages.find((message) => message.role === "system");
+    const otherMessages = request.messages.filter((message) => message.role !== "system");
+    const response = await fetch(`${this.baseUrl}/messages`, {
+      method: "POST",
+      headers: {
+        "x-api-key": this.apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json"
+      },
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        max_tokens: request.maxTokens || 4096,
+        stream: true,
+        system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
+        messages: otherMessages.map((message) => ({
+          role: message.role === "assistant" ? "assistant" : "user",
+          content: message.content
+        }))
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.status} - ${await response.text()}`);
+    }
+    const accumulator = createAccumulator(model);
+    await readSseStream(response, (eventName, data) => {
+      if (!data) {
+        return;
+      }
+      const payload = tryParseJson(data);
+      if (!payload) {
+        return;
+      }
+      if (eventName === "message_start") {
+        const message = payload.message;
+        accumulator.id = String(message?.id || accumulator.id);
+        accumulator.model = String(message?.model || accumulator.model);
+        const usage = message?.usage;
+        accumulator.inputTokens = typeof usage?.input_tokens === "number" ? usage.input_tokens : accumulator.inputTokens;
+      }
+      if (eventName === "content_block_delta") {
+        const delta = payload.delta;
+        if (delta?.type === "text_delta" && typeof delta.text === "string") {
+          accumulator.content += delta.text;
+          emitTextChunk(delta.text, onChunk);
+        }
+      }
+      if (eventName === "message_delta") {
+        const delta = payload.delta;
+        const usage = payload.usage;
+        accumulator.outputTokens = typeof usage?.output_tokens === "number" ? usage.output_tokens : accumulator.outputTokens;
+        accumulator.stopReason = mapFinishReason(
+          typeof delta?.stop_reason === "string" ? delta.stop_reason : void 0
+        );
+      }
+    });
+    return buildResponseFromAccumulator(accumulator);
+  }
+  async isAvailable() {
+    return Boolean(this.apiKey);
+  }
+  getModels() {
+    return this.models;
+  }
+}
+const createProviderByKind = (providerId, kind) => {
+  if (kind === "openrouter") {
+    return new OpenRouterProvider(providerId);
+  }
+  if (kind === "anthropic") {
+    return new AnthropicProvider(providerId);
+  }
+  if (kind === "ollama") {
+    return new OpenAICompatibleProvider(providerId, false);
+  }
+  return new OpenAICompatibleProvider(providerId, true);
+};
+class LLMAdapter {
+  providers = /* @__PURE__ */ new Map();
+  configure(config) {
+    this.providers.clear();
+    for (const providerConfig of config.providers) {
+      const provider = createProviderByKind(providerConfig.id, providerConfig.kind);
+      if ("configure" in provider && typeof provider.configure === "function") {
+        provider.configure(providerConfig);
+      }
+      this.providers.set(providerConfig.id, {
+        config: providerConfig,
+        provider
+      });
+    }
+  }
+  async chat(request, providerId) {
+    const resolvedProviderId = providerId?.trim();
+    if (!resolvedProviderId) {
+      throw new Error("No explicit LLM provider was supplied for this request.");
+    }
+    const runtimeProvider = this.providers.get(resolvedProviderId);
+    if (!runtimeProvider) {
+      throw new Error(`Provider not found: ${resolvedProviderId}`);
+    }
+    if (!runtimeProvider.config.enabled) {
+      throw new Error(`Provider disabled: ${resolvedProviderId}`);
+    }
+    if (!await runtimeProvider.provider.isAvailable()) {
+      throw new Error(`Provider not configured: ${resolvedProviderId}`);
+    }
+    return runtimeProvider.provider.chat(request);
+  }
+  async streamChat(request, onChunk, providerId) {
+    const resolvedProviderId = providerId?.trim();
+    if (!resolvedProviderId) {
+      throw new Error("No explicit LLM provider was supplied for this request.");
+    }
+    const runtimeProvider = this.providers.get(resolvedProviderId);
+    if (!runtimeProvider) {
+      throw new Error(`Provider not found: ${resolvedProviderId}`);
+    }
+    if (!runtimeProvider.config.enabled) {
+      throw new Error(`Provider disabled: ${resolvedProviderId}`);
+    }
+    if (!await runtimeProvider.provider.isAvailable()) {
+      throw new Error(`Provider not configured: ${resolvedProviderId}`);
+    }
+    return runtimeProvider.provider.streamChat(request, onChunk);
+  }
+  async testConnection(providerId) {
+    const runtimeProvider = this.providers.get(providerId);
+    if (!runtimeProvider) {
+      return { success: false, error: `Provider not found: ${providerId}` };
+    }
+    try {
+      const available = await runtimeProvider.provider.isAvailable();
+      return { success: available, error: available ? void 0 : "Provider not configured" };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  }
+  getAvailableModels(providerId) {
+    return this.providers.get(providerId)?.config.models || [];
+  }
+  getDefaultProvider() {
+    return "";
+  }
+}
+const llmAdapter = new LLMAdapter();
+class LlmAdapterAgentSdkAdapter {
+  id = "rdc-llm-adapter";
+  canRun(_request) {
+    return true;
+  }
+  async run(request, _tools) {
+    const messages = [
+      { role: "system", content: request.systemPrompt },
+      { role: "user", content: request.prompt }
+    ];
+    let streamedContent = "";
+    const response = await llmAdapter.streamChat(
+      {
+        messages,
+        model: request.modelId,
+        maxTokens: request.maxTokens,
+        temperature: request.temperature,
+        signal: request.signal
+      },
+      (event) => {
+        request.onStreamEvent?.(event);
+        if (event.type === "text-delta") {
+          streamedContent += event.text;
+          request.onChunk?.(event.text);
+        }
+      },
+      request.providerId
+    );
+    const fallbackContent = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+    return {
+      agentId: request.agentId,
+      providerId: request.providerId,
+      modelId: request.modelId,
+      text: streamedContent || fallbackContent,
+      toolResults: [],
+      usage: response.usage,
+      trace: {
+        adapter: this.id,
+        responseId: response.id
+      }
+    };
+  }
+}
+function readFinalOutput(result) {
+  if (result && typeof result === "object") {
+    const record = result;
+    for (const key of ["finalOutput", "output", "text"]) {
+      const value = record[key];
+      if (typeof value === "string") {
+        return value;
+      }
+    }
+  }
+  return typeof result === "string" ? result : JSON.stringify(result);
+}
+class OpenAiAgentSdkAdapter {
+  id = "openai-agents-sdk";
+  canRun(request) {
+    const settings = settingsService.getAll();
+    const provider = settings.llm.providers.find((entry) => entry.id === request.providerId);
+    return provider?.id === "openai" || provider?.kind === "openai-compatible";
+  }
+  async run(request, tools) {
+    const settings = settingsService.getAll();
+    const provider = settings.llm.providers.find((entry) => entry.id === request.providerId);
+    if (!provider) {
+      throw new Error(`OpenAI provider not found: ${request.providerId}`);
+    }
+    const apiKey = settingsService.getProviderSecret(provider.id, settings.workspace.rootPath);
+    if (!apiKey) {
+      throw new Error(`OpenAI provider secret is missing: ${provider.id}`);
+    }
+    const sdk = await import("@openai/agents");
+    sdk.setDefaultOpenAIKey?.(apiKey);
+    const tracingDisabled = provider.id !== "openai";
+    const traceId = `rdc-agent-${request.runId || request.turnId || Date.now().toString(36)}`;
+    const workflowName = "RDC Agent SDK Runner";
+    if (provider.baseUrl || provider.id !== "openai") {
+      const { default: OpenAI } = await Promise.resolve().then(() => require("./chunks/index-DjSBD69L.js"));
+      sdk.setDefaultOpenAIClient?.(new OpenAI({
+        apiKey,
+        baseURL: provider.baseUrl
+      }));
+      sdk.setOpenAIAPI?.(provider.id === "openai" ? "responses" : "chat_completions");
+    }
+    const toolResults = [];
+    const preparedTools = prepareAgentTools(await tools.listTools(request.agentId), request.toolAllowlist);
+    const openAiTools = preparedTools.map((tool) => sdk.tool({
+      name: tool.sdkName,
+      description: `${tool.definition.description}
+
+RDC tool: ${tool.originalName}`,
+      parameters: tool.parameters,
+      strict: false,
+      needsApproval: false,
+      execute: async (input) => {
+        const args = input && typeof input === "object" ? input : {};
+        if (!toolMatchesPolicy(tool.originalName, request.toolAllowlist)) {
+          const result3 = createToolPolicyDeniedResult(
+            tool.originalName,
+            `Tool ${tool.originalName} is not allowed by RDC DebuggerRuntime policy.`
+          );
+          toolResults.push({
+            toolName: tool.originalName,
+            result: result3
+          });
+          return formatToolResult(result3);
+        }
+        const result2 = await tools.execute({
+          toolName: tool.originalName,
+          args,
+          runId: request.runId,
+          turnId: request.turnId,
+          contextId: request.sessionId,
+          runtimeOwner: request.agentId,
+          signal: request.signal
+        });
+        toolResults.push({
+          toolName: tool.originalName,
+          result: result2
+        });
+        return formatToolResult(result2);
+      }
+    }));
+    const agent = new sdk.Agent({
+      name: request.agentId,
+      instructions: request.systemPrompt,
+      model: request.modelId,
+      modelSettings: {
+        temperature: request.temperature,
+        maxTokens: request.maxTokens
+      },
+      tools: openAiTools
+    });
+    const runner = new sdk.Runner({
+      tracingDisabled,
+      traceIncludeSensitiveData: false,
+      workflowName,
+      traceId,
+      groupId: request.sessionId || request.runId || void 0,
+      traceMetadata: {
+        adapter: this.id,
+        agentId: request.agentId,
+        providerId: request.providerId,
+        modelId: request.modelId,
+        stage: request.stage || "stage"
+      }
+    });
+    const result = await runner.run(agent, request.prompt, {
+      signal: request.signal
+    });
+    const text = readFinalOutput(result);
+    request.onChunk?.(text);
+    return {
+      agentId: request.agentId,
+      providerId: request.providerId,
+      modelId: request.modelId,
+      text,
+      toolResults,
+      trace: buildAgentRunTrace({
+        adapter: this.id,
+        request,
+        providerKind: provider.kind,
+        preparedTools,
+        policy: {
+          tracingDisabled,
+          traceIncludeSensitiveData: false
+        },
+        guardrails: [
+          {
+            name: "rdc-tool-allowlist",
+            scope: "tool-input",
+            status: "enforced"
+          },
+          {
+            name: "rdc-tool-result-summary",
+            scope: "tool-output",
+            status: "enforced"
+          },
+          {
+            name: "external-openai-tracing",
+            scope: "sdk-tracing",
+            status: tracingDisabled ? "disabled" : "available",
+            reason: tracingDisabled ? "non_openai_provider" : "official_openai_provider"
+          }
+        ],
+        sdkTrace: {
+          workflowName,
+          traceId,
+          externalExport: !tracingDisabled,
+          resultKeys: result && typeof result === "object" ? Object.keys(result) : []
+        }
+      })
+    };
+  }
+}
+class AgentRunnerRegistry {
+  adapters = [
+    new OpenAiAgentSdkAdapter(),
+    new ClaudeAgentSdkAdapter(),
+    new LlmAdapterAgentSdkAdapter()
+  ];
+  async run(request) {
+    const settings = settingsService.getAll();
+    const provider = settings.llm.providers.find((entry) => entry.id === request.providerId);
+    if (!provider || !provider.enabled || !provider.isConfigured) {
+      throw new Error(`Agent provider is not configured: ${request.providerId}`);
+    }
+    const adapter = this.adapters.find((entry) => entry.canRun(request));
+    if (!adapter) {
+      throw new Error(`No AgentRunner adapter for provider: ${request.providerId}`);
+    }
+    runtimeLogService.log({
+      scope: request.sessionId ? "session" : "app",
+      namespace: "agent",
+      severity: "info",
+      title: "Agent runner selected",
+      summary: `${request.agentId} 使用 ${adapter.id} 执行 ${request.stage || "stage"}。`,
+      sessionId: request.sessionId,
+      runId: request.runId,
+      raw: {
+        agentId: request.agentId,
+        providerId: request.providerId,
+        modelId: request.modelId,
+        adapter: adapter.id
+      }
+    });
+    return adapter.run(request, toolBridgeAgentToolPort);
+  }
+}
+const agentRunnerRegistry = new AgentRunnerRegistry();
+class WorkflowProjectionPublisher {
+  publish(channel, ...args) {
+    for (const window of electron.BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) {
+        window.webContents.send(channel, ...args);
+      }
+    }
+  }
+  publishWorkflowState(state2) {
+    this.publish("workflow:stateChanged", state2);
+    this.publish("workflow:stageChanged", {
+      stage: state2.currentStage,
+      blockers: state2.blockers
+    });
+  }
+  publishRunStatus(payload) {
+    this.publish("workflow:runStatusChanged", payload);
+  }
+  publishRunUsage(usage) {
+    this.publish("workflow:runUsageChanged", usage);
+  }
+  publishEvidenceEvent(event) {
+    this.publish("evidence:eventAdded", event);
+  }
+  publishConversationEvent(event) {
+    this.publish("conversation:event", event);
+  }
+  publishAgentStatus(state2) {
+    this.publish("agent:statusChanged", state2);
+  }
+  publishAgentMessage(message) {
+    this.publish("agent:message", message);
+  }
+}
+const workflowProjectionPublisher = new WorkflowProjectionPublisher();
+const SPECIALIST_TOOL_BINDINGS = {
+  triage_agent: [
+    "rd.session.get_context",
+    "rd.event.get_action_tree",
+    "rd.macro.summarize_frame"
+  ],
+  capture_repro_agent: [
+    "rd.capture.get_info",
+    "rd.capture.list_frames",
+    "rd.context.snapshot"
+  ],
+  pass_graph_pipeline_agent: [
+    "rd.pipeline.get_state_summary",
+    "rd.pipeline.get_output_targets",
+    "rd.macro.find_state_change_point"
+  ],
+  pixel_forensics_agent: [
+    "rd.macro.explain_pixel",
+    "rd.texture.get_pixel_value",
+    "rd.export.screenshot"
+  ],
+  shader_ir_agent: [
+    "rd.shader.get_disassembly",
+    "rd.shader.debug_start"
+  ],
+  driver_device_agent: [
+    "rd.session.get_context",
+    "rd.remote.connect",
+    "rd.remote.ping",
+    "rd.remote.list_devices"
+  ],
+  skeptic_agent: [],
+  curator_agent: [],
+  "rdc-debugger": []
+};
+const SHADER_EDIT_TOOLS = ["rd.shader.edit_and_replace", "rd.macro.shader_hotfix_validate"];
+function resolveAgentToolAllowlist(agentId, stage) {
+  const settings = settingsService.getAll();
+  const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, stage || "investigate", agentId);
+  if (runtimeProfile.toolAllowlist?.length) {
+    return runtimeProfile.toolAllowlist;
+  }
+  return SPECIALIST_TOOL_BINDINGS[agentId] ?? [];
+}
+function isToolAllowedForAgent(toolName, agentId, stage) {
+  if (SHADER_EDIT_TOOLS.includes(toolName)) {
+    return false;
+  }
+  const allowlist = resolveAgentToolAllowlist(agentId, stage);
+  for (const pattern of allowlist) {
+    if (pattern === "*" || pattern === toolName) {
+      return true;
+    }
+    if (pattern.endsWith(".*") && toolName.startsWith(pattern.slice(0, -1))) {
+      return true;
+    }
+  }
+  return false;
+}
+class AgentOrchestrator {
+  agentStates = /* @__PURE__ */ new Map();
+  agentConfigs = /* @__PURE__ */ new Map();
+  constructor() {
+    this.initializeAgents();
+  }
+  /**
+   * 设置主窗口引用
+   */
+  setMainWindow(_window) {
+  }
+  /**
+   * 初始化所有Agent
+   */
+  initializeAgents() {
+    const allRoles = [
+      "rdc-debugger",
+      "triage_agent",
+      "capture_repro_agent",
+      "pass_graph_pipeline_agent",
+      "pixel_forensics_agent",
+      "shader_ir_agent",
+      "driver_device_agent",
+      "skeptic_agent",
+      "curator_agent"
+    ];
+    for (const role of allRoles) {
+      this.agentStates.set(role, {
+        agentId: role,
+        status: "idle",
+        lastActivity: nowIso$1()
+      });
+      const defaultRouting = DEFAULT_MODEL_ROUTING[role];
+      this.agentConfigs.set(role, {
+        agentId: role,
+        systemPrompt: "",
+        modelProvider: defaultRouting.provider,
+        modelName: defaultRouting.model,
+        temperature: 0.7,
+        maxTokens: 4096,
+        category: this.getAgentCategory(role),
+        writeScope: this.getAgentWriteScopes(role)
+      });
+    }
+  }
+  /**
+   * 获取Agent类别
+   */
+  getAgentCategory(role) {
+    if (role === "rdc-debugger") return "orchestrator";
+    if (INVESTIGATOR_AGENTS.includes(role)) return "investigator";
+    if (VERIFIER_AGENTS.includes(role)) return "verifier";
+    if (REPORTER_AGENTS.includes(role)) return "reporter";
+    return "investigator";
+  }
+  /**
+   * 获取Agent写入范围
+   */
+  getAgentWriteScopes(role) {
+    if (role === "rdc-debugger") return ["workspace_control"];
+    if (INVESTIGATOR_AGENTS.includes(role)) return ["workspace_notes"];
+    if (role === "skeptic_agent") return ["session_signoff"];
+    if (role === "curator_agent") return ["workspace_reports", "session_artifacts", "knowledge_library"];
+    return [];
+  }
+  /**
+   * 获取Agent状态
+   */
+  getAgentState(agentId) {
+    return this.agentStates.get(agentId) || null;
+  }
+  /**
+   * 获取所有Agent状态
+   */
+  getAllAgentStates() {
+    return Array.from(this.agentStates.values());
+  }
+  /**
+   * 配置Agent
+   */
+  configureAgent(agentId, config) {
+    const existing = this.agentConfigs.get(agentId);
+    if (existing) {
+      this.agentConfigs.set(agentId, { ...existing, ...config });
+    }
+  }
+  /**
+   * 获取Agent配置
+   */
+  getAgentConfig(agentId) {
+    return this.agentConfigs.get(agentId) || null;
+  }
+  applyLlmConfig(config) {
+    const routeMap = new Map(config.agentRoutes.map((route) => [route.agentId, route]));
+    for (const [agentId, agentConfig] of this.agentConfigs.entries()) {
+      const fallback = DEFAULT_MODEL_ROUTING[agentId];
+      const route = routeMap.get(agentId);
+      this.agentConfigs.set(agentId, {
+        ...agentConfig,
+        modelProvider: route ? route.providerId : fallback.provider,
+        modelName: route ? route.modelId : fallback.model
+      });
+    }
+  }
+  resolveRuntimeProfile(agentId, stage) {
+    const settings = settingsService.getAll();
+    return executionProfileService.resolveAgentRuntimeProfile(settings, stage || "investigate", agentId);
+  }
+  async finalizeRecordedAssistantMessage(agentId, streamedContent, fallbackContent, context2) {
+    const finalContent = streamedContent || fallbackContent;
+    await this.recordMessage(agentId, "assistant", finalContent, context2);
+    return finalContent;
+  }
+  /**
+   * 发送消息给Agent
+   */
+  async sendMessage(agentId, content, context2, options) {
+    const fallbackConfig = this.agentConfigs.get(agentId);
+    if (!fallbackConfig) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+    this.updateAgentStatus(agentId, "thinking");
+    try {
+      const runtimeProfile = this.resolveRuntimeProfile(agentId, context2?.stageId);
+      const config = {
+        ...fallbackConfig,
+        systemPrompt: runtimeProfile.systemPrompt,
+        modelProvider: runtimeProfile.providerId,
+        modelName: runtimeProfile.modelId,
+        temperature: runtimeProfile.temperature ?? fallbackConfig.temperature,
+        maxTokens: runtimeProfile.maxTokens ?? fallbackConfig.maxTokens
+      };
+      const messages = [
+        { role: "system", content: config.systemPrompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}` },
+        { role: "user", content }
+      ];
+      await this.recordMessage(agentId, "user", content, context2);
+      const response = await agentRunnerRegistry.run({
+        agentId,
+        prompt: content,
+        systemPrompt: messages[0]?.content ?? "",
+        modelId: config.modelName,
+        providerId: config.modelProvider,
+        maxTokens: config.maxTokens,
+        temperature: config.temperature,
+        toolAllowlist: resolveAgentToolAllowlist(agentId, context2?.stageId),
+        stage: context2?.stageId,
+        caseId: context2?.caseId,
+        runId: context2?.runId,
+        sessionId: context2?.sessionId,
+        turnId: context2?.turnId,
+        signal: options?.signal,
+        onChunk: options?.onChunk,
+        onStreamEvent: options?.onStreamEvent
+      });
+      const finalContent = await this.finalizeRecordedAssistantMessage(
+        agentId,
+        response.text,
+        response.text,
+        context2
+      );
+      this.updateAgentStatus(agentId, "complete");
+      return finalContent;
+    } catch (error) {
+      this.updateAgentStatus(agentId, "error");
+      throw error;
+    }
+  }
+  async sendCoworkMessage(agentId, content, options) {
+    const fallbackConfig = this.agentConfigs.get(agentId);
+    if (!fallbackConfig) {
+      throw new Error(`Agent not found: ${agentId}`);
+    }
+    this.updateAgentStatus(agentId, "thinking");
+    try {
+      const settings = settingsService.getAll();
+      const routeMap = new Map(settings.llm.agentRoutes.map((route2) => [route2.agentId, route2]));
+      const route = routeMap.get(agentId);
+      const config = {
+        ...fallbackConfig,
+        modelProvider: route?.providerId || fallbackConfig.modelProvider,
+        modelName: route?.modelId || fallbackConfig.modelName,
+        systemPrompt: options?.systemPrompt || fallbackConfig.systemPrompt,
+        temperature: options?.temperature ?? fallbackConfig.temperature,
+        maxTokens: options?.maxTokens ?? fallbackConfig.maxTokens
+      };
+      if (process.env.RDC_AGENT_TEST_MODE === "1") {
+        let userMessage = content;
+        try {
+          const parsed = JSON.parse(content);
+          userMessage = parsed.effective_user_message || parsed.user_message || content;
+        } catch {
+          userMessage = content;
+        }
+        const lower = userMessage.toLowerCase();
+        let stub = "我在。你可以先告诉我你遇到了什么现象，或者直接说你希望我现在正式开始调试。";
+        if (/ue4|unreal/i.test(userMessage)) {
+          stub = "UE4 是 Unreal Engine 4。它是 Epic Games 的一代游戏引擎，常见于延迟渲染、材质系统、后处理链和 Shader 调试场景。";
+        } else if (/你好|您好|hello|hi/i.test(userMessage)) {
+          stub = "你好，我是 RDC Debugger。你可以先和我聊现象、问我能力范围，等你准备好 capture 后，我再进入正式的 RenderDoc 调试。";
+        } else if (/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower)) {
+          stub = "收到，我会先帮你整理正式调试前的关键信息，然后在条件满足时进入严格执行流程。";
+        }
+        this.updateAgentStatus(agentId, "complete");
+        const finalStub = `${stub}
+<control>{"intent":"${/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower) ? "execute" : "talk"}","safe_to_start":${/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower) ? "true" : "false"}}</control>`;
+        if (options?.onChunk) {
+          const midpoint = Math.max(1, Math.ceil(finalStub.length / 2));
+          options.onChunk(finalStub.slice(0, midpoint));
+          await Promise.resolve();
+          options.onChunk(finalStub.slice(midpoint));
+        }
+        return finalStub;
+      }
+      const response = await agentRunnerRegistry.run({
+        agentId,
+        prompt: content,
+        systemPrompt: config.systemPrompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}`,
+        modelId: config.modelName,
+        providerId: config.modelProvider,
+        maxTokens: config.maxTokens,
+        temperature: config.temperature,
+        toolAllowlist: [],
+        stage: "cowork",
+        sessionId: options?.sessionId,
+        turnId: options?.turnId,
+        signal: options?.signal,
+        onChunk: options?.onChunk,
+        onStreamEvent: options?.onStreamEvent
+      });
+      const finalContent = response.text;
+      runtimeLogService.log({
+        scope: options?.sessionId ? "session" : "app",
+        namespace: "agent",
+        severity: "info",
+        title: `${AGENT_DISPLAY_NAMES[agentId] || agentId} cowork turn`,
+        summary: finalContent.slice(0, 160) || "空消息",
+        sessionId: options?.sessionId,
+        raw: {
+          agentId,
+          providerId: response.providerId,
+          modelId: response.modelId,
+          adapter: response.trace?.adapter
+        }
+      });
+      this.updateAgentStatus(agentId, "complete");
+      return finalContent;
+    } catch (error) {
+      this.updateAgentStatus(agentId, "error");
+      throw error;
+    }
+  }
+  /**
+   * 获取 Specialist 可用工具清单（Task 4b）
+   * 根据角色过滤可用工具，确保 skeptic_agent 和 curator_agent 不接收任何 live tool
+   */
+  getToolsForRole(agentId) {
+    return resolveAgentToolAllowlist(agentId);
+  }
+  /**
+   * 检查工具是否允许被指定角色使用（Task 4b）
+   * shader 编辑工具默认只读，不在任何 specialist 的工具清单中
+   */
+  isToolAllowedForRole(toolName, agentId) {
+    return isToolAllowedForAgent(toolName, agentId);
+  }
+  /**
+   * 更新Agent状态
+   */
+  updateAgentStatus(agentId, status) {
+    const state2 = this.agentStates.get(agentId);
+    if (state2) {
+      state2.status = status;
+      state2.lastActivity = nowIso$1();
+      runtimeLogService.log({
+        scope: "app",
+        namespace: "agent",
+        severity: status === "error" ? "error" : status === "complete" ? "success" : "info",
+        title: AGENT_DISPLAY_NAMES[agentId] || agentId,
+        summary: `状态切换为 ${status}。`,
+        raw: {
+          agentId,
+          status
+        }
+      });
+      this.notifyAgentStateChanged(state2);
+    }
+  }
+  /**
+   * 记录消息
+   */
+  async recordMessage(agentId, role, content, context2) {
+    if (!context2?.sessionId) return;
+    const message = {
+      id: generateEventId("msg"),
+      agentId,
+      role,
+      content,
+      timestamp: nowMs()
+    };
+    if (context2.runId) {
+      await storageAdapter.appendActionEvent(context2.sessionId, storageAdapter.createActionEvent({
+        runId: context2.runId,
+        sessionId: context2.sessionId,
+        agentId,
+        eventType: role === "user" ? "user_message" : role === "assistant" ? "agent_summary" : "system",
+        status: role === "system" ? "warning" : "ok",
+        turnId: context2.turnId,
+        payload: {
+          role,
+          content,
+          message_id: message.id
+        }
+      }));
+    }
+    this.notifyMessage(message, context2?.sessionId);
+  }
+  /**
+   * 通知Agent状态变化
+   */
+  notifyAgentStateChanged(state2) {
+    workflowProjectionPublisher.publishAgentStatus(state2);
+  }
+  /**
+   * 通知消息
+   */
+  notifyMessage(message, sessionId) {
+    runtimeLogService.log({
+      scope: sessionId ? "session" : "app",
+      namespace: "agent",
+      severity: message.role === "system" ? "warning" : "info",
+      title: AGENT_DISPLAY_NAMES[message.agentId] || message.agentId,
+      summary: message.content.slice(0, 120) || "空消息",
+      sessionId,
+      raw: {
+        agentId: message.agentId,
+        role: message.role,
+        messageId: message.id,
+        content: message.content
+      },
+      timestamp: message.timestamp
+    });
+    workflowProjectionPublisher.publishAgentMessage(message);
+  }
+}
+const agentOrchestrator = new AgentOrchestrator();
 const BLOCKER_CODES = {
   // Capture相关
   BLOCKED_MISSING_CAPTURE: {
@@ -6614,6 +6827,67 @@ class PlanBuilder {
   }
 }
 const planBuilder = new PlanBuilder();
+class RunExecutionService {
+  activeRuns = /* @__PURE__ */ new Map();
+  startRun(context2, executor) {
+    const existing = this.activeRuns.get(context2.runId);
+    if (existing) {
+      return existing;
+    }
+    const abortController = new AbortController();
+    const controller = {
+      ...context2,
+      startedAt: Date.now(),
+      abortController
+    };
+    controller.promise = executor(abortController.signal).finally(() => {
+      const active = this.activeRuns.get(context2.runId);
+      if (active?.abortController === abortController) {
+        this.activeRuns.delete(context2.runId);
+      }
+    });
+    this.activeRuns.set(context2.runId, controller);
+    return controller;
+  }
+  listActiveRuns() {
+    return Array.from(this.activeRuns.values()).map((run) => ({
+      runId: run.runId,
+      sessionId: run.sessionId,
+      projectId: run.projectId,
+      startedAt: run.startedAt,
+      stage: run.stage
+    }));
+  }
+  getAbortSignal(runId) {
+    return this.activeRuns.get(runId)?.abortController.signal ?? null;
+  }
+  updateStage(runId, stage) {
+    const active = this.activeRuns.get(runId);
+    if (!active) {
+      return;
+    }
+    active.stage = stage;
+  }
+  isAbortRequested(runId) {
+    return this.activeRuns.get(runId)?.abortController.signal.aborted ?? false;
+  }
+  stopRun(runId) {
+    const active = this.activeRuns.get(runId);
+    if (!active) {
+      return false;
+    }
+    active.abortController.abort();
+    return true;
+  }
+  async stopAll() {
+    const runIds = Array.from(this.activeRuns.keys());
+    runIds.forEach((runId) => this.stopRun(runId));
+    await Promise.allSettled(
+      runIds.map((runId) => this.activeRuns.get(runId)?.promise)
+    );
+  }
+}
+const runExecutionService = new RunExecutionService();
 class DebuggerLlmBlockerError extends Error {
   blocker;
   constructor(blocker) {
@@ -6845,9 +7119,9 @@ class DebuggerLlmService {
       modelId: route.modelId
     };
   }
-  async call(context, request) {
+  async call(context2, request) {
     const settings = settingsService.getAll();
-    const route = this.resolveRoute(context.agentId, context.stage, settings);
+    const route = this.resolveRoute(context2.agentId, context2.stage, settings);
     if (process.env.RDC_AGENT_TEST_MODE === "1") {
       const response = {
         id: `test-llm-${Date.now()}`,
@@ -6860,7 +7134,7 @@ class DebuggerLlmService {
         stopReason: "end_turn"
       };
       const text = "";
-      await this.recordCall(context, route, response, "ok", "test-mode llm stub");
+      await this.recordCall(context2, route, response, "ok", "test-mode llm stub");
       return {
         route,
         response,
@@ -6874,14 +7148,14 @@ class DebuggerLlmService {
         model: route.modelId
       }, route.providerId);
       const text = extractTextContent(response.content);
-      await this.recordCall(context, route, response, "ok", text || `${route.providerId}/${route.modelId}`);
+      await this.recordCall(context2, route, response, "ok", text || `${route.providerId}/${route.modelId}`);
       return {
         route,
         response,
         text
       };
     } catch (error) {
-      await this.recordFailure(context, route, error instanceof Error ? error.message : String(error));
+      await this.recordFailure(context2, route, error instanceof Error ? error.message : String(error));
       throw this.toRuntimeError(route, error);
     }
   }
@@ -6971,17 +7245,17 @@ class DebuggerLlmService {
       [`agent:${route.agentId}`, `provider:${route.providerId}`, `model:${route.modelId}`]
     ));
   }
-  async recordCall(context, route, response, status, summary) {
-    this.updateRunSummary(context, route, response, status);
+  async recordCall(context2, route, response, status, summary) {
+    this.updateRunSummary(context2, route, response, status);
     runtimeLogService.log({
-      scope: context.sessionId ? "session" : "app",
+      scope: context2.sessionId ? "session" : "app",
       namespace: "llm",
       severity: status === "ok" ? "success" : "error",
       title: `${route.agentId} -> ${route.providerId}/${route.modelId}`,
       summary,
       detail: response.id ? `request=${response.id}` : void 0,
-      sessionId: context.sessionId ?? null,
-      runId: context.runId ?? null,
+      sessionId: context2.sessionId ?? null,
+      runId: context2.runId ?? null,
       raw: {
         agentId: route.agentId,
         stage: route.stage,
@@ -6991,12 +7265,12 @@ class DebuggerLlmService {
         usage: response.usage
       }
     });
-    if (!context.sessionId || !context.runId) {
+    if (!context2.sessionId || !context2.runId) {
       return;
     }
     const event = storageAdapter.createActionEvent({
-      runId: context.runId,
-      sessionId: context.sessionId,
+      runId: context2.runId,
+      sessionId: context2.sessionId,
       agentId: route.agentId,
       eventType: "llm_call",
       status,
@@ -7010,18 +7284,18 @@ class DebuggerLlmService {
         summary
       }
     });
-    await this.appendBroadcastEvent(context.sessionId, event);
+    await this.appendBroadcastEvent(context2.sessionId, event);
   }
-  async recordFailure(context, route, errorMessage) {
-    this.updateRunSummary(context, route, null, "error");
+  async recordFailure(context2, route, errorMessage) {
+    this.updateRunSummary(context2, route, null, "error");
     runtimeLogService.log({
-      scope: context.sessionId ? "session" : "app",
+      scope: context2.sessionId ? "session" : "app",
       namespace: "llm",
       severity: "error",
       title: `${route.agentId} -> ${route.providerId}/${route.modelId}`,
       summary: errorMessage,
-      sessionId: context.sessionId ?? null,
-      runId: context.runId ?? null,
+      sessionId: context2.sessionId ?? null,
+      runId: context2.runId ?? null,
       raw: {
         agentId: route.agentId,
         stage: route.stage,
@@ -7029,12 +7303,12 @@ class DebuggerLlmService {
         modelId: route.modelId
       }
     });
-    if (!context.sessionId || !context.runId) {
+    if (!context2.sessionId || !context2.runId) {
       return;
     }
     const event = storageAdapter.createActionEvent({
-      runId: context.runId,
-      sessionId: context.sessionId,
+      runId: context2.runId,
+      sessionId: context2.sessionId,
       agentId: route.agentId,
       eventType: "llm_call",
       status: "error",
@@ -7046,13 +7320,13 @@ class DebuggerLlmService {
         summary: errorMessage
       }
     });
-    await this.appendBroadcastEvent(context.sessionId, event);
+    await this.appendBroadcastEvent(context2.sessionId, event);
   }
-  updateRunSummary(context, route, response, status) {
-    if (!context.runId) {
+  updateRunSummary(context2, route, response, status) {
+    if (!context2.runId) {
       return;
     }
-    const existing = this.runSummaries.get(context.runId) ?? {
+    const existing = this.runSummaries.get(context2.runId) ?? {
       providerId: route.providerId,
       modelId: route.modelId,
       successfulCallCount: 0,
@@ -7082,8 +7356,8 @@ class DebuggerLlmService {
       requestId: response?.id,
       status
     });
-    this.runSummaries.set(context.runId, existing);
-    this.broadcastRunUsage(context.runId);
+    this.runSummaries.set(context2.runId, existing);
+    this.broadcastRunUsage(context2.runId);
   }
   broadcastRunUsage(runId) {
     const usage = this.getRunContextUsage(runId);
@@ -7527,12 +7801,12 @@ async function fileToImageBlock(filePath) {
   };
 }
 class SpecialistRecipeRunner {
-  async prepareSurface(context) {
+  async prepareSurface(context2) {
     const existingSnapshot = rdxSessionService.snapshotContext();
-    const existingCapture = rdxSessionService.getCaptureDescriptors().find((capture) => capture.id === context.debugPlan.targetCapture?.captureId || capture.filePath === context.targetCapturePath);
-    const existingReplaySessionId = existingCapture?.sessionId || existingCapture?.replaySessionId || existingSnapshot.sessionId || await this.resolveReplaySessionId(context);
+    const existingCapture = rdxSessionService.getCaptureDescriptors().find((capture) => capture.id === context2.debugPlan.targetCapture?.captureId || capture.filePath === context2.targetCapturePath);
+    const existingReplaySessionId = existingCapture?.sessionId || existingCapture?.replaySessionId || existingSnapshot.sessionId || await this.resolveReplaySessionId(context2);
     if (existingReplaySessionId) {
-      const frameIndex2 = getFrameIndex(context.debugPlan);
+      const frameIndex2 = getFrameIndex(context2.debugPlan);
       if (typeof frameIndex2 === "number") {
         await this.callTool(
           "rd.replay.set_frame",
@@ -7541,10 +7815,10 @@ class SpecialistRecipeRunner {
             frame_index: frameIndex2
           },
           "triage_agent",
-          context
+          context2
         );
       }
-      const eventId2 = getActiveEventId(context.debugPlan);
+      const eventId2 = getActiveEventId(context2.debugPlan);
       if (typeof eventId2 === "number") {
         await this.callTool(
           "rd.event.set_active",
@@ -7553,24 +7827,24 @@ class SpecialistRecipeRunner {
             event_id: eventId2
           },
           "triage_agent",
-          context
+          context2
         );
       }
       await this.openHumanPreviewSafe(existingReplaySessionId);
       return {
-        captureFileId: existingCapture?.captureFileId || existingCapture?.id || context.debugPlan.targetCapture?.captureId || "target_capture",
+        captureFileId: existingCapture?.captureFileId || existingCapture?.id || context2.debugPlan.targetCapture?.captureId || "target_capture",
         replaySessionId: existingReplaySessionId
       };
     }
     const openCapture = await this.callTool(
       "rd.capture.open_file",
       {
-        file_path: context.targetCapturePath
+        file_path: context2.targetCapturePath
       },
       "triage_agent",
-      context
+      context2
     );
-    const captureFileId = typeof openCapture.data?.capture_file_id === "string" ? openCapture.data.capture_file_id : context.debugPlan.targetCapture?.captureId;
+    const captureFileId = typeof openCapture.data?.capture_file_id === "string" ? openCapture.data.capture_file_id : context2.debugPlan.targetCapture?.captureId;
     if (!openCapture.ok || !captureFileId) {
       throw new Error(openCapture.error?.message || `Failed to open target capture. capture_id=${String(captureFileId || "")} data_keys=${Object.keys(openCapture.data || {}).join(",") || "none"}`);
     }
@@ -7580,13 +7854,13 @@ class SpecialistRecipeRunner {
         capture_file_id: captureFileId
       },
       "triage_agent",
-      context
+      context2
     );
-    const replaySessionId = typeof openReplay.data?.session_id === "string" ? openReplay.data.session_id : typeof openReplay.data?.replay_session_id === "string" ? openReplay.data.replay_session_id : await this.resolveReplaySessionId(context);
+    const replaySessionId = typeof openReplay.data?.session_id === "string" ? openReplay.data.session_id : typeof openReplay.data?.replay_session_id === "string" ? openReplay.data.replay_session_id : await this.resolveReplaySessionId(context2);
     if (!openReplay.ok || !replaySessionId) {
       throw new Error(openReplay.error?.message || `Failed to open replay session. data_keys=${Object.keys(openReplay.data || {}).join(",") || "none"}`);
     }
-    const frameIndex = getFrameIndex(context.debugPlan);
+    const frameIndex = getFrameIndex(context2.debugPlan);
     if (typeof frameIndex === "number") {
       await this.callTool(
         "rd.replay.set_frame",
@@ -7595,10 +7869,10 @@ class SpecialistRecipeRunner {
           frame_index: frameIndex
         },
         "triage_agent",
-        context
+        context2
       );
     }
-    const eventId = getActiveEventId(context.debugPlan);
+    const eventId = getActiveEventId(context2.debugPlan);
     if (typeof eventId === "number") {
       await this.callTool(
         "rd.event.set_active",
@@ -7607,7 +7881,7 @@ class SpecialistRecipeRunner {
           event_id: eventId
         },
         "triage_agent",
-        context
+        context2
       );
     }
     await this.openHumanPreviewSafe(replaySessionId);
@@ -7616,106 +7890,106 @@ class SpecialistRecipeRunner {
       replaySessionId: String(replaySessionId)
     };
   }
-  async run(agentId, context, surface) {
+  async run(agentId, context2, surface) {
     if (agentId === "triage_agent") {
-      return this.runTriage(context, surface);
+      return this.runTriage(context2, surface);
     }
     if (agentId === "capture_repro_agent") {
-      return this.runCaptureRepro(context, surface);
+      return this.runCaptureRepro(context2, surface);
     }
     if (agentId === "pass_graph_pipeline_agent") {
-      return this.runPassGraph(context, surface);
+      return this.runPassGraph(context2, surface);
     }
     if (agentId === "pixel_forensics_agent") {
-      return this.runPixelForensics(context, surface);
+      return this.runPixelForensics(context2, surface);
     }
     if (agentId === "shader_ir_agent") {
-      return this.runShaderIr(context, surface);
+      return this.runShaderIr(context2, surface);
     }
     if (agentId === "driver_device_agent") {
-      return this.runDriverDevice(context);
+      return this.runDriverDevice(context2);
     }
     throw new Error(`Unsupported specialist recipe: ${agentId}`);
   }
   async openHumanPreviewSafe(sessionId) {
     await rdxSessionService.openHumanPreviewWindow({ sessionId }).catch(() => void 0);
   }
-  async runTriage(context, surface) {
-    const eventId = getActiveEventId(context.debugPlan);
+  async runTriage(context2, surface) {
+    const eventId = getActiveEventId(context2.debugPlan);
     const payloads = [];
     const info = await this.callTool("rd.capture.get_info", {
       capture_file_id: surface.captureFileId
-    }, "triage_agent", context);
+    }, "triage_agent", context2);
     payloads.push(this.toPayload("rd.capture.get_info", info));
     const frame = await this.callTool("rd.replay.get_frame_info", {
       session_id: surface.replaySessionId
-    }, "triage_agent", context);
+    }, "triage_agent", context2);
     payloads.push(this.toPayload("rd.replay.get_frame_info", frame));
     if (typeof eventId === "number") {
       const action = await this.callTool("rd.event.get_action_details", {
         session_id: surface.replaySessionId,
         event_id: eventId
-      }, "triage_agent", context);
+      }, "triage_agent", context2);
       payloads.push(this.toPayload("rd.event.get_action_details", action));
       const parentChain = await this.callTool("rd.event.get_parent_chain", {
         session_id: surface.replaySessionId,
         event_id: eventId
-      }, "triage_agent", context);
+      }, "triage_agent", context2);
       payloads.push(this.toPayload("rd.event.get_parent_chain", parentChain));
       const markerStack = await this.callTool("rd.event.get_marker_stack", {
         session_id: surface.replaySessionId,
         event_id: eventId
-      }, "triage_agent", context);
+      }, "triage_agent", context2);
       payloads.push(this.toPayload("rd.event.get_marker_stack", markerStack));
     }
     const summary = await this.callTool("rd.macro.summarize_frame", {
       session_id: surface.replaySessionId
-    }, "triage_agent", context);
+    }, "triage_agent", context2);
     payloads.push(this.toPayload("rd.macro.summarize_frame", summary));
-    return this.finishRecipe("triage_agent", context, payloads, [
+    return this.finishRecipe("triage_agent", context2, payloads, [
       "Capture metadata",
       "Frame summary",
       eventId ? `Event ${eventId}` : "Frame-level scope"
     ]);
   }
-  async runCaptureRepro(context, surface) {
+  async runCaptureRepro(context2, surface) {
     const payloads = [];
     const listFrames = await this.callTool("rd.capture.list_frames", {
       capture_file_id: surface.captureFileId
-    }, "capture_repro_agent", context);
+    }, "capture_repro_agent", context2);
     payloads.push(this.toPayload("rd.capture.list_frames", listFrames));
-    const screenshotPath = path.join(context.outputRoot, "screenshots", "capture_repro.png");
+    const screenshotPath = path.join(context2.outputRoot, "screenshots", "capture_repro.png");
     const screenshot = await this.callTool("rd.export.screenshot", {
       session_id: surface.replaySessionId,
       output_path: screenshotPath,
       file_format: "png",
       include_alpha: true
-    }, "capture_repro_agent", context);
+    }, "capture_repro_agent", context2);
     payloads.push(this.toPayload("rd.export.screenshot", screenshot));
-    return this.finishRecipe("capture_repro_agent", context, payloads, [
+    return this.finishRecipe("capture_repro_agent", context2, payloads, [
       "Frame list",
       "Reference screenshot"
     ]);
   }
-  async runPassGraph(context, surface) {
-    const eventId = getActiveEventId(context.debugPlan);
+  async runPassGraph(context2, surface) {
+    const eventId = getActiveEventId(context2.debugPlan);
     const payloads = [];
     const stageState = await this.callTool("rd.pipeline.get_state_summary", {
       session_id: surface.replaySessionId,
       event_id: eventId,
       include_bindings: true,
       include_shaders: true
-    }, "pass_graph_pipeline_agent", context);
+    }, "pass_graph_pipeline_agent", context2);
     payloads.push(this.toPayload("rd.pipeline.get_state_summary", stageState));
     const outputTargets = await this.callTool("rd.pipeline.get_output_targets", {
       session_id: surface.replaySessionId,
       event_id: eventId
-    }, "pass_graph_pipeline_agent", context);
+    }, "pass_graph_pipeline_agent", context2);
     payloads.push(this.toPayload("rd.pipeline.get_output_targets", outputTargets));
     const bindings = await this.callTool("rd.pipeline.get_resource_bindings", {
       session_id: surface.replaySessionId,
       stage: "ps"
-    }, "pass_graph_pipeline_agent", context);
+    }, "pass_graph_pipeline_agent", context2);
     payloads.push(this.toPayload("rd.pipeline.get_resource_bindings", bindings));
     if (typeof eventId === "number" && eventId > 1) {
       const diff = await this.callTool("rd.event.diff_pipeline_state", {
@@ -7724,26 +7998,26 @@ class SpecialistRecipeRunner {
         event_b: eventId,
         scope: "full",
         include_unchanged: false
-      }, "pass_graph_pipeline_agent", context);
+      }, "pass_graph_pipeline_agent", context2);
       payloads.push(this.toPayload("rd.event.diff_pipeline_state", diff));
     }
-    return this.finishRecipe("pass_graph_pipeline_agent", context, payloads, [
+    return this.finishRecipe("pass_graph_pipeline_agent", context2, payloads, [
       "Pipeline summary",
       "Output targets",
       "Binding diff"
     ]);
   }
-  async runPixelForensics(context, surface) {
+  async runPixelForensics(context2, surface) {
     const payloads = [];
-    const screenshotPath = path.join(context.outputRoot, "screenshots", "pixel_forensics.png");
+    const screenshotPath = path.join(context2.outputRoot, "screenshots", "pixel_forensics.png");
     const screenshot = await this.callTool("rd.export.screenshot", {
       session_id: surface.replaySessionId,
       output_path: screenshotPath,
       file_format: "png",
       include_alpha: true
-    }, "pixel_forensics_agent", context);
+    }, "pixel_forensics_agent", context2);
     payloads.push(this.toPayload("rd.export.screenshot", screenshot));
-    const point = await this.locatePixelFocus(screenshotPath, context.debugPlan.userGoal);
+    const point = await this.locatePixelFocus(screenshotPath, context2.debugPlan.userGoal);
     const resolvedTextureId = typeof screenshot.data?.texture_id === "string" ? screenshot.data.texture_id : void 0;
     const explain = await this.callTool("rd.macro.explain_pixel", {
       session_id: surface.replaySessionId,
@@ -7751,7 +8025,7 @@ class SpecialistRecipeRunner {
       y: point.y,
       target: resolvedTextureId ?? "auto",
       verbosity: "medium"
-    }, "pixel_forensics_agent", context);
+    }, "pixel_forensics_agent", context2);
     payloads.push(this.toPayload("rd.macro.explain_pixel", explain));
     if (resolvedTextureId) {
       const pixelValue = await this.callTool("rd.texture.get_pixel_value", {
@@ -7763,7 +8037,7 @@ class SpecialistRecipeRunner {
         slice: 0,
         sample: 0,
         as_type: "float"
-      }, "pixel_forensics_agent", context);
+      }, "pixel_forensics_agent", context2);
       payloads.push(this.toPayload("rd.texture.get_pixel_value", pixelValue));
       const pixelHistory = await this.callTool("rd.texture.get_pixel_history", {
         session_id: surface.replaySessionId,
@@ -7774,17 +8048,17 @@ class SpecialistRecipeRunner {
         slice: 0,
         sample: 0,
         include_shaders: true
-      }, "pixel_forensics_agent", context);
+      }, "pixel_forensics_agent", context2);
       payloads.push(this.toPayload("rd.texture.get_pixel_history", pixelHistory));
     }
-    return this.finishRecipe("pixel_forensics_agent", context, payloads, [
+    return this.finishRecipe("pixel_forensics_agent", context2, payloads, [
       `Pixel focus ${point.x},${point.y}`,
       "Framebuffer screenshot",
       "Pixel explanation"
     ], [screenshotPath]);
   }
-  async runShaderIr(context, surface) {
-    const eventId = getActiveEventId(context.debugPlan);
+  async runShaderIr(context2, surface) {
+    const eventId = getActiveEventId(context2.debugPlan);
     const payloads = [];
     let shaderId;
     let shaderStage = "ps";
@@ -7793,7 +8067,7 @@ class SpecialistRecipeRunner {
         session_id: surface.replaySessionId,
         event_id: eventId,
         stage
-      }, "shader_ir_agent", context);
+      }, "shader_ir_agent", context2);
       payloads.push(this.toPayload(`rd.pipeline.get_shader:${stage}`, shader));
       const candidateShaderId = typeof shader.data?.shader_id === "string" ? shader.data.shader_id : typeof shader.data?.resource_id === "string" ? shader.data.resource_id : void 0;
       if (candidateShaderId) {
@@ -7807,14 +8081,14 @@ class SpecialistRecipeRunner {
         session_id: surface.replaySessionId,
         shader_id: shaderId,
         prefer_original: true
-      }, "shader_ir_agent", context);
+      }, "shader_ir_agent", context2);
       payloads.push(this.toPayload("rd.shader.get_source", source));
       const disassembly = await this.callTool("rd.shader.get_disassembly", {
         session_id: surface.replaySessionId,
         shader_id: shaderId,
         stage: shaderStage,
         event_id: eventId
-      }, "shader_ir_agent", context);
+      }, "shader_ir_agent", context2);
       payloads.push(this.toPayload("rd.shader.get_disassembly", disassembly));
       const reflection = await this.callTool("rd.shader.get_reflection", {
         session_id: surface.replaySessionId,
@@ -7823,51 +8097,51 @@ class SpecialistRecipeRunner {
         event_id: eventId,
         include_bindings: true,
         include_constant_blocks: true
-      }, "shader_ir_agent", context);
+      }, "shader_ir_agent", context2);
       payloads.push(this.toPayload("rd.shader.get_reflection", reflection));
     }
-    return this.finishRecipe("shader_ir_agent", context, payloads, [
+    return this.finishRecipe("shader_ir_agent", context2, payloads, [
       shaderId ? `Shader ${shaderId}` : "Shader lookup attempted",
       `Stage ${shaderStage}`
     ]);
   }
-  async runDriverDevice(context) {
+  async runDriverDevice(context2) {
     const payloads = [];
     const contextSnapshot = await this.callTool("rd.session.get_context", {
-      context_id: context.contextId
-    }, "driver_device_agent", context);
+      context_id: context2.contextId
+    }, "driver_device_agent", context2);
     payloads.push(this.toPayload("rd.session.get_context", contextSnapshot));
     const ping = await this.callTool("rd.remote.ping", {
       remote_id: "current"
-    }, "driver_device_agent", context);
+    }, "driver_device_agent", context2);
     payloads.push(this.toPayload("rd.remote.ping", ping));
-    return this.finishRecipe("driver_device_agent", context, payloads, [
+    return this.finishRecipe("driver_device_agent", context2, payloads, [
       "Runtime context",
       "Remote status probe"
     ]);
   }
-  async callTool(toolName, args, agentId, context) {
+  async callTool(toolName, args, agentId, context2) {
     const result = await harnessController.wrapToolExecution({
       toolName,
       args,
       agentId,
-      sessionId: context.sessionId,
-      runId: context.runId,
-      turnId: context.turnId,
+      sessionId: context2.sessionId,
+      runId: context2.runId,
+      turnId: context2.turnId,
       execute: () => toolBridge.call({
         toolName,
         args: {
           ...args,
-          context_id: context.contextId,
-          runtime_owner: context.runtimeOwner,
-          owner_lease_id: context.ownerLeaseId
+          context_id: context2.contextId,
+          runtime_owner: context2.runtimeOwner,
+          owner_lease_id: context2.ownerLeaseId
         },
-        contextId: context.contextId,
-        turnId: context.turnId,
-        runtimeOwner: context.runtimeOwner,
-        ownerLeaseId: context.ownerLeaseId,
-        runId: context.runId,
-        abortSignal: context.signal
+        contextId: context2.contextId,
+        turnId: context2.turnId,
+        runtimeOwner: context2.runtimeOwner,
+        ownerLeaseId: context2.ownerLeaseId,
+        runId: context2.runId,
+        abortSignal: context2.signal
       })
     });
     return {
@@ -7878,9 +8152,9 @@ class SpecialistRecipeRunner {
       duration_ms: 0
     };
   }
-  async resolveReplaySessionId(context) {
+  async resolveReplaySessionId(context2) {
     for (const toolName of ["rd.session.get_context", "rd.session.list_sessions", "rd.core.get_capabilities"]) {
-      const result = await this.callTool(toolName, {}, "triage_agent", context);
+      const result = await this.callTool(toolName, {}, "triage_agent", context2);
       if (!result.ok) {
         continue;
       }
@@ -7950,8 +8224,8 @@ Find the suspicious bright white highlight that should be investigated first.`
       y: Math.max(0, Math.min(dims.height - 1, Math.round(clamp01(toNumber(data.normalized_y, 0.5)) * dims.height)))
     };
   }
-  async finishRecipe(agentId, context, payloads, evidence, extraArtifacts = []) {
-    const agentRoot = path.join(context.outputRoot, "notes");
+  async finishRecipe(agentId, context2, payloads, evidence, extraArtifacts = []) {
+    const agentRoot = path.join(context2.outputRoot, "notes");
     fs.mkdirSync(agentRoot, { recursive: true });
     const artifactPath = path.join(agentRoot, `${agentId}.json`);
     fs.writeFileSync(artifactPath, JSON.stringify(payloads, null, 2), "utf-8");
@@ -7978,8 +8252,8 @@ Find the suspicious bright white highlight that should be investigated first.`
       const structuredResult = await debuggerLlmService.callStructured({
         agentId,
         stage: "dispatch",
-        sessionId: context.sessionId,
-        runId: context.runId,
+        sessionId: context2.sessionId,
+        runId: context2.runId,
         messages: [
           {
             role: "system",
@@ -7992,7 +8266,7 @@ Find the suspicious bright white highlight that should be investigated first.`
                 type: "text",
                 text: [
                   `Agent: ${agentId}`,
-                  `Goal: ${context.debugPlan.userGoal}`,
+                  `Goal: ${context2.debugPlan.userGoal}`,
                   `Evidence anchors: ${evidence.join(" | ") || "N/A"}`,
                   `Successful tools: ${successfulTools.map((payload) => payload.toolName).join(", ") || "none"}`,
                   `Failed tools: ${failedTools.map((payload) => `${payload.toolName}: ${payload.error || "failed"}`).join(" | ") || "none"}`,
@@ -8013,8 +8287,8 @@ Find the suspicious bright white highlight that should be investigated first.`
       const fallbackResult = await debuggerLlmService.call({
         agentId,
         stage: "dispatch",
-        sessionId: context.sessionId,
-        runId: context.runId
+        sessionId: context2.sessionId,
+        runId: context2.runId
       }, {
         messages: [
           {
@@ -8028,7 +8302,7 @@ Find the suspicious bright white highlight that should be investigated first.`
                 type: "text",
                 text: [
                   `Agent: ${agentId}`,
-                  `Goal: ${context.debugPlan.userGoal}`,
+                  `Goal: ${context2.debugPlan.userGoal}`,
                   `Evidence anchors: ${evidence.join(" | ") || "N/A"}`,
                   `Successful tools: ${successfulTools.map((payload) => payload.toolName).join(", ") || "none"}`,
                   `Failed tools: ${failedTools.map((payload) => `${payload.toolName}: ${payload.error || "failed"}`).join(" | ") || "none"}`
@@ -8310,6 +8584,126 @@ class ReportBundleService {
   }
 }
 const reportBundleService = new ReportBundleService();
+class RunScopedStore {
+  getRunRoot(sessionId, runId) {
+    return storageAdapter.getRunPath(sessionId, runId);
+  }
+  readJson(sessionId, runId, relativePath, fallback) {
+    const filePath = this.resolveRunPath(sessionId, runId, relativePath);
+    if (!fs__namespace.existsSync(filePath)) {
+      return fallback;
+    }
+    try {
+      return JSON.parse(fs__namespace.readFileSync(filePath, "utf-8"));
+    } catch (error) {
+      console.error(`[RunScopedStore] Failed to read ${filePath}`, error);
+      return fallback;
+    }
+  }
+  writeJson(sessionId, runId, relativePath, data) {
+    const filePath = this.resolveRunPath(sessionId, runId, relativePath);
+    fs__namespace.mkdirSync(path__namespace.dirname(filePath), { recursive: true });
+    fs__namespace.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+    return filePath;
+  }
+  readJsonl(sessionId, runId, relativePath) {
+    return readJsonl(this.resolveRunPath(sessionId, runId, relativePath));
+  }
+  writeJsonl(sessionId, runId, relativePath, items) {
+    const filePath = this.resolveRunPath(sessionId, runId, relativePath);
+    writeJsonl(filePath, items);
+    return filePath;
+  }
+  appendJsonl(sessionId, runId, relativePath, item) {
+    const items = this.readJsonl(sessionId, runId, relativePath);
+    items.push(item);
+    return this.writeJsonl(sessionId, runId, relativePath, items);
+  }
+  resolveRunPath(sessionId, runId, relativePath) {
+    const runRoot = this.getRunRoot(sessionId, runId);
+    const targetPath = path__namespace.resolve(runRoot, relativePath);
+    if (!this.isPathInside(runRoot, targetPath)) {
+      throw new Error(`Run-scoped write escaped run directory: ${relativePath}`);
+    }
+    return targetPath;
+  }
+  isPathInside(rootPath, targetPath) {
+    const relative = path__namespace.relative(path__namespace.resolve(rootPath), path__namespace.resolve(targetPath));
+    return relative === "" || !relative.startsWith("..") && !path__namespace.isAbsolute(relative);
+  }
+}
+const runScopedStore = new RunScopedStore();
+const STORE_PATH = "artifact_store.json";
+class ArtifactStore {
+  read(sessionId, runId) {
+    return runScopedStore.readJson(
+      sessionId,
+      runId,
+      STORE_PATH,
+      {
+        schemaVersion: "1",
+        runId,
+        sessionId,
+        artifacts: [],
+        updatedAt: nowIso$1()
+      }
+    );
+  }
+  list(sessionId, runId) {
+    return this.read(sessionId, runId).artifacts;
+  }
+  get(sessionId, runId, artifactId) {
+    return this.list(sessionId, runId).find((artifact) => artifact.artifactId === artifactId) ?? null;
+  }
+  register(sessionId, runId, record) {
+    this.assertRunBinding(sessionId, runId, record);
+    const scopedPath = this.resolveArtifactPath(sessionId, runId, record.filePath);
+    const stat = fs__namespace.existsSync(scopedPath) ? fs__namespace.statSync(scopedPath) : null;
+    const now = nowIso$1();
+    const nextRecord = {
+      ...record,
+      filePath: scopedPath,
+      sizeBytes: stat?.size ?? record.sizeBytes,
+      createdAt: record.createdAt || now,
+      updatedAt: now
+    };
+    const snapshot = this.read(sessionId, runId);
+    const existingIndex = snapshot.artifacts.findIndex((artifact) => artifact.artifactId === record.artifactId);
+    const artifacts = [...snapshot.artifacts];
+    if (existingIndex >= 0) {
+      artifacts[existingIndex] = {
+        ...artifacts[existingIndex],
+        ...nextRecord,
+        createdAt: artifacts[existingIndex].createdAt
+      };
+    } else {
+      artifacts.push(nextRecord);
+    }
+    this.write({
+      ...snapshot,
+      artifacts,
+      updatedAt: now
+    });
+    return existingIndex >= 0 ? artifacts[existingIndex] : nextRecord;
+  }
+  write(snapshot) {
+    runScopedStore.writeJson(snapshot.sessionId, snapshot.runId, STORE_PATH, snapshot);
+  }
+  resolveArtifactPath(sessionId, runId, filePath) {
+    const runRoot = runScopedStore.getRunRoot(sessionId, runId);
+    const resolvedPath = path__namespace.isAbsolute(filePath) ? path__namespace.resolve(filePath) : path__namespace.resolve(runRoot, "artifacts", filePath);
+    if (!runScopedStore.isPathInside(runRoot, resolvedPath)) {
+      throw new Error(`Artifact path escaped run directory: ${filePath}`);
+    }
+    return resolvedPath;
+  }
+  assertRunBinding(sessionId, runId, value) {
+    if (value.sessionId !== sessionId || value.runId !== runId) {
+      throw new Error(`Run binding mismatch for ${value.sessionId}/${value.runId}`);
+    }
+  }
+}
+const artifactStore = new ArtifactStore();
 const EVIDENCE_PATH = "evidence-ledger.jsonl";
 const VERIFICATION_PATH = "verification_results.jsonl";
 class EvidenceLedger {
@@ -8513,6 +8907,17 @@ class ContextService {
   }
 }
 const contextService = new ContextService();
+const KNOWN_AGENT_ROLES = /* @__PURE__ */ new Set([
+  "rdc-debugger",
+  "triage_agent",
+  "capture_repro_agent",
+  "pass_graph_pipeline_agent",
+  "pixel_forensics_agent",
+  "shader_ir_agent",
+  "driver_device_agent",
+  "skeptic_agent",
+  "curator_agent"
+]);
 function latestStageHistory(events) {
   return events.filter((event) => event.event_type === "workflow_stage_transition").map((event) => normalizeWorkflowStage(String(event.payload.toStage || "preflight")));
 }
@@ -8529,17 +8934,6 @@ function dedupeBlockers(blockers) {
   }
   return result;
 }
-const KNOWN_AGENT_ROLES = /* @__PURE__ */ new Set([
-  "rdc-debugger",
-  "triage_agent",
-  "capture_repro_agent",
-  "pass_graph_pipeline_agent",
-  "pixel_forensics_agent",
-  "shader_ir_agent",
-  "driver_device_agent",
-  "skeptic_agent",
-  "curator_agent"
-]);
 function toStringArray(value) {
   if (Array.isArray(value)) {
     return value.map((entry) => String(entry ?? "").trim()).filter(Boolean);
@@ -10219,8 +10613,8 @@ class DebugWorkflowService {
     }
     return null;
   }
-  emitWorkflowState(state) {
-    workflowProjectionPublisher.publishWorkflowState(state);
+  emitWorkflowState(state2) {
+    workflowProjectionPublisher.publishWorkflowState(state2);
   }
   emitRunStatus(sessionId, runId, status, lastStage, stopReason) {
     workflowProjectionPublisher.publishRunStatus({
@@ -10273,6 +10667,206 @@ class DebuggerRuntime {
   }
 }
 const debuggerRuntime = new DebuggerRuntime();
+function registerAgentHandlers(context2) {
+  const { state: state2 } = context2;
+  electron.ipcMain.handle("agent:sendMessage", async (_event, agentId, content) => {
+    try {
+      let runContext;
+      if (state2.currentSessionId) {
+        const currentRun = state2.currentRunId ? storageAdapter.listRuns(state2.currentSessionId).find((run) => run.runId === state2.currentRunId) : storageAdapter.getLatestRun(state2.currentSessionId);
+        if (currentRun) {
+          runContext = {
+            caseId: currentRun.caseId,
+            runId: currentRun.runId,
+            sessionId: currentRun.sessionId
+          };
+        }
+      }
+      const response = await agentOrchestrator.sendMessage(agentId, content, runContext, {
+        signal: (runContext?.runId ? runExecutionService.getAbortSignal(runContext.runId) : null) ?? void 0
+      });
+      return { response };
+    } catch (error) {
+      return {
+        response: void 0,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("agent:getState", async (_event, agentId) => {
+    return agentOrchestrator.getAgentState(agentId);
+  });
+  electron.ipcMain.handle("agent:getAllStates", async () => {
+    return agentOrchestrator.getAllAgentStates();
+  });
+  electron.ipcMain.handle("agent:configure", async (_event, agentId, config) => {
+    try {
+      agentOrchestrator.configureAgent(agentId, config);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+}
+function registerCaptureDeviceHandlers(context2) {
+  const { state: state2 } = context2;
+  electron.ipcMain.handle("context:get", async () => {
+    return rdxSessionService.snapshotContext();
+  });
+  electron.ipcMain.handle("context:openHumanPreview", async (_event, request) => {
+    try {
+      const contextSnapshot = await rdxSessionService.openHumanPreviewWindow(request);
+      context2.broadcastToRenderer("context:changed", contextSnapshot);
+      const preview = contextSnapshot.humanPreview;
+      return {
+        success: preview?.status === "open" || preview?.status === "opening",
+        contextSnapshot,
+        error: preview?.lastError
+      };
+    } catch (error) {
+      const contextSnapshot = rdxSessionService.snapshotContext();
+      return {
+        success: false,
+        contextSnapshot,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("context:closeHumanPreview", async () => {
+    try {
+      const contextSnapshot = await rdxSessionService.closeHumanPreviewWindow();
+      context2.broadcastToRenderer("context:changed", contextSnapshot);
+      return {
+        success: contextSnapshot.humanPreview?.status === "closed",
+        contextSnapshot,
+        error: contextSnapshot.humanPreview?.lastError
+      };
+    } catch (error) {
+      const contextSnapshot = rdxSessionService.snapshotContext();
+      return {
+        success: false,
+        contextSnapshot,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("capture:list", async () => {
+    return { captures: rdxSessionService.getCaptureDescriptors() };
+  });
+  electron.ipcMain.handle(
+    "capture:openProjectInput",
+    async (_event, request) => {
+      try {
+        runtimeLogService.log({
+          scope: state2.currentSessionId ? "session" : "app",
+          namespace: "capture",
+          severity: "info",
+          title: "Open project input",
+          summary: `开始打开 ${request.inputId}。`,
+          detail: request.filePath,
+          sessionId: state2.currentSessionId,
+          projectId: request.projectId,
+          runId: state2.currentRunId,
+          raw: {
+            inputId: request.inputId,
+            replayDeviceId: request.replayDeviceId,
+            filePath: request.filePath
+          }
+        });
+        const input = storageAdapter.listProjectInputs(request.projectId).find((entry) => entry.inputId === request.inputId && entry.filePath === request.filePath);
+        if (!input) {
+          return { success: false, error: `Project input not found: ${request.inputId}` };
+        }
+        const replayDevice = replayDeviceService.getDeviceById(request.replayDeviceId);
+        if (!replayDevice) {
+          return { success: false, error: `Replay device not found: ${request.replayDeviceId}` };
+        }
+        const openedCapture = await rdxSessionService.openProjectInput({
+          projectId: request.projectId,
+          inputId: input.inputId,
+          filePath: input.filePath,
+          replayDevice
+        });
+        const contextSnapshot = rdxSessionService.snapshotContext();
+        context2.broadcastToRenderer("capture:openedStateChanged", openedCapture);
+        context2.broadcastToRenderer("context:changed", contextSnapshot);
+        runtimeLogService.log({
+          scope: state2.currentSessionId ? "session" : "app",
+          namespace: "capture",
+          severity: "success",
+          title: "Project input opened",
+          summary: `${input.fileName} 已打开。`,
+          detail: openedCapture.preview?.source === "framebuffer_screenshot" ? "预览来源：framebuffer" : openedCapture.preview?.source === "capture_thumbnail" ? "预览来源：thumbnail" : openedCapture.previewError?.code ? `当前无可用预览：${openedCapture.previewError.code}` : "当前无可用预览",
+          sessionId: state2.currentSessionId,
+          projectId: request.projectId,
+          runId: state2.currentRunId,
+          raw: {
+            openedCapture,
+            contextSnapshot
+          }
+        });
+        return { success: true, openedCapture, contextSnapshot };
+      } catch (err) {
+        runtimeLogService.log({
+          scope: state2.currentSessionId ? "session" : "app",
+          namespace: "capture",
+          severity: "error",
+          title: "Project input open failed",
+          summary: err instanceof Error ? err.message : String(err),
+          sessionId: state2.currentSessionId,
+          projectId: request.projectId,
+          runId: state2.currentRunId,
+          raw: {
+            inputId: request.inputId,
+            replayDeviceId: request.replayDeviceId,
+            filePath: request.filePath
+          }
+        });
+        return { success: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    }
+  );
+  electron.ipcMain.handle("capture:getOpenedState", async () => {
+    return rdxSessionService.snapshotOpenedCapture();
+  });
+  electron.ipcMain.handle("capture:clearOpenedState", async () => {
+    await rdxSessionService.closeOrReplaceOpenedCapture();
+    context2.broadcastToRenderer("capture:openedStateChanged", null);
+    context2.broadcastToRenderer("context:changed", rdxSessionService.snapshotContext());
+    runtimeLogService.log({
+      scope: state2.currentSessionId ? "session" : "app",
+      namespace: "capture",
+      severity: "info",
+      title: "Opened capture cleared",
+      summary: "当前打开的 capture 已清理。",
+      sessionId: state2.currentSessionId,
+      projectId: state2.currentProjectId,
+      runId: state2.currentRunId
+    });
+    return { success: true };
+  });
+  electron.ipcMain.handle("capture:select", async (_event, captureId) => {
+    try {
+      await rdxSessionService.switchActiveCapture(captureId);
+      context2.broadcastToRenderer("capture:statusChanged", { captureId, status: "selected" });
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+  electron.ipcMain.handle("device:list", async () => {
+    return replayDeviceService.listDevices();
+  });
+  electron.ipcMain.handle("device:refresh", async () => {
+    return replayDeviceService.refreshDevices();
+  });
+  electron.ipcMain.handle("device:activate", async (_event, deviceId) => {
+    return replayDeviceService.activateDevice(deviceId);
+  });
+}
 const EXECUTE_PATTERN = /开始|启动|执行|正式分析|直接分析|现在分析|run\b|start\b|debug\b|analy[sz]e\b|帮我调试|请调试|开始调试|开始分析/i;
 const TASK_FILE_PATTERN = /([A-Za-z]:[\\/][^\r\n"]+\.(txt|md))/i;
 const CONTROL_OPEN_TAG = "<control>";
@@ -10421,7 +11015,7 @@ function resolveTaskFileContext(message) {
     effectiveMessage: [message, taskFileContent].filter(Boolean).join("\n\n")
   };
 }
-function buildCoworkPrompt(context, history, mode, message, attachments) {
+function buildCoworkPrompt(context2, history, mode, message, attachments) {
   const resolvedTaskFile = resolveTaskFileContext(message);
   const recentHistory = history.slice(-6).map((entry) => ({
     role: entry.role,
@@ -10434,11 +11028,11 @@ function buildCoworkPrompt(context, history, mode, message, attachments) {
     effective_user_message: resolvedTaskFile.effectiveMessage,
     task_file_path: resolvedTaskFile.taskFilePath,
     task_file_content: resolvedTaskFile.taskFileContent,
-    current_project_id: context.projectId,
-    current_session_id: context.session?.sessionId ?? null,
-    active_run_id: context.currentRun?.runId ?? null,
-    opened_capture: context.openedCapturePath,
-    project_inputs: context.projectInputs.slice(0, 8).map((entry) => entry.fileName),
+    current_project_id: context2.projectId,
+    current_session_id: context2.session?.sessionId ?? null,
+    active_run_id: context2.currentRun?.runId ?? null,
+    opened_capture: context2.openedCapturePath,
+    project_inputs: context2.projectInputs.slice(0, 8).map((entry) => entry.fileName),
     incoming_attachments: attachments.map((entry) => ({
       file_name: entry.fileName,
       kind: entry.kind,
@@ -10476,20 +11070,20 @@ function hasUsableDebuggerRoute() {
 function inferExplicitCapture(message, projectInputs) {
   return projectInputs.find((entry) => message.includes(entry.fileName)) ?? null;
 }
-function resolveCaptureGuards(message, context) {
-  const explicitCapture = inferExplicitCapture(message, context.projectInputs);
-  if (context.openedCapturePath || explicitCapture) {
+function resolveCaptureGuards(message, context2) {
+  const explicitCapture = inferExplicitCapture(message, context2.projectInputs);
+  if (context2.openedCapturePath || explicitCapture) {
     return { ready: true };
   }
-  if (context.projectInputs.length === 0) {
+  if (context2.projectInputs.length === 0) {
     return {
       ready: false,
       needsCapture: true,
       reason: "我可以先帮你梳理问题，但正式分析需要一个 .rdc capture。你可以先描述现象，或者直接打开一个 capture。"
     };
   }
-  if (context.projectInputs.length > 1) {
-    const captureLabels = context.projectInputs.slice(0, 3).map((entry) => trimPathLabel(entry.fileName));
+  if (context2.projectInputs.length > 1) {
+    const captureLabels = context2.projectInputs.slice(0, 3).map((entry) => trimPathLabel(entry.fileName));
     return {
       ready: false,
       needsTargetCapture: true,
@@ -10498,8 +11092,8 @@ function resolveCaptureGuards(message, context) {
   }
   return { ready: true };
 }
-function createFallbackAssistantReply(message, context) {
-  if (!context.projectId && EXECUTE_PATTERN.test(message)) {
+function createFallbackAssistantReply(message, context2) {
+  if (!context2.projectId && EXECUTE_PATTERN.test(message)) {
     return "我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。";
   }
   if (!hasUsableDebuggerRoute()) {
@@ -10576,11 +11170,11 @@ class ConversationService {
     }
   }
   async sendMessage(input) {
-    const context = await this.resolveContext(input);
-    if (context.currentRun && ACTIVE_RUN_STATUSES.includes(context.currentRun.status)) {
-      return this.startActiveDebugTurn(context, input.mode, input.message.trim(), input.attachments ?? []);
+    const context2 = await this.resolveContext(input);
+    if (context2.currentRun && ACTIVE_RUN_STATUSES.includes(context2.currentRun.status)) {
+      return this.startActiveDebugTurn(context2, input.mode, input.message.trim(), input.attachments ?? []);
     }
-    return this.startCoworkTurn(context, input.mode, input.message.trim(), input.attachments ?? []);
+    return this.startCoworkTurn(context2, input.mode, input.message.trim(), input.attachments ?? []);
   }
   async resolveContext(input) {
     const projectId = input.projectId ?? input.fallbackProjectId ?? storageAdapter.getCurrentProjectId() ?? null;
@@ -10600,26 +11194,26 @@ class ConversationService {
       replayDevice
     };
   }
-  async startActiveDebugTurn(context, requestedMode, rawMessage, pendingAttachments) {
+  async startActiveDebugTurn(context2, requestedMode, rawMessage, pendingAttachments) {
     const turnId = generateEventId("turn");
-    const attachments = context.session ? storageAdapter.importSessionAttachments(
-      context.session.sessionId,
+    const attachments = context2.session ? storageAdapter.importSessionAttachments(
+      context2.session.sessionId,
       pendingAttachments.map((entry) => entry.sourcePath)
     ) : [];
     const userMessage = makeConversationMessage("user", rawMessage, {
       turnId,
-      sessionId: context.session?.sessionId ?? null,
-      projectId: context.projectId,
-      runId: context.currentRun?.runId ?? null,
+      sessionId: context2.session?.sessionId ?? null,
+      projectId: context2.projectId,
+      runId: context2.currentRun?.runId ?? null,
       modeContext: requestedMode,
       attachments,
       status: "complete"
     });
     const assistantDraftMessage = makeConversationMessage("assistant", "", {
       turnId,
-      sessionId: context.session?.sessionId ?? null,
-      projectId: context.projectId,
-      runId: context.currentRun?.runId ?? null,
+      sessionId: context2.session?.sessionId ?? null,
+      projectId: context2.projectId,
+      runId: context2.currentRun?.runId ?? null,
       modeContext: requestedMode,
       agentId: "rdc-debugger",
       status: "streaming",
@@ -10627,21 +11221,21 @@ class ConversationService {
         createReasoningStep("active-debug-reply", "生成调试回复", "investigate")
       ])
     });
-    this.persistConversationSnapshot(context.session?.sessionId ?? null, userMessage);
-    this.persistConversationSnapshot(context.session?.sessionId ?? null, assistantDraftMessage);
+    this.persistConversationSnapshot(context2.session?.sessionId ?? null, userMessage);
+    this.persistConversationSnapshot(context2.session?.sessionId ?? null, assistantDraftMessage);
     void this.completeActiveDebugTurn({
-      context,
+      context: context2,
       requestedMode,
       userMessage,
       assistantDraftMessage
     });
     return {
-      session: context.session,
+      session: context2.session,
       mode: "active_debug",
       userMessage,
       assistantDraftMessage,
       executionTransition: { action: "none" },
-      runUpdate: context.currentRun,
+      runUpdate: context2.currentRun,
       errorViewModel: null
     };
   }
@@ -10766,10 +11360,10 @@ class ConversationService {
       this.clearActiveTurn(assistantMessage.turnId, abortController);
     }
   }
-  async startCoworkTurn(context, requestedMode, rawMessage, pendingAttachments) {
-    let workingSession = context.session;
-    if (!workingSession && context.projectId) {
-      workingSession = storageAdapter.createSession(context.projectId, rawMessage.slice(0, 80));
+  async startCoworkTurn(context2, requestedMode, rawMessage, pendingAttachments) {
+    let workingSession = context2.session;
+    if (!workingSession && context2.projectId) {
+      workingSession = storageAdapter.createSession(context2.projectId, rawMessage.slice(0, 80));
     }
     const turnId = generateEventId("turn");
     const importedAttachments = workingSession ? storageAdapter.importSessionAttachments(
@@ -10779,8 +11373,8 @@ class ConversationService {
     const userMessage = makeConversationMessage("user", rawMessage, {
       turnId,
       sessionId: workingSession?.sessionId ?? null,
-      projectId: context.projectId,
-      runId: context.currentRun?.runId ?? null,
+      projectId: context2.projectId,
+      runId: context2.currentRun?.runId ?? null,
       modeContext: requestedMode,
       attachments: importedAttachments,
       status: "complete"
@@ -10788,8 +11382,8 @@ class ConversationService {
     const assistantDraftMessage = makeConversationMessage("assistant", "", {
       turnId,
       sessionId: workingSession?.sessionId ?? null,
-      projectId: context.projectId,
-      runId: context.currentRun?.runId ?? null,
+      projectId: context2.projectId,
+      runId: context2.currentRun?.runId ?? null,
       modeContext: requestedMode,
       agentId: "rdc-debugger",
       status: "streaming",
@@ -10802,7 +11396,7 @@ class ConversationService {
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
     void this.completeCoworkTurn({
       context: {
-        ...context,
+        ...context2,
         session: workingSession
       },
       requestedMode,
@@ -11083,6 +11677,235 @@ ${upgradeReply}`);
   }
 }
 const conversationService = new ConversationService();
+function registerConversationHandlers(context2) {
+  const { state: state2 } = context2;
+  electron.ipcMain.handle("conversation:sendMessage", async (_event, request) => {
+    const result = await conversationService.sendMessage({
+      ...request,
+      fallbackProjectId: state2.currentProjectId,
+      fallbackSessionId: state2.currentSessionId,
+      fallbackRunId: state2.currentRunId
+    });
+    if (result.session?.projectId) {
+      state2.currentProjectId = result.session.projectId;
+    }
+    if (result.session?.sessionId) {
+      state2.currentSessionId = result.session.sessionId;
+      await storageAdapter.setCurrentSessionId(result.session.sessionId);
+    }
+    if (result.runUpdate?.runId) {
+      state2.currentRunId = result.runUpdate.runId;
+    }
+    return result;
+  });
+  electron.ipcMain.handle("conversation:getHistory", async (_event, sessionId) => {
+    if (!sessionId) {
+      return { messages: [] };
+    }
+    return {
+      messages: await conversationService.getHistory(sessionId)
+    };
+  });
+  electron.ipcMain.handle("conversation:cancelActiveTurn", async (_event, request) => {
+    return conversationService.cancelActiveTurn(request);
+  });
+}
+function registerProjectSessionHandlers(context2) {
+  const { state: state2 } = context2;
+  electron.ipcMain.handle("project:list", async () => {
+    return { projects: storageAdapter.listProjects() };
+  });
+  electron.ipcMain.handle("project:add", async (_event, rootPath) => {
+    try {
+      const project = storageAdapter.createProject(rootPath);
+      await context2.selectCurrentProject(project.projectId);
+      return { success: true, project };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  electron.ipcMain.handle("project:select", async (_event, projectId) => {
+    try {
+      const selection = await context2.selectCurrentProject(projectId);
+      if (!selection.project) {
+        return { success: false, error: `Project not found: ${projectId}` };
+      }
+      return {
+        success: true,
+        project: selection.project,
+        currentSession: selection.currentSession,
+        currentRun: selection.currentRun
+      };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  electron.ipcMain.handle("project:rename", async (_event, projectId, newName) => {
+    try {
+      const project = storageAdapter.renameProject(projectId, newName);
+      return { success: true, project };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  electron.ipcMain.handle("project:remove", async (_event, projectId) => {
+    try {
+      storageAdapter.removeProject(projectId);
+      if (state2.currentProjectId === projectId) {
+        state2.currentProjectId = null;
+        state2.currentSessionId = null;
+        state2.currentRunId = null;
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  electron.ipcMain.handle("project:inputs:list", async (_event, projectId) => {
+    return { inputs: storageAdapter.listProjectInputs(projectId) };
+  });
+  electron.ipcMain.handle("project:inputs:refresh", async (_event, projectId) => {
+    const inputs = storageAdapter.refreshProjectInputs(projectId);
+    context2.broadcastToRenderer("project:inputsChanged", { projectId, inputs });
+    return { inputs };
+  });
+  electron.ipcMain.handle("project:inputs:import", async (_event, projectId) => {
+    const result = await electron.dialog.showOpenDialog({
+      filters: [{ name: "RenderDoc Capture", extensions: ["rdc"] }],
+      properties: ["openFile", "multiSelections"]
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return { success: true, inputs: storageAdapter.listProjectInputs(projectId) };
+    }
+    const inputs = storageAdapter.importProjectInputs(projectId, result.filePaths);
+    context2.broadcastToRenderer("project:inputsChanged", { projectId, inputs });
+    return { success: true, inputs };
+  });
+  electron.ipcMain.handle("project:inputs:importPaths", async (_event, projectId, filePaths) => {
+    try {
+      const inputs = storageAdapter.importProjectInputs(projectId, filePaths ?? []);
+      context2.broadcastToRenderer("project:inputsChanged", { projectId, inputs });
+      return { success: true, inputs };
+    } catch (error) {
+      return {
+        success: false,
+        inputs: [],
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("session:list", async (_event, projectId) => {
+    const resolvedProjectId = projectId || state2.currentProjectId;
+    if (!resolvedProjectId) {
+      return { sessions: [] };
+    }
+    return { sessions: storageAdapter.listSessions(resolvedProjectId) };
+  });
+  electron.ipcMain.handle("session:create", async (_event, projectId, title) => {
+    try {
+      const session = storageAdapter.createSession(projectId, title);
+      state2.currentProjectId = session.projectId;
+      state2.currentSessionId = session.sessionId;
+      state2.currentRunId = null;
+      await storageAdapter.setCurrentSessionId(session.sessionId);
+      return { success: true, session };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  electron.ipcMain.handle("session:rename", async (_event, id, title) => {
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      return { success: false, error: "Session 名称不能为空。" };
+    }
+    const session = storageAdapter.updateSession(id, { title: trimmedTitle });
+    if (!session) {
+      return { success: false, error: `Session not found: ${id}` };
+    }
+    return { success: true, session };
+  });
+  electron.ipcMain.handle("session:remove", async (_event, id) => {
+    const session = storageAdapter.readSession(id);
+    if (!session) {
+      return { success: false, error: `Session not found: ${id}` };
+    }
+    const runs = storageAdapter.listRuns(id);
+    const activeRun = runs.find((run) => ["queued", "running", "stopping"].includes(run.status));
+    if (activeRun) {
+      runExecutionService.stopRun(activeRun.runId);
+      toolBridge.abortRun(activeRun.runId);
+      await context2.setRunLifecycleState(id, activeRun.runId, {
+        status: "cancelled",
+        lastStage: activeRun.lastStage,
+        stopReason: "Session removed",
+        stoppedAt: Date.now(),
+        finishedAt: Date.now()
+      });
+    }
+    storageAdapter.removeSession(id);
+    const remainingSessions = storageAdapter.listSessions(session.projectId);
+    const nextSession = remainingSessions[0] || null;
+    let nextRun = null;
+    if (state2.currentSessionId === id) {
+      state2.currentSessionId = nextSession?.sessionId || null;
+      state2.currentRunId = nextSession?.lastRunId || null;
+      state2.currentProjectId = session.projectId;
+      if (state2.currentSessionId) {
+        await storageAdapter.setCurrentSessionId(state2.currentSessionId);
+        nextRun = storageAdapter.getLatestRun(state2.currentSessionId);
+      } else {
+        await storageAdapter.setCurrentSessionId(null);
+        storageAdapter.setCurrentProjectId(session.projectId);
+      }
+    }
+    return { success: true, nextSession, nextRun };
+  });
+  electron.ipcMain.handle("session:select", async (_event, id) => {
+    const session = storageAdapter.readSession(id);
+    if (!session) {
+      return { success: false, error: `Session not found: ${id}` };
+    }
+    state2.currentSessionId = id;
+    state2.currentProjectId = session.projectId;
+    state2.currentRunId = session.lastRunId || null;
+    await storageAdapter.setCurrentSessionId(id);
+    return {
+      success: true,
+      session,
+      currentRun: storageAdapter.getLatestRun(id)
+    };
+  });
+  electron.ipcMain.handle("session:attachments:list", async (_event, sessionId) => {
+    return {
+      attachments: storageAdapter.listSessionAttachments(sessionId)
+    };
+  });
+  electron.ipcMain.handle("session:outputs:list", async (_event, sessionId, runId) => {
+    if (!sessionId) {
+      return { outputs: [] };
+    }
+    return {
+      outputs: await context2.buildSessionOutputs(sessionId, runId)
+    };
+  });
+  electron.ipcMain.handle("session:attachments:import", async (_event, sessionId, filePaths) => {
+    try {
+      return {
+        success: true,
+        attachments: storageAdapter.importSessionAttachments(sessionId, filePaths ?? [])
+      };
+    } catch (error) {
+      return {
+        success: false,
+        attachments: [],
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("run:list", async (_event, sessionId) => {
+    return { runs: storageAdapter.listRuns(sessionId) };
+  });
+}
 const DEFAULT_COLS = 120;
 const DEFAULT_ROWS = 32;
 function resolvePowerShellPath() {
@@ -11258,6 +12081,365 @@ class TerminalSessionService {
   }
 }
 const terminalSessionService = new TerminalSessionService();
+function registerRuntimeTerminalHandlers() {
+  electron.ipcMain.handle("runtimeLog:list", async (_event, request) => {
+    return {
+      entries: runtimeLogService.list(request.scope, request.sessionId)
+    };
+  });
+  electron.ipcMain.handle("terminal:listTabs", async () => {
+    return {
+      tabs: terminalSessionService.listTabs()
+    };
+  });
+  electron.ipcMain.handle("terminal:createTab", async (_event, request) => {
+    try {
+      const tab = terminalSessionService.createTab(request);
+      return {
+        success: true,
+        tab,
+        tabs: terminalSessionService.listTabs()
+      };
+    } catch (error) {
+      return {
+        success: false,
+        tabs: terminalSessionService.listTabs(),
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("terminal:closeTab", async (_event, tabId) => {
+    try {
+      return {
+        success: true,
+        tabs: terminalSessionService.closeTab(tabId)
+      };
+    } catch (error) {
+      return {
+        success: false,
+        tabs: terminalSessionService.listTabs(),
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("terminal:activateTab", async (_event, tabId) => {
+    return {
+      success: true,
+      tabs: terminalSessionService.activateTab(tabId)
+    };
+  });
+  electron.ipcMain.handle("terminal:write", async (_event, tabId, data) => {
+    try {
+      terminalSessionService.write(tabId, data);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("terminal:resize", async (_event, tabId, cols, rows) => {
+    try {
+      terminalSessionService.resize(tabId, cols, rows);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+}
+const REQUEST_TIMEOUT_MS = 2e4;
+function normalizeDiscoveredModels(values) {
+  const models = /* @__PURE__ */ new Map();
+  for (const value of values) {
+    const id = typeof value === "string" ? value.trim() : value && typeof value === "object" && typeof value.id === "string" ? value.id.trim() : value && typeof value === "object" && typeof value.name === "string" ? value.name.trim() : "";
+    if (!id || isDeprecatedModel(id) || models.has(id)) {
+      continue;
+    }
+    const label = value && typeof value === "object" && typeof value.display_name === "string" ? value.display_name.trim() || id : id;
+    models.set(id, {
+      id,
+      label,
+      enabled: true
+    });
+  }
+  return Array.from(models.values()).sort((left, right) => left.id.localeCompare(right.id));
+}
+function parseProviderError(error) {
+  if (error instanceof ProviderConnectionError) {
+    return error.message;
+  }
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return "连接测试超时，请稍后重试";
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return "连接测试失败";
+}
+class ProviderConnectionError extends Error {
+}
+const isDeprecatedModel = (modelId) => {
+  const normalized = modelId.toLowerCase();
+  return normalized.includes("deprecated") || normalized.startsWith("gpt-3.5") || normalized.startsWith("claude-2") || normalized.startsWith("claude-instant");
+};
+const requireModels = (models) => {
+  if (models.length === 0) {
+    throw new ProviderConnectionError("该 Provider 暂未返回可用模型");
+  }
+  return models;
+};
+const getJson = async (url2, init) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(url2, {
+      ...init,
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      throw new ProviderConnectionError(formatHttpError(response.status));
+    }
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+const formatHttpError = (status) => {
+  if (status === 401 || status === 403) {
+    return "API Key 无效或权限不足";
+  }
+  if (status === 404) {
+    return "模型发现端点不可用";
+  }
+  if (status >= 500) {
+    return "Provider 服务暂时不可用";
+  }
+  return `连接测试失败（HTTP ${status}）`;
+};
+const appendPath = (baseUrl, path2) => `${baseUrl.trim().replace(/\/+$/, "")}/${path2.replace(/^\/+/, "")}`;
+const parseModelsPayload = (strategy, payload) => {
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+  const record = payload;
+  if (strategy === "ollama-tags") {
+    return Array.isArray(record.models) ? normalizeDiscoveredModels(record.models) : [];
+  }
+  return Array.isArray(record.data) ? normalizeDiscoveredModels(record.data) : [];
+};
+class ProviderConnectionService {
+  async testProviderDraft(request) {
+    try {
+      const provider = this.getProvider(request.providerId);
+      const models = await this.discoverModels(provider, request.apiKey?.trim() ?? "");
+      return {
+        success: true,
+        provider,
+        models
+      };
+    } catch (error) {
+      return {
+        success: false,
+        models: [],
+        error: parseProviderError(error)
+      };
+    }
+  }
+  async connectProvider(request) {
+    try {
+      const provider = this.getProvider(request.providerId);
+      const apiKey = request.apiKey?.trim() ?? "";
+      const models = await this.discoverModels(provider, apiKey);
+      const nextSettings = settingsService.saveProviderConnection(provider.id, apiKey, models);
+      const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
+      return {
+        success: true,
+        provider: nextProvider,
+        models
+      };
+    } catch (error) {
+      return {
+        success: false,
+        models: [],
+        error: parseProviderError(error)
+      };
+    }
+  }
+  async refreshProviderModels(providerId) {
+    try {
+      const provider = this.getProvider(providerId);
+      const models = await this.discoverModels(provider, "");
+      const nextSettings = settingsService.saveProviderConnection(provider.id, "", models);
+      const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
+      return {
+        success: true,
+        provider: nextProvider,
+        models
+      };
+    } catch (error) {
+      return {
+        success: false,
+        models: [],
+        error: parseProviderError(error)
+      };
+    }
+  }
+  disconnectProvider(providerId) {
+    try {
+      const nextSettings = settingsService.disconnectProvider(providerId);
+      const provider = nextSettings.llm.providers.find((entry) => entry.id === providerId);
+      return {
+        success: true,
+        provider,
+        models: []
+      };
+    } catch (error) {
+      return {
+        success: false,
+        models: [],
+        error: parseProviderError(error)
+      };
+    }
+  }
+  startProviderAccountLogin(providerId) {
+    return this.getProviderAccountStatus(providerId);
+  }
+  getProviderAccountStatus(providerId) {
+    const definition = isBuiltinProviderId(providerId) ? getBuiltinProviderDefinition(providerId) : null;
+    const isAccountProvider = definition?.authMode === "account";
+    return {
+      providerId,
+      available: Boolean(isAccountProvider && definition?.accountLoginConfigured),
+      connected: false,
+      message: isAccountProvider ? definition?.unavailableReason ?? "当前版本未配置登录通道" : void 0,
+      error: isAccountProvider ? void 0 : "Provider 不支持账号登录"
+    };
+  }
+  logoutProviderAccount(providerId) {
+    return this.getProviderAccountStatus(providerId);
+  }
+  getProvider(providerId) {
+    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+    if (!provider || !isBuiltinProviderId(provider.id)) {
+      throw new ProviderConnectionError("未知 Provider");
+    }
+    return provider;
+  }
+  async discoverModels(provider, apiKeyDraft) {
+    if (provider.authMode === "account") {
+      throw new ProviderConnectionError(provider.unavailableReason || "当前版本未配置登录通道");
+    }
+    const definition = getBuiltinProviderDefinition(provider.id);
+    if (!definition?.baseUrl || !definition.modelDiscovery) {
+      throw new ProviderConnectionError("Provider 缺少模型发现配置");
+    }
+    const apiKey = provider.authMode === "api-key" ? apiKeyDraft || settingsService.getProviderSecret(provider.id) : "";
+    if (provider.authMode === "api-key" && !apiKey) {
+      throw new ProviderConnectionError("请输入 API Key");
+    }
+    const strategy = definition.modelDiscovery;
+    const url2 = strategy === "ollama-tags" ? appendPath(new URL(definition.baseUrl).origin, "/api/tags") : appendPath(definition.baseUrl, "/models");
+    const headers = this.createHeaders(provider, apiKey);
+    const payload = await getJson(url2, {
+      method: "GET",
+      headers
+    });
+    return requireModels(parseModelsPayload(strategy, payload));
+  }
+  createHeaders(provider, apiKey) {
+    if (provider.authMode === "local") {
+      return {};
+    }
+    if (provider.kind === "anthropic") {
+      return {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01"
+      };
+    }
+    return {
+      Authorization: `Bearer ${apiKey}`
+    };
+  }
+}
+const providerConnectionService = new ProviderConnectionService();
+function registerSettingsLlmHandlers(context2) {
+  electron.ipcMain.handle("llm:configure", async (_event, config) => {
+    llmAdapter.configure(config);
+    return;
+  });
+  electron.ipcMain.handle("llm:testConnection", async (_event, provider) => {
+    return llmAdapter.testConnection(provider);
+  });
+  electron.ipcMain.handle("llm:getAvailableModels", async (_event, provider) => {
+    return llmAdapter.getAvailableModels(provider);
+  });
+  electron.ipcMain.handle("llm:testProviderDraft", async (_event, request) => {
+    return providerConnectionService.testProviderDraft(request);
+  });
+  electron.ipcMain.handle("llm:connectProvider", async (_event, request) => {
+    const result = await providerConnectionService.connectProvider(request);
+    if (result.success) {
+      context2.applyCurrentLlmConfig();
+    }
+    return result;
+  });
+  electron.ipcMain.handle("llm:refreshProviderModels", async (_event, providerId) => {
+    const result = await providerConnectionService.refreshProviderModels(providerId);
+    if (result.success) {
+      context2.applyCurrentLlmConfig();
+    }
+    return result;
+  });
+  electron.ipcMain.handle("llm:disconnectProvider", async (_event, providerId) => {
+    const result = providerConnectionService.disconnectProvider(providerId);
+    if (result.success) {
+      context2.applyCurrentLlmConfig();
+    }
+    return result;
+  });
+  electron.ipcMain.handle("llm:startProviderAccountLogin", async (_event, providerId) => {
+    return providerConnectionService.startProviderAccountLogin(providerId);
+  });
+  electron.ipcMain.handle("llm:getProviderAccountStatus", async (_event, providerId) => {
+    return providerConnectionService.getProviderAccountStatus(providerId);
+  });
+  electron.ipcMain.handle("llm:logoutProviderAccount", async (_event, providerId) => {
+    return providerConnectionService.logoutProviderAccount(providerId);
+  });
+  electron.ipcMain.handle("settings:get", async () => {
+    const paths = appPathService.getWorkspacePaths();
+    return settingsService.getAll({
+      workspaceRoot: paths.workspaceRoot,
+      defaultWorkspaceRoot: paths.defaultWorkspaceRoot,
+      settingsPath: paths.settingsPath,
+      logsPath: paths.logsPath,
+      logPath: paths.logPath,
+      projectsPath: paths.projectsPath,
+      knowledgePath: paths.knowledgePath,
+      migrationOrphansPath: paths.migrationOrphansPath,
+      profilesPath: paths.profilesPath,
+      policiesPath: paths.policiesPath,
+      secretsPath: paths.secretsPath,
+      migrationReportsPath: paths.migrationReportsPath
+    });
+  });
+  electron.ipcMain.handle("settings:getProviderSecret", async (_event, providerId) => {
+    const paths = appPathService.getWorkspacePaths();
+    return settingsService.getProviderSecret(providerId, paths.workspaceRoot);
+  });
+  electron.ipcMain.handle("settings:set", async (_event, settings) => {
+    const nextSettings = settingsService.setAll(settings, appPathService.getWorkspacePaths());
+    storageAdapter.setWorkspaceRoot(nextSettings.workspace.rootPath);
+    await storageAdapter.initializeWorkspace();
+    await context2.initializeIpcState();
+    context2.applyCurrentLlmConfig();
+    return nextSettings;
+  });
+}
 const AVATAR_MIME_BY_EXTENSION = {
   ".png": "image/png",
   ".jpg": "image/jpeg",
@@ -11575,20 +12757,150 @@ async function buildSessionOutputs(sessionId, runId) {
   }
   return outputs.sort((left, right) => (right.updatedAt ?? right.createdAt ?? 0) - (left.updatedAt ?? left.createdAt ?? 0));
 }
-let currentSessionId = null;
-let currentProjectId = null;
-let currentRunId = null;
+function registerToolEvidenceHandlers(context2) {
+  const { state: state2 } = context2;
+  electron.ipcMain.handle("tool:getCatalog", async () => {
+    try {
+      return await toolBridge.loadCatalog();
+    } catch {
+      return { tools: [], namespaces: {} };
+    }
+  });
+  electron.ipcMain.handle("tool:getRuntimeSummary", async () => {
+    return toolBridge.getRuntimeSummary();
+  });
+  electron.ipcMain.handle("tool:execute", async (_event, toolName, args) => {
+    return toolBridge.call({
+      toolName,
+      args
+    });
+  });
+  electron.ipcMain.handle("evidence:getChain", async () => {
+    const sessionId = await storageAdapter.getCurrentSessionId();
+    if (!sessionId) {
+      return { sessionId: "", runId: "", events: [], isValid: true };
+    }
+    const events = await storageAdapter.readActionChain(sessionId);
+    return {
+      sessionId,
+      runId: state2.currentRunId || storageAdapter.getLatestRun(sessionId)?.runId || "",
+      events,
+      isValid: true
+    };
+  });
+  electron.ipcMain.handle("evidence:getEvents", async (_event, eventType) => {
+    const sessionId = await storageAdapter.getCurrentSessionId();
+    if (!sessionId) return [];
+    const events = await storageAdapter.readActionChain(sessionId);
+    if (eventType) {
+      return events.filter((event) => event.event_type === eventType);
+    }
+    return events;
+  });
+}
+function registerWorkflowHandlers(context2) {
+  const { state: state2 } = context2;
+  electron.ipcMain.handle("workflow:getState", async () => {
+    if (!state2.currentSessionId) {
+      return null;
+    }
+    try {
+      return await debuggerRuntime.getWorkflowState(state2.currentSessionId, state2.currentRunId || void 0);
+    } catch (error) {
+      console.error("[IPC] Failed to get workflow state:", error);
+      return null;
+    }
+  });
+  electron.ipcMain.handle("workflow:resume", async (_event, sessionId) => {
+    try {
+      if (sessionId) {
+        state2.currentSessionId = sessionId;
+        await storageAdapter.setCurrentSessionId(sessionId);
+        state2.currentRunId = storageAdapter.getLatestRun(sessionId)?.runId || null;
+      }
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+  electron.ipcMain.handle("workflow:stop", async (_event, runId) => {
+    const targetRunId = runId || state2.currentRunId;
+    if (!targetRunId) {
+      return { success: false, error: "No active run." };
+    }
+    const result = await debuggerRuntime.stopRun(targetRunId);
+    context2.broadcastToRenderer("capture:openedStateChanged", null);
+    context2.broadcastToRenderer("context:changed", rdxSessionService.snapshotContext());
+    return result;
+  });
+  electron.ipcMain.handle("workflow:getRunUsage", async (_event, runId) => {
+    const targetRunId = runId || state2.currentRunId;
+    if (!targetRunId) {
+      return { usage: null };
+    }
+    return {
+      usage: debuggerLlmService.getRunContextUsage(targetRunId)
+    };
+  });
+  electron.ipcMain.handle("workflow:listRuns", async () => {
+    if (!state2.currentSessionId) {
+      return { runs: [] };
+    }
+    return { runs: storageAdapter.listRuns(state2.currentSessionId) };
+  });
+  electron.ipcMain.handle("workflow:listActiveRuns", async () => {
+    return { runs: runExecutionService.listActiveRuns() };
+  });
+  electron.ipcMain.handle("workflow:start", async (_event, request) => {
+    const result = await debuggerRuntime.startPlan(request);
+    if (result.success) {
+      state2.currentSessionId = result.sessionId || state2.currentSessionId;
+      state2.currentRunId = result.runId || state2.currentRunId;
+      state2.currentProjectId = request.projectId;
+      if (state2.currentSessionId) {
+        await storageAdapter.setCurrentSessionId(state2.currentSessionId);
+      }
+    }
+    return result;
+  });
+  electron.ipcMain.handle("workflow:getPlan", async (_event, runId) => {
+    return debuggerRuntime.getPlan(runId);
+  });
+  electron.ipcMain.handle("workflow:submitQuestions", async (_event, runId, answers) => {
+    return debuggerRuntime.submitQuestions(runId, answers);
+  });
+  electron.ipcMain.handle("workflow:approvePlan", async (_event, runId) => {
+    return debuggerRuntime.approvePlan(runId);
+  });
+  electron.ipcMain.handle("workflow:restartRun", async (_event, runId) => {
+    const result = await debuggerRuntime.restartRun(runId);
+    if (result.success) {
+      state2.currentSessionId = result.sessionId || state2.currentSessionId;
+      state2.currentRunId = result.runId || state2.currentRunId;
+      if (state2.currentSessionId) {
+        await storageAdapter.setCurrentSessionId(state2.currentSessionId);
+      }
+    }
+    return result;
+  });
+}
+const state = {
+  currentSessionId: null,
+  currentProjectId: null,
+  currentRunId: null
+};
 let toolTraceSubscribed = false;
+let nativeThemeSubscribed = false;
 async function initializeIpcState() {
   try {
-    currentSessionId = await storageAdapter.getCurrentSessionId();
-    currentProjectId = storageAdapter.getCurrentProjectId();
-    currentRunId = currentSessionId ? storageAdapter.getLatestRun(currentSessionId)?.runId || null : null;
+    state.currentSessionId = await storageAdapter.getCurrentSessionId();
+    state.currentProjectId = storageAdapter.getCurrentProjectId();
+    state.currentRunId = state.currentSessionId ? storageAdapter.getLatestRun(state.currentSessionId)?.runId || null : null;
   } catch (error) {
     console.warn("[IPC] Failed to restore current session id:", error);
-    currentSessionId = null;
-    currentProjectId = null;
-    currentRunId = null;
+    state.currentSessionId = null;
+    state.currentProjectId = null;
+    state.currentRunId = null;
   }
   await debuggerRuntime.recoverInterruptedRuns();
 }
@@ -11602,6 +12914,11 @@ function broadcastToRenderer(channel, ...args) {
 }
 function broadcastRunStatusChanged(payload) {
   broadcastToRenderer("workflow:runStatusChanged", payload);
+}
+function applyCurrentLlmConfig() {
+  const llmConfig = settingsService.getLlmConfig();
+  llmAdapter.configure(llmConfig);
+  agentOrchestrator.applyLlmConfig(llmConfig);
 }
 async function appendActionEvent(event) {
   await storageAdapter.appendActionEvent(event.session_id, event);
@@ -11637,9 +12954,9 @@ async function setRunLifecycleState(sessionId, runId, patch) {
 }
 async function selectCurrentProject(projectId) {
   if (!projectId) {
-    currentProjectId = null;
-    currentSessionId = null;
-    currentRunId = null;
+    state.currentProjectId = null;
+    state.currentSessionId = null;
+    state.currentRunId = null;
     storageAdapter.setCurrentProjectId(null);
     return {
       project: null,
@@ -11655,724 +12972,107 @@ async function selectCurrentProject(projectId) {
       currentRun: null
     };
   }
-  currentProjectId = projectId;
-  const selectedSession = currentSessionId ? storageAdapter.readSession(currentSessionId) : null;
+  state.currentProjectId = projectId;
+  const selectedSession = state.currentSessionId ? storageAdapter.readSession(state.currentSessionId) : null;
   if (!selectedSession || selectedSession.projectId !== projectId) {
-    currentSessionId = null;
-    currentRunId = null;
+    state.currentSessionId = null;
+    state.currentRunId = null;
     await storageAdapter.setCurrentSessionId(null);
   } else {
-    currentRunId = selectedSession.lastRunId || currentRunId;
+    state.currentRunId = selectedSession.lastRunId || state.currentRunId;
   }
   storageAdapter.setCurrentProjectId(projectId);
   return {
     project,
     currentSession: selectedSession?.projectId === projectId ? selectedSession : null,
-    currentRun: currentSessionId ? storageAdapter.getLatestRun(currentSessionId) : null
+    currentRun: state.currentSessionId ? storageAdapter.getLatestRun(state.currentSessionId) : null
   };
 }
-function registerIPCHandlers() {
-  if (!toolTraceSubscribed) {
-    toolBridge.onToolTrace((trace) => {
-      broadcastToRenderer("tool:executionComplete", trace);
-      if (currentSessionId && currentRunId) {
-        void appendActionEvent(storageAdapter.createActionEvent({
-          runId: currentRunId,
-          sessionId: currentSessionId,
-          agentId: trace.runtimeOwner || "rdc-debugger",
-          eventType: "tool_execution",
-          status: trace.result.ok ? "ok" : "error",
-          turnId: trace.turnId,
-          payload: {
-            tool_name: trace.toolName,
-            args: trace.args,
-            result: trace.result.ok ? "success" : "failed",
-            error: trace.result.error,
-            trace_id: trace.traceId
-          }
-        }));
-      }
-      runtimeLogService.log({
-        scope: currentSessionId ? "session" : "app",
-        namespace: "tool",
-        severity: trace.result.ok ? "success" : "error",
-        title: trace.toolName,
-        summary: trace.result.ok ? "工具调用已完成。" : trace.result.error?.message ?? "工具调用失败。",
-        detail: trace.result.duration_ms ? `${trace.result.duration_ms}ms` : void 0,
-        sessionId: currentSessionId,
-        projectId: currentProjectId,
-        runId: currentRunId,
-        raw: {
-          args: trace.args,
-          result: trace.result,
-          contextId: trace.contextId,
-          runtimeOwner: trace.runtimeOwner,
-          ownerLeaseId: trace.ownerLeaseId ?? null
-        },
-        timestamp: trace.timestamp
-      });
-    });
-    toolTraceSubscribed = true;
+const context = {
+  state,
+  broadcastToRenderer,
+  broadcastRunStatusChanged,
+  applyCurrentLlmConfig,
+  setRunLifecycleState,
+  selectCurrentProject,
+  buildSessionOutputs,
+  initializeIpcState
+};
+function registerToolTraceBridge() {
+  if (toolTraceSubscribed) {
+    return;
   }
+  toolBridge.onToolTrace((trace) => {
+    broadcastToRenderer("tool:executionComplete", trace);
+    if (state.currentSessionId && state.currentRunId) {
+      void appendActionEvent(storageAdapter.createActionEvent({
+        runId: state.currentRunId,
+        sessionId: state.currentSessionId,
+        agentId: trace.runtimeOwner || "rdc-debugger",
+        eventType: "tool_execution",
+        status: trace.result.ok ? "ok" : "error",
+        turnId: trace.turnId,
+        payload: {
+          tool_name: trace.toolName,
+          args: trace.args,
+          result: trace.result.ok ? "success" : "failed",
+          error: trace.result.error,
+          trace_id: trace.traceId
+        }
+      }));
+    }
+    runtimeLogService.log({
+      scope: state.currentSessionId ? "session" : "app",
+      namespace: "tool",
+      severity: trace.result.ok ? "success" : "error",
+      title: trace.toolName,
+      summary: trace.result.ok ? "工具调用已完成。" : trace.result.error?.message ?? "工具调用失败。",
+      detail: trace.result.duration_ms ? `${trace.result.duration_ms}ms` : void 0,
+      sessionId: state.currentSessionId,
+      projectId: state.currentProjectId,
+      runId: state.currentRunId,
+      raw: {
+        args: trace.args,
+        result: trace.result,
+        contextId: trace.contextId,
+        runtimeOwner: trace.runtimeOwner,
+        ownerLeaseId: trace.ownerLeaseId ?? null
+      },
+      timestamp: trace.timestamp
+    });
+  });
+  toolTraceSubscribed = true;
+}
+function preloadLlmConfig() {
   try {
-    const llmConfig = settingsService.getLlmConfig();
-    llmAdapter.configure(llmConfig);
-    agentOrchestrator.applyLlmConfig(llmConfig);
+    applyCurrentLlmConfig();
     console.log("[IPC] Loaded persisted LLM config");
   } catch (err) {
     console.warn("[IPC] Failed to preload LLM config:", err);
   }
-  registerShellHandlers();
-  electron.ipcMain.handle("conversation:sendMessage", async (_event, request) => {
-    const result = await conversationService.sendMessage({
-      ...request,
-      fallbackProjectId: currentProjectId,
-      fallbackSessionId: currentSessionId,
-      fallbackRunId: currentRunId
-    });
-    if (result.session?.projectId) {
-      currentProjectId = result.session.projectId;
-    }
-    if (result.session?.sessionId) {
-      currentSessionId = result.session.sessionId;
-      await storageAdapter.setCurrentSessionId(result.session.sessionId);
-    }
-    if (result.runUpdate?.runId) {
-      currentRunId = result.runUpdate.runId;
-    }
-    return result;
-  });
-  electron.ipcMain.handle("conversation:getHistory", async (_event, sessionId) => {
-    if (!sessionId) {
-      return { messages: [] };
-    }
-    return {
-      messages: await conversationService.getHistory(sessionId)
-    };
-  });
-  electron.ipcMain.handle("conversation:cancelActiveTurn", async (_event, request) => {
-    return conversationService.cancelActiveTurn(request);
-  });
-  electron.ipcMain.handle("workflow:getState", async () => {
-    if (!currentSessionId) {
-      return null;
-    }
-    try {
-      return await debuggerRuntime.getWorkflowState(currentSessionId, currentRunId || void 0);
-    } catch (error) {
-      console.error("[IPC] Failed to get workflow state:", error);
-      return null;
-    }
-  });
-  electron.ipcMain.handle("workflow:resume", async (_event, sessionId) => {
-    try {
-      if (sessionId) {
-        currentSessionId = sessionId;
-        await storageAdapter.setCurrentSessionId(sessionId);
-        currentRunId = storageAdapter.getLatestRun(sessionId)?.runId || null;
-      }
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: err.message };
-    }
-  });
-  electron.ipcMain.handle("workflow:stop", async (_event, runId) => {
-    const targetRunId = runId || currentRunId;
-    if (!targetRunId) {
-      return { success: false, error: "No active run." };
-    }
-    const result = await debuggerRuntime.stopRun(targetRunId);
-    broadcastToRenderer("capture:openedStateChanged", null);
-    broadcastToRenderer("context:changed", rdxSessionService.snapshotContext());
-    return result;
-  });
-  electron.ipcMain.handle("workflow:getRunUsage", async (_event, runId) => {
-    const targetRunId = runId || currentRunId;
-    if (!targetRunId) {
-      return { usage: null };
-    }
-    return {
-      usage: debuggerLlmService.getRunContextUsage(targetRunId)
-    };
-  });
-  electron.ipcMain.handle("workflow:listRuns", async () => {
-    if (!currentSessionId) {
-      return { runs: [] };
-    }
-    return { runs: storageAdapter.listRuns(currentSessionId) };
-  });
-  electron.ipcMain.handle("workflow:listActiveRuns", async () => {
-    return { runs: runExecutionService.listActiveRuns() };
-  });
-  electron.ipcMain.handle("project:list", async () => {
-    return { projects: storageAdapter.listProjects() };
-  });
-  electron.ipcMain.handle("project:add", async (_event, rootPath) => {
-    try {
-      const project = storageAdapter.createProject(rootPath);
-      await selectCurrentProject(project.projectId);
-      return { success: true, project };
-    } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  });
-  electron.ipcMain.handle("project:select", async (_event, projectId) => {
-    try {
-      const selection = await selectCurrentProject(projectId);
-      if (!selection.project) {
-        return { success: false, error: `Project not found: ${projectId}` };
-      }
-      return {
-        success: true,
-        project: selection.project,
-        currentSession: selection.currentSession,
-        currentRun: selection.currentRun
-      };
-    } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  });
-  electron.ipcMain.handle("project:rename", async (_event, projectId, newName) => {
-    try {
-      const project = storageAdapter.renameProject(projectId, newName);
-      return { success: true, project };
-    } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  });
-  electron.ipcMain.handle("project:remove", async (_event, projectId) => {
-    try {
-      storageAdapter.removeProject(projectId);
-      if (currentProjectId === projectId) {
-        currentProjectId = null;
-        currentSessionId = null;
-        currentRunId = null;
-      }
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  });
-  electron.ipcMain.handle("project:inputs:list", async (_event, projectId) => {
-    return { inputs: storageAdapter.listProjectInputs(projectId) };
-  });
-  electron.ipcMain.handle("project:inputs:refresh", async (_event, projectId) => {
-    const inputs = storageAdapter.refreshProjectInputs(projectId);
-    broadcastToRenderer("project:inputsChanged", { projectId, inputs });
-    return { inputs };
-  });
-  electron.ipcMain.handle("project:inputs:import", async (_event, projectId) => {
-    const result = await electron.dialog.showOpenDialog({
-      filters: [{ name: "RenderDoc Capture", extensions: ["rdc"] }],
-      properties: ["openFile", "multiSelections"]
-    });
-    if (result.canceled || result.filePaths.length === 0) {
-      return { success: true, inputs: storageAdapter.listProjectInputs(projectId) };
-    }
-    const inputs = storageAdapter.importProjectInputs(projectId, result.filePaths);
-    broadcastToRenderer("project:inputsChanged", { projectId, inputs });
-    return { success: true, inputs };
-  });
-  electron.ipcMain.handle("project:inputs:importPaths", async (_event, projectId, filePaths) => {
-    try {
-      const inputs = storageAdapter.importProjectInputs(projectId, filePaths ?? []);
-      broadcastToRenderer("project:inputsChanged", { projectId, inputs });
-      return { success: true, inputs };
-    } catch (error) {
-      return {
-        success: false,
-        inputs: [],
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("session:list", async (_event, projectId) => {
-    const resolvedProjectId = projectId || currentProjectId;
-    if (!resolvedProjectId) {
-      return { sessions: [] };
-    }
-    return { sessions: storageAdapter.listSessions(resolvedProjectId) };
-  });
-  electron.ipcMain.handle("session:create", async (_event, projectId, title) => {
-    try {
-      const session = storageAdapter.createSession(projectId, title);
-      currentProjectId = session.projectId;
-      currentSessionId = session.sessionId;
-      currentRunId = null;
-      await storageAdapter.setCurrentSessionId(session.sessionId);
-      return { success: true, session };
-    } catch (err) {
-      return { success: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  });
-  electron.ipcMain.handle("session:rename", async (_event, id, title) => {
-    const trimmedTitle = title.trim();
-    if (!trimmedTitle) {
-      return { success: false, error: "Session 名称不能为空。" };
-    }
-    const session = storageAdapter.updateSession(id, { title: trimmedTitle });
-    if (!session) {
-      return { success: false, error: `Session not found: ${id}` };
-    }
-    return { success: true, session };
-  });
-  electron.ipcMain.handle("session:remove", async (_event, id) => {
-    const session = storageAdapter.readSession(id);
-    if (!session) {
-      return { success: false, error: `Session not found: ${id}` };
-    }
-    const runs = storageAdapter.listRuns(id);
-    const activeRun = runs.find((run) => ["queued", "running", "stopping"].includes(run.status));
-    if (activeRun) {
-      runExecutionService.stopRun(activeRun.runId);
-      toolBridge.abortRun(activeRun.runId);
-      await setRunLifecycleState(id, activeRun.runId, {
-        status: "cancelled",
-        lastStage: activeRun.lastStage,
-        stopReason: "Session removed",
-        stoppedAt: Date.now(),
-        finishedAt: Date.now()
-      });
-    }
-    storageAdapter.removeSession(id);
-    const remainingSessions = storageAdapter.listSessions(session.projectId);
-    const nextSession = remainingSessions[0] || null;
-    let nextRun = null;
-    if (currentSessionId === id) {
-      currentSessionId = nextSession?.sessionId || null;
-      currentRunId = nextSession?.lastRunId || null;
-      currentProjectId = session.projectId;
-      if (currentSessionId) {
-        await storageAdapter.setCurrentSessionId(currentSessionId);
-        nextRun = storageAdapter.getLatestRun(currentSessionId);
-      } else {
-        await storageAdapter.setCurrentSessionId(null);
-        storageAdapter.setCurrentProjectId(session.projectId);
-      }
-    }
-    return { success: true, nextSession, nextRun };
-  });
-  electron.ipcMain.handle("session:select", async (_event, id) => {
-    const session = storageAdapter.readSession(id);
-    if (!session) {
-      return { success: false, error: `Session not found: ${id}` };
-    }
-    currentSessionId = id;
-    currentProjectId = session.projectId;
-    currentRunId = session.lastRunId || null;
-    await storageAdapter.setCurrentSessionId(id);
-    return {
-      success: true,
-      session,
-      currentRun: storageAdapter.getLatestRun(id)
-    };
-  });
-  electron.ipcMain.handle("session:attachments:list", async (_event, sessionId) => {
-    return {
-      attachments: storageAdapter.listSessionAttachments(sessionId)
-    };
-  });
-  electron.ipcMain.handle("session:outputs:list", async (_event, sessionId, runId) => {
-    if (!sessionId) {
-      return { outputs: [] };
-    }
-    return {
-      outputs: await buildSessionOutputs(sessionId, runId)
-    };
-  });
-  electron.ipcMain.handle("session:attachments:import", async (_event, sessionId, filePaths) => {
-    try {
-      return {
-        success: true,
-        attachments: storageAdapter.importSessionAttachments(sessionId, filePaths ?? [])
-      };
-    } catch (error) {
-      return {
-        success: false,
-        attachments: [],
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("run:list", async (_event, sessionId) => {
-    return { runs: storageAdapter.listRuns(sessionId) };
-  });
-  electron.ipcMain.handle("runtimeLog:list", async (_event, request) => {
-    return {
-      entries: runtimeLogService.list(request.scope, request.sessionId)
-    };
-  });
-  electron.ipcMain.handle("terminal:listTabs", async () => {
-    return {
-      tabs: terminalSessionService.listTabs()
-    };
-  });
-  electron.ipcMain.handle("terminal:createTab", async (_event, request) => {
-    try {
-      const tab = terminalSessionService.createTab(request);
-      return {
-        success: true,
-        tab,
-        tabs: terminalSessionService.listTabs()
-      };
-    } catch (error) {
-      return {
-        success: false,
-        tabs: terminalSessionService.listTabs(),
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("terminal:closeTab", async (_event, tabId) => {
-    try {
-      return {
-        success: true,
-        tabs: terminalSessionService.closeTab(tabId)
-      };
-    } catch (error) {
-      return {
-        success: false,
-        tabs: terminalSessionService.listTabs(),
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("terminal:activateTab", async (_event, tabId) => {
-    return {
-      success: true,
-      tabs: terminalSessionService.activateTab(tabId)
-    };
-  });
-  electron.ipcMain.handle("terminal:write", async (_event, tabId, data) => {
-    try {
-      terminalSessionService.write(tabId, data);
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("terminal:resize", async (_event, tabId, cols, rows) => {
-    try {
-      terminalSessionService.resize(tabId, cols, rows);
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("context:get", async () => {
-    return rdxSessionService.snapshotContext();
-  });
-  electron.ipcMain.handle("context:openHumanPreview", async (_event, request) => {
-    try {
-      const contextSnapshot = await rdxSessionService.openHumanPreviewWindow(request);
-      broadcastToRenderer("context:changed", contextSnapshot);
-      const preview = contextSnapshot.humanPreview;
-      return {
-        success: preview?.status === "open" || preview?.status === "opening",
-        contextSnapshot,
-        error: preview?.lastError
-      };
-    } catch (error) {
-      const contextSnapshot = rdxSessionService.snapshotContext();
-      return {
-        success: false,
-        contextSnapshot,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("context:closeHumanPreview", async () => {
-    try {
-      const contextSnapshot = await rdxSessionService.closeHumanPreviewWindow();
-      broadcastToRenderer("context:changed", contextSnapshot);
-      return {
-        success: contextSnapshot.humanPreview?.status === "closed",
-        contextSnapshot,
-        error: contextSnapshot.humanPreview?.lastError
-      };
-    } catch (error) {
-      const contextSnapshot = rdxSessionService.snapshotContext();
-      return {
-        success: false,
-        contextSnapshot,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("capture:list", async () => {
-    return { captures: rdxSessionService.getCaptureDescriptors() };
-  });
-  electron.ipcMain.handle(
-    "capture:openProjectInput",
-    async (_event, request) => {
-      try {
-        runtimeLogService.log({
-          scope: currentSessionId ? "session" : "app",
-          namespace: "capture",
-          severity: "info",
-          title: "Open project input",
-          summary: `开始打开 ${request.inputId}。`,
-          detail: request.filePath,
-          sessionId: currentSessionId,
-          projectId: request.projectId,
-          runId: currentRunId,
-          raw: {
-            inputId: request.inputId,
-            replayDeviceId: request.replayDeviceId,
-            filePath: request.filePath
-          }
-        });
-        const input = storageAdapter.listProjectInputs(request.projectId).find((entry) => entry.inputId === request.inputId && entry.filePath === request.filePath);
-        if (!input) {
-          return { success: false, error: `Project input not found: ${request.inputId}` };
-        }
-        const replayDevice = replayDeviceService.getDeviceById(request.replayDeviceId);
-        if (!replayDevice) {
-          return { success: false, error: `Replay device not found: ${request.replayDeviceId}` };
-        }
-        const openedCapture = await rdxSessionService.openProjectInput({
-          projectId: request.projectId,
-          inputId: input.inputId,
-          filePath: input.filePath,
-          replayDevice
-        });
-        const contextSnapshot = rdxSessionService.snapshotContext();
-        broadcastToRenderer("capture:openedStateChanged", openedCapture);
-        broadcastToRenderer("context:changed", contextSnapshot);
-        runtimeLogService.log({
-          scope: currentSessionId ? "session" : "app",
-          namespace: "capture",
-          severity: "success",
-          title: "Project input opened",
-          summary: `${input.fileName} 已打开。`,
-          detail: openedCapture.preview?.source === "framebuffer_screenshot" ? "预览来源：framebuffer" : openedCapture.preview?.source === "capture_thumbnail" ? "预览来源：thumbnail" : openedCapture.previewError?.code ? `当前无可用预览：${openedCapture.previewError.code}` : "当前无可用预览",
-          sessionId: currentSessionId,
-          projectId: request.projectId,
-          runId: currentRunId,
-          raw: {
-            openedCapture,
-            contextSnapshot
-          }
-        });
-        return { success: true, openedCapture, contextSnapshot };
-      } catch (err) {
-        runtimeLogService.log({
-          scope: currentSessionId ? "session" : "app",
-          namespace: "capture",
-          severity: "error",
-          title: "Project input open failed",
-          summary: err instanceof Error ? err.message : String(err),
-          sessionId: currentSessionId,
-          projectId: request.projectId,
-          runId: currentRunId,
-          raw: {
-            inputId: request.inputId,
-            replayDeviceId: request.replayDeviceId,
-            filePath: request.filePath
-          }
-        });
-        return { success: false, error: err instanceof Error ? err.message : String(err) };
-      }
-    }
-  );
-  electron.ipcMain.handle("capture:getOpenedState", async () => {
-    return rdxSessionService.snapshotOpenedCapture();
-  });
-  electron.ipcMain.handle("capture:clearOpenedState", async () => {
-    await rdxSessionService.closeOrReplaceOpenedCapture();
-    broadcastToRenderer("capture:openedStateChanged", null);
-    broadcastToRenderer("context:changed", rdxSessionService.snapshotContext());
-    runtimeLogService.log({
-      scope: currentSessionId ? "session" : "app",
-      namespace: "capture",
-      severity: "info",
-      title: "Opened capture cleared",
-      summary: "当前打开的 capture 已清理。",
-      sessionId: currentSessionId,
-      projectId: currentProjectId,
-      runId: currentRunId
-    });
-    return { success: true };
-  });
-  electron.ipcMain.handle("capture:select", async (_event, captureId) => {
-    try {
-      await rdxSessionService.switchActiveCapture(captureId);
-      broadcastToRenderer("capture:statusChanged", { captureId, status: "selected" });
-      return { success: true };
-    } catch (err) {
-      return { success: false, error: err.message };
-    }
-  });
-  electron.ipcMain.handle("workflow:start", async (_event, request) => {
-    const result = await debuggerRuntime.startPlan(request);
-    if (result.success) {
-      currentSessionId = result.sessionId || currentSessionId;
-      currentRunId = result.runId || currentRunId;
-      currentProjectId = request.projectId;
-      if (currentSessionId) {
-        await storageAdapter.setCurrentSessionId(currentSessionId);
-      }
-    }
-    return result;
-  });
-  electron.ipcMain.handle("workflow:getPlan", async (_event, runId) => {
-    return debuggerRuntime.getPlan(runId);
-  });
-  electron.ipcMain.handle("workflow:submitQuestions", async (_event, runId, answers) => {
-    return debuggerRuntime.submitQuestions(runId, answers);
-  });
-  electron.ipcMain.handle("workflow:approvePlan", async (_event, runId) => {
-    return debuggerRuntime.approvePlan(runId);
-  });
-  electron.ipcMain.handle("workflow:restartRun", async (_event, runId) => {
-    const result = await debuggerRuntime.restartRun(runId);
-    if (result.success) {
-      currentSessionId = result.sessionId || currentSessionId;
-      currentRunId = result.runId || currentRunId;
-      if (currentSessionId) {
-        await storageAdapter.setCurrentSessionId(currentSessionId);
-      }
-    }
-    return result;
-  });
-  electron.ipcMain.handle("agent:sendMessage", async (_event, agentId, content) => {
-    try {
-      let context;
-      if (currentSessionId) {
-        const currentRun = currentRunId ? storageAdapter.listRuns(currentSessionId).find((run) => run.runId === currentRunId) : storageAdapter.getLatestRun(currentSessionId);
-        if (currentRun) {
-          context = {
-            caseId: currentRun.caseId,
-            runId: currentRun.runId,
-            sessionId: currentRun.sessionId
-          };
-        }
-      }
-      const response = await agentOrchestrator.sendMessage(agentId, content, context, {
-        signal: (context?.runId ? runExecutionService.getAbortSignal(context.runId) : null) ?? void 0
-      });
-      return { response };
-    } catch (error) {
-      return {
-        response: void 0,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("agent:getState", async (_event, agentId) => {
-    return agentOrchestrator.getAgentState(agentId);
-  });
-  electron.ipcMain.handle("agent:getAllStates", async () => {
-    return agentOrchestrator.getAllAgentStates();
-  });
-  electron.ipcMain.handle("agent:configure", async (_event, agentId, config) => {
-    try {
-      agentOrchestrator.configureAgent(agentId, config);
-      return { success: true };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("tool:getCatalog", async () => {
-    try {
-      return await toolBridge.loadCatalog();
-    } catch {
-      return { tools: [], namespaces: {} };
-    }
-  });
-  electron.ipcMain.handle("tool:getRuntimeSummary", async () => {
-    return toolBridge.getRuntimeSummary();
-  });
-  electron.ipcMain.handle("tool:execute", async (_event, toolName, args) => {
-    return toolBridge.call({
-      toolName,
-      args
-    });
-  });
-  electron.ipcMain.handle("evidence:getChain", async () => {
-    const sessionId = await storageAdapter.getCurrentSessionId();
-    if (!sessionId) {
-      return { sessionId: "", runId: "", events: [], isValid: true };
-    }
-    const events = await storageAdapter.readActionChain(sessionId);
-    return {
-      sessionId,
-      runId: currentRunId || storageAdapter.getLatestRun(sessionId)?.runId || "",
-      events,
-      isValid: true
-    };
-  });
-  electron.ipcMain.handle("evidence:getEvents", async (_event, eventType) => {
-    const sessionId = await storageAdapter.getCurrentSessionId();
-    if (!sessionId) return [];
-    const events = await storageAdapter.readActionChain(sessionId);
-    if (eventType) {
-      return events.filter((e) => e.event_type === eventType);
-    }
-    return events;
-  });
-  electron.ipcMain.handle("llm:configure", async (_event, config) => {
-    llmAdapter.configure(config);
+}
+function registerNativeThemeBridge() {
+  if (nativeThemeSubscribed) {
     return;
-  });
-  electron.ipcMain.handle("llm:testConnection", async (_event, provider) => {
-    return llmAdapter.testConnection(provider);
-  });
-  electron.ipcMain.handle("llm:getAvailableModels", async (_event, provider) => {
-    return llmAdapter.getAvailableModels(provider);
-  });
-  electron.ipcMain.handle("settings:get", async () => {
-    const paths = appPathService.getWorkspacePaths();
-    return settingsService.getAll({
-      workspaceRoot: paths.workspaceRoot,
-      defaultWorkspaceRoot: paths.defaultWorkspaceRoot,
-      settingsPath: paths.settingsPath,
-      logsPath: paths.logsPath,
-      logPath: paths.logPath,
-      projectsPath: paths.projectsPath,
-      knowledgePath: paths.knowledgePath,
-      migrationOrphansPath: paths.migrationOrphansPath,
-      profilesPath: paths.profilesPath,
-      policiesPath: paths.policiesPath,
-      secretsPath: paths.secretsPath,
-      migrationReportsPath: paths.migrationReportsPath
-    });
-  });
-  electron.ipcMain.handle("settings:getProviderSecret", async (_event, providerId) => {
-    const paths = appPathService.getWorkspacePaths();
-    return settingsService.getProviderSecret(providerId, paths.workspaceRoot);
-  });
-  electron.ipcMain.handle("settings:set", async (_event, settings) => {
-    const nextSettings = settingsService.setAll(settings, appPathService.getWorkspacePaths());
-    storageAdapter.setWorkspaceRoot(nextSettings.workspace.rootPath);
-    await storageAdapter.initializeWorkspace();
-    await initializeIpcState();
-    const llmConfig = settingsService.getLlmConfig();
-    llmAdapter.configure(llmConfig);
-    agentOrchestrator.applyLlmConfig(llmConfig);
-    return nextSettings;
-  });
-  electron.ipcMain.handle("device:list", async () => {
-    return replayDeviceService.listDevices();
-  });
-  electron.ipcMain.handle("device:refresh", async () => {
-    return replayDeviceService.refreshDevices();
-  });
-  electron.ipcMain.handle("device:activate", async (_event, deviceId) => {
-    return replayDeviceService.activateDevice(deviceId);
-  });
+  }
   electron.nativeTheme.on("updated", () => {
     broadcastToRenderer("app:themeChanged", electron.nativeTheme.shouldUseDarkColors ? "dark" : "light");
   });
+  nativeThemeSubscribed = true;
+}
+function registerIPCHandlers() {
+  registerToolTraceBridge();
+  preloadLlmConfig();
+  registerShellHandlers();
+  registerConversationHandlers(context);
+  registerWorkflowHandlers(context);
+  registerProjectSessionHandlers(context);
+  registerRuntimeTerminalHandlers();
+  registerCaptureDeviceHandlers(context);
+  registerAgentHandlers(context);
+  registerToolEvidenceHandlers(context);
+  registerSettingsLlmHandlers(context);
+  registerNativeThemeBridge();
 }
 function setMainWindow(window) {
   replayDeviceService.setMainWindow(window);

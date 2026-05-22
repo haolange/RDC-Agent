@@ -909,19 +909,19 @@ src/renderer/
 │   ├── design-system.css    # CSS变量和工具类
 │   ├── global.css           # 全局样式
 │   └── components.css       # 共享组件样式
-├── components/
-│   ├── WorkflowPanel/
-│   │   ├── index.tsx
-│   │   └── WorkflowPanel.css
-│   ├── AgentChat/
-│   │   ├── index.tsx
-│   │   └── AgentChat.css
-│   ├── EvidencePanel/
-│   │   ├── index.tsx
-│   │   └── EvidencePanel.css
-│   └── ArtifactViewer/
-│       ├── index.tsx
-│       └── ArtifactViewer.css
+├── features/
+│   ├── debugger/
+│   │   ├── WorkflowPanel/
+│   │   ├── AgentChat/
+│   │   ├── EvidencePanel/
+│   │   └── ArtifactViewer/
+│   ├── settings/
+│   ├── projects/
+│   ├── captures/
+│   └── terminal/
+├── shell/
+├── ui/
+├── patterns/
 ├── pages/
 │   └── Debugger/
 │       ├── index.tsx

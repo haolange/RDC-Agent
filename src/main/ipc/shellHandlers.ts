@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, shell } from 'electron';
 
-import { appPathService } from '../services/AppPathService';
+import { appPathService } from '../runtime/AppPathService';
 
 const AVATAR_MIME_BY_EXTENSION: Record<string, string> = {
   '.png': 'image/png',

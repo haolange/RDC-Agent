@@ -92,6 +92,7 @@ interface AppSettingsState {
   hydrate: (settings: AppSettings, systemTheme: ResolvedTheme) => void;
   setSystemTheme: (systemTheme: ResolvedTheme) => void;
   patchSettings: (patch: AppSettingsPatch) => Promise<AppSettings>;
+  reloadSettings: () => Promise<AppSettings>;
   setTheme: (theme: AppTheme) => Promise<void>;
   setLanguage: (language: AppLanguage) => Promise<void>;
   setFontScale: (fontScale: FontScale) => Promise<void>;
@@ -111,6 +112,11 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   setSystemTheme: (systemTheme) => set({ systemTheme }),
   patchSettings: async (patch) => {
     const nextSettings = await window.electronAPI.settings.set(patch);
+    set({ settings: nextSettings, hydrated: true });
+    return nextSettings;
+  },
+  reloadSettings: async () => {
+    const nextSettings = await window.electronAPI.settings.get();
     set({ settings: nextSettings, hydrated: true });
     return nextSettings;
   },

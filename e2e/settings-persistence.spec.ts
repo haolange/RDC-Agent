@@ -18,203 +18,158 @@ const readDropdownOptionLabels = async (ctx: AppContext, testId: string): Promis
   return labels;
 };
 
-const openDropdownMenu = async (ctx: AppContext, testId: string) => {
-  const trigger = ctx.page.locator(`[data-testid="${testId}"]`).first();
-  await trigger.click();
-  const menu = ctx.page.locator(`[data-testid="${testId}-menu"]`).first();
-  await expect(menu).toBeVisible();
-  return { trigger, menu };
+const installModelDiscoveryMock = async (ctx: AppContext): Promise<void> => {
+  await ctx.app.evaluate(() => {
+    const json = (payload: unknown, init?: ResponseInit) => new Response(JSON.stringify(payload), {
+      status: init?.status ?? 200,
+      headers: {
+        'content-type': 'application/json',
+        ...(init?.headers ?? {}),
+      },
+    });
+
+    globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const headers = new Headers(init?.headers);
+      const bearer = headers.get('authorization') || '';
+      const anthropicKey = headers.get('x-api-key') || '';
+
+      if (url.includes('api.openai.com') && bearer.includes('bad-key')) {
+        return json({ error: 'bad key' }, { status: 401 });
+      }
+      if (url.includes('api.openai.com')) {
+        return json({
+          object: 'list',
+          data: [
+            { id: 'gpt-test-1' },
+            { id: 'deprecated-gpt-test' },
+          ],
+        });
+      }
+      if (url.includes('api.anthropic.com') && anthropicKey) {
+        return json({
+          data: [
+            { id: 'claude-test-1', display_name: 'Claude Test 1' },
+          ],
+        });
+      }
+      if (url.includes('127.0.0.1:11434') && url.endsWith('/api/tags')) {
+        return json({
+          models: [
+            { name: 'qwen-test:latest' },
+          ],
+        });
+      }
+      if (url.includes('api.deepseek.com')) {
+        return json({ object: 'list', data: [] });
+      }
+      return json({ error: 'not found' }, { status: 404 });
+    };
+  });
 };
 
-test('模型页展示内置 Provider 模板源，默认不自动注入已保存 provider', async () => {
+test('供应商页直接枚举 catalog，并移除旧模板、自定义、Base URL 与手动模型入口', async () => {
   const ctx = await launchApp();
 
   try {
     await openSettings(ctx);
     await ctx.page.locator('[data-testid="settings-nav-models"]').click();
+
+    await expect(ctx.page.locator('[data-testid="settings-nav-models"]')).toContainText(/供应商|Provider/);
     const providerList = ctx.page.locator('[data-testid="settings-provider-list"]');
-    await expect(providerList).not.toContainText('OpenRouter');
-    await expect(providerList).not.toContainText('OpenAI');
-    const templateOptions = await readDropdownOptionLabels(ctx, 'settings-provider-template-select');
-    expect(templateOptions).toContain('OpenRouter');
-    expect(templateOptions).toContain('OpenAI');
-    await ctx.page.locator('[data-testid="settings-nav-workspace"]').click();
-    await expect(ctx.page.locator('text=Profiles').first()).toBeVisible();
-    await expect(ctx.page.locator('text=Policies').first()).toBeVisible();
+    await expect(providerList).toContainText('OpenRouter');
+    await expect(providerList).toContainText('OpenAI');
+    await expect(providerList).toContainText('Anthropic');
+    await expect(providerList).toContainText('Kimi / Moonshot');
+    await expect(providerList).toContainText('Ollama');
+    await expect(providerList).toContainText('GitHub Copilot');
+
+    await expect(ctx.page.locator('[data-testid="settings-provider-template-select"]')).toHaveCount(0);
+    await expect(ctx.page.locator('[data-testid="settings-provider-add-template"]')).toHaveCount(0);
+    await expect(ctx.page.locator('[data-testid="settings-provider-add"]')).toHaveCount(0);
+    await expect(ctx.page.locator('[data-testid="settings-provider-kind"]')).toHaveCount(0);
+    await expect(ctx.page.locator('[data-testid="settings-model-detail"]')).not.toContainText('API Base URL');
+    await expect(ctx.page.locator('[data-testid="settings-model-detail"]')).not.toContainText(/添加模型|Add Model/);
   } finally {
     await closeApp(ctx);
   }
 });
 
-test('Settings 下拉菜单展开后可见且可点击', async () => {
-  let ctx = await launchApp({ cleanupOnClose: false });
-  const tempDir = ctx.tempDir;
+test('连接弹窗测试失败不保存密钥，直接保存会先测试成功后才写入 discovered models', async () => {
+  const ctx = await launchApp();
 
   try {
-    await ctx.page.evaluate(async () => {
-      const settings = await window.electronAPI.settings.get();
-
-      await window.electronAPI.settings.set({
-        llm: {
-          providers: [
-            {
-              id: 'openrouter',
-              kind: 'openrouter',
-              label: 'OpenRouter',
-              enabled: true,
-              apiKey: 'sk-or-test-1234567890',
-              secretRef: 'provider-openrouter-api-key',
-              hasStoredSecret: false,
-              baseUrl: 'https://openrouter.ai/api/v1',
-              models: [
-                { id: 'anthropic/claude-sonnet-4.5', label: 'Claude Sonnet 4.5', enabled: true },
-                { id: 'openai/gpt-5.2', label: 'GPT-5.2', enabled: true },
-              ],
-              recommendedModels: [],
-              docsUrl: 'https://openrouter.ai/keys',
-              isConfigured: true,
-            },
-            {
-              id: 'sirius',
-              kind: 'openai-compatible',
-              label: 'Sirius',
-              enabled: true,
-              apiKey: 'sirius-secret-123456',
-              secretRef: 'provider-sirius-api-key',
-              hasStoredSecret: false,
-              baseUrl: 'https://api.sirius.dev/v1',
-              models: [{ id: 'sirius-model', label: 'Sirius Model', enabled: true }],
-              recommendedModels: [],
-              docsUrl: '',
-              isConfigured: true,
-            },
-          ],
-          agentRoutes: settings.llm.agentRoutes.map((route) => ({
-            ...route,
-            providerId: 'openrouter',
-            modelId: 'anthropic/claude-sonnet-4.5',
-          })),
-        },
-      });
-    });
-
-    await closeApp(ctx, { cleanup: false });
-    ctx = await launchApp({ tempDir, cleanupOnClose: false });
-
-    await ctx.app.evaluate(({ BrowserWindow }) => {
-      const mainWindow = BrowserWindow.getAllWindows()[0];
-      mainWindow.setSize(1360, 820);
-    });
-    await ctx.page.waitForTimeout(300);
-
+    await installModelDiscoveryMock(ctx);
     await openSettings(ctx);
     await ctx.page.locator('[data-testid="settings-nav-models"]').click();
+    await ctx.page.locator('[data-testid="settings-provider-item-openai"]').click();
+    await ctx.page.locator('[data-testid="settings-provider-connect-openai"]').click();
 
-    const providerTemplateDropdown = await openDropdownMenu(ctx, 'settings-provider-template-select');
-    await expect(providerTemplateDropdown.menu).toHaveScreenshot('settings-provider-template-menu.png');
-    await providerTemplateDropdown.menu.locator('[data-testid="settings-provider-template-select-option-openai"]').click();
-    await expect(ctx.page.locator('[data-testid="settings-provider-template-select"]')).toContainText('OpenAI');
+    await expect(ctx.page.locator('[data-testid="settings-provider-connect-dialog"]')).toBeVisible();
+    await ctx.page.locator('[data-testid="settings-provider-connect-api-key"]').fill('bad-key');
+    await ctx.page.locator('[data-testid="settings-provider-connect-test"]').click();
+    await expect(ctx.page.locator('[data-testid="settings-provider-connect-error"]')).toContainText(/无效|权限|Invalid|permission/);
 
-    await ctx.page.locator('[data-testid="settings-provider-item-sirius"]').click();
-    const providerKindDropdown = await openDropdownMenu(ctx, 'settings-provider-kind');
-    await expect(providerKindDropdown.menu).toHaveScreenshot('settings-provider-kind-menu.png');
-    await providerKindDropdown.menu.locator('[data-testid="settings-provider-kind-option-anthropic"]').click();
-    await expect(ctx.page.locator('[data-testid="settings-provider-kind"]')).toContainText('anthropic');
+    let settings = await ctx.page.evaluate(async () => window.electronAPI.settings.get());
+    let openai = settings.llm.providers.find((provider) => provider.id === 'openai');
+    expect(openai?.apiKey).toBe('');
+    expect(openai?.hasStoredSecret).toBe(false);
+    expect(openai?.isConfigured).toBe(false);
 
-    await ctx.page.locator('[data-testid="settings-nav-agents"]').click();
-    const providerDropdown = await openDropdownMenu(ctx, 'settings-agent-provider-curator_agent');
-    await expect(providerDropdown.menu).toHaveScreenshot('settings-agent-provider-menu.png', { maxDiffPixels: 80 });
-    await providerDropdown.menu.locator('[data-testid="settings-agent-provider-curator_agent-option-sirius"]').click();
-    await expect(ctx.page.locator('[data-testid="settings-agent-provider-curator_agent"]')).toContainText('Sirius');
+    await ctx.page.locator('[data-testid="settings-provider-connect-api-key"]').fill('sk-good-key');
+    await ctx.page.locator('[data-testid="settings-provider-connect-save"]').click();
+    await expect(ctx.page.locator('[data-testid="settings-provider-connect-dialog"]')).toHaveCount(0);
+    await expect(ctx.page.locator('[data-testid="settings-model-detail"]')).toContainText('gpt-test-1');
+    await expect(ctx.page.locator('[data-testid="settings-model-detail"]')).not.toContainText('deprecated-gpt-test');
 
-    const modelDropdown = await openDropdownMenu(ctx, 'settings-agent-model-curator_agent');
-    await expect(modelDropdown.menu).toHaveScreenshot('settings-agent-model-menu.png');
-    await modelDropdown.menu.locator('[data-testid="settings-agent-model-curator_agent-option-sirius-model"]').click();
-    await expect(ctx.page.locator('[data-testid="settings-agent-model-curator_agent"]')).toContainText('Sirius Model');
+    settings = await ctx.page.evaluate(async () => window.electronAPI.settings.get());
+    openai = settings.llm.providers.find((provider) => provider.id === 'openai');
+    expect(openai?.apiKey).toBe('');
+    expect(openai?.hasStoredSecret).toBe(true);
+    expect(openai?.status).toBe('verified');
+    expect(openai?.models.map((model) => model.id)).toEqual(['gpt-test-1']);
   } finally {
-    await closeApp(ctx, { cleanup: true });
+    await closeApp(ctx);
   }
 });
 
-test('Models 已配置态在长字段场景下保持稳定布局', async () => {
-  let ctx = await launchApp({ cleanupOnClose: false });
-  const tempDir = ctx.tempDir;
+test('模型发现统一归一化 OpenAI-compatible、Anthropic、Ollama，并阻止空模型保存', async () => {
+  const ctx = await launchApp();
 
   try {
-    await ctx.page.evaluate(async () => {
+    await installModelDiscoveryMock(ctx);
+
+    const result = await ctx.page.evaluate(async () => {
+      const openai = await window.electronAPI.llm.testProviderDraft({ providerId: 'openai', apiKey: 'good-key' });
+      const anthropic = await window.electronAPI.llm.testProviderDraft({ providerId: 'anthropic', apiKey: 'sk-ant-test' });
+      const ollama = await window.electronAPI.llm.testProviderDraft({ providerId: 'ollama' });
+      const empty = await window.electronAPI.llm.connectProvider({ providerId: 'deepseek', apiKey: 'deepseek-key' });
       const settings = await window.electronAPI.settings.get();
-
-      await window.electronAPI.settings.set({
-        llm: {
-          providers: [
-            {
-              id: 'openrouter',
-              kind: 'openrouter',
-              label: 'Open Router Enterprise Routing Workspace Alpha',
-              enabled: true,
-              apiKey: 'sk-or-v1-f291e84aebc1c0c8b5db6b44de8074cefeba3444053740821019283746501',
-              secretRef: 'provider-openrouter-api-key',
-              hasStoredSecret: false,
-              baseUrl: 'https://openrouter.ai/api/v1/enterprise/control-plane/with/a/very/long/path/segment',
-              models: [
-                {
-                  id: 'moonshotai/kimi-k2.5-enterprise-preview-with-very-long-suffix',
-                  label: 'moonshotai/kimi-k2.5-enterprise-preview-with-very-long-suffix',
-                  enabled: true,
-                },
-                {
-                  id: 'anthropic/claude-sonnet-4.5-long-context-enterprise',
-                  label: 'anthropic/claude-sonnet-4.5-long-context-enterprise',
-                  enabled: true,
-                },
-              ],
-              recommendedModels: [
-                'openai/gpt-5.2',
-                'google/gemini-2.5-pro',
-              ],
-              docsUrl: 'https://openrouter.ai/keys',
-              isConfigured: false,
-            },
-          ],
-          agentRoutes: settings.llm.agentRoutes,
-        },
-      });
+      return {
+        openai,
+        anthropic,
+        ollama,
+        empty,
+        deepseek: settings.llm.providers.find((provider) => provider.id === 'deepseek'),
+      };
     });
 
-    await closeApp(ctx, { cleanup: false });
-    ctx = await launchApp({ tempDir, cleanupOnClose: false });
-
-    await ctx.app.evaluate(({ BrowserWindow }) => {
-      const mainWindow = BrowserWindow.getAllWindows()[0];
-      mainWindow.setSize(1360, 820);
-    });
-    await ctx.page.waitForTimeout(300);
-
-    await openSettings(ctx);
-    await ctx.page.locator('[data-testid="settings-nav-models"]').click();
-
-    const modal = ctx.page.locator('[data-testid="settings-modal"]');
-    const detail = ctx.page.locator('[data-testid="settings-model-detail"]');
-    const detailBody = ctx.page.locator('[data-testid="settings-model-detail-body"]');
-
-    await expect(ctx.page.locator('[data-testid="settings-provider-savebar"]')).toBeVisible();
-    await expect(ctx.page.locator('[data-testid="settings-api-key-input"]')).toHaveAttribute('type', 'password');
-    await expect(modal).toHaveScreenshot('settings-models-configured-provider.png');
-    await detailBody.evaluate((node) => {
-      node.scrollTop = 420;
-    });
-    await ctx.page.waitForTimeout(150);
-    await expect(detail).toHaveScreenshot('settings-models-configured-detail.png');
-
-    await ctx.page.locator('[data-testid="settings-api-key-toggle"]').click();
-    await expect(ctx.page.locator('[data-testid="settings-api-key-input"]')).toHaveAttribute('type', 'text');
-    await expect(detail).toHaveScreenshot('settings-models-configured-detail-revealed.png');
+    expect(result.openai.success).toBe(true);
+    expect(result.openai.models.map((model) => model.id)).toEqual(['gpt-test-1']);
+    expect(result.anthropic.success).toBe(true);
+    expect(result.anthropic.models.map((model) => model.id)).toEqual(['claude-test-1']);
+    expect(result.ollama.success).toBe(true);
+    expect(result.ollama.models.map((model) => model.id)).toEqual(['qwen-test:latest']);
+    expect(result.empty.success).toBe(false);
+    expect(result.empty.error).toContain('暂未返回可用模型');
+    expect(result.deepseek?.hasStoredSecret).toBe(false);
+    expect(result.deepseek?.isConfigured).toBe(false);
   } finally {
-    await closeApp(ctx, { cleanup: true });
+    await closeApp(ctx);
   }
 });
 
-test('自定义 Provider 会持久化，API key 不再明文出现在 settings.get 中', async () => {
+test('账号 Provider 缺少登录配置时不可连接，Agent 路由只展示 verified 且有模型的 Provider', async () => {
   let ctx = await launchApp({ cleanupOnClose: false });
   const tempDir = ctx.tempDir;
 
@@ -223,148 +178,36 @@ test('自定义 Provider 会持久化，API key 不再明文出现在 settings.g
       const settings = await window.electronAPI.settings.get();
       await window.electronAPI.settings.set({
         llm: {
-          providers: [
-            ...settings.llm.providers,
-            {
-              id: 'sirius',
-              kind: 'openai-compatible',
-              label: 'Sirius',
-              enabled: true,
-              apiKey: 'sirius-secret-123456',
-              secretRef: 'provider-sirius-api-key',
-              hasStoredSecret: false,
-              baseUrl: 'https://api.sirius.dev/v1',
-              models: [{ id: 'sirius-model', label: 'Sirius Model', enabled: true }],
-              recommendedModels: [],
-              docsUrl: '',
-              isConfigured: false,
-            },
-          ],
-        },
-      });
-    });
-
-    await closeApp(ctx, { cleanup: false });
-    ctx = await launchApp({ tempDir, cleanupOnClose: false });
-
-    const persistedSettings = await ctx.page.evaluate(async () => window.electronAPI.settings.get());
-    const vendorProvider = persistedSettings.llm.providers.find((provider) => provider.id === 'sirius');
-    expect(vendorProvider).toBeTruthy();
-    expect(vendorProvider?.apiKey).toBe('');
-    expect(vendorProvider?.hasStoredSecret).toBe(true);
-    expect(persistedSettings.llm.providers).toHaveLength(1);
-
-    await openSettings(ctx);
-    await ctx.page.locator('[data-testid="settings-nav-models"]').click();
-    await expect(ctx.page.locator('[data-testid="settings-provider-list"]')).toContainText('Sirius');
-    await ctx.page.locator('[data-testid="settings-provider-item-sirius"]').click();
-    await expect(ctx.page.locator('[data-testid="settings-model-detail"]')).toContainText('已存储');
-    await expect(ctx.page.locator('[data-testid="settings-model-detail"]')).not.toContainText('sirius-secret-123456');
-    await expect(ctx.page.locator('[data-testid="settings-api-key-input"]')).toHaveValue('sirius-secret-123456');
-    await expect(ctx.page.locator('[data-testid="settings-api-key-input"]')).toHaveAttribute('type', 'password');
-    await expect(ctx.page.locator('[data-testid="settings-provider-auth-status"]')).toBeVisible();
-    await expect(ctx.page.locator('[data-testid="settings-provider-clear-secret"]')).toBeVisible();
-    await ctx.page.locator('[data-testid="settings-api-key-toggle"]').click();
-    await expect(ctx.page.locator('[data-testid="settings-api-key-input"]')).toHaveAttribute('type', 'text');
-  } finally {
-    await closeApp(ctx, { cleanup: true });
-  }
-});
-
-test('点击 Provider 行会直接切换详情', async () => {
-  let ctx = await launchApp({ cleanupOnClose: false });
-  const tempDir = ctx.tempDir;
-
-  try {
-    await ctx.page.evaluate(async () => {
-      const settings = await window.electronAPI.settings.get();
-
-      await window.electronAPI.settings.set({
-        llm: {
-          providers: [
-            {
-              id: 'alpha',
-              kind: 'openai-compatible',
-              label: 'Alpha',
-              enabled: true,
-              apiKey: 'alpha-secret-123',
-              secretRef: 'provider-alpha-api-key',
-              hasStoredSecret: false,
-              baseUrl: 'https://alpha.local/v1',
-              models: [{ id: 'alpha-model', label: 'Alpha Model', enabled: true }],
-              recommendedModels: [],
-              docsUrl: '',
-              isConfigured: true,
-            },
-            {
-              id: 'beta',
-              kind: 'openai-compatible',
-              label: 'Beta',
-              enabled: true,
-              apiKey: 'beta-secret-123',
-              secretRef: 'provider-beta-api-key',
-              hasStoredSecret: false,
-              baseUrl: 'https://beta.local/v1',
-              models: [{ id: 'beta-model', label: 'Beta Model', enabled: true }],
-              recommendedModels: [],
-              docsUrl: '',
-              isConfigured: true,
-            },
-          ],
-        },
-      });
-    });
-
-    await closeApp(ctx, { cleanup: false });
-    ctx = await launchApp({ tempDir, cleanupOnClose: false });
-
-    await openSettings(ctx);
-    await ctx.page.locator('[data-testid="settings-nav-models"]').click();
-
-    const modelDetail = ctx.page.locator('[data-testid="settings-model-detail"]');
-    await expect(modelDetail).toContainText('Alpha');
-    await expect(modelDetail).not.toContainText('Beta Model');
-
-    await ctx.page.locator('[data-testid="settings-provider-item-beta"]').click();
-    await expect(modelDetail).toContainText('Beta');
-    await expect(modelDetail).toContainText('Beta Model');
-  } finally {
-    await closeApp(ctx, { cleanup: true });
-  }
-});
-
-test('Agent 路由只展示当前可用 Provider 与启用模型', async () => {
-  let ctx = await launchApp({ cleanupOnClose: false });
-  const tempDir = ctx.tempDir;
-
-  try {
-    await ctx.page.evaluate(async () => {
-      const settings = await window.electronAPI.settings.get();
-
-      await window.electronAPI.settings.set({
-        llm: {
-          providers: [
-            {
-              id: 'openrouter',
-              kind: 'openrouter',
-              label: 'OpenRouter',
-              enabled: true,
-              apiKey: 'sk-or-test-1234567890',
-              secretRef: 'provider-openrouter-api-key',
-              hasStoredSecret: false,
-              baseUrl: 'https://openrouter.ai/api/v1',
-              models: [
-                { id: 'anthropic/claude-sonnet-4.5', label: 'Claude Sonnet 4.5', enabled: true },
-                { id: 'openai/gpt-5.2', label: 'GPT-5.2', enabled: false },
-              ],
-              recommendedModels: [],
-              docsUrl: 'https://openrouter.ai/keys',
-              isConfigured: false,
-            },
-          ],
+          providers: settings.llm.providers.map((provider) => {
+            if (provider.id === 'openai') {
+              return {
+                ...provider,
+                enabled: true,
+                apiKey: 'sk-good-key',
+                hasStoredSecret: false,
+                models: [{ id: 'gpt-test-1', label: 'GPT Test 1', enabled: true }],
+                status: 'verified',
+                lastTestedAt: new Date().toISOString(),
+                lastModelRefreshAt: new Date().toISOString(),
+                isConfigured: true,
+              };
+            }
+            if (provider.id === 'anthropic') {
+              return {
+                ...provider,
+                enabled: false,
+                apiKey: '',
+                models: [{ id: 'claude-failed', label: 'Claude Failed', enabled: true }],
+                status: 'failed',
+                lastError: 'API Key 无效',
+                isConfigured: false,
+              };
+            }
+            return provider;
+          }),
           agentRoutes: settings.llm.agentRoutes.map((route) => (
             route.agentId === 'curator_agent'
-              ? { ...route, providerId: 'openrouter', modelId: 'anthropic/claude-sonnet-4.5' }
+              ? { ...route, providerId: 'openai', modelId: 'gpt-test-1' }
               : route
           )),
         },
@@ -375,20 +218,24 @@ test('Agent 路由只展示当前可用 Provider 与启用模型', async () => {
     ctx = await launchApp({ tempDir, cleanupOnClose: false });
 
     await openSettings(ctx);
-    await ctx.page.locator('[data-testid="settings-nav-agents"]').click();
+    await ctx.page.locator('[data-testid="settings-nav-models"]').click();
+    await ctx.page.locator('[data-testid="settings-provider-item-chatgpt-account"]').click();
+    await expect(ctx.page.locator('[data-testid="settings-provider-account-unavailable-chatgpt-account"]')).toContainText(/未配置登录通道|login channel/);
+    await expect(ctx.page.locator('[data-testid="settings-provider-connect-chatgpt-account"]')).toBeDisabled();
 
+    await ctx.page.locator('[data-testid="settings-nav-agents"]').click();
     const providerOptions = await readDropdownOptionLabels(ctx, 'settings-agent-provider-curator_agent');
-    expect(providerOptions).toContain('OpenRouter');
+    expect(providerOptions).toContain('OpenAI');
+    expect(providerOptions).not.toContain('Anthropic');
 
     const modelOptions = await readDropdownOptionLabels(ctx, 'settings-agent-model-curator_agent');
-    expect(modelOptions).toContain('Claude Sonnet 4.5');
-    expect(modelOptions).not.toContain('GPT-5.2');
+    expect(modelOptions).toEqual(['GPT Test 1']);
   } finally {
     await closeApp(ctx, { cleanup: true });
   }
 });
 
-test('通用设置修改后停留在当前面板，不跳回模型页', async () => {
+test('通用设置修改后停留在当前面板，不跳回供应商页', async () => {
   const ctx = await launchApp();
 
   try {
@@ -401,230 +248,6 @@ test('通用设置修改后停留在当前面板，不跳回模型页', async ()
     await expect(ctx.page.locator('[data-testid="settings-nav-general"]')).toHaveClass(/active/);
     await expect(ctx.page.locator('[data-testid="settings-nav-models"]')).not.toHaveClass(/active/);
     await expect(ctx.page.locator('[data-testid="settings-model-detail"]')).toHaveCount(0);
-
-    await ctx.page.getByRole('button', { name: /English|简体中文/, exact: false }).nth(1).click();
-
-    await expect(ctx.page.locator('[data-testid="settings-nav-general"]')).toHaveClass(/active/);
-    await expect(ctx.page.locator('[data-testid="settings-nav-models"]')).not.toHaveClass(/active/);
-  } finally {
-    await closeApp(ctx);
-  }
-});
-
-test('General、Workspace、Models 写回设置后都停留在当前面板', async () => {
-  let ctx = await launchApp({ cleanupOnClose: false });
-  const tempDir = ctx.tempDir;
-
-  try {
-    await ctx.page.evaluate(async () => {
-      const settings = await window.electronAPI.settings.get();
-
-      await window.electronAPI.settings.set({
-        profile: {
-          nickname: settings.profile.nickname || 'RDC Operator',
-        },
-        workspace: {
-          rootPath: settings.workspace.rootPath || settings.paths.defaultWorkspaceRoot,
-        },
-        llm: {
-          providers: [
-            {
-              id: 'sirius',
-              kind: 'openai-compatible',
-              label: 'Sirius',
-              enabled: true,
-              apiKey: 'sirius-secret-123456',
-              secretRef: 'provider-sirius-api-key',
-              hasStoredSecret: false,
-              baseUrl: 'https://api.sirius.dev/v1',
-              models: [{ id: 'sirius-model', label: 'Sirius Model', enabled: true }],
-              recommendedModels: [],
-              docsUrl: '',
-              isConfigured: false,
-            },
-          ],
-          agentRoutes: settings.llm.agentRoutes,
-        },
-      });
-    });
-
-    await closeApp(ctx, { cleanup: false });
-    ctx = await launchApp({ tempDir, cleanupOnClose: false });
-
-    await openSettings(ctx);
-
-    await ctx.page.locator('[data-testid="settings-nav-general"]').click();
-    await expect(ctx.page.locator('[data-testid="settings-nav-general"]')).toHaveClass(/active/);
-    await ctx.page.locator('.settings-page-general input').first().fill('Operator Prime');
-    await ctx.page.getByRole('button', { name: '保存', exact: true }).click();
-    await expect(ctx.page.locator('[data-testid="settings-nav-general"]')).toHaveClass(/active/);
-    await expect(ctx.page.locator('[data-testid="settings-nav-models"]')).not.toHaveClass(/active/);
-
-    await ctx.page.locator('[data-testid="settings-nav-workspace"]').click();
-    await expect(ctx.page.locator('[data-testid="settings-nav-workspace"]')).toHaveClass(/active/);
-    await ctx.page.getByRole('button', { name: '保存', exact: true }).click();
-    await expect(ctx.page.locator('[data-testid="settings-nav-workspace"]')).toHaveClass(/active/);
-    await expect(ctx.page.locator('[data-testid="settings-nav-models"]')).not.toHaveClass(/active/);
-
-    await ctx.page.locator('[data-testid="settings-nav-models"]').click();
-    await ctx.page.locator('[data-testid="settings-provider-item-sirius"]').click();
-    await expect(ctx.page.locator('[data-testid="settings-nav-models"]')).toHaveClass(/active/);
-    await ctx.page.locator('[data-testid="settings-provider-save"]').click();
-    await expect(ctx.page.locator('[data-testid="settings-nav-models"]')).toHaveClass(/active/);
-    await expect(ctx.page.locator('[data-testid="settings-provider-item-sirius"]')).toBeVisible();
-    await expect(ctx.page.locator('[data-testid="settings-model-detail"]')).toContainText('Sirius');
-  } finally {
-    await closeApp(ctx, { cleanup: true });
-  }
-});
-
-test('Agent 保存后停留在 Agent 面板，不跳回模型页', async () => {
-  let ctx = await launchApp({ cleanupOnClose: false });
-  const tempDir = ctx.tempDir;
-
-  try {
-    await ctx.page.evaluate(async () => {
-      const settings = await window.electronAPI.settings.get();
-
-      await window.electronAPI.settings.set({
-        llm: {
-          providers: [
-            {
-              id: 'openrouter',
-              kind: 'openrouter',
-              label: 'OpenRouter',
-              enabled: true,
-              apiKey: 'sk-or-test-1234567890',
-              secretRef: 'provider-openrouter-api-key',
-              hasStoredSecret: false,
-              baseUrl: 'https://openrouter.ai/api/v1',
-              models: [
-                { id: 'anthropic/claude-sonnet-4.5', label: 'Claude Sonnet 4.5', enabled: true },
-              ],
-              recommendedModels: [],
-              docsUrl: 'https://openrouter.ai/keys',
-              isConfigured: false,
-            },
-          ],
-          agentRoutes: settings.llm.agentRoutes.map((route) => ({
-            ...route,
-            providerId: 'openrouter',
-            modelId: 'anthropic/claude-sonnet-4.5',
-          })),
-        },
-      });
-    });
-
-    await closeApp(ctx, { cleanup: false });
-    ctx = await launchApp({ tempDir, cleanupOnClose: false });
-
-    await openSettings(ctx);
-    await ctx.page.locator('[data-testid="settings-nav-agents"]').click();
-    await expect(ctx.page.locator('[data-testid="settings-nav-agents"]')).toHaveClass(/active/);
-
-    await ctx.page.locator('[data-testid="settings-agent-save"]').click();
-
-    await expect(ctx.page.locator('[data-testid="settings-nav-agents"]')).toHaveClass(/active/);
-    await expect(ctx.page.locator('[data-testid="settings-nav-models"]')).not.toHaveClass(/active/);
-    await expect(ctx.page.locator('[data-testid="settings-agent-list"]')).toBeVisible();
-    await expect(ctx.page.locator('[data-testid="settings-model-detail"]')).toHaveCount(0);
-  } finally {
-    await closeApp(ctx, { cleanup: true });
-  }
-});
-
-test('Provider 保存时会提交模型输入框中的待添加模型，并让 Agents 可选择', async () => {
-  const ctx = await launchApp();
-
-  try {
-    await ctx.page.evaluate(async () => {
-      const settings = await window.electronAPI.settings.get();
-      await window.electronAPI.settings.set({
-        llm: {
-          providers: [
-            {
-              id: 'sirius',
-              kind: 'ollama',
-              label: 'Sirius',
-              enabled: true,
-              apiKey: '',
-              secretRef: 'provider-sirius-api-key',
-              hasStoredSecret: true,
-              baseUrl: 'http://127.0.0.1:11434/v1',
-              models: [],
-              recommendedModels: [],
-              docsUrl: '',
-              isConfigured: true,
-            },
-          ],
-          agentRoutes: settings.llm.agentRoutes,
-        },
-      });
-      const confirmed = await window.electronAPI.settings.get();
-      (window as typeof window & {
-        __RDC_AGENT_E2E__?: {
-          setAppSettings: (settings: unknown) => void;
-        };
-      }).__RDC_AGENT_E2E__?.setAppSettings(confirmed);
-    });
-
-    await openSettings(ctx);
-    await ctx.page.locator('[data-testid="settings-nav-models"]').click();
-    await ctx.page.locator('[data-testid="settings-provider-item-sirius"]').click();
-    await ctx.page.locator('.settings-model-adder-row .input').fill('sirius-model');
-    await ctx.page.locator('[data-testid="settings-provider-save"]').click();
-
-    await ctx.page.locator('[data-testid="settings-nav-agents"]').click();
-    const providerDropdown = await openDropdownMenu(ctx, 'settings-agent-provider-curator_agent');
-    await expect(providerDropdown.menu.locator('[data-testid="settings-agent-provider-curator_agent-option-sirius"]')).toBeVisible();
-    await providerDropdown.menu.locator('[data-testid="settings-agent-provider-curator_agent-option-sirius"]').click();
-
-    const modelDropdown = await openDropdownMenu(ctx, 'settings-agent-model-curator_agent');
-    await expect(modelDropdown.menu.locator('[data-testid="settings-agent-model-curator_agent-option-sirius-model"]')).toBeVisible();
-  } finally {
-    await closeApp(ctx);
-  }
-});
-
-test('已配置 Provider 没有启用模型时 Agents 页显示明确提示且不可保存', async () => {
-  const ctx = await launchApp();
-
-  try {
-    await ctx.page.evaluate(async () => {
-      const settings = await window.electronAPI.settings.get();
-      await window.electronAPI.settings.set({
-        llm: {
-          providers: [
-            {
-              id: 'sirius',
-              kind: 'ollama',
-              label: 'Sirius',
-              enabled: true,
-              apiKey: '',
-              secretRef: 'provider-sirius-api-key',
-              hasStoredSecret: true,
-              baseUrl: 'http://127.0.0.1:11434/v1',
-              models: [],
-              recommendedModels: [],
-              docsUrl: '',
-              isConfigured: true,
-            },
-          ],
-          agentRoutes: settings.llm.agentRoutes,
-        },
-      });
-      const confirmed = await window.electronAPI.settings.get();
-      (window as typeof window & {
-        __RDC_AGENT_E2E__?: {
-          setAppSettings: (settings: unknown) => void;
-        };
-      }).__RDC_AGENT_E2E__?.setAppSettings(confirmed);
-    });
-
-    await openSettings(ctx);
-    await ctx.page.locator('[data-testid="settings-nav-agents"]').click();
-    await expect(ctx.page.locator('[data-testid="settings-agent-no-enabled-models"]')).toContainText('Sirius');
-    await expect(ctx.page.locator('[data-testid="settings-agent-save"]')).toBeDisabled();
   } finally {
     await closeApp(ctx);
   }

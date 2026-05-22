@@ -1,6 +1,6 @@
 import type { AgentRole } from '@shared/types/agent';
 import type { ToolCallResult, ToolDefinition } from '@shared/types/tool';
-import { toolBridge } from '../../services/ToolBridge';
+import { toolBridge } from '../../tools/ToolBridge';
 import type { AgentToolExecutionRequest, AgentToolPort } from './AgentRunnerPort';
 
 export class ToolBridgeAgentToolPort implements AgentToolPort {

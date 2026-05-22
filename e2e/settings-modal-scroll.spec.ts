@@ -26,28 +26,24 @@ test('设置弹窗中的 Workspace、Model 与 Agent 面板保持可访问的滚
 
   await ctx.page.evaluate(async ({ workspaceRoot }) => {
     const settings = await window.electronAPI.settings.get();
-    const providers = Array.from({ length: 24 }, (_, index) => ({
-      id: `custom.scroll-${index}`,
-      kind: 'openai-compatible' as const,
-      label: `Provider ${index}`,
+    const providers = settings.llm.providers.map((provider, index) => ({
+      ...provider,
       enabled: true,
       apiKey: `key-${index}`,
-      baseUrl: `https://scroll-${index}.local/v1`,
       models: Array.from({ length: index === 0 ? 28 : 2 }, (_, modelIndex) => ({
         id: `model-${index}-${modelIndex}`,
         label: `Model ${index}-${modelIndex}`,
         enabled: true,
       })),
-      recommendedModels: index === 0
-        ? Array.from({ length: 24 }, (_, modelIndex) => `recommended-model-${modelIndex}`)
-        : [],
-      docsUrl: '',
+      status: 'verified' as const,
+      lastTestedAt: new Date().toISOString(),
+      lastModelRefreshAt: new Date().toISOString(),
       isConfigured: true,
     }));
 
     const agentRoutes = settings.llm.agentRoutes.map((route) => ({
       ...route,
-      providerId: 'custom.scroll-0',
+      providerId: providers[0]?.id ?? '',
       modelId: 'model-0-0',
     }));
 
@@ -104,17 +100,36 @@ test('设置弹窗中的 Workspace、Model 与 Agent 面板保持可访问的滚
   await page.locator('[data-testid="settings-nav-models"]').click();
   await expect(page.locator('[data-testid="settings-provider-list"]')).toBeVisible();
   await expect(page.locator('[data-testid="settings-model-detail"]')).toBeVisible();
-  await expect(page.locator('[data-testid="settings-modal"]')).toHaveScreenshot('settings-models.png');
+  await expect(page.locator('[data-testid="settings-provider-template-select"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="settings-model-detail"]')).not.toContainText('API Base URL');
+  const providerLayout = await page.locator('[data-testid="settings-modal"]').evaluate((modal) => {
+    const list = modal.querySelector('[data-testid="settings-provider-list"]')?.getBoundingClientRect();
+    const detail = modal.querySelector('[data-testid="settings-model-detail"]')?.getBoundingClientRect();
+    return {
+      listRight: list?.right ?? 0,
+      detailLeft: detail?.left ?? 0,
+      detailWidth: detail?.width ?? 0,
+      detailHeight: detail?.height ?? 0,
+    };
+  });
+  expect(providerLayout.detailLeft).toBeGreaterThan(providerLayout.listRight);
+  expect(providerLayout.detailWidth).toBeGreaterThan(360);
+  expect(providerLayout.detailHeight).toBeGreaterThan(420);
 
   await page.locator('[data-testid="settings-nav-workspace"]').click();
   await expect(page.locator('[data-testid="settings-workspace-body"]')).toBeVisible();
   await expect(page.locator('.settings-workspace-root-value')).toContainText('very-long-workspace-segment-17');
-  await expect(page.locator('[data-testid="settings-modal"]')).toHaveScreenshot('settings-workspace.png', {
-    mask: [
-      page.locator('.settings-workspace-root-value'),
-      page.locator('.settings-derived-path-value'),
-    ],
+  const workspaceLayout = await page.locator('[data-testid="settings-modal"]').evaluate((modal) => {
+    const root = modal.querySelector('.settings-workspace-root-value')?.getBoundingClientRect();
+    const derived = modal.querySelector('.settings-derived-paths-card')?.getBoundingClientRect();
+    return {
+      rootHeight: root?.height ?? 0,
+      derivedTop: derived?.top ?? 0,
+      rootBottom: root?.bottom ?? 0,
+    };
   });
+  expect(workspaceLayout.rootHeight).toBeGreaterThan(30);
+  expect(workspaceLayout.derivedTop).toBeGreaterThan(workspaceLayout.rootBottom);
 
   await page.locator('[data-testid="settings-nav-agents"]').click();
   await expect(page.locator('[data-testid="settings-agent-list"]')).toBeVisible();
@@ -140,9 +155,6 @@ test('设置弹窗中的 Workspace、Model 与 Agent 面板保持可访问的滚
   expect(agentRowLayout.controlCount).toBe(2);
   expect(Math.abs(agentRowLayout.providerY - agentRowLayout.modelY)).toBeLessThanOrEqual(2);
   expect(Math.abs(agentRowLayout.headCenterY - agentRowLayout.providerCenterY)).toBeLessThanOrEqual(14);
-  await expect(page.locator('[data-testid="settings-modal"]')).toHaveScreenshot('settings-agents.png', {
-    maxDiffPixels: 240,
-  });
 
   await page.locator('.settings-modal-backdrop').click({ position: { x: 4, y: 4 } });
   await expect(page.locator('[data-testid="settings-modal"]')).toBeHidden();

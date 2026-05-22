@@ -105,7 +105,7 @@ export async function configureTestDebuggerRoutes(
   page: Page,
   options: ConfigureTestDebuggerRoutesOptions = {},
 ): Promise<void> {
-  const providerId = options.providerId ?? 'ollama-test-provider';
+  const providerId = options.providerId ?? 'ollama';
   const modelId = options.modelId ?? 'debugger-test-model';
   const withRoutes = options.withRoutes !== false;
 
@@ -117,6 +117,9 @@ export async function configureTestDebuggerRoutes(
           {
             id: nextProviderId,
             kind: 'ollama',
+            authMode: 'local',
+            catalogGroup: 'local',
+            modelDiscovery: 'ollama-tags',
             label: 'Test Ollama',
             enabled: true,
             apiKey: '',
@@ -126,6 +129,9 @@ export async function configureTestDebuggerRoutes(
             models: [{ id: nextModelId, label: 'Debugger Test Model', enabled: true, contextWindowTokens: 8192 }],
             recommendedModels: [nextModelId],
             docsUrl: '',
+            status: 'verified',
+            lastTestedAt: new Date().toISOString(),
+            lastModelRefreshAt: new Date().toISOString(),
             isConfigured: true,
           },
         ],
@@ -164,7 +170,27 @@ export async function configureTestDebuggerRoutes(
  * 关闭 app 并清理临时目录
  */
 export async function closeApp(ctx: AppContext, options?: { cleanup?: boolean }): Promise<void> {
-  await ctx.app.close();
+  let closed = false;
+  const proc = ctx.app.process();
+  try {
+    await Promise.race([
+      ctx.app.close().then(() => {
+        closed = true;
+      }),
+      new Promise<void>((resolve) => setTimeout(resolve, 10000)),
+    ]);
+  } finally {
+    if (!closed && proc && !proc.killed) {
+      proc.kill();
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 5000);
+        proc.once('exit', () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+    }
+  }
   const shouldCleanup = options?.cleanup ?? ctx.cleanupOnClose;
   // 清理临时目录
   if (shouldCleanup) {

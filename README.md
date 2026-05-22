@@ -81,6 +81,7 @@ npm run dev
 
 ## 文档入口
 
+- [DESIGN.md](./DESIGN.md)：产品设计与工程架构权威入口
 - [docs/README.md](./docs/README.md)：文档索引
 - [docs/product/vertical-debugger-overview.md](./docs/product/vertical-debugger-overview.md)：产品总览
 - [docs/architecture/overview.md](./docs/architecture/overview.md)：当前架构总览

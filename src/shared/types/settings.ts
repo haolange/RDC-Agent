@@ -7,16 +7,32 @@ export type AppLanguage = 'zh-CN' | 'en';
 export type FontScale = 'small' | 'medium' | 'large';
 export type BuiltinLlmProviderId =
   | 'openrouter'
+  | 'openai'
+  | 'anthropic'
+  | 'deepseek'
+  | 'gemini'
+  | 'xai'
+  | 'kimi'
   | 'minimax'
   | 'zai'
+  | 'qwen'
   | 'volcengine'
   | '302ai'
-  | 'ollama'
   | 'siliconflow'
-  | 'openai'
-  | 'anthropic';
+  | 'ollama'
+  | 'claude-account'
+  | 'chatgpt-account'
+  | 'github-copilot';
 export type LlmProviderId = BuiltinLlmProviderId | (string & {});
 export type LlmProviderKind = 'openrouter' | 'openai-compatible' | 'anthropic' | 'ollama';
+export type LlmProviderAuthMode = 'api-key' | 'local' | 'account';
+export type LlmProviderCatalogGroup = 'api-key' | 'local' | 'account';
+export type LlmProviderConnectionStatus = 'unconfigured' | 'verified' | 'failed' | 'unavailable';
+export type LlmProviderModelDiscoveryStrategy =
+  | 'openai-compatible'
+  | 'anthropic'
+  | 'ollama-tags'
+  | 'gemini';
 
 export interface SidebarLayoutPreference {
   collapsed: boolean;
@@ -74,6 +90,9 @@ export interface LlmProviderModel {
 export interface LlmProviderEntry {
   id: LlmProviderId;
   kind: LlmProviderKind;
+  authMode: LlmProviderAuthMode;
+  catalogGroup: LlmProviderCatalogGroup;
+  modelDiscovery: LlmProviderModelDiscoveryStrategy | null;
   label: string;
   enabled: boolean;
   apiKey: string;
@@ -83,6 +102,12 @@ export interface LlmProviderEntry {
   models: LlmProviderModel[];
   recommendedModels: string[];
   docsUrl?: string;
+  status: LlmProviderConnectionStatus;
+  lastTestedAt?: string;
+  lastModelRefreshAt?: string;
+  lastError?: string;
+  accountLoginConfigured?: boolean;
+  unavailableReason?: string;
   isConfigured: boolean;
 }
 
@@ -137,3 +162,23 @@ export type AppSettingsPatch = Partial<{
   }>;
   configuration: Partial<ConfigurationSettings>;
 }>;
+
+export interface LlmProviderDraftRequest {
+  providerId: LlmProviderId;
+  apiKey?: string;
+}
+
+export interface LlmProviderConnectionResult {
+  success: boolean;
+  provider?: LlmProviderEntry;
+  models: LlmProviderModel[];
+  error?: string;
+}
+
+export interface LlmProviderAccountStatus {
+  providerId: LlmProviderId;
+  available: boolean;
+  connected: boolean;
+  message?: string;
+  error?: string;
+}
