@@ -17,8 +17,8 @@ CodePilot 值得学习的是架构表达方式，而不是技术栈迁移：
 | --- | --- | --- | --- |
 | 桌面外壳 | `electron/` 管理窗口、preload、嵌入式服务 | `src/main` 同时承担窗口、IPC、服务编排 | 保留主进程，但把 `ipc`、`shell`、`runtime`、`workflow` 等边界写清 |
 | 应用/API 层 | Next.js App Router + REST API | preload + IPC 是主要 API 面 | 以 `window.electronAPI`、IPC channel、shared types 作为跨层契约 |
-| 核心业务 | `src/lib` 承载 db、SDK、stream、provider、workspace | `src/main/services` 承载 workflow、storage、settings、tool、runtime log | 不机械搬家，先建立 `workflow/sessions/tools/settings/runtime/reports/shell` 领域入口 |
-| UI 分层 | `components/ui`、业务组件、layout 分层明显 | `App.tsx` 和部分组件承担较多 shell glue | 先建立 `renderer/ui`、`patterns`、`features/debugger`、`shell` 边界，后续按 UI 保真拆分 |
+| 核心业务 | `src/lib` 承载 db、SDK、stream、provider、workspace | `src/main` 已收敛到 workflow、sessions、captures、conversation、tools、settings、runtime、reports、shell | 后续继续拆内部 facade，不恢复 services 技术桶 |
+| UI 分层 | `components/ui`、业务组件、layout 分层明显 | `src/renderer` 已收敛到 shell、features、ui、patterns、platform | 后续继续拆 `App.tsx` glue，不恢复 components 技术桶 |
 | 数据流文档 | wiki 中按 API、workspace、Bridge 分域描述 | 主链散落在 README、workflow 文档和服务代码中 | 新增架构总览、数据流、模块地图，作为后续 agent 入口 |
 | 测试策略 | Playwright、单元、构建文档有集中描述 | E2E 已存在，但入口与构建前置规则不够显眼 | 在模块地图中标出关键 smoke 与构建前置 |
 
@@ -44,5 +44,5 @@ CodePilot 值得学习的是架构表达方式，而不是技术栈迁移：
 
 1. 文档先变成后续 agent 的入口，而不是继续从巨型文件反推系统。
 2. IPC/preload/shared 先建立域入口，保持 `window.electronAPI` 形状兼容。
-3. `DebugWorkflowService`、`App.tsx`、`browserElectronApi.ts` 后续按现有 DOM 和业务行为保真拆分。
+3. `DebugWorkflowService`、`StorageAdapter`、`App.tsx`、`BrowserElectronApiFallback.ts` 后续按现有 DOM 和业务行为保真继续拆分。
 4. 每次结构迁移都以 `npm run typecheck` 为底线，涉及入口或窗口逻辑时补 `npm run build`。

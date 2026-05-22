@@ -10,7 +10,7 @@ flowchart TB
   Renderer["src/renderer<br/>React 工作台"]
   Preload["src/preload<br/>受控 ElectronAPI"]
   IPC["src/main/ipc<br/>IPC handler 域"]
-  MainDomains["src/main 领域服务<br/>DebuggerRuntime / sessions / tools / settings / runtime / reports / shell"]
+  MainDomains["src/main 领域服务<br/>workflow / sessions / captures / conversation / tools / settings / runtime / reports / shell"]
   Shared["src/shared<br/>跨层类型 / 常量 / 工具"]
   Workspace["workspace root<br/>settings / logs / projects / profiles / secrets"]
   ToolBridge["ToolBridge"]
@@ -41,16 +41,18 @@ flowchart TB
 | Electron shell | `src/main/index.ts`、`src/main/shell/` | 窗口、菜单、生命周期、系统能力入口 |
 | IPC/API | `src/main/ipc/` | 注册主进程 handler，维护 renderer 与 main 的调用边界 |
 | Preload | `src/preload/` | 通过 `contextBridge` 暴露 `window.electronAPI`，屏蔽主进程实现细节 |
-| Workflow | `src/main/workflow/debugger/DebuggerRuntime.ts` | Debugger plan/intake、approval、execution lifecycle、阶段推进的唯一顶层权威 |
-| Sessions | `src/main/sessions/`、`RdxSessionService`、`StorageAdapter` | project/session/run/capture 元数据和工作区持久化 |
-| Tools | `src/main/tools/`、`ToolBridge` | RenderDoc 垂直工具目录、调用、trace、runtime metadata |
-| Settings | `src/main/settings/`、`SettingsService`、`LLMAdapter` | provider、model route、profile、workspace path、secret 配置 |
-| Runtime | `src/main/runtime/`、`RuntimeLogService`、`TerminalSessionService` | Activity、terminal、运行期日志和状态广播 |
-| Reports | `src/main/reports/`、`ReportBundleService`、`ArtifactStore` | 证据、报告、中间产物和输出索引 |
+| Workflow | `src/main/workflow/debugger/` | Debugger plan/intake、approval、execution lifecycle、阶段推进的唯一顶层权威 |
+| Sessions | `src/main/sessions/` | project/session/run 元数据、workspace layout 和持久化 |
+| Captures | `src/main/captures/` | ReplayDevice、capture opened state、context preview |
+| Conversation | `src/main/conversation/` | 对话持久化、stream/event bridge、conversation-to-workflow glue |
+| Tools | `src/main/tools/` | RenderDoc 垂直工具目录、调用、trace、runtime metadata |
+| Settings | `src/main/settings/` | provider、model route、profile、workspace path、secret 配置 |
+| Runtime | `src/main/runtime/` | Activity、terminal、运行期日志和状态广播 |
+| Reports | `src/main/reports/` | 证据、报告、中间产物和输出索引 |
 | Renderer shell | `src/renderer/shell/`、`App.tsx` | 应用布局、窗口事件、hydration、composer glue |
-| Renderer features | `src/renderer/features/debugger/`、`components/`、`pages/Debugger` | Debugger 业务视图和工作台交互 |
+| Renderer features | `src/renderer/features/*`、`pages/Debugger` | Debugger、settings、projects、captures、terminal 业务视图和工作台交互 |
 | Renderer UI/patterns | `src/renderer/ui/`、`src/renderer/patterns/` | 纯控件与无副作用展示模式 |
-| Shared contracts | `src/shared/` | ElectronAPI、workflow、session、tool、runtime log、harness 等跨层契约 |
+| Shared contracts | `src/shared/`、`src/shared/types/electron/*` | ElectronAPI、workflow、session、tool、runtime log、harness 等跨层契约 |
 
 ## 现役主链
 

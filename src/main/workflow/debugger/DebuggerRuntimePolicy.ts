@@ -1,7 +1,7 @@
 import type { AgentRole } from '@shared/types/agent';
 import type { WorkflowStage } from '@shared/types/workflow';
-import { executionProfileService } from '../../services/ExecutionProfileService';
-import { settingsService } from '../../services/SettingsService';
+import { executionProfileService } from '../../settings/ExecutionProfileService';
+import { settingsService } from '../../settings/SettingsService';
 
 const SPECIALIST_TOOL_BINDINGS: Record<string, string[]> = {
   triage_agent: [

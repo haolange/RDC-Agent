@@ -68,6 +68,13 @@ export const IPC_HANDLER_DOMAINS = {
     'llm:configure',
     'llm:testConnection',
     'llm:getAvailableModels',
+    'llm:testProviderDraft',
+    'llm:connectProvider',
+    'llm:refreshProviderModels',
+    'llm:disconnectProvider',
+    'llm:startProviderAccountLogin',
+    'llm:getProviderAccountStatus',
+    'llm:logoutProviderAccount',
   ],
   toolsEvidenceRuntime: [
     'tool:getCatalog',

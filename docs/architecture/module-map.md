@@ -6,17 +6,17 @@
 
 | 能力域 | main 入口 | shared 契约 | preload / IPC | renderer 入口 | 测试入口 |
 | --- | --- | --- | --- | --- | --- |
-| Shell / Window / Dialog | `src/main/ipc/shellHandlers.ts`、`src/main/shell/` | `ElectronAPI.appMeta/appShell/windowControls` | `src/preload/api/shell.ts`、`app:*`、`window:*`、`dialog:*` | `App.tsx`、标题栏/用户菜单 | workbench smoke |
-| Project / Session / Run | `RdxSessionService`、`StorageAdapter`、`src/main/sessions/` | `ProjectRecord`、`SessionRecord`、`RunSummary` | `project:*`、`session:*`、`run:*` | `Sidebar`、`sessionStore`、`App.tsx` | `session-lifecycle.spec.ts` |
-| Capture / Device | `ReplayDeviceService`、`RdxSessionService`、`ContextService` | `CaptureDescriptor`、`OpenedCaptureState`、`ReplayDeviceEntry` | `capture:*`、`device:*` | `ControlPanel`、`DeviceSelector`、opened capture preview | capture / workbench smoke |
-| Conversation | `ConversationService`、`DebuggerRuntime.requestStartFromConversation` | `ConversationMessage`、`ConversationTurnResult` | `conversation:*`、`conversation:event` | `AgentChat`、composer glue | debugger plan intake smoke |
-| Debugger Workflow | `DebuggerRuntime`、`DebugWorkflowService` 内部执行服务、`RunExecutionService`、`WorkflowProjectionPublisher` | `WorkflowState`、`DebugPlan`、`AskUserPrompt`、`HarnessTask` | `workflow:*` | `PlanIntakePanel`、`WorkflowPanel`、`ControlPanel` | `debugger-runtime-contract.spec.ts`、`debugger-plan-intake.spec.ts` |
-| Agent Runner | `AgentRunnerPort`、`AgentRunnerRegistry`、`OpenAiAgentSdkAdapter`、`ClaudeAgentSdkAdapter` | `LLMConfig`、`ToolCatalog`、`ToolCallResult` | 经 workflow stage 内部调用，不公开 workflow 旁路 | Agent timeline、conversation stream | runtime/SDK smoke |
-| Tools | `ToolBridge`、`ToolBridgeAgentToolPort`、`src/main/tools/` | `ToolCatalog`、`ToolCallResult`、`ToolRuntimeSummary` | `tool:*`、`tool:executionComplete` | capabilities panel、Activity | tool smoke / workflow smoke |
-| Evidence / Reports | `EvidenceLedger`、`ArtifactStore`、`ReportBundleService`、`src/main/reports/` | `ActionEvent`、`ArtifactRecord`、`Report` | `evidence:*` | `EvidencePanel`、artifact/report views | workflow/report smoke |
-| Settings / Profile / LLM | `SettingsService`、`SecretStorageService`、`LLMAdapter`、`DebuggerLlmService`、`src/main/settings/` | `AppSettings`、`LLMConfig`、`LlmProviderEntry` | `settings:*`、`llm:*`、`app:selectAvatar` | `SettingsModal`、`UserMenu` | `settings-persistence.spec.ts` |
-| Runtime / Terminal | `RuntimeLogService`、`TerminalSessionService`、`src/main/runtime/` | `RuntimeLogEntry`、`TerminalTabRecord` | `runtimeLog:*`、`terminal:*` | `TerminalDrawer`、Activity | terminal / workbench smoke |
-| Browser fallback | `src/renderer/platform/browserElectronApi.ts`、`browserElectronApiDomains.ts` | `ElectronAPI` | fallback implementation | browser preview / static smoke | browser fallback smoke |
+| Shell / Window / Dialog | `src/main/ipc/shellHandlers.ts`、`src/main/shell/` | `src/shared/types/electron/platform.ts` | `src/preload/api/shell.ts`、`app:*`、`window:*`、`dialog:*` | `src/renderer/shell/`、`App.tsx` 标题栏 | workbench smoke |
+| Project / Session / Run | `src/main/sessions/RdxSessionService.ts`、`StorageAdapter.ts`、`src/main/ipc/projectSessionHandlers.ts` | `ProjectRecord`、`SessionRecord`、`RunSummary` | `src/preload/api/projectSession.ts`、`project:*`、`session:*`、`run:*` | `src/renderer/features/projects/Sidebar`、`sessionStore` | `session-lifecycle.spec.ts` |
+| Capture / Device | `src/main/captures/ReplayDeviceService.ts`、`ContextService.ts`、`src/main/sessions/RdxSessionService.ts`、`src/main/ipc/captureDeviceHandlers.ts` | `CaptureDescriptor`、`OpenedCaptureState`、`ReplayDeviceEntry` | `src/preload/api/captureContext.ts`、`capture:*`、`device:*` | `src/renderer/features/captures/DeviceSelector`、`features/debugger/ControlPanel` | capture / workbench smoke |
+| Conversation | `src/main/conversation/ConversationService.ts`、`DebuggerRuntime.requestStartFromConversation`、`src/main/ipc/conversationHandlers.ts` | `ConversationMessage`、`ConversationTurnResult` | `src/preload/api/conversation.ts`、`conversation:*`、`conversation:event` | `src/renderer/features/debugger/AgentChat`、composer glue | debugger plan intake smoke |
+| Debugger Workflow | `src/main/workflow/debugger/DebuggerRuntime.ts`、`DebugWorkflowService.ts`、`RunExecutionService.ts`、`WorkflowProjectionPublisher.ts`、`src/main/ipc/workflowHandlers.ts` | `WorkflowState`、`DebugPlan`、`AskUserPrompt`、`HarnessTask` | `src/preload/api/workflow.ts`、`workflow:*` | `src/renderer/features/debugger/PlanIntakePanel`、`WorkflowPanel`、`ControlPanel` | `debugger-runtime-contract.spec.ts`、`debugger-plan-intake.spec.ts` |
+| Agent Runner | `src/main/workflow/debugger/AgentRunnerPort.ts`、`AgentRunnerRegistry.ts`、`adapters/*AgentSdkAdapter.ts` | `LLMConfig`、`ToolCatalog`、`ToolCallResult` | 经 workflow stage 内部调用，不公开 workflow 旁路 | `AgentMessageTimeline`、conversation stream | runtime/SDK smoke |
+| Tools | `src/main/tools/ToolBridge.ts`、`ToolBridgeAgentToolPort.ts`、`src/main/ipc/toolEvidenceHandlers.ts` | `ToolCatalog`、`ToolCallResult`、`ToolRuntimeSummary` | `src/preload/api/toolEvidence.ts`、`tool:*`、`tool:executionComplete` | capabilities panel、Activity | tool smoke / workflow smoke |
+| Evidence / Reports | `src/main/reports/EvidenceLedger.ts`、`ArtifactStore.ts`、`ReportBundleService.ts`、`src/main/ipc/toolEvidenceHandlers.ts` | `ActionEvent`、`ArtifactRecord`、`Report` | `src/preload/api/toolEvidence.ts`、`evidence:*` | `src/renderer/features/debugger/EvidencePanel`、`ArtifactViewer` | workflow/report smoke |
+| Settings / Profile / LLM | `src/main/settings/SettingsService.ts`、`SecretStorageService.ts`、`LLMAdapter.ts`、`DebuggerLlmService.ts`、`src/main/ipc/settingsLlmHandlers.ts` | `AppSettings`、`LLMConfig`、`LlmProviderEntry` | `src/preload/api/settings.ts`、`settings:*`、`llm:*`、`app:selectAvatar` | `src/renderer/features/settings/SettingsModal`、`src/renderer/shell/UserMenu` | `settings-persistence.spec.ts` |
+| Runtime / Terminal | `src/main/runtime/RuntimeLogService.ts`、`TerminalSessionService.ts`、`AppPathService.ts`、`src/main/ipc/runtimeTerminalHandlers.ts` | `RuntimeLogEntry`、`TerminalTabRecord` | `src/preload/api/runtime.ts`、`runtimeLog:*`、`terminal:*` | `src/renderer/features/terminal/TerminalDrawer`、Activity | terminal / workbench smoke |
+| Browser fallback | `src/renderer/platform/browserElectronApi.ts`、`src/renderer/platform/browserFallback/BrowserElectronApiFallback.ts` | `ElectronAPI` | browser fallback implementation | browser preview / static smoke | browser fallback smoke |
 
 ## 新增或调整功能的触点
 
@@ -26,7 +26,7 @@
 2. `src/main/ipc/channels.ts` 是否需要登记 channel 所属域。
 3. `src/main/ipc/*Handlers.ts` 是否有对应 handler 注册位置。
 4. `src/preload/index.ts` 与 `src/preload/api/*` 是否保持 `window.electronAPI` 公开形状。
-5. `src/renderer/platform/browserElectronApi.ts` 是否需要 fallback。
+5. `src/renderer/platform/browserFallback/*` 是否需要 fallback。
 6. 对应 UI 入口是否完整，测试定位符是否保持。
 7. 文档是否需要同步 `overview.md`、`data-flow.md` 或本文。
 
@@ -34,15 +34,17 @@
 
 | 热点文件 | 当前问题 | 拆分方向 | 约束 |
 | --- | --- | --- | --- |
-| `src/main/ipc/handlers.ts` | 多个 API 域集中注册 | 按 shell、conversation、workflow、session、capture、settings、tool、runtime 分 handler 模块 | 保持 channel 名不变 |
-| `src/main/services/DebugWorkflowService.ts` | plan/intake、approval、execution、report、LLM parsing 仍较集中 | 保持为 `DebuggerRuntime` 内部执行服务，继续向 `workflow/debugger/*` 拆 stage worker / validator / projection | 不恢复公开入口，不改阶段和工具行为 |
-| `src/renderer/App.tsx` | shell layout、hydration、事件订阅、composer glue 集中 | 拆 `renderer/shell`、`features/debugger`、无副作用 patterns | DOM/CSS/test id 保真 |
-| `src/renderer/platform/browserElectronApi.ts` | 浏览器 fallback 覆盖多个 API 域 | 按 API 域拆 builder，保留总 fallback | 浏览器预览数据完整 |
-| `src/shared/types/electron.ts` | 单一总接口可读性弱 | 保持总接口，补按域类型导出 | 不删除现有类型 |
+| `src/main/ipc/workbenchHandlers.ts` | 已收敛为 IPC 状态、广播、启动订阅和域注册组合入口 | 后续只允许增加上下文能力，不再把新 channel 直接写回组合入口 | 保持 channel 名不变 |
+| `src/main/workflow/debugger/DebugWorkflowService.ts` | plan/intake、approval、execution、report、LLM parsing 仍较集中 | 继续拆 stage worker、validator、publication、payload normalization | 不恢复公开入口，不改阶段和工具行为 |
+| `src/main/sessions/StorageAdapter.ts` | project/session/run repository 与 file store 仍在同一 facade 内 | 继续拆 workspace layout、project repository、session repository、run repository、JSON/YAML file store | 不改 workspace 数据格式 |
+| `src/renderer/App.tsx` | 已拆出 conversation/timeline hydration 与附件 helper；shell layout、事件订阅、composer glue 仍较集中 | 继续拆 `renderer/shell` hooks 和 feature glue | DOM/CSS/test id 保真 |
+| `src/renderer/platform/browserFallback/BrowserElectronApiFallback.ts` | 安装入口已收敛且本机绝对预览路径已移除；fallback state、fixtures、domain builders 仍集中 | 继续按 fixtures、event bus、domain API builders 拆分 | 浏览器预览数据完整 |
+| `src/shared/types/electron.ts` | 总接口仍在单文件聚合 | 保持总接口，域类型已在 `src/shared/types/electron/*` 暴露 | 不删除现有类型 |
 
 ## 验证入口
 
 - 静态：`npm run typecheck`
+- 架构：`npm run check:architecture`
 - 构建：`npm run build`
 - 关键 E2E：
   - `npm run test:e2e -- debugger-plan-intake.spec.ts`

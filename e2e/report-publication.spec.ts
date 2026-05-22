@@ -90,7 +90,7 @@ await ctx.page.locator('textarea.chat-input').fill('调试 Character_EyeSpark_De
     expect(actionChain).toContain('"event_type":"tool_execution"');
     expect(actionChain).toContain('"event_type":"verification"');
     expect(actionChain).toContain('"event_type":"report_published"');
-    expect(reportJson.llmExecution?.providerId).toBe('ollama-test-provider');
+    expect(reportJson.llmExecution?.providerId).toBe('ollama');
     expect(reportJson.llmExecution?.modelId).toBe('debugger-test-model');
     expect(reportJson.llmExecution?.successfulCallCount ?? 0).toBeGreaterThan(0);
     expect(fs.readFileSync(markdownPath, 'utf8')).toContain('## LLM Execution');

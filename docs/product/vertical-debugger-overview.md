@@ -66,30 +66,23 @@
 src/renderer/
 ├── App.tsx
 ├── pages/
-│   ├── Debugger/           # 首发实现
-│   │   ├── index.tsx
-│   │   ├── components/
-│   │   │   ├── ConversationArea.tsx
-│   │   │   ├── ToolOutputArea.tsx
-│   │   │   ├── UserInputArea.tsx
-│   │   │   └── WorkflowHeader.tsx
-│   │   └── hooks/
-│   ├── Analyzer/           # 占位
-│   └── Optimizer/          # 占位
-├── components/
-│   ├── WorkflowPanel/      # 工作流状态面板
-│   ├── AgentChat/          # Agent对话组件
-│   ├── EvidencePanel/      # 证据链面板
-│   └── ArtifactViewer/     # Artifact查看器
+│   └── Debugger/
+├── features/
+│   ├── debugger/           # Debugger 工作台业务组件
+│   ├── settings/           # Settings / provider / model UI
+│   ├── projects/           # Project / session navigation
+│   ├── captures/           # Device / capture preview UI
+│   └── terminal/           # Terminal drawer
+├── shell/                  # App shell、窗口和布局 glue
+├── ui/                     # 纯基础控件
+├── patterns/               # 无副作用展示模式
+├── platform/               # Electron / browser fallback
 ├── stores/
-│   ├── workflowStore.ts    # 工作流状态
-│   ├── evidenceStore.ts    # 证据状态
-│   ├── settingsStore.ts    # 设置状态
-│   └── conversationStore.ts
-└── hooks/
-    ├── useWorkflow.ts
-    ├── useEvidence.ts
-    └── useToolCall.ts
+│   ├── sessionStore.ts
+│   ├── deviceStore.ts
+│   ├── layoutStore.ts
+│   └── appSettingsStore.ts
+└── i18n.ts
 ```
 
 ### 2. 后端模块 (src/main/)
@@ -98,28 +91,18 @@ src/renderer/
 src/main/
 ├── index.ts
 ├── ipc/
-│   ├── handlers.ts
-│   ├── workflow.ts
-│   ├── tools.ts
-│   └── llm.ts
-├── services/
-│   ├── DebuggerRuntime.ts      # 顶层 deterministic Debugger Runtime
-│   ├── HarnessController.ts    # 过程控制器（前置Gate）
-│   ├── ContextManager.ts       # Context统一管理
-│   ├── EvidenceChain.ts        # 证据链记录与验证
-│   ├── ToolBridge.ts           # 工具层桥接
-│   └── AgentRunnerRegistry.ts  # Stage 内 Agent SDK runner 适配
-└── adapters/
-    ├── LLMAdapter.ts           # LLM统一适配
-    ├── providers/
-    │   ├── OpenRouterProvider.ts  # 必须
-    │   ├── OpenAIProvider.ts
-    │   ├── AnthropicProvider.ts
-    │   ├── GeminiProvider.ts
-    │   ├── KimiProvider.ts
-    │   └── XAIProvider.ts
-    ├── ToolAdapter.ts
-    └── StorageAdapter.ts
+│   ├── handlers.ts             # 稳定总入口
+│   ├── workbenchHandlers.ts    # 当前工作台 handler 实现
+│   └── shellHandlers.ts
+├── workflow/debugger/          # DebuggerRuntime、Harness、AgentRunner
+├── sessions/                   # StorageAdapter、RdxSessionService
+├── captures/                   # ReplayDevice、ContextService
+├── conversation/               # ConversationService
+├── settings/                   # Settings、LLM、provider、secret
+├── tools/                      # ToolBridge
+├── reports/                    # Evidence、Artifact、ReportBundle
+├── runtime/                    # AppPath、RuntimeLog、Terminal
+└── shell/                      # Electron shell helpers
 ```
 
 ### 3. 共享类型 (src/shared/)
@@ -301,12 +284,12 @@ RdcAgent/
 ## Key Files
 
 ### 需要新创建的核心文件
-1. `RdcAgent/src/main/services/HarnessController.ts` - 过程控制Harness
+1. `RdcAgent/src/main/workflow/debugger/HarnessController.ts` - 过程控制Harness
 2. `RdcAgent/src/main/workflow/debugger/DebuggerRuntime.ts` - 顶层 deterministic Debugger Runtime
-3. `RdcAgent/src/main/adapters/LLMAdapter.ts` - LLM统一适配层
-4. `RdcAgent/src/main/adapters/providers/OpenRouterProvider.ts` - OpenRouter适配
+3. `RdcAgent/src/main/settings/LLMAdapter.ts` - LLM统一适配层
+4. `RdcAgent/src/main/settings/ProviderConnectionService.ts` - OpenRouter适配
 5. `RdcAgent/src/main/workflow/debugger/AgentRunnerRegistry.ts` - Agent SDK runner registry
-6. `RdcAgent/src/renderer/components/WorkflowPanel/index.tsx` - 工作流状态面板
+6. `RdcAgent/src/renderer/features/debugger/WorkflowPanel/index.tsx` - 工作流状态面板
 
 ### 需要复用的原框架文件
 1. `RDC-Agent-Tools/` - 整包复制到resources/tools/

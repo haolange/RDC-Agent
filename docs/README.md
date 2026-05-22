@@ -28,9 +28,10 @@
 后续 agent 进入本仓库时，优先阅读：
 
 1. `README.md`
-2. `AGENTS.md`
-3. `docs/architecture/overview.md`
-4. `docs/architecture/module-map.md`
-5. `docs/architecture/data-flow.md`
+2. `DESIGN.md`
+3. `AGENTS.md`
+4. `docs/architecture/overview.md`
+5. `docs/architecture/module-map.md`
+6. `docs/architecture/data-flow.md`
 
 如果任务涉及结构升级或跨仓库对照，再阅读 `docs/architecture/codepilot-comparison.md`。

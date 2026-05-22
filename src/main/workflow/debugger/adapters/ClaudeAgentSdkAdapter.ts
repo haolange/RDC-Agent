@@ -1,7 +1,14 @@
 import { z } from 'zod';
-import { settingsService } from '../../../services/SettingsService';
+import { settingsService } from '../../../settings/SettingsService';
 import type { AgentRunRequest, AgentRunResult, AgentSdkAdapter, AgentToolPort } from '../AgentRunnerPort';
-import { formatToolResult, prepareAgentTools } from '../AgentToolPolicy';
+import {
+  buildAgentRunTrace,
+  createToolPolicyDeniedResult,
+  formatToolResult,
+  prepareAgentTools,
+  summarizeSdkMessages,
+  toolMatchesPolicy,
+} from '../AgentToolPolicy';
 import type { ToolDefinition, ToolParameter } from '@shared/types/tool';
 
 type ClaudeAgentSdkModule = {
@@ -9,6 +16,9 @@ type ClaudeAgentSdkModule = {
   createSdkMcpServer: (options: Record<string, unknown>) => unknown;
   tool: (name: string, description: string, inputSchema: Record<string, unknown>, handler: (args: Record<string, unknown>) => Promise<unknown>, extras?: Record<string, unknown>) => unknown;
 };
+
+const CLAUDE_DENIED_BUILTIN_TOOLS = ['Bash', 'Edit', 'Write', 'Read', 'WebSearch'] as const;
+const CLAUDE_PERMISSION_MODE = 'dontAsk';
 
 function zodParameter(parameter: ToolParameter): z.ZodTypeAny {
   let schema: z.ZodTypeAny;
@@ -70,18 +80,34 @@ export class ClaudeAgentSdkAdapter implements AgentSdkAdapter {
     const env = {
       ...process.env,
       ANTHROPIC_API_KEY: apiKey,
+      CLAUDE_AGENT_SDK_CLIENT_APP: 'rdc-agent/1.0.0',
     };
     const preparedTools = prepareAgentTools(await tools.listTools(request.agentId), request.toolAllowlist);
-    const allowedToolNames = new Set<string>();
+    const allowedMcpToolNames = new Set<string>();
     const sdkTools = preparedTools.map((tool) => {
-      allowedToolNames.add(tool.originalName);
-      allowedToolNames.add(tool.sdkName);
-      allowedToolNames.add(`mcp__rdc__${tool.sdkName}`);
+      allowedMcpToolNames.add(`mcp__rdc__${tool.sdkName}`);
       return sdk.tool(
         tool.sdkName,
         `${tool.definition.description}\n\nRDC tool: ${tool.originalName}`,
         zodRawShape(tool.definition),
         async (args: Record<string, unknown>) => {
+          if (!toolMatchesPolicy(tool.originalName, request.toolAllowlist)) {
+            const result = createToolPolicyDeniedResult(
+              tool.originalName,
+              `Tool ${tool.originalName} is not allowed by RDC DebuggerRuntime policy.`,
+            );
+            toolResults.push({
+              toolName: tool.originalName,
+              result,
+            });
+            return {
+              content: [{
+                type: 'text',
+                text: formatToolResult(result),
+              }],
+              is_error: true,
+            };
+          }
           const result = await tools.execute({
             toolName: tool.originalName,
             args,
@@ -127,9 +153,9 @@ export class ClaudeAgentSdkAdapter implements AgentSdkAdapter {
         maxTurns: 4,
         tools: [],
         mcpServers: sdkTools.length > 0 ? { rdc: rdcMcpServer } : {},
-        allowedTools: Array.from(allowedToolNames).filter((name) => name.startsWith('mcp__')),
+        allowedTools: Array.from(allowedMcpToolNames),
         canUseTool: async (toolName: string, _input: Record<string, unknown>, options: { toolUseID?: string }) => (
-          allowedToolNames.has(toolName)
+          allowedMcpToolNames.has(toolName)
             ? { behavior: 'allow', toolUseID: options.toolUseID }
             : {
                 behavior: 'deny',
@@ -137,8 +163,8 @@ export class ClaudeAgentSdkAdapter implements AgentSdkAdapter {
                 toolUseID: options.toolUseID,
               }
         ),
-        disallowedTools: ['Bash', 'Edit', 'Write', 'Read', 'WebSearch'],
-        permissionMode: 'default',
+        disallowedTools: [...CLAUDE_DENIED_BUILTIN_TOOLS],
+        permissionMode: CLAUDE_PERMISSION_MODE,
         env,
       },
     })) {
@@ -170,14 +196,43 @@ export class ClaudeAgentSdkAdapter implements AgentSdkAdapter {
       modelId: request.modelId,
       text,
       toolResults,
-      trace: {
+      trace: buildAgentRunTrace({
         adapter: this.id,
-        tools: preparedTools.map((tool) => ({
-          sdkName: tool.sdkName,
-          toolName: tool.originalName,
-        })),
-        messages,
-      },
+        request,
+        providerKind: provider.kind,
+        preparedTools,
+        policy: {
+          permissionMode: CLAUDE_PERMISSION_MODE,
+          allowedTools: Array.from(allowedMcpToolNames),
+          disallowedTools: [...CLAUDE_DENIED_BUILTIN_TOOLS],
+          builtInTools: 'disabled',
+          mcpServers: sdkTools.length > 0 ? ['rdc'] : [],
+        },
+        guardrails: [
+          {
+            name: 'claude-builtins-denied',
+            scope: 'sdk-tools',
+            status: 'enforced',
+            deniedTools: [...CLAUDE_DENIED_BUILTIN_TOOLS],
+          },
+          {
+            name: 'claude-mcp-only',
+            scope: 'tool-surface',
+            status: 'enforced',
+            allowedTools: Array.from(allowedMcpToolNames),
+          },
+          {
+            name: 'claude-permission-mode',
+            scope: 'permissions',
+            status: 'enforced',
+            mode: CLAUDE_PERMISSION_MODE,
+          },
+        ],
+        sdkTrace: {
+          messageSummary: summarizeSdkMessages(messages),
+          messageCount: messages.length,
+        },
+      }),
     };
   }
 }

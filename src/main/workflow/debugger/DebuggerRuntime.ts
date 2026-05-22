@@ -2,7 +2,7 @@ import type { ConversationMessage } from '@shared/types/conversation';
 import type { AgentRole } from '@shared/types/agent';
 import type { AskUserAnswer, WorkflowStage } from '@shared/types/workflow';
 import type { DebugSessionStartRequest } from '@shared/types/session';
-import { debugWorkflowService, type PlanResult, type StartWorkflowResult } from '../../services/DebugWorkflowService';
+import { debugWorkflowService, type PlanResult, type StartWorkflowResult } from './DebugWorkflowService';
 import { isToolAllowedForAgent, resolveAgentToolAllowlist } from './DebuggerRuntimePolicy';
 
 export interface ConversationDebuggerStartRequest extends DebugSessionStartRequest {

@@ -7,12 +7,12 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 
 import { registerIPCHandlers, setMainWindow, initializeIpcState, stopAllActiveRuns } from './ipc/handlers';
-import { storageAdapter } from './services/StorageAdapter';
-import { settingsService } from './services/SettingsService';
-import { toolBridge } from './services/ToolBridge';
-import { RdxSessionService } from './services/RdxSessionService';
-import { replayDeviceService } from './services/ReplayDeviceService';
-import { runtimeLogService } from './services/RuntimeLogService';
+import { storageAdapter } from './sessions/StorageAdapter';
+import { settingsService } from './settings/SettingsService';
+import { toolBridge } from './tools/ToolBridge';
+import { RdxSessionService } from './sessions/RdxSessionService';
+import { replayDeviceService } from './captures/ReplayDeviceService';
+import { runtimeLogService } from './runtime/RuntimeLogService';
 
 // RdxSessionService 鍗曚緥 - 渚?IPC handlers 浣跨敤
 export const rdxSessionService = new RdxSessionService(toolBridge);

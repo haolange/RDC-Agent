@@ -76,7 +76,7 @@
 **ConversationService 中的意图识别**
 
 ```typescript
-// src/main/services/ConversationService.ts
+// src/main/conversation/ConversationService.ts
 const EXECUTE_PATTERN = /开始|启动|执行|正式分析|直接分析|现在分析|run\b|start\b|debug\b|analy[sz]e\b|帮我调试|请调试|开始调试|开始分析/i;
 ```
 
@@ -275,7 +275,7 @@ END
 - capturePaths 全部存在
 - Debugger 模式下 LLM Provider 已配置（`settingsService.hasConfiguredProvider()`）
 
-**Blocker 触发**（来源：`src/main/services/HarnessController.ts`）：
+**Blocker 触发**（来源：`src/main/workflow/debugger/HarnessController.ts`）：
 - `BLOCKED_MISSING_CAPTURE`：无 .rdc 文件
 - `BLOCKED_CAPTURE_IMPORT_FAILED`：文件不存在
 - `LLM_KEY_MISSING`：Debugger 模式缺少 LLM 配置
@@ -402,7 +402,7 @@ export type PlanReadiness =
 - 所有 `activeSpecialists[id].status === 'completed'`
 - `collectedBriefs` 已填充
 
-**Specialist 工具绑定**（来源：`src/main/services/AgentOrchestrator.ts`）：
+**Specialist 工具绑定**（来源：`src/main/workflow/debugger/AgentOrchestrator.ts`）：
 
 ```typescript
 const SPECIALIST_TOOL_BINDINGS: Record<string, string[]> = {
@@ -486,7 +486,7 @@ const SPECIALIST_TOOL_BINDINGS: Record<string, string[]> = {
 - VerifyGate 通过
 - verdict 为 'passed' 或 'evidence_consistent_warning'
 
-**VerifyGate 必需字段**（来源：`src/main/services/HarnessController.ts`）：
+**VerifyGate 必需字段**（来源：`src/main/workflow/debugger/HarnessController.ts`）：
 - `verdict`、`verification_mode`、`verification_confidence`
 - `structural_verification`、`semantic_verification`、`overall_result`
 
@@ -621,7 +621,7 @@ export interface AskUserQuestion {
 
 **原则**：约束优先、强制语言、动态阶段注入
 
-**System Prompt 构建逻辑**（来源：`src/main/services/ExecutionProfileService.ts`）：
+**System Prompt 构建逻辑**（来源：`src/main/settings/ExecutionProfileService.ts`）：
 
 ```typescript
 // resolveAgentRuntimeProfile 中的合并逻辑
@@ -638,7 +638,7 @@ systemPrompt: [
 2. 阶段 System Prompt 在每次 `sendMessage` 时动态注入，确保约束新鲜
 3. Cowork 模式有专用 System Prompt（`buildCoworkSystemPrompt()`），与 Workflow 模式完全隔离
 
-**Cowork System Prompt 模板**（来源：`src/main/services/ConversationService.ts`）：
+**Cowork System Prompt 模板**（来源：`src/main/conversation/ConversationService.ts`）：
 
 ```typescript
 function buildCoworkSystemPrompt(): string {
@@ -720,7 +720,7 @@ export type SystemToolName =
   | 'task.create' | 'task.update' | 'task.list';
 ```
 
-**RDC 工具组定义**（来源：`src/main/services/ToolBridge.ts`）：
+**RDC 工具组定义**（来源：`src/main/tools/ToolBridge.ts`）：
 
 ```typescript
 const RDC_TOOL_GROUPS = [
@@ -753,7 +753,7 @@ export interface ToolCallResult {
 
 **原则**：仅加载当前阶段所需上下文，已完成阶段的 artifact 只保留摘要引用
 
-**Cowork 对话上下文**（来源：`src/main/services/ConversationService.ts`）：
+**Cowork 对话上下文**（来源：`src/main/conversation/ConversationService.ts`）：
 
 ```typescript
 function buildCoworkPrompt(context, history, message): string {
@@ -819,7 +819,7 @@ workspace/checkpoints/{thread_id}/{checkpoint_ns}/index.json
 Gate 前：HarnessController 各 Gate 方法在阶段入口强制执行
 ```
 
-**角色工具绑定强制**（来源：`src/main/services/AgentOrchestrator.ts`）：
+**角色工具绑定强制**（来源：`src/main/workflow/debugger/AgentOrchestrator.ts`）：
 
 ```typescript
 isToolAllowedForRole(toolName: string, agentId: AgentRole): boolean {
@@ -1356,37 +1356,37 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 
 #### M1-1 System Prompt 重构
 
-- 涉及文件：`src/main/services/ExecutionProfileService.ts`、`src/main/services/ConversationService.ts`
+- 涉及文件：`src/main/settings/ExecutionProfileService.ts`、`src/main/conversation/ConversationService.ts`
 - 任务：规范化所有 Agent 的 System Prompt 结构，确保约束前置
 - 验收：所有 Agent System Prompt 符合第4.1章模板；typecheck 通过
 
 #### M1-2 Context 压缩策略
 
-- 涉及文件：`src/main/services/ConversationService.ts`、`src/main/services/DebuggerRuntime.ts`
+- 涉及文件：`src/main/conversation/ConversationService.ts`、`src/main/workflow/debugger/DebuggerRuntime.ts`
 - 任务：实现 Cowork 历史截断（已有 slice(-6)，验证其有效性）；已完成阶段 artifact 只保留摘要
 - 验收：长对话（> 20 轮）不触发 Token 超限错误
 
 #### M1-3 工具调用显式错误处理
 
-- 涉及文件：`src/main/services/HarnessController.ts`、`src/main/services/DebugWorkflowService.ts`
+- 涉及文件：`src/main/workflow/debugger/HarnessController.ts`、`src/main/workflow/debugger/DebugWorkflowService.ts`
 - 任务：所有 live 工具调用路径确保通过 `wrapToolExecution()` 包装
 - 验收：工具失败时 ActionEvent 写入证据链，EventStatus 为 'error'
 
 #### M1-4 自纠正循环
 
-- 涉及文件：`src/main/services/DebuggerRuntime.ts`（节点函数）
+- 涉及文件：`src/main/workflow/debugger/DebuggerRuntime.ts`（节点函数）
 - 任务：实现工具失败 → 错误上下文回注 → 重试 → 超限触发 Blocker 的完整循环
 - 验收：`retry ledger` 正确追踪重试次数；超出 maxRetries 正确写 Blocker
 
 #### M1-5 超时策略统一
 
-- 涉及文件：`src/main/services/ToolBridge.ts`
+- 涉及文件：`src/main/tools/ToolBridge.ts`
 - 任务：工具超时从硬编码 60 秒改为可配置；添加指数退避重试
 - 验收：超时 60 秒后工具调用返回 `ToolCallResult.ok === false`
 
 #### M1-6 Token 预算管理
 
-- 涉及文件：`src/main/services/DebugWorkflowService.ts`（各 LLM 调用处）
+- 涉及文件：`src/main/workflow/debugger/DebugWorkflowService.ts`（各 LLM 调用处）
 - 任务：按第3章各阶段 Token 预算规范，审查并修正所有 maxTokens 配置
 - 验收：plan(700) / investigate(700) / skepti(400) / curate(900) 符合规范
 
@@ -1412,25 +1412,25 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 
 #### M2-2 Loading States 完善
 
-- 涉及文件：`src/renderer/components/`
+- 涉及文件：`src/renderer/features/`
 - 任务：每个 WorkflowStage 对应专用 Loading 状态组件
 - 验收：阶段切换时 Loading 过渡无空白闪烁
 
 #### M2-3 意图识别增强
 
-- 涉及文件：`src/main/services/ConversationService.ts`
+- 涉及文件：`src/main/conversation/ConversationService.ts`
 - 任务：优化 `EXECUTE_PATTERN` 正则；添加更多中文意图表达
 - 验收：E2E 意图识别准确率 > 95%
 
 #### M2-4 Cowork/Debug 无缝切换
 
-- 涉及文件：`src/main/services/ConversationService.ts`、renderer
+- 涉及文件：`src/main/conversation/ConversationService.ts`、renderer
 - 任务：execute_upgrade 模式下对话内容无中断；WorkflowState 变化自动刷新 UI
 - 验收：`mode-switch.spec.ts` 全部通过
 
 #### M2-5 错误消息友好化
 
-- 涉及文件：`src/main/services/ConversationService.ts`（`createFallbackAssistantReply`）
+- 涉及文件：`src/main/conversation/ConversationService.ts`（`createFallbackAssistantReply`）
 - 任务：补全所有 Blocker 的友好消息映射（参照 `buildWorkflowUpgradeReply` 模式）
 - 验收：所有 Blocker 码有对应中文友好消息
 
@@ -1457,7 +1457,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 
 #### M3-3 流程遵循性监控
 
-- 涉及文件：`src/main/services/HarnessController.ts`
+- 涉及文件：`src/main/workflow/debugger/HarnessController.ts`
 - 任务：实现第5.4章指标的实时计算和 IPC 推送
 - 验收：每次 run 结束后可查询流程遵循性报告
 
@@ -1496,7 +1496,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 
 #### M4-2 Remote Device 完整支持
 
-- 涉及文件：`src/main/services/HarnessController.ts`（Remote 前置检查）、driver_device_agent 工具
+- 涉及文件：`src/main/workflow/debugger/HarnessController.ts`（Remote 前置检查）、driver_device_agent 工具
 - 任务：完善 Remote Capture 的完整执行路径
 - 验收：Android Remote 端到端调试流程通过
 
@@ -1514,7 +1514,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 
 #### M4-5 跨平台兼容
 
-- 涉及文件：`src/main/services/ToolBridge.ts`
+- 涉及文件：`src/main/tools/ToolBridge.ts`
 - 任务：当前仅支持 Windows；设计 macOS/Linux 的 ToolBridge 适配层
 - 验收：macOS 上工具路径解析正确（即使当前为 stub）
 
@@ -1574,7 +1574,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 | `src/shared/constants/stages.ts` | STAGE_PHASES / normalizeWorkflowStage |
 | `src/shared/constants/blockers.ts` | BLOCKER_CODES |
 
-### 主进程服务（`src/main/services/`）
+### 主进程服务（`src/main/workflow/debugger/`）
 
 | 文件 | 职责 |
 |------|-----|
@@ -1654,7 +1654,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 3. 每次调用重新构建 System Prompt（不缓存带历史的 Prompt）
 4. Workflow 模式使用 Stage Policy 注入而非对话历史传递
 
-**检查代码**：`src/main/services/ConversationService.ts` 中的 `buildCoworkPrompt` 和 `buildCoworkSystemPrompt`
+**检查代码**：`src/main/conversation/ConversationService.ts` 中的 `buildCoworkPrompt` 和 `buildCoworkSystemPrompt`
 
 ---
 
@@ -1669,7 +1669,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 2. 检查 `result.ok === false` 后必须抛出或写入 Blocker
 3. `ToolBridge.emitToolTrace()` 在成功和失败时都调用（确保可观测性）
 
-**检查代码**：`src/main/services/DebugWorkflowService.ts` 中的 `executeVerification` 方法
+**检查代码**：`src/main/workflow/debugger/DebugWorkflowService.ts` 中的 `executeVerification` 方法
 
 ---
 
@@ -1685,7 +1685,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 3. Cowork 历史截断（已实现）
 4. 按第3章各阶段 Token 预算规范审查 maxTokens 配置
 
-**检查代码**：`src/main/services/DebugWorkflowService.ts` 中的 `buildInvestigationSummary`
+**检查代码**：`src/main/workflow/debugger/DebugWorkflowService.ts` 中的 `buildInvestigationSummary`
 
 ---
 
@@ -1701,7 +1701,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 3. 监控 Skeptic 拒绝率，若低于 5% 则检查 System Prompt
 4. 输出强制为三值枚举（approved / approved_with_warning / rejected），不接受模糊回答
 
-**检查代码**：`src/main/services/DebugWorkflowService.ts` 中的 `executeSkepticReview`
+**检查代码**：`src/main/workflow/debugger/DebugWorkflowService.ts` 中的 `executeSkepticReview`
 
 ---
 

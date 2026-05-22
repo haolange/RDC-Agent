@@ -21,6 +21,10 @@ import type { RuntimeLogEntry, RuntimeLogScope } from './runtimeLog';
 import type {
   AppSettings,
   AppSettingsPatch,
+  LlmProviderAccountStatus,
+  LlmProviderConnectionResult,
+  LlmProviderDraftRequest,
+  LlmProviderId,
   ResolvedTheme,
 } from './settings';
 import type {
@@ -181,6 +185,13 @@ export interface ElectronAPI {
       error?: string;
     }>;
     getAvailableModels: (provider: string) => Promise<string[]>;
+    testProviderDraft: (request: LlmProviderDraftRequest) => Promise<LlmProviderConnectionResult>;
+    connectProvider: (request: LlmProviderDraftRequest) => Promise<LlmProviderConnectionResult>;
+    refreshProviderModels: (providerId: LlmProviderId) => Promise<LlmProviderConnectionResult>;
+    disconnectProvider: (providerId: LlmProviderId) => Promise<LlmProviderConnectionResult>;
+    startProviderAccountLogin: (providerId: LlmProviderId) => Promise<LlmProviderAccountStatus>;
+    getProviderAccountStatus: (providerId: LlmProviderId) => Promise<LlmProviderAccountStatus>;
+    logoutProviderAccount: (providerId: LlmProviderId) => Promise<LlmProviderAccountStatus>;
   };
 
   settings: {

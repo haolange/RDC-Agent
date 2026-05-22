@@ -1,5 +1,5 @@
 import type { LLMMessage } from '@shared/types/llm';
-import { llmAdapter } from '../../../adapters/LLMAdapter';
+import { llmAdapter } from '../../../settings/LLMAdapter';
 import type { AgentRunRequest, AgentRunResult, AgentSdkAdapter, AgentToolPort } from '../AgentRunnerPort';
 
 export class LlmAdapterAgentSdkAdapter implements AgentSdkAdapter {

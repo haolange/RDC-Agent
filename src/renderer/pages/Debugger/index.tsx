@@ -1,6 +1,6 @@
 import React from 'react';
 import type { AgentMode } from '@shared/types/layout';
-import { AgentChat } from '../../components/AgentChat';
+import { AgentChat } from '../../features/debugger/AgentChat';
 import './Debugger.css';
 
 export const DebuggerPage: React.FC<{ mode: AgentMode }> = ({ mode }) => {

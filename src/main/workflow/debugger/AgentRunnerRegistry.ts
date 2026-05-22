@@ -1,5 +1,5 @@
-import { settingsService } from '../../services/SettingsService';
-import { runtimeLogService } from '../../services/RuntimeLogService';
+import { settingsService } from '../../settings/SettingsService';
+import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import type { AgentRunRequest, AgentRunResult, AgentSdkAdapter } from './AgentRunnerPort';
 import { toolBridgeAgentToolPort } from './ToolBridgeAgentToolPort';
 import { ClaudeAgentSdkAdapter } from './adapters/ClaudeAgentSdkAdapter';
