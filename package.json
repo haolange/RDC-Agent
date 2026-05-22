@@ -18,6 +18,7 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.3.145",
     "@openai/agents": "^0.11.4",
+    "openai": "^6.38.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "electron-store": "^8.1.0",

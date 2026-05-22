@@ -47,7 +47,7 @@ migration-reports/
 profiles/
 policies/
 secrets/
-projects/
+/projects/
 knowledge/
 
 # OS junk

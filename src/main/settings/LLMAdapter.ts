@@ -51,6 +51,11 @@ const normalizeOpenRouterBaseUrl = (baseUrl: string): string => {
   return trimmed;
 };
 
+const appendQueryParam = (url: string, key: string, value: string): string => {
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+};
+
 const extractMessageContent = (
   payload: unknown,
 ): string | ContentBlock[] => {
@@ -483,8 +488,8 @@ class OpenRouterProvider extends BaseStreamingProvider {
 }
 
 class OpenAICompatibleProvider extends BaseStreamingProvider {
-  private apiKey = '';
-  private baseUrl = 'https://api.openai.com/v1';
+  protected apiKey = '';
+  protected baseUrl = 'https://api.openai.com/v1';
   private models: string[] = [];
   private requireApiKey = true;
 
@@ -499,11 +504,7 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
     this.models = config.models;
   }
 
-  async chat(request: LLMRequest): Promise<LLMResponse> {
-    const model = request.model?.trim();
-    if (!model) {
-      throw new Error(`${this.name} requires an explicit model selection.`);
-    }
+  protected createHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -512,9 +513,26 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
       headers.Authorization = `Bearer ${this.apiKey}`;
     }
 
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+    return headers;
+  }
+
+  protected createChatCompletionsUrl(): string {
+    return `${this.baseUrl}/chat/completions`;
+  }
+
+  protected describeApiError(status: number, text: string): string {
+    return `${this.name} API error: ${status} - ${text}`;
+  }
+
+  async chat(request: LLMRequest): Promise<LLMResponse> {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+
+    const response = await fetch(this.createChatCompletionsUrl(), {
       method: 'POST',
-      headers,
+      headers: this.createHeaders(),
       signal: request.signal,
       body: JSON.stringify({
         model,
@@ -527,7 +545,7 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
     });
 
     if (!response.ok) {
-      throw new Error(`${this.name} API error: ${response.status} - ${await response.text()}`);
+      throw new Error(this.describeApiError(response.status, await response.text()));
     }
 
     const data = await response.json();
@@ -553,17 +571,9 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
 
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-
-    if (this.apiKey) {
-      headers.Authorization = `Bearer ${this.apiKey}`;
-    }
-
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+    const response = await fetch(this.createChatCompletionsUrl(), {
       method: 'POST',
-      headers,
+      headers: this.createHeaders(),
       signal: request.signal,
       body: JSON.stringify({
         model,
@@ -577,7 +587,7 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
     });
 
     if (!response.ok) {
-      throw new Error(`${this.name} API error: ${response.status} - ${await response.text()}`);
+      throw new Error(this.describeApiError(response.status, await response.text()));
     }
 
     const accumulator = createAccumulator(model);
@@ -644,10 +654,138 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
   }
 }
 
+class GitHubCopilotProvider extends OpenAICompatibleProvider {
+  constructor(name: string) {
+    super(name, true);
+  }
+
+  protected createHeaders(): Record<string, string> {
+    return {
+      ...super.createHeaders(),
+      'Copilot-Integration-Id': 'vscode-chat',
+      'Editor-Version': 'RDC-Agent/1.0',
+      'Editor-Plugin-Version': 'RDC-Agent/1.0',
+    };
+  }
+
+  protected describeApiError(status: number, text: string): string {
+    if (status === 401) {
+      return `GitHub Copilot account token was rejected. Sign in again or check token policy. ${text}`;
+    }
+    if (status === 403) {
+      return `GitHub Copilot access was blocked by license, organization, or policy settings. ${text}`;
+    }
+    return `GitHub Copilot API error: ${status} - ${text}`;
+  }
+}
+
+class AzureOpenAIProvider extends OpenAICompatibleProvider {
+  protected createHeaders(): Record<string, string> {
+    return {
+      'api-key': this.apiKey,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  protected createChatCompletionsUrl(): string {
+    const base = this.baseUrl.endsWith('/chat/completions')
+      ? this.baseUrl
+      : `${this.baseUrl}/chat/completions`;
+    return appendQueryParam(base, 'api-version', '2024-10-21');
+  }
+}
+
+class GoogleAiStudioProvider extends BaseStreamingProvider {
+  private apiKey = '';
+  private baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+  private models: string[] = [];
+
+  constructor(name: string) {
+    super(name);
+  }
+
+  configure(config: LLMProviderConfig): void {
+    this.apiKey = config.apiKey.trim();
+    this.baseUrl = (config.baseUrl || this.baseUrl).trim().replace(/\/+$/, '');
+    this.models = config.models;
+  }
+
+  async chat(request: LLMRequest): Promise<LLMResponse> {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const response = await fetch(appendQueryParam(`${this.baseUrl}/models/${model}:generateContent`, 'key', this.apiKey), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: request.signal,
+      body: JSON.stringify({
+        contents: request.messages
+          .filter((message) => message.role !== 'system')
+          .map((message) => ({
+            role: message.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: typeof message.content === 'string' ? message.content : JSON.stringify(message.content) }],
+          })),
+        generationConfig: {
+          maxOutputTokens: request.maxTokens || 4096,
+          temperature: request.temperature ?? 0.7,
+        },
+        systemInstruction: request.messages.some((message) => message.role === 'system')
+          ? {
+              parts: request.messages
+                .filter((message) => message.role === 'system')
+                .map((message) => ({ text: typeof message.content === 'string' ? message.content : JSON.stringify(message.content) })),
+            }
+          : undefined,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google AI Studio API error: ${response.status} - ${await response.text()}`);
+    }
+
+    const data = await response.json();
+    const text = Array.isArray(data.candidates?.[0]?.content?.parts)
+      ? data.candidates[0].content.parts
+          .map((part: { text?: unknown }) => (typeof part.text === 'string' ? part.text : ''))
+          .join('')
+      : '';
+
+    return {
+      id: data.responseId || `google-ai-studio-${Date.now()}`,
+      model,
+      content: text,
+      usage: {
+        inputTokens: data.usageMetadata?.promptTokenCount || 0,
+        outputTokens: data.usageMetadata?.candidatesTokenCount || 0,
+      },
+      stopReason: 'end_turn',
+    };
+  }
+
+  protected async performStreamingChat(request: LLMRequest, onChunk: StreamCallback): Promise<LLMResponse> {
+    const response = await this.chat(request);
+    const text = typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
+    emitTextChunk(text, onChunk);
+    return response;
+  }
+
+  async isAvailable(): Promise<boolean> {
+    return Boolean(this.apiKey);
+  }
+
+  getModels(): string[] {
+    return this.models;
+  }
+}
+
 class AnthropicProvider extends BaseStreamingProvider {
   private apiKey = '';
   private baseUrl = 'https://api.anthropic.com/v1';
   private models: string[] = [];
+  private useBearerAuth = false;
 
   constructor(name: string) {
     super(name);
@@ -657,6 +795,15 @@ class AnthropicProvider extends BaseStreamingProvider {
     this.apiKey = config.apiKey.trim();
     this.baseUrl = (config.baseUrl || 'https://api.anthropic.com/v1').trim().replace(/\/+$/, '');
     this.models = config.models;
+    this.useBearerAuth = config.authMode === 'account';
+  }
+
+  private createHeaders(): Record<string, string> {
+    return {
+      ...(this.useBearerAuth ? { Authorization: `Bearer ${this.apiKey}` } : { 'x-api-key': this.apiKey }),
+      'anthropic-version': '2023-06-01',
+      'Content-Type': 'application/json',
+    };
   }
 
   async chat(request: LLMRequest): Promise<LLMResponse> {
@@ -669,11 +816,7 @@ class AnthropicProvider extends BaseStreamingProvider {
 
     const response = await fetch(`${this.baseUrl}/messages`, {
       method: 'POST',
-      headers: {
-        'x-api-key': this.apiKey,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      },
+      headers: this.createHeaders(),
       signal: request.signal,
       body: JSON.stringify({
         model,
@@ -714,11 +857,7 @@ class AnthropicProvider extends BaseStreamingProvider {
 
     const response = await fetch(`${this.baseUrl}/messages`, {
       method: 'POST',
-      headers: {
-        'x-api-key': this.apiKey,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      },
+      headers: this.createHeaders(),
       signal: request.signal,
       body: JSON.stringify({
         model,
@@ -792,6 +931,9 @@ interface RuntimeProviderEntry {
 }
 
 const createProviderByKind = (providerId: string, kind: LlmProviderKind): LLMProvider => {
+  if (providerId === 'github-copilot') {
+    return new GitHubCopilotProvider(providerId);
+  }
   if (kind === 'openrouter') {
     return new OpenRouterProvider(providerId);
   }
@@ -800,6 +942,12 @@ const createProviderByKind = (providerId: string, kind: LlmProviderKind): LLMPro
   }
   if (kind === 'ollama') {
     return new OpenAICompatibleProvider(providerId, false);
+  }
+  if (kind === 'google-ai-studio') {
+    return new GoogleAiStudioProvider(providerId);
+  }
+  if (kind === 'azure-openai') {
+    return new AzureOpenAIProvider(providerId);
   }
   return new OpenAICompatibleProvider(providerId, true);
 };

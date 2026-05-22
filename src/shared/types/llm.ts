@@ -3,7 +3,7 @@
  */
 
 import type { AgentRole } from './agent';
-import type { LlmProviderId, LlmProviderKind } from './settings';
+import type { LlmProviderAuthMode, LlmProviderId, LlmProviderKind } from './settings';
 
 // 内容块类型
 export type ContentBlockType = 'text' | 'image' | 'tool_use' | 'tool_result';
@@ -116,6 +116,7 @@ export interface LLMProvider {
 export interface LLMProviderConfig {
   id: LlmProviderId;
   kind: LlmProviderKind;
+  authMode?: LlmProviderAuthMode;
   label: string;
   enabled: boolean;
   apiKey: string;

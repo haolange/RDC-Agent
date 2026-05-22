@@ -8,15 +8,35 @@ export type FontScale = 'small' | 'medium' | 'large';
 export type BuiltinLlmProviderId =
   | 'openrouter'
   | 'openai'
+  | 'openai-eu'
+  | 'openai-us'
   | 'anthropic'
+  | 'anthropic-thirdparty'
+  | 'azure-openai'
   | 'deepseek'
-  | 'gemini'
   | 'xai'
-  | 'kimi'
-  | 'minimax'
-  | 'zai'
+  | 'google-ai-studio'
+  | 'groq'
+  | 'mistral'
+  | 'cerebras'
+  | 'huggingface'
+  | 'glm-cn'
+  | 'glm-global'
+  | 'kimi-coding-plan'
+  | 'moonshot'
+  | 'minimax-cn'
+  | 'minimax-global'
+  | 'xiaomi-mimo'
+  | 'xiaomi-mimo-token-plan'
+  | 'bailian'
+  | 'bedrock'
+  | 'vertex'
   | 'qwen'
   | 'volcengine'
+  | 'vercel-ai-gateway'
+  | 'manifest'
+  | 'custom-endpoint'
+  | 'litellm'
   | '302ai'
   | 'siliconflow'
   | 'ollama'
@@ -24,15 +44,18 @@ export type BuiltinLlmProviderId =
   | 'chatgpt-account'
   | 'github-copilot';
 export type LlmProviderId = BuiltinLlmProviderId | (string & {});
-export type LlmProviderKind = 'openrouter' | 'openai-compatible' | 'anthropic' | 'ollama';
-export type LlmProviderAuthMode = 'api-key' | 'local' | 'account';
-export type LlmProviderCatalogGroup = 'api-key' | 'local' | 'account';
+export type LlmProviderKind = 'openrouter' | 'openai-compatible' | 'anthropic' | 'google-ai-studio' | 'azure-openai' | 'bedrock' | 'vertex' | 'ollama';
+export type LlmProviderAuthMode = 'api-key' | 'local' | 'account' | 'environment';
+export type LlmProviderCatalogGroup = 'api-key' | 'local' | 'account' | 'environment';
 export type LlmProviderConnectionStatus = 'unconfigured' | 'verified' | 'failed' | 'unavailable';
 export type LlmProviderModelDiscoveryStrategy =
   | 'openai-compatible'
   | 'anthropic'
+  | 'anthropic-candidate-validation'
+  | 'google-ai-studio'
+  | 'azure-openai'
   | 'ollama-tags'
-  | 'gemini';
+  | 'static';
 
 export interface SidebarLayoutPreference {
   collapsed: boolean;
@@ -99,6 +122,7 @@ export interface LlmProviderEntry {
   secretRef?: string;
   hasStoredSecret: boolean;
   baseUrl?: string;
+  baseUrlEditable?: boolean;
   models: LlmProviderModel[];
   recommendedModels: string[];
   docsUrl?: string;
@@ -107,6 +131,10 @@ export interface LlmProviderEntry {
   lastModelRefreshAt?: string;
   lastError?: string;
   accountLoginConfigured?: boolean;
+  accountLabel?: string;
+  planLabel?: string;
+  oauthExpiresAt?: string;
+  oauthRefreshAvailable?: boolean;
   unavailableReason?: string;
   isConfigured: boolean;
 }
@@ -166,6 +194,14 @@ export type AppSettingsPatch = Partial<{
 export interface LlmProviderDraftRequest {
   providerId: LlmProviderId;
   apiKey?: string;
+  baseUrl?: string;
+}
+
+export interface LlmProviderAccountLoginFinishRequest {
+  providerId: LlmProviderId;
+  code?: string;
+  state?: string;
+  flowId?: string;
 }
 
 export interface LlmProviderConnectionResult {
@@ -177,8 +213,17 @@ export interface LlmProviderConnectionResult {
 
 export interface LlmProviderAccountStatus {
   providerId: LlmProviderId;
+  state: 'signed-out' | 'pending' | 'connected' | 'failed' | 'unavailable';
   available: boolean;
   connected: boolean;
   message?: string;
   error?: string;
+  accountLabel?: string;
+  planLabel?: string;
+  expiresAt?: string;
+  authUrl?: string;
+  verificationUri?: string;
+  userCode?: string;
+  requiresCodeInput?: boolean;
+  models?: LlmProviderModel[];
 }

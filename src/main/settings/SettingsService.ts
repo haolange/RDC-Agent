@@ -208,6 +208,39 @@ function getResolvedProviderSecret(providerId: string, secretRef: string | undef
   return isVendorSecretUsable(providerId, secret) ? secret : '';
 }
 
+function resolveAccountRuntimeCredential(providerId: string, workspaceRoot: string): { apiKey: string; baseUrl?: string } {
+  const raw = secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(providerId), workspaceRoot);
+  if (!raw) {
+    return { apiKey: '' };
+  }
+  try {
+    const bundle = JSON.parse(raw) as {
+      accessToken?: string;
+      apiKey?: string;
+      copilotToken?: string;
+      copilotApiBaseUrl?: string;
+    };
+    if (providerId === 'github-copilot') {
+      return {
+        apiKey: bundle.copilotToken ?? '',
+        baseUrl: bundle.copilotApiBaseUrl ?? 'https://api.githubcopilot.com',
+      };
+    }
+    if (providerId === 'chatgpt-account') {
+      return {
+        apiKey: bundle.apiKey ?? bundle.accessToken ?? '',
+        baseUrl: 'https://api.openai.com/v1',
+      };
+    }
+    return {
+      apiKey: bundle.accessToken ?? '',
+      baseUrl: 'https://api.anthropic.com/v1',
+    };
+  } catch {
+    return { apiKey: '' };
+  }
+}
+
 function sanitizeSidebar(
   input: unknown,
   defaults: typeof LEFT_DEFAULTS | typeof RIGHT_DEFAULTS,
@@ -372,11 +405,19 @@ function isFixtureProvider(provider: Partial<LlmProviderEntry>): boolean {
   );
 }
 
+function normalizeLegacyProviderId(providerId: string): string {
+  if (providerId === 'gemini') return 'vertex';
+  if (providerId === 'kimi') return 'kimi-coding-plan';
+  if (providerId === 'minimax') return 'minimax-global';
+  if (providerId === 'zai') return 'glm-global';
+  return providerId;
+}
+
 function sanitizeUserProvider(
   provider: Partial<LlmProviderEntry>,
   workspaceRoot = appPathService.getWorkspaceRoot(),
 ): LlmProviderEntry | null {
-  const rawId = typeof provider.id === 'string' ? provider.id.trim() : '';
+  const rawId = normalizeLegacyProviderId(typeof provider.id === 'string' ? provider.id.trim() : '');
   if (!rawId || !isBuiltinProviderId(rawId)) {
     return null;
   }
@@ -386,15 +427,18 @@ function sanitizeUserProvider(
   const secretRef = provider.secretRef || secretStorageService.createProviderSecretRef(rawId);
   const kind = builtinFallback.kind;
   const models = sanitizeModels(provider.models ?? []);
+  const oauthSecretRef = secretStorageService.createProviderOAuthSecretRef(rawId);
   const resolvedSecret = builtinFallback.authMode === 'api-key'
     ? getResolvedProviderSecret(rawId, secretRef, workspaceRoot)
-    : '';
-  const hasStoredSecret = builtinFallback.authMode === 'local' || Boolean(resolvedSecret);
-  const canUseProvider = builtinFallback.authMode === 'local'
+    : builtinFallback.authMode === 'account'
+      ? secretStorageService.getSecret(oauthSecretRef, workspaceRoot)
+      : '';
+  const hasStoredSecret = builtinFallback.authMode === 'local' || builtinFallback.authMode === 'environment' || Boolean(resolvedSecret);
+  const canUseProvider = builtinFallback.authMode === 'local' || builtinFallback.authMode === 'environment'
     ? true
     : builtinFallback.authMode === 'api-key'
       ? Boolean(resolvedSecret)
-      : provider.status === 'verified';
+      : Boolean(resolvedSecret);
   const status = pickProviderStatus(provider, builtinFallback, canUseProvider, models);
   const enabled = status === 'verified' && models.length > 0;
 
@@ -411,7 +455,10 @@ function sanitizeUserProvider(
     apiKey: '',
     secretRef,
     hasStoredSecret,
-    baseUrl: definition?.baseUrl,
+    baseUrl: definition?.baseUrlEditable
+      ? (typeof provider.baseUrl === 'string' ? provider.baseUrl.trim() : definition.baseUrl)
+      : definition?.baseUrl,
+    baseUrlEditable: definition?.baseUrlEditable,
     models,
     recommendedModels: dedupeStrings(
       Array.isArray(provider.recommendedModels)
@@ -426,6 +473,10 @@ function sanitizeUserProvider(
     lastModelRefreshAt: typeof provider.lastModelRefreshAt === 'string' ? provider.lastModelRefreshAt : undefined,
     lastError: status === 'failed' && typeof provider.lastError === 'string' ? provider.lastError : undefined,
     accountLoginConfigured: definition?.accountLoginConfigured,
+    accountLabel: typeof provider.accountLabel === 'string' ? provider.accountLabel : undefined,
+    planLabel: typeof provider.planLabel === 'string' ? provider.planLabel : undefined,
+    oauthExpiresAt: typeof provider.oauthExpiresAt === 'string' ? provider.oauthExpiresAt : undefined,
+    oauthRefreshAvailable: typeof provider.oauthRefreshAvailable === 'boolean' ? provider.oauthRefreshAvailable : undefined,
     unavailableReason: definition?.unavailableReason,
     isConfigured: status === 'verified' && models.length > 0 && enabled,
   };
@@ -462,13 +513,15 @@ function hydrateProviderSecrets(
   return providers.map((provider) => {
     const resolvedSecret = provider.authMode === 'api-key'
       ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot)
-      : '';
-    const hasStoredSecret = provider.authMode === 'local' || Boolean(resolvedSecret);
-    const canUseProvider = provider.authMode === 'local'
+      : provider.authMode === 'account'
+        ? secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(provider.id), workspaceRoot)
+        : '';
+    const hasStoredSecret = provider.authMode === 'local' || provider.authMode === 'environment' || Boolean(resolvedSecret);
+    const canUseProvider = provider.authMode === 'local' || provider.authMode === 'environment'
       ? true
       : provider.authMode === 'api-key'
         ? Boolean(resolvedSecret)
-        : provider.status === 'verified';
+        : Boolean(resolvedSecret);
     const status = provider.status === 'unavailable'
       ? 'unavailable'
       : provider.status === 'verified' && canUseProvider && provider.models.length > 0
@@ -587,7 +640,7 @@ export class SettingsService {
         continue;
       }
 
-      const rawId = typeof entry.id === 'string' ? entry.id.trim() : '';
+      const rawId = normalizeLegacyProviderId(typeof entry.id === 'string' ? entry.id.trim() : '');
       if (!rawId) {
         fixes.push('Removed provider with empty id');
         continue;
@@ -836,6 +889,11 @@ export class SettingsService {
     return getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot);
   }
 
+  getProviderOAuthSecret(providerId: string, workspaceRoot = appPathService.getWorkspaceRoot()): string {
+    this.ensureInitialized();
+    return secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(providerId), workspaceRoot);
+  }
+
   setAll(patch: AppSettingsPatch, runtimePaths?: Partial<AppRuntimePaths>): AppSettings {
     this.ensureInitialized();
 
@@ -937,7 +995,7 @@ export class SettingsService {
     });
   }
 
-  saveProviderConnection(providerId: LlmProviderId, apiKey: string, models: LlmProviderModel[]): AppSettings {
+  saveProviderConnection(providerId: LlmProviderId, apiKey: string, models: LlmProviderModel[], baseUrl = ''): AppSettings {
     const current = this.getAll();
     const provider = current.llm.providers.find((entry) => entry.id === providerId);
     if (!provider || !isBuiltinProviderId(provider.id)) {
@@ -956,12 +1014,61 @@ export class SettingsService {
       enabled: true,
       hasStoredSecret: provider.authMode === 'api-key'
         ? Boolean(apiKey.trim() || provider.hasStoredSecret)
-        : provider.hasStoredSecret,
+        : provider.authMode === 'local' || provider.authMode === 'environment' || provider.hasStoredSecret,
+      baseUrl: provider.baseUrlEditable ? baseUrl.trim() || provider.baseUrl : provider.baseUrl,
       models: discoveredModels.map((model) => ({ ...model, enabled: true })),
       status: 'verified',
       lastTestedAt: timestamp,
       lastModelRefreshAt: timestamp,
       lastError: undefined,
+      isConfigured: true,
+    };
+
+    return this.setAll({
+      llm: {
+        providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
+        agentRoutes: current.llm.agentRoutes,
+      },
+    });
+  }
+
+  saveProviderAccountConnection(
+    providerId: LlmProviderId,
+    secretPayload: string,
+    models: LlmProviderModel[],
+    accountSummary: Pick<LlmProviderEntry, 'accountLabel' | 'planLabel' | 'oauthExpiresAt' | 'oauthRefreshAvailable'> = {},
+  ): AppSettings {
+    const current = this.getAll();
+    const provider = current.llm.providers.find((entry) => entry.id === providerId);
+    if (!provider || !isBuiltinProviderId(provider.id) || provider.authMode !== 'account') {
+      throw new Error(`Unknown account provider: ${providerId}`);
+    }
+
+    const discoveredModels = sanitizeModels(models);
+    if (discoveredModels.length === 0) {
+      throw new Error('Provider returned no usable models');
+    }
+
+    secretStorageService.setSecret(
+      secretStorageService.createProviderOAuthSecretRef(provider.id),
+      secretPayload,
+      current.workspace.rootPath,
+    );
+
+    const timestamp = nowIso();
+    const nextProvider: LlmProviderEntry = {
+      ...provider,
+      enabled: true,
+      hasStoredSecret: true,
+      models: discoveredModels.map((model) => ({ ...model, enabled: true })),
+      status: 'verified',
+      lastTestedAt: timestamp,
+      lastModelRefreshAt: timestamp,
+      lastError: undefined,
+      accountLabel: accountSummary.accountLabel,
+      planLabel: accountSummary.planLabel,
+      oauthExpiresAt: accountSummary.oauthExpiresAt,
+      oauthRefreshAvailable: accountSummary.oauthRefreshAvailable,
       isConfigured: true,
     };
 
@@ -982,6 +1089,8 @@ export class SettingsService {
 
     if (provider.authMode === 'api-key') {
       secretStorageService.deleteSecret(provider.secretRef, current.workspace.rootPath);
+    } else if (provider.authMode === 'account') {
+      secretStorageService.deleteSecret(secretStorageService.createProviderOAuthSecretRef(provider.id), current.workspace.rootPath);
     }
 
     const fallback = createBuiltinProviderEntry(provider.id);
@@ -993,6 +1102,10 @@ export class SettingsService {
       enabled: false,
       status: fallback.status,
       lastError: undefined,
+      accountLabel: undefined,
+      planLabel: undefined,
+      oauthExpiresAt: undefined,
+      oauthRefreshAvailable: undefined,
       isConfigured: false,
     };
 
@@ -1008,18 +1121,26 @@ export class SettingsService {
     const settings = this.getAll();
     const providers: LLMProviderConfig[] = settings.llm.providers
       .filter((provider) => provider.enabled && provider.isConfigured && provider.status === 'verified')
-      .map((provider) => ({
-        id: provider.id,
-        kind: provider.kind,
-        label: provider.label,
-        enabled: provider.enabled,
-        apiKey: provider.authMode === 'api-key'
-          ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.workspace.rootPath)
-          : '',
-        baseUrl: provider.baseUrl,
-        models: provider.models.filter((model) => model.enabled).map((model) => model.id),
-        docsUrl: provider.docsUrl,
-      }))
+      .map((provider) => {
+        const accountCredential = provider.authMode === 'account'
+          ? resolveAccountRuntimeCredential(provider.id, settings.workspace.rootPath)
+          : { apiKey: '', baseUrl: undefined };
+        return {
+          id: provider.id,
+          kind: provider.kind,
+          label: provider.label,
+          enabled: provider.enabled,
+          apiKey: provider.authMode === 'api-key'
+            ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.workspace.rootPath)
+            : provider.authMode === 'account'
+              ? accountCredential.apiKey
+              : '',
+          baseUrl: accountCredential.baseUrl ?? provider.baseUrl,
+          authMode: provider.authMode,
+          models: provider.models.filter((model) => model.enabled).map((model) => model.id),
+          docsUrl: provider.docsUrl,
+        };
+      })
       .filter((provider) => provider.models.length > 0);
 
     return {

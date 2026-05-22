@@ -19,6 +19,8 @@ export const createLlmApi = (): LlmApi => ({
     ipcRenderer.invoke('llm:startProviderAccountLogin', providerId),
   getProviderAccountStatus: (providerId): ReturnType<LlmApi['getProviderAccountStatus']> =>
     ipcRenderer.invoke('llm:getProviderAccountStatus', providerId),
+  finishProviderAccountLogin: (request): ReturnType<LlmApi['finishProviderAccountLogin']> =>
+    ipcRenderer.invoke('llm:finishProviderAccountLogin', request),
   logoutProviderAccount: (providerId): ReturnType<LlmApi['logoutProviderAccount']> =>
     ipcRenderer.invoke('llm:logoutProviderAccount', providerId),
 });

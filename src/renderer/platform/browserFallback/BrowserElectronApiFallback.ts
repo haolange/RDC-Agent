@@ -600,6 +600,7 @@ class BrowserElectronApiFallback {
                   ...entry,
                   enabled: true,
                   hasStoredSecret: entry.authMode !== 'local',
+                  baseUrl: entry.baseUrlEditable ? request.baseUrl || entry.baseUrl : entry.baseUrl,
                   status: 'verified',
                   models,
                   lastTestedAt: new Date().toISOString(),
@@ -637,13 +638,53 @@ class BrowserElectronApiFallback {
           models: [],
         };
       },
-      startProviderAccountLogin: async (providerId) => this.api.llm.getProviderAccountStatus(providerId),
+      startProviderAccountLogin: async (providerId) => ({
+        providerId,
+        state: providerId === 'github-copilot' ? 'pending' : 'pending',
+        available: true,
+        connected: false,
+        message: 'Browser preview authorization flow started.',
+        authUrl: providerId === 'github-copilot' ? undefined : 'https://example.com/oauth',
+        verificationUri: providerId === 'github-copilot' ? 'https://github.com/login/device' : undefined,
+        userCode: providerId === 'github-copilot' ? 'ABCD-1234' : undefined,
+        requiresCodeInput: providerId === 'claude-account',
+      }),
       getProviderAccountStatus: async (providerId) => ({
         providerId,
-        available: false,
+        state: 'signed-out',
+        available: true,
         connected: false,
-        message: '当前版本未配置登录通道',
+        message: 'Not connected',
       }),
+      finishProviderAccountLogin: async (request) => {
+        const models = [{ id: 'browser-preview-oauth-model', label: 'Browser Preview OAuth Model', enabled: true }];
+        this.settings = this.applySettingsPatch(this.settings, {
+          llm: {
+            providers: this.settings.llm.providers.map((entry) => entry.id === request.providerId
+              ? {
+                  ...entry,
+                  enabled: true,
+                  hasStoredSecret: true,
+                  status: 'verified',
+                  models,
+                  accountLabel: entry.label,
+                  lastTestedAt: new Date().toISOString(),
+                  lastModelRefreshAt: new Date().toISOString(),
+                  isConfigured: true,
+                }
+              : entry),
+          },
+        });
+        return {
+          providerId: request.providerId,
+          state: 'connected',
+          available: true,
+          connected: true,
+          message: 'Connected',
+          accountLabel: 'Browser Preview Account',
+          models,
+        };
+      },
       logoutProviderAccount: async (providerId) => this.api.llm.getProviderAccountStatus(providerId),
     },
 
