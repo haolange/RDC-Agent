@@ -193,8 +193,8 @@ test('AskUserQuestion 卡片要求先选择或填写，再提交进入待批准�
   await expect(ctx.page.locator('[data-testid="plan-submit-answers-button"]')).toBeDisabled();
   await expect(ctx.page.locator('.main-input-bar [data-testid="plan-intake-panel"]')).toHaveCount(0);
 
-  await ctx.page.locator('[data-testid="assistant-reasoning-toggle"]').first().click();
   const askTrace = ctx.page.locator('[data-testid="agent-timeline-tool-call"]').filter({ hasText: 'ui.ask_user_question' }).first();
+  await expect(askTrace).toBeVisible();
   await expect(askTrace).toContainText('等待用户');
 
   const desktopOption = ctx.page.locator('[data-testid^="plan-option-target_capture-"]').filter({ hasText: 'Character_EyeSpark_Desktop.rdc' }).first();
@@ -203,10 +203,6 @@ test('AskUserQuestion 卡片要求先选择或填写，再提交进入待批准�
   await ctx.page.locator('[data-testid="plan-submit-answers-button"]').click();
 
   await expect(ctx.page.locator('[data-testid="ask-user-question-card"]')).toHaveCount(0);
-  const answeredTraceToggle = ctx.page.locator('[data-testid="assistant-reasoning-toggle"]').first();
-  if (await answeredTraceToggle.getAttribute('aria-expanded') !== 'true') {
-    await answeredTraceToggle.click();
-  }
   await expect(ctx.page.locator('[data-testid="agent-timeline-tool-call"]').filter({ hasText: 'ui.ask_user_question' }).first()).toContainText('已回答');
   await expect(ctx.page.locator('[data-testid="plan-approve-button"]')).toBeEnabled();
   await expect(ctx.page.locator('.plan-document-card')).toContainText('Character_EyeSpark_Desktop.rdc');

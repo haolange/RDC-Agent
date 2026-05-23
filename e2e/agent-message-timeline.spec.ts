@@ -5,11 +5,12 @@ import { expect, test } from '@playwright/test';
 import { AppContext, closeApp, launchApp } from './helpers/electron-app';
 import type { ConversationMessage } from '../src/shared/types/conversation';
 import type { ActionEvent } from '../src/shared/types/evidence';
-import type { WorkflowState } from '../src/shared/types/workflow';
+import type { DebugPlan, WorkflowState } from '../src/shared/types/workflow';
 
 let ctx: AppContext;
 
 const BASE_TIME = Date.UTC(2026, 4, 3, 9, 21, 0);
+const PRODUCT_FLOW_SESSION_DIR = 'D:\\Utility\\DebugTest\\custom\\sessions\\session-rdc-debugger-product-flow';
 
 interface PngPixelStats {
   averageLuma: number;
@@ -126,6 +127,58 @@ const expectScreenshotNotBlack = async (
   expect(stats.averageLuma).toBeGreaterThan(8);
   expect(stats.nonBlackRatio).toBeGreaterThan(0.035);
   return stats;
+};
+
+const setElectronWindowSize = async (appContext: AppContext, width: number, height: number) => {
+  await appContext.app.evaluate(({ BrowserWindow }, size) => {
+    const mainWindow = BrowserWindow.getAllWindows()[0];
+    mainWindow.setSize(size.width, size.height);
+  }, { width, height });
+  await appContext.page.waitForTimeout(350);
+};
+
+const readJsonFile = <T,>(filePath: string): T => JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
+
+const readJsonlFile = <T,>(filePath: string): T[] => fs.readFileSync(filePath, 'utf8')
+  .split(/\r?\n/)
+  .filter((line) => line.trim().length > 0)
+  .map((line) => JSON.parse(line) as T);
+
+const validateProductFlowFixture = () => {
+  expect(fs.existsSync(PRODUCT_FLOW_SESSION_DIR)).toBe(true);
+  const actionEvents = readJsonlFile<ActionEvent>(path.join(PRODUCT_FLOW_SESSION_DIR, 'action_chain.jsonl'));
+  const messages = readJsonlFile<ConversationMessage>(path.join(PRODUCT_FLOW_SESSION_DIR, 'conversation.jsonl'));
+  const artifactStore = readJsonFile<{
+    artifacts: Array<{ filePath: string; sizeBytes: number }>;
+  }>(path.join(PRODUCT_FLOW_SESSION_DIR, 'runs', 'run-rdc-debugger-product-flow', 'artifact_store.json'));
+
+  expect(messages.length).toBeGreaterThan(0);
+  expect(actionEvents.some((event) => event.event_type === 'ask_user_question')).toBe(false);
+
+  for (const artifact of artifactStore.artifacts) {
+    expect(fs.statSync(artifact.filePath).size).toBe(artifact.sizeBytes);
+  }
+
+  const serializedMessages = messages.map((message) => message.content).join('\n');
+  const serializedEvents = actionEvents.map((event) => JSON.stringify(event.payload)).join('\n');
+  const eventToolNames = actionEvents
+    .filter((event) => event.event_type === 'tool_execution')
+    .map((event) => String(event.payload.tool_name || event.payload.toolName));
+
+  expect(serializedMessages).toContain('D:\\Utility\\Test RDC Files\\眼睛泪腺白点.rdc');
+  expect(serializedMessages).toContain('Event ID 6152');
+  expect(serializedMessages).toContain('resolution_mode: audited_execution');
+  expect(serializedMessages).toContain('execution_driver: rdc-execute');
+  expect(serializedMessages).toContain('baseline_policy: predicate_only');
+  expect(serializedEvents).toContain('audited_execution');
+  expect(eventToolNames).toEqual(expect.arrayContaining([
+    'read_file',
+    'grep_search',
+    'file_search',
+    'list_dir',
+    'runSubagent.triage-taxonomy',
+    'runSubagent.capture-repro',
+  ]));
 };
 
 async function seedTimelineScenario(page: AppContext['page'], projectRoot: string) {
@@ -467,6 +520,190 @@ async function seedTimelineScenario(page: AppContext['page'], projectRoot: strin
   });
 }
 
+async function seedProductFlowFixture(page: AppContext['page']) {
+  const session = readJsonFile<{
+    sessionId: string;
+    projectId: string;
+    title: string;
+    goal: string;
+    sessionPath: string;
+    createdAt: number;
+    updatedAt: number;
+  }>(path.join(PRODUCT_FLOW_SESSION_DIR, 'session.json'));
+  const run = readJsonFile<{
+    runId: string;
+    turnId: string;
+    projectId: string;
+    sessionId: string;
+    caseId: string;
+    mode: 'debugger';
+    goal: string;
+    captures: Array<{
+      id: string;
+      filePath: string;
+      role: 'primary';
+      backendHint: 'local';
+      status: 'open';
+      sessionId: string;
+      replaySessionId: string;
+      contextId: string;
+    }>;
+    startedAt: number;
+    finishedAt: number;
+    status: 'completed';
+    lastStage: string;
+    backend: 'local';
+  }>(path.join(PRODUCT_FLOW_SESSION_DIR, 'runs', 'run-rdc-debugger-product-flow', 'run.json'));
+  const capsule = readJsonFile<{
+    plan: DebugPlan['presentation'];
+    tasks: WorkflowState['harnessTasks'];
+  }>(path.join(PRODUCT_FLOW_SESSION_DIR, 'runs', run.runId, 'run_capsule.json'));
+  const events = readJsonlFile<ActionEvent>(path.join(PRODUCT_FLOW_SESSION_DIR, 'action_chain.jsonl'));
+  const messages = readJsonlFile<ConversationMessage>(path.join(PRODUCT_FLOW_SESSION_DIR, 'conversation.jsonl'));
+  const openedCapture = (events.find((event) => event.event_type === 'context_snapshot')?.payload as {
+    openedCapture?: unknown;
+  } | undefined)?.openedCapture ?? null;
+  const captureFileName = path.basename(run.captures[0]?.filePath ?? 'Character_EyeSpark_Desktop.rdc');
+  const project = {
+    projectId: session.projectId,
+    name: 'custom',
+    rootPath: 'D:\\Utility\\DebugTest\\custom',
+    slug: 'custom',
+    resourcePath: 'D:\\Utility\\DebugTest\\custom\\.resource',
+    knowledgePath: 'D:\\Utility\\DebugTest\\custom\\.resource\\knowledge',
+    inputsPath: 'D:\\Utility\\DebugTest\\custom\\.resource\\inputs',
+    inputs: [{
+      inputId: 'input_character_eyespark_desktop',
+      fileName: captureFileName,
+      filePath: run.captures[0]?.filePath,
+      source: 'project_resource',
+      discoveredAt: session.createdAt,
+      lastModifiedAt: session.createdAt,
+      size: 1024,
+    }],
+    inputsUpdatedAt: session.createdAt,
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    lastSessionId: session.sessionId,
+  };
+  const debugPlan: DebugPlan = {
+    planId: 'plan-copilot-audited-execution',
+    planReadiness: 'strict_ready',
+    strictReady: true,
+    userGoal: run.goal,
+    targetCapture: {
+      captureId: run.captures[0]?.id ?? 'cap_character_eyespark_desktop',
+      fileName: captureFileName,
+      filePath: run.captures[0]?.filePath ?? '',
+    },
+    targetFrameOrEvent: {
+      scope: 'event',
+      eventId: 6152,
+      eventLabel: 'Event 6152',
+    },
+    scope: 'Copilot-aligned audited execution contract for Event 6152 lacrimal highlight inspection',
+    referenceContract: {
+      taskSources: ['Copilot title_logs.json'],
+      referenceCaptures: [captureFileName],
+      acceptanceNotes: ['Debugger produces an auditable plan; rdc-execute owns runtime replay.'],
+    },
+    verificationContract: {
+      requiresFixValidation: true,
+      requiresScreenshotEvidence: true,
+      requiresShaderInspection: true,
+      requiresPixelEvidence: true,
+      requiresBaselineComparison: false,
+      targetEventIds: [6152],
+      successCriteria: capsule.plan?.sections.find((section) => section.id === 'test-plan')?.body ?? [],
+    },
+    presentation: capsule.plan,
+    expectedDeliverables: ['report.md', 'report.json', 'visual_report.html'],
+    blockers: [],
+    missingInfo: [],
+    recommendedSpecialists: ['pass_graph_pipeline_agent', 'pixel_value_forensics_agent', 'shader_ir_agent', 'report_knowledge_curator_agent'] as DebugPlan['recommendedSpecialists'],
+    notes: capsule.plan?.sections.find((section) => section.id === 'assumptions')?.body ?? [],
+    createdAt: '2026-05-23T14:36:20.000Z',
+    updatedAt: '2026-05-23T14:39:00.000Z',
+  };
+  const workflowState: WorkflowState = {
+    caseId: run.caseId,
+    runId: run.runId,
+    sessionId: run.sessionId,
+    currentStage: 'finalize',
+    previousStages: ['preflight', 'entry_gate', 'intake_gate', 'plan', 'dispatch', 'investigate', 'fix_verify', 'curate'],
+    entryMode: 'cli',
+    backend: 'local',
+    orchestrationMode: 'multi_agent',
+    coordinationMode: 'staged_handoff',
+    blockers: [],
+    planReadiness: 'strict_ready',
+    approvalState: 'approved',
+    debugPlan,
+    harnessTasks: capsule.tasks ?? [],
+    pendingQuestions: null,
+    reasoningSummaries: [{
+      summaryId: 'summary-product-flow',
+      stage: 'finalize',
+      agentId: 'curator_agent',
+      summary: 'Copilot action_plan、helper brief、报告产物和任务板均已进入 Debugger 主链。',
+      evidence: ['evt-report-published'],
+      nextStep: '等待用户查看 action_plan 和报告产物。',
+      confidence: 0.86,
+      createdAt: '2026-05-23T14:38:30.000Z',
+    }],
+    recoveryState: null,
+    lastUpdated: '2026-05-23T14:39:00.000Z',
+  };
+
+  await page.evaluate(({ project, session, run, messages, events, workflowState, openedCapture }) => {
+    const hook = (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        seedWorkbenchState: (state: Record<string, unknown>) => void;
+      };
+    }).__RDC_AGENT_E2E__;
+    if (!hook) {
+      throw new Error('Missing E2E state hook');
+    }
+    hook.seedWorkbenchState({
+      projects: [project],
+      sessions: [session],
+      currentProject: project,
+      currentSession: session,
+      rightRailTarget: 'session',
+      currentRun: run,
+      currentRunUsage: null,
+      contextSnapshot: null,
+      captures: run.captures,
+      projectInputs: project.inputs,
+      openedCapture,
+      conversationMessages: messages,
+      timeline: [],
+      actionEvents: events,
+      workflowState,
+      runs: [run],
+    });
+  }, { project, session, run, messages, events, workflowState, openedCapture });
+
+  await page.waitForTimeout(500);
+  await page.evaluate(({ messages, events, workflowState }) => {
+    const hook = (window as Window & {
+      __RDC_AGENT_E2E__?: {
+        getWorkbenchState: () => Record<string, unknown>;
+        seedWorkbenchState: (state: Record<string, unknown>) => void;
+      };
+    }).__RDC_AGENT_E2E__;
+    if (!hook) {
+      throw new Error('Missing E2E state hook');
+    }
+    hook.seedWorkbenchState({
+      ...hook.getWorkbenchState(),
+      conversationMessages: messages,
+      actionEvents: events,
+      workflowState,
+    });
+  }, { messages, events, workflowState });
+}
+
 function createRestoredStartupFixture(tempDir: string): { userDataDir: string; workspaceDir: string } {
   const userDataDir = path.join(tempDir, 'restored-userData');
   const workspaceDir = path.join(tempDir, 'restored-workspace');
@@ -616,23 +853,24 @@ test.afterEach(async () => {
   await closeApp(ctx);
 });
 
-test('renders collapsible thinking trace with real evidence, tools, and artifacts', async () => {
+test('renders compact agentic transcript with real evidence, tools, and artifacts', async () => {
   const projectRoot = path.join(ctx.tempDir, 'message-flow-project');
   await seedTimelineScenario(ctx.page, projectRoot);
 
   await expect(ctx.page.locator('[data-testid="agent-message-timeline"]')).toBeVisible();
   await expect(ctx.page.locator('[data-testid="agent-timeline-user-message"]')).toContainText('请分析我自研 Agent');
-  await expect(ctx.page.locator('[data-testid="agent-thinking-trace"]')).toContainText('部分完成');
+  await expect(ctx.page.locator('[data-testid="agent-thinking-trace"]')).toHaveCount(0);
+  await expect(ctx.page.locator('[data-testid="assistant-reasoning-toggle"]')).toHaveCount(0);
   await expect(ctx.page.locator('[data-testid="agent-thinking-area"]')).toHaveCount(0);
   await expect(ctx.page.locator('[data-testid="agent-timeline-assistant-message"]')).toContainText('可展开的思考轨迹');
   await expect(ctx.page.locator('[data-testid="agent-message-timeline"]')).not.toContainText('MessageFlow Analyst');
   await expect(ctx.page.locator('[data-testid="agent-message-timeline"]')).not.toContainText('Phase 1');
   await expect(ctx.page.locator('[data-testid="agent-message-timeline"]')).not.toContainText('Phase 2');
   await expect(ctx.page.locator('[data-testid="agent-message-timeline"]')).not.toContainText('Merge');
-  await ctx.page.locator('[data-testid="agent-thinking-trace"] button[aria-expanded="false"]').click();
-  await expect(ctx.page.locator('[data-testid="agent-thinking-area"]')).toBeVisible();
-  await expect(ctx.page.locator('[data-testid="agent-timeline-group"]').first()).toContainText('思考');
+  await expect(ctx.page.locator('[data-testid="agent-timeline-group"]').first()).toContainText('Agent 活动');
   await expect(ctx.page.locator('[data-testid="agent-timeline-tool-call"]').first()).toContainText('InspectReference');
+  const artifactSection = ctx.page.locator('[data-testid="agent-timeline-artifacts"]').first();
+  await artifactSection.locator('button[aria-expanded="false"]').click();
   await expect(ctx.page.locator('[data-testid="agent-timeline-artifact-grid"]')).toContainText('message_flow_spec.md');
   await expect(ctx.page.locator('textarea.chat-input')).toBeVisible();
 
@@ -662,14 +900,103 @@ test('renders collapsible thinking trace with real evidence, tools, and artifact
   await firstTool.locator('button[aria-expanded="false"]').click();
   await expect(firstTool).toContainText('source');
 
+  const evidenceGroup = ctx.page.locator('[data-testid="agent-timeline-group"]').filter({ hasText: '证据' }).first();
+  await evidenceGroup.locator('button[aria-expanded="false"]').click();
   await expect(ctx.page.locator('[data-testid="agent-timeline-evidence-source"]').first()).toBeVisible();
-
-  await ctx.page.locator('[data-testid="agent-thinking-trace"] > button[aria-expanded="true"]').click();
-  await expect(ctx.page.locator('[data-testid="agent-thinking-area"]')).toHaveCount(0);
 
   const filteredScreenshotPath = path.join(process.cwd(), 'test-results', 'agent-message-timeline-filtered.png');
   await ctx.page.locator('[data-testid="agent-message-timeline"]').screenshot({ path: filteredScreenshotPath });
   expect(fs.statSync(filteredScreenshotPath).size).toBeGreaterThan(12_000);
+});
+
+test('renders fixed Debugger product-flow session as compact main-chain transcript', async () => {
+  validateProductFlowFixture();
+  await setElectronWindowSize(ctx, 1720, 980);
+  await seedProductFlowFixture(ctx.page);
+
+  const page = ctx.page;
+  const transcript = page.locator('[data-testid="agent-message-timeline"]');
+  await expect(transcript).toBeVisible();
+  await expect(page.locator('[data-testid="chat-messages"] [data-testid="plan-intake-panel"]')).toBeVisible();
+  await expect(page.locator('.main-input-bar [data-testid="plan-intake-panel"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="task-board"]')).toBeVisible();
+
+  const planCard = page.locator('[data-testid="plan-intake-panel"]');
+  await expect(planCard.locator('.plan-document-card')).toHaveClass(/collapsed/);
+  await expect(planCard).toContainText('RDC-Debugger audited execution plan');
+  await expect(planCard).toContainText('audited_execution');
+  await page.locator('[data-testid="plan-collapse-toggle"]').click();
+  await expect(planCard.locator('.plan-document-card')).toHaveClass(/expanded/);
+  await expect(planCard).toContainText('Action Plan');
+  await expect(planCard).toContainText('Execution Route');
+  await expect(planCard).toContainText('Test Plan');
+  await expect(planCard).toContainText('Assumptions');
+  await page.locator('[data-testid="plan-collapse-toggle"]').click();
+  await expect(planCard.locator('.plan-document-card')).toHaveClass(/collapsed/);
+  await expect(planCard.locator('[data-testid="plan-approve-button"]')).toHaveCount(0);
+
+  await expect(page.locator('[data-testid="ask-user-question-card"]')).toHaveCount(0);
+  await expect(transcript.locator('[data-testid="agent-timeline-tool-call"]').filter({ hasText: 'ui.ask_user_question' })).toHaveCount(0);
+  await expect(transcript).toContainText('D:\\Utility\\Test RDC Files\\眼睛泪腺白点.rdc');
+  await expect(transcript).toContainText('resolution_mode: audited_execution');
+  await expect(transcript).toContainText('execution_readiness: ready');
+  await expect(transcript).toContainText('execution_driver: rdc-execute');
+  await expect(transcript).toContainText('target_event_id: 6152');
+  await expect(transcript).toContainText('baseline_policy: predicate_only');
+  await expect(transcript.locator('[data-testid="assistant-code-block"]').filter({ hasText: 'resolution_mode' })).toBeVisible();
+  await expect(page.locator('[data-testid="conversation-assistant-card"]').filter({ hasText: '计划已批准' })).toHaveCount(0);
+  await expect(page.locator('[data-testid="conversation-assistant-card"]').filter({ hasText: '正在检查' })).toHaveCount(0);
+  await expect(page.locator('[data-testid="agent-thinking-trace"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="assistant-reasoning-toggle"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="agent-thinking-area"]')).toHaveCount(0);
+
+  const contextGroup = transcript.locator('[data-testid="agent-timeline-group"]').filter({ hasText: /Reviewed|Searched|Explored/ }).first();
+  await expect(contextGroup).toBeVisible();
+  await expect(contextGroup).not.toContainText('system-config.yaml');
+  await contextGroup.locator('button[aria-expanded="false"]').click();
+  await expect(contextGroup).toContainText(/read_file|grep_search|file_search|list_dir/);
+
+  const helperBrief = transcript.locator('[data-testid="agent-timeline-tool-call"]').filter({ hasText: 'runSubagent.triage-taxonomy' }).first();
+  await expect(helperBrief).toBeVisible();
+  await expect(helperBrief).not.toContainText('symptom_tags');
+  await helperBrief.locator('button[aria-expanded="false"]').click();
+  await expect(helperBrief).toContainText('symptom_tags');
+  await expect(transcript.locator('[data-testid="agent-timeline-tool-call"]').filter({ hasText: 'runSubagent.capture-repro' })).toBeVisible();
+  await expect(page.locator('[data-testid="task-board"]')).toContainText('Open capture through local rdx');
+  await expect(page.locator('[data-testid="task-board"]')).toContainText('Anchor Event 6152');
+  await expect(page.locator('[data-testid="task-board"]')).toContainText('Audit shader / IBL / specular inputs');
+
+  const railAlignment = await page.evaluate(() => {
+    const rail = document.querySelector('[data-testid="agent-message-timeline"]');
+    const userRow = document.querySelector('[data-testid="agent-timeline-user-message"]');
+    const userBubble = document.querySelector('[data-testid="conversation-user-brief"]');
+    const assistantRow = document.querySelector('[data-testid="agent-timeline-assistant-message"]');
+    if (!(rail instanceof HTMLElement)
+      || !(userRow instanceof HTMLElement)
+      || !(userBubble instanceof HTMLElement)
+      || !(assistantRow instanceof HTMLElement)) {
+      return null;
+    }
+    const railRect = rail.getBoundingClientRect();
+    const userRowRect = userRow.getBoundingClientRect();
+    const userBubbleRect = userBubble.getBoundingClientRect();
+    const assistantRect = assistantRow.getBoundingClientRect();
+    return {
+      userRowRight: Math.abs(railRect.right - userRowRect.right),
+      userBubbleRight: Math.abs(railRect.right - userBubbleRect.right),
+      assistantLeft: Math.abs(assistantRect.left - railRect.left),
+    };
+  });
+  expect(railAlignment).not.toBeNull();
+  expect(railAlignment?.userRowRight ?? 99).toBeLessThanOrEqual(4);
+  expect(railAlignment?.userBubbleRight ?? 99).toBeLessThanOrEqual(52);
+  expect(railAlignment?.assistantLeft ?? 99).toBeLessThanOrEqual(4);
+
+  const wideScreenshotPath = path.join(process.cwd(), 'test-results', 'product-flow-1720x980.png');
+  await expectScreenshotNotBlack(page, wideScreenshotPath);
+  await setElectronWindowSize(ctx, 1280, 800);
+  const narrowScreenshotPath = path.join(process.cwd(), 'test-results', 'product-flow-1280x800.png');
+  await expectScreenshotNotBlack(page, narrowScreenshotPath);
 });
 
 test('restored real-session startup renders the shared message flow and is not black', async () => {

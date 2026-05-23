@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import type {
   AgentNode,
   AgentNodeStatus,
-  AgentRunPayload,
   ArtifactPayload,
   EvidencePayload,
   FinalAnswerPayload,
@@ -29,6 +28,32 @@ type ExpandedState = Record<string, boolean>;
 interface AssistantMessagePayload {
   diagnostic?: ConversationMessageDiagnostic | null;
 }
+
+interface AskTraceOption {
+  optionId?: string;
+  id?: string;
+  label?: string;
+  description?: string;
+}
+
+interface AskTraceQuestion {
+  questionId?: string;
+  id?: string;
+  prompt?: string;
+  recommendedOptionId?: string;
+  options?: AskTraceOption[];
+}
+
+interface AskTraceAnswer {
+  questionId?: string;
+  selectedOptionId?: string;
+  freeformText?: string;
+}
+
+type DocumentBlock =
+  | { type: 'paragraph'; text: string }
+  | { type: 'list'; ordered: boolean; items: string[] }
+  | { type: 'code'; language?: string; text: string };
 
 const statusLabel: Record<AgentNodeStatus, string> = {
   pending: '待处理',
@@ -82,26 +107,6 @@ const formatSize = (size?: number): string => {
 const hasFailure = (status: AgentNodeStatus): boolean =>
   status === 'failed' || status === 'blocked' || status === 'partial_succeeded';
 
-const titleFromRunStatus = (node: AgentNode, payload?: AgentRunPayload): string => {
-  const compact = node.ui?.density === 'compact' || payload?.executionMode === 'single_agent';
-  if (node.status === 'running' || node.status === 'streaming' || node.status === 'waiting_tool') {
-    return '正在思考';
-  }
-  if (node.status === 'failed') {
-    return compact ? '回复失败' : '执行失败';
-  }
-  if (node.status === 'blocked') {
-    return '等待配置或确认';
-  }
-  if (node.status === 'partial_succeeded') {
-    return '部分完成';
-  }
-  if (node.status === 'cancelled') {
-    return '已停止';
-  }
-  return '已完成思考';
-};
-
 const shouldDefaultExpand = (node: AgentNode, collapseSuccessfulTools: boolean): boolean => {
   if (node.type === 'tool_call' && collapseSuccessfulTools && node.status === 'succeeded') {
     return false;
@@ -114,11 +119,77 @@ const shouldDefaultExpand = (node: AgentNode, collapseSuccessfulTools: boolean):
     || node.status === 'failed'
     || node.status === 'blocked'
     || node.status === 'partial_succeeded'
-    || node.type === 'agent_run'
     || node.type === 'phase';
 };
 
 const getPayload = <TPayload,>(node: AgentNode): TPayload | undefined => node.payload as TPayload | undefined;
+
+const parseDocumentBlocks = (content: string): DocumentBlock[] => {
+  const lines = content.split(/\r?\n/);
+  const blocks: DocumentBlock[] = [];
+  let index = 0;
+  let paragraph: string[] = [];
+
+  const flushParagraph = () => {
+    if (paragraph.length === 0) {
+      return;
+    }
+    blocks.push({ type: 'paragraph', text: paragraph.join(' ').trim() });
+    paragraph = [];
+  };
+
+  while (index < lines.length) {
+    const line = lines[index];
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      flushParagraph();
+      index += 1;
+      continue;
+    }
+
+    const fence = trimmed.match(/^```([\w-]+)?$/);
+    if (fence) {
+      flushParagraph();
+      index += 1;
+      const codeLines: string[] = [];
+      while (index < lines.length && !lines[index].trim().startsWith('```')) {
+        codeLines.push(lines[index]);
+        index += 1;
+      }
+      if (index < lines.length) {
+        index += 1;
+      }
+      blocks.push({ type: 'code', language: fence[1], text: codeLines.join('\n') });
+      continue;
+    }
+
+    const unordered = trimmed.match(/^[-*]\s+(.+)$/);
+    const ordered = trimmed.match(/^\d+\.\s+(.+)$/);
+    if (unordered || ordered) {
+      flushParagraph();
+      const isOrdered = Boolean(ordered);
+      const items: string[] = [];
+      while (index < lines.length) {
+        const next = lines[index].trim();
+        const match = isOrdered ? next.match(/^\d+\.\s+(.+)$/) : next.match(/^[-*]\s+(.+)$/);
+        if (!match) {
+          break;
+        }
+        items.push(match[1]);
+        index += 1;
+      }
+      blocks.push({ type: 'list', ordered: isOrdered, items });
+      continue;
+    }
+
+    paragraph.push(trimmed);
+    index += 1;
+  }
+
+  flushParagraph();
+  return blocks;
+};
 
 const getChildren = (projection: TimelineProjection, node: AgentNode): AgentNode[] =>
   (node.children ?? [])
@@ -238,6 +309,87 @@ const RawDetailView: React.FC<{ node: AgentNode }> = ({ node }) => {
   );
 };
 
+const normalizeAskQuestions = (value: unknown): AskTraceQuestion[] => {
+  if (!value || typeof value !== 'object') {
+    return [];
+  }
+  const questions = (value as { questions?: unknown }).questions;
+  return Array.isArray(questions) ? questions as AskTraceQuestion[] : [];
+};
+
+const normalizeAskAnswers = (value: unknown): AskTraceAnswer[] => {
+  if (!value || typeof value !== 'object') {
+    return [];
+  }
+  const answers = (value as { answers?: unknown }).answers;
+  return Array.isArray(answers) ? answers as AskTraceAnswer[] : [];
+};
+
+const AskUserQuestionTraceView: React.FC<{
+  node: AgentNode;
+  payload?: ToolCallPayload;
+  expanded: boolean;
+  onToggle: () => void;
+}> = ({ node, payload, expanded, onToggle }) => {
+  const duration = formatDuration(node.metrics?.durationMs);
+  const questions = normalizeAskQuestions(payload?.argumentsRaw);
+  const answers = normalizeAskAnswers(payload?.resultRaw);
+  const answerByQuestionId = new Map(answers.map((answer) => [answer.questionId, answer]));
+
+  return (
+    <div className={`amt-tool-call amt-ask-trace amt-node-status-${node.status}`} data-testid="agent-timeline-tool-call" data-node-id={node.id}>
+      <div className="amt-tool-call-header">
+        <span className="amt-tool-icon" aria-hidden="true">⌁</span>
+        <span className="amt-tool-name">{payload?.toolName ?? node.title}</span>
+        <span className="amt-tool-summary">{node.summary || payload?.resultSummary || payload?.argumentsSummary}</span>
+        {duration ? <span className="amt-muted">{duration}</span> : null}
+        <StatusBadge status={node.status} />
+        <ExpandButton expanded={expanded} onClick={onToggle} label={`切换 ${node.title}`} />
+      </div>
+      {expanded ? (
+        <div className="amt-tool-call-body amt-ask-trace-body" data-testid="ask-user-question-trace">
+          {questions.map((question, index) => {
+            const questionId = question.questionId ?? question.id ?? `question-${index + 1}`;
+            const answer = answerByQuestionId.get(questionId);
+            const selectedOption = question.options?.find((option) => (
+              (option.optionId ?? option.id) === answer?.selectedOptionId
+            ));
+            return (
+              <section key={questionId} className="amt-ask-question-trace-item">
+                <div className="amt-ask-question-row">
+                  <strong>问题 {index + 1}</strong>
+                  <span>{question.prompt}</span>
+                </div>
+                {question.options?.length ? (
+                  <ul className="amt-ask-option-list">
+                    {question.options.map((option) => {
+                      const optionId = option.optionId ?? option.id ?? option.label ?? '';
+                      return (
+                        <li key={optionId} className={question.recommendedOptionId === optionId ? 'recommended' : ''}>
+                          <span>{option.label ?? optionId}</span>
+                          {question.recommendedOptionId === optionId ? <em>推荐</em> : null}
+                          {option.description ? <small>{option.description}</small> : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+                {answer ? (
+                  <div className="amt-ask-answer-row">
+                    <strong>用户答案</strong>
+                    <span>{answer.freeformText?.trim() || selectedOption?.label || answer.selectedOptionId || '已回答'}</span>
+                  </div>
+                ) : null}
+              </section>
+            );
+          })}
+          {payload?.resultSummary ? <p>{payload.resultSummary}</p> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
 const ToolCallView: React.FC<{
   node: AgentNode;
   expanded: boolean;
@@ -245,9 +397,10 @@ const ToolCallView: React.FC<{
 }> = ({ node, expanded, onToggle }) => {
   const payload = getPayload<ToolCallPayload>(node);
   const duration = formatDuration(node.metrics?.durationMs);
-  const inlineSummary = payload?.toolName === 'ui.ask_user_question'
-    ? (node.summary || payload?.resultSummary || payload?.argumentsSummary)
-    : '';
+  if (payload?.toolName === 'ui.ask_user_question') {
+    return <AskUserQuestionTraceView node={node} payload={payload} expanded={expanded} onToggle={onToggle} />;
+  }
+  const inlineSummary = node.summary || payload?.resultSummary || payload?.argumentsSummary || '';
 
   return (
     <div className={`amt-tool-call amt-node-status-${node.status}`} data-testid="agent-timeline-tool-call" data-node-id={node.id}>
@@ -412,6 +565,33 @@ const EvidenceView: React.FC<{ node: AgentNode }> = ({ node }) => {
       <p>{payload?.quote ?? node.summary}</p>
       <span className="amt-muted">{payload?.sourceType ?? 'evidence'} · {payload?.confidence !== undefined ? payload.confidence.toFixed(2) : 'tracked'}</span>
     </article>
+  );
+};
+
+const DocumentContent: React.FC<{ content: string; testId?: string }> = ({ content, testId }) => {
+  const blocks = parseDocumentBlocks(content);
+  return (
+    <div className="amt-message-document" data-testid={testId}>
+      {blocks.map((block, index) => {
+        if (block.type === 'code') {
+          return (
+            <pre key={`code-${index}`} className="amt-message-code" data-testid="assistant-code-block">
+              {block.language ? <span className="amt-message-code-language">{block.language}</span> : null}
+              <code>{block.text}</code>
+            </pre>
+          );
+        }
+        if (block.type === 'list') {
+          const ListTag = block.ordered ? 'ol' : 'ul';
+          return (
+            <ListTag key={`list-${index}`} className="amt-message-list">
+              {block.items.map((item) => <li key={item}>{item}</li>)}
+            </ListTag>
+          );
+        }
+        return <p key={`paragraph-${index}`} className="amt-message-paragraph">{block.text}</p>;
+      })}
+    </div>
   );
 };
 
@@ -622,96 +802,25 @@ const TimelineNodeView: React.FC<{
   );
 };
 
-const AgentRunView: React.FC<{
-  projection: TimelineProjection;
-  node: AgentNode;
-  expandedState: ExpandedState;
-  showOnlyFailed: boolean;
-  collapseSuccessfulTools: boolean;
-  onToggle: (id: string, expanded: boolean) => void;
-  onJumpEvidence: (id: string) => void;
-}> = ({
-  projection,
-  node,
-  expandedState,
-  showOnlyFailed,
-  collapseSuccessfulTools,
-  onToggle,
-  onJumpEvidence,
-}) => {
-  const payload = getPayload<AgentRunPayload>(node);
-  const children = getChildren(projection, node).filter((child) => shouldShowNode(projection, child, showOnlyFailed));
-  const expanded = expandedState[node.id] ?? shouldDefaultExpand(node, collapseSuccessfulTools);
-  const duration = formatDuration(node.metrics?.durationMs);
-  const isActive = node.status === 'running' || node.status === 'streaming' || node.status === 'waiting_tool';
-  const isCompact = node.ui?.density === 'compact' || payload?.executionMode === 'single_agent';
-  const progressText = payload?.progress
-    ? `${payload.progress.total} 步`
-    : `${children.length} 组`;
-  const title = titleFromRunStatus(node, payload);
-
+const UserMessageView: React.FC<{ node: AgentNode }> = ({ node }) => {
+  const summary = node.summary ?? '';
+  const isDocument = summary.length > 220 || summary.includes('\n');
   return (
-    <article
-      className={`amt-thinking-trace amt-thinking-status-${node.status} ${isActive ? 'is-active' : ''} ${isCompact ? 'is-compact' : ''}`}
-      data-testid="agent-thinking-trace"
-      data-node-id={node.id}
-    >
-      <button
-        type="button"
-        className="amt-thinking-label"
-        data-testid="assistant-reasoning-toggle"
-        aria-expanded={expanded}
-        onClick={() => onToggle(node.id, expanded)}
-      >
-        <span className="amt-thinking-dot" aria-hidden="true" />
-        <span className="amt-thinking-title">
-          {title}
-          {isActive ? <span className="amt-thinking-ellipsis" aria-hidden="true" /> : null}
-        </span>
-        <span className="amt-thinking-meta">{progressText}</span>
-        {duration ? <span className="amt-thinking-meta">{duration}</span> : null}
-        <span className="amt-thinking-chevron" aria-hidden="true">{expanded ? '⌃' : '⌄'}</span>
-      </button>
-      <div className="assistant-reasoning-panel-compat" data-testid="assistant-reasoning-panel" aria-hidden="true">
-        Reasoning trace
+    <article className={`amt-user-message chat-message user ${isDocument ? 'is-document' : ''}`} data-testid="agent-timeline-user-message" data-node-id={node.id}>
+      <div className="amt-avatar amt-user-avatar" aria-hidden="true">人</div>
+      <div className="amt-user-bubble message-bubble" data-testid="conversation-user-brief">
+        {isDocument ? <DocumentContent content={summary} /> : <p>{summary}</p>}
+        <span>{formatTime(node.createdAt)}</span>
       </div>
-      {expanded ? (
-        <div className="amt-thinking-area" data-testid="agent-thinking-area">
-          <div>
-            {node.summary ? <p className="amt-thinking-summary">{node.summary}</p> : null}
-            {children.map((child) => (
-              <TimelineNodeView
-                key={child.id}
-                projection={projection}
-                node={child}
-                expandedState={expandedState}
-                showOnlyFailed={showOnlyFailed}
-                collapseSuccessfulTools={collapseSuccessfulTools}
-                onToggle={onToggle}
-                onJumpEvidence={onJumpEvidence}
-              />
-            ))}
-          </div>
-        </div>
-      ) : null}
     </article>
   );
 };
-
-const UserMessageView: React.FC<{ node: AgentNode }> = ({ node }) => (
-  <article className="amt-user-message chat-message user" data-testid="agent-timeline-user-message" data-node-id={node.id}>
-    <div className="amt-avatar amt-user-avatar" aria-hidden="true">人</div>
-    <div className="amt-user-bubble message-bubble" data-testid="conversation-user-brief">
-      <p>{node.summary}</p>
-      <span>{formatTime(node.createdAt)}</span>
-    </div>
-  </article>
-);
 
 const AssistantMessageView: React.FC<{ node: AgentNode }> = ({ node }) => {
   const payload = getPayload<AssistantMessagePayload>(node);
   const diagnostic = payload?.diagnostic ?? null;
   const routeLabel = [diagnostic?.providerId, diagnostic?.modelId].filter(Boolean).join('/');
+  const summary = node.summary ?? '';
 
   return (
     <article
@@ -721,8 +830,8 @@ const AssistantMessageView: React.FC<{ node: AgentNode }> = ({ node }) => {
     >
       <div className="amt-avatar amt-assistant-avatar" aria-hidden="true">A</div>
       <div className="amt-assistant-bubble message-bubble" data-testid="conversation-assistant-card">
-        <div data-testid="assistant-document-flow">
-          <p>{node.summary}</p>
+        <div>
+          <DocumentContent content={summary} testId="assistant-document-flow" />
           {diagnostic ? (
             <div className={`amt-assistant-diagnostic is-${diagnostic.severity}`} data-testid="conversation-message-diagnostic">
               <strong>模型链路诊断</strong>
@@ -766,20 +875,6 @@ const ProjectionView: React.FC<{
         }
         if (root.type === 'assistant_message') {
           return <AssistantMessageView key={root.id} node={root} />;
-        }
-        if (root.type === 'agent_run') {
-          return (
-            <AgentRunView
-              key={root.id}
-              projection={projection}
-              node={root}
-              expandedState={expandedState}
-              showOnlyFailed={showOnlyFailed}
-              collapseSuccessfulTools={collapseSuccessfulTools}
-              onToggle={onToggle}
-              onJumpEvidence={onJumpEvidence}
-            />
-          );
         }
         return (
           <TimelineNodeView

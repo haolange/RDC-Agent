@@ -41,43 +41,8 @@ const hasAnswer = (answer?: { selectedOptionId?: string; freeformText?: string }
   Boolean(answer?.selectedOptionId) || Boolean(answer?.freeformText?.trim())
 );
 
-const buildFallbackPresentation = (debugPlan: DebugPlan): PlanPresentation => ({
-  title: '执行前调试计划',
-  sections: [
-    {
-      id: 'goal',
-      title: '目标',
-      body: [debugPlan.userGoal],
-    },
-    {
-      id: 'scope',
-      title: '范围',
-      body: [
-        debugPlan.targetCapture
-          ? `Capture: ${debugPlan.targetCapture.fileName}`
-          : 'Capture: 等待确认',
-        debugPlan.targetFrameOrEvent?.eventLabel
-          ? `入口: ${debugPlan.targetFrameOrEvent.eventLabel}`
-          : debugPlan.scope,
-        debugPlan.scope,
-      ].filter(Boolean),
-    },
-    {
-      id: 'deliverables',
-      title: '交付物',
-      body: debugPlan.expectedDeliverables,
-    },
-    {
-      id: 'verification',
-      title: '验证标准',
-      body: debugPlan.verificationContract.successCriteria,
-    },
-  ],
-});
-
-const normalizePresentation = (debugPlan: DebugPlan): PlanPresentation => {
-  const fallback = buildFallbackPresentation(debugPlan);
-  const title = debugPlan.presentation?.title?.trim() || fallback.title;
+const normalizePresentation = (debugPlan: DebugPlan): PlanPresentation | null => {
+  const title = debugPlan.presentation?.title?.trim();
   const sections = (debugPlan.presentation?.sections ?? [])
     .map((section) => ({
       id: section.id || section.title,
@@ -86,10 +51,7 @@ const normalizePresentation = (debugPlan: DebugPlan): PlanPresentation => {
     }))
     .filter((section) => section.title.trim() && section.body.length > 0);
 
-  return {
-    title,
-    sections: sections.length > 0 ? sections : fallback.sections,
-  };
+  return title && sections.length > 0 ? { title, sections } : null;
 };
 
 interface AskUserQuestionCardProps {
@@ -232,14 +194,16 @@ export const PlanApprovalCard: React.FC = () => {
     currentRun
     && effectiveDebugPlan?.strictReady
     && approvalState !== 'approved'
+    && currentRun.status !== 'completed'
     && !effectivePendingQuestions,
   );
+  const showApproveAction = Boolean(currentRun && approvalState !== 'approved' && currentRun.status !== 'completed');
   const blockers = effectiveDebugPlan?.blockers ?? [];
   const missingInfo = effectiveDebugPlan?.missingInfo ?? [];
   const shouldRender = Boolean(
     currentRun
     && (
-      effectiveDebugPlan
+      (effectiveDebugPlan && presentation)
       || recoveryState
       || currentRun.status === 'interrupted'
     ),
@@ -349,28 +313,30 @@ export const PlanApprovalCard: React.FC = () => {
             </div>
           )}
 
-          {missingInfo.length > 0 && (
+          {planExpanded && missingInfo.length > 0 && (
             <div className="plan-callout plan-callout-warning" data-testid="plan-missing-info">
               待补信息：{missingInfo.join('、')}
             </div>
           )}
 
-          {blockers.length > 0 && (
+          {planExpanded && blockers.length > 0 && (
             <div className="plan-callout plan-callout-error" data-testid="plan-blockers">
               {blockers.map((blocker) => blocker.reason).join(' | ')}
             </div>
           )}
 
           <div className="plan-actions">
-            <button
-              type="button"
-              className="plan-action-button primary"
-              data-testid="plan-approve-button"
-              onClick={() => void handleApprove()}
-              disabled={!canApprove || busyAction !== null}
-            >
-              {busyAction === 'approve' ? '确认中...' : '确认并执行'}
-            </button>
+            {showApproveAction ? (
+              <button
+                type="button"
+                className="plan-action-button primary"
+                data-testid="plan-approve-button"
+                onClick={() => void handleApprove()}
+                disabled={!canApprove || busyAction !== null}
+              >
+                {busyAction === 'approve' ? '确认中...' : '确认并执行'}
+              </button>
+            ) : null}
             {(recoveryState || currentRun.status === 'interrupted') && (
               <button
                 type="button"
