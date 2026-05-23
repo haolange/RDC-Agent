@@ -9,6 +9,7 @@ import { DEFAULT_MODEL_ROUTING } from '../types/agent';
 export { DEFAULT_MODEL_ROUTING };
 
 export const AGENT_ROLES: AgentRole[] = [
+  'ask_agent',
   'rdc-debugger',
   'triage_agent',
   'capture_repro_agent',
@@ -21,6 +22,7 @@ export const AGENT_ROLES: AgentRole[] = [
 ];
 
 export const AGENT_DISPLAY_NAMES: Record<AgentRole, string> = {
+  'ask_agent': 'Ask',
   'rdc-debugger': 'RDC Debugger',
   'triage_agent': 'Triage Agent',
   'capture_repro_agent': 'Capture Repro Agent',
@@ -33,6 +35,7 @@ export const AGENT_DISPLAY_NAMES: Record<AgentRole, string> = {
 };
 
 export const AGENT_DESCRIPTIONS: Record<AgentRole, string> = {
+  'ask_agent': 'Non-executing assistant for clarification, capability explanation, and Open capture guidance',
   'rdc-debugger': 'Main orchestrator responsible for workflow coordination, gates, and stage progression',
   'triage_agent': 'Symptom classification and SOP recommendation',
   'capture_repro_agent': 'Capture quality verification and baseline establishment',
@@ -45,6 +48,7 @@ export const AGENT_DESCRIPTIONS: Record<AgentRole, string> = {
 };
 
 export const AGENT_CATEGORIES: Record<AgentRole, AgentCategory> = {
+  'ask_agent': 'orchestrator',
   'rdc-debugger': 'orchestrator',
   'triage_agent': 'investigator',
   'capture_repro_agent': 'investigator',
@@ -70,6 +74,7 @@ export const VERIFIER_AGENTS: AgentRole[] = ['skeptic_agent'];
 export const REPORTER_AGENTS: AgentRole[] = ['curator_agent'];
 
 export const AGENT_WRITE_SCOPES: Record<AgentRole, WriteScope[]> = {
+  'ask_agent': [],
   'rdc-debugger': ['workspace_control'],
   'triage_agent': ['workspace_notes'],
   'capture_repro_agent': ['workspace_notes'],
@@ -82,6 +87,7 @@ export const AGENT_WRITE_SCOPES: Record<AgentRole, WriteScope[]> = {
 };
 
 export const AGENT_NOTE_FILES: Record<AgentRole, string> = {
+  'ask_agent': '',
   'rdc-debugger': '',
   'triage_agent': 'triage.md',
   'capture_repro_agent': 'capture_repro.md',
@@ -96,6 +102,7 @@ export const AGENT_NOTE_FILES: Record<AgentRole, string> = {
 export const DEFAULT_TOKEN_TTL_SECONDS = 1800;
 
 export const AGENT_COLORS: Record<AgentRole, string> = {
+  'ask_agent': '#38c6f4',
   'rdc-debugger': '#6366f1',
   'triage_agent': '#a855f7',
   'capture_repro_agent': '#3b82f6',
@@ -108,6 +115,14 @@ export const AGENT_COLORS: Record<AgentRole, string> = {
 };
 
 export const AGENT_MODES: ModeConfig[] = [
+  {
+    id: 'ask',
+    label: 'Ask',
+    icon: 'message-orbit',
+    description: '澄清目标并引导打开 Capture',
+    accentColor: '#38c6f4',
+    disabled: false,
+  },
   {
     id: 'debugger',
     label: 'Debugger',

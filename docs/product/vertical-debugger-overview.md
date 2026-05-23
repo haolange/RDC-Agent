@@ -18,7 +18,7 @@
 - **桌面框架**: Electron
 - **前端框架**: React + TypeScript
 - **状态管理**: Zustand
-- **LLM集成**: 多服务商API（OpenRouter必须支持，另支持OpenAI/Anthropic/xAI/Kimi/Gemini等）
+- **LLM集成**: 多服务商API（OpenRouter必须支持，另支持OpenAI / Anthropic / xAI (Grok) / Kimi Code / Google AI Studio / Google Vertex AI等）
 - **工具层**: 复用RDC-Agent-Tools（CLI优先，MCP可扩展）
 - **存储**: 文件系统（JSON/YAML），与原框架一致
 

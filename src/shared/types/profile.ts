@@ -45,7 +45,7 @@ export interface StagePolicy {
 export interface ModeProfile {
   id: string;
   label: string;
-  mode: import('./session').AppMode;
+  mode: import('./session').ExecutableAppMode;
   stagePolicies: Partial<Record<WorkflowStage, string>>;
   defaultAgentPrompts: Partial<Record<AgentRole, string>>;
 }

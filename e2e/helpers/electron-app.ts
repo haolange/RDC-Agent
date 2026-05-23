@@ -90,6 +90,7 @@ interface ConfigureTestDebuggerRoutesOptions {
 }
 
 const TEST_AGENT_IDS = [
+  'ask_agent',
   'rdc-debugger',
   'triage_agent',
   'capture_repro_agent',

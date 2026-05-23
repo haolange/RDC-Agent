@@ -92,6 +92,8 @@ flowchart TB
 - `DebugWorkflowService` 是 Runtime 内部执行服务，不再作为 IPC、conversation 或公开 workflow barrel 的入口。
 - `WorkflowProjectionPublisher` 统一广播 `workflow:*`、`evidence:eventAdded`、`conversation:event` 等投影事件；Runtime 和 agent runner 不直接持有窗口引用。
 - OpenAI / Claude Agent SDK 通过 `AgentRunnerPort` 运行，工具能力由 Runtime policy 生成 allowlist，再经 `AgentToolPort -> ToolBridge` 执行。
+- `DebugPlan.presentation` 是消息流内 Debugger Plan 审批卡的展示契约，包含 `title` 和 `sections`；UI 只渲染结构，fallback 由 plan builder 生成。
+- `AskUserQuestion` 是 plan/intake 阶段可用的用户交互 primitive：renderer 通过 composer 上方 overlay 提交到 `workflow.submitQuestions(runId, answers)`，同时 workflow 写入 `ui.ask_user_question` tool trace，让问题请求和用户回答保留在消息流中。
 - 不新增阶段，不改变 Debugger harness 状态机，不把 Analyzer / Optimizer 并入该主链。
 
 ## Conversation
@@ -108,7 +110,7 @@ sequenceDiagram
   Composer->>API: sendMessage()
   API->>IPC: conversation:sendMessage
   IPC->>Service: sendMessage with fallback project/session/run
-  Service->>Runtime: requestStartFromConversation()
+  Service->>Runtime: requestStartFromConversation() only when mode=Debugger and openedCapture exists
   Service->>Store: persist messages
   Service-->>API: ConversationTurnResult
   API-->>Composer: render patched/completed events
@@ -118,7 +120,11 @@ sequenceDiagram
 
 - 流事件：`conversation:event`。
 - 类型：`ConversationMessage`、`ConversationTurnResult`、`ConversationStreamEvent`。
-- UI 入口：`AgentChat`、composer glue、`App.tsx`。
+- `ConversationMessage.diagnostic` 是跨层模型链路诊断：Cowork / Debugger 回复可以用它传递 route 缺失、provider 不可用或请求失败，renderer 只做轻量提示，Activity 通过 `RuntimeLogService` 保留同一条脱敏诊断。
+- 默认 UI mode 是 `Ask`，它只产生对话消息，不创建 `RunRecord`。`DebugSessionStartRequest.mode` 和 `RunRecord.mode` 只接受执行类 mode。
+- `Ask` 消息走非执行 `ask_agent` profile；该 profile 不暴露 RenderDoc 工具、shell 或 ToolBridge 执行能力。`Debugger` Cowork 与正式 workflow planner 使用独立 prompt，不复用 Ask 身份。
+- 含明确执行意图的 Debugger 输入只有在应用内 `openedCapture` 属于当前 project 且状态为 `open` 时，才会由 `ConversationService` 投影为本次 `DebugSessionStartRequest.captures`。prompt 或任务文件里的 `.rdc` 路径只能触发 Open capture 提示，不能绕过 UI 状态。
+- UI 入口：`AgentChat`、composer glue、`App.tsx`、`PlanIntakePanel`。
 
 ## Settings / Provider / Model Route
 
@@ -150,7 +156,7 @@ flowchart LR
 
 凭据来源由 provider auth mode 决定。API Key provider 存储 provider-scoped key；账号登录 provider 通过 `ProviderAccountAuthService` 自研 OAuth/device-flow 获取 token bundle，`settings.json` 只保存账号摘要、状态和模型列表；Bedrock/Vertex 这类 environment provider 不保存密钥，只把运行环境凭据交给 SDK adapter 使用。SDK adapter 内部可以向 SDK 注入 key、client 或环境凭据信号，但不能把裸 `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` 作为 RDC-Agent 的通用配置来源。
 
-模型列表也属于 settings 边界。标准 Provider 通过真实 `/models` 或等价接口发现模型；没有标准模型列表的 Anthropic-compatible / Azure endpoint 只能保存逐候选轻量请求验证成功的模型；OAuth 账号登录如果模型发现失败或返回空列表，必须保持未配置并向 UI 返回错误，不能保存 fallback 模型。renderer 二次打开 API Key detail 时只接收 `hasStoredSecret` 状态并显示固定星号占位，不能读取已存明文密钥。
+模型列表也属于 settings 边界。标准 Provider 通过真实 `/models` 或等价接口发现模型；没有标准模型列表的 Anthropic-compatible / Azure endpoint 只能保存逐候选轻量请求验证成功的模型；Claude/ChatGPT Account 使用账号模型目录，其中 ChatGPT Account 运行时走 ChatGPT Codex endpoint；GitHub Copilot 使用账号模型目录并用 Copilot `/models` 补充，`/models` 不可用时仍可保存账号目录，但 OAuth/device-flow/token 获取失败仍保持未配置并向 UI 返回错误。GitHub Copilot 的模型目录不是等价的 chat completions 可执行集；`ExecutionProfileService` 和 `DebuggerLlmService` 在运行时会把已知不支持 chat completions 的 specialist route 收敛到同 provider 下可用的 Debugger 模型，并在 LLM activity raw payload 中保留原始 `requestedModelId` 与 `remapReason`。renderer 二次打开 API Key detail 时只接收 `hasStoredSecret` 状态并显示固定星号占位，不能读取已存明文密钥。
 
 ## ToolBridge / Evidence / Runtime Log
 

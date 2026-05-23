@@ -6,6 +6,7 @@ import type {
   Blocker,
   DebugPlan,
   PlanReadiness,
+  PlanPresentation,
   VerificationContract,
 } from '@shared/types/workflow';
 import { BLOCKER_CODES } from '@shared/constants/blockers';
@@ -85,6 +86,42 @@ function recommendSpecialists(goalText: string, captures: CaptureDescriptor[], b
   return Array.from(new Set(specialists));
 }
 
+export function buildDebugPlanPresentation(debugPlan: DebugPlan): PlanPresentation {
+  return {
+    title: '执行前调试计划',
+    sections: [
+      {
+        id: 'goal',
+        title: '目标',
+        body: [debugPlan.userGoal],
+      },
+      {
+        id: 'scope',
+        title: '范围',
+        body: [
+          debugPlan.targetCapture
+            ? `Capture: ${debugPlan.targetCapture.fileName}`
+            : 'Capture: 等待确认',
+          debugPlan.targetFrameOrEvent?.eventLabel
+            ? `入口: ${debugPlan.targetFrameOrEvent.eventLabel}`
+            : debugPlan.scope,
+          debugPlan.scope,
+        ].filter(Boolean),
+      },
+      {
+        id: 'deliverables',
+        title: '交付物',
+        body: debugPlan.expectedDeliverables,
+      },
+      {
+        id: 'verification',
+        title: '验证标准',
+        body: debugPlan.verificationContract.successCriteria,
+      },
+    ],
+  };
+}
+
 export class PlanBuilder {
   build(resolved: ResolvedIntakeContext): PlanBuildResult {
     const blockers: Blocker[] = [];
@@ -134,7 +171,7 @@ export class PlanBuilder {
       planReadiness = 'strict_ready';
     }
 
-    const debugPlan: DebugPlan = {
+    const debugPlanBase: DebugPlan = {
       planId: `plan-${Date.now()}`,
       planReadiness,
       strictReady: planReadiness === 'strict_ready',
@@ -174,6 +211,10 @@ export class PlanBuilder {
       ],
       createdAt: nowIso(),
       updatedAt: nowIso(),
+    };
+    const debugPlan: DebugPlan = {
+      ...debugPlanBase,
+      presentation: buildDebugPlanPresentation(debugPlanBase),
     };
 
     const pendingQuestions = questions.length > 0

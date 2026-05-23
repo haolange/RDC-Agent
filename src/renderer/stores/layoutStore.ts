@@ -66,7 +66,7 @@ const persistLayout = async (state: Pick<
 };
 
 export const useLayoutStore = create<LayoutState>((set, get) => ({
-  currentMode: 'debugger',
+  currentMode: 'ask',
   leftSidebarCollapsed: false,
   rightPanelCollapsed: false,
   leftSidebarWidth: LEFT_SIDEBAR_DEFAULT_WIDTH,

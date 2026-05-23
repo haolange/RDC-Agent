@@ -325,6 +325,9 @@ export class ProviderConnectionService {
     if (!baseUrl) {
       throw new ProviderConnectionError('请填写 Provider Base URL');
     }
+    if (provider.id === 'kimi-code') {
+      return this.validateKimiCodeModels(apiKey, baseUrl, definition.recommendedModels);
+    }
     if (strategy === 'anthropic-candidate-validation') {
       return this.validateAnthropicCandidateModels(provider, apiKey, baseUrl, definition.recommendedModels);
     }
@@ -379,6 +382,19 @@ export class ProviderConnectionService {
       }
     }
     return toStaticModels(validModels);
+  }
+
+  private async validateKimiCodeModels(apiKey: string, baseUrl: string, modelIds: string[]): Promise<LlmProviderModel[]> {
+    const payload = await getJson(appendPath(baseUrl, '/models'), {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+    });
+    const availableModelIds = new Set(
+      parseModelsPayload('openai-compatible', payload).map((model) => model.id),
+    );
+    return toStaticModels(modelIds.filter((modelId) => availableModelIds.has(modelId)));
   }
 
   private async validateAzureCandidateModels(apiKey: string, baseUrl: string, modelIds: string[]): Promise<LlmProviderModel[]> {

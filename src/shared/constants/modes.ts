@@ -6,6 +6,12 @@ import type { ModeCapabilities } from '../types/workflow';
 import type { CaptureRole } from '../types/session';
 
 export const MODE_CAPABILITIES: Record<string, ModeCapabilities> = {
+  ask: {
+    mode: 'ask',
+    availableStages: [],
+    requiresLLM: true,
+    isFullyImplemented: true,
+  },
   debugger: {
     mode: 'debugger',
     availableStages: [

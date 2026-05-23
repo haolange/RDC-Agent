@@ -6,6 +6,7 @@ import { getSessionContextSummary, SessionContextPanel } from './SessionContextP
 import { getSessionProgressSnapshot, SessionProgressPanel } from './SessionProgressPanel';
 import { SessionCapabilitiesPanel } from './SessionCapabilitiesPanel';
 import { SessionWorkingFolderPanel } from './SessionWorkingFolderPanel';
+import { TaskBoard } from './TaskBoard';
 import './ControlPanel.css';
 
 type RightRailMode = 'hidden' | 'project' | 'session';
@@ -173,6 +174,7 @@ const SessionControlPanel: React.FC = () => {
             </>
           )}
         >
+          <TaskBoard />
           <SessionProgressPanel />
         </CollapsibleSection>
 

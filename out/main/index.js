@@ -29,10 +29,10 @@ const child_process = require("child_process");
 const fs = require("fs");
 const uuid = require("uuid");
 const yaml = require("yaml");
-const Store = require("electron-store");
-const zod = require("zod");
 const crypto = require("crypto");
 const http = require("http");
+const Store = require("electron-store");
+const zod = require("zod");
 function _interopNamespaceDefault(e) {
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
   if (e) {
@@ -3085,6 +3085,7 @@ class ReplayDeviceService {
 }
 const replayDeviceService = new ReplayDeviceService();
 const DEFAULT_MODEL_ROUTING = {
+  "ask_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
   "rdc-debugger": { provider: "openrouter", model: "anthropic/claude-3-opus" },
   "triage_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
   "capture_repro_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
@@ -3095,7 +3096,20 @@ const DEFAULT_MODEL_ROUTING = {
   "skeptic_agent": { provider: "openrouter", model: "openai/gpt-4o" },
   "curator_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" }
 };
+const AGENT_ROLES = [
+  "ask_agent",
+  "rdc-debugger",
+  "triage_agent",
+  "capture_repro_agent",
+  "pass_graph_pipeline_agent",
+  "pixel_forensics_agent",
+  "shader_ir_agent",
+  "driver_device_agent",
+  "skeptic_agent",
+  "curator_agent"
+];
 const AGENT_DISPLAY_NAMES = {
+  "ask_agent": "Ask",
   "rdc-debugger": "RDC Debugger",
   "triage_agent": "Triage Agent",
   "capture_repro_agent": "Capture Repro Agent",
@@ -3107,6 +3121,7 @@ const AGENT_DISPLAY_NAMES = {
   "curator_agent": "Curator Agent"
 };
 const AGENT_DESCRIPTIONS = {
+  "ask_agent": "Non-executing assistant for clarification, capability explanation, and Open capture guidance",
   "rdc-debugger": "Main orchestrator responsible for workflow coordination, gates, and stage progression",
   "triage_agent": "Symptom classification and SOP recommendation",
   "capture_repro_agent": "Capture quality verification and baseline establishment",
@@ -3118,6 +3133,7 @@ const AGENT_DESCRIPTIONS = {
   "curator_agent": "Final report generation and knowledge library curation"
 };
 const AGENT_CATEGORIES = {
+  "ask_agent": "orchestrator",
   "rdc-debugger": "orchestrator",
   "triage_agent": "investigator",
   "capture_repro_agent": "investigator",
@@ -3139,6 +3155,7 @@ const INVESTIGATOR_AGENTS = [
 const VERIFIER_AGENTS = ["skeptic_agent"];
 const REPORTER_AGENTS = ["curator_agent"];
 const AGENT_WRITE_SCOPES = {
+  "ask_agent": [],
   "rdc-debugger": ["workspace_control"],
   "triage_agent": ["workspace_notes"],
   "capture_repro_agent": ["workspace_notes"],
@@ -3150,6 +3167,14 @@ const AGENT_WRITE_SCOPES = {
   "curator_agent": ["workspace_reports", "session_artifacts", "knowledge_library"]
 };
 const AGENT_MODES = [
+  {
+    id: "ask",
+    label: "Ask",
+    icon: "message-orbit",
+    description: "澄清目标并引导打开 Capture",
+    accentColor: "#38c6f4",
+    disabled: false
+  },
   {
     id: "debugger",
     label: "Debugger",
@@ -3182,8 +3207,72 @@ AGENT_MODES.reduce(
   },
   {}
 );
+const COPILOT_CHAT_COMPLETIONS_FALLBACK_MODELS = [
+  "gemini-3-flash-preview",
+  "gemini-3.5-flash",
+  "gpt-4.1",
+  "gpt-4o",
+  "claude-sonnet-4-6",
+  "claude-sonnet-4-5",
+  "gpt-5-mini"
+];
+function isCopilotChatCompletionsUnsupportedModel(modelId) {
+  const normalized = modelId.toLowerCase();
+  return /^gpt-5\.[3-9](?:-|$)/.test(normalized) || /^gpt-5\.[0-9]+-codex(?:-|$)/.test(normalized);
+}
+function isEnabledModel(provider, modelId) {
+  return provider.models.some((model) => model.enabled !== false && model.id === modelId);
+}
+function resolveCopilotFallbackModel(routes, provider, agentId) {
+  const debuggerRoute = routes.find((entry) => entry.agentId === "rdc-debugger");
+  const candidates = [
+    ...agentId !== "rdc-debugger" && debuggerRoute?.providerId === provider.id ? [debuggerRoute.modelId] : [],
+    ...COPILOT_CHAT_COMPLETIONS_FALLBACK_MODELS,
+    ...provider.models.map((model) => model.id)
+  ];
+  for (const modelId of candidates) {
+    if (modelId && !isCopilotChatCompletionsUnsupportedModel(modelId) && isEnabledModel(provider, modelId)) {
+      return modelId;
+    }
+  }
+  return null;
+}
+function resolveCompatibleAgentRoute(routes, providers, agentId) {
+  const route = routes.find((entry) => entry.agentId === agentId) || null;
+  if (!route?.providerId || !route.modelId) {
+    return { route: null, provider: null };
+  }
+  const provider = providers.find((entry) => entry.id === route.providerId) || null;
+  if (!provider || !provider.enabled || !provider.isConfigured) {
+    return { route, provider };
+  }
+  if (!isEnabledModel(provider, route.modelId)) {
+    return { route, provider };
+  }
+  if (provider.id !== "github-copilot" || !isCopilotChatCompletionsUnsupportedModel(route.modelId)) {
+    return { route, provider };
+  }
+  const fallbackModelId = resolveCopilotFallbackModel(routes, provider, agentId);
+  if (!fallbackModelId) {
+    return { route, provider };
+  }
+  return {
+    route: {
+      ...route,
+      modelId: fallbackModelId
+    },
+    provider,
+    requestedModelId: route.modelId,
+    remapReason: `${route.modelId} is not available on GitHub Copilot chat completions; using ${fallbackModelId}.`
+  };
+}
 const DEFAULT_MODE_PROFILE_ID = "debugger.default";
 const DEFAULT_AGENT_PROMPTS = {
+  "ask_agent": [
+    "You are the RDC-Agent Ask assistant.",
+    "Stay non-executing: clarify intent, explain capabilities, summarize context, and guide the user to Open a .rdc capture when execution is needed.",
+    "Do not claim to be the RDC Debugger, do not claim that RenderDoc analysis has started, and do not use tool or shell capabilities."
+  ].join(" "),
   "rdc-debugger": "You are the RDC Debugger orchestrator. Coordinate the workflow, keep the run truthful, and drive the next best debugging step.",
   "triage_agent": "You are the triage specialist. Classify the rendering issue, narrow the symptom family, and suggest the right investigation surfaces.",
   "capture_repro_agent": "You are the capture reproduction specialist. Validate capture quality, frame consistency, and reproducibility anchors.",
@@ -3195,7 +3284,8 @@ const DEFAULT_AGENT_PROMPTS = {
   "curator_agent": "You are the curator. Turn accepted evidence into a structured final report and operator-ready summary."
 };
 const DEFAULT_AGENT_TOOLS = {
-  "rdc-debugger": ["rd.core.*", "rd.session.*", "rd.capture.*", "rd.remote.*"],
+  "ask_agent": [],
+  "rdc-debugger": ["ui.ask_user_question", "rd.core.*", "rd.session.*", "rd.capture.*", "rd.remote.*"],
   "triage_agent": ["rd.session.get_context", "rd.event.get_action_tree", "rd.macro.summarize_frame"],
   "capture_repro_agent": ["rd.capture.get_info", "rd.capture.list_frames", "rd.context.snapshot"],
   "pass_graph_pipeline_agent": ["rd.pipeline.get_state_summary", "rd.pipeline.get_output_targets", "rd.macro.find_state_change_point"],
@@ -3234,7 +3324,7 @@ const DEFAULT_STAGE_POLICIES = [
     agentPromptId: "agent.rdc-debugger",
     systemPrompt: "Establish case input, capture references, and canonical intake state for downstream agents.",
     notes: "Produce the durable intake truth object.",
-    toolPolicy: { allowGroups: ["capture", "session"] }
+    toolPolicy: { allowTools: ["ui.ask_user_question"], allowGroups: ["capture", "session"] }
   },
   {
     id: "stage.plan",
@@ -3244,7 +3334,7 @@ const DEFAULT_STAGE_POLICIES = [
     agentPromptId: "agent.rdc-debugger",
     systemPrompt: "Expand the user goal into a structured investigation plan, hypotheses, and risk map.",
     notes: "Planner phase.",
-    toolPolicy: { allowGroups: ["core", "session"] }
+    toolPolicy: { allowTools: ["ui.ask_user_question"], allowGroups: ["core", "session"] }
   },
   {
     id: "stage.speclist",
@@ -3466,16 +3556,12 @@ ${stagePolicy.systemPrompt}` : ""
     return diagnostics;
   }
   resolveAgentRoute(routes, providers, agentId) {
-    const route = routes.find((entry) => entry.agentId === agentId) || null;
-    if (!route) {
+    const resolution = resolveCompatibleAgentRoute(routes, providers, agentId);
+    if (!resolution.route || !resolution.provider) {
       return null;
     }
-    const provider = providers.find((entry) => entry.id === route.providerId);
-    if (!provider || !provider.enabled || !provider.isConfigured) {
-      return null;
-    }
-    const modelExists = provider.models.some((model) => model.enabled && model.id === route.modelId);
-    return modelExists ? route : null;
+    const modelExists = resolution.provider.models.some((model) => model.enabled && model.id === resolution.route?.modelId);
+    return modelExists ? resolution.route : null;
   }
   readJson(filePath) {
     try {
@@ -3497,19 +3583,1025 @@ ${stagePolicy.systemPrompt}` : ""
   }
 }
 const executionProfileService = new ExecutionProfileService();
-const LEFT_SIDEBAR_DEFAULT_WIDTH = 256;
-const LEFT_SIDEBAR_MIN_WIDTH = 220;
-const LEFT_SIDEBAR_MAX_WIDTH = 420;
-const LEFT_SIDEBAR_COLLAPSED_WIDTH = 0;
-const RIGHT_PANEL_DEFAULT_WIDTH = 312;
-const RIGHT_PANEL_MIN_WIDTH = 280;
-const RIGHT_PANEL_MAX_WIDTH = 520;
-const RIGHT_PANEL_COLLAPSED_WIDTH = 0;
-const TERMINAL_DEFAULT_HEIGHT = 328;
-const TERMINAL_MIN_HEIGHT = 180;
-const TERMINAL_MAX_HEIGHT = 720;
+const COPILOT_EDITOR_HEADERS = {
+  "Editor-Version": "vscode/1.107.0",
+  "Editor-Plugin-Version": "copilot-chat/0.35.0"
+};
+const COPILOT_WIRE_HEADERS = {
+  ...COPILOT_EDITOR_HEADERS,
+  "Copilot-Integration-Id": "vscode-chat"
+};
+const toContentBlocks = (messages) => messages.map((message) => {
+  if (typeof message.content === "string") {
+    return { role: message.role, content: message.content };
+  }
+  const content = message.content.map((block) => {
+    if (block.type === "text") {
+      return { type: "text", text: block.text };
+    }
+    if (block.type === "image" && block.source) {
+      return {
+        type: "image_url",
+        image_url: {
+          url: `data:${block.source.media_type};base64,${block.source.data}`
+        }
+      };
+    }
+    return { type: "text", text: "" };
+  });
+  return { role: message.role, content };
+});
+const normalizeOpenRouterBaseUrl = (baseUrl) => {
+  const trimmed = (baseUrl || "https://openrouter.ai/api/v1").trim().replace(/\/+$/, "");
+  if (/^https:\/\/openrouter\.ai\/api$/i.test(trimmed)) {
+    return `${trimmed}/v1`;
+  }
+  return trimmed;
+};
+const appendQueryParam$1 = (url2, key, value) => {
+  const separator = url2.includes("?") ? "&" : "?";
+  return `${url2}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+};
+const extractMessageContent = (payload) => {
+  if (!payload || typeof payload !== "object") {
+    return "";
+  }
+  const message = payload.message ?? null;
+  const messageContent = message?.content;
+  if (typeof messageContent === "string" && messageContent.trim()) {
+    return messageContent;
+  }
+  if (Array.isArray(messageContent) && messageContent.length > 0) {
+    return messageContent;
+  }
+  if (messageContent && typeof messageContent === "object") {
+    return JSON.stringify(messageContent);
+  }
+  const stringFallbacks = [
+    message?.output_text,
+    message?.reasoning_content,
+    message?.reasoning,
+    message?.refusal,
+    payload.text,
+    payload.output_text
+  ];
+  for (const candidate of stringFallbacks) {
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate;
+    }
+  }
+  return "";
+};
+const toResponsesInput = (messages) => messages.map((message) => ({
+  role: message.role === "assistant" || message.role === "system" ? message.role : "user",
+  content: typeof message.content === "string" ? message.content : JSON.stringify(message.content)
+}));
+const extractResponsesText = (payload) => {
+  if (!payload || typeof payload !== "object") {
+    return "";
+  }
+  const record = payload;
+  if (typeof record.output_text === "string") {
+    return record.output_text;
+  }
+  const output = Array.isArray(record.output) ? record.output : [];
+  const chunks = [];
+  for (const item of output) {
+    const itemRecord = item && typeof item === "object" ? item : {};
+    const content = Array.isArray(itemRecord.content) ? itemRecord.content : [];
+    for (const block of content) {
+      const blockRecord = block && typeof block === "object" ? block : {};
+      const text = typeof blockRecord.text === "string" ? blockRecord.text : typeof blockRecord.output_text === "string" ? blockRecord.output_text : "";
+      if (text) {
+        chunks.push(text);
+      }
+    }
+  }
+  if (chunks.length > 0) {
+    return chunks.join("");
+  }
+  const fallback = extractMessageContent(payload);
+  return typeof fallback === "string" ? fallback : JSON.stringify(fallback);
+};
+const extractResponsesUsage = (payload) => {
+  const record = payload && typeof payload === "object" ? payload : {};
+  const usage = record.usage && typeof record.usage === "object" ? record.usage : {};
+  const input = usage.input_tokens ?? usage.prompt_tokens;
+  const output = usage.output_tokens ?? usage.completion_tokens;
+  return {
+    inputTokens: typeof input === "number" ? input : 0,
+    outputTokens: typeof output === "number" ? output : 0
+  };
+};
+const createAccumulator = (model) => ({
+  id: `stream-${Date.now()}`,
+  model,
+  content: "",
+  toolCalls: [],
+  inputTokens: 0,
+  outputTokens: 0,
+  stopReason: "end_turn"
+});
+const ensureToolCall = (toolCalls, index, id) => {
+  while (toolCalls.length <= index) {
+    toolCalls.push({
+      id: id || `tool-call-${index}`,
+      name: "",
+      argumentsText: ""
+    });
+  }
+  const existing = toolCalls[index];
+  if (id && !existing.id) {
+    existing.id = id;
+  }
+  return existing;
+};
+const parseToolArguments = (argumentsText) => {
+  if (!argumentsText.trim()) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(argumentsText);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch {
+  }
+  return {
+    raw: argumentsText
+  };
+};
+const buildResponseFromAccumulator = (accumulator) => {
+  const toolCalls = accumulator.toolCalls.filter((toolCall) => toolCall.id || toolCall.name || toolCall.argumentsText).map((toolCall) => ({
+    id: toolCall.id,
+    name: toolCall.name,
+    arguments: parseToolArguments(toolCall.argumentsText)
+  }));
+  return {
+    id: accumulator.id,
+    model: accumulator.model,
+    content: accumulator.content,
+    toolCalls: toolCalls.length > 0 ? toolCalls : void 0,
+    usage: {
+      inputTokens: accumulator.inputTokens,
+      outputTokens: accumulator.outputTokens
+    },
+    stopReason: accumulator.stopReason
+  };
+};
+const emitTextChunk = (text, onChunk) => {
+  if (!text) {
+    return;
+  }
+  onChunk({
+    type: "text-delta",
+    text
+  });
+};
+const emitToolCallDelta = (toolCall, onChunk) => {
+  onChunk({
+    type: "tool-call-delta",
+    toolCall
+  });
+};
+const emitFallbackChunks = (text, onChunk) => {
+  const chunks = text.split(/(?<=[.!?。！？\n])|(?<=,|，)\s+/).map((chunk) => chunk.trim()).filter(Boolean);
+  if (chunks.length === 0 && text) {
+    emitTextChunk(text, onChunk);
+    return;
+  }
+  for (const chunk of chunks) {
+    emitTextChunk(chunk, onChunk);
+  }
+};
+const tryParseJson = (value) => {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
+const mapFinishReason = (finishReason) => {
+  if (finishReason === "tool_calls" || finishReason === "tool_use") {
+    return "tool_use";
+  }
+  if (finishReason === "length" || finishReason === "max_tokens") {
+    return "max_tokens";
+  }
+  return "end_turn";
+};
+const readSseStream = async (response, onEvent) => {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    throw new Error("Streaming response body is unavailable.");
+  }
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let eventName = "message";
+  let dataLines = [];
+  const flush = () => {
+    if (dataLines.length === 0) {
+      eventName = "message";
+      return;
+    }
+    const payload = dataLines.join("\n");
+    dataLines = [];
+    onEvent(eventName, payload);
+    eventName = "message";
+  };
+  for (; ; ) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    let newlineIndex = buffer.indexOf("\n");
+    while (newlineIndex >= 0) {
+      const rawLine = buffer.slice(0, newlineIndex);
+      buffer = buffer.slice(newlineIndex + 1);
+      const line = rawLine.replace(/\r$/, "");
+      if (!line) {
+        flush();
+      } else if (line.startsWith("event:")) {
+        eventName = line.slice(6).trim();
+      } else if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5).trimStart());
+      }
+      newlineIndex = buffer.indexOf("\n");
+    }
+    if (done) {
+      break;
+    }
+  }
+  if (buffer.trim()) {
+    const line = buffer.replace(/\r$/, "");
+    if (line.startsWith("data:")) {
+      dataLines.push(line.slice(5).trimStart());
+    }
+  }
+  flush();
+};
+class BaseStreamingProvider {
+  name;
+  constructor(name) {
+    this.name = name;
+  }
+  async streamChat(request, onChunk) {
+    try {
+      const response = await this.performStreamingChat(request, onChunk);
+      onChunk({ type: "done" });
+      return response;
+    } catch (error) {
+      if (request.signal?.aborted) {
+        throw error;
+      }
+      const fallbackResponse = await this.chat(request);
+      const fallbackText = typeof fallbackResponse.content === "string" ? fallbackResponse.content : JSON.stringify(fallbackResponse.content);
+      emitFallbackChunks(fallbackText, onChunk);
+      onChunk({ type: "done" });
+      return fallbackResponse;
+    }
+  }
+}
+class OpenRouterProvider extends BaseStreamingProvider {
+  apiKey = "";
+  baseUrl = "https://openrouter.ai/api/v1";
+  models = [];
+  constructor(name) {
+    super(name);
+  }
+  configure(config) {
+    this.apiKey = config.apiKey.trim();
+    this.baseUrl = normalizeOpenRouterBaseUrl(config.baseUrl || "https://openrouter.ai/api/v1");
+    this.models = config.models;
+  }
+  async chat(request) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://rdcagent.local",
+        "X-Title": "RdcAgent"
+      },
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        messages: toContentBlocks(request.messages),
+        max_tokens: request.maxTokens || 4096,
+        temperature: request.temperature ?? 0.7,
+        tools: request.tools,
+        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
+        stream: false
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`OpenRouter API error: ${response.status} - ${await response.text()}`);
+    }
+    const data = await response.json();
+    const choice = data.choices?.[0];
+    const content = extractMessageContent(choice);
+    return {
+      id: data.id || `or-${Date.now()}`,
+      model: data.model || model,
+      content,
+      toolCalls: choice?.message?.tool_calls,
+      usage: {
+        inputTokens: data.usage?.prompt_tokens || 0,
+        outputTokens: data.usage?.completion_tokens || 0
+      },
+      stopReason: mapFinishReason(choice?.finish_reason)
+    };
+  }
+  async performStreamingChat(request, onChunk) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const response = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://rdcagent.local",
+        "X-Title": "RdcAgent"
+      },
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        messages: toContentBlocks(request.messages),
+        max_tokens: request.maxTokens || 4096,
+        temperature: request.temperature ?? 0.7,
+        tools: request.tools,
+        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
+        stream: true
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`OpenRouter API error: ${response.status} - ${await response.text()}`);
+    }
+    const accumulator = createAccumulator(model);
+    await readSseStream(response, (_eventName, data) => {
+      if (!data || data === "[DONE]") {
+        return;
+      }
+      const payload = tryParseJson(data);
+      if (!payload) {
+        return;
+      }
+      accumulator.id = String(payload.id || accumulator.id);
+      accumulator.model = String(payload.model || accumulator.model);
+      const choice = payload.choices?.[0];
+      const delta = choice?.delta ?? {};
+      const text = typeof delta.content === "string" ? delta.content : "";
+      if (text) {
+        accumulator.content += text;
+        emitTextChunk(text, onChunk);
+      }
+      const toolCalls = Array.isArray(delta.tool_calls) ? delta.tool_calls : [];
+      for (const toolCallDelta of toolCalls) {
+        const index = typeof toolCallDelta.index === "number" ? toolCallDelta.index : 0;
+        const functionDelta = typeof toolCallDelta.function === "object" && toolCallDelta.function ? toolCallDelta.function : {};
+        const toolCall = ensureToolCall(
+          accumulator.toolCalls,
+          index,
+          typeof toolCallDelta.id === "string" ? toolCallDelta.id : void 0
+        );
+        if (typeof functionDelta.name === "string") {
+          toolCall.name = functionDelta.name;
+        }
+        if (typeof functionDelta.arguments === "string") {
+          toolCall.argumentsText += functionDelta.arguments;
+        }
+        emitToolCallDelta({
+          id: toolCall.id,
+          name: toolCall.name,
+          argumentsText: toolCall.argumentsText
+        }, onChunk);
+      }
+      accumulator.stopReason = mapFinishReason(
+        typeof choice?.finish_reason === "string" ? choice.finish_reason : void 0
+      );
+    });
+    return buildResponseFromAccumulator(accumulator);
+  }
+  async isAvailable() {
+    return Boolean(this.apiKey);
+  }
+  getModels() {
+    return this.models;
+  }
+}
+class OpenAICompatibleProvider extends BaseStreamingProvider {
+  apiKey = "";
+  baseUrl = "https://api.openai.com/v1";
+  models = [];
+  requireApiKey = true;
+  constructor(name, requireApiKey = true) {
+    super(name);
+    this.requireApiKey = requireApiKey;
+  }
+  configure(config) {
+    this.apiKey = config.apiKey.trim();
+    this.baseUrl = (config.baseUrl || this.baseUrl).trim().replace(/\/+$/, "");
+    this.models = config.models;
+  }
+  createHeaders() {
+    const headers = {
+      "Content-Type": "application/json"
+    };
+    if (this.apiKey) {
+      headers.Authorization = `Bearer ${this.apiKey}`;
+    }
+    return headers;
+  }
+  createChatCompletionsUrl() {
+    return `${this.baseUrl}/chat/completions`;
+  }
+  describeApiError(status, text) {
+    return `${this.name} API error: ${status} - ${text}`;
+  }
+  async chat(request) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const response = await fetch(this.createChatCompletionsUrl(), {
+      method: "POST",
+      headers: this.createHeaders(),
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        messages: toContentBlocks(request.messages),
+        max_tokens: request.maxTokens || 4096,
+        temperature: request.temperature ?? 0.7,
+        tools: request.tools,
+        response_format: request.responseFormat ? { type: request.responseFormat } : void 0
+      })
+    });
+    if (!response.ok) {
+      throw new Error(this.describeApiError(response.status, await response.text()));
+    }
+    const data = await response.json();
+    const choice = data.choices?.[0];
+    const content = extractMessageContent(choice);
+    return {
+      id: data.id || `${this.name}-${Date.now()}`,
+      model: data.model || model,
+      content,
+      toolCalls: choice?.message?.tool_calls,
+      usage: {
+        inputTokens: data.usage?.prompt_tokens || 0,
+        outputTokens: data.usage?.completion_tokens || 0
+      },
+      stopReason: mapFinishReason(choice?.finish_reason)
+    };
+  }
+  async performStreamingChat(request, onChunk) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const response = await fetch(this.createChatCompletionsUrl(), {
+      method: "POST",
+      headers: this.createHeaders(),
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        messages: toContentBlocks(request.messages),
+        max_tokens: request.maxTokens || 4096,
+        temperature: request.temperature ?? 0.7,
+        tools: request.tools,
+        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
+        stream: true
+      })
+    });
+    if (!response.ok) {
+      throw new Error(this.describeApiError(response.status, await response.text()));
+    }
+    const accumulator = createAccumulator(model);
+    await readSseStream(response, (_eventName, data) => {
+      if (!data || data === "[DONE]") {
+        return;
+      }
+      const payload = tryParseJson(data);
+      if (!payload) {
+        return;
+      }
+      accumulator.id = String(payload.id || accumulator.id);
+      accumulator.model = String(payload.model || accumulator.model);
+      const choice = payload.choices?.[0];
+      const delta = choice?.delta ?? {};
+      const text = typeof delta.content === "string" ? delta.content : "";
+      if (text) {
+        accumulator.content += text;
+        emitTextChunk(text, onChunk);
+      }
+      const toolCalls = Array.isArray(delta.tool_calls) ? delta.tool_calls : [];
+      for (const toolCallDelta of toolCalls) {
+        const index = typeof toolCallDelta.index === "number" ? toolCallDelta.index : 0;
+        const functionDelta = typeof toolCallDelta.function === "object" && toolCallDelta.function ? toolCallDelta.function : {};
+        const toolCall = ensureToolCall(
+          accumulator.toolCalls,
+          index,
+          typeof toolCallDelta.id === "string" ? toolCallDelta.id : void 0
+        );
+        if (typeof functionDelta.name === "string") {
+          toolCall.name = functionDelta.name;
+        }
+        if (typeof functionDelta.arguments === "string") {
+          toolCall.argumentsText += functionDelta.arguments;
+        }
+        emitToolCallDelta({
+          id: toolCall.id,
+          name: toolCall.name,
+          argumentsText: toolCall.argumentsText
+        }, onChunk);
+      }
+      accumulator.stopReason = mapFinishReason(
+        typeof choice?.finish_reason === "string" ? choice.finish_reason : void 0
+      );
+    });
+    return buildResponseFromAccumulator(accumulator);
+  }
+  async isAvailable() {
+    return this.requireApiKey ? Boolean(this.apiKey) : true;
+  }
+  getModels() {
+    return this.models;
+  }
+}
+class ChatGptAccountProvider extends BaseStreamingProvider {
+  accessToken = "";
+  baseUrl = "https://chatgpt.com/backend-api/codex";
+  accountId;
+  models = [];
+  constructor(name) {
+    super(name);
+  }
+  configure(config) {
+    this.accessToken = config.apiKey.trim();
+    this.baseUrl = (config.baseUrl || this.baseUrl).trim().replace(/\/+$/, "");
+    this.accountId = config.accountId?.trim() || void 0;
+    this.models = config.models;
+  }
+  createHeaders() {
+    const headers = {
+      Authorization: `Bearer ${this.accessToken}`,
+      "Content-Type": "application/json"
+    };
+    if (this.accountId) {
+      headers["chatgpt-account-id"] = this.accountId;
+    }
+    return headers;
+  }
+  createResponsesUrl() {
+    return this.baseUrl.endsWith("/responses") ? this.baseUrl : `${this.baseUrl}/responses`;
+  }
+  createBody(request, model, stream) {
+    return {
+      model,
+      input: toResponsesInput(request.messages),
+      max_output_tokens: request.maxTokens || 4096,
+      temperature: request.temperature ?? 0.7,
+      stream
+    };
+  }
+  async chat(request) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const response = await fetch(this.createResponsesUrl(), {
+      method: "POST",
+      headers: this.createHeaders(),
+      signal: request.signal,
+      body: JSON.stringify(this.createBody(request, model, false))
+    });
+    if (!response.ok) {
+      throw new Error(`ChatGPT Account API error: ${response.status} - ${await response.text()}`);
+    }
+    const payload = await response.json();
+    return {
+      id: typeof payload.id === "string" ? payload.id : `${this.name}-${Date.now()}`,
+      model: typeof payload.model === "string" ? payload.model : model,
+      content: extractResponsesText(payload),
+      usage: extractResponsesUsage(payload),
+      stopReason: mapFinishReason(typeof payload.status === "string" ? payload.status : void 0)
+    };
+  }
+  async performStreamingChat(request, onChunk) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const response = await fetch(this.createResponsesUrl(), {
+      method: "POST",
+      headers: this.createHeaders(),
+      signal: request.signal,
+      body: JSON.stringify(this.createBody(request, model, true))
+    });
+    if (!response.ok) {
+      throw new Error(`ChatGPT Account API error: ${response.status} - ${await response.text()}`);
+    }
+    const accumulator = createAccumulator(model);
+    await readSseStream(response, (eventName, data) => {
+      if (!data || data === "[DONE]") {
+        return;
+      }
+      const payload = tryParseJson(data);
+      if (!payload) {
+        return;
+      }
+      const eventType = typeof payload.type === "string" ? payload.type : eventName;
+      if (typeof payload.id === "string") {
+        accumulator.id = payload.id;
+      }
+      if (typeof payload.model === "string") {
+        accumulator.model = payload.model;
+      }
+      if (eventType.includes("output_text.delta")) {
+        const text = typeof payload.delta === "string" ? payload.delta : typeof payload.text === "string" ? payload.text : "";
+        if (text) {
+          accumulator.content += text;
+          emitTextChunk(text, onChunk);
+        }
+      }
+      if (eventType.includes("completed")) {
+        const completed = payload.response && typeof payload.response === "object" ? payload.response : payload;
+        if (!accumulator.content) {
+          accumulator.content = extractResponsesText(completed);
+        }
+        if (typeof completed.id === "string") {
+          accumulator.id = completed.id;
+        }
+        if (typeof completed.model === "string") {
+          accumulator.model = completed.model;
+        }
+        const usage = extractResponsesUsage(completed);
+        accumulator.inputTokens = usage.inputTokens;
+        accumulator.outputTokens = usage.outputTokens;
+      }
+    });
+    return buildResponseFromAccumulator(accumulator);
+  }
+  async isAvailable() {
+    return Boolean(this.accessToken);
+  }
+  getModels() {
+    return this.models;
+  }
+}
+class GitHubCopilotProvider extends OpenAICompatibleProvider {
+  constructor(name) {
+    super(name, true);
+  }
+  createHeaders() {
+    return {
+      ...super.createHeaders(),
+      ...COPILOT_WIRE_HEADERS
+    };
+  }
+  describeApiError(status, text) {
+    if (status === 401) {
+      return `GitHub Copilot account token was rejected. Sign in again or check token policy. ${text}`;
+    }
+    if (status === 403) {
+      return `GitHub Copilot access was blocked by license, organization, or policy settings. ${text}`;
+    }
+    return `GitHub Copilot API error: ${status} - ${text}`;
+  }
+}
+class AzureOpenAIProvider extends OpenAICompatibleProvider {
+  createHeaders() {
+    return {
+      "api-key": this.apiKey,
+      "Content-Type": "application/json"
+    };
+  }
+  createChatCompletionsUrl() {
+    const base = this.baseUrl.endsWith("/chat/completions") ? this.baseUrl : `${this.baseUrl}/chat/completions`;
+    return appendQueryParam$1(base, "api-version", "2024-10-21");
+  }
+}
+class GoogleAiStudioProvider extends BaseStreamingProvider {
+  apiKey = "";
+  baseUrl = "https://generativelanguage.googleapis.com/v1beta";
+  models = [];
+  constructor(name) {
+    super(name);
+  }
+  configure(config) {
+    this.apiKey = config.apiKey.trim();
+    this.baseUrl = (config.baseUrl || this.baseUrl).trim().replace(/\/+$/, "");
+    this.models = config.models;
+  }
+  async chat(request) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const response = await fetch(appendQueryParam$1(`${this.baseUrl}/models/${model}:generateContent`, "key", this.apiKey), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      signal: request.signal,
+      body: JSON.stringify({
+        contents: request.messages.filter((message) => message.role !== "system").map((message) => ({
+          role: message.role === "assistant" ? "model" : "user",
+          parts: [{ text: typeof message.content === "string" ? message.content : JSON.stringify(message.content) }]
+        })),
+        generationConfig: {
+          maxOutputTokens: request.maxTokens || 4096,
+          temperature: request.temperature ?? 0.7
+        },
+        systemInstruction: request.messages.some((message) => message.role === "system") ? {
+          parts: request.messages.filter((message) => message.role === "system").map((message) => ({ text: typeof message.content === "string" ? message.content : JSON.stringify(message.content) }))
+        } : void 0
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`Google AI Studio API error: ${response.status} - ${await response.text()}`);
+    }
+    const data = await response.json();
+    const text = Array.isArray(data.candidates?.[0]?.content?.parts) ? data.candidates[0].content.parts.map((part) => typeof part.text === "string" ? part.text : "").join("") : "";
+    return {
+      id: data.responseId || `google-ai-studio-${Date.now()}`,
+      model,
+      content: text,
+      usage: {
+        inputTokens: data.usageMetadata?.promptTokenCount || 0,
+        outputTokens: data.usageMetadata?.candidatesTokenCount || 0
+      },
+      stopReason: "end_turn"
+    };
+  }
+  async performStreamingChat(request, onChunk) {
+    const response = await this.chat(request);
+    const text = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
+    emitTextChunk(text, onChunk);
+    return response;
+  }
+  async isAvailable() {
+    return Boolean(this.apiKey);
+  }
+  getModels() {
+    return this.models;
+  }
+}
+class AnthropicProvider extends BaseStreamingProvider {
+  apiKey = "";
+  baseUrl = "https://api.anthropic.com/v1";
+  models = [];
+  useBearerAuth = false;
+  constructor(name) {
+    super(name);
+  }
+  configure(config) {
+    this.apiKey = config.apiKey.trim();
+    this.baseUrl = (config.baseUrl || "https://api.anthropic.com/v1").trim().replace(/\/+$/, "");
+    this.models = config.models;
+    this.useBearerAuth = config.authMode === "account";
+  }
+  createHeaders() {
+    return {
+      ...this.useBearerAuth ? { Authorization: `Bearer ${this.apiKey}` } : { "x-api-key": this.apiKey },
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json"
+    };
+  }
+  async chat(request) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const systemMessage = request.messages.find((message) => message.role === "system");
+    const otherMessages = request.messages.filter((message) => message.role !== "system");
+    const response = await fetch(`${this.baseUrl}/messages`, {
+      method: "POST",
+      headers: this.createHeaders(),
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        max_tokens: request.maxTokens || 4096,
+        system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
+        messages: otherMessages.map((message) => ({
+          role: message.role === "assistant" ? "assistant" : "user",
+          content: message.content
+        }))
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.status} - ${await response.text()}`);
+    }
+    const data = await response.json();
+    return {
+      id: data.id || `anthropic-${Date.now()}`,
+      model: data.model || model,
+      content: data.content?.[0]?.text || "",
+      usage: {
+        inputTokens: data.usage?.input_tokens || 0,
+        outputTokens: data.usage?.output_tokens || 0
+      },
+      stopReason: mapFinishReason(data.stop_reason)
+    };
+  }
+  async performStreamingChat(request, onChunk) {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+    const systemMessage = request.messages.find((message) => message.role === "system");
+    const otherMessages = request.messages.filter((message) => message.role !== "system");
+    const response = await fetch(`${this.baseUrl}/messages`, {
+      method: "POST",
+      headers: this.createHeaders(),
+      signal: request.signal,
+      body: JSON.stringify({
+        model,
+        max_tokens: request.maxTokens || 4096,
+        stream: true,
+        system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
+        messages: otherMessages.map((message) => ({
+          role: message.role === "assistant" ? "assistant" : "user",
+          content: message.content
+        }))
+      })
+    });
+    if (!response.ok) {
+      throw new Error(`Anthropic API error: ${response.status} - ${await response.text()}`);
+    }
+    const accumulator = createAccumulator(model);
+    await readSseStream(response, (eventName, data) => {
+      if (!data) {
+        return;
+      }
+      const payload = tryParseJson(data);
+      if (!payload) {
+        return;
+      }
+      if (eventName === "message_start") {
+        const message = payload.message;
+        accumulator.id = String(message?.id || accumulator.id);
+        accumulator.model = String(message?.model || accumulator.model);
+        const usage = message?.usage;
+        accumulator.inputTokens = typeof usage?.input_tokens === "number" ? usage.input_tokens : accumulator.inputTokens;
+      }
+      if (eventName === "content_block_delta") {
+        const delta = payload.delta;
+        if (delta?.type === "text_delta" && typeof delta.text === "string") {
+          accumulator.content += delta.text;
+          emitTextChunk(delta.text, onChunk);
+        }
+      }
+      if (eventName === "message_delta") {
+        const delta = payload.delta;
+        const usage = payload.usage;
+        accumulator.outputTokens = typeof usage?.output_tokens === "number" ? usage.output_tokens : accumulator.outputTokens;
+        accumulator.stopReason = mapFinishReason(
+          typeof delta?.stop_reason === "string" ? delta.stop_reason : void 0
+        );
+      }
+    });
+    return buildResponseFromAccumulator(accumulator);
+  }
+  async isAvailable() {
+    return Boolean(this.apiKey);
+  }
+  getModels() {
+    return this.models;
+  }
+}
+const createProviderByKind = (providerId, kind) => {
+  if (providerId === "chatgpt-account") {
+    return new ChatGptAccountProvider(providerId);
+  }
+  if (providerId === "github-copilot") {
+    return new GitHubCopilotProvider(providerId);
+  }
+  if (kind === "openrouter") {
+    return new OpenRouterProvider(providerId);
+  }
+  if (kind === "anthropic") {
+    return new AnthropicProvider(providerId);
+  }
+  if (kind === "ollama") {
+    return new OpenAICompatibleProvider(providerId, false);
+  }
+  if (kind === "google-ai-studio") {
+    return new GoogleAiStudioProvider(providerId);
+  }
+  if (kind === "azure-openai") {
+    return new AzureOpenAIProvider(providerId);
+  }
+  return new OpenAICompatibleProvider(providerId, true);
+};
+class LLMAdapter {
+  providers = /* @__PURE__ */ new Map();
+  configure(config) {
+    this.providers.clear();
+    for (const providerConfig of config.providers) {
+      const provider = createProviderByKind(providerConfig.id, providerConfig.kind);
+      if ("configure" in provider && typeof provider.configure === "function") {
+        provider.configure(providerConfig);
+      }
+      this.providers.set(providerConfig.id, {
+        config: providerConfig,
+        provider
+      });
+    }
+  }
+  async chat(request, providerId) {
+    const resolvedProviderId = providerId?.trim();
+    if (!resolvedProviderId) {
+      throw new Error("No explicit LLM provider was supplied for this request.");
+    }
+    const runtimeProvider = this.providers.get(resolvedProviderId);
+    if (!runtimeProvider) {
+      throw new Error(`Provider not found: ${resolvedProviderId}`);
+    }
+    if (!runtimeProvider.config.enabled) {
+      throw new Error(`Provider disabled: ${resolvedProviderId}`);
+    }
+    if (!await runtimeProvider.provider.isAvailable()) {
+      throw new Error(`Provider not configured: ${resolvedProviderId}`);
+    }
+    return runtimeProvider.provider.chat(request);
+  }
+  async streamChat(request, onChunk, providerId) {
+    const resolvedProviderId = providerId?.trim();
+    if (!resolvedProviderId) {
+      throw new Error("No explicit LLM provider was supplied for this request.");
+    }
+    const runtimeProvider = this.providers.get(resolvedProviderId);
+    if (!runtimeProvider) {
+      throw new Error(`Provider not found: ${resolvedProviderId}`);
+    }
+    if (!runtimeProvider.config.enabled) {
+      throw new Error(`Provider disabled: ${resolvedProviderId}`);
+    }
+    if (!await runtimeProvider.provider.isAvailable()) {
+      throw new Error(`Provider not configured: ${resolvedProviderId}`);
+    }
+    return runtimeProvider.provider.streamChat(request, onChunk);
+  }
+  async testConnection(providerId) {
+    const runtimeProvider = this.providers.get(providerId);
+    if (!runtimeProvider) {
+      return { success: false, error: `Provider not found: ${providerId}` };
+    }
+    try {
+      const available = await runtimeProvider.provider.isAvailable();
+      return { success: available, error: available ? void 0 : "Provider not configured" };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  }
+  getAvailableModels(providerId) {
+    return this.providers.get(providerId)?.config.models || [];
+  }
+  getDefaultProvider() {
+    return "";
+  }
+}
+const llmAdapter = new LLMAdapter();
 const ANTHROPIC_ALIAS_MODELS = ["sonnet", "opus", "haiku"];
 const ANTHROPIC_FIRST_PARTY_MODELS = ["sonnet", "opus"];
+const CLAUDE_ACCOUNT_MODELS = [
+  "claude-opus-4-7",
+  "claude-sonnet-4-6",
+  "claude-haiku-4-5-20251001"
+];
+const CHATGPT_ACCOUNT_MODELS = [
+  "gpt-5.5",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.3-codex",
+  "gpt-5.2-codex",
+  "gpt-5.1-codex",
+  "gpt-5",
+  "o4-mini",
+  "o3",
+  "gpt-4o"
+];
+const GITHUB_COPILOT_ACCOUNT_MODELS = [
+  "gpt-5.5",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.3-codex",
+  "gpt-5.2-codex",
+  "gpt-5.2",
+  "gpt-5-mini",
+  "claude-opus-4-7",
+  "claude-sonnet-4-6",
+  "claude-haiku-4-5",
+  "claude-opus-4-6",
+  "claude-opus-4-5",
+  "claude-sonnet-4-5",
+  "gpt-4.1"
+];
 const OPENAI_CODE_MODELS = ["gpt-5.2", "gpt-4.1", "gpt-5-mini"];
 const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
   {
@@ -3607,9 +4699,9 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     kind: "anthropic",
     authMode: "account",
     catalogGroup: "account",
-    modelDiscovery: null,
+    modelDiscovery: "account-catalog",
     label: "Claude Account",
-    recommendedModels: ["claude-sonnet-4-5", "claude-opus-4-1"],
+    recommendedModels: CLAUDE_ACCOUNT_MODELS,
     docsUrl: "https://claude.ai/",
     accountLoginConfigured: true
   },
@@ -3618,9 +4710,9 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     kind: "openai-compatible",
     authMode: "account",
     catalogGroup: "account",
-    modelDiscovery: null,
+    modelDiscovery: "account-catalog",
     label: "ChatGPT Account",
-    recommendedModels: ["gpt-5.2", "gpt-5-mini"],
+    recommendedModels: CHATGPT_ACCOUNT_MODELS,
     docsUrl: "https://chatgpt.com/",
     accountLoginConfigured: true
   },
@@ -3640,9 +4732,9 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     kind: "openai-compatible",
     authMode: "account",
     catalogGroup: "account",
-    modelDiscovery: null,
+    modelDiscovery: "account-catalog",
     label: "GitHub Copilot",
-    recommendedModels: ["gpt-4.1", "gpt-5-mini"],
+    recommendedModels: GITHUB_COPILOT_ACCOUNT_MODELS,
     docsUrl: "https://github.com/features/copilot",
     accountLoginConfigured: true
   },
@@ -3707,20 +4799,20 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     authMode: "environment",
     catalogGroup: "environment",
     modelDiscovery: "static",
-    label: "Google Vertex",
+    label: "Google Vertex AI",
     recommendedModels: ANTHROPIC_ALIAS_MODELS,
     docsUrl: "https://docs.anthropic.com/en/docs/claude-code/google-vertex-ai"
   },
   {
-    id: "kimi-coding-plan",
+    id: "kimi-code",
     kind: "anthropic",
     authMode: "api-key",
     catalogGroup: "api-key",
     modelDiscovery: "anthropic-candidate-validation",
-    label: "Kimi Coding Plan",
-    baseUrl: "https://api.kimi.com/coding/",
-    recommendedModels: ["sonnet"],
-    docsUrl: "https://www.kimi.com/code/console"
+    label: "Kimi Code",
+    baseUrl: "https://api.kimi.com/coding/v1",
+    recommendedModels: ["kimi-for-coding"],
+    docsUrl: "https://www.kimi.com/code/docs/en/"
   },
   {
     id: "litellm",
@@ -3882,10 +4974,10 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     authMode: "api-key",
     catalogGroup: "api-key",
     modelDiscovery: "openai-compatible",
-    label: "xAI Grok",
+    label: "xAI (Grok)",
     baseUrl: "https://api.x.ai/v1",
-    recommendedModels: ["grok-4", "grok-3"],
-    docsUrl: "https://console.x.ai/"
+    recommendedModels: ["grok-4.3", "grok-4"],
+    docsUrl: "https://docs.x.ai/"
   },
   {
     id: "xiaomi-mimo",
@@ -3959,6 +5051,17 @@ const createBuiltinProviderEntry = (id) => {
   };
 };
 const createBuiltinProviderEntries = () => BUILTIN_LLM_PROVIDER_DEFINITIONS.map((entry) => createBuiltinProviderEntry(entry.id));
+const LEFT_SIDEBAR_DEFAULT_WIDTH = 256;
+const LEFT_SIDEBAR_MIN_WIDTH = 220;
+const LEFT_SIDEBAR_MAX_WIDTH = 420;
+const LEFT_SIDEBAR_COLLAPSED_WIDTH = 0;
+const RIGHT_PANEL_DEFAULT_WIDTH = 312;
+const RIGHT_PANEL_MIN_WIDTH = 280;
+const RIGHT_PANEL_MAX_WIDTH = 520;
+const RIGHT_PANEL_COLLAPSED_WIDTH = 0;
+const TERMINAL_DEFAULT_HEIGHT = 328;
+const TERMINAL_MIN_HEIGHT = 180;
+const TERMINAL_MAX_HEIGHT = 720;
 const SECRET_FILE_NAME = "provider-secrets.json";
 class SecretStorageService {
   getSecretFilePath(workspaceRoot = appPathService.getWorkspaceRoot()) {
@@ -4160,8 +5263,9 @@ function resolveAccountRuntimeCredential(providerId, workspaceRoot) {
     }
     if (providerId === "chatgpt-account") {
       return {
-        apiKey: bundle.apiKey ?? bundle.accessToken ?? "",
-        baseUrl: "https://api.openai.com/v1"
+        apiKey: bundle.accessToken ?? bundle.apiKey ?? "",
+        baseUrl: "https://chatgpt.com/backend-api/codex",
+        accountId: bundle.accountId
       };
     }
     return {
@@ -4295,7 +5399,7 @@ function isFixtureProvider(provider) {
 }
 function normalizeLegacyProviderId(providerId) {
   if (providerId === "gemini") return "vertex";
-  if (providerId === "kimi") return "kimi-coding-plan";
+  if (providerId === "kimi" || providerId === "kimi-coding-plan") return "kimi-code";
   if (providerId === "minimax") return "minimax-global";
   if (providerId === "zai") return "glm-global";
   return providerId;
@@ -4307,6 +5411,7 @@ function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorksp
   }
   const builtinFallback = createBuiltinProviderEntry(rawId);
   const definition = getBuiltinProviderDefinition(rawId);
+  const useBuiltinProviderMetadata = rawId === "kimi-code";
   const secretRef = provider.secretRef || secretStorageService.createProviderSecretRef(rawId);
   const kind = builtinFallback.kind;
   const models = sanitizeModels(provider.models ?? []);
@@ -4316,13 +5421,18 @@ function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorksp
   const canUseProvider = builtinFallback.authMode === "local" || builtinFallback.authMode === "environment" ? true : builtinFallback.authMode === "api-key" ? Boolean(resolvedSecret) : Boolean(resolvedSecret);
   const status = pickProviderStatus(provider, builtinFallback, canUseProvider, models);
   const enabled = status === "verified" && models.length > 0;
+  const label = useBuiltinProviderMetadata ? builtinFallback.label : typeof provider.label === "string" && provider.label.trim() ? provider.label.trim() : builtinFallback.label;
+  const recommendedModels = useBuiltinProviderMetadata ? builtinFallback.recommendedModels : dedupeStrings(
+    Array.isArray(provider.recommendedModels) ? provider.recommendedModels.filter((value) => typeof value === "string").map((value) => value.trim()) : builtinFallback.recommendedModels
+  );
+  const docsUrl = useBuiltinProviderMetadata ? builtinFallback.docsUrl : typeof provider.docsUrl === "string" && provider.docsUrl.trim() ? provider.docsUrl.trim() : builtinFallback.docsUrl;
   return {
     id: rawId,
     kind,
     authMode: builtinFallback.authMode,
     catalogGroup: builtinFallback.catalogGroup,
     modelDiscovery: builtinFallback.modelDiscovery,
-    label: typeof provider.label === "string" && provider.label.trim() ? provider.label.trim() : builtinFallback.label,
+    label,
     enabled,
     apiKey: "",
     secretRef,
@@ -4330,10 +5440,8 @@ function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorksp
     baseUrl: definition?.baseUrlEditable ? typeof provider.baseUrl === "string" ? provider.baseUrl.trim() : definition.baseUrl : definition?.baseUrl,
     baseUrlEditable: definition?.baseUrlEditable,
     models,
-    recommendedModels: dedupeStrings(
-      Array.isArray(provider.recommendedModels) ? provider.recommendedModels.filter((value) => typeof value === "string").map((value) => value.trim()) : builtinFallback.recommendedModels
-    ),
-    docsUrl: typeof provider.docsUrl === "string" && provider.docsUrl.trim() ? provider.docsUrl.trim() : builtinFallback.docsUrl,
+    recommendedModels,
+    docsUrl,
     status,
     lastTestedAt: typeof provider.lastTestedAt === "string" ? provider.lastTestedAt : void 0,
     lastModelRefreshAt: typeof provider.lastModelRefreshAt === "string" ? provider.lastModelRefreshAt : void 0,
@@ -4863,6 +5971,7 @@ class SettingsService {
         enabled: provider.enabled,
         apiKey: provider.authMode === "api-key" ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.workspace.rootPath) : provider.authMode === "account" ? accountCredential.apiKey : "",
         baseUrl: accountCredential.baseUrl ?? provider.baseUrl,
+        accountId: accountCredential.accountId,
         authMode: provider.authMode,
         models: provider.models.filter((model) => model.enabled).map((model) => model.id),
         docsUrl: provider.docsUrl
@@ -4881,6 +5990,701 @@ class SettingsService {
   }
 }
 const settingsService = new SettingsService();
+const REQUEST_TIMEOUT_MS$1 = 2e4;
+const CHATGPT_CALLBACK_PORT = 1455;
+const CHATGPT_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
+const CLAUDE_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
+const GITHUB_COPILOT_CLIENT_ID = "Iv1.b507a08c87ecfe98";
+const pendingFlows = /* @__PURE__ */ new Map();
+const isAccountProviderId = (providerId) => providerId === "claude-account" || providerId === "chatgpt-account" || providerId === "github-copilot";
+const isTestMode = () => process.env.RDC_AGENT_TEST_MODE === "1";
+const base64Url = (buffer) => buffer.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const createPkce = () => {
+  const verifier = base64Url(crypto.randomBytes(32));
+  const challenge = base64Url(crypto.createHash("sha256").update(verifier).digest());
+  return { verifier, challenge };
+};
+const appendParams = (baseUrl, params) => {
+  const url2 = new URL(baseUrl);
+  for (const [key, value] of Object.entries(params)) {
+    url2.searchParams.set(key, value);
+  }
+  return url2.toString();
+};
+const normalizeAccountModels = (values) => {
+  const models = /* @__PURE__ */ new Map();
+  for (const value of values) {
+    const record = value && typeof value === "object" ? value : null;
+    const id = typeof value === "string" ? value.trim() : typeof record?.id === "string" ? record.id.trim() : typeof record?.name === "string" ? record.name.trim() : "";
+    if (!id || !isAgentRoutableAccountModel(id) || models.has(id)) {
+      continue;
+    }
+    models.set(id, {
+      id,
+      label: typeof record?.display_name === "string" && record.display_name.trim() ? record.display_name.trim() : id,
+      enabled: true
+    });
+  }
+  return Array.from(models.values()).sort((left, right) => left.id.localeCompare(right.id));
+};
+const readString = (value) => typeof value === "string" && value.trim() ? value.trim() : void 0;
+const parseJwtPayload = (token) => {
+  const payload = token?.split(".")[1];
+  if (!payload) {
+    return null;
+  }
+  try {
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = Buffer.from(normalized, "base64").toString("utf8");
+    const parsed = JSON.parse(decoded);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+const extractChatGptAccountId = (idToken) => {
+  const claims = parseJwtPayload(idToken);
+  if (!claims) {
+    return void 0;
+  }
+  const authClaim = claims["https://api.openai.com/auth"];
+  const authRecord = authClaim && typeof authClaim === "object" && !Array.isArray(authClaim) ? authClaim : {};
+  const organizations = Array.isArray(claims.organizations) ? claims.organizations : [];
+  const firstOrganization = organizations[0] && typeof organizations[0] === "object" ? organizations[0] : {};
+  return readString(authRecord.chatgpt_account_id) ?? readString(authRecord.account_id) ?? readString(claims["https://api.openai.com/auth.chatgpt_account_id"]) ?? readString(claims.chatgpt_account_id) ?? readString(claims.account_id) ?? readString(firstOrganization.id);
+};
+const createAccountCatalogModels = (providerId) => {
+  const definition = getBuiltinProviderDefinition(providerId);
+  const seen = /* @__PURE__ */ new Set();
+  return (definition?.recommendedModels ?? []).map((modelId) => modelId.trim()).filter((modelId) => {
+    if (!modelId || seen.has(modelId) || !isAgentRoutableAccountModel(modelId)) {
+      return false;
+    }
+    seen.add(modelId);
+    return true;
+  }).map((modelId) => ({
+    id: modelId,
+    label: modelId,
+    enabled: true
+  }));
+};
+const mergeAccountModels = (...groups) => {
+  const models = /* @__PURE__ */ new Map();
+  for (const group of groups) {
+    for (const model of group) {
+      if (!models.has(model.id) && isAgentRoutableAccountModel(model.id)) {
+        models.set(model.id, model);
+      }
+    }
+  }
+  return Array.from(models.values());
+};
+const isAgentRoutableAccountModel = (modelId) => {
+  const normalized = modelId.toLowerCase();
+  return !(normalized.includes("embedding") || normalized.includes("moderation") || normalized.includes("rerank") || normalized.includes("whisper") || normalized.includes("tts") || normalized.includes("dall-e") || normalized.includes("image") || normalized.includes("audio") || normalized.includes("realtime") || normalized.includes("transcribe"));
+};
+const parseProviderError$1 = (error) => {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return "Connection test timed out.";
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return "Provider connection failed.";
+};
+const isExpiringSoon = (expiresAt) => {
+  if (!expiresAt) {
+    return false;
+  }
+  const timestamp = new Date(expiresAt).getTime();
+  return Number.isFinite(timestamp) && timestamp <= Date.now() + 6e4;
+};
+const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+const canRefreshBundle = (bundle) => Boolean(bundle.refreshToken || bundle.providerId === "github-copilot" && bundle.accessToken);
+const fetchJson = async (url2, init) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS$1);
+  try {
+    const response = await fetch(url2, {
+      ...init,
+      signal: controller.signal
+    });
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) : {};
+    if (!response.ok) {
+      const message = payload && typeof payload === "object" && typeof payload.error === "string" ? payload.error : `HTTP ${response.status}`;
+      throw new Error(message);
+    }
+    return payload;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+const parseModels = (payload) => {
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+  const data = payload.data ?? payload.models;
+  return Array.isArray(data) ? normalizeAccountModels(data) : [];
+};
+const parseCopilotModels = (payload) => {
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+  const data = payload.data ?? payload.models;
+  if (!Array.isArray(data)) {
+    return [];
+  }
+  return normalizeAccountModels(data.filter((value) => {
+    const record = value && typeof value === "object" ? value : null;
+    const policy = record?.policy && typeof record.policy === "object" && !Array.isArray(record.policy) ? record.policy : null;
+    const state2 = typeof policy?.state === "string" ? policy.state.toLowerCase() : "";
+    return !state2 || state2 === "enabled";
+  }));
+};
+class ProviderAccountAuthService {
+  async startLogin(providerId) {
+    if (!isAccountProviderId(providerId)) {
+      return this.status(providerId, "Provider does not support account login.");
+    }
+    if (providerId === "claude-account") {
+      return this.startClaudeLogin();
+    }
+    if (providerId === "chatgpt-account") {
+      return this.startChatGptLogin();
+    }
+    return this.startGitHubCopilotLogin();
+  }
+  async finishLogin(request) {
+    if (!isAccountProviderId(request.providerId)) {
+      return this.status(request.providerId, "Provider does not support account login.");
+    }
+    const flow = this.findFlow(request.providerId, request.flowId);
+    if (!flow) {
+      return this.status(request.providerId, "Login flow expired or was not started.", "failed");
+    }
+    try {
+      if (request.providerId === "claude-account") {
+        const bundle2 = await this.exchangeClaudeCode(flow, request.code?.trim() ?? "");
+        return await this.persistAccount(request.providerId, bundle2);
+      }
+      if (request.providerId === "chatgpt-account") {
+        const bundle2 = await this.exchangeChatGptCode(flow, request.code?.trim() ?? "");
+        return await this.persistAccount(request.providerId, bundle2);
+      }
+      const bundle = await this.pollGitHubDevice(flow);
+      return await this.persistAccount(request.providerId, bundle);
+    } catch (error) {
+      flow.error = parseProviderError$1(error);
+      return this.status(request.providerId, flow.error, "failed");
+    }
+  }
+  async test(providerId) {
+    if (!isAccountProviderId(providerId)) {
+      return this.status(providerId, "Provider does not support account login.");
+    }
+    const bundle = this.readBundle(providerId);
+    if (!bundle) {
+      return this.status(providerId, "Account is not connected.");
+    }
+    try {
+      const activeBundle = await this.refreshBundleIfNeeded(bundle);
+      const models = await this.discoverModels(activeBundle);
+      if (models.length === 0) {
+        throw new Error("Account provider returned no usable models.");
+      }
+      settingsService.saveProviderAccountConnection(
+        providerId,
+        JSON.stringify(activeBundle),
+        models,
+        {
+          accountLabel: activeBundle.accountLabel,
+          planLabel: activeBundle.planLabel,
+          oauthExpiresAt: activeBundle.expiresAt,
+          oauthRefreshAvailable: canRefreshBundle(activeBundle)
+        }
+      );
+      return this.status(providerId);
+    } catch (error) {
+      return this.status(providerId, parseProviderError$1(error), "failed");
+    }
+  }
+  async ensureRuntimeCredentials(providerId) {
+    if (!isAccountProviderId(providerId)) {
+      return;
+    }
+    const bundle = this.readBundle(providerId);
+    if (!bundle) {
+      throw new Error("Account is not connected.");
+    }
+    if (providerId === "github-copilot" && !bundle.accessToken) {
+      throw new Error("GitHub Copilot account access token is missing. Sign in again.");
+    }
+    const activeBundle = await this.refreshBundleIfNeeded(bundle);
+    if (JSON.stringify(activeBundle) === JSON.stringify(bundle)) {
+      return;
+    }
+    const models = await this.discoverModels(activeBundle);
+    settingsService.saveProviderAccountConnection(
+      providerId,
+      JSON.stringify(activeBundle),
+      models,
+      {
+        accountLabel: activeBundle.accountLabel,
+        planLabel: activeBundle.planLabel,
+        oauthExpiresAt: activeBundle.expiresAt,
+        oauthRefreshAvailable: canRefreshBundle(activeBundle)
+      }
+    );
+  }
+  status(providerId, message, forcedState) {
+    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+    const isAccount = isAccountProviderId(providerId);
+    const flow = isAccount ? this.findFlow(providerId) : null;
+    const connected = Boolean(provider?.isConfigured && provider.status === "verified");
+    const state2 = forcedState ?? (flow?.error ? "failed" : flow ? "pending" : connected ? "connected" : isAccount ? "signed-out" : "unavailable");
+    const pendingMessage = providerId === "github-copilot" ? "Waiting for GitHub authorization." : "Waiting for authorization.";
+    return {
+      providerId,
+      state: state2,
+      available: isAccount,
+      connected,
+      message: message ?? flow?.error ?? (connected ? "Connected" : flow ? pendingMessage : "Not connected"),
+      error: forcedState === "failed" ? message : flow?.error,
+      accountLabel: provider?.accountLabel,
+      planLabel: provider?.planLabel,
+      expiresAt: provider?.oauthExpiresAt,
+      authUrl: flow?.authUrl,
+      verificationUri: flow?.verificationUri,
+      userCode: flow?.userCode,
+      requiresCodeInput: Boolean(flow?.providerId === "claude-account"),
+      models: provider?.models ?? []
+    };
+  }
+  logout(providerId) {
+    if (isAccountProviderId(providerId)) {
+      this.clearFlows(providerId);
+      settingsService.disconnectProvider(providerId);
+    }
+    return this.status(providerId);
+  }
+  startClaudeLogin() {
+    const { verifier, challenge } = createPkce();
+    const state2 = crypto.randomUUID();
+    const flow = {
+      providerId: "claude-account",
+      flowId: crypto.randomUUID(),
+      state: state2,
+      codeVerifier: verifier,
+      authUrl: appendParams("https://claude.ai/oauth/authorize", {
+        code: "true",
+        client_id: CLAUDE_CLIENT_ID,
+        response_type: "code",
+        redirect_uri: "https://console.anthropic.com/oauth/code/callback",
+        scope: "org:create_api_key user:profile user:inference",
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+        state: state2
+      }),
+      expiresAt: Date.now() + 10 * 60 * 1e3
+    };
+    this.setFlow(flow);
+    void this.openExternal(flow.authUrl);
+    return this.status(flow.providerId);
+  }
+  async startChatGptLogin() {
+    const { verifier, challenge } = createPkce();
+    const state2 = crypto.randomUUID();
+    const flow = {
+      providerId: "chatgpt-account",
+      flowId: crypto.randomUUID(),
+      state: state2,
+      codeVerifier: verifier,
+      authUrl: appendParams("https://auth.openai.com/oauth/authorize", {
+        client_id: CHATGPT_CLIENT_ID,
+        response_type: "code",
+        redirect_uri: `http://localhost:${CHATGPT_CALLBACK_PORT}/auth/callback`,
+        scope: "openid profile email offline_access",
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+        state: state2,
+        codex_cli_simplified_flow: "true",
+        id_token_add_organizations: "true"
+      }),
+      expiresAt: Date.now() + 10 * 60 * 1e3
+    };
+    this.setFlow(flow);
+    await this.startChatGptCallbackServer(flow);
+    void this.openExternal(flow.authUrl);
+    return this.status(flow.providerId);
+  }
+  async startGitHubCopilotLogin() {
+    const payload = await fetchJson("https://github.com/login/device/code", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        client_id: GITHUB_COPILOT_CLIENT_ID,
+        scope: "read:user"
+      })
+    });
+    const flow = {
+      providerId: "github-copilot",
+      flowId: crypto.randomUUID(),
+      state: crypto.randomUUID(),
+      deviceCode: payload.device_code,
+      userCode: payload.user_code,
+      verificationUri: payload.verification_uri,
+      intervalSeconds: payload.interval ?? 5,
+      expiresAt: Date.now() + (payload.expires_in ?? 900) * 1e3
+    };
+    this.setFlow(flow);
+    if (flow.verificationUri) {
+      void this.openExternal(flow.verificationUri);
+    }
+    void this.pollGitHubDevice(flow).then((bundle) => this.persistAccount("github-copilot", bundle)).catch((error) => {
+      flow.error = parseProviderError$1(error);
+    });
+    return this.status(flow.providerId);
+  }
+  async exchangeClaudeCode(flow, code) {
+    if (!code || !flow.codeVerifier) {
+      throw new Error("Authorization code is required.");
+    }
+    const payload = await fetchJson("https://platform.claude.com/v1/oauth/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "RDC-Agent"
+      },
+      body: JSON.stringify({
+        grant_type: "authorization_code",
+        client_id: CLAUDE_CLIENT_ID,
+        code,
+        redirect_uri: "https://console.anthropic.com/oauth/code/callback",
+        code_verifier: flow.codeVerifier,
+        state: flow.state
+      })
+    });
+    if (!payload.access_token) {
+      throw new Error("Claude OAuth did not return an access token.");
+    }
+    return {
+      providerId: "claude-account",
+      accessToken: payload.access_token,
+      refreshToken: payload.refresh_token,
+      expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1e3).toISOString(),
+      accountLabel: "Claude Account",
+      planLabel: payload.scope
+    };
+  }
+  async exchangeChatGptCode(flow, code) {
+    if (!code || !flow.codeVerifier) {
+      throw new Error("Authorization code is required.");
+    }
+    const tokenPayload = await fetchJson("https://auth.openai.com/oauth/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: CHATGPT_CLIENT_ID,
+        code,
+        redirect_uri: `http://localhost:${CHATGPT_CALLBACK_PORT}/auth/callback`,
+        code_verifier: flow.codeVerifier
+      }).toString()
+    });
+    if (!tokenPayload.access_token) {
+      throw new Error("OpenAI OAuth did not return an access token.");
+    }
+    return {
+      providerId: "chatgpt-account",
+      accessToken: tokenPayload.access_token,
+      refreshToken: tokenPayload.refresh_token,
+      apiKey: tokenPayload.access_token,
+      idToken: tokenPayload.id_token,
+      accountId: extractChatGptAccountId(tokenPayload.id_token),
+      expiresAt: new Date(Date.now() + (tokenPayload.expires_in ?? 3600) * 1e3).toISOString(),
+      accountLabel: "ChatGPT Account"
+    };
+  }
+  async pollGitHubDevice(flow) {
+    if (!flow.deviceCode) {
+      throw new Error("GitHub device code is missing.");
+    }
+    let intervalSeconds = flow.intervalSeconds ?? 5;
+    let delayBeforePoll = !isTestMode();
+    for (; ; ) {
+      if (Date.now() > flow.expiresAt) {
+        throw new Error("GitHub authorization code expired.");
+      }
+      if (delayBeforePoll) {
+        await wait(intervalSeconds * 1e3);
+      }
+      delayBeforePoll = true;
+      const payload = await fetchJson("https://github.com/login/oauth/access_token", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          client_id: GITHUB_COPILOT_CLIENT_ID,
+          device_code: flow.deviceCode,
+          grant_type: "urn:ietf:params:oauth:grant-type:device_code"
+        })
+      });
+      if (payload.error === "authorization_pending") {
+        delete flow.error;
+        continue;
+      }
+      if (payload.error === "slow_down") {
+        delete flow.error;
+        intervalSeconds += 5;
+        continue;
+      }
+      if (payload.error) {
+        throw new Error(payload.error);
+      }
+      if (!payload.access_token) {
+        throw new Error("GitHub OAuth did not return an access token.");
+      }
+      const copilot = await fetchJson("https://api.github.com/copilot_internal/v2/token", {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `token ${payload.access_token}`,
+          ...COPILOT_EDITOR_HEADERS
+        }
+      });
+      if (!copilot.token) {
+        throw new Error("GitHub Copilot did not return an API token.");
+      }
+      return {
+        providerId: "github-copilot",
+        accessToken: payload.access_token,
+        copilotToken: copilot.token,
+        copilotApiBaseUrl: copilot.endpoints?.api ?? "https://api.githubcopilot.com",
+        expiresAt: copilot.expires_at ? new Date(copilot.expires_at * 1e3).toISOString() : void 0,
+        accountLabel: "GitHub Copilot"
+      };
+    }
+  }
+  async persistAccount(providerId, bundle) {
+    const models = await this.discoverModels(bundle);
+    if (models.length === 0) {
+      throw new Error("Account provider returned no usable models.");
+    }
+    settingsService.saveProviderAccountConnection(
+      providerId,
+      JSON.stringify(bundle),
+      models,
+      {
+        accountLabel: bundle.accountLabel,
+        planLabel: bundle.planLabel,
+        oauthExpiresAt: bundle.expiresAt,
+        oauthRefreshAvailable: canRefreshBundle(bundle)
+      }
+    );
+    this.clearFlows(providerId);
+    return this.status(providerId);
+  }
+  async refreshBundleIfNeeded(bundle) {
+    if (bundle.providerId !== "github-copilot" && !isExpiringSoon(bundle.expiresAt)) {
+      return bundle;
+    }
+    if (bundle.providerId === "github-copilot") {
+      if (!bundle.accessToken) {
+        return bundle;
+      }
+      const copilot = await fetchJson("https://api.github.com/copilot_internal/v2/token", {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          Authorization: `token ${bundle.accessToken}`,
+          ...COPILOT_EDITOR_HEADERS
+        }
+      });
+      if (!copilot.token) {
+        throw new Error("GitHub Copilot did not return an API token.");
+      }
+      return {
+        ...bundle,
+        copilotToken: copilot.token,
+        copilotApiBaseUrl: copilot.endpoints?.api ?? bundle.copilotApiBaseUrl ?? "https://api.githubcopilot.com",
+        expiresAt: copilot.expires_at ? new Date(copilot.expires_at * 1e3).toISOString() : bundle.expiresAt
+      };
+    }
+    if (!bundle.refreshToken) {
+      return bundle;
+    }
+    if (bundle.providerId === "claude-account") {
+      const payload2 = await fetchJson("https://platform.claude.com/v1/oauth/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "User-Agent": "RDC-Agent"
+        },
+        body: JSON.stringify({
+          grant_type: "refresh_token",
+          client_id: CLAUDE_CLIENT_ID,
+          refresh_token: bundle.refreshToken
+        })
+      });
+      if (!payload2.access_token) {
+        throw new Error("Claude OAuth refresh did not return an access token.");
+      }
+      return {
+        ...bundle,
+        accessToken: payload2.access_token,
+        refreshToken: payload2.refresh_token ?? bundle.refreshToken,
+        expiresAt: new Date(Date.now() + (payload2.expires_in ?? 3600) * 1e3).toISOString(),
+        planLabel: payload2.scope ?? bundle.planLabel
+      };
+    }
+    const payload = await fetchJson("https://auth.openai.com/oauth/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: CHATGPT_CLIENT_ID,
+        refresh_token: bundle.refreshToken
+      }).toString()
+    });
+    if (!payload.access_token) {
+      throw new Error("OpenAI OAuth refresh did not return an access token.");
+    }
+    return {
+      ...bundle,
+      accessToken: payload.access_token,
+      apiKey: payload.access_token,
+      idToken: payload.id_token ?? bundle.idToken,
+      accountId: extractChatGptAccountId(payload.id_token) ?? bundle.accountId,
+      refreshToken: payload.refresh_token ?? bundle.refreshToken,
+      expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1e3).toISOString()
+    };
+  }
+  async discoverModels(bundle) {
+    if (bundle.providerId === "chatgpt-account" || bundle.providerId === "claude-account") {
+      return createAccountCatalogModels(bundle.providerId);
+    }
+    if (bundle.providerId === "github-copilot") {
+      const catalogModels = createAccountCatalogModels(bundle.providerId);
+      const baseUrl = (bundle.copilotApiBaseUrl ?? "https://api.githubcopilot.com").replace(/\/+$/, "");
+      try {
+        const payload2 = await fetchJson(`${baseUrl}/models`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${bundle.copilotToken}`,
+            "Content-Type": "application/json",
+            ...COPILOT_WIRE_HEADERS
+          }
+        });
+        return mergeAccountModels(catalogModels, parseCopilotModels(payload2));
+      } catch {
+        return catalogModels;
+      }
+    }
+    const payload = await fetchJson("https://api.openai.com/v1/models", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${bundle.apiKey ?? bundle.accessToken}`
+      }
+    });
+    return parseModels(payload);
+  }
+  readBundle(providerId) {
+    const raw = settingsService.getProviderOAuthSecret(providerId);
+    if (!raw) {
+      return null;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed.providerId === providerId ? parsed : null;
+    } catch {
+      return null;
+    }
+  }
+  findFlow(providerId, flowId) {
+    for (const flow of pendingFlows.values()) {
+      if (flow.providerId === providerId && (!flowId || flow.flowId === flowId) && Date.now() <= flow.expiresAt) {
+        return flow;
+      }
+    }
+    return null;
+  }
+  setFlow(flow) {
+    this.clearFlows(flow.providerId);
+    pendingFlows.set(flow.flowId, flow);
+  }
+  clearFlows(providerId) {
+    for (const [flowId, flow] of pendingFlows.entries()) {
+      if (flow.providerId === providerId) {
+        this.closeFlowServer(flow);
+        pendingFlows.delete(flowId);
+      }
+    }
+  }
+  closeFlowServer(flow) {
+    const server = flow.server;
+    if (!server) {
+      return;
+    }
+    delete flow.server;
+    if (server.listening) {
+      server.close();
+    }
+  }
+  startChatGptCallbackServer(flow) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const server = http.createServer((request, response) => {
+        const url2 = new URL(request.url ?? "/", `http://localhost:${CHATGPT_CALLBACK_PORT}`);
+        if (url2.pathname !== "/auth/callback" || url2.searchParams.get("state") !== flow.state) {
+          response.writeHead(400, { "Content-Type": "text/plain" });
+          response.end("Invalid OAuth callback.");
+          return;
+        }
+        const code = url2.searchParams.get("code") ?? "";
+        void this.finishLogin({ providerId: flow.providerId, flowId: flow.flowId, code }).then(() => {
+          response.writeHead(200, { "Content-Type": "text/html" });
+          response.end("<html><body>RDC Agent sign-in complete. You can return to the app.</body></html>");
+        }).catch((error) => {
+          response.writeHead(500, { "Content-Type": "text/plain" });
+          response.end(parseProviderError$1(error));
+        }).finally(() => {
+          this.closeFlowServer(flow);
+        });
+      });
+      flow.server = server;
+      server.on("error", (error) => {
+        flow.error = parseProviderError$1(error);
+        this.closeFlowServer(flow);
+        pendingFlows.delete(flow.flowId);
+        if (!settled) {
+          settled = true;
+          reject(error);
+        }
+      });
+      server.listen(CHATGPT_CALLBACK_PORT, "127.0.0.1", () => {
+        settled = true;
+        resolve();
+      });
+    });
+  }
+  async openExternal(url2) {
+    if (!url2 || isTestMode()) {
+      return;
+    }
+    await electron.shell.openExternal(url2);
+  }
+}
+const providerAccountAuthService = new ProviderAccountAuthService();
 class ToolBridgeAgentToolPort {
   async listTools(_agentId) {
     const catalog = await toolBridge.loadCatalog();
@@ -5328,819 +7132,6 @@ RDC tool: ${tool.originalName}`,
     };
   }
 }
-const toContentBlocks = (messages) => messages.map((message) => {
-  if (typeof message.content === "string") {
-    return { role: message.role, content: message.content };
-  }
-  const content = message.content.map((block) => {
-    if (block.type === "text") {
-      return { type: "text", text: block.text };
-    }
-    if (block.type === "image" && block.source) {
-      return {
-        type: "image_url",
-        image_url: {
-          url: `data:${block.source.media_type};base64,${block.source.data}`
-        }
-      };
-    }
-    return { type: "text", text: "" };
-  });
-  return { role: message.role, content };
-});
-const normalizeOpenRouterBaseUrl = (baseUrl) => {
-  const trimmed = (baseUrl || "https://openrouter.ai/api/v1").trim().replace(/\/+$/, "");
-  if (/^https:\/\/openrouter\.ai\/api$/i.test(trimmed)) {
-    return `${trimmed}/v1`;
-  }
-  return trimmed;
-};
-const appendQueryParam$1 = (url2, key, value) => {
-  const separator = url2.includes("?") ? "&" : "?";
-  return `${url2}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
-};
-const extractMessageContent = (payload) => {
-  if (!payload || typeof payload !== "object") {
-    return "";
-  }
-  const message = payload.message ?? null;
-  const messageContent = message?.content;
-  if (typeof messageContent === "string" && messageContent.trim()) {
-    return messageContent;
-  }
-  if (Array.isArray(messageContent) && messageContent.length > 0) {
-    return messageContent;
-  }
-  if (messageContent && typeof messageContent === "object") {
-    return JSON.stringify(messageContent);
-  }
-  const stringFallbacks = [
-    message?.output_text,
-    message?.reasoning_content,
-    message?.reasoning,
-    message?.refusal,
-    payload.text,
-    payload.output_text
-  ];
-  for (const candidate of stringFallbacks) {
-    if (typeof candidate === "string" && candidate.trim()) {
-      return candidate;
-    }
-  }
-  return "";
-};
-const createAccumulator = (model) => ({
-  id: `stream-${Date.now()}`,
-  model,
-  content: "",
-  toolCalls: [],
-  inputTokens: 0,
-  outputTokens: 0,
-  stopReason: "end_turn"
-});
-const ensureToolCall = (toolCalls, index, id) => {
-  while (toolCalls.length <= index) {
-    toolCalls.push({
-      id: id || `tool-call-${index}`,
-      name: "",
-      argumentsText: ""
-    });
-  }
-  const existing = toolCalls[index];
-  if (id && !existing.id) {
-    existing.id = id;
-  }
-  return existing;
-};
-const parseToolArguments = (argumentsText) => {
-  if (!argumentsText.trim()) {
-    return {};
-  }
-  try {
-    const parsed = JSON.parse(argumentsText);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed;
-    }
-  } catch {
-  }
-  return {
-    raw: argumentsText
-  };
-};
-const buildResponseFromAccumulator = (accumulator) => {
-  const toolCalls = accumulator.toolCalls.filter((toolCall) => toolCall.id || toolCall.name || toolCall.argumentsText).map((toolCall) => ({
-    id: toolCall.id,
-    name: toolCall.name,
-    arguments: parseToolArguments(toolCall.argumentsText)
-  }));
-  return {
-    id: accumulator.id,
-    model: accumulator.model,
-    content: accumulator.content,
-    toolCalls: toolCalls.length > 0 ? toolCalls : void 0,
-    usage: {
-      inputTokens: accumulator.inputTokens,
-      outputTokens: accumulator.outputTokens
-    },
-    stopReason: accumulator.stopReason
-  };
-};
-const emitTextChunk = (text, onChunk) => {
-  if (!text) {
-    return;
-  }
-  onChunk({
-    type: "text-delta",
-    text
-  });
-};
-const emitToolCallDelta = (toolCall, onChunk) => {
-  onChunk({
-    type: "tool-call-delta",
-    toolCall
-  });
-};
-const emitFallbackChunks = (text, onChunk) => {
-  const chunks = text.split(/(?<=[.!?。！？\n])|(?<=,|，)\s+/).map((chunk) => chunk.trim()).filter(Boolean);
-  if (chunks.length === 0 && text) {
-    emitTextChunk(text, onChunk);
-    return;
-  }
-  for (const chunk of chunks) {
-    emitTextChunk(chunk, onChunk);
-  }
-};
-const tryParseJson = (value) => {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-};
-const mapFinishReason = (finishReason) => {
-  if (finishReason === "tool_calls" || finishReason === "tool_use") {
-    return "tool_use";
-  }
-  if (finishReason === "length" || finishReason === "max_tokens") {
-    return "max_tokens";
-  }
-  return "end_turn";
-};
-const readSseStream = async (response, onEvent) => {
-  const reader = response.body?.getReader();
-  if (!reader) {
-    throw new Error("Streaming response body is unavailable.");
-  }
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let eventName = "message";
-  let dataLines = [];
-  const flush = () => {
-    if (dataLines.length === 0) {
-      eventName = "message";
-      return;
-    }
-    const payload = dataLines.join("\n");
-    dataLines = [];
-    onEvent(eventName, payload);
-    eventName = "message";
-  };
-  for (; ; ) {
-    const { done, value } = await reader.read();
-    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
-    let newlineIndex = buffer.indexOf("\n");
-    while (newlineIndex >= 0) {
-      const rawLine = buffer.slice(0, newlineIndex);
-      buffer = buffer.slice(newlineIndex + 1);
-      const line = rawLine.replace(/\r$/, "");
-      if (!line) {
-        flush();
-      } else if (line.startsWith("event:")) {
-        eventName = line.slice(6).trim();
-      } else if (line.startsWith("data:")) {
-        dataLines.push(line.slice(5).trimStart());
-      }
-      newlineIndex = buffer.indexOf("\n");
-    }
-    if (done) {
-      break;
-    }
-  }
-  if (buffer.trim()) {
-    const line = buffer.replace(/\r$/, "");
-    if (line.startsWith("data:")) {
-      dataLines.push(line.slice(5).trimStart());
-    }
-  }
-  flush();
-};
-class BaseStreamingProvider {
-  name;
-  constructor(name) {
-    this.name = name;
-  }
-  async streamChat(request, onChunk) {
-    try {
-      const response = await this.performStreamingChat(request, onChunk);
-      onChunk({ type: "done" });
-      return response;
-    } catch (error) {
-      if (request.signal?.aborted) {
-        throw error;
-      }
-      const fallbackResponse = await this.chat(request);
-      const fallbackText = typeof fallbackResponse.content === "string" ? fallbackResponse.content : JSON.stringify(fallbackResponse.content);
-      emitFallbackChunks(fallbackText, onChunk);
-      onChunk({ type: "done" });
-      return fallbackResponse;
-    }
-  }
-}
-class OpenRouterProvider extends BaseStreamingProvider {
-  apiKey = "";
-  baseUrl = "https://openrouter.ai/api/v1";
-  models = [];
-  constructor(name) {
-    super(name);
-  }
-  configure(config) {
-    this.apiKey = config.apiKey.trim();
-    this.baseUrl = normalizeOpenRouterBaseUrl(config.baseUrl || "https://openrouter.ai/api/v1");
-    this.models = config.models;
-  }
-  async chat(request) {
-    const model = request.model?.trim();
-    if (!model) {
-      throw new Error(`${this.name} requires an explicit model selection.`);
-    }
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://rdcagent.local",
-        "X-Title": "RdcAgent"
-      },
-      signal: request.signal,
-      body: JSON.stringify({
-        model,
-        messages: toContentBlocks(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        tools: request.tools,
-        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
-        stream: false
-      })
-    });
-    if (!response.ok) {
-      throw new Error(`OpenRouter API error: ${response.status} - ${await response.text()}`);
-    }
-    const data = await response.json();
-    const choice = data.choices?.[0];
-    const content = extractMessageContent(choice);
-    return {
-      id: data.id || `or-${Date.now()}`,
-      model: data.model || model,
-      content,
-      toolCalls: choice?.message?.tool_calls,
-      usage: {
-        inputTokens: data.usage?.prompt_tokens || 0,
-        outputTokens: data.usage?.completion_tokens || 0
-      },
-      stopReason: mapFinishReason(choice?.finish_reason)
-    };
-  }
-  async performStreamingChat(request, onChunk) {
-    const model = request.model?.trim();
-    if (!model) {
-      throw new Error(`${this.name} requires an explicit model selection.`);
-    }
-    const response = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://rdcagent.local",
-        "X-Title": "RdcAgent"
-      },
-      signal: request.signal,
-      body: JSON.stringify({
-        model,
-        messages: toContentBlocks(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        tools: request.tools,
-        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
-        stream: true
-      })
-    });
-    if (!response.ok) {
-      throw new Error(`OpenRouter API error: ${response.status} - ${await response.text()}`);
-    }
-    const accumulator = createAccumulator(model);
-    await readSseStream(response, (_eventName, data) => {
-      if (!data || data === "[DONE]") {
-        return;
-      }
-      const payload = tryParseJson(data);
-      if (!payload) {
-        return;
-      }
-      accumulator.id = String(payload.id || accumulator.id);
-      accumulator.model = String(payload.model || accumulator.model);
-      const choice = payload.choices?.[0];
-      const delta = choice?.delta ?? {};
-      const text = typeof delta.content === "string" ? delta.content : "";
-      if (text) {
-        accumulator.content += text;
-        emitTextChunk(text, onChunk);
-      }
-      const toolCalls = Array.isArray(delta.tool_calls) ? delta.tool_calls : [];
-      for (const toolCallDelta of toolCalls) {
-        const index = typeof toolCallDelta.index === "number" ? toolCallDelta.index : 0;
-        const functionDelta = typeof toolCallDelta.function === "object" && toolCallDelta.function ? toolCallDelta.function : {};
-        const toolCall = ensureToolCall(
-          accumulator.toolCalls,
-          index,
-          typeof toolCallDelta.id === "string" ? toolCallDelta.id : void 0
-        );
-        if (typeof functionDelta.name === "string") {
-          toolCall.name = functionDelta.name;
-        }
-        if (typeof functionDelta.arguments === "string") {
-          toolCall.argumentsText += functionDelta.arguments;
-        }
-        emitToolCallDelta({
-          id: toolCall.id,
-          name: toolCall.name,
-          argumentsText: toolCall.argumentsText
-        }, onChunk);
-      }
-      accumulator.stopReason = mapFinishReason(
-        typeof choice?.finish_reason === "string" ? choice.finish_reason : void 0
-      );
-    });
-    return buildResponseFromAccumulator(accumulator);
-  }
-  async isAvailable() {
-    return Boolean(this.apiKey);
-  }
-  getModels() {
-    return this.models;
-  }
-}
-class OpenAICompatibleProvider extends BaseStreamingProvider {
-  apiKey = "";
-  baseUrl = "https://api.openai.com/v1";
-  models = [];
-  requireApiKey = true;
-  constructor(name, requireApiKey = true) {
-    super(name);
-    this.requireApiKey = requireApiKey;
-  }
-  configure(config) {
-    this.apiKey = config.apiKey.trim();
-    this.baseUrl = (config.baseUrl || this.baseUrl).trim().replace(/\/+$/, "");
-    this.models = config.models;
-  }
-  createHeaders() {
-    const headers = {
-      "Content-Type": "application/json"
-    };
-    if (this.apiKey) {
-      headers.Authorization = `Bearer ${this.apiKey}`;
-    }
-    return headers;
-  }
-  createChatCompletionsUrl() {
-    return `${this.baseUrl}/chat/completions`;
-  }
-  describeApiError(status, text) {
-    return `${this.name} API error: ${status} - ${text}`;
-  }
-  async chat(request) {
-    const model = request.model?.trim();
-    if (!model) {
-      throw new Error(`${this.name} requires an explicit model selection.`);
-    }
-    const response = await fetch(this.createChatCompletionsUrl(), {
-      method: "POST",
-      headers: this.createHeaders(),
-      signal: request.signal,
-      body: JSON.stringify({
-        model,
-        messages: toContentBlocks(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        tools: request.tools,
-        response_format: request.responseFormat ? { type: request.responseFormat } : void 0
-      })
-    });
-    if (!response.ok) {
-      throw new Error(this.describeApiError(response.status, await response.text()));
-    }
-    const data = await response.json();
-    const choice = data.choices?.[0];
-    const content = extractMessageContent(choice);
-    return {
-      id: data.id || `${this.name}-${Date.now()}`,
-      model: data.model || model,
-      content,
-      toolCalls: choice?.message?.tool_calls,
-      usage: {
-        inputTokens: data.usage?.prompt_tokens || 0,
-        outputTokens: data.usage?.completion_tokens || 0
-      },
-      stopReason: mapFinishReason(choice?.finish_reason)
-    };
-  }
-  async performStreamingChat(request, onChunk) {
-    const model = request.model?.trim();
-    if (!model) {
-      throw new Error(`${this.name} requires an explicit model selection.`);
-    }
-    const response = await fetch(this.createChatCompletionsUrl(), {
-      method: "POST",
-      headers: this.createHeaders(),
-      signal: request.signal,
-      body: JSON.stringify({
-        model,
-        messages: toContentBlocks(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        tools: request.tools,
-        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
-        stream: true
-      })
-    });
-    if (!response.ok) {
-      throw new Error(this.describeApiError(response.status, await response.text()));
-    }
-    const accumulator = createAccumulator(model);
-    await readSseStream(response, (_eventName, data) => {
-      if (!data || data === "[DONE]") {
-        return;
-      }
-      const payload = tryParseJson(data);
-      if (!payload) {
-        return;
-      }
-      accumulator.id = String(payload.id || accumulator.id);
-      accumulator.model = String(payload.model || accumulator.model);
-      const choice = payload.choices?.[0];
-      const delta = choice?.delta ?? {};
-      const text = typeof delta.content === "string" ? delta.content : "";
-      if (text) {
-        accumulator.content += text;
-        emitTextChunk(text, onChunk);
-      }
-      const toolCalls = Array.isArray(delta.tool_calls) ? delta.tool_calls : [];
-      for (const toolCallDelta of toolCalls) {
-        const index = typeof toolCallDelta.index === "number" ? toolCallDelta.index : 0;
-        const functionDelta = typeof toolCallDelta.function === "object" && toolCallDelta.function ? toolCallDelta.function : {};
-        const toolCall = ensureToolCall(
-          accumulator.toolCalls,
-          index,
-          typeof toolCallDelta.id === "string" ? toolCallDelta.id : void 0
-        );
-        if (typeof functionDelta.name === "string") {
-          toolCall.name = functionDelta.name;
-        }
-        if (typeof functionDelta.arguments === "string") {
-          toolCall.argumentsText += functionDelta.arguments;
-        }
-        emitToolCallDelta({
-          id: toolCall.id,
-          name: toolCall.name,
-          argumentsText: toolCall.argumentsText
-        }, onChunk);
-      }
-      accumulator.stopReason = mapFinishReason(
-        typeof choice?.finish_reason === "string" ? choice.finish_reason : void 0
-      );
-    });
-    return buildResponseFromAccumulator(accumulator);
-  }
-  async isAvailable() {
-    return this.requireApiKey ? Boolean(this.apiKey) : true;
-  }
-  getModels() {
-    return this.models;
-  }
-}
-class GitHubCopilotProvider extends OpenAICompatibleProvider {
-  constructor(name) {
-    super(name, true);
-  }
-  createHeaders() {
-    return {
-      ...super.createHeaders(),
-      "Copilot-Integration-Id": "vscode-chat",
-      "Editor-Version": "RDC-Agent/1.0",
-      "Editor-Plugin-Version": "RDC-Agent/1.0"
-    };
-  }
-  describeApiError(status, text) {
-    if (status === 401) {
-      return `GitHub Copilot account token was rejected. Sign in again or check token policy. ${text}`;
-    }
-    if (status === 403) {
-      return `GitHub Copilot access was blocked by license, organization, or policy settings. ${text}`;
-    }
-    return `GitHub Copilot API error: ${status} - ${text}`;
-  }
-}
-class AzureOpenAIProvider extends OpenAICompatibleProvider {
-  createHeaders() {
-    return {
-      "api-key": this.apiKey,
-      "Content-Type": "application/json"
-    };
-  }
-  createChatCompletionsUrl() {
-    const base = this.baseUrl.endsWith("/chat/completions") ? this.baseUrl : `${this.baseUrl}/chat/completions`;
-    return appendQueryParam$1(base, "api-version", "2024-10-21");
-  }
-}
-class GoogleAiStudioProvider extends BaseStreamingProvider {
-  apiKey = "";
-  baseUrl = "https://generativelanguage.googleapis.com/v1beta";
-  models = [];
-  constructor(name) {
-    super(name);
-  }
-  configure(config) {
-    this.apiKey = config.apiKey.trim();
-    this.baseUrl = (config.baseUrl || this.baseUrl).trim().replace(/\/+$/, "");
-    this.models = config.models;
-  }
-  async chat(request) {
-    const model = request.model?.trim();
-    if (!model) {
-      throw new Error(`${this.name} requires an explicit model selection.`);
-    }
-    const response = await fetch(appendQueryParam$1(`${this.baseUrl}/models/${model}:generateContent`, "key", this.apiKey), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      signal: request.signal,
-      body: JSON.stringify({
-        contents: request.messages.filter((message) => message.role !== "system").map((message) => ({
-          role: message.role === "assistant" ? "model" : "user",
-          parts: [{ text: typeof message.content === "string" ? message.content : JSON.stringify(message.content) }]
-        })),
-        generationConfig: {
-          maxOutputTokens: request.maxTokens || 4096,
-          temperature: request.temperature ?? 0.7
-        },
-        systemInstruction: request.messages.some((message) => message.role === "system") ? {
-          parts: request.messages.filter((message) => message.role === "system").map((message) => ({ text: typeof message.content === "string" ? message.content : JSON.stringify(message.content) }))
-        } : void 0
-      })
-    });
-    if (!response.ok) {
-      throw new Error(`Google AI Studio API error: ${response.status} - ${await response.text()}`);
-    }
-    const data = await response.json();
-    const text = Array.isArray(data.candidates?.[0]?.content?.parts) ? data.candidates[0].content.parts.map((part) => typeof part.text === "string" ? part.text : "").join("") : "";
-    return {
-      id: data.responseId || `google-ai-studio-${Date.now()}`,
-      model,
-      content: text,
-      usage: {
-        inputTokens: data.usageMetadata?.promptTokenCount || 0,
-        outputTokens: data.usageMetadata?.candidatesTokenCount || 0
-      },
-      stopReason: "end_turn"
-    };
-  }
-  async performStreamingChat(request, onChunk) {
-    const response = await this.chat(request);
-    const text = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
-    emitTextChunk(text, onChunk);
-    return response;
-  }
-  async isAvailable() {
-    return Boolean(this.apiKey);
-  }
-  getModels() {
-    return this.models;
-  }
-}
-class AnthropicProvider extends BaseStreamingProvider {
-  apiKey = "";
-  baseUrl = "https://api.anthropic.com/v1";
-  models = [];
-  useBearerAuth = false;
-  constructor(name) {
-    super(name);
-  }
-  configure(config) {
-    this.apiKey = config.apiKey.trim();
-    this.baseUrl = (config.baseUrl || "https://api.anthropic.com/v1").trim().replace(/\/+$/, "");
-    this.models = config.models;
-    this.useBearerAuth = config.authMode === "account";
-  }
-  createHeaders() {
-    return {
-      ...this.useBearerAuth ? { Authorization: `Bearer ${this.apiKey}` } : { "x-api-key": this.apiKey },
-      "anthropic-version": "2023-06-01",
-      "Content-Type": "application/json"
-    };
-  }
-  async chat(request) {
-    const model = request.model?.trim();
-    if (!model) {
-      throw new Error(`${this.name} requires an explicit model selection.`);
-    }
-    const systemMessage = request.messages.find((message) => message.role === "system");
-    const otherMessages = request.messages.filter((message) => message.role !== "system");
-    const response = await fetch(`${this.baseUrl}/messages`, {
-      method: "POST",
-      headers: this.createHeaders(),
-      signal: request.signal,
-      body: JSON.stringify({
-        model,
-        max_tokens: request.maxTokens || 4096,
-        system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
-        messages: otherMessages.map((message) => ({
-          role: message.role === "assistant" ? "assistant" : "user",
-          content: message.content
-        }))
-      })
-    });
-    if (!response.ok) {
-      throw new Error(`Anthropic API error: ${response.status} - ${await response.text()}`);
-    }
-    const data = await response.json();
-    return {
-      id: data.id || `anthropic-${Date.now()}`,
-      model: data.model || model,
-      content: data.content?.[0]?.text || "",
-      usage: {
-        inputTokens: data.usage?.input_tokens || 0,
-        outputTokens: data.usage?.output_tokens || 0
-      },
-      stopReason: mapFinishReason(data.stop_reason)
-    };
-  }
-  async performStreamingChat(request, onChunk) {
-    const model = request.model?.trim();
-    if (!model) {
-      throw new Error(`${this.name} requires an explicit model selection.`);
-    }
-    const systemMessage = request.messages.find((message) => message.role === "system");
-    const otherMessages = request.messages.filter((message) => message.role !== "system");
-    const response = await fetch(`${this.baseUrl}/messages`, {
-      method: "POST",
-      headers: this.createHeaders(),
-      signal: request.signal,
-      body: JSON.stringify({
-        model,
-        max_tokens: request.maxTokens || 4096,
-        stream: true,
-        system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
-        messages: otherMessages.map((message) => ({
-          role: message.role === "assistant" ? "assistant" : "user",
-          content: message.content
-        }))
-      })
-    });
-    if (!response.ok) {
-      throw new Error(`Anthropic API error: ${response.status} - ${await response.text()}`);
-    }
-    const accumulator = createAccumulator(model);
-    await readSseStream(response, (eventName, data) => {
-      if (!data) {
-        return;
-      }
-      const payload = tryParseJson(data);
-      if (!payload) {
-        return;
-      }
-      if (eventName === "message_start") {
-        const message = payload.message;
-        accumulator.id = String(message?.id || accumulator.id);
-        accumulator.model = String(message?.model || accumulator.model);
-        const usage = message?.usage;
-        accumulator.inputTokens = typeof usage?.input_tokens === "number" ? usage.input_tokens : accumulator.inputTokens;
-      }
-      if (eventName === "content_block_delta") {
-        const delta = payload.delta;
-        if (delta?.type === "text_delta" && typeof delta.text === "string") {
-          accumulator.content += delta.text;
-          emitTextChunk(delta.text, onChunk);
-        }
-      }
-      if (eventName === "message_delta") {
-        const delta = payload.delta;
-        const usage = payload.usage;
-        accumulator.outputTokens = typeof usage?.output_tokens === "number" ? usage.output_tokens : accumulator.outputTokens;
-        accumulator.stopReason = mapFinishReason(
-          typeof delta?.stop_reason === "string" ? delta.stop_reason : void 0
-        );
-      }
-    });
-    return buildResponseFromAccumulator(accumulator);
-  }
-  async isAvailable() {
-    return Boolean(this.apiKey);
-  }
-  getModels() {
-    return this.models;
-  }
-}
-const createProviderByKind = (providerId, kind) => {
-  if (providerId === "github-copilot") {
-    return new GitHubCopilotProvider(providerId);
-  }
-  if (kind === "openrouter") {
-    return new OpenRouterProvider(providerId);
-  }
-  if (kind === "anthropic") {
-    return new AnthropicProvider(providerId);
-  }
-  if (kind === "ollama") {
-    return new OpenAICompatibleProvider(providerId, false);
-  }
-  if (kind === "google-ai-studio") {
-    return new GoogleAiStudioProvider(providerId);
-  }
-  if (kind === "azure-openai") {
-    return new AzureOpenAIProvider(providerId);
-  }
-  return new OpenAICompatibleProvider(providerId, true);
-};
-class LLMAdapter {
-  providers = /* @__PURE__ */ new Map();
-  configure(config) {
-    this.providers.clear();
-    for (const providerConfig of config.providers) {
-      const provider = createProviderByKind(providerConfig.id, providerConfig.kind);
-      if ("configure" in provider && typeof provider.configure === "function") {
-        provider.configure(providerConfig);
-      }
-      this.providers.set(providerConfig.id, {
-        config: providerConfig,
-        provider
-      });
-    }
-  }
-  async chat(request, providerId) {
-    const resolvedProviderId = providerId?.trim();
-    if (!resolvedProviderId) {
-      throw new Error("No explicit LLM provider was supplied for this request.");
-    }
-    const runtimeProvider = this.providers.get(resolvedProviderId);
-    if (!runtimeProvider) {
-      throw new Error(`Provider not found: ${resolvedProviderId}`);
-    }
-    if (!runtimeProvider.config.enabled) {
-      throw new Error(`Provider disabled: ${resolvedProviderId}`);
-    }
-    if (!await runtimeProvider.provider.isAvailable()) {
-      throw new Error(`Provider not configured: ${resolvedProviderId}`);
-    }
-    return runtimeProvider.provider.chat(request);
-  }
-  async streamChat(request, onChunk, providerId) {
-    const resolvedProviderId = providerId?.trim();
-    if (!resolvedProviderId) {
-      throw new Error("No explicit LLM provider was supplied for this request.");
-    }
-    const runtimeProvider = this.providers.get(resolvedProviderId);
-    if (!runtimeProvider) {
-      throw new Error(`Provider not found: ${resolvedProviderId}`);
-    }
-    if (!runtimeProvider.config.enabled) {
-      throw new Error(`Provider disabled: ${resolvedProviderId}`);
-    }
-    if (!await runtimeProvider.provider.isAvailable()) {
-      throw new Error(`Provider not configured: ${resolvedProviderId}`);
-    }
-    return runtimeProvider.provider.streamChat(request, onChunk);
-  }
-  async testConnection(providerId) {
-    const runtimeProvider = this.providers.get(providerId);
-    if (!runtimeProvider) {
-      return { success: false, error: `Provider not found: ${providerId}` };
-    }
-    try {
-      const available = await runtimeProvider.provider.isAvailable();
-      return { success: available, error: available ? void 0 : "Provider not configured" };
-    } catch (error) {
-      return { success: false, error: String(error) };
-    }
-  }
-  getAvailableModels(providerId) {
-    return this.providers.get(providerId)?.config.models || [];
-  }
-  getDefaultProvider() {
-    return "";
-  }
-}
-const llmAdapter = new LLMAdapter();
 class LlmAdapterAgentSdkAdapter {
   id = "rdc-llm-adapter";
   canRun(_request) {
@@ -6408,6 +7399,7 @@ class WorkflowProjectionPublisher {
 }
 const workflowProjectionPublisher = new WorkflowProjectionPublisher();
 const SPECIALIST_TOOL_BINDINGS = {
+  ask_agent: [],
   triage_agent: [
     "rd.session.get_context",
     "rd.event.get_action_tree",
@@ -6481,18 +7473,7 @@ class AgentOrchestrator {
    * 初始化所有Agent
    */
   initializeAgents() {
-    const allRoles = [
-      "rdc-debugger",
-      "triage_agent",
-      "capture_repro_agent",
-      "pass_graph_pipeline_agent",
-      "pixel_forensics_agent",
-      "shader_ir_agent",
-      "driver_device_agent",
-      "skeptic_agent",
-      "curator_agent"
-    ];
-    for (const role of allRoles) {
+    for (const role of AGENT_ROLES) {
       this.agentStates.set(role, {
         agentId: role,
         status: "idle",
@@ -6515,7 +7496,7 @@ class AgentOrchestrator {
    * 获取Agent类别
    */
   getAgentCategory(role) {
-    if (role === "rdc-debugger") return "orchestrator";
+    if (role === "ask_agent" || role === "rdc-debugger") return "orchestrator";
     if (INVESTIGATOR_AGENTS.includes(role)) return "investigator";
     if (VERIFIER_AGENTS.includes(role)) return "verifier";
     if (REPORTER_AGENTS.includes(role)) return "reporter";
@@ -6525,6 +7506,7 @@ class AgentOrchestrator {
    * 获取Agent写入范围
    */
   getAgentWriteScopes(role) {
+    if (role === "ask_agent") return [];
     if (role === "rdc-debugger") return ["workspace_control"];
     if (INVESTIGATOR_AGENTS.includes(role)) return ["workspace_notes"];
     if (role === "skeptic_agent") return ["session_signoff"];
@@ -6574,6 +7556,16 @@ class AgentOrchestrator {
     const settings = settingsService.getAll();
     return executionProfileService.resolveAgentRuntimeProfile(settings, stage || "investigate", agentId);
   }
+  async refreshAccountRuntimeCredentials(providerId) {
+    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+    if (provider?.authMode !== "account") {
+      return;
+    }
+    await providerAccountAuthService.ensureRuntimeCredentials(providerId);
+    const llmConfig = settingsService.getLlmConfig();
+    llmAdapter.configure(llmConfig);
+    this.applyLlmConfig(llmConfig);
+  }
   async finalizeRecordedAssistantMessage(agentId, streamedContent, fallbackContent, context2) {
     const finalContent = streamedContent || fallbackContent;
     await this.recordMessage(agentId, "assistant", finalContent, context2);
@@ -6589,7 +7581,9 @@ class AgentOrchestrator {
     }
     this.updateAgentStatus(agentId, "thinking");
     try {
-      const runtimeProfile = this.resolveRuntimeProfile(agentId, context2?.stageId);
+      let runtimeProfile = this.resolveRuntimeProfile(agentId, context2?.stageId);
+      await this.refreshAccountRuntimeCredentials(runtimeProfile.providerId);
+      runtimeProfile = this.resolveRuntimeProfile(agentId, context2?.stageId);
       const config = {
         ...fallbackConfig,
         systemPrompt: runtimeProfile.systemPrompt,
@@ -6641,9 +7635,16 @@ class AgentOrchestrator {
     }
     this.updateAgentStatus(agentId, "thinking");
     try {
-      const settings = settingsService.getAll();
-      const routeMap = new Map(settings.llm.agentRoutes.map((route2) => [route2.agentId, route2]));
-      const route = routeMap.get(agentId);
+      let settings = settingsService.getAll();
+      let routeMap = new Map(settings.llm.agentRoutes.map((route2) => [route2.agentId, route2]));
+      const routeAgentId = options?.routeAgentId ?? agentId;
+      let route = routeMap.get(routeAgentId);
+      if (route?.providerId) {
+        await this.refreshAccountRuntimeCredentials(route.providerId);
+        settings = settingsService.getAll();
+        routeMap = new Map(settings.llm.agentRoutes.map((entry) => [entry.agentId, entry]));
+        route = routeMap.get(routeAgentId);
+      }
       const config = {
         ...fallbackConfig,
         modelProvider: route?.providerId || fallbackConfig.modelProvider,
@@ -6660,12 +7661,19 @@ class AgentOrchestrator {
         } catch {
           userMessage = content;
         }
+        if (userMessage.includes("__RDC_AGENT_E2E_FORCE_COWORK_LLM_FAILURE__")) {
+          throw new Error("E2E forced cowork LLM request failure");
+        }
         const lower = userMessage.toLowerCase();
-        let stub = "我在。你可以先告诉我你遇到了什么现象，或者直接说你希望我现在正式开始调试。";
+        let stub = agentId === "ask_agent" ? "我在。你可以先描述问题、目标或需要打开的 .rdc capture；我会先帮你澄清，不会直接启动执行。" : "我在。你可以先告诉我你遇到了什么现象，或者直接说你希望我现在正式开始调试。";
         if (/ue4|unreal/i.test(userMessage)) {
           stub = "UE4 是 Unreal Engine 4。它是 Epic Games 的一代游戏引擎，常见于延迟渲染、材质系统、后处理链和 Shader 调试场景。";
         } else if (/你好|您好|hello|hi/i.test(userMessage)) {
-          stub = "你好，我是 RDC Debugger。你可以先和我聊现象、问我能力范围，等你准备好 capture 后，我再进入正式的 RenderDoc 调试。";
+          if (agentId === "ask_agent") {
+            stub = "你好，我可以先帮你澄清问题、解释能力范围，或引导你在应用内 Open 一个 .rdc capture；不会直接启动 RenderDoc 执行。";
+          } else {
+            stub = "你好。当前是 Debugger 模式；如果你要开始正式调试，请描述目标、异常和关键事件，我会先生成执行前计划。";
+          }
         } else if (/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower)) {
           stub = "收到，我会先帮你整理正式调试前的关键信息，然后在条件满足时进入严格执行流程。";
         }
@@ -7176,6 +8184,37 @@ function recommendSpecialists(goalText, captures, backend) {
   }
   return Array.from(new Set(specialists));
 }
+function buildDebugPlanPresentation(debugPlan) {
+  return {
+    title: "执行前调试计划",
+    sections: [
+      {
+        id: "goal",
+        title: "目标",
+        body: [debugPlan.userGoal]
+      },
+      {
+        id: "scope",
+        title: "范围",
+        body: [
+          debugPlan.targetCapture ? `Capture: ${debugPlan.targetCapture.fileName}` : "Capture: 等待确认",
+          debugPlan.targetFrameOrEvent?.eventLabel ? `入口: ${debugPlan.targetFrameOrEvent.eventLabel}` : debugPlan.scope,
+          debugPlan.scope
+        ].filter(Boolean)
+      },
+      {
+        id: "deliverables",
+        title: "交付物",
+        body: debugPlan.expectedDeliverables
+      },
+      {
+        id: "verification",
+        title: "验证标准",
+        body: debugPlan.verificationContract.successCriteria
+      }
+    ]
+  };
+}
 class PlanBuilder {
   build(resolved) {
     const blockers = [];
@@ -7213,7 +8252,7 @@ class PlanBuilder {
     } else {
       planReadiness = "strict_ready";
     }
-    const debugPlan = {
+    const debugPlanBase = {
       planId: `plan-${Date.now()}`,
       planReadiness,
       strictReady: planReadiness === "strict_ready",
@@ -7249,6 +8288,10 @@ class PlanBuilder {
       ],
       createdAt: nowIso$1(),
       updatedAt: nowIso$1()
+    };
+    const debugPlan = {
+      ...debugPlanBase,
+      presentation: buildDebugPlanPresentation(debugPlanBase)
     };
     const pendingQuestions = questions.length > 0 ? {
       promptId: `ask-${Date.now()}`,
@@ -7496,6 +8539,12 @@ class DebuggerLlmService {
       hasConfiguredContextWindow: Boolean(contextWindowTokens)
     };
   }
+  async refreshAccountRuntimeCredentials(route) {
+    if (route.provider.authMode !== "account") {
+      return;
+    }
+    await providerAccountAuthService.ensureRuntimeCredentials(route.providerId);
+  }
   getRouteBlockers(agentIds, stage, settings = settingsService.getAll()) {
     const blockers = [];
     const seen = /* @__PURE__ */ new Set();
@@ -7517,7 +8566,9 @@ class DebuggerLlmService {
     return blockers;
   }
   resolveRoute(agentId, stage, settings = settingsService.getAll()) {
-    const route = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
+    const requestedRoute = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
+    const resolution = resolveCompatibleAgentRoute(settings.llm.agentRoutes, settings.llm.providers, agentId);
+    const route = resolution.route;
     if (!route?.providerId || !route.modelId) {
       throw new DebuggerLlmBlockerError(makeBlocker(
         BLOCKER_CODES.BLOCKED_LLM_ROUTE_MISSING.code,
@@ -7525,7 +8576,7 @@ class DebuggerLlmService {
         [`agent:${agentId}`]
       ));
     }
-    const provider = settings.llm.providers.find((entry) => entry.id === route.providerId);
+    const provider = resolution.provider ?? settings.llm.providers.find((entry) => entry.id === route.providerId);
     if (!provider || !provider.enabled) {
       throw new DebuggerLlmBlockerError(makeBlocker(
         BLOCKER_CODES.BLOCKED_LLM_PROVIDER_MISSING.code,
@@ -7554,7 +8605,9 @@ class DebuggerLlmService {
       stage,
       provider,
       providerId: provider.id,
-      modelId: route.modelId
+      modelId: route.modelId,
+      requestedModelId: resolution.requestedModelId ?? requestedRoute?.modelId,
+      remapReason: resolution.remapReason
     };
   }
   async call(context2, request) {
@@ -7579,6 +8632,7 @@ class DebuggerLlmService {
         text
       };
     }
+    await this.refreshAccountRuntimeCredentials(route);
     llmAdapter.configure(settingsService.getLlmConfig());
     try {
       const response = await llmAdapter.chat({
@@ -7625,6 +8679,7 @@ class DebuggerLlmService {
     }
     const settings = settingsService.getAll();
     const route = this.resolveRoute(input.agentId, input.stage, settings);
+    await this.refreshAccountRuntimeCredentials(route);
     llmAdapter.configure(settingsService.getLlmConfig());
     const useNativeJsonObject = shouldUseNativeJsonObject(route);
     let lastError;
@@ -7699,6 +8754,8 @@ class DebuggerLlmService {
         stage: route.stage,
         providerId: route.providerId,
         modelId: route.modelId,
+        requestedModelId: route.requestedModelId,
+        remapReason: route.remapReason,
         requestId: response.id,
         usage: response.usage
       }
@@ -7717,6 +8774,8 @@ class DebuggerLlmService {
         stage: route.stage,
         providerId: route.providerId,
         modelId: route.modelId,
+        requestedModelId: route.requestedModelId,
+        remapReason: route.remapReason,
         requestId: response.id,
         usage: response.usage,
         summary
@@ -7738,7 +8797,9 @@ class DebuggerLlmService {
         agentId: route.agentId,
         stage: route.stage,
         providerId: route.providerId,
-        modelId: route.modelId
+        modelId: route.modelId,
+        requestedModelId: route.requestedModelId,
+        remapReason: route.remapReason
       }
     });
     if (!context2.sessionId || !context2.runId) {
@@ -7755,6 +8816,8 @@ class DebuggerLlmService {
         stage: route.stage,
         providerId: route.providerId,
         modelId: route.modelId,
+        requestedModelId: route.requestedModelId,
+        remapReason: route.remapReason,
         summary: errorMessage
       }
     });
@@ -8174,6 +9237,88 @@ function summarizePayloadData(value) {
   }
   return summary;
 }
+function asRecord(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+function formatPixel(value) {
+  const pixel = asRecord(value);
+  const x = pixel.x;
+  const y = pixel.y;
+  const rgba = [pixel.r, pixel.g, pixel.b, pixel.a].map((entry) => typeof entry === "number" ? entry : null);
+  if (rgba.some((entry) => entry === null)) {
+    return null;
+  }
+  return `Pixel(${x ?? "?"},${y ?? "?"}) RGBA=${rgba.join(",")}`;
+}
+function describePayloadEvidence(toolName, data) {
+  const record = asRecord(data);
+  if (toolName === "rd.export.screenshot") {
+    const nameInfo = asRecord(record.name_info);
+    return [
+      `Screenshot ${record.width ?? "?"}x${record.height ?? "?"}`,
+      `event=${record.resolved_event_id ?? record.requested_event_id ?? "?"}`,
+      `target=${record.texture_id ?? nameInfo.resource_id ?? "unknown"}`,
+      `format=${record.texture_format ?? "unknown"}`,
+      record.fallback_reason ? `fallback=${record.fallback_reason}` : "",
+      Array.isArray(record.summary_degraded_reasons) ? `degraded=${record.summary_degraded_reasons.join(",")}` : ""
+    ].filter(Boolean).join("; ");
+  }
+  if (toolName === "rd.macro.explain_pixel") {
+    const history = Array.isArray(record.history) ? record.history : [];
+    return `${record.explanation ?? "Pixel explanation available"} History events=${history.map((entry) => asRecord(entry).event_id).filter(Boolean).join(",") || history.length}`;
+  }
+  if (toolName === "rd.texture.get_pixel_value") {
+    const pixel = formatPixel(record.pixel);
+    return [
+      pixel ?? "Pixel value readback available",
+      `texture=${record.texture_id ?? "unknown"}`,
+      `event=${record.resolved_event_id ?? "?"}`,
+      Array.isArray(record.summary_degraded_reasons) ? `degraded=${record.summary_degraded_reasons.join(",")}` : ""
+    ].filter(Boolean).join("; ");
+  }
+  if (toolName === "rd.texture.get_pixel_history") {
+    const history = Array.isArray(record.history) ? record.history : [];
+    return `Pixel history on ${record.texture_id ?? "unknown"} has ${history.length} modifications: ${history.map((entry) => asRecord(entry).event_id).filter(Boolean).join(",") || "none"}.`;
+  }
+  if (toolName === "rd.pipeline.get_state_summary") {
+    const summary = asRecord(record.summary);
+    const shaders = Array.isArray(summary.shaders) ? summary.shaders.map((entry) => {
+      const shader = asRecord(entry);
+      return `${shader.stage}:${shader.resource_id}`;
+    }).join(", ") : "";
+    const target = asRecord(summary.selected_visual_target);
+    return [
+      `Pipeline api=${summary.api ?? "unknown"}`,
+      shaders ? `shaders=${shaders}` : "",
+      `bindings=${summary.binding_count ?? "?"}`,
+      target.texture_id ? `visual_target=${target.texture_id}` : "",
+      target.fallback_reason ? `fallback=${target.fallback_reason}` : ""
+    ].filter(Boolean).join("; ");
+  }
+  if (toolName === "rd.pipeline.get_output_targets") {
+    const framebuffer = asRecord(record.framebuffer);
+    const target = asRecord(framebuffer.selected_visual_target);
+    return [
+      `Framebuffer render_targets=${Array.isArray(framebuffer.render_targets) ? framebuffer.render_targets.length : "?"}`,
+      target.texture_id ? `visual_target=${target.texture_id}` : "",
+      target.texture_format ? `format=${target.texture_format}` : "",
+      target.fallback_reason ? `fallback=${target.fallback_reason}` : ""
+    ].filter(Boolean).join("; ");
+  }
+  if (toolName === "rd.pipeline.get_resource_bindings") {
+    const bindings = Array.isArray(record.bindings) ? record.bindings : [];
+    const first = bindings.slice(0, 5).map((entry) => {
+      const binding = asRecord(entry);
+      return `${binding.type}@${binding.set_or_space}:${binding.binding}=${binding.resource_id}`;
+    });
+    return `Resource bindings ${bindings.length}: ${first.join(", ")}`;
+  }
+  if (toolName.startsWith("rd.pipeline.get_shader")) {
+    const shader = asRecord(record.shader);
+    return `Shader ${shader.stage ?? "unknown"} ${shader.shader_id ?? "unknown"} entry=${shader.entry ?? "unknown"}`;
+  }
+  return null;
+}
 function findStringFieldDeep(value, keys, seen = /* @__PURE__ */ new Set()) {
   if (!value || typeof value !== "object") {
     return null;
@@ -8455,7 +9600,7 @@ class SpecialistRecipeRunner {
       include_alpha: true
     }, "pixel_forensics_agent", context2);
     payloads.push(this.toPayload("rd.export.screenshot", screenshot));
-    const point = await this.locatePixelFocus(screenshotPath, context2.debugPlan.userGoal);
+    const point = await this.locatePixelFocus(screenshotPath, context2);
     const resolvedTextureId = typeof screenshot.data?.texture_id === "string" ? screenshot.data.texture_id : void 0;
     const explain = await this.callTool("rd.macro.explain_pixel", {
       session_id: surface.replaySessionId,
@@ -8616,51 +9761,59 @@ class SpecialistRecipeRunner {
       error: result.error?.message
     };
   }
-  async locatePixelFocus(screenshotPath, goal) {
+  async locatePixelFocus(screenshotPath, context2) {
     const dims = pngDimensions(screenshotPath);
     if (!dims) {
       return { x: 0, y: 0 };
     }
+    const fallbackPoint = {
+      x: Math.max(0, Math.min(dims.width - 1, Math.round(dims.width * 0.5))),
+      y: Math.max(0, Math.min(dims.height - 1, Math.round(dims.height * 0.5)))
+    };
     const imageBlock = await fileToImageBlock(screenshotPath);
     if (!imageBlock) {
-      throw new Error(`Pixel focus screenshot is unavailable: ${screenshotPath}`);
+      return fallbackPoint;
     }
-    const { data } = await debuggerLlmService.callStructured({
-      agentId: "pixel_forensics_agent",
-      stage: "dispatch",
-      sessionId: void 0,
-      runId: void 0,
-      messages: [
-        {
-          role: "system",
-          content: "You are a graphics debugging assistant. Return JSON only with keys normalized_x, normalized_y, reason. Coordinates must be floats between 0 and 1 for the suspicious bright white highlight most relevant to the debugging task."
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Task: ${goal}
+    try {
+      const { data } = await debuggerLlmService.callStructured({
+        agentId: "pixel_forensics_agent",
+        stage: "dispatch",
+        sessionId: context2.sessionId,
+        runId: context2.runId,
+        messages: [
+          {
+            role: "system",
+            content: "You are a graphics debugging assistant. Return JSON only with keys normalized_x, normalized_y, reason. Coordinates must be floats between 0 and 1 for the suspicious bright white highlight most relevant to the debugging task."
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Task: ${context2.debugPlan.userGoal}
 Find the suspicious bright white highlight that should be investigated first.`
-            },
-            imageBlock
-          ]
-        }
-      ],
-      maxTokens: 300,
-      temperature: 0.1,
-      parse: (text) => debuggerLlmService.parseJson(text),
-      testValue: {
-        normalized_x: 0.5,
-        normalized_y: 0.5,
-        reason: "test-mode center point"
-      },
-      auditSummary: (payload) => payload.reason
-    });
-    return {
-      x: Math.max(0, Math.min(dims.width - 1, Math.round(clamp01(toNumber(data.normalized_x, 0.5)) * dims.width))),
-      y: Math.max(0, Math.min(dims.height - 1, Math.round(clamp01(toNumber(data.normalized_y, 0.5)) * dims.height)))
-    };
+              },
+              imageBlock
+            ]
+          }
+        ],
+        maxTokens: 300,
+        temperature: 0.1,
+        parse: (text) => debuggerLlmService.parseJson(text),
+        testValue: {
+          normalized_x: 0.5,
+          normalized_y: 0.5,
+          reason: "test-mode center point"
+        },
+        auditSummary: (payload) => payload.reason
+      });
+      return {
+        x: Math.max(0, Math.min(dims.width - 1, Math.round(clamp01(toNumber(data.normalized_x, 0.5)) * dims.width))),
+        y: Math.max(0, Math.min(dims.height - 1, Math.round(clamp01(toNumber(data.normalized_y, 0.5)) * dims.height)))
+      };
+    } catch {
+      return fallbackPoint;
+    }
   }
   async finishRecipe(agentId, context2, payloads, evidence, extraArtifacts = []) {
     const agentRoot = path.join(context2.outputRoot, "notes");
@@ -8678,10 +9831,13 @@ Find the suspicious bright white highlight that should be investigated first.`
     const deterministicSummary = {
       summary: [
         `${agentId} collected ${successfulTools.length} successful tool results.`,
-        ...successfulTools.slice(0, 4).map((payload) => `- ${payload.toolName}`),
+        ...successfulTools.map((payload) => describePayloadEvidence(payload.toolName, payload.data) ?? payload.toolName).slice(0, 4).map((line) => `- ${line}`),
         ...failedTools.length > 0 ? [`Failed tools: ${failedTools.map((payload) => payload.toolName).join(", ")}`] : []
       ].join("\n"),
-      evidence,
+      evidence: [
+        ...evidence,
+        ...successfulTools.map((payload) => describePayloadEvidence(payload.toolName, payload.data)).filter((line) => Boolean(line))
+      ],
       next_step: this.getNextStep(agentId),
       confidence: successfulTools.length > 0 ? 0.72 : 0.35
     };
@@ -8721,47 +9877,48 @@ Find the suspicious bright white highlight that should be investigated first.`
         auditSummary: (payload) => payload.summary
       });
       llmSummary = structuredResult.data;
-    } catch (error) {
-      const fallbackResult = await debuggerLlmService.call({
-        agentId,
-        stage: "dispatch",
-        sessionId: context2.sessionId,
-        runId: context2.runId
-      }, {
-        messages: [
-          {
-            role: "system",
-            content: "You are a RenderDoc debugging specialist. Reply with one or two concise sentences only. Summarize the most important finding from the provided tool evidence and what should be checked next."
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: [
-                  `Agent: ${agentId}`,
-                  `Goal: ${context2.debugPlan.userGoal}`,
-                  `Evidence anchors: ${evidence.join(" | ") || "N/A"}`,
-                  `Successful tools: ${successfulTools.map((payload) => payload.toolName).join(", ") || "none"}`,
-                  `Failed tools: ${failedTools.map((payload) => `${payload.toolName}: ${payload.error || "failed"}`).join(" | ") || "none"}`
-                ].join("\n")
-              }
-            ]
-          }
-        ],
-        maxTokens: 160,
-        temperature: 0.1
-      });
-      const fallbackSummary = fallbackResult.text.trim();
-      if (!fallbackSummary) {
-        throw error;
+    } catch {
+      try {
+        const fallbackResult = await debuggerLlmService.call({
+          agentId,
+          stage: "dispatch",
+          sessionId: context2.sessionId,
+          runId: context2.runId
+        }, {
+          messages: [
+            {
+              role: "system",
+              content: "You are a RenderDoc debugging specialist. Reply with one or two concise sentences only. Summarize the most important finding from the provided tool evidence and what should be checked next."
+            },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: [
+                    `Agent: ${agentId}`,
+                    `Goal: ${context2.debugPlan.userGoal}`,
+                    `Evidence anchors: ${evidence.join(" | ") || "N/A"}`,
+                    `Successful tools: ${successfulTools.map((payload) => payload.toolName).join(", ") || "none"}`,
+                    `Failed tools: ${failedTools.map((payload) => `${payload.toolName}: ${payload.error || "failed"}`).join(" | ") || "none"}`
+                  ].join("\n")
+                }
+              ]
+            }
+          ],
+          maxTokens: 160,
+          temperature: 0.1
+        });
+        const fallbackSummary = fallbackResult.text.trim();
+        llmSummary = fallbackSummary ? {
+          summary: fallbackSummary,
+          evidence,
+          next_step: this.getNextStep(agentId),
+          confidence: deterministicSummary.confidence
+        } : deterministicSummary;
+      } catch {
+        llmSummary = deterministicSummary;
       }
-      llmSummary = {
-        summary: fallbackSummary,
-        evidence,
-        next_step: this.getNextStep(agentId),
-        confidence: deterministicSummary.confidence
-      };
     }
     const reasoningSummary = {
       summaryId: `${agentId}-${Date.now()}`,
@@ -9397,6 +10554,31 @@ function toRecommendedSpecialists(value, fallback) {
   const parsed = toStringArray(value).filter((entry) => KNOWN_AGENT_ROLES.has(entry));
   return parsed.length > 0 ? Array.from(new Set(parsed)) : fallback;
 }
+const ASK_USER_TOOL_NAME = "ui.ask_user_question";
+const buildAskUserQuestionTraceQuestions = (prompt) => prompt.questions.map((question) => ({
+  questionId: question.id,
+  prompt: question.prompt,
+  recommendedOptionId: question.recommendedOptionId,
+  options: question.options.map((option) => ({
+    optionId: option.id,
+    label: option.label,
+    description: option.description
+  })),
+  freeformPlaceholder: question.freeformPlaceholder
+}));
+const buildAskUserAnswerSummary = (prompt, answers) => {
+  if (!prompt) {
+    return `已回答 ${answers.length} 个问题。`;
+  }
+  const lines = answers.map((answer) => {
+    const question = prompt.questions.find((entry) => entry.id === answer.questionId);
+    const option = question?.options.find((entry) => entry.id === answer.selectedOptionId);
+    const value = answer.freeformText?.trim() || option?.label || answer.selectedOptionId || "未选择";
+    return question ? `${question.prompt} -> ${value}` : `${answer.questionId} -> ${value}`;
+  });
+  return lines.length > 0 ? `已回答 ${lines.length} 个问题：
+${lines.join("\n")}` : "用户未提供回答。";
+};
 class DebugWorkflowService {
   async startPlan(request) {
     try {
@@ -9507,6 +10689,22 @@ class DebugWorkflowService {
           runId,
           sessionId,
           agentId: "rdc-debugger",
+          eventType: "tool_execution",
+          status: "sent",
+          payload: {
+            tool_name: ASK_USER_TOOL_NAME,
+            phase: "request",
+            prompt_id: pendingQuestions.promptId,
+            title: pendingQuestions.title,
+            summary: pendingQuestions.summary,
+            question_count: pendingQuestions.questions.length,
+            questions: buildAskUserQuestionTraceQuestions(pendingQuestions)
+          }
+        }));
+        await this.appendActionEvent(sessionId, storageAdapter.createActionEvent({
+          runId,
+          sessionId,
+          agentId: "rdc-debugger",
           eventType: "blocker",
           status: "blocked",
           payload: {
@@ -9573,6 +10771,7 @@ class DebugWorkflowService {
     if (!snapshot?.debug_plan) {
       return { success: false, error: "No plan snapshot available." };
     }
+    const pendingQuestionsBeforeSubmit = snapshot.pending_questions;
     const nextPlan = {
       ...snapshot.debug_plan,
       updatedAt: nowIso$1(),
@@ -9602,6 +10801,7 @@ class DebugWorkflowService {
     ]);
     nextPlan.strictReady = Boolean(nextPlan.targetCapture) && nextPlan.blockers.length === 0;
     nextPlan.planReadiness = nextPlan.blockers.length > 0 ? "blocked" : nextPlan.strictReady ? "strict_ready" : "needs_user_input";
+    nextPlan.presentation = buildDebugPlanPresentation(nextPlan);
     const previousBlockerKeys = new Set(snapshot.debug_plan.blockers.map((blocker) => `${blocker.code}:${blocker.reason}`));
     const newBlockers = nextPlan.blockers.filter((blocker) => !previousBlockerKeys.has(`${blocker.code}:${blocker.reason}`));
     const nextStatus = nextPlan.blockers.length > 0 ? "failed" : nextPlan.strictReady ? "awaiting_approval" : "awaiting_input";
@@ -9631,6 +10831,26 @@ class DebugWorkflowService {
         source: "ask_user_answers"
       }
     }));
+    if (pendingQuestionsBeforeSubmit) {
+      await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
+        runId,
+        sessionId: location.session.sessionId,
+        agentId: "rdc-debugger",
+        eventType: "tool_execution",
+        status: "completed",
+        payload: {
+          tool_name: ASK_USER_TOOL_NAME,
+          phase: "answer",
+          prompt_id: pendingQuestionsBeforeSubmit.promptId,
+          title: pendingQuestionsBeforeSubmit.title,
+          summary: pendingQuestionsBeforeSubmit.summary,
+          question_count: pendingQuestionsBeforeSubmit.questions.length,
+          questions: buildAskUserQuestionTraceQuestions(pendingQuestionsBeforeSubmit),
+          answers,
+          answerSummary: buildAskUserAnswerSummary(pendingQuestionsBeforeSubmit, answers)
+        }
+      }));
+    }
     for (const blocker of newBlockers) {
       await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
         runId,
@@ -10397,6 +11617,12 @@ class DebugWorkflowService {
           refs: blocker.refs
         }
       }));
+      await this.appendAssistantConversationMessage(
+        location.session.sessionId,
+        location.run.runId,
+        aborted ? "本轮调试已停止。" : `执行失败：${blocker.reason}`,
+        aborted ? "stopped" : "error"
+      );
       this.emitRunStatus(
         location.session.sessionId,
         location.run.runId,
@@ -10752,43 +11978,63 @@ class DebugWorkflowService {
   }
   async buildInvestigationSummary(location, debugPlan, specialistResults) {
     const evidence = specialistResults.flatMap((result) => result.reasoningSummary.evidence);
+    const evidenceHighlights = evidence.slice(0, 8);
+    const specialistBriefs = specialistResults.map((result) => result.reasoningSummary.summary).filter(Boolean).slice(0, 4);
+    const selectedPixel = evidence.find((entry) => /RGBA=/.test(entry));
+    const visualTarget = evidence.find((entry) => /visual_target=|target=ResourceId/.test(entry));
+    const degradedBinding = evidence.find((entry) => /fallback=|degraded=/.test(entry));
     const deterministic = {
-      summary: `Investigation synthesized ${specialistResults.length} specialist briefs around ${debugPlan.targetCapture?.fileName || "the target capture"} and ${debugPlan.targetFrameOrEvent?.eventLabel || "the active frame"}.`,
+      summary: [
+        `Investigation synthesized ${specialistResults.length} specialist briefs around ${debugPlan.targetCapture?.fileName || "the target capture"} and ${debugPlan.targetFrameOrEvent?.eventLabel || "the active frame"}.`,
+        selectedPixel ? `Selected pixel evidence: ${selectedPixel}` : "",
+        visualTarget ? `Visual target evidence: ${visualTarget}` : ""
+      ].filter(Boolean).join(" "),
       evidence,
-      next_step: "Validate the leading root-cause hypothesis against verification contract and skeptic review.",
+      next_step: degradedBinding ? "Re-run with a precise bright-pixel coordinate or a valid swapchain target to turn the degraded visual evidence into a direct fix validation." : "Validate the leading root-cause hypothesis against verification contract and skeptic review.",
       confidence: specialistResults.length > 1 ? 0.74 : 0.58,
-      root_cause: `The leading root cause sits around ${debugPlan.targetFrameOrEvent?.eventLabel || "the active frame"} and must be validated against the collected pipeline, pixel, and shader evidence.`,
+      root_cause: [
+        `The strongest current evidence localizes the issue to ${debugPlan.targetFrameOrEvent?.eventLabel || "the active frame"} on ${debugPlan.targetCapture?.fileName || "the target capture"}.`,
+        selectedPixel ? `The sampled focus pixel did not itself prove an overbright shader output: ${selectedPixel}.` : "",
+        degradedBinding ? `The capture evidence is degraded by ${degradedBinding}, so the report should treat the IBL/leak hypothesis as unconfirmed until the exact bright coordinate or swapchain target is available.` : ""
+      ].filter(Boolean).join(" "),
       recommendations: [
-        "Review the highlighted pipeline, pixel, and shader evidence together before landing a permanent fix.",
+        ...specialistBriefs,
+        ...evidenceHighlights,
         "Preserve the generated screenshots and specialist notes for regression tracking."
       ]
     };
-    const { data } = await debuggerLlmService.callStructured({
-      agentId: "rdc-debugger",
-      stage: "investigate",
-      sessionId: location.session.sessionId,
-      runId: location.run.runId,
-      messages: [
-        {
-          role: "system",
-          content: "You are the RDC Debugger orchestrator. Return JSON only with keys summary, evidence, next_step, confidence, root_cause, recommendations. Ground every field in the provided specialist evidence."
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            goal: debugPlan.userGoal,
-            targetCapture: debugPlan.targetCapture,
-            targetFrameOrEvent: debugPlan.targetFrameOrEvent,
-            specialistResults: specialistResults.map((result) => result.reasoningSummary)
-          })
-        }
-      ],
-      maxTokens: 700,
-      temperature: 0.2,
-      parse: (text) => debuggerLlmService.parseJson(text),
-      testValue: deterministic,
-      auditSummary: (payload) => payload.summary
-    });
+    let data = deterministic;
+    try {
+      const result = await debuggerLlmService.callStructured({
+        agentId: "rdc-debugger",
+        stage: "investigate",
+        sessionId: location.session.sessionId,
+        runId: location.run.runId,
+        messages: [
+          {
+            role: "system",
+            content: "You are the RDC Debugger orchestrator. Return JSON only with keys summary, evidence, next_step, confidence, root_cause, recommendations. Ground every field in the provided specialist evidence."
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              goal: debugPlan.userGoal,
+              targetCapture: debugPlan.targetCapture,
+              targetFrameOrEvent: debugPlan.targetFrameOrEvent,
+              specialistResults: specialistResults.map((result2) => result2.reasoningSummary)
+            })
+          }
+        ],
+        maxTokens: 700,
+        temperature: 0.2,
+        parse: (text) => debuggerLlmService.parseJson(text),
+        testValue: deterministic,
+        auditSummary: (payload) => payload.summary
+      });
+      data = result.data;
+    } catch {
+      data = deterministic;
+    }
     return {
       summaryId: `rdc-debugger-${Date.now()}`,
       stage: "investigate",
@@ -10849,31 +12095,37 @@ class DebugWorkflowService {
       verdict: verification.status === "ok" ? "approved" : "approved_with_warning",
       summary: verification.status === "ok" ? "Skeptic accepted the evidence chain." : "Skeptic accepted the evidence chain but flagged verification as best-effort."
     };
-    const { data } = await debuggerLlmService.callStructured({
-      agentId: "skeptic_agent",
-      stage: "skeptic",
-      sessionId: location.session.sessionId,
-      runId: location.run.runId,
-      messages: [
-        {
-          role: "system",
-          content: "You are the skeptic agent. Return JSON only with keys verdict and summary. Verdict must be one of approved, approved_with_warning, rejected. Reject only when the evidence chain is not strong enough to support publication."
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            goal: debugPlan.userGoal,
-            investigationSummary,
-            verification
-          })
-        }
-      ],
-      maxTokens: 400,
-      temperature: 0.1,
-      parse: (text) => debuggerLlmService.parseJson(text),
-      testValue: deterministic,
-      auditSummary: (payload) => payload.summary
-    });
+    let data = deterministic;
+    try {
+      const result = await debuggerLlmService.callStructured({
+        agentId: "skeptic_agent",
+        stage: "skeptic",
+        sessionId: location.session.sessionId,
+        runId: location.run.runId,
+        messages: [
+          {
+            role: "system",
+            content: "You are the skeptic agent. Return JSON only with keys verdict and summary. Verdict must be one of approved, approved_with_warning, rejected. Reject only when the evidence chain is not strong enough to support publication."
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              goal: debugPlan.userGoal,
+              investigationSummary,
+              verification
+            })
+          }
+        ],
+        maxTokens: 400,
+        temperature: 0.1,
+        parse: (text) => debuggerLlmService.parseJson(text),
+        testValue: deterministic,
+        auditSummary: (payload) => payload.summary
+      });
+      data = result.data;
+    } catch {
+      data = deterministic;
+    }
     return {
       status: data.verdict === "approved" ? "ok" : "warning",
       payload: {
@@ -10896,32 +12148,38 @@ class DebugWorkflowService {
       ],
       confidence: investigationSummary.confidence
     };
-    const { data } = await debuggerLlmService.callStructured({
-      agentId: "curator_agent",
-      stage: "curate",
-      sessionId: location.session.sessionId,
-      runId: location.run.runId,
-      messages: [
-        {
-          role: "system",
-          content: "You are the curator agent. Return JSON only with keys title, summary, root_cause, fix_description, evidence_summary, recommendations, confidence. Summaries must stay grounded in the verified evidence chain and skeptic outcome."
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            goal: debugPlan.userGoal,
-            investigationSummary,
-            verification,
-            skeptic
-          })
-        }
-      ],
-      maxTokens: 900,
-      temperature: 0.2,
-      parse: (text) => debuggerLlmService.parseJson(text),
-      testValue: deterministic,
-      auditSummary: (payload) => payload.summary
-    });
+    let data = deterministic;
+    try {
+      const result = await debuggerLlmService.callStructured({
+        agentId: "curator_agent",
+        stage: "curate",
+        sessionId: location.session.sessionId,
+        runId: location.run.runId,
+        messages: [
+          {
+            role: "system",
+            content: "You are the curator agent. Return JSON only with keys title, summary, root_cause, fix_description, evidence_summary, recommendations, confidence. Summaries must stay grounded in the verified evidence chain and skeptic outcome."
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              goal: debugPlan.userGoal,
+              investigationSummary,
+              verification,
+              skeptic
+            })
+          }
+        ],
+        maxTokens: 900,
+        temperature: 0.2,
+        parse: (text) => debuggerLlmService.parseJson(text),
+        testValue: deterministic,
+        auditSummary: (payload) => payload.summary
+      });
+      data = result.data;
+    } catch {
+      data = deterministic;
+    }
     return {
       title: data.title,
       summary: data.summary,
@@ -10946,37 +12204,61 @@ class DebugWorkflowService {
     }
     return Array.from(required);
   }
+  normalizePlanPresentation(value, fallback) {
+    if (!value || typeof value.title !== "string" || !Array.isArray(value.sections)) {
+      return fallback;
+    }
+    const sections = value.sections.map((section, index) => ({
+      id: String(section.id || section.title || `section-${index + 1}`),
+      title: String(section.title || "").trim(),
+      body: toStringArray(section.body)
+    })).filter((section) => section.title && section.body.length > 0);
+    if (!value.title.trim() || sections.length === 0) {
+      return fallback;
+    }
+    return {
+      title: value.title.trim(),
+      sections
+    };
+  }
   async generatePlanWithLlm(input) {
     const deterministic = {
       scope: input.basePlan.scope,
       notes: input.basePlan.notes,
       recommended_specialists: input.basePlan.recommendedSpecialists,
-      verification_focus: input.basePlan.verificationContract.successCriteria
+      verification_focus: input.basePlan.verificationContract.successCriteria,
+      presentation: input.basePlan.presentation ?? buildDebugPlanPresentation(input.basePlan)
     };
-    const { data } = await debuggerLlmService.callStructured({
-      agentId: "rdc-debugger",
-      stage: "plan",
-      sessionId: input.sessionId,
-      runId: input.runId,
-      messages: [
-        {
-          role: "system",
-          content: "You are the RDC Debugger planner. Return JSON only with keys scope, notes, recommended_specialists, verification_focus. Keep the plan grounded in the provided intake facts and do not invent unsupported captures or event ids."
-        },
-        {
-          role: "user",
-          content: JSON.stringify({
-            goal: input.resolvedGoal,
-            basePlan: input.basePlan
-          })
-        }
-      ],
-      maxTokens: 700,
-      temperature: 0.2,
-      parse: (text) => debuggerLlmService.parseJson(text),
-      testValue: deterministic,
-      auditSummary: (payload) => payload.scope
-    });
+    let data = deterministic;
+    try {
+      const result = await debuggerLlmService.callStructured({
+        agentId: "rdc-debugger",
+        stage: "plan",
+        sessionId: input.sessionId,
+        runId: input.runId,
+        messages: [
+          {
+            role: "system",
+            content: "You are the RDC Debugger planner. Return JSON only with keys scope, notes, recommended_specialists, verification_focus, presentation. presentation must contain title and sections; each section has id, title, body string array. Keep the plan grounded in the provided intake facts and do not invent unsupported captures or event ids."
+          },
+          {
+            role: "user",
+            content: JSON.stringify({
+              goal: input.resolvedGoal,
+              basePlan: input.basePlan
+            })
+          }
+        ],
+        maxTokens: 700,
+        temperature: 0.2,
+        parse: (text) => debuggerLlmService.parseJson(text),
+        testValue: deterministic,
+        auditSummary: (payload) => payload.scope
+      });
+      data = result.data;
+    } catch {
+      data = deterministic;
+    }
     return {
       ...input.basePlan,
       scope: data.scope || input.basePlan.scope,
@@ -10986,6 +12268,7 @@ class DebugWorkflowService {
         ...toStringArray(data.verification_focus).map((item) => `Verification focus: ${item}`)
       ])),
       recommendedSpecialists: toRecommendedSpecialists(data.recommended_specialists, input.basePlan.recommendedSpecialists),
+      presentation: this.normalizePlanPresentation(data.presentation, input.basePlan.presentation ?? buildDebugPlanPresentation(input.basePlan)),
       updatedAt: nowIso$1()
     };
   }
@@ -11013,7 +12296,7 @@ class DebugWorkflowService {
     await storageAdapter.appendActionEvent(sessionId, event);
     workflowProjectionPublisher.publishEvidenceEvent(event);
   }
-  async appendAssistantConversationMessage(sessionId, runId, content) {
+  async appendAssistantConversationMessage(sessionId, runId, content, status = "complete") {
     const runLocation = this.findRun(runId || "");
     const message = {
       id: generateEventId("msga"),
@@ -11025,14 +12308,14 @@ class DebugWorkflowService {
       role: "assistant",
       agentId: "rdc-debugger",
       content,
-      status: "complete",
+      status,
       updatedAt: nowMs(),
       reasoningTrace: null,
       createdAt: nowMs()
     };
     storageAdapter.appendConversationMessage(sessionId, message);
     this.emitConversationEvent({
-      type: "message_completed",
+      type: status === "error" ? "message_errored" : "message_completed",
       sessionId,
       turnId: message.turnId,
       message
@@ -11305,7 +12588,7 @@ function registerCaptureDeviceHandlers(context2) {
     return replayDeviceService.activateDevice(deviceId);
   });
 }
-const EXECUTE_PATTERN = /开始|启动|执行|正式分析|直接分析|现在分析|run\b|start\b|debug\b|analy[sz]e\b|帮我调试|请调试|开始调试|开始分析/i;
+const EXECUTE_PATTERN = /开始|启动|执行|正式分析|正式调试|本地调试|local\s*模式调试|模式调试|直接分析|现在分析|run\b|start\b|debug\b|analy[sz]e\b|帮我调试|请.*调试|开始调试|开始分析/i;
 const TASK_FILE_PATTERN = /([A-Za-z]:[\\/][^\r\n"]+\.(txt|md))/i;
 const CONTROL_OPEN_TAG = "<control>";
 const ACTIVE_RUN_STATUSES = [
@@ -11316,6 +12599,9 @@ const ACTIVE_RUN_STATUSES = [
   "running",
   "stopping"
 ];
+function isActiveRun(run) {
+  return Boolean(run && ACTIVE_RUN_STATUSES.includes(run.status));
+}
 function trimPathLabel(value) {
   const normalized = value.replace(/\\/g, "/");
   const parts = normalized.split("/");
@@ -11393,6 +12679,7 @@ function makeConversationMessage(role, content, options) {
     status: options.status ?? (role === "assistant" ? "draft" : "complete"),
     updatedAt: createdAt,
     reasoningTrace: options.reasoningTrace ?? null,
+    diagnostic: options.diagnostic ?? null,
     attachments: options.attachments,
     createdAt
   };
@@ -11461,14 +12748,14 @@ function buildCoworkPrompt(context2, history, mode, message, attachments) {
   }));
   return JSON.stringify({
     requested_mode: mode,
-    requested_mode_label: mode === "debugger" ? "Debugger" : mode === "analyzer" ? "Analyzer" : "Optimizer",
+    requested_mode_label: mode === "ask" ? "Ask" : mode === "debugger" ? "Debugger" : mode === "analyzer" ? "Analyzer" : "Optimizer",
     user_message: message,
     effective_user_message: resolvedTaskFile.effectiveMessage,
     task_file_path: resolvedTaskFile.taskFilePath,
     task_file_content: resolvedTaskFile.taskFileContent,
     current_project_id: context2.projectId,
     current_session_id: context2.session?.sessionId ?? null,
-    active_run_id: context2.currentRun?.runId ?? null,
+    active_run_id: isActiveRun(context2.currentRun) ? context2.currentRun.runId : null,
     opened_capture: context2.openedCapturePath,
     project_inputs: context2.projectInputs.slice(0, 8).map((entry) => entry.fileName),
     incoming_attachments: attachments.map((entry) => ({
@@ -11479,71 +12766,188 @@ function buildCoworkPrompt(context2, history, mode, message, attachments) {
     recent_history: recentHistory
   }, null, 2);
 }
-function buildCoworkSystemPrompt() {
+function buildAskSystemPrompt() {
+  return [
+    "你是 RDC-Agent 的 Ask 助手，负责非执行对话。",
+    "要求：",
+    "1. 正常回答用户问题，语气简洁，不使用审批流、工单流或调试执行口吻。",
+    "2. 不要自称 RDC Debugger，不要暗示已经开始 RenderDoc 调试，也不要假装分析过 capture。",
+    "3. 可以解释能力边界、澄清目标、帮助用户判断是否需要 Open .rdc capture。",
+    "4. 如果用户要求正式调试或执行分析，只提示需要在应用内 Open capture 并切换到 Debugger；Ask 模式不能创建 run。",
+    "5. 不要声称可以调用 shell、rdx-tool、ToolBridge 或任何 RenderDoc 执行工具。",
+    "6. 不需要输出隐藏控制块，除非明确需要表达 intake；即使输出 control，也必须 safe_to_start=false。"
+  ].join("\n");
+}
+function buildDebuggerCoworkSystemPrompt() {
   return [
     "你是 RDC Debugger，一个面向 RenderDoc 调试场景的 Cowork Agent。",
     "要求：",
     "1. 始终先用自然中文正常回复用户，不要像审批流或工单流。",
-    "2. 如果用户问通用知识、产品能力、技术概念，直接回答，不要强行转成调试执行。",
+    "2. 如果用户问通用知识、产品能力、技术概念，直接回答，不要强行转成调试执行，也不要在普通寒暄中自我介绍成 RDC Debugger。",
     "3. 没有正式进入调试 run 前，不要假装自己已经分析过 capture。",
-    "4. 只有当用户明确表达“现在开始正式调试/执行分析”，并且条件足够时，才把 intent 标成 execute。",
+    "4. Ask 是非执行入口；只有 requested_mode 是 Debugger、用户明确表达“现在开始正式调试/执行分析”，且应用内已有 opened_capture 时，才把 intent 标成 execute。",
     "5. 回复正文结束后，必须额外附加一个 <control>{...}</control> 块，control JSON 只允许包含 intent, safe_to_start, needs_project, needs_capture, needs_target_capture, needs_route, reason。",
     "6. 如果你不确定，就把 intent 设为 talk 或 intake，safe_to_start 设为 false。",
     "7. 控制块不要在正文里解释给用户。",
-    "8. requested_mode 表示当前 UI 模式，Debugger 偏重定位与排障，Analyzer 偏重拆解与证据整理，Optimizer 偏重瓶颈判断与优化建议；回答结构要随 mode 调整。"
+    "8. requested_mode 表示当前 UI 模式，Ask 只做澄清与引导，Debugger 偏重定位与排障，Analyzer 偏重拆解与证据整理，Optimizer 偏重瓶颈判断与优化建议；回答结构要随 mode 调整。"
   ].join("\n");
 }
-function hasUsableDebuggerRoute() {
+function redactTechnicalMessage(error) {
+  const raw = error instanceof Error ? error.message : String(error);
+  return raw.replace(/(Bearer\s+)[^\s"'`,;)}]+/gi, "$1[redacted]").replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|secret)["'\s:=]+)[^"',;\s)}]+/gi, "$1[redacted]").slice(0, 1200);
+}
+function createConversationDiagnostic(input) {
+  return {
+    code: input.code,
+    severity: input.severity,
+    userMessage: input.userMessage,
+    agentId: input.agentId,
+    providerId: input.providerId,
+    modelId: input.modelId,
+    adapterId: input.adapterId,
+    technicalMessage: input.technicalMessage
+  };
+}
+function getConversationAgentLabel(agentId) {
+  return agentId === "ask_agent" ? "Ask" : "rdc-debugger";
+}
+function resolveAgentRoutePreflight(agentId, fallbackAgentId) {
   const settings = settingsService.getAll();
-  const route = settings.llm.agentRoutes.find((entry) => entry.agentId === "rdc-debugger");
+  const primaryRoute = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
+  const fallbackRoute = fallbackAgentId ? settings.llm.agentRoutes.find((entry) => entry.agentId === fallbackAgentId) : void 0;
+  const route = primaryRoute?.providerId && primaryRoute.modelId ? primaryRoute : fallbackRoute;
+  const routeAgentId = route?.agentId ?? agentId;
+  const label = getConversationAgentLabel(agentId);
   if (!route?.providerId || !route.modelId) {
-    return false;
+    return {
+      ok: false,
+      diagnostic: createConversationDiagnostic({
+        agentId,
+        code: "CONVERSATION_LLM_ROUTE_MISSING",
+        severity: "warning",
+        userMessage: `当前 ${label} 链路还没绑定可用模型。请在 Settings 中为 \`${agentId}\` 选择 provider 和 model route。`
+      })
+    };
   }
   const provider = settings.llm.providers.find((entry) => entry.id === route.providerId);
-  if (!provider || !provider.enabled) {
+  if (!provider || !provider.enabled || !provider.isConfigured) {
+    return {
+      ok: false,
+      diagnostic: createConversationDiagnostic({
+        agentId,
+        code: "CONVERSATION_LLM_PROVIDER_UNAVAILABLE",
+        severity: "error",
+        userMessage: `当前 ${label} 链路的 provider 不可用：${route.providerId}。请检查该服务商的连接状态、账号或密钥后重试。`,
+        providerId: route.providerId,
+        modelId: route.modelId,
+        technicalMessage: provider?.lastError ?? provider?.unavailableReason
+      })
+    };
+  }
+  const model = provider.models.find((entry) => entry.id === route.modelId);
+  if (!model?.enabled) {
+    return {
+      ok: false,
+      diagnostic: createConversationDiagnostic({
+        agentId,
+        code: "CONVERSATION_LLM_ROUTE_MISSING",
+        severity: "warning",
+        userMessage: `当前 ${label} 链路的模型不可用：${route.providerId}/${route.modelId}。请在 Settings 中刷新模型列表或重新选择 route。`,
+        providerId: route.providerId,
+        modelId: route.modelId
+      })
+    };
+  }
+  return {
+    ok: true,
+    agentId,
+    routeAgentId,
+    providerId: route.providerId,
+    modelId: route.modelId
+  };
+}
+function resolveDebuggerRoutePreflight() {
+  return resolveAgentRoutePreflight("rdc-debugger");
+}
+function hasUsableDebuggerRoute() {
+  return resolveDebuggerRoutePreflight().ok;
+}
+function recordCoworkLlmDiagnostic(context2, diagnostic) {
+  runtimeLogService.log({
+    scope: context2.session?.sessionId ? "session" : "app",
+    namespace: "llm",
+    severity: diagnostic.severity === "error" ? "error" : "warning",
+    title: `${diagnostic.agentId ?? "rdc-debugger"} -> ${diagnostic.providerId ?? "route missing"}${diagnostic.modelId ? `/${diagnostic.modelId}` : ""}`,
+    summary: diagnostic.userMessage,
+    detail: diagnostic.technicalMessage,
+    sessionId: context2.session?.sessionId ?? null,
+    projectId: context2.projectId,
+    runId: isActiveRun(context2.currentRun) ? context2.currentRun.runId : null,
+    raw: {
+      code: diagnostic.code,
+      agentId: diagnostic.agentId,
+      providerId: diagnostic.providerId,
+      modelId: diagnostic.modelId,
+      adapterId: diagnostic.adapterId
+    }
+  });
+}
+function createRequestFailedDiagnostic(route, error) {
+  const label = getConversationAgentLabel(route.agentId);
+  return createConversationDiagnostic({
+    agentId: route.agentId,
+    code: "CONVERSATION_LLM_REQUEST_FAILED",
+    severity: "error",
+    userMessage: `模型请求失败：${label} 当前使用 ${route.providerId}/${route.modelId}，但服务商请求没有成功。请检查该账号、模型权限、额度或网络状态后重试。`,
+    providerId: route.providerId,
+    modelId: route.modelId,
+    technicalMessage: redactTechnicalMessage(error)
+  });
+}
+function extractRequestedCaptureName(message) {
+  const match = message.match(/([^\s"'“”‘’]+\.rdc)/i);
+  return match?.[1] ? trimPathLabel(match[1].replace(/[，。；,;]+$/, "")) : null;
+}
+function shouldStartDebuggerFromMessage(message) {
+  if (!EXECUTE_PATTERN.test(message)) {
     return false;
   }
-  return provider.models.some((entry) => entry.id === route.modelId && entry.enabled);
+  return /\.rdc\b/i.test(message) || /event\s*id|事件\s*id|Event\s*\d+/i.test(message) || /帮我调试|请调试|开始调试|正式分析|直接过去看|定位根因|完整\s*report/i.test(message);
 }
-function inferExplicitCapture(message, projectInputs) {
-  return projectInputs.find((entry) => message.includes(entry.fileName)) ?? null;
+function captureDescriptorFromOpenedCapture(openedCapture) {
+  const normalizedPath = path.resolve(openedCapture.filePath);
+  return {
+    id: openedCapture.captureId || openedCapture.inputId,
+    filePath: normalizedPath,
+    captureFileId: openedCapture.captureFileId,
+    role: "primary",
+    backendHint: openedCapture.backend,
+    status: openedCapture.status,
+    sessionId: openedCapture.sessionId,
+    replaySessionId: openedCapture.replaySessionId,
+    contextId: openedCapture.contextId
+  };
+}
+function resolveOpenedCaptureDescriptor(context2) {
+  return context2.openedCapture?.status === "open" ? captureDescriptorFromOpenedCapture(context2.openedCapture) : null;
 }
 function resolveCaptureGuards(message, context2) {
-  const explicitCapture = inferExplicitCapture(message, context2.projectInputs);
-  if (context2.openedCapturePath || explicitCapture) {
+  if (resolveOpenedCaptureDescriptor(context2)) {
     return { ready: true };
   }
-  if (context2.projectInputs.length === 0) {
+  const requestedCaptureName = extractRequestedCaptureName(message);
+  if (requestedCaptureName) {
     return {
       ready: false,
       needsCapture: true,
-      reason: "我可以先帮你梳理问题，但正式分析需要一个 .rdc capture。你可以先描述现象，或者直接打开一个 capture。"
+      reason: `我看到你提到了 ${requestedCaptureName}，但正式 Debugger 只能使用应用内已经 Open 的 .rdc Capture。请先在 Capture Library 打开该 capture，再进入执行模式。`
     };
   }
-  if (context2.projectInputs.length > 1) {
-    const captureLabels = context2.projectInputs.slice(0, 3).map((entry) => trimPathLabel(entry.fileName));
-    return {
-      ready: false,
-      needsTargetCapture: true,
-      reason: `我看到项目里有多个 capture：${captureLabels.join("、")}。你先告诉我这次要看哪一个，我再进入正式分析。`
-    };
-  }
-  return { ready: true };
-}
-function createFallbackAssistantReply(message, context2) {
-  if (!context2.projectId && EXECUTE_PATTERN.test(message)) {
-    return "我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。";
-  }
-  if (!hasUsableDebuggerRoute()) {
-    if (/你好|您好|hello|hi/i.test(message)) {
-      return "当前模型链路还没准备好。请先配置 `rdc-debugger` 的 provider / model route。";
-    }
-    if (EXECUTE_PATTERN.test(message)) {
-      return "当前调试链路还没绑定可用模型，所以我不能开始正式执行；不过我可以先帮你确认问题范围和所需 capture。";
-    }
-    return "当前拿不到核心模型回复。请检查 `rdc-debugger` 的 provider / model route。";
-  }
-  return "我刚才没能稳定产出这轮对话回复。你可以重试一次；如果问题持续，优先检查当前 `rdc-debugger` 的模型链路。";
+  return {
+    ready: false,
+    needsCapture: true,
+    reason: "我可以先帮你梳理问题，但正式 Debugger 执行需要先在应用内 Open 一个 .rdc Capture。仅在 prompt 中写路径不会创建 runtime context。"
+  };
 }
 function buildWorkflowUpgradeReply(result) {
   if (!result.success) {
@@ -11565,7 +12969,7 @@ function buildWorkflowUpgradeReply(result) {
   if (result.status === "awaiting_approval") {
     return "我已经整理好正式执行计划了。你先确认下方计划卡片，批准后我再进入严格调试流程。";
   }
-  return "我已经开始正式调试。接下来会按严格证据链推进分析。";
+  return "正式调试入口已准备完成，后续状态会在计划卡和运行记录中更新。";
 }
 function computeVisibleAssistantText(raw) {
   const controlIndex = raw.indexOf(CONTROL_OPEN_TAG);
@@ -11609,7 +13013,7 @@ class ConversationService {
   }
   async sendMessage(input) {
     const context2 = await this.resolveContext(input);
-    if (context2.currentRun && ACTIVE_RUN_STATUSES.includes(context2.currentRun.status)) {
+    if (isActiveRun(context2.currentRun)) {
       return this.startActiveDebugTurn(context2, input.mode, input.message.trim(), input.attachments ?? []);
     }
     return this.startCoworkTurn(context2, input.mode, input.message.trim(), input.attachments ?? []);
@@ -11622,13 +13026,15 @@ class ConversationService {
     const currentRun = resolvedSessionId ? storageAdapter.listRuns(resolvedSessionId).find((entry) => entry.runId === (input.currentRunId ?? input.fallbackRunId)) ?? storageAdapter.getLatestRun(resolvedSessionId) : null;
     const projectInputs = projectId ? storageAdapter.listProjectInputs(projectId) : [];
     const openedCapture = rdxSessionService.snapshotOpenedCapture();
+    const activeOpenedCapture = openedCapture?.projectId === projectId && openedCapture.status === "open" ? openedCapture : null;
     const replayDevice = replayDeviceService.getDeviceById(input.replayDeviceId || "local") ?? replayDeviceService.getDeviceById("local");
     return {
       projectId,
       session,
       currentRun,
       projectInputs,
-      openedCapturePath: openedCapture?.filePath ?? null,
+      openedCapture: activeOpenedCapture,
+      openedCapturePath: activeOpenedCapture?.filePath ?? null,
       replayDevice
     };
   }
@@ -11776,10 +13182,14 @@ class ConversationService {
         )
       });
     } catch (error) {
-      const message = error instanceof Error ? `我刚才处理这条消息时失败了：${error.message}` : "我刚才处理这条消息时失败了。";
+      const routePreflight = resolveDebuggerRoutePreflight();
+      const diagnostic = routePreflight.ok ? createRequestFailedDiagnostic(routePreflight, error) : routePreflight.diagnostic;
+      recordCoworkLlmDiagnostic(input.context, diagnostic);
+      const message = diagnostic.userMessage;
       commitAssistantMessage("message_errored", {
         status: "error",
         content: assistantMessage.content || message,
+        diagnostic,
         reasoningTrace: finalizeTrace(
           upsertTraceStep(
             assistantMessage.reasoningTrace,
@@ -11787,6 +13197,7 @@ class ConversationService {
             {
               status: "error",
               summary: message,
+              detail: diagnostic.technicalMessage,
               completedAt: nowMs()
             }
           ),
@@ -11812,7 +13223,7 @@ class ConversationService {
       turnId,
       sessionId: workingSession?.sessionId ?? null,
       projectId: context2.projectId,
-      runId: context2.currentRun?.runId ?? null,
+      runId: isActiveRun(context2.currentRun) ? context2.currentRun.runId : null,
       modeContext: requestedMode,
       attachments: importedAttachments,
       status: "complete"
@@ -11821,11 +13232,11 @@ class ConversationService {
       turnId,
       sessionId: workingSession?.sessionId ?? null,
       projectId: context2.projectId,
-      runId: context2.currentRun?.runId ?? null,
+      runId: isActiveRun(context2.currentRun) ? context2.currentRun.runId : null,
       modeContext: requestedMode,
-      agentId: "rdc-debugger",
+      agentId: requestedMode === "ask" ? "ask_agent" : "rdc-debugger",
       status: "streaming",
-      reasoningTrace: createDraftReasoningTrace("正在思考", [
+      reasoningTrace: requestedMode === "ask" ? null : createDraftReasoningTrace("正在思考", [
         createReasoningStep("cowork-route", "检查上下文与路由", "intake_gate"),
         createReasoningStep("cowork-reply", "生成协作回复", "plan")
       ])
@@ -11857,6 +13268,8 @@ class ConversationService {
     let assistantMessage = input.assistantDraftMessage;
     const sessionId = input.context.session?.sessionId ?? null;
     const abortController = new AbortController();
+    const conversationAgentId = input.requestedMode === "ask" ? "ask_agent" : "rdc-debugger";
+    const showCoworkReasoning = input.requestedMode !== "ask";
     const commitAssistantMessage = (type, patch) => {
       if (abortController.signal.aborted && patch.status !== "stopped") {
         return;
@@ -11915,64 +13328,150 @@ class ConversationService {
       systemAppendix += text;
       commitVisibleAssistantText();
     };
-    commitAssistantMessage("message_patched", {
-      reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-route", {
-        status: "running",
-        summary: "正在检查项目、capture 与调试路由。",
-        startedAt: nowMs()
-      })
-    });
+    const withCoworkReasoning = (reasoningTrace) => showCoworkReasoning ? { reasoningTrace } : {};
+    if (showCoworkReasoning) {
+      commitAssistantMessage("message_patched", {
+        reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-route", {
+          status: "running",
+          summary: "正在检查项目、capture 与调试路由。",
+          startedAt: nowMs()
+        })
+      });
+    }
     const history = input.context.session ? storageAdapter.readConversationHistory(input.context.session.sessionId).filter((entry) => entry.id !== assistantMessage.id) : [];
     let rawResponse = "";
     let visibleResponse = "";
     let errorViewModel = null;
-    try {
+    let llmDiagnostic = null;
+    const taskFileContext = resolveTaskFileContext(input.rawMessage);
+    const effectiveMessage = taskFileContext.effectiveMessage;
+    const explicitFormalDebugRequest = shouldStartDebuggerFromMessage(effectiveMessage);
+    const explicitDebuggerRequest = input.requestedMode === "debugger" && explicitFormalDebugRequest;
+    const askModeFormalDebugRequest = input.requestedMode === "ask" && explicitFormalDebugRequest;
+    const explicitDebuggerCaptureGuard = explicitDebuggerRequest ? resolveCaptureGuards(effectiveMessage, input.context) : null;
+    const askModeCaptureGuard = askModeFormalDebugRequest ? resolveCaptureGuards(effectiveMessage, input.context) : null;
+    const routePreflight = conversationAgentId === "ask_agent" ? resolveAgentRoutePreflight("ask_agent", "rdc-debugger") : resolveDebuggerRoutePreflight();
+    if (askModeFormalDebugRequest) {
+      rawResponse = [
+        askModeCaptureGuard?.ready ? "当前 Ask 不会直接创建正式 run。Capture 已经 Open；如需执行，请切换到 Debugger 后发送，我会先生成执行前计划。" : askModeCaptureGuard?.reason || "正式 Debugger 执行需要先在应用内 Open 一个 .rdc Capture。",
+        '<control>{"intent":"intake","safe_to_start":false,"needs_capture":true}</control>'
+      ].join("\n");
+      visibleResponse = stripControlBlock(rawResponse);
+      commitVisibleAssistantText();
       commitAssistantMessage("message_patched", {
-        reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
-          status: "running",
-          summary: "正在生成协作回复。",
-          startedAt: nowMs()
-        })
+        ...withCoworkReasoning(upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
+          status: "complete",
+          summary: "Ask 模式保留为非执行入口，已提示用户通过 Open 和 Debugger 模式进入计划。",
+          completedAt: nowMs()
+        }))
       });
-      const response = await agentOrchestrator.sendCoworkMessage(
-        "rdc-debugger",
-        buildCoworkPrompt(
-          input.context,
-          history,
-          input.requestedMode,
-          input.rawMessage,
-          input.importedAttachments
-        ),
-        {
-          sessionId: input.context.session?.sessionId,
-          turnId: assistantMessage.turnId,
-          systemPrompt: buildCoworkSystemPrompt(),
-          maxTokens: 1200,
-          temperature: 0.35,
-          signal: abortController.signal,
-          onChunk: (chunk) => {
-            rawResponse += chunk;
-            const nextVisible = computeVisibleAssistantText(rawResponse);
-            if (nextVisible.length > visibleResponse.length) {
-              visibleResponse = nextVisible;
-              commitVisibleAssistantText();
+    } else if (explicitDebuggerRequest && explicitDebuggerCaptureGuard && !explicitDebuggerCaptureGuard.ready) {
+      rawResponse = [
+        explicitDebuggerCaptureGuard.reason || "正式 Debugger 执行需要先在应用内 Open 一个 .rdc Capture。",
+        '<control>{"intent":"intake","safe_to_start":false,"needs_capture":true}</control>'
+      ].join("\n");
+      visibleResponse = stripControlBlock(rawResponse);
+      commitVisibleAssistantText();
+      commitAssistantMessage("message_patched", {
+        ...withCoworkReasoning(upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
+          status: "complete",
+          summary: "已拦截正式 Debugger 请求，等待应用内 Open capture。",
+          completedAt: nowMs()
+        }))
+      });
+    } else if (explicitDebuggerRequest && !routePreflight.ok && routePreflight.diagnostic.code !== "CONVERSATION_LLM_ROUTE_MISSING") {
+      llmDiagnostic = routePreflight.diagnostic;
+      errorViewModel = {
+        code: llmDiagnostic.code,
+        message: llmDiagnostic.userMessage,
+        technicalMessage: llmDiagnostic.technicalMessage
+      };
+      rawResponse = llmDiagnostic.userMessage;
+      visibleResponse = llmDiagnostic.userMessage;
+      recordCoworkLlmDiagnostic(input.context, llmDiagnostic);
+      commitVisibleAssistantText();
+    } else if (explicitDebuggerRequest) {
+      if (!routePreflight.ok) {
+        llmDiagnostic = routePreflight.diagnostic;
+        recordCoworkLlmDiagnostic(input.context, llmDiagnostic);
+      }
+      rawResponse = [
+        "已识别为 Debugger 执行请求。我会先生成执行前计划，等待你确认后再进入正式调试。",
+        '<control>{"intent":"execute","safe_to_start":true}</control>'
+      ].join("\n");
+      visibleResponse = stripControlBlock(rawResponse);
+      commitVisibleAssistantText();
+      commitAssistantMessage("message_patched", {
+        ...withCoworkReasoning(upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
+          status: "complete",
+          summary: "已识别为正式 Debugger 任务，准备生成执行前计划。",
+          completedAt: nowMs()
+        }))
+      });
+    } else if (!routePreflight.ok) {
+      llmDiagnostic = routePreflight.diagnostic;
+      errorViewModel = {
+        code: llmDiagnostic.code,
+        message: llmDiagnostic.userMessage,
+        technicalMessage: llmDiagnostic.technicalMessage
+      };
+      rawResponse = llmDiagnostic.userMessage;
+      visibleResponse = llmDiagnostic.userMessage;
+      recordCoworkLlmDiagnostic(input.context, llmDiagnostic);
+      commitVisibleAssistantText();
+    } else {
+      try {
+        if (showCoworkReasoning) {
+          commitAssistantMessage("message_patched", {
+            reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
+              status: "running",
+              summary: `正在通过 ${routePreflight.providerId}/${routePreflight.modelId} 生成协作回复。`,
+              startedAt: nowMs()
+            })
+          });
+        }
+        const response = await agentOrchestrator.sendCoworkMessage(
+          conversationAgentId,
+          buildCoworkPrompt(
+            input.context,
+            history,
+            input.requestedMode,
+            input.rawMessage,
+            input.importedAttachments
+          ),
+          {
+            sessionId: input.context.session?.sessionId,
+            turnId: assistantMessage.turnId,
+            systemPrompt: conversationAgentId === "ask_agent" ? buildAskSystemPrompt() : buildDebuggerCoworkSystemPrompt(),
+            maxTokens: 1200,
+            temperature: 0.35,
+            routeAgentId: routePreflight.routeAgentId,
+            signal: abortController.signal,
+            onChunk: (chunk) => {
+              rawResponse += chunk;
+              const nextVisible = computeVisibleAssistantText(rawResponse);
+              if (nextVisible.length > visibleResponse.length) {
+                visibleResponse = nextVisible;
+                commitVisibleAssistantText();
+              }
             }
           }
+        );
+        if (!rawResponse) {
+          rawResponse = response;
         }
-      );
-      if (!rawResponse) {
-        rawResponse = response;
+      } catch (error) {
+        llmDiagnostic = createRequestFailedDiagnostic(routePreflight, error);
+        errorViewModel = {
+          code: llmDiagnostic.code,
+          message: llmDiagnostic.userMessage,
+          technicalMessage: llmDiagnostic.technicalMessage
+        };
+        rawResponse = llmDiagnostic.userMessage;
+        visibleResponse = llmDiagnostic.userMessage;
+        recordCoworkLlmDiagnostic(input.context, llmDiagnostic);
+        commitVisibleAssistantText();
       }
-    } catch (error) {
-      const fallbackReply = createFallbackAssistantReply(resolveTaskFileContext(input.rawMessage).effectiveMessage, input.context);
-      errorViewModel = {
-        code: "CONVERSATION_LLM_UNAVAILABLE",
-        message: fallbackReply,
-        technicalMessage: error instanceof Error ? error.message : String(error)
-      };
-      rawResponse = fallbackReply;
-      visibleResponse = fallbackReply;
-      commitVisibleAssistantText();
     }
     if (abortController.signal.aborted) {
       this.clearActiveTurn(assistantMessage.turnId, abortController);
@@ -11981,27 +13480,28 @@ class ConversationService {
     const assistantContent = stripControlBlock(rawResponse);
     visibleResponse = assistantContent;
     const control = parseControlBlock(rawResponse);
-    let finalStatus = errorViewModel ? "error" : "complete";
-    let traceStatus = errorViewModel ? "error" : "complete";
+    const isRouteMissingDiagnostic = llmDiagnostic?.code === "CONVERSATION_LLM_ROUTE_MISSING";
+    let finalStatus = errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete";
+    let traceStatus = errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete";
     commitAssistantMessage("message_patched", {
       content: `${visibleResponse}${systemAppendix}`,
-      reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-route", {
+      diagnostic: llmDiagnostic,
+      ...withCoworkReasoning(upsertTraceStep(assistantMessage.reasoningTrace, "cowork-route", {
         status: "complete",
-        summary: "上下文检查完成。",
+        summary: llmDiagnostic ? `模型链路诊断完成：${llmDiagnostic.providerId ? `${llmDiagnostic.providerId}${llmDiagnostic.modelId ? `/${llmDiagnostic.modelId}` : ""}` : "缺少 route"}。` : "上下文检查完成。",
         completedAt: nowMs()
-      })
+      }))
     });
     if (abortController.signal.aborted) {
       this.clearActiveTurn(assistantMessage.turnId, abortController);
       return;
     }
-    const effectiveMessage = resolveTaskFileContext(input.rawMessage).effectiveMessage;
     if (!input.context.projectId && EXECUTE_PATTERN.test(effectiveMessage)) {
       const boundaryReply = "我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。";
       commitAssistantMessage("message_completed", {
         status: "complete",
         content: boundaryReply,
-        reasoningTrace: finalizeTrace(
+        ...withCoworkReasoning(finalizeTrace(
           upsertTraceStep(
             upsertTraceStep(assistantMessage.reasoningTrace, "cowork-route", {
               status: "complete",
@@ -12019,12 +13519,14 @@ class ConversationService {
           ),
           "complete",
           "等待选择项目"
-        )
+        ))
       });
       this.clearActiveTurn(assistantMessage.turnId, abortController);
       return;
     }
-    if ((control?.intent === "execute" || EXECUTE_PATTERN.test(effectiveMessage)) && control?.safe_to_start) {
+    const shouldUpgradeByControl = input.requestedMode === "debugger" && control?.intent === "execute" && control.safe_to_start;
+    const shouldUpgradeByRequest = !errorViewModel && explicitDebuggerRequest && explicitDebuggerCaptureGuard?.ready === true;
+    if (shouldUpgradeByControl || shouldUpgradeByRequest) {
       commitAssistantMessage("message_patched", {
         reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-upgrade", {
           title: "升级到正式调试",
@@ -12051,6 +13553,7 @@ ${captureGuard.reason || "当前还不能进入正式分析。"}`);
             this.clearActiveTurn(assistantMessage.turnId, abortController);
             return;
           }
+          const requestedCapture = resolveOpenedCaptureDescriptor(input.context);
           const workflowResult = await debuggerRuntime.requestStartFromConversation({
             source: "conversation",
             message: assistantMessage,
@@ -12059,6 +13562,8 @@ ${captureGuard.reason || "当前还不能进入正式分析。"}`);
             turnId: assistantMessage.turnId,
             mode: "debugger",
             goal: input.rawMessage,
+            captures: requestedCapture ? [requestedCapture] : void 0,
+            primaryCaptureId: requestedCapture?.id,
             replayDevice: input.context.replayDevice
           });
           if (abortController.signal.aborted) {
@@ -12093,15 +13598,17 @@ ${upgradeReply}`);
     commitAssistantMessage(finalStatus === "error" ? "message_errored" : "message_completed", {
       status: finalStatus,
       content: `${assistantContent}${systemAppendix}`,
-      reasoningTrace: finalizeTrace(
+      diagnostic: llmDiagnostic,
+      ...withCoworkReasoning(finalizeTrace(
         upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
-          status: errorViewModel ? "error" : "complete",
-          summary: errorViewModel ? "协作回复生成失败，已降级到本地兜底回复。" : "协作回复已完成。",
+          status: errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete",
+          summary: llmDiagnostic ? llmDiagnostic.code === "CONVERSATION_LLM_REQUEST_FAILED" ? "模型请求失败，已记录诊断。" : "模型链路不可用，已给出配置诊断。" : explicitDebuggerRequest ? "正式 Debugger 任务入口判断已完成。" : "协作回复已完成。",
+          detail: llmDiagnostic?.technicalMessage,
           completedAt: nowMs()
         }),
         traceStatus,
-        finalStatus === "error" ? "回复失败" : "回复已完成"
-      )
+        llmDiagnostic ? finalStatus === "error" ? "回复失败" : "等待模型配置" : explicitDebuggerRequest ? "已完成执行入口判断" : "回复已完成"
+      ))
     });
     this.clearActiveTurn(assistantMessage.turnId, abortController);
   }
@@ -12589,603 +14096,6 @@ function registerRuntimeTerminalHandlers() {
     }
   });
 }
-const REQUEST_TIMEOUT_MS$1 = 2e4;
-const CHATGPT_CALLBACK_PORT = 1455;
-const CHATGPT_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
-const CLAUDE_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
-const GITHUB_COPILOT_CLIENT_ID = "Iv1.b507a08c87ecfe98";
-const pendingFlows = /* @__PURE__ */ new Map();
-const isAccountProviderId = (providerId) => providerId === "claude-account" || providerId === "chatgpt-account" || providerId === "github-copilot";
-const isTestMode = () => process.env.RDC_AGENT_TEST_MODE === "1";
-const base64Url = (buffer) => buffer.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-const createPkce = () => {
-  const verifier = base64Url(crypto.randomBytes(32));
-  const challenge = base64Url(crypto.createHash("sha256").update(verifier).digest());
-  return { verifier, challenge };
-};
-const appendParams = (baseUrl, params) => {
-  const url2 = new URL(baseUrl);
-  for (const [key, value] of Object.entries(params)) {
-    url2.searchParams.set(key, value);
-  }
-  return url2.toString();
-};
-const normalizeAccountModels = (values) => {
-  const models = /* @__PURE__ */ new Map();
-  for (const value of values) {
-    const record = value && typeof value === "object" ? value : null;
-    const id = typeof value === "string" ? value.trim() : typeof record?.id === "string" ? record.id.trim() : typeof record?.name === "string" ? record.name.trim() : "";
-    if (!id || !isAgentRoutableAccountModel(id) || models.has(id)) {
-      continue;
-    }
-    models.set(id, {
-      id,
-      label: typeof record?.display_name === "string" && record.display_name.trim() ? record.display_name.trim() : id,
-      enabled: true
-    });
-  }
-  return Array.from(models.values()).sort((left, right) => left.id.localeCompare(right.id));
-};
-const isAgentRoutableAccountModel = (modelId) => {
-  const normalized = modelId.toLowerCase();
-  return !(normalized.includes("embedding") || normalized.includes("moderation") || normalized.includes("rerank") || normalized.includes("whisper") || normalized.includes("tts") || normalized.includes("dall-e") || normalized.includes("image") || normalized.includes("audio") || normalized.includes("realtime") || normalized.includes("transcribe"));
-};
-const parseProviderError$1 = (error) => {
-  if (error instanceof DOMException && error.name === "AbortError") {
-    return "Connection test timed out.";
-  }
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return "Provider connection failed.";
-};
-const isExpiringSoon = (expiresAt) => {
-  if (!expiresAt) {
-    return false;
-  }
-  const timestamp = new Date(expiresAt).getTime();
-  return Number.isFinite(timestamp) && timestamp <= Date.now() + 6e4;
-};
-const canRefreshBundle = (bundle) => Boolean(bundle.refreshToken || bundle.providerId === "github-copilot" && bundle.accessToken);
-const fetchJson = async (url2, init) => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS$1);
-  try {
-    const response = await fetch(url2, {
-      ...init,
-      signal: controller.signal
-    });
-    const text = await response.text();
-    const payload = text ? JSON.parse(text) : {};
-    if (!response.ok) {
-      const message = payload && typeof payload === "object" && typeof payload.error === "string" ? payload.error : `HTTP ${response.status}`;
-      throw new Error(message);
-    }
-    return payload;
-  } finally {
-    clearTimeout(timeout);
-  }
-};
-const parseModels = (payload) => {
-  if (!payload || typeof payload !== "object") {
-    return [];
-  }
-  const data = payload.data ?? payload.models;
-  return Array.isArray(data) ? normalizeAccountModels(data) : [];
-};
-class ProviderAccountAuthService {
-  async startLogin(providerId) {
-    if (!isAccountProviderId(providerId)) {
-      return this.status(providerId, "Provider does not support account login.");
-    }
-    if (providerId === "claude-account") {
-      return this.startClaudeLogin();
-    }
-    if (providerId === "chatgpt-account") {
-      return this.startChatGptLogin();
-    }
-    return this.startGitHubCopilotLogin();
-  }
-  async finishLogin(request) {
-    if (!isAccountProviderId(request.providerId)) {
-      return this.status(request.providerId, "Provider does not support account login.");
-    }
-    const flow = this.findFlow(request.providerId, request.flowId);
-    if (!flow) {
-      return this.status(request.providerId, "Login flow expired or was not started.", "failed");
-    }
-    try {
-      if (request.providerId === "claude-account") {
-        const bundle2 = await this.exchangeClaudeCode(flow, request.code?.trim() ?? "");
-        return this.persistAccount(request.providerId, bundle2);
-      }
-      if (request.providerId === "chatgpt-account") {
-        const bundle2 = await this.exchangeChatGptCode(flow, request.code?.trim() ?? "");
-        return this.persistAccount(request.providerId, bundle2);
-      }
-      const bundle = await this.pollGitHubDevice(flow);
-      return this.persistAccount(request.providerId, bundle);
-    } catch (error) {
-      flow.error = parseProviderError$1(error);
-      return this.status(request.providerId, flow.error, "failed");
-    }
-  }
-  async test(providerId) {
-    if (!isAccountProviderId(providerId)) {
-      return this.status(providerId, "Provider does not support account login.");
-    }
-    const bundle = this.readBundle(providerId);
-    if (!bundle) {
-      return this.status(providerId, "Account is not connected.");
-    }
-    try {
-      const activeBundle = await this.refreshBundleIfNeeded(bundle);
-      const models = await this.discoverModels(activeBundle);
-      if (models.length === 0) {
-        throw new Error("Account provider returned no usable models.");
-      }
-      settingsService.saveProviderAccountConnection(
-        providerId,
-        JSON.stringify(activeBundle),
-        models,
-        {
-          accountLabel: activeBundle.accountLabel,
-          planLabel: activeBundle.planLabel,
-          oauthExpiresAt: activeBundle.expiresAt,
-          oauthRefreshAvailable: canRefreshBundle(activeBundle)
-        }
-      );
-      return this.status(providerId);
-    } catch (error) {
-      return this.status(providerId, parseProviderError$1(error), "failed");
-    }
-  }
-  status(providerId, message, forcedState) {
-    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
-    const isAccount = isAccountProviderId(providerId);
-    const flow = isAccount ? this.findFlow(providerId) : null;
-    const connected = Boolean(provider?.isConfigured && provider.status === "verified");
-    const state2 = forcedState ?? (flow?.error ? "failed" : flow ? "pending" : connected ? "connected" : isAccount ? "signed-out" : "unavailable");
-    return {
-      providerId,
-      state: state2,
-      available: isAccount,
-      connected,
-      message: message ?? flow?.error ?? (connected ? "Connected" : flow ? "Waiting for authorization." : "Not connected"),
-      error: forcedState === "failed" ? message : flow?.error,
-      accountLabel: provider?.accountLabel,
-      planLabel: provider?.planLabel,
-      expiresAt: provider?.oauthExpiresAt,
-      authUrl: flow?.authUrl,
-      verificationUri: flow?.verificationUri,
-      userCode: flow?.userCode,
-      requiresCodeInput: Boolean(flow?.providerId === "claude-account" || isTestMode() && flow?.providerId === "chatgpt-account"),
-      models: provider?.models ?? []
-    };
-  }
-  logout(providerId) {
-    if (isAccountProviderId(providerId)) {
-      this.clearFlows(providerId);
-      settingsService.disconnectProvider(providerId);
-    }
-    return this.status(providerId);
-  }
-  startClaudeLogin() {
-    const { verifier, challenge } = createPkce();
-    const state2 = crypto.randomUUID();
-    const flow = {
-      providerId: "claude-account",
-      flowId: crypto.randomUUID(),
-      state: state2,
-      codeVerifier: verifier,
-      authUrl: appendParams("https://claude.ai/oauth/authorize", {
-        code: "true",
-        client_id: CLAUDE_CLIENT_ID,
-        response_type: "code",
-        redirect_uri: "https://console.anthropic.com/oauth/code/callback",
-        scope: "org:create_api_key user:profile user:inference",
-        code_challenge: challenge,
-        code_challenge_method: "S256",
-        state: state2
-      }),
-      expiresAt: Date.now() + 10 * 60 * 1e3
-    };
-    this.setFlow(flow);
-    void this.openExternal(flow.authUrl);
-    return this.status(flow.providerId);
-  }
-  startChatGptLogin() {
-    const { verifier, challenge } = createPkce();
-    const state2 = crypto.randomUUID();
-    const flow = {
-      providerId: "chatgpt-account",
-      flowId: crypto.randomUUID(),
-      state: state2,
-      codeVerifier: verifier,
-      authUrl: appendParams("https://auth.openai.com/oauth/authorize", {
-        client_id: CHATGPT_CLIENT_ID,
-        response_type: "code",
-        redirect_uri: `http://localhost:${CHATGPT_CALLBACK_PORT}/auth/callback`,
-        scope: "openid profile email offline_access",
-        code_challenge: challenge,
-        code_challenge_method: "S256",
-        state: state2,
-        codex_cli_simplified_flow: "true",
-        id_token_add_organizations: "true"
-      }),
-      expiresAt: Date.now() + 10 * 60 * 1e3
-    };
-    this.setFlow(flow);
-    if (!isTestMode()) {
-      this.startChatGptCallbackServer(flow);
-    }
-    void this.openExternal(flow.authUrl);
-    return this.status(flow.providerId);
-  }
-  async startGitHubCopilotLogin() {
-    const payload = await fetchJson("https://github.com/login/device/code", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        client_id: GITHUB_COPILOT_CLIENT_ID,
-        scope: "read:user"
-      })
-    });
-    const flow = {
-      providerId: "github-copilot",
-      flowId: crypto.randomUUID(),
-      state: crypto.randomUUID(),
-      deviceCode: payload.device_code,
-      userCode: payload.user_code,
-      verificationUri: payload.verification_uri,
-      intervalSeconds: payload.interval ?? 5,
-      expiresAt: Date.now() + (payload.expires_in ?? 900) * 1e3
-    };
-    this.setFlow(flow);
-    if (flow.verificationUri) {
-      void this.openExternal(flow.verificationUri);
-    }
-    void this.pollGitHubDevice(flow).then((bundle) => this.persistAccount("github-copilot", bundle)).catch((error) => {
-      flow.error = parseProviderError$1(error);
-    });
-    return this.status(flow.providerId);
-  }
-  async exchangeClaudeCode(flow, code) {
-    if (!code || !flow.codeVerifier) {
-      throw new Error("Authorization code is required.");
-    }
-    const payload = await fetchJson("https://platform.claude.com/v1/oauth/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "User-Agent": "RDC-Agent"
-      },
-      body: JSON.stringify({
-        grant_type: "authorization_code",
-        client_id: CLAUDE_CLIENT_ID,
-        code,
-        redirect_uri: "https://console.anthropic.com/oauth/code/callback",
-        code_verifier: flow.codeVerifier,
-        state: flow.state
-      })
-    });
-    if (!payload.access_token) {
-      throw new Error("Claude OAuth did not return an access token.");
-    }
-    return {
-      providerId: "claude-account",
-      accessToken: payload.access_token,
-      refreshToken: payload.refresh_token,
-      expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1e3).toISOString(),
-      accountLabel: "Claude Account",
-      planLabel: payload.scope
-    };
-  }
-  async exchangeChatGptCode(flow, code) {
-    if (!code || !flow.codeVerifier) {
-      throw new Error("Authorization code is required.");
-    }
-    const tokenPayload = await fetchJson("https://auth.openai.com/oauth/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        client_id: CHATGPT_CLIENT_ID,
-        code,
-        redirect_uri: `http://localhost:${CHATGPT_CALLBACK_PORT}/auth/callback`,
-        code_verifier: flow.codeVerifier
-      }).toString()
-    });
-    let apiKey = tokenPayload.access_token;
-    if (tokenPayload.id_token) {
-      try {
-        const exchangePayload = await fetchJson("https://auth.openai.com/oauth/token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          body: new URLSearchParams({
-            grant_type: "urn:ietf:params:oauth:grant-type:token-exchange",
-            client_id: CHATGPT_CLIENT_ID,
-            subject_token: tokenPayload.id_token,
-            subject_token_type: "urn:ietf:params:oauth:token-type:id_token",
-            requested_token: "openai-api-key"
-          }).toString()
-        });
-        apiKey = exchangePayload.access_token ?? apiKey;
-      } catch {
-      }
-    }
-    if (!apiKey) {
-      throw new Error("OpenAI OAuth did not return a usable credential.");
-    }
-    return {
-      providerId: "chatgpt-account",
-      accessToken: tokenPayload.access_token,
-      refreshToken: tokenPayload.refresh_token,
-      apiKey,
-      expiresAt: new Date(Date.now() + (tokenPayload.expires_in ?? 3600) * 1e3).toISOString(),
-      accountLabel: "ChatGPT Account"
-    };
-  }
-  async pollGitHubDevice(flow) {
-    if (!flow.deviceCode) {
-      throw new Error("GitHub device code is missing.");
-    }
-    let intervalSeconds = flow.intervalSeconds ?? 5;
-    for (; ; ) {
-      if (Date.now() > flow.expiresAt) {
-        throw new Error("GitHub authorization code expired.");
-      }
-      if (!isTestMode()) {
-        await new Promise((resolve) => setTimeout(resolve, intervalSeconds * 1e3));
-      }
-      const payload = await fetchJson("https://github.com/login/oauth/access_token", {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          client_id: GITHUB_COPILOT_CLIENT_ID,
-          device_code: flow.deviceCode,
-          grant_type: "urn:ietf:params:oauth:grant-type:device_code"
-        })
-      });
-      if (payload.error === "authorization_pending") {
-        if (isTestMode()) {
-          throw new Error("GitHub authorization is still pending.");
-        }
-        continue;
-      }
-      if (payload.error === "slow_down") {
-        intervalSeconds += 5;
-        continue;
-      }
-      if (payload.error) {
-        throw new Error(payload.error);
-      }
-      if (!payload.access_token) {
-        throw new Error("GitHub OAuth did not return an access token.");
-      }
-      const copilot = await fetchJson("https://api.github.com/copilot_internal/v2/token", {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          Authorization: `token ${payload.access_token}`,
-          "Editor-Version": "RDC-Agent/1.0",
-          "Editor-Plugin-Version": "RDC-Agent/1.0"
-        }
-      });
-      if (!copilot.token) {
-        throw new Error("GitHub Copilot did not return an API token.");
-      }
-      return {
-        providerId: "github-copilot",
-        accessToken: payload.access_token,
-        copilotToken: copilot.token,
-        copilotApiBaseUrl: copilot.endpoints?.api ?? "https://api.githubcopilot.com",
-        expiresAt: copilot.expires_at ? new Date(copilot.expires_at * 1e3).toISOString() : void 0,
-        accountLabel: "GitHub Copilot"
-      };
-    }
-  }
-  async persistAccount(providerId, bundle) {
-    const models = await this.discoverModels(bundle);
-    if (models.length === 0) {
-      throw new Error("Account provider returned no usable models.");
-    }
-    settingsService.saveProviderAccountConnection(
-      providerId,
-      JSON.stringify(bundle),
-      models,
-      {
-        accountLabel: bundle.accountLabel,
-        planLabel: bundle.planLabel,
-        oauthExpiresAt: bundle.expiresAt,
-        oauthRefreshAvailable: canRefreshBundle(bundle)
-      }
-    );
-    this.clearFlows(providerId);
-    return this.status(providerId);
-  }
-  async refreshBundleIfNeeded(bundle) {
-    if (!isExpiringSoon(bundle.expiresAt)) {
-      return bundle;
-    }
-    if (bundle.providerId === "github-copilot") {
-      if (!bundle.accessToken) {
-        return bundle;
-      }
-      const copilot = await fetchJson("https://api.github.com/copilot_internal/v2/token", {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          Authorization: `token ${bundle.accessToken}`,
-          "Editor-Version": "RDC-Agent/1.0",
-          "Editor-Plugin-Version": "RDC-Agent/1.0"
-        }
-      });
-      if (!copilot.token) {
-        throw new Error("GitHub Copilot did not return an API token.");
-      }
-      return {
-        ...bundle,
-        copilotToken: copilot.token,
-        copilotApiBaseUrl: copilot.endpoints?.api ?? bundle.copilotApiBaseUrl ?? "https://api.githubcopilot.com",
-        expiresAt: copilot.expires_at ? new Date(copilot.expires_at * 1e3).toISOString() : bundle.expiresAt
-      };
-    }
-    if (!bundle.refreshToken) {
-      return bundle;
-    }
-    if (bundle.providerId === "claude-account") {
-      const payload2 = await fetchJson("https://platform.claude.com/v1/oauth/token", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "User-Agent": "RDC-Agent"
-        },
-        body: JSON.stringify({
-          grant_type: "refresh_token",
-          client_id: CLAUDE_CLIENT_ID,
-          refresh_token: bundle.refreshToken
-        })
-      });
-      if (!payload2.access_token) {
-        throw new Error("Claude OAuth refresh did not return an access token.");
-      }
-      return {
-        ...bundle,
-        accessToken: payload2.access_token,
-        refreshToken: payload2.refresh_token ?? bundle.refreshToken,
-        expiresAt: new Date(Date.now() + (payload2.expires_in ?? 3600) * 1e3).toISOString(),
-        planLabel: payload2.scope ?? bundle.planLabel
-      };
-    }
-    const payload = await fetchJson("https://auth.openai.com/oauth/token", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        client_id: CHATGPT_CLIENT_ID,
-        refresh_token: bundle.refreshToken
-      }).toString()
-    });
-    if (!payload.access_token) {
-      throw new Error("OpenAI OAuth refresh did not return an access token.");
-    }
-    return {
-      ...bundle,
-      accessToken: payload.access_token,
-      apiKey: payload.access_token,
-      refreshToken: payload.refresh_token ?? bundle.refreshToken,
-      expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1e3).toISOString()
-    };
-  }
-  async discoverModels(bundle) {
-    if (bundle.providerId === "claude-account") {
-      const payload2 = await fetchJson("https://api.anthropic.com/v1/models", {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${bundle.accessToken}`,
-          "anthropic-version": "2023-06-01"
-        }
-      });
-      return parseModels(payload2);
-    }
-    if (bundle.providerId === "github-copilot") {
-      const baseUrl = (bundle.copilotApiBaseUrl ?? "https://api.githubcopilot.com").replace(/\/+$/, "");
-      const payload2 = await fetchJson(`${baseUrl}/models`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${bundle.copilotToken}`,
-          "Content-Type": "application/json",
-          "Copilot-Integration-Id": "vscode-chat",
-          "Editor-Version": "RDC-Agent/1.0",
-          "Editor-Plugin-Version": "RDC-Agent/1.0"
-        }
-      });
-      return parseModels(payload2);
-    }
-    const payload = await fetchJson("https://api.openai.com/v1/models", {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${bundle.apiKey ?? bundle.accessToken}`
-      }
-    });
-    return parseModels(payload);
-  }
-  readBundle(providerId) {
-    const raw = settingsService.getProviderOAuthSecret(providerId);
-    if (!raw) {
-      return null;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      return parsed.providerId === providerId ? parsed : null;
-    } catch {
-      return null;
-    }
-  }
-  findFlow(providerId, flowId) {
-    for (const flow of pendingFlows.values()) {
-      if (flow.providerId === providerId && (!flowId || flow.flowId === flowId) && Date.now() <= flow.expiresAt) {
-        return flow;
-      }
-    }
-    return null;
-  }
-  setFlow(flow) {
-    this.clearFlows(flow.providerId);
-    pendingFlows.set(flow.flowId, flow);
-  }
-  clearFlows(providerId) {
-    for (const [flowId, flow] of pendingFlows.entries()) {
-      if (flow.providerId === providerId) {
-        flow.server?.close();
-        pendingFlows.delete(flowId);
-      }
-    }
-  }
-  startChatGptCallbackServer(flow) {
-    const server = http.createServer((request, response) => {
-      const url2 = new URL(request.url ?? "/", `http://localhost:${CHATGPT_CALLBACK_PORT}`);
-      if (url2.pathname !== "/auth/callback" || url2.searchParams.get("state") !== flow.state) {
-        response.writeHead(400, { "Content-Type": "text/plain" });
-        response.end("Invalid OAuth callback.");
-        return;
-      }
-      const code = url2.searchParams.get("code") ?? "";
-      void this.finishLogin({ providerId: flow.providerId, flowId: flow.flowId, code }).then(() => {
-        response.writeHead(200, { "Content-Type": "text/html" });
-        response.end("<html><body>RDC Agent sign-in complete. You can return to the app.</body></html>");
-      }).catch((error) => {
-        response.writeHead(500, { "Content-Type": "text/plain" });
-        response.end(parseProviderError$1(error));
-      });
-    });
-    server.on("error", (error) => {
-      flow.error = parseProviderError$1(error);
-    });
-    server.listen(CHATGPT_CALLBACK_PORT, "127.0.0.1");
-    flow.server = server;
-  }
-  async openExternal(url2) {
-    if (!url2 || isTestMode()) {
-      return;
-    }
-    await electron.shell.openExternal(url2);
-  }
-}
-const providerAccountAuthService = new ProviderAccountAuthService();
 const REQUEST_TIMEOUT_MS = 2e4;
 function normalizeDiscoveredModels(values, filterModelId = () => true) {
   const models = /* @__PURE__ */ new Map();
@@ -13435,6 +14345,9 @@ class ProviderConnectionService {
     if (!baseUrl) {
       throw new ProviderConnectionError("请填写 Provider Base URL");
     }
+    if (provider.id === "kimi-code") {
+      return this.validateKimiCodeModels(apiKey, baseUrl, definition.recommendedModels);
+    }
     if (strategy === "anthropic-candidate-validation") {
       return this.validateAnthropicCandidateModels(provider, apiKey, baseUrl, definition.recommendedModels);
     }
@@ -13480,6 +14393,18 @@ class ProviderConnectionService {
       }
     }
     return toStaticModels(validModels);
+  }
+  async validateKimiCodeModels(apiKey, baseUrl, modelIds) {
+    const payload = await getJson(appendPath(baseUrl, "/models"), {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${apiKey}`
+      }
+    });
+    const availableModelIds = new Set(
+      parseModelsPayload("openai-compatible", payload).map((model) => model.id)
+    );
+    return toStaticModels(modelIds.filter((modelId) => availableModelIds.has(modelId)));
   }
   async validateAzureCandidateModels(apiKey, baseUrl, modelIds) {
     const validModels = [];
@@ -13565,7 +14490,11 @@ function registerSettingsLlmHandlers(context2) {
     return providerConnectionService.startProviderAccountLogin(providerId);
   });
   electron.ipcMain.handle("llm:getProviderAccountStatus", async (_event, providerId) => {
-    return providerConnectionService.getProviderAccountStatus(providerId);
+    const result = providerConnectionService.getProviderAccountStatus(providerId);
+    if (result.connected) {
+      context2.applyCurrentLlmConfig();
+    }
+    return result;
   });
   electron.ipcMain.handle("llm:finishProviderAccountLogin", async (_event, request) => {
     const result = await providerConnectionService.finishProviderAccountLogin(request);
@@ -13691,7 +14620,8 @@ function registerShellHandlers() {
     return {
       version: electron.app.getVersion(),
       productName: electron.app.getName(),
-      systemTheme: electron.nativeTheme.shouldUseDarkColors ? "dark" : "light"
+      systemTheme: electron.nativeTheme.shouldUseDarkColors ? "dark" : "light",
+      testMode: process.env.RDC_AGENT_TEST_MODE === "1"
     };
   });
   electron.ipcMain.handle("app:selectAvatar", async () => {

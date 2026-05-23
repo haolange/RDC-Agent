@@ -1241,8 +1241,8 @@ test('chat document flow expands with the main canvas when both sidebars are col
   await expect(page.locator('[data-testid="app-sidebar-left"]')).toHaveClass(/collapsed/);
   await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveClass(/collapsed/);
 
-  const assistantDocument = page.locator('.chat-message.assistant .assistant-document').first();
-  const userBubble = page.locator('.chat-message.user .message-bubble.user').first();
+  const assistantDocument = page.locator('[data-testid="assistant-document-flow"]').first();
+  const userBubble = page.locator('[data-testid="conversation-user-brief"]').first();
 
   await expect(assistantDocument).toBeVisible();
   await expect(userBubble).toBeVisible();
@@ -1251,7 +1251,7 @@ test('chat document flow expands with the main canvas when both sidebars are col
   const layout = await page.evaluate(() => {
     const main = document.querySelector('.app-main');
     const message = document.querySelector('.chat-message.assistant');
-    const documentBlock = document.querySelector('.chat-message.assistant .assistant-document');
+    const documentBlock = document.querySelector('[data-testid="assistant-document-flow"]');
 
     return {
       mainWidth: main?.getBoundingClientRect().width ?? 0,

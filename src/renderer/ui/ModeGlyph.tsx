@@ -13,6 +13,15 @@ const glyphByIcon = (
   icon: ModeIconKey,
 ): React.ReactNode => {
   switch (icon) {
+    case 'message-orbit':
+      return (
+        <>
+          <path d="M5 7.5c0-2 1.6-3.5 3.6-3.5h6.8C17.4 4 19 5.5 19 7.5v4.3c0 2-1.6 3.5-3.6 3.5h-3.2L8.4 19v-3.7h-.1C6.4 15.3 5 13.8 5 11.8z" />
+          <path d="M9 9.5h6" />
+          <path d="M9 12h3.8" />
+          <path d="M18.2 3.2 19.4 2l1.2 1.2 1.2 1.2-1.2 1.2-1.2 1.2-1.2-1.2L17 4.4z" />
+        </>
+      );
     case 'crosshair-bug':
       return (
         <>

@@ -22,7 +22,7 @@ export type BuiltinLlmProviderId =
   | 'huggingface'
   | 'glm-cn'
   | 'glm-global'
-  | 'kimi-coding-plan'
+  | 'kimi-code'
   | 'moonshot'
   | 'minimax-cn'
   | 'minimax-global'
@@ -55,6 +55,7 @@ export type LlmProviderModelDiscoveryStrategy =
   | 'google-ai-studio'
   | 'azure-openai'
   | 'ollama-tags'
+  | 'account-catalog'
   | 'static';
 
 export interface SidebarLayoutPreference {

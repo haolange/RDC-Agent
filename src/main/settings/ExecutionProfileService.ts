@@ -19,10 +19,16 @@ import type { WorkflowStage } from '@shared/types/workflow';
 import { STAGE_PHASES } from '@shared/constants/stages';
 import { AGENT_CATEGORIES, AGENT_WRITE_SCOPES } from '@shared/constants/agents';
 import { appPathService } from '../runtime/AppPathService';
+import { resolveCompatibleAgentRoute } from './LlmRouteCompatibility';
 
 const DEFAULT_MODE_PROFILE_ID = 'debugger.default';
 
 const DEFAULT_AGENT_PROMPTS: Record<AgentRole, string> = {
+  'ask_agent': [
+    'You are the RDC-Agent Ask assistant.',
+    'Stay non-executing: clarify intent, explain capabilities, summarize context, and guide the user to Open a .rdc capture when execution is needed.',
+    'Do not claim to be the RDC Debugger, do not claim that RenderDoc analysis has started, and do not use tool or shell capabilities.',
+  ].join(' '),
   'rdc-debugger': 'You are the RDC Debugger orchestrator. Coordinate the workflow, keep the run truthful, and drive the next best debugging step.',
   'triage_agent': 'You are the triage specialist. Classify the rendering issue, narrow the symptom family, and suggest the right investigation surfaces.',
   'capture_repro_agent': 'You are the capture reproduction specialist. Validate capture quality, frame consistency, and reproducibility anchors.',
@@ -35,7 +41,8 @@ const DEFAULT_AGENT_PROMPTS: Record<AgentRole, string> = {
 };
 
 const DEFAULT_AGENT_TOOLS: Record<AgentRole, string[]> = {
-  'rdc-debugger': ['rd.core.*', 'rd.session.*', 'rd.capture.*', 'rd.remote.*'],
+  'ask_agent': [],
+  'rdc-debugger': ['ui.ask_user_question', 'rd.core.*', 'rd.session.*', 'rd.capture.*', 'rd.remote.*'],
   'triage_agent': ['rd.session.get_context', 'rd.event.get_action_tree', 'rd.macro.summarize_frame'],
   'capture_repro_agent': ['rd.capture.get_info', 'rd.capture.list_frames', 'rd.context.snapshot'],
   'pass_graph_pipeline_agent': ['rd.pipeline.get_state_summary', 'rd.pipeline.get_output_targets', 'rd.macro.find_state_change_point'],
@@ -75,7 +82,7 @@ const DEFAULT_STAGE_POLICIES: StagePolicy[] = [
     agentPromptId: 'agent.rdc-debugger',
     systemPrompt: 'Establish case input, capture references, and canonical intake state for downstream agents.',
     notes: 'Produce the durable intake truth object.',
-    toolPolicy: { allowGroups: ['capture', 'session'] },
+    toolPolicy: { allowTools: ['ui.ask_user_question'], allowGroups: ['capture', 'session'] },
   },
   {
     id: 'stage.plan',
@@ -85,7 +92,7 @@ const DEFAULT_STAGE_POLICIES: StagePolicy[] = [
     agentPromptId: 'agent.rdc-debugger',
     systemPrompt: 'Expand the user goal into a structured investigation plan, hypotheses, and risk map.',
     notes: 'Planner phase.',
-    toolPolicy: { allowGroups: ['core', 'session'] },
+    toolPolicy: { allowTools: ['ui.ask_user_question'], allowGroups: ['core', 'session'] },
   },
   {
     id: 'stage.speclist',
@@ -335,18 +342,13 @@ export class ExecutionProfileService {
     providers: LlmProviderEntry[],
     agentId: AgentRole,
   ): LlmAgentRoute | null {
-    const route = routes.find((entry) => entry.agentId === agentId) || null;
-    if (!route) {
+    const resolution = resolveCompatibleAgentRoute(routes, providers, agentId);
+    if (!resolution.route || !resolution.provider) {
       return null;
     }
 
-    const provider = providers.find((entry) => entry.id === route.providerId);
-    if (!provider || !provider.enabled || !provider.isConfigured) {
-      return null;
-    }
-
-    const modelExists = provider.models.some((model) => model.enabled && model.id === route.modelId);
-    return modelExists ? route : null;
+    const modelExists = resolution.provider.models.some((model) => model.enabled && model.id === resolution.route?.modelId);
+    return modelExists ? resolution.route : null;
   }
 
   private readJson<T>(filePath: string): T | null {

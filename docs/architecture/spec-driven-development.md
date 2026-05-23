@@ -636,18 +636,26 @@ systemPrompt: [
 
 1. 每个 Agent 角色有独立固定的基础 System Prompt，不随对话历史漂移
 2. 阶段 System Prompt 在每次 `sendMessage` 时动态注入，确保约束新鲜
-3. Cowork 模式有专用 System Prompt（`buildCoworkSystemPrompt()`），与 Workflow 模式完全隔离
+3. Conversation 模式按 UI mode 分流：`Ask` 使用非执行 `ask_agent` prompt，`Debugger` 的 Cowork prompt 与 Workflow 模式隔离
 
-**Cowork System Prompt 模板**（来源：`src/main/conversation/ConversationService.ts`）：
+**Conversation System Prompt 分流**（来源：`src/main/conversation/ConversationService.ts`）：
 
 ```typescript
-function buildCoworkSystemPrompt(): string {
+function buildAskSystemPrompt(): string {
+  return [
+    '你是 RDC-Agent 的 Ask 助手，负责非执行对话。',
+    '不要自称 RDC Debugger，不要暗示已经开始 RenderDoc 调试，也不要假装分析过 capture。',
+    '如果用户要求正式调试或执行分析，只提示需要在应用内 Open capture 并切换到 Debugger。',
+  ].join('\n');
+}
+
+function buildDebuggerCoworkSystemPrompt(): string {
   return [
     '你是 RDC Debugger，一个面向 RenderDoc 调试场景的 Cowork Agent。',
     '1. 始终先用自然中文正常回答用户，不要像审批流或工单流。',
-    '2. 如果用户问通用知识、产品能力、技术概念，直接回答，不要强行往调试执行上拐。',
+    '2. 如果用户问通用知识、产品能力、技术概念，直接回答，不要强行转成调试执行。',
     '3. 没有正式进入调试 run 前，不要假装自己已经分析过 capture。',
-    '4. 只有当用户明确表达"现在开始正式调试/执行分析"，并且条件足够时，才把 intent 标成 execute。',
+    '4. 只有 requested_mode 是 Debugger、用户明确表达正式执行，且应用内已有 opened_capture 时，才把 intent 标成 execute。',
     '5. 回复正文结束后，必须额外附加一个 <control>{...}</control> 块，...',
     '6. 如果你不确定，就把 intent 设为 talk 或 intake，safe_to_start 设为 false。',
     '7. 控制块不要在正文里解释给用户。',
@@ -1654,7 +1662,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 3. 每次调用重新构建 System Prompt（不缓存带历史的 Prompt）
 4. Workflow 模式使用 Stage Policy 注入而非对话历史传递
 
-**检查代码**：`src/main/conversation/ConversationService.ts` 中的 `buildCoworkPrompt` 和 `buildCoworkSystemPrompt`
+**检查代码**：`src/main/conversation/ConversationService.ts` 中的 `buildCoworkPrompt`、`buildAskSystemPrompt` 和 `buildDebuggerCoworkSystemPrompt`
 
 ---
 

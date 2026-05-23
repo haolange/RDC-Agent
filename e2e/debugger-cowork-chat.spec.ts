@@ -46,7 +46,7 @@ test.afterEach(async () => {
   await closeApp(ctx);
 });
 
-test('配置好 route 后，普通寒暄会走 cowork agent 而不创建 run', async () => {
+test('Ask 普通寒暄不会伪装成 Debugger，也不创建 run', async () => {
   const projectRoot = path.join(ctx.tempDir, 'cowork-greeting-project');
   await seedProject(ctx.page, projectRoot);
   await configureTestDebuggerRoutes(ctx.page);
@@ -54,7 +54,10 @@ test('配置好 route 后，普通寒暄会走 cowork agent 而不创建 run', a
   await ctx.page.locator('textarea.chat-input').fill('你好');
   await ctx.page.locator('[data-testid="debugger-start-button"]').click();
 
-  await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('你好，我是 RDC Debugger');
+  await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('你好');
+  await expect(ctx.page.locator('[data-testid="chat-messages"]')).not.toContainText('RDC Debugger');
+  await expect(ctx.page.locator('[data-testid="assistant-reasoning-toggle"]')).toHaveCount(0);
+  await expect(ctx.page.locator('[data-testid="assistant-reasoning-panel"]')).toHaveCount(0);
   await expect(ctx.page.locator('[data-testid="plan-intake-panel"]')).toHaveCount(0);
   await expect.poll(async () => {
     return ctx.page.evaluate(() => (window as typeof window & {
@@ -78,7 +81,7 @@ test('配置好 route 后，通用技术问题会得到正常回答，而不是 
   await expect(ctx.page.locator('[data-testid="plan-intake-panel"]')).toHaveCount(0);
 });
 
-test('发送后用户消息立即入流、assistant 先出现 reasoning rail，且不会重复新增消息', async () => {
+test('Ask 发送后用户消息立即入流、assistant 不出现执行式 reasoning rail，且不会重复新增消息', async () => {
   const projectRoot = path.join(ctx.tempDir, 'cowork-stream-project');
   await seedProject(ctx.page, projectRoot);
   await configureTestDebuggerRoutes(ctx.page);
@@ -97,8 +100,8 @@ test('发送后用户消息立即入流、assistant 先出现 reasoning rail，�
   await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('你好');
   await expect(ctx.page.locator('[data-testid="conversation-turn"]')).toHaveCount(1);
   await expect(ctx.page.locator('[data-testid="conversation-user-brief"]')).toHaveCount(1);
-  await expect(ctx.page.locator('[data-testid="assistant-reasoning-toggle"]')).toHaveCount(1);
-  await expect(ctx.page.locator('[data-testid="assistant-reasoning-panel"]')).toHaveCount(1);
+  await expect(ctx.page.locator('[data-testid="assistant-reasoning-toggle"]')).toHaveCount(0);
+  await expect(ctx.page.locator('[data-testid="assistant-reasoning-panel"]')).toHaveCount(0);
   await expect(ctx.page.locator('[data-testid="assistant-document-flow"]')).toHaveCount(1);
 
   const userBubble = ctx.page.locator('.chat-message.user .message-bubble').first();
@@ -117,16 +120,13 @@ test('发送后用户消息立即入流、assistant 先出现 reasoning rail，�
   expect((userBriefBox?.width ?? 0)).toBeLessThan((assistantBox?.width ?? 0));
   await expect.poll(async () => userBubble.evaluate((element) => getComputedStyle(element).textAlign)).toBe('left');
 
-  await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('RDC Debugger');
-  const reasoningBox = await ctx.page.locator('[data-testid="assistant-reasoning-toggle"]').first().boundingBox();
+  await expect(ctx.page.locator('[data-testid="chat-messages"]')).not.toContainText('RDC Debugger');
   const assistantDocBox = await ctx.page.locator('[data-testid="conversation-assistant-card"]').first().boundingBox();
-  expect(reasoningBox).not.toBeNull();
   expect(assistantDocBox).not.toBeNull();
-  expect(reasoningBox?.y ?? 0).toBeLessThan(assistantDocBox?.y ?? 0);
   await expect.poll(async () => ctx.page.locator('[data-testid="assistant-document-flow"]').first().evaluate((element) => {
     const text = element.textContent ?? '';
     return (text.match(/RDC Debugger/g) ?? []).length;
-  })).toBe(1);
+  })).toBe(0);
   await expect.poll(async () => {
     return ctx.page.evaluate(() => (window as typeof window & {
       __RDC_AGENT_E2E__?: {
@@ -135,7 +135,46 @@ test('发送后用户消息立即入流、assistant 先出现 reasoning rail，�
     }).__RDC_AGENT_E2E__?.getWorkbenchState().conversationMessages.length ?? 0);
   }, { timeout: 5000 }).toBe(2);
 
-  const panelBox = await ctx.page.locator('[data-testid="assistant-reasoning-panel"]').first().boundingBox();
-  expect(panelBox).not.toBeNull();
-  expect(panelBox?.height ?? 0).toBeGreaterThan(24);
+});
+
+test('Cowork 模型请求失败时显示诊断，不伪装成本地兜底成功', async () => {
+  const projectRoot = path.join(ctx.tempDir, 'cowork-failure-project');
+  await seedProject(ctx.page, projectRoot);
+  await configureTestDebuggerRoutes(ctx.page);
+
+  await ctx.page.locator('textarea.chat-input').fill('你好 __RDC_AGENT_E2E_FORCE_COWORK_LLM_FAILURE__');
+  await ctx.page.locator('[data-testid="debugger-start-button"]').click();
+
+  await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('模型请求失败');
+  await expect(ctx.page.locator('[data-testid="conversation-message-diagnostic"]')).toContainText('CONVERSATION_LLM_REQUEST_FAILED');
+  await expect(ctx.page.locator('[data-testid="conversation-message-diagnostic"]')).toContainText('ollama/debugger-test-model');
+  await expect(ctx.page.locator('[data-testid="agent-thinking-trace"]')).toHaveCount(0);
+  await expect(ctx.page.locator('[data-testid="agent-thinking-area"]')).toHaveCount(0);
+  await expect(ctx.page.locator('[data-testid="chat-messages"]')).not.toContainText('已降级到本地兜底回复');
+
+  await expect.poll(async () => ctx.page.evaluate(() => {
+    const messages = (window as typeof window & {
+      __RDC_AGENT_E2E__?: {
+        getWorkbenchState: () => {
+          conversationMessages: Array<{
+            role: string;
+            status?: string;
+            diagnostic?: { code?: string; providerId?: string; modelId?: string } | null;
+          }>;
+        };
+      };
+    }).__RDC_AGENT_E2E__?.getWorkbenchState().conversationMessages ?? [];
+    const assistant = messages.find((message) => message.role === 'assistant');
+    return {
+      status: assistant?.status,
+      code: assistant?.diagnostic?.code,
+      providerId: assistant?.diagnostic?.providerId,
+      modelId: assistant?.diagnostic?.modelId,
+    };
+  }), { timeout: 5000 }).toEqual({
+    status: 'error',
+    code: 'CONVERSATION_LLM_REQUEST_FAILED',
+    providerId: 'ollama',
+    modelId: 'debugger-test-model',
+  });
 });

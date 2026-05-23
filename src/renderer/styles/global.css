@@ -831,16 +831,25 @@ a {
   text-align: left;
 }
 
-.composer-agent-menu-item:hover,
+.composer-agent-menu-item:hover:not(:disabled),
 .composer-agent-menu-item.active {
   background: rgb(var(--color-bg-3));
   color: rgb(var(--color-text-primary));
 }
 
+.composer-agent-menu-item:disabled,
+.composer-agent-menu-item.disabled {
+  cursor: not-allowed;
+  color: rgb(var(--color-text-tertiary));
+  opacity: 0.72;
+}
+
 .composer-agent-menu-item-copy {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .composer-agent-menu-item-icon {
@@ -851,6 +860,14 @@ a {
 
 .composer-agent-menu-item-label {
   font-size: var(--text-sm);
+}
+
+.composer-agent-menu-item-hint {
+  grid-column: 2;
+  margin-top: -4px;
+  color: rgb(var(--color-text-tertiary));
+  font-size: 10px;
+  line-height: 1.25;
 }
 
 .composer-agent-menu-item-check {

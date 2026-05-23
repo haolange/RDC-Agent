@@ -20,6 +20,7 @@ import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import { useSessionStore } from '../../../stores/sessionStore';
 import { EmptyWorkbenchPrompt } from '../../../patterns/EmptyWorkbenchPrompt';
 import { AgentMessageTimeline } from '../AgentMessageTimeline';
+import { PlanApprovalCard } from '../PlanIntakePanel';
 import './AgentChat.css';
 
 const STICKY_SCROLL_THRESHOLD = 96;
@@ -54,6 +55,8 @@ interface ToolSource {
   durationMs?: number;
 }
 
+const ASK_USER_TOOL_NAME = 'ui.ask_user_question';
+
 interface ArtifactSource {
   id: string;
   name: string;
@@ -61,6 +64,10 @@ interface ArtifactSource {
   mimeType?: string;
   sizeBytes?: number;
   artifactType: ArtifactPayload['artifactType'];
+}
+
+interface AssistantMessagePayload {
+  diagnostic?: ConversationMessage['diagnostic'];
 }
 
 const sanitizeId = (value: string): string => value.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -247,10 +254,28 @@ const collectTurnEvents = (turn: TurnInput, actionEvents: ActionEvent[]): Action
 const collectToolSources = (turn: TurnInput, events: ActionEvent[]): ToolSource[] => {
   const tools: ToolSource[] = [];
 
+  const upsertTool = (tool: ToolSource) => {
+    const existingIndex = tools.findIndex((entry) => entry.id === tool.id && entry.toolName === tool.toolName);
+    if (existingIndex < 0) {
+      tools.push(tool);
+      return;
+    }
+    const existing = tools[existingIndex];
+    tools[existingIndex] = {
+      ...existing,
+      ...tool,
+      argumentsRaw: existing.argumentsRaw ?? tool.argumentsRaw,
+      argumentsSummary: existing.argumentsSummary || tool.argumentsSummary,
+      startedAt: Math.min(existing.startedAt, tool.startedAt),
+      completedAt: tool.completedAt ?? existing.completedAt,
+      durationMs: tool.durationMs ?? existing.durationMs,
+    };
+  };
+
   for (const message of turn.assistantMessages) {
     for (const step of message.reasoningTrace?.steps ?? []) {
       for (const toolCall of step.toolCalls) {
-        tools.push({
+        upsertTool({
           id: `${message.id}-${toolCall.id}`,
           toolName: toolCall.toolName,
           status: toolCall.status === 'error' ? 'failed' : toolCall.status === 'running' ? 'running' : 'succeeded',
@@ -269,10 +294,42 @@ const collectToolSources = (turn: TurnInput, events: ActionEvent[]): ToolSource[
 
   for (const event of events.filter((entry) => entry.event_type === 'tool_execution')) {
     const toolName = String(event.payload.tool_name || event.payload.toolName || 'tool');
+    if (toolName === ASK_USER_TOOL_NAME) {
+      const promptId = String(event.payload.prompt_id || event.event_id);
+      const questions = Array.isArray(event.payload.questions) ? event.payload.questions : [];
+      const answers = Array.isArray(event.payload.answers) ? event.payload.answers : [];
+      const questionCount = Number(event.payload.question_count || questions.length || 0);
+      const isAnswer = String(event.payload.phase || '') === 'answer' || answers.length > 0;
+      upsertTool({
+        id: `ask-user-${promptId}`,
+        toolName,
+        status: isAnswer ? 'succeeded' : 'waiting_user',
+        argumentsSummary: `已询问 ${Math.max(questionCount, 1)} 个问题`,
+        resultSummary: isAnswer
+          ? firstLine(String(event.payload.answerSummary || `已回答 ${answers.length} 个问题。`), '已回答用户问题。')
+          : '等待用户选择。',
+        argumentsRaw: {
+          title: event.payload.title,
+          summary: event.payload.summary,
+          questions,
+        },
+        resultRaw: isAnswer
+          ? {
+              answers,
+              answerSummary: event.payload.answerSummary,
+            }
+          : undefined,
+        startedAt: event.ts_ms,
+        completedAt: isAnswer ? event.ts_ms + event.duration_ms : undefined,
+        durationMs: isAnswer ? event.duration_ms : undefined,
+      });
+      continue;
+    }
+
     const error = event.status === 'error' || event.status === 'fail'
       ? formatJsonPreview(event.payload.error || event.payload.message || '工具调用失败。')
       : undefined;
-    tools.push({
+    upsertTool({
       id: event.event_id,
       toolName,
       status: statusFromEvent(event),
@@ -426,6 +483,13 @@ const createToolNode = (
   return node;
 };
 
+const isContextToolSource = (tool: ToolSource): boolean => {
+  const name = tool.toolName.toLowerCase();
+  return /(^|[._:-])(read|grep|glob|search|list|ls|context|context_snapshot|snapshot)([._:-]|$)/.test(name)
+    || name.includes('web.search')
+    || name.includes('web_search');
+};
+
 const hasReasoningTrace = (message: ConversationMessage): boolean =>
   Boolean(message.reasoningTrace?.steps.some((step) => (
     step.summary
@@ -434,6 +498,41 @@ const hasReasoningTrace = (message: ConversationMessage): boolean =>
     || step.status === 'running'
     || step.status === 'error'
   )));
+
+const isCoworkReasoningMessage = (message: ConversationMessage): boolean => {
+  const steps = message.reasoningTrace?.steps ?? [];
+  return !message.runId && steps.length > 0 && steps.every((step) => step.id.startsWith('cowork-'));
+};
+
+const isCoworkOnlyTrace = (
+  turn: TurnInput,
+  actualRunId: string | undefined,
+  events: ActionEvent[],
+): boolean => (
+  !actualRunId
+  && events.length === 0
+  && turn.assistantMessages.some(isCoworkReasoningMessage)
+  && turn.assistantMessages.every((message) => !hasReasoningTrace(message) || isCoworkReasoningMessage(message))
+);
+
+const titleFromTraceStatus = (status: AgentNodeStatus, compact: boolean): string => {
+  if (status === 'running' || status === 'streaming' || status === 'waiting_tool') {
+    return '正在思考';
+  }
+  if (status === 'failed') {
+    return compact ? '回复失败' : '执行失败';
+  }
+  if (status === 'blocked') {
+    return '等待配置或确认';
+  }
+  if (status === 'partial_succeeded') {
+    return '部分完成';
+  }
+  if (status === 'cancelled') {
+    return '已停止';
+  }
+  return '已完成思考';
+};
 
 const collectReasoningSteps = (turn: TurnInput): Array<{
   messageId: string;
@@ -529,6 +628,11 @@ const buildTraceProjection = (
   const builder = createBuilder(`projection-${sanitizeId(turn.turnId)}`, turn.turnId, runId, turn.messages);
   const baseTime = turn.createdAt;
   const assistantStatus = aggregateStatus(turn.assistantMessages.map(statusFromMessage));
+  const coworkTrace = isCoworkOnlyTrace(turn, actualRunId, events);
+  const latestDiagnostic = turn.assistantMessages
+    .slice()
+    .reverse()
+    .find((message) => message.diagnostic)?.diagnostic ?? null;
 
   if (turn.userMessage) {
     builder.addNode({
@@ -564,18 +668,23 @@ const buildTraceProjection = (
   );
 
   if (hasTraceDetails) {
-    const runStatus = aggregateStatus([
-      assistantStatus,
-      ...events.map(statusFromEvent),
-      ...reasoningSteps.map((step) => step.status),
-      ...harnessTasks.map((task) => statusFromHarness(task.status)),
-    ]);
+    const runStatus = coworkTrace
+      ? latestDiagnostic?.code === 'CONVERSATION_LLM_ROUTE_MISSING'
+        ? 'blocked'
+        : assistantStatus
+      : aggregateStatus([
+          assistantStatus,
+          ...events.map(statusFromEvent),
+          ...reasoningSteps.map((step) => step.status),
+          ...harnessTasks.map((task) => statusFromHarness(task.status)),
+        ]);
     const traceNode = builder.addNode<AgentRunPayload>({
       id: `${turn.turnId}-trace`,
       type: 'agent_run',
       status: runStatus,
-      title: runStatus === 'running' || runStatus === 'streaming' ? '正在思考' : '已完成思考',
-      summary: traceMessages[traceMessages.length - 1]?.reasoningTrace?.summary
+      title: titleFromTraceStatus(runStatus, coworkTrace),
+      summary: (coworkTrace ? latestDiagnostic?.userMessage : undefined)
+        ?? traceMessages[traceMessages.length - 1]?.reasoningTrace?.summary
         ?? plan?.scope
         ?? firstLine(turn.assistantMessages[0]?.content, 'Agent 轨迹'),
       runId,
@@ -589,12 +698,15 @@ const buildTraceProjection = (
           ? Math.max(...events.map((event) => event.ts_ms + event.duration_ms)) - baseTime
           : undefined,
       },
+      ui: {
+        density: coworkTrace ? 'compact' : 'normal',
+      },
       payload: {
-        agentName: 'Agent',
+        agentName: coworkTrace ? 'Cowork' : 'Agent',
         objective: plan?.userGoal ?? turn.userMessage?.content ?? '处理当前请求。',
         inputSummary: turn.userMessage?.content,
         planSummary: plan?.scope,
-        executionMode: 'debugging',
+        executionMode: coworkTrace ? 'single_agent' : 'debugging',
         progress: {
           completed: reasoningSteps.filter((step) => step.status === 'succeeded').length
             + toolSources.filter((tool) => tool.status === 'succeeded').length
@@ -698,7 +810,48 @@ const buildTraceProjection = (
         aggregateStatus(toolSources.map((tool) => tool.status)),
         traceNode.id,
       );
-      toolSources.forEach((tool, index) => createToolNode(builder, tool, `${turn.turnId}-tool`, index + 1, toolGroup.id));
+      let toolIndex = 0;
+      let order = 1;
+      while (toolIndex < toolSources.length) {
+        const contextRun: ToolSource[] = [];
+        while (toolIndex < toolSources.length && isContextToolSource(toolSources[toolIndex])) {
+          contextRun.push(toolSources[toolIndex]);
+          toolIndex += 1;
+        }
+
+        if (contextRun.length >= 3) {
+          const contextGroup = createGroupNode(
+            builder,
+            `${turn.turnId}-context-tools-${order}`,
+            `已读取/已搜索 ${contextRun.length} 次`,
+            contextRun[contextRun.length - 1]?.resultSummary || '上下文收集工具已完成。',
+            order,
+            contextRun[0].startedAt,
+            'tool_group',
+            aggregateStatus(contextRun.map((tool) => tool.status)),
+            toolGroup.id,
+          );
+          contextGroup.defaultExpanded = false;
+          contextRun.forEach((tool, index) => createToolNode(
+            builder,
+            tool,
+            `${turn.turnId}-context-tool-${order}`,
+            index + 1,
+            contextGroup.id,
+          ));
+          order += 1;
+          continue;
+        }
+
+        const directTools = contextRun.length > 0 ? contextRun : [toolSources[toolIndex]];
+        if (contextRun.length === 0) {
+          toolIndex += 1;
+        }
+        directTools.forEach((tool) => {
+          createToolNode(builder, tool, `${turn.turnId}-tool`, order, toolGroup.id);
+          order += 1;
+        });
+      }
     }
 
     if (harnessTasks.length > 0 || plan?.missingInfo?.length || plan?.blockers?.length) {
@@ -856,7 +1009,7 @@ const buildTraceProjection = (
   turn.assistantMessages
     .filter((message) => message.content.trim().length > 0)
     .forEach((message, index) => {
-      builder.addNode({
+      builder.addNode<AssistantMessagePayload>({
         id: `${message.id}-assistant`,
         type: 'assistant_message',
         status: statusFromMessage(message),
@@ -866,6 +1019,9 @@ const buildTraceProjection = (
         turnId: turn.turnId,
         order: 3 + index,
         createdAt: message.createdAt,
+        payload: {
+          diagnostic: message.diagnostic ?? null,
+        },
       });
     });
 
@@ -879,10 +1035,39 @@ const buildTimelineProjections = (
   currentDebugPlan: DebugPlan | null,
 ): TimelineProjection[] => {
   const turns = groupMessagesByTurn(messages);
+  const coveredRunIds = new Set(turns.flatMap((turn) => turn.runIds));
+  const eventsByUncoveredRun = new Map<string, ActionEvent[]>();
+
+  for (const event of actionEvents) {
+    if (workflowState?.runId && event.run_id !== workflowState.runId) {
+      continue;
+    }
+    if (coveredRunIds.has(event.run_id)) {
+      continue;
+    }
+    const events = eventsByUncoveredRun.get(event.run_id) ?? [];
+    events.push(event);
+    eventsByUncoveredRun.set(event.run_id, events);
+  }
+
+  for (const [runId, events] of eventsByUncoveredRun) {
+    const sortedEvents = events.slice().sort((left, right) => left.ts_ms - right.ts_ms);
+    turns.push({
+      turnId: `run-${sanitizeId(runId)}`,
+      messages: [],
+      assistantMessages: [],
+      runIds: [runId],
+      createdAt: sortedEvents[0]?.ts_ms ?? Date.now(),
+    });
+  }
+
   if (turns.length === 0) {
     return [];
   }
-  return turns.map((turn) => buildTraceProjection(turn, actionEvents, workflowState, currentDebugPlan));
+  return turns
+    .slice()
+    .sort((left, right) => left.createdAt - right.createdAt)
+    .map((turn) => buildTraceProjection(turn, actionEvents, workflowState, currentDebugPlan));
 };
 
 export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
@@ -947,6 +1132,7 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
           projections={projections}
           emptyState={<EmptyWorkbenchPrompt mode={mode} />}
         />
+        <PlanApprovalCard />
       </div>
     </div>
   );

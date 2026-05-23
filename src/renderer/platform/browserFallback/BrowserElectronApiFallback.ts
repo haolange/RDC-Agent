@@ -468,6 +468,7 @@ class BrowserElectronApiFallback {
         version: 'browser-preview',
         productName: 'RDC Agent Browser Preview',
         systemTheme: 'dark',
+        testMode: false,
       }),
     },
 

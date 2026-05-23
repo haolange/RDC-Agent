@@ -4,9 +4,11 @@ import type { LLMMessage, LLMRequest, LLMResponse } from '@shared/types/llm';
 import type { RunContextUsageSummary } from '@shared/types/session';
 import type { Blocker, WorkflowStage } from '@shared/types/workflow';
 import { BLOCKER_CODES } from '@shared/constants/blockers';
-import type { LlmProviderEntry } from '@shared/types/settings';
+import type { LlmProviderEntry, LlmProviderId } from '@shared/types/settings';
 import { llmAdapter } from '../settings/LLMAdapter';
+import { providerAccountAuthService } from '../settings/ProviderAccountAuthService';
 import { settingsService } from '../settings/SettingsService';
+import { resolveCompatibleAgentRoute } from './LlmRouteCompatibility';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
@@ -19,6 +21,8 @@ export interface ResolvedDebuggerRoute {
   provider: LlmProviderEntry;
   providerId: string;
   modelId: string;
+  requestedModelId?: string;
+  remapReason?: string;
 }
 
 export interface LlmCallContext {
@@ -273,6 +277,13 @@ export class DebuggerLlmService {
     };
   }
 
+  private async refreshAccountRuntimeCredentials(route: ResolvedDebuggerRoute): Promise<void> {
+    if (route.provider.authMode !== 'account') {
+      return;
+    }
+    await providerAccountAuthService.ensureRuntimeCredentials(route.providerId as LlmProviderId);
+  }
+
   getRouteBlockers(
     agentIds: AgentRole[],
     stage: LlmAuditStage,
@@ -305,7 +316,9 @@ export class DebuggerLlmService {
     stage: LlmAuditStage,
     settings = settingsService.getAll(),
   ): ResolvedDebuggerRoute {
-    const route = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
+    const requestedRoute = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
+    const resolution = resolveCompatibleAgentRoute(settings.llm.agentRoutes, settings.llm.providers, agentId);
+    const route = resolution.route;
     if (!route?.providerId || !route.modelId) {
       throw new DebuggerLlmBlockerError(makeBlocker(
         BLOCKER_CODES.BLOCKED_LLM_ROUTE_MISSING.code,
@@ -314,7 +327,7 @@ export class DebuggerLlmService {
       ));
     }
 
-    const provider = settings.llm.providers.find((entry) => entry.id === route.providerId);
+    const provider = resolution.provider ?? settings.llm.providers.find((entry) => entry.id === route.providerId);
     if (!provider || !provider.enabled) {
       throw new DebuggerLlmBlockerError(makeBlocker(
         BLOCKER_CODES.BLOCKED_LLM_PROVIDER_MISSING.code,
@@ -353,6 +366,8 @@ export class DebuggerLlmService {
       provider,
       providerId: provider.id,
       modelId: route.modelId,
+      requestedModelId: resolution.requestedModelId ?? requestedRoute?.modelId,
+      remapReason: resolution.remapReason,
     };
   }
 
@@ -381,6 +396,7 @@ export class DebuggerLlmService {
       };
     }
 
+    await this.refreshAccountRuntimeCredentials(route);
     llmAdapter.configure(settingsService.getLlmConfig());
 
     try {
@@ -430,6 +446,7 @@ export class DebuggerLlmService {
 
     const settings = settingsService.getAll();
     const route = this.resolveRoute(input.agentId, input.stage, settings);
+    await this.refreshAccountRuntimeCredentials(route);
     llmAdapter.configure(settingsService.getLlmConfig());
     const useNativeJsonObject = shouldUseNativeJsonObject(route);
 
@@ -519,6 +536,8 @@ export class DebuggerLlmService {
         stage: route.stage,
         providerId: route.providerId,
         modelId: route.modelId,
+        requestedModelId: route.requestedModelId,
+        remapReason: route.remapReason,
         requestId: response.id,
         usage: response.usage,
       },
@@ -539,6 +558,8 @@ export class DebuggerLlmService {
         stage: route.stage,
         providerId: route.providerId,
         modelId: route.modelId,
+        requestedModelId: route.requestedModelId,
+        remapReason: route.remapReason,
         requestId: response.id,
         usage: response.usage,
         summary,
@@ -567,6 +588,8 @@ export class DebuggerLlmService {
         stage: route.stage,
         providerId: route.providerId,
         modelId: route.modelId,
+        requestedModelId: route.requestedModelId,
+        remapReason: route.remapReason,
       },
     });
 
@@ -585,6 +608,8 @@ export class DebuggerLlmService {
         stage: route.stage,
         providerId: route.providerId,
         modelId: route.modelId,
+        requestedModelId: route.requestedModelId,
+        remapReason: route.remapReason,
         summary: errorMessage,
       },
     });

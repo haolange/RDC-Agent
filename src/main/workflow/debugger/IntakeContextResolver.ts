@@ -2,9 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import type {
-  AppMode,
   CaptureDescriptor,
   DebugSessionStartRequest,
+  ExecutableAppMode,
   ProjectInputRecord,
   ProjectRecord,
   SessionRecord,
@@ -61,7 +61,7 @@ function parseEventId(text: string): number | undefined {
   return Number.isFinite(eventId) ? eventId : undefined;
 }
 
-function inferBackend(goal: string, requestMode: AppMode): 'local' | 'remote' {
+function inferBackend(goal: string, requestMode: ExecutableAppMode): 'local' | 'remote' {
   if (requestMode !== 'debugger') {
     return 'local';
   }

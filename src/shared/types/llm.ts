@@ -121,6 +121,7 @@ export interface LLMProviderConfig {
   enabled: boolean;
   apiKey: string;
   baseUrl?: string;
+  accountId?: string;
   models: string[];
   docsUrl?: string;
 }

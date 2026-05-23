@@ -2,10 +2,13 @@
  * Layout Types - Layout and mode-related type definitions
  */
 
-// Agent work modes
-export type AgentMode = 'debugger' | 'analyzer' | 'optimizer';
+import type { ExecutableAppMode } from './session';
 
-export type ModeIconKey = 'crosshair-bug' | 'waveform-gauge' | 'spark-tuning';
+// UI work modes. Ask is UI/conversation-only and must not be persisted as a run mode.
+export type ExecutableAgentMode = ExecutableAppMode;
+export type AgentMode = 'ask' | ExecutableAgentMode;
+
+export type ModeIconKey = 'message-orbit' | 'crosshair-bug' | 'waveform-gauge' | 'spark-tuning';
 
 // Mode configuration
 export interface ModeConfig {

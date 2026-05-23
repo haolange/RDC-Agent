@@ -16,6 +16,7 @@ import type {
   TimelineProjection,
   ToolCallPayload,
 } from '@shared/types/agentTimeline';
+import type { ConversationMessageDiagnostic } from '@shared/types/conversation';
 import './AgentMessageTimeline.css';
 
 interface AgentMessageTimelineProps {
@@ -24,6 +25,10 @@ interface AgentMessageTimelineProps {
 }
 
 type ExpandedState = Record<string, boolean>;
+
+interface AssistantMessagePayload {
+  diagnostic?: ConversationMessageDiagnostic | null;
+}
 
 const statusLabel: Record<AgentNodeStatus, string> = {
   pending: '待处理',
@@ -76,6 +81,26 @@ const formatSize = (size?: number): string => {
 
 const hasFailure = (status: AgentNodeStatus): boolean =>
   status === 'failed' || status === 'blocked' || status === 'partial_succeeded';
+
+const titleFromRunStatus = (node: AgentNode, payload?: AgentRunPayload): string => {
+  const compact = node.ui?.density === 'compact' || payload?.executionMode === 'single_agent';
+  if (node.status === 'running' || node.status === 'streaming' || node.status === 'waiting_tool') {
+    return '正在思考';
+  }
+  if (node.status === 'failed') {
+    return compact ? '回复失败' : '执行失败';
+  }
+  if (node.status === 'blocked') {
+    return '等待配置或确认';
+  }
+  if (node.status === 'partial_succeeded') {
+    return '部分完成';
+  }
+  if (node.status === 'cancelled') {
+    return '已停止';
+  }
+  return '已完成思考';
+};
 
 const shouldDefaultExpand = (node: AgentNode, collapseSuccessfulTools: boolean): boolean => {
   if (node.type === 'tool_call' && collapseSuccessfulTools && node.status === 'succeeded') {
@@ -220,12 +245,16 @@ const ToolCallView: React.FC<{
 }> = ({ node, expanded, onToggle }) => {
   const payload = getPayload<ToolCallPayload>(node);
   const duration = formatDuration(node.metrics?.durationMs);
+  const inlineSummary = payload?.toolName === 'ui.ask_user_question'
+    ? (node.summary || payload?.resultSummary || payload?.argumentsSummary)
+    : '';
 
   return (
     <div className={`amt-tool-call amt-node-status-${node.status}`} data-testid="agent-timeline-tool-call" data-node-id={node.id}>
       <div className="amt-tool-call-header">
         <span className="amt-tool-icon" aria-hidden="true">⌁</span>
         <span className="amt-tool-name">{payload?.toolName ?? node.title}</span>
+        {inlineSummary ? <span className="amt-tool-summary">{inlineSummary}</span> : null}
         {duration ? <span className="amt-muted">{duration}</span> : null}
         <StatusBadge status={node.status} />
         <ExpandButton expanded={expanded} onClick={onToggle} label={`切换 ${node.title}`} />
@@ -615,14 +644,15 @@ const AgentRunView: React.FC<{
   const expanded = expandedState[node.id] ?? shouldDefaultExpand(node, collapseSuccessfulTools);
   const duration = formatDuration(node.metrics?.durationMs);
   const isActive = node.status === 'running' || node.status === 'streaming' || node.status === 'waiting_tool';
+  const isCompact = node.ui?.density === 'compact' || payload?.executionMode === 'single_agent';
   const progressText = payload?.progress
     ? `${payload.progress.total} 步`
     : `${children.length} 组`;
-  const title = isActive ? '正在思考' : '已完成思考';
+  const title = titleFromRunStatus(node, payload);
 
   return (
     <article
-      className={`amt-thinking-trace ${isActive ? 'is-active' : ''}`}
+      className={`amt-thinking-trace amt-thinking-status-${node.status} ${isActive ? 'is-active' : ''} ${isCompact ? 'is-compact' : ''}`}
       data-testid="agent-thinking-trace"
       data-node-id={node.id}
     >
@@ -678,21 +708,35 @@ const UserMessageView: React.FC<{ node: AgentNode }> = ({ node }) => (
   </article>
 );
 
-const AssistantMessageView: React.FC<{ node: AgentNode }> = ({ node }) => (
-  <article
-    className="amt-assistant-message chat-message assistant"
-    data-testid="agent-timeline-assistant-message"
-    data-node-id={node.id}
-  >
-    <div className="amt-avatar amt-assistant-avatar" aria-hidden="true">A</div>
-    <div className="amt-assistant-bubble message-bubble" data-testid="conversation-assistant-card">
-      <div data-testid="assistant-document-flow">
-      <p>{node.summary}</p>
-      <span>{formatTime(node.createdAt)}</span>
+const AssistantMessageView: React.FC<{ node: AgentNode }> = ({ node }) => {
+  const payload = getPayload<AssistantMessagePayload>(node);
+  const diagnostic = payload?.diagnostic ?? null;
+  const routeLabel = [diagnostic?.providerId, diagnostic?.modelId].filter(Boolean).join('/');
+
+  return (
+    <article
+      className={`amt-assistant-message chat-message assistant ${diagnostic ? 'has-diagnostic' : ''}`}
+      data-testid="agent-timeline-assistant-message"
+      data-node-id={node.id}
+    >
+      <div className="amt-avatar amt-assistant-avatar" aria-hidden="true">A</div>
+      <div className="amt-assistant-bubble message-bubble" data-testid="conversation-assistant-card">
+        <div data-testid="assistant-document-flow">
+          <p>{node.summary}</p>
+          {diagnostic ? (
+            <div className={`amt-assistant-diagnostic is-${diagnostic.severity}`} data-testid="conversation-message-diagnostic">
+              <strong>模型链路诊断</strong>
+              <span>{diagnostic.code}</span>
+              {routeLabel ? <span>{routeLabel}</span> : null}
+              {diagnostic.technicalMessage ? <code>{diagnostic.technicalMessage}</code> : null}
+            </div>
+          ) : null}
+          <span>{formatTime(node.createdAt)}</span>
+        </div>
       </div>
-    </div>
-  </article>
-);
+    </article>
+  );
+};
 
 const ProjectionView: React.FC<{
   projection: TimelineProjection;
