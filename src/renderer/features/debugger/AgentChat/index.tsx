@@ -3,7 +3,6 @@ import type {
   AgentEdge,
   AgentNode,
   AgentNodeStatus,
-  AgentRunPayload,
   ArtifactPayload,
   EvidencePayload,
   GroupPayload,
@@ -56,6 +55,15 @@ interface ToolSource {
 }
 
 const ASK_USER_TOOL_NAME = 'ui.ask_user_question';
+const WORKFLOW_STATUS_MESSAGE_PATTERNS = [
+  /^已进入执行前\s*intake/u,
+  /^收到，执行前置条件/u,
+  /^计划已批准/u,
+  /^正在/u,
+  /^我已经为你重建/u,
+  /^本轮调试已停止/u,
+  /^执行失败：/u,
+] as const;
 
 interface ArtifactSource {
   id: string;
@@ -246,13 +254,22 @@ const groupMessagesByTurn = (messages: ConversationMessage[]): TurnInput[] => {
 
 const collectTurnEvents = (turn: TurnInput, actionEvents: ActionEvent[]): ActionEvent[] => {
   const runIds = new Set(turn.runIds);
+  const isSyntheticRunTurn = turn.messages.length === 0 && runIds.size > 0;
   return actionEvents
-    .filter((event) => event.turn_id === turn.turnId || runIds.has(event.run_id))
+    .filter((event) => (
+      event.turn_id === turn.turnId
+      || ((!event.turn_id || isSyntheticRunTurn) && runIds.has(event.run_id))
+    ))
     .sort((left, right) => left.ts_ms - right.ts_ms);
 };
 
 const collectToolSources = (turn: TurnInput, events: ActionEvent[]): ToolSource[] => {
   const tools: ToolSource[] = [];
+  const eventToolNames = new Set(
+    events
+      .filter((entry) => entry.event_type === 'tool_execution')
+      .map((entry) => String(entry.payload.tool_name || entry.payload.toolName || 'tool')),
+  );
 
   const upsertTool = (tool: ToolSource) => {
     const existingIndex = tools.findIndex((entry) => entry.id === tool.id && entry.toolName === tool.toolName);
@@ -275,6 +292,9 @@ const collectToolSources = (turn: TurnInput, events: ActionEvent[]): ToolSource[
   for (const message of turn.assistantMessages) {
     for (const step of message.reasoningTrace?.steps ?? []) {
       for (const toolCall of step.toolCalls) {
+        if (eventToolNames.has(toolCall.toolName)) {
+          continue;
+        }
         upsertTool({
           id: `${message.id}-${toolCall.id}`,
           toolName: toolCall.toolName,
@@ -490,6 +510,29 @@ const isContextToolSource = (tool: ToolSource): boolean => {
     || name.includes('web_search');
 };
 
+const contextToolLabel = (tools: ToolSource[]): { title: string; summary: string } => {
+  const names = tools.map((tool) => tool.toolName.toLowerCase());
+  const rawText = tools.map((tool) => `${formatJsonPreview(tool.argumentsRaw)}\n${tool.resultSummary}`).join('\n').toLowerCase();
+  const readCount = names.filter((name) => name.includes('read')).length;
+  const searchCount = names.filter((name) => name.includes('search') || name.includes('grep') || name.includes('glob')).length;
+  const listCount = names.filter((name) => name.includes('list') || /(^|[._:-])ls([._:-]|$)/.test(name)).length;
+  const summary = tools[tools.length - 1]?.resultSummary || '上下文收集工具已完成。';
+
+  if (/taxonomy|invariant|sop|bugcard|knowledge/.test(rawText)) {
+    return { title: 'Explored taxonomy resources', summary };
+  }
+  if (readCount === tools.length) {
+    return { title: `Reviewed ${tools.length} files`, summary };
+  }
+  if (searchCount === tools.length) {
+    return { title: `Searched ${tools.length} times`, summary };
+  }
+  if (listCount === tools.length) {
+    return { title: `Reviewed ${tools.length} directories`, summary };
+  }
+  return { title: `Reviewed ${tools.length} resources`, summary };
+};
+
 const hasReasoningTrace = (message: ConversationMessage): boolean =>
   Boolean(message.reasoningTrace?.steps.some((step) => (
     step.summary
@@ -514,25 +557,6 @@ const isCoworkOnlyTrace = (
   && turn.assistantMessages.some(isCoworkReasoningMessage)
   && turn.assistantMessages.every((message) => !hasReasoningTrace(message) || isCoworkReasoningMessage(message))
 );
-
-const titleFromTraceStatus = (status: AgentNodeStatus, compact: boolean): string => {
-  if (status === 'running' || status === 'streaming' || status === 'waiting_tool') {
-    return '正在思考';
-  }
-  if (status === 'failed') {
-    return compact ? '回复失败' : '执行失败';
-  }
-  if (status === 'blocked') {
-    return '等待配置或确认';
-  }
-  if (status === 'partial_succeeded') {
-    return '部分完成';
-  }
-  if (status === 'cancelled') {
-    return '已停止';
-  }
-  return '已完成思考';
-};
 
 const collectReasoningSteps = (turn: TurnInput): Array<{
   messageId: string;
@@ -591,7 +615,7 @@ const createGroupNode = (
   createdAt: number,
   groupType: GroupPayload['groupType'],
   status: AgentNodeStatus,
-  parentId: string,
+  parentId?: string,
 ): AgentNode<GroupPayload> => {
   const node = builder.addNode<GroupPayload>({
     id,
@@ -604,15 +628,49 @@ const createGroupNode = (
     order,
     createdAt,
     expandable: true,
-    defaultExpanded: true,
+    defaultExpanded: false,
     payload: {
       groupType,
       strategy: 'collect',
       objective: summary,
     },
   });
-  builder.addChild(parentId, node.id);
+  if (parentId) {
+    builder.addChild(parentId, node.id);
+  }
   return node;
+};
+
+const isWorkflowStatusAssistantMessage = (message: ConversationMessage): boolean => (
+  message.role === 'assistant'
+  && message.modeContext === 'debugger'
+  && Boolean(message.runId)
+  && WORKFLOW_STATUS_MESSAGE_PATTERNS.some((pattern) => pattern.test(message.content.trim()))
+);
+
+const isAskModeTurn = (turn: TurnInput): boolean => (
+  !turn.runIds.length
+  && turn.messages.some((message) => message.modeContext === 'ask')
+  && turn.assistantMessages.length > 0
+);
+
+const isAskUserQuestionAnswerMessage = (
+  message: ConversationMessage | undefined,
+  actionEvents: ActionEvent[],
+): boolean => {
+  if (!message || message.role !== 'user' || message.modeContext !== 'debugger' || !message.runId) {
+    return false;
+  }
+  if (!/^选择[:：]/u.test(message.content.trim())) {
+    return false;
+  }
+  return actionEvents.some((event) => (
+    event.run_id === message.runId
+    && event.event_type === 'tool_execution'
+    && String(event.payload.tool_name || event.payload.toolName) === ASK_USER_TOOL_NAME
+    && String(event.payload.phase || '') === 'answer'
+    && Math.abs(event.ts_ms - message.createdAt) <= 120_000
+  ));
 };
 
 
@@ -634,7 +692,7 @@ const buildTraceProjection = (
     .reverse()
     .find((message) => message.diagnostic)?.diagnostic ?? null;
 
-  if (turn.userMessage) {
+  if (turn.userMessage && !isAskUserQuestionAnswerMessage(turn.userMessage, actionEvents)) {
     builder.addNode({
       id: `${turn.turnId}-user`,
       type: 'user_message',
@@ -652,23 +710,27 @@ const buildTraceProjection = (
   const reasoningSteps = collectReasoningSteps(turn);
   const reasoningSummaries = collectReasoningSummaries(actualRunId, workflowState);
   const harnessTasks = collectHarnessTasks(actualRunId, workflowState);
+  const workflowStatusMessages = turn.assistantMessages.filter(isWorkflowStatusAssistantMessage);
   const plan = actualRunId
     ? (workflowState?.runId === actualRunId ? (workflowState.debugPlan ?? currentDebugPlan) : currentDebugPlan)
     : undefined;
   const traceMessages = turn.assistantMessages.filter(hasReasoningTrace);
+  const askModeTurn = isAskModeTurn(turn);
   const hasTraceDetails = Boolean(
-    traceMessages.length > 0
+    askModeTurn
+    || traceMessages.length > 0
     || events.length > 0
     || toolSources.length > 0
     || artifactSources.length > 0
     || reasoningSummaries.length > 0
     || harnessTasks.length > 0
+    || workflowStatusMessages.length > 0
     || plan?.blockers?.length
     || plan?.missingInfo?.length
   );
 
   if (hasTraceDetails) {
-    const runStatus = coworkTrace
+    const traceStatus = coworkTrace
       ? latestDiagnostic?.code === 'CONVERSATION_LLM_ROUTE_MISSING'
         ? 'blocked'
         : assistantStatus
@@ -677,60 +739,69 @@ const buildTraceProjection = (
           ...events.map(statusFromEvent),
           ...reasoningSteps.map((step) => step.status),
           ...harnessTasks.map((task) => statusFromHarness(task.status)),
+          ...workflowStatusMessages.map(statusFromMessage),
         ]);
-    const traceNode = builder.addNode<AgentRunPayload>({
-      id: `${turn.turnId}-trace`,
-      type: 'agent_run',
-      status: runStatus,
-      title: titleFromTraceStatus(runStatus, coworkTrace),
-      summary: (coworkTrace ? latestDiagnostic?.userMessage : undefined)
-        ?? traceMessages[traceMessages.length - 1]?.reasoningTrace?.summary
-        ?? plan?.scope
-        ?? firstLine(turn.assistantMessages[0]?.content, 'Agent 轨迹'),
-      runId,
-      turnId: turn.turnId,
-      order: 2,
-      createdAt: traceMessages[0]?.reasoningTrace?.updatedAt ?? events[0]?.ts_ms ?? turn.assistantMessages[0]?.createdAt ?? baseTime,
-      expandable: true,
-      defaultExpanded: false,
-      metrics: {
-        durationMs: events.length > 0
-          ? Math.max(...events.map((event) => event.ts_ms + event.duration_ms)) - baseTime
-          : undefined,
-      },
-      ui: {
-        density: coworkTrace ? 'compact' : 'normal',
-      },
-      payload: {
-        agentName: coworkTrace ? 'Cowork' : 'Agent',
-        objective: plan?.userGoal ?? turn.userMessage?.content ?? '处理当前请求。',
-        inputSummary: turn.userMessage?.content,
-        planSummary: plan?.scope,
-        executionMode: coworkTrace ? 'single_agent' : 'debugging',
-        progress: {
-          completed: reasoningSteps.filter((step) => step.status === 'succeeded').length
-            + toolSources.filter((tool) => tool.status === 'succeeded').length
-            + harnessTasks.filter((task) => task.status === 'completed').length,
-          total: Math.max(reasoningSteps.length + toolSources.length + harnessTasks.length, 1),
+    const traceBaseTime = traceMessages[0]?.reasoningTrace?.updatedAt
+      ?? events[0]?.ts_ms
+      ?? turn.assistantMessages[0]?.createdAt
+      ?? baseTime;
+
+    if (askModeTurn) {
+      builder.addNode<StepPayload>({
+        id: `${turn.turnId}-ask-activity`,
+        type: 'step',
+        status: traceStatus,
+        title: 'Ask 活动',
+        summary: latestDiagnostic?.userMessage ?? '检查当前工作台状态并生成回复。',
+        runId,
+        turnId: turn.turnId,
+        order: 2,
+        createdAt: traceBaseTime,
+        completedAt: turn.assistantMessages[turn.assistantMessages.length - 1]?.updatedAt ?? traceBaseTime,
+        ui: {
+          density: 'compact',
         },
-      },
+        payload: {
+          objective: 'Ask 只做澄清、解释和引导，不启动 RenderDoc 执行链。',
+          actualOutput: '生成普通问答回复。',
+        },
+      });
+    }
+
+    workflowStatusMessages.forEach((message, index) => {
+      const nodeId = `${turn.turnId}-workflow-status-${sanitizeId(message.id)}`;
+      builder.addNode<StepPayload>({
+        id: nodeId,
+        type: 'step',
+        status: statusFromMessage(message),
+        title: '工作流状态',
+        summary: firstLine(message.content, '工作流状态已更新。'),
+        runId,
+        turnId: turn.turnId,
+        order: 2.1 + index / 100,
+        createdAt: message.createdAt,
+        completedAt: message.updatedAt ?? message.createdAt,
+        payload: {
+          objective: '收敛本轮 Debugger 状态，不作为普通 assistant 回复展示。',
+          actualOutput: message.content,
+        },
+      });
     });
 
     if (reasoningSteps.length > 0 || reasoningSummaries.length > 0 || events.some((event) => event.event_type !== 'tool_execution')) {
       const thinkingGroup = createGroupNode(
         builder,
         `${turn.turnId}-thinking-group`,
-        '思考',
-        '来自真实 reasoning trace 和运行事件。',
-        1,
-        reasoningSteps[0]?.startedAt ?? events[0]?.ts_ms ?? traceNode.createdAt,
+        actualRunId ? 'Agent 活动' : 'Ask 活动',
+        actualRunId ? '本轮运行状态和高层活动摘要。' : '本轮 Ask 高层活动摘要。',
+        2.2,
+        reasoningSteps[0]?.startedAt ?? events[0]?.ts_ms ?? traceBaseTime,
         'section_group',
         aggregateStatus([
           ...reasoningSteps.map((step) => step.status),
           ...events.filter((event) => event.event_type !== 'tool_execution').map(statusFromEvent),
           ...reasoningSummaries.map(() => 'succeeded' as const),
         ]),
-        traceNode.id,
       );
 
       reasoningSteps.forEach((step, index) => {
@@ -743,8 +814,8 @@ const buildTraceProjection = (
           summary: step.summary ?? step.detail ?? step.stage,
           runId,
           turnId: turn.turnId,
-          order: index + 1,
-          createdAt: step.startedAt,
+            order: index + 1,
+            createdAt: step.startedAt,
           completedAt: step.completedAt,
           payload: {
             objective: step.title,
@@ -764,8 +835,8 @@ const buildTraceProjection = (
           summary: summary.summary,
           runId,
           turnId: turn.turnId,
-          order: reasoningSteps.length + index + 1,
-          createdAt: Date.parse(summary.createdAt) || traceNode.createdAt,
+            order: reasoningSteps.length + index + 1,
+            createdAt: Date.parse(summary.createdAt) || traceBaseTime,
           payload: {
             objective: summary.stage,
             actualOutput: summary.nextStep,
@@ -799,19 +870,8 @@ const buildTraceProjection = (
     }
 
     if (toolSources.length > 0) {
-      const toolGroup = createGroupNode(
-        builder,
-        `${turn.turnId}-tool-group`,
-        '工具',
-        `已记录 ${toolSources.length} 个工具调用。`,
-        2,
-        toolSources[0].startedAt,
-        'tool_group',
-        aggregateStatus(toolSources.map((tool) => tool.status)),
-        traceNode.id,
-      );
       let toolIndex = 0;
-      let order = 1;
+      let order = 3;
       while (toolIndex < toolSources.length) {
         const contextRun: ToolSource[] = [];
         while (toolIndex < toolSources.length && isContextToolSource(toolSources[toolIndex])) {
@@ -820,16 +880,16 @@ const buildTraceProjection = (
         }
 
         if (contextRun.length >= 3) {
+          const contextLabel = contextToolLabel(contextRun);
           const contextGroup = createGroupNode(
             builder,
             `${turn.turnId}-context-tools-${order}`,
-            `已读取/已搜索 ${contextRun.length} 次`,
-            contextRun[contextRun.length - 1]?.resultSummary || '上下文收集工具已完成。',
+            contextLabel.title,
+            contextLabel.summary,
             order,
             contextRun[0].startedAt,
             'tool_group',
             aggregateStatus(contextRun.map((tool) => tool.status)),
-            toolGroup.id,
           );
           contextGroup.defaultExpanded = false;
           contextRun.forEach((tool, index) => createToolNode(
@@ -848,48 +908,25 @@ const buildTraceProjection = (
           toolIndex += 1;
         }
         directTools.forEach((tool) => {
-          createToolNode(builder, tool, `${turn.turnId}-tool`, order, toolGroup.id);
+          createToolNode(builder, tool, `${turn.turnId}-tool`, order);
           order += 1;
         });
       }
     }
 
-    if (harnessTasks.length > 0 || plan?.missingInfo?.length || plan?.blockers?.length) {
+    if (plan?.missingInfo?.length || plan?.blockers?.length) {
       const questionGroup = createGroupNode(
         builder,
         `${turn.turnId}-question-group`,
         '需要用户确认',
-        '来自计划、任务看板或阻塞状态。',
-        3,
-        traceNode.createdAt + 3,
+        '来自计划缺口或阻塞状态。',
+        5,
+        traceBaseTime + 3,
         'section_group',
         aggregateStatus([
-          ...harnessTasks.map((task) => statusFromHarness(task.status)),
           ...(plan?.blockers?.length ? ['blocked' as const] : []),
         ]),
-        traceNode.id,
       );
-
-      harnessTasks.forEach((task, index) => {
-        const nodeId = `${turn.turnId}-task-${sanitizeId(task.taskId)}`;
-        builder.addNode<StepPayload>({
-          id: nodeId,
-          type: 'step',
-          status: statusFromHarness(task.status),
-          title: task.title,
-          summary: task.objective,
-          runId,
-          turnId: turn.turnId,
-          order: index + 1,
-          createdAt: Date.parse(task.createdAt) || traceNode.createdAt,
-          completedAt: task.completedAt ? Date.parse(task.completedAt) : undefined,
-          payload: {
-            objective: task.intent,
-            actualOutput: task.acceptanceCriteria.join('\n'),
-          },
-        });
-        builder.addChild(questionGroup.id, nodeId);
-      });
 
       [...(plan?.missingInfo ?? []), ...(plan?.blockers?.map((blocker) => blocker.reason) ?? [])]
         .filter(Boolean)
@@ -903,8 +940,8 @@ const buildTraceProjection = (
             summary: entry,
             runId,
             turnId: turn.turnId,
-            order: harnessTasks.length + index + 1,
-            createdAt: traceNode.createdAt + index + 1,
+            order: index + 1,
+            createdAt: traceBaseTime + index + 1,
             payload: {
               objective: '等待用户补充信息。',
             },
@@ -919,12 +956,12 @@ const buildTraceProjection = (
         `${turn.turnId}-evidence-group`,
         '证据',
         '本轮轨迹中可回溯的工具结果或产物来源。',
-        4,
-        traceNode.createdAt + 4,
+        6,
+        traceBaseTime + 4,
         'evidence_group',
         'succeeded',
-        traceNode.id,
       );
+      evidenceGroup.defaultExpanded = false;
 
       toolSources.slice(0, 6).forEach((tool, index) => {
         const evidenceNode = builder.addNode<EvidencePayload>({
@@ -957,7 +994,7 @@ const buildTraceProjection = (
           runId,
           turnId: turn.turnId,
           order: toolSources.length + index + 1,
-          createdAt: traceNode.createdAt + 5 + index,
+          createdAt: traceBaseTime + 5 + index,
           payload: {
             sourceNodeId: `${turn.turnId}-artifact-${sanitizeId(artifact.id)}`,
             sourceType: 'artifact',
@@ -975,12 +1012,12 @@ const buildTraceProjection = (
         `${turn.turnId}-artifact-group`,
         '产物',
         '本轮运行生成或引用的文件。',
-        5,
-        traceNode.createdAt + 5,
+        7,
+        traceBaseTime + 5,
         'artifact_group',
         'succeeded',
-        traceNode.id,
       );
+      artifactGroup.defaultExpanded = false;
 
       artifactSources.forEach((artifact, index) => {
         const artifactNode = builder.addNode<ArtifactPayload>({
@@ -992,7 +1029,7 @@ const buildTraceProjection = (
           runId,
           turnId: turn.turnId,
           order: index + 1,
-          createdAt: traceNode.createdAt + index + 1,
+          createdAt: traceBaseTime + index + 1,
           payload: {
             artifactType: artifact.artifactType,
             name: artifact.name,
@@ -1007,7 +1044,7 @@ const buildTraceProjection = (
   }
 
   turn.assistantMessages
-    .filter((message) => message.content.trim().length > 0)
+    .filter((message) => message.content.trim().length > 0 && !isWorkflowStatusAssistantMessage(message))
     .forEach((message, index) => {
       builder.addNode<AssistantMessagePayload>({
         id: `${message.id}-assistant`,
@@ -1067,7 +1104,8 @@ const buildTimelineProjections = (
   return turns
     .slice()
     .sort((left, right) => left.createdAt - right.createdAt)
-    .map((turn) => buildTraceProjection(turn, actionEvents, workflowState, currentDebugPlan));
+    .map((turn) => buildTraceProjection(turn, actionEvents, workflowState, currentDebugPlan))
+    .filter((projection) => projection.rootNodeIds.length > 0);
 };
 
 export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {

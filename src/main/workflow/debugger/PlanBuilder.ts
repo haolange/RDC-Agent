@@ -87,38 +87,64 @@ function recommendSpecialists(goalText: string, captures: CaptureDescriptor[], b
 }
 
 export function buildDebugPlanPresentation(debugPlan: DebugPlan): PlanPresentation {
+  const sections: PlanPresentation['sections'] = [
+    {
+      id: 'goal',
+      title: '目标',
+      body: [debugPlan.userGoal],
+    },
+    {
+      id: 'scope',
+      title: '范围',
+      body: [
+        debugPlan.targetCapture
+          ? `Capture: ${debugPlan.targetCapture.fileName}`
+          : 'Capture: 等待确认',
+        debugPlan.targetFrameOrEvent?.eventLabel
+          ? `入口: ${debugPlan.targetFrameOrEvent.eventLabel}`
+          : debugPlan.scope,
+        debugPlan.scope,
+      ].filter(Boolean),
+    },
+    {
+      id: 'deliverables',
+      title: '交付物',
+      body: debugPlan.expectedDeliverables,
+    },
+    {
+      id: 'test-plan',
+      title: 'Test Plan',
+      body: debugPlan.verificationContract.successCriteria,
+    },
+    {
+      id: 'assumptions',
+      title: 'Assumptions',
+      body: [
+        ...debugPlan.referenceContract.acceptanceNotes,
+        ...debugPlan.notes,
+      ],
+    },
+  ];
+
+  if (debugPlan.missingInfo.length > 0) {
+    sections.push({
+      id: 'missing-info',
+      title: 'Missing Info',
+      body: debugPlan.missingInfo,
+    });
+  }
+
+  if (debugPlan.blockers.length > 0) {
+    sections.push({
+      id: 'blockers',
+      title: 'Blockers',
+      body: debugPlan.blockers.map((blocker) => blocker.reason),
+    });
+  }
+
   return {
     title: '执行前调试计划',
-    sections: [
-      {
-        id: 'goal',
-        title: '目标',
-        body: [debugPlan.userGoal],
-      },
-      {
-        id: 'scope',
-        title: '范围',
-        body: [
-          debugPlan.targetCapture
-            ? `Capture: ${debugPlan.targetCapture.fileName}`
-            : 'Capture: 等待确认',
-          debugPlan.targetFrameOrEvent?.eventLabel
-            ? `入口: ${debugPlan.targetFrameOrEvent.eventLabel}`
-            : debugPlan.scope,
-          debugPlan.scope,
-        ].filter(Boolean),
-      },
-      {
-        id: 'deliverables',
-        title: '交付物',
-        body: debugPlan.expectedDeliverables,
-      },
-      {
-        id: 'verification',
-        title: '验证标准',
-        body: debugPlan.verificationContract.successCriteria,
-      },
-    ],
+    sections: sections.filter((section) => section.body.length > 0),
   };
 }
 
