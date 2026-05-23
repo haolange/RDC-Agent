@@ -56,6 +56,7 @@ export interface ElectronAPI {
       version: string;
       productName: string;
       systemTheme: ResolvedTheme;
+      testMode: boolean;
     }>;
   };
 

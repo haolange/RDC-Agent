@@ -6,6 +6,7 @@ import type { LlmProviderId } from './settings';
 
 // Agent角色
 export type AgentRole =
+  | 'ask_agent'              // 非执行 Ask 入口
   | 'rdc-debugger'           // 主入口/Orchestrator
   | 'triage_agent'           // 症状分类
   | 'capture_repro_agent'    // Capture复现
@@ -92,6 +93,7 @@ export interface AgentConversation {
 
 // 默认模型路由
 export const DEFAULT_MODEL_ROUTING: Record<AgentRole, { provider: LlmProviderId; model: string }> = {
+  'ask_agent': { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
   'rdc-debugger': { provider: 'openrouter', model: 'anthropic/claude-3-opus' },
   'triage_agent': { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
   'capture_repro_agent': { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
@@ -105,6 +107,7 @@ export const DEFAULT_MODEL_ROUTING: Record<AgentRole, { provider: LlmProviderId;
 
 // Agent角色到类别映射
 export const AGENT_CATEGORY_MAP: Record<AgentRole, AgentCategory> = {
+  'ask_agent': 'orchestrator',
   'rdc-debugger': 'orchestrator',
   'triage_agent': 'investigator',
   'capture_repro_agent': 'investigator',

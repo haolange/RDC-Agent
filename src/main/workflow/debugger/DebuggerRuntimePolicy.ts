@@ -4,6 +4,7 @@ import { executionProfileService } from '../../settings/ExecutionProfileService'
 import { settingsService } from '../../settings/SettingsService';
 
 const SPECIALIST_TOOL_BINDINGS: Record<string, string[]> = {
+  ask_agent: [],
   triage_agent: [
     'rd.session.get_context',
     'rd.event.get_action_tree',

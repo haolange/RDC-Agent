@@ -59,7 +59,11 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   });
 
   ipcMain.handle('llm:getProviderAccountStatus', async (_event, providerId: LlmProviderId) => {
-    return providerConnectionService.getProviderAccountStatus(providerId);
+    const result = providerConnectionService.getProviderAccountStatus(providerId);
+    if (result.connected) {
+      context.applyCurrentLlmConfig();
+    }
+    return result;
   });
 
   ipcMain.handle('llm:finishProviderAccountLogin', async (_event, request: LlmProviderAccountLoginFinishRequest) => {

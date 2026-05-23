@@ -27,8 +27,8 @@ import type {
 } from '@shared/types/workflow';
 import { normalizeWorkflowStage } from '@shared/constants/stages';
 import type {
-  AppMode,
   CaptureDescriptor,
+  ExecutableAppMode,
   ProjectInputRecord,
   ProjectRecord,
   RunSummary,
@@ -413,7 +413,7 @@ export class StorageAdapter {
     sessionId?: string;
     turnId?: string;
     capturePaths: string[];
-    mode?: AppMode;
+    mode?: ExecutableAppMode;
     goal?: string;
     captures?: CaptureDescriptor[];
     backend?: 'local' | 'remote';
@@ -1145,7 +1145,7 @@ export class StorageAdapter {
       projectId: String(runYaml.project_id || ''),
       sessionId,
       caseId: String(runYaml.case_id || sessionId),
-      mode: (runYaml.mode as AppMode) || 'debugger',
+      mode: (runYaml.mode as ExecutableAppMode) || 'debugger',
       goal: String(runYaml.goal || ''),
       captures: (runYaml.captures as CaptureDescriptor[]) || [],
       startedAt: Date.parse(String(runYaml.created_at || nowIso())),

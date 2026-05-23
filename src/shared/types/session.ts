@@ -4,7 +4,8 @@
 
 import type { ReplayDeviceEntry } from './device';
 
-export type AppMode = 'debugger' | 'analyzer' | 'optimizer';
+export type ExecutableAppMode = 'debugger' | 'analyzer' | 'optimizer';
+export type AppMode = 'ask' | ExecutableAppMode;
 
 export interface ProjectInputRecord {
   inputId: string;
@@ -123,7 +124,7 @@ export interface DebugSessionStartRequest {
   projectId: string;
   sessionId?: string;
   turnId?: string;
-  mode: AppMode;
+  mode: ExecutableAppMode;
   goal: string;
   captures?: CaptureDescriptor[];
   primaryCaptureId?: string;
@@ -136,7 +137,7 @@ export interface RunRecord {
   projectId: string;
   sessionId: string;
   caseId: string;
-  mode: AppMode;
+  mode: ExecutableAppMode;
   goal: string;
   captures: CaptureDescriptor[];
   startedAt: number;

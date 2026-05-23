@@ -622,7 +622,7 @@ test('renders collapsible thinking trace with real evidence, tools, and artifact
 
   await expect(ctx.page.locator('[data-testid="agent-message-timeline"]')).toBeVisible();
   await expect(ctx.page.locator('[data-testid="agent-timeline-user-message"]')).toContainText('请分析我自研 Agent');
-  await expect(ctx.page.locator('[data-testid="agent-thinking-trace"]')).toContainText('已完成思考');
+  await expect(ctx.page.locator('[data-testid="agent-thinking-trace"]')).toContainText('部分完成');
   await expect(ctx.page.locator('[data-testid="agent-thinking-area"]')).toHaveCount(0);
   await expect(ctx.page.locator('[data-testid="agent-timeline-assistant-message"]')).toContainText('可展开的思考轨迹');
   await expect(ctx.page.locator('[data-testid="agent-message-timeline"]')).not.toContainText('MessageFlow Analyst');

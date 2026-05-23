@@ -14,6 +14,7 @@ import type {
   ToolCall,
 } from '@shared/types/llm';
 import type { LlmProviderKind } from '@shared/types/settings';
+import { COPILOT_WIRE_HEADERS } from './CopilotWire';
 
 const toContentBlocks = (
   messages: LLMMessage[],
@@ -91,6 +92,57 @@ const extractMessageContent = (
   }
 
   return '';
+};
+
+const toResponsesInput = (messages: LLMMessage[]): Array<{ role: string; content: string }> =>
+  messages.map((message) => ({
+    role: message.role === 'assistant' || message.role === 'system' ? message.role : 'user',
+    content: typeof message.content === 'string' ? message.content : JSON.stringify(message.content),
+  }));
+
+const extractResponsesText = (payload: unknown): string => {
+  if (!payload || typeof payload !== 'object') {
+    return '';
+  }
+  const record = payload as Record<string, unknown>;
+  if (typeof record.output_text === 'string') {
+    return record.output_text;
+  }
+
+  const output = Array.isArray(record.output) ? record.output : [];
+  const chunks: string[] = [];
+  for (const item of output) {
+    const itemRecord = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+    const content = Array.isArray(itemRecord.content) ? itemRecord.content : [];
+    for (const block of content) {
+      const blockRecord = block && typeof block === 'object' ? block as Record<string, unknown> : {};
+      const text = typeof blockRecord.text === 'string'
+        ? blockRecord.text
+        : typeof blockRecord.output_text === 'string'
+          ? blockRecord.output_text
+          : '';
+      if (text) {
+        chunks.push(text);
+      }
+    }
+  }
+  if (chunks.length > 0) {
+    return chunks.join('');
+  }
+
+  const fallback = extractMessageContent(payload);
+  return typeof fallback === 'string' ? fallback : JSON.stringify(fallback);
+};
+
+const extractResponsesUsage = (payload: unknown): { inputTokens: number; outputTokens: number } => {
+  const record = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+  const usage = record.usage && typeof record.usage === 'object' ? record.usage as Record<string, unknown> : {};
+  const input = usage.input_tokens ?? usage.prompt_tokens;
+  const output = usage.output_tokens ?? usage.completion_tokens;
+  return {
+    inputTokens: typeof input === 'number' ? input : 0,
+    outputTokens: typeof output === 'number' ? output : 0,
+  };
 };
 
 interface StreamingAccumulator {
@@ -654,6 +706,154 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
   }
 }
 
+class ChatGptAccountProvider extends BaseStreamingProvider {
+  private accessToken = '';
+  private baseUrl = 'https://chatgpt.com/backend-api/codex';
+  private accountId?: string;
+  private models: string[] = [];
+
+  constructor(name: string) {
+    super(name);
+  }
+
+  configure(config: LLMProviderConfig): void {
+    this.accessToken = config.apiKey.trim();
+    this.baseUrl = (config.baseUrl || this.baseUrl).trim().replace(/\/+$/, '');
+    this.accountId = config.accountId?.trim() || undefined;
+    this.models = config.models;
+  }
+
+  private createHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${this.accessToken}`,
+      'Content-Type': 'application/json',
+    };
+    if (this.accountId) {
+      headers['chatgpt-account-id'] = this.accountId;
+    }
+    return headers;
+  }
+
+  private createResponsesUrl(): string {
+    return this.baseUrl.endsWith('/responses') ? this.baseUrl : `${this.baseUrl}/responses`;
+  }
+
+  private createBody(request: LLMRequest, model: string, stream: boolean): Record<string, unknown> {
+    return {
+      model,
+      input: toResponsesInput(request.messages),
+      max_output_tokens: request.maxTokens || 4096,
+      temperature: request.temperature ?? 0.7,
+      stream,
+    };
+  }
+
+  async chat(request: LLMRequest): Promise<LLMResponse> {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+
+    const response = await fetch(this.createResponsesUrl(), {
+      method: 'POST',
+      headers: this.createHeaders(),
+      signal: request.signal,
+      body: JSON.stringify(this.createBody(request, model, false)),
+    });
+
+    if (!response.ok) {
+      throw new Error(`ChatGPT Account API error: ${response.status} - ${await response.text()}`);
+    }
+
+    const payload = await response.json() as Record<string, unknown>;
+    return {
+      id: typeof payload.id === 'string' ? payload.id : `${this.name}-${Date.now()}`,
+      model: typeof payload.model === 'string' ? payload.model : model,
+      content: extractResponsesText(payload),
+      usage: extractResponsesUsage(payload),
+      stopReason: mapFinishReason(typeof payload.status === 'string' ? payload.status : undefined),
+    };
+  }
+
+  protected async performStreamingChat(request: LLMRequest, onChunk: StreamCallback): Promise<LLMResponse> {
+    const model = request.model?.trim();
+    if (!model) {
+      throw new Error(`${this.name} requires an explicit model selection.`);
+    }
+
+    const response = await fetch(this.createResponsesUrl(), {
+      method: 'POST',
+      headers: this.createHeaders(),
+      signal: request.signal,
+      body: JSON.stringify(this.createBody(request, model, true)),
+    });
+
+    if (!response.ok) {
+      throw new Error(`ChatGPT Account API error: ${response.status} - ${await response.text()}`);
+    }
+
+    const accumulator = createAccumulator(model);
+    await readSseStream(response, (eventName, data) => {
+      if (!data || data === '[DONE]') {
+        return;
+      }
+
+      const payload = tryParseJson<Record<string, unknown>>(data);
+      if (!payload) {
+        return;
+      }
+
+      const eventType = typeof payload.type === 'string' ? payload.type : eventName;
+      if (typeof payload.id === 'string') {
+        accumulator.id = payload.id;
+      }
+      if (typeof payload.model === 'string') {
+        accumulator.model = payload.model;
+      }
+
+      if (eventType.includes('output_text.delta')) {
+        const text = typeof payload.delta === 'string'
+          ? payload.delta
+          : typeof payload.text === 'string'
+            ? payload.text
+            : '';
+        if (text) {
+          accumulator.content += text;
+          emitTextChunk(text, onChunk);
+        }
+      }
+
+      if (eventType.includes('completed')) {
+        const completed = payload.response && typeof payload.response === 'object'
+          ? payload.response as Record<string, unknown>
+          : payload;
+        if (!accumulator.content) {
+          accumulator.content = extractResponsesText(completed);
+        }
+        if (typeof completed.id === 'string') {
+          accumulator.id = completed.id;
+        }
+        if (typeof completed.model === 'string') {
+          accumulator.model = completed.model;
+        }
+        const usage = extractResponsesUsage(completed);
+        accumulator.inputTokens = usage.inputTokens;
+        accumulator.outputTokens = usage.outputTokens;
+      }
+    });
+
+    return buildResponseFromAccumulator(accumulator);
+  }
+
+  async isAvailable(): Promise<boolean> {
+    return Boolean(this.accessToken);
+  }
+
+  getModels(): string[] {
+    return this.models;
+  }
+}
+
 class GitHubCopilotProvider extends OpenAICompatibleProvider {
   constructor(name: string) {
     super(name, true);
@@ -662,9 +862,7 @@ class GitHubCopilotProvider extends OpenAICompatibleProvider {
   protected createHeaders(): Record<string, string> {
     return {
       ...super.createHeaders(),
-      'Copilot-Integration-Id': 'vscode-chat',
-      'Editor-Version': 'RDC-Agent/1.0',
-      'Editor-Plugin-Version': 'RDC-Agent/1.0',
+      ...COPILOT_WIRE_HEADERS,
     };
   }
 
@@ -931,6 +1129,9 @@ interface RuntimeProviderEntry {
 }
 
 const createProviderByKind = (providerId: string, kind: LlmProviderKind): LLMProvider => {
+  if (providerId === 'chatgpt-account') {
+    return new ChatGptAccountProvider(providerId);
+  }
   if (providerId === 'github-copilot') {
     return new GitHubCopilotProvider(providerId);
   }

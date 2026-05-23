@@ -46,6 +46,7 @@ import type { ReplayDeviceStatusChangedPayload } from '@shared/types/device';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 import type { AppSettings, ResolvedTheme } from '@shared/types/settings';
 import type { ActionEvent } from '@shared/types/evidence';
+import type { AgentMode } from '@shared/types/layout';
 import type {
   CaptureDescriptor,
   ContextSnapshot,
@@ -104,7 +105,7 @@ type E2EWindow = Window & {
     setComposerDraftState: (state: {
       promptValue?: string;
       pendingAttachments?: PendingAttachmentDraft[];
-      currentMode?: 'debugger' | 'analyzer' | 'optimizer';
+      currentMode?: AgentMode;
     }) => void;
   };
 };
@@ -117,6 +118,7 @@ const App: React.FC = () => {
   const [shellNotice, setShellNotice] = useState<string | null>(null);
   const [userMenuAnchor, setUserMenuAnchor] = useState<DOMRect | null>(null);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [runtimeTestMode, setRuntimeTestMode] = useState<boolean | null>(null);
   const [appBodyWidth, setAppBodyWidth] = useState(0);
   const [isResizing, setIsResizing] = useState(false);
   const [promptValue, setPromptValue] = useState('');
@@ -134,6 +136,7 @@ const App: React.FC = () => {
   const rightRailTarget = useSessionStore((state) => state.rightRailTarget);
   const currentRun = useSessionStore((state) => state.currentRun);
   const currentRunUsage = useSessionStore((state) => state.currentRunUsage);
+  const openedCapture = useSessionStore((state) => state.openedCapture);
   const conversationMessages = useSessionStore((state) => state.conversationMessages);
   const currentMode = useLayoutStore((state) => state.currentMode);
   const leftSidebarCollapsed = useLayoutStore((state) => state.leftSidebarCollapsed);
@@ -162,6 +165,11 @@ const App: React.FC = () => {
   const nickname = settings.profile.nickname || t('sidebar.userName');
   const avatarPath = settings.profile.avatarPath;
   const showWorkbenchShell = true;
+  const hasOpenedCaptureForCurrentProject = Boolean(
+    currentProject
+    && openedCapture?.projectId === currentProject.projectId
+    && openedCapture.status === 'open',
+  );
   const hasActiveDebugRun = Boolean(currentRun && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status));
   const hasActiveConversationTurn = conversationMessages.some(
     (message) => message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming'),
@@ -247,6 +255,12 @@ const App: React.FC = () => {
   useEffect(() => {
     setPendingAttachments([]);
   }, [currentProject?.projectId]);
+
+  useEffect(() => {
+    if (currentMode !== 'ask' && !hasOpenedCaptureForCurrentProject) {
+      setCurrentMode('ask');
+    }
+  }, [currentMode, hasOpenedCaptureForCurrentProject, setCurrentMode]);
 
   useEffect(() => {
     if (!modeMenuOpen) {
@@ -460,6 +474,7 @@ const App: React.FC = () => {
 
         hydrateSettings(appSettings, appMeta.systemTheme);
         hydrateLayout(appSettings);
+        setRuntimeTestMode(appMeta.testMode);
         setWindowMaximized(isMaximized);
         setConnectionStatus('connected');
       } catch (error) {
@@ -726,7 +741,11 @@ const App: React.FC = () => {
       return;
     }
 
-    if (navigator.webdriver) {
+    if (runtimeTestMode === null) {
+      return;
+    }
+
+    if (navigator.webdriver && runtimeTestMode) {
       const seededInputs = currentProject.inputs?.length
         ? currentProject.inputs
         : useSessionStore.getState().projectInputs;
@@ -746,11 +765,15 @@ const App: React.FC = () => {
       .catch(() => {
         useSessionStore.getState().updateProjectInputs(currentProject.projectId, currentProject.inputs ?? []);
       });
-  }, [currentProject]);
+  }, [currentProject, runtimeTestMode]);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
-    if (navigator.webdriver) {
+    if (runtimeTestMode === null) {
+      return;
+    }
+
+    if (navigator.webdriver && runtimeTestMode) {
       return;
     }
 
@@ -794,7 +817,7 @@ const App: React.FC = () => {
         useSessionStore.getState().setReasoningSummaries(workflow.reasoningSummaries ?? []);
       })
       .catch(() => undefined);
-  }, [currentSession?.sessionId]);
+  }, [currentSession?.sessionId, runtimeTestMode]);
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
@@ -866,15 +889,20 @@ const App: React.FC = () => {
   const hasMessageContent = Boolean(promptValue.trim());
   const hasPendingAttachments = pendingAttachments.length > 0;
   const currentModeConfig = AGENT_MODES.find((mode) => mode.id === currentMode) ?? AGENT_MODES[0];
-  const modeLabels = useMemo(() => ({
+  const modeLabels = useMemo<Record<AgentMode, string>>(() => ({
+    ask: t('mode.ask'),
     debugger: t('mode.debugger'),
     analyzer: t('mode.analyzer'),
     optimizer: t('mode.optimizer'),
   }), [t]);
   const currentModeLabel = modeLabels[currentMode];
-  const promptPlaceholder = language === 'zh-CN'
-    ? `向 ${currentModeLabel} 描述目标、异常或验证需求`
-    : `Describe the goal, anomaly, or verification request for ${currentModeLabel}`;
+  const promptPlaceholder = currentMode === 'ask'
+    ? (language === 'zh-CN'
+      ? '向 Ask 描述问题、目标或需要打开的 .rdc Capture'
+      : 'Ask about the issue, goal, or .rdc capture to open')
+    : (language === 'zh-CN'
+      ? `向 ${currentModeLabel} 描述目标、异常或验证需求`
+      : `Describe the goal, anomaly, or verification request for ${currentModeLabel}`);
   const attachButtonLabel = !currentProject
     ? (language === 'zh-CN'
       ? '选择项目后可附加图片、文件或 .rdc Capture'
@@ -887,7 +915,7 @@ const App: React.FC = () => {
   const stopButtonLabel = hasActiveDebugRun
     ? (language === 'zh-CN' ? '停止当前调试' : 'Stop current debug run')
     : (language === 'zh-CN' ? '停止当前请求' : 'Stop current request');
-  const primaryButtonLabel = isComposerBusy ? stopButtonLabel : (hasActiveDebugRun ? sendButtonLabel : startButtonLabel);
+  const primaryButtonLabel = isComposerBusy ? stopButtonLabel : (currentMode === 'ask' || hasActiveDebugRun ? sendButtonLabel : startButtonLabel);
   const primaryButtonDescription = isComposerBusy
     ? stopButtonLabel
     : language === 'zh-CN'
@@ -896,6 +924,9 @@ const App: React.FC = () => {
   const primaryButtonDisabled = isComposerBusy
     ? currentRun?.status === 'stopping' && !hasActiveConversationTurn && !isPromptSending
     : (!hasMessageContent && !hasPendingAttachments);
+  const openCaptureRequiredLabel = language === 'zh-CN'
+    ? '先在应用内 Open 一个 .rdc Capture 后才能选择执行模式'
+    : 'Open a .rdc capture in the app before selecting an execution mode';
   const activityAlertSeverity = activityEntries.some((entry) => entry.severity === 'error')
     ? 'error'
     : activityEntries.some((entry) => entry.severity === 'warning')
@@ -1053,6 +1084,12 @@ const App: React.FC = () => {
     const electronAPI = window.electronAPI;
     if (!electronAPI) return;
 
+    if (currentMode !== 'ask' && !hasOpenedCaptureForCurrentProject) {
+      showNotice(openCaptureRequiredLabel);
+      setCurrentMode('ask');
+      return;
+    }
+
     setIsPromptSending(true);
     try {
       const result = await electronAPI.conversation.sendMessage({
@@ -1158,17 +1195,21 @@ const App: React.FC = () => {
     currentMode,
     currentRun,
     currentSession,
+    hasOpenedCaptureForCurrentProject,
     isComposerBusy,
+    openCaptureRequiredLabel,
     pendingAttachments,
     promptValue,
     selectedDeviceEntry,
     setConversationMessages,
     setCurrentDebugPlan,
+    setCurrentMode,
     setCurrentRun,
     setCurrentSession,
     setPendingQuestions,
     setRuns,
     setSessions,
+    showNotice,
     t,
     upsertConversationMessages,
   ]);
@@ -1461,28 +1502,40 @@ const App: React.FC = () => {
                         </button>
                         {modeMenuOpen && (
                           <div className="composer-agent-menu-popup" role="menu">
-                            {AGENT_MODES.map((mode) => (
-                              <button
-                                key={mode.id}
-                                type="button"
-                                className={`composer-agent-menu-item ${currentMode === mode.id ? 'active' : ''}`}
-                                data-testid={`mode-menu-item-${mode.id}`}
-                                role="menuitemradio"
-                                aria-checked={currentMode === mode.id}
-                                onClick={() => {
-                                  setCurrentMode(mode.id);
-                                  setModeMenuOpen(false);
-                                }}
-                              >
-                                <span className="composer-agent-menu-item-copy">
-                                  <span className="composer-agent-menu-item-icon" aria-hidden="true">
-                                    <ModeGlyph mode={mode.id} size={15} strokeWidth={1.9} />
+                            {AGENT_MODES.map((mode) => {
+                              const executionModeDisabled = mode.id !== 'ask' && !hasOpenedCaptureForCurrentProject;
+                              return (
+                                <button
+                                  key={mode.id}
+                                  type="button"
+                                  className={`composer-agent-menu-item ${currentMode === mode.id ? 'active' : ''} ${executionModeDisabled ? 'disabled' : ''}`}
+                                  data-testid={`mode-menu-item-${mode.id}`}
+                                  role="menuitemradio"
+                                  aria-checked={currentMode === mode.id}
+                                  aria-disabled={executionModeDisabled}
+                                  disabled={executionModeDisabled}
+                                  title={executionModeDisabled ? openCaptureRequiredLabel : mode.description}
+                                  onClick={() => {
+                                    if (executionModeDisabled) {
+                                      return;
+                                    }
+                                    setCurrentMode(mode.id);
+                                    setModeMenuOpen(false);
+                                  }}
+                                >
+                                  <span className="composer-agent-menu-item-copy">
+                                    <span className="composer-agent-menu-item-icon" aria-hidden="true">
+                                      <ModeGlyph mode={mode.id} size={15} strokeWidth={1.9} />
+                                    </span>
+                                    <span className="composer-agent-menu-item-label">{modeLabels[mode.id]}</span>
+                                    {executionModeDisabled ? (
+                                      <span className="composer-agent-menu-item-hint">{openCaptureRequiredLabel}</span>
+                                    ) : null}
                                   </span>
-                                  <span className="composer-agent-menu-item-label">{modeLabels[mode.id]}</span>
-                                </span>
-                                {currentMode === mode.id ? <span className="composer-agent-menu-item-check">●</span> : null}
-                              </button>
-                            ))}
+                                  {currentMode === mode.id ? <span className="composer-agent-menu-item-check">●</span> : null}
+                                </button>
+                              );
+                            })}
                           </div>
                         )}
                       </div>

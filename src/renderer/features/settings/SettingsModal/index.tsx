@@ -253,8 +253,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
           setConnectionDraft(null);
           return;
         }
+        if (status.state === 'failed' || status.state === 'unavailable') {
+          setConnectionDraft((current) => current && current.providerId === connectionDraft.providerId
+            ? {
+              ...current,
+              busy: 'idle',
+              accountStatus: status,
+              error: status.error ?? status.message ?? t('settings.providerSaveFailed'),
+            }
+            : current);
+          return;
+        }
         setConnectionDraft((current) => current && current.providerId === connectionDraft.providerId
-          ? { ...current, accountStatus: status, error: status.error ?? '' }
+          ? { ...current, accountStatus: status, error: '' }
           : current);
       })();
     }, 1200);
@@ -269,6 +280,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     connectionProvider?.authMode,
     open,
     reloadSettings,
+    t,
   ]);
 
   if (!open) return null;
@@ -542,6 +554,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     && connectionProvider?.authMode === 'account'
     && connectionProvider.isConfigured
     && connectionDraft.accountStatus?.connected,
+  );
+  const connectionDevicePending = Boolean(
+    connectionDraft
+    && connectionProvider?.authMode === 'account'
+    && connectionDraft.providerId === 'github-copilot'
+    && connectionDraft.accountStatus?.state === 'pending',
   );
 
   const sections: Array<{ id: SettingsSection; label: string }> = [
@@ -1155,7 +1173,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 <div className="settings-provider-notice">
                   {connectionAccountConnected
                     ? t('settings.oauthConnectedHint')
-                    : connectionDraft.accountStatus?.message || t('settings.oauthConnectHint')}
+                    : connectionDevicePending
+                      ? t('settings.githubAuthorizationPending')
+                      : connectionDraft.accountStatus?.message || t('settings.oauthConnectHint')}
                 </div>
                 {connectionAccountConnected && (connectionDraft.accountStatus?.accountLabel || connectionDraft.accountStatus?.planLabel) && (
                   <div className="settings-secret-status" data-testid="settings-provider-oauth-summary">
@@ -1168,7 +1188,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                     className="button button-secondary"
                     data-testid="settings-provider-oauth-start"
                     onClick={() => void handleStartAccountLogin()}
-                    disabled={connectionDraft.busy !== 'idle'}
+                    disabled={connectionDraft.busy !== 'idle' || connectionDevicePending}
                   >
                     {t('settings.connect')}
                   </button>
@@ -1214,7 +1234,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
             <div className="settings-model-section settings-provider-connect-models" data-testid="settings-provider-connect-models">
               <div className="settings-model-section-header">
-                <span>{connectionProvider.modelDiscovery === 'anthropic-candidate-validation' || connectionProvider.modelDiscovery === 'azure-openai'
+                <span>{connectionProvider.modelDiscovery === 'account-catalog'
+                  ? t('settings.accountCatalogModels')
+                  : connectionProvider.modelDiscovery === 'anthropic-candidate-validation' || connectionProvider.modelDiscovery === 'azure-openai'
                   ? t('settings.verifiedModels')
                   : connectionProvider.modelDiscovery === 'static'
                     ? t('settings.builtinModels')
@@ -1242,7 +1264,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 className="button button-secondary"
                 data-testid="settings-provider-connect-test"
                 onClick={() => void handleTestProviderDraft()}
-                disabled={connectionDraft.busy !== 'idle' || connectionNeedsApiKey || connectionNeedsBaseUrl}
+                disabled={connectionDraft.busy !== 'idle' || connectionNeedsApiKey || connectionNeedsBaseUrl || connectionDevicePending}
               >
                 {connectionDraft.busy === 'testing' ? t('settings.testing') : t('settings.test')}
               </button>
@@ -1251,7 +1273,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 className="button button-primary"
                 data-testid="settings-provider-connect-save"
                 onClick={() => void handleSaveProviderConnection()}
-                disabled={connectionDraft.busy !== 'idle' || connectionNeedsApiKey || connectionNeedsBaseUrl}
+                disabled={connectionDraft.busy !== 'idle' || connectionNeedsApiKey || connectionNeedsBaseUrl || connectionDevicePending}
               >
                 {connectionDraft.busy === 'saving'
                   ? t('settings.saving')

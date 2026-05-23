@@ -104,6 +104,99 @@ function summarizePayloadData(value: unknown): unknown {
   return summary;
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function formatPixel(value: unknown): string | null {
+  const pixel = asRecord(value);
+  const x = pixel.x;
+  const y = pixel.y;
+  const rgba = [pixel.r, pixel.g, pixel.b, pixel.a].map((entry) => typeof entry === 'number' ? entry : null);
+  if (rgba.some((entry) => entry === null)) {
+    return null;
+  }
+  return `Pixel(${x ?? '?'},${y ?? '?'}) RGBA=${rgba.join(',')}`;
+}
+
+function describePayloadEvidence(toolName: string, data: unknown): string | null {
+  const record = asRecord(data);
+  if (toolName === 'rd.export.screenshot') {
+    const nameInfo = asRecord(record.name_info);
+    return [
+      `Screenshot ${record.width ?? '?'}x${record.height ?? '?'}`,
+      `event=${record.resolved_event_id ?? record.requested_event_id ?? '?'}`,
+      `target=${record.texture_id ?? nameInfo.resource_id ?? 'unknown'}`,
+      `format=${record.texture_format ?? 'unknown'}`,
+      record.fallback_reason ? `fallback=${record.fallback_reason}` : '',
+      Array.isArray(record.summary_degraded_reasons) ? `degraded=${record.summary_degraded_reasons.join(',')}` : '',
+    ].filter(Boolean).join('; ');
+  }
+
+  if (toolName === 'rd.macro.explain_pixel') {
+    const history = Array.isArray(record.history) ? record.history : [];
+    return `${record.explanation ?? 'Pixel explanation available'} History events=${history.map((entry) => asRecord(entry).event_id).filter(Boolean).join(',') || history.length}`;
+  }
+
+  if (toolName === 'rd.texture.get_pixel_value') {
+    const pixel = formatPixel(record.pixel);
+    return [
+      pixel ?? 'Pixel value readback available',
+      `texture=${record.texture_id ?? 'unknown'}`,
+      `event=${record.resolved_event_id ?? '?'}`,
+      Array.isArray(record.summary_degraded_reasons) ? `degraded=${record.summary_degraded_reasons.join(',')}` : '',
+    ].filter(Boolean).join('; ');
+  }
+
+  if (toolName === 'rd.texture.get_pixel_history') {
+    const history = Array.isArray(record.history) ? record.history : [];
+    return `Pixel history on ${record.texture_id ?? 'unknown'} has ${history.length} modifications: ${history.map((entry) => asRecord(entry).event_id).filter(Boolean).join(',') || 'none'}.`;
+  }
+
+  if (toolName === 'rd.pipeline.get_state_summary') {
+    const summary = asRecord(record.summary);
+    const shaders = Array.isArray(summary.shaders) ? summary.shaders.map((entry) => {
+      const shader = asRecord(entry);
+      return `${shader.stage}:${shader.resource_id}`;
+    }).join(', ') : '';
+    const target = asRecord(summary.selected_visual_target);
+    return [
+      `Pipeline api=${summary.api ?? 'unknown'}`,
+      shaders ? `shaders=${shaders}` : '',
+      `bindings=${summary.binding_count ?? '?'}`,
+      target.texture_id ? `visual_target=${target.texture_id}` : '',
+      target.fallback_reason ? `fallback=${target.fallback_reason}` : '',
+    ].filter(Boolean).join('; ');
+  }
+
+  if (toolName === 'rd.pipeline.get_output_targets') {
+    const framebuffer = asRecord(record.framebuffer);
+    const target = asRecord(framebuffer.selected_visual_target);
+    return [
+      `Framebuffer render_targets=${Array.isArray(framebuffer.render_targets) ? framebuffer.render_targets.length : '?'}`,
+      target.texture_id ? `visual_target=${target.texture_id}` : '',
+      target.texture_format ? `format=${target.texture_format}` : '',
+      target.fallback_reason ? `fallback=${target.fallback_reason}` : '',
+    ].filter(Boolean).join('; ');
+  }
+
+  if (toolName === 'rd.pipeline.get_resource_bindings') {
+    const bindings = Array.isArray(record.bindings) ? record.bindings : [];
+    const first = bindings.slice(0, 5).map((entry) => {
+      const binding = asRecord(entry);
+      return `${binding.type}@${binding.set_or_space}:${binding.binding}=${binding.resource_id}`;
+    });
+    return `Resource bindings ${bindings.length}: ${first.join(', ')}`;
+  }
+
+  if (toolName.startsWith('rd.pipeline.get_shader')) {
+    const shader = asRecord(record.shader);
+    return `Shader ${shader.stage ?? 'unknown'} ${shader.shader_id ?? 'unknown'} entry=${shader.entry ?? 'unknown'}`;
+  }
+
+  return null;
+}
+
 function findStringFieldDeep(value: unknown, keys: string[], seen = new Set<unknown>()): string | null {
   if (!value || typeof value !== 'object') {
     return null;
@@ -435,7 +528,7 @@ export class SpecialistRecipeRunner {
     }, 'pixel_forensics_agent', context);
     payloads.push(this.toPayload('rd.export.screenshot', screenshot));
 
-    const point = await this.locatePixelFocus(screenshotPath, context.debugPlan.userGoal);
+    const point = await this.locatePixelFocus(screenshotPath, context);
     const resolvedTextureId = typeof screenshot.data?.texture_id === 'string'
       ? screenshot.data.texture_id
       : undefined;
@@ -626,53 +719,61 @@ export class SpecialistRecipeRunner {
     };
   }
 
-  private async locatePixelFocus(screenshotPath: string, goal: string): Promise<{ x: number; y: number }> {
+  private async locatePixelFocus(screenshotPath: string, context: SpecialistRunContext): Promise<{ x: number; y: number }> {
     const dims = pngDimensions(screenshotPath);
     if (!dims) {
       return { x: 0, y: 0 };
     }
+    const fallbackPoint = {
+      x: Math.max(0, Math.min(dims.width - 1, Math.round(dims.width * 0.5))),
+      y: Math.max(0, Math.min(dims.height - 1, Math.round(dims.height * 0.5))),
+    };
 
     const imageBlock = await fileToImageBlock(screenshotPath);
     if (!imageBlock) {
-      throw new Error(`Pixel focus screenshot is unavailable: ${screenshotPath}`);
+      return fallbackPoint;
     }
 
-    const { data } = await debuggerLlmService.callStructured<PixelFocusPayload>({
-      agentId: 'pixel_forensics_agent',
-      stage: 'dispatch',
-      sessionId: undefined,
-      runId: undefined,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a graphics debugging assistant. Return JSON only with keys normalized_x, normalized_y, reason. Coordinates must be floats between 0 and 1 for the suspicious bright white highlight most relevant to the debugging task.',
+    try {
+      const { data } = await debuggerLlmService.callStructured<PixelFocusPayload>({
+        agentId: 'pixel_forensics_agent',
+        stage: 'dispatch',
+        sessionId: context.sessionId,
+        runId: context.runId,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a graphics debugging assistant. Return JSON only with keys normalized_x, normalized_y, reason. Coordinates must be floats between 0 and 1 for the suspicious bright white highlight most relevant to the debugging task.',
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: `Task: ${context.debugPlan.userGoal}\nFind the suspicious bright white highlight that should be investigated first.`,
+              },
+              imageBlock,
+            ],
+          },
+        ],
+        maxTokens: 300,
+        temperature: 0.1,
+        parse: (text) => debuggerLlmService.parseJson<PixelFocusPayload>(text),
+        testValue: {
+          normalized_x: 0.5,
+          normalized_y: 0.5,
+          reason: 'test-mode center point',
         },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Task: ${goal}\nFind the suspicious bright white highlight that should be investigated first.`,
-            },
-            imageBlock,
-          ],
-        },
-      ],
-      maxTokens: 300,
-      temperature: 0.1,
-      parse: (text) => debuggerLlmService.parseJson<PixelFocusPayload>(text),
-      testValue: {
-        normalized_x: 0.5,
-        normalized_y: 0.5,
-        reason: 'test-mode center point',
-      },
-      auditSummary: (payload) => payload.reason,
-    });
+        auditSummary: (payload) => payload.reason,
+      });
 
-    return {
-      x: Math.max(0, Math.min(dims.width - 1, Math.round(clamp01(toNumber(data.normalized_x, 0.5)) * dims.width))),
-      y: Math.max(0, Math.min(dims.height - 1, Math.round(clamp01(toNumber(data.normalized_y, 0.5)) * dims.height))),
-    };
+      return {
+        x: Math.max(0, Math.min(dims.width - 1, Math.round(clamp01(toNumber(data.normalized_x, 0.5)) * dims.width))),
+        y: Math.max(0, Math.min(dims.height - 1, Math.round(clamp01(toNumber(data.normalized_y, 0.5)) * dims.height))),
+      };
+    } catch {
+      return fallbackPoint;
+    }
   }
 
   private async finishRecipe(
@@ -698,10 +799,18 @@ export class SpecialistRecipeRunner {
     const deterministicSummary: SpecialistSummaryPayload = {
       summary: [
         `${agentId} collected ${successfulTools.length} successful tool results.`,
-        ...successfulTools.slice(0, 4).map((payload) => `- ${payload.toolName}`),
+        ...successfulTools
+          .map((payload) => describePayloadEvidence(payload.toolName, payload.data) ?? payload.toolName)
+          .slice(0, 4)
+          .map((line) => `- ${line}`),
         ...(failedTools.length > 0 ? [`Failed tools: ${failedTools.map((payload) => payload.toolName).join(', ')}`] : []),
       ].join('\n'),
-      evidence,
+      evidence: [
+        ...evidence,
+        ...successfulTools
+          .map((payload) => describePayloadEvidence(payload.toolName, payload.data))
+          .filter((line): line is string => Boolean(line)),
+      ],
       next_step: this.getNextStep(agentId),
       confidence: successfulTools.length > 0 ? 0.72 : 0.35,
     };
@@ -742,47 +851,50 @@ export class SpecialistRecipeRunner {
         auditSummary: (payload) => payload.summary,
       });
       llmSummary = structuredResult.data;
-    } catch (error) {
-      const fallbackResult = await debuggerLlmService.call({
-        agentId,
-        stage: 'dispatch',
-        sessionId: context.sessionId,
-        runId: context.runId,
-      }, {
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a RenderDoc debugging specialist. Reply with one or two concise sentences only. Summarize the most important finding from the provided tool evidence and what should be checked next.',
-          },
-          {
-            role: 'user',
-            content: [
-              {
-                type: 'text',
-                text: [
-                  `Agent: ${agentId}`,
-                  `Goal: ${context.debugPlan.userGoal}`,
-                  `Evidence anchors: ${evidence.join(' | ') || 'N/A'}`,
-                  `Successful tools: ${successfulTools.map((payload) => payload.toolName).join(', ') || 'none'}`,
-                  `Failed tools: ${failedTools.map((payload) => `${payload.toolName}: ${payload.error || 'failed'}`).join(' | ') || 'none'}`,
-                ].join('\n'),
-              },
-            ],
-          },
-        ],
-        maxTokens: 160,
-        temperature: 0.1,
-      });
-      const fallbackSummary = fallbackResult.text.trim();
-      if (!fallbackSummary) {
-        throw error;
+    } catch {
+      try {
+        const fallbackResult = await debuggerLlmService.call({
+          agentId,
+          stage: 'dispatch',
+          sessionId: context.sessionId,
+          runId: context.runId,
+        }, {
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a RenderDoc debugging specialist. Reply with one or two concise sentences only. Summarize the most important finding from the provided tool evidence and what should be checked next.',
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: [
+                    `Agent: ${agentId}`,
+                    `Goal: ${context.debugPlan.userGoal}`,
+                    `Evidence anchors: ${evidence.join(' | ') || 'N/A'}`,
+                    `Successful tools: ${successfulTools.map((payload) => payload.toolName).join(', ') || 'none'}`,
+                    `Failed tools: ${failedTools.map((payload) => `${payload.toolName}: ${payload.error || 'failed'}`).join(' | ') || 'none'}`,
+                  ].join('\n'),
+                },
+              ],
+            },
+          ],
+          maxTokens: 160,
+          temperature: 0.1,
+        });
+        const fallbackSummary = fallbackResult.text.trim();
+        llmSummary = fallbackSummary
+          ? {
+              summary: fallbackSummary,
+              evidence,
+              next_step: this.getNextStep(agentId),
+              confidence: deterministicSummary.confidence,
+            }
+          : deterministicSummary;
+      } catch {
+        llmSummary = deterministicSummary;
       }
-      llmSummary = {
-        summary: fallbackSummary,
-        evidence,
-        next_step: this.getNextStep(agentId),
-        confidence: deterministicSummary.confidence,
-      };
     }
 
     const reasoningSummary: ReasoningSummary = {

@@ -10,6 +10,10 @@ interface EmptyWorkbenchPromptProps {
 }
 
 const CARD_COPY: Record<AgentMode, { title: TranslationKey; subtitle: TranslationKey }> = {
+  ask: {
+    title: 'emptyWorkbench.askTitle',
+    subtitle: 'emptyWorkbench.askSubtitle',
+  },
   debugger: {
     title: 'emptyWorkbench.debuggerTitle',
     subtitle: 'emptyWorkbench.debuggerSubtitle',

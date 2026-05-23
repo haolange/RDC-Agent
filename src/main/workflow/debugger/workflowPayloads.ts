@@ -1,6 +1,6 @@
 import type { AgentRole } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
-import type { Blocker, WorkflowState } from '@shared/types/workflow';
+import type { Blocker, PlanPresentation, WorkflowState } from '@shared/types/workflow';
 import { normalizeWorkflowStage } from '@shared/constants/stages';
 
 export interface PlanLlmPayload {
@@ -8,6 +8,7 @@ export interface PlanLlmPayload {
   notes: string[];
   recommended_specialists: AgentRole[];
   verification_focus: string[];
+  presentation?: PlanPresentation;
 }
 
 export interface InvestigationLlmPayload {

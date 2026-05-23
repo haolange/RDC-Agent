@@ -12,6 +12,7 @@ import type {
 } from '@shared/types/agent';
 import type { WorkflowStage } from '@shared/types/workflow';
 import {
+  AGENT_ROLES,
   AGENT_DISPLAY_NAMES,
   AGENT_DESCRIPTIONS,
   DEFAULT_MODEL_ROUTING,
@@ -22,7 +23,10 @@ import {
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import { generateEventId, nowMs, nowIso } from '@shared/utils/id';
 import type { LLMConfig, LLMStreamEvent } from '@shared/types/llm';
+import type { LlmProviderId } from '@shared/types/settings';
 import { executionProfileService } from '../../settings/ExecutionProfileService';
+import { llmAdapter } from '../../settings/LLMAdapter';
+import { providerAccountAuthService } from '../../settings/ProviderAccountAuthService';
 import { settingsService } from '../../settings/SettingsService';
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import { agentRunnerRegistry } from './AgentRunnerRegistry';
@@ -49,19 +53,7 @@ export class AgentOrchestrator {
    * 初始化所有Agent
    */
   private initializeAgents(): void {
-    const allRoles: AgentRole[] = [
-      'rdc-debugger',
-      'triage_agent',
-      'capture_repro_agent',
-      'pass_graph_pipeline_agent',
-      'pixel_forensics_agent',
-      'shader_ir_agent',
-      'driver_device_agent',
-      'skeptic_agent',
-      'curator_agent',
-    ];
-
-    for (const role of allRoles) {
+    for (const role of AGENT_ROLES) {
       this.agentStates.set(role, {
         agentId: role,
         status: 'idle',
@@ -87,7 +79,7 @@ export class AgentOrchestrator {
    * 获取Agent类别
    */
   private getAgentCategory(role: AgentRole): 'orchestrator' | 'investigator' | 'verifier' | 'reporter' {
-    if (role === 'rdc-debugger') return 'orchestrator';
+    if (role === 'ask_agent' || role === 'rdc-debugger') return 'orchestrator';
     if (INVESTIGATOR_AGENTS.includes(role)) return 'investigator';
     if (VERIFIER_AGENTS.includes(role)) return 'verifier';
     if (REPORTER_AGENTS.includes(role)) return 'reporter';
@@ -98,6 +90,7 @@ export class AgentOrchestrator {
    * 获取Agent写入范围
    */
   private getAgentWriteScopes(role: AgentRole): WriteScope[] {
+    if (role === 'ask_agent') return [];
     if (role === 'rdc-debugger') return ['workspace_control'];
     if (INVESTIGATOR_AGENTS.includes(role)) return ['workspace_notes'];
     if (role === 'skeptic_agent') return ['session_signoff'];
@@ -154,6 +147,18 @@ export class AgentOrchestrator {
     return executionProfileService.resolveAgentRuntimeProfile(settings, stage || 'investigate', agentId);
   }
 
+  private async refreshAccountRuntimeCredentials(providerId: LlmProviderId): Promise<void> {
+    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+    if (provider?.authMode !== 'account') {
+      return;
+    }
+
+    await providerAccountAuthService.ensureRuntimeCredentials(providerId);
+    const llmConfig = settingsService.getLlmConfig();
+    llmAdapter.configure(llmConfig);
+    this.applyLlmConfig(llmConfig);
+  }
+
   private async finalizeRecordedAssistantMessage(
     agentId: AgentRole,
     streamedContent: string,
@@ -199,7 +204,9 @@ export class AgentOrchestrator {
     this.updateAgentStatus(agentId, 'thinking');
 
     try {
-      const runtimeProfile = this.resolveRuntimeProfile(agentId, context?.stageId);
+      let runtimeProfile = this.resolveRuntimeProfile(agentId, context?.stageId);
+      await this.refreshAccountRuntimeCredentials(runtimeProfile.providerId);
+      runtimeProfile = this.resolveRuntimeProfile(agentId, context?.stageId);
       const config: AgentConfig = {
         ...fallbackConfig,
         systemPrompt: runtimeProfile.systemPrompt,
@@ -264,6 +271,7 @@ export class AgentOrchestrator {
       turnId?: string;
       onChunk?: (text: string) => void;
       onStreamEvent?: (event: LLMStreamEvent) => void;
+      routeAgentId?: AgentRole;
     },
   ): Promise<string> {
     const fallbackConfig = this.agentConfigs.get(agentId);
@@ -274,9 +282,16 @@ export class AgentOrchestrator {
     this.updateAgentStatus(agentId, 'thinking');
 
     try {
-      const settings = settingsService.getAll();
-      const routeMap = new Map(settings.llm.agentRoutes.map((route) => [route.agentId, route]));
-      const route = routeMap.get(agentId);
+      let settings = settingsService.getAll();
+      let routeMap = new Map(settings.llm.agentRoutes.map((route) => [route.agentId, route]));
+      const routeAgentId = options?.routeAgentId ?? agentId;
+      let route = routeMap.get(routeAgentId);
+      if (route?.providerId) {
+        await this.refreshAccountRuntimeCredentials(route.providerId);
+        settings = settingsService.getAll();
+        routeMap = new Map(settings.llm.agentRoutes.map((entry) => [entry.agentId, entry]));
+        route = routeMap.get(routeAgentId);
+      }
       const config: AgentConfig = {
         ...fallbackConfig,
         modelProvider: route?.providerId || fallbackConfig.modelProvider,
@@ -294,12 +309,21 @@ export class AgentOrchestrator {
         } catch {
           userMessage = content;
         }
+        if (userMessage.includes('__RDC_AGENT_E2E_FORCE_COWORK_LLM_FAILURE__')) {
+          throw new Error('E2E forced cowork LLM request failure');
+        }
         const lower = userMessage.toLowerCase();
-        let stub = '我在。你可以先告诉我你遇到了什么现象，或者直接说你希望我现在正式开始调试。';
+        let stub = agentId === 'ask_agent'
+          ? '我在。你可以先描述问题、目标或需要打开的 .rdc capture；我会先帮你澄清，不会直接启动执行。'
+          : '我在。你可以先告诉我你遇到了什么现象，或者直接说你希望我现在正式开始调试。';
         if (/ue4|unreal/i.test(userMessage)) {
           stub = 'UE4 是 Unreal Engine 4。它是 Epic Games 的一代游戏引擎，常见于延迟渲染、材质系统、后处理链和 Shader 调试场景。';
         } else if (/你好|您好|hello|hi/i.test(userMessage)) {
-          stub = '你好，我是 RDC Debugger。你可以先和我聊现象、问我能力范围，等你准备好 capture 后，我再进入正式的 RenderDoc 调试。';
+          if (agentId === 'ask_agent') {
+            stub = '你好，我可以先帮你澄清问题、解释能力范围，或引导你在应用内 Open 一个 .rdc capture；不会直接启动 RenderDoc 执行。';
+          } else {
+            stub = '你好。当前是 Debugger 模式；如果你要开始正式调试，请描述目标、异常和关键事件，我会先生成执行前计划。';
+          }
         } else if (/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower)) {
           stub = '收到，我会先帮你整理正式调试前的关键信息，然后在条件满足时进入严格执行流程。';
         }

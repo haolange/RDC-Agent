@@ -7,6 +7,8 @@ import type {
   LlmProviderId,
   LlmProviderModel,
 } from '@shared/types/settings';
+import { getBuiltinProviderDefinition } from '@shared/constants/llm';
+import { COPILOT_EDITOR_HEADERS, COPILOT_WIRE_HEADERS } from './CopilotWire';
 import { settingsService } from './SettingsService';
 
 const REQUEST_TIMEOUT_MS = 20000;
@@ -39,6 +41,8 @@ interface OAuthSecretBundle {
   apiKey?: string;
   copilotToken?: string;
   copilotApiBaseUrl?: string;
+  idToken?: string;
+  accountId?: string;
   expiresAt?: string;
   accountLabel?: string;
   planLabel?: string;
@@ -91,6 +95,80 @@ const normalizeAccountModels = (values: unknown[]): LlmProviderModel[] => {
   return Array.from(models.values()).sort((left, right) => left.id.localeCompare(right.id));
 };
 
+const readString = (value: unknown): string | undefined =>
+  typeof value === 'string' && value.trim() ? value.trim() : undefined;
+
+const parseJwtPayload = (token?: string): Record<string, unknown> | null => {
+  const payload = token?.split('.')[1];
+  if (!payload) {
+    return null;
+  }
+  try {
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = Buffer.from(normalized, 'base64').toString('utf8');
+    const parsed = JSON.parse(decoded) as unknown;
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+const extractChatGptAccountId = (idToken?: string): string | undefined => {
+  const claims = parseJwtPayload(idToken);
+  if (!claims) {
+    return undefined;
+  }
+
+  const authClaim = claims['https://api.openai.com/auth'];
+  const authRecord = authClaim && typeof authClaim === 'object' && !Array.isArray(authClaim)
+    ? authClaim as Record<string, unknown>
+    : {};
+  const organizations = Array.isArray(claims.organizations) ? claims.organizations : [];
+  const firstOrganization = organizations[0] && typeof organizations[0] === 'object'
+    ? organizations[0] as Record<string, unknown>
+    : {};
+
+  return readString(authRecord.chatgpt_account_id)
+    ?? readString(authRecord.account_id)
+    ?? readString(claims['https://api.openai.com/auth.chatgpt_account_id'])
+    ?? readString(claims.chatgpt_account_id)
+    ?? readString(claims.account_id)
+    ?? readString(firstOrganization.id);
+};
+
+const createAccountCatalogModels = (providerId: AccountProviderId): LlmProviderModel[] => {
+  const definition = getBuiltinProviderDefinition(providerId);
+  const seen = new Set<string>();
+  return (definition?.recommendedModels ?? [])
+    .map((modelId) => modelId.trim())
+    .filter((modelId) => {
+      if (!modelId || seen.has(modelId) || !isAgentRoutableAccountModel(modelId)) {
+        return false;
+      }
+      seen.add(modelId);
+      return true;
+    })
+    .map((modelId) => ({
+      id: modelId,
+      label: modelId,
+      enabled: true,
+    }));
+};
+
+const mergeAccountModels = (...groups: LlmProviderModel[][]): LlmProviderModel[] => {
+  const models = new Map<string, LlmProviderModel>();
+  for (const group of groups) {
+    for (const model of group) {
+      if (!models.has(model.id) && isAgentRoutableAccountModel(model.id)) {
+        models.set(model.id, model);
+      }
+    }
+  }
+  return Array.from(models.values());
+};
+
 const isAgentRoutableAccountModel = (modelId: string): boolean => {
   const normalized = modelId.toLowerCase();
   return !(
@@ -125,6 +203,9 @@ const isExpiringSoon = (expiresAt?: string): boolean => {
   return Number.isFinite(timestamp) && timestamp <= Date.now() + 60_000;
 };
 
+const wait = (milliseconds: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, milliseconds));
+
 const canRefreshBundle = (bundle: OAuthSecretBundle): boolean =>
   Boolean(bundle.refreshToken || (bundle.providerId === 'github-copilot' && bundle.accessToken));
 
@@ -158,6 +239,24 @@ const parseModels = (payload: unknown): LlmProviderModel[] => {
   return Array.isArray(data) ? normalizeAccountModels(data) : [];
 };
 
+const parseCopilotModels = (payload: unknown): LlmProviderModel[] => {
+  if (!payload || typeof payload !== 'object') {
+    return [];
+  }
+  const data = (payload as { data?: unknown; models?: unknown }).data ?? (payload as { data?: unknown; models?: unknown }).models;
+  if (!Array.isArray(data)) {
+    return [];
+  }
+  return normalizeAccountModels(data.filter((value) => {
+    const record = value && typeof value === 'object' ? value as { policy?: unknown } : null;
+    const policy = record?.policy && typeof record.policy === 'object' && !Array.isArray(record.policy)
+      ? record.policy as { state?: unknown }
+      : null;
+    const state = typeof policy?.state === 'string' ? policy.state.toLowerCase() : '';
+    return !state || state === 'enabled';
+  }));
+};
+
 export class ProviderAccountAuthService {
   async startLogin(providerId: LlmProviderId): Promise<LlmProviderAccountStatus> {
     if (!isAccountProviderId(providerId)) {
@@ -184,14 +283,14 @@ export class ProviderAccountAuthService {
     try {
       if (request.providerId === 'claude-account') {
         const bundle = await this.exchangeClaudeCode(flow, request.code?.trim() ?? '');
-        return this.persistAccount(request.providerId, bundle);
+        return await this.persistAccount(request.providerId, bundle);
       }
       if (request.providerId === 'chatgpt-account') {
         const bundle = await this.exchangeChatGptCode(flow, request.code?.trim() ?? '');
-        return this.persistAccount(request.providerId, bundle);
+        return await this.persistAccount(request.providerId, bundle);
       }
       const bundle = await this.pollGitHubDevice(flow);
-      return this.persistAccount(request.providerId, bundle);
+      return await this.persistAccount(request.providerId, bundle);
     } catch (error) {
       flow.error = parseProviderError(error);
       return this.status(request.providerId, flow.error, 'failed');
@@ -229,6 +328,37 @@ export class ProviderAccountAuthService {
     }
   }
 
+  async ensureRuntimeCredentials(providerId: LlmProviderId): Promise<void> {
+    if (!isAccountProviderId(providerId)) {
+      return;
+    }
+    const bundle = this.readBundle(providerId);
+    if (!bundle) {
+      throw new Error('Account is not connected.');
+    }
+    if (providerId === 'github-copilot' && !bundle.accessToken) {
+      throw new Error('GitHub Copilot account access token is missing. Sign in again.');
+    }
+
+    const activeBundle = await this.refreshBundleIfNeeded(bundle);
+    if (JSON.stringify(activeBundle) === JSON.stringify(bundle)) {
+      return;
+    }
+
+    const models = await this.discoverModels(activeBundle);
+    settingsService.saveProviderAccountConnection(
+      providerId,
+      JSON.stringify(activeBundle),
+      models,
+      {
+        accountLabel: activeBundle.accountLabel,
+        planLabel: activeBundle.planLabel,
+        oauthExpiresAt: activeBundle.expiresAt,
+        oauthRefreshAvailable: canRefreshBundle(activeBundle),
+      },
+    );
+  }
+
   status(providerId: LlmProviderId, message?: string, forcedState?: LlmProviderAccountStatus['state']): LlmProviderAccountStatus {
     const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
     const isAccount = isAccountProviderId(providerId);
@@ -236,12 +366,15 @@ export class ProviderAccountAuthService {
     const connected = Boolean(provider?.isConfigured && provider.status === 'verified');
     const state: LlmProviderAccountStatus['state'] = forcedState
       ?? (flow?.error ? 'failed' : flow ? 'pending' : connected ? 'connected' : isAccount ? 'signed-out' : 'unavailable');
+    const pendingMessage = providerId === 'github-copilot'
+      ? 'Waiting for GitHub authorization.'
+      : 'Waiting for authorization.';
     return {
       providerId,
       state,
       available: isAccount,
       connected,
-      message: message ?? flow?.error ?? (connected ? 'Connected' : flow ? 'Waiting for authorization.' : 'Not connected'),
+      message: message ?? flow?.error ?? (connected ? 'Connected' : flow ? pendingMessage : 'Not connected'),
       error: forcedState === 'failed' ? message : flow?.error,
       accountLabel: provider?.accountLabel,
       planLabel: provider?.planLabel,
@@ -249,7 +382,7 @@ export class ProviderAccountAuthService {
       authUrl: flow?.authUrl,
       verificationUri: flow?.verificationUri,
       userCode: flow?.userCode,
-      requiresCodeInput: Boolean(flow?.providerId === 'claude-account' || (isTestMode() && flow?.providerId === 'chatgpt-account')),
+      requiresCodeInput: Boolean(flow?.providerId === 'claude-account'),
       models: provider?.models ?? [],
     };
   }
@@ -287,7 +420,7 @@ export class ProviderAccountAuthService {
     return this.status(flow.providerId);
   }
 
-  private startChatGptLogin(): LlmProviderAccountStatus {
+  private async startChatGptLogin(): Promise<LlmProviderAccountStatus> {
     const { verifier, challenge } = createPkce();
     const state = randomUUID();
     const flow: OAuthFlowState = {
@@ -309,9 +442,7 @@ export class ProviderAccountAuthService {
       expiresAt: Date.now() + 10 * 60 * 1000,
     };
     this.setFlow(flow);
-    if (!isTestMode()) {
-      this.startChatGptCallbackServer(flow);
-    }
+    await this.startChatGptCallbackServer(flow);
     void this.openExternal(flow.authUrl);
     return this.status(flow.providerId);
   }
@@ -405,35 +536,16 @@ export class ProviderAccountAuthService {
         code_verifier: flow.codeVerifier,
       }).toString(),
     }) as { access_token?: string; refresh_token?: string; id_token?: string; expires_in?: number };
-    let apiKey = tokenPayload.access_token;
-    if (tokenPayload.id_token) {
-      try {
-        const exchangePayload = await fetchJson('https://auth.openai.com/oauth/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
-            client_id: CHATGPT_CLIENT_ID,
-            subject_token: tokenPayload.id_token,
-            subject_token_type: 'urn:ietf:params:oauth:token-type:id_token',
-            requested_token: 'openai-api-key',
-          }).toString(),
-        }) as { access_token?: string };
-        apiKey = exchangePayload.access_token ?? apiKey;
-      } catch {
-        // Access token fallback still lets Test surface a clear provider error.
-      }
-    }
-    if (!apiKey) {
-      throw new Error('OpenAI OAuth did not return a usable credential.');
+    if (!tokenPayload.access_token) {
+      throw new Error('OpenAI OAuth did not return an access token.');
     }
     return {
       providerId: 'chatgpt-account',
       accessToken: tokenPayload.access_token,
       refreshToken: tokenPayload.refresh_token,
-      apiKey,
+      apiKey: tokenPayload.access_token,
+      idToken: tokenPayload.id_token,
+      accountId: extractChatGptAccountId(tokenPayload.id_token),
       expiresAt: new Date(Date.now() + (tokenPayload.expires_in ?? 3600) * 1000).toISOString(),
       accountLabel: 'ChatGPT Account',
     };
@@ -444,13 +556,15 @@ export class ProviderAccountAuthService {
       throw new Error('GitHub device code is missing.');
     }
     let intervalSeconds = flow.intervalSeconds ?? 5;
+    let delayBeforePoll = !isTestMode();
     for (;;) {
       if (Date.now() > flow.expiresAt) {
         throw new Error('GitHub authorization code expired.');
       }
-      if (!isTestMode()) {
-        await new Promise((resolve) => setTimeout(resolve, intervalSeconds * 1000));
+      if (delayBeforePoll) {
+        await wait(intervalSeconds * 1000);
       }
+      delayBeforePoll = true;
       const payload = await fetchJson('https://github.com/login/oauth/access_token', {
         method: 'POST',
         headers: {
@@ -464,12 +578,11 @@ export class ProviderAccountAuthService {
         }),
       }) as { access_token?: string; error?: string; interval?: number };
       if (payload.error === 'authorization_pending') {
-        if (isTestMode()) {
-          throw new Error('GitHub authorization is still pending.');
-        }
+        delete flow.error;
         continue;
       }
       if (payload.error === 'slow_down') {
+        delete flow.error;
         intervalSeconds += 5;
         continue;
       }
@@ -484,8 +597,7 @@ export class ProviderAccountAuthService {
         headers: {
           Accept: 'application/json',
           Authorization: `token ${payload.access_token}`,
-          'Editor-Version': 'RDC-Agent/1.0',
-          'Editor-Plugin-Version': 'RDC-Agent/1.0',
+          ...COPILOT_EDITOR_HEADERS,
         },
       }) as { token?: string; expires_at?: number; endpoints?: { api?: string } };
       if (!copilot.token) {
@@ -523,7 +635,7 @@ export class ProviderAccountAuthService {
   }
 
   private async refreshBundleIfNeeded(bundle: OAuthSecretBundle): Promise<OAuthSecretBundle> {
-    if (!isExpiringSoon(bundle.expiresAt)) {
+    if (bundle.providerId !== 'github-copilot' && !isExpiringSoon(bundle.expiresAt)) {
       return bundle;
     }
 
@@ -536,8 +648,7 @@ export class ProviderAccountAuthService {
         headers: {
           Accept: 'application/json',
           Authorization: `token ${bundle.accessToken}`,
-          'Editor-Version': 'RDC-Agent/1.0',
-          'Editor-Plugin-Version': 'RDC-Agent/1.0',
+          ...COPILOT_EDITOR_HEADERS,
         },
       }) as { token?: string; expires_at?: number; endpoints?: { api?: string } };
       if (!copilot.token) {
@@ -590,7 +701,7 @@ export class ProviderAccountAuthService {
         client_id: CHATGPT_CLIENT_ID,
         refresh_token: bundle.refreshToken,
       }).toString(),
-    }) as { access_token?: string; refresh_token?: string; expires_in?: number };
+    }) as { access_token?: string; refresh_token?: string; id_token?: string; expires_in?: number };
     if (!payload.access_token) {
       throw new Error('OpenAI OAuth refresh did not return an access token.');
     }
@@ -598,35 +709,33 @@ export class ProviderAccountAuthService {
       ...bundle,
       accessToken: payload.access_token,
       apiKey: payload.access_token,
+      idToken: payload.id_token ?? bundle.idToken,
+      accountId: extractChatGptAccountId(payload.id_token) ?? bundle.accountId,
       refreshToken: payload.refresh_token ?? bundle.refreshToken,
       expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
     };
   }
 
   private async discoverModels(bundle: OAuthSecretBundle): Promise<LlmProviderModel[]> {
-    if (bundle.providerId === 'claude-account') {
-      const payload = await fetchJson('https://api.anthropic.com/v1/models', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${bundle.accessToken}`,
-          'anthropic-version': '2023-06-01',
-        },
-      });
-      return parseModels(payload);
+    if (bundle.providerId === 'chatgpt-account' || bundle.providerId === 'claude-account') {
+      return createAccountCatalogModels(bundle.providerId);
     }
     if (bundle.providerId === 'github-copilot') {
+      const catalogModels = createAccountCatalogModels(bundle.providerId);
       const baseUrl = (bundle.copilotApiBaseUrl ?? 'https://api.githubcopilot.com').replace(/\/+$/, '');
-      const payload = await fetchJson(`${baseUrl}/models`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${bundle.copilotToken}`,
-          'Content-Type': 'application/json',
-          'Copilot-Integration-Id': 'vscode-chat',
-          'Editor-Version': 'RDC-Agent/1.0',
-          'Editor-Plugin-Version': 'RDC-Agent/1.0',
-        },
-      });
-      return parseModels(payload);
+      try {
+        const payload = await fetchJson(`${baseUrl}/models`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${bundle.copilotToken}`,
+            'Content-Type': 'application/json',
+            ...COPILOT_WIRE_HEADERS,
+          },
+        });
+        return mergeAccountModels(catalogModels, parseCopilotModels(payload));
+      } catch {
+        return catalogModels;
+      }
     }
     const payload = await fetchJson('https://api.openai.com/v1/models', {
       method: 'GET',
@@ -667,36 +776,62 @@ export class ProviderAccountAuthService {
   private clearFlows(providerId: AccountProviderId): void {
     for (const [flowId, flow] of pendingFlows.entries()) {
       if (flow.providerId === providerId) {
-        flow.server?.close();
+        this.closeFlowServer(flow);
         pendingFlows.delete(flowId);
       }
     }
   }
 
-  private startChatGptCallbackServer(flow: OAuthFlowState): void {
-    const server = createServer((request, response) => {
-      const url = new URL(request.url ?? '/', `http://localhost:${CHATGPT_CALLBACK_PORT}`);
-      if (url.pathname !== '/auth/callback' || url.searchParams.get('state') !== flow.state) {
-        response.writeHead(400, { 'Content-Type': 'text/plain' });
-        response.end('Invalid OAuth callback.');
-        return;
-      }
-      const code = url.searchParams.get('code') ?? '';
-      void this.finishLogin({ providerId: flow.providerId, flowId: flow.flowId, code })
-        .then(() => {
-          response.writeHead(200, { 'Content-Type': 'text/html' });
-          response.end('<html><body>RDC Agent sign-in complete. You can return to the app.</body></html>');
-        })
-        .catch((error) => {
-          response.writeHead(500, { 'Content-Type': 'text/plain' });
-          response.end(parseProviderError(error));
-        });
+  private closeFlowServer(flow: OAuthFlowState): void {
+    const server = flow.server;
+    if (!server) {
+      return;
+    }
+    delete flow.server;
+    if (server.listening) {
+      server.close();
+    }
+  }
+
+  private startChatGptCallbackServer(flow: OAuthFlowState): Promise<void> {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const server = createServer((request, response) => {
+        const url = new URL(request.url ?? '/', `http://localhost:${CHATGPT_CALLBACK_PORT}`);
+        if (url.pathname !== '/auth/callback' || url.searchParams.get('state') !== flow.state) {
+          response.writeHead(400, { 'Content-Type': 'text/plain' });
+          response.end('Invalid OAuth callback.');
+          return;
+        }
+        const code = url.searchParams.get('code') ?? '';
+        void this.finishLogin({ providerId: flow.providerId, flowId: flow.flowId, code })
+          .then(() => {
+            response.writeHead(200, { 'Content-Type': 'text/html' });
+            response.end('<html><body>RDC Agent sign-in complete. You can return to the app.</body></html>');
+          })
+          .catch((error) => {
+            response.writeHead(500, { 'Content-Type': 'text/plain' });
+            response.end(parseProviderError(error));
+          })
+          .finally(() => {
+            this.closeFlowServer(flow);
+          });
+      });
+      flow.server = server;
+      server.on('error', (error) => {
+        flow.error = parseProviderError(error);
+        this.closeFlowServer(flow);
+        pendingFlows.delete(flow.flowId);
+        if (!settled) {
+          settled = true;
+          reject(error);
+        }
+      });
+      server.listen(CHATGPT_CALLBACK_PORT, '127.0.0.1', () => {
+        settled = true;
+        resolve();
+      });
     });
-    server.on('error', (error) => {
-      flow.error = parseProviderError(error);
-    });
-    server.listen(CHATGPT_CALLBACK_PORT, '127.0.0.1');
-    flow.server = server;
   }
 
   private async openExternal(url?: string): Promise<void> {

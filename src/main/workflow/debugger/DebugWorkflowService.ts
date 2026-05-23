@@ -20,13 +20,14 @@ import type {
   PlanReadiness,
   ReasoningSummary,
   WorkflowState,
+  PlanPresentation,
 } from '@shared/types/workflow';
 import { normalizeWorkflowStage } from '@shared/constants/stages';
 import { BLOCKER_CODES } from '@shared/constants/blockers';
 import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
 import { storageAdapter, type PersistedPlanSnapshot } from '../../sessions/StorageAdapter';
 import { intakeContextResolver } from './IntakeContextResolver';
-import { planBuilder } from './PlanBuilder';
+import { buildDebugPlanPresentation, planBuilder } from './PlanBuilder';
 import { runExecutionService } from './RunExecutionService';
 import { rdxSessionService } from '../../index';
 import { specialistRecipeRunner, type SpecialistRecipeResult } from './SpecialistRecipeRunner';
@@ -78,6 +79,40 @@ interface RunLocation {
   session: SessionRecord;
   run: RunSummary;
 }
+
+const ASK_USER_TOOL_NAME = 'ui.ask_user_question';
+
+const buildAskUserQuestionTraceQuestions = (prompt: AskUserPrompt) => (
+  prompt.questions.map((question) => ({
+    questionId: question.id,
+    prompt: question.prompt,
+    recommendedOptionId: question.recommendedOptionId,
+    options: question.options.map((option) => ({
+      optionId: option.id,
+      label: option.label,
+      description: option.description,
+    })),
+    freeformPlaceholder: question.freeformPlaceholder,
+  }))
+);
+
+const buildAskUserAnswerSummary = (
+  prompt: AskUserPrompt | null | undefined,
+  answers: AskUserAnswer[],
+): string => {
+  if (!prompt) {
+    return `已回答 ${answers.length} 个问题。`;
+  }
+
+  const lines = answers.map((answer) => {
+    const question = prompt.questions.find((entry) => entry.id === answer.questionId);
+    const option = question?.options.find((entry) => entry.id === answer.selectedOptionId);
+    const value = answer.freeformText?.trim() || option?.label || answer.selectedOptionId || '未选择';
+    return question ? `${question.prompt} -> ${value}` : `${answer.questionId} -> ${value}`;
+  });
+
+  return lines.length > 0 ? `已回答 ${lines.length} 个问题：\n${lines.join('\n')}` : '用户未提供回答。';
+};
 
 export class DebugWorkflowService {
   async startPlan(request: DebugSessionStartRequest): Promise<StartWorkflowResult> {
@@ -207,6 +242,22 @@ export class DebugWorkflowService {
           runId,
           sessionId,
           agentId: 'rdc-debugger',
+          eventType: 'tool_execution',
+          status: 'sent',
+          payload: {
+            tool_name: ASK_USER_TOOL_NAME,
+            phase: 'request',
+            prompt_id: pendingQuestions.promptId,
+            title: pendingQuestions.title,
+            summary: pendingQuestions.summary,
+            question_count: pendingQuestions.questions.length,
+            questions: buildAskUserQuestionTraceQuestions(pendingQuestions),
+          },
+        }));
+        await this.appendActionEvent(sessionId, storageAdapter.createActionEvent({
+          runId,
+          sessionId,
+          agentId: 'rdc-debugger',
           eventType: 'blocker',
           status: 'blocked',
           payload: {
@@ -283,6 +334,7 @@ export class DebugWorkflowService {
     if (!snapshot?.debug_plan) {
       return { success: false, error: 'No plan snapshot available.' };
     }
+    const pendingQuestionsBeforeSubmit = snapshot.pending_questions;
 
     const nextPlan: DebugPlan = {
       ...snapshot.debug_plan,
@@ -322,6 +374,7 @@ export class DebugWorkflowService {
       : nextPlan.strictReady
         ? 'strict_ready'
         : 'needs_user_input';
+    nextPlan.presentation = buildDebugPlanPresentation(nextPlan);
 
     const previousBlockerKeys = new Set(snapshot.debug_plan.blockers.map((blocker) => `${blocker.code}:${blocker.reason}`));
     const newBlockers = nextPlan.blockers.filter((blocker) => !previousBlockerKeys.has(`${blocker.code}:${blocker.reason}`));
@@ -355,6 +408,27 @@ export class DebugWorkflowService {
         source: 'ask_user_answers',
       },
     }));
+
+    if (pendingQuestionsBeforeSubmit) {
+      await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
+        runId,
+        sessionId: location.session.sessionId,
+        agentId: 'rdc-debugger',
+        eventType: 'tool_execution',
+        status: 'completed',
+        payload: {
+          tool_name: ASK_USER_TOOL_NAME,
+          phase: 'answer',
+          prompt_id: pendingQuestionsBeforeSubmit.promptId,
+          title: pendingQuestionsBeforeSubmit.title,
+          summary: pendingQuestionsBeforeSubmit.summary,
+          question_count: pendingQuestionsBeforeSubmit.questions.length,
+          questions: buildAskUserQuestionTraceQuestions(pendingQuestionsBeforeSubmit),
+          answers,
+          answerSummary: buildAskUserAnswerSummary(pendingQuestionsBeforeSubmit, answers),
+        },
+      }));
+    }
 
     for (const blocker of newBlockers) {
       await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
@@ -1223,6 +1297,12 @@ export class DebugWorkflowService {
           refs: blocker.refs,
         },
       }));
+      await this.appendAssistantConversationMessage(
+        location.session.sessionId,
+        location.run.runId,
+        aborted ? '本轮调试已停止。' : `执行失败：${blocker.reason}`,
+        aborted ? 'stopped' : 'error',
+      );
       this.emitRunStatus(
         location.session.sessionId,
         location.run.runId,
@@ -1627,44 +1707,69 @@ export class DebugWorkflowService {
     specialistResults: Array<{ reasoningSummary: ReasoningSummary }>,
   ): Promise<ReasoningSummary> {
     const evidence = specialistResults.flatMap((result) => result.reasoningSummary.evidence);
+    const evidenceHighlights = evidence.slice(0, 8);
+    const specialistBriefs = specialistResults
+      .map((result) => result.reasoningSummary.summary)
+      .filter(Boolean)
+      .slice(0, 4);
+    const selectedPixel = evidence.find((entry) => /RGBA=/.test(entry));
+    const visualTarget = evidence.find((entry) => /visual_target=|target=ResourceId/.test(entry));
+    const degradedBinding = evidence.find((entry) => /fallback=|degraded=/.test(entry));
     const deterministic: InvestigationLlmPayload = {
-      summary: `Investigation synthesized ${specialistResults.length} specialist briefs around ${debugPlan.targetCapture?.fileName || 'the target capture'} and ${debugPlan.targetFrameOrEvent?.eventLabel || 'the active frame'}.`,
+      summary: [
+        `Investigation synthesized ${specialistResults.length} specialist briefs around ${debugPlan.targetCapture?.fileName || 'the target capture'} and ${debugPlan.targetFrameOrEvent?.eventLabel || 'the active frame'}.`,
+        selectedPixel ? `Selected pixel evidence: ${selectedPixel}` : '',
+        visualTarget ? `Visual target evidence: ${visualTarget}` : '',
+      ].filter(Boolean).join(' '),
       evidence,
-      next_step: 'Validate the leading root-cause hypothesis against verification contract and skeptic review.',
+      next_step: degradedBinding
+        ? 'Re-run with a precise bright-pixel coordinate or a valid swapchain target to turn the degraded visual evidence into a direct fix validation.'
+        : 'Validate the leading root-cause hypothesis against verification contract and skeptic review.',
       confidence: specialistResults.length > 1 ? 0.74 : 0.58,
-      root_cause: `The leading root cause sits around ${debugPlan.targetFrameOrEvent?.eventLabel || 'the active frame'} and must be validated against the collected pipeline, pixel, and shader evidence.`,
+      root_cause: [
+        `The strongest current evidence localizes the issue to ${debugPlan.targetFrameOrEvent?.eventLabel || 'the active frame'} on ${debugPlan.targetCapture?.fileName || 'the target capture'}.`,
+        selectedPixel ? `The sampled focus pixel did not itself prove an overbright shader output: ${selectedPixel}.` : '',
+        degradedBinding ? `The capture evidence is degraded by ${degradedBinding}, so the report should treat the IBL/leak hypothesis as unconfirmed until the exact bright coordinate or swapchain target is available.` : '',
+      ].filter(Boolean).join(' '),
       recommendations: [
-        'Review the highlighted pipeline, pixel, and shader evidence together before landing a permanent fix.',
+        ...specialistBriefs,
+        ...evidenceHighlights,
         'Preserve the generated screenshots and specialist notes for regression tracking.',
       ],
     };
 
-    const { data } = await debuggerLlmService.callStructured<InvestigationLlmPayload>({
-      agentId: 'rdc-debugger',
-      stage: 'investigate',
-      sessionId: location.session.sessionId,
-      runId: location.run.runId,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are the RDC Debugger orchestrator. Return JSON only with keys summary, evidence, next_step, confidence, root_cause, recommendations. Ground every field in the provided specialist evidence.',
-        },
-        {
-          role: 'user',
-          content: JSON.stringify({
-            goal: debugPlan.userGoal,
-            targetCapture: debugPlan.targetCapture,
-            targetFrameOrEvent: debugPlan.targetFrameOrEvent,
-            specialistResults: specialistResults.map((result) => result.reasoningSummary),
-          }),
-        },
-      ],
-      maxTokens: 700,
-      temperature: 0.2,
-      parse: (text) => debuggerLlmService.parseJson<InvestigationLlmPayload>(text),
-      testValue: deterministic,
-      auditSummary: (payload) => payload.summary,
-    });
+    let data = deterministic;
+    try {
+      const result = await debuggerLlmService.callStructured<InvestigationLlmPayload>({
+        agentId: 'rdc-debugger',
+        stage: 'investigate',
+        sessionId: location.session.sessionId,
+        runId: location.run.runId,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are the RDC Debugger orchestrator. Return JSON only with keys summary, evidence, next_step, confidence, root_cause, recommendations. Ground every field in the provided specialist evidence.',
+          },
+          {
+            role: 'user',
+            content: JSON.stringify({
+              goal: debugPlan.userGoal,
+              targetCapture: debugPlan.targetCapture,
+              targetFrameOrEvent: debugPlan.targetFrameOrEvent,
+              specialistResults: specialistResults.map((result) => result.reasoningSummary),
+            }),
+          },
+        ],
+        maxTokens: 700,
+        temperature: 0.2,
+        parse: (text) => debuggerLlmService.parseJson<InvestigationLlmPayload>(text),
+        testValue: deterministic,
+        auditSummary: (payload) => payload.summary,
+      });
+      data = result.data;
+    } catch {
+      data = deterministic;
+    }
 
     return {
       summaryId: `rdc-debugger-${Date.now()}`,
@@ -1761,31 +1866,37 @@ export class DebugWorkflowService {
         : 'Skeptic accepted the evidence chain but flagged verification as best-effort.',
     };
 
-    const { data } = await debuggerLlmService.callStructured<SkepticReviewPayload>({
-      agentId: 'skeptic_agent',
-      stage: 'skeptic',
-      sessionId: location.session.sessionId,
-      runId: location.run.runId,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are the skeptic agent. Return JSON only with keys verdict and summary. Verdict must be one of approved, approved_with_warning, rejected. Reject only when the evidence chain is not strong enough to support publication.',
-        },
-        {
-          role: 'user',
-          content: JSON.stringify({
-            goal: debugPlan.userGoal,
-            investigationSummary,
-            verification,
-          }),
-        },
-      ],
-      maxTokens: 400,
-      temperature: 0.1,
-      parse: (text) => debuggerLlmService.parseJson<SkepticReviewPayload>(text),
-      testValue: deterministic,
-      auditSummary: (payload) => payload.summary,
-    });
+    let data = deterministic;
+    try {
+      const result = await debuggerLlmService.callStructured<SkepticReviewPayload>({
+        agentId: 'skeptic_agent',
+        stage: 'skeptic',
+        sessionId: location.session.sessionId,
+        runId: location.run.runId,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are the skeptic agent. Return JSON only with keys verdict and summary. Verdict must be one of approved, approved_with_warning, rejected. Reject only when the evidence chain is not strong enough to support publication.',
+          },
+          {
+            role: 'user',
+            content: JSON.stringify({
+              goal: debugPlan.userGoal,
+              investigationSummary,
+              verification,
+            }),
+          },
+        ],
+        maxTokens: 400,
+        temperature: 0.1,
+        parse: (text) => debuggerLlmService.parseJson<SkepticReviewPayload>(text),
+        testValue: deterministic,
+        auditSummary: (payload) => payload.summary,
+      });
+      data = result.data;
+    } catch {
+      data = deterministic;
+    }
 
     return {
       status: data.verdict === 'approved' ? 'ok' : 'warning',
@@ -1817,32 +1928,38 @@ export class DebugWorkflowService {
       confidence: investigationSummary.confidence,
     };
 
-    const { data } = await debuggerLlmService.callStructured<CuratedReportPayload>({
-      agentId: 'curator_agent',
-      stage: 'curate',
-      sessionId: location.session.sessionId,
-      runId: location.run.runId,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are the curator agent. Return JSON only with keys title, summary, root_cause, fix_description, evidence_summary, recommendations, confidence. Summaries must stay grounded in the verified evidence chain and skeptic outcome.',
-        },
-        {
-          role: 'user',
-          content: JSON.stringify({
-            goal: debugPlan.userGoal,
-            investigationSummary,
-            verification,
-            skeptic,
-          }),
-        },
-      ],
-      maxTokens: 900,
-      temperature: 0.2,
-      parse: (text) => debuggerLlmService.parseJson<CuratedReportPayload>(text),
-      testValue: deterministic,
-      auditSummary: (payload) => payload.summary,
-    });
+    let data = deterministic;
+    try {
+      const result = await debuggerLlmService.callStructured<CuratedReportPayload>({
+        agentId: 'curator_agent',
+        stage: 'curate',
+        sessionId: location.session.sessionId,
+        runId: location.run.runId,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are the curator agent. Return JSON only with keys title, summary, root_cause, fix_description, evidence_summary, recommendations, confidence. Summaries must stay grounded in the verified evidence chain and skeptic outcome.',
+          },
+          {
+            role: 'user',
+            content: JSON.stringify({
+              goal: debugPlan.userGoal,
+              investigationSummary,
+              verification,
+              skeptic,
+            }),
+          },
+        ],
+        maxTokens: 900,
+        temperature: 0.2,
+        parse: (text) => debuggerLlmService.parseJson<CuratedReportPayload>(text),
+        testValue: deterministic,
+        auditSummary: (payload) => payload.summary,
+      });
+      data = result.data;
+    } catch {
+      data = deterministic;
+    }
 
     return {
       title: data.title,
@@ -1872,6 +1989,32 @@ export class DebugWorkflowService {
     return Array.from(required);
   }
 
+  private normalizePlanPresentation(
+    value: PlanLlmPayload['presentation'],
+    fallback?: PlanPresentation,
+  ): PlanPresentation | undefined {
+    if (!value || typeof value.title !== 'string' || !Array.isArray(value.sections)) {
+      return fallback;
+    }
+
+    const sections = value.sections
+      .map((section, index) => ({
+        id: String(section.id || section.title || `section-${index + 1}`),
+        title: String(section.title || '').trim(),
+        body: toStringArray(section.body),
+      }))
+      .filter((section) => section.title && section.body.length > 0);
+
+    if (!value.title.trim() || sections.length === 0) {
+      return fallback;
+    }
+
+    return {
+      title: value.title.trim(),
+      sections,
+    };
+  }
+
   private async generatePlanWithLlm(input: {
     sessionId: string;
     runId: string;
@@ -1883,32 +2026,39 @@ export class DebugWorkflowService {
       notes: input.basePlan.notes,
       recommended_specialists: input.basePlan.recommendedSpecialists,
       verification_focus: input.basePlan.verificationContract.successCriteria,
+      presentation: input.basePlan.presentation ?? buildDebugPlanPresentation(input.basePlan),
     };
 
-    const { data } = await debuggerLlmService.callStructured<PlanLlmPayload>({
-      agentId: 'rdc-debugger',
-      stage: 'plan',
-      sessionId: input.sessionId,
-      runId: input.runId,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are the RDC Debugger planner. Return JSON only with keys scope, notes, recommended_specialists, verification_focus. Keep the plan grounded in the provided intake facts and do not invent unsupported captures or event ids.',
-        },
-        {
-          role: 'user',
-          content: JSON.stringify({
-            goal: input.resolvedGoal,
-            basePlan: input.basePlan,
-          }),
-        },
-      ],
-      maxTokens: 700,
-      temperature: 0.2,
-      parse: (text) => debuggerLlmService.parseJson<PlanLlmPayload>(text),
-      testValue: deterministic,
-      auditSummary: (payload) => payload.scope,
-    });
+    let data = deterministic;
+    try {
+      const result = await debuggerLlmService.callStructured<PlanLlmPayload>({
+        agentId: 'rdc-debugger',
+        stage: 'plan',
+        sessionId: input.sessionId,
+        runId: input.runId,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are the RDC Debugger planner. Return JSON only with keys scope, notes, recommended_specialists, verification_focus, presentation. presentation must contain title and sections; each section has id, title, body string array. Keep the plan grounded in the provided intake facts and do not invent unsupported captures or event ids.',
+          },
+          {
+            role: 'user',
+            content: JSON.stringify({
+              goal: input.resolvedGoal,
+              basePlan: input.basePlan,
+            }),
+          },
+        ],
+        maxTokens: 700,
+        temperature: 0.2,
+        parse: (text) => debuggerLlmService.parseJson<PlanLlmPayload>(text),
+        testValue: deterministic,
+        auditSummary: (payload) => payload.scope,
+      });
+      data = result.data;
+    } catch {
+      data = deterministic;
+    }
 
     return {
       ...input.basePlan,
@@ -1919,6 +2069,7 @@ export class DebugWorkflowService {
         ...toStringArray(data.verification_focus).map((item) => `Verification focus: ${item}`),
       ])),
       recommendedSpecialists: toRecommendedSpecialists(data.recommended_specialists, input.basePlan.recommendedSpecialists),
+      presentation: this.normalizePlanPresentation(data.presentation, input.basePlan.presentation ?? buildDebugPlanPresentation(input.basePlan)),
       updatedAt: nowIso(),
     };
   }
@@ -1954,6 +2105,7 @@ export class DebugWorkflowService {
     sessionId: string,
     runId: string | null,
     content: string,
+    status: ConversationMessage['status'] = 'complete',
   ): Promise<void> {
     const runLocation = this.findRun(runId || '');
     const message: ConversationMessage = {
@@ -1966,14 +2118,14 @@ export class DebugWorkflowService {
       role: 'assistant',
       agentId: 'rdc-debugger',
       content,
-      status: 'complete',
+      status,
       updatedAt: nowMs(),
       reasoningTrace: null,
       createdAt: nowMs(),
     };
     storageAdapter.appendConversationMessage(sessionId, message);
     this.emitConversationEvent({
-      type: 'message_completed',
+      type: status === 'error' ? 'message_errored' : 'message_completed',
       sessionId,
       turnId: message.turnId,
       message,

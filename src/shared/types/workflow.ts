@@ -82,6 +82,17 @@ export interface VerificationContract {
   successCriteria: string[];
 }
 
+export interface PlanPresentationSection {
+  id: string;
+  title: string;
+  body: string[];
+}
+
+export interface PlanPresentation {
+  title: string;
+  sections: PlanPresentationSection[];
+}
+
 export interface DebugPlan {
   planId: string;
   planReadiness: PlanReadiness;
@@ -101,6 +112,7 @@ export interface DebugPlan {
   scope: string;
   referenceContract: ReferenceContract;
   verificationContract: VerificationContract;
+  presentation?: PlanPresentation;
   expectedDeliverables: string[];
   blockers: Blocker[];
   missingInfo: string[];

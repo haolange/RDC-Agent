@@ -208,7 +208,7 @@ function getResolvedProviderSecret(providerId: string, secretRef: string | undef
   return isVendorSecretUsable(providerId, secret) ? secret : '';
 }
 
-function resolveAccountRuntimeCredential(providerId: string, workspaceRoot: string): { apiKey: string; baseUrl?: string } {
+function resolveAccountRuntimeCredential(providerId: string, workspaceRoot: string): { apiKey: string; baseUrl?: string; accountId?: string } {
   const raw = secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(providerId), workspaceRoot);
   if (!raw) {
     return { apiKey: '' };
@@ -219,6 +219,7 @@ function resolveAccountRuntimeCredential(providerId: string, workspaceRoot: stri
       apiKey?: string;
       copilotToken?: string;
       copilotApiBaseUrl?: string;
+      accountId?: string;
     };
     if (providerId === 'github-copilot') {
       return {
@@ -228,8 +229,9 @@ function resolveAccountRuntimeCredential(providerId: string, workspaceRoot: stri
     }
     if (providerId === 'chatgpt-account') {
       return {
-        apiKey: bundle.apiKey ?? bundle.accessToken ?? '',
-        baseUrl: 'https://api.openai.com/v1',
+        apiKey: bundle.accessToken ?? bundle.apiKey ?? '',
+        baseUrl: 'https://chatgpt.com/backend-api/codex',
+        accountId: bundle.accountId,
       };
     }
     return {
@@ -407,7 +409,7 @@ function isFixtureProvider(provider: Partial<LlmProviderEntry>): boolean {
 
 function normalizeLegacyProviderId(providerId: string): string {
   if (providerId === 'gemini') return 'vertex';
-  if (providerId === 'kimi') return 'kimi-coding-plan';
+    if (providerId === 'kimi' || providerId === 'kimi-coding-plan') return 'kimi-code';
   if (providerId === 'minimax') return 'minimax-global';
   if (providerId === 'zai') return 'glm-global';
   return providerId;
@@ -424,6 +426,7 @@ function sanitizeUserProvider(
 
   const builtinFallback = createBuiltinProviderEntry(rawId);
   const definition = getBuiltinProviderDefinition(rawId);
+  const useBuiltinProviderMetadata = rawId === 'kimi-code';
   const secretRef = provider.secretRef || secretStorageService.createProviderSecretRef(rawId);
   const kind = builtinFallback.kind;
   const models = sanitizeModels(provider.models ?? []);
@@ -441,6 +444,23 @@ function sanitizeUserProvider(
       : Boolean(resolvedSecret);
   const status = pickProviderStatus(provider, builtinFallback, canUseProvider, models);
   const enabled = status === 'verified' && models.length > 0;
+  const label = useBuiltinProviderMetadata
+    ? builtinFallback.label
+    : typeof provider.label === 'string' && provider.label.trim()
+      ? provider.label.trim()
+      : builtinFallback.label;
+  const recommendedModels = useBuiltinProviderMetadata
+    ? builtinFallback.recommendedModels
+    : dedupeStrings(
+      Array.isArray(provider.recommendedModels)
+        ? provider.recommendedModels.filter((value): value is string => typeof value === 'string').map((value) => value.trim())
+        : builtinFallback.recommendedModels,
+    );
+  const docsUrl = useBuiltinProviderMetadata
+    ? builtinFallback.docsUrl
+    : typeof provider.docsUrl === 'string' && provider.docsUrl.trim()
+      ? provider.docsUrl.trim()
+      : builtinFallback.docsUrl;
 
   return {
     id: rawId,
@@ -448,9 +468,7 @@ function sanitizeUserProvider(
     authMode: builtinFallback.authMode,
     catalogGroup: builtinFallback.catalogGroup,
     modelDiscovery: builtinFallback.modelDiscovery,
-    label: typeof provider.label === 'string' && provider.label.trim()
-      ? provider.label.trim()
-      : builtinFallback.label,
+    label,
     enabled,
     apiKey: '',
     secretRef,
@@ -460,14 +478,8 @@ function sanitizeUserProvider(
       : definition?.baseUrl,
     baseUrlEditable: definition?.baseUrlEditable,
     models,
-    recommendedModels: dedupeStrings(
-      Array.isArray(provider.recommendedModels)
-        ? provider.recommendedModels.filter((value): value is string => typeof value === 'string').map((value) => value.trim())
-        : builtinFallback.recommendedModels,
-    ),
-    docsUrl: typeof provider.docsUrl === 'string' && provider.docsUrl.trim()
-      ? provider.docsUrl.trim()
-      : builtinFallback.docsUrl,
+    recommendedModels,
+    docsUrl,
     status,
     lastTestedAt: typeof provider.lastTestedAt === 'string' ? provider.lastTestedAt : undefined,
     lastModelRefreshAt: typeof provider.lastModelRefreshAt === 'string' ? provider.lastModelRefreshAt : undefined,
@@ -1136,6 +1148,7 @@ export class SettingsService {
               ? accountCredential.apiKey
               : '',
           baseUrl: accountCredential.baseUrl ?? provider.baseUrl,
+          accountId: accountCredential.accountId,
           authMode: provider.authMode,
           models: provider.models.filter((model) => model.enabled).map((model) => model.id),
           docsUrl: provider.docsUrl,

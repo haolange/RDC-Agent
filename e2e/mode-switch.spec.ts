@@ -10,6 +10,66 @@ const switchMode = async (page: AppContext['page'], mode: 'debugger' | 'analyzer
   await page.locator(`[data-testid="mode-menu-item-${mode}"]`).click();
 };
 
+const seedOpenedCaptureProject = async (page: AppContext['page']) => {
+  await page.evaluate(() => {
+    const now = Date.now();
+    const input = {
+      inputId: 'input-opened-capture',
+      fileName: 'Character_EyeSpark_Desktop.rdc',
+      filePath: 'H:/fake/project/.resource/inputs/Character_EyeSpark_Desktop.rdc',
+      source: 'project_resource' as const,
+      discoveredAt: now,
+      lastModifiedAt: now,
+      size: 128,
+    };
+    const project = {
+      projectId: 'proj-opened-capture',
+      name: 'Opened Capture Project',
+      rootPath: 'H:/fake/project',
+      slug: 'opened-capture-project',
+      resourcePath: 'H:/fake/project/.resource',
+      knowledgePath: 'H:/fake/project/.resource/knowledge',
+      inputsPath: 'H:/fake/project/.resource/inputs',
+      inputs: [input],
+      inputsUpdatedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    };
+    (window as typeof window & {
+      __RDC_AGENT_E2E__?: {
+        seedWorkbenchState: (state: Record<string, unknown>) => void;
+      };
+    }).__RDC_AGENT_E2E__?.seedWorkbenchState({
+      projects: [project],
+      sessions: [],
+      currentProject: project,
+      currentSession: null,
+      currentRun: null,
+      contextSnapshot: null,
+      captures: [],
+      projectInputs: [input],
+      openedCapture: {
+        projectId: project.projectId,
+        inputId: input.inputId,
+        filePath: input.filePath,
+        captureId: 'capture-opened-capture',
+        sessionId: 'session-opened-capture',
+        contextId: 'ctx-opened-capture',
+        replaySessionId: 'replay-opened-capture',
+        backend: 'local',
+        deviceId: 'local',
+        deviceLabel: 'Local',
+        status: 'open',
+        openedAt: now,
+      },
+      timeline: [],
+      actionEvents: [],
+      workflowState: null,
+      runs: [],
+    });
+  });
+};
+
 const assertComposerFooterOrder = async (page: AppContext['page']) => {
   const selectors = [
     '[data-testid="composer-attach-button"]',
@@ -39,7 +99,7 @@ test.afterEach(async () => {
 test('共享工作台在三种模式下都可交互，空状态保持紧凑', async () => {
   const page = ctx.page;
 
-  await expect(page.locator('[data-testid="debugger-workbench-page"]')).toBeVisible();
+  await expect(page.locator('[data-testid="ask-workbench-page"]')).toBeVisible();
   await expect(page.locator('textarea.chat-input')).toBeVisible();
   await expect(page.locator('[data-testid="composer-attach-button"]')).toBeVisible();
   await expect(page.locator('[data-testid="composer-usage-indicator"]')).toContainText('0%');
@@ -52,22 +112,29 @@ test('共享工作台在三种模式下都可交互，空状态保持紧凑', as
   expect(titleBox!.width).toBeLessThan(viewport.width * 0.8);
   await expect(page.locator('.agent-chat')).toHaveClass(/is-empty/);
   await expect(page.locator('.empty-workbench-step')).toHaveCount(0);
-  await expect(page.locator('.empty-workbench-title')).toContainText('三大 Orchestrator，全面助力研发');
+  await expect(page.locator('.empty-workbench-title')).toContainText('先 Ask，Open Capture 后再执行');
+  await expect(page.locator('[data-testid="empty-workbench-tool-ask"]')).toContainText('先把问题说清楚');
   await expect(page.locator('[data-testid="empty-workbench-tool-debugger"]')).toContainText('从异常现象出发');
   await expect(page.locator('[data-testid="empty-workbench-tool-analyzer"]')).toContainText('拆开线索');
   await expect(page.locator('[data-testid="empty-workbench-tool-optimizer"]')).toContainText('先找瓶颈');
 
   await page.locator('[data-testid="composer-mode-pill"]').click();
   await expect(page.locator('.composer-agent-menu-popup')).toBeVisible();
-  await expect(page.locator('.composer-agent-menu-popup')).toHaveScreenshot('mode-menu.png');
+  await expect(page.locator('[data-testid="mode-menu-item-ask"]')).toBeEnabled();
+  await expect(page.locator('[data-testid="mode-menu-item-debugger"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="mode-menu-item-analyzer"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="mode-menu-item-optimizer"]')).toBeDisabled();
+  await expect(page.locator('[data-testid="mode-menu-item-debugger"]')).toContainText('先在应用内 Open');
   await page.keyboard.press('Escape');
+
+  await seedOpenedCaptureProject(page);
 
   await switchMode(page, 'analyzer');
   await expect(page.locator('[data-testid="analyzer-workbench-page"]')).toBeVisible();
   await expect(page.locator('textarea.chat-input')).toBeVisible();
   await expect(page.locator('[data-testid="app-sidebar-left"]')).toBeVisible();
-  await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveCount(0);
-  await expect(page.locator('.empty-workbench-title')).toContainText('三大 Orchestrator，全面助力研发');
+  await expect(page.locator('.empty-workbench-title')).toContainText('先 Ask，Open Capture 后再执行');
+  await expect(page.locator('[data-testid="empty-workbench-tool-ask"]')).toContainText('Ask');
   await expect(page.locator('[data-testid="empty-workbench-tool-debugger"]')).toContainText('Debugger');
   await expect(page.locator('[data-testid="empty-workbench-tool-analyzer"]')).toContainText('Analyzer');
   await expect(page.locator('[data-testid="empty-workbench-tool-optimizer"]')).toContainText('Optimizer');
@@ -75,7 +142,8 @@ test('共享工作台在三种模式下都可交互，空状态保持紧凑', as
   await switchMode(page, 'optimizer');
   await expect(page.locator('[data-testid="optimizer-workbench-page"]')).toBeVisible();
   await expect(page.locator('textarea.chat-input')).toBeVisible();
-  await expect(page.locator('.empty-workbench-title')).toContainText('三大 Orchestrator，全面助力研发');
+  await expect(page.locator('.empty-workbench-title')).toContainText('先 Ask，Open Capture 后再执行');
+  await expect(page.locator('[data-testid="empty-workbench-tool-ask"]')).toContainText('Ask');
   await expect(page.locator('[data-testid="empty-workbench-tool-debugger"]')).toContainText('Debugger');
   await expect(page.locator('[data-testid="empty-workbench-tool-analyzer"]')).toContainText('Analyzer');
   await expect(page.locator('[data-testid="empty-workbench-tool-optimizer"]')).toContainText('Optimizer');
@@ -134,6 +202,7 @@ test('无项目时点击加号会给出提示，有附件时切换模式不丢�
       runs: [],
     });
   });
+  await seedOpenedCaptureProject(page);
 
   const stagedFile = path.join(ctx.tempDir, 'mode-switch-note.txt');
   fs.writeFileSync(stagedFile, 'attachment smoke');
@@ -215,8 +284,18 @@ test('共享历史保留各自消息的模式标识', async () => {
     });
   });
 
-  await expect(page.locator('.message-mode-badge').filter({ hasText: 'Debugger' })).toHaveCount(1);
-  await expect(page.locator('.message-mode-badge').filter({ hasText: 'Optimizer' })).toHaveCount(1);
+  await expect(page.locator('[data-testid="chat-messages"]')).toContainText('Debugger answer');
+  await expect(page.locator('[data-testid="chat-messages"]')).toContainText('Optimizer answer');
+  await expect.poll(async () => page.evaluate(() => (window as typeof window & {
+    __RDC_AGENT_E2E__?: {
+      getWorkbenchState: () => {
+        conversationMessages: Array<{ modeContext?: string }>;
+      };
+    };
+  }).__RDC_AGENT_E2E__?.getWorkbenchState().conversationMessages.map((message) => message.modeContext))).toEqual([
+    'debugger',
+    'optimizer',
+  ]);
 });
 
 test('composer usage tooltip supports configured and fallback states', async () => {

@@ -12,6 +12,22 @@ export type ConversationReasoningStepStatus = 'pending' | 'running' | 'complete'
 
 export type ConversationToolCallStatus = 'pending' | 'running' | 'complete' | 'error';
 
+export type ConversationMessageDiagnosticCode =
+  | 'CONVERSATION_LLM_ROUTE_MISSING'
+  | 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
+  | 'CONVERSATION_LLM_REQUEST_FAILED';
+
+export interface ConversationMessageDiagnostic {
+  code: ConversationMessageDiagnosticCode;
+  severity: 'warning' | 'error';
+  userMessage: string;
+  agentId?: AgentRole;
+  providerId?: string;
+  modelId?: string;
+  adapterId?: string;
+  technicalMessage?: string;
+}
+
 export interface ConversationToolCall {
   id: string;
   toolName: string;
@@ -55,6 +71,7 @@ export interface ConversationMessage {
   status?: ConversationMessageStatus;
   updatedAt?: number;
   reasoningTrace?: ConversationReasoningTrace | null;
+  diagnostic?: ConversationMessageDiagnostic | null;
   attachments?: SessionAttachmentRecord[];
   createdAt: number;
 }

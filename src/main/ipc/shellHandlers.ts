@@ -107,6 +107,7 @@ export function registerShellHandlers(): void {
       version: app.getVersion(),
       productName: app.getName(),
       systemTheme: nativeTheme.shouldUseDarkColors ? 'dark' : 'light',
+      testMode: process.env.RDC_AGENT_TEST_MODE === '1',
     };
   });
 
