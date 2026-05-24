@@ -4,6 +4,7 @@ import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationStreamEvent } from '@shared/types/conversation';
 import type { RunContextUsageSummary, RunSummary } from '@shared/types/session';
 import type { WorkflowState } from '@shared/types/workflow';
+import type { AgentWorkstreamPresentation } from '@shared/types/workstream';
 
 export interface RunStatusProjection {
   sessionId: string;
@@ -36,6 +37,13 @@ export class WorkflowProjectionPublisher {
 
   publishRunUsage(usage: RunContextUsageSummary): void {
     this.publish('workflow:runUsageChanged', usage);
+  }
+
+  publishWorkstreamChanged(sessionId: string, presentation: AgentWorkstreamPresentation): void {
+    this.publish('workflow:workstreamChanged', {
+      sessionId,
+      presentation,
+    });
   }
 
   publishEvidenceEvent(event: ActionEvent): void {

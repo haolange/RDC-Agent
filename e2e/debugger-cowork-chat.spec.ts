@@ -98,32 +98,16 @@ test('Ask 发送后用户消息立即入流、assistant 不出现执行式 reaso
   }, { timeout: 5000 }).toBe(2);
 
   await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('你好');
-  await expect(ctx.page.locator('[data-testid="conversation-turn"]')).toHaveCount(1);
-  await expect(ctx.page.locator('[data-testid="conversation-user-brief"]')).toHaveCount(1);
+  await expect(ctx.page.locator('[data-testid="aw-task-workstream"]')).toHaveCount(1);
+  await expect(ctx.page.locator('[data-testid="aw-user-prompt"]')).toHaveCount(1);
+  await expect(ctx.page.locator('[data-testid="aw-result-block"]')).toHaveCount(1);
   await expect(ctx.page.locator('[data-testid="assistant-reasoning-toggle"]')).toHaveCount(0);
   await expect(ctx.page.locator('[data-testid="assistant-reasoning-panel"]')).toHaveCount(0);
-  await expect(ctx.page.locator('[data-testid="assistant-document-flow"]')).toHaveCount(1);
-
-  const userBubble = ctx.page.locator('.chat-message.user .message-bubble').first();
-  const userBrief = ctx.page.locator('[data-testid="conversation-user-brief"]').first();
-  const assistantCard = ctx.page.locator('[data-testid="conversation-assistant-card"]').first();
-  const [userBox, userBriefBox, assistantBox] = await Promise.all([
-    userBubble.boundingBox(),
-    userBrief.boundingBox(),
-    assistantCard.boundingBox(),
-  ]);
-
-  expect(userBox).not.toBeNull();
-  expect(userBriefBox).not.toBeNull();
-  expect(assistantBox).not.toBeNull();
-  expect((userBriefBox?.x ?? 0)).toBeGreaterThan((assistantBox?.x ?? 0) + 80);
-  expect((userBriefBox?.width ?? 0)).toBeLessThan((assistantBox?.width ?? 0));
-  await expect.poll(async () => userBubble.evaluate((element) => getComputedStyle(element).textAlign)).toBe('left');
 
   await expect(ctx.page.locator('[data-testid="chat-messages"]')).not.toContainText('RDC Debugger');
-  const assistantDocBox = await ctx.page.locator('[data-testid="conversation-assistant-card"]').first().boundingBox();
-  expect(assistantDocBox).not.toBeNull();
-  await expect.poll(async () => ctx.page.locator('[data-testid="assistant-document-flow"]').first().evaluate((element) => {
+  const resultBox = await ctx.page.locator('[data-testid="aw-result-block"]').first().boundingBox();
+  expect(resultBox).not.toBeNull();
+  await expect.poll(async () => ctx.page.locator('[data-testid="aw-result-block"]').first().evaluate((element) => {
     const text = element.textContent ?? '';
     return (text.match(/RDC Debugger/g) ?? []).length;
   })).toBe(0);
@@ -146,8 +130,8 @@ test('Cowork 模型请求失败时显示诊断，不伪装成本地兜底成功'
   await ctx.page.locator('[data-testid="debugger-start-button"]').click();
 
   await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('模型请求失败');
-  await expect(ctx.page.locator('[data-testid="conversation-message-diagnostic"]')).toContainText('CONVERSATION_LLM_REQUEST_FAILED');
-  await expect(ctx.page.locator('[data-testid="conversation-message-diagnostic"]')).toContainText('ollama/debugger-test-model');
+  await expect(ctx.page.locator('[data-testid="aw-result-block"]')).toContainText('CONVERSATION_LLM_REQUEST_FAILED');
+  await expect(ctx.page.locator('[data-testid="aw-result-block"]')).toContainText('ollama/debugger-test-model');
   await expect(ctx.page.locator('[data-testid="agent-thinking-trace"]')).toHaveCount(0);
   await expect(ctx.page.locator('[data-testid="agent-thinking-area"]')).toHaveCount(0);
   await expect(ctx.page.locator('[data-testid="chat-messages"]')).not.toContainText('已降级到本地兜底回复');

@@ -1,6 +1,7 @@
 import type { AgentRole } from './agent';
 import type { DebugPlan, AskUserPrompt } from './workflow';
 import type { AppMode, RunSummary, SessionAttachmentRecord, SessionRecord } from './session';
+import type { AgentWorkstreamPresentation } from './workstream';
 
 export type ConversationMode = 'talk' | 'intake' | 'active_debug' | 'execute_upgrade';
 
@@ -142,6 +143,7 @@ export interface ConversationTurnResult {
   runUpdate?: RunSummary | null;
   debugPlanSummary?: DebugPlan | null;
   pendingQuestions?: AskUserPrompt | null;
+  workstreamPresentation?: AgentWorkstreamPresentation | null;
   uiHints?: ConversationUiHints;
   errorViewModel?: ConversationErrorViewModel | null;
 }

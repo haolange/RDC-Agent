@@ -8,7 +8,7 @@ import { SettingsModal } from './features/settings/SettingsModal';
 import { TerminalDrawer } from './features/terminal/TerminalDrawer';
 import { ModeGlyph } from './ui/ModeGlyph';
 import { ProfileAvatar } from './ui/ProfileAvatar';
-import { PlanIntakePanel } from './features/debugger/PlanIntakePanel';
+import { ComposerApprovalOverlay, PlanIntakePanel } from './features/debugger/PlanIntakePanel';
 import { useLayoutStore } from './stores/layoutStore';
 import { useSessionStore, type RightRailTarget } from './stores/sessionStore';
 import { useDeviceStore } from './stores/deviceStore';
@@ -59,6 +59,7 @@ import type {
   SessionRecord,
 } from '@shared/types/session';
 import type { WorkflowState } from '@shared/types/workflow';
+import type { AgentWorkstreamPresentation } from '@shared/types/workstream';
 import { AGENT_MODES } from '@shared/constants/agents';
 import {
   APP_RESIZE_HANDLE_WIDTH,
@@ -93,6 +94,7 @@ interface WorkbenchSeedState {
   timeline: AgentTimelineEntry[];
   actionEvents?: ActionEvent[];
   workflowState?: WorkflowState | null;
+  workstreamPresentation?: AgentWorkstreamPresentation | null;
   runs?: RunSummary[];
 }
 
@@ -138,6 +140,7 @@ const App: React.FC = () => {
   const currentRunUsage = useSessionStore((state) => state.currentRunUsage);
   const openedCapture = useSessionStore((state) => state.openedCapture);
   const conversationMessages = useSessionStore((state) => state.conversationMessages);
+  const composerApproval = useSessionStore((state) => state.workstreamPresentation?.approval ?? null);
   const currentMode = useLayoutStore((state) => state.currentMode);
   const leftSidebarCollapsed = useLayoutStore((state) => state.leftSidebarCollapsed);
   const rightPanelCollapsed = useLayoutStore((state) => state.rightPanelCollapsed);
@@ -196,6 +199,7 @@ const App: React.FC = () => {
   const setRuns = useSessionStore((state) => state.setRuns);
   const addActionEvent = useSessionStore((state) => state.addActionEvent);
   const setWorkflowState = useSessionStore((state) => state.setWorkflowState);
+  const setWorkstreamPresentation = useSessionStore((state) => state.setWorkstreamPresentation);
   const setCurrentDebugPlan = useSessionStore((state) => state.setCurrentDebugPlan);
   const setPendingQuestions = useSessionStore((state) => state.setPendingQuestions);
   const setReasoningSummaries = useSessionStore((state) => state.setReasoningSummaries);
@@ -318,16 +322,18 @@ const App: React.FC = () => {
     }
 
     void (async () => {
-      const [historyResult, evidenceResult] = await Promise.all([
+      const [historyResult, evidenceResult, workstreamResult] = await Promise.all([
         electronAPI.conversation.getHistory(currentSession.sessionId).catch(() => ({ messages: [] })),
         electronAPI.evidence.getChain().catch(() => ({ events: [] as ActionEvent[] })),
+        electronAPI.workflow.getWorkstreamSession(currentSession.sessionId).catch(() => ({ success: false, presentation: null })),
       ]);
       setConversationMessages(hydrateMessagesWithActionEvents(
         historyResult.messages ?? [],
         (evidenceResult.events ?? []) as ActionEvent[],
       ));
+      setWorkstreamPresentation(workstreamResult.presentation ?? null);
     })();
-  }, [currentSession?.sessionId, setConversationMessages]);
+  }, [currentSession?.sessionId, setConversationMessages, setWorkstreamPresentation]);
 
   useEffect(() => {
     if (!navigator.webdriver) return;
@@ -354,6 +360,7 @@ const App: React.FC = () => {
         store.setTimeline(state.timeline);
         store.setActionEvents(state.actionEvents ?? []);
         store.setWorkflowState(state.workflowState ?? null);
+        store.setWorkstreamPresentation(state.workstreamPresentation ?? null);
         store.setCurrentDebugPlan(state.workflowState?.debugPlan ?? null);
         store.setPendingQuestions(state.workflowState?.pendingQuestions ?? null);
         store.setReasoningSummaries(state.workflowState?.reasoningSummaries ?? []);
@@ -376,6 +383,7 @@ const App: React.FC = () => {
         store.setTimeline([]);
         store.setActionEvents([]);
         store.setWorkflowState(null);
+        store.setWorkstreamPresentation(null);
         store.setCurrentDebugPlan(null);
         store.setPendingQuestions(null);
         store.setReasoningSummaries([]);
@@ -399,6 +407,7 @@ const App: React.FC = () => {
           timeline: store.timeline,
           actionEvents: store.actionEvents,
           workflowState: store.workflowState,
+          workstreamPresentation: store.workstreamPresentation,
           runs: store.runs,
         };
       },
@@ -525,6 +534,13 @@ const App: React.FC = () => {
       const activeRun = useSessionStore.getState().currentRun;
       if (activeRun?.runId === summary.runId) {
         useSessionStore.getState().setCurrentRunUsage(summary);
+      }
+    });
+
+    const unsubscribeWorkstreamChanged = electronAPI.events.onWorkstreamChanged((payload) => {
+      const activeSessionId = useSessionStore.getState().currentSession?.sessionId;
+      if (!activeSessionId || activeSessionId === payload.sessionId) {
+        useSessionStore.getState().setWorkstreamPresentation(payload.presentation);
       }
     });
 
@@ -714,6 +730,7 @@ const App: React.FC = () => {
 
     return () => {
       unsubscribeRunUsageChanged();
+      unsubscribeWorkstreamChanged();
       unsubscribeContextChanged();
       unsubscribeToolExecutionComplete();
       unsubscribeAgentMessage();
@@ -779,6 +796,7 @@ const App: React.FC = () => {
 
     if (!electronAPI || !currentSession) {
       useSessionStore.getState().setTimeline([]);
+      useSessionStore.getState().setWorkstreamPresentation(null);
       return;
     }
 
@@ -817,6 +835,14 @@ const App: React.FC = () => {
         useSessionStore.getState().setReasoningSummaries(workflow.reasoningSummaries ?? []);
       })
       .catch(() => undefined);
+
+    void electronAPI.workflow.getWorkstreamSession(currentSession.sessionId)
+      .then((result) => {
+        useSessionStore.getState().setWorkstreamPresentation(result.presentation ?? null);
+      })
+      .catch(() => {
+        useSessionStore.getState().setWorkstreamPresentation(null);
+      });
   }, [currentSession?.sessionId, runtimeTestMode]);
 
   useEffect(() => {
@@ -1137,6 +1163,9 @@ const App: React.FC = () => {
 
       setCurrentDebugPlan(result.debugPlanSummary ?? null);
       setPendingQuestions(result.pendingQuestions ?? null);
+      if (result.workstreamPresentation) {
+        setWorkstreamPresentation(result.workstreamPresentation);
+      }
     } catch (error) {
       const currentMessages = useSessionStore.getState().conversationMessages ?? [];
       const turnId = `local-turn-${Date.now()}`;
@@ -1207,6 +1236,7 @@ const App: React.FC = () => {
     setCurrentRun,
     setCurrentSession,
     setPendingQuestions,
+    setWorkstreamPresentation,
     setRuns,
     setSessions,
     showNotice,
@@ -1425,10 +1455,13 @@ const App: React.FC = () => {
             {showMainPromptBar && (
               <div className="main-input-bar">
                 <PlanIntakePanel />
-                <div
-                  className="composer-shell"
-                  style={{ ['--composer-mode-accent' as string]: currentModeConfig.accentColor }}
-                >
+                {composerApproval ? (
+                  <ComposerApprovalOverlay />
+                ) : (
+                  <div
+                    className="composer-shell"
+                    style={{ ['--composer-mode-accent' as string]: currentModeConfig.accentColor }}
+                  >
                   {pendingAttachments.length > 0 && (
                     <div className="composer-attachments" data-testid="composer-attachments">
                       {pendingAttachments.map((attachment) => (
@@ -1564,7 +1597,8 @@ const App: React.FC = () => {
                       </button>
                     </div>
                   </div>
-                </div>
+                  </div>
+                )}
               </div>
             )}
             <TerminalDrawer />

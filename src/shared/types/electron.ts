@@ -44,6 +44,14 @@ import type {
 } from './session';
 import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from './terminal';
 import type { ToolCallResult, ToolCatalog, ToolRuntimeSummary } from './tool';
+import type {
+  AgentWorkstreamPresentation,
+  WorkstreamBranchSwitchResult,
+  WorkstreamExportOptions,
+  WorkstreamExportResult,
+  WorkstreamRevisionResult,
+  WorkstreamSessionResult,
+} from './workstream';
 
 export interface ElectronAPI {
   platform: NodeJS.Platform;
@@ -127,6 +135,13 @@ export interface ElectronAPI {
       approvalState?: string;
       error?: string;
     }>;
+    getWorkstreamSession: (sessionId?: string) => Promise<WorkstreamSessionResult>;
+    requestPlanRevision: (runId: string, revisionText: string) => Promise<WorkstreamRevisionResult>;
+    switchWorkstreamBranch: (sessionId: string, branchId: string) => Promise<WorkstreamBranchSwitchResult>;
+    exportWorkstreamSession: (
+      sessionId: string,
+      options?: WorkstreamExportOptions
+    ) => Promise<WorkstreamExportResult>;
     restartRun: (runId: string) => Promise<{
       success: boolean;
       runId?: string;
@@ -347,6 +362,7 @@ export interface ElectronAPI {
     onWorkflowStageChanged: (callback: (data: { stage: WorkflowStage; blockers: unknown[] }) => void) => () => void;
     onRunStatusChanged: (callback: (data: { runId: string; sessionId: string; status: RunSummary['status']; lastStage?: string; stopReason?: string }) => void) => () => void;
     onRunUsageChanged: (callback: (summary: RunContextUsageSummary) => void) => () => void;
+    onWorkstreamChanged: (callback: (payload: { sessionId: string; presentation: AgentWorkstreamPresentation }) => void) => () => void;
     onAgentMessage: (callback: (msg: unknown) => void) => () => void;
     onAgentStatusChanged: (callback: (state: AgentState) => void) => () => void;
     onToolExecutionComplete: (callback: (trace: unknown) => void) => () => void;

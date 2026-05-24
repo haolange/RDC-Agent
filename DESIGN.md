@@ -1,5 +1,29 @@
 # RDC-Agent 设计与工程架构准则
 
+## Agent Workstream 目标状态
+
+Agent Workstream 是 RDC-Agent 的消息流产品模型，用于把用户委托、agent 过程轨迹、工具/子 agent 调用、Plan/Report 结果块、右侧 session 索引和 raw trace 审计边界从当前 chat/debug trace 混合投影中拆开。它不是新的顶层产品模式，也不是通用 coding-agent shell。
+
+Agent Workstream 的正式文档入口：
+
+- `docs/product/agent-workstream-prd.md`：产品目标、边界、Task 类型、右侧 Progress / Artifacts / Context、Plan/Report 与 raw trace 的用户语义。
+- `docs/ui/agent-workstream-ux-spec.md`：消息流结构、User Prompt Bubble、Agent Thinking Bubble、Tool Row、Sub Agent Row、Task Result Block、Approval Overlay、折叠密度和右侧面板 UX。
+- `docs/architecture/agent-workstream-technical-contract.md`：Task Workstream、ProcessEvent、ProgressTask、ArtifactRecord、ContextRecord、Plan 状态机、Presentation Model 和跨层契约。
+- `docs/workflows/agent-workstream-verification.md`：文档、类型、Browser Preview、Electron E2E、raw trace、右侧面板和 Codex Goal 执行纪律的验收方式。
+- `docs/workflows/agent-workstream-implementation-prompt.md`：面向后续 Codex Goal 的稳定实施提示模板。
+
+关键裁决：
+
+- Agent Workstream 是 vertical agent workstream，不是普通聊天，也不是 raw debug log viewer。
+- Task Workstream 按可交付结果划分；Plan 是 Plan Task 的 final report，Execution Report 是 Execution Task 的 final report。
+- `Ask` 仍是默认轻入口，不创建正式 run，不暴露 RenderDoc 工具。
+- `Debugger` 是当前现役执行主链；`Analyzer` / `Optimizer` 在 Agent Workstream 中只作为目标状态的一等 orchestrator 模式描述，不能被写成当前已完整执行能力。
+- Debugger / Analyzer / Optimizer 目标状态都需要 Plan Approval；同意执行和修改建议必须作为用户消息保留在消息流历史中。
+- 右侧固定为 session 级 `Progress` / `Artifacts` / `Context`：Progress 是 runtime task list，Artifacts 是正式产物，Context 是 capture / file / source / capability 索引。
+- Raw trace 只在 Tool Row Raw tab、失败详情或 session export 中出现，不进入默认主体验。
+- Prompt Edit 不覆盖历史，应创建 request branch；第一版如无法完整实现，至少保留类型和 presentation model 预留。
+- Browser Preview 只验证 renderer fallback，不代表真实 Electron、IPC、ToolBridge 或 RenderDoc 工具链。
+
 `DESIGN.md` 是本仓库的产品设计和工程架构权威入口。`README.md` 说明项目是什么以及如何启动，`AGENTS.md` 说明修改公约，`docs/architecture/*` 说明具体数据流和模块地图；当这些文件出现冲突时，以本文件描述的产品边界、架构边界和验证门禁为先，再同步修正文档。
 
 ## 产品边界

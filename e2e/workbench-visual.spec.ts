@@ -179,6 +179,60 @@ const seedConversationPreview = async (page: Page) => {
           createdAt: fixedNow - 1000,
         },
       ],
+      workstreamPresentation: {
+        sessionId: state.currentSession.sessionId,
+        activeBranchId: 'branch-main',
+        mode: 'ask',
+        items: [
+          {
+            kind: 'task_workstream',
+            id: 'ws-wide-preview',
+            type: 'ask',
+            status: 'completed',
+            density: 'compact',
+            title: 'Ask Task',
+            startedAt: new Date(fixedNow - 2000).toISOString(),
+            prompt: {
+              kind: 'user_prompt',
+              id: 'prompt-wide-preview',
+              branchId: 'branch-main',
+              requestId: 'request-wide-preview',
+              revisionId: 'revision-wide-preview',
+              prompt: 'hello?',
+              createdAt: new Date(fixedNow - 1000).toISOString(),
+              branchIndex: 0,
+              branchCount: 1,
+              canCopy: true,
+              canEdit: true,
+            },
+            process: { collapsed: true, items: [] },
+            result: {
+              id: 'result-wide-preview',
+              workstreamId: 'ws-wide-preview',
+              kind: 'answer',
+              status: 'completed',
+              title: 'Ask Answer',
+              sections: [{
+                id: 'answer',
+                title: '回答',
+                body: 'Both sidebars are collapsed in this preview. The assistant bubble should expand with the main canvas instead of staying inside the old narrow layout.',
+              }],
+              artifactIds: [],
+              createdAt: new Date(fixedNow - 2000).toISOString(),
+              artifacts: [],
+            },
+          },
+        ],
+        rightPanel: {
+          progress: { current: [], history: [] },
+          artifacts: { current: [], previous: [] },
+          context: { groups: [] },
+        },
+        approval: null,
+        branchNavigator: null,
+        rawAuditRefs: [],
+        updatedAt: new Date(fixedNow).toISOString(),
+      },
     });
   }, { fixedNow: FIXED_NOW });
 };
@@ -1189,10 +1243,10 @@ test('chat transcript and composer share the same content rail', async () => {
   await setWindowSize(ctx, 1720, 980);
   await seedConversationPreview(page);
 
-  await expect(page.locator('[data-testid="conversation-turn"]').first()).toBeVisible();
+  await expect(page.locator('[data-testid="aw-task-workstream"]').first()).toBeVisible();
   await expect(page.locator('.composer-shell')).toBeVisible();
 
-  const expandedDelta = await getHorizontalEdgeDelta(page, '[data-testid="conversation-turn"]', '.composer-shell');
+  const expandedDelta = await getHorizontalEdgeDelta(page, '[data-testid="aw-task-workstream"]', '.composer-shell');
   expect(expandedDelta).not.toBeNull();
   expect(expandedDelta?.left ?? 99).toBeLessThanOrEqual(4);
   expect(expandedDelta?.right ?? 99).toBeLessThanOrEqual(4);
@@ -1202,7 +1256,7 @@ test('chat transcript and composer share the same content rail', async () => {
   await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveClass(/collapsed/);
   await page.waitForTimeout(320);
 
-  const rightCollapsedDelta = await getHorizontalEdgeDelta(page, '[data-testid="conversation-turn"]', '.composer-shell');
+  const rightCollapsedDelta = await getHorizontalEdgeDelta(page, '[data-testid="aw-task-workstream"]', '.composer-shell');
   expect(rightCollapsedDelta).not.toBeNull();
   expect(rightCollapsedDelta?.left ?? 99).toBeLessThanOrEqual(4);
   expect(rightCollapsedDelta?.right ?? 99).toBeLessThanOrEqual(4);
@@ -1241,8 +1295,8 @@ test('chat document flow expands with the main canvas when both sidebars are col
   await expect(page.locator('[data-testid="app-sidebar-left"]')).toHaveClass(/collapsed/);
   await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveClass(/collapsed/);
 
-  const assistantDocument = page.locator('[data-testid="assistant-document-flow"]').first();
-  const userBubble = page.locator('[data-testid="conversation-user-brief"]').first();
+  const assistantDocument = page.locator('[data-testid="aw-result-block"]').first();
+  const userBubble = page.locator('[data-testid="aw-user-prompt"]').first();
 
   await expect(assistantDocument).toBeVisible();
   await expect(userBubble).toBeVisible();
@@ -1250,8 +1304,8 @@ test('chat document flow expands with the main canvas when both sidebars are col
 
   const layout = await page.evaluate(() => {
     const main = document.querySelector('.app-main');
-    const message = document.querySelector('.chat-message.assistant');
-    const documentBlock = document.querySelector('[data-testid="assistant-document-flow"]');
+    const message = document.querySelector('[data-testid="aw-task-workstream"]');
+    const documentBlock = document.querySelector('[data-testid="aw-result-block"]');
 
     return {
       mainWidth: main?.getBoundingClientRect().width ?? 0,

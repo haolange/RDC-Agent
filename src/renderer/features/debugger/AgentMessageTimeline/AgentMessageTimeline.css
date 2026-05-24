@@ -1,9 +1,9 @@
 .agent-message-timeline {
-  width: min(var(--workbench-content-rail-width, 1080px), 100%);
+  width: min(880px, 100%);
   max-width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 0;
   color: rgb(var(--color-text-primary));
 }
 
@@ -86,50 +86,44 @@
 }
 
 .amt-projections {
-  gap: 22px;
+  gap: 32px;
+  width: 100%;
+  align-self: stretch;
+  align-items: stretch;
 }
 
 .amt-turn {
-  gap: 14px;
+  gap: 12px;
+  width: 100%;
+  align-self: stretch;
+  align-items: stretch;
 }
 
 .amt-turn > .amt-work-block,
 .amt-turn > .amt-group,
 .amt-turn > .amt-tool-call,
 .amt-turn > .amt-artifact-section,
-.amt-turn > .amt-evidence-source {
-  width: min(var(--workbench-content-rail-width, 1080px), 88%);
-  align-self: flex-start;
+.amt-turn > .amt-evidence-source,
+.amt-turn > .amt-workflow-status,
+.amt-turn > .amt-plan-card-slot {
+  width: 100%;
+  align-self: stretch;
 }
 
 .amt-user-message {
-  align-self: flex-end;
-  display: flex;
-  flex-direction: row-reverse;
-  justify-content: flex-start;
-  align-items: flex-start;
-  gap: 10px;
+  align-self: stretch;
+  display: block;
   width: 100%;
 }
 
 .amt-assistant-message {
-  align-self: flex-start;
-  display: grid;
-  grid-template-columns: 32px minmax(0, 1fr);
-  gap: 10px;
-  width: min(var(--workbench-content-rail-width, 1080px), 88%);
+  align-self: stretch;
+  display: block;
+  width: 100%;
 }
 
 .amt-avatar {
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: var(--font-semibold);
+  display: none;
 }
 
 .amt-user-avatar {
@@ -146,27 +140,29 @@
 
 .amt-user-bubble {
   min-width: 0;
-  width: fit-content;
-  max-width: min(620px, 72%);
-  padding: 12px 14px;
-  border: 1px solid rgb(var(--color-primary-500) / 0.22);
-  border-radius: 8px;
+  width: min(760px, 100%);
+  max-width: 100%;
+  padding: 12px 14px 11px;
+  border: 1px solid rgb(var(--color-primary-500) / 0.28);
+  border-left: 3px solid rgb(var(--color-primary-400));
+  border-radius: 6px;
   background:
-    linear-gradient(135deg, rgb(var(--color-primary-500) / 0.1), rgb(var(--color-accent-500) / 0.06)),
-    rgb(var(--color-bg-1));
+    linear-gradient(90deg, rgb(var(--color-primary-500) / 0.18), rgb(var(--color-primary-500) / 0.08)),
+    rgb(var(--color-bg-1) / 0.84);
+  box-shadow: none;
 }
 
 .amt-user-message.is-document .amt-user-bubble {
-  width: min(900px, calc(100% - 42px));
-  max-width: calc(100% - 42px);
+  width: min(760px, 100%);
+  max-width: 100%;
 }
 
 .amt-assistant-bubble {
   min-width: 0;
-  padding: 12px 14px;
-  border: 1px solid rgb(var(--color-border-secondary));
-  border-radius: 8px;
-  background: rgb(var(--color-bg-1) / 0.86);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .amt-user-bubble p,
@@ -183,16 +179,9 @@
   word-break: break-word;
 }
 
-.amt-user-bubble span {
+.amt-message-time {
   display: block;
-  margin-top: 8px;
-  color: rgb(var(--color-text-muted));
-  font-size: 11px;
-}
-
-.amt-assistant-bubble span {
-  display: block;
-  margin-top: 8px;
+  margin-top: 7px;
   color: rgb(var(--color-text-muted));
   font-size: 11px;
 }
@@ -200,7 +189,7 @@
 .amt-message-document {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -209,7 +198,7 @@
   margin: 0;
   color: rgb(var(--color-text-secondary));
   font-size: 13px;
-  line-height: 1.65;
+  line-height: 1.72;
   word-break: break-word;
 }
 
@@ -218,15 +207,15 @@
 }
 
 .amt-message-list li + li {
-  margin-top: 4px;
+  margin-top: 5px;
 }
 
 .amt-message-code {
-  margin: 2px 0 0;
-  padding: 10px 12px;
+  margin: 0;
+  padding: 11px 12px;
   border: 1px solid rgb(var(--color-border-subtle));
-  border-radius: 8px;
-  background: rgb(var(--color-bg-0));
+  border-radius: 6px;
+  background: rgb(var(--color-bg-1) / 0.54);
   color: rgb(var(--color-text-secondary));
   font-family: var(--font-mono);
   font-size: 11px;
@@ -244,7 +233,7 @@
 }
 
 .amt-assistant-message.has-diagnostic .amt-assistant-bubble {
-  border-color: rgb(var(--color-warning) / 0.34);
+  border-color: transparent;
 }
 
 .amt-assistant-diagnostic {
@@ -316,20 +305,21 @@
 .amt-evidence-source {
   position: relative;
   min-width: 0;
-  border: 1px solid rgb(var(--color-border-secondary));
-  border-radius: 8px;
-  background: rgb(var(--color-bg-1) / 0.72);
+  border: 0;
+  border-top: 1px solid rgb(var(--color-border-subtle));
+  border-radius: 0;
+  background: transparent;
 }
 
 .amt-turn > .amt-work-block,
 .amt-turn > .amt-group,
 .amt-turn > .amt-tool-call {
-  background: rgb(var(--color-bg-1) / 0.42);
+  background: transparent;
   box-shadow: none;
 }
 
 .amt-turn > .amt-work-block {
-  padding: 8px 10px;
+  padding: 12px 0 0;
 }
 
 .amt-turn > .amt-work-block .amt-work-block-summary {
@@ -343,7 +333,7 @@
 }
 
 .amt-work-block {
-  padding: 12px;
+  padding: 14px 0 0;
 }
 
 .amt-work-block-header,
@@ -367,16 +357,7 @@
 }
 
 .amt-node-marker {
-  position: absolute;
-  left: -27px;
-  top: 16px;
-  z-index: 1;
-  width: 12px;
-  height: 12px;
-  border: 2px solid rgb(var(--color-primary-300));
-  border-radius: 999px;
-  background: rgb(var(--color-bg-1));
-  box-shadow: 0 0 0 4px rgb(var(--color-primary-500) / 0.12);
+  display: none;
 }
 
 .amt-node-status-failed .amt-node-marker,
@@ -395,8 +376,8 @@
 }
 
 .amt-work-block-children {
-  gap: 10px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .amt-group,
@@ -405,7 +386,7 @@
 .amt-artifact-section,
 .amt-metrics,
 .amt-evidence-source {
-  padding: 12px;
+  padding: 14px 0 0;
 }
 
 .amt-group-strategy {
@@ -466,14 +447,14 @@
 
 .amt-tool-call {
   border: 1px solid rgb(var(--color-border-secondary));
-  border-radius: 8px;
-  background: rgb(var(--color-bg-2) / 0.62);
+  border-radius: 6px;
+  background: rgb(var(--color-bg-1) / 0.42);
 }
 
 .amt-tool-call-header {
   gap: 8px;
-  min-height: 38px;
-  padding: 8px 10px;
+  min-height: 34px;
+  padding: 7px 10px;
   border-radius: 6px;
 }
 
@@ -500,7 +481,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 0 10px 10px 28px;
+  padding: 0 10px 10px 26px;
 }
 
 .amt-ask-trace-body {
@@ -577,8 +558,8 @@
   margin: 0;
   padding: 9px 10px;
   border: 1px solid rgb(var(--color-border-subtle));
-  border-radius: 8px;
-  background: rgb(var(--color-bg-0));
+  border-radius: 6px;
+  background: rgb(var(--color-bg-0) / 0.72);
   color: rgb(var(--color-text-secondary));
   font-family: var(--font-mono);
   font-size: 11px;
@@ -854,4 +835,61 @@
   .amt-claim-list li {
     grid-template-columns: 1fr;
   }
+}
+
+/* Workflow status compact aggregated trace */
+.amt-workflow-status {
+  position: relative;
+  min-width: 0;
+  border: 1px dashed rgb(var(--color-border-secondary));
+  border-radius: 8px;
+  background: rgb(var(--color-bg-1) / 0.36);
+  padding: 6px 10px;
+}
+
+.amt-workflow-status-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: rgb(var(--color-text-secondary));
+}
+
+.amt-workflow-status-header > .amt-workflow-status-summary {
+  flex: 1;
+  min-width: 0;
+  color: rgb(var(--color-text-primary));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.amt-workflow-status-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: rgb(var(--color-text-secondary));
+}
+
+.amt-workflow-status-item {
+  display: grid;
+  grid-template-columns: 60px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+
+/* Plan card embedded in timeline — host slot. PlanApprovalCard owns its own card chrome. */
+.amt-plan-card-slot {
+  display: block;
+  width: 100%;
+}
+
+.amt-plan-card-slot > .plan-intake-panel {
+  margin: 0;
+  width: 100%;
 }

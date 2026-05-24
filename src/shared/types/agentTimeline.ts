@@ -24,7 +24,9 @@ export type AgentNodeType =
   | 'error'
   | 'retry'
   | 'raw_detail'
-  | 'metrics_summary';
+  | 'metrics_summary'
+  | 'plan_card'
+  | 'workflow_status_group';
 
 export type AgentNodeStatus =
   | 'pending'
@@ -311,6 +313,23 @@ export interface MetricsSummaryPayload {
   toolDensity: number;
   traceabilityScore: number;
   tokenOutput: number;
+}
+
+export interface PlanCardPayload {
+  // store-driven; the renderer reads DebugPlan / approvalState from session store.
+  // payload is intentionally empty so the projection node only marks position in the transcript.
+  placeholder?: true;
+}
+
+export interface WorkflowStatusEntry {
+  messageId: string;
+  content: string;
+  status: AgentNodeStatus;
+  createdAt: number;
+}
+
+export interface WorkflowStatusGroupPayload {
+  entries: WorkflowStatusEntry[];
 }
 
 export interface TimelineProjection {

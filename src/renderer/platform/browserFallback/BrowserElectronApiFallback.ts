@@ -34,9 +34,15 @@ import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, Te
 import type { ToolCatalog, ToolNamespace, ToolRuntimeSummary } from '@shared/types/tool';
 import type {
   AskUserPrompt,
-  DebugPlan,
   WorkflowState,
 } from '@shared/types/workflow';
+import type {
+  AgentWorkstreamPresentation,
+  AgentWorkstreamSession,
+  TaskWorkstream,
+  UserRequest,
+  WorkstreamRevisionResult,
+} from '@shared/types/workstream';
 import type { ElectronAPI } from '@shared/types/electron';
 import {
   LEFT_SIDEBAR_DEFAULT_WIDTH,
@@ -44,12 +50,19 @@ import {
   TERMINAL_DEFAULT_HEIGHT,
 } from '@shared/constants/layout';
 import { createBuiltinProviderEntries } from '@shared/constants/llm';
+import {
+  type BrowserPreviewScenario,
+  DEFAULT_BROWSER_PREVIEW_SCENARIO_ID,
+  createMinimalBrowserPreviewScenario,
+  loadBrowserPreviewScenarioSync,
+} from './BrowserPreviewScenario';
 
 const FALLBACK_MARKER = '__RDC_AGENT_BROWSER_ELECTRON_API_FALLBACK__';
 const NOW = Date.now();
 const BROWSER_PREVIEW_ROOT = '.browser-preview';
 
 const previewPath = (...segments: string[]): string => [BROWSER_PREVIEW_ROOT, ...segments].join('/');
+const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 type BrowserFallbackWindow = Window & {
   [FALLBACK_MARKER]?: true;
@@ -170,201 +183,21 @@ const createSettings = (): AppSettings => {
   };
 };
 
-const previewInput: ProjectInputRecord = {
-  inputId: 'browser-preview-capture',
-  fileName: 'preview-frame.rdc',
-  filePath: previewPath('captures', 'preview-frame.rdc'),
-  source: 'project_resource',
-  discoveredAt: NOW - 1000 * 60 * 30,
-  lastModifiedAt: NOW - 1000 * 60 * 15,
-  size: 5_242_880,
-};
-
-const previewProject: ProjectRecord = {
-  projectId: 'browser-preview-project',
-  name: 'Browser Preview Project',
-  rootPath: previewPath('projects', 'browser-preview'),
-  slug: 'browser-preview-project',
-  resourcePath: previewPath('projects', 'browser-preview', 'resources'),
-  knowledgePath: previewPath('projects', 'browser-preview', 'knowledge'),
-  inputsPath: previewPath('projects', 'browser-preview', 'inputs'),
-  inputs: [previewInput],
-  inputsUpdatedAt: NOW - 1000 * 60 * 12,
-  createdAt: NOW - 1000 * 60 * 60,
-  updatedAt: NOW - 1000 * 60 * 10,
-  lastSessionId: 'browser-preview-session-1',
-};
-
-const previewSessions: SessionRecord[] = [
-  {
-    sessionId: 'browser-preview-session-1',
-    projectId: previewProject.projectId,
-    title: 'Inspect lighting mismatch',
-    goal: 'Investigate a frame where the RenderDoc capture shows a lighting mismatch.',
-    sessionPath: previewPath('sessions', 'inspect-lighting-mismatch'),
-    createdAt: NOW - 1000 * 60 * 50,
-    updatedAt: NOW - 1000 * 60 * 8,
-    lastRunId: 'browser-preview-run-1',
-  },
-  {
-    sessionId: 'browser-preview-session-2',
-    projectId: previewProject.projectId,
-    title: 'Validate capture intake',
-    goal: 'Preview the capture intake and session panels in a normal browser.',
-    sessionPath: previewPath('sessions', 'validate-capture-intake'),
-    createdAt: NOW - 1000 * 60 * 40,
-    updatedAt: NOW - 1000 * 60 * 20,
-  },
-];
-
-const previewDevice: ReplayDeviceEntry = {
-  id: 'local',
-  label: 'Local Browser Preview',
-  type: 'local',
-  status: 'online',
-  transport: 'local',
-  detailText: 'Browser preview replay mock',
-  lastSeen: NOW,
-};
-
-const createCaptureDescriptor = (status: CaptureDescriptor['status']): CaptureDescriptor => ({
-  id: previewInput.inputId,
-  filePath: previewInput.filePath,
-  captureFileId: previewInput.inputId,
-  role: 'primary',
-  backendHint: 'local',
-  status,
-  sessionId: previewSessions[0].sessionId,
-  replaySessionId: 'browser-preview-replay',
-  contextId: 'browser-preview-context',
-});
-
-const createOpenedCaptureState = (status: OpenedCaptureState['status']): OpenedCaptureState => ({
-  projectId: previewProject.projectId,
-  inputId: previewInput.inputId,
-  filePath: previewInput.filePath,
-  captureId: previewInput.inputId,
-  captureFileId: previewInput.inputId,
-  sessionId: previewSessions[0].sessionId,
-  contextId: 'browser-preview-context',
-  replaySessionId: 'browser-preview-replay',
-  backend: 'local',
-  deviceId: previewDevice.id,
-  deviceLabel: previewDevice.label,
-  status,
-  openedAt: Date.now(),
-  preview: null,
-});
-
-const createContextSnapshot = (): ContextSnapshot => ({
-  contextId: 'browser-preview-context',
-  sessionId: previewSessions[0].sessionId,
-  backend: 'local',
-  runtimeOwner: 'browser-preview',
-  ownerLeaseId: 'browser-preview-lease',
-  captureDescriptors: [createCaptureDescriptor('open')],
-  activeCapture: previewInput.inputId,
-  deviceLabel: previewDevice.label,
-  humanPreview: {
-    status: 'closed',
-    updatedAt: Date.now(),
-  },
-});
-
-const createDebugPlan = (): DebugPlan => ({
-  planId: 'browser-preview-plan',
-  planReadiness: 'strict_ready',
-  strictReady: true,
-  userGoal: previewSessions[0].goal,
-  targetCapture: {
-    captureId: previewInput.inputId,
-    fileName: previewInput.fileName,
-    filePath: previewInput.filePath,
-  },
-  targetFrameOrEvent: {
-    scope: 'capture',
-  },
-  scope: 'Browser preview smoke workflow',
-  referenceContract: {
-    taskSources: ['Browser preview seeded state'],
-    referenceCaptures: [previewInput.fileName],
-    acceptanceNotes: ['Renderer should remain interactive without Electron preload.'],
-  },
-  verificationContract: {
-    requiresFixValidation: false,
-    requiresScreenshotEvidence: false,
-    requiresShaderInspection: false,
-    requiresPixelEvidence: false,
-    requiresBaselineComparison: false,
-    targetEventIds: [],
-    successCriteria: ['Sidebar and workbench render in a normal browser.'],
-  },
-  expectedDeliverables: ['Interactive UI preview'],
-  blockers: [],
-  missingInfo: [],
-  recommendedSpecialists: ['triage_agent'],
-  notes: ['This plan is generated by the browser Electron API fallback.'],
-  createdAt: new Date(NOW - 1000 * 60 * 6).toISOString(),
-  updatedAt: new Date(NOW - 1000 * 60 * 5).toISOString(),
-});
-
-const createWorkflowState = (): WorkflowState => ({
-  caseId: 'browser-preview-case',
-  runId: 'browser-preview-run-1',
-  sessionId: previewSessions[0].sessionId,
-  currentStage: 'plan',
-  previousStages: ['preflight', 'entry_gate', 'intake_gate'],
-  entryMode: 'mcp',
-  backend: 'local',
-  orchestrationMode: 'multi_agent',
-  coordinationMode: 'staged_handoff',
-  blockers: [],
-  planReadiness: 'strict_ready',
-  approvalState: 'pending_user',
-  debugPlan: createDebugPlan(),
-  pendingQuestions: null,
-  reasoningSummaries: [
-    {
-      summaryId: 'browser-preview-reasoning',
-      stage: 'plan',
-      agentId: 'rdc-debugger',
-      summary: 'Preview state is ready for Browser Use inspection.',
-      evidence: ['Mock project and session records are loaded.'],
-      nextStep: 'Approve or interact with the workbench controls.',
-      confidence: 0.95,
-      createdAt: new Date(NOW - 1000 * 60 * 4).toISOString(),
-    },
-  ],
-  recoveryState: null,
-  lastUpdated: new Date(NOW - 1000 * 60 * 4).toISOString(),
-});
-
-const createRun = (): RunSummary => ({
-  runId: 'browser-preview-run-1',
-  turnId: 'browser-preview-turn-1',
-  projectId: previewProject.projectId,
-  sessionId: previewSessions[0].sessionId,
-  caseId: 'browser-preview-case',
-  mode: 'debugger',
-  goal: previewSessions[0].goal,
-  captures: [createCaptureDescriptor('open')],
-  startedAt: NOW - 1000 * 60 * 8,
-  status: 'awaiting_approval',
-  lastStage: 'plan',
-  backend: 'local',
-});
-
 const createConversationMessage = (
   role: ConversationMessage['role'],
   content: string,
+  defaults: Pick<ConversationMessage, 'sessionId' | 'projectId'> & {
+    runId?: string | null;
+    modeContext?: ConversationMessage['modeContext'];
+  },
   patch: Partial<ConversationMessage> = {},
 ): ConversationMessage => ({
   id: createId(`browser-preview-${role}`),
   turnId: patch.turnId ?? 'browser-preview-turn-1',
-  sessionId: patch.sessionId ?? previewSessions[0].sessionId,
-  projectId: patch.projectId ?? previewProject.projectId,
-  runId: patch.runId ?? 'browser-preview-run-1',
-  modeContext: patch.modeContext ?? 'debugger',
+  sessionId: patch.sessionId ?? defaults.sessionId,
+  projectId: patch.projectId ?? defaults.projectId,
+  runId: patch.runId ?? defaults.runId ?? null,
+  modeContext: patch.modeContext ?? defaults.modeContext ?? 'debugger',
   role,
   agentId: role === 'assistant' ? 'rdc-debugger' : undefined,
   content,
@@ -384,78 +217,57 @@ const createConversationMessage = (
 });
 
 class BrowserElectronApiFallback {
+  private scenarioId = DEFAULT_BROWSER_PREVIEW_SCENARIO_ID;
   private settings = createSettings();
-  private projects: ProjectRecord[] = [previewProject];
-  private sessions: SessionRecord[] = previewSessions;
-  private runs: RunSummary[] = [createRun()];
-  private currentProjectId: string | null = previewProject.projectId;
-  private currentSessionId: string | null = previewSessions[0].sessionId;
-  private workflowState: WorkflowState = createWorkflowState();
-  private openedCapture: OpenedCaptureState | null = createOpenedCaptureState('open');
-  private contextSnapshot: ContextSnapshot | null = createContextSnapshot();
-  private devices: ReplayDeviceEntry[] = [previewDevice];
+  private projects: ProjectRecord[] = [];
+  private sessions: SessionRecord[] = [];
+  private runs: RunSummary[] = [];
+  private currentProjectId: string | null = null;
+  private currentSessionId: string | null = null;
+  private workflowState!: WorkflowState;
+  private openedCapture: OpenedCaptureState | null = null;
+  private contextSnapshot: ContextSnapshot | null = null;
+  private devices: ReplayDeviceEntry[] = [];
   private terminalTabs: TerminalTabRecord[] = [];
-  private runtimeLogs: RuntimeLogEntry[] = [
-    {
-      id: 'browser-preview-log-1',
-      timestamp: NOW - 1000 * 60 * 7,
-      scope: 'session',
-      namespace: 'capture',
-      severity: 'info',
-      title: 'Capture context loaded',
-      summary: 'Browser preview capture is ready for inspection.',
-      projectId: previewProject.projectId,
-      sessionId: previewSessions[0].sessionId,
-      runId: 'browser-preview-run-1',
-    },
-    {
-      id: 'browser-preview-log-2',
-      timestamp: NOW - 1000 * 60 * 6,
-      scope: 'session',
-      namespace: 'tool',
-      severity: 'warning',
-      title: 'Tool retry scheduled',
-      summary: 'rd.inspect will retry with browser-preview fallback arguments.',
-      detail: 'The first preview tool route did not provide enough metadata.',
-      projectId: previewProject.projectId,
-      sessionId: previewSessions[0].sessionId,
-      runId: 'browser-preview-run-1',
-      raw: {
-        tool: 'rd.inspect',
-        mode: 'browser-preview',
-      },
-    },
-    {
-      id: 'browser-preview-log-3',
-      timestamp: NOW - 1000 * 60 * 5,
-      scope: 'app',
-      namespace: 'system',
-      severity: 'info',
-      title: 'Browser preview fallback active',
-      summary: 'Renderer is using an in-memory Electron API mock.',
-      projectId: previewProject.projectId,
-      sessionId: null,
-      runId: null,
-    },
-  ];
-  private conversations = new Map<string, ConversationMessage[]>([
-    [
-      previewSessions[0].sessionId,
-      [
-        createConversationMessage('user', 'Please inspect the lighting mismatch in this capture.', {
-          id: 'browser-preview-user-1',
-          createdAt: NOW - 1000 * 60 * 6,
-          updatedAt: NOW - 1000 * 60 * 6,
-        }),
-        createConversationMessage('assistant', 'I found a browser-preview capture and prepared the workbench state for inspection.', {
-          id: 'browser-preview-assistant-1',
-          createdAt: NOW - 1000 * 60 * 5,
-          updatedAt: NOW - 1000 * 60 * 5,
-        }),
-      ],
-    ],
-  ]);
+  private runtimeLogs: RuntimeLogEntry[] = [];
+  private conversations = new Map<string, ConversationMessage[]>();
+  private attachments = new Map<string, SessionAttachmentRecord[]>();
+  private outputs = new Map<string, SessionOutputRecord[]>();
+  private actionEvents: ActionEvent[] = [];
+  private workstreamSession: AgentWorkstreamSession | null = null;
+  private workstreamPresentation: AgentWorkstreamPresentation | null = null;
+  private usage: RunContextUsageSummary | null = null;
   private listeners = new Map<string, Set<EventCallback>>();
+
+  constructor() {
+    const scenario = loadBrowserPreviewScenarioSync(NOW);
+    this.applyScenario(scenario);
+  }
+
+  private applyScenario(scenario: BrowserPreviewScenario): void {
+    const fallback = createMinimalBrowserPreviewScenario(NOW);
+    this.scenarioId = scenario.scenarioId ?? fallback.scenarioId;
+    this.settings = createSettings();
+    this.projects = clone(scenario.projects ?? fallback.projects);
+    this.sessions = clone(scenario.sessions ?? fallback.sessions);
+    this.runs = clone(scenario.runs ?? fallback.runs);
+    this.currentProjectId = scenario.currentProjectId ?? fallback.currentProjectId;
+    this.currentSessionId = scenario.currentSessionId ?? fallback.currentSessionId;
+    this.workflowState = clone(scenario.workflowState ?? fallback.workflowState);
+    this.openedCapture = clone(scenario.openedCapture ?? fallback.openedCapture);
+    this.contextSnapshot = clone(scenario.contextSnapshot ?? fallback.contextSnapshot);
+    this.devices = clone(scenario.devices ?? fallback.devices);
+    this.runtimeLogs = clone(scenario.runtimeLogs ?? fallback.runtimeLogs);
+    this.conversations = new Map(Object.entries(clone(scenario.conversations ?? fallback.conversations)));
+    this.attachments = new Map(Object.entries(clone(scenario.attachments ?? {})));
+    this.outputs = new Map(Object.entries(clone(scenario.outputs ?? {})));
+    this.actionEvents = clone(scenario.actionEvents ?? []);
+    this.workstreamSession = scenario.workstreamSession ? clone(scenario.workstreamSession) : this.createWorkstreamSession();
+    this.workstreamPresentation = scenario.workstreamPresentation
+      ? clone(scenario.workstreamPresentation)
+      : this.createWorkstreamPresentation(this.workstreamSession);
+    this.usage = scenario.usage ? clone(scenario.usage) : null;
+  }
 
   readonly api: ElectronAPI = {
     platform: 'win32',
@@ -518,6 +330,75 @@ class BrowserElectronApiFallback {
           lastUpdated: new Date().toISOString(),
         };
         this.runs = this.runs.map((run) => run.runId === runId ? { ...run, status: 'running', lastStage: 'dispatch' } : run);
+        const session = this.workstreamSession ?? this.createWorkstreamSession();
+        const now = new Date().toISOString();
+        this.workstreamSession = {
+          ...session,
+          latestAcceptedPlanId: session.latestDisplayedPlanId,
+          workstreams: [
+            ...session.workstreams.map((workstream) => workstream.id === `ws-${runId}-plan`
+              ? {
+                  ...workstream,
+                  status: 'completed' as const,
+                  density: 'compact' as const,
+                  planStatus: 'accepted' as const,
+                  processEvents: [
+                    ...workstream.processEvents,
+                    {
+                      kind: 'user.confirmed' as const,
+                      id: 'browser-preview-confirmation',
+                      workstreamId: workstream.id,
+                      planId: session.latestDisplayedPlanId ?? 'browser-preview-plan',
+                      createdAt: now,
+                      label: '同意执行',
+                    },
+                  ],
+                }
+              : workstream),
+            {
+              id: `ws-${runId}-execution`,
+              sessionId: session.sessionId,
+              branchId: session.activeBranchId,
+              type: 'debugger',
+              status: 'running',
+              density: 'expanded',
+              resultKind: 'report',
+              startedAt: now,
+              processEvents: [
+                {
+                  kind: 'subagent',
+                  id: 'browser-preview-subagent',
+                  workstreamId: `ws-${runId}-execution`,
+                  createdAt: now,
+                  status: 'running',
+                  label: 'pixel_forensics_agent',
+                  summary: 'Inspecting highlighted render target.',
+                },
+              ],
+            },
+          ],
+          progress: [
+            ...session.progress.map((task) => task.id === 'browser-preview-progress-plan' ? { ...task, status: 'completed' as const, completedAt: now, updatedAt: now } : task),
+            {
+              id: 'browser-preview-progress-execution',
+              sessionId: session.sessionId,
+              workstreamId: `ws-${runId}-execution`,
+              branchId: session.activeBranchId,
+              title: 'Execute approved plan',
+              status: 'running',
+              order: 2,
+              createdAt: now,
+              updatedAt: now,
+              source: 'runtime',
+            },
+          ],
+          updatedAt: now,
+        };
+        this.workstreamPresentation = this.createWorkstreamPresentation(this.workstreamSession);
+        this.emit('workflow:workstreamChanged', {
+          sessionId: this.workstreamSession.sessionId,
+          presentation: this.workstreamPresentation,
+        });
         this.emit('workflow:stateChanged', this.workflowState);
         return {
           success: true,
@@ -528,6 +409,43 @@ class BrowserElectronApiFallback {
           approvalState: this.workflowState.approvalState,
         };
       },
+      getWorkstreamSession: async (_sessionId) => ({
+        success: true,
+        session: this.workstreamSession ?? this.createWorkstreamSession(),
+        presentation: this.workstreamPresentation ?? this.createWorkstreamPresentation(this.workstreamSession ?? this.createWorkstreamSession()),
+      }),
+      requestPlanRevision: async (runId, revisionText) => this.requestPlanRevision(runId, revisionText),
+      switchWorkstreamBranch: async (_sessionId, branchId) => {
+        if (this.workstreamSession) {
+          this.workstreamSession = {
+            ...this.workstreamSession,
+            activeBranchId: branchId,
+            branches: this.workstreamSession.branches.map((group) => ({
+              ...group,
+              activeBranchId: group.branches.some((branch) => branch.id === branchId) ? branchId : group.activeBranchId,
+            })),
+            updatedAt: new Date().toISOString(),
+          };
+          this.workstreamPresentation = this.createWorkstreamPresentation(this.workstreamSession);
+          this.emit('workflow:workstreamChanged', {
+            sessionId: this.workstreamSession.sessionId,
+            presentation: this.workstreamPresentation,
+          });
+        }
+        return {
+          success: true,
+          activeBranchId: this.workstreamSession?.activeBranchId ?? branchId,
+          session: this.workstreamSession ?? undefined,
+          presentation: this.workstreamPresentation ?? undefined,
+        };
+      },
+      exportWorkstreamSession: async (sessionId) => ({
+        success: true,
+        sessionId,
+        summaryPath: previewPath('sessions', sessionId, 'exports', 'agent-workstream-summary.json'),
+        rawTracePath: previewPath('sessions', sessionId, 'exports', 'agent-workstream-raw-trace.jsonl'),
+        bundlePath: previewPath('sessions', sessionId, 'exports', 'agent-workstream-summary.json'),
+      }),
       restartRun: async (runId) => this.updatePlanState('awaiting_approval', runId),
       resume: async () => ({ success: true }),
       stop: async (runId) => {
@@ -778,7 +696,7 @@ class BrowserElectronApiFallback {
     },
 
     context: {
-      get: async () => this.contextSnapshot ?? createContextSnapshot(),
+      get: async () => this.contextSnapshot ?? this.createContextSnapshotFallback(),
       openHumanPreview: async (request) => this.openHumanPreview(request?.sessionId),
       closeHumanPreview: async () => this.closeHumanPreview(),
     },
@@ -788,6 +706,7 @@ class BrowserElectronApiFallback {
       onWorkflowStageChanged: (callback) => this.on('workflow:stageChanged', callback as EventCallback),
       onRunStatusChanged: (callback) => this.on('workflow:runStatusChanged', callback as EventCallback),
       onRunUsageChanged: (callback) => this.on('workflow:runUsageChanged', callback as EventCallback),
+      onWorkstreamChanged: (callback) => this.on('workflow:workstreamChanged', callback as EventCallback),
       onAgentMessage: (callback) => this.on('agent:message', callback as EventCallback),
       onAgentStatusChanged: (callback) => this.on('agent:statusChanged', callback as EventCallback),
       onToolExecutionComplete: (callback) => this.on('tool:executionComplete', callback as EventCallback),
@@ -896,12 +815,15 @@ class BrowserElectronApiFallback {
     const projectId = createId('browser-preview-project');
     const name = rootPath.split(/[\\/]/).filter(Boolean).pop() || 'Browser Preview Project';
     const project: ProjectRecord = {
-      ...previewProject,
       projectId,
       name,
       rootPath,
       slug: projectId,
+      resourcePath: `${rootPath}/resources`,
+      knowledgePath: `${rootPath}/knowledge`,
+      inputsPath: `${rootPath}/inputs`,
       inputs: [],
+      inputsUpdatedAt: Date.now(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
       lastSessionId: undefined,
@@ -1059,7 +981,7 @@ class BrowserElectronApiFallback {
     return {
       attachmentId: createId('browser-preview-attachment'),
       sessionId,
-      projectId: session?.projectId ?? previewProject.projectId,
+      projectId: session?.projectId ?? this.currentProjectId ?? this.projects[0]?.projectId ?? 'browser-preview-project',
       kind: 'file',
       fileName: filePath.split(/[\\/]/).filter(Boolean).pop() || 'attachment.txt',
       filePath,
@@ -1070,12 +992,17 @@ class BrowserElectronApiFallback {
   }
 
   private createAttachments(sessionId: string): SessionAttachmentRecord[] {
-    return [
-      this.createAttachment(sessionId, 'H:\\rdx\\RDC-Agent\\.browser-preview\\notes\\preview-note.md'),
+    return this.attachments.get(sessionId) ?? [
+      this.createAttachment(sessionId, previewPath('notes', 'preview-note.md')),
     ];
   }
 
   private createOutputs(sessionId: string, runId?: string): SessionOutputRecord[] {
+    const scenarioOutputs = this.outputs.get(sessionId);
+    if (scenarioOutputs) {
+      return runId ? scenarioOutputs.filter((output) => !output.runId || output.runId === runId) : scenarioOutputs;
+    }
+
     const run = this.runs.find((entry) => entry.runId === runId)
       ?? this.runs.find((entry) => entry.sessionId === sessionId);
     const now = Date.now();
@@ -1098,7 +1025,7 @@ class BrowserElectronApiFallback {
           kind: 'report' as const,
           title: 'report.md',
           fileName: 'report.md',
-          filePath: `H:\\rdx\\RDC-Agent\\.browser-preview\\sessions\\${sessionId}\\runs\\${run.runId}\\reports\\report.md`,
+          filePath: previewPath('sessions', sessionId, 'runs', run.runId, 'reports', 'report.md'),
           source: 'run report',
           runId: run.runId,
           mimeType: 'text/markdown',
@@ -1111,7 +1038,7 @@ class BrowserElectronApiFallback {
           kind: 'artifact' as const,
           title: 'preview-frame.png',
           fileName: 'preview-frame.png',
-          filePath: `H:\\rdx\\RDC-Agent\\.browser-preview\\sessions\\${sessionId}\\runs\\${run.runId}\\artifacts\\preview-frame.png`,
+          filePath: previewPath('sessions', sessionId, 'runs', run.runId, 'artifacts', 'preview-frame.png'),
           source: 'artifact store',
           runId: run.runId,
           mimeType: 'image/png',
@@ -1124,7 +1051,7 @@ class BrowserElectronApiFallback {
   }
 
   private async cancelActiveTurn(request?: ConversationCancelActiveTurnRequest) {
-    const sessionId = request?.sessionId ?? this.currentSessionId ?? previewSessions[0].sessionId;
+    const sessionId = request?.sessionId ?? this.currentSessionId ?? this.sessions[0]?.sessionId ?? 'browser-preview-session';
     const messages = this.conversations.get(sessionId) ?? [];
     const index = [...messages]
       .reverse()
@@ -1171,12 +1098,14 @@ class BrowserElectronApiFallback {
     const projectId = request.projectId ?? session?.projectId ?? this.projects[0]?.projectId ?? null;
     const run = sessionId ? this.runs.find((entry) => entry.sessionId === sessionId) ?? null : null;
     const turnId = createId('browser-preview-turn');
-    const userMessage = createConversationMessage('user', request.message, {
-      turnId,
+    const messageDefaults = {
       sessionId,
       projectId,
       runId: run?.runId ?? null,
       modeContext: request.mode,
+    };
+    const userMessage = createConversationMessage('user', request.message, messageDefaults, {
+      turnId,
       attachments: request.attachments?.map((attachment) => ({
         attachmentId: createId('browser-preview-attachment'),
         sessionId: sessionId ?? '',
@@ -1192,18 +1121,16 @@ class BrowserElectronApiFallback {
     const assistantDraftMessage = createConversationMessage(
       'assistant',
       'Browser preview mock received the message. Real Electron IPC is not available in this browser.',
+      messageDefaults,
       {
         turnId,
-        sessionId,
-        projectId,
-        runId: run?.runId ?? null,
-        modeContext: request.mode,
       },
     );
 
     if (sessionId) {
       const messages = this.conversations.get(sessionId) ?? [];
       this.conversations.set(sessionId, [...messages, userMessage, assistantDraftMessage]);
+      this.upsertConversationWorkstream(sessionId, userMessage, assistantDraftMessage);
       this.emit('conversation:event', {
         type: 'message_completed',
         sessionId,
@@ -1222,14 +1149,116 @@ class BrowserElectronApiFallback {
       runUpdate: run,
       debugPlanSummary: this.workflowState.debugPlan ?? null,
       pendingQuestions: this.workflowState.pendingQuestions ?? null,
+      workstreamPresentation: this.workstreamPresentation,
       uiHints: {},
       errorViewModel: null,
     };
   }
 
+  private upsertConversationWorkstream(
+    sessionId: string,
+    userMessage: ConversationMessage,
+    assistantMessage: ConversationMessage,
+  ): void {
+    const baseSession = this.workstreamSession?.sessionId === sessionId
+      ? this.workstreamSession
+      : this.createWorkstreamSession();
+    const branchId = baseSession.activeBranchId || 'branch-main';
+    const now = new Date().toISOString();
+    const workstreamId = `ws-ask-${userMessage.turnId}`;
+    const requestId = `request-ask-${userMessage.turnId}`;
+    const revisionId = `revision-ask-${userMessage.turnId}`;
+    const isFailed = assistantMessage.status === 'error';
+    const isRunning = assistantMessage.status === 'draft' || assistantMessage.status === 'streaming';
+    const workstream: TaskWorkstream = {
+      id: workstreamId,
+      sessionId,
+      branchId,
+      type: 'ask',
+      status: isFailed ? 'failed' : isRunning ? 'running' : 'completed',
+      density: isRunning ? 'expanded' : 'compact',
+      resultKind: isFailed ? 'failure' : isRunning ? undefined : 'answer',
+      startedAt: new Date(userMessage.createdAt).toISOString(),
+      completedAt: isRunning ? undefined : new Date(assistantMessage.updatedAt ?? assistantMessage.createdAt).toISOString(),
+      processEvents: isRunning ? [{
+        kind: 'agent.text',
+        id: `agent-text-${assistantMessage.id}`,
+        workstreamId,
+        createdAt: new Date(assistantMessage.createdAt).toISOString(),
+        text: assistantMessage.content || '正在生成回复。',
+      }] : [],
+      result: isRunning ? undefined : {
+        id: isFailed ? `${workstreamId}-failure-result` : `${workstreamId}-answer-result`,
+        workstreamId,
+        kind: isFailed ? 'failure' : 'answer',
+        status: isFailed ? 'failed' : 'completed',
+        title: isFailed ? 'Ask Failed' : 'Ask Answer',
+        sections: isFailed
+          ? [
+              {
+                id: 'error',
+                title: '失败原因',
+                body: assistantMessage.content || assistantMessage.diagnostic?.userMessage || '回复生成失败。',
+                severity: 'error',
+              },
+              ...(assistantMessage.diagnostic ? [{
+                id: 'diagnostic',
+                title: '诊断',
+                body: [
+                  assistantMessage.diagnostic.code,
+                  assistantMessage.diagnostic.providerId && assistantMessage.diagnostic.modelId
+                    ? `${assistantMessage.diagnostic.providerId}/${assistantMessage.diagnostic.modelId}`
+                    : assistantMessage.diagnostic.providerId,
+                  assistantMessage.diagnostic.technicalMessage,
+                ].filter(Boolean).join('\n'),
+                severity: assistantMessage.diagnostic.severity === 'error' ? 'error' as const : 'warning' as const,
+              }] : []),
+            ]
+          : [{ id: 'answer', title: '回答', body: assistantMessage.content || 'Browser preview mock received the message.' }],
+        artifactIds: [],
+        createdAt: new Date(assistantMessage.updatedAt ?? assistantMessage.createdAt).toISOString(),
+      },
+    };
+    const request: UserRequest = {
+      id: requestId,
+      sessionId,
+      rootRevisionId: revisionId,
+      activeRevisionId: revisionId,
+      revisions: [{
+        id: revisionId,
+        requestId,
+        branchId,
+        prompt: userMessage.content || 'Ask',
+        createdAt: new Date(userMessage.createdAt).toISOString(),
+        resultingWorkstreamIds: [workstreamId],
+      }],
+    };
+
+    this.workstreamSession = {
+      ...baseSession,
+      userRequests: [
+        ...baseSession.userRequests.filter((entry) => entry.id !== requestId),
+        request,
+      ],
+      workstreams: [
+        ...baseSession.workstreams.filter((entry) => entry.id !== workstreamId),
+        workstream,
+      ],
+      progress: baseSession.progress,
+      artifacts: baseSession.artifacts,
+      context: baseSession.context,
+      updatedAt: now,
+    };
+    this.workstreamPresentation = this.createWorkstreamPresentation(this.workstreamSession);
+    this.emit('workflow:workstreamChanged', { sessionId, presentation: this.workstreamPresentation });
+  }
+
   private async startWorkflow(request: DebugSessionStartRequest) {
     const runId = createId('browser-preview-run');
-    const sessionId = request.sessionId ?? this.sessions.find((session) => session.projectId === request.projectId)?.sessionId ?? previewSessions[0].sessionId;
+    const sessionId = request.sessionId
+      ?? this.sessions.find((session) => session.projectId === request.projectId)?.sessionId
+      ?? this.sessions[0]?.sessionId
+      ?? 'browser-preview-session';
     const run: RunSummary = {
       runId,
       projectId: request.projectId,
@@ -1284,7 +1313,718 @@ class BrowserElectronApiFallback {
     };
   }
 
+  private createWorkstreamSession(): AgentWorkstreamSession {
+    const sessionId = this.currentSessionId ?? this.workflowState.sessionId;
+    const run = this.runs.find((entry) => entry.sessionId === sessionId) ?? this.runs[0];
+    const runId = run?.runId ?? this.workflowState.runId;
+    const branchId = 'branch-main';
+    const planId = this.workflowState.debugPlan?.planId ?? 'browser-preview-plan';
+    const now = new Date().toISOString();
+    const session: AgentWorkstreamSession = {
+      sessionId,
+      activeBranchId: branchId,
+      latestDisplayedPlanId: planId,
+      latestAcceptedPlanId: this.workflowState.approvalState === 'approved' ? planId : undefined,
+      userRequests: [
+        {
+          id: `request-${runId}`,
+          sessionId,
+          rootRevisionId: `revision-${runId}`,
+          activeRevisionId: `revision-${runId}`,
+          revisions: [
+            {
+              id: `revision-${runId}`,
+              requestId: `request-${runId}`,
+              branchId,
+              prompt: run?.goal ?? 'Browser Preview Agent Workstream',
+              createdAt: now,
+              resultingWorkstreamIds: [`ws-${runId}-plan`],
+            },
+          ],
+        },
+      ],
+      branches: [
+        {
+          id: `branch-group-request-${runId}`,
+          rootRequestId: `request-${runId}`,
+          activeBranchId: branchId,
+          branches: [
+            {
+              id: branchId,
+              revisionId: `revision-${runId}`,
+              status: 'active',
+              workstreamIds: [`ws-${runId}-plan`, `ws-${runId}-execution`],
+            },
+          ],
+        },
+      ],
+      workstreams: [
+        {
+          id: `ws-${runId}-plan`,
+          sessionId,
+          branchId,
+          type: run?.mode ?? 'debugger',
+          status: this.workflowState.approvalState === 'approved' ? 'completed' : 'awaiting_approval',
+          density: this.workflowState.approvalState === 'approved' ? 'compact' : 'expanded',
+          resultKind: 'plan',
+          startedAt: now,
+          processEvents: [
+            {
+              kind: 'agent.text',
+              id: 'browser-preview-thinking-plan',
+              workstreamId: `ws-${runId}-plan`,
+              createdAt: now,
+              text: 'Browser Preview 使用稳定 scenario 展示 Agent Workstream；真实 IPC/ToolBridge 不在此处执行。',
+            },
+            {
+              kind: 'tool',
+              id: 'browser-preview-tool-plan',
+              workstreamId: `ws-${runId}-plan`,
+              createdAt: now,
+              completedAt: now,
+              status: 'done',
+              title: 'Inspect opened capture context',
+              summary: '确认当前 project 已有 opened capture。',
+              target: this.openedCapture?.filePath,
+              rawTraceRef: 'raw-browser-preview-tool-plan',
+            },
+          ],
+          result: {
+            id: `ws-${runId}-plan-result`,
+            workstreamId: `ws-${runId}-plan`,
+            kind: 'plan',
+            status: this.workflowState.approvalState === 'approved' ? 'accepted' : 'awaiting_approval',
+            title: this.workflowState.debugPlan?.presentation?.title ?? 'Browser Preview Debug Plan',
+            sections: [
+              { id: 'goal', title: '目标', body: run?.goal ?? 'Preview Agent Workstream UI.' },
+              { id: 'route', title: '执行路线', body: 'Plan approval 后创建 Execution Workstream，并在右侧累积 Progress / Artifacts / Context。' },
+              { id: 'acceptance', title: '验收标准', body: '消息流不再直接投影 raw trace；raw 仅在展开详情和导出中出现。' },
+            ],
+            artifactIds: ['browser-preview-plan-artifact'],
+            createdAt: now,
+          },
+          planId,
+          planStatus: this.workflowState.approvalState === 'approved' ? 'accepted' : 'awaiting_approval',
+        },
+      ],
+      progress: [
+        {
+          id: 'browser-preview-progress-plan',
+          sessionId,
+          workstreamId: `ws-${runId}-plan`,
+          branchId,
+          title: 'Approve structured plan',
+          status: this.workflowState.approvalState === 'approved' ? 'completed' : 'running',
+          order: 1,
+          createdAt: now,
+          updatedAt: now,
+          source: 'plan',
+        },
+      ],
+      artifacts: [
+        {
+          id: 'browser-preview-plan-artifact',
+          sessionId,
+          workstreamId: `ws-${runId}-plan`,
+          branchId,
+          type: 'plan',
+          status: 'ready',
+          displayName: 'plan.md',
+          taskTitle: 'Plan Task',
+          path: previewPath('sessions', sessionId, 'runs', runId, 'reports', 'plan.md'),
+          rawRef: 'raw-browser-preview-plan',
+          createdAt: now,
+          updatedAt: now,
+        },
+      ],
+      context: [
+        {
+          id: 'browser-preview-context-capture',
+          sessionId,
+          workstreamId: `ws-${runId}-plan`,
+          branchId,
+          kind: 'capture',
+          label: this.openedCapture?.filePath.split(/[\\/]/).pop() ?? 'minimal-preview.rdc',
+          summary: this.openedCapture?.filePath,
+          importance: 'decisive',
+          firstObservedAt: now,
+          lastObservedAt: now,
+        },
+        {
+          id: 'browser-preview-context-capability',
+          sessionId,
+          workstreamId: `ws-${runId}-plan`,
+          branchId,
+          kind: 'capability',
+          label: 'RDX ToolBridge',
+          summary: 'Browser Preview 只显示 capability 索引，不执行真实 rdx.bat。',
+          importance: 'important',
+          firstObservedAt: now,
+          lastObservedAt: now,
+        },
+      ],
+      rawAuditRefs: [
+        {
+          id: 'raw-browser-preview-tool-plan',
+          label: 'tool_execution',
+          runId,
+          sessionId,
+          ref: 'browser-preview',
+        },
+      ],
+      updatedAt: now,
+    };
+    return this.applyWorkstreamScenarioVariant(session, runId, planId, now);
+  }
+
+  private applyWorkstreamScenarioVariant(
+    session: AgentWorkstreamSession,
+    runId: string,
+    planId: string,
+    now: string,
+  ): AgentWorkstreamSession {
+    const planWorkstreamId = `ws-${runId}-plan`;
+    const executionWorkstreamId = `ws-${runId}-execution`;
+    const basePlan = session.workstreams.find((workstream) => workstream.id === planWorkstreamId) ?? session.workstreams[0];
+    if (!basePlan) {
+      return session;
+    }
+
+    const withAcceptedPlan = (nextSession: AgentWorkstreamSession, includeRunningExecution: boolean): AgentWorkstreamSession => {
+      const confirmation = {
+        kind: 'user.confirmed' as const,
+        id: 'browser-preview-user-confirmed',
+        workstreamId: planWorkstreamId,
+        planId,
+        createdAt: now,
+        label: '同意执行',
+      };
+      const plan = {
+        ...basePlan,
+        status: 'completed' as const,
+        density: 'compact' as const,
+        completedAt: now,
+        planStatus: 'accepted' as const,
+        processEvents: [...basePlan.processEvents, confirmation],
+        result: basePlan.result ? { ...basePlan.result, status: 'accepted' as const } : basePlan.result,
+      };
+      const execution = {
+        id: executionWorkstreamId,
+        sessionId: session.sessionId,
+        branchId: session.activeBranchId,
+        type: 'debugger' as const,
+        status: includeRunningExecution ? 'running' as const : 'completed' as const,
+        density: includeRunningExecution ? 'expanded' as const : 'compact' as const,
+        resultKind: 'report' as const,
+        startedAt: now,
+        completedAt: includeRunningExecution ? undefined : now,
+        processEvents: [
+          {
+            kind: 'agent.text' as const,
+            id: 'browser-preview-execution-thinking-a',
+            workstreamId: executionWorkstreamId,
+            createdAt: now,
+            text: '开始执行已接受的计划。',
+          },
+          {
+            kind: 'agent.text' as const,
+            id: 'browser-preview-execution-thinking-b',
+            workstreamId: executionWorkstreamId,
+            createdAt: now,
+            text: '连续 agent text 会在 presentation 中合并为一个 Thinking Bubble。',
+          },
+          {
+            kind: 'tool' as const,
+            id: 'browser-preview-tool-execution',
+            workstreamId: executionWorkstreamId,
+            createdAt: now,
+            completedAt: includeRunningExecution ? undefined : now,
+            status: includeRunningExecution ? 'running' as const : 'done' as const,
+            title: 'Verify render target evidence',
+            summary: '验证执行计划中的 RenderDoc 证据。',
+            rawTraceRef: 'raw-browser-preview-tool-execution',
+          },
+        ],
+        result: includeRunningExecution ? undefined : {
+          id: `${executionWorkstreamId}-result`,
+          workstreamId: executionWorkstreamId,
+          kind: 'report' as const,
+          status: 'ready' as const,
+          title: 'Execution Report',
+          sections: [
+            { id: 'summary', title: '结论', body: '执行已完成，报告和产物进入 Artifacts。' },
+            { id: 'evidence', title: '证据', body: 'Tool Row raw ref 仅作为 audit 入口保留。' },
+          ],
+          artifactIds: ['browser-preview-report-artifact'],
+          createdAt: now,
+        },
+      };
+      return {
+        ...nextSession,
+        latestAcceptedPlanId: planId,
+        workstreams: [plan, execution],
+        progress: [
+          ...nextSession.progress.map((task) => task.workstreamId === planWorkstreamId ? { ...task, status: 'completed' as const, completedAt: now, updatedAt: now } : task),
+          {
+            id: 'browser-preview-progress-execution',
+            sessionId: session.sessionId,
+            workstreamId: executionWorkstreamId,
+            branchId: session.activeBranchId,
+            title: includeRunningExecution ? 'Execute approved plan' : 'Publish execution report',
+            status: includeRunningExecution ? 'running' as const : 'completed' as const,
+            order: 2,
+            createdAt: now,
+            updatedAt: now,
+            completedAt: includeRunningExecution ? undefined : now,
+            source: 'runtime' as const,
+          },
+        ],
+        artifacts: includeRunningExecution ? nextSession.artifacts : [
+          ...nextSession.artifacts,
+          {
+            id: 'browser-preview-report-artifact',
+            sessionId: session.sessionId,
+            workstreamId: executionWorkstreamId,
+            branchId: session.activeBranchId,
+            type: 'report' as const,
+            status: 'ready' as const,
+            displayName: 'report.md',
+            taskTitle: 'Execution Task',
+            path: previewPath('sessions', session.sessionId, 'runs', runId, 'reports', 'report.md'),
+            rawRef: 'raw-browser-preview-report',
+            createdAt: now,
+            updatedAt: now,
+          },
+        ],
+        rawAuditRefs: [
+          ...nextSession.rawAuditRefs,
+          { id: 'raw-browser-preview-tool-execution', label: 'tool_execution', runId, sessionId: session.sessionId, ref: 'browser-preview' },
+        ],
+        updatedAt: now,
+      };
+    };
+
+    switch (this.scenarioId) {
+      case 'ask-task':
+        return {
+          ...session,
+          latestDisplayedPlanId: undefined,
+          latestAcceptedPlanId: undefined,
+          workstreams: [{
+            ...basePlan,
+            type: 'ask',
+            status: 'completed',
+            density: 'compact',
+            resultKind: 'answer',
+            planId: undefined,
+            planStatus: undefined,
+            result: {
+              id: 'browser-preview-ask-result',
+              workstreamId: basePlan.id,
+              kind: 'answer',
+              status: 'ready',
+              title: 'Ask Answer',
+              sections: [{ id: 'answer', title: '回答', body: 'Ask 只产生轻量回答，不创建正式 run，也不暴露 RenderDoc 工具。' }],
+              artifactIds: [],
+              createdAt: now,
+            },
+          }],
+          artifacts: [],
+        };
+      case 'execute-accepted-plan':
+        return withAcceptedPlan(session, true);
+      case 'execution-report':
+        return withAcceptedPlan(session, false);
+      case 'revision-request': {
+        const branchId = 'branch-revision';
+        const revisionId = `revision-${runId}-revision`;
+        const revisionWorkstreamId = `ws-${runId}-revision`;
+        return {
+          ...session,
+          activeBranchId: branchId,
+          latestDisplayedPlanId: `plan-${revisionId}`,
+          latestAcceptedPlanId: undefined,
+          userRequests: session.userRequests.map((request) => ({
+            ...request,
+            activeRevisionId: revisionId,
+            revisions: [
+              ...request.revisions,
+              {
+                id: revisionId,
+                requestId: request.id,
+                branchId,
+                parentRevisionId: request.activeRevisionId,
+                prompt: '请缩小计划范围，先验证当前 opened capture 的关键 draw call。',
+                createdAt: now,
+                resultingWorkstreamIds: [revisionWorkstreamId],
+              },
+            ],
+          })),
+          branches: session.branches.map((group, index) => index === 0 ? {
+            ...group,
+            activeBranchId: branchId,
+            branches: [
+              ...group.branches.map((branch) => ({ ...branch, status: 'inactive' as const })),
+              { id: branchId, parentBranchId: session.activeBranchId, revisionId, status: 'active' as const, workstreamIds: [revisionWorkstreamId] },
+            ],
+          } : group),
+          workstreams: [
+            { ...basePlan, planStatus: 'needs_revision' },
+            {
+              ...basePlan,
+              id: revisionWorkstreamId,
+              branchId,
+              status: 'awaiting_approval',
+              density: 'expanded',
+              planId: `plan-${revisionId}`,
+              planStatus: 'awaiting_approval',
+              processEvents: [
+                { kind: 'user.revision_requested', id: 'browser-preview-user-revision', workstreamId: revisionWorkstreamId, planId, createdAt: now, prompt: '请缩小计划范围，先验证当前 opened capture 的关键 draw call。' },
+                { kind: 'agent.text', id: 'browser-preview-revision-thinking', workstreamId: revisionWorkstreamId, createdAt: now, text: '已根据修改建议创建新的 revision workstream。' },
+              ],
+              result: basePlan.result ? { ...basePlan.result, id: `${revisionWorkstreamId}-result`, workstreamId: revisionWorkstreamId, status: 'awaiting_approval', title: 'Revised Debugger Plan' } : basePlan.result,
+            },
+          ],
+        };
+      }
+      case 'failed-tool':
+        return {
+          ...session,
+          workstreams: [{
+            ...basePlan,
+            status: 'failed',
+            processEvents: basePlan.processEvents.map((event) => event.kind === 'tool'
+              ? { ...event, status: 'failed' as const, errorSummary: 'RenderDoc inspection command failed in preview data.' }
+              : event),
+          }],
+          progress: session.progress.map((task) => ({ ...task, status: 'blocked' as const, blockerSummary: 'Tool failed' })),
+        };
+      case 'failed-task':
+        return {
+          ...session,
+          workstreams: [{
+            ...basePlan,
+            status: 'failed',
+            resultKind: 'failure',
+            result: { id: 'browser-preview-failure', workstreamId: basePlan.id, kind: 'failure', status: 'failed', title: 'Task Failed', sections: [{ id: 'failure', title: '失败原因', body: '任务失败并以 Failure Result Block 收束。' }], artifactIds: [], createdAt: now },
+          }],
+          progress: session.progress.map((task) => ({ ...task, status: 'blocked' as const, blockerSummary: 'Task failed' })),
+        };
+      case 'cancelled-task':
+        return {
+          ...session,
+          latestAcceptedPlanId: planId,
+          workstreams: [{
+            ...basePlan,
+            status: 'cancelled',
+            resultKind: 'cancelled',
+            result: { id: 'browser-preview-cancelled', workstreamId: basePlan.id, kind: 'cancelled', status: 'cancelled', title: 'Task Cancelled', sections: [{ id: 'cancelled', title: '取消', body: '任务被取消，历史消息和 raw audit ref 保留。' }], artifactIds: [], createdAt: now },
+          }],
+          progress: session.progress.map((task) => ({ ...task, status: 'cancelled' as const, completedAt: now })),
+        };
+      case 'sub-agent':
+        return {
+          ...session,
+          workstreams: [{
+            ...basePlan,
+            processEvents: [
+              ...basePlan.processEvents,
+              {
+                kind: 'subagent',
+                id: 'browser-preview-subagent',
+                workstreamId: basePlan.id,
+                createdAt: now,
+                completedAt: now,
+                status: 'done',
+                label: 'pixel_forensics_agent',
+                summary: '检查亮点像素和 render target。',
+                resultSummary: '确认需要继续验证 draw call。',
+                nestedWorkstream: {
+                  id: 'nested-pixel-forensics',
+                  title: 'Pixel Forensics Trace',
+                  process: [{ kind: 'agent.text', id: 'nested-text', workstreamId: 'nested-pixel-forensics', createdAt: now, text: 'Nested trace 只展示一层。' }],
+                },
+                rawTraceRef: 'raw-browser-preview-subagent',
+              },
+            ],
+          }],
+        };
+      case 'long-prompt':
+        return {
+          ...session,
+          userRequests: session.userRequests.map((request) => ({
+            ...request,
+            revisions: request.revisions.map((revision) => ({
+              ...revision,
+              prompt: [
+                '请完整分析当前打开的 capture，并保持所有历史决策可追溯。',
+                '第一步确认 opened capture；第二步建立计划；第三步执行工具；第四步汇总报告。',
+                '这个 prompt 故意很长，用于验证 User Prompt Bubble 的换行、折叠、fade 和展开箭头，不应撑爆消息流宽度。',
+              ].join('\n\n'),
+            })),
+          })),
+        };
+      case 'artifacts-context-accumulation':
+        return {
+          ...withAcceptedPlan(session, false),
+          context: [
+            ...session.context,
+            { id: 'browser-preview-context-file', sessionId: session.sessionId, workstreamId: basePlan.id, branchId: session.activeBranchId, kind: 'file', label: 'report.md', summary: '正式报告产物文件。', importance: 'important', firstObservedAt: now, lastObservedAt: now },
+            { id: 'browser-preview-context-source', sessionId: session.sessionId, workstreamId: basePlan.id, branchId: session.activeBranchId, kind: 'source', label: 'Pipeline State', summary: '被引用的 RenderDoc source context。', importance: 'cited', firstObservedAt: now, lastObservedAt: now },
+          ],
+        };
+      case 'branch-navigator':
+        return {
+          ...session,
+          branches: session.branches.map((group, index) => index === 0 ? {
+            ...group,
+            branches: [...group.branches, { id: 'branch-preview-alt', parentBranchId: session.activeBranchId, revisionId: 'revision-preview-alt', status: 'inactive' as const, workstreamIds: [] }],
+          } : group),
+        };
+      default:
+        return session;
+    }
+  }
+
+  private promptForWorkstream(session: AgentWorkstreamSession, workstreamId: string) {
+    for (const request of session.userRequests) {
+      const revision = request.revisions.find((entry) => entry.resultingWorkstreamIds.includes(workstreamId));
+      if (!revision) {
+        continue;
+      }
+      const group = session.branches.find((entry) => entry.rootRequestId === request.id);
+      return {
+        kind: 'user_prompt' as const,
+        id: `prompt-${revision.id}`,
+        branchId: revision.branchId,
+        requestId: request.id,
+        revisionId: revision.id,
+        prompt: revision.prompt,
+        createdAt: revision.createdAt,
+        branchIndex: Math.max(group?.branches.findIndex((branch) => branch.id === revision.branchId) ?? 0, 0),
+        branchCount: group?.branches.length ?? 1,
+        canCopy: true,
+        canEdit: true,
+      };
+    }
+    return undefined;
+  }
+
+  private createWorkstreamPresentation(session: AgentWorkstreamSession): AgentWorkstreamPresentation {
+    const activeWorkstreams = session.workstreams.filter((workstream) => workstream.branchId === session.activeBranchId);
+    return {
+      sessionId: session.sessionId,
+      activeBranchId: session.activeBranchId,
+      mode: activeWorkstreams[0]?.type ?? 'ask',
+      items: activeWorkstreams.flatMap((workstream) => [{
+        kind: 'task_workstream',
+        id: workstream.id,
+        type: workstream.type,
+        status: workstream.status,
+        density: workstream.density,
+        title: workstream.resultKind === 'plan'
+          ? 'Plan Task'
+          : workstream.resultKind === 'report'
+            ? 'Execution Task'
+            : workstream.type === 'ask'
+              ? 'Ask Task'
+              : 'Agent Task',
+        startedAt: workstream.startedAt,
+        completedAt: workstream.completedAt,
+        prompt: this.promptForWorkstream(session, workstream.id),
+        process: {
+          collapsed: workstream.status === 'completed',
+          items: workstream.processEvents.map((event) => {
+            if (event.kind === 'agent.text') {
+              return { kind: 'agent_thinking', id: event.id, createdAt: event.createdAt, text: event.text };
+            }
+            if (event.kind === 'tool') {
+              return {
+                kind: 'tool_row',
+                id: event.id,
+                createdAt: event.createdAt,
+                completedAt: event.completedAt,
+                status: event.status,
+                title: event.title,
+                summary: event.summary,
+                target: event.target,
+                durationMs: event.durationMs,
+                taskId: event.taskId,
+                artifactIds: event.artifactIds ?? [],
+                rawTraceRef: event.rawTraceRef,
+                inputRef: event.inputRef,
+                outputRef: event.outputRef,
+                errorSummary: event.errorSummary,
+              };
+            }
+            if (event.kind === 'subagent') {
+              return {
+                kind: 'subagent_row',
+                id: event.id,
+                createdAt: event.createdAt,
+                completedAt: event.completedAt,
+                status: event.status,
+                label: event.label,
+                summary: event.summary,
+              };
+            }
+            return {
+              kind: 'subagent_row',
+              id: event.id,
+              createdAt: event.createdAt,
+              status: 'done',
+              label: 'User',
+              summary: event.kind === 'user.confirmed' ? event.label : event.prompt,
+            };
+          }),
+        },
+        result: workstream.result ? {
+          ...workstream.result,
+          artifacts: session.artifacts.filter((artifact) => workstream.result?.artifactIds.includes(artifact.id)),
+        } : undefined,
+        planId: workstream.planId,
+        planStatus: workstream.planStatus,
+      }, ...workstream.processEvents.flatMap((event): AgentWorkstreamPresentation['items'] => {
+        if (event.kind === 'user.confirmed') {
+          return [{
+            kind: 'user_confirmation',
+            id: event.id,
+            workstreamId: event.workstreamId,
+            planId: event.planId,
+            label: event.label,
+            createdAt: event.createdAt,
+          }];
+        }
+        if (event.kind === 'user.revision_requested') {
+          return [{
+            kind: 'user_revision',
+            id: event.id,
+            workstreamId: event.workstreamId,
+            planId: event.planId,
+            prompt: event.prompt,
+            createdAt: event.createdAt,
+          }];
+        }
+        return [];
+      })]),
+      rightPanel: {
+        progress: {
+          current: session.progress.filter((task) => task.status !== 'completed'),
+          history: session.progress.filter((task) => task.status === 'completed'),
+        },
+        artifacts: {
+          current: session.artifacts,
+          previous: [],
+        },
+        context: {
+          groups: (['capture', 'file', 'source', 'capability'] as const).map((kind) => {
+            const all = session.context.filter((record) => record.kind === kind);
+            return { kind, important: all.filter((record) => record.importance !== 'normal'), all };
+          }),
+        },
+      },
+      approval: activeWorkstreams.find((workstream) => workstream.planStatus === 'awaiting_approval') ? {
+        planId: activeWorkstreams.find((workstream) => workstream.planStatus === 'awaiting_approval')?.planId ?? session.latestDisplayedPlanId ?? 'browser-preview-plan',
+        runId: this.workflowState.runId,
+        workstreamId: activeWorkstreams.find((workstream) => workstream.planStatus === 'awaiting_approval')?.id ?? `ws-${this.workflowState.runId}-plan`,
+        status: 'awaiting_approval',
+        title: activeWorkstreams.find((workstream) => workstream.planStatus === 'awaiting_approval')?.result?.title ?? 'Browser Preview Debug Plan',
+        summary: activeWorkstreams.find((workstream) => workstream.planStatus === 'awaiting_approval')?.result?.sections.map((section) => `${section.title}: ${section.body}`).join('\n') ?? '',
+        canApprove: true,
+        canRequestRevision: true,
+      } : null,
+      branchNavigator: session.branches[0] ? {
+        activeBranchId: session.activeBranchId,
+        branchIndex: Math.max(session.branches[0].branches.findIndex((branch) => branch.id === session.activeBranchId), 0),
+        branchCount: session.branches[0].branches.length,
+        branches: session.branches[0].branches,
+      } : null,
+      rawAuditRefs: session.rawAuditRefs,
+      updatedAt: session.updatedAt,
+    };
+  }
+
+  private async requestPlanRevision(runId: string, revisionText: string): Promise<WorkstreamRevisionResult> {
+    const session = this.workstreamSession ?? this.createWorkstreamSession();
+    const branchId = createId('branch');
+    const revisionId = createId('revision');
+    const workstreamId = `ws-${runId}-revision-${Date.now()}`;
+    const now = new Date().toISOString();
+    const request = session.userRequests[0];
+    const nextRevision = {
+      id: revisionId,
+      requestId: request.id,
+      branchId,
+      parentRevisionId: request.activeRevisionId,
+      prompt: revisionText,
+      createdAt: now,
+      resultingWorkstreamIds: [workstreamId],
+    };
+    this.workstreamSession = {
+      ...session,
+      activeBranchId: branchId,
+      latestDisplayedPlanId: `plan-${revisionId}`,
+      latestAcceptedPlanId: undefined,
+      userRequests: [{
+        ...request,
+        activeRevisionId: revisionId,
+        revisions: [...request.revisions, nextRevision],
+      }],
+      branches: session.branches.map((group, index) => index === 0 ? {
+        ...group,
+        activeBranchId: branchId,
+        branches: [
+          ...group.branches.map((branch) => branch.id === session.activeBranchId ? { ...branch, status: 'inactive' as const } : branch),
+          { id: branchId, parentBranchId: session.activeBranchId, revisionId, status: 'active' as const, workstreamIds: [workstreamId] },
+        ],
+      } : group),
+      workstreams: [
+        ...session.workstreams.map((workstream) => workstream.planId === session.latestDisplayedPlanId
+          ? { ...workstream, planStatus: 'needs_revision' as const }
+          : workstream),
+        {
+          id: workstreamId,
+          sessionId: session.sessionId,
+          branchId,
+          type: 'debugger',
+          status: 'awaiting_approval',
+          density: 'expanded',
+          resultKind: 'plan',
+          startedAt: now,
+          processEvents: [{ kind: 'agent.text', id: `agent-text-${revisionId}`, workstreamId, createdAt: now, text: '已根据修改建议创建新的计划分支。' }],
+          result: {
+            id: `${workstreamId}-result`,
+            workstreamId,
+            kind: 'plan',
+            status: 'awaiting_approval',
+            title: 'Revised Browser Preview Plan',
+            sections: [{ id: 'revision', title: '修改建议', body: revisionText }],
+            artifactIds: [],
+            createdAt: now,
+          },
+          planId: `plan-${revisionId}`,
+          planStatus: 'awaiting_approval',
+        },
+      ],
+      updatedAt: now,
+    };
+    this.workstreamPresentation = this.createWorkstreamPresentation(this.workstreamSession);
+    this.emit('workflow:workstreamChanged', { sessionId: session.sessionId, presentation: this.workstreamPresentation });
+    return {
+      success: true,
+      runId,
+      planId: `plan-${revisionId}`,
+      branchId,
+      session: this.workstreamSession,
+      presentation: this.workstreamPresentation,
+    };
+  }
+
   private createUsage(runId: string): RunContextUsageSummary {
+    if (this.usage && this.usage.runId === runId) {
+      return this.usage;
+    }
+
     return {
       runId,
       providerId: 'browser-preview',
@@ -1324,10 +2064,10 @@ class BrowserElectronApiFallback {
     return {
       runtime: {
         source: 'bundled',
-        toolsRoot: 'H:\\rdx\\RDC-Agent\\resources\\tools',
+        toolsRoot: previewPath('resources', 'tools'),
         version: 'browser-preview',
         catalog: {
-          path: 'H:\\rdx\\RDC-Agent\\resources\\tools\\catalog.json',
+          path: previewPath('resources', 'tools', 'catalog.json'),
           exists: true,
           schemaVersion: 'browser-preview',
           generatedAt: new Date(NOW).toISOString(),
@@ -1347,6 +2087,10 @@ class BrowserElectronApiFallback {
   }
 
   private createActionEvents(): ActionEvent[] {
+    if (this.actionEvents.length > 0) {
+      return this.actionEvents;
+    }
+
     return [
       {
         schema_version: '1',
@@ -1359,12 +2103,47 @@ class BrowserElectronApiFallback {
         event_type: 'browser.preview.loaded',
         status: 'ok',
         duration_ms: 1,
-        refs: [previewInput.filePath],
+        refs: this.openedCapture?.filePath ? [this.openedCapture.filePath] : [],
         payload: {
           mode: 'browser-preview',
+          scenarioId: this.scenarioId,
         },
       },
     ];
+  }
+
+  private createContextSnapshotFallback(): ContextSnapshot {
+    const openedCapture = this.openedCapture;
+    const device = this.devices[0];
+    const sessionId = openedCapture?.sessionId ?? this.currentSessionId ?? this.sessions[0]?.sessionId ?? 'browser-preview-session';
+    const contextId = openedCapture?.contextId ?? 'browser-preview-context';
+    const captureId = openedCapture?.captureId ?? 'browser-preview-capture';
+    const captureDescriptor: CaptureDescriptor = {
+      id: captureId,
+      filePath: openedCapture?.filePath ?? previewPath('captures', `${captureId}.rdc`),
+      captureFileId: openedCapture?.captureFileId ?? captureId,
+      role: 'primary',
+      backendHint: openedCapture?.backend ?? 'local',
+      status: openedCapture?.status ?? 'open',
+      sessionId,
+      replaySessionId: openedCapture?.replaySessionId ?? 'browser-preview-replay',
+      contextId,
+    };
+
+    return {
+      contextId,
+      sessionId,
+      backend: openedCapture?.backend ?? 'local',
+      runtimeOwner: 'browser-preview',
+      ownerLeaseId: 'browser-preview-lease',
+      captureDescriptors: [captureDescriptor],
+      activeCapture: captureId,
+      deviceLabel: openedCapture?.deviceLabel ?? device?.label ?? 'Local Browser Preview',
+      humanPreview: {
+        status: 'closed',
+        updatedAt: Date.now(),
+      },
+    };
   }
 
   private matchesLogScope(entry: RuntimeLogEntry, scope: RuntimeLogScope, sessionId?: string | null): boolean {
@@ -1402,7 +2181,7 @@ class BrowserElectronApiFallback {
 
   private async openHumanPreview(sessionId?: string) {
     const contextSnapshot: ContextSnapshot = {
-      ...(this.contextSnapshot ?? createContextSnapshot()),
+      ...(this.contextSnapshot ?? this.createContextSnapshotFallback()),
       humanPreview: {
         status: 'open',
         sessionId: sessionId ?? this.contextSnapshot?.sessionId ?? this.workflowState.sessionId,
@@ -1417,7 +2196,7 @@ class BrowserElectronApiFallback {
 
   private async closeHumanPreview() {
     const contextSnapshot: ContextSnapshot = {
-      ...(this.contextSnapshot ?? createContextSnapshot()),
+      ...(this.contextSnapshot ?? this.createContextSnapshotFallback()),
       humanPreview: {
         status: 'closed',
         updatedAt: Date.now(),

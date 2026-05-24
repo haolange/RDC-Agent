@@ -5,6 +5,7 @@
 - `module-map.md`：能力域到源码入口、共享类型、IPC/preload、UI 和测试入口的地图。
 - `codepilot-comparison.md`：CodePilot 架构参考项与 RDC-Agent 迁移边界。
 - `spec-driven-development.md`：跨层规范与执行约束。
+- `agent-workstream-technical-contract.md`：Agent Workstream 的 Task Workstream、事件、产物、上下文、Plan 状态机和 Presentation Model 跨层契约。
 
 ## 历史/阶段性参考
 

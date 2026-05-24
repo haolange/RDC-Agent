@@ -88,6 +88,10 @@ const createEventSubscriptionApi = () => ({
   onWorkflowStageChanged: (callback) => registerTrackedListener("workflow:stageChanged", (data) => callback(data)),
   onRunStatusChanged: (callback) => registerTrackedListener("workflow:runStatusChanged", (data) => callback(data)),
   onRunUsageChanged: (callback) => registerTrackedListener("workflow:runUsageChanged", (summary) => callback(summary)),
+  onWorkstreamChanged: (callback) => registerTrackedListener(
+    "workflow:workstreamChanged",
+    (payload) => callback(payload)
+  ),
   onAgentMessage: (callback) => registerTrackedListener("agent:message", (msg) => callback(msg)),
   onAgentStatusChanged: (callback) => registerTrackedListener("agent:statusChanged", (state) => callback(state)),
   onToolExecutionComplete: (callback) => registerTrackedListener("tool:executionComplete", (trace) => callback(trace)),
@@ -203,6 +207,10 @@ const createWorkflowApi = () => ({
   getPlan: (runId) => electron.ipcRenderer.invoke("workflow:getPlan", runId),
   submitQuestions: (runId, answers) => electron.ipcRenderer.invoke("workflow:submitQuestions", runId, answers),
   approvePlan: (runId) => electron.ipcRenderer.invoke("workflow:approvePlan", runId),
+  getWorkstreamSession: (sessionId) => electron.ipcRenderer.invoke("workflow:getWorkstreamSession", sessionId),
+  requestPlanRevision: (runId, revisionText) => electron.ipcRenderer.invoke("workflow:requestPlanRevision", runId, revisionText),
+  switchWorkstreamBranch: (sessionId, branchId) => electron.ipcRenderer.invoke("workflow:switchWorkstreamBranch", sessionId, branchId),
+  exportWorkstreamSession: (sessionId, options) => electron.ipcRenderer.invoke("workflow:exportWorkstreamSession", sessionId, options),
   restartRun: (runId) => electron.ipcRenderer.invoke("workflow:restartRun", runId),
   resume: (sessionId) => electron.ipcRenderer.invoke("workflow:resume", sessionId),
   stop: (runId) => electron.ipcRenderer.invoke("workflow:stop", runId),

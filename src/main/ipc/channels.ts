@@ -29,6 +29,10 @@ export const IPC_HANDLER_DOMAINS = {
     'workflow:getPlan',
     'workflow:submitQuestions',
     'workflow:approvePlan',
+    'workflow:getWorkstreamSession',
+    'workflow:requestPlanRevision',
+    'workflow:switchWorkstreamBranch',
+    'workflow:exportWorkstreamSession',
     'workflow:restartRun',
   ],
   projectSession: [
@@ -115,6 +119,7 @@ export const IPC_EVENT_DOMAINS = {
     'workflow:stageChanged',
     'workflow:runStatusChanged',
     'workflow:runUsageChanged',
+    'workflow:workstreamChanged',
     'workflow:blocked',
   ],
   agent: ['agent:message', 'agent:statusChanged'],

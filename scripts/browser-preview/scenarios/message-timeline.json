@@ -1,0 +1,267 @@
+{
+  "scenarioId": "message-timeline",
+  "label": "Message Timeline",
+  "projects": [
+    {
+      "projectId": "browser-preview-message-project",
+      "name": "Message Timeline Preview",
+      "rootPath": ".browser-preview/projects/message-timeline",
+      "slug": "message-timeline-preview",
+      "resourcePath": ".browser-preview/projects/message-timeline/resources",
+      "knowledgePath": ".browser-preview/projects/message-timeline/knowledge",
+      "inputsPath": ".browser-preview/projects/message-timeline/inputs",
+      "inputs": [
+        {
+          "inputId": "message-preview-capture",
+          "fileName": "message-timeline.rdc",
+          "filePath": ".browser-preview/captures/message-timeline.rdc",
+          "source": "project_resource",
+          "discoveredAt": 1770000000000,
+          "lastModifiedAt": 1770000900000,
+          "size": 3145728
+        }
+      ],
+      "inputsUpdatedAt": 1770001080000,
+      "createdAt": 1769998200000,
+      "updatedAt": 1770001320000,
+      "lastSessionId": "message-preview-session"
+    }
+  ],
+  "sessions": [
+    {
+      "sessionId": "message-preview-session",
+      "projectId": "browser-preview-message-project",
+      "title": "Message timeline states",
+      "goal": "Preview dense mixed message states for UI/UX iteration.",
+      "sessionPath": ".browser-preview/sessions/message-timeline",
+      "createdAt": 1769998800000,
+      "updatedAt": 1770001320000,
+      "lastRunId": "message-preview-run"
+    }
+  ],
+  "runs": [
+    {
+      "runId": "message-preview-run",
+      "turnId": "message-preview-turn-1",
+      "projectId": "browser-preview-message-project",
+      "sessionId": "message-preview-session",
+      "caseId": "message-preview-case",
+      "mode": "debugger",
+      "goal": "Preview dense mixed message states for UI/UX iteration.",
+      "captures": [
+        {
+          "id": "message-preview-capture",
+          "filePath": ".browser-preview/captures/message-timeline.rdc",
+          "captureFileId": "message-preview-capture",
+          "role": "primary",
+          "backendHint": "local",
+          "status": "open",
+          "sessionId": "message-preview-session",
+          "replaySessionId": "message-preview-replay",
+          "contextId": "message-preview-context"
+        }
+      ],
+      "startedAt": 1770001200000,
+      "status": "running",
+      "lastStage": "execute",
+      "backend": "local"
+    }
+  ],
+  "currentProjectId": "browser-preview-message-project",
+  "currentSessionId": "message-preview-session",
+  "workflowState": {
+    "caseId": "message-preview-case",
+    "runId": "message-preview-run",
+    "sessionId": "message-preview-session",
+    "currentStage": "execute",
+    "previousStages": ["preflight", "entry_gate", "intake_gate", "plan", "dispatch"],
+    "entryMode": "mcp",
+    "backend": "local",
+    "orchestrationMode": "multi_agent",
+    "coordinationMode": "staged_handoff",
+    "blockers": [],
+    "planReadiness": "strict_ready",
+    "approvalState": "approved",
+    "debugPlan": null,
+    "pendingQuestions": null,
+    "reasoningSummaries": [
+      {
+        "summaryId": "message-preview-reasoning",
+        "stage": "execute",
+        "agentId": "rdc-debugger",
+        "summary": "Message timeline preview includes user, assistant, reasoning, diagnostic, and tool-like content.",
+        "evidence": ["Scenario fixture is loaded from browser preview JSON."],
+        "nextStep": "Inspect message spacing and metadata rhythm.",
+        "confidence": 0.9,
+        "createdAt": "2026-02-01T10:03:00.000Z"
+      }
+    ],
+    "recoveryState": null,
+    "lastUpdated": "2026-02-01T10:03:00.000Z"
+  },
+  "openedCapture": {
+    "projectId": "browser-preview-message-project",
+    "inputId": "message-preview-capture",
+    "filePath": ".browser-preview/captures/message-timeline.rdc",
+    "captureId": "message-preview-capture",
+    "captureFileId": "message-preview-capture",
+    "sessionId": "message-preview-session",
+    "contextId": "message-preview-context",
+    "replaySessionId": "message-preview-replay",
+    "backend": "local",
+    "deviceId": "local",
+    "deviceLabel": "Local Browser Preview",
+    "status": "open",
+    "openedAt": 1770001200000,
+    "preview": null
+  },
+  "contextSnapshot": {
+    "contextId": "message-preview-context",
+    "sessionId": "message-preview-session",
+    "backend": "local",
+    "runtimeOwner": "browser-preview",
+    "ownerLeaseId": "message-preview-lease",
+    "captureDescriptors": [
+      {
+        "id": "message-preview-capture",
+        "filePath": ".browser-preview/captures/message-timeline.rdc",
+        "captureFileId": "message-preview-capture",
+        "role": "primary",
+        "backendHint": "local",
+        "status": "open",
+        "sessionId": "message-preview-session",
+        "replaySessionId": "message-preview-replay",
+        "contextId": "message-preview-context"
+      }
+    ],
+    "activeCapture": "message-preview-capture",
+    "deviceLabel": "Local Browser Preview",
+    "humanPreview": {
+      "status": "open",
+      "sessionId": "message-preview-session",
+      "boundEventId": 6152,
+      "updatedAt": 1770001200000
+    }
+  },
+  "devices": [
+    {
+      "id": "local",
+      "label": "Local Browser Preview",
+      "type": "local",
+      "status": "online",
+      "transport": "local",
+      "detailText": "Browser preview replay mock",
+      "lastSeen": 1770001200000
+    }
+  ],
+  "runtimeLogs": [
+    {
+      "id": "message-preview-log",
+      "timestamp": 1770000900000,
+      "scope": "app",
+      "namespace": "system",
+      "severity": "info",
+      "title": "Message Timeline scenario active",
+      "summary": "This browser preview scenario focuses on message flow UI states.",
+      "projectId": "browser-preview-message-project",
+      "sessionId": "message-preview-session",
+      "runId": "message-preview-run"
+    }
+  ],
+  "conversations": {
+    "message-preview-session": [
+      {
+        "id": "message-user-1",
+        "turnId": "message-turn-1",
+        "sessionId": "message-preview-session",
+        "projectId": "browser-preview-message-project",
+        "runId": "message-preview-run",
+        "modeContext": "debugger",
+        "role": "user",
+        "content": "这张 capture 的高光边缘和参考图不一致，先帮我解释可能原因。",
+        "status": "complete",
+        "attachments": [],
+        "createdAt": 1770000840000,
+        "updatedAt": 1770000840000
+      },
+      {
+        "id": "message-assistant-1",
+        "turnId": "message-turn-1",
+        "sessionId": "message-preview-session",
+        "projectId": "browser-preview-message-project",
+        "runId": "message-preview-run",
+        "modeContext": "debugger",
+        "role": "assistant",
+        "agentId": "rdc-debugger",
+        "content": "我会先检查 capture 的最终 Present、相关 draw call 和 shader 常量。当前是 Browser Preview 场景，只用于验证消息流 UI。",
+        "status": "complete",
+        "reasoningTrace": {
+          "status": "complete",
+          "summary": "Plan before tool execution",
+          "steps": [],
+          "updatedAt": 1770000900000
+        },
+        "attachments": [],
+        "createdAt": 1770000900000,
+        "updatedAt": 1770000900000
+      },
+      {
+        "id": "message-assistant-2",
+        "turnId": "message-turn-2",
+        "sessionId": "message-preview-session",
+        "projectId": "browser-preview-message-project",
+        "runId": "message-preview-run",
+        "modeContext": "debugger",
+        "role": "assistant",
+        "agentId": "triage_agent",
+        "content": "Tool trace preview:\n\n```text\nrd.event.get_actions -> 128 actions\nrd.export.screenshot --semantic swapchain -> preview-frame.png\n```\n\n这条消息用于检查代码块、换行、agent 标签和长文本间距。",
+        "status": "complete",
+        "reasoningTrace": {
+          "status": "complete",
+          "summary": "Tool trace preview content",
+          "steps": [],
+          "updatedAt": 1770000960000
+        },
+        "attachments": [],
+        "createdAt": 1770000960000,
+        "updatedAt": 1770000960000
+      },
+      {
+        "id": "message-assistant-3",
+        "turnId": "message-turn-3",
+        "sessionId": "message-preview-session",
+        "projectId": "browser-preview-message-project",
+        "runId": "message-preview-run",
+        "modeContext": "debugger",
+        "role": "assistant",
+        "agentId": "rdc-debugger",
+        "content": "Provider route is unavailable in this preview. The UI should show this diagnostic without implying a real runtime failure.",
+        "status": "failed",
+        "diagnostic": {
+          "code": "provider_unavailable",
+          "severity": "warning",
+          "userMessage": "Browser Preview 使用 mock provider，不代表真实 provider 状态。",
+          "agentId": "rdc-debugger",
+          "providerId": "browser-preview",
+          "modelId": "browser-preview-model",
+          "technicalMessage": "Preview scenario diagnostic"
+        },
+        "attachments": [],
+        "createdAt": 1770001020000,
+        "updatedAt": 1770001020000
+      }
+    ]
+  },
+  "actionEvents": [],
+  "usage": {
+    "runId": "message-preview-run",
+    "providerId": "browser-preview",
+    "modelId": "browser-preview-model",
+    "inputTokens": 3600,
+    "outputTokens": 920,
+    "totalTokens": 4520,
+    "contextWindowTokens": 8192,
+    "usagePercent": 55,
+    "hasConfiguredContextWindow": true
+  }
+}

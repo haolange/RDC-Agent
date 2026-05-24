@@ -2,6 +2,7 @@ import type { EventSubscriptionApi } from '@shared/types/electron-api';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 import type { RunContextUsageSummary, OpenedCaptureState, ProjectInputRecord } from '@shared/types/session';
 import type { TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
+import type { AgentWorkstreamPresentation } from '@shared/types/workstream';
 import { removeAllTrackedListeners, registerTrackedListener } from './listeners';
 
 export const createEventSubscriptionApi = (): EventSubscriptionApi => ({
@@ -13,6 +14,10 @@ export const createEventSubscriptionApi = (): EventSubscriptionApi => ({
     registerTrackedListener('workflow:runStatusChanged', (data) => (callback as (value: unknown) => void)(data)),
   onRunUsageChanged: (callback): (() => void) =>
     registerTrackedListener('workflow:runUsageChanged', (summary) => callback(summary as RunContextUsageSummary)),
+  onWorkstreamChanged: (callback): (() => void) =>
+    registerTrackedListener('workflow:workstreamChanged', (payload) =>
+      callback(payload as { sessionId: string; presentation: AgentWorkstreamPresentation }),
+    ),
   onAgentMessage: (callback): (() => void) => registerTrackedListener('agent:message', (msg) => callback(msg)),
   onAgentStatusChanged: (callback): (() => void) =>
     registerTrackedListener('agent:statusChanged', (state) => (callback as (value: unknown) => void)(state)),

@@ -14,8 +14,10 @@ import type {
   SubAgentRunPayload,
   TimelineProjection,
   ToolCallPayload,
+  WorkflowStatusGroupPayload,
 } from '@shared/types/agentTimeline';
 import type { ConversationMessageDiagnostic } from '@shared/types/conversation';
+import { PlanApprovalCard } from '../PlanIntakePanel';
 import './AgentMessageTimeline.css';
 
 interface AgentMessageTimelineProps {
@@ -733,6 +735,53 @@ const GroupView: React.FC<{
   );
 };
 
+const formatStatusEntryTime = (createdAt: number): string => formatTime(createdAt);
+
+const WorkflowStatusGroupView: React.FC<{
+  node: AgentNode;
+  expanded: boolean;
+  onToggle: () => void;
+}> = ({ node, expanded, onToggle }) => {
+  const payload = getPayload<WorkflowStatusGroupPayload>(node);
+  const entries = payload?.entries ?? [];
+  const latest = entries[entries.length - 1];
+  const summary = node.summary ?? latest?.content ?? '工作流状态已更新。';
+  return (
+    <section
+      className={`amt-workflow-status amt-node-status-${node.status}`}
+      data-testid="agent-timeline-workflow-status"
+      data-node-id={node.id}
+    >
+      <header className="amt-workflow-status-header">
+        <span className="amt-node-icon" aria-hidden="true">◷</span>
+        <strong>工作流状态</strong>
+        {entries.length > 1 ? (
+          <span className="amt-muted">{entries.length} 项更新</span>
+        ) : null}
+        <span className="amt-workflow-status-summary">{summary}</span>
+        <StatusBadge status={node.status} />
+        {entries.length > 0 ? (
+          <ExpandButton expanded={expanded} onClick={onToggle} label="切换工作流状态" />
+        ) : null}
+      </header>
+      {expanded && entries.length > 0 ? (
+        <ol className="amt-workflow-status-list">
+          {entries.map((entry) => (
+            <li
+              key={entry.messageId}
+              className={`amt-workflow-status-item amt-node-status-${entry.status}`}
+              data-testid="agent-timeline-workflow-status-entry"
+            >
+              <span className="amt-muted">{formatStatusEntryTime(entry.createdAt)}</span>
+              <span>{entry.content}</span>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+    </section>
+  );
+};
+
 const TimelineNodeView: React.FC<{
   projection: TimelineProjection;
   node: AgentNode;
@@ -752,6 +801,22 @@ const TimelineNodeView: React.FC<{
 }) => {
   const expanded = expandedState[node.id] ?? shouldDefaultExpand(node, collapseSuccessfulTools);
 
+  if (node.type === 'plan_card') {
+    return (
+      <div className="amt-plan-card-slot" data-testid="agent-timeline-plan-card" data-node-id={node.id}>
+        <PlanApprovalCard />
+      </div>
+    );
+  }
+  if (node.type === 'workflow_status_group') {
+    return (
+      <WorkflowStatusGroupView
+        node={node}
+        expanded={expanded}
+        onToggle={() => onToggle(node.id, expanded)}
+      />
+    );
+  }
   if (node.type === 'tool_call') {
     return <ToolCallView node={node} expanded={expanded} onToggle={() => onToggle(node.id, expanded)} />;
   }
@@ -810,7 +875,7 @@ const UserMessageView: React.FC<{ node: AgentNode }> = ({ node }) => {
       <div className="amt-avatar amt-user-avatar" aria-hidden="true">人</div>
       <div className="amt-user-bubble message-bubble" data-testid="conversation-user-brief">
         {isDocument ? <DocumentContent content={summary} /> : <p>{summary}</p>}
-        <span>{formatTime(node.createdAt)}</span>
+        <span className="amt-message-time">{formatTime(node.createdAt)}</span>
       </div>
     </article>
   );
@@ -840,7 +905,7 @@ const AssistantMessageView: React.FC<{ node: AgentNode }> = ({ node }) => {
               {diagnostic.technicalMessage ? <code>{diagnostic.technicalMessage}</code> : null}
             </div>
           ) : null}
-          <span>{formatTime(node.createdAt)}</span>
+          <span className="amt-message-time">{formatTime(node.createdAt)}</span>
         </div>
       </div>
     </article>

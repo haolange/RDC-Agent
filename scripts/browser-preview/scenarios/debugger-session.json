@@ -1,0 +1,728 @@
+{
+  "scenarioId": "debugger-session",
+  "label": "RDC debugger local analysis",
+  "projects": [
+    {
+      "projectId": "browser-preview-project",
+      "name": "RDC debugger local analysis",
+      "rootPath": ".browser-preview/projects/rdc-debugger-local-analysis",
+      "slug": "rdc-debugger-local-analysis",
+      "resourcePath": ".browser-preview/projects/rdc-debugger-local-analysis/resources",
+      "knowledgePath": ".browser-preview/projects/rdc-debugger-local-analysis/knowledge",
+      "inputsPath": ".browser-preview/projects/rdc-debugger-local-analysis/inputs",
+      "inputs": [
+        {
+          "inputId": "browser-preview-capture",
+          "fileName": "眼睛泪腺白点.rdc",
+          "filePath": "D:/Utility/Test RDC Files/眼睛泪腺白点.rdc",
+          "source": "project_resource",
+          "discoveredAt": 1779560169594,
+          "lastModifiedAt": 1779560169594,
+          "size": 0
+        }
+      ],
+      "inputsUpdatedAt": 1779560169594,
+      "createdAt": 1779559569594,
+      "updatedAt": 1779560402591,
+      "lastSessionId": "browser-preview-session-1"
+    }
+  ],
+  "sessions": [
+    {
+      "sessionId": "browser-preview-session-1",
+      "projectId": "browser-preview-project",
+      "title": "RDC debugger local analysis",
+      "goal": "以 local 模式分析眼睛泪腺白点 capture，锚定 Event ID 6152，收敛 Plan/Intake 执行合同。",
+      "sessionPath": ".browser-preview/sessions/rdc-debugger-local-analysis",
+      "createdAt": 1779559869594,
+      "updatedAt": 1779560402591,
+      "lastRunId": "browser-preview-run-1"
+    }
+  ],
+  "runs": [
+    {
+      "runId": "browser-preview-run-1",
+      "turnId": "browser-preview-title-logs-turn",
+      "projectId": "browser-preview-project",
+      "sessionId": "browser-preview-session-1",
+      "caseId": "browser-preview-case",
+      "mode": "debugger",
+      "goal": "以 local 模式分析眼睛泪腺白点 capture，锚定 Event ID 6152，收敛 Plan/Intake 执行合同。",
+      "captures": [
+        {
+          "id": "browser-preview-capture",
+          "filePath": "D:/Utility/Test RDC Files/眼睛泪腺白点.rdc",
+          "captureFileId": "browser-preview-capture",
+          "role": "primary",
+          "backendHint": "local",
+          "status": "open",
+          "sessionId": "browser-preview-session-1",
+          "replaySessionId": "browser-preview-replay",
+          "contextId": "browser-preview-context"
+        }
+      ],
+      "startedAt": 1779560169594,
+      "status": "awaiting_approval",
+      "lastStage": "plan",
+      "backend": "local"
+    }
+  ],
+  "currentProjectId": "browser-preview-project",
+  "currentSessionId": "browser-preview-session-1",
+  "workflowState": {
+    "caseId": "browser-preview-case",
+    "runId": "browser-preview-run-1",
+    "sessionId": "browser-preview-session-1",
+    "currentStage": "plan",
+    "previousStages": [
+      "preflight",
+      "entry_gate",
+      "intake_gate"
+    ],
+    "entryMode": "mcp",
+    "backend": "local",
+    "orchestrationMode": "multi_agent",
+    "coordinationMode": "staged_handoff",
+    "blockers": [],
+    "planReadiness": "strict_ready",
+    "approvalState": "pending_user",
+    "debugPlan": {
+      "planId": "browser-preview-plan-title-logs",
+      "planReadiness": "strict_ready",
+      "strictReady": true,
+      "userGoal": "分析泪腺区域白色亮点 / 高光瑕疵，定位 IBL、specular 或漏光根因。",
+      "targetCapture": {
+        "captureId": "browser-preview-capture",
+        "fileName": "眼睛泪腺白点.rdc",
+        "filePath": "D:/Utility/Test RDC Files/眼睛泪腺白点.rdc"
+      },
+      "targetFrameOrEvent": {
+        "scope": "event",
+        "eventId": 6152
+      },
+      "scope": "RDC-Debugger local Plan/Intake from title_logs.json",
+      "referenceContract": {
+        "taskSources": [
+          "Desktop title_logs.json",
+          "User request prompt"
+        ],
+        "referenceCaptures": [
+          "眼睛泪腺白点.rdc"
+        ],
+        "acceptanceNotes": [
+          "无离散白点或异常亮点",
+          "无局部过曝、漏光或突兀白色像素",
+          "shading 平缓自然"
+        ]
+      },
+      "verificationContract": {
+        "requiresFixValidation": true,
+        "requiresScreenshotEvidence": true,
+        "requiresShaderInspection": true,
+        "requiresPixelEvidence": true,
+        "requiresBaselineComparison": true,
+        "targetEventIds": [
+          6152
+        ],
+        "successCriteria": [
+          "Event 6152 相关 draw call 的 shader/uniform/texture/IBL 证据被检查",
+          "framebuffer/blend/depth/stencil/MRT 状态被排查",
+          "最终 report 包含分析结论、证据、验证过程和 fix 是否成立"
+        ]
+      },
+      "expectedDeliverables": [
+        "action_plan",
+        "framebuffer evidence",
+        "shader/state evidence",
+        "final report"
+      ],
+      "blockers": [],
+      "missingInfo": [],
+      "recommendedSpecialists": [
+        "triage_agent",
+        "capture_repro_agent"
+      ],
+      "notes": [
+        "Scenario imported from Desktop title_logs.json for Browser Preview message-flow validation."
+      ],
+      "createdAt": "2026-05-23T18:16:09.594Z",
+      "updatedAt": "2026-05-23T18:20:02.591Z"
+    },
+    "pendingQuestions": null,
+    "reasoningSummaries": [
+      {
+        "summaryId": "title-logs-reasoning",
+        "stage": "plan",
+        "agentId": "rdc-debugger",
+        "summary": "真实 Plan/Intake 日志已导入 Browser Preview；当前 readiness 为 ready，等待 execution handoff。",
+        "evidence": [
+          "title_logs.json",
+          "D:/Utility/Test RDC Files/眼睛泪腺白点.rdc",
+          "Event ID 6152"
+        ],
+        "nextStep": "交给 rdc-execute 执行 local replay 与证据采集。",
+        "confidence": 0.88,
+        "createdAt": "2026-05-23T18:20:02.591Z"
+      }
+    ],
+    "recoveryState": null,
+    "lastUpdated": "2026-05-23T18:20:02.591Z"
+  },
+  "openedCapture": {
+    "projectId": "browser-preview-project",
+    "inputId": "browser-preview-capture",
+    "filePath": "D:/Utility/Test RDC Files/眼睛泪腺白点.rdc",
+    "captureId": "browser-preview-capture",
+    "captureFileId": "browser-preview-capture",
+    "sessionId": "browser-preview-session-1",
+    "contextId": "browser-preview-context",
+    "replaySessionId": "browser-preview-replay",
+    "backend": "local",
+    "deviceId": "local",
+    "deviceLabel": "Local Browser Preview",
+    "status": "open",
+    "openedAt": 1779560169594,
+    "preview": null
+  },
+  "contextSnapshot": {
+    "contextId": "browser-preview-context",
+    "sessionId": "browser-preview-session-1",
+    "backend": "local",
+    "runtimeOwner": "browser-preview",
+    "ownerLeaseId": "browser-preview-lease",
+    "captureDescriptors": [
+      {
+        "id": "browser-preview-capture",
+        "filePath": "D:/Utility/Test RDC Files/眼睛泪腺白点.rdc",
+        "captureFileId": "browser-preview-capture",
+        "role": "primary",
+        "backendHint": "local",
+        "status": "open",
+        "sessionId": "browser-preview-session-1",
+        "replaySessionId": "browser-preview-replay",
+        "contextId": "browser-preview-context"
+      }
+    ],
+    "activeCapture": "browser-preview-capture",
+    "deviceLabel": "Local Browser Preview",
+    "humanPreview": {
+      "status": "closed",
+      "updatedAt": 1779560402591
+    }
+  },
+  "devices": [
+    {
+      "id": "local",
+      "label": "Local Browser Preview",
+      "type": "local",
+      "status": "online",
+      "transport": "local",
+      "detailText": "Browser preview replay mock",
+      "lastSeen": 1770001200000
+    }
+  ],
+  "runtimeLogs": [
+    {
+      "id": "title-logs-runtime-1",
+      "timestamp": 1779560169594,
+      "scope": "workflow",
+      "namespace": "plan_intake",
+      "severity": "info",
+      "title": "Imported title_logs.json",
+      "summary": "Browser Preview is showing the real RDC-Debugger Plan/Intake log export.",
+      "projectId": "browser-preview-project",
+      "sessionId": "browser-preview-session-1",
+      "runId": "browser-preview-run-1"
+    }
+  ],
+  "conversations": {
+    "browser-preview-session-1": [
+      {
+        "id": "title-logs-user-1",
+        "turnId": "browser-preview-title-logs-turn",
+        "sessionId": "browser-preview-session-1",
+        "projectId": "browser-preview-project",
+        "runId": "browser-preview-run-1",
+        "modeContext": "debugger",
+        "role": "user",
+        "content": "请使用 rdc-debugger 技能，以 local 模式直接在本机分析 capture：\r\n\r\n- capture 路径：`D:\\Utility\\Test RDC Files\\眼睛泪腺白点.rdc`\r\n- 已知关键事件：Event ID 6152\r\n- 目标 draw call：泪腺（lacrimal gland / eye tear duct）相关渲染 draw call\r\n\r\n问题现象：\r\n真机上泪腺区域出现不应存在的白色亮点 / 高光瑕疵，视觉上表现为局部过曝或漏光感。理论上该区域应呈现平缓、柔和的眼部 shading，与周围眼部组织自然过渡，不应出现任何突兀的白色高亮像素。初步怀疑为 IBL 强度过高、specular 贡献异常、或某层光照/反射数据漏光所致。\r\n\r\n调试目标：\r\n1. 以 local 模式直接在本机加载指定 capture，直接跳转至 Event ID 6152 检查该泪腺相关 draw call\r\n2. 提取并分析该 draw call 的 shader 源码、uniform 参数、texture 输入及光照/IBL 相关数据，定位白色亮点产生的 root cause（确认是否为 IBL 过亮、specular 项异常、或漏光）\r\n3. 检查 framebuffer 状态、blend 模式、depth/stencil 配置及 MRT 输出，排查是否有异常写入或光照叠加错误\r\n4. 如有必要，修改 shader 或调整渲染状态并进行 replay 验证，观察泪腺白点是否消除\r\n5. 导出 framebuffer / 相关证据做多模态比对，确认结果更接近修复后的右图\r\n\r\n验收标准：\r\n- 泪腺区域不应出现任何离散白点或异常亮点\r\n- 不应存在局部过曝、漏光或突兀白色像素\r\n- 视觉结果应更接近参考图右侧的修复后效果，shading 平缓自然\r\n- 最终输出完整 report，包含分析结论、证据、验证过程及 fix 是否成立的结论\r\n\r\n限制：若 rdc-debugger / rdx-tool 本身存在 bug 导致无法按标准流程执行，直接阻断并回复，不要为完成任务采取绕路手段。",
+        "status": "complete",
+        "attachments": [],
+        "createdAt": 1779560168594,
+        "updatedAt": 1779560168594
+      },
+      {
+        "id": "title-logs-assistant-1",
+        "turnId": "browser-preview-title-logs-turn",
+        "sessionId": "browser-preview-session-1",
+        "projectId": "browser-preview-project",
+        "runId": "browser-preview-run-1",
+        "modeContext": "debugger",
+        "role": "assistant",
+        "agentId": "rdc-debugger",
+        "content": "我会按 RDC-Debugger 的 Plan/Intake 流程先做本地 capture 可执行性与路线收敛：读取控制面和相关知识后，让两个 intake helper 各自给 brief，再由我产出可执行 action_plan。由于你要求 local 模式直接分析，我会特别检查 capture 路径、Event 6152、reference/predicate gate 和 rdx-tool 限制是否构成阻断。",
+        "status": "complete",
+        "reasoningTrace": {
+          "status": "complete",
+          "summary": "Plan/Intake response",
+          "steps": [],
+          "updatedAt": 1779560180822
+        },
+        "attachments": [],
+        "createdAt": 1779560180822,
+        "updatedAt": 1779560180822
+      },
+      {
+        "id": "title-logs-assistant-2",
+        "turnId": "browser-preview-title-logs-turn",
+        "sessionId": "browser-preview-session-1",
+        "projectId": "browser-preview-project",
+        "runId": "browser-preview-run-1",
+        "modeContext": "debugger",
+        "role": "assistant",
+        "agentId": "rdc-debugger",
+        "content": "已读到入口配置：当前公开入口确实只负责 Plan/Intake，真正的本地 replay/证据采集必须经 `rdc-execute` execution gate。接下来我会让两个 plan helper 分别给症状/历史路线与 capture/readiness brief，然后把它们收敛成一份可交给执行端的合同式 plan。",
+        "status": "complete",
+        "reasoningTrace": {
+          "status": "complete",
+          "summary": "list_dir, read_file, read_file, read_file, memory",
+          "steps": [
+            {
+              "id": "title-logs-step-2",
+              "title": "已执行 5 个上下文检查",
+              "stage": "plan-intake",
+              "status": "complete",
+              "summary": "list_dir, read_file, read_file, read_file, memory",
+              "detail": "这些工具调用来自桌面 title_logs.json 的真实 Plan/Intake 日志。",
+              "toolCalls": [
+                {
+                  "id": "call_1VVTMtUvPrrz9h1pAaEGOtbW__vscode-1779560125610",
+                  "toolName": "list_dir",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"path\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\.github\"\n}",
+                  "resultPreview": "[\n  \"agents/\\nAGENT_CORE.md\\nconfig/\\ncopilot/\\ndocs/\\nhooks/\\nmeta-tests/\\nskills/\\nsystem-config.yaml\\ntemplates/\"\n]",
+                  "startedAt": 1779560180933,
+                  "completedAt": 1779560181433
+                },
+                {
+                  "id": "call_rnXfLvM1YHr8dSYsJnlUKk52__vscode-1779560125611",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\.github\\\\system-config.yaml\",\n  \"startLine\": 1,\n  \"endLine\": 220\n}",
+                  "resultPreview": "[\n  \"version: 1\\r\\nentrypoint:\\r\\n  public_agent: RDC-Debugger\\r\\n  target: vscode\\r\\n  plan_artifact: action_plan\\r\\n  plan_memory_path: /memories/session/plan.md\\r\\n\\r\\nexecution:\\r\\n  driver: rdc-execute\\r\\n  owner: agent\\r\\n  workspace_init:\\r\\n    required: true\\r\\n    action: harness_guard.py accept-intake\\r\\n  entry_requirements:\\r\\n    resolution_mode: audited_execution\\r\\n    execution_readiness: ready\\r\\n    required_plan_fields:\\r\\n      - execution_driver\\r\\n      - execution_roadmap\\r\\n  runtime_session_requirements:\\r\\n    required_fields:\\r\\n      - execution_phase\\r\\n      - execution_driver\\r\\n      - skill_protocol_initialized\\r\\n  runtime_baton:\\r\\n    required: true\\r\\n    path: workspace/cases/<case_id>/runs/<run_id>/artifacts/runtime_baton.yaml\\r\\n    required_fields:\\r\\n      - context_id\\r\\n      - session_id\\r\\n      - workspace_session_id\\r\\n      - capture_fil…",
+                  "startedAt": 1779560180933,
+                  "completedAt": 1779560181433
+                },
+                {
+                  "id": "call_Hjg5GeTpnp3sTUlzEJYIUatP__vscode-1779560125612",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\common\\\\knowledge\\\\index.yaml\",\n  \"startLine\": 1,\n  \"endLine\": 220\n}",
+                  "resultPreview": "[\n  \"# RDA 知识库索引\\n\\nschema_version: \\\"1\\\"\\nsnapshot_id: \\\"knowledge-index-20260315-0001\\\"\\ngenerated_at: \\\"2026-03-15T00:00:00Z\\\"\\n\\nfamilies:\\n  sop_catalog:\\n    spec_id: SOP-CATALOG\\n    canonical_id: SOP-CATALOG\\n    version: 1\\n    object_path: common/knowledge/library/sops/sop_catalog.yaml\\n    activated_at: \\\"2026-03-15T00:00:00Z\\\"\\n  invariant_catalog:\\n    spec_id: INVARIANT-CATALOG\\n    canonical_id: INVARIANT-CATALOG\\n    version: 1\\n    object_path: common/knowledge/library/invariants/invariant_catalog.yaml\\n    activated_at: \\\"2026-03-15T00:00:00Z\\\"\\n  symptom_taxonomy:\\n    spec_id: RDA-TAXONOMY\\n    canonical_id: RDA-TAXONOMY\\n    version: \\\"1.0\\\"\\n    object_path: common/knowledge/taxonomy.yaml\\n    activated_at: \\\"2026-03-15T00:00:00Z\\\"\\n  trigger_taxonomy:\\n    spec_id: RDA-TAXONOMY\\n    canonical_id: RDA-TAXONOMY\\n    version: \\\"1.0\\\"\\n    object_path: common/knowledg…",
+                  "startedAt": 1779560180933,
+                  "completedAt": 1779560181433
+                },
+                {
+                  "id": "call_7vPeJmDzraeB82CNr239A7LG__vscode-1779560125613",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\common\\\\knowledge\\\\taxonomy.yaml\",\n  \"startLine\": 1,\n  \"endLine\": 220\n}",
+                  "resultPreview": "[\n  \"spec_id: RDA-TAXONOMY\\r\\nfamily: taxonomy\\r\\nversion: '1.0'\\r\\nstatus: active\\r\\neffective_window:\\r\\n  start: '2026-03-15T00:00:00Z'\\r\\n  end: null\\r\\nsymptoms:\\r\\n- tag: black_pixel\\r\\n  label: 黑色像素\\r\\n  description: 渲染输出特定区域呈现纯黑，值为 (0,0,0) 或接近0\\r\\n  category: visual_color\\r\\n  likely_invariants:\\r\\n  - I-NAN-01\\r\\n  - I-SHADER-01\\r\\n  - I-SHADER-02\\r\\n  - I-SHADING-NONNEG-01\\r\\n  - I-LIGHT-UNPACK-01\\r\\n  priority_order: 1\\r\\n  examples:\\r\\n  - 角色局部区域完全黑色，周围正常\\r\\n  - 整个 DrawCall 的渲染结果全黑\\r\\n  - 阴影区域异常全黑（无环境光）\\r\\n- tag: white_pixel\\r\\n  label: 白色像素\\r\\n  description: 渲染输出特定区域呈现纯白，值为 (1,1,1) 或 NaN 经硬件处理后的最大值\\r\\n  category: visual_color\\r\\n  likely_invariants:\\r\\n  - I-NAN-01\\r\\n  - I-SHADER-01\\r\\n  priority_order: 1\\r\\n  examples:\\r\\n  - 角色局部像素全白，过曝\\r\\n  - 整帧突然变为全白\\r\\n- tag: white_spot\\r\\n  label: 白色斑点\\r\\n  description: 渲染输出中出现局部白色点状或块状瑕疵，非全屏\\r\\n  category: visual_color\\r\\n  likely_i…",
+                  "startedAt": 1779560180934,
+                  "completedAt": 1779560181434
+                },
+                {
+                  "id": "call_rhxoNVRb0azCcveLbe5D2mSP__vscode-1779560125614",
+                  "toolName": "memory",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"command\": \"view\",\n  \"path\": \"/memories/\"\n}",
+                  "resultPreview": "[\n  \"No memories found.\"\n]",
+                  "startedAt": 1779560180934,
+                  "completedAt": 1779560181434
+                }
+              ],
+              "startedAt": 1779560180933,
+              "completedAt": 1779560181434
+            }
+          ],
+          "updatedAt": 1779560187369
+        },
+        "attachments": [],
+        "createdAt": 1779560187369,
+        "updatedAt": 1779560187369
+      },
+      {
+        "id": "title-logs-assistant-3",
+        "turnId": "browser-preview-title-logs-turn",
+        "sessionId": "browser-preview-session-1",
+        "projectId": "browser-preview-project",
+        "runId": "browser-preview-run-1",
+        "modeContext": "debugger",
+        "role": "assistant",
+        "agentId": "rdc-debugger",
+        "content": "本地目录清点显示目标 capture 文件存在；知识库里没有命中的历史 bugcard，但有白点/过曝/光照强度/光照解包/Nan 类不变量和 SOP 可用。现在我会读取 execution skill 的契约边界，并启动两个 helper brief。",
+        "status": "complete",
+        "reasoningTrace": {
+          "status": "complete",
+          "summary": "grep_search, read_file, read_file, read_file, list_dir, read_file, read_file, read_file, read_file, read_file, grep_search, grep_search, file_search, file_search",
+          "steps": [
+            {
+              "id": "title-logs-step-3",
+              "title": "已执行 14 个上下文检查",
+              "stage": "plan-intake",
+              "status": "complete",
+              "summary": "grep_search, read_file, read_file, read_file, list_dir, read_file, read_file, read_file, read_file, read_file, grep_search, grep_search, file_search, file_search",
+              "detail": "这些工具调用来自桌面 title_logs.json 的真实 Plan/Intake 日志。",
+              "toolCalls": [
+                {
+                  "id": "call_Nx5J7TidRnXcLLMYBS7HdAqR__vscode-1779560125615",
+                  "toolName": "grep_search",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"query\": \"IBL|specular|white_spot|white pixel|白点|高光|漏光|overexposure|overbright\",\n  \"isRegexp\": true,\n  \"includePattern\": \"common/knowledge/**\",\n  \"maxResults\": 40\n}",
+                  "resultPreview": "[\n  \"21 matches\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\taxonomy.yaml\\\" line=35>\\n- tag: white_spot\\r\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\taxonomy.yaml\\\" line=43>\\n  - 角色皮肤上出现随机白点\\r\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\taxonomy.yaml\\\" line=64>\\n  - HDR 内容写入 LDR RT 导致高光区域全白\\r\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\taxonomy.yaml\\\" line=100>\\n  - 高光区域大面积过曝\\r\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\taxonomy.yaml\\\" line=132>\\n  - 皮肤高光到暗部过渡区域出现条带\\r\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\taxonomy.yaml\\\" line=151>\\n  - 角色皮肤高光渐变出现量化跳变\\r\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common…",
+                  "startedAt": 1779560187547,
+                  "completedAt": 1779560188047
+                },
+                {
+                  "id": "call_l9SzZxKlX76rujMAobpyQZO9__vscode-1779560125616",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\common\\\\knowledge\\\\library\\\\sops\\\\sop_catalog.yaml\",\n  \"startLine\": 1,\n  \"endLine\": 260\n}",
+                  "resultPreview": "[\n  \"spec_id: SOP-CATALOG\\r\\nfamily: sop_catalog\\r\\nversion: 1\\r\\nstatus: active\\r\\nparent_version: null\\r\\neffective_window:\\r\\n  start: \\\"2026-03-15T00:00:00Z\\\"\\r\\n  end: null\\r\\nrollback_target: null\\r\\nsupport_stats:\\r\\n  support_runs: 0\\r\\n  distinct_sessions: 0\\r\\n  distinct_device_groups: 0\\r\\nvalidation_refs:\\r\\n  replay: []\\r\\n  shadow: []\\r\\n  rollback: []\\r\\ndedupe_group: SOP-CATALOG\\r\\ncanonical_id: SOP-CATALOG\\r\\n\\r\\n# RenderDoc/RDC GPU Debug · SOP Library\\r\\n# 标准操作流程库 — 机器可读版本\\r\\n# 格式版本: 1.0 | 最后更新: 2026-02-27\\r\\n#\\r\\n# 字段说明:\\r\\n#   id                  : SOP 唯一标识\\r\\n#   name                : 简短名称\\r\\n#   category            : 问题大类\\r\\n#   severity            : CRITICAL / HIGH / MEDIUM / LOW\\r\\n#   target_invariants   : 本 SOP 针对验证/修复的不变量列表（精确匹配 active invariant catalog）\\r\\n#   trigger_conditions  : 触发本 SOP 的条件组合\\r\\n#     symptom_tags      : 症状标签（精确匹配 active symptom taxonomy）\\…",
+                  "startedAt": 1779560187547,
+                  "completedAt": 1779560188047
+                },
+                {
+                  "id": "call_d6NQiF8NPw7RIxIhA6rBvJvP__vscode-1779560125617",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\common\\\\knowledge\\\\library\\\\invariants\\\\invariant_catalog.yaml\",\n  \"startLine\": 1,\n  \"endLine\": 260\n}",
+                  "resultPreview": "[\n  \"spec_id: INVARIANT-CATALOG\\r\\nfamily: invariant_catalog\\r\\nversion: 1\\r\\nstatus: active\\r\\nparent_version: null\\r\\neffective_window:\\r\\n  start: \\\"2026-03-15T00:00:00Z\\\"\\r\\n  end: null\\r\\nrollback_target: null\\r\\nsupport_stats:\\r\\n  support_runs: 0\\r\\n  distinct_sessions: 0\\r\\n  distinct_device_groups: 0\\r\\nvalidation_refs:\\r\\n  replay: []\\r\\n  shadow: []\\r\\n  rollback: []\\r\\ndedupe_group: INVARIANT-CATALOG\\r\\ncanonical_id: INVARIANT-CATALOG\\r\\n\\r\\n# RenderDoc/RDC GPU Debug · Invariant Library\\r\\n#\\r\\n# 字段说明:\\r\\n#   id                  : 不变量唯一标识\\r\\n#   name                : 简短名称\\r\\n#   category            : 所属大类\\r\\n#   severity            : CRITICAL / HIGH / MEDIUM / LOW\\r\\n#   definition          : 精确定义（一句话）\\r\\n#   symptom_tags        : 与 active symptom taxonomy 中 tag 字段对齐\\r\\n#   trigger_tags        : 与 active trigger taxonomy 中 tag 字段对齐（可为空）\\r\\n#   typical_root_causes : 常见根因列表（Ag…",
+                  "startedAt": 1779560187547,
+                  "completedAt": 1779560188047
+                },
+                {
+                  "id": "call_ROkAatCIOc7xQtkLMBXZMxh8__vscode-1779560125618",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\product\\\\schemas\\\\action_plan_schema.yaml\",\n  \"startLine\": 1,\n  \"endLine\": 260\n}",
+                  "resultPreview": "[\n  \"schema_id: action_plan\\nschema_version: \\\"1\\\"\\ntitle: Action Plan Schema\\ndescription: Plan 阶段的正式输出，作为 Plan->Execution 的交接对象\\n\\nfields:\\n  execution_readiness:\\n    type: enum\\n    values: [ready, needs_input, blocked]\\n    description: 执行准备状态。ready 表示可以立即执行；needs_input 表示缺少用户信息；blocked 表示存在阻断项。\\n\\n  confirmed_facts:\\n    type: list of objects\\n    description: 用户问题和环境中的已确认事实，包括从用户输入和环境探测中提取的确定性信息。\\n\\n  environment_profile:\\n    type: object\\n    description: 运行环境画像，包括 OS 类型/版本、GPU 型号/驱动、Graphics API 版本、RenderDoc 版本等。\\n\\n  captures:\\n    type: object\\n    description: capture 文件清单及角色，包括 anomalous（异常 capture）、baseline（基线 capture）、fixed（修复验证 capture）三类角色。\\n\\n  references:\\n    type: object\\n    description: 参考基线文件清单，包括 reference capture、golden frame 截图、预期输出等参考文件。\\n\\n  symptom_tags:\\n    type: list\\n    description: 症状标签列表，来自 taxonomy 分类体系，描述用户所遇问题的外在表现。\\n\\n  trigger_tags:\\n    type: …",
+                  "startedAt": 1779560187547,
+                  "completedAt": 1779560188047
+                },
+                {
+                  "id": "call_bBNVqEfGD0ODGywlkdUHAy6v__vscode-1779560125619",
+                  "toolName": "list_dir",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"path\": \"D:\\\\Utility\\\\Test RDC Files\"\n}",
+                  "resultPreview": "[\n  \"Character_Desktop.rdc\\nHairBlack_Mobile.rdc\\nHairSpark_Mobile.rdc\\nHairWhite_Mobile.rdc\\nIRP_Desktop.rdc\\n眼睛泪腺白点.rdc\"\n]",
+                  "startedAt": 1779560206481,
+                  "completedAt": 1779560206981
+                },
+                {
+                  "id": "call_Oe6mPKDEWimO3O9JSMtJ8wpn__vscode-1779560125620",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\tools\\\\docs\\\\quickstart.md\",\n  \"startLine\": 1,\n  \"endLine\": 220\n}",
+                  "resultPreview": "[\n  \"# 快速开始\\r\\n\\r\\n本文只覆盖“最短上手路径”，帮助你确认 `rdx-tools` 的入口可用，并把一份 `.rdc` 变成可操作的 session。更完整的状态模型见 [session-model.md](session-model.md)。\\r\\n\\r\\n仓库默认公开的能力面聚焦于 `.rdc` 离线 replay / 调试 / 导出，不包含 app-side integration 控制链路。\\r\\n\\r\\n## 1. 先验证入口\\r\\n\\r\\n在仓库根目录执行：\\r\\n\\r\\n```bat\\r\\nrdx.bat --non-interactive cli --help\\r\\nrdx.bat --non-interactive mcp --ensure-env\\r\\npython spec/validate_catalog.py\\r\\n```\\r\\n\\r\\n默认用户路径只验证 `rdx.bat`。直接 `python ...` 入口仅保留给维护者回归与排障。\\r\\n\\r\\n如果以上命令都可运行，再继续下面的 `CLI` 或 `MCP` 路径。\\r\\n\\r\\n## 2. local-first 使用 `CLI`\\r\\n\\r\\n可直接访问本地环境时，最方便的入口是：\\r\\n\\r\\n```bat\\r\\nrdx.bat\\r\\n```\\r\\n\\r\\n主菜单为：\\r\\n\\r\\n```text\\r\\n1. Start CLI\\r\\n2. Start MCP\\r\\n3. Help\\r\\n0. Exit\\r\\n```\\r\\n\\r\\n选择 `1. Start CLI` 后，launcher 会让你选择 `default` 或自定义 context，然后打开一个持续可用的 `CLI` shell。\\r\\n\\r\\n### 最小链路\\r\\n\\r\\n在 `CLI` shell 中执行：\\r\\n\\r\\n```bat\\r\\nrdx capture open --file \\\"C:\\\\path\\\\capture.rdc\\\" --frame-index 0 --preview\\r…",
+                  "startedAt": 1779560206481,
+                  "completedAt": 1779560206981
+                },
+                {
+                  "id": "call_8CJQVCOMa9ymQyt4tg2z4mdH__vscode-1779560125621",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\tools\\\\docs\\\\android-remote-cli-smoke-prompt.md\",\n  \"startLine\": 1,\n  \"endLine\": 220\n}",
+                  "resultPreview": "[\n  \"# 桌面与 Android 通用的分层 Smoke / Contract 测试 Prompt\\r\\n\\r\\n本文提供一份可直接复用的执行模板，用于让人工或 Agent 对 `rdx-tools` 做桌面 local 与 Android remote 的分层 smoke / contract 测试，并在每次执行后产出可直接指导后续修复的书面问题报告。\\r\\n\\r\\n注意：\\r\\n\\r\\n- 本文不是规范源，也不替代 `spec/tool_catalog.json`、共享契约或 runtime 实际行为。\\r\\n- 本文是“测试执行模板”，不是“平台定义文档”。若 prompt 与平台真实行为冲突，应以 catalog / contract / runtime 为准。\\r\\n- 若当前任务是开发 Agent 完成开发后的自测，应先回看这些第一性文档，再执行本模板：\\r\\n  - [`../README.md`](../README.md)\\r\\n  - [`session-model.md`](session-model.md)\\r\\n  - [`agent-model.md`](agent-model.md)\\r\\n  - [`troubleshooting.md`](troubleshooting.md)\\r\\n  - [`doc-governance.md`](doc-governance.md)\\r\\n\\r\\n## 适用场景\\r\\n\\r\\n- 验证 `rdx-tools` 在桌面环境与 Android remote 环境下的真实可用性。\\r\\n- 分层判断 local session、remote session、`CLI`、`MCP`、daemon 与 catalog 当前全量 `rd.*` tools 的 contract 表现。\\r\\n- 每次测试后留下“问题报告 + 证据 + 分层归因 + 后续修复建议”，方便下一个 Agent 接力修复与复测。\\r\\n\\r\\n## 使用原则\\r\\n\\r\\n- 不要一上来只跑大脚本；应先做最短链路，再做代表性链路…",
+                  "startedAt": 1779560206481,
+                  "completedAt": 1779560206981
+                },
+                {
+                  "id": "call_kscKVnldyr1lwBbfdjNrfAs0__vscode-1779560125622",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\tools\\\\docs\\\\compatibility-notes.md\",\n  \"startLine\": 1,\n  \"endLine\": 220\n}",
+                  "resultPreview": "[\n  \"# 兼容性说明\\r\\n\\r\\n本文说明 `rdx-tools` 当前公开发布时的兼容边界与推荐使用方式。\\r\\n\\r\\n## 运行时兼容边界\\r\\n\\r\\n- 当前主支持运行时：`Windows`\\r\\n- 当前主入口：\\r\\n  - `rdx.bat`\\r\\n  - `rdx.bat --non-interactive ...`\\r\\n- `cli/run_cli.py` 与 `mcp/run_mcp.py` 继续保留给源码维护与调试，不再是终端用户主入口。\\r\\n- `CLI` 与 `MCP` 都是 daemon-backed adapter；当前不再公开 direct runtime 执行模式。\\r\\n- `spec/tool_catalog.json` 当前公开的规范 `rd.*` tools 数量以 `tool_count` 字段为准。\\r\\n- `rd.vfs.*` 当前属于 read-only、JSON-first 导航层；它适合探索与浏览结构，不保证覆盖全部精细控制语义；需要精确分析时应回到 canonical `rd.*`。\\r\\n- `tabular/tsv projection` 只覆盖声明支持的摘要场景；它是表格化展示投影，用于提升扫描效率，不表示语义重要度排序。\\r\\n- daemon 停止后会保留本地 `.rdc` 的持久化恢复索引；remote session 仍需要显式重建。\\r\\n\\r\\n## 分发与安装定位\\r\\n\\r\\n- 当前首发定位不是“包管理器优先”的跨平台产品。\\r\\n- `pyproject.toml` 的目标是：\\r\\n  - 统一依赖\\r\\n  - 统一本地开发环境\\r\\n  - 统一 pytest 配置\\r\\n- 当前官方使用方式仍是：\\r\\n  - 直接在仓库根运行\\r\\n  - 或显式设置 `RDX_TOOLS_ROOT`\\r\\n\\r\\n## 与上层宿主 / framework 的边界\\r\\n\\r\\n- `rdx-tools` 只提供平台真相，不承诺上层 framework 自动装配。\\r\\n- 如果…",
+                  "startedAt": 1779560206482,
+                  "completedAt": 1779560206982
+                },
+                {
+                  "id": "call_Spxqj3NB4TLcs4oQuvlpUE7V__vscode-1779560125623",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\common\\\\knowledge\\\\library\\\\sops\\\\sop_catalog.yaml\",\n  \"startLine\": 780,\n  \"endLine\": 850\n}",
+                  "resultPreview": "[\n  \"        - type: performance_improvement_data\\r\\n          description: \\\"优化前后帧时间对比数据\\\"\\r\\n\\r\\n    fix_template:\\r\\n      language: pseudocode\\r\\n      patterns:\\r\\n        Batch_Resource_Barriers: |\\r\\n          // 将多个分散的 Resource Barrier 合并为批量提交\\r\\n          // 修复前（逐个提交）：\\r\\n          // cmdList.ResourceBarrier(1, &barrier1);\\r\\n          // cmdList.ResourceBarrier(1, &barrier2);\\r\\n          // 修复后（批量提交）：\\r\\n          // D3D12_RESOURCE_BARRIER barriers[] = {barrier1, barrier2};\\r\\n          // cmdList.ResourceBarrier(2, barriers);\\r\\n\\r\\n    counterfactual_spec:\\r\\n      method: \\\"应用优化后重新捕获帧，对比帧时间\\\"\\r\\n      success_criterion: \\\"目标帧时间降低至预期范围内，Validation Layer 无新增报错\\\"\\r\\n\\r\\n    linked_bugcards: []\\r\\n\\r\\n# ─────────────────────────────────────\\r\\n# SOP-REMOTE-01: Remote Replay Readback 不可用\\r\\n# ─────────────────────────────────────\\r\\n  - id: SOP-REMOTE-01\\r\\n    name: Remote Rep…",
+                  "startedAt": 1779560206482,
+                  "completedAt": 1779560206982
+                },
+                {
+                  "id": "call_XRJMimbfR2JWaG724yik5p4J__vscode-1779560125624",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\common\\\\knowledge\\\\library\\\\invariants\\\\invariant_catalog.yaml\",\n  \"startLine\": 170,\n  \"endLine\": 280\n}",
+                  "resultPreview": "[\n  \"      - rd.mesh.get_post_vs_data\\r\\n    example_cards: []\\r\\n    detection_hints:\\r\\n      - \\\"对比 FrontCounterClockwise 设置与资产的实际环绕顺序\\\"\\r\\n      - \\\"用 rd.mesh.get_post_vs_data 查看顶点和索引数据，手动验证面法线方向\\\"\\r\\n\\r\\n  - id: I-GEO-03\\r\\n    name: 顶点索引约束\\r\\n    category: Geometric\\r\\n    severity: MEDIUM\\r\\n    definition: \\\"索引值必须在顶点缓冲的有效范围内，越界索引会导致未定义行为。\\\"\\r\\n    symptom_tags:\\r\\n      - object_missing\\r\\n      - flickering\\r\\n    trigger_tags: []\\r\\n    typical_root_causes:\\r\\n      - \\\"索引缓冲越界 — 索引值 >= 顶点数\\\"\\r\\n      - \\\"顶点数量与索引不匹配 — LOD 切换时未更新索引缓冲\\\"\\r\\n      - \\\"索引类型错误 — 16bit 索引溢出，应换用 32bit\\\"\\r\\n    fix_patterns:\\r\\n      - 索引范围验证\\r\\n      - 索引类型升级\\r\\n    linked_sop: SOP-GEO-01\\r\\n    secondary_sops: []\\r\\n    detection_tools:\\r\\n      - rd.resource.get_details\\r\\n      - rd.buffer.get_data\\r\\n    example_cards: []\\r\\n    detection_hints:\\r\\n      - \\\"用 rd.resource.get_details 获取 IndexBuffer…",
+                  "startedAt": 1779560206482,
+                  "completedAt": 1779560206982
+                },
+                {
+                  "id": "call_GbZsoGv1QYxYA9ErS8bt82L1__vscode-1779560125625",
+                  "toolName": "grep_search",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"query\": \"I-LIGHT|光照|light|IBL|reflection|specular|SOP-LIGHT\",\n  \"isRegexp\": true,\n  \"includePattern\": \"common/knowledge/library/**\",\n  \"maxResults\": 80\n}",
+                  "resultPreview": "[\n  \"55 matches\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\library\\\\\\\\sops\\\\\\\\sop_catalog.yaml\\\" line=177>\\n          float diffuse = max(0.0f, dot(normal, lightDir));\\r\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\library\\\\\\\\sops\\\\\\\\sop_catalog.yaml\\\" line=193>\\n    target_invariants: [I-COLOR-01, I-COLOR-02, I-LIGHT-02]\\r\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\library\\\\\\\\sops\\\\\\\\sop_catalog.yaml\\\" line=279>\\n              float3 linearColor = ComputeLighting(input);\\r\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\library\\\\\\\\sops\\\\\\\\sop_catalog.yaml\\\" line=288>\\n              float3 linearColor = ComputeLighting(input);\\r\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\librar…",
+                  "startedAt": 1779560210389,
+                  "completedAt": 1779560210889
+                },
+                {
+                  "id": "call_uBqnlqmwo5rnZurKyGhRBw8P__vscode-1779560125626",
+                  "toolName": "grep_search",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"query\": \"trigger_tags|Android_OS|Adreno_GPU|Vulkan|mobile|desktop_local|local\",\n  \"isRegexp\": true,\n  \"includePattern\": \"common/knowledge/taxonomy.yaml\",\n  \"maxResults\": 80\n}",
+                  "resultPreview": "[\n  \"12 matches\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\taxonomy.yaml\\\" line=191>\\n- tag: local_light_unpack\\r\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\taxonomy.yaml\\\" line=394>\\n- tag: Adreno_GPU\\r\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\taxonomy.yaml\\\" line=432>\\n    note: Metal 的 sRGB RT 处理与 Vulkan/D3D12 行为存在细微差异\\r\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\taxonomy.yaml\\\" line=567>\\n- tag: Vulkan\\r\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\taxonomy.yaml\\\" line=568>\\n  label: Vulkan\\r\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\knowledge\\\\\\\\taxonomy.yaml\\\" line=569>\\n  description: Khronos Vulkan 图形/计算 API\\r\\n</match>\\n<match p…",
+                  "startedAt": 1779560210389,
+                  "completedAt": 1779560210889
+                },
+                {
+                  "id": "call_hOJX32dlK2v1jmw3fWVZEnaZ__vscode-1779560125627",
+                  "toolName": "file_search",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"query\": \"common/knowledge/library/bugcards/**\",\n  \"maxResults\": 50\n}",
+                  "resultPreview": "[\n  \"No files found\"\n]",
+                  "startedAt": 1779560210389,
+                  "completedAt": 1779560210889
+                },
+                {
+                  "id": "call_BLVldblMAJX6xyBspI0cRyZN__vscode-1779560125628",
+                  "toolName": "file_search",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"query\": \".github/skills/rdc-execute/SKILL.md\",\n  \"maxResults\": 10\n}",
+                  "resultPreview": "[\n  \"1 total result\\nd:\\\\Utility\\\\DebugTest\\\\copilot\\\\.github\\\\skills\\\\rdc-execute\\\\SKILL.md\"\n]",
+                  "startedAt": 1779560210389,
+                  "completedAt": 1779560210889
+                }
+              ],
+              "startedAt": 1779560187547,
+              "completedAt": 1779560210889
+            }
+          ],
+          "updatedAt": 1779560214901
+        },
+        "attachments": [],
+        "createdAt": 1779560214901,
+        "updatedAt": 1779560214901
+      },
+      {
+        "id": "title-logs-assistant-4",
+        "turnId": "browser-preview-title-logs-turn",
+        "sessionId": "browser-preview-session-1",
+        "projectId": "browser-preview-project",
+        "runId": "browser-preview-run-1",
+        "modeContext": "debugger",
+        "role": "assistant",
+        "agentId": "rdc-debugger",
+        "content": "两个 helper brief 收敛后，当前不是输入不足型问题：capture 文件可见、local replay 可规划、没有 Android 设备 gate，缺少严格 reference 和精确像素坐标也可以用 predicate baseline 处理。接下来我会把完整 action_plan 写入 session plan 记忆，作为后续 `rdc-execute` handoff 的合同。",
+        "status": "complete",
+        "reasoningTrace": {
+          "status": "complete",
+          "summary": "read_file, read_file, read_file, read_file, read_file, runSubagent, read_file, file_search, grep_search, runSubagent",
+          "steps": [
+            {
+              "id": "title-logs-step-4",
+              "title": "已执行 10 个上下文检查",
+              "stage": "plan-intake",
+              "status": "complete",
+              "summary": "read_file, read_file, read_file, read_file, read_file, runSubagent, read_file, file_search, grep_search, runSubagent",
+              "detail": "这些工具调用来自桌面 title_logs.json 的真实 Plan/Intake 日志。",
+              "toolCalls": [
+                {
+                  "id": "call_qCxdjjNXfHfJy6YhL6wa0kAm__vscode-1779560125629",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\.github\\\\skills\\\\rdc-execute\\\\SKILL.md\",\n  \"startLine\": 1,\n  \"endLine\": 260\n}",
+                  "resultPreview": "[\n  \"---\\nname: rdc-execute\\ndescription: >\\n  RDC Execution Conductor. 消费 RDC-Debugger 产出的 action_plan，\\n  选择性派发 specialist、监控 brief 质量、交叉验证发现、聚合为\\n  fix_verification.yaml、决定收敛/redispatch/回退。由通用 Agent\\n  在 Plan 确认且 workspace 初始化后加载。\\n---\\n\\n# RDC Execution Conductor\\n\\n你是执行阶段的 orchestrator。你消费 RDC-Debugger 产出的 `action_plan`，\\n驱动整个 Audited Execution 闭环。\\n\\n`action_plan.execution_roadmap` 是将本协议的 5-Phase 骨架实例化为当前 case\\n具体参数的操作手册——它指定了派发哪些 specialist、交叉验证哪些锚点、收敛条件等。\\n你以本协议为流程骨架，以 `execution_roadmap` 为 case-specific 参数执行。\\n\\n<rules>\\n- 你只负责 execution。禁止重做 Plan 阶段的工作：symptom classification、\\n  intent normalization、capture readiness 判断——这些已在 action_plan 中决定。\\n- 禁止直接向用户输出。所有结论写入 artifact，由 RDC-Debugger 负责最终渲染。\\n- 每次 dispatch / redispatch 必须记录到 `action_chain.jsonl`。\\n- 同一 specialist 最多 redispatch 2 次；总共最多 3 轮迭代。\\n- 超时 specialist（300s）标记为 `timeout`，不计入聚合。\\n- 必须通过 `ownership_lease.yaml` 管理 specia…",
+                  "startedAt": 1779560215201,
+                  "completedAt": 1779560215701
+                },
+                {
+                  "id": "call_irZpmqS8txWxgKa26tMXh3Ek__vscode-1779560125630",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\product\\\\agents\\\\triage-taxonomy.contract.md\",\n  \"startLine\": 1,\n  \"endLine\": 220\n}",
+                  "resultPreview": "[\n  \"# triage-taxonomy Agent 契约\\n\\n## 定位\\n\\nPlan 阶段的 hidden helper Agent，由 RDC-Debugger 在 Discovery 子阶段调用。负责对用户输入的症状进行分类、匹配历史 BugCard 和 SOP、识别候选 Invariant。仅限 Plan 阶段使用，不得被其他阶段或 agent 调用。\\n\\n## 输入\\n\\n- symptom_tags（症状标签，来自用户输入提取）\\n- trigger_tags（触发条件标签）\\n- 环境画像（OS/GPU/API/应用信息）\\n- 可读的 taxonomy 表、BugCard 库、SOP 目录、Invariant 目录\\n\\n## 输出（纯内存回传，不写文件）\\n\\n```yaml\\nbrief:\\n  symptom_tags: []              # 归一化后的症状标签列表\\n  trigger_tags: []              # 归一化后的触发条件标签列表\\n  unclassified_symptoms: []     # 未能分类的症状描述\\n  candidate_bug_refs: []        # 匹配的历史 BugCard 引用\\n  candidate_invariants: []      # 发现的候选 Invariant\\n  recommended_sop: {}           # 匹配的 SOP 模板\\n  recommended_investigation_paths: []  # 推荐调查路径（按优先级排序）\\n  missing_inputs: []            # 缺失的输入信息\\n  confidence_notes: \\\"\\\"          # 匹配置信度和注意事项\\n```\\n\\n## 约束\\n\\n- 禁止输出 action_plan\\n- 禁止写任何 run 级 artifact（文件）\\n- 禁止直接面对用户输出最终结论\\n- 禁止进入 speci…",
+                  "startedAt": 1779560215202,
+                  "completedAt": 1779560215702
+                },
+                {
+                  "id": "call_njN3yuTCM8u0XmVmfGmAgUqW__vscode-1779560125631",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\product\\\\agents\\\\capture-repro.contract.md\",\n  \"startLine\": 1,\n  \"endLine\": 220\n}",
+                  "resultPreview": "[\n  \"# capture-repro Agent 契约\\n\\n## 定位\\n\\nPlan 阶段的 hidden helper Agent，由 RDC-Debugger 在 Discovery 子阶段调用。负责 capture 和 reference 文件的清点、可访问性检查、角色归类和重放准备状态评估。仅限 Plan 阶段使用，不得被其他阶段或 agent 调用。\\n\\n## 输入\\n\\n- capture 文件路径（.rdc 文件）\\n- reference 文件路径（基线和修复验证参考文件，如 golden frame 截图、reference capture 等）\\n- workspace-layout 文档（描述工作区目录结构的文档）\\n\\n## 输出（纯内存回传，不写文件）\\n\\n```yaml\\nbrief:\\n  captures:                     # capture 文件清单与角色\\n    - file, role, size, format_version\\n  references:                   # 参考基线清单\\n    - file, role, alignment_status\\n  capture_roles:                # 角色归一化结果\\n    anomalous: []               # 异常 capture 列表\\n    baseline: []                # 基线 capture 列表\\n    fixed: []                   # 修复验证 capture 列表\\n  capture_accessibility:        # 可访问性检查\\n    - file, accessible, issues\\n  replay_readiness:             # 重放准备状态\\n    status: ready | needs_input | blocked\\n    detail…",
+                  "startedAt": 1779560215202,
+                  "completedAt": 1779560215702
+                },
+                {
+                  "id": "call_r4DNoBgLjVmBpHEKDl28vrvu__vscode-1779560125632",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\common\\\\knowledge\\\\library\\\\invariants\\\\invariant_catalog.yaml\",\n  \"startLine\": 470,\n  \"endLine\": 670\n}",
+                  "resultPreview": "[\n  \"      - rd.shader.get_source\\r\\n    example_cards: []\\r\\n    detection_hints:\\r\\n      - \\\"用 rd.shader.get_source 检查所有 return 语句和 discard 语句前的赋值情况\\\"\\r\\n      - \\\"用 rd.shader.debug_start 单步执行，观察输出寄存器的值何时被首次赋值\\\"\\r\\n\\r\\n  - id: I-SHADING-NONNEG-01\\r\\n    name: 着色值非负\\r\\n    category: Shader\\r\\n    severity: MEDIUM\\r\\n    definition: \\\"光照计算结果（尤其是漫反射分量）必须为非负值，负值光照会导致异常暗斑或颜色失真。\\\"\\r\\n    symptom_tags:\\r\\n      - color_too_dark\\r\\n      - black_pixel\\r\\n    trigger_tags: []\\r\\n    typical_root_causes:\\r\\n      - \\\"NdotL 未做 max(0, x) 保护 — 背光面计算出负值漫反射\\\"\\r\\n      - \\\"环境光遮蔽值为负 — AO 贴图解码错误\\\"\\r\\n    fix_patterns:\\r\\n      - max_0_NdotL\\r\\n      - saturate\\r\\n    linked_sop: SOP-NAN-01\\r\\n    secondary_sops: []\\r\\n    detection_tools:\\r\\n      - rd.shader.debug_start\\r\\n      - rd.debug.pixel_history\\r\\n    example_cards: []\\r\\n    detection_hints:\\r\\n      - \\\"用 rd.shader.debug_start 检查光照计算中 Ndot…",
+                  "startedAt": 1779560215202,
+                  "completedAt": 1779560215702
+                },
+                {
+                  "id": "call_V7llri7SmP740c19GVDa4zdW__vscode-1779560125633",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"d:\\\\Utility\\\\DebugTest\\\\copilot\\\\common\\\\knowledge\\\\taxonomy.yaml\",\n  \"startLine\": 360,\n  \"endLine\": 590\n}",
+                  "resultPreview": "[\n  \"  - I-SHADER-02\\r\\n  - I-GEO-03\\r\\n  priority_order: 1\\r\\n  examples:\\r\\n  - 特定角度下模型某个区域随机闪烁\\r\\n  - 相机移动时出现周期性闪烁\\r\\n- tag: stall\\r\\n  label: 渲染卡顿/Stall\\r\\n  description: GPU 管线发生停顿，导致帧时间异常升高\\r\\n  category: performance\\r\\n  likely_invariants:\\r\\n  - I-PERF-01\\r\\n  priority_order: 1\\r\\n  examples:\\r\\n  - 某帧的 GPU 时间突然从 8ms 升至 40ms\\r\\n- tag: fps_drop\\r\\n  label: 帧率骤降\\r\\n  description: 帧率突然明显下降\\r\\n  category: performance\\r\\n  likely_invariants:\\r\\n  - I-PERF-01\\r\\n  priority_order: 1\\r\\n  examples:\\r\\n  - 进入特定场景后帧率从 60 降至 20\\r\\n- tag: pipeline_error\\r\\n  label: 管线错误\\r\\n  description: 渲染管线状态错误导致的各类异常\\r\\n  category: performance\\r\\n  likely_invariants:\\r\\n  - I-PERF-01\\r\\n  priority_order: 2\\r\\n  examples:\\r\\n  - Resource Barrier 缺失导致 Validation Layer 报错\\r\\ntriggers:\\r\\n- tag: Adreno_GPU\\r\\n  label: 高通 Adreno GPU\\r\\n  description: 高通骁龙系列 SoC 内置 GPU，广泛用于 Android 旗舰机型\\r\\n  category: hardware…",
+                  "startedAt": 1779560215203,
+                  "completedAt": 1779560215703
+                },
+                {
+                  "id": "call_oHRdp5QYhBVIzqQwldMlLldV__vscode-1779560125634",
+                  "toolName": "runSubagent",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"agentName\": \"triage-taxonomy\",\n  \"description\": \"Classify RDC symptom\",\n  \"prompt\": \"Plan/Intake helper brief only. Do not write files, do not produce an action_plan, do not invoke execution/specialists, and do not address the user directly.\\n\\nUser request summary:\\n- Current date: 2026-05-24.\\n- Workspace: d:\\\\Utility\\\\DebugTest\\\\copilot, .github-first RDC-Debugger control plane.\\n- Capture path: D:\\\\Utility\\\\Test RDC Files\\\\眼睛泪腺白点.rdc\\n- Requested runtime: local mode on this Windows host.\\n- Known key event: Event ID 6152.\\n- Target draw call: lacrimal gland / eye tear duct related draw call.\\n- Symptom: real device shows an unwanted white bright spot/highlight artifact in lacrimal gland area; looks li…",
+                  "resultPreview": "[\n  \"brief:\\n  symptom_tags:\\n    - white_spot\\n    - white_pixel\\n    - color_too_bright\\n    - pixel_overflow\\n    - local_light_unpack\\n    - artifact\\n  trigger_tags:\\n    - Windows_local_replay_requested\\n    - target_event_6152\\n    - target_draw_lacrimal_gland_eye_tear_duct\\n  unclassified_symptoms:\\n    - \\\"lacrimal gland / eye tear duct localized bright highlight artifact\\\"\\n    - \\\"suspected excessive IBL or reflection/specular data leakage\\\"\\n    - \\\"expected smooth soft eye shading without isolated white highlight pixels\\\"\\n    - \\\"repaired right-side reference is available/desired for multimodal comparison, but not represented as a taxonomy tag\\\"\\n  candidate_bug_refs:\\n    - id: BUG-PREC-001\\n      source: \\\"common/library/bugcards/bugcard_BUG-PREC-001.yaml\\\"\\n      match_reason: \\\"Historical verified white/washout case caused by local light unpack half/RelaxedPrecision pr…",
+                  "startedAt": 1779560278849,
+                  "completedAt": 1779560279349
+                },
+                {
+                  "id": "call_yzS1SiRrcspLw3TJ14p5gDuQ__vscode-1779560125649",
+                  "toolName": "read_file",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"filePath\": \"c:\\\\Users\\\\a1824\\\\AppData\\\\Roaming\\\\Code\\\\User\\\\workspaceStorage\\\\bbdf3ddc8da2c2826d5ce5bb7e543db1\\\\GitHub.copilot-chat\\\\chat-session-resources\\\\c18d90c8-cb4f-42d7-86e8-f3f4a4d3df84\\\\call_oHRdp5QYhBVIzqQwldMlLldV__vscode-1779560125634\\\\content.txt\",\n  \"startLine\": 1,\n  \"endLine\": 260\n}",
+                  "resultPreview": "[\n  \"brief:\\n  symptom_tags:\\n    - white_spot\\n    - white_pixel\\n    - color_too_bright\\n    - pixel_overflow\\n    - local_light_unpack\\n    - artifact\\n  trigger_tags:\\n    - Windows_local_replay_requested\\n    - target_event_6152\\n    - target_draw_lacrimal_gland_eye_tear_duct\\n  unclassified_symptoms:\\n    - \\\"lacrimal gland / eye tear duct localized bright highlight artifact\\\"\\n    - \\\"suspected excessive IBL or reflection/specular data leakage\\\"\\n    - \\\"expected smooth soft eye shading without isolated white highlight pixels\\\"\\n    - \\\"repaired right-side reference is available/desired for multimodal comparison, but not represented as a taxonomy tag\\\"\\n  candidate_bug_refs:\\n    - id: BUG-PREC-001\\n      source: \\\"common/library/bugcards/bugcard_BUG-PREC-001.yaml\\\"\\n      match_reason: \\\"Historical verified white/washout case caused by local light unpack half/RelaxedPrecision pr…",
+                  "startedAt": 1779560282706,
+                  "completedAt": 1779560283206
+                },
+                {
+                  "id": "call_ZTVU8f9RidzfwKMsIXdiTfLh__vscode-1779560125650",
+                  "toolName": "file_search",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"query\": \"common/library/bugcards/**\",\n  \"maxResults\": 20\n}",
+                  "resultPreview": "[\n  \"4 total results\\nd:\\\\Utility\\\\DebugTest\\\\copilot\\\\common\\\\library\\\\bugcards\\\\README.md\\nd:\\\\Utility\\\\DebugTest\\\\copilot\\\\common\\\\library\\\\bugcards\\\\bugcard_BUG-PREC-002.yaml\\nd:\\\\Utility\\\\DebugTest\\\\copilot\\\\common\\\\library\\\\bugcards\\\\bugcard_BUG-PREC-001.yaml\\nd:\\\\Utility\\\\DebugTest\\\\copilot\\\\common\\\\library\\\\bugcards\\\\BUGCARD-HAIRSPARK-2026-001.yaml\"\n]",
+                  "startedAt": 1779560287893,
+                  "completedAt": 1779560288393
+                },
+                {
+                  "id": "call_jAbNuqTSNLCpnhcciBQqpNLT__vscode-1779560125651",
+                  "toolName": "grep_search",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"query\": \"BUG-PREC-001|BUGCARD-HAIRSPARK|white_spot|RelaxedPrecision|Adreno\",\n  \"isRegexp\": true,\n  \"includePattern\": \"common/library/bugcards/**\",\n  \"maxResults\": 80\n}",
+                  "resultPreview": "[\n  \"41 matches\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\library\\\\\\\\bugcards\\\\\\\\bugcard_BUG-PREC-001.yaml\\\" line=1>\\n# BugCard (sample) — BUG-PREC-001\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\library\\\\\\\\bugcards\\\\\\\\bugcard_BUG-PREC-001.yaml\\\" line=3>\\nbugcard_id: BUG-PREC-001\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\library\\\\\\\\bugcards\\\\\\\\bugcard_BUG-PREC-001.yaml\\\" line=4>\\ntitle: \\\"Adreno 650：Local Light 解包链路 half/RelaxedPrecision 导致头发/衣物白化\\\"\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\library\\\\\\\\bugcards\\\\\\\\bugcard_BUG-PREC-001.yaml\\\" line=4>\\ntitle: \\\"Adreno 650：Local Light 解包链路 half/RelaxedPrecision 导致头发/衣物白化\\\"\\n</match>\\n<match path=\\\"d:\\\\\\\\Utility\\\\\\\\DebugTest\\\\\\\\copilot\\\\\\\\common\\\\\\\\library\\\\\\\\bugcards\\\\\\\\bugcard_BUG-PREC-001.yaml\\\" line=7>\\ntrigger_tags…",
+                  "startedAt": 1779560287893,
+                  "completedAt": 1779560288393
+                },
+                {
+                  "id": "call_iVyj2Cg9AJ0fddqFy3ojVagM__vscode-1779560125652",
+                  "toolName": "runSubagent",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"agentName\": \"capture-repro\",\n  \"description\": \"Audit capture readiness\",\n  \"prompt\": \"Plan/Intake helper brief only. Do not write files, do not produce an action_plan, do not invoke execution/specialists, and do not address the user directly.\\n\\nUser request summary:\\n- Current date: 2026-05-24.\\n- Workspace root: d:\\\\Utility\\\\DebugTest\\\\copilot\\n- Requested mode: local mode on Windows host, not Android remote.\\n- Capture path: D:\\\\Utility\\\\Test RDC Files\\\\眼睛泪腺白点.rdc\\n- Directory listing confirms D:\\\\Utility\\\\Test RDC Files contains 眼睛泪腺白点.rdc along with other .rdc samples.\\n- Known key event: Event ID 6152.\\n- Target draw call: lacrimal gland / eye tear duct render draw call.\\n- Symptom and acceptance: i…",
+                  "resultPreview": "[\n  \"brief:\\n  captures:\\n    - file: \\\"D:\\\\\\\\Utility\\\\\\\\Test RDC Files\\\\\\\\眼睛泪腺白点.rdc\\\"\\n      role: anomalous\\n      accessibility: accessible\\n      notes: \\\"Local Windows capture path present in directory listing; known key event is Event ID 6152 targeting lacrimal gland / eye tear duct draw call.\\\"\\n  references: []\\n  capture_roles:\\n    anomalous:\\n      - \\\"D:\\\\\\\\Utility\\\\\\\\Test RDC Files\\\\\\\\眼睛泪腺白点.rdc\\\"\\n    baseline: []\\n    fixed: []\\n  capture_accessibility:\\n    - file: \\\"D:\\\\\\\\Utility\\\\\\\\Test RDC Files\\\\\\\\眼睛泪腺白点.rdc\\\"\\n      accessible: true\\n      issues: []\\n  replay_readiness:\\n    status: ready\\n    details: \\\"Ready for local Windows rdx handoff using standard local replay/open flow. No Android remote prerequisites or device discovery apply. If standard local open/replay is blocked by rdc-debugger/rdx-tool, that should be treated as a direct blocker rather than bypassed…",
+                  "startedAt": 1779560321239,
+                  "completedAt": 1779560321739
+                }
+              ],
+              "startedAt": 1779560215201,
+              "completedAt": 1779560321739
+            }
+          ],
+          "updatedAt": 1779560382513
+        },
+        "attachments": [],
+        "createdAt": 1779560382513,
+        "updatedAt": 1779560382513
+      },
+      {
+        "id": "title-logs-assistant-5",
+        "turnId": "browser-preview-title-logs-turn",
+        "sessionId": "browser-preview-session-1",
+        "projectId": "browser-preview-project",
+        "runId": "browser-preview-run-1",
+        "modeContext": "debugger",
+        "role": "assistant",
+        "agentId": "rdc-debugger",
+        "content": "已完成 RDC-Debugger 的 Plan/Intake 收敛，并把完整 `action_plan` 同步到 session plan：`/memories/session/plan.md`。\n\n结论：当前可以进入 audited execution，但 RDC-Debugger 入口本身按工作区协议不能直接跑 CLI/replay；它只能产出执行合同并等待 `Start Implementation` handoff 给 `rdc-execute`。本轮没有发现前置 blocker：capture 文件在 `D:\\Utility\\Test RDC Files\\眼睛泪腺白点.rdc` 可见，local backend 可规划，Event ID 6152 足够作为首个锚点。缺少严格 reference 图和精确 ROI 坐标不阻断，会采用 `predicate_only` baseline。\n\n```yaml\nresolution_mode: audited_execution\nexecution_readiness: ready\nexecution_driver: rdc-execute\nruntime_init_mode: managed\nbackend: local\ncapture: \"D:\\\\Utility\\\\Test RDC Files\\\\眼睛泪腺白点.rdc\"\ntarget_event_id: 6152\ndevice_discovery_policy: not_applicable\nreference_alignment_status: predicate_ready\nbaseline_policy: predicate_only\nblockers: []\n```\n\n执行路线已经排好：\n\n1. 先用 local rdx 标准流程打开 capture，跳到/解析 Event 6152。\n2. 由 `pass-graph-pipeline` 和 `pixel-value-forensics` 建立 causal anchor：确认 Event 6152 是否就是 first bad draw，定位泪腺白点像素和 pre/post RT 值。\n3. 由 `shader-ir` 提取 PS shader、uniform/constant buffer、IBL/specular/roughness/normal/reflection/BRDF LUT 等输入，检查 NaN/Inf、过大 specular/IBL、light unpack、gamma/tone-map/range 问题。\n4. 检查 framebuffer、MRT、blend、depth/stencil、RT 格式和后续 composition/tone-map pass，排除异常叠加或写错目标。\n5. 若标准 rdx shader/state replacement 支持，再做最小 counterfactual replay/export；若 rdc-debugger/rdx-tool 标准路径本身出 bug，按你的限制直接阻断并报告，不走绕路。\n\n验收 predicate 已写入 plan：泪腺 ROI 不应有离散白点、NaN/Inf 饱和白像素、局部过曝或漏光；修复后导出的结果应更接近你描述的右侧修复效果，shading 平缓自然。\n\n请回复 `Start Implementation`，我就把这份 action_plan 交给 `rdc-execute` 进入本机 local 分析执行闭环。",
+        "status": "complete",
+        "reasoningTrace": {
+          "status": "complete",
+          "summary": "memory",
+          "steps": [
+            {
+              "id": "title-logs-step-5",
+              "title": "已执行 1 个上下文检查",
+              "stage": "plan-intake",
+              "status": "complete",
+              "summary": "memory",
+              "detail": "这些工具调用来自桌面 title_logs.json 的真实 Plan/Intake 日志。",
+              "toolCalls": [
+                {
+                  "id": "call_kWfXdeBNRTzPJMQiBlQwNnmh__vscode-1779560125658",
+                  "toolName": "memory",
+                  "status": "complete",
+                  "argsPreview": "{\n  \"command\": \"create\",\n  \"path\": \"/memories/session/plan.md\",\n  \"file_text\": \"# RDC-Debugger Action Plan\\n\\n```yaml\\naction_plan:\\n  plan_id: case-eye-lacrimal-white-spot-local-20260524\\n  intent_class: defect_debugging\\n  resolution_mode: audited_execution\\n  execution_readiness: ready\\n  execution_driver: rdc-execute\\n  runtime_init_mode: managed\\n\\n  confirmed_facts:\\n    - fact: User requests local-mode analysis on Windows host.\\n      source: user_request\\n    - fact: Capture path is D:\\\\\\\\Utility\\\\\\\\Test RDC Files\\\\\\\\眼睛泪腺白点.rdc.\\n      source: user_request\\n    - fact: Capture file is present in D:\\\\\\\\Utility\\\\\\\\Test RDC Files directory listing.\\n      source: plan_readiness_check\\n    - fact: Known ke…",
+                  "resultPreview": "[\n  \"File created successfully at: /memories/session/plan.md\"\n]",
+                  "startedAt": 1779560382705,
+                  "completedAt": 1779560383205
+                }
+              ],
+              "startedAt": 1779560382705,
+              "completedAt": 1779560383205
+            }
+          ],
+          "updatedAt": 1779560402591
+        },
+        "attachments": [],
+        "createdAt": 1779560402591,
+        "updatedAt": 1779560402591
+      }
+    ]
+  },
+  "attachments": {
+    "browser-preview-session-1": []
+  },
+  "outputs": {
+    "browser-preview-session-1": [
+      {
+        "id": "browser-preview-run-1:report:markdown",
+        "kind": "report",
+        "title": "report.md",
+        "fileName": "report.md",
+        "filePath": ".browser-preview/sessions/browser-preview-session-1/runs/browser-preview-run-1/reports/report.md",
+        "source": "run report",
+        "runId": "browser-preview-run-1",
+        "mimeType": "text/markdown",
+        "sizeBytes": 4096,
+        "createdAt": 1770000960000,
+        "updatedAt": 1770001020000
+      },
+      {
+        "id": "browser-preview-run-1:artifact:preview-frame",
+        "kind": "artifact",
+        "title": "preview-frame.png",
+        "fileName": "preview-frame.png",
+        "filePath": ".browser-preview/sessions/browser-preview-session-1/runs/browser-preview-run-1/artifacts/preview-frame.png",
+        "source": "artifact store",
+        "runId": "browser-preview-run-1",
+        "mimeType": "image/png",
+        "sizeBytes": 32768,
+        "createdAt": 1770000900000,
+        "updatedAt": 1770000900000
+      }
+    ]
+  },
+  "actionEvents": [],
+  "usage": {
+    "runId": "browser-preview-run-1",
+    "providerId": "browser-preview",
+    "modelId": "gpt-5.5",
+    "inputTokens": 508669,
+    "outputTokens": 9629,
+    "totalTokens": 518298,
+    "contextWindowTokens": 272000,
+    "usagePercent": 99,
+    "hasConfiguredContextWindow": true
+  }
+}

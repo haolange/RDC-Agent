@@ -2,6 +2,13 @@ import type { ConversationMessage } from '@shared/types/conversation';
 import type { AgentRole } from '@shared/types/agent';
 import type { AskUserAnswer, WorkflowStage } from '@shared/types/workflow';
 import type { DebugSessionStartRequest } from '@shared/types/session';
+import type {
+  WorkstreamExportOptions,
+  WorkstreamExportResult,
+  WorkstreamRevisionResult,
+  WorkstreamSessionResult,
+  WorkstreamBranchSwitchResult,
+} from '@shared/types/workstream';
 import { debugWorkflowService, type PlanResult, type StartWorkflowResult } from './DebugWorkflowService';
 import { isToolAllowedForAgent, resolveAgentToolAllowlist } from './DebuggerRuntimePolicy';
 
@@ -34,6 +41,22 @@ export class DebuggerRuntime {
 
   approvePlan(runId: string): Promise<PlanResult> {
     return debugWorkflowService.approvePlan(runId);
+  }
+
+  getWorkstreamSession(sessionId: string): Promise<WorkstreamSessionResult> {
+    return debugWorkflowService.getWorkstreamSession(sessionId);
+  }
+
+  requestPlanRevision(runId: string, revisionText: string): Promise<WorkstreamRevisionResult> {
+    return debugWorkflowService.requestPlanRevision(runId, revisionText);
+  }
+
+  switchWorkstreamBranch(sessionId: string, branchId: string): Promise<WorkstreamBranchSwitchResult> {
+    return debugWorkflowService.switchWorkstreamBranch(sessionId, branchId);
+  }
+
+  exportWorkstreamSession(sessionId: string, options?: WorkstreamExportOptions): Promise<WorkstreamExportResult> {
+    return debugWorkflowService.exportWorkstreamSession(sessionId, options);
   }
 
   restartRun(runId: string): Promise<PlanResult> {
