@@ -47,6 +47,15 @@
 - 修复结构问题时，不要顺手做与任务无关的视觉改版、布局重排或交互重定义。
 - 涉及 `src/renderer` 的改动，除检查类型和功能外，还要检查界面入口是否完整、关键面板是否可渲染、现有交互是否可达。
 
+## Browser Preview 边界
+
+- `Browser Preview` 是 renderer UI/UX 迭代入口，只验证普通浏览器中的 renderer 与 `BrowserElectronApiFallback` 行为，不代表真实 `Electron`、`preload`、`IPC`、`main process`、workspace、`ToolBridge` 或 `RenderDoc` 工具链。
+- 真实软件任务 session 只能来自完整 `Electron` 应用链路；`Browser Preview` 的伪 session / preview scenario 不得写入真实 workspace，也不得作为真实任务状态来源。
+- 涉及 UI/UX、布局、消息流、状态展示、样式、面板可达性的改动，可以优先使用 `npm run dev:renderer` 或 `scripts/start-rdc-agent-renderer.cmd` 加 Browser Use 验证。
+- 涉及 `src/main`、`src/preload`、`IPC`、workspace/session 持久化、真实 settings、`ToolBridge`、`RenderDoc` 工具链或窗口逻辑的改动，不能只用 `Browser Preview` 验收，必须执行对应类型检查、构建和必要的 `Electron E2E`。
+- Preview scenario 是可维护的 UI/UX 样本数据；新增或调整场景时命名要表达稳定职责，不要把临时调试数据、真实用户数据或含 secret 的内容放入 scenario。
+- `scripts/start-rdc-agent.cmd` 表示完整 `Electron` 开发应用入口；`scripts/start-rdc-agent-renderer.cmd` 表示 renderer-only 预览入口，两者不得互相替代。
+
 ## 产物与命名治理
 
 - 不要把构建输出、测试输出、日志、workspace 本地数据、缓存文件或临时调试文件提交到源码目录或根目录。
@@ -69,6 +78,7 @@
 - 开始实现前先写明本次验证方式；实现后按该方式验证并报告结果。无法运行的验证，必须说明原因和剩余风险。
 - 代码改动后执行一次 `npm run typecheck`。
 - 入口、构建或窗口逻辑改动后，再补一次 `npm run build` 或等价打包检查。
+- 仅验证 renderer UI/UX 时，可以使用 `npm run dev:renderer` 或 `scripts/start-rdc-agent-renderer.cmd` 打开 `http://127.0.0.1:5173/`；这只算 `Browser Preview` 验证，不等价于真实 `Electron E2E`。
 - 运行 Electron E2E 前必须先执行 `npm run build`，因为 `e2e/helpers/electron-app.ts` 启动的是 `out/main/index.js` 与 `out/renderer` 的构建产物；不要直接用旧的 `out/` 结果验证最新源码改动。
 - 涉及工作台交互、页面结构、样式引用或共享契约的改动后，至少补一次关键 E2E smoke 或等价人工回归，确认主界面、关键面板和主要交互未退化。
 - 仅文档改动时，检查术语、路径和描述是否与当前仓库结构一致。

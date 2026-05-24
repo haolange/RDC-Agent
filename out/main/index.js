@@ -7384,6 +7384,12 @@ class WorkflowProjectionPublisher {
   publishRunUsage(usage) {
     this.publish("workflow:runUsageChanged", usage);
   }
+  publishWorkstreamChanged(sessionId, presentation) {
+    this.publish("workflow:workstreamChanged", {
+      sessionId,
+      presentation
+    });
+  }
   publishEvidenceEvent(event) {
     this.publish("evidence:eventAdded", event);
   }
@@ -10525,6 +10531,1097 @@ class ContextService {
   }
 }
 const contextService = new ContextService();
+const STORE_FILE = "agent-workstream-state.json";
+const defaultState = (sessionId) => ({
+  schemaVersion: "1",
+  sessionId,
+  activeBranchId: "branch-main",
+  userRequests: [],
+  branches: [],
+  plans: [],
+  updatedAt: nowIso$1()
+});
+class WorkstreamStateStore {
+  read(sessionId) {
+    const filePath = this.resolvePath(sessionId);
+    if (!fs__namespace.existsSync(filePath)) {
+      return defaultState(sessionId);
+    }
+    try {
+      const parsed = JSON.parse(fs__namespace.readFileSync(filePath, "utf-8"));
+      return {
+        ...defaultState(sessionId),
+        ...parsed,
+        sessionId,
+        userRequests: parsed.userRequests ?? [],
+        branches: parsed.branches ?? [],
+        plans: parsed.plans ?? []
+      };
+    } catch (error) {
+      console.error(`[WorkstreamStateStore] Failed to read ${filePath}`, error);
+      return defaultState(sessionId);
+    }
+  }
+  write(state2) {
+    const filePath = this.resolvePath(state2.sessionId);
+    const nextState = {
+      ...state2,
+      updatedAt: nowIso$1()
+    };
+    fs__namespace.mkdirSync(path__namespace.dirname(filePath), { recursive: true });
+    fs__namespace.writeFileSync(filePath, JSON.stringify(nextState, null, 2), "utf-8");
+    return nextState;
+  }
+  ensureRunRequest(input) {
+    const state2 = this.read(input.sessionId);
+    if (state2.userRequests.some((request2) => request2.revisions.some((revision2) => revision2.resultingWorkstreamIds.includes(input.workstreamId)))) {
+      return state2;
+    }
+    const requestId = `request-${input.runId}`;
+    const revisionId = `revision-${input.runId}`;
+    const branchId = state2.activeBranchId || "branch-main";
+    const createdAt = nowIso$1();
+    const revision = {
+      id: revisionId,
+      requestId,
+      branchId,
+      prompt: input.prompt,
+      createdAt,
+      resultingWorkstreamIds: [input.workstreamId]
+    };
+    const request = {
+      id: requestId,
+      sessionId: input.sessionId,
+      rootRevisionId: revisionId,
+      activeRevisionId: revisionId,
+      revisions: [revision]
+    };
+    const branch = {
+      id: branchId,
+      revisionId,
+      status: "active",
+      workstreamIds: [input.workstreamId]
+    };
+    const group = {
+      id: `branch-group-${requestId}`,
+      rootRequestId: requestId,
+      activeBranchId: branchId,
+      branches: [branch]
+    };
+    return this.write({
+      ...state2,
+      activeBranchId: branchId,
+      userRequests: [...state2.userRequests, request],
+      branches: [...state2.branches, group],
+      plans: input.planId ? this.upsertPlan(state2.plans, {
+        planId: input.planId,
+        runId: input.runId,
+        workstreamId: input.workstreamId,
+        status: "awaiting_approval",
+        createdAt,
+        updatedAt: createdAt
+      }) : state2.plans,
+      latestDisplayedPlanId: input.planId ?? state2.latestDisplayedPlanId
+    });
+  }
+  markPlan(sessionId, planId, status) {
+    const state2 = this.read(sessionId);
+    const now = nowIso$1();
+    return this.write({
+      ...state2,
+      latestDisplayedPlanId: status === "awaiting_approval" ? planId : state2.latestDisplayedPlanId,
+      latestAcceptedPlanId: status === "accepted" ? planId : state2.latestAcceptedPlanId,
+      plans: state2.plans.map((plan) => plan.planId === planId ? { ...plan, status, updatedAt: now } : plan)
+    });
+  }
+  registerPlan(input) {
+    const state2 = this.read(input.sessionId);
+    const now = nowIso$1();
+    return this.write({
+      ...state2,
+      latestDisplayedPlanId: input.status === "awaiting_approval" ? input.planId : state2.latestDisplayedPlanId,
+      latestAcceptedPlanId: input.status === "accepted" ? input.planId : state2.latestAcceptedPlanId,
+      plans: this.upsertPlan(state2.plans, {
+        planId: input.planId,
+        runId: input.runId,
+        workstreamId: input.workstreamId,
+        status: input.status,
+        createdAt: now,
+        updatedAt: now
+      })
+    });
+  }
+  createRevision(input) {
+    const state2 = this.read(input.sessionId);
+    const branchGroup = state2.branches[0];
+    const rootRequest = state2.userRequests[0];
+    const createdAt = nowIso$1();
+    const branchId = generateEventId("branch");
+    const revisionId = generateEventId("revision");
+    const requestId = rootRequest?.id ?? `request-${input.runId}`;
+    const parentRevisionId = rootRequest?.activeRevisionId;
+    const revision = {
+      id: revisionId,
+      requestId,
+      branchId,
+      parentRevisionId,
+      prompt: input.revisionText,
+      createdAt,
+      resultingWorkstreamIds: [input.revisionWorkstreamId]
+    };
+    const nextRequest = rootRequest ? {
+      ...rootRequest,
+      activeRevisionId: revisionId,
+      revisions: [...rootRequest.revisions, revision]
+    } : {
+      id: requestId,
+      sessionId: input.sessionId,
+      rootRevisionId: revisionId,
+      activeRevisionId: revisionId,
+      revisions: [revision]
+    };
+    const nextBranch = {
+      id: branchId,
+      parentBranchId: state2.activeBranchId,
+      revisionId,
+      status: "active",
+      workstreamIds: [input.revisionWorkstreamId]
+    };
+    const nextBranchGroup = branchGroup ? {
+      ...branchGroup,
+      activeBranchId: branchId,
+      branches: branchGroup.branches.map((branch) => branch.id === state2.activeBranchId ? { ...branch, status: "inactive" } : branch).concat(nextBranch)
+    } : {
+      id: `branch-group-${requestId}`,
+      rootRequestId: requestId,
+      activeBranchId: branchId,
+      branches: [nextBranch]
+    };
+    return this.write({
+      ...state2,
+      activeBranchId: branchId,
+      latestDisplayedPlanId: void 0,
+      userRequests: rootRequest ? state2.userRequests.map((request) => request.id === rootRequest.id ? nextRequest : request) : [...state2.userRequests, nextRequest],
+      branches: branchGroup ? state2.branches.map((group) => group.id === branchGroup.id ? nextBranchGroup : group) : [...state2.branches, nextBranchGroup],
+      plans: state2.plans.map((plan) => plan.planId === input.previousPlanId ? { ...plan, status: "needs_revision", updatedAt: createdAt } : plan)
+    });
+  }
+  switchBranch(sessionId, branchId) {
+    const state2 = this.read(sessionId);
+    const hasBranch = state2.branches.some((group) => group.branches.some((branch) => branch.id === branchId));
+    if (!hasBranch) {
+      return state2;
+    }
+    return this.write({
+      ...state2,
+      activeBranchId: branchId,
+      branches: state2.branches.map((group) => ({
+        ...group,
+        activeBranchId: group.branches.some((branch) => branch.id === branchId) ? branchId : group.activeBranchId,
+        branches: group.branches.map((branch) => ({
+          ...branch,
+          status: branch.id === branchId ? "active" : branch.status === "active" ? "inactive" : branch.status
+        }))
+      }))
+    });
+  }
+  upsertPlan(plans, plan) {
+    const index = plans.findIndex((entry) => entry.planId === plan.planId);
+    if (index < 0) {
+      return [...plans, plan];
+    }
+    const next = [...plans];
+    next[index] = {
+      ...next[index],
+      ...plan,
+      createdAt: next[index].createdAt
+    };
+    return next;
+  }
+  resolvePath(sessionId) {
+    const session = storageAdapter.readSession(sessionId);
+    if (!session) {
+      throw new Error(`Session not found for workstream state: ${sessionId}`);
+    }
+    const targetPath = path__namespace.resolve(session.sessionPath, STORE_FILE);
+    if (!runScopedStore.isPathInside(session.sessionPath, targetPath)) {
+      throw new Error(`Workstream state escaped session directory: ${targetPath}`);
+    }
+    return targetPath;
+  }
+}
+const workstreamStateStore = new WorkstreamStateStore();
+const toIso = (value, fallback = nowIso$1()) => {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return new Date(value).toISOString();
+  }
+  return fallback;
+};
+const firstLine = (value, fallback) => {
+  const text = typeof value === "string" ? value : value === void 0 || value === null ? "" : JSON.stringify(value);
+  return text.trim().split(/\r?\n/)[0]?.trim() || fallback;
+};
+const cleanText = (value) => {
+  if (typeof value === "string") {
+    return value.trim();
+  }
+  if (value === void 0 || value === null) {
+    return "";
+  }
+  return JSON.stringify(value, null, 2);
+};
+const workstreamTypeFromRun = (run) => run?.mode ?? "ask";
+const statusFromRun = (run, planStatus) => {
+  if (run.status === "awaiting_approval") {
+    return "awaiting_approval";
+  }
+  if (run.status === "failed" || run.status === "interrupted") {
+    return "failed";
+  }
+  if (run.status === "cancelled") {
+    return "cancelled";
+  }
+  if (run.status === "completed") {
+    return "completed";
+  }
+  return "running";
+};
+const toolStatusFromEvent = (event) => {
+  if (event.status === "error" || event.status === "fail" || event.status === "timeout") {
+    return "failed";
+  }
+  if (event.status === "sent" || event.status === "entered") {
+    return "running";
+  }
+  if (event.status === "blocked") {
+    return "skipped";
+  }
+  return "done";
+};
+const progressStatusFromTask = (task) => {
+  if (task.status === "in_progress") return "running";
+  if (task.status === "completed") return "completed";
+  if (task.status === "blocked" || task.status === "rejected") return "blocked";
+  if (task.status === "cancelled") return "cancelled";
+  return "pending";
+};
+const isPendingConversationStatus = (status) => status === "draft" || status === "streaming";
+const artifactTypeFromRecord = (record) => {
+  if (record.kind === "report") return "report";
+  if (record.kind === "screenshot") return "visual_report";
+  if (record.kind === "trace" || record.kind === "data") return "evidence_bundle";
+  return "other";
+};
+const mapPlanStatus = (approvalState, run) => {
+  if (run.status === "failed" || run.status === "interrupted") return "failed";
+  if (run.status === "completed") return "executed";
+  if (approvalState === "approved") return "accepted";
+  if (approvalState === "pending_user" || run.status === "awaiting_approval") return "awaiting_approval";
+  if (approvalState === "rejected") return "needs_revision";
+  return "draft";
+};
+const planSections = (debugPlan) => {
+  const sections = debugPlan.presentation?.sections ?? [];
+  if (sections.length > 0) {
+    return sections.map((section) => ({
+      id: section.id || section.title,
+      title: section.title,
+      body: section.body.join("\n"),
+      severity: "normal"
+    }));
+  }
+  return [
+    { id: "goal", title: "目标", body: debugPlan.userGoal },
+    { id: "scope", title: "执行路线", body: debugPlan.scope || "按 Debugger harness 推进 capture 分析。" },
+    { id: "acceptance", title: "验收标准", body: debugPlan.verificationContract.successCriteria.join("\n") },
+    { id: "risks", title: "风险 / 阻断", body: debugPlan.blockers.map((blocker) => blocker.reason).join("\n") || "暂无阻断。" },
+    { id: "deliverables", title: "预计产物", body: debugPlan.expectedDeliverables.join("\n") || "调试报告。" }
+  ];
+};
+const resultFromPlan = (workstreamId, debugPlan, status) => ({
+  id: `${workstreamId}-plan-result`,
+  workstreamId,
+  kind: "plan",
+  status,
+  title: debugPlan.presentation?.title || "Debugger Plan",
+  sections: planSections(debugPlan),
+  artifactIds: [`artifact-${debugPlan.planId}`],
+  createdAt: debugPlan.createdAt
+});
+const resultFromRun = (workstreamId, run, events, artifacts) => {
+  if (run.status === "completed") {
+    const reportEvent = events.find((event) => event.event_type === "report_published");
+    return {
+      id: `${workstreamId}-report-result`,
+      workstreamId,
+      kind: "report",
+      status: "completed",
+      title: "Execution Report",
+      sections: [
+        {
+          id: "summary",
+          title: "结论",
+          body: "调试执行已完成，报告和证据产物已写入 session 输出。"
+        },
+        {
+          id: "evidence",
+          title: "关键证据",
+          body: events.filter((event) => ["agent_summary", "verification"].includes(event.event_type)).map((event) => firstLine(event.payload.summary ?? event.payload.verdict, event.event_type)).slice(0, 6).join("\n") || "详见 report.md 和 raw trace。"
+        },
+        {
+          id: "artifacts",
+          title: "产物入口",
+          body: artifacts.map((artifact) => artifact.displayName).join("\n") || firstLine(reportEvent?.payload, "report.md")
+        }
+      ],
+      artifactIds: artifacts.map((artifact) => artifact.id),
+      createdAt: toIso(reportEvent?.ts_ms, toIso(run.finishedAt, nowIso$1()))
+    };
+  }
+  if (run.status === "failed" || run.status === "interrupted") {
+    return {
+      id: `${workstreamId}-failure-result`,
+      workstreamId,
+      kind: "failure",
+      status: "failed",
+      title: "Failure Report",
+      sections: [
+        { id: "conclusion", title: "失败结论", body: run.stopReason || "任务未能完成。", severity: "error" },
+        {
+          id: "completed",
+          title: "已完成内容",
+          body: events.filter((event) => event.status === "ok").map((event) => event.event_type).slice(0, 8).join("\n") || "无可确认完成项。"
+        },
+        { id: "recovery", title: "可恢复路径", body: "保留当前 raw trace、context 和已产生产物；修复阻断后可重新发起任务。" }
+      ],
+      artifactIds: [],
+      createdAt: toIso(run.finishedAt ?? run.stoppedAt, nowIso$1())
+    };
+  }
+  if (run.status === "cancelled") {
+    return {
+      id: `${workstreamId}-cancelled-result`,
+      workstreamId,
+      kind: "cancelled",
+      status: "cancelled",
+      title: "Cancelled Result",
+      sections: [
+        { id: "time", title: "中断时间", body: toIso(run.stoppedAt, nowIso$1()) },
+        { id: "completed", title: "已完成内容", body: events.map((event) => event.event_type).slice(0, 8).join("\n") || "尚未产生可确认执行内容。" },
+        { id: "next", title: "可继续路径", body: "历史过程保留，可基于同一 capture 重新发起 Debugger 任务。" }
+      ],
+      artifactIds: [],
+      createdAt: toIso(run.stoppedAt, nowIso$1())
+    };
+  }
+  return void 0;
+};
+const askResultFromTurn = (workstreamId, turn) => {
+  const assistant = turn.assistantMessages.slice(-1)[0];
+  if (!assistant || isPendingConversationStatus(assistant.status)) {
+    return void 0;
+  }
+  const createdAt = toIso(assistant.updatedAt ?? assistant.createdAt, toIso(turn.completedAt));
+  const diagnostic = assistant.diagnostic;
+  if (assistant.status === "error") {
+    const sections = [
+      {
+        id: "error",
+        title: "失败原因",
+        body: assistant.content || diagnostic?.userMessage || "回复生成失败。",
+        severity: "error"
+      }
+    ];
+    if (diagnostic) {
+      sections.push({
+        id: "diagnostic",
+        title: "诊断",
+        body: [
+          diagnostic.code,
+          diagnostic.providerId && diagnostic.modelId ? `${diagnostic.providerId}/${diagnostic.modelId}` : diagnostic.providerId,
+          diagnostic.technicalMessage
+        ].filter(Boolean).join("\n"),
+        severity: diagnostic.severity === "error" ? "error" : "warning"
+      });
+    }
+    return {
+      id: `${workstreamId}-failure-result`,
+      workstreamId,
+      kind: "failure",
+      status: "failed",
+      title: "Ask Failed",
+      sections,
+      artifactIds: [],
+      createdAt
+    };
+  }
+  if (assistant.status === "stopped") {
+    return {
+      id: `${workstreamId}-cancelled-result`,
+      workstreamId,
+      kind: "cancelled",
+      status: "cancelled",
+      title: "Ask Cancelled",
+      sections: [{ id: "cancelled", title: "已停止", body: assistant.content || "当前请求已停止。" }],
+      artifactIds: [],
+      createdAt
+    };
+  }
+  const answer = turn.assistantMessages.map((message) => message.content.trim()).filter(Boolean).join("\n\n");
+  return {
+    id: `${workstreamId}-answer-result`,
+    workstreamId,
+    kind: "answer",
+    status: "completed",
+    title: "Ask Answer",
+    sections: [{ id: "answer", title: "回答", body: answer || "暂无回复内容。" }],
+    artifactIds: [],
+    createdAt
+  };
+};
+class AgentWorkstreamProjector {
+  async getSession(sessionId) {
+    try {
+      const session = storageAdapter.readSession(sessionId);
+      if (!session) {
+        return { success: false, error: `Session not found: ${sessionId}` };
+      }
+      const runs = storageAdapter.listRuns(sessionId).slice().sort((left, right) => left.startedAt - right.startedAt);
+      const conversations = storageAdapter.readConversationHistory(sessionId);
+      const events = await storageAdapter.readActionChain(sessionId);
+      let state2 = workstreamStateStore.read(sessionId);
+      for (const run of runs) {
+        const snapshot = storageAdapter.readPlanSnapshot(sessionId, run.runId);
+        if (snapshot?.debug_plan) {
+          state2 = workstreamStateStore.ensureRunRequest({
+            sessionId,
+            runId: run.runId,
+            prompt: run.goal,
+            planId: snapshot.debug_plan.planId,
+            workstreamId: this.planWorkstreamId(run.runId)
+          });
+          const desiredStatus = mapPlanStatus(snapshot.approval_state, run);
+          const currentStatus = state2.plans.find((plan) => plan.planId === snapshot.debug_plan?.planId)?.status;
+          if (snapshot.debug_plan.planId && currentStatus && currentStatus !== desiredStatus && currentStatus !== "needs_revision" && currentStatus !== "superseded") {
+            state2 = workstreamStateStore.markPlan(sessionId, snapshot.debug_plan.planId, desiredStatus);
+          }
+        }
+      }
+      const model = this.buildSessionModel(sessionId, runs, conversations, events, state2);
+      const presentation = this.buildPresentation(model);
+      return { success: true, session: model, presentation };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+  buildConversationPresentation(sessionId, conversations) {
+    const model = this.buildSessionModel(sessionId, [], conversations, [], {
+      schemaVersion: "1",
+      sessionId,
+      activeBranchId: "branch-main",
+      userRequests: [],
+      branches: [],
+      plans: [],
+      updatedAt: nowIso$1()
+    });
+    return this.buildPresentation(model);
+  }
+  buildSessionModel(sessionId, runs, conversations, events, state2) {
+    const rawAuditRefs = events.map((event) => ({
+      id: `raw-${event.event_id}`,
+      label: event.event_type,
+      eventId: event.event_id,
+      runId: event.run_id,
+      sessionId: event.session_id,
+      ref: `action_chain:${event.event_id}`
+    }));
+    const workstreams = [];
+    const progress = [];
+    const artifacts = [];
+    const context2 = [];
+    const userRequests = [...state2.userRequests];
+    for (const run of runs) {
+      const snapshot = storageAdapter.readPlanSnapshot(sessionId, run.runId);
+      const runEvents = events.filter((event) => event.run_id === run.runId).sort((left, right) => left.ts_ms - right.ts_ms);
+      const planStatus = state2.plans.find((plan) => plan.planId === snapshot?.debug_plan?.planId)?.status ?? mapPlanStatus(snapshot?.approval_state, run);
+      const branchId = this.branchIdForWorkstream(state2.branches, this.planWorkstreamId(run.runId), state2.activeBranchId);
+      const planWorkstream = this.buildPlanWorkstream(run, snapshot?.debug_plan ?? null, planStatus, branchId, runEvents, conversations);
+      workstreams.push(planWorkstream);
+      const runArtifacts = this.mapArtifacts(sessionId, run.runId, branchId, this.executionWorkstreamId(run.runId), runEvents);
+      artifacts.push(...runArtifacts);
+      progress.push(...this.mapProgress(sessionId, run.runId, branchId, this.executionWorkstreamId(run.runId)));
+      context2.push(...this.mapContext(sessionId, run.runId, branchId, this.executionWorkstreamId(run.runId), run));
+      if (this.shouldShowExecutionWorkstream(run, snapshot?.approval_state, runEvents)) {
+        workstreams.push(this.buildExecutionWorkstream(run, branchId, runEvents, runArtifacts));
+      }
+    }
+    for (const turn of this.groupAskTurns(conversations)) {
+      if (turn.messages.some((message) => message.runId)) {
+        continue;
+      }
+      const branchId = state2.activeBranchId || "branch-main";
+      const id = `ws-ask-${turn.turnId}`;
+      workstreams.push(this.buildAskWorkstream(sessionId, branchId, id, turn));
+      userRequests.push(this.userRequestFromAskTurn(sessionId, branchId, id, turn));
+    }
+    const updatedAt = nowIso$1();
+    return {
+      sessionId,
+      activeBranchId: state2.activeBranchId || "branch-main",
+      latestDisplayedPlanId: state2.latestDisplayedPlanId,
+      latestAcceptedPlanId: state2.latestAcceptedPlanId,
+      userRequests,
+      workstreams: workstreams.sort((left, right) => Date.parse(left.startedAt) - Date.parse(right.startedAt)),
+      progress,
+      artifacts,
+      context: context2,
+      branches: state2.branches,
+      rawAuditRefs,
+      updatedAt
+    };
+  }
+  buildPresentation(session) {
+    const activeWorkstreams = session.workstreams.filter((workstream) => workstream.branchId === session.activeBranchId);
+    const items = activeWorkstreams.flatMap((workstream) => {
+      const taskItem = this.toTaskViewModel(session, workstream);
+      const userEvents = workstream.processEvents.flatMap((event) => {
+        if (event.kind === "user.confirmed") {
+          return [{
+            kind: "user_confirmation",
+            id: event.id,
+            workstreamId: event.workstreamId,
+            planId: event.planId,
+            label: event.label,
+            createdAt: event.createdAt
+          }];
+        }
+        if (event.kind === "user.revision_requested") {
+          return [{
+            kind: "user_revision",
+            id: event.id,
+            workstreamId: event.workstreamId,
+            planId: event.planId,
+            prompt: event.prompt,
+            createdAt: event.createdAt
+          }];
+        }
+        return [];
+      });
+      return [taskItem, ...userEvents];
+    });
+    const rightPanel = this.buildRightPanel(session, activeWorkstreams);
+    const latestPlan = activeWorkstreams.filter((workstream) => workstream.planStatus === "awaiting_approval").slice(-1)[0] ?? null;
+    const latestPlanResult = latestPlan?.result;
+    return {
+      sessionId: session.sessionId,
+      activeBranchId: session.activeBranchId,
+      mode: activeWorkstreams.find((workstream) => workstream.type !== "ask")?.type ?? "ask",
+      items,
+      rightPanel,
+      approval: latestPlan && latestPlanResult ? {
+        planId: latestPlan.planId ?? latestPlanResult.id,
+        workstreamId: latestPlan.id,
+        runId: latestPlan.id.replace(/^ws-/, "").replace(/-plan$/, ""),
+        status: "awaiting_approval",
+        title: latestPlanResult.title,
+        summary: latestPlanResult.sections.slice(0, 2).map((section) => `${section.title}: ${section.body}`).join("\n"),
+        canApprove: true,
+        canRequestRevision: true
+      } : null,
+      branchNavigator: session.branches[0] ? {
+        activeBranchId: session.activeBranchId,
+        branchIndex: Math.max(session.branches[0].branches.findIndex((branch) => branch.id === session.activeBranchId), 0),
+        branchCount: session.branches[0].branches.length,
+        branches: session.branches[0].branches
+      } : null,
+      rawAuditRefs: session.rawAuditRefs,
+      updatedAt: session.updatedAt
+    };
+  }
+  buildPlanWorkstream(run, debugPlan, planStatus, branchId, runEvents, conversations) {
+    const id = this.planWorkstreamId(run.runId);
+    const confirmationEvents = runEvents.filter((event) => ["user_confirmation", "user_revision_requested"].includes(event.event_type)).map((event) => event.event_type === "user_confirmation" ? {
+      kind: "user.confirmed",
+      id: event.event_id,
+      workstreamId: id,
+      planId: String(event.payload.planId || debugPlan?.planId || ""),
+      createdAt: toIso(event.ts_ms),
+      label: String(event.payload.label || "同意执行")
+    } : {
+      kind: "user.revision_requested",
+      id: event.event_id,
+      workstreamId: id,
+      planId: String(event.payload.planId || debugPlan?.planId || ""),
+      createdAt: toIso(event.ts_ms),
+      prompt: String(event.payload.prompt || "")
+    });
+    const planEvents = runEvents.filter((event) => event.event_type === "tool_execution" || event.event_type === "blocker" || event.event_type === "workflow_stage_transition");
+    return {
+      id,
+      sessionId: run.sessionId,
+      branchId,
+      type: workstreamTypeFromRun(run),
+      status: planStatus === "awaiting_approval" ? "awaiting_approval" : planStatus === "failed" ? "failed" : "completed",
+      density: planStatus === "awaiting_approval" ? "expanded" : "compact",
+      resultKind: "plan",
+      startedAt: toIso(run.startedAt),
+      completedAt: planStatus === "awaiting_approval" ? void 0 : toIso(run.startedAt + 1),
+      processEvents: [
+        ...this.agentTextFromConversation(id, run.runId, conversations),
+        ...this.processEventsFromActionEvents(id, planEvents),
+        ...confirmationEvents
+      ].sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt)),
+      result: debugPlan ? resultFromPlan(id, debugPlan, planStatus) : void 0,
+      planId: debugPlan?.planId,
+      planStatus
+    };
+  }
+  buildExecutionWorkstream(run, branchId, runEvents, artifacts) {
+    const id = this.executionWorkstreamId(run.runId);
+    const executionEvents = runEvents.filter((event) => ![
+      "user_message",
+      "user_confirmation",
+      "user_revision_requested"
+    ].includes(event.event_type));
+    const status = statusFromRun(run);
+    const result = resultFromRun(id, run, executionEvents, artifacts);
+    return {
+      id,
+      sessionId: run.sessionId,
+      branchId,
+      type: workstreamTypeFromRun(run),
+      status,
+      density: status === "completed" ? "compact" : "expanded",
+      resultKind: result?.kind,
+      sourceRequestRevisionId: this.revisionIdForBranch(branchId),
+      startedAt: toIso(run.startedAt + 2),
+      completedAt: run.finishedAt ? toIso(run.finishedAt) : void 0,
+      processEvents: this.processEventsFromActionEvents(id, executionEvents),
+      result
+    };
+  }
+  buildAskWorkstream(sessionId, branchId, workstreamId, turn) {
+    const assistant = turn.assistantMessages.slice(-1)[0];
+    const pending = !assistant || isPendingConversationStatus(assistant.status);
+    const failed = assistant?.status === "error";
+    const cancelled = assistant?.status === "stopped";
+    const status = failed ? "failed" : cancelled ? "cancelled" : pending ? "running" : "completed";
+    const result = askResultFromTurn(workstreamId, turn);
+    const pendingEvent = pending ? [{
+      kind: "agent.text",
+      id: `agent-text-${assistant?.id ?? `${turn.turnId}-pending`}`,
+      workstreamId,
+      createdAt: toIso(assistant?.createdAt ?? turn.createdAt),
+      text: assistant?.content.trim() || "正在生成回复。"
+    }] : [];
+    return {
+      id: workstreamId,
+      sessionId,
+      branchId,
+      type: "ask",
+      status,
+      density: status === "running" ? "expanded" : "compact",
+      resultKind: result?.kind,
+      startedAt: toIso(turn.createdAt),
+      completedAt: status === "running" ? void 0 : toIso(turn.completedAt),
+      processEvents: pendingEvent,
+      result
+    };
+  }
+  userRequestFromAskTurn(sessionId, branchId, workstreamId, turn) {
+    const requestId = `request-ask-${turn.turnId}`;
+    const revisionId = `revision-ask-${turn.turnId}`;
+    const prompt = turn.userMessage?.content.trim() || turn.messages.find((message) => message.role === "user")?.content.trim() || "Ask";
+    return {
+      id: requestId,
+      sessionId,
+      rootRevisionId: revisionId,
+      activeRevisionId: revisionId,
+      revisions: [
+        {
+          id: revisionId,
+          requestId,
+          branchId,
+          prompt,
+          createdAt: toIso(turn.userMessage?.createdAt ?? turn.createdAt),
+          resultingWorkstreamIds: [workstreamId]
+        }
+      ]
+    };
+  }
+  processEventsFromActionEvents(workstreamId, events) {
+    const processEvents = [];
+    for (const event of events) {
+      if (event.event_type === "tool_execution") {
+        const title = String(event.payload.tool_name || event.payload.toolName || "Tool");
+        processEvents.push({
+          kind: "tool",
+          id: event.event_id,
+          workstreamId,
+          taskId: typeof event.payload.taskId === "string" ? event.payload.taskId : void 0,
+          createdAt: toIso(event.ts_ms),
+          completedAt: event.status === "sent" || event.status === "entered" ? void 0 : toIso(event.ts_ms + event.duration_ms),
+          status: toolStatusFromEvent(event),
+          title,
+          summary: firstLine(event.payload.summary ?? event.payload.result ?? event.payload.error ?? event.payload.data, title),
+          target: cleanText(event.payload.target ?? event.payload.eventId ?? event.payload.prompt_id),
+          durationMs: event.duration_ms,
+          inputRef: `input:${event.event_id}`,
+          outputRef: `output:${event.event_id}`,
+          artifactIds: Array.isArray(event.payload.artifacts) ? event.payload.artifacts.map(String) : [],
+          rawTraceRef: `raw-${event.event_id}`,
+          errorSummary: event.status === "error" || event.status === "fail" ? firstLine(event.payload.error ?? event.payload.message, "工具失败") : void 0
+        });
+        continue;
+      }
+      if (event.event_type === "dispatch") {
+        const label = String(event.payload.targetAgent || event.agent_id || "Sub Agent");
+        processEvents.push({
+          kind: "subagent",
+          id: event.event_id,
+          workstreamId,
+          createdAt: toIso(event.ts_ms),
+          completedAt: event.status === "sent" ? void 0 : toIso(event.ts_ms + event.duration_ms),
+          status: toolStatusFromEvent(event),
+          label,
+          summary: firstLine(event.payload.objective, "子 agent 已接收任务。"),
+          rawTraceRef: `raw-${event.event_id}`
+        });
+        continue;
+      }
+      if (event.event_type === "agent_summary") {
+        processEvents.push({
+          kind: "agent.text",
+          id: event.event_id,
+          workstreamId,
+          createdAt: toIso(event.ts_ms),
+          text: String(event.payload.summary || event.payload.content || "")
+        });
+        continue;
+      }
+      if (event.event_type === "blocker" || event.event_type === "verification" || event.event_type === "report_published") {
+        processEvents.push({
+          kind: "agent.text",
+          id: event.event_id,
+          workstreamId,
+          createdAt: toIso(event.ts_ms),
+          text: firstLine(event.payload.summary ?? event.payload.reason ?? event.payload.verdict ?? event.payload, event.event_type)
+        });
+      }
+    }
+    return processEvents.sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
+  }
+  agentTextFromConversation(workstreamId, runId, conversations) {
+    return conversations.filter((message) => message.runId === runId && message.role === "assistant" && message.content.trim()).map((message) => ({
+      kind: "agent.text",
+      id: `agent-text-${message.id}`,
+      workstreamId,
+      createdAt: toIso(message.createdAt),
+      text: message.content
+    }));
+  }
+  mapProgress(sessionId, runId, branchId, workstreamId) {
+    return taskBoard.listTasks(sessionId, runId).map((task, index) => ({
+      id: task.taskId,
+      sessionId,
+      workstreamId,
+      branchId,
+      title: task.title,
+      status: progressStatusFromTask(task),
+      order: index,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      completedAt: task.completedAt,
+      source: task.source === "plan" ? "plan" : "runtime",
+      linkedEventIds: task.evidenceRefs,
+      blockerSummary: task.blockerRefs.join(", ") || void 0
+    }));
+  }
+  mapArtifacts(sessionId, runId, branchId, workstreamId, runEvents) {
+    const registered = artifactStore.list(sessionId, runId).map((record) => ({
+      id: record.artifactId,
+      sessionId,
+      workstreamId,
+      branchId,
+      sourceEventId: record.evidenceIds[0],
+      type: artifactTypeFromRecord(record),
+      status: "ready",
+      displayName: record.title,
+      taskTitle: record.taskId,
+      path: record.filePath,
+      rawRef: `artifact:${record.artifactId}`,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt
+    }));
+    const reportEvents = runEvents.filter((event) => event.event_type === "report_published");
+    const reports = reportEvents.flatMap((event) => {
+      const records = [];
+      for (const key of ["markdownPath", "htmlPath", "jsonPath"]) {
+        const value = event.payload[key];
+        if (typeof value !== "string" || !value.trim()) {
+          continue;
+        }
+        records.push({
+          id: `${event.event_id}-${key}`,
+          sessionId,
+          workstreamId,
+          branchId,
+          sourceEventId: event.event_id,
+          type: key === "htmlPath" ? "visual_report" : "report",
+          status: "ready",
+          displayName: value.split(/[\\/]/).filter(Boolean).pop() || value,
+          taskTitle: "Execution Report",
+          path: value,
+          rawRef: `raw-${event.event_id}`,
+          createdAt: toIso(event.ts_ms),
+          updatedAt: toIso(event.ts_ms)
+        });
+      }
+      return records;
+    });
+    return [...registered, ...reports];
+  }
+  mapContext(sessionId, runId, branchId, workstreamId, run) {
+    const packets = contextService.listContextPackets(sessionId, runId);
+    const captureContext = run.captures.map((capture) => ({
+      id: `context-capture-${capture.id}`,
+      sessionId,
+      workstreamId,
+      branchId,
+      kind: "capture",
+      label: capture.filePath.split(/[\\/]/).filter(Boolean).pop() || capture.filePath,
+      summary: capture.filePath,
+      importance: "decisive",
+      firstObservedAt: toIso(run.startedAt),
+      lastObservedAt: toIso(run.finishedAt ?? run.startedAt),
+      detailsRef: capture.filePath
+    }));
+    const packetContext = packets.map((packet) => ({
+      id: `context-${packet.packetId}`,
+      sessionId,
+      workstreamId,
+      branchId,
+      kind: packet.kind === "capture" ? "capture" : packet.kind === "tool_result" ? "source" : "file",
+      label: packet.title,
+      summary: packet.summary,
+      importance: packet.evidenceIds.length > 0 ? "cited" : packet.kind === "plan" ? "important" : "normal",
+      firstObservedAt: packet.createdAt,
+      lastObservedAt: packet.createdAt,
+      sourceEventIds: packet.evidenceIds,
+      artifactIds: packet.artifactIds,
+      detailsRef: packet.refs[0]
+    }));
+    const capabilityContext = contextService.readPlanContract(sessionId, runId)?.capabilityProfiles.map((profile) => ({
+      id: `context-capability-${profile.profileId}`,
+      sessionId,
+      workstreamId,
+      branchId,
+      kind: "capability",
+      label: profile.owner,
+      summary: profile.toolNames.slice(0, 4).join(", "),
+      importance: "important",
+      firstObservedAt: profile.createdAt,
+      lastObservedAt: profile.updatedAt,
+      detailsRef: profile.profileId
+    })) ?? [];
+    return [...captureContext, ...packetContext, ...capabilityContext];
+  }
+  toTaskViewModel(session, workstream) {
+    const prompt = this.promptForWorkstream(session, workstream);
+    const result = workstream.result ? {
+      ...workstream.result,
+      artifacts: session.artifacts.filter((artifact) => workstream.result?.artifactIds.includes(artifact.id))
+    } : void 0;
+    return {
+      kind: "task_workstream",
+      id: workstream.id,
+      type: workstream.type,
+      status: workstream.status,
+      density: workstream.density,
+      title: this.titleForWorkstream(workstream),
+      startedAt: workstream.startedAt,
+      completedAt: workstream.completedAt,
+      prompt,
+      process: {
+        collapsed: workstream.status === "completed" || workstream.density === "compact",
+        items: this.toProcessItems(workstream.processEvents)
+      },
+      result,
+      planId: workstream.planId,
+      planStatus: workstream.planStatus
+    };
+  }
+  toProcessItems(events) {
+    const items = [];
+    let textBuffer = [];
+    const flushText = () => {
+      if (textBuffer.length === 0) {
+        return;
+      }
+      const first = textBuffer[0];
+      items.push({
+        kind: "agent_thinking",
+        id: `thinking-${first.id}`,
+        createdAt: first.createdAt,
+        text: textBuffer.map((event) => event.text).filter(Boolean).join("\n\n")
+      });
+      textBuffer = [];
+    };
+    for (const event of events) {
+      if (event.kind === "agent.text") {
+        textBuffer.push(event);
+        continue;
+      }
+      flushText();
+      if (event.kind === "tool") {
+        items.push({
+          kind: "tool_row",
+          id: event.id,
+          createdAt: event.createdAt,
+          completedAt: event.completedAt,
+          status: event.status,
+          title: event.title,
+          summary: event.summary,
+          target: event.target,
+          durationMs: event.durationMs,
+          taskId: event.taskId,
+          artifactIds: event.artifactIds ?? [],
+          rawTraceRef: event.rawTraceRef,
+          inputRef: event.inputRef,
+          outputRef: event.outputRef,
+          errorSummary: event.errorSummary
+        });
+        continue;
+      }
+      if (event.kind === "subagent") {
+        items.push({
+          kind: "subagent_row",
+          id: event.id,
+          createdAt: event.createdAt,
+          completedAt: event.completedAt,
+          status: event.status,
+          label: event.label,
+          summary: event.summary,
+          resultSummary: event.resultSummary,
+          taskId: event.taskId,
+          nestedWorkstream: event.nestedWorkstream,
+          rawTraceRef: event.rawTraceRef
+        });
+      }
+    }
+    flushText();
+    return items;
+  }
+  buildRightPanel(session, activeWorkstreams) {
+    const activeWorkstreamIds = new Set(activeWorkstreams.map((workstream) => workstream.id));
+    const progress = {
+      current: session.progress.filter((task) => activeWorkstreamIds.has(task.workstreamId) && ["running", "blocked", "pending", "reopened"].includes(task.status)).sort((left, right) => left.order - right.order),
+      history: session.progress.filter((task) => activeWorkstreamIds.has(task.workstreamId) && ["completed", "cancelled"].includes(task.status)).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+    };
+    const artifacts = {
+      current: session.artifacts.filter((artifact) => activeWorkstreamIds.has(artifact.workstreamId)).slice(-6),
+      previous: session.artifacts.filter((artifact) => !activeWorkstreamIds.has(artifact.workstreamId))
+    };
+    const contextGroups = ["capture", "file", "source", "capability"].map((kind) => {
+      const all = session.context.filter((record) => record.kind === kind);
+      return {
+        kind,
+        important: all.filter((record) => record.importance !== "normal"),
+        all
+      };
+    });
+    return {
+      progress,
+      artifacts,
+      context: { groups: contextGroups }
+    };
+  }
+  promptForWorkstream(session, workstream) {
+    for (const request of session.userRequests) {
+      const revision = request.revisions.find((entry) => entry.resultingWorkstreamIds.includes(workstream.id));
+      if (!revision) {
+        continue;
+      }
+      const group = session.branches.find((entry) => entry.rootRequestId === request.id);
+      const branchIndex = Math.max(group?.branches.findIndex((branch) => branch.id === revision.branchId) ?? 0, 0);
+      const branchCount = group?.branches.length ?? 1;
+      return {
+        kind: "user_prompt",
+        id: `prompt-${revision.id}`,
+        branchId: revision.branchId,
+        requestId: request.id,
+        revisionId: revision.id,
+        prompt: revision.prompt,
+        createdAt: revision.createdAt,
+        branchIndex,
+        branchCount,
+        canCopy: true,
+        canEdit: true
+      };
+    }
+    return void 0;
+  }
+  titleForWorkstream(workstream) {
+    if (workstream.resultKind === "plan") return "Plan Task";
+    if (workstream.resultKind === "report") return "Execution Task";
+    if (workstream.resultKind === "failure") return "Failure Task";
+    if (workstream.resultKind === "cancelled") return "Cancelled Task";
+    return workstream.type === "ask" ? "Ask Task" : "Agent Task";
+  }
+  shouldShowExecutionWorkstream(run, approvalState, events) {
+    return approvalState === "approved" || ["running", "stopping", "completed", "failed", "cancelled", "interrupted"].includes(run.status) || events.some((event) => ["dispatch", "agent_summary", "verification", "report_published"].includes(event.event_type));
+  }
+  groupAskTurns(messages) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const message of messages) {
+      const turnId = message.turnId || message.id;
+      const group = groups.get(turnId) ?? {
+        turnId,
+        createdAt: message.createdAt,
+        completedAt: message.updatedAt ?? message.createdAt,
+        messages: [],
+        assistantMessages: []
+      };
+      group.createdAt = Math.min(group.createdAt, message.createdAt);
+      group.completedAt = Math.max(group.completedAt, message.updatedAt ?? message.createdAt);
+      group.messages.push(message);
+      if (message.role === "user" && (!group.userMessage || message.createdAt < group.userMessage.createdAt)) {
+        group.userMessage = message;
+      }
+      if (message.role === "assistant") {
+        group.assistantMessages.push(message);
+      }
+      groups.set(turnId, group);
+    }
+    return Array.from(groups.values()).map((group) => ({
+      ...group,
+      messages: group.messages.slice().sort((left, right) => left.createdAt - right.createdAt),
+      assistantMessages: group.assistantMessages.slice().sort((left, right) => left.createdAt - right.createdAt)
+    })).sort((left, right) => left.createdAt - right.createdAt);
+  }
+  branchIdForWorkstream(groups, workstreamId, fallback) {
+    for (const group of groups) {
+      const branch = group.branches.find((entry) => entry.workstreamIds.includes(workstreamId));
+      if (branch) {
+        return branch.id;
+      }
+    }
+    return fallback || "branch-main";
+  }
+  revisionIdForBranch(branchId) {
+    return branchId.startsWith("branch-") ? branchId.replace(/^branch-/, "revision-") : void 0;
+  }
+  planWorkstreamId(runId) {
+    return `ws-${runId}-plan`;
+  }
+  executionWorkstreamId(runId) {
+    return `ws-${runId}-execution`;
+  }
+}
+const agentWorkstreamProjector = new AgentWorkstreamProjector();
 const KNOWN_AGENT_ROLES = /* @__PURE__ */ new Set([
   "rdc-debugger",
   "triage_agent",
@@ -10968,9 +12065,26 @@ class DebugWorkflowService {
       approval_state: "approved",
       pending_questions: null
     });
+    workstreamStateStore.markPlan(location.session.sessionId, snapshot.debug_plan.planId, "accepted");
     this.applyTaskMutation(location.session.sessionId, runId, "plan", "completed", "User approved the Debugger plan.");
     this.applyTaskMutation(location.session.sessionId, runId, "speclist", "in_progress", "Task breakdown started after plan approval.");
     contextService.writeRunCapsule(location.session.sessionId, runId);
+    await this.appendUserConversationMessage(
+      location.session.sessionId,
+      runId,
+      "同意执行"
+    );
+    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
+      runId,
+      sessionId: location.session.sessionId,
+      agentId: "user",
+      eventType: "user_confirmation",
+      status: "ok",
+      payload: {
+        planId: snapshot.debug_plan.planId,
+        label: "同意执行"
+      }
+    }));
     await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
       runId,
       sessionId: location.session.sessionId,
@@ -11009,6 +12123,187 @@ class DebugWorkflowService {
       pendingQuestions: null,
       approvalState: "approved"
     };
+  }
+  async getWorkstreamSession(sessionId) {
+    return agentWorkstreamProjector.getSession(sessionId);
+  }
+  async requestPlanRevision(runId, revisionText) {
+    const location = this.findRun(runId);
+    if (!location) {
+      return { success: false, error: `Run not found: ${runId}` };
+    }
+    const trimmedRevision = revisionText.trim();
+    if (!trimmedRevision) {
+      return { success: false, error: "Revision text is required." };
+    }
+    const snapshot = storageAdapter.readPlanSnapshot(location.session.sessionId, runId);
+    if (!snapshot?.debug_plan) {
+      return { success: false, error: "No plan snapshot available." };
+    }
+    const previousPlanId = snapshot.debug_plan.planId;
+    const { runId: nextRunId, sessionId } = await storageAdapter.createRun({
+      caseId: location.session.sessionId,
+      turnId: location.run.turnId,
+      capturePaths: location.run.captures.map((capture) => capture.filePath),
+      mode: location.run.mode,
+      goal: `${location.run.goal}
+
+修改建议：${trimmedRevision}`,
+      captures: location.run.captures,
+      backend: location.run.backend,
+      status: "awaiting_approval"
+    });
+    const nextPlan = {
+      ...snapshot.debug_plan,
+      planId: generateEventId("plan"),
+      userGoal: `${snapshot.debug_plan.userGoal}
+
+修改建议：${trimmedRevision}`,
+      notes: [...snapshot.debug_plan.notes, `用户修改建议：${trimmedRevision}`],
+      presentation: buildDebugPlanPresentation({
+        ...snapshot.debug_plan,
+        userGoal: `${snapshot.debug_plan.userGoal}
+
+修改建议：${trimmedRevision}`,
+        notes: [...snapshot.debug_plan.notes, `用户修改建议：${trimmedRevision}`]
+      }),
+      createdAt: nowIso$1(),
+      updatedAt: nowIso$1()
+    };
+    workstreamStateStore.createRevision({
+      sessionId,
+      runId: nextRunId,
+      previousPlanId,
+      revisionText: trimmedRevision,
+      revisionWorkstreamId: `ws-${nextRunId}-plan`
+    });
+    storageAdapter.writePlanSnapshot(sessionId, nextRunId, {
+      ...snapshot,
+      debug_plan: nextPlan,
+      pending_questions: null,
+      approval_state: "pending_user"
+    });
+    this.seedHarnessPlan({
+      sessionId,
+      runId: nextRunId,
+      mode: location.run.mode,
+      captures: location.run.captures,
+      debugPlan: nextPlan,
+      pendingQuestions: null
+    });
+    workstreamStateStore.registerPlan({
+      sessionId,
+      runId: nextRunId,
+      planId: nextPlan.planId,
+      workstreamId: `ws-${nextRunId}-plan`,
+      status: "awaiting_approval"
+    });
+    await storageAdapter.updateRun(location.session.sessionId, runId, {
+      status: "interrupted",
+      stopReason: "Plan revision requested",
+      stoppedAt: Date.now(),
+      finishedAt: Date.now()
+    });
+    await storageAdapter.updateRun(sessionId, nextRunId, {
+      status: "awaiting_approval",
+      lastStage: "plan",
+      runtime: {
+        workflow_stage: "plan"
+      }
+    });
+    await this.appendUserConversationMessage(
+      location.session.sessionId,
+      runId,
+      `修改建议：${trimmedRevision}`
+    );
+    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
+      runId,
+      sessionId: location.session.sessionId,
+      agentId: "user",
+      eventType: "user_revision_requested",
+      status: "ok",
+      payload: {
+        planId: previousPlanId,
+        prompt: trimmedRevision,
+        nextRunId,
+        nextPlanId: nextPlan.planId
+      }
+    }));
+    await this.appendActionEvent(sessionId, storageAdapter.createActionEvent({
+      runId: nextRunId,
+      sessionId,
+      agentId: "rdc-debugger",
+      eventType: "user_message",
+      status: "ok",
+      payload: {
+        role: "user",
+        content: trimmedRevision,
+        source: "plan_revision",
+        previousPlanId
+      }
+    }));
+    await this.appendAssistantConversationMessage(
+      sessionId,
+      nextRunId,
+      "我已根据修改建议生成新的计划，请重新确认后再进入正式执行。"
+    );
+    this.emitRunStatus(location.session.sessionId, runId, "interrupted", location.run.lastStage, "Plan revision requested");
+    this.emitRunStatus(sessionId, nextRunId, "awaiting_approval", "plan");
+    this.emitWorkflowState(await this.getWorkflowState(sessionId, nextRunId));
+    const workstream = await this.getWorkstreamSession(sessionId);
+    return {
+      ...workstream,
+      runId: nextRunId,
+      planId: nextPlan.planId,
+      branchId: workstream.session?.activeBranchId
+    };
+  }
+  async switchWorkstreamBranch(sessionId, branchId) {
+    workstreamStateStore.switchBranch(sessionId, branchId);
+    const workstream = await this.getWorkstreamSession(sessionId);
+    return {
+      ...workstream,
+      activeBranchId: workstream.session?.activeBranchId
+    };
+  }
+  async exportWorkstreamSession(sessionId, options = {}) {
+    try {
+      const session = storageAdapter.readSession(sessionId);
+      if (!session) {
+        return { success: false, error: `Session not found: ${sessionId}` };
+      }
+      const workstream = await this.getWorkstreamSession(sessionId);
+      if (!workstream.success) {
+        return { success: false, error: workstream.error };
+      }
+      const exportDir = path.join(session.sessionPath, "exports");
+      fs__namespace.mkdirSync(exportDir, { recursive: true });
+      const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+      const summaryPath = path.join(exportDir, `agent-workstream-summary-${stamp}.json`);
+      fs__namespace.writeFileSync(summaryPath, JSON.stringify({
+        schemaVersion: "1",
+        exportedAt: nowIso$1(),
+        includeAllBranches: options.includeAllBranches ?? true,
+        session: workstream.session,
+        presentation: workstream.presentation
+      }, null, 2), "utf-8");
+      let rawTracePath;
+      if (options.includeRawTrace !== false) {
+        rawTracePath = path.join(exportDir, `agent-workstream-raw-trace-${stamp}.jsonl`);
+        const events = await storageAdapter.readActionChain(sessionId);
+        fs__namespace.writeFileSync(rawTracePath, `${events.map((event) => JSON.stringify(event)).join("\n")}
+`, "utf-8");
+      }
+      return {
+        success: true,
+        sessionId,
+        summaryPath,
+        rawTracePath,
+        bundlePath: summaryPath
+      };
+    } catch (error) {
+      return { success: false, sessionId, error: error instanceof Error ? error.message : String(error) };
+    }
   }
   async restartRun(runId) {
     const location = this.findRun(runId);
@@ -12318,6 +13613,33 @@ class DebugWorkflowService {
     }
     await storageAdapter.appendActionEvent(sessionId, event);
     workflowProjectionPublisher.publishEvidenceEvent(event);
+    this.publishWorkstream(sessionId);
+  }
+  async appendUserConversationMessage(sessionId, runId, content) {
+    const runLocation = this.findRun(runId || "");
+    const message = {
+      id: generateEventId("msgu"),
+      turnId: runLocation?.run.turnId || generateEventId("turn"),
+      sessionId,
+      projectId: runLocation?.session.projectId ?? null,
+      runId,
+      modeContext: runLocation?.run.mode ?? "debugger",
+      role: "user",
+      content,
+      status: "complete",
+      attachments: [],
+      updatedAt: nowMs(),
+      reasoningTrace: null,
+      createdAt: nowMs()
+    };
+    storageAdapter.appendConversationMessage(sessionId, message);
+    this.emitConversationEvent({
+      type: "message_completed",
+      sessionId,
+      turnId: message.turnId,
+      message
+    });
+    this.publishWorkstream(sessionId);
   }
   async appendAssistantConversationMessage(sessionId, runId, content, status = "complete") {
     const runLocation = this.findRun(runId || "");
@@ -12359,6 +13681,7 @@ class DebugWorkflowService {
   }
   emitWorkflowState(state2) {
     workflowProjectionPublisher.publishWorkflowState(state2);
+    this.publishWorkstream(state2.sessionId);
   }
   emitRunStatus(sessionId, runId, status, lastStage, stopReason) {
     workflowProjectionPublisher.publishRunStatus({
@@ -12371,6 +13694,15 @@ class DebugWorkflowService {
   }
   emitConversationEvent(event) {
     workflowProjectionPublisher.publishConversationEvent(event);
+  }
+  publishWorkstream(sessionId) {
+    void agentWorkstreamProjector.getSession(sessionId).then((result) => {
+      if (result.success && result.presentation) {
+        workflowProjectionPublisher.publishWorkstreamChanged(sessionId, result.presentation);
+      }
+    }).catch((error) => {
+      console.error("[WorkflowProjectionPublisher] Failed to publish workstream:", error);
+    });
   }
 }
 const debugWorkflowService = new DebugWorkflowService();
@@ -12393,6 +13725,18 @@ class DebuggerRuntime {
   }
   approvePlan(runId) {
     return debugWorkflowService.approvePlan(runId);
+  }
+  getWorkstreamSession(sessionId) {
+    return debugWorkflowService.getWorkstreamSession(sessionId);
+  }
+  requestPlanRevision(runId, revisionText) {
+    return debugWorkflowService.requestPlanRevision(runId, revisionText);
+  }
+  switchWorkstreamBranch(sessionId, branchId) {
+    return debugWorkflowService.switchWorkstreamBranch(sessionId, branchId);
+  }
+  exportWorkstreamSession(sessionId, options) {
+    return debugWorkflowService.exportWorkstreamSession(sessionId, options);
   }
   restartRun(runId) {
     return debugWorkflowService.restartRun(runId);
@@ -13090,6 +14434,7 @@ class ConversationService {
     });
     this.persistConversationSnapshot(context2.session?.sessionId ?? null, userMessage);
     this.persistConversationSnapshot(context2.session?.sessionId ?? null, assistantDraftMessage);
+    this.publishWorkstream(context2.session?.sessionId ?? null);
     void this.completeActiveDebugTurn({
       context: context2,
       requestedMode,
@@ -13109,6 +14454,7 @@ class ConversationService {
   async completeActiveDebugTurn(input) {
     let assistantMessage = input.assistantDraftMessage;
     const sessionId = input.context.session?.sessionId ?? null;
+    const workstreamSessionId = sessionId ?? this.ephemeralWorkstreamSessionId(input.assistantDraftMessage.turnId);
     const abortController = new AbortController();
     const commitAssistantMessage = (type, patch) => {
       if (abortController.signal.aborted && patch.status !== "stopped") {
@@ -13126,6 +14472,7 @@ class ConversationService {
         turnId: assistantMessage.turnId,
         message: assistantMessage
       });
+      this.publishConversationWorkstream(workstreamSessionId, [input.userMessage, assistantMessage], sessionId);
     };
     const commitStoppedMessage = () => {
       commitAssistantMessage("message_completed", {
@@ -13266,6 +14613,12 @@ class ConversationService {
     });
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, userMessage);
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
+    const workstreamSessionId = workingSession?.sessionId ?? this.ephemeralWorkstreamSessionId(turnId);
+    const workstreamPresentation = agentWorkstreamProjector.buildConversationPresentation(
+      workstreamSessionId,
+      [userMessage, assistantDraftMessage]
+    );
+    this.publishConversationWorkstream(workstreamSessionId, [userMessage, assistantDraftMessage], workingSession?.sessionId ?? null);
     void this.completeCoworkTurn({
       context: {
         ...context2,
@@ -13284,12 +14637,14 @@ class ConversationService {
       assistantDraftMessage,
       executionTransition: { action: "none" },
       runUpdate: null,
+      workstreamPresentation,
       errorViewModel: null
     };
   }
   async completeCoworkTurn(input) {
     let assistantMessage = input.assistantDraftMessage;
     const sessionId = input.context.session?.sessionId ?? null;
+    const workstreamSessionId = sessionId ?? this.ephemeralWorkstreamSessionId(input.assistantDraftMessage.turnId);
     const abortController = new AbortController();
     const conversationAgentId = input.requestedMode === "ask" ? "ask_agent" : "rdc-debugger";
     const showCoworkReasoning = input.requestedMode !== "ask";
@@ -13309,6 +14664,7 @@ class ConversationService {
         turnId: assistantMessage.turnId,
         message: assistantMessage
       });
+      this.publishConversationWorkstream(workstreamSessionId, [input.userMessage, assistantMessage], sessionId);
     };
     const commitStoppedMessage = () => {
       commitAssistantMessage("message_completed", {
@@ -13642,6 +14998,29 @@ ${upgradeReply}`);
   }
   emitConversationEvent(event) {
     workflowProjectionPublisher.publishConversationEvent(event);
+  }
+  publishWorkstream(sessionId) {
+    if (!sessionId) {
+      return;
+    }
+    void agentWorkstreamProjector.getSession(sessionId).then((result) => {
+      if (result.success && result.presentation) {
+        workflowProjectionPublisher.publishWorkstreamChanged(sessionId, result.presentation);
+      }
+    }).catch((error) => {
+      console.error("[ConversationService] Failed to publish workstream:", error);
+    });
+  }
+  publishConversationWorkstream(workstreamSessionId, messages, persistedSessionId) {
+    if (persistedSessionId) {
+      this.publishWorkstream(persistedSessionId);
+      return;
+    }
+    const presentation = agentWorkstreamProjector.buildConversationPresentation(workstreamSessionId, messages);
+    workflowProjectionPublisher.publishWorkstreamChanged(workstreamSessionId, presentation);
+  }
+  ephemeralWorkstreamSessionId(turnId) {
+    return `conversation-${turnId}`;
   }
 }
 const conversationService = new ConversationService();
@@ -14993,6 +16372,30 @@ function registerWorkflowHandlers(context2) {
   });
   electron.ipcMain.handle("workflow:approvePlan", async (_event, runId) => {
     return debuggerRuntime.approvePlan(runId);
+  });
+  electron.ipcMain.handle("workflow:getWorkstreamSession", async (_event, sessionId) => {
+    const targetSessionId = sessionId || state2.currentSessionId;
+    if (!targetSessionId) {
+      return { success: false, error: "No active session." };
+    }
+    return debuggerRuntime.getWorkstreamSession(targetSessionId);
+  });
+  electron.ipcMain.handle("workflow:requestPlanRevision", async (_event, runId, revisionText) => {
+    const result = await debuggerRuntime.requestPlanRevision(runId, revisionText);
+    if (result.success) {
+      state2.currentSessionId = result.session?.sessionId || state2.currentSessionId;
+      state2.currentRunId = result.runId || state2.currentRunId;
+      if (state2.currentSessionId) {
+        await storageAdapter.setCurrentSessionId(state2.currentSessionId);
+      }
+    }
+    return result;
+  });
+  electron.ipcMain.handle("workflow:switchWorkstreamBranch", async (_event, sessionId, branchId) => {
+    return debuggerRuntime.switchWorkstreamBranch(sessionId, branchId);
+  });
+  electron.ipcMain.handle("workflow:exportWorkstreamSession", async (_event, sessionId, options) => {
+    return debuggerRuntime.exportWorkstreamSession(sessionId, options);
   });
   electron.ipcMain.handle("workflow:restartRun", async (_event, runId) => {
     const result = await debuggerRuntime.restartRun(runId);

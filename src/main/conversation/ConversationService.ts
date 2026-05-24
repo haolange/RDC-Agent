@@ -26,6 +26,7 @@ import type {
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
+import { agentWorkstreamProjector } from '../workflow/debugger/AgentWorkstreamProjector';
 import { debuggerRuntime } from '../workflow/debugger/DebuggerRuntime';
 import { replayDeviceService } from '../captures/ReplayDeviceService';
 import { rdxSessionService } from '../index';
@@ -701,6 +702,7 @@ export class ConversationService {
 
     this.persistConversationSnapshot(context.session?.sessionId ?? null, userMessage);
     this.persistConversationSnapshot(context.session?.sessionId ?? null, assistantDraftMessage);
+    this.publishWorkstream(context.session?.sessionId ?? null);
 
     void this.completeActiveDebugTurn({
       context,
@@ -728,6 +730,7 @@ export class ConversationService {
   }) {
     let assistantMessage = input.assistantDraftMessage;
     const sessionId = input.context.session?.sessionId ?? null;
+    const workstreamSessionId = sessionId ?? this.ephemeralWorkstreamSessionId(input.assistantDraftMessage.turnId);
     const abortController = new AbortController();
 
     const commitAssistantMessage = (type: ConversationStreamEvent['type'], patch: Partial<ConversationMessage>) => {
@@ -746,6 +749,7 @@ export class ConversationService {
         turnId: assistantMessage.turnId,
         message: assistantMessage,
       } as ConversationStreamEvent);
+      this.publishConversationWorkstream(workstreamSessionId, [input.userMessage, assistantMessage], sessionId);
     };
 
     const commitStoppedMessage = () => {
@@ -905,6 +909,12 @@ export class ConversationService {
 
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, userMessage);
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
+    const workstreamSessionId = workingSession?.sessionId ?? this.ephemeralWorkstreamSessionId(turnId);
+    const workstreamPresentation = agentWorkstreamProjector.buildConversationPresentation(
+      workstreamSessionId,
+      [userMessage, assistantDraftMessage],
+    );
+    this.publishConversationWorkstream(workstreamSessionId, [userMessage, assistantDraftMessage], workingSession?.sessionId ?? null);
 
     void this.completeCoworkTurn({
       context: {
@@ -925,6 +935,7 @@ export class ConversationService {
       assistantDraftMessage,
       executionTransition: { action: 'none' },
       runUpdate: null,
+      workstreamPresentation,
       errorViewModel: null,
     };
   }
@@ -939,6 +950,7 @@ export class ConversationService {
   }) {
     let assistantMessage = input.assistantDraftMessage;
     const sessionId = input.context.session?.sessionId ?? null;
+    const workstreamSessionId = sessionId ?? this.ephemeralWorkstreamSessionId(input.assistantDraftMessage.turnId);
     const abortController = new AbortController();
     const conversationAgentId: AgentRole = input.requestedMode === 'ask' ? 'ask_agent' : 'rdc-debugger';
     const showCoworkReasoning = input.requestedMode !== 'ask';
@@ -959,6 +971,7 @@ export class ConversationService {
         turnId: assistantMessage.turnId,
         message: assistantMessage,
       } as ConversationStreamEvent);
+      this.publishConversationWorkstream(workstreamSessionId, [input.userMessage, assistantMessage], sessionId);
     };
 
     const commitStoppedMessage = () => {
@@ -1342,6 +1355,40 @@ export class ConversationService {
 
   private emitConversationEvent(event: ConversationStreamEvent) {
     workflowProjectionPublisher.publishConversationEvent(event);
+  }
+
+  private publishWorkstream(sessionId: string | null | undefined): void {
+    if (!sessionId) {
+      return;
+    }
+
+    void agentWorkstreamProjector.getSession(sessionId)
+      .then((result) => {
+        if (result.success && result.presentation) {
+          workflowProjectionPublisher.publishWorkstreamChanged(sessionId, result.presentation);
+        }
+      })
+      .catch((error) => {
+        console.error('[ConversationService] Failed to publish workstream:', error);
+      });
+  }
+
+  private publishConversationWorkstream(
+    workstreamSessionId: string,
+    messages: ConversationMessage[],
+    persistedSessionId?: string | null,
+  ): void {
+    if (persistedSessionId) {
+      this.publishWorkstream(persistedSessionId);
+      return;
+    }
+
+    const presentation = agentWorkstreamProjector.buildConversationPresentation(workstreamSessionId, messages);
+    workflowProjectionPublisher.publishWorkstreamChanged(workstreamSessionId, presentation);
+  }
+
+  private ephemeralWorkstreamSessionId(turnId: string): string {
+    return `conversation-${turnId}`;
   }
 }
 

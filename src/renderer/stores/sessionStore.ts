@@ -18,6 +18,7 @@ import type {
   ReasoningSummary,
   WorkflowState,
 } from '@shared/types/workflow';
+import type { AgentWorkstreamPresentation } from '@shared/types/workstream';
 
 export type RightRailTarget = 'project' | 'session';
 
@@ -81,6 +82,7 @@ interface SessionState {
   actionEvents: ActionEvent[];
   runs: RunSummary[];
   workflowState: WorkflowState | null;
+  workstreamPresentation: AgentWorkstreamPresentation | null;
   currentDebugPlan: DebugPlan | null;
   pendingQuestions: AskUserPrompt | null;
   reasoningSummaries: ReasoningSummary[];
@@ -117,6 +119,7 @@ interface SessionState {
   addActionEvent: (event: ActionEvent) => void;
   setRuns: (runs: RunSummary[]) => void;
   setWorkflowState: (workflowState: WorkflowState | null) => void;
+  setWorkstreamPresentation: (presentation: AgentWorkstreamPresentation | null) => void;
   setCurrentDebugPlan: (debugPlan: DebugPlan | null) => void;
   setPendingQuestions: (prompt: AskUserPrompt | null) => void;
   setReasoningSummaries: (summaries: ReasoningSummary[]) => void;
@@ -141,6 +144,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   actionEvents: [],
   runs: [],
   workflowState: null,
+  workstreamPresentation: null,
   currentDebugPlan: null,
   pendingQuestions: null,
   reasoningSummaries: [],
@@ -243,6 +247,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   addActionEvent: (event) => set((state) => ({ actionEvents: [...state.actionEvents, event] })),
   setRuns: (runs) => set({ runs }),
   setWorkflowState: (workflowState) => set({ workflowState }),
+  setWorkstreamPresentation: (workstreamPresentation) => set({ workstreamPresentation }),
   setCurrentDebugPlan: (currentDebugPlan) => set({ currentDebugPlan }),
   setPendingQuestions: (pendingQuestions) => set({ pendingQuestions }),
   setReasoningSummaries: (reasoningSummaries) => set({ reasoningSummaries }),
@@ -261,6 +266,7 @@ export const useSessionStore = create<SessionState>((set) => ({
       actionEvents: [],
       runs: [],
       workflowState: null,
+      workstreamPresentation: null,
       currentDebugPlan: null,
       pendingQuestions: null,
       reasoningSummaries: [],

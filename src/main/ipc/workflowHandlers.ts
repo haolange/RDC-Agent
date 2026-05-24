@@ -95,6 +95,34 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
     return debuggerRuntime.approvePlan(runId);
   });
 
+  ipcMain.handle('workflow:getWorkstreamSession', async (_event, sessionId?: string) => {
+    const targetSessionId = sessionId || state.currentSessionId;
+    if (!targetSessionId) {
+      return { success: false, error: 'No active session.' };
+    }
+    return debuggerRuntime.getWorkstreamSession(targetSessionId);
+  });
+
+  ipcMain.handle('workflow:requestPlanRevision', async (_event, runId: string, revisionText: string) => {
+    const result = await debuggerRuntime.requestPlanRevision(runId, revisionText);
+    if (result.success) {
+      state.currentSessionId = result.session?.sessionId || state.currentSessionId;
+      state.currentRunId = result.runId || state.currentRunId;
+      if (state.currentSessionId) {
+        await storageAdapter.setCurrentSessionId(state.currentSessionId);
+      }
+    }
+    return result;
+  });
+
+  ipcMain.handle('workflow:switchWorkstreamBranch', async (_event, sessionId: string, branchId: string) => {
+    return debuggerRuntime.switchWorkstreamBranch(sessionId, branchId);
+  });
+
+  ipcMain.handle('workflow:exportWorkstreamSession', async (_event, sessionId: string, options?: unknown) => {
+    return debuggerRuntime.exportWorkstreamSession(sessionId, options as Parameters<typeof debuggerRuntime.exportWorkstreamSession>[1]);
+  });
+
   ipcMain.handle('workflow:restartRun', async (_event, runId: string) => {
     const result = await debuggerRuntime.restartRun(runId);
     if (result.success) {

@@ -68,6 +68,7 @@ flowchart TB
   Curator["Curator / report"]
   AgentRunner["AgentRunnerPort / SDK adapter"]
   Projection["WorkflowProjectionPublisher"]
+  Workstream["AgentWorkstreamProjector / WorkstreamStateStore"]
   Evidence["EvidenceLedger / ArtifactStore"]
   Activity["RuntimeLogService"]
   UI["Debugger UI"]
@@ -81,6 +82,9 @@ flowchart TB
   Execution --> Evidence
   Curator --> Evidence
   Evidence --> Projection
+  Evidence --> Workstream
+  Projection --> Workstream
+  Workstream --> UI
   Execution --> Activity
   Projection --> UI
   Activity --> UI
@@ -92,9 +96,38 @@ flowchart TB
 - `DebugWorkflowService` 是 Runtime 内部执行服务，不再作为 IPC、conversation 或公开 workflow barrel 的入口。
 - `WorkflowProjectionPublisher` 统一广播 `workflow:*`、`evidence:eventAdded`、`conversation:event` 等投影事件；Runtime 和 agent runner 不直接持有窗口引用。
 - OpenAI / Claude Agent SDK 通过 `AgentRunnerPort` 运行，工具能力由 Runtime policy 生成 allowlist，再经 `AgentToolPort -> ToolBridge` 执行。
-- `DebugPlan.presentation` 是消息流内 Debugger Plan 审批卡的展示契约，包含 `title` 和 `sections`；UI 只渲染结构，fallback 由 plan builder 生成。
+- `AgentWorkstreamProjector` 负责把 conversation、action events、plan snapshot、task board、artifact/context store 投影为 `AgentWorkstreamPresentation`；renderer 不再从 raw trace 猜消息节点。
+- `DebugPlan.presentation` 只作为 Plan Result Block 的源数据，主执行/修改入口迁移到 composer 上方的 `ComposerApprovalOverlay`。
 - `AskUserQuestion` 是 plan/intake 阶段可用的用户交互 primitive：renderer 通过 composer 上方 overlay 提交到 `workflow.submitQuestions(runId, answers)`，同时 workflow 写入 `ui.ask_user_question` tool trace，让问题请求和用户回答保留在消息流中。
 - 不新增阶段，不改变 Debugger harness 状态机，不把 Analyzer / Optimizer 并入该主链。
+
+## Agent Workstream Projection
+
+```mermaid
+sequenceDiagram
+  participant Runtime as "DebugWorkflowService"
+  participant Store as "WorkstreamStateStore"
+  participant Projector as "AgentWorkstreamProjector"
+  participant Publisher as "WorkflowProjectionPublisher"
+  participant API as "electronAPI.workflow"
+  participant UI as "AgentWorkstream / WorkstreamRightPanel"
+
+  Runtime->>Store: register plan / approval / revision / branch
+  Runtime->>Projector: build session presentation
+  Projector->>Projector: merge runtime/session data into product events
+  Projector-->>Runtime: AgentWorkstreamSession + AgentWorkstreamPresentation
+  Runtime->>Publisher: workflow:workstreamChanged
+  Publisher-->>UI: presentation update
+  UI->>API: getWorkstreamSession / requestPlanRevision / switchWorkstreamBranch / exportWorkstreamSession
+```
+
+关键触点：
+
+- 共享契约集中在 `src/shared/types/workstream.ts`，包括 `TaskWorkstream`、`ProcessEvent`、`ProgressTask`、`WorkstreamArtifactRecord`、`WorkstreamContextRecord`、`TaskResultRecord`、`PlanStatus`、`UserRequest`、branch 和 export/raw audit 结构。
+- `workflow:getWorkstreamSession` 返回同一份 session/presentation model；`workflow:workstreamChanged` 是 renderer 增量刷新入口。
+- `workflow:requestPlanRevision` 不覆盖旧 prompt 或旧 plan，而是写入 User Revision Message、创建 revision branch，并生成新的 plan workstream。
+- `workflow:exportWorkstreamSession` 导出 presentation summary、branch、artifact/context refs 和 raw trace refs；raw trace 仍是 audit/export 来源，不回到默认消息流。
+- Browser Preview scenario 可以直接提供 `workstreamSession` / `workstreamPresentation`，也可以由 fallback 生成稳定样本；该路径只验证 renderer fallback，不等价于 Electron / IPC / ToolBridge 验收。
 
 ## Conversation
 

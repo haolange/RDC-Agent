@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import path from 'path';
 import type { AgentRole } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
@@ -22,6 +23,13 @@ import type {
   WorkflowState,
   PlanPresentation,
 } from '@shared/types/workflow';
+import type {
+  WorkstreamBranchSwitchResult,
+  WorkstreamExportOptions,
+  WorkstreamExportResult,
+  WorkstreamRevisionResult,
+  WorkstreamSessionResult,
+} from '@shared/types/workstream';
 import { normalizeWorkflowStage } from '@shared/constants/stages';
 import { BLOCKER_CODES } from '@shared/constants/blockers';
 import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
@@ -40,6 +48,8 @@ import { contextService } from '../../captures/ContextService';
 import { evidenceLedger } from '../../reports/EvidenceLedger';
 import { taskBoard } from './TaskBoard';
 import { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
+import { agentWorkstreamProjector } from './AgentWorkstreamProjector';
+import { workstreamStateStore } from './WorkstreamStateStore';
 import {
   dedupeBlockers,
   latestStageHistory,
@@ -534,9 +544,28 @@ export class DebugWorkflowService {
       approval_state: 'approved',
       pending_questions: null,
     });
+    workstreamStateStore.markPlan(location.session.sessionId, snapshot.debug_plan.planId, 'accepted');
     this.applyTaskMutation(location.session.sessionId, runId, 'plan', 'completed', 'User approved the Debugger plan.');
     this.applyTaskMutation(location.session.sessionId, runId, 'speclist', 'in_progress', 'Task breakdown started after plan approval.');
     contextService.writeRunCapsule(location.session.sessionId, runId);
+
+    await this.appendUserConversationMessage(
+      location.session.sessionId,
+      runId,
+      '同意执行',
+    );
+
+    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
+      runId,
+      sessionId: location.session.sessionId,
+      agentId: 'user',
+      eventType: 'user_confirmation',
+      status: 'ok',
+      payload: {
+        planId: snapshot.debug_plan.planId,
+        label: '同意执行',
+      },
+    }));
 
     await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
       runId,
@@ -579,6 +608,197 @@ export class DebugWorkflowService {
       pendingQuestions: null,
       approvalState: 'approved',
     };
+  }
+
+  async getWorkstreamSession(sessionId: string): Promise<WorkstreamSessionResult> {
+    return agentWorkstreamProjector.getSession(sessionId);
+  }
+
+  async requestPlanRevision(runId: string, revisionText: string): Promise<WorkstreamRevisionResult> {
+    const location = this.findRun(runId);
+    if (!location) {
+      return { success: false, error: `Run not found: ${runId}` };
+    }
+    const trimmedRevision = revisionText.trim();
+    if (!trimmedRevision) {
+      return { success: false, error: 'Revision text is required.' };
+    }
+
+    const snapshot = storageAdapter.readPlanSnapshot(location.session.sessionId, runId);
+    if (!snapshot?.debug_plan) {
+      return { success: false, error: 'No plan snapshot available.' };
+    }
+
+    const previousPlanId = snapshot.debug_plan.planId;
+    const { runId: nextRunId, sessionId } = await storageAdapter.createRun({
+      caseId: location.session.sessionId,
+      turnId: location.run.turnId,
+      capturePaths: location.run.captures.map((capture) => capture.filePath),
+      mode: location.run.mode,
+      goal: `${location.run.goal}\n\n修改建议：${trimmedRevision}`,
+      captures: location.run.captures,
+      backend: location.run.backend,
+      status: 'awaiting_approval',
+    });
+    const nextPlan: DebugPlan = {
+      ...snapshot.debug_plan,
+      planId: generateEventId('plan'),
+      userGoal: `${snapshot.debug_plan.userGoal}\n\n修改建议：${trimmedRevision}`,
+      notes: [...snapshot.debug_plan.notes, `用户修改建议：${trimmedRevision}`],
+      presentation: buildDebugPlanPresentation({
+        ...snapshot.debug_plan,
+        userGoal: `${snapshot.debug_plan.userGoal}\n\n修改建议：${trimmedRevision}`,
+        notes: [...snapshot.debug_plan.notes, `用户修改建议：${trimmedRevision}`],
+      }),
+      createdAt: nowIso(),
+      updatedAt: nowIso(),
+    };
+
+    workstreamStateStore.createRevision({
+      sessionId,
+      runId: nextRunId,
+      previousPlanId,
+      revisionText: trimmedRevision,
+      revisionWorkstreamId: `ws-${nextRunId}-plan`,
+    });
+
+    storageAdapter.writePlanSnapshot(sessionId, nextRunId, {
+      ...snapshot,
+      debug_plan: nextPlan,
+      pending_questions: null,
+      approval_state: 'pending_user',
+    });
+    this.seedHarnessPlan({
+      sessionId,
+      runId: nextRunId,
+      mode: location.run.mode,
+      captures: location.run.captures,
+      debugPlan: nextPlan,
+      pendingQuestions: null,
+    });
+    workstreamStateStore.registerPlan({
+      sessionId,
+      runId: nextRunId,
+      planId: nextPlan.planId,
+      workstreamId: `ws-${nextRunId}-plan`,
+      status: 'awaiting_approval',
+    });
+
+    await storageAdapter.updateRun(location.session.sessionId, runId, {
+      status: 'interrupted',
+      stopReason: 'Plan revision requested',
+      stoppedAt: Date.now(),
+      finishedAt: Date.now(),
+    });
+    await storageAdapter.updateRun(sessionId, nextRunId, {
+      status: 'awaiting_approval',
+      lastStage: 'plan',
+      runtime: {
+        workflow_stage: 'plan',
+      },
+    });
+
+    await this.appendUserConversationMessage(
+      location.session.sessionId,
+      runId,
+      `修改建议：${trimmedRevision}`,
+    );
+    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
+      runId,
+      sessionId: location.session.sessionId,
+      agentId: 'user',
+      eventType: 'user_revision_requested',
+      status: 'ok',
+      payload: {
+        planId: previousPlanId,
+        prompt: trimmedRevision,
+        nextRunId,
+        nextPlanId: nextPlan.planId,
+      },
+    }));
+    await this.appendActionEvent(sessionId, storageAdapter.createActionEvent({
+      runId: nextRunId,
+      sessionId,
+      agentId: 'rdc-debugger',
+      eventType: 'user_message',
+      status: 'ok',
+      payload: {
+        role: 'user',
+        content: trimmedRevision,
+        source: 'plan_revision',
+        previousPlanId,
+      },
+    }));
+    await this.appendAssistantConversationMessage(
+      sessionId,
+      nextRunId,
+      '我已根据修改建议生成新的计划，请重新确认后再进入正式执行。',
+    );
+
+    this.emitRunStatus(location.session.sessionId, runId, 'interrupted', location.run.lastStage, 'Plan revision requested');
+    this.emitRunStatus(sessionId, nextRunId, 'awaiting_approval', 'plan');
+    this.emitWorkflowState(await this.getWorkflowState(sessionId, nextRunId));
+    const workstream = await this.getWorkstreamSession(sessionId);
+
+    return {
+      ...workstream,
+      runId: nextRunId,
+      planId: nextPlan.planId,
+      branchId: workstream.session?.activeBranchId,
+    };
+  }
+
+  async switchWorkstreamBranch(sessionId: string, branchId: string): Promise<WorkstreamBranchSwitchResult> {
+    workstreamStateStore.switchBranch(sessionId, branchId);
+    const workstream = await this.getWorkstreamSession(sessionId);
+    return {
+      ...workstream,
+      activeBranchId: workstream.session?.activeBranchId,
+    };
+  }
+
+  async exportWorkstreamSession(
+    sessionId: string,
+    options: WorkstreamExportOptions = {},
+  ): Promise<WorkstreamExportResult> {
+    try {
+      const session = storageAdapter.readSession(sessionId);
+      if (!session) {
+        return { success: false, error: `Session not found: ${sessionId}` };
+      }
+      const workstream = await this.getWorkstreamSession(sessionId);
+      if (!workstream.success) {
+        return { success: false, error: workstream.error };
+      }
+      const exportDir = path.join(session.sessionPath, 'exports');
+      fs.mkdirSync(exportDir, { recursive: true });
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const summaryPath = path.join(exportDir, `agent-workstream-summary-${stamp}.json`);
+      fs.writeFileSync(summaryPath, JSON.stringify({
+        schemaVersion: '1',
+        exportedAt: nowIso(),
+        includeAllBranches: options.includeAllBranches ?? true,
+        session: workstream.session,
+        presentation: workstream.presentation,
+      }, null, 2), 'utf-8');
+
+      let rawTracePath: string | undefined;
+      if (options.includeRawTrace !== false) {
+        rawTracePath = path.join(exportDir, `agent-workstream-raw-trace-${stamp}.jsonl`);
+        const events = await storageAdapter.readActionChain(sessionId);
+        fs.writeFileSync(rawTracePath, `${events.map((event) => JSON.stringify(event)).join('\n')}\n`, 'utf-8');
+      }
+
+      return {
+        success: true,
+        sessionId,
+        summaryPath,
+        rawTracePath,
+        bundlePath: summaryPath,
+      };
+    } catch (error) {
+      return { success: false, sessionId, error: error instanceof Error ? error.message : String(error) };
+    }
   }
 
   async restartRun(runId: string): Promise<PlanResult> {
@@ -2099,6 +2319,38 @@ export class DebugWorkflowService {
     }
     await storageAdapter.appendActionEvent(sessionId, event);
     workflowProjectionPublisher.publishEvidenceEvent(event);
+    this.publishWorkstream(sessionId);
+  }
+
+  private async appendUserConversationMessage(
+    sessionId: string,
+    runId: string | null,
+    content: string,
+  ): Promise<void> {
+    const runLocation = this.findRun(runId || '');
+    const message: ConversationMessage = {
+      id: generateEventId('msgu'),
+      turnId: runLocation?.run.turnId || generateEventId('turn'),
+      sessionId,
+      projectId: runLocation?.session.projectId ?? null,
+      runId,
+      modeContext: runLocation?.run.mode ?? 'debugger',
+      role: 'user',
+      content,
+      status: 'complete',
+      attachments: [],
+      updatedAt: nowMs(),
+      reasoningTrace: null,
+      createdAt: nowMs(),
+    };
+    storageAdapter.appendConversationMessage(sessionId, message);
+    this.emitConversationEvent({
+      type: 'message_completed',
+      sessionId,
+      turnId: message.turnId,
+      message,
+    });
+    this.publishWorkstream(sessionId);
   }
 
   private async appendAssistantConversationMessage(
@@ -2148,6 +2400,7 @@ export class DebugWorkflowService {
 
   private emitWorkflowState(state: WorkflowState): void {
     workflowProjectionPublisher.publishWorkflowState(state);
+    this.publishWorkstream(state.sessionId);
   }
 
   private emitRunStatus(
@@ -2168,6 +2421,18 @@ export class DebugWorkflowService {
 
   private emitConversationEvent(event: ConversationStreamEvent): void {
     workflowProjectionPublisher.publishConversationEvent(event);
+  }
+
+  private publishWorkstream(sessionId: string): void {
+    void agentWorkstreamProjector.getSession(sessionId)
+      .then((result) => {
+        if (result.success && result.presentation) {
+          workflowProjectionPublisher.publishWorkstreamChanged(sessionId, result.presentation);
+        }
+      })
+      .catch((error) => {
+        console.error('[WorkflowProjectionPublisher] Failed to publish workstream:', error);
+      });
   }
 }
 

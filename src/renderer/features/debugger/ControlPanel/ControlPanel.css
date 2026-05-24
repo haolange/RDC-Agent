@@ -178,6 +178,145 @@
   padding: 0 12px 12px;
 }
 
+.workstream-empty {
+  padding: 10px;
+  border: 1px solid rgb(var(--color-border-subtle));
+  border-radius: 8px;
+  background: rgb(var(--color-bg-1) / 0.58);
+  color: rgb(var(--color-text-tertiary));
+  font-size: 12px;
+}
+
+.workstream-progress-list,
+.workstream-artifact-list,
+.workstream-context-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.workstream-progress-item,
+.workstream-artifact-item,
+.workstream-context-item {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid rgb(var(--color-border-subtle));
+  border-radius: 8px;
+  background: rgb(var(--color-bg-1) / 0.7);
+}
+
+.workstream-progress-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 6px 8px;
+  align-items: center;
+}
+
+.workstream-progress-item.status-completed .workstream-progress-title {
+  color: rgb(var(--color-text-tertiary));
+  text-decoration: line-through;
+}
+
+.workstream-progress-item p,
+.workstream-context-item p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: rgb(var(--color-text-tertiary));
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.workstream-progress-status,
+.workstream-progress-time,
+.workstream-artifact-meta,
+.workstream-context-importance {
+  color: rgb(var(--color-text-tertiary));
+  font-size: 10px;
+  font-weight: var(--font-semibold);
+  text-transform: uppercase;
+}
+
+.workstream-progress-title,
+.workstream-artifact-name,
+.workstream-context-label {
+  min-width: 0;
+  color: rgb(var(--color-text-primary));
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workstream-artifact-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.workstream-artifact-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.workstream-artifact-actions,
+.workstream-context-toggle,
+.workstream-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.workstream-artifact-actions button,
+.workstream-context-toggle button,
+.workstream-export-actions button {
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid rgb(var(--color-border-secondary));
+  border-radius: 6px;
+  background: rgb(var(--color-bg-2));
+  color: rgb(var(--color-text-secondary));
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.workstream-context-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.workstream-context-group h3 {
+  margin: 0;
+  color: rgb(var(--color-text-secondary));
+  font-size: 11px;
+  font-weight: var(--font-semibold);
+}
+
+.workstream-context-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px 8px;
+}
+
+.workstream-context-item.importance-cited,
+.workstream-context-item.importance-decisive {
+  border-color: rgb(var(--color-accent-500) / 0.32);
+}
+
+.workstream-history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.workstream-history summary {
+  color: rgb(var(--color-text-tertiary));
+  font-size: 11px;
+  cursor: pointer;
+}
+
 /* ============================================
  * Task Board Component
  * ============================================ */
