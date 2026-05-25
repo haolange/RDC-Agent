@@ -18,6 +18,35 @@
   background: rgb(var(--color-bg-1) / 0.9);
 }
 
+.aw-prompt-branch-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.aw-prompt-branch-nav button {
+  min-height: 22px;
+  padding: 2px 8px;
+  border: 1px solid rgb(var(--color-border-secondary));
+  border-radius: 6px;
+  background: rgb(var(--color-bg-2));
+  color: rgb(var(--color-text-secondary));
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.aw-prompt-branch-nav button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.aw-prompt-branch-nav span {
+  color: rgb(var(--color-text-tertiary));
+  font-size: 11px;
+  font-weight: var(--font-semibold);
+}
+
 .aw-branch-navigator button,
 .aw-inline-actions button,
 .aw-user-prompt-actions button,
@@ -39,36 +68,27 @@
   border-color: rgb(var(--color-accent-500));
 }
 
-.aw-task-workstream {
+.aw-agent-reply {
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 14px;
-  border: 1px solid rgb(var(--color-border-secondary));
-  border-radius: 8px;
-  background: rgb(var(--color-bg-1) / 0.74);
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.03);
 }
 
-.aw-task-header,
 .aw-result-header,
 .aw-user-prompt-meta,
 .aw-user-prompt-actions,
 .aw-result-footer,
-.aw-task-meta,
 .aw-inline-actions {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.aw-task-header,
 .aw-result-header {
   justify-content: space-between;
 }
 
-.aw-task-header h2,
 .aw-result-header h3 {
   margin: 2px 0 0;
   color: rgb(var(--color-text-primary));
@@ -78,7 +98,6 @@
 
 .aw-kicker,
 .aw-user-prompt-meta,
-.aw-task-meta,
 .aw-branch-pill {
   color: rgb(var(--color-text-tertiary));
   font-size: 10px;
@@ -126,6 +145,7 @@
 .aw-user-prompt {
   width: min(640px, 82%);
   align-self: flex-end;
+  margin-left: auto;
   position: relative;
   padding: 11px 13px 10px;
   border: 1px solid rgb(var(--color-border-default));
@@ -186,7 +206,13 @@
   padding: 10px;
 }
 
-.aw-process-trace {
+.aw-process-trace-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.aw-process-trace-items {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -194,16 +220,24 @@
   border-left: 1px solid rgb(var(--color-border-secondary));
 }
 
-.aw-process-toggle {
+.aw-thought-toggle {
   width: fit-content;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border: 0;
-  background: transparent;
+  padding: 6px 12px;
+  border: 1px solid rgb(var(--color-border-subtle));
+  border-radius: 6px;
+  background: rgb(var(--color-bg-2) / 0.5);
   color: rgb(var(--color-text-tertiary));
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.aw-thought-toggle:hover {
+  background: rgb(var(--color-bg-2));
+  color: rgb(var(--color-text-secondary));
 }
 
 .aw-thinking-bubble {
@@ -337,6 +371,15 @@
   border: 1px solid rgb(var(--color-border-secondary));
   border-radius: 8px;
   background: rgb(var(--color-bg-1));
+}
+
+.aw-result-block.result-failure {
+  border-color: rgb(var(--color-error) / 0.35);
+}
+
+.aw-result-block.result-cancelled {
+  border-color: rgb(var(--color-text-muted) / 0.3);
+  opacity: 0.9;
 }
 
 .aw-result-header {

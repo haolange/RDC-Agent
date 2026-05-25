@@ -1816,24 +1816,31 @@ class BrowserElectronApiFallback {
       sessionId: session.sessionId,
       activeBranchId: session.activeBranchId,
       mode: activeWorkstreams[0]?.type ?? 'ask',
-      items: activeWorkstreams.flatMap((workstream) => [{
-        kind: 'task_workstream',
-        id: workstream.id,
-        type: workstream.type,
-        status: workstream.status,
-        density: workstream.density,
-        title: workstream.resultKind === 'plan'
-          ? 'Plan Task'
-          : workstream.resultKind === 'report'
-            ? 'Execution Task'
-            : workstream.type === 'ask'
-              ? 'Ask Task'
-              : 'Agent Task',
-        startedAt: workstream.startedAt,
-        completedAt: workstream.completedAt,
-        prompt: this.promptForWorkstream(session, workstream.id),
+      items: activeWorkstreams.flatMap((workstream) => {
+        const prompt = this.promptForWorkstream(session, workstream.id);
+        const promptItem: AgentWorkstreamPresentation['items'] = prompt ? [prompt] : [];
+        return [...promptItem, {
+          kind: 'task_workstream',
+          id: workstream.id,
+          type: workstream.type,
+          status: workstream.status,
+          density: workstream.density,
+          title: '',
+          startedAt: workstream.startedAt,
+          completedAt: workstream.completedAt,
         process: {
           collapsed: workstream.status === 'completed',
+          thinkingDurationMs: (() => {
+            const firstThinking = workstream.processEvents.find((e) => e.kind === 'agent.text');
+            if (firstThinking && workstream.completedAt) {
+              const start = Date.parse(firstThinking.createdAt);
+              const end = Date.parse(workstream.completedAt);
+              if (!Number.isNaN(start) && !Number.isNaN(end) && end > start) {
+                return end - start;
+              }
+            }
+            return undefined;
+          })(),
           items: workstream.processEvents.map((event) => {
             if (event.kind === 'agent.text') {
               return { kind: 'agent_thinking', id: event.id, createdAt: event.createdAt, text: event.text };
@@ -1906,7 +1913,8 @@ class BrowserElectronApiFallback {
           }];
         }
         return [];
-      })]),
+      })];
+    }),
       rightPanel: {
         progress: {
           current: session.progress.filter((task) => task.status !== 'completed'),

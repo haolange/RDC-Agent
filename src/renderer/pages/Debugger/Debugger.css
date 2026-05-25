@@ -399,7 +399,7 @@
 }
 
 .composer-approval-overlay {
-  width: min(var(--workbench-content-rail-width, 1080px), calc(100% - 24px));
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -407,7 +407,7 @@
   border: 1px solid rgb(var(--color-border-secondary));
   border-radius: 8px;
   background: rgb(var(--color-bg-1) / 0.96);
-  box-shadow: 0 8px 22px rgb(0 0 0 / 0.22);
+  box-shadow: var(--shadow-panel-hover);
 }
 
 .composer-approval-header {
