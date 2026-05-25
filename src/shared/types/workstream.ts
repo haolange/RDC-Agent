@@ -284,6 +284,7 @@ export interface UserPromptBubbleViewModel {
   branchCount: number;
   canCopy: boolean;
   canEdit: boolean;
+  branchNavigator?: BranchNavigatorViewModel | null;
 }
 
 export interface AgentThinkingBubbleViewModel {
@@ -351,6 +352,7 @@ export type ProcessTraceItemViewModel =
 export interface ProcessTraceViewModel {
   collapsed: boolean;
   items: ProcessTraceItemViewModel[];
+  thinkingDurationMs?: number;
 }
 
 export interface TaskResultViewModel extends TaskResultRecord {
@@ -366,6 +368,7 @@ export interface TaskWorkstreamViewModel {
   title: string;
   startedAt: string;
   completedAt?: string;
+  /** @deprecated prompt is now rendered as an independent MessageStreamItem before the task workstream */
   prompt?: UserPromptBubbleViewModel;
   process: ProcessTraceViewModel;
   result?: TaskResultViewModel;

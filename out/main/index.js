@@ -11085,8 +11085,20 @@ class AgentWorkstreamProjector {
   }
   buildPresentation(session) {
     const activeWorkstreams = session.workstreams.filter((workstream) => workstream.branchId === session.activeBranchId);
-    const items = activeWorkstreams.flatMap((workstream) => {
-      const taskItem = this.toTaskViewModel(session, workstream);
+    const allWorkstreams = [...session.workstreams].sort((left, right) => {
+      const leftTime = Date.parse(left.startedAt) || 0;
+      const rightTime = Date.parse(right.startedAt) || 0;
+      return leftTime - rightTime;
+    });
+    const items = [];
+    for (const workstream of allWorkstreams) {
+      const isActive = workstream.branchId === session.activeBranchId;
+      const prompt = this.promptForWorkstream(session, workstream);
+      if (prompt) {
+        const branchNav = this.buildPromptBranchNavigator(session, prompt.requestId, prompt.branchId);
+        items.push({ ...prompt, branchNavigator: branchNav });
+      }
+      items.push(this.toTaskViewModel(session, workstream, !isActive));
       const userEvents = workstream.processEvents.flatMap((event) => {
         if (event.kind === "user.confirmed") {
           return [{
@@ -11110,8 +11122,8 @@ class AgentWorkstreamProjector {
         }
         return [];
       });
-      return [taskItem, ...userEvents];
-    });
+      items.push(...userEvents);
+    }
     const rightPanel = this.buildRightPanel(session, activeWorkstreams);
     const latestPlan = activeWorkstreams.filter((workstream) => workstream.planStatus === "awaiting_approval").slice(-1)[0] ?? null;
     const latestPlanResult = latestPlan?.result;
@@ -11131,12 +11143,7 @@ class AgentWorkstreamProjector {
         canApprove: true,
         canRequestRevision: true
       } : null,
-      branchNavigator: session.branches[0] ? {
-        activeBranchId: session.activeBranchId,
-        branchIndex: Math.max(session.branches[0].branches.findIndex((branch) => branch.id === session.activeBranchId), 0),
-        branchCount: session.branches[0].branches.length,
-        branches: session.branches[0].branches
-      } : null,
+      branchNavigator: null,
       rawAuditRefs: session.rawAuditRefs,
       updatedAt: session.updatedAt
     };
@@ -11429,25 +11436,34 @@ class AgentWorkstreamProjector {
     })) ?? [];
     return [...captureContext, ...packetContext, ...capabilityContext];
   }
-  toTaskViewModel(session, workstream) {
-    const prompt = this.promptForWorkstream(session, workstream);
+  toTaskViewModel(session, workstream, forceCompact = false) {
     const result = workstream.result ? {
       ...workstream.result,
       artifacts: session.artifacts.filter((artifact) => workstream.result?.artifactIds.includes(artifact.id))
     } : void 0;
+    const density = forceCompact ? "compact" : workstream.density;
+    let thinkingDurationMs;
+    const firstThinking = workstream.processEvents.find((e) => e.kind === "agent.text");
+    if (firstThinking && workstream.completedAt) {
+      const start = Date.parse(firstThinking.createdAt);
+      const end = Date.parse(workstream.completedAt);
+      if (!Number.isNaN(start) && !Number.isNaN(end) && end > start) {
+        thinkingDurationMs = end - start;
+      }
+    }
     return {
       kind: "task_workstream",
       id: workstream.id,
       type: workstream.type,
       status: workstream.status,
-      density: workstream.density,
+      density,
       title: this.titleForWorkstream(workstream),
       startedAt: workstream.startedAt,
       completedAt: workstream.completedAt,
-      prompt,
       process: {
-        collapsed: workstream.status === "completed" || workstream.density === "compact",
-        items: this.toProcessItems(workstream.processEvents)
+        collapsed: workstream.status === "completed" || density === "compact",
+        items: this.toProcessItems(workstream.processEvents),
+        thinkingDurationMs
       },
       result,
       planId: workstream.planId,
@@ -11564,12 +11580,20 @@ class AgentWorkstreamProjector {
     }
     return void 0;
   }
-  titleForWorkstream(workstream) {
-    if (workstream.resultKind === "plan") return "Plan Task";
-    if (workstream.resultKind === "report") return "Execution Task";
-    if (workstream.resultKind === "failure") return "Failure Task";
-    if (workstream.resultKind === "cancelled") return "Cancelled Task";
-    return workstream.type === "ask" ? "Ask Task" : "Agent Task";
+  buildPromptBranchNavigator(session, requestId, currentBranchId) {
+    const group = session.branches.find((entry) => entry.rootRequestId === requestId);
+    if (!group || group.branches.length <= 1) {
+      return null;
+    }
+    return {
+      activeBranchId: session.activeBranchId,
+      branchIndex: Math.max(group.branches.findIndex((branch) => branch.id === currentBranchId), 0),
+      branchCount: group.branches.length,
+      branches: group.branches
+    };
+  }
+  titleForWorkstream(_workstream) {
+    return "";
   }
   shouldShowExecutionWorkstream(run, approvalState, events) {
     return approvalState === "approved" || ["running", "stopping", "completed", "failed", "cancelled", "interrupted"].includes(run.status) || events.some((event) => ["dispatch", "agent_summary", "verification", "report_published"].includes(event.event_type));

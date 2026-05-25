@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type {
   AgentWorkstreamPresentation,
+  BranchNavigatorViewModel,
   ProcessTraceItemViewModel,
   TaskResultViewModel,
   TaskWorkstreamViewModel,
@@ -42,7 +43,28 @@ const copyText = async (text: string) => {
   await navigator.clipboard?.writeText(text);
 };
 
-const UserPromptBubble: React.FC<{ prompt: UserPromptBubbleViewModel }> = ({ prompt }) => {
+const PromptBranchNavigator: React.FC<{
+  navigator: BranchNavigatorViewModel;
+  sessionId: string;
+}> = ({ navigator, sessionId }) => {
+  const handlePrev = () => {
+    const prev = navigator.branches[Math.max(navigator.branchIndex - 1, 0)];
+    if (prev) void window.electronAPI?.workflow.switchWorkstreamBranch(sessionId, prev.id);
+  };
+  const handleNext = () => {
+    const next = navigator.branches[Math.min(navigator.branchIndex + 1, navigator.branches.length - 1)];
+    if (next) void window.electronAPI?.workflow.switchWorkstreamBranch(sessionId, next.id);
+  };
+  return (
+    <nav className="aw-prompt-branch-nav" data-testid="aw-prompt-branch-nav">
+      <button type="button" onClick={handlePrev} disabled={navigator.branchIndex <= 0}>‹</button>
+      <span>{navigator.branchIndex + 1}/{navigator.branchCount}</span>
+      <button type="button" onClick={handleNext} disabled={navigator.branchIndex >= navigator.branchCount - 1}>›</button>
+    </nav>
+  );
+};
+
+const UserPromptBubble: React.FC<{ prompt: UserPromptBubbleViewModel; sessionId: string }> = ({ prompt, sessionId }) => {
   const currentRun = useSessionStore((state) => state.currentRun);
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -65,6 +87,9 @@ const UserPromptBubble: React.FC<{ prompt: UserPromptBubbleViewModel }> = ({ pro
 
   return (
     <section className="aw-user-prompt" data-testid="aw-user-prompt">
+      {prompt.branchNavigator && prompt.branchNavigator.branchCount > 1 ? (
+        <PromptBranchNavigator navigator={prompt.branchNavigator} sessionId={sessionId} />
+      ) : null}
       <header className="aw-user-prompt-meta">
         <span>Prompt</span>
         <span title={prompt.createdAt}>{formatTime(prompt.createdAt)}</span>
@@ -176,23 +201,38 @@ const SubAgentRow: React.FC<{ item: Extract<ProcessTraceItemViewModel, { kind: '
 };
 
 const ProcessTrace: React.FC<{ task: TaskWorkstreamViewModel }> = ({ task }) => {
-  const [expanded, setExpanded] = useState(!task.process.collapsed);
+  const [userExpanded, setUserExpanded] = useState<boolean | null>(null);
   if (task.process.items.length === 0) {
     return null;
   }
-  const visibleItems = expanded ? task.process.items : task.process.items.slice(-3);
+  const isExpanded = userExpanded ?? !task.process.collapsed;
+  const durationSec = task.process.thinkingDurationMs
+    ? Math.round(task.process.thinkingDurationMs / 1000)
+    : null;
+  const toggleLabel = durationSec
+    ? `Thought for ${durationSec}s`
+    : task.status === 'running' ? 'Thinking...' : 'Thought process';
+
   return (
-    <section className={`aw-process-trace ${expanded ? 'expanded' : 'collapsed'}`} data-testid="aw-process-trace">
-      <button type="button" className="aw-process-toggle" onClick={() => setExpanded((current) => !current)}>
-        <span>{expanded ? '收起过程' : '思考过程'}</span>
-        <span>{expanded ? '⌃' : '⌄'}</span>
+    <div className="aw-process-trace-wrapper" data-testid="aw-process-trace">
+      <button
+        type="button"
+        className={`aw-thought-toggle ${isExpanded ? 'expanded' : ''}`}
+        onClick={() => setUserExpanded((current) => (current === null ? isExpanded : !current))}
+      >
+        <span>{toggleLabel}</span>
+        <span>{isExpanded ? '⌃' : '⌄'}</span>
       </button>
-      {visibleItems.map((item) => {
-        if (item.kind === 'agent_thinking') return <ThinkingBubble key={item.id} item={item} />;
-        if (item.kind === 'tool_row') return <ToolRow key={item.id} item={item} />;
-        return <SubAgentRow key={item.id} item={item} />;
-      })}
-    </section>
+      {isExpanded && (
+        <div className="aw-process-trace-items">
+          {task.process.items.map((item) => {
+            if (item.kind === 'agent_thinking') return <ThinkingBubble key={item.id} item={item} />;
+            if (item.kind === 'tool_row') return <ToolRow key={item.id} item={item} />;
+            return <SubAgentRow key={item.id} item={item} />;
+          })}
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -249,21 +289,10 @@ const UserEvent: React.FC<{ kind: 'confirmed' | 'revision'; label: string; creat
 );
 
 const TaskWorkstream: React.FC<{ task: TaskWorkstreamViewModel }> = ({ task }) => (
-  <section className={`aw-task-workstream status-${task.status}`} data-testid="aw-task-workstream">
-    <header className="aw-task-header">
-      <div>
-        <span className="aw-kicker">{task.type}</span>
-        <h2>{task.title}</h2>
-      </div>
-      <div className="aw-task-meta">
-        <span className={`aw-result-status status-${task.status}`}>{statusLabel(task.status)}</span>
-        <span title={task.startedAt}>{formatTime(task.startedAt)}</span>
-      </div>
-    </header>
-    {task.prompt ? <UserPromptBubble prompt={task.prompt} /> : null}
+  <div className="aw-agent-reply" data-testid="aw-agent-reply">
     <ProcessTrace task={task} />
     {task.result ? <TaskResultBlock result={task.result} /> : null}
-  </section>
+  </div>
 );
 
 export const AgentWorkstream: React.FC<AgentWorkstreamProps> = ({ presentation, emptyState }) => {
@@ -274,29 +303,6 @@ export const AgentWorkstream: React.FC<AgentWorkstreamProps> = ({ presentation, 
 
   return (
     <div className="agent-workstream" data-testid="agent-workstream">
-      {presentation.branchNavigator && presentation.branchNavigator.branchCount > 1 ? (
-        <nav className="aw-branch-navigator" data-testid="aw-branch-navigator">
-          <button
-            type="button"
-            onClick={() => {
-              const prev = presentation.branchNavigator?.branches[Math.max((presentation.branchNavigator?.branchIndex ?? 0) - 1, 0)];
-              if (prev) void window.electronAPI?.workflow.switchWorkstreamBranch(presentation.sessionId, prev.id);
-            }}
-          >
-            ‹
-          </button>
-          <span>{presentation.branchNavigator.branchIndex + 1}/{presentation.branchNavigator.branchCount}</span>
-          <button
-            type="button"
-            onClick={() => {
-              const next = presentation.branchNavigator?.branches[Math.min((presentation.branchNavigator?.branchIndex ?? 0) + 1, (presentation.branchNavigator?.branchCount ?? 1) - 1)];
-              if (next) void window.electronAPI?.workflow.switchWorkstreamBranch(presentation.sessionId, next.id);
-            }}
-          >
-            ›
-          </button>
-        </nav>
-      ) : null}
       {visibleItems.map((item) => {
         if (item.kind === 'task_workstream') {
           return <TaskWorkstream key={item.id} task={item} />;
@@ -307,7 +313,7 @@ export const AgentWorkstream: React.FC<AgentWorkstreamProps> = ({ presentation, 
         if (item.kind === 'user_revision') {
           return <UserEvent key={item.id} kind="revision" label={item.prompt} createdAt={item.createdAt} />;
         }
-        return <UserPromptBubble key={item.id} prompt={item} />;
+        return <UserPromptBubble key={item.id} prompt={item} sessionId={presentation.sessionId} />;
       })}
     </div>
   );
