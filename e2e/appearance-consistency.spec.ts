@@ -100,6 +100,7 @@ const seedSessionWorkbench = async (appContext: AppContext) => {
       timeline: [],
       actionEvents: [],
       workflowState: null,
+      rightRailTarget: 'session',
       runs: [],
     });
   }, { fixedNow: now });
@@ -170,21 +171,21 @@ test('language switching updates settings, empty workbench, and right rail copy 
   await ctx.page.waitForTimeout(160);
 
   await expect(ctx.page.locator('[data-testid="settings-nav-general"]')).toContainText('General');
-  await expect(ctx.page.locator('.debugger-idle-simple-title')).toContainText('Three Orchestrators for end-to-end development');
+  await expect(ctx.page.locator('.debugger-idle-simple-title')).toContainText('Ask first, execute after opening a capture');
   await expect(ctx.page.locator('[data-testid="cp-section-sessionProgress"] .cp-section-label')).toContainText('Progress');
   await expect(ctx.page.locator('[data-testid="cp-section-sessionWorkingFolder"] .cp-section-label')).toContainText('Working folder');
   await expect(ctx.page.locator('[data-testid="cp-section-sessionContext"] .cp-section-label')).toContainText('Context');
-  await expect(ctx.page.locator('textarea.chat-input')).toHaveAttribute('placeholder', /Describe the goal/);
+  await expect(ctx.page.locator('textarea.chat-input')).toHaveAttribute('placeholder', /Ask about the issue/);
 
   await ctx.page.getByRole('button', { name: 'Simplified Chinese', exact: true }).click();
   await ctx.page.waitForTimeout(160);
 
   await expect(ctx.page.locator('[data-testid="settings-nav-general"]')).toContainText('通用');
-  await expect(ctx.page.locator('.debugger-idle-simple-title')).toContainText('Orchestrator');
+  await expect(ctx.page.locator('.debugger-idle-simple-title')).toContainText('Open Capture');
   await expect(ctx.page.locator('[data-testid="cp-section-sessionProgress"] .cp-section-label')).toContainText('进度');
   await expect(ctx.page.locator('[data-testid="cp-section-sessionWorkingFolder"] .cp-section-label')).toContainText('工作目录');
   await expect(ctx.page.locator('[data-testid="cp-section-sessionContext"] .cp-section-label')).toContainText('上下文');
-  await expect(ctx.page.locator('textarea.chat-input')).toHaveAttribute('placeholder', /描述目标/);
+  await expect(ctx.page.locator('textarea.chat-input')).toHaveAttribute('placeholder', /描述问题/);
 });
 
 test('light theme keeps settings and tablet workbench readable', async () => {

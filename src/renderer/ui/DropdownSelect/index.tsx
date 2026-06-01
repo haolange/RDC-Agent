@@ -6,78 +6,20 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { createPortal } from 'react-dom';
+import {
+  ANCHOR_GAP,
+  clamp,
+  DEFAULT_MIN_MENU_WIDTH,
+  findFirstEnabledIndex,
+  findNextEnabledIndex,
+  findSelectedEnabledIndex,
+  VIEWPORT_MARGIN,
+} from './dropdownSelectUtils';
+import { DropdownSelectMenu, DropdownSelectTrigger } from './DropdownSelectPrimitives';
+import type { DropdownSelectProps } from './types';
 import './DropdownSelect.css';
 
-const VIEWPORT_MARGIN = 16;
-const ANCHOR_GAP = 8;
-const DEFAULT_MIN_MENU_WIDTH = 180;
-
-const clamp = (value: number, min: number, max: number): number => {
-  if (max < min) {
-    return min;
-  }
-  return Math.min(max, Math.max(min, value));
-};
-
-const normalizeTestIdSegment = (value: string): string => {
-  const normalized = value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return normalized || 'option';
-};
-
-const findFirstEnabledIndex = (options: DropdownOption[]): number =>
-  options.findIndex((option) => !option.disabled);
-
-const findSelectedEnabledIndex = (options: DropdownOption[], value: string): number =>
-  options.findIndex((option) => option.value === value && !option.disabled);
-
-const findNextEnabledIndex = (
-  options: DropdownOption[],
-  startIndex: number,
-  direction: 1 | -1,
-): number => {
-  if (options.length === 0) {
-    return -1;
-  }
-
-  let nextIndex = startIndex;
-  for (let step = 0; step < options.length; step += 1) {
-    nextIndex = (nextIndex + direction + options.length) % options.length;
-    if (!options[nextIndex]?.disabled) {
-      return nextIndex;
-    }
-  }
-
-  return -1;
-};
-
-export interface DropdownOption {
-  value: string;
-  label: string;
-  disabled?: boolean;
-  testId?: string;
-}
-
-interface DropdownSelectProps {
-  value: string;
-  options: DropdownOption[];
-  onChange: (value: string) => void;
-  placeholder?: string;
-  emptyLabel?: string;
-  disabled?: boolean;
-  dataTestId: string;
-  ariaLabel?: string;
-  variant?: 'field' | 'inline';
-  minMenuWidth?: number;
-  className?: string;
-  triggerClassName?: string;
-  menuClassName?: string;
-  optionClassName?: string;
-}
+export type { DropdownOption } from './types';
 
 export const DropdownSelect: React.FC<DropdownSelectProps> = ({
   value,
@@ -295,93 +237,36 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
 
   return (
     <div className={rootClassName}>
-      <button
-        ref={triggerRef}
-        type="button"
-        className={[
-          'dropdown-select-trigger',
-          `variant-${variant}`,
-          selectedOption ? '' : 'placeholder',
-          triggerClassName,
-        ].filter(Boolean).join(' ')}
-        data-testid={dataTestId}
+      <DropdownSelectTrigger
+        triggerRef={triggerRef}
+        variant={variant}
+        open={open}
         disabled={disabled}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={triggerAriaLabel}
+        dataTestId={dataTestId}
+        triggerAriaLabel={triggerAriaLabel}
+        triggerLabel={triggerLabel}
+        hasSelection={Boolean(selectedOption)}
+        triggerClassName={triggerClassName}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={handleTriggerKeyDown}
-      >
-        <span className="dropdown-select-trigger-label">{triggerLabel}</span>
-        <span className={`dropdown-select-trigger-caret ${open ? 'open' : ''}`} aria-hidden="true">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </span>
-      </button>
+      />
 
-      {open && createPortal(
-        <div
-          ref={menuRef}
-          className={[
-            'dropdown-select-menu',
-            `variant-${variant}`,
-            menuClassName,
-          ].filter(Boolean).join(' ')}
-          data-testid={`${dataTestId}-menu`}
-          role="listbox"
-          aria-label={triggerAriaLabel}
-          style={{
-            left: menuPosition.left,
-            top: menuPosition.top,
-            width: menuPosition.width,
-            visibility: menuPosition.ready ? 'visible' : 'hidden',
-          }}
-        >
-          {options.length === 0 ? (
-            <div className="dropdown-select-empty">{emptyLabel}</div>
-          ) : (
-            options.map((option, index) => {
-              const optionTestId = option.testId
-                ?? `${dataTestId}-option-${normalizeTestIdSegment(option.value)}`;
-              const isSelected = option.value === value;
-              const isActive = index === activeIndex;
-
-              return (
-                <button
-                  key={`${option.value}-${index}`}
-                  type="button"
-                  className={[
-                    'dropdown-select-option',
-                    isSelected ? 'selected' : '',
-                    isActive ? 'active' : '',
-                    option.disabled ? 'disabled' : '',
-                    optionClassName,
-                  ].filter(Boolean).join(' ')}
-                  data-testid={optionTestId}
-                  role="option"
-                  aria-selected={isSelected}
-                  aria-disabled={option.disabled ? 'true' : 'false'}
-                  disabled={option.disabled}
-                  onMouseEnter={() => {
-                    if (!option.disabled) {
-                      setActiveIndex(index);
-                    }
-                  }}
-                  onClick={() => {
-                    if (!option.disabled) {
-                      commitSelection(option.value);
-                    }
-                  }}
-                >
-                  <span className="dropdown-select-option-label">{option.label}</span>
-                  {isSelected && <span className="dropdown-select-option-check">●</span>}
-                </button>
-              );
-            })
-          )}
-        </div>,
-        document.body,
+      {open && (
+        <DropdownSelectMenu
+          menuRef={menuRef}
+          variant={variant}
+          dataTestId={dataTestId}
+          triggerAriaLabel={triggerAriaLabel}
+          menuClassName={menuClassName}
+          optionClassName={optionClassName}
+          emptyLabel={emptyLabel}
+          value={value}
+          options={options}
+          activeIndex={activeIndex}
+          menuPosition={menuPosition}
+          onActiveIndexChange={setActiveIndex}
+          onCommitSelection={commitSelection}
+        />
       )}
     </div>
   );

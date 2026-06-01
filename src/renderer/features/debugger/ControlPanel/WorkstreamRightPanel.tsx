@@ -5,8 +5,12 @@ import type {
   WorkstreamArtifactRecord,
   WorkstreamContextRecord,
 } from '@shared/types/workstream';
+import { getElectronApi } from '../../../platform/getElectronApi';
+import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
+import { useWorkflowStore } from '../../../stores/workflowStore';
 import { SessionContextPanel } from './SessionContextPanel';
+import { hasApprovedTaskBoardState, TaskBoard } from './TaskBoard';
 
 type SectionId = 'progress' | 'artifacts' | 'context';
 
@@ -87,8 +91,8 @@ const ArtifactList: React.FC<{ current: WorkstreamArtifactRecord[]; previous: Wo
         <span className="workstream-artifact-meta">{artifact.type} · {artifact.taskTitle || artifact.workstreamId}</span>
       </div>
       <div className="workstream-artifact-actions">
-        <button type="button" onClick={() => artifact.path && void window.electronAPI?.appShell.openPath(artifact.path)}>打开</button>
-        <button type="button" onClick={() => artifact.path && void window.electronAPI?.appShell.copyText(artifact.path)}>复制路径</button>
+        <button type="button" onClick={() => artifact.path && void getElectronApi()?.appShell.openPath(artifact.path)}>打开</button>
+        <button type="button" onClick={() => artifact.path && void getElectronApi()?.appShell.copyText(artifact.path)}>复制路径</button>
         <button type="button" title={artifact.rawRef}>Raw</button>
       </div>
     </div>
@@ -125,8 +129,16 @@ const ContextList: React.FC<{ records: WorkstreamContextRecord[]; emptyLabel: st
 };
 
 export const WorkstreamRightPanel: React.FC = () => {
-  const currentSession = useSessionStore((state) => state.currentSession);
-  const presentation = useSessionStore((state) => state.workstreamPresentation);
+  const currentSession = useProjectStore((state) => state.currentSession);
+  const currentRun = useSessionStore((state) => state.currentRun);
+  const workflowState = useWorkflowStore((state) => state.workflowState);
+  const currentDebugPlan = useWorkflowStore((state) => state.currentDebugPlan);
+  const presentation = useWorkflowStore((state) => state.workstreamPresentation);
+  const showTaskBoard = hasApprovedTaskBoardState(
+    currentRun,
+    workflowState,
+    currentDebugPlan ?? workflowState?.debugPlan ?? null,
+  );
   const [expanded, setExpanded] = useState<Record<SectionId, boolean>>({
     progress: true,
     artifacts: true,
@@ -158,7 +170,7 @@ export const WorkstreamRightPanel: React.FC = () => {
   const exportSession = (includeRawTrace: boolean) => {
     const sessionId = currentSession?.sessionId;
     if (!sessionId) return;
-    void window.electronAPI?.workflow.exportWorkstreamSession(sessionId, {
+    void getElectronApi()?.workflow.exportWorkstreamSession(sessionId, {
       includeAllBranches: true,
       includeRawTrace,
     });
@@ -171,6 +183,7 @@ export const WorkstreamRightPanel: React.FC = () => {
           <button type="button" onClick={() => exportSession(false)}>Export summary</button>
           <button type="button" onClick={() => exportSession(true)}>Export raw trace</button>
         </div>
+        {showTaskBoard ? <TaskBoard /> : null}
         <Section
           id="progress"
           title="Progress"

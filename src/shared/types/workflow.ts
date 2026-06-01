@@ -191,6 +191,13 @@ export interface Blocker {
   resolvedAt?: string;
 }
 
+/** Discriminated view for renderer type-narrowing; runtime JSON shape unchanged. */
+export type WorkflowStateView =
+  | (WorkflowState & { currentStage: 'plan'; debugPlan: DebugPlan })
+  | (WorkflowState & { currentStage: 'awaiting_user_input'; pendingQuestions: AskUserPrompt })
+  | (WorkflowState & { currentStage: 'blocked'; blockers: [Blocker, ...Blocker[]] })
+  | WorkflowState;
+
 // Gate结果
 export interface GateResult {
   stage: string;

@@ -12,6 +12,9 @@
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "check:architecture": "node scripts/check-architecture.mjs",
+    "fidelity:extract": "node scripts/extract-fidelity-contract.mjs && node scripts/extract-shared-exports.mjs",
+    "check:fidelity": "node scripts/check-fidelity.mjs",
+    "check:shared-exports": "node scripts/check-shared-exports.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
     "test:e2e": "npx playwright test --config playwright.config.ts"

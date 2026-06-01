@@ -62,11 +62,19 @@ Agent Workstream 的正式文档入口：
 - `src/main/captures`：ReplayDevice、capture opened state、context preview。
 - `src/main/ipc`：按 API 域注册 handlers，保留一个总注册入口。
 
-渲染层按用户能力组织：
+渲染层内部分层（依赖方向：`ui` 无业务依赖 → `patterns` → `stream` / `services` → `features` → `shell` / `app`；`platform` 与 `stores` 为 IPC/状态边界）：
 
-- `src/renderer/shell`：App shell、窗口控制、布局 sizing、session bootstrap、event subscriptions、composer/run action glue、E2E seed harness。
+- `src/renderer/app`：应用装配（`App.tsx` ≤220 行）、`AppProviders`、`bootstrap/*`（`useAppBootstrap`、`useIpcEventBridge`、`useE2ESeedHarness`）。
+- `src/renderer/shell`：布局原语（`AppShell`、`TitleBar`、`WorkbenchLayout`、`PanelZone`、`ResizeHandle`）、`layoutGeometry`、用户菜单。
+- `src/renderer/stream`：消息流渲染原子（`MessageTimeline`、bubble/row 组件）；对应 Agent Workstream 展示模型。
+- `src/renderer/services`：renderer 侧纯逻辑（`conversationTimeline`、`attachmentHelpers`、`timelineFormatters` 等），无 React、无 IPC。
+- `src/renderer/hooks`：通用 hooks（`useIpcSubscription`、`useResizablePanel`、`useScrollAnchor`）；feature 私有 hook 放各 feature 目录。
+- `src/renderer/stores`：分域 Zustand（`projectStore`、`conversationStore`、`workflowStore`、`evidenceStore`、`captureStore`、`sessionStore` 仅 run/usage）+ `selectors/`；`storesReset` 供 case:new / E2E 重置。
+- `src/renderer/features/debugger/plan/`：计划审批与问答 UI（`PlanIntakePanel`、`PlanApprovalCard`、`ComposerApprovalOverlay`）。
+- `src/renderer/styles/tokens`：RGB 三元组 design token（主题/字号预留）；`global.css` 逐步按域拆分。
+- **禁止**重建 `src/renderer/components` 技术桶；基础控件进 `ui/`，展示模式进 `patterns/`。
 - `appMeta.testMode` 是 renderer 区分 deterministic E2E seed 与真实运行恢复的跨层信号；只有 test mode seed 才跳过项目输入和 workflow state 恢复，真实构建的自动化 smoke 仍必须恢复待审批 run。
-- `src/renderer/features/debugger`：Debugger 业务 UI。
+- `src/renderer/features/debugger`：Debugger 业务 UI（`composer/`、`plan/`、ControlPanel 等）。
 - `DebugPlan.presentation` 只在消息流中渲染为 Debugger Plan 审批卡，composer 上方不再承载 Plan；`PlanIntakePanel` 只负责当前待回答的 `AskUserQuestion` overlay，并通过 `workflow.submitQuestions(runId, answers)` 回写，不进入普通 Ask 聊天的全局 resume loop。`AskUserQuestion` 的请求和回答同时作为 `ui.ask_user_question` tool trace 留在消息流中，便于像普通工具调用一样追溯。
 - `src/renderer/features/settings`：settings/provider/model/profile/workspace UI。
 - Settings > Provider 必须把账号登录 Provider 单独展示；API Key/local/environment provider 使用单一 Provider 清单，已连接条目直接在原清单中呈现连接成功状态，不再单独拆出“已连接 Provider”区域。Provider 连接弹层必须保留明确的 `Connect` 与 `Test` 两个动作；已连接 OAuth detail 只展示账号/模型状态，不再显示启动授权的 `Connect`。
@@ -82,6 +90,8 @@ Agent Workstream 的正式文档入口：
 ## UI / UX 设计原则
 
 - 默认保持现有 UI/UX：布局结构、面板层级、交互路径、信息层级、视觉节奏、CSS class、测试定位符和截图基线都不应因架构重排改变。
+- **保真契约**：`scripts/fidelity/*` 清单 + Playwright `e2e/*-snapshots/` 为冻结输出；重写只允许搬家 class/testid，不允许改名或删锚点。
+- **文件行数预算**：组件 ≤300 行、hook/service ≤200 行、store slice ≤200 行（`check:architecture` R1 强制执行，遗留清单逐步清零）。
 - UI 结构调整只有两类允许原因：明确的产品变更，或为保持现有行为而必须做的结构拆分。
 - 任何涉及 `src/renderer` 的改动，都必须确认主界面、左侧项目/会话、右侧控制面板、composer、Activity/运行记录、Settings、capture library、opened capture preview 仍可达。
 - 基础控件沉淀到 `ui`，无副作用展示沉淀到 `patterns`，业务组件沉淀到 `features/*`。不要把新的业务组件继续堆回通用技术桶。
@@ -103,7 +113,9 @@ Agent Workstream 的正式文档入口：
 ## 验证门禁
 
 - 文档/规则改动：检查路径、术语、阅读顺序和仓库当前结构一致。
-- 架构检查：`npm run check:architecture`。
+- 架构检查：`npm run check:architecture`（含 renderer 行数预算 R1、依赖方向 R2、分层 IPC R3、内联颜色 R4；遗留超标文件见守卫内 `R1_LEGACY_OVER_BUDGET` 清单）。
+- 保真检查：`npm run check:fidelity`（`scripts/fidelity/fidelity-classnames.txt` / `fidelity-testids.txt` 差集为空）。
+- 共享导出：`npm run check:shared-exports`（相对 Phase 0 `shared-exports.txt` 无符号删除）。
 - 静态类型：`npm run typecheck`。
 - 构建检查：`npm run build`。
 - Electron E2E：运行前必须先 build，因为 E2E 启动 `out/main/index.js` 和 `out/renderer`。

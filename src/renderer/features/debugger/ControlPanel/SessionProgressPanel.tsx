@@ -5,7 +5,9 @@ import type { RunSummary } from '@shared/types/session';
 import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import { useI18n } from '../../../i18n';
 import type { TranslationKey } from '../../../i18n';
+import { useConversationStore } from '../../../stores/conversationStore';
 import { useSessionStore } from '../../../stores/sessionStore';
+import { useWorkflowStore } from '../../../stores/workflowStore';
 
 const ACTIVE_RUN_STATUSES: RunSummary['status'][] = [
   'planning',
@@ -195,8 +197,8 @@ export const getSessionProgressSnapshot = (
 export const SessionProgressPanel: React.FC = () => {
   const { t } = useI18n();
   const currentRun = useSessionStore((state) => state.currentRun);
-  const workflowState = useSessionStore((state) => state.workflowState);
-  const reasoningSummaries = useSessionStore((state) => state.reasoningSummaries);
+  const workflowState = useWorkflowStore((state) => state.workflowState);
+  const reasoningSummaries = useConversationStore((state) => state.reasoningSummaries);
   const snapshot = getSessionProgressSnapshot(currentRun, workflowState, reasoningSummaries, t);
   const taskItems = buildTaskMonitorItems(currentRun, workflowState, reasoningSummaries);
 

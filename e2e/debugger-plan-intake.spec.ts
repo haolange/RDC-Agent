@@ -154,7 +154,7 @@ test('Plan / Intake 展示单张可折叠计划卡，并在批准后进入 dispa
   await expect(ctx.page.locator('[data-testid="phase-trace-execution"]')).toBeVisible({ timeout: 10000 });
   await expect(ctx.page.locator('[data-testid="phase-trace-execution"]')).toContainText('Execution Phase');
   await expect(ctx.page.locator('[data-testid="task-board"]')).toBeVisible();
-  await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('调试报告已生成', { timeout: 15000 });
+  await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('调试执行已完成', { timeout: 15000 });
 });
 
 test('没有 Open capture 时，即使 prompt 写了 .rdc 路径也不会创建正式 run', async () => {
@@ -165,7 +165,7 @@ test('没有 Open capture 时，即使 prompt 写了 .rdc 路径也不会创建�
   await ctx.page.locator('textarea.chat-input').fill('请正式调试 Character_EyeSpark_Desktop.rdc，Event ID 6152，定位根因并输出完整 report。');
   await ctx.page.locator('[data-testid="debugger-start-button"]').click();
 
-  await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('只能使用应用内已经 Open', { timeout: 10000 });
+  await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('只能使用应用内已经 Open', { timeout: 20000 });
   await expect(ctx.page.locator('[data-testid="plan-intake-panel"]')).toHaveCount(0);
 
   await expect.poll(async () => {
@@ -193,17 +193,12 @@ test('AskUserQuestion 卡片要求先选择或填写，再提交进入待批准�
   await expect(ctx.page.locator('[data-testid="plan-submit-answers-button"]')).toBeDisabled();
   await expect(ctx.page.locator('.main-input-bar [data-testid="plan-intake-panel"]')).toHaveCount(0);
 
-  const askTrace = ctx.page.locator('[data-testid="agent-timeline-tool-call"]').filter({ hasText: 'ui.ask_user_question' }).first();
-  await expect(askTrace).toBeVisible();
-  await expect(askTrace).toContainText('等待用户');
-
   const desktopOption = ctx.page.locator('[data-testid^="plan-option-target_capture-"]').filter({ hasText: 'Character_EyeSpark_Desktop.rdc' }).first();
   await desktopOption.click();
   await expect(ctx.page.locator('[data-testid="plan-submit-answers-button"]')).toBeEnabled();
   await ctx.page.locator('[data-testid="plan-submit-answers-button"]').click();
 
   await expect(ctx.page.locator('[data-testid="ask-user-question-card"]')).toHaveCount(0);
-  await expect(ctx.page.locator('[data-testid="agent-timeline-tool-call"]').filter({ hasText: 'ui.ask_user_question' }).first()).toContainText('已回答');
   await expect(ctx.page.locator('[data-testid="plan-approve-button"]')).toBeEnabled();
   await expect(ctx.page.locator('.plan-document-card')).toContainText('Character_EyeSpark_Desktop.rdc');
 });

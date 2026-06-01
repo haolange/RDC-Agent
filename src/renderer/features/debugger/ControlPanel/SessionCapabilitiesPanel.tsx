@@ -2,20 +2,21 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { ToolRuntimeSummary } from '@shared/types/tool';
 import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import { useI18n } from '../../../i18n';
-import { useSessionStore } from '../../../stores/sessionStore';
+import { getElectronApi } from '../../../platform/getElectronApi';
+import { useWorkflowStore } from '../../../stores/workflowStore';
 
 const CORE_NAMESPACES = ['rd.event.*', 'rd.export.*', 'rd.session.*'];
 
 export const SessionCapabilitiesPanel: React.FC = () => {
   const { t } = useI18n();
-  const workflowState = useSessionStore((state) => state.workflowState);
-  const currentDebugPlan = useSessionStore((state) => state.currentDebugPlan);
+  const workflowState = useWorkflowStore((state) => state.workflowState);
+  const currentDebugPlan = useWorkflowStore((state) => state.currentDebugPlan);
   const [summary, setSummary] = useState<ToolRuntimeSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    const electronAPI = window.electronAPI;
+    const electronAPI = getElectronApi();
     if (!electronAPI) {
       setError(t('control.sessionCapabilitiesUnavailable'));
       return () => {

@@ -1,0 +1,28 @@
+import { useCaptureStore } from './captureStore';
+import { useConversationStore } from './conversationStore';
+import { useEvidenceStore } from './evidenceStore';
+import { useProjectStore } from './projectStore';
+import { useSessionStore } from './sessionStore';
+import { useWorkflowStore } from './workflowStore';
+
+/** Resets session-scoped slices (used by case:new and E2E harness). */
+export function resetWorkbenchStores(): void {
+  useProjectStore.setState({
+    projects: [],
+    sessions: [],
+    currentProject: null,
+    currentSession: null,
+    rightRailTarget: 'project',
+    projectInputs: [],
+  });
+  useCaptureStore.getState().reset();
+  useConversationStore.getState().reset();
+  useEvidenceStore.getState().reset();
+  useWorkflowStore.getState().reset();
+  useSessionStore.setState({
+    runs: [],
+    currentRun: null,
+    currentRunUsage: null,
+    isLoading: false,
+  });
+}

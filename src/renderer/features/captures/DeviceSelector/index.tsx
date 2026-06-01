@@ -1,83 +1,16 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDeviceStore } from '../../../stores/deviceStore';
 import type { ReplayDeviceEntry } from '@shared/types/device';
+import {
+  DeviceStatusIcon,
+  DeviceTypeIcon,
+  getBootstrapSummary,
+  StatusText,
+  type DeviceSelectorVariant,
+} from './DeviceSelectorParts';
+import { useDeviceDropdownPosition } from './useDeviceDropdownPosition';
 import './DeviceSelector.css';
-
-const DROPDOWN_MIN_WIDTH = 280;
-const VIEWPORT_MARGIN = 16;
-const ANCHOR_GAP = 8;
-
-type DeviceSelectorVariant = 'sidebar' | 'utility';
-type DropdownPlacement = 'above' | 'below';
-
-const clamp = (value: number, min: number, max: number): number => {
-  if (max < min) {
-    return min;
-  }
-  return Math.min(max, Math.max(min, value));
-};
-
-const DeviceTypeIcon: React.FC<{ type: ReplayDeviceEntry['type'] }> = ({ type }) => {
-  if (type === 'local') {
-    return (
-      <svg className="device-type-icon" viewBox="0 0 16 16" fill="currentColor">
-        <path d="M8 1a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V3a2 2 0 0 0-2-2H8zm0 1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" />
-        <path d="M3 5a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1v-2H9v1H4V7h1V5H3z" />
-      </svg>
-    );
-  }
-
-  return (
-    <svg className="device-type-icon" viewBox="0 0 16 16" fill="currentColor">
-      <rect x="4" y="1.5" width="8" height="13" rx="1.5" />
-      <rect x="6" y="3.25" width="4" height="8" rx="0.75" fill="rgb(var(--color-bg-1))" />
-    </svg>
-  );
-};
-
-const StatusText: Record<ReplayDeviceEntry['status'], string> = {
-  offline: 'Offline',
-  loading: 'Loading',
-  connected: 'Connected',
-  online: 'Online',
-};
-
-function getBootstrapSummary(device: ReplayDeviceEntry): string | null {
-  if (device.type !== 'android' || !device.bootstrap) {
-    return null;
-  }
-
-  const summary: string[] = [];
-  if (device.bootstrap.packageName) {
-    summary.push(device.bootstrap.packageName);
-  }
-  if (device.bootstrap.installMode === 'force_replace') {
-    summary.push('APK force replaced');
-  } else if (device.bootstrap.installedApk) {
-    summary.push('APK installed');
-  } else if (device.bootstrap.packageName) {
-    summary.push('APK verified');
-  }
-  if (device.bootstrap.abi) {
-    summary.push(device.bootstrap.abi);
-  }
-
-  return summary.length > 0 ? summary.join(' · ') : null;
-}
-
-const DeviceStatusIcon: React.FC<{ device: ReplayDeviceEntry }> = ({ device }) => {
-  if (device.status === 'online') {
-    return <span className="device-status-icon online">✓</span>;
-  }
-  if (device.status === 'connected') {
-    return <span className="device-status-icon connected">Connected</span>;
-  }
-  if (device.status === 'loading') {
-    return <span className="device-status-icon loading" aria-hidden="true" />;
-  }
-  return <span className="device-status-icon offline">✕</span>;
-};
 
 interface DeviceSelectorProps {
   variant?: DeviceSelectorVariant;
@@ -95,12 +28,13 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
   const isUtility = variant === 'utility';
   const dropdownTestId = isUtility ? 'utility-device-selector-dropdown' : 'sidebar-device-selector-dropdown';
   const triggerTestId = isUtility ? 'utility-device-selector-trigger' : 'sidebar-device-selector-trigger';
-  const [dropdownPosition, setDropdownPosition] = useState({
-    left: VIEWPORT_MARGIN,
-    top: VIEWPORT_MARGIN,
-    width: DROPDOWN_MIN_WIDTH,
-    ready: false,
-    placement: 'below' as DropdownPlacement,
+
+  const dropdownPosition = useDeviceDropdownPosition({
+    isOpen,
+    variant,
+    collapsed,
+    triggerRef,
+    menuRef,
   });
 
   const selectedEntry = devices.find((device) => device.id === selectedDevice) ?? devices[0];
@@ -128,85 +62,6 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const updateDropdownPosition = useCallback(() => {
-    const triggerRect = triggerRef.current?.getBoundingClientRect();
-    const dropdownElement = menuRef.current;
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    if (!triggerRect) {
-      setDropdownPosition({
-        left: VIEWPORT_MARGIN,
-        top: VIEWPORT_MARGIN,
-        width: DROPDOWN_MIN_WIDTH,
-        ready: true,
-        placement: 'below',
-      });
-      return;
-    }
-
-    const measuredWidth = isUtility
-      ? Math.max(dropdownElement?.offsetWidth ?? 0, DROPDOWN_MIN_WIDTH)
-      : Math.max(
-        collapsed ? DROPDOWN_MIN_WIDTH : triggerRect.width,
-        dropdownElement?.offsetWidth ?? 0,
-        DROPDOWN_MIN_WIDTH,
-      );
-    const width = Math.min(measuredWidth, viewportWidth - VIEWPORT_MARGIN * 2);
-    const measuredHeight = dropdownElement?.offsetHeight ?? 320;
-    const maxLeft = viewportWidth - width - VIEWPORT_MARGIN;
-    const leftCandidate = isUtility ? triggerRect.right - width : triggerRect.left;
-    const left = clamp(leftCandidate, VIEWPORT_MARGIN, maxLeft);
-    const preferredTop = triggerRect.top - measuredHeight - ANCHOR_GAP;
-    const placement: DropdownPlacement = preferredTop >= VIEWPORT_MARGIN ? 'above' : 'below';
-    const topCandidate = placement === 'above'
-      ? preferredTop
-      : triggerRect.bottom + ANCHOR_GAP;
-    const maxTop = viewportHeight - measuredHeight - VIEWPORT_MARGIN;
-    const top = clamp(topCandidate, VIEWPORT_MARGIN, maxTop);
-
-    setDropdownPosition({
-      left,
-      top,
-      width,
-      ready: true,
-      placement,
-    });
-  }, [collapsed, isUtility]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setDropdownPosition((current) => ({ ...current, ready: false }));
-    }
-  }, [isOpen]);
-
-  useLayoutEffect(() => {
-    if (!isOpen) return;
-
-    updateDropdownPosition();
-
-    const handleViewportChange = () => {
-      updateDropdownPosition();
-    };
-
-    const resizeObserver = typeof ResizeObserver !== 'undefined'
-      ? new ResizeObserver(() => updateDropdownPosition())
-      : null;
-
-    if (menuRef.current && resizeObserver) {
-      resizeObserver.observe(menuRef.current);
-    }
-
-    window.addEventListener('resize', handleViewportChange);
-    window.addEventListener('scroll', handleViewportChange, true);
-
-    return () => {
-      resizeObserver?.disconnect();
-      window.removeEventListener('resize', handleViewportChange);
-      window.removeEventListener('scroll', handleViewportChange, true);
-    };
-  }, [isOpen, updateDropdownPosition]);
 
   const handleToggleOpen = () => {
     setIsOpen((open) => !open);

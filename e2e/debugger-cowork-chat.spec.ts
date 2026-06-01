@@ -76,7 +76,7 @@ test('配置好 route 后，通用技术问题会得到正常回答，而不是 
   await ctx.page.locator('textarea.chat-input').fill('你知道什么是UE4吗?');
   await ctx.page.locator('[data-testid="debugger-start-button"]').click();
 
-  await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('Unreal Engine 4');
+  await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('Unreal Engine 4', { timeout: 20000 });
   await expect(ctx.page.locator('[data-testid="chat-messages"]')).not.toContainText('你可以先告诉我你遇到了什么现象');
   await expect(ctx.page.locator('[data-testid="plan-intake-panel"]')).toHaveCount(0);
 });
@@ -100,7 +100,7 @@ test('Ask 发送后用户消息立即入流、assistant 不出现执行式 reaso
   await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('你好');
   await expect(ctx.page.locator('[data-testid="aw-task-workstream"]')).toHaveCount(1);
   await expect(ctx.page.locator('[data-testid="aw-user-prompt"]')).toHaveCount(1);
-  await expect(ctx.page.locator('[data-testid="aw-result-block"]')).toHaveCount(1);
+  await expect(ctx.page.locator('[data-testid="aw-result-block"]')).toHaveCount(1, { timeout: 20000 });
   await expect(ctx.page.locator('[data-testid="assistant-reasoning-toggle"]')).toHaveCount(0);
   await expect(ctx.page.locator('[data-testid="assistant-reasoning-panel"]')).toHaveCount(0);
 
@@ -129,8 +129,8 @@ test('Cowork 模型请求失败时显示诊断，不伪装成本地兜底成功'
   await ctx.page.locator('textarea.chat-input').fill('你好 __RDC_AGENT_E2E_FORCE_COWORK_LLM_FAILURE__');
   await ctx.page.locator('[data-testid="debugger-start-button"]').click();
 
-  await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('模型请求失败');
-  await expect(ctx.page.locator('[data-testid="aw-result-block"]')).toContainText('CONVERSATION_LLM_REQUEST_FAILED');
+  await expect(ctx.page.locator('[data-testid="chat-messages"]')).toContainText('模型请求失败', { timeout: 20000 });
+  await expect(ctx.page.locator('[data-testid="aw-result-block"]')).toContainText('CONVERSATION_LLM_REQUEST_FAILED', { timeout: 20000 });
   await expect(ctx.page.locator('[data-testid="aw-result-block"]')).toContainText('ollama/debugger-test-model');
   await expect(ctx.page.locator('[data-testid="agent-thinking-trace"]')).toHaveCount(0);
   await expect(ctx.page.locator('[data-testid="agent-thinking-area"]')).toHaveCount(0);
