@@ -1,3 +1,4 @@
+﻿import { getElectronApi } from '../../../platform/getElectronApi';
 import React, { useEffect, useMemo, useState } from 'react';
 import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import type { AgentRole, AgentState, AgentStatus } from '@shared/types/agent';
@@ -44,7 +45,7 @@ export const WorkflowPanel: React.FC = () => {
   const [eventCount, setEventCount] = useState(0);
   const [activeAgents, setActiveAgents] = useState<ActiveAgent[]>([]);
 
-  const electronAPI = typeof window !== 'undefined' ? window.electronAPI : undefined;
+  const electronAPI = typeof window !== 'undefined' ? getElectronApi() : undefined;
 
   useEffect(() => {
     const loadInitialState = async () => {

@@ -1,0 +1,34 @@
+:root {
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+
+  --radius-none: 0;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-full: 9999px;
+
+  --radius-card: var(--radius-lg);
+  --radius-button: var(--radius-lg);
+  --radius-input: var(--radius-md);
+  --radius-bubble: 12px;
+  --radius-bubble-tail: 4px;
+
+  --header-height: 52px;
+  --footer-height: 42px;
+  --panel-width: 360px;
+  --sidebar-width: 240px;
+}

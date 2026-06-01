@@ -4,6 +4,8 @@
 
 本文件只约束 `RDC-Agent` 仓库内的修改方式、文档治理和交付边界。
 
+本文件是仓库级工作约定；若与系统、平台安全规则或用户本轮明确指令冲突，以更高优先级指令为准，并在交付说明中指出采用了哪个约束。仓库内部文档之间出现冲突时，`AGENTS.md` 只负责修改公约，产品边界、架构边界和验证门禁以 `DESIGN.md` 为准，再同步修正文档。
+
 本仓库是一个面向 RenderDoc `.rdc` capture 的 Electron 桌面应用，核心代码分布在 `src/main`、`src/preload`、`src/renderer` 和 `src/shared`。仓库级规则只描述这些层之间的协作方式，不承接上游 `RDC-Agent-Frameworks` 或 `RDC-Agent-Tools` 的仓库级规则。
 
 ## 修改原则
@@ -23,7 +25,10 @@
 ## 执行纪律
 
 - 实现前必须先界定本次目标、可验证的成功标准、验证方式和关键假设。
-- 遇到需求不明确、存在多种合理解释，或实现路径会影响产品边界、UI/UX、架构边界、跨层契约、数据结构或模块解耦时，必须先停下来提出澄清问题，不要静默选择。
+- 遇到需求不明确或存在多种合理解释时，先按影响分级处理：
+  - 会导致 data loss、公开 API/IPC/共享类型破坏、schema/workspace 迁移、安全/权限边界变化，或不可安全回滚的产品语义变化时，属于 Blocking Ambiguity，必须先停下来提出澄清问题。
+  - 影响范围局限、可回滚、可通过测试或 smoke 验证的歧义，属于 Non-blocking Ambiguity，应显式写明假设、风险和回滚方式后继续推进，不要静默选择。
+- 涉及产品边界、UI/UX、架构边界、跨层契约、数据结构或模块解耦时，若仍存在 Blocking Ambiguity，必须先澄清；若只是 Non-blocking Ambiguity，按显式假设执行并验证。
 - 默认采用最小可行修改，不新增未被要求的功能、抽象、配置项、扩展点或兼容层。
 - 只修改完成当前目标必需的文件和代码，每一处 `diff` 都应能对应到本次请求、验证失败或本文件已有约定。
 - 新路径替代旧路径时，应同步删除旧入口、旧文案、旧默认路径或无意义兼容分支，避免留下 legacy / deprecated 双轨。
@@ -77,6 +82,7 @@
 
 - 开始实现前先写明本次验证方式；实现后按该方式验证并报告结果。无法运行的验证，必须说明原因和剩余风险。
 - 代码改动后执行一次 `npm run typecheck`。
+- renderer 结构或 UI 锚点改动后执行 `npm run check:architecture`、`npm run check:fidelity`、`npm run check:shared-exports`。
 - 入口、构建或窗口逻辑改动后，再补一次 `npm run build` 或等价打包检查。
 - 仅验证 renderer UI/UX 时，可以使用 `npm run dev:renderer` 或 `scripts/start-rdc-agent-renderer.cmd` 打开 `http://127.0.0.1:5173/`；这只算 `Browser Preview` 验证，不等价于真实 `Electron E2E`。
 - 运行 Electron E2E 前必须先执行 `npm run build`，因为 `e2e/helpers/electron-app.ts` 启动的是 `out/main/index.js` 与 `out/renderer` 的构建产物；不要直接用旧的 `out/` 结果验证最新源码改动。

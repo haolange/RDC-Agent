@@ -67,6 +67,7 @@ export type {
   PlanApprovalState,
   WorkflowStage,
   WorkflowState,
+  WorkflowStateView,
 } from './workflow';
 export type {
   AgentWorkstreamPresentation,

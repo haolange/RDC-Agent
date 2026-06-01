@@ -602,6 +602,14 @@ const seedRunningSessionWorkbench = async (page: Page) => {
 
     const state = hook.getWorkbenchState() as {
       captures: unknown[];
+      contextSnapshot: {
+        humanPreview?: {
+          status?: string;
+          sessionId?: string;
+          boundEventId?: number;
+          updatedAt?: number;
+        };
+      } | null;
     };
 
     const activeRun = {
@@ -620,8 +628,20 @@ const seedRunningSessionWorkbench = async (page: Page) => {
 
     hook.seedWorkbenchState({
       ...state,
+      rightRailTarget: 'session',
       currentRun: activeRun,
       runs: [activeRun],
+      contextSnapshot: state.contextSnapshot
+        ? {
+            ...state.contextSnapshot,
+            humanPreview: {
+              status: 'open',
+              sessionId: state.contextSnapshot.humanPreview?.sessionId ?? 'replay-session-visual',
+              boundEventId: 1847,
+              updatedAt: fixedNow,
+            },
+          }
+        : null,
       workflowState: {
         caseId: 'session-visual',
         runId: 'run-visual',
@@ -736,7 +756,7 @@ test('project mode keeps only Capture Library on the right rail', async () => {
   await expect(page.locator('[data-testid="cp-section-captureLibrary"]')).toBeVisible();
   await expect(page.locator('[data-testid="cp-section-openedCapture"]')).toHaveCount(0);
   await expect(page.locator('[data-testid="cp-section-runtimeContext"]')).toHaveCount(0);
-  await expect(page.locator('[data-testid^="capture-library-open-"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid^="capture-library-open-"]')).toHaveCount(3);
   await expect(page.locator('[data-testid="app-sidebar-right"]')).toHaveScreenshot('right-panel-project.png');
 });
 
@@ -877,7 +897,7 @@ test('Capture Library toolbar and cards do not clip horizontally', async () => {
   await expect(page.locator('[data-testid="capture-library-import"]')).toBeVisible();
   await expect(page.locator('[data-testid="capture-library-refresh"]')).toBeVisible();
   await expect(page.locator('[data-testid="capture-library-card-input-0"]')).toBeVisible();
-  await expect(page.locator('[data-testid^="capture-library-open-"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid^="capture-library-open-"]')).toHaveCount(3);
 
   expect(await isChildFullyWithinContainer(
     page,

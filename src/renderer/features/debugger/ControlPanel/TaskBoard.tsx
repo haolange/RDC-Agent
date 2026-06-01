@@ -2,7 +2,9 @@ import React, { useMemo } from 'react';
 import type { HarnessTask } from '@shared/types/harness';
 import type { DebugPlan, WorkflowState } from '@shared/types/workflow';
 import type { RunSummary } from '@shared/types/session';
+import { useConversationStore } from '../../../stores/conversationStore';
 import { useSessionStore } from '../../../stores/sessionStore';
+import { useWorkflowStore } from '../../../stores/workflowStore';
 
 type BoardItemStatus = 'completed' | 'active' | 'pending' | 'blocked';
 
@@ -61,9 +63,9 @@ const buildBoardItems = (
 
 export const TaskBoard: React.FC = () => {
   const currentRun = useSessionStore((state) => state.currentRun);
-  const workflowState = useSessionStore((state) => state.workflowState);
-  const currentDebugPlan = useSessionStore((state) => state.currentDebugPlan);
-  const reasoningSummaries = useSessionStore((state) => state.reasoningSummaries);
+  const workflowState = useWorkflowStore((state) => state.workflowState);
+  const currentDebugPlan = useWorkflowStore((state) => state.currentDebugPlan);
+  const reasoningSummaries = useConversationStore((state) => state.reasoningSummaries);
   const debugPlan = currentDebugPlan ?? workflowState?.debugPlan ?? null;
   const harnessTasks = workflowState?.harnessTasks ?? [];
   const blockerCount = workflowState?.blockers.length ?? 0;

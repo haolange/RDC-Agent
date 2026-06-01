@@ -1,17 +1,22 @@
 import React, { useEffect, useRef } from 'react';
 import type { AgentMode } from '@shared/types/layout';
-import { useSessionStore } from '../../../stores/sessionStore';
+import { useWorkflowStore } from '../../../stores/workflowStore';
 import { EmptyWorkbenchPrompt } from '../../../patterns/EmptyWorkbenchPrompt';
 import { AgentWorkstream } from '../AgentWorkstream';
+import { PlanApprovalCard } from '../plan/PlanApprovalCard';
 import './AgentChat.css';
 
 const STICKY_SCROLL_THRESHOLD = 96;
 
 export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
-  const presentation = useSessionStore((state) => state.workstreamPresentation);
+  const presentation = useWorkflowStore((state) => state.workstreamPresentation);
+  const workflowState = useWorkflowStore((state) => state.workflowState);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldStickToBottomRef = useRef(true);
   const itemCount = presentation?.items.length ?? 0;
+  const currentStage = workflowState?.currentStage;
+  const showPlanPhaseMarker = currentStage === 'plan' || workflowState?.approvalState === 'pending_user';
+  const showExecutionPhaseMarker = Boolean(currentStage && !['preflight', 'plan'].includes(currentStage));
   const isEmpty = itemCount === 0;
 
   useEffect(() => {
@@ -26,7 +31,7 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
       top: container.scrollHeight,
       behavior: 'smooth',
     });
-  }, [itemCount, presentation?.updatedAt]);
+  }, [itemCount, presentation?.updatedAt, workflowState?.currentStage, workflowState?.approvalState]);
 
   const handleScroll = () => {
     const container = scrollContainerRef.current;
@@ -47,9 +52,16 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
         data-testid="chat-messages"
         onScroll={handleScroll}
       >
+        {showPlanPhaseMarker ? (
+          <span className="phase-trace-compat-marker" data-testid="phase-trace-plan">Plan Phase</span>
+        ) : null}
+        {showExecutionPhaseMarker ? (
+          <span className="phase-trace-compat-marker" data-testid="phase-trace-execution">Execution Phase</span>
+        ) : null}
+        <PlanApprovalCard />
         <AgentWorkstream
           presentation={presentation}
-          emptyState={<EmptyWorkbenchPrompt mode={mode} />}
+          emptyState={isEmpty ? <EmptyWorkbenchPrompt mode={mode} /> : null}
         />
       </div>
     </div>
@@ -57,4 +69,3 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
 };
 
 export default AgentChat;
-

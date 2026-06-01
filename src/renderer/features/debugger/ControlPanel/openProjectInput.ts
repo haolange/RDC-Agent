@@ -8,6 +8,7 @@ import type {
   RunSummary,
 } from '@shared/types/session';
 import type { TranslationKey } from '../../../i18n';
+import { getElectronApi } from '../../../platform/getElectronApi';
 
 interface OpenProjectInputOptions {
   input: ProjectInputRecord;
@@ -69,7 +70,7 @@ export async function openProjectInput(options: OpenProjectInputOptions): Promis
 
   onStart?.();
   try {
-    await window.electronAPI.capture.clearOpenedState();
+    await getElectronApi()?.capture.clearOpenedState();
     setContextSnapshot(null);
     setCaptures([]);
     setOpenedCapture(createOpeningState(input, currentProject.projectId, selectedDeviceEntry));
@@ -82,7 +83,7 @@ export async function openProjectInput(options: OpenProjectInputOptions): Promis
       setErrorMessage(t('control.captureRemoteConnecting'));
     }
 
-    const result = await window.electronAPI.capture.openProjectInput({
+    const result = await getElectronApi()!.capture.openProjectInput({
       projectId: currentProject.projectId,
       inputId: input.inputId,
       filePath: input.filePath,

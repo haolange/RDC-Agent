@@ -1,0 +1,37 @@
+:root {
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.16);
+  --shadow-md: 0 8px 18px rgb(0 0 0 / 0.18);
+  --shadow-lg: 0 16px 34px rgb(0 0 0 / 0.22);
+  --shadow-xl: 0 24px 48px rgb(0 0 0 / 0.26);
+  --shadow-panel: 0 10px 24px rgb(0 0 0 / 0.18);
+  --shadow-panel-hover: 0 12px 28px rgb(0 0 0 / 0.22);
+  --shadow-glow: 0 0 0 1px rgb(var(--color-accent-500) / 0.12);
+  --shadow-glow-strong: 0 0 0 1px rgb(var(--color-accent-500) / 0.2);
+
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slower: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-fixed: 300;
+  --z-modal-backdrop: 400;
+  --z-modal: 500;
+  --z-popover: 600;
+  --z-tooltip: 700;
+  --z-overlay: 900;
+  --z-notification: 1000;
+
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+
+  --animation-typing: 1.4s;
+  --animation-pulse: 2s;
+  --animation-shimmer: 2s;
+  --animation-float: 3s;
+  --animation-spin: 1s;
+  --animation-shake: 0.5s;
+}

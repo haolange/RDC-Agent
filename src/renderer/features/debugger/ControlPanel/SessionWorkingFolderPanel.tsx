@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { SessionOutputRecord } from '@shared/types/session';
 import { useI18n } from '../../../i18n';
+import { getElectronApi } from '../../../platform/getElectronApi';
+import { useEvidenceStore } from '../../../stores/evidenceStore';
+import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
 
 const getLeafName = (value: string): string => value.split(/[\\/]/).filter(Boolean).pop() || value;
@@ -14,9 +17,9 @@ const formatFileSize = (bytes?: number): string => {
 
 export const SessionWorkingFolderPanel: React.FC = () => {
   const { t } = useI18n();
-  const currentSession = useSessionStore((state) => state.currentSession);
+  const currentSession = useProjectStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
-  const actionEvents = useSessionStore((state) => state.actionEvents);
+  const actionEvents = useEvidenceStore((state) => state.actionEvents);
   const [outputs, setOutputs] = useState<SessionOutputRecord[]>([]);
 
   useEffect(() => {
@@ -29,7 +32,7 @@ export const SessionWorkingFolderPanel: React.FC = () => {
       };
     }
 
-    const electronAPI = window.electronAPI;
+    const electronAPI = getElectronApi();
     if (!electronAPI) {
       setOutputs([]);
       return () => {
@@ -62,7 +65,7 @@ export const SessionWorkingFolderPanel: React.FC = () => {
   }
 
   const openPath = async (targetPath: string) => {
-    await window.electronAPI?.appShell.openPath(targetPath);
+    await getElectronApi()?.appShell.openPath(targetPath);
   };
 
   return (

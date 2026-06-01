@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useElectronApi } from '../hooks/useElectronApi';
 import './ProfileAvatar.css';
 
 interface ProfileAvatarProps {
@@ -21,6 +22,7 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
   fallbackClassName,
   alt = 'avatar',
 }) => {
+  const electronAPI = useElectronApi();
   const normalizedAvatarPath = avatarPath?.trim() ?? '';
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
 
@@ -34,7 +36,7 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
       };
     }
 
-    void window.electronAPI.appShell.getAvatarDataUrl(normalizedAvatarPath)
+    void electronAPI?.appShell.getAvatarDataUrl(normalizedAvatarPath)
       .then((dataUrl) => {
         if (!cancelled) {
           setAvatarDataUrl(dataUrl);
@@ -49,7 +51,7 @@ export const ProfileAvatar: React.FC<ProfileAvatarProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [normalizedAvatarPath]);
+  }, [electronAPI, normalizedAvatarPath]);
 
   if (avatarDataUrl) {
     return (

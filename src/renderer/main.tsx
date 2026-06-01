@@ -1,7 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
+import App from './app/App';
 import { installBrowserElectronApiFallback } from './platform/browserElectronApi';
+import './styles/tokens/index.css';
 import './styles/design-system.css';
 import './styles/global.css';
 

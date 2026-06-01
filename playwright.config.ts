@@ -5,6 +5,7 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 60000,
   retries: 0,
+  workers: 1,
   expect: {
     toHaveScreenshot: {
       animations: 'disabled',

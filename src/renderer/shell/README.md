@@ -1,5 +1,7 @@
 # Renderer Shell
 
-渲染层 shell 入口，覆盖应用布局、窗口事件、session hydration、composer/run action glue 与模式切换外壳。
+布局与窗口 chrome：`AppShell`、`TitleBar`、`WorkbenchLayout`、`PanelZone`、`ResizeHandle`、`UserMenu` 等。
 
-当前实现仍在 `src/renderer/App.tsx`。后续拆分必须以 UI/UX 保真为前提，不改变布局节奏和可达入口。
+应用编排与 bootstrap 在 `src/renderer/app/`；领域状态在 `src/renderer/stores/`；会话/时间线工具在 `src/renderer/services/`。
+
+`main.tsx` 直接挂载 `./app/App`，不再经过根目录 `App.tsx` re-export。
