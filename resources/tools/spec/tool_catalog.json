@@ -86,7 +86,7 @@
     {
       "name": "rd.core.set_log_level",
       "group": "3.1，核心与环境管理 (Core & Environment)",
-      "description": "设置内部日志等级，便于定位 MCP Server 与 RenderDoc 侧错误。",
+      "description": "设置内部日志等级，便于定位 CLI runtime 与 RenderDoc 侧错误。",
       "parameter_raw": "level (str): 'trace'|'debug'|'info'|'warn'|'error'",
       "returns_raw": "ok (bool)<br>data (dict): tool-specific payload<br>artifacts (list)<br>error (dict|null)<br>meta (dict)<br>projections (dict, 可选)",
       "param_names": [
@@ -4565,7 +4565,7 @@
       "name": "rd.session.claim_runtime_owner",
       "group": "3.17，上下文快照工具 (Context Snapshot Tools)",
       "description": "Claim a live runtime owner lease for the current context. Matching runtime_owner and owner_lease_id are then required for live rd.* calls.",
-      "parameter_raw": "force (bool, optional, default false): force takeover of an existing owner<br>entry_mode (str, optional): cli or mcp<br>backend (str, optional): local or remote<br>context_id (str, optional): choose the context to use; defaults to the current daemon context<br>runtime_owner (str, optional): live runtime owner id; when a context has a claimed owner, live tools must match it together with owner_lease_id",
+      "parameter_raw": "force (bool, optional, default false): force takeover of an existing owner<br>entry_mode (str, optional): cli<br>backend (str, optional): local or remote<br>context_id (str, optional): choose the context to use; defaults to the current daemon context<br>runtime_owner (str, optional): live runtime owner id; when a context has a claimed owner, live tools must match it together with owner_lease_id",
       "returns_raw": "ok (bool)<br>data (dict): {context_id, entry_mode, backend, runtime_owner, owner_lease, runtime, remote, focus, active_baton, rehydrate_status, updated_at_ms}<br>artifacts (list)<br>error (dict|null)<br>meta (dict)<br>projections (dict, optional)",
       "param_names": [
         "runtime_owner",

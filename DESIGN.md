@@ -43,7 +43,7 @@ Agent Workstream 的正式文档入口：
 - `Ask` 是只读 agentic work：默认允许 `primitive.read/glob/grep/webFetch/webSearch/askUser/task.list`，禁止 `bash/write/edit/remove`。若模型请求禁用工具，runtime 必须返回 policy denial，而不是静默执行。
 - `Debugger` 绑定 `plan-generate-verify` pattern。首版继续复用现有 Debugger stage 名称，但 pattern contract 明确 planner -> generator -> evaluator 的顺序、plan approval 入口和 verifier/curator 收敛责任。
 - `Analyzer` / `Optimizer` 只作为可配置 mode profile 和 pattern 入口保留，不复制 Debugger runtime，也不声明已有专属执行链。计划文档中的 `Profiler` 在当前代码命名中对应 `Optimizer` 占位。
-- 内置 profile、stage policy、pattern、skill 和 MCP descriptor 来自 `resources/agent-runtime/`，启动时 seed 到 workspace；workspace 配置优先。`ExecutionProfileService` 只负责 schema、loader、validator、seed/repair 和 effective runtime profile 解析，不再把默认 profile 内容写死在代码里。
+- 内置 profile、stage policy、pattern 和 skill 来自 `resources/agent-runtime/`，启动时 seed 到 workspace；workspace 配置优先。通用 MCP descriptor 仍可由 workspace 配置提供，但不再内置 RDC ToolBridge MCP descriptor。`ExecutionProfileService` 只负责 schema、loader、validator、seed/repair 和 effective runtime profile 解析，不再把默认 profile 内容写死在代码里。
 - Settings > Agents 必须同时覆盖 provider/model route 与 runtime ecology：Profiles、Skills、MCP、Patterns。高频 agent route 保持首屏可达；runtime ecology 可折叠，但必须能从 UI 保存到 workspace settings。
 
 ## 架构分层

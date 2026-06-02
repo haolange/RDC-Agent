@@ -9,6 +9,7 @@ import type {
 import { appPathService } from '../runtime/AppPathService';
 
 type RuntimeTemplateKind = 'patterns' | 'skills' | 'mcp';
+const RETIRED_BUILTIN_MCP_SERVER_IDS = new Set(['builtin.rdc-toolbridge']);
 
 const TEMPLATE_COPIES: Array<{ source: string[]; target: (workspaceRoot: string) => string }> = [
   {
@@ -104,7 +105,8 @@ export class AgentRuntimeConfigService {
   }
 
   listMcpServers(workspaceRoot = appPathService.getWorkspaceRoot()): AgentRuntimeMcpDescriptor[] {
-    return this.readDescriptors<AgentRuntimeMcpDescriptor>('mcp', workspaceRoot);
+    return this.readDescriptors<AgentRuntimeMcpDescriptor>('mcp', workspaceRoot)
+      .filter((descriptor) => !RETIRED_BUILTIN_MCP_SERVER_IDS.has(descriptor.id));
   }
 
   private readDescriptors<T extends { id: string }>(kind: RuntimeTemplateKind, workspaceRoot: string): T[] {

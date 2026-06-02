@@ -1,6 +1,6 @@
 """
-RDX-MCP 的核心数据模型。
-供 MCP tools 与内部服务使用的结构化类型集合。
+rdx-tools 的核心数据模型。
+供 runtime tools 与内部服务使用的结构化类型集合。
 """
 
 from __future__ import annotations

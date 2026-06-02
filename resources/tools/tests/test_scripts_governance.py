@@ -10,11 +10,9 @@ SUPPORTED_SCRIPTS = (
     "scripts/check_markdown_health.py",
     "scripts/cleanup_workspace.py",
     "scripts/package_runtime.py",
-    "scripts/rdx_bat_command_smoke.py",
     "scripts/rdx_bat_launcher.ps1",
     "scripts/release_gate.py",
-    "scripts/smoke_report_aggregator.py",
-    "scripts/tool_contract_check.py",
+    "scripts/smoke_cli.sh",
 )
 
 DELETED_ENTRIES = (

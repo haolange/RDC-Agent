@@ -1,5 +1,5 @@
 """
-RDX-MCP 的 shader patch engine。
+rdx-tools 的 shader patch engine。
 
 在 RenderDoc replay 环境中对 shader 执行源级别修改，管理替换资源，
 并跟踪活动 patch 以便干净回滚。每个已应用的 patch 都会被记录，

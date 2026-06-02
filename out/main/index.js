@@ -346,7 +346,7 @@ class ToolBridge {
               ...options.env,
               RDX_TOOLS_ROOT: this.toolsPath,
               PYTHONIOENCODING: "utf-8",
-              RDX_LAUNCHER_PROG: "rdx.bat --non-interactive cli"
+              RDX_LAUNCHER_PROG: "rdx.bat"
             },
             windowsHide: true
           }
@@ -375,7 +375,6 @@ class ToolBridge {
             "-File",
             launcher.launcherScriptPath,
             "--non-interactive",
-            "cli",
             command,
             ...args
           ],
@@ -3217,6 +3216,7 @@ AGENT_MODES.reduce(
   },
   {}
 );
+const RETIRED_BUILTIN_MCP_SERVER_IDS$1 = /* @__PURE__ */ new Set(["builtin.rdc-toolbridge"]);
 const TEMPLATE_COPIES = [
   {
     source: ["profiles", "agents"],
@@ -3302,7 +3302,7 @@ class AgentRuntimeConfigService {
     return this.readDescriptors("skills", workspaceRoot);
   }
   listMcpServers(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return this.readDescriptors("mcp", workspaceRoot);
+    return this.readDescriptors("mcp", workspaceRoot).filter((descriptor) => !RETIRED_BUILTIN_MCP_SERVER_IDS$1.has(descriptor.id));
   }
   readDescriptors(kind, workspaceRoot) {
     this.ensureScaffold(workspaceRoot);
@@ -5150,6 +5150,7 @@ const VALID_THEMES = ["dark", "light", "system"];
 const VALID_LANGUAGES = ["zh-CN", "en"];
 const VALID_FONT_SCALES = ["small", "medium", "large"];
 const KNOWN_AGENT_IDS = new Set(Object.keys(DEFAULT_MODEL_ROUTING));
+const RETIRED_BUILTIN_MCP_SERVER_IDS = /* @__PURE__ */ new Set(["builtin.rdc-toolbridge"]);
 const EMPTY_PATHS = {
   workspaceRoot: "",
   defaultWorkspaceRoot: "",
@@ -5216,7 +5217,7 @@ function dedupeStrings(values) {
 function sanitizeRuntimeIds(values) {
   return dedupeStrings(
     Array.isArray(values) ? values.filter((value) => typeof value === "string").map((value) => value.trim()) : []
-  );
+  ).filter((value) => !RETIRED_BUILTIN_MCP_SERVER_IDS.has(value));
 }
 function sanitizePatternBindings(value) {
   const candidate = value && typeof value === "object" ? value : {};

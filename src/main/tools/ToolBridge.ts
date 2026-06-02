@@ -1,6 +1,5 @@
-/**
- * ToolBridge - 工具层桥接服务
- * 负责与RDC-Agent-Tools CLI/MCP接口通信
+﻿/**
+ * ToolBridge - bridges RDC-Agent to the bundled rdx-tools CLI runtime.
  */
 
 import { spawn, ChildProcess } from 'child_process';
@@ -358,7 +357,7 @@ export class ToolBridge {
               ...options.env,
               RDX_TOOLS_ROOT: this.toolsPath,
               PYTHONIOENCODING: 'utf-8',
-              RDX_LAUNCHER_PROG: 'rdx.bat --non-interactive cli',
+              RDX_LAUNCHER_PROG: 'rdx.bat',
             },
             windowsHide: true,
           },
@@ -388,7 +387,6 @@ export class ToolBridge {
             '-File',
             launcher.launcherScriptPath,
             '--non-interactive',
-            'cli',
             command,
             ...args,
           ],
