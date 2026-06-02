@@ -1,0 +1,166 @@
+import type { AgentRole } from './agent';
+import type { LLMStreamEvent, ToolCall } from './llm';
+import type { MCPTransport } from './mcp';
+import type { AppMode, ExecutableAppMode } from './session';
+import type { ToolCallResult } from './tool';
+import type { WorkflowPhase, WorkflowStage } from './workflow';
+
+export type AgentEventType =
+  | 'run.started'
+  | 'assistant.delta'
+  | 'assistant.completed'
+  | 'tool.requested'
+  | 'tool.started'
+  | 'tool.completed'
+  | 'task.created'
+  | 'task.updated'
+  | 'approval.requested'
+  | 'approval.answered'
+  | 'diagnostic'
+  | 'run.completed'
+  | 'run.failed'
+  | 'run.cancelled';
+
+export interface AgentEventBasePayload {
+  [key: string]: unknown;
+}
+
+export interface AgentRunStartedPayload extends AgentEventBasePayload {
+  mode: AppMode;
+  patternId?: string;
+  providerId: string;
+  modelId: string;
+  toolAllowlist: string[];
+}
+
+export interface AgentAssistantDeltaPayload extends AgentEventBasePayload {
+  text: string;
+}
+
+export interface AgentAssistantCompletedPayload extends AgentEventBasePayload {
+  text: string;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+  };
+}
+
+export interface AgentToolRequestedPayload extends AgentEventBasePayload {
+  toolCall: ToolCall;
+  streamEvent?: LLMStreamEvent;
+}
+
+export interface AgentToolStartedPayload extends AgentEventBasePayload {
+  toolCallId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+}
+
+export interface AgentToolCompletedPayload extends AgentEventBasePayload {
+  toolCallId: string;
+  toolName: string;
+  result: ToolCallResult;
+}
+
+export interface AgentTaskEventPayload extends AgentEventBasePayload {
+  taskId: string;
+  title: string;
+  status?: string;
+  parentTaskId?: string;
+}
+
+export interface AgentApprovalEventPayload extends AgentEventBasePayload {
+  approvalId: string;
+  title: string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  reason?: string;
+}
+
+export interface AgentDiagnosticPayload extends AgentEventBasePayload {
+  code: string;
+  severity: 'info' | 'warning' | 'error';
+  message: string;
+  technicalMessage?: string;
+}
+
+export interface AgentRunFinalPayload extends AgentEventBasePayload {
+  status: 'complete' | 'failed' | 'cancelled';
+  text?: string;
+  error?: string;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+  };
+}
+
+export type AgentEventPayload =
+  | AgentRunStartedPayload
+  | AgentAssistantDeltaPayload
+  | AgentAssistantCompletedPayload
+  | AgentToolRequestedPayload
+  | AgentToolStartedPayload
+  | AgentToolCompletedPayload
+  | AgentTaskEventPayload
+  | AgentApprovalEventPayload
+  | AgentDiagnosticPayload
+  | AgentRunFinalPayload;
+
+export interface AgentEvent {
+  id: string;
+  type: AgentEventType;
+  timestamp: number;
+  runId?: string;
+  turnId?: string;
+  sessionId?: string | null;
+  agentId?: AgentRole;
+  stage?: WorkflowStage | 'cowork' | 'report';
+  phase?: WorkflowPhase;
+  payload: AgentEventPayload;
+}
+
+export interface AgentRuntimeStageDescriptor {
+  id: string;
+  label: string;
+  stage: WorkflowStage;
+  phase: WorkflowPhase;
+  requiresApproval?: boolean;
+  verifierAgents?: AgentRole[];
+}
+
+export interface AgentRuntimePatternDescriptor {
+  id: string;
+  label: string;
+  description: string;
+  modeBindings: ExecutableAppMode[];
+  stages: AgentRuntimeStageDescriptor[];
+  finalStatusOwner: 'runtime';
+}
+
+export interface AgentRuntimeSkillDescriptor {
+  id: string;
+  name: string;
+  label: string;
+  description: string;
+  source: 'builtin' | 'plugin' | 'workspace';
+  enabledByDefault: boolean;
+  path?: string;
+  parameters?: Record<string, unknown>;
+}
+
+export interface AgentRuntimeMcpDescriptor {
+  id: string;
+  name: string;
+  description: string;
+  transport: MCPTransport;
+  enabledByDefault: boolean;
+  command?: string;
+  args?: string[];
+  url?: string;
+  env?: Record<string, string>;
+}
+
+export interface AgentRuntimeCatalog {
+  patterns: AgentRuntimePatternDescriptor[];
+  skills: AgentRuntimeSkillDescriptor[];
+  mcpServers: AgentRuntimeMcpDescriptor[];
+}

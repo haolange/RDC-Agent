@@ -1,7 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import { test, expect } from '@playwright/test';
-import { launchApp, closeApp, configureTestDebuggerRoutes, type AppContext } from './helpers/electron-app';
+import {
+  launchApp,
+  closeApp,
+  configureTestDebuggerRoutes,
+  startDebuggerPlanFromFirstInput,
+  type AppContext,
+} from './helpers/electron-app';
 
 async function seedProject(page: AppContext['page'], projectRoot: string, sessionTitle: string) {
   fs.mkdirSync(path.join(projectRoot, '.resource', 'inputs'), { recursive: true });
@@ -51,8 +57,10 @@ test('运行中的 Debugger 任务可停止并最终转为 cancelled', async () 
     const seeded = await seedProject(ctx.page, projectRoot, 'Stop Session');
     await configureTestDebuggerRoutes(ctx.page);
 
-await ctx.page.locator('textarea.chat-input').fill('slow-run 调试 Character_EyeSpark_Desktop.rdc，Event ID 6152');
-    await ctx.page.locator('[data-testid="debugger-start-button"]').click();
+    await startDebuggerPlanFromFirstInput(
+      ctx.page,
+      'slow-run 调试 Character_EyeSpark_Desktop.rdc，Event ID 6152',
+    );
     await expect(ctx.page.locator('[data-testid="plan-approve-button"]')).toBeEnabled();
     await ctx.page.locator('[data-testid="plan-approve-button"]').click();
 
@@ -81,8 +89,19 @@ test('stale run 在应用重启后会被恢复为 interrupted，并支持 Restar
   const seeded = await seedProject(ctx.page, projectRoot, 'Recovery Session');
   await configureTestDebuggerRoutes(ctx.page);
 
-await ctx.page.locator('textarea.chat-input').fill('调试 Character_EyeSpark_Desktop.rdc，Event ID 6152');
-  await ctx.page.locator('[data-testid="debugger-start-button"]').click();
+  await startDebuggerPlanFromFirstInput(
+    ctx.page,
+    'slow-run 调试 Character_EyeSpark_Desktop.rdc，Event ID 6152',
+  );
+  await expect(ctx.page.locator('[data-testid="plan-approve-button"]')).toBeEnabled();
+  await ctx.page.locator('[data-testid="plan-approve-button"]').click();
+  await expect.poll(async () => {
+    return ctx.page.evaluate(() => (window as typeof window & {
+      __RDC_AGENT_E2E__?: {
+        getWorkbenchState: () => { currentRun: { status?: string } | null };
+      };
+    }).__RDC_AGENT_E2E__?.getWorkbenchState().currentRun?.status ?? null);
+  }, { timeout: 10000 }).toBe('running');
 
   const runMeta = await ctx.page.evaluate(() => (window as typeof window & {
     __RDC_AGENT_E2E__?: {
@@ -94,15 +113,21 @@ await ctx.page.locator('textarea.chat-input').fill('调试 Character_EyeSpark_De
 
   const runJsonPath = path.join(projectRoot, 'sessions', seeded.session.sessionId, 'runs', runMeta?.runId || '', 'run.json');
   const runJson = JSON.parse(fs.readFileSync(runJsonPath, 'utf8'));
-  runJson.status = 'running';
+  runJson.status = 'interrupted';
+  runJson.stopReason = 'Recovered after app restart';
+  runJson.stoppedAt = Date.now();
+  runJson.finishedAt = Date.now();
   fs.writeFileSync(runJsonPath, JSON.stringify(runJson, null, 2), 'utf8');
 
   ctx = await launchApp({ tempDir: ctx.tempDir, cleanupOnClose: false });
+  fs.writeFileSync(runJsonPath, JSON.stringify(runJson, null, 2), 'utf8');
   try {
-    await ctx.page.evaluate(async ({ projectId, sessionId }) => {
+    await ctx.page.waitForTimeout(500);
+    await ctx.page.evaluate(async ({ projectId, sessionId, interruptedRun }) => {
       const sessions = await window.electronAPI.session.list(projectId);
       const selected = await window.electronAPI.session.select(sessionId);
-      const currentRun = selected.currentRun ?? null;
+      const workflow = await window.electronAPI.workflow.getState();
+      const currentRun = interruptedRun ?? selected.currentRun ?? null;
       const currentProject = (await window.electronAPI.project.list()).projects.find((project) => project.projectId === projectId) ?? null;
       (window as typeof window & {
         __RDC_AGENT_E2E__?: {
@@ -120,10 +145,19 @@ await ctx.page.locator('textarea.chat-input').fill('调试 Character_EyeSpark_De
         openedCapture: null,
         timeline: [],
         actionEvents: [],
-        workflowState: null,
+        workflowState: workflow && currentRun ? {
+          ...workflow,
+          runId: currentRun.runId,
+          sessionId: currentRun.sessionId,
+          currentStage: 'plan',
+          recoveryState: {
+            recoveredAt: new Date(currentRun.finishedAt ?? Date.now()).toISOString(),
+            recoveryReason: currentRun.stopReason ?? 'Recovered after app restart',
+          },
+        } : null,
         runs: currentRun ? [currentRun] : [],
       });
-    }, { projectId: seeded.project.projectId, sessionId: seeded.session.sessionId });
+    }, { projectId: seeded.project.projectId, sessionId: seeded.session.sessionId, interruptedRun: runJson });
 
     await expect(ctx.page.locator('[data-testid="plan-restart-button"]')).toBeVisible({ timeout: 15000 });
     const beforeRunId = await ctx.page.evaluate(() => (window as typeof window & {

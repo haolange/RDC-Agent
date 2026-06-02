@@ -1,4 +1,9 @@
 import type { AgentRole } from './agent';
+import type {
+  AgentRuntimeMcpDescriptor,
+  AgentRuntimePatternDescriptor,
+  AgentRuntimeSkillDescriptor,
+} from './agentRuntime';
 import type { ExecutionModeProfileDescriptor } from './profile';
 
 export type AppTheme = 'dark' | 'light' | 'system';
@@ -100,6 +105,9 @@ export interface AppRuntimePaths {
   migrationOrphansPath: string;
   profilesPath: string;
   policiesPath: string;
+  skillsPath: string;
+  mcpPath: string;
+  patternsPath: string;
   secretsPath: string;
   migrationReportsPath: string;
 }
@@ -161,6 +169,12 @@ export interface SettingsDiagnostic {
 export interface ConfigurationSettings {
   activeModeProfileId: string;
   availableModeProfiles: ExecutionModeProfileDescriptor[];
+  enabledSkillIds: string[];
+  enabledMcpServerIds: string[];
+  modePatternBindings: Record<string, string>;
+  availablePatterns: AgentRuntimePatternDescriptor[];
+  availableSkills: AgentRuntimeSkillDescriptor[];
+  availableMcpServers: AgentRuntimeMcpDescriptor[];
   lastMigrationReportPath?: string;
   lastMigrationSummary: string[];
   diagnostics: SettingsDiagnostic[];

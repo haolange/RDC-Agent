@@ -108,6 +108,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   const updateProfile = useAppSettingsStore((state) => state.updateProfile);
   const updateWorkspaceRoot = useAppSettingsStore((state) => state.updateWorkspaceRoot);
   const resetWorkspaceRoot = useAppSettingsStore((state) => state.resetWorkspaceRoot);
+  const patchSettings = useAppSettingsStore((state) => state.patchSettings);
   const reloadSettings = useAppSettingsStore((state) => state.reloadSettings);
   const saveAgentRoute = useAppSettingsStore((state) => state.saveAgentRoute);
 
@@ -116,6 +117,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   const [workspaceDraft, setWorkspaceDraft] = useState(settings.workspace.rootPath);
   const [providerDrafts, setProviderDrafts] = useState<LlmProviderEntry[]>(settings.llm.providers.map(cloneProvider));
   const [agentRouteDrafts, setAgentRouteDrafts] = useState<LlmAgentRoute[]>(settings.llm.agentRoutes.map(cloneRoute));
+  const [activeModeProfileDraft, setActiveModeProfileDraft] = useState(settings.configuration.activeModeProfileId);
+  const [enabledSkillDrafts, setEnabledSkillDrafts] = useState<string[]>(settings.configuration.enabledSkillIds);
+  const [enabledMcpDrafts, setEnabledMcpDrafts] = useState<string[]>(settings.configuration.enabledMcpServerIds);
+  const [patternBindingDrafts, setPatternBindingDrafts] = useState<Record<string, string>>(settings.configuration.modePatternBindings);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(settings.llm.providers[0]?.id ?? null);
   const [connectionDraft, setConnectionDraft] = useState<ProviderConnectionDraft | null>(null);
   const wasOpenRef = useRef(false);
@@ -134,6 +139,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     const providers = settings.llm.providers.map(cloneProvider);
     setProviderDrafts(providers);
     setAgentRouteDrafts(settings.llm.agentRoutes.map(cloneRoute));
+    setActiveModeProfileDraft(settings.configuration.activeModeProfileId);
+    setEnabledSkillDrafts(settings.configuration.enabledSkillIds);
+    setEnabledMcpDrafts(settings.configuration.enabledMcpServerIds);
+    setPatternBindingDrafts(settings.configuration.modePatternBindings);
     setSelectedProviderId(providers[0]?.id ?? null);
     setConnectionDraft(null);
   }, [open, settings]);
@@ -205,6 +214,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     knowledgePath: joinPath(derivedRoot, 'knowledge'),
     profilesPath: joinPath(derivedRoot, 'profiles'),
     policiesPath: joinPath(derivedRoot, 'policies'),
+    skillsPath: joinPath(derivedRoot, 'skills'),
+    mcpPath: joinPath(derivedRoot, 'mcp'),
+    patternsPath: joinPath(derivedRoot, 'patterns'),
   };
   const derivedPathEntries = [
     { label: t('settings.settingsFile'), value: derivedPaths.settingsPath },
@@ -213,6 +225,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     { label: t('settings.knowledgePath'), value: derivedPaths.knowledgePath },
     { label: t('settings.profilesPath'), value: derivedPaths.profilesPath },
     { label: t('settings.policiesPath'), value: derivedPaths.policiesPath },
+    { label: t('settings.skillsPath'), value: derivedPaths.skillsPath },
+    { label: t('settings.mcpPath'), value: derivedPaths.mcpPath },
+    { label: t('settings.patternsPath'), value: derivedPaths.patternsPath },
   ];
 
   const invalidAgentRoutes = useMemo(
@@ -531,6 +546,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     for (const route of agentRouteDrafts) {
       await saveAgentRoute(route);
     }
+  };
+
+  const toggleRuntimeId = (values: string[], id: string): string[] =>
+    values.includes(id) ? values.filter((value) => value !== id) : [...values, id];
+
+  const handleSaveAgentRuntimeConfig = async () => {
+    await patchSettings({
+      configuration: {
+        activeModeProfileId: activeModeProfileDraft,
+        enabledSkillIds: enabledSkillDrafts,
+        enabledMcpServerIds: enabledMcpDrafts,
+        modePatternBindings: patternBindingDrafts,
+      },
+    });
   };
 
   const connectionNeedsApiKey = Boolean(
@@ -1047,6 +1076,102 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                       {t('settings.saveAgentRouting')}
                     </button>
                   </div>
+
+                  <details className="settings-path-card" data-testid="settings-agent-runtime-config">
+                    <summary className="settings-field-label">{t('settings.agentRuntime')}</summary>
+                    <div className="settings-derived-paths-header">
+                      <div className="settings-help-text">{t('settings.agentRuntimeHint')}</div>
+                    </div>
+                    <div className="settings-option-block">
+                      <div className="settings-field-label">{t('settings.activeModeProfile')}</div>
+                      <DropdownSelect
+                        triggerClassName="settings-select-trigger settings-agent-select-trigger"
+                        menuClassName="settings-select-menu"
+                        dataTestId="settings-active-mode-profile"
+                        ariaLabel={t('settings.activeModeProfile')}
+                        value={activeModeProfileDraft}
+                        options={settings.configuration.availableModeProfiles.map<DropdownOption>((profile) => ({
+                          value: profile.id,
+                          label: profile.label,
+                        }))}
+                        placeholder={settings.configuration.activeModeProfileId}
+                        onChange={(profileId) => setActiveModeProfileDraft(profileId)}
+                        disabled={settings.configuration.availableModeProfiles.length === 0}
+                      />
+                    </div>
+
+                    <div className="settings-option-block">
+                      <div className="settings-field-label">{t('settings.patterns')}</div>
+                      {(['debugger', 'analyzer', 'optimizer'] as const).map((modeId) => (
+                        <div key={modeId} className="settings-agent-route-control">
+                          <span className="settings-help-text">{t(`mode.${modeId}` as TranslationKey)}</span>
+                          <DropdownSelect
+                            triggerClassName="settings-select-trigger settings-agent-select-trigger"
+                            menuClassName="settings-select-menu"
+                            dataTestId={`settings-pattern-${modeId}`}
+                            ariaLabel={`${t(`mode.${modeId}` as TranslationKey)} ${t('settings.patterns')}`}
+                            value={patternBindingDrafts[modeId] ?? ''}
+                            options={settings.configuration.availablePatterns.map<DropdownOption>((pattern) => ({
+                              value: pattern.id,
+                              label: pattern.label,
+                            }))}
+                            placeholder="free-agent"
+                            onChange={(patternId) => {
+                              setPatternBindingDrafts((current) => ({ ...current, [modeId]: patternId }));
+                            }}
+                            disabled={settings.configuration.availablePatterns.length === 0}
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="settings-option-block">
+                      <div className="settings-field-label">{t('settings.skills')}</div>
+                      <div className="user-menu-pill-group settings-inline-pills">
+                        {settings.configuration.availableSkills.map((skill) => (
+                          <button
+                            key={skill.id}
+                            type="button"
+                            className={`user-menu-pill ${enabledSkillDrafts.includes(skill.id) ? 'active' : ''}`}
+                            data-testid={`settings-skill-${skill.id}`}
+                            title={skill.description}
+                            onClick={() => setEnabledSkillDrafts((current) => toggleRuntimeId(current, skill.id))}
+                          >
+                            {skill.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="settings-option-block">
+                      <div className="settings-field-label">{t('settings.mcp')}</div>
+                      <div className="user-menu-pill-group settings-inline-pills">
+                        {settings.configuration.availableMcpServers.map((server) => (
+                          <button
+                            key={server.id}
+                            type="button"
+                            className={`user-menu-pill ${enabledMcpDrafts.includes(server.id) ? 'active' : ''}`}
+                            data-testid={`settings-mcp-${server.id}`}
+                            title={server.description}
+                            onClick={() => setEnabledMcpDrafts((current) => toggleRuntimeId(current, server.id))}
+                          >
+                            {server.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="settings-actions">
+                      <button
+                        type="button"
+                        className="button button-secondary"
+                        data-testid="settings-agent-runtime-save"
+                        onClick={() => void handleSaveAgentRuntimeConfig()}
+                      >
+                        {t('settings.saveRuntimeConfig')}
+                      </button>
+                    </div>
+                  </details>
                 </div>
               </section>
             )}

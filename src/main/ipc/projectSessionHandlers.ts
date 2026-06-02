@@ -11,6 +11,31 @@ import { storageAdapter } from '../sessions/StorageAdapter';
 import { toolBridge } from '../tools/ToolBridge';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
+const STALE_RECOVERABLE_RUN_STATUSES: Array<RunSummary['status']> = [
+  'planning',
+  'queued',
+  'running',
+  'stopping',
+];
+
+async function recoverStaleRunOnSelection(run: RunSummary | null): Promise<RunSummary | null> {
+  if (!run || !STALE_RECOVERABLE_RUN_STATUSES.includes(run.status)) {
+    return run;
+  }
+  const isActive = runExecutionService.listActiveRuns().some((activeRun) => activeRun.runId === run.runId);
+  if (isActive) {
+    return run;
+  }
+
+  await storageAdapter.updateRun(run.sessionId, run.runId, {
+    status: 'interrupted',
+    stopReason: 'Recovered after app restart',
+    stoppedAt: Date.now(),
+    finishedAt: Date.now(),
+  });
+  return storageAdapter.getLatestRun(run.sessionId);
+}
+
 export function registerProjectSessionHandlers(context: WorkbenchIpcContext): void {
   const { state } = context;
 
@@ -190,12 +215,13 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
 
     state.currentSessionId = id;
     state.currentProjectId = session.projectId;
-    state.currentRunId = session.lastRunId || null;
+    const currentRun = await recoverStaleRunOnSelection(storageAdapter.getLatestRun(id));
+    state.currentRunId = currentRun?.runId || session.lastRunId || null;
     await storageAdapter.setCurrentSessionId(id);
     return {
       success: true,
       session,
-      currentRun: storageAdapter.getLatestRun(id),
+      currentRun,
     };
   });
 

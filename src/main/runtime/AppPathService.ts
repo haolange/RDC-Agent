@@ -13,6 +13,9 @@ export interface WorkspacePaths {
   migrationOrphansPath: string;
   profilesPath: string;
   policiesPath: string;
+  skillsPath: string;
+  mcpPath: string;
+  patternsPath: string;
   secretsPath: string;
   migrationReportsPath: string;
 }
@@ -91,6 +94,9 @@ export class AppPathService {
       migrationOrphansPath: path.join(root, 'migration-orphans'),
       profilesPath: path.join(root, 'profiles'),
       policiesPath: path.join(root, 'policies'),
+      skillsPath: path.join(root, 'skills'),
+      mcpPath: path.join(root, 'mcp'),
+      patternsPath: path.join(root, 'patterns'),
       secretsPath: path.join(root, 'secrets'),
       migrationReportsPath: path.join(root, 'migration-reports'),
     };
@@ -187,6 +193,9 @@ export class AppPathService {
     fs.mkdirSync(paths.migrationOrphansPath, { recursive: true });
     fs.mkdirSync(paths.profilesPath, { recursive: true });
     fs.mkdirSync(paths.policiesPath, { recursive: true });
+    fs.mkdirSync(paths.skillsPath, { recursive: true });
+    fs.mkdirSync(paths.mcpPath, { recursive: true });
+    fs.mkdirSync(paths.patternsPath, { recursive: true });
     fs.mkdirSync(paths.secretsPath, { recursive: true });
     fs.mkdirSync(paths.migrationReportsPath, { recursive: true });
   }
@@ -200,6 +209,9 @@ export class AppPathService {
       && !this.hasDirectoryEntries(paths.migrationOrphansPath)
       && !this.hasDirectoryEntries(paths.profilesPath)
       && !this.hasDirectoryEntries(paths.policiesPath)
+      && !this.hasDirectoryEntries(paths.skillsPath)
+      && !this.hasDirectoryEntries(paths.mcpPath)
+      && !this.hasDirectoryEntries(paths.patternsPath)
       && !this.hasDirectoryEntries(paths.secretsPath)
       && !this.hasDirectoryEntries(paths.migrationReportsPath);
   }
@@ -241,6 +253,9 @@ export class AppPathService {
     this.copyDirContents(path.join(sourceRoot, 'migration-orphans'), targetPaths.migrationOrphansPath);
     this.copyDirContents(path.join(sourceRoot, 'profiles'), targetPaths.profilesPath);
     this.copyDirContents(path.join(sourceRoot, 'policies'), targetPaths.policiesPath);
+    this.copyDirContents(path.join(sourceRoot, 'skills'), targetPaths.skillsPath);
+    this.copyDirContents(path.join(sourceRoot, 'mcp'), targetPaths.mcpPath);
+    this.copyDirContents(path.join(sourceRoot, 'patterns'), targetPaths.patternsPath);
     this.copyDirContents(path.join(sourceRoot, 'secrets'), targetPaths.secretsPath);
     this.copyDirContents(path.join(sourceRoot, 'migration-reports'), targetPaths.migrationReportsPath);
     this.copyDirContents(path.join(sourceRoot, 'logs'), targetPaths.logsPath);

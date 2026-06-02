@@ -33,6 +33,7 @@ const crypto = require("crypto");
 const http = require("http");
 const Store = require("electron-store");
 const zod = require("zod");
+const events = require("events");
 function _interopNamespaceDefault(e) {
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
   if (e) {
@@ -887,6 +888,9 @@ class AppPathService {
       migrationOrphansPath: path.join(root, "migration-orphans"),
       profilesPath: path.join(root, "profiles"),
       policiesPath: path.join(root, "policies"),
+      skillsPath: path.join(root, "skills"),
+      mcpPath: path.join(root, "mcp"),
+      patternsPath: path.join(root, "patterns"),
       secretsPath: path.join(root, "secrets"),
       migrationReportsPath: path.join(root, "migration-reports")
     };
@@ -965,12 +969,15 @@ class AppPathService {
     fs.mkdirSync(paths.migrationOrphansPath, { recursive: true });
     fs.mkdirSync(paths.profilesPath, { recursive: true });
     fs.mkdirSync(paths.policiesPath, { recursive: true });
+    fs.mkdirSync(paths.skillsPath, { recursive: true });
+    fs.mkdirSync(paths.mcpPath, { recursive: true });
+    fs.mkdirSync(paths.patternsPath, { recursive: true });
     fs.mkdirSync(paths.secretsPath, { recursive: true });
     fs.mkdirSync(paths.migrationReportsPath, { recursive: true });
   }
   shouldImportLegacyData(targetRoot) {
     const paths = this.getWorkspacePaths(targetRoot);
-    return !fs.existsSync(paths.settingsPath) && !this.hasDirectoryEntries(paths.projectsPath) && !this.hasDirectoryEntries(paths.knowledgePath) && !this.hasDirectoryEntries(paths.logsPath) && !this.hasDirectoryEntries(paths.migrationOrphansPath) && !this.hasDirectoryEntries(paths.profilesPath) && !this.hasDirectoryEntries(paths.policiesPath) && !this.hasDirectoryEntries(paths.secretsPath) && !this.hasDirectoryEntries(paths.migrationReportsPath);
+    return !fs.existsSync(paths.settingsPath) && !this.hasDirectoryEntries(paths.projectsPath) && !this.hasDirectoryEntries(paths.knowledgePath) && !this.hasDirectoryEntries(paths.logsPath) && !this.hasDirectoryEntries(paths.migrationOrphansPath) && !this.hasDirectoryEntries(paths.profilesPath) && !this.hasDirectoryEntries(paths.policiesPath) && !this.hasDirectoryEntries(paths.skillsPath) && !this.hasDirectoryEntries(paths.mcpPath) && !this.hasDirectoryEntries(paths.patternsPath) && !this.hasDirectoryEntries(paths.secretsPath) && !this.hasDirectoryEntries(paths.migrationReportsPath);
   }
   hasDirectoryEntries(dirPath) {
     if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
@@ -1003,6 +1010,9 @@ class AppPathService {
     this.copyDirContents(path.join(sourceRoot, "migration-orphans"), targetPaths.migrationOrphansPath);
     this.copyDirContents(path.join(sourceRoot, "profiles"), targetPaths.profilesPath);
     this.copyDirContents(path.join(sourceRoot, "policies"), targetPaths.policiesPath);
+    this.copyDirContents(path.join(sourceRoot, "skills"), targetPaths.skillsPath);
+    this.copyDirContents(path.join(sourceRoot, "mcp"), targetPaths.mcpPath);
+    this.copyDirContents(path.join(sourceRoot, "patterns"), targetPaths.patternsPath);
     this.copyDirContents(path.join(sourceRoot, "secrets"), targetPaths.secretsPath);
     this.copyDirContents(path.join(sourceRoot, "migration-reports"), targetPaths.migrationReportsPath);
     this.copyDirContents(path.join(sourceRoot, "logs"), targetPaths.logsPath);
@@ -3207,6 +3217,104 @@ AGENT_MODES.reduce(
   },
   {}
 );
+const TEMPLATE_COPIES = [
+  {
+    source: ["profiles", "agents"],
+    target: (workspaceRoot) => path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "agents")
+  },
+  {
+    source: ["profiles", "modes"],
+    target: (workspaceRoot) => path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "modes")
+  },
+  {
+    source: ["policies", "stages"],
+    target: (workspaceRoot) => path.join(appPathService.getWorkspacePaths(workspaceRoot).policiesPath, "stages")
+  },
+  {
+    source: ["patterns"],
+    target: (workspaceRoot) => appPathService.getWorkspacePaths(workspaceRoot).patternsPath
+  },
+  {
+    source: ["skills"],
+    target: (workspaceRoot) => appPathService.getWorkspacePaths(workspaceRoot).skillsPath
+  },
+  {
+    source: ["mcp"],
+    target: (workspaceRoot) => appPathService.getWorkspacePaths(workspaceRoot).mcpPath
+  }
+];
+function readJsonFile$1(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return null;
+    }
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch (error) {
+    console.warn("[AgentRuntimeConfigService] Failed to read JSON:", filePath, error);
+    return null;
+  }
+}
+function copyDirContentsIfMissing(sourceDir, targetDir) {
+  if (!fs.existsSync(sourceDir) || !fs.statSync(sourceDir).isDirectory()) {
+    return;
+  }
+  fs.mkdirSync(targetDir, { recursive: true });
+  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+    const sourcePath = path.join(sourceDir, entry.name);
+    const targetPath = path.join(targetDir, entry.name);
+    if (entry.isDirectory()) {
+      copyDirContentsIfMissing(sourcePath, targetPath);
+      continue;
+    }
+    if (!entry.isFile() || fs.existsSync(targetPath)) {
+      continue;
+    }
+    fs.copyFileSync(sourcePath, targetPath);
+  }
+}
+class AgentRuntimeConfigService {
+  resolveTemplateRoot() {
+    const candidates = [
+      path.join(electron.app.getAppPath(), "resources", "agent-runtime"),
+      path.join(electron.app.getAppPath(), "..", "resources", "agent-runtime"),
+      path.join(process.cwd(), "resources", "agent-runtime"),
+      path.join(process.resourcesPath ?? "", "resources", "agent-runtime"),
+      path.join(process.resourcesPath ?? "", "agent-runtime")
+    ].filter(Boolean);
+    for (const candidate of candidates) {
+      const resolved = path.resolve(candidate);
+      if (fs.existsSync(resolved)) {
+        return resolved;
+      }
+    }
+    return path.resolve(candidates[0]);
+  }
+  ensureScaffold(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    const templateRoot = this.resolveTemplateRoot();
+    for (const copy of TEMPLATE_COPIES) {
+      copyDirContentsIfMissing(path.join(templateRoot, ...copy.source), copy.target(workspaceRoot));
+    }
+  }
+  listPatterns(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    return this.readDescriptors("patterns", workspaceRoot);
+  }
+  listSkills(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    return this.readDescriptors("skills", workspaceRoot);
+  }
+  listMcpServers(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    return this.readDescriptors("mcp", workspaceRoot);
+  }
+  readDescriptors(kind, workspaceRoot) {
+    this.ensureScaffold(workspaceRoot);
+    const paths = appPathService.getWorkspacePaths(workspaceRoot);
+    const dir = kind === "patterns" ? paths.patternsPath : kind === "skills" ? paths.skillsPath : paths.mcpPath;
+    if (!fs.existsSync(dir)) {
+      return [];
+    }
+    return fs.readdirSync(dir).filter((entry) => entry.endsWith(".json")).map((entry) => readJsonFile$1(path.join(dir, entry))).filter((entry) => Boolean(entry?.id)).sort((left, right) => left.id.localeCompare(right.id));
+  }
+}
+const agentRuntimeConfigService = new AgentRuntimeConfigService();
 const COPILOT_CHAT_COMPLETIONS_FALLBACK_MODELS = [
   "gemini-3-flash-preview",
   "gemini-3.5-flash",
@@ -3267,188 +3375,48 @@ function resolveCompatibleAgentRoute(routes, providers, agentId) {
   };
 }
 const DEFAULT_MODE_PROFILE_ID = "debugger.default";
-const DEFAULT_AGENT_PROMPTS = {
-  "ask_agent": [
-    "You are the RDC-Agent Ask assistant.",
-    "Stay non-executing: clarify intent, explain capabilities, summarize context, and guide the user to Open a .rdc capture when execution is needed.",
-    "Do not claim to be the RDC Debugger, do not claim that RenderDoc analysis has started, and do not use tool or shell capabilities."
-  ].join(" "),
-  "rdc-debugger": "You are the RDC Debugger orchestrator. Coordinate the workflow, keep the run truthful, and drive the next best debugging step.",
-  "triage_agent": "You are the triage specialist. Classify the rendering issue, narrow the symptom family, and suggest the right investigation surfaces.",
-  "capture_repro_agent": "You are the capture reproduction specialist. Validate capture quality, frame consistency, and reproducibility anchors.",
-  "pass_graph_pipeline_agent": "You are the pass/pipeline specialist. Analyze render-pass sequencing, pipeline state, and dependency shifts.",
-  "pixel_forensics_agent": "You are the pixel forensics specialist. Explain visible corruption with concrete pixel-, target-, and event-level evidence.",
-  "shader_ir_agent": "You are the shader IR specialist. Inspect shader source, compiled IR, and precision or replacement risks.",
-  "driver_device_agent": "You are the driver/device specialist. Compare backend, device, and driver specific behavior and identify remote-runtime risks.",
-  "skeptic_agent": "You are the skeptic. Challenge weak claims and reject conclusions not proven by the evidence chain.",
-  "curator_agent": "You are the curator. Turn accepted evidence into a structured final report and operator-ready summary."
+const groupToAllowPattern = (group) => {
+  if (group === "*") return "*";
+  if (group === "primitive") return "primitive.*";
+  if (group === "ui") return "ui.*";
+  if (group.startsWith("rd.")) return group.endsWith(".*") ? group : `${group}.*`;
+  return `rd.${group}.*`;
 };
-const DEFAULT_AGENT_TOOLS = {
-  "ask_agent": [],
-  "rdc-debugger": ["ui.ask_user_question", "rd.core.*", "rd.session.*", "rd.capture.*", "rd.remote.*"],
-  "triage_agent": ["rd.session.get_context", "rd.event.get_action_tree", "rd.macro.summarize_frame"],
-  "capture_repro_agent": ["rd.capture.get_info", "rd.capture.list_frames", "rd.context.snapshot"],
-  "pass_graph_pipeline_agent": ["rd.pipeline.get_state_summary", "rd.pipeline.get_output_targets", "rd.macro.find_state_change_point"],
-  "pixel_forensics_agent": ["rd.macro.explain_pixel", "rd.texture.get_pixel_value", "rd.export.screenshot"],
-  "shader_ir_agent": ["rd.shader.get_disassembly", "rd.shader.debug_start"],
-  "driver_device_agent": ["rd.session.get_context", "rd.remote.connect", "rd.remote.ping", "rd.remote.list_targets"],
-  "skeptic_agent": [],
-  "curator_agent": []
-};
-const DEFAULT_STAGE_POLICIES = [
-  {
-    id: "stage.preflight",
-    label: "Preflight",
-    stage: "preflight",
-    phase: "planner",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Verify runtime prerequisites, capture availability, and operator configuration before the run starts.",
-    notes: "Fail early on invalid runtime preconditions.",
-    toolPolicy: { allowGroups: ["core", "session", "capture", "remote"] }
-  },
-  {
-    id: "stage.entry_gate",
-    label: "Entry Gate",
-    stage: "entry_gate",
-    phase: "planner",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Validate entry contract, backend truth, and capture/device compatibility.",
-    notes: "Reject remote/local mismatches and missing providers.",
-    toolPolicy: { allowGroups: ["core", "session", "capture", "remote"] }
-  },
-  {
-    id: "stage.intake_gate",
-    label: "Intake Gate",
-    stage: "intake_gate",
-    phase: "planner",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Establish case input, capture references, and canonical intake state for downstream agents.",
-    notes: "Produce the durable intake truth object.",
-    toolPolicy: { allowTools: ["ui.ask_user_question"], allowGroups: ["capture", "session"] }
-  },
-  {
-    id: "stage.plan",
-    label: "Plan",
-    stage: "plan",
-    phase: "planner",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Expand the user goal into a structured investigation plan, hypotheses, and risk map.",
-    notes: "Planner phase.",
-    toolPolicy: { allowTools: ["ui.ask_user_question"], allowGroups: ["core", "session"] }
-  },
-  {
-    id: "stage.speclist",
-    label: "Speclist",
-    stage: "speclist",
-    phase: "planner",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Produce specialist briefs, ownership boundaries, and tool constraints for each investigator.",
-    notes: "Last planner step before specialist execution.",
-    toolPolicy: { allowGroups: ["core", "session"] }
-  },
-  {
-    id: "stage.dispatch",
-    label: "Dispatch",
-    stage: "dispatch",
-    phase: "generator",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Run specialist work, collect their briefs, and preserve every dispatch and tool trace.",
-    notes: "Generator phase.",
-    toolPolicy: { allowGroups: ["core", "session", "capture", "event", "pipeline", "texture", "shader", "remote", "macro"] }
-  },
-  {
-    id: "stage.investigate",
-    label: "Investigate",
-    stage: "investigate",
-    phase: "generator",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Synthesize specialist evidence into a concrete diagnosis and next verification target.",
-    notes: "Generator synthesis step.",
-    toolPolicy: { allowGroups: ["core", "session", "capture", "event", "pipeline", "texture", "shader", "remote", "macro"] }
-  },
-  {
-    id: "stage.fix_verify",
-    label: "Fix Verify",
-    stage: "fix_verify",
-    phase: "evaluator",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Verify the proposed fix against real tool evidence and return pass, retry, or blocked.",
-    notes: "Evaluator oracle step.",
-    toolPolicy: { allowGroups: ["core", "session", "capture", "event", "pipeline", "texture", "shader", "remote", "macro"] }
-  },
-  {
-    id: "stage.skepti",
-    label: "Skepti",
-    stage: "skepti",
-    phase: "evaluator",
-    agentPromptId: "agent.skeptic_agent",
-    systemPrompt: "Challenge unsupported claims and require hard evidence for every conclusion.",
-    notes: "Evaluator skeptic step.",
-    toolPolicy: { allowGroups: [] }
-  },
-  {
-    id: "stage.curate",
-    label: "Curate",
-    stage: "curate",
-    phase: "evaluator",
-    agentPromptId: "agent.curator_agent",
-    systemPrompt: "Compile the accepted investigation into a structured, operator-ready final report.",
-    notes: "Evaluator report step.",
-    toolPolicy: { allowGroups: [] }
-  },
-  {
-    id: "stage.finalize",
-    label: "Finalize",
-    stage: "finalize",
-    phase: "evaluator",
-    agentPromptId: "agent.rdc-debugger",
-    systemPrompt: "Finalize only when all gates, evidence, skeptic signoff, and backend truth checks pass.",
-    notes: "Strict close-out gate.",
-    toolPolicy: { allowGroups: ["core", "session"] }
-  }
-];
-const DEFAULT_MODE_PROFILE = {
+const expandToolPolicy = (policy) => [
+  ...policy?.allowTools ?? [],
+  ...(policy?.allowGroups ?? []).map(groupToAllowPattern)
+].filter(Boolean);
+const createFallbackModeProfile = () => ({
   id: DEFAULT_MODE_PROFILE_ID,
   label: "Debugger Production",
   mode: "debugger",
-  stagePolicies: {
-    preflight: "stage.preflight",
-    entry_gate: "stage.entry_gate",
-    intake_gate: "stage.intake_gate",
-    plan: "stage.plan",
-    speclist: "stage.speclist",
-    dispatch: "stage.dispatch",
-    investigate: "stage.investigate",
-    fix_verify: "stage.fix_verify",
-    skepti: "stage.skepti",
-    curate: "stage.curate",
-    finalize: "stage.finalize"
-  },
-  defaultAgentPrompts: {
-    "rdc-debugger": "agent.rdc-debugger",
-    "triage_agent": "agent.triage_agent",
-    "capture_repro_agent": "agent.capture_repro_agent",
-    "pass_graph_pipeline_agent": "agent.pass_graph_pipeline_agent",
-    "pixel_forensics_agent": "agent.pixel_forensics_agent",
-    "shader_ir_agent": "agent.shader_ir_agent",
-    "driver_device_agent": "agent.driver_device_agent",
-    "skeptic_agent": "agent.skeptic_agent",
-    "curator_agent": "agent.curator_agent"
-  }
+  patternId: "plan-generate-verify",
+  skillIds: [],
+  mcpServerIds: [],
+  stagePolicies: {},
+  defaultAgentPrompts: {}
+});
+const createFallbackAgentProfile = (agentId) => {
+  const route = DEFAULT_MODEL_ROUTING[agentId];
+  return {
+    id: `agent.${agentId}`,
+    label: agentId,
+    agentId,
+    systemPrompt: `You are ${agentId}.`,
+    modelProvider: route.provider,
+    modelName: route.model,
+    temperature: 0.3,
+    maxTokens: 4096,
+    toolPolicy: { allowTools: [] }
+  };
 };
-const DEFAULT_AGENT_PROFILES = Object.entries(DEFAULT_MODEL_ROUTING).map(([agentId, routing]) => ({
-  id: `agent.${agentId}`,
-  label: agentId,
-  agentId,
-  systemPrompt: DEFAULT_AGENT_PROMPTS[agentId],
-  modelProvider: routing.provider,
-  modelName: routing.model,
-  temperature: ["skeptic_agent", "curator_agent"].includes(agentId) ? 0.2 : 0.3,
-  maxTokens: 4096,
-  toolPolicy: {
-    allowTools: DEFAULT_AGENT_TOOLS[agentId]
-  }
-}));
+const createFallbackStagePolicy = (stage) => ({
+  id: `stage.${stage}`,
+  label: stage,
+  stage,
+  phase: STAGE_PHASES[stage],
+  toolPolicy: { allowTools: [] }
+});
 class ExecutionProfileService {
   getModeProfilesPath(workspaceRoot = appPathService.getWorkspaceRoot()) {
     return path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "modes");
@@ -3463,31 +3431,34 @@ class ExecutionProfileService {
     fs.mkdirSync(this.getModeProfilesPath(workspaceRoot), { recursive: true });
     fs.mkdirSync(this.getAgentProfilesPath(workspaceRoot), { recursive: true });
     fs.mkdirSync(this.getStagePoliciesPath(workspaceRoot), { recursive: true });
-    this.writeJsonIfMissing(
-      path.join(this.getModeProfilesPath(workspaceRoot), `${DEFAULT_MODE_PROFILE.id}.json`),
-      DEFAULT_MODE_PROFILE
-    );
-    for (const profile of DEFAULT_AGENT_PROFILES) {
-      this.writeJsonIfMissing(
-        path.join(this.getAgentProfilesPath(workspaceRoot), `${profile.agentId}.json`),
-        profile
-      );
-    }
-    for (const stagePolicy of DEFAULT_STAGE_POLICIES) {
-      this.writeJsonIfMissing(
-        path.join(this.getStagePoliciesPath(workspaceRoot), `${stagePolicy.stage}.json`),
-        stagePolicy
-      );
-    }
+    agentRuntimeConfigService.ensureScaffold(workspaceRoot);
   }
   normalizeConfiguration(configuration, workspaceRoot = appPathService.getWorkspaceRoot()) {
     this.ensureScaffold(workspaceRoot);
     const availableModeProfiles = this.listModeProfiles(workspaceRoot);
     const hasActiveProfile = availableModeProfiles.some((profile) => profile.id === configuration.activeModeProfileId);
+    const availablePatterns = agentRuntimeConfigService.listPatterns(workspaceRoot);
+    const availableSkills = agentRuntimeConfigService.listSkills(workspaceRoot);
+    const availableMcpServers = agentRuntimeConfigService.listMcpServers(workspaceRoot);
+    const patternIds = new Set(availablePatterns.map((pattern) => pattern.id));
+    const modePatternBindings = Object.fromEntries(
+      Object.entries(configuration.modePatternBindings ?? {}).map(([mode, patternId]) => [mode, patternIds.has(patternId) ? patternId : "free-agent"])
+    );
     return {
       ...configuration,
       activeModeProfileId: hasActiveProfile ? configuration.activeModeProfileId : DEFAULT_MODE_PROFILE_ID,
-      availableModeProfiles
+      availableModeProfiles,
+      availablePatterns,
+      availableSkills,
+      availableMcpServers,
+      enabledSkillIds: configuration.enabledSkillIds ?? [],
+      enabledMcpServerIds: configuration.enabledMcpServerIds ?? [],
+      modePatternBindings: {
+        debugger: patternIds.has(modePatternBindings.debugger) ? modePatternBindings.debugger : "plan-generate-verify",
+        analyzer: patternIds.has(modePatternBindings.analyzer) ? modePatternBindings.analyzer : "free-agent",
+        optimizer: patternIds.has(modePatternBindings.optimizer) ? modePatternBindings.optimizer : "free-agent",
+        ...modePatternBindings
+      }
     };
   }
   listModeProfiles(workspaceRoot = appPathService.getWorkspaceRoot()) {
@@ -3499,15 +3470,15 @@ class ExecutionProfileService {
     this.ensureScaffold(workspaceRoot);
     const modeProfile = this.readJson(
       path.join(this.getModeProfilesPath(workspaceRoot), `${settings.configuration.activeModeProfileId}.json`)
-    ) || DEFAULT_MODE_PROFILE;
+    ) || createFallbackModeProfile();
     const agentPromptId = modeProfile.defaultAgentPrompts[agentId] || `agent.${agentId}`;
     const agentProfile = this.readJson(
       path.join(this.getAgentProfilesPath(workspaceRoot), `${agentId}.json`)
-    ) || DEFAULT_AGENT_PROFILES.find((profile) => profile.agentId === agentId);
+    ) || createFallbackAgentProfile(agentId);
     const stagePolicyId = modeProfile.stagePolicies[stage] || `stage.${stage}`;
     const stagePolicy = this.readJson(
       path.join(this.getStagePoliciesPath(workspaceRoot), `${stage}.json`)
-    ) || DEFAULT_STAGE_POLICIES.find((policy) => policy.stage === stage);
+    ) || createFallbackStagePolicy(stage);
     const route = this.resolveAgentRoute(settings.llm.agentRoutes, settings.llm.providers, agentId);
     return {
       agentId,
@@ -3527,8 +3498,17 @@ ${stagePolicy.systemPrompt}` : ""
       stage,
       phase: stagePolicy.phase || STAGE_PHASES[stage],
       toolAllowlist: Array.from(/* @__PURE__ */ new Set([
-        ...stagePolicy.toolPolicy?.allowTools ?? [],
-        ...agentProfile.toolPolicy?.allowTools ?? []
+        ...expandToolPolicy(stagePolicy.toolPolicy),
+        ...expandToolPolicy(agentProfile.toolPolicy)
+      ])),
+      patternId: modeProfile.patternId ?? settings.configuration.modePatternBindings[modeProfile.mode],
+      skillIds: Array.from(/* @__PURE__ */ new Set([
+        ...modeProfile.skillIds ?? [],
+        ...settings.configuration.enabledSkillIds ?? []
+      ])),
+      mcpServerIds: Array.from(/* @__PURE__ */ new Set([
+        ...modeProfile.mcpServerIds ?? [],
+        ...settings.configuration.enabledMcpServerIds ?? []
       ])),
       source: {
         modeProfileId: modeProfile.id,
@@ -3573,13 +3553,6 @@ ${stagePolicy.systemPrompt}` : ""
       console.warn("[ExecutionProfileService] Failed to read JSON:", filePath, error);
       return null;
     }
-  }
-  writeJsonIfMissing(filePath, value) {
-    if (fs.existsSync(filePath)) {
-      return;
-    }
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(value, null, 2), "utf8");
   }
 }
 const executionProfileService = new ExecutionProfileService();
@@ -3656,6 +3629,19 @@ const toResponsesInput = (messages) => messages.map((message) => ({
   role: message.role === "assistant" || message.role === "system" ? message.role : "user",
   content: typeof message.content === "string" ? message.content : JSON.stringify(message.content)
 }));
+const toOpenAiTools = (tools) => {
+  if (!tools?.length) {
+    return void 0;
+  }
+  return tools.map((tool) => ({
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.input_schema
+    }
+  }));
+};
 const extractResponsesText = (payload) => {
   if (!payload || typeof payload !== "object") {
     return "";
@@ -3891,7 +3877,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
         messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
-        tools: request.tools,
+        tools: toOpenAiTools(request.tools),
         response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
         stream: false
       })
@@ -3933,7 +3919,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
         messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
-        tools: request.tools,
+        tools: toOpenAiTools(request.tools),
         response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
         stream: true
       })
@@ -4036,7 +4022,7 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
         messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
-        tools: request.tools,
+        tools: toOpenAiTools(request.tools),
         response_format: request.responseFormat ? { type: request.responseFormat } : void 0
       })
     });
@@ -4072,7 +4058,7 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
         messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
-        tools: request.tools,
+        tools: toOpenAiTools(request.tools),
         response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
         stream: true
       })
@@ -5124,7 +5110,7 @@ class SecretStorageService {
       this.writeSecretMap(secretMap, workspaceRoot);
       return;
     }
-    const encryptionAvailable = electron.safeStorage.isEncryptionAvailable();
+    const encryptionAvailable = process.env.RDC_AGENT_TEST_MODE !== "1" && electron.safeStorage.isEncryptionAvailable();
     secretMap[secretRef] = {
       encoding: encryptionAvailable ? "safeStorage" : "base64",
       payload: encryptionAvailable ? electron.safeStorage.encryptString(normalized).toString("base64") : Buffer.from(normalized, "utf8").toString("base64"),
@@ -5175,6 +5161,9 @@ const EMPTY_PATHS = {
   migrationOrphansPath: "",
   profilesPath: "",
   policiesPath: "",
+  skillsPath: "",
+  mcpPath: "",
+  patternsPath: "",
   secretsPath: "",
   migrationReportsPath: ""
 };
@@ -5203,7 +5192,14 @@ const DEFAULT_PROFILE = {
   avatarPath: ""
 };
 const DEFAULT_CONFIGURATION = {
-  activeModeProfileId: "debugger.default"
+  activeModeProfileId: "debugger.default",
+  enabledSkillIds: [],
+  enabledMcpServerIds: [],
+  modePatternBindings: {
+    debugger: "plan-generate-verify",
+    analyzer: "free-agent",
+    optimizer: "free-agent"
+  }
 };
 function nowIso() {
   return (/* @__PURE__ */ new Date()).toISOString();
@@ -5216,6 +5212,24 @@ function pickEnum(value, allowed, fallback) {
 }
 function dedupeStrings(values) {
   return Array.from(new Set(values.filter(Boolean)));
+}
+function sanitizeRuntimeIds(values) {
+  return dedupeStrings(
+    Array.isArray(values) ? values.filter((value) => typeof value === "string").map((value) => value.trim()) : []
+  );
+}
+function sanitizePatternBindings(value) {
+  const candidate = value && typeof value === "object" ? value : {};
+  const bindings = {};
+  for (const [mode, patternId] of Object.entries(candidate)) {
+    if (typeof patternId === "string" && patternId.trim()) {
+      bindings[mode] = patternId.trim();
+    }
+  }
+  return {
+    ...DEFAULT_CONFIGURATION.modePatternBindings ?? {},
+    ...bindings
+  };
 }
 function readJsonFile(filePath) {
   try {
@@ -5350,6 +5364,12 @@ function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspac
   const configuration = executionProfileService.normalizeConfiguration({
     activeModeProfileId: DEFAULT_CONFIGURATION.activeModeProfileId || "debugger.default",
     availableModeProfiles: [],
+    enabledSkillIds: DEFAULT_CONFIGURATION.enabledSkillIds ?? [],
+    enabledMcpServerIds: DEFAULT_CONFIGURATION.enabledMcpServerIds ?? [],
+    modePatternBindings: DEFAULT_CONFIGURATION.modePatternBindings ?? {},
+    availablePatterns: [],
+    availableSkills: [],
+    availableMcpServers: [],
     lastMigrationReportPath: void 0,
     lastMigrationSummary: [],
     diagnostics: []
@@ -5633,6 +5653,9 @@ class SettingsService {
       },
       configuration: {
         activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
+        enabledSkillIds: sanitizeRuntimeIds(candidate.configuration?.enabledSkillIds),
+        enabledMcpServerIds: sanitizeRuntimeIds(candidate.configuration?.enabledMcpServerIds),
+        modePatternBindings: sanitizePatternBindings(candidate.configuration?.modePatternBindings),
         lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath
       }
     };
@@ -5675,6 +5698,9 @@ class SettingsService {
       },
       configuration: {
         activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
+        enabledSkillIds: sanitizeRuntimeIds(candidate.configuration?.enabledSkillIds),
+        enabledMcpServerIds: sanitizeRuntimeIds(candidate.configuration?.enabledMcpServerIds),
+        modePatternBindings: sanitizePatternBindings(candidate.configuration?.modePatternBindings),
         lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath
       }
     };
@@ -5717,6 +5743,12 @@ class SettingsService {
     const configuration = executionProfileService.normalizeConfiguration({
       activeModeProfileId: normalized.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId || "debugger.default",
       availableModeProfiles: [],
+      enabledSkillIds: normalized.configuration?.enabledSkillIds ?? [],
+      enabledMcpServerIds: normalized.configuration?.enabledMcpServerIds ?? [],
+      modePatternBindings: normalized.configuration?.modePatternBindings ?? DEFAULT_CONFIGURATION.modePatternBindings ?? {},
+      availablePatterns: [],
+      availableSkills: [],
+      availableMcpServers: [],
       lastMigrationReportPath: normalized.configuration?.lastMigrationReportPath,
       lastMigrationSummary: parseMigrationSummary(normalized.configuration?.lastMigrationReportPath),
       diagnostics: []
@@ -5849,6 +5881,9 @@ class SettingsService {
       },
       configuration: {
         activeModeProfileId: patch.configuration?.activeModeProfileId || currentPersisted.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId,
+        enabledSkillIds: patch.configuration?.enabledSkillIds ? sanitizeRuntimeIds(patch.configuration.enabledSkillIds) : sanitizeRuntimeIds(currentPersisted.configuration?.enabledSkillIds),
+        enabledMcpServerIds: patch.configuration?.enabledMcpServerIds ? sanitizeRuntimeIds(patch.configuration.enabledMcpServerIds) : sanitizeRuntimeIds(currentPersisted.configuration?.enabledMcpServerIds),
+        modePatternBindings: patch.configuration?.modePatternBindings ? sanitizePatternBindings(patch.configuration.modePatternBindings) : sanitizePatternBindings(currentPersisted.configuration?.modePatternBindings),
         lastMigrationReportPath: currentPersisted.configuration?.lastMigrationReportPath
       }
     };
@@ -5997,7 +6032,7 @@ const CLAUDE_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const GITHUB_COPILOT_CLIENT_ID = "Iv1.b507a08c87ecfe98";
 const pendingFlows = /* @__PURE__ */ new Map();
 const isAccountProviderId = (providerId) => providerId === "claude-account" || providerId === "chatgpt-account" || providerId === "github-copilot";
-const isTestMode = () => process.env.RDC_AGENT_TEST_MODE === "1";
+const isTestMode$1 = () => process.env.RDC_AGENT_TEST_MODE === "1";
 const base64Url = (buffer) => buffer.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const createPkce = () => {
   const verifier = base64Url(crypto.randomBytes(32));
@@ -6416,7 +6451,7 @@ class ProviderAccountAuthService {
       throw new Error("GitHub device code is missing.");
     }
     let intervalSeconds = flow.intervalSeconds ?? 5;
-    let delayBeforePoll = !isTestMode();
+    let delayBeforePoll = !isTestMode$1();
     for (; ; ) {
       if (Date.now() > flow.expiresAt) {
         throw new Error("GitHub authorization code expired.");
@@ -6678,7 +6713,7 @@ class ProviderAccountAuthService {
     });
   }
   async openExternal(url2) {
-    if (!url2 || isTestMode()) {
+    if (!url2 || isTestMode$1()) {
       return;
     }
     await electron.shell.openExternal(url2);
@@ -7330,9 +7365,9 @@ RDC tool: ${tool.originalName}`,
 }
 class AgentRunnerRegistry {
   adapters = [
+    new LlmAdapterAgentSdkAdapter(),
     new OpenAiAgentSdkAdapter(),
-    new ClaudeAgentSdkAdapter(),
-    new LlmAdapterAgentSdkAdapter()
+    new ClaudeAgentSdkAdapter()
   ];
   async run(request) {
     const settings = settingsService.getAll();
@@ -9008,8 +9043,8 @@ class HarnessController {
     if (input.orchestrationMode === "multi_agent") {
       const sessionId = await storageAdapter.getCurrentSessionId();
       if (sessionId) {
-        const events = await storageAdapter.readActionChain(sessionId);
-        const dispatchEvents = events.filter((e) => e.event_type === "dispatch");
+        const events2 = await storageAdapter.readActionChain(sessionId);
+        const dispatchEvents = events2.filter((e) => e.event_type === "dispatch");
         if (dispatchEvents.length === 0) ;
         else {
           const pendingDispatch = dispatchEvents.find((e) => e.status === "sent");
@@ -9093,8 +9128,8 @@ class HarnessController {
     if (orchestrationMode === "multi_agent") {
       const sessionId = await storageAdapter.getCurrentSessionId();
       if (sessionId) {
-        const events = await storageAdapter.readActionChain(sessionId);
-        const dispatchEvents = events.filter((e) => e.event_type === "dispatch");
+        const events2 = await storageAdapter.readActionChain(sessionId);
+        const dispatchEvents = events2.filter((e) => e.event_type === "dispatch");
         if (dispatchEvents.length === 0) {
           issues.push("multi_agent declared but no dispatch events found");
         }
@@ -9117,8 +9152,8 @@ class HarnessController {
     if (!sessionId) {
       return { isConsistent: true, currentStage: declaredStage, expectedStage: declaredStage };
     }
-    const events = await storageAdapter.readActionChain(sessionId);
-    const stageEvents = events.filter((e) => e.event_type === "workflow_stage_transition");
+    const events2 = await storageAdapter.readActionChain(sessionId);
+    const stageEvents = events2.filter((e) => e.event_type === "workflow_stage_transition");
     if (stageEvents.length === 0) {
       return { isConsistent: true, currentStage: declaredStage, expectedStage: declaredStage };
     }
@@ -10851,9 +10886,9 @@ const resultFromPlan = (workstreamId, debugPlan, status) => ({
   artifactIds: [`artifact-${debugPlan.planId}`],
   createdAt: debugPlan.createdAt
 });
-const resultFromRun = (workstreamId, run, events, artifacts) => {
+const resultFromRun = (workstreamId, run, events2, artifacts) => {
   if (run.status === "completed") {
-    const reportEvent = events.find((event) => event.event_type === "report_published");
+    const reportEvent = events2.find((event) => event.event_type === "report_published");
     return {
       id: `${workstreamId}-report-result`,
       workstreamId,
@@ -10869,7 +10904,7 @@ const resultFromRun = (workstreamId, run, events, artifacts) => {
         {
           id: "evidence",
           title: "关键证据",
-          body: events.filter((event) => ["agent_summary", "verification"].includes(event.event_type)).map((event) => firstLine(event.payload.summary ?? event.payload.verdict, event.event_type)).slice(0, 6).join("\n") || "详见 report.md 和 raw trace。"
+          body: events2.filter((event) => ["agent_summary", "verification"].includes(event.event_type)).map((event) => firstLine(event.payload.summary ?? event.payload.verdict, event.event_type)).slice(0, 6).join("\n") || "详见 report.md 和 raw trace。"
         },
         {
           id: "artifacts",
@@ -10893,7 +10928,7 @@ const resultFromRun = (workstreamId, run, events, artifacts) => {
         {
           id: "completed",
           title: "已完成内容",
-          body: events.filter((event) => event.status === "ok").map((event) => event.event_type).slice(0, 8).join("\n") || "无可确认完成项。"
+          body: events2.filter((event) => event.status === "ok").map((event) => event.event_type).slice(0, 8).join("\n") || "无可确认完成项。"
         },
         { id: "recovery", title: "可恢复路径", body: "保留当前 raw trace、context 和已产生产物；修复阻断后可重新发起任务。" }
       ],
@@ -10910,7 +10945,7 @@ const resultFromRun = (workstreamId, run, events, artifacts) => {
       title: "Cancelled Result",
       sections: [
         { id: "time", title: "中断时间", body: toIso(run.stoppedAt, nowIso$1()) },
-        { id: "completed", title: "已完成内容", body: events.map((event) => event.event_type).slice(0, 8).join("\n") || "尚未产生可确认执行内容。" },
+        { id: "completed", title: "已完成内容", body: events2.map((event) => event.event_type).slice(0, 8).join("\n") || "尚未产生可确认执行内容。" },
         { id: "next", title: "可继续路径", body: "历史过程保留，可基于同一 capture 重新发起 Debugger 任务。" }
       ],
       artifactIds: [],
@@ -10991,7 +11026,7 @@ class AgentWorkstreamProjector {
       }
       const runs = storageAdapter.listRuns(sessionId).slice().sort((left, right) => left.startedAt - right.startedAt);
       const conversations = storageAdapter.readConversationHistory(sessionId);
-      const events = await storageAdapter.readActionChain(sessionId);
+      const events2 = await storageAdapter.readActionChain(sessionId);
       let state2 = workstreamStateStore.read(sessionId);
       for (const run of runs) {
         const snapshot = storageAdapter.readPlanSnapshot(sessionId, run.runId);
@@ -11010,7 +11045,7 @@ class AgentWorkstreamProjector {
           }
         }
       }
-      const model = this.buildSessionModel(sessionId, runs, conversations, events, state2);
+      const model = this.buildSessionModel(sessionId, runs, conversations, events2, state2);
       const presentation = this.buildPresentation(model);
       return { success: true, session: model, presentation };
     } catch (error) {
@@ -11029,8 +11064,8 @@ class AgentWorkstreamProjector {
     });
     return this.buildPresentation(model);
   }
-  buildSessionModel(sessionId, runs, conversations, events, state2) {
-    const rawAuditRefs = events.map((event) => ({
+  buildSessionModel(sessionId, runs, conversations, events2, state2) {
+    const rawAuditRefs = events2.map((event) => ({
       id: `raw-${event.event_id}`,
       label: event.event_type,
       eventId: event.event_id,
@@ -11045,7 +11080,7 @@ class AgentWorkstreamProjector {
     const userRequests = [...state2.userRequests];
     for (const run of runs) {
       const snapshot = storageAdapter.readPlanSnapshot(sessionId, run.runId);
-      const runEvents = events.filter((event) => event.run_id === run.runId).sort((left, right) => left.ts_ms - right.ts_ms);
+      const runEvents = events2.filter((event) => event.run_id === run.runId).sort((left, right) => left.ts_ms - right.ts_ms);
       const planStatus = state2.plans.find((plan) => plan.planId === snapshot?.debug_plan?.planId)?.status ?? mapPlanStatus(snapshot?.approval_state, run);
       const branchId = this.branchIdForWorkstream(state2.branches, this.planWorkstreamId(run.runId), state2.activeBranchId);
       const planWorkstream = this.buildPlanWorkstream(run, snapshot?.debug_plan ?? null, planStatus, branchId, runEvents, conversations);
@@ -11259,9 +11294,9 @@ class AgentWorkstreamProjector {
       ]
     };
   }
-  processEventsFromActionEvents(workstreamId, events) {
+  processEventsFromActionEvents(workstreamId, events2) {
     const processEvents = [];
-    for (const event of events) {
+    for (const event of events2) {
       if (event.event_type === "tool_execution") {
         const title = String(event.payload.tool_name || event.payload.toolName || "Tool");
         processEvents.push({
@@ -11470,7 +11505,7 @@ class AgentWorkstreamProjector {
       planStatus: workstream.planStatus
     };
   }
-  toProcessItems(events) {
+  toProcessItems(events2) {
     const items = [];
     let textBuffer = [];
     const flushText = () => {
@@ -11486,7 +11521,7 @@ class AgentWorkstreamProjector {
       });
       textBuffer = [];
     };
-    for (const event of events) {
+    for (const event of events2) {
       if (event.kind === "agent.text") {
         textBuffer.push(event);
         continue;
@@ -11595,8 +11630,8 @@ class AgentWorkstreamProjector {
   titleForWorkstream(_workstream) {
     return "";
   }
-  shouldShowExecutionWorkstream(run, approvalState, events) {
-    return approvalState === "approved" || ["running", "stopping", "completed", "failed", "cancelled", "interrupted"].includes(run.status) || events.some((event) => ["dispatch", "agent_summary", "verification", "report_published"].includes(event.event_type));
+  shouldShowExecutionWorkstream(run, approvalState, events2) {
+    return approvalState === "approved" || ["running", "stopping", "completed", "failed", "cancelled", "interrupted"].includes(run.status) || events2.some((event) => ["dispatch", "agent_summary", "verification", "report_published"].includes(event.event_type));
   }
   groupAskTurns(messages) {
     const groups = /* @__PURE__ */ new Map();
@@ -11657,8 +11692,8 @@ const KNOWN_AGENT_ROLES = /* @__PURE__ */ new Set([
   "skeptic_agent",
   "curator_agent"
 ]);
-function latestStageHistory(events) {
-  return events.filter((event) => event.event_type === "workflow_stage_transition").map((event) => normalizeWorkflowStage(String(event.payload.toStage || "preflight")));
+function latestStageHistory(events2) {
+  return events2.filter((event) => event.event_type === "workflow_stage_transition").map((event) => normalizeWorkflowStage(String(event.payload.toStage || "preflight")));
 }
 function dedupeBlockers(blockers) {
   const seen = /* @__PURE__ */ new Set();
@@ -12314,8 +12349,8 @@ class DebugWorkflowService {
       let rawTracePath;
       if (options.includeRawTrace !== false) {
         rawTracePath = path.join(exportDir, `agent-workstream-raw-trace-${stamp}.jsonl`);
-        const events = await storageAdapter.readActionChain(sessionId);
-        fs__namespace.writeFileSync(rawTracePath, `${events.map((event) => JSON.stringify(event)).join("\n")}
+        const events2 = await storageAdapter.readActionChain(sessionId);
+        fs__namespace.writeFileSync(rawTracePath, `${events2.map((event) => JSON.stringify(event)).join("\n")}
 `, "utf-8");
       }
       return {
@@ -12429,8 +12464,8 @@ class DebugWorkflowService {
         lastUpdated: nowIso$1()
       };
     }
-    const events = await storageAdapter.readActionChain(sessionId);
-    const runEvents = events.filter((event) => event.run_id === run.runId);
+    const events2 = await storageAdapter.readActionChain(sessionId);
+    const runEvents = events2.filter((event) => event.run_id === run.runId);
     const snapshot = storageAdapter.readPlanSnapshot(sessionId, run.runId);
     const blockers = runEvents.filter((event) => event.event_type === "blocker").map((event) => ({
       code: String(event.payload.code || "BLOCKER"),
@@ -13979,6 +14014,1073 @@ function registerCaptureDeviceHandlers(context2) {
     return replayDeviceService.activateDevice(deviceId);
   });
 }
+class SkillRegistry {
+  skills = /* @__PURE__ */ new Map();
+  /** 注册 skill */
+  register(definition, execute) {
+    if (this.skills.has(definition.name)) {
+      console.warn(`[SkillRegistry] Overwriting existing skill: ${definition.name}`);
+    }
+    this.skills.set(definition.name, { definition, execute });
+  }
+  /** 注销 skill */
+  unregister(name) {
+    return this.skills.delete(name);
+  }
+  /** 获取 skill */
+  get(name) {
+    return this.skills.get(name);
+  }
+  /** 列出所有 skill 定义 */
+  list() {
+    return Array.from(this.skills.values()).map((s) => s.definition);
+  }
+  /** 按标签过滤 */
+  listByTag(tag) {
+    return this.list().filter((s) => s.tags.includes(tag));
+  }
+  /** 按来源过滤 */
+  listBySource(source) {
+    return this.list().filter((s) => s.source === source);
+  }
+  /** 检查 skill 是否存在 */
+  has(name) {
+    return this.skills.has(name);
+  }
+  /** 获取注册数量 */
+  get size() {
+    return this.skills.size;
+  }
+  /** 清空所有注册 */
+  clear() {
+    this.skills.clear();
+  }
+}
+const skillRegistry = new SkillRegistry();
+class MCPConnection extends events.EventEmitter {
+  config;
+  status = "disconnected";
+  childProcess;
+  requestId = 0;
+  pendingRequests = /* @__PURE__ */ new Map();
+  tools = [];
+  connectedAt;
+  error;
+  buffer = "";
+  eventSource;
+  sseEndpoint;
+  constructor(config) {
+    super();
+    this.config = config;
+  }
+  get serverId() {
+    return this.config.id;
+  }
+  get serverName() {
+    return this.config.name;
+  }
+  get connectionInfo() {
+    return {
+      serverId: this.config.id,
+      serverName: this.config.name,
+      status: this.status,
+      tools: this.tools,
+      connectedAt: this.connectedAt,
+      error: this.error
+    };
+  }
+  /**
+   * 建立连接
+   */
+  async connect() {
+    if (this.status === "connected" || this.status === "connecting") {
+      return this.connectionInfo;
+    }
+    this.status = "connecting";
+    this.error = void 0;
+    try {
+      if (this.config.transport === "stdio") {
+        await this.connectStdio();
+      } else if (this.config.transport === "sse" || this.config.transport === "streamable-http") {
+        await this.connectSSE();
+      } else {
+        throw new Error(`不支持的传输类型: ${this.config.transport}`);
+      }
+      await this.initialize();
+      await this.fetchTools();
+      this.status = "connected";
+      this.connectedAt = (/* @__PURE__ */ new Date()).toISOString();
+      return this.connectionInfo;
+    } catch (err) {
+      this.status = "error";
+      this.error = err instanceof Error ? err.message : String(err);
+      this.cleanup();
+      throw err;
+    }
+  }
+  /**
+   * stdio 传输连接
+   */
+  async connectStdio() {
+    const { command, args = [], env = {} } = this.config;
+    if (!command) {
+      throw new Error("stdio 传输模式需要指定 command");
+    }
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("连接超时"));
+      }, 3e4);
+      try {
+        this.childProcess = child_process.spawn(command, args, {
+          env: { ...process.env, ...env },
+          stdio: ["pipe", "pipe", "pipe"]
+        });
+        if (!this.childProcess.stdin || !this.childProcess.stdout) {
+          clearTimeout(timeout);
+          reject(new Error("无法创建子进程管道"));
+          return;
+        }
+        this.childProcess.stdout.on("data", (data) => {
+          this.handleStdioData(data.toString());
+        });
+        this.childProcess.stderr?.on("data", (data) => {
+          console.error(`[MCP ${this.config.name}] stderr:`, data.toString());
+        });
+        this.childProcess.on("exit", (code) => {
+          if (code !== 0 && code !== null) {
+            this.handleDisconnect(new Error(`进程退出，代码: ${code}`));
+          }
+        });
+        this.childProcess.on("error", (err) => {
+          clearTimeout(timeout);
+          reject(err);
+        });
+        setTimeout(() => {
+          clearTimeout(timeout);
+          resolve();
+        }, 500);
+      } catch (err) {
+        clearTimeout(timeout);
+        reject(err);
+      }
+    });
+  }
+  /**
+   * SSE 传输连接
+   */
+  async connectSSE() {
+    const { url: url2 } = this.config;
+    if (!url2) {
+      throw new Error("SSE 传输模式需要指定 url");
+    }
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("SSE 连接超时"));
+      }, 3e4);
+      try {
+        fetch(`${url2}/sse`).then((response) => {
+          if (!response.ok) {
+            throw new Error(`HTTP 错误: ${response.status}`);
+          }
+          return response.text();
+        }).then((endpoint) => {
+          this.sseEndpoint = endpoint.trim();
+          this.eventSource = new EventSource(`${url2}${this.sseEndpoint}`);
+          this.eventSource.onopen = () => {
+            clearTimeout(timeout);
+            resolve();
+          };
+          this.eventSource.onmessage = (event) => {
+            try {
+              const message = JSON.parse(event.data);
+              this.handleMessage(message);
+            } catch (err) {
+              console.error("[MCP SSE] 解析消息失败:", err);
+            }
+          };
+          this.eventSource.onerror = () => {
+            this.handleDisconnect(new Error("SSE 连接错误"));
+          };
+        }).catch((err) => {
+          clearTimeout(timeout);
+          reject(err);
+        });
+      } catch (err) {
+        clearTimeout(timeout);
+        reject(err);
+      }
+    });
+  }
+  /**
+   * 处理 stdio 数据
+   */
+  handleStdioData(data) {
+    this.buffer += data;
+    const lines = this.buffer.split("\n");
+    this.buffer = lines.pop() || "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const message = JSON.parse(trimmed);
+        this.handleMessage(message);
+      } catch (err) {
+        console.error("[MCP stdio] 解析消息失败:", trimmed);
+      }
+    }
+  }
+  /**
+   * 处理 JSON-RPC 消息
+   */
+  handleMessage(message) {
+    if ("id" in message && message.id !== void 0) {
+      const pending = this.pendingRequests.get(message.id);
+      if (pending) {
+        this.pendingRequests.delete(message.id);
+        if ("error" in message && message.error) {
+          pending.reject(new Error(message.error.message));
+        } else if ("result" in message) {
+          pending.resolve(message.result);
+        }
+      }
+    }
+    if (!("id" in message)) {
+      this.emit("notification", message);
+    }
+  }
+  /**
+   * MCP 初始化握手
+   */
+  async initialize() {
+    const params = {
+      protocolVersion: "2024-11-05",
+      capabilities: {},
+      clientInfo: {
+        name: "RDC-Agent",
+        version: "1.0.0"
+      }
+    };
+    await this.sendRequest("initialize", params);
+    await this.sendNotification("initialized", {});
+  }
+  /**
+   * 获取工具列表
+   */
+  async fetchTools() {
+    const result = await this.sendRequest("tools/list", {});
+    if (result && Array.isArray(result.tools)) {
+      this.tools = result.tools.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        serverId: this.config.id,
+        serverName: this.config.name
+      }));
+    }
+  }
+  /**
+   * 发送 JSON-RPC 请求
+   */
+  async sendRequest(method, params) {
+    const id = ++this.requestId;
+    const request = {
+      jsonrpc: "2.0",
+      id,
+      method,
+      params
+    };
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.pendingRequests.delete(id);
+        reject(new Error(`请求超时: ${method}`));
+      }, 6e4);
+      this.pendingRequests.set(id, {
+        resolve: (value) => {
+          clearTimeout(timeout);
+          resolve(value);
+        },
+        reject: (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        }
+      });
+      this.sendMessage(request).catch((err) => {
+        clearTimeout(timeout);
+        this.pendingRequests.delete(id);
+        reject(err);
+      });
+    });
+  }
+  /**
+   * 发送 JSON-RPC 通知
+   */
+  async sendNotification(method, params) {
+    const notification = {
+      jsonrpc: "2.0",
+      method,
+      params
+    };
+    await this.sendMessage(notification);
+  }
+  /**
+   * 发送消息
+   */
+  async sendMessage(message) {
+    const data = JSON.stringify(message);
+    if (this.config.transport === "stdio") {
+      if (!this.childProcess?.stdin) {
+        throw new Error("stdio 连接未建立");
+      }
+      this.childProcess.stdin.write(data + "\n");
+    } else if (this.config.transport === "sse" || this.config.transport === "streamable-http") {
+      if (!this.config.url) {
+        throw new Error("SSE URL 未配置");
+      }
+      const response = await fetch(`${this.config.url}/message`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: data
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP 错误: ${response.status}`);
+      }
+    }
+  }
+  /**
+   * 列出工具
+   */
+  async listTools() {
+    if (this.status !== "connected") {
+      throw new Error("未连接到 MCP Server");
+    }
+    return [...this.tools];
+  }
+  /**
+   * 调用工具
+   */
+  async callTool(toolName, args) {
+    if (this.status !== "connected") {
+      throw new Error("未连接到 MCP Server");
+    }
+    const result = await this.sendRequest("tools/call", {
+      name: toolName,
+      arguments: args
+    });
+    return result;
+  }
+  /**
+   * 断开连接
+   */
+  async disconnect() {
+    this.cleanup();
+    this.status = "disconnected";
+    this.connectedAt = void 0;
+    this.error = void 0;
+    this.tools = [];
+  }
+  /**
+   * 清理资源
+   */
+  cleanup() {
+    if (this.childProcess) {
+      this.childProcess.kill();
+      this.childProcess = void 0;
+    }
+    if (this.eventSource) {
+      this.eventSource.close();
+      this.eventSource = void 0;
+    }
+    for (const [, pending] of this.pendingRequests) {
+      pending.reject(new Error("连接已断开"));
+    }
+    this.pendingRequests.clear();
+    this.buffer = "";
+  }
+  /**
+   * 处理断开连接
+   */
+  handleDisconnect(error) {
+    if (this.status === "connected" || this.status === "connecting") {
+      this.status = "error";
+      this.error = error.message;
+      this.cleanup();
+      this.emit("disconnect", error);
+    }
+  }
+}
+class MCPClient {
+  connections = /* @__PURE__ */ new Map();
+  /**
+   * 连接到 MCP Server
+   */
+  async connect(config) {
+    const existing = this.connections.get(config.id);
+    if (existing) {
+      await existing.disconnect();
+    }
+    const connection = new MCPConnection(config);
+    this.connections.set(config.id, connection);
+    connection.on("disconnect", () => {
+      this.connections.delete(config.id);
+    });
+    return await connection.connect();
+  }
+  /**
+   * 断开指定 Server 连接
+   */
+  async disconnect(serverId) {
+    const connection = this.connections.get(serverId);
+    if (connection) {
+      await connection.disconnect();
+      this.connections.delete(serverId);
+    }
+  }
+  /**
+   * 断开所有连接
+   */
+  async disconnectAll() {
+    const disconnectPromises = Array.from(this.connections.values()).map(
+      (conn) => conn.disconnect()
+    );
+    await Promise.all(disconnectPromises);
+    this.connections.clear();
+  }
+  /**
+   * 列出指定 Server 的工具
+   */
+  async listTools(serverId) {
+    const connection = this.connections.get(serverId);
+    if (!connection) {
+      throw new Error(`未找到 MCP Server: ${serverId}`);
+    }
+    return await connection.listTools();
+  }
+  /**
+   * 调用指定 Server 的工具
+   */
+  async callTool(serverId, toolName, args) {
+    const connection = this.connections.get(serverId);
+    if (!connection) {
+      throw new Error(`未找到 MCP Server: ${serverId}`);
+    }
+    return await connection.callTool(toolName, args);
+  }
+  /**
+   * 获取连接信息
+   */
+  getConnectionInfo(serverId) {
+    const connection = this.connections.get(serverId);
+    return connection?.connectionInfo;
+  }
+  /**
+   * 获取所有连接信息
+   */
+  getAllConnections() {
+    return Array.from(this.connections.values()).map((conn) => conn.connectionInfo);
+  }
+}
+const mcpClient = new MCPClient();
+const ASK_READONLY_TOOL_ALLOWLIST = [
+  "primitive.read",
+  "primitive.glob",
+  "primitive.grep",
+  "primitive.webFetch",
+  "primitive.webSearch",
+  "primitive.askUser",
+  "primitive.task.list",
+  "task.readonly"
+];
+const ASK_DENIED_TOOL_PATTERNS = [
+  "primitive.bash",
+  "primitive.write",
+  "primitive.edit",
+  "primitive.remove",
+  "bash.exec",
+  "fs.write",
+  "fs.edit",
+  "fs.remove"
+];
+function toolMatchesRuntimePolicy(toolName, allowlist = []) {
+  for (const pattern of allowlist) {
+    if (pattern === "*" || pattern === toolName) {
+      return true;
+    }
+    if (pattern.endsWith(".*") && toolName.startsWith(pattern.slice(0, -1))) {
+      return true;
+    }
+  }
+  return false;
+}
+function resolveRuntimeToolAllowlist(agentId, allowlist = []) {
+  if (agentId === "ask_agent") {
+    return ASK_READONLY_TOOL_ALLOWLIST;
+  }
+  return Array.from(new Set(allowlist.filter(Boolean)));
+}
+function isRuntimeToolAllowed(toolName, agentId, allowlist = []) {
+  if (agentId === "ask_agent" && ASK_DENIED_TOOL_PATTERNS.some((pattern) => toolName === pattern || toolName.startsWith(`${pattern}.`))) {
+    return false;
+  }
+  return toolMatchesRuntimePolicy(toolName, resolveRuntimeToolAllowlist(agentId, allowlist));
+}
+const primitiveTool = (name, description, properties = {}, required = [], readOnly = true) => ({
+  name,
+  modelName: toModelToolName(name),
+  description,
+  inputSchema: {
+    type: "object",
+    properties,
+    required
+  },
+  group: "primitive",
+  layer: "primitive",
+  readOnly
+});
+function toModelToolName(toolName) {
+  return toolName.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+class ToolRegistry {
+  async listTools() {
+    const primitiveTools = [
+      primitiveTool("primitive.read", "Read a UTF-8 text file from the active workspace.", {
+        path: { type: "string", description: "Workspace-relative or absolute path." }
+      }, ["path"]),
+      primitiveTool("primitive.glob", "List files under the active workspace using a simple glob-like suffix pattern.", {
+        pattern: { type: "string", description: "Pattern such as **/*.ts or *.json." }
+      }, ["pattern"]),
+      primitiveTool("primitive.grep", "Search text files under the active workspace for a literal pattern.", {
+        pattern: { type: "string", description: "Literal text to search for." }
+      }, ["pattern"]),
+      primitiveTool("primitive.webFetch", "Fetch a URL as text through the provider runtime.", {
+        url: { type: "string", description: "HTTP or HTTPS URL." }
+      }, ["url"]),
+      primitiveTool("primitive.webSearch", "Search the web when a search provider is configured.", {
+        query: { type: "string", description: "Search query." }
+      }, ["query"]),
+      primitiveTool("primitive.askUser", "Request clarification from the user through the UI approval channel.", {
+        question: { type: "string", description: "Question to ask the user." }
+      }, ["question"]),
+      primitiveTool("primitive.task.list", "List readonly runtime task descriptors.", {}, []),
+      primitiveTool("primitive.bash", "Run a shell command. Disabled for Ask.", {
+        command: { type: "string", description: "Command to execute." }
+      }, ["command"], false),
+      primitiveTool("primitive.write", "Write a file. Disabled for Ask.", {
+        path: { type: "string", description: "Target path." },
+        content: { type: "string", description: "File content." }
+      }, ["path", "content"], false),
+      primitiveTool("primitive.edit", "Edit a file. Disabled for Ask.", {}, [], false),
+      primitiveTool("primitive.remove", "Remove a file. Disabled for Ask.", {
+        path: { type: "string", description: "Target path." }
+      }, ["path"], false)
+    ];
+    const catalog = await toolBridge.loadCatalog();
+    const rdcTools = (catalog.tools ?? []).map((tool) => ({
+      name: tool.name,
+      modelName: toModelToolName(tool.name),
+      description: tool.description,
+      inputSchema: {
+        type: "object",
+        properties: Object.fromEntries((tool.parameters ?? []).map((parameter) => [
+          parameter.name,
+          {
+            type: parameter.type,
+            description: parameter.description,
+            enum: parameter.enum
+          }
+        ])),
+        required: (tool.parameters ?? []).filter((parameter) => parameter.required).map((parameter) => parameter.name)
+      },
+      group: tool.group,
+      layer: "rdc",
+      readOnly: !tool.name.includes("edit") && !tool.name.includes("write") && !tool.name.includes("remove")
+    }));
+    const skillTools = skillRegistry.list().map((skill) => ({
+      name: `skill.${skill.name}`,
+      modelName: toModelToolName(`skill.${skill.name}`),
+      description: skill.description,
+      inputSchema: {
+        type: "object",
+        properties: Object.fromEntries(skill.parameters.map((parameter) => [
+          parameter.name,
+          {
+            type: parameter.type,
+            description: parameter.description
+          }
+        ])),
+        required: skill.parameters.filter((parameter) => parameter.required).map((parameter) => parameter.name)
+      },
+      group: "skill",
+      layer: "skill",
+      readOnly: true
+    }));
+    const mcpTools = mcpClient.getAllConnections().flatMap(
+      (connection) => connection.tools.map((tool) => ({
+        name: `mcp.${connection.serverId}.${tool.name}`,
+        modelName: toModelToolName(`mcp.${connection.serverId}.${tool.name}`),
+        description: tool.description,
+        inputSchema: normalizeMcpInputSchema(tool.inputSchema),
+        group: "mcp",
+        layer: "mcp",
+        readOnly: true
+      }))
+    );
+    return [...primitiveTools, ...rdcTools, ...skillTools, ...mcpTools];
+  }
+  async listAllowedLlmTools(agentId, allowlist) {
+    const runtimeTools = (await this.listTools()).filter((tool) => isRuntimeToolAllowed(tool.name, agentId, allowlist));
+    const nameMap = /* @__PURE__ */ new Map();
+    const tools = runtimeTools.map((tool) => {
+      nameMap.set(tool.modelName, tool.name);
+      return {
+        name: tool.modelName,
+        description: `${tool.description}
+
+Runtime tool: ${tool.name}`,
+        input_schema: tool.inputSchema
+      };
+    });
+    return { tools, nameMap };
+  }
+  async execute(request) {
+    const start = nowMs();
+    if (!isRuntimeToolAllowed(request.originalToolName, request.agentId, request.allowlist)) {
+      return {
+        ok: false,
+        data: {},
+        artifacts: [],
+        error: {
+          code: "AGENT_RUNTIME_TOOL_DENIED",
+          message: `Tool ${request.originalToolName} is not allowed for ${request.agentId}.`,
+          category: "policy"
+        },
+        duration_ms: nowMs() - start,
+        trace_id: generateEventId("tool")
+      };
+    }
+    if (request.originalToolName.startsWith("rd.")) {
+      return toolBridge.call({
+        toolName: request.originalToolName,
+        args: request.toolCall.arguments,
+        turnId: request.turnId,
+        contextId: request.sessionId ?? void 0,
+        runId: request.runId,
+        runtimeOwner: request.agentId,
+        abortSignal: request.signal
+      });
+    }
+    if (request.originalToolName.startsWith("skill.")) {
+      return this.executeSkill(request, start);
+    }
+    if (request.originalToolName.startsWith("mcp.")) {
+      return this.executeMcpTool(request, start);
+    }
+    return this.executePrimitiveTool(request, start);
+  }
+  async executePrimitiveTool(request, start) {
+    const workspaceRoot = appPathService.getWorkspaceRoot();
+    const args = request.toolCall.arguments;
+    try {
+      if (request.originalToolName === "primitive.read") {
+        const target = resolveWorkspacePath(workspaceRoot, String(args.path ?? ""));
+        return okResult({ path: target, content: fs.readFileSync(target, "utf8") }, start);
+      }
+      if (request.originalToolName === "primitive.glob") {
+        const pattern = String(args.pattern ?? "");
+        return okResult({ files: listWorkspaceFiles(workspaceRoot, pattern).slice(0, 200) }, start);
+      }
+      if (request.originalToolName === "primitive.grep") {
+        const pattern = String(args.pattern ?? "");
+        return okResult({ matches: grepWorkspace(workspaceRoot, pattern).slice(0, 200) }, start);
+      }
+      if (request.originalToolName === "primitive.webFetch") {
+        const url2 = String(args.url ?? "");
+        const response = await fetch(url2, { signal: request.signal });
+        return okResult({ url: url2, status: response.status, text: (await response.text()).slice(0, 2e4) }, start);
+      }
+      if (request.originalToolName === "primitive.webSearch") {
+        return errorResult("WEB_SEARCH_PROVIDER_MISSING", "No web search provider is configured for the local AgentRuntime.", "configuration", start);
+      }
+      if (request.originalToolName === "primitive.askUser") {
+        return errorResult("ASK_USER_REQUIRES_APPROVAL_EVENT", "Ask-user requests are represented as approval.requested events in this runtime build.", "approval", start);
+      }
+      if (request.originalToolName === "primitive.task.list") {
+        return okResult({ tasks: [] }, start);
+      }
+      return errorResult("PRIMITIVE_TOOL_NOT_IMPLEMENTED", `Primitive tool is not implemented: ${request.originalToolName}`, "implementation", start);
+    } catch (error) {
+      return errorResult("PRIMITIVE_TOOL_FAILED", error instanceof Error ? error.message : String(error), "execution", start);
+    }
+  }
+  async executeSkill(request, start) {
+    const skillName = request.originalToolName.replace(/^skill\./, "");
+    const skill = skillRegistry.get(skillName);
+    if (!skill) {
+      return errorResult("SKILL_NOT_FOUND", `Skill not found: ${skillName}`, "configuration", start);
+    }
+    const result = await skill.execute(request.toolCall.arguments, {
+      caseId: request.runId ?? "",
+      runId: request.runId ?? "",
+      sessionId: request.sessionId ?? "",
+      agentId: request.agentId,
+      workspacePath: appPathService.getWorkspaceRoot()
+    });
+    return result.success ? okResult({ output: result.output, artifacts: result.artifacts ?? [] }, start) : errorResult("SKILL_FAILED", result.error ?? result.output, "execution", start);
+  }
+  async executeMcpTool(request, start) {
+    const [, serverId, ...toolNameParts] = request.originalToolName.split(".");
+    const toolName = toolNameParts.join(".");
+    if (!serverId || !toolName) {
+      return errorResult("MCP_TOOL_NAME_INVALID", `Invalid MCP tool name: ${request.originalToolName}`, "configuration", start);
+    }
+    try {
+      const result = await mcpClient.callTool(serverId, toolName, request.toolCall.arguments);
+      return okResult({ content: result.content, isError: result.isError ?? false }, start);
+    } catch (error) {
+      return errorResult("MCP_TOOL_FAILED", error instanceof Error ? error.message : String(error), "execution", start);
+    }
+  }
+}
+function normalizeMcpInputSchema(inputSchema) {
+  if (inputSchema.type === "object" && inputSchema.properties && typeof inputSchema.properties === "object") {
+    return inputSchema;
+  }
+  return {
+    type: "object",
+    properties: {}
+  };
+}
+function okResult(data, start) {
+  return {
+    ok: true,
+    data,
+    artifacts: [],
+    duration_ms: nowMs() - start,
+    trace_id: generateEventId("tool")
+  };
+}
+function errorResult(code, message, category, start) {
+  return {
+    ok: false,
+    data: {},
+    artifacts: [],
+    error: {
+      code,
+      message,
+      category
+    },
+    duration_ms: nowMs() - start,
+    trace_id: generateEventId("tool")
+  };
+}
+function resolveWorkspacePath(workspaceRoot, inputPath) {
+  const target = path.isAbsolute(inputPath) ? path.resolve(inputPath) : path.resolve(workspaceRoot, inputPath);
+  const root = path.resolve(workspaceRoot);
+  const rootCompare = process.platform === "win32" ? root.toLowerCase() : root;
+  const targetCompare = process.platform === "win32" ? target.toLowerCase() : target;
+  if (!targetCompare.startsWith(rootCompare)) {
+    throw new Error(`Path is outside workspace: ${inputPath}`);
+  }
+  return target;
+}
+function listWorkspaceFiles(workspaceRoot, pattern) {
+  const suffix = pattern.replace(/^\*\*\//, "").replace(/^\*/, "");
+  const results = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = path.join(dir, entry.name);
+      const relativePath = path.relative(workspaceRoot, fullPath);
+      if (entry.isDirectory()) {
+        if (!["node_modules", ".git", "out", "release"].includes(entry.name)) {
+          walk(fullPath);
+        }
+        continue;
+      }
+      if (!suffix || relativePath.endsWith(suffix) || entry.name.includes(pattern.replace(/\*/g, ""))) {
+        results.push(relativePath);
+      }
+    }
+  };
+  walk(workspaceRoot);
+  return results;
+}
+function grepWorkspace(workspaceRoot, pattern) {
+  if (!pattern) {
+    return [];
+  }
+  const matches = [];
+  for (const relativePath of listWorkspaceFiles(workspaceRoot, "*")) {
+    const fullPath = path.join(workspaceRoot, relativePath);
+    if (!/\.(ts|tsx|js|jsx|json|md|txt|css|html)$/i.test(relativePath)) {
+      continue;
+    }
+    const lines = fs.readFileSync(fullPath, "utf8").split(/\r?\n/);
+    lines.forEach((lineText, index) => {
+      if (lineText.includes(pattern)) {
+        matches.push({ path: relativePath, line: index + 1, text: lineText.slice(0, 500) });
+      }
+    });
+  }
+  return matches;
+}
+const toolRegistry = new ToolRegistry();
+class AgentRuntime {
+  async runTurn(request) {
+    const events2 = [];
+    const toolResults = [];
+    const runId = request.runId || generateEventId("agent-run");
+    const allowlist = resolveRuntimeToolAllowlist(request.agentId, request.toolAllowlist);
+    let streamedText = "";
+    let finalResponse;
+    const emit = (type, payload) => {
+      const event = {
+        id: generateEventId("agent-event"),
+        type,
+        timestamp: nowMs(),
+        runId,
+        turnId: request.turnId,
+        sessionId: request.sessionId ?? null,
+        agentId: request.agentId,
+        stage: request.stage,
+        phase: request.phase,
+        payload
+      };
+      events2.push(event);
+      request.onEvent?.(event);
+      this.persistEvent(event);
+      return event;
+    };
+    emit("run.started", {
+      mode: request.mode,
+      patternId: request.patternId,
+      providerId: request.providerId,
+      modelId: request.modelId,
+      toolAllowlist: allowlist
+    });
+    const testStub = this.createTestModeStub(request);
+    if (testStub) {
+      for (const chunk of splitForStreaming(testStub)) {
+        streamedText += chunk;
+        emit("assistant.delta", { text: chunk });
+        await Promise.resolve();
+      }
+      emit("assistant.completed", { text: streamedText });
+      emit("run.completed", { status: "complete", text: streamedText });
+      return { text: streamedText, toolResults, events: events2 };
+    }
+    try {
+      if (!request.providerId || !request.modelId) {
+        const message = "No provider/model route is configured for this agent.";
+        emit("diagnostic", {
+          code: "AGENT_RUNTIME_ROUTE_MISSING",
+          severity: "error",
+          message
+        });
+        emit("run.failed", { status: "failed", error: message });
+        throw new Error(message);
+      }
+      await this.refreshAccountRuntimeCredentials(request.providerId);
+      const { tools, nameMap } = await toolRegistry.listAllowedLlmTools(request.agentId, allowlist);
+      const messages = [
+        { role: "system", content: request.systemPrompt },
+        { role: "user", content: request.prompt }
+      ];
+      finalResponse = await llmAdapter.streamChat(
+        {
+          messages,
+          model: request.modelId,
+          maxTokens: request.maxTokens,
+          temperature: request.temperature,
+          tools,
+          signal: request.signal
+        },
+        (event) => {
+          if (event.type === "text-delta") {
+            streamedText += event.text;
+            emit("assistant.delta", { text: event.text });
+          }
+          if (event.type === "tool-call-delta") {
+            const toolCall = {
+              id: event.toolCall.id,
+              name: nameMap.get(event.toolCall.name ?? "") ?? event.toolCall.name ?? "",
+              arguments: event.toolCall.argumentsText ? { raw: event.toolCall.argumentsText } : {}
+            };
+            emit("tool.requested", { toolCall, streamEvent: event });
+          }
+        },
+        request.providerId
+      );
+      if (!streamedText && typeof finalResponse.content === "string") {
+        streamedText = finalResponse.content;
+      }
+      if (finalResponse.toolCalls?.length) {
+        const toolSummary = await this.executeToolCalls({
+          request,
+          allowlist,
+          nameMap,
+          toolCalls: finalResponse.toolCalls,
+          emit
+        });
+        toolResults.push(...toolSummary.toolResults);
+        if (toolSummary.summaryPrompt) {
+          const followUpText = await this.summarizeToolResults(request, messages, streamedText, toolSummary.summaryPrompt, emit);
+          streamedText = [streamedText, followUpText].filter(Boolean).join("\n");
+        }
+      }
+      emit("assistant.completed", {
+        text: streamedText,
+        usage: finalResponse.usage
+      });
+      emit("run.completed", {
+        status: "complete",
+        text: streamedText,
+        usage: finalResponse.usage
+      });
+      return {
+        text: streamedText,
+        response: finalResponse,
+        toolResults,
+        events: events2
+      };
+    } catch (error) {
+      if (request.signal?.aborted) {
+        emit("run.cancelled", { status: "cancelled", error: "Request was cancelled." });
+        return { text: streamedText, response: finalResponse, toolResults, events: events2 };
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      if (!events2.some((event) => event.type === "run.failed")) {
+        emit("diagnostic", {
+          code: "AGENT_RUNTIME_REQUEST_FAILED",
+          severity: "error",
+          message: "Agent runtime request failed.",
+          technicalMessage: message
+        });
+        emit("run.failed", { status: "failed", error: message });
+      }
+      throw error;
+    }
+  }
+  async executeToolCalls(input) {
+    const toolResults = [];
+    const summaries = [];
+    for (const toolCall of input.toolCalls) {
+      const originalToolName = input.nameMap.get(toolCall.name) ?? toolCall.name;
+      input.emit("tool.started", {
+        toolCallId: toolCall.id,
+        toolName: originalToolName,
+        args: toolCall.arguments
+      });
+      const result = await toolRegistry.execute({
+        agentId: input.request.agentId,
+        toolCall,
+        originalToolName,
+        allowlist: input.allowlist,
+        sessionId: input.request.sessionId,
+        turnId: input.request.turnId,
+        runId: input.request.runId,
+        signal: input.request.signal
+      });
+      toolResults.push({ toolName: originalToolName, result });
+      input.emit("tool.completed", {
+        toolCallId: toolCall.id,
+        toolName: originalToolName,
+        result
+      });
+      summaries.push(`${originalToolName}: ${JSON.stringify(result).slice(0, 4e3)}`);
+    }
+    return {
+      toolResults,
+      summaryPrompt: summaries.join("\n")
+    };
+  }
+  async summarizeToolResults(request, messages, previousText, summaryPrompt, emit) {
+    let text = "";
+    const response = await llmAdapter.streamChat(
+      {
+        messages: [
+          ...messages,
+          {
+            role: "assistant",
+            content: previousText || "I requested tool results."
+          },
+          {
+            role: "user",
+            content: `Tool results:
+${summaryPrompt}
+
+Use these results to continue. Do not expose raw chain-of-thought.`
+          }
+        ],
+        model: request.modelId,
+        maxTokens: request.maxTokens,
+        temperature: request.temperature,
+        signal: request.signal
+      },
+      (event) => {
+        if (event.type === "text-delta") {
+          text += event.text;
+          emit("assistant.delta", { text: event.text });
+        }
+      },
+      request.providerId
+    );
+    if (!text && typeof response.content === "string") {
+      text = response.content;
+    }
+    return text;
+  }
+  async refreshAccountRuntimeCredentials(providerId) {
+    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+    if (provider?.authMode !== "account") {
+      return;
+    }
+    await providerAccountAuthService.ensureRuntimeCredentials(providerId);
+    llmAdapter.configure(settingsService.getLlmConfig());
+  }
+  persistEvent(event) {
+    try {
+      const paths = appPathService.getWorkspacePaths();
+      const eventDir = path.join(paths.logsPath, "agent-events");
+      fs.mkdirSync(eventDir, { recursive: true });
+      const filePath = path.join(eventDir, `${event.runId ?? "run"}.jsonl`);
+      fs.appendFileSync(filePath, `${JSON.stringify(event)}
+`, "utf8");
+    } catch (error) {
+      console.warn("[AgentRuntime] Failed to persist event:", error);
+    }
+  }
+  createTestModeStub(request) {
+    if (process.env.RDC_AGENT_TEST_MODE !== "1") {
+      return null;
+    }
+    let userMessage = request.prompt;
+    try {
+      const parsed = JSON.parse(request.prompt);
+      userMessage = parsed.effective_user_message || parsed.user_message || request.prompt;
+    } catch {
+      userMessage = request.prompt;
+    }
+    if (userMessage.includes("__RDC_AGENT_E2E_FORCE_COWORK_LLM_FAILURE__")) {
+      throw new Error("E2E forced cowork LLM request failure");
+    }
+    const lower = userMessage.toLowerCase();
+    let stub = request.agentId === "ask_agent" ? "Ask is ready. Describe the issue, goal, or .rdc capture you want to inspect; I will clarify without starting execution." : "Debugger is ready. Describe the symptom and capture context; I will prepare a plan before execution.";
+    if (/ue4|unreal/i.test(userMessage)) {
+      stub = "UE4 is Unreal Engine 4, commonly involved in graphics debugging around materials, post-processing, shaders, and render passes.";
+    } else if (/hello|hi/i.test(userMessage)) {
+      stub = request.agentId === "ask_agent" ? "Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution." : "Hello. In Debugger mode I will generate an execution plan first, then wait for approval before running the strict workflow.";
+    } else if (/start|execute|debug|analy[sz]e/.test(lower)) {
+      stub = "Received. I will prepare the formal debugging plan first, then move into the strict execution flow only when conditions are met.";
+    }
+    const intent = /start|execute|debug|analy[sz]e/.test(lower) ? "execute" : "talk";
+    return `${stub}
+<control>{"intent":"${intent}","safe_to_start":${intent === "execute" ? "true" : "false"}}</control>`;
+  }
+}
+function splitForStreaming(text) {
+  const midpoint = Math.max(1, Math.ceil(text.length / 2));
+  return [text.slice(0, midpoint), text.slice(midpoint)].filter(Boolean);
+}
+const agentRuntime = new AgentRuntime();
 const EXECUTE_PATTERN = /开始|启动|执行|正式分析|正式调试|本地调试|local\s*模式调试|模式调试|直接分析|现在分析|run\b|start\b|debug\b|analy[sz]e\b|帮我调试|请.*调试|开始调试|开始分析/i;
 const TASK_FILE_PATTERN = /([A-Za-z]:[\\/][^\r\n"]+\.(txt|md))/i;
 const CONTROL_OPEN_TAG = "<control>";
@@ -14052,6 +15154,41 @@ function finalizeTrace(trace, status, summary) {
   const nextTrace = cloneTrace(trace);
   nextTrace.status = status;
   nextTrace.summary = summary ?? nextTrace.summary;
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+function upsertRuntimeToolCall(trace, patch) {
+  const nextTrace = cloneTrace(trace);
+  const stepId = "runtime-tools";
+  let step = nextTrace.steps.find((entry) => entry.id === stepId);
+  if (!step) {
+    step = createReasoningStep(stepId, "Runtime tool trace", "cowork");
+    step.status = "running";
+    nextTrace.steps.push(step);
+  }
+  const toolIndex = step.toolCalls.findIndex((toolCall) => toolCall.id === patch.id);
+  if (toolIndex >= 0) {
+    step.toolCalls[toolIndex] = {
+      ...step.toolCalls[toolIndex],
+      ...patch
+    };
+  } else {
+    step.toolCalls.push({
+      id: patch.id,
+      toolName: patch.toolName,
+      status: patch.status ?? "pending",
+      argsPreview: patch.argsPreview,
+      resultPreview: patch.resultPreview,
+      error: patch.error,
+      startedAt: patch.startedAt ?? nowMs(),
+      completedAt: patch.completedAt
+    });
+  }
+  if (step.toolCalls.length > 0 && step.toolCalls.every((toolCall) => toolCall.status === "complete" || toolCall.status === "error")) {
+    step.status = step.toolCalls.some((toolCall) => toolCall.status === "error") ? "error" : "complete";
+    step.completedAt = nowMs();
+  }
+  nextTrace.status = "running";
   nextTrace.updatedAt = nowMs();
   return nextTrace;
 }
@@ -14833,24 +15970,35 @@ class ConversationService {
             })
           });
         }
-        const response = await agentOrchestrator.sendCoworkMessage(
-          conversationAgentId,
-          buildCoworkPrompt(
+        const response = await agentRuntime.runTurn({
+          agentId: conversationAgentId,
+          mode: input.requestedMode,
+          prompt: buildCoworkPrompt(
             input.context,
             history,
             input.requestedMode,
             input.rawMessage,
             input.importedAttachments
           ),
-          {
-            sessionId: input.context.session?.sessionId,
-            turnId: assistantMessage.turnId,
-            systemPrompt: conversationAgentId === "ask_agent" ? buildAskSystemPrompt() : buildDebuggerCoworkSystemPrompt(),
-            maxTokens: 1200,
-            temperature: 0.35,
-            routeAgentId: routePreflight.routeAgentId,
-            signal: abortController.signal,
-            onChunk: (chunk) => {
+          sessionId: input.context.session?.sessionId,
+          turnId: assistantMessage.turnId,
+          stage: "cowork",
+          patternId: input.requestedMode === "debugger" ? "plan-generate-verify" : "free-agent",
+          systemPrompt: conversationAgentId === "ask_agent" ? buildAskSystemPrompt() : buildDebuggerCoworkSystemPrompt(),
+          providerId: routePreflight.providerId,
+          modelId: routePreflight.modelId,
+          maxTokens: 1200,
+          temperature: 0.35,
+          signal: abortController.signal,
+          onEvent: (event) => {
+            this.emitConversationEvent({
+              type: "agent_event",
+              sessionId: sessionId ?? "",
+              turnId: assistantMessage.turnId,
+              event
+            });
+            if (event.type === "assistant.delta") {
+              const chunk = typeof event.payload.text === "string" ? event.payload.text : "";
               rawResponse += chunk;
               const nextVisible = computeVisibleAssistantText(rawResponse);
               if (nextVisible.length > visibleResponse.length) {
@@ -14858,10 +16006,34 @@ class ConversationService {
                 commitVisibleAssistantText();
               }
             }
+            if (event.type === "tool.started") {
+              commitAssistantMessage("message_patched", {
+                reasoningTrace: upsertRuntimeToolCall(assistantMessage.reasoningTrace, {
+                  id: String(event.payload.toolCallId),
+                  toolName: String(event.payload.toolName),
+                  status: "running",
+                  argsPreview: JSON.stringify(event.payload.args ?? {}).slice(0, 600),
+                  startedAt: nowMs()
+                })
+              });
+            }
+            if (event.type === "tool.completed") {
+              const result = event.payload.result;
+              commitAssistantMessage("message_patched", {
+                reasoningTrace: upsertRuntimeToolCall(assistantMessage.reasoningTrace, {
+                  id: String(event.payload.toolCallId),
+                  toolName: String(event.payload.toolName),
+                  status: result?.ok ? "complete" : "error",
+                  resultPreview: JSON.stringify(event.payload.result ?? {}).slice(0, 800),
+                  error: result?.ok ? void 0 : result?.error?.message,
+                  completedAt: nowMs()
+                })
+              });
+            }
           }
-        );
+        });
         if (!rawResponse) {
-          rawResponse = response;
+          rawResponse = response.text;
         }
       } catch (error) {
         llmDiagnostic = createRequestFailedDiagnostic(routePreflight, error);
@@ -15081,6 +16253,28 @@ function registerConversationHandlers(context2) {
     return conversationService.cancelActiveTurn(request);
   });
 }
+const STALE_RECOVERABLE_RUN_STATUSES = [
+  "planning",
+  "queued",
+  "running",
+  "stopping"
+];
+async function recoverStaleRunOnSelection(run) {
+  if (!run || !STALE_RECOVERABLE_RUN_STATUSES.includes(run.status)) {
+    return run;
+  }
+  const isActive = runExecutionService.listActiveRuns().some((activeRun) => activeRun.runId === run.runId);
+  if (isActive) {
+    return run;
+  }
+  await storageAdapter.updateRun(run.sessionId, run.runId, {
+    status: "interrupted",
+    stopReason: "Recovered after app restart",
+    stoppedAt: Date.now(),
+    finishedAt: Date.now()
+  });
+  return storageAdapter.getLatestRun(run.sessionId);
+}
 function registerProjectSessionHandlers(context2) {
   const { state: state2 } = context2;
   electron.ipcMain.handle("project:list", async () => {
@@ -15238,12 +16432,13 @@ function registerProjectSessionHandlers(context2) {
     }
     state2.currentSessionId = id;
     state2.currentProjectId = session.projectId;
-    state2.currentRunId = session.lastRunId || null;
+    const currentRun = await recoverStaleRunOnSelection(storageAdapter.getLatestRun(id));
+    state2.currentRunId = currentRun?.runId || session.lastRunId || null;
     await storageAdapter.setCurrentSessionId(id);
     return {
       success: true,
       session,
-      currentRun: storageAdapter.getLatestRun(id)
+      currentRun
     };
   });
   electron.ipcMain.handle("session:attachments:list", async (_event, sessionId) => {
@@ -16305,22 +17500,22 @@ function registerToolEvidenceHandlers(context2) {
     if (!sessionId) {
       return { sessionId: "", runId: "", events: [], isValid: true };
     }
-    const events = await storageAdapter.readActionChain(sessionId);
+    const events2 = await storageAdapter.readActionChain(sessionId);
     return {
       sessionId,
       runId: state2.currentRunId || storageAdapter.getLatestRun(sessionId)?.runId || "",
-      events,
+      events: events2,
       isValid: true
     };
   });
   electron.ipcMain.handle("evidence:getEvents", async (_event, eventType) => {
     const sessionId = await storageAdapter.getCurrentSessionId();
     if (!sessionId) return [];
-    const events = await storageAdapter.readActionChain(sessionId);
+    const events2 = await storageAdapter.readActionChain(sessionId);
     if (eventType) {
-      return events.filter((event) => event.event_type === eventType);
+      return events2.filter((event) => event.event_type === eventType);
     }
-    return events;
+    return events2;
   });
 }
 function registerWorkflowHandlers(context2) {
@@ -17781,6 +18976,13 @@ if (!process.env.RDC_AGENT_USER_DATA?.trim()) {
 }
 const isDev = process.env.NODE_ENV === "development" && process.env.RDC_AGENT_TEST_MODE !== "1";
 const isSettingsRebuildOnly = process.env.RDC_AGENT_REBUILD_SETTINGS_ONLY === "1";
+const isTestMode = process.env.RDC_AGENT_TEST_MODE === "1";
+if (isTestMode) {
+  electron.app.disableHardwareAcceleration();
+  electron.app.commandLine.appendSwitch("disable-gpu");
+  electron.app.commandLine.appendSwitch("disable-gpu-compositing");
+  electron.app.commandLine.appendSwitch("in-process-gpu");
+}
 let mainWindow = null;
 const allowedNavigationOrigins = /* @__PURE__ */ new Set();
 function registerAllowedOrigin(url2) {
@@ -18010,6 +19212,10 @@ electron.app.on("window-all-closed", () => {
 electron.app.on("before-quit", () => {
   void stopAllActiveRuns();
   replayDeviceService.dispose();
+  if (isTestMode) {
+    const forceExitTimer = setTimeout(() => electron.app.exit(0), 100);
+    forceExitTimer.unref?.();
+  }
 });
 electron.app.on("web-contents-created", (_event, contents) => {
   contents.on("will-navigate", (event, navigationUrl) => {

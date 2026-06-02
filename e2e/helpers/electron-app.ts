@@ -22,10 +22,40 @@ interface LaunchAppOptions {
   onPageError?: (error: Error) => void;
 }
 
+let pendingPlaywrightTransportCleanup: NodeJS.Timeout | null = null;
+
+function cancelPendingPlaywrightTransportCleanup(): void {
+  if (pendingPlaywrightTransportCleanup) {
+    clearTimeout(pendingPlaywrightTransportCleanup);
+    pendingPlaywrightTransportCleanup = null;
+  }
+}
+
+function schedulePlaywrightTransportCleanup(): void {
+  cancelPendingPlaywrightTransportCleanup();
+  pendingPlaywrightTransportCleanup = setTimeout(() => {
+    pendingPlaywrightTransportCleanup = null;
+    const activeHandles = (process as typeof process & {
+      _getActiveHandles?: () => unknown[];
+    })._getActiveHandles?.() ?? [];
+    for (const handle of activeHandles) {
+      const socket = handle as {
+        constructor?: { name?: string };
+        fd?: number;
+        destroy?: () => void;
+      };
+      if (socket.constructor?.name === 'Socket' && socket.fd == null) {
+        socket.destroy?.();
+      }
+    }
+  }, 5000);
+}
+
 /**
  * 启动 Electron app，使用临时 userData 和 workspace
  */
 export async function launchApp(options: LaunchAppOptions = {}): Promise<AppContext> {
+  cancelPendingPlaywrightTransportCleanup();
   const tempDir = options.tempDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-agent-e2e-'));
   const userDataDir = options.userDataDir ?? path.join(tempDir, 'userData');
   const workspaceDir = options.workspaceDir ?? path.join(tempDir, 'workspace');
@@ -168,30 +198,102 @@ export async function configureTestDebuggerRoutes(
 }
 
 /**
- * 关闭 app 并清理临时目录
+ * Start a debugger workflow from the first seeded project input.
  */
+export async function startDebuggerPlanFromFirstInput(page: Page, goal: string): Promise<string> {
+  return page.evaluate(async (nextGoal) => {
+    const e2e = (window as typeof window & {
+      __RDC_AGENT_E2E__?: {
+        getWorkbenchState: () => {
+          currentProject: { projectId: string } | null;
+          currentSession: { sessionId: string } | null;
+          projectInputs: Array<{ inputId: string; filePath: string }>;
+        };
+        seedWorkbenchState: (state: unknown) => void;
+      };
+    }).__RDC_AGENT_E2E__;
+    const state = e2e?.getWorkbenchState();
+    const currentProject = state?.currentProject;
+    const currentSession = state?.currentSession;
+    const primaryInput = state?.projectInputs[0];
+    if (!e2e || !currentProject || !currentSession || !primaryInput) {
+      throw new Error('Missing seeded project/session/input for debugger workflow E2E setup');
+    }
+
+    const captures = state.projectInputs.map((input) => ({
+      id: input.inputId,
+      filePath: input.filePath,
+      role: 'primary' as const,
+      backendHint: 'local' as const,
+      status: 'pending' as const,
+    }));
+    const started = await window.electronAPI.workflow.start({
+      projectId: currentProject.projectId,
+      sessionId: currentSession.sessionId,
+      mode: 'debugger',
+      goal: nextGoal,
+      captures,
+      primaryCaptureId: primaryInput.inputId,
+    });
+    if (!started.success || !started.runId) {
+      throw new Error(started.error || 'Failed to start debugger workflow for E2E setup');
+    }
+
+    const runs = await window.electronAPI.run.list(currentSession.sessionId);
+    const workflow = await window.electronAPI.workflow.getState();
+    const currentRun = runs.runs.find((run) => run.runId === started.runId) ?? null;
+    e2e.seedWorkbenchState({
+      ...state,
+      currentRun,
+      runs: runs.runs,
+      workflowState: workflow,
+    });
+    return started.runId;
+  }, goal);
+}
+
+function waitForProcessExit(proc: ReturnType<ElectronApplication['process']>, timeoutMs: number): Promise<boolean> {
+  if (!proc || proc.killed || proc.exitCode !== null) {
+    return Promise.resolve(true);
+  }
+  return new Promise<boolean>((resolve) => {
+    const timer = setTimeout(() => resolve(false), timeoutMs);
+    proc.once('close', () => {
+      clearTimeout(timer);
+      resolve(true);
+    });
+  });
+}
+
+function markPlaywrightElectronClosed(app: ElectronApplication): void {
+  const appInternals = app as ElectronApplication & {
+    emit?: (eventName: string) => boolean;
+    context: () => ReturnType<ElectronApplication['context']> & {
+      _onClose?: () => void;
+    };
+  };
+  appInternals.emit?.('close');
+  appInternals.context()._onClose?.();
+}
+
 export async function closeApp(ctx: AppContext, options?: { cleanup?: boolean }): Promise<void> {
-  let closed = false;
   const proc = ctx.app.process();
-  try {
-    await Promise.race([
-      ctx.app.close().then(() => {
-        closed = true;
-      }),
-      new Promise<void>((resolve) => setTimeout(resolve, 10000)),
-    ]);
-  } finally {
-    if (!closed && proc && !proc.killed) {
+
+  if (proc && !proc.killed) {
+    await ctx.app.evaluate(({ app }) => {
+      app.quit();
+      setTimeout(() => app.exit(0), 100).unref?.();
+    }).catch(() => undefined);
+
+    const exited = await waitForProcessExit(proc, 5000);
+    if (!exited && !proc.killed) {
       proc.kill();
-      await new Promise<void>((resolve) => {
-        const timer = setTimeout(resolve, 5000);
-        proc.once('exit', () => {
-          clearTimeout(timer);
-          resolve();
-        });
-      });
+      await waitForProcessExit(proc, 5000);
     }
   }
+  markPlaywrightElectronClosed(ctx.app);
+  schedulePlaywrightTransportCleanup();
+
   const shouldCleanup = options?.cleanup ?? ctx.cleanupOnClose;
   // 清理临时目录
   if (shouldCleanup) {

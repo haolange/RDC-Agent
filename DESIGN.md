@@ -34,7 +34,17 @@ Agent Workstream 的正式文档入口：
 - `Analyzer` 和 `Optimizer` 是一等产品模式占位，但本仓库默认不把 Debugger harness 自动泛化到这两个模式。
 - `Debugger` / `Analyzer` / `Optimizer` 是执行类 UI 模式；只有应用内已有 `OpenedCaptureState(status=open)` 且属于当前 project 时，renderer 才允许选择执行类模式。用户在 prompt 里写 `.rdc` 路径不等同于 Open capture，也不能被自动升级成正式 run。
 - 工具执行链必须保持为 `renderer -> preload -> IPC -> ToolBridge -> resources/tools/rdx.bat`。不能从 renderer、preload 或任意 SDK adapter 绕过 `ToolBridge` 调 RenderDoc 工具。
-- OpenAI Agents SDK / Claude Agent SDK 只能作为 stage 内 runner，经 `AgentRunnerPort` 接入；顶层 stage、gate、approval、final status 由本仓库 workflow runtime 决定。
+- OpenAI Agents SDK / Claude Agent SDK 只能作为 provider/runner adapter，经本库 runtime 边界接入；顶层 mode、stage、gate、approval、tool policy、final status 由本仓库自有 runtime 决定。
+
+## Agent Runtime 收敛
+
+- 本库的 Agent 执行权威是自有 `AgentRuntime`。Provider SDK、官方 Agent SDK 或 HTTP provider adapter 只能提供模型流、工具请求和 provider 能力适配，不能决定 mode、stage、approval、tool policy 或 final status。
+- Agent Runtime 的跨层事实事件是 `AgentEvent`：覆盖 assistant delta/completed、tool requested/started/completed、task/subagent、approval、diagnostic、run completed/failed/cancelled。renderer 只消费该事件投影和 conversation message projection，不展示原始 chain-of-thought。
+- `Ask` 是只读 agentic work：默认允许 `primitive.read/glob/grep/webFetch/webSearch/askUser/task.list`，禁止 `bash/write/edit/remove`。若模型请求禁用工具，runtime 必须返回 policy denial，而不是静默执行。
+- `Debugger` 绑定 `plan-generate-verify` pattern。首版继续复用现有 Debugger stage 名称，但 pattern contract 明确 planner -> generator -> evaluator 的顺序、plan approval 入口和 verifier/curator 收敛责任。
+- `Analyzer` / `Optimizer` 只作为可配置 mode profile 和 pattern 入口保留，不复制 Debugger runtime，也不声明已有专属执行链。计划文档中的 `Profiler` 在当前代码命名中对应 `Optimizer` 占位。
+- 内置 profile、stage policy、pattern、skill 和 MCP descriptor 来自 `resources/agent-runtime/`，启动时 seed 到 workspace；workspace 配置优先。`ExecutionProfileService` 只负责 schema、loader、validator、seed/repair 和 effective runtime profile 解析，不再把默认 profile 内容写死在代码里。
+- Settings > Agents 必须同时覆盖 provider/model route 与 runtime ecology：Profiles、Skills、MCP、Patterns。高频 agent route 保持首屏可达；runtime ecology 可折叠，但必须能从 UI 保存到 workspace settings。
 
 ## 架构分层
 

@@ -1,0 +1,11 @@
+{
+  "id": "free-agent",
+  "label": "Free Agent",
+  "description": "General agentic work pattern for configurable modes that do not yet define a strict stage graph.",
+  "modeBindings": [
+    "analyzer",
+    "optimizer"
+  ],
+  "finalStatusOwner": "runtime",
+  "stages": []
+}

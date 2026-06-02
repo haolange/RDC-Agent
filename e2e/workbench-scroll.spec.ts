@@ -207,6 +207,42 @@ const seedChatWorkbench = async (page: AppContext['page']) => {
       throw new Error('Missing E2E state hook');
     }
 
+    const workstreamItems = Array.from({ length: 18 }, (_, index) => ({
+      kind: 'task_workstream' as const,
+      id: `scroll-workstream-${index}`,
+      type: 'debugger' as const,
+      status: index === 17 ? 'running' as const : 'completed' as const,
+      density: 'expanded' as const,
+      title: `Timeline workstream ${index}`,
+      startedAt: new Date(Date.now() - (18 - index) * 1_000).toISOString(),
+      process: {
+        collapsed: false,
+        items: [
+          {
+            kind: 'agent_thinking' as const,
+            id: `thinking-${index}`,
+            createdAt: new Date(Date.now() - (18 - index) * 1_000).toISOString(),
+            text: `Timeline entry ${index} `.repeat(6),
+          },
+        ],
+      },
+      result: {
+        id: `result-${index}`,
+        workstreamId: `scroll-workstream-${index}`,
+        kind: 'answer' as const,
+        status: 'completed' as const,
+        title: `Result ${index}`,
+        sections: [{
+          id: `section-${index}`,
+          title: 'Evidence',
+          body: `Timeline entry ${index} `.repeat(8),
+        }],
+        artifactIds: [],
+        artifacts: [],
+        createdAt: new Date(Date.now() - (18 - index) * 1_000).toISOString(),
+      },
+    }));
+
     const state = {
       projects: [project],
       sessions: [session],
@@ -218,6 +254,21 @@ const seedChatWorkbench = async (page: AppContext['page']) => {
       openedCapture: null,
       contextSnapshot: null,
       conversationMessages,
+      workstreamPresentation: {
+        sessionId: session.sessionId,
+        activeBranchId: 'branch-scroll',
+        mode: 'debugger',
+        items: workstreamItems,
+        rightPanel: {
+          progress: { current: [], history: [] },
+          artifacts: { current: [], previous: [] },
+          context: { groups: [] },
+        },
+        approval: null,
+        branchNavigator: null,
+        rawAuditRefs: [],
+        updatedAt: new Date().toISOString(),
+      },
       timeline: [],
       runs: [currentRun],
     };
@@ -261,6 +312,9 @@ test('主壳层左栏和右栏支持独立滚轮滚动', async () => {
   ));
   expect(panelIsScrollable).toBe(true);
 
+  await page.locator('[data-testid="control-panel-scroll"]').evaluate((element) => {
+    element.scrollTop = 0;
+  });
   const panelScrollBefore = await getScrollTop('[data-testid="control-panel-scroll"]', page);
   await page.locator('[data-testid="control-panel-scroll"]').hover({ position: { x: 24, y: 24 } });
   await page.mouse.wheel(0, 3200);

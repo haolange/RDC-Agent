@@ -4,3 +4,4 @@
  */
 
 export { MCPClient, MCPConnection } from './MCPClient';
+export { mcpClient } from './MCPClientInstance';

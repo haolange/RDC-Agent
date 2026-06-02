@@ -7,6 +7,7 @@ import type {
   ConversationControl,
   ConversationMessage,
   ConversationMessageDiagnostic,
+  ConversationToolCall,
   ConversationReasoningStep,
   ConversationReasoningTrace,
   ConversationSendRequest,
@@ -25,6 +26,8 @@ import type {
 } from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import { generateEventId, nowMs } from '@shared/utils/id';
+import type { AgentEvent } from '@shared/types/agentRuntime';
+import { agentRuntime } from '../agent-runtime/AgentRuntime';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
 import { agentWorkstreamProjector } from '../workflow/debugger/AgentWorkstreamProjector';
 import { debuggerRuntime } from '../workflow/debugger/DebuggerRuntime';
@@ -152,6 +155,45 @@ function finalizeTrace(
   const nextTrace = cloneTrace(trace);
   nextTrace.status = status;
   nextTrace.summary = summary ?? nextTrace.summary;
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+
+function upsertRuntimeToolCall(
+  trace: ConversationReasoningTrace | null | undefined,
+  patch: Partial<ConversationToolCall> & { id: string; toolName: string },
+): ConversationReasoningTrace {
+  const nextTrace = cloneTrace(trace);
+  const stepId = 'runtime-tools';
+  let step = nextTrace.steps.find((entry) => entry.id === stepId);
+  if (!step) {
+    step = createReasoningStep(stepId, 'Runtime tool trace', 'cowork');
+    step.status = 'running';
+    nextTrace.steps.push(step);
+  }
+  const toolIndex = step.toolCalls.findIndex((toolCall) => toolCall.id === patch.id);
+  if (toolIndex >= 0) {
+    step.toolCalls[toolIndex] = {
+      ...step.toolCalls[toolIndex],
+      ...patch,
+    };
+  } else {
+    step.toolCalls.push({
+      id: patch.id,
+      toolName: patch.toolName,
+      status: patch.status ?? 'pending',
+      argsPreview: patch.argsPreview,
+      resultPreview: patch.resultPreview,
+      error: patch.error,
+      startedAt: patch.startedAt ?? nowMs(),
+      completedAt: patch.completedAt,
+    });
+  }
+  if (step.toolCalls.length > 0 && step.toolCalls.every((toolCall) => toolCall.status === 'complete' || toolCall.status === 'error')) {
+    step.status = step.toolCalls.some((toolCall) => toolCall.status === 'error') ? 'error' : 'complete';
+    step.completedAt = nowMs();
+  }
+  nextTrace.status = 'running';
   nextTrace.updatedAt = nowMs();
   return nextTrace;
 }
@@ -1139,38 +1181,73 @@ export class ConversationService {
           });
         }
 
-        const response = await agentOrchestrator.sendCoworkMessage(
-          conversationAgentId,
-          buildCoworkPrompt(
+        const response = await agentRuntime.runTurn({
+          agentId: conversationAgentId,
+          mode: input.requestedMode,
+          prompt: buildCoworkPrompt(
             input.context,
             history,
             input.requestedMode,
             input.rawMessage,
             input.importedAttachments,
           ),
-          {
-            sessionId: input.context.session?.sessionId,
-            turnId: assistantMessage.turnId,
-            systemPrompt: conversationAgentId === 'ask_agent'
-              ? buildAskSystemPrompt()
-              : buildDebuggerCoworkSystemPrompt(),
-            maxTokens: 1200,
-            temperature: 0.35,
-            routeAgentId: routePreflight.routeAgentId,
-            signal: abortController.signal,
-            onChunk: (chunk) => {
+          sessionId: input.context.session?.sessionId,
+          turnId: assistantMessage.turnId,
+          stage: 'cowork',
+          patternId: input.requestedMode === 'debugger' ? 'plan-generate-verify' : 'free-agent',
+          systemPrompt: conversationAgentId === 'ask_agent'
+            ? buildAskSystemPrompt()
+            : buildDebuggerCoworkSystemPrompt(),
+          providerId: routePreflight.providerId,
+          modelId: routePreflight.modelId,
+          maxTokens: 1200,
+          temperature: 0.35,
+          signal: abortController.signal,
+          onEvent: (event: AgentEvent) => {
+            this.emitConversationEvent({
+              type: 'agent_event',
+              sessionId: sessionId ?? '',
+              turnId: assistantMessage.turnId,
+              event,
+            });
+            if (event.type === 'assistant.delta') {
+              const chunk = typeof event.payload.text === 'string' ? event.payload.text : '';
               rawResponse += chunk;
               const nextVisible = computeVisibleAssistantText(rawResponse);
               if (nextVisible.length > visibleResponse.length) {
                 visibleResponse = nextVisible;
                 commitVisibleAssistantText();
               }
-            },
+            }
+            if (event.type === 'tool.started') {
+              commitAssistantMessage('message_patched', {
+                reasoningTrace: upsertRuntimeToolCall(assistantMessage.reasoningTrace, {
+                  id: String(event.payload.toolCallId),
+                  toolName: String(event.payload.toolName),
+                  status: 'running',
+                  argsPreview: JSON.stringify(event.payload.args ?? {}).slice(0, 600),
+                  startedAt: nowMs(),
+                }),
+              });
+            }
+            if (event.type === 'tool.completed') {
+              const result = event.payload.result as { ok?: boolean; error?: { message?: string } } | undefined;
+              commitAssistantMessage('message_patched', {
+                reasoningTrace: upsertRuntimeToolCall(assistantMessage.reasoningTrace, {
+                  id: String(event.payload.toolCallId),
+                  toolName: String(event.payload.toolName),
+                  status: result?.ok ? 'complete' : 'error',
+                  resultPreview: JSON.stringify(event.payload.result ?? {}).slice(0, 800),
+                  error: result?.ok ? undefined : result?.error?.message,
+                  completedAt: nowMs(),
+                }),
+              });
+            }
           },
-        );
+        });
 
         if (!rawResponse) {
-          rawResponse = response;
+          rawResponse = response.text;
         }
       } catch (error) {
         llmDiagnostic = createRequestFailedDiagnostic(routePreflight, error);

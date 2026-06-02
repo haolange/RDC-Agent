@@ -56,6 +56,9 @@ interface LegacyAppGlobalSettings {
 
 interface PersistedConfigurationSettings {
   activeModeProfileId?: string;
+  enabledSkillIds?: string[];
+  enabledMcpServerIds?: string[];
+  modePatternBindings?: Record<string, string>;
   lastMigrationReportPath?: string;
 }
 
@@ -119,6 +122,9 @@ const EMPTY_PATHS: AppRuntimePaths = {
   migrationOrphansPath: '',
   profilesPath: '',
   policiesPath: '',
+  skillsPath: '',
+  mcpPath: '',
+  patternsPath: '',
   secretsPath: '',
   migrationReportsPath: '',
 };
@@ -152,6 +158,13 @@ const DEFAULT_PROFILE: ProfileSettings = {
 
 const DEFAULT_CONFIGURATION: PersistedConfigurationSettings = {
   activeModeProfileId: 'debugger.default',
+  enabledSkillIds: [],
+  enabledMcpServerIds: [],
+  modePatternBindings: {
+    debugger: 'plan-generate-verify',
+    analyzer: 'free-agent',
+    optimizer: 'free-agent',
+  },
 };
 
 function nowIso(): string {
@@ -168,6 +181,28 @@ function pickEnum<T extends string>(value: unknown, allowed: T[], fallback: T): 
 
 function dedupeStrings(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
+}
+
+function sanitizeRuntimeIds(values: unknown): string[] {
+  return dedupeStrings(
+    Array.isArray(values)
+      ? values.filter((value): value is string => typeof value === 'string').map((value) => value.trim())
+      : [],
+  );
+}
+
+function sanitizePatternBindings(value: unknown): Record<string, string> {
+  const candidate = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const bindings: Record<string, string> = {};
+  for (const [mode, patternId] of Object.entries(candidate)) {
+    if (typeof patternId === 'string' && patternId.trim()) {
+      bindings[mode] = patternId.trim();
+    }
+  }
+  return {
+    ...(DEFAULT_CONFIGURATION.modePatternBindings ?? {}),
+    ...bindings,
+  };
 }
 
 function readJsonFile<T>(filePath: string): T | null {
@@ -337,6 +372,12 @@ function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspac
   const configuration = executionProfileService.normalizeConfiguration({
     activeModeProfileId: DEFAULT_CONFIGURATION.activeModeProfileId || 'debugger.default',
     availableModeProfiles: [],
+    enabledSkillIds: DEFAULT_CONFIGURATION.enabledSkillIds ?? [],
+    enabledMcpServerIds: DEFAULT_CONFIGURATION.enabledMcpServerIds ?? [],
+    modePatternBindings: DEFAULT_CONFIGURATION.modePatternBindings ?? {},
+    availablePatterns: [],
+    availableSkills: [],
+    availableMcpServers: [],
     lastMigrationReportPath: undefined,
     lastMigrationSummary: [],
     diagnostics: [],
@@ -738,6 +779,9 @@ export class SettingsService {
       },
       configuration: {
         activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
+        enabledSkillIds: sanitizeRuntimeIds(candidate.configuration?.enabledSkillIds),
+        enabledMcpServerIds: sanitizeRuntimeIds(candidate.configuration?.enabledMcpServerIds),
+        modePatternBindings: sanitizePatternBindings(candidate.configuration?.modePatternBindings),
         lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath,
       },
     };
@@ -788,6 +832,9 @@ export class SettingsService {
       },
       configuration: {
         activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
+        enabledSkillIds: sanitizeRuntimeIds(candidate.configuration?.enabledSkillIds),
+        enabledMcpServerIds: sanitizeRuntimeIds(candidate.configuration?.enabledMcpServerIds),
+        modePatternBindings: sanitizePatternBindings(candidate.configuration?.modePatternBindings),
         lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath,
       },
     };
@@ -843,6 +890,12 @@ export class SettingsService {
     const configuration: ConfigurationSettings = executionProfileService.normalizeConfiguration({
       activeModeProfileId: normalized.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId || 'debugger.default',
       availableModeProfiles: [],
+      enabledSkillIds: normalized.configuration?.enabledSkillIds ?? [],
+      enabledMcpServerIds: normalized.configuration?.enabledMcpServerIds ?? [],
+      modePatternBindings: normalized.configuration?.modePatternBindings ?? DEFAULT_CONFIGURATION.modePatternBindings ?? {},
+      availablePatterns: [],
+      availableSkills: [],
+      availableMcpServers: [],
       lastMigrationReportPath: normalized.configuration?.lastMigrationReportPath,
       lastMigrationSummary: parseMigrationSummary(normalized.configuration?.lastMigrationReportPath),
       diagnostics: [],
@@ -996,6 +1049,15 @@ export class SettingsService {
         activeModeProfileId: patch.configuration?.activeModeProfileId
           || currentPersisted.configuration?.activeModeProfileId
           || DEFAULT_CONFIGURATION.activeModeProfileId,
+        enabledSkillIds: patch.configuration?.enabledSkillIds
+          ? sanitizeRuntimeIds(patch.configuration.enabledSkillIds)
+          : sanitizeRuntimeIds(currentPersisted.configuration?.enabledSkillIds),
+        enabledMcpServerIds: patch.configuration?.enabledMcpServerIds
+          ? sanitizeRuntimeIds(patch.configuration.enabledMcpServerIds)
+          : sanitizeRuntimeIds(currentPersisted.configuration?.enabledMcpServerIds),
+        modePatternBindings: patch.configuration?.modePatternBindings
+          ? sanitizePatternBindings(patch.configuration.modePatternBindings)
+          : sanitizePatternBindings(currentPersisted.configuration?.modePatternBindings),
         lastMigrationReportPath: currentPersisted.configuration?.lastMigrationReportPath,
       },
     };

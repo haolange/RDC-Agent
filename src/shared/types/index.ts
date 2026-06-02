@@ -26,6 +26,15 @@ export type {
 } from './electron-api';
 export type { AgentConfig, AgentRole, AgentState, AgentStatus, AgentTimelineEntry } from './agent';
 export type {
+  AgentEvent,
+  AgentEventPayload,
+  AgentEventType,
+  AgentRuntimeCatalog,
+  AgentRuntimeMcpDescriptor,
+  AgentRuntimePatternDescriptor,
+  AgentRuntimeSkillDescriptor,
+} from './agentRuntime';
+export type {
   ConversationMessage,
   ConversationSendRequest,
   ConversationStreamEvent,
