@@ -1006,6 +1006,60 @@ test('agent routing only lists verified providers with enabled models', async ()
   }
 });
 
+test('agent runtime ecology settings persist pattern skill and MCP changes', async () => {
+  const ctx = await launchApp();
+
+  try {
+    const runtimeConfig = await ctx.page.evaluate(async () => {
+      const settings = await window.electronAPI.settings.get();
+      const skillId = settings.configuration.availableSkills[0]?.id ?? '';
+      const mcpId = settings.configuration.availableMcpServers[0]?.id ?? '';
+      const currentAnalyzerPattern = settings.configuration.modePatternBindings.analyzer ?? '';
+      const nextAnalyzerPattern = settings.configuration.availablePatterns.find((pattern) => (
+        pattern.id !== currentAnalyzerPattern
+      ))?.id ?? currentAnalyzerPattern;
+
+      return {
+        skillId,
+        mcpId,
+        nextAnalyzerPattern,
+        skillInitiallyEnabled: settings.configuration.enabledSkillIds.includes(skillId),
+        mcpInitiallyEnabled: settings.configuration.enabledMcpServerIds.includes(mcpId),
+      };
+    });
+
+    expect(runtimeConfig.skillId).toBeTruthy();
+    expect(runtimeConfig.mcpId).toBeTruthy();
+    expect(runtimeConfig.nextAnalyzerPattern).toBeTruthy();
+
+    await openSettings(ctx);
+    await ctx.page.locator('[data-testid="settings-nav-agents"]').click();
+    const runtimePanel = ctx.page.locator('[data-testid="settings-agent-runtime-config"]');
+    await runtimePanel.locator('summary').click();
+
+    await ctx.page.locator(`[data-testid="settings-skill-${runtimeConfig.skillId}"]`).click();
+    await ctx.page.locator(`[data-testid="settings-mcp-${runtimeConfig.mcpId}"]`).click();
+    await ctx.page.locator('[data-testid="settings-pattern-analyzer"]').click();
+    await ctx.page.locator(`[data-testid="settings-pattern-analyzer-option-${runtimeConfig.nextAnalyzerPattern}"]`).click();
+    await ctx.page.locator('[data-testid="settings-agent-runtime-save"]').click();
+
+    const updated = await ctx.page.evaluate(async () => {
+      const settings = await window.electronAPI.settings.get();
+      return {
+        enabledSkillIds: settings.configuration.enabledSkillIds,
+        enabledMcpServerIds: settings.configuration.enabledMcpServerIds,
+        analyzerPattern: settings.configuration.modePatternBindings.analyzer,
+      };
+    });
+
+    expect(updated.enabledSkillIds.includes(runtimeConfig.skillId)).toBe(!runtimeConfig.skillInitiallyEnabled);
+    expect(updated.enabledMcpServerIds.includes(runtimeConfig.mcpId)).toBe(!runtimeConfig.mcpInitiallyEnabled);
+    expect(updated.analyzerPattern).toBe(runtimeConfig.nextAnalyzerPattern);
+  } finally {
+    await closeApp(ctx);
+  }
+});
+
 test('general settings changes stay on the current panel', async () => {
   const ctx = await launchApp();
 

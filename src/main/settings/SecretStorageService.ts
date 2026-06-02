@@ -85,7 +85,7 @@ export class SecretStorageService {
       return;
     }
 
-    const encryptionAvailable = safeStorage.isEncryptionAvailable();
+    const encryptionAvailable = process.env.RDC_AGENT_TEST_MODE !== '1' && safeStorage.isEncryptionAvailable();
     secretMap[secretRef] = {
       encoding: encryptionAvailable ? 'safeStorage' : 'base64',
       payload: encryptionAvailable

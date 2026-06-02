@@ -1,4 +1,5 @@
 import type { AgentRole } from './agent';
+import type { AgentEvent } from './agentRuntime';
 import type { DebugPlan, AskUserPrompt } from './workflow';
 import type { AppMode, RunSummary, SessionAttachmentRecord, SessionRecord } from './session';
 import type { AgentWorkstreamPresentation } from './workstream';
@@ -176,8 +177,16 @@ export interface ConversationRunLinkedEvent {
   runId: string;
 }
 
+export interface ConversationAgentEvent {
+  type: 'agent_event';
+  sessionId: string;
+  turnId: string;
+  event: AgentEvent;
+}
+
 export type ConversationStreamEvent =
   | ConversationMessagePatchedEvent
   | ConversationMessageCompletedEvent
   | ConversationMessageErroredEvent
-  | ConversationRunLinkedEvent;
+  | ConversationRunLinkedEvent
+  | ConversationAgentEvent;

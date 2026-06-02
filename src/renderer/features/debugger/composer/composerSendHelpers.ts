@@ -1,7 +1,10 @@
+import type { ConversationAttachmentInput, ConversationMessage, ConversationTurnResult } from '@shared/types/conversation';
 import type { AgentMode } from '@shared/types/layout';
-import type { ConversationMessage } from '@shared/types/conversation';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
+import type { AgentWorkstreamPresentation } from '@shared/types/workstream';
+import type { AskUserPrompt, DebugPlan } from '@shared/types/workflow';
 import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
+import { useProjectStore } from '../../../stores/projectStore';
 
 export function buildLocalConversationErrorTurn(options: {
   trimmed: string;
@@ -73,4 +76,109 @@ export function buildLocalConversationErrorTurn(options: {
       createdAt: now,
     },
   ];
+}
+
+export const toConversationAttachmentInputs = (
+  pendingAttachments: PendingAttachmentDraft[],
+): ConversationAttachmentInput[] => pendingAttachments.map((attachment) => ({
+  sourcePath: attachment.sourcePath,
+  fileName: attachment.fileName,
+  mimeType: attachment.mimeType,
+  size: attachment.size,
+}));
+
+export async function applyConversationTurnResult(options: {
+  electronAPI: NonNullable<Window['electronAPI']>;
+  result: ConversationTurnResult;
+  currentProject: ProjectRecord | null;
+  setCurrentSession: (session: SessionRecord | null) => void;
+  setSessions: (sessions: SessionRecord[]) => void;
+  setCurrentRun: (run: RunSummary | null) => void;
+  setRuns: (runs: RunSummary[]) => void;
+  setCurrentDebugPlan: (debugPlan: DebugPlan | null) => void;
+  setPendingQuestions: (prompt: AskUserPrompt | null) => void;
+  setWorkstreamPresentation: (presentation: AgentWorkstreamPresentation | null) => void;
+  upsertConversationMessages: (messages: ConversationMessage[]) => void;
+}) {
+  const {
+    electronAPI,
+    result,
+    currentProject,
+    setCurrentSession,
+    setSessions,
+    setCurrentRun,
+    setRuns,
+    setCurrentDebugPlan,
+    setPendingQuestions,
+    setWorkstreamPresentation,
+    upsertConversationMessages,
+  } = options;
+
+  if (result.session?.projectId && currentProject?.projectId !== result.session.projectId) {
+    const projectsResult = await electronAPI.project.list();
+    const nextProjects = projectsResult.projects ?? [];
+    useProjectStore.getState().setProjects(nextProjects);
+    const matchedProject = nextProjects.find((project) => project.projectId === result.session?.projectId) ?? null;
+    useProjectStore.getState().setCurrentProject(matchedProject);
+  }
+
+  if (result.session?.sessionId) {
+    setCurrentSession(result.session);
+    const sessionsResult = await electronAPI.session.list(result.session.projectId);
+    setSessions(sessionsResult.sessions ?? []);
+  }
+
+  upsertConversationMessages([
+    result.userMessage,
+    result.assistantDraftMessage,
+  ]);
+
+  if (result.runUpdate) {
+    setCurrentRun(result.runUpdate);
+    const runsResult = await electronAPI.run.list(result.runUpdate.sessionId);
+    setRuns(runsResult.runs ?? []);
+  }
+
+  setCurrentDebugPlan(result.debugPlanSummary ?? null);
+  setPendingQuestions(result.pendingQuestions ?? null);
+  if (result.workstreamPresentation) {
+    setWorkstreamPresentation(result.workstreamPresentation);
+  }
+}
+
+export async function syncE2EConversationState(options: {
+  electronAPI: NonNullable<Window['electronAPI']>;
+  sessionId: string | null | undefined;
+  turnId: string;
+  setConversationMessages: (messages: ConversationMessage[]) => void;
+  setWorkstreamPresentation: (presentation: AgentWorkstreamPresentation | null) => void;
+}) {
+  const {
+    electronAPI,
+    sessionId,
+    turnId,
+    setConversationMessages,
+    setWorkstreamPresentation,
+  } = options;
+
+  if (!navigator.webdriver || !sessionId) {
+    return;
+  }
+
+  const maxAttempts = 40;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const historyResult = await electronAPI.conversation.getHistory(sessionId).catch(() => ({ messages: [] }));
+    const history = historyResult.messages ?? [];
+    const assistantForTurn = history.find((message) => message.turnId === turnId && message.role === 'assistant');
+    const done = assistantForTurn && ['complete', 'error', 'stopped'].includes(assistantForTurn.status ?? 'draft');
+    if (done) {
+      setConversationMessages(history);
+      const workflowPresentation = await electronAPI.workflow.getWorkstreamSession(sessionId).catch(() => null);
+      if (workflowPresentation?.presentation) {
+        setWorkstreamPresentation(workflowPresentation.presentation);
+      }
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
 }

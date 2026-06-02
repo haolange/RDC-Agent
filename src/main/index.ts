@@ -26,6 +26,14 @@ if (!process.env.RDC_AGENT_USER_DATA?.trim()) {
 // 寮€鍙戠幆澧冩锟?
 const isDev = process.env.NODE_ENV === 'development' && process.env.RDC_AGENT_TEST_MODE !== '1';
 const isSettingsRebuildOnly = process.env.RDC_AGENT_REBUILD_SETTINGS_ONLY === '1';
+const isTestMode = process.env.RDC_AGENT_TEST_MODE === '1';
+
+if (isTestMode) {
+  app.disableHardwareAcceleration();
+  app.commandLine.appendSwitch('disable-gpu');
+  app.commandLine.appendSwitch('disable-gpu-compositing');
+  app.commandLine.appendSwitch('in-process-gpu');
+}
 
 // 涓荤獥鍙ｅ紩锟?
 let mainWindow: BrowserWindow | null = null;
@@ -304,6 +312,10 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   void stopAllActiveRuns();
   replayDeviceService.dispose();
+  if (isTestMode) {
+    const forceExitTimer = setTimeout(() => app.exit(0), 100);
+    forceExitTimer.unref?.();
+  }
 });
 
 // 瀹夊叏澶勭悊锛氶樆姝㈡柊绐楀彛瀵艰埅鍒版湭鐭RL
@@ -365,6 +377,3 @@ async function initializeServices(): Promise<void> {
 export function getMainWindow(): BrowserWindow | null {
   return mainWindow;
 }
-
-
-

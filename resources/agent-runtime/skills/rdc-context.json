@@ -1,0 +1,10 @@
+{
+  "id": "builtin.rdc-context",
+  "name": "rdc-context",
+  "label": "RDC Context",
+  "description": "Builtin skill descriptor for summarizing the active project, capture, and RenderDoc session context.",
+  "source": "builtin",
+  "enabledByDefault": true,
+  "path": "resources/agent-runtime/skills/rdc-context.json",
+  "parameters": {}
+}

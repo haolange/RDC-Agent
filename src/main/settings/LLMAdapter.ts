@@ -100,6 +100,20 @@ const toResponsesInput = (messages: LLMMessage[]): Array<{ role: string; content
     content: typeof message.content === 'string' ? message.content : JSON.stringify(message.content),
   }));
 
+const toOpenAiTools = (tools?: LLMRequest['tools']) => {
+  if (!tools?.length) {
+    return undefined;
+  }
+  return tools.map((tool) => ({
+    type: 'function',
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.input_schema,
+    },
+  }));
+};
+
 const extractResponsesText = (payload: unknown): string => {
   if (!payload || typeof payload !== 'object') {
     return '';
@@ -419,7 +433,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
         messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
-        tools: request.tools,
+        tools: toOpenAiTools(request.tools),
         response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
         stream: false,
       }),
@@ -466,7 +480,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
         messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
-        tools: request.tools,
+        tools: toOpenAiTools(request.tools),
         response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
         stream: true,
       }),
@@ -591,7 +605,7 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
         messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
-        tools: request.tools,
+        tools: toOpenAiTools(request.tools),
         response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
       }),
     });
@@ -632,7 +646,7 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
         messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
-        tools: request.tools,
+        tools: toOpenAiTools(request.tools),
         response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
         stream: true,
       }),

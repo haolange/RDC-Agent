@@ -86,6 +86,18 @@ export function useIpcEventBridge(options: {
         conversation.patchAssistantMessageByTurnId(event.turnId, { runId: event.runId });
         return;
       }
+      if (event.type === 'agent_event') {
+        if (event.event.type === 'diagnostic') {
+          conversation.addTimelineEntry({
+            id: event.event.id,
+            type: 'agent',
+            agentRole: event.event.agentId,
+            content: String(event.event.payload.message ?? ''),
+            timestamp: event.event.timestamp,
+          });
+        }
+        return;
+      }
       conversation.upsertConversationMessage(event.message);
     };
 

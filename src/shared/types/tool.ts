@@ -161,7 +161,7 @@ export interface MCPResponse {
 // ============================================
 
 /** 工具层级 */
-export type ToolLayer = 'rdc' | 'system' | 'skill' | 'mcp';
+export type ToolLayer = 'primitive' | 'rdc' | 'system' | 'skill' | 'mcp' | 'ui';
 
 /** 系统工具名称 */
 export type SystemToolName =

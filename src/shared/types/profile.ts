@@ -46,6 +46,9 @@ export interface ModeProfile {
   id: string;
   label: string;
   mode: import('./session').ExecutableAppMode;
+  patternId?: string;
+  skillIds?: string[];
+  mcpServerIds?: string[];
   stagePolicies: Partial<Record<WorkflowStage, string>>;
   defaultAgentPrompts: Partial<Record<AgentRole, string>>;
 }
@@ -87,6 +90,9 @@ export interface EffectiveAgentRuntimeConfig {
   stage: WorkflowStage;
   phase: WorkflowPhase;
   toolAllowlist: string[];
+  patternId?: string;
+  skillIds: string[];
+  mcpServerIds: string[];
   source: {
     modeProfileId: string;
     stagePolicyId: string;

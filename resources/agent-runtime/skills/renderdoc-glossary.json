@@ -1,0 +1,10 @@
+{
+  "id": "builtin.renderdoc-glossary",
+  "name": "renderdoc-glossary",
+  "label": "RenderDoc Glossary",
+  "description": "Builtin skill descriptor for explaining RenderDoc and graphics debugging terms without invoking runtime tools.",
+  "source": "builtin",
+  "enabledByDefault": true,
+  "path": "resources/agent-runtime/skills/renderdoc-glossary.json",
+  "parameters": {}
+}

@@ -1,7 +1,13 @@
 import fs from 'fs';
 import path from 'path';
 import { test, expect } from '@playwright/test';
-import { launchApp, closeApp, configureTestDebuggerRoutes, type AppContext } from './helpers/electron-app';
+import {
+  launchApp,
+  closeApp,
+  configureTestDebuggerRoutes,
+  startDebuggerPlanFromFirstInput,
+  type AppContext,
+} from './helpers/electron-app';
 
 async function seedProject(page: AppContext['page'], projectRoot: string) {
   fs.mkdirSync(path.join(projectRoot, '.resource', 'inputs'), { recursive: true });
@@ -48,8 +54,10 @@ test('report 发布会真实写入 reports 目录，并且 action_chain 包含�
     const sessionId = await seedProject(ctx.page, projectRoot);
     await configureTestDebuggerRoutes(ctx.page);
 
-await ctx.page.locator('textarea.chat-input').fill('调试 Character_EyeSpark_Desktop.rdc，Event ID 6152，并生成 report');
-    await ctx.page.locator('[data-testid="debugger-start-button"]').click();
+    await startDebuggerPlanFromFirstInput(
+      ctx.page,
+      '调试 Character_EyeSpark_Desktop.rdc，Event ID 6152，并生成 report',
+    );
     await expect(ctx.page.locator('[data-testid="plan-approve-button"]')).toBeEnabled();
     await ctx.page.locator('[data-testid="plan-approve-button"]').click();
 
