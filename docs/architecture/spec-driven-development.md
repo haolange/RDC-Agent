@@ -1498,7 +1498,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 
 #### M4-1 MCP 集成测试
 
-- 涉及文件：`src/main/mcp/`、`resources/tools/mcp/run_mcp.py`
+- 涉及文件：`src/main/mcp/`、`resources/tools/cli/run_cli.py`
 - 任务：完善 MCP 工具注册和调用路径；添加 E2E 集成测试
 - 验收：MCP 工具可正常通过 `LayeredToolDefinition.layer='mcp'` 调用
 
@@ -1608,7 +1608,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 |-----|-----|
 | `resources/tools/spec/tool_catalog.json` | 所有 rd.* 工具定义 |
 | `resources/tools/cli/run_cli.py` | CLI 入口 |
-| `resources/tools/mcp/run_mcp.py` | MCP 入口 |
+| `resources/tools/cli/run_cli.py` | MCP 入口 |
 | `resources/tools/rdx/` | 工具实现 |
 
 ---

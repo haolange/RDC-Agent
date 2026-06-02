@@ -18,12 +18,12 @@ if str(SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPT_ROOT))
 
 from rdx.python_runtime import validate_bundled_python_layout
-from scripts._shared import load_json, run_subprocess, tools_root, write_text
+from scripts._shared import run_subprocess, tools_root, write_text
 
 
 REQUIRED_DIRS = [
     "rdx",
-    "mcp",
+    "bin",
     "cli",
     "spec",
     "policy",
@@ -47,16 +47,7 @@ REQUIRED_FILES = [
 FIXTURE_DIR = Path("tests/fixtures")
 FIXTURE_SUFFIXES = {".rdc"}
 
-CURRENT_REPORTS = [
-    "intermediate/logs/rdx_bat_command_smoke.md",
-    "intermediate/logs/tool_contract_report.md",
-    "intermediate/logs/rdx_smoke_issues_blockers.md",
-    "intermediate/logs/rdx_smoke_detailed_report.md",
-]
-CURRENT_TRUTH_REPORTS = [
-    "intermediate/logs/rdx_bat_command_smoke.json",
-    "intermediate/logs/tool_contract_report.json",
-]
+BASH_SMOKE_LOG = "intermediate/logs/smoke_cli.log"
 
 BANNED_SUFFIXES = {".pdb", ".lib", ".exp", ".ilk", ".h"}
 TEXT_SCAN_SUFFIXES = {
@@ -275,58 +266,22 @@ def _has_bundled_fixture(root: Path) -> bool:
     return False
 
 
-def _check_smoke_truth(root: Path) -> tuple[bool, str]:
-    command_payload = load_json(root / CURRENT_TRUTH_REPORTS[0])
-    if not command_payload:
-        return False, f"invalid smoke truth payload: {root / CURRENT_TRUTH_REPORTS[0]}"
-    tool_payload = load_json(root / CURRENT_TRUTH_REPORTS[1])
-    if not tool_payload:
-        return False, f"invalid smoke truth payload: {root / CURRENT_TRUTH_REPORTS[1]}"
-
-    command_summary = command_payload.get("summary")
-    if not isinstance(command_summary, dict):
-        return False, "invalid rdx_bat_command_smoke.json summary"
-    command_blockers = int(command_summary.get("blocker", 0))
-    if command_blockers > 0:
-        return False, f"command smoke still reports blocker={command_blockers}"
-
-    for transport in ("mcp", "daemon"):
-        transport_payload = tool_payload.get("transports", {}).get(transport, {})
-        if not isinstance(transport_payload, dict):
-            return False, f"missing tool contract transport payload: {transport}"
-        fatal_error = str(transport_payload.get("fatal_error") or "").strip()
-        if fatal_error:
-            return False, f"{transport} tool contract fatal_error: {fatal_error}"
-        summary = transport_payload.get("summary")
-        if not isinstance(summary, dict):
-            return False, f"missing tool contract summary: {transport}"
-        blockers = int(summary.get("blocker", 0))
-        if blockers > 0:
-            return False, f"{transport} tool contract still reports blocker={blockers}"
-
-    return True, "smoke truth reports are current and clean"
-
-
 def _check_reports(root: Path, *, require_smoke_reports: bool) -> tuple[bool, str]:
-    required_artifacts = CURRENT_REPORTS + CURRENT_TRUTH_REPORTS
-    missing = [rel for rel in required_artifacts if not (root / rel).is_file()]
-    if not missing:
+    log_path = root / BASH_SMOKE_LOG
+    if log_path.is_file():
+        text = log_path.read_text(encoding="utf-8", errors="replace")
+        if "[smoke] PASS" in text:
+            return True, "bash CLI smoke log is present and passed"
         if require_smoke_reports or _has_bundled_fixture(root):
-            return _check_smoke_truth(root)
-        return True, "using current smoke reports"
-
-    present = [rel for rel in required_artifacts if rel not in missing]
-    if present:
-        if require_smoke_reports or _has_bundled_fixture(root):
-            return False, f"incomplete smoke reports: missing {', '.join(missing)}"
-        return True, "partial smoke reports ignored in clean checkout: full smoke is optional without bundled fixtures"
+            return False, f"bash CLI smoke log did not contain [smoke] PASS: {BASH_SMOKE_LOG}"
+        return True, "bash CLI smoke log present but not marked passed; full smoke is optional without bundled fixtures"
 
     if require_smoke_reports or _has_bundled_fixture(root):
-        return False, f"missing current reports: {', '.join(missing)}"
+        return False, f"missing bash CLI smoke log: {BASH_SMOKE_LOG}"
 
     return True, (
-        "smoke reports optional in clean checkout: no bundled first-party .rdc fixture; "
-        "run release smoke with explicit sample inputs before tagging a release"
+        "bash CLI smoke optional in clean checkout: no bundled first-party .rdc fixture; "
+        "run bash scripts/smoke_cli.sh with explicit sample inputs before tagging a release"
     )
 
 
@@ -336,7 +291,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--require-smoke-reports",
         action="store_true",
-        help="Fail unless the current smoke reports are present.",
+        help="Fail unless the bash CLI smoke log is present and marked passed.",
     )
     args = parser.parse_args(argv)
 
@@ -367,15 +322,14 @@ def main(argv: list[str] | None = None) -> int:
 
     ok_bat_help, bat_help = _run_launcher(["--help"], cwd=root)
     results.append(("entry:rdx.bat --help", ok_bat_help, bat_help))
-    ok_bat_cli_help, bat_cli_help = _run_launcher(["--non-interactive", "cli", "--help"], cwd=root)
-    results.append(("entry:rdx.bat --non-interactive cli --help", ok_bat_cli_help, bat_cli_help))
-    ok_bat_mcp_env, bat_mcp_env = _run_launcher(["--non-interactive", "mcp", "--ensure-env"], cwd=root)
-    results.append(("entry:rdx.bat --non-interactive mcp --ensure-env", ok_bat_mcp_env, bat_mcp_env))
-
-    ok_mcp_help, mcp_help = _run([sys.executable, "mcp/run_mcp.py", "--help"], cwd=root)
-    results.append(("entry:dev-python mcp/run_mcp.py --help", ok_mcp_help, mcp_help))
+    ok_bat_doctor, bat_doctor = _run_launcher(["--json", "doctor"], cwd=root)
+    results.append(("entry:rdx.bat --json doctor", ok_bat_doctor, bat_doctor))
+    ok_bat_noninteractive_doctor, bat_noninteractive_doctor = _run_launcher(["--non-interactive", "--json", "doctor"], cwd=root)
+    results.append(("entry:rdx.bat --non-interactive --json doctor", ok_bat_noninteractive_doctor, bat_noninteractive_doctor))
     ok_cli_help, cli_help = _run([sys.executable, "cli/run_cli.py", "--help"], cwd=root)
     results.append(("entry:dev-python cli/run_cli.py --help", ok_cli_help, cli_help))
+    ok_cli_doctor, cli_doctor = _run([sys.executable, "cli/run_cli.py", "--json", "doctor"], cwd=root)
+    results.append(("entry:dev-python cli/run_cli.py --json doctor", ok_cli_doctor, cli_doctor))
     ok_md_health, md_health = _run([sys.executable, "scripts/check_markdown_health.py"], cwd=root)
     results.append(("docs:markdown-health", ok_md_health, md_health))
 

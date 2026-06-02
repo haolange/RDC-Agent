@@ -85,8 +85,10 @@ def _launcher_prog(default: str) -> str:
 def _print_launcher_help() -> None:
     prog = _launcher_prog("python cli/run_cli.py")
     for line in (
-        f"usage: {prog} <command> [--daemon-context <id>] ...",
+        f"usage: {prog} [--json] [--daemon-context <id>] <command> ...",
         "commands:",
+        "  doctor",
+        "  tools list|search",
         "  daemon start|stop|status",
         "  context clear",
         "  session preview on|off|status",
@@ -97,6 +99,8 @@ def _print_launcher_help() -> None:
         "  assert pipeline|image",
         "",
         "examples:",
+        f"  {prog} --json doctor",
+        f"  {prog} tools search pipeline --json",
         f"  {prog} daemon start --daemon-context local",
         f"  {prog} context clear --daemon-context local",
         f"  {prog} capture open --file D:\\path\\capture.rdc --frame-index 0 --preview",
@@ -105,6 +109,61 @@ def _print_launcher_help() -> None:
         f"  {prog} vfs ls --path / --format tsv",
     ):
         _write_out(line)
+
+
+def _is_doctor_command(argv: list[str]) -> bool:
+    skip_next = False
+    for item in argv:
+        if skip_next:
+            skip_next = False
+            continue
+        if item in {"--daemon-context", "--context-id"}:
+            skip_next = True
+            continue
+        if item == "doctor":
+            return True
+        if item.startswith("-"):
+            continue
+        return False
+    return False
+
+
+def _extract_context(argv: list[str]) -> str:
+    for index, item in enumerate(argv):
+        if item in {"--daemon-context", "--context-id"} and index + 1 < len(argv):
+            return _normalize_context(argv[index + 1])
+    return _normalize_context(os.environ.get("RDX_CONTEXT_ID"))
+
+
+def _emit_minimal_doctor(argv: list[str], missing: list[str]) -> None:
+    root = TOOLS_ROOT.resolve()
+    payload = {
+        "ok": False,
+        "result_kind": "rdx.doctor",
+        "error_code": "setup_incomplete",
+        "error_message": "rdx-tools setup is incomplete",
+        "context_id": _extract_context(argv),
+        "details": {
+            "tools_root": str(root),
+            "dependencies": {
+                "missing": sorted(missing),
+                "auth_required": False,
+            },
+            "launchers": {
+                "windows_bat": str(root / "rdx.bat"),
+                "windows_bat_exists": (root / "rdx.bat").is_file(),
+                "posix_shell": str(root / "bin" / "rdx"),
+                "posix_shell_exists": (root / "bin" / "rdx").is_file(),
+                "python_cli": str(root / "cli" / "run_cli.py"),
+                "python_cli_exists": (root / "cli" / "run_cli.py").is_file(),
+            },
+            "mcp": {
+                "supported": False,
+                "message": "rdx-tools is CLI-only; use `rdx call <rd.*>` for raw tool calls.",
+            },
+        },
+    }
+    _emit_result(payload)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -119,6 +178,9 @@ def main(argv: list[str] | None = None) -> int:
 
     root = _init_pythonpath()
     missing = _check_deps()
+    if missing and _is_doctor_command(argv):
+        _emit_minimal_doctor(argv, missing)
+        return 2
     if missing:
         _write_err(f"[RDX] missing dependencies: {', '.join(sorted(missing))}")
         _emit_result(

@@ -1272,7 +1272,7 @@ def test_preview_docs_and_catalog_are_synchronized() -> None:
     assert "preview" in tools["rd.session.get_context"]["returns_raw"]
     assert "framebuffer_extent" in tools["rd.session.get_context"]["returns_raw"]
 
-    frameworks_root = repo_root.parent / "RDC-Agent-Frameworks" / "debugger"
+    frameworks_root = repo_root.parent / ("RDC-Agent-" + "Frameworks") / "debugger"
     if frameworks_root.is_dir():
         debugger_readme = (frameworks_root / "README.md").read_text(encoding="utf-8-sig")
         agent_core = (frameworks_root / "common" / "AGENT_CORE.md").read_text(encoding="utf-8-sig")

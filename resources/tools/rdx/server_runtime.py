@@ -109,7 +109,7 @@ def _runtime_context_id() -> str:
 
 def _normalize_entry_mode(value: Any, *, default: str = "cli") -> str:
     mode = str(value or default).strip().lower()
-    if mode not in {"cli", "mcp"}:
+    if mode != "cli":
         return default
     return mode
 
@@ -1022,7 +1022,7 @@ def _record_operation_start(
 ) -> None:
     ctx = normalize_context_id(context_id)
     state = _context_state(ctx)
-    if transport in {"cli", "mcp"}:
+    if transport == "cli":
         state["entry_mode"] = _normalize_entry_mode(transport, default=str(state.get("entry_mode") or "cli"))
     if str(operation or "").startswith("rd.remote."):
         state["backend"] = "remote"
@@ -7210,16 +7210,29 @@ async def _dispatch_capture(action: str, args: Dict[str, Any]) -> str:
                     else {}
                 ),
             )
-            await _auto_sync_preview_if_enabled(_runtime_context_id())
-            _progress("context_synced", "Replay context synchronized", progress_pct=1.0, details={"session_id": session_info.session_id, "capture_file_id": capture_file_id})
+            _progress(
+                "open_replay_state_persisted",
+                "Replay state persisted",
+                progress_pct=0.98,
+                details={
+                    "session_id": session_info.session_id,
+                    "capture_file_id": capture_file_id,
+                    "active_event_id": active_event_id,
+                    "recovery_status": "ready",
+                },
+            )
             api_properties = {}
-            try:
-                props = await _offload(controller.GetAPIProperties)
-                api_properties = {"pipeline_type": str(getattr(props, "pipelineType", ""))}
-            except Exception:
-                api_properties = {}
+            _progress(
+                "open_replay_response_ready",
+                "Replay response ready",
+                progress_pct=1.0,
+                details={"session_id": session_info.session_id, "capture_file_id": capture_file_id},
+            )
             return _ok(
                 session_id=session_info.session_id,
+                capture_file_id=capture_file_id,
+                active_event_id=int(active_event_id or 0),
+                recovery_status="ready",
                 frame_count=max(1, int(getattr(cap_info, "frame_count", 1))),
                 api_properties=api_properties,
             )
@@ -10995,7 +11008,7 @@ async def _dispatch_export(action: str, args: Dict[str, Any]) -> str:
             return summary_resp
         report = textwrap.dedent(
             f"""\
-            # RenderDoc MCP Report
+            # RenderDoc CLI Report
             - Session: `{session_id}`
             - Created: `{datetime.now(timezone.utc).isoformat()}`
 

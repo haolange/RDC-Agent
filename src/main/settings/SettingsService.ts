@@ -111,6 +111,7 @@ const VALID_THEMES: AppTheme[] = ['dark', 'light', 'system'];
 const VALID_LANGUAGES: AppLanguage[] = ['zh-CN', 'en'];
 const VALID_FONT_SCALES: FontScale[] = ['small', 'medium', 'large'];
 const KNOWN_AGENT_IDS = new Set(Object.keys(DEFAULT_MODEL_ROUTING));
+const RETIRED_BUILTIN_MCP_SERVER_IDS = new Set(['builtin.rdc-toolbridge']);
 const EMPTY_PATHS: AppRuntimePaths = {
   workspaceRoot: '',
   defaultWorkspaceRoot: '',
@@ -188,7 +189,7 @@ function sanitizeRuntimeIds(values: unknown): string[] {
     Array.isArray(values)
       ? values.filter((value): value is string => typeof value === 'string').map((value) => value.trim())
       : [],
-  );
+  ).filter((value) => !RETIRED_BUILTIN_MCP_SERVER_IDS.has(value));
 }
 
 function sanitizePatternBindings(value: unknown): Record<string, string> {
