@@ -119,11 +119,34 @@ def test_noninteractive_mcp_route_reports_unsupported_json() -> None:
 def test_noninteractive_launcher_missing_command_keeps_short_status_payload() -> None:
     code, payload, output = _run_bat("--non-interactive")
 
-    assert code == 1
+    assert code == 2
     assert payload["ok"] is False
     assert payload["error_code"] == "missing_command"
     assert "result_kind" not in payload
     assert "missing command" in output
+
+
+@pytest.mark.skipif(os.name != "nt", reason="rdx.bat launcher tests are windows-specific")
+def test_noninteractive_version_and_completion_are_available() -> None:
+    version_code, version_payload, _ = _run_bat("--non-interactive", "version", "--json")
+    completion_proc = subprocess.run(
+        [_cmd_exe(), "/c", "rdx.bat", "--non-interactive", "completion", "powershell"],
+        cwd=str(ROOT),
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=90,
+        env=_launcher_env(),
+        check=False,
+    )
+
+    assert version_code == 0
+    assert version_payload["ok"] is True
+    assert version_payload["result_kind"] == "rdx.version"
+    assert completion_proc.returncode == 0
+    assert "Register-ArgumentCompleter" in completion_proc.stdout
 
 @pytest.mark.skipif(os.name != "nt", reason="rdx.bat launcher tests are windows-specific")
 def test_noninteractive_tools_list_passthroughs_canonical_payload() -> None:

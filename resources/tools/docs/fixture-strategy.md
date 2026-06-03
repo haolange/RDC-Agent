@@ -42,8 +42,8 @@
 ## 当前状态
 
 - 当前仓库已具备 `contract` / `unit` 层能力。
-- 当前 local-only 真样本闭环继续采用“显式传入外部 `.rdc`”的方式，不把外部绝对路径沉淀进仓库。
-- 下一步应补齐 first-party `.rdc` fixture 或 fixture 生成脚本，并把它接入 `scripts/smoke_cli.sh` 与 VFS smoke。
+- 当前 local-only 真样本闭环仍可采用“显式传入外部 `.rdc`”的方式，不把外部绝对路径沉淀进仓库。
+- Stable/GA 必须补齐 first-party `.rdc` fixture；`scripts/smoke_cli.sh` 已支持默认发现 `tests/fixtures/*.rdc`。
 
 ## 接入要求
 

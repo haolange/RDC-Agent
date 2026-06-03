@@ -18,6 +18,9 @@ dependencies = [
   "pydantic>=2.0",
 ]
 
+[project.scripts]
+rdx = "rdx.cli:main"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=9.0",

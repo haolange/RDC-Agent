@@ -9,9 +9,9 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
 $script:RETURN_OK = 0
-$script:RETURN_ARGS_ERROR = 1
+$script:RETURN_ARGS_ERROR = 2
 $script:RETURN_ENV_ERROR = 2
-$script:RETURN_STARTUP_ERROR = 3
+$script:RETURN_STARTUP_ERROR = 2
 $script:RDX_LAST_CLI_EXIT_CODE = $script:RETURN_OK
 
 function Resolve-ToolsRoot {
@@ -162,16 +162,25 @@ function Show-Usage {
     Write-Output 'usage: rdx.bat [--non-interactive] [--daemon-context <id>] [--json] <command> ...'
     Write-Output ''
     Write-Output 'commands:'
+    Write-Output '  version'
     Write-Output '  doctor'
     Write-Output '  tools list|search'
     Write-Output '  daemon start|stop|status'
     Write-Output '  context clear'
+    Write-Output '  session preview on|off|status'
     Write-Output '  capture open|status'
+    Write-Output '  vfs ls|cat|tree|resolve'
+    Write-Output '  diff pipeline|image'
+    Write-Output '  assert pipeline|image'
+    Write-Output '  completion powershell|bash|zsh|fish'
     Write-Output '  call <rd.*>'
     Write-Output ''
     Write-Output 'examples:'
+    Write-Output '  rdx.bat --version'
+    Write-Output '  rdx.bat version --json'
     Write-Output '  rdx.bat --json doctor'
     Write-Output '  rdx.bat --non-interactive --json doctor'
+    Write-Output '  rdx.bat completion powershell'
     Write-Output '  rdx.bat capture open --file D:\path\capture.rdc --frame-index 0'
     Write-Output '  rdx.bat call rd.session.get_context --format json'
 }
