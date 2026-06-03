@@ -210,3 +210,44 @@ def test_release_gate_accepts_passing_bash_smoke_log_when_flagged(monkeypatch, t
     report = (tmp_path / "intermediate" / "logs" / "release_gate_report.md").read_text(encoding="utf-8")
     assert "PASS `reports:smoke-suite`" in report
     assert "bash CLI smoke log is present and passed" in report
+
+
+def test_release_gate_requires_release_package_when_flagged(monkeypatch, tmp_path: Path) -> None:
+    _prepare_root(tmp_path)
+    _write_smoke_log(tmp_path)
+
+    _mock_release_gate_basics(monkeypatch, tmp_path)
+    monkeypatch.setattr(release_gate, "_rg_no_match", lambda pattern, cwd: (True, ""))
+
+    rc = release_gate.main(["--report", "intermediate/logs/release_gate_report.md", "--require-release-package"])
+
+    assert rc == 1
+    report = (tmp_path / "intermediate" / "logs" / "release_gate_report.md").read_text(encoding="utf-8")
+    assert "FAIL `release:package`" in report
+    assert "missing release package" in report
+
+
+def test_release_gate_verifies_release_package_when_present(monkeypatch, tmp_path: Path) -> None:
+    _prepare_root(tmp_path)
+    _write_smoke_log(tmp_path)
+    package = tmp_path / "dist" / "rdx-tools-1.0.0-windows-x64.zip"
+    package.parent.mkdir(parents=True, exist_ok=True)
+    package.write_bytes(b"zip")
+    (package.parent / "SHA256SUMS").write_text("abc  rdx-tools-1.0.0-windows-x64.zip\n", encoding="utf-8")
+
+    _mock_release_gate_basics(monkeypatch, tmp_path)
+    monkeypatch.setattr(release_gate, "_rg_no_match", lambda pattern, cwd: (True, ""))
+
+    rc = release_gate.main(
+        [
+            "--report",
+            "intermediate/logs/release_gate_report.md",
+            "--require-release-package",
+            "--release-package",
+            str(package),
+        ],
+    )
+
+    assert rc == 0
+    report = (tmp_path / "intermediate" / "logs" / "release_gate_report.md").read_text(encoding="utf-8")
+    assert "PASS `release:package`" in report

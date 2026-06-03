@@ -14,7 +14,8 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from rdx.core.assert_service import AssertService
-from rdx.core.contracts import canonical_error, canonical_success
+from rdx import __version__ as TOOL_VERSION
+from rdx.core.contracts import SCHEMA_VERSION, canonical_error, canonical_success
 from rdx.daemon.client import (
     attach_client,
     cleanup_stale_daemon_states,
@@ -45,7 +46,8 @@ from rdx.timeout_policy import daemon_exec_timeout_s
 
 EXIT_OK = 0
 EXIT_ASSERT_FAIL = 1
-EXIT_RUNTIME_ERR = 2
+EXIT_RUNTIME_ERR = 1
+EXIT_USAGE_ERR = 2
 
 
 def _print_json(payload: Dict[str, Any]) -> None:
@@ -60,11 +62,13 @@ def _print_launcher_help() -> None:
     for line in (
         "usage: rdx [--json] [--daemon-context <id>] <command> ...",
         "commands:",
+        "  version",
         "  doctor",
         "  tools list|search",
         "  daemon start|stop|status",
         "  context clear",
         "  session preview on|off|status",
+        "  completion powershell|bash|zsh|fish",
         "  call <operation> [--args-json ... | --args-file ...] [--format json|tsv] [--remote]",
         "  capture open|status",
         "  vfs ls|cat|tree|resolve",
@@ -72,7 +76,10 @@ def _print_launcher_help() -> None:
         "  assert pipeline|image",
         "",
         "examples:",
+        "  rdx --version",
+        "  rdx version --json",
         "  rdx --json doctor",
+        "  rdx completion powershell",
         "  rdx tools search pipeline --json",
         "  rdx daemon start --daemon-context local",
         "  rdx context clear --daemon-context local",
@@ -470,6 +477,140 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
     return EXIT_RUNTIME_ERR
 
 
+def _version_payload() -> Dict[str, Any]:
+    root = tools_root().resolve()
+    return canonical_success(
+        result_kind="rdx.version",
+        data={
+            "tool_version": TOOL_VERSION,
+            "schema_version": SCHEMA_VERSION,
+            "platform": "windows-x64" if os.name == "nt" else sys.platform,
+            "tools_root": str(root),
+            "entrypoints": {
+                "windows_bat": str(root / "rdx.bat"),
+                "posix_shell": str(root / "bin" / "rdx"),
+                "python_cli": str(root / "cli" / "run_cli.py"),
+            },
+            "compatibility": {
+                "stability": "1.x",
+                "json_envelope": "stable",
+                "mcp_supported": False,
+            },
+        },
+        transport="cli",
+    )
+
+
+def _cmd_version(args: argparse.Namespace) -> int:
+    if bool(getattr(args, "json", False)):
+        _print_json(_version_payload())
+    else:
+        _write_stdout(f"rdx {TOOL_VERSION}")
+    return EXIT_OK
+
+
+def _completion_words() -> list[str]:
+    static_words = [
+        "doctor",
+        "version",
+        "tools",
+        "list",
+        "search",
+        "daemon",
+        "start",
+        "stop",
+        "status",
+        "context",
+        "clear",
+        "session",
+        "preview",
+        "on",
+        "off",
+        "capture",
+        "open",
+        "call",
+        "vfs",
+        "ls",
+        "cat",
+        "tree",
+        "resolve",
+        "diff",
+        "pipeline",
+        "image",
+        "assert",
+        "completion",
+        "powershell",
+        "bash",
+        "zsh",
+        "fish",
+        "--json",
+        "--daemon-context",
+        "--version",
+        "--help",
+        "--file",
+        "--frame-index",
+        "--args-json",
+        "--args-file",
+        "--format",
+        "--remote",
+    ]
+    try:
+        tool_names = [str(item.get("name") or "") for item in load_tool_catalog()]
+    except Exception:
+        tool_names = []
+    return sorted({word for word in [*static_words, *tool_names] if word})
+
+
+def _completion_script(shell: str) -> str:
+    words = _completion_words()
+    if shell == "powershell":
+        quoted = ", ".join("'" + word.replace("'", "''") + "'" for word in words)
+        return "\n".join(
+            [
+                "Register-ArgumentCompleter -Native -CommandName rdx,rdx.bat -ScriptBlock {",
+                "  param($wordToComplete, $commandAst, $cursorPosition)",
+                f"  $words = @({quoted})",
+                "  $words | Where-Object { $_ -like \"$wordToComplete*\" } | ForEach-Object {",
+                "    [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)",
+                "  }",
+                "}",
+                "",
+            ]
+        )
+    if shell == "bash":
+        joined = " ".join(words)
+        return "\n".join(
+            [
+                "_rdx_complete() {",
+                "  local cur=\"${COMP_WORDS[COMP_CWORD]}\"",
+                f"  COMPREPLY=( $(compgen -W \"{joined}\" -- \"$cur\") )",
+                "}",
+                "complete -F _rdx_complete rdx rdx.bat",
+                "",
+            ]
+        )
+    if shell == "zsh":
+        joined = " ".join(words)
+        return "\n".join(
+            [
+                "#compdef rdx rdx.bat",
+                "_rdx() {",
+                f"  compadd -- {joined}",
+                "}",
+                "_rdx \"$@\"",
+                "",
+            ]
+        )
+    if shell == "fish":
+        return "".join(f"complete -c rdx -f -a '{word}'\n" for word in words)
+    raise ValueError(f"unsupported completion shell: {shell}")
+
+
+def _cmd_completion(args: argparse.Namespace) -> int:
+    _write_stdout(_completion_script(str(args.shell)))
+    return EXIT_OK
+
+
 def _cmd_tools_list(args: argparse.Namespace) -> int:
     tools = [_tool_summary(tool) for tool in load_tool_catalog()]
     namespace = str(getattr(args, "namespace", "") or "").strip()
@@ -782,18 +923,61 @@ async def _cmd_session_preview(args: argparse.Namespace) -> int:
         _print_json(payload)
         return EXIT_OK if bool(payload.get("ok")) else EXIT_RUNTIME_ERR
     if args.session_preview_cmd == "status":
-        payload = _daemon_exec("rd.session.get_context", {}, context=context)
+        status_payload = _daemon_status_payload(context)
+        status_data = status_payload.get("data") if isinstance(status_payload.get("data"), dict) else {}
+        if not bool(status_data.get("running")):
+            result = canonical_success(
+                result_kind="rdx.session.preview.status",
+                data={
+                    "context_id": context,
+                    "running": False,
+                    "has_session": False,
+                    "current_session_id": "",
+                    "preview": {"enabled": False, "available": False},
+                    "runtime": {},
+                    "daemon": status_data,
+                },
+                transport="cli",
+            )
+            _print_json(result)
+            return EXIT_OK
+        try:
+            payload = _daemon_exec("rd.session.get_context", {}, context=context)
+        except Exception as exc:  # noqa: BLE001
+            _print_json(
+                canonical_error(
+                    result_kind="rdx.session.preview.status",
+                    code=str(getattr(exc, "code", "") or "preview_status_failed"),
+                    category=str(getattr(exc, "category", "") or "runtime"),
+                    message=f"preview status failed: {exc}",
+                    details={"context_id": context, "daemon": status_data},
+                    transport="cli",
+                ),
+            )
+            return EXIT_RUNTIME_ERR
         if not bool(payload.get("ok")):
-            _print_json(payload)
+            _print_json(
+                canonical_error(
+                    result_kind="rdx.session.preview.status",
+                    code=str((payload.get("error") or {}).get("code") or "preview_status_failed"),
+                    category=str((payload.get("error") or {}).get("category") or "runtime"),
+                    message=str((payload.get("error") or {}).get("message") or "preview status failed"),
+                    details={"context_id": context, "source": payload},
+                    transport="cli",
+                ),
+            )
             return EXIT_RUNTIME_ERR
         data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+        runtime = data.get("runtime") if isinstance(data.get("runtime"), dict) else {}
         result = canonical_success(
             result_kind="rdx.session.preview.status",
             data={
                 "context_id": str(data.get("context_id") or context),
                 "current_session_id": str(data.get("current_session_id") or ""),
                 "preview": dict(data.get("preview") or {}),
-                "runtime": dict(data.get("runtime") or {}),
+                "runtime": dict(runtime),
+                "running": True,
+                "has_session": bool(str(runtime.get("session_id") or data.get("current_session_id") or "").strip()),
             },
             transport="cli",
         )
@@ -901,9 +1085,13 @@ async def _cmd_assert_image(args: argparse.Namespace) -> int:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="rdx", description="RDX daemon-backed CLI")
+    parser.add_argument("--version", action="version", version=f"rdx {TOOL_VERSION}")
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON output.")
     parser.add_argument("--daemon-context", default="default", help="Daemon state namespace (default: default)")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    p_version = sub.add_parser("version", help="Print version and compatibility metadata")
+    p_version.add_argument("--json", action="store_true", help="Emit machine-readable JSON output.")
 
     p_doctor = sub.add_parser("doctor", help="Validate CLI runtime setup")
     p_doctor.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
@@ -968,6 +1156,9 @@ def _build_parser() -> argparse.ArgumentParser:
     s_session_preview.add_parser("off")
     s_session_preview.add_parser("status")
 
+    p_completion = sub.add_parser("completion", help="Generate shell completion script")
+    p_completion.add_argument("shell", choices=("powershell", "bash", "zsh", "fish"))
+
     p_vfs = sub.add_parser("vfs", help="Read-only VFS navigation helpers")
     s_vfs = p_vfs.add_subparsers(dest="vfs_cmd", required=True)
     for name in ("ls", "cat", "resolve"):
@@ -1014,6 +1205,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
 async def _main_async(args: argparse.Namespace) -> int:
     ctx = str(args.daemon_context)
+    if args.command == "version":
+        return _cmd_version(args)
+
     if args.command == "doctor":
         return _cmd_doctor(args)
 
@@ -1112,6 +1306,9 @@ async def _main_async(args: argparse.Namespace) -> int:
     if args.command == "session":
         if args.session_cmd == "preview":
             return await _cmd_session_preview(args)
+
+    if args.command == "completion":
+        return _cmd_completion(args)
 
     if args.command == "diff":
         if args.diff_cmd == "pipeline":

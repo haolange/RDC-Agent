@@ -73,10 +73,14 @@ SCAN_SKIP_PREFIXES = {
 }
 USER_DOCS = [
     "README.md",
+    "docs/install.md",
     "docs/quickstart.md",
+    "docs/agent-integration.md",
     "docs/configuration.md",
     "docs/troubleshooting.md",
     "docs/compatibility-notes.md",
+    "docs/stability.md",
+    "docs/release-notes.md",
 ]
 USER_PATH_FORBIDDEN_RULES = (
     re.compile(r"\buv\s+sync\b", re.IGNORECASE),
@@ -285,6 +289,47 @@ def _check_reports(root: Path, *, require_smoke_reports: bool) -> tuple[bool, st
     )
 
 
+def _find_release_package(root: Path, raw_package: str) -> Path | None:
+    if raw_package:
+        candidate = Path(raw_package)
+        if not candidate.is_absolute():
+            candidate = root / candidate
+        return candidate.resolve()
+    dist = root / "dist"
+    if not dist.is_dir():
+        return None
+    packages = sorted(dist.glob("rdx-tools-*-windows-x64.zip"), key=lambda p: p.stat().st_mtime, reverse=True)
+    return packages[0].resolve() if packages else None
+
+
+def _check_release_package(root: Path, *, raw_package: str, required: bool) -> tuple[bool, str]:
+    package_path = _find_release_package(root, raw_package)
+    if package_path is None:
+        if required:
+            return False, "missing release package under dist/rdx-tools-*-windows-x64.zip"
+        return True, "release package check skipped; pass --require-release-package for GA"
+    if not package_path.is_file():
+        return False, f"release package not found: {package_path}"
+    checksums = package_path.parent / "SHA256SUMS"
+    if not checksums.is_file():
+        return False, f"missing SHA256SUMS next to package: {checksums}"
+    checksum_text = checksums.read_text(encoding="utf-8", errors="replace")
+    if package_path.name not in checksum_text:
+        return False, f"SHA256SUMS does not list {package_path.name}"
+    verify_cmd = [
+        sys.executable,
+        "scripts/verify_release_package.py",
+        "--zip",
+        str(package_path),
+    ]
+    if required:
+        verify_cmd.append("--require-fixture-smoke")
+    ok, detail = _run(verify_cmd, cwd=root)
+    if not ok:
+        return False, detail
+    return True, f"verified release package: {package_path.name}"
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run release gate checks")
     parser.add_argument("--report", default="intermediate/logs/release_gate_report.md")
@@ -292,6 +337,16 @@ def main(argv: list[str] | None = None) -> int:
         "--require-smoke-reports",
         action="store_true",
         help="Fail unless the bash CLI smoke log is present and marked passed.",
+    )
+    parser.add_argument(
+        "--require-release-package",
+        action="store_true",
+        help="Fail unless a verified rdx-tools Windows x64 release package exists.",
+    )
+    parser.add_argument(
+        "--release-package",
+        default="",
+        help="Explicit release zip path to verify.",
     )
     args = parser.parse_args(argv)
 
@@ -326,15 +381,29 @@ def main(argv: list[str] | None = None) -> int:
     results.append(("entry:rdx.bat --json doctor", ok_bat_doctor, bat_doctor))
     ok_bat_noninteractive_doctor, bat_noninteractive_doctor = _run_launcher(["--non-interactive", "--json", "doctor"], cwd=root)
     results.append(("entry:rdx.bat --non-interactive --json doctor", ok_bat_noninteractive_doctor, bat_noninteractive_doctor))
+    ok_bat_version, bat_version = _run_launcher(["--version"], cwd=root)
+    results.append(("entry:rdx.bat --version", ok_bat_version, bat_version))
+    ok_bat_version_json, bat_version_json = _run_launcher(["version", "--json"], cwd=root)
+    results.append(("entry:rdx.bat version --json", ok_bat_version_json, bat_version_json))
+    ok_bat_completion, bat_completion = _run_launcher(["completion", "powershell"], cwd=root)
+    results.append(("entry:rdx.bat completion powershell", ok_bat_completion, bat_completion))
     ok_cli_help, cli_help = _run([sys.executable, "cli/run_cli.py", "--help"], cwd=root)
     results.append(("entry:dev-python cli/run_cli.py --help", ok_cli_help, cli_help))
     ok_cli_doctor, cli_doctor = _run([sys.executable, "cli/run_cli.py", "--json", "doctor"], cwd=root)
     results.append(("entry:dev-python cli/run_cli.py --json doctor", ok_cli_doctor, cli_doctor))
+    ok_catalog, catalog_detail = _run([sys.executable, "spec/validate_catalog.py"], cwd=root)
+    results.append(("spec:catalog-validation", ok_catalog, catalog_detail))
     ok_md_health, md_health = _run([sys.executable, "scripts/check_markdown_health.py"], cwd=root)
     results.append(("docs:markdown-health", ok_md_health, md_health))
 
     ok_reports, report_detail = _check_reports(root, require_smoke_reports=bool(args.require_smoke_reports))
     results.append(("reports:smoke-suite", ok_reports, report_detail))
+    ok_package, package_detail = _check_release_package(
+        root,
+        raw_package=str(args.release_package or ""),
+        required=bool(args.require_release_package),
+    )
+    results.append(("release:package", ok_package, package_detail))
 
     ok_all = all(item[1] for item in results)
 

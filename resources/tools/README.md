@@ -5,10 +5,13 @@
 ## Entry Points
 
 ```bat
+rdx.bat --version
+rdx.bat version --json
 rdx.bat --json doctor
 rdx.bat tools list --json
 rdx.bat capture open --file "C:\path\capture.rdc" --frame-index 0
 rdx.bat call rd.session.get_context --format json
+rdx.bat completion powershell
 ```
 
 ```bash
@@ -22,11 +25,15 @@ bash resources/tools/bin/rdx --json doctor
 Agent platforms should run smoke through bash so every CLI step is visible in the terminal:
 
 ```bash
-bash scripts/smoke_cli.sh --skip-rdc
+bash scripts/smoke_cli.sh
 bash scripts/smoke_cli.sh --rdc "C:/path/sample.rdc" --context cli-smoke
 ```
 
-The smoke script calls `bin/rdx` directly for `doctor`, `tools list`, `tools search`, the negative MCP route check, and the daemon-backed capture chain. It writes the same live output to `intermediate/logs/smoke_cli.log`. It does not run a Python smoke runner or a Python command aggregator.
+The smoke script calls `bin/rdx` directly for `doctor`, `tools list`, `tools search`, the negative MCP route check, and the daemon-backed capture chain. If `--rdc` is omitted, it uses the first `tests/fixtures/*.rdc` fixture when one exists. It writes the same live output to `intermediate/logs/smoke_cli.log`. It does not run a Python smoke runner or a Python command aggregator.
+
+## Install
+
+Release packages are self-contained Windows x64 zips. See [Install](docs/install.md).
 
 ## Session State
 
@@ -40,6 +47,9 @@ Use `rd.session.get_context` to read context state and `rd.session.update_contex
 
 - [Session model](docs/session-model.md)
 - [Agent model](docs/agent-model.md)
+- [Install](docs/install.md)
+- [Agent integration](docs/agent-integration.md)
+- [Stability](docs/stability.md)
 - [Documentation governance](docs/doc-governance.md)
 - [Tools](docs/tools.md)
 - [Scripts](scripts/README.md)

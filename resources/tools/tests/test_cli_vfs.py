@@ -20,11 +20,17 @@ def test_build_parser_accepts_cli_first_doctor_and_tools() -> None:
     parser = rdx_cli._build_parser()
 
     doctor = parser.parse_args(["--json", "doctor"])
+    version = parser.parse_args(["version", "--json"])
+    completion = parser.parse_args(["completion", "powershell"])
     tools_list = parser.parse_args(["tools", "list", "--json", "--limit", "3"])
     tools_search = parser.parse_args(["tools", "search", "pipeline", "--json"])
 
     assert doctor.command == "doctor"
     assert doctor.json is True
+    assert version.command == "version"
+    assert version.json is True
+    assert completion.command == "completion"
+    assert completion.shell == "powershell"
     assert tools_list.command == "tools"
     assert tools_list.tools_cmd == "list"
     assert tools_list.limit == 3
@@ -92,6 +98,62 @@ def test_tools_list_and_search_emit_catalog_summaries(monkeypatch) -> None:
     assert captured[1]["result_kind"] == "rdx.tools.search"
     assert captured[1]["data"]["tool_count"] == 1
     assert captured[1]["data"]["tools"][0]["name"] == "rd.pipeline.get_state"
+
+
+def test_version_command_emits_stable_json(monkeypatch) -> None:
+    captured: list[dict] = []
+
+    monkeypatch.setattr(rdx_cli, "_print_json", lambda payload: captured.append(payload))
+
+    exit_code = asyncio.run(
+        rdx_cli._main_async(argparse.Namespace(command="version", json=True, daemon_context="default")),
+    )
+
+    assert exit_code == rdx_cli.EXIT_OK
+    assert captured[0]["ok"] is True
+    assert captured[0]["result_kind"] == "rdx.version"
+    assert captured[0]["data"]["compatibility"]["json_envelope"] == "stable"
+    assert captured[0]["data"]["compatibility"]["mcp_supported"] is False
+
+
+def test_completion_command_outputs_shell_script(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(rdx_cli, "load_tool_catalog", lambda: [{"name": "rd.session.get_context"}])
+
+    exit_code = asyncio.run(
+        rdx_cli._main_async(argparse.Namespace(command="completion", shell="powershell", daemon_context="default")),
+    )
+
+    assert exit_code == rdx_cli.EXIT_OK
+    output = capsys.readouterr().out
+    assert "Register-ArgumentCompleter" in output
+    assert "rd.session.get_context" in output
+
+
+def test_session_preview_status_without_daemon_is_successful_status(monkeypatch) -> None:
+    captured: list[dict] = []
+
+    monkeypatch.setattr(
+        rdx_cli,
+        "_daemon_status_payload",
+        lambda context: {"ok": True, "data": {"running": False, "state": {"context_id": context}}},
+    )
+    monkeypatch.setattr(rdx_cli, "_print_json", lambda payload: captured.append(payload))
+
+    exit_code = asyncio.run(
+        rdx_cli._main_async(
+            argparse.Namespace(
+                command="session",
+                session_cmd="preview",
+                session_preview_cmd="status",
+                daemon_context="ctx-preview",
+            ),
+        ),
+    )
+
+    assert exit_code == rdx_cli.EXIT_OK
+    assert captured[0]["result_kind"] == "rdx.session.preview.status"
+    assert captured[0]["data"]["running"] is False
+    assert captured[0]["data"]["has_session"] is False
 
 
 def test_vfs_command_routes_to_direct_exec(monkeypatch) -> None:

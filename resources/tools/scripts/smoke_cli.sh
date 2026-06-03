@@ -72,6 +72,7 @@ TOOLS_ROOT="$(cd "$TOOLS_ROOT" && pwd)"
 RDX="$TOOLS_ROOT/bin/rdx"
 LOG_FILE="$TOOLS_ROOT/intermediate/logs/smoke_cli.log"
 STATE_FILE="$TOOLS_ROOT/intermediate/runtime/rdx_cli/daemon_state_${CTX}.json"
+FIXTURE_ROOT="$TOOLS_ROOT/tests/fixtures"
 mkdir -p "$(dirname "$LOG_FILE")"
 : > "$LOG_FILE"
 
@@ -80,8 +81,23 @@ if [[ ! -f "$RDX" ]]; then
   exit 2
 fi
 
+if [[ "$SKIP_RDC" -eq 0 && -z "$RDC_PATH" && -d "$FIXTURE_ROOT" ]]; then
+  while IFS= read -r candidate; do
+    RDC_PATH="$candidate"
+    break
+  done < <(find "$FIXTURE_ROOT" -type f -name '*.rdc' | sort)
+  if [[ -n "$RDC_PATH" ]]; then
+    echo "[smoke] first-party fixture: $RDC_PATH" | tee -a "$LOG_FILE"
+  fi
+fi
+
 if [[ "$SKIP_RDC" -eq 0 && -z "$RDC_PATH" ]]; then
-  echo "[smoke] ERROR: pass --rdc <path> for real capture smoke or --skip-rdc for entry-only smoke" | tee -a "$LOG_FILE"
+  echo "[smoke] ERROR: pass --rdc <path>, add a first-party tests/fixtures/*.rdc, or use --skip-rdc for entry-only smoke" | tee -a "$LOG_FILE"
+  exit 2
+fi
+
+if [[ "$SKIP_RDC" -eq 0 && ! -f "$RDC_PATH" ]]; then
+  echo "[smoke] ERROR: .rdc fixture not found: $RDC_PATH" | tee -a "$LOG_FILE"
   exit 2
 fi
 
