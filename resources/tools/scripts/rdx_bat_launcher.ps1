@@ -166,7 +166,7 @@ function Show-Usage {
     Write-Output '  doctor'
     Write-Output '  tools list|search'
     Write-Output '  daemon start|stop|status'
-    Write-Output '  context clear'
+    Write-Output '  context status|update|list|clear'
     Write-Output '  session preview on|off|status'
     Write-Output '  capture open|status'
     Write-Output '  vfs ls|cat|tree|resolve'
@@ -181,8 +181,10 @@ function Show-Usage {
     Write-Output '  rdx.bat --json doctor'
     Write-Output '  rdx.bat --non-interactive --json doctor'
     Write-Output '  rdx.bat completion powershell'
+    Write-Output '  rdx.bat context status --json'
+    Write-Output '  rdx.bat context update --key notes --value triaged --json'
     Write-Output '  rdx.bat capture open --file D:\path\capture.rdc --frame-index 0'
-    Write-Output '  rdx.bat call rd.session.get_context --format json'
+    Write-Output '  rdx.bat vfs ls --path / --format tsv'
 }
 
 function Read-LauncherLine {

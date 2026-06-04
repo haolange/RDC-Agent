@@ -250,6 +250,8 @@ def _iter_manifest_files(out_root: Path) -> Iterable[tuple[Path, bool]]:
         rel = path.relative_to(out_root).as_posix()
         if rel == "manifest.runtime.json":
             continue
+        if "__pycache__/" in rel or path.suffix.lower() == ".pyc":
+            continue
         if path.suffix.lower() in DENY_SUFFIXES:
             continue
         if rel.startswith("python/"):

@@ -9,8 +9,10 @@ rdx.bat --version
 rdx.bat version --json
 rdx.bat --json doctor
 rdx.bat tools list --json
+rdx.bat context status --json
 rdx.bat capture open --file "C:\path\capture.rdc" --frame-index 0
-rdx.bat call rd.session.get_context --format json
+rdx.bat context update --key notes --value "triaged" --json
+rdx.bat vfs ls --path / --format tsv
 rdx.bat completion powershell
 ```
 
@@ -37,11 +39,11 @@ Release packages are self-contained Windows x64 zips. See [Install](docs/install
 
 ## Session State
 
-Use `rd.session.get_context` to read context state and `rd.session.update_context` to update notes, focus, and agent-visible metadata. The state includes `session_locator`, current capture/session IDs, preview state, and remote lifecycle fields. `remote_handle_consumed` means a remote handle has been bound to a replay session and must not be reused as a free remote connection.
+Use `rdx context status` to read context state and `rdx context update` to update notes, focus, and agent-visible metadata. `--daemon-context <id>` selects the continuous runtime namespace; omitting it uses `default`. The state includes `session_locator`, current capture/session IDs, preview state, and remote lifecycle fields. `remote_handle_consumed` means a remote handle has been bound to a replay session and must not be reused as a free remote connection.
 
 ## Preview CLI Contract
 
-`rd.session.open_preview` is still a daemon-backed CLI operation. `rd.session.get_context.preview` reports preview state and `preview.display`; the preview surface should expose the complete framebuffer（完整 framebuffer）instead of cropping viewport / scissor state.
+`session preview on|status|off` is daemon-backed. `rdx context status` reports preview state and `preview.display`; the preview surface should expose the complete framebuffer（完整 framebuffer）instead of cropping viewport / scissor state.
 
 ## Docs
 

@@ -11603,7 +11603,19 @@ def _vfs_require_session_id(path: str, args: Dict[str, Any]) -> str:
     session_id = _vfs_default_session_id()
     if session_id:
         return session_id
-    raise ValueError(f"{_vfs_normalize_path(path)} requires session_id or an active context session")
+    context_id = _runtime_context_id()
+    normalized_path = _vfs_normalize_path(path)
+    raise CoreError(
+        code="session_required",
+        category="validation",
+        message=f"{normalized_path} requires session_id or an active context session",
+        details={
+            "context_id": context_id,
+            "path": normalized_path,
+            "requires_session": True,
+            "recovery_hint": "Open a capture with `rdx capture open --file <rdc>` or pass --session-id.",
+        },
+    )
 
 
 def _vfs_parse_index(segment: str, *, path: str) -> int:
