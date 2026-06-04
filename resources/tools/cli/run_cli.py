@@ -92,7 +92,7 @@ def _print_launcher_help() -> None:
         "  doctor",
         "  tools list|search",
         "  daemon start|stop|status",
-        "  context clear",
+        "  context status|update|list|clear",
         "  session preview on|off|status",
         "  completion powershell|bash|zsh|fish",
         "  call <operation> [--args-json ... | --args-file ...] [--format json|tsv] [--remote]",
@@ -108,10 +108,11 @@ def _print_launcher_help() -> None:
         f"  {prog} completion powershell",
         f"  {prog} tools search pipeline --json",
         f"  {prog} daemon start --daemon-context local",
+        f"  {prog} context status --daemon-context local --json",
+        f"  {prog} context update --daemon-context local --key notes --value triaged --json",
         f"  {prog} context clear --daemon-context local",
         f"  {prog} capture open --file D:\\path\\capture.rdc --frame-index 0 --preview",
         f"  {prog} session preview on",
-        f"  {prog} call rd.session.get_context --args-file .\\args.json --format json",
         f"  {prog} vfs ls --path / --format tsv",
     ):
         _write_out(line)

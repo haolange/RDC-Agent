@@ -206,9 +206,13 @@ if [[ "$SKIP_RDC" -eq 1 ]]; then
 fi
 
 run_step "context clear" "$STEP_TIMEOUT" "$RDX" --daemon-context "$CTX" context clear
+run_step "context status empty" "$STEP_TIMEOUT" "$RDX" --daemon-context "$CTX" context status --json
 run_step "capture open" "$OPEN_TIMEOUT" "$RDX" --daemon-context "$CTX" capture open --file "$RDC_PATH" --frame-index 0
 run_step "capture status" "$STEP_TIMEOUT" "$RDX" --daemon-context "$CTX" capture status
-run_step "session context" "$STEP_TIMEOUT" "$RDX" --daemon-context "$CTX" call rd.session.get_context --format json
+run_step "context status" "$STEP_TIMEOUT" "$RDX" --daemon-context "$CTX" context status --json
+run_step "context update notes" "$STEP_TIMEOUT" "$RDX" --daemon-context "$CTX" context update --key notes --value "smoke-triaged" --json
+run_step "vfs root tsv" "$STEP_TIMEOUT" "$RDX" --daemon-context "$CTX" vfs ls --path / --format tsv
+run_step "vfs tree json" "$STEP_TIMEOUT" "$RDX" --daemon-context "$CTX" vfs tree --path / --depth 2 --format json
 run_step "daemon tools list" "$STEP_TIMEOUT" "$RDX" --daemon-context "$CTX" tools list --json --limit 5
 run_step "cleanup context clear" "$STEP_TIMEOUT" "$RDX" --daemon-context "$CTX" context clear
 run_step "cleanup daemon stop" "$STEP_TIMEOUT" "$RDX" --daemon-context "$CTX" daemon stop

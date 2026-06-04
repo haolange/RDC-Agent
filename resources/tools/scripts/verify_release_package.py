@@ -70,6 +70,38 @@ def _verify_doctor(root: Path) -> None:
         raise RuntimeError(f"doctor returned wrong result_kind: {json.dumps(payload)[:500]}")
 
 
+def _verify_cli_contract(root: Path) -> None:
+    env = os.environ.copy()
+    env.pop("RDX_PYTHON", None)
+    env["RDX_TOOLS_ROOT"] = str(root)
+    checks = [
+        (["context", "status", "--json"], "rd.session.get_context"),
+        (["context", "list", "--json"], "rd.session.list_contexts"),
+        (["--daemon-context", "package-contract", "context", "update", "--key", "notes", "--value", "package-verify", "--json"], "rd.session.update_context"),
+        (["--daemon-context", "package-contract", "context", "clear", "--json"], "rdx.context.clear"),
+        (["vfs", "ls", "--path", "/", "--format", "tsv"], ""),
+    ]
+    for args, result_kind in checks:
+        code, output = _run([_cmd_exe(), "/c", "rdx.bat", *args], root, env=env)
+        if code != 0:
+            raise RuntimeError(f"contract check failed: rdx.bat {' '.join(args)} exit={code}\n{output}")
+        if result_kind:
+            payload = extract_json_payload(output)
+            if not payload or payload.get("ok") is not True or payload.get("result_kind") != result_kind:
+                raise RuntimeError(f"contract check returned wrong payload for {' '.join(args)}:\n{output}")
+    negative_checks = [
+        (["vfs", "tree", "--path", "/", "--format", "tsv"], "projection_not_supported"),
+        (["call", "rd.session.get_context", "--format", "tsv"], "tabular_projection_missing"),
+        (["--daemon-context", "package-empty", "diff", "pipeline", "--event-a", "1", "--event-b", "2"], "session_required"),
+    ]
+    for args, expected in negative_checks:
+        code, output = _run([_cmd_exe(), "/c", "rdx.bat", *args], root, env=env)
+        payload = extract_json_payload(output)
+        code_value = str(((payload or {}).get("error") or {}).get("code") or "")
+        if code == 0 or code_value != expected:
+            raise RuntimeError(f"negative contract check expected {expected}: rdx.bat {' '.join(args)} exit={code}\n{output}")
+
+
 def _verify_fixture_smoke(root: Path, *, required: bool) -> None:
     fixture = _find_fixture(root)
     if fixture is None:
@@ -106,6 +138,7 @@ def main(argv: list[str] | None = None) -> int:
             zf.extractall(temp_dir)
         root = _find_package_root(temp_dir)
         _verify_doctor(root)
+        _verify_cli_contract(root)
         _verify_fixture_smoke(root, required=bool(args.require_fixture_smoke))
     except Exception as exc:  # noqa: BLE001
         print(f"[verify] {exc}")

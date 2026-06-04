@@ -132,6 +132,21 @@ def _run_launcher(args: list[str], cwd: Path) -> tuple[bool, str]:
     return _run([_cmd_exe(), "/c", "rdx.bat", *args], cwd, env=_launcher_env())
 
 
+def _run_launcher_expect_error(args: list[str], cwd: Path, *, expected_code: str) -> tuple[bool, str]:
+    code, out, err = run_subprocess([_cmd_exe(), "/c", "rdx.bat", *args], cwd=cwd, env=_launcher_env())
+    detail = ((out or "") + (err or "")).strip()
+    try:
+        from scripts._shared import extract_json_payload
+
+        payload = extract_json_payload(detail)
+    except Exception:
+        payload = {}
+    actual_code = str(((payload or {}).get("error") or {}).get("code") or "")
+    if code != 0 and actual_code == expected_code:
+        return True, detail
+    return False, f"expected non-zero `{expected_code}`, got exit={code} code={actual_code}\n{detail}"
+
+
 def _match_line(text: str, rule: ScanRule, *, compiled: re.Pattern[str] | None = None) -> bool:
     if rule.literal:
         return rule.pattern in text
@@ -387,6 +402,46 @@ def main(argv: list[str] | None = None) -> int:
     results.append(("entry:rdx.bat version --json", ok_bat_version_json, bat_version_json))
     ok_bat_completion, bat_completion = _run_launcher(["completion", "powershell"], cwd=root)
     results.append(("entry:rdx.bat completion powershell", ok_bat_completion, bat_completion))
+    ok_context_status, context_status = _run_launcher(["context", "status", "--json"], cwd=root)
+    results.append(("entry:rdx.bat context status --json", ok_context_status, context_status))
+    ok_context_list, context_list = _run_launcher(["context", "list", "--json"], cwd=root)
+    results.append(("entry:rdx.bat context list --json", ok_context_list, context_list))
+    ok_context_update, context_update = _run_launcher(
+        ["--daemon-context", "release-gate-context", "context", "update", "--key", "notes", "--value", "release-gate", "--json"],
+        cwd=root,
+    )
+    results.append(("entry:rdx.bat context update --json", ok_context_update, context_update))
+    ok_context_clear, context_clear = _run_launcher(
+        ["--daemon-context", "release-gate-context", "context", "clear", "--json"],
+        cwd=root,
+    )
+    results.append(("entry:rdx.bat context clear --json", ok_context_clear, context_clear))
+    ok_vfs_tsv, vfs_tsv = _run_launcher(["vfs", "ls", "--path", "/", "--format", "tsv"], cwd=root)
+    results.append(("entry:rdx.bat vfs ls --format tsv", ok_vfs_tsv, vfs_tsv))
+    ok_vfs_bad_tsv, vfs_bad_tsv = _run_launcher_expect_error(
+        ["vfs", "tree", "--path", "/", "--format", "tsv"],
+        cwd=root,
+        expected_code="projection_not_supported",
+    )
+    results.append(("negative:vfs tree tsv projection", ok_vfs_bad_tsv, vfs_bad_tsv))
+    ok_call_bad_tsv, call_bad_tsv = _run_launcher_expect_error(
+        ["call", "rd.session.get_context", "--format", "tsv"],
+        cwd=root,
+        expected_code="tabular_projection_missing",
+    )
+    results.append(("negative:call context tsv projection", ok_call_bad_tsv, call_bad_tsv))
+    ok_diff_no_session, diff_no_session = _run_launcher_expect_error(
+        ["--daemon-context", "release-gate-empty", "diff", "pipeline", "--event-a", "1", "--event-b", "2"],
+        cwd=root,
+        expected_code="session_required",
+    )
+    results.append(("negative:diff pipeline no session", ok_diff_no_session, diff_no_session))
+    ok_assert_no_session, assert_no_session = _run_launcher_expect_error(
+        ["--daemon-context", "release-gate-empty", "assert", "pipeline", "--event-a", "1", "--event-b", "2"],
+        cwd=root,
+        expected_code="session_required",
+    )
+    results.append(("negative:assert pipeline no session", ok_assert_no_session, assert_no_session))
     ok_cli_help, cli_help = _run([sys.executable, "cli/run_cli.py", "--help"], cwd=root)
     results.append(("entry:dev-python cli/run_cli.py --help", ok_cli_help, cli_help))
     ok_cli_doctor, cli_doctor = _run([sys.executable, "cli/run_cli.py", "--json", "doctor"], cwd=root)

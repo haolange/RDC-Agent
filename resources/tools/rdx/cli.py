@@ -66,7 +66,7 @@ def _print_launcher_help() -> None:
         "  doctor",
         "  tools list|search",
         "  daemon start|stop|status",
-        "  context clear",
+        "  context status|update|list|clear",
         "  session preview on|off|status",
         "  completion powershell|bash|zsh|fish",
         "  call <operation> [--args-json ... | --args-file ...] [--format json|tsv] [--remote]",
@@ -82,6 +82,8 @@ def _print_launcher_help() -> None:
         "  rdx completion powershell",
         "  rdx tools search pipeline --json",
         "  rdx daemon start --daemon-context local",
+        "  rdx context status --daemon-context local --json",
+        "  rdx context update --daemon-context local --key notes --value triaged --json",
         "  rdx context clear --daemon-context local",
         "  rdx capture open --file D:\\path\\capture.rdc --frame-index 0 --preview",
         "  rdx session preview on",
@@ -346,11 +348,32 @@ def _render_tabular(payload: Dict[str, Any]) -> None:
         _write_stdout("\t".join("" if item is None else str(item) for item in row))
 
 
-def _render_result(payload: Dict[str, Any], *, output_format: str = "json") -> None:
+def _tabular_projection_error_payload(payload: Dict[str, Any], message: str) -> Dict[str, Any]:
+    result_kind = str(payload.get("result_kind") or "rdx.cli")
+    return canonical_error(
+        result_kind=result_kind,
+        code="tabular_projection_missing",
+        category="validation",
+        message=message,
+        details={
+            "requested_format": "tsv",
+            "source_result_kind": result_kind,
+            "recovery_hint": "Use --format json unless the command documents a tabular projection.",
+        },
+        transport="cli",
+    )
+
+
+def _render_result(payload: Dict[str, Any], *, output_format: str = "json") -> bool:
     if output_format == "tsv" and bool(payload.get("ok")):
-        _render_tabular(payload)
-        return
+        try:
+            _render_tabular(payload)
+        except RuntimeError as exc:
+            _print_json(_tabular_projection_error_payload(payload, str(exc)))
+            return False
+        return True
     _print_json(payload)
+    return bool(payload.get("ok"))
 
 
 def _tool_summary(tool: Dict[str, Any]) -> Dict[str, Any]:
@@ -687,6 +710,51 @@ def _safe_capture_open_context_snapshot(context: str) -> Dict[str, Any]:
     return {"ok": bool(payload.get("ok")), "data": data, "error": payload.get("error"), "meta": payload.get("meta", {})}
 
 
+def _parse_context_value(raw: str) -> Any:
+    text = str(raw)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return text
+
+
+def _cmd_context_status(args: argparse.Namespace) -> int:
+    context = str(getattr(args, "daemon_context", "default") or "default")
+    payload = _daemon_exec("rd.session.get_context", {}, context=context)
+    _print_json(payload)
+    return EXIT_OK if bool(payload.get("ok")) else EXIT_RUNTIME_ERR
+
+
+def _cmd_context_update(args: argparse.Namespace) -> int:
+    context = str(getattr(args, "daemon_context", "default") or "default")
+    call_args = {"key": str(args.key), "value": _parse_context_value(str(args.value))}
+    payload = _daemon_exec("rd.session.update_context", call_args, context=context)
+    _print_json(payload)
+    return EXIT_OK if bool(payload.get("ok")) else EXIT_RUNTIME_ERR
+
+
+def _cmd_context_list(args: argparse.Namespace) -> int:
+    context = str(getattr(args, "daemon_context", "default") or "default")
+    payload = _daemon_exec("rd.session.list_contexts", {}, context=context)
+    _print_json(payload)
+    return EXIT_OK if bool(payload.get("ok")) else EXIT_RUNTIME_ERR
+
+
+def _session_required_error_payload(result_kind: str, context: str, message: str) -> Dict[str, Any]:
+    return canonical_error(
+        result_kind=result_kind,
+        code="session_required",
+        category="validation",
+        message=message,
+        details={
+            "context_id": context,
+            "requires_session": True,
+            "recovery_hint": "Open a capture with `rdx capture open --file <rdc>` or pass --session-id.",
+        },
+        transport="cli",
+    )
+
+
 def _capture_open_error_payload(
     *,
     step: str,
@@ -746,8 +814,7 @@ async def _cmd_call(args: argparse.Namespace) -> int:
         ),
     )
     payload = _daemon_exec(args.operation, call_args, remote=bool(args.remote), context=str(args.daemon_context))
-    _render_result(payload, output_format=str(args.format))
-    return EXIT_OK if bool(payload.get("ok")) else EXIT_RUNTIME_ERR
+    return EXIT_OK if _render_result(payload, output_format=str(args.format)) else EXIT_RUNTIME_ERR
 
 
 async def _cmd_vfs(args: argparse.Namespace) -> int:
@@ -758,8 +825,7 @@ async def _cmd_vfs(args: argparse.Namespace) -> int:
     if args.vfs_cmd == "tree":
         call_args["depth"] = int(args.depth)
     payload = _daemon_exec(op, _tabular_request(str(args.format), call_args), context=str(args.daemon_context))
-    _render_result(payload, output_format=str(args.format))
-    return EXIT_OK if bool(payload.get("ok")) else EXIT_RUNTIME_ERR
+    return EXIT_OK if _render_result(payload, output_format=str(args.format)) else EXIT_RUNTIME_ERR
 
 
 async def _cmd_capture_open(args: argparse.Namespace) -> int:
@@ -987,11 +1053,16 @@ async def _cmd_session_preview(args: argparse.Namespace) -> int:
 
 
 async def _cmd_diff_pipeline(args: argparse.Namespace) -> int:
-    session_id = _default_session_id(args.session_id, context=str(args.daemon_context))
+    context = str(args.daemon_context)
+    try:
+        session_id = _default_session_id(args.session_id, context=context)
+    except RuntimeError as exc:
+        _print_json(_session_required_error_payload("rdx.diff.pipeline", context, str(exc)))
+        return EXIT_RUNTIME_ERR
     payload = _daemon_exec(
         "rd.event.diff_pipeline_state",
         {"session_id": session_id, "event_a": int(args.event_a), "event_b": int(args.event_b)},
-        context=str(args.daemon_context),
+        context=context,
     )
     _print_json(payload)
     if not bool(payload.get("ok")):
@@ -1021,11 +1092,16 @@ async def _cmd_diff_image(args: argparse.Namespace) -> int:
 
 
 async def _cmd_assert_pipeline(args: argparse.Namespace) -> int:
-    session_id = _default_session_id(args.session_id, context=str(args.daemon_context))
+    context = str(args.daemon_context)
+    try:
+        session_id = _default_session_id(args.session_id, context=context)
+    except RuntimeError as exc:
+        _print_json(_session_required_error_payload("rdx.assert.pipeline", context, str(exc)))
+        return EXIT_RUNTIME_ERR
     payload = _daemon_exec(
         "rd.event.diff_pipeline_state",
         {"session_id": session_id, "event_a": int(args.event_a), "event_b": int(args.event_b)},
-        context=str(args.daemon_context),
+        context=context,
     )
     if not bool(payload.get("ok")):
         _print_json(
@@ -1128,7 +1204,16 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_context = sub.add_parser("context", help="Context state helpers")
     s_context = p_context.add_subparsers(dest="context_cmd", required=True)
-    s_context.add_parser("clear")
+    p_context_status = s_context.add_parser("status", help="Print the current runtime context snapshot")
+    p_context_status.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+    p_context_update = s_context.add_parser("update", help="Update agent-facing context fields")
+    p_context_update.add_argument("--key", required=True, choices=("notes", "focus_pixel", "focus_resource_id", "focus_shader_id"))
+    p_context_update.add_argument("--value", required=True)
+    p_context_update.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+    p_context_list = s_context.add_parser("list", help="List known daemon contexts")
+    p_context_list.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+    p_context_clear = s_context.add_parser("clear")
+    p_context_clear.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
 
     p_call = sub.add_parser("call", help="Call any rd.* operation")
     p_call.add_argument("operation")
@@ -1268,6 +1353,12 @@ async def _main_async(args: argparse.Namespace) -> int:
             return EXIT_OK
 
     if args.command == "context":
+        if args.context_cmd == "status":
+            return _cmd_context_status(args)
+        if args.context_cmd == "update":
+            return _cmd_context_update(args)
+        if args.context_cmd == "list":
+            return _cmd_context_list(args)
         if args.context_cmd == "clear":
             ok, message, details = clear_context(context=ctx)
             if not ok:
