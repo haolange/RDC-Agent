@@ -412,7 +412,7 @@ function sanitizeRoute(entry: unknown): LlmAgentRoute | null {
 
   return {
     agentId: route.agentId as LlmAgentRoute['agentId'],
-    providerId: typeof route.providerId === 'string' ? route.providerId.trim() : '',
+    providerId: typeof route.providerId === 'string' ? normalizeRetiredProviderId(route.providerId.trim()) : '',
     modelId: typeof route.modelId === 'string' ? route.modelId.trim() : '',
   };
 }
@@ -449,27 +449,36 @@ function isFixtureProvider(provider: Partial<LlmProviderEntry>): boolean {
   );
 }
 
-function normalizeLegacyProviderId(providerId: string): string {
-  if (providerId === 'gemini') return 'vertex';
-    if (providerId === 'kimi' || providerId === 'kimi-coding-plan') return 'kimi-code';
-  if (providerId === 'minimax') return 'minimax-global';
-  if (providerId === 'zai') return 'glm-global';
-  return providerId;
+const RETIRED_PROVIDER_ID_IMPORTS: Record<string, LlmProviderId> = {
+  gemini: 'vertex',
+  kimi: 'kimi-code',
+  'kimi-coding-plan': 'kimi-code',
+  minimax: 'minimax-global',
+  zai: 'glm-global',
+};
+
+function normalizeRetiredProviderId(providerId: string): string {
+  return RETIRED_PROVIDER_ID_IMPORTS[providerId] ?? providerId;
 }
 
 function sanitizeUserProvider(
   provider: Partial<LlmProviderEntry>,
   workspaceRoot = appPathService.getWorkspaceRoot(),
 ): LlmProviderEntry | null {
-  const rawId = normalizeLegacyProviderId(typeof provider.id === 'string' ? provider.id.trim() : '');
+  const incomingId = typeof provider.id === 'string' ? provider.id.trim() : '';
+  const rawId = normalizeRetiredProviderId(incomingId);
   if (!rawId || !isBuiltinProviderId(rawId)) {
     return null;
   }
 
   const builtinFallback = createBuiltinProviderEntry(rawId);
   const definition = getBuiltinProviderDefinition(rawId);
-  const useBuiltinProviderMetadata = rawId === 'kimi-code';
-  const secretRef = provider.secretRef || secretStorageService.createProviderSecretRef(rawId);
+  const incomingSecretRef = typeof provider.secretRef === 'string' && provider.secretRef.trim()
+    ? provider.secretRef.trim()
+    : undefined;
+  const secretRef = incomingId && incomingId !== rawId
+    ? secretStorageService.createProviderSecretRef(rawId)
+    : incomingSecretRef || secretStorageService.createProviderSecretRef(rawId);
   const kind = builtinFallback.kind;
   const models = sanitizeModels(provider.models ?? []);
   const oauthSecretRef = secretStorageService.createProviderOAuthSecretRef(rawId);
@@ -486,23 +495,9 @@ function sanitizeUserProvider(
       : Boolean(resolvedSecret);
   const status = pickProviderStatus(provider, builtinFallback, canUseProvider, models);
   const enabled = status === 'verified' && models.length > 0;
-  const label = useBuiltinProviderMetadata
-    ? builtinFallback.label
-    : typeof provider.label === 'string' && provider.label.trim()
-      ? provider.label.trim()
-      : builtinFallback.label;
-  const recommendedModels = useBuiltinProviderMetadata
-    ? builtinFallback.recommendedModels
-    : dedupeStrings(
-      Array.isArray(provider.recommendedModels)
-        ? provider.recommendedModels.filter((value): value is string => typeof value === 'string').map((value) => value.trim())
-        : builtinFallback.recommendedModels,
-    );
-  const docsUrl = useBuiltinProviderMetadata
-    ? builtinFallback.docsUrl
-    : typeof provider.docsUrl === 'string' && provider.docsUrl.trim()
-      ? provider.docsUrl.trim()
-      : builtinFallback.docsUrl;
+  const label = builtinFallback.label;
+  const recommendedModels = builtinFallback.recommendedModels;
+  const docsUrl = builtinFallback.docsUrl;
 
   return {
     id: rawId,
@@ -694,13 +689,30 @@ export class SettingsService {
         continue;
       }
 
-      const rawId = normalizeLegacyProviderId(typeof entry.id === 'string' ? entry.id.trim() : '');
+      const incomingId = typeof entry.id === 'string' ? entry.id.trim() : '';
+      const rawId = normalizeRetiredProviderId(incomingId);
       if (!rawId) {
         fixes.push('Removed provider with empty id');
         continue;
       }
 
-      const secretRef = entry.secretRef || secretStorageService.createProviderSecretRef(rawId);
+      if (incomingId && incomingId !== rawId) {
+        fixes.push(`Renamed retired provider id ${incomingId} to ${rawId}`);
+      }
+
+      const canonicalSecretRef = secretStorageService.createProviderSecretRef(rawId);
+      const incomingSecretRef = typeof entry.secretRef === 'string' && entry.secretRef.trim()
+        ? entry.secretRef.trim()
+        : undefined;
+      const secretRef = incomingId && incomingId !== rawId ? canonicalSecretRef : incomingSecretRef || canonicalSecretRef;
+      if (incomingSecretRef && incomingSecretRef !== secretRef) {
+        const incomingSecret = secretStorageService.getSecret(incomingSecretRef, workspaceRoot);
+        if (incomingSecret.trim()) {
+          secretStorageService.setSecret(secretRef, incomingSecret, workspaceRoot);
+          secretStorageService.deleteSecret(incomingSecretRef, workspaceRoot);
+          fixes.push(`Moved retired provider secret ${incomingId} to ${rawId}`);
+        }
+      }
       if (entry.apiKey?.trim()) {
         secretStorageService.setSecret(secretRef, entry.apiKey.trim(), workspaceRoot);
         fixes.push(`Migrated plaintext secret for ${rawId}`);
@@ -740,7 +752,18 @@ export class SettingsService {
 
     const catalogProviders = normalizeUserProviders(nextProviders, workspaceRoot);
     const nextRoutes = normalizeUserRoutes(rawRoutes, catalogProviders);
-    const incomingRoutes = Array.isArray(rawRoutes) ? rawRoutes.map(sanitizeRoute).filter((route): route is LlmAgentRoute => route !== null) : [];
+    const incomingRoutes = Array.isArray(rawRoutes) ? rawRoutes.map((entry) => {
+      if (entry && typeof entry === 'object') {
+        const providerId = (entry as Partial<LlmAgentRoute>).providerId;
+        const incomingProviderId = typeof providerId === 'string' ? providerId.trim() : '';
+        const normalizedProviderId = normalizeRetiredProviderId(incomingProviderId);
+        if (incomingProviderId && incomingProviderId !== normalizedProviderId) {
+          const agentId = (entry as Partial<LlmAgentRoute>).agentId;
+          fixes.push(`Renamed retired route provider id ${incomingProviderId} to ${normalizedProviderId}${typeof agentId === 'string' ? ` for ${agentId}` : ''}`);
+        }
+      }
+      return sanitizeRoute(entry);
+    }).filter((route): route is LlmAgentRoute => route !== null) : [];
     for (const route of incomingRoutes) {
       const normalized = nextRoutes.find((entry) => entry.agentId === route.agentId);
       if (!normalized || normalized.providerId !== route.providerId || normalized.modelId !== route.modelId) {

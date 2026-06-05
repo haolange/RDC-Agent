@@ -237,34 +237,34 @@ test('provider page separates OAuth accounts and shows one alphabetized provider
     await expect(ctx.page.locator('[data-testid="settings-connected-providers"]')).toHaveCount(0);
     for (const label of [
       'Anthropic',
-      'Anthropic Third-party API',
+      'Anthropic-compatible Endpoint',
       'Azure OpenAI',
       'OpenRouter',
-      'GLM (CN)',
-      'GLM (Global)',
+      'Zhipu AI GLM (CN)',
+      'Z.ai GLM (Global)',
       'Google AI Studio',
       'Groq',
       'Mistral',
       'Cerebras',
       'Hugging Face',
       'Kimi Code',
-      'Moonshot',
+      'Kimi / Moonshot AI',
       'MiniMax (CN)',
       'MiniMax (Global)',
       'DeepSeek',
       'Vercel AI Gateway',
       'Manifest',
-      'Volcengine Ark',
+      'Volcengine Ark (Doubao)',
       'Xiaomi MiMo',
       'Xiaomi MiMo Token Plan',
-      'Aliyun Bailian',
-      'AWS Bedrock',
+      'Alibaba Cloud Bailian',
+      'Amazon Bedrock',
       'Google Vertex AI',
       'Ollama',
       'LiteLLM',
-      'Custom Endpoint',
-      'OpenAI EU',
-      'OpenAI US',
+      'OpenAI-compatible Endpoint',
+      'OpenAI (EU)',
+      'OpenAI (US)',
     ]) {
       await expect(addSection).toContainText(label);
     }
@@ -335,7 +335,7 @@ test('provider page separates OAuth accounts and shows one alphabetized provider
       baseUrlEditable: true,
     });
     expect(catalog.find((provider) => provider.id === 'custom-endpoint')).toMatchObject({
-      label: 'Custom Endpoint',
+      label: 'OpenAI-compatible Endpoint',
       kind: 'openai-compatible',
       authMode: 'api-key',
       baseUrlEditable: true,
@@ -351,6 +351,18 @@ test('provider page separates OAuth accounts and shows one alphabetized provider
       modelDiscovery: 'account-catalog',
     });
     const providerLabels = await addSection.locator('.settings-provider-item-label').allTextContents();
+    expect(providerLabels).not.toEqual(expect.arrayContaining([
+      'Anthropic Third-party API',
+      'GLM (CN)',
+      'GLM (Global)',
+      'Moonshot',
+      'Volcengine Ark',
+      'Aliyun Bailian',
+      'AWS Bedrock',
+      'Custom Endpoint',
+      'OpenAI EU',
+      'OpenAI US',
+    ]));
     expect(providerLabels).toEqual([...providerLabels].sort((left, right) => (
       left.localeCompare(right, undefined, { sensitivity: 'base' })
     )));
@@ -367,6 +379,132 @@ test('provider page separates OAuth accounts and shows one alphabetized provider
     await expect(ctx.page.locator('[data-testid="settings-provider-environment-notice"]')).toBeVisible();
     await expect(ctx.page.locator('[data-testid="settings-provider-connect-models"]')).toContainText('sonnet');
     await ctx.page.locator('[data-testid="settings-provider-connect-dialog"] .settings-modal-close').click();
+  } finally {
+    await closeApp(ctx);
+  }
+});
+
+test('builtin providers normalize stale display metadata from persisted settings', async () => {
+  const ctx = await launchApp();
+
+  try {
+    const result = await ctx.page.evaluate(async () => {
+      const settings = await window.electronAPI.settings.get();
+      const staleLabels: Record<string, string> = {
+        'anthropic-thirdparty': 'Anthropic Third-party API',
+        bailian: 'Aliyun Bailian',
+        bedrock: 'AWS Bedrock',
+        'custom-endpoint': 'Custom Endpoint',
+        'glm-cn': 'GLM (CN)',
+        'glm-global': 'GLM (Global)',
+        moonshot: 'Moonshot',
+        'openai-eu': 'OpenAI EU',
+        'openai-us': 'OpenAI US',
+        volcengine: 'Volcengine Ark',
+      };
+      await window.electronAPI.settings.set({
+        llm: {
+          ...settings.llm,
+          providers: settings.llm.providers.map((provider) => (
+            provider.id in staleLabels
+              ? {
+                  ...provider,
+                  label: staleLabels[provider.id],
+                  docsUrl: 'https://stale.example/provider',
+                  recommendedModels: ['stale-model'],
+                }
+              : provider
+          )),
+        },
+      });
+      const normalized = await window.electronAPI.settings.get();
+      return normalized.llm.providers
+        .filter((provider) => provider.id in staleLabels)
+        .map((provider) => ({
+          id: provider.id,
+          label: provider.label,
+          docsUrl: provider.docsUrl,
+          recommendedModels: provider.recommendedModels,
+        }));
+    });
+
+    expect(result).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'anthropic-thirdparty', label: 'Anthropic-compatible Endpoint' }),
+      expect.objectContaining({ id: 'bailian', label: 'Alibaba Cloud Bailian' }),
+      expect.objectContaining({ id: 'bedrock', label: 'Amazon Bedrock' }),
+      expect.objectContaining({ id: 'custom-endpoint', label: 'OpenAI-compatible Endpoint' }),
+      expect.objectContaining({ id: 'glm-cn', label: 'Zhipu AI GLM (CN)' }),
+      expect.objectContaining({ id: 'glm-global', label: 'Z.ai GLM (Global)' }),
+      expect.objectContaining({ id: 'moonshot', label: 'Kimi / Moonshot AI' }),
+      expect.objectContaining({ id: 'openai-eu', label: 'OpenAI (EU)' }),
+      expect.objectContaining({ id: 'openai-us', label: 'OpenAI (US)' }),
+      expect.objectContaining({ id: 'volcengine', label: 'Volcengine Ark (Doubao)' }),
+    ]));
+    for (const provider of result) {
+      expect(provider.docsUrl).not.toBe('https://stale.example/provider');
+      expect(provider.recommendedModels).not.toEqual(['stale-model']);
+    }
+  } finally {
+    await closeApp(ctx);
+  }
+});
+
+test('retired provider ids migrate provider inventory and agent routes', async () => {
+  const ctx = await launchApp();
+
+  try {
+    const result = await ctx.page.evaluate(async () => {
+      const settings = await window.electronAPI.settings.get();
+      await window.electronAPI.settings.set({
+        llm: {
+          ...settings.llm,
+          providers: [
+            {
+              id: 'gemini',
+              kind: 'vertex',
+              authMode: 'environment',
+              catalogGroup: 'environment',
+              modelDiscovery: 'static',
+              label: 'Gemini',
+              enabled: true,
+              apiKey: '',
+              secretRef: 'provider-gemini-api-key',
+              hasStoredSecret: true,
+              models: [{ id: 'sonnet', label: 'sonnet', enabled: true }],
+              recommendedModels: ['gemini-legacy-model'],
+              docsUrl: 'https://stale.example/gemini',
+              status: 'verified',
+              isConfigured: true,
+            },
+          ],
+          agentRoutes: [
+            { agentId: 'ask_agent', providerId: 'gemini', modelId: 'sonnet' },
+          ],
+        },
+      });
+      const normalized = await window.electronAPI.settings.get();
+      return {
+        providerIds: normalized.llm.providers.map((provider) => provider.id),
+        vertex: normalized.llm.providers.find((provider) => provider.id === 'vertex'),
+        askRoute: normalized.llm.agentRoutes.find((route) => route.agentId === 'ask_agent'),
+      };
+    });
+
+    expect(result.providerIds).not.toContain('gemini');
+    expect(result.vertex).toMatchObject({
+      id: 'vertex',
+      label: 'Google Vertex AI',
+      secretRef: 'provider-vertex-api-key',
+      recommendedModels: ['sonnet', 'opus', 'haiku'],
+      docsUrl: 'https://docs.anthropic.com/en/docs/claude-code/google-vertex-ai',
+      status: 'verified',
+      isConfigured: true,
+    });
+    expect(result.askRoute).toMatchObject({
+      agentId: 'ask_agent',
+      providerId: 'vertex',
+      modelId: 'sonnet',
+    });
   } finally {
     await closeApp(ctx);
   }
