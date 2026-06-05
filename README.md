@@ -85,6 +85,7 @@ npm run dev
 - [docs/README.md](./docs/README.md)：文档索引
 - [docs/product/vertical-debugger-overview.md](./docs/product/vertical-debugger-overview.md)：产品总览
 - [docs/architecture/overview.md](./docs/architecture/overview.md)：当前架构总览
+- [docs/architecture/agent-runtime-kernel.md](./docs/architecture/agent-runtime-kernel.md)：Agent Runtime Kernel、provider/account、tool mediation、MCP/skills 和 Debugger 串行 multi-agent workflow
 - [docs/architecture/module-map.md](./docs/architecture/module-map.md)：源码入口与能力地图
 - [docs/architecture/data-flow.md](./docs/architecture/data-flow.md)：端到端数据流
 - [docs/architecture/codepilot-comparison.md](./docs/architecture/codepilot-comparison.md)：CodePilot 对照与迁移边界

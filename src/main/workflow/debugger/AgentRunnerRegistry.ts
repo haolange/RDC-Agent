@@ -8,9 +8,9 @@ import { OpenAiAgentSdkAdapter } from './adapters/OpenAiAgentSdkAdapter';
 
 export class AgentRunnerRegistry {
   private readonly adapters: AgentSdkAdapter[] = [
-    new LlmAdapterAgentSdkAdapter(),
     new OpenAiAgentSdkAdapter(),
     new ClaudeAgentSdkAdapter(),
+    new LlmAdapterAgentSdkAdapter(),
   ];
 
   async run(request: AgentRunRequest): Promise<AgentRunResult> {

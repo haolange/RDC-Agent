@@ -911,6 +911,7 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
   private apiKey = '';
   private baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
   private models: string[] = [];
+  private useBearerAuth = false;
 
   constructor(name: string) {
     super(name);
@@ -920,6 +921,19 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
     this.apiKey = config.apiKey.trim();
     this.baseUrl = (config.baseUrl || this.baseUrl).trim().replace(/\/+$/, '');
     this.models = config.models;
+    this.useBearerAuth = config.authMode === 'account';
+  }
+
+  private createGenerateContentUrl(model: string): string {
+    const base = `${this.baseUrl}/models/${model}:generateContent`;
+    return this.useBearerAuth ? base : appendQueryParam(base, 'key', this.apiKey);
+  }
+
+  private createHeaders(): Record<string, string> {
+    return {
+      ...(this.useBearerAuth ? { Authorization: `Bearer ${this.apiKey}` } : {}),
+      'Content-Type': 'application/json',
+    };
   }
 
   async chat(request: LLMRequest): Promise<LLMResponse> {
@@ -927,11 +941,9 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
     if (!model) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
-    const response = await fetch(appendQueryParam(`${this.baseUrl}/models/${model}:generateContent`, 'key', this.apiKey), {
+    const response = await fetch(this.createGenerateContentUrl(model), {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: this.createHeaders(),
       signal: request.signal,
       body: JSON.stringify({
         contents: request.messages

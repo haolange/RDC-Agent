@@ -1,7 +1,9 @@
 import type { AgentRole } from './agent';
 import type { LLMStreamEvent, ToolCall } from './llm';
 import type { MCPTransport } from './mcp';
+import type { AgentPromptProfile, AgentToolPolicy } from './profile';
 import type { AppMode, ExecutableAppMode } from './session';
+import type { LlmProviderAuthMode, LlmProviderId, LlmProviderKind } from './settings';
 import type { ToolCallResult } from './tool';
 import type { WorkflowPhase, WorkflowStage } from './workflow';
 
@@ -12,6 +14,7 @@ export type AgentEventType =
   | 'tool.requested'
   | 'tool.started'
   | 'tool.completed'
+  | 'tool.denied'
   | 'task.created'
   | 'task.updated'
   | 'approval.requested'
@@ -62,6 +65,13 @@ export interface AgentToolCompletedPayload extends AgentEventBasePayload {
   result: ToolCallResult;
 }
 
+export interface AgentToolDeniedPayload extends AgentEventBasePayload {
+  toolCallId: string;
+  toolName: string;
+  reason: string;
+  result?: ToolCallResult;
+}
+
 export interface AgentTaskEventPayload extends AgentEventBasePayload {
   taskId: string;
   title: string;
@@ -74,6 +84,12 @@ export interface AgentApprovalEventPayload extends AgentEventBasePayload {
   title: string;
   status: 'pending' | 'approved' | 'rejected' | 'cancelled';
   reason?: string;
+  kind?: 'tool' | 'ask_user' | 'run_start';
+  toolCallId?: string;
+  toolName?: string;
+  question?: string;
+  options?: string[];
+  answer?: unknown;
 }
 
 export interface AgentDiagnosticPayload extends AgentEventBasePayload {
@@ -100,6 +116,7 @@ export type AgentEventPayload =
   | AgentToolRequestedPayload
   | AgentToolStartedPayload
   | AgentToolCompletedPayload
+  | AgentToolDeniedPayload
   | AgentTaskEventPayload
   | AgentApprovalEventPayload
   | AgentDiagnosticPayload
@@ -145,6 +162,73 @@ export interface AgentRuntimeSkillDescriptor {
   enabledByDefault: boolean;
   path?: string;
   parameters?: Record<string, unknown>;
+}
+
+export type ModelProviderBackendKind =
+  | 'native'
+  | 'openai-agent-sdk'
+  | 'claude-agent-sdk'
+  | 'openai-compatible'
+  | 'local'
+  | 'mockable-account';
+
+export interface ModelProviderCapabilityMatrix {
+  providerId: LlmProviderId;
+  kind: LlmProviderKind;
+  authMode: LlmProviderAuthMode;
+  backendKind: ModelProviderBackendKind;
+  streaming: boolean;
+  nativeToolCalling: boolean;
+  structuredOutput: boolean;
+  vision: boolean;
+  reasoning: boolean;
+  parallelToolCalls: boolean;
+  oauth: boolean;
+  local: boolean;
+  toolCallFormat: 'openai-chat-completions' | 'openai-responses' | 'anthropic-messages' | 'google-gemini' | 'none';
+  structuredReliability: 'native' | 'prompted' | 'unsupported';
+}
+
+export interface ModelTurnEvent {
+  providerId: LlmProviderId;
+  modelId: string;
+  type: 'started' | 'delta' | 'tool_call' | 'completed' | 'failed';
+  text?: string;
+  toolCall?: ToolCall;
+  usage?: {
+    inputTokens: number;
+    outputTokens: number;
+  };
+  error?: string;
+}
+
+export interface AgentRuntimeProfileDescriptor extends AgentPromptProfile {
+  runtimePolicy: AgentToolPolicy;
+  providerRoute?: {
+    providerId: LlmProviderId;
+    modelId: string;
+  };
+  maxTurns?: number;
+  maxToolIterations?: number;
+}
+
+export interface AgentRuntimeTaskDescriptor {
+  id: string;
+  title: string;
+  status: 'pending' | 'running' | 'blocked' | 'completed' | 'failed' | 'cancelled';
+  ownerAgentId: AgentRole;
+  stage?: WorkflowStage | 'cowork' | 'report';
+  phase?: WorkflowPhase;
+  dependsOn?: string[];
+}
+
+export interface AgentRuntimeTaskGraphDescriptor {
+  id: string;
+  runId: string;
+  mode: ExecutableAppMode;
+  execution: 'serial';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  tasks: AgentRuntimeTaskDescriptor[];
 }
 
 export interface AgentRuntimeMcpDescriptor {

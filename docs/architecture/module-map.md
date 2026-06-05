@@ -6,6 +6,7 @@
 
 | 能力域 | main 入口 | shared 契约 | preload / IPC | renderer 入口 | 测试入口 |
 | --- | --- | --- | --- | --- | --- |
+| Agent Runtime Kernel | `src/main/agent-runtime/AgentRuntime.ts`, `ModelProviderRegistry.ts`, `ToolRegistry.ts`, `AgentRuntimeToolPolicy.ts` | `AgentEvent`, `ModelProviderCapabilityMatrix`, `ModelTurnEvent`, runtime profiles/task graph | conversation/workflow internal runtime events; no public bypass | Agent Workstream projection, Activity diagnostics, Browser fallback provider status | `agent-runtime-policy.spec.ts`, `agent-runtime-kernel.spec.ts` |
 | Shell / Window / Dialog | `src/main/ipc/shellHandlers.ts`、`src/main/shell/` | `src/shared/types/electron/platform.ts` | `src/preload/api/shell.ts`、`app:*`、`window:*`、`dialog:*` | `src/renderer/app/`、`src/renderer/shell/`（TitleBar/布局原语） | workbench smoke |
 | Project / Session / Run | `src/main/sessions/RdxSessionService.ts`、`StorageAdapter.ts`、`src/main/ipc/projectSessionHandlers.ts` | `ProjectRecord`、`SessionRecord`、`RunSummary` | `src/preload/api/projectSession.ts`、`project:*`、`session:*`、`run:*` | `src/renderer/features/projects/Sidebar`、`projectStore` / `sessionStore` | `session-lifecycle.spec.ts` |
 | Capture / Device | `src/main/captures/ReplayDeviceService.ts`、`ContextService.ts`、`src/main/sessions/RdxSessionService.ts`、`src/main/ipc/captureDeviceHandlers.ts` | `CaptureDescriptor`、`OpenedCaptureState`、`ReplayDeviceEntry` | `src/preload/api/captureContext.ts`、`capture:*`、`device:*` | `src/renderer/features/captures/DeviceSelector`、`features/debugger/ControlPanel` | capture / workbench smoke |

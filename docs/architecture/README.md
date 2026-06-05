@@ -1,5 +1,7 @@
 # Architecture Docs
 
+- `agent-runtime-kernel.md`: Agent Runtime Kernel, provider/account abstraction, tool mediation, MCP/skills, Ask readonly profile, Debugger serial multi-agent workflow, and SDK backend boundary.
+
 - `overview.md`：当前 Electron / React / Debugger 主链架构总览。
 - `data-flow.md`：Project、Session、Capture、Workflow、ToolBridge 等端到端数据流。
 - `module-map.md`：能力域到源码入口、共享类型、IPC/preload、UI 和测试入口的地图。

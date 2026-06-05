@@ -47,7 +47,10 @@ export type BuiltinLlmProviderId =
   | 'ollama'
   | 'claude-account'
   | 'chatgpt-account'
-  | 'github-copilot';
+  | 'github-copilot'
+  | 'grok-account'
+  | 'gemini-account'
+  | 'qwen-account';
 export type LlmProviderId = BuiltinLlmProviderId | (string & {});
 export type LlmProviderKind = 'openrouter' | 'openai-compatible' | 'anthropic' | 'google-ai-studio' | 'azure-openai' | 'bedrock' | 'vertex' | 'ollama';
 export type LlmProviderAuthMode = 'api-key' | 'local' | 'account' | 'environment';
