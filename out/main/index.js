@@ -4619,7 +4619,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     authMode: "api-key",
     catalogGroup: "api-key",
     modelDiscovery: "anthropic-candidate-validation",
-    label: "Aliyun Bailian",
+    label: "Alibaba Cloud Bailian",
     baseUrl: "https://coding.dashscope.aliyuncs.com/apps/anthropic",
     recommendedModels: ["qwen3.6-plus", "qwen3-coder-next", "qwen3-coder-plus", "kimi-k2.5", "glm-5", "glm-4.7"],
     docsUrl: "https://bailian.console.aliyun.com/"
@@ -4641,7 +4641,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     authMode: "api-key",
     catalogGroup: "api-key",
     modelDiscovery: "anthropic-candidate-validation",
-    label: "Anthropic Third-party API",
+    label: "Anthropic-compatible Endpoint",
     baseUrl: "",
     baseUrlEditable: true,
     recommendedModels: ANTHROPIC_ALIAS_MODELS,
@@ -4664,7 +4664,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     authMode: "environment",
     catalogGroup: "environment",
     modelDiscovery: "static",
-    label: "AWS Bedrock",
+    label: "Amazon Bedrock",
     recommendedModels: ANTHROPIC_ALIAS_MODELS,
     docsUrl: "https://docs.anthropic.com/en/docs/claude-code/amazon-bedrock"
   },
@@ -4674,7 +4674,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     authMode: "api-key",
     catalogGroup: "api-key",
     modelDiscovery: "openai-compatible",
-    label: "Custom Endpoint",
+    label: "OpenAI-compatible Endpoint",
     baseUrl: "",
     baseUrlEditable: true,
     recommendedModels: ["gpt-4.1"],
@@ -4752,7 +4752,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     authMode: "api-key",
     catalogGroup: "api-key",
     modelDiscovery: "anthropic-candidate-validation",
-    label: "GLM (CN)",
+    label: "Zhipu AI GLM (CN)",
     baseUrl: "https://open.bigmodel.cn/api/anthropic",
     recommendedModels: ["sonnet", "opus", "haiku"],
     docsUrl: "https://open.bigmodel.cn/"
@@ -4763,7 +4763,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     authMode: "api-key",
     catalogGroup: "api-key",
     modelDiscovery: "anthropic-candidate-validation",
-    label: "GLM (Global)",
+    label: "Z.ai GLM (Global)",
     baseUrl: "https://api.z.ai/api/anthropic",
     recommendedModels: ["sonnet", "opus", "haiku"],
     docsUrl: "https://platform.z.ai/"
@@ -4861,7 +4861,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     authMode: "api-key",
     catalogGroup: "api-key",
     modelDiscovery: "anthropic-candidate-validation",
-    label: "Moonshot",
+    label: "Kimi / Moonshot AI",
     baseUrl: "https://api.moonshot.cn/anthropic",
     recommendedModels: ["sonnet"],
     docsUrl: "https://platform.moonshot.cn/console/api-keys"
@@ -4894,7 +4894,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     authMode: "api-key",
     catalogGroup: "api-key",
     modelDiscovery: "openai-compatible",
-    label: "OpenAI EU",
+    label: "OpenAI (EU)",
     baseUrl: "https://eu.api.openai.com/v1",
     recommendedModels: OPENAI_CODE_MODELS,
     docsUrl: "https://platform.openai.com/api-keys"
@@ -4905,7 +4905,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     authMode: "api-key",
     catalogGroup: "api-key",
     modelDiscovery: "openai-compatible",
-    label: "OpenAI US",
+    label: "OpenAI (US)",
     baseUrl: "https://us.api.openai.com/v1",
     recommendedModels: OPENAI_CODE_MODELS,
     docsUrl: "https://platform.openai.com/api-keys"
@@ -4938,7 +4938,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     authMode: "api-key",
     catalogGroup: "api-key",
     modelDiscovery: "anthropic-candidate-validation",
-    label: "Volcengine Ark",
+    label: "Volcengine Ark (Doubao)",
     baseUrl: "https://ark.cn-beijing.volces.com/api/coding",
     recommendedModels: ["doubao-seed-1-6", "glm-4.6", "deepseek-v4-pro", "kimi-k2.5"],
     docsUrl: "https://www.volcengine.com/docs/82379/1928262"
@@ -5400,7 +5400,7 @@ function sanitizeRoute(entry) {
   }
   return {
     agentId: route.agentId,
-    providerId: typeof route.providerId === "string" ? route.providerId.trim() : "",
+    providerId: typeof route.providerId === "string" ? normalizeRetiredProviderId(route.providerId.trim()) : "",
     modelId: typeof route.modelId === "string" ? route.modelId.trim() : ""
   };
 }
@@ -5418,22 +5418,26 @@ function isFixtureProvider(provider) {
   const baseUrl = typeof provider.baseUrl === "string" ? provider.baseUrl.trim().toLowerCase() : "";
   return /^provider-\d+$/i.test(id) || id === "acme" || id === "vendorx" || baseUrl.includes("example.com") || baseUrl.includes("acme.local") || baseUrl.includes("vendorx.ai");
 }
-function normalizeLegacyProviderId(providerId) {
-  if (providerId === "gemini") return "vertex";
-  if (providerId === "kimi" || providerId === "kimi-coding-plan") return "kimi-code";
-  if (providerId === "minimax") return "minimax-global";
-  if (providerId === "zai") return "glm-global";
-  return providerId;
+const RETIRED_PROVIDER_ID_IMPORTS = {
+  gemini: "vertex",
+  kimi: "kimi-code",
+  "kimi-coding-plan": "kimi-code",
+  minimax: "minimax-global",
+  zai: "glm-global"
+};
+function normalizeRetiredProviderId(providerId) {
+  return RETIRED_PROVIDER_ID_IMPORTS[providerId] ?? providerId;
 }
 function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorkspaceRoot()) {
-  const rawId = normalizeLegacyProviderId(typeof provider.id === "string" ? provider.id.trim() : "");
+  const incomingId = typeof provider.id === "string" ? provider.id.trim() : "";
+  const rawId = normalizeRetiredProviderId(incomingId);
   if (!rawId || !isBuiltinProviderId(rawId)) {
     return null;
   }
   const builtinFallback = createBuiltinProviderEntry(rawId);
   const definition = getBuiltinProviderDefinition(rawId);
-  const useBuiltinProviderMetadata = rawId === "kimi-code";
-  const secretRef = provider.secretRef || secretStorageService.createProviderSecretRef(rawId);
+  const incomingSecretRef = typeof provider.secretRef === "string" && provider.secretRef.trim() ? provider.secretRef.trim() : void 0;
+  const secretRef = incomingId && incomingId !== rawId ? secretStorageService.createProviderSecretRef(rawId) : incomingSecretRef || secretStorageService.createProviderSecretRef(rawId);
   const kind = builtinFallback.kind;
   const models = sanitizeModels(provider.models ?? []);
   const oauthSecretRef = secretStorageService.createProviderOAuthSecretRef(rawId);
@@ -5442,11 +5446,9 @@ function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorksp
   const canUseProvider = builtinFallback.authMode === "local" || builtinFallback.authMode === "environment" ? true : builtinFallback.authMode === "api-key" ? Boolean(resolvedSecret) : Boolean(resolvedSecret);
   const status = pickProviderStatus(provider, builtinFallback, canUseProvider, models);
   const enabled = status === "verified" && models.length > 0;
-  const label = useBuiltinProviderMetadata ? builtinFallback.label : typeof provider.label === "string" && provider.label.trim() ? provider.label.trim() : builtinFallback.label;
-  const recommendedModels = useBuiltinProviderMetadata ? builtinFallback.recommendedModels : dedupeStrings(
-    Array.isArray(provider.recommendedModels) ? provider.recommendedModels.filter((value) => typeof value === "string").map((value) => value.trim()) : builtinFallback.recommendedModels
-  );
-  const docsUrl = useBuiltinProviderMetadata ? builtinFallback.docsUrl : typeof provider.docsUrl === "string" && provider.docsUrl.trim() ? provider.docsUrl.trim() : builtinFallback.docsUrl;
+  const label = builtinFallback.label;
+  const recommendedModels = builtinFallback.recommendedModels;
+  const docsUrl = builtinFallback.docsUrl;
   return {
     id: rawId,
     kind,
@@ -5579,12 +5581,26 @@ class SettingsService {
         secretStorageService.deleteSecret(entry.secretRef, workspaceRoot);
         continue;
       }
-      const rawId = normalizeLegacyProviderId(typeof entry.id === "string" ? entry.id.trim() : "");
+      const incomingId = typeof entry.id === "string" ? entry.id.trim() : "";
+      const rawId = normalizeRetiredProviderId(incomingId);
       if (!rawId) {
         fixes.push("Removed provider with empty id");
         continue;
       }
-      const secretRef = entry.secretRef || secretStorageService.createProviderSecretRef(rawId);
+      if (incomingId && incomingId !== rawId) {
+        fixes.push(`Renamed retired provider id ${incomingId} to ${rawId}`);
+      }
+      const canonicalSecretRef = secretStorageService.createProviderSecretRef(rawId);
+      const incomingSecretRef = typeof entry.secretRef === "string" && entry.secretRef.trim() ? entry.secretRef.trim() : void 0;
+      const secretRef = incomingId && incomingId !== rawId ? canonicalSecretRef : incomingSecretRef || canonicalSecretRef;
+      if (incomingSecretRef && incomingSecretRef !== secretRef) {
+        const incomingSecret = secretStorageService.getSecret(incomingSecretRef, workspaceRoot);
+        if (incomingSecret.trim()) {
+          secretStorageService.setSecret(secretRef, incomingSecret, workspaceRoot);
+          secretStorageService.deleteSecret(incomingSecretRef, workspaceRoot);
+          fixes.push(`Moved retired provider secret ${incomingId} to ${rawId}`);
+        }
+      }
       if (entry.apiKey?.trim()) {
         secretStorageService.setSecret(secretRef, entry.apiKey.trim(), workspaceRoot);
         fixes.push(`Migrated plaintext secret for ${rawId}`);
@@ -5618,7 +5634,18 @@ class SettingsService {
     }
     const catalogProviders = normalizeUserProviders(nextProviders, workspaceRoot);
     const nextRoutes = normalizeUserRoutes(rawRoutes, catalogProviders);
-    const incomingRoutes = Array.isArray(rawRoutes) ? rawRoutes.map(sanitizeRoute).filter((route) => route !== null) : [];
+    const incomingRoutes = Array.isArray(rawRoutes) ? rawRoutes.map((entry) => {
+      if (entry && typeof entry === "object") {
+        const providerId = entry.providerId;
+        const incomingProviderId = typeof providerId === "string" ? providerId.trim() : "";
+        const normalizedProviderId = normalizeRetiredProviderId(incomingProviderId);
+        if (incomingProviderId && incomingProviderId !== normalizedProviderId) {
+          const agentId = entry.agentId;
+          fixes.push(`Renamed retired route provider id ${incomingProviderId} to ${normalizedProviderId}${typeof agentId === "string" ? ` for ${agentId}` : ""}`);
+        }
+      }
+      return sanitizeRoute(entry);
+    }).filter((route) => route !== null) : [];
     for (const route of incomingRoutes) {
       const normalized = nextRoutes.find((entry) => entry.agentId === route.agentId);
       if (!normalized || normalized.providerId !== route.providerId || normalized.modelId !== route.modelId) {
