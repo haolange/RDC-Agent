@@ -7,6 +7,7 @@ import type {
   AgentEventPayload,
   AgentEventType,
   AgentToolCompletedPayload,
+  AgentToolDeniedPayload,
   AgentToolRequestedPayload,
   AgentToolStartedPayload,
 } from '@shared/types/agentRuntime';
@@ -20,7 +21,27 @@ import { llmAdapter } from '../settings/LLMAdapter';
 import { providerAccountAuthService } from '../settings/ProviderAccountAuthService';
 import { settingsService } from '../settings/SettingsService';
 import { toolRegistry } from './ToolRegistry';
-import { resolveRuntimeToolAllowlist } from './AgentRuntimeToolPolicy';
+import { isRuntimeToolAllowed, resolveRuntimeToolAllowlist } from './AgentRuntimeToolPolicy';
+import { modelProviderRegistry } from './ModelProviderRegistry';
+
+export interface AgentRuntimeAskUserRequest {
+  approvalId: string;
+  question: string;
+  options?: string[];
+  toolCallId: string;
+  runId: string;
+  turnId?: string;
+  sessionId?: string | null;
+}
+
+export interface AgentRuntimeToolApprovalRequest {
+  approvalId: string;
+  toolCall: ToolCall;
+  toolName: string;
+  runId: string;
+  turnId?: string;
+  sessionId?: string | null;
+}
 
 export interface AgentRuntimeRunRequest {
   agentId: AgentRole;
@@ -31,6 +52,8 @@ export interface AgentRuntimeRunRequest {
   modelId: string;
   maxTokens?: number;
   temperature?: number;
+  maxTurns?: number;
+  maxToolIterations?: number;
   toolAllowlist?: string[];
   patternId?: string;
   stage?: WorkflowStage | 'cowork' | 'report';
@@ -39,6 +62,8 @@ export interface AgentRuntimeRunRequest {
   sessionId?: string | null;
   turnId?: string;
   signal?: AbortSignal;
+  askUser?: (request: AgentRuntimeAskUserRequest) => Promise<{ answer?: unknown; cancelled?: boolean }>;
+  approveTool?: (request: AgentRuntimeToolApprovalRequest) => Promise<{ approved: boolean; reason?: string }>;
   onEvent?: (event: AgentEvent) => void;
 }
 
@@ -118,50 +143,76 @@ export class AgentRuntime {
         { role: 'system', content: request.systemPrompt },
         { role: 'user', content: request.prompt },
       ];
+      const maxToolIterations = clampPositiveInt(request.maxToolIterations ?? request.maxTurns ?? 8, 1, 32);
+      let toolIteration = 0;
 
-      finalResponse = await llmAdapter.streamChat(
-        {
-          messages,
-          model: request.modelId,
-          maxTokens: request.maxTokens,
-          temperature: request.temperature,
-          tools,
-          signal: request.signal,
-        },
-        (event) => {
-          if (event.type === 'text-delta') {
-            streamedText += event.text;
-            emit('assistant.delta', { text: event.text });
-          }
-          if (event.type === 'tool-call-delta') {
-            const toolCall: ToolCall = {
-              id: event.toolCall.id,
-              name: nameMap.get(event.toolCall.name ?? '') ?? event.toolCall.name ?? '',
-              arguments: event.toolCall.argumentsText ? { raw: event.toolCall.argumentsText } : {},
-            };
-            emit('tool.requested', { toolCall, streamEvent: event } as AgentToolRequestedPayload);
-          }
-        },
-        request.providerId,
-      );
+      for (;;) {
+        let turnText = '';
+        finalResponse = await modelProviderRegistry.streamTurn({
+          providerId: request.providerId,
+          modelId: request.modelId,
+          request: {
+            messages,
+            model: request.modelId,
+            maxTokens: request.maxTokens,
+            temperature: request.temperature,
+            tools,
+            signal: request.signal,
+          },
+          onStreamEvent: (event) => {
+            if (event.type === 'text-delta') {
+              streamedText += event.text;
+              turnText += event.text;
+              emit('assistant.delta', { text: event.text });
+            }
+            if (event.type === 'tool-call-delta') {
+              const toolCall: ToolCall = {
+                id: event.toolCall.id,
+                name: nameMap.get(event.toolCall.name ?? '') ?? event.toolCall.name ?? '',
+                arguments: event.toolCall.argumentsText ? { raw: event.toolCall.argumentsText } : {},
+              };
+              emit('tool.requested', { toolCall, streamEvent: event } as AgentToolRequestedPayload);
+            }
+          },
+        });
 
-      if (!streamedText && typeof finalResponse.content === 'string') {
-        streamedText = finalResponse.content;
-      }
+        if (!turnText && typeof finalResponse.content === 'string' && finalResponse.content) {
+          turnText = finalResponse.content;
+          streamedText = [streamedText, turnText].filter(Boolean).join(streamedText ? '\n' : '');
+        }
 
-      if (finalResponse.toolCalls?.length) {
+        const toolCalls = finalResponse.toolCalls ?? [];
+        if (toolCalls.length === 0) {
+          break;
+        }
+        if (toolIteration >= maxToolIterations) {
+          emit('diagnostic', {
+            code: 'AGENT_RUNTIME_MAX_TOOL_ITERATIONS',
+            severity: 'warning',
+            message: `Stopped tool loop after ${maxToolIterations} iterations.`,
+          });
+          break;
+        }
+
+        messages.push({
+          role: 'assistant',
+          content: turnText || 'I requested tool results.',
+        });
+
         const toolSummary = await this.executeToolCalls({
           request,
+          runId,
           allowlist,
           nameMap,
-          toolCalls: finalResponse.toolCalls,
+          toolCalls,
           emit,
         });
         toolResults.push(...toolSummary.toolResults);
-        if (toolSummary.summaryPrompt) {
-          const followUpText = await this.summarizeToolResults(request, messages, streamedText, toolSummary.summaryPrompt, emit);
-          streamedText = [streamedText, followUpText].filter(Boolean).join('\n');
-        }
+        messages.push({
+          role: 'user',
+          content: `Tool observations:\n${toolSummary.summaryPrompt}\n\nContinue the same agent turn. Do not expose raw chain-of-thought.`,
+        });
+        toolIteration += 1;
       }
 
       emit('assistant.completed', {
@@ -200,6 +251,7 @@ export class AgentRuntime {
 
   private async executeToolCalls(input: {
     request: AgentRuntimeRunRequest;
+    runId: string;
     allowlist: string[];
     nameMap: Map<string, string>;
     toolCalls: ToolCall[];
@@ -212,6 +264,69 @@ export class AgentRuntime {
     const summaries: string[] = [];
     for (const toolCall of input.toolCalls) {
       const originalToolName = input.nameMap.get(toolCall.name) ?? toolCall.name;
+      input.emit('tool.requested', {
+        toolCall: {
+          ...toolCall,
+          name: originalToolName,
+        },
+      } as AgentToolRequestedPayload);
+      if (!isRuntimeToolAllowed(originalToolName, input.request.agentId, input.allowlist)) {
+        const result = createToolErrorResult(
+          'AGENT_RUNTIME_TOOL_DENIED',
+          `Tool ${originalToolName} is not allowed for ${input.request.agentId}.`,
+          'policy',
+        );
+        toolResults.push({ toolName: originalToolName, result });
+        input.emit('tool.denied', {
+          toolCallId: toolCall.id,
+          toolName: originalToolName,
+          reason: result.error?.message ?? 'Tool denied by runtime policy.',
+          result,
+        } as AgentToolDeniedPayload);
+        summaries.push(formatToolObservation(originalToolName, result));
+        continue;
+      }
+      if (isMalformedToolArguments(toolCall.arguments)) {
+        const result = createToolErrorResult(
+          'AGENT_RUNTIME_TOOL_ARGS_MALFORMED',
+          `Tool ${originalToolName} arguments were not valid JSON object arguments.`,
+          'schema',
+        );
+        toolResults.push({ toolName: originalToolName, result });
+        input.emit('tool.denied', {
+          toolCallId: toolCall.id,
+          toolName: originalToolName,
+          reason: result.error?.message ?? 'Malformed tool arguments.',
+          result,
+        } as AgentToolDeniedPayload);
+        summaries.push(formatToolObservation(originalToolName, result));
+        continue;
+      }
+      if (requiresExplicitToolApproval(originalToolName)) {
+        const approvalResult = await this.requireToolApproval(input, toolCall, originalToolName);
+        if (approvalResult) {
+          toolResults.push({ toolName: originalToolName, result: approvalResult });
+          input.emit('tool.denied', {
+            toolCallId: toolCall.id,
+            toolName: originalToolName,
+            reason: approvalResult.error?.message ?? 'Tool approval was rejected.',
+            result: approvalResult,
+          } as AgentToolDeniedPayload);
+          summaries.push(formatToolObservation(originalToolName, approvalResult));
+          continue;
+        }
+      }
+      if (originalToolName === 'primitive.askUser') {
+        const result = await this.handleAskUserTool(input, toolCall, originalToolName);
+        toolResults.push({ toolName: originalToolName, result });
+        input.emit('tool.completed', {
+          toolCallId: toolCall.id,
+          toolName: originalToolName,
+          result,
+        } as AgentToolCompletedPayload);
+        summaries.push(formatToolObservation(originalToolName, result));
+        continue;
+      }
       input.emit('tool.started', {
         toolCallId: toolCall.id,
         toolName: originalToolName,
@@ -224,7 +339,7 @@ export class AgentRuntime {
         allowlist: input.allowlist,
         sessionId: input.request.sessionId,
         turnId: input.request.turnId,
-        runId: input.request.runId,
+        runId: input.runId,
         signal: input.request.signal,
       });
       toolResults.push({ toolName: originalToolName, result });
@@ -233,7 +348,15 @@ export class AgentRuntime {
         toolName: originalToolName,
         result,
       } as AgentToolCompletedPayload);
-      summaries.push(`${originalToolName}: ${JSON.stringify(result).slice(0, 4000)}`);
+      if (!result.ok && result.error?.code === 'AGENT_RUNTIME_TOOL_DENIED') {
+        input.emit('tool.denied', {
+          toolCallId: toolCall.id,
+          toolName: originalToolName,
+          reason: result.error.message,
+          result,
+        } as AgentToolDeniedPayload);
+      }
+      summaries.push(formatToolObservation(originalToolName, result));
     }
     return {
       toolResults,
@@ -241,44 +364,129 @@ export class AgentRuntime {
     };
   }
 
-  private async summarizeToolResults(
-    request: AgentRuntimeRunRequest,
-    messages: LLMMessage[],
-    previousText: string,
-    summaryPrompt: string,
-    emit: (type: AgentEventType, payload: AgentEventPayload) => AgentEvent,
-  ): Promise<string> {
-    let text = '';
-    const response = await llmAdapter.streamChat(
-      {
-        messages: [
-          ...messages,
-          {
-            role: 'assistant',
-            content: previousText || 'I requested tool results.',
-          },
-          {
-            role: 'user',
-            content: `Tool results:\n${summaryPrompt}\n\nUse these results to continue. Do not expose raw chain-of-thought.`,
-          },
-        ],
-        model: request.modelId,
-        maxTokens: request.maxTokens,
-        temperature: request.temperature,
-        signal: request.signal,
-      },
-      (event) => {
-        if (event.type === 'text-delta') {
-          text += event.text;
-          emit('assistant.delta', { text: event.text });
-        }
-      },
-      request.providerId,
-    );
-    if (!text && typeof response.content === 'string') {
-      text = response.content;
+  private async handleAskUserTool(
+    input: {
+      request: AgentRuntimeRunRequest;
+      runId: string;
+      emit: (type: AgentEventType, payload: AgentEventPayload) => AgentEvent;
+    },
+    toolCall: ToolCall,
+    originalToolName: string,
+  ): Promise<ToolCallResult> {
+    const approvalId = generateEventId('ask-user');
+    const question = String(toolCall.arguments.question ?? '').trim() || 'The agent needs clarification.';
+    const options = Array.isArray(toolCall.arguments.options)
+      ? toolCall.arguments.options.filter((option): option is string => typeof option === 'string')
+      : undefined;
+
+    input.emit('approval.requested', {
+      approvalId,
+      title: 'Ask user',
+      status: 'pending',
+      kind: 'ask_user',
+      toolCallId: toolCall.id,
+      toolName: originalToolName,
+      question,
+      options,
+    });
+
+    if (!input.request.askUser) {
+      return createToolErrorResult(
+        'ASK_USER_RESUME_HANDLER_MISSING',
+        'Ask-user request was emitted, but no runtime resume handler is attached for this turn.',
+        'approval',
+      );
     }
-    return text;
+
+    const answer = await input.request.askUser({
+      approvalId,
+      question,
+      options,
+      toolCallId: toolCall.id,
+      runId: input.runId,
+      turnId: input.request.turnId,
+      sessionId: input.request.sessionId,
+    });
+    input.emit('approval.answered', {
+      approvalId,
+      title: 'Ask user',
+      status: answer.cancelled ? 'cancelled' : 'approved',
+      kind: 'ask_user',
+      toolCallId: toolCall.id,
+      toolName: originalToolName,
+      question,
+      options,
+      answer: answer.answer,
+    });
+
+    if (answer.cancelled) {
+      return createToolErrorResult('ASK_USER_CANCELLED', 'Ask-user request was cancelled.', 'approval');
+    }
+    return {
+      ok: true,
+      data: {
+        question,
+        answer: answer.answer,
+      },
+      artifacts: [],
+      duration_ms: 0,
+      trace_id: generateEventId('tool'),
+    };
+  }
+
+  private async requireToolApproval(
+    input: {
+      request: AgentRuntimeRunRequest;
+      runId: string;
+      emit: (type: AgentEventType, payload: AgentEventPayload) => AgentEvent;
+    },
+    toolCall: ToolCall,
+    originalToolName: string,
+  ): Promise<ToolCallResult | null> {
+    const approvalId = generateEventId('tool-approval');
+    input.emit('approval.requested', {
+      approvalId,
+      title: `Approve ${originalToolName}`,
+      status: 'pending',
+      kind: 'tool',
+      toolCallId: toolCall.id,
+      toolName: originalToolName,
+      reason: 'Mutation primitive tools require explicit runtime approval.',
+    });
+
+    if (!input.request.approveTool) {
+      return createToolErrorResult(
+        'TOOL_APPROVAL_HANDLER_MISSING',
+        `Tool ${originalToolName} requires explicit approval, but no approval handler is attached for this turn.`,
+        'approval',
+      );
+    }
+
+    const answer = await input.request.approveTool({
+      approvalId,
+      toolCall,
+      toolName: originalToolName,
+      runId: input.runId,
+      turnId: input.request.turnId,
+      sessionId: input.request.sessionId,
+    });
+    input.emit('approval.answered', {
+      approvalId,
+      title: `Approve ${originalToolName}`,
+      status: answer.approved ? 'approved' : 'rejected',
+      kind: 'tool',
+      toolCallId: toolCall.id,
+      toolName: originalToolName,
+      reason: answer.reason,
+    });
+
+    return answer.approved
+      ? null
+      : createToolErrorResult(
+        'TOOL_APPROVAL_REJECTED',
+        answer.reason || `Tool ${originalToolName} was rejected by runtime approval policy.`,
+        'approval',
+      );
   }
 
   private async refreshAccountRuntimeCredentials(providerId: string): Promise<void> {
@@ -332,6 +540,52 @@ export class AgentRuntime {
     const intent = /start|execute|debug|analy[sz]e/.test(lower) ? 'execute' : 'talk';
     return `${stub}\n<control>{"intent":"${intent}","safe_to_start":${intent === 'execute' ? 'true' : 'false'}}</control>`;
   }
+}
+
+function clampPositiveInt(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, Math.floor(value)));
+}
+
+function isMalformedToolArguments(args: Record<string, unknown>): boolean {
+  return typeof args.raw === 'string' && args.raw.trim().length > 0;
+}
+
+function requiresExplicitToolApproval(toolName: string): boolean {
+  return toolName === 'primitive.bash'
+    || toolName === 'primitive.write'
+    || toolName === 'primitive.edit'
+    || toolName === 'primitive.remove';
+}
+
+function createToolErrorResult(code: string, message: string, category: string): ToolCallResult {
+  return {
+    ok: false,
+    data: {},
+    artifacts: [],
+    error: {
+      code,
+      message,
+      category,
+    },
+    duration_ms: 0,
+    trace_id: generateEventId('tool'),
+  };
+}
+
+function formatToolObservation(toolName: string, result: ToolCallResult): string {
+  return `${toolName}: ${redactSecrets(JSON.stringify(result)).slice(0, 4000)}`;
+}
+
+function redactSecrets(text: string): string {
+  return text
+    .replace(/(sk-[A-Za-z0-9_-]{12,})/g, '[REDACTED_SECRET]')
+    .replace(/(sk-ant-[A-Za-z0-9_-]{12,})/g, '[REDACTED_SECRET]')
+    .replace(/(gh[pousr]_[A-Za-z0-9_]{12,})/g, '[REDACTED_SECRET]')
+    .replace(/(Bearer\s+)[A-Za-z0-9._-]{12,}/gi, '$1[REDACTED_SECRET]')
+    .replace(/("(?:apiKey|accessToken|refreshToken|copilotToken|idToken|secret)"\s*:\s*")([^"]+)(")/gi, '$1[REDACTED_SECRET]$3');
 }
 
 function splitForStreaming(text: string): string[] {

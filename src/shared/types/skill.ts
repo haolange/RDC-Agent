@@ -19,7 +19,7 @@ export interface SkillDefinition {
   version: string;
   parameters: SkillParameter[];
   /** 来源：内置 / 插件 */
-  source: 'builtin' | 'plugin';
+  source: 'builtin' | 'plugin' | 'workspace';
   /** Skill 文件路径（plugin 类型时） */
   filePath?: string;
   /** 标签 */

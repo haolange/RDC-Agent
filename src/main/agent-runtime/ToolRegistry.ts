@@ -8,6 +8,7 @@ import { appPathService } from '../runtime/AppPathService';
 import { toolBridge } from '../tools/ToolBridge';
 import { skillRegistry } from '../skills/SkillRegistry';
 import { mcpClient } from '../mcp/MCPClientInstance';
+import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService';
 import { isRuntimeToolAllowed } from './AgentRuntimeToolPolicy';
 
 export interface RuntimeToolDefinition {
@@ -84,7 +85,12 @@ export class ToolRegistry {
         path: { type: 'string', description: 'Target path.' },
         content: { type: 'string', description: 'File content.' },
       }, ['path', 'content'], false),
-      primitiveTool('primitive.edit', 'Edit a file. Disabled for Ask.', {}, [], false),
+      primitiveTool('primitive.edit', 'Edit a file by replacing text. Disabled for Ask.', {
+        path: { type: 'string', description: 'Target path.' },
+        search: { type: 'string', description: 'Exact text to replace.' },
+        replace: { type: 'string', description: 'Replacement text.' },
+        replaceAll: { type: 'boolean', description: 'Replace all occurrences instead of the first occurrence.' },
+      }, ['path', 'search', 'replace'], false),
       primitiveTool('primitive.remove', 'Remove a file. Disabled for Ask.', {
         path: { type: 'string', description: 'Target path.' },
       }, ['path'], false),
@@ -112,6 +118,7 @@ export class ToolRegistry {
       readOnly: !tool.name.includes('edit') && !tool.name.includes('write') && !tool.name.includes('remove'),
     }));
 
+    skillRegistry.loadDescriptors(agentRuntimeConfigService.listSkills());
     const skillTools: RuntimeToolDefinition[] = skillRegistry.list().map((skill) => ({
       name: `skill.${skill.name}`,
       modelName: toModelToolName(`skill.${skill.name}`),
@@ -234,6 +241,41 @@ export class ToolRegistry {
       }
       if (request.originalToolName === 'primitive.task.list') {
         return okResult({ tasks: [] }, start);
+      }
+      if (request.originalToolName === 'primitive.bash') {
+        return errorResult('BASH_REQUIRES_APPROVAL_EXECUTOR', 'Bash requires an explicit approval/sandbox executor and is disabled by default.', 'approval', start);
+      }
+      if (request.originalToolName === 'primitive.write') {
+        const target = resolveWorkspacePath(workspaceRoot, String(args.path ?? ''));
+        const content = String(args.content ?? '');
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, content, 'utf8');
+        return okResult({ path: target, bytes: Buffer.byteLength(content, 'utf8') }, start);
+      }
+      if (request.originalToolName === 'primitive.edit') {
+        const target = resolveWorkspacePath(workspaceRoot, String(args.path ?? ''));
+        const search = String(args.search ?? '');
+        const replace = String(args.replace ?? '');
+        if (!search) {
+          return errorResult('EDIT_SEARCH_REQUIRED', 'Edit requires a non-empty search string.', 'schema', start);
+        }
+        const before = fs.readFileSync(target, 'utf8');
+        if (!before.includes(search)) {
+          return errorResult('EDIT_SEARCH_NOT_FOUND', 'Edit search string was not found.', 'execution', start);
+        }
+        const after = args.replaceAll === true
+          ? before.split(search).join(replace)
+          : before.replace(search, replace);
+        fs.writeFileSync(target, after, 'utf8');
+        return okResult({ path: target, changed: before !== after }, start);
+      }
+      if (request.originalToolName === 'primitive.remove') {
+        const target = resolveWorkspacePath(workspaceRoot, String(args.path ?? ''));
+        if (fs.existsSync(target) && fs.statSync(target).isDirectory()) {
+          return errorResult('REMOVE_DIRECTORY_NOT_SUPPORTED', 'Primitive remove only deletes workspace files, not directories.', 'policy', start);
+        }
+        fs.rmSync(target, { force: true });
+        return okResult({ path: target, removed: true }, start);
       }
       return errorResult('PRIMITIVE_TOOL_NOT_IMPLEMENTED', `Primitive tool is not implemented: ${request.originalToolName}`, 'implementation', start);
     } catch (error) {

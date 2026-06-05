@@ -38,6 +38,7 @@ Agent Workstream 的正式文档入口：
 
 ## Agent Runtime 收敛
 
+- 2026-06-05 runtime kernel baseline：`AgentRuntime` 负责 multi-turn loop、tool mediation events、deterministic policy、ask-user approval events、provider routing 与 trace redaction；`ModelProviderRegistry` 统一 API key / account / local provider capability，包括可 mock 验证的 Grok / Gemini / Qwen account adapters；Debugger multi-agent 执行保持串行，由 `MultiAgentWorkflowEngine` 与 deterministic specialist executor 投影 task graph；OpenAI / Claude SDK backend 只能作为 optional provider runner，不能绕过 `ToolBridge`、runtime policy 或 workflow final status ownership。
 - 本库的 Agent 执行权威是自有 `AgentRuntime`。Provider SDK、官方 Agent SDK 或 HTTP provider adapter 只能提供模型流、工具请求和 provider 能力适配，不能决定 mode、stage、approval、tool policy 或 final status。
 - Agent Runtime 的跨层事实事件是 `AgentEvent`：覆盖 assistant delta/completed、tool requested/started/completed、task/subagent、approval、diagnostic、run completed/failed/cancelled。renderer 只消费该事件投影和 conversation message projection，不展示原始 chain-of-thought。
 - `Ask` 是只读 agentic work：默认允许 `primitive.read/glob/grep/webFetch/webSearch/askUser/task.list`，禁止 `bash/write/edit/remove`。若模型请求禁用工具，runtime 必须返回 policy denial，而不是静默执行。

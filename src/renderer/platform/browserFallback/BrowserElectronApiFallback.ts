@@ -575,11 +575,16 @@ class BrowserElectronApiFallback {
         state: providerId === 'github-copilot' ? 'pending' : 'pending',
         available: true,
         connected: false,
-        message: 'Browser preview authorization flow started.',
+        message: providerId === 'grok-account' || providerId === 'gemini-account' || providerId === 'qwen-account'
+          ? 'Browser preview mockable account authorization flow started.'
+          : 'Browser preview authorization flow started.',
         authUrl: providerId === 'github-copilot' ? undefined : 'https://example.com/oauth',
         verificationUri: providerId === 'github-copilot' ? 'https://github.com/login/device' : undefined,
         userCode: providerId === 'github-copilot' ? 'ABCD-1234' : undefined,
-        requiresCodeInput: providerId === 'claude-account',
+        requiresCodeInput: providerId === 'claude-account'
+          || providerId === 'grok-account'
+          || providerId === 'gemini-account'
+          || providerId === 'qwen-account',
       }),
       getProviderAccountStatus: async (providerId) => ({
         providerId,

@@ -270,6 +270,24 @@ function resolveAccountRuntimeCredential(providerId: string, workspaceRoot: stri
         accountId: bundle.accountId,
       };
     }
+    if (providerId === 'grok-account') {
+      return {
+        apiKey: bundle.accessToken ?? bundle.apiKey ?? '',
+        baseUrl: 'https://api.x.ai/v1',
+      };
+    }
+    if (providerId === 'gemini-account') {
+      return {
+        apiKey: bundle.accessToken ?? bundle.apiKey ?? '',
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+      };
+    }
+    if (providerId === 'qwen-account') {
+      return {
+        apiKey: bundle.accessToken ?? bundle.apiKey ?? '',
+        baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      };
+    }
     return {
       apiKey: bundle.accessToken ?? '',
       baseUrl: 'https://api.anthropic.com/v1',

@@ -17,7 +17,13 @@ const CHATGPT_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const CLAUDE_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
 const GITHUB_COPILOT_CLIENT_ID = 'Iv1.b507a08c87ecfe98';
 
-type AccountProviderId = 'claude-account' | 'chatgpt-account' | 'github-copilot';
+type AccountProviderId =
+  | 'claude-account'
+  | 'chatgpt-account'
+  | 'github-copilot'
+  | 'grok-account'
+  | 'gemini-account'
+  | 'qwen-account';
 
 interface OAuthFlowState {
   providerId: AccountProviderId;
@@ -51,7 +57,15 @@ interface OAuthSecretBundle {
 const pendingFlows = new Map<string, OAuthFlowState>();
 
 const isAccountProviderId = (providerId: LlmProviderId): providerId is AccountProviderId =>
-  providerId === 'claude-account' || providerId === 'chatgpt-account' || providerId === 'github-copilot';
+  providerId === 'claude-account'
+  || providerId === 'chatgpt-account'
+  || providerId === 'github-copilot'
+  || providerId === 'grok-account'
+  || providerId === 'gemini-account'
+  || providerId === 'qwen-account';
+
+const isMockableAccountProviderId = (providerId: AccountProviderId): boolean =>
+  providerId === 'grok-account' || providerId === 'gemini-account' || providerId === 'qwen-account';
 
 const isTestMode = (): boolean => process.env.RDC_AGENT_TEST_MODE === '1';
 
@@ -268,6 +282,9 @@ export class ProviderAccountAuthService {
     if (providerId === 'chatgpt-account') {
       return this.startChatGptLogin();
     }
+    if (isMockableAccountProviderId(providerId)) {
+      return this.startMockableAccountLogin(providerId);
+    }
     return this.startGitHubCopilotLogin();
   }
 
@@ -287,6 +304,10 @@ export class ProviderAccountAuthService {
       }
       if (request.providerId === 'chatgpt-account') {
         const bundle = await this.exchangeChatGptCode(flow, request.code?.trim() ?? '');
+        return await this.persistAccount(request.providerId, bundle);
+      }
+      if (isMockableAccountProviderId(request.providerId)) {
+        const bundle = this.exchangeMockableAccountCode(flow, request.code?.trim() ?? '');
         return await this.persistAccount(request.providerId, bundle);
       }
       const bundle = await this.pollGitHubDevice(flow);
@@ -368,7 +389,9 @@ export class ProviderAccountAuthService {
       ?? (flow?.error ? 'failed' : flow ? 'pending' : connected ? 'connected' : isAccount ? 'signed-out' : 'unavailable');
     const pendingMessage = providerId === 'github-copilot'
       ? 'Waiting for GitHub authorization.'
-      : 'Waiting for authorization.';
+      : isAccount && flow && isMockableAccountProviderId(providerId)
+        ? 'Waiting for mockable account authorization.'
+        : 'Waiting for authorization.';
     return {
       providerId,
       state,
@@ -382,7 +405,7 @@ export class ProviderAccountAuthService {
       authUrl: flow?.authUrl,
       verificationUri: flow?.verificationUri,
       userCode: flow?.userCode,
-      requiresCodeInput: Boolean(flow?.providerId === 'claude-account'),
+      requiresCodeInput: Boolean(flow?.providerId === 'claude-account' || (flow && isMockableAccountProviderId(flow.providerId))),
       models: provider?.models ?? [],
     };
   }
@@ -485,6 +508,25 @@ export class ProviderAccountAuthService {
         flow.error = parseProviderError(error);
       });
     return this.status(flow.providerId);
+  }
+
+  private startMockableAccountLogin(providerId: AccountProviderId): LlmProviderAccountStatus {
+    const definition = getBuiltinProviderDefinition(providerId);
+    const flow: OAuthFlowState = {
+      providerId,
+      flowId: randomUUID(),
+      state: randomUUID(),
+      authUrl: definition?.docsUrl,
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    };
+    this.setFlow(flow);
+    void this.openExternal(flow.authUrl);
+    return this.status(
+      flow.providerId,
+      isTestMode()
+        ? 'Mockable account authorization flow started.'
+        : 'Live account OAuth is not yet configured for this provider; mock verification is available in test mode.',
+    );
   }
 
   private async exchangeClaudeCode(flow: OAuthFlowState, code: string): Promise<OAuthSecretBundle> {
@@ -614,6 +656,27 @@ export class ProviderAccountAuthService {
     }
   }
 
+  private exchangeMockableAccountCode(flow: OAuthFlowState, code: string): OAuthSecretBundle {
+    if (!isMockableAccountProviderId(flow.providerId)) {
+      throw new Error('Provider is not a mockable account adapter.');
+    }
+    if (!isTestMode()) {
+      const definition = getBuiltinProviderDefinition(flow.providerId);
+      throw new Error(definition?.unavailableReason ?? 'Live account OAuth is not configured for this provider.');
+    }
+    if (!code) {
+      throw new Error('Authorization code is required.');
+    }
+    return {
+      providerId: flow.providerId,
+      accessToken: `mock-${flow.providerId}-${flow.state}`,
+      apiKey: `mock-${flow.providerId}-${flow.state}`,
+      expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+      accountLabel: getBuiltinProviderDefinition(flow.providerId)?.label ?? flow.providerId,
+      planLabel: 'Mock account',
+    };
+  }
+
   private async persistAccount(providerId: AccountProviderId, bundle: OAuthSecretBundle): Promise<LlmProviderAccountStatus> {
     const models = await this.discoverModels(bundle);
     if (models.length === 0) {
@@ -660,6 +723,10 @@ export class ProviderAccountAuthService {
         copilotApiBaseUrl: copilot.endpoints?.api ?? bundle.copilotApiBaseUrl ?? 'https://api.githubcopilot.com',
         expiresAt: copilot.expires_at ? new Date(copilot.expires_at * 1000).toISOString() : bundle.expiresAt,
       };
+    }
+
+    if (isMockableAccountProviderId(bundle.providerId)) {
+      return bundle;
     }
 
     if (!bundle.refreshToken) {
@@ -717,7 +784,11 @@ export class ProviderAccountAuthService {
   }
 
   private async discoverModels(bundle: OAuthSecretBundle): Promise<LlmProviderModel[]> {
-    if (bundle.providerId === 'chatgpt-account' || bundle.providerId === 'claude-account') {
+    if (
+      bundle.providerId === 'chatgpt-account'
+      || bundle.providerId === 'claude-account'
+      || isMockableAccountProviderId(bundle.providerId)
+    ) {
       return createAccountCatalogModels(bundle.providerId);
     }
     if (bundle.providerId === 'github-copilot') {

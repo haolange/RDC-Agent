@@ -58,6 +58,21 @@ export const GITHUB_COPILOT_ACCOUNT_MODELS = [
   'claude-sonnet-4-5',
   'gpt-4.1',
 ];
+export const GROK_ACCOUNT_MODELS = [
+  'grok-4.3',
+  'grok-4',
+  'grok-code-fast-1',
+];
+export const GEMINI_ACCOUNT_MODELS = [
+  'gemini-2.5-pro',
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+];
+export const QWEN_ACCOUNT_MODELS = [
+  'qwen-plus',
+  'qwen-max',
+  'qwen3-coder-plus',
+];
 const OPENAI_CODE_MODELS = ['gpt-5.2', 'gpt-4.1', 'gpt-5-mini'];
 
 export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
@@ -194,6 +209,45 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     recommendedModels: GITHUB_COPILOT_ACCOUNT_MODELS,
     docsUrl: 'https://github.com/features/copilot',
     accountLoginConfigured: true,
+  },
+  {
+    id: 'grok-account',
+    kind: 'openai-compatible',
+    authMode: 'account',
+    catalogGroup: 'account',
+    modelDiscovery: 'account-catalog',
+    label: 'Grok Account',
+    baseUrl: 'https://api.x.ai/v1',
+    recommendedModels: GROK_ACCOUNT_MODELS,
+    docsUrl: 'https://grok.com/',
+    accountLoginConfigured: true,
+    unavailableReason: 'Live Grok account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured.',
+  },
+  {
+    id: 'gemini-account',
+    kind: 'google-ai-studio',
+    authMode: 'account',
+    catalogGroup: 'account',
+    modelDiscovery: 'account-catalog',
+    label: 'Gemini Account',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    recommendedModels: GEMINI_ACCOUNT_MODELS,
+    docsUrl: 'https://gemini.google.com/',
+    accountLoginConfigured: true,
+    unavailableReason: 'Live Gemini account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured.',
+  },
+  {
+    id: 'qwen-account',
+    kind: 'openai-compatible',
+    authMode: 'account',
+    catalogGroup: 'account',
+    modelDiscovery: 'account-catalog',
+    label: 'Qwen Account',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    recommendedModels: QWEN_ACCOUNT_MODELS,
+    docsUrl: 'https://chat.qwen.ai/',
+    accountLoginConfigured: true,
+    unavailableReason: 'Live Qwen account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured.',
   },
   {
     id: 'google-ai-studio',

@@ -2,7 +2,8 @@
  * Skill 注册表
  * 管理内置和插件 skill 的注册、查询和生命周期
  */
-import type { SkillDefinition } from '../../shared/types/skill';
+import type { AgentRuntimeSkillDescriptor } from '@shared/types/agentRuntime';
+import type { SkillDefinition, SkillParameter } from '../../shared/types/skill';
 
 /** Skill 执行函数类型 */
 export type SkillExecuteFn = (
@@ -27,6 +28,42 @@ export class SkillRegistry {
     this.skills.set(definition.name, { definition, execute });
   }
 
+  loadDescriptors(descriptors: AgentRuntimeSkillDescriptor[]): void {
+    for (const descriptor of descriptors) {
+      if (this.skills.has(descriptor.name)) {
+        continue;
+      }
+      this.skills.set(descriptor.name, {
+        definition: {
+          name: descriptor.name,
+          displayName: descriptor.label,
+          description: descriptor.description,
+          version: '1.0.0',
+          parameters: descriptorToParameters(descriptor),
+          source: descriptor.source,
+          filePath: descriptor.path,
+          tags: ['agent-runtime', descriptor.source],
+        },
+        execute: async () => ({
+          success: true,
+          output: JSON.stringify({
+            id: descriptor.id,
+            name: descriptor.name,
+            label: descriptor.label,
+            description: descriptor.description,
+            source: descriptor.source,
+            path: descriptor.path,
+            parameters: descriptor.parameters ?? {},
+          }),
+          artifacts: descriptor.path
+            ? [{ type: 'skill-descriptor', path: descriptor.path, description: descriptor.description }]
+            : [],
+          duration_ms: 0,
+        }),
+      });
+    }
+  }
+
   /** 注销 skill */
   unregister(name: string): boolean {
     return this.skills.delete(name);
@@ -48,7 +85,7 @@ export class SkillRegistry {
   }
 
   /** 按来源过滤 */
-  listBySource(source: 'builtin' | 'plugin'): SkillDefinition[] {
+  listBySource(source: SkillDefinition['source']): SkillDefinition[] {
     return this.list().filter(s => s.source === source);
   }
 
@@ -69,4 +106,25 @@ export class SkillRegistry {
 }
 
 /** 单例 */
+function descriptorToParameters(descriptor: AgentRuntimeSkillDescriptor): SkillParameter[] {
+  const parameters = descriptor.parameters && typeof descriptor.parameters === 'object'
+    ? descriptor.parameters
+    : {};
+  return Object.entries(parameters).map(([name, value]) => {
+    const record = value && typeof value === 'object' && !Array.isArray(value)
+      ? value as { type?: unknown; description?: unknown; required?: unknown; default?: unknown }
+      : {};
+    const type = typeof record.type === 'string' && ['string', 'number', 'boolean', 'object', 'array'].includes(record.type)
+      ? record.type as SkillParameter['type']
+      : 'string';
+    return {
+      name,
+      type,
+      description: typeof record.description === 'string' ? record.description : name,
+      required: record.required === true,
+      default: record.default,
+    };
+  });
+}
+
 export const skillRegistry = new SkillRegistry();

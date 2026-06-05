@@ -38,7 +38,7 @@ import { intakeContextResolver } from './IntakeContextResolver';
 import { buildDebugPlanPresentation, planBuilder } from './PlanBuilder';
 import { runExecutionService } from './RunExecutionService';
 import { rdxSessionService } from '../../index';
-import { specialistRecipeRunner, type SpecialistRecipeResult } from './SpecialistRecipeRunner';
+import { deterministicSpecialistExecutor, type SpecialistRecipeResult } from './DeterministicSpecialistExecutor';
 import { toolBridge } from '../../tools/ToolBridge';
 import { harnessController } from './HarnessController';
 import { reportBundleService } from '../../reports/ReportBundleService';
@@ -47,6 +47,7 @@ import { artifactStore } from '../../reports/ArtifactStore';
 import { contextService } from '../../captures/ContextService';
 import { evidenceLedger } from '../../reports/EvidenceLedger';
 import { taskBoard } from './TaskBoard';
+import { multiAgentWorkflowEngine } from './MultiAgentWorkflowEngine';
 import { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
 import { agentWorkstreamProjector } from './AgentWorkstreamProjector';
 import { workstreamStateStore } from './WorkstreamStateStore';
@@ -1014,6 +1015,12 @@ export class DebugWorkflowService {
     for (const task of tasks) {
       taskBoard.upsertTask(input.sessionId, input.runId, task);
     }
+    const taskGraph = multiAgentWorkflowEngine.createDebuggerGraph({
+      runId: input.runId,
+      sessionId: input.sessionId,
+      tasks,
+    });
+    multiAgentWorkflowEngine.assertSerialExecution(taskGraph);
 
     const planContract: PlanContract = {
       schemaVersion: '1',
@@ -1090,6 +1097,7 @@ export class DebugWorkflowService {
         targetCapture: input.debugPlan.targetCapture,
         targetFrameOrEvent: input.debugPlan.targetFrameOrEvent,
         deliverables: input.debugPlan.expectedDeliverables,
+        taskGraph,
       }),
       refs: planContract.verificationContract.targetRefs,
       taskIds: tasks.map((task) => task.taskId),
@@ -1236,6 +1244,9 @@ export class DebugWorkflowService {
       requiresUserApproval: false,
       createdAt: nowIso(),
     });
+    multiAgentWorkflowEngine.assertSerialExecution(
+      multiAgentWorkflowEngine.readDebuggerGraph(sessionId, runId),
+    );
   }
 
   private persistAgentResult(sessionId: string, runId: string, result: SpecialistRecipeResult): AgentResultCard {
@@ -1427,7 +1438,7 @@ export class DebugWorkflowService {
         },
       });
 
-      const surface = await specialistRecipeRunner.prepareSurface(runtimeContext);
+      const surface = await deterministicSpecialistExecutor.prepareSurface(runtimeContext);
       this.applyTaskMutation(location.session.sessionId, location.run.runId, 'speclist', 'completed', 'Task board seeded for the approved plan.');
       this.applyTaskMutation(location.session.sessionId, location.run.runId, 'dispatch', 'in_progress', 'Specialist dispatch started.');
       contextService.appendContextPacket(location.session.sessionId, location.run.runId, {
@@ -1467,7 +1478,7 @@ export class DebugWorkflowService {
           },
         }));
 
-        const result = await specialistRecipeRunner.run(specialist, runtimeContext, surface);
+        const result = await deterministicSpecialistExecutor.run(specialist, runtimeContext, surface);
         specialistResults.push(result);
         this.persistAgentResult(location.session.sessionId, location.run.runId, result);
         await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
