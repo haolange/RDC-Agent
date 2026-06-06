@@ -57,7 +57,6 @@ Renderer Registry → AgentRunView
 
 右侧面板类型仍位于 `src/shared/types/workstream.ts`：`ProgressTask`、`WorkstreamArtifactRecord`、`WorkstreamContextRecord`、`RightPanelViewModel`。
 
-`AgentWorkstreamPresentation` 仅为 **deprecated 别名**，等同 `AgentRunPresentation`。
 
 ## 4. 主进程模块
 

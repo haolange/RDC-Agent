@@ -75,7 +75,6 @@ export class StorageAdapter {
     this.ensureRegistry();
     this.ensureSelection();
     this.bootstrapGlobalKnowledge();
-    this.migrateLegacyWorkspace();
   }
 
   setWorkspaceRoot(workspaceRoot: string): void {
@@ -913,49 +912,6 @@ export class StorageAdapter {
     fs.writeFileSync(seededMarker, nowIso(), 'utf-8');
   }
 
-  private migrateLegacyWorkspace(): void {
-    for (const legacyRoot of this.getLegacyWorkspacePaths()) {
-      if (!legacyRoot || !fs.existsSync(legacyRoot) || legacyRoot === this.dataRootPath) {
-        continue;
-      }
-
-      const legacyKnowledge = path.join(legacyRoot, 'common', 'knowledge');
-      if (fs.existsSync(legacyKnowledge)) {
-        this.copyDirectoryContents(legacyKnowledge, this.globalKnowledgePath, false);
-      }
-
-      const legacyCases = path.join(legacyRoot, 'cases');
-      if (fs.existsSync(legacyCases)) {
-        this.copyDirectoryContents(legacyCases, path.join(this.migrationOrphansPath, 'cases'), false);
-      }
-
-      const legacyCheckpoints = path.join(legacyRoot, 'checkpoints');
-      if (fs.existsSync(legacyCheckpoints)) {
-        this.copyDirectoryContents(legacyCheckpoints, path.join(this.migrationOrphansPath, 'checkpoints'), false);
-      }
-
-      const legacyCommon = path.join(legacyRoot, 'common');
-      if (fs.existsSync(legacyCommon)) {
-        const configPath = path.join(legacyCommon, 'config');
-        const skillsPath = path.join(legacyCommon, 'skills');
-        if (fs.existsSync(configPath)) {
-          this.copyDirectoryContents(configPath, path.join(this.migrationOrphansPath, 'common', 'config'), false);
-        }
-        if (fs.existsSync(skillsPath)) {
-          this.copyDirectoryContents(skillsPath, path.join(this.migrationOrphansPath, 'common', 'skills'), false);
-        }
-      }
-
-      fs.rmSync(legacyRoot, { recursive: true, force: true });
-    }
-  }
-
-  private getLegacyWorkspacePaths(): string[] {
-    const devWorkspace = path.join(app.getAppPath(), 'workspace');
-    const packagedWorkspace = path.join(path.dirname(app.getPath('exe')), 'workspace');
-    return [...new Set([devWorkspace, packagedWorkspace])];
-  }
-
   private syncWorkspacePaths(): void {
     const paths = appPathService.getWorkspacePaths();
     this.dataRootPath = paths.workspaceRoot;
@@ -1402,11 +1358,6 @@ export class StorageAdapter {
     this.ensureDir(paths.resourcePath);
     this.ensureDir(paths.knowledgePath);
     this.ensureDir(paths.inputsPath);
-
-    const legacyKnowledgePath = path.join(rootPath, '.rdc-agent', 'knowledge');
-    if (fs.existsSync(legacyKnowledgePath)) {
-      this.copyDirectoryContents(legacyKnowledgePath, paths.knowledgePath, false);
-    }
 
     return paths;
   }

@@ -58,7 +58,7 @@
   }
 }
 
-/* 鍝嶅簲寮忓竷灞€ */
+/* Responsive layout */
 @media (max-width: 900px) {
   .main-floating-utilities {
     width: calc(100% - 28px);

@@ -9,7 +9,7 @@
 - 维护 `workspace root`，统一承载设置、日志和应用级运行数据。
 - 配置 `provider / model / agent route`，并把真实 LLM 路由视为 Debugger 主链的一部分。
 - 以自研 deterministic `DebuggerRuntime` 作为唯一顶层流程权威，控制 stage、gate、approval、state、evidence 和 finalization。
-- 通过 `AgentRunnerPort` 接入 OpenAI Agents SDK / Claude Agent SDK；SDK 只作为 stage 内 runner，凭据来自 Settings provider secret，不读取裸环境变量作为配置来源。
+- 通过自研 `AgentRuntime` / `ToolRegistry` 统一执行 agent turn 和 tool loop；provider、account、API key、OAuth 与 `LLMAdapter` 继续作为模型接入边界。
 - 执行 `Plan / Intake -> 用户批准 -> execution loop -> verification / skeptic / curator -> report` 主链。
 - 展示会话、运行状态、证据链、报告和中间产物。
 
@@ -92,3 +92,4 @@ npm run dev
 - [docs/architecture/codepilot-comparison.md](./docs/architecture/codepilot-comparison.md)：CodePilot 对照与迁移边界
 - [docs/architecture/spec-driven-development.md](./docs/architecture/spec-driven-development.md)：规范宪章
 - [docs/ui/design-system.md](./docs/ui/design-system.md)：UI 设计系统
+

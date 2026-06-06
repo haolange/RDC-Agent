@@ -27,13 +27,12 @@ Agentic Trace 是 RDC-Agent 的**当前消息流协议**，用 `Event Log → Tr
 - 当前现役主链是 `Debugger`：用户输入目标、进入 plan/intake、回答必要问题、批准计划、执行 RenderDoc 工具链、沉淀 evidence/report。
 - `Analyzer` 和 `Optimizer` 是一等产品模式占位，但本仓库默认不把 Debugger harness 自动泛化到这两个模式。
 - `Debugger` / `Analyzer` / `Optimizer` 是执行类 UI 模式；只有应用内已有 `OpenedCaptureState(status=open)` 且属于当前 project 时，renderer 才允许选择执行类模式。用户在 prompt 里写 `.rdc` 路径不等同于 Open capture，也不能被自动升级成正式 run。
-- 工具执行链必须保持为 `renderer -> preload -> IPC -> ToolBridge -> resources/tools/rdx.bat`。不能从 renderer、preload 或任意 SDK adapter 绕过 `ToolBridge` 调 RenderDoc 工具。
-- OpenAI Agents SDK / Claude Agent SDK 只能作为 provider/runner adapter，经本库 runtime 边界接入；顶层 mode、stage、gate、approval、tool policy、final status 由本仓库自有 runtime 决定。
+- 工具执行链必须保持为 `renderer -> preload -> IPC -> ToolBridge -> resources/tools/rdx.bat`。不能从 renderer、preload、MCP、skill 或 provider adapter 绕过 `ToolBridge` 调 RenderDoc 工具。
 
 ## Agent Runtime 收敛
 
-- 2026-06-05 runtime kernel baseline：`AgentRuntime` 负责 multi-turn loop、tool mediation events、deterministic policy、ask-user approval events、provider routing 与 trace redaction；`ModelProviderRegistry` 统一 API key / account / local provider capability，包括可 mock 验证的 Grok / Gemini / Qwen account adapters；Debugger multi-agent 执行保持串行，由 `MultiAgentWorkflowEngine` 与 deterministic specialist executor 投影 task graph；OpenAI / Claude SDK backend 只能作为 optional provider runner，不能绕过 `ToolBridge`、runtime policy 或 workflow final status ownership。
-- 本库的 Agent 执行权威是自有 `AgentRuntime`。Provider SDK、官方 Agent SDK 或 HTTP provider adapter 只能提供模型流、工具请求和 provider 能力适配，不能决定 mode、stage、approval、tool policy 或 final status。
+- 2026-06-05 runtime kernel baseline：`AgentRuntime` 负责 multi-turn loop、tool mediation events、deterministic policy、ask-user approval events、provider routing 与 trace redaction；`ModelProviderRegistry` 统一 API key / account / local provider capability，包括可 mock 验证的 Grok / Gemini / Qwen account adapters；Debugger multi-agent 执行保持串行，由 `MultiAgentWorkflowEngine` 与 deterministic specialist executor 投影 task graph。
+- 本库的 Agent 执行权威是自有 `AgentRuntime`。HTTP provider adapter 或 provider-specific client 只能提供模型流、工具请求格式和 provider 能力适配，不能决定 mode、stage、approval、tool policy 或 final status。
 - Agent Runtime 的跨层事实事件是 `AgentEvent`：覆盖 assistant delta/completed、tool requested/started/completed、task/subagent、approval、diagnostic、run completed/failed/cancelled。renderer 只消费该事件投影和 conversation message projection，不展示原始 chain-of-thought。
 - `Ask` 是只读 agentic work：默认允许 `primitive.read/glob/grep/webFetch/webSearch/askUser/task.list`，禁止 `bash/write/edit/remove`。若模型请求禁用工具，runtime 必须返回 policy denial，而不是静默执行。
 - `Debugger` 绑定 `plan-generate-verify` pattern。首版继续复用现有 Debugger stage 名称，但 pattern contract 明确 planner -> generator -> evaluator 的顺序、plan approval 入口和 verifier/curator 收敛责任。
@@ -56,7 +55,7 @@ Agentic Trace 是 RDC-Agent 的**当前消息流协议**，用 `Event Log → Tr
 
 - `src/main/workflow/debugger`：Debugger workflow facade、plan/intake、approval、execution lifecycle、LLM payload normalization、blocker normalization、workflow projection。
 - `src/main/agent-trace`：Agentic Trace runtime（`TraceService`、`TraceEventStore`、`TraceTreeBuilder`、`ProjectionBuilder`、manifest registry）。
-- `src/main/sessions`：project/session/run repository、workspace layout、attachment/output store、legacy workspace migration、JSON/YAML file store。
+- `src/main/sessions`：project/session/run repository、workspace layout、attachment/output store、JSON/YAML file store。
 - `src/main/settings`：settings、provider connection、secret storage、LLM adapter、Debugger LLM route。
 - 模型服务商授权属于 settings 边界：API Key/local/environment provider 走 `ProviderConnectionService`，Claude/ChatGPT/GitHub Copilot 这类账号登录 provider 走本库自研 OAuth/device-flow 服务。Claude/ChatGPT Account 使用账号模型目录；GitHub Copilot 使用账号模型目录并用 Copilot `/models` 补充；ChatGPT Account 运行时使用 ChatGPT OAuth token 与账号专用 Codex runtime。GitHub Copilot `/models` 中存在不支持当前 chat completions endpoint 的模型时，运行时 route 必须收敛到同 provider 下可用的 Debugger 模型，不让 specialist loop 因 endpoint 不兼容中断。API Key 和账号 token 只进 secret storage；Bedrock/Vertex 这类 environment provider 使用运行环境凭据，settings 只保存状态和模型列表。
 - `src/main/tools`：`ToolBridge`、tool catalog、runtime summary、RDX tool execution helpers。
@@ -128,3 +127,8 @@ Agentic Trace 是 RDC-Agent 的**当前消息流协议**，用 `Event Log → Tr
 - Electron 壳边界 smoke：`npm run test:shell-smoke`，只验证窗口启动、preload 注入、IPC 连通、workspace 权限和 ToolBridge/RenderDoc 本地链路诊断。
 - 模式门禁改动必须补 `mode-switch.spec.ts`，确认默认 `Ask`、未 Open capture 时执行类模式 disabled、Open 后可切换。
 - Provider/OAuth UI 改动：先用 mock E2E 验证分组、Connect/Test、token 状态和模型发现，再用内置浏览器检查 Settings > Provider 的视觉层级、弹层可读性、长文本和窄宽度布局；真实 OAuth 登录验证需要明确区分账号/组织策略失败与本地 UI/IPC 失败。
+
+
+
+
+
