@@ -716,7 +716,7 @@ export class ToolBridge {
    */
   async getSessionStatus(): Promise<ToolCallResult> {
     return this.call({
-      toolName: 'rd.session.status',
+      toolName: 'rd.session.get_context',
       args: {},
     });
   }

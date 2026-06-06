@@ -22,7 +22,7 @@
 - `docs`：产品、架构、工作流和 UI 文档。
 - `resources`：随应用分发或运行时依赖的资源。
 - `scripts`：开发辅助脚本。
-- `e2e`：Playwright 端到端测试。
+- `e2e`：Playwright browser session 与 Electron shell smoke。
 
 仓库保持标准 Electron 应用布局。`Config / Saved / Intermediate / Binaries` 这类概念属于运行期或构建期产物，不作为仓库顶层目录。
 
@@ -64,7 +64,8 @@ npm run dev
 - `npm run build`
 - `npm run pack`
 - `npm run dist`
-- `npm run test:e2e`
+- `npm run test:browser-session`
+- `npm run test:shell-smoke`
 
 ## 开发约定
 

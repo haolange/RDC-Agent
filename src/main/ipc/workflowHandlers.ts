@@ -106,7 +106,7 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
   ipcMain.handle('workflow:requestPlanRevision', async (_event, runId: string, revisionText: string) => {
     const result = await debuggerRuntime.requestPlanRevision(runId, revisionText);
     if (result.success) {
-      state.currentSessionId = result.session?.sessionId || state.currentSessionId;
+      state.currentSessionId = result.presentation?.sessionId || state.currentSessionId;
       state.currentRunId = result.runId || state.currentRunId;
       if (state.currentSessionId) {
         await storageAdapter.setCurrentSessionId(state.currentSessionId);

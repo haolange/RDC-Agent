@@ -133,7 +133,7 @@ export const WorkstreamRightPanel: React.FC = () => {
   const currentRun = useSessionStore((state) => state.currentRun);
   const workflowState = useWorkflowStore((state) => state.workflowState);
   const currentDebugPlan = useWorkflowStore((state) => state.currentDebugPlan);
-  const presentation = useWorkflowStore((state) => state.workstreamPresentation);
+  const presentation = useWorkflowStore((state) => state.tracePresentation);
   const showTaskBoard = hasApprovedTaskBoardState(
     currentRun,
     workflowState,

@@ -65,5 +65,4 @@
 - `npm run check:shared-exports`
 - `npm run check:architecture`
 - `npm run build`，因为 main/workflow/provider contract 已改动
-- focused Playwright contract tests：`e2e/agent-runtime-policy.spec.ts`、`e2e/agent-runtime-kernel.spec.ts`、`e2e/agent-sdk-policy.spec.ts`、`e2e/debugger-runtime-contract.spec.ts`
-
+- focused smoke：`npm run test:browser-session`；涉及窗口/preload/IPC/ToolBridge 边界时补 `npm run test:shell-smoke`

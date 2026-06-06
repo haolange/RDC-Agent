@@ -3,11 +3,11 @@ import type { AgentRole } from '@shared/types/agent';
 import type { AskUserAnswer, WorkflowStage } from '@shared/types/workflow';
 import type { DebugSessionStartRequest } from '@shared/types/session';
 import type {
-  WorkstreamExportOptions,
-  WorkstreamExportResult,
-  WorkstreamRevisionResult,
-  WorkstreamSessionResult,
-  WorkstreamBranchSwitchResult,
+  TraceExportOptions,
+  TraceExportResult,
+  TraceRevisionResult,
+  TraceSessionResult,
+  TraceBranchSwitchResult,
 } from '@shared/types/workstream';
 import { debugWorkflowService, type PlanResult, type StartWorkflowResult } from './DebugWorkflowService';
 import { isToolAllowedForAgent, resolveAgentToolAllowlist } from './DebuggerRuntimePolicy';
@@ -43,19 +43,19 @@ export class DebuggerRuntime {
     return debugWorkflowService.approvePlan(runId);
   }
 
-  getWorkstreamSession(sessionId: string): Promise<WorkstreamSessionResult> {
+  getWorkstreamSession(sessionId: string): Promise<TraceSessionResult> {
     return debugWorkflowService.getWorkstreamSession(sessionId);
   }
 
-  requestPlanRevision(runId: string, revisionText: string): Promise<WorkstreamRevisionResult> {
+  requestPlanRevision(runId: string, revisionText: string): Promise<TraceRevisionResult> {
     return debugWorkflowService.requestPlanRevision(runId, revisionText);
   }
 
-  switchWorkstreamBranch(sessionId: string, branchId: string): Promise<WorkstreamBranchSwitchResult> {
+  switchWorkstreamBranch(sessionId: string, branchId: string): Promise<TraceBranchSwitchResult> {
     return debugWorkflowService.switchWorkstreamBranch(sessionId, branchId);
   }
 
-  exportWorkstreamSession(sessionId: string, options?: WorkstreamExportOptions): Promise<WorkstreamExportResult> {
+  exportWorkstreamSession(sessionId: string, options?: TraceExportOptions): Promise<TraceExportResult> {
     return debugWorkflowService.exportWorkstreamSession(sessionId, options);
   }
 

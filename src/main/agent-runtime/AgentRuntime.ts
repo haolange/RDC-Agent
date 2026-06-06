@@ -139,8 +139,14 @@ export class AgentRuntime {
 
       await this.refreshAccountRuntimeCredentials(request.providerId);
       const { tools, nameMap } = await toolRegistry.listAllowedLlmTools(request.agentId, allowlist);
+      const traceReasoningContract = [
+        'Trace output contract:',
+        'When surfacing user-visible reasoning, emit JSON VisibleReasoningPacket objects instead of raw tool dumps.',
+        'Schema: {"mode":"planning|executing|reflecting","content":"...","hypothesis":"...","nextAction":"...","confidence":"low|medium|high"}',
+        'Keep final answers in markdown; keep raw tool payloads out of the main narrative.',
+      ].join('\n');
       const messages: LLMMessage[] = [
-        { role: 'system', content: request.systemPrompt },
+        { role: 'system', content: `${request.systemPrompt}\n\n${traceReasoningContract}` },
         { role: 'user', content: request.prompt },
       ];
       const maxToolIterations = clampPositiveInt(request.maxToolIterations ?? request.maxTurns ?? 8, 1, 32);

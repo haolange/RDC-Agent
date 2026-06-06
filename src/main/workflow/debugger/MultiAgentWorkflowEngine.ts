@@ -15,10 +15,7 @@ const mapTaskStatus = (
 
 export class MultiAgentWorkflowEngine {
   constructor(
-    private readonly listTasksForRun: (sessionId: string, runId: string) => HarnessTask[] = (sessionId, runId) => {
-      const { taskBoard } = require('./TaskBoard') as typeof import('./TaskBoard');
-      return taskBoard.listTasks(sessionId, runId);
-    },
+    private readonly listTasksForRun: (sessionId: string, runId: string) => HarnessTask[] = () => [],
   ) {}
 
   createDebuggerGraph(input: {
@@ -69,5 +66,3 @@ export class MultiAgentWorkflowEngine {
     return 'pending';
   }
 }
-
-export const multiAgentWorkflowEngine = new MultiAgentWorkflowEngine();

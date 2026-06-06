@@ -1,4 +1,4 @@
 export {
-  installBrowserElectronApiFallback,
-  isBrowserElectronApiFallback,
-} from './browserFallback/BrowserElectronApiFallback';
+  installBrowserAppBridge,
+  isBrowserAppBridge,
+} from './browserAppBridge/BrowserAppBridge';

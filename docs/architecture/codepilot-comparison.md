@@ -44,5 +44,5 @@ CodePilot 值得学习的是架构表达方式，而不是技术栈迁移：
 
 1. 文档先变成后续 agent 的入口，而不是继续从巨型文件反推系统。
 2. IPC/preload/shared 先建立域入口，保持 `window.electronAPI` 形状兼容。
-3. `DebugWorkflowService`、`StorageAdapter`、`App.tsx`、`BrowserElectronApiFallback.ts` 后续按现有 DOM 和业务行为保真继续拆分。
+3. `DebugWorkflowService`、`StorageAdapter`、`App.tsx`、Browser App Bridge 后续按现有 DOM 和业务行为保真继续拆分。
 4. 每次结构迁移都以 `npm run typecheck` 为底线，涉及入口或窗口逻辑时补 `npm run build`。

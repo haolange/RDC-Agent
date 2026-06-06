@@ -4,7 +4,8 @@ import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationStreamEvent } from '@shared/types/conversation';
 import type { RunContextUsageSummary, RunSummary } from '@shared/types/session';
 import type { WorkflowState } from '@shared/types/workflow';
-import type { AgentWorkstreamPresentation } from '@shared/types/workstream';
+import type { AgentRunPresentation } from '@shared/types/agenticTrace';
+import { rendererEventHub } from '../../browserAppBridge/rendererEventHub';
 
 export interface RunStatusProjection {
   sessionId: string;
@@ -16,6 +17,7 @@ export interface RunStatusProjection {
 
 export class WorkflowProjectionPublisher {
   publish(channel: string, ...args: unknown[]): void {
+    rendererEventHub.emit(channel, ...args);
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) {
         window.webContents.send(channel, ...args);
@@ -39,8 +41,8 @@ export class WorkflowProjectionPublisher {
     this.publish('workflow:runUsageChanged', usage);
   }
 
-  publishWorkstreamChanged(sessionId: string, presentation: AgentWorkstreamPresentation): void {
-    this.publish('workflow:workstreamChanged', {
+  publishTraceProjectionChanged(sessionId: string, presentation: AgentRunPresentation): void {
+    this.publish('trace:projectionChanged', {
       sessionId,
       presentation,
     });

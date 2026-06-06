@@ -10,6 +10,7 @@ import { ToolBridge } from '../tools/ToolBridge';
 import { appPathService } from '../runtime/AppPathService';
 import { replayDeviceService, type PreparedRemoteSurface } from '../captures/ReplayDeviceService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
 import type {
   CaptureDescriptor,
   DebugSessionStartRequest,
@@ -726,6 +727,7 @@ export class RdxSessionService {
 
   private broadcastContextChanged(): void {
     const snapshot = this.snapshotContext();
+    rendererEventHub.emit('context:changed', snapshot);
     for (const window of BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) {
         window.webContents.send('context:changed', snapshot);

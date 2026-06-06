@@ -19,7 +19,7 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'electron',
+      name: 'app-smoke',
       testMatch: '**/*.spec.ts',
     },
   ],

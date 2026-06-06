@@ -1,17 +1,22 @@
 ﻿import { getElectronApi } from '../../../platform/getElectronApi';
 import React, { useMemo, useState } from 'react';
 import { useSessionStore } from '../../../stores/sessionStore';
+import { useProjectStore } from '../../../stores/projectStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
+import type { PlanApprovalState } from '@shared/types/workflow';
 import { normalizePresentation } from './planHelpers';
 
 export const PlanApprovalCard: React.FC = () => {
   const currentRun = useSessionStore((state) => state.currentRun);
+  const currentSession = useProjectStore((state) => state.currentSession);
   const debugPlan = useWorkflowStore((state) => state.currentDebugPlan);
   const pendingQuestions = useWorkflowStore((state) => state.pendingQuestions);
   const workflowState = useWorkflowStore((state) => state.workflowState);
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
+  const setRuns = useSessionStore((state) => state.setRuns);
   const setCurrentDebugPlan = useWorkflowStore((state) => state.setCurrentDebugPlan);
   const setPendingQuestions = useWorkflowStore((state) => state.setPendingQuestions);
+  const setWorkflowState = useWorkflowStore((state) => state.setWorkflowState);
 
   const [busyAction, setBusyAction] = useState<'approve' | 'restart' | null>(null);
   const [planExpanded, setPlanExpanded] = useState(false);
@@ -59,12 +64,43 @@ export const PlanApprovalCard: React.FC = () => {
       }
       setPendingQuestions(result.pendingQuestions ?? null);
       if (result.success) {
-        setCurrentRun({
-          ...currentRun,
-          runId: result.runId ?? currentRun.runId,
-          status: 'running',
-          lastStage: 'dispatch',
-        });
+        const nextWorkflow = await electronAPI.workflow.getState().catch(() => null);
+        if (nextWorkflow) {
+          setWorkflowState(nextWorkflow);
+          setCurrentDebugPlan(nextWorkflow.debugPlan ?? result.debugPlan ?? null);
+          setPendingQuestions(nextWorkflow.pendingQuestions ?? null);
+        } else if (workflowState) {
+          setWorkflowState({
+            ...workflowState,
+            approvalState: (result.approvalState as PlanApprovalState | undefined) ?? 'approved',
+            debugPlan: result.debugPlan ?? workflowState.debugPlan,
+            runId: result.runId ?? workflowState.runId,
+          });
+        }
+        if (currentSession?.sessionId) {
+          const runs = await electronAPI.run.list(currentSession.sessionId).catch(() => null);
+          const activeRun = runs?.runs?.find((run) => run.runId === (result.runId ?? currentRun.runId)) ?? null;
+          if (runs?.runs) {
+            setRuns(runs.runs);
+          }
+          if (activeRun) {
+            setCurrentRun(activeRun);
+          } else {
+            setCurrentRun({
+              ...currentRun,
+              runId: result.runId ?? currentRun.runId,
+              status: 'running',
+              lastStage: 'dispatch',
+            });
+          }
+        } else {
+          setCurrentRun({
+            ...currentRun,
+            runId: result.runId ?? currentRun.runId,
+            status: 'running',
+            lastStage: 'dispatch',
+          });
+        }
       }
     } finally {
       setBusyAction(null);

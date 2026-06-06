@@ -1,13 +1,13 @@
-import type { AgentWorkstreamPresentation } from '@shared/types/workstream';
+import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 
 export function shouldShowWorkstreamRightRail(
-  presentation: AgentWorkstreamPresentation | null | undefined,
+  presentation: AgentRunPresentation | null | undefined,
 ): boolean {
   if (!presentation) {
     return false;
   }
 
-  if ((presentation.items?.length ?? 0) > 0) {
+  if ((presentation.runs?.length ?? 0) > 0) {
     return true;
   }
 

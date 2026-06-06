@@ -5,6 +5,7 @@ import * as path from 'path';
 import { toolBridge } from '../tools/ToolBridge';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
 import type {
   AndroidBootstrapMetadata,
   ReplayDeviceEntry,
@@ -997,6 +998,7 @@ export class ReplayDeviceService {
   }
 
   private broadcast(payload: ReplayDeviceStatusChangedPayload): void {
+    rendererEventHub.emit('device:statusChanged', payload);
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
       return;
     }

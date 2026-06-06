@@ -1350,7 +1350,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 
 1. `npm run typecheck` 零错误
 2. `npm run lint` 零错误
-3. 对应 E2E 测试通过（`npm run test:e2e`）
+3. 对应 browser session / shell smoke 通过（`npm run test:browser-session`，必要时 `npm run test:shell-smoke`）
 4. 跨层联动检查清单全部通过
 5. 本文档对应章节已更新
 
@@ -1453,13 +1453,13 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 
 #### M3-1 Backtrack 完整测试
 
-- 涉及文件：`e2e/run-stop-recovery.spec.ts`、新增 `e2e/back-to-plan.spec.ts`
+- 涉及文件：browser session smoke 或主进程 runtime contract 测试
 - 任务：覆盖所有 RuntimeRevisionTrigger（specialist_timeout / skeptic_rejected / triage_low_confidence / blocker_detected / user_requested）
-- 验收：5种触发条件的 E2E 测试全部通过
+- 验收：5种触发条件的 browser session 或 runtime contract 验证全部通过
 
 #### M3-2 故障注入测试
 
-- 涉及文件：新增 `e2e/fault-injection.spec.ts`
+- 涉及文件：browser session smoke 或主进程 fault-injection contract 测试
 - 任务：模拟工具超时、LLM 失败、网络断开等场景
 - 验收：所有故障场景有明确的 Blocker 而不是崩溃
 

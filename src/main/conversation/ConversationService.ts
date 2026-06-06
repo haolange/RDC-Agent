@@ -29,7 +29,7 @@ import { generateEventId, nowMs } from '@shared/utils/id';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 import { agentRuntime } from '../agent-runtime/AgentRuntime';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
-import { agentWorkstreamProjector } from '../workflow/debugger/AgentWorkstreamProjector';
+import { traceService } from '../agent-trace/TraceService';
 import { debuggerRuntime } from '../workflow/debugger/DebuggerRuntime';
 import { replayDeviceService } from '../captures/ReplayDeviceService';
 import { rdxSessionService } from '../index';
@@ -949,13 +949,40 @@ export class ConversationService {
           ]),
     });
 
+    if (!context.projectId && EXECUTE_PATTERN.test(rawMessage)) {
+      const assistantMessage: ConversationMessage = {
+        ...assistantDraftMessage,
+        content: '我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。',
+        status: 'complete',
+        updatedAt: nowMs(),
+      };
+      const workstreamSessionId = this.ephemeralWorkstreamSessionId(turnId);
+      const tracePresentation = await traceService.buildConversationPresentation(
+        workstreamSessionId,
+        [userMessage, assistantMessage],
+      );
+      workflowProjectionPublisher.publishTraceProjectionChanged(workstreamSessionId, tracePresentation);
+      this.publishConversationWorkstream(workstreamSessionId, [userMessage, assistantMessage], null);
+      return {
+        session: null,
+        mode: 'talk',
+        userMessage,
+        assistantDraftMessage: assistantMessage,
+        executionTransition: { action: 'none' },
+        runUpdate: null,
+        tracePresentation,
+        errorViewModel: null,
+      };
+    }
+
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, userMessage);
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
     const workstreamSessionId = workingSession?.sessionId ?? this.ephemeralWorkstreamSessionId(turnId);
-    const workstreamPresentation = agentWorkstreamProjector.buildConversationPresentation(
+    const tracePresentation = await traceService.buildConversationPresentation(
       workstreamSessionId,
       [userMessage, assistantDraftMessage],
     );
+    workflowProjectionPublisher.publishTraceProjectionChanged(workstreamSessionId, tracePresentation);
     this.publishConversationWorkstream(workstreamSessionId, [userMessage, assistantDraftMessage], workingSession?.sessionId ?? null);
 
     void this.completeCoworkTurn({
@@ -977,7 +1004,7 @@ export class ConversationService {
       assistantDraftMessage,
       executionTransition: { action: 'none' },
       runUpdate: null,
-      workstreamPresentation,
+      tracePresentation,
       errorViewModel: null,
     };
   }
@@ -1439,14 +1466,14 @@ export class ConversationService {
       return;
     }
 
-    void agentWorkstreamProjector.getSession(sessionId)
+    void traceService.getSession(sessionId)
       .then((result) => {
         if (result.success && result.presentation) {
-          workflowProjectionPublisher.publishWorkstreamChanged(sessionId, result.presentation);
+          workflowProjectionPublisher.publishTraceProjectionChanged(sessionId, result.presentation);
         }
       })
       .catch((error) => {
-        console.error('[ConversationService] Failed to publish workstream:', error);
+        console.error('[ConversationService] Failed to publish trace projection:', error);
       });
   }
 
@@ -1460,8 +1487,10 @@ export class ConversationService {
       return;
     }
 
-    const presentation = agentWorkstreamProjector.buildConversationPresentation(workstreamSessionId, messages);
-    workflowProjectionPublisher.publishWorkstreamChanged(workstreamSessionId, presentation);
+    void traceService.buildConversationPresentation(workstreamSessionId, messages)
+      .then((presentation) => {
+        workflowProjectionPublisher.publishTraceProjectionChanged(workstreamSessionId, presentation);
+      });
   }
 
   private ephemeralWorkstreamSessionId(turnId: string): string {

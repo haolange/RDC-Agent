@@ -39,13 +39,10 @@ export function useComposerSend(options: {
     showNotice,
     t,
     currentMode,
-    setCurrentMode,
     currentProject,
     currentSession,
     currentRun,
     selectedDeviceEntry,
-    hasOpenedCaptureForCurrentProject,
-    openCaptureRequiredLabel,
     hasActiveDebugRun,
     hasActiveConversationTurn,
     promptValue,
@@ -62,7 +59,7 @@ export function useComposerSend(options: {
   const setRuns = useSessionStore((state) => state.setRuns);
   const setCurrentDebugPlan = useWorkflowStore((state) => state.setCurrentDebugPlan);
   const setPendingQuestions = useWorkflowStore((state) => state.setPendingQuestions);
-  const setWorkstreamPresentation = useWorkflowStore((state) => state.setWorkstreamPresentation);
+  const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
   const setConversationMessages = useConversationStore((state) => state.setConversationMessages);
   const upsertConversationMessages = useConversationStore((state) => state.upsertConversationMessages);
 
@@ -84,12 +81,6 @@ export function useComposerSend(options: {
 
     const electronAPI = window.electronAPI;
     if (!electronAPI) return;
-
-    if (currentMode !== 'ask' && !hasOpenedCaptureForCurrentProject) {
-      showNotice(openCaptureRequiredLabel);
-      setCurrentMode('ask');
-      return;
-    }
 
     setIsPromptSending(true);
     try {
@@ -116,7 +107,7 @@ export function useComposerSend(options: {
         setRuns,
         setCurrentDebugPlan,
         setPendingQuestions,
-        setWorkstreamPresentation,
+        setTracePresentation,
         upsertConversationMessages,
       });
 
@@ -125,7 +116,7 @@ export function useComposerSend(options: {
         sessionId: result.session?.sessionId ?? currentSession?.sessionId ?? null,
         turnId: result.userMessage.turnId,
         setConversationMessages,
-        setWorkstreamPresentation,
+        setTracePresentation,
       });
     } catch (error) {
       const currentMessages = useConversationStore.getState().conversationMessages ?? [];
@@ -150,21 +141,18 @@ export function useComposerSend(options: {
     currentSession,
     hasActiveConversationTurn,
     hasActiveDebugRun,
-    hasOpenedCaptureForCurrentProject,
     isComposerBusy,
-    openCaptureRequiredLabel,
     pendingAttachments,
     promptValue,
     selectedDeviceEntry,
     setConversationMessages,
     setCurrentDebugPlan,
-    setCurrentMode,
     setCurrentRun,
     setCurrentSession,
     setPendingAttachments,
     setPendingQuestions,
     setPromptValue,
-    setWorkstreamPresentation,
+    setTracePresentation,
     setRuns,
     setSessions,
     showNotice,

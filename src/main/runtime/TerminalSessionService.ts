@@ -5,6 +5,7 @@ import * as path from 'path';
 import { generateShortId, nowMs } from '@shared/utils/id';
 import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
 import { storageAdapter } from '../sessions/StorageAdapter';
+import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
 
 interface ShellTabState {
   record: TerminalTabRecord;
@@ -193,6 +194,7 @@ export class TerminalSessionService {
   }
 
   private broadcastData(payload: TerminalDataEvent): void {
+    rendererEventHub.emit('terminal:data', payload);
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) {
         win.webContents.send('terminal:data', payload);
@@ -201,6 +203,7 @@ export class TerminalSessionService {
   }
 
   private broadcastExit(payload: TerminalExitEvent): void {
+    rendererEventHub.emit('terminal:exit', payload);
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) {
         win.webContents.send('terminal:exit', payload);
@@ -210,6 +213,7 @@ export class TerminalSessionService {
 
   private broadcastTabsChanged(): void {
     const tabs = this.listTabs();
+    rendererEventHub.emit('terminal:tabsChanged', { tabs });
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) {
         win.webContents.send('terminal:tabsChanged', { tabs });

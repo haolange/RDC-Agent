@@ -16,6 +16,7 @@ import { createLlmApi, createSettingsApi } from './api/settings';
 import { createAppMetaApi, createAppShellApi, createDialogApi, createWindowControlsApi } from './api/shell';
 import { createEvidenceApi, createToolApi } from './api/toolEvidence';
 import { createWorkflowApi } from './api/workflow';
+import { createTraceApi } from './api/trace';
 
 const dialogApi = createDialogApi();
 
@@ -34,6 +35,7 @@ const electronAPI = {
   selectDirectory: dialogApi.selectDirectory,
 
   workflow: createWorkflowApi(),
+  trace: createTraceApi(),
   agent: createAgentApi(),
   tool: createToolApi(),
   evidence: createEvidenceApi(),
