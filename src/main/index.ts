@@ -29,6 +29,7 @@ if (!process.env.RDC_AGENT_USER_DATA?.trim()) {
 const isDev = process.env.NODE_ENV === 'development' && process.env.RDC_AGENT_TEST_MODE !== '1';
 const isSettingsRebuildOnly = process.env.RDC_AGENT_REBUILD_SETTINGS_ONLY === '1';
 const isTestMode = process.env.RDC_AGENT_TEST_MODE === '1';
+const isHeadlessMode = process.env.RDC_AGENT_HEADLESS === '1';
 
 if (isTestMode) {
   app.disableHardwareAcceleration();
@@ -56,7 +57,12 @@ function emitWindowMaximizedState(): void {
 }
 
 function getDevRendererUrl(): string {
-  return process.env['ELECTRON_RENDERER_URL'] || 'http://127.0.0.1:5173';
+  const configuredUrl = process.env['ELECTRON_RENDERER_URL'] || 'http://127.0.0.1:5173';
+  const rendererUrl = new URL(configuredUrl);
+  if (rendererUrl.hostname === 'localhost') {
+    rendererUrl.hostname = '127.0.0.1';
+  }
+  return rendererUrl.toString();
 }
 
 async function openRdcFiles(): Promise<void> {
@@ -313,11 +319,15 @@ app.whenReady().then(async () => {
     raw: { bridgeUrl },
   });
   
-  createMainWindow();
+  if (isHeadlessMode) {
+    console.log(`[BrowserAppBridge] Headless mode enabled. Open ${bridgeUrl}/app`);
+  } else {
+    createMainWindow();
+  }
 
   // macOS: recreate the window when the dock icon is clicked.
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (!isHeadlessMode && BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
     }
   });
@@ -325,6 +335,9 @@ app.whenReady().then(async () => {
 
 // Quit after all windows close on Windows/Linux.
 app.on('window-all-closed', () => {
+  if (isHeadlessMode) {
+    return;
+  }
   replayDeviceService.dispose();
   if (process.platform !== 'darwin') {
     app.quit();

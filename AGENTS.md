@@ -54,12 +54,11 @@
 
 ## 浏览器真实会话边界
 
-- agent 日常 UI/功能验证默认使用浏览器真实会话：先启动完整应用，再用主进程输出的 `http://127.0.0.1:<port>/app` 打开同一套 renderer。
-- 浏览器真实会话通过 localhost bridge 连接真实 `main process`、workspace、settings、LLM runtime、事件流和 `ToolBridge`；不得再新增 renderer-only mock session 或 scenario 作为验收入口。
+- agent 日常 UI/功能验证默认使用 headless 浏览器真实会话：设置 `RDC_AGENT_HEADLESS=1` 启动应用主进程，再用主进程输出的 `http://127.0.0.1:<port>/app` 打开同一套 renderer。
+- 浏览器真实会话通过 localhost bridge 连接真实 `main process`、workspace、settings、LLM runtime、事件流和 `ToolBridge`；不得再新增渲染层本地样本或演示场景作为验收入口。
 - Electron 窗口仍通过 `preload -> IPC` 进入主进程；浏览器真实会话通过 `localhost bridge -> IPC handler registry` 进入主进程。两条路径必须共享同一套 main/runtime 能力。
 - 涉及 UI/UX、布局、消息流、状态展示、样式、面板可达性的改动，优先用浏览器真实会话和内置浏览器多模态点击验证。
 - 涉及 `src/main`、`src/preload`、窗口、IPC 注册、workspace 权限、`ToolBridge` 或 `RenderDoc` 本地链路时，补 `npm run test:shell-smoke` 或等价 shell smoke；不把交互类 Electron Playwright 作为默认门禁。
-- `scripts/start-rdc-agent.cmd` 是开发启动入口；主进程启动后会输出浏览器真实会话 URL。
 
 ## 产物与命名治理
 

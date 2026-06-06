@@ -129,6 +129,7 @@ Conversation turn 结果字段：`tracePresentation`（非 `workstreamPresentati
 浏览器真实会话是 agent 日常开发验证入口：
 
 - 主进程启动 localhost bridge，并输出 `http://127.0.0.1:<port>/app`。
+- agent 日常验证设置 `RDC_AGENT_HEADLESS=1`，只跳过 Electron 桌面窗口，不跳过 main/runtime、workspace、settings、ToolBridge 或 renderer 加载。
 - Electron window 通过 `preload -> IPC` 进入主进程；浏览器通过 `localhost bridge -> IPC handler registry` 进入同一主进程。
 - 浏览器会话使用真实 workspace、settings、LLM runtime、Trace projection、conversation event 和 ToolBridge，不再使用渲染层本地样本或伪造模型。
 - Renderer 仍只调用 `window.electronAPI`；Electron 环境由 preload 注入，浏览器环境由 `installBrowserAppBridge()` 注入。
