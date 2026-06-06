@@ -44,13 +44,13 @@ import type {
 } from './session';
 import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from './terminal';
 import type { ToolCallResult, ToolCatalog, ToolRuntimeSummary } from './tool';
+import type { AgentRun, AgentRunPresentation, TraceEvent } from './agenticTrace';
 import type {
-  AgentWorkstreamPresentation,
-  WorkstreamBranchSwitchResult,
-  WorkstreamExportOptions,
-  WorkstreamExportResult,
-  WorkstreamRevisionResult,
-  WorkstreamSessionResult,
+  TraceBranchSwitchResult,
+  TraceExportOptions,
+  TraceExportResult,
+  TraceRevisionResult,
+  TraceSessionResult,
 } from './workstream';
 
 export interface ElectronAPI {
@@ -135,13 +135,13 @@ export interface ElectronAPI {
       approvalState?: string;
       error?: string;
     }>;
-    getWorkstreamSession: (sessionId?: string) => Promise<WorkstreamSessionResult>;
-    requestPlanRevision: (runId: string, revisionText: string) => Promise<WorkstreamRevisionResult>;
-    switchWorkstreamBranch: (sessionId: string, branchId: string) => Promise<WorkstreamBranchSwitchResult>;
+    getWorkstreamSession: (sessionId?: string) => Promise<TraceSessionResult>;
+    requestPlanRevision: (runId: string, revisionText: string) => Promise<TraceRevisionResult>;
+    switchWorkstreamBranch: (sessionId: string, branchId: string) => Promise<TraceBranchSwitchResult>;
     exportWorkstreamSession: (
       sessionId: string,
-      options?: WorkstreamExportOptions
-    ) => Promise<WorkstreamExportResult>;
+      options?: TraceExportOptions
+    ) => Promise<TraceExportResult>;
     restartRun: (runId: string) => Promise<{
       success: boolean;
       runId?: string;
@@ -357,12 +357,19 @@ export interface ElectronAPI {
     }>;
   };
 
+  trace: {
+    getRun: (runId: string) => Promise<{ run: AgentRun | null }>;
+    getEvents: (runId: string, afterSeq?: number) => Promise<{ events: TraceEvent[] }>;
+    getProjection: (sessionId?: string) => Promise<TraceSessionResult>;
+    exportRun: (runId: string) => Promise<{ run: AgentRun | null; events: TraceEvent[] }>;
+  };
+
   events: {
     onWorkflowStateChanged: (callback: (state: WorkflowState) => void) => () => void;
     onWorkflowStageChanged: (callback: (data: { stage: WorkflowStage; blockers: unknown[] }) => void) => () => void;
     onRunStatusChanged: (callback: (data: { runId: string; sessionId: string; status: RunSummary['status']; lastStage?: string; stopReason?: string }) => void) => () => void;
     onRunUsageChanged: (callback: (summary: RunContextUsageSummary) => void) => () => void;
-    onWorkstreamChanged: (callback: (payload: { sessionId: string; presentation: AgentWorkstreamPresentation }) => void) => () => void;
+    onTraceProjectionChanged: (callback: (payload: { sessionId: string; presentation: AgentRunPresentation }) => void) => () => void;
     onAgentMessage: (callback: (msg: unknown) => void) => () => void;
     onAgentStatusChanged: (callback: (state: AgentState) => void) => () => void;
     onToolExecutionComplete: (callback: (trace: unknown) => void) => () => void;

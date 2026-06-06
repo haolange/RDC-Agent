@@ -89,15 +89,6 @@
   padding: 28px var(--chat-inline-padding) 28px;
 }
 
-.phase-trace-compat-marker {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  opacity: 0.01;
-  pointer-events: none;
-}
-
 .conversation-turn {
   width: min(var(--chat-transcript-width), 100%);
   max-width: 100%;

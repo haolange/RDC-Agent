@@ -6,6 +6,7 @@ import type {
   RuntimeLogSeverity,
 } from '@shared/types/runtimeLog';
 import { generateEventId, nowMs } from '@shared/utils/id';
+import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
 
 const APP_LOG_LIMIT = 1000;
 const SESSION_LOG_LIMIT = 500;
@@ -74,6 +75,7 @@ export class RuntimeLogService {
   }
 
   private broadcast(entry: RuntimeLogEntry): void {
+    rendererEventHub.emit('runtime:logAppended', entry);
     const windows = BrowserWindow.getAllWindows();
     for (const win of windows) {
       if (!win.isDestroyed()) {

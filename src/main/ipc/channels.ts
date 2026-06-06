@@ -106,6 +106,12 @@ export const IPC_HANDLER_DOMAINS = {
     'agent:getAllStates',
     'agent:configure',
   ],
+  trace: [
+    'trace:getRun',
+    'trace:getEvents',
+    'trace:getProjection',
+    'trace:exportRun',
+  ],
 } as const;
 
 export type IpcHandlerDomain = keyof typeof IPC_HANDLER_DOMAINS;
@@ -119,9 +125,10 @@ export const IPC_EVENT_DOMAINS = {
     'workflow:stageChanged',
     'workflow:runStatusChanged',
     'workflow:runUsageChanged',
-    'workflow:workstreamChanged',
+    'trace:projectionChanged',
     'workflow:blocked',
   ],
+  trace: ['trace:eventAdded'],
   agent: ['agent:message', 'agent:statusChanged'],
   toolsEvidenceRuntime: ['tool:executionComplete', 'evidence:eventAdded', 'runtime:logAppended'],
   captureDevice: ['device:statusChanged', 'capture:statusChanged', 'capture:openedStateChanged'],

@@ -88,8 +88,8 @@ const createEventSubscriptionApi = () => ({
   onWorkflowStageChanged: (callback) => registerTrackedListener("workflow:stageChanged", (data) => callback(data)),
   onRunStatusChanged: (callback) => registerTrackedListener("workflow:runStatusChanged", (data) => callback(data)),
   onRunUsageChanged: (callback) => registerTrackedListener("workflow:runUsageChanged", (summary) => callback(summary)),
-  onWorkstreamChanged: (callback) => registerTrackedListener(
-    "workflow:workstreamChanged",
+  onTraceProjectionChanged: (callback) => registerTrackedListener(
+    "trace:projectionChanged",
     (payload) => callback(payload)
   ),
   onAgentMessage: (callback) => registerTrackedListener("agent:message", (msg) => callback(msg)),
@@ -218,6 +218,12 @@ const createWorkflowApi = () => ({
   listRuns: () => electron.ipcRenderer.invoke("workflow:listRuns"),
   listActiveRuns: () => electron.ipcRenderer.invoke("workflow:listActiveRuns")
 });
+const createTraceApi = () => ({
+  getRun: (runId) => electron.ipcRenderer.invoke("trace:getRun", runId),
+  getEvents: (runId, afterSeq) => electron.ipcRenderer.invoke("trace:getEvents", runId, afterSeq),
+  getProjection: (sessionId) => electron.ipcRenderer.invoke("trace:getProjection", sessionId),
+  exportRun: (runId) => electron.ipcRenderer.invoke("trace:exportRun", runId)
+});
 const dialogApi = createDialogApi();
 const electronAPI = {
   platform: process.platform,
@@ -231,6 +237,7 @@ const electronAPI = {
   selectRdcFiles: dialogApi.selectRdcFiles,
   selectDirectory: dialogApi.selectDirectory,
   workflow: createWorkflowApi(),
+  trace: createTraceApi(),
   agent: createAgentApi(),
   tool: createToolApi(),
   evidence: createEvidenceApi(),

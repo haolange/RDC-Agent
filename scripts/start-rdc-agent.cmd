@@ -19,5 +19,6 @@ if not exist "node_modules\electron\dist\electron.exe" (
 )
 
 echo [RDC-Agent] Starting app...
+echo [RDC-Agent] Browser app session URL will be printed by the main process as /app.
 call npm run dev
 exit /b %ERRORLEVEL%

@@ -8,7 +8,6 @@ import { AppProviders } from './AppProviders';
 import { WorkbenchShell } from './WorkbenchShell';
 import { useWorkbenchLayout } from './useWorkbenchLayout';
 import { useAppBootstrap } from './bootstrap/useAppBootstrap';
-import { useE2ESeedHarness } from './bootstrap/useE2ESeedHarness';
 import { useIpcEventBridge, useSyncCapturesFromSnapshot } from './bootstrap/useIpcEventBridge';
 import { useLayoutStore } from '../stores/layoutStore';
 import { useCaptureStore } from '../stores/captureStore';
@@ -33,7 +32,7 @@ const App: React.FC = () => {
   const currentProject = useProjectStore((state) => state.currentProject);
   const currentRun = useSessionStore((state) => state.currentRun);
   const openedCapture = useCaptureStore((state) => state.openedCapture);
-  const composerApproval = useWorkflowStore((state) => state.workstreamPresentation?.approval ?? null);
+  const composerApproval = useWorkflowStore((state) => state.tracePresentation?.approval ?? null);
   const currentMode = useLayoutStore((state) => state.currentMode);
   const toggleLeftSidebar = useLayoutStore((state) => state.toggleLeftSidebar);
   const toggleRightPanel = useLayoutStore((state) => state.toggleRightPanel);
@@ -77,11 +76,6 @@ const App: React.FC = () => {
     effectiveLeftCollapsed: layout.effectiveLeftCollapsed,
     leftToggleDisabled: layout.leftToggleDisabled,
     toggleLeftSidebar,
-  });
-
-  useE2ESeedHarness({
-    setPromptValue: composer.setPromptValue,
-    setPendingAttachments: composer.setPendingAttachments,
   });
 
   useAppBootstrap({

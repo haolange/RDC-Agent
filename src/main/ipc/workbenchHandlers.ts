@@ -24,6 +24,9 @@ import { registerShellHandlers } from './shellHandlers';
 import { buildSessionOutputs } from './sessionOutputs';
 import { registerToolEvidenceHandlers } from './toolEvidenceHandlers';
 import { registerWorkflowHandlers } from './workflowHandlers';
+import { registerTraceHandlers } from './traceHandlers';
+import { installIpcInvokeRegistry } from './invokeRegistry';
+import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
 import type {
   ProjectSelectionResult,
   RunLifecyclePatch,
@@ -58,6 +61,7 @@ export async function initializeIpcState(): Promise<void> {
 }
 
 function broadcastToRenderer(channel: string, ...args: unknown[]): void {
+  rendererEventHub.emit(channel, ...args);
   const windows = BrowserWindow.getAllWindows();
   for (const win of windows) {
     if (!win.isDestroyed()) {
@@ -245,6 +249,7 @@ function registerNativeThemeBridge(): void {
 }
 
 export function registerIPCHandlers(): void {
+  installIpcInvokeRegistry();
   registerToolTraceBridge();
   preloadLlmConfig();
   registerShellHandlers();
@@ -256,6 +261,7 @@ export function registerIPCHandlers(): void {
   registerAgentHandlers(context);
   registerToolEvidenceHandlers(context);
   registerSettingsLlmHandlers(context);
+  registerTraceHandlers(context);
   registerNativeThemeBridge();
 }
 

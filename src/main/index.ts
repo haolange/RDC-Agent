@@ -13,6 +13,8 @@ import { toolBridge } from './tools/ToolBridge';
 import { RdxSessionService } from './sessions/RdxSessionService';
 import { replayDeviceService } from './captures/ReplayDeviceService';
 import { runtimeLogService } from './runtime/RuntimeLogService';
+import { rendererEventHub } from './browserAppBridge/rendererEventHub';
+import { startBrowserAppBridge, stopBrowserAppBridge } from './browserAppBridge/BrowserAppBridgeServer';
 
 // RdxSessionService 鍗曚緥 - 渚?IPC handlers 浣跨敤
 export const rdxSessionService = new RdxSessionService(toolBridge);
@@ -49,7 +51,12 @@ function registerAllowedOrigin(url: string): void {
 
 function emitWindowMaximizedState(): void {
   if (!mainWindow) return;
+  rendererEventHub.emit('window:maximized-changed', mainWindow.isMaximized());
   mainWindow.webContents.send('window:maximized-changed', mainWindow.isMaximized());
+}
+
+function getDevRendererUrl(): string {
+  return process.env['ELECTRON_RENDERER_URL'] || 'http://127.0.0.1:5173';
 }
 
 async function openRdcFiles(): Promise<void> {
@@ -71,6 +78,7 @@ async function openRdcFiles(): Promise<void> {
         filePaths: result.filePaths,
       },
     });
+    rendererEventHub.emit('file:open', result.filePaths);
     mainWindow?.webContents.send('file:open', result.filePaths);
   }
 }
@@ -90,12 +98,14 @@ function setupKeyboardShortcuts(window: BrowserWindow): void {
 
     if (key === 'n') {
       event.preventDefault();
+      rendererEventHub.emit('case:new');
       window.webContents.send('case:new');
       return;
     }
 
     if (key === ',') {
       event.preventDefault();
+      rendererEventHub.emit('settings:open');
       window.webContents.send('settings:open');
     }
   });
@@ -127,15 +137,9 @@ function createMainWindow(): void {
 
   // 鍔犺浇椤甸潰
   if (isDev) {
-    const rendererUrl = process.env['ELECTRON_RENDERER_URL'];
-    if (rendererUrl) {
-      registerAllowedOrigin(rendererUrl);
-      mainWindow.loadURL(rendererUrl);
-    } else {
-      const fallbackUrl = 'http://localhost:5173';
-      registerAllowedOrigin(fallbackUrl);
-      mainWindow.loadURL(fallbackUrl);
-    }
+    const rendererUrl = getDevRendererUrl();
+    registerAllowedOrigin(rendererUrl);
+    mainWindow.loadURL(rendererUrl);
   } else {
     // 鐢熶骇妯″紡锛氬姞杞芥墦鍖呭悗鐨勬枃锟?
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
@@ -200,12 +204,18 @@ function setupMenu(): void {
           {
             label: 'New Case',
             accelerator: 'CmdOrCtrl+N',
-            click: () => mainWindow?.webContents.send('case:new'),
+            click: () => {
+              rendererEventHub.emit('case:new');
+              mainWindow?.webContents.send('case:new');
+            },
           },
           {
             label: 'Settings',
             accelerator: 'CmdOrCtrl+,',
-            click: () => mainWindow?.webContents.send('settings:open'),
+            click: () => {
+              rendererEventHub.emit('settings:open');
+              mainWindow?.webContents.send('settings:open');
+            },
           },
           { type: 'separator' },
           { role: 'close' },
@@ -290,6 +300,18 @@ app.whenReady().then(async () => {
 
   // 鍒濆鍖栨湇锟?
   await initializeServices();
+  const bridgeUrl = await startBrowserAppBridge({
+    devRendererUrl: isDev ? getDevRendererUrl() : null,
+    rendererRoot: path.join(__dirname, '../renderer'),
+  });
+  runtimeLogService.log({
+    scope: 'app',
+    namespace: 'system',
+    severity: 'success',
+    title: 'Browser app session ready',
+    summary: `浏览器真实会话入口已启动：${bridgeUrl}/app`,
+    raw: { bridgeUrl },
+  });
   
   createMainWindow();
 
@@ -311,6 +333,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   void stopAllActiveRuns();
+  void stopBrowserAppBridge();
   replayDeviceService.dispose();
   if (isTestMode) {
     const forceExitTimer = setTimeout(() => app.exit(0), 100);

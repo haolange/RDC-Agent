@@ -1,7 +1,7 @@
 import type { ConversationAttachmentInput, ConversationMessage, ConversationTurnResult } from '@shared/types/conversation';
 import type { AgentMode } from '@shared/types/layout';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
-import type { AgentWorkstreamPresentation } from '@shared/types/workstream';
+import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { AskUserPrompt, DebugPlan } from '@shared/types/workflow';
 import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
 import { useProjectStore } from '../../../stores/projectStore';
@@ -97,7 +97,7 @@ export async function applyConversationTurnResult(options: {
   setRuns: (runs: RunSummary[]) => void;
   setCurrentDebugPlan: (debugPlan: DebugPlan | null) => void;
   setPendingQuestions: (prompt: AskUserPrompt | null) => void;
-  setWorkstreamPresentation: (presentation: AgentWorkstreamPresentation | null) => void;
+  setTracePresentation: (presentation: AgentRunPresentation | null) => void;
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
 }) {
   const {
@@ -110,7 +110,7 @@ export async function applyConversationTurnResult(options: {
     setRuns,
     setCurrentDebugPlan,
     setPendingQuestions,
-    setWorkstreamPresentation,
+    setTracePresentation,
     upsertConversationMessages,
   } = options;
 
@@ -141,8 +141,8 @@ export async function applyConversationTurnResult(options: {
 
   setCurrentDebugPlan(result.debugPlanSummary ?? null);
   setPendingQuestions(result.pendingQuestions ?? null);
-  if (result.workstreamPresentation) {
-    setWorkstreamPresentation(result.workstreamPresentation);
+  if (result.tracePresentation) {
+    setTracePresentation(result.tracePresentation);
   }
 }
 
@@ -151,14 +151,14 @@ export async function syncE2EConversationState(options: {
   sessionId: string | null | undefined;
   turnId: string;
   setConversationMessages: (messages: ConversationMessage[]) => void;
-  setWorkstreamPresentation: (presentation: AgentWorkstreamPresentation | null) => void;
+  setTracePresentation: (presentation: AgentRunPresentation | null) => void;
 }) {
   const {
     electronAPI,
     sessionId,
     turnId,
     setConversationMessages,
-    setWorkstreamPresentation,
+    setTracePresentation,
   } = options;
 
   if (!navigator.webdriver || !sessionId) {
@@ -175,7 +175,7 @@ export async function syncE2EConversationState(options: {
       setConversationMessages(history);
       const workflowPresentation = await electronAPI.workflow.getWorkstreamSession(sessionId).catch(() => null);
       if (workflowPresentation?.presentation) {
-        setWorkstreamPresentation(workflowPresentation.presentation);
+        setTracePresentation(workflowPresentation.presentation);
       }
       return;
     }

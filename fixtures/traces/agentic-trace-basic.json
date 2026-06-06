@@ -1,0 +1,136 @@
+{
+  "fixtureId": "agentic-trace-basic",
+  "description": "Golden AgentRunPresentation for browser preview and e2e smoke.",
+  "presentation": {
+    "sessionId": "browser-preview-session-1",
+    "activeBranchId": "branch-main",
+    "mode": "debugger",
+    "updatedAt": "2026-05-24T10:00:07.000Z",
+    "runs": [
+      {
+        "run": {
+          "runId": "browser-preview-run-1",
+          "agentType": "debugger",
+          "title": "Browser Preview Debug Plan",
+          "userRequest": "Preview Agentic Trace UI in browser fallback.",
+          "status": "waiting_approval",
+          "createdAt": "2026-05-24T10:00:00.000Z",
+          "updatedAt": "2026-05-24T10:00:07.000Z"
+        },
+        "timeline": {
+          "runId": "browser-preview-run-1",
+          "title": "Browser Preview Debug Plan",
+          "status": "waiting_approval",
+          "nodes": [
+            {
+              "nodeId": "task-frame-basic",
+              "sourceNodeIds": ["task-frame-basic"],
+              "renderer": "task_frame",
+              "title": "Browser Preview Debug Plan",
+              "status": "waiting_approval",
+              "importance": "high",
+              "payload": {
+                "id": "task-frame-basic",
+                "runId": "browser-preview-run-1",
+                "kind": "task_frame",
+                "title": "Browser Preview Debug Plan",
+                "userRequest": "Preview Agentic Trace UI in browser fallback.",
+                "seq": 1,
+                "createdAt": "2026-05-24T10:00:00.000Z",
+                "visibility": "user",
+                "status": "waiting_approval"
+              }
+            },
+            {
+              "nodeId": "thought-basic",
+              "sourceNodeIds": ["thought-basic"],
+              "renderer": "thought_summary",
+              "title": "思考摘要",
+              "status": "succeeded",
+              "payload": {
+                "id": "thought-basic",
+                "runId": "browser-preview-run-1",
+                "kind": "thought_summary",
+                "intent": "Browser Preview 使用 Agentic Trace 协议展示任务帧、工具调用与计划卡片。",
+                "seq": 2,
+                "createdAt": "2026-05-24T10:00:01.000Z",
+                "visibility": "user"
+              }
+            },
+            {
+              "nodeId": "tool-basic",
+              "sourceNodeIds": ["tool-basic"],
+              "renderer": "tool.unknown",
+              "title": "Inspect opened capture context",
+              "status": "succeeded",
+              "collapsedByDefault": true,
+              "payload": {
+                "id": "tool-basic",
+                "runId": "browser-preview-run-1",
+                "kind": "tool_action",
+                "toolCallId": "tool-basic",
+                "toolName": "rd.session.get_context",
+                "displayName": "Inspect opened capture context",
+                "category": "domain",
+                "outputPreview": "确认当前 project 已有 opened capture。",
+                "seq": 3,
+                "createdAt": "2026-05-24T10:00:02.000Z",
+                "visibility": "user",
+                "status": "succeeded"
+              }
+            },
+            {
+              "nodeId": "phase-execute-basic",
+              "sourceNodeIds": ["phase-execute-basic"],
+              "renderer": "phase_group",
+              "title": "执行工具",
+              "status": "succeeded",
+              "payload": {
+                "id": "phase-execute-basic",
+                "runId": "browser-preview-run-1",
+                "kind": "phase_group",
+                "title": "执行工具",
+                "phase": "execute",
+                "children": [],
+                "seq": 4,
+                "createdAt": "2026-05-24T10:00:06.000Z",
+                "visibility": "user",
+                "status": "succeeded"
+              }
+            },
+            {
+              "nodeId": "plan-basic",
+              "sourceNodeIds": ["plan-basic"],
+              "renderer": "plan",
+              "title": "Browser Preview Debug Plan",
+              "status": "waiting_approval",
+              "importance": "high",
+              "payload": {
+                "id": "plan-basic",
+                "runId": "browser-preview-run-1",
+                "kind": "plan",
+                "title": "Browser Preview Debug Plan",
+                "steps": [
+                  { "id": "goal", "title": "目标", "description": "Preview Agentic Trace UI.", "status": "pending" },
+                  { "id": "route", "title": "执行路线", "description": "Plan approval 后进入 execution trace。", "status": "pending" }
+                ],
+                "seq": 5,
+                "createdAt": "2026-05-24T10:00:07.000Z",
+                "visibility": "user",
+                "status": "waiting_approval"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "rightPanel": {
+      "progress": { "current": [], "history": [] },
+      "artifacts": { "current": [], "previous": [] },
+      "context": { "groups": [] }
+    },
+    "approval": null,
+    "branchNavigator": null,
+    "rawAuditRefs": []
+  }
+}

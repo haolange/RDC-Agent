@@ -2,21 +2,18 @@ import React, { useEffect, useRef } from 'react';
 import type { AgentMode } from '@shared/types/layout';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import { EmptyWorkbenchPrompt } from '../../../patterns/EmptyWorkbenchPrompt';
-import { AgentWorkstream } from '../AgentWorkstream';
+import { AgentRunView } from '../../../stream/AgentRunView';
 import { PlanApprovalCard } from '../plan/PlanApprovalCard';
 import './AgentChat.css';
 
 const STICKY_SCROLL_THRESHOLD = 96;
 
 export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
-  const presentation = useWorkflowStore((state) => state.workstreamPresentation);
+  const presentation = useWorkflowStore((state) => state.tracePresentation);
   const workflowState = useWorkflowStore((state) => state.workflowState);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldStickToBottomRef = useRef(true);
-  const itemCount = presentation?.items.length ?? 0;
-  const currentStage = workflowState?.currentStage;
-  const showPlanPhaseMarker = currentStage === 'plan' || workflowState?.approvalState === 'pending_user';
-  const showExecutionPhaseMarker = Boolean(currentStage && !['preflight', 'plan'].includes(currentStage));
+  const itemCount = presentation?.runs.length ?? 0;
   const isEmpty = itemCount === 0;
 
   useEffect(() => {
@@ -52,14 +49,8 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
         data-testid="chat-messages"
         onScroll={handleScroll}
       >
-        {showPlanPhaseMarker ? (
-          <span className="phase-trace-compat-marker" data-testid="phase-trace-plan">Plan Phase</span>
-        ) : null}
-        {showExecutionPhaseMarker ? (
-          <span className="phase-trace-compat-marker" data-testid="phase-trace-execution">Execution Phase</span>
-        ) : null}
         <PlanApprovalCard />
-        <AgentWorkstream
+        <AgentRunView
           presentation={presentation}
           emptyState={isEmpty ? <EmptyWorkbenchPrompt mode={mode} /> : null}
         />

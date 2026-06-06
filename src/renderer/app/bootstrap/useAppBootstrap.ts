@@ -45,7 +45,7 @@ export function useAppBootstrap(options: {
   const currentRunUsage = useSessionStore((state) => state.currentRunUsage);
 
   const setConversationMessages = useConversationStore((state) => state.setConversationMessages);
-  const setWorkstreamPresentation = useWorkflowStore((state) => state.setWorkstreamPresentation);
+  const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
   const setCurrentRunUsage = useSessionStore((state) => state.setCurrentRunUsage);
   const setActiveTerminalContext = useTerminalStore((state) => state.setActiveContext);
 
@@ -120,9 +120,9 @@ export function useAppBootstrap(options: {
         historyResult.messages ?? [],
         (evidenceResult.events ?? []) as ActionEvent[],
       ));
-      setWorkstreamPresentation(workstreamResult.presentation ?? null);
+      setTracePresentation(workstreamResult.presentation ?? null);
     })();
-  }, [currentSession?.sessionId, runtimeTestMode, setConversationMessages, setWorkstreamPresentation]);
+  }, [currentSession?.sessionId, runtimeTestMode, setConversationMessages, setTracePresentation]);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
@@ -209,7 +209,7 @@ function useSessionRestoreBootstrap(runtimeTestMode: boolean | null): void {
 
     if (!electronAPI || !currentSession) {
       useConversationStore.getState().setTimeline([]);
-      useWorkflowStore.getState().setWorkstreamPresentation(null);
+      useWorkflowStore.getState().setTracePresentation(null);
       return;
     }
 
@@ -251,10 +251,10 @@ function useSessionRestoreBootstrap(runtimeTestMode: boolean | null): void {
 
     void electronAPI.workflow.getWorkstreamSession(currentSession.sessionId)
       .then((result) => {
-        useWorkflowStore.getState().setWorkstreamPresentation(result.presentation ?? null);
+        useWorkflowStore.getState().setTracePresentation(result.presentation ?? null);
       })
       .catch(() => {
-        useWorkflowStore.getState().setWorkstreamPresentation(null);
+        useWorkflowStore.getState().setTracePresentation(null);
       });
   }, [currentSession?.sessionId, runtimeTestMode]);
 }

@@ -71,8 +71,8 @@ export function useIpcEventBridge(options: {
       }
     });
 
-    const unsubscribeWorkstreamChanged = electronAPI.events.onWorkstreamChanged((payload) => {
-      useWorkflowStore.getState().setWorkstreamPresentation(payload.presentation);
+    const unsubscribeTraceProjectionChanged = electronAPI.events.onTraceProjectionChanged((payload) => {
+      useWorkflowStore.getState().setTracePresentation(payload.presentation);
     });
 
     const unsubscribeContextChanged = electronAPI.events.onContextChanged((snapshot) => {
@@ -274,7 +274,7 @@ export function useIpcEventBridge(options: {
 
     return () => {
       unsubscribeRunUsageChanged();
-      unsubscribeWorkstreamChanged();
+      unsubscribeTraceProjectionChanged();
       unsubscribeContextChanged();
       unsubscribeToolExecutionComplete();
       unsubscribeAgentMessage();

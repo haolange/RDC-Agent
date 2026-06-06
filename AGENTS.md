@@ -52,14 +52,14 @@
 - 修复结构问题时，不要顺手做与任务无关的视觉改版、布局重排或交互重定义。
 - 涉及 `src/renderer` 的改动，除检查类型和功能外，还要检查界面入口是否完整、关键面板是否可渲染、现有交互是否可达。
 
-## Browser Preview 边界
+## 浏览器真实会话边界
 
-- `Browser Preview` 是 renderer UI/UX 迭代入口，只验证普通浏览器中的 renderer 与 `BrowserElectronApiFallback` 行为，不代表真实 `Electron`、`preload`、`IPC`、`main process`、workspace、`ToolBridge` 或 `RenderDoc` 工具链。
-- 真实软件任务 session 只能来自完整 `Electron` 应用链路；`Browser Preview` 的伪 session / preview scenario 不得写入真实 workspace，也不得作为真实任务状态来源。
-- 涉及 UI/UX、布局、消息流、状态展示、样式、面板可达性的改动，可以优先使用 `npm run dev:renderer` 或 `scripts/start-rdc-agent-renderer.cmd` 加 Browser Use 验证。
-- 涉及 `src/main`、`src/preload`、`IPC`、workspace/session 持久化、真实 settings、`ToolBridge`、`RenderDoc` 工具链或窗口逻辑的改动，不能只用 `Browser Preview` 验收，必须执行对应类型检查、构建和必要的 `Electron E2E`。
-- Preview scenario 是可维护的 UI/UX 样本数据；新增或调整场景时命名要表达稳定职责，不要把临时调试数据、真实用户数据或含 secret 的内容放入 scenario。
-- `scripts/start-rdc-agent.cmd` 表示完整 `Electron` 开发应用入口；`scripts/start-rdc-agent-renderer.cmd` 表示 renderer-only 预览入口，两者不得互相替代。
+- agent 日常 UI/功能验证默认使用浏览器真实会话：先启动完整应用，再用主进程输出的 `http://127.0.0.1:<port>/app` 打开同一套 renderer。
+- 浏览器真实会话通过 localhost bridge 连接真实 `main process`、workspace、settings、LLM runtime、事件流和 `ToolBridge`；不得再新增 renderer-only mock session 或 scenario 作为验收入口。
+- Electron 窗口仍通过 `preload -> IPC` 进入主进程；浏览器真实会话通过 `localhost bridge -> IPC handler registry` 进入主进程。两条路径必须共享同一套 main/runtime 能力。
+- 涉及 UI/UX、布局、消息流、状态展示、样式、面板可达性的改动，优先用浏览器真实会话和内置浏览器多模态点击验证。
+- 涉及 `src/main`、`src/preload`、窗口、IPC 注册、workspace 权限、`ToolBridge` 或 `RenderDoc` 本地链路时，补 `npm run test:shell-smoke` 或等价 shell smoke；不把交互类 Electron Playwright 作为默认门禁。
+- `scripts/start-rdc-agent.cmd` 是开发启动入口；主进程启动后会输出浏览器真实会话 URL。
 
 ## 产物与命名治理
 
@@ -84,7 +84,7 @@
 - 代码改动后执行一次 `npm run typecheck`。
 - renderer 结构或 UI 锚点改动后执行 `npm run check:architecture`、`npm run check:fidelity`、`npm run check:shared-exports`。
 - 入口、构建或窗口逻辑改动后，再补一次 `npm run build` 或等价打包检查。
-- 仅验证 renderer UI/UX 时，可以使用 `npm run dev:renderer` 或 `scripts/start-rdc-agent-renderer.cmd` 打开 `http://127.0.0.1:5173/`；这只算 `Browser Preview` 验证，不等价于真实 `Electron E2E`。
-- 运行 Electron E2E 前必须先执行 `npm run build`，因为 `e2e/helpers/electron-app.ts` 启动的是 `out/main/index.js` 与 `out/renderer` 的构建产物；不要直接用旧的 `out/` 结果验证最新源码改动。
+- 浏览器真实会话 smoke 使用 `npm run test:browser-session`，它打开 `/app` 并通过真实 localhost bridge 调用主进程。
+- Electron 壳边界 smoke 使用 `npm run test:shell-smoke`；运行前必须先执行 `npm run build`，因为 smoke 启动的是 `out/main/index.js` 与 `out/renderer` 的构建产物。
 - 涉及工作台交互、页面结构、样式引用或共享契约的改动后，至少补一次关键 E2E smoke 或等价人工回归，确认主界面、关键面板和主要交互未退化。
 - 仅文档改动时，检查术语、路径和描述是否与当前仓库结构一致。

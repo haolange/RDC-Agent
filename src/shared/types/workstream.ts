@@ -1,24 +1,3 @@
-import type { AppMode } from './session';
-
-export type WorkstreamType = 'ask' | 'debugger' | 'analyzer' | 'optimizer';
-
-export type WorkstreamStatus =
-  | 'running'
-  | 'completed'
-  | 'failed'
-  | 'cancelled'
-  | 'awaiting_approval';
-
-export type WorkstreamDensity = 'expanded' | 'compact';
-
-export type WorkstreamResultKind =
-  | 'answer'
-  | 'plan'
-  | 'report'
-  | 'failure'
-  | 'cancelled'
-  | 'visual_report_summary';
-
 export type PlanStatus =
   | 'draft'
   | 'awaiting_approval'
@@ -28,8 +7,6 @@ export type PlanStatus =
   | 'executed'
   | 'failed';
 
-export type ToolStatus = 'running' | 'done' | 'failed' | 'skipped';
-
 export interface RawAuditRef {
   id: string;
   label: string;
@@ -38,80 +15,6 @@ export interface RawAuditRef {
   sessionId?: string;
   ref?: string;
 }
-
-export interface AgentTextEvent {
-  kind: 'agent.text';
-  id: string;
-  workstreamId: string;
-  createdAt: string;
-  text: string;
-}
-
-export interface ToolEvent {
-  kind: 'tool';
-  id: string;
-  workstreamId: string;
-  taskId?: string;
-  createdAt: string;
-  completedAt?: string;
-  status: ToolStatus;
-  title: string;
-  summary: string;
-  target?: string;
-  durationMs?: number;
-  inputRef?: string;
-  outputRef?: string;
-  artifactIds?: string[];
-  rawTraceRef?: string;
-  errorSummary?: string;
-}
-
-export interface NestedWorkstreamPresentation {
-  id: string;
-  title: string;
-  process: ProcessEvent[];
-  result?: TaskResultRecord;
-}
-
-export interface SubAgentEvent {
-  kind: 'subagent';
-  id: string;
-  workstreamId: string;
-  taskId?: string;
-  createdAt: string;
-  completedAt?: string;
-  status: ToolStatus;
-  label: string;
-  summary: string;
-  resultSummary?: string;
-  nestedWorkstream?: NestedWorkstreamPresentation;
-  rawTraceRef?: string;
-}
-
-export interface UserConfirmationEvent {
-  kind: 'user.confirmed';
-  id: string;
-  workstreamId: string;
-  planId: string;
-  createdAt: string;
-  label: string;
-}
-
-export interface UserRevisionEvent {
-  kind: 'user.revision_requested';
-  id: string;
-  workstreamId: string;
-  planId: string;
-  createdAt: string;
-  prompt: string;
-}
-
-export type ProcessEvent =
-  | AgentTextEvent
-  | ToolEvent
-  | SubAgentEvent
-  | UserConfirmationEvent
-  | UserRevisionEvent;
 
 export type ProgressTaskStatus =
   | 'pending'
@@ -185,25 +88,6 @@ export interface WorkstreamContextRecord {
   detailsRef?: string;
 }
 
-export interface TaskResultSection {
-  id: string;
-  title: string;
-  body: string;
-  severity?: 'normal' | 'info' | 'warning' | 'error';
-  contextIds?: string[];
-}
-
-export interface TaskResultRecord {
-  id: string;
-  workstreamId: string;
-  kind: WorkstreamResultKind;
-  status: PlanStatus | WorkstreamStatus | 'ready';
-  title: string;
-  sections: TaskResultSection[];
-  artifactIds: string[];
-  createdAt: string;
-}
-
 export interface UserRequestRevision {
   id: string;
   requestId: string;
@@ -238,149 +122,6 @@ export interface RequestBranchGroup {
   activeBranchId: string;
   branches: RequestBranch[];
 }
-
-export interface TaskWorkstream {
-  id: string;
-  sessionId: string;
-  branchId: string;
-  type: WorkstreamType;
-  status: WorkstreamStatus;
-  density: WorkstreamDensity;
-  resultKind?: WorkstreamResultKind;
-  sourceRequestRevisionId?: string;
-  parentWorkstreamId?: string;
-  startedAt: string;
-  completedAt?: string;
-  processEvents: ProcessEvent[];
-  result?: TaskResultRecord;
-  planId?: string;
-  planStatus?: PlanStatus;
-}
-
-export interface AgentWorkstreamSession {
-  sessionId: string;
-  activeBranchId: string;
-  latestDisplayedPlanId?: string;
-  latestAcceptedPlanId?: string;
-  userRequests: UserRequest[];
-  workstreams: TaskWorkstream[];
-  progress: ProgressTask[];
-  artifacts: WorkstreamArtifactRecord[];
-  context: WorkstreamContextRecord[];
-  branches: RequestBranchGroup[];
-  rawAuditRefs: RawAuditRef[];
-  updatedAt: string;
-}
-
-export interface UserPromptBubbleViewModel {
-  kind: 'user_prompt';
-  id: string;
-  branchId: string;
-  requestId: string;
-  revisionId: string;
-  prompt: string;
-  createdAt: string;
-  branchIndex: number;
-  branchCount: number;
-  canCopy: boolean;
-  canEdit: boolean;
-  branchNavigator?: BranchNavigatorViewModel | null;
-}
-
-export interface AgentThinkingBubbleViewModel {
-  kind: 'agent_thinking';
-  id: string;
-  createdAt: string;
-  text: string;
-}
-
-export interface ToolRowViewModel {
-  kind: 'tool_row';
-  id: string;
-  createdAt: string;
-  completedAt?: string;
-  status: ToolStatus;
-  title: string;
-  summary: string;
-  target?: string;
-  durationMs?: number;
-  taskId?: string;
-  artifactIds: string[];
-  rawTraceRef?: string;
-  inputRef?: string;
-  outputRef?: string;
-  errorSummary?: string;
-}
-
-export interface SubAgentRowViewModel {
-  kind: 'subagent_row';
-  id: string;
-  createdAt: string;
-  completedAt?: string;
-  status: ToolStatus;
-  label: string;
-  summary: string;
-  resultSummary?: string;
-  taskId?: string;
-  nestedWorkstream?: NestedWorkstreamPresentation;
-  rawTraceRef?: string;
-}
-
-export interface UserConfirmationViewModel {
-  kind: 'user_confirmation';
-  id: string;
-  workstreamId: string;
-  planId: string;
-  label: string;
-  createdAt: string;
-}
-
-export interface UserRevisionViewModel {
-  kind: 'user_revision';
-  id: string;
-  workstreamId: string;
-  planId: string;
-  prompt: string;
-  createdAt: string;
-}
-
-export type ProcessTraceItemViewModel =
-  | AgentThinkingBubbleViewModel
-  | ToolRowViewModel
-  | SubAgentRowViewModel;
-
-export interface ProcessTraceViewModel {
-  collapsed: boolean;
-  items: ProcessTraceItemViewModel[];
-  thinkingDurationMs?: number;
-}
-
-export interface TaskResultViewModel extends TaskResultRecord {
-  artifacts: WorkstreamArtifactRecord[];
-}
-
-export interface TaskWorkstreamViewModel {
-  kind: 'task_workstream';
-  id: string;
-  type: WorkstreamType;
-  status: WorkstreamStatus;
-  density: WorkstreamDensity;
-  title: string;
-  startedAt: string;
-  completedAt?: string;
-  /** @deprecated prompt is now rendered as an independent MessageStreamItem before the task workstream */
-  prompt?: UserPromptBubbleViewModel;
-  process: ProcessTraceViewModel;
-  result?: TaskResultViewModel;
-  planId?: string;
-  planStatus?: PlanStatus;
-}
-
-export type MessageStreamItem =
-  | UserPromptBubbleViewModel
-  | TaskWorkstreamViewModel
-  | UserConfirmationViewModel
-  | UserRevisionViewModel;
 
 export interface ProgressPanelViewModel {
   current: ProgressTask[];
@@ -426,41 +167,28 @@ export interface BranchNavigatorViewModel {
   branches: RequestBranch[];
 }
 
-export interface AgentWorkstreamPresentation {
-  sessionId: string;
-  activeBranchId: string;
-  mode: AppMode;
-  items: MessageStreamItem[];
-  rightPanel: RightPanelViewModel;
-  approval?: ComposerApprovalViewModel | null;
-  branchNavigator?: BranchNavigatorViewModel | null;
-  rawAuditRefs: RawAuditRef[];
-  updatedAt: string;
-}
-
-export interface WorkstreamSessionResult {
+export interface TraceSessionResult {
   success: boolean;
-  session?: AgentWorkstreamSession;
-  presentation?: AgentWorkstreamPresentation;
+  presentation?: import('./agenticTrace').AgentRunPresentation;
   error?: string;
 }
 
-export interface WorkstreamRevisionResult extends WorkstreamSessionResult {
+export interface TraceRevisionResult extends TraceSessionResult {
   runId?: string;
   planId?: string;
   branchId?: string;
 }
 
-export interface WorkstreamBranchSwitchResult extends WorkstreamSessionResult {
+export interface TraceBranchSwitchResult extends TraceSessionResult {
   activeBranchId?: string;
 }
 
-export interface WorkstreamExportOptions {
+export interface TraceExportOptions {
   includeRawTrace?: boolean;
   includeAllBranches?: boolean;
 }
 
-export interface WorkstreamExportResult {
+export interface TraceExportResult {
   success: boolean;
   sessionId?: string;
   summaryPath?: string;
@@ -469,3 +197,8 @@ export interface WorkstreamExportResult {
   error?: string;
 }
 
+/** @deprecated Use AgentRunPresentation from agenticTrace */
+export type AgentWorkstreamPresentation = import('./agenticTrace').AgentRunPresentation & {
+  approval?: ComposerApprovalViewModel | null;
+  rawAuditRefs?: RawAuditRef[];
+};

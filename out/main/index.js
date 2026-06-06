@@ -660,7 +660,7 @@ class ToolBridge {
    */
   async getSessionStatus() {
     return this.call({
-      toolName: "rd.session.status",
+      toolName: "rd.session.get_context",
       args: {}
     });
   }
@@ -2250,6 +2250,39 @@ class StorageAdapter {
   }
 }
 const storageAdapter = new StorageAdapter();
+const clients = /* @__PURE__ */ new Set();
+function writeEvent(response, payload) {
+  response.write(`data: ${JSON.stringify(payload)}
+
+`);
+}
+const rendererEventHub = {
+  emit(channel, ...args) {
+    const payload = { channel, args };
+    for (const client of clients) {
+      writeEvent(client, payload);
+    }
+  },
+  connect(response) {
+    response.writeHead(200, {
+      "Access-Control-Allow-Origin": "*",
+      "Cache-Control": "no-store",
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Connection": "keep-alive"
+    });
+    response.write("retry: 1000\n\n");
+    clients.add(response);
+    const heartbeat = setInterval(() => {
+      response.write(":\n\n");
+    }, 15e3);
+    const disconnect = () => {
+      clearInterval(heartbeat);
+      clients.delete(response);
+    };
+    response.on("close", disconnect);
+    return disconnect;
+  }
+};
 const APP_LOG_LIMIT = 1e3;
 const SESSION_LOG_LIMIT = 500;
 class RuntimeLogService {
@@ -2295,6 +2328,7 @@ class RuntimeLogService {
     }
   }
   broadcast(entry) {
+    rendererEventHub.emit("runtime:logAppended", entry);
     const windows = electron.BrowserWindow.getAllWindows();
     for (const win of windows) {
       if (!win.isDestroyed()) {
@@ -3078,6 +3112,7 @@ class ReplayDeviceService {
     return devices;
   }
   broadcast(payload) {
+    rendererEventHub.emit("device:statusChanged", payload);
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
       return;
     }
@@ -4275,6 +4310,7 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
   apiKey = "";
   baseUrl = "https://generativelanguage.googleapis.com/v1beta";
   models = [];
+  useBearerAuth = false;
   constructor(name) {
     super(name);
   }
@@ -4282,17 +4318,26 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
     this.apiKey = config.apiKey.trim();
     this.baseUrl = (config.baseUrl || this.baseUrl).trim().replace(/\/+$/, "");
     this.models = config.models;
+    this.useBearerAuth = config.authMode === "account";
+  }
+  createGenerateContentUrl(model) {
+    const base = `${this.baseUrl}/models/${model}:generateContent`;
+    return this.useBearerAuth ? base : appendQueryParam$1(base, "key", this.apiKey);
+  }
+  createHeaders() {
+    return {
+      ...this.useBearerAuth ? { Authorization: `Bearer ${this.apiKey}` } : {},
+      "Content-Type": "application/json"
+    };
   }
   async chat(request) {
     const model = request.model?.trim();
     if (!model) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
-    const response = await fetch(appendQueryParam$1(`${this.baseUrl}/models/${model}:generateContent`, "key", this.apiKey), {
+    const response = await fetch(this.createGenerateContentUrl(model), {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: this.createHeaders(),
       signal: request.signal,
       body: JSON.stringify({
         contents: request.messages.filter((message) => message.role !== "system").map((message) => ({
@@ -4588,6 +4633,21 @@ const GITHUB_COPILOT_ACCOUNT_MODELS = [
   "claude-sonnet-4-5",
   "gpt-4.1"
 ];
+const GROK_ACCOUNT_MODELS = [
+  "grok-4.3",
+  "grok-4",
+  "grok-code-fast-1"
+];
+const GEMINI_ACCOUNT_MODELS = [
+  "gemini-2.5-pro",
+  "gemini-2.5-flash",
+  "gemini-2.0-flash"
+];
+const QWEN_ACCOUNT_MODELS = [
+  "qwen-plus",
+  "qwen-max",
+  "qwen3-coder-plus"
+];
 const OPENAI_CODE_MODELS = ["gpt-5.2", "gpt-4.1", "gpt-5-mini"];
 const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
   {
@@ -4723,6 +4783,45 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     recommendedModels: GITHUB_COPILOT_ACCOUNT_MODELS,
     docsUrl: "https://github.com/features/copilot",
     accountLoginConfigured: true
+  },
+  {
+    id: "grok-account",
+    kind: "openai-compatible",
+    authMode: "account",
+    catalogGroup: "account",
+    modelDiscovery: "account-catalog",
+    label: "Grok Account",
+    baseUrl: "https://api.x.ai/v1",
+    recommendedModels: GROK_ACCOUNT_MODELS,
+    docsUrl: "https://grok.com/",
+    accountLoginConfigured: true,
+    unavailableReason: "Live Grok account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured."
+  },
+  {
+    id: "gemini-account",
+    kind: "google-ai-studio",
+    authMode: "account",
+    catalogGroup: "account",
+    modelDiscovery: "account-catalog",
+    label: "Gemini Account",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    recommendedModels: GEMINI_ACCOUNT_MODELS,
+    docsUrl: "https://gemini.google.com/",
+    accountLoginConfigured: true,
+    unavailableReason: "Live Gemini account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured."
+  },
+  {
+    id: "qwen-account",
+    kind: "openai-compatible",
+    authMode: "account",
+    catalogGroup: "account",
+    modelDiscovery: "account-catalog",
+    label: "Qwen Account",
+    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    recommendedModels: QWEN_ACCOUNT_MODELS,
+    docsUrl: "https://chat.qwen.ai/",
+    accountLoginConfigured: true,
+    unavailableReason: "Live Qwen account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured."
   },
   {
     id: "google-ai-studio",
@@ -5281,6 +5380,24 @@ function resolveAccountRuntimeCredential(providerId, workspaceRoot) {
         apiKey: bundle.accessToken ?? bundle.apiKey ?? "",
         baseUrl: "https://chatgpt.com/backend-api/codex",
         accountId: bundle.accountId
+      };
+    }
+    if (providerId === "grok-account") {
+      return {
+        apiKey: bundle.accessToken ?? bundle.apiKey ?? "",
+        baseUrl: "https://api.x.ai/v1"
+      };
+    }
+    if (providerId === "gemini-account") {
+      return {
+        apiKey: bundle.accessToken ?? bundle.apiKey ?? "",
+        baseUrl: "https://generativelanguage.googleapis.com/v1beta"
+      };
+    }
+    if (providerId === "qwen-account") {
+      return {
+        apiKey: bundle.accessToken ?? bundle.apiKey ?? "",
+        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
       };
     }
     return {
@@ -6059,7 +6176,8 @@ const CHATGPT_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 const CLAUDE_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const GITHUB_COPILOT_CLIENT_ID = "Iv1.b507a08c87ecfe98";
 const pendingFlows = /* @__PURE__ */ new Map();
-const isAccountProviderId = (providerId) => providerId === "claude-account" || providerId === "chatgpt-account" || providerId === "github-copilot";
+const isAccountProviderId = (providerId) => providerId === "claude-account" || providerId === "chatgpt-account" || providerId === "github-copilot" || providerId === "grok-account" || providerId === "gemini-account" || providerId === "qwen-account";
+const isMockableAccountProviderId = (providerId) => providerId === "grok-account" || providerId === "gemini-account" || providerId === "qwen-account";
 const isTestMode$1 = () => process.env.RDC_AGENT_TEST_MODE === "1";
 const base64Url = (buffer) => buffer.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const createPkce = () => {
@@ -6216,6 +6334,9 @@ class ProviderAccountAuthService {
     if (providerId === "chatgpt-account") {
       return this.startChatGptLogin();
     }
+    if (isMockableAccountProviderId(providerId)) {
+      return this.startMockableAccountLogin(providerId);
+    }
     return this.startGitHubCopilotLogin();
   }
   async finishLogin(request) {
@@ -6233,6 +6354,10 @@ class ProviderAccountAuthService {
       }
       if (request.providerId === "chatgpt-account") {
         const bundle2 = await this.exchangeChatGptCode(flow, request.code?.trim() ?? "");
+        return await this.persistAccount(request.providerId, bundle2);
+      }
+      if (isMockableAccountProviderId(request.providerId)) {
+        const bundle2 = this.exchangeMockableAccountCode(flow, request.code?.trim() ?? "");
         return await this.persistAccount(request.providerId, bundle2);
       }
       const bundle = await this.pollGitHubDevice(flow);
@@ -6306,7 +6431,7 @@ class ProviderAccountAuthService {
     const flow = isAccount ? this.findFlow(providerId) : null;
     const connected = Boolean(provider?.isConfigured && provider.status === "verified");
     const state2 = forcedState ?? (flow?.error ? "failed" : flow ? "pending" : connected ? "connected" : isAccount ? "signed-out" : "unavailable");
-    const pendingMessage = providerId === "github-copilot" ? "Waiting for GitHub authorization." : "Waiting for authorization.";
+    const pendingMessage = providerId === "github-copilot" ? "Waiting for GitHub authorization." : isAccount && flow && isMockableAccountProviderId(providerId) ? "Waiting for mockable account authorization." : "Waiting for authorization.";
     return {
       providerId,
       state: state2,
@@ -6320,7 +6445,7 @@ class ProviderAccountAuthService {
       authUrl: flow?.authUrl,
       verificationUri: flow?.verificationUri,
       userCode: flow?.userCode,
-      requiresCodeInput: Boolean(flow?.providerId === "claude-account"),
+      requiresCodeInput: Boolean(flow?.providerId === "claude-account" || flow && isMockableAccountProviderId(flow.providerId)),
       models: provider?.models ?? []
     };
   }
@@ -6411,6 +6536,22 @@ class ProviderAccountAuthService {
       flow.error = parseProviderError$1(error);
     });
     return this.status(flow.providerId);
+  }
+  startMockableAccountLogin(providerId) {
+    const definition = getBuiltinProviderDefinition(providerId);
+    const flow = {
+      providerId,
+      flowId: crypto.randomUUID(),
+      state: crypto.randomUUID(),
+      authUrl: definition?.docsUrl,
+      expiresAt: Date.now() + 10 * 60 * 1e3
+    };
+    this.setFlow(flow);
+    void this.openExternal(flow.authUrl);
+    return this.status(
+      flow.providerId,
+      isTestMode$1() ? "Mockable account authorization flow started." : "Live account OAuth is not yet configured for this provider; mock verification is available in test mode."
+    );
   }
   async exchangeClaudeCode(flow, code) {
     if (!code || !flow.codeVerifier) {
@@ -6536,6 +6677,26 @@ class ProviderAccountAuthService {
       };
     }
   }
+  exchangeMockableAccountCode(flow, code) {
+    if (!isMockableAccountProviderId(flow.providerId)) {
+      throw new Error("Provider is not a mockable account adapter.");
+    }
+    if (!isTestMode$1()) {
+      const definition = getBuiltinProviderDefinition(flow.providerId);
+      throw new Error(definition?.unavailableReason ?? "Live account OAuth is not configured for this provider.");
+    }
+    if (!code) {
+      throw new Error("Authorization code is required.");
+    }
+    return {
+      providerId: flow.providerId,
+      accessToken: `mock-${flow.providerId}-${flow.state}`,
+      apiKey: `mock-${flow.providerId}-${flow.state}`,
+      expiresAt: new Date(Date.now() + 3600 * 1e3).toISOString(),
+      accountLabel: getBuiltinProviderDefinition(flow.providerId)?.label ?? flow.providerId,
+      planLabel: "Mock account"
+    };
+  }
   async persistAccount(providerId, bundle) {
     const models = await this.discoverModels(bundle);
     if (models.length === 0) {
@@ -6580,6 +6741,9 @@ class ProviderAccountAuthService {
         copilotApiBaseUrl: copilot.endpoints?.api ?? bundle.copilotApiBaseUrl ?? "https://api.githubcopilot.com",
         expiresAt: copilot.expires_at ? new Date(copilot.expires_at * 1e3).toISOString() : bundle.expiresAt
       };
+    }
+    if (isMockableAccountProviderId(bundle.providerId)) {
+      return bundle;
     }
     if (!bundle.refreshToken) {
       return bundle;
@@ -6633,7 +6797,7 @@ class ProviderAccountAuthService {
     };
   }
   async discoverModels(bundle) {
-    if (bundle.providerId === "chatgpt-account" || bundle.providerId === "claude-account") {
+    if (bundle.providerId === "chatgpt-account" || bundle.providerId === "claude-account" || isMockableAccountProviderId(bundle.providerId)) {
       return createAccountCatalogModels(bundle.providerId);
     }
     if (bundle.providerId === "github-copilot") {
@@ -6694,19 +6858,19 @@ class ProviderAccountAuthService {
     }
   }
   closeFlowServer(flow) {
-    const server = flow.server;
-    if (!server) {
+    const server2 = flow.server;
+    if (!server2) {
       return;
     }
     delete flow.server;
-    if (server.listening) {
-      server.close();
+    if (server2.listening) {
+      server2.close();
     }
   }
   startChatGptCallbackServer(flow) {
     return new Promise((resolve, reject) => {
       let settled = false;
-      const server = http.createServer((request, response) => {
+      const server2 = http.createServer((request, response) => {
         const url2 = new URL(request.url ?? "/", `http://localhost:${CHATGPT_CALLBACK_PORT}`);
         if (url2.pathname !== "/auth/callback" || url2.searchParams.get("state") !== flow.state) {
           response.writeHead(400, { "Content-Type": "text/plain" });
@@ -6724,8 +6888,8 @@ class ProviderAccountAuthService {
           this.closeFlowServer(flow);
         });
       });
-      flow.server = server;
-      server.on("error", (error) => {
+      flow.server = server2;
+      server2.on("error", (error) => {
         flow.error = parseProviderError$1(error);
         this.closeFlowServer(flow);
         pendingFlows.delete(flow.flowId);
@@ -6734,7 +6898,7 @@ class ProviderAccountAuthService {
           reject(error);
         }
       });
-      server.listen(CHATGPT_CALLBACK_PORT, "127.0.0.1", () => {
+      server2.listen(CHATGPT_CALLBACK_PORT, "127.0.0.1", () => {
         settled = true;
         resolve();
       });
@@ -7393,9 +7557,9 @@ RDC tool: ${tool.originalName}`,
 }
 class AgentRunnerRegistry {
   adapters = [
-    new LlmAdapterAgentSdkAdapter(),
     new OpenAiAgentSdkAdapter(),
-    new ClaudeAgentSdkAdapter()
+    new ClaudeAgentSdkAdapter(),
+    new LlmAdapterAgentSdkAdapter()
   ];
   async run(request) {
     const settings = settingsService.getAll();
@@ -7428,6 +7592,7 @@ class AgentRunnerRegistry {
 const agentRunnerRegistry = new AgentRunnerRegistry();
 class WorkflowProjectionPublisher {
   publish(channel, ...args) {
+    rendererEventHub.emit(channel, ...args);
     for (const window of electron.BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) {
         window.webContents.send(channel, ...args);
@@ -7447,8 +7612,8 @@ class WorkflowProjectionPublisher {
   publishRunUsage(usage) {
     this.publish("workflow:runUsageChanged", usage);
   }
-  publishWorkstreamChanged(sessionId, presentation) {
-    this.publish("workflow:workstreamChanged", {
+  publishTraceProjectionChanged(sessionId, presentation) {
+    this.publish("trace:projectionChanged", {
       sessionId,
       presentation
     });
@@ -10045,6 +10210,15 @@ Find the suspicious bright white highlight that should be investigated first.`
   }
 }
 const specialistRecipeRunner = new SpecialistRecipeRunner();
+class DeterministicSpecialistExecutor {
+  prepareSurface(context2) {
+    return specialistRecipeRunner.prepareSurface(context2);
+  }
+  run(specialist, context2, surface) {
+    return specialistRecipeRunner.run(specialist, context2, surface);
+  }
+}
+const deterministicSpecialistExecutor = new DeterministicSpecialistExecutor();
 const escapeHtml = (value) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 class ReportBundleService {
   publish(input) {
@@ -10594,7 +10768,62 @@ class ContextService {
   }
 }
 const contextService = new ContextService();
-const STORE_FILE = "agent-workstream-state.json";
+const mapTaskStatus = (status) => {
+  if (status === "in_progress") return "running";
+  if (status === "rejected") return "failed";
+  return status;
+};
+class MultiAgentWorkflowEngine {
+  constructor(listTasksForRun = () => []) {
+    this.listTasksForRun = listTasksForRun;
+  }
+  listTasksForRun;
+  createDebuggerGraph(input) {
+    return {
+      id: `debugger-serial-${input.runId}`,
+      runId: input.runId,
+      mode: "debugger",
+      execution: "serial",
+      status: this.resolveGraphStatus(input.tasks),
+      tasks: input.tasks.map((task) => ({
+        id: task.taskId,
+        title: task.title,
+        status: mapTaskStatus(task.status),
+        ownerAgentId: task.owner === "harness" ? "rdc-debugger" : task.owner,
+        stage: task.stage,
+        dependsOn: task.dependsOn
+      }))
+    };
+  }
+  readDebuggerGraph(sessionId, runId) {
+    return this.createDebuggerGraph({
+      runId,
+      sessionId,
+      tasks: this.listTasksForRun(sessionId, runId)
+    });
+  }
+  assertSerialExecution(graph) {
+    if (graph.execution !== "serial") {
+      throw new Error(`Debugger workflow must be serial: ${graph.id}`);
+    }
+    const runningTasks = graph.tasks.filter((task) => task.status === "running");
+    if (runningTasks.length > 1) {
+      throw new Error(`Debugger workflow has concurrent running tasks: ${runningTasks.map((task) => task.id).join(", ")}`);
+    }
+  }
+  resolveGraphStatus(tasks) {
+    if (tasks.some((task) => task.status === "in_progress")) return "running";
+    if (tasks.some((task) => task.status === "rejected")) return "failed";
+    if (tasks.some((task) => task.status === "cancelled")) return "cancelled";
+    if (tasks.length > 0 && tasks.every((task) => task.status === "completed")) return "completed";
+    return "pending";
+  }
+}
+const multiAgentWorkflowEngine = new MultiAgentWorkflowEngine(
+  taskBoard.listTasks.bind(taskBoard)
+);
+const STORE_FILE = "agentic-trace-state.json";
+const LEGACY_STORE_FILE = "agent-workstream-state.json";
 const defaultState = (sessionId) => ({
   schemaVersion: "1",
   sessionId,
@@ -10810,73 +11039,727 @@ class WorkstreamStateStore {
     if (!runScopedStore.isPathInside(session.sessionPath, targetPath)) {
       throw new Error(`Workstream state escaped session directory: ${targetPath}`);
     }
+    const legacyPath = path__namespace.resolve(session.sessionPath, LEGACY_STORE_FILE);
+    if (!fs__namespace.existsSync(targetPath) && fs__namespace.existsSync(legacyPath)) {
+      fs__namespace.copyFileSync(legacyPath, targetPath);
+    }
     return targetPath;
   }
 }
 const workstreamStateStore = new WorkstreamStateStore();
+class TraceRunStore {
+  runsDir;
+  constructor(traceRoot) {
+    this.runsDir = path.join(traceRoot, "runs");
+    fs.mkdirSync(this.runsDir, { recursive: true });
+  }
+  runPath(runId) {
+    return path.join(this.runsDir, `${runId}.json`);
+  }
+  save(run) {
+    fs.writeFileSync(this.runPath(run.runId), JSON.stringify(run, null, 2), "utf-8");
+  }
+  get(runId) {
+    const file = this.runPath(runId);
+    if (!fs.existsSync(file)) return null;
+    return JSON.parse(fs.readFileSync(file, "utf-8"));
+  }
+  list() {
+    if (!fs.existsSync(this.runsDir)) return [];
+    return fs.readdirSync(this.runsDir).filter((name) => name.endsWith(".json")).map((name) => JSON.parse(fs.readFileSync(path.join(this.runsDir, name), "utf-8"))).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+  }
+}
+class TraceEventStore {
+  eventsDir;
+  seqCounters = /* @__PURE__ */ new Map();
+  constructor(traceRoot) {
+    this.eventsDir = path.join(traceRoot, "events");
+    fs.mkdirSync(this.eventsDir, { recursive: true });
+  }
+  eventsPath(runId) {
+    return path.join(this.eventsDir, `${runId}.jsonl`);
+  }
+  nextSeq(runId) {
+    const current = this.seqCounters.get(runId);
+    if (current !== void 0) {
+      const next = current + 1;
+      this.seqCounters.set(runId, next);
+      return next;
+    }
+    const events2 = this.getEvents(runId);
+    const seq = events2.length > 0 ? Math.max(...events2.map((e) => e.seq)) + 1 : 1;
+    this.seqCounters.set(runId, seq);
+    return seq;
+  }
+  append(runId, type, payload, visibility = "user") {
+    const event = {
+      eventId: generateEventId("trace"),
+      runId,
+      seq: this.nextSeq(runId),
+      timestamp: nowIso$1(),
+      type,
+      payload,
+      visibility
+    };
+    appendJsonl(this.eventsPath(runId), event);
+    return event;
+  }
+  getEvents(runId, afterSeq = 0) {
+    return readJsonl(this.eventsPath(runId)).filter((event) => event.seq > afterSeq).sort((a, b) => a.seq - b.seq);
+  }
+  exportRun(runId) {
+    const runStore = new TraceRunStore(path.dirname(this.eventsDir));
+    return {
+      run: runStore.get(runId),
+      events: this.getEvents(runId)
+    };
+  }
+  replaceEvents(runId, events2) {
+    writeJsonl(this.eventsPath(runId), events2);
+    this.seqCounters.set(runId, events2.length > 0 ? Math.max(...events2.map((e) => e.seq)) : 0);
+  }
+}
+const PRIMITIVE_MANIFESTS = [
+  {
+    toolName: "file.read",
+    displayName: "读取文件",
+    category: "file",
+    renderer: { key: "tool.file.read", defaultCollapsed: true, supportsPreview: true, supportsRawJson: true }
+  },
+  {
+    toolName: "bash",
+    displayName: "运行命令",
+    category: "shell",
+    renderer: { key: "tool.shell.run", defaultCollapsed: false, supportsPreview: true, supportsRawJson: true },
+    safety: { requiresApproval: true, riskLevel: "medium", redactedFields: ["env", "token", "secret"] }
+  },
+  {
+    toolName: "grep",
+    displayName: "搜索内容",
+    category: "code",
+    renderer: { key: "tool.code.search", defaultCollapsed: true, supportsPreview: true, supportsRawJson: true }
+  },
+  {
+    toolName: "glob",
+    displayName: "搜索文件",
+    category: "file",
+    renderer: { key: "tool.file.search", defaultCollapsed: true, supportsPreview: true, supportsRawJson: true }
+  }
+];
+const categoryFromNamespace = (toolName) => {
+  if (toolName.startsWith("rd.capture.") || toolName.startsWith("rd.replay.")) return "domain";
+  if (toolName.startsWith("rd.pipeline.") || toolName.startsWith("rd.event.")) return "domain";
+  if (toolName.startsWith("rd.texture.") || toolName.startsWith("rd.shader.")) return "domain";
+  if (toolName.startsWith("rd.")) return "domain";
+  return "unknown";
+};
+const displayNameFromTool = (toolName, description) => {
+  if (description) {
+    const short = description.split(/[。.!?\n]/)[0]?.trim();
+    if (short && short.length <= 32) return short;
+  }
+  const segment = toolName.split(".").pop() || toolName;
+  return segment.replace(/_/g, " ");
+};
+class ToolManifestRegistry {
+  manifests = /* @__PURE__ */ new Map();
+  constructor() {
+    for (const manifest of PRIMITIVE_MANIFESTS) {
+      this.manifests.set(manifest.toolName, manifest);
+    }
+  }
+  loadFromCatalog(catalogPath) {
+    if (!fs.existsSync(catalogPath)) return;
+    const raw = JSON.parse(fs.readFileSync(catalogPath, "utf-8"));
+    for (const tool of raw.tools ?? []) {
+      if (this.manifests.has(tool.name)) continue;
+      this.manifests.set(tool.name, {
+        toolName: tool.name,
+        displayName: displayNameFromTool(tool.name, tool.description),
+        category: categoryFromNamespace(tool.name),
+        description: tool.description,
+        renderer: {
+          key: "tool.domain.rd",
+          defaultCollapsed: true,
+          supportsPreview: true,
+          supportsRawJson: true,
+          supportsArtifacts: true
+        }
+      });
+    }
+  }
+  get(toolName) {
+    return this.manifests.get(toolName) ?? {
+      toolName,
+      displayName: displayNameFromTool(toolName),
+      category: categoryFromNamespace(toolName),
+      renderer: {
+        key: "tool.unknown",
+        defaultCollapsed: true,
+        supportsPreview: true,
+        supportsRawJson: true
+      }
+    };
+  }
+  list() {
+    return [...this.manifests.values()];
+  }
+}
+const toolManifestRegistry = new ToolManifestRegistry();
+const firstLine$1 = (value, fallback) => {
+  const text = typeof value === "string" ? value : value == null ? "" : JSON.stringify(value);
+  return text.trim().split(/\r?\n/)[0]?.trim() || fallback;
+};
+class ToolResultNormalizer {
+  fromToolCallResult(toolName, result) {
+    const data = result.data;
+    const summary = result.ok ? firstLine$1(data, `${toolName} 完成`) : firstLine$1(result.error?.message ?? result.error, `${toolName} 失败`);
+    if (typeof data === "string") {
+      return { summary, preview: { kind: "text", text: data }, raw: result };
+    }
+    if (data && typeof data === "object") {
+      const record = data;
+      if (typeof record.stdout === "string" || typeof record.stderr === "string") {
+        return {
+          summary,
+          preview: {
+            kind: "log",
+            stdout: String(record.stdout ?? ""),
+            stderr: String(record.stderr ?? ""),
+            exitCode: typeof record.exitCode === "number" ? record.exitCode : void 0
+          },
+          raw: result
+        };
+      }
+      if (typeof record.code === "string") {
+        return {
+          summary,
+          preview: {
+            kind: "code",
+            code: record.code,
+            language: typeof record.language === "string" ? record.language : void 0,
+            path: typeof record.path === "string" ? record.path : void 0
+          },
+          raw: result
+        };
+      }
+      return { summary, preview: { kind: "json", value: data }, raw: result };
+    }
+    return { summary, raw: result };
+  }
+  fromActionEvent(event) {
+    const toolName = String(event.payload.tool_name || event.payload.toolName || "tool");
+    const summary = firstLine$1(
+      event.payload.summary ?? event.payload.result ?? event.payload.error ?? event.payload.data,
+      toolName
+    );
+    const payload = event.payload;
+    if (typeof payload.data === "string") {
+      return { summary, preview: { kind: "text", text: payload.data }, raw: payload };
+    }
+    if (payload.data && typeof payload.data === "object") {
+      return { summary, preview: { kind: "json", value: payload.data }, raw: payload };
+    }
+    return { summary, preview: { kind: "text", text: summary }, raw: payload };
+  }
+}
+const toolResultNormalizer = new ToolResultNormalizer();
+const toIso$1 = (value, fallback = nowIso$1()) => {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
+  return fallback;
+};
+const traceStatusFromAction = (event) => {
+  if (event.status === "error" || event.status === "fail" || event.status === "timeout") return "failed";
+  if (event.status === "sent" || event.status === "entered") return "running";
+  if (event.status === "blocked") return "skipped";
+  return "succeeded";
+};
+const parseReasoningPacket = (text) => {
+  const trimmed = text.trim();
+  if (!trimmed.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed.content) return parsed;
+  } catch {
+    return null;
+  }
+  return null;
+};
+class TraceEventEmitter {
+  constructor(store) {
+    this.store = store;
+  }
+  store;
+  emitPhaseStarted(runId, phaseId, title) {
+    return this.store.append(runId, "phase.started", { phaseId, title });
+  }
+  emitPhaseCompleted(runId, phaseId) {
+    return this.store.append(runId, "phase.completed", { phaseId });
+  }
+  emitTaskFrame(runId, userRequest, constraints) {
+    const node = {
+      id: generateEventId("task"),
+      runId,
+      kind: "task_frame",
+      title: "本次任务",
+      userRequest,
+      constraints,
+      seq: 0,
+      createdAt: nowIso$1(),
+      visibility: "user",
+      status: "succeeded"
+    };
+    return this.store.append(runId, "node.created", node);
+  }
+  emitThoughtFromText(runId, text, nodeId) {
+    const trimmed = text.trim();
+    if (!trimmed) return null;
+    const packet = parseReasoningPacket(trimmed);
+    const node = {
+      id: nodeId ?? generateEventId("thought"),
+      runId,
+      kind: "thought_summary",
+      mode: packet?.mode,
+      intent: packet?.content ?? trimmed,
+      rationale: packet?.hypothesis,
+      nextAction: packet?.nextAction,
+      confidence: packet?.confidence,
+      seq: 0,
+      createdAt: nowIso$1(),
+      visibility: "user",
+      status: "succeeded"
+    };
+    return this.store.append(runId, "node.created", node);
+  }
+  emitToolFromActionEvent(runId, event) {
+    const toolName = String(event.payload.tool_name || event.payload.toolName || "tool");
+    const manifest = toolManifestRegistry.get(toolName);
+    const normalized = toolResultNormalizer.fromActionEvent(event);
+    const node = {
+      id: event.event_id,
+      runId,
+      kind: "tool_action",
+      toolCallId: event.event_id,
+      toolName,
+      displayName: manifest.displayName,
+      category: manifest.category,
+      purpose: typeof event.payload.purpose === "string" ? event.payload.purpose : void 0,
+      inputPreview: typeof event.payload.target === "string" ? event.payload.target : void 0,
+      outputPreview: normalized.summary,
+      preview: normalized.preview,
+      rawInput: event.payload,
+      rawOutput: normalized.raw,
+      durationMs: event.duration_ms,
+      status: traceStatusFromAction(event),
+      seq: 0,
+      createdAt: toIso$1(event.ts_ms),
+      visibility: "user"
+    };
+    const type = node.status === "failed" ? "tool.failed" : "tool.completed";
+    const traceEvent = this.store.append(runId, type, node);
+    if (normalized.observations?.length) {
+      for (const obs of normalized.observations) {
+        this.store.append(runId, "node.created", { ...obs, runId });
+      }
+    }
+    return traceEvent;
+  }
+  emitSubAgent(runId, event) {
+    const node = {
+      id: event.event_id,
+      runId,
+      kind: "sub_agent",
+      subRunId: String(event.payload.subRunId || event.event_id),
+      agentName: String(event.payload.targetAgent || event.agent_id || "Sub Agent"),
+      title: String(event.payload.targetAgent || event.agent_id || "子 Agent"),
+      inputSummary: typeof event.payload.objective === "string" ? event.payload.objective : void 0,
+      status: traceStatusFromAction(event),
+      seq: 0,
+      createdAt: toIso$1(event.ts_ms),
+      visibility: "user"
+    };
+    return this.store.append(runId, "node.created", node);
+  }
+  emitPlan(runId, debugPlan) {
+    const node = {
+      id: `plan-${debugPlan.planId}`,
+      runId,
+      kind: "plan",
+      title: debugPlan.presentation?.title || "Debugger Plan",
+      steps: (debugPlan.presentation?.sections ?? []).map((section, index) => ({
+        id: section.id || `step-${index}`,
+        title: section.title,
+        description: section.body.join("\n"),
+        status: "pending"
+      })),
+      seq: 0,
+      createdAt: debugPlan.createdAt,
+      visibility: "user",
+      status: "succeeded"
+    };
+    if (node.steps.length === 0) {
+      node.steps = [
+        { id: "goal", title: "目标", description: debugPlan.userGoal, status: "pending" },
+        { id: "scope", title: "执行路线", description: debugPlan.scope, status: "pending" }
+      ];
+    }
+    return this.store.append(runId, "node.created", node);
+  }
+  emitFinalResponse(runId, content, format = "markdown") {
+    const node = {
+      id: generateEventId("final"),
+      runId,
+      kind: "final_response",
+      content,
+      format,
+      seq: 0,
+      createdAt: nowIso$1(),
+      visibility: "user",
+      status: "succeeded"
+    };
+    return this.store.append(runId, "run.completed", node);
+  }
+  emitObservation(runId, title, facts) {
+    const node = {
+      id: generateEventId("obs"),
+      runId,
+      kind: "observation",
+      title,
+      facts,
+      seq: 0,
+      createdAt: nowIso$1(),
+      visibility: "user",
+      status: "succeeded"
+    };
+    return this.store.append(runId, "node.created", node);
+  }
+  emitFromAgentEvent(runId, event) {
+    if (event.type === "assistant.completed") {
+      const payload = event.payload;
+      return payload.text ? this.emitThoughtFromText(runId, payload.text) : null;
+    }
+    if (event.type === "tool.completed") {
+      const payload = event.payload;
+      if (!payload.toolName) return null;
+      const manifest = toolManifestRegistry.get(payload.toolName);
+      const node = {
+        id: event.id,
+        runId,
+        kind: "tool_action",
+        toolCallId: event.id,
+        toolName: payload.toolName,
+        displayName: manifest.displayName,
+        category: manifest.category,
+        outputPreview: typeof payload.result?.data === "string" ? payload.result.data.slice(0, 120) : void 0,
+        status: payload.result?.ok === false ? "failed" : "succeeded",
+        seq: 0,
+        createdAt: toIso$1(event.timestamp),
+        visibility: "user"
+      };
+      return this.store.append(runId, "tool.completed", node);
+    }
+    if (event.type === "run.failed") {
+      const payload = event.payload;
+      const node = {
+        id: generateEventId("error"),
+        runId,
+        kind: "error",
+        title: "执行失败",
+        message: payload.error || "未知错误",
+        recoverable: true,
+        seq: 0,
+        createdAt: toIso$1(event.timestamp),
+        visibility: "user",
+        status: "failed"
+      };
+      return this.store.append(runId, "run.failed", node);
+    }
+    return null;
+  }
+  synthesizeFromConversation(runId, messages) {
+    const events2 = [];
+    for (const message of messages) {
+      if (message.role === "assistant" && message.content.trim()) {
+        const evt = this.emitThoughtFromText(runId, message.content);
+        if (evt) events2.push(evt);
+      }
+    }
+    return events2;
+  }
+}
+const isTraceNode = (payload) => typeof payload === "object" && payload !== null && "kind" in payload && "id" in payload;
+class TraceTreeBuilder {
+  build(events2, profile) {
+    const nodes = [];
+    let currentPhase = null;
+    let seq = 0;
+    const pushNode = (node, parentId) => {
+      const withMeta = {
+        ...node,
+        seq: seq++,
+        parentId: node.parentId,
+        visibility: node.visibility ?? "user"
+      };
+      if (currentPhase && node.kind !== "phase_group" && node.kind !== "task_frame") {
+        currentPhase.children.push(withMeta);
+      } else {
+        nodes.push(withMeta);
+      }
+    };
+    const openPhase = (phaseId, title) => {
+      if (currentPhase) {
+        currentPhase.status = "succeeded";
+        nodes.push(currentPhase);
+      }
+      currentPhase = {
+        id: generateEventId("phase"),
+        runId: events2[0]?.runId ?? "",
+        kind: "phase_group",
+        title,
+        phase: profile.phases.find((p) => p.phaseId === phaseId)?.phaseId ?? "custom",
+        children: [],
+        status: "running",
+        seq: seq++,
+        createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+        visibility: "user"
+      };
+    };
+    const closePhase = () => {
+      if (currentPhase) {
+        currentPhase.status = "succeeded";
+        nodes.push(currentPhase);
+        currentPhase = null;
+      }
+    };
+    for (const event of events2) {
+      if (event.visibility === "internal") continue;
+      if (event.type === "phase.started") {
+        const payload = event.payload;
+        openPhase(payload.phaseId ?? "custom", payload.title ?? "执行阶段");
+        continue;
+      }
+      if (event.type === "phase.completed") {
+        closePhase();
+        continue;
+      }
+      if (event.type === "node.created" || event.type === "node.updated") {
+        if (isTraceNode(event.payload)) {
+          const node = event.payload;
+          if (node.kind === "phase_group") {
+            closePhase();
+            currentPhase = { ...node, children: node.kind === "phase_group" ? node.children : [] };
+            continue;
+          }
+          pushNode(node);
+        }
+        continue;
+      }
+      if (event.type === "tool.started" || event.type === "tool.completed" || event.type === "tool.failed") {
+        if (isTraceNode(event.payload)) {
+          pushNode(event.payload);
+        }
+        continue;
+      }
+      if (event.type === "run.failed" || event.type === "run.cancelled") {
+        if (isTraceNode(event.payload)) {
+          pushNode(event.payload);
+        }
+        continue;
+      }
+      if (event.type === "run.completed") {
+        closePhase();
+        if (isTraceNode(event.payload)) {
+          pushNode(event.payload);
+        }
+      }
+    }
+    closePhase();
+    return nodes;
+  }
+  flatten(nodes) {
+    const result = [];
+    const walk = (node) => {
+      result.push(node);
+      if (node.kind === "phase_group") {
+        for (const child of node.children) {
+          walk(child);
+        }
+      }
+      if (node.kind === "sub_agent" && node.children) {
+        for (const child of node.children ?? []) {
+          walk(child);
+        }
+      }
+    };
+    for (const node of nodes) walk(node);
+    return result;
+  }
+}
+const traceTreeBuilder = new TraceTreeBuilder();
+const rendererForNode = (node, manifest) => {
+  switch (node.kind) {
+    case "task_frame":
+      return "task_frame";
+    case "thought_summary":
+      return "thought_summary";
+    case "plan":
+      return "plan";
+    case "phase_group":
+      return "phase_group";
+    case "tool_action":
+      return manifest?.renderer.key ?? `tool.${node.category}`;
+    case "observation":
+      return "observation";
+    case "finding":
+      return "finding";
+    case "artifact":
+      return `artifact.${node.artifactKind}`;
+    case "approval":
+      return "approval";
+    case "error":
+      return "error";
+    case "sub_agent":
+      return "sub_agent";
+    case "final_response":
+      return "final_response";
+    default:
+      return "unknown";
+  }
+};
+const titleForNode = (node) => {
+  switch (node.kind) {
+    case "task_frame":
+      return node.title || "本次任务";
+    case "thought_summary":
+      return node.intent.slice(0, 80);
+    case "tool_action":
+      return node.displayName;
+    case "plan":
+      return node.title || "执行计划";
+    case "phase_group":
+      return node.title;
+    case "observation":
+      return node.title;
+    case "finding":
+      return node.title;
+    case "artifact":
+      return node.title;
+    case "approval":
+      return node.title;
+    case "error":
+      return node.title;
+    case "sub_agent":
+      return node.title;
+    case "final_response":
+      return "最终回答";
+    default:
+      return node.kind;
+  }
+};
+const projectChild = (node, profile, collapsedRun) => {
+  const manifest = node.kind === "tool_action" ? toolManifestRegistry.get(node.toolName) : void 0;
+  const timelineNode = {
+    nodeId: node.id,
+    sourceNodeIds: [node.id],
+    renderer: rendererForNode(node, manifest),
+    title: titleForNode(node),
+    status: node.kind === "approval" ? node.status === "approved" ? "succeeded" : node.status === "rejected" ? "failed" : "waiting_approval" : node.status,
+    collapsedByDefault: node.kind === "tool_action" ? manifest?.renderer.defaultCollapsed ?? true : node.kind === "thought_summary" ? collapsedRun : false,
+    importance: node.kind === "task_frame" || node.kind === "final_response" ? "high" : "normal",
+    payload: node
+  };
+  if (node.kind === "phase_group") {
+    const phase = node;
+    timelineNode.children = phase.children.map((child) => projectChild(child, profile, collapsedRun));
+    timelineNode.collapsedByDefault = collapsedRun || (profile.phases.find((p) => p.phaseId === phase.phase)?.defaultCollapsed ?? false);
+  }
+  return timelineNode;
+};
+class ProjectionBuilder {
+  build(run, nodes, profile) {
+    const collapsedRun = run.status === "succeeded" || run.status === "failed" || run.status === "cancelled";
+    const timelineNodes = nodes.filter((node) => node.kind !== "phase_group" || node.children.length > 0).map((node) => projectChild(node, profile, collapsedRun));
+    return {
+      runId: run.runId,
+      title: run.title ?? run.userRequest.slice(0, 60),
+      status: run.status,
+      nodes: timelineNodes
+    };
+  }
+}
+const projectionBuilder = new ProjectionBuilder();
+const debuggerAgentProfile = {
+  agentType: "debugger",
+  displayName: "Debugger Agent",
+  description: "RenderDoc capture debugging agent",
+  version: "1.0.0",
+  phases: [
+    { phaseId: "understand", displayName: "理解任务" },
+    { phaseId: "plan", displayName: "制定计划" },
+    { phaseId: "search", displayName: "搜索定位" },
+    { phaseId: "inspect", displayName: "检查分析" },
+    { phaseId: "modify", displayName: "修改验证" },
+    { phaseId: "execute", displayName: "执行工具" },
+    { phaseId: "verify", displayName: "验证结果" },
+    { phaseId: "summarize", displayName: "总结报告" }
+  ],
+  tools: [],
+  ui: {
+    defaultLayout: "timeline",
+    showPlanByDefault: true,
+    showThoughtSummaryByDefault: true,
+    showRawToolName: false,
+    defaultCollapseLevel: "summary"
+  }
+};
+const askAgentProfile = {
+  agentType: "ask",
+  displayName: "Ask Agent",
+  version: "1.0.0",
+  phases: [
+    { phaseId: "understand", displayName: "理解问题" },
+    { phaseId: "summarize", displayName: "回答总结" }
+  ],
+  tools: [],
+  ui: {
+    defaultLayout: "timeline",
+    showPlanByDefault: false,
+    showThoughtSummaryByDefault: true,
+    showRawToolName: false,
+    defaultCollapseLevel: "summary"
+  }
+};
+class AgentProfileRegistry {
+  profiles = /* @__PURE__ */ new Map([
+    ["ask", askAgentProfile],
+    ["debugger", debuggerAgentProfile],
+    ["analyzer", { ...debuggerAgentProfile, agentType: "analyzer", displayName: "Analyzer Agent" }],
+    ["optimizer", { ...debuggerAgentProfile, agentType: "optimizer", displayName: "Optimizer Agent" }]
+  ]);
+  get(agentType) {
+    return this.profiles.get(agentType) ?? debuggerAgentProfile;
+  }
+  getForMode(mode) {
+    return this.get(mode);
+  }
+}
+const agentProfileRegistry = new AgentProfileRegistry();
 const toIso = (value, fallback = nowIso$1()) => {
-  if (typeof value === "string") {
-    return value;
-  }
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return new Date(value).toISOString();
-  }
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return new Date(value).toISOString();
   return fallback;
 };
 const firstLine = (value, fallback) => {
-  const text = typeof value === "string" ? value : value === void 0 || value === null ? "" : JSON.stringify(value);
+  const text = typeof value === "string" ? value : value == null ? "" : JSON.stringify(value);
   return text.trim().split(/\r?\n/)[0]?.trim() || fallback;
 };
-const cleanText = (value) => {
-  if (typeof value === "string") {
-    return value.trim();
-  }
-  if (value === void 0 || value === null) {
-    return "";
-  }
-  return JSON.stringify(value, null, 2);
-};
-const workstreamTypeFromRun = (run) => run?.mode ?? "ask";
-const statusFromRun = (run, planStatus) => {
-  if (run.status === "awaiting_approval") {
-    return "awaiting_approval";
-  }
-  if (run.status === "failed" || run.status === "interrupted") {
-    return "failed";
-  }
-  if (run.status === "cancelled") {
-    return "cancelled";
-  }
-  if (run.status === "completed") {
-    return "completed";
-  }
+const runStatusFromSummary = (run, planStatus) => {
+  if (planStatus === "awaiting_approval" || run.status === "awaiting_approval") return "waiting_approval";
+  if (run.status === "failed" || run.status === "interrupted") return "failed";
+  if (run.status === "cancelled") return "cancelled";
+  if (run.status === "completed") return "succeeded";
   return "running";
-};
-const toolStatusFromEvent = (event) => {
-  if (event.status === "error" || event.status === "fail" || event.status === "timeout") {
-    return "failed";
-  }
-  if (event.status === "sent" || event.status === "entered") {
-    return "running";
-  }
-  if (event.status === "blocked") {
-    return "skipped";
-  }
-  return "done";
-};
-const progressStatusFromTask = (task) => {
-  if (task.status === "in_progress") return "running";
-  if (task.status === "completed") return "completed";
-  if (task.status === "blocked" || task.status === "rejected") return "blocked";
-  if (task.status === "cancelled") return "cancelled";
-  return "pending";
-};
-const isPendingConversationStatus = (status) => status === "draft" || status === "streaming";
-const artifactTypeFromRecord = (record) => {
-  if (record.kind === "report") return "report";
-  if (record.kind === "screenshot") return "visual_report";
-  if (record.kind === "trace" || record.kind === "data") return "evidence_bundle";
-  return "other";
 };
 const mapPlanStatus = (approvalState, run) => {
   if (run.status === "failed" || run.status === "interrupted") return "failed";
@@ -10886,202 +11769,277 @@ const mapPlanStatus = (approvalState, run) => {
   if (approvalState === "rejected") return "needs_revision";
   return "draft";
 };
-const planSections = (debugPlan) => {
-  const sections = debugPlan.presentation?.sections ?? [];
-  if (sections.length > 0) {
-    return sections.map((section) => ({
-      id: section.id || section.title,
-      title: section.title,
-      body: section.body.join("\n"),
-      severity: "normal"
-    }));
-  }
-  return [
-    { id: "goal", title: "目标", body: debugPlan.userGoal },
-    { id: "scope", title: "执行路线", body: debugPlan.scope || "按 Debugger harness 推进 capture 分析。" },
-    { id: "acceptance", title: "验收标准", body: debugPlan.verificationContract.successCriteria.join("\n") },
-    { id: "risks", title: "风险 / 阻断", body: debugPlan.blockers.map((blocker) => blocker.reason).join("\n") || "暂无阻断。" },
-    { id: "deliverables", title: "预计产物", body: debugPlan.expectedDeliverables.join("\n") || "调试报告。" }
-  ];
+const progressStatusFromTask = (task) => {
+  if (task.status === "in_progress") return "running";
+  if (task.status === "completed") return "completed";
+  if (task.status === "blocked" || task.status === "rejected") return "blocked";
+  if (task.status === "cancelled") return "cancelled";
+  return "pending";
 };
-const resultFromPlan = (workstreamId, debugPlan, status) => ({
-  id: `${workstreamId}-plan-result`,
-  workstreamId,
-  kind: "plan",
-  status,
-  title: debugPlan.presentation?.title || "Debugger Plan",
-  sections: planSections(debugPlan),
-  artifactIds: [`artifact-${debugPlan.planId}`],
-  createdAt: debugPlan.createdAt
-});
-const resultFromRun = (workstreamId, run, events2, artifacts) => {
-  if (run.status === "completed") {
-    const reportEvent = events2.find((event) => event.event_type === "report_published");
-    return {
-      id: `${workstreamId}-report-result`,
-      workstreamId,
-      kind: "report",
-      status: "completed",
-      title: "Execution Report",
-      sections: [
-        {
-          id: "summary",
-          title: "结论",
-          body: "调试执行已完成，报告和证据产物已写入 session 输出。"
-        },
-        {
-          id: "evidence",
-          title: "关键证据",
-          body: events2.filter((event) => ["agent_summary", "verification"].includes(event.event_type)).map((event) => firstLine(event.payload.summary ?? event.payload.verdict, event.event_type)).slice(0, 6).join("\n") || "详见 report.md 和 raw trace。"
-        },
-        {
-          id: "artifacts",
-          title: "产物入口",
-          body: artifacts.map((artifact) => artifact.displayName).join("\n") || firstLine(reportEvent?.payload, "report.md")
-        }
-      ],
-      artifactIds: artifacts.map((artifact) => artifact.id),
-      createdAt: toIso(reportEvent?.ts_ms, toIso(run.finishedAt, nowIso$1()))
-    };
-  }
-  if (run.status === "failed" || run.status === "interrupted") {
-    return {
-      id: `${workstreamId}-failure-result`,
-      workstreamId,
-      kind: "failure",
-      status: "failed",
-      title: "Failure Report",
-      sections: [
-        { id: "conclusion", title: "失败结论", body: run.stopReason || "任务未能完成。", severity: "error" },
-        {
-          id: "completed",
-          title: "已完成内容",
-          body: events2.filter((event) => event.status === "ok").map((event) => event.event_type).slice(0, 8).join("\n") || "无可确认完成项。"
-        },
-        { id: "recovery", title: "可恢复路径", body: "保留当前 raw trace、context 和已产生产物；修复阻断后可重新发起任务。" }
-      ],
-      artifactIds: [],
-      createdAt: toIso(run.finishedAt ?? run.stoppedAt, nowIso$1())
-    };
-  }
-  if (run.status === "cancelled") {
-    return {
-      id: `${workstreamId}-cancelled-result`,
-      workstreamId,
-      kind: "cancelled",
-      status: "cancelled",
-      title: "Cancelled Result",
-      sections: [
-        { id: "time", title: "中断时间", body: toIso(run.stoppedAt, nowIso$1()) },
-        { id: "completed", title: "已完成内容", body: events2.map((event) => event.event_type).slice(0, 8).join("\n") || "尚未产生可确认执行内容。" },
-        { id: "next", title: "可继续路径", body: "历史过程保留，可基于同一 capture 重新发起 Debugger 任务。" }
-      ],
-      artifactIds: [],
-      createdAt: toIso(run.stoppedAt, nowIso$1())
-    };
-  }
-  return void 0;
+const artifactTypeFromRecord = (record) => {
+  if (record.kind === "report") return "report";
+  if (record.kind === "screenshot") return "visual_report";
+  if (record.kind === "trace" || record.kind === "data") return "evidence_bundle";
+  return "other";
 };
-const askResultFromTurn = (workstreamId, turn) => {
-  const assistant = turn.assistantMessages.slice(-1)[0];
-  if (!assistant || isPendingConversationStatus(assistant.status)) {
-    return void 0;
-  }
-  const createdAt = toIso(assistant.updatedAt ?? assistant.createdAt, toIso(turn.completedAt));
-  const diagnostic = assistant.diagnostic;
-  if (assistant.status === "error") {
-    const sections = [
-      {
-        id: "error",
-        title: "失败原因",
-        body: assistant.content || diagnostic?.userMessage || "回复生成失败。",
-        severity: "error"
-      }
+class TraceService {
+  traceRoot;
+  runStore;
+  eventStore;
+  emitter;
+  constructor() {
+    this.traceRoot = path.join(appPathService.getWorkspaceRoot(), ".rdc-agent", "trace");
+    this.runStore = new TraceRunStore(this.traceRoot);
+    this.eventStore = new TraceEventStore(this.traceRoot);
+    this.emitter = new TraceEventEmitter(this.eventStore);
+    const catalogCandidates = [
+      path.join(process.cwd(), "resources", "tools", "spec", "tool_catalog.json"),
+      path.join(electron.app.getAppPath(), "resources", "tools", "spec", "tool_catalog.json")
     ];
-    if (diagnostic) {
-      sections.push({
-        id: "diagnostic",
-        title: "诊断",
-        body: [
-          diagnostic.code,
-          diagnostic.providerId && diagnostic.modelId ? `${diagnostic.providerId}/${diagnostic.modelId}` : diagnostic.providerId,
-          diagnostic.technicalMessage
-        ].filter(Boolean).join("\n"),
-        severity: diagnostic.severity === "error" ? "error" : "warning"
-      });
+    for (const catalogPath of catalogCandidates) {
+      if (require("fs").existsSync(catalogPath)) {
+        toolManifestRegistry.loadFromCatalog(catalogPath);
+        break;
+      }
     }
-    return {
-      id: `${workstreamId}-failure-result`,
-      workstreamId,
-      kind: "failure",
-      status: "failed",
-      title: "Ask Failed",
-      sections,
-      artifactIds: [],
-      createdAt
-    };
   }
-  if (assistant.status === "stopped") {
-    return {
-      id: `${workstreamId}-cancelled-result`,
-      workstreamId,
-      kind: "cancelled",
-      status: "cancelled",
-      title: "Ask Cancelled",
-      sections: [{ id: "cancelled", title: "已停止", body: assistant.content || "当前请求已停止。" }],
-      artifactIds: [],
-      createdAt
-    };
+  getRun(runId) {
+    return this.runStore.get(runId);
   }
-  const answer = turn.assistantMessages.map((message) => message.content.trim()).filter(Boolean).join("\n\n");
-  return {
-    id: `${workstreamId}-answer-result`,
-    workstreamId,
-    kind: "answer",
-    status: "completed",
-    title: "Ask Answer",
-    sections: [{ id: "answer", title: "回答", body: answer || "暂无回复内容。" }],
-    artifactIds: [],
-    createdAt
-  };
-};
-class AgentWorkstreamProjector {
+  getEvents(runId, afterSeq = 0) {
+    return this.eventStore.getEvents(runId, afterSeq);
+  }
+  exportRun(runId) {
+    return this.eventStore.exportRun(runId);
+  }
   async getSession(sessionId) {
     try {
       const session = storageAdapter.readSession(sessionId);
       if (!session) {
         return { success: false, error: `Session not found: ${sessionId}` };
       }
-      const runs = storageAdapter.listRuns(sessionId).slice().sort((left, right) => left.startedAt - right.startedAt);
-      const conversations = storageAdapter.readConversationHistory(sessionId);
-      const events2 = await storageAdapter.readActionChain(sessionId);
-      let state2 = workstreamStateStore.read(sessionId);
-      for (const run of runs) {
-        const snapshot = storageAdapter.readPlanSnapshot(sessionId, run.runId);
-        if (snapshot?.debug_plan) {
-          state2 = workstreamStateStore.ensureRunRequest({
-            sessionId,
-            runId: run.runId,
-            prompt: run.goal,
-            planId: snapshot.debug_plan.planId,
-            workstreamId: this.planWorkstreamId(run.runId)
-          });
-          const desiredStatus = mapPlanStatus(snapshot.approval_state, run);
-          const currentStatus = state2.plans.find((plan) => plan.planId === snapshot.debug_plan?.planId)?.status;
-          if (snapshot.debug_plan.planId && currentStatus && currentStatus !== desiredStatus && currentStatus !== "needs_revision" && currentStatus !== "superseded") {
-            state2 = workstreamStateStore.markPlan(sessionId, snapshot.debug_plan.planId, desiredStatus);
-          }
-        }
-      }
-      const model = this.buildSessionModel(sessionId, runs, conversations, events2, state2);
-      const presentation = this.buildPresentation(model);
-      return { success: true, session: model, presentation };
+      const presentation = await this.buildPresentation(sessionId);
+      return { success: true, presentation };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   }
-  buildConversationPresentation(sessionId, conversations) {
-    const model = this.buildSessionModel(sessionId, [], conversations, [], {
+  async buildPresentation(sessionId) {
+    const state2 = workstreamStateStore.read(sessionId);
+    const conversations = storageAdapter.readConversationHistory(sessionId);
+    const events2 = await storageAdapter.readActionChain(sessionId);
+    return this.buildPresentationFromData(
+      sessionId,
+      storageAdapter.listRuns(sessionId),
+      conversations,
+      events2,
+      state2
+    );
+  }
+  async buildPresentationFromData(sessionId, runs, conversations, events2, state2) {
+    const runViewModels = [];
+    const progress = [];
+    const artifacts = [];
+    const context2 = [];
+    const rawAuditRefs = events2.slice(-20).map((event) => ({
+      id: event.event_id,
+      label: event.event_type,
+      eventId: event.event_id,
+      runId: event.run_id,
+      sessionId,
+      ref: `raw-${event.event_id}`
+    }));
+    let latestApproval = null;
+    let mode = "ask";
+    for (const run of runs) {
+      const snapshot = storageAdapter.readPlanSnapshot(sessionId, run.runId);
+      const runEvents = events2.filter((e) => e.run_id === run.runId).sort((a, b) => a.ts_ms - b.ts_ms);
+      const planStatus = mapPlanStatus(snapshot?.approval_state, run);
+      const branchId = state2.activeBranchId || "branch-main";
+      const agentType = run.mode ?? "debugger";
+      mode = agentType;
+      const profile = agentProfileRegistry.getForMode(agentType);
+      const userPrompt = this.userPromptForRun(conversations, run.runId) || snapshot?.debug_plan?.userGoal || runEvents.find((e) => e.event_type === "user_message")?.payload?.content || "调试任务";
+      const runId = run.runId;
+      let agentRun = this.runStore.get(runId);
+      if (!agentRun) {
+        agentRun = {
+          runId,
+          agentType,
+          userRequest: String(userPrompt),
+          status: runStatusFromSummary(run, planStatus),
+          createdAt: toIso(run.startedAt),
+          updatedAt: toIso(run.finishedAt ?? run.startedAt)
+        };
+        this.runStore.save(agentRun);
+      } else {
+        agentRun.status = runStatusFromSummary(run, planStatus);
+        agentRun.updatedAt = toIso(run.finishedAt ?? Date.now());
+        this.runStore.save(agentRun);
+      }
+      const existingRunEvents = this.eventStore.getEvents(runId);
+      const existingNodeIds = new Set(
+        existingRunEvents.flatMap((traceEvent) => {
+          const ids = [];
+          if (traceEvent.type === "run.completed") ids.push(`__final__:${runId}`);
+          const payloadId = traceEvent.payload?.id;
+          if (payloadId) ids.push(payloadId);
+          return ids;
+        })
+      );
+      const existingPhaseStarts = new Set(
+        existingRunEvents.filter((traceEvent) => traceEvent.type === "phase.started").map((traceEvent) => traceEvent.payload.phaseId).filter((phaseId) => Boolean(phaseId))
+      );
+      const existingPhaseCompletions = new Set(
+        existingRunEvents.filter((traceEvent) => traceEvent.type === "phase.completed").map((traceEvent) => traceEvent.payload.phaseId).filter((phaseId) => Boolean(phaseId))
+      );
+      const phaseTitle = (phaseId) => profile.phases.find((phase) => phase.phaseId === phaseId)?.displayName ?? phaseId;
+      const startPhase = (phaseId) => {
+        if (existingPhaseStarts.has(phaseId)) return;
+        this.emitter.emitPhaseStarted(runId, phaseId, phaseTitle(phaseId));
+        existingPhaseStarts.add(phaseId);
+      };
+      const completePhase = (phaseId) => {
+        if (!existingPhaseStarts.has(phaseId) || existingPhaseCompletions.has(phaseId)) return;
+        this.emitter.emitPhaseCompleted(runId, phaseId);
+        existingPhaseCompletions.add(phaseId);
+      };
+      const hasTaskFrame = existingRunEvents.some(
+        (traceEvent) => traceEvent.payload?.kind === "task_frame"
+      );
+      if (!hasTaskFrame) {
+        this.emitter.emitTaskFrame(runId, String(userPrompt));
+      }
+      startPhase("understand");
+      if (snapshot?.debug_plan && !existingRunEvents.some((e) => e.payload?.kind === "plan")) {
+        completePhase("understand");
+        startPhase("plan");
+        this.emitter.emitPlan(runId, snapshot.debug_plan);
+        completePhase("plan");
+      }
+      for (const msg of conversations.filter((m) => m.runId === runId && m.role === "assistant")) {
+        const thoughtId = `thought-${msg.id}`;
+        if (msg.content.trim() && !existingNodeIds.has(thoughtId)) {
+          this.emitter.emitThoughtFromText(runId, msg.content, thoughtId);
+          existingNodeIds.add(thoughtId);
+        }
+      }
+      for (const event of runEvents) {
+        if (existingNodeIds.has(event.event_id)) continue;
+        if (event.event_type === "tool_execution") {
+          completePhase("understand");
+          completePhase("plan");
+          startPhase("execute");
+          this.emitter.emitToolFromActionEvent(runId, event);
+        } else if (event.event_type === "dispatch") {
+          completePhase("understand");
+          completePhase("plan");
+          startPhase("execute");
+          this.emitter.emitSubAgent(runId, event);
+        } else if (event.event_type === "agent_summary") {
+          completePhase("understand");
+          completePhase("plan");
+          startPhase("execute");
+          this.emitter.emitThoughtFromText(runId, String(event.payload.summary || event.payload.content || ""));
+        }
+        existingNodeIds.add(event.event_id);
+      }
+      const finalContent = this.finalContentForRun(run, runEvents, conversations, runId);
+      if (finalContent && !existingNodeIds.has(`__final__:${runId}`)) {
+        completePhase("understand");
+        completePhase("plan");
+        completePhase("execute");
+        startPhase("summarize");
+        this.emitter.emitFinalResponse(runId, finalContent);
+        completePhase("summarize");
+        existingNodeIds.add(`__final__:${runId}`);
+      }
+      const traceEvents = this.eventStore.getEvents(runId);
+      const nodes = traceTreeBuilder.build(traceEvents, profile);
+      const timeline = projectionBuilder.build(agentRun, nodes, profile);
+      runViewModels.push({ run: agentRun, timeline });
+      const wsPlanId = `ws-${runId}-plan`;
+      const wsExecId = `ws-${runId}-execution`;
+      progress.push(...this.mapProgress(sessionId, runId, branchId, wsExecId));
+      artifacts.push(...this.mapArtifacts(sessionId, runId, branchId, wsExecId, runEvents));
+      context2.push(...this.mapContext(sessionId, runId, branchId, wsExecId, run));
+      if (planStatus === "awaiting_approval" && snapshot?.debug_plan) {
+        latestApproval = {
+          planId: snapshot.debug_plan.planId,
+          runId,
+          workstreamId: wsPlanId,
+          status: "awaiting_approval",
+          title: snapshot.debug_plan.presentation?.title || "Debugger Plan",
+          summary: snapshot.debug_plan.userGoal,
+          canApprove: true,
+          canRequestRevision: true
+        };
+      }
+    }
+    for (const turn of this.groupAskTurns(conversations)) {
+      if (turn.messages.some((m) => m.runId)) continue;
+      const runId = `ask-${turn.turnId}`;
+      const userPrompt = turn.userMessage?.content.trim() || "Ask";
+      const assistant = turn.assistantMessages.slice(-1)[0];
+      const status = assistant?.status === "error" ? "failed" : assistant?.status === "stopped" ? "cancelled" : !assistant || assistant.status === "streaming" || assistant.status === "draft" ? "running" : "succeeded";
+      let agentRun = this.runStore.get(runId) ?? {
+        runId,
+        agentType: "ask",
+        userRequest: userPrompt,
+        status,
+        createdAt: toIso(turn.createdAt),
+        updatedAt: toIso(turn.completedAt)
+      };
+      agentRun.status = status;
+      this.runStore.save(agentRun);
+      const existingAskEvents = this.eventStore.getEvents(runId);
+      const existingAskNodeIds = new Set(
+        existingAskEvents.flatMap((traceEvent) => {
+          const ids = [];
+          if (traceEvent.type === "run.completed") ids.push(`__final__:${runId}`);
+          const payloadId = traceEvent.payload?.id;
+          if (payloadId) ids.push(payloadId);
+          return ids;
+        })
+      );
+      const hasAskTaskFrame = existingAskEvents.some(
+        (traceEvent) => traceEvent.payload?.kind === "task_frame"
+      );
+      if (!hasAskTaskFrame) {
+        this.emitter.emitTaskFrame(runId, userPrompt);
+      }
+      for (const msg of turn.assistantMessages) {
+        const thoughtId = `thought-${msg.id}`;
+        if (msg.content.trim() && !existingAskNodeIds.has(thoughtId)) {
+          this.emitter.emitThoughtFromText(runId, msg.content, thoughtId);
+          existingAskNodeIds.add(thoughtId);
+        }
+      }
+      if (assistant?.content.trim() && !existingAskNodeIds.has(`__final__:${runId}`) && status !== "running") {
+        this.emitter.emitFinalResponse(runId, assistant.content);
+      }
+      const profile = agentProfileRegistry.get("ask");
+      const nodes = traceTreeBuilder.build(this.eventStore.getEvents(runId), profile);
+      runViewModels.push({
+        run: agentRun,
+        timeline: projectionBuilder.build(agentRun, nodes, profile)
+      });
+    }
+    const rightPanel = this.buildRightPanel(progress, artifacts, context2, runViewModels);
+    return {
+      sessionId,
+      activeBranchId: state2.activeBranchId || "branch-main",
+      mode,
+      runs: runViewModels.sort((a, b) => Date.parse(a.run.createdAt) - Date.parse(b.run.createdAt)),
+      rightPanel,
+      approval: latestApproval,
+      branchNavigator: null,
+      rawAuditRefs,
+      updatedAt: nowIso$1()
+    };
+  }
+  async buildConversationPresentation(sessionId, conversations) {
+    const state2 = storageAdapter.readSession(sessionId) ? workstreamStateStore.read(sessionId) : {
       schemaVersion: "1",
       sessionId,
       activeBranchId: "branch-main",
@@ -11089,309 +12047,30 @@ class AgentWorkstreamProjector {
       branches: [],
       plans: [],
       updatedAt: nowIso$1()
-    });
-    return this.buildPresentation(model);
+    };
+    const events2 = [];
+    return this.buildPresentationFromData(sessionId, [], conversations, events2, state2);
   }
-  buildSessionModel(sessionId, runs, conversations, events2, state2) {
-    const rawAuditRefs = events2.map((event) => ({
-      id: `raw-${event.event_id}`,
-      label: event.event_type,
-      eventId: event.event_id,
-      runId: event.run_id,
-      sessionId: event.session_id,
-      ref: `action_chain:${event.event_id}`
-    }));
-    const workstreams = [];
-    const progress = [];
-    const artifacts = [];
-    const context2 = [];
-    const userRequests = [...state2.userRequests];
-    for (const run of runs) {
-      const snapshot = storageAdapter.readPlanSnapshot(sessionId, run.runId);
-      const runEvents = events2.filter((event) => event.run_id === run.runId).sort((left, right) => left.ts_ms - right.ts_ms);
-      const planStatus = state2.plans.find((plan) => plan.planId === snapshot?.debug_plan?.planId)?.status ?? mapPlanStatus(snapshot?.approval_state, run);
-      const branchId = this.branchIdForWorkstream(state2.branches, this.planWorkstreamId(run.runId), state2.activeBranchId);
-      const planWorkstream = this.buildPlanWorkstream(run, snapshot?.debug_plan ?? null, planStatus, branchId, runEvents, conversations);
-      workstreams.push(planWorkstream);
-      const runArtifacts = this.mapArtifacts(sessionId, run.runId, branchId, this.executionWorkstreamId(run.runId), runEvents);
-      artifacts.push(...runArtifacts);
-      progress.push(...this.mapProgress(sessionId, run.runId, branchId, this.executionWorkstreamId(run.runId)));
-      context2.push(...this.mapContext(sessionId, run.runId, branchId, this.executionWorkstreamId(run.runId), run));
-      if (this.shouldShowExecutionWorkstream(run, snapshot?.approval_state, runEvents)) {
-        workstreams.push(this.buildExecutionWorkstream(run, branchId, runEvents, runArtifacts));
-      }
+  userPromptForRun(conversations, runId) {
+    const userMsg = conversations.find((m) => m.runId === runId && m.role === "user");
+    return userMsg?.content.trim();
+  }
+  finalContentForRun(run, events2, conversations, runId) {
+    if (run.status === "awaiting_approval") {
+      return null;
     }
-    for (const turn of this.groupAskTurns(conversations)) {
-      if (turn.messages.some((message) => message.runId)) {
-        continue;
-      }
-      const branchId = state2.activeBranchId || "branch-main";
-      const id = `ws-ask-${turn.turnId}`;
-      workstreams.push(this.buildAskWorkstream(sessionId, branchId, id, turn));
-      userRequests.push(this.userRequestFromAskTurn(sessionId, branchId, id, turn));
+    if (run.status === "completed") {
+      const report = events2.find((e) => e.event_type === "report_published");
+      if (report) return firstLine(report.payload.summary, "调试执行已完成，报告已生成。");
+      const assistant = conversations.filter((m) => m.runId === runId && m.role === "assistant").slice(-1)[0];
+      if (assistant?.content.trim()) return assistant.content;
+      return "调试执行已完成。";
     }
-    const updatedAt = nowIso$1();
-    return {
-      sessionId,
-      activeBranchId: state2.activeBranchId || "branch-main",
-      latestDisplayedPlanId: state2.latestDisplayedPlanId,
-      latestAcceptedPlanId: state2.latestAcceptedPlanId,
-      userRequests,
-      workstreams: workstreams.sort((left, right) => Date.parse(left.startedAt) - Date.parse(right.startedAt)),
-      progress,
-      artifacts,
-      context: context2,
-      branches: state2.branches,
-      rawAuditRefs,
-      updatedAt
-    };
-  }
-  buildPresentation(session) {
-    const activeWorkstreams = session.workstreams.filter((workstream) => workstream.branchId === session.activeBranchId);
-    const allWorkstreams = [...session.workstreams].sort((left, right) => {
-      const leftTime = Date.parse(left.startedAt) || 0;
-      const rightTime = Date.parse(right.startedAt) || 0;
-      return leftTime - rightTime;
-    });
-    const items = [];
-    for (const workstream of allWorkstreams) {
-      const isActive = workstream.branchId === session.activeBranchId;
-      const prompt = this.promptForWorkstream(session, workstream);
-      if (prompt) {
-        const branchNav = this.buildPromptBranchNavigator(session, prompt.requestId, prompt.branchId);
-        items.push({ ...prompt, branchNavigator: branchNav });
-      }
-      items.push(this.toTaskViewModel(session, workstream, !isActive));
-      const userEvents = workstream.processEvents.flatMap((event) => {
-        if (event.kind === "user.confirmed") {
-          return [{
-            kind: "user_confirmation",
-            id: event.id,
-            workstreamId: event.workstreamId,
-            planId: event.planId,
-            label: event.label,
-            createdAt: event.createdAt
-          }];
-        }
-        if (event.kind === "user.revision_requested") {
-          return [{
-            kind: "user_revision",
-            id: event.id,
-            workstreamId: event.workstreamId,
-            planId: event.planId,
-            prompt: event.prompt,
-            createdAt: event.createdAt
-          }];
-        }
-        return [];
-      });
-      items.push(...userEvents);
+    if (run.status === "failed" || run.status === "interrupted") {
+      return "执行失败，请查看错误详情与 raw trace。";
     }
-    const rightPanel = this.buildRightPanel(session, activeWorkstreams);
-    const latestPlan = activeWorkstreams.filter((workstream) => workstream.planStatus === "awaiting_approval").slice(-1)[0] ?? null;
-    const latestPlanResult = latestPlan?.result;
-    return {
-      sessionId: session.sessionId,
-      activeBranchId: session.activeBranchId,
-      mode: activeWorkstreams.find((workstream) => workstream.type !== "ask")?.type ?? "ask",
-      items,
-      rightPanel,
-      approval: latestPlan && latestPlanResult ? {
-        planId: latestPlan.planId ?? latestPlanResult.id,
-        workstreamId: latestPlan.id,
-        runId: latestPlan.id.replace(/^ws-/, "").replace(/-plan$/, ""),
-        status: "awaiting_approval",
-        title: latestPlanResult.title,
-        summary: latestPlanResult.sections.slice(0, 2).map((section) => `${section.title}: ${section.body}`).join("\n"),
-        canApprove: true,
-        canRequestRevision: true
-      } : null,
-      branchNavigator: null,
-      rawAuditRefs: session.rawAuditRefs,
-      updatedAt: session.updatedAt
-    };
-  }
-  buildPlanWorkstream(run, debugPlan, planStatus, branchId, runEvents, conversations) {
-    const id = this.planWorkstreamId(run.runId);
-    const confirmationEvents = runEvents.filter((event) => ["user_confirmation", "user_revision_requested"].includes(event.event_type)).map((event) => event.event_type === "user_confirmation" ? {
-      kind: "user.confirmed",
-      id: event.event_id,
-      workstreamId: id,
-      planId: String(event.payload.planId || debugPlan?.planId || ""),
-      createdAt: toIso(event.ts_ms),
-      label: String(event.payload.label || "同意执行")
-    } : {
-      kind: "user.revision_requested",
-      id: event.event_id,
-      workstreamId: id,
-      planId: String(event.payload.planId || debugPlan?.planId || ""),
-      createdAt: toIso(event.ts_ms),
-      prompt: String(event.payload.prompt || "")
-    });
-    const planEvents = runEvents.filter((event) => event.event_type === "tool_execution" || event.event_type === "blocker" || event.event_type === "workflow_stage_transition");
-    return {
-      id,
-      sessionId: run.sessionId,
-      branchId,
-      type: workstreamTypeFromRun(run),
-      status: planStatus === "awaiting_approval" ? "awaiting_approval" : planStatus === "failed" ? "failed" : "completed",
-      density: planStatus === "awaiting_approval" ? "expanded" : "compact",
-      resultKind: "plan",
-      startedAt: toIso(run.startedAt),
-      completedAt: planStatus === "awaiting_approval" ? void 0 : toIso(run.startedAt + 1),
-      processEvents: [
-        ...this.agentTextFromConversation(id, run.runId, conversations),
-        ...this.processEventsFromActionEvents(id, planEvents),
-        ...confirmationEvents
-      ].sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt)),
-      result: debugPlan ? resultFromPlan(id, debugPlan, planStatus) : void 0,
-      planId: debugPlan?.planId,
-      planStatus
-    };
-  }
-  buildExecutionWorkstream(run, branchId, runEvents, artifacts) {
-    const id = this.executionWorkstreamId(run.runId);
-    const executionEvents = runEvents.filter((event) => ![
-      "user_message",
-      "user_confirmation",
-      "user_revision_requested"
-    ].includes(event.event_type));
-    const status = statusFromRun(run);
-    const result = resultFromRun(id, run, executionEvents, artifacts);
-    return {
-      id,
-      sessionId: run.sessionId,
-      branchId,
-      type: workstreamTypeFromRun(run),
-      status,
-      density: status === "completed" ? "compact" : "expanded",
-      resultKind: result?.kind,
-      sourceRequestRevisionId: this.revisionIdForBranch(branchId),
-      startedAt: toIso(run.startedAt + 2),
-      completedAt: run.finishedAt ? toIso(run.finishedAt) : void 0,
-      processEvents: this.processEventsFromActionEvents(id, executionEvents),
-      result
-    };
-  }
-  buildAskWorkstream(sessionId, branchId, workstreamId, turn) {
-    const assistant = turn.assistantMessages.slice(-1)[0];
-    const pending = !assistant || isPendingConversationStatus(assistant.status);
-    const failed = assistant?.status === "error";
-    const cancelled = assistant?.status === "stopped";
-    const status = failed ? "failed" : cancelled ? "cancelled" : pending ? "running" : "completed";
-    const result = askResultFromTurn(workstreamId, turn);
-    const pendingEvent = pending ? [{
-      kind: "agent.text",
-      id: `agent-text-${assistant?.id ?? `${turn.turnId}-pending`}`,
-      workstreamId,
-      createdAt: toIso(assistant?.createdAt ?? turn.createdAt),
-      text: assistant?.content.trim() || "正在生成回复。"
-    }] : [];
-    return {
-      id: workstreamId,
-      sessionId,
-      branchId,
-      type: "ask",
-      status,
-      density: status === "running" ? "expanded" : "compact",
-      resultKind: result?.kind,
-      startedAt: toIso(turn.createdAt),
-      completedAt: status === "running" ? void 0 : toIso(turn.completedAt),
-      processEvents: pendingEvent,
-      result
-    };
-  }
-  userRequestFromAskTurn(sessionId, branchId, workstreamId, turn) {
-    const requestId = `request-ask-${turn.turnId}`;
-    const revisionId = `revision-ask-${turn.turnId}`;
-    const prompt = turn.userMessage?.content.trim() || turn.messages.find((message) => message.role === "user")?.content.trim() || "Ask";
-    return {
-      id: requestId,
-      sessionId,
-      rootRevisionId: revisionId,
-      activeRevisionId: revisionId,
-      revisions: [
-        {
-          id: revisionId,
-          requestId,
-          branchId,
-          prompt,
-          createdAt: toIso(turn.userMessage?.createdAt ?? turn.createdAt),
-          resultingWorkstreamIds: [workstreamId]
-        }
-      ]
-    };
-  }
-  processEventsFromActionEvents(workstreamId, events2) {
-    const processEvents = [];
-    for (const event of events2) {
-      if (event.event_type === "tool_execution") {
-        const title = String(event.payload.tool_name || event.payload.toolName || "Tool");
-        processEvents.push({
-          kind: "tool",
-          id: event.event_id,
-          workstreamId,
-          taskId: typeof event.payload.taskId === "string" ? event.payload.taskId : void 0,
-          createdAt: toIso(event.ts_ms),
-          completedAt: event.status === "sent" || event.status === "entered" ? void 0 : toIso(event.ts_ms + event.duration_ms),
-          status: toolStatusFromEvent(event),
-          title,
-          summary: firstLine(event.payload.summary ?? event.payload.result ?? event.payload.error ?? event.payload.data, title),
-          target: cleanText(event.payload.target ?? event.payload.eventId ?? event.payload.prompt_id),
-          durationMs: event.duration_ms,
-          inputRef: `input:${event.event_id}`,
-          outputRef: `output:${event.event_id}`,
-          artifactIds: Array.isArray(event.payload.artifacts) ? event.payload.artifacts.map(String) : [],
-          rawTraceRef: `raw-${event.event_id}`,
-          errorSummary: event.status === "error" || event.status === "fail" ? firstLine(event.payload.error ?? event.payload.message, "工具失败") : void 0
-        });
-        continue;
-      }
-      if (event.event_type === "dispatch") {
-        const label = String(event.payload.targetAgent || event.agent_id || "Sub Agent");
-        processEvents.push({
-          kind: "subagent",
-          id: event.event_id,
-          workstreamId,
-          createdAt: toIso(event.ts_ms),
-          completedAt: event.status === "sent" ? void 0 : toIso(event.ts_ms + event.duration_ms),
-          status: toolStatusFromEvent(event),
-          label,
-          summary: firstLine(event.payload.objective, "子 agent 已接收任务。"),
-          rawTraceRef: `raw-${event.event_id}`
-        });
-        continue;
-      }
-      if (event.event_type === "agent_summary") {
-        processEvents.push({
-          kind: "agent.text",
-          id: event.event_id,
-          workstreamId,
-          createdAt: toIso(event.ts_ms),
-          text: String(event.payload.summary || event.payload.content || "")
-        });
-        continue;
-      }
-      if (event.event_type === "blocker" || event.event_type === "verification" || event.event_type === "report_published") {
-        processEvents.push({
-          kind: "agent.text",
-          id: event.event_id,
-          workstreamId,
-          createdAt: toIso(event.ts_ms),
-          text: firstLine(event.payload.summary ?? event.payload.reason ?? event.payload.verdict ?? event.payload, event.event_type)
-        });
-      }
-    }
-    return processEvents.sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
-  }
-  agentTextFromConversation(workstreamId, runId, conversations) {
-    return conversations.filter((message) => message.runId === runId && message.role === "assistant" && message.content.trim()).map((message) => ({
-      kind: "agent.text",
-      id: `agent-text-${message.id}`,
-      workstreamId,
-      createdAt: toIso(message.createdAt),
-      text: message.content
-    }));
+    if (run.status === "cancelled") return "任务已取消。";
+    return null;
   }
   mapProgress(sessionId, runId, branchId, workstreamId) {
     return taskBoard.listTasks(sessionId, runId).map((task, index) => ({
@@ -11426,14 +12105,11 @@ class AgentWorkstreamProjector {
       createdAt: record.createdAt,
       updatedAt: record.updatedAt
     }));
-    const reportEvents = runEvents.filter((event) => event.event_type === "report_published");
-    const reports = reportEvents.flatMap((event) => {
+    const reports = runEvents.filter((e) => e.event_type === "report_published").flatMap((event) => {
       const records = [];
       for (const key of ["markdownPath", "htmlPath", "jsonPath"]) {
         const value = event.payload[key];
-        if (typeof value !== "string" || !value.trim()) {
-          continue;
-        }
+        if (typeof value !== "string" || !value.trim()) continue;
         records.push({
           id: `${event.event_id}-${key}`,
           sessionId,
@@ -11443,7 +12119,6 @@ class AgentWorkstreamProjector {
           type: key === "htmlPath" ? "visual_report" : "report",
           status: "ready",
           displayName: value.split(/[\\/]/).filter(Boolean).pop() || value,
-          taskTitle: "Execution Report",
           path: value,
           rawRef: `raw-${event.event_id}`,
           createdAt: toIso(event.ts_ms),
@@ -11484,182 +12159,27 @@ class AgentWorkstreamProjector {
       artifactIds: packet.artifactIds,
       detailsRef: packet.refs[0]
     }));
-    const capabilityContext = contextService.readPlanContract(sessionId, runId)?.capabilityProfiles.map((profile) => ({
-      id: `context-capability-${profile.profileId}`,
-      sessionId,
-      workstreamId,
-      branchId,
-      kind: "capability",
-      label: profile.owner,
-      summary: profile.toolNames.slice(0, 4).join(", "),
-      importance: "important",
-      firstObservedAt: profile.createdAt,
-      lastObservedAt: profile.updatedAt,
-      detailsRef: profile.profileId
-    })) ?? [];
-    return [...captureContext, ...packetContext, ...capabilityContext];
+    return [...captureContext, ...packetContext];
   }
-  toTaskViewModel(session, workstream, forceCompact = false) {
-    const result = workstream.result ? {
-      ...workstream.result,
-      artifacts: session.artifacts.filter((artifact) => workstream.result?.artifactIds.includes(artifact.id))
-    } : void 0;
-    const density = forceCompact ? "compact" : workstream.density;
-    let thinkingDurationMs;
-    const firstThinking = workstream.processEvents.find((e) => e.kind === "agent.text");
-    if (firstThinking && workstream.completedAt) {
-      const start = Date.parse(firstThinking.createdAt);
-      const end = Date.parse(workstream.completedAt);
-      if (!Number.isNaN(start) && !Number.isNaN(end) && end > start) {
-        thinkingDurationMs = end - start;
-      }
-    }
+  buildRightPanel(progress, artifacts, context2, runs) {
+    const activeRunIds = new Set(runs.filter((r) => r.run.status === "running" || r.run.status === "waiting_approval").map((r) => r.run.runId));
+    const activeWsIds = new Set([...activeRunIds].flatMap((id) => [`ws-${id}-plan`, `ws-${id}-execution`, id]));
     return {
-      kind: "task_workstream",
-      id: workstream.id,
-      type: workstream.type,
-      status: workstream.status,
-      density,
-      title: this.titleForWorkstream(workstream),
-      startedAt: workstream.startedAt,
-      completedAt: workstream.completedAt,
-      process: {
-        collapsed: workstream.status === "completed" || density === "compact",
-        items: this.toProcessItems(workstream.processEvents),
-        thinkingDurationMs
+      progress: {
+        current: progress.filter((t) => activeWsIds.has(t.workstreamId) && ["running", "blocked", "pending", "reopened"].includes(t.status)),
+        history: progress.filter((t) => ["completed", "cancelled"].includes(t.status))
       },
-      result,
-      planId: workstream.planId,
-      planStatus: workstream.planStatus
-    };
-  }
-  toProcessItems(events2) {
-    const items = [];
-    let textBuffer = [];
-    const flushText = () => {
-      if (textBuffer.length === 0) {
-        return;
+      artifacts: {
+        current: artifacts.slice(-6),
+        previous: artifacts.slice(0, Math.max(0, artifacts.length - 6))
+      },
+      context: {
+        groups: ["capture", "file", "source", "capability"].map((kind) => {
+          const all = context2.filter((r) => r.kind === kind);
+          return { kind, important: all.filter((r) => r.importance !== "normal"), all };
+        })
       }
-      const first = textBuffer[0];
-      items.push({
-        kind: "agent_thinking",
-        id: `thinking-${first.id}`,
-        createdAt: first.createdAt,
-        text: textBuffer.map((event) => event.text).filter(Boolean).join("\n\n")
-      });
-      textBuffer = [];
     };
-    for (const event of events2) {
-      if (event.kind === "agent.text") {
-        textBuffer.push(event);
-        continue;
-      }
-      flushText();
-      if (event.kind === "tool") {
-        items.push({
-          kind: "tool_row",
-          id: event.id,
-          createdAt: event.createdAt,
-          completedAt: event.completedAt,
-          status: event.status,
-          title: event.title,
-          summary: event.summary,
-          target: event.target,
-          durationMs: event.durationMs,
-          taskId: event.taskId,
-          artifactIds: event.artifactIds ?? [],
-          rawTraceRef: event.rawTraceRef,
-          inputRef: event.inputRef,
-          outputRef: event.outputRef,
-          errorSummary: event.errorSummary
-        });
-        continue;
-      }
-      if (event.kind === "subagent") {
-        items.push({
-          kind: "subagent_row",
-          id: event.id,
-          createdAt: event.createdAt,
-          completedAt: event.completedAt,
-          status: event.status,
-          label: event.label,
-          summary: event.summary,
-          resultSummary: event.resultSummary,
-          taskId: event.taskId,
-          nestedWorkstream: event.nestedWorkstream,
-          rawTraceRef: event.rawTraceRef
-        });
-      }
-    }
-    flushText();
-    return items;
-  }
-  buildRightPanel(session, activeWorkstreams) {
-    const activeWorkstreamIds = new Set(activeWorkstreams.map((workstream) => workstream.id));
-    const progress = {
-      current: session.progress.filter((task) => activeWorkstreamIds.has(task.workstreamId) && ["running", "blocked", "pending", "reopened"].includes(task.status)).sort((left, right) => left.order - right.order),
-      history: session.progress.filter((task) => activeWorkstreamIds.has(task.workstreamId) && ["completed", "cancelled"].includes(task.status)).sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
-    };
-    const artifacts = {
-      current: session.artifacts.filter((artifact) => activeWorkstreamIds.has(artifact.workstreamId)).slice(-6),
-      previous: session.artifacts.filter((artifact) => !activeWorkstreamIds.has(artifact.workstreamId))
-    };
-    const contextGroups = ["capture", "file", "source", "capability"].map((kind) => {
-      const all = session.context.filter((record) => record.kind === kind);
-      return {
-        kind,
-        important: all.filter((record) => record.importance !== "normal"),
-        all
-      };
-    });
-    return {
-      progress,
-      artifacts,
-      context: { groups: contextGroups }
-    };
-  }
-  promptForWorkstream(session, workstream) {
-    for (const request of session.userRequests) {
-      const revision = request.revisions.find((entry) => entry.resultingWorkstreamIds.includes(workstream.id));
-      if (!revision) {
-        continue;
-      }
-      const group = session.branches.find((entry) => entry.rootRequestId === request.id);
-      const branchIndex = Math.max(group?.branches.findIndex((branch) => branch.id === revision.branchId) ?? 0, 0);
-      const branchCount = group?.branches.length ?? 1;
-      return {
-        kind: "user_prompt",
-        id: `prompt-${revision.id}`,
-        branchId: revision.branchId,
-        requestId: request.id,
-        revisionId: revision.id,
-        prompt: revision.prompt,
-        createdAt: revision.createdAt,
-        branchIndex,
-        branchCount,
-        canCopy: true,
-        canEdit: true
-      };
-    }
-    return void 0;
-  }
-  buildPromptBranchNavigator(session, requestId, currentBranchId) {
-    const group = session.branches.find((entry) => entry.rootRequestId === requestId);
-    if (!group || group.branches.length <= 1) {
-      return null;
-    }
-    return {
-      activeBranchId: session.activeBranchId,
-      branchIndex: Math.max(group.branches.findIndex((branch) => branch.id === currentBranchId), 0),
-      branchCount: group.branches.length,
-      branches: group.branches
-    };
-  }
-  titleForWorkstream(_workstream) {
-    return "";
-  }
-  shouldShowExecutionWorkstream(run, approvalState, events2) {
-    return approvalState === "approved" || ["running", "stopping", "completed", "failed", "cancelled", "interrupted"].includes(run.status) || events2.some((event) => ["dispatch", "agent_summary", "verification", "report_published"].includes(event.event_type));
   }
   groupAskTurns(messages) {
     const groups = /* @__PURE__ */ new Map();
@@ -11678,37 +12198,13 @@ class AgentWorkstreamProjector {
       if (message.role === "user" && (!group.userMessage || message.createdAt < group.userMessage.createdAt)) {
         group.userMessage = message;
       }
-      if (message.role === "assistant") {
-        group.assistantMessages.push(message);
-      }
+      if (message.role === "assistant") group.assistantMessages.push(message);
       groups.set(turnId, group);
     }
-    return Array.from(groups.values()).map((group) => ({
-      ...group,
-      messages: group.messages.slice().sort((left, right) => left.createdAt - right.createdAt),
-      assistantMessages: group.assistantMessages.slice().sort((left, right) => left.createdAt - right.createdAt)
-    })).sort((left, right) => left.createdAt - right.createdAt);
-  }
-  branchIdForWorkstream(groups, workstreamId, fallback) {
-    for (const group of groups) {
-      const branch = group.branches.find((entry) => entry.workstreamIds.includes(workstreamId));
-      if (branch) {
-        return branch.id;
-      }
-    }
-    return fallback || "branch-main";
-  }
-  revisionIdForBranch(branchId) {
-    return branchId.startsWith("branch-") ? branchId.replace(/^branch-/, "revision-") : void 0;
-  }
-  planWorkstreamId(runId) {
-    return `ws-${runId}-plan`;
-  }
-  executionWorkstreamId(runId) {
-    return `ws-${runId}-execution`;
+    return Array.from(groups.values()).sort((a, b) => a.createdAt - b.createdAt);
   }
 }
-const agentWorkstreamProjector = new AgentWorkstreamProjector();
+const traceService = new TraceService();
 const KNOWN_AGENT_ROLES = /* @__PURE__ */ new Set([
   "rdc-debugger",
   "triage_agent",
@@ -12212,7 +12708,7 @@ class DebugWorkflowService {
     };
   }
   async getWorkstreamSession(sessionId) {
-    return agentWorkstreamProjector.getSession(sessionId);
+    return traceService.getSession(sessionId);
   }
   async requestPlanRevision(runId, revisionText) {
     const location = this.findRun(runId);
@@ -12342,7 +12838,7 @@ class DebugWorkflowService {
       ...workstream,
       runId: nextRunId,
       planId: nextPlan.planId,
-      branchId: workstream.session?.activeBranchId
+      branchId: workstream.presentation?.activeBranchId
     };
   }
   async switchWorkstreamBranch(sessionId, branchId) {
@@ -12350,7 +12846,7 @@ class DebugWorkflowService {
     const workstream = await this.getWorkstreamSession(sessionId);
     return {
       ...workstream,
-      activeBranchId: workstream.session?.activeBranchId
+      activeBranchId: workstream.presentation?.activeBranchId
     };
   }
   async exportWorkstreamSession(sessionId, options = {}) {
@@ -12366,17 +12862,16 @@ class DebugWorkflowService {
       const exportDir = path.join(session.sessionPath, "exports");
       fs__namespace.mkdirSync(exportDir, { recursive: true });
       const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-      const summaryPath = path.join(exportDir, `agent-workstream-summary-${stamp}.json`);
+      const summaryPath = path.join(exportDir, `agentic-trace-summary-${stamp}.json`);
       fs__namespace.writeFileSync(summaryPath, JSON.stringify({
         schemaVersion: "1",
         exportedAt: nowIso$1(),
         includeAllBranches: options.includeAllBranches ?? true,
-        session: workstream.session,
         presentation: workstream.presentation
       }, null, 2), "utf-8");
       let rawTracePath;
       if (options.includeRawTrace !== false) {
-        rawTracePath = path.join(exportDir, `agent-workstream-raw-trace-${stamp}.jsonl`);
+        rawTracePath = path.join(exportDir, `agentic-trace-raw-trace-${stamp}.jsonl`);
         const events2 = await storageAdapter.readActionChain(sessionId);
         fs__namespace.writeFileSync(rawTracePath, `${events2.map((event) => JSON.stringify(event)).join("\n")}
 `, "utf-8");
@@ -12575,6 +13070,12 @@ class DebugWorkflowService {
     for (const task of tasks) {
       taskBoard.upsertTask(input.sessionId, input.runId, task);
     }
+    const taskGraph = multiAgentWorkflowEngine.createDebuggerGraph({
+      runId: input.runId,
+      sessionId: input.sessionId,
+      tasks
+    });
+    multiAgentWorkflowEngine.assertSerialExecution(taskGraph);
     const planContract = {
       schemaVersion: "1",
       planId: input.debugPlan.planId,
@@ -12640,7 +13141,8 @@ class DebugWorkflowService {
         goal: input.debugPlan.userGoal,
         targetCapture: input.debugPlan.targetCapture,
         targetFrameOrEvent: input.debugPlan.targetFrameOrEvent,
-        deliverables: input.debugPlan.expectedDeliverables
+        deliverables: input.debugPlan.expectedDeliverables,
+        taskGraph
       }),
       refs: planContract.verificationContract.targetRefs,
       taskIds: tasks.map((task) => task.taskId),
@@ -12770,6 +13272,9 @@ class DebugWorkflowService {
       requiresUserApproval: false,
       createdAt: nowIso$1()
     });
+    multiAgentWorkflowEngine.assertSerialExecution(
+      multiAgentWorkflowEngine.readDebuggerGraph(sessionId, runId)
+    );
   }
   persistAgentResult(sessionId, runId, result) {
     const artifactIds = result.artifacts.map((artifactPath) => {
@@ -12937,7 +13442,7 @@ class DebugWorkflowService {
           workflow_stage: "dispatch"
         }
       });
-      const surface = await specialistRecipeRunner.prepareSurface(runtimeContext);
+      const surface = await deterministicSpecialistExecutor.prepareSurface(runtimeContext);
       this.applyTaskMutation(location.session.sessionId, location.run.runId, "speclist", "completed", "Task board seeded for the approved plan.");
       this.applyTaskMutation(location.session.sessionId, location.run.runId, "dispatch", "in_progress", "Specialist dispatch started.");
       contextService.appendContextPacket(location.session.sessionId, location.run.runId, {
@@ -12975,7 +13480,7 @@ class DebugWorkflowService {
             objective: `Investigate ${debugPlan.scope}`
           }
         }));
-        const result = await specialistRecipeRunner.run(specialist, runtimeContext, surface);
+        const result = await deterministicSpecialistExecutor.run(specialist, runtimeContext, surface);
         specialistResults.push(result);
         this.persistAgentResult(location.session.sessionId, location.run.runId, result);
         await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
@@ -13778,17 +14283,20 @@ class DebugWorkflowService {
       lastStage,
       stopReason
     });
+    if (["completed", "failed", "cancelled", "interrupted"].includes(status)) {
+      this.publishWorkstream(sessionId);
+    }
   }
   emitConversationEvent(event) {
     workflowProjectionPublisher.publishConversationEvent(event);
   }
   publishWorkstream(sessionId) {
-    void agentWorkstreamProjector.getSession(sessionId).then((result) => {
+    void traceService.getSession(sessionId).then((result) => {
       if (result.success && result.presentation) {
-        workflowProjectionPublisher.publishWorkstreamChanged(sessionId, result.presentation);
+        workflowProjectionPublisher.publishTraceProjectionChanged(sessionId, result.presentation);
       }
     }).catch((error) => {
-      console.error("[WorkflowProjectionPublisher] Failed to publish workstream:", error);
+      console.error("[WorkflowProjectionPublisher] Failed to publish trace projection:", error);
     });
   }
 }
@@ -14051,6 +14559,39 @@ class SkillRegistry {
     }
     this.skills.set(definition.name, { definition, execute });
   }
+  loadDescriptors(descriptors) {
+    for (const descriptor of descriptors) {
+      if (this.skills.has(descriptor.name)) {
+        continue;
+      }
+      this.skills.set(descriptor.name, {
+        definition: {
+          name: descriptor.name,
+          displayName: descriptor.label,
+          description: descriptor.description,
+          version: "1.0.0",
+          parameters: descriptorToParameters(descriptor),
+          source: descriptor.source,
+          filePath: descriptor.path,
+          tags: ["agent-runtime", descriptor.source]
+        },
+        execute: async () => ({
+          success: true,
+          output: JSON.stringify({
+            id: descriptor.id,
+            name: descriptor.name,
+            label: descriptor.label,
+            description: descriptor.description,
+            source: descriptor.source,
+            path: descriptor.path,
+            parameters: descriptor.parameters ?? {}
+          }),
+          artifacts: descriptor.path ? [{ type: "skill-descriptor", path: descriptor.path, description: descriptor.description }] : [],
+          duration_ms: 0
+        })
+      });
+    }
+  }
   /** 注销 skill */
   unregister(name) {
     return this.skills.delete(name);
@@ -14083,6 +14624,20 @@ class SkillRegistry {
   clear() {
     this.skills.clear();
   }
+}
+function descriptorToParameters(descriptor) {
+  const parameters = descriptor.parameters && typeof descriptor.parameters === "object" ? descriptor.parameters : {};
+  return Object.entries(parameters).map(([name, value]) => {
+    const record = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const type = typeof record.type === "string" && ["string", "number", "boolean", "object", "array"].includes(record.type) ? record.type : "string";
+    return {
+      name,
+      type,
+      description: typeof record.description === "string" ? record.description : name,
+      required: record.required === true,
+      default: record.default
+    };
+  });
 }
 const skillRegistry = new SkillRegistry();
 class MCPConnection extends events.EventEmitter {
@@ -14596,7 +15151,12 @@ class ToolRegistry {
         path: { type: "string", description: "Target path." },
         content: { type: "string", description: "File content." }
       }, ["path", "content"], false),
-      primitiveTool("primitive.edit", "Edit a file. Disabled for Ask.", {}, [], false),
+      primitiveTool("primitive.edit", "Edit a file by replacing text. Disabled for Ask.", {
+        path: { type: "string", description: "Target path." },
+        search: { type: "string", description: "Exact text to replace." },
+        replace: { type: "string", description: "Replacement text." },
+        replaceAll: { type: "boolean", description: "Replace all occurrences instead of the first occurrence." }
+      }, ["path", "search", "replace"], false),
       primitiveTool("primitive.remove", "Remove a file. Disabled for Ask.", {
         path: { type: "string", description: "Target path." }
       }, ["path"], false)
@@ -14622,6 +15182,7 @@ class ToolRegistry {
       layer: "rdc",
       readOnly: !tool.name.includes("edit") && !tool.name.includes("write") && !tool.name.includes("remove")
     }));
+    skillRegistry.loadDescriptors(agentRuntimeConfigService.listSkills());
     const skillTools = skillRegistry.list().map((skill) => ({
       name: `skill.${skill.name}`,
       modelName: toModelToolName(`skill.${skill.name}`),
@@ -14733,6 +15294,39 @@ Runtime tool: ${tool.name}`,
       }
       if (request.originalToolName === "primitive.task.list") {
         return okResult({ tasks: [] }, start);
+      }
+      if (request.originalToolName === "primitive.bash") {
+        return errorResult("BASH_REQUIRES_APPROVAL_EXECUTOR", "Bash requires an explicit approval/sandbox executor and is disabled by default.", "approval", start);
+      }
+      if (request.originalToolName === "primitive.write") {
+        const target = resolveWorkspacePath(workspaceRoot, String(args.path ?? ""));
+        const content = String(args.content ?? "");
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, content, "utf8");
+        return okResult({ path: target, bytes: Buffer.byteLength(content, "utf8") }, start);
+      }
+      if (request.originalToolName === "primitive.edit") {
+        const target = resolveWorkspacePath(workspaceRoot, String(args.path ?? ""));
+        const search = String(args.search ?? "");
+        const replace = String(args.replace ?? "");
+        if (!search) {
+          return errorResult("EDIT_SEARCH_REQUIRED", "Edit requires a non-empty search string.", "schema", start);
+        }
+        const before = fs.readFileSync(target, "utf8");
+        if (!before.includes(search)) {
+          return errorResult("EDIT_SEARCH_NOT_FOUND", "Edit search string was not found.", "execution", start);
+        }
+        const after = args.replaceAll === true ? before.split(search).join(replace) : before.replace(search, replace);
+        fs.writeFileSync(target, after, "utf8");
+        return okResult({ path: target, changed: before !== after }, start);
+      }
+      if (request.originalToolName === "primitive.remove") {
+        const target = resolveWorkspacePath(workspaceRoot, String(args.path ?? ""));
+        if (fs.existsSync(target) && fs.statSync(target).isDirectory()) {
+          return errorResult("REMOVE_DIRECTORY_NOT_SUPPORTED", "Primitive remove only deletes workspace files, not directories.", "policy", start);
+        }
+        fs.rmSync(target, { force: true });
+        return okResult({ path: target, removed: true }, start);
       }
       return errorResult("PRIMITIVE_TOOL_NOT_IMPLEMENTED", `Primitive tool is not implemented: ${request.originalToolName}`, "implementation", start);
     } catch (error) {
@@ -14851,6 +15445,155 @@ function grepWorkspace(workspaceRoot, pattern) {
   return matches;
 }
 const toolRegistry = new ToolRegistry();
+class ModelProviderRegistry {
+  listCapabilities() {
+    return settingsService.getAll().llm.providers.map((provider) => this.getCapabilities(provider.id));
+  }
+  getCapabilities(providerId) {
+    const provider = this.resolveProvider(providerId);
+    const kind = provider?.kind ?? getBuiltinProviderDefinition(providerId)?.kind ?? "openai-compatible";
+    const authMode = provider?.authMode ?? getBuiltinProviderDefinition(providerId)?.authMode ?? "api-key";
+    const backendKind = this.resolveBackendKind(providerId, kind, authMode);
+    const toolCallFormat = this.resolveToolCallFormat(providerId, kind);
+    const nativeToolCalling = toolCallFormat === "openai-chat-completions";
+    const structuredReliability = this.resolveStructuredReliability(providerId, kind);
+    return {
+      providerId,
+      kind,
+      authMode,
+      backendKind,
+      streaming: true,
+      nativeToolCalling,
+      structuredOutput: structuredReliability !== "unsupported",
+      vision: kind === "google-ai-studio" || providerId.includes("openai") || providerId.includes("gpt"),
+      reasoning: kind !== "ollama",
+      parallelToolCalls: false,
+      oauth: authMode === "account",
+      local: authMode === "local" || kind === "ollama",
+      toolCallFormat,
+      structuredReliability
+    };
+  }
+  async streamTurn(input) {
+    const emitModelEvent = input.onModelTurnEvent;
+    emitModelEvent?.({
+      providerId: input.providerId,
+      modelId: input.modelId,
+      type: "started"
+    });
+    try {
+      const response = await llmAdapter.streamChat(
+        input.request,
+        (event) => {
+          input.onStreamEvent?.(event);
+          const mapped = this.toModelTurnEvent(input.providerId, input.modelId, event);
+          if (mapped) {
+            emitModelEvent?.(mapped);
+          }
+        },
+        input.providerId
+      );
+      emitModelEvent?.({
+        providerId: input.providerId,
+        modelId: input.modelId,
+        type: "completed",
+        text: typeof response.content === "string" ? response.content : JSON.stringify(response.content),
+        usage: response.usage
+      });
+      return response;
+    } catch (error) {
+      emitModelEvent?.({
+        providerId: input.providerId,
+        modelId: input.modelId,
+        type: "failed",
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
+  }
+  resolveProvider(providerId) {
+    try {
+      return settingsService.getAll().llm.providers.find((provider) => provider.id === providerId) ?? null;
+    } catch {
+      return null;
+    }
+  }
+  resolveBackendKind(providerId, kind, authMode) {
+    if (authMode === "account" && (providerId === "grok-account" || providerId === "gemini-account" || providerId === "qwen-account")) {
+      return "mockable-account";
+    }
+    if (providerId === "openai" || providerId === "openai-us" || providerId === "openai-eu") {
+      return "openai-agent-sdk";
+    }
+    if (kind === "anthropic" && authMode !== "account") {
+      return "claude-agent-sdk";
+    }
+    if (authMode === "local" || kind === "ollama") {
+      return "local";
+    }
+    if (kind === "openai-compatible" || kind === "openrouter" || kind === "azure-openai") {
+      return "openai-compatible";
+    }
+    return "native";
+  }
+  resolveToolCallFormat(providerId, kind) {
+    if (providerId === "chatgpt-account") {
+      return "openai-responses";
+    }
+    if (kind === "anthropic") {
+      return "anthropic-messages";
+    }
+    if (kind === "google-ai-studio") {
+      return "google-gemini";
+    }
+    if (kind === "openai-compatible" || kind === "openrouter" || kind === "azure-openai" || kind === "ollama") {
+      return "openai-chat-completions";
+    }
+    return "none";
+  }
+  resolveStructuredReliability(providerId, kind) {
+    if (providerId === "chatgpt-account" || kind === "openai-compatible" || kind === "openrouter" || kind === "azure-openai") {
+      return "native";
+    }
+    if (kind === "anthropic" || kind === "google-ai-studio" || kind === "ollama") {
+      return "prompted";
+    }
+    return "unsupported";
+  }
+  toModelTurnEvent(providerId, modelId, event) {
+    if (event.type === "text-delta") {
+      return {
+        providerId,
+        modelId,
+        type: "delta",
+        text: event.text
+      };
+    }
+    if (event.type === "tool-call-delta") {
+      const toolCall = {
+        id: event.toolCall.id,
+        name: event.toolCall.name ?? "",
+        arguments: event.toolCall.argumentsText ? { raw: event.toolCall.argumentsText } : {}
+      };
+      return {
+        providerId,
+        modelId,
+        type: "tool_call",
+        toolCall
+      };
+    }
+    if (event.type === "error") {
+      return {
+        providerId,
+        modelId,
+        type: "failed",
+        error: event.error
+      };
+    }
+    return null;
+  }
+}
+const modelProviderRegistry = new ModelProviderRegistry();
 class AgentRuntime {
   async runTurn(request) {
     const events2 = [];
@@ -14908,51 +15651,86 @@ class AgentRuntime {
       }
       await this.refreshAccountRuntimeCredentials(request.providerId);
       const { tools, nameMap } = await toolRegistry.listAllowedLlmTools(request.agentId, allowlist);
+      const traceReasoningContract = [
+        "Trace output contract:",
+        "When surfacing user-visible reasoning, emit JSON VisibleReasoningPacket objects instead of raw tool dumps.",
+        'Schema: {"mode":"planning|executing|reflecting","content":"...","hypothesis":"...","nextAction":"...","confidence":"low|medium|high"}',
+        "Keep final answers in markdown; keep raw tool payloads out of the main narrative."
+      ].join("\n");
       const messages = [
-        { role: "system", content: request.systemPrompt },
+        { role: "system", content: `${request.systemPrompt}
+
+${traceReasoningContract}` },
         { role: "user", content: request.prompt }
       ];
-      finalResponse = await llmAdapter.streamChat(
-        {
-          messages,
-          model: request.modelId,
-          maxTokens: request.maxTokens,
-          temperature: request.temperature,
-          tools,
-          signal: request.signal
-        },
-        (event) => {
-          if (event.type === "text-delta") {
-            streamedText += event.text;
-            emit("assistant.delta", { text: event.text });
+      const maxToolIterations = clampPositiveInt(request.maxToolIterations ?? request.maxTurns ?? 8, 1, 32);
+      let toolIteration = 0;
+      for (; ; ) {
+        let turnText = "";
+        finalResponse = await modelProviderRegistry.streamTurn({
+          providerId: request.providerId,
+          modelId: request.modelId,
+          request: {
+            messages,
+            model: request.modelId,
+            maxTokens: request.maxTokens,
+            temperature: request.temperature,
+            tools,
+            signal: request.signal
+          },
+          onStreamEvent: (event) => {
+            if (event.type === "text-delta") {
+              streamedText += event.text;
+              turnText += event.text;
+              emit("assistant.delta", { text: event.text });
+            }
+            if (event.type === "tool-call-delta") {
+              const toolCall = {
+                id: event.toolCall.id,
+                name: nameMap.get(event.toolCall.name ?? "") ?? event.toolCall.name ?? "",
+                arguments: event.toolCall.argumentsText ? { raw: event.toolCall.argumentsText } : {}
+              };
+              emit("tool.requested", { toolCall, streamEvent: event });
+            }
           }
-          if (event.type === "tool-call-delta") {
-            const toolCall = {
-              id: event.toolCall.id,
-              name: nameMap.get(event.toolCall.name ?? "") ?? event.toolCall.name ?? "",
-              arguments: event.toolCall.argumentsText ? { raw: event.toolCall.argumentsText } : {}
-            };
-            emit("tool.requested", { toolCall, streamEvent: event });
-          }
-        },
-        request.providerId
-      );
-      if (!streamedText && typeof finalResponse.content === "string") {
-        streamedText = finalResponse.content;
-      }
-      if (finalResponse.toolCalls?.length) {
+        });
+        if (!turnText && typeof finalResponse.content === "string" && finalResponse.content) {
+          turnText = finalResponse.content;
+          streamedText = [streamedText, turnText].filter(Boolean).join(streamedText ? "\n" : "");
+        }
+        const toolCalls = finalResponse.toolCalls ?? [];
+        if (toolCalls.length === 0) {
+          break;
+        }
+        if (toolIteration >= maxToolIterations) {
+          emit("diagnostic", {
+            code: "AGENT_RUNTIME_MAX_TOOL_ITERATIONS",
+            severity: "warning",
+            message: `Stopped tool loop after ${maxToolIterations} iterations.`
+          });
+          break;
+        }
+        messages.push({
+          role: "assistant",
+          content: turnText || "I requested tool results."
+        });
         const toolSummary = await this.executeToolCalls({
           request,
+          runId,
           allowlist,
           nameMap,
-          toolCalls: finalResponse.toolCalls,
+          toolCalls,
           emit
         });
         toolResults.push(...toolSummary.toolResults);
-        if (toolSummary.summaryPrompt) {
-          const followUpText = await this.summarizeToolResults(request, messages, streamedText, toolSummary.summaryPrompt, emit);
-          streamedText = [streamedText, followUpText].filter(Boolean).join("\n");
-        }
+        messages.push({
+          role: "user",
+          content: `Tool observations:
+${toolSummary.summaryPrompt}
+
+Continue the same agent turn. Do not expose raw chain-of-thought.`
+        });
+        toolIteration += 1;
       }
       emit("assistant.completed", {
         text: streamedText,
@@ -14992,6 +15770,69 @@ class AgentRuntime {
     const summaries = [];
     for (const toolCall of input.toolCalls) {
       const originalToolName = input.nameMap.get(toolCall.name) ?? toolCall.name;
+      input.emit("tool.requested", {
+        toolCall: {
+          ...toolCall,
+          name: originalToolName
+        }
+      });
+      if (!isRuntimeToolAllowed(originalToolName, input.request.agentId, input.allowlist)) {
+        const result2 = createToolErrorResult(
+          "AGENT_RUNTIME_TOOL_DENIED",
+          `Tool ${originalToolName} is not allowed for ${input.request.agentId}.`,
+          "policy"
+        );
+        toolResults.push({ toolName: originalToolName, result: result2 });
+        input.emit("tool.denied", {
+          toolCallId: toolCall.id,
+          toolName: originalToolName,
+          reason: result2.error?.message ?? "Tool denied by runtime policy.",
+          result: result2
+        });
+        summaries.push(formatToolObservation(originalToolName, result2));
+        continue;
+      }
+      if (isMalformedToolArguments(toolCall.arguments)) {
+        const result2 = createToolErrorResult(
+          "AGENT_RUNTIME_TOOL_ARGS_MALFORMED",
+          `Tool ${originalToolName} arguments were not valid JSON object arguments.`,
+          "schema"
+        );
+        toolResults.push({ toolName: originalToolName, result: result2 });
+        input.emit("tool.denied", {
+          toolCallId: toolCall.id,
+          toolName: originalToolName,
+          reason: result2.error?.message ?? "Malformed tool arguments.",
+          result: result2
+        });
+        summaries.push(formatToolObservation(originalToolName, result2));
+        continue;
+      }
+      if (requiresExplicitToolApproval(originalToolName)) {
+        const approvalResult = await this.requireToolApproval(input, toolCall, originalToolName);
+        if (approvalResult) {
+          toolResults.push({ toolName: originalToolName, result: approvalResult });
+          input.emit("tool.denied", {
+            toolCallId: toolCall.id,
+            toolName: originalToolName,
+            reason: approvalResult.error?.message ?? "Tool approval was rejected.",
+            result: approvalResult
+          });
+          summaries.push(formatToolObservation(originalToolName, approvalResult));
+          continue;
+        }
+      }
+      if (originalToolName === "primitive.askUser") {
+        const result2 = await this.handleAskUserTool(input, toolCall, originalToolName);
+        toolResults.push({ toolName: originalToolName, result: result2 });
+        input.emit("tool.completed", {
+          toolCallId: toolCall.id,
+          toolName: originalToolName,
+          result: result2
+        });
+        summaries.push(formatToolObservation(originalToolName, result2));
+        continue;
+      }
       input.emit("tool.started", {
         toolCallId: toolCall.id,
         toolName: originalToolName,
@@ -15004,7 +15845,7 @@ class AgentRuntime {
         allowlist: input.allowlist,
         sessionId: input.request.sessionId,
         turnId: input.request.turnId,
-        runId: input.request.runId,
+        runId: input.runId,
         signal: input.request.signal
       });
       toolResults.push({ toolName: originalToolName, result });
@@ -15013,48 +15854,116 @@ class AgentRuntime {
         toolName: originalToolName,
         result
       });
-      summaries.push(`${originalToolName}: ${JSON.stringify(result).slice(0, 4e3)}`);
+      if (!result.ok && result.error?.code === "AGENT_RUNTIME_TOOL_DENIED") {
+        input.emit("tool.denied", {
+          toolCallId: toolCall.id,
+          toolName: originalToolName,
+          reason: result.error.message,
+          result
+        });
+      }
+      summaries.push(formatToolObservation(originalToolName, result));
     }
     return {
       toolResults,
       summaryPrompt: summaries.join("\n")
     };
   }
-  async summarizeToolResults(request, messages, previousText, summaryPrompt, emit) {
-    let text = "";
-    const response = await llmAdapter.streamChat(
-      {
-        messages: [
-          ...messages,
-          {
-            role: "assistant",
-            content: previousText || "I requested tool results."
-          },
-          {
-            role: "user",
-            content: `Tool results:
-${summaryPrompt}
-
-Use these results to continue. Do not expose raw chain-of-thought.`
-          }
-        ],
-        model: request.modelId,
-        maxTokens: request.maxTokens,
-        temperature: request.temperature,
-        signal: request.signal
-      },
-      (event) => {
-        if (event.type === "text-delta") {
-          text += event.text;
-          emit("assistant.delta", { text: event.text });
-        }
-      },
-      request.providerId
-    );
-    if (!text && typeof response.content === "string") {
-      text = response.content;
+  async handleAskUserTool(input, toolCall, originalToolName) {
+    const approvalId = generateEventId("ask-user");
+    const question = String(toolCall.arguments.question ?? "").trim() || "The agent needs clarification.";
+    const options = Array.isArray(toolCall.arguments.options) ? toolCall.arguments.options.filter((option) => typeof option === "string") : void 0;
+    input.emit("approval.requested", {
+      approvalId,
+      title: "Ask user",
+      status: "pending",
+      kind: "ask_user",
+      toolCallId: toolCall.id,
+      toolName: originalToolName,
+      question,
+      options
+    });
+    if (!input.request.askUser) {
+      return createToolErrorResult(
+        "ASK_USER_RESUME_HANDLER_MISSING",
+        "Ask-user request was emitted, but no runtime resume handler is attached for this turn.",
+        "approval"
+      );
     }
-    return text;
+    const answer = await input.request.askUser({
+      approvalId,
+      question,
+      options,
+      toolCallId: toolCall.id,
+      runId: input.runId,
+      turnId: input.request.turnId,
+      sessionId: input.request.sessionId
+    });
+    input.emit("approval.answered", {
+      approvalId,
+      title: "Ask user",
+      status: answer.cancelled ? "cancelled" : "approved",
+      kind: "ask_user",
+      toolCallId: toolCall.id,
+      toolName: originalToolName,
+      question,
+      options,
+      answer: answer.answer
+    });
+    if (answer.cancelled) {
+      return createToolErrorResult("ASK_USER_CANCELLED", "Ask-user request was cancelled.", "approval");
+    }
+    return {
+      ok: true,
+      data: {
+        question,
+        answer: answer.answer
+      },
+      artifacts: [],
+      duration_ms: 0,
+      trace_id: generateEventId("tool")
+    };
+  }
+  async requireToolApproval(input, toolCall, originalToolName) {
+    const approvalId = generateEventId("tool-approval");
+    input.emit("approval.requested", {
+      approvalId,
+      title: `Approve ${originalToolName}`,
+      status: "pending",
+      kind: "tool",
+      toolCallId: toolCall.id,
+      toolName: originalToolName,
+      reason: "Mutation primitive tools require explicit runtime approval."
+    });
+    if (!input.request.approveTool) {
+      return createToolErrorResult(
+        "TOOL_APPROVAL_HANDLER_MISSING",
+        `Tool ${originalToolName} requires explicit approval, but no approval handler is attached for this turn.`,
+        "approval"
+      );
+    }
+    const answer = await input.request.approveTool({
+      approvalId,
+      toolCall,
+      toolName: originalToolName,
+      runId: input.runId,
+      turnId: input.request.turnId,
+      sessionId: input.request.sessionId
+    });
+    input.emit("approval.answered", {
+      approvalId,
+      title: `Approve ${originalToolName}`,
+      status: answer.approved ? "approved" : "rejected",
+      kind: "tool",
+      toolCallId: toolCall.id,
+      toolName: originalToolName,
+      reason: answer.reason
+    });
+    return answer.approved ? null : createToolErrorResult(
+      "TOOL_APPROVAL_REJECTED",
+      answer.reason || `Tool ${originalToolName} was rejected by runtime approval policy.`,
+      "approval"
+    );
   }
   async refreshAccountRuntimeCredentials(providerId) {
     const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
@@ -15103,6 +16012,38 @@ Use these results to continue. Do not expose raw chain-of-thought.`
     return `${stub}
 <control>{"intent":"${intent}","safe_to_start":${intent === "execute" ? "true" : "false"}}</control>`;
   }
+}
+function clampPositiveInt(value, min, max) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, Math.floor(value)));
+}
+function isMalformedToolArguments(args) {
+  return typeof args.raw === "string" && args.raw.trim().length > 0;
+}
+function requiresExplicitToolApproval(toolName) {
+  return toolName === "primitive.bash" || toolName === "primitive.write" || toolName === "primitive.edit" || toolName === "primitive.remove";
+}
+function createToolErrorResult(code, message, category) {
+  return {
+    ok: false,
+    data: {},
+    artifacts: [],
+    error: {
+      code,
+      message,
+      category
+    },
+    duration_ms: 0,
+    trace_id: generateEventId("tool")
+  };
+}
+function formatToolObservation(toolName, result) {
+  return `${toolName}: ${redactSecrets(JSON.stringify(result)).slice(0, 4e3)}`;
+}
+function redactSecrets(text) {
+  return text.replace(/(sk-[A-Za-z0-9_-]{12,})/g, "[REDACTED_SECRET]").replace(/(sk-ant-[A-Za-z0-9_-]{12,})/g, "[REDACTED_SECRET]").replace(/(gh[pousr]_[A-Za-z0-9_]{12,})/g, "[REDACTED_SECRET]").replace(/(Bearer\s+)[A-Za-z0-9._-]{12,}/gi, "$1[REDACTED_SECRET]").replace(/("(?:apiKey|accessToken|refreshToken|copilotToken|idToken|secret)"\s*:\s*")([^"]+)(")/gi, "$1[REDACTED_SECRET]$3");
 }
 function splitForStreaming(text) {
   const midpoint = Math.max(1, Math.ceil(text.length / 2));
@@ -15800,13 +16741,39 @@ class ConversationService {
         createReasoningStep("cowork-reply", "生成协作回复", "plan")
       ])
     });
+    if (!context2.projectId && EXECUTE_PATTERN.test(rawMessage)) {
+      const assistantMessage = {
+        ...assistantDraftMessage,
+        content: "我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。",
+        status: "complete",
+        updatedAt: nowMs()
+      };
+      const workstreamSessionId2 = this.ephemeralWorkstreamSessionId(turnId);
+      const tracePresentation2 = await traceService.buildConversationPresentation(
+        workstreamSessionId2,
+        [userMessage, assistantMessage]
+      );
+      workflowProjectionPublisher.publishTraceProjectionChanged(workstreamSessionId2, tracePresentation2);
+      this.publishConversationWorkstream(workstreamSessionId2, [userMessage, assistantMessage], null);
+      return {
+        session: null,
+        mode: "talk",
+        userMessage,
+        assistantDraftMessage: assistantMessage,
+        executionTransition: { action: "none" },
+        runUpdate: null,
+        tracePresentation: tracePresentation2,
+        errorViewModel: null
+      };
+    }
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, userMessage);
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
     const workstreamSessionId = workingSession?.sessionId ?? this.ephemeralWorkstreamSessionId(turnId);
-    const workstreamPresentation = agentWorkstreamProjector.buildConversationPresentation(
+    const tracePresentation = await traceService.buildConversationPresentation(
       workstreamSessionId,
       [userMessage, assistantDraftMessage]
     );
+    workflowProjectionPublisher.publishTraceProjectionChanged(workstreamSessionId, tracePresentation);
     this.publishConversationWorkstream(workstreamSessionId, [userMessage, assistantDraftMessage], workingSession?.sessionId ?? null);
     void this.completeCoworkTurn({
       context: {
@@ -15826,7 +16793,7 @@ class ConversationService {
       assistantDraftMessage,
       executionTransition: { action: "none" },
       runUpdate: null,
-      workstreamPresentation,
+      tracePresentation,
       errorViewModel: null
     };
   }
@@ -16227,12 +17194,12 @@ ${upgradeReply}`);
     if (!sessionId) {
       return;
     }
-    void agentWorkstreamProjector.getSession(sessionId).then((result) => {
+    void traceService.getSession(sessionId).then((result) => {
       if (result.success && result.presentation) {
-        workflowProjectionPublisher.publishWorkstreamChanged(sessionId, result.presentation);
+        workflowProjectionPublisher.publishTraceProjectionChanged(sessionId, result.presentation);
       }
     }).catch((error) => {
-      console.error("[ConversationService] Failed to publish workstream:", error);
+      console.error("[ConversationService] Failed to publish trace projection:", error);
     });
   }
   publishConversationWorkstream(workstreamSessionId, messages, persistedSessionId) {
@@ -16240,8 +17207,9 @@ ${upgradeReply}`);
       this.publishWorkstream(persistedSessionId);
       return;
     }
-    const presentation = agentWorkstreamProjector.buildConversationPresentation(workstreamSessionId, messages);
-    workflowProjectionPublisher.publishWorkstreamChanged(workstreamSessionId, presentation);
+    void traceService.buildConversationPresentation(workstreamSessionId, messages).then((presentation) => {
+      workflowProjectionPublisher.publishTraceProjectionChanged(workstreamSessionId, presentation);
+    });
   }
   ephemeralWorkstreamSessionId(turnId) {
     return `conversation-${turnId}`;
@@ -16652,6 +17620,7 @@ class TerminalSessionService {
     }
   }
   broadcastData(payload) {
+    rendererEventHub.emit("terminal:data", payload);
     for (const win of electron.BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) {
         win.webContents.send("terminal:data", payload);
@@ -16659,6 +17628,7 @@ class TerminalSessionService {
     }
   }
   broadcastExit(payload) {
+    rendererEventHub.emit("terminal:exit", payload);
     for (const win of electron.BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) {
         win.webContents.send("terminal:exit", payload);
@@ -16667,6 +17637,7 @@ class TerminalSessionService {
   }
   broadcastTabsChanged() {
     const tabs = this.listTabs();
+    rendererEventHub.emit("terminal:tabsChanged", { tabs });
     for (const win of electron.BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) {
         win.webContents.send("terminal:tabsChanged", { tabs });
@@ -17630,7 +18601,7 @@ function registerWorkflowHandlers(context2) {
   electron.ipcMain.handle("workflow:requestPlanRevision", async (_event, runId, revisionText) => {
     const result = await debuggerRuntime.requestPlanRevision(runId, revisionText);
     if (result.success) {
-      state2.currentSessionId = result.session?.sessionId || state2.currentSessionId;
+      state2.currentSessionId = result.presentation?.sessionId || state2.currentSessionId;
       state2.currentRunId = result.runId || state2.currentRunId;
       if (state2.currentSessionId) {
         await storageAdapter.setCurrentSessionId(state2.currentSessionId);
@@ -17656,6 +18627,53 @@ function registerWorkflowHandlers(context2) {
     return result;
   });
 }
+function registerTraceHandlers(context2) {
+  const { state: state2 } = context2;
+  electron.ipcMain.handle("trace:getRun", async (_event, runId) => {
+    const run = traceService.getRun(runId);
+    return { run };
+  });
+  electron.ipcMain.handle("trace:getEvents", async (_event, runId, afterSeq) => {
+    return { events: traceService.getEvents(runId, afterSeq ?? 0) };
+  });
+  electron.ipcMain.handle("trace:getProjection", async (_event, sessionId) => {
+    const targetSessionId = sessionId || state2.currentSessionId;
+    if (!targetSessionId) {
+      return { success: false, error: "No active session." };
+    }
+    const result = await traceService.getSession(targetSessionId);
+    return result;
+  });
+  electron.ipcMain.handle("trace:exportRun", async (_event, runId) => {
+    return traceService.exportRun(runId);
+  });
+}
+const invokeHandlers = /* @__PURE__ */ new Map();
+let registryInstalled = false;
+function installIpcInvokeRegistry() {
+  if (registryInstalled) {
+    return;
+  }
+  const nativeHandle = electron.ipcMain.handle.bind(electron.ipcMain);
+  electron.ipcMain.handle = ((channel, listener) => {
+    invokeHandlers.set(channel, listener);
+    nativeHandle(channel, listener);
+  });
+  registryInstalled = true;
+}
+function createBrowserInvokeEvent() {
+  const sender = electron.BrowserWindow.getFocusedWindow()?.webContents ?? electron.BrowserWindow.getAllWindows().find((window) => !window.isDestroyed())?.webContents;
+  return {
+    sender
+  };
+}
+async function invokeRegisteredIpcChannel(channel, args = []) {
+  const handler = invokeHandlers.get(channel);
+  if (!handler) {
+    throw new Error(`No IPC handler registered for ${channel}`);
+  }
+  return handler(createBrowserInvokeEvent(), ...args);
+}
 const state = {
   currentSessionId: null,
   currentProjectId: null,
@@ -17677,6 +18695,7 @@ async function initializeIpcState() {
   await debuggerRuntime.recoverInterruptedRuns();
 }
 function broadcastToRenderer(channel, ...args) {
+  rendererEventHub.emit(channel, ...args);
   const windows = electron.BrowserWindow.getAllWindows();
   for (const win of windows) {
     if (!win.isDestroyed()) {
@@ -17833,6 +18852,7 @@ function registerNativeThemeBridge() {
   nativeThemeSubscribed = true;
 }
 function registerIPCHandlers() {
+  installIpcInvokeRegistry();
   registerToolTraceBridge();
   preloadLlmConfig();
   registerShellHandlers();
@@ -17844,6 +18864,7 @@ function registerIPCHandlers() {
   registerAgentHandlers(context);
   registerToolEvidenceHandlers(context);
   registerSettingsLlmHandlers(context);
+  registerTraceHandlers(context);
   registerNativeThemeBridge();
 }
 function setMainWindow(window) {
@@ -18431,6 +19452,7 @@ class RdxSessionService {
   }
   broadcastContextChanged() {
     const snapshot = this.snapshotContext();
+    rendererEventHub.emit("context:changed", snapshot);
     for (const window of electron.BrowserWindow.getAllWindows()) {
       if (!window.isDestroyed()) {
         window.webContents.send("context:changed", snapshot);
@@ -18997,6 +20019,159 @@ class RdxSessionService {
     }
   }
 }
+let server = null;
+let bridgeUrl = null;
+const contentTypes = {
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon"
+};
+function setCors(response) {
+  response.setHeader("Access-Control-Allow-Origin", "*");
+  response.setHeader("Access-Control-Allow-Headers", "content-type");
+  response.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+}
+function sendJson(response, statusCode, payload) {
+  setCors(response);
+  response.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
+  response.end(JSON.stringify(payload));
+}
+async function readJsonBody(request) {
+  const chunks = [];
+  for await (const chunk of request) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  const text = Buffer.concat(chunks).toString("utf-8").trim();
+  return text ? JSON.parse(text) : {};
+}
+function redirectToDevRenderer(response, rendererUrl, bridgeOrigin) {
+  const target = new url.URL(rendererUrl);
+  target.searchParams.set("rdcBridgeOrigin", bridgeOrigin);
+  response.writeHead(302, {
+    Location: target.toString(),
+    "Cache-Control": "no-store"
+  });
+  response.end();
+}
+function serveStatic(response, rendererRoot, requestPath) {
+  const relativePath = requestPath === "/app" || requestPath === "/app/" ? "index.html" : requestPath.replace(/^\/app\/?/, "").replace(/^\//, "");
+  const requestedPath = path.normalize(path.join(rendererRoot, relativePath || "index.html"));
+  const root = path.resolve(rendererRoot);
+  const fallbackIndex = path.join(root, "index.html");
+  const filePath = requestedPath.startsWith(root) && fs.existsSync(requestedPath) && fs.statSync(requestedPath).isFile() ? requestedPath : fallbackIndex;
+  if (!fs.existsSync(filePath)) {
+    sendJson(response, 404, { success: false, error: "Renderer build output not found" });
+    return;
+  }
+  response.writeHead(200, {
+    "Cache-Control": "no-store",
+    "Content-Type": contentTypes[path.extname(filePath)] ?? "application/octet-stream"
+  });
+  fs.createReadStream(filePath).pipe(response);
+}
+function handleRequest(options, request, response) {
+  if (!request.url) {
+    sendJson(response, 400, { success: false, error: "Missing URL" });
+    return;
+  }
+  if (request.method === "OPTIONS") {
+    setCors(response);
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+  const bridgeOrigin = bridgeUrl ?? "http://127.0.0.1";
+  const url$1 = new url.URL(request.url, bridgeOrigin);
+  if (url$1.pathname === "/health" && request.method === "GET") {
+    sendJson(response, 200, {
+      ok: true,
+      productName: "RDC-Agent",
+      mode: "browser-app-session",
+      bridgeUrl
+    });
+    return;
+  }
+  if (url$1.pathname === "/invoke" && request.method === "POST") {
+    void readJsonBody(request).then(async (body) => {
+      const payload = body;
+      if (typeof payload.channel !== "string") {
+        sendJson(response, 400, { success: false, error: "channel must be a string" });
+        return;
+      }
+      const args = Array.isArray(payload.args) ? payload.args : [];
+      const result = await invokeRegisteredIpcChannel(payload.channel, args);
+      sendJson(response, 200, { success: true, result });
+    }).catch((error) => {
+      sendJson(response, 500, {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    });
+    return;
+  }
+  if (url$1.pathname === "/events" && request.method === "GET") {
+    rendererEventHub.connect(response);
+    return;
+  }
+  if (url$1.pathname === "/app" || url$1.pathname.startsWith("/app/")) {
+    if (options.devRendererUrl) {
+      redirectToDevRenderer(response, options.devRendererUrl, bridgeOrigin);
+      return;
+    }
+    serveStatic(response, options.rendererRoot, url$1.pathname);
+    return;
+  }
+  if (!options.devRendererUrl && (url$1.pathname.startsWith("/assets/") || url$1.pathname === "/favicon.ico")) {
+    serveStatic(response, options.rendererRoot, url$1.pathname);
+    return;
+  }
+  sendJson(response, 404, { success: false, error: "Not found" });
+}
+async function startBrowserAppBridge(options) {
+  if (server && bridgeUrl) {
+    return bridgeUrl;
+  }
+  const preferredPort = options.preferredPort ?? Number(process.env.RDC_AGENT_BROWSER_BRIDGE_PORT || 5127);
+  server = http.createServer((request, response) => handleRequest(options, request, response));
+  await new Promise((resolveListen, rejectListen) => {
+    const activeServer = server;
+    if (!activeServer) {
+      rejectListen(new Error("Browser app bridge server was not created"));
+      return;
+    }
+    const listen = (port2) => {
+      activeServer.once("error", (error) => {
+        if (error.code === "EADDRINUSE" && port2 !== 0) {
+          listen(0);
+          return;
+        }
+        rejectListen(error);
+      });
+      activeServer.listen(port2, "127.0.0.1", () => resolveListen());
+    };
+    listen(preferredPort);
+  });
+  const address = server.address();
+  const port = typeof address === "object" && address ? address.port : preferredPort;
+  bridgeUrl = `http://127.0.0.1:${port}`;
+  globalThis.__RDC_AGENT_BROWSER_BRIDGE_URL__ = bridgeUrl;
+  console.log(`[BrowserAppBridge] Browser app session: ${bridgeUrl}/app`);
+  return bridgeUrl;
+}
+async function stopBrowserAppBridge() {
+  const activeServer = server;
+  server = null;
+  bridgeUrl = null;
+  delete globalThis.__RDC_AGENT_BROWSER_BRIDGE_URL__;
+  if (!activeServer) {
+    return;
+  }
+  await new Promise((resolveClose) => activeServer.close(() => resolveClose()));
+}
 const rdxSessionService = new RdxSessionService(toolBridge);
 const __dirname$1 = path__namespace.dirname(url.fileURLToPath(require("url").pathToFileURL(__filename).href));
 if (!process.env.RDC_AGENT_USER_DATA?.trim()) {
@@ -19021,7 +20196,11 @@ function registerAllowedOrigin(url2) {
 }
 function emitWindowMaximizedState() {
   if (!mainWindow) return;
+  rendererEventHub.emit("window:maximized-changed", mainWindow.isMaximized());
   mainWindow.webContents.send("window:maximized-changed", mainWindow.isMaximized());
+}
+function getDevRendererUrl() {
+  return process.env["ELECTRON_RENDERER_URL"] || "http://127.0.0.1:5173";
 }
 async function openRdcFiles() {
   const result = await electron.dialog.showOpenDialog({
@@ -19041,6 +20220,7 @@ async function openRdcFiles() {
         filePaths: result.filePaths
       }
     });
+    rendererEventHub.emit("file:open", result.filePaths);
     mainWindow?.webContents.send("file:open", result.filePaths);
   }
 }
@@ -19056,11 +20236,13 @@ function setupKeyboardShortcuts(window) {
     }
     if (key === "n") {
       event.preventDefault();
+      rendererEventHub.emit("case:new");
       window.webContents.send("case:new");
       return;
     }
     if (key === ",") {
       event.preventDefault();
+      rendererEventHub.emit("settings:open");
       window.webContents.send("settings:open");
     }
   });
@@ -19086,15 +20268,9 @@ function createMainWindow() {
     backgroundColor: "#08080c"
   });
   if (isDev) {
-    const rendererUrl = process.env["ELECTRON_RENDERER_URL"];
-    if (rendererUrl) {
-      registerAllowedOrigin(rendererUrl);
-      mainWindow.loadURL(rendererUrl);
-    } else {
-      const fallbackUrl = "http://localhost:5173";
-      registerAllowedOrigin(fallbackUrl);
-      mainWindow.loadURL(fallbackUrl);
-    }
+    const rendererUrl = getDevRendererUrl();
+    registerAllowedOrigin(rendererUrl);
+    mainWindow.loadURL(rendererUrl);
   } else {
     mainWindow.loadFile(path__namespace.join(__dirname$1, "../renderer/index.html"));
   }
@@ -19142,12 +20318,18 @@ function setupMenu() {
           {
             label: "New Case",
             accelerator: "CmdOrCtrl+N",
-            click: () => mainWindow?.webContents.send("case:new")
+            click: () => {
+              rendererEventHub.emit("case:new");
+              mainWindow?.webContents.send("case:new");
+            }
           },
           {
             label: "Settings",
             accelerator: "CmdOrCtrl+,",
-            click: () => mainWindow?.webContents.send("settings:open")
+            click: () => {
+              rendererEventHub.emit("settings:open");
+              mainWindow?.webContents.send("settings:open");
+            }
           },
           { type: "separator" },
           { role: "close" }
@@ -19224,6 +20406,18 @@ electron.app.whenReady().then(async () => {
   });
   registerIPCHandlers();
   await initializeServices();
+  const bridgeUrl2 = await startBrowserAppBridge({
+    devRendererUrl: isDev ? getDevRendererUrl() : null,
+    rendererRoot: path__namespace.join(__dirname$1, "../renderer")
+  });
+  runtimeLogService.log({
+    scope: "app",
+    namespace: "system",
+    severity: "success",
+    title: "Browser app session ready",
+    summary: `浏览器真实会话入口已启动：${bridgeUrl2}/app`,
+    raw: { bridgeUrl: bridgeUrl2 }
+  });
   createMainWindow();
   electron.app.on("activate", () => {
     if (electron.BrowserWindow.getAllWindows().length === 0) {
@@ -19239,6 +20433,7 @@ electron.app.on("window-all-closed", () => {
 });
 electron.app.on("before-quit", () => {
   void stopAllActiveRuns();
+  void stopBrowserAppBridge();
   replayDeviceService.dispose();
   if (isTestMode) {
     const forceExitTimer = setTimeout(() => electron.app.exit(0), 100);

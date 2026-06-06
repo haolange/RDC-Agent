@@ -30,5 +30,11 @@
         "curator_agent"
       ]
     }
-  ]
+  ],
+  "traceOutputContract": {
+    "visibleReasoning": "VisibleReasoningPacket",
+    "toolResults": "normalized_preview",
+    "finalResponse": "markdown",
+    "rawTraceVisibility": "inspector_only"
+  }
 }

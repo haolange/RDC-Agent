@@ -1,28 +1,22 @@
 # RDC-Agent 设计与工程架构准则
 
-## Agent Workstream 目标状态
+## Agentic Trace 目标状态
 
-Agent Workstream 是 RDC-Agent 的消息流产品模型，用于把用户委托、agent 过程轨迹、工具/子 agent 调用、Plan/Report 结果块、右侧 session 索引和 raw trace 审计边界从当前 chat/debug trace 混合投影中拆开。它不是新的顶层产品模式，也不是通用 coding-agent shell。
+Agentic Trace 是 RDC-Agent 的**当前消息流协议**，用 `Event Log → Trace Tree → UI Projection → Renderer Registry → Frontend` 替代已废弃的 Agent Workstream（`items[]` / `aw-*` testid）。
 
-Agent Workstream 的正式文档入口：
+正式文档入口：
 
-- `docs/product/agent-workstream-prd.md`：产品目标、边界、Task 类型、右侧 Progress / Artifacts / Context、Plan/Report 与 raw trace 的用户语义。
-- `docs/ui/agent-workstream-ux-spec.md`：消息流结构、User Prompt Bubble、Agent Thinking Bubble、Tool Row、Sub Agent Row、Task Result Block、Approval Overlay、折叠密度和右侧面板 UX。
-- `docs/architecture/agent-workstream-technical-contract.md`：Task Workstream、ProcessEvent、ProgressTask、ArtifactRecord、ContextRecord、Plan 状态机、Presentation Model 和跨层契约。
-- `docs/workflows/agent-workstream-verification.md`：文档、类型、Browser Preview、Electron E2E、raw trace、右侧面板和 Codex Goal 执行纪律的验收方式。
-- `docs/workflows/agent-workstream-implementation-prompt.md`：面向后续 Codex Goal 的稳定实施提示模板。
+- `docs/architecture/agentic-trace-protocol.md`：**权威跨层契约**（类型、JSONL 存储、IPC、Renderer Registry、浏览器真实会话、runtime 输出约束）。
 
 关键裁决：
 
-- Agent Workstream 是 vertical agent workstream，不是普通聊天，也不是 raw debug log viewer。
-- Task Workstream 按可交付结果划分；Plan 是 Plan Task 的 final report，Execution Report 是 Execution Task 的 final report。
-- `Ask` 仍是默认轻入口，不创建正式 run，不暴露 RenderDoc 工具。
-- `Debugger` 是当前现役执行主链；`Analyzer` / `Optimizer` 在 Agent Workstream 中只作为目标状态的一等 orchestrator 模式描述，不能被写成当前已完整执行能力。
-- Debugger / Analyzer / Optimizer 目标状态都需要 Plan Approval；同意执行和修改建议必须作为用户消息保留在消息流历史中。
-- 右侧固定为 session 级 `Progress` / `Artifacts` / `Context`：Progress 是 runtime task list，Artifacts 是正式产物，Context 是 capture / file / source / capability 索引。
-- Raw trace 只在 Tool Row Raw tab、失败详情或 session export 中出现，不进入默认主体验。
-- Prompt Edit 不覆盖历史，应创建 request branch；第一版如无法完整实现，至少保留类型和 presentation model 预留。
-- Browser Preview 只验证 renderer fallback，不代表真实 Electron、IPC、ToolBridge 或 RenderDoc 工具链。
+- 消息流 UI 唯一入口：`AgentRunView` + `renderer-registry`（`trace-*` testid），**不保留** `AgentWorkstream` / `MessageTimeline` / `aw-*` legacy。
+- Presentation 模型：`AgentRunPresentation.runs[].timeline.nodes[]`；右栏仍为 session 级 `Progress` / `Artifacts` / `Context`。
+- 事件存储：`workspace/.rdc-agent/trace/` 下 **JSONL append-only**（`runs/*.json` + `events/*.jsonl`），当前版本不引入 SQLite。
+- IPC：`trace:projectionChanged` + `trace:getRun/getEvents/getProjection/exportRun`；`workflow:workstreamChanged` 已删除。
+- `Ask` 仍是默认轻入口；`Debugger` 是现役执行主链；Plan Approval 与修改建议保留在消息流与 composer overlay。
+- Raw trace 仅在 Tool 卡片 Raw 标签、Inspector 或 export 中出现。
+- 浏览器真实会话通过主进程 localhost bridge 打开同一套 renderer，并连接真实 workspace、settings、LLM runtime、Trace 事件流和 ToolBridge。
 
 `DESIGN.md` 是本仓库的产品设计和工程架构权威入口。`README.md` 说明项目是什么以及如何启动，`AGENTS.md` 说明修改公约，`docs/architecture/*` 说明具体数据流和模块地图；当这些文件出现冲突时，以本文件描述的产品边界、架构边界和验证门禁为先，再同步修正文档。
 
@@ -61,6 +55,7 @@ Agent Workstream 的正式文档入口：
 主进程按领域组织：
 
 - `src/main/workflow/debugger`：Debugger workflow facade、plan/intake、approval、execution lifecycle、LLM payload normalization、blocker normalization、workflow projection。
+- `src/main/agent-trace`：Agentic Trace runtime（`TraceService`、`TraceEventStore`、`TraceTreeBuilder`、`ProjectionBuilder`、manifest registry）。
 - `src/main/sessions`：project/session/run repository、workspace layout、attachment/output store、legacy workspace migration、JSON/YAML file store。
 - `src/main/settings`：settings、provider connection、secret storage、LLM adapter、Debugger LLM route。
 - 模型服务商授权属于 settings 边界：API Key/local/environment provider 走 `ProviderConnectionService`，Claude/ChatGPT/GitHub Copilot 这类账号登录 provider 走本库自研 OAuth/device-flow 服务。Claude/ChatGPT Account 使用账号模型目录；GitHub Copilot 使用账号模型目录并用 Copilot `/models` 补充；ChatGPT Account 运行时使用 ChatGPT OAuth token 与账号专用 Codex runtime。GitHub Copilot `/models` 中存在不支持当前 chat completions endpoint 的模型时，运行时 route 必须收敛到同 provider 下可用的 Debugger 模型，不让 specialist loop 因 endpoint 不兼容中断。API Key 和账号 token 只进 secret storage；Bedrock/Vertex 这类 environment provider 使用运行环境凭据，settings 只保存状态和模型列表。
@@ -77,8 +72,8 @@ Agent Workstream 的正式文档入口：
 
 - `src/renderer/app`：应用装配（`App.tsx` ≤220 行）、`AppProviders`、`bootstrap/*`（`useAppBootstrap`、`useIpcEventBridge`、`useE2ESeedHarness`）。
 - `src/renderer/shell`：布局原语（`AppShell`、`TitleBar`、`WorkbenchLayout`、`PanelZone`、`ResizeHandle`）、`layoutGeometry`、用户菜单。
-- `src/renderer/stream`：消息流渲染原子（`MessageTimeline`、bubble/row 组件）；对应 Agent Workstream 展示模型。
-- `src/renderer/services`：renderer 侧纯逻辑（`conversationTimeline`、`attachmentHelpers`、`timelineFormatters` 等），无 React、无 IPC。
+- `src/renderer/stream`：Agentic Trace UI（`AgentRunView`、`TimelinePanel`、`renderer-registry`、`TraceCards`）。
+- `src/renderer/services`：renderer 侧纯逻辑（`conversationTimeline`、`attachmentHelpers` 等），无 React、无 IPC。
 - `src/renderer/hooks`：通用 hooks（`useIpcSubscription`、`useResizablePanel`、`useScrollAnchor`）；feature 私有 hook 放各 feature 目录。
 - `src/renderer/stores`：分域 Zustand（`projectStore`、`conversationStore`、`workflowStore`、`evidenceStore`、`captureStore`、`sessionStore` 仅 run/usage）+ `selectors/`；`storesReset` 供 case:new / E2E 重置。
 - `src/renderer/features/debugger/plan/`：计划审批与问答 UI（`PlanIntakePanel`、`PlanApprovalCard`、`ComposerApprovalOverlay`）。
@@ -101,7 +96,7 @@ Agent Workstream 的正式文档入口：
 ## UI / UX 设计原则
 
 - 默认保持现有 UI/UX：布局结构、面板层级、交互路径、信息层级、视觉节奏、CSS class、测试定位符和截图基线都不应因架构重排改变。
-- **保真契约**：`scripts/fidelity/*` 清单 + Playwright `e2e/*-snapshots/` 为冻结输出；重写只允许搬家 class/testid，不允许改名或删锚点。
+- **保真契约**：`scripts/fidelity/*` 清单为冻结输出；重写只允许搬家 class/testid，不允许改名或删锚点。
 - **文件行数预算**：组件 ≤300 行、hook/service ≤200 行、store slice ≤200 行（`check:architecture` R1 强制执行，遗留清单逐步清零）。
 - UI 结构调整只有两类允许原因：明确的产品变更，或为保持现有行为而必须做的结构拆分。
 - 任何涉及 `src/renderer` 的改动，都必须确认主界面、左侧项目/会话、右侧控制面板、composer、Activity/运行记录、Settings、capture library、opened capture preview 仍可达。
@@ -129,7 +124,7 @@ Agent Workstream 的正式文档入口：
 - 共享导出：`npm run check:shared-exports`（相对 Phase 0 `shared-exports.txt` 无符号删除）。
 - 静态类型：`npm run typecheck`。
 - 构建检查：`npm run build`。
-- Electron E2E：运行前必须先 build，因为 E2E 启动 `out/main/index.js` 和 `out/renderer`。
-- 关键 E2E：`debugger-plan-intake.spec.ts`、`session-lifecycle.spec.ts`、`settings-persistence.spec.ts`、`workbench-visual.spec.ts`。
+- 浏览器真实会话 smoke：`npm run test:browser-session`，运行前必须先 build，因为 smoke 启动 `out/main/index.js` 和 `out/renderer`，再用浏览器打开 `/app`。
+- Electron 壳边界 smoke：`npm run test:shell-smoke`，只验证窗口启动、preload 注入、IPC 连通、workspace 权限和 ToolBridge/RenderDoc 本地链路诊断。
 - 模式门禁改动必须补 `mode-switch.spec.ts`，确认默认 `Ask`、未 Open capture 时执行类模式 disabled、Open 后可切换。
 - Provider/OAuth UI 改动：先用 mock E2E 验证分组、Connect/Test、token 状态和模型发现，再用内置浏览器检查 Settings > Provider 的视觉层级、弹层可读性、长文本和窄宽度布局；真实 OAuth 登录验证需要明确区分账号/组织策略失败与本地 UI/IPC 失败。

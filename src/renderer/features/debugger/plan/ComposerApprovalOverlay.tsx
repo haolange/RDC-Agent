@@ -5,9 +5,9 @@ import { useWorkflowStore } from '../../../stores/workflowStore';
 
 export const ComposerApprovalOverlay: React.FC = () => {
   const currentRun = useSessionStore((state) => state.currentRun);
-  const presentation = useWorkflowStore((state) => state.workstreamPresentation);
+  const presentation = useWorkflowStore((state) => state.tracePresentation);
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
-  const setWorkstreamPresentation = useWorkflowStore((state) => state.setWorkstreamPresentation);
+  const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
   const setCurrentDebugPlan = useWorkflowStore((state) => state.setCurrentDebugPlan);
   const setPendingQuestions = useWorkflowStore((state) => state.setPendingQuestions);
   const [revisionText, setRevisionText] = useState('');
@@ -24,7 +24,7 @@ export const ComposerApprovalOverlay: React.FC = () => {
     if (!sessionId) return;
     const result = await getElectronApi()?.workflow.getWorkstreamSession(sessionId);
     if (result?.presentation) {
-      setWorkstreamPresentation(result.presentation);
+      setTracePresentation(result.presentation);
     }
   };
 
@@ -60,7 +60,7 @@ export const ComposerApprovalOverlay: React.FC = () => {
     try {
       const result = await electronAPI.workflow.requestPlanRevision(runId, trimmed);
       if (result.presentation) {
-        setWorkstreamPresentation(result.presentation);
+        setTracePresentation(result.presentation);
       }
       if (result.runId && currentRun) {
         setCurrentRun({

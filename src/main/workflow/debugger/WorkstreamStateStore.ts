@@ -11,7 +11,8 @@ import { generateEventId, nowIso } from '@shared/utils/id';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import { runScopedStore } from './RunScopedStore';
 
-const STORE_FILE = 'agent-workstream-state.json';
+const STORE_FILE = 'agentic-trace-state.json';
+const LEGACY_STORE_FILE = 'agent-workstream-state.json';
 
 export interface WorkstreamPlanRecord {
   planId: string;
@@ -301,6 +302,10 @@ export class WorkstreamStateStore {
     const targetPath = path.resolve(session.sessionPath, STORE_FILE);
     if (!runScopedStore.isPathInside(session.sessionPath, targetPath)) {
       throw new Error(`Workstream state escaped session directory: ${targetPath}`);
+    }
+    const legacyPath = path.resolve(session.sessionPath, LEGACY_STORE_FILE);
+    if (!fs.existsSync(targetPath) && fs.existsSync(legacyPath)) {
+      fs.copyFileSync(legacyPath, targetPath);
     }
     return targetPath;
   }

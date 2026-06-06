@@ -50,7 +50,7 @@ const ProjectControlPanel: React.FC = () => {
 };
 
 const SessionControlPanel: React.FC = () => {
-  const presentation = useWorkflowStore((state) => state.workstreamPresentation);
+  const presentation = useWorkflowStore((state) => state.tracePresentation);
   if (shouldShowWorkstreamRightRail(presentation)) {
     return <WorkstreamRightPanel />;
   }

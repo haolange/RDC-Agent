@@ -24,11 +24,11 @@ import type {
   PlanPresentation,
 } from '@shared/types/workflow';
 import type {
-  WorkstreamBranchSwitchResult,
-  WorkstreamExportOptions,
-  WorkstreamExportResult,
-  WorkstreamRevisionResult,
-  WorkstreamSessionResult,
+  TraceBranchSwitchResult,
+  TraceExportOptions,
+  TraceExportResult,
+  TraceRevisionResult,
+  TraceSessionResult,
 } from '@shared/types/workstream';
 import { normalizeWorkflowStage } from '@shared/constants/stages';
 import { BLOCKER_CODES } from '@shared/constants/blockers';
@@ -47,9 +47,9 @@ import { artifactStore } from '../../reports/ArtifactStore';
 import { contextService } from '../../captures/ContextService';
 import { evidenceLedger } from '../../reports/EvidenceLedger';
 import { taskBoard } from './TaskBoard';
-import { multiAgentWorkflowEngine } from './MultiAgentWorkflowEngine';
+import { multiAgentWorkflowEngine } from './MultiAgentWorkflowEngineRuntime';
 import { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
-import { agentWorkstreamProjector } from './AgentWorkstreamProjector';
+import { traceService } from '../../agent-trace/TraceService';
 import { workstreamStateStore } from './WorkstreamStateStore';
 import {
   dedupeBlockers,
@@ -611,11 +611,11 @@ export class DebugWorkflowService {
     };
   }
 
-  async getWorkstreamSession(sessionId: string): Promise<WorkstreamSessionResult> {
-    return agentWorkstreamProjector.getSession(sessionId);
+  async getWorkstreamSession(sessionId: string): Promise<TraceSessionResult> {
+    return traceService.getSession(sessionId);
   }
 
-  async requestPlanRevision(runId: string, revisionText: string): Promise<WorkstreamRevisionResult> {
+  async requestPlanRevision(runId: string, revisionText: string): Promise<TraceRevisionResult> {
     const location = this.findRun(runId);
     if (!location) {
       return { success: false, error: `Run not found: ${runId}` };
@@ -745,23 +745,23 @@ export class DebugWorkflowService {
       ...workstream,
       runId: nextRunId,
       planId: nextPlan.planId,
-      branchId: workstream.session?.activeBranchId,
+      branchId: workstream.presentation?.activeBranchId,
     };
   }
 
-  async switchWorkstreamBranch(sessionId: string, branchId: string): Promise<WorkstreamBranchSwitchResult> {
+  async switchWorkstreamBranch(sessionId: string, branchId: string): Promise<TraceBranchSwitchResult> {
     workstreamStateStore.switchBranch(sessionId, branchId);
     const workstream = await this.getWorkstreamSession(sessionId);
     return {
       ...workstream,
-      activeBranchId: workstream.session?.activeBranchId,
+      activeBranchId: workstream.presentation?.activeBranchId,
     };
   }
 
   async exportWorkstreamSession(
     sessionId: string,
-    options: WorkstreamExportOptions = {},
-  ): Promise<WorkstreamExportResult> {
+    options: TraceExportOptions = {},
+  ): Promise<TraceExportResult> {
     try {
       const session = storageAdapter.readSession(sessionId);
       if (!session) {
@@ -774,18 +774,17 @@ export class DebugWorkflowService {
       const exportDir = path.join(session.sessionPath, 'exports');
       fs.mkdirSync(exportDir, { recursive: true });
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const summaryPath = path.join(exportDir, `agent-workstream-summary-${stamp}.json`);
+      const summaryPath = path.join(exportDir, `agentic-trace-summary-${stamp}.json`);
       fs.writeFileSync(summaryPath, JSON.stringify({
         schemaVersion: '1',
         exportedAt: nowIso(),
         includeAllBranches: options.includeAllBranches ?? true,
-        session: workstream.session,
         presentation: workstream.presentation,
       }, null, 2), 'utf-8');
 
       let rawTracePath: string | undefined;
       if (options.includeRawTrace !== false) {
-        rawTracePath = path.join(exportDir, `agent-workstream-raw-trace-${stamp}.jsonl`);
+        rawTracePath = path.join(exportDir, `agentic-trace-raw-trace-${stamp}.jsonl`);
         const events = await storageAdapter.readActionChain(sessionId);
         fs.writeFileSync(rawTracePath, `${events.map((event) => JSON.stringify(event)).join('\n')}\n`, 'utf-8');
       }
@@ -2428,6 +2427,9 @@ export class DebugWorkflowService {
       lastStage,
       stopReason,
     });
+    if (['completed', 'failed', 'cancelled', 'interrupted'].includes(status)) {
+      this.publishWorkstream(sessionId);
+    }
   }
 
   private emitConversationEvent(event: ConversationStreamEvent): void {
@@ -2435,14 +2437,14 @@ export class DebugWorkflowService {
   }
 
   private publishWorkstream(sessionId: string): void {
-    void agentWorkstreamProjector.getSession(sessionId)
+    void traceService.getSession(sessionId)
       .then((result) => {
         if (result.success && result.presentation) {
-          workflowProjectionPublisher.publishWorkstreamChanged(sessionId, result.presentation);
+          workflowProjectionPublisher.publishTraceProjectionChanged(sessionId, result.presentation);
         }
       })
       .catch((error) => {
-        console.error('[WorkflowProjectionPublisher] Failed to publish workstream:', error);
+        console.error('[WorkflowProjectionPublisher] Failed to publish trace projection:', error);
       });
   }
 }
