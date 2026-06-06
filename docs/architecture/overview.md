@@ -16,7 +16,7 @@ flowchart TB
   ToolBridge["ToolBridge"]
   RdxBat["resources/tools/rdx.bat"]
   RenderDoc["RenderDoc / replay device"]
-  AgentRunner["AgentRunnerPort<br/>OpenAI / Claude SDK adapter"]
+  AgentRuntime["AgentRuntime<br/>ToolRegistry"]
   LLM["LLM provider / model route"]
 
   User --> Renderer
@@ -27,8 +27,8 @@ flowchart TB
   Preload -. "ElectronAPI" .-> Shared
   MainDomains -. "contracts" .-> Shared
   MainDomains --> Workspace
-  MainDomains --> AgentRunner
-  AgentRunner --> LLM
+  MainDomains --> AgentRuntime
+  AgentRuntime --> LLM
   MainDomains --> ToolBridge
   ToolBridge --> RdxBat
   RdxBat --> RenderDoc
@@ -64,7 +64,7 @@ sequenceDiagram
   participant API as "window.electronAPI"
   participant IPC as "main IPC handlers"
   participant Runtime as "DebuggerRuntime"
-  participant Agent as "AgentRunnerPort / SDK adapter"
+  participant Runtime as "AgentRuntime"
   participant LLM as "DebuggerLlmService / LLMAdapter"
   participant Store as "StorageAdapter / RunScopedStore"
   participant Tools as "ToolBridge"
@@ -94,5 +94,5 @@ Analyzer 和 Optimizer 仍是产品模式占位，不在本次结构升级中扩
 - 优先拆边界，不做目录搬家式重构。
 - 不改变 UI/UX：DOM 层级、CSS 类、测试定位符和交互路径默认保持。
 - 保持 RenderDoc 垂直工具边界：`renderer -> preload -> IPC -> ToolBridge -> rdx.bat`。
-- 通用 Agent SDK 只能在 stage 内通过 `AgentRunnerPort` 运行，不能决定 Debugger 顶层阶段、gate 或 final status。
+- 所有 agent turn 只能通过 `AgentRuntime` 运行，不能绕过 Debugger 顶层阶段、gate 或 final status。
 - 新增文档必须指向当前代码和当前能力，不堆设想文件。

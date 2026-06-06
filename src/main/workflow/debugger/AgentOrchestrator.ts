@@ -1,57 +1,63 @@
-/**
- * AgentOrchestrator - Agent runner registry facade
- * 只负责角色配置、路由和消息投影；顶层流程阶段和 gate 由 DebuggerRuntime 控制。
- */
-
 import type {
-  AgentRole,
   AgentConfig,
-  AgentState,
   AgentMessage,
+  AgentRole,
+  AgentState,
   WriteScope,
 } from '@shared/types/agent';
-import type { WorkflowStage } from '@shared/types/workflow';
 import {
-  AGENT_ROLES,
-  AGENT_DISPLAY_NAMES,
   AGENT_DESCRIPTIONS,
+  AGENT_DISPLAY_NAMES,
+  AGENT_ROLES,
   DEFAULT_MODEL_ROUTING,
   INVESTIGATOR_AGENTS,
-  VERIFIER_AGENTS,
   REPORTER_AGENTS,
+  VERIFIER_AGENTS,
 } from '@shared/constants/agents';
-import { storageAdapter } from '../../sessions/StorageAdapter';
-import { generateEventId, nowMs, nowIso } from '@shared/utils/id';
+import type { AgentEvent } from '@shared/types/agentRuntime';
 import type { LLMConfig, LLMStreamEvent } from '@shared/types/llm';
+import type { AppMode } from '@shared/types/session';
 import type { LlmProviderId } from '@shared/types/settings';
+import type { WorkflowStage } from '@shared/types/workflow';
+import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
+import { agentRuntime } from '../../agent-runtime/AgentRuntime';
+import { runtimeLogService } from '../../runtime/RuntimeLogService';
+import { storageAdapter } from '../../sessions/StorageAdapter';
 import { executionProfileService } from '../../settings/ExecutionProfileService';
 import { llmAdapter } from '../../settings/LLMAdapter';
 import { providerAccountAuthService } from '../../settings/ProviderAccountAuthService';
 import { settingsService } from '../../settings/SettingsService';
-import { runtimeLogService } from '../../runtime/RuntimeLogService';
-import { agentRunnerRegistry } from './AgentRunnerRegistry';
 import { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
 import { isToolAllowedForAgent, resolveAgentToolAllowlist } from './DebuggerRuntimePolicy';
+
+interface AgentTurnContext {
+  caseId?: string;
+  runId?: string;
+  sessionId?: string;
+  stageId?: WorkflowStage;
+  turnId?: string;
+}
+
+interface AgentTurnOptions {
+  signal?: AbortSignal;
+  onChunk?: (text: string) => void;
+  onStreamEvent?: (event: LLMStreamEvent) => void;
+}
+
+const EXECUTE_PATTERN = /start|execute|debug|analy[sz]e|开始|启动|执行|正式分析|开始调试|调试/i;
 
 export class AgentOrchestrator {
   private agentStates: Map<AgentRole, AgentState> = new Map();
   private agentConfigs: Map<AgentRole, AgentConfig> = new Map();
 
   constructor() {
-    // 初始化所有Agent状态
     this.initializeAgents();
   }
 
-  /**
-   * 设置主窗口引用
-   */
   setMainWindow(_window: unknown): void {
     // Renderer projection is owned by WorkflowProjectionPublisher.
   }
 
-  /**
-   * 初始化所有Agent
-   */
   private initializeAgents(): void {
     for (const role of AGENT_ROLES) {
       this.agentStates.set(role, {
@@ -60,7 +66,6 @@ export class AgentOrchestrator {
         lastActivity: nowIso(),
       });
 
-      // 设置默认配置
       const defaultRouting = DEFAULT_MODEL_ROUTING[role];
       this.agentConfigs.set(role, {
         agentId: role,
@@ -75,9 +80,6 @@ export class AgentOrchestrator {
     }
   }
 
-  /**
-   * 获取Agent类别
-   */
   private getAgentCategory(role: AgentRole): 'orchestrator' | 'investigator' | 'verifier' | 'reporter' {
     if (role === 'ask_agent' || role === 'rdc-debugger') return 'orchestrator';
     if (INVESTIGATOR_AGENTS.includes(role)) return 'investigator';
@@ -86,9 +88,6 @@ export class AgentOrchestrator {
     return 'investigator';
   }
 
-  /**
-   * 获取Agent写入范围
-   */
   private getAgentWriteScopes(role: AgentRole): WriteScope[] {
     if (role === 'ask_agent') return [];
     if (role === 'rdc-debugger') return ['workspace_control'];
@@ -98,23 +97,14 @@ export class AgentOrchestrator {
     return [];
   }
 
-  /**
-   * 获取Agent状态
-   */
   getAgentState(agentId: AgentRole): AgentState | null {
     return this.agentStates.get(agentId) || null;
   }
 
-  /**
-   * 获取所有Agent状态
-   */
   getAllAgentStates(): AgentState[] {
     return Array.from(this.agentStates.values());
   }
 
-  /**
-   * 配置Agent
-   */
   configureAgent(agentId: AgentRole, config: Partial<AgentConfig>): void {
     const existing = this.agentConfigs.get(agentId);
     if (existing) {
@@ -122,9 +112,6 @@ export class AgentOrchestrator {
     }
   }
 
-  /**
-   * 获取Agent配置
-   */
   getAgentConfig(agentId: AgentRole): AgentConfig | null {
     return this.agentConfigs.get(agentId) || null;
   }
@@ -159,48 +146,50 @@ export class AgentOrchestrator {
     this.applyLlmConfig(llmConfig);
   }
 
+  private modeForAgent(agentId: AgentRole): AppMode {
+    return agentId === 'ask_agent' ? 'ask' : 'debugger';
+  }
+
+  private patternForAgent(agentId: AgentRole): string {
+    return agentId === 'ask_agent' ? 'free-agent' : 'plan-generate-verify';
+  }
+
+  private systemPromptForAgent(agentId: AgentRole, prompt?: string): string {
+    return prompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}`;
+  }
+
+  private emitRuntimeChunk(event: AgentEvent, onChunk?: (text: string) => void): void {
+    if (!onChunk || event.type !== 'assistant.delta') {
+      return;
+    }
+    const text = event.payload && typeof event.payload.text === 'string' ? event.payload.text : '';
+    if (text) {
+      onChunk(text);
+    }
+  }
+
   private async finalizeRecordedAssistantMessage(
     agentId: AgentRole,
     streamedContent: string,
     fallbackContent: string,
-    context?: {
-      caseId?: string;
-      runId?: string;
-      sessionId?: string;
-      stageId?: WorkflowStage;
-      turnId?: string;
-    },
+    context?: AgentTurnContext,
   ): Promise<string> {
     const finalContent = streamedContent || fallbackContent;
     await this.recordMessage(agentId, 'assistant', finalContent, context);
     return finalContent;
   }
 
-  /**
-   * 发送消息给Agent
-   */
   async sendMessage(
     agentId: AgentRole,
     content: string,
-    context?: {
-      caseId?: string;
-      runId?: string;
-      sessionId?: string;
-      stageId?: WorkflowStage;
-      turnId?: string;
-    },
-    options?: {
-      signal?: AbortSignal;
-      onChunk?: (text: string) => void;
-      onStreamEvent?: (event: LLMStreamEvent) => void;
-    },
+    context?: AgentTurnContext,
+    options?: AgentTurnOptions,
   ): Promise<string> {
     const fallbackConfig = this.agentConfigs.get(agentId);
     if (!fallbackConfig) {
       throw new Error(`Agent not found: ${agentId}`);
     }
 
-    // 更新状态
     this.updateAgentStatus(agentId, 'thinking');
 
     try {
@@ -215,32 +204,28 @@ export class AgentOrchestrator {
         temperature: runtimeProfile.temperature ?? fallbackConfig.temperature,
         maxTokens: runtimeProfile.maxTokens ?? fallbackConfig.maxTokens,
       };
-
-      // 构建消息
-      const messages = [
-        { role: 'system' as const, content: config.systemPrompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}` },
-        { role: 'user' as const, content },
-      ];
+      const systemPrompt = this.systemPromptForAgent(agentId, config.systemPrompt);
 
       await this.recordMessage(agentId, 'user', content, context);
 
-      const response = await agentRunnerRegistry.run({
+      const response = await agentRuntime.runTurn({
         agentId,
+        mode: this.modeForAgent(agentId),
         prompt: content,
-        systemPrompt: messages[0]?.content ?? '',
+        systemPrompt,
         modelId: config.modelName,
         providerId: config.modelProvider,
         maxTokens: config.maxTokens,
         temperature: config.temperature,
         toolAllowlist: resolveAgentToolAllowlist(agentId, context?.stageId),
         stage: context?.stageId,
-        caseId: context?.caseId,
+        patternId: this.patternForAgent(agentId),
         runId: context?.runId,
         sessionId: context?.sessionId,
         turnId: context?.turnId,
         signal: options?.signal,
-        onChunk: options?.onChunk,
         onStreamEvent: options?.onStreamEvent,
+        onEvent: (event) => this.emitRuntimeChunk(event, options?.onChunk),
       });
       const finalContent = await this.finalizeRecordedAssistantMessage(
         agentId,
@@ -249,9 +234,7 @@ export class AgentOrchestrator {
         context,
       );
 
-      // 更新状态
       this.updateAgentStatus(agentId, 'complete');
-
       return finalContent;
     } catch (error) {
       this.updateAgentStatus(agentId, 'error');
@@ -262,15 +245,12 @@ export class AgentOrchestrator {
   async sendCoworkMessage(
     agentId: AgentRole,
     content: string,
-    options?: {
+    options?: AgentTurnOptions & {
       sessionId?: string;
-      signal?: AbortSignal;
       systemPrompt?: string;
       maxTokens?: number;
       temperature?: number;
       turnId?: string;
-      onChunk?: (text: string) => void;
-      onStreamEvent?: (event: LLMStreamEvent) => void;
       routeAgentId?: AgentRole;
     },
   ): Promise<string> {
@@ -302,57 +282,28 @@ export class AgentOrchestrator {
       };
 
       if (process.env.RDC_AGENT_TEST_MODE === '1') {
-        let userMessage = content;
-        try {
-          const parsed = JSON.parse(content) as { effective_user_message?: string; user_message?: string };
-          userMessage = parsed.effective_user_message || parsed.user_message || content;
-        } catch {
-          userMessage = content;
-        }
-        if (userMessage.includes('__RDC_AGENT_E2E_FORCE_COWORK_LLM_FAILURE__')) {
-          throw new Error('E2E forced cowork LLM request failure');
-        }
-        const lower = userMessage.toLowerCase();
-        let stub = agentId === 'ask_agent'
-          ? '我在。你可以先描述问题、目标或需要打开的 .rdc capture；我会先帮你澄清，不会直接启动执行。'
-          : '我在。你可以先告诉我你遇到了什么现象，或者直接说你希望我现在正式开始调试。';
-        if (/ue4|unreal/i.test(userMessage)) {
-          stub = 'UE4 是 Unreal Engine 4。它是 Epic Games 的一代游戏引擎，常见于延迟渲染、材质系统、后处理链和 Shader 调试场景。';
-        } else if (/你好|您好|hello|hi/i.test(userMessage)) {
-          if (agentId === 'ask_agent') {
-            stub = '你好，我可以先帮你澄清问题、解释能力范围，或引导你在应用内 Open 一个 .rdc capture；不会直接启动 RenderDoc 执行。';
-          } else {
-            stub = '你好。当前是 Debugger 模式；如果你要开始正式调试，请描述目标、异常和关键事件，我会先生成执行前计划。';
-          }
-        } else if (/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower)) {
-          stub = '收到，我会先帮你整理正式调试前的关键信息，然后在条件满足时进入严格执行流程。';
-        }
+        const finalStub = await this.createCoworkTestResponse(agentId, content, options?.onChunk);
         this.updateAgentStatus(agentId, 'complete');
-        const finalStub = `${stub}\n<control>{"intent":"${/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower) ? 'execute' : 'talk'}","safe_to_start":${/开始|启动|执行|正式分析|开始调试|debug|analy[sz]e|调试/.test(lower) ? 'true' : 'false'}}</control>`;
-        if (options?.onChunk) {
-          const midpoint = Math.max(1, Math.ceil(finalStub.length / 2));
-          options.onChunk(finalStub.slice(0, midpoint));
-          await Promise.resolve();
-          options.onChunk(finalStub.slice(midpoint));
-        }
         return finalStub;
       }
 
-      const response = await agentRunnerRegistry.run({
+      const response = await agentRuntime.runTurn({
         agentId,
+        mode: this.modeForAgent(agentId),
         prompt: content,
-        systemPrompt: config.systemPrompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}`,
+        systemPrompt: this.systemPromptForAgent(agentId, config.systemPrompt),
         modelId: config.modelName,
         providerId: config.modelProvider,
         maxTokens: config.maxTokens,
         temperature: config.temperature,
         toolAllowlist: [],
         stage: 'cowork',
+        patternId: this.patternForAgent(agentId),
         sessionId: options?.sessionId,
         turnId: options?.turnId,
         signal: options?.signal,
-        onChunk: options?.onChunk,
         onStreamEvent: options?.onStreamEvent,
+        onEvent: (event) => this.emitRuntimeChunk(event, options?.onChunk),
       });
       const finalContent = response.text;
 
@@ -361,13 +312,12 @@ export class AgentOrchestrator {
         namespace: 'agent',
         severity: 'info',
         title: `${AGENT_DISPLAY_NAMES[agentId] || agentId} cowork turn`,
-        summary: finalContent.slice(0, 160) || '空消息',
+        summary: finalContent.slice(0, 160) || 'Empty message.',
         sessionId: options?.sessionId,
         raw: {
           agentId,
-          providerId: response.providerId,
-          modelId: response.modelId,
-          adapter: response.trace?.adapter,
+          providerId: config.modelProvider,
+          modelId: config.modelName,
         },
       });
 
@@ -379,25 +329,54 @@ export class AgentOrchestrator {
     }
   }
 
-  /**
-   * 获取 Specialist 可用工具清单（Task 4b）
-   * 根据角色过滤可用工具，确保 skeptic_agent 和 curator_agent 不接收任何 live tool
-   */
+  private async createCoworkTestResponse(
+    agentId: AgentRole,
+    content: string,
+    onChunk?: (text: string) => void,
+  ): Promise<string> {
+    let userMessage = content;
+    try {
+      const parsed = JSON.parse(content) as { effective_user_message?: string; user_message?: string };
+      userMessage = parsed.effective_user_message || parsed.user_message || content;
+    } catch {
+      userMessage = content;
+    }
+    if (userMessage.includes('__RDC_AGENT_E2E_FORCE_COWORK_LLM_FAILURE__')) {
+      throw new Error('E2E forced cowork LLM request failure');
+    }
+    const lower = userMessage.toLowerCase();
+    const wantsExecution = EXECUTE_PATTERN.test(userMessage);
+    let stub = agentId === 'ask_agent'
+      ? 'I can help clarify the problem, explain boundaries, or guide you to open a .rdc capture without starting execution.'
+      : 'I can help scope the debugging target, or prepare a formal Debugger plan when you are ready to execute.';
+    if (/ue4|unreal/i.test(userMessage)) {
+      stub = 'UE4 is Unreal Engine 4. In RDC-Agent it is usually relevant to render pass, material, post-process, and shader debugging context.';
+    } else if (/hello|hi|你好|您好/i.test(userMessage)) {
+      stub = agentId === 'ask_agent'
+        ? 'Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution.'
+        : 'Hello. In Debugger mode I prepare an execution plan first, then wait for approval before running the debugging workflow.';
+    } else if (wantsExecution || EXECUTE_PATTERN.test(lower)) {
+      stub = 'Received. I will prepare the formal debugging plan first, then move into the strict execution flow only when conditions are met.';
+    }
+
+    const finalStub = `${stub}\n<control>{"intent":"${wantsExecution ? 'execute' : 'talk'}","safe_to_start":${wantsExecution ? 'true' : 'false'}}</control>`;
+    if (onChunk) {
+      const midpoint = Math.max(1, Math.ceil(finalStub.length / 2));
+      onChunk(finalStub.slice(0, midpoint));
+      await Promise.resolve();
+      onChunk(finalStub.slice(midpoint));
+    }
+    return finalStub;
+  }
+
   getToolsForRole(agentId: AgentRole): string[] {
     return resolveAgentToolAllowlist(agentId);
   }
-  
-  /**
-   * 检查工具是否允许被指定角色使用（Task 4b）
-   * shader 编辑工具默认只读，不在任何 specialist 的工具清单中
-   */
+
   isToolAllowedForRole(toolName: string, agentId: AgentRole): boolean {
     return isToolAllowedForAgent(toolName, agentId);
   }
-  
-  /**
-   * 更新Agent状态
-   */
+
   private updateAgentStatus(agentId: AgentRole, status: AgentState['status']): void {
     const state = this.agentStates.get(agentId);
     if (state) {
@@ -408,7 +387,7 @@ export class AgentOrchestrator {
         namespace: 'agent',
         severity: status === 'error' ? 'error' : status === 'complete' ? 'success' : 'info',
         title: AGENT_DISPLAY_NAMES[agentId] || agentId,
-        summary: `状态切换为 ${status}。`,
+        summary: `Status changed to ${status}.`,
         raw: {
           agentId,
           status,
@@ -418,14 +397,11 @@ export class AgentOrchestrator {
     }
   }
 
-  /**
-   * 记录消息
-   */
   private async recordMessage(
     agentId: AgentRole,
     role: 'user' | 'assistant' | 'system',
     content: string,
-    context?: { caseId?: string; runId?: string; sessionId?: string; turnId?: string }
+    context?: { caseId?: string; runId?: string; sessionId?: string; turnId?: string },
   ): Promise<void> {
     if (!context?.sessionId) return;
 
@@ -453,27 +429,20 @@ export class AgentOrchestrator {
       }));
     }
 
-    // 通知UI
     this.notifyMessage(message, context?.sessionId);
   }
 
-  /**
-   * 通知Agent状态变化
-   */
   private notifyAgentStateChanged(state: AgentState): void {
     workflowProjectionPublisher.publishAgentStatus(state);
   }
 
-  /**
-   * 通知消息
-   */
   private notifyMessage(message: AgentMessage, sessionId?: string): void {
     runtimeLogService.log({
       scope: sessionId ? 'session' : 'app',
       namespace: 'agent',
       severity: message.role === 'system' ? 'warning' : 'info',
       title: AGENT_DISPLAY_NAMES[message.agentId] || message.agentId,
-      summary: message.content.slice(0, 120) || '空消息',
+      summary: message.content.slice(0, 120) || 'Empty message.',
       sessionId,
       raw: {
         agentId: message.agentId,
@@ -487,5 +456,4 @@ export class AgentOrchestrator {
   }
 }
 
-// 单例导出
 export const agentOrchestrator = new AgentOrchestrator();

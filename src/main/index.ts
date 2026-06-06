@@ -16,7 +16,7 @@ import { runtimeLogService } from './runtime/RuntimeLogService';
 import { rendererEventHub } from './browserAppBridge/rendererEventHub';
 import { startBrowserAppBridge, stopBrowserAppBridge } from './browserAppBridge/BrowserAppBridgeServer';
 
-// RdxSessionService 鍗曚緥 - 渚?IPC handlers 浣跨敤
+// Shared RDX session service for IPC handlers.
 export const rdxSessionService = new RdxSessionService(toolBridge);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -25,7 +25,7 @@ if (!process.env.RDC_AGENT_USER_DATA?.trim()) {
   app.setPath('userData', path.join(app.getPath('appData'), 'rdc-agent'));
 }
 
-// 寮€鍙戠幆澧冩锟?
+// Development environment detection.
 const isDev = process.env.NODE_ENV === 'development' && process.env.RDC_AGENT_TEST_MODE !== '1';
 const isSettingsRebuildOnly = process.env.RDC_AGENT_REBUILD_SETTINGS_ONLY === '1';
 const isTestMode = process.env.RDC_AGENT_TEST_MODE === '1';
@@ -37,7 +37,7 @@ if (isTestMode) {
   app.commandLine.appendSwitch('in-process-gpu');
 }
 
-// 涓荤獥鍙ｅ紩锟?
+// Main window reference.
 let mainWindow: BrowserWindow | null = null;
 const allowedNavigationOrigins = new Set<string>();
 
@@ -112,7 +112,7 @@ function setupKeyboardShortcuts(window: BrowserWindow): void {
 }
 
 /**
- * 鍒涘缓涓荤獥锟?
+ * Create the main window.
  */
 function createMainWindow(): void {
   mainWindow = new BrowserWindow({
@@ -128,24 +128,24 @@ function createMainWindow(): void {
       contextIsolation: true,
       sandbox: false,
     },
-    // 绐楀彛鏍峰紡
+    // Window chrome.
     frame: false,
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
     backgroundColor: '#08080c',
   });
 
-  // 鍔犺浇椤甸潰
+  // Load the renderer.
   if (isDev) {
     const rendererUrl = getDevRendererUrl();
     registerAllowedOrigin(rendererUrl);
     mainWindow.loadURL(rendererUrl);
   } else {
-    // 鐢熶骇妯″紡锛氬姞杞芥墦鍖呭悗鐨勬枃锟?
+    // Production mode loads the bundled renderer.
     mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
 
-  // 绐楀彛鍑嗗濂藉悗鏄剧ず
+  // Show after the window is ready.
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
   });
@@ -155,7 +155,7 @@ function createMainWindow(): void {
   mainWindow.on('enter-full-screen', emitWindowMaximizedState);
   mainWindow.on('leave-full-screen', emitWindowMaximizedState);
 
-  // 绐楀彛鍏抽棴澶勭悊
+  // Clear the main window reference after close.
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -172,7 +172,7 @@ function createMainWindow(): void {
     console.error('[RendererProcessGone]', details);
   });
 
-  // 澶栭儴閾炬帴鐢ㄩ粯璁ゆ祻瑙堝櫒鎵撳紑
+  // Open external links in the default browser.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http://') || url.startsWith('https://')) {
       shell.openExternal(url);
@@ -180,7 +180,7 @@ function createMainWindow(): void {
     return { action: 'deny' };
   });
 
-  // 璁剧疆绐楀彛鎺у埗涓庡揩鎹烽敭
+  // Register window controls and shortcuts.
   setMainWindow(mainWindow);
   setupKeyboardShortcuts(mainWindow);
   setupMenu();
@@ -269,7 +269,7 @@ function setupMenu(): void {
   Menu.setApplicationMenu(null);
 }
 
-// 搴旂敤灏辩华
+// App lifecycle.
 app.whenReady().then(async () => {
   const settings = settingsService.initialize();
   if (isSettingsRebuildOnly) {
@@ -298,7 +298,7 @@ app.whenReady().then(async () => {
 
   registerIPCHandlers();
 
-  // 鍒濆鍖栨湇锟?
+  // Initialize main process services.
   await initializeServices();
   const bridgeUrl = await startBrowserAppBridge({
     devRendererUrl: isDev ? getDevRendererUrl() : null,
@@ -315,7 +315,7 @@ app.whenReady().then(async () => {
   
   createMainWindow();
 
-  // macOS: 鐐瑰嚮dock鍥炬爣鏃堕噸鏂板垱寤虹獥锟?
+  // macOS: recreate the window when the dock icon is clicked.
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createMainWindow();
@@ -323,7 +323,7 @@ app.whenReady().then(async () => {
   });
 });
 
-// 鎵€鏈夌獥鍙ｅ叧闂椂閫€鍑猴紙Windows/Linux锟?
+// Quit after all windows close on Windows/Linux.
 app.on('window-all-closed', () => {
   replayDeviceService.dispose();
   if (process.platform !== 'darwin') {
@@ -341,7 +341,7 @@ app.on('before-quit', () => {
   }
 });
 
-// 瀹夊叏澶勭悊锛氶樆姝㈡柊绐楀彛瀵艰埅鍒版湭鐭RL
+// Block navigation to unknown origins.
 app.on('web-contents-created', (_event, contents) => {
   contents.on('will-navigate', (event, navigationUrl) => {
     const parsedUrl = new URL(navigationUrl);
@@ -354,11 +354,11 @@ app.on('web-contents-created', (_event, contents) => {
 });
 
 /**
- * 鍒濆鍖栨湇锟?
+ * Initialize main process services.
  */
 async function initializeServices(): Promise<void> {
   try {
-    // 鍒濆鍖?SettingsService锛坋lectron-store 寤惰繜鍔犺浇锛屾澶勮Е鍙戞瀯閫狅級
+    // SettingsService is initialized lazily by this access.
     const hasConfiguredProvider = settingsService.hasConfiguredProvider();
     console.log('[Main] SettingsService initialized, hasConfiguredProvider:', hasConfiguredProvider);
     
@@ -396,7 +396,7 @@ async function initializeServices(): Promise<void> {
   }
 }
 
-// 瀵煎嚭绐楀彛寮曠敤渚汭PC浣跨敤
+// Export the main window reference for IPC usage.
 export function getMainWindow(): BrowserWindow | null {
   return mainWindow;
 }

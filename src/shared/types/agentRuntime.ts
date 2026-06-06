@@ -166,8 +166,6 @@ export interface AgentRuntimeSkillDescriptor {
 
 export type ModelProviderBackendKind =
   | 'native'
-  | 'openai-agent-sdk'
-  | 'claude-agent-sdk'
   | 'openai-compatible'
   | 'local'
   | 'mockable-account';

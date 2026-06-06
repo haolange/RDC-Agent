@@ -49,7 +49,7 @@
 │  DebuggerRuntime / DebugWorkflowService / HarnessController│
 ├──────────────────────────────────────────────────────────┤
 │  工具执行层（Tools / MCP / CLI）                          │  底层：可靠可审计
-│  ToolBridge / AgentToolPort / rdx.bat                   │
+│  ToolBridge / ToolRegistry / rdx.bat                   │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -822,7 +822,7 @@ workspace/checkpoints/{thread_id}/{checkpoint_ns}/index.json
 **Schema 验证**：
 
 ```
-调用前：Zod Schema 验证 ToolCallRequest 参数（AgentToolPort schema adapter）
+调用前：Zod Schema 验证 ToolCallRequest 参数（ToolRegistry schema guard）
 调用后：ToolCallResult.ok 字段必须检查，error 必须处理
 Gate 前：HarnessController 各 Gate 方法在阶段入口强制执行
 ```
@@ -1600,7 +1600,7 @@ E2E 测试位于 `e2e/` 目录，使用 Playwright。
 
 | 文件 | 职责 |
 |------|-----|
-| `ToolBridgeAgentToolPort.ts` | rd.* 工具适配为 AgentRunnerPort 可调用工具 |
+| `ToolRegistry.ts` | runtime 工具注册、策略检查与 ToolBridge 调用入口 |
 
 ### 工具目录（`resources/tools/`）
 

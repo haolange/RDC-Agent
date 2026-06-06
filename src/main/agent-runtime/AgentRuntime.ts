@@ -11,7 +11,7 @@ import type {
   AgentToolRequestedPayload,
   AgentToolStartedPayload,
 } from '@shared/types/agentRuntime';
-import type { LLMMessage, LLMResponse, ToolCall } from '@shared/types/llm';
+import type { LLMMessage, LLMResponse, LLMStreamEvent, ToolCall } from '@shared/types/llm';
 import type { AppMode } from '@shared/types/session';
 import type { ToolCallResult } from '@shared/types/tool';
 import type { WorkflowPhase, WorkflowStage } from '@shared/types/workflow';
@@ -64,6 +64,7 @@ export interface AgentRuntimeRunRequest {
   signal?: AbortSignal;
   askUser?: (request: AgentRuntimeAskUserRequest) => Promise<{ answer?: unknown; cancelled?: boolean }>;
   approveTool?: (request: AgentRuntimeToolApprovalRequest) => Promise<{ approved: boolean; reason?: string }>;
+  onStreamEvent?: (event: LLMStreamEvent) => void;
   onEvent?: (event: AgentEvent) => void;
 }
 
@@ -166,6 +167,7 @@ export class AgentRuntime {
             signal: request.signal,
           },
           onStreamEvent: (event) => {
+            request.onStreamEvent?.(event);
             if (event.type === 'text-delta') {
               streamedText += event.text;
               turnText += event.text;

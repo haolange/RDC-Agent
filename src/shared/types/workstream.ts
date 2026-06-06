@@ -196,9 +196,3 @@ export interface TraceExportResult {
   bundlePath?: string;
   error?: string;
 }
-
-/** @deprecated Use AgentRunPresentation from agenticTrace */
-export type AgentWorkstreamPresentation = import('./agenticTrace').AgentRunPresentation & {
-  approval?: ComposerApprovalViewModel | null;
-  rawAuditRefs?: RawAuditRef[];
-};

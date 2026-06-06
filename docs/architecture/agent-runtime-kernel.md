@@ -2,9 +2,9 @@
 
 ## 目标
 
-`AgentRuntimeKernel` 是 RDC-Agent 的底层 agent runtime substrate。它吸收 provider schema、account/OAuth、本地模型、MCP、skills、primitive tools 和 SDK backend 的差异，并把上层暴露面收敛为统一的 agent turn、tool loop、标准事件、确定性 tool policy 和 provider capability。
+`AgentRuntimeKernel` 是 RDC-Agent 的底层 agent runtime substrate。它吸收 provider schema、account/OAuth、本地模型、MCP、skills、primitive tools 和 provider backend 的差异，并把上层暴露面收敛为统一的 agent turn、tool loop、标准事件、确定性 tool policy 和 provider capability。
 
-本库的强流程 multi-agent workflow 不由 skill 文本或商业 Agent SDK 控制。`Debugger` workflow 负责 stage/task graph/final status；runtime kernel 负责模型 turn、工具循环、策略、approval/ask-user、事件和 provider routing。
+本库的强流程 multi-agent workflow 不由 skill 文本或external provider runner 控制。`Debugger` workflow 负责 stage/task graph/final status；runtime kernel 负责模型 turn、工具循环、策略、approval/ask-user、事件和 provider routing。
 
 ## Runtime Ownership
 
@@ -25,7 +25,7 @@
 ## Tool Substrate
 
 - `ToolRegistry` 是统一 tool mediation 入口，工具来源包括 primitive、RDC ToolBridge、MCP、skill。
-- RDC tool 只能通过 `ToolBridge` 执行；renderer、preload、SDK adapter、MCP、skill 均不得绕过 `ToolBridge` 直接调用 RenderDoc 运行链。
+- RDC tool 只能通过 `ToolBridge` 执行；renderer、preload、provider adapter、MCP、skill 均不得绕过 `ToolBridge` 直接调用 RenderDoc 运行链。
 - primitive tools 包括 `primitive.read`、`primitive.glob`、`primitive.grep`、`primitive.webFetch`、`primitive.webSearch`、`primitive.askUser`、`primitive.task.list`、`primitive.bash`、`primitive.write`、`primitive.edit`、`primitive.remove`。
 - `primitive.bash` 默认 fail-closed，除非未来显式接入 approval/sandbox executor。
 - `primitive.write/edit/remove` 只允许 workspace-scoped 文件操作；Ask profile 默认禁止这些工具。
@@ -51,11 +51,11 @@
 - Debugger 主链保持 strict serial flow：plan -> approval -> prepare surface -> triage/specialist dispatch -> synthesis -> skeptic -> curator -> report -> finalize。
 - Analyzer / Optimizer 只有在有明确 workflow pattern 时才启用专属执行链；否则只能作为 profile/pattern 占位。
 
-## SDK Backend Boundary
+## Provider Backend Boundary
 
-- OpenAI Agents SDK 和 Claude Agent SDK 是 optional backend，不拥有 runtime control。
-- SDK backend 的 tool execution 必须通过本库 tool policy 和 `ToolBridge` adapter。
-- `AgentRunnerRegistry` 先选择 provider-specific SDK adapter，再落到 `LlmAdapterAgentSdkAdapter` fallback；fallback 不再抢占 OpenAI/Claude SDK backend。
+- Provider clients and HTTP adapters do not own runtime control.
+- All agent turns run through `AgentRuntime`.
+- Every tool request is mediated by `ToolRegistry` before any `ToolBridge` call.
 
 ## Verification
 

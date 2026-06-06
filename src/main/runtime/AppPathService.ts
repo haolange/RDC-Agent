@@ -22,7 +22,6 @@ export interface WorkspacePaths {
 
 interface BootstrapState {
   workspaceRoot?: string;
-  legacyMigrationCompleted?: boolean;
 }
 
 const SETTINGS_FILE_NAME = 'settings.json';
@@ -42,12 +41,6 @@ const isSamePath = (left: string, right: string): boolean => {
 export class AppPathService {
   private workspaceRootCache: string | null = null;
 
-  private shouldSkipLegacyImport(): boolean {
-    return process.env.RDC_AGENT_TEST_MODE === '1'
-      || Boolean(process.env.RDC_AGENT_USER_DATA?.trim())
-      || Boolean(process.env.RDC_AGENT_WORKSPACE?.trim());
-  }
-
   private getUserDataRoot(): string {
     return normalizePath(process.env.RDC_AGENT_USER_DATA?.trim() || app.getPath('userData'));
   }
@@ -58,10 +51,6 @@ export class AppPathService {
 
   private getBootstrapPath(): string {
     return path.join(this.getBootstrapDir(), 'workspace-bootstrap.json');
-  }
-
-  private getLegacyBootstrapPath(): string {
-    return path.join(app.getPath('appData'), 'RdcAgent', 'workspace-bootstrap.json');
   }
 
   getDefaultWorkspaceRoot(): string {
@@ -108,20 +97,14 @@ export class AppPathService {
     const paths = this.getWorkspacePaths(workspaceRoot);
     this.ensureWorkspaceStructure(paths);
 
-    if (!this.shouldSkipLegacyImport() && !bootstrapState.legacyMigrationCompleted && this.shouldImportLegacyData(paths.workspaceRoot)) {
-      this.copyLegacyData(paths.workspaceRoot);
-    }
-
     this.workspaceRootCache = paths.workspaceRoot;
     this.writeBootstrapState({
       workspaceRoot: paths.workspaceRoot,
-      legacyMigrationCompleted: true,
     });
     return paths;
   }
 
   setWorkspaceRoot(nextRoot: string): WorkspacePaths {
-    const bootstrapState = this.readBootstrapState();
     const currentRoot = this.getWorkspaceRoot();
     const resolvedRoot = normalizePath(nextRoot || this.getDefaultWorkspaceRoot());
     const nextPaths = this.getWorkspacePaths(resolvedRoot);
@@ -132,14 +115,9 @@ export class AppPathService {
       this.copyWorkspaceData(currentRoot, resolvedRoot);
     }
 
-    if (!this.shouldSkipLegacyImport() && !bootstrapState.legacyMigrationCompleted && this.shouldImportLegacyData(resolvedRoot)) {
-      this.copyLegacyData(resolvedRoot);
-    }
-
     this.workspaceRootCache = resolvedRoot;
     this.writeBootstrapState({
       workspaceRoot: resolvedRoot,
-      legacyMigrationCompleted: true,
     });
     return nextPaths;
   }
@@ -161,19 +139,13 @@ export class AppPathService {
   }
 
   private readBootstrapState(): BootstrapState {
-    const candidates = this.shouldSkipLegacyImport()
-      ? [this.getBootstrapPath()]
-      : [this.getBootstrapPath(), this.getLegacyBootstrapPath()];
-
-    for (const bootstrapPath of candidates) {
-      try {
-        if (!fs.existsSync(bootstrapPath)) {
-          continue;
-        }
+    const bootstrapPath = this.getBootstrapPath();
+    try {
+      if (fs.existsSync(bootstrapPath)) {
         return JSON.parse(fs.readFileSync(bootstrapPath, 'utf8')) as BootstrapState;
-      } catch (error) {
-        console.warn('[AppPathService] Failed to read bootstrap state:', error);
       }
+    } catch (error) {
+      console.warn('[AppPathService] Failed to read bootstrap state:', error);
     }
 
     return {};
@@ -198,46 +170,6 @@ export class AppPathService {
     fs.mkdirSync(paths.patternsPath, { recursive: true });
     fs.mkdirSync(paths.secretsPath, { recursive: true });
     fs.mkdirSync(paths.migrationReportsPath, { recursive: true });
-  }
-
-  private shouldImportLegacyData(targetRoot: string): boolean {
-    const paths = this.getWorkspacePaths(targetRoot);
-    return !fs.existsSync(paths.settingsPath)
-      && !this.hasDirectoryEntries(paths.projectsPath)
-      && !this.hasDirectoryEntries(paths.knowledgePath)
-      && !this.hasDirectoryEntries(paths.logsPath)
-      && !this.hasDirectoryEntries(paths.migrationOrphansPath)
-      && !this.hasDirectoryEntries(paths.profilesPath)
-      && !this.hasDirectoryEntries(paths.policiesPath)
-      && !this.hasDirectoryEntries(paths.skillsPath)
-      && !this.hasDirectoryEntries(paths.mcpPath)
-      && !this.hasDirectoryEntries(paths.patternsPath)
-      && !this.hasDirectoryEntries(paths.secretsPath)
-      && !this.hasDirectoryEntries(paths.migrationReportsPath);
-  }
-
-  private hasDirectoryEntries(dirPath: string): boolean {
-    if (!fs.existsSync(dirPath) || !fs.statSync(dirPath).isDirectory()) {
-      return false;
-    }
-    return fs.readdirSync(dirPath).length > 0;
-  }
-
-  private copyLegacyData(targetRoot: string): void {
-    const targetPaths = this.getWorkspacePaths(targetRoot);
-    const legacyRoots = [
-      app.getPath('userData'),
-      path.join(app.getPath('appData'), 'RdcAgent'),
-      path.join(app.getPath('appData'), 'rdc-agent'),
-      path.join(app.getAppPath(), 'workspace'),
-      path.join(path.dirname(app.getPath('exe')), 'workspace'),
-    ];
-
-    for (const legacyRoot of legacyRoots) {
-      this.copyWorkspaceData(legacyRoot, targetRoot);
-    }
-
-    this.copyLogFile(path.join(app.getAppPath(), 'dev-stdout.log'), targetPaths.logPath);
   }
 
   private copyWorkspaceData(sourceRoot: string, targetRoot: string): void {

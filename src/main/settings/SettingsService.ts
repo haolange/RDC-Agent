@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import Store from 'electron-store';
 import type {
   AppLanguage,
   AppRuntimePaths,
@@ -44,15 +43,6 @@ import {
 import { appPathService } from '../runtime/AppPathService';
 import { executionProfileService } from './ExecutionProfileService';
 import { secretStorageService } from './SecretStorageService';
-
-interface LegacyOpenRouterSettings {
-  apiKey: string;
-  baseUrl?: string;
-}
-
-interface LegacyAppGlobalSettings {
-  openRouter?: LegacyOpenRouterSettings;
-}
 
 interface PersistedConfigurationSettings {
   activeModeProfileId?: string;
@@ -658,21 +648,14 @@ function parseMigrationSummary(reportPath?: string): string[] {
 }
 
 export class SettingsService {
-  private legacyStore: Store<LegacyAppGlobalSettings>;
   private initialized = false;
-
-  constructor() {
-    this.legacyStore = new Store<LegacyAppGlobalSettings>({
-      name: 'rdc-agent-settings',
-    });
-  }
 
   initialize(): AppSettings {
     const runtimePaths = appPathService.initializeWorkspaceRoot();
     executionProfileService.ensureScaffold(runtimePaths.workspaceRoot);
 
     const rawPersisted = readJsonFile<PersistedSettingsPayload>(runtimePaths.settingsPath);
-    const rebuildResult = this.rebuildPersistedSettings(rawPersisted, runtimePaths.workspaceRoot, true);
+    const rebuildResult = this.rebuildPersistedSettings(rawPersisted, runtimePaths.workspaceRoot);
     if (rebuildResult.changed || !fs.existsSync(runtimePaths.settingsPath)) {
       this.persistHardRebuild(runtimePaths, rawPersisted, rebuildResult);
     }
@@ -690,7 +673,6 @@ export class SettingsService {
   private rebuildPersistedSettings(
     raw: PersistedSettingsPayload | null,
     workspaceRoot: string,
-    includeLegacySecrets: boolean,
   ): HardRebuildResult {
     const fallback = createDefaultPersistedSettings(workspaceRoot);
     const candidate = raw ?? fallback;
@@ -746,25 +728,6 @@ export class SettingsService {
         nextProviders.push(sanitized);
       } else {
         fixes.push(`Removed duplicated provider ${sanitized.id}`);
-      }
-    }
-
-    if (includeLegacySecrets) {
-      const legacyOpenRouter = this.legacyStore.get('openRouter');
-      if (legacyOpenRouter?.apiKey?.trim()) {
-        const secretRef = secretStorageService.createProviderSecretRef('openrouter');
-        secretStorageService.setSecret(secretRef, legacyOpenRouter.apiKey.trim(), workspaceRoot);
-        const sanitized = sanitizeUserProvider({
-          ...createBuiltinProviderEntry('openrouter'),
-          enabled: true,
-          secretRef,
-          baseUrl: legacyOpenRouter.baseUrl || createBuiltinProviderEntry('openrouter').baseUrl,
-        }, workspaceRoot);
-
-        if (sanitized?.isConfigured && !nextProviders.some((provider) => provider.id === 'openrouter')) {
-          nextProviders.push(sanitized);
-          fixes.push('Imported legacy OpenRouter provider');
-        }
       }
     }
 

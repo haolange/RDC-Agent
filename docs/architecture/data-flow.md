@@ -66,7 +66,7 @@ flowchart TB
   Execution["Execution loop"]
   Verification["Verification / skeptic"]
   Curator["Curator / report"]
-  AgentRunner["AgentRunnerPort / SDK adapter"]
+  AgentRuntime["AgentRuntime / ToolRegistry"]
   Projection["WorkflowProjectionPublisher"]
   Trace["TraceService / TraceEventStore"]
   Evidence["EvidenceLedger / ArtifactStore"]
@@ -76,7 +76,7 @@ flowchart TB
   Intake --> Questions
   Questions --> Approval
   Approval --> Execution
-  Execution --> AgentRunner
+  Execution --> AgentRuntime
   Execution --> Verification
   Verification --> Curator
   Execution --> Evidence
@@ -95,7 +95,7 @@ flowchart TB
 - 唯一顶层入口：`src/main/workflow/debugger/DebuggerRuntime.ts`。
 - `DebugWorkflowService` 是 Runtime 内部执行服务，不再作为 IPC、conversation 或公开 workflow barrel 的入口。
 - `WorkflowProjectionPublisher` 统一广播 `workflow:*`、`evidence:eventAdded`、`conversation:event` 等投影事件；Runtime 和 agent runner 不直接持有窗口引用。
-- OpenAI / Claude Agent SDK 通过 `AgentRunnerPort` 运行，工具能力由 Runtime policy 生成 allowlist，再经 `AgentToolPort -> ToolBridge` 执行。
+- Agent turn 通过 `AgentRuntime` 运行，工具能力由 runtime policy 生成 allowlist，再经 `ToolRegistry -> ToolBridge` 执行。
 - `TraceService` 负责把 conversation、action events、plan snapshot、task board、artifact/context store 投影为 `AgentRunPresentation`；renderer 通过 `TimelineProjection` 与 Renderer Registry 渲染，不再从 raw trace 猜消息节点。
 - `DebugPlan.presentation` 只作为 Plan Result Block 的源数据，主执行/修改入口迁移到 composer 上方的 `ComposerApprovalOverlay`。
 - `AskUserQuestion` 是 plan/intake 阶段可用的用户交互 primitive：renderer 通过 composer 上方 overlay 提交到 `workflow.submitQuestions(runId, answers)`，同时 workflow 写入 `ui.ask_user_question` tool trace，让问题请求和用户回答保留在消息流中。
@@ -170,7 +170,7 @@ flowchart LR
   IPC["settings:* / llm:*"]
   SettingsSvc["SettingsService"]
   AccountAuth["ProviderAccountAuthService"]
-  SDK["AgentRunnerPort / OpenAI / Claude SDK adapter"]
+  Runtime["AgentRuntime / ModelProviderRegistry"]
   Adapter["LLMAdapter"]
   DebuggerLLM["DebuggerLlmService"]
   Secrets["SecretStorageService"]
@@ -184,12 +184,12 @@ flowchart LR
   AccountAuth --> SettingsSvc
   SettingsSvc --> Secrets
   SettingsSvc --> Workspace
-  IPC --> SDK
-  SDK --> Adapter
+  IPC --> Runtime
+  Runtime --> Adapter
   Adapter --> DebuggerLLM
 ```
 
-凭据来源由 provider auth mode 决定。API Key provider 存储 provider-scoped key；账号登录 provider 通过 `ProviderAccountAuthService` 自研 OAuth/device-flow 获取 token bundle，`settings.json` 只保存账号摘要、状态和模型列表；Bedrock/Vertex 这类 environment provider 不保存密钥，只把运行环境凭据交给 SDK adapter 使用。SDK adapter 内部可以向 SDK 注入 key、client 或环境凭据信号，但不能把裸 `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` 作为 RDC-Agent 的通用配置来源。
+凭据来源由 provider auth mode 决定。API Key provider 存储 provider-scoped key；账号登录 provider 通过 `ProviderAccountAuthService` 自研 OAuth/device-flow 获取 token bundle，`settings.json` 只保存账号摘要、状态和模型列表；Bedrock/Vertex 这类 environment provider 不保存密钥，只把运行环境凭据交给 provider client 使用。provider client 不能把裸 `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` 作为 RDC-Agent 的通用配置来源。
 
 模型列表也属于 settings 边界。标准 Provider 通过真实 `/models` 或等价接口发现模型；没有标准模型列表的 Anthropic-compatible / Azure endpoint 只能保存逐候选轻量请求验证成功的模型；Claude/ChatGPT Account 使用账号模型目录，其中 ChatGPT Account 运行时走 ChatGPT Codex endpoint；GitHub Copilot 使用账号模型目录并用 Copilot `/models` 补充，`/models` 不可用时仍可保存账号目录，但 OAuth/device-flow/token 获取失败仍保持未配置并向 UI 返回错误。GitHub Copilot 的模型目录不是等价的 chat completions 可执行集；`ExecutionProfileService` 和 `DebuggerLlmService` 在运行时会把已知不支持 chat completions 的 specialist route 收敛到同 provider 下可用的 Debugger 模型，并在 LLM activity raw payload 中保留原始 `requestedModelId` 与 `remapReason`。renderer 二次打开 API Key detail 时只接收 `hasStoredSecret` 状态并显示固定星号占位，不能读取已存明文密钥。
 
@@ -198,7 +198,7 @@ flowchart LR
 ```mermaid
 sequenceDiagram
   participant Runtime as "DebuggerRuntime"
-  participant Agent as "AgentRunnerPort"
+  participant Runtime as "AgentRuntime"
   participant Tool as "ToolBridge"
   participant RDX as "rdx.bat"
   participant Evidence as "EvidenceLedger / StorageAdapter"
@@ -206,7 +206,7 @@ sequenceDiagram
   participant Renderer as "Renderer event subscribers"
 
   Runtime->>Tool: execute(toolName, args)
-  Agent->>Tool: execute allowed SDK tool calls
+  Runtime->>Tool: execute allowed runtime tool calls
   Tool->>RDX: spawn RenderDoc tool
   RDX-->>Tool: result / artifact / error
   Tool-->>Runtime: ToolTraceEntry

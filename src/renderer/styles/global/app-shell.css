@@ -95,7 +95,7 @@
   z-index: 1;
 }
 
-/* 涓夋爮甯冨眬 */
+/* Three-column layout */
 .app-body {
   flex: 1;
   display: grid;
@@ -998,4 +998,3 @@
   background: rgb(var(--color-bg-2) / 0.9);
   box-shadow: inset 0 0 0 1px rgb(var(--color-border-default) / 0.6);
 }
-

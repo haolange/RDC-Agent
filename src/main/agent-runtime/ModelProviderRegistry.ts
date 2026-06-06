@@ -100,16 +100,10 @@ export class ModelProviderRegistry {
     if (authMode === 'account' && (providerId === 'grok-account' || providerId === 'gemini-account' || providerId === 'qwen-account')) {
       return 'mockable-account';
     }
-    if (providerId === 'openai' || providerId === 'openai-us' || providerId === 'openai-eu') {
-      return 'openai-agent-sdk';
-    }
-    if (kind === 'anthropic' && authMode !== 'account') {
-      return 'claude-agent-sdk';
-    }
     if (authMode === 'local' || kind === 'ollama') {
       return 'local';
     }
-    if (kind === 'openai-compatible' || kind === 'openrouter' || kind === 'azure-openai') {
+    if (providerId === 'openai' || providerId === 'openai-us' || providerId === 'openai-eu' || kind === 'openai-compatible' || kind === 'openrouter' || kind === 'azure-openai') {
       return 'openai-compatible';
     }
     return 'native';
