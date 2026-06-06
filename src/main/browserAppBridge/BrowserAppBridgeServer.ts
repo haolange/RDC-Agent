@@ -28,6 +28,7 @@ function setCors(response: ServerResponse): void {
   response.setHeader('Access-Control-Allow-Origin', '*');
   response.setHeader('Access-Control-Allow-Headers', 'content-type');
   response.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  response.setHeader('Access-Control-Allow-Private-Network', 'true');
 }
 
 function sendJson(response: ServerResponse, statusCode: number, payload: unknown): void {

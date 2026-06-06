@@ -22,6 +22,7 @@ export const rendererEventHub = {
   connect(response: ServerResponse): () => void {
     response.writeHead(200, {
       'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Private-Network': 'true',
       'Cache-Control': 'no-store',
       'Content-Type': 'text/event-stream; charset=utf-8',
       'Connection': 'keep-alive',

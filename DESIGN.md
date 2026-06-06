@@ -16,7 +16,7 @@ Agentic Trace 是 RDC-Agent 的**当前消息流协议**，用 `Event Log → Tr
 - IPC：`trace:projectionChanged` + `trace:getRun/getEvents/getProjection/exportRun`；`workflow:workstreamChanged` 已删除。
 - `Ask` 仍是默认轻入口；`Debugger` 是现役执行主链；Plan Approval 与修改建议保留在消息流与 composer overlay。
 - Raw trace 仅在 Tool 卡片 Raw 标签、Inspector 或 export 中出现。
-- 浏览器真实会话通过主进程 localhost bridge 打开同一套 renderer，并连接真实 workspace、settings、LLM runtime、Trace 事件流和 ToolBridge。
+- 浏览器真实会话通过主进程 localhost bridge 打开同一套 renderer，并连接真实 workspace、settings、LLM runtime、Trace 事件流和 ToolBridge；agent 日常验证使用 `RDC_AGENT_HEADLESS=1` 跳过 Electron 桌面窗口，但不拆分 renderer 或 runtime 能力。
 
 `DESIGN.md` 是本仓库的产品设计和工程架构权威入口。`README.md` 说明项目是什么以及如何启动，`AGENTS.md` 说明修改公约，`docs/architecture/*` 说明具体数据流和模块地图；当这些文件出现冲突时，以本文件描述的产品边界、架构边界和验证门禁为先，再同步修正文档。
 
@@ -123,11 +123,10 @@ Agentic Trace 是 RDC-Agent 的**当前消息流协议**，用 `Event Log → Tr
 - 共享导出：`npm run check:shared-exports`（相对 Phase 0 `shared-exports.txt` 无符号删除）。
 - 静态类型：`npm run typecheck`。
 - 构建检查：`npm run build`。
-- 浏览器真实会话 smoke：`npm run test:browser-session`，运行前必须先 build，因为 smoke 启动 `out/main/index.js` 和 `out/renderer`，再用浏览器打开 `/app`。
+- 浏览器真实会话 smoke：`npm run test:browser-session`，运行前必须先 build，因为 smoke 以 `RDC_AGENT_HEADLESS=1` 启动 `out/main/index.js` 和 `out/renderer`，再用浏览器打开 `/app`。
 - Electron 壳边界 smoke：`npm run test:shell-smoke`，只验证窗口启动、preload 注入、IPC 连通、workspace 权限和 ToolBridge/RenderDoc 本地链路诊断。
 - 模式门禁改动必须补 `mode-switch.spec.ts`，确认默认 `Ask`、未 Open capture 时执行类模式 disabled、Open 后可切换。
 - Provider/OAuth UI 改动：先用 mock E2E 验证分组、Connect/Test、token 状态和模型发现，再用内置浏览器检查 Settings > Provider 的视觉层级、弹层可读性、长文本和窄宽度布局；真实 OAuth 登录验证需要明确区分账号/组织策略失败与本地 UI/IPC 失败。
-
 
 
 

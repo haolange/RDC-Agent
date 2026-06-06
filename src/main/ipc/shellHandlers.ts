@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, shell } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, shell, type IpcMainInvokeEvent } from 'electron';
 
 import { appPathService } from '../runtime/AppPathService';
 
@@ -54,6 +54,11 @@ function readAvatarDataUrl(avatarPath: string): string | null {
   return `data:${mimeType};base64,${content.toString('base64')}`;
 }
 
+function getSenderWindow(event: IpcMainInvokeEvent): BrowserWindow | null {
+  const sender = event.sender as IpcMainInvokeEvent['sender'] | undefined;
+  return sender ? BrowserWindow.fromWebContents(sender) : null;
+}
+
 export function registerShellHandlers(): void {
   ipcMain.handle('dialog:selectRdcFiles', async () => {
     const result = await dialog.showOpenDialog({
@@ -78,11 +83,11 @@ export function registerShellHandlers(): void {
   });
 
   ipcMain.handle('window:minimize', async (event) => {
-    BrowserWindow.fromWebContents(event.sender)?.minimize();
+    getSenderWindow(event)?.minimize();
   });
 
   ipcMain.handle('window:toggleMaximize', async (event) => {
-    const window = BrowserWindow.fromWebContents(event.sender);
+    const window = getSenderWindow(event);
     if (!window) return false;
 
     if (window.isMaximized()) {
@@ -95,11 +100,11 @@ export function registerShellHandlers(): void {
   });
 
   ipcMain.handle('window:close', async (event) => {
-    BrowserWindow.fromWebContents(event.sender)?.close();
+    getSenderWindow(event)?.close();
   });
 
   ipcMain.handle('window:isMaximized', async (event) => {
-    return BrowserWindow.fromWebContents(event.sender)?.isMaximized() ?? false;
+    return getSenderWindow(event)?.isMaximized() ?? false;
   });
 
   ipcMain.handle('app:getMeta', async () => {
