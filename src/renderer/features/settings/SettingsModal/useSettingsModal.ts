@@ -1,7 +1,9 @@
 import { useMemo } from 'react';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useI18n } from '../../../i18n';
-import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
+import type { TranslationKey } from '../../../i18n';
+import type { AppSettings, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
+import { AGENT_ROLES } from '@shared/constants/agents';
 import { resolveAgentRouteStatus } from './agentRouteStatus';
 import { useProviderConnection } from './useProviderConnection';
 import { useSettingsModalState } from './useSettingsModalState';
@@ -21,8 +23,8 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const updateProfile = useAppSettingsStore((state) => state.updateProfile);
   const updateWorkspaceRoot = useAppSettingsStore((state) => state.updateWorkspaceRoot);
   const resetWorkspaceRoot = useAppSettingsStore((state) => state.resetWorkspaceRoot);
+  const patchSettings = useAppSettingsStore((state) => state.patchSettings);
   const reloadSettings = useAppSettingsStore((state) => state.reloadSettings);
-  const saveAgentRoute = useAppSettingsStore((state) => state.saveAgentRoute);
 
   const modalState = useSettingsModalState(open, settings);
 
@@ -57,7 +59,11 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     [modalState.providerDrafts],
   );
   const invalidAgentRoutes = useMemo(
-    () => modalState.agentRouteDrafts.filter((route) => resolveAgentRouteStatus(route, modalState.providerDrafts).issue !== null),
+    () => AGENT_ROLES.map((agentId) => {
+      const route = modalState.agentRouteDrafts.find((entry) => entry.agentId === agentId);
+      const routeStatus = resolveAgentRouteStatus(route, modalState.providerDrafts);
+      return routeStatus.issue ? { agentId, issue: routeStatus.issue } : null;
+    }).filter((entry): entry is { agentId: LlmAgentRoute['agentId']; issue: TranslationKey } => entry !== null),
     [modalState.agentRouteDrafts, modalState.providerDrafts],
   );
 
@@ -141,9 +147,16 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
 
   const handleSaveAgentRoutes = async () => {
     if (invalidAgentRoutes.length > 0) return;
-    for (const route of modalState.agentRouteDrafts) {
-      await saveAgentRoute(route);
-    }
+    await patchSettings({
+      llm: {
+        agentRoutes: AGENT_ROLES.map((agentId) => {
+          const route = modalState.agentRouteDrafts.find((entry) => entry.agentId === agentId);
+          return route ?? { agentId, providerId: '', modelId: '' };
+        }),
+      },
+    });
+    const nextSettings = await reloadSettings();
+    modalState.setAgentRouteDrafts(nextSettings.llm.agentRoutes.map((route) => ({ ...route })));
   };
 
   return {

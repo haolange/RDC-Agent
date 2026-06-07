@@ -114,7 +114,6 @@ interface AppSettingsState {
   resetWorkspaceRoot: () => Promise<void>;
   saveProvider: (provider: LlmProviderEntry) => Promise<AppSettings>;
   removeProvider: (providerId: string) => Promise<void>;
-  saveAgentRoute: (route: LlmAgentRoute) => Promise<void>;
 }
 
 export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
@@ -162,17 +161,6 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
     await get().patchSettings({
       llm: {
         providers: get().settings.llm.providers.filter((entry) => entry.id !== providerId),
-      },
-    });
-  },
-  saveAgentRoute: async (route) => {
-    const nextRoutes = get().settings.llm.agentRoutes.some((entry) => entry.agentId === route.agentId)
-      ? get().settings.llm.agentRoutes.map((entry) => entry.agentId === route.agentId ? route : entry)
-      : [...get().settings.llm.agentRoutes, route];
-
-    await get().patchSettings({
-      llm: {
-        agentRoutes: nextRoutes,
       },
     });
   },

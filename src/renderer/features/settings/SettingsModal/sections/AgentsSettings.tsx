@@ -2,7 +2,7 @@ import React from 'react';
 import type { AppSettings, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
 import { AGENT_DISPLAY_NAMES, AGENT_ROLES } from '@shared/constants/agents';
 import DropdownSelect, { type DropdownOption } from '../../../../ui/DropdownSelect';
-import type { useI18n } from '../../../../i18n';
+import type { TranslationKey, useI18n } from '../../../../i18n';
 import { resolveAgentRouteStatus } from '../agentRouteStatus';
 import { getEnabledModels } from '../utils';
 
@@ -17,6 +17,8 @@ interface AgentsSettingsProps {
   getResolvedProviderLabel: (provider: Pick<LlmProviderEntry, 'label'>) => string;
   onRouteChange: (agentId: LlmAgentRoute['agentId'], patch: Partial<LlmAgentRoute>) => void;
   onSaveAgentRoutes: () => void | Promise<void>;
+  agentRouteSaveState?: 'idle' | 'saving' | 'saved' | 'error';
+  agentRouteSaveMessage?: string;
   t: Translate;
 }
 
@@ -29,11 +31,23 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   getResolvedProviderLabel,
   onRouteChange,
   onSaveAgentRoutes,
+  agentRouteSaveState = 'idle',
+  agentRouteSaveMessage = '',
   t,
 }) => {
-  const invalidAgentRoutes = agentRouteDrafts.filter(
-    (route) => resolveAgentRouteStatus(route, providerDrafts).issue !== null,
+  const invalidAgentRoutes = AGENT_ROLES.map((agentId) => {
+    const route = agentRouteDrafts.find((entry) => entry.agentId === agentId);
+    const routeStatus = resolveAgentRouteStatus(route, providerDrafts);
+    return routeStatus.issue ? { agentId, issue: routeStatus.issue } : null;
+  }).filter(
+    (entry): entry is { agentId: LlmAgentRoute['agentId']; issue: TranslationKey } => entry !== null,
   );
+  const invalidAgentRouteMessage = invalidAgentRoutes.length === 0
+    ? ''
+    : t('settings.agentRouteInvalidSummary', {
+      count: invalidAgentRoutes.length,
+      routes: invalidAgentRoutes.map((entry) => `${AGENT_DISPLAY_NAMES[entry.agentId]}: ${t(entry.issue)}`).join('; '),
+    });
 
   return (
     <section className="settings-page settings-page-agents">
@@ -135,15 +149,24 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
           })}
         </div>
 
+        {(invalidAgentRouteMessage || agentRouteSaveMessage) && (
+          <div
+            className={`settings-provider-notice ${agentRouteSaveState === 'saved' ? 'success' : 'error'}`}
+            data-testid="settings-agent-route-save-status"
+          >
+            {agentRouteSaveMessage || invalidAgentRouteMessage}
+          </div>
+        )}
+
         <div className="settings-actions">
           <button
             type="button"
             className="button button-primary"
             data-testid="settings-agent-save"
             onClick={() => void onSaveAgentRoutes()}
-            disabled={invalidAgentRoutes.length > 0}
+            disabled={agentRouteSaveState === 'saving'}
           >
-            {t('settings.saveAgentRouting')}
+            {agentRouteSaveState === 'saving' ? t('settings.saving') : t('settings.saveAgentRouting')}
           </button>
         </div>
       </div>
