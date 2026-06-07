@@ -1,20 +1,27 @@
 import React, { useEffect, useRef } from 'react';
 import type { AgentMode } from '@shared/types/layout';
+import { useConversationStore } from '../../../stores/conversationStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
-import { EmptyWorkbenchPrompt } from '../../../patterns/EmptyWorkbenchPrompt';
-import { AgentRunView } from '../../../stream/AgentRunView';
+import { ConversationThread } from './ConversationThread';
 import { PlanApprovalCard } from '../plan/PlanApprovalCard';
 import './AgentChat.css';
 
 const STICKY_SCROLL_THRESHOLD = 96;
 
 export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
-  const presentation = useWorkflowStore((state) => state.tracePresentation);
+  const messages = useConversationStore((state) => state.conversationMessages);
   const workflowState = useWorkflowStore((state) => state.workflowState);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldStickToBottomRef = useRef(true);
-  const itemCount = presentation?.runs.length ?? 0;
-  const isEmpty = itemCount === 0;
+  const messageCount = messages.length;
+  const isEmpty = messageCount === 0;
+
+  // Track the latest message updatedAt so streaming patches re-trigger the
+  // sticky scroll effect even when the message count stays the same.
+  const latestMessageActivityAt = messages.reduce<number>((max, message) => {
+    const candidate = message.updatedAt ?? message.createdAt;
+    return candidate > max ? candidate : max;
+  }, 0);
 
   useEffect(() => {
     if (navigator.webdriver) {
@@ -28,7 +35,12 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
       top: container.scrollHeight,
       behavior: 'smooth',
     });
-  }, [itemCount, presentation?.updatedAt, workflowState?.currentStage, workflowState?.approvalState]);
+  }, [
+    messageCount,
+    latestMessageActivityAt,
+    workflowState?.currentStage,
+    workflowState?.approvalState,
+  ]);
 
   const handleScroll = () => {
     const container = scrollContainerRef.current;
@@ -50,10 +62,7 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
         onScroll={handleScroll}
       >
         <PlanApprovalCard />
-        <AgentRunView
-          presentation={presentation}
-          emptyState={isEmpty ? <EmptyWorkbenchPrompt mode={mode} /> : null}
-        />
+        <ConversationThread mode={mode} />
       </div>
     </div>
   );

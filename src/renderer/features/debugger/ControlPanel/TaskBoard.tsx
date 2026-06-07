@@ -5,6 +5,7 @@ import type { RunSummary } from '@shared/types/session';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useSessionStore } from '../../../stores/sessionStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
+import { TaskHistory } from './TaskHistory';
 
 type BoardItemStatus = 'completed' | 'active' | 'pending' | 'blocked';
 
@@ -61,8 +62,16 @@ const buildBoardItems = (
   }));
 };
 
+const HISTORICAL_STATUSES = new Set<RunSummary['status']>([
+  'completed',
+  'failed',
+  'cancelled',
+  'interrupted',
+]);
+
 export const TaskBoard: React.FC = () => {
   const currentRun = useSessionStore((state) => state.currentRun);
+  const runs = useSessionStore((state) => state.runs);
   const workflowState = useWorkflowStore((state) => state.workflowState);
   const currentDebugPlan = useWorkflowStore((state) => state.currentDebugPlan);
   const reasoningSummaries = useConversationStore((state) => state.reasoningSummaries);
@@ -79,31 +88,83 @@ export const TaskBoard: React.FC = () => {
     [debugPlan, harnessTasks],
   );
 
+  const completedCount = useMemo(
+    () => boardItems.filter((item) => item.status === 'completed').length,
+    [boardItems],
+  );
+  const totalCount = boardItems.length;
+
+  const historicalRuns = useMemo(
+    () => runs.filter((run) => (
+      run.runId !== currentRun?.runId && HISTORICAL_STATUSES.has(run.status)
+    )),
+    [runs, currentRun?.runId],
+  );
+
   if (!hasApprovedTaskBoardState(currentRun, workflowState, debugPlan)) {
     return null;
   }
 
+  const hasBlocker = blockerCount > 0;
+  const hasProgress = totalCount > 0;
+  const progressLabel = hasProgress ? `${completedCount}/${totalCount} completed` : '';
+
   return (
     <div className="task-board" data-testid="task-board">
       <div className="task-board-overview">
-        <div>
+        <div className="task-board-overview-copy">
           <span className="task-board-kicker">Task Board</span>
           <strong className="task-board-title">{activeTask?.title ?? 'Task Board'}</strong>
+          {hasProgress ? (
+            <span
+              className="task-board-progress"
+              data-testid="task-board-progress"
+              aria-label={`Progress ${progressLabel}`}
+            >
+              <span className="task-board-progress-track" aria-hidden="true">
+                <span
+                  className="task-board-progress-fill"
+                  style={{ width: `${(completedCount / Math.max(totalCount, 1)) * 100}%` }}
+                />
+              </span>
+              <span className="task-board-progress-label">{progressLabel}</span>
+            </span>
+          ) : null}
         </div>
-        <span className={`task-board-status ${blockerCount > 0 ? 'blocked' : 'active'}`}>
-          {blockerCount > 0 ? `${blockerCount} blocker${blockerCount === 1 ? '' : 's'}` : currentRun?.status ?? 'active'}
+        <span className={`task-board-status ${hasBlocker ? 'blocked' : 'active'}`}>
+          {hasBlocker
+            ? `${blockerCount} blocker${blockerCount === 1 ? '' : 's'}`
+            : currentRun?.status ?? 'active'}
         </span>
       </div>
 
-      <div className="task-board-list">
+      <TaskHistory runs={historicalRuns} />
+
+      <div className="task-board-list" data-testid="task-board-list">
         {boardItems.map((item) => (
-          <div key={item.id} className={`task-board-item ${item.status}`}>
-            <span className="task-board-item-marker" aria-hidden="true" />
+          <div key={item.id} className={`task-board-item ${item.status}`} data-task-status={item.status}>
+            <span className="task-board-item-marker" aria-hidden="true">
+              {item.status === 'completed' ? (
+                <svg viewBox="0 0 12 12" width="10" height="10" aria-hidden="true">
+                  <path
+                    d="M2.5 6.2 L5 8.6 L9.6 3.6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ) : null}
+              {item.status === 'active' ? <span className="task-board-item-pulse" aria-hidden="true" /> : null}
+            </span>
             <span className="task-board-item-copy">
               <span className="task-board-item-title">{item.title}</span>
               <span className="task-board-item-detail">{item.detail}</span>
               <span className="task-board-item-meta">
-                {item.evidenceCount} evidence · {item.approval}
+                <span className="task-board-item-meta-pill">{item.evidenceCount} evidence</span>
+                <span className="task-board-item-meta-dot" aria-hidden="true">·</span>
+                <span className="task-board-item-meta-approval">{item.approval}</span>
               </span>
             </span>
           </div>

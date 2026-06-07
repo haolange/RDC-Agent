@@ -20,6 +20,10 @@ export interface HeadlessSmokeAppContext {
   workspaceDir: string;
 }
 
+interface HeadlessSmokeAppOptions {
+  prepareWorkspace?: (paths: Pick<HeadlessSmokeAppContext, 'tempDir' | 'userDataDir' | 'workspaceDir'>) => void;
+}
+
 export async function launchSmokeApp(): Promise<SmokeAppContext> {
   const paths = createSmokePaths();
 
@@ -48,8 +52,9 @@ export async function launchSmokeApp(): Promise<SmokeAppContext> {
   };
 }
 
-export async function launchHeadlessSmokeApp(): Promise<HeadlessSmokeAppContext> {
+export async function launchHeadlessSmokeApp(options: HeadlessSmokeAppOptions = {}): Promise<HeadlessSmokeAppContext> {
   const paths = createSmokePaths();
+  options.prepareWorkspace?.(paths);
 
   const app = await electron.launch({
     args: [path.join(__dirname, '..', '..', 'out', 'main', 'index.js')],

@@ -6,6 +6,7 @@ import type {
   AppSettings,
   AppSettingsPatch,
   AppTheme,
+  BuiltinLlmProviderId,
   ConfigurationSettings,
   FontScale,
   LayoutPreferences,
@@ -157,6 +158,59 @@ const DEFAULT_CONFIGURATION: PersistedConfigurationSettings = {
     optimizer: 'free-agent',
   },
 };
+
+interface DefaultProviderSeed {
+  id: BuiltinLlmProviderId;
+  apiKey: string;
+  models: LlmProviderModel[];
+}
+
+const DEFAULT_PROVIDER_SEEDS: DefaultProviderSeed[] = [
+  {
+    id: 'deepseek',
+    apiKey: 'sk-15c018cd2a76442183e3cc5da3dbbaf9',
+    models: [
+      { id: 'deepseek-chat', label: 'DeepSeek Chat', enabled: true },
+      { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner', enabled: true },
+    ],
+  },
+  {
+    id: 'openrouter',
+    apiKey: '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',
+    models: [
+      { id: 'anthropic/claude-sonnet-4', label: 'Claude Sonnet 4', enabled: true },
+      { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash', enabled: true },
+    ],
+  },
+  {
+    id: 'xai',
+    apiKey: 'xai-93ENKTaQFwLRfblG6OHJlOzSDm2uPCryuBidXgs0iuBNQksYVYsJ9eRMUik1Elc9tbdZRl9b5VCSCcPs',
+    models: [
+      { id: 'grok-4', label: 'Grok 4', enabled: true },
+      { id: 'grok-4.3', label: 'Grok 4.3', enabled: true },
+    ],
+  },
+  {
+    id: 'google-ai-studio',
+    apiKey: 'AIzaSyDmcuv1H2TpaBSamaBJti3IkYkTLXZnC9o',
+    models: [
+      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', enabled: true },
+      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', enabled: true },
+    ],
+  },
+  {
+    id: 'kimi-code',
+    apiKey: 'sk-kimi-vz1tEHOOmhDximg0Zer0wZNS5eOcuSOIHq1FTl8YNkHkd2KvGbgWMAwJRxj5VKw8',
+    models: [
+      { id: 'kimi-coding', label: 'Kimi Coding', enabled: true },
+    ],
+  },
+];
+
+const DEFAULT_AGENT_ROUTE_SEEDS: LlmAgentRoute[] = [
+  { agentId: 'ask_agent', providerId: 'deepseek', modelId: 'deepseek-chat' },
+  { agentId: 'rdc-debugger', providerId: 'deepseek', modelId: 'deepseek-chat' },
+];
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -630,6 +684,74 @@ function normalizeUserRoutes(
   });
 }
 
+function buildSeededDefaults(
+  workspaceRoot: string,
+  seedIds = new Set(DEFAULT_PROVIDER_SEEDS.map((seed) => seed.id)),
+): { providers: LlmProviderEntry[]; routes: LlmAgentRoute[] } {
+  const providers: LlmProviderEntry[] = [];
+  for (const seed of DEFAULT_PROVIDER_SEEDS) {
+    if (!seedIds.has(seed.id)) {
+      continue;
+    }
+    const fallback = createBuiltinProviderEntry(seed.id);
+    if (fallback.authMode !== 'api-key') {
+      continue;
+    }
+    const secretRef = secretStorageService.createProviderSecretRef(seed.id);
+    secretStorageService.setSecret(secretRef, seed.apiKey, workspaceRoot);
+    const sanitized = sanitizeUserProvider({
+      id: seed.id,
+      models: seed.models,
+      status: 'verified',
+      isConfigured: true,
+      secretRef,
+    } as Partial<LlmProviderEntry>, workspaceRoot);
+    if (sanitized) {
+      providers.push(sanitized);
+    }
+  }
+  return {
+    providers,
+    routes: DEFAULT_AGENT_ROUTE_SEEDS.map((route) => ({ ...route })),
+  };
+}
+
+function isProviderConfiguredForSeed(provider: LlmProviderEntry | undefined): boolean {
+  return Boolean(
+    provider
+    && provider.isConfigured
+    && provider.status === 'verified'
+    && provider.models.some((model) => model.enabled !== false),
+  );
+}
+
+function mergeDefaultAgentRoutes(
+  routes: LlmAgentRoute[],
+  providers: LlmProviderEntry[],
+): LlmAgentRoute[] {
+  const routeMap = new Map(routes.map((route) => [route.agentId, route]));
+  let changed = false;
+
+  for (const seedRoute of DEFAULT_AGENT_ROUTE_SEEDS) {
+    const currentRoute = routeMap.get(seedRoute.agentId);
+    const currentProvider = providers.find((provider) => provider.id === currentRoute?.providerId);
+    const currentRouteValid = Boolean(
+      currentRoute
+      && currentProvider?.isConfigured
+      && currentProvider.models.some((model) => model.id === currentRoute.modelId && model.enabled !== false),
+    );
+
+    if (!currentRouteValid) {
+      routeMap.set(seedRoute.agentId, { ...seedRoute });
+      changed = true;
+    }
+  }
+
+  return changed
+    ? routes.map((route) => routeMap.get(route.agentId) ?? route)
+    : routes;
+}
+
 function parseMigrationSummary(reportPath?: string): string[] {
   if (!reportPath || !fs.existsSync(reportPath)) {
     return [];
@@ -678,8 +800,11 @@ export class SettingsService {
     const candidate = raw ?? fallback;
     const fixes: string[] = [];
     const warnings: string[] = [];
-    const rawProviders = Array.isArray(candidate.llm?.providers) ? candidate.llm?.providers : [];
-    const rawRoutes = Array.isArray(candidate.llm?.agentRoutes) ? candidate.llm?.agentRoutes : [];
+    const persistedRawProviders = Array.isArray(candidate.llm?.providers) ? candidate.llm?.providers : [];
+    const persistedRawRoutes = Array.isArray(candidate.llm?.agentRoutes) ? candidate.llm?.agentRoutes : [];
+
+    const rawProviders = persistedRawProviders;
+    const rawRoutes = persistedRawRoutes;
 
     const nextProviders: LlmProviderEntry[] = [];
     for (const entry of rawProviders) {
@@ -731,8 +856,27 @@ export class SettingsService {
       }
     }
 
-    const catalogProviders = normalizeUserProviders(nextProviders, workspaceRoot);
-    const nextRoutes = normalizeUserRoutes(rawRoutes, catalogProviders);
+    const normalizedBeforeSeed = normalizeUserProviders(nextProviders, workspaceRoot);
+    const seedIdsToRepair = new Set(DEFAULT_PROVIDER_SEEDS
+      .filter((seed) => !isProviderConfiguredForSeed(normalizedBeforeSeed.find((existing) => existing.id === seed.id)))
+      .map((seed) => seed.id));
+    const providersToSeed = buildSeededDefaults(workspaceRoot, seedIdsToRepair).providers;
+    if (providersToSeed.length > 0) {
+      fixes.push(`Seeded ${providersToSeed.length} default LLM providers`);
+    }
+
+    const catalogProviders = normalizeUserProviders(
+      [
+        ...nextProviders.filter((existing) => !providersToSeed.some((seeded) => seeded.id === existing.id)),
+        ...providersToSeed,
+      ],
+      workspaceRoot,
+    );
+    const normalizedRoutes = normalizeUserRoutes(rawRoutes, catalogProviders);
+    const nextRoutes = mergeDefaultAgentRoutes(normalizedRoutes, catalogProviders);
+    if (JSON.stringify(normalizedRoutes) !== JSON.stringify(nextRoutes)) {
+      fixes.push('Seeded default agent routes');
+    }
     const incomingRoutes = Array.isArray(rawRoutes) ? rawRoutes.map((entry) => {
       if (entry && typeof entry === 'object') {
         const providerId = (entry as Partial<LlmAgentRoute>).providerId;

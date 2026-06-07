@@ -2,6 +2,7 @@ import React from 'react';
 import { ModeGlyph } from '../../../ui/ModeGlyph';
 import { ContextUsageIndicator } from '../../../patterns/ContextUsageIndicator';
 import { AGENT_MODES } from '@shared/constants/agents';
+import type { AgentMode } from '@shared/types/layout';
 import { formatBytes } from '../../../services/attachmentHelpers';
 import { useI18n } from '../../../i18n';
 import { useLayoutStore } from '../../../stores/layoutStore';
@@ -10,6 +11,46 @@ import type { ComposerController } from './useComposer';
 export interface ComposerProps {
   composer: ComposerController;
   hasOpenedCaptureForCurrentProject: boolean;
+}
+
+interface ComposerAgentTag {
+  id: string;
+  label: string;
+}
+
+function getAgentsForMode(modeId: AgentMode): ComposerAgentTag[] {
+  switch (modeId) {
+    case 'ask':
+      return [{ id: 'ask_agent', label: 'Ask' }];
+    case 'debugger':
+      return [
+        { id: 'rdc-debugger', label: 'Debugger' },
+        { id: 'triage_agent', label: 'Triage' },
+        { id: 'skeptic_agent', label: 'Skeptic' },
+      ];
+    case 'analyzer':
+      return [{ id: 'analyzer', label: 'Analyzer' }];
+    case 'optimizer':
+      return [{ id: 'optimizer', label: 'Optimizer' }];
+    default:
+      return [];
+  }
+}
+
+function getModeCapability(modeId: AgentMode, language: string): string {
+  const isZh = language === 'zh-CN';
+  switch (modeId) {
+    case 'ask':
+      return isZh ? '只读对话' : 'Read-only chat';
+    case 'debugger':
+      return isZh ? 'RenderDoc 调试' : 'RenderDoc debugging';
+    case 'analyzer':
+      return isZh ? '性能分析' : 'Performance analysis';
+    case 'optimizer':
+      return isZh ? '优化建议' : 'Optimization advice';
+    default:
+      return '';
+  }
 }
 
 export const Composer: React.FC<ComposerProps> = ({
@@ -116,6 +157,17 @@ export const Composer: React.FC<ComposerProps> = ({
                 <ModeGlyph mode={currentMode} size={15} strokeWidth={1.9} />
               </span>
               <span className="composer-agent-pill-label">{currentModeLabel}</span>
+              {(() => {
+                const capability = getModeCapability(currentMode, language);
+                return capability ? (
+                  <span
+                    className="composer-agent-pill-capability"
+                    data-testid="composer-mode-pill-capability"
+                  >
+                    {capability}
+                  </span>
+                ) : null;
+              })()}
               <span className="composer-agent-pill-caret" aria-hidden="true">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="6 9 12 15 18 9" />
@@ -126,6 +178,7 @@ export const Composer: React.FC<ComposerProps> = ({
               <div className="composer-agent-menu-popup" role="menu">
                 {AGENT_MODES.map((mode) => {
                   const executionModeDisabled = mode.id !== 'ask' && !hasOpenedCaptureForCurrentProject;
+                  const associatedAgents = getAgentsForMode(mode.id);
                   return (
                     <button
                       key={mode.id}
@@ -150,8 +203,20 @@ export const Composer: React.FC<ComposerProps> = ({
                           <ModeGlyph mode={mode.id} size={15} strokeWidth={1.9} />
                         </span>
                         <span className="composer-agent-menu-item-label">{modeLabels[mode.id]}</span>
+                        {mode.description ? (
+                          <span className="composer-agent-menu-item-desc">{mode.description}</span>
+                        ) : null}
                         {executionModeDisabled ? (
                           <span className="composer-agent-menu-item-hint">{openCaptureRequiredLabel}</span>
+                        ) : null}
+                        {associatedAgents.length > 0 ? (
+                          <span className="composer-agent-menu-item-agents" aria-hidden="true">
+                            {associatedAgents.map((agent) => (
+                              <span key={agent.id} className="agent-tag" data-agent-id={agent.id}>
+                                {agent.label}
+                              </span>
+                            ))}
+                          </span>
                         ) : null}
                       </span>
                       {currentMode === mode.id ? <span className="composer-agent-menu-item-check">●</span> : null}

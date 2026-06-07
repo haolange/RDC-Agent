@@ -724,7 +724,7 @@
   left: 0;
   bottom: calc(100% + 8px);
   z-index: var(--z-dropdown);
-  width: 220px;
+  width: 280px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -737,12 +737,12 @@
 
 .composer-agent-menu-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   width: 100%;
   min-height: 38px;
-  padding: 0 10px;
+  padding: 8px 10px;
   border-radius: 10px;
   background: transparent;
   color: rgb(var(--color-text-secondary));
@@ -789,9 +789,56 @@
   line-height: 1.25;
 }
 
+.composer-agent-menu-item-desc {
+  grid-column: 2;
+  margin-top: 2px;
+  color: rgb(var(--color-text-tertiary));
+  font-size: var(--text-xs, 11px);
+  line-height: 1.35;
+}
+
+.composer-agent-menu-item-agents {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.composer-agent-menu-item .agent-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  line-height: 1.4;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid rgb(var(--color-border-secondary));
+  background: rgb(var(--color-bg-4, var(--color-bg-3)));
+  color: rgb(var(--color-text-secondary));
+  letter-spacing: 0.02em;
+}
+
+.composer-agent-menu-item.active .agent-tag {
+  border-color: color-mix(in srgb, var(--composer-mode-accent) 32%, rgb(var(--color-border-strong)));
+  color: rgb(var(--color-text-primary));
+}
+
+.composer-agent-pill-capability {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-xs, 11px);
+  color: rgb(var(--color-text-tertiary));
+  margin-left: 6px;
+  padding-left: 8px;
+  border-left: 1px solid rgb(var(--color-border-secondary) / 0.6);
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
 .composer-agent-menu-item-check {
   font-size: var(--text-xs);
   color: rgb(var(--color-accent-300));
+  align-self: start;
 }
 
 .chat-input-wrapper {
