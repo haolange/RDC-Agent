@@ -55,14 +55,18 @@ export type {
   TraceStatus,
   VisibleReasoningPacket,
 } from './agenticTrace';
+/**
+ * @deprecated 仅用于 IPC 协议兼容（Ask 模式 diagnostics + tool events）。
+ * 新 Trace 投影已由 TraceEvent/TraceNode 驱动，不依赖 AgentEvent。
+ * 新代码请使用 agent-runtime/core/types.ts 中的事件类型。
+ */
+export type { AgentEvent, AgentEventPayload, AgentEventType } from './agentRuntime';
 export type {
-  AgentEvent,
-  AgentEventPayload,
-  AgentEventType,
   AgentRuntimeCatalog,
   AgentRuntimeMcpDescriptor,
   AgentRuntimePatternDescriptor,
   AgentRuntimeSkillDescriptor,
+  ModelProviderCapabilityMatrix,
 } from './agentRuntime';
 export type {
   ConversationMessage,

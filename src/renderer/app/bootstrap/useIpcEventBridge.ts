@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react';
-import type { AgentTimelineEntry } from '@shared/types/agent';
+import type { AgentState, AgentTimelineEntry } from '@shared/types/agent';
 import type { ConversationStreamEvent } from '@shared/types/conversation';
 import type { ToolTraceEntry } from '@shared/types/tool';
 import type { ReplayDeviceStatusChangedPayload } from '@shared/types/device';
@@ -15,6 +15,7 @@ import {
   mapActionEventToTimelineEntry,
   mergeCapturesWithSnapshot,
 } from '../../services/conversationTimeline';
+import { useAgentStore } from '../../stores/agentStore';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useCaptureStore } from '../../stores/captureStore';
 import { useConversationStore } from '../../stores/conversationStore';
@@ -121,16 +122,42 @@ export function useIpcEventBridge(options: {
       }
     });
 
+    /** 类型守卫：判断 IPC 入站对象是否符合 agent:message 的最小契约。 */
+    const isAgentMessagePayload = (
+      value: unknown,
+    ): value is { id?: string; agentRole?: AgentTimelineEntry['agentRole']; content?: string } => {
+      if (!value || typeof value !== 'object') return false;
+      const obj = value as Record<string, unknown>;
+      if (obj.id !== undefined && typeof obj.id !== 'string') return false;
+      if (obj.content !== undefined && typeof obj.content !== 'string') return false;
+      return true;
+    };
+
     const unsubscribeAgentMessage = electronAPI.events.onAgentMessage((rawMsg) => {
-      const msg = rawMsg as { id?: string; agentRole?: AgentTimelineEntry['agentRole']; content?: string };
+      if (!isAgentMessagePayload(rawMsg)) {
+        return;
+      }
       const entry: AgentTimelineEntry = {
-        id: msg.id || Date.now().toString(),
+        id: rawMsg.id || Date.now().toString(),
         type: 'agent',
-        agentRole: msg.agentRole,
-        content: msg.content ?? '',
+        agentRole: rawMsg.agentRole,
+        content: rawMsg.content ?? '',
         timestamp: Date.now(),
       };
       useConversationStore.getState().addTimelineEntry(entry);
+    });
+
+    /** 类型守卫：判断 IPC 入站对象是否符合 AgentState 的最小契约。 */
+    const isAgentStatePayload = (value: unknown): value is AgentState => {
+      if (!value || typeof value !== 'object') return false;
+      const obj = value as Record<string, unknown>;
+      return typeof obj.agentId === 'string' && typeof obj.status === 'string';
+    };
+
+    const unsubscribeAgentStatusChanged = electronAPI.events.onAgentStatusChanged((rawState) => {
+      if (isAgentStatePayload(rawState)) {
+        useAgentStore.getState().updateAgentState(rawState);
+      }
     });
 
     const unsubscribeCaptureStatusChanged = electronAPI.events.onCaptureStatusChanged(() => {
@@ -278,6 +305,7 @@ export function useIpcEventBridge(options: {
       unsubscribeContextChanged();
       unsubscribeToolExecutionComplete();
       unsubscribeAgentMessage();
+      unsubscribeAgentStatusChanged();
       unsubscribeCaptureStatusChanged();
       unsubscribeEvidenceEventAdded();
       unsubscribeWorkflowStateChanged();

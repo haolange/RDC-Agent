@@ -27,7 +27,6 @@ import type {
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import type { AgentEvent } from '@shared/types/agentRuntime';
-import { agentRuntime } from '../agent-runtime/AgentRuntime';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
 import { traceService } from '../agent-trace/TraceService';
 import { debuggerRuntime } from '../workflow/debugger/DebuggerRuntime';
@@ -1208,73 +1207,74 @@ export class ConversationService {
           });
         }
 
-        const response = await agentRuntime.runTurn({
-          agentId: conversationAgentId,
-          mode: input.requestedMode,
-          prompt: buildCoworkPrompt(
-            input.context,
-            history,
-            input.requestedMode,
-            input.rawMessage,
-            input.importedAttachments,
-          ),
-          sessionId: input.context.session?.sessionId,
-          turnId: assistantMessage.turnId,
-          stage: 'cowork',
-          patternId: input.requestedMode === 'debugger' ? 'plan-generate-verify' : 'free-agent',
-          systemPrompt: conversationAgentId === 'ask_agent'
-            ? buildAskSystemPrompt()
-            : buildDebuggerCoworkSystemPrompt(),
-          providerId: routePreflight.providerId,
-          modelId: routePreflight.modelId,
-          maxTokens: 1200,
-          temperature: 0.35,
-          signal: abortController.signal,
-          onEvent: (event: AgentEvent) => {
-            this.emitConversationEvent({
-              type: 'agent_event',
-              sessionId: sessionId ?? '',
-              turnId: assistantMessage.turnId,
-              event,
-            });
-            if (event.type === 'assistant.delta') {
-              const chunk = typeof event.payload.text === 'string' ? event.payload.text : '';
-              rawResponse += chunk;
-              const nextVisible = computeVisibleAssistantText(rawResponse);
-              if (nextVisible.length > visibleResponse.length) {
-                visibleResponse = nextVisible;
-                commitVisibleAssistantText();
+        const coworkPrompt = buildCoworkPrompt(
+          input.context,
+          history,
+          input.requestedMode,
+          input.rawMessage,
+          input.importedAttachments,
+        );
+        const responseText = await agentOrchestrator.sendCoworkMessage(
+          conversationAgentId,
+          input.rawMessage,
+          {
+            sessionId: input.context.session?.sessionId,
+            turnId: assistantMessage.turnId,
+            stage: 'cowork',
+            patternId: input.requestedMode === 'debugger' ? 'plan-generate-verify' : 'free-agent',
+            systemPrompt: conversationAgentId === 'ask_agent'
+              ? buildAskSystemPrompt()
+              : buildDebuggerCoworkSystemPrompt(),
+            maxTokens: 1200,
+            temperature: 0.35,
+            signal: abortController.signal,
+            promptOverride: coworkPrompt,
+            onEvent: (event: AgentEvent) => {
+              this.emitConversationEvent({
+                type: 'agent_event',
+                sessionId: sessionId ?? '',
+                turnId: assistantMessage.turnId,
+                event,
+              });
+              if (event.type === 'assistant.delta') {
+                const chunk = typeof event.payload.text === 'string' ? event.payload.text : '';
+                rawResponse += chunk;
+                const nextVisible = computeVisibleAssistantText(rawResponse);
+                if (nextVisible.length > visibleResponse.length) {
+                  visibleResponse = nextVisible;
+                  commitVisibleAssistantText();
+                }
               }
-            }
-            if (event.type === 'tool.started') {
-              commitAssistantMessage('message_patched', {
-                reasoningTrace: upsertRuntimeToolCall(assistantMessage.reasoningTrace, {
-                  id: String(event.payload.toolCallId),
-                  toolName: String(event.payload.toolName),
-                  status: 'running',
-                  argsPreview: JSON.stringify(event.payload.args ?? {}).slice(0, 600),
-                  startedAt: nowMs(),
-                }),
-              });
-            }
-            if (event.type === 'tool.completed') {
-              const result = event.payload.result as { ok?: boolean; error?: { message?: string } } | undefined;
-              commitAssistantMessage('message_patched', {
-                reasoningTrace: upsertRuntimeToolCall(assistantMessage.reasoningTrace, {
-                  id: String(event.payload.toolCallId),
-                  toolName: String(event.payload.toolName),
-                  status: result?.ok ? 'complete' : 'error',
-                  resultPreview: JSON.stringify(event.payload.result ?? {}).slice(0, 800),
-                  error: result?.ok ? undefined : result?.error?.message,
-                  completedAt: nowMs(),
-                }),
-              });
-            }
+              if (event.type === 'tool.started') {
+                commitAssistantMessage('message_patched', {
+                  reasoningTrace: upsertRuntimeToolCall(assistantMessage.reasoningTrace, {
+                    id: String(event.payload.toolCallId),
+                    toolName: String(event.payload.toolName),
+                    status: 'running',
+                    argsPreview: JSON.stringify(event.payload.args ?? {}).slice(0, 600),
+                    startedAt: nowMs(),
+                  }),
+                });
+              }
+              if (event.type === 'tool.completed') {
+                const result = event.payload.result as { ok?: boolean; error?: { message?: string } } | undefined;
+                commitAssistantMessage('message_patched', {
+                  reasoningTrace: upsertRuntimeToolCall(assistantMessage.reasoningTrace, {
+                    id: String(event.payload.toolCallId),
+                    toolName: String(event.payload.toolName),
+                    status: result?.ok ? 'complete' : 'error',
+                    resultPreview: JSON.stringify(event.payload.result ?? {}).slice(0, 800),
+                    error: result?.ok ? undefined : result?.error?.message,
+                    completedAt: nowMs(),
+                  }),
+                });
+              }
+            },
           },
-        });
+        );
 
         if (!rawResponse) {
-          rawResponse = response.text;
+          rawResponse = responseText;
         }
       } catch (error) {
         llmDiagnostic = createRequestFailedDiagnostic(routePreflight, error);
