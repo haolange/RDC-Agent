@@ -1,5 +1,9 @@
 import { expect, test } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
 import { closeSmokeApp, launchHeadlessSmokeApp } from './helpers/app';
+
+const DEFAULT_SEEDED_PROVIDER_IDS = ['deepseek', 'openrouter', 'xai', 'google-ai-studio', 'kimi-code'];
 
 test('browser app session uses real main runtime bridge', async ({ page, request }) => {
   const context = await launchHeadlessSmokeApp();
@@ -95,6 +99,80 @@ test('browser app session uses real main runtime bridge', async ({ page, request
     });
     expect(fetchFailures).toBe(0);
     expect(consoleMessages.filter((message) => message.includes('Failed to fetch'))).toHaveLength(0);
+  } finally {
+    await closeSmokeApp(context);
+  }
+});
+
+test('default provider seeds repair existing unconfigured catalog settings', async ({ page }) => {
+  const context = await launchHeadlessSmokeApp({
+    prepareWorkspace: ({ workspaceDir }) => {
+      fs.writeFileSync(path.join(workspaceDir, 'settings.json'), JSON.stringify({
+        appearance: {
+          theme: 'dark',
+          language: 'zh-CN',
+          fontScale: 'medium',
+        },
+        workspace: {
+          rootPath: workspaceDir,
+        },
+        llm: {
+          providers: DEFAULT_SEEDED_PROVIDER_IDS.map((id) => ({
+            id,
+            apiKey: '',
+            models: [],
+            status: 'unconfigured',
+            isConfigured: false,
+          })),
+          agentRoutes: [
+            { agentId: 'ask_agent', providerId: '', modelId: '' },
+            { agentId: 'rdc-debugger', providerId: 'openrouter', modelId: 'missing-model' },
+          ],
+        },
+      }, null, 2), 'utf8');
+    },
+  });
+
+  try {
+    await page.goto(`${context.bridgeUrl}/app`);
+    await page.locator('.app-titlebar').waitFor({ state: 'visible', timeout: 15000 });
+
+    const settingsState = await page.evaluate(async (providerIds) => {
+      const settings = await window.electronAPI.settings.get();
+      return {
+        providers: providerIds.map((id) => {
+          const provider = settings.llm.providers.find((entry) => entry.id === id);
+          return provider
+            ? {
+              id: provider.id,
+              apiKey: provider.apiKey,
+              hasStoredSecret: provider.hasStoredSecret,
+              isConfigured: provider.isConfigured,
+              modelIds: provider.models.map((model) => model.id),
+              status: provider.status,
+            }
+            : null;
+        }),
+        routes: settings.llm.agentRoutes.filter((route) => (
+          route.agentId === 'ask_agent' || route.agentId === 'rdc-debugger'
+        )),
+      };
+    }, DEFAULT_SEEDED_PROVIDER_IDS);
+
+    expect(settingsState.providers).toEqual(expect.arrayContaining(
+      DEFAULT_SEEDED_PROVIDER_IDS.map((id) => expect.objectContaining({
+        id,
+        apiKey: '',
+        hasStoredSecret: true,
+        isConfigured: true,
+        status: 'verified',
+      })),
+    ));
+    expect(settingsState.providers.every((provider) => provider && provider.modelIds.length > 0)).toBe(true);
+    expect(settingsState.routes).toEqual(expect.arrayContaining([
+      { agentId: 'ask_agent', providerId: 'deepseek', modelId: 'deepseek-chat' },
+      { agentId: 'rdc-debugger', providerId: 'deepseek', modelId: 'deepseek-chat' },
+    ]));
   } finally {
     await closeSmokeApp(context);
   }
