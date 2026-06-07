@@ -237,6 +237,11 @@ export class GeminiProvider implements ProviderStrategy {
     if (typeof options.temperature === 'number') generationConfig.temperature = options.temperature;
     if (typeof options.topP === 'number') generationConfig.topP = options.topP;
     if (typeof options.maxTokens === 'number') generationConfig.maxOutputTokens = options.maxTokens;
+    if (options.reasoningBudget && options.reasoningBudget !== 'auto') {
+      generationConfig.thinkingConfig = {
+        thinkingBudget: options.reasoningBudget === 'low' ? 1024 : options.reasoningBudget === 'medium' ? 4096 : 8192,
+      };
+    }
     if (Object.keys(generationConfig).length > 0) body.generationConfig = generationConfig;
 
     if (context.tools && context.tools.length > 0) {

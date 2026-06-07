@@ -339,14 +339,14 @@ function buildCoworkPrompt(
 
 function buildAskSystemPrompt(): string {
   return [
-    '你是 RDC-Agent 的 Ask 助手，负责非执行对话。',
+    '你是 RDC-Agent 的 Ask 助手，工作模式是只读 agentic 协作。',
     '要求：',
-    '1. 正常回答用户问题，语气简洁，不使用审批流、工单流或调试执行口吻。',
-    '2. 不要自称 RDC Debugger，不要暗示已经开始 RenderDoc 调试，也不要假装分析过 capture。',
-    '3. 可以解释能力边界、澄清目标、帮助用户判断是否需要 Open .rdc capture。',
-    '4. 如果用户要求正式调试或执行分析，只提示需要在应用内 Open capture 并切换到 Debugger；Ask 模式不能创建 run。',
-    '5. 不要声称可以调用 shell、rdx-tool、ToolBridge 或任何 RenderDoc 执行工具。',
-    '6. 不需要输出隐藏控制块，除非明确需要表达 intake；即使输出 control，也必须 safe_to_start=false。',
+    '1. 正常回答用户问题，语气简洁；可以澄清目标、检索上下文、读取或搜索当前 workspace 内文本文件，也可以访问公开 HTTP(S) 页面。',
+    '2. 只允许使用只读工具：read_file、glob、grep、task_list、web_fetch、web_search；不要请求 bash、write_file、edit_file、remove、task_create/update、rd.* 或 ToolBridge mutation 工具。',
+    '3. 不要自称 RDC Debugger，不要暗示已经开始 RenderDoc 调试，也不要假装分析过 capture。',
+    '4. 如果用户要求正式调试或执行分析，只提示需要在应用内 Open capture 并切换到 Debugger；Ask 模式不能创建正式 run。',
+    '5. 可以展示可见工作轨迹和工具轨迹，但不要输出隐藏 chain-of-thought。',
+    '6. 如果需要输出 control JSON，也必须 safe_to_start=false，除非后端路由已经确认进入 Debugger 执行链。',
   ].join('\n');
 }
 
@@ -940,12 +940,17 @@ export class ConversationService {
       modeContext: requestedMode,
       agentId: requestedMode === 'ask' ? 'ask_agent' : 'rdc-debugger',
       status: 'streaming',
-      reasoningTrace: requestedMode === 'ask'
-        ? null
-        : createDraftReasoningTrace('正在思考', [
-            createReasoningStep('cowork-route', '检查上下文与路由', 'intake_gate'),
-            createReasoningStep('cowork-reply', '生成协作回复', 'plan'),
-          ]),
+      reasoningTrace: createDraftReasoningTrace(
+        requestedMode === 'ask' ? '正在执行只读协作' : '正在思考',
+        [
+          createReasoningStep('cowork-route', '检查上下文与路由', 'intake_gate'),
+          createReasoningStep(
+            'cowork-reply',
+            requestedMode === 'ask' ? '生成只读协作回复' : '生成协作回复',
+            'plan',
+          ),
+        ],
+      ),
     });
 
     if (!context.projectId && EXECUTE_PATTERN.test(rawMessage)) {
@@ -1021,7 +1026,7 @@ export class ConversationService {
     const workstreamSessionId = sessionId ?? this.ephemeralWorkstreamSessionId(input.assistantDraftMessage.turnId);
     const abortController = new AbortController();
     const conversationAgentId: AgentRole = input.requestedMode === 'ask' ? 'ask_agent' : 'rdc-debugger';
-    const showCoworkReasoning = input.requestedMode !== 'ask';
+    const showCoworkReasoning = true;
 
     const commitAssistantMessage = (type: ConversationStreamEvent['type'], patch: Partial<ConversationMessage>) => {
       if (abortController.signal.aborted && patch.status !== 'stopped') {
@@ -1096,7 +1101,9 @@ export class ConversationService {
       commitAssistantMessage('message_patched', {
         reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, 'cowork-route', {
           status: 'running',
-          summary: '正在检查项目、capture 与调试路由。',
+          summary: input.requestedMode === 'ask'
+            ? '正在检查项目上下文、只读工具权限与模型路由。'
+            : '正在检查项目、capture 与调试路由。',
           startedAt: nowMs(),
         }),
       });
@@ -1201,7 +1208,9 @@ export class ConversationService {
           commitAssistantMessage('message_patched', {
             reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, 'cowork-reply', {
               status: 'running',
-              summary: `正在通过 ${routePreflight.providerId}/${routePreflight.modelId} 生成协作回复。`,
+              summary: input.requestedMode === 'ask'
+                ? `正在通过 ${routePreflight.providerId}/${routePreflight.modelId} 生成只读协作回复。`
+                : `正在通过 ${routePreflight.providerId}/${routePreflight.modelId} 生成协作回复。`,
               startedAt: nowMs(),
             }),
           });
@@ -1245,6 +1254,20 @@ export class ConversationService {
                   commitVisibleAssistantText();
                 }
               }
+              if (event.type === 'diagnostic') {
+                const payload = event.payload as { code?: string; message?: string; severity?: string };
+                const summary = typeof payload.message === 'string' && payload.message
+                  ? payload.message
+                  : '收到运行时诊断。';
+                commitAssistantMessage('message_patched', {
+                  reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, `cowork-diagnostic-${payload.code ?? 'runtime'}`, {
+                    status: payload.severity === 'error' ? 'error' : 'complete',
+                    title: '运行时诊断',
+                    summary,
+                    completedAt: nowMs(),
+                  }),
+                });
+              }
               if (event.type === 'tool.started') {
                 commitAssistantMessage('message_patched', {
                   reasoningTrace: upsertRuntimeToolCall(assistantMessage.reasoningTrace, {
@@ -1253,6 +1276,21 @@ export class ConversationService {
                     status: 'running',
                     argsPreview: JSON.stringify(event.payload.args ?? {}).slice(0, 600),
                     startedAt: nowMs(),
+                  }),
+                });
+              }
+              if (event.type === 'tool.denied') {
+                const reason = typeof event.payload.reason === 'string'
+                  ? event.payload.reason
+                  : 'Ask 只读策略拒绝了该工具调用。';
+                commitAssistantMessage('message_patched', {
+                  reasoningTrace: upsertRuntimeToolCall(assistantMessage.reasoningTrace, {
+                    id: String(event.payload.toolCallId),
+                    toolName: String(event.payload.toolName),
+                    status: 'error',
+                    resultPreview: JSON.stringify(event.payload.result ?? { reason }).slice(0, 800),
+                    error: reason,
+                    completedAt: nowMs(),
                   }),
                 });
               }

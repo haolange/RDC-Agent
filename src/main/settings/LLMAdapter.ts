@@ -114,6 +114,28 @@ const toOpenAiTools = (tools?: LLMRequest['tools']) => {
   }));
 };
 
+const toOpenAiReasoningEffort = (budget?: LLMRequest['reasoningBudget']): 'low' | 'medium' | 'high' | undefined => {
+  if (budget === 'low' || budget === 'medium' || budget === 'high') {
+    return budget;
+  }
+  return undefined;
+};
+
+const toAnthropicThinking = (budget?: LLMRequest['reasoningBudget']): { type: 'enabled'; budget_tokens: number } | undefined => {
+  if (!budget || budget === 'auto') {
+    return undefined;
+  }
+  const budgetTokens = budget === 'low' ? 1024 : budget === 'medium' ? 4096 : 8192;
+  return { type: 'enabled', budget_tokens: budgetTokens };
+};
+
+const toGoogleThinkingConfig = (budget?: LLMRequest['reasoningBudget']): { thinkingBudget: number } | undefined => {
+  if (!budget || budget === 'auto') {
+    return undefined;
+  }
+  return { thinkingBudget: budget === 'low' ? 1024 : budget === 'medium' ? 4096 : 8192 };
+};
+
 const extractResponsesText = (payload: unknown): string => {
   if (!payload || typeof payload !== 'object') {
     return '';
@@ -433,6 +455,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
         messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
+        reasoning_effort: toOpenAiReasoningEffort(request.reasoningBudget),
         tools: toOpenAiTools(request.tools),
         response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
         stream: false,
@@ -480,6 +503,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
         messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
+        reasoning_effort: toOpenAiReasoningEffort(request.reasoningBudget),
         tools: toOpenAiTools(request.tools),
         response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
         stream: true,
@@ -605,6 +629,7 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
         messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
+        reasoning_effort: toOpenAiReasoningEffort(request.reasoningBudget),
         tools: toOpenAiTools(request.tools),
         response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
       }),
@@ -646,6 +671,7 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
         messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
+        reasoning_effort: toOpenAiReasoningEffort(request.reasoningBudget),
         tools: toOpenAiTools(request.tools),
         response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
         stream: true,
@@ -955,6 +981,7 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
         generationConfig: {
           maxOutputTokens: request.maxTokens || 4096,
           temperature: request.temperature ?? 0.7,
+          thinkingConfig: toGoogleThinkingConfig(request.reasoningBudget),
         },
         systemInstruction: request.messages.some((message) => message.role === 'system')
           ? {
@@ -1045,6 +1072,7 @@ class AnthropicProvider extends BaseStreamingProvider {
       body: JSON.stringify({
         model,
         max_tokens: request.maxTokens || 4096,
+        thinking: toAnthropicThinking(request.reasoningBudget),
         system: typeof systemMessage?.content === 'string' ? systemMessage.content : undefined,
         messages: otherMessages.map((message) => ({
           role: message.role === 'assistant' ? 'assistant' : 'user',
@@ -1086,6 +1114,7 @@ class AnthropicProvider extends BaseStreamingProvider {
       body: JSON.stringify({
         model,
         max_tokens: request.maxTokens || 4096,
+        thinking: toAnthropicThinking(request.reasoningBudget),
         stream: true,
         system: typeof systemMessage?.content === 'string' ? systemMessage.content : undefined,
         messages: otherMessages.map((message) => ({

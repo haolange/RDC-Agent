@@ -636,14 +636,15 @@ systemPrompt: [
 
 1. 每个 Agent 角色有独立固定的基础 System Prompt，不随对话历史漂移
 2. 阶段 System Prompt 在每次 `sendMessage` 时动态注入，确保约束新鲜
-3. Conversation 模式按 UI mode 分流：`Ask` 使用非执行 `ask_agent` prompt，`Debugger` 的 Cowork prompt 与 Workflow 模式隔离
+3. Conversation 模式按 UI mode 分流：`Ask` 使用只读 agentic `ask_agent` prompt，`Debugger` 的 Cowork prompt 与 Workflow 模式隔离
 
 **Conversation System Prompt 分流**（来源：`src/main/conversation/ConversationService.ts`）：
 
 ```typescript
 function buildAskSystemPrompt(): string {
   return [
-    '你是 RDC-Agent 的 Ask 助手，负责非执行对话。',
+    '你是 RDC-Agent 的 Ask 助手，工作模式是只读 agentic 协作。',
+    '可以使用 read_file、glob、grep、task_list、web_fetch、web_search 等只读工具，但不能写入、编辑、删除、执行 shell、调用 rd.* 或创建正式 Debugger run。',
     '不要自称 RDC Debugger，不要暗示已经开始 RenderDoc 调试，也不要假装分析过 capture。',
     '如果用户要求正式调试或执行分析，只提示需要在应用内 Open capture 并切换到 Debugger。',
   ].join('\n');

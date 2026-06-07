@@ -106,6 +106,28 @@ export function translateCoreToLegacy(
       if (ev.type === 'text_delta') {
         return buildLegacyEvent('assistant.delta', { text: ev.delta }, context);
       }
+      if (ev.type === 'thinking_start') {
+        return buildLegacyEvent(
+          'diagnostic',
+          {
+            code: 'MODEL_THINKING_STARTED',
+            severity: 'info',
+            message: '模型已进入 provider reasoning / thinking 阶段；仅展示可见工作轨迹，不展示隐藏思维链。',
+          },
+          context,
+        );
+      }
+      if (ev.type === 'thinking_end') {
+        return buildLegacyEvent(
+          'diagnostic',
+          {
+            code: 'MODEL_THINKING_COMPLETED',
+            severity: 'info',
+            message: '模型 reasoning / thinking 阶段已结束。',
+          },
+          context,
+        );
+      }
       return null;
     }
     case 'message_end': {
@@ -142,12 +164,26 @@ export function translateCoreToLegacy(
       );
     }
     case 'tool_execution_end': {
+      const legacyResult = toolResultToLegacy(event.result, event.durationMs);
+      const denialReason = getPolicyDenialReason(event.result);
+      if (denialReason) {
+        return buildLegacyEvent(
+          'tool.denied',
+          {
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            reason: denialReason,
+            result: legacyResult,
+          },
+          context,
+        );
+      }
       return buildLegacyEvent(
         'tool.completed',
         {
           toolCallId: event.toolCallId,
           toolName: event.toolName,
-          result: toolResultToLegacy(event.result, event.durationMs),
+          result: legacyResult,
         },
         context,
       );
@@ -165,6 +201,19 @@ export function translateCoreToLegacy(
     default:
       return null;
   }
+}
+
+function getPolicyDenialReason(result: ToolResultMessage): string | null {
+  if (!result.isError) return null;
+  const message = extractToolResultText(result);
+  return message.toLowerCase().includes('policy denied') ? message : null;
+}
+
+function extractToolResultText(result: ToolResultMessage): string {
+  return result.content
+    .filter((block) => block.type === 'text')
+    .map((block) => (block as { text: string }).text)
+    .join('');
 }
 
 function extractAssistantText(messages: Message[]): string {
@@ -188,10 +237,7 @@ function toolResultToLegacy(result: ToolResultMessage, durationMs: number): impo
       artifacts: [],
       error: {
         code: 'AGENT_TOOL_FAILED',
-        message: result.content
-          .filter((block) => block.type === 'text')
-          .map((block) => (block as { text: string }).text)
-          .join('') || 'Tool execution failed.',
+        message: extractToolResultText(result) || 'Tool execution failed.',
         category: 'execution',
       },
       duration_ms: durationMs,

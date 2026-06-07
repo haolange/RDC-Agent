@@ -38,12 +38,18 @@ import type { LlmProviderId } from '@shared/types/settings';
 import type { WorkflowStage } from '@shared/types/workflow';
 import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
 import { Agent } from '../../agent-runtime/agent/Agent';
+import type { AgentTool, AgentToolResult } from '../../agent-runtime/agent/AgentTool';
+import { toolToDefinition } from '../../agent-runtime/agent/AgentTool';
+import type { ToolExecutor } from '../../agent-runtime/agent/AgentLoop';
 import type {
   AgentEvent as CoreAgentEvent,
+  StreamOptions,
   ToolCall,
+  ToolDefinition,
   ToolResultMessage,
   UserMessage,
 } from '../../agent-runtime/core/types';
+import { getPrimitiveTools } from '../../agent-runtime/tools';
 import {
   encodeAgentModel,
   llmAdapterProvider,
@@ -59,7 +65,7 @@ import { llmAdapter } from '../../settings/LLMAdapter';
 import { providerAccountAuthService } from '../../settings/ProviderAccountAuthService';
 import { settingsService } from '../../settings/SettingsService';
 import { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
-import { isToolAllowedForAgent, resolveAgentToolAllowlist } from './DebuggerRuntimePolicy';
+import { isToolAllowedForAgent, normalizeToolName, resolveAgentToolAllowlist } from './DebuggerRuntimePolicy';
 
 interface AgentTurnContext {
   caseId?: string;
@@ -74,6 +80,7 @@ interface AgentTurnOptions {
   onChunk?: (text: string) => void;
   onStreamEvent?: (event: LLMStreamEvent) => void;
   onEvent?: (event: LegacyAgentEvent) => void;
+  reasoningBudget?: 'auto' | 'low' | 'medium' | 'high';
 }
 
 interface AgentCoworkOptions extends AgentTurnOptions {
@@ -97,6 +104,11 @@ interface AgentSlot {
   providerId: string;
   modelId: string;
   systemPrompt: string;
+}
+
+interface ResolvedRuntimeTools {
+  definitions: ToolDefinition[];
+  toolMap: Map<string, AgentTool>;
 }
 
 export class AgentOrchestrator {
@@ -293,12 +305,13 @@ export class AgentOrchestrator {
       };
 
       if (process.env.RDC_AGENT_TEST_MODE === '1') {
-        const finalStub = await this.createCoworkTestResponse(agentId, content, options?.onChunk);
+        const finalStub = await this.createCoworkTestResponse(agentId, content, options);
         this.updateAgentStatus(agentId, 'complete');
         return finalStub;
       }
 
       const userPrompt = options?.promptOverride ?? content;
+      const toolAllowlist = resolveAgentToolAllowlist(agentId, options?.stage && options.stage !== 'cowork' && options.stage !== 'report' ? options.stage : undefined);
       const responseText = await this.runAgentTurn({
         agentId,
         content: userPrompt,
@@ -313,7 +326,7 @@ export class AgentOrchestrator {
         runId: undefined,
         sessionId: options?.sessionId ?? null,
         turnId: options?.turnId,
-        toolAllowlist: [],
+        toolAllowlist,
         options,
         // cowork 每次调用都是独立轮次，不复用缓存 Agent。
         useFreshAgent: true,
@@ -350,6 +363,9 @@ export class AgentOrchestrator {
     providerId: string,
     modelId: string,
     systemPrompt: string,
+    tools: ToolDefinition[] = [],
+    toolExecutor = this.createToolExecutor(agentId, [], undefined),
+    streamOptions?: StreamOptions,
   ): AgentSlot {
     const existing = this.agentSlots.get(agentId);
     if (
@@ -366,27 +382,12 @@ export class AgentOrchestrator {
       initialState: {
         model: encodeAgentModel(providerId, modelId),
         systemPrompt,
+        tools,
         messages: [],
       },
       provider: llmAdapterProvider,
-      // 暂不启用工具：旧 ToolRegistry 已下线，新 ToolExecutor 由后续任务接入。
-      toolExecutor: {
-        async execute(toolCall: ToolCall): Promise<ToolResultMessage> {
-          return {
-            role: 'toolResult',
-            toolCallId: toolCall.id,
-            toolName: toolCall.name,
-            content: [
-              {
-                type: 'text',
-                text: `Tool ${toolCall.name} is not wired in this build.`,
-              },
-            ],
-            isError: true,
-            timestamp: Date.now(),
-          };
-        },
-      },
+      toolExecutor,
+      streamOptions,
       maxTurns: 8,
     });
 
@@ -400,34 +401,136 @@ export class AgentOrchestrator {
     providerId: string,
     modelId: string,
     systemPrompt: string,
+    tools: ToolDefinition[] = [],
+    toolExecutor = this.createToolExecutor('ask_agent', [], undefined),
+    streamOptions?: StreamOptions,
   ): AgentSlot {
     const agent = new Agent({
       initialState: {
         model: encodeAgentModel(providerId, modelId),
         systemPrompt,
+        tools,
         messages: [],
       },
       provider: llmAdapterProvider,
-      toolExecutor: {
-        async execute(toolCall: ToolCall): Promise<ToolResultMessage> {
+      toolExecutor,
+      streamOptions,
+      maxTurns: 4,
+    });
+    return { agent, providerId, modelId, systemPrompt };
+  }
+
+  private resolveRuntimeTools(
+    agentId: AgentRole,
+    toolAllowlist: string[],
+    stage?: WorkflowStage | 'cowork' | 'report',
+  ): ResolvedRuntimeTools {
+    const availableTools = new Map<string, AgentTool>();
+    for (const tool of getPrimitiveTools()) {
+      availableTools.set(normalizeToolName(tool.name), tool);
+    }
+    const taskListTool = this.createReadonlyTaskListTool();
+    availableTools.set(taskListTool.name, taskListTool);
+
+    const definitions: ToolDefinition[] = [];
+    const toolMap = new Map<string, AgentTool>();
+    for (const name of toolAllowlist) {
+      const normalized = normalizeToolName(name);
+      const tool = availableTools.get(normalized);
+      if (!tool) continue;
+      if (!this.isAllowedForRuntime(agentId, tool.name, stage)) continue;
+      if (!toolMap.has(tool.name)) {
+        toolMap.set(tool.name, tool);
+        definitions.push(toolToDefinition(tool));
+      }
+    }
+    return { definitions, toolMap };
+  }
+
+  private createToolExecutor(
+    agentId: AgentRole,
+    toolAllowlist: string[],
+    stage?: WorkflowStage | 'cowork' | 'report',
+  ): ToolExecutor {
+    const tools = this.resolveRuntimeTools(agentId, toolAllowlist, stage).toolMap;
+    return {
+      execute: async (toolCall: ToolCall, signal?: AbortSignal, onUpdate?: (partialResult: unknown) => void) => {
+        const normalizedName = normalizeToolName(toolCall.name);
+        if (!this.isAllowedForRuntime(agentId, toolCall.name, stage) || !tools.has(normalizedName)) {
+          return this.createPolicyDeniedToolResult(toolCall, agentId);
+        }
+        const tool = tools.get(normalizedName);
+        if (!tool) {
+          return this.createPolicyDeniedToolResult(toolCall, agentId);
+        }
+        try {
+          const result = await tool.execute(toolCall.id, toolCall.arguments, signal, onUpdate);
+          return this.agentToolResultToMessage(toolCall, result);
+        } catch (error) {
           return {
             role: 'toolResult',
             toolCallId: toolCall.id,
             toolName: toolCall.name,
-            content: [
-              {
-                type: 'text',
-                text: `Tool ${toolCall.name} is not wired in this build.`,
-              },
-            ],
+            content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
             isError: true,
             timestamp: Date.now(),
           };
-        },
+        }
       },
-      maxTurns: 4,
-    });
-    return { agent, providerId, modelId, systemPrompt };
+    };
+  }
+
+  private isAllowedForRuntime(
+    agentId: AgentRole,
+    toolName: string,
+    stage?: WorkflowStage | 'cowork' | 'report',
+  ): boolean {
+    const workflowStage = stage === 'cowork' || stage === 'report' ? undefined : stage;
+    return isToolAllowedForAgent(toolName, agentId, workflowStage);
+  }
+
+  private createPolicyDeniedToolResult(toolCall: ToolCall, agentId: AgentRole): ToolResultMessage {
+    return {
+      role: 'toolResult',
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+      content: [{
+        type: 'text',
+        text: `Policy denied tool "${toolCall.name}" for ${agentId}. Ask mode only allows read-only tools.`,
+      }],
+      isError: true,
+      timestamp: Date.now(),
+    };
+  }
+
+  private agentToolResultToMessage(toolCall: ToolCall, result: AgentToolResult): ToolResultMessage {
+    return {
+      role: 'toolResult',
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+      content: result.content,
+      isError: result.isError === true,
+      timestamp: Date.now(),
+    };
+  }
+
+  private createReadonlyTaskListTool(): AgentTool<Record<string, never>, { count: number }> {
+    return {
+      name: 'task_list',
+      label: 'List Tasks',
+      description: 'List current conversation tasks without creating or modifying any task records.',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+      permissionHint: 'readonly',
+      async execute() {
+        return {
+          content: [{ type: 'text', text: 'No formal Debugger run tasks are active in Ask mode.' }],
+          details: { count: 0 },
+        };
+      },
+    };
   }
 
   // -------------------------------------------------------------------
@@ -457,13 +560,31 @@ export class AgentOrchestrator {
       throw new Error('No provider/model route is configured for this agent.');
     }
 
+    const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage);
+    const toolExecutor = this.createToolExecutor(input.agentId, input.toolAllowlist, input.stage);
+    const streamOptions: StreamOptions = {
+      maxTokens: input.maxTokens,
+      temperature: input.temperature,
+      reasoningBudget: input.options?.reasoningBudget,
+      signal: input.options?.signal,
+    };
     const slot = input.useFreshAgent
-      ? this.createFreshAgentSlot(input.providerId, input.modelId, input.systemPrompt)
+      ? this.createFreshAgentSlot(
+          input.providerId,
+          input.modelId,
+          input.systemPrompt,
+          runtimeTools.definitions,
+          toolExecutor,
+          streamOptions,
+        )
       : this.getOrCreateAgentSlot(
           input.agentId,
           input.providerId,
           input.modelId,
           input.systemPrompt,
+          runtimeTools.definitions,
+          toolExecutor,
+          streamOptions,
         );
 
     const userMessage: UserMessage = {
@@ -689,7 +810,7 @@ export class AgentOrchestrator {
     }
     const lower = userMessage.toLowerCase();
     let stub = agentId === 'ask_agent'
-      ? 'Ask is ready. Describe the issue, goal, or .rdc capture you want to inspect; I will clarify without starting execution.'
+      ? 'Ask is ready. I can inspect readonly context, search files or public pages, and explain next steps without starting a Debugger run.'
       : 'Debugger is ready. Describe the symptom and capture context; I will prepare a plan before execution.';
     if (/ue4|unreal/i.test(userMessage)) {
       stub = 'UE4 is Unreal Engine 4, commonly involved in graphics debugging around materials, post-processing, shaders, and render passes.';
@@ -707,7 +828,7 @@ export class AgentOrchestrator {
   private async createCoworkTestResponse(
     agentId: AgentRole,
     content: string,
-    onChunk?: (text: string) => void,
+    options?: AgentCoworkOptions,
   ): Promise<string> {
     let userMessage = content;
     try {
@@ -722,7 +843,7 @@ export class AgentOrchestrator {
     const lower = userMessage.toLowerCase();
     const wantsExecution = EXECUTE_PATTERN.test(userMessage);
     let stub = agentId === 'ask_agent'
-      ? 'I can help clarify the problem, explain boundaries, or guide you to open a .rdc capture without starting execution.'
+      ? 'I can inspect readonly context, search files or public pages, explain boundaries, or guide you to open a .rdc capture without starting a Debugger run.'
       : 'I can help scope the debugging target, or prepare a formal Debugger plan when you are ready to execute.';
     if (/ue4|unreal/i.test(userMessage)) {
       stub = 'UE4 is Unreal Engine 4. In RDC-Agent it is usually relevant to render pass, material, post-process, and shader debugging context.';
@@ -733,15 +854,83 @@ export class AgentOrchestrator {
     } else if (wantsExecution || EXECUTE_PATTERN.test(lower)) {
       stub = 'Received. I will prepare the formal debugging plan first, then move into the strict execution flow only when conditions are met.';
     }
+    if (agentId === 'ask_agent' && userMessage.includes('__RDC_AGENT_E2E_ASK_READONLY_TOOL__')) {
+      const toolCallId = generateEventId('e2e-tool');
+      this.emitCoworkTestEvent('tool.started', {
+        toolCallId,
+        toolName: 'grep',
+        args: { pattern: 'ConversationService', path: 'src/main/conversation' },
+      }, options);
+      this.emitCoworkTestEvent('tool.completed', {
+        toolCallId,
+        toolName: 'grep',
+        result: {
+          ok: true,
+          data: {
+            content: [
+              {
+                type: 'text',
+                text: 'src/main/conversation/ConversationService.ts: Ask readonly trace is visible.',
+              },
+            ],
+          },
+          artifacts: [],
+          duration_ms: 1,
+          trace_id: toolCallId,
+        },
+      }, options);
+      stub = 'I searched the workspace with grep and found the Ask conversation code path. No Debugger run was created.';
+    } else if (agentId === 'ask_agent' && userMessage.includes('__RDC_AGENT_E2E_ASK_DENY_WRITE__')) {
+      const toolCallId = generateEventId('e2e-tool');
+      this.emitCoworkTestEvent('tool.started', {
+        toolCallId,
+        toolName: 'write_file',
+        args: { path: 'should-not-exist.txt' },
+      }, options);
+      this.emitCoworkTestEvent('tool.denied', {
+        toolCallId,
+        toolName: 'write_file',
+        reason: 'Policy denied: ask_agent can only use readonly tools.',
+        result: {
+          ok: false,
+          data: {},
+          artifacts: [],
+          error: {
+            code: 'AGENT_TOOL_POLICY_DENIED',
+            message: 'Policy denied: ask_agent can only use readonly tools.',
+            category: 'policy',
+          },
+          duration_ms: 1,
+          trace_id: toolCallId,
+        },
+      }, options);
+      stub = 'I cannot write files in Ask mode. Ask can inspect and search, but mutation requires the appropriate execution flow.';
+    }
 
     const finalStub = `${stub}\n<control>{"intent":"${wantsExecution ? 'execute' : 'talk'}","safe_to_start":${wantsExecution ? 'true' : 'false'}}</control>`;
-    if (onChunk) {
+    if (options?.onChunk) {
       const midpoint = Math.max(1, Math.ceil(finalStub.length / 2));
-      onChunk(finalStub.slice(0, midpoint));
+      options.onChunk(finalStub.slice(0, midpoint));
       await Promise.resolve();
-      onChunk(finalStub.slice(midpoint));
+      options.onChunk(finalStub.slice(midpoint));
     }
     return finalStub;
+  }
+
+  private emitCoworkTestEvent(
+    type: LegacyAgentEvent['type'],
+    payload: LegacyAgentEvent['payload'],
+    options?: AgentCoworkOptions,
+  ): void {
+    options?.onEvent?.({
+      id: generateEventId('agent-event'),
+      type,
+      timestamp: nowMs(),
+      turnId: options.turnId,
+      sessionId: options.sessionId ?? null,
+      stage: options.stage,
+      payload,
+    });
   }
 }
 

@@ -14,7 +14,12 @@
  *    即可路由到具体 provider；上层使用 `encodeAgentModel` 帮助构造。
  */
 
-import type { LLMMessage, LLMRequest, LLMStreamEvent } from '@shared/types/llm';
+import type {
+  LLMMessage,
+  LLMRequest,
+  LLMStreamEvent,
+  ToolDefinition as LegacyToolDefinition,
+} from '@shared/types/llm';
 import { llmAdapter } from '../settings/LLMAdapter';
 import { EventStream } from './core/EventStream';
 import type { ProviderStrategy } from './core/ProviderRegistry';
@@ -22,6 +27,7 @@ import type {
   AssistantMessage,
   AssistantMessageEvent,
   Context,
+  JsonSchema,
   Message,
   Model,
   ProviderCapabilities,
@@ -30,7 +36,9 @@ import type {
   TextContent,
   ThinkingContent,
   ToolCall,
+  ToolDefinition,
 } from './core/types';
+import { AssistantStreamBuilder } from './providers/internal/AssistantStreamBuilder';
 
 /** 把 (providerId, modelId) 编码成新 Agent Runtime 的 `Model` 描述。 */
 export function encodeAgentModel(providerId: string, modelId: string): Model {
@@ -76,6 +84,31 @@ function messagesToLlm(systemPrompt: string | undefined, messages: Message[]): L
   return result;
 }
 
+function toolsToLlm(tools: ToolDefinition[] | undefined): LegacyToolDefinition[] | undefined {
+  if (!tools?.length) return undefined;
+  return tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    input_schema: normalizeLegacyJsonSchema(tool.parameters),
+  }));
+}
+
+function normalizeLegacyJsonSchema(schema: JsonSchema): LegacyToolDefinition['input_schema'] {
+  const properties: LegacyToolDefinition['input_schema']['properties'] = {};
+  for (const [key, value] of Object.entries(schema.properties ?? {})) {
+    properties[key] = {
+      type: typeof value.type === 'string' ? value.type : 'string',
+      description: typeof value.description === 'string' ? value.description : '',
+      enum: Array.isArray(value.enum) ? value.enum.map(String) : undefined,
+    };
+  }
+  return {
+    type: 'object',
+    properties,
+    required: schema.required,
+  };
+}
+
 function userContentToText(content: Array<{ type: string; text?: string }>): string {
   return content.map((block) => (block.type === 'text' && typeof block.text === 'string' ? block.text : '')).join('');
 }
@@ -96,43 +129,6 @@ function assistantContentToText(content: Array<TextContent | ThinkingContent | T
 }
 
 /** 旧 `LLMStreamEvent` 映射为新 `AssistantMessageEvent`，构造 partial 助手消息。 */
-class AssistantMessageBuilder {
-  private textBuffer = '';
-  private text: TextContent | null = null;
-  private contentIndex = 0;
-
-  constructor(
-    private readonly model: Model,
-    private readonly providerId: string,
-  ) {}
-
-  buildPartial(stopReason: StopReason = 'stop'): AssistantMessage {
-    const content: AssistantMessage['content'] = [];
-    if (this.text) {
-      content.push({ ...this.text });
-    }
-    return {
-      role: 'assistant',
-      content,
-      model: this.model.id,
-      provider: this.providerId,
-      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
-      stopReason,
-      timestamp: Date.now(),
-    };
-  }
-
-  appendText(delta: string): { contentIndex: number } {
-    if (!this.text) {
-      this.text = { type: 'text', text: '' };
-      this.contentIndex = 0;
-    }
-    this.textBuffer += delta;
-    this.text.text = this.textBuffer;
-    return { contentIndex: this.contentIndex };
-  }
-}
-
 /** 真正的 ProviderStrategy 实现：流式调用 llmAdapter 并翻译事件。 */
 export class LLMAdapterProvider implements ProviderStrategy {
   readonly api = 'rdc-agent-llm-adapter';
@@ -159,45 +155,49 @@ export class LLMAdapterProvider implements ProviderStrategy {
       (event) => (event as { message: AssistantMessage }).message,
     );
 
-    const builder = new AssistantMessageBuilder(model, providerId);
+    const builder = new AssistantStreamBuilder(stream, model.id, providerId);
+    const toolIndexes = new Map<string, { index: number; argumentsText: string }>();
+    let sawTextDelta = false;
 
     // start 事件
-    const startMessage = builder.buildPartial();
-    stream.push({ type: 'start', partial: startMessage });
+    builder.start();
 
     const llmRequest: LLMRequest = {
       messages: messagesToLlm(context.systemPrompt, context.messages as Message[]),
       model: modelId,
       maxTokens: options?.maxTokens,
       temperature: options?.temperature,
+      tools: toolsToLlm(context.tools),
+      reasoningBudget: options?.reasoningBudget,
       signal: options?.signal,
     };
 
     const onChunk = (chunk: LLMStreamEvent): void => {
       if (stream.isDone) return;
       if (chunk.type === 'text-delta') {
-        const before = builder.buildPartial();
-        const beforeContent = before.content.find((b) => b.type === 'text') as TextContent | undefined;
-        if (!beforeContent) {
-          builder.appendText('');
-          stream.push({
-            type: 'text_start',
-            contentIndex: 0,
-            partial: builder.buildPartial(),
-          });
+        sawTextDelta = true;
+        builder.appendText(0, chunk.text);
+      } else if (chunk.type === 'tool-call-delta') {
+        const toolCall = chunk.toolCall;
+        const id = toolCall.id || `tool-call-${toolIndexes.size}`;
+        let entry = toolIndexes.get(id);
+        if (!entry) {
+          entry = { index: toolIndexes.size + 1, argumentsText: '' };
+          toolIndexes.set(id, entry);
         }
-        const { contentIndex } = builder.appendText(chunk.text);
-        stream.push({
-          type: 'text_delta',
-          contentIndex,
-          delta: chunk.text,
-          partial: builder.buildPartial(),
-        });
+        builder.ensureToolCall(entry.index, id, toolCall.name ?? '');
+        if (typeof toolCall.argumentsText === 'string') {
+          const delta = toolCall.argumentsText.startsWith(entry.argumentsText)
+            ? toolCall.argumentsText.slice(entry.argumentsText.length)
+            : toolCall.argumentsText;
+          entry.argumentsText = toolCall.argumentsText;
+          builder.appendToolCallArgs(entry.index, delta);
+        }
       }
       // tool-call-delta / done / error 不在此映射；done/error 由 await 后逻辑处理。
     };
 
-    void this.runStream(llmRequest, providerId, builder, stream, onChunk);
+    void this.runStream(llmRequest, providerId, builder, stream, onChunk, () => sawTextDelta, toolIndexes);
 
     return stream;
   }
@@ -205,41 +205,51 @@ export class LLMAdapterProvider implements ProviderStrategy {
   private async runStream(
     request: LLMRequest,
     providerId: string,
-    builder: AssistantMessageBuilder,
+    builder: AssistantStreamBuilder,
     stream: EventStream<AssistantMessageEvent, AssistantMessage>,
     onChunk: (event: LLMStreamEvent) => void,
+    hasStreamedText: () => boolean,
+    streamedToolIndexes: Map<string, { index: number; argumentsText: string }>,
   ): Promise<void> {
     try {
       const response = await llmAdapter.streamChat(request, onChunk, providerId);
       if (stream.isDone) return;
 
-      const partial = builder.buildPartial();
-      const textBlock = partial.content.find((b) => b.type === 'text') as TextContent | undefined;
-      if (textBlock) {
-        stream.push({
-          type: 'text_end',
-          contentIndex: 0,
-          content: textBlock.text,
-          partial,
-        });
-      } else if (typeof response.content === 'string' && response.content) {
-        builder.appendText(response.content);
+      if (!hasStreamedText() && typeof response.content === 'string' && response.content) {
+        builder.appendText(0, response.content);
       }
-
-      const finalMessage = builder.buildPartial(mapStopReason(response.stopReason));
-      finalMessage.usage = {
+      appendFinalToolCalls(builder, response.toolCalls, streamedToolIndexes);
+      builder.setUsage({
         inputTokens: response.usage.inputTokens,
         outputTokens: response.usage.outputTokens,
         totalTokens: response.usage.inputTokens + response.usage.outputTokens,
-      };
-      stream.push({ type: 'done', reason: finalMessage.stopReason, message: finalMessage });
+      });
+      builder.done(mapStopReason(response.stopReason));
     } catch (error) {
       if (stream.isDone) return;
       const err = error instanceof Error ? error : new Error(String(error));
-      const partial = builder.buildPartial('error');
-      stream.push({ type: 'error', error: err, message: partial });
+      builder.fail(err);
     }
   }
+}
+
+function appendFinalToolCalls(
+  builder: AssistantStreamBuilder,
+  toolCalls: Array<{ id: string; name: string; arguments: Record<string, unknown> }> | undefined,
+  streamedToolIndexes: Map<string, { index: number; argumentsText: string }>,
+): void {
+  if (!toolCalls?.length) return;
+  toolCalls.forEach((toolCall, index) => {
+    const existing = streamedToolIndexes.get(toolCall.id);
+    const contentIndex = existing?.index ?? index + 1;
+    if (existing) {
+      builder.endToolCall(contentIndex);
+      return;
+    }
+    builder.ensureToolCall(contentIndex, toolCall.id, toolCall.name);
+    builder.appendToolCallArgs(contentIndex, JSON.stringify(toolCall.arguments ?? {}));
+    builder.endToolCall(contentIndex);
+  });
 }
 
 function mapStopReason(reason: 'end_turn' | 'tool_use' | 'max_tokens' | undefined): StopReason {

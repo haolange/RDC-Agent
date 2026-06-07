@@ -1,12 +1,3 @@
-/**
- * AgentTool — 工具的统一抽象基类。
- *
- * 该类把「工具定义 + 执行入口」聚合为一个对象，
- * 供 SkillLoader / MCPManager / 内置工具子系统统一注册。
- *
- * 注意：本类只描述工具自身，调度由上层 ToolExecutor / Agent 完成。
- */
-
 import type {
   ImageContent,
   JsonSchema,
@@ -14,35 +5,36 @@ import type {
   ToolDefinition,
 } from '../core/types';
 
-/** AgentTool 执行结果（Provider/Runtime 中性表示）。 */
-export interface AgentToolResult {
-  /** 结果内容块（文本或图像）。 */
+export type AgentToolPermissionHint = 'readonly' | 'mutation' | 'destructive';
+
+export interface AgentToolResult<TDetails = unknown> {
   content: (TextContent | ImageContent)[];
-  /** 是否为错误结果。 */
-  isError: boolean;
+  isError?: boolean;
+  details?: TDetails;
 }
 
-/** AgentTool 抽象基类。 */
-export abstract class AgentTool {
-  /** 工具名（在一组 tools 内唯一）。 */
-  abstract readonly name: string;
-  /** 工具描述（提供给模型阅读）。 */
-  abstract readonly description: string;
-  /** 入参 JSON Schema。 */
-  abstract readonly parameters: JsonSchema;
+export interface AgentTool<
+  TParams extends object = Record<string, unknown>,
+  TDetails = unknown,
+> {
+  readonly name: string;
+  readonly label?: string;
+  readonly description: string;
+  readonly parameters: JsonSchema;
+  readonly permissionHint?: AgentToolPermissionHint;
 
-  /** 执行工具调用。 */
-  abstract execute(
-    args: Record<string, unknown>,
+  execute(
+    toolCallId: string,
+    args: TParams,
     signal?: AbortSignal,
-  ): Promise<AgentToolResult>;
+    onUpdate?: (partialResult: unknown) => void,
+  ): Promise<AgentToolResult<TDetails>>;
+}
 
-  /** 转换为 ToolDefinition（用于发给 LLM）。 */
-  toDefinition(): ToolDefinition {
-    return {
-      name: this.name,
-      description: this.description,
-      parameters: this.parameters,
-    };
-  }
+export function toolToDefinition(tool: Pick<AgentTool, 'name' | 'description' | 'parameters'>): ToolDefinition {
+  return {
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters,
+  };
 }
