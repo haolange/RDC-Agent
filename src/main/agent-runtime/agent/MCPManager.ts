@@ -194,7 +194,7 @@ class StdioRpcClient {
 // AgentTool 适配
 // =====================================================================
 
-class MCPAgentTool extends AgentTool {
+class MCPAgentTool implements AgentTool {
   readonly name: string;
   readonly description: string;
   readonly parameters: JsonSchema;
@@ -203,13 +203,12 @@ class MCPAgentTool extends AgentTool {
     private readonly manager: MCPManager,
     tool: MCPDiscoveredTool,
   ) {
-    super();
     this.name = tool.prefixedName;
     this.description = tool.description;
     this.parameters = tool.inputSchema;
   }
 
-  async execute(args: Record<string, unknown>): Promise<AgentToolResult> {
+  async execute(_toolCallId: string, args: Record<string, unknown>): Promise<AgentToolResult> {
     return this.manager.executeTool(this.name, args);
   }
 }

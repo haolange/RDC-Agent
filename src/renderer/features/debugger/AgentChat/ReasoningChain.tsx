@@ -10,32 +10,33 @@ interface ReasoningChainProps {
 }
 
 const STEP_STATUS_GLYPH: Record<ConversationReasoningStep['status'], string> = {
-  pending: '○',
-  running: '●',
-  complete: '✓',
-  error: '✕',
+  pending: 'o',
+  running: '*',
+  complete: 'ok',
+  error: '!',
 };
 
 const TOOL_STATUS_GLYPH: Record<ConversationToolCall['status'], string> = {
-  pending: '·',
-  running: '⟳',
-  complete: '✓',
-  error: '✕',
+  pending: 'o',
+  running: '*',
+  complete: 'ok',
+  error: '!',
 };
 
 const TOOL_ICONS: Record<string, string> = {
-  bash: '$_',
-  shell: '$_',
-  exec: '$_',
-  read: '⎘',
-  readfile: '⎘',
-  write: '✎',
-  writefile: '✎',
-  edit: '✎',
-  search: '⌕',
-  grep: '⌕',
-  glob: '⌕',
-  list: '☰',
+  bash: '$',
+  shell: '$',
+  exec: '$',
+  read: 'R',
+  readfile: 'R',
+  write: 'W',
+  writefile: 'W',
+  edit: 'E',
+  web: 'W',
+  search: 'S',
+  grep: 'S',
+  glob: 'S',
+  list: 'L',
 };
 
 const inferToolIcon = (toolName: string): string => {
@@ -45,7 +46,7 @@ const inferToolIcon = (toolName: string): string => {
       return glyph;
     }
   }
-  return '◇';
+  return 'T';
 };
 
 const formatDurationMs = (start?: number, end?: number): string => {
@@ -129,7 +130,7 @@ const StepRow: React.FC<{ step: ConversationReasoningStep }> = ({ step }) => {
           <p className="reasoning-step-summary">{step.summary}</p>
         ) : null}
         {step.toolCalls.length > 0 ? (
-          <div className="reasoning-step-tools">
+          <div className="reasoning-step-tools" aria-label="工具轨迹">
             {step.toolCalls.map((call) => (
               <ToolCallRow key={call.id} call={call} />
             ))}
@@ -147,8 +148,6 @@ export const ReasoningChain: React.FC<ReasoningChainProps> = ({ trace }) => {
   const isRunning = trace.status === 'running';
   const [expanded, setExpanded] = useState<boolean>(isRunning);
 
-  // Auto-expand whenever it transitions back to running; auto-collapse only
-  // on the first transition to complete (let user override afterwards).
   const [autoCollapsedOnce, setAutoCollapsedOnce] = useState(false);
   useEffect(() => {
     if (isRunning) {
@@ -163,11 +162,11 @@ export const ReasoningChain: React.FC<ReasoningChainProps> = ({ trace }) => {
   const counts = useMemo(() => aggregateStepCounts(trace), [trace]);
 
   const headerLabel = useMemo(() => {
-    if (isRunning) return '思考中';
-    if (trace.status === 'error') return '思考失败';
-    if (trace.status === 'stopped') return '思考已停止';
-    if (trace.status === 'complete') return '思考过程';
-    return '思考过程';
+    if (isRunning) return '推理中';
+    if (trace.status === 'error') return '推理失败';
+    if (trace.status === 'stopped') return '推理已停止';
+    if (trace.status === 'complete') return '推理轨迹';
+    return '推理轨迹';
   }, [trace.status, isRunning]);
 
   return (
@@ -185,7 +184,7 @@ export const ReasoningChain: React.FC<ReasoningChainProps> = ({ trace }) => {
           className={`reasoning-chain-caret ${expanded ? 'is-open' : ''}`}
           aria-hidden="true"
         >
-          ▸
+          &gt;
         </span>
         <span className={`reasoning-chain-pulse status-${trace.status}`} aria-hidden="true" />
         <span className="reasoning-chain-label">{headerLabel}</span>
@@ -209,7 +208,7 @@ export const ReasoningChain: React.FC<ReasoningChainProps> = ({ trace }) => {
             <p className="reasoning-chain-summary">{trace.summary}</p>
           ) : null}
           {trace.steps.length === 0 ? (
-            <p className="reasoning-chain-empty">尚未生成思考步骤。</p>
+            <p className="reasoning-chain-empty">暂无推理轨迹或工具轨迹。</p>
           ) : (
             <ol className="reasoning-chain-steps">
               {trace.steps.map((step) => (

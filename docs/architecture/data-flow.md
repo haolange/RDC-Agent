@@ -156,8 +156,8 @@ sequenceDiagram
 - 流事件：`conversation:event`。
 - 类型：`ConversationMessage`、`ConversationTurnResult`、`ConversationStreamEvent`。
 - `ConversationMessage.diagnostic` 是跨层模型链路诊断：Cowork / Debugger 回复可以用它传递 route 缺失、provider 不可用或请求失败，renderer 只做轻量提示，Activity 通过 `RuntimeLogService` 保留同一条脱敏诊断。
-- 默认 UI mode 是 `Ask`，它只产生对话消息，不创建 `RunRecord`。`DebugSessionStartRequest.mode` 和 `RunRecord.mode` 只接受执行类 mode。
-- `Ask` 消息走非执行 `ask_agent` profile；该 profile 不暴露 RenderDoc 工具、shell 或 ToolBridge 执行能力。`Debugger` Cowork 与正式 workflow planner 使用独立 prompt，不复用 Ask 身份。
+- 默认 UI mode 是 `Ask`，它产生对话消息和只读 agentic 工具轨迹，不创建 `RunRecord`。`DebugSessionStartRequest.mode` 和 `RunRecord.mode` 只接受执行类 mode。
+- `Ask` 消息走只读 `ask_agent` profile；该 profile 可暴露 read/glob/grep/task_list/web_fetch/web_search 等只读工具，但不暴露 RenderDoc mutation、shell、write/edit/remove 或 ToolBridge 执行能力。`Debugger` Cowork 与正式 workflow planner 使用独立 prompt，不复用 Ask 身份。
 - 含明确执行意图的 Debugger 输入只有在应用内 `openedCapture` 属于当前 project 且状态为 `open` 时，才会由 `ConversationService` 投影为本次 `DebugSessionStartRequest.captures`。prompt 或任务文件里的 `.rdc` 路径只能触发 Open capture 提示，不能绕过 UI 状态。
 - UI 入口：`AgentChat`、composer glue、`App.tsx`、`PlanIntakePanel`。
 

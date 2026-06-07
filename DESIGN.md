@@ -23,7 +23,7 @@ Agentic Trace 是 RDC-Agent 的**当前消息流协议**，用 `Event Log → Tr
 ## 产品边界
 
 - `RDC-Agent` 是面向 `RenderDoc` `.rdc` capture 的 Electron 桌面工作台，不是通用 coding-agent shell。
-- 默认用户入口是 `Ask`：它只负责对话、澄清、解释能力和引导用户通过应用内 `Open` 打开 `.rdc`，不创建正式 run，不暴露 RenderDoc 执行工具。
+- 默认用户入口是 `Ask`：它负责只读 agentic 协作、澄清、解释能力、读取/搜索当前 workspace 与公开网页，并引导用户通过应用内 `Open` 打开 `.rdc`；它不创建正式 run，不暴露 RenderDoc mutation 或 shell/write/edit/remove 工具。
 - 当前现役主链是 `Debugger`：用户输入目标、进入 plan/intake、回答必要问题、批准计划、执行 RenderDoc 工具链、沉淀 evidence/report。
 - `Analyzer` 和 `Optimizer` 是一等产品模式占位，但本仓库默认不把 Debugger harness 自动泛化到这两个模式。
 - `Debugger` / `Analyzer` / `Optimizer` 是执行类 UI 模式；只有应用内已有 `OpenedCaptureState(status=open)` 且属于当前 project 时，renderer 才允许选择执行类模式。用户在 prompt 里写 `.rdc` 路径不等同于 Open capture，也不能被自动升级成正式 run。
@@ -127,7 +127,6 @@ Agentic Trace 是 RDC-Agent 的**当前消息流协议**，用 `Event Log → Tr
 - Electron 壳边界 smoke：`npm run test:shell-smoke`，只验证窗口启动、preload 注入、IPC 连通、workspace 权限和 ToolBridge/RenderDoc 本地链路诊断。
 - 模式门禁改动必须补 `mode-switch.spec.ts`，确认默认 `Ask`、未 Open capture 时执行类模式 disabled、Open 后可切换。
 - Provider/OAuth UI 改动：先用 mock E2E 验证分组、Connect/Test、token 状态和模型发现，再用内置浏览器检查 Settings > Provider 的视觉层级、弹层可读性、长文本和窄宽度布局；真实 OAuth 登录验证需要明确区分账号/组织策略失败与本地 UI/IPC 失败。
-
 
 
 

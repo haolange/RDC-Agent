@@ -299,6 +299,7 @@ export interface StreamOptions {
   temperature?: number;
   maxTokens?: number;
   topP?: number;
+  reasoningBudget?: 'auto' | 'low' | 'medium' | 'high';
   /** 用于中止本次生成的信号。 */
   signal?: AbortSignal;
   /** 覆盖 Provider 默认 API key。 */

@@ -4,10 +4,14 @@
  * 仅在 `src/main/agent-runtime/**` 内部消费，不要在 renderer 直接 import。
  */
 
-export * from './OpenAICompatibleProvider';
-export * from './AnthropicProvider';
-export * from './GeminiProvider';
-export * from './OllamaProvider';
+export { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
+export type { OpenAICompatibleProviderOptions } from './OpenAICompatibleProvider';
+export { AnthropicProvider } from './AnthropicProvider';
+export type { AnthropicProviderOptions } from './AnthropicProvider';
+export { GeminiProvider } from './GeminiProvider';
+export type { GeminiProviderOptions } from './GeminiProvider';
+export { OllamaProvider } from './OllamaProvider';
+export type { OllamaProviderOptions } from './OllamaProvider';
 export * from './ProviderAuth';
 
 import { ProviderRegistry } from '../core/ProviderRegistry';

@@ -64,6 +64,7 @@ export interface LLMRequest {
   model?: string;
   maxTokens?: number;
   temperature?: number;
+  reasoningBudget?: 'auto' | 'low' | 'medium' | 'high';
   tools?: ToolDefinition[];
   responseFormat?: 'json_object';
   stream?: boolean;

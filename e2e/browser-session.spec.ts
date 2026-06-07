@@ -177,3 +177,106 @@ test('default provider seeds repair existing unconfigured catalog settings', asy
     await closeSmokeApp(context);
   }
 });
+
+test('Ask mode shows readonly tool trace and denies mutation tools', async ({ page }) => {
+  const context = await launchHeadlessSmokeApp();
+  const deniedPath = path.join(context.workspaceDir, 'should-not-exist.txt');
+
+  try {
+    await page.goto(`${context.bridgeUrl}/app`);
+    await page.locator('.app-titlebar').waitFor({ state: 'visible', timeout: 15000 });
+
+    const setup = await page.evaluate(async (projectRoot) => {
+      const addedProject = await window.electronAPI.project.add(projectRoot);
+      if (!addedProject.success || !addedProject.project) {
+        throw new Error(addedProject.error || 'project.add failed');
+      }
+      const createdSession = await window.electronAPI.session.create(
+        addedProject.project.projectId,
+        'Ask Readonly Tool Trace Smoke',
+      );
+      if (!createdSession.success || !createdSession.session) {
+        throw new Error(createdSession.error || 'session.create failed');
+      }
+      await window.electronAPI.project.select(addedProject.project.projectId);
+      await window.electronAPI.session.select(createdSession.session.sessionId);
+      return {
+        projectId: addedProject.project.projectId,
+        sessionId: createdSession.session.sessionId,
+      };
+    }, context.workspaceDir);
+
+    await page.evaluate(() => {
+      const target = window as Window & {
+        __askReadonlyEvents?: Array<import('../src/shared/types/conversation').ConversationStreamEvent>;
+      };
+      target.__askReadonlyEvents = [];
+      window.electronAPI.conversation.onEvent((event) => {
+        target.__askReadonlyEvents?.push(event);
+      });
+    });
+
+    const readonlyTurn = await page.evaluate(async ({ projectId, sessionId }) => (
+      window.electronAPI.conversation.sendMessage({
+        projectId,
+        sessionId,
+        currentRunId: null,
+        replayDeviceId: null,
+        mode: 'ask',
+        message: '__RDC_AGENT_E2E_ASK_READONLY_TOOL__ search ConversationService',
+        attachments: [],
+      })
+    ), setup);
+
+    await expect.poll(async () => page.evaluate((turnId) => {
+      const events = ((window as Window & {
+        __askReadonlyEvents?: Array<import('../src/shared/types/conversation').ConversationStreamEvent>;
+      }).__askReadonlyEvents ?? []);
+      return events.some((event) => (
+        event.type === 'agent_event'
+        && event.turnId === turnId
+        && event.event.type === 'tool.completed'
+        && event.event.payload.toolName === 'grep'
+      ));
+    }, readonlyTurn.userMessage.turnId), { timeout: 10000 }).toBe(true);
+
+    const deniedTurn = await page.evaluate(async ({ projectId, sessionId }) => (
+      window.electronAPI.conversation.sendMessage({
+        projectId,
+        sessionId,
+        currentRunId: null,
+        replayDeviceId: null,
+        mode: 'ask',
+        message: '__RDC_AGENT_E2E_ASK_DENY_WRITE__ create a file',
+        attachments: [],
+      })
+    ), setup);
+
+    await expect.poll(async () => page.evaluate((turnId) => {
+      const events = ((window as Window & {
+        __askReadonlyEvents?: Array<import('../src/shared/types/conversation').ConversationStreamEvent>;
+      }).__askReadonlyEvents ?? []);
+      const event = events.find((entry) => (
+        entry.type === 'agent_event'
+        && entry.turnId === turnId
+        && entry.event.type === 'tool.denied'
+        && entry.event.payload.toolName === 'write_file'
+      ));
+      return event?.type === 'agent_event'
+        ? {
+          toolName: event.event.payload.toolName,
+          reason: event.event.payload.reason,
+        }
+        : {
+          toolName: '',
+          reason: '',
+        };
+    }, deniedTurn.userMessage.turnId), { timeout: 10000 }).toMatchObject({
+      toolName: 'write_file',
+      reason: expect.stringContaining('Policy denied'),
+    });
+    expect(fs.existsSync(deniedPath)).toBe(false);
+  } finally {
+    await closeSmokeApp(context);
+  }
+});

@@ -38,10 +38,10 @@ const ALLOWED_STATUS: TaskStatus[] = [
  */
 export function createTaskTools(registry: TaskRegistry): AgentTool[] {
   return [
-    createTaskCreateTool(registry) as AgentTool,
-    createTaskUpdateTool(registry) as AgentTool,
-    createTaskGetTool(registry) as AgentTool,
-    createTaskListTool(registry) as AgentTool,
+    createTaskCreateTool(registry) as unknown as AgentTool,
+    createTaskUpdateTool(registry) as unknown as AgentTool,
+    createTaskGetTool(registry) as unknown as AgentTool,
+    createTaskListTool(registry) as unknown as AgentTool,
   ];
 }
 
@@ -305,12 +305,14 @@ function throwIfAborted(signal?: AbortSignal): void {
 }
 
 /** 从未知入参中读取字符串字段；`required` 时为空会抛错。 */
+function readString(params: object, key: string, required: true): string;
+function readString(params: object, key: string, required: false): string | undefined;
 function readString(
-  params: Record<string, unknown>,
+  params: object,
   key: string,
   required: boolean,
 ): string | undefined {
-  const value = params[key];
+  const value = (params as Record<string, unknown>)[key];
   if (value === undefined || value === null || value === '') {
     if (required) throw new Error(`参数 "${key}" 不能为空`);
     return undefined;
@@ -323,10 +325,10 @@ function readString(
 
 /** 从未知入参中读取字符串数组字段。 */
 function readStringArray(
-  params: Record<string, unknown>,
+  params: object,
   key: string,
 ): string[] | undefined {
-  const value = params[key];
+  const value = (params as Record<string, unknown>)[key];
   if (value === undefined || value === null) return undefined;
   if (!Array.isArray(value)) {
     throw new Error(`参数 "${key}" 必须是字符串数组`);
@@ -343,11 +345,11 @@ function readStringArray(
 
 /** 读取受限的枚举字段；不在白名单内时抛错。 */
 function readEnum<T extends string>(
-  params: Record<string, unknown>,
+  params: object,
   key: string,
   allowed: readonly T[],
 ): T | undefined {
-  const value = params[key];
+  const value = (params as Record<string, unknown>)[key];
   if (value === undefined || value === null || value === '') return undefined;
   if (typeof value !== 'string' || !allowed.includes(value as T)) {
     throw new Error(

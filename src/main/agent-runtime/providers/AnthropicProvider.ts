@@ -275,11 +275,23 @@ export class AnthropicProvider implements ProviderStrategy {
     if (system) body.system = system;
     if (typeof options.temperature === 'number') body.temperature = options.temperature;
     if (typeof options.topP === 'number') body.top_p = options.topP;
+    const thinking = toAnthropicThinking(options.reasoningBudget);
+    if (thinking) body.thinking = thinking;
     if (context.tools && context.tools.length > 0) {
       body.tools = context.tools.map(toAnthropicTool);
     }
     return body;
   }
+}
+
+function toAnthropicThinking(
+  budget?: StreamOptions['reasoningBudget'],
+): { type: 'enabled'; budget_tokens: number } | undefined {
+  if (!budget || budget === 'auto') return undefined;
+  return {
+    type: 'enabled',
+    budget_tokens: budget === 'low' ? 1024 : budget === 'medium' ? 4096 : 8192,
+  };
 }
 
 // =====================================================================

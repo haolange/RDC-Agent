@@ -231,6 +231,9 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
     };
     if (typeof options.temperature === 'number') body.temperature = options.temperature;
     if (typeof options.topP === 'number') body.top_p = options.topP;
+    if (options.reasoningBudget && options.reasoningBudget !== 'auto') {
+      body.reasoning_effort = options.reasoningBudget;
+    }
     const maxTokens = options.maxTokens ?? model.maxTokens;
     if (typeof maxTokens === 'number' && maxTokens > 0) body.max_tokens = maxTokens;
     if (context.tools && context.tools.length > 0) {
