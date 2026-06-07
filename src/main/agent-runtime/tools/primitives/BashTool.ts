@@ -10,11 +10,13 @@
 
 import { spawn } from 'child_process';
 import type { AgentTool, AgentToolResult } from '../../agent/AgentTool';
+import { getBackgroundTaskRunner } from '../../scheduler';
 import { getWorkspaceRoot, truncateOutput } from './_shared';
 
 interface BashParams {
   command: string;
   timeout?: number;
+  run_in_background?: boolean;
 }
 
 interface BashDetails {
@@ -24,6 +26,8 @@ interface BashDetails {
   durationMs: number;
   truncated: boolean;
   cwd: string;
+  /** 当 run_in_background=true 时填充，指向 BackgroundTaskRunner 的任务 ID。 */
+  bgTaskId?: string;
 }
 
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -45,6 +49,11 @@ export const bashTool: AgentTool<BashParams, BashDetails> = {
         type: 'number',
         description: 'Timeout in milliseconds (default: 120000)',
       },
+      run_in_background: {
+        type: 'boolean',
+        description:
+          'Run the command in the background without waiting for completion',
+      },
     },
     required: ['command'],
   },
@@ -55,6 +64,28 @@ export const bashTool: AgentTool<BashParams, BashDetails> = {
     const timeoutMs = params.timeout ?? DEFAULT_TIMEOUT_MS;
     const cwd = getWorkspaceRoot();
     const startedAt = Date.now();
+
+    // 后台模式：交给 BackgroundTaskRunner，立即返回 bgTaskId。
+    if (params.run_in_background === true) {
+      const runner = getBackgroundTaskRunner();
+      const bgTaskId = runner.startBackground(command, cwd, signal);
+      const text =
+        `[Background task ${bgTaskId} started]\n` +
+        `Command: ${command}\n` +
+        `Result will be delivered via background task notification when complete.`;
+      return {
+        content: [{ type: 'text', text }],
+        details: {
+          command,
+          exitCode: null,
+          signal: null,
+          durationMs: Date.now() - startedAt,
+          truncated: false,
+          cwd,
+          bgTaskId,
+        },
+      };
+    }
 
     const isWindows = process.platform === 'win32';
     const shell = isWindows ? process.env.ComSpec || 'cmd.exe' : '/bin/sh';

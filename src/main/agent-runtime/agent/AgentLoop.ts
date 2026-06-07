@@ -60,6 +60,20 @@ export interface AgentLoopConfig {
   getFollowUpMessages?: () => UserMessage[];
   /** 外部 abort 信号；触发时会中止 provider 流并以 AbortError 终止。 */
   signal?: AbortSignal;
+  /**
+   * 后台任务运行器（可选）。
+   *
+   * 每轮 LLM 调用前调用 `buildNotificationMessage()`，将已完成但未通知的
+   * 后台任务结果作为系统通知注入到上下文。使用接口而非具体类，避免循环依赖。
+   */
+  backgroundTaskRunner?: { buildNotificationMessage(): string | null };
+  /**
+   * Cron 调度器（可选）。
+   *
+   * 每轮 LLM 调用前调用 `getPendingPrompts()`，将到期的 cron 任务以
+   * `<cron_triggered>...</cron_triggered>` 形式注入为 user 消息。
+   */
+  cronScheduler?: { getPendingPrompts(): string[] };
 }
 
 /** Agent 上下文（可变；agentLoop 会原地修改 messages）。 */
@@ -194,6 +208,42 @@ async function runAgentLoop(
           break outer;
         }
         stream.push({ type: 'turn_start', turn });
+
+        // --- Background Task & Cron 注入点 ---
+        // 在调用 provider.stream() 之前，将已完成的后台任务通知与到期的
+        // cron 任务提示作为 user 消息注入上下文，从而让 LLM 在本轮可见。
+        const injected: UserMessage[] = [];
+        if (config.backgroundTaskRunner) {
+          const notification =
+            config.backgroundTaskRunner.buildNotificationMessage();
+          if (notification) {
+            injected.push({
+              role: 'user',
+              content: [{ type: 'text', text: notification }],
+              timestamp: Date.now(),
+            });
+          }
+        }
+        if (config.cronScheduler) {
+          for (const prompt of config.cronScheduler.getPendingPrompts()) {
+            injected.push({
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: `<cron_triggered>${prompt}</cron_triggered>`,
+                },
+              ],
+              timestamp: Date.now(),
+            });
+          }
+        }
+        for (const msg of injected) {
+          context.messages.push(msg);
+          newMessages.push(msg);
+          stream.push({ type: 'message_start', message: msg });
+          stream.push({ type: 'message_end', message: msg });
+        }
 
         // 1. 调用 LLM 生成助手消息
         const assistantMessage = await streamAssistantResponse(
