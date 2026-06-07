@@ -58,7 +58,7 @@ npm install
 npm run dev
 ```
 
-人类日常打开软件也可以运行 `scripts/start-rdc-agent.cmd`，该脚本会同步依赖后启动应用。主进程启动后会输出 `http://127.0.0.1:<port>/app`，供浏览器真实会话连接同一套 main/runtime。
+人类日常打开软件也可以运行 `scripts/start-rdc-agent.cmd`，该脚本会使用构建产物启动同一套 Electron 主进程和 renderer；缺少构建产物时会先构建一次。主进程启动后会输出 `http://127.0.0.1:<port>/app`，供浏览器真实会话连接同一套 main/runtime。
 
 agent 日常交互式迭代使用 headless 浏览器真实会话：设置 `RDC_AGENT_HEADLESS=1` 启动主进程后，打开主进程输出的 `/app` 地址。该模式只跳过 Electron 桌面窗口，renderer、样式、workspace、settings、ToolBridge 和 `window.electronAPI` 能力面与人类桌面软件保持同源。
 

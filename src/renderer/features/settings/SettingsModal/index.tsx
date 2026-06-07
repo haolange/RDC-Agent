@@ -4,6 +4,7 @@ import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useI18n } from '../../../i18n';
 import type { TranslationKey } from '../../../i18n';
 import DropdownSelect, { type DropdownOption } from '../../../ui/DropdownSelect';
+import { resolveAgentRouteStatus } from './agentRouteStatus';
 import type {
   AppSettings,
   AppTheme,
@@ -110,7 +111,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   const resetWorkspaceRoot = useAppSettingsStore((state) => state.resetWorkspaceRoot);
   const patchSettings = useAppSettingsStore((state) => state.patchSettings);
   const reloadSettings = useAppSettingsStore((state) => state.reloadSettings);
-  const saveAgentRoute = useAppSettingsStore((state) => state.saveAgentRoute);
 
   const [activeSection, setActiveSection] = useState<SettingsSection>('general');
   const [accountDraft, setAccountDraft] = useState(settings.profile);
@@ -123,6 +123,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   const [patternBindingDrafts, setPatternBindingDrafts] = useState<Record<string, string>>(settings.configuration.modePatternBindings);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(settings.llm.providers[0]?.id ?? null);
   const [connectionDraft, setConnectionDraft] = useState<ProviderConnectionDraft | null>(null);
+  const [agentRouteSaveState, setAgentRouteSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [agentRouteSaveMessage, setAgentRouteSaveMessage] = useState('');
   const wasOpenRef = useRef(false);
 
   useEffect(() => {
@@ -145,6 +147,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     setPatternBindingDrafts(settings.configuration.modePatternBindings);
     setSelectedProviderId(providers[0]?.id ?? null);
     setConnectionDraft(null);
+    setAgentRouteSaveState('idle');
+    setAgentRouteSaveMessage('');
   }, [open, settings]);
 
   useEffect(() => {
@@ -180,32 +184,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   const getResolvedProviderLabel = (provider: Pick<LlmProviderEntry, 'label'>) =>
     getProviderDisplayLabel(provider, t('settings.unnamedProvider'));
 
-  const resolveAgentRouteStatus = (route?: LlmAgentRoute): {
-    issue: TranslationKey | null;
-    provider: LlmProviderEntry | null;
-    availableModels: LlmProviderEntry['models'];
-  } => {
-    if (!route?.providerId) {
-      return { issue: 'settings.routeReasonNoProvider', provider: null, availableModels: [] };
-    }
-
-    const provider = providerDrafts.find((entry) => entry.id === route.providerId) ?? null;
-    if (!provider || !provider.enabled || !provider.isConfigured) {
-      return { issue: 'settings.routeReasonProviderUnavailable', provider, availableModels: [] };
-    }
-
-    const availableModels = getEnabledModels(provider);
-    if (availableModels.length === 0) {
-      return { issue: 'settings.routeReasonNoModels', provider, availableModels };
-    }
-
-    if (!route.modelId || !availableModels.some((model) => model.id === route.modelId)) {
-      return { issue: 'settings.routeReasonModelInvalid', provider, availableModels };
-    }
-
-    return { issue: null, provider, availableModels };
-  };
-
   const derivedRoot = workspaceDraft.trim() || settings.paths.defaultWorkspaceRoot || settings.workspace.rootPath;
   const derivedPaths = {
     settingsPath: joinPath(derivedRoot, 'settings.json'),
@@ -231,9 +209,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   ];
 
   const invalidAgentRoutes = useMemo(
-    () => agentRouteDrafts.filter((route) => resolveAgentRouteStatus(route).issue !== null),
+    () => AGENT_ROLES.map((agentId) => {
+      const route = agentRouteDrafts.find((entry) => entry.agentId === agentId);
+      const routeStatus = resolveAgentRouteStatus(route, providerDrafts);
+      return routeStatus.issue ? { agentId, issue: routeStatus.issue } : null;
+    }).filter((entry): entry is { agentId: LlmAgentRoute['agentId']; issue: TranslationKey } => entry !== null),
     [agentRouteDrafts, providerDrafts],
   );
+
+  const invalidAgentRouteMessage = useMemo(() => {
+    if (invalidAgentRoutes.length === 0) return '';
+    return t('settings.agentRouteInvalidSummary', {
+      count: invalidAgentRoutes.length,
+      routes: invalidAgentRoutes
+        .map((entry) => `${AGENT_DISPLAY_NAMES[entry.agentId]}: ${t(entry.issue)}`)
+        .join('; '),
+    });
+  }, [invalidAgentRoutes, t]);
 
   useEffect(() => {
     if (
@@ -532,19 +524,47 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   };
 
   const handleRouteChange = (agentId: LlmAgentRoute['agentId'], patch: Partial<LlmAgentRoute>) => {
-    setAgentRouteDrafts((current) => current.map((route) => {
-      if (route.agentId !== agentId) return route;
-      return {
-        ...route,
-        ...patch,
-      };
-    }));
+    setAgentRouteSaveState('idle');
+    setAgentRouteSaveMessage('');
+    setAgentRouteDrafts((current) => {
+      if (!current.some((route) => route.agentId === agentId)) {
+        return [...current, { agentId, providerId: '', modelId: '', ...patch }];
+      }
+      return current.map((route) => {
+        if (route.agentId !== agentId) return route;
+        return {
+          ...route,
+          ...patch,
+        };
+      });
+    });
   };
 
   const handleSaveAgentRoutes = async () => {
-    if (invalidAgentRoutes.length > 0) return;
-    for (const route of agentRouteDrafts) {
-      await saveAgentRoute(route);
+    if (invalidAgentRoutes.length > 0) {
+      setAgentRouteSaveState('error');
+      setAgentRouteSaveMessage(invalidAgentRouteMessage);
+      return;
+    }
+
+    setAgentRouteSaveState('saving');
+    setAgentRouteSaveMessage('');
+    try {
+      await patchSettings({
+        llm: {
+          agentRoutes: AGENT_ROLES.map((agentId) => {
+            const route = agentRouteDrafts.find((entry) => entry.agentId === agentId);
+            return route ?? { agentId, providerId: '', modelId: '' };
+          }),
+        },
+      });
+      const nextSettings = await reloadSettings();
+      setAgentRouteDrafts(nextSettings.llm.agentRoutes.map(cloneRoute));
+      setAgentRouteSaveState('saved');
+      setAgentRouteSaveMessage(t('settings.agentRouteSaved'));
+    } catch (error) {
+      setAgentRouteSaveState('error');
+      setAgentRouteSaveMessage(getErrorMessage(error, t('settings.agentRouteSaveFailed')));
     }
   };
 
@@ -995,7 +1015,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                   <div className="settings-agent-list scrollbar-thin" data-testid="settings-agent-list">
                     {AGENT_ROLES.map((agentId) => {
                       const route = agentRouteDrafts.find((entry) => entry.agentId === agentId);
-                      const routeStatus = resolveAgentRouteStatus(route);
+                      const routeStatus = resolveAgentRouteStatus(route, providerDrafts);
                       const selectedRouteProvider = routableProviders.find((entry) => entry.id === route?.providerId) ?? null;
                       const availableModels = selectedRouteProvider ? getEnabledModels(selectedRouteProvider) : [];
                       const providerValue = selectedRouteProvider?.id ?? '';
@@ -1065,15 +1085,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                     })}
                   </div>
 
+                  {(invalidAgentRouteMessage || agentRouteSaveMessage) && (
+                    <div
+                      className={`settings-provider-notice ${agentRouteSaveState === 'saved' ? 'success' : 'error'}`}
+                      data-testid="settings-agent-route-save-status"
+                    >
+                      {agentRouteSaveMessage || invalidAgentRouteMessage}
+                    </div>
+                  )}
+
                   <div className="settings-actions">
                     <button
                       type="button"
                       className="button button-primary"
                       data-testid="settings-agent-save"
                       onClick={() => void handleSaveAgentRoutes()}
-                      disabled={invalidAgentRoutes.length > 0}
+                      disabled={agentRouteSaveState === 'saving'}
                     >
-                      {t('settings.saveAgentRouting')}
+                      {agentRouteSaveState === 'saving' ? t('settings.saving') : t('settings.saveAgentRouting')}
                     </button>
                   </div>
 
