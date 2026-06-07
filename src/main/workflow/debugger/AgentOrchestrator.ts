@@ -1,3 +1,20 @@
+/**
+ * AgentOrchestrator — 把多个 AgentRole 映射到新 Agent Runtime 的
+ * `Agent` 实例池。每个 AgentRole 持有一个 `Agent`，按需根据
+ * 当前 settings/profile 重置 model 与 systemPrompt。
+ *
+ * 公共契约（不变）：
+ *  - `sendMessage(agentId, content, runContext?, options?) → Promise<string>`
+ *  - `sendCoworkMessage(agentId, content, options?) → Promise<string>`
+ *  - `getAgentState`, `getAllAgentStates`, `configureAgent`, `applyLlmConfig`
+ *  - 状态广播仍走 `WorkflowProjectionPublisher`，事件名不变。
+ *
+ * 内部实现：
+ *  - 调用 `Agent.prompt()` 触发新循环；
+ *  - 订阅核心 `AgentEvent`，通过 `LegacyEventBridge` 翻译为旧 `AgentEvent`，
+ *    供 ConversationService / agent-trace 等老 API 复用。
+ */
+
 import type {
   AgentConfig,
   AgentMessage,
@@ -14,13 +31,27 @@ import {
   REPORTER_AGENTS,
   VERIFIER_AGENTS,
 } from '@shared/constants/agents';
-import type { AgentEvent } from '@shared/types/agentRuntime';
+import type { AgentEvent as LegacyAgentEvent } from '@shared/types/agentRuntime';
 import type { LLMConfig, LLMStreamEvent } from '@shared/types/llm';
 import type { AppMode } from '@shared/types/session';
 import type { LlmProviderId } from '@shared/types/settings';
 import type { WorkflowStage } from '@shared/types/workflow';
 import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
-import { agentRuntime } from '../../agent-runtime/AgentRuntime';
+import { Agent } from '../../agent-runtime/agent/Agent';
+import type {
+  AgentEvent as CoreAgentEvent,
+  ToolCall,
+  ToolResultMessage,
+  UserMessage,
+} from '../../agent-runtime/core/types';
+import {
+  encodeAgentModel,
+  llmAdapterProvider,
+} from '../../agent-runtime/LLMAdapterProvider';
+import {
+  translateCoreToLegacy,
+  type LegacyEventContext,
+} from '../../agent-runtime/LegacyEventBridge';
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import { executionProfileService } from '../../settings/ExecutionProfileService';
@@ -42,20 +73,43 @@ interface AgentTurnOptions {
   signal?: AbortSignal;
   onChunk?: (text: string) => void;
   onStreamEvent?: (event: LLMStreamEvent) => void;
+  onEvent?: (event: LegacyAgentEvent) => void;
+}
+
+interface AgentCoworkOptions extends AgentTurnOptions {
+  sessionId?: string;
+  systemPrompt?: string;
+  maxTokens?: number;
+  temperature?: number;
+  turnId?: string;
+  routeAgentId?: AgentRole;
+  patternId?: string;
+  stage?: WorkflowStage | 'cowork' | 'report';
+  /** 用于 cowork 场景的特殊 prompt（替代 content 中的 user message）。 */
+  promptOverride?: string;
 }
 
 const EXECUTE_PATTERN = /start|execute|debug|analy[sz]e|开始|启动|执行|正式分析|开始调试|调试/i;
 
+/** 单个 AgentRole 在内部维护的运行态。 */
+interface AgentSlot {
+  agent: Agent;
+  providerId: string;
+  modelId: string;
+  systemPrompt: string;
+}
+
 export class AgentOrchestrator {
   private agentStates: Map<AgentRole, AgentState> = new Map();
   private agentConfigs: Map<AgentRole, AgentConfig> = new Map();
+  private agentSlots: Map<AgentRole, AgentSlot> = new Map();
 
   constructor() {
     this.initializeAgents();
   }
 
   setMainWindow(_window: unknown): void {
-    // Renderer projection is owned by WorkflowProjectionPublisher.
+    // Renderer projection 由 WorkflowProjectionPublisher 拥有。
   }
 
   private initializeAgents(): void {
@@ -129,55 +183,17 @@ export class AgentOrchestrator {
     }
   }
 
-  private resolveRuntimeProfile(agentId: AgentRole, stage?: WorkflowStage) {
-    const settings = settingsService.getAll();
-    return executionProfileService.resolveAgentRuntimeProfile(settings, stage || 'investigate', agentId);
+  getToolsForRole(agentId: AgentRole): string[] {
+    return resolveAgentToolAllowlist(agentId);
   }
 
-  private async refreshAccountRuntimeCredentials(providerId: LlmProviderId): Promise<void> {
-    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
-    if (provider?.authMode !== 'account') {
-      return;
-    }
-
-    await providerAccountAuthService.ensureRuntimeCredentials(providerId);
-    const llmConfig = settingsService.getLlmConfig();
-    llmAdapter.configure(llmConfig);
-    this.applyLlmConfig(llmConfig);
+  isToolAllowedForRole(toolName: string, agentId: AgentRole): boolean {
+    return isToolAllowedForAgent(toolName, agentId);
   }
 
-  private modeForAgent(agentId: AgentRole): AppMode {
-    return agentId === 'ask_agent' ? 'ask' : 'debugger';
-  }
-
-  private patternForAgent(agentId: AgentRole): string {
-    return agentId === 'ask_agent' ? 'free-agent' : 'plan-generate-verify';
-  }
-
-  private systemPromptForAgent(agentId: AgentRole, prompt?: string): string {
-    return prompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}`;
-  }
-
-  private emitRuntimeChunk(event: AgentEvent, onChunk?: (text: string) => void): void {
-    if (!onChunk || event.type !== 'assistant.delta') {
-      return;
-    }
-    const text = event.payload && typeof event.payload.text === 'string' ? event.payload.text : '';
-    if (text) {
-      onChunk(text);
-    }
-  }
-
-  private async finalizeRecordedAssistantMessage(
-    agentId: AgentRole,
-    streamedContent: string,
-    fallbackContent: string,
-    context?: AgentTurnContext,
-  ): Promise<string> {
-    const finalContent = streamedContent || fallbackContent;
-    await this.recordMessage(agentId, 'assistant', finalContent, context);
-    return finalContent;
-  }
+  // -------------------------------------------------------------------
+  // 主入口：sendMessage / sendCoworkMessage
+  // -------------------------------------------------------------------
 
   async sendMessage(
     agentId: AgentRole,
@@ -208,29 +224,31 @@ export class AgentOrchestrator {
 
       await this.recordMessage(agentId, 'user', content, context);
 
-      const response = await agentRuntime.runTurn({
-        agentId,
-        mode: this.modeForAgent(agentId),
-        prompt: content,
-        systemPrompt,
-        modelId: config.modelName,
-        providerId: config.modelProvider,
-        maxTokens: config.maxTokens,
-        temperature: config.temperature,
-        toolAllowlist: resolveAgentToolAllowlist(agentId, context?.stageId),
-        stage: context?.stageId,
-        patternId: this.patternForAgent(agentId),
-        runId: context?.runId,
-        sessionId: context?.sessionId,
-        turnId: context?.turnId,
-        signal: options?.signal,
-        onStreamEvent: options?.onStreamEvent,
-        onEvent: (event) => this.emitRuntimeChunk(event, options?.onChunk),
-      });
+      const stub = this.createTestModeStub(agentId, content);
+      const responseText = stub
+        ? await this.streamTestModeStub(stub, options)
+        : await this.runAgentTurn({
+          agentId,
+          content,
+          systemPrompt,
+          providerId: config.modelProvider,
+          modelId: config.modelName,
+          maxTokens: config.maxTokens,
+          temperature: config.temperature,
+          mode: this.modeForAgent(agentId),
+          patternId: this.patternForAgent(agentId),
+          stage: context?.stageId,
+          runId: context?.runId,
+          sessionId: context?.sessionId ?? null,
+          turnId: context?.turnId,
+          toolAllowlist: resolveAgentToolAllowlist(agentId, context?.stageId),
+          options,
+        });
+
       const finalContent = await this.finalizeRecordedAssistantMessage(
         agentId,
-        response.text,
-        response.text,
+        responseText,
+        responseText,
         context,
       );
 
@@ -245,14 +263,7 @@ export class AgentOrchestrator {
   async sendCoworkMessage(
     agentId: AgentRole,
     content: string,
-    options?: AgentTurnOptions & {
-      sessionId?: string;
-      systemPrompt?: string;
-      maxTokens?: number;
-      temperature?: number;
-      turnId?: string;
-      routeAgentId?: AgentRole;
-    },
+    options?: AgentCoworkOptions,
   ): Promise<string> {
     const fallbackConfig = this.agentConfigs.get(agentId);
     if (!fallbackConfig) {
@@ -287,32 +298,33 @@ export class AgentOrchestrator {
         return finalStub;
       }
 
-      const response = await agentRuntime.runTurn({
+      const userPrompt = options?.promptOverride ?? content;
+      const responseText = await this.runAgentTurn({
         agentId,
-        mode: this.modeForAgent(agentId),
-        prompt: content,
+        content: userPrompt,
         systemPrompt: this.systemPromptForAgent(agentId, config.systemPrompt),
-        modelId: config.modelName,
         providerId: config.modelProvider,
+        modelId: config.modelName,
         maxTokens: config.maxTokens,
         temperature: config.temperature,
-        toolAllowlist: [],
-        stage: 'cowork',
-        patternId: this.patternForAgent(agentId),
-        sessionId: options?.sessionId,
+        mode: this.modeForAgent(agentId),
+        patternId: options?.patternId ?? this.patternForAgent(agentId),
+        stage: options?.stage ?? 'cowork',
+        runId: undefined,
+        sessionId: options?.sessionId ?? null,
         turnId: options?.turnId,
-        signal: options?.signal,
-        onStreamEvent: options?.onStreamEvent,
-        onEvent: (event) => this.emitRuntimeChunk(event, options?.onChunk),
+        toolAllowlist: [],
+        options,
+        // cowork 每次调用都是独立轮次，不复用缓存 Agent。
+        useFreshAgent: true,
       });
-      const finalContent = response.text;
 
       runtimeLogService.log({
         scope: options?.sessionId ? 'session' : 'app',
         namespace: 'agent',
         severity: 'info',
         title: `${AGENT_DISPLAY_NAMES[agentId] || agentId} cowork turn`,
-        summary: finalContent.slice(0, 160) || 'Empty message.',
+        summary: responseText.slice(0, 160) || 'Empty message.',
         sessionId: options?.sessionId,
         raw: {
           agentId,
@@ -322,59 +334,261 @@ export class AgentOrchestrator {
       });
 
       this.updateAgentStatus(agentId, 'complete');
-      return finalContent;
+      return responseText;
     } catch (error) {
       this.updateAgentStatus(agentId, 'error');
       throw error;
     }
   }
 
-  private async createCoworkTestResponse(
+  // -------------------------------------------------------------------
+  // Agent 实例池
+  // -------------------------------------------------------------------
+
+  private getOrCreateAgentSlot(
     agentId: AgentRole,
-    content: string,
-    onChunk?: (text: string) => void,
-  ): Promise<string> {
-    let userMessage = content;
+    providerId: string,
+    modelId: string,
+    systemPrompt: string,
+  ): AgentSlot {
+    const existing = this.agentSlots.get(agentId);
+    if (
+      existing
+      && existing.providerId === providerId
+      && existing.modelId === modelId
+      && existing.systemPrompt === systemPrompt
+      && !existing.agent.isStreaming
+    ) {
+      return existing;
+    }
+
+    const agent = new Agent({
+      initialState: {
+        model: encodeAgentModel(providerId, modelId),
+        systemPrompt,
+        messages: [],
+      },
+      provider: llmAdapterProvider,
+      // 暂不启用工具：旧 ToolRegistry 已下线，新 ToolExecutor 由后续任务接入。
+      toolExecutor: {
+        async execute(toolCall: ToolCall): Promise<ToolResultMessage> {
+          return {
+            role: 'toolResult',
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            content: [
+              {
+                type: 'text',
+                text: `Tool ${toolCall.name} is not wired in this build.`,
+              },
+            ],
+            isError: true,
+            timestamp: Date.now(),
+          };
+        },
+      },
+      maxTurns: 8,
+    });
+
+    const slot: AgentSlot = { agent, providerId, modelId, systemPrompt };
+    this.agentSlots.set(agentId, slot);
+    return slot;
+  }
+
+  /** 创建一个全新的 Agent slot（不进入缓存）。适用于 cowork 这种一次性调用。 */
+  private createFreshAgentSlot(
+    providerId: string,
+    modelId: string,
+    systemPrompt: string,
+  ): AgentSlot {
+    const agent = new Agent({
+      initialState: {
+        model: encodeAgentModel(providerId, modelId),
+        systemPrompt,
+        messages: [],
+      },
+      provider: llmAdapterProvider,
+      toolExecutor: {
+        async execute(toolCall: ToolCall): Promise<ToolResultMessage> {
+          return {
+            role: 'toolResult',
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            content: [
+              {
+                type: 'text',
+                text: `Tool ${toolCall.name} is not wired in this build.`,
+              },
+            ],
+            isError: true,
+            timestamp: Date.now(),
+          };
+        },
+      },
+      maxTurns: 4,
+    });
+    return { agent, providerId, modelId, systemPrompt };
+  }
+
+  // -------------------------------------------------------------------
+  // 单轮 Agent 执行
+  // -------------------------------------------------------------------
+
+  private async runAgentTurn(input: {
+    agentId: AgentRole;
+    content: string;
+    systemPrompt: string;
+    providerId: string;
+    modelId: string;
+    maxTokens?: number;
+    temperature?: number;
+    mode: AppMode;
+    patternId: string;
+    stage?: WorkflowStage | 'cowork' | 'report';
+    runId?: string;
+    sessionId?: string | null;
+    turnId?: string;
+    toolAllowlist: string[];
+    options?: AgentTurnOptions;
+    /** 为 true 时创建一次性 Agent 实例，不进入缓存（cowork 场景）。 */
+    useFreshAgent?: boolean;
+  }): Promise<string> {
+    if (!input.providerId || !input.modelId) {
+      throw new Error('No provider/model route is configured for this agent.');
+    }
+
+    const slot = input.useFreshAgent
+      ? this.createFreshAgentSlot(input.providerId, input.modelId, input.systemPrompt)
+      : this.getOrCreateAgentSlot(
+          input.agentId,
+          input.providerId,
+          input.modelId,
+          input.systemPrompt,
+        );
+
+    const userMessage: UserMessage = {
+      role: 'user',
+      content: input.content,
+      timestamp: nowMs(),
+    };
+
+    const legacyContext: LegacyEventContext = {
+      agentId: input.agentId,
+      runId: input.runId,
+      turnId: input.turnId,
+      sessionId: input.sessionId ?? null,
+      stage: input.stage,
+      mode: input.mode,
+      patternId: input.patternId,
+      providerId: input.providerId,
+      modelId: input.modelId,
+      toolAllowlist: input.toolAllowlist,
+    };
+
+    let responseText = '';
+    const unsubscribe = slot.agent.subscribe((event: CoreAgentEvent) => {
+      if (event.type === 'message_update') {
+        const ev = event.assistantMessageEvent;
+        if (ev.type === 'text_delta' && typeof ev.delta === 'string') {
+          input.options?.onChunk?.(ev.delta);
+        }
+      }
+      if (event.type === 'message_end' && event.message.role === 'assistant') {
+        responseText = event.message.content
+          .filter((block) => block.type === 'text')
+          .map((block) => (block as { text: string }).text)
+          .join('');
+      }
+      const legacyEvent = translateCoreToLegacy(event, legacyContext);
+      if (legacyEvent) {
+        input.options?.onEvent?.(legacyEvent);
+      }
+    });
+
+    // abort 信号桥接到 Agent.abort()
+    let abortListener: (() => void) | null = null;
+    if (input.options?.signal) {
+      if (input.options.signal.aborted) {
+        unsubscribe();
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      abortListener = () => slot.agent.abort();
+      input.options.signal.addEventListener('abort', abortListener, { once: true });
+    }
+
     try {
-      const parsed = JSON.parse(content) as { effective_user_message?: string; user_message?: string };
-      userMessage = parsed.effective_user_message || parsed.user_message || content;
-    } catch {
-      userMessage = content;
+      // Agent.prompt 内部跑完整循环；返回值是新增的全部消息，
+      // 我们只在订阅里收集助手文本，最后返回 `responseText`。
+      await slot.agent.prompt(userMessage);
+      return responseText;
+    } finally {
+      unsubscribe();
+      if (abortListener && input.options?.signal) {
+        input.options.signal.removeEventListener('abort', abortListener);
+      }
     }
-    if (userMessage.includes('__RDC_AGENT_E2E_FORCE_COWORK_LLM_FAILURE__')) {
-      throw new Error('E2E forced cowork LLM request failure');
-    }
-    const lower = userMessage.toLowerCase();
-    const wantsExecution = EXECUTE_PATTERN.test(userMessage);
-    let stub = agentId === 'ask_agent'
-      ? 'I can help clarify the problem, explain boundaries, or guide you to open a .rdc capture without starting execution.'
-      : 'I can help scope the debugging target, or prepare a formal Debugger plan when you are ready to execute.';
-    if (/ue4|unreal/i.test(userMessage)) {
-      stub = 'UE4 is Unreal Engine 4. In RDC-Agent it is usually relevant to render pass, material, post-process, and shader debugging context.';
-    } else if (/hello|hi|你好|您好/i.test(userMessage)) {
-      stub = agentId === 'ask_agent'
-        ? 'Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution.'
-        : 'Hello. In Debugger mode I prepare an execution plan first, then wait for approval before running the debugging workflow.';
-    } else if (wantsExecution || EXECUTE_PATTERN.test(lower)) {
-      stub = 'Received. I will prepare the formal debugging plan first, then move into the strict execution flow only when conditions are met.';
-    }
+  }
 
-    const finalStub = `${stub}\n<control>{"intent":"${wantsExecution ? 'execute' : 'talk'}","safe_to_start":${wantsExecution ? 'true' : 'false'}}</control>`;
-    if (onChunk) {
-      const midpoint = Math.max(1, Math.ceil(finalStub.length / 2));
-      onChunk(finalStub.slice(0, midpoint));
+  private async streamTestModeStub(
+    stub: string,
+    options?: AgentTurnOptions,
+  ): Promise<string> {
+    const midpoint = Math.max(1, Math.ceil(stub.length / 2));
+    const firstChunk = stub.slice(0, midpoint);
+    const secondChunk = stub.slice(midpoint);
+    if (firstChunk) {
+      options?.onChunk?.(firstChunk);
       await Promise.resolve();
-      onChunk(finalStub.slice(midpoint));
     }
-    return finalStub;
+    if (secondChunk) {
+      options?.onChunk?.(secondChunk);
+      await Promise.resolve();
+    }
+    return stub;
   }
 
-  getToolsForRole(agentId: AgentRole): string[] {
-    return resolveAgentToolAllowlist(agentId);
+  // -------------------------------------------------------------------
+  // 辅助：profile / system prompt / status
+  // -------------------------------------------------------------------
+
+  private resolveRuntimeProfile(agentId: AgentRole, stage?: WorkflowStage) {
+    const settings = settingsService.getAll();
+    return executionProfileService.resolveAgentRuntimeProfile(settings, stage || 'investigate', agentId);
   }
 
-  isToolAllowedForRole(toolName: string, agentId: AgentRole): boolean {
-    return isToolAllowedForAgent(toolName, agentId);
+  private async refreshAccountRuntimeCredentials(providerId: LlmProviderId): Promise<void> {
+    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+    if (provider?.authMode !== 'account') {
+      return;
+    }
+
+    await providerAccountAuthService.ensureRuntimeCredentials(providerId);
+    const llmConfig = settingsService.getLlmConfig();
+    llmAdapter.configure(llmConfig);
+    this.applyLlmConfig(llmConfig);
+  }
+
+  private modeForAgent(agentId: AgentRole): AppMode {
+    return agentId === 'ask_agent' ? 'ask' : 'debugger';
+  }
+
+  private patternForAgent(agentId: AgentRole): string {
+    return agentId === 'ask_agent' ? 'free-agent' : 'plan-generate-verify';
+  }
+
+  private systemPromptForAgent(agentId: AgentRole, prompt?: string): string {
+    return prompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}`;
+  }
+
+  private async finalizeRecordedAssistantMessage(
+    agentId: AgentRole,
+    streamedContent: string,
+    fallbackContent: string,
+    context?: AgentTurnContext,
+  ): Promise<string> {
+    const finalContent = streamedContent || fallbackContent;
+    await this.recordMessage(agentId, 'assistant', finalContent, context);
+    return finalContent;
   }
 
   private updateAgentStatus(agentId: AgentRole, status: AgentState['status']): void {
@@ -453,6 +667,81 @@ export class AgentOrchestrator {
       timestamp: message.timestamp,
     });
     workflowProjectionPublisher.publishAgentMessage(message);
+  }
+
+  // -------------------------------------------------------------------
+  // 测试模式 / Stub
+  // -------------------------------------------------------------------
+
+  private createTestModeStub(agentId: AgentRole, content: string): string | null {
+    if (process.env.RDC_AGENT_TEST_MODE !== '1') {
+      return null;
+    }
+    let userMessage = content;
+    try {
+      const parsed = JSON.parse(content) as { effective_user_message?: string; user_message?: string };
+      userMessage = parsed.effective_user_message || parsed.user_message || content;
+    } catch {
+      userMessage = content;
+    }
+    if (userMessage.includes('__RDC_AGENT_E2E_FORCE_COWORK_LLM_FAILURE__')) {
+      throw new Error('E2E forced cowork LLM request failure');
+    }
+    const lower = userMessage.toLowerCase();
+    let stub = agentId === 'ask_agent'
+      ? 'Ask is ready. Describe the issue, goal, or .rdc capture you want to inspect; I will clarify without starting execution.'
+      : 'Debugger is ready. Describe the symptom and capture context; I will prepare a plan before execution.';
+    if (/ue4|unreal/i.test(userMessage)) {
+      stub = 'UE4 is Unreal Engine 4, commonly involved in graphics debugging around materials, post-processing, shaders, and render passes.';
+    } else if (/hello|hi/i.test(userMessage)) {
+      stub = agentId === 'ask_agent'
+        ? 'Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution.'
+        : 'Hello. In Debugger mode I will generate an execution plan first, then wait for approval before running the strict workflow.';
+    } else if (/start|execute|debug|analy[sz]e/.test(lower)) {
+      stub = 'Received. I will prepare the formal debugging plan first, then move into the strict execution flow only when conditions are met.';
+    }
+    const intent = /start|execute|debug|analy[sz]e/.test(lower) ? 'execute' : 'talk';
+    return `${stub}\n<control>{"intent":"${intent}","safe_to_start":${intent === 'execute' ? 'true' : 'false'}}</control>`;
+  }
+
+  private async createCoworkTestResponse(
+    agentId: AgentRole,
+    content: string,
+    onChunk?: (text: string) => void,
+  ): Promise<string> {
+    let userMessage = content;
+    try {
+      const parsed = JSON.parse(content) as { effective_user_message?: string; user_message?: string };
+      userMessage = parsed.effective_user_message || parsed.user_message || content;
+    } catch {
+      userMessage = content;
+    }
+    if (userMessage.includes('__RDC_AGENT_E2E_FORCE_COWORK_LLM_FAILURE__')) {
+      throw new Error('E2E forced cowork LLM request failure');
+    }
+    const lower = userMessage.toLowerCase();
+    const wantsExecution = EXECUTE_PATTERN.test(userMessage);
+    let stub = agentId === 'ask_agent'
+      ? 'I can help clarify the problem, explain boundaries, or guide you to open a .rdc capture without starting execution.'
+      : 'I can help scope the debugging target, or prepare a formal Debugger plan when you are ready to execute.';
+    if (/ue4|unreal/i.test(userMessage)) {
+      stub = 'UE4 is Unreal Engine 4. In RDC-Agent it is usually relevant to render pass, material, post-process, and shader debugging context.';
+    } else if (/hello|hi|你好|您好/i.test(userMessage)) {
+      stub = agentId === 'ask_agent'
+        ? 'Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution.'
+        : 'Hello. In Debugger mode I prepare an execution plan first, then wait for approval before running the debugging workflow.';
+    } else if (wantsExecution || EXECUTE_PATTERN.test(lower)) {
+      stub = 'Received. I will prepare the formal debugging plan first, then move into the strict execution flow only when conditions are met.';
+    }
+
+    const finalStub = `${stub}\n<control>{"intent":"${wantsExecution ? 'execute' : 'talk'}","safe_to_start":${wantsExecution ? 'true' : 'false'}}</control>`;
+    if (onChunk) {
+      const midpoint = Math.max(1, Math.ceil(finalStub.length / 2));
+      onChunk(finalStub.slice(0, midpoint));
+      await Promise.resolve();
+      onChunk(finalStub.slice(midpoint));
+    }
+    return finalStub;
   }
 }
 

@@ -1,9 +1,15 @@
 /**
- * Skill 注册表
- * 管理内置和插件 skill 的注册、查询和生命周期
+ * Skill 注册表（旧实现，保留以兼容历史调用方）。
+ *
+ * @deprecated 新 Agent Runtime 使用 `agent-runtime/agent/SkillLoader`，
+ * 它从 `~/.qoder/skills` 与项目目录加载 SKILL.md，并由 ToolPermission 统一管控。
+ * 新代码请使用：
+ *   import { SkillLoader } from '@/main/agent-runtime/agent/SkillLoader';
  */
 import type { AgentRuntimeSkillDescriptor } from '@shared/types/agentRuntime';
 import type { SkillDefinition, SkillParameter } from '../../shared/types/skill';
+
+export { SkillLoader } from '../agent-runtime/agent/SkillLoader';
 
 /** Skill 执行函数类型 */
 export type SkillExecuteFn = (

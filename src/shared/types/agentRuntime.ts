@@ -1,3 +1,15 @@
+/**
+ * Agent Runtime 共享类型 — IPC 协议层。
+ *
+ * 这些类型定义了 main → renderer 的事件协议契约，
+ * 被 Preload API、Renderer 事件订阅、Conversation Service 共同依赖。
+ *
+ * 注意：新 Agent Runtime 核心使用独立的事件类型体系（定义在 core/types.ts），
+ * 通过 LegacyEventBridge 单向翻译为本文件的格式后经 IPC 广播给 Renderer。
+ *
+ * @see src/main/agent-runtime/core/types.ts — Runtime 内部事件类型
+ * @see src/main/agent-runtime/LegacyEventBridge.ts — 新→旧事件翻译
+ */
 import type { AgentRole } from './agent';
 import type { LLMStreamEvent, ToolCall } from './llm';
 import type { MCPTransport } from './mcp';
