@@ -11,6 +11,7 @@ import type {
   FontScale,
   LayoutPreferences,
   LlmAgentRoute,
+  LlmProviderCatalogGroup,
   LlmProviderConnectionStatus,
   LlmProviderEntry,
   LlmProviderId,
@@ -36,6 +37,7 @@ import {
   TERMINAL_MIN_HEIGHT,
 } from '@shared/constants/layout';
 import {
+  BUILTIN_LLM_PROVIDER_DEFINITIONS,
   createBuiltinProviderEntry,
   createBuiltinProviderEntries,
   getBuiltinProviderDefinition,
@@ -523,6 +525,52 @@ function normalizeRetiredProviderId(providerId: string): string {
   return RETIRED_PROVIDER_ID_IMPORTS[providerId] ?? providerId;
 }
 
+const NEW_CATALOG_GROUPS: LlmProviderCatalogGroup[] = [
+  'account',
+  'openai-compatible',
+  'anthropic-compatible',
+  'cloud-platform',
+  'local',
+  'image',
+];
+
+/**
+ * Map legacy catalogGroup values ('api-key' / 'environment') onto the
+ * product-oriented categories. Resolution order:
+ *   1. Already a new value -> keep.
+ *   2. Look up by provider.id in BUILTIN_LLM_PROVIDER_DEFINITIONS.
+ *   3. Fallback inference from authMode.
+ */
+function normalizeCatalogGroup(provider: Partial<LlmProviderEntry>): LlmProviderCatalogGroup {
+  const current = provider.catalogGroup;
+  if (typeof current === 'string' && NEW_CATALOG_GROUPS.includes(current as LlmProviderCatalogGroup)) {
+    return current as LlmProviderCatalogGroup;
+  }
+
+  const id = typeof provider.id === 'string' ? provider.id.trim() : '';
+  if (id) {
+    const builtinDef = BUILTIN_LLM_PROVIDER_DEFINITIONS.find((def) => def.id === id);
+    if (builtinDef) {
+      return builtinDef.catalogGroup;
+    }
+  }
+
+  switch (provider.authMode) {
+    case 'account':
+      return 'account';
+    case 'local':
+      return 'local';
+    case 'environment':
+      return 'cloud-platform';
+    default:
+      console.warn(
+        '[SettingsService] Unable to infer catalogGroup for provider; defaulting to openai-compatible.',
+        { id, authMode: provider.authMode, legacyCatalogGroup: current },
+      );
+      return 'openai-compatible';
+  }
+}
+
 function sanitizeUserProvider(
   provider: Partial<LlmProviderEntry>,
   workspaceRoot = appPathService.getWorkspaceRoot(),
@@ -565,7 +613,7 @@ function sanitizeUserProvider(
     id: rawId,
     kind,
     authMode: builtinFallback.authMode,
-    catalogGroup: builtinFallback.catalogGroup,
+    catalogGroup: normalizeCatalogGroup({ ...provider, id: rawId, authMode: builtinFallback.authMode }),
     modelDiscovery: builtinFallback.modelDiscovery,
     label,
     enabled,

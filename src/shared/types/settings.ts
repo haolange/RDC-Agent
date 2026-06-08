@@ -52,9 +52,80 @@ export type BuiltinLlmProviderId =
   | 'gemini-account'
   | 'qwen-account';
 export type LlmProviderId = BuiltinLlmProviderId | (string & {});
-export type LlmProviderKind = 'openrouter' | 'openai-compatible' | 'anthropic' | 'google-ai-studio' | 'azure-openai' | 'bedrock' | 'vertex' | 'ollama';
+
+/**
+ * Wire-protocol kind — describes the underlying request/response protocol that the
+ * provider speaks at the HTTP layer. This is independent of how a user authenticates
+ * (see `LlmProviderAuthMode`) and where the provider is shown in the catalog UI
+ * (see `LlmProviderCatalogGroup`).
+ *
+ * Values:
+ * - `openrouter`           : OpenRouter's hosted gateway (OpenAI-style chat completions with provider routing).
+ * - `openai-compatible`    : OpenAI Chat Completions / Responses API contract.
+ * - `anthropic`            : Anthropic Messages API contract.
+ * - `google-ai-studio`     : Google Generative Language (AI Studio / Gemini) API contract.
+ * - `azure-openai`         : Azure-hosted OpenAI deployments (path/version/auth quirks vs raw OpenAI).
+ * - `bedrock`              : AWS Bedrock invocation API (signed via AWS credential chain).
+ * - `vertex`               : Google Cloud Vertex AI (signed via GCP credential chain).
+ * - `ollama`               : Local Ollama runtime (OpenAI-style endpoint exposed by ollama serve).
+ */
+export type LlmProviderKind =
+  | 'openrouter'
+  | 'openai-compatible'
+  | 'anthropic'
+  | 'google-ai-studio'
+  | 'azure-openai'
+  | 'bedrock'
+  | 'vertex'
+  | 'ollama';
+
+/**
+ * Authentication mode — describes HOW the user authenticates to the provider.
+ * Orthogonal to `LlmProviderKind` (wire protocol) and `LlmProviderCatalogGroup`
+ * (UI grouping).
+ *
+ * - `api-key`     : User-supplied API key sent as a bearer/header.
+ * - `local`       : Local runtime, no remote credentials needed.
+ * - `account`     : OAuth / Device Flow login that yields a refreshable account session.
+ * - `environment` : Resolved from ambient environment / cloud credential chain (AWS, GCP).
+ */
 export type LlmProviderAuthMode = 'api-key' | 'local' | 'account' | 'environment';
-export type LlmProviderCatalogGroup = 'api-key' | 'local' | 'account' | 'environment';
+
+/**
+ * Product-oriented catalog grouping — decides WHERE a provider is shown in the
+ * Settings UI. Independent of `authMode` (HOW to authenticate) and `kind`
+ * (wire protocol).
+ *
+ * - `account`              : Login-authorized providers (OAuth / Device Flow).
+ * - `openai-compatible`    : Endpoints speaking the OpenAI Chat Completions contract.
+ * - `anthropic-compatible` : Endpoints speaking the Anthropic Messages contract.
+ * - `cloud-platform`       : Cloud-platform managed offerings (Azure / Bedrock / Vertex).
+ * - `local`                : Local runtimes (Ollama and similar).
+ * - `image`                : Image-generation skeleton group (no concrete providers in this iteration).
+ */
+export type LlmProviderCatalogGroup =
+  | 'account'
+  | 'openai-compatible'
+  | 'anthropic-compatible'
+  | 'cloud-platform'
+  | 'local'
+  | 'image';
+
+/**
+ * Provider capability declaration — feature flags that downstream code can
+ * consult before attempting capability-gated behaviour (e.g. requesting tool
+ * calls, structured outputs, image generation, etc.).
+ */
+export type LlmProviderCapability =
+  | 'chat'
+  | 'tool-calling'
+  | 'structured-output'
+  | 'reasoning'
+  | 'prompt-cache'
+  | 'vision-input'
+  | 'model-discovery'
+  | 'image-generation'
+  | 'video-generation';
 export type LlmProviderConnectionStatus = 'unconfigured' | 'verified' | 'failed' | 'unavailable';
 export type LlmProviderModelDiscoveryStrategy =
   | 'openai-compatible'
@@ -149,6 +220,7 @@ export interface LlmProviderEntry {
   oauthRefreshAvailable?: boolean;
   unavailableReason?: string;
   isConfigured: boolean;
+  capabilities?: LlmProviderCapability[];
 }
 
 export interface LlmAgentRoute {

@@ -27,10 +27,22 @@ export const getProviderDisplayLabel = (
 ): string => provider.label.trim() || fallbackLabel;
 
 export const getProviderGroupLabel = (provider: Pick<LlmProviderEntry, 'catalogGroup'>): string => {
-  if (provider.catalogGroup === 'local') return 'Local';
-  if (provider.catalogGroup === 'account') return 'Account';
-  if (provider.catalogGroup === 'environment') return 'Environment';
-  return 'API Key';
+  switch (provider.catalogGroup) {
+    case 'account':
+      return 'Account';
+    case 'openai-compatible':
+      return 'OpenAI Compatible';
+    case 'anthropic-compatible':
+      return 'Anthropic Compatible';
+    case 'cloud-platform':
+      return 'Cloud Platform';
+    case 'local':
+      return 'Local';
+    case 'image':
+      return 'Image';
+    default:
+      return 'Other';
+  }
 };
 
 export const getProviderStatusLabel = (provider: Pick<LlmProviderEntry, 'status' | 'isConfigured'>): TranslationKey => {

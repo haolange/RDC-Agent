@@ -8,6 +8,7 @@
 - `codepilot-comparison.md`：CodePilot 架构参考项与 RDC-Agent 迁移边界。
 - `spec-driven-development.md`：跨层规范与执行约束。
 - `agentic-trace-protocol.md`：**Agentic Trace 权威跨层契约**（Event Log → Trace Tree → UI Projection → Renderer Registry）。
+- `provider-system.md`：Provider 体系架构（`LlmProviderEntry` / `LlmProviderKind` / `LlmProviderAuthMode` / `LlmProviderCatalogGroup` / `LlmProviderCapability` 的正交维度与 Settings、Agent Runtime 路由契约）。
 
 ## 历史/阶段性参考
 

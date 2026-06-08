@@ -85,6 +85,12 @@ Agentic Trace 是 RDC-Agent 的**当前消息流协议**，用 `Event Log → Tr
 - Settings > Provider 必须把账号登录 Provider 单独展示；API Key/local/environment provider 使用单一 Provider 清单，已连接条目直接在原清单中呈现连接成功状态，不再单独拆出“已连接 Provider”区域。Provider 连接弹层必须保留明确的 `Connect` 与 `Test` 两个动作；已连接 OAuth detail 只展示账号/模型状态，不再显示启动授权的 `Connect`。
 - Settings > Provider 的模型列表必须区分真实来源：标准模型接口返回的列表显示为“已发现模型”，逐候选模型请求验证成功的列表显示为“已验证模型”；Claude/ChatGPT Account 使用“账号模型目录”，GitHub Copilot 使用“账号模型目录”并允许 live `/models` 补充；静态推荐只能作为内置候选，不得伪装成已发现模型保存到 route。
 - API Key 明文只进入 `SecretStorageService`，`settings:get` 和 detail 二次打开不得把已存密钥回传 renderer；UI 只能显示固定星号占位，输入新密钥后才允许显示/隐藏本次输入。
+- Provider catalogGroup 采用产品导向分类（`account` / `openai-compatible` / `anthropic-compatible` / `cloud-platform` / `local` / `image`），独立于 `authMode`（认证方式）；分组只决定 Settings UI 的展示位置，不反推协议或认证形态。
+- Protocol Kind (`LlmProviderKind`) 表示 wire protocol 差异，不与产品分组绑定；同一 kind 可能出现在多个 catalogGroup（例如 `openai-compatible` kind 在 `openai-compatible`、`cloud-platform`、`local` 等多个分组中均可存在）。
+- Provider 必须声明 `capabilities` 数组，作为运行时能力查询和 UI 展示的唯一事实；调用方在使用 `tool-calling`、`structured-output`、`reasoning`、`vision-input`、`image-generation` 等能力前必须显式判定，未声明的能力按 fail-closed 处理。
+- Media generation 通过独立的 `MediaRuntimeService` 路由，不进入 chat runtime；当前实现为 fail-closed skeleton，所有请求返回 `adapter-not-implemented`。
+- 不可用 provider（`unavailableReason` 非空）在 Settings UI 中仍然显示，但标记为不可用且不能被选作 agent route，不静默从清单中删除。
+- Provider 体系的稳定结构以 `docs/architecture/provider-system.md` 为权威说明，`LlmProviderEntry`、`LlmProviderKind`、`LlmProviderAuthMode`、`LlmProviderCatalogGroup`、`LlmProviderCapability` 在 `src/shared/types/settings.ts` 单点定义，跨层不得重复声明。
 - `src/renderer/features/projects`：project/session navigation。
 - `src/renderer/features/captures`：capture library、device selector、opened capture preview 和 context panels。
 - `src/renderer/features/terminal`：terminal drawer 和 terminal UI glue。
