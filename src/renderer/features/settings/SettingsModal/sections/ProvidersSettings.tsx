@@ -32,11 +32,21 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
   const renderProviderRow = (provider: LlmProviderEntry, mode: 'account' | 'connected' | 'add') => {
     const models = getEnabledModels(provider);
     const connected = provider.isConfigured && provider.status === 'verified';
+    const unavailable = Boolean(provider.unavailableReason && provider.unavailableReason.trim());
+    const rowClassName = [
+      'settings-provider-row',
+      connected ? 'connected' : '',
+      unavailable ? 'settings-provider-row--unavailable' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const unavailableLabel = unavailable ? t('settings.providerUnavailable') : '';
     return (
       <div
         key={provider.id}
-        className={`settings-provider-row ${connected ? 'connected' : ''}`}
+        className={rowClassName}
         data-testid={`settings-${mode === 'account' ? 'oauth-row' : 'provider-row'}-${provider.id}`}
+        title={unavailable ? provider.unavailableReason : undefined}
       >
         <div className="settings-provider-row-main">
           <span className={`settings-provider-status ${connected ? 'configured' : 'pending'}`} />
@@ -50,11 +60,13 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
                   provider.accountLabel,
                   provider.planLabel,
                   getModelSummary(models, ''),
+                  unavailableLabel,
                 ].filter(Boolean).join(' · ')
                 : [
                   getProviderGroupLabel(provider),
                   connected ? t('settings.providerConnected') : t('settings.providerUnconfigured'),
                   getModelSummary(models, t('settings.noEnabledModels')),
+                  unavailableLabel,
                 ].filter(Boolean).join(' · ')}
             </span>
           </span>

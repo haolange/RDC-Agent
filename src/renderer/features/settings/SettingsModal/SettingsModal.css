@@ -553,6 +553,15 @@
   background: rgb(var(--color-success) / 0.04);
 }
 
+.settings-provider-row--unavailable {
+  opacity: 0.6;
+}
+
+.settings-provider-row--unavailable .settings-provider-status {
+  color: var(--color-text-muted, #888);
+  background: rgb(var(--color-text-muted));
+}
+
 .settings-provider-row-main,
 .settings-provider-row-actions,
 .settings-provider-oauth-panel {
