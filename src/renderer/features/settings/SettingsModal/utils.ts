@@ -1,7 +1,7 @@
 import type { TranslationKey } from '../../../i18n';
 import type { LlmAgentRoute, LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 
-export const STORED_SECRET_MASK = '••••••••••••••••••••••••';
+export const STORED_SECRET_MASK = '************************';
 
 export const joinPath = (root: string, ...segments: string[]): string => {
   const separator = root.includes('\\') ? '\\' : '/';
@@ -14,6 +14,7 @@ export const cloneProvider = (provider: LlmProviderEntry): LlmProviderEntry => (
   ...provider,
   models: provider.models.map((model) => ({ ...model })),
   recommendedModels: [...provider.recommendedModels],
+  capabilities: provider.capabilities ? [...provider.capabilities] : undefined,
 });
 
 export const cloneRoute = (route: LlmAgentRoute): LlmAgentRoute => ({ ...route });

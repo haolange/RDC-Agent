@@ -3,13 +3,13 @@ import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useI18n } from '../../../i18n';
 import type { TranslationKey } from '../../../i18n';
 import type { AppSettings, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
-import { AGENT_ROLES } from '@shared/constants/agents';
+import { AGENT_DISPLAY_NAMES, AGENT_ROLES } from '@shared/constants/agents';
 import { resolveAgentRouteStatus } from './agentRouteStatus';
+import { createSettingsModalActions } from './settingsModalActions';
 import { useProviderConnection } from './useProviderConnection';
 import { useSettingsModalState } from './useSettingsModalState';
 import {
   getEnabledModels,
-  getErrorMessage,
   getProviderDisplayLabel,
   joinPath,
   sortProvidersByLabel,
@@ -66,6 +66,15 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     }).filter((entry): entry is { agentId: LlmAgentRoute['agentId']; issue: TranslationKey } => entry !== null),
     [modalState.agentRouteDrafts, modalState.providerDrafts],
   );
+  const invalidAgentRouteMessage = useMemo(() => {
+    if (invalidAgentRoutes.length === 0) return '';
+    return t('settings.agentRouteInvalidSummary', {
+      count: invalidAgentRoutes.length,
+      routes: invalidAgentRoutes
+        .map((entry) => `${AGENT_DISPLAY_NAMES[entry.agentId]}: ${t(entry.issue)}`)
+        .join('; '),
+    });
+  }, [invalidAgentRoutes, t]);
 
   const getResolvedProviderLabel = (provider: Pick<LlmProviderEntry, 'label'>) =>
     getProviderDisplayLabel(provider, t('settings.unnamedProvider'));
@@ -79,6 +88,9 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
       knowledgePath: joinPath(derivedRoot, 'knowledge'),
       profilesPath: joinPath(derivedRoot, 'profiles'),
       policiesPath: joinPath(derivedRoot, 'policies'),
+      skillsPath: joinPath(derivedRoot, 'skills'),
+      mcpPath: joinPath(derivedRoot, 'mcp'),
+      patternsPath: joinPath(derivedRoot, 'patterns'),
     };
     return [
       { label: t('settings.settingsFile'), value: derivedPaths.settingsPath },
@@ -87,6 +99,9 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
       { label: t('settings.knowledgePath'), value: derivedPaths.knowledgePath },
       { label: t('settings.profilesPath'), value: derivedPaths.profilesPath },
       { label: t('settings.policiesPath'), value: derivedPaths.policiesPath },
+      { label: t('settings.skillsPath'), value: derivedPaths.skillsPath },
+      { label: t('settings.mcpPath'), value: derivedPaths.mcpPath },
+      { label: t('settings.patternsPath'), value: derivedPaths.patternsPath },
     ];
   }, [derivedRoot, t]);
 
@@ -97,67 +112,19 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     { id: 'agents', label: t('settings.agents') },
   ], [t]);
 
-  const handleRefreshProviderModels = async (provider: LlmProviderEntry) => {
-    modalState.setProviderDrafts((current) => current.map((entry) => (
-      entry.id === provider.id ? { ...entry, status: 'unconfigured', lastError: '' } : entry
-    )));
-    try {
-      const result = await window.electronAPI.llm.refreshProviderModels(provider.id);
-      if (!result.success) {
-        modalState.setProviderDrafts((current) => current.map((entry) => (
-          entry.id === provider.id ? { ...entry, status: 'failed', lastError: result.error } : entry
-        )));
-        return;
-      }
-      await providerConnection.refreshLocalSettings(provider.id);
-    } catch (error) {
-      modalState.setProviderDrafts((current) => current.map((entry) => (
-        entry.id === provider.id ? { ...entry, status: 'failed', lastError: getErrorMessage(error, t('settings.providerTestFailed')) } : entry
-      )));
-    }
-  };
-
-  const handleDisconnectProvider = async (provider: LlmProviderEntry) => {
-    try {
-      if (provider.authMode === 'account') {
-        const status = await window.electronAPI.llm.logoutProviderAccount(provider.id);
-        if (status.error) {
-          modalState.setProviderDrafts((current) => current.map((entry) => (
-            entry.id === provider.id ? { ...entry, status: 'failed', lastError: status.error } : entry
-          )));
-          return;
-        }
-        await providerConnection.refreshLocalSettings(provider.id);
-        return;
-      }
-      const result = await window.electronAPI.llm.disconnectProvider(provider.id);
-      if (!result.success) {
-        modalState.setProviderDrafts((current) => current.map((entry) => (
-          entry.id === provider.id ? { ...entry, status: 'failed', lastError: result.error } : entry
-        )));
-        return;
-      }
-      await providerConnection.refreshLocalSettings(provider.id);
-    } catch (error) {
-      modalState.setProviderDrafts((current) => current.map((entry) => (
-        entry.id === provider.id ? { ...entry, status: 'failed', lastError: getErrorMessage(error, t('settings.providerSaveFailed')) } : entry
-      )));
-    }
-  };
-
-  const handleSaveAgentRoutes = async () => {
-    if (invalidAgentRoutes.length > 0) return;
-    await patchSettings({
-      llm: {
-        agentRoutes: AGENT_ROLES.map((agentId) => {
-          const route = modalState.agentRouteDrafts.find((entry) => entry.agentId === agentId);
-          return route ?? { agentId, providerId: '', modelId: '' };
-        }),
-      },
-    });
-    const nextSettings = await reloadSettings();
-    modalState.setAgentRouteDrafts(nextSettings.llm.agentRoutes.map((route) => ({ ...route })));
-  };
+  const actions = createSettingsModalActions({
+    settings,
+    modalState,
+    providerConnection,
+    invalidAgentRoutes,
+    invalidAgentRouteMessage,
+    updateProfile,
+    updateWorkspaceRoot,
+    resetWorkspaceRoot,
+    patchSettings,
+    reloadSettings,
+    t,
+  });
 
   return {
     t,
@@ -169,16 +136,13 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     accountProviders,
     providerCatalog,
     configuredProvidersWithoutEnabledModels,
+    invalidAgentRoutes,
+    invalidAgentRouteMessage,
     getResolvedProviderLabel,
     setTheme,
     setLanguage,
     setFontScale,
-    updateProfile,
-    updateWorkspaceRoot,
-    resetWorkspaceRoot,
-    handleRefreshProviderModels,
-    handleDisconnectProvider,
-    handleSaveAgentRoutes,
+    ...actions,
     ...providerConnection,
   };
 };

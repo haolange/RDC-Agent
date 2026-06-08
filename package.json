@@ -17,6 +17,7 @@
     "check:shared-exports": "node scripts/check-shared-exports.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
+    "test:provider-system": "npx playwright test e2e/provider-system.spec.ts --config playwright.config.ts",
     "test:shell-smoke": "npx playwright test e2e/shell-smoke.spec.ts --config playwright.config.ts",
     "test:browser-session": "npx playwright test e2e/browser-session.spec.ts --config playwright.config.ts"
   },
