@@ -54,7 +54,7 @@
 - Electron 窗口仍通过 `preload -> IPC` 进入主进程；浏览器真实会话通过 `localhost bridge -> IPC handler registry` 进入主进程。两条路径必须共享同一套 main/runtime 能力。
 - 涉及 UI/UX、布局、消息流、状态展示、样式、面板可达性的改动，优先用浏览器真实会话和内置浏览器点击/截图验证。
 - 产品级浏览器评审必须至少覆盖：Workbench 初始状态、Project/Session 入口、`.rdc` 导入或打开状态、Settings > Providers、Settings > Agents、桌面与窄屏视口、水平溢出检查、长路径/中文文件名显示、按钮 disabled/active 状态和前后端数据一致性。
-- 涉及 `src/main`、`src/preload`、窗口、IPC 注册、workspace 权限、RDX CLI invoker 或 `RenderDoc` 本地链路时，补 `npm run test:shell-smoke` 或等价 shell smoke；不把交互类 Electron Playwright 作为默认门禁。
+- 涉及 `src/main`、`src/preload`、窗口、IPC 注册、workspace 权限、RDX CLI invoker 或 `RenderDoc` 本地链路时，补真实启动检查或内置浏览器真实会话；禁止把 Playwright/Electron E2E 作为门禁。
 
 ## RDX CLI Invoker 边界
 
@@ -85,9 +85,10 @@
 - 代码改动后执行 `npm run typecheck`。
 - renderer 结构或 UI 锚点改动后执行 `npm run check:architecture`、`npm run check:fidelity`、`npm run check:shared-exports`。
 - 入口、构建或窗口逻辑改动后，再补 `npm run build` 或等价打包检查。
-- 浏览器真实会话 smoke 使用 `npm run test:browser-session`，它打开 `/app` 并通过真实 localhost bridge 调用主进程。
-- Electron 壳边界 smoke 使用 `npm run test:shell-smoke`；运行前必须先执行 `npm run build`，因为 smoke 启动的是 `out/main/index.js` 与 `out/renderer` 的构建产物。
-- Settings Agents 路由验证使用 `npm run test:settings-agents`。
-- 产品级本地 smoke 使用 `npm run test:product-smoke`，并通过 `RDC_AGENT_PRODUCT_SMOKE_PROJECT_ROOT` 与 `RDC_AGENT_PRODUCT_SMOKE_RDC_PATH` 指向真实 project 和 `.rdc`。
+- 浏览器真实会话使用 `npm run start:agent-browser` 或 `scripts/start-browser-session.cmd`，然后用 Codex 内置浏览器打开主进程输出的 `/app`。
+- 人类开发入口使用 `scripts/start-rdc-agent-dev.cmd`；人类构建产物入口使用 `scripts/start-rdc-agent.cmd`；发布模式直接双击 exe / app 包。
+- Provider 体系契约验证使用 `npm run check:provider-system`。
+- Settings Agents 路由契约验证使用 `npm run check:settings-agents`。
+- 产品级本地验收通过真实浏览器会话完成，并指向真实 project 和 `.rdc`；RDX/RenderDoc 失败必须 fail-closed 并显示诊断。
 - 涉及工作台交互、页面结构、样式引用或共享契约的改动后，至少补一次关键 E2E smoke 或等价人工回归，确认主界面、关键面板和主要交互未退化。
 - 仅文档改动时，检查术语、路径和描述是否与当前仓库结构一致。

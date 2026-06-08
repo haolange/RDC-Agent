@@ -60,8 +60,8 @@ Do not add call-site constants for commands, catalog paths, or environment varia
 | Renderer structure or anchors | `npm run typecheck`, `npm run check:architecture`, `npm run check:fidelity` |
 | Main IPC or invocation boundary | `npm run typecheck`, `npm run build`, shell smoke when available |
 | RDX CLI catalog/tooling config | `npm run typecheck`, catalog/runtime summary smoke |
-| Settings Agents routing | `npm run test:settings-agents` |
-| Product browser flow with real local inputs | `npm run test:product-smoke` with `RDC_AGENT_PRODUCT_SMOKE_PROJECT_ROOT` and `RDC_AGENT_PRODUCT_SMOKE_RDC_PATH` |
+| Settings Agents routing | `npm run check:settings-agents` |
+| Product browser flow with real local inputs | `npm run start:agent-browser`, then inspect `/app` in the Codex in-app browser with real project and `.rdc` inputs |
 | Documentation only | Path and terminology scan |
 
 ## Cleanup Rules

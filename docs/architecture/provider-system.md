@@ -97,9 +97,9 @@ Settings > Providers 使用 `catalogGroup` 展示产品分组，同时保留 `au
 Provider 体系的最小验证集合：
 
 - `npm run typecheck`
-- `npm run test:provider-system`
+- `npm run check:provider-system`
 - `npm run check:shared-exports`
 - `npm run check:fidelity`
 - `npm run check:architecture`
 
-涉及 Settings UI 结构、样式或状态展示时，补充 `npm run test:browser-session` 或等价浏览器真实会话检查。
+涉及 Settings UI 结构、样式或状态展示时，补充 `npm run start:agent-browser` 并用 Codex 内置浏览器打开 `/app` 做真实会话检查。

@@ -9,30 +9,31 @@ if not exist "package.json" (
 )
 
 if not exist "node_modules\electron\dist\electron.exe" (
-  echo [RDC-Agent] Electron runtime is missing. Installing dependencies once...
-  call npm install
-  if errorlevel 1 exit /b %ERRORLEVEL%
-)
-
-if not exist "node_modules\electron\dist\electron.exe" (
-  echo [RDC-Agent] Installing Electron runtime...
-  call node node_modules\electron\install.js
-  if errorlevel 1 exit /b %ERRORLEVEL%
+  echo [RDC-Agent] Electron runtime is missing. Run npm install first.
+  exit /b 1
 )
 
 if not exist "out\main\index.js" (
+  if not exist "node_modules\.bin\electron-vite.cmd" (
+    echo [RDC-Agent] Build tool is missing. Run npm install first.
+    exit /b 1
+  )
   echo [RDC-Agent] Build output is missing. Building the application...
-  call npm run build
+  call "node_modules\.bin\electron-vite.cmd" build
   if errorlevel 1 exit /b %ERRORLEVEL%
 )
 
 if not exist "out\renderer\index.html" (
+  if not exist "node_modules\.bin\electron-vite.cmd" (
+    echo [RDC-Agent] Build tool is missing. Run npm install first.
+    exit /b 1
+  )
   echo [RDC-Agent] Renderer build output is missing. Building the application...
-  call npm run build
+  call "node_modules\.bin\electron-vite.cmd" build
   if errorlevel 1 exit /b %ERRORLEVEL%
 )
 
-echo [RDC-Agent] Starting app...
-echo [RDC-Agent] Browser app session URL will be printed by the main process as /app.
+echo [RDC-Agent] Starting visible Electron React WebUI from build output...
+echo [RDC-Agent] The same main process will also print the /app browser session URL.
 call "node_modules\electron\dist\electron.exe" "out\main\index.js"
 exit /b %ERRORLEVEL%

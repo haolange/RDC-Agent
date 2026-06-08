@@ -21,7 +21,6 @@
 - `docs`：产品、架构、工作流和 UI 文档。
 - `resources`：随应用分发或运行时依赖的资源。
 - `scripts`：可复用开发脚本。
-- `e2e`：Playwright browser session 与 Electron shell smoke。
 
 仓库保持标准 Electron 应用布局。`Config`、`Saved`、`Intermediate`、`Binaries` 属于运行期或构建期概念，不作为仓库顶层源码目录。
 
@@ -55,9 +54,9 @@ npm install
 npm run dev
 ```
 
-人类日常打开软件也可以运行 `scripts/start-rdc-agent.cmd`。该脚本使用构建产物启动同一套 Electron 主进程和 renderer；缺少构建产物时会先构建一次。主进程启动后会输出 `http://127.0.0.1:<port>/app`，供浏览器真实会话连接同一套 main/runtime。
+人类开发模式运行 `scripts/start-rdc-agent-dev.cmd`，它启动可见 Electron React WebUI。人类本地构建产物运行 `scripts/start-rdc-agent.cmd`；发布包按平台双击 exe / app 包。两条人类路径都进入同一套 Electron main process、renderer、workspace、settings 和 RDX CLI invoker。
 
-agent 日常交互式迭代使用 headless 浏览器真实会话：设置 `RDC_AGENT_HEADLESS=1` 启动主进程后，打开主进程输出的 `/app` 地址。该模式只跳过 Electron 桌面窗口，renderer、样式、workspace、settings、RDX CLI invoker 和 `window.electronAPI` 能力面与人类桌面软件保持同源。
+agent 日常交互式迭代运行 `scripts/start-browser-session.cmd` 或 `npm run start:agent-browser`，再用 Codex 内置浏览器打开主进程输出的 `/app` 地址。该模式只跳过 Electron 桌面窗口，renderer、样式、workspace、settings、project/session、RDX CLI invoker 和 `window.electronAPI` 能力面与人类桌面软件保持同源。
 
 ## 常用命令
 
@@ -66,18 +65,18 @@ agent 日常交互式迭代使用 headless 浏览器真实会话：设置 `RDC_A
 - `npm run check:architecture`
 - `npm run check:fidelity`
 - `npm run check:shared-exports`
-- `npm run test:browser-session`
-- `npm run test:shell-smoke`
-- `npm run test:provider-system`
-- `npm run test:settings-agents`
-- `npm run test:product-smoke`
+- `npm run check:provider-system`
+- `npm run check:settings-agents`
+- `npm run start:human`
+- `npm run start:human:dev`
+- `npm run start:agent-browser`
 
 本地产品级 smoke 需要显式传入真实输入路径：
 
 ```powershell
 $env:RDC_AGENT_PRODUCT_SMOKE_PROJECT_ROOT='H:\DebugTest\custom'
 $env:RDC_AGENT_PRODUCT_SMOKE_RDC_PATH="$env:USERPROFILE\Desktop\眼睛泪腺白点.rdc"
-npm run test:product-smoke
+npm run start:agent-browser
 ```
 
 ## 开发约定

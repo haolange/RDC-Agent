@@ -91,8 +91,9 @@ renderer 内部分层依赖方向：
 - 共享导出：`npm run check:shared-exports`。
 - 静态类型：`npm run typecheck`。
 - 构建检查：`npm run build`。
-- 浏览器真实会话 smoke：`npm run test:browser-session`。运行前必须先 build，因为 smoke 以 `RDC_AGENT_HEADLESS=1` 启动 `out/main/index.js` 和 `out/renderer`，再用浏览器打开 `/app`。
-- Electron 壳边界 smoke：`npm run test:shell-smoke`。只验证窗口启动、preload 注入、IPC 连通、workspace 权限和 RDX CLI invoker/RenderDoc 本地链路诊断。
-- Provider 体系：`npm run test:provider-system`。
-- Settings Agents 路由：`npm run test:settings-agents`。
-- 本地产品级 smoke：`npm run test:product-smoke`，需要 `RDC_AGENT_PRODUCT_SMOKE_PROJECT_ROOT` 和 `RDC_AGENT_PRODUCT_SMOKE_RDC_PATH`。
+- 浏览器真实会话：`npm run start:agent-browser` 或 `scripts/start-browser-session.cmd`。运行前必须先 build；入口以 `RDC_AGENT_HEADLESS=1` 启动 `out/main/index.js` 和 `out/renderer`，再用 Codex 内置浏览器打开主进程输出的 `/app`。
+- 人类开发入口：`scripts/start-rdc-agent-dev.cmd`，启动可见 Electron React WebUI。
+- 人类构建产物入口：`scripts/start-rdc-agent.cmd`，使用构建产物启动可见 Electron React WebUI；发布模式直接双击 exe / app 包。
+- Provider 体系：`npm run check:provider-system`。
+- Settings Agents 路由：`npm run check:settings-agents`。
+- 本地产品级浏览器验收需要真实 project 与 `.rdc` 输入，例如 `D:\Utility\RDC_Agent` 和 `D:\Utility\GPUCaptures\RenderDoc\眼睛泪腺白点.rdc`；RDX/RenderDoc 失败必须 fail-closed 并显示诊断。
