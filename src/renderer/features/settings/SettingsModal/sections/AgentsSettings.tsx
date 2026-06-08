@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type Dispatch, type SetStateAction } from 'react';
 import type { AppSettings, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
 import { AGENT_DISPLAY_NAMES, AGENT_ROLES } from '@shared/constants/agents';
 import DropdownSelect, { type DropdownOption } from '../../../../ui/DropdownSelect';
@@ -12,13 +12,23 @@ interface AgentsSettingsProps {
   settings: AppSettings;
   providerDrafts: LlmProviderEntry[];
   agentRouteDrafts: LlmAgentRoute[];
+  activeModeProfileDraft: string;
+  enabledSkillDrafts: string[];
+  enabledMcpDrafts: string[];
+  patternBindingDrafts: Record<string, string>;
   routableProviders: LlmProviderEntry[];
   configuredProvidersWithoutEnabledModels: LlmProviderEntry[];
   getResolvedProviderLabel: (provider: Pick<LlmProviderEntry, 'label'>) => string;
   onRouteChange: (agentId: LlmAgentRoute['agentId'], patch: Partial<LlmAgentRoute>) => void;
+  onActiveModeProfileChange: (profileId: string) => void;
+  onEnabledSkillDraftsChange: Dispatch<SetStateAction<string[]>>;
+  onEnabledMcpDraftsChange: Dispatch<SetStateAction<string[]>>;
+  onPatternBindingDraftsChange: Dispatch<SetStateAction<Record<string, string>>>;
   onSaveAgentRoutes: () => void | Promise<void>;
-  agentRouteSaveState?: 'idle' | 'saving' | 'saved' | 'error';
-  agentRouteSaveMessage?: string;
+  onSaveAgentRuntimeConfig: () => void | Promise<void>;
+  toggleRuntimeId: (values: string[], id: string) => string[];
+  agentRouteSaveState: 'idle' | 'saving' | 'saved' | 'error';
+  agentRouteSaveMessage: string;
   t: Translate;
 }
 
@@ -26,13 +36,23 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   settings,
   providerDrafts,
   agentRouteDrafts,
+  activeModeProfileDraft,
+  enabledSkillDrafts,
+  enabledMcpDrafts,
+  patternBindingDrafts,
   routableProviders,
   configuredProvidersWithoutEnabledModels,
   getResolvedProviderLabel,
   onRouteChange,
+  onActiveModeProfileChange,
+  onEnabledSkillDraftsChange,
+  onEnabledMcpDraftsChange,
+  onPatternBindingDraftsChange,
   onSaveAgentRoutes,
-  agentRouteSaveState = 'idle',
-  agentRouteSaveMessage = '',
+  onSaveAgentRuntimeConfig,
+  toggleRuntimeId,
+  agentRouteSaveState,
+  agentRouteSaveMessage,
   t,
 }) => {
   const invalidAgentRoutes = AGENT_ROLES.map((agentId) => {
@@ -169,6 +189,102 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
             {agentRouteSaveState === 'saving' ? t('settings.saving') : t('settings.saveAgentRouting')}
           </button>
         </div>
+
+        <details className="settings-path-card" data-testid="settings-agent-runtime-config">
+          <summary className="settings-field-label">{t('settings.agentRuntime')}</summary>
+          <div className="settings-derived-paths-header">
+            <div className="settings-help-text">{t('settings.agentRuntimeHint')}</div>
+          </div>
+          <div className="settings-option-block">
+            <div className="settings-field-label">{t('settings.activeModeProfile')}</div>
+            <DropdownSelect
+              triggerClassName="settings-select-trigger settings-agent-select-trigger"
+              menuClassName="settings-select-menu"
+              dataTestId="settings-active-mode-profile"
+              ariaLabel={t('settings.activeModeProfile')}
+              value={activeModeProfileDraft}
+              options={settings.configuration.availableModeProfiles.map<DropdownOption>((profile) => ({
+                value: profile.id,
+                label: profile.label,
+              }))}
+              placeholder={settings.configuration.activeModeProfileId}
+              onChange={onActiveModeProfileChange}
+              disabled={settings.configuration.availableModeProfiles.length === 0}
+            />
+          </div>
+
+          <div className="settings-option-block">
+            <div className="settings-field-label">{t('settings.patterns')}</div>
+            {(['debugger', 'analyzer', 'optimizer'] as const).map((modeId) => (
+              <div key={modeId} className="settings-agent-route-control">
+                <span className="settings-help-text">{t(`mode.${modeId}` as TranslationKey)}</span>
+                <DropdownSelect
+                  triggerClassName="settings-select-trigger settings-agent-select-trigger"
+                  menuClassName="settings-select-menu"
+                  dataTestId={`settings-pattern-${modeId}`}
+                  ariaLabel={`${t(`mode.${modeId}` as TranslationKey)} ${t('settings.patterns')}`}
+                  value={patternBindingDrafts[modeId] ?? ''}
+                  options={settings.configuration.availablePatterns.map<DropdownOption>((pattern) => ({
+                    value: pattern.id,
+                    label: pattern.label,
+                  }))}
+                  placeholder="free-agent"
+                  onChange={(patternId) => {
+                    onPatternBindingDraftsChange((current) => ({ ...current, [modeId]: patternId }));
+                  }}
+                  disabled={settings.configuration.availablePatterns.length === 0}
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="settings-option-block">
+            <div className="settings-field-label">{t('settings.skills')}</div>
+            <div className="user-menu-pill-group settings-inline-pills">
+              {settings.configuration.availableSkills.map((skill) => (
+                <button
+                  key={skill.id}
+                  type="button"
+                  className={`user-menu-pill ${enabledSkillDrafts.includes(skill.id) ? 'active' : ''}`}
+                  data-testid={`settings-skill-${skill.id}`}
+                  title={skill.description}
+                  onClick={() => onEnabledSkillDraftsChange((current) => toggleRuntimeId(current, skill.id))}
+                >
+                  {skill.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="settings-option-block">
+            <div className="settings-field-label">{t('settings.mcp')}</div>
+            <div className="user-menu-pill-group settings-inline-pills">
+              {settings.configuration.availableMcpServers.map((server) => (
+                <button
+                  key={server.id}
+                  type="button"
+                  className={`user-menu-pill ${enabledMcpDrafts.includes(server.id) ? 'active' : ''}`}
+                  data-testid={`settings-mcp-${server.id}`}
+                  title={server.description}
+                  onClick={() => onEnabledMcpDraftsChange((current) => toggleRuntimeId(current, server.id))}
+                >
+                  {server.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="settings-actions">
+            <button
+              type="button"
+              className="button button-secondary"
+              data-testid="settings-agent-runtime-save"
+              onClick={() => void onSaveAgentRuntimeConfig()}
+            >
+              {t('settings.saveRuntimeConfig')}
+            </button>
+          </div>
+        </details>
       </div>
     </section>
   );

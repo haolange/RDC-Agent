@@ -1,5 +1,5 @@
 import React from 'react';
-import type { LlmProviderEntry } from '@shared/types/settings';
+import type { LlmProviderCatalogGroup, LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import {
   getEnabledModels,
@@ -9,6 +9,14 @@ import {
 } from '../utils';
 
 type Translate = ReturnType<typeof useI18n>['t'];
+
+const CATALOG_GROUP_ORDER: LlmProviderCatalogGroup[] = [
+  'openai-compatible',
+  'anthropic-compatible',
+  'cloud-platform',
+  'local',
+  'image',
+];
 
 interface ProvidersSettingsProps {
   accountProviders: LlmProviderEntry[];
@@ -41,6 +49,7 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
       .filter(Boolean)
       .join(' ');
     const unavailableLabel = unavailable ? t('settings.providerUnavailable') : '';
+
     return (
       <div
         key={provider.id}
@@ -61,13 +70,13 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
                   provider.planLabel,
                   getModelSummary(models, ''),
                   unavailableLabel,
-                ].filter(Boolean).join(' · ')
+                ].filter(Boolean).join(' / ')
                 : [
                   getProviderGroupLabel(provider),
                   connected ? t('settings.providerConnected') : t('settings.providerUnconfigured'),
                   getModelSummary(models, t('settings.noEnabledModels')),
                   unavailableLabel,
-                ].filter(Boolean).join(' · ')}
+                ].filter(Boolean).join(' / ')}
             </span>
           </span>
         </div>
@@ -127,6 +136,11 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
     </div>
   );
 
+  const catalogGroups = CATALOG_GROUP_ORDER.map((group) => ({
+    group,
+    providers: providerCatalog.filter((provider) => provider.catalogGroup === group),
+  }));
+
   return (
     <>
       {renderProviderGroup(
@@ -136,13 +150,15 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
         'settings-oauth-accounts',
         'account',
       )}
-      {renderProviderGroup(
-        t('settings.addProvider'),
-        t('settings.addProviderHint'),
-        providerCatalog,
-        'settings-add-provider',
-        'add',
-      )}
+      <div className="settings-provider-catalog-groups" data-testid="settings-add-provider">
+        {catalogGroups.map(({ group, providers }) => renderProviderGroup(
+          getProviderGroupLabel({ catalogGroup: group }),
+          t('settings.addProviderHint'),
+          providers,
+          `settings-provider-group-${group}`,
+          'add',
+        ))}
+      </div>
     </>
   );
 };

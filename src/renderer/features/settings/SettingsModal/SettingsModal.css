@@ -526,6 +526,12 @@
   gap: 8px;
 }
 
+.settings-provider-catalog-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .settings-provider-row-list:empty::before {
   content: attr(data-empty-label);
   display: block;
@@ -558,7 +564,7 @@
 }
 
 .settings-provider-row--unavailable .settings-provider-status {
-  color: var(--color-text-muted, #888);
+  color: rgb(var(--color-text-muted));
   background: rgb(var(--color-text-muted));
 }
 
