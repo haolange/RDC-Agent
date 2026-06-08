@@ -21,7 +21,8 @@
     "check:settings-agents": "node scripts/check-settings-agents.mjs",
     "start:human": "scripts\\start-rdc-agent.cmd",
     "start:human:dev": "scripts\\start-rdc-agent-dev.cmd",
-    "start:agent-browser": "scripts\\start-browser-session.cmd"
+    "start:agent-browser": "scripts\\start-browser-session.cmd",
+    "start:agent-browser:dev": "scripts\\start-browser-session-dev.cmd"
   },
   "dependencies": {
     "openai": "^6.38.0",

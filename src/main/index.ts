@@ -21,7 +21,11 @@ export const rdxSessionService = new RdxSessionService(rdxCliInvokerService);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-if (!process.env.RDC_AGENT_USER_DATA?.trim()) {
+const configuredUserDataPath = process.env.RDC_AGENT_USER_DATA?.trim();
+if (configuredUserDataPath) {
+  app.commandLine.appendSwitch('user-data-dir', configuredUserDataPath);
+  app.setPath('userData', configuredUserDataPath);
+} else {
   app.setPath('userData', path.join(app.getPath('appData'), 'rdc-agent'));
 }
 
@@ -37,7 +41,7 @@ if (!hasSingleInstanceLock) {
   app.exit(0);
 }
 
-if (isTestMode) {
+if (isTestMode || isHeadlessMode) {
   app.disableHardwareAcceleration();
   app.commandLine.appendSwitch('disable-gpu');
   app.commandLine.appendSwitch('disable-gpu-compositing');
