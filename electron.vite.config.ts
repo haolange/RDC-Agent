@@ -37,6 +37,11 @@ export default defineConfig({
   },
   renderer: {
     root: rendererRoot,
+    server: {
+      host: '127.0.0.1',
+      port: 5173,
+      strictPort: false
+    },
     build: {
       rollupOptions: {
         input: {

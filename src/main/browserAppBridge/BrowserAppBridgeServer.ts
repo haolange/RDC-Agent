@@ -1,5 +1,6 @@
 import { createReadStream, existsSync, statSync } from 'fs';
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'http';
+import { createServer, request as httpRequest, type IncomingMessage, type Server, type ServerResponse } from 'http';
+import { request as httpsRequest } from 'https';
 import { extname, join, normalize, resolve } from 'path';
 import { URL } from 'url';
 import { invokeRegisteredIpcChannel } from '../ipc/invokeRegistry';
@@ -35,6 +36,39 @@ function sendJson(response: ServerResponse, statusCode: number, payload: unknown
   setCors(response);
   response.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
   response.end(JSON.stringify(payload));
+}
+
+async function checkDevRenderer(url: string): Promise<{ ok: boolean; url: string; error?: string }> {
+  return new Promise((resolveCheck) => {
+    const target = new URL(url);
+    const requestImpl = target.protocol === 'https:' ? httpsRequest : httpRequest;
+    const request = requestImpl(
+      {
+        method: 'GET',
+        hostname: target.hostname,
+        port: target.port,
+        path: `${target.pathname}${target.search}`,
+        timeout: 1500,
+      },
+      (response) => {
+        response.resume();
+        const ok = Boolean(response.statusCode && response.statusCode >= 200 && response.statusCode < 400);
+        resolveCheck({
+          ok,
+          url,
+          ...(ok ? {} : { error: response.statusCode ? `HTTP ${response.statusCode}` : 'Missing status code' }),
+        });
+      },
+    );
+
+    request.on('timeout', () => {
+      request.destroy(new Error('Timed out while connecting to the dev renderer'));
+    });
+    request.on('error', (error) => {
+      resolveCheck({ ok: false, url, error: error.message });
+    });
+    request.end();
+  });
 }
 
 async function readJsonBody(request: IncomingMessage): Promise<unknown> {
@@ -79,7 +113,7 @@ function serveStatic(response: ServerResponse, rendererRoot: string, requestPath
   createReadStream(filePath).pipe(response);
 }
 
-function handleRequest(options: BridgeOptions, request: IncomingMessage, response: ServerResponse): void {
+async function handleRequest(options: BridgeOptions, request: IncomingMessage, response: ServerResponse): Promise<void> {
   if (!request.url) {
     sendJson(response, 400, { success: false, error: 'Missing URL' });
     return;
@@ -96,11 +130,15 @@ function handleRequest(options: BridgeOptions, request: IncomingMessage, respons
   const url = new URL(request.url, bridgeOrigin);
 
   if (url.pathname === '/health' && request.method === 'GET') {
+    const renderer = options.devRendererUrl
+      ? await checkDevRenderer(options.devRendererUrl)
+      : { ok: existsSync(join(options.rendererRoot, 'index.html')), url: null };
     sendJson(response, 200, {
-      ok: true,
+      ok: renderer.ok,
       productName: 'RDC-Agent',
       mode: 'browser-app-session',
       bridgeUrl,
+      renderer,
     });
     return;
   }
@@ -133,6 +171,15 @@ function handleRequest(options: BridgeOptions, request: IncomingMessage, respons
 
   if (url.pathname === '/app' || url.pathname.startsWith('/app/')) {
     if (options.devRendererUrl) {
+      const renderer = await checkDevRenderer(options.devRendererUrl);
+      if (!renderer.ok) {
+        sendJson(response, 503, {
+          success: false,
+          error: 'Dev renderer is not reachable',
+          renderer,
+        });
+        return;
+      }
       redirectToDevRenderer(response, options.devRendererUrl, bridgeOrigin);
       return;
     }
@@ -155,7 +202,14 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
 
   const preferredPort = options.preferredPort ?? Number(process.env.RDC_AGENT_BROWSER_BRIDGE_PORT || 5127);
 
-  server = createServer((request, response) => handleRequest(options, request, response));
+  server = createServer((request, response) => {
+    void handleRequest(options, request, response).catch((error) => {
+      sendJson(response, 500, {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+  });
 
   await new Promise<void>((resolveListen, rejectListen) => {
     const activeServer = server;

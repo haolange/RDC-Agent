@@ -37,6 +37,7 @@ const fs$1 = require("fs/promises");
 const promises = require("dns/promises");
 const net = require("net");
 const http = require("http");
+const https = require("https");
 function _interopNamespaceDefault(e) {
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
   if (e) {
@@ -20625,6 +20626,37 @@ function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(payload));
 }
+async function checkDevRenderer(url$1) {
+  return new Promise((resolveCheck) => {
+    const target = new url.URL(url$1);
+    const requestImpl = target.protocol === "https:" ? https.request : http.request;
+    const request = requestImpl(
+      {
+        method: "GET",
+        hostname: target.hostname,
+        port: target.port,
+        path: `${target.pathname}${target.search}`,
+        timeout: 1500
+      },
+      (response) => {
+        response.resume();
+        const ok = Boolean(response.statusCode && response.statusCode >= 200 && response.statusCode < 400);
+        resolveCheck({
+          ok,
+          url: url$1,
+          ...ok ? {} : { error: response.statusCode ? `HTTP ${response.statusCode}` : "Missing status code" }
+        });
+      }
+    );
+    request.on("timeout", () => {
+      request.destroy(new Error("Timed out while connecting to the dev renderer"));
+    });
+    request.on("error", (error) => {
+      resolveCheck({ ok: false, url: url$1, error: error.message });
+    });
+    request.end();
+  });
+}
 async function readJsonBody(request) {
   const chunks = [];
   for await (const chunk of request) {
@@ -20658,7 +20690,7 @@ function serveStatic(response, rendererRoot, requestPath) {
   });
   fs.createReadStream(filePath).pipe(response);
 }
-function handleRequest(options, request, response) {
+async function handleRequest(options, request, response) {
   if (!request.url) {
     sendJson(response, 400, { success: false, error: "Missing URL" });
     return;
@@ -20672,11 +20704,13 @@ function handleRequest(options, request, response) {
   const bridgeOrigin = bridgeUrl ?? "http://127.0.0.1";
   const url$1 = new url.URL(request.url, bridgeOrigin);
   if (url$1.pathname === "/health" && request.method === "GET") {
+    const renderer = options.devRendererUrl ? await checkDevRenderer(options.devRendererUrl) : { ok: fs.existsSync(path.join(options.rendererRoot, "index.html")), url: null };
     sendJson(response, 200, {
-      ok: true,
+      ok: renderer.ok,
       productName: "RDC-Agent",
       mode: "browser-app-session",
-      bridgeUrl
+      bridgeUrl,
+      renderer
     });
     return;
   }
@@ -20704,6 +20738,15 @@ function handleRequest(options, request, response) {
   }
   if (url$1.pathname === "/app" || url$1.pathname.startsWith("/app/")) {
     if (options.devRendererUrl) {
+      const renderer = await checkDevRenderer(options.devRendererUrl);
+      if (!renderer.ok) {
+        sendJson(response, 503, {
+          success: false,
+          error: "Dev renderer is not reachable",
+          renderer
+        });
+        return;
+      }
       redirectToDevRenderer(response, options.devRendererUrl, bridgeOrigin);
       return;
     }
@@ -20721,7 +20764,14 @@ async function startBrowserAppBridge(options) {
     return bridgeUrl;
   }
   const preferredPort = options.preferredPort ?? Number(process.env.RDC_AGENT_BROWSER_BRIDGE_PORT || 5127);
-  server = http.createServer((request, response) => handleRequest(options, request, response));
+  server = http.createServer((request, response) => {
+    void handleRequest(options, request, response).catch((error) => {
+      sendJson(response, 500, {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    });
+  });
   await new Promise((resolveListen, rejectListen) => {
     const activeServer = server;
     if (!activeServer) {
@@ -20759,7 +20809,11 @@ async function stopBrowserAppBridge() {
 }
 const rdxSessionService = new RdxSessionService(rdxCliInvokerService);
 const __dirname$1 = path__namespace.dirname(url.fileURLToPath(require("url").pathToFileURL(__filename).href));
-if (!process.env.RDC_AGENT_USER_DATA?.trim()) {
+const configuredUserDataPath = process.env.RDC_AGENT_USER_DATA?.trim();
+if (configuredUserDataPath) {
+  electron.app.commandLine.appendSwitch("user-data-dir", configuredUserDataPath);
+  electron.app.setPath("userData", configuredUserDataPath);
+} else {
   electron.app.setPath("userData", path__namespace.join(electron.app.getPath("appData"), "rdc-agent"));
 }
 const isDev = process.env.NODE_ENV === "development" && process.env.RDC_AGENT_TEST_MODE !== "1";
@@ -20771,7 +20825,7 @@ if (!hasSingleInstanceLock) {
   console.log("[RDC-Agent] Another instance is already running. Reusing the existing instance.");
   electron.app.exit(0);
 }
-if (isTestMode) {
+if (isTestMode || isHeadlessMode) {
   electron.app.disableHardwareAcceleration();
   electron.app.commandLine.appendSwitch("disable-gpu");
   electron.app.commandLine.appendSwitch("disable-gpu-compositing");
