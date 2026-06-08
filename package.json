@@ -17,11 +17,11 @@
     "check:shared-exports": "node scripts/check-shared-exports.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
-    "test:provider-system": "npx playwright test e2e/provider-system.spec.ts --config playwright.config.ts",
-    "test:settings-agents": "npx playwright test e2e/settings-agent-routes.spec.ts --config playwright.config.ts",
-    "test:product-smoke": "npx playwright test e2e/product-smoke.spec.ts --config playwright.config.ts",
-    "test:shell-smoke": "npx playwright test e2e/shell-smoke.spec.ts --config playwright.config.ts",
-    "test:browser-session": "npx playwright test e2e/browser-session.spec.ts --config playwright.config.ts"
+    "check:provider-system": "node scripts/check-provider-system.mjs",
+    "check:settings-agents": "node scripts/check-settings-agents.mjs",
+    "start:human": "scripts\\start-rdc-agent.cmd",
+    "start:human:dev": "scripts\\start-rdc-agent-dev.cmd",
+    "start:agent-browser": "scripts\\start-browser-session.cmd"
   },
   "dependencies": {
     "openai": "^6.38.0",
@@ -39,7 +39,6 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.3",
-    "@playwright/test": "^1.59.1",
     "@swc/core": "^1.15.33",
     "@types/node": "^24.12.4",
     "@types/react": "^18.2.0",

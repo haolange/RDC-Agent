@@ -33,7 +33,8 @@ if not exist "out\renderer\index.html" (
   if errorlevel 1 exit /b %ERRORLEVEL%
 )
 
-echo [RDC-Agent] Starting visible Electron React WebUI from build output...
-echo [RDC-Agent] The same main process will also print the /app browser session URL.
+echo [RDC-Agent] Starting headless main process for Codex in-app browser verification...
+set "RDC_AGENT_HEADLESS=1"
+if "%NODE_ENV%"=="" set "NODE_ENV=production"
 call "node_modules\electron\dist\electron.exe" "out\main\index.js"
 exit /b %ERRORLEVEL%
