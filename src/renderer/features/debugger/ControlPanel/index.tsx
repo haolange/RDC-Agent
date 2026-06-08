@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useI18n } from '../../../i18n';
 import { useCaptureStore } from '../../../stores/captureStore';
 import { useProjectStore } from '../../../stores/projectStore';
@@ -7,8 +7,8 @@ import { useWorkflowStore } from '../../../stores/workflowStore';
 import { CaptureLibrary } from './CaptureLibrary';
 import { CollapsibleSection } from './CollapsibleSection';
 import { ClassicSessionControlPanel } from './SessionControlPanel';
-import { WorkstreamRightPanel } from './WorkstreamRightPanel';
-import { shouldShowWorkstreamRightRail } from './workstreamRail';
+import { TraceRightPanel } from './TraceRightPanel';
+import { shouldShowTraceRightRail } from './traceRail';
 import './ControlPanel.css';
 
 type RightRailMode = 'hidden' | 'project' | 'session';
@@ -51,8 +51,8 @@ const ProjectControlPanel: React.FC = () => {
 
 const SessionControlPanel: React.FC = () => {
   const presentation = useWorkflowStore((state) => state.tracePresentation);
-  if (shouldShowWorkstreamRightRail(presentation)) {
-    return <WorkstreamRightPanel />;
+  if (shouldShowTraceRightRail(presentation)) {
+    return <TraceRightPanel />;
   }
   return <ClassicSessionControlPanel />;
 };
@@ -87,3 +87,5 @@ export const ControlPanel: React.FC = () => {
 };
 
 export default ControlPanel;
+
+

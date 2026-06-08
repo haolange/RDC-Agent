@@ -160,6 +160,7 @@ def default_context_state(context: Optional[str] = "default", *, limits: Any = N
             "attempt_count": 0,
             "recovered_session_ids": [],
             "degraded_session_ids": [],
+            "deferred_session_ids": [],
             "last_error": "",
         },
         "preview": default_preview_state(),
@@ -272,6 +273,26 @@ def _normalize_remote_session_record(value: Any) -> Dict[str, Any]:
     }
 
 
+def _normalize_shader_replacements(value: Any) -> list[Dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    normalized: list[Dict[str, Any]] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        replacement_id = str(item.get("replacement_id") or "").strip()
+        if not replacement_id:
+            continue
+        try:
+            payload = json.loads(json.dumps(item, ensure_ascii=False, default=str))
+        except TypeError:
+            payload = {"replacement_id": replacement_id}
+        if isinstance(payload, dict):
+            payload["replacement_id"] = replacement_id
+            normalized.append(payload)
+    return normalized
+
+
 def _normalize_session_record(session_id: str, value: Any) -> Dict[str, Any]:
     item = dict(value or {}) if isinstance(value, dict) else {}
     recovery = item.get("recovery") if isinstance(item.get("recovery"), dict) else {}
@@ -288,6 +309,7 @@ def _normalize_session_record(session_id: str, value: Any) -> Dict[str, Any]:
         "state": str(item.get("state") or "active").strip() or "active",
         "is_live": bool(item.get("is_live", True)),
         "last_error": str(item.get("last_error") or "").strip(),
+        "shader_replacements": _normalize_shader_replacements(item.get("shader_replacements")),
         "updated_at_ms": _normalize_int(item.get("updated_at_ms"), _now_ms()),
         "remote": _normalize_remote_session_record(remote) if remote else {},
         "recovery": {
@@ -392,6 +414,7 @@ def normalize_context_state(
             "attempt_count": _normalize_int(recovery.get("attempt_count")),
             "recovered_session_ids": [str(item).strip() for item in recovery.get("recovered_session_ids", []) if str(item).strip()],
             "degraded_session_ids": [str(item).strip() for item in recovery.get("degraded_session_ids", []) if str(item).strip()],
+            "deferred_session_ids": [str(item).strip() for item in recovery.get("deferred_session_ids", []) if str(item).strip()],
             "last_error": str(recovery.get("last_error") or "").strip(),
         }
 

@@ -19,10 +19,10 @@ export const ComposerApprovalOverlay: React.FC = () => {
     return null;
   }
 
-  const refreshWorkstream = async () => {
+  const refreshTraceProjection = async () => {
     const sessionId = presentation?.sessionId;
     if (!sessionId) return;
-    const result = await getElectronApi()?.workflow.getWorkstreamSession(sessionId);
+    const result = await getElectronApi()?.trace.getProjection(sessionId);
     if (result?.presentation) {
       setTracePresentation(result.presentation);
     }
@@ -46,7 +46,7 @@ export const ComposerApprovalOverlay: React.FC = () => {
           lastStage: 'dispatch',
         });
       }
-      await refreshWorkstream();
+      await refreshTraceProjection();
     } finally {
       setBusyAction(null);
     }
@@ -119,3 +119,6 @@ export const ComposerApprovalOverlay: React.FC = () => {
     </section>
   );
 };
+
+
+

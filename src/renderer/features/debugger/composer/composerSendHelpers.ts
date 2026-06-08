@@ -1,4 +1,4 @@
-import type { ConversationAttachmentInput, ConversationMessage, ConversationTurnResult } from '@shared/types/conversation';
+﻿import type { ConversationAttachmentInput, ConversationMessage, ConversationTurnResult } from '@shared/types/conversation';
 import type { AgentMode } from '@shared/types/layout';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
@@ -173,7 +173,7 @@ export async function syncE2EConversationState(options: {
     const done = assistantForTurn && ['complete', 'error', 'stopped'].includes(assistantForTurn.status ?? 'draft');
     if (done) {
       setConversationMessages(history);
-      const workflowPresentation = await electronAPI.workflow.getWorkstreamSession(sessionId).catch(() => null);
+      const workflowPresentation = await electronAPI.trace.getProjection(sessionId).catch(() => null);
       if (workflowPresentation?.presentation) {
         setTracePresentation(workflowPresentation.presentation);
       }
@@ -182,3 +182,5 @@ export async function syncE2EConversationState(options: {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 }
+
+

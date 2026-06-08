@@ -158,6 +158,9 @@ export function createSettingsModalActions({
 
   const handleSaveAgentRuntimeConfig = async () => {
     await patchSettings({
+      tooling: {
+        rdxCli: modalState.rdxCliDraft,
+      },
       configuration: {
         activeModeProfileId: modalState.activeModeProfileDraft,
         enabledSkillIds: modalState.enabledSkillDrafts,

@@ -314,7 +314,7 @@ class PixelDebugResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 class PatchOp(BaseModel):
-    op: str  # force_full_precision, insert_guard, replace_expr
+    op: str  # force_full_precision, insert_guard
     variables: List[str] = Field(default_factory=list)
     range_from: Optional[int] = None  # instruction index
     range_to: Optional[int] = None

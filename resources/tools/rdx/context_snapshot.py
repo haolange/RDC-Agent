@@ -291,6 +291,11 @@ def default_context_snapshot(context: Optional[str] = "default") -> Dict[str, An
             "origin_context_id": "",
             "context_locality": "strict",
             "reuse_policy": "must_reconnect",
+            "transport": "",
+            "requested": {},
+            "options": {},
+            "bootstrap": {},
+            "device_serial": "",
         },
         "focus": {
             "pixel": None,
@@ -473,6 +478,15 @@ def normalize_context_snapshot(
         snapshot["remote"]["reuse_policy"] = str(
             remote_payload.get("reuse_policy") or "must_reconnect"
         ).strip() or "must_reconnect"
+        snapshot["remote"]["transport"] = str(
+            remote_payload.get("transport") or ""
+        ).strip()
+        for key in ("requested", "options", "bootstrap"):
+            value = remote_payload.get(key)
+            snapshot["remote"][key] = dict(value) if isinstance(value, dict) else {}
+        snapshot["remote"]["device_serial"] = str(
+            remote_payload.get("device_serial") or ""
+        ).strip()
 
     focus_payload = payload.get("focus")
     if isinstance(focus_payload, dict):

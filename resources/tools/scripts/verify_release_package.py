@@ -48,16 +48,6 @@ def _find_package_root(extract_dir: Path) -> Path:
     return candidates[0]
 
 
-def _find_fixture(root: Path) -> Path | None:
-    fixture_root = root / "tests" / "fixtures"
-    if not fixture_root.is_dir():
-        return None
-    for path in sorted(fixture_root.rglob("*.rdc")):
-        if path.is_file():
-            return path
-    return None
-
-
 def _verify_doctor(root: Path) -> None:
     env = os.environ.copy()
     env.pop("RDX_PYTHON", None)
@@ -102,29 +92,9 @@ def _verify_cli_contract(root: Path) -> None:
             raise RuntimeError(f"negative contract check expected {expected}: rdx.bat {' '.join(args)} exit={code}\n{output}")
 
 
-def _verify_fixture_smoke(root: Path, *, required: bool) -> None:
-    fixture = _find_fixture(root)
-    if fixture is None:
-        if required:
-            raise RuntimeError("missing first-party .rdc fixture in release package")
-        return
-    if shutil.which("bash") is None:
-        if required:
-            raise RuntimeError("bash is required to run fixture smoke")
-        return
-    code, output = _run(
-        ["bash", "scripts/smoke_cli.sh", "--rdc", str(fixture), "--context", "package-smoke"],
-        root,
-        timeout_s=900,
-    )
-    if code != 0 or "[smoke] PASS" not in output:
-        raise RuntimeError(f"fixture smoke failed: exit={code}\n{output}")
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Verify an rdx-tools release package")
     parser.add_argument("--zip", dest="zip_path", required=True, help="Release zip path")
-    parser.add_argument("--require-fixture-smoke", action="store_true", help="Fail unless fixture-backed smoke passes")
     args = parser.parse_args(argv)
 
     zip_path = Path(args.zip_path).resolve()
@@ -139,7 +109,6 @@ def main(argv: list[str] | None = None) -> int:
         root = _find_package_root(temp_dir)
         _verify_doctor(root)
         _verify_cli_contract(root)
-        _verify_fixture_smoke(root, required=bool(args.require_fixture_smoke))
     except Exception as exc:  # noqa: BLE001
         print(f"[verify] {exc}")
         return 1

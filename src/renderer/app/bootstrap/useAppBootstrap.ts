@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+﻿import { useEffect } from 'react';
 import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ResolvedTheme } from '@shared/types/settings';
@@ -111,16 +111,16 @@ export function useAppBootstrap(options: {
     }
 
     void (async () => {
-      const [historyResult, evidenceResult, workstreamResult] = await Promise.all([
+      const [historyResult, evidenceResult, traceResult] = await Promise.all([
         electronAPI.conversation.getHistory(currentSession.sessionId).catch(() => ({ messages: [] })),
         electronAPI.evidence.getChain().catch(() => ({ events: [] as ActionEvent[] })),
-        electronAPI.workflow.getWorkstreamSession(currentSession.sessionId).catch(() => ({ success: false, presentation: null })),
+        electronAPI.trace.getProjection(currentSession.sessionId).catch(() => ({ success: false, presentation: null })),
       ]);
       setConversationMessages(hydrateMessagesWithActionEvents(
         historyResult.messages ?? [],
         (evidenceResult.events ?? []) as ActionEvent[],
       ));
-      setTracePresentation(workstreamResult.presentation ?? null);
+      setTracePresentation(traceResult.presentation ?? null);
     })();
   }, [currentSession?.sessionId, runtimeTestMode, setConversationMessages, setTracePresentation]);
 
@@ -249,7 +249,7 @@ function useSessionRestoreBootstrap(runtimeTestMode: boolean | null): void {
       })
       .catch(() => undefined);
 
-    void electronAPI.workflow.getWorkstreamSession(currentSession.sessionId)
+    void electronAPI.trace.getProjection(currentSession.sessionId)
       .then((result) => {
         useWorkflowStore.getState().setTracePresentation(result.presentation ?? null);
       })
@@ -258,3 +258,6 @@ function useSessionRestoreBootstrap(runtimeTestMode: boolean | null): void {
       });
   }, [currentSession?.sessionId, runtimeTestMode]);
 }
+
+
+

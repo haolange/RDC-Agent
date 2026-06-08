@@ -202,9 +202,6 @@ def test_shader_get_constant_buffer_contents_returns_decoded_payload(monkeypatch
     async def _fake_ensure_event(session_id: str, event_id: int | None) -> int:
         return int(event_id or 314)
 
-    async def _fake_resolve_shader_binding(*, shader_id: str = "", stage_name=None, require_reflection=False):  # type: ignore[no-untyped-def]
-        return "ps", "ResourceId::77", SimpleNamespace(entryPoint="main", constantBlocks=[SimpleNamespace(name="Globals", bindPoint=2, byteSize=64, variables=[])])
-
     async def _fake_collect_constant_buffers(*args, **kwargs):  # type: ignore[no-untyped-def]
         return [
             {
@@ -224,7 +221,6 @@ def test_shader_get_constant_buffer_contents_returns_decoded_payload(monkeypatch
     monkeypatch.setattr(server.server_runtime, "_get_controller", _fake_get_controller)
     monkeypatch.setattr(server.server_runtime, "_ensure_event", _fake_ensure_event)
     monkeypatch.setattr(server.server_runtime, "_rd_stage", lambda stage: stage)
-    monkeypatch.setattr(server.server_runtime, "_resolve_shader_binding", _fake_resolve_shader_binding)
     monkeypatch.setattr(server.server_runtime, "_collect_constant_buffers", _fake_collect_constant_buffers)
 
     payload = json.loads(

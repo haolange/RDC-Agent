@@ -65,6 +65,7 @@ index.ts::*
 interface
 LlmApi
 LlmProviderAuthMode
+LlmProviderCapability
 LlmProviderCatalogGroup
 LlmProviderConnectionStatus
 LlmProviderId
@@ -85,6 +86,7 @@ PlatformApi
 ProgressTaskStatus
 ProjectApi
 RawChannelSubscriptionApi
+RdxCliJsonMode
 readJsonl
 readYaml
 ReasoningConfidence
@@ -118,6 +120,7 @@ ToolLayer
 ToolNamespace
 ToolResultPreview
 ToolRuntimeSource
+TraceArtifactType
 TraceEventType
 TraceNode
 TraceStatus
@@ -132,7 +135,6 @@ WorkflowApi
 WorkflowPhase
 WorkflowStage
 WorkflowStateView
-WorkstreamArtifactType
 writeJsonl
 WriteScope
 writeYaml

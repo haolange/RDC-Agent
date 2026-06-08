@@ -10,6 +10,7 @@ from rdx import server
 from rdx.core.errors import map_exception
 from rdx.core.session_manager import SessionError
 from rdx.context_snapshot import clear_context_snapshot
+from rdx.models import PatchResult
 from rdx.runtime_state import clear_context_state, save_context_state
 
 
@@ -56,6 +57,41 @@ class _FakeRecoverySessionManager:
         raise SessionError(code="session_not_found", message=f"Unknown session_id: {session_id}")
 
 
+class _FakeRecoveryPatchEngine:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    async def apply_patch(
+        self,
+        *,
+        session_id: str,
+        event_id: int,
+        stage: object,
+        session_manager: object,
+        patch_spec: object,
+    ) -> PatchResult:
+        self.calls.append(
+            {
+                "session_id": str(session_id),
+                "event_id": int(event_id),
+                "stage": stage,
+                "patch_spec": patch_spec,
+                "session_manager": session_manager,
+            }
+        )
+        return PatchResult(
+            patch_id=str(getattr(patch_spec, "patch_id", "")),
+            applied_to_shader_hash="hash_after_recovered",
+            original_shader_hash="hash_before_recovered",
+            success=True,
+            messages=["reapplied"],
+            disassembly_target="SPIR-V (RenderDoc)",
+            encoding="spirvasm",
+            entry_point="main",
+            compile_flags=[],
+        )
+
+
 @pytest.fixture(autouse=True)
 def _reset_runtime_state() -> None:
     original_captures = dict(server._runtime.captures)
@@ -65,6 +101,8 @@ def _reset_runtime_state() -> None:
     original_hydrated = set(server._runtime.hydrated_contexts)
     original_logs = list(server._runtime.logs)
     original_session_manager = server.server_runtime._session_manager
+    original_patch_engine = server.server_runtime._patch_engine
+    original_replacements = dict(server._runtime.shader_replacements)
     original_bootstrapped = server.server_runtime._runtime_bootstrapped
     original_config = server.server_runtime._config
     clear_context_snapshot("default")
@@ -75,6 +113,7 @@ def _reset_runtime_state() -> None:
     server._runtime.context_states.clear()
     server._runtime.hydrated_contexts.clear()
     server._runtime.logs.clear()
+    server._runtime.shader_replacements.clear()
     try:
         yield
     finally:
@@ -86,7 +125,9 @@ def _reset_runtime_state() -> None:
         server._runtime.context_states = original_context_states
         server._runtime.hydrated_contexts = original_hydrated
         server._runtime.logs = original_logs
+        server._runtime.shader_replacements = original_replacements
         server.server_runtime._session_manager = original_session_manager
+        server.server_runtime._patch_engine = original_patch_engine
         server.server_runtime._runtime_bootstrapped = original_bootstrapped
         server.server_runtime._config = original_config
 
@@ -294,6 +335,166 @@ def test_session_resume_restores_persisted_local_session(monkeypatch: pytest.Mon
     assert fake_manager.created == ["sess_resume"]
     assert fake_manager.opened == [("sess_resume", str(capture_path))]
     assert fake_controller.set_calls == [202]
+
+
+def test_get_context_defers_remote_session_recovery(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    capture_path = tmp_path / "remote_context.rdc"
+    capture_path.write_text("rdc", encoding="utf-8")
+    save_context_state(
+        {
+            "context_id": "default",
+            "current_capture_file_id": "capf_remote",
+            "current_session_id": "sess_remote",
+            "captures": {
+                "capf_remote": {
+                    "capture_file_id": "capf_remote",
+                    "file_path": str(capture_path),
+                    "read_only": True,
+                    "driver": "Vulkan",
+                    "file_size_bytes": int(capture_path.stat().st_size),
+                    "file_mtime_ms": int(capture_path.stat().st_mtime * 1000),
+                    "file_fingerprint": f"{int(capture_path.stat().st_size)}:{int(capture_path.stat().st_mtime * 1000)}",
+                }
+            },
+            "sessions": {
+                "sess_remote": {
+                    "session_id": "sess_remote",
+                    "capture_file_id": "capf_remote",
+                    "rdc_path": str(capture_path),
+                    "file_fingerprint": f"{int(capture_path.stat().st_size)}:{int(capture_path.stat().st_mtime * 1000)}",
+                    "file_size_bytes": int(capture_path.stat().st_size),
+                    "frame_index": 0,
+                    "active_event_id": 1248,
+                    "backend_type": "remote",
+                    "state": "active",
+                    "is_live": True,
+                    "last_error": "",
+                    "remote": {
+                        "transport": "adb_android",
+                        "host": "127.0.0.1",
+                        "port": 62417,
+                        "endpoint": "127.0.0.1:62417",
+                        "origin_remote_id": "remote_origin",
+                        "origin_context_id": "default",
+                        "ownership_state": "session_owned",
+                        "device_serial": "e38b8019",
+                        "requested": {"host": "127.0.0.1", "port": 38920},
+                        "options": {"install_apk": True, "push_config": True, "local_port": 62417, "remote_port": 38920},
+                        "bootstrap": {"remote_port": 38920},
+                    },
+                }
+            },
+        },
+        "default",
+    )
+    fake_manager = _FakeRecoverySessionManager(controller=_FakeRecoveryController([1248]))
+
+    asyncio.run(server.server_runtime.runtime_startup())
+    server.server_runtime._session_manager = fake_manager
+
+    asyncio.run(server.server_runtime._recover_context_sessions("default"))
+    payload = asyncio.run(server.dispatch_operation("rd.session.get_context", {}, transport="test"))
+
+    assert payload["ok"] is True
+    assert payload["data"]["current_session_id"] == "sess_remote"
+    assert payload["data"]["runtime"]["session_id"] == "sess_remote"
+    assert payload["data"]["recovery"]["deferred_session_ids"] == ["sess_remote"]
+    assert payload["data"]["remote_capability_matrix"]["fix_verification"]["status"] == "not_currently_probed"
+    assert fake_manager.created == []
+    assert fake_manager.opened == []
+
+
+def test_session_resume_reapplies_persisted_shader_replacements(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    capture_path = tmp_path / "shader_replace_resume.rdc"
+    capture_path.write_text("rdc", encoding="utf-8")
+    save_context_state(
+        {
+            "context_id": "default",
+            "current_capture_file_id": "capf_resume",
+            "current_session_id": "sess_resume",
+            "captures": {
+                "capf_resume": {
+                    "capture_file_id": "capf_resume",
+                    "file_path": str(capture_path),
+                    "read_only": True,
+                    "driver": "Vulkan",
+                    "file_size_bytes": int(capture_path.stat().st_size),
+                    "file_mtime_ms": int(capture_path.stat().st_mtime * 1000),
+                    "file_fingerprint": f"{int(capture_path.stat().st_size)}:{int(capture_path.stat().st_mtime * 1000)}",
+                }
+            },
+            "sessions": {
+                "sess_resume": {
+                    "session_id": "sess_resume",
+                    "capture_file_id": "capf_resume",
+                    "rdc_path": str(capture_path),
+                    "file_fingerprint": f"{int(capture_path.stat().st_size)}:{int(capture_path.stat().st_mtime * 1000)}",
+                    "file_size_bytes": int(capture_path.stat().st_size),
+                    "frame_index": 0,
+                    "active_event_id": 202,
+                    "backend_type": "local",
+                    "state": "degraded",
+                    "is_live": False,
+                    "last_error": "daemon recycled",
+                    "shader_replacements": [
+                        {
+                            "replacement_id": "repl_resume",
+                            "stage": "PS",
+                            "resolved_event_id": 202,
+                            "original_shader_id": "ResourceId::77",
+                            "status": "applied",
+                            "patch_spec": {
+                                "patch_id": "repl_resume",
+                                "target_event_id": 202,
+                                "target_stage": "ps",
+                                "target_shader_id": "ResourceId::77",
+                                "intent": "shader_replace",
+                                "ops": [{"op": "force_full_precision", "variables": []}],
+                                "source_text": "",
+                                "diff_text": "",
+                                "source_target": "SPIR-V ASM",
+                                "source_encoding": "spirvasm",
+                                "expected_source_hash": "hash_before",
+                                "max_diff_ops": 20,
+                                "preserve_outputs": True,
+                            },
+                        }
+                    ],
+                    "recovery": {"status": "degraded", "attempt_count": 1, "last_error": "daemon recycled"},
+                }
+            },
+        },
+        "default",
+    )
+    fake_controller = _FakeRecoveryController([101, 202, 303])
+    fake_manager = _FakeRecoverySessionManager(controller=fake_controller)
+    fake_patch_engine = _FakeRecoveryPatchEngine()
+
+    async def _inline_offload(fn, *args, **kwargs):  # type: ignore[no-untyped-def]
+        return fn(*args, **kwargs)
+
+    asyncio.run(server.server_runtime.runtime_startup())
+    monkeypatch.setattr(server.server_runtime, "_offload", _inline_offload)
+    server.server_runtime._session_manager = fake_manager
+    server.server_runtime._patch_engine = fake_patch_engine
+
+    payload = asyncio.run(server.dispatch_operation("rd.session.resume", {"session_id": "sess_resume"}, transport="test"))
+
+    assert payload["ok"] is True
+    assert fake_patch_engine.calls
+    call = fake_patch_engine.calls[0]
+    assert call["session_id"] == "sess_resume"
+    assert call["event_id"] == 202
+    assert getattr(call["patch_spec"], "patch_id") == "repl_resume"
+    assert server._runtime.shader_replacements["sess_resume"][0]["messages"] == ["reapplied"]
+    state = server.server_runtime._context_state("default")
+    replacement = state["sessions"]["sess_resume"]["shader_replacements"][0]
+    assert replacement["replacement_id"] == "repl_resume"
+    assert replacement["applied_to_shader_hash"] == "hash_after_recovered"
+    assert replacement["patch_spec"]["ops"][0]["op"] == "force_full_precision"
 
 
 def test_session_resume_restores_persisted_remote_session_and_metadata(
@@ -517,13 +718,13 @@ def test_context_snapshot_preserves_remote_session_recovery_metadata(tmp_path: P
     snapshot = server._context_snapshot()
 
     assert snapshot["runtime"]["session_id"] == "sess_remote"
-    assert snapshot["remote"] == {
-        "state": "session_owned",
-        "remote_id": "",
-        "origin_remote_id": "remote_origin",
-        "endpoint": "127.0.0.1:62417",
-        "consumed_by_session_id": "sess_remote",
-    }
+    assert snapshot["remote"]["state"] == "session_owned"
+    assert snapshot["remote"]["remote_id"] == ""
+    assert snapshot["remote"]["origin_remote_id"] == "remote_origin"
+    assert snapshot["remote"]["endpoint"] == "127.0.0.1:62417"
+    assert snapshot["remote"]["consumed_by_session_id"] == "sess_remote"
+    assert snapshot["remote"]["context_locality"] == "strict"
+    assert snapshot["remote"]["reuse_policy"] == "must_reconnect"
 
 
 def test_dispatch_operation_preserves_session_error_details(monkeypatch: pytest.MonkeyPatch) -> None:

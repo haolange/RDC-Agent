@@ -31,7 +31,6 @@ def test_package_release_builds_self_contained_zip(tmp_path: Path, monkeypatch) 
         "scripts/verify_release_package.py",
         "spec/tool_catalog.json",
         "binaries/windows/x64/manifest.runtime.json",
-        "tests/fixtures/README.md",
     ):
         _write(root / rel)
     _write(root / "intermediate/logs/secret.log", "must not ship\n")
@@ -48,8 +47,15 @@ def test_package_release_builds_self_contained_zip(tmp_path: Path, monkeypatch) 
         assert "rdx-tools/RELEASE_MANIFEST.json" in names
         assert "rdx-tools/SBOM.json" in names
         assert "rdx-tools/LICENSE_INVENTORY.json" in names
+        assert "rdx-tools/pyproject.toml" in names
         assert "rdx-tools/scripts/rdx_install.ps1" in names
+        assert "rdx-tools/uv.lock" not in names
+        assert not any(name.startswith("rdx-tools/tests/") for name in names)
         assert "rdx-tools/intermediate/logs/secret.log" not in names
         manifest = json.loads(zf.read("rdx-tools/RELEASE_MANIFEST.json").decode("utf-8"))
     assert manifest["platform"] == "windows-x64"
     assert "rdx.bat" in manifest["entrypoints"]
+    manifest_paths = {entry["path"] for entry in manifest["files"]}
+    assert "pyproject.toml" in manifest_paths
+    assert "uv.lock" not in manifest_paths
+    assert not any(path == "tests" or path.startswith("tests/") for path in manifest_paths)

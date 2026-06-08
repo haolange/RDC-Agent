@@ -185,7 +185,6 @@ def _emit_version(argv: list[str]) -> None:
                 "compatibility": {
                     "stability": "1.x",
                     "json_envelope": "stable",
-                    "mcp_supported": False,
                 },
             },
             "artifacts": [],
@@ -217,10 +216,6 @@ def _emit_minimal_doctor(argv: list[str], missing: list[str]) -> None:
                 "posix_shell_exists": (root / "bin" / "rdx").is_file(),
                 "python_cli": str(root / "cli" / "run_cli.py"),
                 "python_cli_exists": (root / "cli" / "run_cli.py").is_file(),
-            },
-            "mcp": {
-                "supported": False,
-                "message": "rdx-tools is CLI-only; use `rdx call <rd.*>` for raw tool calls.",
             },
         },
     }

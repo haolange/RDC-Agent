@@ -1,4 +1,4 @@
-export type PlanStatus =
+﻿export type PlanStatus =
   | 'draft'
   | 'awaiting_approval'
   | 'accepted'
@@ -27,7 +27,7 @@ export type ProgressTaskStatus =
 export interface ProgressTask {
   id: string;
   sessionId: string;
-  workstreamId: string;
+  traceLaneId: string;
   branchId: string;
   title: string;
   status: ProgressTaskStatus;
@@ -40,7 +40,7 @@ export interface ProgressTask {
   blockerSummary?: string;
 }
 
-export type WorkstreamArtifactType =
+export type TraceArtifactType =
   | 'plan'
   | 'report'
   | 'generative_ui'
@@ -52,13 +52,13 @@ export type WorkstreamArtifactType =
 
 export type ArtifactStatus = 'draft' | 'ready' | 'failed' | 'superseded';
 
-export interface WorkstreamArtifactRecord {
+export interface TraceArtifactRecord {
   id: string;
   sessionId: string;
-  workstreamId: string;
+  traceLaneId: string;
   branchId: string;
   sourceEventId?: string;
-  type: WorkstreamArtifactType;
+  type: TraceArtifactType;
   status: ArtifactStatus;
   displayName: string;
   taskTitle?: string;
@@ -72,10 +72,10 @@ export interface WorkstreamArtifactRecord {
 export type ContextKind = 'capture' | 'file' | 'source' | 'capability';
 export type ContextImportance = 'normal' | 'important' | 'cited' | 'decisive';
 
-export interface WorkstreamContextRecord {
+export interface TraceContextRecord {
   id: string;
   sessionId: string;
-  workstreamId?: string;
+  traceLaneId?: string;
   branchId?: string;
   kind: ContextKind;
   label: string;
@@ -95,7 +95,7 @@ export interface UserRequestRevision {
   parentRevisionId?: string;
   prompt: string;
   createdAt: string;
-  resultingWorkstreamIds: string[];
+  resultingTraceLaneIds: string[];
 }
 
 export interface UserRequest {
@@ -113,7 +113,7 @@ export interface RequestBranch {
   parentBranchId?: string;
   revisionId: string;
   status: RequestBranchStatus;
-  workstreamIds: string[];
+  traceLaneIds: string[];
 }
 
 export interface RequestBranchGroup {
@@ -129,14 +129,14 @@ export interface ProgressPanelViewModel {
 }
 
 export interface ArtifactsPanelViewModel {
-  current: WorkstreamArtifactRecord[];
-  previous: WorkstreamArtifactRecord[];
+  current: TraceArtifactRecord[];
+  previous: TraceArtifactRecord[];
 }
 
 export interface ContextPanelGroupViewModel {
   kind: ContextKind;
-  important: WorkstreamContextRecord[];
-  all: WorkstreamContextRecord[];
+  important: TraceContextRecord[];
+  all: TraceContextRecord[];
 }
 
 export interface ContextPanelViewModel {
@@ -152,7 +152,7 @@ export interface RightPanelViewModel {
 export interface ComposerApprovalViewModel {
   planId: string;
   runId?: string;
-  workstreamId: string;
+  traceLaneId: string;
   status: PlanStatus;
   title: string;
   summary: string;
@@ -196,3 +196,4 @@ export interface TraceExportResult {
   bundlePath?: string;
   error?: string;
 }
+

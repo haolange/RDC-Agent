@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { storageAdapter } from '../sessions/StorageAdapter';
-import { toolBridge } from '../tools/ToolBridge';
+import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
 export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void {
@@ -8,21 +8,14 @@ export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void
 
   ipcMain.handle('tool:getCatalog', async () => {
     try {
-      return await toolBridge.loadCatalog();
+      return await rdxCliInvokerService.loadCatalog();
     } catch {
       return { tools: [], namespaces: {} };
     }
   });
 
   ipcMain.handle('tool:getRuntimeSummary', async () => {
-    return toolBridge.getRuntimeSummary();
-  });
-
-  ipcMain.handle('tool:execute', async (_event, toolName: string, args: unknown) => {
-    return toolBridge.call({
-      toolName,
-      args: args as Record<string, unknown>,
-    });
+    return rdxCliInvokerService.getRuntimeSummary();
   });
 
   ipcMain.handle('evidence:getChain', async () => {

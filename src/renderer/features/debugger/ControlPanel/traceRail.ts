@@ -1,6 +1,6 @@
-import type { AgentRunPresentation } from '@shared/types/agenticTrace';
+﻿import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 
-export function shouldShowWorkstreamRightRail(
+export function shouldShowTraceRightRail(
   presentation: AgentRunPresentation | null | undefined,
 ): boolean {
   if (!presentation) {
@@ -24,3 +24,4 @@ export function shouldShowWorkstreamRightRail(
     || (rightPanel.context.groups?.length ?? 0) > 0
   );
 }
+

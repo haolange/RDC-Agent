@@ -1,4 +1,4 @@
-export const IPC_HANDLER_DOMAINS = {
+﻿export const IPC_HANDLER_DOMAINS = {
   shell: [
     'dialog:selectRdcFiles',
     'dialog:selectFiles',
@@ -29,10 +29,7 @@ export const IPC_HANDLER_DOMAINS = {
     'workflow:getPlan',
     'workflow:submitQuestions',
     'workflow:approvePlan',
-    'workflow:getWorkstreamSession',
     'workflow:requestPlanRevision',
-    'workflow:switchWorkstreamBranch',
-    'workflow:exportWorkstreamSession',
     'workflow:restartRun',
   ],
   projectSession: [
@@ -84,7 +81,6 @@ export const IPC_HANDLER_DOMAINS = {
   toolsEvidenceRuntime: [
     'tool:getCatalog',
     'tool:getRuntimeSummary',
-    'tool:execute',
     'evidence:getChain',
     'evidence:getEvents',
     'runtimeLog:list',
@@ -111,6 +107,8 @@ export const IPC_HANDLER_DOMAINS = {
     'trace:getEvents',
     'trace:getProjection',
     'trace:exportRun',
+    'trace:switchBranch',
+    'trace:exportSession',
   ],
 } as const;
 
@@ -138,3 +136,4 @@ export const IPC_EVENT_DOMAINS = {
 
 export type IpcEventDomain = keyof typeof IPC_EVENT_DOMAINS;
 export type IpcEventChannel = (typeof IPC_EVENT_DOMAINS)[IpcEventDomain][number];
+

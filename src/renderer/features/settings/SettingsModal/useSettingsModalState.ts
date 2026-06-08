@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { AppSettings, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
+import type { AppSettings, LlmAgentRoute, LlmProviderEntry, RdxCliInvokerSettings } from '@shared/types/settings';
 import type { ProviderConnectionDraft, SettingsSection } from './types';
 import { cloneProvider, cloneRoute } from './utils';
 
@@ -13,6 +13,7 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
   const [enabledSkillDrafts, setEnabledSkillDrafts] = useState<string[]>(settings.configuration.enabledSkillIds);
   const [enabledMcpDrafts, setEnabledMcpDrafts] = useState<string[]>(settings.configuration.enabledMcpServerIds);
   const [patternBindingDrafts, setPatternBindingDrafts] = useState<Record<string, string>>(settings.configuration.modePatternBindings);
+  const [rdxCliDraft, setRdxCliDraft] = useState<RdxCliInvokerSettings>(settings.tooling.rdxCli);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(settings.llm.providers[0]?.id ?? null);
   const [connectionDraft, setConnectionDraft] = useState<ProviderConnectionDraft | null>(null);
   const [agentRouteSaveState, setAgentRouteSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -37,6 +38,7 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setEnabledSkillDrafts(settings.configuration.enabledSkillIds);
     setEnabledMcpDrafts(settings.configuration.enabledMcpServerIds);
     setPatternBindingDrafts(settings.configuration.modePatternBindings);
+    setRdxCliDraft(settings.tooling.rdxCli);
     setSelectedProviderId(providers[0]?.id ?? null);
     setConnectionDraft(null);
     setAgentRouteSaveState('idle');
@@ -62,6 +64,8 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setEnabledMcpDrafts,
     patternBindingDrafts,
     setPatternBindingDrafts,
+    rdxCliDraft,
+    setRdxCliDraft,
     selectedProviderId,
     setSelectedProviderId,
     connectionDraft,

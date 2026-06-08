@@ -79,7 +79,7 @@ export const SessionCapabilitiesPanel: React.FC = () => {
           </span>
           <span className="session-capability-runtime-detail">
             {summary
-              ? `${summary.runtime.source} · ${summary.runtime.version ?? 'unknown'} · ${summary.runtime.catalog.exists ? 'catalog' : 'no catalog'}`
+              ? `${summary.runtime.source} | ${summary.runtime.command || 'no command'} | ${summary.runtime.catalog.exists ? 'catalog' : 'no catalog'}`
               : error ?? t('control.sessionCapabilitiesLoading')}
           </span>
           {!summary?.cli.available && summary?.cli.unavailableReason ? (

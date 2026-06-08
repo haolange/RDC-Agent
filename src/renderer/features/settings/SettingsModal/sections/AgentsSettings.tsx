@@ -1,13 +1,13 @@
-import React, { type Dispatch, type SetStateAction } from 'react';
-import type { AppSettings, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
+﻿import React, { type Dispatch, type SetStateAction } from 'react';
+import type { AppSettings, LlmAgentRoute, LlmProviderEntry, RdxCliInvokerSettings } from '@shared/types/settings';
 import { AGENT_DISPLAY_NAMES, AGENT_ROLES } from '@shared/constants/agents';
 import DropdownSelect, { type DropdownOption } from '../../../../ui/DropdownSelect';
 import type { TranslationKey, useI18n } from '../../../../i18n';
 import { resolveAgentRouteStatus } from '../agentRouteStatus';
 import { getEnabledModels } from '../utils';
+import { RdxCliInvokerSettingsFields } from './RdxCliInvokerSettingsFields';
 
 type Translate = ReturnType<typeof useI18n>['t'];
-
 interface AgentsSettingsProps {
   settings: AppSettings;
   providerDrafts: LlmProviderEntry[];
@@ -16,6 +16,7 @@ interface AgentsSettingsProps {
   enabledSkillDrafts: string[];
   enabledMcpDrafts: string[];
   patternBindingDrafts: Record<string, string>;
+  rdxCliDraft: RdxCliInvokerSettings;
   routableProviders: LlmProviderEntry[];
   configuredProvidersWithoutEnabledModels: LlmProviderEntry[];
   getResolvedProviderLabel: (provider: Pick<LlmProviderEntry, 'label'>) => string;
@@ -24,6 +25,7 @@ interface AgentsSettingsProps {
   onEnabledSkillDraftsChange: Dispatch<SetStateAction<string[]>>;
   onEnabledMcpDraftsChange: Dispatch<SetStateAction<string[]>>;
   onPatternBindingDraftsChange: Dispatch<SetStateAction<Record<string, string>>>;
+  onRdxCliDraftChange: Dispatch<SetStateAction<RdxCliInvokerSettings>>;
   onSaveAgentRoutes: () => void | Promise<void>;
   onSaveAgentRuntimeConfig: () => void | Promise<void>;
   toggleRuntimeId: (values: string[], id: string) => string[];
@@ -31,7 +33,6 @@ interface AgentsSettingsProps {
   agentRouteSaveMessage: string;
   t: Translate;
 }
-
 export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   settings,
   providerDrafts,
@@ -40,6 +41,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   enabledSkillDrafts,
   enabledMcpDrafts,
   patternBindingDrafts,
+  rdxCliDraft,
   routableProviders,
   configuredProvidersWithoutEnabledModels,
   getResolvedProviderLabel,
@@ -48,6 +50,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   onEnabledSkillDraftsChange,
   onEnabledMcpDraftsChange,
   onPatternBindingDraftsChange,
+  onRdxCliDraftChange,
   onSaveAgentRoutes,
   onSaveAgentRuntimeConfig,
   toggleRuntimeId,
@@ -68,7 +71,6 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
       count: invalidAgentRoutes.length,
       routes: invalidAgentRoutes.map((entry) => `${AGENT_DISPLAY_NAMES[entry.agentId]}: ${t(entry.issue)}`).join('; '),
     });
-
   return (
     <section className="settings-page settings-page-agents">
       <div className="settings-agent-page">
@@ -212,7 +214,6 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
               disabled={settings.configuration.availableModeProfiles.length === 0}
             />
           </div>
-
           <div className="settings-option-block">
             <div className="settings-field-label">{t('settings.patterns')}</div>
             {(['debugger', 'analyzer', 'optimizer'] as const).map((modeId) => (
@@ -237,6 +238,12 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
               </div>
             ))}
           </div>
+
+          <RdxCliInvokerSettingsFields
+            rdxCliDraft={rdxCliDraft}
+            onRdxCliDraftChange={onRdxCliDraftChange}
+            t={t}
+          />
 
           <div className="settings-option-block">
             <div className="settings-field-label">{t('settings.skills')}</div>
@@ -289,3 +296,4 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
     </section>
   );
 };
+

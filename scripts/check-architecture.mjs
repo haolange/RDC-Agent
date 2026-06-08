@@ -10,6 +10,10 @@ const fail = (message) => {
 const read = (relativePath) => fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
 const exists = (relativePath) => fs.existsSync(path.join(repoRoot, relativePath));
 const lineCount = (filePath) => fs.readFileSync(filePath, 'utf8').split('\n').length;
+const MOJIBAKE_PATTERNS = [
+  /锛|銆|鈥|乄|丄|両|鐨|浣|璺|鍦|搴|闆|戠|€|鑼|鏈|浠|妗|浜|杈|鍚|鍏|鏂|瀹|绋|楠/,
+  /鎵撳紑|澶嶅埗|鏈湴|鐘舶?侊細|璁剧疆|搴旂敤|鑿滎?崟|RenderDoc` `\.rdc` capture 鐨/,
+];
 
 const walk = (dir, files = [], filter = /\.(ts|tsx|js|jsx|md|css)$/) => {
   if (!fs.existsSync(dir)) {
@@ -50,6 +54,9 @@ const sourceFiles = walk(path.join(repoRoot, 'src'));
 for (const filePath of sourceFiles) {
   const relativePath = path.relative(repoRoot, filePath).replace(/\\/g, '/');
   const content = fs.readFileSync(filePath, 'utf8');
+  if (MOJIBAKE_PATTERNS.some((pattern) => pattern.test(content))) {
+    fail(`${relativePath} contains mojibake text; restore readable UTF-8 copy before merging.`);
+  }
   if (/from ['"].*src\/main\/services/.test(content)) {
     fail(`${relativePath} imports from main services technology bucket.`);
   }
@@ -60,6 +67,22 @@ for (const filePath of sourceFiles) {
     if (!relativePath.includes('node_modules')) {
       fail(`${relativePath} imports from a renderer components technology bucket.`);
     }
+  }
+}
+
+for (const filePath of walk(path.join(repoRoot, 'docs'), [], /\.(md)$/)) {
+  const relativePath = path.relative(repoRoot, filePath).replace(/\\/g, '/');
+  const content = fs.readFileSync(filePath, 'utf8');
+  if (MOJIBAKE_PATTERNS.some((pattern) => pattern.test(content))) {
+    fail(`${relativePath} contains mojibake text; restore readable UTF-8 copy before merging.`);
+  }
+}
+
+for (const relativePath of ['README.md', 'AGENTS.md', 'DESIGN.md']) {
+  if (!exists(relativePath)) continue;
+  const content = read(relativePath);
+  if (MOJIBAKE_PATTERNS.some((pattern) => pattern.test(content))) {
+    fail(`${relativePath} contains mojibake text; restore readable UTF-8 copy before merging.`);
   }
 }
 

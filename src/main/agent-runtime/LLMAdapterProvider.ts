@@ -1,24 +1,14 @@
 /**
- * LLMAdapterProvider — 把现有 `llmAdapter.streamChat` 包装成新 Agent Runtime
- * `ProviderStrategy`，让 Agent 类可以复用所有 settings 层注册的 provider
- * （含 OAuth/账户态、自定义 baseUrl、Copilot bridge 等）。
- *
- * 设计目标：
- * 1. 不重写已有 provider 实现：所有真实 HTTP/SSE 解析、凭证刷新仍在
- *    `LLMAdapter` 中执行。
- * 2. 在新旧两套类型之间做一次显式翻译：
- *    - new `Context` / `Model` → 旧 `LLMRequest` / `LLMMessage`；
- *    - 旧 `LLMStreamEvent` → 新 `AssistantMessageEvent`；
- *    - 旧 `LLMResponse` → 新 `AssistantMessage`。
- * 3. `model.id` 携带 `<providerId>::<modelId>` 编码，确保从 `Model` 单一对象
- *    即可路由到具体 provider；上层使用 `encodeAgentModel` 帮助构造。
+ * LLMAdapterProvider adapts the settings-layer LLM adapter to the Agent Runtime
+ * ProviderStrategy interface. The settings adapter remains responsible for
+ * provider-specific HTTP/SSE handling, account state, and credential refresh.
  */
 
 import type {
   LLMMessage,
   LLMRequest,
   LLMStreamEvent,
-  ToolDefinition as LegacyToolDefinition,
+  ToolDefinition as LlmToolDefinition,
 } from '@shared/types/llm';
 import { llmAdapter } from '../settings/LLMAdapter';
 import { EventStream } from './core/EventStream';
@@ -63,7 +53,7 @@ export function decodeAgentModel(model: Model): { providerId: string; modelId: s
   return { providerId: providerPart || model.provider, modelId: modelParts.join('::') };
 }
 
-/** 把新 `Message[]` 序列化为旧 `LLMMessage[]`（保留 system 提示词）。 */
+/** Serializes runtime messages into the settings-layer LLM message format. */
 function messagesToLlm(systemPrompt: string | undefined, messages: Message[]): LLMMessage[] {
   const result: LLMMessage[] = [];
   if (systemPrompt && systemPrompt.trim()) {
@@ -84,17 +74,17 @@ function messagesToLlm(systemPrompt: string | undefined, messages: Message[]): L
   return result;
 }
 
-function toolsToLlm(tools: ToolDefinition[] | undefined): LegacyToolDefinition[] | undefined {
+function toolsToLlm(tools: ToolDefinition[] | undefined): LlmToolDefinition[] | undefined {
   if (!tools?.length) return undefined;
   return tools.map((tool) => ({
     name: tool.name,
     description: tool.description,
-    input_schema: normalizeLegacyJsonSchema(tool.parameters),
+    input_schema: normalizeToolInputSchema(tool.parameters),
   }));
 }
 
-function normalizeLegacyJsonSchema(schema: JsonSchema): LegacyToolDefinition['input_schema'] {
-  const properties: LegacyToolDefinition['input_schema']['properties'] = {};
+function normalizeToolInputSchema(schema: JsonSchema): LlmToolDefinition['input_schema'] {
+  const properties: LlmToolDefinition['input_schema']['properties'] = {};
   for (const [key, value] of Object.entries(schema.properties ?? {})) {
     properties[key] = {
       type: typeof value.type === 'string' ? value.type : 'string',
@@ -128,7 +118,6 @@ function assistantContentToText(content: Array<TextContent | ThinkingContent | T
   return parts.join('');
 }
 
-/** 旧 `LLMStreamEvent` 映射为新 `AssistantMessageEvent`，构造 partial 助手消息。 */
 /** 真正的 ProviderStrategy 实现：流式调用 llmAdapter 并翻译事件。 */
 export class LLMAdapterProvider implements ProviderStrategy {
   readonly api = 'rdc-agent-llm-adapter';

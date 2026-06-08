@@ -194,8 +194,7 @@ const createWindowControlsApi = () => ({
 });
 const createToolApi = () => ({
   getCatalog: () => electron.ipcRenderer.invoke("tool:getCatalog"),
-  getRuntimeSummary: () => electron.ipcRenderer.invoke("tool:getRuntimeSummary"),
-  execute: (toolName, args) => electron.ipcRenderer.invoke("tool:execute", toolName, args)
+  getRuntimeSummary: () => electron.ipcRenderer.invoke("tool:getRuntimeSummary")
 });
 const createEvidenceApi = () => ({
   getChain: () => electron.ipcRenderer.invoke("evidence:getChain"),
@@ -207,10 +206,7 @@ const createWorkflowApi = () => ({
   getPlan: (runId) => electron.ipcRenderer.invoke("workflow:getPlan", runId),
   submitQuestions: (runId, answers) => electron.ipcRenderer.invoke("workflow:submitQuestions", runId, answers),
   approvePlan: (runId) => electron.ipcRenderer.invoke("workflow:approvePlan", runId),
-  getWorkstreamSession: (sessionId) => electron.ipcRenderer.invoke("workflow:getWorkstreamSession", sessionId),
   requestPlanRevision: (runId, revisionText) => electron.ipcRenderer.invoke("workflow:requestPlanRevision", runId, revisionText),
-  switchWorkstreamBranch: (sessionId, branchId) => electron.ipcRenderer.invoke("workflow:switchWorkstreamBranch", sessionId, branchId),
-  exportWorkstreamSession: (sessionId, options) => electron.ipcRenderer.invoke("workflow:exportWorkstreamSession", sessionId, options),
   restartRun: (runId) => electron.ipcRenderer.invoke("workflow:restartRun", runId),
   resume: (sessionId) => electron.ipcRenderer.invoke("workflow:resume", sessionId),
   stop: (runId) => electron.ipcRenderer.invoke("workflow:stop", runId),
@@ -222,7 +218,9 @@ const createTraceApi = () => ({
   getRun: (runId) => electron.ipcRenderer.invoke("trace:getRun", runId),
   getEvents: (runId, afterSeq) => electron.ipcRenderer.invoke("trace:getEvents", runId, afterSeq),
   getProjection: (sessionId) => electron.ipcRenderer.invoke("trace:getProjection", sessionId),
-  exportRun: (runId) => electron.ipcRenderer.invoke("trace:exportRun", runId)
+  exportRun: (runId) => electron.ipcRenderer.invoke("trace:exportRun", runId),
+  switchBranch: (sessionId, branchId) => electron.ipcRenderer.invoke("trace:switchBranch", sessionId, branchId),
+  exportSession: (sessionId, options) => electron.ipcRenderer.invoke("trace:exportSession", sessionId, options)
 });
 const dialogApi = createDialogApi();
 const electronAPI = {

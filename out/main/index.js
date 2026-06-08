@@ -30,6 +30,12 @@ const fs = require("fs");
 const uuid = require("uuid");
 const yaml = require("yaml");
 const crypto = require("crypto");
+require("node:fs");
+const path$1 = require("node:path");
+require("node:crypto");
+const fs$1 = require("fs/promises");
+const promises = require("dns/promises");
+const net = require("net");
 const http = require("http");
 function _interopNamespaceDefault(e) {
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
@@ -49,6 +55,8 @@ function _interopNamespaceDefault(e) {
 }
 const path__namespace = /* @__PURE__ */ _interopNamespaceDefault(path);
 const fs__namespace = /* @__PURE__ */ _interopNamespaceDefault(fs);
+const fs__namespace$1 = /* @__PURE__ */ _interopNamespaceDefault(fs$1);
+const net__namespace = /* @__PURE__ */ _interopNamespaceDefault(net);
 function generateId() {
   return uuid.v4();
 }
@@ -75,763 +83,618 @@ function nowMs() {
 function nowIso$1() {
   return (/* @__PURE__ */ new Date()).toISOString();
 }
-class ToolBridge {
-  toolsPath;
-  runtime;
-  catalog = null;
-  activeProcesses = /* @__PURE__ */ new Map();
-  traceListeners = /* @__PURE__ */ new Set();
-  constructor() {
-    this.runtime = this.resolveToolRuntime();
-    this.toolsPath = this.runtime.toolsRoot;
-  }
-  resolveToolRuntime() {
-    const externalRoot = !electron.app.isPackaged ? process.env.RDX_TOOLS_ROOT?.trim() : void 0;
-    const toolsRoot = externalRoot ? path__namespace.resolve(externalRoot) : this.resolveBundledToolsRoot();
-    return {
-      source: externalRoot ? "external" : "bundled",
-      toolsRoot,
-      version: this.readRuntimeVersion(toolsRoot),
-      catalogPath: path__namespace.join(toolsRoot, "spec", "tool_catalog.json")
-    };
-  }
-  resolveBundledToolsRoot() {
-    const appPath = electron.app.getAppPath();
-    const candidates = electron.app.isPackaged ? [
-      path__namespace.join(process.resourcesPath, "resources", "tools"),
-      path__namespace.join(process.resourcesPath, "tools")
-    ] : [
-      path__namespace.join(appPath, "resources", "tools"),
-      path__namespace.join(appPath, "..", "resources", "tools"),
-      path__namespace.join(appPath, "..", "..", "resources", "tools"),
-      path__namespace.join(appPath, "..", "..", "..", "resources", "tools"),
-      path__namespace.join(process.cwd(), "resources", "tools")
-    ];
-    for (const candidate of candidates) {
-      const resolved = path__namespace.resolve(candidate);
-      if (fs__namespace.existsSync(resolved)) {
-        return resolved;
-      }
-    }
-    return path__namespace.resolve(candidates[0]);
-  }
-  readRuntimeVersion(toolsRoot) {
-    const pyprojectPath = path__namespace.join(toolsRoot, "pyproject.toml");
-    if (!fs__namespace.existsSync(pyprojectPath)) {
-      return null;
-    }
-    try {
-      const content = fs__namespace.readFileSync(pyprojectPath, "utf-8");
-      const match = content.match(/^\s*version\s*=\s*"([^"]+)"/m);
-      return match?.[1] ?? null;
-    } catch {
-      return null;
-    }
-  }
-  createRuntimeMetadata(catalog) {
-    return {
-      source: this.runtime.source,
-      toolsRoot: this.runtime.toolsRoot,
-      version: this.runtime.version,
-      catalog: {
-        path: this.runtime.catalogPath,
-        exists: fs__namespace.existsSync(this.runtime.catalogPath),
-        schemaVersion: catalog?.schema_version ?? null,
-        generatedAt: catalog?.generated_at ?? null,
-        toolCount: catalog?.tool_count ?? (Array.isArray(catalog?.tools) ? catalog.tools.length : null)
-      }
-    };
-  }
-  /**
-   * 获取工具目录路径
-   */
-  getToolsPath() {
-    return this.toolsPath;
-  }
-  /**
-   * 获取rdx.bat路径
-   */
-  getRdxPath() {
-    return path__namespace.join(this.toolsPath, "rdx.bat");
-  }
-  getRuntimeMetadata() {
-    return this.createRuntimeMetadata(this.catalog ?? void 0);
-  }
-  resolveDirectCliSpec() {
-    const pythonPath = path__namespace.join(this.toolsPath, "binaries", "windows", "x64", "python", "python.exe");
-    const runCliPath = path__namespace.join(this.toolsPath, "cli", "run_cli.py");
-    if (!fs__namespace.existsSync(pythonPath)) {
-      throw new Error(`RDX python runtime not found: ${pythonPath}`);
-    }
-    if (!fs__namespace.existsSync(runCliPath)) {
-      throw new Error(`CLI launcher not found: ${runCliPath}`);
-    }
-    return {
-      pythonPath,
-      runCliPath
-    };
-  }
-  normalizeCliArgs(args) {
-    const normalized = [];
-    for (let index = 0; index < args.length; index += 1) {
-      const current = args[index];
-      if (current === "--context-id") {
-        normalized.push("--daemon-context");
-        continue;
-      }
-      normalized.push(current);
-    }
-    return normalized;
-  }
-  buildDirectCliArgs(command, args) {
-    const normalized = this.normalizeCliArgs(args);
-    const globalArgs = [];
-    const commandArgs = [];
-    for (let index = 0; index < normalized.length; index += 1) {
-      const current = normalized[index];
-      if (current === "--daemon-context") {
-        const value = normalized[index + 1];
-        if (value) {
-          globalArgs.push(current, value);
-          index += 1;
-          continue;
-        }
-      }
-      commandArgs.push(current);
-    }
-    return [
-      ...globalArgs,
-      command,
-      ...commandArgs
-    ];
-  }
-  resolveWindowsLauncher() {
-    const toolsRoot = path__namespace.resolve(this.toolsPath);
-    if (!fs__namespace.existsSync(toolsRoot)) {
-      throw new Error(`RDX tools root not found: ${toolsRoot}`);
-    }
-    const launcherScriptPath = path__namespace.join(toolsRoot, "scripts", "rdx_bat_launcher.ps1");
-    if (!fs__namespace.existsSync(launcherScriptPath)) {
-      throw new Error(`RDX launcher script not found: ${launcherScriptPath}`);
-    }
-    const systemRoot = process.env.SystemRoot?.trim() || process.env.windir?.trim() || "C:\\Windows";
-    const powershellPath = path__namespace.join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
-    if (!fs__namespace.existsSync(powershellPath)) {
-      throw new Error(`Windows PowerShell launcher not found: ${powershellPath}`);
-    }
-    return {
-      powershellPath,
-      launcherScriptPath,
-      systemRoot,
-      comSpec: process.env.ComSpec?.trim() || path__namespace.join(systemRoot, "System32", "cmd.exe")
-    };
-  }
-  /**
-   * 检查工具是否可用
-   */
-  isAvailable() {
-    if (process.platform !== "win32") {
-      return false;
-    }
-    try {
-      const launcher = this.resolveWindowsLauncher();
-      return fs__namespace.existsSync(launcher.launcherScriptPath);
-    } catch {
-      return false;
-    }
-  }
-  getAvailabilityFailure() {
-    if (process.platform !== "win32") {
-      return "RDX CLI is available only through the bundled Windows launcher in this app.";
-    }
-    try {
-      this.resolveWindowsLauncher();
-      return void 0;
-    } catch (error) {
-      return error instanceof Error ? error.message : String(error);
-    }
-  }
-  /**
-   * 加载工具目录
-   */
-  async loadCatalog() {
-    if (this.catalog) {
-      return this.catalog;
-    }
-    const catalogPath = this.runtime.catalogPath;
-    if (!fs__namespace.existsSync(catalogPath)) {
-      console.warn("[ToolBridge] Tool catalog not found, starting with empty RDC tool catalog: " + catalogPath);
-      this.catalog = {
-        schema_version: "1",
-        tools: [],
-        namespaces: {},
-        runtime: this.createRuntimeMetadata()
-      };
-      return this.catalog;
-    }
-    const content = await fs__namespace.promises.readFile(catalogPath, "utf-8");
-    const catalog = JSON.parse(content);
-    this.catalog = {
-      ...catalog,
-      runtime: this.createRuntimeMetadata(catalog)
-    };
-    return this.catalog;
-  }
-  async getRuntimeSummary() {
-    const catalog = await this.loadCatalog();
-    const namespaceCounts = /* @__PURE__ */ new Map();
-    for (const tool of catalog.tools ?? []) {
-      namespaceCounts.set(tool.namespace, (namespaceCounts.get(tool.namespace) ?? 0) + 1);
-    }
-    const namespaces = Object.keys(catalog.namespaces ?? {}).sort().map((namespace) => ({
-      namespace: `rd.${namespace}.*`,
-      toolCount: namespaceCounts.get(namespace) ?? 0,
-      available: (namespaceCounts.get(namespace) ?? 0) > 0
-    }));
-    return {
-      runtime: this.createRuntimeMetadata(catalog),
-      cli: {
-        available: this.isAvailable(),
-        unavailableReason: this.getAvailabilityFailure()
-      },
-      namespaces,
-      recommendedSpecialists: [
-        "triage_agent",
-        "capture_repro_agent",
-        "pass_graph_pipeline_agent",
-        "pixel_forensics_agent",
-        "shader_ir_agent",
-        "skeptic_agent",
-        "curator_agent"
-      ]
-    };
-  }
-  /**
-   * 执行CLI命令（参数数组模式，避免命令字符串注入风险）
-   * command: 子命令名称，如 'call', 'daemon'
-   * args: 子命令参数数组
-   */
-  async executeCLI(command, args = [], options = {}) {
-    const startTime = nowMs();
-    if (process.platform !== "win32") {
-      return {
-        exitCode: 2,
-        stdout: "",
-        stderr: "RDC-Agent currently supports the bundled Windows launcher only.",
-        duration_ms: nowMs() - startTime
-      };
-    }
-    let directCli = null;
-    try {
-      directCli = this.resolveDirectCliSpec();
-    } catch {
-      directCli = null;
-    }
-    return new Promise((resolve, reject) => {
-      let proc;
-      if (directCli) {
-        proc = child_process.spawn(
-          directCli.pythonPath,
-          [
-            directCli.runCliPath,
-            ...this.buildDirectCliArgs(command, args)
-          ],
-          {
-            cwd: options.cwd || this.toolsPath,
-            env: {
-              ...process.env,
-              ...options.env,
-              RDX_TOOLS_ROOT: this.toolsPath,
-              PYTHONIOENCODING: "utf-8",
-              RDX_LAUNCHER_PROG: "rdx.bat"
-            },
-            windowsHide: true
-          }
-        );
-      } else {
-        let launcher;
-        try {
-          launcher = this.resolveWindowsLauncher();
-        } catch (error) {
-          resolve({
-            exitCode: 2,
-            stdout: "",
-            stderr: error instanceof Error ? error.message : String(error),
-            duration_ms: nowMs() - startTime
-          });
-          return;
-        }
-        proc = child_process.spawn(
-          launcher.powershellPath,
-          [
-            "-NoProfile",
-            "-NoLogo",
-            "-NonInteractive",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            launcher.launcherScriptPath,
-            "--non-interactive",
-            command,
-            ...args
-          ],
-          {
-            cwd: options.cwd || this.toolsPath,
-            env: {
-              ...process.env,
-              ...options.env,
-              RDX_TOOLS_ROOT: this.toolsPath,
-              PYTHONIOENCODING: "utf-8",
-              SystemRoot: launcher.systemRoot,
-              ComSpec: launcher.comSpec
-            },
-            windowsHide: true
-          }
-        );
-      }
-      const procId = generateEventId("proc");
-      this.activeProcesses.set(procId, {
-        process: proc,
-        runId: options.runId
-      });
-      let stdout = "";
-      let stderr = "";
-      let timeoutId = null;
-      let settled = false;
-      const finalize = (result) => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        if (timeoutId) clearTimeout(timeoutId);
-        this.activeProcesses.delete(procId);
-        if (options.abortSignal && abortHandler) {
-          options.abortSignal.removeEventListener("abort", abortHandler);
-        }
-        resolve(result);
-      };
-      if (options.timeout) {
-        timeoutId = setTimeout(() => {
-          proc.kill();
-          reject(new Error(`Process timeout after ${options.timeout}ms`));
-        }, options.timeout);
-      }
-      const abortHandler = () => {
-        try {
-          proc.kill();
-        } catch {
-        }
-      };
-      if (options.abortSignal) {
-        if (options.abortSignal.aborted) {
-          abortHandler();
-        } else {
-          options.abortSignal.addEventListener("abort", abortHandler, { once: true });
-        }
-      }
-      proc.stdout?.on("data", (data) => {
-        stdout += data.toString("utf-8");
-      });
-      proc.stderr?.on("data", (data) => {
-        stderr += data.toString("utf-8");
-      });
-      proc.on("close", (code) => {
-        finalize({
-          exitCode: code || 0,
-          stdout,
-          stderr,
-          duration_ms: nowMs() - startTime
-        });
-      });
-      proc.on("error", (error) => {
-        finalize({
-          exitCode: 2,
-          stdout,
-          stderr: error instanceof Error ? error.message : String(error),
-          duration_ms: nowMs() - startTime
-        });
-      });
-    });
-  }
-  onToolTrace(listener) {
-    this.traceListeners.add(listener);
-    return () => {
-      this.traceListeners.delete(listener);
-    };
-  }
-  emitToolTrace(request, result) {
-    const trace = {
-      traceId: result.trace_id || generateEventId("tool-trace"),
-      turnId: request.turnId,
-      toolName: request.toolName,
-      args: request.args,
-      result,
-      timestamp: nowMs(),
-      contextId: request.contextId ?? "",
-      runtimeOwner: request.runtimeOwner ?? "",
-      ownerLeaseId: request.ownerLeaseId
-    };
-    for (const listener of this.traceListeners) {
-      listener(trace);
-    }
-  }
-  /**
-   * 调用rd.*工具
-   * 使用参数数组模式，避免命令字符串拼接注入风险
-   */
-  async call(request) {
-    const startTime = nowMs();
-    let response;
-    try {
-      const cliArgs = [request.toolName];
-      const effectiveArgs = {
-        ...request.args || {}
-      };
-      if (request.contextId && effectiveArgs["context_id"] === void 0) {
-        effectiveArgs["context_id"] = request.contextId;
-      }
-      if (request.runtimeOwner && effectiveArgs["runtime_owner"] === void 0) {
-        effectiveArgs["runtime_owner"] = request.runtimeOwner;
-      }
-      if (request.ownerLeaseId && effectiveArgs["owner_lease_id"] === void 0) {
-        effectiveArgs["owner_lease_id"] = request.ownerLeaseId;
-      }
-      if (Object.keys(effectiveArgs).length > 0) {
-        cliArgs.push("--args-json", JSON.stringify(effectiveArgs));
-      }
-      if (request.contextId) {
-        cliArgs.push("--daemon-context", request.contextId);
-      }
-      const result = await this.executeCLI("call", cliArgs, {
-        timeout: 6e4,
-        // 60秒超时
-        runId: request.runId,
-        abortSignal: request.abortSignal
-      });
-      if (result.stdout.trim()) {
-        let parsed = null;
-        try {
-          parsed = JSON.parse(result.stdout);
-        } catch {
-          if (result.exitCode === 0) {
-            response = {
-              ok: true,
-              data: { raw: result.stdout },
-              duration_ms: nowMs() - startTime,
-              trace_id: generateEventId("tool")
-            };
-            this.emitToolTrace(request, response);
-            return response;
-          }
-        }
-        if (parsed) {
-          if (parsed.ok === false) {
-            const errObj = parsed.error ?? {};
-            response = {
-              ok: false,
-              data: null,
-              artifacts: [],
-              error: {
-                code: errObj.code ?? "TOOL_ERROR",
-                message: errObj.message ?? "Tool returned ok:false",
-                category: errObj.category ?? "execution",
-                details: errObj.details ?? void 0
-              },
-              duration_ms: nowMs() - startTime,
-              trace_id: generateEventId("tool")
-            };
-            this.emitToolTrace(request, response);
-            return response;
-          }
-          response = {
-            ok: true,
-            data: parsed.data ?? parsed,
-            artifacts: parsed.artifacts,
-            duration_ms: nowMs() - startTime,
-            trace_id: generateEventId("tool")
-          };
-          this.emitToolTrace(request, response);
-          return response;
-        }
-      }
-      response = {
-        ok: false,
-        data: null,
-        artifacts: [],
-        error: {
-          code: "CLI_ERROR",
-          message: result.stderr.trim() || `Exit code: ${result.exitCode}`,
-          category: "execution",
-          details: {
-            stdout: result.stdout,
-            stderr: result.stderr,
-            exitCode: result.exitCode
-          }
-        },
-        duration_ms: nowMs() - startTime,
-        trace_id: generateEventId("tool")
-      };
-      this.emitToolTrace(request, response);
-      return response;
-    } catch (error) {
-      response = {
-        ok: false,
-        data: null,
-        artifacts: [],
-        error: {
-          code: "EXECUTION_ERROR",
-          message: error instanceof Error ? error.message : String(error),
-          category: "internal"
-        },
-        duration_ms: nowMs() - startTime,
-        trace_id: generateEventId("tool")
-      };
-      this.emitToolTrace(request, response);
-      return response;
-    }
-  }
-  abortRun(runId) {
-    for (const { process: process2, runId: activeRunId } of this.activeProcesses.values()) {
-      if (activeRunId !== runId) {
-        continue;
-      }
-      try {
-        process2.kill();
-      } catch {
-      }
-    }
-  }
-  /**
-   * 打开capture文件
-   */
-  async openCapture(filePath, options = {}) {
-    const args = {
-      file: filePath
-    };
-    if (options.frameIndex !== void 0) {
-      args["frame-index"] = options.frameIndex;
-    }
-    if (options.preview) {
-      args["--preview"] = true;
-    }
-    return this.call({
-      toolName: "rd.capture.open_file",
-      args
-    });
-  }
-  /**
-   * 打开replay session
-   */
-  async openReplay(captureFileId, options = {}) {
-    const args = {
-      capture_file_id: captureFileId
-    };
-    if (options.remoteId) {
-      args.options = { remote_id: options.remoteId };
-    }
-    return this.call({
-      toolName: "rd.capture.open_replay",
-      args
-    });
-  }
-  /**
-   * 获取session context
-   */
-  async getSessionContext(sessionId) {
-    return this.call({
-      toolName: "rd.session.get_context",
-      args: sessionId ? { session_id: sessionId } : {}
-    });
-  }
-  /**
-   * 获取capture状态
-   */
-  async getCaptureStatus() {
-    return this.call({
-      toolName: "rd.capture.status",
-      args: {}
-    });
-  }
-  /**
-   * 获取session状态
-   */
-  async getSessionStatus() {
-    return this.call({
-      toolName: "rd.session.get_context",
-      args: {}
-    });
-  }
-  /**
-   * 列出可用工具
-   */
-  async listTools(options = {}) {
-    return this.call({
-      toolName: "rd.core.list_tools",
-      args: options
-    });
-  }
-  /**
-   * 终止所有活动进程
-   */
-  terminateAll() {
-    for (const [id, active] of this.activeProcesses) {
-      try {
-        active.process.kill();
-      } catch (error) {
-        console.error(`Failed to terminate process ${id}:`, error);
-      }
-    }
-    this.activeProcesses.clear();
-  }
-}
-const toolBridge = new ToolBridge();
-function readJsonl(filePath) {
-  try {
-    if (!fs__namespace.existsSync(filePath)) {
-      return [];
-    }
-    const content = fs__namespace.readFileSync(filePath, "utf-8");
-    const lines = content.trim().split("\n");
-    const results = [];
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      try {
-        results.push(JSON.parse(trimmed));
-      } catch {
-        continue;
-      }
-    }
-    return results;
-  } catch (error) {
-    console.error(`Failed to read JSONL file: ${filePath}`, error);
-    return [];
-  }
-}
-function appendJsonl(filePath, data) {
-  try {
-    const dir = path__namespace.dirname(filePath);
-    if (!fs__namespace.existsSync(dir)) {
-      fs__namespace.mkdirSync(dir, { recursive: true });
-    }
-    const serialized = JSON.stringify(data, null, 0);
-    if (fs__namespace.existsSync(filePath)) {
-      const existing = fs__namespace.readFileSync(filePath, "utf-8");
-      if (existing && !existing.endsWith("\n")) {
-        fs__namespace.appendFileSync(filePath, "\n", "utf-8");
-      }
-    }
-    fs__namespace.appendFileSync(filePath, `${serialized}
-`, "utf-8");
-    return true;
-  } catch (error) {
-    console.error(`Failed to append to JSONL file: ${filePath}`, error);
-    return false;
-  }
-}
-function writeJsonl(filePath, items) {
-  try {
-    const dir = path__namespace.dirname(filePath);
-    if (!fs__namespace.existsSync(dir)) {
-      fs__namespace.mkdirSync(dir, { recursive: true });
-    }
-    const lines = items.map((item) => JSON.stringify(item, null, 0));
-    fs__namespace.writeFileSync(filePath, `${lines.join("\n")}
-`, "utf-8");
-    return true;
-  } catch (error) {
-    console.error(`Failed to write JSONL file: ${filePath}`, error);
-    return false;
-  }
-}
-function readYaml(filePath) {
-  try {
-    if (!fs__namespace.existsSync(filePath)) {
-      return null;
-    }
-    const content = fs__namespace.readFileSync(filePath, "utf-8");
-    return yaml.parse(content);
-  } catch (error) {
-    console.error(`Failed to read YAML file: ${filePath}`, error);
-    return null;
-  }
-}
-function writeYaml(filePath, data) {
-  try {
-    const dir = path__namespace.dirname(filePath);
-    if (!fs__namespace.existsSync(dir)) {
-      fs__namespace.mkdirSync(dir, { recursive: true });
-    }
-    const content = yaml.stringify(data, {
-      indent: 2,
-      lineWidth: 0,
-      defaultStringType: "QUOTE_DOUBLE",
-      defaultKeyType: "PLAIN"
-    });
-    fs__namespace.writeFileSync(filePath, content, "utf-8");
-    return true;
-  } catch (error) {
-    console.error(`Failed to write YAML file: ${filePath}`, error);
-    return false;
-  }
-}
-const MAIN_STAGES = [
-  "preflight",
-  "entry_gate",
-  "intake_gate",
-  "plan",
-  "speclist",
-  "dispatch",
-  "investigate",
-  "fix_verify",
-  "skepti",
-  "curate",
-  "finalize"
+const DEFAULT_MODEL_ROUTING = {
+  "ask_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  "rdc-debugger": { provider: "openrouter", model: "anthropic/claude-3-opus" },
+  "triage_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  "capture_repro_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  "pass_graph_pipeline_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  "pixel_forensics_agent": { provider: "openrouter", model: "google/gemini-pro-1.5" },
+  "shader_ir_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  "driver_device_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  "skeptic_agent": { provider: "openrouter", model: "openai/gpt-4o" },
+  "curator_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" }
+};
+const LEFT_SIDEBAR_DEFAULT_WIDTH = 256;
+const LEFT_SIDEBAR_MIN_WIDTH = 220;
+const LEFT_SIDEBAR_MAX_WIDTH = 420;
+const LEFT_SIDEBAR_COLLAPSED_WIDTH = 0;
+const RIGHT_PANEL_DEFAULT_WIDTH = 312;
+const RIGHT_PANEL_MIN_WIDTH = 280;
+const RIGHT_PANEL_MAX_WIDTH = 520;
+const RIGHT_PANEL_COLLAPSED_WIDTH = 0;
+const TERMINAL_DEFAULT_HEIGHT = 328;
+const TERMINAL_MIN_HEIGHT = 180;
+const TERMINAL_MAX_HEIGHT = 720;
+const ANTHROPIC_ALIAS_MODELS = ["sonnet", "opus", "haiku"];
+const ANTHROPIC_FIRST_PARTY_MODELS = ["sonnet", "opus"];
+const CLAUDE_ACCOUNT_MODELS = [
+  "claude-opus-4-7",
+  "claude-sonnet-4-6",
+  "claude-haiku-4-5-20251001"
 ];
-const SPECIAL_STAGES = [
-  "blocked",
-  "awaiting_user_input"
+const CHATGPT_ACCOUNT_MODELS = [
+  "gpt-5.5",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.3-codex",
+  "gpt-5.2-codex",
+  "gpt-5.1-codex",
+  "gpt-5",
+  "o4-mini",
+  "o3",
+  "gpt-4o"
 ];
-const ALL_STAGES = [...MAIN_STAGES, ...SPECIAL_STAGES];
-const STAGE_PHASES = {
-  preflight: "planner",
-  entry_gate: "planner",
-  intake_gate: "planner",
-  plan: "planner",
-  speclist: "planner",
-  dispatch: "generator",
-  investigate: "generator",
-  fix_verify: "evaluator",
-  skepti: "evaluator",
-  curate: "evaluator",
-  finalize: "evaluator",
-  blocked: "evaluator",
-  awaiting_user_input: "planner"
-};
-const LEGACY_STAGE_MIGRATION = {
-  preflight_pending: "preflight",
-  intent_gate_passed: "plan",
-  entry_gate_passed: "entry_gate",
-  accepted_intake_initialized: "intake_gate",
-  intake_gate_passed: "intake_gate",
-  waiting_for_specialist_brief: "dispatch",
-  specialist_briefs_collected: "dispatch",
-  expert_investigation_complete: "investigate",
-  fix_verification_complete: "fix_verify",
-  skeptic_ready: "skepti",
-  curator_ready: "curate",
-  finalized: "finalize",
-  validation_blocked: "blocked"
-};
-const normalizeWorkflowStage = (stage) => {
-  if (!stage) {
-    return "preflight";
+const GITHUB_COPILOT_ACCOUNT_MODELS = [
+  "gpt-5.5",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.3-codex",
+  "gpt-5.2-codex",
+  "gpt-5.2",
+  "gpt-5-mini",
+  "claude-opus-4-7",
+  "claude-sonnet-4-6",
+  "claude-haiku-4-5",
+  "claude-opus-4-6",
+  "claude-opus-4-5",
+  "claude-sonnet-4-5",
+  "gpt-4.1"
+];
+const GROK_ACCOUNT_MODELS = [
+  "grok-4.3",
+  "grok-4",
+  "grok-code-fast-1"
+];
+const GEMINI_ACCOUNT_MODELS = [
+  "gemini-2.5-pro",
+  "gemini-2.5-flash",
+  "gemini-2.0-flash"
+];
+const QWEN_ACCOUNT_MODELS = [
+  "qwen-plus",
+  "qwen-max",
+  "qwen3-coder-plus"
+];
+const OPENAI_CODE_MODELS = ["gpt-5.2", "gpt-4.1", "gpt-5-mini"];
+const CAPS_OPENAI_COMPATIBLE = ["chat", "tool-calling", "model-discovery"];
+const CAPS_ANTHROPIC = ["chat", "tool-calling", "reasoning", "prompt-cache", "model-discovery"];
+const CAPS_GOOGLE_AI_STUDIO = ["chat", "tool-calling", "reasoning", "vision-input", "model-discovery"];
+const CAPS_OLLAMA = ["chat", "model-discovery"];
+const CAPS_OPENROUTER = ["chat", "model-discovery"];
+const CAPS_AZURE_OPENAI = ["chat", "model-discovery"];
+const CAPS_OPENAI_FIRST_PARTY = ["chat", "tool-calling", "structured-output", "vision-input", "model-discovery"];
+const CAPS_ANTHROPIC_FIRST_PARTY = ["chat", "tool-calling", "reasoning", "prompt-cache", "vision-input", "model-discovery"];
+const CAPS_XAI = ["chat", "tool-calling", "vision-input", "model-discovery"];
+const CAPS_STATIC_CLOUD = ["chat"];
+const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
+  {
+    id: "302ai",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "openai-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "302.AI",
+    baseUrl: "https://api.302.ai/v1",
+    recommendedModels: ["gpt-4o", "claude-3-7-sonnet"],
+    docsUrl: "https://302.ai/",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "azure-openai",
+    kind: "azure-openai",
+    authMode: "api-key",
+    catalogGroup: "cloud-platform",
+    modelDiscovery: "azure-openai",
+    label: "Azure OpenAI",
+    baseUrl: "",
+    baseUrlEditable: true,
+    recommendedModels: ["gpt-4.1", "gpt-5-mini"],
+    docsUrl: "https://learn.microsoft.com/azure/ai-services/openai/",
+    capabilities: CAPS_AZURE_OPENAI
+  },
+  {
+    id: "bailian",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "anthropic-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Alibaba Cloud Bailian",
+    baseUrl: "https://coding.dashscope.aliyuncs.com/apps/anthropic",
+    recommendedModels: ["qwen3.6-plus", "qwen3-coder-next", "qwen3-coder-plus", "kimi-k2.5", "glm-5", "glm-4.7"],
+    docsUrl: "https://bailian.console.aliyun.com/",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "anthropic",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "anthropic-compatible",
+    modelDiscovery: "anthropic",
+    label: "Anthropic",
+    baseUrl: "https://api.anthropic.com/v1",
+    recommendedModels: ANTHROPIC_FIRST_PARTY_MODELS,
+    docsUrl: "https://platform.claude.com/settings/keys",
+    capabilities: CAPS_ANTHROPIC_FIRST_PARTY
+  },
+  {
+    id: "anthropic-thirdparty",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "anthropic-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Anthropic-compatible Endpoint",
+    baseUrl: "",
+    baseUrlEditable: true,
+    recommendedModels: ANTHROPIC_ALIAS_MODELS,
+    docsUrl: "https://platform.claude.com/docs/en/api/overview",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "cerebras",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "openai-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "Cerebras",
+    baseUrl: "https://api.cerebras.ai/v1",
+    recommendedModels: ["llama-4-scout-17b-16e-instruct", "qwen-3-coder-480b"],
+    docsUrl: "https://cloud.cerebras.ai/",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "bedrock",
+    kind: "bedrock",
+    authMode: "environment",
+    catalogGroup: "cloud-platform",
+    modelDiscovery: "static",
+    label: "Amazon Bedrock",
+    recommendedModels: ANTHROPIC_ALIAS_MODELS,
+    docsUrl: "https://docs.anthropic.com/en/docs/claude-code/amazon-bedrock",
+    capabilities: CAPS_STATIC_CLOUD
+  },
+  {
+    id: "custom-endpoint",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "openai-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "OpenAI-compatible Endpoint",
+    baseUrl: "",
+    baseUrlEditable: true,
+    recommendedModels: ["gpt-4.1"],
+    docsUrl: "https://platform.openai.com/docs/api-reference",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "claude-account",
+    kind: "anthropic",
+    authMode: "account",
+    catalogGroup: "account",
+    modelDiscovery: "account-catalog",
+    label: "Claude Account",
+    recommendedModels: CLAUDE_ACCOUNT_MODELS,
+    docsUrl: "https://claude.ai/",
+    accountLoginConfigured: true,
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "chatgpt-account",
+    kind: "openai-compatible",
+    authMode: "account",
+    catalogGroup: "account",
+    modelDiscovery: "account-catalog",
+    label: "ChatGPT Account",
+    recommendedModels: CHATGPT_ACCOUNT_MODELS,
+    docsUrl: "https://chatgpt.com/",
+    accountLoginConfigured: true,
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "deepseek",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "anthropic-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "DeepSeek",
+    baseUrl: "https://api.deepseek.com/anthropic",
+    recommendedModels: ["deepseek-v4-pro", "deepseek-v4-flash"],
+    docsUrl: "https://platform.deepseek.com/api_keys",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "github-copilot",
+    kind: "openai-compatible",
+    authMode: "account",
+    catalogGroup: "account",
+    modelDiscovery: "account-catalog",
+    label: "GitHub Copilot",
+    recommendedModels: GITHUB_COPILOT_ACCOUNT_MODELS,
+    docsUrl: "https://github.com/features/copilot",
+    accountLoginConfigured: true,
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "grok-account",
+    kind: "openai-compatible",
+    authMode: "account",
+    catalogGroup: "account",
+    modelDiscovery: "account-catalog",
+    label: "Grok Account",
+    baseUrl: "https://api.x.ai/v1",
+    recommendedModels: GROK_ACCOUNT_MODELS,
+    docsUrl: "https://grok.com/",
+    accountLoginConfigured: true,
+    unavailableReason: "Live Grok account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured.",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "gemini-account",
+    kind: "google-ai-studio",
+    authMode: "account",
+    catalogGroup: "account",
+    modelDiscovery: "account-catalog",
+    label: "Gemini Account",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    recommendedModels: GEMINI_ACCOUNT_MODELS,
+    docsUrl: "https://gemini.google.com/",
+    accountLoginConfigured: true,
+    unavailableReason: "Live Gemini account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured.",
+    capabilities: CAPS_GOOGLE_AI_STUDIO
+  },
+  {
+    id: "qwen-account",
+    kind: "openai-compatible",
+    authMode: "account",
+    catalogGroup: "account",
+    modelDiscovery: "account-catalog",
+    label: "Qwen Account",
+    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    recommendedModels: QWEN_ACCOUNT_MODELS,
+    docsUrl: "https://chat.qwen.ai/",
+    accountLoginConfigured: true,
+    unavailableReason: "Live Qwen account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured.",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "google-ai-studio",
+    kind: "google-ai-studio",
+    authMode: "api-key",
+    catalogGroup: "openai-compatible",
+    modelDiscovery: "google-ai-studio",
+    label: "Google AI Studio",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    recommendedModels: ["gemini-2.5-pro", "gemini-2.5-flash"],
+    docsUrl: "https://aistudio.google.com/app/apikey",
+    capabilities: CAPS_GOOGLE_AI_STUDIO
+  },
+  {
+    id: "groq",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "openai-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "Groq",
+    baseUrl: "https://api.groq.com/openai/v1",
+    recommendedModels: ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"],
+    docsUrl: "https://console.groq.com/keys",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "glm-cn",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "anthropic-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Zhipu AI GLM (CN)",
+    baseUrl: "https://open.bigmodel.cn/api/anthropic",
+    recommendedModels: ["sonnet", "opus", "haiku"],
+    docsUrl: "https://open.bigmodel.cn/",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "glm-global",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "anthropic-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Z.ai GLM (Global)",
+    baseUrl: "https://api.z.ai/api/anthropic",
+    recommendedModels: ["sonnet", "opus", "haiku"],
+    docsUrl: "https://platform.z.ai/",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "huggingface",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "openai-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "Hugging Face",
+    baseUrl: "https://router.huggingface.co/v1",
+    recommendedModels: ["openai/gpt-oss-120b", "Qwen/Qwen3-Coder-480B-A35B-Instruct"],
+    docsUrl: "https://huggingface.co/settings/tokens",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "vertex",
+    kind: "vertex",
+    authMode: "environment",
+    catalogGroup: "cloud-platform",
+    modelDiscovery: "static",
+    label: "Google Vertex AI",
+    recommendedModels: ANTHROPIC_ALIAS_MODELS,
+    docsUrl: "https://docs.anthropic.com/en/docs/claude-code/google-vertex-ai",
+    capabilities: CAPS_STATIC_CLOUD
+  },
+  {
+    id: "kimi-code",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "anthropic-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Kimi Code",
+    baseUrl: "https://api.kimi.com/coding/v1",
+    recommendedModels: ["kimi-for-coding"],
+    docsUrl: "https://www.kimi.com/code/docs/en/",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "litellm",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "anthropic-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "LiteLLM",
+    baseUrl: "http://localhost:4000",
+    recommendedModels: ANTHROPIC_ALIAS_MODELS,
+    docsUrl: "https://docs.litellm.ai/docs/",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "manifest",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "openai-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "Manifest",
+    baseUrl: "https://app.manifest.build/v1",
+    recommendedModels: ["gpt-4.1"],
+    docsUrl: "https://app.manifest.build/",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "minimax-cn",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "anthropic-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "MiniMax (CN)",
+    baseUrl: "https://api.minimaxi.com/anthropic",
+    recommendedModels: ["MiniMax-M2.7"],
+    docsUrl: "https://platform.minimaxi.com/",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "minimax-global",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "anthropic-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "MiniMax (Global)",
+    baseUrl: "https://api.minimax.io/anthropic",
+    recommendedModels: ["MiniMax-M2.7"],
+    docsUrl: "https://platform.minimaxi.com/",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "mistral",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "openai-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "Mistral",
+    baseUrl: "https://api.mistral.ai/v1",
+    recommendedModels: ["mistral-large-latest", "codestral-latest"],
+    docsUrl: "https://console.mistral.ai/api-keys/",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "moonshot",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "anthropic-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Kimi / Moonshot AI",
+    baseUrl: "https://api.moonshot.cn/anthropic",
+    recommendedModels: ["sonnet"],
+    docsUrl: "https://platform.moonshot.cn/console/api-keys",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "openrouter",
+    kind: "openrouter",
+    authMode: "api-key",
+    catalogGroup: "openai-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "OpenRouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    recommendedModels: ["anthropic/claude-haiku-latest", "anthropic/claude-sonnet-4.5", "openai/gpt-5.2"],
+    docsUrl: "https://openrouter.ai/keys",
+    capabilities: CAPS_OPENROUTER
+  },
+  {
+    id: "openai",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "openai-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "OpenAI",
+    baseUrl: "https://api.openai.com/v1",
+    recommendedModels: OPENAI_CODE_MODELS,
+    docsUrl: "https://platform.openai.com/api-keys",
+    capabilities: CAPS_OPENAI_FIRST_PARTY
+  },
+  {
+    id: "openai-eu",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "openai-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "OpenAI (EU)",
+    baseUrl: "https://eu.api.openai.com/v1",
+    recommendedModels: OPENAI_CODE_MODELS,
+    docsUrl: "https://platform.openai.com/api-keys",
+    capabilities: CAPS_OPENAI_FIRST_PARTY
+  },
+  {
+    id: "openai-us",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "openai-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "OpenAI (US)",
+    baseUrl: "https://us.api.openai.com/v1",
+    recommendedModels: OPENAI_CODE_MODELS,
+    docsUrl: "https://platform.openai.com/api-keys",
+    capabilities: CAPS_OPENAI_FIRST_PARTY
+  },
+  {
+    id: "qwen",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "openai-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "Qwen / DashScope",
+    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    recommendedModels: ["qwen-plus", "qwen-max"],
+    docsUrl: "https://dashscope.console.aliyun.com/apiKey",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "siliconflow",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "openai-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "SiliconFlow",
+    baseUrl: "https://api.siliconflow.cn/v1",
+    recommendedModels: ["Qwen/Qwen3-32B", "deepseek-ai/DeepSeek-V3"],
+    docsUrl: "https://siliconflow.cn/",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "volcengine",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "anthropic-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Volcengine Ark (Doubao)",
+    baseUrl: "https://ark.cn-beijing.volces.com/api/coding",
+    recommendedModels: ["doubao-seed-1-6", "glm-4.6", "deepseek-v4-pro", "kimi-k2.5"],
+    docsUrl: "https://www.volcengine.com/docs/82379/1928262",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "vercel-ai-gateway",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "openai-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "Vercel AI Gateway",
+    baseUrl: "https://ai-gateway.vercel.sh/v1",
+    recommendedModels: ["openai/gpt-5.2", "anthropic/claude-sonnet-4.5"],
+    docsUrl: "https://vercel.com/docs/ai-gateway",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "xai",
+    kind: "openai-compatible",
+    authMode: "api-key",
+    catalogGroup: "openai-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "xAI (Grok)",
+    baseUrl: "https://api.x.ai/v1",
+    recommendedModels: ["grok-4.3", "grok-4"],
+    docsUrl: "https://docs.x.ai/",
+    capabilities: CAPS_XAI
+  },
+  {
+    id: "xiaomi-mimo",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "anthropic-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Xiaomi MiMo",
+    baseUrl: "https://api.xiaomimimo.com/anthropic",
+    recommendedModels: ["mimo-v2.5-pro"],
+    docsUrl: "https://platform.xiaomimimo.com/#/console/api-keys",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "xiaomi-mimo-token-plan",
+    kind: "anthropic",
+    authMode: "api-key",
+    catalogGroup: "anthropic-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Xiaomi MiMo Token Plan",
+    baseUrl: "https://token-plan-cn.xiaomimimo.com/anthropic",
+    recommendedModels: ["mimo-v2.5-pro"],
+    docsUrl: "https://platform.xiaomimimo.com/#/console/plan-manage",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "ollama",
+    kind: "ollama",
+    authMode: "local",
+    catalogGroup: "local",
+    modelDiscovery: "ollama-tags",
+    label: "Ollama",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    recommendedModels: ["qwen2.5-coder:14b", "llama3.1:8b"],
+    docsUrl: "https://ollama.com/download",
+    capabilities: CAPS_OLLAMA
   }
-  if (ALL_STAGES.includes(stage)) {
-    return stage;
+];
+function isBuiltinProviderId(id) {
+  return BUILTIN_LLM_PROVIDER_DEFINITIONS.some((entry) => entry.id === id);
+}
+function getBuiltinProviderDefinition(id) {
+  return BUILTIN_LLM_PROVIDER_DEFINITIONS.find((entry) => entry.id === id) ?? null;
+}
+const toModels = (modelIds) => Array.from(new Set(modelIds)).map((modelId) => ({
+  id: modelId,
+  label: modelId,
+  enabled: true
+}));
+const createBuiltinProviderEntry = (id) => {
+  const definition = getBuiltinProviderDefinition(id);
+  if (!definition) {
+    throw new Error(`Unknown builtin provider: ${id}`);
   }
-  return LEGACY_STAGE_MIGRATION[stage] || "preflight";
+  return {
+    id: definition.id,
+    kind: definition.kind,
+    authMode: definition.authMode,
+    catalogGroup: definition.catalogGroup,
+    modelDiscovery: definition.modelDiscovery,
+    label: definition.label,
+    enabled: false,
+    apiKey: "",
+    hasStoredSecret: definition.authMode === "local" || definition.authMode === "environment",
+    baseUrl: definition.baseUrl,
+    baseUrlEditable: definition.baseUrlEditable,
+    models: definition.modelDiscovery === "static" && definition.authMode === "environment" ? toModels(definition.recommendedModels) : toModels([]),
+    recommendedModels: definition.recommendedModels,
+    docsUrl: definition.docsUrl,
+    status: "unconfigured",
+    accountLoginConfigured: definition.accountLoginConfigured,
+    unavailableReason: definition.unavailableReason,
+    isConfigured: false,
+    capabilities: definition.capabilities ? [...definition.capabilities] : void 0
+  };
 };
+const createBuiltinProviderEntries = () => BUILTIN_LLM_PROVIDER_DEFINITIONS.map((entry) => createBuiltinProviderEntry(entry.id));
 const SETTINGS_FILE_NAME = "settings.json";
 const LOG_FILE_NAME = "rdc-agent.log";
 const sanitizePathSegment = (value) => value.replace(/[^a-zA-Z0-9_-]/g, "-");
@@ -1000,6 +863,2236 @@ class AppPathService {
   }
 }
 const appPathService = new AppPathService();
+const MAIN_STAGES = [
+  "preflight",
+  "entry_gate",
+  "intake_gate",
+  "plan",
+  "speclist",
+  "dispatch",
+  "investigate",
+  "fix_verify",
+  "skepti",
+  "curate",
+  "finalize"
+];
+const SPECIAL_STAGES = [
+  "blocked",
+  "awaiting_user_input"
+];
+const ALL_STAGES = [...MAIN_STAGES, ...SPECIAL_STAGES];
+const STAGE_PHASES = {
+  preflight: "planner",
+  entry_gate: "planner",
+  intake_gate: "planner",
+  plan: "planner",
+  speclist: "planner",
+  dispatch: "generator",
+  investigate: "generator",
+  fix_verify: "evaluator",
+  skepti: "evaluator",
+  curate: "evaluator",
+  finalize: "evaluator",
+  blocked: "evaluator",
+  awaiting_user_input: "planner"
+};
+const LEGACY_STAGE_MIGRATION = {
+  preflight_pending: "preflight",
+  intent_gate_passed: "plan",
+  entry_gate_passed: "entry_gate",
+  accepted_intake_initialized: "intake_gate",
+  intake_gate_passed: "intake_gate",
+  waiting_for_specialist_brief: "dispatch",
+  specialist_briefs_collected: "dispatch",
+  expert_investigation_complete: "investigate",
+  fix_verification_complete: "fix_verify",
+  skeptic_ready: "skepti",
+  curator_ready: "curate",
+  finalized: "finalize",
+  validation_blocked: "blocked"
+};
+const normalizeWorkflowStage = (stage) => {
+  if (!stage) {
+    return "preflight";
+  }
+  if (ALL_STAGES.includes(stage)) {
+    return stage;
+  }
+  return LEGACY_STAGE_MIGRATION[stage] || "preflight";
+};
+const AGENT_ROLES = [
+  "ask_agent",
+  "rdc-debugger",
+  "triage_agent",
+  "capture_repro_agent",
+  "pass_graph_pipeline_agent",
+  "pixel_forensics_agent",
+  "shader_ir_agent",
+  "driver_device_agent",
+  "skeptic_agent",
+  "curator_agent"
+];
+const AGENT_DISPLAY_NAMES = {
+  "ask_agent": "Ask",
+  "rdc-debugger": "RDC Debugger",
+  "triage_agent": "Triage Agent",
+  "capture_repro_agent": "Capture Repro Agent",
+  "pass_graph_pipeline_agent": "Pass Graph Agent",
+  "pixel_forensics_agent": "Pixel Forensics Agent",
+  "shader_ir_agent": "Shader IR Agent",
+  "driver_device_agent": "Driver Device Agent",
+  "skeptic_agent": "Skeptic Agent",
+  "curator_agent": "Curator Agent"
+};
+const AGENT_DESCRIPTIONS = {
+  "ask_agent": "Non-executing assistant for clarification, capability explanation, and Open capture guidance",
+  "rdc-debugger": "Main orchestrator responsible for workflow coordination, gates, and stage progression",
+  "triage_agent": "Symptom classification and SOP recommendation",
+  "capture_repro_agent": "Capture quality verification and baseline establishment",
+  "pass_graph_pipeline_agent": "Render pass and pipeline dependency analysis",
+  "pixel_forensics_agent": "Pixel-level evidence collection and first-bad event localization",
+  "shader_ir_agent": "Shader source and IR evidence analysis",
+  "driver_device_agent": "Cross-device attribution and platform-specific checks",
+  "skeptic_agent": "Evidence chain challenger and weak claim detector",
+  "curator_agent": "Final report generation and knowledge library curation"
+};
+const AGENT_CATEGORIES = {
+  "ask_agent": "orchestrator",
+  "rdc-debugger": "orchestrator",
+  "triage_agent": "investigator",
+  "capture_repro_agent": "investigator",
+  "pass_graph_pipeline_agent": "investigator",
+  "pixel_forensics_agent": "investigator",
+  "shader_ir_agent": "investigator",
+  "driver_device_agent": "investigator",
+  "skeptic_agent": "verifier",
+  "curator_agent": "reporter"
+};
+const INVESTIGATOR_AGENTS = [
+  "triage_agent",
+  "capture_repro_agent",
+  "pass_graph_pipeline_agent",
+  "pixel_forensics_agent",
+  "shader_ir_agent",
+  "driver_device_agent"
+];
+const VERIFIER_AGENTS = ["skeptic_agent"];
+const REPORTER_AGENTS = ["curator_agent"];
+const AGENT_WRITE_SCOPES = {
+  "ask_agent": [],
+  "rdc-debugger": ["workspace_control"],
+  "triage_agent": ["workspace_notes"],
+  "capture_repro_agent": ["workspace_notes"],
+  "pass_graph_pipeline_agent": ["workspace_notes"],
+  "pixel_forensics_agent": ["workspace_notes"],
+  "shader_ir_agent": ["workspace_notes"],
+  "driver_device_agent": ["workspace_notes"],
+  "skeptic_agent": ["session_signoff"],
+  "curator_agent": ["workspace_reports", "session_artifacts", "knowledge_library"]
+};
+const AGENT_MODES = [
+  {
+    id: "ask",
+    label: "Ask",
+    icon: "message-orbit",
+    description: "澄清目标并引导打开 Capture",
+    accentColor: "#38c6f4",
+    disabled: false
+  },
+  {
+    id: "debugger",
+    label: "Debugger",
+    icon: "crosshair-bug",
+    description: "定位异常与验证修复",
+    accentColor: "#33d1ff",
+    disabled: false
+  },
+  {
+    id: "analyzer",
+    label: "Analyzer",
+    icon: "waveform-gauge",
+    description: "拆解现象并收敛证据",
+    accentColor: "#8d8bff",
+    disabled: false
+  },
+  {
+    id: "optimizer",
+    label: "Optimizer",
+    icon: "spark-tuning",
+    description: "判断瓶颈与优化顺序",
+    accentColor: "#4ee3a0",
+    disabled: false
+  }
+];
+AGENT_MODES.reduce(
+  (accumulator, mode) => {
+    accumulator[mode.id] = mode;
+    return accumulator;
+  },
+  {}
+);
+const RETIRED_BUILTIN_MCP_SERVER_IDS$1 = /* @__PURE__ */ new Set(["builtin.rdc-toolbridge"]);
+const TEMPLATE_COPIES = [
+  {
+    source: ["profiles", "agents"],
+    target: (workspaceRoot) => path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "agents")
+  },
+  {
+    source: ["profiles", "modes"],
+    target: (workspaceRoot) => path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "modes")
+  },
+  {
+    source: ["policies", "stages"],
+    target: (workspaceRoot) => path.join(appPathService.getWorkspacePaths(workspaceRoot).policiesPath, "stages")
+  },
+  {
+    source: ["patterns"],
+    target: (workspaceRoot) => appPathService.getWorkspacePaths(workspaceRoot).patternsPath
+  },
+  {
+    source: ["skills"],
+    target: (workspaceRoot) => appPathService.getWorkspacePaths(workspaceRoot).skillsPath
+  },
+  {
+    source: ["mcp"],
+    target: (workspaceRoot) => appPathService.getWorkspacePaths(workspaceRoot).mcpPath
+  }
+];
+function readJsonFile$1(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return null;
+    }
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch (error) {
+    console.warn("[AgentRuntimeConfigService] Failed to read JSON:", filePath, error);
+    return null;
+  }
+}
+function copyDirContentsIfMissing(sourceDir, targetDir) {
+  if (!fs.existsSync(sourceDir) || !fs.statSync(sourceDir).isDirectory()) {
+    return;
+  }
+  fs.mkdirSync(targetDir, { recursive: true });
+  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+    const sourcePath = path.join(sourceDir, entry.name);
+    const targetPath = path.join(targetDir, entry.name);
+    if (entry.isDirectory()) {
+      copyDirContentsIfMissing(sourcePath, targetPath);
+      continue;
+    }
+    if (!entry.isFile() || fs.existsSync(targetPath)) {
+      continue;
+    }
+    fs.copyFileSync(sourcePath, targetPath);
+  }
+}
+class AgentRuntimeConfigService {
+  resolveTemplateRoot() {
+    const candidates = [
+      path.join(electron.app.getAppPath(), "resources", "agent-runtime"),
+      path.join(electron.app.getAppPath(), "..", "resources", "agent-runtime"),
+      path.join(process.cwd(), "resources", "agent-runtime"),
+      path.join(process.resourcesPath ?? "", "resources", "agent-runtime"),
+      path.join(process.resourcesPath ?? "", "agent-runtime")
+    ].filter(Boolean);
+    for (const candidate of candidates) {
+      const resolved = path.resolve(candidate);
+      if (fs.existsSync(resolved)) {
+        return resolved;
+      }
+    }
+    return path.resolve(candidates[0]);
+  }
+  ensureScaffold(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    const templateRoot = this.resolveTemplateRoot();
+    for (const copy of TEMPLATE_COPIES) {
+      copyDirContentsIfMissing(path.join(templateRoot, ...copy.source), copy.target(workspaceRoot));
+    }
+  }
+  listPatterns(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    return this.readDescriptors("patterns", workspaceRoot);
+  }
+  listSkills(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    return this.readDescriptors("skills", workspaceRoot);
+  }
+  listMcpServers(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    return this.readDescriptors("mcp", workspaceRoot).filter((descriptor) => !RETIRED_BUILTIN_MCP_SERVER_IDS$1.has(descriptor.id));
+  }
+  readDescriptors(kind, workspaceRoot) {
+    this.ensureScaffold(workspaceRoot);
+    const paths = appPathService.getWorkspacePaths(workspaceRoot);
+    const dir = kind === "patterns" ? paths.patternsPath : kind === "skills" ? paths.skillsPath : paths.mcpPath;
+    if (!fs.existsSync(dir)) {
+      return [];
+    }
+    return fs.readdirSync(dir).filter((entry) => entry.endsWith(".json")).map((entry) => readJsonFile$1(path.join(dir, entry))).filter((entry) => Boolean(entry?.id)).sort((left, right) => left.id.localeCompare(right.id));
+  }
+}
+const agentRuntimeConfigService = new AgentRuntimeConfigService();
+const COPILOT_CHAT_COMPLETIONS_FALLBACK_MODELS = [
+  "gemini-3-flash-preview",
+  "gemini-3.5-flash",
+  "gpt-4.1",
+  "gpt-4o",
+  "claude-sonnet-4-6",
+  "claude-sonnet-4-5",
+  "gpt-5-mini"
+];
+function isCopilotChatCompletionsUnsupportedModel(modelId) {
+  const normalized = modelId.toLowerCase();
+  return /^gpt-5\.[3-9](?:-|$)/.test(normalized) || /^gpt-5\.[0-9]+-codex(?:-|$)/.test(normalized);
+}
+function isEnabledModel(provider, modelId) {
+  return provider.models.some((model) => model.enabled !== false && model.id === modelId);
+}
+function resolveCopilotFallbackModel(routes, provider, agentId) {
+  const debuggerRoute = routes.find((entry) => entry.agentId === "rdc-debugger");
+  const candidates = [
+    ...agentId !== "rdc-debugger" && debuggerRoute?.providerId === provider.id ? [debuggerRoute.modelId] : [],
+    ...COPILOT_CHAT_COMPLETIONS_FALLBACK_MODELS,
+    ...provider.models.map((model) => model.id)
+  ];
+  for (const modelId of candidates) {
+    if (modelId && !isCopilotChatCompletionsUnsupportedModel(modelId) && isEnabledModel(provider, modelId)) {
+      return modelId;
+    }
+  }
+  return null;
+}
+function resolveCompatibleAgentRoute(routes, providers, agentId) {
+  const route = routes.find((entry) => entry.agentId === agentId) || null;
+  if (!route?.providerId || !route.modelId) {
+    return { route: null, provider: null };
+  }
+  const provider = providers.find((entry) => entry.id === route.providerId) || null;
+  if (!provider || !provider.enabled || !provider.isConfigured) {
+    return { route, provider };
+  }
+  if (!isEnabledModel(provider, route.modelId)) {
+    return { route, provider };
+  }
+  if (provider.id !== "github-copilot" || !isCopilotChatCompletionsUnsupportedModel(route.modelId)) {
+    return { route, provider };
+  }
+  const fallbackModelId = resolveCopilotFallbackModel(routes, provider, agentId);
+  if (!fallbackModelId) {
+    return { route, provider };
+  }
+  return {
+    route: {
+      ...route,
+      modelId: fallbackModelId
+    },
+    provider,
+    requestedModelId: route.modelId,
+    remapReason: `${route.modelId} is not available on GitHub Copilot chat completions; using ${fallbackModelId}.`
+  };
+}
+const DEFAULT_MODE_PROFILE_ID = "debugger.default";
+const groupToAllowPattern = (group) => {
+  if (group === "*") return "*";
+  if (group === "primitive") return "primitive.*";
+  if (group === "ui") return "ui.*";
+  if (group.startsWith("rd.")) return group.endsWith(".*") ? group : `${group}.*`;
+  return `rd.${group}.*`;
+};
+const expandToolPolicy = (policy) => [
+  ...policy?.allowTools ?? [],
+  ...(policy?.allowGroups ?? []).map(groupToAllowPattern)
+].filter(Boolean);
+const createFallbackModeProfile = () => ({
+  id: DEFAULT_MODE_PROFILE_ID,
+  label: "Debugger Production",
+  mode: "debugger",
+  patternId: "plan-generate-verify",
+  skillIds: [],
+  mcpServerIds: [],
+  stagePolicies: {},
+  defaultAgentPrompts: {}
+});
+const createFallbackAgentProfile = (agentId) => {
+  const route = DEFAULT_MODEL_ROUTING[agentId];
+  return {
+    id: `agent.${agentId}`,
+    label: agentId,
+    agentId,
+    systemPrompt: `You are ${agentId}.`,
+    modelProvider: route.provider,
+    modelName: route.model,
+    temperature: 0.3,
+    maxTokens: 4096,
+    toolPolicy: { allowTools: [] }
+  };
+};
+const createFallbackStagePolicy = (stage) => ({
+  id: `stage.${stage}`,
+  label: stage,
+  stage,
+  phase: STAGE_PHASES[stage],
+  toolPolicy: { allowTools: [] }
+});
+class ExecutionProfileService {
+  getModeProfilesPath(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    return path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "modes");
+  }
+  getAgentProfilesPath(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    return path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "agents");
+  }
+  getStagePoliciesPath(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    return path.join(appPathService.getWorkspacePaths(workspaceRoot).policiesPath, "stages");
+  }
+  ensureScaffold(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    fs.mkdirSync(this.getModeProfilesPath(workspaceRoot), { recursive: true });
+    fs.mkdirSync(this.getAgentProfilesPath(workspaceRoot), { recursive: true });
+    fs.mkdirSync(this.getStagePoliciesPath(workspaceRoot), { recursive: true });
+    agentRuntimeConfigService.ensureScaffold(workspaceRoot);
+  }
+  normalizeConfiguration(configuration, workspaceRoot = appPathService.getWorkspaceRoot()) {
+    this.ensureScaffold(workspaceRoot);
+    const availableModeProfiles = this.listModeProfiles(workspaceRoot);
+    const hasActiveProfile = availableModeProfiles.some((profile) => profile.id === configuration.activeModeProfileId);
+    const availablePatterns = agentRuntimeConfigService.listPatterns(workspaceRoot);
+    const availableSkills = agentRuntimeConfigService.listSkills(workspaceRoot);
+    const availableMcpServers = agentRuntimeConfigService.listMcpServers(workspaceRoot);
+    const patternIds = new Set(availablePatterns.map((pattern) => pattern.id));
+    const modePatternBindings = Object.fromEntries(
+      Object.entries(configuration.modePatternBindings ?? {}).map(([mode, patternId]) => [mode, patternIds.has(patternId) ? patternId : "free-agent"])
+    );
+    return {
+      ...configuration,
+      activeModeProfileId: hasActiveProfile ? configuration.activeModeProfileId : DEFAULT_MODE_PROFILE_ID,
+      availableModeProfiles,
+      availablePatterns,
+      availableSkills,
+      availableMcpServers,
+      enabledSkillIds: configuration.enabledSkillIds ?? [],
+      enabledMcpServerIds: configuration.enabledMcpServerIds ?? [],
+      modePatternBindings: {
+        debugger: patternIds.has(modePatternBindings.debugger) ? modePatternBindings.debugger : "plan-generate-verify",
+        analyzer: patternIds.has(modePatternBindings.analyzer) ? modePatternBindings.analyzer : "free-agent",
+        optimizer: patternIds.has(modePatternBindings.optimizer) ? modePatternBindings.optimizer : "free-agent",
+        ...modePatternBindings
+      }
+    };
+  }
+  listModeProfiles(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    this.ensureScaffold(workspaceRoot);
+    return fs.readdirSync(this.getModeProfilesPath(workspaceRoot)).filter((entry) => entry.endsWith(".json")).map((entry) => this.readJson(path.join(this.getModeProfilesPath(workspaceRoot), entry))).filter((profile) => profile !== null).map((profile) => ({ id: profile.id, label: profile.label }));
+  }
+  resolveAgentRuntimeProfile(settings, stage, agentId) {
+    const workspaceRoot = settings.workspace.rootPath;
+    this.ensureScaffold(workspaceRoot);
+    const modeProfile = this.readJson(
+      path.join(this.getModeProfilesPath(workspaceRoot), `${settings.configuration.activeModeProfileId}.json`)
+    ) || createFallbackModeProfile();
+    const agentPromptId = modeProfile.defaultAgentPrompts[agentId] || `agent.${agentId}`;
+    const agentProfile = this.readJson(
+      path.join(this.getAgentProfilesPath(workspaceRoot), `${agentId}.json`)
+    ) || createFallbackAgentProfile(agentId);
+    const stagePolicyId = modeProfile.stagePolicies[stage] || `stage.${stage}`;
+    const stagePolicy = this.readJson(
+      path.join(this.getStagePoliciesPath(workspaceRoot), `${stage}.json`)
+    ) || createFallbackStagePolicy(stage);
+    const route = this.resolveAgentRoute(settings.llm.agentRoutes, settings.llm.providers, agentId);
+    return {
+      agentId,
+      systemPrompt: [
+        agentProfile.systemPrompt,
+        stagePolicy.systemPrompt ? `
+
+Stage Policy:
+${stagePolicy.systemPrompt}` : ""
+      ].join("").trim(),
+      providerId: route?.providerId || "",
+      modelId: route?.modelId || "",
+      temperature: agentProfile.temperature,
+      maxTokens: agentProfile.maxTokens,
+      category: AGENT_CATEGORIES[agentId],
+      writeScope: AGENT_WRITE_SCOPES[agentId],
+      stage,
+      phase: stagePolicy.phase || STAGE_PHASES[stage],
+      toolAllowlist: Array.from(/* @__PURE__ */ new Set([
+        ...expandToolPolicy(stagePolicy.toolPolicy),
+        ...expandToolPolicy(agentProfile.toolPolicy)
+      ])),
+      patternId: modeProfile.patternId ?? settings.configuration.modePatternBindings[modeProfile.mode],
+      skillIds: Array.from(/* @__PURE__ */ new Set([
+        ...modeProfile.skillIds ?? [],
+        ...settings.configuration.enabledSkillIds ?? []
+      ])),
+      mcpServerIds: Array.from(/* @__PURE__ */ new Set([
+        ...modeProfile.mcpServerIds ?? [],
+        ...settings.configuration.enabledMcpServerIds ?? []
+      ])),
+      source: {
+        modeProfileId: modeProfile.id,
+        stagePolicyId,
+        agentProfileId: agentPromptId
+      }
+    };
+  }
+  getDiagnostics(settings) {
+    const diagnostics = [];
+    if (!settings.configuration.availableModeProfiles.length) {
+      diagnostics.push({
+        code: "missing_mode_profile",
+        severity: "warning",
+        message: "No execution mode profile found. Falling back to debugger.default."
+      });
+    }
+    if (!settings.llm.providers.some((provider) => provider.isConfigured)) {
+      diagnostics.push({
+        code: "missing_configured_provider",
+        severity: "warning",
+        message: "No configured provider available for Debugger mode."
+      });
+    }
+    return diagnostics;
+  }
+  resolveAgentRoute(routes, providers, agentId) {
+    const resolution = resolveCompatibleAgentRoute(routes, providers, agentId);
+    if (!resolution.route || !resolution.provider) {
+      return null;
+    }
+    const modelExists = resolution.provider.models.some((model) => model.enabled && model.id === resolution.route?.modelId);
+    return modelExists ? resolution.route : null;
+  }
+  readJson(filePath) {
+    try {
+      if (!fs.existsSync(filePath)) {
+        return null;
+      }
+      return JSON.parse(fs.readFileSync(filePath, "utf8"));
+    } catch (error) {
+      console.warn("[ExecutionProfileService] Failed to read JSON:", filePath, error);
+      return null;
+    }
+  }
+}
+const executionProfileService = new ExecutionProfileService();
+const CATALOG_GROUPS = [
+  "account",
+  "openai-compatible",
+  "anthropic-compatible",
+  "cloud-platform",
+  "local",
+  "image"
+];
+function normalizeProviderCatalogGroup(provider) {
+  const current = provider.catalogGroup;
+  if (typeof current === "string" && CATALOG_GROUPS.includes(current)) {
+    return current;
+  }
+  const id = typeof provider.id === "string" ? provider.id.trim() : "";
+  if (id) {
+    const builtinDef = BUILTIN_LLM_PROVIDER_DEFINITIONS.find((def) => def.id === id);
+    if (builtinDef) {
+      return builtinDef.catalogGroup;
+    }
+  }
+  switch (provider.authMode) {
+    case "account":
+      return "account";
+    case "local":
+      return "local";
+    case "environment":
+      return "cloud-platform";
+    default:
+      console.warn(
+        "[SettingsService] Unable to infer catalogGroup for provider; defaulting to openai-compatible.",
+        { id, authMode: provider.authMode, catalogGroup: current }
+      );
+      return "openai-compatible";
+  }
+}
+const SECRET_FILE_NAME = "provider-secrets.json";
+class SecretStorageService {
+  getSecretFilePath(workspaceRoot = appPathService.getWorkspaceRoot()) {
+    return path.join(appPathService.getWorkspacePaths(workspaceRoot).secretsPath, SECRET_FILE_NAME);
+  }
+  readSecretMap(workspaceRoot) {
+    const filePath = this.getSecretFilePath(workspaceRoot);
+    if (!fs.existsSync(filePath)) {
+      return {};
+    }
+    try {
+      return JSON.parse(fs.readFileSync(filePath, "utf8"));
+    } catch (error) {
+      console.warn("[SecretStorageService] Failed to read secrets file:", error);
+      return {};
+    }
+  }
+  writeSecretMap(secretMap, workspaceRoot) {
+    const filePath = this.getSecretFilePath(workspaceRoot);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(secretMap, null, 2), "utf8");
+  }
+  createProviderSecretRef(providerId) {
+    return `provider-${sanitizeToken(providerId)}-api-key`;
+  }
+  createProviderOAuthSecretRef(providerId) {
+    return `provider-${sanitizeToken(providerId)}-oauth`;
+  }
+  getSecret(secretRef, workspaceRoot) {
+    if (!secretRef) {
+      return "";
+    }
+    const secretMap = this.readSecretMap(workspaceRoot);
+    const entry = secretMap[secretRef];
+    if (!entry) {
+      return "";
+    }
+    try {
+      if (entry.encoding === "safeStorage") {
+        if (!electron.safeStorage.isEncryptionAvailable()) {
+          console.warn("[SecretStorageService] safeStorage is unavailable for secret:", secretRef);
+          return "";
+        }
+        return electron.safeStorage.decryptString(Buffer.from(entry.payload, "base64"));
+      }
+      return Buffer.from(entry.payload, "base64").toString("utf8");
+    } catch (error) {
+      console.warn("[SecretStorageService] Failed to decrypt secret:", error);
+      return "";
+    }
+  }
+  setSecret(secretRef, plaintext, workspaceRoot) {
+    if (!secretRef) {
+      return;
+    }
+    const normalized = plaintext.trim();
+    const secretMap = this.readSecretMap(workspaceRoot);
+    if (!normalized) {
+      delete secretMap[secretRef];
+      this.writeSecretMap(secretMap, workspaceRoot);
+      return;
+    }
+    const encryptionAvailable = process.env.RDC_AGENT_TEST_MODE !== "1" && electron.safeStorage.isEncryptionAvailable();
+    secretMap[secretRef] = {
+      encoding: encryptionAvailable ? "safeStorage" : "base64",
+      payload: encryptionAvailable ? electron.safeStorage.encryptString(normalized).toString("base64") : Buffer.from(normalized, "utf8").toString("base64"),
+      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    this.writeSecretMap(secretMap, workspaceRoot);
+  }
+  deleteSecret(secretRef, workspaceRoot) {
+    if (!secretRef) {
+      return;
+    }
+    const secretMap = this.readSecretMap(workspaceRoot);
+    if (!(secretRef in secretMap)) {
+      return;
+    }
+    delete secretMap[secretRef];
+    this.writeSecretMap(secretMap, workspaceRoot);
+  }
+  hasSecret(secretRef, workspaceRoot) {
+    return Boolean(secretRef && this.getSecret(secretRef, workspaceRoot));
+  }
+}
+const secretStorageService = new SecretStorageService();
+const LEFT_DEFAULTS = {
+  width: LEFT_SIDEBAR_DEFAULT_WIDTH,
+  min: LEFT_SIDEBAR_MIN_WIDTH,
+  max: LEFT_SIDEBAR_MAX_WIDTH,
+  collapsedWidth: LEFT_SIDEBAR_COLLAPSED_WIDTH
+};
+const RIGHT_DEFAULTS = {
+  width: RIGHT_PANEL_DEFAULT_WIDTH,
+  min: RIGHT_PANEL_MIN_WIDTH,
+  max: RIGHT_PANEL_MAX_WIDTH,
+  collapsedWidth: RIGHT_PANEL_COLLAPSED_WIDTH
+};
+const VALID_THEMES = ["dark", "light", "system"];
+const VALID_LANGUAGES = ["zh-CN", "en"];
+const VALID_FONT_SCALES = ["small", "medium", "large"];
+const KNOWN_AGENT_IDS = new Set(Object.keys(DEFAULT_MODEL_ROUTING));
+const RETIRED_BUILTIN_MCP_SERVER_IDS = /* @__PURE__ */ new Set(["builtin.rdc-toolbridge"]);
+const EMPTY_PATHS = {
+  workspaceRoot: "",
+  defaultWorkspaceRoot: "",
+  settingsPath: "",
+  logsPath: "",
+  logPath: "",
+  projectsPath: "",
+  knowledgePath: "",
+  migrationOrphansPath: "",
+  profilesPath: "",
+  policiesPath: "",
+  skillsPath: "",
+  mcpPath: "",
+  patternsPath: "",
+  secretsPath: "",
+  migrationReportsPath: ""
+};
+const DEFAULT_APPEARANCE = {
+  theme: "dark",
+  language: "zh-CN",
+  fontScale: "medium"
+};
+const DEFAULT_LAYOUT = {
+  leftSidebar: {
+    collapsed: false,
+    width: LEFT_DEFAULTS.width,
+    expandedWidth: LEFT_DEFAULTS.width
+  },
+  rightPanel: {
+    collapsed: false,
+    width: RIGHT_DEFAULTS.width,
+    expandedWidth: RIGHT_DEFAULTS.width
+  },
+  terminal: {
+    height: TERMINAL_DEFAULT_HEIGHT
+  }
+};
+const DEFAULT_PROFILE = {
+  nickname: "RDC Operator",
+  avatarPath: ""
+};
+const DEFAULT_CONFIGURATION = {
+  activeModeProfileId: "debugger.default",
+  enabledSkillIds: [],
+  enabledMcpServerIds: [],
+  modePatternBindings: {
+    debugger: "plan-generate-verify",
+    analyzer: "free-agent",
+    optimizer: "free-agent"
+  }
+};
+const DEFAULT_RDX_CLI_INVOKER = {
+  enabled: false,
+  command: "",
+  argsPrefix: [],
+  workingDirectory: "",
+  env: {},
+  timeoutMs: 6e4,
+  catalogPath: "",
+  jsonMode: "auto"
+};
+const DEFAULT_TOOLING = {
+  rdxCli: DEFAULT_RDX_CLI_INVOKER
+};
+const DEFAULT_PROVIDER_SEEDS = [
+  {
+    id: "deepseek",
+    apiKey: "sk-15c018cd2a76442183e3cc5da3dbbaf9",
+    models: [
+      { id: "deepseek-chat", label: "DeepSeek Chat", enabled: true },
+      { id: "deepseek-reasoner", label: "DeepSeek Reasoner", enabled: true }
+    ]
+  },
+  {
+    id: "openrouter",
+    apiKey: "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",
+    models: [
+      { id: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4", enabled: true },
+      { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", enabled: true }
+    ]
+  },
+  {
+    id: "xai",
+    apiKey: "xai-93ENKTaQFwLRfblG6OHJlOzSDm2uPCryuBidXgs0iuBNQksYVYsJ9eRMUik1Elc9tbdZRl9b5VCSCcPs",
+    models: [
+      { id: "grok-4", label: "Grok 4", enabled: true },
+      { id: "grok-4.3", label: "Grok 4.3", enabled: true }
+    ]
+  },
+  {
+    id: "google-ai-studio",
+    apiKey: "AIzaSyDmcuv1H2TpaBSamaBJti3IkYkTLXZnC9o",
+    models: [
+      { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", enabled: true },
+      { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", enabled: true }
+    ]
+  },
+  {
+    id: "kimi-code",
+    apiKey: "sk-kimi-vz1tEHOOmhDximg0Zer0wZNS5eOcuSOIHq1FTl8YNkHkd2KvGbgWMAwJRxj5VKw8",
+    models: [
+      { id: "kimi-coding", label: "Kimi Coding", enabled: true }
+    ]
+  }
+];
+const DEFAULT_AGENT_ROUTE_SEEDS = [
+  { agentId: "ask_agent", providerId: "deepseek", modelId: "deepseek-chat" },
+  { agentId: "rdc-debugger", providerId: "deepseek", modelId: "deepseek-chat" }
+];
+function nowIso() {
+  return (/* @__PURE__ */ new Date()).toISOString();
+}
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+function pickEnum(value, allowed, fallback) {
+  return typeof value === "string" && allowed.includes(value) ? value : fallback;
+}
+function dedupeStrings(values) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+function sanitizeRuntimeIds(values) {
+  return dedupeStrings(
+    Array.isArray(values) ? values.filter((value) => typeof value === "string").map((value) => value.trim()) : []
+  ).filter((value) => !RETIRED_BUILTIN_MCP_SERVER_IDS.has(value));
+}
+function sanitizePatternBindings(value) {
+  const candidate = value && typeof value === "object" ? value : {};
+  const bindings = {};
+  for (const [mode, patternId] of Object.entries(candidate)) {
+    if (typeof patternId === "string" && patternId.trim()) {
+      bindings[mode] = patternId.trim();
+    }
+  }
+  return {
+    ...DEFAULT_CONFIGURATION.modePatternBindings ?? {},
+    ...bindings
+  };
+}
+function sanitizeStringArray(value) {
+  return Array.isArray(value) ? value.filter((entry) => typeof entry === "string").map((entry) => entry.trim()).filter(Boolean) : [];
+}
+function sanitizeStringRecord(value) {
+  const record = value && typeof value === "object" ? value : {};
+  const sanitized = {};
+  for (const [key, entry] of Object.entries(record)) {
+    const cleanKey = key.trim();
+    if (!cleanKey || typeof entry !== "string") {
+      continue;
+    }
+    sanitized[cleanKey] = entry;
+  }
+  return sanitized;
+}
+function sanitizeRdxCliInvokerSettings(value, fallback = DEFAULT_RDX_CLI_INVOKER) {
+  const candidate = value && typeof value === "object" ? value : {};
+  const timeoutMs = typeof candidate.timeoutMs === "number" && Number.isFinite(candidate.timeoutMs) ? clamp(Math.trunc(candidate.timeoutMs), 1e3, 6e5) : fallback.timeoutMs;
+  return {
+    enabled: typeof candidate.enabled === "boolean" ? candidate.enabled : fallback.enabled,
+    command: typeof candidate.command === "string" ? candidate.command.trim() : fallback.command,
+    argsPrefix: sanitizeStringArray(candidate.argsPrefix ?? fallback.argsPrefix),
+    workingDirectory: typeof candidate.workingDirectory === "string" ? candidate.workingDirectory.trim() : fallback.workingDirectory,
+    env: sanitizeStringRecord(candidate.env ?? fallback.env),
+    timeoutMs,
+    catalogPath: typeof candidate.catalogPath === "string" ? candidate.catalogPath.trim() : fallback.catalogPath,
+    jsonMode: pickEnum(candidate.jsonMode, ["auto", "always"], fallback.jsonMode)
+  };
+}
+function sanitizeToolingSettings(value) {
+  const candidate = value && typeof value === "object" ? value : {};
+  return {
+    rdxCli: sanitizeRdxCliInvokerSettings(candidate.rdxCli)
+  };
+}
+function readJsonFile(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return null;
+    }
+    return JSON.parse(fs.readFileSync(filePath, "utf8"));
+  } catch (error) {
+    console.warn("[SettingsService] Failed to read JSON:", filePath, error);
+    return null;
+  }
+}
+function isVendorSecretUsable(providerId, secret) {
+  const normalized = secret.trim();
+  if (!normalized) {
+    return false;
+  }
+  if (providerId === "openrouter") {
+    return /^sk-or-/i.test(normalized);
+  }
+  if (providerId === "openai") {
+    return /^sk-/i.test(normalized);
+  }
+  if (providerId === "anthropic") {
+    return /^sk-ant-/i.test(normalized);
+  }
+  return true;
+}
+function getResolvedProviderSecret(providerId, secretRef, workspaceRoot) {
+  const secret = secretStorageService.getSecret(secretRef, workspaceRoot).trim();
+  return isVendorSecretUsable(providerId, secret) ? secret : "";
+}
+function resolveAccountRuntimeCredential(providerId, workspaceRoot) {
+  const raw = secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(providerId), workspaceRoot);
+  if (!raw) {
+    return { apiKey: "" };
+  }
+  try {
+    const bundle = JSON.parse(raw);
+    if (providerId === "github-copilot") {
+      return {
+        apiKey: bundle.copilotToken ?? "",
+        baseUrl: bundle.copilotApiBaseUrl ?? "https://api.githubcopilot.com"
+      };
+    }
+    if (providerId === "chatgpt-account") {
+      return {
+        apiKey: bundle.accessToken ?? bundle.apiKey ?? "",
+        baseUrl: "https://chatgpt.com/backend-api/codex",
+        accountId: bundle.accountId
+      };
+    }
+    if (providerId === "grok-account") {
+      return {
+        apiKey: bundle.accessToken ?? bundle.apiKey ?? "",
+        baseUrl: "https://api.x.ai/v1"
+      };
+    }
+    if (providerId === "gemini-account") {
+      return {
+        apiKey: bundle.accessToken ?? bundle.apiKey ?? "",
+        baseUrl: "https://generativelanguage.googleapis.com/v1beta"
+      };
+    }
+    if (providerId === "qwen-account") {
+      return {
+        apiKey: bundle.accessToken ?? bundle.apiKey ?? "",
+        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+      };
+    }
+    return {
+      apiKey: bundle.accessToken ?? "",
+      baseUrl: "https://api.anthropic.com/v1"
+    };
+  } catch {
+    return { apiKey: "" };
+  }
+}
+function sanitizeSidebar(input, defaults, fallback) {
+  const candidate = input ?? {};
+  const expandedWidth = clamp(
+    typeof candidate.expandedWidth === "number" ? candidate.expandedWidth : fallback.expandedWidth,
+    defaults.min,
+    defaults.max
+  );
+  return {
+    collapsed: typeof candidate.collapsed === "boolean" ? candidate.collapsed : fallback.collapsed,
+    expandedWidth,
+    width: clamp(
+      typeof candidate.width === "number" ? candidate.width : fallback.collapsed ? defaults.collapsedWidth : expandedWidth,
+      defaults.collapsedWidth,
+      defaults.max
+    )
+  };
+}
+function sanitizeTerminal(input, fallback = DEFAULT_LAYOUT.terminal) {
+  const candidate = input ?? {};
+  return {
+    height: clamp(
+      typeof candidate.height === "number" ? candidate.height : fallback.height,
+      TERMINAL_MIN_HEIGHT,
+      TERMINAL_MAX_HEIGHT
+    )
+  };
+}
+function sanitizeModels(models) {
+  const candidates = Array.isArray(models) ? models : [];
+  const modelMap = /* @__PURE__ */ new Map();
+  for (const entry of candidates) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const candidate = entry;
+    const modelId = typeof candidate.id === "string" ? candidate.id.trim() : "";
+    if (!modelId || modelMap.has(modelId)) {
+      continue;
+    }
+    modelMap.set(modelId, {
+      id: modelId,
+      label: typeof candidate.label === "string" && candidate.label.trim() ? candidate.label.trim() : modelId,
+      enabled: candidate.enabled !== false,
+      contextWindowTokens: typeof candidate.contextWindowTokens === "number" && Number.isFinite(candidate.contextWindowTokens) ? Math.max(0, Math.round(candidate.contextWindowTokens)) : null
+    });
+  }
+  return Array.from(modelMap.values());
+}
+function createEmptyAgentRoutes() {
+  return Object.keys(DEFAULT_MODEL_ROUTING).map((agentId) => ({
+    agentId,
+    providerId: "",
+    modelId: ""
+  }));
+}
+function createDefaultPersistedSettings(workspaceRoot = appPathService.getWorkspaceRoot()) {
+  return {
+    appearance: DEFAULT_APPEARANCE,
+    layout: DEFAULT_LAYOUT,
+    profile: DEFAULT_PROFILE,
+    workspace: {
+      rootPath: workspaceRoot
+    },
+    tooling: DEFAULT_TOOLING,
+    llm: {
+      providers: [],
+      agentRoutes: createEmptyAgentRoutes()
+    },
+    configuration: DEFAULT_CONFIGURATION
+  };
+}
+function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspaceRoot()) {
+  const configuration = executionProfileService.normalizeConfiguration({
+    activeModeProfileId: DEFAULT_CONFIGURATION.activeModeProfileId || "debugger.default",
+    availableModeProfiles: [],
+    enabledSkillIds: DEFAULT_CONFIGURATION.enabledSkillIds ?? [],
+    enabledMcpServerIds: DEFAULT_CONFIGURATION.enabledMcpServerIds ?? [],
+    modePatternBindings: DEFAULT_CONFIGURATION.modePatternBindings ?? {},
+    availablePatterns: [],
+    availableSkills: [],
+    availableMcpServers: [],
+    lastMigrationReportPath: void 0,
+    lastMigrationSummary: [],
+    diagnostics: []
+  }, workspaceRoot);
+  return {
+    appearance: DEFAULT_APPEARANCE,
+    layout: DEFAULT_LAYOUT,
+    profile: DEFAULT_PROFILE,
+    workspace: {
+      rootPath: workspaceRoot
+    },
+    tooling: DEFAULT_TOOLING,
+    llm: {
+      providers: [],
+      agentRoutes: createEmptyAgentRoutes()
+    },
+    configuration,
+    paths: EMPTY_PATHS
+  };
+}
+function sanitizeRoute(entry) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+  const route = entry;
+  if (typeof route.agentId !== "string" || !KNOWN_AGENT_IDS.has(route.agentId)) {
+    return null;
+  }
+  return {
+    agentId: route.agentId,
+    providerId: typeof route.providerId === "string" ? normalizeRetiredProviderId(route.providerId.trim()) : "",
+    modelId: typeof route.modelId === "string" ? route.modelId.trim() : ""
+  };
+}
+function pickProviderStatus(provider, fallback, canUseProvider, models) {
+  if (provider.status === "failed") {
+    return "failed";
+  }
+  if ((provider.status === "verified" || provider.isConfigured === true) && canUseProvider && models.length > 0) {
+    return "verified";
+  }
+  return "unconfigured";
+}
+function isFixtureProvider(provider) {
+  const id = typeof provider.id === "string" ? provider.id.trim() : "";
+  const baseUrl = typeof provider.baseUrl === "string" ? provider.baseUrl.trim().toLowerCase() : "";
+  return /^provider-\d+$/i.test(id) || id === "acme" || id === "vendorx" || baseUrl.includes("example.com") || baseUrl.includes("acme.local") || baseUrl.includes("vendorx.ai");
+}
+const RETIRED_PROVIDER_ID_IMPORTS = {
+  gemini: "vertex",
+  kimi: "kimi-code",
+  "kimi-coding-plan": "kimi-code",
+  minimax: "minimax-global",
+  zai: "glm-global"
+};
+function normalizeRetiredProviderId(providerId) {
+  return RETIRED_PROVIDER_ID_IMPORTS[providerId] ?? providerId;
+}
+function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorkspaceRoot()) {
+  const incomingId = typeof provider.id === "string" ? provider.id.trim() : "";
+  const rawId = normalizeRetiredProviderId(incomingId);
+  if (!rawId || !isBuiltinProviderId(rawId)) {
+    return null;
+  }
+  const builtinFallback = createBuiltinProviderEntry(rawId);
+  const definition = getBuiltinProviderDefinition(rawId);
+  const incomingSecretRef = typeof provider.secretRef === "string" && provider.secretRef.trim() ? provider.secretRef.trim() : void 0;
+  const secretRef = incomingId && incomingId !== rawId ? secretStorageService.createProviderSecretRef(rawId) : incomingSecretRef || secretStorageService.createProviderSecretRef(rawId);
+  const kind = builtinFallback.kind;
+  const models = sanitizeModels(provider.models ?? []);
+  const oauthSecretRef = secretStorageService.createProviderOAuthSecretRef(rawId);
+  const resolvedSecret = builtinFallback.authMode === "api-key" ? getResolvedProviderSecret(rawId, secretRef, workspaceRoot) : builtinFallback.authMode === "account" ? secretStorageService.getSecret(oauthSecretRef, workspaceRoot) : "";
+  const hasStoredSecret = builtinFallback.authMode === "local" || builtinFallback.authMode === "environment" || Boolean(resolvedSecret);
+  const canUseProvider = builtinFallback.authMode === "local" || builtinFallback.authMode === "environment" ? true : builtinFallback.authMode === "api-key" ? Boolean(resolvedSecret) : Boolean(resolvedSecret);
+  const status = pickProviderStatus(provider, builtinFallback, canUseProvider, models);
+  const enabled = status === "verified" && models.length > 0;
+  const label = builtinFallback.label;
+  const recommendedModels = builtinFallback.recommendedModels;
+  const docsUrl = builtinFallback.docsUrl;
+  return {
+    id: rawId,
+    kind,
+    authMode: builtinFallback.authMode,
+    catalogGroup: normalizeProviderCatalogGroup({ ...provider, id: rawId, authMode: builtinFallback.authMode }),
+    modelDiscovery: builtinFallback.modelDiscovery,
+    label,
+    enabled,
+    apiKey: "",
+    secretRef,
+    hasStoredSecret,
+    baseUrl: definition?.baseUrlEditable ? typeof provider.baseUrl === "string" ? provider.baseUrl.trim() : definition.baseUrl : definition?.baseUrl,
+    baseUrlEditable: definition?.baseUrlEditable,
+    models,
+    recommendedModels,
+    docsUrl,
+    status,
+    lastTestedAt: typeof provider.lastTestedAt === "string" ? provider.lastTestedAt : void 0,
+    lastModelRefreshAt: typeof provider.lastModelRefreshAt === "string" ? provider.lastModelRefreshAt : void 0,
+    lastError: status === "failed" && typeof provider.lastError === "string" ? provider.lastError : void 0,
+    accountLoginConfigured: definition?.accountLoginConfigured,
+    accountLabel: typeof provider.accountLabel === "string" ? provider.accountLabel : void 0,
+    planLabel: typeof provider.planLabel === "string" ? provider.planLabel : void 0,
+    oauthExpiresAt: typeof provider.oauthExpiresAt === "string" ? provider.oauthExpiresAt : void 0,
+    oauthRefreshAvailable: typeof provider.oauthRefreshAvailable === "boolean" ? provider.oauthRefreshAvailable : void 0,
+    unavailableReason: definition?.unavailableReason,
+    isConfigured: status === "verified" && models.length > 0 && enabled
+  };
+}
+function normalizeUserProviders(providers, workspaceRoot) {
+  const persistedProviders = /* @__PURE__ */ new Map();
+  for (const entry of Array.isArray(providers) ? providers : []) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const provider = sanitizeUserProvider(entry, workspaceRoot);
+    if (!provider || persistedProviders.has(provider.id)) {
+      continue;
+    }
+    persistedProviders.set(provider.id, provider);
+  }
+  return createBuiltinProviderEntries().map((catalogProvider) => sanitizeUserProvider(persistedProviders.get(catalogProvider.id) ?? catalogProvider, workspaceRoot)).filter((provider) => provider !== null);
+}
+function hydrateProviderSecrets(providers, workspaceRoot) {
+  return providers.map((provider) => {
+    const resolvedSecret = provider.authMode === "api-key" ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot) : provider.authMode === "account" ? secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(provider.id), workspaceRoot) : "";
+    const hasStoredSecret = provider.authMode === "local" || provider.authMode === "environment" || Boolean(resolvedSecret);
+    const canUseProvider = provider.authMode === "local" || provider.authMode === "environment" ? true : provider.authMode === "api-key" ? Boolean(resolvedSecret) : Boolean(resolvedSecret);
+    const status = provider.status === "unavailable" ? "unavailable" : provider.status === "verified" && canUseProvider && provider.models.length > 0 ? "verified" : provider.status === "failed" ? "failed" : "unconfigured";
+    const isConfigured = status === "verified" && provider.models.length > 0;
+    return {
+      ...provider,
+      // The renderer only needs to know whether a secret exists.
+      // Keep plaintext secrets out of settings:get payloads.
+      apiKey: "",
+      hasStoredSecret,
+      enabled: isConfigured,
+      status,
+      isConfigured
+    };
+  });
+}
+function normalizeUserRoutes(routes, providers) {
+  const routeMap = /* @__PURE__ */ new Map();
+  for (const route of Array.isArray(routes) ? routes.map(sanitizeRoute) : []) {
+    if (!route) {
+      continue;
+    }
+    routeMap.set(route.agentId, route);
+  }
+  return createEmptyAgentRoutes().map((route) => {
+    const incoming = routeMap.get(route.agentId);
+    if (!incoming?.providerId || !incoming.modelId) {
+      return route;
+    }
+    const provider = providers.find((entry) => entry.id === incoming.providerId);
+    const isValid = Boolean(
+      provider && provider.isConfigured && provider.models.some((model) => model.id === incoming.modelId && model.enabled !== false)
+    );
+    return isValid ? incoming : route;
+  });
+}
+function buildSeededDefaults(workspaceRoot, seedIds = new Set(DEFAULT_PROVIDER_SEEDS.map((seed) => seed.id))) {
+  const providers = [];
+  for (const seed of DEFAULT_PROVIDER_SEEDS) {
+    if (!seedIds.has(seed.id)) {
+      continue;
+    }
+    const fallback = createBuiltinProviderEntry(seed.id);
+    if (fallback.authMode !== "api-key") {
+      continue;
+    }
+    const secretRef = secretStorageService.createProviderSecretRef(seed.id);
+    secretStorageService.setSecret(secretRef, seed.apiKey, workspaceRoot);
+    const sanitized = sanitizeUserProvider({
+      id: seed.id,
+      models: seed.models,
+      status: "verified",
+      isConfigured: true,
+      secretRef
+    }, workspaceRoot);
+    if (sanitized) {
+      providers.push(sanitized);
+    }
+  }
+  return {
+    providers,
+    routes: DEFAULT_AGENT_ROUTE_SEEDS.map((route) => ({ ...route }))
+  };
+}
+function isProviderConfiguredForSeed(provider) {
+  return Boolean(
+    provider && provider.isConfigured && provider.status === "verified" && provider.models.some((model) => model.enabled !== false)
+  );
+}
+function mergeDefaultAgentRoutes(routes, providers) {
+  const routeMap = new Map(routes.map((route) => [route.agentId, route]));
+  let changed = false;
+  for (const seedRoute of DEFAULT_AGENT_ROUTE_SEEDS) {
+    const currentRoute = routeMap.get(seedRoute.agentId);
+    const currentProvider = providers.find((provider) => provider.id === currentRoute?.providerId);
+    const currentRouteValid = Boolean(
+      currentRoute && currentProvider?.isConfigured && currentProvider.models.some((model) => model.id === currentRoute.modelId && model.enabled !== false)
+    );
+    if (!currentRouteValid) {
+      routeMap.set(seedRoute.agentId, { ...seedRoute });
+      changed = true;
+    }
+  }
+  return changed ? routes.map((route) => routeMap.get(route.agentId) ?? route) : routes;
+}
+function parseMigrationSummary(reportPath) {
+  if (!reportPath || !fs.existsSync(reportPath)) {
+    return [];
+  }
+  try {
+    const content = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+    return [...content.fixes ?? [], ...content.warnings ?? []];
+  } catch (error) {
+    console.warn("[SettingsService] Failed to read migration report:", error);
+    return [];
+  }
+}
+class SettingsService {
+  initialized = false;
+  initialize() {
+    const runtimePaths = appPathService.initializeWorkspaceRoot();
+    executionProfileService.ensureScaffold(runtimePaths.workspaceRoot);
+    const rawPersisted = readJsonFile(runtimePaths.settingsPath);
+    const rebuildResult = this.rebuildPersistedSettings(rawPersisted, runtimePaths.workspaceRoot);
+    if (rebuildResult.changed || !fs.existsSync(runtimePaths.settingsPath)) {
+      this.persistHardRebuild(runtimePaths, rawPersisted, rebuildResult);
+    }
+    this.initialized = true;
+    return this.getAll(runtimePaths);
+  }
+  ensureInitialized() {
+    if (!this.initialized) {
+      this.initialize();
+    }
+  }
+  rebuildPersistedSettings(raw, workspaceRoot) {
+    const fallback = createDefaultPersistedSettings(workspaceRoot);
+    const candidate = raw ?? fallback;
+    const fixes = [];
+    const warnings = [];
+    const persistedRawProviders = Array.isArray(candidate.llm?.providers) ? candidate.llm?.providers : [];
+    const persistedRawRoutes = Array.isArray(candidate.llm?.agentRoutes) ? candidate.llm?.agentRoutes : [];
+    const rawProviders = persistedRawProviders;
+    const rawRoutes = persistedRawRoutes;
+    const nextProviders = [];
+    for (const entry of rawProviders) {
+      if (isFixtureProvider(entry)) {
+        fixes.push(`Removed fixture provider ${entry.id}`);
+        secretStorageService.deleteSecret(entry.secretRef, workspaceRoot);
+        continue;
+      }
+      const incomingId = typeof entry.id === "string" ? entry.id.trim() : "";
+      const rawId = normalizeRetiredProviderId(incomingId);
+      if (!rawId) {
+        fixes.push("Removed provider with empty id");
+        continue;
+      }
+      if (incomingId && incomingId !== rawId) {
+        fixes.push(`Renamed retired provider id ${incomingId} to ${rawId}`);
+      }
+      const canonicalSecretRef = secretStorageService.createProviderSecretRef(rawId);
+      const incomingSecretRef = typeof entry.secretRef === "string" && entry.secretRef.trim() ? entry.secretRef.trim() : void 0;
+      const secretRef = incomingId && incomingId !== rawId ? canonicalSecretRef : incomingSecretRef || canonicalSecretRef;
+      if (incomingSecretRef && incomingSecretRef !== secretRef) {
+        const incomingSecret = secretStorageService.getSecret(incomingSecretRef, workspaceRoot);
+        if (incomingSecret.trim()) {
+          secretStorageService.setSecret(secretRef, incomingSecret, workspaceRoot);
+          secretStorageService.deleteSecret(incomingSecretRef, workspaceRoot);
+          fixes.push(`Moved retired provider secret ${incomingId} to ${rawId}`);
+        }
+      }
+      if (entry.apiKey?.trim()) {
+        secretStorageService.setSecret(secretRef, entry.apiKey.trim(), workspaceRoot);
+        fixes.push(`Migrated plaintext secret for ${rawId}`);
+      }
+      const sanitized = sanitizeUserProvider({ ...entry, secretRef }, workspaceRoot);
+      if (!sanitized) {
+        fixes.push(`Removed non-catalog provider ${rawId}`);
+        continue;
+      }
+      if (!nextProviders.some((provider) => provider.id === sanitized.id)) {
+        nextProviders.push(sanitized);
+      } else {
+        fixes.push(`Removed duplicated provider ${sanitized.id}`);
+      }
+    }
+    const normalizedBeforeSeed = normalizeUserProviders(nextProviders, workspaceRoot);
+    const seedIdsToRepair = new Set(DEFAULT_PROVIDER_SEEDS.filter((seed) => !isProviderConfiguredForSeed(normalizedBeforeSeed.find((existing) => existing.id === seed.id))).map((seed) => seed.id));
+    const providersToSeed = buildSeededDefaults(workspaceRoot, seedIdsToRepair).providers;
+    if (providersToSeed.length > 0) {
+      fixes.push(`Seeded ${providersToSeed.length} default LLM providers`);
+    }
+    const catalogProviders = normalizeUserProviders(
+      [
+        ...nextProviders.filter((existing) => !providersToSeed.some((seeded) => seeded.id === existing.id)),
+        ...providersToSeed
+      ],
+      workspaceRoot
+    );
+    const normalizedRoutes = normalizeUserRoutes(rawRoutes, catalogProviders);
+    const nextRoutes = mergeDefaultAgentRoutes(normalizedRoutes, catalogProviders);
+    if (JSON.stringify(normalizedRoutes) !== JSON.stringify(nextRoutes)) {
+      fixes.push("Seeded default agent routes");
+    }
+    const incomingRoutes = Array.isArray(rawRoutes) ? rawRoutes.map((entry) => {
+      if (entry && typeof entry === "object") {
+        const providerId = entry.providerId;
+        const incomingProviderId = typeof providerId === "string" ? providerId.trim() : "";
+        const normalizedProviderId = normalizeRetiredProviderId(incomingProviderId);
+        if (incomingProviderId && incomingProviderId !== normalizedProviderId) {
+          const agentId = entry.agentId;
+          fixes.push(`Renamed retired route provider id ${incomingProviderId} to ${normalizedProviderId}${typeof agentId === "string" ? ` for ${agentId}` : ""}`);
+        }
+      }
+      return sanitizeRoute(entry);
+    }).filter((route) => route !== null) : [];
+    for (const route of incomingRoutes) {
+      const normalized = nextRoutes.find((entry) => entry.agentId === route.agentId);
+      if (!normalized || normalized.providerId !== route.providerId || normalized.modelId !== route.modelId) {
+        if (route.providerId || route.modelId) {
+          fixes.push(`Cleared invalid route for ${route.agentId}`);
+        }
+      }
+    }
+    if (!catalogProviders.some((provider) => provider.isConfigured)) {
+      warnings.push("No configured provider available for Debugger mode.");
+    }
+    const nextSettings = {
+      appearance: {
+        theme: pickEnum(candidate.appearance?.theme, VALID_THEMES, fallback.appearance?.theme ?? "dark"),
+        language: pickEnum(candidate.appearance?.language, VALID_LANGUAGES, fallback.appearance?.language ?? "zh-CN"),
+        fontScale: pickEnum(candidate.appearance?.fontScale, VALID_FONT_SCALES, fallback.appearance?.fontScale ?? "medium")
+      },
+      layout: {
+        leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
+        rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
+        terminal: sanitizeTerminal(candidate.layout?.terminal, fallback.layout?.terminal ?? DEFAULT_LAYOUT.terminal)
+      },
+      profile: {
+        nickname: typeof candidate.profile?.nickname === "string" && candidate.profile.nickname.trim() ? candidate.profile.nickname.trim() : DEFAULT_PROFILE.nickname,
+        avatarPath: typeof candidate.profile?.avatarPath === "string" ? candidate.profile.avatarPath : DEFAULT_PROFILE.avatarPath
+      },
+      workspace: {
+        rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot
+      },
+      tooling: sanitizeToolingSettings(candidate.tooling ?? fallback.tooling),
+      llm: {
+        providers: catalogProviders.map((provider) => ({ ...provider, apiKey: "" })),
+        agentRoutes: nextRoutes
+      },
+      configuration: {
+        activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
+        enabledSkillIds: sanitizeRuntimeIds(candidate.configuration?.enabledSkillIds),
+        enabledMcpServerIds: sanitizeRuntimeIds(candidate.configuration?.enabledMcpServerIds),
+        modePatternBindings: sanitizePatternBindings(candidate.configuration?.modePatternBindings),
+        lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath
+      }
+    };
+    return {
+      settings: nextSettings,
+      changed: JSON.stringify(candidate) !== JSON.stringify(nextSettings),
+      fixes,
+      warnings
+    };
+  }
+  normalizePersistedSettings(raw, workspaceRoot) {
+    const fallback = createDefaultPersistedSettings(workspaceRoot);
+    const candidate = raw ?? fallback;
+    const nextProviders = normalizeUserProviders(candidate.llm?.providers, workspaceRoot).map((provider) => ({
+      ...provider,
+      apiKey: ""
+    }));
+    const nextRoutes = normalizeUserRoutes(candidate.llm?.agentRoutes, nextProviders);
+    return {
+      appearance: {
+        theme: pickEnum(candidate.appearance?.theme, VALID_THEMES, fallback.appearance?.theme ?? "dark"),
+        language: pickEnum(candidate.appearance?.language, VALID_LANGUAGES, fallback.appearance?.language ?? "zh-CN"),
+        fontScale: pickEnum(candidate.appearance?.fontScale, VALID_FONT_SCALES, fallback.appearance?.fontScale ?? "medium")
+      },
+      layout: {
+        leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
+        rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
+        terminal: sanitizeTerminal(candidate.layout?.terminal, fallback.layout?.terminal ?? DEFAULT_LAYOUT.terminal)
+      },
+      profile: {
+        nickname: typeof candidate.profile?.nickname === "string" && candidate.profile.nickname.trim() ? candidate.profile.nickname.trim() : DEFAULT_PROFILE.nickname,
+        avatarPath: typeof candidate.profile?.avatarPath === "string" ? candidate.profile.avatarPath : DEFAULT_PROFILE.avatarPath
+      },
+      workspace: {
+        rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot
+      },
+      tooling: sanitizeToolingSettings(candidate.tooling ?? fallback.tooling),
+      llm: {
+        providers: nextProviders,
+        agentRoutes: nextRoutes
+      },
+      configuration: {
+        activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
+        enabledSkillIds: sanitizeRuntimeIds(candidate.configuration?.enabledSkillIds),
+        enabledMcpServerIds: sanitizeRuntimeIds(candidate.configuration?.enabledMcpServerIds),
+        modePatternBindings: sanitizePatternBindings(candidate.configuration?.modePatternBindings),
+        lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath
+      }
+    };
+  }
+  writeMigrationReport(paths, fixes, warnings) {
+    const reportPath = path.join(paths.migrationReportsPath, `settings-rebuild-${Date.now()}.json`);
+    fs.mkdirSync(paths.migrationReportsPath, { recursive: true });
+    fs.writeFileSync(reportPath, JSON.stringify({
+      generatedAt: nowIso(),
+      fixes,
+      warnings
+    }, null, 2), "utf8");
+    return reportPath;
+  }
+  persistHardRebuild(paths, previous, result) {
+    const nextSettings = {
+      ...result.settings,
+      configuration: {
+        ...result.settings.configuration
+      }
+    };
+    if (result.changed && previous && fs.existsSync(paths.settingsPath)) {
+      fs.mkdirSync(paths.migrationOrphansPath, { recursive: true });
+      const backupPath = path.join(paths.migrationOrphansPath, `settings.backup.${Date.now()}.json`);
+      fs.copyFileSync(paths.settingsPath, backupPath);
+    }
+    if (result.changed && (result.fixes.length > 0 || result.warnings.length > 0)) {
+      nextSettings.configuration = {
+        ...nextSettings.configuration,
+        lastMigrationReportPath: this.writeMigrationReport(paths, result.fixes, result.warnings)
+      };
+    }
+    this.writeSettings(nextSettings, paths.workspaceRoot);
+  }
+  toRuntimeSettings(persisted, runtimePaths) {
+    const workspaceRoot = persisted.workspace?.rootPath?.trim() || appPathService.getWorkspaceRoot();
+    const normalized = this.normalizePersistedSettings(persisted, workspaceRoot);
+    const hydratedProviders = hydrateProviderSecrets(normalized.llm.providers, workspaceRoot);
+    const paths = appPathService.getWorkspacePaths(workspaceRoot);
+    const configuration = executionProfileService.normalizeConfiguration({
+      activeModeProfileId: normalized.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId || "debugger.default",
+      availableModeProfiles: [],
+      enabledSkillIds: normalized.configuration?.enabledSkillIds ?? [],
+      enabledMcpServerIds: normalized.configuration?.enabledMcpServerIds ?? [],
+      modePatternBindings: normalized.configuration?.modePatternBindings ?? DEFAULT_CONFIGURATION.modePatternBindings ?? {},
+      availablePatterns: [],
+      availableSkills: [],
+      availableMcpServers: [],
+      lastMigrationReportPath: normalized.configuration?.lastMigrationReportPath,
+      lastMigrationSummary: parseMigrationSummary(normalized.configuration?.lastMigrationReportPath),
+      diagnostics: []
+    }, workspaceRoot);
+    const settings = {
+      ...createDefaultRuntimeSettings(workspaceRoot),
+      appearance: normalized.appearance,
+      layout: normalized.layout,
+      profile: normalized.profile,
+      workspace: {
+        rootPath: workspaceRoot
+      },
+      tooling: normalized.tooling,
+      llm: {
+        providers: hydratedProviders,
+        agentRoutes: normalizeUserRoutes(normalized.llm?.agentRoutes ?? createEmptyAgentRoutes(), hydratedProviders)
+      },
+      configuration,
+      paths: {
+        ...paths,
+        ...runtimePaths ?? {}
+      }
+    };
+    settings.configuration.diagnostics = executionProfileService.getDiagnostics(settings);
+    return settings;
+  }
+  writeSettings(settings, workspaceRoot = settings.workspace?.rootPath || appPathService.getWorkspaceRoot()) {
+    const filePath = appPathService.getWorkspacePaths(workspaceRoot).settingsPath;
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), "utf8");
+  }
+  getAll(runtimePaths) {
+    this.ensureInitialized();
+    const paths = appPathService.getWorkspacePaths();
+    const persisted = readJsonFile(paths.settingsPath) ?? createDefaultPersistedSettings(paths.workspaceRoot);
+    return this.toRuntimeSettings(persisted, runtimePaths);
+  }
+  getProviderSecret(providerId, workspaceRoot = appPathService.getWorkspaceRoot()) {
+    this.ensureInitialized();
+    const persisted = this.normalizePersistedSettings(
+      readJsonFile(appPathService.getWorkspacePaths(workspaceRoot).settingsPath) ?? createDefaultPersistedSettings(workspaceRoot),
+      workspaceRoot
+    );
+    const provider = persisted.llm.providers.find((entry) => entry.id === providerId);
+    if (!provider || provider.authMode !== "api-key") {
+      return "";
+    }
+    return getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot);
+  }
+  getProviderOAuthSecret(providerId, workspaceRoot = appPathService.getWorkspaceRoot()) {
+    this.ensureInitialized();
+    return secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(providerId), workspaceRoot);
+  }
+  setAll(patch, runtimePaths) {
+    this.ensureInitialized();
+    const currentRuntime = this.getAll();
+    const requestedRoot = patch.workspace?.rootPath?.trim() || currentRuntime.workspace.rootPath || appPathService.getWorkspacePaths().workspaceRoot;
+    const nextPaths = appPathService.setWorkspaceRoot(requestedRoot);
+    executionProfileService.ensureScaffold(nextPaths.workspaceRoot);
+    const currentPersisted = this.normalizePersistedSettings(
+      readJsonFile(nextPaths.settingsPath) ?? createDefaultPersistedSettings(nextPaths.workspaceRoot),
+      nextPaths.workspaceRoot
+    );
+    const providerDrafts = (patch.llm?.providers ?? currentPersisted.llm?.providers ?? []).map((provider) => {
+      const secretRef = provider.secretRef || secretStorageService.createProviderSecretRef(provider.id);
+      const apiKey = provider.apiKey?.trim() ?? "";
+      if (provider.authMode === "api-key" && apiKey) {
+        secretStorageService.setSecret(secretRef, apiKey, nextPaths.workspaceRoot);
+      } else if (provider.authMode === "api-key" && !provider.hasStoredSecret) {
+        secretStorageService.deleteSecret(secretRef, nextPaths.workspaceRoot);
+      }
+      return sanitizeUserProvider({
+        ...provider,
+        secretRef
+      }, nextPaths.workspaceRoot);
+    }).filter((provider) => provider !== null);
+    const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.workspaceRoot);
+    const nextPersisted = {
+      appearance: {
+        theme: pickEnum(
+          patch.appearance?.theme ?? currentPersisted.appearance?.theme,
+          VALID_THEMES,
+          DEFAULT_APPEARANCE.theme
+        ),
+        language: pickEnum(
+          patch.appearance?.language ?? currentPersisted.appearance?.language,
+          VALID_LANGUAGES,
+          DEFAULT_APPEARANCE.language
+        ),
+        fontScale: pickEnum(
+          patch.appearance?.fontScale ?? currentPersisted.appearance?.fontScale,
+          VALID_FONT_SCALES,
+          DEFAULT_APPEARANCE.fontScale
+        )
+      },
+      layout: {
+        leftSidebar: sanitizeSidebar(
+          {
+            ...currentPersisted.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar,
+            ...patch.layout?.leftSidebar ?? {}
+          },
+          LEFT_DEFAULTS,
+          DEFAULT_LAYOUT.leftSidebar
+        ),
+        rightPanel: sanitizeSidebar(
+          {
+            ...currentPersisted.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel,
+            ...patch.layout?.rightPanel ?? {}
+          },
+          RIGHT_DEFAULTS,
+          DEFAULT_LAYOUT.rightPanel
+        ),
+        terminal: sanitizeTerminal(
+          {
+            ...currentPersisted.layout?.terminal ?? DEFAULT_LAYOUT.terminal,
+            ...patch.layout?.terminal ?? {}
+          },
+          DEFAULT_LAYOUT.terminal
+        )
+      },
+      profile: {
+        nickname: typeof patch.profile?.nickname === "string" && patch.profile.nickname.trim() ? patch.profile.nickname.trim() : currentPersisted.profile?.nickname || DEFAULT_PROFILE.nickname,
+        avatarPath: typeof patch.profile?.avatarPath === "string" ? patch.profile.avatarPath : currentPersisted.profile?.avatarPath || DEFAULT_PROFILE.avatarPath
+      },
+      workspace: {
+        rootPath: nextPaths.workspaceRoot
+      },
+      tooling: {
+        rdxCli: sanitizeRdxCliInvokerSettings({
+          ...currentPersisted.tooling?.rdxCli ?? DEFAULT_RDX_CLI_INVOKER,
+          ...patch.tooling?.rdxCli ?? {}
+        })
+      },
+      llm: {
+        providers: nextProviders.map((provider) => ({ ...provider, apiKey: "" })),
+        agentRoutes: normalizeUserRoutes(patch.llm?.agentRoutes ?? currentPersisted.llm?.agentRoutes ?? [], nextProviders)
+      },
+      configuration: {
+        activeModeProfileId: patch.configuration?.activeModeProfileId || currentPersisted.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId,
+        enabledSkillIds: patch.configuration?.enabledSkillIds ? sanitizeRuntimeIds(patch.configuration.enabledSkillIds) : sanitizeRuntimeIds(currentPersisted.configuration?.enabledSkillIds),
+        enabledMcpServerIds: patch.configuration?.enabledMcpServerIds ? sanitizeRuntimeIds(patch.configuration.enabledMcpServerIds) : sanitizeRuntimeIds(currentPersisted.configuration?.enabledMcpServerIds),
+        modePatternBindings: patch.configuration?.modePatternBindings ? sanitizePatternBindings(patch.configuration.modePatternBindings) : sanitizePatternBindings(currentPersisted.configuration?.modePatternBindings),
+        lastMigrationReportPath: currentPersisted.configuration?.lastMigrationReportPath
+      }
+    };
+    this.writeSettings(nextPersisted, nextPaths.workspaceRoot);
+    return this.getAll({
+      ...nextPaths,
+      ...runtimePaths ?? {}
+    });
+  }
+  saveProviderConnection(providerId, apiKey, models, baseUrl = "") {
+    const current = this.getAll();
+    const provider = current.llm.providers.find((entry) => entry.id === providerId);
+    if (!provider || !isBuiltinProviderId(provider.id)) {
+      throw new Error(`Unknown provider: ${providerId}`);
+    }
+    const discoveredModels = sanitizeModels(models);
+    if (discoveredModels.length === 0) {
+      throw new Error("该 Provider 暂未返回可用模型");
+    }
+    const timestamp = nowIso();
+    const nextProvider = {
+      ...provider,
+      apiKey: apiKey.trim(),
+      enabled: true,
+      hasStoredSecret: provider.authMode === "api-key" ? Boolean(apiKey.trim() || provider.hasStoredSecret) : provider.authMode === "local" || provider.authMode === "environment" || provider.hasStoredSecret,
+      baseUrl: provider.baseUrlEditable ? baseUrl.trim() || provider.baseUrl : provider.baseUrl,
+      models: discoveredModels.map((model) => ({ ...model, enabled: true })),
+      status: "verified",
+      lastTestedAt: timestamp,
+      lastModelRefreshAt: timestamp,
+      lastError: void 0,
+      isConfigured: true
+    };
+    return this.setAll({
+      llm: {
+        providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
+        agentRoutes: current.llm.agentRoutes
+      }
+    });
+  }
+  saveProviderAccountConnection(providerId, secretPayload, models, accountSummary = {}) {
+    const current = this.getAll();
+    const provider = current.llm.providers.find((entry) => entry.id === providerId);
+    if (!provider || !isBuiltinProviderId(provider.id) || provider.authMode !== "account") {
+      throw new Error(`Unknown account provider: ${providerId}`);
+    }
+    const discoveredModels = sanitizeModels(models);
+    if (discoveredModels.length === 0) {
+      throw new Error("Provider returned no usable models");
+    }
+    secretStorageService.setSecret(
+      secretStorageService.createProviderOAuthSecretRef(provider.id),
+      secretPayload,
+      current.workspace.rootPath
+    );
+    const timestamp = nowIso();
+    const nextProvider = {
+      ...provider,
+      enabled: true,
+      hasStoredSecret: true,
+      models: discoveredModels.map((model) => ({ ...model, enabled: true })),
+      status: "verified",
+      lastTestedAt: timestamp,
+      lastModelRefreshAt: timestamp,
+      lastError: void 0,
+      accountLabel: accountSummary.accountLabel,
+      planLabel: accountSummary.planLabel,
+      oauthExpiresAt: accountSummary.oauthExpiresAt,
+      oauthRefreshAvailable: accountSummary.oauthRefreshAvailable,
+      isConfigured: true
+    };
+    return this.setAll({
+      llm: {
+        providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
+        agentRoutes: current.llm.agentRoutes
+      }
+    });
+  }
+  disconnectProvider(providerId) {
+    const current = this.getAll();
+    const provider = current.llm.providers.find((entry) => entry.id === providerId);
+    if (!provider || !isBuiltinProviderId(provider.id)) {
+      throw new Error(`Unknown provider: ${providerId}`);
+    }
+    if (provider.authMode === "api-key") {
+      secretStorageService.deleteSecret(provider.secretRef, current.workspace.rootPath);
+    } else if (provider.authMode === "account") {
+      secretStorageService.deleteSecret(secretStorageService.createProviderOAuthSecretRef(provider.id), current.workspace.rootPath);
+    }
+    const fallback = createBuiltinProviderEntry(provider.id);
+    const nextProvider = {
+      ...provider,
+      apiKey: "",
+      hasStoredSecret: fallback.hasStoredSecret,
+      models: [],
+      enabled: false,
+      status: fallback.status,
+      lastError: void 0,
+      accountLabel: void 0,
+      planLabel: void 0,
+      oauthExpiresAt: void 0,
+      oauthRefreshAvailable: void 0,
+      isConfigured: false
+    };
+    return this.setAll({
+      llm: {
+        providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
+        agentRoutes: current.llm.agentRoutes
+      }
+    });
+  }
+  getLlmConfig() {
+    const settings = this.getAll();
+    const providers = settings.llm.providers.filter((provider) => provider.enabled && provider.isConfigured && provider.status === "verified").map((provider) => {
+      const accountCredential = provider.authMode === "account" ? resolveAccountRuntimeCredential(provider.id, settings.workspace.rootPath) : { apiKey: "", baseUrl: void 0 };
+      return {
+        id: provider.id,
+        kind: provider.kind,
+        label: provider.label,
+        enabled: provider.enabled,
+        apiKey: provider.authMode === "api-key" ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.workspace.rootPath) : provider.authMode === "account" ? accountCredential.apiKey : "",
+        baseUrl: accountCredential.baseUrl ?? provider.baseUrl,
+        accountId: accountCredential.accountId,
+        authMode: provider.authMode,
+        models: provider.models.filter((model) => model.enabled).map((model) => model.id),
+        docsUrl: provider.docsUrl
+      };
+    }).filter((provider) => provider.models.length > 0);
+    return {
+      providers,
+      agentRoutes: settings.llm.agentRoutes
+    };
+  }
+  hasConfiguredProvider() {
+    return this.getAll().llm.providers.some((provider) => provider.isConfigured);
+  }
+  getSettingsPath() {
+    return appPathService.getWorkspacePaths().settingsPath;
+  }
+}
+const settingsService = new SettingsService();
+class ShellInvocationService {
+  activeProcesses = /* @__PURE__ */ new Map();
+  async invoke(request) {
+    const startTime = nowMs();
+    const command = request.command.trim();
+    if (!command) {
+      return {
+        exitCode: 2,
+        stdout: "",
+        stderr: "RDX CLI command is not configured.",
+        duration_ms: nowMs() - startTime
+      };
+    }
+    return new Promise((resolve) => {
+      const proc = child_process.spawn(command, request.args ?? [], {
+        cwd: request.cwd || void 0,
+        env: {
+          ...process.env,
+          ...request.env,
+          PYTHONIOENCODING: "utf-8"
+        },
+        shell: true,
+        windowsHide: true
+      });
+      const procId = generateEventId("proc");
+      this.activeProcesses.set(procId, { process: proc, runId: request.runId });
+      let stdout = "";
+      let stderr = "";
+      let timeoutId = null;
+      let settled = false;
+      const abortHandler = () => {
+        try {
+          proc.kill();
+        } catch {
+        }
+      };
+      const finalize = (result) => {
+        if (settled) return;
+        settled = true;
+        if (timeoutId) clearTimeout(timeoutId);
+        this.activeProcesses.delete(procId);
+        request.abortSignal?.removeEventListener("abort", abortHandler);
+        resolve(result);
+      };
+      if (request.timeoutMs) {
+        timeoutId = setTimeout(() => {
+          abortHandler();
+          finalize({
+            exitCode: 124,
+            stdout,
+            stderr: stderr || `Process timeout after ${request.timeoutMs}ms`,
+            duration_ms: nowMs() - startTime
+          });
+        }, request.timeoutMs);
+      }
+      if (request.abortSignal) {
+        if (request.abortSignal.aborted) {
+          abortHandler();
+        } else {
+          request.abortSignal.addEventListener("abort", abortHandler, { once: true });
+        }
+      }
+      proc.stdout?.on("data", (data) => {
+        stdout += data.toString("utf-8");
+      });
+      proc.stderr?.on("data", (data) => {
+        stderr += data.toString("utf-8");
+      });
+      proc.on("close", (code) => {
+        finalize({
+          exitCode: code ?? 0,
+          stdout,
+          stderr,
+          duration_ms: nowMs() - startTime
+        });
+      });
+      proc.on("error", (error) => {
+        finalize({
+          exitCode: 2,
+          stdout,
+          stderr: error instanceof Error ? error.message : String(error),
+          duration_ms: nowMs() - startTime
+        });
+      });
+    });
+  }
+  abortRun(runId) {
+    for (const { process: process2, runId: activeRunId } of this.activeProcesses.values()) {
+      if (activeRunId !== runId) continue;
+      try {
+        process2.kill();
+      } catch {
+      }
+    }
+  }
+  terminateAll() {
+    for (const active of this.activeProcesses.values()) {
+      try {
+        active.process.kill();
+      } catch {
+      }
+    }
+    this.activeProcesses.clear();
+  }
+}
+const shellInvocationService = new ShellInvocationService();
+const EMPTY_NAMESPACES = {
+  capture: { description: "", groups: [] },
+  session: { description: "", groups: [] },
+  event: { description: "", groups: [] },
+  replay: { description: "", groups: [] },
+  pipeline: { description: "", groups: [] },
+  shader: { description: "", groups: [] },
+  texture: { description: "", groups: [] },
+  resource: { description: "", groups: [] },
+  export: { description: "", groups: [] },
+  remote: { description: "", groups: [] },
+  core: { description: "", groups: [] },
+  macro: { description: "", groups: [] },
+  vfs: { description: "", groups: [] }
+};
+const EMPTY_CATALOG = {
+  schema_version: "unconfigured",
+  tool_count: 0,
+  tools: [],
+  namespaces: EMPTY_NAMESPACES
+};
+const RECOMMENDED_SPECIALISTS = [
+  "triage_agent",
+  "capture_repro_agent",
+  "pass_graph_pipeline_agent",
+  "pixel_forensics_agent",
+  "shader_ir_agent",
+  "skeptic_agent",
+  "curator_agent"
+];
+class RdxCliInvokerService {
+  constructor(shell = shellInvocationService) {
+    this.shell = shell;
+  }
+  shell;
+  catalog = null;
+  catalogPath = null;
+  traceListeners = /* @__PURE__ */ new Set();
+  getSettings() {
+    return settingsService.getAll().tooling.rdxCli;
+  }
+  createRuntimeMetadata(settings = this.getSettings(), catalog) {
+    const catalogPath = settings.catalogPath.trim();
+    return {
+      source: settings.enabled && settings.command.trim() ? "configured" : "unconfigured",
+      command: settings.command.trim(),
+      workingDirectory: settings.workingDirectory.trim(),
+      version: null,
+      catalog: {
+        path: catalogPath,
+        exists: catalogPath ? fs.existsSync(catalogPath) : false,
+        schemaVersion: catalog?.schema_version ?? null,
+        generatedAt: catalog?.generated_at ?? null,
+        toolCount: catalog?.tool_count ?? (Array.isArray(catalog?.tools) ? catalog.tools.length : null)
+      }
+    };
+  }
+  getAvailabilityFailure(settings = this.getSettings()) {
+    if (!settings.enabled) {
+      return "RDX CLI invoker is disabled. Configure it in Settings.";
+    }
+    if (!settings.command.trim()) {
+      return "RDX CLI command is not configured.";
+    }
+    const command = settings.command.trim();
+    if ((path.isAbsolute(command) || command.includes(path.sep) || command.includes("/")) && !fs.existsSync(command)) {
+      return `RDX CLI command not found: ${command}`;
+    }
+    return void 0;
+  }
+  isAvailable() {
+    return this.getAvailabilityFailure() === void 0;
+  }
+  getRuntimeMetadata() {
+    return this.createRuntimeMetadata(this.getSettings(), this.catalog ?? void 0);
+  }
+  async loadCatalog() {
+    const settings = this.getSettings();
+    const catalogPath = settings.catalogPath.trim();
+    if (!catalogPath) {
+      this.catalog = { ...EMPTY_CATALOG, runtime: this.createRuntimeMetadata(settings) };
+      this.catalogPath = null;
+      return this.catalog;
+    }
+    if (this.catalog && this.catalogPath === catalogPath) {
+      return this.catalog;
+    }
+    if (!fs.existsSync(catalogPath)) {
+      this.catalog = { ...EMPTY_CATALOG, runtime: this.createRuntimeMetadata(settings) };
+      this.catalogPath = catalogPath;
+      return this.catalog;
+    }
+    const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf-8"));
+    this.catalog = {
+      ...catalog,
+      runtime: this.createRuntimeMetadata(settings, catalog)
+    };
+    this.catalogPath = catalogPath;
+    return this.catalog;
+  }
+  async getRuntimeSummary() {
+    const settings = this.getSettings();
+    const catalog = await this.loadCatalog();
+    const namespaceCounts = /* @__PURE__ */ new Map();
+    for (const tool of catalog.tools ?? []) {
+      namespaceCounts.set(tool.namespace, (namespaceCounts.get(tool.namespace) ?? 0) + 1);
+    }
+    const unavailableReason = this.getAvailabilityFailure(settings);
+    const namespaces = Array.from(namespaceCounts.entries()).map(([namespace, toolCount]) => ({
+      namespace: `rd.${namespace}.*`,
+      toolCount,
+      available: !unavailableReason
+    }));
+    return {
+      runtime: this.createRuntimeMetadata(settings, catalog),
+      cli: {
+        available: !unavailableReason,
+        unavailableReason
+      },
+      namespaces,
+      recommendedSpecialists: RECOMMENDED_SPECIALISTS
+    };
+  }
+  normalizeCliArgs(args) {
+    const normalized = [];
+    for (let index = 0; index < args.length; index += 1) {
+      const current = args[index];
+      normalized.push(current === "--context-id" ? "--daemon-context" : current);
+    }
+    return normalized;
+  }
+  buildCommandArgs(settings, command, args) {
+    const normalized = this.normalizeCliArgs(args);
+    const globalArgs = [];
+    const commandArgs = [];
+    for (let index = 0; index < normalized.length; index += 1) {
+      const current = normalized[index];
+      if (current === "--daemon-context") {
+        const value = normalized[index + 1];
+        if (value) {
+          globalArgs.push(current, value);
+          index += 1;
+          continue;
+        }
+      }
+      commandArgs.push(current);
+    }
+    return [
+      ...settings.argsPrefix,
+      ...globalArgs,
+      command,
+      ...commandArgs
+    ];
+  }
+  async executeCLI(command, args = [], options = {}) {
+    const startTime = nowMs();
+    const settings = this.getSettings();
+    const unavailableReason = this.getAvailabilityFailure(settings);
+    if (unavailableReason) {
+      return {
+        exitCode: 2,
+        stdout: "",
+        stderr: unavailableReason,
+        duration_ms: nowMs() - startTime
+      };
+    }
+    return this.shell.invoke({
+      command: settings.command,
+      args: this.buildCommandArgs(settings, command, args),
+      cwd: options.cwd || settings.workingDirectory || void 0,
+      env: {
+        ...settings.env,
+        ...options.env
+      },
+      timeoutMs: options.timeout ?? settings.timeoutMs,
+      runId: options.runId,
+      abortSignal: options.abortSignal
+    });
+  }
+  onInvocationTrace(listener) {
+    this.traceListeners.add(listener);
+    return () => {
+      this.traceListeners.delete(listener);
+    };
+  }
+  emitInvocationTrace(request, result) {
+    const trace = {
+      traceId: result.trace_id || generateEventId("tool-trace"),
+      turnId: request.turnId,
+      toolName: request.toolName,
+      args: request.args,
+      result,
+      timestamp: nowMs(),
+      contextId: request.contextId ?? "",
+      runtimeOwner: request.runtimeOwner ?? "",
+      ownerLeaseId: request.ownerLeaseId
+    };
+    for (const listener of this.traceListeners) {
+      listener(trace);
+    }
+  }
+  async call(request) {
+    const startTime = nowMs();
+    let response;
+    try {
+      const cliArgs = [request.toolName];
+      const effectiveArgs = {
+        ...request.args || {}
+      };
+      if (request.contextId && effectiveArgs["context_id"] === void 0) {
+        effectiveArgs["context_id"] = request.contextId;
+      }
+      if (request.runtimeOwner && effectiveArgs["runtime_owner"] === void 0) {
+        effectiveArgs["runtime_owner"] = request.runtimeOwner;
+      }
+      if (request.ownerLeaseId && effectiveArgs["owner_lease_id"] === void 0) {
+        effectiveArgs["owner_lease_id"] = request.ownerLeaseId;
+      }
+      if (Object.keys(effectiveArgs).length > 0) {
+        cliArgs.push("--args-json", JSON.stringify(effectiveArgs));
+      }
+      if (request.contextId) {
+        cliArgs.push("--daemon-context", request.contextId);
+      }
+      const result = await this.executeCLI("call", cliArgs, {
+        timeout: this.getSettings().timeoutMs,
+        runId: request.runId,
+        abortSignal: request.abortSignal
+      });
+      if (result.stdout.trim()) {
+        let parsed = null;
+        try {
+          parsed = JSON.parse(result.stdout);
+        } catch {
+          if (result.exitCode === 0) {
+            response = {
+              ok: true,
+              data: { raw: result.stdout },
+              duration_ms: nowMs() - startTime,
+              trace_id: generateEventId("tool")
+            };
+            this.emitInvocationTrace(request, response);
+            return response;
+          }
+        }
+        if (parsed) {
+          if (parsed.ok === false) {
+            const errObj = parsed.error ?? {};
+            response = {
+              ok: false,
+              data: null,
+              artifacts: [],
+              error: {
+                code: errObj.code ?? "TOOL_ERROR",
+                message: errObj.message ?? "RDX CLI returned ok:false",
+                category: errObj.category ?? "execution",
+                details: errObj.details ?? void 0
+              },
+              duration_ms: nowMs() - startTime,
+              trace_id: generateEventId("tool")
+            };
+            this.emitInvocationTrace(request, response);
+            return response;
+          }
+          response = {
+            ok: true,
+            data: parsed.data ?? parsed,
+            artifacts: parsed.artifacts,
+            duration_ms: nowMs() - startTime,
+            trace_id: generateEventId("tool")
+          };
+          this.emitInvocationTrace(request, response);
+          return response;
+        }
+      }
+      response = {
+        ok: false,
+        data: null,
+        artifacts: [],
+        error: {
+          code: "CLI_ERROR",
+          message: result.stderr.trim() || `Exit code: ${result.exitCode}`,
+          category: "execution",
+          details: {
+            stdout: result.stdout,
+            stderr: result.stderr,
+            exitCode: result.exitCode
+          }
+        },
+        duration_ms: nowMs() - startTime,
+        trace_id: generateEventId("tool")
+      };
+      this.emitInvocationTrace(request, response);
+      return response;
+    } catch (error) {
+      response = {
+        ok: false,
+        data: null,
+        artifacts: [],
+        error: {
+          code: "EXECUTION_ERROR",
+          message: error instanceof Error ? error.message : String(error),
+          category: "internal"
+        },
+        duration_ms: nowMs() - startTime,
+        trace_id: generateEventId("tool")
+      };
+      this.emitInvocationTrace(request, response);
+      return response;
+    }
+  }
+  abortRun(runId) {
+    this.shell.abortRun(runId);
+  }
+  terminateAll() {
+    this.shell.terminateAll();
+  }
+}
+const rdxCliInvokerService = new RdxCliInvokerService();
+function readJsonl(filePath) {
+  try {
+    if (!fs__namespace.existsSync(filePath)) {
+      return [];
+    }
+    const content = fs__namespace.readFileSync(filePath, "utf-8");
+    const lines = content.trim().split("\n");
+    const results = [];
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        results.push(JSON.parse(trimmed));
+      } catch {
+        continue;
+      }
+    }
+    return results;
+  } catch (error) {
+    console.error(`Failed to read JSONL file: ${filePath}`, error);
+    return [];
+  }
+}
+function appendJsonl(filePath, data) {
+  try {
+    const dir = path__namespace.dirname(filePath);
+    if (!fs__namespace.existsSync(dir)) {
+      fs__namespace.mkdirSync(dir, { recursive: true });
+    }
+    const serialized = JSON.stringify(data, null, 0);
+    if (fs__namespace.existsSync(filePath)) {
+      const existing = fs__namespace.readFileSync(filePath, "utf-8");
+      if (existing && !existing.endsWith("\n")) {
+        fs__namespace.appendFileSync(filePath, "\n", "utf-8");
+      }
+    }
+    fs__namespace.appendFileSync(filePath, `${serialized}
+`, "utf-8");
+    return true;
+  } catch (error) {
+    console.error(`Failed to append to JSONL file: ${filePath}`, error);
+    return false;
+  }
+}
+function writeJsonl(filePath, items) {
+  try {
+    const dir = path__namespace.dirname(filePath);
+    if (!fs__namespace.existsSync(dir)) {
+      fs__namespace.mkdirSync(dir, { recursive: true });
+    }
+    const lines = items.map((item) => JSON.stringify(item, null, 0));
+    fs__namespace.writeFileSync(filePath, `${lines.join("\n")}
+`, "utf-8");
+    return true;
+  } catch (error) {
+    console.error(`Failed to write JSONL file: ${filePath}`, error);
+    return false;
+  }
+}
+function readYaml(filePath) {
+  try {
+    if (!fs__namespace.existsSync(filePath)) {
+      return null;
+    }
+    const content = fs__namespace.readFileSync(filePath, "utf-8");
+    return yaml.parse(content);
+  } catch (error) {
+    console.error(`Failed to read YAML file: ${filePath}`, error);
+    return null;
+  }
+}
+function writeYaml(filePath, data) {
+  try {
+    const dir = path__namespace.dirname(filePath);
+    if (!fs__namespace.existsSync(dir)) {
+      fs__namespace.mkdirSync(dir, { recursive: true });
+    }
+    const content = yaml.stringify(data, {
+      indent: 2,
+      lineWidth: 0,
+      defaultStringType: "QUOTE_DOUBLE",
+      defaultKeyType: "PLAIN"
+    });
+    fs__namespace.writeFileSync(filePath, content, "utf-8");
+    return true;
+  } catch (error) {
+    console.error(`Failed to write YAML file: ${filePath}`, error);
+    return false;
+  }
+}
 class StorageAdapter {
   dataRootPath = "";
   projectsRootPath = "";
@@ -1809,9 +3902,6 @@ class StorageAdapter {
     }
     return path__namespace.join(target.rootPath, "sessions");
   }
-  getLegacyProjectSessionsRoot(project) {
-    return path__namespace.join(this.getProjectDataPath(project), "sessions");
-  }
   ensureProjectSessionsRoot(project) {
     const target = typeof project === "string" ? this.getProjectById(project) : project;
     if (!target) {
@@ -1819,10 +3909,6 @@ class StorageAdapter {
     }
     const sessionsRoot = this.getProjectSessionsRoot(target);
     this.ensureDir(sessionsRoot);
-    const legacySessionsRoot = this.getLegacyProjectSessionsRoot(target);
-    if (fs__namespace.existsSync(legacySessionsRoot) && legacySessionsRoot !== sessionsRoot) {
-      this.copyDirectoryContents(legacySessionsRoot, sessionsRoot, false);
-    }
     return sessionsRoot;
   }
   findSessionLocation(sessionId) {
@@ -1923,8 +4009,8 @@ class StorageAdapter {
     const storedSessions = this.readProjectSessions(project);
     const normalizedSessions = storedSessions.map(({ session, sessionPath }) => this.normalizeSessionRecord(session, sessionPath));
     const autoGeneratedTitlePattern = /^new session (\d+)$/i;
-    const legacyTimestampTitlePattern = /^Session \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/;
-    const autoSessions = normalizedSessions.filter((session) => autoGeneratedTitlePattern.test(session.title.trim()) || legacyTimestampTitlePattern.test(session.title.trim())).sort((a, b) => {
+    const timestampTitlePattern = /^Session \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/;
+    const autoSessions = normalizedSessions.filter((session) => autoGeneratedTitlePattern.test(session.title.trim()) || timestampTitlePattern.test(session.title.trim())).sort((a, b) => {
       if (a.createdAt !== b.createdAt) {
         return a.createdAt - b.createdAt;
       }
@@ -2081,11 +4167,11 @@ class StorageAdapter {
       return [];
     }
     const records = [];
-    const walk = (dirPath) => {
+    const walk2 = (dirPath) => {
       for (const entry of fs__namespace.readdirSync(dirPath, { withFileTypes: true })) {
         const fullPath = path__namespace.join(dirPath, entry.name);
         if (entry.isDirectory()) {
-          walk(fullPath);
+          walk2(fullPath);
           continue;
         }
         if (path__namespace.extname(entry.name).toLowerCase() !== ".rdc") {
@@ -2103,7 +4189,7 @@ class StorageAdapter {
         });
       }
     };
-    walk(inputsPath);
+    walk2(inputsPath);
     return records.sort((a, b) => a.fileName.localeCompare(b.fileName));
   }
   createProjectInputId(inputsPath, filePath) {
@@ -2429,7 +4515,7 @@ function buildBootstrapDetailText(bootstrap) {
 function buildRemoteReadyText(bootstrap) {
   const prefix = hasBootstrapManagedLaunch(bootstrap) ? "Started Android RenderDoc and connected" : "Connected to Android RenderDoc server";
   const suffix = buildBootstrapDetailText(bootstrap);
-  return suffix.length > 0 ? `${prefix} · ${suffix.join(" · ")}` : prefix;
+  return suffix.length > 0 ? `${prefix} 路 ${suffix.join(" 路 ")}` : prefix;
 }
 function parseToolError(result, fallbackMessage) {
   return {
@@ -2796,7 +4882,7 @@ class ReplayDeviceService {
       activationUpdatedAt: Date.now()
     });
     let contextId = `ctx-device-${sanitizeDeviceId(device.serial)}-${generateShortId()}`;
-    const contextResult = await toolBridge.call({
+    const contextResult = await rdxCliInvokerService.call({
       toolName: "rd.session.create_context",
       args: { context_id: contextId }
     });
@@ -2822,7 +4908,7 @@ class ReplayDeviceService {
       activationPhase: "init",
       activationUpdatedAt: Date.now()
     });
-    const initResult = await toolBridge.call({
+    const initResult = await rdxCliInvokerService.call({
       toolName: "rd.core.init",
       args: {},
       contextId
@@ -2839,7 +4925,7 @@ class ReplayDeviceService {
       activationPhase: "connect",
       activationUpdatedAt: Date.now()
     });
-    const connectResult = await toolBridge.call({
+    const connectResult = await rdxCliInvokerService.call({
       toolName: "rd.remote.connect",
       args: {
         timeout_ms: 5e3,
@@ -2874,7 +4960,7 @@ class ReplayDeviceService {
       activationUpdatedAt: Date.now(),
       lastSeen: Date.now()
     });
-    const pingResult = await toolBridge.call({
+    const pingResult = await rdxCliInvokerService.call({
       toolName: "rd.remote.ping",
       args: { remote_id: remoteId },
       contextId
@@ -2894,7 +4980,7 @@ class ReplayDeviceService {
       activationUpdatedAt: Date.now(),
       lastSeen: Date.now()
     });
-    const targetsResult = await toolBridge.call({
+    const targetsResult = await rdxCliInvokerService.call({
       toolName: "rd.remote.list_targets",
       args: { remote_id: remoteId },
       contextId
@@ -2931,7 +5017,7 @@ class ReplayDeviceService {
     };
   }
   async ensureDaemonReady() {
-    const statusResult = await toolBridge.executeCLI("daemon", ["status"]);
+    const statusResult = await rdxCliInvokerService.executeCLI("daemon", ["status"]);
     if (statusResult.exitCode === 0) {
       try {
         const parsed = JSON.parse(statusResult.stdout);
@@ -2942,14 +5028,14 @@ class ReplayDeviceService {
         return;
       }
     }
-    const startResult = await toolBridge.executeCLI("daemon", ["start"]);
+    const startResult = await rdxCliInvokerService.executeCLI("daemon", ["start"]);
     if (startResult.exitCode !== 0) {
       const stderr = startResult.stderr.trim();
       throw new Error(stderr || "Failed to start the rdx daemon.");
     }
   }
   async resolveReusableContextId() {
-    const daemonResult = await toolBridge.executeCLI("daemon", ["start"]);
+    const daemonResult = await rdxCliInvokerService.executeCLI("daemon", ["start"]);
     if (daemonResult.exitCode !== 0 || !daemonResult.stdout.trim()) {
       return null;
     }
@@ -2996,7 +5082,7 @@ class ReplayDeviceService {
         namespace: "device",
         severity: device.status === "online" ? "success" : device.status === "offline" ? "warning" : device.status === "loading" ? "info" : "info",
         title: device.label,
-        summary: `${device.type === "local" ? "本地" : "Android"} Replay Device 状态：${device.status}`,
+        summary: `${device.type === "local" ? "Local" : "Android"} Replay Device status: ${device.status}`,
         detail: device.detailText,
         raw: {
           deviceId: device.id,
@@ -3043,129 +5129,6 @@ class ReplayDeviceService {
   }
 }
 const replayDeviceService = new ReplayDeviceService();
-const DEFAULT_MODEL_ROUTING = {
-  "ask_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "rdc-debugger": { provider: "openrouter", model: "anthropic/claude-3-opus" },
-  "triage_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "capture_repro_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "pass_graph_pipeline_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "pixel_forensics_agent": { provider: "openrouter", model: "google/gemini-pro-1.5" },
-  "shader_ir_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "driver_device_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "skeptic_agent": { provider: "openrouter", model: "openai/gpt-4o" },
-  "curator_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" }
-};
-const AGENT_ROLES = [
-  "ask_agent",
-  "rdc-debugger",
-  "triage_agent",
-  "capture_repro_agent",
-  "pass_graph_pipeline_agent",
-  "pixel_forensics_agent",
-  "shader_ir_agent",
-  "driver_device_agent",
-  "skeptic_agent",
-  "curator_agent"
-];
-const AGENT_DISPLAY_NAMES = {
-  "ask_agent": "Ask",
-  "rdc-debugger": "RDC Debugger",
-  "triage_agent": "Triage Agent",
-  "capture_repro_agent": "Capture Repro Agent",
-  "pass_graph_pipeline_agent": "Pass Graph Agent",
-  "pixel_forensics_agent": "Pixel Forensics Agent",
-  "shader_ir_agent": "Shader IR Agent",
-  "driver_device_agent": "Driver Device Agent",
-  "skeptic_agent": "Skeptic Agent",
-  "curator_agent": "Curator Agent"
-};
-const AGENT_DESCRIPTIONS = {
-  "ask_agent": "Non-executing assistant for clarification, capability explanation, and Open capture guidance",
-  "rdc-debugger": "Main orchestrator responsible for workflow coordination, gates, and stage progression",
-  "triage_agent": "Symptom classification and SOP recommendation",
-  "capture_repro_agent": "Capture quality verification and baseline establishment",
-  "pass_graph_pipeline_agent": "Render pass and pipeline dependency analysis",
-  "pixel_forensics_agent": "Pixel-level evidence collection and first-bad event localization",
-  "shader_ir_agent": "Shader source and IR evidence analysis",
-  "driver_device_agent": "Cross-device attribution and platform-specific checks",
-  "skeptic_agent": "Evidence chain challenger and weak claim detector",
-  "curator_agent": "Final report generation and knowledge library curation"
-};
-const AGENT_CATEGORIES = {
-  "ask_agent": "orchestrator",
-  "rdc-debugger": "orchestrator",
-  "triage_agent": "investigator",
-  "capture_repro_agent": "investigator",
-  "pass_graph_pipeline_agent": "investigator",
-  "pixel_forensics_agent": "investigator",
-  "shader_ir_agent": "investigator",
-  "driver_device_agent": "investigator",
-  "skeptic_agent": "verifier",
-  "curator_agent": "reporter"
-};
-const INVESTIGATOR_AGENTS = [
-  "triage_agent",
-  "capture_repro_agent",
-  "pass_graph_pipeline_agent",
-  "pixel_forensics_agent",
-  "shader_ir_agent",
-  "driver_device_agent"
-];
-const VERIFIER_AGENTS = ["skeptic_agent"];
-const REPORTER_AGENTS = ["curator_agent"];
-const AGENT_WRITE_SCOPES = {
-  "ask_agent": [],
-  "rdc-debugger": ["workspace_control"],
-  "triage_agent": ["workspace_notes"],
-  "capture_repro_agent": ["workspace_notes"],
-  "pass_graph_pipeline_agent": ["workspace_notes"],
-  "pixel_forensics_agent": ["workspace_notes"],
-  "shader_ir_agent": ["workspace_notes"],
-  "driver_device_agent": ["workspace_notes"],
-  "skeptic_agent": ["session_signoff"],
-  "curator_agent": ["workspace_reports", "session_artifacts", "knowledge_library"]
-};
-const AGENT_MODES = [
-  {
-    id: "ask",
-    label: "Ask",
-    icon: "message-orbit",
-    description: "澄清目标并引导打开 Capture",
-    accentColor: "#38c6f4",
-    disabled: false
-  },
-  {
-    id: "debugger",
-    label: "Debugger",
-    icon: "crosshair-bug",
-    description: "定位异常与验证修复",
-    accentColor: "#33d1ff",
-    disabled: false
-  },
-  {
-    id: "analyzer",
-    label: "Analyzer",
-    icon: "waveform-gauge",
-    description: "拆解现象并收敛证据",
-    accentColor: "#8d8bff",
-    disabled: false
-  },
-  {
-    id: "optimizer",
-    label: "Optimizer",
-    icon: "spark-tuning",
-    description: "判断瓶颈与优化顺序",
-    accentColor: "#4ee3a0",
-    disabled: false
-  }
-];
-AGENT_MODES.reduce(
-  (accumulator, mode) => {
-    accumulator[mode.id] = mode;
-    return accumulator;
-  },
-  {}
-);
 class EventStream {
   /**
    * @param isComplete 可选：判断某个事件是否意味着流应当结束。
@@ -3930,6 +5893,980 @@ function normalizeUserMessage(input) {
   }
   return input;
 }
+function toolToDefinition(tool) {
+  return {
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters
+  };
+}
+const MAX_OUTPUT_CHARS = 1e4;
+const NOTIFICATION_TAIL_CHARS = 500;
+class BackgroundTaskRunner {
+  /** 任务表：bgTaskId → BackgroundTask。 */
+  tasks = /* @__PURE__ */ new Map();
+  /** 子进程引用：bgTaskId → ChildProcess（用于 abort/kill）。 */
+  children = /* @__PURE__ */ new Map();
+  /**
+   * 启动一个后台任务。
+   *
+   * @param command shell 命令字符串
+   * @param cwd 工作目录
+   * @param signal 可选的 AbortSignal；触发后会 SIGTERM 子进程
+   * @returns 新生成的 bgTaskId
+   */
+  startBackground(command, cwd, signal) {
+    const id = generateBgTaskId();
+    const startedAt = Date.now();
+    const task = {
+      id,
+      command,
+      cwd,
+      status: "running",
+      output: "",
+      startedAt,
+      notified: false
+    };
+    this.tasks.set(id, task);
+    let child;
+    try {
+      child = child_process.spawn(command, {
+        cwd,
+        shell: true,
+        env: process.env,
+        windowsHide: true
+      });
+    } catch (err) {
+      this.markFinished(id, "failed", void 0, formatSpawnError(err));
+      return id;
+    }
+    this.children.set(id, child);
+    const appendOutput = (chunk) => {
+      const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      const current = this.tasks.get(id);
+      if (!current) return;
+      const next = current.output + text;
+      current.output = next.length > MAX_OUTPUT_CHARS ? next.slice(next.length - MAX_OUTPUT_CHARS) : next;
+    };
+    child.stdout?.on("data", appendOutput);
+    child.stderr?.on("data", appendOutput);
+    const onAbort = () => {
+      try {
+        child.kill("SIGTERM");
+      } catch {
+      }
+    };
+    if (signal) {
+      if (signal.aborted) {
+        onAbort();
+      } else {
+        signal.addEventListener("abort", onAbort, { once: true });
+      }
+    }
+    child.on("error", (err) => {
+      if (signal) signal.removeEventListener("abort", onAbort);
+      const current = this.tasks.get(id);
+      if (current) {
+        current.output += `
+[spawn error] ${err.message}`;
+        if (current.output.length > MAX_OUTPUT_CHARS) {
+          current.output = current.output.slice(
+            current.output.length - MAX_OUTPUT_CHARS
+          );
+        }
+      }
+      this.markFinished(id, "failed", void 0);
+    });
+    child.on("close", (code, sig) => {
+      if (signal) signal.removeEventListener("abort", onAbort);
+      const finalStatus = code === 0 ? "completed" : "failed";
+      const exit = typeof code === "number" ? code : void 0;
+      if (sig) {
+        const current = this.tasks.get(id);
+        if (current) {
+          current.output += `
+[terminated by signal ${sig}]`;
+          if (current.output.length > MAX_OUTPUT_CHARS) {
+            current.output = current.output.slice(
+              current.output.length - MAX_OUTPUT_CHARS
+            );
+          }
+        }
+      }
+      this.markFinished(id, finalStatus, exit);
+    });
+    return id;
+  }
+  /** 查询任务状态；不存在返回 null。 */
+  getStatus(bgTaskId) {
+    const task = this.tasks.get(bgTaskId);
+    return task ? { ...task } : null;
+  }
+  /**
+   * 获取所有"已完成且尚未通知"的任务，并将其标记为已通知。
+   * 返回值是任务快照，调用方可安全持有。
+   */
+  getCompletedResults() {
+    const ready = [];
+    for (const task of this.tasks.values()) {
+      if (task.status !== "running" && task.notified === false) {
+        task.notified = true;
+        ready.push({ ...task });
+      }
+    }
+    return ready;
+  }
+  /**
+   * 构造给 Agent 的后台任务完成通知文本。
+   * 调用此方法会消费掉所有"未通知的已完成任务"。
+   * 如果当前没有待通知任务，返回 null。
+   */
+  buildNotificationMessage() {
+    const finished = this.getCompletedResults();
+    if (finished.length === 0) return null;
+    const blocks = finished.map((task) => formatNotificationBlock(task));
+    return blocks.join("\n");
+  }
+  /** 列出当前仍在运行的任务快照。 */
+  listRunning() {
+    const running = [];
+    for (const task of this.tasks.values()) {
+      if (task.status === "running") {
+        running.push({ ...task });
+      }
+    }
+    return running;
+  }
+  /**
+   * 清理已通知的非运行态任务，释放内存。
+   * 不会清理仍在运行或尚未通知的任务。
+   */
+  cleanup() {
+    for (const [id, task] of this.tasks) {
+      if (task.status !== "running" && task.notified === true) {
+        this.tasks.delete(id);
+        this.children.delete(id);
+      }
+    }
+  }
+  /** 内部：把任务推进到终止态并清理子进程引用。 */
+  markFinished(id, status, exitCode, extraOutput) {
+    const task = this.tasks.get(id);
+    if (!task) return;
+    if (task.status !== "running") return;
+    if (extraOutput) {
+      const next = task.output + extraOutput;
+      task.output = next.length > MAX_OUTPUT_CHARS ? next.slice(next.length - MAX_OUTPUT_CHARS) : next;
+    }
+    task.status = status;
+    task.exitCode = exitCode;
+    task.completedAt = Date.now();
+    this.children.delete(id);
+  }
+}
+let singleton = null;
+function getBackgroundTaskRunner() {
+  if (singleton === null) {
+    singleton = new BackgroundTaskRunner();
+  }
+  return singleton;
+}
+function generateBgTaskId() {
+  const hex = crypto.randomBytes(4).toString("hex");
+  return `bg_${Date.now()}_${hex}`;
+}
+function formatSpawnError(err) {
+  if (err instanceof Error) {
+    return `[spawn error] ${err.message}`;
+  }
+  return `[spawn error] ${String(err)}`;
+}
+function formatNotificationBlock(task) {
+  const tail = task.output.length > NOTIFICATION_TAIL_CHARS ? task.output.slice(task.output.length - NOTIFICATION_TAIL_CHARS) : task.output;
+  const exitLine = typeof task.exitCode === "number" ? `Exit code: ${task.exitCode}` : `Exit code: (none)`;
+  return [
+    `<bg_task_completed id="${task.id}">`,
+    `Command: ${task.command}`,
+    exitLine,
+    `Output (last ${NOTIFICATION_TAIL_CHARS} chars):`,
+    tail,
+    `</bg_task_completed>`
+  ].join("\n");
+}
+path$1.join(".rdc-agent", "cron");
+function getWorkspaceRoot() {
+  const fromEnv = process.env.RDC_WORKSPACE_ROOT?.trim();
+  if (fromEnv && fromEnv.length > 0) {
+    return path__namespace.resolve(fromEnv);
+  }
+  return path__namespace.resolve(process.cwd());
+}
+function safeResolvePath(input, root) {
+  if (typeof input !== "string" || input.length === 0) {
+    throw new Error("路径不能为空");
+  }
+  const workspaceRoot = root ?? getWorkspaceRoot();
+  const target = path__namespace.isAbsolute(input) ? path__namespace.resolve(input) : path__namespace.resolve(workspaceRoot, input);
+  const rel = path__namespace.relative(workspaceRoot, target);
+  if (rel.startsWith("..") || path__namespace.isAbsolute(rel)) {
+    throw new Error(`路径 "${input}" 超出 workspace (${workspaceRoot})`);
+  }
+  return target;
+}
+function truncateOutput(text, maxBytes = 50 * 1024) {
+  if (Buffer.byteLength(text, "utf8") <= maxBytes) {
+    return text;
+  }
+  const head = Math.floor(maxBytes * 0.7);
+  const tail = Math.floor(maxBytes * 0.2);
+  const omitted = Buffer.byteLength(text, "utf8") - head - tail;
+  return text.slice(0, head) + `
+... [truncated ${omitted} bytes] ...
+` + text.slice(text.length - tail);
+}
+const DEFAULT_TIMEOUT_MS = 12e4;
+const MAX_OUTPUT_BYTES$2 = 50 * 1024;
+const bashTool = {
+  name: "bash",
+  label: "终端命令",
+  description: "Run a shell command in the workspace directory. Use for file operations, git, build tools, etc. Output is captured (stdout+stderr) and truncated at 50KB.",
+  parameters: {
+    type: "object",
+    properties: {
+      command: {
+        type: "string",
+        description: "The shell command to execute"
+      },
+      timeout: {
+        type: "number",
+        description: "Timeout in milliseconds (default: 120000)"
+      },
+      run_in_background: {
+        type: "boolean",
+        description: "Run the command in the background without waiting for completion"
+      }
+    },
+    required: ["command"]
+  },
+  permissionHint: "mutation",
+  async execute(_toolCallId, params, signal, onUpdate) {
+    const command = params.command;
+    const timeoutMs = params.timeout ?? DEFAULT_TIMEOUT_MS;
+    const cwd = getWorkspaceRoot();
+    const startedAt = Date.now();
+    if (params.run_in_background === true) {
+      const runner = getBackgroundTaskRunner();
+      const bgTaskId = runner.startBackground(command, cwd, signal);
+      const text = `[Background task ${bgTaskId} started]
+Command: ${command}
+Result will be delivered via background task notification when complete.`;
+      return {
+        content: [{ type: "text", text }],
+        details: {
+          command,
+          exitCode: null,
+          signal: null,
+          durationMs: Date.now() - startedAt,
+          truncated: false,
+          cwd,
+          bgTaskId
+        }
+      };
+    }
+    const isWindows = process.platform === "win32";
+    const shell = isWindows ? process.env.ComSpec || "cmd.exe" : "/bin/sh";
+    const shellArgs = isWindows ? ["/d", "/s", "/c", command] : ["-c", command];
+    return await new Promise((resolve) => {
+      let stdout = "";
+      let stderr = "";
+      let timedOut = false;
+      let aborted = false;
+      const child = child_process.spawn(shell, shellArgs, {
+        cwd,
+        env: process.env,
+        windowsHide: true
+      });
+      const timer = setTimeout(() => {
+        timedOut = true;
+        try {
+          child.kill("SIGTERM");
+        } catch {
+        }
+      }, timeoutMs);
+      const onAbort = () => {
+        aborted = true;
+        try {
+          child.kill("SIGTERM");
+        } catch {
+        }
+      };
+      if (signal) {
+        if (signal.aborted) {
+          onAbort();
+        } else {
+          signal.addEventListener("abort", onAbort, { once: true });
+        }
+      }
+      const emitUpdate = () => {
+        if (!onUpdate) return;
+        const text = combineOutput(stdout, stderr);
+        onUpdate({
+          content: [{ type: "text", text: truncateOutput(text, MAX_OUTPUT_BYTES$2) }]
+        });
+      };
+      child.stdout?.on("data", (chunk) => {
+        stdout += typeof chunk === "string" ? chunk : chunk.toString("utf8");
+        emitUpdate();
+      });
+      child.stderr?.on("data", (chunk) => {
+        stderr += typeof chunk === "string" ? chunk : chunk.toString("utf8");
+        emitUpdate();
+      });
+      child.on("error", (err) => {
+        clearTimeout(timer);
+        if (signal) signal.removeEventListener("abort", onAbort);
+        const text = combineOutput(stdout, stderr) + `
+[spawn error] ${err.message}`;
+        const truncated = Buffer.byteLength(text, "utf8") > MAX_OUTPUT_BYTES$2;
+        resolve({
+          content: [
+            { type: "text", text: truncateOutput(text, MAX_OUTPUT_BYTES$2) }
+          ],
+          details: {
+            command,
+            exitCode: null,
+            signal: null,
+            durationMs: Date.now() - startedAt,
+            truncated,
+            cwd
+          }
+        });
+      });
+      child.on("close", (code, sig) => {
+        clearTimeout(timer);
+        if (signal) signal.removeEventListener("abort", onAbort);
+        let combined = combineOutput(stdout, stderr);
+        if (timedOut) {
+          combined += `
+[timeout] command exceeded ${timeoutMs}ms`;
+        }
+        if (aborted) {
+          combined += `
+[aborted]`;
+        }
+        const truncated = Buffer.byteLength(combined, "utf8") > MAX_OUTPUT_BYTES$2;
+        resolve({
+          content: [
+            { type: "text", text: truncateOutput(combined, MAX_OUTPUT_BYTES$2) }
+          ],
+          details: {
+            command,
+            exitCode: code,
+            signal: sig,
+            durationMs: Date.now() - startedAt,
+            truncated,
+            cwd
+          }
+        });
+      });
+    });
+  }
+};
+function combineOutput(stdout, stderr) {
+  if (!stderr) return stdout;
+  if (!stdout) return stderr;
+  return `${stdout}
+${stderr}`;
+}
+const DEFAULT_LIMIT = 2e3;
+const MAX_OUTPUT_BYTES$1 = 200 * 1024;
+const readFileTool = {
+  name: "read_file",
+  label: "读取文件",
+  description: "Read the contents of a file in the workspace. Supports line offset (1-based) and limit. Default limit is 2000 lines.",
+  parameters: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description: "Relative or absolute path inside the workspace."
+      },
+      offset: {
+        type: "integer",
+        description: "Start line number (1-based, default: 1)."
+      },
+      limit: {
+        type: "integer",
+        description: "Maximum number of lines to read (default: 2000)."
+      }
+    },
+    required: ["path"]
+  },
+  permissionHint: "readonly",
+  async execute(_toolCallId, params, signal) {
+    if (signal?.aborted) {
+      throw new Error("Aborted");
+    }
+    const absolute = safeResolvePath(params.path);
+    const offset = Math.max(1, Math.floor(params.offset ?? 1));
+    const limit = Math.max(1, Math.floor(params.limit ?? DEFAULT_LIMIT));
+    const raw = await fs__namespace$1.readFile(absolute, "utf8");
+    if (signal?.aborted) {
+      throw new Error("Aborted");
+    }
+    const lines = raw.split(/\r?\n/);
+    const totalLines = lines.length;
+    const startIdx = offset - 1;
+    const endIdx = Math.min(totalLines, startIdx + limit);
+    const slice = lines.slice(startIdx, endIdx);
+    const numbered = slice.map((line, i) => `${String(startIdx + i + 1).padStart(6, " ")}→${line}`).join("\n");
+    const text = truncateOutput(numbered, MAX_OUTPUT_BYTES$1);
+    const truncated = Buffer.byteLength(numbered, "utf8") > MAX_OUTPUT_BYTES$1 || endIdx < totalLines;
+    return {
+      content: [{ type: "text", text }],
+      details: {
+        path: absolute,
+        totalLines,
+        offset,
+        limit,
+        truncated
+      }
+    };
+  }
+};
+const writeFileTool = {
+  name: "write_file",
+  label: "写入文件",
+  description: "Write content to a file inside the workspace. Creates the file (and parent directories) if needed; overwrites if it exists.",
+  parameters: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description: "Target file path (relative or absolute, must be inside workspace)."
+      },
+      content: {
+        type: "string",
+        description: "Full file content to write."
+      }
+    },
+    required: ["path", "content"]
+  },
+  permissionHint: "mutation",
+  async execute(_toolCallId, params, signal) {
+    if (signal?.aborted) {
+      throw new Error("Aborted");
+    }
+    const absolute = safeResolvePath(params.path);
+    const dir = path__namespace.dirname(absolute);
+    let created = true;
+    try {
+      await fs__namespace$1.access(absolute);
+      created = false;
+    } catch {
+      created = true;
+    }
+    await fs__namespace$1.mkdir(dir, { recursive: true });
+    if (signal?.aborted) {
+      throw new Error("Aborted");
+    }
+    await fs__namespace$1.writeFile(absolute, params.content, "utf8");
+    const bytesWritten = Buffer.byteLength(params.content, "utf8");
+    const text = `${created ? "Created" : "Overwrote"} ${absolute} (${bytesWritten} bytes)`;
+    return {
+      content: [{ type: "text", text }],
+      details: {
+        path: absolute,
+        bytesWritten,
+        created
+      }
+    };
+  }
+};
+const editFileTool = {
+  name: "edit_file",
+  label: "编辑文件",
+  description: "Edit a file by replacing old_text with new_text. The old_text must match exactly and appear exactly once in the file.",
+  parameters: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description: "Target file path (relative or absolute, must be inside workspace)."
+      },
+      old_text: {
+        type: "string",
+        description: "The exact text to replace. Must match exactly and uniquely."
+      },
+      new_text: {
+        type: "string",
+        description: "The replacement text."
+      }
+    },
+    required: ["path", "old_text", "new_text"]
+  },
+  permissionHint: "mutation",
+  async execute(_toolCallId, params, signal) {
+    if (signal?.aborted) {
+      throw new Error("Aborted");
+    }
+    if (params.old_text.length === 0) {
+      throw new Error("old_text 不能为空");
+    }
+    if (params.old_text === params.new_text) {
+      throw new Error("old_text 与 new_text 相同，无需编辑");
+    }
+    const absolute = safeResolvePath(params.path);
+    const original = await fs__namespace$1.readFile(absolute, "utf8");
+    if (signal?.aborted) {
+      throw new Error("Aborted");
+    }
+    const firstIdx = original.indexOf(params.old_text);
+    if (firstIdx < 0) {
+      throw new Error("old_text 未在文件中找到");
+    }
+    const secondIdx = original.indexOf(
+      params.old_text,
+      firstIdx + params.old_text.length
+    );
+    if (secondIdx >= 0) {
+      throw new Error("old_text 在文件中出现多次，请提供更精确的上下文");
+    }
+    const updated = original.slice(0, firstIdx) + params.new_text + original.slice(firstIdx + params.old_text.length);
+    await fs__namespace$1.writeFile(absolute, updated, "utf8");
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Edited ${absolute}: replaced 1 occurrence (${params.old_text.length} → ${params.new_text.length} chars).`
+        }
+      ],
+      details: {
+        path: absolute,
+        oldLength: params.old_text.length,
+        newLength: params.new_text.length,
+        occurrence: 1,
+        delta: params.new_text.length - params.old_text.length
+      }
+    };
+  }
+};
+const MAX_RESULTS = 1e3;
+const DEFAULT_IGNORED_DIRS$1 = /* @__PURE__ */ new Set([
+  "node_modules",
+  ".git",
+  "out",
+  "release",
+  "dist",
+  ".qoder",
+  ".tmp",
+  "test-results",
+  ".codex"
+]);
+const globTool = {
+  name: "glob",
+  label: "文件搜索",
+  description: "Search for files matching a glob pattern in the workspace. Supports *, **, ?, {a,b}, and [abc].",
+  parameters: {
+    type: "object",
+    properties: {
+      pattern: {
+        type: "string",
+        description: 'Glob pattern, e.g. "src/**/*.ts" or "**/*.{json,md}".'
+      },
+      cwd: {
+        type: "string",
+        description: "Optional sub-directory inside the workspace to search from (default: workspace root)."
+      }
+    },
+    required: ["pattern"]
+  },
+  permissionHint: "readonly",
+  async execute(_toolCallId, params, signal) {
+    if (signal?.aborted) {
+      throw new Error("Aborted");
+    }
+    const workspaceRoot = getWorkspaceRoot();
+    const baseDir = params.cwd ? safeResolvePath(params.cwd, workspaceRoot) : workspaceRoot;
+    const regex = compileGlob(params.pattern);
+    const matches = [];
+    let truncated = false;
+    await walk(baseDir, baseDir, async (relPath) => {
+      if (signal?.aborted) {
+        throw new Error("Aborted");
+      }
+      const normalized = relPath.split(path__namespace.sep).join("/");
+      if (regex.test(normalized)) {
+        if (matches.length >= MAX_RESULTS) {
+          truncated = true;
+          return false;
+        }
+        matches.push(normalized);
+      }
+      return true;
+    });
+    matches.sort();
+    const text = matches.length === 0 ? `(no matches for pattern "${params.pattern}")` : matches.join("\n") + (truncated ? `
+... [truncated at ${MAX_RESULTS}]` : "");
+    return {
+      content: [{ type: "text", text }],
+      details: {
+        pattern: params.pattern,
+        cwd: baseDir,
+        matched: matches.length,
+        truncated
+      }
+    };
+  }
+};
+function compileGlob(pattern) {
+  let i = 0;
+  let out = "^";
+  while (i < pattern.length) {
+    const ch = pattern[i];
+    if (ch === "*") {
+      if (pattern[i + 1] === "*") {
+        if (pattern[i + 2] === "/") {
+          out += "(?:.*/)?";
+          i += 3;
+          continue;
+        }
+        out += ".*";
+        i += 2;
+        continue;
+      }
+      out += "[^/]*";
+      i++;
+      continue;
+    }
+    if (ch === "?") {
+      out += "[^/]";
+      i++;
+      continue;
+    }
+    if (ch === "{") {
+      const end = pattern.indexOf("}", i);
+      if (end < 0) {
+        out += escapeReg(ch);
+        i++;
+        continue;
+      }
+      const parts = pattern.slice(i + 1, end).split(",").map((p) => p.trim()).filter(Boolean);
+      if (parts.length === 0) {
+        out += escapeReg(ch);
+        i++;
+        continue;
+      }
+      out += "(?:" + parts.map((p) => compileGlob(p).source.replace(/^\^|\$$/g, "")).join("|") + ")";
+      i = end + 1;
+      continue;
+    }
+    if (ch === "[") {
+      const end = pattern.indexOf("]", i);
+      if (end < 0) {
+        out += escapeReg(ch);
+        i++;
+        continue;
+      }
+      out += pattern.slice(i, end + 1);
+      i = end + 1;
+      continue;
+    }
+    out += escapeReg(ch);
+    i++;
+  }
+  out += "$";
+  return new RegExp(out);
+}
+function escapeReg(ch) {
+  if (/[.+^$()|\\]/.test(ch)) return "\\" + ch;
+  return ch;
+}
+async function walk(root, current, visit) {
+  let entries;
+  try {
+    entries = await fs__namespace$1.readdir(current, { withFileTypes: true });
+  } catch {
+    return true;
+  }
+  for (const entry of entries) {
+    const abs = path__namespace.join(current, entry.name);
+    if (entry.isDirectory()) {
+      if (DEFAULT_IGNORED_DIRS$1.has(entry.name)) {
+        continue;
+      }
+      const cont = await walk(root, abs, visit);
+      if (!cont) return false;
+    } else if (entry.isFile()) {
+      const rel = path__namespace.relative(root, abs);
+      const cont = await visit(rel);
+      if (!cont) return false;
+    }
+  }
+  return true;
+}
+const DEFAULT_MAX_MATCHES = 200;
+const MAX_OUTPUT_BYTES = 120 * 1024;
+const DEFAULT_IGNORED_DIRS = /* @__PURE__ */ new Set([
+  "node_modules",
+  ".git",
+  "out",
+  "release",
+  "dist",
+  ".qoder",
+  ".tmp",
+  "test-results",
+  ".codex"
+]);
+const grepTool = {
+  name: "grep",
+  label: "Search Text",
+  description: "Search text files in the workspace using a JavaScript regular expression or plain text pattern.",
+  parameters: {
+    type: "object",
+    properties: {
+      pattern: {
+        type: "string",
+        description: "Text or JavaScript regular expression to search for."
+      },
+      path: {
+        type: "string",
+        description: "Optional file or directory inside the workspace. Defaults to workspace root."
+      },
+      caseSensitive: {
+        type: "boolean",
+        description: "Whether matching is case-sensitive. Defaults to false."
+      },
+      maxMatches: {
+        type: "integer",
+        description: "Maximum matching lines to return. Defaults to 200."
+      }
+    },
+    required: ["pattern"]
+  },
+  permissionHint: "readonly",
+  async execute(_toolCallId, params, signal) {
+    throwIfAborted(signal);
+    const workspaceRoot = getWorkspaceRoot();
+    const root = params.path ? safeResolvePath(params.path, workspaceRoot) : workspaceRoot;
+    const maxMatches = Math.max(1, Math.min(1e3, Math.floor(params.maxMatches ?? DEFAULT_MAX_MATCHES)));
+    const regex = compilePattern(params.pattern, params.caseSensitive === true);
+    const matches = [];
+    const matchedFiles = /* @__PURE__ */ new Set();
+    let truncated = false;
+    const stat = await fs__namespace$1.stat(root);
+    if (stat.isFile()) {
+      await searchFile(root, workspaceRoot, regex, matches, matchedFiles, maxMatches, signal);
+    } else if (stat.isDirectory()) {
+      await walkAndSearch(root, workspaceRoot, regex, matches, matchedFiles, maxMatches, signal);
+    } else {
+      throw new Error(`Unsupported path type: ${root}`);
+    }
+    if (matches.length >= maxMatches) {
+      truncated = true;
+    }
+    const rawText = matches.length > 0 ? matches.join("\n") : `(no matches for pattern "${params.pattern}")`;
+    const text = truncateOutput(rawText, MAX_OUTPUT_BYTES);
+    truncated = truncated || Buffer.byteLength(rawText, "utf8") > MAX_OUTPUT_BYTES;
+    return {
+      content: [{ type: "text", text }],
+      details: {
+        pattern: params.pattern,
+        root,
+        matchedFiles: matchedFiles.size,
+        matchedLines: matches.length,
+        truncated
+      }
+    };
+  }
+};
+function compilePattern(pattern, caseSensitive) {
+  if (!pattern || !pattern.trim()) {
+    throw new Error("pattern cannot be empty");
+  }
+  try {
+    return new RegExp(pattern, caseSensitive ? "g" : "gi");
+  } catch {
+    return new RegExp(escapeRegExp(pattern), caseSensitive ? "g" : "gi");
+  }
+}
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+async function walkAndSearch(current, workspaceRoot, regex, matches, matchedFiles, maxMatches, signal) {
+  throwIfAborted(signal);
+  const entries = await fs__namespace$1.readdir(current, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    if (matches.length >= maxMatches) return;
+    const absolute = path__namespace.join(current, entry.name);
+    if (entry.isDirectory()) {
+      if (!DEFAULT_IGNORED_DIRS.has(entry.name)) {
+        await walkAndSearch(absolute, workspaceRoot, regex, matches, matchedFiles, maxMatches, signal);
+      }
+    } else if (entry.isFile()) {
+      await searchFile(absolute, workspaceRoot, regex, matches, matchedFiles, maxMatches, signal);
+    }
+  }
+}
+async function searchFile(absolute, workspaceRoot, regex, matches, matchedFiles, maxMatches, signal) {
+  throwIfAborted(signal);
+  if (matches.length >= maxMatches) return;
+  const buffer = await fs__namespace$1.readFile(absolute).catch(() => null);
+  if (!buffer || buffer.includes(0)) return;
+  const text = buffer.toString("utf8");
+  const rel = path__namespace.relative(workspaceRoot, absolute).split(path__namespace.sep).join("/");
+  const lines = text.split(/\r?\n/);
+  for (let index = 0; index < lines.length && matches.length < maxMatches; index += 1) {
+    regex.lastIndex = 0;
+    if (regex.test(lines[index])) {
+      matchedFiles.add(rel);
+      matches.push(`${rel}:${index + 1}: ${lines[index]}`);
+    }
+  }
+}
+function throwIfAborted(signal) {
+  if (signal?.aborted) {
+    throw new Error("Aborted");
+  }
+}
+const MAX_RESPONSE_BYTES = 160 * 1024;
+const REQUEST_TIMEOUT_MS$2 = 12e3;
+const SEARCH_BASE_URL = process.env.RDC_AGENT_WEB_SEARCH_URL || "https://s.jina.ai/";
+const webFetchTool = {
+  name: "web_fetch",
+  label: "Fetch Web Page",
+  description: "Fetch a public HTTP(S) URL as read-only text. Localhost, private networks, and oversized responses are blocked.",
+  parameters: {
+    type: "object",
+    properties: {
+      url: {
+        type: "string",
+        description: "Public http or https URL to fetch."
+      }
+    },
+    required: ["url"]
+  },
+  permissionHint: "readonly",
+  async execute(_toolCallId, params, signal) {
+    return fetchPublicText(params.url, signal);
+  }
+};
+const webSearchTool = {
+  name: "web_search",
+  label: "Search Web",
+  description: "Search the public web using the configured read-only search endpoint and return text results with source links.",
+  parameters: {
+    type: "object",
+    properties: {
+      query: {
+        type: "string",
+        description: "Search query. Do not include secrets or private file contents."
+      }
+    },
+    required: ["query"]
+  },
+  permissionHint: "readonly",
+  async execute(_toolCallId, params, signal) {
+    if (!params.query || !params.query.trim()) {
+      throw new Error("query cannot be empty");
+    }
+    const base = SEARCH_BASE_URL.endsWith("/") ? SEARCH_BASE_URL : `${SEARCH_BASE_URL}/`;
+    return fetchPublicText(`${base}${encodeURIComponent(params.query.trim())}`, signal);
+  }
+};
+async function fetchPublicText(rawUrl, signal) {
+  const url2 = await assertPublicHttpUrl(rawUrl);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS$2);
+  const abort = () => controller.abort();
+  signal?.addEventListener("abort", abort, { once: true });
+  try {
+    const response = await fetch(url2, {
+      redirect: "follow",
+      signal: controller.signal,
+      headers: {
+        Accept: "text/plain,text/markdown,text/html,application/json;q=0.9,*/*;q=0.5",
+        "User-Agent": "RDC-Agent/AskReadonlyWebTool"
+      }
+    });
+    const finalUrl = await assertPublicHttpUrl(response.url);
+    const arrayBuffer = await response.arrayBuffer();
+    const bytes = arrayBuffer.byteLength;
+    const limited = arrayBuffer.slice(0, MAX_RESPONSE_BYTES);
+    const text = new TextDecoder("utf-8", { fatal: false }).decode(limited);
+    const truncated = bytes > MAX_RESPONSE_BYTES;
+    const output = [
+      `URL: ${finalUrl}`,
+      `Status: ${response.status} ${response.statusText}`,
+      truncated ? `[truncated at ${MAX_RESPONSE_BYTES} bytes]` : "",
+      "",
+      truncateOutput(text, MAX_RESPONSE_BYTES)
+    ].filter(Boolean).join("\n");
+    return {
+      content: [{ type: "text", text: output }],
+      details: {
+        url: finalUrl,
+        status: response.status,
+        bytes,
+        truncated
+      }
+    };
+  } finally {
+    clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", abort);
+  }
+}
+async function assertPublicHttpUrl(rawUrl) {
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error(`Invalid URL: ${rawUrl}`);
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`Blocked non-HTTP URL: ${parsed.protocol}`);
+  }
+  const hostname = parsed.hostname.toLowerCase();
+  if (!hostname || hostname === "localhost" || hostname.endsWith(".localhost")) {
+    throw new Error(`Blocked local host: ${hostname || "(empty)"}`);
+  }
+  if (isPrivateIp(hostname)) {
+    throw new Error(`Blocked private network address: ${hostname}`);
+  }
+  const addresses = await promises.lookup(hostname, { all: true }).catch(() => []);
+  for (const address of addresses) {
+    if (isPrivateIp(address.address)) {
+      throw new Error(`Blocked private network address: ${address.address}`);
+    }
+  }
+  return parsed.toString();
+}
+function isPrivateIp(value) {
+  const ipVersion = net__namespace.isIP(value);
+  if (ipVersion === 4) {
+    const parts = value.split(".").map((part) => Number(part));
+    if (parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) return true;
+    const [a, b] = parts;
+    return a === 0 || a === 10 || a === 127 || a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31 || a === 192 && b === 168 || a >= 224;
+  }
+  if (ipVersion === 6) {
+    const normalized = value.toLowerCase();
+    return normalized === "::1" || normalized === "::" || normalized.startsWith("fc") || normalized.startsWith("fd") || normalized.startsWith("fe80:");
+  }
+  return false;
+}
+function getPrimitiveTools() {
+  return [
+    bashTool,
+    readFileTool,
+    writeFileTool,
+    editFileTool,
+    globTool,
+    grepTool,
+    webFetchTool,
+    webSearchTool
+  ];
+}
 const COPILOT_EDITOR_HEADERS = {
   "Editor-Version": "vscode/1.107.0",
   "Editor-Plugin-Version": "copilot-chat/0.35.0"
@@ -4015,6 +6952,25 @@ const toOpenAiTools = (tools) => {
       parameters: tool.input_schema
     }
   }));
+};
+const toOpenAiReasoningEffort = (budget) => {
+  if (budget === "low" || budget === "medium" || budget === "high") {
+    return budget;
+  }
+  return void 0;
+};
+const toAnthropicThinking = (budget) => {
+  if (!budget || budget === "auto") {
+    return void 0;
+  }
+  const budgetTokens = budget === "low" ? 1024 : budget === "medium" ? 4096 : 8192;
+  return { type: "enabled", budget_tokens: budgetTokens };
+};
+const toGoogleThinkingConfig = (budget) => {
+  if (!budget || budget === "auto") {
+    return void 0;
+  }
+  return { thinkingBudget: budget === "low" ? 1024 : budget === "medium" ? 4096 : 8192 };
 };
 const extractResponsesText = (payload) => {
   if (!payload || typeof payload !== "object") {
@@ -4251,6 +7207,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
         messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
+        reasoning_effort: toOpenAiReasoningEffort(request.reasoningBudget),
         tools: toOpenAiTools(request.tools),
         response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
         stream: false
@@ -4293,6 +7250,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
         messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
+        reasoning_effort: toOpenAiReasoningEffort(request.reasoningBudget),
         tools: toOpenAiTools(request.tools),
         response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
         stream: true
@@ -4396,6 +7354,7 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
         messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
+        reasoning_effort: toOpenAiReasoningEffort(request.reasoningBudget),
         tools: toOpenAiTools(request.tools),
         response_format: request.responseFormat ? { type: request.responseFormat } : void 0
       })
@@ -4432,6 +7391,7 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
         messages: toContentBlocks(request.messages),
         max_tokens: request.maxTokens || 4096,
         temperature: request.temperature ?? 0.7,
+        reasoning_effort: toOpenAiReasoningEffort(request.reasoningBudget),
         tools: toOpenAiTools(request.tools),
         response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
         stream: true
@@ -4685,7 +7645,8 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
         })),
         generationConfig: {
           maxOutputTokens: request.maxTokens || 4096,
-          temperature: request.temperature ?? 0.7
+          temperature: request.temperature ?? 0.7,
+          thinkingConfig: toGoogleThinkingConfig(request.reasoningBudget)
         },
         systemInstruction: request.messages.some((message) => message.role === "system") ? {
           parts: request.messages.filter((message) => message.role === "system").map((message) => ({ text: typeof message.content === "string" ? message.content : JSON.stringify(message.content) }))
@@ -4756,6 +7717,7 @@ class AnthropicProvider extends BaseStreamingProvider {
       body: JSON.stringify({
         model,
         max_tokens: request.maxTokens || 4096,
+        thinking: toAnthropicThinking(request.reasoningBudget),
         system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
         messages: otherMessages.map((message) => ({
           role: message.role === "assistant" ? "assistant" : "user",
@@ -4792,6 +7754,7 @@ class AnthropicProvider extends BaseStreamingProvider {
       body: JSON.stringify({
         model,
         max_tokens: request.maxTokens || 4096,
+        thinking: toAnthropicThinking(request.reasoningBudget),
         stream: true,
         system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
         messages: otherMessages.map((message) => ({
@@ -4937,6 +7900,233 @@ class LLMAdapter {
   }
 }
 const llmAdapter = new LLMAdapter();
+const EMPTY_USAGE = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+class AssistantStreamBuilder {
+  stream;
+  blocks = [];
+  modelId;
+  providerId;
+  usage = { ...EMPTY_USAGE };
+  started = false;
+  finished = false;
+  constructor(stream, modelId, providerId) {
+    this.stream = stream;
+    this.modelId = modelId;
+    this.providerId = providerId;
+  }
+  /** 推送 `start` 事件并初始化 partial。 */
+  start() {
+    if (this.started) return;
+    this.started = true;
+    this.stream.push({ type: "start", partial: this.snapshot("stop") });
+  }
+  /** 累积一段文本到指定 contentIndex；首次出现会自动发 `text_start`。 */
+  appendText(index, delta) {
+    if (!delta) return;
+    let block = this.blocks[index];
+    if (!block || block.kind !== "text") {
+      block = { kind: "text", index, text: "", closed: false };
+      this.blocks[index] = block;
+      this.stream.push({
+        type: "text_start",
+        contentIndex: index,
+        partial: this.snapshot("stop")
+      });
+    }
+    block.text += delta;
+    this.stream.push({
+      type: "text_delta",
+      contentIndex: index,
+      delta,
+      partial: this.snapshot("stop")
+    });
+  }
+  /** 显式结束某个文本块，发 `text_end` 事件。 */
+  endText(index) {
+    const block = this.blocks[index];
+    if (!block || block.kind !== "text" || block.closed) return;
+    block.closed = true;
+    this.stream.push({
+      type: "text_end",
+      contentIndex: index,
+      content: block.text,
+      partial: this.snapshot("stop")
+    });
+  }
+  /** 累积一段 thinking。 */
+  appendThinking(index, delta) {
+    if (!delta) return;
+    let block = this.blocks[index];
+    if (!block || block.kind !== "thinking") {
+      block = { kind: "thinking", index, text: "", closed: false };
+      this.blocks[index] = block;
+      this.stream.push({
+        type: "thinking_start",
+        contentIndex: index,
+        partial: this.snapshot("stop")
+      });
+    }
+    block.text += delta;
+    this.stream.push({
+      type: "thinking_delta",
+      contentIndex: index,
+      delta,
+      partial: this.snapshot("stop")
+    });
+  }
+  endThinking(index) {
+    const block = this.blocks[index];
+    if (!block || block.kind !== "thinking" || block.closed) return;
+    block.closed = true;
+    this.stream.push({
+      type: "thinking_end",
+      contentIndex: index,
+      content: block.text,
+      partial: this.snapshot("stop")
+    });
+  }
+  /** 初始化或更新一个 tool_call 块（不发 delta）。 */
+  ensureToolCall(index, id, name) {
+    let block = this.blocks[index];
+    if (!block || block.kind !== "tool") {
+      block = {
+        kind: "tool",
+        index,
+        id: id || `call_${index}`,
+        name: name || "",
+        argsBuffer: "",
+        closed: false
+      };
+      this.blocks[index] = block;
+      this.stream.push({
+        type: "toolcall_start",
+        contentIndex: index,
+        partial: this.snapshot("stop")
+      });
+    } else {
+      if (id && !block.id.startsWith("call_")) ;
+      else if (id) {
+        block.id = id;
+      }
+      if (name && !block.name) {
+        block.name = name;
+      }
+    }
+  }
+  /** 累积一段 tool_call 参数（原始 JSON 字符串增量）。 */
+  appendToolCallArgs(index, delta) {
+    if (!delta) return;
+    const block = this.blocks[index];
+    if (!block || block.kind !== "tool") return;
+    block.argsBuffer += delta;
+    this.stream.push({
+      type: "toolcall_delta",
+      contentIndex: index,
+      delta,
+      partial: this.snapshot("stop")
+    });
+  }
+  /** 结束 tool_call，解析 args，发 `toolcall_end`。 */
+  endToolCall(index) {
+    const block = this.blocks[index];
+    if (!block || block.kind !== "tool" || block.closed) return;
+    block.closed = true;
+    const toolCall = {
+      type: "toolCall",
+      id: block.id,
+      name: block.name,
+      arguments: parseJsonSafely(block.argsBuffer)
+    };
+    this.stream.push({
+      type: "toolcall_end",
+      contentIndex: index,
+      toolCall,
+      partial: this.snapshot("stop")
+    });
+  }
+  /** 设置或合并 usage 信息。 */
+  setUsage(partial) {
+    this.usage = {
+      inputTokens: partial.inputTokens ?? this.usage.inputTokens,
+      outputTokens: partial.outputTokens ?? this.usage.outputTokens,
+      totalTokens: partial.totalTokens ?? (partial.inputTokens ?? this.usage.inputTokens) + (partial.outputTokens ?? this.usage.outputTokens),
+      cost: partial.cost ?? this.usage.cost
+    };
+  }
+  /** 完成流：关闭所有未关闭块，推 `done` 事件并 complete。 */
+  done(reason) {
+    if (this.finished) return;
+    this.finished = true;
+    for (let i = 0; i < this.blocks.length; i += 1) {
+      const block = this.blocks[i];
+      if (!block || block.closed) continue;
+      if (block.kind === "text") this.endText(i);
+      else if (block.kind === "thinking") this.endThinking(i);
+      else this.endToolCall(i);
+    }
+    const message = this.snapshot(reason);
+    this.stream.push({ type: "done", reason, message });
+  }
+  /** 标记错误：推 `error` 事件，并以错误结束 stream。 */
+  fail(error, reason = "error") {
+    if (this.finished) return;
+    this.finished = true;
+    const message = this.snapshot(reason);
+    this.stream.push({ type: "error", error, message });
+    this.stream.error(error);
+  }
+  /** 是否已经结束。 */
+  get isFinished() {
+    return this.finished;
+  }
+  // -----------------------------------------------------------------
+  // 内部
+  // -----------------------------------------------------------------
+  snapshot(reason) {
+    const content = [];
+    for (const block of this.blocks) {
+      if (!block) continue;
+      if (block.kind === "text") {
+        const item = { type: "text", text: block.text };
+        content.push(item);
+      } else if (block.kind === "thinking") {
+        const item = { type: "thinking", thinking: block.text };
+        content.push(item);
+      } else {
+        const item = {
+          type: "toolCall",
+          id: block.id,
+          name: block.name,
+          arguments: parseJsonSafely(block.argsBuffer)
+        };
+        content.push(item);
+      }
+    }
+    return {
+      role: "assistant",
+      content,
+      model: this.modelId,
+      provider: this.providerId,
+      usage: { ...this.usage },
+      stopReason: reason,
+      timestamp: Date.now()
+    };
+  }
+}
+function parseJsonSafely(raw) {
+  if (!raw || !raw.trim()) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed;
+    }
+    return { value: parsed };
+  } catch {
+    return { _raw: raw };
+  }
+}
 function encodeAgentModel(providerId, modelId) {
   return {
     id: `${providerId}::${modelId}`,
@@ -4975,6 +8165,29 @@ function messagesToLlm(systemPrompt, messages) {
   }
   return result;
 }
+function toolsToLlm(tools) {
+  if (!tools?.length) return void 0;
+  return tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    input_schema: normalizeToolInputSchema(tool.parameters)
+  }));
+}
+function normalizeToolInputSchema(schema) {
+  const properties = {};
+  for (const [key, value] of Object.entries(schema.properties ?? {})) {
+    properties[key] = {
+      type: typeof value.type === "string" ? value.type : "string",
+      description: typeof value.description === "string" ? value.description : "",
+      enum: Array.isArray(value.enum) ? value.enum.map(String) : void 0
+    };
+  }
+  return {
+    type: "object",
+    properties,
+    required: schema.required
+  };
+}
 function userContentToText(content) {
   return content.map((block) => block.type === "text" && typeof block.text === "string" ? block.text : "").join("");
 }
@@ -4990,41 +8203,6 @@ function assistantContentToText(content) {
     }
   }
   return parts.join("");
-}
-class AssistantMessageBuilder {
-  constructor(model, providerId) {
-    this.model = model;
-    this.providerId = providerId;
-  }
-  model;
-  providerId;
-  textBuffer = "";
-  text = null;
-  contentIndex = 0;
-  buildPartial(stopReason = "stop") {
-    const content = [];
-    if (this.text) {
-      content.push({ ...this.text });
-    }
-    return {
-      role: "assistant",
-      content,
-      model: this.model.id,
-      provider: this.providerId,
-      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
-      stopReason,
-      timestamp: Date.now()
-    };
-  }
-  appendText(delta) {
-    if (!this.text) {
-      this.text = { type: "text", text: "" };
-      this.contentIndex = 0;
-    }
-    this.textBuffer += delta;
-    this.text.text = this.textBuffer;
-    return { contentIndex: this.contentIndex };
-  }
 }
 class LLMAdapterProvider {
   api = "rdc-agent-llm-adapter";
@@ -5044,71 +8222,77 @@ class LLMAdapterProvider {
       (event) => event.type === "done" || event.type === "error",
       (event) => event.message
     );
-    const builder = new AssistantMessageBuilder(model, providerId);
-    const startMessage = builder.buildPartial();
-    stream.push({ type: "start", partial: startMessage });
+    const builder = new AssistantStreamBuilder(stream, model.id, providerId);
+    const toolIndexes = /* @__PURE__ */ new Map();
+    let sawTextDelta = false;
+    builder.start();
     const llmRequest = {
       messages: messagesToLlm(context2.systemPrompt, context2.messages),
       model: modelId,
       maxTokens: options?.maxTokens,
       temperature: options?.temperature,
+      tools: toolsToLlm(context2.tools),
+      reasoningBudget: options?.reasoningBudget,
       signal: options?.signal
     };
     const onChunk = (chunk) => {
       if (stream.isDone) return;
       if (chunk.type === "text-delta") {
-        const before = builder.buildPartial();
-        const beforeContent = before.content.find((b) => b.type === "text");
-        if (!beforeContent) {
-          builder.appendText("");
-          stream.push({
-            type: "text_start",
-            contentIndex: 0,
-            partial: builder.buildPartial()
-          });
+        sawTextDelta = true;
+        builder.appendText(0, chunk.text);
+      } else if (chunk.type === "tool-call-delta") {
+        const toolCall = chunk.toolCall;
+        const id = toolCall.id || `tool-call-${toolIndexes.size}`;
+        let entry = toolIndexes.get(id);
+        if (!entry) {
+          entry = { index: toolIndexes.size + 1, argumentsText: "" };
+          toolIndexes.set(id, entry);
         }
-        const { contentIndex } = builder.appendText(chunk.text);
-        stream.push({
-          type: "text_delta",
-          contentIndex,
-          delta: chunk.text,
-          partial: builder.buildPartial()
-        });
+        builder.ensureToolCall(entry.index, id, toolCall.name ?? "");
+        if (typeof toolCall.argumentsText === "string") {
+          const delta = toolCall.argumentsText.startsWith(entry.argumentsText) ? toolCall.argumentsText.slice(entry.argumentsText.length) : toolCall.argumentsText;
+          entry.argumentsText = toolCall.argumentsText;
+          builder.appendToolCallArgs(entry.index, delta);
+        }
       }
     };
-    void this.runStream(llmRequest, providerId, builder, stream, onChunk);
+    void this.runStream(llmRequest, providerId, builder, stream, onChunk, () => sawTextDelta, toolIndexes);
     return stream;
   }
-  async runStream(request, providerId, builder, stream, onChunk) {
+  async runStream(request, providerId, builder, stream, onChunk, hasStreamedText, streamedToolIndexes) {
     try {
       const response = await llmAdapter.streamChat(request, onChunk, providerId);
       if (stream.isDone) return;
-      const partial = builder.buildPartial();
-      const textBlock = partial.content.find((b) => b.type === "text");
-      if (textBlock) {
-        stream.push({
-          type: "text_end",
-          contentIndex: 0,
-          content: textBlock.text,
-          partial
-        });
-      } else if (typeof response.content === "string" && response.content) {
-        builder.appendText(response.content);
+      if (!hasStreamedText() && typeof response.content === "string" && response.content) {
+        builder.appendText(0, response.content);
       }
-      const finalMessage = builder.buildPartial(mapStopReason(response.stopReason));
-      finalMessage.usage = {
+      appendFinalToolCalls(builder, response.toolCalls, streamedToolIndexes);
+      builder.setUsage({
         inputTokens: response.usage.inputTokens,
         outputTokens: response.usage.outputTokens,
         totalTokens: response.usage.inputTokens + response.usage.outputTokens
-      };
-      stream.push({ type: "done", reason: finalMessage.stopReason, message: finalMessage });
+      });
+      builder.done(mapStopReason(response.stopReason));
     } catch (error) {
       if (stream.isDone) return;
       const err = error instanceof Error ? error : new Error(String(error));
-      const partial = builder.buildPartial("error");
-      stream.push({ type: "error", error: err, message: partial });
+      builder.fail(err);
     }
   }
+}
+function appendFinalToolCalls(builder, toolCalls, streamedToolIndexes) {
+  if (!toolCalls?.length) return;
+  toolCalls.forEach((toolCall, index) => {
+    const existing = streamedToolIndexes.get(toolCall.id);
+    const contentIndex = existing?.index ?? index + 1;
+    if (existing) {
+      builder.endToolCall(contentIndex);
+      return;
+    }
+    builder.ensureToolCall(contentIndex, toolCall.id, toolCall.name);
+    builder.appendToolCallArgs(contentIndex, JSON.stringify(toolCall.arguments ?? {}));
+    builder.endToolCall(contentIndex);
+  });
 }
 function mapStopReason(reason) {
   if (reason === "tool_use") return "toolUse";
@@ -5116,7 +8300,7 @@ function mapStopReason(reason) {
   return "stop";
 }
 const llmAdapterProvider = new LLMAdapterProvider();
-function buildLegacyEvent(type, payload, context2) {
+function buildSharedAgentEvent(type, payload, context2) {
   return {
     id: generateEventId("agent-event"),
     type,
@@ -5130,10 +8314,10 @@ function buildLegacyEvent(type, payload, context2) {
     payload
   };
 }
-function translateCoreToLegacy(event, context2) {
+function translateCoreToSharedAgentEvent(event, context2) {
   switch (event.type) {
     case "agent_start": {
-      return buildLegacyEvent(
+      return buildSharedAgentEvent(
         "run.started",
         {
           mode: context2.mode ?? "debugger",
@@ -5147,7 +8331,7 @@ function translateCoreToLegacy(event, context2) {
     }
     case "agent_end": {
       const text = extractAssistantText(event.messages);
-      return buildLegacyEvent(
+      return buildSharedAgentEvent(
         "run.completed",
         {
           status: "complete",
@@ -5159,14 +8343,36 @@ function translateCoreToLegacy(event, context2) {
     case "message_update": {
       const ev = event.assistantMessageEvent;
       if (ev.type === "text_delta") {
-        return buildLegacyEvent("assistant.delta", { text: ev.delta }, context2);
+        return buildSharedAgentEvent("assistant.delta", { text: ev.delta }, context2);
+      }
+      if (ev.type === "thinking_start") {
+        return buildSharedAgentEvent(
+          "diagnostic",
+          {
+            code: "MODEL_THINKING_STARTED",
+            severity: "info",
+            message: "模型已进入 provider reasoning / thinking 阶段；仅展示可见工作轨迹，不展示隐藏思维链。"
+          },
+          context2
+        );
+      }
+      if (ev.type === "thinking_end") {
+        return buildSharedAgentEvent(
+          "diagnostic",
+          {
+            code: "MODEL_THINKING_COMPLETED",
+            severity: "info",
+            message: "模型 reasoning / thinking 阶段已结束。"
+          },
+          context2
+        );
       }
       return null;
     }
     case "message_end": {
       if (event.message.role === "assistant") {
         const text = event.message.content.filter((block) => block.type === "text").map((block) => block.text).join("");
-        return buildLegacyEvent(
+        return buildSharedAgentEvent(
           "assistant.completed",
           {
             text,
@@ -5181,7 +8387,7 @@ function translateCoreToLegacy(event, context2) {
       return null;
     }
     case "tool_execution_start": {
-      return buildLegacyEvent(
+      return buildSharedAgentEvent(
         "tool.started",
         {
           toolCallId: event.toolCallId,
@@ -5192,18 +8398,32 @@ function translateCoreToLegacy(event, context2) {
       );
     }
     case "tool_execution_end": {
-      return buildLegacyEvent(
+      const sharedResult = toolResultToSharedResult(event.result, event.durationMs);
+      const denialReason = getPolicyDenialReason(event.result);
+      if (denialReason) {
+        return buildSharedAgentEvent(
+          "tool.denied",
+          {
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            reason: denialReason,
+            result: sharedResult
+          },
+          context2
+        );
+      }
+      return buildSharedAgentEvent(
         "tool.completed",
         {
           toolCallId: event.toolCallId,
           toolName: event.toolName,
-          result: toolResultToLegacy(event.result, event.durationMs)
+          result: sharedResult
         },
         context2
       );
     }
     case "error": {
-      return buildLegacyEvent(
+      return buildSharedAgentEvent(
         "run.failed",
         {
           status: "failed",
@@ -5216,6 +8436,14 @@ function translateCoreToLegacy(event, context2) {
       return null;
   }
 }
+function getPolicyDenialReason(result) {
+  if (!result.isError) return null;
+  const message = extractToolResultText(result);
+  return message.toLowerCase().includes("policy denied") ? message : null;
+}
+function extractToolResultText(result) {
+  return result.content.filter((block) => block.type === "text").map((block) => block.text).join("");
+}
 function extractAssistantText(messages) {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const msg = messages[i];
@@ -5225,7 +8453,7 @@ function extractAssistantText(messages) {
   }
   return "";
 }
-function toolResultToLegacy(result, durationMs) {
+function toolResultToSharedResult(result, durationMs) {
   if (result.isError) {
     return {
       ok: false,
@@ -5233,7 +8461,7 @@ function toolResultToLegacy(result, durationMs) {
       artifacts: [],
       error: {
         code: "AGENT_TOOL_FAILED",
-        message: result.content.filter((block) => block.type === "text").map((block) => block.text).join("") || "Tool execution failed.",
+        message: extractToolResultText(result) || "Tool execution failed.",
         category: "execution"
       },
       duration_ms: durationMs,
@@ -5250,2008 +8478,6 @@ function toolResultToLegacy(result, durationMs) {
     trace_id: result.toolCallId
   };
 }
-const RETIRED_BUILTIN_MCP_SERVER_IDS$1 = /* @__PURE__ */ new Set(["builtin.rdc-toolbridge"]);
-const TEMPLATE_COPIES = [
-  {
-    source: ["profiles", "agents"],
-    target: (workspaceRoot) => path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "agents")
-  },
-  {
-    source: ["profiles", "modes"],
-    target: (workspaceRoot) => path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "modes")
-  },
-  {
-    source: ["policies", "stages"],
-    target: (workspaceRoot) => path.join(appPathService.getWorkspacePaths(workspaceRoot).policiesPath, "stages")
-  },
-  {
-    source: ["patterns"],
-    target: (workspaceRoot) => appPathService.getWorkspacePaths(workspaceRoot).patternsPath
-  },
-  {
-    source: ["skills"],
-    target: (workspaceRoot) => appPathService.getWorkspacePaths(workspaceRoot).skillsPath
-  },
-  {
-    source: ["mcp"],
-    target: (workspaceRoot) => appPathService.getWorkspacePaths(workspaceRoot).mcpPath
-  }
-];
-function readJsonFile$1(filePath) {
-  try {
-    if (!fs.existsSync(filePath)) {
-      return null;
-    }
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch (error) {
-    console.warn("[AgentRuntimeConfigService] Failed to read JSON:", filePath, error);
-    return null;
-  }
-}
-function copyDirContentsIfMissing(sourceDir, targetDir) {
-  if (!fs.existsSync(sourceDir) || !fs.statSync(sourceDir).isDirectory()) {
-    return;
-  }
-  fs.mkdirSync(targetDir, { recursive: true });
-  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
-    const sourcePath = path.join(sourceDir, entry.name);
-    const targetPath = path.join(targetDir, entry.name);
-    if (entry.isDirectory()) {
-      copyDirContentsIfMissing(sourcePath, targetPath);
-      continue;
-    }
-    if (!entry.isFile() || fs.existsSync(targetPath)) {
-      continue;
-    }
-    fs.copyFileSync(sourcePath, targetPath);
-  }
-}
-class AgentRuntimeConfigService {
-  resolveTemplateRoot() {
-    const candidates = [
-      path.join(electron.app.getAppPath(), "resources", "agent-runtime"),
-      path.join(electron.app.getAppPath(), "..", "resources", "agent-runtime"),
-      path.join(process.cwd(), "resources", "agent-runtime"),
-      path.join(process.resourcesPath ?? "", "resources", "agent-runtime"),
-      path.join(process.resourcesPath ?? "", "agent-runtime")
-    ].filter(Boolean);
-    for (const candidate of candidates) {
-      const resolved = path.resolve(candidate);
-      if (fs.existsSync(resolved)) {
-        return resolved;
-      }
-    }
-    return path.resolve(candidates[0]);
-  }
-  ensureScaffold(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    const templateRoot = this.resolveTemplateRoot();
-    for (const copy of TEMPLATE_COPIES) {
-      copyDirContentsIfMissing(path.join(templateRoot, ...copy.source), copy.target(workspaceRoot));
-    }
-  }
-  listPatterns(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return this.readDescriptors("patterns", workspaceRoot);
-  }
-  listSkills(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return this.readDescriptors("skills", workspaceRoot);
-  }
-  listMcpServers(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return this.readDescriptors("mcp", workspaceRoot).filter((descriptor) => !RETIRED_BUILTIN_MCP_SERVER_IDS$1.has(descriptor.id));
-  }
-  readDescriptors(kind, workspaceRoot) {
-    this.ensureScaffold(workspaceRoot);
-    const paths = appPathService.getWorkspacePaths(workspaceRoot);
-    const dir = kind === "patterns" ? paths.patternsPath : kind === "skills" ? paths.skillsPath : paths.mcpPath;
-    if (!fs.existsSync(dir)) {
-      return [];
-    }
-    return fs.readdirSync(dir).filter((entry) => entry.endsWith(".json")).map((entry) => readJsonFile$1(path.join(dir, entry))).filter((entry) => Boolean(entry?.id)).sort((left, right) => left.id.localeCompare(right.id));
-  }
-}
-const agentRuntimeConfigService = new AgentRuntimeConfigService();
-const COPILOT_CHAT_COMPLETIONS_FALLBACK_MODELS = [
-  "gemini-3-flash-preview",
-  "gemini-3.5-flash",
-  "gpt-4.1",
-  "gpt-4o",
-  "claude-sonnet-4-6",
-  "claude-sonnet-4-5",
-  "gpt-5-mini"
-];
-function isCopilotChatCompletionsUnsupportedModel(modelId) {
-  const normalized = modelId.toLowerCase();
-  return /^gpt-5\.[3-9](?:-|$)/.test(normalized) || /^gpt-5\.[0-9]+-codex(?:-|$)/.test(normalized);
-}
-function isEnabledModel(provider, modelId) {
-  return provider.models.some((model) => model.enabled !== false && model.id === modelId);
-}
-function resolveCopilotFallbackModel(routes, provider, agentId) {
-  const debuggerRoute = routes.find((entry) => entry.agentId === "rdc-debugger");
-  const candidates = [
-    ...agentId !== "rdc-debugger" && debuggerRoute?.providerId === provider.id ? [debuggerRoute.modelId] : [],
-    ...COPILOT_CHAT_COMPLETIONS_FALLBACK_MODELS,
-    ...provider.models.map((model) => model.id)
-  ];
-  for (const modelId of candidates) {
-    if (modelId && !isCopilotChatCompletionsUnsupportedModel(modelId) && isEnabledModel(provider, modelId)) {
-      return modelId;
-    }
-  }
-  return null;
-}
-function resolveCompatibleAgentRoute(routes, providers, agentId) {
-  const route = routes.find((entry) => entry.agentId === agentId) || null;
-  if (!route?.providerId || !route.modelId) {
-    return { route: null, provider: null };
-  }
-  const provider = providers.find((entry) => entry.id === route.providerId) || null;
-  if (!provider || !provider.enabled || !provider.isConfigured) {
-    return { route, provider };
-  }
-  if (!isEnabledModel(provider, route.modelId)) {
-    return { route, provider };
-  }
-  if (provider.id !== "github-copilot" || !isCopilotChatCompletionsUnsupportedModel(route.modelId)) {
-    return { route, provider };
-  }
-  const fallbackModelId = resolveCopilotFallbackModel(routes, provider, agentId);
-  if (!fallbackModelId) {
-    return { route, provider };
-  }
-  return {
-    route: {
-      ...route,
-      modelId: fallbackModelId
-    },
-    provider,
-    requestedModelId: route.modelId,
-    remapReason: `${route.modelId} is not available on GitHub Copilot chat completions; using ${fallbackModelId}.`
-  };
-}
-const DEFAULT_MODE_PROFILE_ID = "debugger.default";
-const groupToAllowPattern = (group) => {
-  if (group === "*") return "*";
-  if (group === "primitive") return "primitive.*";
-  if (group === "ui") return "ui.*";
-  if (group.startsWith("rd.")) return group.endsWith(".*") ? group : `${group}.*`;
-  return `rd.${group}.*`;
-};
-const expandToolPolicy = (policy) => [
-  ...policy?.allowTools ?? [],
-  ...(policy?.allowGroups ?? []).map(groupToAllowPattern)
-].filter(Boolean);
-const createFallbackModeProfile = () => ({
-  id: DEFAULT_MODE_PROFILE_ID,
-  label: "Debugger Production",
-  mode: "debugger",
-  patternId: "plan-generate-verify",
-  skillIds: [],
-  mcpServerIds: [],
-  stagePolicies: {},
-  defaultAgentPrompts: {}
-});
-const createFallbackAgentProfile = (agentId) => {
-  const route = DEFAULT_MODEL_ROUTING[agentId];
-  return {
-    id: `agent.${agentId}`,
-    label: agentId,
-    agentId,
-    systemPrompt: `You are ${agentId}.`,
-    modelProvider: route.provider,
-    modelName: route.model,
-    temperature: 0.3,
-    maxTokens: 4096,
-    toolPolicy: { allowTools: [] }
-  };
-};
-const createFallbackStagePolicy = (stage) => ({
-  id: `stage.${stage}`,
-  label: stage,
-  stage,
-  phase: STAGE_PHASES[stage],
-  toolPolicy: { allowTools: [] }
-});
-class ExecutionProfileService {
-  getModeProfilesPath(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "modes");
-  }
-  getAgentProfilesPath(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "agents");
-  }
-  getStagePoliciesPath(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return path.join(appPathService.getWorkspacePaths(workspaceRoot).policiesPath, "stages");
-  }
-  ensureScaffold(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    fs.mkdirSync(this.getModeProfilesPath(workspaceRoot), { recursive: true });
-    fs.mkdirSync(this.getAgentProfilesPath(workspaceRoot), { recursive: true });
-    fs.mkdirSync(this.getStagePoliciesPath(workspaceRoot), { recursive: true });
-    agentRuntimeConfigService.ensureScaffold(workspaceRoot);
-  }
-  normalizeConfiguration(configuration, workspaceRoot = appPathService.getWorkspaceRoot()) {
-    this.ensureScaffold(workspaceRoot);
-    const availableModeProfiles = this.listModeProfiles(workspaceRoot);
-    const hasActiveProfile = availableModeProfiles.some((profile) => profile.id === configuration.activeModeProfileId);
-    const availablePatterns = agentRuntimeConfigService.listPatterns(workspaceRoot);
-    const availableSkills = agentRuntimeConfigService.listSkills(workspaceRoot);
-    const availableMcpServers = agentRuntimeConfigService.listMcpServers(workspaceRoot);
-    const patternIds = new Set(availablePatterns.map((pattern) => pattern.id));
-    const modePatternBindings = Object.fromEntries(
-      Object.entries(configuration.modePatternBindings ?? {}).map(([mode, patternId]) => [mode, patternIds.has(patternId) ? patternId : "free-agent"])
-    );
-    return {
-      ...configuration,
-      activeModeProfileId: hasActiveProfile ? configuration.activeModeProfileId : DEFAULT_MODE_PROFILE_ID,
-      availableModeProfiles,
-      availablePatterns,
-      availableSkills,
-      availableMcpServers,
-      enabledSkillIds: configuration.enabledSkillIds ?? [],
-      enabledMcpServerIds: configuration.enabledMcpServerIds ?? [],
-      modePatternBindings: {
-        debugger: patternIds.has(modePatternBindings.debugger) ? modePatternBindings.debugger : "plan-generate-verify",
-        analyzer: patternIds.has(modePatternBindings.analyzer) ? modePatternBindings.analyzer : "free-agent",
-        optimizer: patternIds.has(modePatternBindings.optimizer) ? modePatternBindings.optimizer : "free-agent",
-        ...modePatternBindings
-      }
-    };
-  }
-  listModeProfiles(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    this.ensureScaffold(workspaceRoot);
-    return fs.readdirSync(this.getModeProfilesPath(workspaceRoot)).filter((entry) => entry.endsWith(".json")).map((entry) => this.readJson(path.join(this.getModeProfilesPath(workspaceRoot), entry))).filter((profile) => profile !== null).map((profile) => ({ id: profile.id, label: profile.label }));
-  }
-  resolveAgentRuntimeProfile(settings, stage, agentId) {
-    const workspaceRoot = settings.workspace.rootPath;
-    this.ensureScaffold(workspaceRoot);
-    const modeProfile = this.readJson(
-      path.join(this.getModeProfilesPath(workspaceRoot), `${settings.configuration.activeModeProfileId}.json`)
-    ) || createFallbackModeProfile();
-    const agentPromptId = modeProfile.defaultAgentPrompts[agentId] || `agent.${agentId}`;
-    const agentProfile = this.readJson(
-      path.join(this.getAgentProfilesPath(workspaceRoot), `${agentId}.json`)
-    ) || createFallbackAgentProfile(agentId);
-    const stagePolicyId = modeProfile.stagePolicies[stage] || `stage.${stage}`;
-    const stagePolicy = this.readJson(
-      path.join(this.getStagePoliciesPath(workspaceRoot), `${stage}.json`)
-    ) || createFallbackStagePolicy(stage);
-    const route = this.resolveAgentRoute(settings.llm.agentRoutes, settings.llm.providers, agentId);
-    return {
-      agentId,
-      systemPrompt: [
-        agentProfile.systemPrompt,
-        stagePolicy.systemPrompt ? `
-
-Stage Policy:
-${stagePolicy.systemPrompt}` : ""
-      ].join("").trim(),
-      providerId: route?.providerId || "",
-      modelId: route?.modelId || "",
-      temperature: agentProfile.temperature,
-      maxTokens: agentProfile.maxTokens,
-      category: AGENT_CATEGORIES[agentId],
-      writeScope: AGENT_WRITE_SCOPES[agentId],
-      stage,
-      phase: stagePolicy.phase || STAGE_PHASES[stage],
-      toolAllowlist: Array.from(/* @__PURE__ */ new Set([
-        ...expandToolPolicy(stagePolicy.toolPolicy),
-        ...expandToolPolicy(agentProfile.toolPolicy)
-      ])),
-      patternId: modeProfile.patternId ?? settings.configuration.modePatternBindings[modeProfile.mode],
-      skillIds: Array.from(/* @__PURE__ */ new Set([
-        ...modeProfile.skillIds ?? [],
-        ...settings.configuration.enabledSkillIds ?? []
-      ])),
-      mcpServerIds: Array.from(/* @__PURE__ */ new Set([
-        ...modeProfile.mcpServerIds ?? [],
-        ...settings.configuration.enabledMcpServerIds ?? []
-      ])),
-      source: {
-        modeProfileId: modeProfile.id,
-        stagePolicyId,
-        agentProfileId: agentPromptId
-      }
-    };
-  }
-  getDiagnostics(settings) {
-    const diagnostics = [];
-    if (!settings.configuration.availableModeProfiles.length) {
-      diagnostics.push({
-        code: "missing_mode_profile",
-        severity: "warning",
-        message: "No execution mode profile found. Falling back to debugger.default."
-      });
-    }
-    if (!settings.llm.providers.some((provider) => provider.isConfigured)) {
-      diagnostics.push({
-        code: "missing_configured_provider",
-        severity: "warning",
-        message: "No configured provider available for Debugger mode."
-      });
-    }
-    return diagnostics;
-  }
-  resolveAgentRoute(routes, providers, agentId) {
-    const resolution = resolveCompatibleAgentRoute(routes, providers, agentId);
-    if (!resolution.route || !resolution.provider) {
-      return null;
-    }
-    const modelExists = resolution.provider.models.some((model) => model.enabled && model.id === resolution.route?.modelId);
-    return modelExists ? resolution.route : null;
-  }
-  readJson(filePath) {
-    try {
-      if (!fs.existsSync(filePath)) {
-        return null;
-      }
-      return JSON.parse(fs.readFileSync(filePath, "utf8"));
-    } catch (error) {
-      console.warn("[ExecutionProfileService] Failed to read JSON:", filePath, error);
-      return null;
-    }
-  }
-}
-const executionProfileService = new ExecutionProfileService();
-const ANTHROPIC_ALIAS_MODELS = ["sonnet", "opus", "haiku"];
-const ANTHROPIC_FIRST_PARTY_MODELS = ["sonnet", "opus"];
-const CLAUDE_ACCOUNT_MODELS = [
-  "claude-opus-4-7",
-  "claude-sonnet-4-6",
-  "claude-haiku-4-5-20251001"
-];
-const CHATGPT_ACCOUNT_MODELS = [
-  "gpt-5.5",
-  "gpt-5.4",
-  "gpt-5.4-mini",
-  "gpt-5.3-codex",
-  "gpt-5.2-codex",
-  "gpt-5.1-codex",
-  "gpt-5",
-  "o4-mini",
-  "o3",
-  "gpt-4o"
-];
-const GITHUB_COPILOT_ACCOUNT_MODELS = [
-  "gpt-5.5",
-  "gpt-5.4",
-  "gpt-5.4-mini",
-  "gpt-5.3-codex",
-  "gpt-5.2-codex",
-  "gpt-5.2",
-  "gpt-5-mini",
-  "claude-opus-4-7",
-  "claude-sonnet-4-6",
-  "claude-haiku-4-5",
-  "claude-opus-4-6",
-  "claude-opus-4-5",
-  "claude-sonnet-4-5",
-  "gpt-4.1"
-];
-const GROK_ACCOUNT_MODELS = [
-  "grok-4.3",
-  "grok-4",
-  "grok-code-fast-1"
-];
-const GEMINI_ACCOUNT_MODELS = [
-  "gemini-2.5-pro",
-  "gemini-2.5-flash",
-  "gemini-2.0-flash"
-];
-const QWEN_ACCOUNT_MODELS = [
-  "qwen-plus",
-  "qwen-max",
-  "qwen3-coder-plus"
-];
-const OPENAI_CODE_MODELS = ["gpt-5.2", "gpt-4.1", "gpt-5-mini"];
-const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
-  {
-    id: "302ai",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "302.AI",
-    baseUrl: "https://api.302.ai/v1",
-    recommendedModels: ["gpt-4o", "claude-3-7-sonnet"],
-    docsUrl: "https://302.ai/"
-  },
-  {
-    id: "azure-openai",
-    kind: "azure-openai",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "azure-openai",
-    label: "Azure OpenAI",
-    baseUrl: "",
-    baseUrlEditable: true,
-    recommendedModels: ["gpt-4.1", "gpt-5-mini"],
-    docsUrl: "https://learn.microsoft.com/azure/ai-services/openai/"
-  },
-  {
-    id: "bailian",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "Alibaba Cloud Bailian",
-    baseUrl: "https://coding.dashscope.aliyuncs.com/apps/anthropic",
-    recommendedModels: ["qwen3.6-plus", "qwen3-coder-next", "qwen3-coder-plus", "kimi-k2.5", "glm-5", "glm-4.7"],
-    docsUrl: "https://bailian.console.aliyun.com/"
-  },
-  {
-    id: "anthropic",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "anthropic",
-    label: "Anthropic",
-    baseUrl: "https://api.anthropic.com/v1",
-    recommendedModels: ANTHROPIC_FIRST_PARTY_MODELS,
-    docsUrl: "https://platform.claude.com/settings/keys"
-  },
-  {
-    id: "anthropic-thirdparty",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "Anthropic-compatible Endpoint",
-    baseUrl: "",
-    baseUrlEditable: true,
-    recommendedModels: ANTHROPIC_ALIAS_MODELS,
-    docsUrl: "https://platform.claude.com/docs/en/api/overview"
-  },
-  {
-    id: "cerebras",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "Cerebras",
-    baseUrl: "https://api.cerebras.ai/v1",
-    recommendedModels: ["llama-4-scout-17b-16e-instruct", "qwen-3-coder-480b"],
-    docsUrl: "https://cloud.cerebras.ai/"
-  },
-  {
-    id: "bedrock",
-    kind: "bedrock",
-    authMode: "environment",
-    catalogGroup: "environment",
-    modelDiscovery: "static",
-    label: "Amazon Bedrock",
-    recommendedModels: ANTHROPIC_ALIAS_MODELS,
-    docsUrl: "https://docs.anthropic.com/en/docs/claude-code/amazon-bedrock"
-  },
-  {
-    id: "custom-endpoint",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "OpenAI-compatible Endpoint",
-    baseUrl: "",
-    baseUrlEditable: true,
-    recommendedModels: ["gpt-4.1"],
-    docsUrl: "https://platform.openai.com/docs/api-reference"
-  },
-  {
-    id: "claude-account",
-    kind: "anthropic",
-    authMode: "account",
-    catalogGroup: "account",
-    modelDiscovery: "account-catalog",
-    label: "Claude Account",
-    recommendedModels: CLAUDE_ACCOUNT_MODELS,
-    docsUrl: "https://claude.ai/",
-    accountLoginConfigured: true
-  },
-  {
-    id: "chatgpt-account",
-    kind: "openai-compatible",
-    authMode: "account",
-    catalogGroup: "account",
-    modelDiscovery: "account-catalog",
-    label: "ChatGPT Account",
-    recommendedModels: CHATGPT_ACCOUNT_MODELS,
-    docsUrl: "https://chatgpt.com/",
-    accountLoginConfigured: true
-  },
-  {
-    id: "deepseek",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "DeepSeek",
-    baseUrl: "https://api.deepseek.com/anthropic",
-    recommendedModels: ["deepseek-v4-pro", "deepseek-v4-flash"],
-    docsUrl: "https://platform.deepseek.com/api_keys"
-  },
-  {
-    id: "github-copilot",
-    kind: "openai-compatible",
-    authMode: "account",
-    catalogGroup: "account",
-    modelDiscovery: "account-catalog",
-    label: "GitHub Copilot",
-    recommendedModels: GITHUB_COPILOT_ACCOUNT_MODELS,
-    docsUrl: "https://github.com/features/copilot",
-    accountLoginConfigured: true
-  },
-  {
-    id: "grok-account",
-    kind: "openai-compatible",
-    authMode: "account",
-    catalogGroup: "account",
-    modelDiscovery: "account-catalog",
-    label: "Grok Account",
-    baseUrl: "https://api.x.ai/v1",
-    recommendedModels: GROK_ACCOUNT_MODELS,
-    docsUrl: "https://grok.com/",
-    accountLoginConfigured: true,
-    unavailableReason: "Live Grok account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured."
-  },
-  {
-    id: "gemini-account",
-    kind: "google-ai-studio",
-    authMode: "account",
-    catalogGroup: "account",
-    modelDiscovery: "account-catalog",
-    label: "Gemini Account",
-    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
-    recommendedModels: GEMINI_ACCOUNT_MODELS,
-    docsUrl: "https://gemini.google.com/",
-    accountLoginConfigured: true,
-    unavailableReason: "Live Gemini account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured."
-  },
-  {
-    id: "qwen-account",
-    kind: "openai-compatible",
-    authMode: "account",
-    catalogGroup: "account",
-    modelDiscovery: "account-catalog",
-    label: "Qwen Account",
-    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    recommendedModels: QWEN_ACCOUNT_MODELS,
-    docsUrl: "https://chat.qwen.ai/",
-    accountLoginConfigured: true,
-    unavailableReason: "Live Qwen account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured."
-  },
-  {
-    id: "google-ai-studio",
-    kind: "google-ai-studio",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "google-ai-studio",
-    label: "Google AI Studio",
-    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
-    recommendedModels: ["gemini-2.5-pro", "gemini-2.5-flash"],
-    docsUrl: "https://aistudio.google.com/app/apikey"
-  },
-  {
-    id: "groq",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "Groq",
-    baseUrl: "https://api.groq.com/openai/v1",
-    recommendedModels: ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"],
-    docsUrl: "https://console.groq.com/keys"
-  },
-  {
-    id: "glm-cn",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "Zhipu AI GLM (CN)",
-    baseUrl: "https://open.bigmodel.cn/api/anthropic",
-    recommendedModels: ["sonnet", "opus", "haiku"],
-    docsUrl: "https://open.bigmodel.cn/"
-  },
-  {
-    id: "glm-global",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "Z.ai GLM (Global)",
-    baseUrl: "https://api.z.ai/api/anthropic",
-    recommendedModels: ["sonnet", "opus", "haiku"],
-    docsUrl: "https://platform.z.ai/"
-  },
-  {
-    id: "huggingface",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "Hugging Face",
-    baseUrl: "https://router.huggingface.co/v1",
-    recommendedModels: ["openai/gpt-oss-120b", "Qwen/Qwen3-Coder-480B-A35B-Instruct"],
-    docsUrl: "https://huggingface.co/settings/tokens"
-  },
-  {
-    id: "vertex",
-    kind: "vertex",
-    authMode: "environment",
-    catalogGroup: "environment",
-    modelDiscovery: "static",
-    label: "Google Vertex AI",
-    recommendedModels: ANTHROPIC_ALIAS_MODELS,
-    docsUrl: "https://docs.anthropic.com/en/docs/claude-code/google-vertex-ai"
-  },
-  {
-    id: "kimi-code",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "Kimi Code",
-    baseUrl: "https://api.kimi.com/coding/v1",
-    recommendedModels: ["kimi-for-coding"],
-    docsUrl: "https://www.kimi.com/code/docs/en/"
-  },
-  {
-    id: "litellm",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "LiteLLM",
-    baseUrl: "http://localhost:4000",
-    recommendedModels: ANTHROPIC_ALIAS_MODELS,
-    docsUrl: "https://docs.litellm.ai/docs/"
-  },
-  {
-    id: "manifest",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "Manifest",
-    baseUrl: "https://app.manifest.build/v1",
-    recommendedModels: ["gpt-4.1"],
-    docsUrl: "https://app.manifest.build/"
-  },
-  {
-    id: "minimax-cn",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "MiniMax (CN)",
-    baseUrl: "https://api.minimaxi.com/anthropic",
-    recommendedModels: ["MiniMax-M2.7"],
-    docsUrl: "https://platform.minimaxi.com/"
-  },
-  {
-    id: "minimax-global",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "MiniMax (Global)",
-    baseUrl: "https://api.minimax.io/anthropic",
-    recommendedModels: ["MiniMax-M2.7"],
-    docsUrl: "https://platform.minimaxi.com/"
-  },
-  {
-    id: "mistral",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "Mistral",
-    baseUrl: "https://api.mistral.ai/v1",
-    recommendedModels: ["mistral-large-latest", "codestral-latest"],
-    docsUrl: "https://console.mistral.ai/api-keys/"
-  },
-  {
-    id: "moonshot",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "Kimi / Moonshot AI",
-    baseUrl: "https://api.moonshot.cn/anthropic",
-    recommendedModels: ["sonnet"],
-    docsUrl: "https://platform.moonshot.cn/console/api-keys"
-  },
-  {
-    id: "openrouter",
-    kind: "openrouter",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "OpenRouter",
-    baseUrl: "https://openrouter.ai/api/v1",
-    recommendedModels: ["anthropic/claude-haiku-latest", "anthropic/claude-sonnet-4.5", "openai/gpt-5.2"],
-    docsUrl: "https://openrouter.ai/keys"
-  },
-  {
-    id: "openai",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "OpenAI",
-    baseUrl: "https://api.openai.com/v1",
-    recommendedModels: OPENAI_CODE_MODELS,
-    docsUrl: "https://platform.openai.com/api-keys"
-  },
-  {
-    id: "openai-eu",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "OpenAI (EU)",
-    baseUrl: "https://eu.api.openai.com/v1",
-    recommendedModels: OPENAI_CODE_MODELS,
-    docsUrl: "https://platform.openai.com/api-keys"
-  },
-  {
-    id: "openai-us",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "OpenAI (US)",
-    baseUrl: "https://us.api.openai.com/v1",
-    recommendedModels: OPENAI_CODE_MODELS,
-    docsUrl: "https://platform.openai.com/api-keys"
-  },
-  {
-    id: "qwen",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "Qwen / DashScope",
-    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    recommendedModels: ["qwen-plus", "qwen-max"],
-    docsUrl: "https://dashscope.console.aliyun.com/apiKey"
-  },
-  {
-    id: "siliconflow",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "SiliconFlow",
-    baseUrl: "https://api.siliconflow.cn/v1",
-    recommendedModels: ["Qwen/Qwen3-32B", "deepseek-ai/DeepSeek-V3"],
-    docsUrl: "https://siliconflow.cn/"
-  },
-  {
-    id: "volcengine",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "Volcengine Ark (Doubao)",
-    baseUrl: "https://ark.cn-beijing.volces.com/api/coding",
-    recommendedModels: ["doubao-seed-1-6", "glm-4.6", "deepseek-v4-pro", "kimi-k2.5"],
-    docsUrl: "https://www.volcengine.com/docs/82379/1928262"
-  },
-  {
-    id: "vercel-ai-gateway",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "Vercel AI Gateway",
-    baseUrl: "https://ai-gateway.vercel.sh/v1",
-    recommendedModels: ["openai/gpt-5.2", "anthropic/claude-sonnet-4.5"],
-    docsUrl: "https://vercel.com/docs/ai-gateway"
-  },
-  {
-    id: "xai",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "openai-compatible",
-    label: "xAI (Grok)",
-    baseUrl: "https://api.x.ai/v1",
-    recommendedModels: ["grok-4.3", "grok-4"],
-    docsUrl: "https://docs.x.ai/"
-  },
-  {
-    id: "xiaomi-mimo",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "Xiaomi MiMo",
-    baseUrl: "https://api.xiaomimimo.com/anthropic",
-    recommendedModels: ["mimo-v2.5-pro"],
-    docsUrl: "https://platform.xiaomimimo.com/#/console/api-keys"
-  },
-  {
-    id: "xiaomi-mimo-token-plan",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "api-key",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "Xiaomi MiMo Token Plan",
-    baseUrl: "https://token-plan-cn.xiaomimimo.com/anthropic",
-    recommendedModels: ["mimo-v2.5-pro"],
-    docsUrl: "https://platform.xiaomimimo.com/#/console/plan-manage"
-  },
-  {
-    id: "ollama",
-    kind: "ollama",
-    authMode: "local",
-    catalogGroup: "local",
-    modelDiscovery: "ollama-tags",
-    label: "Ollama",
-    baseUrl: "http://127.0.0.1:11434/v1",
-    recommendedModels: ["qwen2.5-coder:14b", "llama3.1:8b"],
-    docsUrl: "https://ollama.com/download"
-  }
-];
-function isBuiltinProviderId(id) {
-  return BUILTIN_LLM_PROVIDER_DEFINITIONS.some((entry) => entry.id === id);
-}
-function getBuiltinProviderDefinition(id) {
-  return BUILTIN_LLM_PROVIDER_DEFINITIONS.find((entry) => entry.id === id) ?? null;
-}
-const toModels = (modelIds) => Array.from(new Set(modelIds)).map((modelId) => ({
-  id: modelId,
-  label: modelId,
-  enabled: true
-}));
-const createBuiltinProviderEntry = (id) => {
-  const definition = getBuiltinProviderDefinition(id);
-  if (!definition) {
-    throw new Error(`Unknown builtin provider: ${id}`);
-  }
-  return {
-    id: definition.id,
-    kind: definition.kind,
-    authMode: definition.authMode,
-    catalogGroup: definition.catalogGroup,
-    modelDiscovery: definition.modelDiscovery,
-    label: definition.label,
-    enabled: false,
-    apiKey: "",
-    hasStoredSecret: definition.authMode === "local" || definition.authMode === "environment",
-    baseUrl: definition.baseUrl,
-    baseUrlEditable: definition.baseUrlEditable,
-    models: definition.modelDiscovery === "static" && definition.authMode === "environment" ? toModels(definition.recommendedModels) : toModels([]),
-    recommendedModels: definition.recommendedModels,
-    docsUrl: definition.docsUrl,
-    status: "unconfigured",
-    accountLoginConfigured: definition.accountLoginConfigured,
-    unavailableReason: definition.unavailableReason,
-    isConfigured: false
-  };
-};
-const createBuiltinProviderEntries = () => BUILTIN_LLM_PROVIDER_DEFINITIONS.map((entry) => createBuiltinProviderEntry(entry.id));
-const LEFT_SIDEBAR_DEFAULT_WIDTH = 256;
-const LEFT_SIDEBAR_MIN_WIDTH = 220;
-const LEFT_SIDEBAR_MAX_WIDTH = 420;
-const LEFT_SIDEBAR_COLLAPSED_WIDTH = 0;
-const RIGHT_PANEL_DEFAULT_WIDTH = 312;
-const RIGHT_PANEL_MIN_WIDTH = 280;
-const RIGHT_PANEL_MAX_WIDTH = 520;
-const RIGHT_PANEL_COLLAPSED_WIDTH = 0;
-const TERMINAL_DEFAULT_HEIGHT = 328;
-const TERMINAL_MIN_HEIGHT = 180;
-const TERMINAL_MAX_HEIGHT = 720;
-const SECRET_FILE_NAME = "provider-secrets.json";
-class SecretStorageService {
-  getSecretFilePath(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return path.join(appPathService.getWorkspacePaths(workspaceRoot).secretsPath, SECRET_FILE_NAME);
-  }
-  readSecretMap(workspaceRoot) {
-    const filePath = this.getSecretFilePath(workspaceRoot);
-    if (!fs.existsSync(filePath)) {
-      return {};
-    }
-    try {
-      return JSON.parse(fs.readFileSync(filePath, "utf8"));
-    } catch (error) {
-      console.warn("[SecretStorageService] Failed to read secrets file:", error);
-      return {};
-    }
-  }
-  writeSecretMap(secretMap, workspaceRoot) {
-    const filePath = this.getSecretFilePath(workspaceRoot);
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(secretMap, null, 2), "utf8");
-  }
-  createProviderSecretRef(providerId) {
-    return `provider-${sanitizeToken(providerId)}-api-key`;
-  }
-  createProviderOAuthSecretRef(providerId) {
-    return `provider-${sanitizeToken(providerId)}-oauth`;
-  }
-  getSecret(secretRef, workspaceRoot) {
-    if (!secretRef) {
-      return "";
-    }
-    const secretMap = this.readSecretMap(workspaceRoot);
-    const entry = secretMap[secretRef];
-    if (!entry) {
-      return "";
-    }
-    try {
-      if (entry.encoding === "safeStorage") {
-        if (!electron.safeStorage.isEncryptionAvailable()) {
-          console.warn("[SecretStorageService] safeStorage is unavailable for secret:", secretRef);
-          return "";
-        }
-        return electron.safeStorage.decryptString(Buffer.from(entry.payload, "base64"));
-      }
-      return Buffer.from(entry.payload, "base64").toString("utf8");
-    } catch (error) {
-      console.warn("[SecretStorageService] Failed to decrypt secret:", error);
-      return "";
-    }
-  }
-  setSecret(secretRef, plaintext, workspaceRoot) {
-    if (!secretRef) {
-      return;
-    }
-    const normalized = plaintext.trim();
-    const secretMap = this.readSecretMap(workspaceRoot);
-    if (!normalized) {
-      delete secretMap[secretRef];
-      this.writeSecretMap(secretMap, workspaceRoot);
-      return;
-    }
-    const encryptionAvailable = process.env.RDC_AGENT_TEST_MODE !== "1" && electron.safeStorage.isEncryptionAvailable();
-    secretMap[secretRef] = {
-      encoding: encryptionAvailable ? "safeStorage" : "base64",
-      payload: encryptionAvailable ? electron.safeStorage.encryptString(normalized).toString("base64") : Buffer.from(normalized, "utf8").toString("base64"),
-      updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-    };
-    this.writeSecretMap(secretMap, workspaceRoot);
-  }
-  deleteSecret(secretRef, workspaceRoot) {
-    if (!secretRef) {
-      return;
-    }
-    const secretMap = this.readSecretMap(workspaceRoot);
-    if (!(secretRef in secretMap)) {
-      return;
-    }
-    delete secretMap[secretRef];
-    this.writeSecretMap(secretMap, workspaceRoot);
-  }
-  hasSecret(secretRef, workspaceRoot) {
-    return Boolean(secretRef && this.getSecret(secretRef, workspaceRoot));
-  }
-}
-const secretStorageService = new SecretStorageService();
-const LEFT_DEFAULTS = {
-  width: LEFT_SIDEBAR_DEFAULT_WIDTH,
-  min: LEFT_SIDEBAR_MIN_WIDTH,
-  max: LEFT_SIDEBAR_MAX_WIDTH,
-  collapsedWidth: LEFT_SIDEBAR_COLLAPSED_WIDTH
-};
-const RIGHT_DEFAULTS = {
-  width: RIGHT_PANEL_DEFAULT_WIDTH,
-  min: RIGHT_PANEL_MIN_WIDTH,
-  max: RIGHT_PANEL_MAX_WIDTH,
-  collapsedWidth: RIGHT_PANEL_COLLAPSED_WIDTH
-};
-const VALID_THEMES = ["dark", "light", "system"];
-const VALID_LANGUAGES = ["zh-CN", "en"];
-const VALID_FONT_SCALES = ["small", "medium", "large"];
-const KNOWN_AGENT_IDS = new Set(Object.keys(DEFAULT_MODEL_ROUTING));
-const RETIRED_BUILTIN_MCP_SERVER_IDS = /* @__PURE__ */ new Set(["builtin.rdc-toolbridge"]);
-const EMPTY_PATHS = {
-  workspaceRoot: "",
-  defaultWorkspaceRoot: "",
-  settingsPath: "",
-  logsPath: "",
-  logPath: "",
-  projectsPath: "",
-  knowledgePath: "",
-  migrationOrphansPath: "",
-  profilesPath: "",
-  policiesPath: "",
-  skillsPath: "",
-  mcpPath: "",
-  patternsPath: "",
-  secretsPath: "",
-  migrationReportsPath: ""
-};
-const DEFAULT_APPEARANCE = {
-  theme: "dark",
-  language: "zh-CN",
-  fontScale: "medium"
-};
-const DEFAULT_LAYOUT = {
-  leftSidebar: {
-    collapsed: false,
-    width: LEFT_DEFAULTS.width,
-    expandedWidth: LEFT_DEFAULTS.width
-  },
-  rightPanel: {
-    collapsed: false,
-    width: RIGHT_DEFAULTS.width,
-    expandedWidth: RIGHT_DEFAULTS.width
-  },
-  terminal: {
-    height: TERMINAL_DEFAULT_HEIGHT
-  }
-};
-const DEFAULT_PROFILE = {
-  nickname: "RDC Operator",
-  avatarPath: ""
-};
-const DEFAULT_CONFIGURATION = {
-  activeModeProfileId: "debugger.default",
-  enabledSkillIds: [],
-  enabledMcpServerIds: [],
-  modePatternBindings: {
-    debugger: "plan-generate-verify",
-    analyzer: "free-agent",
-    optimizer: "free-agent"
-  }
-};
-const DEFAULT_PROVIDER_SEEDS = [
-  {
-    id: "deepseek",
-    apiKey: "sk-15c018cd2a76442183e3cc5da3dbbaf9",
-    models: [
-      { id: "deepseek-chat", label: "DeepSeek Chat", enabled: true },
-      { id: "deepseek-reasoner", label: "DeepSeek Reasoner", enabled: true }
-    ]
-  },
-  {
-    id: "openrouter",
-    apiKey: "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",
-    models: [
-      { id: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4", enabled: true },
-      { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", enabled: true }
-    ]
-  },
-  {
-    id: "xai",
-    apiKey: "xai-93ENKTaQFwLRfblG6OHJlOzSDm2uPCryuBidXgs0iuBNQksYVYsJ9eRMUik1Elc9tbdZRl9b5VCSCcPs",
-    models: [
-      { id: "grok-4", label: "Grok 4", enabled: true },
-      { id: "grok-4.3", label: "Grok 4.3", enabled: true }
-    ]
-  },
-  {
-    id: "google-ai-studio",
-    apiKey: "AIzaSyDmcuv1H2TpaBSamaBJti3IkYkTLXZnC9o",
-    models: [
-      { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", enabled: true },
-      { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", enabled: true }
-    ]
-  },
-  {
-    id: "kimi-code",
-    apiKey: "sk-kimi-vz1tEHOOmhDximg0Zer0wZNS5eOcuSOIHq1FTl8YNkHkd2KvGbgWMAwJRxj5VKw8",
-    models: [
-      { id: "kimi-coding", label: "Kimi Coding", enabled: true }
-    ]
-  }
-];
-const DEFAULT_AGENT_ROUTE_SEEDS = [
-  { agentId: "ask_agent", providerId: "deepseek", modelId: "deepseek-chat" },
-  { agentId: "rdc-debugger", providerId: "deepseek", modelId: "deepseek-chat" }
-];
-function nowIso() {
-  return (/* @__PURE__ */ new Date()).toISOString();
-}
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value));
-}
-function pickEnum(value, allowed, fallback) {
-  return typeof value === "string" && allowed.includes(value) ? value : fallback;
-}
-function dedupeStrings(values) {
-  return Array.from(new Set(values.filter(Boolean)));
-}
-function sanitizeRuntimeIds(values) {
-  return dedupeStrings(
-    Array.isArray(values) ? values.filter((value) => typeof value === "string").map((value) => value.trim()) : []
-  ).filter((value) => !RETIRED_BUILTIN_MCP_SERVER_IDS.has(value));
-}
-function sanitizePatternBindings(value) {
-  const candidate = value && typeof value === "object" ? value : {};
-  const bindings = {};
-  for (const [mode, patternId] of Object.entries(candidate)) {
-    if (typeof patternId === "string" && patternId.trim()) {
-      bindings[mode] = patternId.trim();
-    }
-  }
-  return {
-    ...DEFAULT_CONFIGURATION.modePatternBindings ?? {},
-    ...bindings
-  };
-}
-function readJsonFile(filePath) {
-  try {
-    if (!fs.existsSync(filePath)) {
-      return null;
-    }
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch (error) {
-    console.warn("[SettingsService] Failed to read JSON:", filePath, error);
-    return null;
-  }
-}
-function isVendorSecretUsable(providerId, secret) {
-  const normalized = secret.trim();
-  if (!normalized) {
-    return false;
-  }
-  if (providerId === "openrouter") {
-    return /^sk-or-/i.test(normalized);
-  }
-  if (providerId === "openai") {
-    return /^sk-/i.test(normalized);
-  }
-  if (providerId === "anthropic") {
-    return /^sk-ant-/i.test(normalized);
-  }
-  return true;
-}
-function getResolvedProviderSecret(providerId, secretRef, workspaceRoot) {
-  const secret = secretStorageService.getSecret(secretRef, workspaceRoot).trim();
-  return isVendorSecretUsable(providerId, secret) ? secret : "";
-}
-function resolveAccountRuntimeCredential(providerId, workspaceRoot) {
-  const raw = secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(providerId), workspaceRoot);
-  if (!raw) {
-    return { apiKey: "" };
-  }
-  try {
-    const bundle = JSON.parse(raw);
-    if (providerId === "github-copilot") {
-      return {
-        apiKey: bundle.copilotToken ?? "",
-        baseUrl: bundle.copilotApiBaseUrl ?? "https://api.githubcopilot.com"
-      };
-    }
-    if (providerId === "chatgpt-account") {
-      return {
-        apiKey: bundle.accessToken ?? bundle.apiKey ?? "",
-        baseUrl: "https://chatgpt.com/backend-api/codex",
-        accountId: bundle.accountId
-      };
-    }
-    if (providerId === "grok-account") {
-      return {
-        apiKey: bundle.accessToken ?? bundle.apiKey ?? "",
-        baseUrl: "https://api.x.ai/v1"
-      };
-    }
-    if (providerId === "gemini-account") {
-      return {
-        apiKey: bundle.accessToken ?? bundle.apiKey ?? "",
-        baseUrl: "https://generativelanguage.googleapis.com/v1beta"
-      };
-    }
-    if (providerId === "qwen-account") {
-      return {
-        apiKey: bundle.accessToken ?? bundle.apiKey ?? "",
-        baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-      };
-    }
-    return {
-      apiKey: bundle.accessToken ?? "",
-      baseUrl: "https://api.anthropic.com/v1"
-    };
-  } catch {
-    return { apiKey: "" };
-  }
-}
-function sanitizeSidebar(input, defaults, fallback) {
-  const candidate = input ?? {};
-  const expandedWidth = clamp(
-    typeof candidate.expandedWidth === "number" ? candidate.expandedWidth : fallback.expandedWidth,
-    defaults.min,
-    defaults.max
-  );
-  return {
-    collapsed: typeof candidate.collapsed === "boolean" ? candidate.collapsed : fallback.collapsed,
-    expandedWidth,
-    width: clamp(
-      typeof candidate.width === "number" ? candidate.width : fallback.collapsed ? defaults.collapsedWidth : expandedWidth,
-      defaults.collapsedWidth,
-      defaults.max
-    )
-  };
-}
-function sanitizeTerminal(input, fallback = DEFAULT_LAYOUT.terminal) {
-  const candidate = input ?? {};
-  return {
-    height: clamp(
-      typeof candidate.height === "number" ? candidate.height : fallback.height,
-      TERMINAL_MIN_HEIGHT,
-      TERMINAL_MAX_HEIGHT
-    )
-  };
-}
-function sanitizeModels(models) {
-  const candidates = Array.isArray(models) ? models : [];
-  const modelMap = /* @__PURE__ */ new Map();
-  for (const entry of candidates) {
-    if (!entry || typeof entry !== "object") {
-      continue;
-    }
-    const candidate = entry;
-    const modelId = typeof candidate.id === "string" ? candidate.id.trim() : "";
-    if (!modelId || modelMap.has(modelId)) {
-      continue;
-    }
-    modelMap.set(modelId, {
-      id: modelId,
-      label: typeof candidate.label === "string" && candidate.label.trim() ? candidate.label.trim() : modelId,
-      enabled: candidate.enabled !== false,
-      contextWindowTokens: typeof candidate.contextWindowTokens === "number" && Number.isFinite(candidate.contextWindowTokens) ? Math.max(0, Math.round(candidate.contextWindowTokens)) : null
-    });
-  }
-  return Array.from(modelMap.values());
-}
-function createEmptyAgentRoutes() {
-  return Object.keys(DEFAULT_MODEL_ROUTING).map((agentId) => ({
-    agentId,
-    providerId: "",
-    modelId: ""
-  }));
-}
-function createDefaultPersistedSettings(workspaceRoot = appPathService.getWorkspaceRoot()) {
-  return {
-    appearance: DEFAULT_APPEARANCE,
-    layout: DEFAULT_LAYOUT,
-    profile: DEFAULT_PROFILE,
-    workspace: {
-      rootPath: workspaceRoot
-    },
-    llm: {
-      providers: [],
-      agentRoutes: createEmptyAgentRoutes()
-    },
-    configuration: DEFAULT_CONFIGURATION
-  };
-}
-function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspaceRoot()) {
-  const configuration = executionProfileService.normalizeConfiguration({
-    activeModeProfileId: DEFAULT_CONFIGURATION.activeModeProfileId || "debugger.default",
-    availableModeProfiles: [],
-    enabledSkillIds: DEFAULT_CONFIGURATION.enabledSkillIds ?? [],
-    enabledMcpServerIds: DEFAULT_CONFIGURATION.enabledMcpServerIds ?? [],
-    modePatternBindings: DEFAULT_CONFIGURATION.modePatternBindings ?? {},
-    availablePatterns: [],
-    availableSkills: [],
-    availableMcpServers: [],
-    lastMigrationReportPath: void 0,
-    lastMigrationSummary: [],
-    diagnostics: []
-  }, workspaceRoot);
-  return {
-    appearance: DEFAULT_APPEARANCE,
-    layout: DEFAULT_LAYOUT,
-    profile: DEFAULT_PROFILE,
-    workspace: {
-      rootPath: workspaceRoot
-    },
-    llm: {
-      providers: [],
-      agentRoutes: createEmptyAgentRoutes()
-    },
-    configuration,
-    paths: EMPTY_PATHS
-  };
-}
-function sanitizeRoute(entry) {
-  if (!entry || typeof entry !== "object") {
-    return null;
-  }
-  const route = entry;
-  if (typeof route.agentId !== "string" || !KNOWN_AGENT_IDS.has(route.agentId)) {
-    return null;
-  }
-  return {
-    agentId: route.agentId,
-    providerId: typeof route.providerId === "string" ? normalizeRetiredProviderId(route.providerId.trim()) : "",
-    modelId: typeof route.modelId === "string" ? route.modelId.trim() : ""
-  };
-}
-function pickProviderStatus(provider, fallback, canUseProvider, models) {
-  if (provider.status === "failed") {
-    return "failed";
-  }
-  if ((provider.status === "verified" || provider.isConfigured === true) && canUseProvider && models.length > 0) {
-    return "verified";
-  }
-  return "unconfigured";
-}
-function isFixtureProvider(provider) {
-  const id = typeof provider.id === "string" ? provider.id.trim() : "";
-  const baseUrl = typeof provider.baseUrl === "string" ? provider.baseUrl.trim().toLowerCase() : "";
-  return /^provider-\d+$/i.test(id) || id === "acme" || id === "vendorx" || baseUrl.includes("example.com") || baseUrl.includes("acme.local") || baseUrl.includes("vendorx.ai");
-}
-const RETIRED_PROVIDER_ID_IMPORTS = {
-  gemini: "vertex",
-  kimi: "kimi-code",
-  "kimi-coding-plan": "kimi-code",
-  minimax: "minimax-global",
-  zai: "glm-global"
-};
-function normalizeRetiredProviderId(providerId) {
-  return RETIRED_PROVIDER_ID_IMPORTS[providerId] ?? providerId;
-}
-function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorkspaceRoot()) {
-  const incomingId = typeof provider.id === "string" ? provider.id.trim() : "";
-  const rawId = normalizeRetiredProviderId(incomingId);
-  if (!rawId || !isBuiltinProviderId(rawId)) {
-    return null;
-  }
-  const builtinFallback = createBuiltinProviderEntry(rawId);
-  const definition = getBuiltinProviderDefinition(rawId);
-  const incomingSecretRef = typeof provider.secretRef === "string" && provider.secretRef.trim() ? provider.secretRef.trim() : void 0;
-  const secretRef = incomingId && incomingId !== rawId ? secretStorageService.createProviderSecretRef(rawId) : incomingSecretRef || secretStorageService.createProviderSecretRef(rawId);
-  const kind = builtinFallback.kind;
-  const models = sanitizeModels(provider.models ?? []);
-  const oauthSecretRef = secretStorageService.createProviderOAuthSecretRef(rawId);
-  const resolvedSecret = builtinFallback.authMode === "api-key" ? getResolvedProviderSecret(rawId, secretRef, workspaceRoot) : builtinFallback.authMode === "account" ? secretStorageService.getSecret(oauthSecretRef, workspaceRoot) : "";
-  const hasStoredSecret = builtinFallback.authMode === "local" || builtinFallback.authMode === "environment" || Boolean(resolvedSecret);
-  const canUseProvider = builtinFallback.authMode === "local" || builtinFallback.authMode === "environment" ? true : builtinFallback.authMode === "api-key" ? Boolean(resolvedSecret) : Boolean(resolvedSecret);
-  const status = pickProviderStatus(provider, builtinFallback, canUseProvider, models);
-  const enabled = status === "verified" && models.length > 0;
-  const label = builtinFallback.label;
-  const recommendedModels = builtinFallback.recommendedModels;
-  const docsUrl = builtinFallback.docsUrl;
-  return {
-    id: rawId,
-    kind,
-    authMode: builtinFallback.authMode,
-    catalogGroup: builtinFallback.catalogGroup,
-    modelDiscovery: builtinFallback.modelDiscovery,
-    label,
-    enabled,
-    apiKey: "",
-    secretRef,
-    hasStoredSecret,
-    baseUrl: definition?.baseUrlEditable ? typeof provider.baseUrl === "string" ? provider.baseUrl.trim() : definition.baseUrl : definition?.baseUrl,
-    baseUrlEditable: definition?.baseUrlEditable,
-    models,
-    recommendedModels,
-    docsUrl,
-    status,
-    lastTestedAt: typeof provider.lastTestedAt === "string" ? provider.lastTestedAt : void 0,
-    lastModelRefreshAt: typeof provider.lastModelRefreshAt === "string" ? provider.lastModelRefreshAt : void 0,
-    lastError: status === "failed" && typeof provider.lastError === "string" ? provider.lastError : void 0,
-    accountLoginConfigured: definition?.accountLoginConfigured,
-    accountLabel: typeof provider.accountLabel === "string" ? provider.accountLabel : void 0,
-    planLabel: typeof provider.planLabel === "string" ? provider.planLabel : void 0,
-    oauthExpiresAt: typeof provider.oauthExpiresAt === "string" ? provider.oauthExpiresAt : void 0,
-    oauthRefreshAvailable: typeof provider.oauthRefreshAvailable === "boolean" ? provider.oauthRefreshAvailable : void 0,
-    unavailableReason: definition?.unavailableReason,
-    isConfigured: status === "verified" && models.length > 0 && enabled
-  };
-}
-function normalizeUserProviders(providers, workspaceRoot) {
-  const persistedProviders = /* @__PURE__ */ new Map();
-  for (const entry of Array.isArray(providers) ? providers : []) {
-    if (!entry || typeof entry !== "object") {
-      continue;
-    }
-    const provider = sanitizeUserProvider(entry, workspaceRoot);
-    if (!provider || persistedProviders.has(provider.id)) {
-      continue;
-    }
-    persistedProviders.set(provider.id, provider);
-  }
-  return createBuiltinProviderEntries().map((catalogProvider) => sanitizeUserProvider(persistedProviders.get(catalogProvider.id) ?? catalogProvider, workspaceRoot)).filter((provider) => provider !== null);
-}
-function hydrateProviderSecrets(providers, workspaceRoot) {
-  return providers.map((provider) => {
-    const resolvedSecret = provider.authMode === "api-key" ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot) : provider.authMode === "account" ? secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(provider.id), workspaceRoot) : "";
-    const hasStoredSecret = provider.authMode === "local" || provider.authMode === "environment" || Boolean(resolvedSecret);
-    const canUseProvider = provider.authMode === "local" || provider.authMode === "environment" ? true : provider.authMode === "api-key" ? Boolean(resolvedSecret) : Boolean(resolvedSecret);
-    const status = provider.status === "unavailable" ? "unavailable" : provider.status === "verified" && canUseProvider && provider.models.length > 0 ? "verified" : provider.status === "failed" ? "failed" : "unconfigured";
-    const isConfigured = status === "verified" && provider.models.length > 0;
-    return {
-      ...provider,
-      // The renderer only needs to know whether a secret exists.
-      // Keep plaintext secrets out of settings:get payloads.
-      apiKey: "",
-      hasStoredSecret,
-      enabled: isConfigured,
-      status,
-      isConfigured
-    };
-  });
-}
-function normalizeUserRoutes(routes, providers) {
-  const routeMap = /* @__PURE__ */ new Map();
-  for (const route of Array.isArray(routes) ? routes.map(sanitizeRoute) : []) {
-    if (!route) {
-      continue;
-    }
-    routeMap.set(route.agentId, route);
-  }
-  return createEmptyAgentRoutes().map((route) => {
-    const incoming = routeMap.get(route.agentId);
-    if (!incoming?.providerId || !incoming.modelId) {
-      return route;
-    }
-    const provider = providers.find((entry) => entry.id === incoming.providerId);
-    const isValid = Boolean(
-      provider && provider.isConfigured && provider.models.some((model) => model.id === incoming.modelId && model.enabled !== false)
-    );
-    return isValid ? incoming : route;
-  });
-}
-function buildSeededDefaults(workspaceRoot, seedIds = new Set(DEFAULT_PROVIDER_SEEDS.map((seed) => seed.id))) {
-  const providers = [];
-  for (const seed of DEFAULT_PROVIDER_SEEDS) {
-    if (!seedIds.has(seed.id)) {
-      continue;
-    }
-    const fallback = createBuiltinProviderEntry(seed.id);
-    if (fallback.authMode !== "api-key") {
-      continue;
-    }
-    const secretRef = secretStorageService.createProviderSecretRef(seed.id);
-    secretStorageService.setSecret(secretRef, seed.apiKey, workspaceRoot);
-    const sanitized = sanitizeUserProvider({
-      id: seed.id,
-      models: seed.models,
-      status: "verified",
-      isConfigured: true,
-      secretRef
-    }, workspaceRoot);
-    if (sanitized) {
-      providers.push(sanitized);
-    }
-  }
-  return {
-    providers,
-    routes: DEFAULT_AGENT_ROUTE_SEEDS.map((route) => ({ ...route }))
-  };
-}
-function isProviderConfiguredForSeed(provider) {
-  return Boolean(
-    provider && provider.isConfigured && provider.status === "verified" && provider.models.some((model) => model.enabled !== false)
-  );
-}
-function mergeDefaultAgentRoutes(routes, providers) {
-  const routeMap = new Map(routes.map((route) => [route.agentId, route]));
-  let changed = false;
-  for (const seedRoute of DEFAULT_AGENT_ROUTE_SEEDS) {
-    const currentRoute = routeMap.get(seedRoute.agentId);
-    const currentProvider = providers.find((provider) => provider.id === currentRoute?.providerId);
-    const currentRouteValid = Boolean(
-      currentRoute && currentProvider?.isConfigured && currentProvider.models.some((model) => model.id === currentRoute.modelId && model.enabled !== false)
-    );
-    if (!currentRouteValid) {
-      routeMap.set(seedRoute.agentId, { ...seedRoute });
-      changed = true;
-    }
-  }
-  return changed ? routes.map((route) => routeMap.get(route.agentId) ?? route) : routes;
-}
-function parseMigrationSummary(reportPath) {
-  if (!reportPath || !fs.existsSync(reportPath)) {
-    return [];
-  }
-  try {
-    const content = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-    return [...content.fixes ?? [], ...content.warnings ?? []];
-  } catch (error) {
-    console.warn("[SettingsService] Failed to read migration report:", error);
-    return [];
-  }
-}
-class SettingsService {
-  initialized = false;
-  initialize() {
-    const runtimePaths = appPathService.initializeWorkspaceRoot();
-    executionProfileService.ensureScaffold(runtimePaths.workspaceRoot);
-    const rawPersisted = readJsonFile(runtimePaths.settingsPath);
-    const rebuildResult = this.rebuildPersistedSettings(rawPersisted, runtimePaths.workspaceRoot);
-    if (rebuildResult.changed || !fs.existsSync(runtimePaths.settingsPath)) {
-      this.persistHardRebuild(runtimePaths, rawPersisted, rebuildResult);
-    }
-    this.initialized = true;
-    return this.getAll(runtimePaths);
-  }
-  ensureInitialized() {
-    if (!this.initialized) {
-      this.initialize();
-    }
-  }
-  rebuildPersistedSettings(raw, workspaceRoot) {
-    const fallback = createDefaultPersistedSettings(workspaceRoot);
-    const candidate = raw ?? fallback;
-    const fixes = [];
-    const warnings = [];
-    const persistedRawProviders = Array.isArray(candidate.llm?.providers) ? candidate.llm?.providers : [];
-    const persistedRawRoutes = Array.isArray(candidate.llm?.agentRoutes) ? candidate.llm?.agentRoutes : [];
-    const rawProviders = persistedRawProviders;
-    const rawRoutes = persistedRawRoutes;
-    const nextProviders = [];
-    for (const entry of rawProviders) {
-      if (isFixtureProvider(entry)) {
-        fixes.push(`Removed fixture provider ${entry.id}`);
-        secretStorageService.deleteSecret(entry.secretRef, workspaceRoot);
-        continue;
-      }
-      const incomingId = typeof entry.id === "string" ? entry.id.trim() : "";
-      const rawId = normalizeRetiredProviderId(incomingId);
-      if (!rawId) {
-        fixes.push("Removed provider with empty id");
-        continue;
-      }
-      if (incomingId && incomingId !== rawId) {
-        fixes.push(`Renamed retired provider id ${incomingId} to ${rawId}`);
-      }
-      const canonicalSecretRef = secretStorageService.createProviderSecretRef(rawId);
-      const incomingSecretRef = typeof entry.secretRef === "string" && entry.secretRef.trim() ? entry.secretRef.trim() : void 0;
-      const secretRef = incomingId && incomingId !== rawId ? canonicalSecretRef : incomingSecretRef || canonicalSecretRef;
-      if (incomingSecretRef && incomingSecretRef !== secretRef) {
-        const incomingSecret = secretStorageService.getSecret(incomingSecretRef, workspaceRoot);
-        if (incomingSecret.trim()) {
-          secretStorageService.setSecret(secretRef, incomingSecret, workspaceRoot);
-          secretStorageService.deleteSecret(incomingSecretRef, workspaceRoot);
-          fixes.push(`Moved retired provider secret ${incomingId} to ${rawId}`);
-        }
-      }
-      if (entry.apiKey?.trim()) {
-        secretStorageService.setSecret(secretRef, entry.apiKey.trim(), workspaceRoot);
-        fixes.push(`Migrated plaintext secret for ${rawId}`);
-      }
-      const sanitized = sanitizeUserProvider({ ...entry, secretRef }, workspaceRoot);
-      if (!sanitized) {
-        fixes.push(`Removed non-catalog provider ${rawId}`);
-        continue;
-      }
-      if (!nextProviders.some((provider) => provider.id === sanitized.id)) {
-        nextProviders.push(sanitized);
-      } else {
-        fixes.push(`Removed duplicated provider ${sanitized.id}`);
-      }
-    }
-    const normalizedBeforeSeed = normalizeUserProviders(nextProviders, workspaceRoot);
-    const seedIdsToRepair = new Set(DEFAULT_PROVIDER_SEEDS.filter((seed) => !isProviderConfiguredForSeed(normalizedBeforeSeed.find((existing) => existing.id === seed.id))).map((seed) => seed.id));
-    const providersToSeed = buildSeededDefaults(workspaceRoot, seedIdsToRepair).providers;
-    if (providersToSeed.length > 0) {
-      fixes.push(`Seeded ${providersToSeed.length} default LLM providers`);
-    }
-    const catalogProviders = normalizeUserProviders(
-      [
-        ...nextProviders.filter((existing) => !providersToSeed.some((seeded) => seeded.id === existing.id)),
-        ...providersToSeed
-      ],
-      workspaceRoot
-    );
-    const normalizedRoutes = normalizeUserRoutes(rawRoutes, catalogProviders);
-    const nextRoutes = mergeDefaultAgentRoutes(normalizedRoutes, catalogProviders);
-    if (JSON.stringify(normalizedRoutes) !== JSON.stringify(nextRoutes)) {
-      fixes.push("Seeded default agent routes");
-    }
-    const incomingRoutes = Array.isArray(rawRoutes) ? rawRoutes.map((entry) => {
-      if (entry && typeof entry === "object") {
-        const providerId = entry.providerId;
-        const incomingProviderId = typeof providerId === "string" ? providerId.trim() : "";
-        const normalizedProviderId = normalizeRetiredProviderId(incomingProviderId);
-        if (incomingProviderId && incomingProviderId !== normalizedProviderId) {
-          const agentId = entry.agentId;
-          fixes.push(`Renamed retired route provider id ${incomingProviderId} to ${normalizedProviderId}${typeof agentId === "string" ? ` for ${agentId}` : ""}`);
-        }
-      }
-      return sanitizeRoute(entry);
-    }).filter((route) => route !== null) : [];
-    for (const route of incomingRoutes) {
-      const normalized = nextRoutes.find((entry) => entry.agentId === route.agentId);
-      if (!normalized || normalized.providerId !== route.providerId || normalized.modelId !== route.modelId) {
-        if (route.providerId || route.modelId) {
-          fixes.push(`Cleared invalid route for ${route.agentId}`);
-        }
-      }
-    }
-    if (!catalogProviders.some((provider) => provider.isConfigured)) {
-      warnings.push("No configured provider available for Debugger mode.");
-    }
-    const nextSettings = {
-      appearance: {
-        theme: pickEnum(candidate.appearance?.theme, VALID_THEMES, fallback.appearance?.theme ?? "dark"),
-        language: pickEnum(candidate.appearance?.language, VALID_LANGUAGES, fallback.appearance?.language ?? "zh-CN"),
-        fontScale: pickEnum(candidate.appearance?.fontScale, VALID_FONT_SCALES, fallback.appearance?.fontScale ?? "medium")
-      },
-      layout: {
-        leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
-        rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
-        terminal: sanitizeTerminal(candidate.layout?.terminal, fallback.layout?.terminal ?? DEFAULT_LAYOUT.terminal)
-      },
-      profile: {
-        nickname: typeof candidate.profile?.nickname === "string" && candidate.profile.nickname.trim() ? candidate.profile.nickname.trim() : DEFAULT_PROFILE.nickname,
-        avatarPath: typeof candidate.profile?.avatarPath === "string" ? candidate.profile.avatarPath : DEFAULT_PROFILE.avatarPath
-      },
-      workspace: {
-        rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot
-      },
-      llm: {
-        providers: catalogProviders.map((provider) => ({ ...provider, apiKey: "" })),
-        agentRoutes: nextRoutes
-      },
-      configuration: {
-        activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
-        enabledSkillIds: sanitizeRuntimeIds(candidate.configuration?.enabledSkillIds),
-        enabledMcpServerIds: sanitizeRuntimeIds(candidate.configuration?.enabledMcpServerIds),
-        modePatternBindings: sanitizePatternBindings(candidate.configuration?.modePatternBindings),
-        lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath
-      }
-    };
-    return {
-      settings: nextSettings,
-      changed: JSON.stringify(candidate) !== JSON.stringify(nextSettings),
-      fixes,
-      warnings
-    };
-  }
-  normalizePersistedSettings(raw, workspaceRoot) {
-    const fallback = createDefaultPersistedSettings(workspaceRoot);
-    const candidate = raw ?? fallback;
-    const nextProviders = normalizeUserProviders(candidate.llm?.providers, workspaceRoot).map((provider) => ({
-      ...provider,
-      apiKey: ""
-    }));
-    const nextRoutes = normalizeUserRoutes(candidate.llm?.agentRoutes, nextProviders);
-    return {
-      appearance: {
-        theme: pickEnum(candidate.appearance?.theme, VALID_THEMES, fallback.appearance?.theme ?? "dark"),
-        language: pickEnum(candidate.appearance?.language, VALID_LANGUAGES, fallback.appearance?.language ?? "zh-CN"),
-        fontScale: pickEnum(candidate.appearance?.fontScale, VALID_FONT_SCALES, fallback.appearance?.fontScale ?? "medium")
-      },
-      layout: {
-        leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
-        rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
-        terminal: sanitizeTerminal(candidate.layout?.terminal, fallback.layout?.terminal ?? DEFAULT_LAYOUT.terminal)
-      },
-      profile: {
-        nickname: typeof candidate.profile?.nickname === "string" && candidate.profile.nickname.trim() ? candidate.profile.nickname.trim() : DEFAULT_PROFILE.nickname,
-        avatarPath: typeof candidate.profile?.avatarPath === "string" ? candidate.profile.avatarPath : DEFAULT_PROFILE.avatarPath
-      },
-      workspace: {
-        rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot
-      },
-      llm: {
-        providers: nextProviders,
-        agentRoutes: nextRoutes
-      },
-      configuration: {
-        activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
-        enabledSkillIds: sanitizeRuntimeIds(candidate.configuration?.enabledSkillIds),
-        enabledMcpServerIds: sanitizeRuntimeIds(candidate.configuration?.enabledMcpServerIds),
-        modePatternBindings: sanitizePatternBindings(candidate.configuration?.modePatternBindings),
-        lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath
-      }
-    };
-  }
-  writeMigrationReport(paths, fixes, warnings) {
-    const reportPath = path.join(paths.migrationReportsPath, `settings-rebuild-${Date.now()}.json`);
-    fs.mkdirSync(paths.migrationReportsPath, { recursive: true });
-    fs.writeFileSync(reportPath, JSON.stringify({
-      generatedAt: nowIso(),
-      fixes,
-      warnings
-    }, null, 2), "utf8");
-    return reportPath;
-  }
-  persistHardRebuild(paths, previous, result) {
-    const nextSettings = {
-      ...result.settings,
-      configuration: {
-        ...result.settings.configuration
-      }
-    };
-    if (result.changed && previous && fs.existsSync(paths.settingsPath)) {
-      fs.mkdirSync(paths.migrationOrphansPath, { recursive: true });
-      const backupPath = path.join(paths.migrationOrphansPath, `settings.backup.${Date.now()}.json`);
-      fs.copyFileSync(paths.settingsPath, backupPath);
-    }
-    if (result.changed && (result.fixes.length > 0 || result.warnings.length > 0)) {
-      nextSettings.configuration = {
-        ...nextSettings.configuration,
-        lastMigrationReportPath: this.writeMigrationReport(paths, result.fixes, result.warnings)
-      };
-    }
-    this.writeSettings(nextSettings, paths.workspaceRoot);
-  }
-  toRuntimeSettings(persisted, runtimePaths) {
-    const workspaceRoot = persisted.workspace?.rootPath?.trim() || appPathService.getWorkspaceRoot();
-    const normalized = this.normalizePersistedSettings(persisted, workspaceRoot);
-    const hydratedProviders = hydrateProviderSecrets(normalized.llm.providers, workspaceRoot);
-    const paths = appPathService.getWorkspacePaths(workspaceRoot);
-    const configuration = executionProfileService.normalizeConfiguration({
-      activeModeProfileId: normalized.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId || "debugger.default",
-      availableModeProfiles: [],
-      enabledSkillIds: normalized.configuration?.enabledSkillIds ?? [],
-      enabledMcpServerIds: normalized.configuration?.enabledMcpServerIds ?? [],
-      modePatternBindings: normalized.configuration?.modePatternBindings ?? DEFAULT_CONFIGURATION.modePatternBindings ?? {},
-      availablePatterns: [],
-      availableSkills: [],
-      availableMcpServers: [],
-      lastMigrationReportPath: normalized.configuration?.lastMigrationReportPath,
-      lastMigrationSummary: parseMigrationSummary(normalized.configuration?.lastMigrationReportPath),
-      diagnostics: []
-    }, workspaceRoot);
-    const settings = {
-      ...createDefaultRuntimeSettings(workspaceRoot),
-      appearance: normalized.appearance,
-      layout: normalized.layout,
-      profile: normalized.profile,
-      workspace: {
-        rootPath: workspaceRoot
-      },
-      llm: {
-        providers: hydratedProviders,
-        agentRoutes: normalizeUserRoutes(normalized.llm?.agentRoutes ?? createEmptyAgentRoutes(), hydratedProviders)
-      },
-      configuration,
-      paths: {
-        ...paths,
-        ...runtimePaths ?? {}
-      }
-    };
-    settings.configuration.diagnostics = executionProfileService.getDiagnostics(settings);
-    return settings;
-  }
-  writeSettings(settings, workspaceRoot = settings.workspace?.rootPath || appPathService.getWorkspaceRoot()) {
-    const filePath = appPathService.getWorkspacePaths(workspaceRoot).settingsPath;
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), "utf8");
-  }
-  getAll(runtimePaths) {
-    this.ensureInitialized();
-    const paths = appPathService.getWorkspacePaths();
-    const persisted = readJsonFile(paths.settingsPath) ?? createDefaultPersistedSettings(paths.workspaceRoot);
-    return this.toRuntimeSettings(persisted, runtimePaths);
-  }
-  getProviderSecret(providerId, workspaceRoot = appPathService.getWorkspaceRoot()) {
-    this.ensureInitialized();
-    const persisted = this.normalizePersistedSettings(
-      readJsonFile(appPathService.getWorkspacePaths(workspaceRoot).settingsPath) ?? createDefaultPersistedSettings(workspaceRoot),
-      workspaceRoot
-    );
-    const provider = persisted.llm.providers.find((entry) => entry.id === providerId);
-    if (!provider || provider.authMode !== "api-key") {
-      return "";
-    }
-    return getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot);
-  }
-  getProviderOAuthSecret(providerId, workspaceRoot = appPathService.getWorkspaceRoot()) {
-    this.ensureInitialized();
-    return secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(providerId), workspaceRoot);
-  }
-  setAll(patch, runtimePaths) {
-    this.ensureInitialized();
-    const currentRuntime = this.getAll();
-    const requestedRoot = patch.workspace?.rootPath?.trim() || currentRuntime.workspace.rootPath || appPathService.getWorkspacePaths().workspaceRoot;
-    const nextPaths = appPathService.setWorkspaceRoot(requestedRoot);
-    executionProfileService.ensureScaffold(nextPaths.workspaceRoot);
-    const currentPersisted = this.normalizePersistedSettings(
-      readJsonFile(nextPaths.settingsPath) ?? createDefaultPersistedSettings(nextPaths.workspaceRoot),
-      nextPaths.workspaceRoot
-    );
-    const providerDrafts = (patch.llm?.providers ?? currentPersisted.llm?.providers ?? []).map((provider) => {
-      const secretRef = provider.secretRef || secretStorageService.createProviderSecretRef(provider.id);
-      const apiKey = provider.apiKey?.trim() ?? "";
-      if (provider.authMode === "api-key" && apiKey) {
-        secretStorageService.setSecret(secretRef, apiKey, nextPaths.workspaceRoot);
-      } else if (provider.authMode === "api-key" && !provider.hasStoredSecret) {
-        secretStorageService.deleteSecret(secretRef, nextPaths.workspaceRoot);
-      }
-      return sanitizeUserProvider({
-        ...provider,
-        secretRef
-      }, nextPaths.workspaceRoot);
-    }).filter((provider) => provider !== null);
-    const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.workspaceRoot);
-    const nextPersisted = {
-      appearance: {
-        theme: pickEnum(
-          patch.appearance?.theme ?? currentPersisted.appearance?.theme,
-          VALID_THEMES,
-          DEFAULT_APPEARANCE.theme
-        ),
-        language: pickEnum(
-          patch.appearance?.language ?? currentPersisted.appearance?.language,
-          VALID_LANGUAGES,
-          DEFAULT_APPEARANCE.language
-        ),
-        fontScale: pickEnum(
-          patch.appearance?.fontScale ?? currentPersisted.appearance?.fontScale,
-          VALID_FONT_SCALES,
-          DEFAULT_APPEARANCE.fontScale
-        )
-      },
-      layout: {
-        leftSidebar: sanitizeSidebar(
-          {
-            ...currentPersisted.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar,
-            ...patch.layout?.leftSidebar ?? {}
-          },
-          LEFT_DEFAULTS,
-          DEFAULT_LAYOUT.leftSidebar
-        ),
-        rightPanel: sanitizeSidebar(
-          {
-            ...currentPersisted.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel,
-            ...patch.layout?.rightPanel ?? {}
-          },
-          RIGHT_DEFAULTS,
-          DEFAULT_LAYOUT.rightPanel
-        ),
-        terminal: sanitizeTerminal(
-          {
-            ...currentPersisted.layout?.terminal ?? DEFAULT_LAYOUT.terminal,
-            ...patch.layout?.terminal ?? {}
-          },
-          DEFAULT_LAYOUT.terminal
-        )
-      },
-      profile: {
-        nickname: typeof patch.profile?.nickname === "string" && patch.profile.nickname.trim() ? patch.profile.nickname.trim() : currentPersisted.profile?.nickname || DEFAULT_PROFILE.nickname,
-        avatarPath: typeof patch.profile?.avatarPath === "string" ? patch.profile.avatarPath : currentPersisted.profile?.avatarPath || DEFAULT_PROFILE.avatarPath
-      },
-      workspace: {
-        rootPath: nextPaths.workspaceRoot
-      },
-      llm: {
-        providers: nextProviders.map((provider) => ({ ...provider, apiKey: "" })),
-        agentRoutes: normalizeUserRoutes(patch.llm?.agentRoutes ?? currentPersisted.llm?.agentRoutes ?? [], nextProviders)
-      },
-      configuration: {
-        activeModeProfileId: patch.configuration?.activeModeProfileId || currentPersisted.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId,
-        enabledSkillIds: patch.configuration?.enabledSkillIds ? sanitizeRuntimeIds(patch.configuration.enabledSkillIds) : sanitizeRuntimeIds(currentPersisted.configuration?.enabledSkillIds),
-        enabledMcpServerIds: patch.configuration?.enabledMcpServerIds ? sanitizeRuntimeIds(patch.configuration.enabledMcpServerIds) : sanitizeRuntimeIds(currentPersisted.configuration?.enabledMcpServerIds),
-        modePatternBindings: patch.configuration?.modePatternBindings ? sanitizePatternBindings(patch.configuration.modePatternBindings) : sanitizePatternBindings(currentPersisted.configuration?.modePatternBindings),
-        lastMigrationReportPath: currentPersisted.configuration?.lastMigrationReportPath
-      }
-    };
-    this.writeSettings(nextPersisted, nextPaths.workspaceRoot);
-    return this.getAll({
-      ...nextPaths,
-      ...runtimePaths ?? {}
-    });
-  }
-  saveProviderConnection(providerId, apiKey, models, baseUrl = "") {
-    const current = this.getAll();
-    const provider = current.llm.providers.find((entry) => entry.id === providerId);
-    if (!provider || !isBuiltinProviderId(provider.id)) {
-      throw new Error(`Unknown provider: ${providerId}`);
-    }
-    const discoveredModels = sanitizeModels(models);
-    if (discoveredModels.length === 0) {
-      throw new Error("该 Provider 暂未返回可用模型");
-    }
-    const timestamp = nowIso();
-    const nextProvider = {
-      ...provider,
-      apiKey: apiKey.trim(),
-      enabled: true,
-      hasStoredSecret: provider.authMode === "api-key" ? Boolean(apiKey.trim() || provider.hasStoredSecret) : provider.authMode === "local" || provider.authMode === "environment" || provider.hasStoredSecret,
-      baseUrl: provider.baseUrlEditable ? baseUrl.trim() || provider.baseUrl : provider.baseUrl,
-      models: discoveredModels.map((model) => ({ ...model, enabled: true })),
-      status: "verified",
-      lastTestedAt: timestamp,
-      lastModelRefreshAt: timestamp,
-      lastError: void 0,
-      isConfigured: true
-    };
-    return this.setAll({
-      llm: {
-        providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
-        agentRoutes: current.llm.agentRoutes
-      }
-    });
-  }
-  saveProviderAccountConnection(providerId, secretPayload, models, accountSummary = {}) {
-    const current = this.getAll();
-    const provider = current.llm.providers.find((entry) => entry.id === providerId);
-    if (!provider || !isBuiltinProviderId(provider.id) || provider.authMode !== "account") {
-      throw new Error(`Unknown account provider: ${providerId}`);
-    }
-    const discoveredModels = sanitizeModels(models);
-    if (discoveredModels.length === 0) {
-      throw new Error("Provider returned no usable models");
-    }
-    secretStorageService.setSecret(
-      secretStorageService.createProviderOAuthSecretRef(provider.id),
-      secretPayload,
-      current.workspace.rootPath
-    );
-    const timestamp = nowIso();
-    const nextProvider = {
-      ...provider,
-      enabled: true,
-      hasStoredSecret: true,
-      models: discoveredModels.map((model) => ({ ...model, enabled: true })),
-      status: "verified",
-      lastTestedAt: timestamp,
-      lastModelRefreshAt: timestamp,
-      lastError: void 0,
-      accountLabel: accountSummary.accountLabel,
-      planLabel: accountSummary.planLabel,
-      oauthExpiresAt: accountSummary.oauthExpiresAt,
-      oauthRefreshAvailable: accountSummary.oauthRefreshAvailable,
-      isConfigured: true
-    };
-    return this.setAll({
-      llm: {
-        providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
-        agentRoutes: current.llm.agentRoutes
-      }
-    });
-  }
-  disconnectProvider(providerId) {
-    const current = this.getAll();
-    const provider = current.llm.providers.find((entry) => entry.id === providerId);
-    if (!provider || !isBuiltinProviderId(provider.id)) {
-      throw new Error(`Unknown provider: ${providerId}`);
-    }
-    if (provider.authMode === "api-key") {
-      secretStorageService.deleteSecret(provider.secretRef, current.workspace.rootPath);
-    } else if (provider.authMode === "account") {
-      secretStorageService.deleteSecret(secretStorageService.createProviderOAuthSecretRef(provider.id), current.workspace.rootPath);
-    }
-    const fallback = createBuiltinProviderEntry(provider.id);
-    const nextProvider = {
-      ...provider,
-      apiKey: "",
-      hasStoredSecret: fallback.hasStoredSecret,
-      models: [],
-      enabled: false,
-      status: fallback.status,
-      lastError: void 0,
-      accountLabel: void 0,
-      planLabel: void 0,
-      oauthExpiresAt: void 0,
-      oauthRefreshAvailable: void 0,
-      isConfigured: false
-    };
-    return this.setAll({
-      llm: {
-        providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
-        agentRoutes: current.llm.agentRoutes
-      }
-    });
-  }
-  getLlmConfig() {
-    const settings = this.getAll();
-    const providers = settings.llm.providers.filter((provider) => provider.enabled && provider.isConfigured && provider.status === "verified").map((provider) => {
-      const accountCredential = provider.authMode === "account" ? resolveAccountRuntimeCredential(provider.id, settings.workspace.rootPath) : { apiKey: "", baseUrl: void 0 };
-      return {
-        id: provider.id,
-        kind: provider.kind,
-        label: provider.label,
-        enabled: provider.enabled,
-        apiKey: provider.authMode === "api-key" ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.workspace.rootPath) : provider.authMode === "account" ? accountCredential.apiKey : "",
-        baseUrl: accountCredential.baseUrl ?? provider.baseUrl,
-        accountId: accountCredential.accountId,
-        authMode: provider.authMode,
-        models: provider.models.filter((model) => model.enabled).map((model) => model.id),
-        docsUrl: provider.docsUrl
-      };
-    }).filter((provider) => provider.models.length > 0);
-    return {
-      providers,
-      agentRoutes: settings.llm.agentRoutes
-    };
-  }
-  hasConfiguredProvider() {
-    return this.getAll().llm.providers.some((provider) => provider.isConfigured);
-  }
-  getSettingsPath() {
-    return appPathService.getWorkspacePaths().settingsPath;
-  }
-}
-const settingsService = new SettingsService();
 const REQUEST_TIMEOUT_MS$1 = 2e4;
 const CHATGPT_CALLBACK_PORT = 1455;
 const CHATGPT_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
@@ -8036,65 +9262,95 @@ class WorkflowProjectionPublisher {
   }
 }
 const workflowProjectionPublisher = new WorkflowProjectionPublisher();
+const ASK_READONLY_TOOL_ALLOWLIST = [
+  "read_file",
+  "glob",
+  "grep",
+  "task_list",
+  "web_fetch",
+  "web_search"
+];
+const TOOL_ALIASES = {
+  "primitive.read": "read_file",
+  "primitive.glob": "glob",
+  "primitive.grep": "grep",
+  "primitive.webFetch": "web_fetch",
+  "primitive.webSearch": "web_search",
+  "primitive.task.list": "task_list",
+  "task.list": "task_list",
+  "fs.read": "read_file",
+  "fs.glob": "glob",
+  "fs.grep": "grep"
+};
+const ASK_DENIED_TOOL_PREFIXES = ["rd.", "mcp."];
+const ASK_DENIED_TOOLS = /* @__PURE__ */ new Set([
+  "bash",
+  "primitive.bash",
+  "write",
+  "write_file",
+  "primitive.write",
+  "edit",
+  "edit_file",
+  "primitive.edit",
+  "remove",
+  "delete",
+  "task_create",
+  "task_update"
+]);
+const DEBUG_AGENT_SHELL_TOOL_ALLOWLIST = [
+  ...ASK_READONLY_TOOL_ALLOWLIST,
+  "bash"
+];
 const SPECIALIST_TOOL_BINDINGS = {
-  ask_agent: [],
-  triage_agent: [
-    "rd.session.get_context",
-    "rd.event.get_action_tree",
-    "rd.macro.summarize_frame"
-  ],
-  capture_repro_agent: [
-    "rd.capture.get_info",
-    "rd.capture.list_frames",
-    "rd.context.snapshot"
-  ],
-  pass_graph_pipeline_agent: [
-    "rd.pipeline.get_state_summary",
-    "rd.pipeline.get_output_targets",
-    "rd.macro.find_state_change_point"
-  ],
-  pixel_forensics_agent: [
-    "rd.macro.explain_pixel",
-    "rd.texture.get_pixel_value",
-    "rd.export.screenshot"
-  ],
-  shader_ir_agent: [
-    "rd.shader.get_disassembly",
-    "rd.shader.debug_start"
-  ],
-  driver_device_agent: [
-    "rd.session.get_context",
-    "rd.remote.connect",
-    "rd.remote.ping",
-    "rd.remote.list_devices"
-  ],
-  skeptic_agent: [],
-  curator_agent: [],
-  "rdc-debugger": []
+  ask_agent: ASK_READONLY_TOOL_ALLOWLIST,
+  triage_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
+  capture_repro_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
+  pass_graph_pipeline_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
+  pixel_forensics_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
+  shader_ir_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
+  driver_device_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
+  skeptic_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
+  curator_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
+  "rdc-debugger": DEBUG_AGENT_SHELL_TOOL_ALLOWLIST
 };
 const SHADER_EDIT_TOOLS = ["rd.shader.edit_and_replace", "rd.macro.shader_hotfix_validate"];
 function resolveAgentToolAllowlist(agentId, stage) {
   const settings = settingsService.getAll();
   const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, stage || "investigate", agentId);
   if (runtimeProfile.toolAllowlist?.length) {
-    return runtimeProfile.toolAllowlist;
+    const normalizedProfileTools = runtimeProfile.toolAllowlist.map(normalizeToolName);
+    return agentId === "ask_agent" ? Array.from(new Set(normalizedProfileTools)) : Array.from(/* @__PURE__ */ new Set([...normalizedProfileTools.filter((toolName) => !toolName.startsWith("rd.")), "bash"]));
   }
   return SPECIALIST_TOOL_BINDINGS[agentId] ?? [];
 }
 function isToolAllowedForAgent(toolName, agentId, stage) {
-  if (SHADER_EDIT_TOOLS.includes(toolName)) {
+  const normalizedToolName = normalizeToolName(toolName);
+  if (SHADER_EDIT_TOOLS.includes(normalizedToolName)) {
+    return false;
+  }
+  if (agentId === "ask_agent" && isDeniedAskTool(toolName, normalizedToolName)) {
     return false;
   }
   const allowlist = resolveAgentToolAllowlist(agentId, stage);
   for (const pattern of allowlist) {
-    if (pattern === "*" || pattern === toolName) {
+    const normalizedPattern = normalizeToolName(pattern);
+    if (normalizedPattern === "*" || normalizedPattern === normalizedToolName) {
       return true;
     }
-    if (pattern.endsWith(".*") && toolName.startsWith(pattern.slice(0, -1))) {
+    if (normalizedPattern.endsWith(".*") && normalizedToolName.startsWith(normalizedPattern.slice(0, -1))) {
       return true;
     }
   }
   return false;
+}
+function normalizeToolName(toolName) {
+  return TOOL_ALIASES[toolName] ?? toolName;
+}
+function isDeniedAskTool(originalToolName, normalizedToolName) {
+  if (ASK_DENIED_TOOLS.has(originalToolName) || ASK_DENIED_TOOLS.has(normalizedToolName)) {
+    return true;
+  }
+  return ASK_DENIED_TOOL_PREFIXES.some((prefix) => originalToolName.startsWith(prefix) || normalizedToolName.startsWith(prefix));
 }
 const EXECUTE_PATTERN$1 = /start|execute|debug|analy[sz]e|开始|启动|执行|正式分析|开始调试|调试/i;
 class AgentOrchestrator {
@@ -8254,11 +9510,12 @@ class AgentOrchestrator {
         maxTokens: options?.maxTokens ?? fallbackConfig.maxTokens
       };
       if (process.env.RDC_AGENT_TEST_MODE === "1") {
-        const finalStub = await this.createCoworkTestResponse(agentId, content, options?.onChunk);
+        const finalStub = await this.createCoworkTestResponse(agentId, content, options);
         this.updateAgentStatus(agentId, "complete");
         return finalStub;
       }
       const userPrompt = options?.promptOverride ?? content;
+      const toolAllowlist = resolveAgentToolAllowlist(agentId, options?.stage && options.stage !== "cowork" && options.stage !== "report" ? options.stage : void 0);
       const responseText = await this.runAgentTurn({
         agentId,
         content: userPrompt,
@@ -8273,7 +9530,7 @@ class AgentOrchestrator {
         runId: void 0,
         sessionId: options?.sessionId ?? null,
         turnId: options?.turnId,
-        toolAllowlist: [],
+        toolAllowlist,
         options,
         // cowork 每次调用都是独立轮次，不复用缓存 Agent。
         useFreshAgent: true
@@ -8301,7 +9558,7 @@ class AgentOrchestrator {
   // -------------------------------------------------------------------
   // Agent 实例池
   // -------------------------------------------------------------------
-  getOrCreateAgentSlot(agentId, providerId, modelId, systemPrompt) {
+  getOrCreateAgentSlot(agentId, providerId, modelId, systemPrompt, tools = [], toolExecutor = this.createToolExecutor(agentId, [], void 0), streamOptions) {
     const existing = this.agentSlots.get(agentId);
     if (existing && existing.providerId === providerId && existing.modelId === modelId && existing.systemPrompt === systemPrompt && !existing.agent.isStreaming) {
       return existing;
@@ -8310,27 +9567,12 @@ class AgentOrchestrator {
       initialState: {
         model: encodeAgentModel(providerId, modelId),
         systemPrompt,
+        tools,
         messages: []
       },
       provider: llmAdapterProvider,
-      // 暂不启用工具：旧 ToolRegistry 已下线，新 ToolExecutor 由后续任务接入。
-      toolExecutor: {
-        async execute(toolCall) {
-          return {
-            role: "toolResult",
-            toolCallId: toolCall.id,
-            toolName: toolCall.name,
-            content: [
-              {
-                type: "text",
-                text: `Tool ${toolCall.name} is not wired in this build.`
-              }
-            ],
-            isError: true,
-            timestamp: Date.now()
-          };
-        }
-      },
+      toolExecutor,
+      streamOptions,
       maxTurns: 8
     });
     const slot = { agent, providerId, modelId, systemPrompt };
@@ -8338,34 +9580,114 @@ class AgentOrchestrator {
     return slot;
   }
   /** 创建一个全新的 Agent slot（不进入缓存）。适用于 cowork 这种一次性调用。 */
-  createFreshAgentSlot(providerId, modelId, systemPrompt) {
+  createFreshAgentSlot(providerId, modelId, systemPrompt, tools = [], toolExecutor = this.createToolExecutor("ask_agent", [], void 0), streamOptions) {
     const agent = new Agent({
       initialState: {
         model: encodeAgentModel(providerId, modelId),
         systemPrompt,
+        tools,
         messages: []
       },
       provider: llmAdapterProvider,
-      toolExecutor: {
-        async execute(toolCall) {
+      toolExecutor,
+      streamOptions,
+      maxTurns: 4
+    });
+    return { agent, providerId, modelId, systemPrompt };
+  }
+  resolveRuntimeTools(agentId, toolAllowlist, stage) {
+    const availableTools = /* @__PURE__ */ new Map();
+    for (const tool of getPrimitiveTools()) {
+      availableTools.set(normalizeToolName(tool.name), tool);
+    }
+    const taskListTool = this.createReadonlyTaskListTool();
+    availableTools.set(taskListTool.name, taskListTool);
+    const definitions = [];
+    const toolMap = /* @__PURE__ */ new Map();
+    for (const name of toolAllowlist) {
+      const normalized = normalizeToolName(name);
+      const tool = availableTools.get(normalized);
+      if (!tool) continue;
+      if (!this.isAllowedForRuntime(agentId, tool.name, stage)) continue;
+      if (!toolMap.has(tool.name)) {
+        toolMap.set(tool.name, tool);
+        definitions.push(toolToDefinition(tool));
+      }
+    }
+    return { definitions, toolMap };
+  }
+  createToolExecutor(agentId, toolAllowlist, stage) {
+    const tools = this.resolveRuntimeTools(agentId, toolAllowlist, stage).toolMap;
+    return {
+      execute: async (toolCall, signal, onUpdate) => {
+        const normalizedName = normalizeToolName(toolCall.name);
+        if (!this.isAllowedForRuntime(agentId, toolCall.name, stage) || !tools.has(normalizedName)) {
+          return this.createPolicyDeniedToolResult(toolCall, agentId);
+        }
+        const tool = tools.get(normalizedName);
+        if (!tool) {
+          return this.createPolicyDeniedToolResult(toolCall, agentId);
+        }
+        try {
+          const result = await tool.execute(toolCall.id, toolCall.arguments, signal, onUpdate);
+          return this.agentToolResultToMessage(toolCall, result);
+        } catch (error) {
           return {
             role: "toolResult",
             toolCallId: toolCall.id,
             toolName: toolCall.name,
-            content: [
-              {
-                type: "text",
-                text: `Tool ${toolCall.name} is not wired in this build.`
-              }
-            ],
+            content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }],
             isError: true,
             timestamp: Date.now()
           };
         }
+      }
+    };
+  }
+  isAllowedForRuntime(agentId, toolName, stage) {
+    const workflowStage = stage === "cowork" || stage === "report" ? void 0 : stage;
+    return isToolAllowedForAgent(toolName, agentId, workflowStage);
+  }
+  createPolicyDeniedToolResult(toolCall, agentId) {
+    return {
+      role: "toolResult",
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+      content: [{
+        type: "text",
+        text: `Policy denied tool "${toolCall.name}" for ${agentId}. Ask mode only allows read-only tools.`
+      }],
+      isError: true,
+      timestamp: Date.now()
+    };
+  }
+  agentToolResultToMessage(toolCall, result) {
+    return {
+      role: "toolResult",
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+      content: result.content,
+      isError: result.isError === true,
+      timestamp: Date.now()
+    };
+  }
+  createReadonlyTaskListTool() {
+    return {
+      name: "task_list",
+      label: "List Tasks",
+      description: "List current conversation tasks without creating or modifying any task records.",
+      parameters: {
+        type: "object",
+        properties: {}
       },
-      maxTurns: 4
-    });
-    return { agent, providerId, modelId, systemPrompt };
+      permissionHint: "readonly",
+      async execute() {
+        return {
+          content: [{ type: "text", text: "No formal Debugger run tasks are active in Ask mode." }],
+          details: { count: 0 }
+        };
+      }
+    };
   }
   // -------------------------------------------------------------------
   // 单轮 Agent 执行
@@ -8374,18 +9696,36 @@ class AgentOrchestrator {
     if (!input.providerId || !input.modelId) {
       throw new Error("No provider/model route is configured for this agent.");
     }
-    const slot = input.useFreshAgent ? this.createFreshAgentSlot(input.providerId, input.modelId, input.systemPrompt) : this.getOrCreateAgentSlot(
+    const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage);
+    const toolExecutor = this.createToolExecutor(input.agentId, input.toolAllowlist, input.stage);
+    const streamOptions = {
+      maxTokens: input.maxTokens,
+      temperature: input.temperature,
+      reasoningBudget: input.options?.reasoningBudget,
+      signal: input.options?.signal
+    };
+    const slot = input.useFreshAgent ? this.createFreshAgentSlot(
+      input.providerId,
+      input.modelId,
+      input.systemPrompt,
+      runtimeTools.definitions,
+      toolExecutor,
+      streamOptions
+    ) : this.getOrCreateAgentSlot(
       input.agentId,
       input.providerId,
       input.modelId,
-      input.systemPrompt
+      input.systemPrompt,
+      runtimeTools.definitions,
+      toolExecutor,
+      streamOptions
     );
     const userMessage = {
       role: "user",
       content: input.content,
       timestamp: nowMs()
     };
-    const legacyContext = {
+    const sharedEventContext = {
       agentId: input.agentId,
       runId: input.runId,
       turnId: input.turnId,
@@ -8408,9 +9748,9 @@ class AgentOrchestrator {
       if (event.type === "message_end" && event.message.role === "assistant") {
         responseText = event.message.content.filter((block) => block.type === "text").map((block) => block.text).join("");
       }
-      const legacyEvent = translateCoreToLegacy(event, legacyContext);
-      if (legacyEvent) {
-        input.options?.onEvent?.(legacyEvent);
+      const sharedEvent = translateCoreToSharedAgentEvent(event, sharedEventContext);
+      if (sharedEvent) {
+        input.options?.onEvent?.(sharedEvent);
       }
     });
     let abortListener = null;
@@ -8561,7 +9901,7 @@ class AgentOrchestrator {
       throw new Error("E2E forced cowork LLM request failure");
     }
     const lower = userMessage.toLowerCase();
-    let stub = agentId === "ask_agent" ? "Ask is ready. Describe the issue, goal, or .rdc capture you want to inspect; I will clarify without starting execution." : "Debugger is ready. Describe the symptom and capture context; I will prepare a plan before execution.";
+    let stub = agentId === "ask_agent" ? "Ask is ready. I can inspect readonly context, search files or public pages, and explain next steps without starting a Debugger run." : "Debugger is ready. Describe the symptom and capture context; I will prepare a plan before execution.";
     if (/ue4|unreal/i.test(userMessage)) {
       stub = "UE4 is Unreal Engine 4, commonly involved in graphics debugging around materials, post-processing, shaders, and render passes.";
     } else if (/hello|hi/i.test(userMessage)) {
@@ -8573,7 +9913,7 @@ class AgentOrchestrator {
     return `${stub}
 <control>{"intent":"${intent}","safe_to_start":${intent === "execute" ? "true" : "false"}}</control>`;
   }
-  async createCoworkTestResponse(agentId, content, onChunk) {
+  async createCoworkTestResponse(agentId, content, options) {
     let userMessage = content;
     try {
       const parsed = JSON.parse(content);
@@ -8586,7 +9926,7 @@ class AgentOrchestrator {
     }
     const lower = userMessage.toLowerCase();
     const wantsExecution = EXECUTE_PATTERN$1.test(userMessage);
-    let stub = agentId === "ask_agent" ? "I can help clarify the problem, explain boundaries, or guide you to open a .rdc capture without starting execution." : "I can help scope the debugging target, or prepare a formal Debugger plan when you are ready to execute.";
+    let stub = agentId === "ask_agent" ? "I can inspect readonly context, search files or public pages, explain boundaries, or guide you to open a .rdc capture without starting a Debugger run." : "I can help scope the debugging target, or prepare a formal Debugger plan when you are ready to execute.";
     if (/ue4|unreal/i.test(userMessage)) {
       stub = "UE4 is Unreal Engine 4. In RDC-Agent it is usually relevant to render pass, material, post-process, and shader debugging context.";
     } else if (/hello|hi|你好|您好/i.test(userMessage)) {
@@ -8594,15 +9934,78 @@ class AgentOrchestrator {
     } else if (wantsExecution || EXECUTE_PATTERN$1.test(lower)) {
       stub = "Received. I will prepare the formal debugging plan first, then move into the strict execution flow only when conditions are met.";
     }
+    if (agentId === "ask_agent" && userMessage.includes("__RDC_AGENT_E2E_ASK_READONLY_TOOL__")) {
+      const toolCallId = generateEventId("e2e-tool");
+      this.emitCoworkTestEvent("tool.started", {
+        toolCallId,
+        toolName: "grep",
+        args: { pattern: "ConversationService", path: "src/main/conversation" }
+      }, options);
+      this.emitCoworkTestEvent("tool.completed", {
+        toolCallId,
+        toolName: "grep",
+        result: {
+          ok: true,
+          data: {
+            content: [
+              {
+                type: "text",
+                text: "src/main/conversation/ConversationService.ts: Ask readonly trace is visible."
+              }
+            ]
+          },
+          artifacts: [],
+          duration_ms: 1,
+          trace_id: toolCallId
+        }
+      }, options);
+      stub = "I searched the workspace with grep and found the Ask conversation code path. No Debugger run was created.";
+    } else if (agentId === "ask_agent" && userMessage.includes("__RDC_AGENT_E2E_ASK_DENY_WRITE__")) {
+      const toolCallId = generateEventId("e2e-tool");
+      this.emitCoworkTestEvent("tool.started", {
+        toolCallId,
+        toolName: "write_file",
+        args: { path: "should-not-exist.txt" }
+      }, options);
+      this.emitCoworkTestEvent("tool.denied", {
+        toolCallId,
+        toolName: "write_file",
+        reason: "Policy denied: ask_agent can only use readonly tools.",
+        result: {
+          ok: false,
+          data: {},
+          artifacts: [],
+          error: {
+            code: "AGENT_TOOL_POLICY_DENIED",
+            message: "Policy denied: ask_agent can only use readonly tools.",
+            category: "policy"
+          },
+          duration_ms: 1,
+          trace_id: toolCallId
+        }
+      }, options);
+      stub = "I cannot write files in Ask mode. Ask can inspect and search, but mutation requires the appropriate execution flow.";
+    }
     const finalStub = `${stub}
 <control>{"intent":"${wantsExecution ? "execute" : "talk"}","safe_to_start":${wantsExecution ? "true" : "false"}}</control>`;
-    if (onChunk) {
+    if (options?.onChunk) {
       const midpoint = Math.max(1, Math.ceil(finalStub.length / 2));
-      onChunk(finalStub.slice(0, midpoint));
+      options.onChunk(finalStub.slice(0, midpoint));
       await Promise.resolve();
-      onChunk(finalStub.slice(midpoint));
+      options.onChunk(finalStub.slice(midpoint));
     }
     return finalStub;
+  }
+  emitCoworkTestEvent(type, payload, options) {
+    options?.onEvent?.({
+      id: generateEventId("agent-event"),
+      type,
+      timestamp: nowMs(),
+      turnId: options.turnId,
+      sessionId: options.sessionId ?? null,
+      stage: options.stage,
+      payload
+    });
   }
 }
 const agentOrchestrator = new AgentOrchestrator();
@@ -10520,7 +11923,7 @@ class SpecialistRecipeRunner {
       sessionId: context2.sessionId,
       runId: context2.runId,
       turnId: context2.turnId,
-      execute: () => toolBridge.call({
+      execute: () => rdxCliInvokerService.call({
         toolName,
         args: {
           ...args,
@@ -11384,7 +12787,7 @@ const defaultState = (sessionId) => ({
   plans: [],
   updatedAt: nowIso$1()
 });
-class WorkstreamStateStore {
+class TraceStateStore {
   read(sessionId) {
     const filePath = this.resolvePath(sessionId);
     if (!fs__namespace.existsSync(filePath)) {
@@ -11401,7 +12804,7 @@ class WorkstreamStateStore {
         plans: parsed.plans ?? []
       };
     } catch (error) {
-      console.error(`[WorkstreamStateStore] Failed to read ${filePath}`, error);
+      console.error(`[TraceStateStore] Failed to read ${filePath}`, error);
       return defaultState(sessionId);
     }
   }
@@ -11417,7 +12820,7 @@ class WorkstreamStateStore {
   }
   ensureRunRequest(input) {
     const state2 = this.read(input.sessionId);
-    if (state2.userRequests.some((request2) => request2.revisions.some((revision2) => revision2.resultingWorkstreamIds.includes(input.workstreamId)))) {
+    if (state2.userRequests.some((request2) => request2.revisions.some((revision2) => revision2.resultingTraceLaneIds.includes(input.traceLaneId)))) {
       return state2;
     }
     const requestId = `request-${input.runId}`;
@@ -11430,7 +12833,7 @@ class WorkstreamStateStore {
       branchId,
       prompt: input.prompt,
       createdAt,
-      resultingWorkstreamIds: [input.workstreamId]
+      resultingTraceLaneIds: [input.traceLaneId]
     };
     const request = {
       id: requestId,
@@ -11443,7 +12846,7 @@ class WorkstreamStateStore {
       id: branchId,
       revisionId,
       status: "active",
-      workstreamIds: [input.workstreamId]
+      traceLaneIds: [input.traceLaneId]
     };
     const group = {
       id: `branch-group-${requestId}`,
@@ -11459,7 +12862,7 @@ class WorkstreamStateStore {
       plans: input.planId ? this.upsertPlan(state2.plans, {
         planId: input.planId,
         runId: input.runId,
-        workstreamId: input.workstreamId,
+        traceLaneId: input.traceLaneId,
         status: "awaiting_approval",
         createdAt,
         updatedAt: createdAt
@@ -11487,7 +12890,7 @@ class WorkstreamStateStore {
       plans: this.upsertPlan(state2.plans, {
         planId: input.planId,
         runId: input.runId,
-        workstreamId: input.workstreamId,
+        traceLaneId: input.traceLaneId,
         status: input.status,
         createdAt: now,
         updatedAt: now
@@ -11510,7 +12913,7 @@ class WorkstreamStateStore {
       parentRevisionId,
       prompt: input.revisionText,
       createdAt,
-      resultingWorkstreamIds: [input.revisionWorkstreamId]
+      resultingTraceLaneIds: [input.revisionTraceLaneId]
     };
     const nextRequest = rootRequest ? {
       ...rootRequest,
@@ -11528,7 +12931,7 @@ class WorkstreamStateStore {
       parentBranchId: state2.activeBranchId,
       revisionId,
       status: "active",
-      workstreamIds: [input.revisionWorkstreamId]
+      traceLaneIds: [input.revisionTraceLaneId]
     };
     const nextBranchGroup = branchGroup ? {
       ...branchGroup,
@@ -11584,16 +12987,16 @@ class WorkstreamStateStore {
   resolvePath(sessionId) {
     const session = storageAdapter.readSession(sessionId);
     if (!session) {
-      throw new Error(`Session not found for workstream state: ${sessionId}`);
+      throw new Error(`Session not found for trace state: ${sessionId}`);
     }
     const targetPath = path__namespace.resolve(session.sessionPath, STORE_FILE);
     if (!runScopedStore.isPathInside(session.sessionPath, targetPath)) {
-      throw new Error(`Workstream state escaped session directory: ${targetPath}`);
+      throw new Error(`Trace state escaped session directory: ${targetPath}`);
     }
     return targetPath;
   }
 }
-const workstreamStateStore = new WorkstreamStateStore();
+const traceStateStore = new TraceStateStore();
 class TraceRunStore {
   runsDir;
   constructor(traceRoot) {
@@ -12025,9 +13428,8 @@ class TraceEventEmitter {
     return null;
   }
   /**
-   * 处理新 Agent Runtime 核心 AgentEvent（来自 `agent-runtime/core/types`）。
-   * 该方法与 {@link emitFromAgentEvent}（消费旧 `@shared/types/agentRuntime` 形状）
-   * 并行存在，以便在系统迁移期间同时支持两种事件形状。
+   * 处理 Agent Runtime 核心 AgentEvent（来自 `agent-runtime/core/types`）。
+   * 该方法与 {@link emitFromAgentEvent} 分别服务 core runtime 与 shared IPC event 输入。
    *
    * 映射规则：
    *  - `tool_execution_start` → `node.created` + `ToolActionNode (running)`
@@ -12238,20 +13640,20 @@ class TraceTreeBuilder {
   }
   flatten(nodes) {
     const result = [];
-    const walk = (node) => {
+    const walk2 = (node) => {
       result.push(node);
       if (node.kind === "phase_group") {
         for (const child of node.children) {
-          walk(child);
+          walk2(child);
         }
       }
       if (node.kind === "sub_agent" && node.children) {
         for (const child of node.children ?? []) {
-          walk(child);
+          walk2(child);
         }
       }
     };
-    for (const node of nodes) walk(node);
+    for (const node of nodes) walk2(node);
     return result;
   }
 }
@@ -12484,7 +13886,7 @@ class TraceService {
     }
   }
   async buildPresentation(sessionId) {
-    const state2 = workstreamStateStore.read(sessionId);
+    const state2 = traceStateStore.read(sessionId);
     const conversations = storageAdapter.readConversationHistory(sessionId);
     const events = await storageAdapter.readActionChain(sessionId);
     return this.buildPresentationFromData(
@@ -12617,16 +14019,16 @@ class TraceService {
       const nodes = traceTreeBuilder.build(traceEvents, profile);
       const timeline = projectionBuilder.build(agentRun, nodes, profile);
       runViewModels.push({ run: agentRun, timeline });
-      const wsPlanId = `ws-${runId}-plan`;
-      const wsExecId = `ws-${runId}-execution`;
-      progress.push(...this.mapProgress(sessionId, runId, branchId, wsExecId));
-      artifacts.push(...this.mapArtifacts(sessionId, runId, branchId, wsExecId, runEvents));
-      context2.push(...this.mapContext(sessionId, runId, branchId, wsExecId, run));
+      const tracePlanId = `ws-${runId}-plan`;
+      const traceExecutionId = `ws-${runId}-execution`;
+      progress.push(...this.mapProgress(sessionId, runId, branchId, traceExecutionId));
+      artifacts.push(...this.mapArtifacts(sessionId, runId, branchId, traceExecutionId, runEvents));
+      context2.push(...this.mapContext(sessionId, runId, branchId, traceExecutionId, run));
       if (planStatus === "awaiting_approval" && snapshot?.debug_plan) {
         latestApproval = {
           planId: snapshot.debug_plan.planId,
           runId,
-          workstreamId: wsPlanId,
+          traceLaneId: tracePlanId,
           status: "awaiting_approval",
           title: snapshot.debug_plan.presentation?.title || "Debugger Plan",
           summary: snapshot.debug_plan.userGoal,
@@ -12698,7 +14100,7 @@ class TraceService {
     };
   }
   async buildConversationPresentation(sessionId, conversations) {
-    const state2 = storageAdapter.readSession(sessionId) ? workstreamStateStore.read(sessionId) : {
+    const state2 = storageAdapter.readSession(sessionId) ? traceStateStore.read(sessionId) : {
       schemaVersion: "1",
       sessionId,
       activeBranchId: "branch-main",
@@ -12731,11 +14133,11 @@ class TraceService {
     if (run.status === "cancelled") return "任务已取消。";
     return null;
   }
-  mapProgress(sessionId, runId, branchId, workstreamId) {
+  mapProgress(sessionId, runId, branchId, traceLaneId) {
     return taskBoard.listTasks(sessionId, runId).map((task, index) => ({
       id: task.taskId,
       sessionId,
-      workstreamId,
+      traceLaneId,
       branchId,
       title: task.title,
       status: progressStatusFromTask(task),
@@ -12748,11 +14150,11 @@ class TraceService {
       blockerSummary: task.blockerRefs.join(", ") || void 0
     }));
   }
-  mapArtifacts(sessionId, runId, branchId, workstreamId, runEvents) {
+  mapArtifacts(sessionId, runId, branchId, traceLaneId, runEvents) {
     const registered = artifactStore.list(sessionId, runId).map((record) => ({
       id: record.artifactId,
       sessionId,
-      workstreamId,
+      traceLaneId,
       branchId,
       sourceEventId: record.evidenceIds[0],
       type: artifactTypeFromRecord(record),
@@ -12772,7 +14174,7 @@ class TraceService {
         records.push({
           id: `${event.event_id}-${key}`,
           sessionId,
-          workstreamId,
+          traceLaneId,
           branchId,
           sourceEventId: event.event_id,
           type: key === "htmlPath" ? "visual_report" : "report",
@@ -12788,12 +14190,12 @@ class TraceService {
     });
     return [...registered, ...reports];
   }
-  mapContext(sessionId, runId, branchId, workstreamId, run) {
+  mapContext(sessionId, runId, branchId, traceLaneId, run) {
     const packets = contextService.listContextPackets(sessionId, runId);
     const captureContext = run.captures.map((capture) => ({
       id: `context-capture-${capture.id}`,
       sessionId,
-      workstreamId,
+      traceLaneId,
       branchId,
       kind: "capture",
       label: capture.filePath.split(/[\\/]/).filter(Boolean).pop() || capture.filePath,
@@ -12806,7 +14208,7 @@ class TraceService {
     const packetContext = packets.map((packet) => ({
       id: `context-${packet.packetId}`,
       sessionId,
-      workstreamId,
+      traceLaneId,
       branchId,
       kind: packet.kind === "capture" ? "capture" : packet.kind === "tool_result" ? "source" : "file",
       label: packet.title,
@@ -12822,10 +14224,10 @@ class TraceService {
   }
   buildRightPanel(progress, artifacts, context2, runs) {
     const activeRunIds = new Set(runs.filter((r) => r.run.status === "running" || r.run.status === "waiting_approval").map((r) => r.run.runId));
-    const activeWsIds = new Set([...activeRunIds].flatMap((id) => [`ws-${id}-plan`, `ws-${id}-execution`, id]));
+    const activeTraceLaneIds = new Set([...activeRunIds].flatMap((id) => [`ws-${id}-plan`, `ws-${id}-execution`, id]));
     return {
       progress: {
-        current: progress.filter((t) => activeWsIds.has(t.workstreamId) && ["running", "blocked", "pending", "reopened"].includes(t.status)),
+        current: progress.filter((t) => activeTraceLaneIds.has(t.traceLaneId) && ["running", "blocked", "pending", "reopened"].includes(t.status)),
         history: progress.filter((t) => ["completed", "cancelled"].includes(t.status))
       },
       artifacts: {
@@ -13307,7 +14709,7 @@ class DebugWorkflowService {
       approval_state: "approved",
       pending_questions: null
     });
-    workstreamStateStore.markPlan(location.session.sessionId, snapshot.debug_plan.planId, "accepted");
+    traceStateStore.markPlan(location.session.sessionId, snapshot.debug_plan.planId, "accepted");
     this.applyTaskMutation(location.session.sessionId, runId, "plan", "completed", "User approved the Debugger plan.");
     this.applyTaskMutation(location.session.sessionId, runId, "speclist", "in_progress", "Task breakdown started after plan approval.");
     contextService.writeRunCapsule(location.session.sessionId, runId);
@@ -13366,7 +14768,7 @@ class DebugWorkflowService {
       approvalState: "approved"
     };
   }
-  async getWorkstreamSession(sessionId) {
+  async getTraceProjection(sessionId) {
     return traceService.getSession(sessionId);
   }
   async requestPlanRevision(runId, revisionText) {
@@ -13412,12 +14814,12 @@ class DebugWorkflowService {
       createdAt: nowIso$1(),
       updatedAt: nowIso$1()
     };
-    workstreamStateStore.createRevision({
+    traceStateStore.createRevision({
       sessionId,
       runId: nextRunId,
       previousPlanId,
       revisionText: trimmedRevision,
-      revisionWorkstreamId: `ws-${nextRunId}-plan`
+      revisionTraceLaneId: `ws-${nextRunId}-plan`
     });
     storageAdapter.writePlanSnapshot(sessionId, nextRunId, {
       ...snapshot,
@@ -13433,11 +14835,11 @@ class DebugWorkflowService {
       debugPlan: nextPlan,
       pendingQuestions: null
     });
-    workstreamStateStore.registerPlan({
+    traceStateStore.registerPlan({
       sessionId,
       runId: nextRunId,
       planId: nextPlan.planId,
-      workstreamId: `ws-${nextRunId}-plan`,
+      traceLaneId: `ws-${nextRunId}-plan`,
       status: "awaiting_approval"
     });
     await storageAdapter.updateRun(location.session.sessionId, runId, {
@@ -13492,31 +14894,31 @@ class DebugWorkflowService {
     this.emitRunStatus(location.session.sessionId, runId, "interrupted", location.run.lastStage, "Plan revision requested");
     this.emitRunStatus(sessionId, nextRunId, "awaiting_approval", "plan");
     this.emitWorkflowState(await this.getWorkflowState(sessionId, nextRunId));
-    const workstream = await this.getWorkstreamSession(sessionId);
+    const traceProjection = await this.getTraceProjection(sessionId);
     return {
-      ...workstream,
+      ...traceProjection,
       runId: nextRunId,
       planId: nextPlan.planId,
-      branchId: workstream.presentation?.activeBranchId
+      branchId: traceProjection.presentation?.activeBranchId
     };
   }
-  async switchWorkstreamBranch(sessionId, branchId) {
-    workstreamStateStore.switchBranch(sessionId, branchId);
-    const workstream = await this.getWorkstreamSession(sessionId);
+  async switchTraceBranch(sessionId, branchId) {
+    traceStateStore.switchBranch(sessionId, branchId);
+    const traceProjection = await this.getTraceProjection(sessionId);
     return {
-      ...workstream,
-      activeBranchId: workstream.presentation?.activeBranchId
+      ...traceProjection,
+      activeBranchId: traceProjection.presentation?.activeBranchId
     };
   }
-  async exportWorkstreamSession(sessionId, options = {}) {
+  async exportTraceSession(sessionId, options = {}) {
     try {
       const session = storageAdapter.readSession(sessionId);
       if (!session) {
         return { success: false, error: `Session not found: ${sessionId}` };
       }
-      const workstream = await this.getWorkstreamSession(sessionId);
-      if (!workstream.success) {
-        return { success: false, error: workstream.error };
+      const traceProjection = await this.getTraceProjection(sessionId);
+      if (!traceProjection.success) {
+        return { success: false, error: traceProjection.error };
       }
       const exportDir = path.join(session.sessionPath, "exports");
       fs__namespace.mkdirSync(exportDir, { recursive: true });
@@ -13526,7 +14928,7 @@ class DebugWorkflowService {
         schemaVersion: "1",
         exportedAt: nowIso$1(),
         includeAllBranches: options.includeAllBranches ?? true,
-        presentation: workstream.presentation
+        presentation: traceProjection.presentation
       }, null, 2), "utf-8");
       let rawTracePath;
       if (options.includeRawTrace !== false) {
@@ -13600,7 +15002,7 @@ class DebugWorkflowService {
       return { success: false, error: `Run not found: ${runId}` };
     }
     const active = runExecutionService.stopRun(runId);
-    toolBridge.abortRun(runId);
+    rdxCliInvokerService.abortRun(runId);
     await rdxSessionService.closeOrReplaceOpenedCapture();
     await storageAdapter.updateRun(location.session.sessionId, runId, {
       status: active && process.env.RDC_AGENT_TEST_MODE !== "1" ? "stopping" : "cancelled",
@@ -14629,7 +16031,7 @@ class DebugWorkflowService {
       sessionId: runtimeContext.sessionId,
       runId: runtimeContext.runId,
       turnId: runtimeContext.turnId,
-      execute: () => toolBridge.call({
+      execute: () => rdxCliInvokerService.call({
         toolName: "rd.export.screenshot",
         args: {
           session_id: replaySessionId,
@@ -14864,7 +16266,7 @@ class DebugWorkflowService {
     }
     await storageAdapter.appendActionEvent(sessionId, event);
     workflowProjectionPublisher.publishEvidenceEvent(event);
-    this.publishWorkstream(sessionId);
+    this.publishTraceProjection(sessionId);
   }
   async appendUserConversationMessage(sessionId, runId, content) {
     const runLocation = this.findRun(runId || "");
@@ -14890,7 +16292,7 @@ class DebugWorkflowService {
       turnId: message.turnId,
       message
     });
-    this.publishWorkstream(sessionId);
+    this.publishTraceProjection(sessionId);
   }
   async appendAssistantConversationMessage(sessionId, runId, content, status = "complete") {
     const runLocation = this.findRun(runId || "");
@@ -14932,7 +16334,7 @@ class DebugWorkflowService {
   }
   emitWorkflowState(state2) {
     workflowProjectionPublisher.publishWorkflowState(state2);
-    this.publishWorkstream(state2.sessionId);
+    this.publishTraceProjection(state2.sessionId);
   }
   emitRunStatus(sessionId, runId, status, lastStage, stopReason) {
     workflowProjectionPublisher.publishRunStatus({
@@ -14943,13 +16345,13 @@ class DebugWorkflowService {
       stopReason
     });
     if (["completed", "failed", "cancelled", "interrupted"].includes(status)) {
-      this.publishWorkstream(sessionId);
+      this.publishTraceProjection(sessionId);
     }
   }
   emitConversationEvent(event) {
     workflowProjectionPublisher.publishConversationEvent(event);
   }
-  publishWorkstream(sessionId) {
+  publishTraceProjection(sessionId) {
     void traceService.getSession(sessionId).then((result) => {
       if (result.success && result.presentation) {
         workflowProjectionPublisher.publishTraceProjectionChanged(sessionId, result.presentation);
@@ -14980,17 +16382,17 @@ class DebuggerRuntime {
   approvePlan(runId) {
     return debugWorkflowService.approvePlan(runId);
   }
-  getWorkstreamSession(sessionId) {
-    return debugWorkflowService.getWorkstreamSession(sessionId);
+  getTraceProjection(sessionId) {
+    return debugWorkflowService.getTraceProjection(sessionId);
   }
   requestPlanRevision(runId, revisionText) {
     return debugWorkflowService.requestPlanRevision(runId, revisionText);
   }
-  switchWorkstreamBranch(sessionId, branchId) {
-    return debugWorkflowService.switchWorkstreamBranch(sessionId, branchId);
+  switchTraceBranch(sessionId, branchId) {
+    return debugWorkflowService.switchTraceBranch(sessionId, branchId);
   }
-  exportWorkstreamSession(sessionId, options) {
-    return debugWorkflowService.exportWorkstreamSession(sessionId, options);
+  exportTraceSession(sessionId, options) {
+    return debugWorkflowService.exportTraceSession(sessionId, options);
   }
   restartRun(runId) {
     return debugWorkflowService.restartRun(runId);
@@ -15424,14 +16826,14 @@ function buildCoworkPrompt(context2, history, mode, message, attachments) {
 }
 function buildAskSystemPrompt() {
   return [
-    "你是 RDC-Agent 的 Ask 助手，负责非执行对话。",
+    "你是 RDC-Agent 的 Ask 助手，工作模式是只读 agentic 协作。",
     "要求：",
-    "1. 正常回答用户问题，语气简洁，不使用审批流、工单流或调试执行口吻。",
-    "2. 不要自称 RDC Debugger，不要暗示已经开始 RenderDoc 调试，也不要假装分析过 capture。",
-    "3. 可以解释能力边界、澄清目标、帮助用户判断是否需要 Open .rdc capture。",
-    "4. 如果用户要求正式调试或执行分析，只提示需要在应用内 Open capture 并切换到 Debugger；Ask 模式不能创建 run。",
-    "5. 不要声称可以调用 shell、rdx-tool、ToolBridge 或任何 RenderDoc 执行工具。",
-    "6. 不需要输出隐藏控制块，除非明确需要表达 intake；即使输出 control，也必须 safe_to_start=false。"
+    "1. 正常回答用户问题，语气简洁；可以澄清目标、检索上下文、读取或搜索当前 workspace 内文本文件，也可以访问公开 HTTP(S) 页面。",
+    "2. 只允许使用只读工具：read_file、glob、grep、task_list、web_fetch、web_search；不要请求 bash、write_file、edit_file、remove 或 task_create/update。",
+    "3. 不要自称 RDC Debugger，不要暗示已经开始 RenderDoc 调试，也不要假装分析过 capture。",
+    "4. 如果用户要求正式调试或执行分析，只提示需要在应用内 Open capture 并切换到 Debugger；Ask 模式不能创建正式 run。",
+    "5. 可以展示可见工作轨迹和工具轨迹，但不要输出隐藏 chain-of-thought。",
+    "6. 如果需要输出 control JSON，也必须 safe_to_start=false，除非后端路由已经确认进入 Debugger 执行链。"
   ].join("\n");
 }
 function buildDebuggerCoworkSystemPrompt() {
@@ -15723,7 +17125,7 @@ class ConversationService {
     });
     this.persistConversationSnapshot(context2.session?.sessionId ?? null, userMessage);
     this.persistConversationSnapshot(context2.session?.sessionId ?? null, assistantDraftMessage);
-    this.publishWorkstream(context2.session?.sessionId ?? null);
+    this.publishTraceProjection(context2.session?.sessionId ?? null);
     void this.completeActiveDebugTurn({
       context: context2,
       requestedMode,
@@ -15743,7 +17145,7 @@ class ConversationService {
   async completeActiveDebugTurn(input) {
     let assistantMessage = input.assistantDraftMessage;
     const sessionId = input.context.session?.sessionId ?? null;
-    const workstreamSessionId = sessionId ?? this.ephemeralWorkstreamSessionId(input.assistantDraftMessage.turnId);
+    const traceSessionId = sessionId ?? this.ephemeralTraceSessionId(input.assistantDraftMessage.turnId);
     const abortController = new AbortController();
     const commitAssistantMessage = (type, patch) => {
       if (abortController.signal.aborted && patch.status !== "stopped") {
@@ -15761,7 +17163,7 @@ class ConversationService {
         turnId: assistantMessage.turnId,
         message: assistantMessage
       });
-      this.publishConversationWorkstream(workstreamSessionId, [input.userMessage, assistantMessage], sessionId);
+      this.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
     };
     const commitStoppedMessage = () => {
       commitAssistantMessage("message_completed", {
@@ -15895,10 +17297,17 @@ class ConversationService {
       modeContext: requestedMode,
       agentId: requestedMode === "ask" ? "ask_agent" : "rdc-debugger",
       status: "streaming",
-      reasoningTrace: requestedMode === "ask" ? null : createDraftReasoningTrace("正在思考", [
-        createReasoningStep("cowork-route", "检查上下文与路由", "intake_gate"),
-        createReasoningStep("cowork-reply", "生成协作回复", "plan")
-      ])
+      reasoningTrace: createDraftReasoningTrace(
+        requestedMode === "ask" ? "正在执行只读协作" : "正在思考",
+        [
+          createReasoningStep("cowork-route", "检查上下文与路由", "intake_gate"),
+          createReasoningStep(
+            "cowork-reply",
+            requestedMode === "ask" ? "生成只读协作回复" : "生成协作回复",
+            "plan"
+          )
+        ]
+      )
     });
     if (!context2.projectId && EXECUTE_PATTERN.test(rawMessage)) {
       const assistantMessage = {
@@ -15907,13 +17316,13 @@ class ConversationService {
         status: "complete",
         updatedAt: nowMs()
       };
-      const workstreamSessionId2 = this.ephemeralWorkstreamSessionId(turnId);
+      const traceSessionId2 = this.ephemeralTraceSessionId(turnId);
       const tracePresentation2 = await traceService.buildConversationPresentation(
-        workstreamSessionId2,
+        traceSessionId2,
         [userMessage, assistantMessage]
       );
-      workflowProjectionPublisher.publishTraceProjectionChanged(workstreamSessionId2, tracePresentation2);
-      this.publishConversationWorkstream(workstreamSessionId2, [userMessage, assistantMessage], null);
+      workflowProjectionPublisher.publishTraceProjectionChanged(traceSessionId2, tracePresentation2);
+      this.publishConversationTrace(traceSessionId2, [userMessage, assistantMessage], null);
       return {
         session: null,
         mode: "talk",
@@ -15927,13 +17336,13 @@ class ConversationService {
     }
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, userMessage);
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
-    const workstreamSessionId = workingSession?.sessionId ?? this.ephemeralWorkstreamSessionId(turnId);
+    const traceSessionId = workingSession?.sessionId ?? this.ephemeralTraceSessionId(turnId);
     const tracePresentation = await traceService.buildConversationPresentation(
-      workstreamSessionId,
+      traceSessionId,
       [userMessage, assistantDraftMessage]
     );
-    workflowProjectionPublisher.publishTraceProjectionChanged(workstreamSessionId, tracePresentation);
-    this.publishConversationWorkstream(workstreamSessionId, [userMessage, assistantDraftMessage], workingSession?.sessionId ?? null);
+    workflowProjectionPublisher.publishTraceProjectionChanged(traceSessionId, tracePresentation);
+    this.publishConversationTrace(traceSessionId, [userMessage, assistantDraftMessage], workingSession?.sessionId ?? null);
     void this.completeCoworkTurn({
       context: {
         ...context2,
@@ -15959,10 +17368,10 @@ class ConversationService {
   async completeCoworkTurn(input) {
     let assistantMessage = input.assistantDraftMessage;
     const sessionId = input.context.session?.sessionId ?? null;
-    const workstreamSessionId = sessionId ?? this.ephemeralWorkstreamSessionId(input.assistantDraftMessage.turnId);
+    const traceSessionId = sessionId ?? this.ephemeralTraceSessionId(input.assistantDraftMessage.turnId);
     const abortController = new AbortController();
     const conversationAgentId = input.requestedMode === "ask" ? "ask_agent" : "rdc-debugger";
-    const showCoworkReasoning = input.requestedMode !== "ask";
+    const showCoworkReasoning = true;
     const commitAssistantMessage = (type, patch) => {
       if (abortController.signal.aborted && patch.status !== "stopped") {
         return;
@@ -15979,7 +17388,7 @@ class ConversationService {
         turnId: assistantMessage.turnId,
         message: assistantMessage
       });
-      this.publishConversationWorkstream(workstreamSessionId, [input.userMessage, assistantMessage], sessionId);
+      this.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
     };
     const commitStoppedMessage = () => {
       commitAssistantMessage("message_completed", {
@@ -16022,12 +17431,12 @@ class ConversationService {
       systemAppendix += text;
       commitVisibleAssistantText();
     };
-    const withCoworkReasoning = (reasoningTrace) => showCoworkReasoning ? { reasoningTrace } : {};
-    if (showCoworkReasoning) {
+    const withCoworkReasoning = (reasoningTrace) => ({ reasoningTrace });
+    {
       commitAssistantMessage("message_patched", {
         reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-route", {
           status: "running",
-          summary: "正在检查项目、capture 与调试路由。",
+          summary: input.requestedMode === "ask" ? "正在检查项目上下文、只读工具权限与模型路由。" : "正在检查项目、capture 与调试路由。",
           startedAt: nowMs()
         })
       });
@@ -16119,7 +17528,7 @@ class ConversationService {
           commitAssistantMessage("message_patched", {
             reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
               status: "running",
-              summary: `正在通过 ${routePreflight.providerId}/${routePreflight.modelId} 生成协作回复。`,
+              summary: input.requestedMode === "ask" ? `正在通过 ${routePreflight.providerId}/${routePreflight.modelId} 生成只读协作回复。` : `正在通过 ${routePreflight.providerId}/${routePreflight.modelId} 生成协作回复。`,
               startedAt: nowMs()
             })
           });
@@ -16160,6 +17569,18 @@ class ConversationService {
                   commitVisibleAssistantText();
                 }
               }
+              if (event.type === "diagnostic") {
+                const payload = event.payload;
+                const summary = typeof payload.message === "string" && payload.message ? payload.message : "收到运行时诊断。";
+                commitAssistantMessage("message_patched", {
+                  reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, `cowork-diagnostic-${payload.code ?? "runtime"}`, {
+                    status: payload.severity === "error" ? "error" : "complete",
+                    title: "运行时诊断",
+                    summary,
+                    completedAt: nowMs()
+                  })
+                });
+              }
               if (event.type === "tool.started") {
                 commitAssistantMessage("message_patched", {
                   reasoningTrace: upsertRuntimeToolCall(assistantMessage.reasoningTrace, {
@@ -16168,6 +17589,19 @@ class ConversationService {
                     status: "running",
                     argsPreview: JSON.stringify(event.payload.args ?? {}).slice(0, 600),
                     startedAt: nowMs()
+                  })
+                });
+              }
+              if (event.type === "tool.denied") {
+                const reason = typeof event.payload.reason === "string" ? event.payload.reason : "Ask 只读策略拒绝了该工具调用。";
+                commitAssistantMessage("message_patched", {
+                  reasoningTrace: upsertRuntimeToolCall(assistantMessage.reasoningTrace, {
+                    id: String(event.payload.toolCallId),
+                    toolName: String(event.payload.toolName),
+                    status: "error",
+                    resultPreview: JSON.stringify(event.payload.result ?? { reason }).slice(0, 800),
+                    error: reason,
+                    completedAt: nowMs()
                   })
                 });
               }
@@ -16350,7 +17784,7 @@ ${upgradeReply}`);
   emitConversationEvent(event) {
     workflowProjectionPublisher.publishConversationEvent(event);
   }
-  publishWorkstream(sessionId) {
+  publishTraceProjection(sessionId) {
     if (!sessionId) {
       return;
     }
@@ -16362,16 +17796,16 @@ ${upgradeReply}`);
       console.error("[ConversationService] Failed to publish trace projection:", error);
     });
   }
-  publishConversationWorkstream(workstreamSessionId, messages, persistedSessionId) {
+  publishConversationTrace(traceSessionId, messages, persistedSessionId) {
     if (persistedSessionId) {
-      this.publishWorkstream(persistedSessionId);
+      this.publishTraceProjection(persistedSessionId);
       return;
     }
-    void traceService.buildConversationPresentation(workstreamSessionId, messages).then((presentation) => {
-      workflowProjectionPublisher.publishTraceProjectionChanged(workstreamSessionId, presentation);
+    void traceService.buildConversationPresentation(traceSessionId, messages).then((presentation) => {
+      workflowProjectionPublisher.publishTraceProjectionChanged(traceSessionId, presentation);
     });
   }
-  ephemeralWorkstreamSessionId(turnId) {
+  ephemeralTraceSessionId(turnId) {
     return `conversation-${turnId}`;
   }
 }
@@ -16554,7 +17988,7 @@ function registerProjectSessionHandlers(context2) {
     const activeRun = runs.find((run) => ["queued", "running", "stopping"].includes(run.status));
     if (activeRun) {
       runExecutionService.stopRun(activeRun.runId);
-      toolBridge.abortRun(activeRun.runId);
+      rdxCliInvokerService.abortRun(activeRun.runId);
       await context2.setRunLifecycleState(id, activeRun.runId, {
         status: "cancelled",
         lastStage: activeRun.lastStage,
@@ -17644,19 +19078,13 @@ function registerToolEvidenceHandlers(context2) {
   const { state: state2 } = context2;
   electron.ipcMain.handle("tool:getCatalog", async () => {
     try {
-      return await toolBridge.loadCatalog();
+      return await rdxCliInvokerService.loadCatalog();
     } catch {
       return { tools: [], namespaces: {} };
     }
   });
   electron.ipcMain.handle("tool:getRuntimeSummary", async () => {
-    return toolBridge.getRuntimeSummary();
-  });
-  electron.ipcMain.handle("tool:execute", async (_event, toolName, args) => {
-    return toolBridge.call({
-      toolName,
-      args
-    });
+    return rdxCliInvokerService.getRuntimeSummary();
   });
   electron.ipcMain.handle("evidence:getChain", async () => {
     const sessionId = await storageAdapter.getCurrentSessionId();
@@ -17755,13 +19183,6 @@ function registerWorkflowHandlers(context2) {
   electron.ipcMain.handle("workflow:approvePlan", async (_event, runId) => {
     return debuggerRuntime.approvePlan(runId);
   });
-  electron.ipcMain.handle("workflow:getWorkstreamSession", async (_event, sessionId) => {
-    const targetSessionId = sessionId || state2.currentSessionId;
-    if (!targetSessionId) {
-      return { success: false, error: "No active session." };
-    }
-    return debuggerRuntime.getWorkstreamSession(targetSessionId);
-  });
   electron.ipcMain.handle("workflow:requestPlanRevision", async (_event, runId, revisionText) => {
     const result = await debuggerRuntime.requestPlanRevision(runId, revisionText);
     if (result.success) {
@@ -17772,12 +19193,6 @@ function registerWorkflowHandlers(context2) {
       }
     }
     return result;
-  });
-  electron.ipcMain.handle("workflow:switchWorkstreamBranch", async (_event, sessionId, branchId) => {
-    return debuggerRuntime.switchWorkstreamBranch(sessionId, branchId);
-  });
-  electron.ipcMain.handle("workflow:exportWorkstreamSession", async (_event, sessionId, options) => {
-    return debuggerRuntime.exportWorkstreamSession(sessionId, options);
   });
   electron.ipcMain.handle("workflow:restartRun", async (_event, runId) => {
     const result = await debuggerRuntime.restartRun(runId);
@@ -17805,11 +19220,16 @@ function registerTraceHandlers(context2) {
     if (!targetSessionId) {
       return { success: false, error: "No active session." };
     }
-    const result = await traceService.getSession(targetSessionId);
-    return result;
+    return debuggerRuntime.getTraceProjection(targetSessionId);
   });
   electron.ipcMain.handle("trace:exportRun", async (_event, runId) => {
     return traceService.exportRun(runId);
+  });
+  electron.ipcMain.handle("trace:switchBranch", async (_event, sessionId, branchId) => {
+    return debuggerRuntime.switchTraceBranch(sessionId, branchId);
+  });
+  electron.ipcMain.handle("trace:exportSession", async (_event, sessionId, options) => {
+    return debuggerRuntime.exportTraceSession(sessionId, options);
   });
 }
 const invokeHandlers = /* @__PURE__ */ new Map();
@@ -17957,7 +19377,7 @@ function registerToolTraceBridge() {
   if (toolTraceSubscribed) {
     return;
   }
-  toolBridge.onToolTrace((trace) => {
+  rdxCliInvokerService.onInvocationTrace((trace) => {
     broadcastToRenderer("tool:executionComplete", trace);
     if (state.currentSessionId && state.currentRunId) {
       void appendActionEvent(storageAdapter.createActionEvent({
@@ -18044,7 +19464,7 @@ const emptyPreviewLoadResult = () => ({
   attempts: []
 });
 class RdxSessionService {
-  toolBridge;
+  rdxCliInvoker;
   contextId = null;
   runtimeOwner = null;
   ownerLeaseId = null;
@@ -18059,8 +19479,8 @@ class RdxSessionService {
     status: "closed",
     updatedAt: Date.now()
   };
-  constructor(toolBridge2) {
-    this.toolBridge = toolBridge2;
+  constructor(rdxCliInvoker) {
+    this.rdxCliInvoker = rdxCliInvoker;
   }
   async bootstrap(request) {
     const requestedCaptures = request.captures ?? [];
@@ -18241,7 +19661,7 @@ class RdxSessionService {
       status: "opening",
       sessionId: replaySessionId
     });
-    const result = await this.toolBridge.call({
+    const result = await this.rdxCliInvoker.call({
       toolName: "rd.session.open_preview",
       args: {
         session_id: replaySessionId,
@@ -18278,7 +19698,7 @@ class RdxSessionService {
       this.setHumanPreview({ status: "closed" });
       return this.snapshotContext();
     }
-    const result = await this.toolBridge.call({
+    const result = await this.rdxCliInvoker.call({
       toolName: "rd.session.close_preview",
       args: {
         context_id: this.contextId,
@@ -18315,7 +19735,7 @@ class RdxSessionService {
     await this.initializeContextRuntime();
   }
   async ensureRuntimeReady() {
-    const statusResult = await this.toolBridge.executeCLI("daemon", ["status"]);
+    const statusResult = await this.rdxCliInvoker.executeCLI("daemon", ["status"]);
     if (statusResult.exitCode === 0) {
       try {
         const parsed = JSON.parse(statusResult.stdout);
@@ -18326,7 +19746,7 @@ class RdxSessionService {
         return;
       }
     }
-    const startResult = await this.toolBridge.executeCLI("daemon", ["start"]);
+    const startResult = await this.rdxCliInvoker.executeCLI("daemon", ["start"]);
     if (startResult.exitCode !== 0) {
       const message = startResult.stderr.trim() || `Exit code: ${startResult.exitCode}`;
       throw new Error(`Failed to start rdx daemon: ${message}`);
@@ -18334,7 +19754,7 @@ class RdxSessionService {
   }
   async allocateContext() {
     const contextId = `ctx-${generateShortId()}`;
-    let result = await this.toolBridge.call({
+    let result = await this.rdxCliInvoker.call({
       toolName: "rd.session.create_context",
       args: { context_id: contextId },
       contextId
@@ -18343,7 +19763,7 @@ class RdxSessionService {
       if (result.error?.message?.includes("Context limit exceeded")) {
         const daemonCleaned = await this.cleanupDaemonRuntimeState();
         if (daemonCleaned) {
-          result = await this.toolBridge.call({
+          result = await this.rdxCliInvoker.call({
             toolName: "rd.session.create_context",
             args: { context_id: contextId },
             contextId
@@ -18354,7 +19774,7 @@ class RdxSessionService {
         }
         const cleanedCount = await this.cleanupStaleRdcAgentContexts();
         if (cleanedCount > 0) {
-          result = await this.toolBridge.call({
+          result = await this.rdxCliInvoker.call({
             toolName: "rd.session.create_context",
             args: { context_id: contextId },
             contextId
@@ -18369,7 +19789,7 @@ class RdxSessionService {
     return contextId;
   }
   async initializeContextRuntime() {
-    const result = await this.toolBridge.call({
+    const result = await this.rdxCliInvoker.call({
       toolName: "rd.core.init",
       args: {},
       contextId: this.contextId
@@ -18380,7 +19800,7 @@ class RdxSessionService {
   }
   async claimOwner(contextId) {
     const owner = `rdc-agent-${generateShortId()}`;
-    const result = await this.toolBridge.call({
+    const result = await this.rdxCliInvoker.call({
       toolName: "rd.session.claim_runtime_owner",
       args: {
         runtime_owner: owner,
@@ -18413,7 +19833,7 @@ class RdxSessionService {
     }
     this.captures[captureIndex] = { ...this.captures[captureIndex], status: "opening" };
     try {
-      const openResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+      const openResult = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
         "rd.capture.open_file",
         { file_path: capture.filePath }
       ));
@@ -18432,7 +19852,7 @@ class RdxSessionService {
           remote_id: this.remoteId
         };
       }
-      const replayResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+      const replayResult = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
         "rd.capture.open_replay",
         replayArgs
       ));
@@ -18480,7 +19900,7 @@ class RdxSessionService {
     }
     this.replayDevice = device;
     this.remoteStatus = "connected";
-    const connectResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+    const connectResult = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
       "rd.remote.connect",
       {
         timeout_ms: 5e3,
@@ -18505,7 +19925,7 @@ class RdxSessionService {
       throw new Error("Remote connect did not return a remote_id.");
     }
     this.remoteId = remoteId;
-    const pingResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+    const pingResult = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
       "rd.remote.ping",
       { remote_id: remoteId }
     ));
@@ -18555,7 +19975,7 @@ class RdxSessionService {
     if (!this.contextId || !this.remoteId) {
       return false;
     }
-    const pingResult = await this.toolBridge.call({
+    const pingResult = await this.rdxCliInvoker.call({
       toolName: "rd.remote.ping",
       args: { remote_id: this.remoteId },
       contextId: this.contextId,
@@ -18788,7 +20208,7 @@ class RdxSessionService {
     if (eventId !== void 0) {
       args.event_id = eventId;
     }
-    const result = await this.toolBridge.call(this.buildClaimedToolRequest(
+    const result = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
       "rd.export.screenshot",
       args
     ));
@@ -18837,7 +20257,7 @@ class RdxSessionService {
     return preview;
   }
   async listPreviewCandidateEvents(sessionId) {
-    const result = await this.toolBridge.call(this.buildClaimedToolRequest(
+    const result = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
       "rd.event.get_actions",
       {
         session_id: sessionId,
@@ -18873,7 +20293,7 @@ class RdxSessionService {
     return Array.from(new Set(eventIds));
   }
   async loadCaptureThumbnail(captureFileId, attempts) {
-    const result = await this.toolBridge.call(this.buildClaimedToolRequest(
+    const result = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
       "rd.capture.get_thumbnail",
       {
         capture_file_id: captureFileId,
@@ -19023,7 +20443,7 @@ class RdxSessionService {
       this.captures.map((capture) => capture.captureFileId).filter((captureFileId) => typeof captureFileId === "string" && Boolean(captureFileId))
     ));
     for (const sessionId of replaySessionIds) {
-      const result = await this.toolBridge.call({
+      const result = await this.rdxCliInvoker.call({
         toolName: "rd.capture.close_replay",
         args: { session_id: sessionId },
         contextId: contextId ?? void 0,
@@ -19045,7 +20465,7 @@ class RdxSessionService {
       }
     }
     for (const captureFileId of captureFileIds) {
-      const result = await this.toolBridge.call({
+      const result = await this.rdxCliInvoker.call({
         toolName: "rd.capture.close_file",
         args: { capture_file_id: captureFileId },
         contextId: contextId ?? void 0,
@@ -19067,7 +20487,7 @@ class RdxSessionService {
       }
     }
     if (contextId && runtimeOwner && ownerLeaseId) {
-      await this.toolBridge.call({
+      await this.rdxCliInvoker.call({
         toolName: "rd.session.release_runtime_owner",
         args: {
           runtime_owner: runtimeOwner,
@@ -19080,7 +20500,7 @@ class RdxSessionService {
       });
     }
     if (contextId) {
-      await this.toolBridge.call({
+      await this.rdxCliInvoker.call({
         toolName: "rd.session.clear_context",
         args: {
           target_context_id: contextId
@@ -19090,7 +20510,7 @@ class RdxSessionService {
     }
   }
   async cleanupStaleRdcAgentContexts() {
-    const result = await this.toolBridge.call({
+    const result = await this.rdxCliInvoker.call({
       toolName: "rd.session.list_contexts",
       args: {}
     });
@@ -19110,7 +20530,7 @@ class RdxSessionService {
         continue;
       }
       if (runtimeOwner && ownerLeaseId) {
-        await this.toolBridge.call({
+        await this.rdxCliInvoker.call({
           toolName: "rd.session.release_runtime_owner",
           args: {
             runtime_owner: runtimeOwner,
@@ -19122,7 +20542,7 @@ class RdxSessionService {
           ownerLeaseId
         });
       }
-      const clearResult = await this.toolBridge.call({
+      const clearResult = await this.rdxCliInvoker.call({
         toolName: "rd.session.clear_context",
         args: {
           target_context_id: targetContextId
@@ -19137,7 +20557,7 @@ class RdxSessionService {
   }
   async cleanupDaemonRuntimeState() {
     let cleaned = false;
-    const daemonCleanup = await this.toolBridge.executeCLI("daemon", ["cleanup"]);
+    const daemonCleanup = await this.rdxCliInvoker.executeCLI("daemon", ["cleanup"]);
     if (daemonCleanup.exitCode === 0) {
       cleaned = true;
     } else {
@@ -19149,7 +20569,7 @@ class RdxSessionService {
         summary: daemonCleanup.stderr.trim() || daemonCleanup.stdout.trim() || "Failed to cleanup stale daemon state."
       });
     }
-    const contextClear = await this.toolBridge.executeCLI("context", ["clear"]);
+    const contextClear = await this.rdxCliInvoker.executeCLI("context", ["clear"]);
     if (contextClear.exitCode === 0) {
       cleaned = true;
     } else {
@@ -19337,7 +20757,7 @@ async function stopBrowserAppBridge() {
   }
   await new Promise((resolveClose) => activeServer.close(() => resolveClose()));
 }
-const rdxSessionService = new RdxSessionService(toolBridge);
+const rdxSessionService = new RdxSessionService(rdxCliInvokerService);
 const __dirname$1 = path__namespace.dirname(url.fileURLToPath(require("url").pathToFileURL(__filename).href));
 if (!process.env.RDC_AGENT_USER_DATA?.trim()) {
   electron.app.setPath("userData", path__namespace.join(electron.app.getPath("appData"), "rdc-agent"));
@@ -19650,14 +21070,14 @@ async function initializeServices() {
   try {
     const hasConfiguredProvider = settingsService.hasConfiguredProvider();
     console.log("[Main] SettingsService initialized, hasConfiguredProvider:", hasConfiguredProvider);
-    await toolBridge.loadCatalog();
-    console.log("[Main] ToolBridge catalog initialized");
+    await rdxCliInvokerService.loadCatalog();
+    console.log("[Main] RDX CLI invoker initialized");
     runtimeLogService.log({
       scope: "app",
       namespace: "system",
       severity: "success",
-      title: "Tool catalog ready",
-      summary: "RDC 工具目录已加载。"
+      title: "RDX CLI invoker ready",
+      summary: "RDX CLI invoker 诊断已加载。"
     });
     await initializeIpcState();
     console.log("[Main] DebuggerRuntime initialized");

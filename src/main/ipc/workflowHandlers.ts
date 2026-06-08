@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+﻿import { ipcMain } from 'electron';
 import type { DebugSessionStartRequest, RunContextUsageSummary, RunSummary } from '@shared/types/session';
 import type { AskUserAnswer } from '@shared/types/workflow';
 import { storageAdapter } from '../sessions/StorageAdapter';
@@ -95,14 +95,6 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
     return debuggerRuntime.approvePlan(runId);
   });
 
-  ipcMain.handle('workflow:getWorkstreamSession', async (_event, sessionId?: string) => {
-    const targetSessionId = sessionId || state.currentSessionId;
-    if (!targetSessionId) {
-      return { success: false, error: 'No active session.' };
-    }
-    return debuggerRuntime.getWorkstreamSession(targetSessionId);
-  });
-
   ipcMain.handle('workflow:requestPlanRevision', async (_event, runId: string, revisionText: string) => {
     const result = await debuggerRuntime.requestPlanRevision(runId, revisionText);
     if (result.success) {
@@ -113,14 +105,6 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
       }
     }
     return result;
-  });
-
-  ipcMain.handle('workflow:switchWorkstreamBranch', async (_event, sessionId: string, branchId: string) => {
-    return debuggerRuntime.switchWorkstreamBranch(sessionId, branchId);
-  });
-
-  ipcMain.handle('workflow:exportWorkstreamSession', async (_event, sessionId: string, options?: unknown) => {
-    return debuggerRuntime.exportWorkstreamSession(sessionId, options as Parameters<typeof debuggerRuntime.exportWorkstreamSession>[1]);
   });
 
   ipcMain.handle('workflow:restartRun', async (_event, runId: string) => {
@@ -135,3 +119,4 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
     return result;
   });
 }
+

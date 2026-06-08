@@ -29,8 +29,6 @@ EXCLUDED_BUNDLED_SITE_PACKAGE_PREFIXES: tuple[str, ...] = (
     "pygments-",
     "pip",
     "pip-",
-    "mcp",
-    "mcp-",
     "pyarrow",
     "setuptools",
     "setuptools-",

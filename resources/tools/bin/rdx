@@ -25,4 +25,15 @@ export RDX_TOOLS_ROOT="$tools_root"
 export PYTHONIOENCODING="${PYTHONIOENCODING:-utf-8}"
 export RDX_LAUNCHER_PROG="${RDX_LAUNCHER_PROG:-rdx}"
 
-exec "$python_cmd" "$tools_root/cli/run_cli.py" "$@"
+python_script="$tools_root/cli/run_cli.py"
+case "$python_cmd" in
+  *.exe|*.EXE)
+    if command -v cygpath >/dev/null 2>&1; then
+      python_cmd=$(cygpath -w "$python_cmd")
+      python_script=$(cygpath -w "$python_script")
+      export RDX_TOOLS_ROOT="$(cygpath -w "$tools_root")"
+    fi
+    ;;
+esac
+
+exec "$python_cmd" "$python_script" "$@"

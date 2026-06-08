@@ -58,6 +58,7 @@ class FakeSessionManager:
         self.backend_config: dict[str, object] | None = None
         self.closed: list[str] = []
         self.controller = FakeController()
+        self.controller_calls = 0
 
     async def create_session(self, *, backend_config: dict[str, object], replay_config: dict[str, object]) -> SimpleNamespace:
         self.backend_config = dict(backend_config)
@@ -70,6 +71,7 @@ class FakeSessionManager:
         self.closed.append(session_id)
 
     def get_controller(self, session_id: str) -> FakeController:
+        self.controller_calls += 1
         return self.controller
 
 
@@ -290,6 +292,7 @@ def test_dispatch_capture_open_replay_keeps_live_remote_handle(monkeypatch) -> N
         assert server._runtime.session_owned_remotes["sess_demo"].transport == "adb_android"
         assert "remote_demo" not in server._runtime.consumed_remotes
 
+        controller_calls_after_open_replay = fake_manager.controller_calls
         context_payload = json.loads(asyncio.run(server._dispatch_session("get_context", {})))
         assert context_payload["success"] is True
         assert context_payload["runtime"]["session_id"] == "sess_demo"
@@ -300,7 +303,8 @@ def test_dispatch_capture_open_replay_keeps_live_remote_handle(monkeypatch) -> N
         assert context_payload["remote"]["reuse_policy"] == "must_reconnect"
         assert context_payload["remote_handle_origin_context"] == "default"
         assert context_payload["remote_capability_matrix"]["endpoint"]["status"] == "verified"
-        assert context_payload["remote_capability_matrix"]["fix_verification"]["status"] == "blocked_current_session"
+        assert context_payload["remote_capability_matrix"]["fix_verification"]["status"] == "not_currently_probed"
+        assert fake_manager.controller_calls == controller_calls_after_open_replay
     finally:
         clear_context_snapshot()
         server._runtime.context_snapshots.clear()

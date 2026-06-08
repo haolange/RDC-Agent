@@ -6,13 +6,12 @@ rdx-tools 的 shader patch engine。
 以便随时恢复原始 shader。
 
 该引擎操作的是从 replay controller 获取的反汇编/反编译 shader 文本。
-支持三类 patch 操作：
+支持两类 patch 操作：
 
 * **force_full_precision** —— 提升低精度类型并添加 ``precise`` 关键字（HLSL），
   升级精度限定符（GLSL），或移除 ``RelaxedPrecision`` 装饰（SPIR-V assembly）。
 * **insert_guard** —— 用 ``isnan`` / ``isinf`` guards 包裹表达式，
   使 NaN 或 Inf 替换为安全的 fallback。
-* **replace_expr** —— 在 shader 源码中直接进行文本替换。
 
 修改后会通过 replay controller（``BuildTargetShader``）重新编译，
 并通过 ``ReplaceResource`` 进行热替换。
@@ -102,6 +101,52 @@ def _shader_id_str(shader_id: Any) -> str:
     return str(shader_id or "")
 
 
+def _is_null_shader_id(shader_id: Any) -> bool:
+    if shader_id is None:
+        return True
+    text = _shader_id_str(shader_id).strip()
+    if text in {"", "0", "ResourceId::0"}:
+        return True
+    try:
+        return shader_id == _get_rd().ResourceId()
+    except Exception:
+        return False
+
+
+def _compiler_output_is_fatal(output: Any) -> bool:
+    text = str(output or "").strip().lower()
+    if not text:
+        return False
+    fatal_markers = (
+        "error:",
+        "errors:",
+        "fatal:",
+        "fatal error",
+        "compile error",
+        "failed",
+        "compilation failed",
+        "compile failed",
+    )
+    return any(marker in text for marker in fatal_markers)
+
+
+def _pipeline_output_resource_ids(pipe: Any) -> Optional[List[str]]:
+    get_outputs = getattr(pipe, "GetOutputTargets", None)
+    if not callable(get_outputs):
+        return None
+    outputs = get_outputs() or []
+    resource_ids: List[str] = []
+    for desc in outputs:
+        rid = getattr(desc, "resourceId", None)
+        if rid is None:
+            resource = getattr(desc, "resource", None)
+            rid = getattr(resource, "resourceId", resource) if resource is not None else None
+        if _is_null_shader_id(rid):
+            continue
+        resource_ids.append(_shader_id_str(rid))
+    return resource_ids
+
+
 # ---------------------------------------------------------------------------
 # PatchRecord
 # ---------------------------------------------------------------------------
@@ -180,8 +225,13 @@ class PatchEngine:
             rd_stage = _to_rd_stage(stage)
             shader_id = pipe.GetShader(rd_stage)
             refl = pipe.GetShaderReflection(rd_stage)
+            output_ids_before = (
+                _pipeline_output_resource_ids(pipe)
+                if patch_spec.preserve_outputs and stage == ShaderStage.PS
+                else None
+            )
 
-            if shader_id is None or _shader_id_str(shader_id) in {"", "0", "ResourceId::0"}:
+            if _is_null_shader_id(shader_id):
                 return PatchResult(
                     patch_id=patch_spec.patch_id,
                     success=False,
@@ -302,6 +352,48 @@ class PatchEngine:
                 source.encode("utf-8"),
             ).hexdigest()
             encoding_name = self._encoding_name(encoding)
+            edit_plan = self._edit_plan_for_source(
+                encoding_name=encoding_name,
+                disassembly_target=str(disasm_target),
+                source=source,
+            )
+            if not bool(edit_plan.get("can_replace")):
+                requested_ops = [str(getattr(op, "op", "") or "") for op in patch_spec.ops]
+                op_requested = next((op for op in requested_ops if op), "")
+                code = (
+                    "shader_patch_op_unsupported_for_encoding"
+                    if op_requested
+                    else "shader_replace_backend_unsupported"
+                )
+                reason = str(edit_plan.get("blocked_reason") or "shader source encoding is not safely replaceable")
+                return PatchResult(
+                    patch_id=patch_spec.patch_id,
+                    original_shader_hash=original_hash,
+                    success=False,
+                    error_message=reason,
+                    error_code=code,
+                    error_category="validation",
+                    error_details={
+                        "event_id": int(event_id),
+                        "stage": stage.value.upper(),
+                        "session_id": str(session_id),
+                        "shader_id": _shader_id_str(shader_id),
+                        "encoding": encoding_name,
+                        "disassembly_target": str(disasm_target),
+                        "edit_plan": edit_plan,
+                        "op": op_requested,
+                        "agent_text_edit_inputs": ["source_text", "diff_text"],
+                        "failure_stage": "validate_edit_plan",
+                        "failure_reason": "source_encoding_not_safely_replaceable",
+                        "replacement_attempted": False,
+                        "context_preserved": True,
+                    },
+                    source_before_text=source,
+                    source_after_text=source,
+                    disassembly_target=str(disasm_target),
+                    encoding=encoding_name,
+                    entry_point=str(getattr(refl, "entryPoint", "") or "main"),
+                )
             messages: List[str] = []
             if patch_spec.expected_source_hash and patch_spec.expected_source_hash != original_hash:
                 return PatchResult(
@@ -363,6 +455,107 @@ class PatchEngine:
                 messages.append("Applied diff_text replacement.")
             else:
                 for op in patch_spec.ops:
+                    supported_ops = {"force_full_precision", "insert_guard"}
+                    if op.op not in supported_ops:
+                        return PatchResult(
+                            patch_id=patch_spec.patch_id,
+                            original_shader_hash=original_hash,
+                            success=False,
+                            error_message=(
+                                "Unsupported shader patch op. Use force_full_precision, "
+                                "insert_guard, source_text, or diff_text."
+                            ),
+                            error_code="validation_error",
+                            error_category="validation",
+                            error_details={
+                                "unsupported_op": str(op.op),
+                                "supported_ops": sorted(supported_ops),
+                                "agent_text_edit_inputs": ["source_text", "diff_text"],
+                                "failure_stage": "validate_patch_ops",
+                                "failure_reason": "unsupported_patch_op",
+                            },
+                            source_before_text=source,
+                            source_after_text=source,
+                            disassembly_target=str(disasm_target),
+                            encoding=encoding_name,
+                                entry_point=str(getattr(refl, "entryPoint", "") or "main"),
+                            )
+                    missing_guard_expr = op.op == "insert_guard" and not str(op.guard_expr or "").strip()
+                    if op.op not in set(edit_plan.get("allowed_ops") or []) and not missing_guard_expr:
+                        return PatchResult(
+                            patch_id=patch_spec.patch_id,
+                            original_shader_hash=original_hash,
+                            success=False,
+                            error_message=(
+                                f"{op.op} is not supported for shader source encoding "
+                                f"'{encoding_name}'."
+                            ),
+                            error_code="shader_patch_op_unsupported_for_encoding",
+                            error_category="validation",
+                            error_details={
+                                "op": str(op.op),
+                                "encoding": encoding_name,
+                                "disassembly_target": str(disasm_target),
+                                "edit_plan": edit_plan,
+                                "supported_ops": list(edit_plan.get("allowed_ops") or []),
+                                "agent_text_edit_inputs": ["source_text", "diff_text"],
+                                "failure_stage": "validate_patch_ops",
+                                "failure_reason": "unsupported_patch_op_for_encoding",
+                                "replacement_attempted": False,
+                                "context_preserved": True,
+                            },
+                            source_before_text=source,
+                            source_after_text=source,
+                            disassembly_target=str(disasm_target),
+                            encoding=encoding_name,
+                            entry_point=str(getattr(refl, "entryPoint", "") or "main"),
+                        )
+                    if op.op == "insert_guard":
+                        if not str(op.guard_expr or "").strip():
+                            return PatchResult(
+                                patch_id=patch_spec.patch_id,
+                                original_shader_hash=original_hash,
+                                success=False,
+                                error_message="insert_guard requires guard_expr.",
+                                error_code="validation_error",
+                                error_category="validation",
+                                error_details={
+                                    "op": "insert_guard",
+                                    "missing": ["guard_expr"],
+                                    "failure_stage": "validate_patch_ops",
+                                    "failure_reason": "missing_guard_expr",
+                                },
+                                source_before_text=source,
+                                source_after_text=source,
+                                disassembly_target=str(disasm_target),
+                                encoding=encoding_name,
+                                entry_point=str(getattr(refl, "entryPoint", "") or "main"),
+                            )
+                        if "spirv" in encoding_name or "spv" in encoding_name:
+                            return PatchResult(
+                                patch_id=patch_spec.patch_id,
+                                original_shader_hash=original_hash,
+                                success=False,
+                                error_message=(
+                                    "insert_guard is a source-level HLSL/GLSL NaN/Inf guard. "
+                                    "For SPIR-V ASM, provide source_text or diff_text."
+                                ),
+                                error_code="shader_patch_op_unsupported_for_encoding",
+                                error_category="validation",
+                                error_details={
+                                    "op": "insert_guard",
+                                    "encoding": encoding_name,
+                                    "supported_encodings": ["hlsl", "glsl"],
+                                    "agent_text_edit_inputs": ["source_text", "diff_text"],
+                                    "failure_stage": "validate_patch_ops",
+                                    "failure_reason": "unsupported_encoding_for_insert_guard",
+                                },
+                                source_before_text=source,
+                                source_after_text=source,
+                                disassembly_target=str(disasm_target),
+                                encoding=encoding_name,
+                                entry_point=str(getattr(refl, "entryPoint", "") or "main"),
+                            )
                     if op.op == "force_full_precision" and ("spirv" in encoding_name or "spv" in encoding_name):
                         precision_matches = self._collect_spirv_precision_targets(
                             modified,
@@ -409,9 +602,44 @@ class PatchEngine:
 
             # 5 -- 编译修改后的源码
             entry_point = refl.entryPoint if refl.entryPoint else "main"
-            source_bytes = modified.encode("utf-8")
             compile_flags = self._build_compile_flags(refl)
             compile_flag_payload = self._compile_flag_payload(compile_flags)
+            try:
+                source_bytes = self._source_bytes_for_build(
+                    modified,
+                    encoding_name,
+                    str(disasm_target),
+                )
+            except RuntimeError as exc:
+                return PatchResult(
+                    patch_id=patch_spec.patch_id,
+                    original_shader_hash=original_hash,
+                    success=False,
+                    error_message=str(exc),
+                    error_code="shader_build_failed",
+                    error_category="runtime",
+                    error_details={
+                        "event_id": int(event_id),
+                        "stage": stage.value.upper(),
+                        "session_id": str(session_id),
+                        "shader_id": _shader_id_str(shader_id),
+                        "entry_point": str(entry_point),
+                        "encoding": encoding_name,
+                        "disassembly_target": str(disasm_target),
+                        "compile_flags": compile_flag_payload,
+                        "failure_stage": "build",
+                        "failure_reason": "spirv_assembly_failed",
+                        "replacement_attempted": False,
+                        "context_preserved": True,
+                    },
+                    messages=messages,
+                    source_before_text=source,
+                    source_after_text=modified,
+                    disassembly_target=str(disasm_target),
+                    encoding=encoding_name,
+                    entry_point=str(entry_point),
+                    compile_flags=compile_flag_payload,
+                )
             try:
                 new_id, errors = controller.BuildTargetShader(
                     entry_point,
@@ -440,6 +668,8 @@ class PatchEngine:
                         "exception_type": type(exc).__name__,
                         "failure_stage": "build",
                         "failure_reason": "build_runtime_error",
+                        "replacement_attempted": False,
+                        "context_preserved": True,
                     },
                     messages=messages,
                 )
@@ -447,8 +677,15 @@ class PatchEngine:
             if errors:
                 # 区分硬失败（null resource）与仅有警告
                 # （资源已分配但 compiler 输出诊断信息）。
-                null_id = rd.ResourceId()
-                if new_id == null_id or new_id is None:
+                if _is_null_shader_id(new_id) or _compiler_output_is_fatal(errors):
+                    if not _is_null_shader_id(new_id):
+                        try:
+                            controller.FreeTargetResource(new_id)
+                        except Exception:
+                            logger.debug(
+                                "Failed to free replacement resource after shader build diagnostics failure",
+                                exc_info=True,
+                            )
                     return PatchResult(
                         patch_id=patch_spec.patch_id,
                         original_shader_hash=original_hash,
@@ -468,6 +705,9 @@ class PatchEngine:
                             "compiler_output": str(errors),
                             "failure_stage": "build",
                             "failure_reason": "compiler_failed",
+                            "replacement_attempted": False,
+                            "cleanup_attempted": not _is_null_shader_id(new_id),
+                            "context_preserved": True,
                         },
                         messages=messages,
                         source_before_text=source,
@@ -514,6 +754,9 @@ class PatchEngine:
                         "exception_type": type(exc).__name__,
                         "failure_stage": "apply_replacement",
                         "failure_reason": "replace_resource_failed",
+                        "replacement_attempted": True,
+                        "cleanup_attempted": True,
+                        "context_preserved": True,
                     },
                     messages=messages,
                     source_before_text=source,
@@ -560,6 +803,80 @@ class PatchEngine:
                         "exception_type": type(exc).__name__,
                         "failure_stage": "rebind_event",
                         "failure_reason": "set_frame_event_failed",
+                        "replacement_attempted": True,
+                        "cleanup_attempted": True,
+                        "context_preserved": True,
+                    },
+                    messages=messages,
+                    source_before_text=source,
+                    source_after_text=modified,
+                    disassembly_target=str(disasm_target),
+                    encoding=encoding_name,
+                    entry_point=str(entry_point),
+                    compile_flags=compile_flag_payload,
+                )
+
+            output_ids_after = (
+                _pipeline_output_resource_ids(controller.GetPipelineState())
+                if patch_spec.preserve_outputs and stage == ShaderStage.PS
+                else None
+            )
+            if output_ids_before:
+                try:
+                    controller.SetFrameEvent(event_id, True)
+                    output_ids_after_second = _pipeline_output_resource_ids(controller.GetPipelineState())
+                    if output_ids_after_second is not None:
+                        output_ids_after = output_ids_after_second
+                except Exception:
+                    logger.debug(
+                        "Second output preservation probe failed after shader replacement",
+                        exc_info=True,
+                    )
+            if output_ids_before and output_ids_after == []:
+                try:
+                    controller.RemoveReplacement(shader_id)
+                except Exception:
+                    logger.debug(
+                        "Failed to remove replacement after output preservation failure",
+                        exc_info=True,
+                    )
+                try:
+                    controller.FreeTargetResource(new_id)
+                except Exception:
+                    logger.debug(
+                        "Failed to free replacement resource after output preservation failure",
+                        exc_info=True,
+                    )
+                try:
+                    controller.SetFrameEvent(event_id, True)
+                except Exception:
+                    logger.debug(
+                        "Failed to rebind original event after output preservation failure",
+                        exc_info=True,
+                    )
+                return PatchResult(
+                    patch_id=patch_spec.patch_id,
+                    original_shader_hash=original_hash,
+                    success=False,
+                    error_message="Replacement removed all framebuffer output targets for the target event",
+                    error_code="shader_replace_preserve_outputs_failed",
+                    error_category="runtime",
+                    error_details={
+                        "event_id": int(event_id),
+                        "stage": stage.value.upper(),
+                        "session_id": str(session_id),
+                        "shader_id": _shader_id_str(shader_id),
+                        "replacement_shader_id": _shader_id_str(new_id),
+                        "entry_point": str(entry_point),
+                        "encoding": encoding_name,
+                        "compile_flags": compile_flag_payload,
+                        "failure_stage": "preserve_outputs",
+                        "failure_reason": "event_output_targets_missing_after_replacement",
+                        "output_targets_before": list(output_ids_before or []),
+                        "output_targets_after": list(output_ids_after or []),
+                        "replacement_attempted": True,
+                        "cleanup_attempted": True,
+                        "context_preserved": True,
                     },
                     messages=messages,
                     source_before_text=source,
@@ -731,12 +1048,6 @@ class PatchEngine:
                 op.guard_expr or "",
                 op.guard_replacement or "0.0",
             )
-        if op.op == "replace_expr":
-            return self._apply_expr_replace(
-                source,
-                op.expr_from or "",
-                op.expr_to or "",
-            )
         logger.warning("Unknown patch op type '%s'; skipping", op.op)
         return source
 
@@ -836,6 +1147,12 @@ class PatchEngine:
                     flags=re.MULTILINE,
                 )
                 modified = re.sub(
+                    r"^\s*OpMemberDecorate\s+%\w+\s+\d+\s+RelaxedPrecision\s*$",
+                    "",
+                    modified,
+                    flags=re.MULTILINE,
+                )
+                modified = re.sub(
                     r"\s*:\s*\[\[RelaxedPrecision\]\](\s*;)",
                     r"\1",
                     modified,
@@ -882,8 +1199,8 @@ class PatchEngine:
 
             (isnan(expr) || isinf(expr)) ? guard : expr
 
-        适用于 HLSL 与 GLSL 源码。对于 SPIR-V assembly，会输出注释 marker，
-        因为指令级改写需要外部 SPIR-V tooling。
+        适用于 HLSL 与 GLSL 源码。SPIR-V assembly 的指令级 NaN/Inf
+        防护必须由 agent 生成完整 source_text/diff_text。
 
         Parameters
         ----------
@@ -912,14 +1229,6 @@ class PatchEngine:
             return re.sub(token_pattern, replacement, source)
 
         if "spirv" in enc or "spv" in enc:
-            # 指令级改写超出文本 patch 范畴。输出结构化注释，便于外部
-            # SPIR-V assembler pass 识别处理。
-            marker = f"; RDX_GUARD: {expr} -> {guard}\n"
-            if marker not in source:
-                idx = source.find("OpFunction")
-                if idx >= 0:
-                    return source[:idx] + marker + source[idx:]
-                return marker + source
             return source
 
         # 未知/通用 encoding —— 尽力做字面替换。
@@ -927,25 +1236,6 @@ class PatchEngine:
             f"(isnan({expr}) || isinf({expr}) ? {guard} : {expr})"
         )
         return source.replace(expr, replacement)
-
-    # ------------------------------------------------------------------
-    # Expression replacement（表达式替换）
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _apply_expr_replace(
-        source: str,
-        expr_from: str,
-        expr_to: str,
-    ) -> str:
-        """在 shader 源码中执行直接文本替换。
-
-        将所有 *expr_from* 替换为 *expr_to*。若 *expr_from* 为空，
-        则返回原始 *source* 不变。
-        """
-        if not expr_from:
-            return source
-        return source.replace(expr_from, expr_to)
 
     @classmethod
     def _resolve_source(
@@ -984,8 +1274,11 @@ class PatchEngine:
         if raw_requested:
             encoding = cls._find_requested_encoding(supported_encodings, encoding_name or "spirvasm")
             if encoding is None:
+                encoding = cls._find_requested_encoding(supported_encodings, "spirv")
+            if encoding is None:
                 raise RuntimeError(
-                    "Raw SPIR-V ASM editing requires a replay backend that supports SPIRVAsm source encoding"
+                    "Raw SPIR-V ASM editing requires a replay backend that supports SPIRVAsm source encoding "
+                    "or SPIRV binary encoding with a local spirv-as assembler"
                 )
             raw_target = cls._find_raw_spirv_asm_target(targets)
             if raw_target:
@@ -1056,7 +1349,8 @@ class PatchEngine:
         if not normalized:
             return None
         aliases = {
-            "spirvasm": {"spirvasm", "spirvdis"},
+            "spirvasm": {"spirvasm", "openglspirvasm", "spirvdis"},
+            "spirv": {"spirv", "openglspirv"},
             "hlsl": {"hlsl"},
             "glsl": {"glsl"},
             "dxbc": {"dxbc"},
@@ -1114,6 +1408,145 @@ class PatchEngine:
                 )
                 return ""
             return output_path.read_text(encoding="utf-8")
+        finally:
+            for path in (source_path, output_path):
+                try:
+                    path.unlink()
+                except Exception:
+                    pass
+
+    @classmethod
+    def _source_bytes_for_build(
+        cls,
+        source: str,
+        encoding_name: str,
+        disassembly_target: str,
+    ) -> bytes:
+        normalized = str(encoding_name or "").strip().lower().replace("_", "")
+        if normalized in {"spirv", "openglspirv"} and cls._looks_like_raw_spirv_asm(source):
+            return cls._assemble_spirv_asm(source)
+        return str(source or "").encode("utf-8")
+
+    @classmethod
+    def _edit_plan_for_source(
+        cls,
+        *,
+        encoding_name: str,
+        disassembly_target: str = "",
+        source: str = "",
+    ) -> Dict[str, Any]:
+        normalized = str(encoding_name or "").strip().lower().replace("_", "")
+        target = str(disassembly_target or "").strip()
+        target_key = target.lower()
+        is_spirv_asm = normalized in {"spirvasm", "openglspirvasm"} or cls._looks_like_raw_spirv_asm(source)
+        if normalized in {"hlsl", "glsl"}:
+            return {
+                "shader_format": {
+                    "source_encoding": normalized,
+                    "container": normalized,
+                    "disassembly_target": target,
+                },
+                "input_kind": "debug_source",
+                "can_edit_text": True,
+                "can_build": True,
+                "can_replace": True,
+                "requires_toolchain": [],
+                "build_input_kind": "text",
+                "allowed_edit_inputs": ["source_text", "diff_text", "ops"],
+                "allowed_ops": ["force_full_precision", "insert_guard"],
+                "recommended_next_tool": "rd.shader.edit_and_replace",
+                "blocked_reason": "",
+            }
+        if is_spirv_asm:
+            requires = ["spirv-as"] if normalized in {"spirv", "openglspirv"} else []
+            return {
+                "shader_format": {
+                    "source_encoding": normalized or "spirvasm",
+                    "container": "spirv",
+                    "disassembly_target": target,
+                },
+                "input_kind": "text_ir",
+                "can_edit_text": True,
+                "can_build": True,
+                "can_replace": True,
+                "requires_toolchain": requires,
+                "build_input_kind": "binary_spirv" if requires else "text",
+                "allowed_edit_inputs": ["source_text", "diff_text", "ops"],
+                "allowed_ops": ["force_full_precision"],
+                "recommended_next_tool": "rd.shader.edit_and_replace",
+                "blocked_reason": "",
+            }
+        if normalized in {"dxil", "dxbc"} or "dxil" in target_key or "dxbc" in target_key:
+            container = "dxil" if normalized == "dxil" or "dxil" in target_key else "dxbc"
+            return {
+                "shader_format": {
+                    "source_encoding": normalized or container,
+                    "container": container,
+                    "disassembly_target": target,
+                },
+                "input_kind": "renderdoc_disassembly",
+                "can_edit_text": False,
+                "can_build": False,
+                "can_replace": False,
+                "requires_toolchain": [],
+                "build_input_kind": "unsupported",
+                "allowed_edit_inputs": [],
+                "allowed_ops": [],
+                "recommended_next_tool": "rd.shader.extract_binary",
+                "blocked_reason": (
+                    f"{container.upper()} disassembly is read-only in rdx-tools. "
+                    "Use debug HLSL source when available, or inspect the binary with "
+                    "rd.shader.extract_binary; do not pass disassembly text to edit_and_replace."
+                ),
+            }
+        return {
+            "shader_format": {
+                "source_encoding": normalized,
+                "container": normalized or "unknown",
+                "disassembly_target": target,
+            },
+            "input_kind": "unsupported",
+            "can_edit_text": False,
+            "can_build": False,
+            "can_replace": False,
+            "requires_toolchain": [],
+            "build_input_kind": "unsupported",
+            "allowed_edit_inputs": [],
+            "allowed_ops": [],
+            "recommended_next_tool": "rd.shader.get_source",
+            "blocked_reason": (
+                f"Shader source encoding '{encoding_name}' is not safely editable by "
+                "rd.shader.edit_and_replace."
+            ),
+        }
+
+    @staticmethod
+    def _assemble_spirv_asm(source: str) -> bytes:
+        tool = shutil.which("spirv-as") or shutil.which("spirv-as.exe")
+        if not tool:
+            raise RuntimeError(
+                "Raw SPIR-V ASM replacement requires spirv-as when the replay backend only accepts SPIRV binary encoding"
+            )
+        runtime_dir = Path(__file__).resolve().parents[2] / "intermediate" / "runtime" / "rdx_cli" / "patch_engine"
+        runtime_dir.mkdir(parents=True, exist_ok=True)
+        stem = f"spirv_asm_{uuid.uuid4().hex[:10]}"
+        source_path = runtime_dir / f"{stem}.spvasm"
+        output_path = runtime_dir / f"{stem}.spv"
+        try:
+            source_path.write_text(str(source or ""), encoding="utf-8")
+            proc = subprocess.run(
+                [tool, str(source_path), "-o", str(output_path)],
+                capture_output=True,
+                text=True,
+                timeout=20,
+                check=False,
+            )
+            if proc.returncode != 0:
+                diagnostics = (proc.stderr or proc.stdout or "").strip()
+                raise RuntimeError(f"spirv-as failed: {diagnostics}")
+            return output_path.read_bytes()
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError("spirv-as timed out while assembling SPIR-V ASM") from exc
         finally:
             for path in (source_path, output_path):
                 try:
@@ -1300,17 +1733,45 @@ class PatchEngine:
         ``"HLSL"`` 形式。
         """
         try:
+            rd = _get_rd()
+            raw_value = int(encoding)
+            for name in dir(rd.ShaderEncoding):
+                if name.startswith("_"):
+                    continue
+                try:
+                    if int(getattr(rd.ShaderEncoding, name)) == raw_value:
+                        mapping = {
+                            "HLSL": "hlsl",
+                            "GLSL": "glsl",
+                            "SPIRV": "spirv",
+                            "SPIRVAsm": "spirvasm",
+                            "OpenGLSPIRV": "openglspirv",
+                            "OpenGLSPIRVAsm": "openglspirvasm",
+                            "DXBC": "dxbc",
+                            "DXIL": "dxil",
+                            "Slang": "slang",
+                        }
+                        return mapping.get(name, str(name).strip().lower())
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        try:
             numeric = int(encoding)
         except (TypeError, ValueError):
             numeric = None
         if numeric is not None:
             numeric_map = {
                 0: "unknown",
-                1: "hlsl",
+                1: "dxbc",
                 2: "glsl",
-                3: "spirvasm",
-                4: "dxil",
-                5: "slang",
+                3: "spirv",
+                4: "spirvasm",
+                5: "hlsl",
+                6: "dxil",
+                7: "openglspirv",
+                8: "openglspirvasm",
+                9: "slang",
             }
             if numeric in numeric_map:
                 return numeric_map[numeric]

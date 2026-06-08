@@ -2,7 +2,7 @@
 
 Scope: this file governs `resources/tools` changes only.
 
-`rdx-tools` is CLI-only. Do not add back an MCP server, MCP transport, or built-in RDC ToolBridge MCP descriptor. Keep `rdx.bat`, `bin/rdx`, and `python cli/run_cli.py` as the public entrypoints.
+`rdx-tools` is CLI-only. Keep `rdx.bat`, `bin/rdx`, and `python cli/run_cli.py` as the public entrypoints.
 
 ## Conflict policy:
 

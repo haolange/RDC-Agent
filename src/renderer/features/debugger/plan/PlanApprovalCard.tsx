@@ -155,7 +155,7 @@ export const PlanApprovalCard: React.FC = () => {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points={planExpanded ? '18 15 12 9 6 15' : '6 9 12 15 18 9'} />
                 </svg>
-                <span>{planExpanded ? '鎶樺彔璁″垝' : '灞曞紑璁″垝'}</span>
+                <span>{planExpanded ? '折叠计划' : '展开计划'}</span>
               </button>
             </div>
           </header>
@@ -178,7 +178,7 @@ export const PlanApprovalCard: React.FC = () => {
               {presentation.sections.slice(0, 3).map((section) => (
                 <div key={section.id} className="plan-document-preview-row">
                   <strong>{section.title}</strong>
-                  <span>{section.body.slice(0, 2).join(' 路 ')}</span>
+                  <span>{section.body.slice(0, 2).join(' / ')}</span>
                 </div>
               ))}
             </div>

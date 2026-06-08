@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import { traceService } from '../agent-trace/TraceService';
+import { debuggerRuntime } from '../workflow/debugger/DebuggerRuntime';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
 export function registerTraceHandlers(context: WorkbenchIpcContext): void {
@@ -19,11 +20,18 @@ export function registerTraceHandlers(context: WorkbenchIpcContext): void {
     if (!targetSessionId) {
       return { success: false, error: 'No active session.' };
     }
-    const result = await traceService.getSession(targetSessionId);
-    return result;
+    return debuggerRuntime.getTraceProjection(targetSessionId);
   });
 
   ipcMain.handle('trace:exportRun', async (_event, runId: string) => {
     return traceService.exportRun(runId);
+  });
+
+  ipcMain.handle('trace:switchBranch', async (_event, sessionId: string, branchId: string) => {
+    return debuggerRuntime.switchTraceBranch(sessionId, branchId);
+  });
+
+  ipcMain.handle('trace:exportSession', async (_event, sessionId: string, options?: unknown) => {
+    return debuggerRuntime.exportTraceSession(sessionId, options as Parameters<typeof debuggerRuntime.exportTraceSession>[1]);
   });
 }

@@ -250,9 +250,8 @@ export class TraceEventEmitter {
   }
 
   /**
-   * 处理新 Agent Runtime 核心 AgentEvent（来自 `agent-runtime/core/types`）。
-   * 该方法与 {@link emitFromAgentEvent}（消费旧 `@shared/types/agentRuntime` 形状）
-   * 并行存在，以便在系统迁移期间同时支持两种事件形状。
+   * 处理 Agent Runtime 核心 AgentEvent（来自 `agent-runtime/core/types`）。
+   * 该方法与 {@link emitFromAgentEvent} 分别服务 core runtime 与 shared IPC event 输入。
    *
    * 映射规则：
    *  - `tool_execution_start` → `node.created` + `ToolActionNode (running)`
