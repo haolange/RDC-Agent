@@ -1,12 +1,12 @@
 ﻿/**
  * RdxSessionService - Session / Runtime 编排层
- * ToolBridge 上层，负责 bootstrap、context 分配、owner claim 和 capture 会话管理
+ * RDX CLI invoker 上层，负责 bootstrap、context 分配、owner claim 和 capture 会话管理
  */
 
 import fs from 'fs';
 import path from 'path';
 import { BrowserWindow, nativeImage } from 'electron';
-import { ToolBridge } from '../tools/ToolBridge';
+import { RdxCliInvokerService } from '../tools/RdxCliInvokerService';
 import { appPathService } from '../runtime/AppPathService';
 import { replayDeviceService, type PreparedRemoteSurface } from '../captures/ReplayDeviceService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
@@ -55,7 +55,7 @@ const emptyPreviewLoadResult = (): PreviewLoadResult => ({
 });
 
 export class RdxSessionService {
-  private toolBridge: ToolBridge;
+  private rdxCliInvoker: RdxCliInvokerService;
   private contextId: string | null = null;
   private runtimeOwner: string | null = null;
   private ownerLeaseId: string | null = null;
@@ -71,8 +71,8 @@ export class RdxSessionService {
     updatedAt: Date.now(),
   };
 
-  constructor(toolBridge: ToolBridge) {
-    this.toolBridge = toolBridge;
+  constructor(rdxCliInvoker: RdxCliInvokerService) {
+    this.rdxCliInvoker = rdxCliInvoker;
   }
 
   async bootstrap(request: DebugSessionStartRequest): Promise<ContextSnapshot> {
@@ -286,7 +286,7 @@ export class RdxSessionService {
       sessionId: replaySessionId,
     });
 
-    const result = await this.toolBridge.call({
+    const result = await this.rdxCliInvoker.call({
       toolName: 'rd.session.open_preview',
       args: {
         session_id: replaySessionId,
@@ -327,7 +327,7 @@ export class RdxSessionService {
       return this.snapshotContext();
     }
 
-    const result = await this.toolBridge.call({
+    const result = await this.rdxCliInvoker.call({
       toolName: 'rd.session.close_preview',
       args: {
         context_id: this.contextId,
@@ -368,7 +368,7 @@ export class RdxSessionService {
   }
 
   private async ensureRuntimeReady(): Promise<void> {
-    const statusResult = await this.toolBridge.executeCLI('daemon', ['status']);
+    const statusResult = await this.rdxCliInvoker.executeCLI('daemon', ['status']);
     if (statusResult.exitCode === 0) {
       try {
         const parsed = JSON.parse(statusResult.stdout) as { data?: { running?: boolean } };
@@ -380,7 +380,7 @@ export class RdxSessionService {
       }
     }
 
-    const startResult = await this.toolBridge.executeCLI('daemon', ['start']);
+    const startResult = await this.rdxCliInvoker.executeCLI('daemon', ['start']);
     if (startResult.exitCode !== 0) {
       const message = startResult.stderr.trim() || `Exit code: ${startResult.exitCode}`;
       throw new Error(`Failed to start rdx daemon: ${message}`);
@@ -389,7 +389,7 @@ export class RdxSessionService {
 
   async allocateContext(): Promise<string> {
     const contextId = `ctx-${generateShortId()}`;
-    let result: ToolCallResult = await this.toolBridge.call({
+    let result: ToolCallResult = await this.rdxCliInvoker.call({
       toolName: 'rd.session.create_context',
       args: { context_id: contextId },
       contextId,
@@ -398,7 +398,7 @@ export class RdxSessionService {
       if (result.error?.message?.includes('Context limit exceeded')) {
         const daemonCleaned = await this.cleanupDaemonRuntimeState();
         if (daemonCleaned) {
-          result = await this.toolBridge.call({
+          result = await this.rdxCliInvoker.call({
             toolName: 'rd.session.create_context',
             args: { context_id: contextId },
             contextId,
@@ -410,7 +410,7 @@ export class RdxSessionService {
 
         const cleanedCount = await this.cleanupStaleRdcAgentContexts();
         if (cleanedCount > 0) {
-          result = await this.toolBridge.call({
+          result = await this.rdxCliInvoker.call({
             toolName: 'rd.session.create_context',
             args: { context_id: contextId },
             contextId,
@@ -426,7 +426,7 @@ export class RdxSessionService {
   }
 
   private async initializeContextRuntime(): Promise<void> {
-    const result = await this.toolBridge.call({
+    const result = await this.rdxCliInvoker.call({
       toolName: 'rd.core.init',
       args: {},
       contextId: this.contextId!,
@@ -438,7 +438,7 @@ export class RdxSessionService {
 
   async claimOwner(contextId: string): Promise<{ owner: string; leaseId: string }> {
     const owner = `rdc-agent-${generateShortId()}`;
-    const result: ToolCallResult = await this.toolBridge.call({
+    const result: ToolCallResult = await this.rdxCliInvoker.call({
       toolName: 'rd.session.claim_runtime_owner',
       args: {
         runtime_owner: owner,
@@ -485,7 +485,7 @@ export class RdxSessionService {
     this.captures[captureIndex] = { ...this.captures[captureIndex], status: 'opening' };
 
     try {
-      const openResult: ToolCallResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+      const openResult: ToolCallResult = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
         'rd.capture.open_file',
         { file_path: capture.filePath },
       ));
@@ -507,7 +507,7 @@ export class RdxSessionService {
         };
       }
 
-      const replayResult: ToolCallResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+      const replayResult: ToolCallResult = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
         'rd.capture.open_replay',
         replayArgs,
       ));
@@ -564,7 +564,7 @@ export class RdxSessionService {
     this.replayDevice = device;
     this.remoteStatus = 'connected';
 
-    const connectResult: ToolCallResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+    const connectResult: ToolCallResult = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
       'rd.remote.connect',
       {
         timeout_ms: 5000,
@@ -591,7 +591,7 @@ export class RdxSessionService {
     }
     this.remoteId = remoteId;
 
-    const pingResult: ToolCallResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+    const pingResult: ToolCallResult = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
       'rd.remote.ping',
       { remote_id: remoteId },
     ));
@@ -655,7 +655,7 @@ export class RdxSessionService {
       return false;
     }
 
-    const pingResult: ToolCallResult = await this.toolBridge.call({
+    const pingResult: ToolCallResult = await this.rdxCliInvoker.call({
       toolName: 'rd.remote.ping',
       args: { remote_id: this.remoteId },
       contextId: this.contextId,
@@ -959,7 +959,7 @@ export class RdxSessionService {
       args.event_id = eventId;
     }
 
-    const result: ToolCallResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+    const result: ToolCallResult = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
       'rd.export.screenshot',
       args,
     ));
@@ -1015,7 +1015,7 @@ export class RdxSessionService {
   }
 
   private async listPreviewCandidateEvents(sessionId: string): Promise<number[]> {
-    const result: ToolCallResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+    const result: ToolCallResult = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
       'rd.event.get_actions',
       {
         session_id: sessionId,
@@ -1061,7 +1061,7 @@ export class RdxSessionService {
     captureFileId: string,
     attempts: OpenedCapturePreviewAttempt[],
   ): Promise<OpenedCapturePreview | null> {
-    const result: ToolCallResult = await this.toolBridge.call(this.buildClaimedToolRequest(
+    const result: ToolCallResult = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
       'rd.capture.get_thumbnail',
       {
         capture_file_id: captureFileId,
@@ -1255,7 +1255,7 @@ export class RdxSessionService {
     ));
 
     for (const sessionId of replaySessionIds) {
-      const result = await this.toolBridge.call({
+      const result = await this.rdxCliInvoker.call({
         toolName: 'rd.capture.close_replay',
         args: { session_id: sessionId },
         contextId: contextId ?? undefined,
@@ -1278,7 +1278,7 @@ export class RdxSessionService {
     }
 
     for (const captureFileId of captureFileIds) {
-      const result = await this.toolBridge.call({
+      const result = await this.rdxCliInvoker.call({
         toolName: 'rd.capture.close_file',
         args: { capture_file_id: captureFileId },
         contextId: contextId ?? undefined,
@@ -1301,7 +1301,7 @@ export class RdxSessionService {
     }
 
     if (contextId && runtimeOwner && ownerLeaseId) {
-      await this.toolBridge.call({
+      await this.rdxCliInvoker.call({
         toolName: 'rd.session.release_runtime_owner',
         args: {
           runtime_owner: runtimeOwner,
@@ -1315,7 +1315,7 @@ export class RdxSessionService {
     }
 
     if (contextId) {
-      await this.toolBridge.call({
+      await this.rdxCliInvoker.call({
         toolName: 'rd.session.clear_context',
         args: {
           target_context_id: contextId,
@@ -1326,7 +1326,7 @@ export class RdxSessionService {
   }
 
   private async cleanupStaleRdcAgentContexts(): Promise<number> {
-    const result = await this.toolBridge.call({
+    const result = await this.rdxCliInvoker.call({
       toolName: 'rd.session.list_contexts',
       args: {},
     });
@@ -1355,7 +1355,7 @@ export class RdxSessionService {
       }
 
       if (runtimeOwner && ownerLeaseId) {
-        await this.toolBridge.call({
+        await this.rdxCliInvoker.call({
           toolName: 'rd.session.release_runtime_owner',
           args: {
             runtime_owner: runtimeOwner,
@@ -1368,7 +1368,7 @@ export class RdxSessionService {
         });
       }
 
-      const clearResult = await this.toolBridge.call({
+      const clearResult = await this.rdxCliInvoker.call({
         toolName: 'rd.session.clear_context',
         args: {
           target_context_id: targetContextId,
@@ -1386,7 +1386,7 @@ export class RdxSessionService {
   private async cleanupDaemonRuntimeState(): Promise<boolean> {
     let cleaned = false;
 
-    const daemonCleanup = await this.toolBridge.executeCLI('daemon', ['cleanup']);
+    const daemonCleanup = await this.rdxCliInvoker.executeCLI('daemon', ['cleanup']);
     if (daemonCleanup.exitCode === 0) {
       cleaned = true;
     } else {
@@ -1399,7 +1399,7 @@ export class RdxSessionService {
       });
     }
 
-    const contextClear = await this.toolBridge.executeCLI('context', ['clear']);
+    const contextClear = await this.rdxCliInvoker.executeCLI('context', ['clear']);
     if (contextClear.exitCode === 0) {
       cleaned = true;
     } else {
@@ -1437,6 +1437,7 @@ export class RdxSessionService {
   }
 }
 
-export function createRdxSessionService(toolBridge: ToolBridge): RdxSessionService {
-  return new RdxSessionService(toolBridge);
+export function createRdxSessionService(rdxCliInvoker: RdxCliInvokerService): RdxSessionService {
+  return new RdxSessionService(rdxCliInvoker);
 }
+

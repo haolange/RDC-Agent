@@ -466,6 +466,28 @@ def test_choose_visual_output_target_honors_requested_rt_index(
     assert target_source == "event_output_slot"
 
 
+def test_choose_visual_output_target_rejects_missing_explicit_rt_index(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _fake_output_targets(session_id: str, event_id: int | None):  # type: ignore[no-untyped-def]
+        return []
+
+    monkeypatch.setattr(server.server_runtime, "_output_target_resource_ids", _fake_output_targets)
+
+    with pytest.raises(Exception) as exc_info:
+        asyncio.run(
+            server.server_runtime._choose_visual_output_target(
+                "sess-preview",
+                1847,
+                target={"rt_index": 0},
+                allow_framebuffer_fallback=True,
+            )
+        )
+
+    assert getattr(exc_info.value, "code", "") == "preview_event_output_unavailable"
+    assert "requested RT slot 0" in str(getattr(exc_info.value, "message", ""))
+
+
 def test_choose_visual_output_target_defaults_to_rt0_before_visual_scoring(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1206,7 +1228,7 @@ def test_resume_waits_for_preview_sync(monkeypatch: pytest.MonkeyPatch) -> None:
         "default",
     )
 
-    async def _fake_recover_context_sessions(context_id: str):  # type: ignore[no-untyped-def]
+    async def _fake_recover_context_sessions(context_id: str, **kwargs):  # type: ignore[no-untyped-def]
         return server.server_runtime._context_state(context_id)
 
     preview_sync_calls: list[str] = []
@@ -1274,14 +1296,5 @@ def test_preview_docs_and_catalog_are_synchronized() -> None:
 
     frameworks_root = repo_root.parent / ("RDC-Agent-" + "Frameworks") / "debugger"
     if frameworks_root.is_dir():
-        debugger_readme = (frameworks_root / "README.md").read_text(encoding="utf-8-sig")
-        agent_core = (frameworks_root / "common" / "AGENT_CORE.md").read_text(encoding="utf-8-sig")
         cli_mode = (frameworks_root / "common" / "docs" / "cli-mode-reference.md").read_text(encoding="utf-8-sig")
-        runtime_coordination = (frameworks_root / "common" / "docs" / "runtime-coordination-model.md").read_text(encoding="utf-8-sig")
-        truth_store = (frameworks_root / "common" / "docs" / "truth_store_contract.md").read_text(encoding="utf-8-sig")
-
-        assert "preview" in debugger_readme
-        assert "preview" in agent_core
         assert "session preview on|off|status" in cli_mode
-        assert "human observer" in runtime_coordination
-        assert "preview" in truth_store

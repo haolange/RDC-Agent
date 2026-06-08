@@ -29,7 +29,7 @@ import type {
   TraceExportResult,
   TraceRevisionResult,
   TraceSessionResult,
-} from '@shared/types/workstream';
+} from '@shared/types/trace';
 import { normalizeWorkflowStage } from '@shared/constants/stages';
 import { BLOCKER_CODES } from '@shared/constants/blockers';
 import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
@@ -39,7 +39,7 @@ import { buildDebugPlanPresentation, planBuilder } from './PlanBuilder';
 import { runExecutionService } from './RunExecutionService';
 import { rdxSessionService } from '../../index';
 import { deterministicSpecialistExecutor, type SpecialistRecipeResult } from './DeterministicSpecialistExecutor';
-import { toolBridge } from '../../tools/ToolBridge';
+import { rdxCliInvokerService } from '../../tools/RdxCliInvokerService';
 import { harnessController } from './HarnessController';
 import { reportBundleService } from '../../reports/ReportBundleService';
 import { debuggerLlmService } from '../../settings/DebuggerLlmService';
@@ -50,7 +50,7 @@ import { taskBoard } from './TaskBoard';
 import { multiAgentWorkflowEngine } from './MultiAgentWorkflowEngineRuntime';
 import { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
 import { traceService } from '../../agent-trace/TraceService';
-import { workstreamStateStore } from './WorkstreamStateStore';
+import { traceStateStore } from './TraceStateStore';
 import {
   dedupeBlockers,
   latestStageHistory,
@@ -545,7 +545,7 @@ export class DebugWorkflowService {
       approval_state: 'approved',
       pending_questions: null,
     });
-    workstreamStateStore.markPlan(location.session.sessionId, snapshot.debug_plan.planId, 'accepted');
+    traceStateStore.markPlan(location.session.sessionId, snapshot.debug_plan.planId, 'accepted');
     this.applyTaskMutation(location.session.sessionId, runId, 'plan', 'completed', 'User approved the Debugger plan.');
     this.applyTaskMutation(location.session.sessionId, runId, 'speclist', 'in_progress', 'Task breakdown started after plan approval.');
     contextService.writeRunCapsule(location.session.sessionId, runId);
@@ -611,7 +611,7 @@ export class DebugWorkflowService {
     };
   }
 
-  async getWorkstreamSession(sessionId: string): Promise<TraceSessionResult> {
+  async getTraceProjection(sessionId: string): Promise<TraceSessionResult> {
     return traceService.getSession(sessionId);
   }
 
@@ -655,12 +655,12 @@ export class DebugWorkflowService {
       updatedAt: nowIso(),
     };
 
-    workstreamStateStore.createRevision({
+    traceStateStore.createRevision({
       sessionId,
       runId: nextRunId,
       previousPlanId,
       revisionText: trimmedRevision,
-      revisionWorkstreamId: `ws-${nextRunId}-plan`,
+      revisionTraceLaneId: `ws-${nextRunId}-plan`,
     });
 
     storageAdapter.writePlanSnapshot(sessionId, nextRunId, {
@@ -677,11 +677,11 @@ export class DebugWorkflowService {
       debugPlan: nextPlan,
       pendingQuestions: null,
     });
-    workstreamStateStore.registerPlan({
+    traceStateStore.registerPlan({
       sessionId,
       runId: nextRunId,
       planId: nextPlan.planId,
-      workstreamId: `ws-${nextRunId}-plan`,
+      traceLaneId: `ws-${nextRunId}-plan`,
       status: 'awaiting_approval',
     });
 
@@ -739,26 +739,26 @@ export class DebugWorkflowService {
     this.emitRunStatus(location.session.sessionId, runId, 'interrupted', location.run.lastStage, 'Plan revision requested');
     this.emitRunStatus(sessionId, nextRunId, 'awaiting_approval', 'plan');
     this.emitWorkflowState(await this.getWorkflowState(sessionId, nextRunId));
-    const workstream = await this.getWorkstreamSession(sessionId);
+    const traceProjection = await this.getTraceProjection(sessionId);
 
     return {
-      ...workstream,
+      ...traceProjection,
       runId: nextRunId,
       planId: nextPlan.planId,
-      branchId: workstream.presentation?.activeBranchId,
+      branchId: traceProjection.presentation?.activeBranchId,
     };
   }
 
-  async switchWorkstreamBranch(sessionId: string, branchId: string): Promise<TraceBranchSwitchResult> {
-    workstreamStateStore.switchBranch(sessionId, branchId);
-    const workstream = await this.getWorkstreamSession(sessionId);
+  async switchTraceBranch(sessionId: string, branchId: string): Promise<TraceBranchSwitchResult> {
+    traceStateStore.switchBranch(sessionId, branchId);
+    const traceProjection = await this.getTraceProjection(sessionId);
     return {
-      ...workstream,
-      activeBranchId: workstream.presentation?.activeBranchId,
+      ...traceProjection,
+      activeBranchId: traceProjection.presentation?.activeBranchId,
     };
   }
 
-  async exportWorkstreamSession(
+  async exportTraceSession(
     sessionId: string,
     options: TraceExportOptions = {},
   ): Promise<TraceExportResult> {
@@ -767,9 +767,9 @@ export class DebugWorkflowService {
       if (!session) {
         return { success: false, error: `Session not found: ${sessionId}` };
       }
-      const workstream = await this.getWorkstreamSession(sessionId);
-      if (!workstream.success) {
-        return { success: false, error: workstream.error };
+      const traceProjection = await this.getTraceProjection(sessionId);
+      if (!traceProjection.success) {
+        return { success: false, error: traceProjection.error };
       }
       const exportDir = path.join(session.sessionPath, 'exports');
       fs.mkdirSync(exportDir, { recursive: true });
@@ -779,7 +779,7 @@ export class DebugWorkflowService {
         schemaVersion: '1',
         exportedAt: nowIso(),
         includeAllBranches: options.includeAllBranches ?? true,
-        presentation: workstream.presentation,
+        presentation: traceProjection.presentation,
       }, null, 2), 'utf-8');
 
       let rawTracePath: string | undefined;
@@ -860,7 +860,7 @@ export class DebugWorkflowService {
     }
 
     const active = runExecutionService.stopRun(runId);
-    toolBridge.abortRun(runId);
+    rdxCliInvokerService.abortRun(runId);
     await rdxSessionService.closeOrReplaceOpenedCapture();
 
     await storageAdapter.updateRun(location.session.sessionId, runId, {
@@ -2046,7 +2046,7 @@ export class DebugWorkflowService {
       sessionId: runtimeContext.sessionId,
       runId: runtimeContext.runId,
       turnId: runtimeContext.turnId,
-      execute: () => toolBridge.call({
+      execute: () => rdxCliInvokerService.call({
         toolName: 'rd.export.screenshot',
         args: {
           session_id: replaySessionId,
@@ -2329,7 +2329,7 @@ export class DebugWorkflowService {
     }
     await storageAdapter.appendActionEvent(sessionId, event);
     workflowProjectionPublisher.publishEvidenceEvent(event);
-    this.publishWorkstream(sessionId);
+    this.publishTraceProjection(sessionId);
   }
 
   private async appendUserConversationMessage(
@@ -2360,7 +2360,7 @@ export class DebugWorkflowService {
       turnId: message.turnId,
       message,
     });
-    this.publishWorkstream(sessionId);
+    this.publishTraceProjection(sessionId);
   }
 
   private async appendAssistantConversationMessage(
@@ -2410,7 +2410,7 @@ export class DebugWorkflowService {
 
   private emitWorkflowState(state: WorkflowState): void {
     workflowProjectionPublisher.publishWorkflowState(state);
-    this.publishWorkstream(state.sessionId);
+    this.publishTraceProjection(state.sessionId);
   }
 
   private emitRunStatus(
@@ -2428,7 +2428,7 @@ export class DebugWorkflowService {
       stopReason,
     });
     if (['completed', 'failed', 'cancelled', 'interrupted'].includes(status)) {
-      this.publishWorkstream(sessionId);
+      this.publishTraceProjection(sessionId);
     }
   }
 
@@ -2436,7 +2436,7 @@ export class DebugWorkflowService {
     workflowProjectionPublisher.publishConversationEvent(event);
   }
 
-  private publishWorkstream(sessionId: string): void {
+  private publishTraceProjection(sessionId: string): void {
     void traceService.getSession(sessionId)
       .then((result) => {
         if (result.success && result.presentation) {

@@ -35,6 +35,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     setEnabledMcpDrafts,
     patternBindingDrafts,
     setPatternBindingDrafts,
+    rdxCliDraft,
+    setRdxCliDraft,
     connectionDraft,
     setConnectionDraft,
     agentRouteSaveState,
@@ -199,6 +201,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 enabledSkillDrafts={enabledSkillDrafts}
                 enabledMcpDrafts={enabledMcpDrafts}
                 patternBindingDrafts={patternBindingDrafts}
+                rdxCliDraft={rdxCliDraft}
                 routableProviders={routableProviders}
                 configuredProvidersWithoutEnabledModels={configuredProvidersWithoutEnabledModels}
                 getResolvedProviderLabel={getResolvedProviderLabel}
@@ -207,6 +210,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 onEnabledSkillDraftsChange={setEnabledSkillDrafts}
                 onEnabledMcpDraftsChange={setEnabledMcpDrafts}
                 onPatternBindingDraftsChange={setPatternBindingDrafts}
+                onRdxCliDraftChange={setRdxCliDraft}
                 onSaveAgentRoutes={handleSaveAgentRoutes}
                 onSaveAgentRuntimeConfig={handleSaveAgentRuntimeConfig}
                 toggleRuntimeId={toggleRuntimeId}

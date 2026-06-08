@@ -68,8 +68,10 @@ def test_doctor_reports_cli_only_contract(monkeypatch) -> None:
     assert captured[0]["ok"] is True
     details = captured[0]["data"]
     assert details["context_id"] == "ctx-doctor"
-    assert details["mcp"]["supported"] is False
     assert details["launchers"]["python_cli_exists"] is True
+    assert "shader_tools" in details
+    assert "spirv_as" in details["shader_tools"]
+    assert "spirv_dis" in details["shader_tools"]
 
 
 def test_tools_list_and_search_emit_catalog_summaries(monkeypatch) -> None:
@@ -123,7 +125,6 @@ def test_version_command_emits_stable_json(monkeypatch) -> None:
     assert captured[0]["ok"] is True
     assert captured[0]["result_kind"] == "rdx.version"
     assert captured[0]["data"]["compatibility"]["json_envelope"] == "stable"
-    assert captured[0]["data"]["compatibility"]["mcp_supported"] is False
 
 
 def test_completion_command_outputs_shell_script(monkeypatch, capsys) -> None:

@@ -1,6 +1,6 @@
 ﻿# rdx-tools
 
-`rdx-tools` is a CLI-only RenderDoc `.rdc` runtime package. It exposes 200 `rd.*` tools through `rdx.bat`, `bin/rdx`, or `python cli/run_cli.py`; it no longer ships an MCP server, MCP transport, or built-in RDC ToolBridge MCP descriptor.
+`rdx-tools` is a CLI-only RenderDoc `.rdc` runtime package. It exposes 200 `rd.*` tools through `rdx.bat`, `bin/rdx`, or `python cli/run_cli.py`.
 
 ## Entry Points
 
@@ -20,7 +20,7 @@ rdx.bat completion powershell
 bash resources/tools/bin/rdx --json doctor
 ```
 
-`--non-interactive` is a launcher flag only. `rdx.bat --non-interactive --json doctor` runs the same CLI. `rdx.bat --non-interactive mcp --ensure-env` is intentionally unsupported and returns non-zero JSON.
+`--non-interactive` is a launcher flag only. `rdx.bat --non-interactive --json doctor` runs the same CLI.
 
 ## Smoke
 
@@ -31,7 +31,7 @@ bash scripts/smoke_cli.sh
 bash scripts/smoke_cli.sh --rdc "C:/path/sample.rdc" --context cli-smoke
 ```
 
-The smoke script calls `bin/rdx` directly for `doctor`, `tools list`, `tools search`, the negative MCP route check, and the daemon-backed capture chain. If `--rdc` is omitted, it uses the first `tests/fixtures/*.rdc` fixture when one exists. It writes the same live output to `intermediate/logs/smoke_cli.log`. It does not run a Python smoke runner or a Python command aggregator.
+The smoke script calls `bin/rdx` directly for `doctor`, `tools list`, `tools search`, and, when `--rdc` is passed, the daemon-backed capture chain. The repository does not bundle `.rdc` smoke samples; pass an external capture path for full smoke. The script writes the same live output to `intermediate/logs/smoke_cli.log`. It does not run a Python smoke runner or a Python command aggregator.
 
 ## Install
 
@@ -39,11 +39,11 @@ Release packages are self-contained Windows x64 zips. See [Install](docs/install
 
 ## Session State
 
-Use `rdx context status` to read context state and `rdx context update` to update notes, focus, and agent-visible metadata. `--daemon-context <id>` selects the continuous runtime namespace; omitting it uses `default`. The state includes `session_locator`, current capture/session IDs, preview state, and remote lifecycle fields. `remote_handle_consumed` means a remote handle has been bound to a replay session and must not be reused as a free remote connection.
+Use `rdx context status` to read context state and `rdx context update` to update notes, focus, and agent-visible metadata. `--daemon-context <id>` selects the continuous runtime namespace; omitting it uses `default`. The state includes `session_locator`, current capture/session IDs, preview state, and remote lifecycle fields for staged_handoff between agents. Local contexts support orchestrated multi-context work; remote contexts require stricter ownership. `remote_handle_consumed` means a remote handle has been bound to a replay session and must not be reused as a free remote connection.
 
 ## Preview CLI Contract
 
-`session preview on|status|off` is daemon-backed. `rdx context status` reports preview state and `preview.display`; the preview surface should expose the complete framebuffer（完整 framebuffer）instead of cropping viewport / scissor state.
+`session preview on|status|off` is daemon-backed through `rd.session.open_preview`. `rdx context status` reports `rd.session.get_context.preview` and `preview.display`; the preview surface should expose the complete framebuffer（完整 framebuffer）instead of cropping viewport / scissor state.
 
 ## Docs
 

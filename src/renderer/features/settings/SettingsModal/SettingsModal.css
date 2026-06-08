@@ -1134,6 +1134,31 @@
   min-width: 0;
 }
 
+.settings-checkbox-row,
+.settings-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.settings-checkbox-row {
+  flex-direction: row;
+  align-items: center;
+  color: rgb(var(--color-text-primary));
+  font-size: 13px;
+}
+
+.settings-rdx-cli-input {
+  width: 100%;
+  min-width: 0;
+}
+
+.settings-rdx-cli-textarea {
+  min-height: 74px;
+  resize: vertical;
+}
+
 .settings-agent-select-trigger.dropdown-select-trigger.variant-field {
   min-height: 38px;
   padding: 0 11px;
@@ -1292,5 +1317,17 @@
   .settings-agent-card {
     gap: 8px;
     align-items: stretch;
+  }
+
+  .settings-page-agents,
+  .settings-agent-page {
+    height: auto;
+    overflow: visible;
+  }
+
+  .settings-agent-list {
+    flex: 0 0 auto;
+    overflow: visible;
+    padding-right: 0;
   }
 }

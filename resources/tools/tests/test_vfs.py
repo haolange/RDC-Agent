@@ -89,6 +89,48 @@ def test_vfs_draw_shader_path_routes_through_pipeline_tools(monkeypatch) -> None
 
 
 @pytest.mark.unit
+def test_vfs_shader_not_bound_becomes_unavailable_node(monkeypatch) -> None:
+    async def _fake_dispatch(tool_name: str, args: dict[str, object], **_: object) -> dict[str, object]:
+        if tool_name == "rd.pipeline.get_state":
+            return {
+                "ok": True,
+                "data": {"pipeline_state": {"shaders": [{"stage": "PS", "entry": "psMain"}]}},
+                "error": {},
+                "meta": {},
+            }
+        if tool_name == "rd.pipeline.get_shader":
+            return {
+                "ok": False,
+                "data": {},
+                "error": {
+                    "code": "shader_not_bound",
+                    "category": "validation",
+                    "message": "No shader bound at stage PS for event 42",
+                    "details": {"event_id": 42, "stage": "ps"},
+                },
+                "meta": {},
+            }
+        raise AssertionError(f"unexpected tool: {tool_name}")
+
+    monkeypatch.setattr(server, "dispatch_operation", _fake_dispatch)
+
+    payload = json.loads(
+        asyncio.run(
+            server._dispatch_vfs(
+                "tree",
+                {"path": "/draws/42/shaders", "session_id": "sess_demo", "depth": 1},
+            )
+        )
+    )
+
+    assert payload["success"] is True
+    child = payload["tree"]["children"][0]
+    assert child["path"] == "/draws/42/shaders/ps"
+    assert child["data"]["available"] is False
+    assert child["data"]["error"]["code"] == "shader_not_bound"
+
+
+@pytest.mark.unit
 def test_vfs_resolve_uses_node_key() -> None:
     payload = json.loads(asyncio.run(server._dispatch_vfs("resolve", {"path": "/"})))
 

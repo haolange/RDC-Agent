@@ -14,11 +14,10 @@ Smoke checks should be run through bash so every CLI call is visible to the agen
 
 ```bash
 bash scripts/smoke_cli.sh
-bash scripts/smoke_cli.sh --skip-rdc
 bash scripts/smoke_cli.sh --rdc "C:/path/sample.rdc" --context cli-smoke
 ```
 
-`smoke_cli.sh` directly invokes `bin/rdx` for `doctor`, tool discovery, the negative MCP route check, and the capture/session chain. It does not delegate command orchestration to Python. The release gate checks `intermediate/logs/smoke_cli.log` only when smoke reports are required.
+`smoke_cli.sh` directly invokes `bin/rdx` for `doctor`, tool discovery, and, when `--rdc` is passed, the capture/session chain. It does not delegate command orchestration to Python. The release gate checks `intermediate/logs/smoke_cli.log` only when smoke reports are required, and it does not consume Python smoke JSON reports.
 
 `preview_geometry_smoke.py` validates preview window geometry and should stay aligned with CLI preview behavior.
 

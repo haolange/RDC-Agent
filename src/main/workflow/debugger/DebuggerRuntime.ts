@@ -1,4 +1,4 @@
-import type { ConversationMessage } from '@shared/types/conversation';
+﻿import type { ConversationMessage } from '@shared/types/conversation';
 import type { AgentRole } from '@shared/types/agent';
 import type { AskUserAnswer, WorkflowStage } from '@shared/types/workflow';
 import type { DebugSessionStartRequest } from '@shared/types/session';
@@ -8,7 +8,7 @@ import type {
   TraceRevisionResult,
   TraceSessionResult,
   TraceBranchSwitchResult,
-} from '@shared/types/workstream';
+} from '@shared/types/trace';
 import { debugWorkflowService, type PlanResult, type StartWorkflowResult } from './DebugWorkflowService';
 import { isToolAllowedForAgent, resolveAgentToolAllowlist } from './DebuggerRuntimePolicy';
 
@@ -43,20 +43,20 @@ export class DebuggerRuntime {
     return debugWorkflowService.approvePlan(runId);
   }
 
-  getWorkstreamSession(sessionId: string): Promise<TraceSessionResult> {
-    return debugWorkflowService.getWorkstreamSession(sessionId);
+  getTraceProjection(sessionId: string): Promise<TraceSessionResult> {
+    return debugWorkflowService.getTraceProjection(sessionId);
   }
 
   requestPlanRevision(runId: string, revisionText: string): Promise<TraceRevisionResult> {
     return debugWorkflowService.requestPlanRevision(runId, revisionText);
   }
 
-  switchWorkstreamBranch(sessionId: string, branchId: string): Promise<TraceBranchSwitchResult> {
-    return debugWorkflowService.switchWorkstreamBranch(sessionId, branchId);
+  switchTraceBranch(sessionId: string, branchId: string): Promise<TraceBranchSwitchResult> {
+    return debugWorkflowService.switchTraceBranch(sessionId, branchId);
   }
 
-  exportWorkstreamSession(sessionId: string, options?: TraceExportOptions): Promise<TraceExportResult> {
-    return debugWorkflowService.exportWorkstreamSession(sessionId, options);
+  exportTraceSession(sessionId: string, options?: TraceExportOptions): Promise<TraceExportResult> {
+    return debugWorkflowService.exportTraceSession(sessionId, options);
   }
 
   restartRun(runId: string): Promise<PlanResult> {
@@ -81,3 +81,4 @@ export class DebuggerRuntime {
 }
 
 export const debuggerRuntime = new DebuggerRuntime();
+

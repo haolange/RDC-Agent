@@ -1,15 +1,10 @@
 /**
- * LegacyEventBridge — 把新 Agent Runtime 的 `core.AgentEvent` 翻译为
- * 旧 `@shared/types/agentRuntime.AgentEvent`。
- *
- * 旧 AgentEvent 是 IPC / Trace / ConversationService 的稳定契约
- * （IPC 广播事件名固定），本任务范围内不允许修改其结构；
- * 因此 AgentOrchestrator / ConversationService 对外仍然消费旧事件，
- * 只在内部用此模块完成翻译。
+ * AgentEventBridge translates core runtime events into the shared AgentEvent
+ * contract consumed by IPC, Trace, and ConversationService.
  */
 
 import type {
-  AgentEvent as LegacyAgentEvent,
+  AgentEvent as SharedAgentEvent,
   AgentEventPayload,
   AgentEventType,
 } from '@shared/types/agentRuntime';
@@ -24,8 +19,8 @@ import type {
   ToolResultMessage,
 } from './core/types';
 
-/** 构建旧 AgentEvent 的可选上下文字段。 */
-export interface LegacyEventContext {
+/** Context fields copied into the shared AgentEvent. */
+export interface AgentEventBridgeContext {
   agentId?: AgentRole;
   runId?: string;
   turnId?: string;
@@ -39,12 +34,12 @@ export interface LegacyEventContext {
   toolAllowlist?: string[];
 }
 
-/** 创建一个携带统一上下文的旧 AgentEvent。 */
-function buildLegacyEvent(
+/** Creates a shared AgentEvent with normalized runtime context. */
+function buildSharedAgentEvent(
   type: AgentEventType,
   payload: AgentEventPayload,
-  context: LegacyEventContext,
-): LegacyAgentEvent {
+  context: AgentEventBridgeContext,
+): SharedAgentEvent {
   return {
     id: generateEventId('agent-event'),
     type,
@@ -60,7 +55,7 @@ function buildLegacyEvent(
 }
 
 /**
- * 把核心 AgentEvent 翻译成 0~1 个旧 AgentEvent。
+ * Translates one core AgentEvent into zero or one shared AgentEvent.
  *
  * 翻译规则：
  *  - `agent_start` → `run.started`
@@ -72,13 +67,13 @@ function buildLegacyEvent(
  *  - `error`               → `run.failed`
  *  - 其它事件返回 null（不翻译）。
  */
-export function translateCoreToLegacy(
+export function translateCoreToSharedAgentEvent(
   event: CoreAgentEvent,
-  context: LegacyEventContext,
-): LegacyAgentEvent | null {
+  context: AgentEventBridgeContext,
+): SharedAgentEvent | null {
   switch (event.type) {
     case 'agent_start': {
-      return buildLegacyEvent(
+      return buildSharedAgentEvent(
         'run.started',
         {
           mode: context.mode ?? 'debugger',
@@ -92,7 +87,7 @@ export function translateCoreToLegacy(
     }
     case 'agent_end': {
       const text = extractAssistantText(event.messages);
-      return buildLegacyEvent(
+      return buildSharedAgentEvent(
         'run.completed',
         {
           status: 'complete',
@@ -104,10 +99,10 @@ export function translateCoreToLegacy(
     case 'message_update': {
       const ev = event.assistantMessageEvent as AssistantMessageEvent;
       if (ev.type === 'text_delta') {
-        return buildLegacyEvent('assistant.delta', { text: ev.delta }, context);
+        return buildSharedAgentEvent('assistant.delta', { text: ev.delta }, context);
       }
       if (ev.type === 'thinking_start') {
-        return buildLegacyEvent(
+        return buildSharedAgentEvent(
           'diagnostic',
           {
             code: 'MODEL_THINKING_STARTED',
@@ -118,7 +113,7 @@ export function translateCoreToLegacy(
         );
       }
       if (ev.type === 'thinking_end') {
-        return buildLegacyEvent(
+        return buildSharedAgentEvent(
           'diagnostic',
           {
             code: 'MODEL_THINKING_COMPLETED',
@@ -136,7 +131,7 @@ export function translateCoreToLegacy(
           .filter((block) => block.type === 'text')
           .map((block) => (block as { text: string }).text)
           .join('');
-        return buildLegacyEvent(
+        return buildSharedAgentEvent(
           'assistant.completed',
           {
             text,
@@ -153,7 +148,7 @@ export function translateCoreToLegacy(
       return null;
     }
     case 'tool_execution_start': {
-      return buildLegacyEvent(
+      return buildSharedAgentEvent(
         'tool.started',
         {
           toolCallId: event.toolCallId,
@@ -164,32 +159,32 @@ export function translateCoreToLegacy(
       );
     }
     case 'tool_execution_end': {
-      const legacyResult = toolResultToLegacy(event.result, event.durationMs);
+      const sharedResult = toolResultToSharedResult(event.result, event.durationMs);
       const denialReason = getPolicyDenialReason(event.result);
       if (denialReason) {
-        return buildLegacyEvent(
+        return buildSharedAgentEvent(
           'tool.denied',
           {
             toolCallId: event.toolCallId,
             toolName: event.toolName,
             reason: denialReason,
-            result: legacyResult,
+            result: sharedResult,
           },
           context,
         );
       }
-      return buildLegacyEvent(
+      return buildSharedAgentEvent(
         'tool.completed',
         {
           toolCallId: event.toolCallId,
           toolName: event.toolName,
-          result: legacyResult,
+          result: sharedResult,
         },
         context,
       );
     }
     case 'error': {
-      return buildLegacyEvent(
+      return buildSharedAgentEvent(
         'run.failed',
         {
           status: 'failed',
@@ -229,7 +224,7 @@ function extractAssistantText(messages: Message[]): string {
   return '';
 }
 
-function toolResultToLegacy(result: ToolResultMessage, durationMs: number): import('@shared/types/tool').ToolCallResult {
+function toolResultToSharedResult(result: ToolResultMessage, durationMs: number): import('@shared/types/tool').ToolCallResult {
   if (result.isError) {
     return {
       ok: false,

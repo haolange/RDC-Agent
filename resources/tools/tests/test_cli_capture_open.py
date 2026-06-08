@@ -144,6 +144,11 @@ def test_capture_open_wraps_open_replay_failure_with_step_state(monkeypatch, tmp
             },
         },
     )
+    monkeypatch.setattr(
+        rdx_cli,
+        "_daemon_status_payload",
+        lambda context: {"ok": True, "data": {"running": True, "state": {"context_id": context}}},
+    )
     monkeypatch.setattr(rdx_cli, "_print_json", lambda payload: captured.append(payload))
 
     args = argparse.Namespace(
@@ -378,6 +383,11 @@ def test_session_preview_status_reads_context_preview(monkeypatch) -> None:
                 },
             },
         },
+    )
+    monkeypatch.setattr(
+        rdx_cli,
+        "_daemon_status_payload",
+        lambda context: {"ok": True, "data": {"running": True, "state": {"context_id": context}}},
     )
     monkeypatch.setattr(rdx_cli, "_print_json", lambda payload: captured.append(payload))
 

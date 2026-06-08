@@ -1,4 +1,4 @@
-import type { ElectronAPI } from '@shared/types/electron';
+﻿import type { ElectronAPI } from '@shared/types/electron';
 
 const BRIDGE_MARKER = '__RDC_AGENT_BROWSER_APP_BRIDGE__';
 
@@ -58,10 +58,7 @@ class BrowserAppBridgeClient {
       getPlan: (runId) => this.invoke('workflow:getPlan', runId),
       submitQuestions: (runId, answers) => this.invoke('workflow:submitQuestions', runId, answers),
       approvePlan: (runId) => this.invoke('workflow:approvePlan', runId),
-      getWorkstreamSession: (sessionId) => this.invoke('workflow:getWorkstreamSession', sessionId),
       requestPlanRevision: (runId, revisionText) => this.invoke('workflow:requestPlanRevision', runId, revisionText),
-      switchWorkstreamBranch: (sessionId, branchId) => this.invoke('workflow:switchWorkstreamBranch', sessionId, branchId),
-      exportWorkstreamSession: (sessionId, options) => this.invoke('workflow:exportWorkstreamSession', sessionId, options),
       restartRun: (runId) => this.invoke('workflow:restartRun', runId),
       resume: (sessionId) => this.invoke('workflow:resume', sessionId),
       stop: (runId) => this.invoke('workflow:stop', runId),
@@ -78,7 +75,6 @@ class BrowserAppBridgeClient {
     tool: {
       getCatalog: () => this.invoke('tool:getCatalog'),
       getRuntimeSummary: () => this.invoke('tool:getRuntimeSummary'),
-      execute: (toolName, args) => this.invoke('tool:execute', toolName, args),
     },
     evidence: {
       getChain: () => this.invoke('evidence:getChain'),
@@ -165,6 +161,8 @@ class BrowserAppBridgeClient {
       getEvents: (runId, afterSeq) => this.invoke('trace:getEvents', runId, afterSeq),
       getProjection: (sessionId) => this.invoke('trace:getProjection', sessionId),
       exportRun: (runId) => this.invoke('trace:exportRun', runId),
+      switchBranch: (sessionId, branchId) => this.invoke('trace:switchBranch', sessionId, branchId),
+      exportSession: (sessionId, options) => this.invoke('trace:exportSession', sessionId, options),
     },
     events: {
       onWorkflowStateChanged: (callback) => this.subscribe('workflow:stateChanged', callback as EventCallback),
@@ -272,3 +270,4 @@ export function installBrowserAppBridge(): void {
 export function isBrowserAppBridge(): boolean {
   return Boolean((window as BrowserBridgeWindow)[BRIDGE_MARKER]);
 }
+

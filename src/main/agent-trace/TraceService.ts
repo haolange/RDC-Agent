@@ -14,18 +14,18 @@ import type {
   ProgressTask,
   ProgressTaskStatus,
   RightPanelViewModel,
-  WorkstreamArtifactRecord,
-  WorkstreamContextRecord,
+  TraceArtifactRecord,
+  TraceContextRecord,
   ComposerApprovalViewModel,
   RawAuditRef,
   TraceSessionResult,
-} from '@shared/types/workstream';
+} from '@shared/types/trace';
 import { nowIso } from '@shared/utils/id';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { artifactStore } from '../reports/ArtifactStore';
 import { contextService } from '../captures/ContextService';
 import { taskBoard } from '../workflow/debugger/TaskBoard';
-import { workstreamStateStore } from '../workflow/debugger/WorkstreamStateStore';
+import { traceStateStore } from '../workflow/debugger/TraceStateStore';
 import { appPathService } from '../runtime/AppPathService';
 import { app } from 'electron';
 import path from 'path';
@@ -72,7 +72,7 @@ const progressStatusFromTask = (task: HarnessTask): ProgressTaskStatus => {
   return 'pending';
 };
 
-const artifactTypeFromRecord = (record: ArtifactRecord): WorkstreamArtifactRecord['type'] => {
+const artifactTypeFromRecord = (record: ArtifactRecord): TraceArtifactRecord['type'] => {
   if (record.kind === 'report') return 'report';
   if (record.kind === 'screenshot') return 'visual_report';
   if (record.kind === 'trace' || record.kind === 'data') return 'evidence_bundle';
@@ -137,7 +137,7 @@ export class TraceService {
   }
 
   async buildPresentation(sessionId: string): Promise<AgentRunPresentation> {
-    const state = workstreamStateStore.read(sessionId);
+    const state = traceStateStore.read(sessionId);
     const conversations = storageAdapter.readConversationHistory(sessionId);
     const events = await storageAdapter.readActionChain(sessionId);
     return this.buildPresentationFromData(
@@ -154,12 +154,12 @@ export class TraceService {
     runs: RunSummary[],
     conversations: ConversationMessage[],
     events: ActionEvent[],
-    state: ReturnType<typeof workstreamStateStore.read>,
+    state: ReturnType<typeof traceStateStore.read>,
   ): Promise<AgentRunPresentation> {
     const runViewModels: AgentRunViewModel[] = [];
     const progress: ProgressTask[] = [];
-    const artifacts: WorkstreamArtifactRecord[] = [];
-    const context: WorkstreamContextRecord[] = [];
+    const artifacts: TraceArtifactRecord[] = [];
+    const context: TraceContextRecord[] = [];
     const rawAuditRefs: RawAuditRef[] = events.slice(-20).map((event) => ({
       id: event.event_id,
       label: event.event_type,
@@ -296,17 +296,17 @@ export class TraceService {
 
       runViewModels.push({ run: agentRun, timeline });
 
-      const wsPlanId = `ws-${runId}-plan`;
-      const wsExecId = `ws-${runId}-execution`;
-      progress.push(...this.mapProgress(sessionId, runId, branchId, wsExecId));
-      artifacts.push(...this.mapArtifacts(sessionId, runId, branchId, wsExecId, runEvents));
-      context.push(...this.mapContext(sessionId, runId, branchId, wsExecId, run));
+      const tracePlanId = `ws-${runId}-plan`;
+      const traceExecutionId = `ws-${runId}-execution`;
+      progress.push(...this.mapProgress(sessionId, runId, branchId, traceExecutionId));
+      artifacts.push(...this.mapArtifacts(sessionId, runId, branchId, traceExecutionId, runEvents));
+      context.push(...this.mapContext(sessionId, runId, branchId, traceExecutionId, run));
 
       if (planStatus === 'awaiting_approval' && snapshot?.debug_plan) {
         latestApproval = {
           planId: snapshot.debug_plan.planId,
           runId,
-          workstreamId: wsPlanId,
+          traceLaneId: tracePlanId,
           status: 'awaiting_approval',
           title: snapshot.debug_plan.presentation?.title || 'Debugger Plan',
           summary: snapshot.debug_plan.userGoal,
@@ -399,7 +399,7 @@ export class TraceService {
     conversations: ConversationMessage[],
   ): Promise<AgentRunPresentation> {
     const state = storageAdapter.readSession(sessionId)
-      ? workstreamStateStore.read(sessionId)
+      ? traceStateStore.read(sessionId)
       : {
           schemaVersion: '1' as const,
           sessionId,
@@ -441,11 +441,11 @@ export class TraceService {
     return null;
   }
 
-  private mapProgress(sessionId: string, runId: string, branchId: string, workstreamId: string): ProgressTask[] {
+  private mapProgress(sessionId: string, runId: string, branchId: string, traceLaneId: string): ProgressTask[] {
     return taskBoard.listTasks(sessionId, runId).map((task, index) => ({
       id: task.taskId,
       sessionId,
-      workstreamId,
+      traceLaneId,
       branchId,
       title: task.title,
       status: progressStatusFromTask(task),
@@ -463,13 +463,13 @@ export class TraceService {
     sessionId: string,
     runId: string,
     branchId: string,
-    workstreamId: string,
+    traceLaneId: string,
     runEvents: ActionEvent[],
-  ): WorkstreamArtifactRecord[] {
-    const registered = artifactStore.list(sessionId, runId).map<WorkstreamArtifactRecord>((record) => ({
+  ): TraceArtifactRecord[] {
+    const registered = artifactStore.list(sessionId, runId).map<TraceArtifactRecord>((record) => ({
       id: record.artifactId,
       sessionId,
-      workstreamId,
+      traceLaneId,
       branchId,
       sourceEventId: record.evidenceIds[0],
       type: artifactTypeFromRecord(record),
@@ -483,15 +483,15 @@ export class TraceService {
     }));
     const reports = runEvents
       .filter((e) => e.event_type === 'report_published')
-      .flatMap<WorkstreamArtifactRecord>((event) => {
-        const records: WorkstreamArtifactRecord[] = [];
+      .flatMap<TraceArtifactRecord>((event) => {
+        const records: TraceArtifactRecord[] = [];
         for (const key of ['markdownPath', 'htmlPath', 'jsonPath']) {
           const value = event.payload[key];
           if (typeof value !== 'string' || !value.trim()) continue;
           records.push({
             id: `${event.event_id}-${key}`,
             sessionId,
-            workstreamId,
+            traceLaneId,
             branchId,
             sourceEventId: event.event_id,
             type: key === 'htmlPath' ? 'visual_report' : 'report',
@@ -512,14 +512,14 @@ export class TraceService {
     sessionId: string,
     runId: string,
     branchId: string,
-    workstreamId: string,
+    traceLaneId: string,
     run: RunSummary,
-  ): WorkstreamContextRecord[] {
+  ): TraceContextRecord[] {
     const packets = contextService.listContextPackets(sessionId, runId);
-    const captureContext = run.captures.map<WorkstreamContextRecord>((capture) => ({
+    const captureContext = run.captures.map<TraceContextRecord>((capture) => ({
       id: `context-capture-${capture.id}`,
       sessionId,
-      workstreamId,
+      traceLaneId,
       branchId,
       kind: 'capture',
       label: capture.filePath.split(/[\\/]/).filter(Boolean).pop() || capture.filePath,
@@ -529,10 +529,10 @@ export class TraceService {
       lastObservedAt: toIso(run.finishedAt ?? run.startedAt),
       detailsRef: capture.filePath,
     }));
-    const packetContext = packets.map<WorkstreamContextRecord>((packet) => ({
+    const packetContext = packets.map<TraceContextRecord>((packet) => ({
       id: `context-${packet.packetId}`,
       sessionId,
-      workstreamId,
+      traceLaneId,
       branchId,
       kind: packet.kind === 'capture' ? 'capture' : packet.kind === 'tool_result' ? 'source' : 'file',
       label: packet.title,
@@ -549,16 +549,16 @@ export class TraceService {
 
   private buildRightPanel(
     progress: ProgressTask[],
-    artifacts: WorkstreamArtifactRecord[],
-    context: WorkstreamContextRecord[],
+    artifacts: TraceArtifactRecord[],
+    context: TraceContextRecord[],
     runs: AgentRunViewModel[],
   ): RightPanelViewModel {
     const activeRunIds = new Set(runs.filter((r) => r.run.status === 'running' || r.run.status === 'waiting_approval').map((r) => r.run.runId));
-    const activeWsIds = new Set([...activeRunIds].flatMap((id) => [`ws-${id}-plan`, `ws-${id}-execution`, id]));
+    const activeTraceLaneIds = new Set([...activeRunIds].flatMap((id) => [`ws-${id}-plan`, `ws-${id}-execution`, id]));
 
     return {
       progress: {
-        current: progress.filter((t) => activeWsIds.has(t.workstreamId) && ['running', 'blocked', 'pending', 'reopened'].includes(t.status)),
+        current: progress.filter((t) => activeTraceLaneIds.has(t.traceLaneId) && ['running', 'blocked', 'pending', 'reopened'].includes(t.status)),
         history: progress.filter((t) => ['completed', 'cancelled'].includes(t.status)),
       },
       artifacts: {

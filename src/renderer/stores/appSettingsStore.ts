@@ -52,6 +52,18 @@ const DEFAULT_SETTINGS: AppSettings = {
   workspace: {
     rootPath: '',
   },
+  tooling: {
+    rdxCli: {
+      enabled: false,
+      command: '',
+      argsPrefix: [],
+      workingDirectory: '',
+      env: {},
+      timeoutMs: 60000,
+      catalogPath: '',
+      jsonMode: 'auto',
+    },
+  },
   llm: {
     providers: [],
     agentRoutes: createEmptyAgentRoutes(),

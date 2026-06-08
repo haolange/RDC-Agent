@@ -103,11 +103,12 @@ export interface ToolCatalog {
   runtime?: ToolRuntimeMetadata;
 }
 
-export type ToolRuntimeSource = 'external' | 'bundled';
+export type ToolRuntimeSource = 'configured' | 'unconfigured';
 
 export interface ToolRuntimeMetadata {
   source: ToolRuntimeSource;
-  toolsRoot: string;
+  command: string;
+  workingDirectory: string;
   version: string | null;
   catalog: {
     path: string;

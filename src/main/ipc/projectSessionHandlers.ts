@@ -8,7 +8,7 @@ import type {
 } from '@shared/types/session';
 import { runExecutionService } from '../workflow/debugger/RunExecutionService';
 import { storageAdapter } from '../sessions/StorageAdapter';
-import { toolBridge } from '../tools/ToolBridge';
+import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
 const STALE_RECOVERABLE_RUN_STATUSES: Array<RunSummary['status']> = [
@@ -177,7 +177,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
     const activeRun = runs.find((run) => ['queued', 'running', 'stopping'].includes(run.status));
     if (activeRun) {
       runExecutionService.stopRun(activeRun.runId);
-      toolBridge.abortRun(activeRun.runId);
+      rdxCliInvokerService.abortRun(activeRun.runId);
       await context.setRunLifecycleState(id, activeRun.runId, {
         status: 'cancelled',
         lastStage: activeRun.lastStage,

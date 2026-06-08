@@ -1,4 +1,4 @@
-import * as fs from 'fs';
+﻿import * as fs from 'fs';
 import * as path from 'path';
 import type {
   PlanStatus,
@@ -6,23 +6,23 @@ import type {
   RequestBranchGroup,
   UserRequest,
   UserRequestRevision,
-} from '@shared/types/workstream';
+} from '@shared/types/trace';
 import { generateEventId, nowIso } from '@shared/utils/id';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import { runScopedStore } from './RunScopedStore';
 
 const STORE_FILE = 'agentic-trace-state.json';
 
-export interface WorkstreamPlanRecord {
+export interface TracePlanRecord {
   planId: string;
   runId: string;
-  workstreamId: string;
+  traceLaneId: string;
   status: PlanStatus;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface WorkstreamPersistedState {
+export interface TracePersistedState {
   schemaVersion: '1';
   sessionId: string;
   activeBranchId: string;
@@ -30,11 +30,11 @@ export interface WorkstreamPersistedState {
   latestAcceptedPlanId?: string;
   userRequests: UserRequest[];
   branches: RequestBranchGroup[];
-  plans: WorkstreamPlanRecord[];
+  plans: TracePlanRecord[];
   updatedAt: string;
 }
 
-const defaultState = (sessionId: string): WorkstreamPersistedState => ({
+const defaultState = (sessionId: string): TracePersistedState => ({
   schemaVersion: '1',
   sessionId,
   activeBranchId: 'branch-main',
@@ -44,15 +44,15 @@ const defaultState = (sessionId: string): WorkstreamPersistedState => ({
   updatedAt: nowIso(),
 });
 
-export class WorkstreamStateStore {
-  read(sessionId: string): WorkstreamPersistedState {
+export class TraceStateStore {
+  read(sessionId: string): TracePersistedState {
     const filePath = this.resolvePath(sessionId);
     if (!fs.existsSync(filePath)) {
       return defaultState(sessionId);
     }
 
     try {
-      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Partial<WorkstreamPersistedState>;
+      const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Partial<TracePersistedState>;
       return {
         ...defaultState(sessionId),
         ...parsed,
@@ -62,14 +62,14 @@ export class WorkstreamStateStore {
         plans: parsed.plans ?? [],
       };
     } catch (error) {
-      console.error(`[WorkstreamStateStore] Failed to read ${filePath}`, error);
+      console.error(`[TraceStateStore] Failed to read ${filePath}`, error);
       return defaultState(sessionId);
     }
   }
 
-  write(state: WorkstreamPersistedState): WorkstreamPersistedState {
+  write(state: TracePersistedState): TracePersistedState {
     const filePath = this.resolvePath(state.sessionId);
-    const nextState: WorkstreamPersistedState = {
+    const nextState: TracePersistedState = {
       ...state,
       updatedAt: nowIso(),
     };
@@ -83,11 +83,11 @@ export class WorkstreamStateStore {
     runId: string;
     prompt: string;
     planId?: string;
-    workstreamId: string;
-  }): WorkstreamPersistedState {
+    traceLaneId: string;
+  }): TracePersistedState {
     const state = this.read(input.sessionId);
     if (state.userRequests.some((request) => (
-      request.revisions.some((revision) => revision.resultingWorkstreamIds.includes(input.workstreamId))
+      request.revisions.some((revision) => revision.resultingTraceLaneIds.includes(input.traceLaneId))
     ))) {
       return state;
     }
@@ -102,7 +102,7 @@ export class WorkstreamStateStore {
       branchId,
       prompt: input.prompt,
       createdAt,
-      resultingWorkstreamIds: [input.workstreamId],
+      resultingTraceLaneIds: [input.traceLaneId],
     };
     const request: UserRequest = {
       id: requestId,
@@ -115,7 +115,7 @@ export class WorkstreamStateStore {
       id: branchId,
       revisionId,
       status: 'active',
-      workstreamIds: [input.workstreamId],
+      traceLaneIds: [input.traceLaneId],
     };
     const group: RequestBranchGroup = {
       id: `branch-group-${requestId}`,
@@ -133,7 +133,7 @@ export class WorkstreamStateStore {
         ? this.upsertPlan(state.plans, {
             planId: input.planId,
             runId: input.runId,
-            workstreamId: input.workstreamId,
+            traceLaneId: input.traceLaneId,
             status: 'awaiting_approval',
             createdAt,
             updatedAt: createdAt,
@@ -143,7 +143,7 @@ export class WorkstreamStateStore {
     });
   }
 
-  markPlan(sessionId: string, planId: string, status: PlanStatus): WorkstreamPersistedState {
+  markPlan(sessionId: string, planId: string, status: PlanStatus): TracePersistedState {
     const state = this.read(sessionId);
     const now = nowIso();
     return this.write({
@@ -158,9 +158,9 @@ export class WorkstreamStateStore {
     sessionId: string;
     planId: string;
     runId: string;
-    workstreamId: string;
+    traceLaneId: string;
     status: PlanStatus;
-  }): WorkstreamPersistedState {
+  }): TracePersistedState {
     const state = this.read(input.sessionId);
     const now = nowIso();
     return this.write({
@@ -170,7 +170,7 @@ export class WorkstreamStateStore {
       plans: this.upsertPlan(state.plans, {
         planId: input.planId,
         runId: input.runId,
-        workstreamId: input.workstreamId,
+        traceLaneId: input.traceLaneId,
         status: input.status,
         createdAt: now,
         updatedAt: now,
@@ -183,8 +183,8 @@ export class WorkstreamStateStore {
     runId: string;
     previousPlanId: string;
     revisionText: string;
-    revisionWorkstreamId: string;
-  }): WorkstreamPersistedState {
+    revisionTraceLaneId: string;
+  }): TracePersistedState {
     const state = this.read(input.sessionId);
     const branchGroup = state.branches[0];
     const rootRequest = state.userRequests[0];
@@ -200,7 +200,7 @@ export class WorkstreamStateStore {
       parentRevisionId,
       prompt: input.revisionText,
       createdAt,
-      resultingWorkstreamIds: [input.revisionWorkstreamId],
+      resultingTraceLaneIds: [input.revisionTraceLaneId],
     };
 
     const nextRequest: UserRequest = rootRequest
@@ -221,7 +221,7 @@ export class WorkstreamStateStore {
       parentBranchId: state.activeBranchId,
       revisionId,
       status: 'active',
-      workstreamIds: [input.revisionWorkstreamId],
+      traceLaneIds: [input.revisionTraceLaneId],
     };
     const nextBranchGroup: RequestBranchGroup = branchGroup
       ? {
@@ -258,7 +258,7 @@ export class WorkstreamStateStore {
     });
   }
 
-  switchBranch(sessionId: string, branchId: string): WorkstreamPersistedState {
+  switchBranch(sessionId: string, branchId: string): TracePersistedState {
     const state = this.read(sessionId);
     const hasBranch = state.branches.some((group) => group.branches.some((branch) => branch.id === branchId));
     if (!hasBranch) {
@@ -279,7 +279,7 @@ export class WorkstreamStateStore {
     });
   }
 
-  private upsertPlan(plans: WorkstreamPlanRecord[], plan: WorkstreamPlanRecord): WorkstreamPlanRecord[] {
+  private upsertPlan(plans: TracePlanRecord[], plan: TracePlanRecord): TracePlanRecord[] {
     const index = plans.findIndex((entry) => entry.planId === plan.planId);
     if (index < 0) {
       return [...plans, plan];
@@ -296,14 +296,16 @@ export class WorkstreamStateStore {
   private resolvePath(sessionId: string): string {
     const session = storageAdapter.readSession(sessionId);
     if (!session) {
-      throw new Error(`Session not found for workstream state: ${sessionId}`);
+      throw new Error(`Session not found for trace state: ${sessionId}`);
     }
     const targetPath = path.resolve(session.sessionPath, STORE_FILE);
     if (!runScopedStore.isPathInside(session.sessionPath, targetPath)) {
-      throw new Error(`Workstream state escaped session directory: ${targetPath}`);
+      throw new Error(`Trace state escaped session directory: ${targetPath}`);
     }
     return targetPath;
   }
 }
 
-export const workstreamStateStore = new WorkstreamStateStore();
+export const traceStateStore = new TraceStateStore();
+
+

@@ -1,5 +1,5 @@
 ﻿0001: RenderDoc CLI 工具集
-0002: 遵照“为 Agent 提供与人类专家通过 GUI 操作等价的 API”这一核心思想，本报告对 RenderDoc 的全部 UI 功能进行了地毯式分析与映射，旨在构建一套真正全面、强大且具备第一性原理的 MCP (Model Context Protocol) 工具集，确保 AI Agent 能够复现人类专家在 RenderDoc UI 上的任何调试操作。
+0002: 遵照“为 Agent 提供与人类专家通过 GUI 操作等价的 API”这一核心思想，本报告对 RenderDoc 的全部 UI 功能进行了地毯式分析与映射，旨在构建一套真正全面、强大且具备第一性原理的 CLI 工具集，确保 AI Agent 能够复现人类专家在 RenderDoc UI 上的任何调试操作。
 0003: 一，设计哲学
 0004: 1.1，目标
 0005: 本工具集的设计旨在实现两大核心目标，以赋能 Agent 在 RenderDoc 生态系统中的调试能力：

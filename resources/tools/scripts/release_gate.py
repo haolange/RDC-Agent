@@ -44,9 +44,6 @@ REQUIRED_FILES = [
     "CHANGELOG.md",
 ]
 
-FIXTURE_DIR = Path("tests/fixtures")
-FIXTURE_SUFFIXES = {".rdc"}
-
 BASH_SMOKE_LOG = "intermediate/logs/smoke_cli.log"
 
 BANNED_SUFFIXES = {".pdb", ".lib", ".exp", ".ilk", ".h"}
@@ -83,6 +80,7 @@ USER_DOCS = [
     "docs/release-notes.md",
 ]
 USER_PATH_FORBIDDEN_RULES = (
+    re.compile(r"\buv\.lock\b", re.IGNORECASE),
     re.compile(r"\buv\s+sync\b", re.IGNORECASE),
     re.compile(r"python\s+-m\s+venv", re.IGNORECASE),
     re.compile(r"pip\s+install", re.IGNORECASE),
@@ -145,6 +143,11 @@ def _run_launcher_expect_error(args: list[str], cwd: Path, *, expected_code: str
     if code != 0 and actual_code == expected_code:
         return True, detail
     return False, f"expected non-zero `{expected_code}`, got exit={code} code={actual_code}\n{detail}"
+
+
+def _bundled_python_for_gate(root: Path) -> str:
+    bundled = root / "binaries" / "windows" / "x64" / "python" / "python.exe"
+    return str(bundled) if bundled.is_file() else sys.executable
 
 
 def _match_line(text: str, rule: ScanRule, *, compiled: re.Pattern[str] | None = None) -> bool:
@@ -275,33 +278,20 @@ def _check_user_docs_no_python_bootstrap(root: Path) -> tuple[bool, str]:
     return True, "user docs do not require venv or package-manager bootstrap"
 
 
-def _has_bundled_fixture(root: Path) -> bool:
-    fixture_root = root / FIXTURE_DIR
-    if not fixture_root.is_dir():
-        return False
-    for path in fixture_root.rglob("*"):
-        if path.is_file() and path.suffix.lower() in FIXTURE_SUFFIXES:
-            return True
-    return False
-
-
 def _check_reports(root: Path, *, require_smoke_reports: bool) -> tuple[bool, str]:
     log_path = root / BASH_SMOKE_LOG
     if log_path.is_file():
         text = log_path.read_text(encoding="utf-8", errors="replace")
         if "[smoke] PASS" in text:
             return True, "bash CLI smoke log is present and passed"
-        if require_smoke_reports or _has_bundled_fixture(root):
+        if require_smoke_reports:
             return False, f"bash CLI smoke log did not contain [smoke] PASS: {BASH_SMOKE_LOG}"
-        return True, "bash CLI smoke log present but not marked passed; full smoke is optional without bundled fixtures"
+        return True, "bash CLI smoke log present but not marked passed; smoke evidence is optional unless required"
 
-    if require_smoke_reports or _has_bundled_fixture(root):
+    if require_smoke_reports:
         return False, f"missing bash CLI smoke log: {BASH_SMOKE_LOG}"
 
-    return True, (
-        "bash CLI smoke optional in clean checkout: no bundled first-party .rdc fixture; "
-        "run bash scripts/smoke_cli.sh with explicit sample inputs before tagging a release"
-    )
+    return True, "bash CLI smoke optional; run bash scripts/smoke_cli.sh before requiring smoke reports"
 
 
 def _find_release_package(root: Path, raw_package: str) -> Path | None:
@@ -337,8 +327,6 @@ def _check_release_package(root: Path, *, raw_package: str, required: bool) -> t
         "--zip",
         str(package_path),
     ]
-    if required:
-        verify_cmd.append("--require-fixture-smoke")
     ok, detail = _run(verify_cmd, cwd=root)
     if not ok:
         return False, detail
@@ -444,8 +432,9 @@ def main(argv: list[str] | None = None) -> int:
     results.append(("negative:assert pipeline no session", ok_assert_no_session, assert_no_session))
     ok_cli_help, cli_help = _run([sys.executable, "cli/run_cli.py", "--help"], cwd=root)
     results.append(("entry:dev-python cli/run_cli.py --help", ok_cli_help, cli_help))
-    ok_cli_doctor, cli_doctor = _run([sys.executable, "cli/run_cli.py", "--json", "doctor"], cwd=root)
-    results.append(("entry:dev-python cli/run_cli.py --json doctor", ok_cli_doctor, cli_doctor))
+    gate_python = _bundled_python_for_gate(root)
+    ok_cli_doctor, cli_doctor = _run([gate_python, "cli/run_cli.py", "--json", "doctor"], cwd=root)
+    results.append(("entry:bundled-python cli/run_cli.py --json doctor", ok_cli_doctor, cli_doctor))
     ok_catalog, catalog_detail = _run([sys.executable, "spec/validate_catalog.py"], cwd=root)
     results.append(("spec:catalog-validation", ok_catalog, catalog_detail))
     ok_md_health, md_health = _run([sys.executable, "scripts/check_markdown_health.py"], cwd=root)

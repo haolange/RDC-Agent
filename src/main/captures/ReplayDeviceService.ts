@@ -1,8 +1,8 @@
-import { BrowserWindow } from 'electron';
+﻿import { BrowserWindow } from 'electron';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import { toolBridge } from '../tools/ToolBridge';
+import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
@@ -276,7 +276,7 @@ function buildRemoteReadyText(bootstrap?: AndroidBootstrapMetadata): string {
     ? 'Started Android RenderDoc and connected'
     : 'Connected to Android RenderDoc server';
   const suffix = buildBootstrapDetailText(bootstrap);
-  return suffix.length > 0 ? `${prefix} · ${suffix.join(' · ')}` : prefix;
+  return suffix.length > 0 ? `${prefix} 路 ${suffix.join(' 路 ')}` : prefix;
 }
 
 function parseToolError(result: ToolCallResult, fallbackMessage: string): {
@@ -726,7 +726,7 @@ export class ReplayDeviceService {
 
     let contextId = `ctx-device-${sanitizeDeviceId(device.serial)}-${generateShortId()}`;
 
-    const contextResult = await toolBridge.call({
+    const contextResult = await rdxCliInvokerService.call({
       toolName: 'rd.session.create_context',
       args: { context_id: contextId },
     });
@@ -753,7 +753,7 @@ export class ReplayDeviceService {
       activationPhase: 'init',
       activationUpdatedAt: Date.now(),
     });
-    const initResult = await toolBridge.call({
+    const initResult = await rdxCliInvokerService.call({
       toolName: 'rd.core.init',
       args: {},
       contextId,
@@ -771,7 +771,7 @@ export class ReplayDeviceService {
       activationPhase: 'connect',
       activationUpdatedAt: Date.now(),
     });
-    const connectResult = await toolBridge.call({
+    const connectResult = await rdxCliInvokerService.call({
       toolName: 'rd.remote.connect',
       args: {
         timeout_ms: 5000,
@@ -814,7 +814,7 @@ export class ReplayDeviceService {
       lastSeen: Date.now(),
     });
 
-    const pingResult = await toolBridge.call({
+    const pingResult = await rdxCliInvokerService.call({
       toolName: 'rd.remote.ping',
       args: { remote_id: remoteId },
       contextId,
@@ -835,7 +835,7 @@ export class ReplayDeviceService {
       activationUpdatedAt: Date.now(),
       lastSeen: Date.now(),
     });
-    const targetsResult = await toolBridge.call({
+    const targetsResult = await rdxCliInvokerService.call({
       toolName: 'rd.remote.list_targets',
       args: { remote_id: remoteId },
       contextId,
@@ -875,7 +875,7 @@ export class ReplayDeviceService {
   }
 
   private async ensureDaemonReady(): Promise<void> {
-    const statusResult = await toolBridge.executeCLI('daemon', ['status']);
+    const statusResult = await rdxCliInvokerService.executeCLI('daemon', ['status']);
     if (statusResult.exitCode === 0) {
       try {
         const parsed = JSON.parse(statusResult.stdout) as { data?: { running?: boolean } };
@@ -887,7 +887,7 @@ export class ReplayDeviceService {
       }
     }
 
-    const startResult = await toolBridge.executeCLI('daemon', ['start']);
+    const startResult = await rdxCliInvokerService.executeCLI('daemon', ['start']);
     if (startResult.exitCode !== 0) {
       const stderr = startResult.stderr.trim();
       throw new Error(stderr || 'Failed to start the rdx daemon.');
@@ -895,7 +895,7 @@ export class ReplayDeviceService {
   }
 
   private async resolveReusableContextId(): Promise<string | null> {
-    const daemonResult = await toolBridge.executeCLI('daemon', ['start']);
+    const daemonResult = await rdxCliInvokerService.executeCLI('daemon', ['start']);
     if (daemonResult.exitCode !== 0 || !daemonResult.stdout.trim()) {
       return null;
     }
@@ -963,7 +963,7 @@ export class ReplayDeviceService {
               ? 'info'
               : 'info',
         title: device.label,
-        summary: `${device.type === 'local' ? '本地' : 'Android'} Replay Device 状态：${device.status}`,
+        summary: `${device.type === 'local' ? 'Local' : 'Android'} Replay Device status: ${device.status}`,
         detail: device.detailText,
         raw: {
           deviceId: device.id,
@@ -1017,3 +1017,4 @@ export class ReplayDeviceService {
 }
 
 export const replayDeviceService = new ReplayDeviceService();
+

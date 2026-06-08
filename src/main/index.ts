@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 import { registerIPCHandlers, setMainWindow, initializeIpcState, stopAllActiveRuns } from './ipc/handlers';
 import { storageAdapter } from './sessions/StorageAdapter';
 import { settingsService } from './settings/SettingsService';
-import { toolBridge } from './tools/ToolBridge';
+import { rdxCliInvokerService } from './tools/RdxCliInvokerService';
 import { RdxSessionService } from './sessions/RdxSessionService';
 import { replayDeviceService } from './captures/ReplayDeviceService';
 import { runtimeLogService } from './runtime/RuntimeLogService';
@@ -17,7 +17,7 @@ import { rendererEventHub } from './browserAppBridge/rendererEventHub';
 import { startBrowserAppBridge, stopBrowserAppBridge } from './browserAppBridge/BrowserAppBridgeServer';
 
 // Shared RDX session service for IPC handlers.
-export const rdxSessionService = new RdxSessionService(toolBridge);
+export const rdxSessionService = new RdxSessionService(rdxCliInvokerService);
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -214,7 +214,7 @@ function createMainWindow(): void {
 }
 
 /**
- * 璁剧疆搴旂敤鑿滃崟
+ * Set the application menu.
  */
 function setupMenu(): void {
   if (process.platform === 'darwin') {
@@ -396,14 +396,14 @@ async function initializeServices(): Promise<void> {
     const hasConfiguredProvider = settingsService.hasConfiguredProvider();
     console.log('[Main] SettingsService initialized, hasConfiguredProvider:', hasConfiguredProvider);
     
-    await toolBridge.loadCatalog();
-    console.log('[Main] ToolBridge catalog initialized');
+    await rdxCliInvokerService.loadCatalog();
+    console.log('[Main] RDX CLI invoker initialized');
     runtimeLogService.log({
       scope: 'app',
       namespace: 'system',
       severity: 'success',
-      title: 'Tool catalog ready',
-      summary: 'RDC 工具目录已加载。',
+      title: 'RDX CLI invoker ready',
+      summary: 'RDX CLI invoker 诊断已加载。',
     });
     
     await initializeIpcState();

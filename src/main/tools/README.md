@@ -1,5 +1,14 @@
 # Tools
 
-RenderDoc 垂直工具域入口。
+`src/main/tools` owns the main-process boundary for invoking RDX CLI commands.
 
-当前工具主链保持为 `renderer -> preload -> IPC -> ToolBridge -> resources/tools/rdx.bat`。本目录只承接工具域内部组织，不把本仓库泛化为通用 coding-agent tool system。
+The forward path is:
+
+`workflow/runtime -> RdxCliInvokerService -> ShellInvocationService -> configured CLI command`
+
+Rules:
+
+- The CLI command, default arguments, working directory, environment, timeout, and catalog path come from Settings.
+- No bundled `resources/tools` fallback is allowed in this layer.
+- Renderer and preload code may read catalog/runtime status through IPC, but they must not expose an arbitrary tool execution API.
+- Tool traces are emitted from the invoker so Activity, workflow, and diagnostics observe the same execution boundary.

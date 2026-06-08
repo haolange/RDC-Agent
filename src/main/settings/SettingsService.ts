@@ -16,7 +16,9 @@ import type {
   LlmProviderId,
   LlmProviderModel,
   ProfileSettings,
+  RdxCliInvokerSettings,
   SidebarLayoutPreference,
+  ToolingSettings,
   UiPreferences,
   WorkspaceSettings,
 } from '@shared/types/settings';
@@ -63,6 +65,9 @@ interface PersistedSettingsPayload {
     providers?: LlmProviderEntry[];
     agentRoutes?: LlmAgentRoute[];
   };
+  tooling?: {
+    rdxCli?: Partial<RdxCliInvokerSettings>;
+  };
   configuration?: PersistedConfigurationSettings;
 }
 
@@ -78,6 +83,7 @@ interface NormalizedPersistedSettings {
   layout: LayoutPreferences;
   profile: ProfileSettings;
   workspace: WorkspaceSettings;
+  tooling: ToolingSettings;
   llm: {
     providers: LlmProviderEntry[];
     agentRoutes: LlmAgentRoute[];
@@ -158,6 +164,21 @@ const DEFAULT_CONFIGURATION: PersistedConfigurationSettings = {
     analyzer: 'free-agent',
     optimizer: 'free-agent',
   },
+};
+
+const DEFAULT_RDX_CLI_INVOKER: RdxCliInvokerSettings = {
+  enabled: false,
+  command: '',
+  argsPrefix: [],
+  workingDirectory: '',
+  env: {},
+  timeoutMs: 60000,
+  catalogPath: '',
+  jsonMode: 'auto',
+};
+
+const DEFAULT_TOOLING: ToolingSettings = {
+  rdxCli: DEFAULT_RDX_CLI_INVOKER,
 };
 
 interface DefaultProviderSeed {
@@ -248,6 +269,53 @@ function sanitizePatternBindings(value: unknown): Record<string, string> {
   return {
     ...(DEFAULT_CONFIGURATION.modePatternBindings ?? {}),
     ...bindings,
+  };
+}
+
+function sanitizeStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.trim()).filter(Boolean)
+    : [];
+}
+
+function sanitizeStringRecord(value: unknown): Record<string, string> {
+  const record = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const sanitized: Record<string, string> = {};
+  for (const [key, entry] of Object.entries(record)) {
+    const cleanKey = key.trim();
+    if (!cleanKey || typeof entry !== 'string') {
+      continue;
+    }
+    sanitized[cleanKey] = entry;
+  }
+  return sanitized;
+}
+
+function sanitizeRdxCliInvokerSettings(
+  value: unknown,
+  fallback: RdxCliInvokerSettings = DEFAULT_RDX_CLI_INVOKER,
+): RdxCliInvokerSettings {
+  const candidate = value && typeof value === 'object' ? value as Partial<RdxCliInvokerSettings> : {};
+  const timeoutMs = typeof candidate.timeoutMs === 'number' && Number.isFinite(candidate.timeoutMs)
+    ? clamp(Math.trunc(candidate.timeoutMs), 1000, 600000)
+    : fallback.timeoutMs;
+
+  return {
+    enabled: typeof candidate.enabled === 'boolean' ? candidate.enabled : fallback.enabled,
+    command: typeof candidate.command === 'string' ? candidate.command.trim() : fallback.command,
+    argsPrefix: sanitizeStringArray(candidate.argsPrefix ?? fallback.argsPrefix),
+    workingDirectory: typeof candidate.workingDirectory === 'string' ? candidate.workingDirectory.trim() : fallback.workingDirectory,
+    env: sanitizeStringRecord(candidate.env ?? fallback.env),
+    timeoutMs,
+    catalogPath: typeof candidate.catalogPath === 'string' ? candidate.catalogPath.trim() : fallback.catalogPath,
+    jsonMode: pickEnum(candidate.jsonMode, ['auto', 'always'], fallback.jsonMode),
+  };
+}
+
+function sanitizeToolingSettings(value: unknown): ToolingSettings {
+  const candidate = value && typeof value === 'object' ? value as Partial<ToolingSettings> : {};
+  return {
+    rdxCli: sanitizeRdxCliInvokerSettings(candidate.rdxCli),
   };
 }
 
@@ -424,6 +492,7 @@ function createDefaultPersistedSettings(workspaceRoot = appPathService.getWorksp
     workspace: {
       rootPath: workspaceRoot,
     },
+    tooling: DEFAULT_TOOLING,
     llm: {
       providers: [],
       agentRoutes: createEmptyAgentRoutes(),
@@ -454,6 +523,7 @@ function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspac
     workspace: {
       rootPath: workspaceRoot,
     },
+    tooling: DEFAULT_TOOLING,
     llm: {
       providers: [],
       agentRoutes: createEmptyAgentRoutes(),
@@ -923,6 +993,7 @@ export class SettingsService {
       workspace: {
         rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot,
       },
+      tooling: sanitizeToolingSettings(candidate.tooling ?? fallback.tooling),
       llm: {
         providers: catalogProviders.map((provider) => ({ ...provider, apiKey: '' })),
         agentRoutes: nextRoutes,
@@ -976,6 +1047,7 @@ export class SettingsService {
       workspace: {
         rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot,
       },
+      tooling: sanitizeToolingSettings(candidate.tooling ?? fallback.tooling),
       llm: {
         providers: nextProviders,
         agentRoutes: nextRoutes,
@@ -1059,6 +1131,7 @@ export class SettingsService {
       workspace: {
         rootPath: workspaceRoot,
       },
+      tooling: normalized.tooling,
       llm: {
         providers: hydratedProviders,
         agentRoutes: normalizeUserRoutes(normalized.llm?.agentRoutes ?? createEmptyAgentRoutes(), hydratedProviders),
@@ -1190,6 +1263,12 @@ export class SettingsService {
       },
       workspace: {
         rootPath: nextPaths.workspaceRoot,
+      },
+      tooling: {
+        rdxCli: sanitizeRdxCliInvokerSettings({
+          ...(currentPersisted.tooling?.rdxCli ?? DEFAULT_RDX_CLI_INVOKER),
+          ...(patch.tooling?.rdxCli ?? {}),
+        }),
       },
       llm: {
         providers: nextProviders.map((provider) => ({ ...provider, apiKey: '' })),

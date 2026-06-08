@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import json
+from types import SimpleNamespace
 
 from rdx import cli, server
+from rdx.context_snapshot import clear_context_snapshot, save_context_snapshot
 from rdx.timeout_policy import (
     DAEMON_RESPONSE_BUFFER_S,
     DEFAULT_DAEMON_REQUEST_TIMEOUT_S,
@@ -130,3 +132,80 @@ def test_dispatch_remote_connect_uses_default_timeout_when_missing(monkeypatch) 
         server._runtime.remotes.clear()
         server._runtime.remotes.update(original_remotes)
         server._runtime.enable_remote = original_enable_remote
+
+
+def test_remote_ping_rehydrates_handle_from_context_snapshot(monkeypatch) -> None:
+    original_remotes = dict(server._runtime.remotes)
+    context_id = "remote-rehydrate-test"
+
+    async def _inline_offload(fn, *args, **kwargs):
+        return fn(*args, **kwargs)
+
+    monkeypatch.setattr(server.server_runtime, "_offload", _inline_offload)
+    monkeypatch.setattr(server.server_runtime, "_create_remote_server_connection", lambda url: DummyRemoteServer())
+    monkeypatch.setattr(server.server_runtime, "_wait_for_remote_endpoint", lambda url, timeout_ms: None)
+    monkeypatch.setattr(
+        server.server_runtime,
+        "bootstrap_android_remote",
+        lambda remote_port, options: SimpleNamespace(
+            device_serial=options.device_serial,
+            package_name="org.renderdoc.renderdoccmd.arm64",
+            activity_name="org.renderdoc.renderdoccmd.arm64.Loader",
+            abi="arm64-v8a",
+            apk_path="demo.apk",
+            host="127.0.0.1",
+            port=45678,
+            remote_port=remote_port,
+            forward_spec="tcp:45678",
+            config_remote_path="/sdcard/renderdoc.conf",
+            installed_apk=True,
+            pushed_config=True,
+            started_activity=True,
+            created_forward=True,
+            install_mode="upgrade",
+            install_reason="test",
+            uninstalled_existing=False,
+            cleanup_actions=["adb-forward"],
+        ),
+    )
+
+    server._runtime.remotes.clear()
+    save_context_snapshot(
+        {
+            "context_id": context_id,
+            "entry_mode": "cli",
+            "backend": "remote",
+            "remote": {
+                "state": "live_handle",
+                "remote_id": "remote_demo",
+                "origin_remote_id": "remote_demo",
+                "endpoint": "127.0.0.1:45678",
+                "origin_context_id": context_id,
+                "context_locality": "strict",
+                "reuse_policy": "must_reconnect",
+                "transport": "adb_android",
+                "device_serial": "serial-1",
+                "options": {"device_serial": "serial-1", "local_port": 45678, "remote_port": 38920},
+                "bootstrap": {"device_serial": "serial-1", "remote_port": 38920},
+            },
+        },
+        context_id,
+    )
+    try:
+        payload = asyncio.run(
+            server.dispatch_operation(
+                "rd.remote.ping",
+                {"remote_id": "remote_demo"},
+                transport="test",
+                context_id=context_id,
+            )
+        )
+        assert payload["ok"] is True
+        assert payload["data"]["detail"]["remote_id"] == "remote_demo"
+        assert server._runtime.remotes["remote_demo"].host == "127.0.0.1"
+        assert server._runtime.remotes["remote_demo"].device_serial == "serial-1"
+    finally:
+        clear_context_snapshot(context_id)
+        server._runtime.context_snapshots.pop(context_id, None)
+        server._runtime.remotes.clear()
+        server._runtime.remotes.update(original_remotes)

@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AskUserAnswer,
   AskUserPrompt,
   DebugPlan,
@@ -43,7 +43,7 @@ import type {
   SessionRecord,
 } from './session';
 import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from './terminal';
-import type { ToolCallResult, ToolCatalog, ToolRuntimeSummary } from './tool';
+import type { ToolCatalog, ToolRuntimeSummary } from './tool';
 import type { AgentRun, AgentRunPresentation, TraceEvent } from './agenticTrace';
 import type {
   TraceBranchSwitchResult,
@@ -51,7 +51,7 @@ import type {
   TraceExportResult,
   TraceRevisionResult,
   TraceSessionResult,
-} from './workstream';
+} from './trace';
 
 export interface ElectronAPI {
   platform: NodeJS.Platform;
@@ -135,13 +135,7 @@ export interface ElectronAPI {
       approvalState?: string;
       error?: string;
     }>;
-    getWorkstreamSession: (sessionId?: string) => Promise<TraceSessionResult>;
     requestPlanRevision: (runId: string, revisionText: string) => Promise<TraceRevisionResult>;
-    switchWorkstreamBranch: (sessionId: string, branchId: string) => Promise<TraceBranchSwitchResult>;
-    exportWorkstreamSession: (
-      sessionId: string,
-      options?: TraceExportOptions
-    ) => Promise<TraceExportResult>;
     restartRun: (runId: string) => Promise<{
       success: boolean;
       runId?: string;
@@ -182,7 +176,6 @@ export interface ElectronAPI {
   tool: {
     getCatalog: () => Promise<ToolCatalog>;
     getRuntimeSummary: () => Promise<ToolRuntimeSummary>;
-    execute: (toolName: string, args: Record<string, unknown>) => Promise<ToolCallResult>;
   };
 
   evidence: {
@@ -362,6 +355,8 @@ export interface ElectronAPI {
     getEvents: (runId: string, afterSeq?: number) => Promise<{ events: TraceEvent[] }>;
     getProjection: (sessionId?: string) => Promise<TraceSessionResult>;
     exportRun: (runId: string) => Promise<{ run: AgentRun | null; events: TraceEvent[] }>;
+    switchBranch: (sessionId: string, branchId: string) => Promise<TraceBranchSwitchResult>;
+    exportSession: (sessionId: string, options?: TraceExportOptions) => Promise<TraceExportResult>;
   };
 
   events: {
@@ -397,3 +392,4 @@ export interface ElectronAPI {
   on: (channel: string, callback: (...args: unknown[]) => void) => void;
   off: (channel: string, callback: (...args: unknown[]) => void) => void;
 }
+

@@ -342,7 +342,7 @@ function buildAskSystemPrompt(): string {
     '你是 RDC-Agent 的 Ask 助手，工作模式是只读 agentic 协作。',
     '要求：',
     '1. 正常回答用户问题，语气简洁；可以澄清目标、检索上下文、读取或搜索当前 workspace 内文本文件，也可以访问公开 HTTP(S) 页面。',
-    '2. 只允许使用只读工具：read_file、glob、grep、task_list、web_fetch、web_search；不要请求 bash、write_file、edit_file、remove、task_create/update、rd.* 或 ToolBridge mutation 工具。',
+    '2. 只允许使用只读工具：read_file、glob、grep、task_list、web_fetch、web_search；不要请求 bash、write_file、edit_file、remove 或 task_create/update。',
     '3. 不要自称 RDC Debugger，不要暗示已经开始 RenderDoc 调试，也不要假装分析过 capture。',
     '4. 如果用户要求正式调试或执行分析，只提示需要在应用内 Open capture 并切换到 Debugger；Ask 模式不能创建正式 run。',
     '5. 可以展示可见工作轨迹和工具轨迹，但不要输出隐藏 chain-of-thought。',
@@ -743,7 +743,7 @@ export class ConversationService {
 
     this.persistConversationSnapshot(context.session?.sessionId ?? null, userMessage);
     this.persistConversationSnapshot(context.session?.sessionId ?? null, assistantDraftMessage);
-    this.publishWorkstream(context.session?.sessionId ?? null);
+    this.publishTraceProjection(context.session?.sessionId ?? null);
 
     void this.completeActiveDebugTurn({
       context,
@@ -771,7 +771,7 @@ export class ConversationService {
   }) {
     let assistantMessage = input.assistantDraftMessage;
     const sessionId = input.context.session?.sessionId ?? null;
-    const workstreamSessionId = sessionId ?? this.ephemeralWorkstreamSessionId(input.assistantDraftMessage.turnId);
+    const traceSessionId = sessionId ?? this.ephemeralTraceSessionId(input.assistantDraftMessage.turnId);
     const abortController = new AbortController();
 
     const commitAssistantMessage = (type: ConversationStreamEvent['type'], patch: Partial<ConversationMessage>) => {
@@ -790,7 +790,7 @@ export class ConversationService {
         turnId: assistantMessage.turnId,
         message: assistantMessage,
       } as ConversationStreamEvent);
-      this.publishConversationWorkstream(workstreamSessionId, [input.userMessage, assistantMessage], sessionId);
+      this.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
     };
 
     const commitStoppedMessage = () => {
@@ -960,13 +960,13 @@ export class ConversationService {
         status: 'complete',
         updatedAt: nowMs(),
       };
-      const workstreamSessionId = this.ephemeralWorkstreamSessionId(turnId);
+      const traceSessionId = this.ephemeralTraceSessionId(turnId);
       const tracePresentation = await traceService.buildConversationPresentation(
-        workstreamSessionId,
+        traceSessionId,
         [userMessage, assistantMessage],
       );
-      workflowProjectionPublisher.publishTraceProjectionChanged(workstreamSessionId, tracePresentation);
-      this.publishConversationWorkstream(workstreamSessionId, [userMessage, assistantMessage], null);
+      workflowProjectionPublisher.publishTraceProjectionChanged(traceSessionId, tracePresentation);
+      this.publishConversationTrace(traceSessionId, [userMessage, assistantMessage], null);
       return {
         session: null,
         mode: 'talk',
@@ -981,13 +981,13 @@ export class ConversationService {
 
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, userMessage);
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
-    const workstreamSessionId = workingSession?.sessionId ?? this.ephemeralWorkstreamSessionId(turnId);
+    const traceSessionId = workingSession?.sessionId ?? this.ephemeralTraceSessionId(turnId);
     const tracePresentation = await traceService.buildConversationPresentation(
-      workstreamSessionId,
+      traceSessionId,
       [userMessage, assistantDraftMessage],
     );
-    workflowProjectionPublisher.publishTraceProjectionChanged(workstreamSessionId, tracePresentation);
-    this.publishConversationWorkstream(workstreamSessionId, [userMessage, assistantDraftMessage], workingSession?.sessionId ?? null);
+    workflowProjectionPublisher.publishTraceProjectionChanged(traceSessionId, tracePresentation);
+    this.publishConversationTrace(traceSessionId, [userMessage, assistantDraftMessage], workingSession?.sessionId ?? null);
 
     void this.completeCoworkTurn({
       context: {
@@ -1023,7 +1023,7 @@ export class ConversationService {
   }) {
     let assistantMessage = input.assistantDraftMessage;
     const sessionId = input.context.session?.sessionId ?? null;
-    const workstreamSessionId = sessionId ?? this.ephemeralWorkstreamSessionId(input.assistantDraftMessage.turnId);
+    const traceSessionId = sessionId ?? this.ephemeralTraceSessionId(input.assistantDraftMessage.turnId);
     const abortController = new AbortController();
     const conversationAgentId: AgentRole = input.requestedMode === 'ask' ? 'ask_agent' : 'rdc-debugger';
     const showCoworkReasoning = true;
@@ -1044,7 +1044,7 @@ export class ConversationService {
         turnId: assistantMessage.turnId,
         message: assistantMessage,
       } as ConversationStreamEvent);
-      this.publishConversationWorkstream(workstreamSessionId, [input.userMessage, assistantMessage], sessionId);
+      this.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
     };
 
     const commitStoppedMessage = () => {
@@ -1499,7 +1499,7 @@ export class ConversationService {
     workflowProjectionPublisher.publishConversationEvent(event);
   }
 
-  private publishWorkstream(sessionId: string | null | undefined): void {
+  private publishTraceProjection(sessionId: string | null | undefined): void {
     if (!sessionId) {
       return;
     }
@@ -1515,23 +1515,23 @@ export class ConversationService {
       });
   }
 
-  private publishConversationWorkstream(
-    workstreamSessionId: string,
+  private publishConversationTrace(
+    traceSessionId: string,
     messages: ConversationMessage[],
     persistedSessionId?: string | null,
   ): void {
     if (persistedSessionId) {
-      this.publishWorkstream(persistedSessionId);
+      this.publishTraceProjection(persistedSessionId);
       return;
     }
 
-    void traceService.buildConversationPresentation(workstreamSessionId, messages)
+    void traceService.buildConversationPresentation(traceSessionId, messages)
       .then((presentation) => {
-        workflowProjectionPublisher.publishTraceProjectionChanged(workstreamSessionId, presentation);
+        workflowProjectionPublisher.publishTraceProjectionChanged(traceSessionId, presentation);
       });
   }
 
-  private ephemeralWorkstreamSessionId(turnId: string): string {
+  private ephemeralTraceSessionId(turnId: string): string {
     return `conversation-${turnId}`;
   }
 }

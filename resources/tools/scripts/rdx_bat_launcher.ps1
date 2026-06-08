@@ -428,25 +428,6 @@ function Show-MainMenu {
     }
 }
 
-function First-CommandToken {
-    param([string[]]$CommandArgs)
-
-    $skipNext = $false
-    foreach ($arg in $CommandArgs) {
-        if ($skipNext) {
-            $skipNext = $false
-            continue
-        }
-        if ($arg -in @('--daemon-context', '--context-id')) {
-            $skipNext = $true
-            continue
-        }
-        if ($arg.StartsWith('-')) { continue }
-        return $arg
-    }
-    return ''
-}
-
 try {
     $toolsRoot = Resolve-ToolsRoot
     $env:RDX_TOOLS_ROOT = $toolsRoot
@@ -473,17 +454,6 @@ if ($commandArgs.Count -eq 0) {
 if ($commandArgs.Count -eq 1 -and $commandArgs[0] -in @('--help', '-h', 'help')) {
     Show-Usage
     exit $script:RETURN_OK
-}
-
-$firstCommand = First-CommandToken -CommandArgs $commandArgs
-if ($firstCommand -eq 'mcp') {
-    Write-JsonStatus `
-        -Ok $false `
-        -ErrorCode 'unsupported_command' `
-        -ErrorMessage 'rdx-tools no longer exposes an MCP server; use CLI commands such as `rdx.bat --json doctor` or `rdx.bat call <rd.*>`.' `
-        -ContextId $contextId `
-        -Details @{ unsupported_command = 'mcp'; supported_entrypoints = @('rdx.bat', 'bin/rdx', 'python cli/run_cli.py') }
-    exit $script:RETURN_ARGS_ERROR
 }
 
 try {

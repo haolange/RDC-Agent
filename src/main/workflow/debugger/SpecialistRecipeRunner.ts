@@ -1,4 +1,4 @@
-import fs from 'fs';
+﻿import fs from 'fs';
 import path from 'path';
 import type { AgentRole } from '@shared/types/agent';
 import type { ContentBlock } from '@shared/types/llm';
@@ -6,7 +6,7 @@ import type { ToolCallResult } from '@shared/types/tool';
 import type { DebugPlan, ReasoningSummary } from '@shared/types/workflow';
 import { nowIso } from '@shared/utils/id';
 import { harnessController } from './HarnessController';
-import { toolBridge } from '../../tools/ToolBridge';
+import { rdxCliInvokerService } from '../../tools/RdxCliInvokerService';
 import { rdxSessionService } from '../../index';
 import { debuggerLlmService } from '../../settings/DebuggerLlmService';
 
@@ -664,7 +664,7 @@ export class SpecialistRecipeRunner {
       sessionId: context.sessionId,
       runId: context.runId,
       turnId: context.turnId,
-      execute: () => toolBridge.call({
+      execute: () => rdxCliInvokerService.call({
         toolName,
         args: {
           ...args,
@@ -933,3 +933,4 @@ export class SpecialistRecipeRunner {
 }
 
 export const specialistRecipeRunner = new SpecialistRecipeRunner();
+

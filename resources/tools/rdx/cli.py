@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -431,6 +432,8 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
         "posix_shell": str(root / "bin" / "rdx"),
         "python_cli": str(root / "cli" / "run_cli.py"),
     }
+    spirv_as = shutil.which("spirv-as") or shutil.which("spirv-as.exe")
+    spirv_dis = shutil.which("spirv-dis") or shutil.which("spirv-dis.exe")
     details = {
         "tools_root": str(root),
         "context_id": context,
@@ -452,6 +455,22 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
             "renderdoc_json": str(renderdoc_json),
             "renderdoc_pyd": str(renderdoc_pyd),
         },
+        "shader_tools": {
+            "spirv_as": {
+                "available": bool(spirv_as),
+                "path": str(spirv_as or ""),
+                "required_for": [
+                    "rd.shader.edit_and_replace raw SPIR-V ASM when RenderDoc only accepts SPIRV binary encoding",
+                ],
+            },
+            "spirv_dis": {
+                "available": bool(spirv_dis),
+                "path": str(spirv_dis or ""),
+                "required_for": [
+                    "rd.shader.get_disassembly raw SPIR-V ASM fallback when RenderDoc does not expose a raw ASM target",
+                ],
+            },
+        },
         "catalog": {
             "path": str(tool_catalog_path()),
             "tool_count": catalog_count,
@@ -470,10 +489,6 @@ def _cmd_doctor(args: argparse.Namespace) -> int:
             "python_cli_exists": (root / "cli" / "run_cli.py").is_file(),
         },
         "daemon": daemon_status,
-        "mcp": {
-            "supported": False,
-            "message": "rdx-tools is CLI-only; use `rdx call <rd.*>` for raw tool calls.",
-        },
     }
     ok = (
         not dependencies_missing
@@ -517,7 +532,6 @@ def _version_payload() -> Dict[str, Any]:
             "compatibility": {
                 "stability": "1.x",
                 "json_envelope": "stable",
-                "mcp_supported": False,
             },
         },
         transport="cli",

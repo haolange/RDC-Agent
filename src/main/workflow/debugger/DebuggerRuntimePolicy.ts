@@ -41,41 +41,22 @@ const ASK_DENIED_TOOLS = new Set([
   'task_update',
 ]);
 
+const DEBUG_AGENT_SHELL_TOOL_ALLOWLIST = [
+  ...ASK_READONLY_TOOL_ALLOWLIST,
+  'bash',
+];
+
 const SPECIALIST_TOOL_BINDINGS: Record<string, string[]> = {
   ask_agent: ASK_READONLY_TOOL_ALLOWLIST,
-  triage_agent: [
-    'rd.session.get_context',
-    'rd.event.get_action_tree',
-    'rd.macro.summarize_frame',
-  ],
-  capture_repro_agent: [
-    'rd.capture.get_info',
-    'rd.capture.list_frames',
-    'rd.context.snapshot',
-  ],
-  pass_graph_pipeline_agent: [
-    'rd.pipeline.get_state_summary',
-    'rd.pipeline.get_output_targets',
-    'rd.macro.find_state_change_point',
-  ],
-  pixel_forensics_agent: [
-    'rd.macro.explain_pixel',
-    'rd.texture.get_pixel_value',
-    'rd.export.screenshot',
-  ],
-  shader_ir_agent: [
-    'rd.shader.get_disassembly',
-    'rd.shader.debug_start',
-  ],
-  driver_device_agent: [
-    'rd.session.get_context',
-    'rd.remote.connect',
-    'rd.remote.ping',
-    'rd.remote.list_devices',
-  ],
-  skeptic_agent: [],
-  curator_agent: [],
-  'rdc-debugger': [],
+  triage_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
+  capture_repro_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
+  pass_graph_pipeline_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
+  pixel_forensics_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
+  shader_ir_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
+  driver_device_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
+  skeptic_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
+  curator_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
+  'rdc-debugger': DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
 };
 
 const SHADER_EDIT_TOOLS = ['rd.shader.edit_and_replace', 'rd.macro.shader_hotfix_validate'];
@@ -84,7 +65,10 @@ export function resolveAgentToolAllowlist(agentId: AgentRole, stage?: WorkflowSt
   const settings = settingsService.getAll();
   const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, stage || 'investigate', agentId);
   if (runtimeProfile.toolAllowlist?.length) {
-    return Array.from(new Set(runtimeProfile.toolAllowlist.map(normalizeToolName)));
+    const normalizedProfileTools = runtimeProfile.toolAllowlist.map(normalizeToolName);
+    return agentId === 'ask_agent'
+      ? Array.from(new Set(normalizedProfileTools))
+      : Array.from(new Set([...normalizedProfileTools.filter((toolName) => !toolName.startsWith('rd.')), 'bash']));
   }
   return SPECIALIST_TOOL_BINDINGS[agentId] ?? [];
 }

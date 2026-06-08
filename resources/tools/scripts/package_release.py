@@ -42,7 +42,6 @@ RELEASE_ROOT_FILES = {
     "README.md",
     "pyproject.toml",
     "rdx.bat",
-    "uv.lock",
 }
 RELEASE_DIRS = {
     "bin",
@@ -54,7 +53,6 @@ RELEASE_DIRS = {
     "scripts",
     "spec",
 }
-FIXTURE_DIR = Path("tests") / "fixtures"
 
 
 def _tools_root() -> Path:
@@ -78,14 +76,14 @@ def _should_skip(path: Path, root: Path) -> bool:
         return True
     if path.is_file() and path.suffix.lower() in EXCLUDE_FILE_SUFFIXES:
         return True
-    if rel.parts and rel.parts[0] == "tests" and not rel.is_relative_to(FIXTURE_DIR):
+    if rel.parts and rel.parts[0] == "tests":
         return True
     return False
 
 
 def _copy_release_tree(root: Path, staging_root: Path) -> list[dict[str, object]]:
     copied: list[dict[str, object]] = []
-    allowed_roots = RELEASE_ROOT_FILES | RELEASE_DIRS | {"tests"}
+    allowed_roots = RELEASE_ROOT_FILES | RELEASE_DIRS
     for path in sorted(root.rglob("*")):
         if path.is_dir() or _should_skip(path, root):
             continue

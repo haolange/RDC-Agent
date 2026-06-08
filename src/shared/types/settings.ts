@@ -168,6 +168,23 @@ export interface WorkspaceSettings {
   rootPath: string;
 }
 
+export type RdxCliJsonMode = 'auto' | 'always';
+
+export interface RdxCliInvokerSettings {
+  enabled: boolean;
+  command: string;
+  argsPrefix: string[];
+  workingDirectory: string;
+  env: Record<string, string>;
+  timeoutMs: number;
+  catalogPath: string;
+  jsonMode: RdxCliJsonMode;
+}
+
+export interface ToolingSettings {
+  rdxCli: RdxCliInvokerSettings;
+}
+
 export interface AppRuntimePaths {
   workspaceRoot: string;
   defaultWorkspaceRoot: string;
@@ -260,6 +277,7 @@ export interface AppSettings {
   layout: LayoutPreferences;
   profile: ProfileSettings;
   workspace: WorkspaceSettings;
+  tooling: ToolingSettings;
   llm: LlmSettings;
   configuration: ConfigurationSettings;
   paths: AppRuntimePaths;
@@ -274,6 +292,9 @@ export type AppSettingsPatch = Partial<{
   }>;
   profile: Partial<ProfileSettings>;
   workspace: Partial<WorkspaceSettings>;
+  tooling: Partial<{
+    rdxCli: Partial<RdxCliInvokerSettings>;
+  }>;
   llm: Partial<{
     providers: LlmProviderEntry[];
     agentRoutes: LlmAgentRoute[];

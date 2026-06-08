@@ -24,6 +24,12 @@ def _write_smoke_log(root: Path, *, passed: bool = True) -> None:
 def _mock_release_gate_basics(monkeypatch, root: Path) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.setattr(release_gate, "_tools_root", lambda: root)
     monkeypatch.setattr(release_gate, "_run", lambda cmd, cwd, **kwargs: (True, "ok"))
+    monkeypatch.setattr(release_gate, "_run_launcher", lambda args, cwd: (True, "ok"))
+    monkeypatch.setattr(
+        release_gate,
+        "_run_launcher_expect_error",
+        lambda args, cwd, expected_code: (True, expected_code),
+    )
     monkeypatch.setattr(release_gate, "_check_manifest", lambda root: (True, "manifest ok"))
     monkeypatch.setattr(release_gate, "_check_bundled_python", lambda: (True, "bundled python ok"))
     monkeypatch.setattr(
@@ -111,7 +117,7 @@ def test_release_gate_accepts_missing_reports_in_clean_checkout(monkeypatch, tmp
     assert rc == 0
     report = (tmp_path / "intermediate" / "logs" / "release_gate_report.md").read_text(encoding="utf-8")
     assert "PASS `reports:smoke-suite`" in report
-    assert "bash CLI smoke optional in clean checkout" in report
+    assert "bash CLI smoke optional" in report
 
 
 def test_release_gate_rejects_failing_bash_smoke_log_when_flagged(monkeypatch, tmp_path: Path) -> None:
@@ -129,7 +135,7 @@ def test_release_gate_rejects_failing_bash_smoke_log_when_flagged(monkeypatch, t
     assert "bash CLI smoke log did not contain [smoke] PASS" in report
 
 
-def test_release_gate_requires_reports_when_fixture_exists(monkeypatch, tmp_path: Path) -> None:
+def test_release_gate_does_not_special_case_fixture_directory(monkeypatch, tmp_path: Path) -> None:
     _prepare_root(tmp_path)
     fixture = tmp_path / "tests" / "fixtures" / "sample.rdc"
     fixture.parent.mkdir(parents=True, exist_ok=True)
@@ -140,10 +146,10 @@ def test_release_gate_requires_reports_when_fixture_exists(monkeypatch, tmp_path
 
     rc = release_gate.main(["--report", "intermediate/logs/release_gate_report.md"])
 
-    assert rc == 1
+    assert rc == 0
     report = (tmp_path / "intermediate" / "logs" / "release_gate_report.md").read_text(encoding="utf-8")
-    assert "FAIL `reports:smoke-suite`" in report
-    assert "missing bash CLI smoke log" in report
+    assert "PASS `reports:smoke-suite`" in report
+    assert "bash CLI smoke optional" in report
 
 
 def test_release_gate_requires_reports_when_flagged(monkeypatch, tmp_path: Path) -> None:

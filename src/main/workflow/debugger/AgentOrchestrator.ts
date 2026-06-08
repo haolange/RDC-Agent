@@ -11,7 +11,7 @@
  *
  * 内部实现：
  *  - 调用 `Agent.prompt()` 触发新循环；
- *  - 订阅核心 `AgentEvent`，通过 `LegacyEventBridge` 翻译为旧 `AgentEvent`，
+ *  - 订阅核心 `AgentEvent`，通过 `AgentEventBridge` 翻译为共享 `AgentEvent`，
  *    供 ConversationService / agent-trace 等老 API 复用。
  */
 
@@ -31,7 +31,7 @@ import {
   REPORTER_AGENTS,
   VERIFIER_AGENTS,
 } from '@shared/constants/agents';
-import type { AgentEvent as LegacyAgentEvent } from '@shared/types/agentRuntime';
+import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
 import type { LLMConfig, LLMStreamEvent } from '@shared/types/llm';
 import type { AppMode } from '@shared/types/session';
 import type { LlmProviderId } from '@shared/types/settings';
@@ -55,9 +55,9 @@ import {
   llmAdapterProvider,
 } from '../../agent-runtime/LLMAdapterProvider';
 import {
-  translateCoreToLegacy,
-  type LegacyEventContext,
-} from '../../agent-runtime/LegacyEventBridge';
+  translateCoreToSharedAgentEvent,
+  type AgentEventBridgeContext,
+} from '../../agent-runtime/AgentEventBridge';
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import { executionProfileService } from '../../settings/ExecutionProfileService';
@@ -79,7 +79,7 @@ interface AgentTurnOptions {
   signal?: AbortSignal;
   onChunk?: (text: string) => void;
   onStreamEvent?: (event: LLMStreamEvent) => void;
-  onEvent?: (event: LegacyAgentEvent) => void;
+  onEvent?: (event: SharedAgentEvent) => void;
   reasoningBudget?: 'auto' | 'low' | 'medium' | 'high';
 }
 
@@ -593,7 +593,7 @@ export class AgentOrchestrator {
       timestamp: nowMs(),
     };
 
-    const legacyContext: LegacyEventContext = {
+    const sharedEventContext: AgentEventBridgeContext = {
       agentId: input.agentId,
       runId: input.runId,
       turnId: input.turnId,
@@ -620,9 +620,9 @@ export class AgentOrchestrator {
           .map((block) => (block as { text: string }).text)
           .join('');
       }
-      const legacyEvent = translateCoreToLegacy(event, legacyContext);
-      if (legacyEvent) {
-        input.options?.onEvent?.(legacyEvent);
+      const sharedEvent = translateCoreToSharedAgentEvent(event, sharedEventContext);
+      if (sharedEvent) {
+        input.options?.onEvent?.(sharedEvent);
       }
     });
 
@@ -918,8 +918,8 @@ export class AgentOrchestrator {
   }
 
   private emitCoworkTestEvent(
-    type: LegacyAgentEvent['type'],
-    payload: LegacyAgentEvent['payload'],
+    type: SharedAgentEvent['type'],
+    payload: SharedAgentEvent['payload'],
     options?: AgentCoworkOptions,
   ): void {
     options?.onEvent?.({

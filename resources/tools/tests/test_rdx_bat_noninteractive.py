@@ -103,16 +103,26 @@ def test_noninteractive_doctor_returns_cli_only_payload() -> None:
     assert code == 0
     assert payload["ok"] is True
     assert payload["result_kind"] == "rdx.doctor"
-    assert payload["data"]["mcp"]["supported"] is False
 
 
 @pytest.mark.skipif(os.name != "nt", reason="rdx.bat launcher tests are windows-specific")
-def test_noninteractive_mcp_route_reports_unsupported_json() -> None:
-    code, payload, _ = _run_bat("--non-interactive", "mcp", "--ensure-env")
+def test_noninteractive_unknown_command_uses_cli_usage_error() -> None:
+    proc = subprocess.run(
+        [_cmd_exe(), "/c", "rdx.bat", "--non-interactive", "__unknown_command__"],
+        cwd=str(ROOT),
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=90,
+        env=_launcher_env(),
+        check=False,
+    )
+    combined = (proc.stdout or "") + (proc.stderr or "")
 
-    assert code != 0
-    assert payload["ok"] is False
-    assert payload["error_code"] == "unsupported_command"
+    assert proc.returncode == 2
+    assert "invalid choice" in combined
 
 
 @pytest.mark.skipif(os.name != "nt", reason="rdx.bat launcher tests are windows-specific")

@@ -14,8 +14,8 @@
  *    - 通用：`<PROVIDER>_API_KEY` / `<PROVIDER>_BASE_URL`，其中 provider id 全部转大写、
  *      `-` 转 `_`。
  *
- * 后续接入旧版 `ProviderAccountAuthService` 时，仅需在主进程入口
- * 调用 `providerAuth.setResolver(...)` 注入即可，不需要修改 Provider 实现。
+ * 主进程通过 `providerAuth.setResolver(...)` 注入账号/密钥解析器；
+ * Provider 实现不直接依赖 settings 或 secret storage。
  */
 
 /** Provider 运行时凭证。 */

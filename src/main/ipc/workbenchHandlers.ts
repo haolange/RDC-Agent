@@ -13,7 +13,7 @@ import { llmAdapter } from '../settings/LLMAdapter';
 import { settingsService } from '../settings/SettingsService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
-import { toolBridge } from '../tools/ToolBridge';
+import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
 import { registerAgentHandlers } from './agentHandlers';
 import { registerCaptureDeviceHandlers } from './captureDeviceHandlers';
 import { registerConversationHandlers } from './conversationHandlers';
@@ -184,7 +184,7 @@ function registerToolTraceBridge(): void {
     return;
   }
 
-  toolBridge.onToolTrace((trace) => {
+  rdxCliInvokerService.onInvocationTrace((trace) => {
     broadcastToRenderer('tool:executionComplete', trace);
     if (state.currentSessionId && state.currentRunId) {
       void appendActionEvent(storageAdapter.createActionEvent({
