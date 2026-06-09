@@ -101,7 +101,6 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
       { label: t('settings.policiesPath'), value: derivedPaths.policiesPath },
       { label: t('settings.skillsPath'), value: derivedPaths.skillsPath },
       { label: t('settings.mcpPath'), value: derivedPaths.mcpPath },
-      { label: t('settings.patternsPath'), value: derivedPaths.patternsPath },
     ];
   }, [derivedRoot, t]);
 
@@ -110,6 +109,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     { id: 'workspace', label: t('settings.workspace') },
     { id: 'models', label: t('settings.models') },
     { id: 'agents', label: t('settings.agents') },
+    { id: 'tools', label: t('settings.skillsAndTools') },
   ], [t]);
 
   const actions = createSettingsModalActions({

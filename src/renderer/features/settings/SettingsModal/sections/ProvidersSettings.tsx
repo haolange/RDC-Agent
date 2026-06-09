@@ -151,12 +151,16 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
         'account',
       )}
       <div className="settings-provider-catalog-groups" data-testid="settings-add-provider">
-        {catalogGroups.map(({ group, providers }) => renderProviderGroup(
-          getProviderGroupLabel({ catalogGroup: group }),
-          t('settings.addProviderHint'),
-          providers,
-          `settings-provider-group-${group}`,
-          'add',
+        {catalogGroups.map(({ group, providers }) => (
+          <React.Fragment key={group}>
+            {renderProviderGroup(
+              getProviderGroupLabel({ catalogGroup: group }),
+              t('settings.addProviderHint'),
+              providers,
+              `settings-provider-group-${group}`,
+              'add',
+            )}
+          </React.Fragment>
         ))}
       </div>
     </>

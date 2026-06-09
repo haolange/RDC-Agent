@@ -208,6 +208,7 @@ export interface ElectronAPI {
   settings: {
     get: () => Promise<AppSettings>;
     getProviderSecret: (providerId: string) => Promise<string>;
+    importAgentManifest: (filePath: string) => Promise<AppSettings>;
     set: (settings: AppSettingsPatch) => Promise<AppSettings>;
   };
 
@@ -392,4 +393,3 @@ export interface ElectronAPI {
   on: (channel: string, callback: (...args: unknown[]) => void) => void;
   off: (channel: string, callback: (...args: unknown[]) => void) => void;
 }
-

@@ -6,6 +6,7 @@ import { GeneralSettings } from './sections/GeneralSettings';
 import { WorkspaceSettings } from './sections/WorkspaceSettings';
 import { ModelsSettings } from './sections/ModelsSettings';
 import { AgentsSettings } from './sections/AgentsSettings';
+import { SkillsToolsSettings } from './sections/SkillsToolsSettings';
 import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
 import './SettingsModal.css';
 
@@ -25,27 +26,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     accountDraft,
     setAccountDraft,
     workspaceDraft,
-    providerDrafts,
-    agentRouteDrafts,
-    activeModeProfileDraft,
-    setActiveModeProfileDraft,
     enabledSkillDrafts,
     setEnabledSkillDrafts,
     enabledMcpDrafts,
     setEnabledMcpDrafts,
-    patternBindingDrafts,
-    setPatternBindingDrafts,
     rdxCliDraft,
     setRdxCliDraft,
+    agentManifestDrafts,
+    setAgentManifestDrafts,
+    globalInstructionsDraft,
+    setGlobalInstructionsDraft,
     connectionDraft,
     setConnectionDraft,
     agentRouteSaveState,
     agentRouteSaveMessage,
     derivedPathEntries,
-    routableProviders,
     accountProviders,
     providerCatalog,
-    configuredProvidersWithoutEnabledModels,
     getResolvedProviderLabel,
     handleAvatarSelect,
     handleAccountSave,
@@ -54,9 +51,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     handleWorkspaceReset,
     handleRefreshProviderModels,
     handleDisconnectProvider,
-    handleRouteChange,
-    handleSaveAgentRoutes,
-    handleSaveAgentRuntimeConfig,
+    handleSaveAgentManifests,
+    handleImportAgentManifest,
+    handleSaveSkillsAndTools,
     setTheme,
     setLanguage,
     setFontScale,
@@ -85,6 +82,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
   if (!open) return null;
 
+  const configuredProviderCount = settings.llm.providers.filter((provider) => provider.enabled && provider.isConfigured).length;
+  const workspaceRoot = settings.workspace.rootPath || settings.paths.defaultWorkspaceRoot;
+
   const subtitle = (() => {
     switch (activeSection) {
       case 'general':
@@ -95,6 +95,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
         return t('settings.modelsSubtitle');
       case 'agents':
         return t('settings.agentsSubtitle');
+      case 'tools':
+        return t('settings.skillsAndToolsSubtitle');
       default:
         return '';
     }
@@ -132,6 +134,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 {section.label}
               </button>
             ))}
+          </div>
+
+          <div className="settings-center-sidebar-status" aria-label={t('settings.sidebarStatus')}>
+            <div>
+              <span>{t('settings.workspaceRoot')}</span>
+              <strong title={workspaceRoot}>{workspaceRoot || t('settings.unset')}</strong>
+            </div>
+            <div>
+              <span>{t('settings.connectedProviders')}</span>
+              <strong>{configuredProviderCount}</strong>
+            </div>
+            <div>
+              <span>{t('settings.localRenderDocToolchain')}</span>
+              <strong>{settings.tooling.rdxCli.enabled ? t('settings.enabled') : t('settings.disabled')}</strong>
+            </div>
           </div>
         </div>
 
@@ -195,27 +212,29 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
             {activeSection === 'agents' && (
               <AgentsSettings
                 settings={settings}
-                providerDrafts={providerDrafts}
-                agentRouteDrafts={agentRouteDrafts}
-                activeModeProfileDraft={activeModeProfileDraft}
-                enabledSkillDrafts={enabledSkillDrafts}
-                enabledMcpDrafts={enabledMcpDrafts}
-                patternBindingDrafts={patternBindingDrafts}
-                rdxCliDraft={rdxCliDraft}
-                routableProviders={routableProviders}
-                configuredProvidersWithoutEnabledModels={configuredProvidersWithoutEnabledModels}
-                getResolvedProviderLabel={getResolvedProviderLabel}
-                onRouteChange={handleRouteChange}
-                onActiveModeProfileChange={setActiveModeProfileDraft}
-                onEnabledSkillDraftsChange={setEnabledSkillDrafts}
-                onEnabledMcpDraftsChange={setEnabledMcpDrafts}
-                onPatternBindingDraftsChange={setPatternBindingDrafts}
-                onRdxCliDraftChange={setRdxCliDraft}
-                onSaveAgentRoutes={handleSaveAgentRoutes}
-                onSaveAgentRuntimeConfig={handleSaveAgentRuntimeConfig}
-                toggleRuntimeId={toggleRuntimeId}
+                agentManifestDrafts={agentManifestDrafts}
+                onAgentManifestDraftsChange={setAgentManifestDrafts}
+                onSaveAgentManifests={handleSaveAgentManifests}
+                onImportAgentManifest={handleImportAgentManifest}
                 agentRouteSaveState={agentRouteSaveState}
                 agentRouteSaveMessage={agentRouteSaveMessage}
+                t={t}
+              />
+            )}
+
+            {activeSection === 'tools' && (
+              <SkillsToolsSettings
+                settings={settings}
+                enabledSkillDrafts={enabledSkillDrafts}
+                enabledMcpDrafts={enabledMcpDrafts}
+                rdxCliDraft={rdxCliDraft}
+                globalInstructionsDraft={globalInstructionsDraft}
+                onEnabledSkillDraftsChange={setEnabledSkillDrafts}
+                onEnabledMcpDraftsChange={setEnabledMcpDrafts}
+                onRdxCliDraftChange={setRdxCliDraft}
+                onGlobalInstructionsDraftChange={setGlobalInstructionsDraft}
+                onSave={handleSaveSkillsAndTools}
+                toggleRuntimeId={toggleRuntimeId}
                 t={t}
               />
             )}

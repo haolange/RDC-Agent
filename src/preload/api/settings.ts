@@ -29,5 +29,7 @@ export const createSettingsApi = (): SettingsApi => ({
   get: (): ReturnType<SettingsApi['get']> => ipcRenderer.invoke('settings:get'),
   getProviderSecret: (providerId): ReturnType<SettingsApi['getProviderSecret']> =>
     ipcRenderer.invoke('settings:getProviderSecret', providerId),
+  importAgentManifest: (filePath): ReturnType<SettingsApi['importAgentManifest']> =>
+    ipcRenderer.invoke('settings:importAgentManifest', filePath),
   set: (settings): ReturnType<SettingsApi['set']> => ipcRenderer.invoke('settings:set', settings),
 });

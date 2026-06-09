@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { AgentMode } from '@shared/types/layout';
+import { useEffect, useRef, useState } from 'react';
 import { AGENT_MODES } from '@shared/constants/agents';
 import { useI18n } from '../../../i18n';
 import { useConversationStore } from '../../../stores/conversationStore';
@@ -7,6 +6,7 @@ import { useLayoutStore } from '../../../stores/layoutStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
 import { useDeviceStore } from '../../../stores/deviceStore';
+import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useComposerAttachments } from './useComposerAttachments';
 import { useComposerSend } from './useComposerSend';
 
@@ -33,6 +33,10 @@ export function useComposer(options: {
   const conversationMessages = useConversationStore((state) => state.conversationMessages);
   const currentMode = useLayoutStore((state) => state.currentMode);
   const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
+  const userInvocableAgents = useAppSettingsStore((state) =>
+    state.settings.agents.definitions.filter((agent) => agent.enabled && agent.userInvocable),
+  );
+  const [selectedAgentId, setSelectedAgentId] = useState(userInvocableAgents[0]?.id ?? 'ask_agent');
 
   const devices = useDeviceStore((state) => state.devices);
   const selectedDevice = useDeviceStore((state) => state.selectedDevice);
@@ -52,14 +56,9 @@ export function useComposer(options: {
     toggleLeftSidebar,
   });
 
-  const modeLabels = useMemo<Record<AgentMode, string>>(() => ({
-    ask: t('mode.ask'),
-    debugger: t('mode.debugger'),
-    analyzer: t('mode.analyzer'),
-    optimizer: t('mode.optimizer'),
-  }), [t]);
   const currentModeConfig = AGENT_MODES.find((mode) => mode.id === currentMode) ?? AGENT_MODES[0];
-  const currentModeLabel = modeLabels[currentMode];
+  const selectedAgent = userInvocableAgents.find((agent) => agent.id === selectedAgentId) ?? userInvocableAgents[0];
+  const currentModeLabel = selectedAgent?.name ?? currentModeConfig.label;
   const openCaptureRequiredLabel = language === 'zh-CN'
     ? '先在应用内 Open 一个 .rdc Capture 后才能选择执行模式'
     : 'Open a .rdc capture in the app before selecting an execution mode';
@@ -68,6 +67,7 @@ export function useComposer(options: {
     showNotice,
     t,
     currentMode,
+    selectedAgentId,
     setCurrentMode,
     currentProject,
     currentSession,
@@ -117,8 +117,15 @@ export function useComposer(options: {
   useEffect(() => {
     if (currentMode !== 'ask' && !hasOpenedCaptureForCurrentProject) {
       setCurrentMode('ask');
+      setSelectedAgentId('ask_agent');
     }
   }, [currentMode, hasOpenedCaptureForCurrentProject, setCurrentMode]);
+  useEffect(() => {
+    const fallback = userInvocableAgents[0];
+    if (!fallback || userInvocableAgents.some((agent) => agent.id === selectedAgentId)) return;
+    setSelectedAgentId(fallback.id);
+    setCurrentMode(fallback.id === 'ask_agent' ? 'ask' : 'debugger');
+  }, [selectedAgentId, setCurrentMode, userInvocableAgents]);
 
   useEffect(() => {
     if (!modeMenuOpen) {
@@ -168,6 +175,9 @@ export function useComposer(options: {
     currentMode,
     currentModeConfig,
     currentModeLabel,
+    selectedAgentId,
+    userInvocableAgents,
+    setSelectedAgentId,
     currentRunUsage,
     hasActiveDebugRun,
     isComposerBusy: send.isComposerBusy,
@@ -176,7 +186,6 @@ export function useComposer(options: {
     primaryButtonDisabled,
     primaryButtonDescription,
     openCaptureRequiredLabel,
-    modeLabels,
     handlePrimaryStop: send.handlePrimaryStop,
     handleAttachmentSelect: attachments.handleAttachmentSelect,
     handlePendingAttachmentRemove: attachments.handlePendingAttachmentRemove,

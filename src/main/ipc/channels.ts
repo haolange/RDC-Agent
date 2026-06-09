@@ -65,6 +65,7 @@
   settingsProfile: [
     'settings:get',
     'settings:getProviderSecret',
+    'settings:importAgentManifest',
     'settings:set',
     'llm:configure',
     'llm:testConnection',
@@ -136,4 +137,3 @@ export const IPC_EVENT_DOMAINS = {
 
 export type IpcEventDomain = keyof typeof IPC_EVENT_DOMAINS;
 export type IpcEventChannel = (typeof IPC_EVENT_DOMAINS)[IpcEventDomain][number];
-

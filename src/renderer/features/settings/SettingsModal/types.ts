@@ -1,6 +1,6 @@
 import type { LlmProviderAccountStatus, LlmProviderModel } from '@shared/types/settings';
 
-export type SettingsSection = 'general' | 'workspace' | 'models' | 'agents';
+export type SettingsSection = 'general' | 'workspace' | 'models' | 'agents' | 'tools';
 
 export type ProviderConnectionBusyState = 'idle' | 'testing' | 'saving';
 

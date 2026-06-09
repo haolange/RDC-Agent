@@ -68,6 +68,12 @@ const DEFAULT_SETTINGS: AppSettings = {
     providers: [],
     agentRoutes: createEmptyAgentRoutes(),
   },
+  agents: {
+    directoryPath: '',
+    definitions: [],
+    modelOptions: [],
+    globalInstructions: '',
+  },
   configuration: {
     activeModeProfileId: 'debugger.default',
     availableModeProfiles: [],

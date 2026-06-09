@@ -21,6 +21,7 @@ export function useComposerSend(options: {
   showNotice: (message: string) => void;
   t: Translate;
   currentMode: AgentMode;
+  selectedAgentId: string;
   setCurrentMode: (mode: AgentMode) => void;
   currentProject: ProjectRecord | null;
   currentSession: SessionRecord | null;
@@ -39,6 +40,7 @@ export function useComposerSend(options: {
     showNotice,
     t,
     currentMode,
+    selectedAgentId,
     currentProject,
     currentSession,
     currentRun,
@@ -90,6 +92,7 @@ export function useComposerSend(options: {
         currentRunId: currentRun?.runId ?? null,
         replayDeviceId: selectedDeviceEntry?.id ?? null,
         mode: currentMode,
+        agentId: selectedAgentId || null,
         message: trimmed,
         attachments: toConversationAttachmentInputs(pendingAttachments),
       });

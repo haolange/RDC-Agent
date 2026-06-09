@@ -96,6 +96,7 @@ class BrowserAppBridgeClient {
     settings: {
       get: () => this.invoke('settings:get'),
       getProviderSecret: (providerId) => this.invoke('settings:getProviderSecret', providerId),
+      importAgentManifest: (filePath) => this.invoke('settings:importAgentManifest', filePath),
       set: (settings) => this.invoke('settings:set', settings),
     },
     project: {
@@ -270,4 +271,3 @@ export function installBrowserAppBridge(): void {
 export function isBrowserAppBridge(): boolean {
   return Boolean((window as BrowserBridgeWindow)[BRIDGE_MARKER]);
 }
-

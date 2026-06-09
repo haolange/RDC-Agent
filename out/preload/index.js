@@ -170,6 +170,7 @@ const createLlmApi = () => ({
 const createSettingsApi = () => ({
   get: () => electron.ipcRenderer.invoke("settings:get"),
   getProviderSecret: (providerId) => electron.ipcRenderer.invoke("settings:getProviderSecret", providerId),
+  importAgentManifest: (filePath) => electron.ipcRenderer.invoke("settings:importAgentManifest", filePath),
   set: (settings) => electron.ipcRenderer.invoke("settings:set", settings)
 });
 const createAppMetaApi = () => ({

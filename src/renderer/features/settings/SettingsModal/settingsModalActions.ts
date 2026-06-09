@@ -156,6 +156,46 @@ export function createSettingsModalActions({
     }
   };
 
+  const handleSaveAgentManifests = async () => {
+    modalState.setAgentRouteSaveState('saving');
+    modalState.setAgentRouteSaveMessage('');
+    try {
+      await patchSettings({
+        agents: {
+          definitions: modalState.agentManifestDrafts,
+        },
+      });
+      const nextSettings = await reloadSettings();
+      modalState.setAgentManifestDrafts(nextSettings.agents.definitions.map((definition) => ({ ...definition })));
+      modalState.setAgentRouteSaveState('saved');
+      modalState.setAgentRouteSaveMessage(t('settings.agentManifestSaved'));
+    } catch (error) {
+      modalState.setAgentRouteSaveState('error');
+      modalState.setAgentRouteSaveMessage(getErrorMessage(error, t('settings.agentRouteSaveFailed')));
+    }
+  };
+
+  const handleImportAgentManifest = async () => {
+    const filePaths = await window.electronAPI?.selectFiles();
+    const filePath = filePaths?.find((entry) => entry.endsWith('.agent.md'));
+    if (!filePath) {
+      modalState.setAgentRouteSaveState('error');
+      modalState.setAgentRouteSaveMessage(t('settings.agentImportRequiresManifest'));
+      return;
+    }
+    modalState.setAgentRouteSaveState('saving');
+    modalState.setAgentRouteSaveMessage('');
+    try {
+      const nextSettings = await window.electronAPI.settings.importAgentManifest(filePath);
+      modalState.setAgentManifestDrafts(nextSettings.agents.definitions.map((definition) => ({ ...definition })));
+      modalState.setAgentRouteSaveState('saved');
+      modalState.setAgentRouteSaveMessage(t('settings.agentManifestImported'));
+    } catch (error) {
+      modalState.setAgentRouteSaveState('error');
+      modalState.setAgentRouteSaveMessage(getErrorMessage(error, t('settings.agentRouteSaveFailed')));
+    }
+  };
+
   const handleSaveAgentRuntimeConfig = async () => {
     await patchSettings({
       tooling: {
@@ -168,6 +208,26 @@ export function createSettingsModalActions({
         modePatternBindings: modalState.patternBindingDrafts,
       },
     });
+  };
+
+  const handleSaveSkillsAndTools = async () => {
+    await patchSettings({
+      tooling: {
+        rdxCli: modalState.rdxCliDraft,
+      },
+      agents: {
+        globalInstructions: modalState.globalInstructionsDraft,
+      },
+      configuration: {
+        enabledSkillIds: modalState.enabledSkillDrafts,
+        enabledMcpServerIds: modalState.enabledMcpDrafts,
+      },
+    });
+    const nextSettings = await reloadSettings();
+    modalState.setRdxCliDraft(nextSettings.tooling.rdxCli);
+    modalState.setEnabledSkillDrafts(nextSettings.configuration.enabledSkillIds);
+    modalState.setEnabledMcpDrafts(nextSettings.configuration.enabledMcpServerIds);
+    modalState.setGlobalInstructionsDraft(nextSettings.agents.globalInstructions);
   };
 
   const toggleRuntimeId = (values: string[], id: string): string[] =>
@@ -183,7 +243,10 @@ export function createSettingsModalActions({
     handleDisconnectProvider,
     handleRouteChange,
     handleSaveAgentRoutes,
+    handleSaveAgentManifests,
+    handleImportAgentManifest,
     handleSaveAgentRuntimeConfig,
+    handleSaveSkillsAndTools,
     toggleRuntimeId,
   };
 }

@@ -15,6 +15,7 @@ import type {
   ConversationTurnResult,
 } from '@shared/types/conversation';
 import type { AgentRole } from '@shared/types/agent';
+import { AGENT_ROLES } from '@shared/constants/agents';
 import type {
   AppMode,
   CaptureDescriptor,
@@ -59,6 +60,15 @@ interface ActiveConversationTurn {
   startedAt: number;
   abortController: AbortController;
   stop: () => void;
+}
+
+const KNOWN_CONVERSATION_AGENTS = new Set<string>(AGENT_ROLES);
+
+function resolveConversationAgentId(requestedMode: AppMode, requestedAgentId?: string | null): AgentRole {
+  if (requestedAgentId && KNOWN_CONVERSATION_AGENTS.has(requestedAgentId)) {
+    return requestedAgentId as AgentRole;
+  }
+  return requestedMode === 'ask' ? 'ask_agent' : 'rdc-debugger';
 }
 
 const EXECUTE_PATTERN = /开始|启动|执行|正式分析|正式调试|本地调试|local\s*模式调试|模式调试|直接分析|现在分析|run\b|start\b|debug\b|analy[sz]e\b|帮我调试|请.*调试|开始调试|开始分析/i;
@@ -676,7 +686,7 @@ export class ConversationService {
       return this.startActiveDebugTurn(context, input.mode, input.message.trim(), input.attachments ?? []);
     }
 
-    return this.startCoworkTurn(context, input.mode, input.message.trim(), input.attachments ?? []);
+    return this.startCoworkTurn(context, input.mode, input.agentId ?? null, input.message.trim(), input.attachments ?? []);
   }
 
   private async resolveContext(input: ConversationContextInput): Promise<ResolvedConversationContext> {
@@ -908,9 +918,11 @@ export class ConversationService {
   private async startCoworkTurn(
     context: ResolvedConversationContext,
     requestedMode: AppMode,
+    requestedAgentId: string | null,
     rawMessage: string,
     pendingAttachments: ConversationAttachmentInput[],
   ): Promise<ConversationTurnResult> {
+    const conversationAgentId = resolveConversationAgentId(requestedMode, requestedAgentId);
     let workingSession = context.session;
     if (!workingSession && context.projectId) {
       workingSession = storageAdapter.createSession(context.projectId, rawMessage.slice(0, 80));
@@ -938,7 +950,7 @@ export class ConversationService {
       projectId: context.projectId,
       runId: isActiveRun(context.currentRun) ? context.currentRun.runId : null,
       modeContext: requestedMode,
-      agentId: requestedMode === 'ask' ? 'ask_agent' : 'rdc-debugger',
+      agentId: conversationAgentId,
       status: 'streaming',
       reasoningTrace: createDraftReasoningTrace(
         requestedMode === 'ask' ? '正在执行只读协作' : '正在思考',
@@ -995,6 +1007,7 @@ export class ConversationService {
         session: workingSession,
       },
       requestedMode,
+      requestedAgentId: conversationAgentId,
       rawMessage,
       importedAttachments,
       userMessage,
@@ -1016,6 +1029,7 @@ export class ConversationService {
   private async completeCoworkTurn(input: {
     context: ResolvedConversationContext;
     requestedMode: AppMode;
+    requestedAgentId: AgentRole;
     rawMessage: string;
     importedAttachments: SessionAttachmentRecord[];
     userMessage: ConversationMessage;
@@ -1025,7 +1039,7 @@ export class ConversationService {
     const sessionId = input.context.session?.sessionId ?? null;
     const traceSessionId = sessionId ?? this.ephemeralTraceSessionId(input.assistantDraftMessage.turnId);
     const abortController = new AbortController();
-    const conversationAgentId: AgentRole = input.requestedMode === 'ask' ? 'ask_agent' : 'rdc-debugger';
+    const conversationAgentId: AgentRole = input.requestedAgentId;
     const showCoworkReasoning = true;
 
     const commitAssistantMessage = (type: ConversationStreamEvent['type'], patch: Partial<ConversationMessage>) => {
@@ -1223,6 +1237,16 @@ export class ConversationService {
           input.rawMessage,
           input.importedAttachments,
         );
+        const globalInstructions = settingsService.getAll().agents.globalInstructions.trim();
+        const baseSystemPrompt = conversationAgentId === 'ask_agent'
+          ? buildAskSystemPrompt()
+          : buildDebuggerCoworkSystemPrompt();
+        const systemPrompt = [
+          baseSystemPrompt,
+          conversationAgentId !== 'ask_agent' && globalInstructions
+            ? `\n\nGlobal Instructions:\n${globalInstructions}`
+            : '',
+        ].join('').trim();
         const responseText = await agentOrchestrator.sendCoworkMessage(
           conversationAgentId,
           input.rawMessage,
@@ -1231,9 +1255,7 @@ export class ConversationService {
             turnId: assistantMessage.turnId,
             stage: 'cowork',
             patternId: input.requestedMode === 'debugger' ? 'plan-generate-verify' : 'free-agent',
-            systemPrompt: conversationAgentId === 'ask_agent'
-              ? buildAskSystemPrompt()
-              : buildDebuggerCoworkSystemPrompt(),
+            systemPrompt,
             maxTokens: 1200,
             temperature: 0.35,
             signal: abortController.signal,
