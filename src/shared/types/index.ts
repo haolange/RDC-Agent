@@ -105,18 +105,13 @@ export type {
 export type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from './terminal';
 export type { ToolCallResult, ToolCatalog, ToolRuntimeSummary, ToolTraceEntry } from './tool';
 export type {
-  AskUserAnswer,
-  AskUserPrompt,
-  DebugPlan,
   IntakeContext,
-  PlanApprovalState,
   WorkflowStage,
   WorkflowState,
   WorkflowStateView,
 } from './workflow';
 export type {
   BranchNavigatorViewModel,
-  ComposerApprovalViewModel,
   PlanStatus,
   ProgressTask,
   RequestBranch,

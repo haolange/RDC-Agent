@@ -30,7 +30,6 @@ function getModeCapability(modeId: AgentMode, language: string): string {
 
 export const Composer: React.FC<ComposerProps> = ({
   composer,
-  hasOpenedCaptureForCurrentProject,
 }) => {
   const { t, language } = useI18n();
   const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
@@ -158,8 +157,13 @@ export const Composer: React.FC<ComposerProps> = ({
                   <span className="agent-tag" />
                 </span>
                 {userInvocableAgents.map((agent) => {
-                  const agentMode: AgentMode = agent.id === 'ask_agent' ? 'ask' : 'debugger';
-                  const executionModeDisabled = agentMode !== 'ask' && !hasOpenedCaptureForCurrentProject;
+                  const agentMode: AgentMode = (
+                    agent.id === 'ask'
+                      || agent.id === 'debugger'
+                      || agent.id === 'analyzer'
+                      || agent.id === 'optimizer'
+                  ) ? agent.id : 'ask';
+                  const executionModeDisabled = false;
                   return (
                     <button
                       key={agent.id}

@@ -182,8 +182,22 @@ export interface RdxCliInvokerSettings {
   jsonMode: RdxCliJsonMode;
 }
 
+export type RdxActionId = 'openCapture' | 'connectRemote' | 'closeRuntime' | 'openPreview';
+
+export interface RdxShellActionSettings {
+  enabled: boolean;
+  command: string;
+  args: string[];
+  workingDirectory: string;
+  env: Record<string, string>;
+  timeoutMs: number;
+}
+
+export type RdxActionSettingsMap = Record<RdxActionId, RdxShellActionSettings>;
+
 export interface ToolingSettings {
   rdxCli: RdxCliInvokerSettings;
+  rdxActions: RdxActionSettingsMap;
 }
 
 export interface AppRuntimePaths {
@@ -296,6 +310,7 @@ export type AppSettingsPatch = Partial<{
   workspace: Partial<WorkspaceSettings>;
   tooling: Partial<{
     rdxCli: Partial<RdxCliInvokerSettings>;
+    rdxActions: Partial<Record<RdxActionId, Partial<RdxShellActionSettings>>>;
   }>;
   llm: Partial<{
     providers: LlmProviderEntry[];

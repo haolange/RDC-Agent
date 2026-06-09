@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
-import type { AgentRole } from '@shared/types/agent';
+import type { AgentId } from '@shared/types/agent';
+import { isTopLevelAgentId } from '@shared/types/agent';
 import type {
   AgentHandoffDefinition,
   AgentManifestDefinition,
@@ -11,6 +12,7 @@ import type {
 } from '@shared/types/agentManifest';
 import type { AppRuntimePaths, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
 import { AGENT_DESCRIPTIONS, AGENT_DISPLAY_NAMES, AGENT_ROLES } from '@shared/constants/agents';
+import { canonicalAgentModelId, splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
 
 const GLOBAL_INSTRUCTIONS_FILE = 'global-instructions.md';
 
@@ -25,20 +27,6 @@ const toSlug = (value: string): string => {
 };
 
 const fileNameForId = (id: string): string => `${toSlug(id.replace(/_/g, '-'))}.agent.md`;
-
-const canonicalModelId = (providerId: string, modelId: string): string =>
-  providerId && modelId ? `${providerId}:${modelId}` : '';
-
-const splitCanonicalModelId = (value: string): { providerId: string; modelId: string } | null => {
-  const separator = value.indexOf(':');
-  if (separator <= 0 || separator === value.length - 1) {
-    return null;
-  }
-  return {
-    providerId: value.slice(0, separator),
-    modelId: value.slice(separator + 1),
-  };
-};
 
 const readStringArray = (value: unknown): string[] => {
   if (Array.isArray(value)) {
@@ -80,6 +68,9 @@ const readHandoffs = (value: unknown): AgentHandoffDefinition[] => {
       if (typeof candidate.showContinueOn === 'boolean') {
         handoff.showContinueOn = candidate.showContinueOn;
       }
+      if (typeof candidate.model === 'string' && candidate.model.trim()) {
+        handoff.model = candidate.model.trim();
+      }
       handoffs.push(handoff);
   }
   return handoffs;
@@ -93,12 +84,8 @@ const parseAgentMarkdown = (filePath: string, fallbackId: string): AgentManifest
   const name = typeof frontmatter.name === 'string' && frontmatter.name.trim()
     ? frontmatter.name.trim()
     : fallbackId;
-  const id = typeof frontmatter.id === 'string' && frontmatter.id.trim()
-    ? frontmatter.id.trim()
-    : fallbackId;
-
   return {
-    id,
+    id: fallbackId,
     fileName: path.basename(filePath),
     filePath,
     name,
@@ -110,7 +97,7 @@ const parseAgentMarkdown = (filePath: string, fallbackId: string): AgentManifest
     userInvocable: readBoolean(frontmatter['user-invocable'], true),
     tools: readStringArray(frontmatter.tools),
     skills: readStringArray(frontmatter.skills),
-    mcpServers: readStringArray(frontmatter.mcpServers),
+    mcpServers: readStringArray(frontmatter['mcp-servers']),
     agents: readStringArray(frontmatter.agents),
     handoffs: readHandoffs(frontmatter.handoffs),
     metadata: frontmatter.metadata && typeof frontmatter.metadata === 'object'
@@ -125,7 +112,6 @@ const parseAgentMarkdown = (filePath: string, fallbackId: string): AgentManifest
 
 const serializeAgentMarkdown = (definition: AgentManifestDraft): string => {
   const frontmatter: Record<string, unknown> = {
-    id: definition.id,
     name: definition.name,
     description: definition.description,
     'argument-hint': definition.argumentHint,
@@ -136,45 +122,40 @@ const serializeAgentMarkdown = (definition: AgentManifestDraft): string => {
     enabled: definition.enabled,
     tools: definition.tools,
     skills: definition.skills,
-    mcpServers: definition.mcpServers,
+    'mcp-servers': definition.mcpServers,
     agents: definition.agents,
     handoffs: definition.handoffs,
-    metadata: definition.metadata,
   };
   return `---\n${YAML.stringify(frontmatter).trim()}\n---\n\n${definition.instructions.trim()}\n`;
 };
 
 const createSeedDefinition = (
-  agentId: AgentRole,
+  agentId: AgentId,
   routes: LlmAgentRoute[],
 ): AgentManifestDraft => {
   const route = routes.find((entry) => entry.agentId === agentId);
-  const model = canonicalModelId(route?.providerId ?? '', route?.modelId ?? '');
+  const model = canonicalAgentModelId(route?.providerId ?? '', route?.modelId ?? '');
   const name = AGENT_DISPLAY_NAMES[agentId];
   return {
     id: agentId,
     fileName: fileNameForId(agentId),
     name,
     description: AGENT_DESCRIPTIONS[agentId],
-    argumentHint: agentId === 'ask_agent'
+    argumentHint: agentId === 'ask'
       ? 'Ask about the current project, capture, or workflow'
       : 'Describe the RenderDoc/RDC investigation goal',
     target: 'rdc-agent',
     models: model ? [model] : [],
     disableModelInvocation: false,
-    userInvocable: agentId === 'ask_agent' || agentId === 'rdc-debugger',
-    tools: agentId === 'ask_agent'
-      ? ['read', 'search', 'web']
-      : ['read', 'search', 'agent', 'rdx'],
+    userInvocable: true,
+    tools: agentId === 'ask'
+      ? ['read', 'search', 'web', 'askUser']
+      : ['read', 'search', 'web', 'bash', 'askUser', 'agent', 'todo', 'memory', 'rdxContext'],
     skills: [],
     mcpServers: [],
-    agents: agentId === 'rdc-debugger'
-      ? AGENT_ROLES.filter((role) => role !== 'ask_agent' && role !== 'rdc-debugger')
-      : [],
+    agents: agentId === 'ask' ? [] : AGENT_ROLES.filter((role) => role !== agentId),
     handoffs: [],
-    metadata: {
-      legacyAgentRole: agentId,
-    },
+    metadata: {},
     instructions: `You are ${name}. ${AGENT_DESCRIPTIONS[agentId]}.`,
     enabled: true,
   };
@@ -192,13 +173,12 @@ export class AgentManifestService {
   ensureSeedManifests(paths: Pick<AppRuntimePaths, 'profilesPath'>, routes: LlmAgentRoute[]): void {
     const directory = this.getAgentsDirectory(paths);
     fs.mkdirSync(directory, { recursive: true });
-    const hasManifest = fs.readdirSync(directory).some((entry) => entry.endsWith('.agent.md'));
-    if (hasManifest) {
-      return;
-    }
+    const existing = new Set(fs.readdirSync(directory));
     for (const agentId of AGENT_ROLES) {
       const seed = createSeedDefinition(agentId, routes);
-      fs.writeFileSync(path.join(directory, seed.fileName), serializeAgentMarkdown(seed), 'utf8');
+      if (!existing.has(seed.fileName)) {
+        fs.writeFileSync(path.join(directory, seed.fileName), serializeAgentMarkdown(seed), 'utf8');
+      }
     }
   }
 
@@ -211,6 +191,7 @@ export class AgentManifestService {
     const directoryPath = this.getAgentsDirectory(paths);
     const definitions = fs.readdirSync(directoryPath)
       .filter((entry) => entry.endsWith('.agent.md'))
+      .filter((entry) => isTopLevelAgentId(entry.replace(/\.agent\.md$/u, '')))
       .map((entry) => {
         const fullPath = path.join(directoryPath, entry);
         const fallbackId = entry.replace(/\.agent\.md$/u, '');
@@ -234,6 +215,9 @@ export class AgentManifestService {
     const directory = this.getAgentsDirectory(paths);
     fs.mkdirSync(directory, { recursive: true });
     for (const draft of drafts) {
+      if (!isTopLevelAgentId(draft.id)) {
+        continue;
+      }
       const fileName = draft.fileName && draft.fileName.endsWith('.agent.md')
         ? draft.fileName
         : fileNameForId(draft.id || draft.name);
@@ -266,6 +250,9 @@ export class AgentManifestService {
     const directory = this.getAgentsDirectory(paths);
     fs.mkdirSync(directory, { recursive: true });
     const imported = parseAgentMarkdown(sourcePath, path.basename(sourcePath, '.agent.md'));
+    if (!isTopLevelAgentId(imported.id)) {
+      throw new Error(`Only top-level agent manifests can be imported: ${AGENT_ROLES.join(', ')}`);
+    }
     const fileName = fileNameForId(imported.id || imported.name);
     const targetPath = path.join(directory, fileName);
     fs.copyFileSync(sourcePath, targetPath);
@@ -275,6 +262,7 @@ export class AgentManifestService {
   routesFromDefinitions(
     currentRoutes: LlmAgentRoute[],
     definitions: AgentManifestDraft[],
+    providers: LlmProviderEntry[],
   ): LlmAgentRoute[] {
     const routeMap = new Map(currentRoutes.map((route) => [route.agentId, route]));
     const knownAgentIds = new Set<string>(AGENT_ROLES);
@@ -282,12 +270,32 @@ export class AgentManifestService {
       if (!knownAgentIds.has(definition.id) || definition.delete) {
         continue;
       }
-      const model = definition.models.map(splitCanonicalModelId).find((entry) => entry !== null);
-      if (!model) {
+      if (!isTopLevelAgentId(definition.id)) {
         continue;
       }
-      routeMap.set(definition.id as AgentRole, {
-        agentId: definition.id as AgentRole,
+      const model = definition.models.map(splitCanonicalAgentModelId).find((entry) => entry !== null);
+      if (!model) {
+        routeMap.set(definition.id, {
+          agentId: definition.id,
+          providerId: '',
+          modelId: '',
+        });
+        continue;
+      }
+      const provider = providers.find((entry) => entry.id === model.providerId);
+      const modelEnabled = provider?.enabled
+        && provider.isConfigured
+        && provider.models.some((entry) => entry.id === model.modelId && entry.enabled !== false);
+      if (!modelEnabled) {
+        routeMap.set(definition.id, {
+          agentId: definition.id,
+          providerId: '',
+          modelId: '',
+        });
+        continue;
+      }
+      routeMap.set(definition.id, {
+        agentId: definition.id,
         providerId: model.providerId,
         modelId: model.modelId,
       });
@@ -301,12 +309,17 @@ export class AgentManifestService {
 
   private getModelOptions(providers: LlmProviderEntry[]): AgentModelOption[] {
     return providers.flatMap((provider) => provider.models.map((model) => ({
-      canonicalId: canonicalModelId(provider.id, model.id),
+      canonicalId: canonicalAgentModelId(provider.id, model.id),
       providerId: provider.id,
       providerLabel: provider.label,
       modelId: model.id,
       modelLabel: model.label || model.id,
       configured: provider.enabled && provider.isConfigured && model.enabled !== false,
+      status: !provider.enabled || !provider.isConfigured
+        ? 'provider-unavailable'
+        : model.enabled === false
+          ? 'model-disabled'
+          : 'ready',
     })));
   }
 

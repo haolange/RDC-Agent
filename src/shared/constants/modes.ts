@@ -18,7 +18,6 @@ export const MODE_CAPABILITIES: Record<string, ModeCapabilities> = {
       'preflight',
       'entry_gate',
       'intake_gate',
-      'plan',
       'speclist',
       'dispatch',
       'investigate',

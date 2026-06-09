@@ -2,7 +2,6 @@ import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ArtifactRecord, HarnessTask } from '@shared/types/harness';
 import type { RunSummary, AppMode } from '@shared/types/session';
-import type { PlanApprovalState } from '@shared/types/workflow';
 import type {
   AgentRun,
   AgentRunPresentation,
@@ -16,7 +15,6 @@ import type {
   RightPanelViewModel,
   TraceArtifactRecord,
   TraceContextRecord,
-  ComposerApprovalViewModel,
   RawAuditRef,
   TraceSessionResult,
 } from '@shared/types/trace';
@@ -27,14 +25,12 @@ import { contextService } from '../captures/ContextService';
 import { taskBoard } from '../workflow/debugger/TaskBoard';
 import { traceStateStore } from '../workflow/debugger/TraceStateStore';
 import { appPathService } from '../runtime/AppPathService';
-import { app } from 'electron';
 import path from 'path';
 import { TraceEventStore, TraceRunStore } from './TraceEventStore';
 import { TraceEventEmitter } from './TraceEventEmitter';
 import { traceTreeBuilder } from './TraceTreeBuilder';
 import { projectionBuilder } from './ProjectionBuilder';
 import { agentProfileRegistry } from './manifests/AgentProfileRegistry';
-import { toolManifestRegistry } from './manifests/ToolManifestRegistry';
 
 const toIso = (value: number | string | undefined, fallback = nowIso()): string => {
   if (typeof value === 'string') return value;
@@ -55,13 +51,11 @@ const runStatusFromSummary = (run: RunSummary, planStatus?: PlanStatus): TraceSt
   return 'running';
 };
 
-const mapPlanStatus = (approvalState: PlanApprovalState | undefined, run: RunSummary): PlanStatus => {
+const mapRunPlanStatus = (run: RunSummary): PlanStatus => {
   if (run.status === 'failed' || run.status === 'interrupted') return 'failed';
   if (run.status === 'completed') return 'executed';
-  if (approvalState === 'approved') return 'accepted';
-  if (approvalState === 'pending_user' || run.status === 'awaiting_approval') return 'awaiting_approval';
-  if (approvalState === 'rejected') return 'needs_revision';
-  return 'draft';
+  if (run.status === 'awaiting_approval') return 'awaiting_approval';
+  return 'accepted';
 };
 
 const progressStatusFromTask = (task: HarnessTask): ProgressTaskStatus => {
@@ -99,16 +93,6 @@ export class TraceService {
     this.runStore = new TraceRunStore(this.traceRoot);
     this.eventStore = new TraceEventStore(this.traceRoot);
     this.emitter = new TraceEventEmitter(this.eventStore);
-    const catalogCandidates = [
-      path.join(process.cwd(), 'resources', 'tools', 'spec', 'tool_catalog.json'),
-      path.join(app.getAppPath(), 'resources', 'tools', 'spec', 'tool_catalog.json'),
-    ];
-    for (const catalogPath of catalogCandidates) {
-      if (require('fs').existsSync(catalogPath)) {
-        toolManifestRegistry.loadFromCatalog(catalogPath);
-        break;
-      }
-    }
   }
 
   getRun(runId: string): AgentRun | null {
@@ -169,20 +153,17 @@ export class TraceService {
       ref: `raw-${event.event_id}`,
     }));
 
-    let latestApproval: ComposerApprovalViewModel | null = null;
     let mode: AppMode = 'ask';
 
     for (const run of runs) {
-      const snapshot = storageAdapter.readPlanSnapshot(sessionId, run.runId);
       const runEvents = events.filter((e) => e.run_id === run.runId).sort((a, b) => a.ts_ms - b.ts_ms);
-      const planStatus = mapPlanStatus(snapshot?.approval_state, run);
+      const planStatus = mapRunPlanStatus(run);
       const branchId = state.activeBranchId || 'branch-main';
       const agentType = run.mode ?? 'debugger';
       mode = agentType;
       const profile = agentProfileRegistry.getForMode(agentType);
 
       const userPrompt = this.userPromptForRun(conversations, run.runId)
-        || snapshot?.debug_plan?.userGoal
         || runEvents.find((e) => e.event_type === 'user_message')?.payload?.content as string
         || '调试任务';
 
@@ -246,12 +227,6 @@ export class TraceService {
         this.emitter.emitTaskFrame(runId, String(userPrompt));
       }
       startPhase('understand');
-      if (snapshot?.debug_plan && !existingRunEvents.some((e) => (e.payload as { kind?: string })?.kind === 'plan')) {
-        completePhase('understand');
-        startPhase('plan');
-        this.emitter.emitPlan(runId, snapshot.debug_plan);
-        completePhase('plan');
-      }
       for (const msg of conversations.filter((m) => m.runId === runId && m.role === 'assistant')) {
         const thoughtId = `thought-${msg.id}`;
         if (msg.content.trim() && !existingNodeIds.has(thoughtId)) {
@@ -296,24 +271,10 @@ export class TraceService {
 
       runViewModels.push({ run: agentRun, timeline });
 
-      const tracePlanId = `ws-${runId}-plan`;
       const traceExecutionId = `ws-${runId}-execution`;
       progress.push(...this.mapProgress(sessionId, runId, branchId, traceExecutionId));
       artifacts.push(...this.mapArtifacts(sessionId, runId, branchId, traceExecutionId, runEvents));
       context.push(...this.mapContext(sessionId, runId, branchId, traceExecutionId, run));
-
-      if (planStatus === 'awaiting_approval' && snapshot?.debug_plan) {
-        latestApproval = {
-          planId: snapshot.debug_plan.planId,
-          runId,
-          traceLaneId: tracePlanId,
-          status: 'awaiting_approval',
-          title: snapshot.debug_plan.presentation?.title || 'Debugger Plan',
-          summary: snapshot.debug_plan.userGoal,
-          canApprove: true,
-          canRequestRevision: true,
-        };
-      }
     }
 
     for (const turn of this.groupAskTurns(conversations)) {
@@ -387,7 +348,6 @@ export class TraceService {
       mode,
       runs: runViewModels.sort((a, b) => Date.parse(a.run.createdAt) - Date.parse(b.run.createdAt)),
       rightPanel,
-      approval: latestApproval,
       branchNavigator: null,
       rawAuditRefs,
       updatedAt: nowIso(),

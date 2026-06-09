@@ -1,13 +1,28 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { AgentModelOption } from '@shared/types/agentManifest';
+import { splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
+import type { useI18n } from '../../../../i18n';
+
+type Translate = ReturnType<typeof useI18n>['t'];
 
 interface AgentModelCascadeSelectProps {
   value: string;
   options: AgentModelOption[];
   onChange: (value: string) => void;
+  t: Translate;
 }
 
-export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = ({ value, options, onChange }) => {
+export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = ({
+  value,
+  options,
+  onChange,
+  t,
+}) => {
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [open, setOpen] = useState(false);
+  const [openAbove, setOpenAbove] = useState(false);
+  const [activeProviderId, setActiveProviderId] = useState('');
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
   const groups = useMemo(() => {
     const map = new Map<string, AgentModelOption[]>();
     for (const option of options) {
@@ -22,36 +37,155 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
     }));
   }, [options]);
   const selected = options.find((option) => option.canonicalId === value);
+  const missingSelection = useMemo<AgentModelOption | null>(() => {
+    if (!value || selected) {
+      return null;
+    }
+    const parsed = splitCanonicalAgentModelId(value);
+    if (!parsed) {
+      return null;
+    }
+    return {
+      canonicalId: value,
+      providerId: parsed.providerId,
+      providerLabel: parsed.providerId,
+      modelId: parsed.modelId,
+      modelLabel: parsed.modelId,
+      configured: false,
+      status: 'missing',
+    };
+  }, [selected, value]);
+  const visibleSelected = selected ?? missingSelection;
+  const displayGroups = useMemo(() => [
+    ...(missingSelection
+      ? [{
+        providerId: missingSelection.providerId,
+        label: missingSelection.providerLabel,
+        options: [missingSelection],
+      }]
+      : []),
+    ...groups,
+  ], [groups, missingSelection]);
+  const resolvedActiveProviderId = displayGroups.some((group) => group.providerId === activeProviderId)
+    ? activeProviderId
+    : visibleSelected?.providerId && displayGroups.some((group) => group.providerId === visibleSelected.providerId)
+      ? visibleSelected.providerId
+      : displayGroups[0]?.providerId ?? '';
+  const activeGroup = displayGroups.find((group) => group.providerId === resolvedActiveProviderId) ?? displayGroups[0];
+
+  const toggleOpen = () => {
+    setOpen((current) => {
+      const nextOpen = !current;
+      if (nextOpen) {
+        const rect = rootRef.current?.getBoundingClientRect();
+        if (rect) {
+          const spaceBelow = window.innerHeight - rect.bottom;
+          const spaceAbove = rect.top;
+          const menuHeight = Math.min(560, Math.floor(window.innerHeight * 0.72));
+          const menuWidth = Math.min(720, window.innerWidth - 32);
+          const nextOpenAbove = spaceBelow < menuHeight && spaceAbove > spaceBelow;
+          const left = Math.min(
+            Math.max(16, rect.right - menuWidth),
+            Math.max(16, window.innerWidth - menuWidth - 16),
+          );
+          const top = nextOpenAbove
+            ? Math.max(16, rect.top - menuHeight - 6)
+            : Math.min(rect.bottom + 6, window.innerHeight - menuHeight - 16);
+          setOpenAbove(nextOpenAbove);
+          setMenuStyle({
+            left,
+            top,
+            width: menuWidth,
+            maxHeight: menuHeight,
+          });
+        }
+        setActiveProviderId((currentProviderId) => {
+          if (displayGroups.some((group) => group.providerId === currentProviderId)) {
+            return currentProviderId;
+          }
+          return visibleSelected?.providerId && displayGroups.some((group) => group.providerId === visibleSelected.providerId)
+            ? visibleSelected.providerId
+            : displayGroups[0]?.providerId ?? '';
+        });
+      }
+      return nextOpen;
+    });
+  };
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
 
   return (
-    <div className="settings-model-cascade">
-      <button type="button" className="settings-model-cascade-trigger">
-        <span>{selected ? selected.providerLabel : '选择模型'}</span>
-        <strong>{selected ? selected.modelLabel : '未设置'}</strong>
+    <div className={`settings-model-cascade ${open ? 'open' : ''} ${openAbove ? 'above' : ''}`} ref={rootRef}>
+      <button
+        type="button"
+        className="settings-model-cascade-trigger"
+        data-testid="settings-model-cascade-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={toggleOpen}
+      >
+        <span>{visibleSelected ? visibleSelected.providerLabel : t('settings.selectProviderPlaceholder')}</span>
+        <strong>{visibleSelected ? visibleSelected.modelLabel : t('settings.selectModelPlaceholder')}</strong>
       </button>
-      <div className="settings-model-cascade-menu" role="menu">
-        {groups.map((group) => (
-          <div key={group.providerId} className="settings-model-provider-group">
-            <button type="button" className="settings-model-provider-trigger">
+      <div className="settings-model-cascade-menu" role="listbox" style={open ? menuStyle : undefined}>
+        <div className="settings-model-provider-list">
+          {displayGroups.map((group) => (
+            <button
+              key={group.providerId}
+              type="button"
+              className={`settings-model-provider-trigger ${group.providerId === resolvedActiveProviderId ? 'active' : ''}`}
+              data-provider-id={group.providerId}
+              onClick={() => setActiveProviderId(group.providerId)}
+            >
               <span>{group.label}</span>
               <span>{group.options.filter((option) => option.configured).length}</span>
             </button>
-            <div className="settings-model-submenu">
-              {group.options.map((option) => (
-                <button
-                  key={option.canonicalId}
-                  type="button"
-                  className={`settings-model-option ${option.canonicalId === value ? 'active' : ''}`}
-                  disabled={!option.configured}
-                  onClick={() => onChange(option.canonicalId)}
-                >
-                  <span>{option.modelLabel}</span>
-                  <small>{option.canonicalId}</small>
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
+        <div className="settings-model-submenu">
+          {activeGroup?.options.map((option) => (
+            <button
+              key={option.canonicalId}
+              type="button"
+              className={`settings-model-option ${option.canonicalId === value ? 'active' : ''}`}
+              data-provider-id={option.providerId}
+              data-model-id={option.modelId}
+              data-canonical-id={option.canonicalId}
+              disabled={!option.configured}
+              role="option"
+              aria-selected={option.canonicalId === value}
+              onClick={() => {
+                onChange(option.canonicalId);
+                setOpen(false);
+              }}
+            >
+              <span>{option.modelLabel}</span>
+              <small>
+                {option.configured ? option.canonicalId : `${option.canonicalId} / ${t('settings.modelUnavailable')}`}
+              </small>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -59,8 +59,6 @@ export function useComposerSend(options: {
   const setSessions = useProjectStore((state) => state.setSessions);
   const setCurrentSession = useProjectStore((state) => state.setCurrentSession);
   const setRuns = useSessionStore((state) => state.setRuns);
-  const setCurrentDebugPlan = useWorkflowStore((state) => state.setCurrentDebugPlan);
-  const setPendingQuestions = useWorkflowStore((state) => state.setPendingQuestions);
   const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
   const setConversationMessages = useConversationStore((state) => state.setConversationMessages);
   const upsertConversationMessages = useConversationStore((state) => state.upsertConversationMessages);
@@ -108,8 +106,6 @@ export function useComposerSend(options: {
         setSessions,
         setCurrentRun,
         setRuns,
-        setCurrentDebugPlan,
-        setPendingQuestions,
         setTracePresentation,
         upsertConversationMessages,
       });
@@ -148,12 +144,11 @@ export function useComposerSend(options: {
     pendingAttachments,
     promptValue,
     selectedDeviceEntry,
+    selectedAgentId,
     setConversationMessages,
-    setCurrentDebugPlan,
     setCurrentRun,
     setCurrentSession,
     setPendingAttachments,
-    setPendingQuestions,
     setPromptValue,
     setTracePresentation,
     setRuns,

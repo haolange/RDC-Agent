@@ -6,6 +6,7 @@ export interface AgentHandoffDefinition {
   prompt: string;
   send?: boolean;
   showContinueOn?: boolean;
+  model?: string;
 }
 
 export interface AgentManifestDefinition {
@@ -42,6 +43,7 @@ export interface AgentModelOption {
   modelId: string;
   modelLabel: string;
   configured: boolean;
+  status: 'ready' | 'provider-unavailable' | 'model-disabled' | 'missing';
 }
 
 export interface AgentManifestSettings {

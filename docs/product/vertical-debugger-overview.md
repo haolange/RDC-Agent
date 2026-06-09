@@ -9,7 +9,7 @@ Debugger is the current execution-oriented mode for RenderDoc `.rdc` capture ana
 3. Enter Debugger mode.
 4. Provide the debugging goal.
 5. Review and approve the generated plan.
-6. Let the workflow execute through the configured RDX CLI.
+6. Let the agent or app entry execute through configured RDX shell actions / system CLI.
 7. Review trace, evidence, artifacts, and report output.
 
 ## Product Boundaries
@@ -21,7 +21,7 @@ Debugger is the current execution-oriented mode for RenderDoc `.rdc` capture ana
 
 ## Tooling Boundary
 
-Debugger execution uses the configured RDX CLI invoker. The CLI command and catalog path are Settings data, not built-in application constants.
+Debugger execution uses configured shell access and stable `RdxRuntimeContext`. RDX CLI commands, action recipes, and catalog path are Settings data, not built-in application constants.
 
 Renderer UI displays state, approvals, trace, evidence, and artifacts. It does not execute arbitrary RDX tools.
 

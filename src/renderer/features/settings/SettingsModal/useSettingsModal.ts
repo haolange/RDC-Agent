@@ -1,8 +1,7 @@
 import { useMemo } from 'react';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useI18n } from '../../../i18n';
-import type { TranslationKey } from '../../../i18n';
-import type { AppSettings, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
+import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
 import { AGENT_DISPLAY_NAMES, AGENT_ROLES } from '@shared/constants/agents';
 import { resolveAgentRouteStatus } from './agentRouteStatus';
 import { createSettingsModalActions } from './settingsModalActions';
@@ -63,7 +62,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
       const route = modalState.agentRouteDrafts.find((entry) => entry.agentId === agentId);
       const routeStatus = resolveAgentRouteStatus(route, modalState.providerDrafts);
       return routeStatus.issue ? { agentId, issue: routeStatus.issue } : null;
-    }).filter((entry): entry is { agentId: LlmAgentRoute['agentId']; issue: TranslationKey } => entry !== null),
+    }).filter((entry): entry is NonNullable<typeof entry> => entry !== null),
     [modalState.agentRouteDrafts, modalState.providerDrafts],
   );
   const invalidAgentRouteMessage = useMemo(() => {

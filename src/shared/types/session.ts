@@ -182,6 +182,22 @@ export interface HumanPreviewSnapshot {
   updatedAt: number;
 }
 
+export interface RdxRuntimeContext {
+  contextId: string;
+  runtimeOwner: string;
+  ownerLeaseId: string;
+  replaySessionId?: string;
+  captureFileId?: string;
+  captureId?: string;
+  backend: 'local' | 'remote';
+  deviceId?: string;
+  deviceLabel?: string;
+  remoteId?: string;
+  remoteStatus?: 'connected' | 'online' | 'disconnected' | 'error';
+  updatedAt: number;
+  raw?: Record<string, unknown>;
+}
+
 export interface ContextSnapshot {
   contextId: string;
   sessionId: string;
@@ -193,6 +209,7 @@ export interface ContextSnapshot {
   activeCapture: string;
   deviceLabel: string;
   humanPreview?: HumanPreviewSnapshot;
+  runtimeContext?: RdxRuntimeContext | null;
 }
 
 export interface OpenedCapturePreview {
@@ -250,6 +267,7 @@ export interface OpenedCaptureState {
   preview?: OpenedCapturePreview | null;
   previewError?: OpenedCapturePreviewError | null;
   previewAttempts?: OpenedCapturePreviewAttempt[];
+  runtimeContext?: RdxRuntimeContext | null;
 }
 
 export interface OpenProjectInputRequest {

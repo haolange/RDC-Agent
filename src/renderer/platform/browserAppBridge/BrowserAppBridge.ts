@@ -54,12 +54,6 @@ class BrowserAppBridgeClient {
     selectDirectory: () => this.invoke('dialog:selectDirectory'),
     workflow: {
       getState: () => this.invoke('workflow:getState'),
-      start: (request) => this.invoke('workflow:start', request),
-      getPlan: (runId) => this.invoke('workflow:getPlan', runId),
-      submitQuestions: (runId, answers) => this.invoke('workflow:submitQuestions', runId, answers),
-      approvePlan: (runId) => this.invoke('workflow:approvePlan', runId),
-      requestPlanRevision: (runId, revisionText) => this.invoke('workflow:requestPlanRevision', runId, revisionText),
-      restartRun: (runId) => this.invoke('workflow:restartRun', runId),
       resume: (sessionId) => this.invoke('workflow:resume', sessionId),
       stop: (runId) => this.invoke('workflow:stop', runId),
       getRunUsage: (runId) => this.invoke('workflow:getRunUsage', runId),

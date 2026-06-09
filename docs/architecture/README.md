@@ -2,7 +2,7 @@
 
 - `overview.md`：当前 Electron / React / Debugger 主链架构总览。
 - `module-map.md`：能力域到源码入口、共享类型、IPC/preload、UI 和测试入口的地图。
-- `data-flow.md`：Project、Session、Capture、Workflow、Trace 与 RDX CLI invoker 的端到端数据流。
+- `data-flow.md`：Project、Session、Capture、Agent、Trace 与 RDX shell actions 的端到端数据流。
 - `agent-runtime-kernel.md`：Agent Runtime kernel、provider/account abstraction、tool mediation、Ask readonly profile、Debugger serial multi-agent workflow 与 SDK backend boundary。
 - `agentic-trace-protocol.md`：Agentic Trace 权威追踪契约。
 - `provider-system.md`：Provider 体系架构，覆盖 `LlmProviderEntry` / `LlmProviderKind` / `LlmProviderAuthMode` / `LlmProviderCatalogGroup` / `LlmProviderCapability` 的正交维度与 Settings、Agent Runtime 路由契约。

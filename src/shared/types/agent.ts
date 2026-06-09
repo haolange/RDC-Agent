@@ -1,41 +1,23 @@
-/**
- * Agent Types - Agent角色相关类型定义
- */
-
 import type { LlmProviderId } from './settings';
 
-// Agent角色
-export type AgentRole =
-  | 'ask_agent'              // 非执行 Ask 入口
-  | 'rdc-debugger'           // 主入口/Orchestrator
-  | 'triage_agent'           // 症状分类
-  | 'capture_repro_agent'    // Capture复现
-  | 'pass_graph_pipeline_agent'  // Pass/Pipeline分析
-  | 'pixel_forensics_agent'  // 像素取证
-  | 'shader_ir_agent'        // Shader IR分析
-  | 'driver_device_agent'    // 驱动设备分析
-  | 'skeptic_agent'          // 审批者
-  | 'curator_agent';         // 报告/知识沉淀
+export type AgentId = 'ask' | 'debugger' | 'analyzer' | 'optimizer';
+export type AgentRole = AgentId | (string & {});
 
-// Agent角色类别
-export type AgentCategory = 'orchestrator' | 'investigator' | 'verifier' | 'reporter';
+export type AgentCategory = 'orchestrator' | 'general';
 
-// Agent状态
 export type AgentStatus = 'idle' | 'thinking' | 'executing' | 'waiting' | 'complete' | 'error';
 
-// Agent配置
 export interface AgentConfig {
   agentId: AgentRole;
-  systemPrompt: string;           // 可自定义System Prompt
+  systemPrompt: string;
   modelProvider: LlmProviderId;
-  modelName: string;              // 具体模型名称
+  modelName: string;
   temperature?: number;
   maxTokens?: number;
   category: AgentCategory;
   writeScope: WriteScope[];
 }
 
-// 写入范围
 export type WriteScope =
   | 'workspace_control'
   | 'workspace_notes'
@@ -44,7 +26,6 @@ export type WriteScope =
   | 'session_artifacts'
   | 'knowledge_library';
 
-// Agent运行时状态
 export interface AgentState {
   agentId: AgentRole;
   status: AgentStatus;
@@ -54,7 +35,6 @@ export interface AgentState {
   error?: string;
 }
 
-// Specialist Token
 export interface SpecialistToken {
   token_id: string;
   agent_id: AgentRole;
@@ -65,7 +45,6 @@ export interface SpecialistToken {
   runtime_owner: string;
 }
 
-// Agent消息
 export interface AgentMessage {
   id: string;
   agentId: AgentRole;
@@ -80,7 +59,6 @@ export interface AgentMessage {
   }[];
 }
 
-// Agent对话
 export interface AgentConversation {
   id: string;
   caseId: string;
@@ -91,43 +69,30 @@ export interface AgentConversation {
   lastUpdated: string;
 }
 
-// 默认模型路由
-export const DEFAULT_MODEL_ROUTING: Record<AgentRole, { provider: LlmProviderId; model: string }> = {
-  'ask_agent': { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
-  'rdc-debugger': { provider: 'openrouter', model: 'anthropic/claude-3-opus' },
-  'triage_agent': { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
-  'capture_repro_agent': { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
-  'pass_graph_pipeline_agent': { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
-  'pixel_forensics_agent': { provider: 'openrouter', model: 'google/gemini-pro-1.5' },
-  'shader_ir_agent': { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
-  'driver_device_agent': { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
-  'skeptic_agent': { provider: 'openrouter', model: 'openai/gpt-4o' },
-  'curator_agent': { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
+export const TOP_LEVEL_AGENT_IDS: AgentId[] = ['ask', 'debugger', 'analyzer', 'optimizer'];
+
+export const DEFAULT_MODEL_ROUTING: Record<AgentId, { provider: LlmProviderId; model: string }> = {
+  ask: { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
+  debugger: { provider: 'openrouter', model: 'anthropic/claude-3-opus' },
+  analyzer: { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
+  optimizer: { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
 };
 
-// Agent角色到类别映射
-export const AGENT_CATEGORY_MAP: Record<AgentRole, AgentCategory> = {
-  'ask_agent': 'orchestrator',
-  'rdc-debugger': 'orchestrator',
-  'triage_agent': 'investigator',
-  'capture_repro_agent': 'investigator',
-  'pass_graph_pipeline_agent': 'investigator',
-  'pixel_forensics_agent': 'investigator',
-  'shader_ir_agent': 'investigator',
-  'driver_device_agent': 'investigator',
-  'skeptic_agent': 'verifier',
-  'curator_agent': 'reporter',
+export const AGENT_CATEGORY_MAP: Record<AgentId, AgentCategory> = {
+  ask: 'orchestrator',
+  debugger: 'general',
+  analyzer: 'general',
+  optimizer: 'general',
 };
 
-// ============================================
-// Agent Timeline 类型
-// ============================================
+export function isTopLevelAgentId(value: string): value is AgentId {
+  return (TOP_LEVEL_AGENT_IDS as string[]).includes(value);
+}
 
 import type { ToolTraceEntry } from './tool';
 import type { ActionEvent } from './evidence';
 import type { ReasoningSummary } from './workflow';
 
-/** Agent 时间线条目 */
 export interface AgentTimelineEntry {
   id: string;
   type:

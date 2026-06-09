@@ -1,10 +1,13 @@
 import { createRequire } from 'module';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
 
 const {
   BUILTIN_LLM_PROVIDER_DEFINITIONS,
+  createBuiltinProviderEntries,
 } = require('../src/shared/constants/llm.ts');
 const {
   normalizeProviderCatalogGroup,
@@ -59,7 +62,10 @@ function assertIncludes(values, value, label) {
 
 async function main() {
   const ids = BUILTIN_LLM_PROVIDER_DEFINITIONS.map((definition) => definition.id);
+  const runtimeEntries = createBuiltinProviderEntries();
   assert(new Set(ids).size === ids.length, 'Builtin provider ids must be unique.');
+  assert(ids.length === 40, `Builtin provider catalog should expose 40 providers, found ${ids.length}.`);
+  assert(runtimeEntries.length === ids.length, 'Runtime provider entries should mirror the builtin catalog.');
   for (const id of ['openai', 'anthropic', 'bedrock', 'vertex', 'ollama', 'chatgpt-account', 'claude-account']) {
     assert(ids.includes(id), `Builtin provider is missing: ${id}`);
   }
@@ -125,6 +131,13 @@ async function main() {
   assert(generationResult.error?.includes('not implemented'), 'Media runtime should explain missing adapter.');
   assert(mediaRuntime.isMediaAdapterAvailable('openai') === false, 'Media adapter discovery must report unavailable.');
   assert(mediaRuntime.getRegisteredMediaProviders().length === 0, 'No media providers should be registered yet.');
+
+  const settingsServiceSource = fs.readFileSync(path.join(process.cwd(), 'src/main/settings/SettingsService.ts'), 'utf8');
+  assert(!settingsServiceSource.includes('DEFAULT_PROVIDER_SEEDS'), 'SettingsService must not auto-seed default providers.');
+  assert(!settingsServiceSource.includes('DEFAULT_AGENT_ROUTE_SEEDS'), 'SettingsService must not auto-seed default agent routes.');
+  assert(!/sk-or-v1-[A-Za-z0-9]+/.test(settingsServiceSource), 'SettingsService must not contain OpenRouter API keys.');
+  assert(!/xai-[A-Za-z0-9]+/.test(settingsServiceSource), 'SettingsService must not contain xAI API keys.');
+  assert(!/AIzaSy[A-Za-z0-9_-]+/.test(settingsServiceSource), 'SettingsService must not contain Google API keys.');
 
   console.log('[provider-system] OK');
 }

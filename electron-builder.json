@@ -9,14 +9,8 @@
   },
   "files": [
     "dist/**/*",
-    "resources/**/*"
-  ],
-  "extraResources": [
-    {
-      "from": "resources/tools",
-      "to": "resources/tools",
-      "filter": ["**/*"]
-    }
+    "resources/agent-runtime/**/*",
+    "resources/knowledge/**/*"
   ],
   "win": {
     "target": [

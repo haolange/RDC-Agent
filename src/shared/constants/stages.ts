@@ -8,7 +8,6 @@ export const MAIN_STAGES: WorkflowStage[] = [
   'preflight',
   'entry_gate',
   'intake_gate',
-  'plan',
   'speclist',
   'dispatch',
   'investigate',
@@ -20,7 +19,6 @@ export const MAIN_STAGES: WorkflowStage[] = [
 
 export const SPECIAL_STAGES: WorkflowStage[] = [
   'blocked',
-  'awaiting_user_input',
 ];
 
 export const ALL_STAGES: WorkflowStage[] = [...MAIN_STAGES, ...SPECIAL_STAGES];
@@ -29,7 +27,6 @@ export const STAGE_DISPLAY_NAMES: Record<WorkflowStage, string> = {
   preflight: 'Preflight',
   entry_gate: 'Entry Gate',
   intake_gate: 'Intake Gate',
-  plan: 'Plan',
   speclist: 'Speclist',
   dispatch: 'Dispatch',
   investigate: 'Investigate',
@@ -38,14 +35,12 @@ export const STAGE_DISPLAY_NAMES: Record<WorkflowStage, string> = {
   curate: 'Curate',
   finalize: 'Finalize',
   blocked: 'Blocked',
-  awaiting_user_input: 'Awaiting Input',
 };
 
 export const STAGE_PHASES: Record<WorkflowStage, WorkflowPhase> = {
   preflight: 'planner',
   entry_gate: 'planner',
   intake_gate: 'planner',
-  plan: 'planner',
   speclist: 'planner',
   dispatch: 'generator',
   investigate: 'generator',
@@ -54,11 +49,10 @@ export const STAGE_PHASES: Record<WorkflowStage, WorkflowPhase> = {
   curate: 'evaluator',
   finalize: 'evaluator',
   blocked: 'evaluator',
-  awaiting_user_input: 'planner',
 };
 
 export const STAGE_GROUPS: Record<string, WorkflowStage[]> = {
-  planner: ['preflight', 'entry_gate', 'intake_gate', 'plan', 'speclist'],
+  planner: ['preflight', 'entry_gate', 'intake_gate', 'speclist'],
   generator: ['dispatch', 'investigate'],
   evaluator: ['fix_verify', 'skepti', 'curate', 'finalize'],
 };
@@ -71,7 +65,7 @@ export const SIMPLIFIED_STAGES: Array<{ id: string; name: string; stages: Workfl
 
 export const LEGACY_STAGE_MIGRATION: Record<string, WorkflowStage> = {
   preflight_pending: 'preflight',
-  intent_gate_passed: 'plan',
+  intent_gate_passed: 'speclist',
   entry_gate_passed: 'entry_gate',
   accepted_intake_initialized: 'intake_gate',
   intake_gate_passed: 'intake_gate',

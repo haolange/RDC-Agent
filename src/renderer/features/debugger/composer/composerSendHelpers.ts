@@ -2,7 +2,6 @@
 import type { AgentMode } from '@shared/types/layout';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
-import type { AskUserPrompt, DebugPlan } from '@shared/types/workflow';
 import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
 import { useProjectStore } from '../../../stores/projectStore';
 
@@ -63,7 +62,7 @@ export function buildLocalConversationErrorTurn(options: {
       runId: currentRun?.runId ?? null,
       modeContext: currentMode,
       role: 'assistant',
-      agentId: 'rdc-debugger',
+      agentId: 'debugger',
       content: errorMessage,
       status: 'error',
       updatedAt: now,
@@ -95,8 +94,6 @@ export async function applyConversationTurnResult(options: {
   setSessions: (sessions: SessionRecord[]) => void;
   setCurrentRun: (run: RunSummary | null) => void;
   setRuns: (runs: RunSummary[]) => void;
-  setCurrentDebugPlan: (debugPlan: DebugPlan | null) => void;
-  setPendingQuestions: (prompt: AskUserPrompt | null) => void;
   setTracePresentation: (presentation: AgentRunPresentation | null) => void;
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
 }) {
@@ -108,8 +105,6 @@ export async function applyConversationTurnResult(options: {
     setSessions,
     setCurrentRun,
     setRuns,
-    setCurrentDebugPlan,
-    setPendingQuestions,
     setTracePresentation,
     upsertConversationMessages,
   } = options;
@@ -139,8 +134,6 @@ export async function applyConversationTurnResult(options: {
     setRuns(runsResult.runs ?? []);
   }
 
-  setCurrentDebugPlan(result.debugPlanSummary ?? null);
-  setPendingQuestions(result.pendingQuestions ?? null);
   if (result.tracePresentation) {
     setTracePresentation(result.tracePresentation);
   }

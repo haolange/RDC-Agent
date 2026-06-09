@@ -1,16 +1,10 @@
-/**
- * Workflow Types - 工作流状态机相关类型定义
- */
-
 import type { AgentRole } from './agent';
 import type { HarnessTask } from './harness';
 
-// Debugger 工作流阶段（生产级单一路径）
 export type WorkflowStage =
   | 'preflight'
   | 'entry_gate'
   | 'intake_gate'
-  | 'plan'
   | 'speclist'
   | 'dispatch'
   | 'investigate'
@@ -18,109 +12,12 @@ export type WorkflowStage =
   | 'skepti'
   | 'curate'
   | 'finalize'
-  | 'blocked'
-  | 'awaiting_user_input';
+  | 'blocked';
 
 export type WorkflowPhase =
   | 'planner'
   | 'generator'
   | 'evaluator';
-
-export type PlanReadiness =
-  | 'discovering'
-  | 'needs_user_input'
-  | 'ready_for_approval'
-  | 'strict_ready'
-  | 'blocked';
-
-export interface AskUserQuestionOption {
-  id: string;
-  label: string;
-  description: string;
-}
-
-export interface AskUserQuestion {
-  id: string;
-  prompt: string;
-  recommendedOptionId?: string;
-  options: [
-    AskUserQuestionOption,
-    AskUserQuestionOption,
-    AskUserQuestionOption,
-    AskUserQuestionOption,
-  ];
-  freeformPlaceholder?: string;
-}
-
-export interface AskUserPrompt {
-  promptId: string;
-  title: string;
-  summary: string;
-  questions: AskUserQuestion[];
-  createdAt: string;
-}
-
-export interface AskUserAnswer {
-  questionId: string;
-  selectedOptionId?: string;
-  freeformText?: string;
-}
-
-export interface ReferenceContract {
-  taskSources: string[];
-  referenceCaptures: string[];
-  acceptanceNotes: string[];
-}
-
-export interface VerificationContract {
-  requiresFixValidation: boolean;
-  requiresScreenshotEvidence: boolean;
-  requiresShaderInspection: boolean;
-  requiresPixelEvidence: boolean;
-  requiresBaselineComparison: boolean;
-  targetEventIds: number[];
-  successCriteria: string[];
-}
-
-export interface PlanPresentationSection {
-  id: string;
-  title: string;
-  body: string[];
-}
-
-export interface PlanPresentation {
-  title: string;
-  sections: PlanPresentationSection[];
-}
-
-export interface DebugPlan {
-  planId: string;
-  planReadiness: PlanReadiness;
-  strictReady: boolean;
-  userGoal: string;
-  targetCapture: {
-    captureId: string;
-    fileName: string;
-    filePath: string;
-  } | null;
-  targetFrameOrEvent: {
-    scope: 'event' | 'frame' | 'capture';
-    frameIndex?: number;
-    eventId?: number;
-    eventLabel?: string;
-  } | null;
-  scope: string;
-  referenceContract: ReferenceContract;
-  verificationContract: VerificationContract;
-  presentation?: PlanPresentation;
-  expectedDeliverables: string[];
-  blockers: Blocker[];
-  missingInfo: string[];
-  recommendedSpecialists: AgentRole[];
-  notes: string[];
-  createdAt: string;
-  updatedAt: string;
-}
 
 export interface ReasoningSummary {
   summaryId: string;
@@ -154,13 +51,6 @@ export interface IntakeContext {
   replayDeviceLabel?: string | null;
 }
 
-export type PlanApprovalState =
-  | 'not_requested'
-  | 'pending_user'
-  | 'approved'
-  | 'rejected';
-
-// 工作流状态
 export interface WorkflowState {
   caseId: string;
   runId: string;
@@ -169,20 +59,15 @@ export interface WorkflowState {
   previousStages: WorkflowStage[];
   entryMode: 'cli' | 'mcp';
   backend: 'local' | 'remote';
-  orchestrationMode: 'multi_agent';  // 垂直简化：只支持multi_agent
-  coordinationMode: 'staged_handoff'; // 垂直简化：只支持staged_handoff
+  orchestrationMode: 'multi_agent';
+  coordinationMode: 'staged_handoff';
   blockers: Blocker[];
-  planReadiness?: PlanReadiness;
-  approvalState?: PlanApprovalState;
-  debugPlan?: DebugPlan | null;
   harnessTasks?: HarnessTask[];
-  pendingQuestions?: AskUserPrompt | null;
   reasoningSummaries?: ReasoningSummary[];
   recoveryState?: RunRecoveryState | null;
   lastUpdated: string;
 }
 
-// 阻断器
 export interface Blocker {
   code: string;
   reason: string;
@@ -191,14 +76,10 @@ export interface Blocker {
   resolvedAt?: string;
 }
 
-/** Discriminated view for renderer type-narrowing; runtime JSON shape unchanged. */
 export type WorkflowStateView =
-  | (WorkflowState & { currentStage: 'plan'; debugPlan: DebugPlan })
-  | (WorkflowState & { currentStage: 'awaiting_user_input'; pendingQuestions: AskUserPrompt })
   | (WorkflowState & { currentStage: 'blocked'; blockers: [Blocker, ...Blocker[]] })
   | WorkflowState;
 
-// Gate结果
 export interface GateResult {
   stage: string;
   status: 'passed' | 'blocked' | 'pending';
@@ -208,7 +89,6 @@ export interface GateResult {
   extra?: Record<string, unknown>;
 }
 
-/** 最终报告 */
 export interface Report {
   title: string;
   summary: string;
@@ -221,11 +101,6 @@ export interface Report {
   curatorAgentId: string;
 }
 
-// ============================================
-// Mode Capabilities 类型
-// ============================================
-
-/** 模式能力定义 */
 export interface ModeCapabilities {
   mode: import('./session').AppMode;
   availableStages: WorkflowStage[];

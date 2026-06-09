@@ -13,7 +13,7 @@
 - 仓库保持标准 Electron 应用布局，`Config`、`Saved`、`Intermediate`、`Binaries` 属于运行期或构建期概念，不要重新引入为仓库顶层源码目录。
 - 涉及主进程、预加载脚本、渲染层、共享类型时，优先保持一次改动内联动更新，避免只改单层造成契约漂移。
 - 新增或调整 agent 角色、工作流阶段、IPC 事件、共享类型时，必须同步检查 `src/shared`、`src/main` 和对应 UI 页面是否一致。
-- 不要保留明显的 legacy 双轨入口、镜像目录或“临时兼容”文案。新结构替代旧结构时，直接收敛到单一路径。
+- 不要保留明显的 legacy 双轨入口、镜像目录或“临时兼容”文案。新结构替代旧结构时，直接收敛到单一路径；除非用户本轮明确要求兼容，否则不得为了旧字段、旧入口或旧语义增加兼容层、迁移 shim 或静默 fallback。
 - 路径引用应以本仓库为基准，不要硬编码上游仓库的绝对路径。
 - 不要把 Nexus、CodePilot、上游 Frameworks 或 Tools 仓库的路径、概念或兼容面直接写成本库前提；如需引用，只能作为明确标注的对照参考。
 - 文档以中文为主，必要的英文术语保留原样，例如 `RenderDoc`、`.rdc`、`Electron`、`IPC`、`LLM`、`Debugger`、`Analyzer`、`Optimizer`。
@@ -27,7 +27,7 @@
 - 默认采用最小可行修改，不新增未被要求的功能、抽象、配置项、扩展点或兼容层。
 - 只修改完成当前目标必需的文件和代码，每一处 diff 都应能对应到本次请求、验证失败或本文件已有约定。
 - 新路径替代旧路径时，应同步删除旧入口、旧文案、旧默认路径或无意义兼容分支，避免留下 legacy / deprecated 双轨。
-- 如确需临时兼容，必须明确原因、边界和移除条件；临时兼容不得成为静默 fallback 或默认执行路径。
+- 临时兼容只能在用户明确要求、外部不可控依赖强制需要，或无法一次性安全迁移时使用；采用前必须说明原因、边界、移除条件和验证方式。默认实现不得保留旧字段/新字段双写、旧入口/新入口双轨或 deprecated 分支。
 
 ## 代码与文档边界
 
@@ -58,8 +58,8 @@
 
 ## RDX CLI Invoker 边界
 
-- 本仓库不把任何 tool bridge 或 `resources/tools` 副本作为内置默认执行链；RenderDoc 工具调用必须经 Settings 中显式配置的 RDX CLI invoker 进入外部 CLI。
-- `resources/tools` 若存在，只能作为可选的外部 CLI 开发副本或手动配置目标，不得被主进程、preload、renderer 或打包配置写死为默认 fallback。
+- 本仓库不保留内置 RDX tool 副本，不把任何 tool bridge、MCP server 或仓库资源目录作为默认执行链；RenderDoc/RDX 能力必须来自系统安装或用户配置的外部 CLI。
+- Open `.rdc`、connect remote、preview、close runtime 等垂直入口必须经 Settings 中配置的 RDX shell action 进入 `ShellInvocationService`；不得在主进程、preload、renderer 或打包配置中写死 CLI 命令、catalog 路径或仓库 fallback。
 - 新增 RDX CLI 配置项时必须同步 `src/shared/types/settings.ts`、`SettingsService` sanitize、Settings UI 和文档；不得在调用点硬编码命令、catalog 路径或环境变量。
 - renderer/preload 不暴露任意 tool execute 入口；UI 只读取 catalog、runtime summary 和 trace projection，实际执行由主进程根据 workflow/runtime policy 调用配置的 CLI。
 

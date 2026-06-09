@@ -1,6 +1,5 @@
-﻿import { ipcMain } from 'electron';
-import type { DebugSessionStartRequest, RunContextUsageSummary, RunSummary } from '@shared/types/session';
-import type { AskUserAnswer } from '@shared/types/workflow';
+import { ipcMain } from 'electron';
+import type { RunContextUsageSummary, RunSummary } from '@shared/types/session';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { rdxSessionService } from '../index';
 import { debuggerLlmService } from '../settings/DebuggerLlmService';
@@ -69,54 +68,4 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
   ipcMain.handle('workflow:listActiveRuns', async () => {
     return { runs: runExecutionService.listActiveRuns() };
   });
-
-  ipcMain.handle('workflow:start', async (_event, request: DebugSessionStartRequest) => {
-    const result = await debuggerRuntime.startPlan(request);
-    if (result.success) {
-      state.currentSessionId = result.sessionId || state.currentSessionId;
-      state.currentRunId = result.runId || state.currentRunId;
-      state.currentProjectId = request.projectId;
-      if (state.currentSessionId) {
-        await storageAdapter.setCurrentSessionId(state.currentSessionId);
-      }
-    }
-    return result;
-  });
-
-  ipcMain.handle('workflow:getPlan', async (_event, runId: string) => {
-    return debuggerRuntime.getPlan(runId);
-  });
-
-  ipcMain.handle('workflow:submitQuestions', async (_event, runId: string, answers: unknown[]) => {
-    return debuggerRuntime.submitQuestions(runId, answers as AskUserAnswer[]);
-  });
-
-  ipcMain.handle('workflow:approvePlan', async (_event, runId: string) => {
-    return debuggerRuntime.approvePlan(runId);
-  });
-
-  ipcMain.handle('workflow:requestPlanRevision', async (_event, runId: string, revisionText: string) => {
-    const result = await debuggerRuntime.requestPlanRevision(runId, revisionText);
-    if (result.success) {
-      state.currentSessionId = result.presentation?.sessionId || state.currentSessionId;
-      state.currentRunId = result.runId || state.currentRunId;
-      if (state.currentSessionId) {
-        await storageAdapter.setCurrentSessionId(state.currentSessionId);
-      }
-    }
-    return result;
-  });
-
-  ipcMain.handle('workflow:restartRun', async (_event, runId: string) => {
-    const result = await debuggerRuntime.restartRun(runId);
-    if (result.success) {
-      state.currentSessionId = result.sessionId || state.currentSessionId;
-      state.currentRunId = result.runId || state.currentRunId;
-      if (state.currentSessionId) {
-        await storageAdapter.setCurrentSessionId(state.currentSessionId);
-      }
-    }
-    return result;
-  });
 }
-

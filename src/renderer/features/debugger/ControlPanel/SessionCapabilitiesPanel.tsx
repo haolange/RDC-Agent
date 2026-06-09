@@ -3,14 +3,11 @@ import type { ToolRuntimeSummary } from '@shared/types/tool';
 import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import { useI18n } from '../../../i18n';
 import { getElectronApi } from '../../../platform/getElectronApi';
-import { useWorkflowStore } from '../../../stores/workflowStore';
 
 const CORE_NAMESPACES = ['rd.event.*', 'rd.export.*', 'rd.session.*'];
 
 export const SessionCapabilitiesPanel: React.FC = () => {
   const { t } = useI18n();
-  const workflowState = useWorkflowStore((state) => state.workflowState);
-  const currentDebugPlan = useWorkflowStore((state) => state.currentDebugPlan);
   const [summary, setSummary] = useState<ToolRuntimeSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,10 +40,9 @@ export const SessionCapabilitiesPanel: React.FC = () => {
   }, [t]);
 
   const recommendedSpecialists = useMemo(() => {
-    const fromPlan = currentDebugPlan?.recommendedSpecialists ?? workflowState?.debugPlan?.recommendedSpecialists ?? [];
     const fromRuntime = summary?.recommendedSpecialists ?? [];
-    return (fromPlan.length > 0 ? fromPlan : fromRuntime).slice(0, 5);
-  }, [currentDebugPlan?.recommendedSpecialists, summary?.recommendedSpecialists, workflowState?.debugPlan?.recommendedSpecialists]);
+    return fromRuntime.slice(0, 5);
+  }, [summary?.recommendedSpecialists]);
 
   const namespaces = useMemo(() => {
     const runtimeNamespaces = summary?.namespaces ?? [];

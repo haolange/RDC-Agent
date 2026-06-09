@@ -190,7 +190,7 @@ function registerToolTraceBridge(): void {
       void appendActionEvent(storageAdapter.createActionEvent({
         runId: state.currentRunId,
         sessionId: state.currentSessionId,
-        agentId: trace.runtimeOwner || 'rdc-debugger',
+        agentId: trace.runtimeOwner || 'debugger',
         eventType: 'tool_execution',
         status: trace.result.ok ? 'ok' : 'error',
         turnId: trace.turnId,

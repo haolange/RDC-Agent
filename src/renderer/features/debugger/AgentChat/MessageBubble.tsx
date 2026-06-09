@@ -1,54 +1,37 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import type {
   ConversationMessage,
   ConversationMessageStatus,
 } from '@shared/types/conversation';
-import type { AgentRole } from '@shared/types/agent';
 import type { SessionAttachmentRecord } from '@shared/types/session';
 import { formatBytes } from '../../../services/attachmentHelpers';
+import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { ReasoningChain } from './ReasoningChain';
+import { useAgentHandoffActions } from './useAgentHandoffActions';
 
 interface MessageBubbleProps {
   message: ConversationMessage;
 }
 
-const AGENT_DISPLAY_NAME: Record<AgentRole, string> = {
-  ask_agent: 'Ask',
-  'rdc-debugger': 'Debugger',
-  triage_agent: 'Triage',
-  capture_repro_agent: 'Capture',
-  pass_graph_pipeline_agent: 'Pipeline',
-  pixel_forensics_agent: 'Pixel',
-  shader_ir_agent: 'Shader',
-  driver_device_agent: 'Driver',
-  skeptic_agent: 'Skeptic',
-  curator_agent: 'Curator',
+const AGENT_DISPLAY_NAME: Partial<Record<string, string>> = {
+  ask: 'Ask',
+  debugger: 'Debugger',
+  analyzer: 'Analyzer',
+  optimizer: 'Optimizer',
 };
 
-const AGENT_AVATAR_GLYPH: Record<AgentRole, string> = {
-  ask_agent: 'AS',
-  'rdc-debugger': 'DG',
-  triage_agent: 'TR',
-  capture_repro_agent: 'CR',
-  pass_graph_pipeline_agent: 'PG',
-  pixel_forensics_agent: 'PF',
-  shader_ir_agent: 'SH',
-  driver_device_agent: 'DV',
-  skeptic_agent: 'SK',
-  curator_agent: 'CU',
+const AGENT_AVATAR_GLYPH: Partial<Record<string, string>> = {
+  ask: 'AS',
+  debugger: 'DG',
+  analyzer: 'AN',
+  optimizer: 'OP',
 };
 
-const AGENT_ACCENT: Record<AgentRole, string> = {
-  ask_agent: '#33d1ff',
-  'rdc-debugger': '#33d1ff',
-  triage_agent: '#fbbf24',
-  capture_repro_agent: '#a8ff60',
-  pass_graph_pipeline_agent: '#7ed1ff',
-  pixel_forensics_agent: '#ff8fbf',
-  shader_ir_agent: '#c19bff',
-  driver_device_agent: '#ffb38a',
-  skeptic_agent: '#ff8a8a',
-  curator_agent: '#9be8c2',
+const AGENT_ACCENT: Partial<Record<string, string>> = {
+  ask: '#33d1ff',
+  debugger: '#33d1ff',
+  analyzer: '#fbbf24',
+  optimizer: '#a8ff60',
 };
 
 const formatClockTime = (epoch: number): string => {
@@ -155,9 +138,28 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
   const trace = message.reasoningTrace ?? null;
   const status: ConversationMessageStatus = message.status ?? 'complete';
   const hasContent = Boolean(message.content && message.content.length > 0);
+  const definitions = useAppSettingsStore((state) => state.settings.agents.definitions);
+  const [sendingHandoff, setSendingHandoff] = useState<string | null>(null);
+  const sendAgentHandoff = useAgentHandoffActions(message);
+  const handoffs = useMemo(() => {
+    if (!agentId || status !== 'complete') return [];
+    const definition = definitions.find((entry) => entry.id === agentId && entry.enabled);
+    return definition?.handoffs ?? [];
+  }, [agentId, definitions, status]);
 
   const styleVar: React.CSSProperties = {
     ['--message-mode-accent' as string]: accent,
+  };
+
+  const sendHandoff = async (handoffIndex: number) => {
+    const handoff = handoffs[handoffIndex];
+    if (!handoff || sendingHandoff) return;
+    setSendingHandoff(handoff.label);
+    try {
+      await sendAgentHandoff(handoff);
+    } finally {
+      setSendingHandoff(null);
+    }
   };
 
   return (
@@ -207,6 +209,26 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
               <span className="conversation-message-diagnostic-text">
                 {message.diagnostic.userMessage}
               </span>
+            </div>
+          ) : null}
+          {handoffs.length > 0 ? (
+            <div className="conversation-handoff-actions" data-testid="conversation-handoff-actions">
+              {handoffs.map((handoff, index) => (
+                <button
+                  key={`${handoff.agent}-${handoff.label}-${index}`}
+                  type="button"
+                  className="conversation-handoff-button"
+                  disabled={Boolean(sendingHandoff)}
+                  data-testid={`conversation-handoff-${handoff.agent}`}
+                  onClick={() => {
+                    void sendHandoff(index);
+                  }}
+                  title={handoff.prompt}
+                >
+                  <span>{handoff.label}</span>
+                  <small>{AGENT_DISPLAY_NAME[handoff.agent] ?? handoff.agent}</small>
+                </button>
+              ))}
             </div>
           ) : null}
         </div>

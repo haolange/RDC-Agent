@@ -36,7 +36,7 @@ export function useComposer(options: {
   const userInvocableAgents = useAppSettingsStore((state) =>
     state.settings.agents.definitions.filter((agent) => agent.enabled && agent.userInvocable),
   );
-  const [selectedAgentId, setSelectedAgentId] = useState(userInvocableAgents[0]?.id ?? 'ask_agent');
+  const [selectedAgentId, setSelectedAgentId] = useState(userInvocableAgents[0]?.id ?? 'ask');
 
   const devices = useDeviceStore((state) => state.devices);
   const selectedDevice = useDeviceStore((state) => state.selectedDevice);
@@ -115,16 +115,12 @@ export function useComposer(options: {
     : (!hasMessageContent && !hasPendingAttachments);
 
   useEffect(() => {
-    if (currentMode !== 'ask' && !hasOpenedCaptureForCurrentProject) {
-      setCurrentMode('ask');
-      setSelectedAgentId('ask_agent');
-    }
-  }, [currentMode, hasOpenedCaptureForCurrentProject, setCurrentMode]);
-  useEffect(() => {
     const fallback = userInvocableAgents[0];
     if (!fallback || userInvocableAgents.some((agent) => agent.id === selectedAgentId)) return;
     setSelectedAgentId(fallback.id);
-    setCurrentMode(fallback.id === 'ask_agent' ? 'ask' : 'debugger');
+    setCurrentMode((fallback.id === 'ask' || fallback.id === 'debugger' || fallback.id === 'analyzer' || fallback.id === 'optimizer')
+      ? fallback.id
+      : 'ask');
   }, [selectedAgentId, setCurrentMode, userInvocableAgents]);
 
   useEffect(() => {

@@ -33,9 +33,9 @@ function resolveCopilotFallbackModel(
   provider: LlmProviderEntry,
   agentId: AgentRole,
 ): string | null {
-  const debuggerRoute = routes.find((entry) => entry.agentId === 'rdc-debugger');
+  const debuggerRoute = routes.find((entry) => entry.agentId === 'debugger');
   const candidates = [
-    ...(agentId !== 'rdc-debugger' && debuggerRoute?.providerId === provider.id ? [debuggerRoute.modelId] : []),
+    ...(agentId !== 'debugger' && debuggerRoute?.providerId === provider.id ? [debuggerRoute.modelId] : []),
     ...COPILOT_CHAT_COMPLETIONS_FALLBACK_MODELS,
     ...provider.models.map((model) => model.id),
   ];

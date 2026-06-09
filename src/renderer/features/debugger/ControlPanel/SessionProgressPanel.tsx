@@ -3,6 +3,7 @@ import type { HarnessTask } from '@shared/types/harness';
 import type { ReasoningSummary, WorkflowStage, WorkflowState } from '@shared/types/workflow';
 import type { RunSummary } from '@shared/types/session';
 import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
+import { isTopLevelAgentId } from '@shared/types/agent';
 import { useI18n } from '../../../i18n';
 import type { TranslationKey } from '../../../i18n';
 import { useConversationStore } from '../../../stores/conversationStore';
@@ -19,7 +20,7 @@ const ACTIVE_RUN_STATUSES: RunSummary['status'][] = [
 ];
 
 const UI_STAGES: Array<{ id: string; label: string; stages: WorkflowStage[] }> = [
-  { id: 'planner', label: '规划', stages: ['preflight', 'entry_gate', 'intake_gate', 'plan', 'speclist'] },
+  { id: 'planner', label: '规划', stages: ['preflight', 'entry_gate', 'intake_gate', 'speclist'] },
   { id: 'generator', label: '执行', stages: ['dispatch', 'investigate'] },
   { id: 'evaluator', label: '验证', stages: ['fix_verify', 'skepti', 'curate', 'finalize'] },
 ];
@@ -28,7 +29,6 @@ const STAGE_LABELS: Partial<Record<WorkflowStage, string>> = {
   preflight: '预检',
   entry_gate: '入口校验',
   intake_gate: '任务 intake',
-  plan: '计划审批',
   speclist: '任务拆分',
   dispatch: '分派 specialists',
   investigate: '证据调查',
@@ -37,7 +37,6 @@ const STAGE_LABELS: Partial<Record<WorkflowStage, string>> = {
   curate: '整理交付',
   finalize: '完成',
   blocked: '阻塞',
-  awaiting_user_input: '等待用户输入',
 };
 
 export interface SessionProgressSnapshot {
@@ -78,7 +77,6 @@ const buildTaskMonitorItems = (
   workflowState: WorkflowState | null,
   reasoningSummaries: ReasoningSummary[],
 ): TaskMonitorItem[] => {
-  const debugPlan = workflowState?.debugPlan ?? null;
   const harnessTasks = workflowState?.harnessTasks ?? [];
   const items: TaskMonitorItem[] = harnessTasks.map((task) => ({
     id: task.taskId,
@@ -87,24 +85,6 @@ const buildTaskMonitorItems = (
     meta: `${task.evidenceRefs.length} evidence · ${task.userApproval}`,
     status: mapTaskStatus(task),
   }));
-
-  if (items.length === 0 && debugPlan?.expectedDeliverables.length) {
-    debugPlan.expectedDeliverables.forEach((deliverable, index) => {
-      items.push({
-        id: `deliverable-${index}`,
-        title: deliverable,
-        detail: index === 0 ? debugPlan.scope : undefined,
-        meta: debugPlan.recommendedSpecialists.length > 0
-          ? debugPlan.recommendedSpecialists.join(' · ')
-          : undefined,
-        status: currentRun?.status === 'completed'
-          ? 'completed'
-          : currentRun && ACTIVE_RUN_STATUSES.includes(currentRun.status) && index === 0
-            ? 'active'
-            : 'pending',
-      });
-    });
-  }
 
   if (items.length === 0 && currentRun) {
     items.push({
@@ -136,7 +116,7 @@ const buildTaskMonitorItems = (
   if (latestReasoning && items.length > 0) {
     items.push({
       id: `reasoning-${latestReasoning.summaryId}`,
-      title: AGENT_DISPLAY_NAMES[latestReasoning.agentId] || latestReasoning.agentId,
+      title: AGENT_DISPLAY_NAMES[isTopLevelAgentId(latestReasoning.agentId) ? latestReasoning.agentId : 'debugger'] || latestReasoning.agentId,
       detail: latestReasoning.summary,
       meta: STAGE_LABELS[latestReasoning.stage] ?? latestReasoning.stage,
       status: currentRun && ACTIVE_RUN_STATUSES.includes(currentRun.status) ? 'active' : 'completed',

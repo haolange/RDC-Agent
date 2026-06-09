@@ -2,7 +2,6 @@
 import type { TimelineProjection } from './projection';
 import type {
   BranchNavigatorViewModel,
-  ComposerApprovalViewModel,
   RawAuditRef,
   RightPanelViewModel,
 } from '../trace';
@@ -14,7 +13,6 @@ export interface AgentRunPresentation {
   updatedAt: string;
   runs: AgentRunViewModel[];
   rightPanel: RightPanelViewModel;
-  approval?: ComposerApprovalViewModel | null;
   branchNavigator?: BranchNavigatorViewModel | null;
   rawAuditRefs: RawAuditRef[];
 }

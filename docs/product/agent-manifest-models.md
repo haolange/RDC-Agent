@@ -1,68 +1,109 @@
-# Agent manifest and model selection
+# Agent Manifest 与模型选择
 
-RDC-Agent uses app-level `.agent.md` files as the product-facing source for Agent configuration. The Settings UI reads and writes the same files, so users can configure Agents through either the GUI or Markdown.
+RDC-Agent 以 `.agent.md` 作为 agent 行为配置的唯一产品入口。Settings UI 读取和写入同一组文件，因此用户可以通过 GUI 或 Markdown 配置 agent。
 
-## Manifest location
+## Manifest 位置
 
-Agent manifests live under the active workspace:
+Agent manifests 位于当前 workspace：
 
 `profiles/agents/*.agent.md`
 
-Global orchestrator instructions live at:
+当前只 seed 四个顶层 agent：
 
-`profiles/global-instructions.md`
+- `ask.agent.md`
+- `debugger.agent.md`
+- `analyzer.agent.md`
+- `optimizer.agent.md`
 
-## Manifest shape
+Agent ID 来自文件名 stem，不再从 frontmatter 读取 `id`。
 
-Each manifest uses YAML frontmatter plus Markdown instructions:
+## Manifest 字段
+
+每个 manifest 使用 YAML frontmatter 加 Markdown instructions：
 
 ```markdown
 ---
-id: rdc-debugger
-name: RDC Debugger
-description: RenderDoc/RDC planning and intake orchestrator.
-argument-hint: Describe the .rdc symptom, goal, capture, or baseline.
+name: Debugger
+description: General executable RDC/RDX debugging agent.
+argument-hint: Describe the goal, symptom, capture, or artifact to inspect.
 target: rdc-agent
-model:
-  - kimi-code:kimi-coding
-disable-model-invocation: false
-user-invocable: true
+model: github-copilot:gpt-4.1
 enabled: true
+user-invocable: true
+disable-model-invocation: false
 tools:
   - read
   - search
-  - rdx
-skills: []
-mcpServers: []
+  - web
+  - bash
+  - askUser
+  - agent
+  - todo
+  - memory
+  - rdxContext
 agents:
-  - triage_agent
-  - capture_repro_agent
+  - analyzer
+  - optimizer
+skills: []
+mcp-servers: []
 handoffs:
-  - label: Start Implementation
-    agent: rdc-debugger
-    prompt: Start the approved RDC investigation.
+  - label: Analyze Evidence
+    agent: analyzer
+    prompt: Analyze the current evidence and summarize findings.
     send: true
-metadata:
-  legacyAgentRole: rdc-debugger
+    showContinueOn: false
 ---
 
-You are the RDC Debugger orchestrator.
+You are the Debugger agent.
 ```
 
-## Model ids
+Supported frontmatter fields are:
 
-The GUI shows models as a provider-grouped picker. The manifest stores the selected model as a canonical id:
+- `name`
+- `description`
+- `argument-hint`
+- `target`
+- `model`
+- `enabled`
+- `user-invocable`
+- `disable-model-invocation`
+- `tools`
+- `agents`
+- `skills`
+- `mcp-servers`
+- `handoffs`
 
-`<providerId>:<modelId>`
+`handoffs` support:
 
-Examples:
+- `label`
+- `agent`
+- `prompt`
+- `send`
+- `showContinueOn`
+- `model`
 
-- `kimi-code:kimi-coding`
-- `deepseek:deepseek-chat`
-- `google-ai-studio:gemini-2.5-pro`
+Composer and orchestrator switch lists are derived from `.agent.md` definitions where `enabled && userInvocable` is true.
 
-If a provider or model is disabled, the picker keeps the manifest readable but marks that model unavailable. Runtime routing fails closed until the provider is connected and the model is enabled again.
+## Tool Tokens
 
-## Toolchain boundary
+Manifest-facing tool names are canonical tokens:
 
-RenderDoc tools are exposed to Agents through the local RenderDoc toolchain configured in Settings. Agents may decide to call available tools during their loop, but command execution still goes through the main-process settings boundary and fails closed when the toolchain is disabled or misconfigured.
+- `read`
+- `search`
+- `web`
+- `bash`
+- `askUser`
+- `agent`
+- `todo`
+- `memory`
+- `rdxContext`
+
+`ask` is read-only by default. `debugger`、`analyzer`、`optimizer` are general executable agents and may use configured tools such as `bash` and `rdxContext` when policy allows.
+
+## Plan 输出
+
+`plan.md` is a normal artifact, attachment, or trace output produced by an agent. It is not a workflow state machine, IPC channel, or renderer overlay. Approval and continuation UX should be modeled through generic handoffs and conversation/tool events.
+
+## RDX Shell Actions
+
+Open `.rdc`、connect remote、preview、close runtime are Settings-managed shell actions under `settings.tooling.rdxActions`. The main process executes configured shell actions through `ShellInvocationService`, parses JSON output, and stores stable `RdxRuntimeContext` for later agent/tool use.

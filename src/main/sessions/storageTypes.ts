@@ -1,8 +1,4 @@
 import type {
-  AskUserPrompt,
-  DebugPlan,
-  IntakeContext,
-  PlanApprovalState,
   ReasoningSummary,
   WorkflowStage,
   Blocker,
@@ -40,26 +36,11 @@ export interface SessionEvidenceRecord {
   latest_run_status: RunRecord['status'] | null;
   latest_stage: string | null;
   updated_at: string;
-  debug_plan: {
-    plan_id: string;
-    readiness: string;
-    strict_ready: boolean;
-    target_capture: string | null;
-    target_scope: string | null;
-    deliverables: string[];
-  } | null;
   event_counts: Record<string, number>;
   active_blockers: Blocker[];
   verification_summary: string[];
   reasoning_summaries: ReasoningSummary[];
   report_paths: RunRecord['reportPaths'] | null;
-}
-
-export interface PersistedPlanSnapshot {
-  debug_plan: DebugPlan | null;
-  pending_questions: AskUserPrompt | null;
-  approval_state: PlanApprovalState;
-  intake_context?: IntakeContext;
 }
 
 export interface SessionLocation {

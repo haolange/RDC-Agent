@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
-import type { AppSettings, LlmAgentRoute, LlmProviderEntry, RdxCliInvokerSettings } from '@shared/types/settings';
+import type {
+  AppSettings,
+  LlmAgentRoute,
+  LlmProviderEntry,
+  RdxActionSettingsMap,
+  RdxCliInvokerSettings,
+} from '@shared/types/settings';
 import type { ProviderConnectionDraft, SettingsSection } from './types';
 import { cloneProvider, cloneRoute } from './utils';
 
@@ -15,6 +21,7 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
   const [enabledMcpDrafts, setEnabledMcpDrafts] = useState<string[]>(settings.configuration.enabledMcpServerIds);
   const [patternBindingDrafts, setPatternBindingDrafts] = useState<Record<string, string>>(settings.configuration.modePatternBindings);
   const [rdxCliDraft, setRdxCliDraft] = useState<RdxCliInvokerSettings>(settings.tooling.rdxCli);
+  const [rdxActionsDraft, setRdxActionsDraft] = useState<RdxActionSettingsMap>(cloneRdxActions(settings.tooling.rdxActions));
   const [agentManifestDrafts, setAgentManifestDrafts] = useState<AgentManifestDraft[]>(
     settings.agents.definitions.map((definition) => ({ ...definition })),
   );
@@ -44,6 +51,7 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setEnabledMcpDrafts(settings.configuration.enabledMcpServerIds);
     setPatternBindingDrafts(settings.configuration.modePatternBindings);
     setRdxCliDraft(settings.tooling.rdxCli);
+    setRdxActionsDraft(cloneRdxActions(settings.tooling.rdxActions));
     setAgentManifestDrafts(settings.agents.definitions.map((definition) => ({ ...definition })));
     setGlobalInstructionsDraft(settings.agents.globalInstructions);
     setSelectedProviderId(providers[0]?.id ?? null);
@@ -73,6 +81,8 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setPatternBindingDrafts,
     rdxCliDraft,
     setRdxCliDraft,
+    rdxActionsDraft,
+    setRdxActionsDraft,
     agentManifestDrafts,
     setAgentManifestDrafts,
     globalInstructionsDraft,
@@ -87,3 +97,29 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setAgentRouteSaveMessage,
   };
 };
+
+const defaultRdxAction = () => ({
+  enabled: false,
+  command: '',
+  args: [],
+  workingDirectory: '',
+  env: {},
+  timeoutMs: 60000,
+});
+
+function cloneRdxActions(actions?: Partial<RdxActionSettingsMap>): RdxActionSettingsMap {
+  return {
+    openCapture: cloneRdxAction(actions?.openCapture ?? defaultRdxAction()),
+    connectRemote: cloneRdxAction(actions?.connectRemote ?? defaultRdxAction()),
+    closeRuntime: cloneRdxAction(actions?.closeRuntime ?? defaultRdxAction()),
+    openPreview: cloneRdxAction(actions?.openPreview ?? defaultRdxAction()),
+  };
+}
+
+function cloneRdxAction(action: RdxActionSettingsMap[keyof RdxActionSettingsMap]): RdxActionSettingsMap[keyof RdxActionSettingsMap] {
+  return {
+    ...action,
+    args: [...action.args],
+    env: { ...action.env },
+  };
+}

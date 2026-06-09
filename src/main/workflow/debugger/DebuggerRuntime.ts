@@ -1,74 +1,71 @@
-﻿import type { ConversationMessage } from '@shared/types/conversation';
 import type { AgentRole } from '@shared/types/agent';
-import type { AskUserAnswer, WorkflowStage } from '@shared/types/workflow';
-import type { DebugSessionStartRequest } from '@shared/types/session';
+import type { WorkflowStage, WorkflowState } from '@shared/types/workflow';
 import type {
   TraceExportOptions,
   TraceExportResult,
-  TraceRevisionResult,
   TraceSessionResult,
   TraceBranchSwitchResult,
 } from '@shared/types/trace';
-import { debugWorkflowService, type PlanResult, type StartWorkflowResult } from './DebugWorkflowService';
+import { nowIso } from '@shared/utils/id';
+import { traceService } from '../../agent-trace/TraceService';
+import { storageAdapter } from '../../sessions/StorageAdapter';
 import { isToolAllowedForAgent, resolveAgentToolAllowlist } from './DebuggerRuntimePolicy';
-
-export interface ConversationDebuggerStartRequest extends DebugSessionStartRequest {
-  source: 'conversation';
-  message: ConversationMessage;
-}
+import { runExecutionService } from './RunExecutionService';
 
 export class DebuggerRuntime {
-  recoverInterruptedRuns(): Promise<void> {
-    return debugWorkflowService.recoverInterruptedRuns();
-  }
-
-  startPlan(request: DebugSessionStartRequest): Promise<StartWorkflowResult> {
-    return debugWorkflowService.startPlan(request);
-  }
-
-  requestStartFromConversation(request: ConversationDebuggerStartRequest): Promise<StartWorkflowResult> {
-    const { source: _source, message: _message, ...startRequest } = request;
-    return this.startPlan(startRequest);
-  }
-
-  getPlan(runId: string): Promise<PlanResult> {
-    return debugWorkflowService.getPlan(runId);
-  }
-
-  submitQuestions(runId: string, answers: AskUserAnswer[]): Promise<PlanResult> {
-    return debugWorkflowService.submitQuestions(runId, answers);
-  }
-
-  approvePlan(runId: string): Promise<PlanResult> {
-    return debugWorkflowService.approvePlan(runId);
+  async recoverInterruptedRuns(): Promise<void> {
+    await Promise.resolve();
   }
 
   getTraceProjection(sessionId: string): Promise<TraceSessionResult> {
-    return debugWorkflowService.getTraceProjection(sessionId);
+    return traceService.getSession(sessionId);
   }
 
-  requestPlanRevision(runId: string, revisionText: string): Promise<TraceRevisionResult> {
-    return debugWorkflowService.requestPlanRevision(runId, revisionText);
+  async switchTraceBranch(sessionId: string, branchId: string): Promise<TraceBranchSwitchResult> {
+    const projection = await traceService.getSession(sessionId);
+    return {
+      ...projection,
+      activeBranchId: branchId,
+    };
   }
 
-  switchTraceBranch(sessionId: string, branchId: string): Promise<TraceBranchSwitchResult> {
-    return debugWorkflowService.switchTraceBranch(sessionId, branchId);
+  async exportTraceSession(sessionId: string, _options?: TraceExportOptions): Promise<TraceExportResult> {
+    return {
+      success: false,
+      sessionId,
+      error: 'Trace session export is not available without an active workflow run.',
+    };
   }
 
-  exportTraceSession(sessionId: string, options?: TraceExportOptions): Promise<TraceExportResult> {
-    return debugWorkflowService.exportTraceSession(sessionId, options);
+  stopRun(runId: string): { success: boolean; error?: string } {
+    const stopped = runExecutionService.stopRun(runId);
+    return stopped ? { success: true } : { success: false, error: 'No active run.' };
   }
 
-  restartRun(runId: string): Promise<PlanResult> {
-    return debugWorkflowService.restartRun(runId);
-  }
+  getWorkflowState(sessionId: string, runId?: string): WorkflowState | null {
+    const run = runId
+      ? storageAdapter.listRuns(sessionId).find((entry) => entry.runId === runId) ?? null
+      : storageAdapter.getLatestRun(sessionId);
+    if (!run) {
+      return null;
+    }
 
-  stopRun(runId: string): Promise<{ success: boolean; error?: string }> {
-    return debugWorkflowService.stopRun(runId);
-  }
-
-  getWorkflowState(sessionId: string, runId?: string) {
-    return debugWorkflowService.getWorkflowState(sessionId, runId);
+    const activeRun = runExecutionService.listActiveRuns().find((entry) => entry.runId === run.runId);
+    return {
+      caseId: run.caseId,
+      runId: run.runId,
+      sessionId: run.sessionId,
+      currentStage: (activeRun?.stage as WorkflowStage | undefined) ?? (run.lastStage as WorkflowStage | undefined) ?? 'investigate',
+      previousStages: [],
+      entryMode: 'cli',
+      backend: 'local',
+      orchestrationMode: 'multi_agent',
+      coordinationMode: 'staged_handoff',
+      blockers: [],
+      harnessTasks: [],
+      reasoningSummaries: [],
+      lastUpdated: nowIso(),
+    };
   }
 
   resolveAgentToolAllowlist(agentId: AgentRole, stage?: WorkflowStage): string[] {
@@ -81,4 +78,3 @@ export class DebuggerRuntime {
 }
 
 export const debuggerRuntime = new DebuggerRuntime();
-

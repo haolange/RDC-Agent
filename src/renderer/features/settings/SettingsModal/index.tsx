@@ -32,6 +32,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     setEnabledMcpDrafts,
     rdxCliDraft,
     setRdxCliDraft,
+    rdxActionsDraft,
+    setRdxActionsDraft,
     agentManifestDrafts,
     setAgentManifestDrafts,
     globalInstructionsDraft,
@@ -228,10 +230,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 enabledSkillDrafts={enabledSkillDrafts}
                 enabledMcpDrafts={enabledMcpDrafts}
                 rdxCliDraft={rdxCliDraft}
+                rdxActionsDraft={rdxActionsDraft}
                 globalInstructionsDraft={globalInstructionsDraft}
                 onEnabledSkillDraftsChange={setEnabledSkillDrafts}
                 onEnabledMcpDraftsChange={setEnabledMcpDrafts}
                 onRdxCliDraftChange={setRdxCliDraft}
+                onRdxActionsDraftChange={setRdxActionsDraft}
                 onGlobalInstructionsDraftChange={setGlobalInstructionsDraft}
                 onSave={handleSaveSkillsAndTools}
                 toggleRuntimeId={toggleRuntimeId}

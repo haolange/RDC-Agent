@@ -13,7 +13,6 @@ import { useLayoutStore } from '../stores/layoutStore';
 import { useCaptureStore } from '../stores/captureStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useSessionStore } from '../stores/sessionStore';
-import { useWorkflowStore } from '../stores/workflowStore';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useI18n } from '../i18n';
@@ -32,7 +31,6 @@ const App: React.FC = () => {
   const currentProject = useProjectStore((state) => state.currentProject);
   const currentRun = useSessionStore((state) => state.currentRun);
   const openedCapture = useCaptureStore((state) => state.openedCapture);
-  const composerApproval = useWorkflowStore((state) => state.tracePresentation?.approval ?? null);
   const currentMode = useLayoutStore((state) => state.currentMode);
   const toggleLeftSidebar = useLayoutStore((state) => state.toggleLeftSidebar);
   const toggleRightPanel = useLayoutStore((state) => state.toggleRightPanel);
@@ -178,7 +176,6 @@ const App: React.FC = () => {
           nickname={nickname}
           avatarPath={avatarPath}
           composer={composer}
-          composerApproval={Boolean(composerApproval)}
           hasOpenedCaptureForCurrentProject={hasOpenedCaptureForCurrentProject}
           showMainPromptBar
           mainPage={<DebuggerPage mode={currentMode} />}
