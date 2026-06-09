@@ -13,22 +13,22 @@ RDC-Agent is an Electron desktop workbench for RenderDoc `.rdc` captures. The ap
 flowchart LR
   Renderer["Renderer UI"] --> Preload["Preload API"]
   Preload --> IPC["IPC handlers"]
-  IPC --> Workflow["DebuggerRuntime / workflow services"]
-  Workflow --> Trace["Agentic Trace"]
-  Workflow --> Settings["SettingsService"]
-  Workflow --> Invoker["RdxCliInvokerService"]
-  Invoker --> Shell["ShellInvocationService"]
-  Shell --> CLI["Configured external RDX CLI"]
+  IPC --> Runtime["Agent / session services"]
+  Runtime --> Trace["Agentic Trace"]
+  Runtime --> Settings["SettingsService"]
+  Runtime --> Actions["RDX shell actions"]
+  Actions --> Shell["ShellInvocationService"]
+  Shell --> CLI["System-installed RDX CLI"]
   Trace --> Renderer
 ```
 
-The RDX CLI command is not hardcoded. It is configured in Settings together with default arguments, working directory, environment variables, timeout, and catalog path.
+The RDX CLI command is not hardcoded or bundled. System-installed CLI commands, action arguments, working directory, environment variables, timeout, and catalog path are Settings data.
 
 ## Public Boundaries
 
 - Renderer/preload can read catalog and runtime status through IPC.
 - Renderer/preload do not expose arbitrary tool execution.
-- Workflow execution calls `RdxCliInvokerService`, which calls the configured CLI through `ShellInvocationService`.
+- RDX vertical entries call configured shell actions through `ShellInvocationService`; agents use allowed shell access and read stable runtime context through `rdxContext`.
 - Agentic Trace exposes projection APIs under `trace:*`.
 - Debugger workflow actions remain under `workflow:*`.
 

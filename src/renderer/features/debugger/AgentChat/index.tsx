@@ -3,7 +3,6 @@ import type { AgentMode } from '@shared/types/layout';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import { ConversationThread } from './ConversationThread';
-import { PlanApprovalCard } from '../plan/PlanApprovalCard';
 import './AgentChat.css';
 
 const STICKY_SCROLL_THRESHOLD = 96;
@@ -39,7 +38,6 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
     messageCount,
     latestMessageActivityAt,
     workflowState?.currentStage,
-    workflowState?.approvalState,
   ]);
 
   const handleScroll = () => {
@@ -61,7 +59,6 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
         data-testid="chat-messages"
         onScroll={handleScroll}
       >
-        <PlanApprovalCard />
         <ConversationThread mode={mode} />
       </div>
     </div>

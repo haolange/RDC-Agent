@@ -1,26 +1,4 @@
 "use strict";
-var __create = Object.create;
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
 Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 const electron = require("electron");
 const path = require("path");
@@ -58,9 +36,6 @@ const path__namespace = /* @__PURE__ */ _interopNamespaceDefault(path);
 const fs__namespace = /* @__PURE__ */ _interopNamespaceDefault(fs);
 const fs__namespace$1 = /* @__PURE__ */ _interopNamespaceDefault(fs$1);
 const net__namespace = /* @__PURE__ */ _interopNamespaceDefault(net);
-function generateId() {
-  return uuid.v4();
-}
 function generateShortId() {
   return uuid.v4().replace(/-/g, "").slice(0, 12);
 }
@@ -84,18 +59,105 @@ function nowMs() {
 function nowIso$1() {
   return (/* @__PURE__ */ new Date()).toISOString();
 }
-const DEFAULT_MODEL_ROUTING = {
-  "ask_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "rdc-debugger": { provider: "openrouter", model: "anthropic/claude-3-opus" },
-  "triage_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "capture_repro_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "pass_graph_pipeline_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "pixel_forensics_agent": { provider: "openrouter", model: "google/gemini-pro-1.5" },
-  "shader_ir_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "driver_device_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
-  "skeptic_agent": { provider: "openrouter", model: "openai/gpt-4o" },
-  "curator_agent": { provider: "openrouter", model: "anthropic/claude-3-sonnet" }
+const clients = /* @__PURE__ */ new Set();
+function writeEvent(response, payload) {
+  response.write(`data: ${JSON.stringify(payload)}
+
+`);
+}
+const rendererEventHub = {
+  emit(channel, ...args) {
+    const payload = { channel, args };
+    for (const client of clients) {
+      writeEvent(client, payload);
+    }
+  },
+  connect(response) {
+    response.writeHead(200, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Private-Network": "true",
+      "Cache-Control": "no-store",
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Connection": "keep-alive"
+    });
+    response.write("retry: 1000\n\n");
+    clients.add(response);
+    const heartbeat = setInterval(() => {
+      response.write(":\n\n");
+    }, 15e3);
+    const disconnect = () => {
+      clearInterval(heartbeat);
+      clients.delete(response);
+    };
+    response.on("close", disconnect);
+    return disconnect;
+  }
 };
+const APP_LOG_LIMIT = 1e3;
+const SESSION_LOG_LIMIT = 500;
+class RuntimeLogService {
+  appEntries = [];
+  sessionEntries = /* @__PURE__ */ new Map();
+  log(input) {
+    const entry = {
+      id: generateEventId("rlog"),
+      timestamp: input.timestamp ?? nowMs(),
+      scope: input.scope,
+      namespace: input.namespace,
+      severity: input.severity ?? "info",
+      title: input.title,
+      summary: input.summary,
+      detail: input.detail,
+      sessionId: input.sessionId ?? null,
+      projectId: input.projectId ?? null,
+      runId: input.runId ?? null,
+      raw: input.raw ?? null
+    };
+    this.pushWithLimit(this.appEntries, entry, APP_LOG_LIMIT);
+    if (entry.sessionId) {
+      const bucket = this.sessionEntries.get(entry.sessionId) ?? [];
+      this.pushWithLimit(bucket, entry, SESSION_LOG_LIMIT);
+      this.sessionEntries.set(entry.sessionId, bucket);
+    }
+    this.broadcast(entry);
+    return entry;
+  }
+  list(scope, sessionId) {
+    if (scope === "session") {
+      if (!sessionId) {
+        return [];
+      }
+      return [...this.sessionEntries.get(sessionId) ?? []];
+    }
+    return [...this.appEntries];
+  }
+  pushWithLimit(target, entry, limit) {
+    target.push(entry);
+    if (target.length > limit) {
+      target.splice(0, target.length - limit);
+    }
+  }
+  broadcast(entry) {
+    rendererEventHub.emit("runtime:logAppended", entry);
+    const windows = electron.BrowserWindow.getAllWindows();
+    for (const win of windows) {
+      if (!win.isDestroyed()) {
+        win.webContents.send("runtime:logAppended", entry);
+      }
+    }
+  }
+}
+const runtimeLogService = new RuntimeLogService();
+const TOP_LEVEL_AGENT_IDS = ["ask", "debugger", "analyzer", "optimizer"];
+const DEFAULT_MODEL_ROUTING = {
+  ask: { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  debugger: { provider: "openrouter", model: "anthropic/claude-3-opus" },
+  analyzer: { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  optimizer: { provider: "openrouter", model: "anthropic/claude-3-sonnet" }
+};
+function isTopLevelAgentId(value) {
+  return TOP_LEVEL_AGENT_IDS.includes(value);
+}
 const LEFT_SIDEBAR_DEFAULT_WIDTH = 256;
 const LEFT_SIDEBAR_MIN_WIDTH = 220;
 const LEFT_SIDEBAR_MAX_WIDTH = 420;
@@ -864,107 +926,68 @@ class AppPathService {
   }
 }
 const appPathService = new AppPathService();
-const AGENT_ROLES = [
-  "ask_agent",
-  "rdc-debugger",
-  "triage_agent",
-  "capture_repro_agent",
-  "pass_graph_pipeline_agent",
-  "pixel_forensics_agent",
-  "shader_ir_agent",
-  "driver_device_agent",
-  "skeptic_agent",
-  "curator_agent"
-];
+const AGENT_ROLES = [...TOP_LEVEL_AGENT_IDS];
 const AGENT_DISPLAY_NAMES = {
-  "ask_agent": "Ask",
-  "rdc-debugger": "RDC Debugger",
-  "triage_agent": "Triage Agent",
-  "capture_repro_agent": "Capture Repro Agent",
-  "pass_graph_pipeline_agent": "Pass Graph Agent",
-  "pixel_forensics_agent": "Pixel Forensics Agent",
-  "shader_ir_agent": "Shader IR Agent",
-  "driver_device_agent": "Driver Device Agent",
-  "skeptic_agent": "Skeptic Agent",
-  "curator_agent": "Curator Agent"
+  ask: "Ask",
+  debugger: "Debugger",
+  analyzer: "Analyzer",
+  optimizer: "Optimizer"
 };
 const AGENT_DESCRIPTIONS = {
-  "ask_agent": "Non-executing assistant for clarification, capability explanation, and Open capture guidance",
-  "rdc-debugger": "Main orchestrator responsible for workflow coordination, gates, and stage progression",
-  "triage_agent": "Symptom classification and SOP recommendation",
-  "capture_repro_agent": "Capture quality verification and baseline establishment",
-  "pass_graph_pipeline_agent": "Render pass and pipeline dependency analysis",
-  "pixel_forensics_agent": "Pixel-level evidence collection and first-bad event localization",
-  "shader_ir_agent": "Shader source and IR evidence analysis",
-  "driver_device_agent": "Cross-device attribution and platform-specific checks",
-  "skeptic_agent": "Evidence chain challenger and weak claim detector",
-  "curator_agent": "Final report generation and knowledge library curation"
+  ask: "Read-only agent for codebase questions, clarification, and guidance.",
+  debugger: "General executable agent for RDC/RenderDoc investigation and debugging work.",
+  analyzer: "General executable agent for evidence analysis, performance triage, and reportable findings.",
+  optimizer: "General executable agent for bottleneck analysis, optimization ordering, and validation."
 };
 const AGENT_CATEGORIES = {
-  "ask_agent": "orchestrator",
-  "rdc-debugger": "orchestrator",
-  "triage_agent": "investigator",
-  "capture_repro_agent": "investigator",
-  "pass_graph_pipeline_agent": "investigator",
-  "pixel_forensics_agent": "investigator",
-  "shader_ir_agent": "investigator",
-  "driver_device_agent": "investigator",
-  "skeptic_agent": "verifier",
-  "curator_agent": "reporter"
+  ask: "orchestrator",
+  debugger: "general",
+  analyzer: "general",
+  optimizer: "general"
 };
-const INVESTIGATOR_AGENTS = [
-  "triage_agent",
-  "capture_repro_agent",
-  "pass_graph_pipeline_agent",
-  "pixel_forensics_agent",
-  "shader_ir_agent",
-  "driver_device_agent"
-];
-const VERIFIER_AGENTS = ["skeptic_agent"];
-const REPORTER_AGENTS = ["curator_agent"];
 const AGENT_WRITE_SCOPES = {
-  "ask_agent": [],
-  "rdc-debugger": ["workspace_control"],
-  "triage_agent": ["workspace_notes"],
-  "capture_repro_agent": ["workspace_notes"],
-  "pass_graph_pipeline_agent": ["workspace_notes"],
-  "pixel_forensics_agent": ["workspace_notes"],
-  "shader_ir_agent": ["workspace_notes"],
-  "driver_device_agent": ["workspace_notes"],
-  "skeptic_agent": ["session_signoff"],
-  "curator_agent": ["workspace_reports", "session_artifacts", "knowledge_library"]
+  ask: [],
+  debugger: ["workspace_control", "workspace_notes", "session_artifacts", "workspace_reports"],
+  analyzer: ["workspace_notes", "session_artifacts", "workspace_reports"],
+  optimizer: ["workspace_notes", "session_artifacts", "workspace_reports"]
+};
+const AGENT_COLORS = {
+  ask: "#38c6f4",
+  debugger: "#33d1ff",
+  analyzer: "#8d8bff",
+  optimizer: "#4ee3a0"
 };
 const AGENT_MODES = [
   {
     id: "ask",
     label: "Ask",
     icon: "message-orbit",
-    description: "澄清目标并引导打开 Capture",
-    accentColor: "#38c6f4",
+    description: "Read-only clarification and guidance",
+    accentColor: AGENT_COLORS.ask,
     disabled: false
   },
   {
     id: "debugger",
     label: "Debugger",
     icon: "crosshair-bug",
-    description: "定位异常与验证修复",
-    accentColor: "#33d1ff",
+    description: "Executable RDC/RenderDoc debugging agent",
+    accentColor: AGENT_COLORS.debugger,
     disabled: false
   },
   {
     id: "analyzer",
     label: "Analyzer",
     icon: "waveform-gauge",
-    description: "拆解现象并收敛证据",
-    accentColor: "#8d8bff",
+    description: "Executable analysis and evidence agent",
+    accentColor: AGENT_COLORS.analyzer,
     disabled: false
   },
   {
     id: "optimizer",
     label: "Optimizer",
     icon: "spark-tuning",
-    description: "判断瓶颈与优化顺序",
-    accentColor: "#4ee3a0",
+    description: "Executable optimization and validation agent",
+    accentColor: AGENT_COLORS.optimizer,
     disabled: false
   }
 ];
@@ -975,23 +998,22 @@ AGENT_MODES.reduce(
   },
   {}
 );
+const canonicalAgentModelId = (providerId, modelId) => providerId.trim() && modelId.trim() ? `${providerId.trim()}:${modelId.trim()}` : "";
+const splitCanonicalAgentModelId = (value) => {
+  const separator = value.indexOf(":");
+  if (separator <= 0 || separator === value.length - 1) {
+    return null;
+  }
+  const providerId = value.slice(0, separator).trim();
+  const modelId = value.slice(separator + 1).trim();
+  return providerId && modelId ? { providerId, modelId } : null;
+};
 const GLOBAL_INSTRUCTIONS_FILE = "global-instructions.md";
 const toSlug = (value) => {
   const slug = value.trim().toLowerCase().replace(/['"]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   return slug || "agent";
 };
 const fileNameForId = (id) => `${toSlug(id.replace(/_/g, "-"))}.agent.md`;
-const canonicalModelId = (providerId, modelId) => providerId && modelId ? `${providerId}:${modelId}` : "";
-const splitCanonicalModelId = (value) => {
-  const separator = value.indexOf(":");
-  if (separator <= 0 || separator === value.length - 1) {
-    return null;
-  }
-  return {
-    providerId: value.slice(0, separator),
-    modelId: value.slice(separator + 1)
-  };
-};
 const readStringArray = (value) => {
   if (Array.isArray(value)) {
     return value.filter((entry) => typeof entry === "string").map((entry) => entry.trim()).filter(Boolean);
@@ -1029,6 +1051,9 @@ const readHandoffs = (value) => {
     if (typeof candidate.showContinueOn === "boolean") {
       handoff.showContinueOn = candidate.showContinueOn;
     }
+    if (typeof candidate.model === "string" && candidate.model.trim()) {
+      handoff.model = candidate.model.trim();
+    }
     handoffs.push(handoff);
   }
   return handoffs;
@@ -1039,9 +1064,8 @@ const parseAgentMarkdown = (filePath, fallbackId) => {
   const frontmatter = match ? YAML.parse(match[1]) : {};
   const instructions = match ? match[2].trim() : raw.trim();
   const name = typeof frontmatter.name === "string" && frontmatter.name.trim() ? frontmatter.name.trim() : fallbackId;
-  const id = typeof frontmatter.id === "string" && frontmatter.id.trim() ? frontmatter.id.trim() : fallbackId;
   return {
-    id,
+    id: fallbackId,
     fileName: path.basename(filePath),
     filePath,
     name,
@@ -1053,7 +1077,7 @@ const parseAgentMarkdown = (filePath, fallbackId) => {
     userInvocable: readBoolean(frontmatter["user-invocable"], true),
     tools: readStringArray(frontmatter.tools),
     skills: readStringArray(frontmatter.skills),
-    mcpServers: readStringArray(frontmatter.mcpServers),
+    mcpServers: readStringArray(frontmatter["mcp-servers"]),
     agents: readStringArray(frontmatter.agents),
     handoffs: readHandoffs(frontmatter.handoffs),
     metadata: frontmatter.metadata && typeof frontmatter.metadata === "object" ? frontmatter.metadata : {},
@@ -1065,7 +1089,6 @@ const parseAgentMarkdown = (filePath, fallbackId) => {
 };
 const serializeAgentMarkdown = (definition) => {
   const frontmatter = {
-    id: definition.id,
     name: definition.name,
     description: definition.description,
     "argument-hint": definition.argumentHint,
@@ -1076,10 +1099,9 @@ const serializeAgentMarkdown = (definition) => {
     enabled: definition.enabled,
     tools: definition.tools,
     skills: definition.skills,
-    mcpServers: definition.mcpServers,
+    "mcp-servers": definition.mcpServers,
     agents: definition.agents,
-    handoffs: definition.handoffs,
-    metadata: definition.metadata
+    handoffs: definition.handoffs
   };
   return `---
 ${YAML.stringify(frontmatter).trim()}
@@ -1090,26 +1112,24 @@ ${definition.instructions.trim()}
 };
 const createSeedDefinition = (agentId, routes) => {
   const route = routes.find((entry) => entry.agentId === agentId);
-  const model = canonicalModelId(route?.providerId ?? "", route?.modelId ?? "");
+  const model = canonicalAgentModelId(route?.providerId ?? "", route?.modelId ?? "");
   const name = AGENT_DISPLAY_NAMES[agentId];
   return {
     id: agentId,
     fileName: fileNameForId(agentId),
     name,
     description: AGENT_DESCRIPTIONS[agentId],
-    argumentHint: agentId === "ask_agent" ? "Ask about the current project, capture, or workflow" : "Describe the RenderDoc/RDC investigation goal",
+    argumentHint: agentId === "ask" ? "Ask about the current project, capture, or workflow" : "Describe the RenderDoc/RDC investigation goal",
     target: "rdc-agent",
     models: model ? [model] : [],
     disableModelInvocation: false,
-    userInvocable: agentId === "ask_agent" || agentId === "rdc-debugger",
-    tools: agentId === "ask_agent" ? ["read", "search", "web"] : ["read", "search", "agent", "rdx"],
+    userInvocable: true,
+    tools: agentId === "ask" ? ["read", "search", "web", "askUser"] : ["read", "search", "web", "bash", "askUser", "agent", "todo", "memory", "rdxContext"],
     skills: [],
     mcpServers: [],
-    agents: agentId === "rdc-debugger" ? AGENT_ROLES.filter((role) => role !== "ask_agent" && role !== "rdc-debugger") : [],
+    agents: agentId === "ask" ? [] : AGENT_ROLES.filter((role) => role !== agentId),
     handoffs: [],
-    metadata: {
-      legacyAgentRole: agentId
-    },
+    metadata: {},
     instructions: `You are ${name}. ${AGENT_DESCRIPTIONS[agentId]}.`,
     enabled: true
   };
@@ -1124,19 +1144,18 @@ class AgentManifestService {
   ensureSeedManifests(paths, routes) {
     const directory = this.getAgentsDirectory(paths);
     fs.mkdirSync(directory, { recursive: true });
-    const hasManifest = fs.readdirSync(directory).some((entry) => entry.endsWith(".agent.md"));
-    if (hasManifest) {
-      return;
-    }
+    const existing = new Set(fs.readdirSync(directory));
     for (const agentId of AGENT_ROLES) {
       const seed = createSeedDefinition(agentId, routes);
-      fs.writeFileSync(path.join(directory, seed.fileName), serializeAgentMarkdown(seed), "utf8");
+      if (!existing.has(seed.fileName)) {
+        fs.writeFileSync(path.join(directory, seed.fileName), serializeAgentMarkdown(seed), "utf8");
+      }
     }
   }
   getSettings(paths, providers, routes) {
     this.ensureSeedManifests(paths, routes);
     const directoryPath = this.getAgentsDirectory(paths);
-    const definitions = fs.readdirSync(directoryPath).filter((entry) => entry.endsWith(".agent.md")).map((entry) => {
+    const definitions = fs.readdirSync(directoryPath).filter((entry) => entry.endsWith(".agent.md")).filter((entry) => isTopLevelAgentId(entry.replace(/\.agent\.md$/u, ""))).map((entry) => {
       const fullPath = path.join(directoryPath, entry);
       const fallbackId = entry.replace(/\.agent\.md$/u, "");
       return parseAgentMarkdown(fullPath, fallbackId);
@@ -1152,6 +1171,9 @@ class AgentManifestService {
     const directory = this.getAgentsDirectory(paths);
     fs.mkdirSync(directory, { recursive: true });
     for (const draft of drafts) {
+      if (!isTopLevelAgentId(draft.id)) {
+        continue;
+      }
       const fileName = draft.fileName && draft.fileName.endsWith(".agent.md") ? draft.fileName : fileNameForId(draft.id || draft.name);
       const filePath = path.join(directory, fileName);
       if (draft.delete) {
@@ -1179,20 +1201,41 @@ class AgentManifestService {
     const directory = this.getAgentsDirectory(paths);
     fs.mkdirSync(directory, { recursive: true });
     const imported = parseAgentMarkdown(sourcePath, path.basename(sourcePath, ".agent.md"));
+    if (!isTopLevelAgentId(imported.id)) {
+      throw new Error(`Only top-level agent manifests can be imported: ${AGENT_ROLES.join(", ")}`);
+    }
     const fileName = fileNameForId(imported.id || imported.name);
     const targetPath = path.join(directory, fileName);
     fs.copyFileSync(sourcePath, targetPath);
     return parseAgentMarkdown(targetPath, fileName.replace(/\.agent\.md$/u, ""));
   }
-  routesFromDefinitions(currentRoutes, definitions) {
+  routesFromDefinitions(currentRoutes, definitions, providers) {
     const routeMap = new Map(currentRoutes.map((route) => [route.agentId, route]));
     const knownAgentIds = new Set(AGENT_ROLES);
     for (const definition of definitions) {
       if (!knownAgentIds.has(definition.id) || definition.delete) {
         continue;
       }
-      const model = definition.models.map(splitCanonicalModelId).find((entry) => entry !== null);
+      if (!isTopLevelAgentId(definition.id)) {
+        continue;
+      }
+      const model = definition.models.map(splitCanonicalAgentModelId).find((entry) => entry !== null);
       if (!model) {
+        routeMap.set(definition.id, {
+          agentId: definition.id,
+          providerId: "",
+          modelId: ""
+        });
+        continue;
+      }
+      const provider = providers.find((entry) => entry.id === model.providerId);
+      const modelEnabled = provider?.enabled && provider.isConfigured && provider.models.some((entry) => entry.id === model.modelId && entry.enabled !== false);
+      if (!modelEnabled) {
+        routeMap.set(definition.id, {
+          agentId: definition.id,
+          providerId: "",
+          modelId: ""
+        });
         continue;
       }
       routeMap.set(definition.id, {
@@ -1209,12 +1252,13 @@ class AgentManifestService {
   }
   getModelOptions(providers) {
     return providers.flatMap((provider) => provider.models.map((model) => ({
-      canonicalId: canonicalModelId(provider.id, model.id),
+      canonicalId: canonicalAgentModelId(provider.id, model.id),
       providerId: provider.id,
       providerLabel: provider.label,
       modelId: model.id,
       modelLabel: model.label || model.id,
-      configured: provider.enabled && provider.isConfigured && model.enabled !== false
+      configured: provider.enabled && provider.isConfigured && model.enabled !== false,
+      status: !provider.enabled || !provider.isConfigured ? "provider-unavailable" : model.enabled === false ? "model-disabled" : "ready"
     })));
   }
   readGlobalInstructions(paths) {
@@ -1230,7 +1274,6 @@ const MAIN_STAGES = [
   "preflight",
   "entry_gate",
   "intake_gate",
-  "plan",
   "speclist",
   "dispatch",
   "investigate",
@@ -1240,15 +1283,13 @@ const MAIN_STAGES = [
   "finalize"
 ];
 const SPECIAL_STAGES = [
-  "blocked",
-  "awaiting_user_input"
+  "blocked"
 ];
 const ALL_STAGES = [...MAIN_STAGES, ...SPECIAL_STAGES];
 const STAGE_PHASES = {
   preflight: "planner",
   entry_gate: "planner",
   intake_gate: "planner",
-  plan: "planner",
   speclist: "planner",
   dispatch: "generator",
   investigate: "generator",
@@ -1256,12 +1297,11 @@ const STAGE_PHASES = {
   skepti: "evaluator",
   curate: "evaluator",
   finalize: "evaluator",
-  blocked: "evaluator",
-  awaiting_user_input: "planner"
+  blocked: "evaluator"
 };
 const LEGACY_STAGE_MIGRATION = {
   preflight_pending: "preflight",
-  intent_gate_passed: "plan",
+  intent_gate_passed: "speclist",
   entry_gate_passed: "entry_gate",
   accepted_intake_initialized: "intake_gate",
   intake_gate_passed: "intake_gate",
@@ -1399,9 +1439,9 @@ function isEnabledModel(provider, modelId) {
   return provider.models.some((model) => model.enabled !== false && model.id === modelId);
 }
 function resolveCopilotFallbackModel(routes, provider, agentId) {
-  const debuggerRoute = routes.find((entry) => entry.agentId === "rdc-debugger");
+  const debuggerRoute = routes.find((entry) => entry.agentId === "debugger");
   const candidates = [
-    ...agentId !== "rdc-debugger" && debuggerRoute?.providerId === provider.id ? [debuggerRoute.modelId] : [],
+    ...agentId !== "debugger" && debuggerRoute?.providerId === provider.id ? [debuggerRoute.modelId] : [],
     ...COPILOT_CHAT_COMPLETIONS_FALLBACK_MODELS,
     ...provider.models.map((model) => model.id)
   ];
@@ -1457,14 +1497,14 @@ const createFallbackModeProfile = () => ({
   id: DEFAULT_MODE_PROFILE_ID,
   label: "Debugger Production",
   mode: "debugger",
-  patternId: "plan-generate-verify",
+  patternId: "free-agent",
   skillIds: [],
   mcpServerIds: [],
   stagePolicies: {},
   defaultAgentPrompts: {}
 });
 const createFallbackAgentProfile = (agentId) => {
-  const route = DEFAULT_MODEL_ROUTING[agentId];
+  const route = isTopLevelAgentId(agentId) ? DEFAULT_MODEL_ROUTING[agentId] : DEFAULT_MODEL_ROUTING.debugger;
   return {
     id: `agent.${agentId}`,
     label: agentId,
@@ -1521,7 +1561,7 @@ class ExecutionProfileService {
       enabledSkillIds: configuration.enabledSkillIds ?? [],
       enabledMcpServerIds: configuration.enabledMcpServerIds ?? [],
       modePatternBindings: {
-        debugger: patternIds.has(modePatternBindings.debugger) ? modePatternBindings.debugger : "plan-generate-verify",
+        debugger: patternIds.has(modePatternBindings.debugger) ? modePatternBindings.debugger : "free-agent",
         analyzer: patternIds.has(modePatternBindings.analyzer) ? modePatternBindings.analyzer : "free-agent",
         optimizer: patternIds.has(modePatternBindings.optimizer) ? modePatternBindings.optimizer : "free-agent",
         ...modePatternBindings
@@ -1560,8 +1600,8 @@ ${stagePolicy.systemPrompt}` : ""
       modelId: route?.modelId || "",
       temperature: agentProfile.temperature,
       maxTokens: agentProfile.maxTokens,
-      category: AGENT_CATEGORIES[agentId],
-      writeScope: AGENT_WRITE_SCOPES[agentId],
+      category: isTopLevelAgentId(agentId) ? AGENT_CATEGORIES[agentId] : "general",
+      writeScope: isTopLevelAgentId(agentId) ? AGENT_WRITE_SCOPES[agentId] : [],
       stage,
       phase: stagePolicy.phase || STAGE_PHASES[stage],
       toolAllowlist: Array.from(/* @__PURE__ */ new Set([
@@ -1807,7 +1847,7 @@ const DEFAULT_CONFIGURATION = {
   enabledSkillIds: [],
   enabledMcpServerIds: [],
   modePatternBindings: {
-    debugger: "plan-generate-verify",
+    debugger: "free-agent",
     analyzer: "free-agent",
     optimizer: "free-agent"
   }
@@ -1822,54 +1862,24 @@ const DEFAULT_RDX_CLI_INVOKER = {
   catalogPath: "",
   jsonMode: "auto"
 };
-const DEFAULT_TOOLING = {
-  rdxCli: DEFAULT_RDX_CLI_INVOKER
+const createDefaultRdxAction = () => ({
+  enabled: false,
+  command: "",
+  args: [],
+  workingDirectory: "",
+  env: {},
+  timeoutMs: 6e4
+});
+const DEFAULT_RDX_ACTIONS = {
+  openCapture: createDefaultRdxAction(),
+  connectRemote: createDefaultRdxAction(),
+  closeRuntime: createDefaultRdxAction(),
+  openPreview: createDefaultRdxAction()
 };
-const DEFAULT_PROVIDER_SEEDS = [
-  {
-    id: "deepseek",
-    apiKey: "sk-15c018cd2a76442183e3cc5da3dbbaf9",
-    models: [
-      { id: "deepseek-chat", label: "DeepSeek Chat", enabled: true },
-      { id: "deepseek-reasoner", label: "DeepSeek Reasoner", enabled: true }
-    ]
-  },
-  {
-    id: "openrouter",
-    apiKey: "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",
-    models: [
-      { id: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4", enabled: true },
-      { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", enabled: true }
-    ]
-  },
-  {
-    id: "xai",
-    apiKey: "xai-93ENKTaQFwLRfblG6OHJlOzSDm2uPCryuBidXgs0iuBNQksYVYsJ9eRMUik1Elc9tbdZRl9b5VCSCcPs",
-    models: [
-      { id: "grok-4", label: "Grok 4", enabled: true },
-      { id: "grok-4.3", label: "Grok 4.3", enabled: true }
-    ]
-  },
-  {
-    id: "google-ai-studio",
-    apiKey: "AIzaSyDmcuv1H2TpaBSamaBJti3IkYkTLXZnC9o",
-    models: [
-      { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", enabled: true },
-      { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", enabled: true }
-    ]
-  },
-  {
-    id: "kimi-code",
-    apiKey: "sk-kimi-vz1tEHOOmhDximg0Zer0wZNS5eOcuSOIHq1FTl8YNkHkd2KvGbgWMAwJRxj5VKw8",
-    models: [
-      { id: "kimi-coding", label: "Kimi Coding", enabled: true }
-    ]
-  }
-];
-const DEFAULT_AGENT_ROUTE_SEEDS = [
-  { agentId: "ask_agent", providerId: "deepseek", modelId: "deepseek-chat" },
-  { agentId: "rdc-debugger", providerId: "deepseek", modelId: "deepseek-chat" }
-];
+const DEFAULT_TOOLING = {
+  rdxCli: DEFAULT_RDX_CLI_INVOKER,
+  rdxActions: DEFAULT_RDX_ACTIONS
+};
 function nowIso() {
   return (/* @__PURE__ */ new Date()).toISOString();
 }
@@ -1929,10 +1939,32 @@ function sanitizeRdxCliInvokerSettings(value, fallback = DEFAULT_RDX_CLI_INVOKER
     jsonMode: pickEnum(candidate.jsonMode, ["auto", "always"], fallback.jsonMode)
   };
 }
+function sanitizeRdxShellActionSettings(value, fallback = createDefaultRdxAction()) {
+  const candidate = value && typeof value === "object" ? value : {};
+  const timeoutMs = typeof candidate.timeoutMs === "number" && Number.isFinite(candidate.timeoutMs) ? clamp(Math.trunc(candidate.timeoutMs), 1e3, 6e5) : fallback.timeoutMs;
+  return {
+    enabled: typeof candidate.enabled === "boolean" ? candidate.enabled : fallback.enabled,
+    command: typeof candidate.command === "string" ? candidate.command.trim() : fallback.command,
+    args: sanitizeStringArray(candidate.args ?? fallback.args),
+    workingDirectory: typeof candidate.workingDirectory === "string" ? candidate.workingDirectory.trim() : fallback.workingDirectory,
+    env: sanitizeStringRecord(candidate.env ?? fallback.env),
+    timeoutMs
+  };
+}
+function sanitizeRdxActionsSettings(value) {
+  const candidate = value && typeof value === "object" ? value : {};
+  return {
+    openCapture: sanitizeRdxShellActionSettings(candidate.openCapture, DEFAULT_RDX_ACTIONS.openCapture),
+    connectRemote: sanitizeRdxShellActionSettings(candidate.connectRemote, DEFAULT_RDX_ACTIONS.connectRemote),
+    closeRuntime: sanitizeRdxShellActionSettings(candidate.closeRuntime, DEFAULT_RDX_ACTIONS.closeRuntime),
+    openPreview: sanitizeRdxShellActionSettings(candidate.openPreview, DEFAULT_RDX_ACTIONS.openPreview)
+  };
+}
 function sanitizeToolingSettings(value) {
   const candidate = value && typeof value === "object" ? value : {};
   return {
-    rdxCli: sanitizeRdxCliInvokerSettings(candidate.rdxCli)
+    rdxCli: sanitizeRdxCliInvokerSettings(candidate.rdxCli),
+    rdxActions: sanitizeRdxActionsSettings(candidate.rdxActions)
   };
 }
 function readJsonFile(filePath) {
@@ -2260,55 +2292,6 @@ function normalizeUserRoutes(routes, providers) {
     return isValid ? incoming : route;
   });
 }
-function buildSeededDefaults(workspaceRoot, seedIds = new Set(DEFAULT_PROVIDER_SEEDS.map((seed) => seed.id))) {
-  const providers = [];
-  for (const seed of DEFAULT_PROVIDER_SEEDS) {
-    if (!seedIds.has(seed.id)) {
-      continue;
-    }
-    const fallback = createBuiltinProviderEntry(seed.id);
-    if (fallback.authMode !== "api-key") {
-      continue;
-    }
-    const secretRef = secretStorageService.createProviderSecretRef(seed.id);
-    secretStorageService.setSecret(secretRef, seed.apiKey, workspaceRoot);
-    const sanitized = sanitizeUserProvider({
-      id: seed.id,
-      models: seed.models,
-      status: "verified",
-      isConfigured: true,
-      secretRef
-    }, workspaceRoot);
-    if (sanitized) {
-      providers.push(sanitized);
-    }
-  }
-  return {
-    providers,
-    routes: DEFAULT_AGENT_ROUTE_SEEDS.map((route) => ({ ...route }))
-  };
-}
-function isProviderConfiguredForSeed(provider) {
-  return Boolean(
-    provider && provider.isConfigured && provider.status === "verified" && provider.models.some((model) => model.enabled !== false)
-  );
-}
-function mergeDefaultAgentRoutes(routes, providers) {
-  const routeMap = new Map(routes.map((route) => [route.agentId, route]));
-  let changed = false;
-  for (const seedRoute of DEFAULT_AGENT_ROUTE_SEEDS) {
-    const currentRoute = routeMap.get(seedRoute.agentId);
-    const currentProvider = providers.find((provider) => provider.id === currentRoute?.providerId);
-    const currentRouteValid = Boolean(
-      currentRoute && currentProvider?.isConfigured && currentProvider.models.some((model) => model.id === currentRoute.modelId && model.enabled !== false)
-    );
-    if (!currentRouteValid) {
-      routeMap.set(seedRoute.agentId, { ...seedRoute });
-      changed = true;
-    }
-  }
-  return changed ? routes.map((route) => routeMap.get(route.agentId) ?? route) : routes;
-}
 function parseMigrationSummary(reportPath) {
   if (!reportPath || !fs.existsSync(reportPath)) {
     return [];
@@ -2390,24 +2373,9 @@ class SettingsService {
         fixes.push(`Removed duplicated provider ${sanitized.id}`);
       }
     }
-    const normalizedBeforeSeed = normalizeUserProviders(nextProviders, workspaceRoot);
-    const seedIdsToRepair = new Set(DEFAULT_PROVIDER_SEEDS.filter((seed) => !isProviderConfiguredForSeed(normalizedBeforeSeed.find((existing) => existing.id === seed.id))).map((seed) => seed.id));
-    const providersToSeed = buildSeededDefaults(workspaceRoot, seedIdsToRepair).providers;
-    if (providersToSeed.length > 0) {
-      fixes.push(`Seeded ${providersToSeed.length} default LLM providers`);
-    }
-    const catalogProviders = normalizeUserProviders(
-      [
-        ...nextProviders.filter((existing) => !providersToSeed.some((seeded) => seeded.id === existing.id)),
-        ...providersToSeed
-      ],
-      workspaceRoot
-    );
+    const catalogProviders = normalizeUserProviders(nextProviders, workspaceRoot);
     const normalizedRoutes = normalizeUserRoutes(rawRoutes, catalogProviders);
-    const nextRoutes = mergeDefaultAgentRoutes(normalizedRoutes, catalogProviders);
-    if (JSON.stringify(normalizedRoutes) !== JSON.stringify(nextRoutes)) {
-      fixes.push("Seeded default agent routes");
-    }
+    const nextRoutes = normalizedRoutes;
     const incomingRoutes = Array.isArray(rawRoutes) ? rawRoutes.map((entry) => {
       if (entry && typeof entry === "object") {
         const providerId = entry.providerId;
@@ -2641,7 +2609,7 @@ class SettingsService {
     } else if (typeof patch.agents?.globalInstructions === "string") {
       agentManifestService.save(nextPaths, [], patch.agents.globalInstructions);
     }
-    const manifestRoutes = patch.agents?.definitions ? agentManifestService.routesFromDefinitions(currentRoutes, patch.agents.definitions) : currentRoutes;
+    const manifestRoutes = patch.agents?.definitions ? agentManifestService.routesFromDefinitions(currentRoutes, patch.agents.definitions, nextProviders) : currentRoutes;
     const nextPersisted = {
       appearance: {
         theme: pickEnum(
@@ -2696,6 +2664,10 @@ class SettingsService {
         rdxCli: sanitizeRdxCliInvokerSettings({
           ...currentPersisted.tooling?.rdxCli ?? DEFAULT_RDX_CLI_INVOKER,
           ...patch.tooling?.rdxCli ?? {}
+        }),
+        rdxActions: sanitizeRdxActionsSettings({
+          ...currentPersisted.tooling?.rdxActions ?? DEFAULT_RDX_ACTIONS,
+          ...patch.tooling?.rdxActions ?? {}
         })
       },
       llm: {
@@ -2954,325 +2926,108 @@ class ShellInvocationService {
   }
 }
 const shellInvocationService = new ShellInvocationService();
-const EMPTY_NAMESPACES = {
-  capture: { description: "", groups: [] },
-  session: { description: "", groups: [] },
-  event: { description: "", groups: [] },
-  replay: { description: "", groups: [] },
-  pipeline: { description: "", groups: [] },
-  shader: { description: "", groups: [] },
-  texture: { description: "", groups: [] },
-  resource: { description: "", groups: [] },
-  export: { description: "", groups: [] },
-  remote: { description: "", groups: [] },
-  core: { description: "", groups: [] },
-  macro: { description: "", groups: [] },
-  vfs: { description: "", groups: [] }
+const substitute = (value, variables) => value.replace(/\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g, (_match, key) => {
+  const replacement = variables[key];
+  return replacement == null ? "" : String(replacement);
+});
+const parseJsonPayload = (stdout) => {
+  const trimmed = stdout.trim();
+  if (!trimmed) {
+    return {};
+  }
+  const parsed = JSON.parse(trimmed);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("RDX action stdout must be a JSON object.");
+  }
+  return parsed;
 };
-const EMPTY_CATALOG = {
-  schema_version: "unconfigured",
-  tool_count: 0,
-  tools: [],
-  namespaces: EMPTY_NAMESPACES
-};
-const RECOMMENDED_SPECIALISTS = [
-  "triage_agent",
-  "capture_repro_agent",
-  "pass_graph_pipeline_agent",
-  "pixel_forensics_agent",
-  "shader_ir_agent",
-  "skeptic_agent",
-  "curator_agent"
-];
-class RdxCliInvokerService {
-  constructor(shell = shellInvocationService) {
-    this.shell = shell;
-  }
-  shell;
-  catalog = null;
-  catalogPath = null;
-  traceListeners = /* @__PURE__ */ new Set();
-  getSettings() {
-    return settingsService.getAll().tooling.rdxCli;
-  }
-  createRuntimeMetadata(settings = this.getSettings(), catalog) {
-    const catalogPath = settings.catalogPath.trim();
-    return {
-      source: settings.enabled && settings.command.trim() ? "configured" : "unconfigured",
-      command: settings.command.trim(),
-      workingDirectory: settings.workingDirectory.trim(),
-      version: null,
-      catalog: {
-        path: catalogPath,
-        exists: catalogPath ? fs.existsSync(catalogPath) : false,
-        schemaVersion: catalog?.schema_version ?? null,
-        generatedAt: catalog?.generated_at ?? null,
-        toolCount: catalog?.tool_count ?? (Array.isArray(catalog?.tools) ? catalog.tools.length : null)
-      }
-    };
-  }
-  getAvailabilityFailure(settings = this.getSettings()) {
-    if (!settings.enabled) {
-      return "RDX CLI invoker is disabled. Configure it in Settings.";
-    }
-    if (!settings.command.trim()) {
-      return "RDX CLI command is not configured.";
-    }
-    const command = settings.command.trim();
-    if ((path.isAbsolute(command) || command.includes(path.sep) || command.includes("/")) && !fs.existsSync(command)) {
-      return `RDX CLI command not found: ${command}`;
-    }
-    return void 0;
-  }
-  isAvailable() {
-    return this.getAvailabilityFailure() === void 0;
-  }
-  getRuntimeMetadata() {
-    return this.createRuntimeMetadata(this.getSettings(), this.catalog ?? void 0);
-  }
-  async loadCatalog() {
-    const settings = this.getSettings();
-    const catalogPath = settings.catalogPath.trim();
-    if (!catalogPath) {
-      this.catalog = { ...EMPTY_CATALOG, runtime: this.createRuntimeMetadata(settings) };
-      this.catalogPath = null;
-      return this.catalog;
-    }
-    if (this.catalog && this.catalogPath === catalogPath) {
-      return this.catalog;
-    }
-    if (!fs.existsSync(catalogPath)) {
-      this.catalog = { ...EMPTY_CATALOG, runtime: this.createRuntimeMetadata(settings) };
-      this.catalogPath = catalogPath;
-      return this.catalog;
-    }
-    const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf-8"));
-    this.catalog = {
-      ...catalog,
-      runtime: this.createRuntimeMetadata(settings, catalog)
-    };
-    this.catalogPath = catalogPath;
-    return this.catalog;
-  }
-  async getRuntimeSummary() {
-    const settings = this.getSettings();
-    const catalog = await this.loadCatalog();
-    const namespaceCounts = /* @__PURE__ */ new Map();
-    for (const tool of catalog.tools ?? []) {
-      namespaceCounts.set(tool.namespace, (namespaceCounts.get(tool.namespace) ?? 0) + 1);
-    }
-    const unavailableReason = this.getAvailabilityFailure(settings);
-    const namespaces = Array.from(namespaceCounts.entries()).map(([namespace, toolCount]) => ({
-      namespace: `rd.${namespace}.*`,
-      toolCount,
-      available: !unavailableReason
-    }));
-    return {
-      runtime: this.createRuntimeMetadata(settings, catalog),
-      cli: {
-        available: !unavailableReason,
-        unavailableReason
-      },
-      namespaces,
-      recommendedSpecialists: RECOMMENDED_SPECIALISTS
-    };
-  }
-  normalizeCliArgs(args) {
-    const normalized = [];
-    for (let index = 0; index < args.length; index += 1) {
-      const current = args[index];
-      normalized.push(current === "--context-id" ? "--daemon-context" : current);
-    }
-    return normalized;
-  }
-  buildCommandArgs(settings, command, args) {
-    const normalized = this.normalizeCliArgs(args);
-    const globalArgs = [];
-    const commandArgs = [];
-    for (let index = 0; index < normalized.length; index += 1) {
-      const current = normalized[index];
-      if (current === "--daemon-context") {
-        const value = normalized[index + 1];
-        if (value) {
-          globalArgs.push(current, value);
-          index += 1;
-          continue;
-        }
-      }
-      commandArgs.push(current);
-    }
-    return [
-      ...settings.argsPrefix,
-      ...globalArgs,
-      command,
-      ...commandArgs
-    ];
-  }
-  async executeCLI(command, args = [], options = {}) {
-    const startTime = nowMs();
-    const settings = this.getSettings();
-    const unavailableReason = this.getAvailabilityFailure(settings);
-    if (unavailableReason) {
+class RdxShellActionService {
+  async runAction(actionId, variables = {}, options = {}) {
+    const action = settingsService.getAll().tooling.rdxActions[actionId];
+    if (!isActionConfigured(action)) {
+      const message = `RDX action "${actionId}" is not configured.`;
+      runtimeLogService.log({
+        scope: "app",
+        namespace: "context",
+        severity: "error",
+        title: "RDX action unavailable",
+        summary: message,
+        raw: { actionId }
+      });
       return {
-        exitCode: 2,
+        ok: false,
+        actionId,
+        data: {},
         stdout: "",
-        stderr: unavailableReason,
-        duration_ms: nowMs() - startTime
+        stderr: message,
+        exitCode: 2,
+        error: message
       };
     }
-    return this.shell.invoke({
-      command: settings.command,
-      args: this.buildCommandArgs(settings, command, args),
-      cwd: options.cwd || settings.workingDirectory || void 0,
-      env: {
-        ...settings.env,
+    const paths = appPathService.getWorkspacePaths();
+    const resolvedVariables = {
+      workspaceRoot: paths.workspaceRoot,
+      logsPath: paths.logsPath,
+      projectsPath: paths.projectsPath,
+      knowledgePath: paths.knowledgePath,
+      ...variables
+    };
+    const args = action.args.map((arg) => substitute(arg, resolvedVariables));
+    const env = Object.fromEntries(
+      Object.entries({
+        ...action.env,
         ...options.env
-      },
-      timeoutMs: options.timeout ?? settings.timeoutMs,
-      runId: options.runId,
+      }).map(([key, value]) => [key, substitute(value, resolvedVariables)])
+    );
+    const result = await shellInvocationService.invoke({
+      command: substitute(action.command, resolvedVariables),
+      args,
+      cwd: action.workingDirectory ? substitute(action.workingDirectory, resolvedVariables) : void 0,
+      env,
+      timeoutMs: action.timeoutMs,
       abortSignal: options.abortSignal
     });
-  }
-  onInvocationTrace(listener) {
-    this.traceListeners.add(listener);
-    return () => {
-      this.traceListeners.delete(listener);
-    };
-  }
-  emitInvocationTrace(request, result) {
-    const trace = {
-      traceId: result.trace_id || generateEventId("tool-trace"),
-      turnId: request.turnId,
-      toolName: request.toolName,
-      args: request.args,
-      result,
-      timestamp: nowMs(),
-      contextId: request.contextId ?? "",
-      runtimeOwner: request.runtimeOwner ?? "",
-      ownerLeaseId: request.ownerLeaseId
-    };
-    for (const listener of this.traceListeners) {
-      listener(trace);
+    let data = {};
+    let parseError;
+    if (result.exitCode === 0) {
+      try {
+        data = parseJsonPayload(result.stdout);
+      } catch (error2) {
+        parseError = error2 instanceof Error ? error2.message : String(error2);
+      }
     }
-  }
-  async call(request) {
-    const startTime = nowMs();
-    let response;
-    try {
-      const cliArgs = [request.toolName];
-      const effectiveArgs = {
-        ...request.args || {}
-      };
-      if (request.contextId && effectiveArgs["context_id"] === void 0) {
-        effectiveArgs["context_id"] = request.contextId;
+    const ok = result.exitCode === 0 && !parseError;
+    const error = ok ? void 0 : parseError ?? (result.stderr.trim() || result.stdout.trim() || `RDX action "${actionId}" exited with ${result.exitCode}.`);
+    runtimeLogService.log({
+      scope: "app",
+      namespace: "context",
+      severity: ok ? "success" : "error",
+      title: ok ? `RDX action ${actionId}` : `RDX action ${actionId} failed`,
+      summary: ok ? "Action completed." : error ?? "Action failed.",
+      raw: {
+        actionId,
+        command: action.command,
+        args,
+        exitCode: result.exitCode,
+        stdout: result.stdout,
+        stderr: result.stderr
       }
-      if (request.runtimeOwner && effectiveArgs["runtime_owner"] === void 0) {
-        effectiveArgs["runtime_owner"] = request.runtimeOwner;
-      }
-      if (request.ownerLeaseId && effectiveArgs["owner_lease_id"] === void 0) {
-        effectiveArgs["owner_lease_id"] = request.ownerLeaseId;
-      }
-      if (Object.keys(effectiveArgs).length > 0) {
-        cliArgs.push("--args-json", JSON.stringify(effectiveArgs));
-      }
-      if (request.contextId) {
-        cliArgs.push("--daemon-context", request.contextId);
-      }
-      const result = await this.executeCLI("call", cliArgs, {
-        timeout: this.getSettings().timeoutMs,
-        runId: request.runId,
-        abortSignal: request.abortSignal
-      });
-      if (result.stdout.trim()) {
-        let parsed = null;
-        try {
-          parsed = JSON.parse(result.stdout);
-        } catch {
-          if (result.exitCode === 0) {
-            response = {
-              ok: true,
-              data: { raw: result.stdout },
-              duration_ms: nowMs() - startTime,
-              trace_id: generateEventId("tool")
-            };
-            this.emitInvocationTrace(request, response);
-            return response;
-          }
-        }
-        if (parsed) {
-          if (parsed.ok === false) {
-            const errObj = parsed.error ?? {};
-            response = {
-              ok: false,
-              data: null,
-              artifacts: [],
-              error: {
-                code: errObj.code ?? "TOOL_ERROR",
-                message: errObj.message ?? "RDX CLI returned ok:false",
-                category: errObj.category ?? "execution",
-                details: errObj.details ?? void 0
-              },
-              duration_ms: nowMs() - startTime,
-              trace_id: generateEventId("tool")
-            };
-            this.emitInvocationTrace(request, response);
-            return response;
-          }
-          response = {
-            ok: true,
-            data: parsed.data ?? parsed,
-            artifacts: parsed.artifacts,
-            duration_ms: nowMs() - startTime,
-            trace_id: generateEventId("tool")
-          };
-          this.emitInvocationTrace(request, response);
-          return response;
-        }
-      }
-      response = {
-        ok: false,
-        data: null,
-        artifacts: [],
-        error: {
-          code: "CLI_ERROR",
-          message: result.stderr.trim() || `Exit code: ${result.exitCode}`,
-          category: "execution",
-          details: {
-            stdout: result.stdout,
-            stderr: result.stderr,
-            exitCode: result.exitCode
-          }
-        },
-        duration_ms: nowMs() - startTime,
-        trace_id: generateEventId("tool")
-      };
-      this.emitInvocationTrace(request, response);
-      return response;
-    } catch (error) {
-      response = {
-        ok: false,
-        data: null,
-        artifacts: [],
-        error: {
-          code: "EXECUTION_ERROR",
-          message: error instanceof Error ? error.message : String(error),
-          category: "internal"
-        },
-        duration_ms: nowMs() - startTime,
-        trace_id: generateEventId("tool")
-      };
-      this.emitInvocationTrace(request, response);
-      return response;
-    }
-  }
-  abortRun(runId) {
-    this.shell.abortRun(runId);
-  }
-  terminateAll() {
-    this.shell.terminateAll();
+    });
+    return {
+      ok,
+      actionId,
+      data,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      exitCode: result.exitCode,
+      error
+    };
   }
 }
-const rdxCliInvokerService = new RdxCliInvokerService();
+function isActionConfigured(action) {
+  return Boolean(action?.enabled && action.command.trim());
+}
+const rdxShellActionService = new RdxShellActionService();
 function readJsonl(filePath) {
   try {
     if (!fs__namespace.existsSync(filePath)) {
@@ -3705,20 +3460,15 @@ class StorageAdapter {
         source_path: capture.filePath
       }))
     });
-    writeYaml(path__namespace.join(runPath, "notes", "debug_plan.yaml"), {
-      debug_plan: null,
-      pending_questions: null,
-      approval_state: "not_requested"
-    });
     writeYaml(path__namespace.join(runPath, "notes", "hypothesis_board.yaml"), {
       hypothesis_board: {
         session_id: sessionId,
-        entry_skill: "rdc-debugger",
+        entry_skill: "debugger",
         user_goal: persistedRun.goal,
         intake_state: "handoff_ready",
         current_phase: "intake",
         current_task: "",
-        active_owner: "rdc-debugger",
+        active_owner: "debugger",
         pending_requirements: [],
         blocking_issues: [],
         progress_summary: ["accepted intake complete"],
@@ -3814,9 +3564,6 @@ class StorageAdapter {
     }
     return path__namespace.join(location.sessionPath, "session_evidence.yaml");
   }
-  getDebugPlanPath(sessionId, runId) {
-    return path__namespace.join(this.getRunPath(sessionId, runId), "notes", "debug_plan.yaml");
-  }
   readConversationHistory(sessionId) {
     const snapshots = readJsonl(this.getConversationPath(sessionId));
     const latestById = /* @__PURE__ */ new Map();
@@ -3872,33 +3619,6 @@ class StorageAdapter {
   }
   readSessionEvidence(sessionId) {
     return readYaml(this.getSessionEvidencePath(sessionId));
-  }
-  readDebugPlan(sessionId, runId) {
-    const payload = readYaml(this.getDebugPlanPath(sessionId, runId));
-    return payload?.debug_plan ?? null;
-  }
-  writeDebugPlan(sessionId, runId, debugPlan) {
-    const existing = this.readPlanSnapshot(sessionId, runId);
-    writeYaml(this.getDebugPlanPath(sessionId, runId), {
-      debug_plan: debugPlan,
-      pending_questions: existing?.pending_questions ?? null,
-      approval_state: existing?.approval_state ?? "not_requested",
-      intake_context: existing?.intake_context
-    });
-    const session = this.readSession(sessionId);
-    if (session) {
-      this.syncSessionEvidence(sessionId, session.projectId);
-    }
-  }
-  readPlanSnapshot(sessionId, runId) {
-    return readYaml(this.getDebugPlanPath(sessionId, runId));
-  }
-  writePlanSnapshot(sessionId, runId, snapshot) {
-    writeYaml(this.getDebugPlanPath(sessionId, runId), snapshot);
-    const session = this.readSession(sessionId);
-    if (session) {
-      this.syncSessionEvidence(sessionId, session.projectId);
-    }
   }
   async appendActionEvent(sessionId, event) {
     appendJsonl(this.getActionChainPath(sessionId), event);
@@ -4003,7 +3723,6 @@ class StorageAdapter {
       acc[event.event_type] = (acc[event.event_type] || 0) + 1;
       return acc;
     }, {});
-    const debugPlan = latestRun ? this.readDebugPlan(sessionId, latestRun.runId) : null;
     const activeBlockers = actionEvents.filter((event) => event.event_type === "blocker").map((event) => ({
       code: String(event.payload.code || "BLOCKER"),
       reason: String(event.payload.reason || event.payload.message || "Blocker"),
@@ -4013,7 +3732,7 @@ class StorageAdapter {
     const verificationSummary = actionEvents.filter((event) => event.event_type === "verification").slice(-5).map((event) => String(event.payload.summary || event.payload.verdict || event.payload.verification_kind || "verification"));
     const reasoningSummaries = actionEvents.filter((event) => event.event_type === "agent_summary").slice(-10).map((event, index) => ({
       summaryId: `summary-${index}-${event.event_id}`,
-      stage: normalizeWorkflowStage(String(event.payload.stage || latestRun?.lastStage || "plan")),
+      stage: normalizeWorkflowStage(String(event.payload.stage || latestRun?.lastStage || "investigate")),
       agentId: String(event.agent_id),
       summary: String(event.payload.summary || event.payload.content || ""),
       evidence: Array.isArray(event.payload.evidence) ? event.payload.evidence.map(String) : [],
@@ -4029,14 +3748,6 @@ class StorageAdapter {
       latest_run_status: latestRun?.status || null,
       latest_stage: latestRun?.lastStage || null,
       updated_at: nowIso$1(),
-      debug_plan: debugPlan ? {
-        plan_id: debugPlan.planId,
-        readiness: debugPlan.planReadiness,
-        strict_ready: debugPlan.strictReady,
-        target_capture: debugPlan.targetCapture?.fileName || null,
-        target_scope: debugPlan.targetFrameOrEvent?.scope || null,
-        deliverables: debugPlan.expectedDeliverables
-      } : null,
       event_counts: eventCounts,
       active_blockers: activeBlockers,
       verification_summary: verificationSummary,
@@ -4520,95 +4231,6 @@ class StorageAdapter {
   }
 }
 const storageAdapter = new StorageAdapter();
-const clients = /* @__PURE__ */ new Set();
-function writeEvent(response, payload) {
-  response.write(`data: ${JSON.stringify(payload)}
-
-`);
-}
-const rendererEventHub = {
-  emit(channel, ...args) {
-    const payload = { channel, args };
-    for (const client of clients) {
-      writeEvent(client, payload);
-    }
-  },
-  connect(response) {
-    response.writeHead(200, {
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Private-Network": "true",
-      "Cache-Control": "no-store",
-      "Content-Type": "text/event-stream; charset=utf-8",
-      "Connection": "keep-alive"
-    });
-    response.write("retry: 1000\n\n");
-    clients.add(response);
-    const heartbeat = setInterval(() => {
-      response.write(":\n\n");
-    }, 15e3);
-    const disconnect = () => {
-      clearInterval(heartbeat);
-      clients.delete(response);
-    };
-    response.on("close", disconnect);
-    return disconnect;
-  }
-};
-const APP_LOG_LIMIT = 1e3;
-const SESSION_LOG_LIMIT = 500;
-class RuntimeLogService {
-  appEntries = [];
-  sessionEntries = /* @__PURE__ */ new Map();
-  log(input) {
-    const entry = {
-      id: generateEventId("rlog"),
-      timestamp: input.timestamp ?? nowMs(),
-      scope: input.scope,
-      namespace: input.namespace,
-      severity: input.severity ?? "info",
-      title: input.title,
-      summary: input.summary,
-      detail: input.detail,
-      sessionId: input.sessionId ?? null,
-      projectId: input.projectId ?? null,
-      runId: input.runId ?? null,
-      raw: input.raw ?? null
-    };
-    this.pushWithLimit(this.appEntries, entry, APP_LOG_LIMIT);
-    if (entry.sessionId) {
-      const bucket = this.sessionEntries.get(entry.sessionId) ?? [];
-      this.pushWithLimit(bucket, entry, SESSION_LOG_LIMIT);
-      this.sessionEntries.set(entry.sessionId, bucket);
-    }
-    this.broadcast(entry);
-    return entry;
-  }
-  list(scope, sessionId) {
-    if (scope === "session") {
-      if (!sessionId) {
-        return [];
-      }
-      return [...this.sessionEntries.get(sessionId) ?? []];
-    }
-    return [...this.appEntries];
-  }
-  pushWithLimit(target, entry, limit) {
-    target.push(entry);
-    if (target.length > limit) {
-      target.splice(0, target.length - limit);
-    }
-  }
-  broadcast(entry) {
-    rendererEventHub.emit("runtime:logAppended", entry);
-    const windows = electron.BrowserWindow.getAllWindows();
-    for (const win of windows) {
-      if (!win.isDestroyed()) {
-        win.webContents.send("runtime:logAppended", entry);
-      }
-    }
-  }
-}
-const runtimeLogService = new RuntimeLogService();
 const POLL_INTERVAL_MS = 5e3;
 const ACTIVATE_TIMEOUT_MS = 9e4;
 const PREPARED_REMOTE_TTL_MS = 10 * 60 * 1e3;
@@ -4787,12 +4409,6 @@ function buildRemoteReadyText(bootstrap) {
   const suffix = buildBootstrapDetailText(bootstrap);
   return suffix.length > 0 ? `${prefix} 路 ${suffix.join(" 路 ")}` : prefix;
 }
-function parseToolError(result, fallbackMessage) {
-  return {
-    message: result.error?.message ?? fallbackMessage,
-    code: result.error?.code
-  };
-}
 function applyActivationFailure(device, phase, message, code) {
   return {
     ...device,
@@ -4857,6 +4473,26 @@ function parseAdbDeviceLine(line) {
     lastError,
     lastSeen: Date.now()
   };
+}
+function readActionString(source, keys) {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return void 0;
+}
+function parseRemoteBootstrap(data) {
+  const direct = parseAndroidBootstrapMetadata(data.bootstrap);
+  if (direct) {
+    return direct;
+  }
+  const detail = data.detail;
+  if (!detail || typeof detail !== "object") {
+    return void 0;
+  }
+  return parseAndroidBootstrapMetadata(detail.bootstrap);
 }
 class ReplayDeviceService {
   devices = /* @__PURE__ */ new Map([[LOCAL_DEVICE.id, LOCAL_DEVICE]]);
@@ -5109,7 +4745,7 @@ class ReplayDeviceService {
       status: "loading",
       detailText: "Connecting to Android RenderDoc...",
       lastError: void 0,
-      activationPhase: "daemon",
+      activationPhase: "connect",
       activationErrorCode: void 0,
       activationErrorMessage: void 0,
       activationUpdatedAt: Date.now()
@@ -5142,51 +4778,6 @@ class ReplayDeviceService {
     if (!device?.serial) {
       throw new Error("Android device serial is missing.");
     }
-    await this.ensureDaemonReady();
-    this.updateDevice({
-      ...device,
-      status: "loading",
-      detailText: "Allocating remote context...",
-      lastError: void 0,
-      activationPhase: "context",
-      activationUpdatedAt: Date.now()
-    });
-    let contextId = `ctx-device-${sanitizeDeviceId(device.serial)}-${generateShortId()}`;
-    const contextResult = await rdxCliInvokerService.call({
-      toolName: "rd.session.create_context",
-      args: { context_id: contextId }
-    });
-    if (!contextResult.ok) {
-      if (contextResult.error?.message?.includes("Context limit exceeded")) {
-        const reusableContextId = await this.resolveReusableContextId();
-        if (reusableContextId) {
-          contextId = reusableContextId;
-        } else {
-          const parsedError = parseToolError(contextResult, "Failed to create a replay device context.");
-          throw new Error(parsedError.message);
-        }
-      } else {
-        const parsedError = parseToolError(contextResult, "Failed to create a replay device context.");
-        throw new Error(parsedError.message);
-      }
-    }
-    this.updateDevice({
-      ...device,
-      status: "loading",
-      detailText: "Initializing remote capability...",
-      lastError: void 0,
-      activationPhase: "init",
-      activationUpdatedAt: Date.now()
-    });
-    const initResult = await rdxCliInvokerService.call({
-      toolName: "rd.core.init",
-      args: {},
-      contextId
-    });
-    if (!initResult.ok) {
-      const parsedError = parseToolError(initResult, "Failed to initialize remote capability.");
-      throw new Error(parsedError.message);
-    }
     this.updateDevice({
       ...device,
       status: "loading",
@@ -5195,70 +4786,25 @@ class ReplayDeviceService {
       activationPhase: "connect",
       activationUpdatedAt: Date.now()
     });
-    const connectResult = await rdxCliInvokerService.call({
-      toolName: "rd.remote.connect",
-      args: {
-        timeout_ms: 5e3,
-        options: {
-          transport: "adb_android",
-          device_serial: device.serial
-        }
-      },
-      contextId
+    const result = await rdxShellActionService.runAction("connectRemote", {
+      deviceId: device.id,
+      deviceLabel: device.label,
+      deviceType: device.type,
+      deviceSerial: device.serial,
+      transport: device.transport
     });
-    if (!connectResult.ok) {
-      const parsedError = parseToolError(connectResult, "Failed to connect to the Android RenderDoc server.");
-      throw new Error(parsedError.message);
+    if (!result.ok) {
+      throw new Error(result.error ?? "RDX connectRemote action failed.");
     }
-    const remoteId = typeof connectResult.data?.remote_id === "string" ? connectResult.data.remote_id : void 0;
+    const contextId = readActionString(result.data, ["contextId", "context_id", "RDX_CONTEXT_ID"]);
+    const remoteId = readActionString(result.data, ["remoteId", "remote_id", "RDX_REMOTE_ID"]);
+    if (!contextId) {
+      throw new Error("RDX connectRemote action result must include contextId/context_id.");
+    }
     if (!remoteId) {
-      throw new Error("Remote connect did not return a remote_id.");
+      throw new Error("RDX connectRemote action result must include remoteId/remote_id.");
     }
-    const bootstrap = parseAndroidBootstrapMetadata(
-      connectResult.data?.detail && typeof connectResult.data.detail === "object" ? connectResult.data.detail.bootstrap : void 0
-    );
-    this.updateDevice({
-      ...device,
-      status: "connected",
-      remoteId,
-      bootstrap,
-      detailText: buildRemoteReadyText(bootstrap),
-      lastError: void 0,
-      activationPhase: "ping",
-      activationErrorCode: void 0,
-      activationErrorMessage: void 0,
-      activationUpdatedAt: Date.now(),
-      lastSeen: Date.now()
-    });
-    const pingResult = await rdxCliInvokerService.call({
-      toolName: "rd.remote.ping",
-      args: { remote_id: remoteId },
-      contextId
-    });
-    if (!pingResult.ok) {
-      const parsedError = parseToolError(pingResult, "Remote server ping failed.");
-      throw new Error(parsedError.message);
-    }
-    this.updateDevice({
-      ...device,
-      status: "connected",
-      remoteId,
-      bootstrap,
-      detailText: buildRemoteReadyText(bootstrap),
-      lastError: void 0,
-      activationPhase: "targets",
-      activationUpdatedAt: Date.now(),
-      lastSeen: Date.now()
-    });
-    const targetsResult = await rdxCliInvokerService.call({
-      toolName: "rd.remote.list_targets",
-      args: { remote_id: remoteId },
-      contextId
-    });
-    if (!targetsResult.ok) {
-      const parsedError = parseToolError(targetsResult, "Remote target discovery failed.");
-      throw new Error(parsedError.message);
-    }
+    const bootstrap = parseRemoteBootstrap(result.data);
     const validatedAt = Date.now();
     this.preparedRemotes.set(deviceId, {
       deviceId,
@@ -5285,36 +4831,6 @@ class ReplayDeviceService {
       activationUpdatedAt: validatedAt,
       lastSeen: Date.now()
     };
-  }
-  async ensureDaemonReady() {
-    const statusResult = await rdxCliInvokerService.executeCLI("daemon", ["status"]);
-    if (statusResult.exitCode === 0) {
-      try {
-        const parsed = JSON.parse(statusResult.stdout);
-        if (parsed.data?.running === true) {
-          return;
-        }
-      } catch {
-        return;
-      }
-    }
-    const startResult = await rdxCliInvokerService.executeCLI("daemon", ["start"]);
-    if (startResult.exitCode !== 0) {
-      const stderr = startResult.stderr.trim();
-      throw new Error(stderr || "Failed to start the rdx daemon.");
-    }
-  }
-  async resolveReusableContextId() {
-    const daemonResult = await rdxCliInvokerService.executeCLI("daemon", ["start"]);
-    if (daemonResult.exitCode !== 0 || !daemonResult.stdout.trim()) {
-      return null;
-    }
-    try {
-      const parsed = JSON.parse(daemonResult.stdout);
-      return parsed.data?.state?.context_id ?? null;
-    } catch {
-      return null;
-    }
   }
   async runAdbCommand(args) {
     const adbPath = resolveAdbExecutable();
@@ -8748,6 +8264,13 @@ function toolResultToSharedResult(result, durationMs) {
     trace_id: result.toolCallId
   };
 }
+let currentRuntimeContext = null;
+function setRdxRuntimeContext(runtimeContext) {
+  currentRuntimeContext = runtimeContext ? { ...runtimeContext, raw: { ...runtimeContext.raw } } : null;
+}
+function getRdxRuntimeContext() {
+  return currentRuntimeContext ? { ...currentRuntimeContext, raw: { ...currentRuntimeContext.raw } } : null;
+}
 const REQUEST_TIMEOUT_MS$1 = 2e4;
 const CHATGPT_CALLBACK_PORT = 1455;
 const CHATGPT_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
@@ -9540,65 +9063,68 @@ const ASK_READONLY_TOOL_ALLOWLIST = [
   "web_fetch",
   "web_search"
 ];
-const TOOL_ALIASES = {
-  "primitive.read": "read_file",
-  "primitive.glob": "glob",
-  "primitive.grep": "grep",
-  "primitive.webFetch": "web_fetch",
-  "primitive.webSearch": "web_search",
-  "primitive.task.list": "task_list",
-  "task.list": "task_list",
-  "fs.read": "read_file",
-  "fs.glob": "glob",
-  "fs.grep": "grep"
+const CANONICAL_TOOL_EXPANSIONS = {
+  read: ["read_file"],
+  search: ["glob", "grep"],
+  web: ["web_fetch", "web_search"],
+  bash: ["bash"],
+  askUser: ["ask_user"],
+  agent: ["agent_handoff"],
+  todo: ["task_list"],
+  memory: ["memory_read"],
+  rdxContext: ["rdx_context"]
+};
+const RUNTIME_TOOL_ALIASES = {
+  read_file: "read_file",
+  glob: "glob",
+  grep: "grep",
+  web_fetch: "web_fetch",
+  web_search: "web_search",
+  bash: "bash",
+  task_list: "task_list",
+  ask_user: "ask_user",
+  agent_handoff: "agent_handoff",
+  memory_read: "memory_read",
+  rdx_context: "rdx_context"
 };
 const ASK_DENIED_TOOL_PREFIXES = ["rd.", "mcp."];
 const ASK_DENIED_TOOLS = /* @__PURE__ */ new Set([
   "bash",
-  "primitive.bash",
   "write",
   "write_file",
-  "primitive.write",
   "edit",
   "edit_file",
-  "primitive.edit",
   "remove",
   "delete",
   "task_create",
-  "task_update"
+  "task_update",
+  "rdx_context"
 ]);
-const DEBUG_AGENT_SHELL_TOOL_ALLOWLIST = [
+const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
   ...ASK_READONLY_TOOL_ALLOWLIST,
-  "bash"
+  "bash",
+  "ask_user",
+  "agent_handoff",
+  "task_list",
+  "memory_read",
+  "rdx_context"
 ];
-const SPECIALIST_TOOL_BINDINGS = {
-  ask_agent: ASK_READONLY_TOOL_ALLOWLIST,
-  triage_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
-  capture_repro_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
-  pass_graph_pipeline_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
-  pixel_forensics_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
-  shader_ir_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
-  driver_device_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
-  skeptic_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
-  curator_agent: DEBUG_AGENT_SHELL_TOOL_ALLOWLIST,
-  "rdc-debugger": DEBUG_AGENT_SHELL_TOOL_ALLOWLIST
-};
 const SHADER_EDIT_TOOLS = ["rd.shader.edit_and_replace", "rd.macro.shader_hotfix_validate"];
 function resolveAgentToolAllowlist(agentId, stage) {
   const settings = settingsService.getAll();
   const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, stage || "investigate", agentId);
-  if (runtimeProfile.toolAllowlist?.length) {
-    const normalizedProfileTools = runtimeProfile.toolAllowlist.map(normalizeToolName);
-    return agentId === "ask_agent" ? Array.from(new Set(normalizedProfileTools)) : Array.from(/* @__PURE__ */ new Set([...normalizedProfileTools.filter((toolName) => !toolName.startsWith("rd.")), "bash"]));
+  const profileTools = runtimeProfile.toolAllowlist?.length ? runtimeProfile.toolAllowlist.flatMap(expandCanonicalToolToken) : agentId === "ask" ? ASK_READONLY_TOOL_ALLOWLIST : EXECUTABLE_AGENT_TOOL_ALLOWLIST;
+  if (agentId === "ask") {
+    return Array.from(new Set(profileTools.filter((toolName) => !isDeniedAskTool(toolName, normalizeToolName(toolName)))));
   }
-  return SPECIALIST_TOOL_BINDINGS[agentId] ?? [];
+  return Array.from(new Set(profileTools));
 }
 function isToolAllowedForAgent(toolName, agentId, stage) {
   const normalizedToolName = normalizeToolName(toolName);
   if (SHADER_EDIT_TOOLS.includes(normalizedToolName)) {
     return false;
   }
-  if (agentId === "ask_agent" && isDeniedAskTool(toolName, normalizedToolName)) {
+  if (agentId === "ask" && isDeniedAskTool(toolName, normalizedToolName)) {
     return false;
   }
   const allowlist = resolveAgentToolAllowlist(agentId, stage);
@@ -9614,7 +9140,10 @@ function isToolAllowedForAgent(toolName, agentId, stage) {
   return false;
 }
 function normalizeToolName(toolName) {
-  return TOOL_ALIASES[toolName] ?? toolName;
+  return RUNTIME_TOOL_ALIASES[toolName] ?? toolName;
+}
+function expandCanonicalToolToken(toolName) {
+  return CANONICAL_TOOL_EXPANSIONS[toolName] ?? [normalizeToolName(toolName)];
 }
 function isDeniedAskTool(originalToolName, normalizedToolName) {
   if (ASK_DENIED_TOOLS.has(originalToolName) || ASK_DENIED_TOOLS.has(normalizedToolName)) {
@@ -9653,19 +9182,10 @@ class AgentOrchestrator {
     }
   }
   getAgentCategory(role) {
-    if (role === "ask_agent" || role === "rdc-debugger") return "orchestrator";
-    if (INVESTIGATOR_AGENTS.includes(role)) return "investigator";
-    if (VERIFIER_AGENTS.includes(role)) return "verifier";
-    if (REPORTER_AGENTS.includes(role)) return "reporter";
-    return "investigator";
+    return role === "ask" ? "orchestrator" : "general";
   }
   getAgentWriteScopes(role) {
-    if (role === "ask_agent") return [];
-    if (role === "rdc-debugger") return ["workspace_control"];
-    if (INVESTIGATOR_AGENTS.includes(role)) return ["workspace_notes"];
-    if (role === "skeptic_agent") return ["session_signoff"];
-    if (role === "curator_agent") return ["workspace_reports", "session_artifacts", "knowledge_library"];
-    return [];
+    return role === "ask" ? [] : ["workspace_notes", "workspace_control"];
   }
   getAgentState(agentId) {
     return this.agentStates.get(agentId) || null;
@@ -9685,7 +9205,8 @@ class AgentOrchestrator {
   applyLlmConfig(config) {
     const routeMap = new Map(config.agentRoutes.map((route) => [route.agentId, route]));
     for (const [agentId, agentConfig] of this.agentConfigs.entries()) {
-      const fallback = DEFAULT_MODEL_ROUTING[agentId];
+      const fallbackAgentId = isTopLevelAgentId(agentId) ? agentId : "debugger";
+      const fallback = DEFAULT_MODEL_ROUTING[fallbackAgentId];
       const route = routeMap.get(agentId);
       this.agentConfigs.set(agentId, {
         ...agentConfig,
@@ -9809,7 +9330,7 @@ class AgentOrchestrator {
         scope: options?.sessionId ? "session" : "app",
         namespace: "agent",
         severity: "info",
-        title: `${AGENT_DISPLAY_NAMES[agentId] || agentId} cowork turn`,
+        title: `${AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : "debugger"]} cowork turn`,
         summary: responseText.slice(0, 160) || "Empty message.",
         sessionId: options?.sessionId,
         raw: {
@@ -9850,7 +9371,7 @@ class AgentOrchestrator {
     return slot;
   }
   /** 创建一个全新的 Agent slot（不进入缓存）。适用于 cowork 这种一次性调用。 */
-  createFreshAgentSlot(providerId, modelId, systemPrompt, tools = [], toolExecutor = this.createToolExecutor("ask_agent", [], void 0), streamOptions) {
+  createFreshAgentSlot(providerId, modelId, systemPrompt, tools = [], toolExecutor = this.createToolExecutor("ask", [], void 0), streamOptions) {
     const agent = new Agent({
       initialState: {
         model: encodeAgentModel(providerId, modelId),
@@ -9872,6 +9393,8 @@ class AgentOrchestrator {
     }
     const taskListTool = this.createReadonlyTaskListTool();
     availableTools.set(taskListTool.name, taskListTool);
+    const rdxContextTool = this.createRdxContextTool();
+    availableTools.set(rdxContextTool.name, rdxContextTool);
     const definitions = [];
     const toolMap = /* @__PURE__ */ new Map();
     for (const name of toolAllowlist) {
@@ -9955,6 +9478,31 @@ class AgentOrchestrator {
         return {
           content: [{ type: "text", text: "No formal Debugger run tasks are active in Ask mode." }],
           details: { count: 0 }
+        };
+      }
+    };
+  }
+  createRdxContextTool() {
+    return {
+      name: "rdx_context",
+      label: "RDX Context",
+      description: "Read the current stable RDX runtime context captured by configured shell actions.",
+      parameters: {
+        type: "object",
+        properties: {}
+      },
+      permissionHint: "readonly",
+      async execute() {
+        const runtimeContext = getRdxRuntimeContext();
+        if (!runtimeContext) {
+          return {
+            content: [{ type: "text", text: "No RDX runtime context is currently available." }],
+            details: { available: false }
+          };
+        }
+        return {
+          content: [{ type: "text", text: JSON.stringify(runtimeContext, null, 2) }],
+          details: { available: true }
         };
       }
     };
@@ -10074,13 +9622,14 @@ class AgentOrchestrator {
     this.applyLlmConfig(llmConfig);
   }
   modeForAgent(agentId) {
-    return agentId === "ask_agent" ? "ask" : "debugger";
+    return isTopLevelAgentId(agentId) ? agentId : "debugger";
   }
-  patternForAgent(agentId) {
-    return agentId === "ask_agent" ? "free-agent" : "plan-generate-verify";
+  patternForAgent(_agentId) {
+    return "free-agent";
   }
   systemPromptForAgent(agentId, prompt) {
-    return prompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}`;
+    const topLevelAgentId = isTopLevelAgentId(agentId) ? agentId : "debugger";
+    return prompt || `You are the ${AGENT_DISPLAY_NAMES[topLevelAgentId]}. ${AGENT_DESCRIPTIONS[topLevelAgentId]}`;
   }
   async finalizeRecordedAssistantMessage(agentId, streamedContent, fallbackContent, context2) {
     const finalContent = streamedContent || fallbackContent;
@@ -10096,7 +9645,7 @@ class AgentOrchestrator {
         scope: "app",
         namespace: "agent",
         severity: status === "error" ? "error" : status === "complete" ? "success" : "info",
-        title: AGENT_DISPLAY_NAMES[agentId] || agentId,
+        title: AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : "debugger"] || agentId,
         summary: `Status changed to ${status}.`,
         raw: {
           agentId,
@@ -10140,7 +9689,7 @@ class AgentOrchestrator {
       scope: sessionId ? "session" : "app",
       namespace: "agent",
       severity: message.role === "system" ? "warning" : "info",
-      title: AGENT_DISPLAY_NAMES[message.agentId] || message.agentId,
+      title: AGENT_DISPLAY_NAMES[isTopLevelAgentId(message.agentId) ? message.agentId : "debugger"] || message.agentId,
       summary: message.content.slice(0, 120) || "Empty message.",
       sessionId,
       raw: {
@@ -10171,13 +9720,13 @@ class AgentOrchestrator {
       throw new Error("E2E forced cowork LLM request failure");
     }
     const lower = userMessage.toLowerCase();
-    let stub = agentId === "ask_agent" ? "Ask is ready. I can inspect readonly context, search files or public pages, and explain next steps without starting a Debugger run." : "Debugger is ready. Describe the symptom and capture context; I will prepare a plan before execution.";
+    let stub = agentId === "ask" ? "Ask is ready. I can inspect readonly context, search files or public pages, and explain next steps without starting a Debugger run." : `${AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : "debugger"]} is ready. Describe the goal and I can use the configured tools for this turn.`;
     if (/ue4|unreal/i.test(userMessage)) {
       stub = "UE4 is Unreal Engine 4, commonly involved in graphics debugging around materials, post-processing, shaders, and render passes.";
     } else if (/hello|hi/i.test(userMessage)) {
-      stub = agentId === "ask_agent" ? "Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution." : "Hello. In Debugger mode I will generate an execution plan first, then wait for approval before running the strict workflow.";
+      stub = agentId === "ask" ? "Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution." : "Hello. I can run as a general executable agent using the tools enabled by this agent profile.";
     } else if (/start|execute|debug|analy[sz]e/.test(lower)) {
-      stub = "Received. I will prepare the formal debugging plan first, then move into the strict execution flow only when conditions are met.";
+      stub = "Received. I will handle this as a normal agent turn using the configured tools and runtime context.";
     }
     const intent = /start|execute|debug|analy[sz]e/.test(lower) ? "execute" : "talk";
     return `${stub}
@@ -10196,15 +9745,15 @@ class AgentOrchestrator {
     }
     const lower = userMessage.toLowerCase();
     const wantsExecution = EXECUTE_PATTERN$1.test(userMessage);
-    let stub = agentId === "ask_agent" ? "I can inspect readonly context, search files or public pages, explain boundaries, or guide you to open a .rdc capture without starting a Debugger run." : "I can help scope the debugging target, or prepare a formal Debugger plan when you are ready to execute.";
+    let stub = agentId === "ask" ? "I can inspect readonly context, search files or public pages, explain boundaries, or guide you to open a .rdc capture without starting a Debugger run." : "I can help scope the target and execute configured tools directly within this agent turn.";
     if (/ue4|unreal/i.test(userMessage)) {
       stub = "UE4 is Unreal Engine 4. In RDC-Agent it is usually relevant to render pass, material, post-process, and shader debugging context.";
     } else if (/hello|hi|你好|您好/i.test(userMessage)) {
-      stub = agentId === "ask_agent" ? "Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution." : "Hello. In Debugger mode I prepare an execution plan first, then wait for approval before running the debugging workflow.";
+      stub = agentId === "ask" ? "Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution." : "Hello. I can run as a general executable agent using the tools enabled by this agent profile.";
     } else if (wantsExecution || EXECUTE_PATTERN$1.test(lower)) {
-      stub = "Received. I will prepare the formal debugging plan first, then move into the strict execution flow only when conditions are met.";
+      stub = "Received. I will handle this as a normal agent turn using the configured tools and runtime context.";
     }
-    if (agentId === "ask_agent" && userMessage.includes("__RDC_AGENT_E2E_ASK_READONLY_TOOL__")) {
+    if (agentId === "ask" && userMessage.includes("__RDC_AGENT_E2E_ASK_READONLY_TOOL__")) {
       const toolCallId = generateEventId("e2e-tool");
       this.emitCoworkTestEvent("tool.started", {
         toolCallId,
@@ -10230,7 +9779,7 @@ class AgentOrchestrator {
         }
       }, options);
       stub = "I searched the workspace with grep and found the Ask conversation code path. No Debugger run was created.";
-    } else if (agentId === "ask_agent" && userMessage.includes("__RDC_AGENT_E2E_ASK_DENY_WRITE__")) {
+    } else if (agentId === "ask" && userMessage.includes("__RDC_AGENT_E2E_ASK_DENY_WRITE__")) {
       const toolCallId = generateEventId("e2e-tool");
       this.emitCoworkTestEvent("tool.started", {
         toolCallId,
@@ -10240,14 +9789,14 @@ class AgentOrchestrator {
       this.emitCoworkTestEvent("tool.denied", {
         toolCallId,
         toolName: "write_file",
-        reason: "Policy denied: ask_agent can only use readonly tools.",
+        reason: "Policy denied: ask can only use readonly tools.",
         result: {
           ok: false,
           data: {},
           artifacts: [],
           error: {
             code: "AGENT_TOOL_POLICY_DENIED",
-            message: "Policy denied: ask_agent can only use readonly tools.",
+            message: "Policy denied: ask can only use readonly tools.",
             category: "policy"
           },
           duration_ms: 1,
@@ -10279,2397 +9828,6 @@ class AgentOrchestrator {
   }
 }
 const agentOrchestrator = new AgentOrchestrator();
-const BLOCKER_CODES = {
-  // Capture相关
-  BLOCKED_MISSING_CAPTURE: {
-    code: "BLOCKED_MISSING_CAPTURE",
-    category: "capture",
-    severity: "critical",
-    description: "Missing .rdc capture file",
-    resolution: "Provide a valid .rdc file path"
-  },
-  BLOCKED_CAPTURE_IMPORT_FAILED: {
-    code: "BLOCKED_CAPTURE_IMPORT_FAILED",
-    category: "capture",
-    severity: "critical",
-    description: "Failed to import capture file"
-  },
-  // Gate相关
-  BLOCKED_ENTRY_PREFLIGHT: {
-    code: "BLOCKED_ENTRY_PREFLIGHT",
-    category: "gate",
-    severity: "critical",
-    description: "Entry preflight check failed"
-  },
-  BLOCKED_PLATFORM_MODE_UNSUPPORTED: {
-    code: "BLOCKED_PLATFORM_MODE_UNSUPPORTED",
-    category: "gate",
-    severity: "critical",
-    description: "Platform mode not supported"
-  },
-  BLOCKED_INTAKE_GATE_REQUIRED: {
-    code: "BLOCKED_INTAKE_GATE_REQUIRED",
-    category: "gate",
-    severity: "critical",
-    description: "Intake gate check failed"
-  },
-  BLOCKED_RUNTIME_TOPOLOGY_REQUIRED: {
-    code: "BLOCKED_RUNTIME_TOPOLOGY_REQUIRED",
-    category: "gate",
-    severity: "critical",
-    description: "Runtime topology check failed"
-  },
-  BLOCKED_REQUIRED_ARTIFACT_MISSING: {
-    code: "BLOCKED_REQUIRED_ARTIFACT_MISSING",
-    category: "gate",
-    severity: "critical",
-    description: "Required artifact is missing"
-  },
-  BLOCKED_LLM_ROUTE_MISSING: {
-    code: "BLOCKED_LLM_ROUTE_MISSING",
-    category: "gate",
-    severity: "critical",
-    description: "Agent route is missing a provider/model binding",
-    resolution: "Bind the required agent to a provider/model in Settings -> Agent Routing"
-  },
-  BLOCKED_LLM_PROVIDER_MISSING: {
-    code: "BLOCKED_LLM_PROVIDER_MISSING",
-    category: "gate",
-    severity: "critical",
-    description: "Configured LLM provider cannot be resolved or is disabled",
-    resolution: "Enable a valid provider for the bound agent route"
-  },
-  BLOCKED_LLM_SECRET_MISSING: {
-    code: "BLOCKED_LLM_SECRET_MISSING",
-    category: "gate",
-    severity: "critical",
-    description: "Configured LLM provider is missing a valid secret",
-    resolution: "Save a valid provider secret in Settings -> Models"
-  },
-  BLOCKED_LLM_MODEL_MISSING: {
-    code: "BLOCKED_LLM_MODEL_MISSING",
-    category: "gate",
-    severity: "critical",
-    description: "Configured LLM model cannot be resolved for the provider route",
-    resolution: "Enable the bound model for the provider in Settings -> Models"
-  },
-  // Runtime相关
-  BLOCKED_RUNTIME_OWNER_CONFLICT: {
-    code: "BLOCKED_RUNTIME_OWNER_CONFLICT",
-    category: "runtime",
-    severity: "critical",
-    description: "Runtime owner conflict detected"
-  },
-  BLOCKED_RUNTIME_LOCK_EXPIRED: {
-    code: "BLOCKED_RUNTIME_LOCK_EXPIRED",
-    category: "runtime",
-    severity: "warning",
-    description: "Runtime lock has expired"
-  },
-  BLOCKED_CAPABILITY_TOKEN_EXPIRED: {
-    code: "BLOCKED_CAPABILITY_TOKEN_EXPIRED",
-    category: "runtime",
-    severity: "warning",
-    description: "Capability token has expired"
-  },
-  BLOCKED_LLM_PROVIDER_UNAVAILABLE: {
-    code: "BLOCKED_LLM_PROVIDER_UNAVAILABLE",
-    category: "runtime",
-    severity: "critical",
-    description: "Configured LLM provider is unavailable at runtime",
-    resolution: "Check provider base URL, connectivity, and account availability"
-  },
-  BLOCKED_LLM_REQUEST_FAILED: {
-    code: "BLOCKED_LLM_REQUEST_FAILED",
-    category: "runtime",
-    severity: "critical",
-    description: "Runtime LLM request failed",
-    resolution: "Inspect the recorded provider/model/request failure and fix the provider configuration before retrying"
-  },
-  // Specialist相关
-  BLOCKED_SPECIALIST_FEEDBACK_TIMEOUT: {
-    code: "BLOCKED_SPECIALIST_FEEDBACK_TIMEOUT",
-    category: "specialist",
-    severity: "critical",
-    description: "Specialist feedback timeout",
-    resolution: "Redispatch or skip investigation"
-  },
-  BLOCKED_UNKNOWN_SPECIALIST: {
-    code: "BLOCKED_UNKNOWN_SPECIALIST",
-    category: "specialist",
-    severity: "critical",
-    description: "Unknown specialist agent"
-  },
-  BLOCKED_SINGLE_AGENT_MODE_NO_DISPATCH: {
-    code: "BLOCKED_SINGLE_AGENT_MODE_NO_DISPATCH",
-    category: "specialist",
-    severity: "info",
-    description: "Single agent mode - no dispatch allowed"
-  },
-  // Verification相关
-  BLOCKED_FIX_VERIFICATION_FAILED: {
-    code: "BLOCKED_FIX_VERIFICATION_FAILED",
-    category: "verification",
-    severity: "critical",
-    description: "Fix verification failed"
-  },
-  BLOCKED_SKEPTIC_SIGNOFF_REQUIRED: {
-    code: "BLOCKED_SKEPTIC_SIGNOFF_REQUIRED",
-    category: "verification",
-    severity: "critical",
-    description: "Skeptic signoff required"
-  },
-  BLOCKED_SHADER_REPLACEMENT_OBSERVABILITY: {
-    code: "BLOCKED_SHADER_REPLACEMENT_OBSERVABILITY",
-    category: "verification",
-    severity: "warning",
-    description: "Shader replacement observability blocked"
-  },
-  // Process相关
-  PROCESS_DEVIATION_MAIN_AGENT_OVERREACH: {
-    code: "PROCESS_DEVIATION_MAIN_AGENT_OVERREACH",
-    category: "process",
-    severity: "critical",
-    description: "Main agent overreach during specialist brief"
-  },
-  BLOCKED_FREEZE_STATE_ACTIVE: {
-    code: "BLOCKED_FREEZE_STATE_ACTIVE",
-    category: "process",
-    severity: "critical",
-    description: "Run is frozen due to process deviation"
-  },
-  // 新增：修复参照缺失
-  BLOCKED_MISSING_FIX_REFERENCE: {
-    code: "BLOCKED_MISSING_FIX_REFERENCE",
-    category: "gate",
-    severity: "critical",
-    description: "Missing fix reference for verification",
-    resolution: "Provide fix_reference (description + comparison/baseline .rdc)"
-  }
-};
-const TASK_FILE_PATTERN$1 = /([A-Za-z]:[\\/][^\r\n"]+?\.txt)/g;
-const CAPTURE_FILE_PATTERN = /([A-Za-z0-9_.-]+\.rdc)/gi;
-const EVENT_ID_PATTERN = /event\s*id\s*(?:是|:)?\s*(\d+)/i;
-function firstMatch(pattern, value) {
-  const match = pattern.exec(value);
-  pattern.lastIndex = 0;
-  return match?.[1];
-}
-function parseTaskFilePath(goal) {
-  const match = goal.match(TASK_FILE_PATTERN$1);
-  return match?.[0] ? path.resolve(match[0]) : void 0;
-}
-function parseCaptureFileName(text) {
-  const match = text.match(CAPTURE_FILE_PATTERN);
-  return match?.[0];
-}
-function parseEventId(text) {
-  const raw = firstMatch(EVENT_ID_PATTERN, text);
-  if (!raw) {
-    return void 0;
-  }
-  const eventId = Number(raw);
-  return Number.isFinite(eventId) ? eventId : void 0;
-}
-function inferBackend(goal, requestMode) {
-  if (requestMode !== "debugger") {
-    return "local";
-  }
-  return /\bremote\b|远端|安卓|android/i.test(goal) ? "remote" : "local";
-}
-function createCaptureDescriptor(input, backend) {
-  return {
-    id: input.inputId,
-    filePath: input.filePath,
-    role: "primary",
-    backendHint: backend,
-    status: "pending"
-  };
-}
-function chooseFallbackReplayDevice(preferred) {
-  if (preferred) {
-    return preferred;
-  }
-  const devices = replayDeviceService.listDevices();
-  const local = devices.find((device) => device.type === "local");
-  return local || {
-    id: "local",
-    label: "Local",
-    type: "local",
-    status: "online",
-    transport: "local",
-    detailText: "Local replay ready"
-  };
-}
-class IntakeContextResolver {
-  resolve(request) {
-    const project = storageAdapter.getProjectById(request.projectId);
-    if (!project) {
-      throw new Error(`Project not found: ${request.projectId}`);
-    }
-    const session = request.sessionId ? storageAdapter.readSession(request.sessionId) : null;
-    const taskFilePath = parseTaskFilePath(request.goal);
-    const taskFileContent = taskFilePath && fs.existsSync(taskFilePath) ? fs.readFileSync(taskFilePath, "utf-8") : void 0;
-    const goalText = [request.goal, taskFileContent].filter(Boolean).join("\n\n").trim();
-    const explicitCaptureFileName = parseCaptureFileName(goalText);
-    const explicitEventId = parseEventId(goalText);
-    const backend = inferBackend(goalText, request.mode);
-    const projectInputs = storageAdapter.listProjectInputs(project.projectId);
-    const openedCapture = rdxSessionService.snapshotOpenedCapture();
-    const currentSettings = settingsService.getAll();
-    const debuggerRoute = currentSettings.llm.agentRoutes.find((route) => route.agentId === "rdc-debugger");
-    const requestCaptures = request.captures ?? [];
-    let captures = requestCaptures.length > 0 ? requestCaptures.map((capture) => ({ ...capture })) : projectInputs.map((input) => createCaptureDescriptor(input, backend));
-    if (explicitCaptureFileName) {
-      const exactFromRequest = captures.find((capture) => path.basename(capture.filePath) === explicitCaptureFileName);
-      if (!exactFromRequest) {
-        const matchedInput = projectInputs.find((input) => input.fileName === explicitCaptureFileName);
-        if (matchedInput) {
-          captures = [createCaptureDescriptor(matchedInput, backend)];
-        }
-      } else {
-        captures = captures.map((capture) => ({
-          ...capture,
-          role: path.basename(capture.filePath) === explicitCaptureFileName ? "primary" : capture.role,
-          backendHint: backend
-        }));
-      }
-    }
-    const primaryCapture = captures.find((capture) => {
-      if (request.primaryCaptureId) {
-        return capture.id === request.primaryCaptureId;
-      }
-      if (explicitCaptureFileName) {
-        return path.basename(capture.filePath) === explicitCaptureFileName;
-      }
-      if (openedCapture) {
-        return capture.filePath === openedCapture.filePath;
-      }
-      return captures.length === 1;
-    }) || null;
-    const replayDevice = chooseFallbackReplayDevice(request.replayDevice);
-    const taskSources = taskFilePath ? [taskFilePath] : [];
-    return {
-      intakeContext: {
-        taskFilePath,
-        taskFileContent,
-        effectiveGoal: goalText || request.goal,
-        discoveredProjectRoot: project.rootPath,
-        openedCaptureId: openedCapture?.captureId ?? null,
-        openedCapturePath: openedCapture?.filePath ?? null,
-        availableCaptureIds: captures.map((capture) => capture.id),
-        providerId: debuggerRoute?.providerId || void 0,
-        modelId: debuggerRoute?.modelId,
-        replayDeviceId: replayDevice.id,
-        replayDeviceLabel: replayDevice.label
-      },
-      project,
-      session,
-      goalText: goalText || request.goal,
-      taskFilePath,
-      taskFileContent,
-      explicitCaptureFileName,
-      explicitEventId,
-      captures: captures.map((capture) => ({
-        ...capture,
-        backendHint: capture.backendHint || backend
-      })),
-      primaryCaptureId: primaryCapture?.id,
-      replayDevice,
-      backend,
-      taskSources,
-      projectInputs
-    };
-  }
-}
-const intakeContextResolver = new IntakeContextResolver();
-function makeBlocker$1(code, reason, refs = []) {
-  return {
-    code,
-    reason,
-    refs,
-    detectedAt: nowIso$1()
-  };
-}
-function makeCaptureQuestion(captures) {
-  const options = captures.slice(0, 4).map((capture) => ({
-    id: capture.id,
-    label: path.basename(capture.filePath),
-    description: capture.filePath
-  }));
-  while (options.length < 4) {
-    options.push({
-      id: `option-${options.length + 1}`,
-      label: `选项 ${options.length + 1}`,
-      description: "使用自由输入指定更准确的 capture。"
-    });
-  }
-  return {
-    id: "target_capture",
-    prompt: "当前有多个可用 capture，选择本次 Debugger 主链要分析的目标。",
-    recommendedOptionId: options[0]?.id,
-    options: [
-      options[0],
-      options[1],
-      options[2],
-      options[3]
-    ],
-    freeformPlaceholder: "输入更准确的 .rdc 文件名"
-  };
-}
-function buildVerificationContract(goalText, eventId) {
-  const lower = goalText.toLowerCase();
-  return {
-    requiresFixValidation: /验证|verify|fix/.test(goalText),
-    requiresScreenshotEvidence: /framebuffer|screenshot|截图|多模态/.test(lower + goalText),
-    requiresShaderInspection: /shader|ibl|漏光|light|亮点/.test(lower + goalText),
-    requiresPixelEvidence: /pixel|像素|亮点|白点/.test(lower + goalText),
-    requiresBaselineComparison: /baseline|compare|对比|比较/.test(lower + goalText),
-    targetEventIds: eventId ? [eventId] : [],
-    successCriteria: [
-      "结论必须有真实 rd.* 工具证据支撑。",
-      "必须给出 verification 结果，并说明 fix 是否成立。",
-      "最终发布 report.md、report.json 和 visual_report.html。"
-    ]
-  };
-}
-function recommendSpecialists(goalText, captures, backend) {
-  const specialists = ["triage_agent", "pass_graph_pipeline_agent", "pixel_forensics_agent", "shader_ir_agent"];
-  if (captures.length > 1 || /baseline|compare|对比|比较/.test(goalText)) {
-    specialists.splice(1, 0, "capture_repro_agent");
-  }
-  if (backend === "remote") {
-    specialists.push("driver_device_agent");
-  }
-  return Array.from(new Set(specialists));
-}
-function buildDebugPlanPresentation(debugPlan) {
-  const sections = [
-    {
-      id: "goal",
-      title: "目标",
-      body: [debugPlan.userGoal]
-    },
-    {
-      id: "scope",
-      title: "范围",
-      body: [
-        debugPlan.targetCapture ? `Capture: ${debugPlan.targetCapture.fileName}` : "Capture: 等待确认",
-        debugPlan.targetFrameOrEvent?.eventLabel ? `入口: ${debugPlan.targetFrameOrEvent.eventLabel}` : debugPlan.scope,
-        debugPlan.scope
-      ].filter(Boolean)
-    },
-    {
-      id: "deliverables",
-      title: "交付物",
-      body: debugPlan.expectedDeliverables
-    },
-    {
-      id: "test-plan",
-      title: "Test Plan",
-      body: debugPlan.verificationContract.successCriteria
-    },
-    {
-      id: "assumptions",
-      title: "Assumptions",
-      body: [
-        ...debugPlan.referenceContract.acceptanceNotes,
-        ...debugPlan.notes
-      ]
-    }
-  ];
-  if (debugPlan.missingInfo.length > 0) {
-    sections.push({
-      id: "missing-info",
-      title: "Missing Info",
-      body: debugPlan.missingInfo
-    });
-  }
-  if (debugPlan.blockers.length > 0) {
-    sections.push({
-      id: "blockers",
-      title: "Blockers",
-      body: debugPlan.blockers.map((blocker) => blocker.reason)
-    });
-  }
-  return {
-    title: "执行前调试计划",
-    sections: sections.filter((section) => section.body.length > 0)
-  };
-}
-class PlanBuilder {
-  build(resolved) {
-    const blockers = [];
-    const questions = [];
-    const targetCapture = resolved.primaryCaptureId ? resolved.captures.find((capture) => capture.id === resolved.primaryCaptureId) ?? null : resolved.captures.length === 1 ? resolved.captures[0] : null;
-    const explicitEventId = resolved.explicitEventId;
-    if (resolved.captures.length === 0) {
-      blockers.push(makeBlocker$1(
-        BLOCKER_CODES.BLOCKED_MISSING_CAPTURE.code,
-        "当前 project 中没有可用于 Debugger 的 capture。"
-      ));
-    }
-    if (!targetCapture && resolved.captures.length > 1) {
-      questions.push(makeCaptureQuestion(resolved.captures));
-    }
-    const verificationContract = buildVerificationContract(resolved.goalText, explicitEventId);
-    const missingInfo = [];
-    if (!targetCapture) {
-      missingInfo.push("target_capture");
-    }
-    const targetFrameOrEvent = explicitEventId ? {
-      scope: "event",
-      eventId: explicitEventId,
-      eventLabel: `Event ${explicitEventId}`
-    } : {
-      scope: "frame",
-      frameIndex: 0,
-      eventLabel: "Frame 0 default scope"
-    };
-    let planReadiness = "discovering";
-    if (blockers.length > 0) {
-      planReadiness = "blocked";
-    } else if (questions.length > 0) {
-      planReadiness = "needs_user_input";
-    } else {
-      planReadiness = "strict_ready";
-    }
-    const debugPlanBase = {
-      planId: `plan-${Date.now()}`,
-      planReadiness,
-      strictReady: planReadiness === "strict_ready",
-      userGoal: resolved.goalText,
-      targetCapture: targetCapture ? {
-        captureId: targetCapture.id,
-        fileName: path.basename(targetCapture.filePath),
-        filePath: targetCapture.filePath
-      } : null,
-      targetFrameOrEvent,
-      scope: explicitEventId ? "Anchor on the explicit event first, then expand to nearby pipeline and framebuffer evidence." : "Start from the frame and narrow down to the first bad event.",
-      referenceContract: {
-        taskSources: resolved.taskSources,
-        referenceCaptures: resolved.captures.slice(1).map((capture) => capture.filePath),
-        acceptanceNotes: [
-          "只在 debug_plan.strict_ready 且用户批准后进入执行。",
-          "报告需要覆盖 root cause、verification 和 deliverables。"
-        ]
-      },
-      verificationContract,
-      expectedDeliverables: [
-        "report.md",
-        "report.json",
-        "visual_report.html"
-      ],
-      blockers,
-      missingInfo,
-      recommendedSpecialists: recommendSpecialists(resolved.goalText, resolved.captures, resolved.backend),
-      notes: [
-        resolved.taskFilePath ? `Task source: ${resolved.taskFilePath}` : "Task source: inline prompt",
-        resolved.intakeContext.openedCapturePath ? `Opened capture: ${resolved.intakeContext.openedCapturePath}` : "No opened capture reused",
-        resolved.intakeContext.providerId && resolved.intakeContext.modelId ? `LLM route: ${resolved.intakeContext.providerId}/${resolved.intakeContext.modelId}` : "LLM route missing; execution must stay blocked until an explicit provider/model route is configured."
-      ],
-      createdAt: nowIso$1(),
-      updatedAt: nowIso$1()
-    };
-    const debugPlan = {
-      ...debugPlanBase,
-      presentation: buildDebugPlanPresentation(debugPlanBase)
-    };
-    const pendingQuestions = questions.length > 0 ? {
-      promptId: `ask-${Date.now()}`,
-      title: "补齐执行关键缺口",
-      summary: "以下信息会直接影响执行路径，请先确认。",
-      questions,
-      createdAt: nowIso$1()
-    } : null;
-    return {
-      debugPlan,
-      pendingQuestions,
-      blockers
-    };
-  }
-}
-const planBuilder = new PlanBuilder();
-class RunExecutionService {
-  activeRuns = /* @__PURE__ */ new Map();
-  startRun(context2, executor) {
-    const existing = this.activeRuns.get(context2.runId);
-    if (existing) {
-      return existing;
-    }
-    const abortController = new AbortController();
-    const controller = {
-      ...context2,
-      startedAt: Date.now(),
-      abortController
-    };
-    controller.promise = executor(abortController.signal).finally(() => {
-      const active = this.activeRuns.get(context2.runId);
-      if (active?.abortController === abortController) {
-        this.activeRuns.delete(context2.runId);
-      }
-    });
-    this.activeRuns.set(context2.runId, controller);
-    return controller;
-  }
-  listActiveRuns() {
-    return Array.from(this.activeRuns.values()).map((run) => ({
-      runId: run.runId,
-      sessionId: run.sessionId,
-      projectId: run.projectId,
-      startedAt: run.startedAt,
-      stage: run.stage
-    }));
-  }
-  getAbortSignal(runId) {
-    return this.activeRuns.get(runId)?.abortController.signal ?? null;
-  }
-  updateStage(runId, stage) {
-    const active = this.activeRuns.get(runId);
-    if (!active) {
-      return;
-    }
-    active.stage = stage;
-  }
-  isAbortRequested(runId) {
-    return this.activeRuns.get(runId)?.abortController.signal.aborted ?? false;
-  }
-  stopRun(runId) {
-    const active = this.activeRuns.get(runId);
-    if (!active) {
-      return false;
-    }
-    active.abortController.abort();
-    return true;
-  }
-  async stopAll() {
-    const runIds = Array.from(this.activeRuns.keys());
-    runIds.forEach((runId) => this.stopRun(runId));
-    await Promise.allSettled(
-      runIds.map((runId) => this.activeRuns.get(runId)?.promise)
-    );
-  }
-}
-const runExecutionService = new RunExecutionService();
-class DebuggerLlmBlockerError extends Error {
-  blocker;
-  constructor(blocker) {
-    super(blocker.reason);
-    this.name = "DebuggerLlmBlockerError";
-    this.blocker = blocker;
-  }
-}
-function makeBlocker(code, reason, refs = []) {
-  return {
-    code,
-    reason,
-    refs,
-    detectedAt: (/* @__PURE__ */ new Date()).toISOString()
-  };
-}
-function extractTextContent(content) {
-  if (typeof content === "string") {
-    return content.trim();
-  }
-  return content.map((block) => {
-    if (block.type === "text") {
-      return block.text || "";
-    }
-    if (block.type === "tool_result") {
-      return block.content || "";
-    }
-    return "";
-  }).join("\n").trim();
-}
-function extractBalancedJsonFragment(text, opening) {
-  const start = text.indexOf(opening);
-  if (start < 0) {
-    return null;
-  }
-  const closing = opening === "{" ? "}" : "]";
-  let depth = 0;
-  let inString = false;
-  let escaping = false;
-  for (let index = start; index < text.length; index += 1) {
-    const char = text[index];
-    if (inString) {
-      if (escaping) {
-        escaping = false;
-        continue;
-      }
-      if (char === "\\") {
-        escaping = true;
-        continue;
-      }
-      if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-    if (char === '"') {
-      inString = true;
-      continue;
-    }
-    if (char === opening) {
-      depth += 1;
-      continue;
-    }
-    if (char === closing) {
-      depth -= 1;
-      if (depth === 0) {
-        return text.slice(start, index + 1);
-      }
-    }
-  }
-  return null;
-}
-function extractJsonCandidate(text) {
-  const trimmed = text.trim();
-  if (!trimmed) {
-    throw new Error("LLM response was empty");
-  }
-  try {
-    JSON.parse(trimmed);
-    return trimmed;
-  } catch {
-  }
-  const fencedMatch = trimmed.match(/```json\s*([\s\S]*?)```/i) || trimmed.match(/```\s*([\s\S]*?)```/i);
-  if (fencedMatch?.[1]) {
-    const candidate = fencedMatch[1].trim();
-    JSON.parse(candidate);
-    return candidate;
-  }
-  const balancedObject = extractBalancedJsonFragment(trimmed, "{");
-  if (balancedObject) {
-    JSON.parse(balancedObject);
-    return balancedObject;
-  }
-  const balancedArray = extractBalancedJsonFragment(trimmed, "[");
-  if (balancedArray) {
-    JSON.parse(balancedArray);
-    return balancedArray;
-  }
-  const objectStart = trimmed.indexOf("{");
-  const objectEnd = trimmed.lastIndexOf("}");
-  if (objectStart >= 0 && objectEnd > objectStart) {
-    const candidate = trimmed.slice(objectStart, objectEnd + 1);
-    JSON.parse(candidate);
-    return candidate;
-  }
-  const arrayStart = trimmed.indexOf("[");
-  const arrayEnd = trimmed.lastIndexOf("]");
-  if (arrayStart >= 0 && arrayEnd > arrayStart) {
-    const candidate = trimmed.slice(arrayStart, arrayEnd + 1);
-    JSON.parse(candidate);
-    return candidate;
-  }
-  throw new Error("LLM response did not contain valid JSON");
-}
-function shouldRetryStructuredLlmError(error) {
-  const message = error instanceof Error ? error.message : String(error);
-  return /LLM response was empty|did not contain valid JSON|Unexpected non-whitespace character after JSON|OpenRouter API error: 5\d\d|timed out|timeout/i.test(message);
-}
-function shouldUseNativeJsonObject(route) {
-  const providerKind = route.provider.kind;
-  const modelId = route.modelId.toLowerCase();
-  if (providerKind === "anthropic") {
-    return false;
-  }
-  if (/moonshot|kimi/.test(modelId)) {
-    return false;
-  }
-  return true;
-}
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-class DebuggerLlmService {
-  runSummaries = /* @__PURE__ */ new Map();
-  resetRunSummary(runId) {
-    this.runSummaries.delete(runId);
-    this.broadcastRunUsage(runId);
-  }
-  getRunSummary(runId) {
-    const summary = this.runSummaries.get(runId);
-    if (!summary) {
-      return null;
-    }
-    return {
-      ...summary,
-      routesUsed: summary.routesUsed.map((entry) => ({ ...entry }))
-    };
-  }
-  getRunContextUsage(runId) {
-    const summary = this.runSummaries.get(runId);
-    if (!summary) {
-      return null;
-    }
-    const settings = settingsService.getAll();
-    const provider = settings.llm.providers.find((entry) => entry.id === summary.providerId);
-    const model = provider?.models.find((entry) => entry.id === summary.modelId) ?? null;
-    const contextWindowTokens = typeof model?.contextWindowTokens === "number" && model.contextWindowTokens > 0 ? model.contextWindowTokens : null;
-    const totalTokens = summary.totalInputTokens + summary.totalOutputTokens;
-    return {
-      runId,
-      providerId: summary.providerId,
-      modelId: summary.modelId,
-      inputTokens: summary.totalInputTokens,
-      outputTokens: summary.totalOutputTokens,
-      totalTokens,
-      contextWindowTokens,
-      usagePercent: contextWindowTokens ? Math.min(100, Math.max(0, Math.round(totalTokens / contextWindowTokens * 100))) : 0,
-      hasConfiguredContextWindow: Boolean(contextWindowTokens)
-    };
-  }
-  async refreshAccountRuntimeCredentials(route) {
-    if (route.provider.authMode !== "account") {
-      return;
-    }
-    await providerAccountAuthService.ensureRuntimeCredentials(route.providerId);
-  }
-  getRouteBlockers(agentIds, stage, settings = settingsService.getAll()) {
-    const blockers = [];
-    const seen = /* @__PURE__ */ new Set();
-    for (const agentId of agentIds) {
-      try {
-        this.resolveRoute(agentId, stage, settings);
-      } catch (error) {
-        if (!(error instanceof DebuggerLlmBlockerError)) {
-          throw error;
-        }
-        const key = `${error.blocker.code}:${agentId}`;
-        if (seen.has(key)) {
-          continue;
-        }
-        seen.add(key);
-        blockers.push(error.blocker);
-      }
-    }
-    return blockers;
-  }
-  resolveRoute(agentId, stage, settings = settingsService.getAll()) {
-    const requestedRoute = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
-    const resolution = resolveCompatibleAgentRoute(settings.llm.agentRoutes, settings.llm.providers, agentId);
-    const route = resolution.route;
-    if (!route?.providerId || !route.modelId) {
-      throw new DebuggerLlmBlockerError(makeBlocker(
-        BLOCKER_CODES.BLOCKED_LLM_ROUTE_MISSING.code,
-        `${agentId} is not bound to a provider/model route.`,
-        [`agent:${agentId}`]
-      ));
-    }
-    const provider = resolution.provider ?? settings.llm.providers.find((entry) => entry.id === route.providerId);
-    if (!provider || !provider.enabled) {
-      throw new DebuggerLlmBlockerError(makeBlocker(
-        BLOCKER_CODES.BLOCKED_LLM_PROVIDER_MISSING.code,
-        `${agentId} route points to an unavailable provider: ${route.providerId}.`,
-        [`agent:${agentId}`, `provider:${route.providerId}`]
-      ));
-    }
-    const model = provider.models.find((entry) => entry.enabled && entry.id === route.modelId);
-    if (!model) {
-      throw new DebuggerLlmBlockerError(makeBlocker(
-        BLOCKER_CODES.BLOCKED_LLM_MODEL_MISSING.code,
-        `${agentId} route points to a disabled or missing model: ${route.modelId}.`,
-        [`agent:${agentId}`, `provider:${provider.id}`, `model:${route.modelId}`]
-      ));
-    }
-    const secret = provider.authMode === "local" ? "local-provider" : provider.authMode === "environment" ? "environment-provider" : provider.authMode === "account" ? settingsService.getProviderOAuthSecret(provider.id, settings.workspace.rootPath) : settingsService.getProviderSecret(provider.id, settings.workspace.rootPath);
-    if (!secret.trim()) {
-      throw new DebuggerLlmBlockerError(makeBlocker(
-        BLOCKER_CODES.BLOCKED_LLM_SECRET_MISSING.code,
-        `${agentId} route provider is missing a usable secret: ${provider.id}.`,
-        [`agent:${agentId}`, `provider:${provider.id}`]
-      ));
-    }
-    return {
-      agentId,
-      stage,
-      provider,
-      providerId: provider.id,
-      modelId: route.modelId,
-      requestedModelId: resolution.requestedModelId ?? requestedRoute?.modelId,
-      remapReason: resolution.remapReason
-    };
-  }
-  async call(context2, request) {
-    const settings = settingsService.getAll();
-    const route = this.resolveRoute(context2.agentId, context2.stage, settings);
-    if (process.env.RDC_AGENT_TEST_MODE === "1") {
-      const response = {
-        id: `test-llm-${Date.now()}`,
-        model: route.modelId,
-        content: "",
-        usage: {
-          inputTokens: 0,
-          outputTokens: 0
-        },
-        stopReason: "end_turn"
-      };
-      const text = "";
-      await this.recordCall(context2, route, response, "ok", "test-mode llm stub");
-      return {
-        route,
-        response,
-        text
-      };
-    }
-    await this.refreshAccountRuntimeCredentials(route);
-    llmAdapter.configure(settingsService.getLlmConfig());
-    try {
-      const response = await llmAdapter.chat({
-        ...request,
-        model: route.modelId
-      }, route.providerId);
-      const text = extractTextContent(response.content);
-      await this.recordCall(context2, route, response, "ok", text || `${route.providerId}/${route.modelId}`);
-      return {
-        route,
-        response,
-        text
-      };
-    } catch (error) {
-      await this.recordFailure(context2, route, error instanceof Error ? error.message : String(error));
-      throw this.toRuntimeError(route, error);
-    }
-  }
-  async callStructured(input) {
-    if (process.env.RDC_AGENT_TEST_MODE === "1" && input.testValue !== void 0) {
-      const settings2 = settingsService.getAll();
-      const route2 = this.resolveRoute(input.agentId, input.stage, settings2);
-      const response = {
-        id: `test-llm-${Date.now()}`,
-        model: route2.modelId,
-        content: JSON.stringify(input.testValue),
-        usage: {
-          inputTokens: 0,
-          outputTokens: 0
-        },
-        stopReason: "end_turn"
-      };
-      const text = JSON.stringify(input.testValue);
-      const summary = input.auditSummary ? input.auditSummary(input.testValue, text) : text;
-      await this.recordCall(input, route2, response, "ok", summary);
-      return {
-        data: input.testValue,
-        call: {
-          route: route2,
-          response,
-          text
-        }
-      };
-    }
-    const settings = settingsService.getAll();
-    const route = this.resolveRoute(input.agentId, input.stage, settings);
-    await this.refreshAccountRuntimeCredentials(route);
-    llmAdapter.configure(settingsService.getLlmConfig());
-    const useNativeJsonObject = shouldUseNativeJsonObject(route);
-    let lastError;
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      try {
-        const response = await llmAdapter.chat({
-          messages: input.messages,
-          model: route.modelId,
-          maxTokens: input.maxTokens,
-          temperature: input.temperature,
-          responseFormat: useNativeJsonObject ? "json_object" : void 0
-        }, route.providerId);
-        const text = extractTextContent(response.content);
-        const data = input.parse(text);
-        const summary = input.auditSummary ? input.auditSummary(data, text) : text || `${route.providerId}/${route.modelId}`;
-        await this.recordCall(input, route, response, "ok", summary);
-        return {
-          data,
-          call: {
-            route,
-            response,
-            text
-          }
-        };
-      } catch (error) {
-        lastError = error;
-        if (attempt < 3 && shouldRetryStructuredLlmError(error)) {
-          await sleep(500 * (attempt + 1));
-          continue;
-        }
-        await this.recordFailure(
-          input,
-          route,
-          error instanceof Error ? error.message : String(error)
-        );
-        throw this.toRuntimeError(route, error);
-      }
-    }
-    await this.recordFailure(
-      input,
-      route,
-      lastError instanceof Error ? lastError.message : String(lastError)
-    );
-    throw this.toRuntimeError(route, lastError);
-  }
-  parseJson(text) {
-    return JSON.parse(extractJsonCandidate(text));
-  }
-  toRuntimeError(route, error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const providerUnavailable = /provider not found|provider disabled|provider not configured|no llm provider configured/i.test(message);
-    const code = providerUnavailable ? BLOCKER_CODES.BLOCKED_LLM_PROVIDER_UNAVAILABLE.code : BLOCKER_CODES.BLOCKED_LLM_REQUEST_FAILED.code;
-    return new DebuggerLlmBlockerError(makeBlocker(
-      code,
-      `${route.agentId} failed to call ${route.providerId}/${route.modelId}: ${message}`,
-      [`agent:${route.agentId}`, `provider:${route.providerId}`, `model:${route.modelId}`]
-    ));
-  }
-  async recordCall(context2, route, response, status, summary) {
-    this.updateRunSummary(context2, route, response, status);
-    runtimeLogService.log({
-      scope: context2.sessionId ? "session" : "app",
-      namespace: "llm",
-      severity: status === "ok" ? "success" : "error",
-      title: `${route.agentId} -> ${route.providerId}/${route.modelId}`,
-      summary,
-      detail: response.id ? `request=${response.id}` : void 0,
-      sessionId: context2.sessionId ?? null,
-      runId: context2.runId ?? null,
-      raw: {
-        agentId: route.agentId,
-        stage: route.stage,
-        providerId: route.providerId,
-        modelId: route.modelId,
-        requestedModelId: route.requestedModelId,
-        remapReason: route.remapReason,
-        requestId: response.id,
-        usage: response.usage
-      }
-    });
-    if (!context2.sessionId || !context2.runId) {
-      return;
-    }
-    const event = storageAdapter.createActionEvent({
-      runId: context2.runId,
-      sessionId: context2.sessionId,
-      agentId: route.agentId,
-      eventType: "llm_call",
-      status,
-      payload: {
-        agentId: route.agentId,
-        stage: route.stage,
-        providerId: route.providerId,
-        modelId: route.modelId,
-        requestedModelId: route.requestedModelId,
-        remapReason: route.remapReason,
-        requestId: response.id,
-        usage: response.usage,
-        summary
-      }
-    });
-    await this.appendBroadcastEvent(context2.sessionId, event);
-  }
-  async recordFailure(context2, route, errorMessage) {
-    this.updateRunSummary(context2, route, null, "error");
-    runtimeLogService.log({
-      scope: context2.sessionId ? "session" : "app",
-      namespace: "llm",
-      severity: "error",
-      title: `${route.agentId} -> ${route.providerId}/${route.modelId}`,
-      summary: errorMessage,
-      sessionId: context2.sessionId ?? null,
-      runId: context2.runId ?? null,
-      raw: {
-        agentId: route.agentId,
-        stage: route.stage,
-        providerId: route.providerId,
-        modelId: route.modelId,
-        requestedModelId: route.requestedModelId,
-        remapReason: route.remapReason
-      }
-    });
-    if (!context2.sessionId || !context2.runId) {
-      return;
-    }
-    const event = storageAdapter.createActionEvent({
-      runId: context2.runId,
-      sessionId: context2.sessionId,
-      agentId: route.agentId,
-      eventType: "llm_call",
-      status: "error",
-      payload: {
-        agentId: route.agentId,
-        stage: route.stage,
-        providerId: route.providerId,
-        modelId: route.modelId,
-        requestedModelId: route.requestedModelId,
-        remapReason: route.remapReason,
-        summary: errorMessage
-      }
-    });
-    await this.appendBroadcastEvent(context2.sessionId, event);
-  }
-  updateRunSummary(context2, route, response, status) {
-    if (!context2.runId) {
-      return;
-    }
-    const existing = this.runSummaries.get(context2.runId) ?? {
-      providerId: route.providerId,
-      modelId: route.modelId,
-      successfulCallCount: 0,
-      failedCallCount: 0,
-      totalInputTokens: 0,
-      totalOutputTokens: 0,
-      firstRequestId: void 0,
-      routesUsed: []
-    };
-    existing.providerId = existing.providerId || route.providerId;
-    existing.modelId = existing.modelId || route.modelId;
-    if (status === "ok") {
-      existing.successfulCallCount += 1;
-      if (!existing.firstRequestId && response?.id) {
-        existing.firstRequestId = response.id;
-      }
-      existing.totalInputTokens += response?.usage.inputTokens ?? 0;
-      existing.totalOutputTokens += response?.usage.outputTokens ?? 0;
-    } else {
-      existing.failedCallCount += 1;
-    }
-    existing.routesUsed.push({
-      agentId: route.agentId,
-      stage: route.stage,
-      providerId: route.providerId,
-      modelId: route.modelId,
-      requestId: response?.id,
-      status
-    });
-    this.runSummaries.set(context2.runId, existing);
-    this.broadcastRunUsage(context2.runId);
-  }
-  broadcastRunUsage(runId) {
-    const usage = this.getRunContextUsage(runId);
-    if (!usage) {
-      return;
-    }
-    workflowProjectionPublisher.publishRunUsage(usage);
-  }
-  async appendBroadcastEvent(sessionId, event) {
-    await storageAdapter.appendActionEvent(sessionId, event);
-    workflowProjectionPublisher.publishEvidenceEvent(event);
-  }
-}
-const debuggerLlmService = new DebuggerLlmService();
-class HarnessController {
-  _enabled = true;
-  /**
-   * 检查控制器是否启用
-   */
-  isEnabled() {
-    return this._enabled;
-  }
-  /**
-   * 启用/禁用控制器
-   */
-  setEnabled(enabled) {
-    this._enabled = enabled;
-  }
-  // ========== 前置Gate层 ==========
-  /**
-   * EntryGate - 入口闸门
-   * 检查：.rdc文件存在性、平台模式、环境配置
-   */
-  async executeEntryGate(input) {
-    const blockers = [];
-    if (!input.capturePaths || input.capturePaths.length === 0) {
-      blockers.push(this.createBlocker("BLOCKED_MISSING_CAPTURE", "No .rdc capture files provided"));
-    }
-    for (const capturePath of input.capturePaths || []) {
-      const fs2 = await import("fs");
-      if (!fs2.existsSync(capturePath)) {
-        blockers.push(this.createBlocker(
-          "BLOCKED_CAPTURE_IMPORT_FAILED",
-          `Capture file not found: ${capturePath}`,
-          [capturePath]
-        ));
-      }
-    }
-    if (input.backend === "remote") ;
-    if (input.mode === "debugger") {
-      if (!settingsService.hasConfiguredProvider()) {
-        blockers.push(this.createBlocker(
-          "LLM_KEY_MISSING",
-          "At least one configured provider is required for Debugger mode",
-          ["settings:models"]
-        ));
-      }
-      blockers.push(...debuggerLlmService.getRouteBlockers(["rdc-debugger"], "plan"));
-    }
-    if (input.captures && input.captures.length > 0) {
-      const hasRemoteCapture = input.captures.some((c) => c.backendHint === "remote");
-      if (hasRemoteCapture && (!input.replayDevice || input.replayDevice.type === "local" || input.replayDevice.status !== "online")) {
-        blockers.push(this.createBlocker(
-          "REMOTE_CONFIG_MISSING",
-          "Remote capture requires an online Replay Device",
-          []
-        ));
-      }
-    }
-    return this.createGateResult("entry_gate", blockers);
-  }
-  /**
-   * IntakeGate - Intake闸门
-   * 检查：数据完整性、参照契约
-   */
-  async executeIntakeGate(caseId, runId, input) {
-    const blockers = [];
-    const requiredFields = ["session", "symptom", "captures"];
-    for (const field of requiredFields) {
-      if (!input.caseInput[field]) {
-        blockers.push(this.createBlocker(
-          "BLOCKED_INTAKE_GATE_REQUIRED",
-          `Missing required field in case_input: ${field}`
-        ));
-      }
-    }
-    if (!input.captureRefs || input.captureRefs.length === 0) {
-      blockers.push(this.createBlocker(
-        "BLOCKED_INTAKE_GATE_REQUIRED",
-        "No capture references defined"
-      ));
-    }
-    const referenceContract = input.caseInput.reference_contract;
-    if (!referenceContract || !referenceContract.source_refs) {
-      blockers.push(this.createBlocker(
-        "BLOCKED_MISSING_FIX_REFERENCE",
-        "Missing fix_reference for verification. Provide description + comparison/baseline .rdc"
-      ));
-    }
-    await storageAdapter.writeArtifact(caseId, runId, "intake_gate.yaml", {
-      schema_version: "2",
-      generated_at: nowIso$1(),
-      status: blockers.length === 0 ? "passed" : "blocked",
-      checks: requiredFields.map((f) => ({
-        id: `check_${f}`,
-        result: input.caseInput[f] ? "pass" : "fail"
-      })),
-      blocking_codes: blockers.map((b) => b.code)
-    });
-    return this.createGateResult("intake_gate", blockers);
-  }
-  /**
-   * DispatchGate - 分派闸门
-   * 检查：模式一致性、执行证据
-   */
-  async executeDispatchGate(_caseId, _runId, input) {
-    const blockers = [];
-    if (input.orchestrationMode === "multi_agent") {
-      const sessionId = await storageAdapter.getCurrentSessionId();
-      if (sessionId) {
-        const events = await storageAdapter.readActionChain(sessionId);
-        const dispatchEvents = events.filter((e) => e.event_type === "dispatch");
-        if (dispatchEvents.length === 0) ;
-        else {
-          const pendingDispatch = dispatchEvents.find((e) => e.status === "sent");
-          if (pendingDispatch) {
-            blockers.push(this.createBlocker(
-              "BLOCKED_SPECIALIST_FEEDBACK_TIMEOUT",
-              "Previous dispatch still pending feedback",
-              [pendingDispatch.event_id]
-            ));
-          }
-        }
-      }
-    }
-    const validAgents = [
-      "triage_agent",
-      "capture_repro_agent",
-      "pass_graph_pipeline_agent",
-      "pixel_forensics_agent",
-      "shader_ir_agent",
-      "driver_device_agent",
-      "skeptic_agent",
-      "curator_agent"
-    ];
-    if (!validAgents.includes(input.targetAgent)) {
-      blockers.push(this.createBlocker(
-        "BLOCKED_UNKNOWN_SPECIALIST",
-        `Unknown specialist: ${input.targetAgent}`,
-        [input.targetAgent]
-      ));
-    }
-    return this.createGateResult("dispatch_gate", blockers);
-  }
-  /**
-   * VerifyGate - 验证闸门
-   * 检查：fix_verification schema完整性
-   */
-  async executeVerifyGate(_caseId, _runId, input) {
-    const blockers = [];
-    const requiredFields = [
-      "verdict",
-      "verification_mode",
-      "verification_confidence",
-      "structural_verification",
-      "semantic_verification",
-      "overall_result"
-    ];
-    for (const field of requiredFields) {
-      if (input.fixVerificationData[field] === void 0) {
-        blockers.push(this.createBlocker(
-          "BLOCKED_FIX_VERIFICATION_FAILED",
-          `Missing required field in fix_verification: ${field}`
-        ));
-      }
-    }
-    const structural = input.fixVerificationData.structural_verification;
-    if (structural && structural.status !== "passed") {
-      blockers.push(this.createBlocker(
-        "BLOCKED_FIX_VERIFICATION_FAILED",
-        "Structural verification failed"
-      ));
-    }
-    const semantic = input.fixVerificationData.semantic_verification;
-    if (semantic && semantic.status === "fallback_only") {
-      console.warn("Semantic verification is fallback_only");
-    }
-    return this.createGateResult("verify_gate", blockers);
-  }
-  // ========== 运行时监控层 ==========
-  /**
-   * 模式一致性检查
-   * 验证声明的multi_agent是否有dispatch证据
-   */
-  async checkModeConsistency(caseId, runId) {
-    const issues = [];
-    const topology = await storageAdapter.readArtifact(caseId, runId, "runtime_topology.yaml");
-    if (!topology) {
-      issues.push("runtime_topology.yaml not found");
-      return { isConsistent: false, issues };
-    }
-    const orchestrationMode = topology.orchestration_mode;
-    if (orchestrationMode === "multi_agent") {
-      const sessionId = await storageAdapter.getCurrentSessionId();
-      if (sessionId) {
-        const events = await storageAdapter.readActionChain(sessionId);
-        const dispatchEvents = events.filter((e) => e.event_type === "dispatch");
-        if (dispatchEvents.length === 0) {
-          issues.push("multi_agent declared but no dispatch events found");
-        }
-      }
-    }
-    return { isConsistent: issues.length === 0, issues };
-  }
-  /**
-   * Stage推进校验
-   * 验证workflow_stage是否与action_chain一致
-   */
-  async validateStageConsistency(caseId, runId) {
-    const runData = await storageAdapter.readRun(caseId, runId);
-    if (!runData) {
-      return { isConsistent: false, currentStage: null, expectedStage: null };
-    }
-    const runtime = runData.runtime;
-    const declaredStage = runtime?.workflow_stage;
-    const sessionId = await storageAdapter.getCurrentSessionId();
-    if (!sessionId) {
-      return { isConsistent: true, currentStage: declaredStage, expectedStage: declaredStage };
-    }
-    const events = await storageAdapter.readActionChain(sessionId);
-    const stageEvents = events.filter((e) => e.event_type === "workflow_stage_transition");
-    if (stageEvents.length === 0) {
-      return { isConsistent: true, currentStage: declaredStage, expectedStage: declaredStage };
-    }
-    const lastStageEvent = stageEvents[stageEvents.length - 1];
-    const expectedStage = lastStageEvent.payload?.to_stage;
-    return {
-      isConsistent: declaredStage === expectedStage,
-      currentStage: declaredStage,
-      expectedStage
-    };
-  }
-  /**
-   * 工具执行包装器
-   * 所有live rd.*调用必须经过此包装器，自动写入action_chain
-   */
-  async wrapToolExecution(input) {
-    const startTime = nowMs();
-    const result = await input.execute();
-    const duration = nowMs() - startTime;
-    const event = {
-      schema_version: "2",
-      event_id: `evt-tool-${nowMs()}`,
-      turn_id: input.turnId,
-      ts_ms: startTime,
-      run_id: input.runId,
-      session_id: input.sessionId,
-      agent_id: input.agentId,
-      event_type: "tool_execution",
-      status: result.ok ? "ok" : "error",
-      duration_ms: duration,
-      refs: [],
-      payload: {
-        tool_name: input.toolName,
-        args: input.args,
-        result: result.ok ? "success" : "failed",
-        data: result.ok ? result.data : void 0,
-        artifacts: result.ok ? result.artifacts : void 0,
-        error: result.error
-      }
-    };
-    await storageAdapter.appendActionEvent(input.sessionId, event);
-    return result;
-  }
-  /**
-   * 早期Blocker检测
-   * 实时检测blocking_issues，而非等到final audit
-   */
-  async detectEarlyBlockers(caseId, runId) {
-    const blockers = [];
-    const runPath = storageAdapter.getRunPath(caseId, runId);
-    const fs2 = await import("fs");
-    const boardPath = `${runPath}/notes/hypothesis_board.yaml`;
-    if (fs2.existsSync(boardPath)) {
-      const yaml = await import("yaml");
-      const content = await fs2.promises.readFile(boardPath, "utf-8");
-      const board = yaml.parse(content);
-      if (board?.hypothesis_board?.blocking_issues) {
-        for (const issue of board.hypothesis_board.blocking_issues) {
-          blockers.push(this.createBlocker(
-            issue.code || "BLOCKER_DETECTED",
-            issue.reason || "Blocking issue detected",
-            issue.refs || []
-          ));
-        }
-      }
-    }
-    const freezePath = `${runPath}/artifacts/freeze_state.yaml`;
-    if (fs2.existsSync(freezePath)) {
-      const yaml = await import("yaml");
-      const content = await fs2.promises.readFile(freezePath, "utf-8");
-      const freeze = yaml.parse(content);
-      if (freeze?.status === "frozen") {
-        blockers.push(this.createBlocker(
-          "BLOCKED_FREEZE_STATE_ACTIVE",
-          "Run is frozen due to process deviation",
-          freeze.blocking_codes || []
-        ));
-      }
-    }
-    return { hasBlockers: blockers.length > 0, blockers };
-  }
-  // ========== 辅助方法 ==========
-  createBlocker(code, reason, refs = []) {
-    return {
-      code,
-      reason,
-      refs,
-      detectedAt: nowIso$1()
-    };
-  }
-  createGateResult(stage, blockers) {
-    return {
-      stage,
-      status: blockers.length === 0 ? "passed" : "blocked",
-      blockers,
-      refs: [],
-      paths: {}
-    };
-  }
-}
-const harnessController = new HarnessController();
-function toStringArray$1(value) {
-  if (Array.isArray(value)) {
-    return value.map((entry) => String(entry ?? "").trim()).filter(Boolean);
-  }
-  if (typeof value === "string" && value.trim()) {
-    return [value.trim()];
-  }
-  return [];
-}
-function toNumber(value, fallback) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-  return fallback;
-}
-function clamp01(value) {
-  return Math.max(0, Math.min(1, value));
-}
-function summarizePayloadData(value) {
-  if (Array.isArray(value)) {
-    return `array(${value.length})`;
-  }
-  if (!value || typeof value !== "object") {
-    return value;
-  }
-  const record = value;
-  const summary = {};
-  for (const [key, entry] of Object.entries(record).slice(0, 8)) {
-    if (Array.isArray(entry)) {
-      summary[key] = `array(${entry.length})`;
-      continue;
-    }
-    if (entry && typeof entry === "object") {
-      summary[key] = `object(${Object.keys(entry).length})`;
-      continue;
-    }
-    summary[key] = entry;
-  }
-  return summary;
-}
-function asRecord(value) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-}
-function formatPixel(value) {
-  const pixel = asRecord(value);
-  const x = pixel.x;
-  const y = pixel.y;
-  const rgba = [pixel.r, pixel.g, pixel.b, pixel.a].map((entry) => typeof entry === "number" ? entry : null);
-  if (rgba.some((entry) => entry === null)) {
-    return null;
-  }
-  return `Pixel(${x ?? "?"},${y ?? "?"}) RGBA=${rgba.join(",")}`;
-}
-function describePayloadEvidence(toolName, data) {
-  const record = asRecord(data);
-  if (toolName === "rd.export.screenshot") {
-    const nameInfo = asRecord(record.name_info);
-    return [
-      `Screenshot ${record.width ?? "?"}x${record.height ?? "?"}`,
-      `event=${record.resolved_event_id ?? record.requested_event_id ?? "?"}`,
-      `target=${record.texture_id ?? nameInfo.resource_id ?? "unknown"}`,
-      `format=${record.texture_format ?? "unknown"}`,
-      record.fallback_reason ? `fallback=${record.fallback_reason}` : "",
-      Array.isArray(record.summary_degraded_reasons) ? `degraded=${record.summary_degraded_reasons.join(",")}` : ""
-    ].filter(Boolean).join("; ");
-  }
-  if (toolName === "rd.macro.explain_pixel") {
-    const history = Array.isArray(record.history) ? record.history : [];
-    return `${record.explanation ?? "Pixel explanation available"} History events=${history.map((entry) => asRecord(entry).event_id).filter(Boolean).join(",") || history.length}`;
-  }
-  if (toolName === "rd.texture.get_pixel_value") {
-    const pixel = formatPixel(record.pixel);
-    return [
-      pixel ?? "Pixel value readback available",
-      `texture=${record.texture_id ?? "unknown"}`,
-      `event=${record.resolved_event_id ?? "?"}`,
-      Array.isArray(record.summary_degraded_reasons) ? `degraded=${record.summary_degraded_reasons.join(",")}` : ""
-    ].filter(Boolean).join("; ");
-  }
-  if (toolName === "rd.texture.get_pixel_history") {
-    const history = Array.isArray(record.history) ? record.history : [];
-    return `Pixel history on ${record.texture_id ?? "unknown"} has ${history.length} modifications: ${history.map((entry) => asRecord(entry).event_id).filter(Boolean).join(",") || "none"}.`;
-  }
-  if (toolName === "rd.pipeline.get_state_summary") {
-    const summary = asRecord(record.summary);
-    const shaders = Array.isArray(summary.shaders) ? summary.shaders.map((entry) => {
-      const shader = asRecord(entry);
-      return `${shader.stage}:${shader.resource_id}`;
-    }).join(", ") : "";
-    const target = asRecord(summary.selected_visual_target);
-    return [
-      `Pipeline api=${summary.api ?? "unknown"}`,
-      shaders ? `shaders=${shaders}` : "",
-      `bindings=${summary.binding_count ?? "?"}`,
-      target.texture_id ? `visual_target=${target.texture_id}` : "",
-      target.fallback_reason ? `fallback=${target.fallback_reason}` : ""
-    ].filter(Boolean).join("; ");
-  }
-  if (toolName === "rd.pipeline.get_output_targets") {
-    const framebuffer = asRecord(record.framebuffer);
-    const target = asRecord(framebuffer.selected_visual_target);
-    return [
-      `Framebuffer render_targets=${Array.isArray(framebuffer.render_targets) ? framebuffer.render_targets.length : "?"}`,
-      target.texture_id ? `visual_target=${target.texture_id}` : "",
-      target.texture_format ? `format=${target.texture_format}` : "",
-      target.fallback_reason ? `fallback=${target.fallback_reason}` : ""
-    ].filter(Boolean).join("; ");
-  }
-  if (toolName === "rd.pipeline.get_resource_bindings") {
-    const bindings = Array.isArray(record.bindings) ? record.bindings : [];
-    const first = bindings.slice(0, 5).map((entry) => {
-      const binding = asRecord(entry);
-      return `${binding.type}@${binding.set_or_space}:${binding.binding}=${binding.resource_id}`;
-    });
-    return `Resource bindings ${bindings.length}: ${first.join(", ")}`;
-  }
-  if (toolName.startsWith("rd.pipeline.get_shader")) {
-    const shader = asRecord(record.shader);
-    return `Shader ${shader.stage ?? "unknown"} ${shader.shader_id ?? "unknown"} entry=${shader.entry ?? "unknown"}`;
-  }
-  return null;
-}
-function findStringFieldDeep(value, keys, seen = /* @__PURE__ */ new Set()) {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-  if (seen.has(value)) {
-    return null;
-  }
-  seen.add(value);
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      const nested = findStringFieldDeep(item, keys, seen);
-      if (nested) {
-        return nested;
-      }
-    }
-    return null;
-  }
-  const record = value;
-  for (const key of keys) {
-    if (typeof record[key] === "string" && record[key]) {
-      return record[key];
-    }
-  }
-  for (const nestedValue of Object.values(record)) {
-    const nested = findStringFieldDeep(nestedValue, keys, seen);
-    if (nested) {
-      return nested;
-    }
-  }
-  return null;
-}
-function getActiveEventId(debugPlan) {
-  return debugPlan.targetFrameOrEvent?.eventId;
-}
-function getFrameIndex(debugPlan) {
-  return debugPlan.targetFrameOrEvent?.frameIndex;
-}
-function pngDimensions(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return null;
-  }
-  const buffer = fs.readFileSync(filePath);
-  if (buffer.length < 24 || buffer.toString("ascii", 1, 4) !== "PNG") {
-    return null;
-  }
-  return {
-    width: buffer.readUInt32BE(16),
-    height: buffer.readUInt32BE(20)
-  };
-}
-async function fileToImageBlock(filePath) {
-  if (!fs.existsSync(filePath)) {
-    return null;
-  }
-  const data = await fs.promises.readFile(filePath);
-  return {
-    type: "image",
-    source: {
-      type: "base64",
-      media_type: "image/png",
-      data: data.toString("base64")
-    }
-  };
-}
-class SpecialistRecipeRunner {
-  async prepareSurface(context2) {
-    const existingSnapshot = rdxSessionService.snapshotContext();
-    const existingCapture = rdxSessionService.getCaptureDescriptors().find((capture) => capture.id === context2.debugPlan.targetCapture?.captureId || capture.filePath === context2.targetCapturePath);
-    const existingReplaySessionId = existingCapture?.sessionId || existingCapture?.replaySessionId || existingSnapshot.sessionId || await this.resolveReplaySessionId(context2);
-    if (existingReplaySessionId) {
-      const frameIndex2 = getFrameIndex(context2.debugPlan);
-      if (typeof frameIndex2 === "number") {
-        await this.callTool(
-          "rd.replay.set_frame",
-          {
-            session_id: existingReplaySessionId,
-            frame_index: frameIndex2
-          },
-          "triage_agent",
-          context2
-        );
-      }
-      const eventId2 = getActiveEventId(context2.debugPlan);
-      if (typeof eventId2 === "number") {
-        await this.callTool(
-          "rd.event.set_active",
-          {
-            session_id: existingReplaySessionId,
-            event_id: eventId2
-          },
-          "triage_agent",
-          context2
-        );
-      }
-      await this.openHumanPreviewSafe(existingReplaySessionId);
-      return {
-        captureFileId: existingCapture?.captureFileId || existingCapture?.id || context2.debugPlan.targetCapture?.captureId || "target_capture",
-        replaySessionId: existingReplaySessionId
-      };
-    }
-    const openCapture = await this.callTool(
-      "rd.capture.open_file",
-      {
-        file_path: context2.targetCapturePath
-      },
-      "triage_agent",
-      context2
-    );
-    const captureFileId = typeof openCapture.data?.capture_file_id === "string" ? openCapture.data.capture_file_id : context2.debugPlan.targetCapture?.captureId;
-    if (!openCapture.ok || !captureFileId) {
-      throw new Error(openCapture.error?.message || `Failed to open target capture. capture_id=${String(captureFileId || "")} data_keys=${Object.keys(openCapture.data || {}).join(",") || "none"}`);
-    }
-    const openReplay = await this.callTool(
-      "rd.capture.open_replay",
-      {
-        capture_file_id: captureFileId
-      },
-      "triage_agent",
-      context2
-    );
-    const replaySessionId = typeof openReplay.data?.session_id === "string" ? openReplay.data.session_id : typeof openReplay.data?.replay_session_id === "string" ? openReplay.data.replay_session_id : await this.resolveReplaySessionId(context2);
-    if (!openReplay.ok || !replaySessionId) {
-      throw new Error(openReplay.error?.message || `Failed to open replay session. data_keys=${Object.keys(openReplay.data || {}).join(",") || "none"}`);
-    }
-    const frameIndex = getFrameIndex(context2.debugPlan);
-    if (typeof frameIndex === "number") {
-      await this.callTool(
-        "rd.replay.set_frame",
-        {
-          session_id: replaySessionId,
-          frame_index: frameIndex
-        },
-        "triage_agent",
-        context2
-      );
-    }
-    const eventId = getActiveEventId(context2.debugPlan);
-    if (typeof eventId === "number") {
-      await this.callTool(
-        "rd.event.set_active",
-        {
-          session_id: replaySessionId,
-          event_id: eventId
-        },
-        "triage_agent",
-        context2
-      );
-    }
-    await this.openHumanPreviewSafe(replaySessionId);
-    return {
-      captureFileId: String(captureFileId),
-      replaySessionId: String(replaySessionId)
-    };
-  }
-  async run(agentId, context2, surface) {
-    if (agentId === "triage_agent") {
-      return this.runTriage(context2, surface);
-    }
-    if (agentId === "capture_repro_agent") {
-      return this.runCaptureRepro(context2, surface);
-    }
-    if (agentId === "pass_graph_pipeline_agent") {
-      return this.runPassGraph(context2, surface);
-    }
-    if (agentId === "pixel_forensics_agent") {
-      return this.runPixelForensics(context2, surface);
-    }
-    if (agentId === "shader_ir_agent") {
-      return this.runShaderIr(context2, surface);
-    }
-    if (agentId === "driver_device_agent") {
-      return this.runDriverDevice(context2);
-    }
-    throw new Error(`Unsupported specialist recipe: ${agentId}`);
-  }
-  async openHumanPreviewSafe(sessionId) {
-    await rdxSessionService.openHumanPreviewWindow({ sessionId }).catch(() => void 0);
-  }
-  async runTriage(context2, surface) {
-    const eventId = getActiveEventId(context2.debugPlan);
-    const payloads = [];
-    const info = await this.callTool("rd.capture.get_info", {
-      capture_file_id: surface.captureFileId
-    }, "triage_agent", context2);
-    payloads.push(this.toPayload("rd.capture.get_info", info));
-    const frame = await this.callTool("rd.replay.get_frame_info", {
-      session_id: surface.replaySessionId
-    }, "triage_agent", context2);
-    payloads.push(this.toPayload("rd.replay.get_frame_info", frame));
-    if (typeof eventId === "number") {
-      const action = await this.callTool("rd.event.get_action_details", {
-        session_id: surface.replaySessionId,
-        event_id: eventId
-      }, "triage_agent", context2);
-      payloads.push(this.toPayload("rd.event.get_action_details", action));
-      const parentChain = await this.callTool("rd.event.get_parent_chain", {
-        session_id: surface.replaySessionId,
-        event_id: eventId
-      }, "triage_agent", context2);
-      payloads.push(this.toPayload("rd.event.get_parent_chain", parentChain));
-      const markerStack = await this.callTool("rd.event.get_marker_stack", {
-        session_id: surface.replaySessionId,
-        event_id: eventId
-      }, "triage_agent", context2);
-      payloads.push(this.toPayload("rd.event.get_marker_stack", markerStack));
-    }
-    const summary = await this.callTool("rd.macro.summarize_frame", {
-      session_id: surface.replaySessionId
-    }, "triage_agent", context2);
-    payloads.push(this.toPayload("rd.macro.summarize_frame", summary));
-    return this.finishRecipe("triage_agent", context2, payloads, [
-      "Capture metadata",
-      "Frame summary",
-      eventId ? `Event ${eventId}` : "Frame-level scope"
-    ]);
-  }
-  async runCaptureRepro(context2, surface) {
-    const payloads = [];
-    const listFrames = await this.callTool("rd.capture.list_frames", {
-      capture_file_id: surface.captureFileId
-    }, "capture_repro_agent", context2);
-    payloads.push(this.toPayload("rd.capture.list_frames", listFrames));
-    const screenshotPath = path.join(context2.outputRoot, "screenshots", "capture_repro.png");
-    const screenshot = await this.callTool("rd.export.screenshot", {
-      session_id: surface.replaySessionId,
-      output_path: screenshotPath,
-      file_format: "png",
-      include_alpha: true
-    }, "capture_repro_agent", context2);
-    payloads.push(this.toPayload("rd.export.screenshot", screenshot));
-    return this.finishRecipe("capture_repro_agent", context2, payloads, [
-      "Frame list",
-      "Reference screenshot"
-    ]);
-  }
-  async runPassGraph(context2, surface) {
-    const eventId = getActiveEventId(context2.debugPlan);
-    const payloads = [];
-    const stageState = await this.callTool("rd.pipeline.get_state_summary", {
-      session_id: surface.replaySessionId,
-      event_id: eventId,
-      include_bindings: true,
-      include_shaders: true
-    }, "pass_graph_pipeline_agent", context2);
-    payloads.push(this.toPayload("rd.pipeline.get_state_summary", stageState));
-    const outputTargets = await this.callTool("rd.pipeline.get_output_targets", {
-      session_id: surface.replaySessionId,
-      event_id: eventId
-    }, "pass_graph_pipeline_agent", context2);
-    payloads.push(this.toPayload("rd.pipeline.get_output_targets", outputTargets));
-    const bindings = await this.callTool("rd.pipeline.get_resource_bindings", {
-      session_id: surface.replaySessionId,
-      stage: "ps"
-    }, "pass_graph_pipeline_agent", context2);
-    payloads.push(this.toPayload("rd.pipeline.get_resource_bindings", bindings));
-    if (typeof eventId === "number" && eventId > 1) {
-      const diff = await this.callTool("rd.event.diff_pipeline_state", {
-        session_id: surface.replaySessionId,
-        event_a: Math.max(1, eventId - 1),
-        event_b: eventId,
-        scope: "full",
-        include_unchanged: false
-      }, "pass_graph_pipeline_agent", context2);
-      payloads.push(this.toPayload("rd.event.diff_pipeline_state", diff));
-    }
-    return this.finishRecipe("pass_graph_pipeline_agent", context2, payloads, [
-      "Pipeline summary",
-      "Output targets",
-      "Binding diff"
-    ]);
-  }
-  async runPixelForensics(context2, surface) {
-    const payloads = [];
-    const screenshotPath = path.join(context2.outputRoot, "screenshots", "pixel_forensics.png");
-    const screenshot = await this.callTool("rd.export.screenshot", {
-      session_id: surface.replaySessionId,
-      output_path: screenshotPath,
-      file_format: "png",
-      include_alpha: true
-    }, "pixel_forensics_agent", context2);
-    payloads.push(this.toPayload("rd.export.screenshot", screenshot));
-    const point = await this.locatePixelFocus(screenshotPath, context2);
-    const resolvedTextureId = typeof screenshot.data?.texture_id === "string" ? screenshot.data.texture_id : void 0;
-    const explain = await this.callTool("rd.macro.explain_pixel", {
-      session_id: surface.replaySessionId,
-      x: point.x,
-      y: point.y,
-      target: resolvedTextureId ?? "auto",
-      verbosity: "medium"
-    }, "pixel_forensics_agent", context2);
-    payloads.push(this.toPayload("rd.macro.explain_pixel", explain));
-    if (resolvedTextureId) {
-      const pixelValue = await this.callTool("rd.texture.get_pixel_value", {
-        session_id: surface.replaySessionId,
-        texture_id: resolvedTextureId,
-        x: point.x,
-        y: point.y,
-        mip: 0,
-        slice: 0,
-        sample: 0,
-        as_type: "float"
-      }, "pixel_forensics_agent", context2);
-      payloads.push(this.toPayload("rd.texture.get_pixel_value", pixelValue));
-      const pixelHistory = await this.callTool("rd.texture.get_pixel_history", {
-        session_id: surface.replaySessionId,
-        texture_id: resolvedTextureId,
-        x: point.x,
-        y: point.y,
-        mip: 0,
-        slice: 0,
-        sample: 0,
-        include_shaders: true
-      }, "pixel_forensics_agent", context2);
-      payloads.push(this.toPayload("rd.texture.get_pixel_history", pixelHistory));
-    }
-    return this.finishRecipe("pixel_forensics_agent", context2, payloads, [
-      `Pixel focus ${point.x},${point.y}`,
-      "Framebuffer screenshot",
-      "Pixel explanation"
-    ], [screenshotPath]);
-  }
-  async runShaderIr(context2, surface) {
-    const eventId = getActiveEventId(context2.debugPlan);
-    const payloads = [];
-    let shaderId;
-    let shaderStage = "ps";
-    for (const stage of ["ps", "cs", "vs"]) {
-      const shader = await this.callTool("rd.pipeline.get_shader", {
-        session_id: surface.replaySessionId,
-        event_id: eventId,
-        stage
-      }, "shader_ir_agent", context2);
-      payloads.push(this.toPayload(`rd.pipeline.get_shader:${stage}`, shader));
-      const candidateShaderId = typeof shader.data?.shader_id === "string" ? shader.data.shader_id : typeof shader.data?.resource_id === "string" ? shader.data.resource_id : void 0;
-      if (candidateShaderId) {
-        shaderId = candidateShaderId;
-        shaderStage = stage;
-        break;
-      }
-    }
-    if (shaderId) {
-      const source = await this.callTool("rd.shader.get_source", {
-        session_id: surface.replaySessionId,
-        shader_id: shaderId,
-        prefer_original: true
-      }, "shader_ir_agent", context2);
-      payloads.push(this.toPayload("rd.shader.get_source", source));
-      const disassembly = await this.callTool("rd.shader.get_disassembly", {
-        session_id: surface.replaySessionId,
-        shader_id: shaderId,
-        stage: shaderStage,
-        event_id: eventId
-      }, "shader_ir_agent", context2);
-      payloads.push(this.toPayload("rd.shader.get_disassembly", disassembly));
-      const reflection = await this.callTool("rd.shader.get_reflection", {
-        session_id: surface.replaySessionId,
-        shader_id: shaderId,
-        stage: shaderStage,
-        event_id: eventId,
-        include_bindings: true,
-        include_constant_blocks: true
-      }, "shader_ir_agent", context2);
-      payloads.push(this.toPayload("rd.shader.get_reflection", reflection));
-    }
-    return this.finishRecipe("shader_ir_agent", context2, payloads, [
-      shaderId ? `Shader ${shaderId}` : "Shader lookup attempted",
-      `Stage ${shaderStage}`
-    ]);
-  }
-  async runDriverDevice(context2) {
-    const payloads = [];
-    const contextSnapshot = await this.callTool("rd.session.get_context", {
-      context_id: context2.contextId
-    }, "driver_device_agent", context2);
-    payloads.push(this.toPayload("rd.session.get_context", contextSnapshot));
-    const ping = await this.callTool("rd.remote.ping", {
-      remote_id: "current"
-    }, "driver_device_agent", context2);
-    payloads.push(this.toPayload("rd.remote.ping", ping));
-    return this.finishRecipe("driver_device_agent", context2, payloads, [
-      "Runtime context",
-      "Remote status probe"
-    ]);
-  }
-  async callTool(toolName, args, agentId, context2) {
-    const result = await harnessController.wrapToolExecution({
-      toolName,
-      args,
-      agentId,
-      sessionId: context2.sessionId,
-      runId: context2.runId,
-      turnId: context2.turnId,
-      execute: () => rdxCliInvokerService.call({
-        toolName,
-        args: {
-          ...args,
-          context_id: context2.contextId,
-          runtime_owner: context2.runtimeOwner,
-          owner_lease_id: context2.ownerLeaseId
-        },
-        contextId: context2.contextId,
-        turnId: context2.turnId,
-        runtimeOwner: context2.runtimeOwner,
-        ownerLeaseId: context2.ownerLeaseId,
-        runId: context2.runId,
-        abortSignal: context2.signal
-      })
-    });
-    return {
-      ok: result.ok,
-      data: result.data,
-      error: result.error,
-      artifacts: [],
-      duration_ms: 0
-    };
-  }
-  async resolveReplaySessionId(context2) {
-    for (const toolName of ["rd.session.get_context", "rd.session.list_sessions", "rd.core.get_capabilities"]) {
-      const result = await this.callTool(toolName, {}, "triage_agent", context2);
-      if (!result.ok) {
-        continue;
-      }
-      const replaySessionId = findStringFieldDeep(result.data, [
-        "current_session_id",
-        "selected_session_id",
-        "session_id",
-        "replay_session_id"
-      ]);
-      if (replaySessionId) {
-        return replaySessionId;
-      }
-    }
-    return null;
-  }
-  toPayload(toolName, result) {
-    return {
-      toolName,
-      ok: result.ok,
-      data: result.data,
-      error: result.error?.message
-    };
-  }
-  async locatePixelFocus(screenshotPath, context2) {
-    const dims = pngDimensions(screenshotPath);
-    if (!dims) {
-      return { x: 0, y: 0 };
-    }
-    const fallbackPoint = {
-      x: Math.max(0, Math.min(dims.width - 1, Math.round(dims.width * 0.5))),
-      y: Math.max(0, Math.min(dims.height - 1, Math.round(dims.height * 0.5)))
-    };
-    const imageBlock = await fileToImageBlock(screenshotPath);
-    if (!imageBlock) {
-      return fallbackPoint;
-    }
-    try {
-      const { data } = await debuggerLlmService.callStructured({
-        agentId: "pixel_forensics_agent",
-        stage: "dispatch",
-        sessionId: context2.sessionId,
-        runId: context2.runId,
-        messages: [
-          {
-            role: "system",
-            content: "You are a graphics debugging assistant. Return JSON only with keys normalized_x, normalized_y, reason. Coordinates must be floats between 0 and 1 for the suspicious bright white highlight most relevant to the debugging task."
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: `Task: ${context2.debugPlan.userGoal}
-Find the suspicious bright white highlight that should be investigated first.`
-              },
-              imageBlock
-            ]
-          }
-        ],
-        maxTokens: 300,
-        temperature: 0.1,
-        parse: (text) => debuggerLlmService.parseJson(text),
-        testValue: {
-          normalized_x: 0.5,
-          normalized_y: 0.5,
-          reason: "test-mode center point"
-        },
-        auditSummary: (payload) => payload.reason
-      });
-      return {
-        x: Math.max(0, Math.min(dims.width - 1, Math.round(clamp01(toNumber(data.normalized_x, 0.5)) * dims.width))),
-        y: Math.max(0, Math.min(dims.height - 1, Math.round(clamp01(toNumber(data.normalized_y, 0.5)) * dims.height)))
-      };
-    } catch {
-      return fallbackPoint;
-    }
-  }
-  async finishRecipe(agentId, context2, payloads, evidence, extraArtifacts = []) {
-    const agentRoot = path.join(context2.outputRoot, "notes");
-    fs.mkdirSync(agentRoot, { recursive: true });
-    const artifactPath = path.join(agentRoot, `${agentId}.json`);
-    fs.writeFileSync(artifactPath, JSON.stringify(payloads, null, 2), "utf-8");
-    const successfulTools = payloads.filter((payload) => payload.ok);
-    const failedTools = payloads.filter((payload) => !payload.ok);
-    const condensedPayloads = payloads.map((payload) => ({
-      toolName: payload.toolName,
-      ok: payload.ok,
-      data: summarizePayloadData(payload.data),
-      error: payload.error
-    }));
-    const deterministicSummary = {
-      summary: [
-        `${agentId} collected ${successfulTools.length} successful tool results.`,
-        ...successfulTools.map((payload) => describePayloadEvidence(payload.toolName, payload.data) ?? payload.toolName).slice(0, 4).map((line) => `- ${line}`),
-        ...failedTools.length > 0 ? [`Failed tools: ${failedTools.map((payload) => payload.toolName).join(", ")}`] : []
-      ].join("\n"),
-      evidence: [
-        ...evidence,
-        ...successfulTools.map((payload) => describePayloadEvidence(payload.toolName, payload.data)).filter((line) => Boolean(line))
-      ],
-      next_step: this.getNextStep(agentId),
-      confidence: successfulTools.length > 0 ? 0.72 : 0.35
-    };
-    let llmSummary;
-    try {
-      const structuredResult = await debuggerLlmService.callStructured({
-        agentId,
-        stage: "dispatch",
-        sessionId: context2.sessionId,
-        runId: context2.runId,
-        messages: [
-          {
-            role: "system",
-            content: "You are a RenderDoc debugging specialist. Return compact JSON only with keys summary, evidence, next_step, confidence. Keep summary to at most two sentences, evidence to at most three short strings, and confidence between 0 and 1. Do not include markdown fences or extra commentary."
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: [
-                  `Agent: ${agentId}`,
-                  `Goal: ${context2.debugPlan.userGoal}`,
-                  `Evidence anchors: ${evidence.join(" | ") || "N/A"}`,
-                  `Successful tools: ${successfulTools.map((payload) => payload.toolName).join(", ") || "none"}`,
-                  `Failed tools: ${failedTools.map((payload) => `${payload.toolName}: ${payload.error || "failed"}`).join(" | ") || "none"}`,
-                  `Condensed tool payloads JSON: ${JSON.stringify(condensedPayloads)}`
-                ].join("\n")
-              }
-            ]
-          }
-        ],
-        maxTokens: 220,
-        temperature: 0.1,
-        parse: (text) => debuggerLlmService.parseJson(text),
-        testValue: deterministicSummary,
-        auditSummary: (payload) => payload.summary
-      });
-      llmSummary = structuredResult.data;
-    } catch {
-      try {
-        const fallbackResult = await debuggerLlmService.call({
-          agentId,
-          stage: "dispatch",
-          sessionId: context2.sessionId,
-          runId: context2.runId
-        }, {
-          messages: [
-            {
-              role: "system",
-              content: "You are a RenderDoc debugging specialist. Reply with one or two concise sentences only. Summarize the most important finding from the provided tool evidence and what should be checked next."
-            },
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: [
-                    `Agent: ${agentId}`,
-                    `Goal: ${context2.debugPlan.userGoal}`,
-                    `Evidence anchors: ${evidence.join(" | ") || "N/A"}`,
-                    `Successful tools: ${successfulTools.map((payload) => payload.toolName).join(", ") || "none"}`,
-                    `Failed tools: ${failedTools.map((payload) => `${payload.toolName}: ${payload.error || "failed"}`).join(" | ") || "none"}`
-                  ].join("\n")
-                }
-              ]
-            }
-          ],
-          maxTokens: 160,
-          temperature: 0.1
-        });
-        const fallbackSummary = fallbackResult.text.trim();
-        llmSummary = fallbackSummary ? {
-          summary: fallbackSummary,
-          evidence,
-          next_step: this.getNextStep(agentId),
-          confidence: deterministicSummary.confidence
-        } : deterministicSummary;
-      } catch {
-        llmSummary = deterministicSummary;
-      }
-    }
-    const reasoningSummary = {
-      summaryId: `${agentId}-${Date.now()}`,
-      stage: "dispatch",
-      agentId,
-      summary: llmSummary.summary,
-      evidence: toStringArray$1(llmSummary.evidence).length > 0 ? toStringArray$1(llmSummary.evidence) : evidence,
-      nextStep: llmSummary.next_step || this.getNextStep(agentId),
-      confidence: toNumber(llmSummary.confidence, deterministicSummary.confidence),
-      createdAt: nowIso$1()
-    };
-    return {
-      agentId,
-      brief: reasoningSummary.summary,
-      reasoningSummary,
-      artifacts: [artifactPath, ...extraArtifacts],
-      evidenceRefs: reasoningSummary.evidence,
-      payloads
-    };
-  }
-  getNextStep(agentId) {
-    if (agentId === "triage_agent") {
-      return "Use triage evidence to decide which pipeline, pixel, and shader investigations should continue.";
-    }
-    if (agentId === "pixel_forensics_agent") {
-      return "Correlate the suspicious pixel evidence with pipeline and shader state.";
-    }
-    if (agentId === "shader_ir_agent") {
-      return "Validate whether shader logic matches the visual artifact and proposed fix.";
-    }
-    return "Feed this specialist evidence into the orchestrator investigation summary.";
-  }
-}
-const specialistRecipeRunner = new SpecialistRecipeRunner();
-class DeterministicSpecialistExecutor {
-  prepareSurface(context2) {
-    return specialistRecipeRunner.prepareSurface(context2);
-  }
-  run(specialist, context2, surface) {
-    return specialistRecipeRunner.run(specialist, context2, surface);
-  }
-}
-const deterministicSpecialistExecutor = new DeterministicSpecialistExecutor();
-const escapeHtml = (value) => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-class ReportBundleService {
-  publish(input) {
-    const reportsDir = path.join(
-      input.projectRoot,
-      "sessions",
-      input.sessionId,
-      "runs",
-      input.runId,
-      "reports"
-    );
-    fs.mkdirSync(reportsDir, { recursive: true });
-    const markdownPath = path.join(reportsDir, "report.md");
-    const jsonPath = path.join(reportsDir, "report.json");
-    const htmlPath = path.join(reportsDir, "visual_report.html");
-    const payload = {
-      sessionId: input.sessionId,
-      runId: input.runId,
-      goal: input.goal,
-      eventCount: input.eventCount ?? 0,
-      artifactPaths: input.artifactPaths ?? [],
-      evidenceSummary: input.evidenceSummary ?? input.report.evidenceSummary,
-      verificationSummary: input.verificationSummary ?? [],
-      llmExecution: input.llmExecution ?? null,
-      report: input.report
-    };
-    fs.writeFileSync(markdownPath, this.buildMarkdown(payload), "utf8");
-    fs.writeFileSync(jsonPath, JSON.stringify(payload, null, 2), "utf8");
-    fs.writeFileSync(htmlPath, this.buildHtml(payload), "utf8");
-    return {
-      reportsDir,
-      markdownPath,
-      jsonPath,
-      htmlPath
-    };
-  }
-  buildMarkdown(payload) {
-    const lines = [
-      `# ${payload.report.title}`,
-      "",
-      "## Task Goal",
-      payload.goal || "N/A",
-      "",
-      "## Summary",
-      payload.report.summary || "N/A",
-      "",
-      "## Root Cause",
-      payload.report.rootCause || "N/A",
-      "",
-      "## Fix Verification",
-      payload.report.fixDescription || "N/A",
-      "",
-      "## Evidence Summary",
-      ...payload.evidenceSummary.length > 0 ? payload.evidenceSummary.map((item) => `- ${item}`) : ["- N/A"],
-      "",
-      "## Verification Notes",
-      ...payload.verificationSummary.length > 0 ? payload.verificationSummary.map((item) => `- ${item}`) : ["- N/A"],
-      "",
-      "## LLM Execution",
-      ...payload.llmExecution ? [
-        `- Provider ID: ${payload.llmExecution.providerId}`,
-        `- Model ID: ${payload.llmExecution.modelId}`,
-        `- Successful Calls: ${payload.llmExecution.successfulCallCount}`,
-        `- Failed Calls: ${payload.llmExecution.failedCallCount}`,
-        `- First Request ID: ${payload.llmExecution.firstRequestId || "N/A"}`,
-        `- Token Usage: input=${payload.llmExecution.totalInputTokens}, output=${payload.llmExecution.totalOutputTokens}`
-      ] : ["- N/A"],
-      "",
-      "## Recommendations",
-      ...payload.report.recommendations.length > 0 ? payload.report.recommendations.map((item) => `- ${item}`) : ["- N/A"],
-      "",
-      "## Run Metadata",
-      `- Session ID: ${payload.sessionId}`,
-      `- Run ID: ${payload.runId}`,
-      `- Event Count: ${payload.eventCount}`,
-      `- Confidence: ${payload.report.confidence}`,
-      "",
-      "## Related Artifacts",
-      ...payload.artifactPaths.length > 0 ? payload.artifactPaths.map((item) => `- ${item}`) : ["- N/A"],
-      ""
-    ];
-    return lines.join("\n");
-  }
-  buildHtml(payload) {
-    const evidenceItems = (payload.evidenceSummary.length > 0 ? payload.evidenceSummary : ["N/A"]).map((item) => `<li>${escapeHtml(item)}</li>`).join("");
-    const verificationItems = (payload.verificationSummary.length > 0 ? payload.verificationSummary : ["N/A"]).map((item) => `<li>${escapeHtml(item)}</li>`).join("");
-    const recommendationItems = (payload.report.recommendations.length > 0 ? payload.report.recommendations : ["N/A"]).map((item) => `<li>${escapeHtml(item)}</li>`).join("");
-    const artifactItems = (payload.artifactPaths.length > 0 ? payload.artifactPaths : ["N/A"]).map((item) => `<li><code>${escapeHtml(item)}</code></li>`).join("");
-    const llmItems = payload.llmExecution ? [
-      `<li>Provider ID: <code>${escapeHtml(payload.llmExecution.providerId)}</code></li>`,
-      `<li>Model ID: <code>${escapeHtml(payload.llmExecution.modelId)}</code></li>`,
-      `<li>Successful Calls: ${payload.llmExecution.successfulCallCount}</li>`,
-      `<li>Failed Calls: ${payload.llmExecution.failedCallCount}</li>`,
-      `<li>First Request ID: <code>${escapeHtml(payload.llmExecution.firstRequestId || "N/A")}</code></li>`,
-      `<li>Token Usage: input=${payload.llmExecution.totalInputTokens}, output=${payload.llmExecution.totalOutputTokens}</li>`
-    ].join("") : "<li>N/A</li>";
-    return `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${escapeHtml(payload.report.title)}</title>
-  <style>
-    :root {
-      --bg: #0d1117;
-      --panel: #161b22;
-      --muted: #8b949e;
-      --text: #e6edf3;
-      --accent: #4cc2ff;
-      --border: #30363d;
-      --success: #3fb950;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: "Segoe UI", "PingFang SC", sans-serif;
-      background: radial-gradient(circle at top, #162234, var(--bg) 55%);
-      color: var(--text);
-    }
-    .page {
-      max-width: 1120px;
-      margin: 0 auto;
-      padding: 32px 24px 48px;
-    }
-    .hero, .section {
-      background: color-mix(in srgb, var(--panel) 92%, black);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 24px;
-      margin-bottom: 20px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
-    }
-    .eyebrow {
-      color: var(--accent);
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      font-size: 12px;
-      margin-bottom: 8px;
-    }
-    h1, h2 { margin: 0 0 12px; }
-    p { line-height: 1.6; color: var(--text); }
-    .meta {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 12px;
-      margin-top: 16px;
-    }
-    .meta-item {
-      background: rgba(255,255,255,0.02);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px;
-    }
-    .meta-item .label {
-      color: var(--muted);
-      font-size: 12px;
-      margin-bottom: 6px;
-    }
-    .meta-item .value {
-      color: var(--text);
-      font-weight: 600;
-      word-break: break-word;
-    }
-    ul { margin: 0; padding-left: 20px; }
-    li { margin: 8px 0; color: var(--text); }
-    .confidence {
-      color: var(--success);
-      font-weight: 700;
-    }
-    code {
-      font-family: "JetBrains Mono", Consolas, monospace;
-      color: #9cdcfe;
-    }
-  </style>
-</head>
-<body>
-  <main class="page">
-    <section class="hero">
-      <div class="eyebrow">RDC Agent Report</div>
-      <h1>${escapeHtml(payload.report.title)}</h1>
-      <p>${escapeHtml(payload.report.summary || "N/A")}</p>
-      <div class="meta">
-        <div class="meta-item"><div class="label">Session</div><div class="value">${escapeHtml(payload.sessionId)}</div></div>
-        <div class="meta-item"><div class="label">Run</div><div class="value">${escapeHtml(payload.runId)}</div></div>
-        <div class="meta-item"><div class="label">Events</div><div class="value">${payload.eventCount}</div></div>
-        <div class="meta-item"><div class="label">Confidence</div><div class="value confidence">${escapeHtml(String(payload.report.confidence))}</div></div>
-      </div>
-    </section>
-    <section class="section">
-      <div class="eyebrow">Task Goal</div>
-      <p>${escapeHtml(payload.goal || "N/A")}</p>
-    </section>
-    <section class="section">
-      <div class="eyebrow">Root Cause</div>
-      <p>${escapeHtml(payload.report.rootCause || "N/A")}</p>
-    </section>
-    <section class="section">
-      <div class="eyebrow">Fix Verification</div>
-      <p>${escapeHtml(payload.report.fixDescription || "N/A")}</p>
-    </section>
-    <section class="section">
-      <div class="eyebrow">Evidence Summary</div>
-      <ul>${evidenceItems}</ul>
-    </section>
-    <section class="section">
-      <div class="eyebrow">Verification Notes</div>
-      <ul>${verificationItems}</ul>
-    </section>
-    <section class="section">
-      <div class="eyebrow">LLM Execution</div>
-      <ul>${llmItems}</ul>
-    </section>
-    <section class="section">
-      <div class="eyebrow">Recommendations</div>
-      <ul>${recommendationItems}</ul>
-    </section>
-    <section class="section">
-      <div class="eyebrow">Artifacts</div>
-      <ul>${artifactItems}</ul>
-    </section>
-  </main>
-</body>
-</html>`;
-  }
-}
-const reportBundleService = new ReportBundleService();
 class RunScopedStore {
   getRunRoot(sessionId, runId) {
     return storageAdapter.getRunPath(sessionId, runId);
@@ -12993,60 +10151,6 @@ class ContextService {
   }
 }
 const contextService = new ContextService();
-const mapTaskStatus = (status) => {
-  if (status === "in_progress") return "running";
-  if (status === "rejected") return "failed";
-  return status;
-};
-class MultiAgentWorkflowEngine {
-  constructor(listTasksForRun = () => []) {
-    this.listTasksForRun = listTasksForRun;
-  }
-  listTasksForRun;
-  createDebuggerGraph(input) {
-    return {
-      id: `debugger-serial-${input.runId}`,
-      runId: input.runId,
-      mode: "debugger",
-      execution: "serial",
-      status: this.resolveGraphStatus(input.tasks),
-      tasks: input.tasks.map((task) => ({
-        id: task.taskId,
-        title: task.title,
-        status: mapTaskStatus(task.status),
-        ownerAgentId: task.owner === "harness" ? "rdc-debugger" : task.owner,
-        stage: task.stage,
-        dependsOn: task.dependsOn
-      }))
-    };
-  }
-  readDebuggerGraph(sessionId, runId) {
-    return this.createDebuggerGraph({
-      runId,
-      sessionId,
-      tasks: this.listTasksForRun(sessionId, runId)
-    });
-  }
-  assertSerialExecution(graph) {
-    if (graph.execution !== "serial") {
-      throw new Error(`Debugger workflow must be serial: ${graph.id}`);
-    }
-    const runningTasks = graph.tasks.filter((task) => task.status === "running");
-    if (runningTasks.length > 1) {
-      throw new Error(`Debugger workflow has concurrent running tasks: ${runningTasks.map((task) => task.id).join(", ")}`);
-    }
-  }
-  resolveGraphStatus(tasks) {
-    if (tasks.some((task) => task.status === "in_progress")) return "running";
-    if (tasks.some((task) => task.status === "rejected")) return "failed";
-    if (tasks.some((task) => task.status === "cancelled")) return "cancelled";
-    if (tasks.length > 0 && tasks.every((task) => task.status === "completed")) return "completed";
-    return "pending";
-  }
-}
-const multiAgentWorkflowEngine = new MultiAgentWorkflowEngine(
-  taskBoard.listTasks.bind(taskBoard)
-);
 const STORE_FILE = "agentic-trace-state.json";
 const defaultState = (sessionId) => ({
   schemaVersion: "1",
@@ -13601,31 +10705,6 @@ class TraceEventEmitter {
     };
     return this.store.append(runId, "node.created", node);
   }
-  emitPlan(runId, debugPlan) {
-    const node = {
-      id: `plan-${debugPlan.planId}`,
-      runId,
-      kind: "plan",
-      title: debugPlan.presentation?.title || "Debugger Plan",
-      steps: (debugPlan.presentation?.sections ?? []).map((section, index) => ({
-        id: section.id || `step-${index}`,
-        title: section.title,
-        description: section.body.join("\n"),
-        status: "pending"
-      })),
-      seq: 0,
-      createdAt: debugPlan.createdAt,
-      visibility: "user",
-      status: "succeeded"
-    };
-    if (node.steps.length === 0) {
-      node.steps = [
-        { id: "goal", title: "目标", description: debugPlan.userGoal, status: "pending" },
-        { id: "scope", title: "执行路线", description: debugPlan.scope, status: "pending" }
-      ];
-    }
-    return this.store.append(runId, "node.created", node);
-  }
   emitFinalResponse(runId, content, format = "markdown") {
     const node = {
       id: generateEventId("final"),
@@ -14092,13 +11171,11 @@ const runStatusFromSummary = (run, planStatus) => {
   if (run.status === "completed") return "succeeded";
   return "running";
 };
-const mapPlanStatus = (approvalState, run) => {
+const mapRunPlanStatus = (run) => {
   if (run.status === "failed" || run.status === "interrupted") return "failed";
   if (run.status === "completed") return "executed";
-  if (approvalState === "approved") return "accepted";
-  if (approvalState === "pending_user" || run.status === "awaiting_approval") return "awaiting_approval";
-  if (approvalState === "rejected") return "needs_revision";
-  return "draft";
+  if (run.status === "awaiting_approval") return "awaiting_approval";
+  return "accepted";
 };
 const progressStatusFromTask = (task) => {
   if (task.status === "in_progress") return "running";
@@ -14123,16 +11200,6 @@ class TraceService {
     this.runStore = new TraceRunStore(this.traceRoot);
     this.eventStore = new TraceEventStore(this.traceRoot);
     this.emitter = new TraceEventEmitter(this.eventStore);
-    const catalogCandidates = [
-      path.join(process.cwd(), "resources", "tools", "spec", "tool_catalog.json"),
-      path.join(electron.app.getAppPath(), "resources", "tools", "spec", "tool_catalog.json")
-    ];
-    for (const catalogPath of catalogCandidates) {
-      if (require("fs").existsSync(catalogPath)) {
-        toolManifestRegistry.loadFromCatalog(catalogPath);
-        break;
-      }
-    }
   }
   getRun(runId) {
     return this.runStore.get(runId);
@@ -14180,17 +11247,15 @@ class TraceService {
       sessionId,
       ref: `raw-${event.event_id}`
     }));
-    let latestApproval = null;
     let mode = "ask";
     for (const run of runs) {
-      const snapshot = storageAdapter.readPlanSnapshot(sessionId, run.runId);
       const runEvents = events.filter((e) => e.run_id === run.runId).sort((a, b) => a.ts_ms - b.ts_ms);
-      const planStatus = mapPlanStatus(snapshot?.approval_state, run);
+      const planStatus = mapRunPlanStatus(run);
       const branchId = state2.activeBranchId || "branch-main";
       const agentType = run.mode ?? "debugger";
       mode = agentType;
       const profile = agentProfileRegistry.getForMode(agentType);
-      const userPrompt = this.userPromptForRun(conversations, run.runId) || snapshot?.debug_plan?.userGoal || runEvents.find((e) => e.event_type === "user_message")?.payload?.content || "调试任务";
+      const userPrompt = this.userPromptForRun(conversations, run.runId) || runEvents.find((e) => e.event_type === "user_message")?.payload?.content || "调试任务";
       const runId = run.runId;
       let agentRun = this.runStore.get(runId);
       if (!agentRun) {
@@ -14242,12 +11307,6 @@ class TraceService {
         this.emitter.emitTaskFrame(runId, String(userPrompt));
       }
       startPhase("understand");
-      if (snapshot?.debug_plan && !existingRunEvents.some((e) => e.payload?.kind === "plan")) {
-        completePhase("understand");
-        startPhase("plan");
-        this.emitter.emitPlan(runId, snapshot.debug_plan);
-        completePhase("plan");
-      }
       for (const msg of conversations.filter((m) => m.runId === runId && m.role === "assistant")) {
         const thoughtId = `thought-${msg.id}`;
         if (msg.content.trim() && !existingNodeIds.has(thoughtId)) {
@@ -14289,23 +11348,10 @@ class TraceService {
       const nodes = traceTreeBuilder.build(traceEvents, profile);
       const timeline = projectionBuilder.build(agentRun, nodes, profile);
       runViewModels.push({ run: agentRun, timeline });
-      const tracePlanId = `ws-${runId}-plan`;
       const traceExecutionId = `ws-${runId}-execution`;
       progress.push(...this.mapProgress(sessionId, runId, branchId, traceExecutionId));
       artifacts.push(...this.mapArtifacts(sessionId, runId, branchId, traceExecutionId, runEvents));
       context2.push(...this.mapContext(sessionId, runId, branchId, traceExecutionId, run));
-      if (planStatus === "awaiting_approval" && snapshot?.debug_plan) {
-        latestApproval = {
-          planId: snapshot.debug_plan.planId,
-          runId,
-          traceLaneId: tracePlanId,
-          status: "awaiting_approval",
-          title: snapshot.debug_plan.presentation?.title || "Debugger Plan",
-          summary: snapshot.debug_plan.userGoal,
-          canApprove: true,
-          canRequestRevision: true
-        };
-      }
     }
     for (const turn of this.groupAskTurns(conversations)) {
       if (turn.messages.some((m) => m.runId)) continue;
@@ -14363,7 +11409,6 @@ class TraceService {
       mode,
       runs: runViewModels.sort((a, b) => Date.parse(a.run.createdAt) - Date.parse(b.run.createdAt)),
       rightPanel,
-      approval: latestApproval,
       branchNavigator: null,
       rawAuditRefs,
       updatedAt: nowIso$1()
@@ -14536,2142 +11581,113 @@ class TraceService {
   }
 }
 const traceService = new TraceService();
-const KNOWN_AGENT_ROLES = /* @__PURE__ */ new Set([
-  "rdc-debugger",
-  "triage_agent",
-  "capture_repro_agent",
-  "pass_graph_pipeline_agent",
-  "pixel_forensics_agent",
-  "shader_ir_agent",
-  "driver_device_agent",
-  "skeptic_agent",
-  "curator_agent"
-]);
-function latestStageHistory(events) {
-  return events.filter((event) => event.event_type === "workflow_stage_transition").map((event) => normalizeWorkflowStage(String(event.payload.toStage || "preflight")));
-}
-function dedupeBlockers(blockers) {
-  const seen = /* @__PURE__ */ new Set();
-  const result = [];
-  for (const blocker of blockers) {
-    const key = `${blocker.code}:${blocker.reason}`;
-    if (seen.has(key)) {
-      continue;
+class RunExecutionService {
+  activeRuns = /* @__PURE__ */ new Map();
+  startRun(context2, executor) {
+    const existing = this.activeRuns.get(context2.runId);
+    if (existing) {
+      return existing;
     }
-    seen.add(key);
-    result.push(blocker);
-  }
-  return result;
-}
-function toStringArray(value) {
-  if (Array.isArray(value)) {
-    return value.map((entry) => String(entry ?? "").trim()).filter(Boolean);
-  }
-  if (typeof value === "string" && value.trim()) {
-    return [value.trim()];
-  }
-  return [];
-}
-function toConfidence(value, fallback) {
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return value;
-  }
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
-  }
-  return fallback;
-}
-function toRecommendedSpecialists(value, fallback) {
-  const parsed = toStringArray(value).filter((entry) => KNOWN_AGENT_ROLES.has(entry));
-  return parsed.length > 0 ? Array.from(new Set(parsed)) : fallback;
-}
-const ASK_USER_TOOL_NAME = "ui.ask_user_question";
-const buildAskUserQuestionTraceQuestions = (prompt) => prompt.questions.map((question) => ({
-  questionId: question.id,
-  prompt: question.prompt,
-  recommendedOptionId: question.recommendedOptionId,
-  options: question.options.map((option) => ({
-    optionId: option.id,
-    label: option.label,
-    description: option.description
-  })),
-  freeformPlaceholder: question.freeformPlaceholder
-}));
-const buildAskUserAnswerSummary = (prompt, answers) => {
-  if (!prompt) {
-    return `已回答 ${answers.length} 个问题。`;
-  }
-  const lines = answers.map((answer) => {
-    const question = prompt.questions.find((entry) => entry.id === answer.questionId);
-    const option = question?.options.find((entry) => entry.id === answer.selectedOptionId);
-    const value = answer.freeformText?.trim() || option?.label || answer.selectedOptionId || "未选择";
-    return question ? `${question.prompt} -> ${value}` : `${answer.questionId} -> ${value}`;
-  });
-  return lines.length > 0 ? `已回答 ${lines.length} 个问题：
-${lines.join("\n")}` : "用户未提供回答。";
-};
-class DebugWorkflowService {
-  async startPlan(request) {
-    try {
-      const resolved = intakeContextResolver.resolve(request);
-      const caseId = request.sessionId || await storageAdapter.createCase({
-        caseId: request.sessionId,
-        projectId: request.projectId,
-        userGoal: resolved.goalText,
-        symptomSummary: resolved.goalText
-      });
-      const { runId, sessionId } = await storageAdapter.createRun({
-        caseId,
-        turnId: request.turnId,
-        capturePaths: resolved.captures.map((capture) => capture.filePath),
-        mode: request.mode,
-        goal: resolved.goalText,
-        captures: resolved.captures,
-        backend: resolved.backend,
-        status: "planning"
-      });
-      debuggerLlmService.resetRunSummary(runId);
-      const basePlan = planBuilder.build(resolved);
-      let debugPlan = basePlan.debugPlan;
-      let pendingQuestions = basePlan.pendingQuestions;
-      const blockers = [...basePlan.blockers];
-      if (blockers.length === 0) {
-        blockers.push(...debuggerLlmService.getRouteBlockers(
-          this.getRequiredRouteAgents(debugPlan, resolved.backend),
-          "plan"
-        ));
-      }
-      if (blockers.length === 0) {
-        try {
-          debugPlan = await this.generatePlanWithLlm({
-            sessionId,
-            runId,
-            resolvedGoal: resolved.goalText,
-            basePlan: debugPlan
-          });
-          blockers.push(...debuggerLlmService.getRouteBlockers(
-            this.getRequiredRouteAgents(debugPlan, resolved.backend),
-            "plan"
-          ));
-        } catch (error) {
-          blockers.push(this.normalizeLlmBlocker(error, BLOCKER_CODES.BLOCKED_LLM_REQUEST_FAILED.code));
-        }
-      }
-      debugPlan = {
-        ...debugPlan,
-        blockers: dedupeBlockers([...debugPlan.blockers, ...blockers]),
-        strictReady: Boolean(debugPlan.targetCapture) && dedupeBlockers([...debugPlan.blockers, ...blockers]).length === 0 && !pendingQuestions,
-        planReadiness: blockers.length > 0 ? "blocked" : pendingQuestions ? "needs_user_input" : "strict_ready",
-        updatedAt: nowIso$1()
-      };
-      const approvalState = debugPlan.strictReady ? "pending_user" : "not_requested";
-      storageAdapter.writePlanSnapshot(sessionId, runId, {
-        debug_plan: debugPlan,
-        pending_questions: pendingQuestions,
-        approval_state: approvalState,
-        intake_context: resolved.intakeContext
-      });
-      this.seedHarnessPlan({
-        sessionId,
-        runId,
-        mode: request.mode,
-        captures: resolved.captures,
-        debugPlan,
-        pendingQuestions
-      });
-      await storageAdapter.updateRun(sessionId, runId, {
-        status: blockers.length > 0 ? "failed" : pendingQuestions ? "awaiting_input" : "awaiting_approval",
-        lastStage: blockers.length > 0 ? "plan" : pendingQuestions ? "awaiting_user_input" : "plan",
-        runtime: {
-          workflow_stage: blockers.length > 0 ? "plan" : pendingQuestions ? "awaiting_user_input" : "plan"
-        }
-      });
-      await this.appendActionEvent(sessionId, storageAdapter.createActionEvent({
-        runId,
-        sessionId,
-        agentId: "rdc-debugger",
-        eventType: "user_message",
-        status: "ok",
-        payload: {
-          role: "user",
-          content: resolved.goalText,
-          source: resolved.taskFilePath ? "task_file" : "prompt"
-        }
-      }));
-      for (const [fromStage, toStage] of [
-        ["preflight", "entry_gate"],
-        ["entry_gate", "intake_gate"],
-        ["intake_gate", "plan"]
-      ]) {
-        await this.appendActionEvent(sessionId, storageAdapter.createActionEvent({
-          runId,
-          sessionId,
-          agentId: "rdc-debugger",
-          eventType: "workflow_stage_transition",
-          status: "ok",
-          payload: {
-            fromStage,
-            toStage
-          }
-        }));
-      }
-      if (pendingQuestions) {
-        await this.appendActionEvent(sessionId, storageAdapter.createActionEvent({
-          runId,
-          sessionId,
-          agentId: "rdc-debugger",
-          eventType: "tool_execution",
-          status: "sent",
-          payload: {
-            tool_name: ASK_USER_TOOL_NAME,
-            phase: "request",
-            prompt_id: pendingQuestions.promptId,
-            title: pendingQuestions.title,
-            summary: pendingQuestions.summary,
-            question_count: pendingQuestions.questions.length,
-            questions: buildAskUserQuestionTraceQuestions(pendingQuestions)
-          }
-        }));
-        await this.appendActionEvent(sessionId, storageAdapter.createActionEvent({
-          runId,
-          sessionId,
-          agentId: "rdc-debugger",
-          eventType: "blocker",
-          status: "blocked",
-          payload: {
-            code: "ASK_USER_REQUIRED",
-            reason: "Plan requires structured user answers before execution can start.",
-            prompt_id: pendingQuestions.promptId
-          }
-        }));
-      }
-      for (const blocker of blockers) {
-        await this.appendActionEvent(sessionId, storageAdapter.createActionEvent({
-          runId,
-          sessionId,
-          agentId: "rdc-debugger",
-          eventType: "blocker",
-          status: "blocked",
-          payload: {
-            code: blocker.code,
-            reason: blocker.reason,
-            refs: blocker.refs
-          }
-        }));
-      }
-      this.emitWorkflowState(await this.getWorkflowState(sessionId, runId));
-      return {
-        success: true,
-        runId,
-        sessionId,
-        caseId,
-        currentStage: blockers.length > 0 ? "plan" : pendingQuestions ? "awaiting_user_input" : "plan",
-        status: blockers.length > 0 ? "failed" : pendingQuestions ? "awaiting_input" : "awaiting_approval",
-        planStatus: debugPlan.planReadiness,
-        pendingQuestions,
-        debugPlanSummary: debugPlan
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  }
-  async getPlan(runId) {
-    const location = this.findRun(runId);
-    if (!location) {
-      return { success: false, error: `Run not found: ${runId}` };
-    }
-    const snapshot = storageAdapter.readPlanSnapshot(location.session.sessionId, runId);
-    return {
-      success: true,
-      runId,
-      sessionId: location.session.sessionId,
-      debugPlan: snapshot?.debug_plan ?? null,
-      pendingQuestions: snapshot?.pending_questions ?? null,
-      approvalState: snapshot?.approval_state ?? "not_requested"
+    const abortController = new AbortController();
+    const controller = {
+      ...context2,
+      startedAt: Date.now(),
+      abortController
     };
-  }
-  async submitQuestions(runId, answers) {
-    const location = this.findRun(runId);
-    if (!location) {
-      return { success: false, error: `Run not found: ${runId}` };
-    }
-    const snapshot = storageAdapter.readPlanSnapshot(location.session.sessionId, runId);
-    if (!snapshot?.debug_plan) {
-      return { success: false, error: "No plan snapshot available." };
-    }
-    const pendingQuestionsBeforeSubmit = snapshot.pending_questions;
-    const nextPlan = {
-      ...snapshot.debug_plan,
-      updatedAt: nowIso$1(),
-      blockers: snapshot.debug_plan.blockers.filter((blocker) => blocker.code !== "ASK_USER_REQUIRED")
-    };
-    for (const answer of answers) {
-      if (answer.questionId !== "target_capture") {
-        continue;
-      }
-      const projectInputs = storageAdapter.listProjectInputs(location.session.projectId);
-      const matchedInput = projectInputs.find((input) => input.inputId === answer.selectedOptionId || input.fileName === answer.freeformText?.trim());
-      if (matchedInput) {
-        nextPlan.targetCapture = {
-          captureId: matchedInput.inputId,
-          fileName: matchedInput.fileName,
-          filePath: matchedInput.filePath
-        };
-        nextPlan.missingInfo = nextPlan.missingInfo.filter((item) => item !== "target_capture");
-      }
-    }
-    nextPlan.blockers = dedupeBlockers([
-      ...nextPlan.blockers,
-      ...debuggerLlmService.getRouteBlockers(
-        this.getRequiredRouteAgents(nextPlan, location.run.backend),
-        "plan"
-      )
-    ]);
-    nextPlan.strictReady = Boolean(nextPlan.targetCapture) && nextPlan.blockers.length === 0;
-    nextPlan.planReadiness = nextPlan.blockers.length > 0 ? "blocked" : nextPlan.strictReady ? "strict_ready" : "needs_user_input";
-    nextPlan.presentation = buildDebugPlanPresentation(nextPlan);
-    const previousBlockerKeys = new Set(snapshot.debug_plan.blockers.map((blocker) => `${blocker.code}:${blocker.reason}`));
-    const newBlockers = nextPlan.blockers.filter((blocker) => !previousBlockerKeys.has(`${blocker.code}:${blocker.reason}`));
-    const nextStatus = nextPlan.blockers.length > 0 ? "failed" : nextPlan.strictReady ? "awaiting_approval" : "awaiting_input";
-    const nextStage = nextPlan.blockers.length > 0 || nextPlan.strictReady ? "plan" : "awaiting_user_input";
-    storageAdapter.writePlanSnapshot(location.session.sessionId, runId, {
-      ...snapshot,
-      debug_plan: nextPlan,
-      pending_questions: nextPlan.strictReady || nextPlan.blockers.length > 0 ? null : snapshot.pending_questions,
-      approval_state: nextPlan.blockers.length > 0 ? "not_requested" : nextPlan.strictReady ? "pending_user" : snapshot.approval_state
-    });
-    await storageAdapter.updateRun(location.session.sessionId, runId, {
-      status: nextStatus,
-      lastStage: nextStage,
-      runtime: {
-        workflow_stage: nextStage
+    controller.promise = executor(abortController.signal).finally(() => {
+      const active = this.activeRuns.get(context2.runId);
+      if (active?.abortController === abortController) {
+        this.activeRuns.delete(context2.runId);
       }
     });
-    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-      runId,
-      sessionId: location.session.sessionId,
-      agentId: "rdc-debugger",
-      eventType: "user_message",
-      status: "ok",
-      payload: {
-        role: "user",
-        content: JSON.stringify(answers),
-        source: "ask_user_answers"
-      }
+    this.activeRuns.set(context2.runId, controller);
+    return controller;
+  }
+  listActiveRuns() {
+    return Array.from(this.activeRuns.values()).map((run) => ({
+      runId: run.runId,
+      sessionId: run.sessionId,
+      projectId: run.projectId,
+      startedAt: run.startedAt,
+      stage: run.stage
     }));
-    if (pendingQuestionsBeforeSubmit) {
-      await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-        runId,
-        sessionId: location.session.sessionId,
-        agentId: "rdc-debugger",
-        eventType: "tool_execution",
-        status: "completed",
-        payload: {
-          tool_name: ASK_USER_TOOL_NAME,
-          phase: "answer",
-          prompt_id: pendingQuestionsBeforeSubmit.promptId,
-          title: pendingQuestionsBeforeSubmit.title,
-          summary: pendingQuestionsBeforeSubmit.summary,
-          question_count: pendingQuestionsBeforeSubmit.questions.length,
-          questions: buildAskUserQuestionTraceQuestions(pendingQuestionsBeforeSubmit),
-          answers,
-          answerSummary: buildAskUserAnswerSummary(pendingQuestionsBeforeSubmit, answers)
-        }
-      }));
-    }
-    for (const blocker of newBlockers) {
-      await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-        runId,
-        sessionId: location.session.sessionId,
-        agentId: "rdc-debugger",
-        eventType: "blocker",
-        status: "blocked",
-        payload: {
-          code: blocker.code,
-          reason: blocker.reason,
-          refs: blocker.refs
-        }
-      }));
-    }
-    this.emitRunStatus(location.session.sessionId, runId, nextStatus, nextStage);
-    this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, runId));
-    await this.appendAssistantConversationMessage(
-      location.session.sessionId,
-      runId,
-      nextPlan.strictReady ? "收到，执行前置条件已经补齐。你现在可以批准这份计划，我再进入正式调试。" : nextPlan.blockers.length > 0 ? nextPlan.blockers[0]?.reason || "当前还不能进入正式调试。" : "收到，我已经更新了计划输入，不过还需要你继续补全剩余信息。"
-    );
-    return {
-      success: true,
-      runId,
-      sessionId: location.session.sessionId,
-      debugPlan: nextPlan,
-      pendingQuestions: nextPlan.strictReady || nextPlan.blockers.length > 0 ? null : snapshot.pending_questions,
-      approvalState: nextPlan.blockers.length > 0 ? "not_requested" : nextPlan.strictReady ? "pending_user" : snapshot.approval_state
-    };
   }
-  async approvePlan(runId) {
-    const location = this.findRun(runId);
-    if (!location) {
-      return { success: false, error: `Run not found: ${runId}` };
-    }
-    const snapshot = storageAdapter.readPlanSnapshot(location.session.sessionId, runId);
-    if (!snapshot?.debug_plan) {
-      return { success: false, error: "No plan snapshot available." };
-    }
-    if (!snapshot.debug_plan.strictReady) {
-      return { success: false, error: "Plan is not strict ready." };
-    }
-    const routeBlockers = debuggerLlmService.getRouteBlockers(
-      this.getRequiredRouteAgents(snapshot.debug_plan, location.run.backend),
-      "dispatch"
-    );
-    if (routeBlockers.length > 0) {
-      const blockedPlan = {
-        ...snapshot.debug_plan,
-        blockers: dedupeBlockers([...snapshot.debug_plan.blockers, ...routeBlockers]),
-        strictReady: false,
-        planReadiness: "blocked",
-        updatedAt: nowIso$1()
-      };
-      storageAdapter.writePlanSnapshot(location.session.sessionId, runId, {
-        ...snapshot,
-        debug_plan: blockedPlan,
-        approval_state: "not_requested"
-      });
-      for (const blocker of routeBlockers) {
-        await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-          runId,
-          sessionId: location.session.sessionId,
-          agentId: "rdc-debugger",
-          eventType: "blocker",
-          status: "blocked",
-          payload: {
-            code: blocker.code,
-            reason: blocker.reason,
-            refs: blocker.refs
-          }
-        }));
-      }
-      await storageAdapter.updateRun(location.session.sessionId, runId, {
-        status: "failed",
-        lastStage: "plan",
-        runtime: {
-          workflow_stage: "plan"
-        }
-      });
-      this.emitRunStatus(location.session.sessionId, runId, "failed", "plan");
-      this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, runId));
-      return {
-        success: false,
-        error: routeBlockers.map((blocker) => blocker.reason).join(" | "),
-        debugPlan: blockedPlan,
-        approvalState: "not_requested"
-      };
-    }
-    storageAdapter.writePlanSnapshot(location.session.sessionId, runId, {
-      ...snapshot,
-      approval_state: "approved",
-      pending_questions: null
-    });
-    traceStateStore.markPlan(location.session.sessionId, snapshot.debug_plan.planId, "accepted");
-    this.applyTaskMutation(location.session.sessionId, runId, "plan", "completed", "User approved the Debugger plan.");
-    this.applyTaskMutation(location.session.sessionId, runId, "speclist", "in_progress", "Task breakdown started after plan approval.");
-    contextService.writeRunCapsule(location.session.sessionId, runId);
-    await this.appendUserConversationMessage(
-      location.session.sessionId,
-      runId,
-      "同意执行"
-    );
-    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-      runId,
-      sessionId: location.session.sessionId,
-      agentId: "user",
-      eventType: "user_confirmation",
-      status: "ok",
-      payload: {
-        planId: snapshot.debug_plan.planId,
-        label: "同意执行"
-      }
-    }));
-    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-      runId,
-      sessionId: location.session.sessionId,
-      agentId: "rdc-debugger",
-      eventType: "workflow_stage_transition",
-      status: "ok",
-      payload: {
-        fromStage: "plan",
-        toStage: "dispatch"
-      }
-    }));
-    await storageAdapter.updateRun(location.session.sessionId, runId, {
-      status: "running",
-      lastStage: "dispatch",
-      runtime: {
-        workflow_stage: "dispatch"
-      }
-    });
-    this.emitRunStatus(location.session.sessionId, runId, "running", "dispatch");
-    this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, runId));
-    await this.appendAssistantConversationMessage(
-      location.session.sessionId,
-      runId,
-      "计划已批准，我现在开始正式调试，并按证据链推进后续分析。"
-    );
-    runExecutionService.startRun({
-      runId,
-      sessionId: location.session.sessionId,
-      projectId: location.run.projectId
-    }, (signal) => this.executeApprovedRun(location, snapshot.debug_plan, signal));
-    return {
-      success: true,
-      runId,
-      sessionId: location.session.sessionId,
-      debugPlan: snapshot.debug_plan,
-      pendingQuestions: null,
-      approvalState: "approved"
-    };
+  getAbortSignal(runId) {
+    return this.activeRuns.get(runId)?.abortController.signal ?? null;
   }
-  async getTraceProjection(sessionId) {
+  updateStage(runId, stage) {
+    const active = this.activeRuns.get(runId);
+    if (!active) {
+      return;
+    }
+    active.stage = stage;
+  }
+  isAbortRequested(runId) {
+    return this.activeRuns.get(runId)?.abortController.signal.aborted ?? false;
+  }
+  stopRun(runId) {
+    const active = this.activeRuns.get(runId);
+    if (!active) {
+      return false;
+    }
+    active.abortController.abort();
+    return true;
+  }
+  async stopAll() {
+    const runIds = Array.from(this.activeRuns.keys());
+    runIds.forEach((runId) => this.stopRun(runId));
+    await Promise.allSettled(
+      runIds.map((runId) => this.activeRuns.get(runId)?.promise)
+    );
+  }
+}
+const runExecutionService = new RunExecutionService();
+class DebuggerRuntime {
+  async recoverInterruptedRuns() {
+    await Promise.resolve();
+  }
+  getTraceProjection(sessionId) {
     return traceService.getSession(sessionId);
   }
-  async requestPlanRevision(runId, revisionText) {
-    const location = this.findRun(runId);
-    if (!location) {
-      return { success: false, error: `Run not found: ${runId}` };
-    }
-    const trimmedRevision = revisionText.trim();
-    if (!trimmedRevision) {
-      return { success: false, error: "Revision text is required." };
-    }
-    const snapshot = storageAdapter.readPlanSnapshot(location.session.sessionId, runId);
-    if (!snapshot?.debug_plan) {
-      return { success: false, error: "No plan snapshot available." };
-    }
-    const previousPlanId = snapshot.debug_plan.planId;
-    const { runId: nextRunId, sessionId } = await storageAdapter.createRun({
-      caseId: location.session.sessionId,
-      turnId: location.run.turnId,
-      capturePaths: location.run.captures.map((capture) => capture.filePath),
-      mode: location.run.mode,
-      goal: `${location.run.goal}
-
-修改建议：${trimmedRevision}`,
-      captures: location.run.captures,
-      backend: location.run.backend,
-      status: "awaiting_approval"
-    });
-    const nextPlan = {
-      ...snapshot.debug_plan,
-      planId: generateEventId("plan"),
-      userGoal: `${snapshot.debug_plan.userGoal}
-
-修改建议：${trimmedRevision}`,
-      notes: [...snapshot.debug_plan.notes, `用户修改建议：${trimmedRevision}`],
-      presentation: buildDebugPlanPresentation({
-        ...snapshot.debug_plan,
-        userGoal: `${snapshot.debug_plan.userGoal}
-
-修改建议：${trimmedRevision}`,
-        notes: [...snapshot.debug_plan.notes, `用户修改建议：${trimmedRevision}`]
-      }),
-      createdAt: nowIso$1(),
-      updatedAt: nowIso$1()
-    };
-    traceStateStore.createRevision({
-      sessionId,
-      runId: nextRunId,
-      previousPlanId,
-      revisionText: trimmedRevision,
-      revisionTraceLaneId: `ws-${nextRunId}-plan`
-    });
-    storageAdapter.writePlanSnapshot(sessionId, nextRunId, {
-      ...snapshot,
-      debug_plan: nextPlan,
-      pending_questions: null,
-      approval_state: "pending_user"
-    });
-    this.seedHarnessPlan({
-      sessionId,
-      runId: nextRunId,
-      mode: location.run.mode,
-      captures: location.run.captures,
-      debugPlan: nextPlan,
-      pendingQuestions: null
-    });
-    traceStateStore.registerPlan({
-      sessionId,
-      runId: nextRunId,
-      planId: nextPlan.planId,
-      traceLaneId: `ws-${nextRunId}-plan`,
-      status: "awaiting_approval"
-    });
-    await storageAdapter.updateRun(location.session.sessionId, runId, {
-      status: "interrupted",
-      stopReason: "Plan revision requested",
-      stoppedAt: Date.now(),
-      finishedAt: Date.now()
-    });
-    await storageAdapter.updateRun(sessionId, nextRunId, {
-      status: "awaiting_approval",
-      lastStage: "plan",
-      runtime: {
-        workflow_stage: "plan"
-      }
-    });
-    await this.appendUserConversationMessage(
-      location.session.sessionId,
-      runId,
-      `修改建议：${trimmedRevision}`
-    );
-    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-      runId,
-      sessionId: location.session.sessionId,
-      agentId: "user",
-      eventType: "user_revision_requested",
-      status: "ok",
-      payload: {
-        planId: previousPlanId,
-        prompt: trimmedRevision,
-        nextRunId,
-        nextPlanId: nextPlan.planId
-      }
-    }));
-    await this.appendActionEvent(sessionId, storageAdapter.createActionEvent({
-      runId: nextRunId,
-      sessionId,
-      agentId: "rdc-debugger",
-      eventType: "user_message",
-      status: "ok",
-      payload: {
-        role: "user",
-        content: trimmedRevision,
-        source: "plan_revision",
-        previousPlanId
-      }
-    }));
-    await this.appendAssistantConversationMessage(
-      sessionId,
-      nextRunId,
-      "我已根据修改建议生成新的计划，请重新确认后再进入正式执行。"
-    );
-    this.emitRunStatus(location.session.sessionId, runId, "interrupted", location.run.lastStage, "Plan revision requested");
-    this.emitRunStatus(sessionId, nextRunId, "awaiting_approval", "plan");
-    this.emitWorkflowState(await this.getWorkflowState(sessionId, nextRunId));
-    const traceProjection = await this.getTraceProjection(sessionId);
-    return {
-      ...traceProjection,
-      runId: nextRunId,
-      planId: nextPlan.planId,
-      branchId: traceProjection.presentation?.activeBranchId
-    };
-  }
   async switchTraceBranch(sessionId, branchId) {
-    traceStateStore.switchBranch(sessionId, branchId);
-    const traceProjection = await this.getTraceProjection(sessionId);
+    const projection = await traceService.getSession(sessionId);
     return {
-      ...traceProjection,
-      activeBranchId: traceProjection.presentation?.activeBranchId
+      ...projection,
+      activeBranchId: branchId
     };
   }
-  async exportTraceSession(sessionId, options = {}) {
-    try {
-      const session = storageAdapter.readSession(sessionId);
-      if (!session) {
-        return { success: false, error: `Session not found: ${sessionId}` };
-      }
-      const traceProjection = await this.getTraceProjection(sessionId);
-      if (!traceProjection.success) {
-        return { success: false, error: traceProjection.error };
-      }
-      const exportDir = path.join(session.sessionPath, "exports");
-      fs__namespace.mkdirSync(exportDir, { recursive: true });
-      const stamp = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
-      const summaryPath = path.join(exportDir, `agentic-trace-summary-${stamp}.json`);
-      fs__namespace.writeFileSync(summaryPath, JSON.stringify({
-        schemaVersion: "1",
-        exportedAt: nowIso$1(),
-        includeAllBranches: options.includeAllBranches ?? true,
-        presentation: traceProjection.presentation
-      }, null, 2), "utf-8");
-      let rawTracePath;
-      if (options.includeRawTrace !== false) {
-        rawTracePath = path.join(exportDir, `agentic-trace-raw-trace-${stamp}.jsonl`);
-        const events = await storageAdapter.readActionChain(sessionId);
-        fs__namespace.writeFileSync(rawTracePath, `${events.map((event) => JSON.stringify(event)).join("\n")}
-`, "utf-8");
-      }
-      return {
-        success: true,
-        sessionId,
-        summaryPath,
-        rawTracePath,
-        bundlePath: summaryPath
-      };
-    } catch (error) {
-      return { success: false, sessionId, error: error instanceof Error ? error.message : String(error) };
-    }
-  }
-  async restartRun(runId) {
-    const location = this.findRun(runId);
-    if (!location) {
-      return { success: false, error: `Run not found: ${runId}` };
-    }
-    const snapshot = storageAdapter.readPlanSnapshot(location.session.sessionId, runId);
-    if (!snapshot?.debug_plan?.strictReady) {
-      return { success: false, error: "Cannot restart without a strict-ready plan." };
-    }
-    const { runId: nextRunId, sessionId } = await storageAdapter.createRun({
-      caseId: location.session.sessionId,
-      capturePaths: location.run.captures.map((capture) => capture.filePath),
-      mode: location.run.mode,
-      goal: location.run.goal,
-      captures: location.run.captures,
-      backend: location.run.backend,
-      status: "awaiting_approval"
-    });
-    storageAdapter.writePlanSnapshot(sessionId, nextRunId, {
-      ...snapshot,
-      approval_state: "pending_user",
-      pending_questions: null,
-      debug_plan: {
-        ...snapshot.debug_plan,
-        updatedAt: nowIso$1()
-      }
-    });
-    await storageAdapter.updateRun(location.session.sessionId, runId, {
-      status: "interrupted",
-      stopReason: "Restarted from stale run",
-      stoppedAt: Date.now(),
-      finishedAt: Date.now()
-    });
-    this.emitWorkflowState(await this.getWorkflowState(sessionId, nextRunId));
-    await this.appendAssistantConversationMessage(
-      sessionId,
-      nextRunId,
-      "我已经为你重建了一次可继续的调试运行。确认计划后，我会从新的 run 继续推进。"
-    );
+  async exportTraceSession(sessionId, _options) {
     return {
-      success: true,
-      runId: nextRunId,
+      success: false,
       sessionId,
-      debugPlan: snapshot.debug_plan,
-      pendingQuestions: null,
-      approvalState: "pending_user"
+      error: "Trace session export is not available without an active workflow run."
     };
   }
-  async stopRun(runId) {
-    const location = this.findRun(runId);
-    if (!location) {
-      return { success: false, error: `Run not found: ${runId}` };
-    }
-    const active = runExecutionService.stopRun(runId);
-    rdxCliInvokerService.abortRun(runId);
-    await rdxSessionService.closeOrReplaceOpenedCapture();
-    await storageAdapter.updateRun(location.session.sessionId, runId, {
-      status: active && process.env.RDC_AGENT_TEST_MODE !== "1" ? "stopping" : "cancelled",
-      stopReason: "Stopped by user",
-      stoppedAt: Date.now(),
-      finishedAt: active && process.env.RDC_AGENT_TEST_MODE !== "1" ? void 0 : Date.now()
-    });
-    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-      runId,
-      sessionId: location.session.sessionId,
-      agentId: "rdc-debugger",
-      eventType: "blocker",
-      status: "warning",
-      payload: {
-        code: "RUN_STOPPED",
-        reason: "Run stopped by user request."
-      }
-    }));
-    this.emitRunStatus(
-      location.session.sessionId,
-      runId,
-      active && process.env.RDC_AGENT_TEST_MODE !== "1" ? "stopping" : "cancelled",
-      location.run.lastStage,
-      "Stopped by user"
-    );
-    this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, runId));
-    return { success: true };
+  stopRun(runId) {
+    const stopped = runExecutionService.stopRun(runId);
+    return stopped ? { success: true } : { success: false, error: "No active run." };
   }
-  async getWorkflowState(sessionId, runId) {
-    const run = runId ? storageAdapter.listRuns(sessionId).find((entry) => entry.runId === runId) || null : storageAdapter.getLatestRun(sessionId);
+  getWorkflowState(sessionId, runId) {
+    const run = runId ? storageAdapter.listRuns(sessionId).find((entry) => entry.runId === runId) ?? null : storageAdapter.getLatestRun(sessionId);
     if (!run) {
-      return {
-        caseId: sessionId,
-        runId: "",
-        sessionId,
-        currentStage: "preflight",
-        previousStages: [],
-        entryMode: "cli",
-        backend: "local",
-        orchestrationMode: "multi_agent",
-        coordinationMode: "staged_handoff",
-        blockers: [],
-        lastUpdated: nowIso$1()
-      };
+      return null;
     }
-    const events = await storageAdapter.readActionChain(sessionId);
-    const runEvents = events.filter((event) => event.run_id === run.runId);
-    const snapshot = storageAdapter.readPlanSnapshot(sessionId, run.runId);
-    const blockers = runEvents.filter((event) => event.event_type === "blocker").map((event) => ({
-      code: String(event.payload.code || "BLOCKER"),
-      reason: String(event.payload.reason || event.payload.message || "Blocker"),
-      refs: Array.isArray(event.payload.refs) ? event.payload.refs.map(String) : [],
-      detectedAt: new Date(event.ts_ms).toISOString()
-    }));
-    const reasoningSummaries = runEvents.filter((event) => event.event_type === "agent_summary").map((event) => ({
-      summaryId: event.event_id,
-      stage: normalizeWorkflowStage(String(event.payload.stage || run.lastStage)),
-      agentId: String(event.agent_id),
-      summary: String(event.payload.summary || event.payload.content || ""),
-      evidence: Array.isArray(event.payload.evidence) ? event.payload.evidence.map(String) : [],
-      nextStep: String(event.payload.next_step || event.payload.nextStep || ""),
-      confidence: typeof event.payload.confidence === "number" ? event.payload.confidence : 0.5,
-      createdAt: new Date(event.ts_ms).toISOString()
-    }));
+    const activeRun = runExecutionService.listActiveRuns().find((entry) => entry.runId === run.runId);
     return {
       caseId: run.caseId,
       runId: run.runId,
-      sessionId,
-      currentStage: normalizeWorkflowStage(run.lastStage),
-      previousStages: latestStageHistory(runEvents),
+      sessionId: run.sessionId,
+      currentStage: activeRun?.stage ?? run.lastStage ?? "investigate",
+      previousStages: [],
       entryMode: "cli",
-      backend: run.backend,
+      backend: "local",
       orchestrationMode: "multi_agent",
       coordinationMode: "staged_handoff",
-      blockers,
-      planReadiness: snapshot?.debug_plan?.strictReady ? "ready_for_approval" : snapshot?.debug_plan?.planReadiness,
-      approvalState: snapshot?.approval_state,
-      debugPlan: snapshot?.debug_plan ?? null,
-      harnessTasks: taskBoard.listTasks(sessionId, run.runId),
-      pendingQuestions: snapshot?.pending_questions ?? null,
-      reasoningSummaries,
-      recoveryState: run.status === "interrupted" ? {
-        recoveredAt: run.finishedAt ? new Date(run.finishedAt).toISOString() : void 0,
-        recoveryReason: run.stopReason
-      } : null,
+      blockers: [],
+      harnessTasks: [],
+      reasoningSummaries: [],
       lastUpdated: nowIso$1()
     };
-  }
-  async recoverInterruptedRuns() {
-    const projects = storageAdapter.listProjects();
-    for (const project of projects) {
-      const sessions = storageAdapter.listSessions(project.projectId);
-      for (const session of sessions) {
-        const runs = storageAdapter.listRuns(session.sessionId);
-        for (const run of runs) {
-          if (!["running", "queued", "planning", "stopping"].includes(run.status)) {
-            continue;
-          }
-          if (runExecutionService.listActiveRuns().some((active) => active.runId === run.runId)) {
-            continue;
-          }
-          await storageAdapter.updateRun(session.sessionId, run.runId, {
-            status: "interrupted",
-            stopReason: "Recovered after app restart",
-            stoppedAt: Date.now(),
-            finishedAt: Date.now()
-          });
-          await this.appendActionEvent(session.sessionId, storageAdapter.createActionEvent({
-            runId: run.runId,
-            sessionId: session.sessionId,
-            agentId: "rdc-debugger",
-            eventType: "blocker",
-            status: "warning",
-            payload: {
-              code: "STALE_RUN_RECOVERED",
-              reason: "Run was marked interrupted during app startup recovery."
-            }
-          }));
-        }
-      }
-    }
-  }
-  seedHarnessPlan(input) {
-    const now = nowIso$1();
-    const tasks = this.createHarnessTasks(input.sessionId, input.runId, input.debugPlan, now);
-    for (const task of tasks) {
-      taskBoard.upsertTask(input.sessionId, input.runId, task);
-    }
-    const taskGraph = multiAgentWorkflowEngine.createDebuggerGraph({
-      runId: input.runId,
-      sessionId: input.sessionId,
-      tasks
-    });
-    multiAgentWorkflowEngine.assertSerialExecution(taskGraph);
-    const planContract = {
-      schemaVersion: "1",
-      planId: input.debugPlan.planId,
-      runId: input.runId,
-      sessionId: input.sessionId,
-      mode: input.mode,
-      goal: input.debugPlan.userGoal,
-      status: input.pendingQuestions ? "blocked" : input.debugPlan.strictReady ? "ready" : input.debugPlan.blockers.length > 0 ? "blocked" : "pending",
-      captures: input.captures ?? [],
-      tasks,
-      verificationContract: {
-        contractId: `${input.debugPlan.planId}-verification`,
-        runId: input.runId,
-        sessionId: input.sessionId,
-        requiredMethods: this.getRequiredVerificationMethods(input.debugPlan),
-        targetRefs: [
-          input.debugPlan.targetCapture?.captureId,
-          input.debugPlan.targetCapture?.filePath,
-          input.debugPlan.targetFrameOrEvent?.eventLabel
-        ].filter((entry) => Boolean(entry)),
-        successCriteria: input.debugPlan.verificationContract.successCriteria,
-        evidenceRequirements: [
-          input.debugPlan.verificationContract.requiresScreenshotEvidence ? "screenshot" : "",
-          input.debugPlan.verificationContract.requiresShaderInspection ? "shader" : "",
-          input.debugPlan.verificationContract.requiresPixelEvidence ? "pixel" : "",
-          input.debugPlan.verificationContract.requiresBaselineComparison ? "baseline" : ""
-        ].filter(Boolean),
-        blockerCodes: input.debugPlan.blockers.map((blocker) => blocker.code),
-        createdAt: now,
-        updatedAt: now
-      },
-      questionRequests: input.pendingQuestions ? input.pendingQuestions.questions.map((question) => ({
-        questionId: question.id,
-        runId: input.runId,
-        sessionId: input.sessionId,
-        prompt: question.prompt,
-        reason: input.pendingQuestions.summary,
-        options: question.options.map((option) => ({
-          optionId: option.id,
-          label: option.label,
-          description: option.description
-        })),
-        allowFreeform: Boolean(question.freeformPlaceholder),
-        requestedBy: "harness",
-        createdAt: input.pendingQuestions.createdAt
-      })) : [],
-      questionAnswers: [],
-      revisions: [],
-      capabilityProfiles: [],
-      createdAt: now,
-      updatedAt: now
-    };
-    contextService.writePlanContract(input.sessionId, input.runId, planContract);
-    contextService.appendContextPacket(input.sessionId, input.runId, {
-      packetId: generateEventId("context-packet"),
-      runId: input.runId,
-      sessionId: input.sessionId,
-      kind: "plan",
-      source: "harness",
-      title: "Debugger plan contract",
-      summary: input.debugPlan.scope,
-      content: JSON.stringify({
-        goal: input.debugPlan.userGoal,
-        targetCapture: input.debugPlan.targetCapture,
-        targetFrameOrEvent: input.debugPlan.targetFrameOrEvent,
-        deliverables: input.debugPlan.expectedDeliverables,
-        taskGraph
-      }),
-      refs: planContract.verificationContract.targetRefs,
-      taskIds: tasks.map((task) => task.taskId),
-      evidenceIds: [],
-      artifactIds: [],
-      createdAt: now
-    });
-    contextService.writeRunCapsule(input.sessionId, input.runId);
-    return planContract;
-  }
-  createHarnessTasks(sessionId, runId, debugPlan, createdAt) {
-    const base = {
-      runId,
-      sessionId,
-      priority: "normal",
-      dependsOn: [],
-      evidenceRefs: [],
-      artifactRefs: [],
-      blockerRefs: [],
-      source: "plan",
-      userApproval: "not_required",
-      createdAt,
-      updatedAt: createdAt
-    };
-    return [
-      {
-        ...base,
-        taskId: "plan",
-        title: "Plan",
-        intent: "context",
-        objective: debugPlan.scope,
-        status: debugPlan.blockers.length > 0 ? "blocked" : "pending",
-        owner: "rdc-debugger",
-        stage: "plan",
-        acceptanceCriteria: ["Target capture, scope, specialists, deliverables, and verification criteria are explicit."]
-      },
-      {
-        ...base,
-        taskId: "speclist",
-        title: "Task breakdown",
-        intent: "hypothesis",
-        objective: "Seed the Debugger task board from the approved plan.",
-        status: "pending",
-        owner: "rdc-debugger",
-        stage: "speclist",
-        dependsOn: ["plan"],
-        acceptanceCriteria: debugPlan.expectedDeliverables
-      },
-      {
-        ...base,
-        taskId: "dispatch",
-        title: "Specialist dispatch",
-        intent: "investigation",
-        objective: `Dispatch ${debugPlan.recommendedSpecialists.length || 1} Debugger investigation lane(s).`,
-        status: "pending",
-        owner: "rdc-debugger",
-        stage: "dispatch",
-        dependsOn: ["speclist"],
-        acceptanceCriteria: ["Every selected specialist returns an AgentResultCard with evidence references."]
-      },
-      {
-        ...base,
-        taskId: "investigate",
-        title: "Evidence investigation",
-        intent: "investigation",
-        objective: debugPlan.targetFrameOrEvent?.eventLabel ?? debugPlan.scope,
-        status: "pending",
-        owner: "rdc-debugger",
-        stage: "investigate",
-        dependsOn: ["dispatch"],
-        acceptanceCriteria: ["Investigation summary is grounded in EvidenceLedger records."]
-      },
-      {
-        ...base,
-        taskId: "fix_verify",
-        title: "Verification",
-        intent: "verification",
-        objective: "Validate the leading finding against the verification contract.",
-        status: "pending",
-        owner: "skeptic_agent",
-        stage: "fix_verify",
-        dependsOn: ["investigate"],
-        acceptanceCriteria: debugPlan.verificationContract.successCriteria
-      },
-      {
-        ...base,
-        taskId: "curate",
-        title: "Curation",
-        intent: "report",
-        objective: "Publish a report bundle grounded in accepted evidence.",
-        status: "pending",
-        owner: "curator_agent",
-        stage: "curate",
-        dependsOn: ["fix_verify"],
-        acceptanceCriteria: debugPlan.expectedDeliverables
-      }
-    ];
-  }
-  getRequiredVerificationMethods(debugPlan) {
-    const methods = /* @__PURE__ */ new Set(["tool", "llm_review"]);
-    if (debugPlan.verificationContract.requiresScreenshotEvidence) methods.add("screenshot");
-    if (debugPlan.verificationContract.requiresPixelEvidence) methods.add("pixel");
-    if (debugPlan.verificationContract.requiresShaderInspection) methods.add("shader");
-    if (debugPlan.verificationContract.requiresBaselineComparison) methods.add("baseline");
-    return Array.from(methods);
-  }
-  applyTaskMutation(sessionId, runId, taskId, status, reason, refs = {}) {
-    const existing = taskBoard.getTask(sessionId, runId, taskId);
-    if (!existing) {
-      return;
-    }
-    taskBoard.mutateTask(sessionId, runId, {
-      mutationId: generateEventId("task-mutation"),
-      taskId,
-      runId,
-      sessionId,
-      type: status === "completed" ? "update_status" : "update_status",
-      actor: "harness",
-      patch: {
-        status,
-        evidenceRefs: refs.evidenceRefs ?? existing.evidenceRefs,
-        artifactRefs: refs.artifactRefs ?? existing.artifactRefs,
-        blockerRefs: refs.blockerRefs ?? existing.blockerRefs,
-        completedAt: status === "completed" ? nowIso$1() : existing.completedAt
-      },
-      reason,
-      requiresUserApproval: false,
-      createdAt: nowIso$1()
-    });
-    multiAgentWorkflowEngine.assertSerialExecution(
-      multiAgentWorkflowEngine.readDebuggerGraph(sessionId, runId)
-    );
-  }
-  persistAgentResult(sessionId, runId, result) {
-    const artifactIds = result.artifacts.map((artifactPath) => {
-      const artifactId = generateEventId("artifact");
-      const record = {
-        artifactId,
-        runId,
-        sessionId,
-        kind: artifactPath.toLowerCase().endsWith(".png") ? "screenshot" : "data",
-        title: `${result.agentId} artifact`,
-        filePath: artifactPath,
-        mimeType: artifactPath.toLowerCase().endsWith(".png") ? "image/png" : "application/json",
-        sizeBytes: 0,
-        taskId: "dispatch",
-        evidenceIds: [],
-        metadata: {
-          agentId: result.agentId
-        },
-        createdAt: nowIso$1(),
-        updatedAt: nowIso$1()
-      };
-      artifactStore.register(sessionId, runId, record);
-      return artifactId;
-    });
-    const evidenceId = generateEventId("evidence");
-    const evidenceRecord = {
-      evidenceId,
-      runId,
-      sessionId,
-      kind: "analysis",
-      title: `${result.agentId} finding`,
-      summary: result.reasoningSummary.summary,
-      refs: result.reasoningSummary.evidence,
-      taskId: "dispatch",
-      agentId: result.agentId,
-      artifactIds,
-      strength: result.reasoningSummary.confidence >= 0.75 ? "strong" : "supporting",
-      metadata: {
-        nextStep: result.reasoningSummary.nextStep,
-        confidence: result.reasoningSummary.confidence
-      },
-      createdAt: nowIso$1()
-    };
-    evidenceLedger.appendEvidence(sessionId, runId, evidenceRecord);
-    const card = {
-      cardId: generateEventId("agent-card"),
-      runId,
-      sessionId,
-      agentId: result.agentId,
-      taskId: "dispatch",
-      status: "completed",
-      summary: result.reasoningSummary.summary,
-      evidenceIds: [evidenceId],
-      artifactIds,
-      verificationResultIds: [],
-      nextActions: [result.reasoningSummary.nextStep].filter(Boolean),
-      createdAt: nowIso$1(),
-      updatedAt: nowIso$1()
-    };
-    const storedCard = contextService.appendAgentResultCard(sessionId, runId, card);
-    contextService.writeRunCapsule(sessionId, runId);
-    return storedCard;
-  }
-  persistVerificationResult(sessionId, runId, debugPlan, verification, skeptic, evidenceIds) {
-    const rejected = skeptic.payload.verdict === "rejected";
-    const verificationResult = {
-      resultId: generateEventId("verification"),
-      contractId: `${debugPlan.planId}-verification`,
-      runId,
-      sessionId,
-      status: rejected ? "failed" : verification.status === "ok" ? "passed" : "inconclusive",
-      proposedRoute: rejected ? "generator" : "curator",
-      method: "llm_review",
-      summary: String(skeptic.payload.summary || verification.payload.summary || ""),
-      failedCriteria: rejected ? debugPlan.verificationContract.successCriteria : [],
-      evidenceGaps: rejected ? ["Verifier rejected the available evidence chain."] : [],
-      rejectedClaims: rejected ? [String(verification.payload.summary || "Rejected verification claim")] : [],
-      taskMutations: rejected ? [{
-        mutationId: generateEventId("task-mutation"),
-        taskId: "fix_verify",
-        runId,
-        sessionId,
-        type: "update_status",
-        actor: "skeptic_agent",
-        patch: {
-          status: "blocked",
-          blockerRefs: ["SKEPTIC_REJECTED"]
-        },
-        reason: String(skeptic.payload.summary || "Skeptic rejected the evidence chain."),
-        requiresUserApproval: false,
-        createdAt: nowIso$1()
-      }] : [],
-      evidenceIds,
-      artifactIds: [],
-      blockers: rejected ? ["SKEPTIC_REJECTED"] : [],
-      confidence: rejected ? 0.35 : verification.status === "ok" ? 0.82 : 0.64,
-      loopCount: 0,
-      createdAt: nowIso$1()
-    };
-    evidenceLedger.appendVerificationResult(sessionId, runId, verificationResult);
-    contextService.writeRunCapsule(sessionId, runId);
-    return verificationResult;
-  }
-  async executeApprovedRun(location, debugPlan, signal) {
-    const project = storageAdapter.getProjectById(location.run.projectId);
-    if (!project || !debugPlan.targetCapture) {
-      throw new Error("Project or target capture is missing.");
-    }
-    if (process.env.RDC_AGENT_TEST_MODE === "1") {
-      await this.executeMockRun(location, debugPlan, signal, project.rootPath);
-      return;
-    }
-    const resolved = intakeContextResolver.resolve({
-      projectId: location.run.projectId,
-      sessionId: location.session.sessionId,
-      mode: location.run.mode,
-      goal: location.run.goal,
-      captures: location.run.captures
-    });
-    const captures = location.run.captures.length > 0 ? location.run.captures : [{
-      id: debugPlan.targetCapture.captureId,
-      filePath: debugPlan.targetCapture.filePath,
-      role: "primary",
-      backendHint: location.run.backend,
-      status: "pending"
-    }];
-    try {
-      const routeBlockers = debuggerLlmService.getRouteBlockers(
-        this.getRequiredRouteAgents(debugPlan, location.run.backend),
-        "dispatch"
-      );
-      if (routeBlockers.length > 0) {
-        throw { blocker: routeBlockers[0] };
-      }
-      await rdxSessionService.bootstrap({
-        projectId: location.run.projectId,
-        sessionId: location.session.sessionId,
-        mode: location.run.mode,
-        goal: location.run.goal,
-        captures,
-        primaryCaptureId: debugPlan.targetCapture.captureId,
-        replayDevice: resolved.replayDevice
-      });
-      const runtimeContext = {
-        runId: location.run.runId,
-        turnId: location.run.turnId,
-        sessionId: location.session.sessionId,
-        caseId: location.run.caseId,
-        contextId: rdxSessionService.getContextId() || "",
-        runtimeOwner: rdxSessionService.getRuntimeOwner() || "",
-        ownerLeaseId: rdxSessionService.getOwnerLeaseId() || "",
-        debugPlan,
-        targetCapturePath: debugPlan.targetCapture.filePath,
-        outputRoot: storageAdapter.getRunPath(location.session.sessionId, location.run.runId),
-        signal
-      };
-      if (!runtimeContext.contextId || !runtimeContext.runtimeOwner || !runtimeContext.ownerLeaseId) {
-        throw new Error("Runtime context is incomplete after bootstrap.");
-      }
-      await storageAdapter.updateRun(location.session.sessionId, location.run.runId, {
-        captures: rdxSessionService.getCaptureDescriptors(),
-        runtime: {
-          context_id: runtimeContext.contextId,
-          runtime_owner: runtimeContext.runtimeOwner,
-          workflow_stage: "dispatch"
-        }
-      });
-      const surface = await deterministicSpecialistExecutor.prepareSurface(runtimeContext);
-      this.applyTaskMutation(location.session.sessionId, location.run.runId, "speclist", "completed", "Task board seeded for the approved plan.");
-      this.applyTaskMutation(location.session.sessionId, location.run.runId, "dispatch", "in_progress", "Specialist dispatch started.");
-      contextService.appendContextPacket(location.session.sessionId, location.run.runId, {
-        packetId: generateEventId("context-packet"),
-        runId: location.run.runId,
-        sessionId: location.session.sessionId,
-        kind: "handoff",
-        source: "harness",
-        title: "Specialist dispatch context",
-        summary: debugPlan.scope,
-        content: JSON.stringify({
-          targetCapture: debugPlan.targetCapture,
-          targetFrameOrEvent: debugPlan.targetFrameOrEvent,
-          specialists: debugPlan.recommendedSpecialists
-        }),
-        refs: [debugPlan.targetCapture.filePath],
-        taskIds: ["dispatch"],
-        evidenceIds: [],
-        artifactIds: [],
-        createdAt: nowIso$1()
-      });
-      const specialistResults = [];
-      for (const specialist of debugPlan.recommendedSpecialists) {
-        if (signal.aborted) {
-          throw new Error(`Run aborted: ${location.run.runId}`);
-        }
-        await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-          runId: location.run.runId,
-          sessionId: location.session.sessionId,
-          agentId: "rdc-debugger",
-          eventType: "dispatch",
-          status: "sent",
-          payload: {
-            targetAgent: specialist,
-            objective: `Investigate ${debugPlan.scope}`
-          }
-        }));
-        const result = await deterministicSpecialistExecutor.run(specialist, runtimeContext, surface);
-        specialistResults.push(result);
-        this.persistAgentResult(location.session.sessionId, location.run.runId, result);
-        await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-          runId: location.run.runId,
-          sessionId: location.session.sessionId,
-          agentId: specialist,
-          eventType: "agent_summary",
-          status: "ok",
-          payload: {
-            stage: "dispatch",
-            summary: result.reasoningSummary.summary,
-            evidence: result.reasoningSummary.evidence,
-            next_step: result.reasoningSummary.nextStep,
-            confidence: result.reasoningSummary.confidence,
-            artifacts: result.artifacts
-          }
-        }));
-      }
-      this.applyTaskMutation(location.session.sessionId, location.run.runId, "dispatch", "completed", "Specialist dispatch completed.");
-      await this.persistInvestigationAndReport(location, debugPlan, runtimeContext, surface.replaySessionId, specialistResults);
-    } catch (error) {
-      const aborted = signal.aborted;
-      const blocker = aborted ? {
-        code: "RUN_STOPPED",
-        reason: "Run stopped by user.",
-        refs: [],
-        detectedAt: nowIso$1()
-      } : this.normalizeLlmBlocker(error, "RUN_FAILED");
-      await storageAdapter.updateRun(location.session.sessionId, location.run.runId, {
-        status: aborted ? "cancelled" : "failed",
-        stopReason: aborted ? "Stopped by user" : blocker.reason,
-        stoppedAt: Date.now(),
-        finishedAt: Date.now()
-      });
-      await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-        runId: location.run.runId,
-        sessionId: location.session.sessionId,
-        agentId: "rdc-debugger",
-        eventType: "blocker",
-        status: aborted ? "warning" : "error",
-        payload: {
-          code: blocker.code,
-          reason: blocker.reason,
-          refs: blocker.refs
-        }
-      }));
-      await this.appendAssistantConversationMessage(
-        location.session.sessionId,
-        location.run.runId,
-        aborted ? "本轮调试已停止。" : `执行失败：${blocker.reason}`,
-        aborted ? "stopped" : "error"
-      );
-      this.emitRunStatus(
-        location.session.sessionId,
-        location.run.runId,
-        aborted ? "cancelled" : "failed",
-        location.run.lastStage,
-        blocker.reason
-      );
-      this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, location.run.runId));
-    } finally {
-      await rdxSessionService.closeOrReplaceOpenedCapture();
-    }
-  }
-  async executeMockRun(location, debugPlan, signal, projectRoot) {
-    const slowRun = /stop-test|slow-run/i.test(debugPlan.userGoal);
-    const specialistAgents = debugPlan.recommendedSpecialists.length > 0 ? debugPlan.recommendedSpecialists : ["triage_agent", "pixel_forensics_agent", "shader_ir_agent"];
-    this.applyTaskMutation(location.session.sessionId, location.run.runId, "speclist", "completed", "Mock task board seeded.");
-    this.applyTaskMutation(location.session.sessionId, location.run.runId, "dispatch", "in_progress", "Mock specialist dispatch started.");
-    for (const specialist of specialistAgents) {
-      if (signal.aborted) {
-        throw new Error(`Run aborted: ${location.run.runId}`);
-      }
-      await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-        runId: location.run.runId,
-        sessionId: location.session.sessionId,
-        agentId: "rdc-debugger",
-        eventType: "dispatch",
-        status: "sent",
-        payload: {
-          targetAgent: specialist,
-          objective: `Mock investigate ${debugPlan.scope}`
-        }
-      }));
-      await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-        runId: location.run.runId,
-        sessionId: location.session.sessionId,
-        agentId: specialist,
-        eventType: "tool_execution",
-        status: "ok",
-        payload: {
-          tool_name: `mock.${specialist}.tool`,
-          result: "success"
-        }
-      }));
-      await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-        runId: location.run.runId,
-        sessionId: location.session.sessionId,
-        agentId: specialist,
-        eventType: "agent_summary",
-        status: "ok",
-        payload: {
-          stage: "dispatch",
-          summary: `${specialist} completed deterministic mock analysis.`,
-          evidence: [`mock:${specialist}`],
-          next_step: "Continue through the debugger main chain.",
-          confidence: 0.7
-        }
-      }));
-      const evidenceId = generateEventId("evidence");
-      evidenceLedger.appendEvidence(location.session.sessionId, location.run.runId, {
-        evidenceId,
-        runId: location.run.runId,
-        sessionId: location.session.sessionId,
-        kind: "analysis",
-        title: `${specialist} mock finding`,
-        summary: `${specialist} completed deterministic mock analysis.`,
-        refs: [`mock:${specialist}`],
-        taskId: "dispatch",
-        agentId: specialist,
-        artifactIds: [],
-        strength: "supporting",
-        metadata: {
-          confidence: 0.7
-        },
-        createdAt: nowIso$1()
-      });
-      contextService.appendAgentResultCard(location.session.sessionId, location.run.runId, {
-        cardId: generateEventId("agent-card"),
-        runId: location.run.runId,
-        sessionId: location.session.sessionId,
-        agentId: specialist,
-        taskId: "dispatch",
-        status: "completed",
-        summary: `${specialist} completed deterministic mock analysis.`,
-        evidenceIds: [evidenceId],
-        artifactIds: [],
-        verificationResultIds: [],
-        nextActions: ["Continue through the debugger main chain."],
-        createdAt: nowIso$1(),
-        updatedAt: nowIso$1()
-      });
-    }
-    this.applyTaskMutation(location.session.sessionId, location.run.runId, "dispatch", "completed", "Mock specialist dispatch completed.");
-    this.applyTaskMutation(location.session.sessionId, location.run.runId, "investigate", "completed", "Mock investigation completed.");
-    this.applyTaskMutation(location.session.sessionId, location.run.runId, "fix_verify", "completed", "Mock verification completed.");
-    if (slowRun) {
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(resolve, 1800);
-        signal.addEventListener("abort", () => {
-          clearTimeout(timeout);
-          reject(new Error(`Run aborted: ${location.run.runId}`));
-        }, { once: true });
-      });
-    }
-    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-      runId: location.run.runId,
-      sessionId: location.session.sessionId,
-      agentId: "rdc-debugger",
-      eventType: "verification",
-      status: "ok",
-      payload: {
-        verification_kind: "fix_verify",
-        verdict: "passed",
-        summary: "Deterministic mock verification passed."
-      }
-    }));
-    const report = {
-      title: `Mock Debugger Report - ${debugPlan.targetCapture?.fileName || "capture"}`,
-      summary: "Deterministic mock execution completed through the debugger main chain.",
-      rootCause: "Mock root cause for deterministic E2E coverage.",
-      fixDescription: "Mock fix validated for deterministic E2E coverage.",
-      evidenceSummary: specialistAgents.map((agent) => `mock:${agent}`),
-      recommendations: ["Use live mode for full RenderDoc-backed execution."],
-      confidence: 0.75,
-      generatedAt: nowIso$1(),
-      curatorAgentId: "curator_agent"
-    };
-    const bundle = reportBundleService.publish({
-      projectRoot,
-      sessionId: location.session.sessionId,
-      runId: location.run.runId,
-      goal: debugPlan.userGoal,
-      report,
-      evidenceSummary: report.evidenceSummary,
-      verificationSummary: ["Deterministic mock verification passed."],
-      eventCount: (await storageAdapter.readActionChain(location.session.sessionId)).filter((event) => event.run_id === location.run.runId).length,
-      artifactPaths: [],
-      llmExecution: debuggerLlmService.getRunSummary(location.run.runId)
-    });
-    await storageAdapter.updateRun(location.session.sessionId, location.run.runId, {
-      status: "completed",
-      finishedAt: Date.now(),
-      lastStage: "finalize",
-      reportPaths: bundle,
-      runtime: {
-        workflow_stage: "finalize"
-      }
-    });
-    this.applyTaskMutation(location.session.sessionId, location.run.runId, "curate", "completed", "Mock report bundle published.");
-    contextService.writeRunCapsule(location.session.sessionId, location.run.runId);
-    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-      runId: location.run.runId,
-      sessionId: location.session.sessionId,
-      agentId: "curator_agent",
-      eventType: "report_published",
-      status: "ok",
-      payload: {
-        markdownPath: bundle.markdownPath,
-        jsonPath: bundle.jsonPath,
-        htmlPath: bundle.htmlPath
-      }
-    }));
-    await this.appendAssistantConversationMessage(
-      location.session.sessionId,
-      location.run.runId,
-      `调试报告已生成：${bundle.htmlPath || bundle.markdownPath || "reports ready"}`
-    );
-    this.emitRunStatus(location.session.sessionId, location.run.runId, "completed", "finalize");
-    this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, location.run.runId));
-  }
-  async persistInvestigationAndReport(location, debugPlan, runtimeContext, replaySessionId, specialistResults) {
-    this.applyTaskMutation(location.session.sessionId, location.run.runId, "investigate", "in_progress", "Investigation synthesis started.");
-    await storageAdapter.updateRun(location.session.sessionId, location.run.runId, {
-      lastStage: "investigate",
-      runtime: {
-        workflow_stage: "investigate"
-      }
-    });
-    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-      runId: location.run.runId,
-      sessionId: location.session.sessionId,
-      agentId: "rdc-debugger",
-      eventType: "workflow_stage_transition",
-      status: "ok",
-      payload: {
-        fromStage: "dispatch",
-        toStage: "investigate"
-      }
-    }));
-    const investigationSummary = await this.buildInvestigationSummary(location, debugPlan, specialistResults);
-    const investigationEvidenceId = generateEventId("evidence");
-    evidenceLedger.appendEvidence(location.session.sessionId, location.run.runId, {
-      evidenceId: investigationEvidenceId,
-      runId: location.run.runId,
-      sessionId: location.session.sessionId,
-      kind: "analysis",
-      title: "Debugger investigation summary",
-      summary: investigationSummary.summary,
-      refs: investigationSummary.evidence,
-      taskId: "investigate",
-      agentId: "rdc-debugger",
-      artifactIds: [],
-      strength: investigationSummary.confidence >= 0.75 ? "strong" : "supporting",
-      metadata: {
-        nextStep: investigationSummary.nextStep,
-        confidence: investigationSummary.confidence
-      },
-      createdAt: nowIso$1()
-    });
-    this.applyTaskMutation(
-      location.session.sessionId,
-      location.run.runId,
-      "investigate",
-      "completed",
-      "Investigation summary recorded in EvidenceLedger.",
-      { evidenceRefs: [investigationEvidenceId] }
-    );
-    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-      runId: location.run.runId,
-      sessionId: location.session.sessionId,
-      agentId: "rdc-debugger",
-      eventType: "agent_summary",
-      status: "ok",
-      payload: {
-        stage: "investigate",
-        summary: investigationSummary.summary,
-        evidence: investigationSummary.evidence,
-        next_step: investigationSummary.nextStep,
-        confidence: investigationSummary.confidence
-      }
-    }));
-    this.applyTaskMutation(location.session.sessionId, location.run.runId, "fix_verify", "in_progress", "Verification started.");
-    const verification = await this.executeVerification(runtimeContext, replaySessionId, investigationSummary);
-    await storageAdapter.updateRun(location.session.sessionId, location.run.runId, {
-      lastStage: "fix_verify",
-      runtime: {
-        workflow_stage: "fix_verify"
-      }
-    });
-    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-      runId: location.run.runId,
-      sessionId: location.session.sessionId,
-      agentId: "rdc-debugger",
-      eventType: "verification",
-      status: verification.status,
-      payload: verification.payload
-    }));
-    const skeptic = await this.executeSkepticReview(location, debugPlan, investigationSummary, verification);
-    const verificationResult = this.persistVerificationResult(
-      location.session.sessionId,
-      location.run.runId,
-      debugPlan,
-      verification,
-      skeptic,
-      [investigationEvidenceId]
-    );
-    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-      runId: location.run.runId,
-      sessionId: location.session.sessionId,
-      agentId: "skeptic_agent",
-      eventType: "verification",
-      status: skeptic.status,
-      payload: skeptic.payload
-    }));
-    if (skeptic.payload.verdict === "rejected") {
-      this.applyTaskMutation(
-        location.session.sessionId,
-        location.run.runId,
-        "fix_verify",
-        "blocked",
-        String(skeptic.payload.summary || "Skeptic rejected the evidence chain."),
-        { evidenceRefs: verificationResult.evidenceIds }
-      );
-      await storageAdapter.updateRun(location.session.sessionId, location.run.runId, {
-        status: "failed",
-        stopReason: String(skeptic.payload.summary || "Skeptic rejected the evidence chain."),
-        stoppedAt: Date.now(),
-        finishedAt: Date.now(),
-        lastStage: "fix_verify",
-        runtime: {
-          workflow_stage: "fix_verify"
-        }
-      });
-      this.emitRunStatus(
-        location.session.sessionId,
-        location.run.runId,
-        "failed",
-        "fix_verify",
-        String(skeptic.payload.summary || "Skeptic rejected the evidence chain.")
-      );
-      this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, location.run.runId));
-      return;
-    }
-    this.applyTaskMutation(
-      location.session.sessionId,
-      location.run.runId,
-      "fix_verify",
-      "completed",
-      "Verifier accepted the evidence chain.",
-      { evidenceRefs: verificationResult.evidenceIds }
-    );
-    this.applyTaskMutation(location.session.sessionId, location.run.runId, "curate", "in_progress", "Curator report generation started.");
-    const project = storageAdapter.getProjectById(location.run.projectId);
-    if (!project) {
-      throw new Error(`Project not found: ${location.run.projectId}`);
-    }
-    const report = await this.buildReport(location, debugPlan, investigationSummary, verification, skeptic);
-    const llmExecution = debuggerLlmService.getRunSummary(location.run.runId);
-    const bundle = reportBundleService.publish({
-      projectRoot: project.rootPath,
-      sessionId: location.session.sessionId,
-      runId: location.run.runId,
-      goal: debugPlan.userGoal,
-      report,
-      evidenceSummary: investigationSummary.evidence,
-      verificationSummary: [
-        String(verification.payload.summary),
-        String(skeptic.payload.summary)
-      ],
-      eventCount: (await storageAdapter.readActionChain(location.session.sessionId)).filter((event) => event.run_id === location.run.runId).length,
-      artifactPaths: specialistResults.flatMap((result) => result.artifacts),
-      llmExecution
-    });
-    await storageAdapter.updateRun(location.session.sessionId, location.run.runId, {
-      status: "completed",
-      finishedAt: Date.now(),
-      lastStage: "finalize",
-      reportPaths: bundle,
-      runtime: {
-        workflow_stage: "finalize"
-      }
-    });
-    this.applyTaskMutation(location.session.sessionId, location.run.runId, "curate", "completed", "Report bundle published.");
-    contextService.writeRunCapsule(location.session.sessionId, location.run.runId);
-    await this.appendActionEvent(location.session.sessionId, storageAdapter.createActionEvent({
-      runId: location.run.runId,
-      sessionId: location.session.sessionId,
-      agentId: "curator_agent",
-      eventType: "report_published",
-      status: "ok",
-      payload: {
-        markdownPath: bundle.markdownPath,
-        jsonPath: bundle.jsonPath,
-        htmlPath: bundle.htmlPath
-      }
-    }));
-    await this.appendAssistantConversationMessage(
-      location.session.sessionId,
-      location.run.runId,
-      `调试报告已生成：${bundle.htmlPath || bundle.markdownPath || "reports ready"}`
-    );
-    this.emitRunStatus(location.session.sessionId, location.run.runId, "completed", "finalize");
-    this.emitWorkflowState(await this.getWorkflowState(location.session.sessionId, location.run.runId));
-  }
-  async buildInvestigationSummary(location, debugPlan, specialistResults) {
-    const evidence = specialistResults.flatMap((result) => result.reasoningSummary.evidence);
-    const evidenceHighlights = evidence.slice(0, 8);
-    const specialistBriefs = specialistResults.map((result) => result.reasoningSummary.summary).filter(Boolean).slice(0, 4);
-    const selectedPixel = evidence.find((entry) => /RGBA=/.test(entry));
-    const visualTarget = evidence.find((entry) => /visual_target=|target=ResourceId/.test(entry));
-    const degradedBinding = evidence.find((entry) => /fallback=|degraded=/.test(entry));
-    const deterministic = {
-      summary: [
-        `Investigation synthesized ${specialistResults.length} specialist briefs around ${debugPlan.targetCapture?.fileName || "the target capture"} and ${debugPlan.targetFrameOrEvent?.eventLabel || "the active frame"}.`,
-        selectedPixel ? `Selected pixel evidence: ${selectedPixel}` : "",
-        visualTarget ? `Visual target evidence: ${visualTarget}` : ""
-      ].filter(Boolean).join(" "),
-      evidence,
-      next_step: degradedBinding ? "Re-run with a precise bright-pixel coordinate or a valid swapchain target to turn the degraded visual evidence into a direct fix validation." : "Validate the leading root-cause hypothesis against verification contract and skeptic review.",
-      confidence: specialistResults.length > 1 ? 0.74 : 0.58,
-      root_cause: [
-        `The strongest current evidence localizes the issue to ${debugPlan.targetFrameOrEvent?.eventLabel || "the active frame"} on ${debugPlan.targetCapture?.fileName || "the target capture"}.`,
-        selectedPixel ? `The sampled focus pixel did not itself prove an overbright shader output: ${selectedPixel}.` : "",
-        degradedBinding ? `The capture evidence is degraded by ${degradedBinding}, so the report should treat the IBL/leak hypothesis as unconfirmed until the exact bright coordinate or swapchain target is available.` : ""
-      ].filter(Boolean).join(" "),
-      recommendations: [
-        ...specialistBriefs,
-        ...evidenceHighlights,
-        "Preserve the generated screenshots and specialist notes for regression tracking."
-      ]
-    };
-    let data = deterministic;
-    try {
-      const result = await debuggerLlmService.callStructured({
-        agentId: "rdc-debugger",
-        stage: "investigate",
-        sessionId: location.session.sessionId,
-        runId: location.run.runId,
-        messages: [
-          {
-            role: "system",
-            content: "You are the RDC Debugger orchestrator. Return JSON only with keys summary, evidence, next_step, confidence, root_cause, recommendations. Ground every field in the provided specialist evidence."
-          },
-          {
-            role: "user",
-            content: JSON.stringify({
-              goal: debugPlan.userGoal,
-              targetCapture: debugPlan.targetCapture,
-              targetFrameOrEvent: debugPlan.targetFrameOrEvent,
-              specialistResults: specialistResults.map((result2) => result2.reasoningSummary)
-            })
-          }
-        ],
-        maxTokens: 700,
-        temperature: 0.2,
-        parse: (text) => debuggerLlmService.parseJson(text),
-        testValue: deterministic,
-        auditSummary: (payload) => payload.summary
-      });
-      data = result.data;
-    } catch {
-      data = deterministic;
-    }
-    return {
-      summaryId: `rdc-debugger-${Date.now()}`,
-      stage: "investigate",
-      agentId: "rdc-debugger",
-      summary: data.summary,
-      evidence: toStringArray(data.evidence).length > 0 ? toStringArray(data.evidence) : evidence,
-      nextStep: data.next_step,
-      confidence: toConfidence(data.confidence, deterministic.confidence),
-      createdAt: nowIso$1()
-    };
-  }
-  async executeVerification(runtimeContext, replaySessionId, investigationSummary) {
-    const verificationScreenshot = path.join(runtimeContext.outputRoot, "screenshots", "verification.png");
-    await harnessController.wrapToolExecution({
-      toolName: "rd.export.screenshot",
-      args: {
-        session_id: replaySessionId,
-        output_path: verificationScreenshot,
-        file_format: "png",
-        include_alpha: true
-      },
-      agentId: "rdc-debugger",
-      sessionId: runtimeContext.sessionId,
-      runId: runtimeContext.runId,
-      turnId: runtimeContext.turnId,
-      execute: () => rdxCliInvokerService.call({
-        toolName: "rd.export.screenshot",
-        args: {
-          session_id: replaySessionId,
-          output_path: verificationScreenshot,
-          file_format: "png",
-          include_alpha: true,
-          context_id: runtimeContext.contextId,
-          runtime_owner: runtimeContext.runtimeOwner,
-          owner_lease_id: runtimeContext.ownerLeaseId
-        },
-        contextId: runtimeContext.contextId,
-        turnId: runtimeContext.turnId,
-        runtimeOwner: runtimeContext.runtimeOwner,
-        ownerLeaseId: runtimeContext.ownerLeaseId,
-        runId: runtimeContext.runId,
-        abortSignal: runtimeContext.signal
-      })
-    });
-    return {
-      status: runtimeContext.debugPlan.verificationContract.requiresFixValidation ? "warning" : "ok",
-      payload: {
-        verification_kind: "fix_verify",
-        verdict: runtimeContext.debugPlan.verificationContract.requiresFixValidation ? "evidence_consistent_warning" : "passed",
-        summary: runtimeContext.debugPlan.verificationContract.requiresFixValidation ? "Verification completed with real framebuffer evidence, but shader hotfix replay remained best-effort only." : "Verification completed with real framebuffer evidence.",
-        screenshot_path: verificationScreenshot,
-        evidence: investigationSummary.evidence
-      }
-    };
-  }
-  async executeSkepticReview(location, debugPlan, investigationSummary, verification) {
-    const deterministic = {
-      verdict: verification.status === "ok" ? "approved" : "approved_with_warning",
-      summary: verification.status === "ok" ? "Skeptic accepted the evidence chain." : "Skeptic accepted the evidence chain but flagged verification as best-effort."
-    };
-    let data = deterministic;
-    try {
-      const result = await debuggerLlmService.callStructured({
-        agentId: "skeptic_agent",
-        stage: "skeptic",
-        sessionId: location.session.sessionId,
-        runId: location.run.runId,
-        messages: [
-          {
-            role: "system",
-            content: "You are the skeptic agent. Return JSON only with keys verdict and summary. Verdict must be one of approved, approved_with_warning, rejected. Reject only when the evidence chain is not strong enough to support publication."
-          },
-          {
-            role: "user",
-            content: JSON.stringify({
-              goal: debugPlan.userGoal,
-              investigationSummary,
-              verification
-            })
-          }
-        ],
-        maxTokens: 400,
-        temperature: 0.1,
-        parse: (text) => debuggerLlmService.parseJson(text),
-        testValue: deterministic,
-        auditSummary: (payload) => payload.summary
-      });
-      data = result.data;
-    } catch {
-      data = deterministic;
-    }
-    return {
-      status: data.verdict === "approved" ? "ok" : "warning",
-      payload: {
-        verification_kind: "skeptic_review",
-        verdict: data.verdict,
-        summary: data.summary
-      }
-    };
-  }
-  async buildReport(location, debugPlan, investigationSummary, verification, skeptic) {
-    const deterministic = {
-      title: `Debugger Report - ${debugPlan.targetCapture?.fileName || "capture"}`,
-      summary: investigationSummary.summary,
-      root_cause: investigationSummary.summary,
-      fix_description: String(verification.payload.summary),
-      evidence_summary: investigationSummary.evidence,
-      recommendations: [
-        "Review the highlighted pipeline/shader evidence before landing a permanent fix.",
-        "Keep the generated screenshot and specialist notes together with the report for regression tracking."
-      ],
-      confidence: investigationSummary.confidence
-    };
-    let data = deterministic;
-    try {
-      const result = await debuggerLlmService.callStructured({
-        agentId: "curator_agent",
-        stage: "curate",
-        sessionId: location.session.sessionId,
-        runId: location.run.runId,
-        messages: [
-          {
-            role: "system",
-            content: "You are the curator agent. Return JSON only with keys title, summary, root_cause, fix_description, evidence_summary, recommendations, confidence. Summaries must stay grounded in the verified evidence chain and skeptic outcome."
-          },
-          {
-            role: "user",
-            content: JSON.stringify({
-              goal: debugPlan.userGoal,
-              investigationSummary,
-              verification,
-              skeptic
-            })
-          }
-        ],
-        maxTokens: 900,
-        temperature: 0.2,
-        parse: (text) => debuggerLlmService.parseJson(text),
-        testValue: deterministic,
-        auditSummary: (payload) => payload.summary
-      });
-      data = result.data;
-    } catch {
-      data = deterministic;
-    }
-    return {
-      title: data.title,
-      summary: data.summary,
-      rootCause: data.root_cause,
-      fixDescription: data.fix_description,
-      evidenceSummary: toStringArray(data.evidence_summary),
-      recommendations: toStringArray(data.recommendations),
-      confidence: toConfidence(data.confidence, deterministic.confidence),
-      generatedAt: nowIso$1(),
-      curatorAgentId: "curator_agent"
-    };
-  }
-  getRequiredRouteAgents(debugPlan, backend) {
-    const required = /* @__PURE__ */ new Set([
-      "rdc-debugger",
-      "skeptic_agent",
-      "curator_agent",
-      ...debugPlan.recommendedSpecialists
-    ]);
-    if (backend === "remote") {
-      required.add("driver_device_agent");
-    }
-    return Array.from(required);
-  }
-  normalizePlanPresentation(value, fallback) {
-    if (!value || typeof value.title !== "string" || !Array.isArray(value.sections)) {
-      return fallback;
-    }
-    const sections = value.sections.map((section, index) => ({
-      id: String(section.id || section.title || `section-${index + 1}`),
-      title: String(section.title || "").trim(),
-      body: toStringArray(section.body)
-    })).filter((section) => section.title && section.body.length > 0);
-    if (!value.title.trim() || sections.length === 0) {
-      return fallback;
-    }
-    return {
-      title: value.title.trim(),
-      sections
-    };
-  }
-  async generatePlanWithLlm(input) {
-    const deterministic = {
-      scope: input.basePlan.scope,
-      notes: input.basePlan.notes,
-      recommended_specialists: input.basePlan.recommendedSpecialists,
-      verification_focus: input.basePlan.verificationContract.successCriteria,
-      presentation: input.basePlan.presentation ?? buildDebugPlanPresentation(input.basePlan)
-    };
-    let data = deterministic;
-    try {
-      const result = await debuggerLlmService.callStructured({
-        agentId: "rdc-debugger",
-        stage: "plan",
-        sessionId: input.sessionId,
-        runId: input.runId,
-        messages: [
-          {
-            role: "system",
-            content: "You are the RDC Debugger planner. Return JSON only with keys scope, notes, recommended_specialists, verification_focus, presentation. presentation must contain title and sections; each section has id, title, body string array. Keep the plan grounded in the provided intake facts and do not invent unsupported captures or event ids."
-          },
-          {
-            role: "user",
-            content: JSON.stringify({
-              goal: input.resolvedGoal,
-              basePlan: input.basePlan
-            })
-          }
-        ],
-        maxTokens: 700,
-        temperature: 0.2,
-        parse: (text) => debuggerLlmService.parseJson(text),
-        testValue: deterministic,
-        auditSummary: (payload) => payload.scope
-      });
-      data = result.data;
-    } catch {
-      data = deterministic;
-    }
-    return {
-      ...input.basePlan,
-      scope: data.scope || input.basePlan.scope,
-      notes: Array.from(/* @__PURE__ */ new Set([
-        ...input.basePlan.notes,
-        ...toStringArray(data.notes),
-        ...toStringArray(data.verification_focus).map((item) => `Verification focus: ${item}`)
-      ])),
-      recommendedSpecialists: toRecommendedSpecialists(data.recommended_specialists, input.basePlan.recommendedSpecialists),
-      presentation: this.normalizePlanPresentation(data.presentation, input.basePlan.presentation ?? buildDebugPlanPresentation(input.basePlan)),
-      updatedAt: nowIso$1()
-    };
-  }
-  normalizeLlmBlocker(error, fallbackCode) {
-    if (error && typeof error === "object" && "blocker" in error) {
-      const blocker = error.blocker;
-      if (blocker) {
-        return blocker;
-      }
-    }
-    return {
-      code: fallbackCode,
-      reason: error instanceof Error ? error.message : String(error),
-      refs: [],
-      detectedAt: nowIso$1()
-    };
-  }
-  async appendActionEvent(sessionId, event) {
-    if (!event.turn_id && event.run_id) {
-      const location = this.findRun(event.run_id);
-      if (location?.run.turnId) {
-        event.turn_id = location.run.turnId;
-      }
-    }
-    await storageAdapter.appendActionEvent(sessionId, event);
-    workflowProjectionPublisher.publishEvidenceEvent(event);
-    this.publishTraceProjection(sessionId);
-  }
-  async appendUserConversationMessage(sessionId, runId, content) {
-    const runLocation = this.findRun(runId || "");
-    const message = {
-      id: generateEventId("msgu"),
-      turnId: runLocation?.run.turnId || generateEventId("turn"),
-      sessionId,
-      projectId: runLocation?.session.projectId ?? null,
-      runId,
-      modeContext: runLocation?.run.mode ?? "debugger",
-      role: "user",
-      content,
-      status: "complete",
-      attachments: [],
-      updatedAt: nowMs(),
-      reasoningTrace: null,
-      createdAt: nowMs()
-    };
-    storageAdapter.appendConversationMessage(sessionId, message);
-    this.emitConversationEvent({
-      type: "message_completed",
-      sessionId,
-      turnId: message.turnId,
-      message
-    });
-    this.publishTraceProjection(sessionId);
-  }
-  async appendAssistantConversationMessage(sessionId, runId, content, status = "complete") {
-    const runLocation = this.findRun(runId || "");
-    const message = {
-      id: generateEventId("msga"),
-      turnId: runLocation?.run.turnId || generateEventId("turn"),
-      sessionId,
-      projectId: runLocation?.session.projectId ?? null,
-      runId,
-      modeContext: runLocation?.run.mode ?? "debugger",
-      role: "assistant",
-      agentId: "rdc-debugger",
-      content,
-      status,
-      updatedAt: nowMs(),
-      reasoningTrace: null,
-      createdAt: nowMs()
-    };
-    storageAdapter.appendConversationMessage(sessionId, message);
-    this.emitConversationEvent({
-      type: status === "error" ? "message_errored" : "message_completed",
-      sessionId,
-      turnId: message.turnId,
-      message
-    });
-  }
-  findRun(runId) {
-    const projects = storageAdapter.listProjects();
-    for (const project of projects) {
-      const sessions = storageAdapter.listSessions(project.projectId);
-      for (const session of sessions) {
-        const run = storageAdapter.listRuns(session.sessionId).find((entry) => entry.runId === runId);
-        if (run) {
-          return { session, run };
-        }
-      }
-    }
-    return null;
-  }
-  emitWorkflowState(state2) {
-    workflowProjectionPublisher.publishWorkflowState(state2);
-    this.publishTraceProjection(state2.sessionId);
-  }
-  emitRunStatus(sessionId, runId, status, lastStage, stopReason) {
-    workflowProjectionPublisher.publishRunStatus({
-      sessionId,
-      runId,
-      status,
-      lastStage,
-      stopReason
-    });
-    if (["completed", "failed", "cancelled", "interrupted"].includes(status)) {
-      this.publishTraceProjection(sessionId);
-    }
-  }
-  emitConversationEvent(event) {
-    workflowProjectionPublisher.publishConversationEvent(event);
-  }
-  publishTraceProjection(sessionId) {
-    void traceService.getSession(sessionId).then((result) => {
-      if (result.success && result.presentation) {
-        workflowProjectionPublisher.publishTraceProjectionChanged(sessionId, result.presentation);
-      }
-    }).catch((error) => {
-      console.error("[WorkflowProjectionPublisher] Failed to publish trace projection:", error);
-    });
-  }
-}
-const debugWorkflowService = new DebugWorkflowService();
-class DebuggerRuntime {
-  recoverInterruptedRuns() {
-    return debugWorkflowService.recoverInterruptedRuns();
-  }
-  startPlan(request) {
-    return debugWorkflowService.startPlan(request);
-  }
-  requestStartFromConversation(request) {
-    const { source: _source, message: _message, ...startRequest } = request;
-    return this.startPlan(startRequest);
-  }
-  getPlan(runId) {
-    return debugWorkflowService.getPlan(runId);
-  }
-  submitQuestions(runId, answers) {
-    return debugWorkflowService.submitQuestions(runId, answers);
-  }
-  approvePlan(runId) {
-    return debugWorkflowService.approvePlan(runId);
-  }
-  getTraceProjection(sessionId) {
-    return debugWorkflowService.getTraceProjection(sessionId);
-  }
-  requestPlanRevision(runId, revisionText) {
-    return debugWorkflowService.requestPlanRevision(runId, revisionText);
-  }
-  switchTraceBranch(sessionId, branchId) {
-    return debugWorkflowService.switchTraceBranch(sessionId, branchId);
-  }
-  exportTraceSession(sessionId, options) {
-    return debugWorkflowService.exportTraceSession(sessionId, options);
-  }
-  restartRun(runId) {
-    return debugWorkflowService.restartRun(runId);
-  }
-  stopRun(runId) {
-    return debugWorkflowService.stopRun(runId);
-  }
-  getWorkflowState(sessionId, runId) {
-    return debugWorkflowService.getWorkflowState(sessionId, runId);
   }
   resolveAgentToolAllowlist(agentId, stage) {
     return resolveAgentToolAllowlist(agentId, stage);
@@ -16681,6 +11697,325 @@ class DebuggerRuntime {
   }
 }
 const debuggerRuntime = new DebuggerRuntime();
+const EMPTY_NAMESPACES = {
+  capture: { description: "", groups: [] },
+  session: { description: "", groups: [] },
+  event: { description: "", groups: [] },
+  replay: { description: "", groups: [] },
+  pipeline: { description: "", groups: [] },
+  shader: { description: "", groups: [] },
+  texture: { description: "", groups: [] },
+  resource: { description: "", groups: [] },
+  export: { description: "", groups: [] },
+  remote: { description: "", groups: [] },
+  core: { description: "", groups: [] },
+  macro: { description: "", groups: [] },
+  vfs: { description: "", groups: [] }
+};
+const EMPTY_CATALOG = {
+  schema_version: "unconfigured",
+  tool_count: 0,
+  tools: [],
+  namespaces: EMPTY_NAMESPACES
+};
+const RECOMMENDED_SPECIALISTS = [
+  "triage_agent",
+  "capture_repro_agent",
+  "pass_graph_pipeline_agent",
+  "pixel_forensics_agent",
+  "shader_ir_agent",
+  "skeptic_agent",
+  "curator_agent"
+];
+class RdxCliInvokerService {
+  constructor(shell = shellInvocationService) {
+    this.shell = shell;
+  }
+  shell;
+  catalog = null;
+  catalogPath = null;
+  traceListeners = /* @__PURE__ */ new Set();
+  getSettings() {
+    return settingsService.getAll().tooling.rdxCli;
+  }
+  createRuntimeMetadata(settings = this.getSettings(), catalog) {
+    const catalogPath = settings.catalogPath.trim();
+    return {
+      source: settings.enabled && settings.command.trim() ? "configured" : "unconfigured",
+      command: settings.command.trim(),
+      workingDirectory: settings.workingDirectory.trim(),
+      version: null,
+      catalog: {
+        path: catalogPath,
+        exists: catalogPath ? fs.existsSync(catalogPath) : false,
+        schemaVersion: catalog?.schema_version ?? null,
+        generatedAt: catalog?.generated_at ?? null,
+        toolCount: catalog?.tool_count ?? (Array.isArray(catalog?.tools) ? catalog.tools.length : null)
+      }
+    };
+  }
+  getAvailabilityFailure(settings = this.getSettings()) {
+    if (!settings.enabled) {
+      return "RDX CLI invoker is disabled. Configure it in Settings.";
+    }
+    if (!settings.command.trim()) {
+      return "RDX CLI command is not configured.";
+    }
+    const command = settings.command.trim();
+    if ((path.isAbsolute(command) || command.includes(path.sep) || command.includes("/")) && !fs.existsSync(command)) {
+      return `RDX CLI command not found: ${command}`;
+    }
+    return void 0;
+  }
+  isAvailable() {
+    return this.getAvailabilityFailure() === void 0;
+  }
+  getRuntimeMetadata() {
+    return this.createRuntimeMetadata(this.getSettings(), this.catalog ?? void 0);
+  }
+  async loadCatalog() {
+    const settings = this.getSettings();
+    const catalogPath = settings.catalogPath.trim();
+    if (!catalogPath) {
+      this.catalog = { ...EMPTY_CATALOG, runtime: this.createRuntimeMetadata(settings) };
+      this.catalogPath = null;
+      return this.catalog;
+    }
+    if (this.catalog && this.catalogPath === catalogPath) {
+      return this.catalog;
+    }
+    if (!fs.existsSync(catalogPath)) {
+      this.catalog = { ...EMPTY_CATALOG, runtime: this.createRuntimeMetadata(settings) };
+      this.catalogPath = catalogPath;
+      return this.catalog;
+    }
+    const catalog = JSON.parse(fs.readFileSync(catalogPath, "utf-8"));
+    this.catalog = {
+      ...catalog,
+      runtime: this.createRuntimeMetadata(settings, catalog)
+    };
+    this.catalogPath = catalogPath;
+    return this.catalog;
+  }
+  async getRuntimeSummary() {
+    const settings = this.getSettings();
+    const catalog = await this.loadCatalog();
+    const namespaceCounts = /* @__PURE__ */ new Map();
+    for (const tool of catalog.tools ?? []) {
+      namespaceCounts.set(tool.namespace, (namespaceCounts.get(tool.namespace) ?? 0) + 1);
+    }
+    const unavailableReason = this.getAvailabilityFailure(settings);
+    const namespaces = Array.from(namespaceCounts.entries()).map(([namespace, toolCount]) => ({
+      namespace: `rd.${namespace}.*`,
+      toolCount,
+      available: !unavailableReason
+    }));
+    return {
+      runtime: this.createRuntimeMetadata(settings, catalog),
+      cli: {
+        available: !unavailableReason,
+        unavailableReason
+      },
+      namespaces,
+      recommendedSpecialists: RECOMMENDED_SPECIALISTS
+    };
+  }
+  normalizeCliArgs(args) {
+    const normalized = [];
+    for (let index = 0; index < args.length; index += 1) {
+      const current = args[index];
+      normalized.push(current === "--context-id" ? "--daemon-context" : current);
+    }
+    return normalized;
+  }
+  buildCommandArgs(settings, command, args) {
+    const normalized = this.normalizeCliArgs(args);
+    const globalArgs = [];
+    const commandArgs = [];
+    for (let index = 0; index < normalized.length; index += 1) {
+      const current = normalized[index];
+      if (current === "--daemon-context") {
+        const value = normalized[index + 1];
+        if (value) {
+          globalArgs.push(current, value);
+          index += 1;
+          continue;
+        }
+      }
+      commandArgs.push(current);
+    }
+    return [
+      ...settings.argsPrefix,
+      ...globalArgs,
+      command,
+      ...commandArgs
+    ];
+  }
+  async executeCLI(command, args = [], options = {}) {
+    const startTime = nowMs();
+    const settings = this.getSettings();
+    const unavailableReason = this.getAvailabilityFailure(settings);
+    if (unavailableReason) {
+      return {
+        exitCode: 2,
+        stdout: "",
+        stderr: unavailableReason,
+        duration_ms: nowMs() - startTime
+      };
+    }
+    return this.shell.invoke({
+      command: settings.command,
+      args: this.buildCommandArgs(settings, command, args),
+      cwd: options.cwd || settings.workingDirectory || void 0,
+      env: {
+        ...settings.env,
+        ...options.env
+      },
+      timeoutMs: options.timeout ?? settings.timeoutMs,
+      runId: options.runId,
+      abortSignal: options.abortSignal
+    });
+  }
+  onInvocationTrace(listener) {
+    this.traceListeners.add(listener);
+    return () => {
+      this.traceListeners.delete(listener);
+    };
+  }
+  emitInvocationTrace(request, result) {
+    const trace = {
+      traceId: result.trace_id || generateEventId("tool-trace"),
+      turnId: request.turnId,
+      toolName: request.toolName,
+      args: request.args,
+      result,
+      timestamp: nowMs(),
+      contextId: request.contextId ?? "",
+      runtimeOwner: request.runtimeOwner ?? "",
+      ownerLeaseId: request.ownerLeaseId
+    };
+    for (const listener of this.traceListeners) {
+      listener(trace);
+    }
+  }
+  async call(request) {
+    const startTime = nowMs();
+    let response;
+    try {
+      const cliArgs = [request.toolName];
+      const effectiveArgs = {
+        ...request.args || {}
+      };
+      if (request.contextId && effectiveArgs["context_id"] === void 0) {
+        effectiveArgs["context_id"] = request.contextId;
+      }
+      if (request.runtimeOwner && effectiveArgs["runtime_owner"] === void 0) {
+        effectiveArgs["runtime_owner"] = request.runtimeOwner;
+      }
+      if (request.ownerLeaseId && effectiveArgs["owner_lease_id"] === void 0) {
+        effectiveArgs["owner_lease_id"] = request.ownerLeaseId;
+      }
+      if (Object.keys(effectiveArgs).length > 0) {
+        cliArgs.push("--args-json", JSON.stringify(effectiveArgs));
+      }
+      if (request.contextId) {
+        cliArgs.push("--daemon-context", request.contextId);
+      }
+      const result = await this.executeCLI("call", cliArgs, {
+        timeout: this.getSettings().timeoutMs,
+        runId: request.runId,
+        abortSignal: request.abortSignal
+      });
+      if (result.stdout.trim()) {
+        let parsed = null;
+        try {
+          parsed = JSON.parse(result.stdout);
+        } catch {
+          if (result.exitCode === 0) {
+            response = {
+              ok: true,
+              data: { raw: result.stdout },
+              duration_ms: nowMs() - startTime,
+              trace_id: generateEventId("tool")
+            };
+            this.emitInvocationTrace(request, response);
+            return response;
+          }
+        }
+        if (parsed) {
+          if (parsed.ok === false) {
+            const errObj = parsed.error ?? {};
+            response = {
+              ok: false,
+              data: null,
+              artifacts: [],
+              error: {
+                code: errObj.code ?? "TOOL_ERROR",
+                message: errObj.message ?? "RDX CLI returned ok:false",
+                category: errObj.category ?? "execution",
+                details: errObj.details ?? void 0
+              },
+              duration_ms: nowMs() - startTime,
+              trace_id: generateEventId("tool")
+            };
+            this.emitInvocationTrace(request, response);
+            return response;
+          }
+          response = {
+            ok: true,
+            data: parsed.data ?? parsed,
+            artifacts: parsed.artifacts,
+            duration_ms: nowMs() - startTime,
+            trace_id: generateEventId("tool")
+          };
+          this.emitInvocationTrace(request, response);
+          return response;
+        }
+      }
+      response = {
+        ok: false,
+        data: null,
+        artifacts: [],
+        error: {
+          code: "CLI_ERROR",
+          message: result.stderr.trim() || `Exit code: ${result.exitCode}`,
+          category: "execution",
+          details: {
+            stdout: result.stdout,
+            stderr: result.stderr,
+            exitCode: result.exitCode
+          }
+        },
+        duration_ms: nowMs() - startTime,
+        trace_id: generateEventId("tool")
+      };
+      this.emitInvocationTrace(request, response);
+      return response;
+    } catch (error) {
+      response = {
+        ok: false,
+        data: null,
+        artifacts: [],
+        error: {
+          code: "EXECUTION_ERROR",
+          message: error instanceof Error ? error.message : String(error),
+          category: "internal"
+        },
+        duration_ms: nowMs() - startTime,
+        trace_id: generateEventId("tool")
+      };
+      this.emitInvocationTrace(request, response);
+      return response;
+    }
+  }
+  abortRun(runId) {
+    this.shell.abortRun(runId);
+  }
+  terminateAll() {
+    this.shell.terminateAll();
+  }
+}
+const rdxCliInvokerService = new RdxCliInvokerService();
 function registerAgentHandlers(context2) {
   const { state: state2 } = context2;
   electron.ipcMain.handle("agent:sendMessage", async (_event, agentId, content) => {
@@ -16886,7 +12221,7 @@ function resolveConversationAgentId(requestedMode, requestedAgentId) {
   if (requestedAgentId && KNOWN_CONVERSATION_AGENTS.has(requestedAgentId)) {
     return requestedAgentId;
   }
-  return requestedMode === "ask" ? "ask_agent" : "rdc-debugger";
+  return requestedMode === "ask" ? "ask" : requestedMode;
 }
 const EXECUTE_PATTERN = /开始|启动|执行|正式分析|正式调试|本地调试|local\s*模式调试|模式调试|直接分析|现在分析|run\b|start\b|debug\b|analy[sz]e\b|帮我调试|请.*调试|开始调试|开始分析/i;
 const TASK_FILE_PATTERN = /([A-Za-z]:[\\/][^\r\n"]+\.(txt|md))/i;
@@ -16901,11 +12236,6 @@ const ACTIVE_RUN_STATUSES = [
 ];
 function isActiveRun(run) {
   return Boolean(run && ACTIVE_RUN_STATUSES.includes(run.status));
-}
-function trimPathLabel(value) {
-  const normalized = value.replace(/\\/g, "/");
-  const parts = normalized.split("/");
-  return parts[parts.length - 1] || value;
 }
 function createReasoningStep(id, title, stage) {
   return {
@@ -17034,30 +12364,6 @@ ${attachmentLines.join("\n")}`;
 function stripControlBlock(text) {
   return text.replace(/<control>\s*[\s\S]*?<\/control>/i, "").trim();
 }
-function parseControlBlock(text) {
-  const match = text.match(/<control>\s*([\s\S]*?)\s*<\/control>/i);
-  if (!match?.[1]) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(match[1]);
-    const intent = parsed.intent;
-    if (intent !== "talk" && intent !== "intake" && intent !== "execute") {
-      return null;
-    }
-    return {
-      intent,
-      safe_to_start: parsed.safe_to_start === true,
-      needs_project: parsed.needs_project === true,
-      needs_capture: parsed.needs_capture === true,
-      needs_target_capture: parsed.needs_target_capture === true,
-      needs_route: parsed.needs_route === true,
-      reason: typeof parsed.reason === "string" ? parsed.reason : void 0
-    };
-  } catch {
-    return null;
-  }
-}
 function resolveTaskFileContext(message) {
   const match = message.match(TASK_FILE_PATTERN);
   const taskFilePath = match?.[1] ? path.resolve(match[1]) : null;
@@ -17144,12 +12450,12 @@ function createConversationDiagnostic(input) {
   };
 }
 function getConversationAgentLabel(agentId) {
-  return agentId === "ask_agent" ? "Ask" : "rdc-debugger";
+  return agentId === "ask" ? "Ask" : agentId;
 }
 function resolveAgentRoutePreflight(agentId, fallbackAgentId) {
   const settings = settingsService.getAll();
   const primaryRoute = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
-  const fallbackRoute = fallbackAgentId ? settings.llm.agentRoutes.find((entry) => entry.agentId === fallbackAgentId) : void 0;
+  const fallbackRoute = void 0;
   const route = primaryRoute?.providerId && primaryRoute.modelId ? primaryRoute : fallbackRoute;
   const routeAgentId = route?.agentId ?? agentId;
   const label = getConversationAgentLabel(agentId);
@@ -17202,17 +12508,14 @@ function resolveAgentRoutePreflight(agentId, fallbackAgentId) {
   };
 }
 function resolveDebuggerRoutePreflight() {
-  return resolveAgentRoutePreflight("rdc-debugger");
-}
-function hasUsableDebuggerRoute() {
-  return resolveDebuggerRoutePreflight().ok;
+  return resolveAgentRoutePreflight("debugger");
 }
 function recordCoworkLlmDiagnostic(context2, diagnostic) {
   runtimeLogService.log({
     scope: context2.session?.sessionId ? "session" : "app",
     namespace: "llm",
     severity: diagnostic.severity === "error" ? "error" : "warning",
-    title: `${diagnostic.agentId ?? "rdc-debugger"} -> ${diagnostic.providerId ?? "route missing"}${diagnostic.modelId ? `/${diagnostic.modelId}` : ""}`,
+    title: `${diagnostic.agentId ?? "debugger"} -> ${diagnostic.providerId ?? "route missing"}${diagnostic.modelId ? `/${diagnostic.modelId}` : ""}`,
     summary: diagnostic.userMessage,
     detail: diagnostic.technicalMessage,
     sessionId: context2.session?.sessionId ?? null,
@@ -17238,73 +12541,6 @@ function createRequestFailedDiagnostic(route, error) {
     modelId: route.modelId,
     technicalMessage: redactTechnicalMessage(error)
   });
-}
-function extractRequestedCaptureName(message) {
-  const match = message.match(/([^\s"'“”‘’]+\.rdc)/i);
-  return match?.[1] ? trimPathLabel(match[1].replace(/[，。；,;]+$/, "")) : null;
-}
-function shouldStartDebuggerFromMessage(message) {
-  if (!EXECUTE_PATTERN.test(message)) {
-    return false;
-  }
-  return /\.rdc\b/i.test(message) || /event\s*id|事件\s*id|Event\s*\d+/i.test(message) || /帮我调试|请调试|开始调试|正式分析|直接过去看|定位根因|完整\s*report/i.test(message);
-}
-function captureDescriptorFromOpenedCapture(openedCapture) {
-  const normalizedPath = path.resolve(openedCapture.filePath);
-  return {
-    id: openedCapture.captureId || openedCapture.inputId,
-    filePath: normalizedPath,
-    captureFileId: openedCapture.captureFileId,
-    role: "primary",
-    backendHint: openedCapture.backend,
-    status: openedCapture.status,
-    sessionId: openedCapture.sessionId,
-    replaySessionId: openedCapture.replaySessionId,
-    contextId: openedCapture.contextId
-  };
-}
-function resolveOpenedCaptureDescriptor(context2) {
-  return context2.openedCapture?.status === "open" ? captureDescriptorFromOpenedCapture(context2.openedCapture) : null;
-}
-function resolveCaptureGuards(message, context2) {
-  if (resolveOpenedCaptureDescriptor(context2)) {
-    return { ready: true };
-  }
-  const requestedCaptureName = extractRequestedCaptureName(message);
-  if (requestedCaptureName) {
-    return {
-      ready: false,
-      needsCapture: true,
-      reason: `我看到你提到了 ${requestedCaptureName}，但正式 Debugger 只能使用应用内已经 Open 的 .rdc Capture。请先在 Capture Library 打开该 capture，再进入执行模式。`
-    };
-  }
-  return {
-    ready: false,
-    needsCapture: true,
-    reason: "我可以先帮你梳理问题，但正式 Debugger 执行需要先在应用内 Open 一个 .rdc Capture。仅在 prompt 中写路径不会创建 runtime context。"
-  };
-}
-function buildWorkflowUpgradeReply(result) {
-  if (!result.success) {
-    return result.error ? `我刚才尝试进入正式调试，但没有成功：${result.error}` : "我刚才尝试进入正式调试，但没有成功。";
-  }
-  if (result.debugPlanSummary?.blockers?.length) {
-    const blocker = result.debugPlanSummary.blockers[0];
-    if (blocker?.code === "BLOCKED_LLM_ROUTE_MISSING" || blocker?.code === "BLOCKED_LLM_PROVIDER_MISSING" || blocker?.code === "BLOCKED_LLM_SECRET_MISSING" || blocker?.code === "BLOCKED_LLM_MODEL_MISSING" || blocker?.code === "BLOCKED_LLM_PROVIDER_UNAVAILABLE") {
-      return "当前调试链路还没绑定可用模型，所以我不能开始正式执行；不过我可以先帮你确认问题范围和所需 capture。";
-    }
-    if (blocker?.code === "BLOCKED_MISSING_CAPTURE") {
-      return "我可以先帮你梳理问题，但正式分析需要一个 .rdc capture。你可以先描述现象，或者直接打开一个 capture。";
-    }
-    return blocker?.reason || "当前还不能进入正式调试。";
-  }
-  if (result.pendingQuestions?.questions.some((question) => question.id === "target_capture")) {
-    return "我已经开始整理正式执行计划了，不过当前还需要你明确这次要分析的 capture。";
-  }
-  if (result.status === "awaiting_approval") {
-    return "我已经整理好正式执行计划了。你先确认下方计划卡片，批准后我再进入严格调试流程。";
-  }
-  return "正式调试入口已准备完成，后续状态会在计划卡和运行记录中更新。";
 }
 function computeVisibleAssistantText(raw) {
   const controlIndex = raw.indexOf(CONTROL_OPEN_TAG);
@@ -17394,7 +12630,7 @@ class ConversationService {
       projectId: context2.projectId,
       runId: context2.currentRun?.runId ?? null,
       modeContext: requestedMode,
-      agentId: "rdc-debugger",
+      agentId: "debugger",
       status: "streaming",
       reasoningTrace: createDraftReasoningTrace("正在思考", [
         createReasoningStep("active-debug-reply", "生成调试回复", "investigate")
@@ -17484,7 +12720,7 @@ class ConversationService {
     });
     try {
       const responseText = await agentOrchestrator.sendMessage(
-        "rdc-debugger",
+        "debugger",
         composeMessageForAgent(input.userMessage),
         {
           caseId: input.context.session?.sessionId,
@@ -17703,13 +12939,6 @@ class ConversationService {
         content: `${visibleResponse}${systemAppendix}`
       });
     };
-    const appendSystemAppendix = (text) => {
-      if (!text) {
-        return;
-      }
-      systemAppendix += text;
-      commitVisibleAssistantText();
-    };
     const withCoworkReasoning = (reasoningTrace) => ({ reasoningTrace });
     {
       commitAssistantMessage("message_patched", {
@@ -17727,70 +12956,11 @@ class ConversationService {
     let llmDiagnostic = null;
     const taskFileContext = resolveTaskFileContext(input.rawMessage);
     const effectiveMessage = taskFileContext.effectiveMessage;
-    const explicitFormalDebugRequest = shouldStartDebuggerFromMessage(effectiveMessage);
-    const explicitDebuggerRequest = input.requestedMode === "debugger" && explicitFormalDebugRequest;
-    const askModeFormalDebugRequest = input.requestedMode === "ask" && explicitFormalDebugRequest;
-    const explicitDebuggerCaptureGuard = explicitDebuggerRequest ? resolveCaptureGuards(effectiveMessage, input.context) : null;
-    const askModeCaptureGuard = askModeFormalDebugRequest ? resolveCaptureGuards(effectiveMessage, input.context) : null;
-    const routePreflight = conversationAgentId === "ask_agent" ? resolveAgentRoutePreflight("ask_agent", "rdc-debugger") : resolveDebuggerRoutePreflight();
-    if (askModeFormalDebugRequest) {
-      rawResponse = [
-        askModeCaptureGuard?.ready ? "当前 Ask 不会直接创建正式 run。Capture 已经 Open；如需执行，请切换到 Debugger 后发送，我会先生成执行前计划。" : askModeCaptureGuard?.reason || "正式 Debugger 执行需要先在应用内 Open 一个 .rdc Capture。",
-        '<control>{"intent":"intake","safe_to_start":false,"needs_capture":true}</control>'
-      ].join("\n");
-      visibleResponse = stripControlBlock(rawResponse);
-      commitVisibleAssistantText();
-      commitAssistantMessage("message_patched", {
-        ...withCoworkReasoning(upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
-          status: "complete",
-          summary: "Ask 模式保留为非执行入口，已提示用户通过 Open 和 Debugger 模式进入计划。",
-          completedAt: nowMs()
-        }))
-      });
-    } else if (explicitDebuggerRequest && explicitDebuggerCaptureGuard && !explicitDebuggerCaptureGuard.ready) {
-      rawResponse = [
-        explicitDebuggerCaptureGuard.reason || "正式 Debugger 执行需要先在应用内 Open 一个 .rdc Capture。",
-        '<control>{"intent":"intake","safe_to_start":false,"needs_capture":true}</control>'
-      ].join("\n");
-      visibleResponse = stripControlBlock(rawResponse);
-      commitVisibleAssistantText();
-      commitAssistantMessage("message_patched", {
-        ...withCoworkReasoning(upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
-          status: "complete",
-          summary: "已拦截正式 Debugger 请求，等待应用内 Open capture。",
-          completedAt: nowMs()
-        }))
-      });
-    } else if (explicitDebuggerRequest && !routePreflight.ok && routePreflight.diagnostic.code !== "CONVERSATION_LLM_ROUTE_MISSING") {
-      llmDiagnostic = routePreflight.diagnostic;
-      errorViewModel = {
-        code: llmDiagnostic.code,
-        message: llmDiagnostic.userMessage,
-        technicalMessage: llmDiagnostic.technicalMessage
-      };
-      rawResponse = llmDiagnostic.userMessage;
-      visibleResponse = llmDiagnostic.userMessage;
-      recordCoworkLlmDiagnostic(input.context, llmDiagnostic);
-      commitVisibleAssistantText();
-    } else if (explicitDebuggerRequest) {
-      if (!routePreflight.ok) {
-        llmDiagnostic = routePreflight.diagnostic;
-        recordCoworkLlmDiagnostic(input.context, llmDiagnostic);
-      }
-      rawResponse = [
-        "已识别为 Debugger 执行请求。我会先生成执行前计划，等待你确认后再进入正式调试。",
-        '<control>{"intent":"execute","safe_to_start":true}</control>'
-      ].join("\n");
-      visibleResponse = stripControlBlock(rawResponse);
-      commitVisibleAssistantText();
-      commitAssistantMessage("message_patched", {
-        ...withCoworkReasoning(upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
-          status: "complete",
-          summary: "已识别为正式 Debugger 任务，准备生成执行前计划。",
-          completedAt: nowMs()
-        }))
-      });
-    } else if (!routePreflight.ok) {
+    const explicitFormalDebugRequest = false;
+    input.requestedMode === "debugger" && explicitFormalDebugRequest;
+    input.requestedMode === "ask" && explicitFormalDebugRequest;
+    const routePreflight = conversationAgentId === "ask" ? resolveAgentRoutePreflight("ask") : resolveDebuggerRoutePreflight();
+    if (!routePreflight.ok) {
       llmDiagnostic = routePreflight.diagnostic;
       errorViewModel = {
         code: llmDiagnostic.code,
@@ -17820,10 +12990,10 @@ class ConversationService {
           input.importedAttachments
         );
         const globalInstructions = settingsService.getAll().agents.globalInstructions.trim();
-        const baseSystemPrompt = conversationAgentId === "ask_agent" ? buildAskSystemPrompt() : buildDebuggerCoworkSystemPrompt();
+        const baseSystemPrompt = conversationAgentId === "ask" ? buildAskSystemPrompt() : buildDebuggerCoworkSystemPrompt();
         const systemPrompt = [
           baseSystemPrompt,
-          conversationAgentId !== "ask_agent" && globalInstructions ? `
+          conversationAgentId !== "ask" && globalInstructions ? `
 
 Global Instructions:
 ${globalInstructions}` : ""
@@ -17835,7 +13005,7 @@ ${globalInstructions}` : ""
             sessionId: input.context.session?.sessionId,
             turnId: assistantMessage.turnId,
             stage: "cowork",
-            patternId: input.requestedMode === "debugger" ? "plan-generate-verify" : "free-agent",
+            patternId: "free-agent",
             systemPrompt,
             maxTokens: 1200,
             temperature: 0.35,
@@ -17931,7 +13101,6 @@ ${globalInstructions}` : ""
     }
     const assistantContent = stripControlBlock(rawResponse);
     visibleResponse = assistantContent;
-    const control = parseControlBlock(rawResponse);
     const isRouteMissingDiagnostic = llmDiagnostic?.code === "CONVERSATION_LLM_ROUTE_MISSING";
     let finalStatus = errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete";
     let traceStatus = errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete";
@@ -17976,77 +13145,6 @@ ${globalInstructions}` : ""
       this.clearActiveTurn(assistantMessage.turnId, abortController);
       return;
     }
-    const shouldUpgradeByControl = input.requestedMode === "debugger" && control?.intent === "execute" && control.safe_to_start;
-    const shouldUpgradeByRequest = !errorViewModel && explicitDebuggerRequest && explicitDebuggerCaptureGuard?.ready === true;
-    if (shouldUpgradeByControl || shouldUpgradeByRequest) {
-      commitAssistantMessage("message_patched", {
-        reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-upgrade", {
-          title: "升级到正式调试",
-          stage: "plan",
-          status: "running",
-          summary: "正在准备正式调试计划。",
-          startedAt: nowMs()
-        })
-      });
-      if (!input.context.projectId) {
-        appendSystemAppendix(`
-
-我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。`);
-      } else {
-        const captureGuard = resolveCaptureGuards(effectiveMessage, input.context);
-        if (!captureGuard.ready) {
-          appendSystemAppendix(`
-
-${captureGuard.reason || "当前还不能进入正式分析。"}`);
-        } else if (!hasUsableDebuggerRoute()) {
-          appendSystemAppendix("\n\n当前调试链路还没绑定可用模型，所以我不能开始正式执行；不过我可以先帮你确认问题范围和所需 capture。");
-        } else {
-          if (abortController.signal.aborted) {
-            this.clearActiveTurn(assistantMessage.turnId, abortController);
-            return;
-          }
-          const requestedCapture = resolveOpenedCaptureDescriptor(input.context);
-          const workflowResult = await debuggerRuntime.requestStartFromConversation({
-            source: "conversation",
-            message: assistantMessage,
-            projectId: input.context.projectId,
-            sessionId: input.context.session?.sessionId,
-            turnId: assistantMessage.turnId,
-            mode: "debugger",
-            goal: input.rawMessage,
-            captures: requestedCapture ? [requestedCapture] : void 0,
-            primaryCaptureId: requestedCapture?.id,
-            replayDevice: input.context.replayDevice
-          });
-          if (abortController.signal.aborted) {
-            this.clearActiveTurn(assistantMessage.turnId, abortController);
-            return;
-          }
-          const upgradeReply = buildWorkflowUpgradeReply(workflowResult);
-          appendSystemAppendix(`
-
-${upgradeReply}`);
-          if (workflowResult.runId) {
-            commitAssistantMessage("message_patched", {
-              runId: workflowResult.runId
-            });
-            this.emitConversationEvent({
-              type: "run_linked",
-              sessionId: input.context.session?.sessionId ?? "",
-              turnId: assistantMessage.turnId,
-              runId: workflowResult.runId
-            });
-          }
-        }
-      }
-      commitAssistantMessage("message_patched", {
-        reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-upgrade", {
-          status: "complete",
-          summary: "正式调试升级判断已完成。",
-          completedAt: nowMs()
-        })
-      });
-    }
     commitAssistantMessage(finalStatus === "error" ? "message_errored" : "message_completed", {
       status: finalStatus,
       content: `${assistantContent}${systemAppendix}`,
@@ -18054,12 +13152,12 @@ ${upgradeReply}`);
       ...withCoworkReasoning(finalizeTrace(
         upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
           status: errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete",
-          summary: llmDiagnostic ? llmDiagnostic.code === "CONVERSATION_LLM_REQUEST_FAILED" ? "模型请求失败，已记录诊断。" : "模型链路不可用，已给出配置诊断。" : explicitDebuggerRequest ? "正式 Debugger 任务入口判断已完成。" : "协作回复已完成。",
+          summary: llmDiagnostic ? llmDiagnostic.code === "CONVERSATION_LLM_REQUEST_FAILED" ? "模型请求失败，已记录诊断。" : "模型链路不可用，已给出配置诊断。" : "协作回复已完成。",
           detail: llmDiagnostic?.technicalMessage,
           completedAt: nowMs()
         }),
         traceStatus,
-        llmDiagnostic ? finalStatus === "error" ? "回复失败" : "等待模型配置" : explicitDebuggerRequest ? "已完成执行入口判断" : "回复已完成"
+        llmDiagnostic ? finalStatus === "error" ? "回复失败" : "等待模型配置" : "回复已完成"
       ))
     });
     this.clearActiveTurn(assistantMessage.turnId, abortController);
@@ -19402,6 +14500,530 @@ function registerToolEvidenceHandlers(context2) {
     return events;
   });
 }
+const BLOCKER_CODES = {
+  BLOCKED_LLM_ROUTE_MISSING: {
+    code: "BLOCKED_LLM_ROUTE_MISSING"
+  },
+  BLOCKED_LLM_PROVIDER_MISSING: {
+    code: "BLOCKED_LLM_PROVIDER_MISSING"
+  },
+  BLOCKED_LLM_SECRET_MISSING: {
+    code: "BLOCKED_LLM_SECRET_MISSING"
+  },
+  BLOCKED_LLM_MODEL_MISSING: {
+    code: "BLOCKED_LLM_MODEL_MISSING"
+  },
+  BLOCKED_LLM_PROVIDER_UNAVAILABLE: {
+    code: "BLOCKED_LLM_PROVIDER_UNAVAILABLE"
+  },
+  BLOCKED_LLM_REQUEST_FAILED: {
+    code: "BLOCKED_LLM_REQUEST_FAILED"
+  }
+};
+class DebuggerLlmBlockerError extends Error {
+  blocker;
+  constructor(blocker) {
+    super(blocker.reason);
+    this.name = "DebuggerLlmBlockerError";
+    this.blocker = blocker;
+  }
+}
+function makeBlocker(code, reason, refs = []) {
+  return {
+    code,
+    reason,
+    refs,
+    detectedAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+}
+function extractTextContent(content) {
+  if (typeof content === "string") {
+    return content.trim();
+  }
+  return content.map((block) => {
+    if (block.type === "text") {
+      return block.text || "";
+    }
+    if (block.type === "tool_result") {
+      return block.content || "";
+    }
+    return "";
+  }).join("\n").trim();
+}
+function extractBalancedJsonFragment(text, opening) {
+  const start = text.indexOf(opening);
+  if (start < 0) {
+    return null;
+  }
+  const closing = opening === "{" ? "}" : "]";
+  let depth = 0;
+  let inString = false;
+  let escaping = false;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escaping) {
+        escaping = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaping = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === opening) {
+      depth += 1;
+      continue;
+    }
+    if (char === closing) {
+      depth -= 1;
+      if (depth === 0) {
+        return text.slice(start, index + 1);
+      }
+    }
+  }
+  return null;
+}
+function extractJsonCandidate(text) {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    throw new Error("LLM response was empty");
+  }
+  try {
+    JSON.parse(trimmed);
+    return trimmed;
+  } catch {
+  }
+  const fencedMatch = trimmed.match(/```json\s*([\s\S]*?)```/i) || trimmed.match(/```\s*([\s\S]*?)```/i);
+  if (fencedMatch?.[1]) {
+    const candidate = fencedMatch[1].trim();
+    JSON.parse(candidate);
+    return candidate;
+  }
+  const balancedObject = extractBalancedJsonFragment(trimmed, "{");
+  if (balancedObject) {
+    JSON.parse(balancedObject);
+    return balancedObject;
+  }
+  const balancedArray = extractBalancedJsonFragment(trimmed, "[");
+  if (balancedArray) {
+    JSON.parse(balancedArray);
+    return balancedArray;
+  }
+  const objectStart = trimmed.indexOf("{");
+  const objectEnd = trimmed.lastIndexOf("}");
+  if (objectStart >= 0 && objectEnd > objectStart) {
+    const candidate = trimmed.slice(objectStart, objectEnd + 1);
+    JSON.parse(candidate);
+    return candidate;
+  }
+  const arrayStart = trimmed.indexOf("[");
+  const arrayEnd = trimmed.lastIndexOf("]");
+  if (arrayStart >= 0 && arrayEnd > arrayStart) {
+    const candidate = trimmed.slice(arrayStart, arrayEnd + 1);
+    JSON.parse(candidate);
+    return candidate;
+  }
+  throw new Error("LLM response did not contain valid JSON");
+}
+function shouldRetryStructuredLlmError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /LLM response was empty|did not contain valid JSON|Unexpected non-whitespace character after JSON|OpenRouter API error: 5\d\d|timed out|timeout/i.test(message);
+}
+function shouldUseNativeJsonObject(route) {
+  const providerKind = route.provider.kind;
+  const modelId = route.modelId.toLowerCase();
+  if (providerKind === "anthropic") {
+    return false;
+  }
+  if (/moonshot|kimi/.test(modelId)) {
+    return false;
+  }
+  return true;
+}
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+class DebuggerLlmService {
+  runSummaries = /* @__PURE__ */ new Map();
+  resetRunSummary(runId) {
+    this.runSummaries.delete(runId);
+    this.broadcastRunUsage(runId);
+  }
+  getRunSummary(runId) {
+    const summary = this.runSummaries.get(runId);
+    if (!summary) {
+      return null;
+    }
+    return {
+      ...summary,
+      routesUsed: summary.routesUsed.map((entry) => ({ ...entry }))
+    };
+  }
+  getRunContextUsage(runId) {
+    const summary = this.runSummaries.get(runId);
+    if (!summary) {
+      return null;
+    }
+    const settings = settingsService.getAll();
+    const provider = settings.llm.providers.find((entry) => entry.id === summary.providerId);
+    const model = provider?.models.find((entry) => entry.id === summary.modelId) ?? null;
+    const contextWindowTokens = typeof model?.contextWindowTokens === "number" && model.contextWindowTokens > 0 ? model.contextWindowTokens : null;
+    const totalTokens = summary.totalInputTokens + summary.totalOutputTokens;
+    return {
+      runId,
+      providerId: summary.providerId,
+      modelId: summary.modelId,
+      inputTokens: summary.totalInputTokens,
+      outputTokens: summary.totalOutputTokens,
+      totalTokens,
+      contextWindowTokens,
+      usagePercent: contextWindowTokens ? Math.min(100, Math.max(0, Math.round(totalTokens / contextWindowTokens * 100))) : 0,
+      hasConfiguredContextWindow: Boolean(contextWindowTokens)
+    };
+  }
+  async refreshAccountRuntimeCredentials(route) {
+    if (route.provider.authMode !== "account") {
+      return;
+    }
+    await providerAccountAuthService.ensureRuntimeCredentials(route.providerId);
+  }
+  getRouteBlockers(agentIds, stage, settings = settingsService.getAll()) {
+    const blockers = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const agentId of agentIds) {
+      try {
+        this.resolveRoute(agentId, stage, settings);
+      } catch (error) {
+        if (!(error instanceof DebuggerLlmBlockerError)) {
+          throw error;
+        }
+        const key = `${error.blocker.code}:${agentId}`;
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        blockers.push(error.blocker);
+      }
+    }
+    return blockers;
+  }
+  resolveRoute(agentId, stage, settings = settingsService.getAll()) {
+    const requestedRoute = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
+    const resolution = resolveCompatibleAgentRoute(settings.llm.agentRoutes, settings.llm.providers, agentId);
+    const route = resolution.route;
+    if (!route?.providerId || !route.modelId) {
+      throw new DebuggerLlmBlockerError(makeBlocker(
+        BLOCKER_CODES.BLOCKED_LLM_ROUTE_MISSING.code,
+        `${agentId} is not bound to a provider/model route.`,
+        [`agent:${agentId}`]
+      ));
+    }
+    const provider = resolution.provider ?? settings.llm.providers.find((entry) => entry.id === route.providerId);
+    if (!provider || !provider.enabled) {
+      throw new DebuggerLlmBlockerError(makeBlocker(
+        BLOCKER_CODES.BLOCKED_LLM_PROVIDER_MISSING.code,
+        `${agentId} route points to an unavailable provider: ${route.providerId}.`,
+        [`agent:${agentId}`, `provider:${route.providerId}`]
+      ));
+    }
+    const model = provider.models.find((entry) => entry.enabled && entry.id === route.modelId);
+    if (!model) {
+      throw new DebuggerLlmBlockerError(makeBlocker(
+        BLOCKER_CODES.BLOCKED_LLM_MODEL_MISSING.code,
+        `${agentId} route points to a disabled or missing model: ${route.modelId}.`,
+        [`agent:${agentId}`, `provider:${provider.id}`, `model:${route.modelId}`]
+      ));
+    }
+    const secret = provider.authMode === "local" ? "local-provider" : provider.authMode === "environment" ? "environment-provider" : provider.authMode === "account" ? settingsService.getProviderOAuthSecret(provider.id, settings.workspace.rootPath) : settingsService.getProviderSecret(provider.id, settings.workspace.rootPath);
+    if (!secret.trim()) {
+      throw new DebuggerLlmBlockerError(makeBlocker(
+        BLOCKER_CODES.BLOCKED_LLM_SECRET_MISSING.code,
+        `${agentId} route provider is missing a usable secret: ${provider.id}.`,
+        [`agent:${agentId}`, `provider:${provider.id}`]
+      ));
+    }
+    return {
+      agentId,
+      stage,
+      provider,
+      providerId: provider.id,
+      modelId: route.modelId,
+      requestedModelId: resolution.requestedModelId ?? requestedRoute?.modelId,
+      remapReason: resolution.remapReason
+    };
+  }
+  async call(context2, request) {
+    const settings = settingsService.getAll();
+    const route = this.resolveRoute(context2.agentId, context2.stage, settings);
+    if (process.env.RDC_AGENT_TEST_MODE === "1") {
+      const response = {
+        id: `test-llm-${Date.now()}`,
+        model: route.modelId,
+        content: "",
+        usage: {
+          inputTokens: 0,
+          outputTokens: 0
+        },
+        stopReason: "end_turn"
+      };
+      const text = "";
+      await this.recordCall(context2, route, response, "ok", "test-mode llm stub");
+      return {
+        route,
+        response,
+        text
+      };
+    }
+    await this.refreshAccountRuntimeCredentials(route);
+    llmAdapter.configure(settingsService.getLlmConfig());
+    try {
+      const response = await llmAdapter.chat({
+        ...request,
+        model: route.modelId
+      }, route.providerId);
+      const text = extractTextContent(response.content);
+      await this.recordCall(context2, route, response, "ok", text || `${route.providerId}/${route.modelId}`);
+      return {
+        route,
+        response,
+        text
+      };
+    } catch (error) {
+      await this.recordFailure(context2, route, error instanceof Error ? error.message : String(error));
+      throw this.toRuntimeError(route, error);
+    }
+  }
+  async callStructured(input) {
+    if (process.env.RDC_AGENT_TEST_MODE === "1" && input.testValue !== void 0) {
+      const settings2 = settingsService.getAll();
+      const route2 = this.resolveRoute(input.agentId, input.stage, settings2);
+      const response = {
+        id: `test-llm-${Date.now()}`,
+        model: route2.modelId,
+        content: JSON.stringify(input.testValue),
+        usage: {
+          inputTokens: 0,
+          outputTokens: 0
+        },
+        stopReason: "end_turn"
+      };
+      const text = JSON.stringify(input.testValue);
+      const summary = input.auditSummary ? input.auditSummary(input.testValue, text) : text;
+      await this.recordCall(input, route2, response, "ok", summary);
+      return {
+        data: input.testValue,
+        call: {
+          route: route2,
+          response,
+          text
+        }
+      };
+    }
+    const settings = settingsService.getAll();
+    const route = this.resolveRoute(input.agentId, input.stage, settings);
+    await this.refreshAccountRuntimeCredentials(route);
+    llmAdapter.configure(settingsService.getLlmConfig());
+    const useNativeJsonObject = shouldUseNativeJsonObject(route);
+    let lastError;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      try {
+        const response = await llmAdapter.chat({
+          messages: input.messages,
+          model: route.modelId,
+          maxTokens: input.maxTokens,
+          temperature: input.temperature,
+          responseFormat: useNativeJsonObject ? "json_object" : void 0
+        }, route.providerId);
+        const text = extractTextContent(response.content);
+        const data = input.parse(text);
+        const summary = input.auditSummary ? input.auditSummary(data, text) : text || `${route.providerId}/${route.modelId}`;
+        await this.recordCall(input, route, response, "ok", summary);
+        return {
+          data,
+          call: {
+            route,
+            response,
+            text
+          }
+        };
+      } catch (error) {
+        lastError = error;
+        if (attempt < 3 && shouldRetryStructuredLlmError(error)) {
+          await sleep(500 * (attempt + 1));
+          continue;
+        }
+        await this.recordFailure(
+          input,
+          route,
+          error instanceof Error ? error.message : String(error)
+        );
+        throw this.toRuntimeError(route, error);
+      }
+    }
+    await this.recordFailure(
+      input,
+      route,
+      lastError instanceof Error ? lastError.message : String(lastError)
+    );
+    throw this.toRuntimeError(route, lastError);
+  }
+  parseJson(text) {
+    return JSON.parse(extractJsonCandidate(text));
+  }
+  toRuntimeError(route, error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const providerUnavailable = /provider not found|provider disabled|provider not configured|no llm provider configured/i.test(message);
+    const code = providerUnavailable ? BLOCKER_CODES.BLOCKED_LLM_PROVIDER_UNAVAILABLE.code : BLOCKER_CODES.BLOCKED_LLM_REQUEST_FAILED.code;
+    return new DebuggerLlmBlockerError(makeBlocker(
+      code,
+      `${route.agentId} failed to call ${route.providerId}/${route.modelId}: ${message}`,
+      [`agent:${route.agentId}`, `provider:${route.providerId}`, `model:${route.modelId}`]
+    ));
+  }
+  async recordCall(context2, route, response, status, summary) {
+    this.updateRunSummary(context2, route, response, status);
+    runtimeLogService.log({
+      scope: context2.sessionId ? "session" : "app",
+      namespace: "llm",
+      severity: status === "ok" ? "success" : "error",
+      title: `${route.agentId} -> ${route.providerId}/${route.modelId}`,
+      summary,
+      detail: response.id ? `request=${response.id}` : void 0,
+      sessionId: context2.sessionId ?? null,
+      runId: context2.runId ?? null,
+      raw: {
+        agentId: route.agentId,
+        stage: route.stage,
+        providerId: route.providerId,
+        modelId: route.modelId,
+        requestedModelId: route.requestedModelId,
+        remapReason: route.remapReason,
+        requestId: response.id,
+        usage: response.usage
+      }
+    });
+    if (!context2.sessionId || !context2.runId) {
+      return;
+    }
+    const event = storageAdapter.createActionEvent({
+      runId: context2.runId,
+      sessionId: context2.sessionId,
+      agentId: route.agentId,
+      eventType: "llm_call",
+      status,
+      payload: {
+        agentId: route.agentId,
+        stage: route.stage,
+        providerId: route.providerId,
+        modelId: route.modelId,
+        requestedModelId: route.requestedModelId,
+        remapReason: route.remapReason,
+        requestId: response.id,
+        usage: response.usage,
+        summary
+      }
+    });
+    await this.appendBroadcastEvent(context2.sessionId, event);
+  }
+  async recordFailure(context2, route, errorMessage) {
+    this.updateRunSummary(context2, route, null, "error");
+    runtimeLogService.log({
+      scope: context2.sessionId ? "session" : "app",
+      namespace: "llm",
+      severity: "error",
+      title: `${route.agentId} -> ${route.providerId}/${route.modelId}`,
+      summary: errorMessage,
+      sessionId: context2.sessionId ?? null,
+      runId: context2.runId ?? null,
+      raw: {
+        agentId: route.agentId,
+        stage: route.stage,
+        providerId: route.providerId,
+        modelId: route.modelId,
+        requestedModelId: route.requestedModelId,
+        remapReason: route.remapReason
+      }
+    });
+    if (!context2.sessionId || !context2.runId) {
+      return;
+    }
+    const event = storageAdapter.createActionEvent({
+      runId: context2.runId,
+      sessionId: context2.sessionId,
+      agentId: route.agentId,
+      eventType: "llm_call",
+      status: "error",
+      payload: {
+        agentId: route.agentId,
+        stage: route.stage,
+        providerId: route.providerId,
+        modelId: route.modelId,
+        requestedModelId: route.requestedModelId,
+        remapReason: route.remapReason,
+        summary: errorMessage
+      }
+    });
+    await this.appendBroadcastEvent(context2.sessionId, event);
+  }
+  updateRunSummary(context2, route, response, status) {
+    if (!context2.runId) {
+      return;
+    }
+    const existing = this.runSummaries.get(context2.runId) ?? {
+      providerId: route.providerId,
+      modelId: route.modelId,
+      successfulCallCount: 0,
+      failedCallCount: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      firstRequestId: void 0,
+      routesUsed: []
+    };
+    existing.providerId = existing.providerId || route.providerId;
+    existing.modelId = existing.modelId || route.modelId;
+    if (status === "ok") {
+      existing.successfulCallCount += 1;
+      if (!existing.firstRequestId && response?.id) {
+        existing.firstRequestId = response.id;
+      }
+      existing.totalInputTokens += response?.usage.inputTokens ?? 0;
+      existing.totalOutputTokens += response?.usage.outputTokens ?? 0;
+    } else {
+      existing.failedCallCount += 1;
+    }
+    existing.routesUsed.push({
+      agentId: route.agentId,
+      stage: route.stage,
+      providerId: route.providerId,
+      modelId: route.modelId,
+      requestId: response?.id,
+      status
+    });
+    this.runSummaries.set(context2.runId, existing);
+    this.broadcastRunUsage(context2.runId);
+  }
+  broadcastRunUsage(runId) {
+    const usage = this.getRunContextUsage(runId);
+    if (!usage) {
+      return;
+    }
+    workflowProjectionPublisher.publishRunUsage(usage);
+  }
+  async appendBroadcastEvent(sessionId, event) {
+    await storageAdapter.appendActionEvent(sessionId, event);
+    workflowProjectionPublisher.publishEvidenceEvent(event);
+  }
+}
+const debuggerLlmService = new DebuggerLlmService();
 function registerWorkflowHandlers(context2) {
   const { state: state2 } = context2;
   electron.ipcMain.handle("workflow:getState", async () => {
@@ -19454,49 +15076,6 @@ function registerWorkflowHandlers(context2) {
   });
   electron.ipcMain.handle("workflow:listActiveRuns", async () => {
     return { runs: runExecutionService.listActiveRuns() };
-  });
-  electron.ipcMain.handle("workflow:start", async (_event, request) => {
-    const result = await debuggerRuntime.startPlan(request);
-    if (result.success) {
-      state2.currentSessionId = result.sessionId || state2.currentSessionId;
-      state2.currentRunId = result.runId || state2.currentRunId;
-      state2.currentProjectId = request.projectId;
-      if (state2.currentSessionId) {
-        await storageAdapter.setCurrentSessionId(state2.currentSessionId);
-      }
-    }
-    return result;
-  });
-  electron.ipcMain.handle("workflow:getPlan", async (_event, runId) => {
-    return debuggerRuntime.getPlan(runId);
-  });
-  electron.ipcMain.handle("workflow:submitQuestions", async (_event, runId, answers) => {
-    return debuggerRuntime.submitQuestions(runId, answers);
-  });
-  electron.ipcMain.handle("workflow:approvePlan", async (_event, runId) => {
-    return debuggerRuntime.approvePlan(runId);
-  });
-  electron.ipcMain.handle("workflow:requestPlanRevision", async (_event, runId, revisionText) => {
-    const result = await debuggerRuntime.requestPlanRevision(runId, revisionText);
-    if (result.success) {
-      state2.currentSessionId = result.presentation?.sessionId || state2.currentSessionId;
-      state2.currentRunId = result.runId || state2.currentRunId;
-      if (state2.currentSessionId) {
-        await storageAdapter.setCurrentSessionId(state2.currentSessionId);
-      }
-    }
-    return result;
-  });
-  electron.ipcMain.handle("workflow:restartRun", async (_event, runId) => {
-    const result = await debuggerRuntime.restartRun(runId);
-    if (result.success) {
-      state2.currentSessionId = result.sessionId || state2.currentSessionId;
-      state2.currentRunId = result.runId || state2.currentRunId;
-      if (state2.currentSessionId) {
-        await storageAdapter.setCurrentSessionId(state2.currentSessionId);
-      }
-    }
-    return result;
   });
 }
 function registerTraceHandlers(context2) {
@@ -19676,7 +15255,7 @@ function registerToolTraceBridge() {
       void appendActionEvent(storageAdapter.createActionEvent({
         runId: state.currentRunId,
         sessionId: state.currentSessionId,
-        agentId: trace.runtimeOwner || "rdc-debugger",
+        agentId: trace.runtimeOwner || "debugger",
         eventType: "tool_execution",
         status: trace.result.ok ? "ok" : "error",
         turnId: trace.turnId,
@@ -19757,7 +15336,6 @@ const emptyPreviewLoadResult = () => ({
   attempts: []
 });
 class RdxSessionService {
-  rdxCliInvoker;
   contextId = null;
   runtimeOwner = null;
   ownerLeaseId = null;
@@ -19766,101 +15344,20 @@ class RdxSessionService {
   deviceLabel = "Local";
   replayDevice = null;
   remoteStatus = "disconnected";
-  remoteId = null;
   openedCapture = null;
+  runtimeContext = null;
   humanPreview = {
     status: "closed",
     updatedAt: Date.now()
   };
-  constructor(rdxCliInvoker) {
-    this.rdxCliInvoker = rdxCliInvoker;
-  }
-  async bootstrap(request) {
-    const requestedCaptures = request.captures ?? [];
-    const requestedReplayDevice = request.replayDevice ?? null;
-    if (this.canReuseOpenedCapture(request)) {
-      this.captures = requestedCaptures.map((capture) => capture.id === request.primaryCaptureId && this.openedCapture ? {
-        ...capture,
-        captureFileId: this.openedCapture.captureFileId,
-        status: "open",
-        sessionId: this.openedCapture.sessionId,
-        replaySessionId: this.openedCapture.replaySessionId,
-        contextId: this.openedCapture.contextId
-      } : { ...capture });
-      this.activeCaptureId = request.primaryCaptureId || null;
-      return this.snapshotContext();
-    }
-    if (this.contextId || this.captures.length > 0 || this.openedCapture) {
-      await this.closeOrReplaceOpenedCapture();
-    }
-    await this.ensureRuntimeReady();
-    this.captures = requestedCaptures.map((capture) => ({ ...capture }));
-    this.remoteId = null;
-    this.remoteStatus = "disconnected";
-    const hasRemoteCapture = this.captures.some((capture) => capture.backendHint === "remote");
-    let replayDevice = requestedReplayDevice;
-    let reusedPreparedRemote = false;
-    if (hasRemoteCapture) {
-      if (!replayDevice || replayDevice.type === "local") {
-        throw new Error("Remote capture requires an Android Replay Device.");
-      }
-      replayDevice = await this.ensureReplayDeviceReady(replayDevice);
-      reusedPreparedRemote = await this.tryAdoptPreparedRemote(replayDevice);
-    }
-    if (!replayDevice) {
-      throw new Error("Replay Device is required before bootstrap.");
-    }
-    this.replayDevice = replayDevice;
-    this.deviceLabel = replayDevice.label;
-    if (!reusedPreparedRemote) {
-      await this.prepareFreshContext();
-    }
-    try {
-      const ownerResult = await this.claimOwner(this.contextId);
-      this.runtimeOwner = ownerResult.owner;
-      this.ownerLeaseId = ownerResult.leaseId;
-    } catch (error) {
-      if (!reusedPreparedRemote) {
-        throw error;
-      }
-      this.resetRemoteConnectionState();
-      await this.prepareFreshContext();
-      const ownerResult = await this.claimOwner(this.contextId);
-      this.runtimeOwner = ownerResult.owner;
-      this.ownerLeaseId = ownerResult.leaseId;
-      reusedPreparedRemote = false;
-    }
-    if (hasRemoteCapture) {
-      if (reusedPreparedRemote) {
-        const preparedRemoteStillValid = await this.validatePreparedRemoteHandle();
-        if (!preparedRemoteStillValid) {
-          this.remoteId = null;
-          this.remoteStatus = "disconnected";
-          await this.ensureRemoteConnection(replayDevice);
-        } else {
-          this.remoteStatus = "online";
-        }
-      } else {
-        await this.ensureRemoteConnection(replayDevice);
-      }
-    }
-    const primaryCapture = this.captures.find((capture) => capture.id === request.primaryCaptureId);
-    if (!primaryCapture) {
-      throw new Error(`Primary capture ${request.primaryCaptureId} not found in captures list`);
-    }
-    await this.ensureCaptureSession(primaryCapture);
-    this.activeCaptureId = primaryCapture.id;
-    this.openedCapture = null;
-    return this.snapshotContext();
-  }
   async openProjectInput(request) {
     await this.closeOrReplaceOpenedCapture();
-    await this.ensureRuntimeReady();
     let replayDevice = request.replayDevice;
     const isRemoteReplay = replayDevice.type === "android";
     if (isRemoteReplay) {
       replayDevice = await this.ensureReplayDeviceReady(replayDevice);
     }
+    const preparedRemote = isRemoteReplay ? replayDeviceService.peekPreparedRemote(replayDevice.id) : null;
     const capture = {
       id: request.inputId,
       filePath: request.filePath,
@@ -19872,48 +15369,49 @@ class RdxSessionService {
     this.activeCaptureId = capture.id;
     this.replayDevice = replayDevice;
     this.deviceLabel = replayDevice.label;
-    this.remoteId = null;
     this.remoteStatus = "disconnected";
-    let reusedPreparedRemote = false;
-    if (isRemoteReplay) {
-      reusedPreparedRemote = await this.tryAdoptPreparedRemote(replayDevice);
-    }
-    if (!reusedPreparedRemote) {
-      await this.prepareFreshContext();
-    }
-    try {
-      const ownerResult = await this.claimOwner(this.contextId);
-      this.runtimeOwner = ownerResult.owner;
-      this.ownerLeaseId = ownerResult.leaseId;
-    } catch (error) {
-      if (!reusedPreparedRemote) {
-        throw error;
-      }
-      this.resetRemoteConnectionState();
-      await this.prepareFreshContext();
-      const ownerResult = await this.claimOwner(this.contextId);
-      this.runtimeOwner = ownerResult.owner;
-      this.ownerLeaseId = ownerResult.leaseId;
-      reusedPreparedRemote = false;
-    }
-    if (isRemoteReplay) {
-      if (reusedPreparedRemote) {
-        const preparedRemoteStillValid = await this.validatePreparedRemoteHandle();
-        if (!preparedRemoteStillValid) {
-          this.remoteId = null;
-          this.remoteStatus = "disconnected";
-          await this.ensureRemoteConnection(replayDevice);
-        } else {
-          this.remoteStatus = "online";
-        }
-      } else {
-        await this.ensureRemoteConnection(replayDevice);
-      }
-    }
-    const previewResult = await this.ensureCaptureSession(capture, {
+    const result = await rdxShellActionService.runAction("openCapture", {
       projectId: request.projectId,
-      inputId: request.inputId
+      inputId: request.inputId,
+      filePath: request.filePath,
+      capturePath: request.filePath,
+      deviceId: replayDevice.id,
+      deviceLabel: replayDevice.label,
+      deviceType: replayDevice.type,
+      deviceSerial: replayDevice.serial,
+      deviceRemoteId: replayDevice.remoteId,
+      remoteId: preparedRemote?.remoteId ?? replayDevice.remoteId,
+      remoteContextId: preparedRemote?.contextId,
+      backend: isRemoteReplay ? "remote" : "local"
+    }, {
+      env: {
+        ...this.buildRuntimeContextEnv(),
+        RDX_REMOTE_ID: preparedRemote?.remoteId ?? replayDevice.remoteId ?? "",
+        RDX_REMOTE_CONTEXT_ID: preparedRemote?.contextId ?? ""
+      }
     });
+    if (!result.ok) {
+      capture.status = "error";
+      this.captures = [capture];
+      this.remoteStatus = "error";
+      throw new Error(result.error ?? "RDX openCapture action failed.");
+    }
+    const runtimeContext = this.extractRuntimeContext(result.data, {
+      backend: isRemoteReplay ? "remote" : "local",
+      deviceId: replayDevice.id,
+      deviceLabel: replayDevice.label
+    });
+    this.applyRuntimeContext(runtimeContext);
+    const captureIndex = this.captures.findIndex((item) => item.id === capture.id);
+    this.captures[captureIndex] = {
+      ...this.captures[captureIndex],
+      captureFileId: runtimeContext.captureFileId,
+      status: "open",
+      sessionId: runtimeContext.replaySessionId,
+      replaySessionId: runtimeContext.replaySessionId,
+      contextId: runtimeContext.contextId
+    };
+    const previewResult = this.previewFromActionData(result.data);
     const openedCapture = this.createOpenedCaptureState(
       request.projectId,
       request.inputId,
@@ -19922,6 +15420,7 @@ class RdxSessionService {
       previewResult
     );
     this.openedCapture = openedCapture;
+    this.broadcastContextChanged();
     return openedCapture;
   }
   async closeOrReplaceOpenedCapture() {
@@ -19954,20 +15453,17 @@ class RdxSessionService {
       status: "opening",
       sessionId: replaySessionId
     });
-    const result = await this.rdxCliInvoker.call({
-      toolName: "rd.session.open_preview",
-      args: {
-        session_id: replaySessionId,
-        context_id: this.contextId,
-        runtime_owner: this.runtimeOwner,
-        owner_lease_id: this.ownerLeaseId
-      },
+    const result = await rdxShellActionService.runAction("openPreview", {
+      sessionId: replaySessionId,
+      replaySessionId,
       contextId: this.contextId,
       runtimeOwner: this.runtimeOwner,
       ownerLeaseId: this.ownerLeaseId
+    }, {
+      env: this.buildRuntimeContextEnv()
     });
     if (!result.ok) {
-      const message = result.error?.message ?? "rd.session.open_preview failed.";
+      const message = result.error ?? "RDX openPreview action failed.";
       this.setHumanPreview({
         status: "error",
         sessionId: replaySessionId,
@@ -19983,199 +15479,12 @@ class RdxSessionService {
       });
       return this.snapshotContext();
     }
-    this.setHumanPreview(this.extractHumanPreview(result, "open", replaySessionId));
+    this.setHumanPreview(this.extractHumanPreview({ data: result.data }, "open", replaySessionId));
     return this.snapshotContext();
   }
   async closeHumanPreviewWindow() {
-    if (!this.contextId || !this.runtimeOwner || !this.ownerLeaseId) {
-      this.setHumanPreview({ status: "closed" });
-      return this.snapshotContext();
-    }
-    const result = await this.rdxCliInvoker.call({
-      toolName: "rd.session.close_preview",
-      args: {
-        context_id: this.contextId,
-        runtime_owner: this.runtimeOwner,
-        owner_lease_id: this.ownerLeaseId
-      },
-      contextId: this.contextId,
-      runtimeOwner: this.runtimeOwner,
-      ownerLeaseId: this.ownerLeaseId
-    });
-    if (!result.ok) {
-      const message = result.error?.message ?? "rd.session.close_preview failed.";
-      this.setHumanPreview({
-        status: "error",
-        sessionId: this.humanPreview.sessionId,
-        boundEventId: this.humanPreview.boundEventId,
-        lastError: message
-      });
-      runtimeLogService.log({
-        scope: "app",
-        namespace: "context",
-        severity: "warning",
-        title: "Human preview close warning",
-        summary: message,
-        raw: { result }
-      });
-      return this.snapshotContext();
-    }
-    this.setHumanPreview(this.extractHumanPreview(result, "closed", this.humanPreview.sessionId));
+    this.setHumanPreview({ status: "closed" });
     return this.snapshotContext();
-  }
-  async prepareFreshContext() {
-    this.contextId = await this.allocateContext();
-    await this.initializeContextRuntime();
-  }
-  async ensureRuntimeReady() {
-    const statusResult = await this.rdxCliInvoker.executeCLI("daemon", ["status"]);
-    if (statusResult.exitCode === 0) {
-      try {
-        const parsed = JSON.parse(statusResult.stdout);
-        if (parsed.data?.running === true) {
-          return;
-        }
-      } catch {
-        return;
-      }
-    }
-    const startResult = await this.rdxCliInvoker.executeCLI("daemon", ["start"]);
-    if (startResult.exitCode !== 0) {
-      const message = startResult.stderr.trim() || `Exit code: ${startResult.exitCode}`;
-      throw new Error(`Failed to start rdx daemon: ${message}`);
-    }
-  }
-  async allocateContext() {
-    const contextId = `ctx-${generateShortId()}`;
-    let result = await this.rdxCliInvoker.call({
-      toolName: "rd.session.create_context",
-      args: { context_id: contextId },
-      contextId
-    });
-    if (!result.ok) {
-      if (result.error?.message?.includes("Context limit exceeded")) {
-        const daemonCleaned = await this.cleanupDaemonRuntimeState();
-        if (daemonCleaned) {
-          result = await this.rdxCliInvoker.call({
-            toolName: "rd.session.create_context",
-            args: { context_id: contextId },
-            contextId
-          });
-          if (result.ok) {
-            return contextId;
-          }
-        }
-        const cleanedCount = await this.cleanupStaleRdcAgentContexts();
-        if (cleanedCount > 0) {
-          result = await this.rdxCliInvoker.call({
-            toolName: "rd.session.create_context",
-            args: { context_id: contextId },
-            contextId
-          });
-          if (result.ok) {
-            return contextId;
-          }
-        }
-      }
-      throw new Error(`Failed to allocate context: ${result.error?.message ?? "unknown"}`);
-    }
-    return contextId;
-  }
-  async initializeContextRuntime() {
-    const result = await this.rdxCliInvoker.call({
-      toolName: "rd.core.init",
-      args: {},
-      contextId: this.contextId
-    });
-    if (!result.ok) {
-      throw new Error(`Failed to initialize runtime context: ${result.error?.message ?? "unknown"}`);
-    }
-  }
-  async claimOwner(contextId) {
-    const owner = `rdc-agent-${generateShortId()}`;
-    const result = await this.rdxCliInvoker.call({
-      toolName: "rd.session.claim_runtime_owner",
-      args: {
-        runtime_owner: owner,
-        entry_mode: "cli",
-        backend: "local"
-      },
-      contextId
-    });
-    if (!result.ok) {
-      throw new Error(`Failed to claim owner: ${result.error?.message ?? "unknown"}`);
-    }
-    const ownerInfo = result.data?.runtime_owner || result.data?.owner_lease;
-    const leaseId = typeof ownerInfo?.lease_id === "string" && ownerInfo.lease_id ? ownerInfo.lease_id : generateId();
-    const resolvedOwner = typeof ownerInfo?.agent_id === "string" && ownerInfo.agent_id ? ownerInfo.agent_id : owner;
-    return { owner: resolvedOwner, leaseId };
-  }
-  buildClaimedToolRequest(toolName, args) {
-    return {
-      toolName,
-      args,
-      contextId: this.contextId,
-      runtimeOwner: this.runtimeOwner,
-      ownerLeaseId: this.ownerLeaseId ?? void 0
-    };
-  }
-  async ensureCaptureSession(capture, previewContext) {
-    const captureIndex = this.captures.findIndex((item) => item.id === capture.id);
-    if (captureIndex < 0) {
-      throw new Error(`Capture ${capture.id} not in captures list`);
-    }
-    this.captures[captureIndex] = { ...this.captures[captureIndex], status: "opening" };
-    try {
-      const openResult = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
-        "rd.capture.open_file",
-        { file_path: capture.filePath }
-      ));
-      if (!openResult.ok) {
-        throw new Error(`Failed to open capture file: ${openResult.error?.message ?? "unknown"}`);
-      }
-      const captureFileId = openResult.data?.capture_file_id;
-      const replayArgs = {
-        capture_file_id: captureFileId ?? capture.id
-      };
-      if (capture.backendHint === "remote") {
-        if (!this.remoteId) {
-          throw new Error("Remote replay requested but remote connection is not ready.");
-        }
-        replayArgs.options = {
-          remote_id: this.remoteId
-        };
-      }
-      const replayResult = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
-        "rd.capture.open_replay",
-        replayArgs
-      ));
-      if (!replayResult.ok) {
-        if (capture.backendHint === "remote") {
-          throw new Error(`Remote replay failed (hard fail, no local fallback): ${replayResult.error?.message ?? "unknown"}`);
-        }
-        throw new Error(`Failed to open replay session: ${replayResult.error?.message ?? "unknown"}`);
-      }
-      this.captures[captureIndex] = {
-        ...this.captures[captureIndex],
-        captureFileId,
-        status: "open",
-        sessionId: replayResult.data?.session_id,
-        replaySessionId: replayResult.data?.replay_session_id,
-        contextId: this.contextId
-      };
-      if (!previewContext || !captureFileId) {
-        return emptyPreviewLoadResult();
-      }
-      return this.loadPreferredPreview(
-        previewContext.projectId,
-        previewContext.inputId,
-        this.captures[captureIndex].sessionId ?? "",
-        captureFileId
-      );
-    } catch (error) {
-      this.captures[captureIndex] = { ...this.captures[captureIndex], status: "error" };
-      throw error;
-    }
   }
   async switchActiveCapture(captureId) {
     const capture = this.captures.find((item) => item.id === captureId);
@@ -20183,50 +15492,9 @@ class RdxSessionService {
       throw new Error(`Capture ${captureId} not found`);
     }
     if (capture.status === "pending") {
-      await this.ensureCaptureSession(capture);
+      throw new Error(`Capture ${captureId} has not been opened by a configured RDX shell action.`);
     }
     this.activeCaptureId = captureId;
-  }
-  async ensureRemoteConnection(device) {
-    if (!device.serial) {
-      throw new Error("Replay Device is missing an Android serial number.");
-    }
-    this.replayDevice = device;
-    this.remoteStatus = "connected";
-    const connectResult = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
-      "rd.remote.connect",
-      {
-        timeout_ms: 5e3,
-        options: {
-          transport: "adb_android",
-          device_serial: device.serial
-        }
-      }
-    ));
-    if (!connectResult.ok) {
-      this.remoteStatus = "error";
-      const detail = [
-        device.activationPhase ? `phase=${device.activationPhase}` : "",
-        device.activationErrorCode ? `code=${device.activationErrorCode}` : ""
-      ].filter(Boolean).join(" ");
-      const suffix = detail ? ` (${detail})` : "";
-      throw new Error(`Remote connect failed (hard fail): ${connectResult.error?.message ?? device.activationErrorMessage ?? "unknown"}${suffix}`);
-    }
-    const remoteId = connectResult.data?.remote_id;
-    if (!remoteId) {
-      this.remoteStatus = "error";
-      throw new Error("Remote connect did not return a remote_id.");
-    }
-    this.remoteId = remoteId;
-    const pingResult = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
-      "rd.remote.ping",
-      { remote_id: remoteId }
-    ));
-    if (!pingResult.ok) {
-      this.remoteStatus = "error";
-      throw new Error(`Remote ping failed (hard fail): ${pingResult.error?.message ?? device.activationErrorMessage ?? "unknown"}`);
-    }
-    this.remoteStatus = "online";
   }
   async ensureReplayDeviceReady(device) {
     if (device.type === "local") {
@@ -20247,45 +15515,107 @@ class RdxSessionService {
     }
     return activatedDevice;
   }
-  async tryAdoptPreparedRemote(device) {
-    const prepared = replayDeviceService.consumePreparedRemote(device.id);
-    if (!prepared) {
-      return false;
+  extractRuntimeContext(data, fallback) {
+    const contextId = this.readString(data, ["contextId", "context_id", "RDX_CONTEXT_ID"]);
+    const runtimeOwner = this.readString(data, ["runtimeOwner", "runtime_owner", "RDX_RUNTIME_OWNER"]);
+    const ownerLeaseId = this.readString(data, ["ownerLeaseId", "owner_lease_id", "RDX_OWNER_LEASE_ID"]);
+    if (!contextId || !runtimeOwner || !ownerLeaseId) {
+      throw new Error("RDX action result must include contextId/context_id, runtimeOwner/runtime_owner, and ownerLeaseId/owner_lease_id.");
     }
-    if (!device.serial || prepared.serial !== device.serial) {
-      replayDeviceService.invalidatePreparedRemote(device.id);
-      return false;
-    }
-    this.adoptPreparedRemote(prepared);
-    return true;
+    return {
+      contextId,
+      runtimeOwner,
+      ownerLeaseId,
+      replaySessionId: this.readString(data, ["replaySessionId", "replay_session_id", "sessionId", "session_id"]),
+      captureFileId: this.readString(data, ["captureFileId", "capture_file_id"]),
+      captureId: this.readString(data, ["captureId", "capture_id"]),
+      backend: this.readString(data, ["backend"]) === "remote" ? "remote" : fallback.backend,
+      deviceId: this.readString(data, ["deviceId", "device_id"]) ?? fallback.deviceId,
+      deviceLabel: this.readString(data, ["deviceLabel", "device_label"]) ?? fallback.deviceLabel,
+      remoteId: this.readString(data, ["remoteId", "remote_id"]),
+      remoteStatus: this.normalizeRemoteStatus(this.readString(data, ["remoteStatus", "remote_status"])),
+      updatedAt: Date.now(),
+      raw: data
+    };
   }
-  adoptPreparedRemote(prepared) {
-    this.contextId = prepared.contextId;
-    this.remoteId = prepared.remoteId;
-    this.remoteStatus = "connected";
+  applyRuntimeContext(runtimeContext) {
+    this.runtimeContext = runtimeContext;
+    setRdxRuntimeContext(runtimeContext);
+    this.contextId = runtimeContext.contextId;
+    this.runtimeOwner = runtimeContext.runtimeOwner;
+    this.ownerLeaseId = runtimeContext.ownerLeaseId;
+    this.remoteStatus = runtimeContext.remoteStatus ?? (runtimeContext.backend === "remote" ? "online" : "disconnected");
+    this.deviceLabel = runtimeContext.deviceLabel ?? this.deviceLabel;
   }
-  async validatePreparedRemoteHandle() {
-    if (!this.contextId || !this.remoteId) {
-      return false;
+  buildRuntimeContextEnv() {
+    if (!this.runtimeContext) {
+      return {};
     }
-    const pingResult = await this.rdxCliInvoker.call({
-      toolName: "rd.remote.ping",
-      args: { remote_id: this.remoteId },
-      contextId: this.contextId,
-      runtimeOwner: this.runtimeOwner ?? void 0,
-      ownerLeaseId: this.ownerLeaseId ?? void 0
-    });
-    if (!pingResult.ok) {
-      return false;
-    }
-    return true;
+    return {
+      RDX_CONTEXT_ID: this.runtimeContext.contextId,
+      RDX_RUNTIME_OWNER: this.runtimeContext.runtimeOwner,
+      RDX_OWNER_LEASE_ID: this.runtimeContext.ownerLeaseId,
+      RDX_REPLAY_SESSION_ID: this.runtimeContext.replaySessionId ?? "",
+      RDX_CAPTURE_FILE_ID: this.runtimeContext.captureFileId ?? ""
+    };
   }
-  resetRemoteConnectionState() {
-    this.contextId = null;
-    this.runtimeOwner = null;
-    this.ownerLeaseId = null;
-    this.remoteId = null;
-    this.remoteStatus = "disconnected";
+  previewFromActionData(data) {
+    const imagePath = this.readString(data, ["previewImagePath", "preview_image_path", "imagePath", "image_path"]);
+    if (!imagePath) {
+      return emptyPreviewLoadResult();
+    }
+    const preview = this.createPreviewFromPath(
+      imagePath,
+      this.readString(data, ["previewSource", "preview_source"]) === "capture_thumbnail" ? "capture_thumbnail" : "framebuffer_screenshot",
+      this.readNumber(data, ["previewWidth", "preview_width", "width"]),
+      this.readNumber(data, ["previewHeight", "preview_height", "height"])
+    );
+    return {
+      preview,
+      error: preview ? null : {
+        message: `RDX action returned an unreadable preview image: ${imagePath}`,
+        code: "preview_image_unreadable",
+        attempts: []
+      },
+      attempts: preview ? [{
+        source: preview.source,
+        status: "success",
+        imagePath: preview.imagePath
+      }] : [{
+        source: "framebuffer_screenshot",
+        status: "failed",
+        imagePath,
+        message: `RDX action returned an unreadable preview image: ${imagePath}`,
+        code: "preview_image_unreadable"
+      }]
+    };
+  }
+  readString(source, keys) {
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === "string" && value.trim()) {
+        return value;
+      }
+    }
+    return void 0;
+  }
+  readNumber(source, keys) {
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === "number" && Number.isFinite(value)) {
+        return value;
+      }
+      if (typeof value === "string") {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) {
+          return parsed;
+        }
+      }
+    }
+    return void 0;
+  }
+  normalizeRemoteStatus(value) {
+    return value === "connected" || value === "online" || value === "disconnected" || value === "error" ? value : void 0;
   }
   snapshotContext() {
     const activeCapture = this.captures.find((capture) => capture.id === this.activeCaptureId);
@@ -20299,7 +15629,8 @@ class RdxSessionService {
       captureDescriptors: [...this.captures],
       activeCapture: this.activeCaptureId ?? "",
       deviceLabel: this.deviceLabel,
-      humanPreview: { ...this.humanPreview }
+      humanPreview: { ...this.humanPreview },
+      runtimeContext: this.runtimeContext ? { ...this.runtimeContext } : null
     };
   }
   snapshotOpenedCapture() {
@@ -20414,230 +15745,9 @@ class RdxSessionService {
       openedAt: Date.now(),
       preview: previewResult.preview,
       previewError: previewResult.error,
-      previewAttempts: previewResult.attempts
+      previewAttempts: previewResult.attempts,
+      runtimeContext: this.runtimeContext ? { ...this.runtimeContext } : null
     };
-  }
-  async loadPreferredPreview(projectId, inputId, sessionId, captureFileId) {
-    const attempts = [];
-    const framebufferPreview = sessionId ? await this.loadFramebufferPreview(projectId, inputId, sessionId, attempts) : null;
-    if (framebufferPreview) {
-      runtimeLogService.log({
-        scope: "app",
-        namespace: "capture",
-        severity: "success",
-        title: "Preview ready",
-        summary: `已加载 ${inputId} 的最终渲染预览。`,
-        detail: framebufferPreview.width > 0 && framebufferPreview.height > 0 ? `${framebufferPreview.width}x${framebufferPreview.height} · framebuffer · event=${framebufferPreview.resolvedEventId ?? "-"} · target=${framebufferPreview.targetSource ?? "-"}` : `framebuffer · event=${framebufferPreview.resolvedEventId ?? "-"} · target=${framebufferPreview.targetSource ?? "-"}`,
-        projectId,
-        raw: { preview: framebufferPreview, attempts }
-      });
-      return { preview: framebufferPreview, error: null, attempts };
-    }
-    const thumbnailPreview = await this.loadCaptureThumbnail(captureFileId, attempts);
-    if (thumbnailPreview) {
-      runtimeLogService.log({
-        scope: "app",
-        namespace: "capture",
-        severity: "warning",
-        title: "Preview fallback",
-        summary: `最终 framebuffer 不可用，已回退为 ${inputId} 的 capture thumbnail。`,
-        detail: thumbnailPreview.width > 0 && thumbnailPreview.height > 0 ? `${thumbnailPreview.width}x${thumbnailPreview.height} · thumbnail` : "thumbnail",
-        projectId,
-        raw: { preview: thumbnailPreview, attempts }
-      });
-      return { preview: thumbnailPreview, error: null, attempts };
-    }
-    const error = this.createPreviewError(attempts);
-    runtimeLogService.log({
-      scope: "app",
-      namespace: "capture",
-      severity: "warning",
-      title: "Preview unavailable",
-      summary: `已打开 ${inputId}，但当前没有可用预览内容：${error.message}`,
-      projectId,
-      raw: { error, attempts }
-    });
-    return { preview: null, error, attempts };
-  }
-  async loadFramebufferPreview(projectId, inputId, sessionId, attempts) {
-    const outputPath = appPathService.getCapturePreviewPath(projectId, inputId);
-    await fs.promises.mkdir(path.dirname(outputPath), { recursive: true });
-    const swapchainPreview = await this.loadFramebufferPreviewAtEvent(
-      sessionId,
-      outputPath,
-      attempts,
-      void 0,
-      "swapchain"
-    );
-    if (swapchainPreview) {
-      return swapchainPreview;
-    }
-    const candidateEventIds = await this.listPreviewCandidateEvents(sessionId);
-    const eventAttempts = candidateEventIds.slice().reverse().filter((eventId, index, values) => values.indexOf(eventId) === index);
-    for (const eventId of eventAttempts) {
-      const preview = await this.loadFramebufferPreviewAtEvent(
-        sessionId,
-        outputPath,
-        attempts,
-        eventId,
-        "event_output"
-      );
-      if (preview) {
-        return preview;
-      }
-    }
-    return null;
-  }
-  async loadFramebufferPreviewAtEvent(sessionId, outputPath, attempts, eventId, targetSemantic = "swapchain") {
-    const args = {
-      session_id: sessionId,
-      output_path: outputPath,
-      file_format: "png",
-      include_alpha: false,
-      target: {
-        semantic: targetSemantic
-      }
-    };
-    if (eventId !== void 0) {
-      args.event_id = eventId;
-    }
-    const result = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
-      "rd.export.screenshot",
-      args
-    ));
-    if (!result.ok || result.data?.success === false) {
-      attempts.push({
-        source: "framebuffer_screenshot",
-        status: "failed",
-        eventId,
-        message: this.describeToolFailure(result, "rd.export.screenshot did not return a preview image."),
-        code: this.readToolFailureCode(result),
-        targetSemantic,
-        details: this.readToolFailureDetails(result)
-      });
-      return null;
-    }
-    const imagePath = this.resolvePreviewPath(result, outputPath);
-    const metadata = this.extractPreviewMetadata(result);
-    const preview = imagePath ? this.createPreviewFromPath(imagePath, "framebuffer_screenshot", void 0, void 0, metadata) : null;
-    if (!preview) {
-      attempts.push({
-        source: "framebuffer_screenshot",
-        status: "failed",
-        eventId,
-        message: imagePath ? `rd.export.screenshot produced an unreadable image: ${imagePath}` : "rd.export.screenshot succeeded without image_path, saved_path, artifact_path, or artifact path.",
-        code: "preview_image_unreadable",
-        imagePath: imagePath ?? void 0,
-        targetSemantic,
-        details: this.readToolFailureDetails(result),
-        ...metadata
-      });
-      return null;
-    }
-    attempts.push({
-      source: "framebuffer_screenshot",
-      status: "success",
-      eventId,
-      imagePath: preview.imagePath,
-      resolvedEventId: preview.resolvedEventId,
-      presentEventId: preview.presentEventId,
-      textureId: preview.textureId,
-      targetSource: preview.targetSource,
-      targetSemantic: preview.targetSemantic ?? targetSemantic,
-      fallbackReason: preview.fallbackReason,
-      details: result.data?.swapchain_error
-    });
-    return preview;
-  }
-  async listPreviewCandidateEvents(sessionId) {
-    const result = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
-      "rd.event.get_actions",
-      {
-        session_id: sessionId,
-        include_markers: true,
-        include_drawcalls: true,
-        max_nodes: 2e4
-      }
-    ));
-    if (!result.ok || result.data?.success === false || !Array.isArray(result.data?.actions)) {
-      return [];
-    }
-    const eventIds = [];
-    const visit = (node) => {
-      const flags = typeof node.flags === "object" && node.flags !== null ? node.flags : {};
-      const isPreviewable = flags.is_draw === true || flags.is_dispatch === true || flags.is_pass_boundary === true;
-      const eventId = typeof node.event_id === "number" ? node.event_id : Number(node.event_id);
-      if (isPreviewable && Number.isFinite(eventId) && eventId > 0) {
-        eventIds.push(eventId);
-      }
-      if (Array.isArray(node.children)) {
-        for (const child of node.children) {
-          if (typeof child === "object" && child !== null) {
-            visit(child);
-          }
-        }
-      }
-    };
-    for (const action of result.data.actions) {
-      if (typeof action === "object" && action !== null) {
-        visit(action);
-      }
-    }
-    return Array.from(new Set(eventIds));
-  }
-  async loadCaptureThumbnail(captureFileId, attempts) {
-    const result = await this.rdxCliInvoker.call(this.buildClaimedToolRequest(
-      "rd.capture.get_thumbnail",
-      {
-        capture_file_id: captureFileId,
-        max_size_px: 640
-      }
-    ));
-    if (!result.ok) {
-      attempts.push({
-        source: "capture_thumbnail",
-        status: "failed",
-        message: this.describeToolFailure(result, "rd.capture.get_thumbnail did not return a thumbnail."),
-        code: this.readToolFailureCode(result)
-      });
-      return null;
-    }
-    const imagePath = this.resolvePreviewPath(result);
-    if (!imagePath) {
-      attempts.push({
-        source: "capture_thumbnail",
-        status: "failed",
-        message: "rd.capture.get_thumbnail succeeded without image_path, saved_path, artifact_path, or artifact path.",
-        code: "thumbnail_path_missing"
-      });
-      return null;
-    }
-    const preview = this.createPreviewFromPath(
-      imagePath,
-      "capture_thumbnail",
-      typeof result.data?.width === "number" ? result.data.width : void 0,
-      typeof result.data?.height === "number" ? result.data.height : void 0
-    );
-    if (!preview) {
-      attempts.push({
-        source: "capture_thumbnail",
-        status: "failed",
-        message: `rd.capture.get_thumbnail produced an unreadable image: ${imagePath}`,
-        code: "thumbnail_image_unreadable",
-        imagePath
-      });
-      return null;
-    }
-    attempts.push({
-      source: "capture_thumbnail",
-      status: "success",
-      imagePath: preview.imagePath
-    });
-    return preview;
-  }
-  resolvePreviewPath(result, fallbackPath) {
-    const imagePath = typeof result.data?.image_path === "string" ? result.data.image_path : typeof result.data?.saved_path === "string" ? result.data.saved_path : typeof result.data?.artifact_path === "string" ? result.data.artifact_path : typeof result.data?.path === "string" ? result.data.path : result.artifacts?.[0]?.path ?? fallbackPath ?? null;
-    return imagePath ? path.resolve(imagePath) : null;
   }
   createPreviewFromPath(imagePath, source, fallbackWidth, fallbackHeight, metadata = {}) {
     const normalizedPath = path.resolve(imagePath);
@@ -20664,61 +15774,31 @@ class RdxSessionService {
       updatedAt: Date.now()
     };
   }
-  extractPreviewMetadata(result) {
-    return {
-      resolvedEventId: typeof result.data?.resolved_event_id === "number" ? result.data.resolved_event_id : void 0,
-      presentEventId: typeof result.data?.present_event_id === "number" ? result.data.present_event_id : void 0,
-      textureId: typeof result.data?.texture_id === "string" ? result.data.texture_id : void 0,
-      targetSource: typeof result.data?.target_source === "string" ? result.data.target_source : void 0,
-      targetSemantic: typeof result.data?.requested_semantic === "string" ? result.data.requested_semantic : void 0,
-      fallbackReason: typeof result.data?.fallback_reason === "string" ? result.data.fallback_reason : void 0,
-      summaryDegraded: typeof result.data?.summary_degraded === "boolean" ? result.data.summary_degraded : void 0
-    };
-  }
-  describeToolFailure(result, fallback) {
-    if (result.error?.message) {
-      return result.error.message;
-    }
-    if (typeof result.data?.error_message === "string" && result.data.error_message) {
-      return result.data.error_message;
-    }
-    return fallback;
-  }
-  readToolFailureCode(result) {
-    if (result.error?.code) {
-      return result.error.code;
-    }
-    return typeof result.data?.code === "string" ? result.data.code : void 0;
-  }
-  readToolFailureDetails(result) {
-    if (result.error?.details) {
-      return result.error.details;
-    }
-    return result.data?.details;
-  }
-  createPreviewError(attempts) {
-    const failedAttempts = attempts.filter((attempt) => attempt.status === "failed");
-    const lastFailure = failedAttempts[failedAttempts.length - 1];
-    return {
-      message: lastFailure?.message ?? "No preview attempt produced a readable image.",
-      code: lastFailure?.code,
-      attempts: [...attempts]
-    };
-  }
-  canReuseOpenedCapture(request) {
-    const primaryCapture = (request.captures ?? []).find((capture) => capture.id === request.primaryCaptureId);
-    if (!primaryCapture || !this.openedCapture) {
-      return false;
-    }
-    return Boolean(
-      this.contextId && this.runtimeOwner && this.ownerLeaseId && this.openedCapture.status === "open" && primaryCapture.id === this.openedCapture.inputId && primaryCapture.filePath === this.openedCapture.filePath && primaryCapture.backendHint === this.openedCapture.backend && request.replayDevice?.id === this.openedCapture.deviceId
-    );
-  }
   async teardownRuntime() {
-    const contextId = this.contextId;
-    const runtimeOwner = this.runtimeOwner;
-    const ownerLeaseId = this.ownerLeaseId;
-    if (contextId && runtimeOwner && ownerLeaseId && this.humanPreview.status !== "closed") {
+    if (this.runtimeContext) {
+      const result = await rdxShellActionService.runAction("closeRuntime", {
+        contextId: this.runtimeContext.contextId,
+        runtimeOwner: this.runtimeContext.runtimeOwner,
+        ownerLeaseId: this.runtimeContext.ownerLeaseId,
+        replaySessionId: this.runtimeContext.replaySessionId,
+        captureFileId: this.runtimeContext.captureFileId,
+        captureId: this.runtimeContext.captureId
+      }, {
+        env: this.buildRuntimeContextEnv()
+      });
+      if (!result.ok) {
+        runtimeLogService.log({
+          scope: "app",
+          namespace: "context",
+          severity: "warning",
+          title: "RDX runtime close warning",
+          summary: result.error ?? "closeRuntime action failed.",
+          raw: result
+        });
+      }
+      return;
+    }
+    if (this.humanPreview.status !== "closed") {
       await this.closeHumanPreviewWindow().catch((error) => {
         runtimeLogService.log({
           scope: "app",
@@ -20729,152 +15809,6 @@ class RdxSessionService {
         });
       });
     }
-    const replaySessionIds = Array.from(new Set(
-      this.captures.map((capture) => capture.sessionId || capture.replaySessionId).filter((sessionId) => typeof sessionId === "string" && Boolean(sessionId))
-    ));
-    const captureFileIds = Array.from(new Set(
-      this.captures.map((capture) => capture.captureFileId).filter((captureFileId) => typeof captureFileId === "string" && Boolean(captureFileId))
-    ));
-    for (const sessionId of replaySessionIds) {
-      const result = await this.rdxCliInvoker.call({
-        toolName: "rd.capture.close_replay",
-        args: { session_id: sessionId },
-        contextId: contextId ?? void 0,
-        runtimeOwner: runtimeOwner ?? void 0,
-        ownerLeaseId: ownerLeaseId ?? void 0
-      });
-      if (!result.ok) {
-        runtimeLogService.log({
-          scope: "app",
-          namespace: "capture",
-          severity: "warning",
-          title: "Replay teardown warning",
-          summary: result.error?.message ?? `Failed to close replay ${sessionId}.`,
-          raw: {
-            sessionId,
-            contextId
-          }
-        });
-      }
-    }
-    for (const captureFileId of captureFileIds) {
-      const result = await this.rdxCliInvoker.call({
-        toolName: "rd.capture.close_file",
-        args: { capture_file_id: captureFileId },
-        contextId: contextId ?? void 0,
-        runtimeOwner: runtimeOwner ?? void 0,
-        ownerLeaseId: ownerLeaseId ?? void 0
-      });
-      if (!result.ok) {
-        runtimeLogService.log({
-          scope: "app",
-          namespace: "capture",
-          severity: "warning",
-          title: "Capture teardown warning",
-          summary: result.error?.message ?? `Failed to close capture ${captureFileId}.`,
-          raw: {
-            captureFileId,
-            contextId
-          }
-        });
-      }
-    }
-    if (contextId && runtimeOwner && ownerLeaseId) {
-      await this.rdxCliInvoker.call({
-        toolName: "rd.session.release_runtime_owner",
-        args: {
-          runtime_owner: runtimeOwner,
-          owner_lease_id: ownerLeaseId,
-          force: true
-        },
-        contextId,
-        runtimeOwner,
-        ownerLeaseId
-      });
-    }
-    if (contextId) {
-      await this.rdxCliInvoker.call({
-        toolName: "rd.session.clear_context",
-        args: {
-          target_context_id: contextId
-        },
-        contextId
-      });
-    }
-  }
-  async cleanupStaleRdcAgentContexts() {
-    const result = await this.rdxCliInvoker.call({
-      toolName: "rd.session.list_contexts",
-      args: {}
-    });
-    if (!result.ok || !Array.isArray(result.data?.contexts)) {
-      return 0;
-    }
-    let cleanedCount = 0;
-    for (const contextEntry of result.data.contexts) {
-      const targetContextId = typeof contextEntry.context_id === "string" ? contextEntry.context_id : "";
-      if (!targetContextId) {
-        continue;
-      }
-      const runtimeOwner = typeof contextEntry.runtime_owner === "string" ? contextEntry.runtime_owner : typeof contextEntry.runtime_owner?.agent_id === "string" ? String(contextEntry.runtime_owner.agent_id) : "";
-      const ownerLeaseId = typeof contextEntry.owner_lease?.lease_id === "string" ? String(contextEntry.owner_lease.lease_id) : "";
-      const shouldClear = targetContextId.startsWith("ctx-") || runtimeOwner.startsWith("rdc-agent-");
-      if (!shouldClear) {
-        continue;
-      }
-      if (runtimeOwner && ownerLeaseId) {
-        await this.rdxCliInvoker.call({
-          toolName: "rd.session.release_runtime_owner",
-          args: {
-            runtime_owner: runtimeOwner,
-            owner_lease_id: ownerLeaseId,
-            force: true
-          },
-          contextId: targetContextId,
-          runtimeOwner,
-          ownerLeaseId
-        });
-      }
-      const clearResult = await this.rdxCliInvoker.call({
-        toolName: "rd.session.clear_context",
-        args: {
-          target_context_id: targetContextId
-        },
-        contextId: targetContextId
-      });
-      if (clearResult.ok) {
-        cleanedCount += 1;
-      }
-    }
-    return cleanedCount;
-  }
-  async cleanupDaemonRuntimeState() {
-    let cleaned = false;
-    const daemonCleanup = await this.rdxCliInvoker.executeCLI("daemon", ["cleanup"]);
-    if (daemonCleanup.exitCode === 0) {
-      cleaned = true;
-    } else {
-      runtimeLogService.log({
-        scope: "app",
-        namespace: "context",
-        severity: "warning",
-        title: "Daemon cleanup warning",
-        summary: daemonCleanup.stderr.trim() || daemonCleanup.stdout.trim() || "Failed to cleanup stale daemon state."
-      });
-    }
-    const contextClear = await this.rdxCliInvoker.executeCLI("context", ["clear"]);
-    if (contextClear.exitCode === 0) {
-      cleaned = true;
-    } else {
-      runtimeLogService.log({
-        scope: "app",
-        namespace: "context",
-        severity: "warning",
-        title: "Daemon context clear warning",
-        summary: contextClear.stderr.trim() || contextClear.stdout.trim() || "Failed to clear default daemon context."
-      });
-    }
-    return cleaned;
   }
   resetRuntimeState(previousCapture) {
     this.openedCapture = null;
@@ -20886,7 +15820,8 @@ class RdxSessionService {
     this.deviceLabel = "Local";
     this.replayDevice = null;
     this.remoteStatus = "disconnected";
-    this.remoteId = null;
+    this.runtimeContext = null;
+    setRdxRuntimeContext(null);
     this.humanPreview = {
       status: "closed",
       updatedAt: Date.now()
@@ -21099,7 +16034,7 @@ async function stopBrowserAppBridge() {
   }
   await new Promise((resolveClose) => activeServer.close(() => resolveClose()));
 }
-const rdxSessionService = new RdxSessionService(rdxCliInvokerService);
+const rdxSessionService = new RdxSessionService();
 const __dirname$1 = path__namespace.dirname(url.fileURLToPath(require("url").pathToFileURL(__filename).href));
 const configuredUserDataPath = process.env.RDC_AGENT_USER_DATA?.trim();
 if (configuredUserDataPath) {

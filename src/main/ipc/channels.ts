@@ -25,12 +25,6 @@
     'workflow:getRunUsage',
     'workflow:listRuns',
     'workflow:listActiveRuns',
-    'workflow:start',
-    'workflow:getPlan',
-    'workflow:submitQuestions',
-    'workflow:approvePlan',
-    'workflow:requestPlanRevision',
-    'workflow:restartRun',
   ],
   projectSession: [
     'project:list',

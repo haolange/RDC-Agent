@@ -1,7 +1,4 @@
 ﻿import type {
-  AskUserAnswer,
-  AskUserPrompt,
-  DebugPlan,
   WorkflowStage,
   WorkflowState,
 } from './workflow';
@@ -31,7 +28,6 @@ import type {
 import type {
   CaptureDescriptor,
   ContextSnapshot,
-  DebugSessionStartRequest,
   OpenProjectInputRequest,
   OpenedCaptureState,
   ProjectInputRecord,
@@ -49,7 +45,6 @@ import type {
   TraceBranchSwitchResult,
   TraceExportOptions,
   TraceExportResult,
-  TraceRevisionResult,
   TraceSessionResult,
 } from './trace';
 
@@ -96,55 +91,6 @@ export interface ElectronAPI {
 
   workflow: {
     getState: () => Promise<WorkflowState>;
-    start: (request: DebugSessionStartRequest) => Promise<{
-      success: boolean;
-      caseId?: string;
-      runId?: string;
-      sessionId?: string;
-      currentStage?: WorkflowStage;
-      status?: RunSummary['status'];
-      planStatus?: string;
-      pendingQuestions?: AskUserPrompt | null;
-      debugPlanSummary?: DebugPlan | null;
-      error?: string;
-    }>;
-    getPlan: (runId: string) => Promise<{
-      success: boolean;
-      runId?: string;
-      sessionId?: string;
-      debugPlan?: DebugPlan | null;
-      pendingQuestions?: AskUserPrompt | null;
-      approvalState?: string;
-      error?: string;
-    }>;
-    submitQuestions: (runId: string, answers: AskUserAnswer[]) => Promise<{
-      success: boolean;
-      runId?: string;
-      sessionId?: string;
-      debugPlan?: DebugPlan | null;
-      pendingQuestions?: AskUserPrompt | null;
-      approvalState?: string;
-      error?: string;
-    }>;
-    approvePlan: (runId: string) => Promise<{
-      success: boolean;
-      runId?: string;
-      sessionId?: string;
-      debugPlan?: DebugPlan | null;
-      pendingQuestions?: AskUserPrompt | null;
-      approvalState?: string;
-      error?: string;
-    }>;
-    requestPlanRevision: (runId: string, revisionText: string) => Promise<TraceRevisionResult>;
-    restartRun: (runId: string) => Promise<{
-      success: boolean;
-      runId?: string;
-      sessionId?: string;
-      debugPlan?: DebugPlan | null;
-      pendingQuestions?: AskUserPrompt | null;
-      approvalState?: string;
-      error?: string;
-    }>;
     resume: (sessionId?: string) => Promise<{
       success: boolean;
       error?: string;

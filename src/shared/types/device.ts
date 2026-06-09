@@ -38,7 +38,7 @@ export interface ReplayDeviceEntry {
   lastSeen?: number;
   remoteId?: string;
   bootstrap?: AndroidBootstrapMetadata;
-  activationPhase?: 'idle' | 'daemon' | 'context' | 'init' | 'connect' | 'ping' | 'targets' | 'ready';
+  activationPhase?: 'idle' | 'connect' | 'ready';
   activationErrorCode?: string;
   activationErrorMessage?: string;
   activationUpdatedAt?: number;

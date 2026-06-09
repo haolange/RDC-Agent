@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import type { AgentRole, AgentState, AgentStatus } from '@shared/types/agent';
+import { isTopLevelAgentId } from '@shared/types/agent';
 import type { WorkflowState } from '@shared/types/workflow';
 import './WorkflowPanel.css';
 
@@ -17,8 +18,12 @@ interface ActiveAgent {
   message: string;
 }
 
+const getAgentDisplayName = (role: AgentRole): string => (
+  AGENT_DISPLAY_NAMES[isTopLevelAgentId(role) ? role : 'debugger'] || role
+);
+
 const UI_STAGES: UiStageDefinition[] = [
-  { id: 'planner', label: 'Planner', stages: ['preflight', 'entry_gate', 'intake_gate', 'plan', 'speclist'] },
+  { id: 'planner', label: 'Planner', stages: ['preflight', 'entry_gate', 'intake_gate', 'speclist'] },
   { id: 'generator', label: 'Generator', stages: ['dispatch', 'investigate'] },
   { id: 'evaluator', label: 'Evaluator', stages: ['fix_verify', 'skepti', 'curate', 'finalize'] },
 ];
@@ -160,10 +165,10 @@ export const WorkflowPanel: React.FC = () => {
           {activeAgents.slice(0, 3).map((agent) => (
             <div key={agent.role} className="agent-activity">
               <div className={`agent-activity-avatar ${agent.role.replace(/(_agent|rdc-)/g, '').replace(/_/g, '-')}`}>
-                {(AGENT_DISPLAY_NAMES[agent.role] || agent.role).charAt(0)}
+                {getAgentDisplayName(agent.role).charAt(0)}
               </div>
               <div className="agent-activity-info">
-                <span className="agent-activity-name">{AGENT_DISPLAY_NAMES[agent.role] || agent.role}</span>
+                <span className="agent-activity-name">{getAgentDisplayName(agent.role)}</span>
                 <span className="agent-activity-status">{agent.message}</span>
               </div>
             </div>

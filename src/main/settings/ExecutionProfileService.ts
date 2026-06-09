@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { AgentRole } from '@shared/types/agent';
-import { DEFAULT_MODEL_ROUTING } from '@shared/types/agent';
+import { DEFAULT_MODEL_ROUTING, isTopLevelAgentId } from '@shared/types/agent';
 import type {
   ConfigurationSettings,
   AppSettings,
@@ -42,7 +42,7 @@ const createFallbackModeProfile = (): ModeProfile => ({
   id: DEFAULT_MODE_PROFILE_ID,
   label: 'Debugger Production',
   mode: 'debugger',
-  patternId: 'plan-generate-verify',
+  patternId: 'free-agent',
   skillIds: [],
   mcpServerIds: [],
   stagePolicies: {},
@@ -50,7 +50,7 @@ const createFallbackModeProfile = (): ModeProfile => ({
 });
 
 const createFallbackAgentProfile = (agentId: AgentRole): AgentPromptProfile => {
-  const route = DEFAULT_MODEL_ROUTING[agentId];
+  const route = isTopLevelAgentId(agentId) ? DEFAULT_MODEL_ROUTING[agentId] : DEFAULT_MODEL_ROUTING.debugger;
   return {
     id: `agent.${agentId}`,
     label: agentId,
@@ -117,7 +117,7 @@ export class ExecutionProfileService {
       enabledSkillIds: configuration.enabledSkillIds ?? [],
       enabledMcpServerIds: configuration.enabledMcpServerIds ?? [],
       modePatternBindings: {
-        debugger: patternIds.has(modePatternBindings.debugger) ? modePatternBindings.debugger : 'plan-generate-verify',
+        debugger: patternIds.has(modePatternBindings.debugger) ? modePatternBindings.debugger : 'free-agent',
         analyzer: patternIds.has(modePatternBindings.analyzer) ? modePatternBindings.analyzer : 'free-agent',
         optimizer: patternIds.has(modePatternBindings.optimizer) ? modePatternBindings.optimizer : 'free-agent',
         ...modePatternBindings,
@@ -165,8 +165,8 @@ export class ExecutionProfileService {
       modelId: route?.modelId || '',
       temperature: agentProfile.temperature,
       maxTokens: agentProfile.maxTokens,
-      category: AGENT_CATEGORIES[agentId],
-      writeScope: AGENT_WRITE_SCOPES[agentId],
+      category: isTopLevelAgentId(agentId) ? AGENT_CATEGORIES[agentId] : 'general',
+      writeScope: isTopLevelAgentId(agentId) ? AGENT_WRITE_SCOPES[agentId] : [],
       stage,
       phase: stagePolicy.phase || STAGE_PHASES[stage],
       toolAllowlist: Array.from(new Set([

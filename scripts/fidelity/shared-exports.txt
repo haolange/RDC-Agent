@@ -79,8 +79,6 @@ ModeIconKey
 ModelProviderBackendKind
 parseYaml
 PhaseKind
-PlanApprovalState
-PlanReadiness
 PlanStatus
 PlatformApi
 ProgressTaskStatus

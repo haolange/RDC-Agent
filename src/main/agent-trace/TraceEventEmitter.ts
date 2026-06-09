@@ -14,12 +14,10 @@ import type {
   FinalResponseNode,
   ErrorNode,
   ObservationNode,
-  PlanNode,
   TraceStatus,
   VisibleReasoningPacket,
 } from '@shared/types/agenticTrace';
 import type { ConversationMessage } from '@shared/types/conversation';
-import type { DebugPlan } from '@shared/types/workflow';
 import { generateEventId, nowIso } from '@shared/utils/id';
 import { toolManifestRegistry } from './manifests/ToolManifestRegistry';
 import { toolResultNormalizer } from './ToolResultNormalizer';
@@ -149,31 +147,6 @@ export class TraceEventEmitter {
     return this.store.append(runId, 'node.created', node);
   }
 
-  emitPlan(runId: string, debugPlan: DebugPlan): TraceEvent {
-    const node: PlanNode = {
-      id: `plan-${debugPlan.planId}`,
-      runId,
-      kind: 'plan',
-      title: debugPlan.presentation?.title || 'Debugger Plan',
-      steps: (debugPlan.presentation?.sections ?? []).map((section, index) => ({
-        id: section.id || `step-${index}`,
-        title: section.title,
-        description: section.body.join('\n'),
-        status: 'pending' as TraceStatus,
-      })),
-      seq: 0,
-      createdAt: debugPlan.createdAt,
-      visibility: 'user',
-      status: 'succeeded',
-    };
-    if (node.steps.length === 0) {
-      node.steps = [
-        { id: 'goal', title: '目标', description: debugPlan.userGoal, status: 'pending' },
-        { id: 'scope', title: '执行路线', description: debugPlan.scope, status: 'pending' },
-      ];
-    }
-    return this.store.append(runId, 'node.created', node);
-  }
 
   emitFinalResponse(runId: string, content: string, format: 'markdown' | 'plain' = 'markdown'): TraceEvent {
     const node: FinalResponseNode = {

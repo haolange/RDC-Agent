@@ -9,7 +9,7 @@
 - 维护 workspace root，统一承载 settings、logs 和应用级运行数据。
 - 配置 provider / model / agent route，并把真实 LLM 路由视为 Debugger 主链的一部分。
 - 通过 `AgentRuntime` / `ToolRegistry` 统一执行 agent turn 和 tool loop。
-- 通过配置化 `RdxCliInvokerService -> ShellInvocationService -> external RDX CLI` 调用 RenderDoc 工具。
+- 通过配置化 Settings shell action / `bash -> ShellInvocationService -> system-installed RDX CLI` 调用 RenderDoc 工具。
 - 展示会话、运行状态、证据链、报告和中间产物。
 
 ## 仓库结构
@@ -85,7 +85,7 @@ npm run start:agent-browser
 - 不保留明显的 legacy 双轨入口、镜像目录或“临时兼容”路径。
 - 文档以中文为主，必要英文术语保留原文。
 - 目录、脚本和文档命名采用稳定主题名，不使用“设想 / 演示 / 建议 / 分析”这类阶段性文件名作为正式结构。
-- `resources/tools` 不作为本应用默认内置执行链；如需使用，只能通过 Settings 中配置的 RDX CLI invoker 作为外部 CLI 调用。
+- 仓库不保留内置 RDX tool 副本；RDX CLI 由系统安装或用户提供，并通过 Settings 中的 CLI invoker 与 RDX shell actions 配置。
 
 ## Git 与产物治理
 

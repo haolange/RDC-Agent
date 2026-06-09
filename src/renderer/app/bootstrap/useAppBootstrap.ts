@@ -236,15 +236,11 @@ function useSessionRestoreBootstrap(runtimeTestMode: boolean | null): void {
       .then((state) => {
         if (!state) {
           useWorkflowStore.getState().setWorkflowState(null);
-          useWorkflowStore.getState().setCurrentDebugPlan(null);
-          useWorkflowStore.getState().setPendingQuestions(null);
           useConversationStore.getState().setReasoningSummaries([]);
           return;
         }
         const workflow = state as WorkflowState;
         useWorkflowStore.getState().setWorkflowState(workflow);
-        useWorkflowStore.getState().setCurrentDebugPlan(workflow.debugPlan ?? null);
-        useWorkflowStore.getState().setPendingQuestions(workflow.pendingQuestions ?? null);
         useConversationStore.getState().setReasoningSummaries(workflow.reasoningSummaries ?? []);
       })
       .catch(() => undefined);

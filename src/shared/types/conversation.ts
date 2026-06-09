@@ -1,6 +1,5 @@
 import type { AgentRole } from './agent';
 import type { AgentEvent } from './agentRuntime';
-import type { DebugPlan, AskUserPrompt } from './workflow';
 import type { AppMode, RunSummary, SessionAttachmentRecord, SessionRecord } from './session';
 
 export type ConversationMode = 'talk' | 'intake' | 'active_debug' | 'execute_upgrade';
@@ -101,7 +100,6 @@ export interface ConversationErrorViewModel {
 }
 
 export interface ConversationUiHints {
-  showPlanIntake?: boolean;
   highlightProjectPicker?: boolean;
   highlightCaptureLibrary?: boolean;
   highlightSettingsRoute?: boolean;
@@ -142,8 +140,6 @@ export interface ConversationTurnResult {
   assistantDraftMessage: ConversationMessage;
   executionTransition: ConversationExecutionTransition;
   runUpdate?: RunSummary | null;
-  debugPlanSummary?: DebugPlan | null;
-  pendingQuestions?: AskUserPrompt | null;
   tracePresentation?: import('./agenticTrace').AgentRunPresentation | null;
   uiHints?: ConversationUiHints;
   errorViewModel?: ConversationErrorViewModel | null;

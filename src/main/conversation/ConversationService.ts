@@ -4,7 +4,6 @@ import type {
   ConversationAttachmentInput,
   ConversationCancelActiveTurnRequest,
   ConversationCancelActiveTurnResult,
-  ConversationControl,
   ConversationMessage,
   ConversationMessageDiagnostic,
   ConversationToolCall,
@@ -30,7 +29,6 @@ import { generateEventId, nowMs } from '@shared/utils/id';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
 import { traceService } from '../agent-trace/TraceService';
-import { debuggerRuntime } from '../workflow/debugger/DebuggerRuntime';
 import { replayDeviceService } from '../captures/ReplayDeviceService';
 import { rdxSessionService } from '../index';
 import { settingsService } from '../settings/SettingsService';
@@ -68,7 +66,7 @@ function resolveConversationAgentId(requestedMode: AppMode, requestedAgentId?: s
   if (requestedAgentId && KNOWN_CONVERSATION_AGENTS.has(requestedAgentId)) {
     return requestedAgentId as AgentRole;
   }
-  return requestedMode === 'ask' ? 'ask_agent' : 'rdc-debugger';
+  return requestedMode === 'ask' ? 'ask' : requestedMode;
 }
 
 const EXECUTE_PATTERN = /开始|启动|执行|正式分析|正式调试|本地调试|local\s*模式调试|模式调试|直接分析|现在分析|run\b|start\b|debug\b|analy[sz]e\b|帮我调试|请.*调试|开始调试|开始分析/i;
@@ -257,33 +255,6 @@ function stripControlBlock(text: string): string {
   return text.replace(/<control>\s*[\s\S]*?<\/control>/i, '').trim();
 }
 
-function parseControlBlock(text: string): ConversationControl | null {
-  const match = text.match(/<control>\s*([\s\S]*?)\s*<\/control>/i);
-  if (!match?.[1]) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(match[1]) as Partial<ConversationControl>;
-    const intent = parsed.intent;
-    if (intent !== 'talk' && intent !== 'intake' && intent !== 'execute') {
-      return null;
-    }
-
-    return {
-      intent,
-      safe_to_start: parsed.safe_to_start === true,
-      needs_project: parsed.needs_project === true,
-      needs_capture: parsed.needs_capture === true,
-      needs_target_capture: parsed.needs_target_capture === true,
-      needs_route: parsed.needs_route === true,
-      reason: typeof parsed.reason === 'string' ? parsed.reason : undefined,
-    };
-  } catch {
-    return null;
-  }
-}
-
 function resolveTaskFileContext(message: string): {
   taskFilePath: string | null;
   taskFileContent: string | null;
@@ -421,7 +392,7 @@ function createConversationDiagnostic(input: {
 }
 
 function getConversationAgentLabel(agentId: AgentRole): string {
-  return agentId === 'ask_agent' ? 'Ask' : 'rdc-debugger';
+  return agentId === 'ask' ? 'Ask' : agentId;
 }
 
 function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?: AgentRole): AgentRoutePreflight {
@@ -486,11 +457,7 @@ function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?: AgentR
 }
 
 function resolveDebuggerRoutePreflight(): AgentRoutePreflight {
-  return resolveAgentRoutePreflight('rdc-debugger');
-}
-
-function hasUsableDebuggerRoute(): boolean {
-  return resolveDebuggerRoutePreflight().ok;
+  return resolveAgentRoutePreflight('debugger');
 }
 
 function recordCoworkLlmDiagnostic(
@@ -501,7 +468,7 @@ function recordCoworkLlmDiagnostic(
     scope: context.session?.sessionId ? 'session' : 'app',
     namespace: 'llm',
     severity: diagnostic.severity === 'error' ? 'error' : 'warning',
-    title: `${diagnostic.agentId ?? 'rdc-debugger'} -> ${diagnostic.providerId ?? 'route missing'}${diagnostic.modelId ? `/${diagnostic.modelId}` : ''}`,
+    title: `${diagnostic.agentId ?? 'debugger'} -> ${diagnostic.providerId ?? 'route missing'}${diagnostic.modelId ? `/${diagnostic.modelId}` : ''}`,
     summary: diagnostic.userMessage,
     detail: diagnostic.technicalMessage,
     sessionId: context.session?.sessionId ?? null,
@@ -589,39 +556,6 @@ function resolveCaptureGuards(message: string, context: ResolvedConversationCont
     needsCapture: true,
     reason: '我可以先帮你梳理问题，但正式 Debugger 执行需要先在应用内 Open 一个 .rdc Capture。仅在 prompt 中写路径不会创建 runtime context。',
   };
-}
-
-function buildWorkflowUpgradeReply(result: Awaited<ReturnType<typeof debuggerRuntime.startPlan>>): string {
-  if (!result.success) {
-    return result.error
-      ? `我刚才尝试进入正式调试，但没有成功：${result.error}`
-      : '我刚才尝试进入正式调试，但没有成功。';
-  }
-
-  if (result.debugPlanSummary?.blockers?.length) {
-    const blocker = result.debugPlanSummary.blockers[0];
-    if (blocker?.code === 'BLOCKED_LLM_ROUTE_MISSING'
-      || blocker?.code === 'BLOCKED_LLM_PROVIDER_MISSING'
-      || blocker?.code === 'BLOCKED_LLM_SECRET_MISSING'
-      || blocker?.code === 'BLOCKED_LLM_MODEL_MISSING'
-      || blocker?.code === 'BLOCKED_LLM_PROVIDER_UNAVAILABLE') {
-      return '当前调试链路还没绑定可用模型，所以我不能开始正式执行；不过我可以先帮你确认问题范围和所需 capture。';
-    }
-    if (blocker?.code === 'BLOCKED_MISSING_CAPTURE') {
-      return '我可以先帮你梳理问题，但正式分析需要一个 .rdc capture。你可以先描述现象，或者直接打开一个 capture。';
-    }
-    return blocker?.reason || '当前还不能进入正式调试。';
-  }
-
-  if (result.pendingQuestions?.questions.some((question) => question.id === 'target_capture')) {
-    return '我已经开始整理正式执行计划了，不过当前还需要你明确这次要分析的 capture。';
-  }
-
-  if (result.status === 'awaiting_approval') {
-    return '我已经整理好正式执行计划了。你先确认下方计划卡片，批准后我再进入严格调试流程。';
-  }
-
-  return '正式调试入口已准备完成，后续状态会在计划卡和运行记录中更新。';
 }
 
 function computeVisibleAssistantText(raw: string): string {
@@ -744,7 +678,7 @@ export class ConversationService {
       projectId: context.projectId,
       runId: context.currentRun?.runId ?? null,
       modeContext: requestedMode,
-      agentId: 'rdc-debugger',
+      agentId: 'debugger',
       status: 'streaming',
       reasoningTrace: createDraftReasoningTrace('正在思考', [
         createReasoningStep('active-debug-reply', '生成调试回复', 'investigate'),
@@ -848,7 +782,7 @@ export class ConversationService {
 
     try {
       const responseText = await agentOrchestrator.sendMessage(
-        'rdc-debugger',
+        'debugger',
         composeMessageForAgent(input.userMessage),
         {
           caseId: input.context.session?.sessionId,
@@ -1099,14 +1033,6 @@ export class ConversationService {
       });
     };
 
-    const appendSystemAppendix = (text: string) => {
-      if (!text) {
-        return;
-      }
-      systemAppendix += text;
-      commitVisibleAssistantText();
-    };
-
     const withCoworkReasoning = (reasoningTrace: ConversationReasoningTrace): Partial<ConversationMessage> => (
       showCoworkReasoning ? { reasoningTrace } : {}
     );
@@ -1133,7 +1059,7 @@ export class ConversationService {
     let llmDiagnostic: ConversationMessageDiagnostic | null = null;
     const taskFileContext = resolveTaskFileContext(input.rawMessage);
     const effectiveMessage = taskFileContext.effectiveMessage;
-    const explicitFormalDebugRequest = shouldStartDebuggerFromMessage(effectiveMessage);
+    const explicitFormalDebugRequest = false && shouldStartDebuggerFromMessage(effectiveMessage);
     const explicitDebuggerRequest = input.requestedMode === 'debugger' && explicitFormalDebugRequest;
     const askModeFormalDebugRequest = input.requestedMode === 'ask' && explicitFormalDebugRequest;
     const explicitDebuggerCaptureGuard = explicitDebuggerRequest
@@ -1143,8 +1069,8 @@ export class ConversationService {
       ? resolveCaptureGuards(effectiveMessage, input.context)
       : null;
 
-    const routePreflight = conversationAgentId === 'ask_agent'
-      ? resolveAgentRoutePreflight('ask_agent', 'rdc-debugger')
+    const routePreflight = conversationAgentId === 'ask'
+      ? resolveAgentRoutePreflight('ask')
       : resolveDebuggerRoutePreflight();
     if (askModeFormalDebugRequest) {
       rawResponse = [
@@ -1238,12 +1164,12 @@ export class ConversationService {
           input.importedAttachments,
         );
         const globalInstructions = settingsService.getAll().agents.globalInstructions.trim();
-        const baseSystemPrompt = conversationAgentId === 'ask_agent'
+        const baseSystemPrompt = conversationAgentId === 'ask'
           ? buildAskSystemPrompt()
           : buildDebuggerCoworkSystemPrompt();
         const systemPrompt = [
           baseSystemPrompt,
-          conversationAgentId !== 'ask_agent' && globalInstructions
+          conversationAgentId !== 'ask' && globalInstructions
             ? `\n\nGlobal Instructions:\n${globalInstructions}`
             : '',
         ].join('').trim();
@@ -1254,7 +1180,7 @@ export class ConversationService {
             sessionId: input.context.session?.sessionId,
             turnId: assistantMessage.turnId,
             stage: 'cowork',
-            patternId: input.requestedMode === 'debugger' ? 'plan-generate-verify' : 'free-agent',
+            patternId: 'free-agent',
             systemPrompt,
             maxTokens: 1200,
             temperature: 0.35,
@@ -1357,7 +1283,6 @@ export class ConversationService {
 
     const assistantContent = stripControlBlock(rawResponse);
     visibleResponse = assistantContent;
-    const control = parseControlBlock(rawResponse);
     const isRouteMissingDiagnostic = llmDiagnostic?.code === 'CONVERSATION_LLM_ROUTE_MISSING';
     let finalStatus: ConversationMessage['status'] = errorViewModel && !isRouteMissingDiagnostic ? 'error' : 'complete';
     let traceStatus: ConversationReasoningTrace['status'] = errorViewModel && !isRouteMissingDiagnostic ? 'error' : 'complete';
@@ -1408,78 +1333,6 @@ export class ConversationService {
       return;
     }
 
-    const shouldUpgradeByControl = input.requestedMode === 'debugger' && control?.intent === 'execute' && control.safe_to_start;
-    const shouldUpgradeByRequest = !errorViewModel
-      && explicitDebuggerRequest
-      && explicitDebuggerCaptureGuard?.ready === true;
-    if (shouldUpgradeByControl || shouldUpgradeByRequest) {
-      commitAssistantMessage('message_patched', {
-        reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, 'cowork-upgrade', {
-          title: '升级到正式调试',
-          stage: 'plan',
-          status: 'running',
-          summary: '正在准备正式调试计划。',
-          startedAt: nowMs(),
-        }),
-      });
-
-      if (!input.context.projectId) {
-        appendSystemAppendix(`\n\n我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。`);
-      } else {
-        const captureGuard = resolveCaptureGuards(effectiveMessage, input.context);
-        if (!captureGuard.ready) {
-          appendSystemAppendix(`\n\n${captureGuard.reason || '当前还不能进入正式分析。'}`);
-        } else if (!hasUsableDebuggerRoute()) {
-          appendSystemAppendix('\n\n当前调试链路还没绑定可用模型，所以我不能开始正式执行；不过我可以先帮你确认问题范围和所需 capture。');
-        } else {
-          if (abortController.signal.aborted) {
-            this.clearActiveTurn(assistantMessage.turnId, abortController);
-            return;
-          }
-          const requestedCapture = resolveOpenedCaptureDescriptor(input.context);
-          const workflowResult = await debuggerRuntime.requestStartFromConversation({
-            source: 'conversation',
-            message: assistantMessage,
-            projectId: input.context.projectId,
-            sessionId: input.context.session?.sessionId,
-            turnId: assistantMessage.turnId,
-            mode: 'debugger',
-            goal: input.rawMessage,
-            captures: requestedCapture ? [requestedCapture] : undefined,
-            primaryCaptureId: requestedCapture?.id,
-            replayDevice: input.context.replayDevice,
-          });
-
-          if (abortController.signal.aborted) {
-            this.clearActiveTurn(assistantMessage.turnId, abortController);
-            return;
-          }
-
-          const upgradeReply = buildWorkflowUpgradeReply(workflowResult);
-          appendSystemAppendix(`\n\n${upgradeReply}`);
-
-          if (workflowResult.runId) {
-            commitAssistantMessage('message_patched', {
-              runId: workflowResult.runId,
-            });
-            this.emitConversationEvent({
-              type: 'run_linked',
-              sessionId: input.context.session?.sessionId ?? '',
-              turnId: assistantMessage.turnId,
-              runId: workflowResult.runId,
-            });
-          }
-        }
-      }
-
-      commitAssistantMessage('message_patched', {
-        reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, 'cowork-upgrade', {
-          status: 'complete',
-          summary: '正式调试升级判断已完成。',
-          completedAt: nowMs(),
-        }),
-      });
-    }
 
     commitAssistantMessage(finalStatus === 'error' ? 'message_errored' : 'message_completed', {
       status: finalStatus,

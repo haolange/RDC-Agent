@@ -149,17 +149,6 @@ export interface RightPanelViewModel {
   context: ContextPanelViewModel;
 }
 
-export interface ComposerApprovalViewModel {
-  planId: string;
-  runId?: string;
-  traceLaneId: string;
-  status: PlanStatus;
-  title: string;
-  summary: string;
-  canApprove: boolean;
-  canRequestRevision: boolean;
-}
-
 export interface BranchNavigatorViewModel {
   activeBranchId: string;
   branchIndex: number;

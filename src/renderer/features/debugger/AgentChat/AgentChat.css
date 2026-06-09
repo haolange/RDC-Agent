@@ -1046,6 +1046,52 @@
   line-height: 1.55;
 }
 
+.conversation-handoff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.conversation-handoff-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid rgb(var(--color-border-secondary));
+  border-radius: 8px;
+  background: rgb(var(--color-surface-subtle) / 0.72);
+  color: rgb(var(--color-text-primary));
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.conversation-handoff-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--message-mode-accent) 44%, rgb(var(--color-border-secondary)));
+  background: rgb(var(--color-surface-subtle) / 0.95);
+}
+
+.conversation-handoff-button:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.conversation-handoff-button span,
+.conversation-handoff-button small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-handoff-button small {
+  color: rgb(var(--color-text-tertiary));
+  font-size: 11px;
+}
+
 /* ============================================================
  * ReasoningChain — collapsible thinking trace
  * ============================================================ */

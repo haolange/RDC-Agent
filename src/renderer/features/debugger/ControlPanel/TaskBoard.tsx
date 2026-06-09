@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import type { HarnessTask } from '@shared/types/harness';
-import type { DebugPlan, WorkflowState } from '@shared/types/workflow';
+import type { WorkflowState } from '@shared/types/workflow';
 import type { RunSummary } from '@shared/types/session';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useSessionStore } from '../../../stores/sessionStore';
@@ -21,28 +21,22 @@ interface BoardItem {
 export const hasApprovedTaskBoardState = (
   currentRun: RunSummary | null,
   workflowState: WorkflowState | null,
-  debugPlan: DebugPlan | null,
 ): boolean => {
-  if (!debugPlan) {
-    return false;
-  }
-
-  return workflowState?.approvalState === 'approved'
+  return (workflowState?.harnessTasks?.length ?? 0) > 0
     || (currentRun ? ['queued', 'running', 'stopping', 'completed'].includes(currentRun.status) : false);
 };
 
 const buildBoardItems = (
-  debugPlan: DebugPlan,
   tasks: HarnessTask[],
 ): BoardItem[] => {
   if (tasks.length === 0) {
     return [{
-      id: 'plan',
-      title: 'Plan',
-      detail: debugPlan.targetCapture?.fileName ?? debugPlan.scope,
-      status: 'completed',
+      id: 'run',
+      title: 'Current Run',
+      detail: 'Waiting for runtime trace tasks.',
+      status: 'active',
       evidenceCount: 0,
-      approval: 'approved',
+      approval: 'runtime',
     }];
   }
 
@@ -73,9 +67,7 @@ export const TaskBoard: React.FC = () => {
   const currentRun = useSessionStore((state) => state.currentRun);
   const runs = useSessionStore((state) => state.runs);
   const workflowState = useWorkflowStore((state) => state.workflowState);
-  const currentDebugPlan = useWorkflowStore((state) => state.currentDebugPlan);
   const reasoningSummaries = useConversationStore((state) => state.reasoningSummaries);
-  const debugPlan = currentDebugPlan ?? workflowState?.debugPlan ?? null;
   const harnessTasks = workflowState?.harnessTasks ?? [];
   const blockerCount = workflowState?.blockers.length ?? 0;
   const activeTask = harnessTasks.find((task) => task.status === 'in_progress')
@@ -84,8 +76,8 @@ export const TaskBoard: React.FC = () => {
     ?? harnessTasks[harnessTasks.length - 1];
 
   const boardItems = useMemo(
-    () => (debugPlan ? buildBoardItems(debugPlan, harnessTasks) : []),
-    [debugPlan, harnessTasks],
+    () => buildBoardItems(harnessTasks),
+    [harnessTasks],
   );
 
   const completedCount = useMemo(
@@ -101,7 +93,7 @@ export const TaskBoard: React.FC = () => {
     [runs, currentRun?.runId],
   );
 
-  if (!hasApprovedTaskBoardState(currentRun, workflowState, debugPlan)) {
+  if (!hasApprovedTaskBoardState(currentRun, workflowState)) {
     return null;
   }
 

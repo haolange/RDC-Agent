@@ -18,7 +18,6 @@ export const ClassicSessionControlPanel: React.FC = () => {
   const { t } = useI18n();
   const currentRun = useSessionStore((state) => state.currentRun);
   const workflowState = useWorkflowStore((state) => state.workflowState);
-  const currentDebugPlan = useWorkflowStore((state) => state.currentDebugPlan);
   const reasoningSummaries = useConversationStore((state) => state.reasoningSummaries);
   const currentSession = useProjectStore((state) => state.currentSession);
   const openedCapture = useCaptureStore((state) => state.openedCapture);
@@ -29,9 +28,9 @@ export const ClassicSessionControlPanel: React.FC = () => {
     () => getSessionProgressSnapshot(currentRun, workflowState, reasoningSummaries, t),
     [currentRun, reasoningSummaries, t, workflowState],
   );
-  const capabilitySummary = (currentDebugPlan ?? workflowState?.debugPlan ?? null)?.recommendedSpecialists.length ?? 0;
+  const capabilitySummary = workflowState?.harnessTasks?.length ?? 0;
   const hasWorkingFolderActivity = Boolean(currentRun) || actionEvents.length > 0;
-  const showTaskBoard = hasApprovedTaskBoardState(currentRun, workflowState, currentDebugPlan ?? workflowState?.debugPlan ?? null);
+  const showTaskBoard = hasApprovedTaskBoardState(currentRun, workflowState);
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => ({
     sessionProgress: true,

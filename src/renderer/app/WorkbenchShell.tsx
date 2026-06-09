@@ -4,7 +4,6 @@ import { DeviceSelector } from '../features/captures/DeviceSelector';
 import { Sidebar } from '../features/projects/Sidebar';
 import { TerminalDrawer } from '../features/terminal/TerminalDrawer';
 import { ProfileAvatar } from '../ui/ProfileAvatar';
-import { ComposerApprovalOverlay, PlanIntakePanel } from '../features/debugger/PlanIntakePanel';
 import { Composer } from '../features/debugger/composer/Composer';
 import type { ComposerController } from '../features/debugger/composer/useComposer';
 import type { TranslationKey } from '../i18n';
@@ -28,7 +27,6 @@ export interface WorkbenchShellProps {
   nickname: string;
   avatarPath: string | undefined;
   composer: ComposerController;
-  composerApproval: boolean;
   hasOpenedCaptureForCurrentProject: boolean;
   showMainPromptBar: boolean;
   mainPage: ReactNode;
@@ -54,7 +52,6 @@ export function WorkbenchShell({
   nickname,
   avatarPath,
   composer,
-  composerApproval,
   hasOpenedCaptureForCurrentProject,
   showMainPromptBar,
   mainPage,
@@ -153,15 +150,10 @@ export function WorkbenchShell({
         </div>
         {showMainPromptBar && (
           <div className="main-input-bar">
-            <PlanIntakePanel />
-            {composerApproval ? (
-              <ComposerApprovalOverlay />
-            ) : (
-              <Composer
-                composer={composer}
-                hasOpenedCaptureForCurrentProject={hasOpenedCaptureForCurrentProject}
-              />
-            )}
+            <Composer
+              composer={composer}
+              hasOpenedCaptureForCurrentProject={hasOpenedCaptureForCurrentProject}
+            />
           </div>
         )}
         <TerminalDrawer />

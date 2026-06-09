@@ -9,7 +9,7 @@
 - 当前执行主链是 `Debugger`：用户输入目标、进入 plan/intake、回答必要问题、批准计划、执行 RenderDoc 工具链、沉淀 evidence/report。
 - `Analyzer` 和 `Optimizer` 是一等产品模式占位，但当前默认不把 Debugger harness 自动泛化到这两个模式。
 - 只有应用内已有 `OpenedCaptureState(status=open)` 且属于当前 project 时，renderer 才允许选择执行类模式。用户在 prompt 里写 `.rdc` 路径不等同于 Open capture，也不能被自动升级成正式 run。
-- 工具执行链必须保持为 `workflow/runtime -> RdxCliInvokerService -> configured shell command`。命令、默认参数、工作目录、环境变量和 catalog 路径只能来自 Settings，不能从 renderer、preload、MCP、skill、provider adapter 或打包资源绕过主进程 invoker 调 RenderDoc 工具。
+- 工具执行链必须保持为 `UI/agent -> Settings shell action or bash -> ShellInvocationService -> system-installed CLI -> JSON runtime context`。命令、默认参数、工作目录、环境变量和 catalog 路径只能来自 Settings，不能从 renderer、preload、MCP、skill、provider adapter 或打包资源绕过主进程 shell boundary 调 RenderDoc/RDX 工具。
 
 ## Agent Runtime
 
@@ -17,7 +17,7 @@
 - HTTP provider adapter 或 provider-specific client 只提供模型流、工具请求格式和 provider 能力适配，不能决定 mode、stage、approval、tool policy 或 final status。
 - Agent Runtime 的跨层事实事件是 `AgentEvent`。renderer 只消费事件投影和 conversation message projection，不展示原始 chain-of-thought。
 - `Ask` 是只读 agentic work：默认允许 `primitive.read/glob/grep/webFetch/webSearch/askUser/task.list`，禁止 `bash/write/edit/remove`。若模型请求禁用工具，runtime 必须返回 policy denial，而不是静默执行。
-- `Debugger` 绑定 `plan-generate-verify` pattern。首版继续复用现有 Debugger stage 名称，但 pattern contract 明确 planner -> generator -> evaluator 的顺序、plan approval 入口和 verifier/curator 收敛责任。
+- `Debugger`、`Analyzer`、`Optimizer` 都是 `.agent.md` 驱动的通用可聊天可执行 agent；计划内容只能作为普通 artifact（例如 `plan.md`）或 handoff 结果出现，不绑定专用 workflow state 或 approval overlay。
 - Settings > Agents 必须同时覆盖 provider/model route 与 runtime ecology：profiles、skills、MCP、patterns。高频 agent route 保持首屏可达，runtime ecology 可折叠，但必须能从 UI 保存到 workspace settings。
 
 ## 架构分层
@@ -26,7 +26,7 @@
 - `src/preload`：唯一受控的 renderer API 暴露层。它负责组合 `window.electronAPI`，不承载业务流程。
 - `src/renderer`：工作台 UI、交互状态、用户入口、浏览器 bridge 适配和 E2E seed helper。
 - `src/shared`：跨 main/preload/renderer 共享的常量、类型和纯工具函数。跨层契约必须从这里出发，不在各层重复定义。
-- `resources`：随应用分发或运行时依赖的资源，例如 `resources/agent-runtime` 和 `resources/knowledge`。`resources/tools` 不是应用内置默认执行链，只能作为显式配置的外部 CLI 目标。
+- `resources`：随应用分发或运行时依赖的资源，例如 `resources/agent-runtime` 和 `resources/knowledge`。仓库不保留内置 RDX tool 副本；RDX CLI 由系统安装并在 Settings 中配置。
 - `scripts`：可复用开发脚本，不放一次性调试代码。
 
 renderer 内部分层依赖方向：

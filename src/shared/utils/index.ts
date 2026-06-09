@@ -15,3 +15,8 @@ export {
 } from './id';
 export { appendJsonl, countJsonl, filterJsonl, readJsonl, writeJsonl } from './jsonl';
 export { parseYaml, readYaml, stringifyYaml, writeYaml } from './yaml';
+export {
+  canonicalAgentModelId,
+  splitCanonicalAgentModelId,
+  type CanonicalAgentModelId,
+} from './agentModelRoute';

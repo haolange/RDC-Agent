@@ -12,11 +12,11 @@ Every change must define verification before implementation. Prefer:
 
 ## Runtime Contract
 
-RDX tool execution is not a bundled bridge. The current forward path is:
+RDX tool execution is not a bundled bridge or repository resource. The current forward path is:
 
-`workflow/runtime -> RdxCliInvokerService -> ShellInvocationService -> configured CLI command`
+`UI/agent -> Settings shell action or bash -> ShellInvocationService -> system-installed CLI -> JSON runtime context`
 
-The invoker reads `settings.tooling.rdxCli`:
+Catalog/runtime summary configuration reads `settings.tooling.rdxCli`:
 
 - `enabled`
 - `command`
@@ -27,7 +27,7 @@ The invoker reads `settings.tooling.rdxCli`:
 - `catalogPath`
 - `jsonMode`
 
-If the invoker is disabled or incomplete, execution fails closed with an explicit diagnostic. There is no repository-path fallback.
+Open `.rdc`, connect remote, preview, and close runtime read `settings.tooling.rdxActions`. If the CLI/action configuration is disabled or incomplete, execution fails closed with an explicit diagnostic. There is no repository-path fallback.
 
 ## Catalog Contract
 
@@ -68,7 +68,7 @@ Do not add call-site constants for commands, catalog paths, or environment varia
 
 - Do not keep parallel names for the same concept.
 - Do not reintroduce hidden bridge, MCP, or skill-based RDX tool defaults.
-- Do not bundle a local tool copy as the default execution path.
+- Do not keep or bundle a local RDX tool copy in the repository.
 - Do not expose generic execution from renderer/preload.
 - Do not keep stale docs that point to removed files or old IPC names.
 - Do not commit mojibake or unreadable encoded text; restore readable UTF-8 before merging.

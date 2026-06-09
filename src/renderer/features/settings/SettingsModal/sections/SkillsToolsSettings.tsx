@@ -1,5 +1,5 @@
 import React, { type Dispatch, type SetStateAction } from 'react';
-import type { AppSettings, RdxCliInvokerSettings } from '@shared/types/settings';
+import type { AppSettings, RdxActionSettingsMap, RdxCliInvokerSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import { RdxCliInvokerSettingsFields } from './RdxCliInvokerSettingsFields';
 
@@ -10,10 +10,12 @@ interface SkillsToolsSettingsProps {
   enabledSkillDrafts: string[];
   enabledMcpDrafts: string[];
   rdxCliDraft: RdxCliInvokerSettings;
+  rdxActionsDraft: RdxActionSettingsMap;
   globalInstructionsDraft: string;
   onEnabledSkillDraftsChange: Dispatch<SetStateAction<string[]>>;
   onEnabledMcpDraftsChange: Dispatch<SetStateAction<string[]>>;
   onRdxCliDraftChange: Dispatch<SetStateAction<RdxCliInvokerSettings>>;
+  onRdxActionsDraftChange: Dispatch<SetStateAction<RdxActionSettingsMap>>;
   onGlobalInstructionsDraftChange: Dispatch<SetStateAction<string>>;
   onSave: () => void | Promise<void>;
   toggleRuntimeId: (values: string[], id: string) => string[];
@@ -25,10 +27,12 @@ export const SkillsToolsSettings: React.FC<SkillsToolsSettingsProps> = ({
   enabledSkillDrafts,
   enabledMcpDrafts,
   rdxCliDraft,
+  rdxActionsDraft,
   globalInstructionsDraft,
   onEnabledSkillDraftsChange,
   onEnabledMcpDraftsChange,
   onRdxCliDraftChange,
+  onRdxActionsDraftChange,
   onGlobalInstructionsDraftChange,
   onSave,
   toggleRuntimeId,
@@ -91,7 +95,9 @@ export const SkillsToolsSettings: React.FC<SkillsToolsSettingsProps> = ({
 
       <RdxCliInvokerSettingsFields
         rdxCliDraft={rdxCliDraft}
+        rdxActionsDraft={rdxActionsDraft}
         onRdxCliDraftChange={onRdxCliDraftChange}
+        onRdxActionsDraftChange={onRdxActionsDraftChange}
         t={t}
       />
 

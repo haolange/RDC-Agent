@@ -16,20 +16,20 @@
  */
 
 import type {
+  AgentCategory,
   AgentConfig,
+  AgentId,
   AgentMessage,
   AgentRole,
   AgentState,
   WriteScope,
 } from '@shared/types/agent';
+import { isTopLevelAgentId } from '@shared/types/agent';
 import {
   AGENT_DESCRIPTIONS,
   AGENT_DISPLAY_NAMES,
   AGENT_ROLES,
   DEFAULT_MODEL_ROUTING,
-  INVESTIGATOR_AGENTS,
-  REPORTER_AGENTS,
-  VERIFIER_AGENTS,
 } from '@shared/constants/agents';
 import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
 import type { LLMConfig, LLMStreamEvent } from '@shared/types/llm';
@@ -60,6 +60,7 @@ import {
 } from '../../agent-runtime/AgentEventBridge';
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import { storageAdapter } from '../../sessions/StorageAdapter';
+import { getRdxRuntimeContext } from '../../sessions/RdxRuntimeContextRegistry';
 import { executionProfileService } from '../../settings/ExecutionProfileService';
 import { llmAdapter } from '../../settings/LLMAdapter';
 import { providerAccountAuthService } from '../../settings/ProviderAccountAuthService';
@@ -146,21 +147,12 @@ export class AgentOrchestrator {
     }
   }
 
-  private getAgentCategory(role: AgentRole): 'orchestrator' | 'investigator' | 'verifier' | 'reporter' {
-    if (role === 'ask_agent' || role === 'rdc-debugger') return 'orchestrator';
-    if (INVESTIGATOR_AGENTS.includes(role)) return 'investigator';
-    if (VERIFIER_AGENTS.includes(role)) return 'verifier';
-    if (REPORTER_AGENTS.includes(role)) return 'reporter';
-    return 'investigator';
+  private getAgentCategory(role: AgentRole): AgentCategory {
+    return role === 'ask' ? 'orchestrator' : 'general';
   }
 
   private getAgentWriteScopes(role: AgentRole): WriteScope[] {
-    if (role === 'ask_agent') return [];
-    if (role === 'rdc-debugger') return ['workspace_control'];
-    if (INVESTIGATOR_AGENTS.includes(role)) return ['workspace_notes'];
-    if (role === 'skeptic_agent') return ['session_signoff'];
-    if (role === 'curator_agent') return ['workspace_reports', 'session_artifacts', 'knowledge_library'];
-    return [];
+    return role === 'ask' ? [] : ['workspace_notes', 'workspace_control'];
   }
 
   getAgentState(agentId: AgentRole): AgentState | null {
@@ -185,7 +177,8 @@ export class AgentOrchestrator {
   applyLlmConfig(config: LLMConfig): void {
     const routeMap = new Map(config.agentRoutes.map((route) => [route.agentId, route]));
     for (const [agentId, agentConfig] of this.agentConfigs.entries()) {
-      const fallback = DEFAULT_MODEL_ROUTING[agentId];
+      const fallbackAgentId: AgentId = isTopLevelAgentId(agentId) ? agentId : 'debugger';
+      const fallback = DEFAULT_MODEL_ROUTING[fallbackAgentId];
       const route = routeMap.get(agentId);
       this.agentConfigs.set(agentId, {
         ...agentConfig,
@@ -336,7 +329,7 @@ export class AgentOrchestrator {
         scope: options?.sessionId ? 'session' : 'app',
         namespace: 'agent',
         severity: 'info',
-        title: `${AGENT_DISPLAY_NAMES[agentId] || agentId} cowork turn`,
+        title: `${AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : 'debugger']} cowork turn`,
         summary: responseText.slice(0, 160) || 'Empty message.',
         sessionId: options?.sessionId,
         raw: {
@@ -402,7 +395,7 @@ export class AgentOrchestrator {
     modelId: string,
     systemPrompt: string,
     tools: ToolDefinition[] = [],
-    toolExecutor = this.createToolExecutor('ask_agent', [], undefined),
+    toolExecutor = this.createToolExecutor('ask', [], undefined),
     streamOptions?: StreamOptions,
   ): AgentSlot {
     const agent = new Agent({
@@ -431,6 +424,8 @@ export class AgentOrchestrator {
     }
     const taskListTool = this.createReadonlyTaskListTool();
     availableTools.set(taskListTool.name, taskListTool);
+    const rdxContextTool = this.createRdxContextTool();
+    availableTools.set(rdxContextTool.name, rdxContextTool);
 
     const definitions: ToolDefinition[] = [];
     const toolMap = new Map<string, AgentTool>();
@@ -528,6 +523,32 @@ export class AgentOrchestrator {
         return {
           content: [{ type: 'text', text: 'No formal Debugger run tasks are active in Ask mode.' }],
           details: { count: 0 },
+        };
+      },
+    };
+  }
+
+  private createRdxContextTool(): AgentTool<Record<string, never>, { available: boolean }> {
+    return {
+      name: 'rdx_context',
+      label: 'RDX Context',
+      description: 'Read the current stable RDX runtime context captured by configured shell actions.',
+      parameters: {
+        type: 'object',
+        properties: {},
+      },
+      permissionHint: 'readonly',
+      async execute() {
+        const runtimeContext = getRdxRuntimeContext();
+        if (!runtimeContext) {
+          return {
+            content: [{ type: 'text', text: 'No RDX runtime context is currently available.' }],
+            details: { available: false },
+          };
+        }
+        return {
+          content: [{ type: 'text', text: JSON.stringify(runtimeContext, null, 2) }],
+          details: { available: true },
         };
       },
     };
@@ -690,15 +711,16 @@ export class AgentOrchestrator {
   }
 
   private modeForAgent(agentId: AgentRole): AppMode {
-    return agentId === 'ask_agent' ? 'ask' : 'debugger';
+    return isTopLevelAgentId(agentId) ? agentId : 'debugger';
   }
 
-  private patternForAgent(agentId: AgentRole): string {
-    return agentId === 'ask_agent' ? 'free-agent' : 'plan-generate-verify';
+  private patternForAgent(_agentId: AgentRole): string {
+    return 'free-agent';
   }
 
   private systemPromptForAgent(agentId: AgentRole, prompt?: string): string {
-    return prompt || `You are the ${AGENT_DISPLAY_NAMES[agentId]}. ${AGENT_DESCRIPTIONS[agentId]}`;
+    const topLevelAgentId: AgentId = isTopLevelAgentId(agentId) ? agentId : 'debugger';
+    return prompt || `You are the ${AGENT_DISPLAY_NAMES[topLevelAgentId]}. ${AGENT_DESCRIPTIONS[topLevelAgentId]}`;
   }
 
   private async finalizeRecordedAssistantMessage(
@@ -721,7 +743,7 @@ export class AgentOrchestrator {
         scope: 'app',
         namespace: 'agent',
         severity: status === 'error' ? 'error' : status === 'complete' ? 'success' : 'info',
-        title: AGENT_DISPLAY_NAMES[agentId] || agentId,
+        title: AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : 'debugger'] || agentId,
         summary: `Status changed to ${status}.`,
         raw: {
           agentId,
@@ -776,7 +798,7 @@ export class AgentOrchestrator {
       scope: sessionId ? 'session' : 'app',
       namespace: 'agent',
       severity: message.role === 'system' ? 'warning' : 'info',
-      title: AGENT_DISPLAY_NAMES[message.agentId] || message.agentId,
+      title: AGENT_DISPLAY_NAMES[isTopLevelAgentId(message.agentId) ? message.agentId : 'debugger'] || message.agentId,
       summary: message.content.slice(0, 120) || 'Empty message.',
       sessionId,
       raw: {
@@ -809,17 +831,17 @@ export class AgentOrchestrator {
       throw new Error('E2E forced cowork LLM request failure');
     }
     const lower = userMessage.toLowerCase();
-    let stub = agentId === 'ask_agent'
+    let stub = agentId === 'ask'
       ? 'Ask is ready. I can inspect readonly context, search files or public pages, and explain next steps without starting a Debugger run.'
-      : 'Debugger is ready. Describe the symptom and capture context; I will prepare a plan before execution.';
+      : `${AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : 'debugger']} is ready. Describe the goal and I can use the configured tools for this turn.`;
     if (/ue4|unreal/i.test(userMessage)) {
       stub = 'UE4 is Unreal Engine 4, commonly involved in graphics debugging around materials, post-processing, shaders, and render passes.';
     } else if (/hello|hi/i.test(userMessage)) {
-      stub = agentId === 'ask_agent'
+      stub = agentId === 'ask'
         ? 'Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution.'
-        : 'Hello. In Debugger mode I will generate an execution plan first, then wait for approval before running the strict workflow.';
+        : 'Hello. I can run as a general executable agent using the tools enabled by this agent profile.';
     } else if (/start|execute|debug|analy[sz]e/.test(lower)) {
-      stub = 'Received. I will prepare the formal debugging plan first, then move into the strict execution flow only when conditions are met.';
+      stub = 'Received. I will handle this as a normal agent turn using the configured tools and runtime context.';
     }
     const intent = /start|execute|debug|analy[sz]e/.test(lower) ? 'execute' : 'talk';
     return `${stub}\n<control>{"intent":"${intent}","safe_to_start":${intent === 'execute' ? 'true' : 'false'}}</control>`;
@@ -842,19 +864,19 @@ export class AgentOrchestrator {
     }
     const lower = userMessage.toLowerCase();
     const wantsExecution = EXECUTE_PATTERN.test(userMessage);
-    let stub = agentId === 'ask_agent'
+    let stub = agentId === 'ask'
       ? 'I can inspect readonly context, search files or public pages, explain boundaries, or guide you to open a .rdc capture without starting a Debugger run.'
-      : 'I can help scope the debugging target, or prepare a formal Debugger plan when you are ready to execute.';
+      : 'I can help scope the target and execute configured tools directly within this agent turn.';
     if (/ue4|unreal/i.test(userMessage)) {
       stub = 'UE4 is Unreal Engine 4. In RDC-Agent it is usually relevant to render pass, material, post-process, and shader debugging context.';
     } else if (/hello|hi|你好|您好/i.test(userMessage)) {
-      stub = agentId === 'ask_agent'
+      stub = agentId === 'ask'
         ? 'Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution.'
-        : 'Hello. In Debugger mode I prepare an execution plan first, then wait for approval before running the debugging workflow.';
+        : 'Hello. I can run as a general executable agent using the tools enabled by this agent profile.';
     } else if (wantsExecution || EXECUTE_PATTERN.test(lower)) {
-      stub = 'Received. I will prepare the formal debugging plan first, then move into the strict execution flow only when conditions are met.';
+      stub = 'Received. I will handle this as a normal agent turn using the configured tools and runtime context.';
     }
-    if (agentId === 'ask_agent' && userMessage.includes('__RDC_AGENT_E2E_ASK_READONLY_TOOL__')) {
+    if (agentId === 'ask' && userMessage.includes('__RDC_AGENT_E2E_ASK_READONLY_TOOL__')) {
       const toolCallId = generateEventId('e2e-tool');
       this.emitCoworkTestEvent('tool.started', {
         toolCallId,
@@ -880,7 +902,7 @@ export class AgentOrchestrator {
         },
       }, options);
       stub = 'I searched the workspace with grep and found the Ask conversation code path. No Debugger run was created.';
-    } else if (agentId === 'ask_agent' && userMessage.includes('__RDC_AGENT_E2E_ASK_DENY_WRITE__')) {
+    } else if (agentId === 'ask' && userMessage.includes('__RDC_AGENT_E2E_ASK_DENY_WRITE__')) {
       const toolCallId = generateEventId('e2e-tool');
       this.emitCoworkTestEvent('tool.started', {
         toolCallId,
@@ -890,14 +912,14 @@ export class AgentOrchestrator {
       this.emitCoworkTestEvent('tool.denied', {
         toolCallId,
         toolName: 'write_file',
-        reason: 'Policy denied: ask_agent can only use readonly tools.',
+        reason: 'Policy denied: ask can only use readonly tools.',
         result: {
           ok: false,
           data: {},
           artifacts: [],
           error: {
             code: 'AGENT_TOOL_POLICY_DENIED',
-            message: 'Policy denied: ask_agent can only use readonly tools.',
+            message: 'Policy denied: ask can only use readonly tools.',
             category: 'policy',
           },
           duration_ms: 1,

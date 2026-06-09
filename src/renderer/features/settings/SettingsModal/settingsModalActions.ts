@@ -200,6 +200,7 @@ export function createSettingsModalActions({
     await patchSettings({
       tooling: {
         rdxCli: modalState.rdxCliDraft,
+        rdxActions: modalState.rdxActionsDraft,
       },
       configuration: {
         activeModeProfileId: modalState.activeModeProfileDraft,
@@ -214,6 +215,7 @@ export function createSettingsModalActions({
     await patchSettings({
       tooling: {
         rdxCli: modalState.rdxCliDraft,
+        rdxActions: modalState.rdxActionsDraft,
       },
       agents: {
         globalInstructions: modalState.globalInstructionsDraft,
@@ -225,6 +227,7 @@ export function createSettingsModalActions({
     });
     const nextSettings = await reloadSettings();
     modalState.setRdxCliDraft(nextSettings.tooling.rdxCli);
+    modalState.setRdxActionsDraft(nextSettings.tooling.rdxActions);
     modalState.setEnabledSkillDrafts(nextSettings.configuration.enabledSkillIds);
     modalState.setEnabledMcpDrafts(nextSettings.configuration.enabledMcpServerIds);
     modalState.setGlobalInstructionsDraft(nextSettings.agents.globalInstructions);

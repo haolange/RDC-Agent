@@ -215,6 +215,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
                     value={selectedAgent.models[0] ?? ''}
                     options={settings.agents.modelOptions}
                     onChange={(model) => updateAgent({ models: [model] })}
+                    t={t}
                   />
                 </div>
                 <div className="settings-agent-flags">

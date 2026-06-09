@@ -132,12 +132,10 @@ export const TraceRightPanel: React.FC = () => {
   const currentSession = useProjectStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
   const workflowState = useWorkflowStore((state) => state.workflowState);
-  const currentDebugPlan = useWorkflowStore((state) => state.currentDebugPlan);
   const presentation = useWorkflowStore((state) => state.tracePresentation);
   const showTaskBoard = hasApprovedTaskBoardState(
     currentRun,
     workflowState,
-    currentDebugPlan ?? workflowState?.debugPlan ?? null,
   );
   const [expanded, setExpanded] = useState<Record<SectionId, boolean>>({
     progress: true,

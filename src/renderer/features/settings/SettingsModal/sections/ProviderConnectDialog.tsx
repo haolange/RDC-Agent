@@ -38,7 +38,26 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   onSave,
   onStartAccountLogin,
   t,
-}) => (
+}) => {
+  const accountRequiresCode = Boolean(
+    connectionProvider.authMode === 'account'
+    && connectionDraft.accountStatus?.requiresCodeInput,
+  );
+  const accountSaveBlocked = Boolean(
+    connectionProvider.authMode === 'account'
+    && !connectionAccountConnected
+    && (!accountRequiresCode || !connectionDraft.authCode.trim()),
+  );
+  const accountTestBlocked = Boolean(
+    connectionProvider.authMode === 'account'
+    && !connectionAccountConnected,
+  );
+  const commonActionBlocked = connectionDraft.busy !== 'idle'
+    || connectionNeedsApiKey
+    || connectionNeedsBaseUrl
+    || connectionDevicePending;
+
+  return (
   <div
     className="settings-provider-connect-layer"
     data-testid="settings-provider-connect-layer"
@@ -164,7 +183,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
           </div>
           {connectionAccountConnected && (connectionDraft.accountStatus?.accountLabel || connectionDraft.accountStatus?.planLabel) && (
             <div className="settings-secret-status" data-testid="settings-provider-oauth-summary">
-              <span>{[connectionDraft.accountStatus.accountLabel, connectionDraft.accountStatus.planLabel].filter(Boolean).join(' · ')}</span>
+              <span>{[connectionDraft.accountStatus.accountLabel, connectionDraft.accountStatus.planLabel].filter(Boolean).join(t('settings.accountSummarySeparator'))}</span>
             </div>
           )}
           {!connectionAccountConnected && (
@@ -249,7 +268,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
           className="button button-secondary"
           data-testid="settings-provider-connect-test"
           onClick={() => void onTest()}
-          disabled={connectionDraft.busy !== 'idle' || connectionNeedsApiKey || connectionNeedsBaseUrl || connectionDevicePending}
+          disabled={commonActionBlocked || accountTestBlocked}
         >
           {connectionDraft.busy === 'testing' ? t('settings.testing') : t('settings.test')}
         </button>
@@ -258,7 +277,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
           className="button button-primary"
           data-testid="settings-provider-connect-save"
           onClick={() => void onSave()}
-          disabled={connectionDraft.busy !== 'idle' || connectionNeedsApiKey || connectionNeedsBaseUrl || connectionDevicePending}
+          disabled={commonActionBlocked || accountSaveBlocked}
         >
           {connectionDraft.busy === 'saving'
             ? t('settings.saving')
@@ -273,4 +292,5 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
       </div>
     </div>
   </div>
-);
+  );
+};

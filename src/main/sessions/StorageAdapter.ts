@@ -20,7 +20,6 @@ import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type {
   Blocker,
-  DebugPlan,
   ReasoningSummary,
   WorkflowStage,
   WorkflowState,
@@ -37,13 +36,11 @@ import type {
 } from '@shared/types/session';
 import { appPathService } from '../runtime/AppPathService';
 import type {
-  PersistedPlanSnapshot,
   PersistedRunRecord,
   ProjectRegistry,
   SelectionState,
   SessionEvidenceRecord,
 } from './storageTypes';
-export type { PersistedPlanSnapshot } from './storageTypes';
 
 export class StorageAdapter {
   private dataRootPath = '';
@@ -480,20 +477,15 @@ export class StorageAdapter {
         source_path: capture.filePath,
       })),
     });
-    writeYaml(path.join(runPath, 'notes', 'debug_plan.yaml'), {
-      debug_plan: null,
-      pending_questions: null,
-      approval_state: 'not_requested',
-    } satisfies PersistedPlanSnapshot);
     writeYaml(path.join(runPath, 'notes', 'hypothesis_board.yaml'), {
       hypothesis_board: {
         session_id: sessionId,
-        entry_skill: 'rdc-debugger',
+        entry_skill: 'debugger',
         user_goal: persistedRun.goal,
         intake_state: 'handoff_ready',
         current_phase: 'intake',
         current_task: '',
-        active_owner: 'rdc-debugger',
+        active_owner: 'debugger',
         pending_requirements: [],
         blocking_issues: [],
         progress_summary: ['accepted intake complete'],
@@ -604,10 +596,6 @@ export class StorageAdapter {
     return path.join(location.sessionPath, 'session_evidence.yaml');
   }
 
-  getDebugPlanPath(sessionId: string, runId: string): string {
-    return path.join(this.getRunPath(sessionId, runId), 'notes', 'debug_plan.yaml');
-  }
-
   readConversationHistory(sessionId: string): ConversationMessage[] {
     const snapshots = readJsonl<ConversationMessage>(this.getConversationPath(sessionId));
     const latestById = new Map<string, ConversationMessage>();
@@ -677,37 +665,6 @@ export class StorageAdapter {
 
   readSessionEvidence(sessionId: string): SessionEvidenceRecord | null {
     return readYaml<SessionEvidenceRecord>(this.getSessionEvidencePath(sessionId));
-  }
-
-  readDebugPlan(sessionId: string, runId: string): DebugPlan | null {
-    const payload = readYaml<PersistedPlanSnapshot>(this.getDebugPlanPath(sessionId, runId));
-    return payload?.debug_plan ?? null;
-  }
-
-  writeDebugPlan(sessionId: string, runId: string, debugPlan: DebugPlan | null): void {
-    const existing = this.readPlanSnapshot(sessionId, runId);
-    writeYaml(this.getDebugPlanPath(sessionId, runId), {
-      debug_plan: debugPlan,
-      pending_questions: existing?.pending_questions ?? null,
-      approval_state: existing?.approval_state ?? 'not_requested',
-      intake_context: existing?.intake_context,
-    } satisfies PersistedPlanSnapshot);
-    const session = this.readSession(sessionId);
-    if (session) {
-      this.syncSessionEvidence(sessionId, session.projectId);
-    }
-  }
-
-  readPlanSnapshot(sessionId: string, runId: string): PersistedPlanSnapshot | null {
-    return readYaml<PersistedPlanSnapshot>(this.getDebugPlanPath(sessionId, runId));
-  }
-
-  writePlanSnapshot(sessionId: string, runId: string, snapshot: PersistedPlanSnapshot): void {
-    writeYaml(this.getDebugPlanPath(sessionId, runId), snapshot);
-    const session = this.readSession(sessionId);
-    if (session) {
-      this.syncSessionEvidence(sessionId, session.projectId);
-    }
   }
 
   async appendActionEvent(sessionId: string, event: ActionEvent): Promise<void> {
@@ -838,7 +795,6 @@ export class StorageAdapter {
       acc[event.event_type] = (acc[event.event_type] || 0) + 1;
       return acc;
     }, {});
-    const debugPlan = latestRun ? this.readDebugPlan(sessionId, latestRun.runId) : null;
     const activeBlockers = actionEvents
       .filter((event) => event.event_type === 'blocker')
       .map((event) => ({
@@ -856,7 +812,7 @@ export class StorageAdapter {
       .slice(-10)
       .map((event, index) => ({
         summaryId: `summary-${index}-${event.event_id}`,
-        stage: normalizeWorkflowStage(String(event.payload.stage || latestRun?.lastStage || 'plan')),
+        stage: normalizeWorkflowStage(String(event.payload.stage || latestRun?.lastStage || 'investigate')),
         agentId: String(event.agent_id) as ReasoningSummary['agentId'],
         summary: String(event.payload.summary || event.payload.content || ''),
         evidence: Array.isArray(event.payload.evidence) ? event.payload.evidence.map(String) : [],
@@ -873,16 +829,6 @@ export class StorageAdapter {
       latest_run_status: latestRun?.status || null,
       latest_stage: latestRun?.lastStage || null,
       updated_at: nowIso(),
-      debug_plan: debugPlan
-        ? {
-            plan_id: debugPlan.planId,
-            readiness: debugPlan.planReadiness,
-            strict_ready: debugPlan.strictReady,
-            target_capture: debugPlan.targetCapture?.fileName || null,
-            target_scope: debugPlan.targetFrameOrEvent?.scope || null,
-            deliverables: debugPlan.expectedDeliverables,
-          }
-        : null,
       event_counts: eventCounts,
       active_blockers: activeBlockers,
       verification_summary: verificationSummary,

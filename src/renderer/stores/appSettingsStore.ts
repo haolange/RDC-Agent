@@ -24,6 +24,14 @@ const createEmptyAgentRoutes = (): LlmAgentRoute[] =>
     modelId: '',
   }));
 
+const createEmptyRdxAction = () => ({
+  enabled: false,
+  command: '',
+  args: [],
+  workingDirectory: '', env: {},
+  timeoutMs: 60000,
+});
+
 const DEFAULT_SETTINGS: AppSettings = {
   appearance: {
     theme: 'dark',
@@ -63,6 +71,12 @@ const DEFAULT_SETTINGS: AppSettings = {
       catalogPath: '',
       jsonMode: 'auto',
     },
+    rdxActions: {
+      openCapture: createEmptyRdxAction(),
+      connectRemote: createEmptyRdxAction(),
+      closeRuntime: createEmptyRdxAction(),
+      openPreview: createEmptyRdxAction(),
+    },
   },
   llm: {
     providers: [],
@@ -80,7 +94,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     enabledSkillIds: [],
     enabledMcpServerIds: [],
     modePatternBindings: {
-      debugger: 'plan-generate-verify',
+      debugger: 'free-agent',
       analyzer: 'free-agent',
       optimizer: 'free-agent',
     },

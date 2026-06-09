@@ -203,12 +203,6 @@ const createEvidenceApi = () => ({
 });
 const createWorkflowApi = () => ({
   getState: () => electron.ipcRenderer.invoke("workflow:getState"),
-  start: (request) => electron.ipcRenderer.invoke("workflow:start", request),
-  getPlan: (runId) => electron.ipcRenderer.invoke("workflow:getPlan", runId),
-  submitQuestions: (runId, answers) => electron.ipcRenderer.invoke("workflow:submitQuestions", runId, answers),
-  approvePlan: (runId) => electron.ipcRenderer.invoke("workflow:approvePlan", runId),
-  requestPlanRevision: (runId, revisionText) => electron.ipcRenderer.invoke("workflow:requestPlanRevision", runId, revisionText),
-  restartRun: (runId) => electron.ipcRenderer.invoke("workflow:restartRun", runId),
   resume: (sessionId) => electron.ipcRenderer.invoke("workflow:resume", sessionId),
   stop: (runId) => electron.ipcRenderer.invoke("workflow:stop", runId),
   getRunUsage: (runId) => electron.ipcRenderer.invoke("workflow:getRunUsage", runId),

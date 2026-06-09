@@ -16,8 +16,8 @@ import { runtimeLogService } from './runtime/RuntimeLogService';
 import { rendererEventHub } from './browserAppBridge/rendererEventHub';
 import { startBrowserAppBridge, stopBrowserAppBridge } from './browserAppBridge/BrowserAppBridgeServer';
 
-// Shared RDX session service for IPC handlers.
-export const rdxSessionService = new RdxSessionService(rdxCliInvokerService);
+// Shared RDX runtime context service for IPC handlers.
+export const rdxSessionService = new RdxSessionService();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

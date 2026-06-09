@@ -6,7 +6,6 @@ import type {
   AppSettings,
   AppSettingsPatch,
   AppTheme,
-  BuiltinLlmProviderId,
   ConfigurationSettings,
   FontScale,
   LayoutPreferences,
@@ -16,7 +15,10 @@ import type {
   LlmProviderId,
   LlmProviderModel,
   ProfileSettings,
+  RdxActionId,
+  RdxActionSettingsMap,
   RdxCliInvokerSettings,
+  RdxShellActionSettings,
   SidebarLayoutPreference,
   ToolingSettings,
   UiPreferences,
@@ -68,6 +70,7 @@ interface PersistedSettingsPayload {
   };
   tooling?: {
     rdxCli?: Partial<RdxCliInvokerSettings>;
+    rdxActions?: Partial<Record<RdxActionId, Partial<RdxShellActionSettings>>>;
   };
   configuration?: PersistedConfigurationSettings;
 }
@@ -161,7 +164,7 @@ const DEFAULT_CONFIGURATION: PersistedConfigurationSettings = {
   enabledSkillIds: [],
   enabledMcpServerIds: [],
   modePatternBindings: {
-    debugger: 'plan-generate-verify',
+    debugger: 'free-agent',
     analyzer: 'free-agent',
     optimizer: 'free-agent',
   },
@@ -178,62 +181,26 @@ const DEFAULT_RDX_CLI_INVOKER: RdxCliInvokerSettings = {
   jsonMode: 'auto',
 };
 
-const DEFAULT_TOOLING: ToolingSettings = {
-  rdxCli: DEFAULT_RDX_CLI_INVOKER,
+const createDefaultRdxAction = (): RdxShellActionSettings => ({
+  enabled: false,
+  command: '',
+  args: [],
+  workingDirectory: '',
+  env: {},
+  timeoutMs: 60000,
+});
+
+const DEFAULT_RDX_ACTIONS: RdxActionSettingsMap = {
+  openCapture: createDefaultRdxAction(),
+  connectRemote: createDefaultRdxAction(),
+  closeRuntime: createDefaultRdxAction(),
+  openPreview: createDefaultRdxAction(),
 };
 
-interface DefaultProviderSeed {
-  id: BuiltinLlmProviderId;
-  apiKey: string;
-  models: LlmProviderModel[];
-}
-
-const DEFAULT_PROVIDER_SEEDS: DefaultProviderSeed[] = [
-  {
-    id: 'deepseek',
-    apiKey: 'sk-15c018cd2a76442183e3cc5da3dbbaf9',
-    models: [
-      { id: 'deepseek-chat', label: 'DeepSeek Chat', enabled: true },
-      { id: 'deepseek-reasoner', label: 'DeepSeek Reasoner', enabled: true },
-    ],
-  },
-  {
-    id: 'openrouter',
-    apiKey: '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',
-    models: [
-      { id: 'anthropic/claude-sonnet-4', label: 'Claude Sonnet 4', enabled: true },
-      { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash', enabled: true },
-    ],
-  },
-  {
-    id: 'xai',
-    apiKey: 'xai-93ENKTaQFwLRfblG6OHJlOzSDm2uPCryuBidXgs0iuBNQksYVYsJ9eRMUik1Elc9tbdZRl9b5VCSCcPs',
-    models: [
-      { id: 'grok-4', label: 'Grok 4', enabled: true },
-      { id: 'grok-4.3', label: 'Grok 4.3', enabled: true },
-    ],
-  },
-  {
-    id: 'google-ai-studio',
-    apiKey: 'AIzaSyDmcuv1H2TpaBSamaBJti3IkYkTLXZnC9o',
-    models: [
-      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', enabled: true },
-      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', enabled: true },
-    ],
-  },
-  {
-    id: 'kimi-code',
-    apiKey: 'sk-kimi-vz1tEHOOmhDximg0Zer0wZNS5eOcuSOIHq1FTl8YNkHkd2KvGbgWMAwJRxj5VKw8',
-    models: [
-      { id: 'kimi-coding', label: 'Kimi Coding', enabled: true },
-    ],
-  },
-];
-
-const DEFAULT_AGENT_ROUTE_SEEDS: LlmAgentRoute[] = [
-  { agentId: 'ask_agent', providerId: 'deepseek', modelId: 'deepseek-chat' },
-  { agentId: 'rdc-debugger', providerId: 'deepseek', modelId: 'deepseek-chat' },
-];
+const DEFAULT_TOOLING: ToolingSettings = {
+  rdxCli: DEFAULT_RDX_CLI_INVOKER,
+  rdxActions: DEFAULT_RDX_ACTIONS,
+};
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -313,10 +280,39 @@ function sanitizeRdxCliInvokerSettings(
   };
 }
 
+function sanitizeRdxShellActionSettings(
+  value: unknown,
+  fallback: RdxShellActionSettings = createDefaultRdxAction(),
+): RdxShellActionSettings {
+  const candidate = value && typeof value === 'object' ? value as Partial<RdxShellActionSettings> : {};
+  const timeoutMs = typeof candidate.timeoutMs === 'number' && Number.isFinite(candidate.timeoutMs)
+    ? clamp(Math.trunc(candidate.timeoutMs), 1000, 600000)
+    : fallback.timeoutMs;
+  return {
+    enabled: typeof candidate.enabled === 'boolean' ? candidate.enabled : fallback.enabled,
+    command: typeof candidate.command === 'string' ? candidate.command.trim() : fallback.command,
+    args: sanitizeStringArray(candidate.args ?? fallback.args),
+    workingDirectory: typeof candidate.workingDirectory === 'string' ? candidate.workingDirectory.trim() : fallback.workingDirectory,
+    env: sanitizeStringRecord(candidate.env ?? fallback.env),
+    timeoutMs,
+  };
+}
+
+function sanitizeRdxActionsSettings(value: unknown): RdxActionSettingsMap {
+  const candidate = value && typeof value === 'object' ? value as Partial<Record<RdxActionId, unknown>> : {};
+  return {
+    openCapture: sanitizeRdxShellActionSettings(candidate.openCapture, DEFAULT_RDX_ACTIONS.openCapture),
+    connectRemote: sanitizeRdxShellActionSettings(candidate.connectRemote, DEFAULT_RDX_ACTIONS.connectRemote),
+    closeRuntime: sanitizeRdxShellActionSettings(candidate.closeRuntime, DEFAULT_RDX_ACTIONS.closeRuntime),
+    openPreview: sanitizeRdxShellActionSettings(candidate.openPreview, DEFAULT_RDX_ACTIONS.openPreview),
+  };
+}
+
 function sanitizeToolingSettings(value: unknown): ToolingSettings {
   const candidate = value && typeof value === 'object' ? value as Partial<ToolingSettings> : {};
   return {
     rdxCli: sanitizeRdxCliInvokerSettings(candidate.rdxCli),
+    rdxActions: sanitizeRdxActionsSettings(candidate.rdxActions),
   };
 }
 
@@ -762,74 +758,6 @@ function normalizeUserRoutes(
   });
 }
 
-function buildSeededDefaults(
-  workspaceRoot: string,
-  seedIds = new Set(DEFAULT_PROVIDER_SEEDS.map((seed) => seed.id)),
-): { providers: LlmProviderEntry[]; routes: LlmAgentRoute[] } {
-  const providers: LlmProviderEntry[] = [];
-  for (const seed of DEFAULT_PROVIDER_SEEDS) {
-    if (!seedIds.has(seed.id)) {
-      continue;
-    }
-    const fallback = createBuiltinProviderEntry(seed.id);
-    if (fallback.authMode !== 'api-key') {
-      continue;
-    }
-    const secretRef = secretStorageService.createProviderSecretRef(seed.id);
-    secretStorageService.setSecret(secretRef, seed.apiKey, workspaceRoot);
-    const sanitized = sanitizeUserProvider({
-      id: seed.id,
-      models: seed.models,
-      status: 'verified',
-      isConfigured: true,
-      secretRef,
-    } as Partial<LlmProviderEntry>, workspaceRoot);
-    if (sanitized) {
-      providers.push(sanitized);
-    }
-  }
-  return {
-    providers,
-    routes: DEFAULT_AGENT_ROUTE_SEEDS.map((route) => ({ ...route })),
-  };
-}
-
-function isProviderConfiguredForSeed(provider: LlmProviderEntry | undefined): boolean {
-  return Boolean(
-    provider
-    && provider.isConfigured
-    && provider.status === 'verified'
-    && provider.models.some((model) => model.enabled !== false),
-  );
-}
-
-function mergeDefaultAgentRoutes(
-  routes: LlmAgentRoute[],
-  providers: LlmProviderEntry[],
-): LlmAgentRoute[] {
-  const routeMap = new Map(routes.map((route) => [route.agentId, route]));
-  let changed = false;
-
-  for (const seedRoute of DEFAULT_AGENT_ROUTE_SEEDS) {
-    const currentRoute = routeMap.get(seedRoute.agentId);
-    const currentProvider = providers.find((provider) => provider.id === currentRoute?.providerId);
-    const currentRouteValid = Boolean(
-      currentRoute
-      && currentProvider?.isConfigured
-      && currentProvider.models.some((model) => model.id === currentRoute.modelId && model.enabled !== false),
-    );
-
-    if (!currentRouteValid) {
-      routeMap.set(seedRoute.agentId, { ...seedRoute });
-      changed = true;
-    }
-  }
-
-  return changed
-    ? routes.map((route) => routeMap.get(route.agentId) ?? route)
-    : routes;
-}
-
 function parseMigrationSummary(reportPath?: string): string[] {
   if (!reportPath || !fs.existsSync(reportPath)) {
     return [];
@@ -934,27 +862,9 @@ export class SettingsService {
       }
     }
 
-    const normalizedBeforeSeed = normalizeUserProviders(nextProviders, workspaceRoot);
-    const seedIdsToRepair = new Set(DEFAULT_PROVIDER_SEEDS
-      .filter((seed) => !isProviderConfiguredForSeed(normalizedBeforeSeed.find((existing) => existing.id === seed.id)))
-      .map((seed) => seed.id));
-    const providersToSeed = buildSeededDefaults(workspaceRoot, seedIdsToRepair).providers;
-    if (providersToSeed.length > 0) {
-      fixes.push(`Seeded ${providersToSeed.length} default LLM providers`);
-    }
-
-    const catalogProviders = normalizeUserProviders(
-      [
-        ...nextProviders.filter((existing) => !providersToSeed.some((seeded) => seeded.id === existing.id)),
-        ...providersToSeed,
-      ],
-      workspaceRoot,
-    );
+    const catalogProviders = normalizeUserProviders(nextProviders, workspaceRoot);
     const normalizedRoutes = normalizeUserRoutes(rawRoutes, catalogProviders);
-    const nextRoutes = mergeDefaultAgentRoutes(normalizedRoutes, catalogProviders);
-    if (JSON.stringify(normalizedRoutes) !== JSON.stringify(nextRoutes)) {
-      fixes.push('Seeded default agent routes');
-    }
+    const nextRoutes = normalizedRoutes;
     const incomingRoutes = Array.isArray(rawRoutes) ? rawRoutes.map((entry) => {
       if (entry && typeof entry === 'object') {
         const providerId = (entry as Partial<LlmAgentRoute>).providerId;
@@ -1228,7 +1138,7 @@ export class SettingsService {
       agentManifestService.save(nextPaths, [], patch.agents.globalInstructions);
     }
     const manifestRoutes = patch.agents?.definitions
-      ? agentManifestService.routesFromDefinitions(currentRoutes, patch.agents.definitions)
+      ? agentManifestService.routesFromDefinitions(currentRoutes, patch.agents.definitions, nextProviders)
       : currentRoutes;
 
     const nextPersisted: PersistedSettingsPayload = {
@@ -1289,6 +1199,10 @@ export class SettingsService {
         rdxCli: sanitizeRdxCliInvokerSettings({
           ...(currentPersisted.tooling?.rdxCli ?? DEFAULT_RDX_CLI_INVOKER),
           ...(patch.tooling?.rdxCli ?? {}),
+        }),
+        rdxActions: sanitizeRdxActionsSettings({
+          ...(currentPersisted.tooling?.rdxActions ?? DEFAULT_RDX_ACTIONS),
+          ...(patch.tooling?.rdxActions ?? {}),
         }),
       },
       llm: {

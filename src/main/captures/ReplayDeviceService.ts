@@ -2,7 +2,7 @@
 import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
+import { rdxShellActionService } from '../tools/RdxShellActionService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
@@ -12,8 +12,6 @@ import type {
   ReplayDeviceStatusChangedPayload,
   ReplayDeviceTransport,
 } from '@shared/types/device';
-import { generateShortId } from '@shared/utils/id';
-import type { ToolCallResult } from '@shared/types/tool';
 
 const POLL_INTERVAL_MS = 5000;
 const ACTIVATE_TIMEOUT_MS = 90000;
@@ -279,16 +277,6 @@ function buildRemoteReadyText(bootstrap?: AndroidBootstrapMetadata): string {
   return suffix.length > 0 ? `${prefix} 路 ${suffix.join(' 路 ')}` : prefix;
 }
 
-function parseToolError(result: ToolCallResult, fallbackMessage: string): {
-  message: string;
-  code?: string;
-} {
-  return {
-    message: result.error?.message ?? fallbackMessage,
-    code: result.error?.code,
-  };
-}
-
 function applyActivationFailure(
   device: ReplayDeviceEntry,
   phase: ReplayDeviceEntry['activationPhase'],
@@ -366,6 +354,30 @@ function parseAdbDeviceLine(line: string): ReplayDeviceEntry | null {
     lastError,
     lastSeen: Date.now(),
   };
+}
+
+function readActionString(source: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+  return undefined;
+}
+
+function parseRemoteBootstrap(data: Record<string, unknown>): AndroidBootstrapMetadata | undefined {
+  const direct = parseAndroidBootstrapMetadata(data.bootstrap);
+  if (direct) {
+    return direct;
+  }
+
+  const detail = data.detail;
+  if (!detail || typeof detail !== 'object') {
+    return undefined;
+  }
+
+  return parseAndroidBootstrapMetadata((detail as Record<string, unknown>).bootstrap);
 }
 
 export class ReplayDeviceService {
@@ -677,7 +689,7 @@ export class ReplayDeviceService {
       status: 'loading',
       detailText: 'Connecting to Android RenderDoc...',
       lastError: undefined,
-      activationPhase: 'daemon',
+      activationPhase: 'connect',
       activationErrorCode: undefined,
       activationErrorMessage: undefined,
       activationUpdatedAt: Date.now(),
@@ -714,55 +726,6 @@ export class ReplayDeviceService {
       throw new Error('Android device serial is missing.');
     }
 
-    await this.ensureDaemonReady();
-    this.updateDevice({
-      ...device,
-      status: 'loading',
-      detailText: 'Allocating remote context...',
-      lastError: undefined,
-      activationPhase: 'context',
-      activationUpdatedAt: Date.now(),
-    });
-
-    let contextId = `ctx-device-${sanitizeDeviceId(device.serial)}-${generateShortId()}`;
-
-    const contextResult = await rdxCliInvokerService.call({
-      toolName: 'rd.session.create_context',
-      args: { context_id: contextId },
-    });
-    if (!contextResult.ok) {
-      if (contextResult.error?.message?.includes('Context limit exceeded')) {
-        const reusableContextId = await this.resolveReusableContextId();
-        if (reusableContextId) {
-          contextId = reusableContextId;
-        } else {
-          const parsedError = parseToolError(contextResult, 'Failed to create a replay device context.');
-          throw new Error(parsedError.message);
-        }
-      } else {
-        const parsedError = parseToolError(contextResult, 'Failed to create a replay device context.');
-        throw new Error(parsedError.message);
-      }
-    }
-
-    this.updateDevice({
-      ...device,
-      status: 'loading',
-      detailText: 'Initializing remote capability...',
-      lastError: undefined,
-      activationPhase: 'init',
-      activationUpdatedAt: Date.now(),
-    });
-    const initResult = await rdxCliInvokerService.call({
-      toolName: 'rd.core.init',
-      args: {},
-      contextId,
-    });
-    if (!initResult.ok) {
-      const parsedError = parseToolError(initResult, 'Failed to initialize remote capability.');
-      throw new Error(parsedError.message);
-    }
-
     this.updateDevice({
       ...device,
       status: 'loading',
@@ -771,79 +734,28 @@ export class ReplayDeviceService {
       activationPhase: 'connect',
       activationUpdatedAt: Date.now(),
     });
-    const connectResult = await rdxCliInvokerService.call({
-      toolName: 'rd.remote.connect',
-      args: {
-        timeout_ms: 5000,
-        options: {
-          transport: 'adb_android',
-          device_serial: device.serial,
-        },
-      },
-      contextId,
+
+    const result = await rdxShellActionService.runAction('connectRemote', {
+      deviceId: device.id,
+      deviceLabel: device.label,
+      deviceType: device.type,
+      deviceSerial: device.serial,
+      transport: device.transport,
     });
-    if (!connectResult.ok) {
-      const parsedError = parseToolError(connectResult, 'Failed to connect to the Android RenderDoc server.');
-      throw new Error(parsedError.message);
+    if (!result.ok) {
+      throw new Error(result.error ?? 'RDX connectRemote action failed.');
     }
 
-    const remoteId = typeof connectResult.data?.remote_id === 'string'
-      ? connectResult.data.remote_id
-      : undefined;
+    const contextId = readActionString(result.data, ['contextId', 'context_id', 'RDX_CONTEXT_ID']);
+    const remoteId = readActionString(result.data, ['remoteId', 'remote_id', 'RDX_REMOTE_ID']);
+    if (!contextId) {
+      throw new Error('RDX connectRemote action result must include contextId/context_id.');
+    }
     if (!remoteId) {
-      throw new Error('Remote connect did not return a remote_id.');
+      throw new Error('RDX connectRemote action result must include remoteId/remote_id.');
     }
 
-    const bootstrap = parseAndroidBootstrapMetadata(
-      connectResult.data?.detail && typeof connectResult.data.detail === 'object'
-        ? (connectResult.data.detail as Record<string, unknown>).bootstrap
-        : undefined,
-    );
-
-    this.updateDevice({
-      ...device,
-      status: 'connected',
-      remoteId,
-      bootstrap,
-      detailText: buildRemoteReadyText(bootstrap),
-      lastError: undefined,
-      activationPhase: 'ping',
-      activationErrorCode: undefined,
-      activationErrorMessage: undefined,
-      activationUpdatedAt: Date.now(),
-      lastSeen: Date.now(),
-    });
-
-    const pingResult = await rdxCliInvokerService.call({
-      toolName: 'rd.remote.ping',
-      args: { remote_id: remoteId },
-      contextId,
-    });
-    if (!pingResult.ok) {
-      const parsedError = parseToolError(pingResult, 'Remote server ping failed.');
-      throw new Error(parsedError.message);
-    }
-
-    this.updateDevice({
-      ...device,
-      status: 'connected',
-      remoteId,
-      bootstrap,
-      detailText: buildRemoteReadyText(bootstrap),
-      lastError: undefined,
-      activationPhase: 'targets',
-      activationUpdatedAt: Date.now(),
-      lastSeen: Date.now(),
-    });
-    const targetsResult = await rdxCliInvokerService.call({
-      toolName: 'rd.remote.list_targets',
-      args: { remote_id: remoteId },
-      contextId,
-    });
-    if (!targetsResult.ok) {
-      const parsedError = parseToolError(targetsResult, 'Remote target discovery failed.');
-      throw new Error(parsedError.message);
-    }
+    const bootstrap = parseRemoteBootstrap(result.data);
 
     const validatedAt = Date.now();
     this.preparedRemotes.set(deviceId, {
@@ -872,40 +784,6 @@ export class ReplayDeviceService {
       activationUpdatedAt: validatedAt,
       lastSeen: Date.now(),
     };
-  }
-
-  private async ensureDaemonReady(): Promise<void> {
-    const statusResult = await rdxCliInvokerService.executeCLI('daemon', ['status']);
-    if (statusResult.exitCode === 0) {
-      try {
-        const parsed = JSON.parse(statusResult.stdout) as { data?: { running?: boolean } };
-        if (parsed.data?.running === true) {
-          return;
-        }
-      } catch {
-        return;
-      }
-    }
-
-    const startResult = await rdxCliInvokerService.executeCLI('daemon', ['start']);
-    if (startResult.exitCode !== 0) {
-      const stderr = startResult.stderr.trim();
-      throw new Error(stderr || 'Failed to start the rdx daemon.');
-    }
-  }
-
-  private async resolveReusableContextId(): Promise<string | null> {
-    const daemonResult = await rdxCliInvokerService.executeCLI('daemon', ['start']);
-    if (daemonResult.exitCode !== 0 || !daemonResult.stdout.trim()) {
-      return null;
-    }
-
-    try {
-      const parsed = JSON.parse(daemonResult.stdout) as { data?: { state?: { context_id?: string } } };
-      return parsed.data?.state?.context_id ?? null;
-    } catch {
-      return null;
-    }
   }
 
   private async runAdbCommand(args: string[]): Promise<string[]> {

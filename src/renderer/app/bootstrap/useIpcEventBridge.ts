@@ -57,8 +57,6 @@ export function useIpcEventBridge(options: {
   const setSystemTheme = useAppSettingsStore((state) => state.setSystemTheme);
   const addActionEvent = useEvidenceStore((state) => state.addActionEvent);
   const setWorkflowState = useWorkflowStore((state) => state.setWorkflowState);
-  const setCurrentDebugPlan = useWorkflowStore((state) => state.setCurrentDebugPlan);
-  const setPendingQuestions = useWorkflowStore((state) => state.setPendingQuestions);
   const setReasoningSummaries = useConversationStore((state) => state.setReasoningSummaries);
 
   useEffect(() => {
@@ -182,8 +180,6 @@ export function useIpcEventBridge(options: {
     const unsubscribeWorkflowStateChanged = electronAPI.events.onWorkflowStateChanged((rawState) => {
       const state = rawState as WorkflowState;
       setWorkflowState(state);
-      setCurrentDebugPlan(state.debugPlan ?? null);
-      setPendingQuestions(state.pendingQuestions ?? null);
       setReasoningSummaries(state.reasoningSummaries ?? []);
       const currentProject = useProjectStore.getState().currentProject;
       const currentSession = useProjectStore.getState().currentSession;
@@ -321,5 +317,5 @@ export function useIpcEventBridge(options: {
       electronAPI.off('settings:open', handleSettingsOpen);
       electronAPI.off('window:maximized-changed', handleWindowStateChange);
     };
-  }, [addActionEvent, setCurrentDebugPlan, setPendingQuestions, setReasoningSummaries, setSettingsModalOpen, setSystemTheme, setWindowMaximized, setWorkflowState, showNotice, syncCapturesFromSnapshot, t]);
+  }, [addActionEvent, setReasoningSummaries, setSettingsModalOpen, setSystemTheme, setWindowMaximized, setWorkflowState, showNotice, syncCapturesFromSnapshot, t]);
 }
