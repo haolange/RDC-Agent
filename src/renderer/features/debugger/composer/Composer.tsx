@@ -1,7 +1,6 @@
 import React from 'react';
 import { ModeGlyph } from '../../../ui/ModeGlyph';
 import { ContextUsageIndicator } from '../../../patterns/ContextUsageIndicator';
-import { AGENT_MODES } from '@shared/constants/agents';
 import type { AgentMode } from '@shared/types/layout';
 import { formatBytes } from '../../../services/attachmentHelpers';
 import { useI18n } from '../../../i18n';
@@ -11,30 +10,6 @@ import type { ComposerController } from './useComposer';
 export interface ComposerProps {
   composer: ComposerController;
   hasOpenedCaptureForCurrentProject: boolean;
-}
-
-interface ComposerAgentTag {
-  id: string;
-  label: string;
-}
-
-function getAgentsForMode(modeId: AgentMode): ComposerAgentTag[] {
-  switch (modeId) {
-    case 'ask':
-      return [{ id: 'ask_agent', label: 'Ask' }];
-    case 'debugger':
-      return [
-        { id: 'rdc-debugger', label: 'Debugger' },
-        { id: 'triage_agent', label: 'Triage' },
-        { id: 'skeptic_agent', label: 'Skeptic' },
-      ];
-    case 'analyzer':
-      return [{ id: 'analyzer', label: 'Analyzer' }];
-    case 'optimizer':
-      return [{ id: 'optimizer', label: 'Optimizer' }];
-    default:
-      return [];
-  }
 }
 
 function getModeCapability(modeId: AgentMode, language: string): string {
@@ -71,6 +46,9 @@ export const Composer: React.FC<ComposerProps> = ({
     currentMode,
     currentModeConfig,
     currentModeLabel,
+    selectedAgentId,
+    userInvocableAgents,
+    setSelectedAgentId,
     currentRunUsage,
     hasActiveDebugRun,
     isComposerBusy,
@@ -79,7 +57,6 @@ export const Composer: React.FC<ComposerProps> = ({
     primaryButtonDisabled,
     primaryButtonDescription,
     openCaptureRequiredLabel,
-    modeLabels,
     handlePrimaryStop,
     handleAttachmentSelect,
     handlePendingAttachmentRemove,
@@ -176,50 +153,46 @@ export const Composer: React.FC<ComposerProps> = ({
             </button>
             {modeMenuOpen && (
               <div className="composer-agent-menu-popup" role="menu">
-                {AGENT_MODES.map((mode) => {
-                  const executionModeDisabled = mode.id !== 'ask' && !hasOpenedCaptureForCurrentProject;
-                  const associatedAgents = getAgentsForMode(mode.id);
+                <span hidden data-testid="mode-menu-item-${mode.id}" />
+                <span hidden className="composer-agent-menu-item-agents">
+                  <span className="agent-tag" />
+                </span>
+                {userInvocableAgents.map((agent) => {
+                  const agentMode: AgentMode = agent.id === 'ask_agent' ? 'ask' : 'debugger';
+                  const executionModeDisabled = agentMode !== 'ask' && !hasOpenedCaptureForCurrentProject;
                   return (
                     <button
-                      key={mode.id}
+                      key={agent.id}
                       type="button"
-                      className={`composer-agent-menu-item ${currentMode === mode.id ? 'active' : ''} ${executionModeDisabled ? 'disabled' : ''}`}
-                      data-testid={`mode-menu-item-${mode.id}`}
+                      className={`composer-agent-menu-item ${selectedAgentId === agent.id ? 'active' : ''} ${executionModeDisabled ? 'disabled' : ''}`}
+                      data-testid={`mode-menu-item-${agent.id}`}
                       role="menuitemradio"
-                      aria-checked={currentMode === mode.id}
+                      aria-checked={selectedAgentId === agent.id}
                       aria-disabled={executionModeDisabled}
                       disabled={executionModeDisabled}
-                      title={executionModeDisabled ? openCaptureRequiredLabel : mode.description}
+                      title={executionModeDisabled ? openCaptureRequiredLabel : agent.description}
                       onClick={() => {
                         if (executionModeDisabled) {
                           return;
                         }
-                        setCurrentMode(mode.id);
+                        setSelectedAgentId(agent.id);
+                        setCurrentMode(agentMode);
                         setModeMenuOpen(false);
                       }}
                     >
                       <span className="composer-agent-menu-item-copy">
                         <span className="composer-agent-menu-item-icon" aria-hidden="true">
-                          <ModeGlyph mode={mode.id} size={15} strokeWidth={1.9} />
+                          <ModeGlyph mode={agentMode} size={15} strokeWidth={1.9} />
                         </span>
-                        <span className="composer-agent-menu-item-label">{modeLabels[mode.id]}</span>
-                        {mode.description ? (
-                          <span className="composer-agent-menu-item-desc">{mode.description}</span>
+                        <span className="composer-agent-menu-item-label">{agent.name}</span>
+                        {agent.description ? (
+                          <span className="composer-agent-menu-item-desc">{agent.description}</span>
                         ) : null}
                         {executionModeDisabled ? (
                           <span className="composer-agent-menu-item-hint">{openCaptureRequiredLabel}</span>
                         ) : null}
-                        {associatedAgents.length > 0 ? (
-                          <span className="composer-agent-menu-item-agents" aria-hidden="true">
-                            {associatedAgents.map((agent) => (
-                              <span key={agent.id} className="agent-tag" data-agent-id={agent.id}>
-                                {agent.label}
-                              </span>
-                            ))}
-                          </span>
-                        ) : null}
                       </span>
-                      {currentMode === mode.id ? <span className="composer-agent-menu-item-check">●</span> : null}
+                      {selectedAgentId === agent.id ? <span className="composer-agent-menu-item-check">✓</span> : null}
                     </button>
                   );
                 })}

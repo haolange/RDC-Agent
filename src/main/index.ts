@@ -50,6 +50,8 @@ if (isTestMode || isHeadlessMode) {
 
 // Main window reference.
 let mainWindow: BrowserWindow | null = null;
+let headlessKeepAliveTimer: NodeJS.Timeout | null = null;
+let headlessKeepAliveWindow: BrowserWindow | null = null;
 const allowedNavigationOrigins = new Set<string>();
 
 app.on('second-instance', () => {
@@ -345,6 +347,26 @@ app.whenReady().then(async () => {
   });
   
   if (isHeadlessMode) {
+    headlessKeepAliveWindow = new BrowserWindow({
+      width: 1,
+      height: 1,
+      show: false,
+      skipTaskbar: true,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: false,
+      },
+    });
+    headlessKeepAliveWindow.loadURL('about:blank').catch(() => {
+      // The window only anchors the Electron lifecycle; a blank-load failure is non-fatal.
+    });
+    headlessKeepAliveWindow.on('closed', () => {
+      headlessKeepAliveWindow = null;
+    });
+    headlessKeepAliveTimer = setInterval(() => {
+      // Keep Electron's main process alive when the browser session has no BrowserWindow.
+    }, 60_000);
     console.log(`[BrowserAppBridge] Headless mode enabled. Open ${bridgeUrl}/app`);
   } else {
     createMainWindow();
@@ -369,7 +391,19 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  if (isHeadlessMode) {
+    event.preventDefault();
+    return;
+  }
+  if (headlessKeepAliveWindow && !headlessKeepAliveWindow.isDestroyed()) {
+    headlessKeepAliveWindow.destroy();
+    headlessKeepAliveWindow = null;
+  }
+  if (headlessKeepAliveTimer) {
+    clearInterval(headlessKeepAliveTimer);
+    headlessKeepAliveTimer = null;
+  }
   void stopAllActiveRuns();
   void stopBrowserAppBridge();
   replayDeviceService.dispose();

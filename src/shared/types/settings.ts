@@ -1,4 +1,5 @@
 import type { AgentRole } from './agent';
+import type { AgentManifestDraft, AgentManifestSettings } from './agentManifest';
 import type {
   AgentRuntimeMcpDescriptor,
   AgentRuntimePatternDescriptor,
@@ -279,6 +280,7 @@ export interface AppSettings {
   workspace: WorkspaceSettings;
   tooling: ToolingSettings;
   llm: LlmSettings;
+  agents: AgentManifestSettings;
   configuration: ConfigurationSettings;
   paths: AppRuntimePaths;
 }
@@ -298,6 +300,10 @@ export type AppSettingsPatch = Partial<{
   llm: Partial<{
     providers: LlmProviderEntry[];
     agentRoutes: LlmAgentRoute[];
+  }>;
+  agents: Partial<{
+    definitions: AgentManifestDraft[];
+    globalInstructions: string;
   }>;
   configuration: Partial<ConfigurationSettings>;
 }>;

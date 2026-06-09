@@ -44,6 +44,7 @@ import {
   isBuiltinProviderId,
 } from '@shared/constants/llm';
 import { appPathService } from '../runtime/AppPathService';
+import { agentManifestService } from './AgentManifestService';
 import { executionProfileService } from './ExecutionProfileService';
 import { normalizeProviderCatalogGroup } from './providerCatalogGroup';
 import { secretStorageService } from './SecretStorageService';
@@ -527,6 +528,12 @@ function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspac
     llm: {
       providers: [],
       agentRoutes: createEmptyAgentRoutes(),
+    },
+    agents: {
+      directoryPath: path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, 'agents'),
+      definitions: [],
+      modelOptions: [],
+      globalInstructions: '',
     },
     configuration,
     paths: EMPTY_PATHS,
@@ -1136,6 +1143,7 @@ export class SettingsService {
         providers: hydratedProviders,
         agentRoutes: normalizeUserRoutes(normalized.llm?.agentRoutes ?? createEmptyAgentRoutes(), hydratedProviders),
       },
+      agents: agentManifestService.getSettings(paths, hydratedProviders, normalized.llm?.agentRoutes ?? createEmptyAgentRoutes()),
       configuration,
       paths: {
         ...paths,
@@ -1209,6 +1217,19 @@ export class SettingsService {
       }, nextPaths.workspaceRoot);
     }).filter((provider): provider is LlmProviderEntry => provider !== null);
     const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.workspaceRoot);
+    const currentRoutes = normalizeUserRoutes(patch.llm?.agentRoutes ?? currentPersisted.llm?.agentRoutes ?? [], nextProviders);
+    if (patch.agents?.definitions) {
+      agentManifestService.save(
+        nextPaths,
+        patch.agents.definitions,
+        patch.agents.globalInstructions,
+      );
+    } else if (typeof patch.agents?.globalInstructions === 'string') {
+      agentManifestService.save(nextPaths, [], patch.agents.globalInstructions);
+    }
+    const manifestRoutes = patch.agents?.definitions
+      ? agentManifestService.routesFromDefinitions(currentRoutes, patch.agents.definitions)
+      : currentRoutes;
 
     const nextPersisted: PersistedSettingsPayload = {
       appearance: {
@@ -1272,7 +1293,7 @@ export class SettingsService {
       },
       llm: {
         providers: nextProviders.map((provider) => ({ ...provider, apiKey: '' })),
-        agentRoutes: normalizeUserRoutes(patch.llm?.agentRoutes ?? currentPersisted.llm?.agentRoutes ?? [], nextProviders),
+        agentRoutes: normalizeUserRoutes(manifestRoutes, nextProviders),
       },
       configuration: {
         activeModeProfileId: patch.configuration?.activeModeProfileId

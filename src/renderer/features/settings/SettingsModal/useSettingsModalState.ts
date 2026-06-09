@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings, LlmAgentRoute, LlmProviderEntry, RdxCliInvokerSettings } from '@shared/types/settings';
 import type { ProviderConnectionDraft, SettingsSection } from './types';
 import { cloneProvider, cloneRoute } from './utils';
@@ -14,6 +15,10 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
   const [enabledMcpDrafts, setEnabledMcpDrafts] = useState<string[]>(settings.configuration.enabledMcpServerIds);
   const [patternBindingDrafts, setPatternBindingDrafts] = useState<Record<string, string>>(settings.configuration.modePatternBindings);
   const [rdxCliDraft, setRdxCliDraft] = useState<RdxCliInvokerSettings>(settings.tooling.rdxCli);
+  const [agentManifestDrafts, setAgentManifestDrafts] = useState<AgentManifestDraft[]>(
+    settings.agents.definitions.map((definition) => ({ ...definition })),
+  );
+  const [globalInstructionsDraft, setGlobalInstructionsDraft] = useState(settings.agents.globalInstructions);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(settings.llm.providers[0]?.id ?? null);
   const [connectionDraft, setConnectionDraft] = useState<ProviderConnectionDraft | null>(null);
   const [agentRouteSaveState, setAgentRouteSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -39,6 +44,8 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setEnabledMcpDrafts(settings.configuration.enabledMcpServerIds);
     setPatternBindingDrafts(settings.configuration.modePatternBindings);
     setRdxCliDraft(settings.tooling.rdxCli);
+    setAgentManifestDrafts(settings.agents.definitions.map((definition) => ({ ...definition })));
+    setGlobalInstructionsDraft(settings.agents.globalInstructions);
     setSelectedProviderId(providers[0]?.id ?? null);
     setConnectionDraft(null);
     setAgentRouteSaveState('idle');
@@ -66,6 +73,10 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setPatternBindingDrafts,
     rdxCliDraft,
     setRdxCliDraft,
+    agentManifestDrafts,
+    setAgentManifestDrafts,
+    globalInstructionsDraft,
+    setGlobalInstructionsDraft,
     selectedProviderId,
     setSelectedProviderId,
     connectionDraft,

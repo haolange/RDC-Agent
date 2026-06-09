@@ -119,6 +119,7 @@ export interface ConversationSendRequest {
   currentRunId?: string | null;
   replayDeviceId?: string | null;
   mode: AppMode;
+  agentId?: string | null;
   message: string;
   attachments?: ConversationAttachmentInput[];
 }

@@ -28,7 +28,7 @@ const url = require("url");
 const child_process = require("child_process");
 const fs = require("fs");
 const uuid = require("uuid");
-const yaml = require("yaml");
+const YAML = require("yaml");
 const crypto = require("crypto");
 require("node:fs");
 const path$1 = require("node:path");
@@ -864,63 +864,6 @@ class AppPathService {
   }
 }
 const appPathService = new AppPathService();
-const MAIN_STAGES = [
-  "preflight",
-  "entry_gate",
-  "intake_gate",
-  "plan",
-  "speclist",
-  "dispatch",
-  "investigate",
-  "fix_verify",
-  "skepti",
-  "curate",
-  "finalize"
-];
-const SPECIAL_STAGES = [
-  "blocked",
-  "awaiting_user_input"
-];
-const ALL_STAGES = [...MAIN_STAGES, ...SPECIAL_STAGES];
-const STAGE_PHASES = {
-  preflight: "planner",
-  entry_gate: "planner",
-  intake_gate: "planner",
-  plan: "planner",
-  speclist: "planner",
-  dispatch: "generator",
-  investigate: "generator",
-  fix_verify: "evaluator",
-  skepti: "evaluator",
-  curate: "evaluator",
-  finalize: "evaluator",
-  blocked: "evaluator",
-  awaiting_user_input: "planner"
-};
-const LEGACY_STAGE_MIGRATION = {
-  preflight_pending: "preflight",
-  intent_gate_passed: "plan",
-  entry_gate_passed: "entry_gate",
-  accepted_intake_initialized: "intake_gate",
-  intake_gate_passed: "intake_gate",
-  waiting_for_specialist_brief: "dispatch",
-  specialist_briefs_collected: "dispatch",
-  expert_investigation_complete: "investigate",
-  fix_verification_complete: "fix_verify",
-  skeptic_ready: "skepti",
-  curator_ready: "curate",
-  finalized: "finalize",
-  validation_blocked: "blocked"
-};
-const normalizeWorkflowStage = (stage) => {
-  if (!stage) {
-    return "preflight";
-  }
-  if (ALL_STAGES.includes(stage)) {
-    return stage;
-  }
-  return LEGACY_STAGE_MIGRATION[stage] || "preflight";
-};
 const AGENT_ROLES = [
   "ask_agent",
   "rdc-debugger",
@@ -1032,6 +975,314 @@ AGENT_MODES.reduce(
   },
   {}
 );
+const GLOBAL_INSTRUCTIONS_FILE = "global-instructions.md";
+const toSlug = (value) => {
+  const slug = value.trim().toLowerCase().replace(/['"]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || "agent";
+};
+const fileNameForId = (id) => `${toSlug(id.replace(/_/g, "-"))}.agent.md`;
+const canonicalModelId = (providerId, modelId) => providerId && modelId ? `${providerId}:${modelId}` : "";
+const splitCanonicalModelId = (value) => {
+  const separator = value.indexOf(":");
+  if (separator <= 0 || separator === value.length - 1) {
+    return null;
+  }
+  return {
+    providerId: value.slice(0, separator),
+    modelId: value.slice(separator + 1)
+  };
+};
+const readStringArray = (value) => {
+  if (Array.isArray(value)) {
+    return value.filter((entry) => typeof entry === "string").map((entry) => entry.trim()).filter(Boolean);
+  }
+  if (typeof value === "string" && value.trim()) {
+    return [value.trim()];
+  }
+  return [];
+};
+const readBoolean = (value, fallback) => typeof value === "boolean" ? value : fallback;
+const readHandoffs = (value) => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const handoffs = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const candidate = entry;
+    const label = typeof candidate.label === "string" ? candidate.label.trim() : "";
+    const agent = typeof candidate.agent === "string" ? candidate.agent.trim() : "";
+    const prompt = typeof candidate.prompt === "string" ? candidate.prompt.trim() : "";
+    if (!label || !agent || !prompt) {
+      continue;
+    }
+    const handoff = {
+      label,
+      agent,
+      prompt
+    };
+    if (typeof candidate.send === "boolean") {
+      handoff.send = candidate.send;
+    }
+    if (typeof candidate.showContinueOn === "boolean") {
+      handoff.showContinueOn = candidate.showContinueOn;
+    }
+    handoffs.push(handoff);
+  }
+  return handoffs;
+};
+const parseAgentMarkdown = (filePath, fallbackId) => {
+  const raw = fs.readFileSync(filePath, "utf8");
+  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/u.exec(raw);
+  const frontmatter = match ? YAML.parse(match[1]) : {};
+  const instructions = match ? match[2].trim() : raw.trim();
+  const name = typeof frontmatter.name === "string" && frontmatter.name.trim() ? frontmatter.name.trim() : fallbackId;
+  const id = typeof frontmatter.id === "string" && frontmatter.id.trim() ? frontmatter.id.trim() : fallbackId;
+  return {
+    id,
+    fileName: path.basename(filePath),
+    filePath,
+    name,
+    description: typeof frontmatter.description === "string" ? frontmatter.description.trim() : "",
+    argumentHint: typeof frontmatter["argument-hint"] === "string" ? frontmatter["argument-hint"].trim() : "",
+    target: typeof frontmatter.target === "string" ? frontmatter.target.trim() : "rdc-agent",
+    models: readStringArray(frontmatter.model),
+    disableModelInvocation: readBoolean(frontmatter["disable-model-invocation"], false),
+    userInvocable: readBoolean(frontmatter["user-invocable"], true),
+    tools: readStringArray(frontmatter.tools),
+    skills: readStringArray(frontmatter.skills),
+    mcpServers: readStringArray(frontmatter.mcpServers),
+    agents: readStringArray(frontmatter.agents),
+    handoffs: readHandoffs(frontmatter.handoffs),
+    metadata: frontmatter.metadata && typeof frontmatter.metadata === "object" ? frontmatter.metadata : {},
+    instructions,
+    builtin: false,
+    enabled: readBoolean(frontmatter.enabled, true),
+    updatedAt: fs.statSync(filePath).mtime.toISOString()
+  };
+};
+const serializeAgentMarkdown = (definition) => {
+  const frontmatter = {
+    id: definition.id,
+    name: definition.name,
+    description: definition.description,
+    "argument-hint": definition.argumentHint,
+    target: definition.target || "rdc-agent",
+    model: definition.models,
+    "disable-model-invocation": definition.disableModelInvocation,
+    "user-invocable": definition.userInvocable,
+    enabled: definition.enabled,
+    tools: definition.tools,
+    skills: definition.skills,
+    mcpServers: definition.mcpServers,
+    agents: definition.agents,
+    handoffs: definition.handoffs,
+    metadata: definition.metadata
+  };
+  return `---
+${YAML.stringify(frontmatter).trim()}
+---
+
+${definition.instructions.trim()}
+`;
+};
+const createSeedDefinition = (agentId, routes) => {
+  const route = routes.find((entry) => entry.agentId === agentId);
+  const model = canonicalModelId(route?.providerId ?? "", route?.modelId ?? "");
+  const name = AGENT_DISPLAY_NAMES[agentId];
+  return {
+    id: agentId,
+    fileName: fileNameForId(agentId),
+    name,
+    description: AGENT_DESCRIPTIONS[agentId],
+    argumentHint: agentId === "ask_agent" ? "Ask about the current project, capture, or workflow" : "Describe the RenderDoc/RDC investigation goal",
+    target: "rdc-agent",
+    models: model ? [model] : [],
+    disableModelInvocation: false,
+    userInvocable: agentId === "ask_agent" || agentId === "rdc-debugger",
+    tools: agentId === "ask_agent" ? ["read", "search", "web"] : ["read", "search", "agent", "rdx"],
+    skills: [],
+    mcpServers: [],
+    agents: agentId === "rdc-debugger" ? AGENT_ROLES.filter((role) => role !== "ask_agent" && role !== "rdc-debugger") : [],
+    handoffs: [],
+    metadata: {
+      legacyAgentRole: agentId
+    },
+    instructions: `You are ${name}. ${AGENT_DESCRIPTIONS[agentId]}.`,
+    enabled: true
+  };
+};
+class AgentManifestService {
+  getAgentsDirectory(paths) {
+    return path.join(paths.profilesPath, "agents");
+  }
+  getGlobalInstructionsPath(paths) {
+    return path.join(paths.profilesPath, GLOBAL_INSTRUCTIONS_FILE);
+  }
+  ensureSeedManifests(paths, routes) {
+    const directory = this.getAgentsDirectory(paths);
+    fs.mkdirSync(directory, { recursive: true });
+    const hasManifest = fs.readdirSync(directory).some((entry) => entry.endsWith(".agent.md"));
+    if (hasManifest) {
+      return;
+    }
+    for (const agentId of AGENT_ROLES) {
+      const seed = createSeedDefinition(agentId, routes);
+      fs.writeFileSync(path.join(directory, seed.fileName), serializeAgentMarkdown(seed), "utf8");
+    }
+  }
+  getSettings(paths, providers, routes) {
+    this.ensureSeedManifests(paths, routes);
+    const directoryPath = this.getAgentsDirectory(paths);
+    const definitions = fs.readdirSync(directoryPath).filter((entry) => entry.endsWith(".agent.md")).map((entry) => {
+      const fullPath = path.join(directoryPath, entry);
+      const fallbackId = entry.replace(/\.agent\.md$/u, "");
+      return parseAgentMarkdown(fullPath, fallbackId);
+    }).sort((left, right) => Number(right.userInvocable) - Number(left.userInvocable) || left.name.localeCompare(right.name));
+    return {
+      directoryPath,
+      definitions,
+      modelOptions: this.getModelOptions(providers),
+      globalInstructions: this.readGlobalInstructions(paths)
+    };
+  }
+  save(paths, drafts, globalInstructions) {
+    const directory = this.getAgentsDirectory(paths);
+    fs.mkdirSync(directory, { recursive: true });
+    for (const draft of drafts) {
+      const fileName = draft.fileName && draft.fileName.endsWith(".agent.md") ? draft.fileName : fileNameForId(draft.id || draft.name);
+      const filePath = path.join(directory, fileName);
+      if (draft.delete) {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+        continue;
+      }
+      fs.writeFileSync(filePath, serializeAgentMarkdown({
+        ...draft,
+        id: draft.id || toSlug(draft.name)
+      }), "utf8");
+    }
+    if (typeof globalInstructions === "string") {
+      fs.writeFileSync(this.getGlobalInstructionsPath(paths), globalInstructions.trim(), "utf8");
+    }
+  }
+  importFile(paths, sourcePath) {
+    if (!sourcePath.endsWith(".agent.md")) {
+      throw new Error("Only .agent.md files can be imported.");
+    }
+    if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
+      throw new Error(`Agent manifest not found: ${sourcePath}`);
+    }
+    const directory = this.getAgentsDirectory(paths);
+    fs.mkdirSync(directory, { recursive: true });
+    const imported = parseAgentMarkdown(sourcePath, path.basename(sourcePath, ".agent.md"));
+    const fileName = fileNameForId(imported.id || imported.name);
+    const targetPath = path.join(directory, fileName);
+    fs.copyFileSync(sourcePath, targetPath);
+    return parseAgentMarkdown(targetPath, fileName.replace(/\.agent\.md$/u, ""));
+  }
+  routesFromDefinitions(currentRoutes, definitions) {
+    const routeMap = new Map(currentRoutes.map((route) => [route.agentId, route]));
+    const knownAgentIds = new Set(AGENT_ROLES);
+    for (const definition of definitions) {
+      if (!knownAgentIds.has(definition.id) || definition.delete) {
+        continue;
+      }
+      const model = definition.models.map(splitCanonicalModelId).find((entry) => entry !== null);
+      if (!model) {
+        continue;
+      }
+      routeMap.set(definition.id, {
+        agentId: definition.id,
+        providerId: model.providerId,
+        modelId: model.modelId
+      });
+    }
+    return AGENT_ROLES.map((agentId) => routeMap.get(agentId) ?? {
+      agentId,
+      providerId: "",
+      modelId: ""
+    });
+  }
+  getModelOptions(providers) {
+    return providers.flatMap((provider) => provider.models.map((model) => ({
+      canonicalId: canonicalModelId(provider.id, model.id),
+      providerId: provider.id,
+      providerLabel: provider.label,
+      modelId: model.id,
+      modelLabel: model.label || model.id,
+      configured: provider.enabled && provider.isConfigured && model.enabled !== false
+    })));
+  }
+  readGlobalInstructions(paths) {
+    const filePath = this.getGlobalInstructionsPath(paths);
+    if (!fs.existsSync(filePath)) {
+      return "";
+    }
+    return fs.readFileSync(filePath, "utf8");
+  }
+}
+const agentManifestService = new AgentManifestService();
+const MAIN_STAGES = [
+  "preflight",
+  "entry_gate",
+  "intake_gate",
+  "plan",
+  "speclist",
+  "dispatch",
+  "investigate",
+  "fix_verify",
+  "skepti",
+  "curate",
+  "finalize"
+];
+const SPECIAL_STAGES = [
+  "blocked",
+  "awaiting_user_input"
+];
+const ALL_STAGES = [...MAIN_STAGES, ...SPECIAL_STAGES];
+const STAGE_PHASES = {
+  preflight: "planner",
+  entry_gate: "planner",
+  intake_gate: "planner",
+  plan: "planner",
+  speclist: "planner",
+  dispatch: "generator",
+  investigate: "generator",
+  fix_verify: "evaluator",
+  skepti: "evaluator",
+  curate: "evaluator",
+  finalize: "evaluator",
+  blocked: "evaluator",
+  awaiting_user_input: "planner"
+};
+const LEGACY_STAGE_MIGRATION = {
+  preflight_pending: "preflight",
+  intent_gate_passed: "plan",
+  entry_gate_passed: "entry_gate",
+  accepted_intake_initialized: "intake_gate",
+  intake_gate_passed: "intake_gate",
+  waiting_for_specialist_brief: "dispatch",
+  specialist_briefs_collected: "dispatch",
+  expert_investigation_complete: "investigate",
+  fix_verification_complete: "fix_verify",
+  skeptic_ready: "skepti",
+  curator_ready: "curate",
+  finalized: "finalize",
+  validation_blocked: "blocked"
+};
+const normalizeWorkflowStage = (stage) => {
+  if (!stage) {
+    return "preflight";
+  }
+  if (ALL_STAGES.includes(stage)) {
+    return stage;
+  }
+  return LEGACY_STAGE_MIGRATION[stage] || "preflight";
+};
 const RETIRED_BUILTIN_MCP_SERVER_IDS$1 = /* @__PURE__ */ new Set(["builtin.rdc-toolbridge"]);
 const TEMPLATE_COPIES = [
   {
@@ -1858,6 +2109,12 @@ function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspac
       providers: [],
       agentRoutes: createEmptyAgentRoutes()
     },
+    agents: {
+      directoryPath: path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "agents"),
+      definitions: [],
+      modelOptions: [],
+      globalInstructions: ""
+    },
     configuration,
     paths: EMPTY_PATHS
   };
@@ -2313,6 +2570,7 @@ class SettingsService {
         providers: hydratedProviders,
         agentRoutes: normalizeUserRoutes(normalized.llm?.agentRoutes ?? createEmptyAgentRoutes(), hydratedProviders)
       },
+      agents: agentManifestService.getSettings(paths, hydratedProviders, normalized.llm?.agentRoutes ?? createEmptyAgentRoutes()),
       configuration,
       paths: {
         ...paths,
@@ -2373,6 +2631,17 @@ class SettingsService {
       }, nextPaths.workspaceRoot);
     }).filter((provider) => provider !== null);
     const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.workspaceRoot);
+    const currentRoutes = normalizeUserRoutes(patch.llm?.agentRoutes ?? currentPersisted.llm?.agentRoutes ?? [], nextProviders);
+    if (patch.agents?.definitions) {
+      agentManifestService.save(
+        nextPaths,
+        patch.agents.definitions,
+        patch.agents.globalInstructions
+      );
+    } else if (typeof patch.agents?.globalInstructions === "string") {
+      agentManifestService.save(nextPaths, [], patch.agents.globalInstructions);
+    }
+    const manifestRoutes = patch.agents?.definitions ? agentManifestService.routesFromDefinitions(currentRoutes, patch.agents.definitions) : currentRoutes;
     const nextPersisted = {
       appearance: {
         theme: pickEnum(
@@ -2431,7 +2700,7 @@ class SettingsService {
       },
       llm: {
         providers: nextProviders.map((provider) => ({ ...provider, apiKey: "" })),
-        agentRoutes: normalizeUserRoutes(patch.llm?.agentRoutes ?? currentPersisted.llm?.agentRoutes ?? [], nextProviders)
+        agentRoutes: normalizeUserRoutes(manifestRoutes, nextProviders)
       },
       configuration: {
         activeModeProfileId: patch.configuration?.activeModeProfileId || currentPersisted.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId,
@@ -3069,7 +3338,7 @@ function readYaml(filePath) {
       return null;
     }
     const content = fs__namespace.readFileSync(filePath, "utf-8");
-    return yaml.parse(content);
+    return YAML.parse(content);
   } catch (error) {
     console.error(`Failed to read YAML file: ${filePath}`, error);
     return null;
@@ -3081,7 +3350,7 @@ function writeYaml(filePath, data) {
     if (!fs__namespace.existsSync(dir)) {
       fs__namespace.mkdirSync(dir, { recursive: true });
     }
-    const content = yaml.stringify(data, {
+    const content = YAML.stringify(data, {
       indent: 2,
       lineWidth: 0,
       defaultStringType: "QUOTE_DOUBLE",
@@ -11356,9 +11625,9 @@ class HarnessController {
     const fs2 = await import("fs");
     const boardPath = `${runPath}/notes/hypothesis_board.yaml`;
     if (fs2.existsSync(boardPath)) {
-      const yaml2 = await import("yaml");
+      const yaml = await import("yaml");
       const content = await fs2.promises.readFile(boardPath, "utf-8");
-      const board = yaml2.parse(content);
+      const board = yaml.parse(content);
       if (board?.hypothesis_board?.blocking_issues) {
         for (const issue of board.hypothesis_board.blocking_issues) {
           blockers.push(this.createBlocker(
@@ -11371,9 +11640,9 @@ class HarnessController {
     }
     const freezePath = `${runPath}/artifacts/freeze_state.yaml`;
     if (fs2.existsSync(freezePath)) {
-      const yaml2 = await import("yaml");
+      const yaml = await import("yaml");
       const content = await fs2.promises.readFile(freezePath, "utf-8");
-      const freeze = yaml2.parse(content);
+      const freeze = yaml.parse(content);
       if (freeze?.status === "frozen") {
         blockers.push(this.createBlocker(
           "BLOCKED_FREEZE_STATE_ACTIVE",
@@ -16612,6 +16881,13 @@ function registerCaptureDeviceHandlers(context2) {
     return replayDeviceService.activateDevice(deviceId);
   });
 }
+const KNOWN_CONVERSATION_AGENTS = new Set(AGENT_ROLES);
+function resolveConversationAgentId(requestedMode, requestedAgentId) {
+  if (requestedAgentId && KNOWN_CONVERSATION_AGENTS.has(requestedAgentId)) {
+    return requestedAgentId;
+  }
+  return requestedMode === "ask" ? "ask_agent" : "rdc-debugger";
+}
 const EXECUTE_PATTERN = /开始|启动|执行|正式分析|正式调试|本地调试|local\s*模式调试|模式调试|直接分析|现在分析|run\b|start\b|debug\b|analy[sz]e\b|帮我调试|请.*调试|开始调试|开始分析/i;
 const TASK_FILE_PATTERN = /([A-Za-z]:[\\/][^\r\n"]+\.(txt|md))/i;
 const CONTROL_OPEN_TAG = "<control>";
@@ -17075,7 +17351,7 @@ class ConversationService {
     if (isActiveRun(context2.currentRun)) {
       return this.startActiveDebugTurn(context2, input.mode, input.message.trim(), input.attachments ?? []);
     }
-    return this.startCoworkTurn(context2, input.mode, input.message.trim(), input.attachments ?? []);
+    return this.startCoworkTurn(context2, input.mode, input.agentId ?? null, input.message.trim(), input.attachments ?? []);
   }
   async resolveContext(input) {
     const projectId = input.projectId ?? input.fallbackProjectId ?? storageAdapter.getCurrentProjectId() ?? null;
@@ -17271,7 +17547,8 @@ class ConversationService {
       this.clearActiveTurn(assistantMessage.turnId, abortController);
     }
   }
-  async startCoworkTurn(context2, requestedMode, rawMessage, pendingAttachments) {
+  async startCoworkTurn(context2, requestedMode, requestedAgentId, rawMessage, pendingAttachments) {
+    const conversationAgentId = resolveConversationAgentId(requestedMode, requestedAgentId);
     let workingSession = context2.session;
     if (!workingSession && context2.projectId) {
       workingSession = storageAdapter.createSession(context2.projectId, rawMessage.slice(0, 80));
@@ -17296,7 +17573,7 @@ class ConversationService {
       projectId: context2.projectId,
       runId: isActiveRun(context2.currentRun) ? context2.currentRun.runId : null,
       modeContext: requestedMode,
-      agentId: requestedMode === "ask" ? "ask_agent" : "rdc-debugger",
+      agentId: conversationAgentId,
       status: "streaming",
       reasoningTrace: createDraftReasoningTrace(
         requestedMode === "ask" ? "正在执行只读协作" : "正在思考",
@@ -17350,6 +17627,7 @@ class ConversationService {
         session: workingSession
       },
       requestedMode,
+      requestedAgentId: conversationAgentId,
       rawMessage,
       importedAttachments,
       userMessage,
@@ -17371,7 +17649,7 @@ class ConversationService {
     const sessionId = input.context.session?.sessionId ?? null;
     const traceSessionId = sessionId ?? this.ephemeralTraceSessionId(input.assistantDraftMessage.turnId);
     const abortController = new AbortController();
-    const conversationAgentId = input.requestedMode === "ask" ? "ask_agent" : "rdc-debugger";
+    const conversationAgentId = input.requestedAgentId;
     const showCoworkReasoning = true;
     const commitAssistantMessage = (type, patch) => {
       if (abortController.signal.aborted && patch.status !== "stopped") {
@@ -17541,6 +17819,15 @@ class ConversationService {
           input.rawMessage,
           input.importedAttachments
         );
+        const globalInstructions = settingsService.getAll().agents.globalInstructions.trim();
+        const baseSystemPrompt = conversationAgentId === "ask_agent" ? buildAskSystemPrompt() : buildDebuggerCoworkSystemPrompt();
+        const systemPrompt = [
+          baseSystemPrompt,
+          conversationAgentId !== "ask_agent" && globalInstructions ? `
+
+Global Instructions:
+${globalInstructions}` : ""
+        ].join("").trim();
         const responseText = await agentOrchestrator.sendCoworkMessage(
           conversationAgentId,
           input.rawMessage,
@@ -17549,7 +17836,7 @@ class ConversationService {
             turnId: assistantMessage.turnId,
             stage: "cowork",
             patternId: input.requestedMode === "debugger" ? "plan-generate-verify" : "free-agent",
-            systemPrompt: conversationAgentId === "ask_agent" ? buildAskSystemPrompt() : buildDebuggerCoworkSystemPrompt(),
+            systemPrompt,
             maxTokens: 1200,
             temperature: 0.35,
             signal: abortController.signal,
@@ -18743,6 +19030,11 @@ function registerSettingsLlmHandlers(context2) {
   electron.ipcMain.handle("settings:getProviderSecret", async (_event, providerId) => {
     const paths = appPathService.getWorkspacePaths();
     return settingsService.getProviderSecret(providerId, paths.workspaceRoot);
+  });
+  electron.ipcMain.handle("settings:importAgentManifest", async (_event, filePath) => {
+    const paths = appPathService.getWorkspacePaths();
+    agentManifestService.importFile(paths, filePath);
+    return settingsService.getAll(paths);
   });
   electron.ipcMain.handle("settings:set", async (_event, settings) => {
     const nextSettings = settingsService.setAll(settings, appPathService.getWorkspacePaths());
@@ -20832,6 +21124,8 @@ if (isTestMode || isHeadlessMode) {
   electron.app.commandLine.appendSwitch("in-process-gpu");
 }
 let mainWindow = null;
+let headlessKeepAliveTimer = null;
+let headlessKeepAliveWindow = null;
 const allowedNavigationOrigins = /* @__PURE__ */ new Set();
 electron.app.on("second-instance", () => {
   if (isHeadlessMode) {
@@ -21083,6 +21377,24 @@ electron.app.whenReady().then(async () => {
     raw: { bridgeUrl: bridgeUrl2 }
   });
   if (isHeadlessMode) {
+    headlessKeepAliveWindow = new electron.BrowserWindow({
+      width: 1,
+      height: 1,
+      show: false,
+      skipTaskbar: true,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        sandbox: false
+      }
+    });
+    headlessKeepAliveWindow.loadURL("about:blank").catch(() => {
+    });
+    headlessKeepAliveWindow.on("closed", () => {
+      headlessKeepAliveWindow = null;
+    });
+    headlessKeepAliveTimer = setInterval(() => {
+    }, 6e4);
     console.log(`[BrowserAppBridge] Headless mode enabled. Open ${bridgeUrl2}/app`);
   } else {
     createMainWindow();
@@ -21102,7 +21414,19 @@ electron.app.on("window-all-closed", () => {
     electron.app.quit();
   }
 });
-electron.app.on("before-quit", () => {
+electron.app.on("before-quit", (event) => {
+  if (isHeadlessMode) {
+    event.preventDefault();
+    return;
+  }
+  if (headlessKeepAliveWindow && !headlessKeepAliveWindow.isDestroyed()) {
+    headlessKeepAliveWindow.destroy();
+    headlessKeepAliveWindow = null;
+  }
+  if (headlessKeepAliveTimer) {
+    clearInterval(headlessKeepAliveTimer);
+    headlessKeepAliveTimer = null;
+  }
   void stopAllActiveRuns();
   void stopBrowserAppBridge();
   replayDeviceService.dispose();

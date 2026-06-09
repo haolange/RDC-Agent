@@ -26,6 +26,13 @@ export type {
 } from './electron-api';
 export type { AgentConfig, AgentRole, AgentState, AgentStatus } from './agent';
 export type {
+  AgentHandoffDefinition,
+  AgentManifestDefinition,
+  AgentManifestDraft,
+  AgentManifestSettings,
+  AgentModelOption,
+} from './agentManifest';
+export type {
   AgentRun,
   AgentRunPresentation,
   AgentRunViewModel,
@@ -124,4 +131,3 @@ export type {
   TraceArtifactRecord,
   TraceContextRecord,
 } from './trace';
-

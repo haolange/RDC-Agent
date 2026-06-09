@@ -6,6 +6,7 @@ import type {
   LlmProviderId,
 } from '@shared/types/settings';
 import { appPathService } from '../runtime/AppPathService';
+import { agentManifestService } from '../settings/AgentManifestService';
 import { llmAdapter } from '../settings/LLMAdapter';
 import { providerConnectionService } from '../settings/ProviderConnectionService';
 import { settingsService } from '../settings/SettingsService';
@@ -101,6 +102,12 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   ipcMain.handle('settings:getProviderSecret', async (_event, providerId: string) => {
     const paths = appPathService.getWorkspacePaths();
     return settingsService.getProviderSecret(providerId, paths.workspaceRoot);
+  });
+
+  ipcMain.handle('settings:importAgentManifest', async (_event, filePath: string) => {
+    const paths = appPathService.getWorkspacePaths();
+    agentManifestService.importFile(paths, filePath);
+    return settingsService.getAll(paths);
   });
 
   ipcMain.handle('settings:set', async (_event, settings: unknown) => {
