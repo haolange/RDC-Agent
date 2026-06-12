@@ -39,98 +39,111 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
 
   return (
     <section className="settings-page settings-page-general">
-      <div className="settings-general-grid">
-        <ProfileSettings
-          accountDraft={accountDraft}
-          onAccountDraftChange={onAccountDraftChange}
-          onAvatarSelect={onAvatarSelect}
-          onSave={onAccountSave}
-          t={t}
-        />
+      <div className="settings-general-grid settings-general-grid--rows">
+        <div className="settings-general-top-row">
+          <ProfileSettings
+            accountDraft={accountDraft}
+            onAccountDraftChange={onAccountDraftChange}
+            onAvatarSelect={onAvatarSelect}
+            onSave={onAccountSave}
+            t={t}
+          />
 
-        <div className="settings-section settings-appearance-section">
+          <div className="settings-section settings-appearance-section settings-appearance-section--compact">
+            <div className="settings-section-header">
+              <div>
+                <div className="settings-section-title">{t('settings.appearance')}</div>
+                <div className="settings-section-subtitle">{t('settings.appearanceHint')}</div>
+              </div>
+            </div>
+            <div className="settings-preference-list settings-appearance-list">
+              <div className="settings-preference-row">
+                <div className="settings-preference-copy settings-option-block">
+                  <div className="settings-field-label">{t('userMenu.theme')}</div>
+                  <div className="settings-help-text">{t('settings.themeHint')}</div>
+                </div>
+                <div className="user-menu-pill-group settings-inline-pills settings-choice-group">
+                  {(['dark', 'light', 'system'] as AppTheme[]).map((theme) => (
+                    <button
+                      key={theme}
+                      type="button"
+                      className={`user-menu-pill ${settings.appearance.theme === theme ? 'active' : ''}`}
+                      onClick={() => void onThemeChange(theme)}
+                    >
+                      {t(`theme.${theme}`)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="settings-preference-row">
+                <div className="settings-preference-copy settings-option-block">
+                  <div className="settings-field-label">{t('userMenu.language')}</div>
+                  <div className="settings-help-text">{t('settings.languageHint')}</div>
+                </div>
+                <div className="user-menu-pill-group settings-inline-pills settings-choice-group">
+                  <button
+                    type="button"
+                    className={`user-menu-pill ${settings.appearance.language === 'zh-CN' ? 'active' : ''}`}
+                    onClick={() => void onLanguageChange('zh-CN')}
+                  >
+                    {t('language.zh')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`user-menu-pill ${settings.appearance.language === 'en' ? 'active' : ''}`}
+                    onClick={() => void onLanguageChange('en')}
+                  >
+                    English
+                  </button>
+                </div>
+              </div>
+
+              <div className="settings-preference-row">
+                <div className="settings-preference-copy settings-option-block">
+                  <div className="settings-field-label">{t('userMenu.fontScale')}</div>
+                  <div className="settings-help-text">{t('settings.fontScaleHint')}</div>
+                </div>
+                <div className="user-menu-pill-group settings-inline-pills settings-choice-group">
+                  {(['small', 'medium', 'large'] as FontScale[]).map((fontScale) => (
+                    <button
+                      key={fontScale}
+                      type="button"
+                      className={`user-menu-pill ${settings.appearance.fontScale === fontScale ? 'active' : ''}`}
+                      onClick={() => void onFontScaleChange(fontScale)}
+                    >
+                      {t(`font.${fontScale}`)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="settings-section settings-environment-overview settings-environment-overview--compact">
           <div className="settings-section-header">
             <div>
-              <div className="settings-section-title">{t('settings.appearance')}</div>
-              <div className="settings-section-subtitle">{t('settings.appearanceHint')}</div>
+              <div className="settings-section-title">{t('settings.localEnvironment')}</div>
+              <div className="settings-section-subtitle">{t('settings.localEnvironmentHint')}</div>
             </div>
           </div>
-          <div className="settings-option-block">
-            <div className="settings-field-label">{t('userMenu.theme')}</div>
-            <div className="user-menu-pill-group settings-inline-pills">
-              {(['dark', 'light', 'system'] as AppTheme[]).map((theme) => (
-                <button
-                  key={theme}
-                  type="button"
-                  className={`user-menu-pill ${settings.appearance.theme === theme ? 'active' : ''}`}
-                  onClick={() => void onThemeChange(theme)}
-                >
-                  {t(`theme.${theme}`)}
-                </button>
-              ))}
+          <div className="settings-overview-grid">
+            <div className="settings-overview-item">
+              <span>{t('settings.workspaceRoot')}</span>
+              <strong title={workspaceRoot}>{workspaceRoot || t('settings.unset')}</strong>
             </div>
-          </div>
-
-          <div className="settings-option-block">
-            <div className="settings-field-label">{t('userMenu.language')}</div>
-            <div className="user-menu-pill-group settings-inline-pills">
-              <button
-                type="button"
-                className={`user-menu-pill ${settings.appearance.language === 'zh-CN' ? 'active' : ''}`}
-                onClick={() => void onLanguageChange('zh-CN')}
-              >
-                {t('language.zh')}
-              </button>
-              <button
-                type="button"
-                className={`user-menu-pill ${settings.appearance.language === 'en' ? 'active' : ''}`}
-                onClick={() => void onLanguageChange('en')}
-              >
-                English
-              </button>
+            <div className="settings-overview-item">
+              <span>{t('settings.connectedProviders')}</span>
+              <strong>{t('settings.providerModelSummary', {
+                providers: String(configuredProviderCount),
+                models: String(enabledModelCount),
+              })}</strong>
             </div>
-          </div>
-
-          <div className="settings-option-block">
-            <div className="settings-field-label">{t('userMenu.fontScale')}</div>
-            <div className="user-menu-pill-group settings-inline-pills">
-              {(['small', 'medium', 'large'] as FontScale[]).map((fontScale) => (
-                <button
-                  key={fontScale}
-                  type="button"
-                  className={`user-menu-pill ${settings.appearance.fontScale === fontScale ? 'active' : ''}`}
-                  onClick={() => void onFontScaleChange(fontScale)}
-                >
-                  {t(`font.${fontScale}`)}
-                </button>
-              ))}
+            <div className="settings-overview-item">
+              <span>{t('settings.rdxCliInvoker')}</span>
+              <strong>{settings.tooling.rdxCli.enabled ? t('settings.enabled') : t('settings.disabled')}</strong>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="settings-section settings-environment-overview">
-        <div className="settings-section-header">
-          <div>
-            <div className="settings-section-title">{t('settings.localEnvironment')}</div>
-            <div className="settings-section-subtitle">{t('settings.localEnvironmentHint')}</div>
-          </div>
-        </div>
-        <div className="settings-overview-grid">
-          <div className="settings-overview-item">
-            <span>{t('settings.workspaceRoot')}</span>
-            <strong title={workspaceRoot}>{workspaceRoot || t('settings.unset')}</strong>
-          </div>
-          <div className="settings-overview-item">
-            <span>{t('settings.connectedProviders')}</span>
-            <strong>{t('settings.providerModelSummary', {
-              providers: String(configuredProviderCount),
-              models: String(enabledModelCount),
-            })}</strong>
-          </div>
-          <div className="settings-overview-item">
-            <span>{t('settings.rdxCliInvoker')}</span>
-            <strong>{settings.tooling.rdxCli.enabled ? t('settings.enabled') : t('settings.disabled')}</strong>
           </div>
         </div>
       </div>

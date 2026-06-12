@@ -91,32 +91,18 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({
         </div>
       </div>
 
-      {(settings.configuration.lastMigrationSummary.length > 0 || settings.configuration.diagnostics.length > 0) && (
+      {settings.configuration.diagnostics.length > 0 && (
         <div className="settings-workspace-meta-grid">
-          {settings.configuration.lastMigrationSummary.length > 0 && (
-            <div className="settings-path-card settings-workspace-note-card">
-              <div className="settings-field-label">{t('settings.lastMigration')}</div>
-              <div className="settings-workspace-note-list">
-                {settings.configuration.lastMigrationSummary.map((summary, index) => (
-                  <div key={`${summary}-${index}`} className="settings-workspace-note-item">
-                    {summary}
-                  </div>
-                ))}
-              </div>
+          <div className="settings-path-card settings-workspace-note-card">
+            <div className="settings-field-label">{t('settings.diagnostics')}</div>
+            <div className="settings-workspace-note-list">
+              {settings.configuration.diagnostics.map((diagnostic, index) => (
+                <div key={`${diagnostic.message}-${index}`} className="settings-workspace-note-item">
+                  {diagnostic.message}
+                </div>
+              ))}
             </div>
-          )}
-          {settings.configuration.diagnostics.length > 0 && (
-            <div className="settings-path-card settings-workspace-note-card">
-              <div className="settings-field-label">{t('settings.diagnostics')}</div>
-              <div className="settings-workspace-note-list">
-                {settings.configuration.diagnostics.map((diagnostic, index) => (
-                  <div key={`${diagnostic.message}-${index}`} className="settings-workspace-note-item">
-                    {diagnostic.message}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       )}
       <div className="settings-actions settings-workspace-footer-actions">

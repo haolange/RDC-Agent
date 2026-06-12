@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentModelOption } from '@shared/types/agentManifest';
 import { splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
 import type { useI18n } from '../../../../i18n';
@@ -22,7 +22,6 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
   const [open, setOpen] = useState(false);
   const [openAbove, setOpenAbove] = useState(false);
   const [activeProviderId, setActiveProviderId] = useState('');
-  const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
   const groups = useMemo(() => {
     const map = new Map<string, AgentModelOption[]>();
     for (const option of options) {
@@ -79,25 +78,13 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
       if (nextOpen) {
         const rect = rootRef.current?.getBoundingClientRect();
         if (rect) {
-          const spaceBelow = window.innerHeight - rect.bottom;
-          const spaceAbove = rect.top;
-          const menuHeight = Math.min(560, Math.floor(window.innerHeight * 0.72));
-          const menuWidth = Math.min(720, window.innerWidth - 32);
-          const nextOpenAbove = spaceBelow < menuHeight && spaceAbove > spaceBelow;
-          const left = Math.min(
-            Math.max(16, rect.right - menuWidth),
-            Math.max(16, window.innerWidth - menuWidth - 16),
-          );
-          const top = nextOpenAbove
-            ? Math.max(16, rect.top - menuHeight - 6)
-            : Math.min(rect.bottom + 6, window.innerHeight - menuHeight - 16);
-          setOpenAbove(nextOpenAbove);
-          setMenuStyle({
-            left,
-            top,
-            width: menuWidth,
-            maxHeight: menuHeight,
-          });
+          const modalRect = rootRef.current?.closest('.settings-modal')?.getBoundingClientRect();
+          const topBoundary = Math.max(0, modalRect?.top ?? 0);
+          const bottomBoundary = Math.min(window.innerHeight, modalRect?.bottom ?? window.innerHeight);
+          const menuHeight = Math.min(448, Math.floor(window.innerHeight * 0.7));
+          const spaceBelow = bottomBoundary - rect.bottom;
+          const spaceAbove = rect.top - topBoundary;
+          setOpenAbove(spaceBelow < menuHeight + 16 && spaceAbove > spaceBelow);
         }
         setActiveProviderId((currentProviderId) => {
           if (displayGroups.some((group) => group.providerId === currentProviderId)) {
@@ -147,7 +134,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
         <span>{visibleSelected ? visibleSelected.providerLabel : t('settings.selectProviderPlaceholder')}</span>
         <strong>{visibleSelected ? visibleSelected.modelLabel : t('settings.selectModelPlaceholder')}</strong>
       </button>
-      <div className="settings-model-cascade-menu" role="listbox" style={open ? menuStyle : undefined}>
+      <div className="settings-model-cascade-menu" role="listbox">
         <div className="settings-model-provider-list">
           {displayGroups.map((group) => (
             <button

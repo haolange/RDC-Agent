@@ -1,10 +1,17 @@
 import React, { type Dispatch, type SetStateAction, useState } from 'react';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
-import type { useI18n } from '../../../../i18n';
-import { AgentModelCascadeSelect } from './AgentModelCascadeSelect';
+import type { TranslationKey, useI18n } from '../../../../i18n';
+import { AgentManifestEditor } from './AgentManifestEditor';
 
 type Translate = ReturnType<typeof useI18n>['t'];
+
+const AGENT_DESCRIPTION_KEYS: Partial<Record<string, TranslationKey>> = {
+  analyzer: 'settings.agentDescription.analyzer',
+  ask: 'settings.agentDescription.ask',
+  debugger: 'settings.agentDescription.debugger',
+  optimizer: 'settings.agentDescription.optimizer',
+};
 
 interface AgentsSettingsProps {
   settings: AppSettings;
@@ -22,6 +29,11 @@ const visibleDrafts = (drafts: AgentManifestDraft[]): AgentManifestDraft[] =>
 
 const toSlug = (value: string): string =>
   value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'agent';
+
+const getAgentCardDescription = (agent: AgentManifestDraft, t: Translate): string => {
+  const key = AGENT_DESCRIPTION_KEYS[agent.id];
+  return key ? t(key) : agent.description;
+};
 
 const createNewAgent = (existing: AgentManifestDraft[]): AgentManifestDraft => {
   const base = 'custom-agent';
@@ -52,26 +64,6 @@ const createNewAgent = (existing: AgentManifestDraft[]): AgentManifestDraft => {
     enabled: true,
   };
 };
-
-const parseLines = (value: string): string[] =>
-  value.split(/\r?\n|,/).map((entry) => entry.trim()).filter(Boolean);
-
-const formatLines = (values: string[]): string => values.join('\n');
-
-const parseHandoffs = (value: string): AgentManifestDraft['handoffs'] => {
-  if (!value.trim()) {
-    return [];
-  }
-  try {
-    const parsed = JSON.parse(value) as unknown;
-    return Array.isArray(parsed) ? parsed as AgentManifestDraft['handoffs'] : [];
-  } catch {
-    return [];
-  }
-};
-
-const formatHandoffs = (value: AgentManifestDraft['handoffs']): string =>
-  value.length > 0 ? JSON.stringify(value, null, 2) : '';
 
 export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   settings,
@@ -166,7 +158,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
               >
                 <span>
                   <strong>{agent.name}</strong>
-                  <small>{agent.description}</small>
+                  <small>{getAgentCardDescription(agent, t)}</small>
                 </span>
                 <span className="settings-manifest-card-meta">
                   {agent.userInvocable ? t('settings.userInvocable') : t('settings.subAgent')}
@@ -176,114 +168,18 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
           </div>
 
           {selectedAgent && (
-            <div className="settings-manifest-editor" data-testid="settings-agent-manifest-editor">
-              <div className="settings-manifest-editor-head">
-                <div>
-                  <div className="settings-field-label">{selectedAgent.name}</div>
-                  <div className="settings-help-text">{selectedAgent.fileName}</div>
-                </div>
-                <div className="settings-manifest-editor-actions">
-                  <button type="button" className="button button-secondary" onClick={duplicateAgent}>
-                    {t('settings.duplicateAgent')}
-                  </button>
-                  <button type="button" className="button button-secondary" onClick={deleteAgent}>
-                    {t('settings.deleteAgent')}
-                  </button>
-                </div>
-              </div>
-
-              <div className="settings-manifest-form-grid">
-                <label className="settings-input-row">
-                  <span className="settings-help-text">{t('settings.agentName')}</span>
-                  <input className="input" value={selectedAgent.name} onChange={(event) => updateAgent({ name: event.currentTarget.value })} />
-                </label>
-                <label className="settings-input-row">
-                  <span className="settings-help-text">{t('settings.agentArgumentHint')}</span>
-                  <input className="input" value={selectedAgent.argumentHint} onChange={(event) => updateAgent({ argumentHint: event.currentTarget.value })} />
-                </label>
-              </div>
-
-              <label className="settings-input-row">
-                <span className="settings-help-text">{t('settings.agentDescription')}</span>
-                <input className="input" value={selectedAgent.description} onChange={(event) => updateAgent({ description: event.currentTarget.value })} />
-              </label>
-
-              <div className="settings-manifest-form-grid">
-                <div className="settings-input-row">
-                  <span className="settings-help-text">{t('settings.modelFieldLabel')}</span>
-                  <AgentModelCascadeSelect
-                    value={selectedAgent.models[0] ?? ''}
-                    options={settings.agents.modelOptions}
-                    onChange={(model) => updateAgent({ models: [model] })}
-                    t={t}
-                  />
-                </div>
-                <div className="settings-agent-flags">
-                  <label className="settings-checkbox-row">
-                    <input type="checkbox" checked={selectedAgent.enabled} onChange={(event) => updateAgent({ enabled: event.currentTarget.checked })} />
-                    <span>{t('settings.agentEnabled')}</span>
-                  </label>
-                  <label className="settings-checkbox-row">
-                    <input type="checkbox" checked={selectedAgent.userInvocable} onChange={(event) => updateAgent({ userInvocable: event.currentTarget.checked })} />
-                    <span>{t('settings.userInvocable')}</span>
-                  </label>
-                  <label className="settings-checkbox-row">
-                    <input type="checkbox" checked={selectedAgent.disableModelInvocation} onChange={(event) => updateAgent({ disableModelInvocation: event.currentTarget.checked })} />
-                    <span>{t('settings.disableModelInvocation')}</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="settings-manifest-form-grid">
-                <label className="settings-input-row">
-                  <span className="settings-help-text">{t('settings.tools')}</span>
-                  <textarea className="input settings-rdx-cli-textarea" value={formatLines(selectedAgent.tools)} onChange={(event) => updateAgent({ tools: parseLines(event.currentTarget.value) })} />
-                </label>
-                <label className="settings-input-row">
-                  <span className="settings-help-text">{t('settings.subAgents')}</span>
-                  <textarea className="input settings-rdx-cli-textarea" value={formatLines(selectedAgent.agents)} onChange={(event) => updateAgent({ agents: parseLines(event.currentTarget.value) })} />
-                </label>
-              </div>
-
-              <div className="settings-manifest-form-grid">
-                <label className="settings-input-row">
-                  <span className="settings-help-text">{t('settings.skills')}</span>
-                  <textarea className="input settings-rdx-cli-textarea" value={formatLines(selectedAgent.skills)} onChange={(event) => updateAgent({ skills: parseLines(event.currentTarget.value) })} />
-                </label>
-                <label className="settings-input-row">
-                  <span className="settings-help-text">{t('settings.mcp')}</span>
-                  <textarea className="input settings-rdx-cli-textarea" value={formatLines(selectedAgent.mcpServers)} onChange={(event) => updateAgent({ mcpServers: parseLines(event.currentTarget.value) })} />
-                </label>
-              </div>
-
-              <label className="settings-input-row">
-                <span className="settings-help-text">{t('settings.handoffs')}</span>
-                <textarea className="input settings-agent-handoff-textarea" value={formatHandoffs(selectedAgent.handoffs)} onChange={(event) => updateAgent({ handoffs: parseHandoffs(event.currentTarget.value) })} />
-              </label>
-
-              <label className="settings-input-row">
-                <span className="settings-help-text">{t('settings.agentInstructions')}</span>
-                <textarea className="input settings-agent-instructions" value={selectedAgent.instructions} onChange={(event) => updateAgent({ instructions: event.currentTarget.value })} />
-              </label>
-            </div>
+            <AgentManifestEditor
+              settings={settings}
+              selectedAgent={selectedAgent}
+              onUpdateAgent={updateAgent}
+              onDuplicateAgent={duplicateAgent}
+              onDeleteAgent={deleteAgent}
+              onSaveAgentManifests={onSaveAgentManifests}
+              agentRouteSaveState={agentRouteSaveState}
+              agentRouteSaveMessage={agentRouteSaveMessage}
+              t={t}
+            />
           )}
-        </div>
-
-        <div className="settings-actions">
-          {agentRouteSaveMessage && (
-            <div className={`settings-inline-status ${agentRouteSaveState === 'saved' ? 'success' : 'error'}`}>
-              {agentRouteSaveMessage}
-            </div>
-          )}
-          <button
-            type="button"
-            className="button button-primary"
-            data-testid="settings-agent-save"
-            onClick={() => void onSaveAgentManifests()}
-            disabled={agentRouteSaveState === 'saving'}
-          >
-            {agentRouteSaveState === 'saving' ? t('settings.saving') : t('settings.saveAgentManifests')}
-          </button>
         </div>
       </div>
     </section>
