@@ -73,6 +73,11 @@
   --surface-elevated: rgb(var(--color-bg-2));
   --surface-active: rgb(var(--color-accent-500) / 0.1);
 
+  /* Semantic surface aliases — consumed by component CSS */
+  --color-surface-raised: var(--color-bg-3);
+  --color-surface-subtle: var(--color-bg-2);
+  --color-surface-overlay: 16 18 22;
+
   /* Spacing Scale - 4px base */
   --space-0: 0;
   --space-1: 4px;
@@ -230,6 +235,11 @@
   --surface-card-hover: rgb(255 255 255 / 0.92);
   --surface-elevated: rgb(255 255 255 / 0.94);
   --surface-active: rgb(var(--color-accent-500) / 0.1);
+
+  /* Semantic surface aliases — light theme overrides */
+  --color-surface-raised: var(--color-bg-3);
+  --color-surface-subtle: var(--color-bg-1);
+  --color-surface-overlay: 242 245 249;
 }
 
 :root[data-font-scale='small'] {
@@ -624,4 +634,113 @@
 .ui-skeleton--card {
   height: 56px;
   border-radius: var(--radius-card);
+}
+
+/* ─── Semantic Token Layer ─────────────────────────────────────────────────
+ *
+ *  Three-layer token architecture:
+ *    Primitive  →  --color-bg-*, --color-accent-*, --space-*, etc.
+ *    Semantic   →  --token-* (this section) — intent-named aliases
+ *    Component  →  --btn-*, --input-*, --card-*, etc. (per component)
+ *
+ *  Rules for agents writing component CSS:
+ *    • Prefer semantic tokens over primitive tokens.
+ *    • Never use hex literals; always reference a token.
+ *    • Component tokens must reference semantic tokens, not primitives.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* ── Interactive surfaces ── */
+  --token-bg-app:              rgb(var(--color-bg-0));
+  --token-bg-shell:            rgb(var(--color-bg-1));
+  --token-bg-panel:            rgb(var(--color-bg-2));
+  --token-bg-raised:           rgb(var(--color-bg-3));
+  --token-bg-overlay:          rgb(var(--color-surface-overlay));
+
+  /* ── Interactive element states ── */
+  --token-interactive-rest:    transparent;
+  --token-interactive-hover:   rgb(var(--color-bg-3));
+  --token-interactive-active:  rgb(var(--color-accent-500) / 0.12);
+  --token-interactive-focus:   rgb(var(--color-accent-500) / 0.16);
+
+  /* ── Borders ── */
+  --token-border-muted:        rgb(var(--color-border-subtle));
+  --token-border-default:      rgb(var(--color-border-default));
+  --token-border-strong:       rgb(var(--color-border-strong));
+  --token-border-focus:        rgb(var(--color-accent-500));
+  --token-border-card:         rgb(var(--color-border-secondary));
+  --token-border-input:        rgb(var(--color-border-default));
+
+  /* ── Typography ── */
+  --token-text-heading:        rgb(var(--color-text-primary));
+  --token-text-body:           rgb(var(--color-text-secondary));
+  --token-text-caption:        rgb(var(--color-text-tertiary));
+  --token-text-placeholder:    rgb(var(--color-text-muted));
+  --token-text-disabled:       rgb(var(--color-text-disabled));
+  --token-text-link:           rgb(var(--color-accent-400));
+  --token-text-inverse:        rgb(var(--color-text-on-accent));
+
+  /* ── Status ── */
+  --token-status-success:      rgb(var(--color-success));
+  --token-status-warning:      rgb(var(--color-warning));
+  --token-status-error:        rgb(var(--color-error));
+  --token-status-info:         rgb(var(--color-info));
+
+  /* ── Component: Button ── */
+  --btn-height-sm:             32px;
+  --btn-height-md:             36px;
+  --btn-height-lg:             44px;
+  --btn-padding-sm:            0 10px;
+  --btn-padding-md:            0 14px;
+  --btn-padding-lg:            0 20px;
+  --btn-radius:                var(--radius-lg);
+  --btn-font-size:             var(--text-sm);
+  --btn-font-weight:           var(--font-semibold);
+  --btn-primary-bg:            linear-gradient(135deg, rgb(var(--color-accent-600)), rgb(var(--color-primary-600)));
+  --btn-primary-bg-hover:      linear-gradient(135deg, rgb(var(--color-accent-500)), rgb(var(--color-primary-500)));
+  --btn-primary-text:          var(--token-text-inverse);
+  --btn-secondary-bg:          rgb(var(--color-bg-3) / 0.52);
+  --btn-secondary-bg-hover:    rgb(var(--color-bg-3));
+  --btn-secondary-border:      var(--token-border-default);
+  --btn-ghost-bg:              transparent;
+  --btn-ghost-bg-hover:        rgb(var(--color-bg-3));
+
+  /* ── Component: Input ── */
+  --input-height-sm:           32px;
+  --input-height-md:           36px;
+  --input-height-lg:           44px;
+  --input-bg:                  rgb(var(--color-bg-3) / 0.52);
+  --input-bg-hover:            rgb(var(--color-bg-3) / 0.72);
+  --input-border:              var(--token-border-input);
+  --input-border-hover:        var(--token-border-strong);
+  --input-border-focus:        var(--token-border-focus);
+  --input-radius:              var(--radius-input);
+  --input-text:                var(--token-text-heading);
+  --input-placeholder:         var(--token-text-placeholder);
+
+  /* ── Component: Card ── */
+  --card-bg:                   rgb(var(--color-bg-2) / 0.52);
+  --card-bg-hover:             rgb(var(--color-bg-3) / 0.72);
+  --card-border:               var(--token-border-card);
+  --card-radius:               var(--radius-lg);
+  --card-shadow:               var(--shadow-sm);
+
+  /* ── Component: Modal / Dialog ── */
+  --modal-bg:                  rgb(var(--color-bg-1));
+  --modal-border:              var(--token-border-default);
+  --modal-radius:              12px;
+  --modal-shadow:              var(--shadow-xl);
+  --modal-backdrop:            rgb(0 0 0 / 0.4);
+  --modal-backdrop-blur:       16px;
+
+  /* ── Component: Badge ── */
+  --badge-radius:              var(--radius-full);
+  --badge-font-size:           var(--text-xs);
+  --badge-font-weight:         var(--font-semibold);
+
+  /* ── Layout constants ── */
+  --layout-sidebar-left:       256px;
+  --layout-sidebar-right:      312px;
+  --layout-header:             52px;
+  --layout-composer-max:       760px;
 }

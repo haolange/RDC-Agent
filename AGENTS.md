@@ -47,6 +47,42 @@
 - 修复结构问题时，不要顺手做与任务无关的视觉改版、布局重排或交互重定义。
 - 涉及 `src/renderer` 的改动，除检查类型和功能外，还要检查界面入口是否完整、关键面板是否可渲染、现有交互是否可达。
 
+## 设计系统约束（agent 写 CSS 必读）
+
+**权威文件**：`DESIGN.md` 的"设计系统与视觉语言"章节。本节是该章节的快速执行摘要。
+
+### Token 使用规则
+
+- **必须**引用语义 token（`--token-*`），禁止在组件 CSS 中直接用 primitive token（`--color-bg-3`、`rgb(var(--color-accent-500))` 等）。
+- `--token-*` 完整定义在 `src/renderer/styles/design-system.css` 的 "Semantic Token Layer" 部分。
+- 边框 token 已内含 alpha，使用方式为 `rgb(var(--color-border-subtle))`，**禁止**追加额外 alpha：`rgb(var(--color-border-subtle) / 0.65)` 是无效 CSS。
+- 字号必须用 `var(--text-*)` 变量，**禁止** px 字面值。
+- 间距必须用 `var(--space-*)` 变量，**禁止**奇数像素值（3px、7px、9px）。
+
+### 按钮规则
+
+- 全局唯一按钮系统：`.button`（基类） + `.button-primary / button-secondary / button-ghost / button-danger`，定义在 `panels-composer.css`。
+- React 层用 `<Button variant="primary|secondary|ghost|danger" size="sm|md|lg">`（`src/renderer/ui/Button.tsx`）。
+- **禁止**新增第三套按钮类名，禁止在 feature CSS 中重复定义按钮样式。
+
+### 颜色使用规则
+
+- 强调色（`--color-accent-*`）只用于：焦点环、激活状态、主要 CTA。不得用于正文、装饰或多处背景。
+- 状态色（success / warning / error / info）只用于语义状态，不得挪作装饰。
+- 不得引入非 design-system.css 定义的新颜色；需要新颜色时先在 `--token-*` 层添加并说明用途。
+
+### 新增组件规则
+
+每个新组件必须：
+1. 覆盖所有交互状态：rest / hover / active / focus / disabled（按需加 loading / error）。
+2. 通过 CSS 变量控制 variant，不得在选择器里硬编码颜色。
+3. 不使用内联 `style={{}}`，动态值（宽度百分比、JS 计算值）例外。
+4. 文件行数不超过 300 行（组件）/ 200 行（hook / service）。
+
+### 视觉参考
+
+`designs/rdc-agent-design-system/Design System Preview.html`——在浏览器打开，可交互查看所有 token、组件规范和完整 dark/light 两套主题展示。写新组件前应先参考对应 section。
+
 ## 浏览器真实会话边界
 
 - agent 日常 UI/功能验证默认使用 headless 浏览器真实会话：设置 `RDC_AGENT_HEADLESS=1` 启动应用主进程，再用主进程输出的 `http://127.0.0.1:<port>/app` 打开同一套 renderer。

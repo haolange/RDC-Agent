@@ -97,3 +97,95 @@ renderer 内部分层依赖方向：
 - Provider 体系：`npm run check:provider-system`。
 - Settings Agents 路由：`npm run check:settings-agents`。
 - 本地产品级浏览器验收需要真实 project 与 `.rdc` 输入，例如 `D:\Utility\RDC_Agent` 和 `D:\Utility\GPUCaptures\RenderDoc\眼睛泪腺白点.rdc`；RDX/RenderDoc 失败必须 fail-closed 并显示诊断。
+
+## 设计系统与视觉语言
+
+### 设计方向
+
+**Professional Tool Aesthetic**：克制、高密度、暗色优先、精确感。参考 VS Code、JetBrains、Linear。视觉语言服务于焦点和快速诊断，而非装饰。
+
+- 主题：深色（默认）+ 浅色，同等质量
+- 字型：`Inter`（UI）+ `JetBrains Mono`（代码、路径、ID）
+- 强调色：信号青（`--color-accent-500`），仅用于焦点环、激活状态、主要 CTA
+- 主色：工作站蓝（`--color-primary-500`），用于品牌标识和主按钮渐变
+
+### Token 三层架构
+
+Agent 写组件 CSS 时必须按以下层级引用，禁止跨层：
+
+```
+Primitive  →  --color-bg-*, --color-accent-*, --space-*
+Semantic   →  --token-bg-*, --token-text-*, --token-border-*  ← 组件必须用这层
+Component  →  --btn-*, --input-*, --card-*                    ← 组件内部可进一步细化
+```
+
+**完整 token 定义**见 `src/renderer/styles/design-system.css`。
+**视觉参考**（可在浏览器打开）见 `designs/rdc-agent-design-system/Design System Preview.html`。
+
+### 颜色使用规则
+
+1. 背景层级：`--token-bg-app`（最深）→ `--token-bg-shell` → `--token-bg-panel` → `--token-bg-raised`（最浅可交互面）
+2. 边框 token 已内含 alpha（如 `--color-border-subtle: 255 255 255 / 0.06`），直接用 `rgb(var(--color-border-subtle))`。**禁止**写 `rgb(var(--color-border-subtle) / 0.65)`——那是无效 CSS。
+3. 需要自定义透明度的边框，应从 `--token-border-*` 语义层选最接近的，不得二次叠加 alpha。
+4. 强调色只用于交互状态和主 CTA，不得作为正文、标签或装饰色。
+
+### 按钮系统
+
+**单一系统**：`.button` 基类 + 修饰符，定义在 `src/renderer/styles/global/panels-composer.css`。
+
+```html
+<button class="button button-primary">主操作</button>
+<button class="button button-secondary">次要</button>
+<button class="button button-ghost">幽灵</button>
+<button class="button button-danger">危险</button>
+<button class="button button-secondary button-sm">小号</button>
+```
+
+React 组件：`<Button variant="primary" size="sm">` —— 见 `src/renderer/ui/Button.tsx`。
+
+**禁止**：不得新增第三套按钮类名（如 `ui-btn`、`ds-btn` 等），也不得在组件 CSS 中重复定义按钮样式。
+
+### 排版规则
+
+- 正文：`var(--text-base)` / 14px，`var(--font-normal)`
+- 说明文字：`var(--text-sm)` / 12px，`--token-text-caption`
+- 大写标签（区块标题、状态标签）：`var(--text-xs)` + `letter-spacing: var(--tracking-caps)` + `text-transform: uppercase`
+- 路径/ID/代码：`var(--font-mono)`，`var(--text-sm)`
+- **禁止**使用 px 字面值；所有字号从 `--text-*` 变量读取。
+
+### 间距规则
+
+- 使用 `--space-*` 系列（4px 基准网格）
+- 组件内边距：`--space-3`（12px）至 `--space-4`（16px）
+- 区块间隔：`--space-4` 至 `--space-6`
+- 紧凑列表间距：`--space-2`（8px）
+- **禁止**使用奇数像素值（3px、7px、9px 等）。
+
+### Z-index 规范
+
+| 层 | 值 | 用途 |
+|---|---|---|
+| base | 0 | 普通内容 |
+| dropdown | 100 | 下拉菜单 |
+| sticky | 200 | 粘性标题 |
+| modal-backdrop | 400 | 遮罩层 |
+| modal | 500 | 对话框、Settings modal |
+| popover | 600 | 浮动面板 |
+| tooltip | 700 | 悬浮提示 |
+| notification | 1000 | Toast |
+
+### 组件约定
+
+新增组件必须满足：
+1. **States**：rest / hover / active / focus / disabled / error（按需）
+2. **Variants**：通过 `--component-*` token 控制，不得硬编码颜色
+3. **Size variants**：sm / md / lg，使用高度 token 而非 px 字面值
+4. **无内联样式**：`style={{}}` 只用于纯动态值（宽度百分比、计算高度）
+
+### 迁移路线图（未来阶段）
+
+下列是已规划但尚未实施的改进，下一次 UI/UX 专项迭代时推进：
+
+1. **shadcn/ui + Tailwind CSS 迁移**：引入 Radix UI 原语 + class-variance-authority，获得 40+ 可访问性合格组件。需要 `npm install tailwindcss @tailwindcss/vite clsx tailwind-merge`，并将现有 CSS 变量映射到 shadcn 的 `--background/--foreground` 体系。
+2. **ui/ 控件补全**：补充 `Input`、`Textarea`、`Switch`、`Checkbox`、`Tooltip`、`Select`、`Tabs`、`Toast` 等缺失原语。
+3. **Settings 视觉改版**：基于设计系统重写 Settings > Providers / Agents / General 的视觉表达，提升信息层级和状态可读性。
