@@ -21,7 +21,7 @@
 .dropdown-select-trigger.variant-field {
   min-height: 44px;
   padding: 0 14px;
-  border: 1px solid rgb(var(--color-border-default) / 0.65);
+  border: 1px solid rgb(var(--color-border-subtle));
   border-radius: 8px;
   background: rgb(var(--color-bg-2));
 }

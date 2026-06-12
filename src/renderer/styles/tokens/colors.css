@@ -60,6 +60,11 @@
   --surface-card-hover: rgb(var(--color-bg-3) / 0.92);
   --surface-elevated: rgb(var(--color-bg-2));
   --surface-active: rgb(var(--color-accent-500) / 0.1);
+
+  /* Semantic surface aliases — consumed by component CSS */
+  --color-surface-raised: var(--color-bg-3);
+  --color-surface-subtle: var(--color-bg-2);
+  --color-surface-overlay: 16 18 22;
 }
 
 :root[data-resolved-theme='light'] {
@@ -112,4 +117,9 @@
   --surface-card-hover: rgb(255 255 255 / 0.92);
   --surface-elevated: rgb(255 255 255 / 0.94);
   --surface-active: rgb(var(--color-accent-500) / 0.1);
+
+  /* Semantic surface aliases — light theme overrides */
+  --color-surface-raised: var(--color-bg-3);
+  --color-surface-subtle: var(--color-bg-1);
+  --color-surface-overlay: 242 245 249;
 }

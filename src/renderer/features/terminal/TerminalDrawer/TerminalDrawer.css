@@ -50,7 +50,7 @@
   width: 84px;
   height: 2px;
   border-radius: 999px;
-  background: rgb(var(--color-border-strong) / 0.5);
+  background: rgb(var(--color-border-default));
   transform: translateX(-50%);
   opacity: 0;
   transition: opacity var(--transition-fast), background var(--transition-fast);

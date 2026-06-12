@@ -104,7 +104,7 @@
   min-height: 22px;
   padding: 0 8px;
   border-radius: 999px;
-  border: 1px solid rgb(var(--color-border-default) / 0.55);
+  border: 1px solid rgb(var(--color-border-subtle));
   background: rgb(var(--color-bg-2) / 0.88);
   color: rgb(var(--color-text-primary));
   font-size: var(--text-xs);
@@ -877,7 +877,7 @@
   display: flex;
   flex-direction: column;
   padding: 2px 0 8px;
-  border-top: 1px solid rgb(var(--color-border-secondary) / 0.5);
+  border-top: 1px solid rgb(var(--color-border-subtle));
   background: rgb(var(--color-bg-1) / 0.4);
 }
 
@@ -1614,7 +1614,7 @@
   color: rgb(var(--color-text-primary));
   font-size: var(--text-md);
   font-weight: var(--font-semibold);
-  box-shadow: inset 0 0 0 1px rgb(var(--color-border-default) / 0.4);
+  box-shadow: inset 0 0 0 1px rgb(var(--color-border-subtle));
 }
 
 .session-progress-idle-state,
@@ -1647,7 +1647,7 @@
 .session-progress-idle-step.completed {
   border-color: rgb(var(--color-border-default));
   background: rgb(var(--color-bg-3));
-  box-shadow: inset 0 0 0 1px rgb(var(--color-border-default) / 0.5);
+  box-shadow: inset 0 0 0 1px rgb(var(--color-border-subtle));
 }
 
 .session-progress-idle-link {

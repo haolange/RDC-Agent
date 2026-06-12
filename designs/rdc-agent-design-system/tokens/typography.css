@@ -1,0 +1,49 @@
+/* Typography tokens */
+
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+
+  /* Size scale (px for precision in desktop apps) */
+  --text-xs:   11px;
+  --text-sm:   12px;
+  --text-base: 14px;
+  --text-md:   15px;
+  --text-lg:   17px;
+  --text-xl:   20px;
+  --text-2xl:  24px;
+  --text-3xl:  30px;
+  --text-4xl:  36px;
+
+  /* Weight */
+  --font-normal:   400;
+  --font-medium:   500;
+  --font-semibold: 600;
+  --font-bold:     700;
+
+  /* Line height */
+  --leading-none:    1;
+  --leading-tight:   1.25;
+  --leading-snug:    1.375;
+  --leading-normal:  1.5;
+  --leading-relaxed: 1.625;
+
+  /* Letter spacing */
+  --tracking-tight:  -0.02em;
+  --tracking-normal:  0;
+  --tracking-wide:    0.04em;
+  --tracking-wider:   0.08em;
+  --tracking-caps:    0.10em;
+}
+
+:root[data-font-scale='small'] {
+  --text-xs: 10px; --text-sm: 11px; --text-base: 13px;
+  --text-md: 14px; --text-lg: 16px; --text-xl: 18px;
+  --text-2xl: 20px; --text-3xl: 26px; --text-4xl: 32px;
+}
+
+:root[data-font-scale='large'] {
+  --text-xs: 12px; --text-sm: 13px; --text-base: 15px;
+  --text-md: 16px; --text-lg: 18px; --text-xl: 22px;
+  --text-2xl: 26px; --text-3xl: 34px; --text-4xl: 40px;
+}
