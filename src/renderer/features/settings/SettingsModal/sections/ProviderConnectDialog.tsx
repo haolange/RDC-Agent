@@ -56,6 +56,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
     || connectionNeedsApiKey
     || connectionNeedsBaseUrl
     || connectionDevicePending;
+  const modelListSize = connectionDraft.models.length >= 24 ? 'long' : connectionDraft.models.length >= 8 ? 'medium' : 'short';
 
   return (
   <div
@@ -68,6 +69,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   >
     <div
       className="settings-provider-connect-dialog"
+      data-model-list-size={modelListSize}
       data-testid="settings-provider-connect-dialog"
       role="dialog"
       aria-modal="true"

@@ -41,6 +41,13 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
     const models = getEnabledModels(provider);
     const connected = provider.isConfigured && provider.status === 'verified';
     const unavailable = Boolean(provider.unavailableReason && provider.unavailableReason.trim());
+    const showConfiguredActions = provider.isConfigured;
+    const primaryDisabled = unavailable && !provider.isConfigured;
+    const primaryLabel = provider.isConfigured
+      ? t('settings.edit')
+      : primaryDisabled
+        ? t('settings.providerUnavailable')
+        : t('settings.connect');
     const rowClassName = [
       'settings-provider-row',
       connected ? 'connected' : '',
@@ -80,38 +87,48 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
             </span>
           </span>
         </div>
-        <div className="settings-provider-row-actions">
-          {(mode !== 'add' || provider.isConfigured) && (
+        {showConfiguredActions ? (
+          <div className="settings-provider-row-actions settings-provider-row-actions--configured">
             <button
               type="button"
               className="button button-secondary settings-provider-row-button"
               data-testid={`settings-provider-test-${provider.id}`}
               onClick={() => void onRefreshProviderModels(provider)}
-              disabled={!provider.isConfigured}
+              disabled={unavailable}
             >
               {t('settings.test')}
             </button>
-          )}
-          {(mode !== 'add' || provider.isConfigured) && (
             <button
               type="button"
               className="button button-secondary settings-provider-row-button"
               data-testid={`settings-provider-disconnect-${provider.id}`}
               onClick={() => void onDisconnectProvider(provider)}
-              disabled={!provider.isConfigured}
             >
               {provider.authMode === 'account' ? t('settings.signOut') : t('settings.disconnect')}
             </button>
-          )}
-          <button
-            type="button"
-            className="button button-primary settings-provider-row-button"
-            data-testid={`settings-provider-connect-${provider.id}`}
-            onClick={() => onOpenProviderConnection(provider)}
-          >
-            {provider.isConfigured ? t('settings.edit') : t('settings.connect')}
-          </button>
-        </div>
+            <button
+              type="button"
+              className="button button-primary settings-provider-row-button"
+              data-testid={`settings-provider-connect-${provider.id}`}
+              onClick={() => onOpenProviderConnection(provider)}
+              disabled={primaryDisabled}
+            >
+              {primaryLabel}
+            </button>
+          </div>
+        ) : (
+          <div className="settings-provider-row-actions">
+            <button
+              type="button"
+              className="button button-primary settings-provider-row-button"
+              data-testid={`settings-provider-connect-${provider.id}`}
+              onClick={() => onOpenProviderConnection(provider)}
+              disabled={primaryDisabled}
+            >
+              {primaryLabel}
+            </button>
+          </div>
+        )}
       </div>
     );
   };

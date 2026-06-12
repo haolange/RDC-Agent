@@ -20,7 +20,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   onSave,
   t,
 }) => (
-  <div className="settings-section">
+  <div className="settings-section settings-profile-section">
     <div className="settings-section-header">
       <div>
         <div className="settings-section-title">{t('settings.profile')}</div>

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { AppSettings } from '@shared/types/settings';
 import { useSettingsModal } from './useSettingsModal';
@@ -18,6 +18,7 @@ interface SettingsModalProps {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, onClose }) => {
   const modal = useSettingsModal(open, settings);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const {
     t,
     activeSection,
@@ -82,10 +83,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [open, onClose]);
 
-  if (!open) return null;
+  useEffect(() => {
+    if (!open) return;
+    panelRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [activeSection, open]);
 
-  const configuredProviderCount = settings.llm.providers.filter((provider) => provider.enabled && provider.isConfigured).length;
-  const workspaceRoot = settings.workspace.rootPath || settings.paths.defaultWorkspaceRoot;
+  if (!open) return null;
 
   const subtitle = (() => {
     switch (activeSection) {
@@ -105,143 +108,131 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   })();
 
   return createPortal(
-    <div className="settings-modal-backdrop" onClick={onClose}>
-      <div
-        className="settings-modal settings-center"
-        data-testid="settings-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="settings-modal-title"
-        aria-describedby="settings-modal-subtitle"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="settings-center-sidebar">
-          <div className="settings-center-brand">
-            <div className="settings-center-brand-icon">RD</div>
-            <div className="settings-center-brand-copy">
-              <div className="settings-center-brand-title">RDC Agent</div>
-              <div className="settings-center-brand-subtitle">{t('settings.title')}</div>
+    <>
+      <div className="settings-modal-backdrop" onClick={onClose}>
+        <div
+          className="settings-modal settings-center"
+          data-testid="settings-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="settings-modal-title"
+          aria-describedby="settings-modal-subtitle"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="settings-center-sidebar">
+            <div className="settings-center-brand">
+              <div className="settings-center-brand-icon">RD</div>
+              <div className="settings-center-brand-copy">
+                <div className="settings-center-brand-title">RDC Agent</div>
+                <div className="settings-center-brand-subtitle">{t('settings.title')}</div>
+              </div>
             </div>
+
+            <div className="settings-center-nav">
+              {sections.map((section) => (
+                <button
+                  key={section.id}
+                  type="button"
+                  className={`settings-center-nav-item ${activeSection === section.id ? 'active' : ''}`}
+                  data-testid={`settings-nav-${section.id}`}
+                  onClick={() => setActiveSection(section.id)}
+                >
+                  {section.label}
+                </button>
+              ))}
+            </div>
+
           </div>
 
-          <div className="settings-center-nav">
-            {sections.map((section) => (
-              <button
-                key={section.id}
-                type="button"
-                className={`settings-center-nav-item ${activeSection === section.id ? 'active' : ''}`}
-                data-testid={`settings-nav-${section.id}`}
-                onClick={() => setActiveSection(section.id)}
-              >
-                {section.label}
+          <div className="settings-center-content">
+            <div className="settings-modal-header">
+              <div className="settings-modal-heading">
+                <div className="settings-modal-title" id="settings-modal-title">
+                  {sections.find((section) => section.id === activeSection)?.label}
+                </div>
+                <div className="settings-modal-subtitle" id="settings-modal-subtitle">
+                  {subtitle}
+                </div>
+              </div>
+              <button type="button" className="settings-modal-close" onClick={onClose} aria-label={t('settings.close')}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
               </button>
-            ))}
-          </div>
-
-          <div className="settings-center-sidebar-status" aria-label={t('settings.sidebarStatus')}>
-            <div>
-              <span>{t('settings.workspaceRoot')}</span>
-              <strong title={workspaceRoot}>{workspaceRoot || t('settings.unset')}</strong>
             </div>
-            <div>
-              <span>{t('settings.connectedProviders')}</span>
-              <strong>{configuredProviderCount}</strong>
+
+            <div ref={panelRef} className="settings-center-panel scrollbar-thin" data-testid="settings-center-panel">
+              {activeSection === 'general' && (
+                <GeneralSettings
+                  settings={settings}
+                  accountDraft={accountDraft}
+                  onAccountDraftChange={setAccountDraft}
+                  onAvatarSelect={handleAvatarSelect}
+                  onAccountSave={handleAccountSave}
+                  onThemeChange={setTheme}
+                  onLanguageChange={setLanguage}
+                  onFontScaleChange={setFontScale}
+                  t={t}
+                />
+              )}
+
+              {activeSection === 'workspace' && (
+                <WorkspaceSettings
+                  settings={settings}
+                  workspaceDraft={workspaceDraft}
+                  derivedPathEntries={derivedPathEntries}
+                  onWorkspacePick={handleWorkspacePick}
+                  onWorkspaceSave={handleWorkspaceSave}
+                  onWorkspaceReset={handleWorkspaceReset}
+                  t={t}
+                />
+              )}
+
+              {activeSection === 'models' && (
+                <ModelsSettings
+                  accountProviders={accountProviders}
+                  providerCatalog={providerCatalog}
+                  getResolvedProviderLabel={getResolvedProviderLabel}
+                  onRefreshProviderModels={handleRefreshProviderModels}
+                  onDisconnectProvider={handleDisconnectProvider}
+                  onOpenProviderConnection={openProviderConnection}
+                  t={t}
+                />
+              )}
+
+              {activeSection === 'agents' && (
+                <AgentsSettings
+                  settings={settings}
+                  agentManifestDrafts={agentManifestDrafts}
+                  onAgentManifestDraftsChange={setAgentManifestDrafts}
+                  onSaveAgentManifests={handleSaveAgentManifests}
+                  onImportAgentManifest={handleImportAgentManifest}
+                  agentRouteSaveState={agentRouteSaveState}
+                  agentRouteSaveMessage={agentRouteSaveMessage}
+                  t={t}
+                />
+              )}
+
+              {activeSection === 'tools' && (
+                <SkillsToolsSettings
+                  settings={settings}
+                  enabledSkillDrafts={enabledSkillDrafts}
+                  enabledMcpDrafts={enabledMcpDrafts}
+                  rdxCliDraft={rdxCliDraft}
+                  rdxActionsDraft={rdxActionsDraft}
+                  globalInstructionsDraft={globalInstructionsDraft}
+                  onEnabledSkillDraftsChange={setEnabledSkillDrafts}
+                  onEnabledMcpDraftsChange={setEnabledMcpDrafts}
+                  onRdxCliDraftChange={setRdxCliDraft}
+                  onRdxActionsDraftChange={setRdxActionsDraft}
+                  onGlobalInstructionsDraftChange={setGlobalInstructionsDraft}
+                  onSave={handleSaveSkillsAndTools}
+                  toggleRuntimeId={toggleRuntimeId}
+                  t={t}
+                />
+              )}
             </div>
-            <div>
-              <span>{t('settings.localRenderDocToolchain')}</span>
-              <strong>{settings.tooling.rdxCli.enabled ? t('settings.enabled') : t('settings.disabled')}</strong>
-            </div>
-          </div>
-        </div>
-
-        <div className="settings-center-content">
-          <div className="settings-modal-header">
-            <div className="settings-modal-heading">
-              <div className="settings-modal-title" id="settings-modal-title">
-                {sections.find((section) => section.id === activeSection)?.label}
-              </div>
-              <div className="settings-modal-subtitle" id="settings-modal-subtitle">
-                {subtitle}
-              </div>
-            </div>
-            <button type="button" className="settings-modal-close" onClick={onClose} aria-label={t('settings.close')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="settings-center-panel" data-testid="settings-center-panel">
-            {activeSection === 'general' && (
-              <GeneralSettings
-                settings={settings}
-                accountDraft={accountDraft}
-                onAccountDraftChange={setAccountDraft}
-                onAvatarSelect={handleAvatarSelect}
-                onAccountSave={handleAccountSave}
-                onThemeChange={setTheme}
-                onLanguageChange={setLanguage}
-                onFontScaleChange={setFontScale}
-                t={t}
-              />
-            )}
-
-            {activeSection === 'workspace' && (
-              <WorkspaceSettings
-                settings={settings}
-                workspaceDraft={workspaceDraft}
-                derivedPathEntries={derivedPathEntries}
-                onWorkspacePick={handleWorkspacePick}
-                onWorkspaceSave={handleWorkspaceSave}
-                onWorkspaceReset={handleWorkspaceReset}
-                t={t}
-              />
-            )}
-
-            {activeSection === 'models' && (
-              <ModelsSettings
-                accountProviders={accountProviders}
-                providerCatalog={providerCatalog}
-                getResolvedProviderLabel={getResolvedProviderLabel}
-                onRefreshProviderModels={handleRefreshProviderModels}
-                onDisconnectProvider={handleDisconnectProvider}
-                onOpenProviderConnection={openProviderConnection}
-                t={t}
-              />
-            )}
-
-            {activeSection === 'agents' && (
-              <AgentsSettings
-                settings={settings}
-                agentManifestDrafts={agentManifestDrafts}
-                onAgentManifestDraftsChange={setAgentManifestDrafts}
-                onSaveAgentManifests={handleSaveAgentManifests}
-                onImportAgentManifest={handleImportAgentManifest}
-                agentRouteSaveState={agentRouteSaveState}
-                agentRouteSaveMessage={agentRouteSaveMessage}
-                t={t}
-              />
-            )}
-
-            {activeSection === 'tools' && (
-              <SkillsToolsSettings
-                settings={settings}
-                enabledSkillDrafts={enabledSkillDrafts}
-                enabledMcpDrafts={enabledMcpDrafts}
-                rdxCliDraft={rdxCliDraft}
-                rdxActionsDraft={rdxActionsDraft}
-                globalInstructionsDraft={globalInstructionsDraft}
-                onEnabledSkillDraftsChange={setEnabledSkillDrafts}
-                onEnabledMcpDraftsChange={setEnabledMcpDrafts}
-                onRdxCliDraftChange={setRdxCliDraft}
-                onRdxActionsDraftChange={setRdxActionsDraft}
-                onGlobalInstructionsDraftChange={setGlobalInstructionsDraft}
-                onSave={handleSaveSkillsAndTools}
-                toggleRuntimeId={toggleRuntimeId}
-                t={t}
-              />
-            )}
           </div>
         </div>
       </div>
@@ -264,7 +255,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
           t={t}
         />
       )}
-    </div>,
+    </>,
     document.body,
   );
 };
