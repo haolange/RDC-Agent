@@ -2834,6 +2834,7 @@ class ShellInvocationService {
       };
     }
     return new Promise((resolve) => {
+      const needsShell = process.platform === "win32" && [".bat", ".cmd"].includes(path.extname(command).toLowerCase());
       const proc = child_process.spawn(command, request.args ?? [], {
         cwd: request.cwd || void 0,
         env: {
@@ -2841,7 +2842,7 @@ class ShellInvocationService {
           ...request.env,
           PYTHONIOENCODING: "utf-8"
         },
-        shell: true,
+        shell: needsShell,
         windowsHide: true
       });
       const procId = generateEventId("proc");
@@ -2926,20 +2927,64 @@ class ShellInvocationService {
   }
 }
 const shellInvocationService = new ShellInvocationService();
+function resolveRdxBatchInvocation(command, args) {
+  if (process.platform !== "win32" || path.basename(command).toLowerCase() !== "rdx.bat") {
+    return { command, args };
+  }
+  const launcherPath = path.join(path.dirname(command), "scripts", "rdx_bat_launcher.ps1");
+  if (!fs.existsSync(launcherPath)) {
+    return { command, args };
+  }
+  const psFlags = ["-NoProfile", "-NoLogo", "-ExecutionPolicy", "Bypass"];
+  if (args[0]?.toLowerCase() === "--non-interactive") {
+    psFlags.push("-NonInteractive");
+  }
+  return {
+    command: path.join(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+    args: [...psFlags, "-File", launcherPath, ...args]
+  };
+}
 const substitute = (value, variables) => value.replace(/\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g, (_match, key) => {
   const replacement = variables[key];
   return replacement == null ? "" : String(replacement);
 });
+const isRecord = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+const readErrorMessage = (value) => {
+  if (typeof value === "string" && value.trim()) {
+    return value;
+  }
+  if (isRecord(value)) {
+    const message = value.message ?? value.error_message ?? value.code;
+    return typeof message === "string" && message.trim() ? message : void 0;
+  }
+  return void 0;
+};
 const parseJsonPayload = (stdout) => {
   const trimmed = stdout.trim();
   if (!trimmed) {
-    return {};
+    return { data: {} };
   }
   const parsed = JSON.parse(trimmed);
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+  if (!isRecord(parsed)) {
     throw new Error("RDX action stdout must be a JSON object.");
   }
-  return parsed;
+  if (typeof parsed.ok === "boolean" && ("data" in parsed || "result_kind" in parsed || "error" in parsed)) {
+    const envelopeData = isRecord(parsed.data) ? parsed.data : {};
+    const data = { ...envelopeData };
+    const envelopeContextId = typeof parsed.context_id === "string" && parsed.context_id.trim() ? parsed.context_id.trim() : typeof parsed.contextId === "string" && parsed.contextId.trim() ? parsed.contextId.trim() : void 0;
+    if (envelopeContextId && typeof data.context_id !== "string" && typeof data.contextId !== "string") {
+      data.context_id = envelopeContextId;
+    }
+    return {
+      data: {
+        ...data,
+        _rdxEnvelope: parsed
+      },
+      ok: parsed.ok,
+      error: parsed.ok ? void 0 : readErrorMessage(parsed.error)
+    };
+  }
+  return { data: parsed };
 };
 class RdxShellActionService {
   async runAction(actionId, variables = {}, options = {}) {
@@ -2979,25 +3024,32 @@ class RdxShellActionService {
         ...options.env
       }).map(([key, value]) => [key, substitute(value, resolvedVariables)])
     );
+    const command = substitute(action.command, resolvedVariables);
+    const invocation = resolveRdxBatchInvocation(command, args);
     const result = await shellInvocationService.invoke({
-      command: substitute(action.command, resolvedVariables),
-      args,
+      command: invocation.command,
+      args: invocation.args,
       cwd: action.workingDirectory ? substitute(action.workingDirectory, resolvedVariables) : void 0,
       env,
       timeoutMs: action.timeoutMs,
       abortSignal: options.abortSignal
     });
     let data = {};
+    let payloadOk;
+    let payloadError;
     let parseError;
-    if (result.exitCode === 0) {
+    if (result.stdout.trim()) {
       try {
-        data = parseJsonPayload(result.stdout);
+        const parsedPayload = parseJsonPayload(result.stdout);
+        data = parsedPayload.data;
+        payloadOk = parsedPayload.ok;
+        payloadError = parsedPayload.error;
       } catch (error2) {
         parseError = error2 instanceof Error ? error2.message : String(error2);
       }
     }
-    const ok = result.exitCode === 0 && !parseError;
-    const error = ok ? void 0 : parseError ?? (result.stderr.trim() || result.stdout.trim() || `RDX action "${actionId}" exited with ${result.exitCode}.`);
+    const ok = result.exitCode === 0 && !parseError && payloadOk !== false;
+    const error = ok ? void 0 : parseError ?? payloadError ?? (result.stderr.trim() || result.stdout.trim() || `RDX action "${actionId}" exited with ${result.exitCode}.`);
     runtimeLogService.log({
       scope: "app",
       namespace: "context",
@@ -4796,11 +4848,8 @@ class ReplayDeviceService {
     if (!result.ok) {
       throw new Error(result.error ?? "RDX connectRemote action failed.");
     }
-    const contextId = readActionString(result.data, ["contextId", "context_id", "RDX_CONTEXT_ID"]);
+    const contextId = readActionString(result.data, ["contextId", "context_id", "RDX_CONTEXT_ID"]) ?? device.id;
     const remoteId = readActionString(result.data, ["remoteId", "remote_id", "RDX_REMOTE_ID"]);
-    if (!contextId) {
-      throw new Error("RDX connectRemote action result must include contextId/context_id.");
-    }
     if (!remoteId) {
       throw new Error("RDX connectRemote action result must include remoteId/remote_id.");
     }
@@ -11863,9 +11912,13 @@ class RdxCliInvokerService {
         duration_ms: nowMs() - startTime
       };
     }
+    const invocation = resolveRdxBatchInvocation(
+      settings.command,
+      this.buildCommandArgs(settings, command, args)
+    );
     return this.shell.invoke({
-      command: settings.command,
-      args: this.buildCommandArgs(settings, command, args),
+      command: invocation.command,
+      args: invocation.args,
       cwd: options.cwd || settings.workingDirectory || void 0,
       env: {
         ...settings.env,
@@ -15330,6 +15383,7 @@ function setMainWindow(window) {
 async function stopAllActiveRuns() {
   await runExecutionService.stopAll();
 }
+const DEFAULT_RUNTIME_OWNER = "rdc-agent";
 const emptyPreviewLoadResult = () => ({
   preview: null,
   error: null,
@@ -15370,33 +15424,41 @@ class RdxSessionService {
     this.replayDevice = replayDevice;
     this.deviceLabel = replayDevice.label;
     this.remoteStatus = "disconnected";
-    const result = await rdxShellActionService.runAction("openCapture", {
-      projectId: request.projectId,
-      inputId: request.inputId,
-      filePath: request.filePath,
-      capturePath: request.filePath,
-      deviceId: replayDevice.id,
-      deviceLabel: replayDevice.label,
-      deviceType: replayDevice.type,
-      deviceSerial: replayDevice.serial,
-      deviceRemoteId: replayDevice.remoteId,
-      remoteId: preparedRemote?.remoteId ?? replayDevice.remoteId,
-      remoteContextId: preparedRemote?.contextId,
-      backend: isRemoteReplay ? "remote" : "local"
-    }, {
-      env: {
-        ...this.buildRuntimeContextEnv(),
-        RDX_REMOTE_ID: preparedRemote?.remoteId ?? replayDevice.remoteId ?? "",
-        RDX_REMOTE_CONTEXT_ID: preparedRemote?.contextId ?? ""
+    let resultData;
+    if (isRemoteReplay) {
+      if (!preparedRemote?.contextId || !preparedRemote.remoteId) {
+        capture.status = "error";
+        this.captures = [capture];
+        this.remoteStatus = "error";
+        throw new Error("Remote replay requires a prepared remote context and remoteId.");
       }
-    });
-    if (!result.ok) {
-      capture.status = "error";
-      this.captures = [capture];
-      this.remoteStatus = "error";
-      throw new Error(result.error ?? "RDX openCapture action failed.");
+      resultData = await this.openRemoteProjectInput(request, replayDevice, preparedRemote);
+    } else {
+      const result = await rdxShellActionService.runAction("openCapture", {
+        projectId: request.projectId,
+        inputId: request.inputId,
+        filePath: request.filePath,
+        capturePath: request.filePath,
+        deviceId: replayDevice.id,
+        deviceLabel: replayDevice.label,
+        deviceType: replayDevice.type,
+        deviceSerial: replayDevice.serial,
+        deviceRemoteId: replayDevice.remoteId,
+        remoteId: preparedRemote?.remoteId ?? replayDevice.remoteId,
+        remoteContextId: preparedRemote?.contextId,
+        backend: "local"
+      }, {
+        env: this.buildRuntimeContextEnv()
+      });
+      if (!result.ok) {
+        capture.status = "error";
+        this.captures = [capture];
+        this.remoteStatus = "error";
+        throw new Error(result.error ?? "RDX openCapture action failed.");
+      }
+      resultData = result.data;
     }
-    const runtimeContext = this.extractRuntimeContext(result.data, {
+    const runtimeContext = this.extractRuntimeContext(resultData, {
       backend: isRemoteReplay ? "remote" : "local",
       deviceId: replayDevice.id,
       deviceLabel: replayDevice.label
@@ -15411,7 +15473,7 @@ class RdxSessionService {
       replaySessionId: runtimeContext.replaySessionId,
       contextId: runtimeContext.contextId
     };
-    const previewResult = this.previewFromActionData(result.data);
+    const previewResult = this.previewFromActionData(resultData);
     const openedCapture = this.createOpenedCaptureState(
       request.projectId,
       request.inputId,
@@ -15422,6 +15484,87 @@ class RdxSessionService {
     this.openedCapture = openedCapture;
     this.broadcastContextChanged();
     return openedCapture;
+  }
+  async openRemoteProjectInput(request, replayDevice, preparedRemote) {
+    const runIdBase = `remote-open-${request.inputId}-${Date.now()}`;
+    const openFile = await rdxCliInvokerService.call({
+      toolName: "rd.capture.open_file",
+      args: {
+        file_path: request.filePath,
+        read_only: true
+      },
+      contextId: preparedRemote.contextId,
+      runId: `${runIdBase}-file`
+    });
+    if (!openFile.ok) {
+      throw new Error(this.formatToolError("rd.capture.open_file", openFile));
+    }
+    const captureFileId = this.readString(openFile.data ?? {}, ["captureFileId", "capture_file_id"]);
+    if (!captureFileId) {
+      throw new Error("rd.capture.open_file did not return capture_file_id.");
+    }
+    const openReplay = await rdxCliInvokerService.call({
+      toolName: "rd.capture.open_replay",
+      args: {
+        capture_file_id: captureFileId,
+        options: {
+          remote_id: preparedRemote.remoteId
+        }
+      },
+      contextId: preparedRemote.contextId,
+      runId: `${runIdBase}-replay`
+    });
+    if (!openReplay.ok) {
+      throw new Error(this.formatToolError("rd.capture.open_replay", openReplay));
+    }
+    const replaySessionId = this.readString(openReplay.data ?? {}, ["replaySessionId", "replay_session_id", "sessionId", "session_id"]);
+    if (!replaySessionId) {
+      throw new Error("rd.capture.open_replay did not return session_id.");
+    }
+    const setFrame = await rdxCliInvokerService.call({
+      toolName: "rd.replay.set_frame",
+      args: {
+        session_id: replaySessionId,
+        frame_index: 0
+      },
+      contextId: preparedRemote.contextId,
+      runId: `${runIdBase}-frame`
+    });
+    if (!setFrame.ok) {
+      throw new Error(this.formatToolError("rd.replay.set_frame", setFrame));
+    }
+    const getContext = await rdxCliInvokerService.call({
+      toolName: "rd.session.get_context",
+      args: {},
+      contextId: preparedRemote.contextId,
+      runId: `${runIdBase}-context`
+    });
+    if (!getContext.ok) {
+      throw new Error(this.formatToolError("rd.session.get_context", getContext));
+    }
+    const contextData = getContext.data ?? {};
+    const runtime = this.readRecord(contextData, ["runtime"]);
+    const activeEventId = this.readNumber(setFrame.data ?? {}, ["activeEventId", "active_event_id"]) ?? this.readNumber(openReplay.data ?? {}, ["activeEventId", "active_event_id"]);
+    return {
+      context_id: preparedRemote.contextId,
+      capture_file_id: captureFileId,
+      capture_path: request.filePath,
+      session_id: replaySessionId,
+      replay_session_id: replaySessionId,
+      active_event_id: activeEventId,
+      backend: "remote",
+      device_id: replayDevice.id,
+      device_label: replayDevice.label,
+      remote_id: preparedRemote.remoteId,
+      remote_status: "online",
+      runtime: runtime ?? {},
+      _rdxRemoteOpen: {
+        openFile,
+        openReplay,
+        setFrame,
+        getContext
+      }
+    };
   }
   async closeOrReplaceOpenedCapture() {
     const previousCapture = this.openedCapture;
@@ -15504,7 +15647,8 @@ class RdxSessionService {
     if (currentDevice.type === "local") {
       return currentDevice;
     }
-    if (["connected", "online"].includes(currentDevice.status)) {
+    const preparedRemote = replayDeviceService.peekPreparedRemote(currentDevice.id);
+    if (["connected", "online"].includes(currentDevice.status) && preparedRemote?.contextId && preparedRemote.remoteId) {
       return currentDevice;
     }
     const activatedDevice = await replayDeviceService.activateDevice(currentDevice.id);
@@ -15517,11 +15661,11 @@ class RdxSessionService {
   }
   extractRuntimeContext(data, fallback) {
     const contextId = this.readString(data, ["contextId", "context_id", "RDX_CONTEXT_ID"]);
-    const runtimeOwner = this.readString(data, ["runtimeOwner", "runtime_owner", "RDX_RUNTIME_OWNER"]);
-    const ownerLeaseId = this.readString(data, ["ownerLeaseId", "owner_lease_id", "RDX_OWNER_LEASE_ID"]);
-    if (!contextId || !runtimeOwner || !ownerLeaseId) {
-      throw new Error("RDX action result must include contextId/context_id, runtimeOwner/runtime_owner, and ownerLeaseId/owner_lease_id.");
+    if (!contextId) {
+      throw new Error("RDX action result must include contextId/context_id.");
     }
+    const runtimeOwner = this.readString(data, ["runtimeOwner", "runtime_owner", "RDX_RUNTIME_OWNER"]) ?? DEFAULT_RUNTIME_OWNER;
+    const ownerLeaseId = this.readString(data, ["ownerLeaseId", "owner_lease_id", "RDX_OWNER_LEASE_ID"]) ?? `${DEFAULT_RUNTIME_OWNER}:${contextId}`;
     return {
       contextId,
       runtimeOwner,
@@ -15598,6 +15742,19 @@ class RdxSessionService {
       }
     }
     return void 0;
+  }
+  readRecord(source, keys) {
+    for (const key of keys) {
+      const value = source[key];
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        return value;
+      }
+    }
+    return void 0;
+  }
+  formatToolError(toolName, result) {
+    const message = result.error?.message ?? (result.data ? JSON.stringify(result.data) : "") ?? "RDX tool call failed.";
+    return `${toolName} failed: ${message}`;
   }
   readNumber(source, keys) {
     for (const key of keys) {

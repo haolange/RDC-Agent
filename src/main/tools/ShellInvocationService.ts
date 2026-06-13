@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from 'child_process';
+import path from 'path';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import type { CLIResult } from '@shared/types/tool';
 
@@ -28,6 +29,7 @@ export class ShellInvocationService {
     }
 
     return new Promise((resolve) => {
+      const needsShell = process.platform === 'win32' && ['.bat', '.cmd'].includes(path.extname(command).toLowerCase());
       const proc = spawn(command, request.args ?? [], {
         cwd: request.cwd || undefined,
         env: {
@@ -35,7 +37,7 @@ export class ShellInvocationService {
           ...request.env,
           PYTHONIOENCODING: 'utf-8',
         },
-        shell: true,
+        shell: needsShell,
         windowsHide: true,
       });
       const procId = generateEventId('proc');

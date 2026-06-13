@@ -22,6 +22,7 @@ import type {
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import type { ToolCallResult } from '@shared/types/tool';
 import { rdxShellActionService } from '../tools/RdxShellActionService';
+import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
 import { setRdxRuntimeContext } from './RdxRuntimeContextRegistry';
 
 interface PreviewLoadResult {
@@ -80,34 +81,42 @@ export class RdxSessionService {
     this.deviceLabel = replayDevice.label;
     this.remoteStatus = 'disconnected';
 
-    const result = await rdxShellActionService.runAction('openCapture', {
-      projectId: request.projectId,
-      inputId: request.inputId,
-      filePath: request.filePath,
-      capturePath: request.filePath,
-      deviceId: replayDevice.id,
-      deviceLabel: replayDevice.label,
-      deviceType: replayDevice.type,
-      deviceSerial: replayDevice.serial,
-      deviceRemoteId: replayDevice.remoteId,
-      remoteId: preparedRemote?.remoteId ?? replayDevice.remoteId,
-      remoteContextId: preparedRemote?.contextId,
-      backend: isRemoteReplay ? 'remote' : 'local',
-    }, {
-      env: {
-        ...this.buildRuntimeContextEnv(),
-        RDX_REMOTE_ID: preparedRemote?.remoteId ?? replayDevice.remoteId ?? '',
-        RDX_REMOTE_CONTEXT_ID: preparedRemote?.contextId ?? '',
-      },
-    });
-    if (!result.ok) {
-      capture.status = 'error';
-      this.captures = [capture];
-      this.remoteStatus = 'error';
-      throw new Error(result.error ?? 'RDX openCapture action failed.');
+    let resultData: Record<string, unknown>;
+    if (isRemoteReplay) {
+      if (!preparedRemote?.contextId || !preparedRemote.remoteId) {
+        capture.status = 'error';
+        this.captures = [capture];
+        this.remoteStatus = 'error';
+        throw new Error('Remote replay requires a prepared remote context and remoteId.');
+      }
+      resultData = await this.openRemoteProjectInput(request, replayDevice, preparedRemote);
+    } else {
+      const result = await rdxShellActionService.runAction('openCapture', {
+        projectId: request.projectId,
+        inputId: request.inputId,
+        filePath: request.filePath,
+        capturePath: request.filePath,
+        deviceId: replayDevice.id,
+        deviceLabel: replayDevice.label,
+        deviceType: replayDevice.type,
+        deviceSerial: replayDevice.serial,
+        deviceRemoteId: replayDevice.remoteId,
+        remoteId: preparedRemote?.remoteId ?? replayDevice.remoteId,
+        remoteContextId: preparedRemote?.contextId,
+        backend: 'local',
+      }, {
+        env: this.buildRuntimeContextEnv(),
+      });
+      if (!result.ok) {
+        capture.status = 'error';
+        this.captures = [capture];
+        this.remoteStatus = 'error';
+        throw new Error(result.error ?? 'RDX openCapture action failed.');
+      }
+      resultData = result.data;
     }
 
-    const runtimeContext = this.extractRuntimeContext(result.data, {
+    const runtimeContext = this.extractRuntimeContext(resultData, {
       backend: isRemoteReplay ? 'remote' : 'local',
       deviceId: replayDevice.id,
       deviceLabel: replayDevice.label,
@@ -123,7 +132,7 @@ export class RdxSessionService {
       contextId: runtimeContext.contextId,
     };
 
-    const previewResult = this.previewFromActionData(result.data);
+    const previewResult = this.previewFromActionData(resultData);
 
     const openedCapture = this.createOpenedCaptureState(
       request.projectId,
@@ -135,6 +144,100 @@ export class RdxSessionService {
     this.openedCapture = openedCapture;
     this.broadcastContextChanged();
     return openedCapture;
+  }
+
+  private async openRemoteProjectInput(
+    request: OpenProjectInputRequest,
+    replayDevice: ReplayDeviceEntry,
+    preparedRemote: { contextId: string; remoteId: string },
+  ): Promise<Record<string, unknown>> {
+    const runIdBase = `remote-open-${request.inputId}-${Date.now()}`;
+    const openFile = await rdxCliInvokerService.call({
+      toolName: 'rd.capture.open_file',
+      args: {
+        file_path: request.filePath,
+        read_only: true,
+      },
+      contextId: preparedRemote.contextId,
+      runId: `${runIdBase}-file`,
+    });
+    if (!openFile.ok) {
+      throw new Error(this.formatToolError('rd.capture.open_file', openFile));
+    }
+
+    const captureFileId = this.readString(openFile.data ?? {}, ['captureFileId', 'capture_file_id']);
+    if (!captureFileId) {
+      throw new Error('rd.capture.open_file did not return capture_file_id.');
+    }
+
+    const openReplay = await rdxCliInvokerService.call({
+      toolName: 'rd.capture.open_replay',
+      args: {
+        capture_file_id: captureFileId,
+        options: {
+          remote_id: preparedRemote.remoteId,
+        },
+      },
+      contextId: preparedRemote.contextId,
+      runId: `${runIdBase}-replay`,
+    });
+    if (!openReplay.ok) {
+      throw new Error(this.formatToolError('rd.capture.open_replay', openReplay));
+    }
+
+    const replaySessionId = this.readString(openReplay.data ?? {}, ['replaySessionId', 'replay_session_id', 'sessionId', 'session_id']);
+    if (!replaySessionId) {
+      throw new Error('rd.capture.open_replay did not return session_id.');
+    }
+
+    const setFrame = await rdxCliInvokerService.call({
+      toolName: 'rd.replay.set_frame',
+      args: {
+        session_id: replaySessionId,
+        frame_index: 0,
+      },
+      contextId: preparedRemote.contextId,
+      runId: `${runIdBase}-frame`,
+    });
+    if (!setFrame.ok) {
+      throw new Error(this.formatToolError('rd.replay.set_frame', setFrame));
+    }
+
+    const getContext = await rdxCliInvokerService.call({
+      toolName: 'rd.session.get_context',
+      args: {},
+      contextId: preparedRemote.contextId,
+      runId: `${runIdBase}-context`,
+    });
+    if (!getContext.ok) {
+      throw new Error(this.formatToolError('rd.session.get_context', getContext));
+    }
+
+    const contextData = getContext.data ?? {};
+    const runtime = this.readRecord(contextData, ['runtime']);
+    const activeEventId = this.readNumber(setFrame.data ?? {}, ['activeEventId', 'active_event_id'])
+      ?? this.readNumber(openReplay.data ?? {}, ['activeEventId', 'active_event_id']);
+
+    return {
+      context_id: preparedRemote.contextId,
+      capture_file_id: captureFileId,
+      capture_path: request.filePath,
+      session_id: replaySessionId,
+      replay_session_id: replaySessionId,
+      active_event_id: activeEventId,
+      backend: 'remote',
+      device_id: replayDevice.id,
+      device_label: replayDevice.label,
+      remote_id: preparedRemote.remoteId,
+      remote_status: 'online',
+      runtime: runtime ?? {},
+      _rdxRemoteOpen: {
+        openFile,
+        openReplay,
+        setFrame,
+        getContext,
+      },
+    };
   }
 
   async closeOrReplaceOpenedCapture(): Promise<void> {
@@ -230,7 +333,12 @@ export class RdxSessionService {
       return currentDevice;
     }
 
-    if (['connected', 'online'].includes(currentDevice.status)) {
+    const preparedRemote = replayDeviceService.peekPreparedRemote(currentDevice.id);
+    if (
+      ['connected', 'online'].includes(currentDevice.status)
+      && preparedRemote?.contextId
+      && preparedRemote.remoteId
+    ) {
       return currentDevice;
     }
 
@@ -340,6 +448,23 @@ export class RdxSessionService {
       }
     }
     return undefined;
+  }
+
+  private readRecord(source: Record<string, unknown>, keys: string[]): Record<string, unknown> | undefined {
+    for (const key of keys) {
+      const value = source[key];
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        return value as Record<string, unknown>;
+      }
+    }
+    return undefined;
+  }
+
+  private formatToolError(toolName: string, result: ToolCallResult): string {
+    const message = result.error?.message
+      ?? (result.data ? JSON.stringify(result.data) : '')
+      ?? 'RDX tool call failed.';
+    return `${toolName} failed: ${message}`;
   }
 
   private readNumber(source: Record<string, unknown>, keys: string[]): number | undefined {

@@ -14,7 +14,6 @@ artifact-tree
 artifact-tree-group-${group.key}
 capture-library
 capture-library-import
-capture-library-open-${input.inputId}
 capture-library-refresh
 capture-library-toolbar
 chat-messages
@@ -25,6 +24,8 @@ composer-mode-pill
 composer-mode-pill-capability
 composer-usage-indicator
 control-panel-scroll
+conversation-handoff-${handoff.agent}
+conversation-handoff-actions
 conversation-thread
 cp-section-${id}
 cp-section-trace-lane-${id}
@@ -34,6 +35,7 @@ message-attachments
 message-bubble-assistant
 message-bubble-system
 message-bubble-user
+mode-menu-item-${agent.id}
 mode-menu-item-${mode.id}
 open-settings-entry
 opened-capture-preview-window
@@ -63,6 +65,7 @@ settings-${mode
 settings-add-provider
 settings-agent-card-${agentId}
 settings-agent-list
+settings-agent-manifest-editor
 settings-agent-no-enabled-models
 settings-agent-route-save-status
 settings-agent-runtime-config
@@ -71,6 +74,7 @@ settings-agent-save
 settings-center-panel
 settings-mcp-${server.id}
 settings-modal
+settings-model-cascade-trigger
 settings-nav-${section.id}
 settings-provider-connect-${provider.id}
 settings-provider-connect-api-key
@@ -89,6 +93,8 @@ settings-provider-oauth-device-code
 settings-provider-oauth-start
 settings-provider-oauth-summary
 settings-provider-test-${provider.id}
+settings-rdx-action-${entry.id}
+settings-rdx-actions
 settings-skill-${skill.id}
 settings-workspace-body
 sidebar-footer
