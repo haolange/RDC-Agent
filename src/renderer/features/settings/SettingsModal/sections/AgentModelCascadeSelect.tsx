@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentModelOption } from '@shared/types/agentManifest';
 import { splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
 import type { useI18n } from '../../../../i18n';
@@ -19,8 +19,8 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
   t,
 }) => {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const placementFrameRef = useRef<number | null>(null);
   const [open, setOpen] = useState(false);
-  const [openAbove, setOpenAbove] = useState(false);
   const [activeProviderId, setActiveProviderId] = useState('');
   const groups = useMemo(() => {
     const map = new Map<string, AgentModelOption[]>();
@@ -72,20 +72,58 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
       : displayGroups[0]?.providerId ?? '';
   const activeGroup = displayGroups.find((group) => group.providerId === resolvedActiveProviderId) ?? displayGroups[0];
 
+  const updateMenuPlacement = useCallback(() => {
+    const root = rootRef.current;
+    const rect = root?.getBoundingClientRect();
+    if (!root || !rect) {
+      return;
+    }
+    const modalRect = root.closest('.settings-modal')?.getBoundingClientRect();
+    const editorRect = root.closest('.settings-manifest-editor')?.getBoundingClientRect();
+    const savebarRect = root.closest('.settings-manifest-editor')?.querySelector('.settings-manifest-editor-savebar')?.getBoundingClientRect();
+    const viewportPadding = 16;
+    const menuGap = 8;
+    const boundaryLeft = Math.max(viewportPadding, modalRect?.left ?? viewportPadding);
+    const boundaryRight = Math.min(window.innerWidth - viewportPadding, modalRect?.right ?? window.innerWidth - viewportPadding);
+    const boundaryTop = Math.max(viewportPadding, modalRect?.top ?? viewportPadding);
+    const boundaryBottom = Math.min(
+      window.innerHeight - viewportPadding,
+      modalRect?.bottom ?? window.innerHeight - viewportPadding,
+      editorRect?.bottom ?? window.innerHeight - viewportPadding,
+      savebarRect?.top ?? window.innerHeight - viewportPadding,
+    );
+    const boundaryWidth = Math.max(280, boundaryRight - boundaryLeft - viewportPadding * 2);
+    const menuWidth = Math.min(544, boundaryWidth);
+    const preferredHeight = Math.min(368, boundaryBottom - boundaryTop - viewportPadding * 2);
+    const spaceBelow = boundaryBottom - rect.bottom - menuGap;
+    const availableHeight = Math.max(48, Math.min(preferredHeight, Math.max(0, spaceBelow)));
+    const left = Math.min(
+      Math.max(boundaryLeft + viewportPadding, rect.left),
+      Math.max(boundaryLeft + viewportPadding, boundaryRight - menuWidth - viewportPadding),
+    );
+    const top = rect.bottom + menuGap;
+
+    root.style.setProperty('--settings-model-menu-left', `${left}px`);
+    root.style.setProperty('--settings-model-menu-top', `${top}px`);
+    root.style.setProperty('--settings-model-menu-width', `${menuWidth}px`);
+    root.style.setProperty('--settings-model-menu-height', `${availableHeight}px`);
+  }, []);
+
+  const scheduleMenuPlacement = useCallback(() => {
+    if (placementFrameRef.current !== null) {
+      return;
+    }
+    placementFrameRef.current = window.requestAnimationFrame(() => {
+      placementFrameRef.current = null;
+      updateMenuPlacement();
+    });
+  }, [updateMenuPlacement]);
+
   const toggleOpen = () => {
     setOpen((current) => {
       const nextOpen = !current;
       if (nextOpen) {
-        const rect = rootRef.current?.getBoundingClientRect();
-        if (rect) {
-          const modalRect = rootRef.current?.closest('.settings-modal')?.getBoundingClientRect();
-          const topBoundary = Math.max(0, modalRect?.top ?? 0);
-          const bottomBoundary = Math.min(window.innerHeight, modalRect?.bottom ?? window.innerHeight);
-          const menuHeight = Math.min(448, Math.floor(window.innerHeight * 0.7));
-          const spaceBelow = bottomBoundary - rect.bottom;
-          const spaceAbove = rect.top - topBoundary;
-          setOpenAbove(spaceBelow < menuHeight + 16 && spaceAbove > spaceBelow);
-        }
+        updateMenuPlacement();
         setActiveProviderId((currentProviderId) => {
           if (displayGroups.some((group) => group.providerId === currentProviderId)) {
             return currentProviderId;
@@ -98,6 +136,23 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
       return nextOpen;
     });
   };
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    updateMenuPlacement();
+    window.addEventListener('resize', scheduleMenuPlacement);
+    document.addEventListener('scroll', scheduleMenuPlacement, true);
+    return () => {
+      window.removeEventListener('resize', scheduleMenuPlacement);
+      document.removeEventListener('scroll', scheduleMenuPlacement, true);
+      if (placementFrameRef.current !== null) {
+        window.cancelAnimationFrame(placementFrameRef.current);
+        placementFrameRef.current = null;
+      }
+    };
+  }, [open, scheduleMenuPlacement, updateMenuPlacement]);
 
   useEffect(() => {
     if (!open) {
@@ -122,7 +177,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
   }, [open]);
 
   return (
-    <div className={`settings-model-cascade ${open ? 'open' : ''} ${openAbove ? 'above' : ''}`} ref={rootRef}>
+    <div className={`settings-model-cascade ${open ? 'open' : ''}`} ref={rootRef}>
       <button
         type="button"
         className="settings-model-cascade-trigger"

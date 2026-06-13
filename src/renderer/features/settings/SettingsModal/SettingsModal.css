@@ -174,11 +174,6 @@
   z-index: 1;
 }
 
-.settings-manifest-editor:has(.settings-model-cascade.open),
-.settings-center-panel:has(.settings-model-cascade.open) {
-  overflow: visible;
-}
-
 .settings-model-cascade.open {
   z-index: 120;
 }
@@ -217,11 +212,12 @@
 }
 
 .settings-model-cascade-menu {
-  position: absolute;
-  top: calc(100% + var(--space-2));
-  left: 0;
+  position: fixed;
+  top: var(--settings-model-menu-top, calc(100% + var(--space-2)));
+  left: var(--settings-model-menu-left, 0);
   z-index: 140;
-  width: min(34rem, calc(100vw - var(--space-8)));
+  width: var(--settings-model-menu-width, min(34rem, calc(100vw - var(--space-8))));
+  height: var(--settings-model-menu-height, min(23rem, calc(100vh - 8rem)));
   display: none;
   grid-template-columns: minmax(12rem, 0.42fr) minmax(0, 0.58fr);
   gap: var(--space-2);
@@ -230,16 +226,12 @@
   border-radius: var(--radius-lg);
   background: var(--token-bg-overlay);
   box-shadow: 0 var(--space-5) var(--space-10) color-mix(in srgb, var(--token-bg-shell) 78%, transparent);
-  max-height: min(28rem, calc(100vh - var(--space-8)));
+  max-height: var(--settings-model-menu-height, min(23rem, calc(100vh - 8rem)));
+  overflow: hidden;
 }
 
 .settings-model-cascade.open .settings-model-cascade-menu {
   display: grid;
-}
-
-.settings-model-cascade.above .settings-model-cascade-menu {
-  top: auto;
-  bottom: calc(100% + var(--space-2));
 }
 
 .settings-model-provider-list {
@@ -248,7 +240,8 @@
   gap: var(--space-2);
   overflow-y: auto;
   min-height: 0;
-  max-height: calc(28rem - var(--space-4));
+  height: 100%;
+  overscroll-behavior: contain;
 }
 
 .settings-model-provider-trigger {
@@ -269,8 +262,9 @@
   flex-direction: column;
   gap: var(--space-2);
   min-height: 0;
-  max-height: calc(28rem - var(--space-4));
+  height: 100%;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: var(--space-2);
   border: 1px solid var(--token-border-card);
   border-radius: var(--radius-lg);
