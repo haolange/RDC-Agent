@@ -43,6 +43,17 @@
   gap: 16px;
 }
 
+.settings-manifest-list-column {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-manifest-list-toolbar {
+  justify-content: flex-start;
+}
+
 .settings-manifest-list {
   min-height: 0;
   overflow: auto;
@@ -2496,16 +2507,40 @@
   gap: var(--space-4);
 }
 
-.settings-manifest-list {
+.settings-manifest-list-column {
+  height: 100%;
+  gap: var(--space-3);
+}
+
+.settings-manifest-list-toolbar {
+  flex: 0 0 auto;
+  padding: 0;
+}
+
+.settings-manifest-list-toolbar .settings-manifest-actions {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--token-border-card);
-  border-radius: var(--radius-lg);
-  background: var(--token-bg-shell);
+}
+
+.settings-manifest-list-toolbar .button {
+  width: 100%;
+  justify-content: center;
+}
+
+.settings-manifest-list {
+  flex: 0 1 auto;
+  gap: var(--space-2);
+  padding: 0 var(--space-1) 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .settings-manifest-card {
-  min-height: 72px;
+  min-height: 64px;
+  padding: var(--space-3);
   border-color: transparent;
   background: transparent;
 }
@@ -3007,7 +3042,7 @@
 }
 
 .settings-agent-textarea-compact {
-  min-height: calc(var(--space-10) + var(--space-8));
+  min-height: var(--input-height-lg);
   resize: vertical;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -3022,7 +3057,7 @@
 }
 
 .settings-agent-description-field {
-  min-height: calc(var(--space-10) + var(--space-10));
+  min-height: var(--input-height-lg);
 }
 
 @media (max-width: 960px) {

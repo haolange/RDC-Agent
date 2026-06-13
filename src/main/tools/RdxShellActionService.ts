@@ -18,6 +18,12 @@ export interface RdxShellActionResult {
   error?: string;
 }
 
+interface ParsedActionPayload {
+  data: Record<string, unknown>;
+  ok?: boolean;
+  error?: string;
+}
+
 const substitute = (value: string, variables: RdxShellActionVariables): string => (
   value.replace(/\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g, (_match, key: string) => {
     const replacement = variables[key];
@@ -25,16 +31,44 @@ const substitute = (value: string, variables: RdxShellActionVariables): string =
   })
 );
 
-const parseJsonPayload = (stdout: string): Record<string, unknown> => {
+const isRecord = (value: unknown): value is Record<string, unknown> => (
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+);
+
+const readErrorMessage = (value: unknown): string | undefined => {
+  if (typeof value === 'string' && value.trim()) {
+    return value;
+  }
+  if (isRecord(value)) {
+    const message = value.message ?? value.error_message ?? value.code;
+    return typeof message === 'string' && message.trim() ? message : undefined;
+  }
+  return undefined;
+};
+
+const parseJsonPayload = (stdout: string): ParsedActionPayload => {
   const trimmed = stdout.trim();
   if (!trimmed) {
-    return {};
+    return { data: {} };
   }
   const parsed = JSON.parse(trimmed) as unknown;
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+  if (!isRecord(parsed)) {
     throw new Error('RDX action stdout must be a JSON object.');
   }
-  return parsed as Record<string, unknown>;
+
+  if (typeof parsed.ok === 'boolean' && ('data' in parsed || 'result_kind' in parsed || 'error' in parsed)) {
+    const envelopeData = isRecord(parsed.data) ? parsed.data : {};
+    return {
+      data: {
+        ...envelopeData,
+        _rdxEnvelope: parsed,
+      },
+      ok: parsed.ok,
+      error: parsed.ok ? undefined : readErrorMessage(parsed.error),
+    };
+  }
+
+  return { data: parsed };
 };
 
 class RdxShellActionService {
@@ -91,19 +125,26 @@ class RdxShellActionService {
     });
 
     let data: Record<string, unknown> = {};
+    let payloadOk: boolean | undefined;
+    let payloadError: string | undefined;
     let parseError: string | undefined;
-    if (result.exitCode === 0) {
+    if (result.stdout.trim()) {
       try {
-        data = parseJsonPayload(result.stdout);
+        const parsedPayload = parseJsonPayload(result.stdout);
+        data = parsedPayload.data;
+        payloadOk = parsedPayload.ok;
+        payloadError = parsedPayload.error;
       } catch (error) {
         parseError = error instanceof Error ? error.message : String(error);
       }
     }
 
-    const ok = result.exitCode === 0 && !parseError;
+    const ok = result.exitCode === 0 && !parseError && payloadOk !== false;
     const error = ok
       ? undefined
-      : parseError ?? (result.stderr.trim() || result.stdout.trim() || `RDX action "${actionId}" exited with ${result.exitCode}.`);
+      : parseError
+        ?? payloadError
+        ?? (result.stderr.trim() || result.stdout.trim() || `RDX action "${actionId}" exited with ${result.exitCode}.`);
 
     runtimeLogService.log({
       scope: 'app',

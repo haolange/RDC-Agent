@@ -174,7 +174,6 @@ export const Composer: React.FC<ComposerProps> = ({
                       aria-checked={selectedAgentId === agent.id}
                       aria-disabled={executionModeDisabled}
                       disabled={executionModeDisabled}
-                      title={executionModeDisabled ? openCaptureRequiredLabel : agent.description}
                       onClick={() => {
                         if (executionModeDisabled) {
                           return;
@@ -190,12 +189,17 @@ export const Composer: React.FC<ComposerProps> = ({
                         </span>
                         <span className="composer-agent-menu-item-label">{agent.name}</span>
                         {agent.description ? (
-                          <span className="composer-agent-menu-item-desc">{agent.description}</span>
+                          <span hidden className="composer-agent-menu-item-desc">{agent.description}</span>
                         ) : null}
                         {executionModeDisabled ? (
-                          <span className="composer-agent-menu-item-hint">{openCaptureRequiredLabel}</span>
+                          <span hidden className="composer-agent-menu-item-hint">{openCaptureRequiredLabel}</span>
                         ) : null}
                       </span>
+                      {agent.description || executionModeDisabled ? (
+                        <span className="composer-agent-menu-item-tooltip" role="tooltip">
+                          {executionModeDisabled ? openCaptureRequiredLabel : agent.description}
+                        </span>
+                      ) : null}
                       {selectedAgentId === agent.id ? <span className="composer-agent-menu-item-check">✓</span> : null}
                     </button>
                   );

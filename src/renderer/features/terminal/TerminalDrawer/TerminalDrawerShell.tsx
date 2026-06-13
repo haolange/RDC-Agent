@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import type { TerminalDrawerViewModel } from './useTerminalDrawer';
 
 interface TerminalDrawerShellProps {
@@ -22,10 +22,30 @@ export const TerminalDrawerShell: React.FC<TerminalDrawerShellProps> = ({
     handleResizeDoubleClick,
     closeTerminal,
   } = vm;
+  const [isVisuallyOpen, setIsVisuallyOpen] = useState(isOpen);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setIsVisuallyOpen(false);
+      return undefined;
+    }
+
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => setIsVisuallyOpen(true));
+    });
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) {
+        window.cancelAnimationFrame(secondFrame);
+      }
+    };
+  }, [isOpen]);
 
   return (
     <section
-      className={`runtime-terminal-workspace ${isOpen ? 'open' : ''} ${isResizing ? 'resizing' : ''}`}
+      className={`runtime-terminal-workspace ${isVisuallyOpen ? 'open' : ''} ${isResizing ? 'resizing' : ''}`}
       data-testid="runtime-terminal"
       aria-hidden={!isOpen}
       style={{ ['--runtime-terminal-height' as string]: `${terminalHeight}px` }}

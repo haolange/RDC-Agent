@@ -34,6 +34,29 @@
   transition: none;
 }
 
+.runtime-terminal-titlebar,
+.runtime-terminal-toolbar,
+.runtime-terminal-workspace-body {
+  opacity: 0;
+  transform: translateY(var(--space-2));
+  transition:
+    opacity var(--transition-base),
+    transform var(--transition-slow);
+}
+
+.runtime-terminal-workspace.open .runtime-terminal-titlebar,
+.runtime-terminal-workspace.open .runtime-terminal-toolbar,
+.runtime-terminal-workspace.open .runtime-terminal-workspace-body {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.runtime-terminal-workspace.resizing .runtime-terminal-titlebar,
+.runtime-terminal-workspace.resizing .runtime-terminal-toolbar,
+.runtime-terminal-workspace.resizing .runtime-terminal-workspace-body {
+  transition: none;
+}
+
 .runtime-terminal-resize-handle {
   position: absolute;
   inset: 0 0 auto;

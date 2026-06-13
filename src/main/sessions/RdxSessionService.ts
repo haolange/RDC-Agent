@@ -30,6 +30,8 @@ interface PreviewLoadResult {
   attempts: OpenedCapturePreviewAttempt[];
 }
 
+const DEFAULT_RUNTIME_OWNER = 'rdc-agent';
+
 const emptyPreviewLoadResult = (): PreviewLoadResult => ({
   preview: null,
   error: null,
@@ -249,11 +251,13 @@ export class RdxSessionService {
     fallback: { backend: 'local' | 'remote'; deviceId?: string; deviceLabel?: string },
   ): RdxRuntimeContext {
     const contextId = this.readString(data, ['contextId', 'context_id', 'RDX_CONTEXT_ID']);
-    const runtimeOwner = this.readString(data, ['runtimeOwner', 'runtime_owner', 'RDX_RUNTIME_OWNER']);
-    const ownerLeaseId = this.readString(data, ['ownerLeaseId', 'owner_lease_id', 'RDX_OWNER_LEASE_ID']);
-    if (!contextId || !runtimeOwner || !ownerLeaseId) {
-      throw new Error('RDX action result must include contextId/context_id, runtimeOwner/runtime_owner, and ownerLeaseId/owner_lease_id.');
+    if (!contextId) {
+      throw new Error('RDX action result must include contextId/context_id.');
     }
+    const runtimeOwner = this.readString(data, ['runtimeOwner', 'runtime_owner', 'RDX_RUNTIME_OWNER'])
+      ?? DEFAULT_RUNTIME_OWNER;
+    const ownerLeaseId = this.readString(data, ['ownerLeaseId', 'owner_lease_id', 'RDX_OWNER_LEASE_ID'])
+      ?? `${DEFAULT_RUNTIME_OWNER}:${contextId}`;
     return {
       contextId,
       runtimeOwner,
