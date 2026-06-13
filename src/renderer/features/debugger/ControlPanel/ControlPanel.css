@@ -1479,17 +1479,6 @@
   font-weight: var(--font-semibold);
 }
 
-.capture-library-item-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-2);
-}
-
-.capture-library-item-actions .button {
-  width: 100%;
-  min-width: 0;
-}
-
 .capture-library-empty {
   padding: 8px 0;
   color: rgb(var(--color-text-tertiary));
@@ -2180,7 +2169,6 @@
   .runtime-context-actions,
   .opened-capture-actions,
   .capture-library-toolbar,
-  .capture-library-item-actions,
   .session-working-folder-actions,
   .session-progress-facts,
   .session-working-folder-stats {
@@ -2214,4 +2202,3 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
-

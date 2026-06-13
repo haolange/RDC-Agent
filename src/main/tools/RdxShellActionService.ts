@@ -3,6 +3,7 @@ import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { settingsService } from '../settings/SettingsService';
 import { appPathService } from '../runtime/AppPathService';
 import { shellInvocationService } from './ShellInvocationService';
+import { resolveRdxBatchInvocation } from './resolveRdxBatchInvocation';
 
 export interface RdxShellActionVariables {
   [key: string]: string | number | boolean | null | undefined;
@@ -58,9 +59,23 @@ const parseJsonPayload = (stdout: string): ParsedActionPayload => {
 
   if (typeof parsed.ok === 'boolean' && ('data' in parsed || 'result_kind' in parsed || 'error' in parsed)) {
     const envelopeData = isRecord(parsed.data) ? parsed.data : {};
+    const data = { ...envelopeData };
+    const envelopeContextId =
+      typeof parsed.context_id === 'string' && parsed.context_id.trim()
+        ? parsed.context_id.trim()
+        : typeof parsed.contextId === 'string' && parsed.contextId.trim()
+          ? parsed.contextId.trim()
+          : undefined;
+    if (
+      envelopeContextId
+      && typeof data.context_id !== 'string'
+      && typeof data.contextId !== 'string'
+    ) {
+      data.context_id = envelopeContextId;
+    }
     return {
       data: {
-        ...envelopeData,
+        ...data,
         _rdxEnvelope: parsed,
       },
       ok: parsed.ok,
@@ -115,9 +130,11 @@ class RdxShellActionService {
         ...options.env,
       }).map(([key, value]) => [key, substitute(value, resolvedVariables)]),
     );
+    const command = substitute(action.command, resolvedVariables);
+    const invocation = resolveRdxBatchInvocation(command, args);
     const result = await shellInvocationService.invoke({
-      command: substitute(action.command, resolvedVariables),
-      args,
+      command: invocation.command,
+      args: invocation.args,
       cwd: action.workingDirectory ? substitute(action.workingDirectory, resolvedVariables) : undefined,
       env,
       timeoutMs: action.timeoutMs,

@@ -746,11 +746,10 @@ export class ReplayDeviceService {
       throw new Error(result.error ?? 'RDX connectRemote action failed.');
     }
 
-    const contextId = readActionString(result.data, ['contextId', 'context_id', 'RDX_CONTEXT_ID']);
+    const contextId =
+      readActionString(result.data, ['contextId', 'context_id', 'RDX_CONTEXT_ID'])
+      ?? device.id;
     const remoteId = readActionString(result.data, ['remoteId', 'remote_id', 'RDX_REMOTE_ID']);
-    if (!contextId) {
-      throw new Error('RDX connectRemote action result must include contextId/context_id.');
-    }
     if (!remoteId) {
       throw new Error('RDX connectRemote action result must include remoteId/remote_id.');
     }
@@ -895,4 +894,3 @@ export class ReplayDeviceService {
 }
 
 export const replayDeviceService = new ReplayDeviceService();
-

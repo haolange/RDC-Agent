@@ -13,6 +13,7 @@ import { generateEventId, nowMs } from '@shared/utils/id';
 import type { RdxCliInvokerSettings } from '@shared/types/settings';
 import { settingsService } from '../settings/SettingsService';
 import { shellInvocationService, type ShellInvocationService } from './ShellInvocationService';
+import { resolveRdxBatchInvocation } from './resolveRdxBatchInvocation';
 
 const EMPTY_NAMESPACES: ToolCatalog['namespaces'] = {
   capture: { description: '', groups: [] },
@@ -207,9 +208,14 @@ export class RdxCliInvokerService {
       };
     }
 
+    const invocation = resolveRdxBatchInvocation(
+      settings.command,
+      this.buildCommandArgs(settings, command, args),
+    );
+
     return this.shell.invoke({
-      command: settings.command,
-      args: this.buildCommandArgs(settings, command, args),
+      command: invocation.command,
+      args: invocation.args,
       cwd: options.cwd || settings.workingDirectory || undefined,
       env: {
         ...settings.env,
