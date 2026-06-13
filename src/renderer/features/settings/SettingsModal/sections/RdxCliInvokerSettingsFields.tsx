@@ -6,6 +6,7 @@ import type {
   RdxShellActionSettings,
 } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { AutosizeTextarea } from '../AutosizeTextarea';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type TranslationKey = Parameters<Translate>[0];
@@ -140,7 +141,8 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
             </label>
             <label className="settings-input-row">
               <span className="settings-help-text">{t('settings.rdxCliEnv')}</span>
-              <textarea
+              <AutosizeTextarea
+                maxHeight={180}
                 className="input settings-rdx-cli-input settings-rdx-cli-textarea"
                 value={envText}
                 placeholder="NAME=value"
@@ -236,7 +238,8 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
                   </label>
                   <label className="settings-input-row">
                     <span className="settings-help-text">{t('settings.rdxActionEnvironment')}</span>
-                    <textarea
+                    <AutosizeTextarea
+                      maxHeight={180}
                       className="input settings-rdx-cli-input settings-rdx-cli-textarea"
                       value={actionEnvText}
                       placeholder="NAME=value"

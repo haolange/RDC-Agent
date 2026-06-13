@@ -132,39 +132,37 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
             <span className="settings-agent-warning" />
           </span>
         </div>
-        <div className="settings-manifest-toolbar">
-          <div>
-            <div className="settings-agent-page-title">{t('settings.agentManifestTitle')}</div>
-            <div className="settings-agent-page-subtitle">{t('settings.agentManifestHint')}</div>
-          </div>
-          <div className="settings-manifest-actions">
-            <button type="button" className="button button-secondary" onClick={() => void onImportAgentManifest()}>
-              {t('settings.importAgentManifest')}
-            </button>
-            <button type="button" className="button button-secondary" onClick={addAgent}>
-              {t('settings.newAgent')}
-            </button>
-          </div>
-        </div>
-
         <div className="settings-manifest-layout">
-          <div className="settings-manifest-list" aria-label={t('settings.agentManifestTitle')}>
-            {activeDrafts.map((agent) => (
-              <button
-                key={agent.id}
-                type="button"
-                className={`settings-manifest-card ${agent.id === selectedId ? 'active' : ''}`}
-                onClick={() => setSelectedAgentId(agent.id)}
-              >
-                <span>
-                  <strong>{agent.name}</strong>
-                  <small>{getAgentCardDescription(agent, t)}</small>
-                </span>
-                <span className="settings-manifest-card-meta">
-                  {agent.userInvocable ? t('settings.userInvocable') : t('settings.subAgent')}
-                </span>
-              </button>
-            ))}
+          <div className="settings-manifest-list-column">
+            <div className="settings-manifest-toolbar settings-manifest-list-toolbar">
+              <div className="settings-manifest-actions">
+                <button type="button" className="button button-secondary" onClick={() => void onImportAgentManifest()}>
+                  {t('settings.importAgentManifest')}
+                </button>
+                <button type="button" className="button button-secondary" onClick={addAgent}>
+                  {t('settings.newAgent')}
+                </button>
+              </div>
+            </div>
+
+            <div className="settings-manifest-list" aria-label={t('settings.agentManifestTitle')}>
+              {activeDrafts.map((agent) => (
+                <button
+                  key={agent.id}
+                  type="button"
+                  className={`settings-manifest-card ${agent.id === selectedId ? 'active' : ''}`}
+                  onClick={() => setSelectedAgentId(agent.id)}
+                >
+                  <span>
+                    <strong>{agent.name}</strong>
+                    <small>{getAgentCardDescription(agent, t)}</small>
+                  </span>
+                  <span className="settings-manifest-card-meta">
+                    {agent.userInvocable ? t('settings.userInvocable') : t('settings.subAgent')}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {selectedAgent && (

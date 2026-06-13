@@ -2,6 +2,7 @@ import React from 'react';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { AutosizeTextarea } from '../AutosizeTextarea';
 import { AgentCapabilityPicker, type AgentCapabilityGroup } from './AgentCapabilityPicker';
 import { AgentModelCascadeSelect } from './AgentModelCascadeSelect';
 
@@ -171,11 +172,11 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
             </label>
             <label className="settings-input-row">
               <span className="settings-help-text">{t('settings.agentArgumentHint')}</span>
-              <textarea className="input settings-agent-textarea-compact" value={selectedAgent.argumentHint} onChange={(event) => onUpdateAgent({ argumentHint: event.currentTarget.value })} />
+              <AutosizeTextarea rows={1} maxHeight={132} className="input settings-agent-textarea-compact" value={selectedAgent.argumentHint} onChange={(event) => onUpdateAgent({ argumentHint: event.currentTarget.value })} />
             </label>
             <label className="settings-input-row">
               <span className="settings-help-text">{t('settings.agentDescription')}</span>
-              <textarea className="input settings-agent-textarea-compact settings-agent-description-field" value={selectedAgent.description} onChange={(event) => onUpdateAgent({ description: event.currentTarget.value })} />
+              <AutosizeTextarea rows={1} maxHeight={132} className="input settings-agent-textarea-compact settings-agent-description-field" value={selectedAgent.description} onChange={(event) => onUpdateAgent({ description: event.currentTarget.value })} />
             </label>
           </div>
         </div>
@@ -199,7 +200,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
         <div className="settings-advanced-content">
           <label className="settings-input-row">
             <span className="settings-help-text">{t('settings.agentInstructions')}</span>
-            <textarea className="input settings-agent-instructions settings-agent-handoff-textarea" value={selectedAgent.instructions} onChange={(event) => onUpdateAgent({ instructions: event.currentTarget.value })} />
+            <AutosizeTextarea maxHeight={520} className="input settings-agent-instructions settings-agent-handoff-textarea" value={selectedAgent.instructions} onChange={(event) => onUpdateAgent({ instructions: event.currentTarget.value })} />
           </label>
         </div>
       </details>

@@ -1,6 +1,7 @@
 import React, { type Dispatch, type SetStateAction } from 'react';
 import type { AppSettings, RdxActionSettingsMap, RdxCliInvokerSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { AutosizeTextarea } from '../AutosizeTextarea';
 import { RdxCliInvokerSettingsFields } from './RdxCliInvokerSettingsFields';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -44,13 +45,7 @@ export const SkillsToolsSettings: React.FC<SkillsToolsSettingsProps> = ({
   return (
     <section className="settings-page settings-page-tools">
       <div className="settings-tools-page">
-        <div className="settings-agent-page-header">
-          <div>
-            <div className="settings-agent-page-title">{t('settings.skillsAndTools')}</div>
-            <div className="settings-agent-page-subtitle">{t('settings.skillsAndToolsHint')}</div>
-          </div>
-        </div>
-
+        <span hidden className="settings-agent-page-header" />
         <div className="settings-tools-overview" aria-label={t('settings.configurationSummary')}>
           <div className="settings-product-summary-card">
             <span>{t('settings.enabledSkillsSummary')}</span>
@@ -123,7 +118,8 @@ export const SkillsToolsSettings: React.FC<SkillsToolsSettingsProps> = ({
         <div className="settings-tool-section">
           <div className="settings-field-label">{t('settings.globalInstructions')}</div>
           <div className="settings-help-text">{t('settings.globalInstructionsHint')}</div>
-          <textarea
+          <AutosizeTextarea
+            maxHeight={520}
             className="input settings-agent-instructions"
             value={globalInstructionsDraft}
             onChange={(event) => onGlobalInstructionsDraftChange(event.currentTarget.value)}
