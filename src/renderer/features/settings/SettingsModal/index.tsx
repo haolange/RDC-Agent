@@ -8,6 +8,7 @@ import { ModelsSettings } from './sections/ModelsSettings';
 import { AgentsSettings } from './sections/AgentsSettings';
 import { SkillsToolsSettings } from './sections/SkillsToolsSettings';
 import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
+import { SettingsNavIcon } from './SettingsNavIcon';
 import './SettingsModal.css';
 
 interface SettingsModalProps {
@@ -137,7 +138,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                   data-testid={`settings-nav-${section.id}`}
                   onClick={() => setActiveSection(section.id)}
                 >
-                  {section.label}
+                  <SettingsNavIcon section={section.id} />
+                  <span>{section.label}</span>
                 </button>
               ))}
             </div>
