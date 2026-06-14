@@ -6,9 +6,9 @@ import type { ExecutableAppMode } from './session';
 
 // UI work modes. Ask is UI/conversation-only and must not be persisted as a run mode.
 export type ExecutableAgentMode = ExecutableAppMode;
-export type AgentMode = 'ask' | ExecutableAgentMode;
+export type AgentMode = 'ask' | 'plan' | 'edit' | ExecutableAgentMode;
 
-export type ModeIconKey = 'message-orbit' | 'crosshair-bug' | 'waveform-gauge' | 'spark-tuning';
+export type ModeIconKey = 'message-orbit' | 'route-plan' | 'pencil-edit' | 'crosshair-bug' | 'waveform-gauge' | 'spark-tuning';
 
 // Mode configuration
 export interface ModeConfig {

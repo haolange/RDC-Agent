@@ -1,4 +1,13 @@
 export {
+  AGENT_WORKBENCH_COMMAND_CATALOG,
+  AGENT_WORKBENCH_TOOL_CATALOG,
+} from './agentWorkbenchCatalog';
+export type {
+  AgentWorkbenchCommandDeclaration,
+  AgentWorkbenchToolDeclaration,
+  AgentWorkbenchToolPermission,
+} from './agentWorkbenchCatalog';
+export {
   AGENT_CATEGORIES,
   AGENT_COLORS,
   AGENT_DESCRIPTIONS,

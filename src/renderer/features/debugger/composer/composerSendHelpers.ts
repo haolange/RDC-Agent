@@ -1,9 +1,14 @@
 ﻿import type { ConversationAttachmentInput, ConversationMessage, ConversationTurnResult } from '@shared/types/conversation';
 import type { AgentMode } from '@shared/types/layout';
-import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
+import type { AppMode, ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
 import { useProjectStore } from '../../../stores/projectStore';
+
+const EXECUTABLE_CONVERSATION_MODES = new Set<AgentMode>(['edit', 'debugger', 'analyzer', 'optimizer']);
+
+export const toConversationMode = (mode: AgentMode): AppMode =>
+  EXECUTABLE_CONVERSATION_MODES.has(mode) ? mode as AppMode : 'ask';
 
 export function buildLocalConversationErrorTurn(options: {
   trimmed: string;
@@ -27,6 +32,7 @@ export function buildLocalConversationErrorTurn(options: {
   } = options;
   const turnId = `local-turn-${Date.now()}`;
   const now = Date.now();
+  const conversationMode = toConversationMode(currentMode);
 
   return [
     {
@@ -35,12 +41,12 @@ export function buildLocalConversationErrorTurn(options: {
       sessionId: currentSession?.sessionId ?? null,
       projectId: currentProject?.projectId ?? null,
       runId: currentRun?.runId ?? null,
-      modeContext: currentMode,
+      modeContext: conversationMode,
       role: 'user',
       content: trimmed,
       status: 'complete',
       updatedAt: now,
-      reasoningTrace: null,
+      workTrace: null,
       attachments: pendingAttachments.map((attachment) => ({
         attachmentId: `local-${attachment.id}`,
         sessionId: currentSession?.sessionId ?? '',
@@ -60,16 +66,16 @@ export function buildLocalConversationErrorTurn(options: {
       sessionId: currentSession?.sessionId ?? null,
       projectId: currentProject?.projectId ?? null,
       runId: currentRun?.runId ?? null,
-      modeContext: currentMode,
+      modeContext: conversationMode,
       role: 'assistant',
       agentId: 'debugger',
       content: errorMessage,
       status: 'error',
       updatedAt: now,
-      reasoningTrace: {
+      workTrace: {
         status: 'error',
         summary: failedSummary,
-        steps: [],
+        blocks: [],
         updatedAt: now,
       },
       createdAt: now,
@@ -175,5 +181,3 @@ export async function syncE2EConversationState(options: {
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
 }
-
-

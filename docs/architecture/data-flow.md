@@ -18,7 +18,7 @@ sequenceDiagram
   UI->>API: conversation.sendMessage(agentId, message)
   API->>IPC: conversation:sendMessage
   IPC->>Conversation: create user/assistant turn
-  Conversation->>Orchestrator: sendCoworkMessage(agentId)
+  Conversation->>Orchestrator: sendProfileMessage(agentId)
   Orchestrator->>Runtime: run agent with manifest instructions and tool policy
   Runtime->>Provider: stream model response
   Runtime->>Tools: execute allowed tools
@@ -79,7 +79,7 @@ Settings are persisted by `SettingsService`, sanitized before write, and exposed
 
 Relevant settings groups:
 
-- `settings.agents.definitions`: loaded from four canonical `.agent.md` files.
+- `settings.agents.definitions`: loaded from baseline `.agent.md` profiles such as Ask, Plan, Edit, Debugger, Analyzer, and Optimizer.
 - `settings.llm.agentRoutes`: provider/model route for each top-level agent.
 - `settings.tooling.rdxActions`: configured shell actions for RDX runtime context.
 - `settings.tooling.rdxCli`: optional catalog/runtime summary configuration.

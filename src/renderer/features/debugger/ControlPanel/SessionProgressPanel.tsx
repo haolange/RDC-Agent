@@ -20,7 +20,7 @@ const ACTIVE_RUN_STATUSES: RunSummary['status'][] = [
 ];
 
 const UI_STAGES: Array<{ id: string; label: string; stages: WorkflowStage[] }> = [
-  { id: 'planner', label: '规划', stages: ['preflight', 'entry_gate', 'intake_gate', 'speclist'] },
+  { id: 'planner', label: '规划', stages: ['preflight', 'entry_gate', 'speclist'] },
   { id: 'generator', label: '执行', stages: ['dispatch', 'investigate'] },
   { id: 'evaluator', label: '验证', stages: ['fix_verify', 'skepti', 'curate', 'finalize'] },
 ];
@@ -28,7 +28,6 @@ const UI_STAGES: Array<{ id: string; label: string; stages: WorkflowStage[] }> =
 const STAGE_LABELS: Partial<Record<WorkflowStage, string>> = {
   preflight: '预检',
   entry_gate: '入口校验',
-  intake_gate: '任务 intake',
   speclist: '任务拆分',
   dispatch: '分派 specialists',
   investigate: '证据调查',

@@ -34,6 +34,7 @@ function _interopNamespaceDefault(e) {
 }
 const path__namespace = /* @__PURE__ */ _interopNamespaceDefault(path);
 const fs__namespace = /* @__PURE__ */ _interopNamespaceDefault(fs);
+const crypto__namespace = /* @__PURE__ */ _interopNamespaceDefault(crypto);
 const fs__namespace$1 = /* @__PURE__ */ _interopNamespaceDefault(fs$1);
 const net__namespace = /* @__PURE__ */ _interopNamespaceDefault(net);
 function generateShortId() {
@@ -148,9 +149,11 @@ class RuntimeLogService {
   }
 }
 const runtimeLogService = new RuntimeLogService();
-const TOP_LEVEL_AGENT_IDS = ["ask", "debugger", "analyzer", "optimizer"];
+const TOP_LEVEL_AGENT_IDS = ["ask", "plan", "edit", "debugger", "analyzer", "optimizer"];
 const DEFAULT_MODEL_ROUTING = {
   ask: { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  plan: { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
+  edit: { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
   debugger: { provider: "openrouter", model: "anthropic/claude-3-opus" },
   analyzer: { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
   optimizer: { provider: "openrouter", model: "anthropic/claude-3-sonnet" }
@@ -929,30 +932,40 @@ const appPathService = new AppPathService();
 const AGENT_ROLES = [...TOP_LEVEL_AGENT_IDS];
 const AGENT_DISPLAY_NAMES = {
   ask: "Ask",
+  plan: "Plan",
+  edit: "Edit",
   debugger: "Debugger",
   analyzer: "Analyzer",
   optimizer: "Optimizer"
 };
 const AGENT_DESCRIPTIONS = {
   ask: "Read-only agent for codebase questions, clarification, and guidance.",
+  plan: "Planning agent for research, questions, handoffs, and implementation plans without direct changes.",
+  edit: "General implementation agent for ordinary code and workspace changes with approval policy.",
   debugger: "General executable agent for RDC/RenderDoc investigation and debugging work.",
   analyzer: "General executable agent for evidence analysis, performance triage, and reportable findings.",
   optimizer: "General executable agent for bottleneck analysis, optimization ordering, and validation."
 };
 const AGENT_CATEGORIES = {
   ask: "orchestrator",
+  plan: "orchestrator",
+  edit: "orchestrator",
   debugger: "general",
   analyzer: "general",
   optimizer: "general"
 };
 const AGENT_WRITE_SCOPES = {
   ask: [],
+  plan: ["workspace_notes"],
+  edit: ["workspace_notes", "session_artifacts", "workspace_reports"],
   debugger: ["workspace_control", "workspace_notes", "session_artifacts", "workspace_reports"],
   analyzer: ["workspace_notes", "session_artifacts", "workspace_reports"],
   optimizer: ["workspace_notes", "session_artifacts", "workspace_reports"]
 };
 const AGENT_COLORS = {
   ask: "#38c6f4",
+  plan: "#8d8bff",
+  edit: "#33d1ff",
   debugger: "#33d1ff",
   analyzer: "#8d8bff",
   optimizer: "#4ee3a0"
@@ -964,6 +977,22 @@ const AGENT_MODES = [
     icon: "message-orbit",
     description: "Read-only clarification and guidance",
     accentColor: AGENT_COLORS.ask,
+    disabled: false
+  },
+  {
+    id: "plan",
+    label: "Plan",
+    icon: "route-plan",
+    description: "Research, questions, handoff, and implementation planning",
+    accentColor: AGENT_COLORS.plan,
+    disabled: false
+  },
+  {
+    id: "edit",
+    label: "Edit",
+    icon: "pencil-edit",
+    description: "General implementation agent",
+    accentColor: AGENT_COLORS.edit,
     disabled: false
   },
   {
@@ -1014,7 +1043,7 @@ const toSlug = (value) => {
   return slug || "agent";
 };
 const fileNameForId = (id) => `${toSlug(id.replace(/_/g, "-"))}.agent.md`;
-const readStringArray = (value) => {
+const readStringArray$1 = (value) => {
   if (Array.isArray(value)) {
     return value.filter((entry) => typeof entry === "string").map((entry) => entry.trim()).filter(Boolean);
   }
@@ -1059,7 +1088,7 @@ const readHandoffs = (value) => {
   return handoffs;
 };
 const parseAgentMarkdown = (filePath, fallbackId) => {
-  const raw = fs.readFileSync(filePath, "utf8");
+  const raw = fs.readFileSync(filePath, "utf8").replace(/^\uFEFF/u, "");
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/u.exec(raw);
   const frontmatter = match ? YAML.parse(match[1]) : {};
   const instructions = match ? match[2].trim() : raw.trim();
@@ -1072,13 +1101,13 @@ const parseAgentMarkdown = (filePath, fallbackId) => {
     description: typeof frontmatter.description === "string" ? frontmatter.description.trim() : "",
     argumentHint: typeof frontmatter["argument-hint"] === "string" ? frontmatter["argument-hint"].trim() : "",
     target: typeof frontmatter.target === "string" ? frontmatter.target.trim() : "rdc-agent",
-    models: readStringArray(frontmatter.model),
+    models: readStringArray$1(frontmatter.model),
     disableModelInvocation: readBoolean(frontmatter["disable-model-invocation"], false),
     userInvocable: readBoolean(frontmatter["user-invocable"], true),
-    tools: readStringArray(frontmatter.tools),
-    skills: readStringArray(frontmatter.skills),
-    mcpServers: readStringArray(frontmatter["mcp-servers"]),
-    agents: readStringArray(frontmatter.agents),
+    tools: readStringArray$1(frontmatter.tools),
+    skills: readStringArray$1(frontmatter.skills),
+    mcpServers: readStringArray$1(frontmatter["mcp-servers"]),
+    agents: readStringArray$1(frontmatter.agents),
     handoffs: readHandoffs(frontmatter.handoffs),
     metadata: frontmatter.metadata && typeof frontmatter.metadata === "object" ? frontmatter.metadata : {},
     instructions,
@@ -1114,6 +1143,7 @@ const createSeedDefinition = (agentId, routes) => {
   const route = routes.find((entry) => entry.agentId === agentId);
   const model = canonicalAgentModelId(route?.providerId ?? "", route?.modelId ?? "");
   const name = AGENT_DISPLAY_NAMES[agentId];
+  const tools = agentId === "ask" ? ["read", "search", "web", "askUser"] : agentId === "plan" ? ["read", "search", "web", "askUser", "agent", "todo", "memory", "planArtifact", "handoff"] : agentId === "edit" ? ["read", "search", "web", "bash", "write", "edit", "askUser", "agent", "todo", "memory", "skill", "mcp"] : ["read", "search", "web", "bash", "askUser", "agent", "todo", "memory", "rdxContext"];
   return {
     id: agentId,
     fileName: fileNameForId(agentId),
@@ -1124,11 +1154,17 @@ const createSeedDefinition = (agentId, routes) => {
     models: model ? [model] : [],
     disableModelInvocation: false,
     userInvocable: true,
-    tools: agentId === "ask" ? ["read", "search", "web", "askUser"] : ["read", "search", "web", "bash", "askUser", "agent", "todo", "memory", "rdxContext"],
+    tools,
     skills: [],
     mcpServers: [],
     agents: agentId === "ask" ? [] : AGENT_ROLES.filter((role) => role !== agentId),
-    handoffs: [],
+    handoffs: agentId === "plan" ? [
+      {
+        label: "Start Implementation",
+        agent: "edit",
+        prompt: "Start implementing the approved plan."
+      }
+    ] : [],
     metadata: {},
     instructions: `You are ${name}. ${AGENT_DESCRIPTIONS[agentId]}.`,
     enabled: true
@@ -1273,7 +1309,6 @@ const agentManifestService = new AgentManifestService();
 const MAIN_STAGES = [
   "preflight",
   "entry_gate",
-  "intake_gate",
   "speclist",
   "dispatch",
   "investigate",
@@ -1289,7 +1324,6 @@ const ALL_STAGES = [...MAIN_STAGES, ...SPECIAL_STAGES];
 const STAGE_PHASES = {
   preflight: "planner",
   entry_gate: "planner",
-  intake_gate: "planner",
   speclist: "planner",
   dispatch: "generator",
   investigate: "generator",
@@ -1303,8 +1337,6 @@ const LEGACY_STAGE_MIGRATION = {
   preflight_pending: "preflight",
   intent_gate_passed: "speclist",
   entry_gate_passed: "entry_gate",
-  accepted_intake_initialized: "intake_gate",
-  intake_gate_passed: "intake_gate",
   waiting_for_specialist_brief: "dispatch",
   specialist_briefs_collected: "dispatch",
   expert_investigation_complete: "investigate",
@@ -3615,6 +3647,17 @@ class StorageAdapter {
       throw new Error(`Session not found for session evidence: ${sessionId}`);
     }
     return path__namespace.join(location.sessionPath, "session_evidence.yaml");
+  }
+  writeSessionPlanArtifact(sessionId, content) {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) {
+      throw new Error(`Session not found for plan artifact: ${sessionId}`);
+    }
+    const artifactsDir = path__namespace.join(location.sessionPath, "artifacts");
+    this.ensureDir(artifactsDir);
+    const artifactPath = path__namespace.join(artifactsDir, "plan.md");
+    fs__namespace.writeFileSync(artifactPath, content, "utf8");
+    return artifactPath;
   }
   readConversationHistory(sessionId) {
     const snapshots = readJsonl(this.getConversationPath(sessionId));
@@ -6481,7 +6524,7 @@ const grepTool = {
   },
   permissionHint: "readonly",
   async execute(_toolCallId, params, signal) {
-    throwIfAborted(signal);
+    throwIfAborted$1(signal);
     const workspaceRoot = getWorkspaceRoot();
     const root = params.path ? safeResolvePath(params.path, workspaceRoot) : workspaceRoot;
     const maxMatches = Math.max(1, Math.min(1e3, Math.floor(params.maxMatches ?? DEFAULT_MAX_MATCHES)));
@@ -6529,7 +6572,7 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 async function walkAndSearch(current, workspaceRoot, regex, matches, matchedFiles, maxMatches, signal) {
-  throwIfAborted(signal);
+  throwIfAborted$1(signal);
   const entries = await fs__namespace$1.readdir(current, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
     if (matches.length >= maxMatches) return;
@@ -6544,7 +6587,7 @@ async function walkAndSearch(current, workspaceRoot, regex, matches, matchedFile
   }
 }
 async function searchFile(absolute, workspaceRoot, regex, matches, matchedFiles, maxMatches, signal) {
-  throwIfAborted(signal);
+  throwIfAborted$1(signal);
   if (matches.length >= maxMatches) return;
   const buffer = await fs__namespace$1.readFile(absolute).catch(() => null);
   if (!buffer || buffer.includes(0)) return;
@@ -6559,7 +6602,7 @@ async function searchFile(absolute, workspaceRoot, regex, matches, matchedFiles,
     }
   }
 }
-function throwIfAborted(signal) {
+function throwIfAborted$1(signal) {
   if (signal?.aborted) {
     throw new Error("Aborted");
   }
@@ -6702,6 +6745,520 @@ function getPrimitiveTools() {
     webSearchTool
   ];
 }
+class TaskRegistry {
+  /** 任务 JSON 文件存放目录（绝对路径）。 */
+  tasksDir;
+  /** 是否已确保目录存在（避免每次 IO 都调用 mkdir）。 */
+  dirEnsured = false;
+  /**
+   * 构造一个任务注册表。
+   *
+   * @param tasksDir 任务文件目录。如果是相对路径，相对当前进程 cwd 解析；
+   *                 默认 `.tasks/`（即 workspace 根下的 `.tasks/`）。
+   */
+  constructor(tasksDir = ".tasks") {
+    this.tasksDir = path__namespace.resolve(tasksDir);
+  }
+  // ── 公共接口 ──────────────────────────────────────────────
+  /**
+   * 创建一个新任务。
+   *
+   * - 自动生成唯一 ID；
+   * - 若指定了 `blockedBy`，会在那些上游任务的 `blocks` 列表中追加当前 ID；
+   *   找不到的上游 ID 会被忽略（保留在 `blockedBy` 中，由 `canStart` 视作未完成）。
+   *
+   * @param subject 任务标题（动作型）。
+   * @param options 可选参数。
+   * @returns 新创建的任务记录。
+   */
+  async createTask(subject, options = {}) {
+    if (typeof subject !== "string" || subject.trim().length === 0) {
+      throw new Error("subject 不能为空");
+    }
+    await this.ensureDir();
+    const now = Date.now();
+    const id = this.generateId();
+    const blockedBy = dedupe(options.blockedBy ?? []);
+    const task = {
+      id,
+      subject: subject.trim(),
+      description: options.description ?? "",
+      status: "pending",
+      owner: options.owner,
+      blockedBy,
+      blocks: [],
+      activeForm: options.activeForm,
+      metadata: options.metadata ? { ...options.metadata } : void 0,
+      createdAt: now,
+      updatedAt: now
+    };
+    await this.saveTask(task);
+    for (const upstreamId of blockedBy) {
+      await this.linkBlocks(upstreamId, id);
+    }
+    return task;
+  }
+  /**
+   * 更新现有任务。
+   *
+   * - 简单字段（status / subject / description / activeForm / owner）直接覆盖；
+   * - `addBlockedBy` / `addBlocks` 为增量追加（自动去重，且会同步另一端的反向链接）；
+   * - `metadata` 为浅合并（传入 `null` 不会删除已有 key，请显式传入新对象）；
+   * - 任何更新都会刷新 `updatedAt`。
+   *
+   * 当 `status` 被切换为 `completed` 时，调用方可通过 {@link getUnblockedTasks}
+   * 查询哪些下游任务因此被解锁。
+   *
+   * @param taskId 任务 ID。
+   * @param updates 更新字段。
+   * @returns 更新后的任务记录。
+   * @throws 如果任务不存在。
+   */
+  async updateTask(taskId, updates) {
+    const task = await this.loadTask(taskId);
+    if (!task) {
+      throw new Error(`任务不存在：${taskId}`);
+    }
+    if (updates.status !== void 0) task.status = updates.status;
+    if (updates.subject !== void 0) task.subject = updates.subject;
+    if (updates.description !== void 0) {
+      task.description = updates.description;
+    }
+    if (updates.activeForm !== void 0) task.activeForm = updates.activeForm;
+    if (updates.owner !== void 0) task.owner = updates.owner;
+    if (updates.metadata !== void 0) {
+      task.metadata = { ...task.metadata ?? {}, ...updates.metadata };
+    }
+    if (updates.addBlockedBy && updates.addBlockedBy.length > 0) {
+      const added = appendUnique(task.blockedBy, updates.addBlockedBy);
+      for (const upstreamId of added) {
+        await this.linkBlocks(upstreamId, task.id);
+      }
+    }
+    if (updates.addBlocks && updates.addBlocks.length > 0) {
+      const added = appendUnique(task.blocks, updates.addBlocks);
+      for (const downstreamId of added) {
+        await this.linkBlockedBy(downstreamId, task.id);
+      }
+    }
+    task.updatedAt = Date.now();
+    await this.saveTask(task);
+    return task;
+  }
+  /**
+   * 读取单个任务。
+   *
+   * @param taskId 任务 ID。
+   * @returns 任务记录；不存在时返回 `null`。
+   */
+  async getTask(taskId) {
+    return this.loadTask(taskId);
+  }
+  /**
+   * 列出所有任务（按 ID 升序，与文件名字典序一致）。
+   *
+   * - 单个文件解析失败时会被跳过，不影响整体列表；
+   * - 目录不存在时返回空数组。
+   */
+  async listTasks() {
+    await this.ensureDir();
+    let entries;
+    try {
+      entries = await fs__namespace$1.readdir(this.tasksDir);
+    } catch (err) {
+      if (err.code === "ENOENT") return [];
+      throw err;
+    }
+    const files = entries.filter((name) => name.startsWith("task_") && name.endsWith(".json")).sort();
+    const tasks = [];
+    for (const file of files) {
+      const id = file.slice(0, -".json".length);
+      const task = await this.loadTask(id);
+      if (task) tasks.push(task);
+    }
+    return tasks;
+  }
+  /**
+   * 判断任务是否可以开始。
+   *
+   * - 所有 `blockedBy` 中的上游任务必须存在且状态为 `completed`；
+   * - 上游缺失（文件不存在）视为未完成 → 仍处于阻塞状态。
+   *
+   * @param taskId 任务 ID。
+   * @returns 任务存在且可启动时返回 `true`。
+   */
+  async canStart(taskId) {
+    const task = await this.loadTask(taskId);
+    if (!task) return false;
+    for (const depId of task.blockedBy) {
+      const dep = await this.loadTask(depId);
+      if (!dep || dep.status !== "completed") return false;
+    }
+    return true;
+  }
+  /**
+   * 查找因 `completedTaskId` 完成而被解锁的下游任务。
+   *
+   * 解锁条件：
+   *  - 下游任务状态为 `pending`；
+   *  - 下游任务的 `blockedBy` 包含 `completedTaskId`；
+   *  - 下游任务的所有 `blockedBy` 此刻都已完成（即 `canStart` 为真）。
+   *
+   * @param completedTaskId 刚完成的任务 ID。
+   * @returns 被解锁的下游任务记录列表（可能为空）。
+   */
+  async getUnblockedTasks(completedTaskId) {
+    const all = await this.listTasks();
+    const unblocked = [];
+    for (const task of all) {
+      if (task.status !== "pending") continue;
+      if (!task.blockedBy.includes(completedTaskId)) continue;
+      if (await this.canStart(task.id)) {
+        unblocked.push(task);
+      }
+    }
+    return unblocked;
+  }
+  // ── 私有辅助 ──────────────────────────────────────────────
+  /** 生成任务 ID。 */
+  generateId() {
+    return `task_${Date.now()}_${crypto__namespace.randomBytes(3).toString("hex")}`;
+  }
+  /** 任务对应的 JSON 文件绝对路径。 */
+  taskPath(taskId) {
+    return path__namespace.join(this.tasksDir, `${taskId}.json`);
+  }
+  /** 确保任务目录存在（懒执行 + 缓存）。 */
+  async ensureDir() {
+    if (this.dirEnsured) return;
+    await fs__namespace$1.mkdir(this.tasksDir, { recursive: true });
+    this.dirEnsured = true;
+  }
+  /** 把任务序列化写入文件。 */
+  async saveTask(task) {
+    await this.ensureDir();
+    const payload = JSON.stringify(task, null, 2);
+    await fs__namespace$1.writeFile(this.taskPath(task.id), payload, "utf8");
+  }
+  /** 从文件读取任务；缺失或解析失败时返回 `null`。 */
+  async loadTask(taskId) {
+    try {
+      const raw = await fs__namespace$1.readFile(this.taskPath(taskId), "utf8");
+      const parsed = JSON.parse(raw);
+      return normalizeTask(parsed);
+    } catch (err) {
+      if (err.code === "ENOENT") return null;
+      return null;
+    }
+  }
+  /** 在上游任务的 `blocks` 中追加 `downstreamId`（若上游存在）。 */
+  async linkBlocks(upstreamId, downstreamId) {
+    const upstream = await this.loadTask(upstreamId);
+    if (!upstream) return;
+    if (upstream.blocks.includes(downstreamId)) return;
+    upstream.blocks = [...upstream.blocks, downstreamId];
+    upstream.updatedAt = Date.now();
+    await this.saveTask(upstream);
+  }
+  /** 在下游任务的 `blockedBy` 中追加 `upstreamId`（若下游存在）。 */
+  async linkBlockedBy(downstreamId, upstreamId) {
+    const downstream = await this.loadTask(downstreamId);
+    if (!downstream) return;
+    if (downstream.blockedBy.includes(upstreamId)) return;
+    downstream.blockedBy = [...downstream.blockedBy, upstreamId];
+    downstream.updatedAt = Date.now();
+    await this.saveTask(downstream);
+  }
+}
+function dedupe(arr) {
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const item of arr) {
+    if (typeof item !== "string" || item.length === 0) continue;
+    if (seen.has(item)) continue;
+    seen.add(item);
+    out.push(item);
+  }
+  return out;
+}
+function appendUnique(target, incoming) {
+  const existing = new Set(target);
+  const added = [];
+  for (const item of incoming) {
+    if (typeof item !== "string" || item.length === 0) continue;
+    if (existing.has(item)) continue;
+    existing.add(item);
+    target.push(item);
+    added.push(item);
+  }
+  return added;
+}
+function normalizeTask(raw) {
+  if (!raw || typeof raw.id !== "string" || typeof raw.subject !== "string") {
+    return null;
+  }
+  const status = raw.status === "in_progress" || raw.status === "completed" || raw.status === "deleted" ? raw.status : "pending";
+  const now = Date.now();
+  return {
+    id: raw.id,
+    subject: raw.subject,
+    description: typeof raw.description === "string" ? raw.description : "",
+    status,
+    owner: typeof raw.owner === "string" ? raw.owner : void 0,
+    blockedBy: Array.isArray(raw.blockedBy) ? raw.blockedBy.filter((x) => typeof x === "string") : [],
+    blocks: Array.isArray(raw.blocks) ? raw.blocks.filter((x) => typeof x === "string") : [],
+    activeForm: typeof raw.activeForm === "string" ? raw.activeForm : void 0,
+    metadata: raw.metadata && typeof raw.metadata === "object" ? raw.metadata : void 0,
+    createdAt: typeof raw.createdAt === "number" ? raw.createdAt : now,
+    updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : now
+  };
+}
+const ALLOWED_STATUS = [
+  "pending",
+  "in_progress",
+  "completed",
+  "deleted"
+];
+function createTaskTools(registry) {
+  return [
+    createTaskCreateTool(registry),
+    createTaskUpdateTool(registry),
+    createTaskGetTool(registry),
+    createTaskListTool(registry)
+  ];
+}
+function createTaskCreateTool(registry) {
+  return {
+    name: "task_create",
+    label: "Create Task",
+    description: "Create a new task for tracking work progress",
+    parameters: {
+      type: "object",
+      properties: {
+        subject: {
+          type: "string",
+          description: "Brief imperative title"
+        },
+        description: {
+          type: "string",
+          description: "Detailed description"
+        },
+        activeForm: {
+          type: "string",
+          description: "Present continuous form for spinner"
+        },
+        blockedBy: {
+          type: "array",
+          items: { type: "string" },
+          description: "Task IDs that block this"
+        }
+      },
+      required: ["subject"]
+    },
+    permissionHint: "readonly",
+    async execute(_toolCallId, params, signal) {
+      throwIfAborted(signal);
+      const subject = readString$1(params, "subject", true);
+      const description = readString$1(params, "description", false);
+      const activeForm = readString$1(params, "activeForm", false);
+      const blockedBy = readStringArray(params, "blockedBy");
+      const task = await registry.createTask(subject, {
+        description,
+        activeForm,
+        blockedBy
+      });
+      const depsText = blockedBy && blockedBy.length > 0 ? ` (blockedBy: ${blockedBy.join(", ")})` : "";
+      const text = `Created ${task.id}: ${task.subject}${depsText}`;
+      return {
+        content: [{ type: "text", text }],
+        details: { id: task.id }
+      };
+    }
+  };
+}
+function createTaskUpdateTool(registry) {
+  return {
+    name: "task_update",
+    label: "Update Task",
+    description: "Update an existing task status or details",
+    parameters: {
+      type: "object",
+      properties: {
+        taskId: { type: "string" },
+        status: {
+          type: "string",
+          enum: ["pending", "in_progress", "completed", "deleted"]
+        },
+        subject: { type: "string" },
+        description: { type: "string" },
+        activeForm: { type: "string" },
+        owner: { type: "string" },
+        addBlockedBy: { type: "array", items: { type: "string" } },
+        addBlocks: { type: "array", items: { type: "string" } },
+        metadata: { type: "object" }
+      },
+      required: ["taskId"]
+    },
+    permissionHint: "readonly",
+    async execute(_toolCallId, params, signal) {
+      throwIfAborted(signal);
+      const taskId = readString$1(params, "taskId", true);
+      const status = readEnum(params, "status", ALLOWED_STATUS);
+      const subject = readString$1(params, "subject", false);
+      const description = readString$1(params, "description", false);
+      const activeForm = readString$1(params, "activeForm", false);
+      const owner = readString$1(params, "owner", false);
+      const addBlockedBy = readStringArray(params, "addBlockedBy");
+      const addBlocks = readStringArray(params, "addBlocks");
+      const metadata = params.metadata && typeof params.metadata === "object" ? params.metadata : void 0;
+      const updated = await registry.updateTask(taskId, {
+        status,
+        subject,
+        description,
+        activeForm,
+        owner,
+        addBlockedBy,
+        addBlocks,
+        metadata
+      });
+      let unblocked = [];
+      if (status === "completed") {
+        unblocked = await registry.getUnblockedTasks(updated.id);
+      }
+      const lines = [
+        `Updated ${updated.id}: ${updated.subject} [${updated.status}]`
+      ];
+      if (unblocked.length > 0) {
+        lines.push(
+          `Unblocked: ${unblocked.map((t) => `${t.id} (${t.subject})`).join(", ")}`
+        );
+      }
+      return {
+        content: [{ type: "text", text: lines.join("\n") }],
+        details: {
+          id: updated.id,
+          status: updated.status,
+          unblocked: unblocked.map((t) => t.id)
+        }
+      };
+    }
+  };
+}
+function createTaskGetTool(registry) {
+  return {
+    name: "task_get",
+    label: "Get Task",
+    description: "Get full details of a specific task",
+    parameters: {
+      type: "object",
+      properties: {
+        taskId: { type: "string" }
+      },
+      required: ["taskId"]
+    },
+    permissionHint: "readonly",
+    async execute(_toolCallId, params, signal) {
+      throwIfAborted(signal);
+      const taskId = readString$1(params, "taskId", true);
+      const task = await registry.getTask(taskId);
+      if (!task) {
+        return {
+          content: [{ type: "text", text: `Task not found: ${taskId}` }],
+          details: { id: taskId, found: false }
+        };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(task, null, 2) }],
+        details: { id: task.id, found: true }
+      };
+    }
+  };
+}
+function createTaskListTool(registry) {
+  return {
+    name: "task_list",
+    label: "List Tasks",
+    description: "List all tasks with their current status",
+    parameters: {
+      type: "object",
+      properties: {}
+    },
+    permissionHint: "readonly",
+    async execute(_toolCallId, _params, signal) {
+      throwIfAborted(signal);
+      const tasks = await registry.listTasks();
+      if (tasks.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "No tasks. Use task_create to add some."
+            }
+          ],
+          details: { count: 0 }
+        };
+      }
+      const lines = tasks.map(formatTaskLine);
+      return {
+        content: [{ type: "text", text: lines.join("\n") }],
+        details: { count: tasks.length }
+      };
+    }
+  };
+}
+function throwIfAborted(signal) {
+  if (signal?.aborted) {
+    throw new Error("Aborted");
+  }
+}
+function readString$1(params, key, required) {
+  const value = params[key];
+  if (value === void 0 || value === null || value === "") {
+    if (required) throw new Error(`参数 "${key}" 不能为空`);
+    return void 0;
+  }
+  if (typeof value !== "string") {
+    throw new Error(`参数 "${key}" 必须是字符串`);
+  }
+  return value;
+}
+function readStringArray(params, key) {
+  const value = params[key];
+  if (value === void 0 || value === null) return void 0;
+  if (!Array.isArray(value)) {
+    throw new Error(`参数 "${key}" 必须是字符串数组`);
+  }
+  const out = [];
+  for (const item of value) {
+    if (typeof item !== "string" || item.length === 0) {
+      throw new Error(`参数 "${key}" 中存在非法元素`);
+    }
+    out.push(item);
+  }
+  return out;
+}
+function readEnum(params, key, allowed) {
+  const value = params[key];
+  if (value === void 0 || value === null || value === "") return void 0;
+  if (typeof value !== "string" || !allowed.includes(value)) {
+    throw new Error(
+      `参数 "${key}" 必须是以下之一：${allowed.join(", ")}`
+    );
+  }
+  return value;
+}
+function formatTaskLine(task) {
+  const icon = STATUS_ICON[task.status] ?? "?";
+  const owner = task.owner ? ` [${task.owner}]` : "";
+  const deps = task.blockedBy.length > 0 ? ` (blockedBy: ${task.blockedBy.join(", ")})` : "";
+  return `  ${icon} ${task.id}: ${task.subject} [${task.status}]${owner}${deps}`;
+}
+const STATUS_ICON = {
+  pending: "○",
+  in_progress: "●",
+  completed: "✓",
+  deleted: "✗"
+};
 const COPILOT_EDITOR_HEADERS = {
   "Editor-Version": "vscode/1.107.0",
   "Editor-Plugin-Version": "copilot-chat/0.35.0"
@@ -8202,6 +8759,19 @@ function translateCoreToSharedAgentEvent(event, context2) {
           context2
         );
       }
+      if (ev.type === "toolcall_end") {
+        return buildSharedAgentEvent(
+          "tool.requested",
+          {
+            toolCall: {
+              id: ev.toolCall.id,
+              name: ev.toolCall.name,
+              arguments: ev.toolCall.arguments
+            }
+          },
+          context2
+        );
+      }
       return null;
     }
     case "message_end": {
@@ -8234,6 +8804,22 @@ function translateCoreToSharedAgentEvent(event, context2) {
     }
     case "tool_execution_end": {
       const sharedResult = toolResultToSharedResult(event.result, event.durationMs);
+      const approvalReason = getApprovalRequiredReason(event.result);
+      if (approvalReason) {
+        return buildSharedAgentEvent(
+          "approval.requested",
+          {
+            approvalId: `approval-${event.toolCallId}`,
+            title: `Approve ${event.toolName}`,
+            status: "pending",
+            reason: approvalReason,
+            kind: "tool",
+            toolCallId: event.toolCallId,
+            toolName: event.toolName
+          },
+          context2
+        );
+      }
       const denialReason = getPolicyDenialReason(event.result);
       if (denialReason) {
         return buildSharedAgentEvent(
@@ -8257,6 +8843,34 @@ function translateCoreToSharedAgentEvent(event, context2) {
         context2
       );
     }
+    case "approval_requested": {
+      return buildSharedAgentEvent(
+        "approval.requested",
+        {
+          approvalId: `approval-${event.toolCallId}`,
+          title: `Approve ${event.toolName}`,
+          status: "pending",
+          reason: `Approval required before ${event.toolName} can run.`,
+          kind: "tool",
+          toolCallId: event.toolCallId,
+          toolName: event.toolName
+        },
+        context2
+      );
+    }
+    case "approval_resolved": {
+      return buildSharedAgentEvent(
+        "approval.answered",
+        {
+          approvalId: `approval-${event.toolCallId}`,
+          title: `Approve ${event.toolCallId}`,
+          status: event.approved ? "approved" : "rejected",
+          kind: "tool",
+          toolCallId: event.toolCallId
+        },
+        context2
+      );
+    }
     case "error": {
       return buildSharedAgentEvent(
         "run.failed",
@@ -8270,6 +8884,11 @@ function translateCoreToSharedAgentEvent(event, context2) {
     default:
       return null;
   }
+}
+function getApprovalRequiredReason(result) {
+  if (!result.isError) return null;
+  const message = extractToolResultText(result);
+  return message.toLowerCase().includes("approval required") ? message : null;
 }
 function getPolicyDenialReason(result) {
   if (!result.isError) return null;
@@ -9117,23 +9736,63 @@ const CANONICAL_TOOL_EXPANSIONS = {
   search: ["glob", "grep"],
   web: ["web_fetch", "web_search"],
   bash: ["bash"],
+  write: ["write_file"],
+  edit: ["edit_file"],
   askUser: ["ask_user"],
+  "vscode/askQuestions": ["ask_user"],
   agent: ["agent_handoff"],
-  todo: ["task_list"],
+  handoff: ["agent_handoff"],
+  todo: ["task_create", "task_update", "task_get", "task_list"],
+  task: ["task_create", "task_update", "task_get", "task_list"],
   memory: ["memory_read"],
-  rdxContext: ["rdx_context"]
+  planArtifact: ["plan_artifact"],
+  artifact: ["plan_artifact"],
+  "vscode/memory": ["memory_read"],
+  skill: ["skills"],
+  skills: ["skills"],
+  mcp: ["mcp"],
+  MCP: ["mcp"],
+  rdxContext: ["rdx_context"],
+  rdx: ["rdx_context"]
 };
 const RUNTIME_TOOL_ALIASES = {
+  read: "read_file",
   read_file: "read_file",
+  search: "grep",
   glob: "glob",
   grep: "grep",
+  web: "web_fetch",
   web_fetch: "web_fetch",
   web_search: "web_search",
   bash: "bash",
+  write: "write_file",
+  write_file: "write_file",
+  edit: "edit_file",
+  edit_file: "edit_file",
+  todo: "task_list",
+  task: "task_list",
+  task_create: "task_create",
+  task_update: "task_update",
+  task_get: "task_get",
   task_list: "task_list",
+  askUser: "ask_user",
   ask_user: "ask_user",
+  "vscode/askQuestions": "ask_user",
+  agent: "agent_handoff",
+  handoff: "agent_handoff",
   agent_handoff: "agent_handoff",
+  memory: "memory_read",
   memory_read: "memory_read",
+  planArtifact: "plan_artifact",
+  artifact: "plan_artifact",
+  plan_artifact: "plan_artifact",
+  "vscode/memory": "memory_read",
+  skill: "skills",
+  skills: "skills",
+  mcp: "mcp",
+  MCP: "mcp",
+  rdxContext: "rdx_context",
+  rdx: "rdx_context",
   rdx_context: "rdx_context"
 };
 const ASK_DENIED_TOOL_PREFIXES = ["rd.", "mcp."];
@@ -9152,17 +9811,27 @@ const ASK_DENIED_TOOLS = /* @__PURE__ */ new Set([
 const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
   ...ASK_READONLY_TOOL_ALLOWLIST,
   "bash",
+  "write_file",
+  "edit_file",
   "ask_user",
   "agent_handoff",
+  "task_create",
+  "task_update",
+  "task_get",
   "task_list",
   "memory_read",
+  "plan_artifact",
+  "skills",
+  "mcp",
   "rdx_context"
 ];
 const SHADER_EDIT_TOOLS = ["rd.shader.edit_and_replace", "rd.macro.shader_hotfix_validate"];
 function resolveAgentToolAllowlist(agentId, stage) {
   const settings = settingsService.getAll();
   const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, stage || "investigate", agentId);
-  const profileTools = runtimeProfile.toolAllowlist?.length ? runtimeProfile.toolAllowlist.flatMap(expandCanonicalToolToken) : agentId === "ask" ? ASK_READONLY_TOOL_ALLOWLIST : EXECUTABLE_AGENT_TOOL_ALLOWLIST;
+  const manifest = settings.agents.definitions.find((definition) => definition.id === agentId && definition.enabled);
+  const manifestTools = manifest?.tools?.length ? manifest.tools : [];
+  const profileTools = manifestTools.length ? manifestTools.flatMap(expandCanonicalToolToken) : runtimeProfile.toolAllowlist?.length ? runtimeProfile.toolAllowlist.flatMap(expandCanonicalToolToken) : agentId === "ask" ? ASK_READONLY_TOOL_ALLOWLIST : EXECUTABLE_AGENT_TOOL_ALLOWLIST;
   if (agentId === "ask") {
     return Array.from(new Set(profileTools.filter((toolName) => !isDeniedAskTool(toolName, normalizeToolName(toolName)))));
   }
@@ -9200,7 +9869,6 @@ function isDeniedAskTool(originalToolName, normalizedToolName) {
   }
   return ASK_DENIED_TOOL_PREFIXES.some((prefix) => originalToolName.startsWith(prefix) || normalizedToolName.startsWith(prefix));
 }
-const EXECUTE_PATTERN$1 = /start|execute|debug|analy[sz]e|开始|启动|执行|正式分析|开始调试|调试/i;
 class AgentOrchestrator {
   agentStates = /* @__PURE__ */ new Map();
   agentConfigs = /* @__PURE__ */ new Map();
@@ -9231,10 +9899,10 @@ class AgentOrchestrator {
     }
   }
   getAgentCategory(role) {
-    return role === "ask" ? "orchestrator" : "general";
+    return isTopLevelAgentId(role) ? AGENT_CATEGORIES[role] : "general";
   }
   getAgentWriteScopes(role) {
-    return role === "ask" ? [] : ["workspace_notes", "workspace_control"];
+    return isTopLevelAgentId(role) ? AGENT_WRITE_SCOPES[role] : ["workspace_notes"];
   }
   getAgentState(agentId) {
     return this.agentStates.get(agentId) || null;
@@ -9271,7 +9939,7 @@ class AgentOrchestrator {
     return isToolAllowedForAgent(toolName, agentId);
   }
   // -------------------------------------------------------------------
-  // 主入口：sendMessage / sendCoworkMessage
+  // Main entry points: workflow run turn / profile turn.
   // -------------------------------------------------------------------
   async sendMessage(agentId, content, context2, options) {
     const fallbackConfig = this.agentConfigs.get(agentId);
@@ -9324,7 +9992,7 @@ class AgentOrchestrator {
       throw error;
     }
   }
-  async sendCoworkMessage(agentId, content, options) {
+  async sendProfileMessage(agentId, content, options) {
     const fallbackConfig = this.agentConfigs.get(agentId);
     if (!fallbackConfig) {
       throw new Error(`Agent not found: ${agentId}`);
@@ -9350,12 +10018,12 @@ class AgentOrchestrator {
         maxTokens: options?.maxTokens ?? fallbackConfig.maxTokens
       };
       if (process.env.RDC_AGENT_TEST_MODE === "1") {
-        const finalStub = await this.createCoworkTestResponse(agentId, content, options);
+        const finalStub = await this.createProfileTestResponse(agentId, content, options);
         this.updateAgentStatus(agentId, "complete");
         return finalStub;
       }
       const userPrompt = options?.promptOverride ?? content;
-      const toolAllowlist = resolveAgentToolAllowlist(agentId, options?.stage && options.stage !== "cowork" && options.stage !== "report" ? options.stage : void 0);
+      const toolAllowlist = resolveAgentToolAllowlist(agentId, options?.stage && options.stage !== "report" ? options.stage : void 0);
       const responseText = await this.runAgentTurn({
         agentId,
         content: userPrompt,
@@ -9366,20 +10034,20 @@ class AgentOrchestrator {
         temperature: config.temperature,
         mode: this.modeForAgent(agentId),
         patternId: options?.patternId ?? this.patternForAgent(agentId),
-        stage: options?.stage ?? "cowork",
+        stage: options?.stage ?? "investigate",
         runId: void 0,
         sessionId: options?.sessionId ?? null,
         turnId: options?.turnId,
         toolAllowlist,
         options,
-        // cowork 每次调用都是独立轮次，不复用缓存 Agent。
+        // A profile turn is isolated so previous cached chat state cannot leak into this user turn.
         useFreshAgent: true
       });
       runtimeLogService.log({
         scope: options?.sessionId ? "session" : "app",
         namespace: "agent",
         severity: "info",
-        title: `${AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : "debugger"]} cowork turn`,
+        title: `${AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : "debugger"]} profile turn`,
         summary: responseText.slice(0, 160) || "Empty message.",
         sessionId: options?.sessionId,
         raw: {
@@ -9419,7 +10087,7 @@ class AgentOrchestrator {
     this.agentSlots.set(agentId, slot);
     return slot;
   }
-  /** 创建一个全新的 Agent slot（不进入缓存）。适用于 cowork 这种一次性调用。 */
+  /** Create a fresh one-shot agent slot for an isolated profile turn. */
   createFreshAgentSlot(providerId, modelId, systemPrompt, tools = [], toolExecutor = this.createToolExecutor("ask", [], void 0), streamOptions) {
     const agent = new Agent({
       initialState: {
@@ -9435,15 +10103,19 @@ class AgentOrchestrator {
     });
     return { agent, providerId, modelId, systemPrompt };
   }
-  resolveRuntimeTools(agentId, toolAllowlist, stage) {
+  resolveRuntimeTools(agentId, toolAllowlist, stage, sessionId) {
     const availableTools = /* @__PURE__ */ new Map();
     for (const tool of getPrimitiveTools()) {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
-    const taskListTool = this.createReadonlyTaskListTool();
-    availableTools.set(taskListTool.name, taskListTool);
+    for (const tool of this.createTaskRuntimeTools()) {
+      availableTools.set(normalizeToolName(tool.name), tool);
+    }
     const rdxContextTool = this.createRdxContextTool();
     availableTools.set(rdxContextTool.name, rdxContextTool);
+    for (const tool of this.createWorkbenchTools(agentId, sessionId)) {
+      availableTools.set(normalizeToolName(tool.name), tool);
+    }
     const definitions = [];
     const toolMap = /* @__PURE__ */ new Map();
     for (const name of toolAllowlist) {
@@ -9458,8 +10130,8 @@ class AgentOrchestrator {
     }
     return { definitions, toolMap };
   }
-  createToolExecutor(agentId, toolAllowlist, stage) {
-    const tools = this.resolveRuntimeTools(agentId, toolAllowlist, stage).toolMap;
+  createToolExecutor(agentId, toolAllowlist, stage, sessionId) {
+    const tools = this.resolveRuntimeTools(agentId, toolAllowlist, stage, sessionId).toolMap;
     return {
       execute: async (toolCall, signal, onUpdate) => {
         const normalizedName = normalizeToolName(toolCall.name);
@@ -9469,6 +10141,10 @@ class AgentOrchestrator {
         const tool = tools.get(normalizedName);
         if (!tool) {
           return this.createPolicyDeniedToolResult(toolCall, agentId);
+        }
+        const approvalRequired = tool.permissionHint === "mutation" || tool.permissionHint === "destructive";
+        if (approvalRequired) {
+          return this.createApprovalRequiredToolResult(toolCall, agentId, tool.permissionHint);
         }
         try {
           const result = await tool.execute(toolCall.id, toolCall.arguments, signal, onUpdate);
@@ -9487,7 +10163,7 @@ class AgentOrchestrator {
     };
   }
   isAllowedForRuntime(agentId, toolName, stage) {
-    const workflowStage = stage === "cowork" || stage === "report" ? void 0 : stage;
+    const workflowStage = stage === "report" ? void 0 : stage;
     return isToolAllowedForAgent(toolName, agentId, workflowStage);
   }
   createPolicyDeniedToolResult(toolCall, agentId) {
@@ -9503,6 +10179,20 @@ class AgentOrchestrator {
       timestamp: Date.now()
     };
   }
+  createApprovalRequiredToolResult(toolCall, agentId, permissionHint) {
+    const operation = permissionHint === "destructive" ? "destructive operation" : "workspace mutation";
+    return {
+      role: "toolResult",
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+      content: [{
+        type: "text",
+        text: `Approval required for tool "${toolCall.name}" before ${operation} can run for ${agentId}. No changes were made.`
+      }],
+      isError: true,
+      timestamp: Date.now()
+    };
+  }
   agentToolResultToMessage(toolCall, result) {
     return {
       role: "toolResult",
@@ -9513,23 +10203,9 @@ class AgentOrchestrator {
       timestamp: Date.now()
     };
   }
-  createReadonlyTaskListTool() {
-    return {
-      name: "task_list",
-      label: "List Tasks",
-      description: "List current conversation tasks without creating or modifying any task records.",
-      parameters: {
-        type: "object",
-        properties: {}
-      },
-      permissionHint: "readonly",
-      async execute() {
-        return {
-          content: [{ type: "text", text: "No formal Debugger run tasks are active in Ask mode." }],
-          details: { count: 0 }
-        };
-      }
-    };
+  createTaskRuntimeTools() {
+    const tasksDir = path__namespace.join(storageAdapter.getWorkspacePath(), ".tasks");
+    return createTaskTools(new TaskRegistry(tasksDir));
   }
   createRdxContextTool() {
     return {
@@ -9556,6 +10232,199 @@ class AgentOrchestrator {
       }
     };
   }
+  createWorkbenchTools(agentId, sessionId) {
+    return [
+      this.createAskUserTool(agentId),
+      this.createAgentHandoffTool(agentId),
+      this.createMemoryReadTool(sessionId),
+      this.createPlanArtifactTool(sessionId),
+      this.createSkillsCatalogTool(),
+      this.createMcpCatalogTool()
+    ];
+  }
+  createAskUserTool(agentId) {
+    return {
+      name: "ask_user",
+      label: "Ask User",
+      description: "Ask the user for a decision or missing information. Use this when progress depends on user input.",
+      parameters: {
+        type: "object",
+        required: ["question"],
+        properties: {
+          question: { type: "string", description: "The concise question to ask the user." },
+          choices: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional short mutually exclusive choices."
+          }
+        }
+      },
+      permissionHint: "readonly",
+      async execute(_toolCallId, args) {
+        const question = typeof args.question === "string" && args.question.trim() ? args.question.trim() : "The agent needs user input before continuing.";
+        const choices = Array.isArray(args.choices) ? args.choices.filter((entry) => typeof entry === "string" && entry.trim().length > 0) : [];
+        const suffix = choices.length > 0 ? ` Choices: ${choices.join(" | ")}` : "";
+        return {
+          content: [{ type: "text", text: `User input requested by ${agentId}: ${question}${suffix}` }],
+          details: { agentId, question, choices }
+        };
+      }
+    };
+  }
+  createAgentHandoffTool(agentId) {
+    return {
+      name: "agent_handoff",
+      label: "Agent Handoff",
+      description: "Prepare a handoff to another agent profile without executing it directly.",
+      parameters: {
+        type: "object",
+        required: ["prompt"],
+        properties: {
+          agent: { type: "string", description: "Target agent profile id, such as edit, debugger, analyzer, or optimizer." },
+          label: { type: "string", description: "Short handoff label." },
+          prompt: { type: "string", description: "Implementation or specialist prompt for the receiving agent." }
+        }
+      },
+      permissionHint: "readonly",
+      async execute(_toolCallId, args) {
+        const toAgentId = typeof args.agent === "string" && args.agent.trim() ? args.agent.trim() : "edit";
+        const label = typeof args.label === "string" && args.label.trim() ? args.label.trim() : `Hand off to ${toAgentId}`;
+        const prompt = typeof args.prompt === "string" && args.prompt.trim() ? args.prompt.trim() : "Continue from the current plan and ask for missing context before making changes.";
+        return {
+          content: [{
+            type: "text",
+            text: `Handoff prepared from ${agentId} to ${toAgentId}: ${label}
+${prompt}`
+          }],
+          details: { fromAgentId: agentId, toAgentId, label, prompt }
+        };
+      }
+    };
+  }
+  createPlanArtifactTool(sessionId) {
+    return {
+      name: "plan_artifact",
+      label: "Write Plan Artifact",
+      description: "Write or replace the current session plan artifact. This cannot edit arbitrary workspace files.",
+      parameters: {
+        type: "object",
+        required: ["content"],
+        properties: {
+          title: { type: "string", description: "Optional plan title." },
+          content: { type: "string", description: "Plan content to persist for this session." }
+        }
+      },
+      permissionHint: "session_mutation",
+      async execute(_toolCallId, args) {
+        if (!sessionId) {
+          return {
+            content: [{ type: "text", text: "No active session is available for a plan artifact." }],
+            isError: true,
+            details: { sessionId: null }
+          };
+        }
+        const body = typeof args.content === "string" ? args.content.trim() : "";
+        if (!body) {
+          return {
+            content: [{ type: "text", text: "Plan artifact content is required." }],
+            isError: true,
+            details: { sessionId }
+          };
+        }
+        const title = typeof args.title === "string" && args.title.trim() ? args.title.trim() : "Agent Plan";
+        const artifactPath = storageAdapter.writeSessionPlanArtifact(sessionId, `# ${title}
+
+${body}
+`);
+        return {
+          content: [{ type: "text", text: `Plan artifact saved: ${artifactPath}` }],
+          details: { sessionId, artifactPath }
+        };
+      }
+    };
+  }
+  createMemoryReadTool(sessionId) {
+    return {
+      name: "memory_read",
+      label: "Read Memory",
+      description: "Read recent session memory and conversation context without mutating persisted data.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Optional case-insensitive filter." },
+          limit: { type: "number", description: "Maximum recent entries to return, default 8." }
+        }
+      },
+      permissionHint: "readonly",
+      async execute(_toolCallId, args) {
+        if (!sessionId) {
+          return {
+            content: [{ type: "text", text: "No active session memory is available for this turn." }],
+            details: { sessionId: null, count: 0 }
+          };
+        }
+        const rawLimit = typeof args.limit === "number" && Number.isFinite(args.limit) ? args.limit : 8;
+        const limit = Math.max(1, Math.min(20, Math.floor(rawLimit)));
+        const query = typeof args.query === "string" ? args.query.trim().toLowerCase() : "";
+        const history = storageAdapter.readConversationHistory(sessionId);
+        const candidates = query ? history.filter((entry) => entry.content.toLowerCase().includes(query)) : history;
+        const entries = candidates.slice(-limit).map((entry) => `${entry.role}${entry.agentId ? `/${entry.agentId}` : ""}: ${entry.content.slice(0, 240)}`);
+        return {
+          content: [{
+            type: "text",
+            text: entries.length > 0 ? entries.join("\n") : "No matching session memory entries were found."
+          }],
+          details: { sessionId, count: entries.length }
+        };
+      }
+    };
+  }
+  createSkillsCatalogTool() {
+    return {
+      name: "skills",
+      label: "List Skills",
+      description: "List reusable skills configured for the current workspace.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Optional case-insensitive filter." }
+        }
+      },
+      permissionHint: "readonly",
+      async execute(_toolCallId, args) {
+        const query = typeof args.query === "string" ? args.query.trim().toLowerCase() : "";
+        const skills = agentRuntimeConfigService.listSkills().filter((skill) => !query || `${skill.id} ${skill.name} ${skill.label} ${skill.description}`.toLowerCase().includes(query));
+        const lines = skills.map((skill) => `${skill.id}: ${skill.label || skill.name} (${skill.source})${skill.enabledByDefault ? "" : " - disabled by default"}`);
+        return {
+          content: [{ type: "text", text: lines.length > 0 ? lines.join("\n") : "No configured skills matched the query." }],
+          details: { count: skills.length }
+        };
+      }
+    };
+  }
+  createMcpCatalogTool() {
+    return {
+      name: "mcp",
+      label: "List MCP Services",
+      description: "List MCP services configured for the current workspace.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Optional case-insensitive filter." }
+        }
+      },
+      permissionHint: "readonly",
+      async execute(_toolCallId, args) {
+        const query = typeof args.query === "string" ? args.query.trim().toLowerCase() : "";
+        const servers = agentRuntimeConfigService.listMcpServers().filter((server2) => !query || `${server2.id} ${server2.name} ${server2.description}`.toLowerCase().includes(query));
+        const lines = servers.map((server2) => `${server2.id}: ${server2.name} (${server2.transport})${server2.enabledByDefault ? "" : " - disabled by default"}`);
+        return {
+          content: [{ type: "text", text: lines.length > 0 ? lines.join("\n") : "No configured MCP services matched the query." }],
+          details: { count: servers.length }
+        };
+      }
+    };
+  }
   // -------------------------------------------------------------------
   // 单轮 Agent 执行
   // -------------------------------------------------------------------
@@ -9563,8 +10432,8 @@ class AgentOrchestrator {
     if (!input.providerId || !input.modelId) {
       throw new Error("No provider/model route is configured for this agent.");
     }
-    const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage);
-    const toolExecutor = this.createToolExecutor(input.agentId, input.toolAllowlist, input.stage);
+    const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
+    const toolExecutor = this.createToolExecutor(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
     const streamOptions = {
       maxTokens: input.maxTokens,
       temperature: input.temperature,
@@ -9671,6 +10540,9 @@ class AgentOrchestrator {
     this.applyLlmConfig(llmConfig);
   }
   modeForAgent(agentId) {
+    if (agentId === "plan") {
+      return "ask";
+    }
     return isTopLevelAgentId(agentId) ? agentId : "debugger";
   }
   patternForAgent(_agentId) {
@@ -9765,8 +10637,8 @@ class AgentOrchestrator {
     } catch {
       userMessage = content;
     }
-    if (userMessage.includes("__RDC_AGENT_E2E_FORCE_COWORK_LLM_FAILURE__")) {
-      throw new Error("E2E forced cowork LLM request failure");
+    if (userMessage.includes("__RDC_AGENT_E2E_FORCE_LLM_FAILURE__")) {
+      throw new Error("E2E forced profile LLM request failure");
     }
     const lower = userMessage.toLowerCase();
     let stub = agentId === "ask" ? "Ask is ready. I can inspect readonly context, search files or public pages, and explain next steps without starting a Debugger run." : `${AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : "debugger"]} is ready. Describe the goal and I can use the configured tools for this turn.`;
@@ -9777,11 +10649,9 @@ class AgentOrchestrator {
     } else if (/start|execute|debug|analy[sz]e/.test(lower)) {
       stub = "Received. I will handle this as a normal agent turn using the configured tools and runtime context.";
     }
-    const intent = /start|execute|debug|analy[sz]e/.test(lower) ? "execute" : "talk";
-    return `${stub}
-<control>{"intent":"${intent}","safe_to_start":${intent === "execute" ? "true" : "false"}}</control>`;
+    return stub;
   }
-  async createCoworkTestResponse(agentId, content, options) {
+  async createProfileTestResponse(agentId, content, options) {
     let userMessage = content;
     try {
       const parsed = JSON.parse(content);
@@ -9789,27 +10659,26 @@ class AgentOrchestrator {
     } catch {
       userMessage = content;
     }
-    if (userMessage.includes("__RDC_AGENT_E2E_FORCE_COWORK_LLM_FAILURE__")) {
-      throw new Error("E2E forced cowork LLM request failure");
+    if (userMessage.includes("__RDC_AGENT_E2E_FORCE_LLM_FAILURE__")) {
+      throw new Error("E2E forced profile LLM request failure");
     }
     const lower = userMessage.toLowerCase();
-    const wantsExecution = EXECUTE_PATTERN$1.test(userMessage);
     let stub = agentId === "ask" ? "I can inspect readonly context, search files or public pages, explain boundaries, or guide you to open a .rdc capture without starting a Debugger run." : "I can help scope the target and execute configured tools directly within this agent turn.";
     if (/ue4|unreal/i.test(userMessage)) {
       stub = "UE4 is Unreal Engine 4. In RDC-Agent it is usually relevant to render pass, material, post-process, and shader debugging context.";
     } else if (/hello|hi|你好|您好/i.test(userMessage)) {
       stub = agentId === "ask" ? "Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution." : "Hello. I can run as a general executable agent using the tools enabled by this agent profile.";
-    } else if (wantsExecution || EXECUTE_PATTERN$1.test(lower)) {
+    } else if (/start|execute|debug|analy[sz]e/.test(lower)) {
       stub = "Received. I will handle this as a normal agent turn using the configured tools and runtime context.";
     }
     if (agentId === "ask" && userMessage.includes("__RDC_AGENT_E2E_ASK_READONLY_TOOL__")) {
       const toolCallId = generateEventId("e2e-tool");
-      this.emitCoworkTestEvent("tool.started", {
+      this.emitProfileTestEvent("tool.started", {
         toolCallId,
         toolName: "grep",
         args: { pattern: "ConversationService", path: "src/main/conversation" }
       }, options);
-      this.emitCoworkTestEvent("tool.completed", {
+      this.emitProfileTestEvent("tool.completed", {
         toolCallId,
         toolName: "grep",
         result: {
@@ -9830,12 +10699,12 @@ class AgentOrchestrator {
       stub = "I searched the workspace with grep and found the Ask conversation code path. No Debugger run was created.";
     } else if (agentId === "ask" && userMessage.includes("__RDC_AGENT_E2E_ASK_DENY_WRITE__")) {
       const toolCallId = generateEventId("e2e-tool");
-      this.emitCoworkTestEvent("tool.started", {
+      this.emitProfileTestEvent("tool.started", {
         toolCallId,
         toolName: "write_file",
         args: { path: "should-not-exist.txt" }
       }, options);
-      this.emitCoworkTestEvent("tool.denied", {
+      this.emitProfileTestEvent("tool.denied", {
         toolCallId,
         toolName: "write_file",
         reason: "Policy denied: ask can only use readonly tools.",
@@ -9854,8 +10723,7 @@ class AgentOrchestrator {
       }, options);
       stub = "I cannot write files in Ask mode. Ask can inspect and search, but mutation requires the appropriate execution flow.";
     }
-    const finalStub = `${stub}
-<control>{"intent":"${wantsExecution ? "execute" : "talk"}","safe_to_start":${wantsExecution ? "true" : "false"}}</control>`;
+    const finalStub = stub;
     if (options?.onChunk) {
       const midpoint = Math.max(1, Math.ceil(finalStub.length / 2));
       options.onChunk(finalStub.slice(0, midpoint));
@@ -9864,7 +10732,7 @@ class AgentOrchestrator {
     }
     return finalStub;
   }
-  emitCoworkTestEvent(type, payload, options) {
+  emitProfileTestEvent(type, payload, options) {
     options?.onEvent?.({
       id: generateEventId("agent-event"),
       type,
@@ -11148,56 +12016,39 @@ class ProjectionBuilder {
   }
 }
 const projectionBuilder = new ProjectionBuilder();
-const debuggerAgentProfile = {
-  agentType: "debugger",
-  displayName: "Debugger Agent",
-  description: "RenderDoc capture debugging agent",
+const BASELINE_PHASES = [
+  { phaseId: "understand", displayName: "理解任务" },
+  { phaseId: "work", displayName: "执行工作" },
+  { phaseId: "summarize", displayName: "总结结果" }
+];
+const PLAN_PHASES = [
+  { phaseId: "understand", displayName: "理解目标" },
+  { phaseId: "research", displayName: "研究约束" },
+  { phaseId: "handoff", displayName: "准备交接" }
+];
+const createTraceAgentProfile = (agentId) => ({
+  agentType: agentId,
+  displayName: AGENT_DISPLAY_NAMES[agentId],
+  description: AGENT_DESCRIPTIONS[agentId],
   version: "1.0.0",
-  phases: [
-    { phaseId: "understand", displayName: "理解任务" },
-    { phaseId: "plan", displayName: "制定计划" },
-    { phaseId: "search", displayName: "搜索定位" },
-    { phaseId: "inspect", displayName: "检查分析" },
-    { phaseId: "modify", displayName: "修改验证" },
-    { phaseId: "execute", displayName: "执行工具" },
-    { phaseId: "verify", displayName: "验证结果" },
-    { phaseId: "summarize", displayName: "总结报告" }
-  ],
+  phases: agentId === "plan" ? PLAN_PHASES : BASELINE_PHASES,
   tools: [],
   ui: {
     defaultLayout: "timeline",
-    showPlanByDefault: true,
-    showThoughtSummaryByDefault: true,
+    showPlanByDefault: agentId === "plan",
+    showThoughtSummaryByDefault: false,
     showRawToolName: false,
     defaultCollapseLevel: "summary"
   }
-};
-const askAgentProfile = {
-  agentType: "ask",
-  displayName: "Ask Agent",
-  version: "1.0.0",
-  phases: [
-    { phaseId: "understand", displayName: "理解问题" },
-    { phaseId: "summarize", displayName: "回答总结" }
-  ],
-  tools: [],
-  ui: {
-    defaultLayout: "timeline",
-    showPlanByDefault: false,
-    showThoughtSummaryByDefault: true,
-    showRawToolName: false,
-    defaultCollapseLevel: "summary"
-  }
-};
+});
+const TRACE_AGENT_PROFILES = AGENT_ROLES.map((agentId) => [
+  agentId,
+  createTraceAgentProfile(agentId)
+]);
 class AgentProfileRegistry {
-  profiles = /* @__PURE__ */ new Map([
-    ["ask", askAgentProfile],
-    ["debugger", debuggerAgentProfile],
-    ["analyzer", { ...debuggerAgentProfile, agentType: "analyzer", displayName: "Analyzer Agent" }],
-    ["optimizer", { ...debuggerAgentProfile, agentType: "optimizer", displayName: "Optimizer Agent" }]
-  ]);
+  profiles = new Map(TRACE_AGENT_PROFILES);
   get(agentType) {
-    return this.profiles.get(agentType) ?? debuggerAgentProfile;
+    return this.profiles.get(agentType) ?? createTraceAgentProfile("debugger");
   }
   getForMode(mode) {
     return this.get(mode);
@@ -12269,6 +13120,262 @@ function registerCaptureDeviceHandlers(context2) {
     return replayDeviceService.activateDevice(deviceId);
   });
 }
+const AGENT_WORKBENCH_TOOL_CATALOG = [
+  {
+    id: "read_file",
+    label: "Read File",
+    permission: "readonly",
+    inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } },
+    resultSummary: "Returns text content from a workspace file.",
+    icon: "file-text",
+    approvalRequired: false
+  },
+  {
+    id: "glob",
+    label: "Glob",
+    permission: "readonly",
+    inputSchema: { type: "object", required: ["pattern"], properties: { pattern: { type: "string" } } },
+    resultSummary: "Lists workspace paths matching a glob pattern.",
+    icon: "folder-search",
+    approvalRequired: false
+  },
+  {
+    id: "grep",
+    label: "Grep",
+    permission: "readonly",
+    inputSchema: { type: "object", required: ["pattern"], properties: { pattern: { type: "string" }, path: { type: "string" } } },
+    resultSummary: "Returns matching text locations from workspace files.",
+    icon: "search",
+    approvalRequired: false
+  },
+  {
+    id: "web_fetch",
+    label: "Web Fetch",
+    permission: "readonly",
+    inputSchema: { type: "object", required: ["url"], properties: { url: { type: "string" } } },
+    resultSummary: "Fetches public HTTP(S) page text.",
+    icon: "globe",
+    approvalRequired: false
+  },
+  {
+    id: "web_search",
+    label: "Web Search",
+    permission: "readonly",
+    inputSchema: { type: "object", required: ["query"], properties: { query: { type: "string" } } },
+    resultSummary: "Searches public web results.",
+    icon: "search-check",
+    approvalRequired: false
+  },
+  {
+    id: "bash",
+    label: "Shell",
+    permission: "approval",
+    inputSchema: { type: "object", required: ["command"], properties: { command: { type: "string" } } },
+    resultSummary: "Runs an approved workspace command and returns stdout/stderr.",
+    icon: "terminal",
+    approvalRequired: true
+  },
+  {
+    id: "write_file",
+    label: "Write File",
+    permission: "mutation",
+    inputSchema: { type: "object", required: ["path", "content"], properties: { path: { type: "string" }, content: { type: "string" } } },
+    resultSummary: "Writes a workspace file after policy approval.",
+    icon: "file-plus",
+    approvalRequired: true
+  },
+  {
+    id: "edit_file",
+    label: "Edit File",
+    permission: "mutation",
+    inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" }, patch: { type: "string" } } },
+    resultSummary: "Edits a workspace file after policy approval.",
+    icon: "pencil",
+    approvalRequired: true
+  },
+  {
+    id: "task_list",
+    label: "Tasks",
+    permission: "readonly",
+    inputSchema: { type: "object", properties: {} },
+    resultSummary: "Summarizes current task or plan state.",
+    icon: "list-checks",
+    approvalRequired: false
+  },
+  {
+    id: "task_create",
+    label: "Create Task",
+    permission: "mutation",
+    inputSchema: {
+      type: "object",
+      required: ["subject"],
+      properties: {
+        subject: { type: "string" },
+        description: { type: "string" },
+        activeForm: { type: "string" },
+        blockedBy: { type: "array", items: { type: "string" } }
+      }
+    },
+    resultSummary: "Creates a private agent task record in workspace user space.",
+    icon: "list-plus",
+    approvalRequired: false
+  },
+  {
+    id: "task_update",
+    label: "Update Task",
+    permission: "mutation",
+    inputSchema: {
+      type: "object",
+      required: ["taskId"],
+      properties: {
+        taskId: { type: "string" },
+        status: { type: "string" },
+        subject: { type: "string" },
+        description: { type: "string" }
+      }
+    },
+    resultSummary: "Updates status or metadata for a private agent task record.",
+    icon: "list-todo",
+    approvalRequired: false
+  },
+  {
+    id: "task_get",
+    label: "Get Task",
+    permission: "readonly",
+    inputSchema: { type: "object", required: ["taskId"], properties: { taskId: { type: "string" } } },
+    resultSummary: "Reads a private agent task record by id.",
+    icon: "list",
+    approvalRequired: false
+  },
+  {
+    id: "ask_user",
+    label: "Ask User",
+    permission: "approval",
+    inputSchema: { type: "object", required: ["question"], properties: { question: { type: "string" }, choices: { type: "array", items: { type: "string" } } } },
+    resultSummary: "Surfaces a decision or missing information request.",
+    icon: "message-question",
+    approvalRequired: false
+  },
+  {
+    id: "agent_handoff",
+    label: "Agent Handoff",
+    permission: "readonly",
+    inputSchema: { type: "object", required: ["prompt"], properties: { agent: { type: "string" }, label: { type: "string" }, prompt: { type: "string" } } },
+    resultSummary: "Creates an implementation or specialist handoff summary.",
+    icon: "route",
+    approvalRequired: false
+  },
+  {
+    id: "memory_read",
+    label: "Memory",
+    permission: "readonly",
+    inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "number" } } },
+    resultSummary: "Reads recent session/workspace memory summaries.",
+    icon: "brain",
+    approvalRequired: false
+  },
+  {
+    id: "plan_artifact",
+    label: "Plan Artifact",
+    permission: "mutation",
+    inputSchema: { type: "object", required: ["content"], properties: { title: { type: "string" }, content: { type: "string" } } },
+    resultSummary: "Writes the current plan to the active session artifact.",
+    icon: "file-check",
+    approvalRequired: false
+  },
+  {
+    id: "skills",
+    label: "Skills",
+    permission: "readonly",
+    inputSchema: { type: "object", properties: { query: { type: "string" } } },
+    resultSummary: "Lists configured reusable skills.",
+    icon: "sparkles",
+    approvalRequired: false
+  },
+  {
+    id: "mcp",
+    label: "MCP",
+    permission: "readonly",
+    inputSchema: { type: "object", properties: { query: { type: "string" } } },
+    resultSummary: "Lists configured MCP services.",
+    icon: "plug",
+    approvalRequired: false
+  },
+  {
+    id: "rdx_context",
+    label: "RDX Context",
+    permission: "readonly",
+    inputSchema: { type: "object", properties: {} },
+    resultSummary: "Reads current RDC/RDX runtime context.",
+    icon: "monitor-dot",
+    approvalRequired: false
+  }
+];
+const AGENT_WORKBENCH_COMMAND_CATALOG = [
+  {
+    command: "/help",
+    label: "Help",
+    description: "Show available profile commands and tool boundaries.",
+    relatedTools: [],
+    permission: "readonly"
+  },
+  {
+    command: "/compact",
+    label: "Compact",
+    description: "Request context compaction when the profile can manage context.",
+    relatedTools: ["memory_read"],
+    permission: "readonly"
+  },
+  {
+    command: "/context",
+    label: "Context",
+    description: "Summarize current project, session, captures, and available context.",
+    relatedTools: ["read_file", "memory_read", "rdx_context"],
+    permission: "readonly"
+  },
+  {
+    command: "/memory",
+    label: "Memory",
+    description: "Inspect profile-accessible memory.",
+    relatedTools: ["memory_read", "plan_artifact", "task_list"],
+    permission: "readonly"
+  },
+  {
+    command: "/agents",
+    label: "Agents",
+    description: "List profiles and handoff options visible to the current profile.",
+    relatedTools: ["agent_handoff"],
+    permission: "readonly"
+  },
+  {
+    command: "/skills",
+    label: "Skills",
+    description: "List configured skills visible to the current profile.",
+    relatedTools: ["skills"],
+    permission: "readonly"
+  },
+  {
+    command: "/mcp",
+    label: "MCP",
+    description: "List configured MCP services visible to the current profile.",
+    relatedTools: ["mcp"],
+    permission: "readonly"
+  },
+  {
+    command: "/status",
+    label: "Status",
+    description: "Summarize runtime, route, tool, and capture status.",
+    relatedTools: ["task_list", "task_get", "rdx_context"],
+    permission: "readonly"
+  },
+  {
+    command: "/model",
+    label: "Model",
+    description: "Show the active model route for this profile.",
+    relatedTools: [],
+    permission: "readonly"
+  }
+];
 const KNOWN_CONVERSATION_AGENTS = new Set(AGENT_ROLES);
 function resolveConversationAgentId(requestedMode, requestedAgentId) {
   if (requestedAgentId && KNOWN_CONVERSATION_AGENTS.has(requestedAgentId)) {
@@ -12276,9 +13383,7 @@ function resolveConversationAgentId(requestedMode, requestedAgentId) {
   }
   return requestedMode === "ask" ? "ask" : requestedMode;
 }
-const EXECUTE_PATTERN = /开始|启动|执行|正式分析|正式调试|本地调试|local\s*模式调试|模式调试|直接分析|现在分析|run\b|start\b|debug\b|analy[sz]e\b|帮我调试|请.*调试|开始调试|开始分析/i;
 const TASK_FILE_PATTERN = /([A-Za-z]:[\\/][^\r\n"]+\.(txt|md))/i;
-const CONTROL_OPEN_TAG = "<control>";
 const ACTIVE_RUN_STATUSES = [
   "planning",
   "awaiting_input",
@@ -12290,9 +13395,10 @@ const ACTIVE_RUN_STATUSES = [
 function isActiveRun(run) {
   return Boolean(run && ACTIVE_RUN_STATUSES.includes(run.status));
 }
-function createReasoningStep(id, title, stage) {
+function createWorkBlock(id, title, stage, kind = "reasoning") {
   return {
     id,
+    kind,
     title,
     stage,
     status: "pending",
@@ -12300,40 +13406,41 @@ function createReasoningStep(id, title, stage) {
     startedAt: nowMs()
   };
 }
-function createDraftReasoningTrace(summary, steps) {
+function createDraftWorkTrace(summary, blocks = []) {
   return {
     status: "running",
     summary,
-    steps,
+    blocks,
     updatedAt: nowMs()
   };
 }
 function cloneTrace(trace) {
   return trace ? {
     ...trace,
-    steps: trace.steps.map((step) => ({
-      ...step,
-      toolCalls: step.toolCalls.map((toolCall) => ({ ...toolCall }))
+    blocks: trace.blocks.map((block) => ({
+      ...block,
+      toolCalls: block.toolCalls.map((toolCall) => ({ ...toolCall }))
     }))
   } : {
     status: "idle",
-    steps: [],
+    blocks: [],
     updatedAt: nowMs()
   };
 }
-function upsertTraceStep(trace, stepId, patch) {
+function upsertWorkBlock(trace, blockId, patch) {
   const nextTrace = cloneTrace(trace);
-  const stepIndex = nextTrace.steps.findIndex((step) => step.id === stepId);
-  if (stepIndex >= 0) {
-    nextTrace.steps[stepIndex] = {
-      ...nextTrace.steps[stepIndex],
+  const blockIndex = nextTrace.blocks.findIndex((block) => block.id === blockId);
+  if (blockIndex >= 0) {
+    nextTrace.blocks[blockIndex] = {
+      ...nextTrace.blocks[blockIndex],
       ...patch,
-      toolCalls: patch.toolCalls ? patch.toolCalls.map((toolCall) => ({ ...toolCall })) : nextTrace.steps[stepIndex].toolCalls.map((toolCall) => ({ ...toolCall }))
+      toolCalls: patch.toolCalls ? patch.toolCalls.map((toolCall) => ({ ...toolCall })) : nextTrace.blocks[blockIndex].toolCalls.map((toolCall) => ({ ...toolCall }))
     };
   } else {
-    nextTrace.steps.push({
-      ...createReasoningStep(stepId, patch.title || stepId, patch.stage),
+    nextTrace.blocks.push({
+      ...createWorkBlock(blockId, patch.title || blockId, patch.stage, patch.kind),
       ...patch,
+      kind: patch.kind ?? "reasoning",
       toolCalls: patch.toolCalls ? patch.toolCalls.map((toolCall) => ({ ...toolCall })) : []
     });
   }
@@ -12349,21 +13456,22 @@ function finalizeTrace(trace, status, summary) {
 }
 function upsertRuntimeToolCall(trace, patch) {
   const nextTrace = cloneTrace(trace);
-  const stepId = "runtime-tools";
-  let step = nextTrace.steps.find((entry) => entry.id === stepId);
-  if (!step) {
-    step = createReasoningStep(stepId, "Runtime tool trace", "cowork");
-    step.status = "running";
-    nextTrace.steps.push(step);
+  const blockMeta = getRuntimeToolBlockMeta(patch.toolName);
+  const blockId = blockMeta.id;
+  let block = nextTrace.blocks.find((entry) => entry.id === blockId);
+  if (!block) {
+    block = createWorkBlock(blockId, blockMeta.title, blockMeta.stage, blockMeta.kind);
+    block.status = "running";
+    nextTrace.blocks.push(block);
   }
-  const toolIndex = step.toolCalls.findIndex((toolCall) => toolCall.id === patch.id);
+  const toolIndex = block.toolCalls.findIndex((toolCall) => toolCall.id === patch.id);
   if (toolIndex >= 0) {
-    step.toolCalls[toolIndex] = {
-      ...step.toolCalls[toolIndex],
+    block.toolCalls[toolIndex] = {
+      ...block.toolCalls[toolIndex],
       ...patch
     };
   } else {
-    step.toolCalls.push({
+    block.toolCalls.push({
       id: patch.id,
       toolName: patch.toolName,
       status: patch.status ?? "pending",
@@ -12374,13 +13482,53 @@ function upsertRuntimeToolCall(trace, patch) {
       completedAt: patch.completedAt
     });
   }
-  if (step.toolCalls.length > 0 && step.toolCalls.every((toolCall) => toolCall.status === "complete" || toolCall.status === "error")) {
-    step.status = step.toolCalls.some((toolCall) => toolCall.status === "error") ? "error" : "complete";
-    step.completedAt = nowMs();
+  if (block.toolCalls.length > 0 && block.toolCalls.every((toolCall) => toolCall.status === "complete" || toolCall.status === "error")) {
+    block.status = block.toolCalls.some((toolCall) => toolCall.status === "error") ? "error" : "complete";
+    block.completedAt = nowMs();
   }
   nextTrace.status = "running";
   nextTrace.updatedAt = nowMs();
   return nextTrace;
+}
+function getRuntimeToolBlockMeta(toolName) {
+  const normalizedToolName = normalizeToolName(toolName);
+  if (normalizedToolName === "ask_user") {
+    return {
+      id: "runtime-user-input",
+      title: "请求用户决策",
+      stage: "decision",
+      kind: "approval"
+    };
+  }
+  if (normalizedToolName === "agent_handoff") {
+    return {
+      id: "runtime-handoff",
+      title: "准备交接",
+      stage: "handoff",
+      kind: "handoff"
+    };
+  }
+  return {
+    id: "runtime-tools",
+    title: "工具调用",
+    stage: "tool",
+    kind: "tool"
+  };
+}
+function summarizeRuntimePayload(payload) {
+  if ("message" in payload && typeof payload.message === "string" && payload.message.trim()) {
+    return payload.message.trim();
+  }
+  if ("text" in payload && typeof payload.text === "string" && payload.text.trim()) {
+    return payload.text.trim().slice(0, 240);
+  }
+  if ("error" in payload && typeof payload.error === "string" && payload.error.trim()) {
+    return payload.error.trim();
+  }
+  if ("title" in payload && typeof payload.title === "string" && payload.title.trim()) {
+    return payload.title.trim();
+  }
+  return "";
 }
 function makeConversationMessage(role, content, options) {
   const createdAt = nowMs();
@@ -12396,26 +13544,11 @@ function makeConversationMessage(role, content, options) {
     content,
     status: options.status ?? (role === "assistant" ? "draft" : "complete"),
     updatedAt: createdAt,
-    reasoningTrace: options.reasoningTrace ?? null,
+    workTrace: options.workTrace ?? null,
     diagnostic: options.diagnostic ?? null,
     attachments: options.attachments,
     createdAt
   };
-}
-function composeMessageForAgent(entry) {
-  const attachmentLines = (entry.attachments ?? []).map((attachment) => `- ${attachment.fileName}`);
-  if (attachmentLines.length === 0) {
-    return entry.content;
-  }
-  const suffix = `
-
-Attached files:
-${attachmentLines.join("\n")}`;
-  return entry.content ? `${entry.content}${suffix}` : `Attached files:
-${attachmentLines.join("\n")}`;
-}
-function stripControlBlock(text) {
-  return text.replace(/<control>\s*[\s\S]*?<\/control>/i, "").trim();
 }
 function resolveTaskFileContext(message) {
   const match = message.match(TASK_FILE_PATTERN);
@@ -12434,15 +13567,23 @@ function resolveTaskFileContext(message) {
     effectiveMessage: [message, taskFileContent].filter(Boolean).join("\n\n")
   };
 }
-function buildCoworkPrompt(context2, history, mode, message, attachments) {
+function getAgentLabel(agentId) {
+  return isTopLevelAgentId(agentId) ? AGENT_DISPLAY_NAMES[agentId] : agentId;
+}
+function getAgentDescription(agentId) {
+  return isTopLevelAgentId(agentId) ? AGENT_DESCRIPTIONS[agentId] : "Workspace agent profile.";
+}
+function buildProfileTurnPrompt(context2, history, agentId, mode, message, attachments) {
   const resolvedTaskFile = resolveTaskFileContext(message);
   const recentHistory = history.slice(-6).map((entry) => ({
     role: entry.role,
     content: entry.content
   }));
   return JSON.stringify({
+    agent_id: agentId,
+    agent_label: getAgentLabel(agentId),
     requested_mode: mode,
-    requested_mode_label: mode === "ask" ? "Ask" : mode === "debugger" ? "Debugger" : mode === "analyzer" ? "Analyzer" : "Optimizer",
+    requested_mode_label: getAgentLabel(agentId),
     user_message: message,
     effective_user_message: resolvedTaskFile.effectiveMessage,
     task_file_path: resolvedTaskFile.taskFilePath,
@@ -12460,30 +13601,33 @@ function buildCoworkPrompt(context2, history, mode, message, attachments) {
     recent_history: recentHistory
   }, null, 2);
 }
-function buildAskSystemPrompt() {
+function buildProfileSystemPrompt(agentId) {
+  const settings = settingsService.getAll();
+  const definition = settings.agents.definitions.find((entry) => entry.id === agentId && entry.enabled);
+  const basePrompt = definition?.instructions.trim() || `You are ${getAgentLabel(agentId)}. ${getAgentDescription(agentId)}`;
+  const globalInstructions = settings.agents.globalInstructions.trim();
   return [
-    "你是 RDC-Agent 的 Ask 助手，工作模式是只读 agentic 协作。",
-    "要求：",
-    "1. 正常回答用户问题，语气简洁；可以澄清目标、检索上下文、读取或搜索当前 workspace 内文本文件，也可以访问公开 HTTP(S) 页面。",
-    "2. 只允许使用只读工具：read_file、glob、grep、task_list、web_fetch、web_search；不要请求 bash、write_file、edit_file、remove 或 task_create/update。",
-    "3. 不要自称 RDC Debugger，不要暗示已经开始 RenderDoc 调试，也不要假装分析过 capture。",
-    "4. 如果用户要求正式调试或执行分析，只提示需要在应用内 Open capture 并切换到 Debugger；Ask 模式不能创建正式 run。",
-    "5. 可以展示可见工作轨迹和工具轨迹，但不要输出隐藏 chain-of-thought。",
-    "6. 如果需要输出 control JSON，也必须 safe_to_start=false，除非后端路由已经确认进入 Debugger 执行链。"
-  ].join("\n");
+    basePrompt,
+    "",
+    "Show concise visible work summaries and tool results only. Do not reveal hidden chain-of-thought.",
+    buildProfileCatalogPrompt(agentId),
+    globalInstructions ? `Global Instructions:
+${globalInstructions}` : ""
+  ].filter(Boolean).join("\n\n").trim();
 }
-function buildDebuggerCoworkSystemPrompt() {
+function buildProfileCatalogPrompt(agentId) {
+  const allowedTools = new Set(resolveAgentToolAllowlist(agentId).map((toolName) => normalizeToolName(toolName)));
+  const toolLines = AGENT_WORKBENCH_TOOL_CATALOG.filter((tool) => allowedTools.has(tool.id)).map((tool) => `- ${tool.id}: ${tool.label}; permission=${tool.permission}; approval=${tool.approvalRequired ? "required" : "not required"}; result=${tool.resultSummary}`);
+  const commandLines = AGENT_WORKBENCH_COMMAND_CATALOG.map((command) => `- ${command.command}: ${command.description}${command.relatedTools.length ? ` Uses: ${command.relatedTools.join(", ")}` : ""}.`);
   return [
-    "你是 RDC Debugger，一个面向 RenderDoc 调试场景的 Cowork Agent。",
-    "要求：",
-    "1. 始终先用自然中文正常回复用户，不要像审批流或工单流。",
-    "2. 如果用户问通用知识、产品能力、技术概念，直接回答，不要强行转成调试执行，也不要在普通寒暄中自我介绍成 RDC Debugger。",
-    "3. 没有正式进入调试 run 前，不要假装自己已经分析过 capture。",
-    "4. Ask 是非执行入口；只有 requested_mode 是 Debugger、用户明确表达“现在开始正式调试/执行分析”，且应用内已有 opened_capture 时，才把 intent 标成 execute。",
-    "5. 回复正文结束后，必须额外附加一个 <control>{...}</control> 块，control JSON 只允许包含 intent, safe_to_start, needs_project, needs_capture, needs_target_capture, needs_route, reason。",
-    "6. 如果你不确定，就把 intent 设为 talk 或 intake，safe_to_start 设为 false。",
-    "7. 控制块不要在正文里解释给用户。",
-    "8. requested_mode 表示当前 UI 模式，Ask 只做澄清与引导，Debugger 偏重定位与排障，Analyzer 偏重拆解与证据整理，Optimizer 偏重瓶颈判断与优化建议；回答结构要随 mode 调整。"
+    "# Runtime Catalog",
+    "Only use tools exposed to this profile by the runtime. Slash commands are intent hints and never bypass profile permissions.",
+    "",
+    "Allowed tools:",
+    ...toolLines.length > 0 ? toolLines : ["- None."],
+    "",
+    "Slash commands:",
+    ...commandLines
   ].join("\n");
 }
 function redactTechnicalMessage(error) {
@@ -12502,16 +13646,13 @@ function createConversationDiagnostic(input) {
     technicalMessage: input.technicalMessage
   };
 }
-function getConversationAgentLabel(agentId) {
-  return agentId === "ask" ? "Ask" : agentId;
-}
 function resolveAgentRoutePreflight(agentId, fallbackAgentId) {
   const settings = settingsService.getAll();
   const primaryRoute = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
   const fallbackRoute = void 0;
   const route = primaryRoute?.providerId && primaryRoute.modelId ? primaryRoute : fallbackRoute;
   const routeAgentId = route?.agentId ?? agentId;
-  const label = getConversationAgentLabel(agentId);
+  const label = getAgentLabel(agentId);
   if (!route?.providerId || !route.modelId) {
     return {
       ok: false,
@@ -12560,10 +13701,7 @@ function resolveAgentRoutePreflight(agentId, fallbackAgentId) {
     modelId: route.modelId
   };
 }
-function resolveDebuggerRoutePreflight() {
-  return resolveAgentRoutePreflight("debugger");
-}
-function recordCoworkLlmDiagnostic(context2, diagnostic) {
+function recordLlmDiagnostic(context2, diagnostic) {
   runtimeLogService.log({
     scope: context2.session?.sessionId ? "session" : "app",
     namespace: "llm",
@@ -12584,7 +13722,7 @@ function recordCoworkLlmDiagnostic(context2, diagnostic) {
   });
 }
 function createRequestFailedDiagnostic(route, error) {
-  const label = getConversationAgentLabel(route.agentId);
+  const label = getAgentLabel(route.agentId);
   return createConversationDiagnostic({
     agentId: route.agentId,
     code: "CONVERSATION_LLM_REQUEST_FAILED",
@@ -12594,20 +13732,6 @@ function createRequestFailedDiagnostic(route, error) {
     modelId: route.modelId,
     technicalMessage: redactTechnicalMessage(error)
   });
-}
-function computeVisibleAssistantText(raw) {
-  const controlIndex = raw.indexOf(CONTROL_OPEN_TAG);
-  if (controlIndex >= 0) {
-    return raw.slice(0, controlIndex);
-  }
-  let partialMatchLength = 0;
-  for (let index = CONTROL_OPEN_TAG.length - 1; index > 0; index -= 1) {
-    if (raw.endsWith(CONTROL_OPEN_TAG.slice(0, index))) {
-      partialMatchLength = index;
-      break;
-    }
-  }
-  return partialMatchLength > 0 ? raw.slice(0, raw.length - partialMatchLength) : raw;
 }
 class ConversationService {
   activeTurns = /* @__PURE__ */ new Map();
@@ -12637,10 +13761,7 @@ class ConversationService {
   }
   async sendMessage(input) {
     const context2 = await this.resolveContext(input);
-    if (isActiveRun(context2.currentRun)) {
-      return this.startActiveDebugTurn(context2, input.mode, input.message.trim(), input.attachments ?? []);
-    }
-    return this.startCoworkTurn(context2, input.mode, input.agentId ?? null, input.message.trim(), input.attachments ?? []);
+    return this.startProfileTurn(context2, input.mode, input.agentId ?? null, input.message.trim(), input.attachments ?? []);
   }
   async resolveContext(input) {
     const projectId = input.projectId ?? input.fallbackProjectId ?? storageAdapter.getCurrentProjectId() ?? null;
@@ -12662,181 +13783,7 @@ class ConversationService {
       replayDevice
     };
   }
-  async startActiveDebugTurn(context2, requestedMode, rawMessage, pendingAttachments) {
-    const turnId = generateEventId("turn");
-    const attachments = context2.session ? storageAdapter.importSessionAttachments(
-      context2.session.sessionId,
-      pendingAttachments.map((entry) => entry.sourcePath)
-    ) : [];
-    const userMessage = makeConversationMessage("user", rawMessage, {
-      turnId,
-      sessionId: context2.session?.sessionId ?? null,
-      projectId: context2.projectId,
-      runId: context2.currentRun?.runId ?? null,
-      modeContext: requestedMode,
-      attachments,
-      status: "complete"
-    });
-    const assistantDraftMessage = makeConversationMessage("assistant", "", {
-      turnId,
-      sessionId: context2.session?.sessionId ?? null,
-      projectId: context2.projectId,
-      runId: context2.currentRun?.runId ?? null,
-      modeContext: requestedMode,
-      agentId: "debugger",
-      status: "streaming",
-      reasoningTrace: createDraftReasoningTrace("正在思考", [
-        createReasoningStep("active-debug-reply", "生成调试回复", "investigate")
-      ])
-    });
-    this.persistConversationSnapshot(context2.session?.sessionId ?? null, userMessage);
-    this.persistConversationSnapshot(context2.session?.sessionId ?? null, assistantDraftMessage);
-    this.publishTraceProjection(context2.session?.sessionId ?? null);
-    void this.completeActiveDebugTurn({
-      context: context2,
-      requestedMode,
-      userMessage,
-      assistantDraftMessage
-    });
-    return {
-      session: context2.session,
-      mode: "active_debug",
-      userMessage,
-      assistantDraftMessage,
-      executionTransition: { action: "none" },
-      runUpdate: context2.currentRun,
-      errorViewModel: null
-    };
-  }
-  async completeActiveDebugTurn(input) {
-    let assistantMessage = input.assistantDraftMessage;
-    const sessionId = input.context.session?.sessionId ?? null;
-    const traceSessionId = sessionId ?? this.ephemeralTraceSessionId(input.assistantDraftMessage.turnId);
-    const abortController = new AbortController();
-    const commitAssistantMessage = (type, patch) => {
-      if (abortController.signal.aborted && patch.status !== "stopped") {
-        return;
-      }
-      assistantMessage = {
-        ...assistantMessage,
-        ...patch,
-        updatedAt: nowMs()
-      };
-      this.persistConversationSnapshot(sessionId, assistantMessage);
-      this.emitConversationEvent({
-        type,
-        sessionId: sessionId ?? "",
-        turnId: assistantMessage.turnId,
-        message: assistantMessage
-      });
-      this.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
-    };
-    const commitStoppedMessage = () => {
-      commitAssistantMessage("message_completed", {
-        status: "stopped",
-        content: assistantMessage.content || "当前请求已停止。",
-        reasoningTrace: finalizeTrace(
-          upsertTraceStep(assistantMessage.reasoningTrace, "active-debug-reply", {
-            status: "complete",
-            summary: "用户已停止当前请求。",
-            completedAt: nowMs()
-          }),
-          "stopped",
-          "请求已停止"
-        )
-      });
-    };
-    this.registerActiveTurn({
-      turnId: assistantMessage.turnId,
-      sessionId,
-      startedAt: nowMs(),
-      abortController,
-      stop: () => {
-        if (!abortController.signal.aborted) {
-          abortController.abort();
-          commitStoppedMessage();
-        }
-      }
-    });
-    commitAssistantMessage("message_patched", {
-      reasoningTrace: upsertTraceStep(
-        assistantMessage.reasoningTrace,
-        "active-debug-reply",
-        {
-          title: "生成调试回复",
-          stage: "investigate",
-          status: "running",
-          summary: "Debugger 正在结合当前 run 上下文生成回复。",
-          startedAt: nowMs()
-        }
-      )
-    });
-    try {
-      const responseText = await agentOrchestrator.sendMessage(
-        "debugger",
-        composeMessageForAgent(input.userMessage),
-        {
-          caseId: input.context.session?.sessionId,
-          runId: input.context.currentRun?.runId ?? void 0,
-          sessionId: input.context.session?.sessionId ?? void 0,
-          turnId: assistantMessage.turnId
-        },
-        {
-          onChunk: (chunk) => {
-            commitAssistantMessage("message_patched", {
-              status: "streaming",
-              content: `${assistantMessage.content}${chunk}`
-            });
-          },
-          signal: abortController.signal
-        }
-      );
-      commitAssistantMessage("message_completed", {
-        status: "complete",
-        content: responseText,
-        reasoningTrace: finalizeTrace(
-          upsertTraceStep(
-            assistantMessage.reasoningTrace,
-            "active-debug-reply",
-            {
-              status: "complete",
-              summary: "调试回复已生成。",
-              completedAt: nowMs()
-            }
-          ),
-          "complete",
-          "回复已完成"
-        )
-      });
-    } catch (error) {
-      const routePreflight = resolveDebuggerRoutePreflight();
-      const diagnostic = routePreflight.ok ? createRequestFailedDiagnostic(routePreflight, error) : routePreflight.diagnostic;
-      recordCoworkLlmDiagnostic(input.context, diagnostic);
-      const message = diagnostic.userMessage;
-      commitAssistantMessage("message_errored", {
-        status: "error",
-        content: assistantMessage.content || message,
-        diagnostic,
-        reasoningTrace: finalizeTrace(
-          upsertTraceStep(
-            assistantMessage.reasoningTrace,
-            "active-debug-reply",
-            {
-              status: "error",
-              summary: message,
-              detail: diagnostic.technicalMessage,
-              completedAt: nowMs()
-            }
-          ),
-          "error",
-          "回复生成失败"
-        )
-      });
-    } finally {
-      this.clearActiveTurn(assistantMessage.turnId, abortController);
-    }
-  }
-  async startCoworkTurn(context2, requestedMode, requestedAgentId, rawMessage, pendingAttachments) {
+  async startProfileTurn(context2, requestedMode, requestedAgentId, rawMessage, pendingAttachments) {
     const conversationAgentId = resolveConversationAgentId(requestedMode, requestedAgentId);
     let workingSession = context2.session;
     if (!workingSession && context2.projectId) {
@@ -12864,43 +13811,8 @@ class ConversationService {
       modeContext: requestedMode,
       agentId: conversationAgentId,
       status: "streaming",
-      reasoningTrace: createDraftReasoningTrace(
-        requestedMode === "ask" ? "正在执行只读协作" : "正在思考",
-        [
-          createReasoningStep("cowork-route", "检查上下文与路由", "intake_gate"),
-          createReasoningStep(
-            "cowork-reply",
-            requestedMode === "ask" ? "生成只读协作回复" : "生成协作回复",
-            "plan"
-          )
-        ]
-      )
+      workTrace: createDraftWorkTrace()
     });
-    if (!context2.projectId && EXECUTE_PATTERN.test(rawMessage)) {
-      const assistantMessage = {
-        ...assistantDraftMessage,
-        content: "我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。",
-        status: "complete",
-        updatedAt: nowMs()
-      };
-      const traceSessionId2 = this.ephemeralTraceSessionId(turnId);
-      const tracePresentation2 = await traceService.buildConversationPresentation(
-        traceSessionId2,
-        [userMessage, assistantMessage]
-      );
-      workflowProjectionPublisher.publishTraceProjectionChanged(traceSessionId2, tracePresentation2);
-      this.publishConversationTrace(traceSessionId2, [userMessage, assistantMessage], null);
-      return {
-        session: null,
-        mode: "talk",
-        userMessage,
-        assistantDraftMessage: assistantMessage,
-        executionTransition: { action: "none" },
-        runUpdate: null,
-        tracePresentation: tracePresentation2,
-        errorViewModel: null
-      };
-    }
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, userMessage);
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
     const traceSessionId = workingSession?.sessionId ?? this.ephemeralTraceSessionId(turnId);
@@ -12910,7 +13822,7 @@ class ConversationService {
     );
     workflowProjectionPublisher.publishTraceProjectionChanged(traceSessionId, tracePresentation);
     this.publishConversationTrace(traceSessionId, [userMessage, assistantDraftMessage], workingSession?.sessionId ?? null);
-    void this.completeCoworkTurn({
+    void this.completeProfileTurn({
       context: {
         ...context2,
         session: workingSession
@@ -12933,13 +13845,13 @@ class ConversationService {
       errorViewModel: null
     };
   }
-  async completeCoworkTurn(input) {
+  async completeProfileTurn(input) {
     let assistantMessage = input.assistantDraftMessage;
     const sessionId = input.context.session?.sessionId ?? null;
     const traceSessionId = sessionId ?? this.ephemeralTraceSessionId(input.assistantDraftMessage.turnId);
     const abortController = new AbortController();
     const conversationAgentId = input.requestedAgentId;
-    const showCoworkReasoning = true;
+    const agentLabel = getAgentLabel(conversationAgentId);
     const commitAssistantMessage = (type, patch) => {
       if (abortController.signal.aborted && patch.status !== "stopped") {
         return;
@@ -12962,8 +13874,8 @@ class ConversationService {
       commitAssistantMessage("message_completed", {
         status: "stopped",
         content: assistantMessage.content || "当前请求已停止。",
-        reasoningTrace: finalizeTrace(
-          upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
+        workTrace: finalizeTrace(
+          upsertWorkBlock(assistantMessage.workTrace, "assistant-output", {
             status: "complete",
             summary: "用户已停止当前请求。",
             completedAt: nowMs()
@@ -12985,34 +13897,19 @@ class ConversationService {
         }
       }
     });
-    let systemAppendix = "";
     const commitVisibleAssistantText = () => {
       commitAssistantMessage("message_patched", {
         status: "streaming",
-        content: `${visibleResponse}${systemAppendix}`
+        content: visibleResponse
       });
     };
-    const withCoworkReasoning = (reasoningTrace) => ({ reasoningTrace });
-    {
-      commitAssistantMessage("message_patched", {
-        reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-route", {
-          status: "running",
-          summary: input.requestedMode === "ask" ? "正在检查项目上下文、只读工具权限与模型路由。" : "正在检查项目、capture 与调试路由。",
-          startedAt: nowMs()
-        })
-      });
-    }
+    const withWorkTrace = (workTrace) => ({ workTrace });
     const history = input.context.session ? storageAdapter.readConversationHistory(input.context.session.sessionId).filter((entry) => entry.id !== assistantMessage.id) : [];
     let rawResponse = "";
     let visibleResponse = "";
     let errorViewModel = null;
     let llmDiagnostic = null;
-    const taskFileContext = resolveTaskFileContext(input.rawMessage);
-    const effectiveMessage = taskFileContext.effectiveMessage;
-    const explicitFormalDebugRequest = false;
-    input.requestedMode === "debugger" && explicitFormalDebugRequest;
-    input.requestedMode === "ask" && explicitFormalDebugRequest;
-    const routePreflight = conversationAgentId === "ask" ? resolveAgentRoutePreflight("ask") : resolveDebuggerRoutePreflight();
+    const routePreflight = resolveAgentRoutePreflight(conversationAgentId);
     if (!routePreflight.ok) {
       llmDiagnostic = routePreflight.diagnostic;
       errorViewModel = {
@@ -13022,48 +13919,42 @@ class ConversationService {
       };
       rawResponse = llmDiagnostic.userMessage;
       visibleResponse = llmDiagnostic.userMessage;
-      recordCoworkLlmDiagnostic(input.context, llmDiagnostic);
+      recordLlmDiagnostic(input.context, llmDiagnostic);
       commitVisibleAssistantText();
+      commitAssistantMessage("message_patched", {
+        ...withWorkTrace(upsertWorkBlock(assistantMessage.workTrace, "runtime-route-diagnostic", {
+          kind: "diagnostic",
+          status: llmDiagnostic.severity === "error" ? "error" : "complete",
+          title: "模型路由诊断",
+          stage: "preflight",
+          summary: llmDiagnostic.userMessage,
+          detail: llmDiagnostic.technicalMessage,
+          completedAt: nowMs()
+        }))
+      });
     } else {
       try {
-        if (showCoworkReasoning) {
-          commitAssistantMessage("message_patched", {
-            reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
-              status: "running",
-              summary: input.requestedMode === "ask" ? `正在通过 ${routePreflight.providerId}/${routePreflight.modelId} 生成只读协作回复。` : `正在通过 ${routePreflight.providerId}/${routePreflight.modelId} 生成协作回复。`,
-              startedAt: nowMs()
-            })
-          });
-        }
-        const coworkPrompt = buildCoworkPrompt(
+        const profilePrompt = buildProfileTurnPrompt(
           input.context,
           history,
+          conversationAgentId,
           input.requestedMode,
           input.rawMessage,
           input.importedAttachments
         );
-        const globalInstructions = settingsService.getAll().agents.globalInstructions.trim();
-        const baseSystemPrompt = conversationAgentId === "ask" ? buildAskSystemPrompt() : buildDebuggerCoworkSystemPrompt();
-        const systemPrompt = [
-          baseSystemPrompt,
-          conversationAgentId !== "ask" && globalInstructions ? `
-
-Global Instructions:
-${globalInstructions}` : ""
-        ].join("").trim();
-        const responseText = await agentOrchestrator.sendCoworkMessage(
+        const responseText = await agentOrchestrator.sendProfileMessage(
           conversationAgentId,
           input.rawMessage,
           {
             sessionId: input.context.session?.sessionId,
             turnId: assistantMessage.turnId,
-            stage: "cowork",
+            stage: "investigate",
             patternId: "free-agent",
-            systemPrompt,
+            systemPrompt: buildProfileSystemPrompt(conversationAgentId),
             maxTokens: 1200,
             temperature: 0.35,
             signal: abortController.signal,
-            promptOverride: coworkPrompt,
+            promptOverride: profilePrompt,
             onEvent: (event) => {
               this.emitConversationEvent({
                 type: "agent_event",
@@ -13071,10 +13962,28 @@ ${globalInstructions}` : ""
                 turnId: assistantMessage.turnId,
                 event
               });
+              if (event.type === "run.started") {
+                const payload = event.payload;
+                const details = [
+                  payload.providerId && payload.modelId ? `Model: ${payload.providerId} / ${payload.modelId}` : "",
+                  Array.isArray(payload.toolAllowlist) && payload.toolAllowlist.length > 0 ? `Tools: ${payload.toolAllowlist.join(", ")}` : ""
+                ].filter(Boolean).join("\n");
+                commitAssistantMessage("message_patched", {
+                  workTrace: upsertWorkBlock(assistantMessage.workTrace, "runtime-run", {
+                    kind: "reasoning",
+                    title: "启动 Agent Loop",
+                    stage: "preflight",
+                    status: "running",
+                    summary: `${agentLabel} 已进入模型与工具循环。`,
+                    detail: details || void 0,
+                    startedAt: nowMs()
+                  })
+                });
+              }
               if (event.type === "assistant.delta") {
                 const chunk = typeof event.payload.text === "string" ? event.payload.text : "";
                 rawResponse += chunk;
-                const nextVisible = computeVisibleAssistantText(rawResponse);
+                const nextVisible = rawResponse;
                 if (nextVisible.length > visibleResponse.length) {
                   visibleResponse = nextVisible;
                   commitVisibleAssistantText();
@@ -13082,19 +13991,47 @@ ${globalInstructions}` : ""
               }
               if (event.type === "diagnostic") {
                 const payload = event.payload;
-                const summary = typeof payload.message === "string" && payload.message ? payload.message : "收到运行时诊断。";
+                const summary = typeof payload.message === "string" && payload.message ? payload.message : "Received runtime diagnostic.";
+                if (payload.code === "MODEL_THINKING_STARTED" || payload.code === "MODEL_THINKING_COMPLETED") {
+                  commitAssistantMessage("message_patched", {
+                    workTrace: upsertWorkBlock(assistantMessage.workTrace, "runtime-reasoning", {
+                      kind: "reasoning",
+                      stage: "respond",
+                      status: payload.code === "MODEL_THINKING_STARTED" ? "running" : "complete",
+                      title: "整理思路",
+                      summary,
+                      completedAt: payload.code === "MODEL_THINKING_COMPLETED" ? nowMs() : void 0
+                    })
+                  });
+                  return;
+                }
                 commitAssistantMessage("message_patched", {
-                  reasoningTrace: upsertTraceStep(assistantMessage.reasoningTrace, `cowork-diagnostic-${payload.code ?? "runtime"}`, {
+                  workTrace: upsertWorkBlock(assistantMessage.workTrace, `runtime-diagnostic-${payload.code ?? "runtime"}`, {
+                    kind: "diagnostic",
                     status: payload.severity === "error" ? "error" : "complete",
-                    title: "运行时诊断",
+                    title: "Runtime diagnostic",
                     summary,
                     completedAt: nowMs()
                   })
                 });
               }
+              if (event.type === "tool.requested") {
+                const payload = event.payload;
+                if (payload.toolCall?.id && payload.toolCall.name) {
+                  commitAssistantMessage("message_patched", {
+                    workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
+                      id: String(payload.toolCall.id),
+                      toolName: String(payload.toolCall.name),
+                      status: "pending",
+                      argsPreview: JSON.stringify(payload.toolCall.arguments ?? {}).slice(0, 600),
+                      startedAt: nowMs()
+                    })
+                  });
+                }
+              }
               if (event.type === "tool.started") {
                 commitAssistantMessage("message_patched", {
-                  reasoningTrace: upsertRuntimeToolCall(assistantMessage.reasoningTrace, {
+                  workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                     id: String(event.payload.toolCallId),
                     toolName: String(event.payload.toolName),
                     status: "running",
@@ -13104,9 +14041,9 @@ ${globalInstructions}` : ""
                 });
               }
               if (event.type === "tool.denied") {
-                const reason = typeof event.payload.reason === "string" ? event.payload.reason : "Ask 只读策略拒绝了该工具调用。";
+                const reason = typeof event.payload.reason === "string" ? event.payload.reason : "Profile policy denied this tool call.";
                 commitAssistantMessage("message_patched", {
-                  reasoningTrace: upsertRuntimeToolCall(assistantMessage.reasoningTrace, {
+                  workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                     id: String(event.payload.toolCallId),
                     toolName: String(event.payload.toolName),
                     status: "error",
@@ -13116,15 +14053,105 @@ ${globalInstructions}` : ""
                   })
                 });
               }
+              if (event.type === "approval.requested") {
+                const payload = event.payload;
+                const approvalId = payload.approvalId ?? `approval-${payload.toolCallId ?? "runtime"}`;
+                const toolCallId = String(payload.toolCallId ?? approvalId);
+                const toolName = String(payload.toolName ?? "approval");
+                const reason = typeof payload.reason === "string" && payload.reason ? payload.reason : "This action requires user approval before it can run.";
+                const traceWithTool = upsertRuntimeToolCall(assistantMessage.workTrace, {
+                  id: toolCallId,
+                  toolName,
+                  status: "complete",
+                  resultPreview: reason,
+                  completedAt: nowMs()
+                });
+                commitAssistantMessage("message_patched", {
+                  workTrace: upsertWorkBlock(traceWithTool, `runtime-approval-${approvalId}`, {
+                    kind: "approval",
+                    title: "请求批准",
+                    stage: "decision",
+                    status: "complete",
+                    summary: reason,
+                    detail: `Tool: ${toolName}`,
+                    completedAt: nowMs()
+                  })
+                });
+              }
+              if (event.type === "approval.answered") {
+                const payload = event.payload;
+                const approvalId = payload.approvalId ?? "runtime";
+                commitAssistantMessage("message_patched", {
+                  workTrace: upsertWorkBlock(assistantMessage.workTrace, `runtime-approval-${approvalId}`, {
+                    kind: "approval",
+                    title: "审批结果",
+                    stage: "decision",
+                    status: payload.status === "rejected" || payload.status === "cancelled" ? "error" : "complete",
+                    summary: `审批状态：${payload.status ?? "answered"}`,
+                    detail: payload.answer === void 0 ? void 0 : JSON.stringify(payload.answer).slice(0, 800),
+                    completedAt: nowMs()
+                  })
+                });
+              }
               if (event.type === "tool.completed") {
                 const result = event.payload.result;
                 commitAssistantMessage("message_patched", {
-                  reasoningTrace: upsertRuntimeToolCall(assistantMessage.reasoningTrace, {
+                  workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                     id: String(event.payload.toolCallId),
                     toolName: String(event.payload.toolName),
                     status: result?.ok ? "complete" : "error",
                     resultPreview: JSON.stringify(event.payload.result ?? {}).slice(0, 800),
                     error: result?.ok ? void 0 : result?.error?.message,
+                    completedAt: nowMs()
+                  })
+                });
+              }
+              if (event.type === "task.created" || event.type === "task.updated") {
+                const payload = event.payload;
+                commitAssistantMessage("message_patched", {
+                  workTrace: upsertWorkBlock(assistantMessage.workTrace, "runtime-tasks", {
+                    kind: "subagent",
+                    title: "任务状态",
+                    stage: "tool",
+                    status: payload.status === "failed" ? "error" : "complete",
+                    summary: `${payload.title ?? payload.taskId ?? "Task"}${payload.status ? `：${payload.status}` : ""}`,
+                    completedAt: nowMs()
+                  })
+                });
+              }
+              if (event.type === "assistant.completed") {
+                commitAssistantMessage("message_patched", {
+                  workTrace: upsertWorkBlock(assistantMessage.workTrace, "assistant-output", {
+                    kind: "output",
+                    title: "生成最终回答",
+                    stage: "respond",
+                    status: "complete",
+                    summary: summarizeRuntimePayload(event.payload) || "模型已完成可见回复。",
+                    completedAt: nowMs()
+                  })
+                });
+              }
+              if (event.type === "run.completed") {
+                commitAssistantMessage("message_patched", {
+                  workTrace: upsertWorkBlock(assistantMessage.workTrace, "runtime-run", {
+                    kind: "reasoning",
+                    title: "Agent Loop 完成",
+                    stage: "respond",
+                    status: "complete",
+                    summary: summarizeRuntimePayload(event.payload) || "模型与工具循环已完成。",
+                    completedAt: nowMs()
+                  })
+                });
+              }
+              if (event.type === "run.failed" || event.type === "run.cancelled") {
+                const failed = event.type === "run.failed";
+                commitAssistantMessage("message_patched", {
+                  workTrace: upsertWorkBlock(assistantMessage.workTrace, `runtime-${event.type}`, {
+                    kind: "diagnostic",
+                    title: failed ? "Agent Loop 失败" : "Agent Loop 已取消",
+                    stage: "respond",
+                    status: failed ? "error" : "complete",
+                    summary: summarizeRuntimePayload(event.payload) || (failed ? "Agent Loop 失败。" : "Agent Loop 已取消。"),
                     completedAt: nowMs()
                   })
                 });
@@ -13144,7 +14171,7 @@ ${globalInstructions}` : ""
         };
         rawResponse = llmDiagnostic.userMessage;
         visibleResponse = llmDiagnostic.userMessage;
-        recordCoworkLlmDiagnostic(input.context, llmDiagnostic);
+        recordLlmDiagnostic(input.context, llmDiagnostic);
         commitVisibleAssistantText();
       }
     }
@@ -13152,60 +14179,25 @@ ${globalInstructions}` : ""
       this.clearActiveTurn(assistantMessage.turnId, abortController);
       return;
     }
-    const assistantContent = stripControlBlock(rawResponse);
+    const assistantContent = (rawResponse || visibleResponse).trim();
     visibleResponse = assistantContent;
     const isRouteMissingDiagnostic = llmDiagnostic?.code === "CONVERSATION_LLM_ROUTE_MISSING";
-    let finalStatus = errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete";
-    let traceStatus = errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete";
-    commitAssistantMessage("message_patched", {
-      content: `${visibleResponse}${systemAppendix}`,
-      diagnostic: llmDiagnostic,
-      ...withCoworkReasoning(upsertTraceStep(assistantMessage.reasoningTrace, "cowork-route", {
-        status: "complete",
-        summary: llmDiagnostic ? `模型链路诊断完成：${llmDiagnostic.providerId ? `${llmDiagnostic.providerId}${llmDiagnostic.modelId ? `/${llmDiagnostic.modelId}` : ""}` : "缺少 route"}。` : "上下文检查完成。",
-        completedAt: nowMs()
-      }))
-    });
+    const finalStatus = errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete";
+    const traceStatus = errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete";
     if (abortController.signal.aborted) {
       this.clearActiveTurn(assistantMessage.turnId, abortController);
       return;
     }
-    if (!input.context.projectId && EXECUTE_PATTERN.test(effectiveMessage)) {
-      const boundaryReply = "我可以先帮你梳理问题，不过正式调试要先选一个项目。选好项目后，你可以继续描述现象，或者直接打开一个 .rdc capture。";
-      commitAssistantMessage("message_completed", {
-        status: "complete",
-        content: boundaryReply,
-        ...withCoworkReasoning(finalizeTrace(
-          upsertTraceStep(
-            upsertTraceStep(assistantMessage.reasoningTrace, "cowork-route", {
-              status: "complete",
-              summary: "当前还没有可用项目。",
-              completedAt: nowMs()
-            }),
-            "cowork-upgrade",
-            {
-              title: "升级到正式调试",
-              stage: "plan",
-              status: "complete",
-              summary: "已拦截正式调试请求，等待选择项目。",
-              completedAt: nowMs()
-            }
-          ),
-          "complete",
-          "等待选择项目"
-        ))
-      });
-      this.clearActiveTurn(assistantMessage.turnId, abortController);
-      return;
-    }
+    const outputSummary = llmDiagnostic ? llmDiagnostic.code === "CONVERSATION_LLM_REQUEST_FAILED" ? "模型请求失败，已记录诊断。" : "模型链路不可用，已给出配置诊断。" : "最终回答已生成。";
     commitAssistantMessage(finalStatus === "error" ? "message_errored" : "message_completed", {
       status: finalStatus,
-      content: `${assistantContent}${systemAppendix}`,
+      content: assistantContent,
       diagnostic: llmDiagnostic,
-      ...withCoworkReasoning(finalizeTrace(
-        upsertTraceStep(assistantMessage.reasoningTrace, "cowork-reply", {
-          status: errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete",
-          summary: llmDiagnostic ? llmDiagnostic.code === "CONVERSATION_LLM_REQUEST_FAILED" ? "模型请求失败，已记录诊断。" : "模型链路不可用，已给出配置诊断。" : "协作回复已完成。",
+      ...withWorkTrace(finalizeTrace(
+        upsertWorkBlock(assistantMessage.workTrace, "assistant-output", {
+          kind: "output",
+          status: finalStatus === "error" ? "error" : "complete",
+          summary: outputSummary,
           detail: llmDiagnostic?.technicalMessage,
           completedAt: nowMs()
         }),
@@ -16436,9 +17428,7 @@ electron.app.whenReady().then(async () => {
     console.log("[SettingsRebuildOnly]", JSON.stringify({
       workspaceRoot: settings.workspace.rootPath,
       settingsPath: settings.paths.settingsPath,
-      providerIds: settings.llm.providers.map((provider) => provider.id),
-      lastMigrationReportPath: settings.configuration.lastMigrationReportPath ?? null,
-      migrationSummary: settings.configuration.lastMigrationSummary
+      providerIds: settings.llm.providers.map((provider) => provider.id)
     }));
     electron.app.exit(0);
     return;

@@ -2,13 +2,23 @@ import type { AgentRole } from './agent';
 import type { AgentEvent } from './agentRuntime';
 import type { AppMode, RunSummary, SessionAttachmentRecord, SessionRecord } from './session';
 
-export type ConversationMode = 'talk' | 'intake' | 'active_debug' | 'execute_upgrade';
+export type ConversationMode = 'talk';
 
 export type ConversationRole = 'user' | 'assistant' | 'system';
 
 export type ConversationMessageStatus = 'draft' | 'streaming' | 'complete' | 'error' | 'stopped';
 
-export type ConversationReasoningStepStatus = 'pending' | 'running' | 'complete' | 'error';
+export type ConversationWorkBlockStatus = 'pending' | 'running' | 'complete' | 'error';
+
+export type ConversationWorkBlockKind =
+  | 'reasoning'
+  | 'tool'
+  | 'approval'
+  | 'compaction'
+  | 'subagent'
+  | 'handoff'
+  | 'diagnostic'
+  | 'output';
 
 export type ConversationToolCallStatus = 'pending' | 'running' | 'complete' | 'error';
 
@@ -39,11 +49,12 @@ export interface ConversationToolCall {
   completedAt?: number;
 }
 
-export interface ConversationReasoningStep {
+export interface ConversationWorkBlock {
   id: string;
+  kind: ConversationWorkBlockKind;
   title: string;
   stage?: string;
-  status: ConversationReasoningStepStatus;
+  status: ConversationWorkBlockStatus;
   summary?: string;
   detail?: string;
   toolCalls: ConversationToolCall[];
@@ -51,12 +62,19 @@ export interface ConversationReasoningStep {
   completedAt?: number;
 }
 
-export interface ConversationReasoningTrace {
+export interface ConversationWorkTrace {
   status: 'idle' | 'running' | 'complete' | 'error' | 'stopped';
   summary?: string;
-  steps: ConversationReasoningStep[];
+  blocks: ConversationWorkBlock[];
   updatedAt: number;
 }
+
+type LegacyTraceStep = Omit<ConversationWorkBlock, 'kind'> & {
+  kind?: ConversationWorkBlockKind;
+};
+type LegacyTrace = Omit<ConversationWorkTrace, 'blocks'> & {
+  steps: LegacyTraceStep[];
+};
 
 export interface ConversationMessage {
   id: string;
@@ -70,7 +88,9 @@ export interface ConversationMessage {
   content: string;
   status?: ConversationMessageStatus;
   updatedAt?: number;
-  reasoningTrace?: ConversationReasoningTrace | null;
+  workTrace?: ConversationWorkTrace | null;
+  /** Historical session data only. Remove after persisted sessions have migrated to workTrace. */
+  reasoningTrace?: LegacyTrace | null;
   diagnostic?: ConversationMessageDiagnostic | null;
   attachments?: SessionAttachmentRecord[];
   createdAt: number;
@@ -81,16 +101,6 @@ export interface ConversationAttachmentInput {
   fileName: string;
   mimeType?: string | null;
   size?: number | null;
-}
-
-export interface ConversationControl {
-  intent: 'talk' | 'intake' | 'execute';
-  safe_to_start: boolean;
-  needs_project?: boolean;
-  needs_capture?: boolean;
-  needs_target_capture?: boolean;
-  needs_route?: boolean;
-  reason?: string;
 }
 
 export interface ConversationErrorViewModel {

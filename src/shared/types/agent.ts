@@ -1,6 +1,6 @@
 import type { LlmProviderId } from './settings';
 
-export type AgentId = 'ask' | 'debugger' | 'analyzer' | 'optimizer';
+export type AgentId = 'ask' | 'plan' | 'edit' | 'debugger' | 'analyzer' | 'optimizer';
 export type AgentRole = AgentId | (string & {});
 
 export type AgentCategory = 'orchestrator' | 'general';
@@ -69,10 +69,12 @@ export interface AgentConversation {
   lastUpdated: string;
 }
 
-export const TOP_LEVEL_AGENT_IDS: AgentId[] = ['ask', 'debugger', 'analyzer', 'optimizer'];
+export const TOP_LEVEL_AGENT_IDS: AgentId[] = ['ask', 'plan', 'edit', 'debugger', 'analyzer', 'optimizer'];
 
 export const DEFAULT_MODEL_ROUTING: Record<AgentId, { provider: LlmProviderId; model: string }> = {
   ask: { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
+  plan: { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
+  edit: { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
   debugger: { provider: 'openrouter', model: 'anthropic/claude-3-opus' },
   analyzer: { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
   optimizer: { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
@@ -80,6 +82,8 @@ export const DEFAULT_MODEL_ROUTING: Record<AgentId, { provider: LlmProviderId; m
 
 export const AGENT_CATEGORY_MAP: Record<AgentId, AgentCategory> = {
   ask: 'orchestrator',
+  plan: 'orchestrator',
+  edit: 'orchestrator',
   debugger: 'general',
   analyzer: 'general',
   optimizer: 'general',

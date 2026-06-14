@@ -135,7 +135,7 @@ export interface AgentEvent {
   turnId?: string;
   sessionId?: string | null;
   agentId?: AgentRole;
-  stage?: WorkflowStage | 'cowork' | 'report';
+  stage?: WorkflowStage | 'report';
   phase?: WorkflowPhase;
   payload: AgentEventPayload;
 }
@@ -220,7 +220,7 @@ export interface AgentRuntimeTaskDescriptor {
   title: string;
   status: 'pending' | 'running' | 'blocked' | 'completed' | 'failed' | 'cancelled';
   ownerAgentId: AgentRole;
-  stage?: WorkflowStage | 'cowork' | 'report';
+  stage?: WorkflowStage | 'report';
   phase?: WorkflowPhase;
   dependsOn?: string[];
 }

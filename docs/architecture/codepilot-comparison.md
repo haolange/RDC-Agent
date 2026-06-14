@@ -8,7 +8,7 @@ CodePilot 值得学习的是架构表达方式，而不是技术栈迁移：
 
 - CodePilot 用 `Electron shell -> App/API -> lib -> hooks -> feature components -> ui/patterns -> tests/docs` 把每层职责写得很清楚。
 - CodePilot 的 API、Provider、工作区、Bridge、媒体等能力都有源码入口、数据流、故障边界和测试入口。
-- `RDC-Agent` 当前的技术方向仍应保持 `Electron + React + electron-vite`，因为本仓库是 RenderDoc `.rdc` 垂直调试工作台，不是通用 coding agent 客户端。
+- `RDC-Agent` 当前的技术方向仍应保持 `Electron + React + electron-vite`。本仓库的产品边界已经升级为通用 agent workbench，并以内置 RDC/RDX、RenderDoc `.rdc` 能力作为专项扩展。
 - 本次迁移的是“可读边界”：领域目录、IPC/API 域、共享契约入口、数据流文档和后续拆分路线。
 
 ## 架构对照
@@ -35,7 +35,7 @@ CodePilot 值得学习的是架构表达方式，而不是技术栈迁移：
 - 不引入 CodePilot 的 REST API server 层。
 - 不引入 SQLite 作为当前工作区数据的强制替代。
 - 不把 RenderDoc 工具链泛化成通用 coding-agent tool system。
-- 不把 Analyzer / Optimizer 自动并入 Debugger harness；当前可执行主链仍是 Debugger。
+- 不把 Analyzer / Optimizer 自动并入 Debugger harness；它们与 Debugger、Edit 一样是独立 executable profile，由 profile visibility、handoff 和 tool policy 调度。
 - 不做 UI 视觉改版，不改变现有布局、面板层级、测试定位符和交互路径。
 
 ## 采用方式

@@ -112,6 +112,29 @@ if (browserFallback.length > 12000) {
   fail('browserElectronApi.ts should be a small installer that delegates to browserFallback domain modules.');
 }
 
+const removedReasoningKeyPattern = new RegExp(`chat\\.reasoning${'Trace'}`, 'g');
+const removedWorkBlockIdPattern = new RegExp([
+  `co${'work-route'}`,
+  `co${'work-reply'}`,
+  `active-debug${'-reply'}`,
+].join('|'), 'g');
+
+const forbiddenAgentWorkbenchPatterns = [
+  { pattern: /\u63a8\u7406\u8f68\u8ff9/g, message: 'Use "工作过程" / "Work process" for visible agent progress UI.' },
+  { pattern: removedReasoningKeyPattern, message: 'Visible i18n keys must use chat.workProcess.' },
+  { pattern: removedWorkBlockIdPattern, message: 'Conversation work blocks must not use removed pseudo-stage ids.' },
+];
+for (const filePath of sourceFiles) {
+  const relativePath = path.relative(repoRoot, filePath).replace(/\\/g, '/');
+  const content = fs.readFileSync(filePath, 'utf8');
+  for (const { pattern, message } of forbiddenAgentWorkbenchPatterns) {
+    pattern.lastIndex = 0;
+    if (pattern.test(content)) {
+      fail(`${relativePath} contains removed Agent Workbench wording or pseudo-stage id. ${message}`);
+    }
+  }
+}
+
 const r1ComponentExempt = new Set([
   'src/renderer/features/settings/SettingsModal/index.tsx',
 ]);

@@ -77,7 +77,7 @@ const readHandoffs = (value: unknown): AgentHandoffDefinition[] => {
 };
 
 const parseAgentMarkdown = (filePath: string, fallbackId: string): AgentManifestDefinition => {
-  const raw = fs.readFileSync(filePath, 'utf8');
+  const raw = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/u, '');
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/u.exec(raw);
   const frontmatter = match ? YAML.parse(match[1]) as Record<string, unknown> : {};
   const instructions = match ? match[2].trim() : raw.trim();
@@ -136,6 +136,13 @@ const createSeedDefinition = (
   const route = routes.find((entry) => entry.agentId === agentId);
   const model = canonicalAgentModelId(route?.providerId ?? '', route?.modelId ?? '');
   const name = AGENT_DISPLAY_NAMES[agentId];
+  const tools = agentId === 'ask'
+    ? ['read', 'search', 'web', 'askUser']
+    : agentId === 'plan'
+      ? ['read', 'search', 'web', 'askUser', 'agent', 'todo', 'memory', 'planArtifact', 'handoff']
+      : agentId === 'edit'
+        ? ['read', 'search', 'web', 'bash', 'write', 'edit', 'askUser', 'agent', 'todo', 'memory', 'skill', 'mcp']
+        : ['read', 'search', 'web', 'bash', 'askUser', 'agent', 'todo', 'memory', 'rdxContext'];
   return {
     id: agentId,
     fileName: fileNameForId(agentId),
@@ -148,13 +155,19 @@ const createSeedDefinition = (
     models: model ? [model] : [],
     disableModelInvocation: false,
     userInvocable: true,
-    tools: agentId === 'ask'
-      ? ['read', 'search', 'web', 'askUser']
-      : ['read', 'search', 'web', 'bash', 'askUser', 'agent', 'todo', 'memory', 'rdxContext'],
+    tools,
     skills: [],
     mcpServers: [],
     agents: agentId === 'ask' ? [] : AGENT_ROLES.filter((role) => role !== agentId),
-    handoffs: [],
+    handoffs: agentId === 'plan'
+      ? [
+          {
+            label: 'Start Implementation',
+            agent: 'edit',
+            prompt: 'Start implementing the approved plan.',
+          },
+        ]
+      : [],
     metadata: {},
     instructions: `You are ${name}. ${AGENT_DESCRIPTIONS[agentId]}.`,
     enabled: true,

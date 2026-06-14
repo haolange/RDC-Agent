@@ -14,6 +14,14 @@ const CARD_COPY: Record<AgentMode, { title: TranslationKey; subtitle: Translatio
     title: 'emptyWorkbench.askTitle',
     subtitle: 'emptyWorkbench.askSubtitle',
   },
+  plan: {
+    title: 'emptyWorkbench.planTitle',
+    subtitle: 'emptyWorkbench.planSubtitle',
+  },
+  edit: {
+    title: 'emptyWorkbench.editTitle',
+    subtitle: 'emptyWorkbench.editSubtitle',
+  },
   debugger: {
     title: 'emptyWorkbench.debuggerTitle',
     subtitle: 'emptyWorkbench.debuggerSubtitle',

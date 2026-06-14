@@ -11,6 +11,7 @@ import {
   applyConversationTurnResult,
   buildLocalConversationErrorTurn,
   syncE2EConversationState,
+  toConversationMode,
   toConversationAttachmentInputs,
 } from './composerSendHelpers';
 import { useComposerStop } from './useComposerStop';
@@ -84,12 +85,13 @@ export function useComposerSend(options: {
 
     setIsPromptSending(true);
     try {
+      const conversationMode = toConversationMode(currentMode);
       const result = await electronAPI.conversation.sendMessage({
         projectId: currentProject?.projectId ?? null,
         sessionId: currentSession?.sessionId ?? null,
         currentRunId: currentRun?.runId ?? null,
         replayDeviceId: selectedDeviceEntry?.id ?? null,
-        mode: currentMode,
+        mode: conversationMode,
         agentId: selectedAgentId || null,
         message: trimmed,
         attachments: toConversationAttachmentInputs(pendingAttachments),

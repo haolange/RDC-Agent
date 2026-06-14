@@ -310,8 +310,6 @@ app.whenReady().then(async () => {
       workspaceRoot: settings.workspace.rootPath,
       settingsPath: settings.paths.settingsPath,
       providerIds: settings.llm.providers.map((provider) => provider.id),
-      lastMigrationReportPath: settings.configuration.lastMigrationReportPath ?? null,
-      migrationSummary: settings.configuration.lastMigrationSummary,
     }));
     app.exit(0);
     return;

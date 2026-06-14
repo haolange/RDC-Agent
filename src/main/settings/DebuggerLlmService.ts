@@ -13,7 +13,7 @@ import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 
-export type LlmAuditStage = WorkflowStage | 'plan' | 'skeptic' | 'curate' | 'report' | 'dispatch' | 'cowork';
+export type LlmAuditStage = WorkflowStage | 'plan' | 'skeptic' | 'curate' | 'report' | 'dispatch';
 
 export interface ResolvedDebuggerRoute {
   agentId: AgentRole;

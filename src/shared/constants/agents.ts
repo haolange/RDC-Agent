@@ -8,6 +8,8 @@ export const AGENT_ROLES: AgentId[] = [...TOP_LEVEL_AGENT_IDS];
 
 export const AGENT_DISPLAY_NAMES: Record<AgentId, string> = {
   ask: 'Ask',
+  plan: 'Plan',
+  edit: 'Edit',
   debugger: 'Debugger',
   analyzer: 'Analyzer',
   optimizer: 'Optimizer',
@@ -15,6 +17,8 @@ export const AGENT_DISPLAY_NAMES: Record<AgentId, string> = {
 
 export const AGENT_DESCRIPTIONS: Record<AgentId, string> = {
   ask: 'Read-only agent for codebase questions, clarification, and guidance.',
+  plan: 'Planning agent for research, questions, handoffs, and implementation plans without direct changes.',
+  edit: 'General implementation agent for ordinary code and workspace changes with approval policy.',
   debugger: 'General executable agent for RDC/RenderDoc investigation and debugging work.',
   analyzer: 'General executable agent for evidence analysis, performance triage, and reportable findings.',
   optimizer: 'General executable agent for bottleneck analysis, optimization ordering, and validation.',
@@ -22,6 +26,8 @@ export const AGENT_DESCRIPTIONS: Record<AgentId, string> = {
 
 export const AGENT_CATEGORIES: Record<AgentId, AgentCategory> = {
   ask: 'orchestrator',
+  plan: 'orchestrator',
+  edit: 'orchestrator',
   debugger: 'general',
   analyzer: 'general',
   optimizer: 'general',
@@ -33,6 +39,8 @@ export const REPORTER_AGENTS: AgentRole[] = [];
 
 export const AGENT_WRITE_SCOPES: Record<AgentId, WriteScope[]> = {
   ask: [],
+  plan: ['workspace_notes'],
+  edit: ['workspace_notes', 'session_artifacts', 'workspace_reports'],
   debugger: ['workspace_control', 'workspace_notes', 'session_artifacts', 'workspace_reports'],
   analyzer: ['workspace_notes', 'session_artifacts', 'workspace_reports'],
   optimizer: ['workspace_notes', 'session_artifacts', 'workspace_reports'],
@@ -40,6 +48,8 @@ export const AGENT_WRITE_SCOPES: Record<AgentId, WriteScope[]> = {
 
 export const AGENT_NOTE_FILES: Record<AgentId, string> = {
   ask: '',
+  plan: '',
+  edit: '',
   debugger: '',
   analyzer: '',
   optimizer: '',
@@ -49,6 +59,8 @@ export const DEFAULT_TOKEN_TTL_SECONDS = 1800;
 
 export const AGENT_COLORS: Record<AgentId, string> = {
   ask: '#38c6f4',
+  plan: '#8d8bff',
+  edit: '#33d1ff',
   debugger: '#33d1ff',
   analyzer: '#8d8bff',
   optimizer: '#4ee3a0',
@@ -61,6 +73,22 @@ export const AGENT_MODES: ModeConfig[] = [
     icon: 'message-orbit',
     description: 'Read-only clarification and guidance',
     accentColor: AGENT_COLORS.ask,
+    disabled: false,
+  },
+  {
+    id: 'plan',
+    label: 'Plan',
+    icon: 'route-plan',
+    description: 'Research, questions, handoff, and implementation planning',
+    accentColor: AGENT_COLORS.plan,
+    disabled: false,
+  },
+  {
+    id: 'edit',
+    label: 'Edit',
+    icon: 'pencil-edit',
+    description: 'General implementation agent',
+    accentColor: AGENT_COLORS.edit,
     disabled: false,
   },
   {

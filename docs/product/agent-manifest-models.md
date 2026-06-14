@@ -8,9 +8,11 @@ Agent manifests 位于当前 workspace：
 
 `profiles/agents/*.agent.md`
 
-当前只 seed 四个顶层 agent：
+当前 baseline seed 六个顶层 profile：
 
 - `ask.agent.md`
+- `plan.agent.md`
+- `edit.agent.md`
 - `debugger.agent.md`
 - `analyzer.agent.md`
 - `optimizer.agent.md`
@@ -92,13 +94,18 @@ Manifest-facing tool names are canonical tokens:
 - `search`
 - `web`
 - `bash`
+- `write`
+- `edit`
 - `askUser`
 - `agent`
+- `handoff`
 - `todo`
 - `memory`
+- `skills`
+- `mcp`
 - `rdxContext`
 
-`ask` is read-only by default. `debugger`、`analyzer`、`optimizer` are general executable agents and may use configured tools such as `bash` and `rdxContext` when policy allows.
+`ask` is read-only by default. `plan` uses research, questions, handoffs, memory or plan artifacts rather than direct implementation. `edit`、`debugger`、`analyzer`、`optimizer` are executable profiles and may use configured tools such as `bash`、`write`、`edit` and `rdxContext` when policy allows.
 
 ## Plan 输出
 

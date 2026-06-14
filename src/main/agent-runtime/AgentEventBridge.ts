@@ -25,7 +25,7 @@ export interface AgentEventBridgeContext {
   runId?: string;
   turnId?: string;
   sessionId?: string | null;
-  stage?: WorkflowStage | 'cowork' | 'report';
+  stage?: WorkflowStage | 'report';
   phase?: WorkflowPhase;
   mode?: AppMode;
   patternId?: string;
@@ -123,6 +123,19 @@ export function translateCoreToSharedAgentEvent(
           context,
         );
       }
+      if (ev.type === 'toolcall_end') {
+        return buildSharedAgentEvent(
+          'tool.requested',
+          {
+            toolCall: {
+              id: ev.toolCall.id,
+              name: ev.toolCall.name,
+              arguments: ev.toolCall.arguments,
+            },
+          },
+          context,
+        );
+      }
       return null;
     }
     case 'message_end': {
@@ -160,6 +173,22 @@ export function translateCoreToSharedAgentEvent(
     }
     case 'tool_execution_end': {
       const sharedResult = toolResultToSharedResult(event.result, event.durationMs);
+      const approvalReason = getApprovalRequiredReason(event.result);
+      if (approvalReason) {
+        return buildSharedAgentEvent(
+          'approval.requested',
+          {
+            approvalId: `approval-${event.toolCallId}`,
+            title: `Approve ${event.toolName}`,
+            status: 'pending',
+            reason: approvalReason,
+            kind: 'tool',
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+          },
+          context,
+        );
+      }
       const denialReason = getPolicyDenialReason(event.result);
       if (denialReason) {
         return buildSharedAgentEvent(
@@ -183,6 +212,34 @@ export function translateCoreToSharedAgentEvent(
         context,
       );
     }
+    case 'approval_requested': {
+      return buildSharedAgentEvent(
+        'approval.requested',
+        {
+          approvalId: `approval-${event.toolCallId}`,
+          title: `Approve ${event.toolName}`,
+          status: 'pending',
+          reason: `Approval required before ${event.toolName} can run.`,
+          kind: 'tool',
+          toolCallId: event.toolCallId,
+          toolName: event.toolName,
+        },
+        context,
+      );
+    }
+    case 'approval_resolved': {
+      return buildSharedAgentEvent(
+        'approval.answered',
+        {
+          approvalId: `approval-${event.toolCallId}`,
+          title: `Approve ${event.toolCallId}`,
+          status: event.approved ? 'approved' : 'rejected',
+          kind: 'tool',
+          toolCallId: event.toolCallId,
+        },
+        context,
+      );
+    }
     case 'error': {
       return buildSharedAgentEvent(
         'run.failed',
@@ -196,6 +253,12 @@ export function translateCoreToSharedAgentEvent(
     default:
       return null;
   }
+}
+
+function getApprovalRequiredReason(result: ToolResultMessage): string | null {
+  if (!result.isError) return null;
+  const message = extractToolResultText(result);
+  return message.toLowerCase().includes('approval required') ? message : null;
 }
 
 function getPolicyDenialReason(result: ToolResultMessage): string | null {

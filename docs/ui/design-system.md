@@ -2,12 +2,15 @@
 
 ## 项目概述
 
-**RDC-Agent** 是一个RenderDoc调试的垂直Agent桌面应用，基于Electron + React + TypeScript构建。
+**RDC-Agent** 是一个通用 Agent Workbench，并内置 RDC/RDX 与 RenderDoc `.rdc` 专项能力，基于 Electron + React + TypeScript 构建。
 
 **核心定位**:
-- **Debugger**（首发）：调试渲染问题，通过多Agent协作分析.rdc文件
-- **Analyzer**（占位）：性能分析（Coming Soon）
-- **Optimizer**（占位）：优化建议（Coming Soon）
+- **Ask**：只读问答、项目搜索和解释。
+- **Plan**：研究、提问、组织计划和交接，不直接执行实现。
+- **Edit**：普通执行型 profile，按 approval policy 进行 workspace 修改。
+- **Debugger**：RDC/RDX 与 RenderDoc `.rdc` 调查。
+- **Analyzer**：证据分析、性能分诊和可报告结论。
+- **Optimizer**：瓶颈分析、优化排序和验证。
 
 ---
 

@@ -1,38 +1,40 @@
-import type { ConversationMessage, ConversationReasoningTrace } from '@shared/types/conversation';
+import type { ConversationMessage, ConversationWorkBlock, ConversationWorkTrace } from '@shared/types/conversation';
 import type { ActionEvent } from '@shared/types/evidence';
 
 export const mergeToolExecutionActionEvent = (
   message: ConversationMessage,
   event: ActionEvent,
-  nextTrace: ConversationReasoningTrace,
-  upsertReasoningStep: (
-    trace: ConversationReasoningTrace | null | undefined,
-    stepId: string,
+  nextTrace: ConversationWorkTrace,
+  upsertWorkBlock: (
+    trace: ConversationWorkTrace | null | undefined,
+    blockId: string,
     patch: {
+      kind?: ConversationWorkBlock['kind'];
       title: string;
       stage?: string;
-      status: 'pending' | 'running' | 'complete' | 'error';
+      status: ConversationWorkBlock['status'];
       summary?: string;
       detail?: string;
       completedAt?: number;
     },
-  ) => ConversationReasoningTrace,
+  ) => ConversationWorkTrace,
 ): ConversationMessage | null => {
   if (event.event_type !== 'tool_execution') {
     return null;
   }
 
   const eventTime = event.ts_ms;
-  const stepTrace = upsertReasoningStep(nextTrace, 'tool-execution', {
+  const stepTrace = upsertWorkBlock(nextTrace, 'tool-execution', {
+    kind: 'tool',
     title: '工具调用',
-    stage: 'investigate',
+    stage: 'runtime',
     status: event.status === 'error' ? 'error' : 'running',
     summary: event.status === 'error' ? '工具调用失败。' : '正在记录工具调用。',
   });
-  const step = stepTrace.steps.find((entry) => entry.id === 'tool-execution');
-  if (step) {
+  const block = stepTrace.blocks.find((entry) => entry.id === 'tool-execution');
+  if (block) {
     const toolName = String(event.payload.tool_name || 'unknown_tool');
-    const existingIndex = step.toolCalls.findIndex((toolCall) => toolCall.id === event.event_id);
+    const existingIndex = block.toolCalls.findIndex((toolCall) => toolCall.id === event.event_id);
     const nextToolCall = {
       id: event.event_id,
       toolName,
@@ -48,19 +50,19 @@ export const mergeToolExecutionActionEvent = (
       completedAt: eventTime + event.duration_ms,
     };
     if (existingIndex >= 0) {
-      step.toolCalls[existingIndex] = nextToolCall;
+      block.toolCalls[existingIndex] = nextToolCall;
     } else {
-      step.toolCalls.push(nextToolCall);
+      block.toolCalls.push(nextToolCall);
     }
-    step.status = step.toolCalls.some((toolCall) => toolCall.status === 'error') ? 'error' : 'complete';
-    step.summary = step.status === 'error'
+    block.status = block.toolCalls.some((toolCall) => toolCall.status === 'error') ? 'error' : 'complete';
+    block.summary = block.status === 'error'
       ? '工具调用中出现错误。'
-      : `已记录 ${step.toolCalls.length} 个工具调用。`;
-    step.completedAt = eventTime + event.duration_ms;
+      : `已记录 ${block.toolCalls.length} 个工具调用。`;
+    block.completedAt = eventTime + event.duration_ms;
   }
   return {
     ...message,
-    reasoningTrace: stepTrace,
+    workTrace: stepTrace,
     updatedAt: Date.now(),
   };
 };

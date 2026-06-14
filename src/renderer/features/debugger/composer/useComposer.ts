@@ -118,7 +118,7 @@ export function useComposer(options: {
     const fallback = userInvocableAgents[0];
     if (!fallback || userInvocableAgents.some((agent) => agent.id === selectedAgentId)) return;
     setSelectedAgentId(fallback.id);
-    setCurrentMode((fallback.id === 'ask' || fallback.id === 'debugger' || fallback.id === 'analyzer' || fallback.id === 'optimizer')
+    setCurrentMode((fallback.id === 'ask' || fallback.id === 'plan' || fallback.id === 'edit' || fallback.id === 'debugger' || fallback.id === 'analyzer' || fallback.id === 'optimizer')
       ? fallback.id
       : 'ask');
   }, [selectedAgentId, setCurrentMode, userInvocableAgents]);

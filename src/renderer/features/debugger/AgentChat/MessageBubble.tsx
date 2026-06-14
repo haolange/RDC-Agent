@@ -2,11 +2,12 @@ import React, { useMemo, useState } from 'react';
 import type {
   ConversationMessage,
   ConversationMessageStatus,
+  ConversationWorkTrace,
 } from '@shared/types/conversation';
 import type { SessionAttachmentRecord } from '@shared/types/session';
 import { formatBytes } from '../../../services/attachmentHelpers';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
-import { ReasoningChain } from './ReasoningChain';
+import { WorkProcess } from './WorkProcess';
 import { useAgentHandoffActions } from './useAgentHandoffActions';
 
 interface MessageBubbleProps {
@@ -15,6 +16,8 @@ interface MessageBubbleProps {
 
 const AGENT_DISPLAY_NAME: Partial<Record<string, string>> = {
   ask: 'Ask',
+  edit: 'Edit',
+  plan: 'Plan',
   debugger: 'Debugger',
   analyzer: 'Analyzer',
   optimizer: 'Optimizer',
@@ -22,6 +25,8 @@ const AGENT_DISPLAY_NAME: Partial<Record<string, string>> = {
 
 const AGENT_AVATAR_GLYPH: Partial<Record<string, string>> = {
   ask: 'AS',
+  edit: 'ED',
+  plan: 'PL',
   debugger: 'DG',
   analyzer: 'AN',
   optimizer: 'OP',
@@ -29,6 +34,8 @@ const AGENT_AVATAR_GLYPH: Partial<Record<string, string>> = {
 
 const AGENT_ACCENT: Partial<Record<string, string>> = {
   ask: '#33d1ff',
+  edit: '#33d1ff',
+  plan: '#8d8bff',
   debugger: '#33d1ff',
   analyzer: '#fbbf24',
   optimizer: '#a8ff60',
@@ -98,6 +105,26 @@ const renderContentWithCursor = (
   );
 };
 
+const migrateLegacyTrace = (message: ConversationMessage): ConversationWorkTrace | null => {
+  if (message.workTrace) {
+    return message.workTrace;
+  }
+  // Historical session compatibility boundary. Remove after persisted sessions are migrated to workTrace.
+  const legacyTrace = message.reasoningTrace;
+  if (!legacyTrace) {
+    return null;
+  }
+  return {
+    status: legacyTrace.status,
+    summary: legacyTrace.summary,
+    blocks: legacyTrace.steps.map((step) => ({
+      kind: step.kind ?? (step.toolCalls.length > 0 ? 'tool' : 'reasoning'),
+      ...step,
+    })),
+    updatedAt: legacyTrace.updatedAt,
+  };
+};
+
 const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => {
   const time = formatClockTime(message.createdAt);
   return (
@@ -135,7 +162,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
   const displayName = agentId ? AGENT_DISPLAY_NAME[agentId] : 'Assistant';
   const glyph = agentId ? AGENT_AVATAR_GLYPH[agentId] : 'AI';
   const time = formatClockTime(message.createdAt);
-  const trace = message.reasoningTrace ?? null;
+  const trace = migrateLegacyTrace(message);
   const status: ConversationMessageStatus = message.status ?? 'complete';
   const hasContent = Boolean(message.content && message.content.length > 0);
   const definitions = useAppSettingsStore((state) => state.settings.agents.definitions);
@@ -190,8 +217,8 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
               <span className="conversation-message-time">{time}</span>
             ) : null}
           </header>
-          {trace && (trace.steps.length > 0 || trace.summary || trace.status === 'running') ? (
-            <ReasoningChain trace={trace} />
+          {trace && (trace.blocks.length > 0 || trace.summary || trace.status === 'running') ? (
+            <WorkProcess trace={trace} />
           ) : null}
           {message.attachments && message.attachments.length > 0 ? (
             <AttachmentList attachments={message.attachments} />

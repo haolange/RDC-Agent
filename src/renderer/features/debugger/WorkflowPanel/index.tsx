@@ -23,7 +23,7 @@ const getAgentDisplayName = (role: AgentRole): string => (
 );
 
 const UI_STAGES: UiStageDefinition[] = [
-  { id: 'planner', label: 'Planner', stages: ['preflight', 'entry_gate', 'intake_gate', 'speclist'] },
+  { id: 'planner', label: 'Planner', stages: ['preflight', 'entry_gate', 'speclist'] },
   { id: 'generator', label: 'Generator', stages: ['dispatch', 'investigate'] },
   { id: 'evaluator', label: 'Evaluator', stages: ['fix_verify', 'skepti', 'curate', 'finalize'] },
 ];
