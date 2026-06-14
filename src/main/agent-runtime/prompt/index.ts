@@ -20,3 +20,14 @@ export type { PromptContext, PromptSection } from './PromptSections';
 
 export { DYNAMIC_BOUNDARY, PromptAssembler } from './PromptAssembler';
 export type { PromptAssemblerOptions } from './PromptAssembler';
+
+export {
+  composeProfileSystemPrompt,
+  composeProfileTurnPrompt,
+} from './PromptComposer';
+export type {
+  ProfilePromptContext,
+  ProfilePromptDefinition,
+  ProfileSystemPromptInput,
+  ProfileTurnPromptInput,
+} from './PromptComposer';

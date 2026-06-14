@@ -2,9 +2,11 @@ AgentApi
 AgentCategory
 AgentEventPayload
 AgentEventType
+AgentId
 AgentMode
 AgentRole
 AgentStatus
+AgentWorkbenchToolPermission
 appendJsonl
 AppLanguage
 AppMetaApi
@@ -19,6 +21,7 @@ ArtifactStatus
 assignDefaultCaptureRoles
 AttachmentKind
 BLOCKER_CODES
+BuiltinAgentMode
 BuiltinLlmProviderId
 CaptureApi
 CaptureRole
@@ -35,6 +38,8 @@ ConversationMode
 ConversationRole
 ConversationStreamEvent
 ConversationToolCallStatus
+ConversationWorkBlockKind
+ConversationWorkBlockStatus
 countJsonl
 DEFAULT_MODEL_ROUTING
 DeviceApi
@@ -62,6 +67,7 @@ HarnessTaskPriority
 HarnessTaskStatus
 index.ts::*
 interface
+isTopLevelAgentId
 LlmApi
 LlmProviderAuthMode
 LlmProviderCapability
@@ -83,6 +89,8 @@ PlatformApi
 ProgressTaskStatus
 ProjectApi
 RawChannelSubscriptionApi
+RdxActionId
+RdxActionSettingsMap
 RdxCliJsonMode
 readJsonl
 readYaml

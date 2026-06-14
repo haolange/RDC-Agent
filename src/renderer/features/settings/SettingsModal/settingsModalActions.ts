@@ -4,7 +4,6 @@ import type {
   LlmAgentRoute,
   LlmProviderEntry,
 } from '@shared/types/settings';
-import { AGENT_ROLES } from '@shared/constants/agents';
 import type { TranslationKey, useI18n } from '../../../i18n';
 import type { useProviderConnection } from './useProviderConnection';
 import type { useSettingsModalState } from './useSettingsModalState';
@@ -138,9 +137,15 @@ export function createSettingsModalActions({
     modalState.setAgentRouteSaveState('saving');
     modalState.setAgentRouteSaveMessage('');
     try {
+      const agentIds = Array.from(new Set(
+        modalState.agentManifestDrafts
+          .filter((agent) => !agent.delete)
+          .map((agent) => agent.id.trim())
+          .filter(Boolean),
+      ));
       await patchSettings({
         llm: {
-          agentRoutes: AGENT_ROLES.map((agentId) => {
+          agentRoutes: agentIds.map((agentId) => {
             const route = modalState.agentRouteDrafts.find((entry) => entry.agentId === agentId);
             return route ?? { agentId, providerId: '', modelId: '' };
           }),
@@ -167,6 +172,7 @@ export function createSettingsModalActions({
       });
       const nextSettings = await reloadSettings();
       modalState.setAgentManifestDrafts(nextSettings.agents.definitions.map((definition) => ({ ...definition })));
+      modalState.setAgentRouteDrafts(nextSettings.llm.agentRoutes.map(cloneRoute));
       modalState.setAgentRouteSaveState('saved');
       modalState.setAgentRouteSaveMessage(t('settings.agentManifestSaved'));
     } catch (error) {
@@ -188,6 +194,7 @@ export function createSettingsModalActions({
     try {
       const nextSettings = await window.electronAPI.settings.importAgentManifest(filePath);
       modalState.setAgentManifestDrafts(nextSettings.agents.definitions.map((definition) => ({ ...definition })));
+      modalState.setAgentRouteDrafts(nextSettings.llm.agentRoutes.map(cloneRoute));
       modalState.setAgentRouteSaveState('saved');
       modalState.setAgentRouteSaveMessage(t('settings.agentManifestImported'));
     } catch (error) {

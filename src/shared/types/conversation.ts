@@ -69,13 +69,6 @@ export interface ConversationWorkTrace {
   updatedAt: number;
 }
 
-type LegacyTraceStep = Omit<ConversationWorkBlock, 'kind'> & {
-  kind?: ConversationWorkBlockKind;
-};
-type LegacyTrace = Omit<ConversationWorkTrace, 'blocks'> & {
-  steps: LegacyTraceStep[];
-};
-
 export interface ConversationMessage {
   id: string;
   turnId: string;
@@ -89,8 +82,6 @@ export interface ConversationMessage {
   status?: ConversationMessageStatus;
   updatedAt?: number;
   workTrace?: ConversationWorkTrace | null;
-  /** Historical session data only. Remove after persisted sessions have migrated to workTrace. */
-  reasoningTrace?: LegacyTrace | null;
   diagnostic?: ConversationMessageDiagnostic | null;
   attachments?: SessionAttachmentRecord[];
   createdAt: number;

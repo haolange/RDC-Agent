@@ -81,13 +81,18 @@ const glyphByIcon = (
   }
 };
 
+const FALLBACK_MODE_CONFIG = {
+  icon: 'message-orbit' as const,
+  accentColor: '#33d1ff',
+};
+
 export const ModeGlyph: React.FC<ModeGlyphProps> = ({
   mode,
   className,
   size = 16,
   strokeWidth = 1.85,
 }) => {
-  const modeConfig = getAgentModeConfig(mode);
+  const modeConfig = getAgentModeConfig(mode) ?? FALLBACK_MODE_CONFIG;
 
   return (
     <span

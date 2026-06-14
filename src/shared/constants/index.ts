@@ -47,7 +47,6 @@ export {
 export { MODE_CAPABILITIES, assignDefaultCaptureRoles } from './modes';
 export {
   ALL_STAGES,
-  LEGACY_STAGE_MIGRATION,
   MAIN_STAGES,
   SIMPLIFIED_STAGES,
   SPECIAL_STAGES,

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { AgentMode } from '@shared/types/layout';
+import type { AgentMode, BuiltinAgentMode } from '@shared/types/layout';
 import { AGENT_MODES } from '@shared/constants/agents';
 import { useI18n, type TranslationKey } from '../../i18n';
 import { ModeGlyph } from '../../ui/ModeGlyph';
@@ -9,7 +9,7 @@ interface EmptyWorkbenchPromptProps {
   mode: AgentMode;
 }
 
-const CARD_COPY: Record<AgentMode, { title: TranslationKey; subtitle: TranslationKey }> = {
+const CARD_COPY: Record<BuiltinAgentMode, { title: TranslationKey; subtitle: TranslationKey }> = {
   ask: {
     title: 'emptyWorkbench.askTitle',
     subtitle: 'emptyWorkbench.askSubtitle',
@@ -78,10 +78,10 @@ export const EmptyWorkbenchPrompt: React.FC<EmptyWorkbenchPromptProps> = ({ mode
                     size={13}
                     strokeWidth={1.9}
                   />
-                  <span>{t(`mode.${toolMode.id}`)}</span>
+                  <span>{t(`mode.${toolMode.id as BuiltinAgentMode}`)}</span>
                 </div>
-                <h2 className="empty-workbench-tool-title">{t(CARD_COPY[toolMode.id].title)}</h2>
-                <p className="empty-workbench-tool-subtitle">{t(CARD_COPY[toolMode.id].subtitle)}</p>
+                <h2 className="empty-workbench-tool-title">{t(CARD_COPY[toolMode.id as BuiltinAgentMode].title)}</h2>
+                <p className="empty-workbench-tool-subtitle">{t(CARD_COPY[toolMode.id as BuiltinAgentMode].subtitle)}</p>
               </div>
               <div className="empty-workbench-tool-edge" aria-hidden="true" />
             </article>

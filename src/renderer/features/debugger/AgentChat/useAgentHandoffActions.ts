@@ -1,16 +1,15 @@
+import { isTopLevelAgentId } from '@shared/types/agent';
 import type { AppMode } from '@shared/types/session';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
 
-const APP_MODE_AGENT_IDS = new Set(['ask', 'edit', 'debugger', 'analyzer', 'optimizer']);
-
 export const modeForHandoffAgent = (agentId: string): AppMode =>
   agentId === 'plan'
     ? 'ask'
-    : APP_MODE_AGENT_IDS.has(agentId)
+    : isTopLevelAgentId(agentId) && agentId !== 'plan'
       ? agentId as AppMode
-      : 'debugger';
+      : 'edit';
 
 export function useAgentHandoffActions(message: {
   projectId: string | null;

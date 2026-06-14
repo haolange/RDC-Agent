@@ -131,6 +131,7 @@ export function useComposerSend(options: {
         pendingAttachments,
         errorMessage: error instanceof Error ? error.message : failedSummary,
         failedSummary,
+        selectedAgentId,
       })));
     } finally {
       setIsPromptSending(false);

@@ -17,6 +17,8 @@
     "check:shared-exports": "node scripts/check-shared-exports.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
+    "check:work-process": "node scripts/check-work-process-presentation.mjs",
+    "check:agent-runtime": "node scripts/check-agent-runtime.mjs",
     "check:provider-system": "node scripts/check-provider-system.mjs",
     "check:settings-agents": "node scripts/check-settings-agents.mjs",
     "start:human": "scripts\\start-rdc-agent.cmd",

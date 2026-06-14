@@ -2,9 +2,11 @@ import React from 'react';
 import { ModeGlyph } from '../../../ui/ModeGlyph';
 import { ContextUsageIndicator } from '../../../patterns/ContextUsageIndicator';
 import type { AgentMode } from '@shared/types/layout';
+import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import { formatBytes } from '../../../services/attachmentHelpers';
 import { useI18n } from '../../../i18n';
 import { useLayoutStore } from '../../../stores/layoutStore';
+import { useConversationStore } from '../../../stores/conversationStore';
 import type { ComposerController } from './useComposer';
 
 export interface ComposerProps {
@@ -12,30 +14,21 @@ export interface ComposerProps {
   hasOpenedCaptureForCurrentProject: boolean;
 }
 
-function getModeCapability(modeId: AgentMode, language: string): string {
-  const isZh = language === 'zh-CN';
-  switch (modeId) {
-    case 'ask':
-      return isZh ? '只读对话' : 'Read-only chat';
-    case 'plan':
-      return isZh ? '计划与交接' : 'Plan and handoff';
-    case 'edit':
-      return isZh ? '执行与修改' : 'Edit and execute';
-    case 'debugger':
-      return isZh ? 'RenderDoc 调试' : 'RenderDoc debugging';
-    case 'analyzer':
-      return isZh ? '性能分析' : 'Performance analysis';
-    case 'optimizer':
-      return isZh ? '优化建议' : 'Optimization advice';
-    default:
-      return '';
-  }
+function getAgentCapability(agentId: string, definitions: AgentManifestDefinition[]): string {
+  const manifest = definitions.find((d) => d.id === agentId);
+  return manifest?.description ?? '';
 }
 
 export const Composer: React.FC<ComposerProps> = ({
   composer,
 }) => {
   const { t, language } = useI18n();
+  const activeAgentId = useConversationStore((state) => {
+    const activeMsg = state.conversationMessages.find(
+      (m) => m.role === 'assistant' && (m.status === 'streaming' || m.status === 'draft'),
+    );
+    return activeMsg?.agentId ?? null;
+  });
   const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
 
   const {
@@ -138,7 +131,7 @@ export const Composer: React.FC<ComposerProps> = ({
               </span>
               <span className="composer-agent-pill-label">{currentModeLabel}</span>
               {(() => {
-                const capability = getModeCapability(currentMode, language);
+                const capability = getAgentCapability(selectedAgentId, userInvocableAgents);
                 return capability ? (
                   <span
                     className="composer-agent-pill-capability"
@@ -161,14 +154,7 @@ export const Composer: React.FC<ComposerProps> = ({
                   <span className="agent-tag" />
                 </span>
                 {userInvocableAgents.map((agent) => {
-                  const agentMode: AgentMode = (
-                    agent.id === 'ask'
-                      || agent.id === 'plan'
-                      || agent.id === 'edit'
-                      || agent.id === 'debugger'
-                      || agent.id === 'analyzer'
-                      || agent.id === 'optimizer'
-                  ) ? agent.id : 'ask';
+                  const agentMode: AgentMode = agent.id;
                   const executionModeDisabled = false;
                   return (
                     <button
@@ -194,6 +180,9 @@ export const Composer: React.FC<ComposerProps> = ({
                           <ModeGlyph mode={agentMode} size={15} strokeWidth={1.9} />
                         </span>
                         <span className="composer-agent-menu-item-label">{agent.name}</span>
+                        {activeAgentId === agent.id ? (
+                          <span className="composer-agent-status-dot is-active" aria-label="Active" />
+                        ) : null}
                         {agent.description ? (
                           <span hidden className="composer-agent-menu-item-desc">{agent.description}</span>
                         ) : null}

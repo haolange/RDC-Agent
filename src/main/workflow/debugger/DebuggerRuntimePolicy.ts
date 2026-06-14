@@ -1,4 +1,5 @@
 import type { AgentRole } from '@shared/types/agent';
+import { isTopLevelAgentId } from '@shared/types/agent';
 import type { WorkflowStage } from '@shared/types/workflow';
 import { executionProfileService } from '../../settings/ExecutionProfileService';
 import { settingsService } from '../../settings/SettingsService';
@@ -116,14 +117,15 @@ export function resolveAgentToolAllowlist(agentId: AgentRole, stage?: WorkflowSt
   const settings = settingsService.getAll();
   const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, stage || 'investigate', agentId);
   const manifest = settings.agents.definitions.find((definition) => definition.id === agentId && definition.enabled);
-  const manifestTools = manifest?.tools?.length ? manifest.tools : [];
-  const profileTools = manifestTools.length
-    ? manifestTools.flatMap(expandCanonicalToolToken)
+  const profileTools = manifest
+    ? manifest.tools.flatMap(expandCanonicalToolToken)
     : runtimeProfile.toolAllowlist?.length
       ? runtimeProfile.toolAllowlist.flatMap(expandCanonicalToolToken)
-    : agentId === 'ask'
-      ? ASK_READONLY_TOOL_ALLOWLIST
-      : EXECUTABLE_AGENT_TOOL_ALLOWLIST;
+      : agentId === 'ask'
+        ? ASK_READONLY_TOOL_ALLOWLIST
+        : isTopLevelAgentId(agentId)
+          ? EXECUTABLE_AGENT_TOOL_ALLOWLIST
+          : [];
 
   if (agentId === 'ask') {
     return Array.from(new Set(profileTools.filter((toolName) => !isDeniedAskTool(toolName, normalizeToolName(toolName)))));

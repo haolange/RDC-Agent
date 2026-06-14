@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import type { AgentMode, ModeConfig } from '@shared/types/layout';
 import { AGENT_MODES } from '@shared/constants/agents';
 import { useI18n } from '../../../i18n';
 import { useConversationStore } from '../../../stores/conversationStore';
@@ -55,9 +56,15 @@ export function useComposer(options: {
     leftToggleDisabled,
     toggleLeftSidebar,
   });
-
-  const currentModeConfig = AGENT_MODES.find((mode) => mode.id === currentMode) ?? AGENT_MODES[0];
   const selectedAgent = userInvocableAgents.find((agent) => agent.id === selectedAgentId) ?? userInvocableAgents[0];
+  const currentModeConfig: ModeConfig = AGENT_MODES.find((mode) => mode.id === currentMode) ?? {
+    id: selectedAgent?.id ?? currentMode,
+    label: selectedAgent?.name ?? currentMode,
+    icon: 'message-orbit',
+    description: selectedAgent?.description ?? 'Agent profile',
+    accentColor: '#33d1ff',
+    disabled: false,
+  };
   const currentModeLabel = selectedAgent?.name ?? currentModeConfig.label;
   const openCaptureRequiredLabel = language === 'zh-CN'
     ? '先在应用内 Open 一个 .rdc Capture 后才能选择执行模式'
@@ -108,7 +115,7 @@ export function useComposer(options: {
   const primaryButtonDescription = send.isComposerBusy
     ? stopButtonLabel
     : language === 'zh-CN'
-      ? `${primaryButtonLabel}${currentModeLabel}消息`
+      ? `${primaryButtonLabel} ${currentModeLabel} 消息`
       : `${primaryButtonLabel} ${currentModeLabel} message`;
   const primaryButtonDisabled = send.isComposerBusy
     ? currentRun?.status === 'stopping' && !hasActiveConversationTurn && !send.isPromptSending
@@ -118,9 +125,7 @@ export function useComposer(options: {
     const fallback = userInvocableAgents[0];
     if (!fallback || userInvocableAgents.some((agent) => agent.id === selectedAgentId)) return;
     setSelectedAgentId(fallback.id);
-    setCurrentMode((fallback.id === 'ask' || fallback.id === 'plan' || fallback.id === 'edit' || fallback.id === 'debugger' || fallback.id === 'analyzer' || fallback.id === 'optimizer')
-      ? fallback.id
-      : 'ask');
+    setCurrentMode(fallback.id as AgentMode);
   }, [selectedAgentId, setCurrentMode, userInvocableAgents]);
 
   useEffect(() => {
