@@ -3,10 +3,14 @@ import { useConversationStore } from '../../../stores/conversationStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
 
-const TOP_LEVEL_AGENT_IDS = new Set(['ask', 'debugger', 'analyzer', 'optimizer']);
+const APP_MODE_AGENT_IDS = new Set(['ask', 'edit', 'debugger', 'analyzer', 'optimizer']);
 
 export const modeForHandoffAgent = (agentId: string): AppMode =>
-  TOP_LEVEL_AGENT_IDS.has(agentId) ? agentId as AppMode : 'debugger';
+  agentId === 'plan'
+    ? 'ask'
+    : APP_MODE_AGENT_IDS.has(agentId)
+      ? agentId as AppMode
+      : 'debugger';
 
 export function useAgentHandoffActions(message: {
   projectId: string | null;

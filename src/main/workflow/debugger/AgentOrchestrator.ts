@@ -5,7 +5,7 @@
  *
  * 公共契约（不变）：
  *  - `sendMessage(agentId, content, runContext?, options?) → Promise<string>`
- *  - `sendCoworkMessage(agentId, content, options?) → Promise<string>`
+ *  - `sendProfileMessage(agentId, content, options?) -> Promise<string>`
  *  - `getAgentState`, `getAllAgentStates`, `configureAgent`, `applyLlmConfig`
  *  - 状态广播仍走 `WorkflowProjectionPublisher`，事件名不变。
  *
@@ -15,6 +15,7 @@
  *    供 ConversationService / agent-trace 等老 API 复用。
  */
 
+import * as path from 'path';
 import type {
   AgentCategory,
   AgentConfig,
@@ -26,9 +27,11 @@ import type {
 } from '@shared/types/agent';
 import { isTopLevelAgentId } from '@shared/types/agent';
 import {
+  AGENT_CATEGORIES,
   AGENT_DESCRIPTIONS,
   AGENT_DISPLAY_NAMES,
   AGENT_ROLES,
+  AGENT_WRITE_SCOPES,
   DEFAULT_MODEL_ROUTING,
 } from '@shared/constants/agents';
 import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
@@ -54,6 +57,7 @@ import {
   encodeAgentModel,
   llmAdapterProvider,
 } from '../../agent-runtime/LLMAdapterProvider';
+import { createTaskTools, TaskRegistry } from '../../agent-runtime/tasks';
 import {
   translateCoreToSharedAgentEvent,
   type AgentEventBridgeContext,
@@ -62,6 +66,7 @@ import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import { getRdxRuntimeContext } from '../../sessions/RdxRuntimeContextRegistry';
 import { executionProfileService } from '../../settings/ExecutionProfileService';
+import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 import { llmAdapter } from '../../settings/LLMAdapter';
 import { providerAccountAuthService } from '../../settings/ProviderAccountAuthService';
 import { settingsService } from '../../settings/SettingsService';
@@ -84,7 +89,7 @@ interface AgentTurnOptions {
   reasoningBudget?: 'auto' | 'low' | 'medium' | 'high';
 }
 
-interface AgentCoworkOptions extends AgentTurnOptions {
+interface AgentProfileTurnOptions extends AgentTurnOptions {
   sessionId?: string;
   systemPrompt?: string;
   maxTokens?: number;
@@ -92,12 +97,10 @@ interface AgentCoworkOptions extends AgentTurnOptions {
   turnId?: string;
   routeAgentId?: AgentRole;
   patternId?: string;
-  stage?: WorkflowStage | 'cowork' | 'report';
-  /** 用于 cowork 场景的特殊 prompt（替代 content 中的 user message）。 */
+  stage?: WorkflowStage | 'report';
+  /** Profile turn prompt that replaces the raw user message for this runtime call. */
   promptOverride?: string;
 }
-
-const EXECUTE_PATTERN = /start|execute|debug|analy[sz]e|开始|启动|执行|正式分析|开始调试|调试/i;
 
 /** 单个 AgentRole 在内部维护的运行态。 */
 interface AgentSlot {
@@ -148,11 +151,11 @@ export class AgentOrchestrator {
   }
 
   private getAgentCategory(role: AgentRole): AgentCategory {
-    return role === 'ask' ? 'orchestrator' : 'general';
+    return isTopLevelAgentId(role) ? AGENT_CATEGORIES[role] : 'general';
   }
 
   private getAgentWriteScopes(role: AgentRole): WriteScope[] {
-    return role === 'ask' ? [] : ['workspace_notes', 'workspace_control'];
+    return isTopLevelAgentId(role) ? AGENT_WRITE_SCOPES[role] : ['workspace_notes'];
   }
 
   getAgentState(agentId: AgentRole): AgentState | null {
@@ -197,7 +200,7 @@ export class AgentOrchestrator {
   }
 
   // -------------------------------------------------------------------
-  // 主入口：sendMessage / sendCoworkMessage
+  // Main entry points: workflow run turn / profile turn.
   // -------------------------------------------------------------------
 
   async sendMessage(
@@ -265,10 +268,10 @@ export class AgentOrchestrator {
     }
   }
 
-  async sendCoworkMessage(
+  async sendProfileMessage(
     agentId: AgentRole,
     content: string,
-    options?: AgentCoworkOptions,
+    options?: AgentProfileTurnOptions,
   ): Promise<string> {
     const fallbackConfig = this.agentConfigs.get(agentId);
     if (!fallbackConfig) {
@@ -298,13 +301,13 @@ export class AgentOrchestrator {
       };
 
       if (process.env.RDC_AGENT_TEST_MODE === '1') {
-        const finalStub = await this.createCoworkTestResponse(agentId, content, options);
+        const finalStub = await this.createProfileTestResponse(agentId, content, options);
         this.updateAgentStatus(agentId, 'complete');
         return finalStub;
       }
 
       const userPrompt = options?.promptOverride ?? content;
-      const toolAllowlist = resolveAgentToolAllowlist(agentId, options?.stage && options.stage !== 'cowork' && options.stage !== 'report' ? options.stage : undefined);
+      const toolAllowlist = resolveAgentToolAllowlist(agentId, options?.stage && options.stage !== 'report' ? options.stage : undefined);
       const responseText = await this.runAgentTurn({
         agentId,
         content: userPrompt,
@@ -315,13 +318,13 @@ export class AgentOrchestrator {
         temperature: config.temperature,
         mode: this.modeForAgent(agentId),
         patternId: options?.patternId ?? this.patternForAgent(agentId),
-        stage: options?.stage ?? 'cowork',
+        stage: options?.stage ?? 'investigate',
         runId: undefined,
         sessionId: options?.sessionId ?? null,
         turnId: options?.turnId,
         toolAllowlist,
         options,
-        // cowork 每次调用都是独立轮次，不复用缓存 Agent。
+        // A profile turn is isolated so previous cached chat state cannot leak into this user turn.
         useFreshAgent: true,
       });
 
@@ -329,7 +332,7 @@ export class AgentOrchestrator {
         scope: options?.sessionId ? 'session' : 'app',
         namespace: 'agent',
         severity: 'info',
-        title: `${AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : 'debugger']} cowork turn`,
+        title: `${AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : 'debugger']} profile turn`,
         summary: responseText.slice(0, 160) || 'Empty message.',
         sessionId: options?.sessionId,
         raw: {
@@ -389,7 +392,7 @@ export class AgentOrchestrator {
     return slot;
   }
 
-  /** 创建一个全新的 Agent slot（不进入缓存）。适用于 cowork 这种一次性调用。 */
+  /** Create a fresh one-shot agent slot for an isolated profile turn. */
   private createFreshAgentSlot(
     providerId: string,
     modelId: string,
@@ -416,16 +419,21 @@ export class AgentOrchestrator {
   private resolveRuntimeTools(
     agentId: AgentRole,
     toolAllowlist: string[],
-    stage?: WorkflowStage | 'cowork' | 'report',
+    stage?: WorkflowStage | 'report',
+    sessionId?: string | null,
   ): ResolvedRuntimeTools {
     const availableTools = new Map<string, AgentTool>();
     for (const tool of getPrimitiveTools()) {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
-    const taskListTool = this.createReadonlyTaskListTool();
-    availableTools.set(taskListTool.name, taskListTool);
+    for (const tool of this.createTaskRuntimeTools()) {
+      availableTools.set(normalizeToolName(tool.name), tool);
+    }
     const rdxContextTool = this.createRdxContextTool();
     availableTools.set(rdxContextTool.name, rdxContextTool);
+    for (const tool of this.createWorkbenchTools(agentId, sessionId)) {
+      availableTools.set(normalizeToolName(tool.name), tool);
+    }
 
     const definitions: ToolDefinition[] = [];
     const toolMap = new Map<string, AgentTool>();
@@ -445,9 +453,10 @@ export class AgentOrchestrator {
   private createToolExecutor(
     agentId: AgentRole,
     toolAllowlist: string[],
-    stage?: WorkflowStage | 'cowork' | 'report',
+    stage?: WorkflowStage | 'report',
+    sessionId?: string | null,
   ): ToolExecutor {
-    const tools = this.resolveRuntimeTools(agentId, toolAllowlist, stage).toolMap;
+    const tools = this.resolveRuntimeTools(agentId, toolAllowlist, stage, sessionId).toolMap;
     return {
       execute: async (toolCall: ToolCall, signal?: AbortSignal, onUpdate?: (partialResult: unknown) => void) => {
         const normalizedName = normalizeToolName(toolCall.name);
@@ -457,6 +466,10 @@ export class AgentOrchestrator {
         const tool = tools.get(normalizedName);
         if (!tool) {
           return this.createPolicyDeniedToolResult(toolCall, agentId);
+        }
+        const approvalRequired = tool.permissionHint === 'mutation' || tool.permissionHint === 'destructive';
+        if (approvalRequired) {
+          return this.createApprovalRequiredToolResult(toolCall, agentId, tool.permissionHint);
         }
         try {
           const result = await tool.execute(toolCall.id, toolCall.arguments, signal, onUpdate);
@@ -478,9 +491,9 @@ export class AgentOrchestrator {
   private isAllowedForRuntime(
     agentId: AgentRole,
     toolName: string,
-    stage?: WorkflowStage | 'cowork' | 'report',
+    stage?: WorkflowStage | 'report',
   ): boolean {
-    const workflowStage = stage === 'cowork' || stage === 'report' ? undefined : stage;
+    const workflowStage = stage === 'report' ? undefined : stage;
     return isToolAllowedForAgent(toolName, agentId, workflowStage);
   }
 
@@ -498,6 +511,25 @@ export class AgentOrchestrator {
     };
   }
 
+  private createApprovalRequiredToolResult(
+    toolCall: ToolCall,
+    agentId: AgentRole,
+    permissionHint: 'mutation' | 'destructive',
+  ): ToolResultMessage {
+    const operation = permissionHint === 'destructive' ? 'destructive operation' : 'workspace mutation';
+    return {
+      role: 'toolResult',
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+      content: [{
+        type: 'text',
+        text: `Approval required for tool "${toolCall.name}" before ${operation} can run for ${agentId}. No changes were made.`,
+      }],
+      isError: true,
+      timestamp: Date.now(),
+    };
+  }
+
   private agentToolResultToMessage(toolCall: ToolCall, result: AgentToolResult): ToolResultMessage {
     return {
       role: 'toolResult',
@@ -509,23 +541,9 @@ export class AgentOrchestrator {
     };
   }
 
-  private createReadonlyTaskListTool(): AgentTool<Record<string, never>, { count: number }> {
-    return {
-      name: 'task_list',
-      label: 'List Tasks',
-      description: 'List current conversation tasks without creating or modifying any task records.',
-      parameters: {
-        type: 'object',
-        properties: {},
-      },
-      permissionHint: 'readonly',
-      async execute() {
-        return {
-          content: [{ type: 'text', text: 'No formal Debugger run tasks are active in Ask mode.' }],
-          details: { count: 0 },
-        };
-      },
-    };
+  private createTaskRuntimeTools(): AgentTool[] {
+    const tasksDir = path.join(storageAdapter.getWorkspacePath(), '.tasks');
+    return createTaskTools(new TaskRegistry(tasksDir));
   }
 
   private createRdxContextTool(): AgentTool<Record<string, never>, { available: boolean }> {
@@ -554,6 +572,238 @@ export class AgentOrchestrator {
     };
   }
 
+  private createWorkbenchTools(agentId: AgentRole, sessionId?: string | null): AgentTool[] {
+    return [
+      this.createAskUserTool(agentId),
+      this.createAgentHandoffTool(agentId),
+      this.createMemoryReadTool(sessionId),
+      this.createPlanArtifactTool(sessionId),
+      this.createSkillsCatalogTool(),
+      this.createMcpCatalogTool(),
+    ];
+  }
+
+  private createAskUserTool(agentId: AgentRole): AgentTool<
+    { question?: string; choices?: string[] },
+    { agentId: AgentRole; question: string; choices: string[] }
+  > {
+    return {
+      name: 'ask_user',
+      label: 'Ask User',
+      description: 'Ask the user for a decision or missing information. Use this when progress depends on user input.',
+      parameters: {
+        type: 'object',
+        required: ['question'],
+        properties: {
+          question: { type: 'string', description: 'The concise question to ask the user.' },
+          choices: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Optional short mutually exclusive choices.',
+          },
+        },
+      },
+      permissionHint: 'readonly',
+      async execute(_toolCallId, args) {
+        const question = typeof args.question === 'string' && args.question.trim()
+          ? args.question.trim()
+          : 'The agent needs user input before continuing.';
+        const choices = Array.isArray(args.choices)
+          ? args.choices.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+          : [];
+        const suffix = choices.length > 0 ? ` Choices: ${choices.join(' | ')}` : '';
+        return {
+          content: [{ type: 'text', text: `User input requested by ${agentId}: ${question}${suffix}` }],
+          details: { agentId, question, choices },
+        };
+      },
+    };
+  }
+
+  private createAgentHandoffTool(agentId: AgentRole): AgentTool<
+    { agent?: string; label?: string; prompt?: string },
+    { fromAgentId: AgentRole; toAgentId: string; label: string; prompt: string }
+  > {
+    return {
+      name: 'agent_handoff',
+      label: 'Agent Handoff',
+      description: 'Prepare a handoff to another agent profile without executing it directly.',
+      parameters: {
+        type: 'object',
+        required: ['prompt'],
+        properties: {
+          agent: { type: 'string', description: 'Target agent profile id, such as edit, debugger, analyzer, or optimizer.' },
+          label: { type: 'string', description: 'Short handoff label.' },
+          prompt: { type: 'string', description: 'Implementation or specialist prompt for the receiving agent.' },
+        },
+      },
+      permissionHint: 'readonly',
+      async execute(_toolCallId, args) {
+        const toAgentId = typeof args.agent === 'string' && args.agent.trim() ? args.agent.trim() : 'edit';
+        const label = typeof args.label === 'string' && args.label.trim() ? args.label.trim() : `Hand off to ${toAgentId}`;
+        const prompt = typeof args.prompt === 'string' && args.prompt.trim()
+          ? args.prompt.trim()
+          : 'Continue from the current plan and ask for missing context before making changes.';
+        return {
+          content: [{
+            type: 'text',
+            text: `Handoff prepared from ${agentId} to ${toAgentId}: ${label}\n${prompt}`,
+          }],
+          details: { fromAgentId: agentId, toAgentId, label, prompt },
+        };
+      },
+    };
+  }
+
+  private createPlanArtifactTool(sessionId?: string | null): AgentTool<
+    { title?: string; content?: string },
+    { sessionId: string | null; artifactPath?: string }
+  > {
+    return {
+      name: 'plan_artifact',
+      label: 'Write Plan Artifact',
+      description: 'Write or replace the current session plan artifact. This cannot edit arbitrary workspace files.',
+      parameters: {
+        type: 'object',
+        required: ['content'],
+        properties: {
+          title: { type: 'string', description: 'Optional plan title.' },
+          content: { type: 'string', description: 'Plan content to persist for this session.' },
+        },
+      },
+      permissionHint: 'session_mutation',
+      async execute(_toolCallId, args) {
+        if (!sessionId) {
+          return {
+            content: [{ type: 'text', text: 'No active session is available for a plan artifact.' }],
+            isError: true,
+            details: { sessionId: null },
+          };
+        }
+        const body = typeof args.content === 'string' ? args.content.trim() : '';
+        if (!body) {
+          return {
+            content: [{ type: 'text', text: 'Plan artifact content is required.' }],
+            isError: true,
+            details: { sessionId },
+          };
+        }
+        const title = typeof args.title === 'string' && args.title.trim()
+          ? args.title.trim()
+          : 'Agent Plan';
+        const artifactPath = storageAdapter.writeSessionPlanArtifact(sessionId, `# ${title}\n\n${body}\n`);
+        return {
+          content: [{ type: 'text', text: `Plan artifact saved: ${artifactPath}` }],
+          details: { sessionId, artifactPath },
+        };
+      },
+    };
+  }
+
+  private createMemoryReadTool(sessionId?: string | null): AgentTool<
+    { query?: string; limit?: number },
+    { sessionId: string | null; count: number }
+  > {
+    return {
+      name: 'memory_read',
+      label: 'Read Memory',
+      description: 'Read recent session memory and conversation context without mutating persisted data.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Optional case-insensitive filter.' },
+          limit: { type: 'number', description: 'Maximum recent entries to return, default 8.' },
+        },
+      },
+      permissionHint: 'readonly',
+      async execute(_toolCallId, args) {
+        if (!sessionId) {
+          return {
+            content: [{ type: 'text', text: 'No active session memory is available for this turn.' }],
+            details: { sessionId: null, count: 0 },
+          };
+        }
+        const rawLimit = typeof args.limit === 'number' && Number.isFinite(args.limit) ? args.limit : 8;
+        const limit = Math.max(1, Math.min(20, Math.floor(rawLimit)));
+        const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
+        const history = storageAdapter.readConversationHistory(sessionId);
+        const candidates = query
+          ? history.filter((entry) => entry.content.toLowerCase().includes(query))
+          : history;
+        const entries = candidates.slice(-limit).map((entry) => (
+          `${entry.role}${entry.agentId ? `/${entry.agentId}` : ''}: ${entry.content.slice(0, 240)}`
+        ));
+        return {
+          content: [{
+            type: 'text',
+            text: entries.length > 0 ? entries.join('\n') : 'No matching session memory entries were found.',
+          }],
+          details: { sessionId, count: entries.length },
+        };
+      },
+    };
+  }
+
+  private createSkillsCatalogTool(): AgentTool<
+    { query?: string },
+    { count: number }
+  > {
+    return {
+      name: 'skills',
+      label: 'List Skills',
+      description: 'List reusable skills configured for the current workspace.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Optional case-insensitive filter.' },
+        },
+      },
+      permissionHint: 'readonly',
+      async execute(_toolCallId, args) {
+        const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
+        const skills = agentRuntimeConfigService.listSkills()
+          .filter((skill) => !query || `${skill.id} ${skill.name} ${skill.label} ${skill.description}`.toLowerCase().includes(query));
+        const lines = skills.map((skill) => (
+          `${skill.id}: ${skill.label || skill.name} (${skill.source})${skill.enabledByDefault ? '' : ' - disabled by default'}`
+        ));
+        return {
+          content: [{ type: 'text', text: lines.length > 0 ? lines.join('\n') : 'No configured skills matched the query.' }],
+          details: { count: skills.length },
+        };
+      },
+    };
+  }
+
+  private createMcpCatalogTool(): AgentTool<
+    { query?: string },
+    { count: number }
+  > {
+    return {
+      name: 'mcp',
+      label: 'List MCP Services',
+      description: 'List MCP services configured for the current workspace.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Optional case-insensitive filter.' },
+        },
+      },
+      permissionHint: 'readonly',
+      async execute(_toolCallId, args) {
+        const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
+        const servers = agentRuntimeConfigService.listMcpServers()
+          .filter((server) => !query || `${server.id} ${server.name} ${server.description}`.toLowerCase().includes(query));
+        const lines = servers.map((server) => (
+          `${server.id}: ${server.name} (${server.transport})${server.enabledByDefault ? '' : ' - disabled by default'}`
+        ));
+        return {
+          content: [{ type: 'text', text: lines.length > 0 ? lines.join('\n') : 'No configured MCP services matched the query.' }],
+          details: { count: servers.length },
+        };
+      },
+    };
+  }
+
   // -------------------------------------------------------------------
   // 单轮 Agent 执行
   // -------------------------------------------------------------------
@@ -568,21 +818,21 @@ export class AgentOrchestrator {
     temperature?: number;
     mode: AppMode;
     patternId: string;
-    stage?: WorkflowStage | 'cowork' | 'report';
+    stage?: WorkflowStage | 'report';
     runId?: string;
     sessionId?: string | null;
     turnId?: string;
     toolAllowlist: string[];
     options?: AgentTurnOptions;
-    /** 为 true 时创建一次性 Agent 实例，不进入缓存（cowork 场景）。 */
+    /** Creates a one-shot agent instance instead of reusing the cached slot. */
     useFreshAgent?: boolean;
   }): Promise<string> {
     if (!input.providerId || !input.modelId) {
       throw new Error('No provider/model route is configured for this agent.');
     }
 
-    const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage);
-    const toolExecutor = this.createToolExecutor(input.agentId, input.toolAllowlist, input.stage);
+    const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
+    const toolExecutor = this.createToolExecutor(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
     const streamOptions: StreamOptions = {
       maxTokens: input.maxTokens,
       temperature: input.temperature,
@@ -711,7 +961,10 @@ export class AgentOrchestrator {
   }
 
   private modeForAgent(agentId: AgentRole): AppMode {
-    return isTopLevelAgentId(agentId) ? agentId : 'debugger';
+    if (agentId === 'plan') {
+      return 'ask';
+    }
+    return isTopLevelAgentId(agentId) ? agentId as AppMode : 'debugger';
   }
 
   private patternForAgent(_agentId: AgentRole): string {
@@ -827,8 +1080,8 @@ export class AgentOrchestrator {
     } catch {
       userMessage = content;
     }
-    if (userMessage.includes('__RDC_AGENT_E2E_FORCE_COWORK_LLM_FAILURE__')) {
-      throw new Error('E2E forced cowork LLM request failure');
+    if (userMessage.includes('__RDC_AGENT_E2E_FORCE_LLM_FAILURE__')) {
+      throw new Error('E2E forced profile LLM request failure');
     }
     const lower = userMessage.toLowerCase();
     let stub = agentId === 'ask'
@@ -843,14 +1096,13 @@ export class AgentOrchestrator {
     } else if (/start|execute|debug|analy[sz]e/.test(lower)) {
       stub = 'Received. I will handle this as a normal agent turn using the configured tools and runtime context.';
     }
-    const intent = /start|execute|debug|analy[sz]e/.test(lower) ? 'execute' : 'talk';
-    return `${stub}\n<control>{"intent":"${intent}","safe_to_start":${intent === 'execute' ? 'true' : 'false'}}</control>`;
+    return stub;
   }
 
-  private async createCoworkTestResponse(
+  private async createProfileTestResponse(
     agentId: AgentRole,
     content: string,
-    options?: AgentCoworkOptions,
+    options?: AgentProfileTurnOptions,
   ): Promise<string> {
     let userMessage = content;
     try {
@@ -859,11 +1111,10 @@ export class AgentOrchestrator {
     } catch {
       userMessage = content;
     }
-    if (userMessage.includes('__RDC_AGENT_E2E_FORCE_COWORK_LLM_FAILURE__')) {
-      throw new Error('E2E forced cowork LLM request failure');
+    if (userMessage.includes('__RDC_AGENT_E2E_FORCE_LLM_FAILURE__')) {
+      throw new Error('E2E forced profile LLM request failure');
     }
     const lower = userMessage.toLowerCase();
-    const wantsExecution = EXECUTE_PATTERN.test(userMessage);
     let stub = agentId === 'ask'
       ? 'I can inspect readonly context, search files or public pages, explain boundaries, or guide you to open a .rdc capture without starting a Debugger run.'
       : 'I can help scope the target and execute configured tools directly within this agent turn.';
@@ -873,17 +1124,17 @@ export class AgentOrchestrator {
       stub = agentId === 'ask'
         ? 'Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution.'
         : 'Hello. I can run as a general executable agent using the tools enabled by this agent profile.';
-    } else if (wantsExecution || EXECUTE_PATTERN.test(lower)) {
+    } else if (/start|execute|debug|analy[sz]e/.test(lower)) {
       stub = 'Received. I will handle this as a normal agent turn using the configured tools and runtime context.';
     }
     if (agentId === 'ask' && userMessage.includes('__RDC_AGENT_E2E_ASK_READONLY_TOOL__')) {
       const toolCallId = generateEventId('e2e-tool');
-      this.emitCoworkTestEvent('tool.started', {
+      this.emitProfileTestEvent('tool.started', {
         toolCallId,
         toolName: 'grep',
         args: { pattern: 'ConversationService', path: 'src/main/conversation' },
       }, options);
-      this.emitCoworkTestEvent('tool.completed', {
+      this.emitProfileTestEvent('tool.completed', {
         toolCallId,
         toolName: 'grep',
         result: {
@@ -904,12 +1155,12 @@ export class AgentOrchestrator {
       stub = 'I searched the workspace with grep and found the Ask conversation code path. No Debugger run was created.';
     } else if (agentId === 'ask' && userMessage.includes('__RDC_AGENT_E2E_ASK_DENY_WRITE__')) {
       const toolCallId = generateEventId('e2e-tool');
-      this.emitCoworkTestEvent('tool.started', {
+      this.emitProfileTestEvent('tool.started', {
         toolCallId,
         toolName: 'write_file',
         args: { path: 'should-not-exist.txt' },
       }, options);
-      this.emitCoworkTestEvent('tool.denied', {
+      this.emitProfileTestEvent('tool.denied', {
         toolCallId,
         toolName: 'write_file',
         reason: 'Policy denied: ask can only use readonly tools.',
@@ -929,7 +1180,7 @@ export class AgentOrchestrator {
       stub = 'I cannot write files in Ask mode. Ask can inspect and search, but mutation requires the appropriate execution flow.';
     }
 
-    const finalStub = `${stub}\n<control>{"intent":"${wantsExecution ? 'execute' : 'talk'}","safe_to_start":${wantsExecution ? 'true' : 'false'}}</control>`;
+    const finalStub = stub;
     if (options?.onChunk) {
       const midpoint = Math.max(1, Math.ceil(finalStub.length / 2));
       options.onChunk(finalStub.slice(0, midpoint));
@@ -939,10 +1190,10 @@ export class AgentOrchestrator {
     return finalStub;
   }
 
-  private emitCoworkTestEvent(
+  private emitProfileTestEvent(
     type: SharedAgentEvent['type'],
     payload: SharedAgentEvent['payload'],
-    options?: AgentCoworkOptions,
+    options?: AgentProfileTurnOptions,
   ): void {
     options?.onEvent?.({
       id: generateEventId('agent-event'),

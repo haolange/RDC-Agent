@@ -17,7 +17,6 @@ export const MODE_CAPABILITIES: Record<string, ModeCapabilities> = {
     availableStages: [
       'preflight',
       'entry_gate',
-      'intake_gate',
       'speclist',
       'dispatch',
       'investigate',

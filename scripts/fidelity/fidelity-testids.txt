@@ -39,9 +39,6 @@ mode-menu-item-${agent.id}
 mode-menu-item-${mode.id}
 open-settings-entry
 opened-capture-preview-window
-reasoning-chain
-reasoning-step
-reasoning-tool-call
 runtime-log-entry-${entry.id}
 runtime-terminal
 runtime-terminal-activity-pane
@@ -130,3 +127,6 @@ trace-task-frame
 trace-thought-summary
 trace-timeline
 trace-tool-action
+work-process
+work-process-block
+work-process-tool-call

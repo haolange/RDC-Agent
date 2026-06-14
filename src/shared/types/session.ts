@@ -5,7 +5,7 @@
 import type { ReplayDeviceEntry } from './device';
 
 export type ExecutableAppMode = 'debugger' | 'analyzer' | 'optimizer';
-export type AppMode = 'ask' | ExecutableAppMode;
+export type AppMode = 'ask' | 'edit' | ExecutableAppMode;
 
 export interface ProjectInputRecord {
   inputId: string;

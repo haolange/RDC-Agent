@@ -30,7 +30,7 @@ export interface PromptContext {
   /** 当前使用的模型信息。 */
   model: { provider: string; name: string };
   /** 运行模式。 */
-  mode: 'ask' | 'debugger' | 'cowork';
+  mode: 'ask' | 'debugger' | 'edit' | 'analyzer' | 'optimizer';
   /** 用户自定义规则（如有）。 */
   userRules?: string;
   /** 额外的自定义段落。 */
@@ -49,8 +49,8 @@ export const sectionIdentity: PromptSection = (context) => {
   const identity =
     context.mode === 'debugger'
       ? 'You are a GPU debugger agent specialized in analyzing RenderDoc `.rdc` captures.'
-      : context.mode === 'cowork'
-        ? 'You are a co-working coding agent that collaborates with the user on RenderDoc capture analysis.'
+      : context.mode === 'edit'
+        ? 'You are an implementation agent that can make approved workspace changes and verify them.'
         : 'You are a coding agent. Answer questions accurately and concisely.';
 
   return [

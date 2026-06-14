@@ -22,6 +22,23 @@ const glyphByIcon = (
           <path d="M18.2 3.2 19.4 2l1.2 1.2 1.2 1.2-1.2 1.2-1.2 1.2-1.2-1.2L17 4.4z" />
         </>
       );
+    case 'route-plan':
+      return (
+        <>
+          <circle cx="6" cy="6" r="2" />
+          <circle cx="18" cy="18" r="2" />
+          <path d="M8 6h3.5a3.5 3.5 0 0 1 0 7H10a3.5 3.5 0 0 0 0 7h6" />
+          <path d="M14 10l2 3-2 3" />
+        </>
+      );
+    case 'pencil-edit':
+      return (
+        <>
+          <path d="M4 20h4.5L19 9.5 14.5 5 4 15.5z" />
+          <path d="M13.5 6 18 10.5" />
+          <path d="M3.5 20.5h17" />
+        </>
+      );
     case 'crosshair-bug':
       return (
         <>

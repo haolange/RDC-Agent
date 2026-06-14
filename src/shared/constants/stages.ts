@@ -7,7 +7,6 @@ import type { WorkflowPhase, WorkflowStage } from '../types/workflow';
 export const MAIN_STAGES: WorkflowStage[] = [
   'preflight',
   'entry_gate',
-  'intake_gate',
   'speclist',
   'dispatch',
   'investigate',
@@ -26,7 +25,6 @@ export const ALL_STAGES: WorkflowStage[] = [...MAIN_STAGES, ...SPECIAL_STAGES];
 export const STAGE_DISPLAY_NAMES: Record<WorkflowStage, string> = {
   preflight: 'Preflight',
   entry_gate: 'Entry Gate',
-  intake_gate: 'Intake Gate',
   speclist: 'Speclist',
   dispatch: 'Dispatch',
   investigate: 'Investigate',
@@ -40,7 +38,6 @@ export const STAGE_DISPLAY_NAMES: Record<WorkflowStage, string> = {
 export const STAGE_PHASES: Record<WorkflowStage, WorkflowPhase> = {
   preflight: 'planner',
   entry_gate: 'planner',
-  intake_gate: 'planner',
   speclist: 'planner',
   dispatch: 'generator',
   investigate: 'generator',
@@ -52,7 +49,7 @@ export const STAGE_PHASES: Record<WorkflowStage, WorkflowPhase> = {
 };
 
 export const STAGE_GROUPS: Record<string, WorkflowStage[]> = {
-  planner: ['preflight', 'entry_gate', 'intake_gate', 'speclist'],
+  planner: ['preflight', 'entry_gate', 'speclist'],
   generator: ['dispatch', 'investigate'],
   evaluator: ['fix_verify', 'skepti', 'curate', 'finalize'],
 };
@@ -67,8 +64,6 @@ export const LEGACY_STAGE_MIGRATION: Record<string, WorkflowStage> = {
   preflight_pending: 'preflight',
   intent_gate_passed: 'speclist',
   entry_gate_passed: 'entry_gate',
-  accepted_intake_initialized: 'intake_gate',
-  intake_gate_passed: 'intake_gate',
   waiting_for_specialist_brief: 'dispatch',
   specialist_briefs_collected: 'dispatch',
   expert_investigation_complete: 'investigate',

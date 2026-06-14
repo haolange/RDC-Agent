@@ -1,17 +1,12 @@
 import type { AgentProfile } from '@shared/types/agenticTrace';
 import type { AppMode } from '@shared/types/session';
-import { askAgentProfile, debuggerAgentProfile } from './debuggerProfile';
+import { TRACE_AGENT_PROFILES, createTraceAgentProfile } from './profileManifest';
 
 export class AgentProfileRegistry {
-  private profiles = new Map<string, AgentProfile>([
-    ['ask', askAgentProfile],
-    ['debugger', debuggerAgentProfile],
-    ['analyzer', { ...debuggerAgentProfile, agentType: 'analyzer', displayName: 'Analyzer Agent' }],
-    ['optimizer', { ...debuggerAgentProfile, agentType: 'optimizer', displayName: 'Optimizer Agent' }],
-  ]);
+  private profiles = new Map<string, AgentProfile>(TRACE_AGENT_PROFILES);
 
   get(agentType: string): AgentProfile {
-    return this.profiles.get(agentType) ?? debuggerAgentProfile;
+    return this.profiles.get(agentType) ?? createTraceAgentProfile('debugger');
   }
 
   getForMode(mode: AppMode): AgentProfile {

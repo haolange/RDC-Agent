@@ -4,7 +4,6 @@ import type { HarnessTask } from './harness';
 export type WorkflowStage =
   | 'preflight'
   | 'entry_gate'
-  | 'intake_gate'
   | 'speclist'
   | 'dispatch'
   | 'investigate'

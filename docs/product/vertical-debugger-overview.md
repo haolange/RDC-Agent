@@ -1,22 +1,23 @@
-# Vertical Debugger Overview
+# RDC/RDX Debugger Profile Overview
 
-Debugger is the current execution-oriented mode for RenderDoc `.rdc` capture analysis.
+Debugger is the RDC/RDX-oriented executable profile inside the general RDC-Agent workbench. It is not the only execution path: Edit, Analyzer, and Optimizer are also profiles with their own instructions, tools, approval policy, and handoffs.
 
 ## User Flow
 
 1. Open a project.
 2. Open a `.rdc` capture through the application.
-3. Enter Debugger mode.
+3. Select the Debugger profile when the task needs RenderDoc/RDC context.
 4. Provide the debugging goal.
-5. Review and approve the generated plan.
-6. Let the agent or app entry execute through configured RDX shell actions / system CLI.
+5. Review Work Process events, tool calls, approvals, diagnostics, and any handoff.
+6. Let approved app entries execute through configured RDX shell actions / system CLI.
 7. Review trace, evidence, artifacts, and report output.
 
 ## Product Boundaries
 
-- Ask mode is read-only guidance and clarification.
-- Debugger mode is the execution chain.
-- Analyzer and Optimizer are product modes, but they are not auto-wired into the Debugger harness.
+- Ask is read-only guidance and clarification.
+- Plan researches, asks questions, and creates plan/handoff artifacts without direct implementation.
+- Edit handles ordinary implementation work under approval policy.
+- Debugger, Analyzer, and Optimizer are executable profiles; they are selected or invoked by profile visibility, handoffs, and tool policy rather than hardcoded mode branches.
 - Prompt text that mentions a path does not open a capture; only application state can provide an opened capture context.
 
 ## Tooling Boundary

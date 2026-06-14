@@ -17,24 +17,64 @@ const CANONICAL_TOOL_EXPANSIONS: Record<string, string[]> = {
   search: ['glob', 'grep'],
   web: ['web_fetch', 'web_search'],
   bash: ['bash'],
+  write: ['write_file'],
+  edit: ['edit_file'],
   askUser: ['ask_user'],
+  'vscode/askQuestions': ['ask_user'],
   agent: ['agent_handoff'],
-  todo: ['task_list'],
+  handoff: ['agent_handoff'],
+  todo: ['task_create', 'task_update', 'task_get', 'task_list'],
+  task: ['task_create', 'task_update', 'task_get', 'task_list'],
   memory: ['memory_read'],
+  planArtifact: ['plan_artifact'],
+  artifact: ['plan_artifact'],
+  'vscode/memory': ['memory_read'],
+  skill: ['skills'],
+  skills: ['skills'],
+  mcp: ['mcp'],
+  MCP: ['mcp'],
   rdxContext: ['rdx_context'],
+  rdx: ['rdx_context'],
 };
 
 const RUNTIME_TOOL_ALIASES: Record<string, string> = {
+  read: 'read_file',
   read_file: 'read_file',
+  search: 'grep',
   glob: 'glob',
   grep: 'grep',
+  web: 'web_fetch',
   web_fetch: 'web_fetch',
   web_search: 'web_search',
   bash: 'bash',
+  write: 'write_file',
+  write_file: 'write_file',
+  edit: 'edit_file',
+  edit_file: 'edit_file',
+  todo: 'task_list',
+  task: 'task_list',
+  task_create: 'task_create',
+  task_update: 'task_update',
+  task_get: 'task_get',
   task_list: 'task_list',
+  askUser: 'ask_user',
   ask_user: 'ask_user',
+  'vscode/askQuestions': 'ask_user',
+  agent: 'agent_handoff',
+  handoff: 'agent_handoff',
   agent_handoff: 'agent_handoff',
+  memory: 'memory_read',
   memory_read: 'memory_read',
+  planArtifact: 'plan_artifact',
+  artifact: 'plan_artifact',
+  plan_artifact: 'plan_artifact',
+  'vscode/memory': 'memory_read',
+  skill: 'skills',
+  skills: 'skills',
+  mcp: 'mcp',
+  MCP: 'mcp',
+  rdxContext: 'rdx_context',
+  rdx: 'rdx_context',
   rdx_context: 'rdx_context',
 };
 
@@ -55,10 +95,18 @@ const ASK_DENIED_TOOLS = new Set([
 const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
   ...ASK_READONLY_TOOL_ALLOWLIST,
   'bash',
+  'write_file',
+  'edit_file',
   'ask_user',
   'agent_handoff',
+  'task_create',
+  'task_update',
+  'task_get',
   'task_list',
   'memory_read',
+  'plan_artifact',
+  'skills',
+  'mcp',
   'rdx_context',
 ];
 
@@ -67,8 +115,12 @@ const SHADER_EDIT_TOOLS = ['rd.shader.edit_and_replace', 'rd.macro.shader_hotfix
 export function resolveAgentToolAllowlist(agentId: AgentRole, stage?: WorkflowStage): string[] {
   const settings = settingsService.getAll();
   const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, stage || 'investigate', agentId);
-  const profileTools = runtimeProfile.toolAllowlist?.length
-    ? runtimeProfile.toolAllowlist.flatMap(expandCanonicalToolToken)
+  const manifest = settings.agents.definitions.find((definition) => definition.id === agentId && definition.enabled);
+  const manifestTools = manifest?.tools?.length ? manifest.tools : [];
+  const profileTools = manifestTools.length
+    ? manifestTools.flatMap(expandCanonicalToolToken)
+    : runtimeProfile.toolAllowlist?.length
+      ? runtimeProfile.toolAllowlist.flatMap(expandCanonicalToolToken)
     : agentId === 'ask'
       ? ASK_READONLY_TOOL_ALLOWLIST
       : EXECUTABLE_AGENT_TOOL_ALLOWLIST;

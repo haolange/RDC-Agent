@@ -5,7 +5,7 @@ import type {
   ToolDefinition,
 } from '../core/types';
 
-export type AgentToolPermissionHint = 'readonly' | 'mutation' | 'destructive';
+export type AgentToolPermissionHint = 'readonly' | 'session_mutation' | 'mutation' | 'destructive';
 
 export interface AgentToolResult<TDetails = unknown> {
   content: (TextContent | ImageContent)[];

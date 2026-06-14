@@ -17,6 +17,10 @@ function getModeCapability(modeId: AgentMode, language: string): string {
   switch (modeId) {
     case 'ask':
       return isZh ? '只读对话' : 'Read-only chat';
+    case 'plan':
+      return isZh ? '计划与交接' : 'Plan and handoff';
+    case 'edit':
+      return isZh ? '执行与修改' : 'Edit and execute';
     case 'debugger':
       return isZh ? 'RenderDoc 调试' : 'RenderDoc debugging';
     case 'analyzer':
@@ -159,6 +163,8 @@ export const Composer: React.FC<ComposerProps> = ({
                 {userInvocableAgents.map((agent) => {
                   const agentMode: AgentMode = (
                     agent.id === 'ask'
+                      || agent.id === 'plan'
+                      || agent.id === 'edit'
                       || agent.id === 'debugger'
                       || agent.id === 'analyzer'
                       || agent.id === 'optimizer'

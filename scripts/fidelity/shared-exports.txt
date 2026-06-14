@@ -32,7 +32,6 @@ ConversationApi
 ConversationMessageDiagnosticCode
 ConversationMessageStatus
 ConversationMode
-ConversationReasoningStepStatus
 ConversationRole
 ConversationStreamEvent
 ConversationToolCallStatus

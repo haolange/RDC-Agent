@@ -5,7 +5,7 @@
 ## 标准路径
 
 1. 用户在工作台中补齐项目、capture、设备和问题描述。
-2. 系统完成 `preflight / entry_gate / intake_gate` 等前置检查。
+2. 系统完成 `preflight / entry_gate / speclist` 等前置检查。
 3. `plan` 阶段产出结构化调查计划，并等待用户批准。
 4. `dispatch / investigate / fix_verify / skeptic / curator` 严格按工作流主链推进。
 5. 最终生成报告、证据链和运行记录。

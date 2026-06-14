@@ -596,6 +596,18 @@ export class StorageAdapter {
     return path.join(location.sessionPath, 'session_evidence.yaml');
   }
 
+  writeSessionPlanArtifact(sessionId: string, content: string): string {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) {
+      throw new Error(`Session not found for plan artifact: ${sessionId}`);
+    }
+    const artifactsDir = path.join(location.sessionPath, 'artifacts');
+    this.ensureDir(artifactsDir);
+    const artifactPath = path.join(artifactsDir, 'plan.md');
+    fs.writeFileSync(artifactPath, content, 'utf8');
+    return artifactPath;
+  }
+
   readConversationHistory(sessionId: string): ConversationMessage[] {
     const snapshots = readJsonl<ConversationMessage>(this.getConversationPath(sessionId));
     const latestById = new Map<string, ConversationMessage>();

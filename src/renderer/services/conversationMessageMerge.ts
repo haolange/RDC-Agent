@@ -1,49 +1,73 @@
 import type {
   ConversationMessage,
-  ConversationReasoningTrace,
+  ConversationWorkBlock,
+  ConversationWorkTrace,
 } from '@shared/types/conversation';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ToolTraceEntry } from '@shared/types/tool';
 import { mergeToolExecutionActionEvent } from './conversationActionEventMerge';
 
-const cloneReasoningTrace = (trace: ConversationReasoningTrace | null | undefined): ConversationReasoningTrace => (
+const cloneWorkTrace = (trace: ConversationWorkTrace | null | undefined): ConversationWorkTrace => (
   trace
     ? {
         ...trace,
-        steps: trace.steps.map((step) => ({
-          ...step,
-          toolCalls: step.toolCalls.map((toolCall) => ({ ...toolCall })),
+        blocks: trace.blocks.map((block) => ({
+          ...block,
+          toolCalls: block.toolCalls.map((toolCall) => ({ ...toolCall })),
         })),
       }
     : {
         status: 'idle',
-        steps: [],
+        blocks: [],
         updatedAt: Date.now(),
       }
 );
 
-const upsertReasoningStep = (
-  trace: ConversationReasoningTrace | null | undefined,
-  stepId: string,
+const migrateLegacyTrace = (message: ConversationMessage): ConversationWorkTrace | null => {
+  if (message.workTrace) {
+    return message.workTrace;
+  }
+  // Historical session compatibility boundary. Remove after persisted sessions are migrated to workTrace.
+  const legacyTrace = message.reasoningTrace;
+  if (!legacyTrace) {
+    return null;
+  }
+  return {
+    status: legacyTrace.status,
+    summary: legacyTrace.summary,
+    blocks: legacyTrace.steps.map((step) => ({
+      kind: step.kind ?? (step.toolCalls.length > 0 ? 'tool' : 'reasoning'),
+      ...step,
+    })),
+    updatedAt: legacyTrace.updatedAt,
+  };
+};
+
+const upsertWorkBlock = (
+  trace: ConversationWorkTrace | null | undefined,
+  blockId: string,
   patch: {
+    kind?: ConversationWorkBlock['kind'];
     title: string;
     stage?: string;
-    status: 'pending' | 'running' | 'complete' | 'error';
+    status: ConversationWorkBlock['status'];
     summary?: string;
     detail?: string;
     completedAt?: number;
   },
-): ConversationReasoningTrace => {
-  const nextTrace = cloneReasoningTrace(trace);
-  const nextIndex = nextTrace.steps.findIndex((step) => step.id === stepId);
+): ConversationWorkTrace => {
+  const nextTrace = cloneWorkTrace(trace);
+  const nextIndex = nextTrace.blocks.findIndex((block) => block.id === blockId);
   if (nextIndex >= 0) {
-    nextTrace.steps[nextIndex] = {
-      ...nextTrace.steps[nextIndex],
+    nextTrace.blocks[nextIndex] = {
+      ...nextTrace.blocks[nextIndex],
       ...patch,
+      kind: patch.kind ?? nextTrace.blocks[nextIndex].kind,
     };
   } else {
-    nextTrace.steps.push({
-      id: stepId,
+    nextTrace.blocks.push({
+      id: blockId,
+      kind: patch.kind ?? 'diagnostic',
       title: patch.title,
       stage: patch.stage,
       status: patch.status,
@@ -60,15 +84,16 @@ const upsertReasoningStep = (
 };
 
 export const applyToolTraceToMessage = (message: ConversationMessage, trace: ToolTraceEntry): ConversationMessage => {
-  const nextTrace = upsertReasoningStep(message.reasoningTrace, 'tool-execution', {
+  const nextTrace = upsertWorkBlock(migrateLegacyTrace(message), 'tool-execution', {
+    kind: 'tool',
     title: '工具调用',
-    stage: 'investigate',
+    stage: 'runtime',
     status: trace.result.ok ? 'running' : 'error',
     summary: trace.result.ok ? '正在执行工具调用。' : '工具调用失败。',
   });
-  const step = nextTrace.steps.find((entry) => entry.id === 'tool-execution');
-  if (step) {
-    const existingIndex = step.toolCalls.findIndex((toolCall) => toolCall.id === trace.traceId);
+  const block = nextTrace.blocks.find((entry) => entry.id === 'tool-execution');
+  if (block) {
+    const existingIndex = block.toolCalls.findIndex((toolCall) => toolCall.id === trace.traceId);
     const nextToolCall = {
       id: trace.traceId,
       toolName: trace.toolName,
@@ -83,22 +108,22 @@ export const applyToolTraceToMessage = (message: ConversationMessage, trace: Too
     };
 
     if (existingIndex >= 0) {
-      step.toolCalls[existingIndex] = nextToolCall;
+      block.toolCalls[existingIndex] = nextToolCall;
     } else {
-      step.toolCalls.push(nextToolCall);
+      block.toolCalls.push(nextToolCall);
     }
-    step.status = step.toolCalls.some((toolCall) => toolCall.status === 'error') ? 'error' : 'complete';
-    step.summary = step.status === 'error'
+    block.status = block.toolCalls.some((toolCall) => toolCall.status === 'error') ? 'error' : 'complete';
+    block.summary = block.status === 'error'
       ? '工具调用中出现错误。'
-      : `已记录 ${step.toolCalls.length} 个工具调用。`;
-    step.completedAt = Date.now();
+      : `已记录 ${block.toolCalls.length} 个工具调用。`;
+    block.completedAt = Date.now();
   }
 
-  nextTrace.status = step?.status === 'error' ? 'error' : 'running';
+  nextTrace.status = block?.status === 'error' ? 'error' : 'running';
 
   return {
     ...message,
-    reasoningTrace: nextTrace,
+    workTrace: nextTrace,
     updatedAt: Date.now(),
   };
 };
@@ -108,10 +133,10 @@ export const applyActionEventToMessage = (message: ConversationMessage, event: A
     return message;
   }
 
-  const nextTrace = cloneReasoningTrace(message.reasoningTrace);
+  const nextTrace = cloneWorkTrace(migrateLegacyTrace(message));
   const eventTime = event.ts_ms;
 
-  const toolMerged = mergeToolExecutionActionEvent(message, event, nextTrace, upsertReasoningStep);
+  const toolMerged = mergeToolExecutionActionEvent(message, event, nextTrace, upsertWorkBlock);
   if (toolMerged) {
     return toolMerged;
   }
@@ -121,7 +146,7 @@ export const applyActionEventToMessage = (message: ConversationMessage, event: A
     : typeof event.payload.stage === 'string'
       ? event.payload.stage
       : undefined;
-  const stepId = `${event.event_type}:${stage || event.event_id}`;
+  const blockId = `${event.event_type}:${stage || event.event_id}`;
   const summary = String(
     event.payload.summary
     || event.payload.reason
@@ -131,7 +156,10 @@ export const applyActionEventToMessage = (message: ConversationMessage, event: A
     || event.payload.toStage
     || event.event_type,
   );
-  const nextStepTrace = upsertReasoningStep(nextTrace, stepId, {
+  const nextBlockTrace = upsertWorkBlock(nextTrace, blockId, {
+    kind: event.status === 'error' || event.status === 'blocked' || event.status === 'fail'
+      ? 'diagnostic'
+      : 'output',
     title: stage ? `阶段：${stage}` : event.event_type,
     stage,
     status: event.status === 'error' || event.status === 'blocked' || event.status === 'fail'
@@ -141,13 +169,13 @@ export const applyActionEventToMessage = (message: ConversationMessage, event: A
     detail: JSON.stringify(event.payload, null, 2),
     completedAt: eventTime + event.duration_ms,
   });
-  nextStepTrace.status = event.status === 'error' || event.status === 'blocked' || event.status === 'fail'
+  nextBlockTrace.status = event.status === 'error' || event.status === 'blocked' || event.status === 'fail'
     ? 'error'
     : 'running';
 
   return {
     ...message,
-    reasoningTrace: nextStepTrace,
+    workTrace: nextBlockTrace,
     updatedAt: Date.now(),
   };
 };
