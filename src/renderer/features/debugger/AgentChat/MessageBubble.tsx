@@ -194,22 +194,31 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
           ) : null}
           {handoffs.length > 0 ? (
             <div className="conversation-handoff-actions" data-testid="conversation-handoff-actions">
-              {handoffs.map((handoff, index) => (
-                <button
-                  key={`${handoff.agent}-${handoff.label}-${index}`}
-                  type="button"
-                  className="conversation-handoff-button"
-                  disabled={Boolean(sendingHandoff)}
-                  data-testid={`conversation-handoff-${handoff.agent}`}
-                  onClick={() => {
-                    void sendHandoff(index);
-                  }}
-                  title={handoff.prompt}
-                >
-                  <span>{handoff.label}</span>
-                  <small>{resolveAgentDisplay(handoff.agent, definitions).name}</small>
-                </button>
-              ))}
+              <span className="conversation-handoff-actions-label">Next actions</span>
+              <div className="conversation-handoff-button-row">
+                {handoffs.map((handoff, index) => {
+                  const target = resolveAgentDisplay(handoff.agent, definitions);
+                  return (
+                    <button
+                      key={`${handoff.agent}-${handoff.label}-${index}`}
+                      type="button"
+                      className="conversation-handoff-button"
+                      disabled={Boolean(sendingHandoff)}
+                      data-testid={`conversation-handoff-${handoff.agent}`}
+                      onClick={() => {
+                        void sendHandoff(index);
+                      }}
+                      title={`${handoff.prompt}\nTarget: ${target.name}`}
+                      aria-label={`${handoff.label} (${target.name})`}
+                    >
+                      <span className="conversation-handoff-button-icon" aria-hidden="true">
+                        {target.glyph}
+                      </span>
+                      <span>{handoff.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ) : null}
         </div>

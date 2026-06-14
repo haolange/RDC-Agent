@@ -6,6 +6,9 @@ import type {
   AppSettings,
   AppSettingsPatch,
   AppTheme,
+  AgentPermissionMode,
+  AgentPermissionSettings,
+  AgentRuntimeSettings,
   ConfigurationSettings,
   FontScale,
   LayoutPreferences,
@@ -72,6 +75,9 @@ interface PersistedSettingsPayload {
     rdxCli?: Partial<RdxCliInvokerSettings>;
     rdxActions?: Partial<Record<RdxActionId, Partial<RdxShellActionSettings>>>;
   };
+  agentRuntime?: {
+    permissions?: Partial<AgentPermissionSettings>;
+  };
   configuration?: PersistedConfigurationSettings;
 }
 
@@ -88,6 +94,7 @@ interface NormalizedPersistedSettings {
   profile: ProfileSettings;
   workspace: WorkspaceSettings;
   tooling: ToolingSettings;
+  agentRuntime: AgentRuntimeSettings;
   llm: {
     providers: LlmProviderEntry[];
     agentRoutes: LlmAgentRoute[];
@@ -112,6 +119,7 @@ const RIGHT_DEFAULTS = {
 const VALID_THEMES: AppTheme[] = ['dark', 'light', 'system'];
 const VALID_LANGUAGES: AppLanguage[] = ['zh-CN', 'en'];
 const VALID_FONT_SCALES: FontScale[] = ['small', 'medium', 'large'];
+const VALID_PERMISSION_MODES: AgentPermissionMode[] = ['default', 'auto-review', 'full-access', 'custom'];
 const RETIRED_BUILTIN_MCP_SERVER_IDS = new Set(['builtin.rdc-toolbridge']);
 const EMPTY_PATHS: AppRuntimePaths = {
   workspaceRoot: '',
@@ -199,6 +207,16 @@ const DEFAULT_RDX_ACTIONS: RdxActionSettingsMap = {
 const DEFAULT_TOOLING: ToolingSettings = {
   rdxCli: DEFAULT_RDX_CLI_INVOKER,
   rdxActions: DEFAULT_RDX_ACTIONS,
+};
+
+const DEFAULT_AGENT_RUNTIME: AgentRuntimeSettings = {
+  permissions: {
+    mode: 'default',
+    readableRoots: [],
+    writableRoots: [],
+    allowedCommandPrefixes: [],
+    deniedCommandPrefixes: [],
+  },
 };
 
 function nowIso(): string {
@@ -312,6 +330,47 @@ function sanitizeToolingSettings(value: unknown): ToolingSettings {
   return {
     rdxCli: sanitizeRdxCliInvokerSettings(candidate.rdxCli),
     rdxActions: sanitizeRdxActionsSettings(candidate.rdxActions),
+  };
+}
+
+function sanitizePathList(value: unknown): string[] {
+  return dedupeStrings(
+    sanitizeStringArray(value).map((entry) => path.resolve(expandHomePath(entry))),
+  );
+}
+
+function expandHomePath(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  if (trimmed === '~') return process.env.USERPROFILE || process.env.HOME || trimmed;
+  if (trimmed.startsWith('~/') || trimmed.startsWith('~\\')) {
+    const home = process.env.USERPROFILE || process.env.HOME || '';
+    return home ? path.join(home, trimmed.slice(2)) : trimmed;
+  }
+  return trimmed.replace(/^%USERPROFILE%/i, process.env.USERPROFILE || '%USERPROFILE%');
+}
+
+function sanitizeAgentPermissionSettings(
+  value: unknown,
+  fallback: AgentPermissionSettings = DEFAULT_AGENT_RUNTIME.permissions,
+): AgentPermissionSettings {
+  const candidate = value && typeof value === 'object' ? value as Partial<AgentPermissionSettings> : {};
+  return {
+    mode: pickEnum(candidate.mode, VALID_PERMISSION_MODES, fallback.mode),
+    readableRoots: sanitizePathList(candidate.readableRoots ?? fallback.readableRoots),
+    writableRoots: sanitizePathList(candidate.writableRoots ?? fallback.writableRoots),
+    allowedCommandPrefixes: sanitizeStringArray(candidate.allowedCommandPrefixes ?? fallback.allowedCommandPrefixes),
+    deniedCommandPrefixes: sanitizeStringArray(candidate.deniedCommandPrefixes ?? fallback.deniedCommandPrefixes),
+    configPath: typeof candidate.configPath === 'string' && candidate.configPath.trim()
+      ? path.resolve(expandHomePath(candidate.configPath.trim()))
+      : undefined,
+  };
+}
+
+function sanitizeAgentRuntimeSettings(value: unknown): AgentRuntimeSettings {
+  const candidate = value && typeof value === 'object' ? value as Partial<AgentRuntimeSettings> : {};
+  return {
+    permissions: sanitizeAgentPermissionSettings(candidate.permissions),
   };
 }
 
@@ -489,6 +548,7 @@ function createDefaultPersistedSettings(workspaceRoot = appPathService.getWorksp
       rootPath: workspaceRoot,
     },
     tooling: DEFAULT_TOOLING,
+    agentRuntime: DEFAULT_AGENT_RUNTIME,
     llm: {
       providers: [],
       agentRoutes: createEmptyAgentRoutes(),
@@ -520,6 +580,7 @@ function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspac
       rootPath: workspaceRoot,
     },
     tooling: DEFAULT_TOOLING,
+    agentRuntime: DEFAULT_AGENT_RUNTIME,
     llm: {
       providers: [],
       agentRoutes: createEmptyAgentRoutes(),
@@ -917,6 +978,7 @@ export class SettingsService {
         rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot,
       },
       tooling: sanitizeToolingSettings(candidate.tooling ?? fallback.tooling),
+      agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
       llm: {
         providers: catalogProviders.map((provider) => ({ ...provider, apiKey: '' })),
         agentRoutes: nextRoutes,
@@ -971,6 +1033,7 @@ export class SettingsService {
         rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot,
       },
       tooling: sanitizeToolingSettings(candidate.tooling ?? fallback.tooling),
+      agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
       llm: {
         providers: nextProviders,
         agentRoutes: nextRoutes,
@@ -1055,6 +1118,7 @@ export class SettingsService {
         rootPath: workspaceRoot,
       },
       tooling: normalized.tooling,
+      agentRuntime: normalized.agentRuntime,
       llm: {
         providers: hydratedProviders,
         agentRoutes: normalizeUserRoutes(normalized.llm?.agentRoutes ?? createEmptyAgentRoutes(), hydratedProviders),
@@ -1209,6 +1273,12 @@ export class SettingsService {
         rdxActions: sanitizeRdxActionsSettings({
           ...(currentPersisted.tooling?.rdxActions ?? DEFAULT_RDX_ACTIONS),
           ...(patch.tooling?.rdxActions ?? {}),
+        }),
+      },
+      agentRuntime: {
+        permissions: sanitizeAgentPermissionSettings({
+          ...(currentPersisted.agentRuntime?.permissions ?? DEFAULT_AGENT_RUNTIME.permissions),
+          ...(patch.agentRuntime?.permissions ?? {}),
         }),
       },
       llm: {

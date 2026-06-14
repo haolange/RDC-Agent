@@ -13,6 +13,7 @@
  */
 
 import * as fs from 'fs/promises';
+import * as os from 'os';
 import * as path from 'path';
 import type { AgentTool } from '../../agent/AgentTool';
 import { getWorkspaceRoot, safeResolvePath } from './_shared';
@@ -72,11 +73,15 @@ export const globTool: AgentTool<GlobParams, GlobDetails> = {
     }
 
     const workspaceRoot = getWorkspaceRoot();
+    const externalPattern = params.cwd ? null : splitExternalPattern(params.pattern);
     const baseDir = params.cwd
       ? safeResolvePath(params.cwd, workspaceRoot)
-      : workspaceRoot;
+      : externalPattern
+        ? safeResolvePath(externalPattern.baseDir, workspaceRoot)
+        : workspaceRoot;
+    const pattern = externalPattern?.pattern ?? params.pattern;
 
-    const regex = compileGlob(params.pattern);
+    const regex = compileGlob(pattern);
     const matches: string[] = [];
     let truncated = false;
 
@@ -99,13 +104,13 @@ export const globTool: AgentTool<GlobParams, GlobDetails> = {
 
     const text =
       matches.length === 0
-        ? `(no matches for pattern "${params.pattern}")`
+        ? `(no matches for pattern "${pattern}")`
         : matches.join('\n') + (truncated ? `\n... [truncated at ${MAX_RESULTS}]` : '');
 
     return {
       content: [{ type: 'text', text }],
       details: {
-        pattern: params.pattern,
+        pattern,
         cwd: baseDir,
         matched: matches.length,
         truncated,
@@ -113,6 +118,36 @@ export const globTool: AgentTool<GlobParams, GlobDetails> = {
     };
   },
 };
+
+function expandUserPath(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed === '~') return os.homedir();
+  if (trimmed.startsWith('~/') || trimmed.startsWith('~\\')) {
+    return path.resolve(os.homedir(), trimmed.slice(2));
+  }
+  return trimmed.replace(/^%USERPROFILE%/i, os.homedir());
+}
+
+function splitExternalPattern(pattern: string): { baseDir: string; pattern: string } | null {
+  const expanded = expandUserPath(pattern);
+  if (!path.isAbsolute(expanded)) return null;
+
+  const wildcardIndex = expanded.search(/[*?{[]/);
+  if (wildcardIndex < 0) {
+    return {
+      baseDir: path.dirname(expanded),
+      pattern: path.basename(expanded),
+    };
+  }
+
+  const sepIndex = Math.max(expanded.lastIndexOf('/', wildcardIndex), expanded.lastIndexOf('\\', wildcardIndex));
+  const baseDir = sepIndex > 0 ? expanded.slice(0, sepIndex) : path.parse(expanded).root;
+  const normalizedPattern = expanded.slice(sepIndex + 1).replace(/\\/g, '/');
+  return {
+    baseDir,
+    pattern: normalizedPattern || '*',
+  };
+}
 
 // =====================================================================
 // 内部：轻量 glob → RegExp 编译器

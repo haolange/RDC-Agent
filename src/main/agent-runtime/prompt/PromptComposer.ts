@@ -1,5 +1,6 @@
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
+import type { AgentPermissionSettings } from '@shared/types/settings';
 import type { AppMode, ProjectInputRecord, SessionAttachmentRecord } from '@shared/types/session';
 import type { ConversationMessage } from '@shared/types/conversation';
 import {
@@ -39,6 +40,7 @@ export interface ProfileSystemPromptInput {
   definition: ProfilePromptDefinition;
   routeCapability: AgentRouteCapability;
   allowedToolNames: string[];
+  permissionSettings: AgentPermissionSettings;
 }
 
 export function composeProfileTurnPrompt(input: ProfileTurnPromptInput): string {
@@ -75,17 +77,39 @@ export function composeProfileSystemPrompt(input: ProfileSystemPromptInput): str
     || `You are ${input.definition.agentLabel}. ${input.definition.agentDescription}`;
   const globalInstructions = input.definition.globalInstructions?.trim();
   const routeInstructions = composeRouteCapabilityPrompt(input.routeCapability, input.allowedToolNames);
+  const permissionInstructions = composePermissionPrompt(input.permissionSettings);
 
   return [
     basePrompt,
     '',
     'Show concise visible work summaries and tool results only. Do not reveal hidden chain-of-thought.',
     routeInstructions,
+    permissionInstructions,
     input.routeCapability.toolCallingMode === 'native-structured'
       ? composeRuntimeCatalogPrompt(input.allowedToolNames)
       : '',
     globalInstructions ? `Global Instructions:\n${globalInstructions}` : '',
   ].filter(Boolean).join('\n\n').trim();
+}
+
+function composePermissionPrompt(permissionSettings: AgentPermissionSettings): string {
+  const modeLabel = permissionSettings.mode;
+  const readableRoots = permissionSettings.readableRoots.length > 0
+    ? permissionSettings.readableRoots.join(', ')
+    : 'workspace only unless user approves';
+  const writableRoots = permissionSettings.writableRoots.length > 0
+    ? permissionSettings.writableRoots.join(', ')
+    : 'workspace only unless user approves';
+
+  return [
+    '# Runtime Permission Policy',
+    `Current permission mode: ${modeLabel}.`,
+    `Readable roots: ${readableRoots}.`,
+    `Writable roots: ${writableRoots}.`,
+    'Routine local inspection commands can run when the runtime policy allows them.',
+    'External files, network access, file mutation, destructive shell commands, and unrecognized commands may pause for user approval or auto-review.',
+    'If the runtime denies or requests approval, do not route around the decision with guessed paths or textual tool calls.',
+  ].join('\n');
 }
 
 function composeRouteCapabilityPrompt(
@@ -132,4 +156,3 @@ function composeRuntimeCatalogPrompt(allowedToolNames: string[]): string {
     ...commandLines,
   ].join('\n');
 }
-

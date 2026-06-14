@@ -88,7 +88,6 @@ composer-agent-menu-item-icon
 composer-agent-menu-item-label
 composer-agent-menu-item-tooltip
 composer-agent-menu-popup
-composer-agent-pill-capability
 composer-agent-pill-caret
 composer-agent-pill-icon
 composer-agent-pill-label
@@ -103,6 +102,7 @@ composer-attachments
 composer-footer-bar
 composer-input-row
 composer-shell
+composer-shell-user-input
 composer-textarea
 composer-toolbar-group
 composer-toolbar-group-left
@@ -114,6 +114,15 @@ composer-usage-tooltip
 composer-usage-tooltip-line
 composer-usage-tooltip-line-strong
 composer-usage-value
+composer-user-input-choice
+composer-user-input-choices
+composer-user-input-error
+composer-user-input-freeform
+composer-user-input-header
+composer-user-input-kicker
+composer-user-input-panel
+composer-user-input-submit
+composer-user-input-textarea
 connected
 context-status
 context-status-text
@@ -129,7 +138,10 @@ conversation-bubble-system
 conversation-bubble-text
 conversation-bubble-user
 conversation-handoff-actions
+conversation-handoff-actions-label
 conversation-handoff-button
+conversation-handoff-button-icon
+conversation-handoff-button-row
 conversation-message
 conversation-message-author
 conversation-message-diagnostic
@@ -742,6 +754,9 @@ window-control-maximize
 window-control-minimize
 window-controls
 work-process-body
+work-process-debug-body
+work-process-debug-label
+work-process-debug-section
 work-process-diagnostic-message
 work-process-empty
 work-process-header
@@ -761,6 +776,8 @@ work-process-tool-result
 work-process-tool-summary
 work-process-tool-target
 work-process-tool-verb
+work-process-user-input
+work-process-user-input-question
 workflow-active-agents
 workflow-heading
 workflow-kicker

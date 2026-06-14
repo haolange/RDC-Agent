@@ -74,6 +74,10 @@ function main() {
   assert(orchestrator.includes('route_tool_calling_unsupported'), 'AgentOrchestrator must emit route capability diagnostics.');
   assert(orchestrator.includes('textual_tool_call_not_executed'), 'AgentOrchestrator must normalize textual tool call diagnostics.');
   assert(orchestrator.includes('empty_response_without_tool_call'), 'AgentOrchestrator must normalize empty response diagnostics.');
+  assert(orchestrator.includes('agentPermissionPolicyService.evaluate'), 'AgentOrchestrator must mediate tools through AgentPermissionPolicy.');
+  assert(orchestrator.includes('agentToolApprovalRequestService.request'), 'AgentOrchestrator must pause for tool approval requests.');
+  assert(orchestrator.includes('agentToolApprovalRequestService.autoReview'), 'AgentOrchestrator must emit auto-review decisions.');
+  assert(orchestrator.includes('withTemporaryPathAccess'), 'approved external path access must be scoped to the tool execution.');
 
   assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/LLMAdapterProvider.ts')), 'Legacy LLMAdapterProvider must be removed from agent runtime.');
 
@@ -87,16 +91,24 @@ function main() {
   assert(promptComposer.includes('native structured tool calling is enabled'), 'PromptComposer must include native structured route instructions.');
   assert(promptComposer.includes('This route cannot execute runtime tools'), 'PromptComposer must include text-only/disabled route instructions.');
   assert(promptComposer.includes('composeRuntimeCatalogPrompt'), 'PromptComposer must own runtime catalog prompt composition.');
+  assert(promptComposer.includes('Current permission mode'), 'PromptComposer must describe runtime permission mode to the model.');
+  assert(promptComposer.includes('If the runtime denies or requests approval'), 'PromptComposer must tell the model not to route around permission decisions.');
 
   const conversationService = read('src/main/conversation/ConversationService.ts');
   for (const forbidden of ['buildProfileSystemPrompt', 'buildProfileCatalogPrompt', 'buildProfileTurnPrompt', 'mentionsTextualToolCall', 'traceHasRuntimeToolCalls', 'AGENT_WORKBENCH_TOOL_CATALOG']) {
     assert(!conversationService.includes(forbidden), `ConversationService must not keep legacy prompt/text-tool logic: ${forbidden}.`);
   }
+  for (const forbidden of ['TASK_FILE_PATTERN', 'readFileSync(taskFilePath', 'fs.existsSync(taskFilePath']) {
+    assert(!conversationService.includes(forbidden), `ConversationService must not preload local files outside the tool permission policy: ${forbidden}.`);
+  }
   assert(conversationService.includes('composeProfileSystemPrompt'), 'ConversationService must call PromptComposer for system prompts.');
   assert(conversationService.includes('routeCapability: routePreflight.routeCapability'), 'ConversationService must pass route capability into PromptComposer.');
+  assert(conversationService.includes('permissionSettings: settingsService.getAll().agentRuntime.permissions'), 'ConversationService must pass runtime permission settings into PromptComposer.');
+  assert(conversationService.includes('answerToolApproval'), 'ConversationService must expose tool approval resume.');
 
   const settingsService = read('src/main/settings/SettingsService.ts');
   assert(settingsService.includes('capabilities: definition?.capabilities'), 'Settings normalization must hydrate builtin provider capabilities.');
+  assert(settingsService.includes('agentRuntime'), 'Settings must persist agent runtime permission controls.');
 
   const bridge = read('src/main/agent-runtime/AgentEventBridge.ts');
   assert(bridge.includes('buildDiagnosticAgentEvent'), 'AgentEventBridge must expose normalized diagnostic event construction.');
@@ -111,6 +123,21 @@ function main() {
   for (const token of ['body.tools', 'tool_choice', 'tool_calls']) {
     assert(openai.includes(token), `OpenAI-compatible provider must support ${token}.`);
   }
+
+  const permissionPolicy = read('src/main/agent-runtime/permissions/AgentPermissionPolicy.ts');
+  for (const token of ['full-access', 'auto_review', 'DEFAULT_ROUTINE_COMMAND_PREFIXES', 'readableRoots', 'writableRoots', 'commandUsesExternalPath']) {
+    assert(permissionPolicy.includes(token), `AgentPermissionPolicy must cover ${token}.`);
+  }
+
+  const toolApprovalService = read('src/main/agent-runtime/permissions/AgentToolApprovalRequestService.ts');
+  assert(toolApprovalService.includes('approval.requested'), 'Tool approval service must emit requested events.');
+  assert(toolApprovalService.includes('approval.answered'), 'Tool approval service must emit answered events.');
+
+  const primitiveShared = read('src/main/agent-runtime/tools/primitives/_shared.ts');
+  assert(primitiveShared.includes('withTemporaryPathAccess'), 'Primitive tools must support scoped temporary path access.');
+
+  const globTool = read('src/main/agent-runtime/tools/primitives/GlobTool.ts');
+  assert(globTool.includes('splitExternalPattern'), 'Glob tool must resolve approved external path patterns.');
 
   console.log('[agent-runtime] OK');
 }

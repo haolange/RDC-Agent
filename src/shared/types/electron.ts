@@ -7,6 +7,10 @@ import type { ActionEvent, EventType } from './evidence';
 import type {
   ConversationCancelActiveTurnRequest,
   ConversationCancelActiveTurnResult,
+  ConversationAnswerUserInputRequest,
+  ConversationAnswerUserInputResult,
+  ConversationAnswerToolApprovalRequest,
+  ConversationAnswerToolApprovalResult,
   ConversationMessage,
   ConversationSendRequest,
   ConversationStreamEvent,
@@ -78,6 +82,8 @@ export interface ElectronAPI {
   conversation: {
     sendMessage: (request: ConversationSendRequest) => Promise<ConversationTurnResult>;
     cancelActiveTurn: (request?: ConversationCancelActiveTurnRequest) => Promise<ConversationCancelActiveTurnResult>;
+    answerUserInput: (request: ConversationAnswerUserInputRequest) => Promise<ConversationAnswerUserInputResult>;
+    answerToolApproval: (request: ConversationAnswerToolApprovalRequest) => Promise<ConversationAnswerToolApprovalResult>;
     getHistory: (sessionId: string) => Promise<{
       messages: ConversationMessage[];
     }>;

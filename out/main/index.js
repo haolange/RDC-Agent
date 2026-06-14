@@ -11,6 +11,7 @@ const crypto = require("crypto");
 require("node:fs");
 const path$1 = require("node:path");
 require("node:crypto");
+const os = require("os");
 const fs$1 = require("fs/promises");
 const promises = require("dns/promises");
 const net = require("net");
@@ -35,6 +36,7 @@ function _interopNamespaceDefault(e) {
 const path__namespace = /* @__PURE__ */ _interopNamespaceDefault(path);
 const fs__namespace = /* @__PURE__ */ _interopNamespaceDefault(fs);
 const crypto__namespace = /* @__PURE__ */ _interopNamespaceDefault(crypto);
+const os__namespace = /* @__PURE__ */ _interopNamespaceDefault(os);
 const fs__namespace$1 = /* @__PURE__ */ _interopNamespaceDefault(fs$1);
 const net__namespace = /* @__PURE__ */ _interopNamespaceDefault(net);
 function generateShortId() {
@@ -1826,6 +1828,7 @@ const RIGHT_DEFAULTS = {
 const VALID_THEMES = ["dark", "light", "system"];
 const VALID_LANGUAGES = ["zh-CN", "en"];
 const VALID_FONT_SCALES = ["small", "medium", "large"];
+const VALID_PERMISSION_MODES = ["default", "auto-review", "full-access", "custom"];
 const RETIRED_BUILTIN_MCP_SERVER_IDS = /* @__PURE__ */ new Set(["builtin.rdc-toolbridge"]);
 const EMPTY_PATHS = {
   workspaceRoot: "",
@@ -1905,6 +1908,15 @@ const DEFAULT_RDX_ACTIONS = {
 const DEFAULT_TOOLING = {
   rdxCli: DEFAULT_RDX_CLI_INVOKER,
   rdxActions: DEFAULT_RDX_ACTIONS
+};
+const DEFAULT_AGENT_RUNTIME = {
+  permissions: {
+    mode: "default",
+    readableRoots: [],
+    writableRoots: [],
+    allowedCommandPrefixes: [],
+    deniedCommandPrefixes: []
+  }
 };
 function nowIso() {
   return (/* @__PURE__ */ new Date()).toISOString();
@@ -1991,6 +2003,38 @@ function sanitizeToolingSettings(value) {
   return {
     rdxCli: sanitizeRdxCliInvokerSettings(candidate.rdxCli),
     rdxActions: sanitizeRdxActionsSettings(candidate.rdxActions)
+  };
+}
+function sanitizePathList(value) {
+  return dedupeStrings(
+    sanitizeStringArray(value).map((entry) => path.resolve(expandHomePath(entry)))
+  );
+}
+function expandHomePath(value) {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+  if (trimmed === "~") return process.env.USERPROFILE || process.env.HOME || trimmed;
+  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
+    const home = process.env.USERPROFILE || process.env.HOME || "";
+    return home ? path.join(home, trimmed.slice(2)) : trimmed;
+  }
+  return trimmed.replace(/^%USERPROFILE%/i, process.env.USERPROFILE || "%USERPROFILE%");
+}
+function sanitizeAgentPermissionSettings(value, fallback = DEFAULT_AGENT_RUNTIME.permissions) {
+  const candidate = value && typeof value === "object" ? value : {};
+  return {
+    mode: pickEnum(candidate.mode, VALID_PERMISSION_MODES, fallback.mode),
+    readableRoots: sanitizePathList(candidate.readableRoots ?? fallback.readableRoots),
+    writableRoots: sanitizePathList(candidate.writableRoots ?? fallback.writableRoots),
+    allowedCommandPrefixes: sanitizeStringArray(candidate.allowedCommandPrefixes ?? fallback.allowedCommandPrefixes),
+    deniedCommandPrefixes: sanitizeStringArray(candidate.deniedCommandPrefixes ?? fallback.deniedCommandPrefixes),
+    configPath: typeof candidate.configPath === "string" && candidate.configPath.trim() ? path.resolve(expandHomePath(candidate.configPath.trim())) : void 0
+  };
+}
+function sanitizeAgentRuntimeSettings(value) {
+  const candidate = value && typeof value === "object" ? value : {};
+  return {
+    permissions: sanitizeAgentPermissionSettings(candidate.permissions)
   };
 }
 function readJsonFile(filePath) {
@@ -2134,6 +2178,7 @@ function createDefaultPersistedSettings(workspaceRoot = appPathService.getWorksp
       rootPath: workspaceRoot
     },
     tooling: DEFAULT_TOOLING,
+    agentRuntime: DEFAULT_AGENT_RUNTIME,
     llm: {
       providers: [],
       agentRoutes: createEmptyAgentRoutes()
@@ -2163,6 +2208,7 @@ function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspac
       rootPath: workspaceRoot
     },
     tooling: DEFAULT_TOOLING,
+    agentRuntime: DEFAULT_AGENT_RUNTIME,
     llm: {
       providers: [],
       agentRoutes: createEmptyAgentRoutes()
@@ -2450,6 +2496,7 @@ class SettingsService {
         rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot
       },
       tooling: sanitizeToolingSettings(candidate.tooling ?? fallback.tooling),
+      agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
       llm: {
         providers: catalogProviders.map((provider) => ({ ...provider, apiKey: "" })),
         agentRoutes: nextRoutes
@@ -2496,6 +2543,7 @@ class SettingsService {
         rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot
       },
       tooling: sanitizeToolingSettings(candidate.tooling ?? fallback.tooling),
+      agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
       llm: {
         providers: nextProviders,
         agentRoutes: nextRoutes
@@ -2566,6 +2614,7 @@ class SettingsService {
         rootPath: workspaceRoot
       },
       tooling: normalized.tooling,
+      agentRuntime: normalized.agentRuntime,
       llm: {
         providers: hydratedProviders,
         agentRoutes: normalizeUserRoutes(normalized.llm?.agentRoutes ?? createEmptyAgentRoutes(), hydratedProviders)
@@ -2700,6 +2749,12 @@ class SettingsService {
         rdxActions: sanitizeRdxActionsSettings({
           ...currentPersisted.tooling?.rdxActions ?? DEFAULT_RDX_ACTIONS,
           ...patch.tooling?.rdxActions ?? {}
+        })
+      },
+      agentRuntime: {
+        permissions: sanitizeAgentPermissionSettings({
+          ...currentPersisted.agentRuntime?.permissions ?? DEFAULT_AGENT_RUNTIME.permissions,
+          ...patch.agentRuntime?.permissions ?? {}
         })
       },
       llm: {
@@ -2854,9 +2909,9 @@ class SettingsService {
 const settingsService = new SettingsService();
 class ShellInvocationService {
   activeProcesses = /* @__PURE__ */ new Map();
-  async invoke(request) {
+  async invoke(request2) {
     const startTime = nowMs();
-    const command = request.command.trim();
+    const command = request2.command.trim();
     if (!command) {
       return {
         exitCode: 2,
@@ -2867,18 +2922,18 @@ class ShellInvocationService {
     }
     return new Promise((resolve) => {
       const needsShell = process.platform === "win32" && [".bat", ".cmd"].includes(path.extname(command).toLowerCase());
-      const proc = child_process.spawn(command, request.args ?? [], {
-        cwd: request.cwd || void 0,
+      const proc = child_process.spawn(command, request2.args ?? [], {
+        cwd: request2.cwd || void 0,
         env: {
           ...process.env,
-          ...request.env,
+          ...request2.env,
           PYTHONIOENCODING: "utf-8"
         },
         shell: needsShell,
         windowsHide: true
       });
       const procId = generateEventId("proc");
-      this.activeProcesses.set(procId, { process: proc, runId: request.runId });
+      this.activeProcesses.set(procId, { process: proc, runId: request2.runId });
       let stdout = "";
       let stderr = "";
       let timeoutId = null;
@@ -2894,25 +2949,25 @@ class ShellInvocationService {
         settled = true;
         if (timeoutId) clearTimeout(timeoutId);
         this.activeProcesses.delete(procId);
-        request.abortSignal?.removeEventListener("abort", abortHandler);
+        request2.abortSignal?.removeEventListener("abort", abortHandler);
         resolve(result);
       };
-      if (request.timeoutMs) {
+      if (request2.timeoutMs) {
         timeoutId = setTimeout(() => {
           abortHandler();
           finalize({
             exitCode: 124,
             stdout,
-            stderr: stderr || `Process timeout after ${request.timeoutMs}ms`,
+            stderr: stderr || `Process timeout after ${request2.timeoutMs}ms`,
             duration_ms: nowMs() - startTime
           });
-        }, request.timeoutMs);
+        }, request2.timeoutMs);
       }
-      if (request.abortSignal) {
-        if (request.abortSignal.aborted) {
+      if (request2.abortSignal) {
+        if (request2.abortSignal.aborted) {
           abortHandler();
         } else {
-          request.abortSignal.addEventListener("abort", abortHandler, { once: true });
+          request2.abortSignal.addEventListener("abort", abortHandler, { once: true });
         }
       }
       proc.stdout?.on("data", (data) => {
@@ -5972,6 +6027,19 @@ function formatNotificationBlock(task) {
   ].join("\n");
 }
 path$1.join(".rdc-agent", "cron");
+let temporaryAllowedPathRoots = [];
+async function withTemporaryPathAccess(roots, run) {
+  const previous = temporaryAllowedPathRoots;
+  temporaryAllowedPathRoots = [
+    ...previous,
+    ...roots.map((root) => normalizeInputPath(root))
+  ];
+  try {
+    return await run();
+  } finally {
+    temporaryAllowedPathRoots = previous;
+  }
+}
 function getWorkspaceRoot() {
   const fromEnv = process.env.RDC_WORKSPACE_ROOT?.trim();
   if (fromEnv && fromEnv.length > 0) {
@@ -5979,14 +6047,29 @@ function getWorkspaceRoot() {
   }
   return path__namespace.resolve(process.cwd());
 }
+function normalizeInputPath(input) {
+  const trimmed = input.trim();
+  if (trimmed === "~") return os__namespace.homedir();
+  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
+    return path__namespace.resolve(os__namespace.homedir(), trimmed.slice(2));
+  }
+  return trimmed.replace(/^%USERPROFILE%/i, os__namespace.homedir());
+}
+function isWithinRoot$1(target, root) {
+  if (root === "*") return true;
+  const resolvedRoot = path__namespace.resolve(root);
+  const rel = path__namespace.relative(resolvedRoot, target);
+  return rel === "" || !rel.startsWith("..") && !path__namespace.isAbsolute(rel);
+}
 function safeResolvePath(input, root) {
   if (typeof input !== "string" || input.length === 0) {
     throw new Error("路径不能为空");
   }
   const workspaceRoot = root ?? getWorkspaceRoot();
-  const target = path__namespace.isAbsolute(input) ? path__namespace.resolve(input) : path__namespace.resolve(workspaceRoot, input);
+  const expandedInput = normalizeInputPath(input);
+  const target = path__namespace.isAbsolute(expandedInput) ? path__namespace.resolve(expandedInput) : path__namespace.resolve(workspaceRoot, expandedInput);
   const rel = path__namespace.relative(workspaceRoot, target);
-  if (rel.startsWith("..") || path__namespace.isAbsolute(rel)) {
+  if ((rel.startsWith("..") || path__namespace.isAbsolute(rel)) && !temporaryAllowedPathRoots.some((root2) => isWithinRoot$1(target, root2))) {
     throw new Error(`路径 "${input}" 超出 workspace (${workspaceRoot})`);
   }
   return target;
@@ -6365,8 +6448,10 @@ const globTool = {
       throw new Error("Aborted");
     }
     const workspaceRoot = getWorkspaceRoot();
-    const baseDir = params.cwd ? safeResolvePath(params.cwd, workspaceRoot) : workspaceRoot;
-    const regex = compileGlob(params.pattern);
+    const externalPattern = params.cwd ? null : splitExternalPattern(params.pattern);
+    const baseDir = params.cwd ? safeResolvePath(params.cwd, workspaceRoot) : externalPattern ? safeResolvePath(externalPattern.baseDir, workspaceRoot) : workspaceRoot;
+    const pattern = externalPattern?.pattern ?? params.pattern;
+    const regex = compileGlob(pattern);
     const matches = [];
     let truncated = false;
     await walk(baseDir, baseDir, async (relPath) => {
@@ -6384,12 +6469,12 @@ const globTool = {
       return true;
     });
     matches.sort();
-    const text = matches.length === 0 ? `(no matches for pattern "${params.pattern}")` : matches.join("\n") + (truncated ? `
+    const text = matches.length === 0 ? `(no matches for pattern "${pattern}")` : matches.join("\n") + (truncated ? `
 ... [truncated at ${MAX_RESULTS}]` : "");
     return {
       content: [{ type: "text", text }],
       details: {
-        pattern: params.pattern,
+        pattern,
         cwd: baseDir,
         matched: matches.length,
         truncated
@@ -6397,6 +6482,32 @@ const globTool = {
     };
   }
 };
+function expandUserPath(value) {
+  const trimmed = value.trim();
+  if (trimmed === "~") return os__namespace.homedir();
+  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
+    return path__namespace.resolve(os__namespace.homedir(), trimmed.slice(2));
+  }
+  return trimmed.replace(/^%USERPROFILE%/i, os__namespace.homedir());
+}
+function splitExternalPattern(pattern) {
+  const expanded = expandUserPath(pattern);
+  if (!path__namespace.isAbsolute(expanded)) return null;
+  const wildcardIndex = expanded.search(/[*?{[]/);
+  if (wildcardIndex < 0) {
+    return {
+      baseDir: path__namespace.dirname(expanded),
+      pattern: path__namespace.basename(expanded)
+    };
+  }
+  const sepIndex = Math.max(expanded.lastIndexOf("/", wildcardIndex), expanded.lastIndexOf("\\", wildcardIndex));
+  const baseDir = sepIndex > 0 ? expanded.slice(0, sepIndex) : path__namespace.parse(expanded).root;
+  const normalizedPattern = expanded.slice(sepIndex + 1).replace(/\\/g, "/");
+  return {
+    baseDir,
+    pattern: normalizedPattern || "*"
+  };
+}
 function compileGlob(pattern) {
   let i = 0;
   let out = "^";
@@ -8965,6 +9076,481 @@ function toolResultToSharedResult(result, durationMs) {
     trace_id: result.toolCallId
   };
 }
+const normalizeOption = (value) => {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  return text ? text : null;
+};
+const normalizeQuestion = (value) => {
+  const text = value.trim();
+  return text || "The agent needs user input before continuing.";
+};
+const keyFor$1 = (turnId, toolCallId) => `${turnId}::${toolCallId}`;
+class AgentUserInputRequestService {
+  pending = /* @__PURE__ */ new Map();
+  async request(input) {
+    const turnId = input.turnId?.trim();
+    if (!turnId) {
+      throw new Error("ask_user requires an active conversation turn.");
+    }
+    const toolCallId = input.toolCallId.trim();
+    if (!toolCallId) {
+      throw new Error("ask_user requires a tool call id.");
+    }
+    const key = keyFor$1(turnId, toolCallId);
+    this.cancelPending(key, "Superseded by a new user input request.");
+    const question = normalizeQuestion(input.question);
+    const options = (input.options ?? []).map(normalizeOption).filter((entry) => Boolean(entry));
+    const approvalId = `ask-user-${toolCallId}`;
+    return new Promise((resolve, reject) => {
+      const pending = {
+        agentId: input.agentId,
+        sessionId: input.sessionId ?? null,
+        turnId,
+        toolCallId,
+        approvalId,
+        question,
+        options,
+        context: input.context,
+        onEvent: input.onEvent,
+        resolve,
+        reject,
+        signal: input.signal
+      };
+      if (input.signal) {
+        if (input.signal.aborted) {
+          reject(new Error("User input request was cancelled."));
+          return;
+        }
+        pending.abortListener = () => {
+          this.cancelPending(key, "User input request was cancelled.");
+        };
+        input.signal.addEventListener("abort", pending.abortListener, { once: true });
+      }
+      this.pending.set(key, pending);
+      this.emit(pending, "approval.requested", {
+        approvalId,
+        title: "User input requested",
+        status: "pending",
+        kind: "ask_user",
+        toolCallId,
+        toolName: "ask_user",
+        question,
+        options
+      });
+    });
+  }
+  answer(input) {
+    const answer = input.answer.trim();
+    if (!answer) {
+      return { success: false, error: "Answer cannot be empty." };
+    }
+    const pending = this.pending.get(keyFor$1(input.turnId, input.toolCallId));
+    if (!pending) {
+      return { success: false, error: "No pending user input request was found for this turn." };
+    }
+    if (input.sessionId && pending.sessionId && input.sessionId !== pending.sessionId) {
+      return { success: false, error: "Pending user input request belongs to a different session." };
+    }
+    this.deletePending(pending);
+    this.emit(pending, "approval.answered", {
+      approvalId: pending.approvalId,
+      title: "User input answered",
+      status: "approved",
+      kind: "ask_user",
+      toolCallId: pending.toolCallId,
+      toolName: "ask_user",
+      question: pending.question,
+      answer
+    });
+    pending.resolve(answer);
+    return { success: true };
+  }
+  cancelTurn(turnId) {
+    if (!turnId) return;
+    for (const [key, pending] of Array.from(this.pending.entries())) {
+      if (pending.turnId === turnId) {
+        this.cancelPending(key, "User input request was cancelled.");
+      }
+    }
+  }
+  cancelPending(key, reason) {
+    const pending = this.pending.get(key);
+    if (!pending) return;
+    this.deletePending(pending);
+    this.emit(pending, "approval.answered", {
+      approvalId: pending.approvalId,
+      title: "User input cancelled",
+      status: "cancelled",
+      kind: "ask_user",
+      toolCallId: pending.toolCallId,
+      toolName: "ask_user",
+      question: pending.question,
+      answer: reason
+    });
+    pending.reject(new Error(reason));
+  }
+  deletePending(pending) {
+    this.pending.delete(keyFor$1(pending.turnId, pending.toolCallId));
+    if (pending.abortListener && pending.signal) {
+      pending.signal.removeEventListener("abort", pending.abortListener);
+    }
+  }
+  emit(pending, type, payload) {
+    pending.onEvent?.(buildSharedAgentEvent(type, payload, pending.context));
+  }
+}
+const agentUserInputRequestService = new AgentUserInputRequestService();
+const READ_ONLY_FILE_TOOLS = /* @__PURE__ */ new Set(["read_file", "glob", "grep"]);
+const MUTATION_TOOLS = /* @__PURE__ */ new Set(["write_file", "edit_file"]);
+const NETWORK_TOOL_NAMES = /* @__PURE__ */ new Set(["web_fetch", "web_search"]);
+const DEFAULT_ROUTINE_COMMAND_PREFIXES = [
+  "dir",
+  "ls",
+  "type",
+  "cat",
+  "pwd",
+  "head",
+  "tail",
+  "findstr",
+  "find ",
+  "where",
+  "echo",
+  "git status",
+  "git diff",
+  "git show",
+  "git log",
+  "rg",
+  "node scripts/check-",
+  "npm run check:",
+  "npm run typecheck"
+];
+const DANGEROUS_COMMAND_PATTERNS = [
+  /\brm\b/i,
+  /\brmdir\b/i,
+  /\bdel\b/i,
+  /\berase\b/i,
+  /\bmove\b/i,
+  /\bcopy\b/i,
+  /\bren\b/i,
+  /\brename\b/i,
+  /\bset-content\b/i,
+  /\badd-content\b/i,
+  /\bremove-item\b/i,
+  /\binvoke-webrequest\b/i,
+  /\bcurl\b/i,
+  /\bwget\b/i,
+  /\bssh\b/i,
+  /\bscp\b/i,
+  /\bformat\b/i,
+  /\bshutdown\b/i,
+  /\breg\b/i,
+  />\s*[^&|]/,
+  />>/
+];
+function normalizeToolName$1(name) {
+  return name.trim().toLowerCase().replace(/[.-]/g, "_");
+}
+function expandPath(value) {
+  const trimmed = value.trim();
+  if (trimmed === "~") return os__namespace.homedir();
+  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
+    return path__namespace.resolve(os__namespace.homedir(), trimmed.slice(2));
+  }
+  return trimmed.replace(/^%USERPROFILE%/i, os__namespace.homedir());
+}
+function resolveConfiguredRoot(value) {
+  return path__namespace.resolve(expandPath(value));
+}
+function resolveToolTarget(value, workspaceRoot) {
+  const expanded = expandPath(value);
+  return path__namespace.isAbsolute(expanded) ? path__namespace.resolve(expanded) : path__namespace.resolve(workspaceRoot, expanded);
+}
+function isWithinRoot(target, root) {
+  if (root === "*") return true;
+  const rel = path__namespace.relative(path__namespace.resolve(root), path__namespace.resolve(target));
+  return rel === "" || !rel.startsWith("..") && !path__namespace.isAbsolute(rel);
+}
+function isInsideWorkspace(target, workspaceRoot) {
+  return isWithinRoot(target, workspaceRoot);
+}
+function extractStringArg(toolCall, key) {
+  const value = toolCall.arguments[key];
+  return typeof value === "string" ? value.trim() : "";
+}
+function inferPathTargetFromGlobPattern(pattern) {
+  const expanded = expandPath(pattern);
+  if (!path__namespace.isAbsolute(expanded)) return "";
+  const wildcardIndex = expanded.search(/[*?{[]/);
+  if (wildcardIndex < 0) return expanded;
+  const sepIndex = Math.max(expanded.lastIndexOf("/", wildcardIndex), expanded.lastIndexOf("\\", wildcardIndex));
+  return sepIndex > 0 ? expanded.slice(0, sepIndex) : path__namespace.parse(expanded).root;
+}
+function extractPathTargets(toolName, toolCall) {
+  if (toolName === "read_file" || toolName === "write_file" || toolName === "edit_file") {
+    const filePath = extractStringArg(toolCall, "path");
+    return filePath ? [filePath] : [];
+  }
+  if (toolName === "glob" || toolName === "grep") {
+    const cwd = extractStringArg(toolCall, "cwd") || extractStringArg(toolCall, "path");
+    if (cwd) return [cwd];
+    const patternTarget = toolName === "glob" ? inferPathTargetFromGlobPattern(extractStringArg(toolCall, "pattern")) : "";
+    return patternTarget ? [patternTarget] : [];
+  }
+  return [];
+}
+function commandUsesExternalPath(command, workspaceRoot, roots) {
+  const normalized = command.replace(/\\/g, "/");
+  const home = os__namespace.homedir().replace(/\\/g, "/");
+  const workspace = workspaceRoot.replace(/\\/g, "/");
+  const mentionsHome = normalized.includes("~/") || normalized.toLowerCase().includes(home.toLowerCase());
+  const mentionsOtherRoot = roots.some((root) => normalized.toLowerCase().includes(root.replace(/\\/g, "/").toLowerCase()));
+  const absoluteMentions = [
+    ...normalized.matchAll(/[A-Za-z]:\/[^\s"'|&;]+/g),
+    ...normalized.matchAll(/\/(?:Users|home|Desktop|tmp|var|etc|opt)\/[^\s"'|&;]*/g),
+    ...normalized.matchAll(/(^|\s)\/(?=\s|$)/g)
+  ].map((match) => match[0].trim()).filter(Boolean);
+  const mentionsExternalAbsolutePath = absoluteMentions.some((candidate) => !candidate.toLowerCase().startsWith(workspace.toLowerCase()));
+  if (!mentionsHome && !mentionsOtherRoot && !mentionsExternalAbsolutePath) return false;
+  return !normalized.toLowerCase().includes(workspace.toLowerCase());
+}
+function isCommandDeniedByRule(command, permissions) {
+  const normalized = command.trim().toLowerCase();
+  return permissions.deniedCommandPrefixes.some((prefix) => normalized.startsWith(prefix.trim().toLowerCase()));
+}
+function isCommandAllowedByRule(command, permissions) {
+  const normalized = command.trim().toLowerCase();
+  return permissions.allowedCommandPrefixes.some((prefix) => normalized.startsWith(prefix.trim().toLowerCase()));
+}
+function isRoutineCommand(command, permissions) {
+  if (isCommandAllowedByRule(command, permissions)) return true;
+  const normalized = command.trim().toLowerCase();
+  return DEFAULT_ROUTINE_COMMAND_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+}
+function isDangerousCommand(command) {
+  return DANGEROUS_COMMAND_PATTERNS.some((pattern) => pattern.test(command));
+}
+function denied(reason, risk = "high") {
+  return { action: "deny", reason, risk, temporaryPathRoots: [] };
+}
+function request(mode, reason, risk, temporaryPathRoots = []) {
+  if (mode === "auto-review") {
+    return { action: "auto_review", reason, risk, temporaryPathRoots };
+  }
+  return { action: "ask_user", reason, risk, temporaryPathRoots };
+}
+class AgentPermissionPolicyService {
+  evaluate(input) {
+    const settings = settingsService.getAll();
+    const permissions = settings.agentRuntime.permissions;
+    const mode = permissions.mode;
+    const toolName = normalizeToolName$1(input.toolCall.name);
+    const workspaceRoot = path__namespace.resolve(settings.workspace.rootPath || process.cwd());
+    if (mode === "full-access") {
+      return { action: "allow", risk: "low", temporaryPathRoots: ["*"] };
+    }
+    if (isCommandDeniedByRule(extractStringArg(input.toolCall, "command"), permissions)) {
+      return denied("Custom policy denied this command prefix.");
+    }
+    const configuredReadableRoots = permissions.readableRoots.map(resolveConfiguredRoot);
+    const configuredWritableRoots = permissions.writableRoots.map(resolveConfiguredRoot);
+    if (READ_ONLY_FILE_TOOLS.has(toolName)) {
+      const targets = extractPathTargets(toolName, input.toolCall).map((target) => resolveToolTarget(target, workspaceRoot));
+      const externalTargets = targets.filter((target) => !isInsideWorkspace(target, workspaceRoot));
+      if (externalTargets.length === 0) {
+        return { action: "allow", risk: "low", temporaryPathRoots: [] };
+      }
+      const allowedTargets = externalTargets.filter((target) => configuredReadableRoots.some((root) => isWithinRoot(target, root)));
+      if (allowedTargets.length === externalTargets.length) {
+        return { action: "allow", risk: "low", temporaryPathRoots: allowedTargets };
+      }
+      return request(
+        mode,
+        `Read access is outside the workspace: ${externalTargets.join(", ")}`,
+        "medium",
+        externalTargets
+      );
+    }
+    if (toolName === "bash") {
+      const command = extractStringArg(input.toolCall, "command");
+      if (!command) return denied("Shell command is empty.", "medium");
+      if (isCommandAllowedByRule(command, permissions)) {
+        return { action: "allow", risk: "low", temporaryPathRoots: [] };
+      }
+      if (isDangerousCommand(command)) {
+        return request(mode, `Shell command requires review: ${command}`, "high");
+      }
+      if (commandUsesExternalPath(command, workspaceRoot, configuredReadableRoots)) {
+        return request(mode, `Shell command references paths outside the workspace: ${command}`, "medium");
+      }
+      if (isRoutineCommand(command, permissions)) {
+        return { action: "allow", risk: "low", temporaryPathRoots: [] };
+      }
+      return request(mode, `Shell command is not in the routine command set: ${command}`, "medium");
+    }
+    if (MUTATION_TOOLS.has(toolName) || input.tool.permissionHint === "mutation" || input.tool.permissionHint === "destructive") {
+      const targets = extractPathTargets(toolName, input.toolCall).map((target) => resolveToolTarget(target, workspaceRoot));
+      const externalTargets = targets.filter((target) => !isInsideWorkspace(target, workspaceRoot));
+      if (mode === "custom" && externalTargets.length > 0) {
+        const allowedTargets = externalTargets.filter((target) => configuredWritableRoots.some((root) => isWithinRoot(target, root)));
+        if (allowedTargets.length === externalTargets.length) {
+          return { action: "allow", risk: "medium", temporaryPathRoots: allowedTargets };
+        }
+      }
+      return request(
+        mode,
+        externalTargets.length > 0 ? `Write access is outside the workspace: ${externalTargets.join(", ")}` : `Tool "${input.toolCall.name}" can modify workspace files.`,
+        "high",
+        externalTargets
+      );
+    }
+    if (NETWORK_TOOL_NAMES.has(toolName) && mode !== "custom") {
+      return request(mode, `Network tool "${input.toolCall.name}" requires approval in the current permission mode.`, "medium");
+    }
+    return { action: "allow", risk: "low", temporaryPathRoots: [] };
+  }
+}
+const agentPermissionPolicyService = new AgentPermissionPolicyService();
+const keyFor = (turnId, approvalId) => `${turnId}::${approvalId}`;
+class AgentToolApprovalRequestService {
+  pending = /* @__PURE__ */ new Map();
+  async request(input) {
+    const turnId = input.turnId?.trim();
+    if (!turnId) {
+      throw new Error("Tool approval requires an active conversation turn.");
+    }
+    const approvalId = `tool-approval-${input.toolCallId}`;
+    const key = keyFor(turnId, approvalId);
+    this.cancelPending(key, "Superseded by a new approval request.");
+    return new Promise((resolve, reject) => {
+      const pending = {
+        ...input,
+        sessionId: input.sessionId ?? null,
+        turnId,
+        approvalId,
+        resolve,
+        reject
+      };
+      if (input.signal) {
+        if (input.signal.aborted) {
+          reject(new Error("Tool approval request was cancelled."));
+          return;
+        }
+        pending.abortListener = () => {
+          this.cancelPending(key, "Tool approval request was cancelled.");
+        };
+        input.signal.addEventListener("abort", pending.abortListener, { once: true });
+      }
+      this.pending.set(key, pending);
+      this.emit(pending, "approval.requested", {
+        approvalId,
+        title: `Approve ${input.toolName}`,
+        status: "pending",
+        reason: input.reason,
+        kind: "tool",
+        toolCallId: input.toolCallId,
+        toolName: input.toolName,
+        question: input.reason,
+        options: ["Approve once", "Deny"],
+        risk: input.risk
+      });
+    });
+  }
+  autoReview(input) {
+    const approved = input.risk === "low";
+    const approvalId = `auto-review-${input.toolCallId}`;
+    const synthetic = {
+      ...input,
+      sessionId: input.sessionId ?? null,
+      turnId: input.turnId?.trim() || "auto-review",
+      approvalId,
+      resolve: () => void 0,
+      reject: () => void 0
+    };
+    this.emit(synthetic, "approval.requested", {
+      approvalId,
+      title: `Auto-review ${input.toolName}`,
+      status: "pending",
+      reason: input.reason,
+      kind: "tool",
+      toolCallId: input.toolCallId,
+      toolName: input.toolName,
+      risk: input.risk,
+      reviewer: "auto_review"
+    });
+    this.emit(synthetic, "approval.answered", {
+      approvalId,
+      title: `Auto-review ${input.toolName}`,
+      status: approved ? "approved" : "rejected",
+      reason: input.reason,
+      kind: "tool",
+      toolCallId: input.toolCallId,
+      toolName: input.toolName,
+      answer: approved ? "Auto-review approved this low-risk action." : "Auto-review denied this action. Use a safer workspace-scoped path or switch permissions.",
+      risk: input.risk,
+      reviewer: "auto_review"
+    });
+    return approved;
+  }
+  answer(input) {
+    const pending = this.pending.get(keyFor(input.turnId, input.approvalId));
+    if (!pending) {
+      return { success: false, error: "No pending approval request was found for this turn." };
+    }
+    if (input.sessionId && pending.sessionId && input.sessionId !== pending.sessionId) {
+      return { success: false, error: "Pending approval request belongs to a different session." };
+    }
+    this.deletePending(pending);
+    this.emit(pending, "approval.answered", {
+      approvalId: pending.approvalId,
+      title: `Approve ${pending.toolName}`,
+      status: input.approved ? "approved" : "rejected",
+      reason: pending.reason,
+      kind: "tool",
+      toolCallId: pending.toolCallId,
+      toolName: pending.toolName,
+      answer: input.approved ? "Approved once." : "Denied by user.",
+      risk: pending.risk
+    });
+    pending.resolve(input.approved);
+    return { success: true };
+  }
+  cancelTurn(turnId) {
+    if (!turnId) return;
+    for (const [key, pending] of Array.from(this.pending.entries())) {
+      if (pending.turnId === turnId) {
+        this.cancelPending(key, "Tool approval request was cancelled.");
+      }
+    }
+  }
+  cancelPending(key, reason) {
+    const pending = this.pending.get(key);
+    if (!pending) return;
+    this.deletePending(pending);
+    this.emit(pending, "approval.answered", {
+      approvalId: pending.approvalId,
+      title: `Approve ${pending.toolName}`,
+      status: "cancelled",
+      reason: pending.reason,
+      kind: "tool",
+      toolCallId: pending.toolCallId,
+      toolName: pending.toolName,
+      answer: reason,
+      risk: pending.risk
+    });
+    pending.reject(new Error(reason));
+  }
+  deletePending(pending) {
+    this.pending.delete(keyFor(pending.turnId, pending.approvalId));
+    if (pending.abortListener && pending.signal) {
+      pending.signal.removeEventListener("abort", pending.abortListener);
+    }
+  }
+  emit(pending, type, payload) {
+    pending.onEvent?.(buildSharedAgentEvent(type, payload, pending.context));
+  }
+}
+const agentToolApprovalRequestService = new AgentToolApprovalRequestService();
 let currentRuntimeContext = null;
 function setRdxRuntimeContext(runtimeContext) {
   currentRuntimeContext = runtimeContext ? { ...runtimeContext, raw: { ...runtimeContext.raw } } : null;
@@ -9264,16 +9850,16 @@ class BaseStreamingProvider {
   constructor(name) {
     this.name = name;
   }
-  async streamChat(request, onChunk) {
+  async streamChat(request2, onChunk) {
     try {
-      const response = await this.performStreamingChat(request, onChunk);
+      const response = await this.performStreamingChat(request2, onChunk);
       onChunk({ type: "done" });
       return response;
     } catch (error) {
-      if (request.signal?.aborted) {
+      if (request2.signal?.aborted) {
         throw error;
       }
-      const fallbackResponse = await this.chat(request);
+      const fallbackResponse = await this.chat(request2);
       const fallbackText = typeof fallbackResponse.content === "string" ? fallbackResponse.content : JSON.stringify(fallbackResponse.content);
       emitFallbackChunks(fallbackText, onChunk);
       onChunk({ type: "done" });
@@ -9293,8 +9879,8 @@ class OpenRouterProvider extends BaseStreamingProvider {
     this.baseUrl = normalizeOpenRouterBaseUrl(config.baseUrl || "https://openrouter.ai/api/v1");
     this.models = config.models;
   }
-  async chat(request) {
-    const model = request.model?.trim();
+  async chat(request2) {
+    const model = request2.model?.trim();
     if (!model) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
@@ -9306,15 +9892,15 @@ class OpenRouterProvider extends BaseStreamingProvider {
         "HTTP-Referer": "https://rdcagent.local",
         "X-Title": "RdcAgent"
       },
-      signal: request.signal,
+      signal: request2.signal,
       body: JSON.stringify({
         model,
-        messages: toContentBlocks(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        reasoning_effort: toOpenAiReasoningEffort(request.reasoningBudget),
-        tools: toOpenAiTools(request.tools),
-        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
+        messages: toContentBlocks(request2.messages),
+        max_tokens: request2.maxTokens || 4096,
+        temperature: request2.temperature ?? 0.7,
+        reasoning_effort: toOpenAiReasoningEffort(request2.reasoningBudget),
+        tools: toOpenAiTools(request2.tools),
+        response_format: request2.responseFormat ? { type: request2.responseFormat } : void 0,
         stream: false
       })
     });
@@ -9336,8 +9922,8 @@ class OpenRouterProvider extends BaseStreamingProvider {
       stopReason: mapFinishReason(choice?.finish_reason)
     };
   }
-  async performStreamingChat(request, onChunk) {
-    const model = request.model?.trim();
+  async performStreamingChat(request2, onChunk) {
+    const model = request2.model?.trim();
     if (!model) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
@@ -9349,15 +9935,15 @@ class OpenRouterProvider extends BaseStreamingProvider {
         "HTTP-Referer": "https://rdcagent.local",
         "X-Title": "RdcAgent"
       },
-      signal: request.signal,
+      signal: request2.signal,
       body: JSON.stringify({
         model,
-        messages: toContentBlocks(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        reasoning_effort: toOpenAiReasoningEffort(request.reasoningBudget),
-        tools: toOpenAiTools(request.tools),
-        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
+        messages: toContentBlocks(request2.messages),
+        max_tokens: request2.maxTokens || 4096,
+        temperature: request2.temperature ?? 0.7,
+        reasoning_effort: toOpenAiReasoningEffort(request2.reasoningBudget),
+        tools: toOpenAiTools(request2.tools),
+        response_format: request2.responseFormat ? { type: request2.responseFormat } : void 0,
         stream: true
       })
     });
@@ -9445,23 +10031,23 @@ class OpenAICompatibleProvider2 extends BaseStreamingProvider {
   describeApiError(status, text) {
     return `${this.name} API error: ${status} - ${text}`;
   }
-  async chat(request) {
-    const model = request.model?.trim();
+  async chat(request2) {
+    const model = request2.model?.trim();
     if (!model) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
     const response = await fetch(this.createChatCompletionsUrl(), {
       method: "POST",
       headers: this.createHeaders(),
-      signal: request.signal,
+      signal: request2.signal,
       body: JSON.stringify({
         model,
-        messages: toContentBlocks(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        reasoning_effort: toOpenAiReasoningEffort(request.reasoningBudget),
-        tools: toOpenAiTools(request.tools),
-        response_format: request.responseFormat ? { type: request.responseFormat } : void 0
+        messages: toContentBlocks(request2.messages),
+        max_tokens: request2.maxTokens || 4096,
+        temperature: request2.temperature ?? 0.7,
+        reasoning_effort: toOpenAiReasoningEffort(request2.reasoningBudget),
+        tools: toOpenAiTools(request2.tools),
+        response_format: request2.responseFormat ? { type: request2.responseFormat } : void 0
       })
     });
     if (!response.ok) {
@@ -9482,23 +10068,23 @@ class OpenAICompatibleProvider2 extends BaseStreamingProvider {
       stopReason: mapFinishReason(choice?.finish_reason)
     };
   }
-  async performStreamingChat(request, onChunk) {
-    const model = request.model?.trim();
+  async performStreamingChat(request2, onChunk) {
+    const model = request2.model?.trim();
     if (!model) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
     const response = await fetch(this.createChatCompletionsUrl(), {
       method: "POST",
       headers: this.createHeaders(),
-      signal: request.signal,
+      signal: request2.signal,
       body: JSON.stringify({
         model,
-        messages: toContentBlocks(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        reasoning_effort: toOpenAiReasoningEffort(request.reasoningBudget),
-        tools: toOpenAiTools(request.tools),
-        response_format: request.responseFormat ? { type: request.responseFormat } : void 0,
+        messages: toContentBlocks(request2.messages),
+        max_tokens: request2.maxTokens || 4096,
+        temperature: request2.temperature ?? 0.7,
+        reasoning_effort: toOpenAiReasoningEffort(request2.reasoningBudget),
+        tools: toOpenAiTools(request2.tools),
+        response_format: request2.responseFormat ? { type: request2.responseFormat } : void 0,
         stream: true
       })
     });
@@ -9584,25 +10170,25 @@ class ChatGptAccountProvider extends BaseStreamingProvider {
   createResponsesUrl() {
     return this.baseUrl.endsWith("/responses") ? this.baseUrl : `${this.baseUrl}/responses`;
   }
-  createBody(request, model, stream) {
+  createBody(request2, model, stream) {
     return {
       model,
-      input: toResponsesInput(request.messages),
-      max_output_tokens: request.maxTokens || 4096,
-      temperature: request.temperature ?? 0.7,
+      input: toResponsesInput(request2.messages),
+      max_output_tokens: request2.maxTokens || 4096,
+      temperature: request2.temperature ?? 0.7,
       stream
     };
   }
-  async chat(request) {
-    const model = request.model?.trim();
+  async chat(request2) {
+    const model = request2.model?.trim();
     if (!model) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
     const response = await fetch(this.createResponsesUrl(), {
       method: "POST",
       headers: this.createHeaders(),
-      signal: request.signal,
-      body: JSON.stringify(this.createBody(request, model, false))
+      signal: request2.signal,
+      body: JSON.stringify(this.createBody(request2, model, false))
     });
     if (!response.ok) {
       throw new Error(`ChatGPT Account API error: ${response.status} - ${await response.text()}`);
@@ -9616,16 +10202,16 @@ class ChatGptAccountProvider extends BaseStreamingProvider {
       stopReason: mapFinishReason(typeof payload.status === "string" ? payload.status : void 0)
     };
   }
-  async performStreamingChat(request, onChunk) {
-    const model = request.model?.trim();
+  async performStreamingChat(request2, onChunk) {
+    const model = request2.model?.trim();
     if (!model) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
     const response = await fetch(this.createResponsesUrl(), {
       method: "POST",
       headers: this.createHeaders(),
-      signal: request.signal,
-      body: JSON.stringify(this.createBody(request, model, true))
+      signal: request2.signal,
+      body: JSON.stringify(this.createBody(request2, model, true))
     });
     if (!response.ok) {
       throw new Error(`ChatGPT Account API error: ${response.status} - ${await response.text()}`);
@@ -9734,27 +10320,27 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
       "Content-Type": "application/json"
     };
   }
-  async chat(request) {
-    const model = request.model?.trim();
+  async chat(request2) {
+    const model = request2.model?.trim();
     if (!model) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
     const response = await fetch(this.createGenerateContentUrl(model), {
       method: "POST",
       headers: this.createHeaders(),
-      signal: request.signal,
+      signal: request2.signal,
       body: JSON.stringify({
-        contents: request.messages.filter((message) => message.role !== "system").map((message) => ({
+        contents: request2.messages.filter((message) => message.role !== "system").map((message) => ({
           role: message.role === "assistant" ? "model" : "user",
           parts: [{ text: typeof message.content === "string" ? message.content : JSON.stringify(message.content) }]
         })),
         generationConfig: {
-          maxOutputTokens: request.maxTokens || 4096,
-          temperature: request.temperature ?? 0.7,
-          thinkingConfig: toGoogleThinkingConfig(request.reasoningBudget)
+          maxOutputTokens: request2.maxTokens || 4096,
+          temperature: request2.temperature ?? 0.7,
+          thinkingConfig: toGoogleThinkingConfig(request2.reasoningBudget)
         },
-        systemInstruction: request.messages.some((message) => message.role === "system") ? {
-          parts: request.messages.filter((message) => message.role === "system").map((message) => ({ text: typeof message.content === "string" ? message.content : JSON.stringify(message.content) }))
+        systemInstruction: request2.messages.some((message) => message.role === "system") ? {
+          parts: request2.messages.filter((message) => message.role === "system").map((message) => ({ text: typeof message.content === "string" ? message.content : JSON.stringify(message.content) }))
         } : void 0
       })
     });
@@ -9774,8 +10360,8 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
       stopReason: "end_turn"
     };
   }
-  async performStreamingChat(request, onChunk) {
-    const response = await this.chat(request);
+  async performStreamingChat(request2, onChunk) {
+    const response = await this.chat(request2);
     const text = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
     emitTextChunk(text, onChunk);
     return response;
@@ -9808,21 +10394,21 @@ class AnthropicProvider2 extends BaseStreamingProvider {
       "Content-Type": "application/json"
     };
   }
-  async chat(request) {
-    const model = request.model?.trim();
+  async chat(request2) {
+    const model = request2.model?.trim();
     if (!model) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
-    const systemMessage = request.messages.find((message) => message.role === "system");
-    const otherMessages = request.messages.filter((message) => message.role !== "system");
+    const systemMessage = request2.messages.find((message) => message.role === "system");
+    const otherMessages = request2.messages.filter((message) => message.role !== "system");
     const response = await fetch(`${this.baseUrl}/messages`, {
       method: "POST",
       headers: this.createHeaders(),
-      signal: request.signal,
+      signal: request2.signal,
       body: JSON.stringify({
         model,
-        max_tokens: request.maxTokens || 4096,
-        thinking: toAnthropicThinking(request.reasoningBudget),
+        max_tokens: request2.maxTokens || 4096,
+        thinking: toAnthropicThinking(request2.reasoningBudget),
         system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
         messages: otherMessages.map((message) => ({
           role: message.role === "assistant" ? "assistant" : "user",
@@ -9845,21 +10431,21 @@ class AnthropicProvider2 extends BaseStreamingProvider {
       stopReason: mapFinishReason(data.stop_reason)
     };
   }
-  async performStreamingChat(request, onChunk) {
-    const model = request.model?.trim();
+  async performStreamingChat(request2, onChunk) {
+    const model = request2.model?.trim();
     if (!model) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
-    const systemMessage = request.messages.find((message) => message.role === "system");
-    const otherMessages = request.messages.filter((message) => message.role !== "system");
+    const systemMessage = request2.messages.find((message) => message.role === "system");
+    const otherMessages = request2.messages.filter((message) => message.role !== "system");
     const response = await fetch(`${this.baseUrl}/messages`, {
       method: "POST",
       headers: this.createHeaders(),
-      signal: request.signal,
+      signal: request2.signal,
       body: JSON.stringify({
         model,
-        max_tokens: request.maxTokens || 4096,
-        thinking: toAnthropicThinking(request.reasoningBudget),
+        max_tokens: request2.maxTokens || 4096,
+        thinking: toAnthropicThinking(request2.reasoningBudget),
         stream: true,
         system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
         messages: otherMessages.map((message) => ({
@@ -9951,7 +10537,7 @@ class LLMAdapter {
       });
     }
   }
-  async chat(request, providerId) {
+  async chat(request2, providerId) {
     const resolvedProviderId = providerId?.trim();
     if (!resolvedProviderId) {
       throw new Error("No explicit LLM provider was supplied for this request.");
@@ -9966,9 +10552,9 @@ class LLMAdapter {
     if (!await runtimeProvider.provider.isAvailable()) {
       throw new Error(`Provider not configured: ${resolvedProviderId}`);
     }
-    return runtimeProvider.provider.chat(request);
+    return runtimeProvider.provider.chat(request2);
   }
-  async streamChat(request, onChunk, providerId) {
+  async streamChat(request2, onChunk, providerId) {
     const resolvedProviderId = providerId?.trim();
     if (!resolvedProviderId) {
       throw new Error("No explicit LLM provider was supplied for this request.");
@@ -9983,7 +10569,7 @@ class LLMAdapter {
     if (!await runtimeProvider.provider.isAvailable()) {
       throw new Error(`Provider not configured: ${resolvedProviderId}`);
     }
-    return runtimeProvider.provider.streamChat(request, onChunk);
+    return runtimeProvider.provider.streamChat(request2, onChunk);
   }
   async testConnection(providerId) {
     const runtimeProvider = this.providers.get(providerId);
@@ -10174,32 +10760,32 @@ class ProviderAccountAuthService {
     }
     return this.startGitHubCopilotLogin();
   }
-  async finishLogin(request) {
-    if (!isAccountProviderId(request.providerId)) {
-      return this.status(request.providerId, "Provider does not support account login.");
+  async finishLogin(request2) {
+    if (!isAccountProviderId(request2.providerId)) {
+      return this.status(request2.providerId, "Provider does not support account login.");
     }
-    const flow = this.findFlow(request.providerId, request.flowId);
+    const flow = this.findFlow(request2.providerId, request2.flowId);
     if (!flow) {
-      return this.status(request.providerId, "Login flow expired or was not started.", "failed");
+      return this.status(request2.providerId, "Login flow expired or was not started.", "failed");
     }
     try {
-      if (request.providerId === "claude-account") {
-        const bundle2 = await this.exchangeClaudeCode(flow, request.code?.trim() ?? "");
-        return await this.persistAccount(request.providerId, bundle2);
+      if (request2.providerId === "claude-account") {
+        const bundle2 = await this.exchangeClaudeCode(flow, request2.code?.trim() ?? "");
+        return await this.persistAccount(request2.providerId, bundle2);
       }
-      if (request.providerId === "chatgpt-account") {
-        const bundle2 = await this.exchangeChatGptCode(flow, request.code?.trim() ?? "");
-        return await this.persistAccount(request.providerId, bundle2);
+      if (request2.providerId === "chatgpt-account") {
+        const bundle2 = await this.exchangeChatGptCode(flow, request2.code?.trim() ?? "");
+        return await this.persistAccount(request2.providerId, bundle2);
       }
-      if (isMockableAccountProviderId(request.providerId)) {
-        const bundle2 = this.exchangeMockableAccountCode(flow, request.code?.trim() ?? "");
-        return await this.persistAccount(request.providerId, bundle2);
+      if (isMockableAccountProviderId(request2.providerId)) {
+        const bundle2 = this.exchangeMockableAccountCode(flow, request2.code?.trim() ?? "");
+        return await this.persistAccount(request2.providerId, bundle2);
       }
       const bundle = await this.pollGitHubDevice(flow);
-      return await this.persistAccount(request.providerId, bundle);
+      return await this.persistAccount(request2.providerId, bundle);
     } catch (error) {
       flow.error = parseProviderError$1(error);
-      return this.status(request.providerId, flow.error, "failed");
+      return this.status(request2.providerId, flow.error, "failed");
     }
   }
   async test(providerId) {
@@ -10705,8 +11291,8 @@ class ProviderAccountAuthService {
   startChatGptCallbackServer(flow) {
     return new Promise((resolve, reject) => {
       let settled = false;
-      const server2 = http.createServer((request, response) => {
-        const url2 = new URL(request.url ?? "/", `http://localhost:${CHATGPT_CALLBACK_PORT}`);
+      const server2 = http.createServer((request2, response) => {
+        const url2 = new URL(request2.url ?? "/", `http://localhost:${CHATGPT_CALLBACK_PORT}`);
         if (url2.pathname !== "/auth/callback" || url2.searchParams.get("state") !== flow.state) {
           response.writeHead(400, { "Content-Type": "text/plain" });
           response.end("Invalid OAuth callback.");
@@ -11146,10 +11732,10 @@ class AgentOrchestrator {
   // -------------------------------------------------------------------
   // Agent 实例池
   // -------------------------------------------------------------------
-  getOrCreateAgentSlot(agentId, providerId, modelId, systemPrompt, tools = [], toolExecutor = this.createToolExecutor(agentId, [], void 0), streamOptions) {
+  getOrCreateAgentSlot(agentId, providerId, modelId, systemPrompt, tools = [], toolExecutor = this.createToolExecutor(agentId, [], void 0), streamOptions, turnSignature = "") {
     const toolSignature = this.createToolSignature(tools);
     const existing = this.agentSlots.get(agentId);
-    if (existing && existing.providerId === providerId && existing.modelId === modelId && existing.systemPrompt === systemPrompt && existing.toolSignature === toolSignature && !existing.agent.isStreaming) {
+    if (existing && existing.providerId === providerId && existing.modelId === modelId && existing.systemPrompt === systemPrompt && existing.toolSignature === toolSignature && existing.turnSignature === turnSignature && !existing.agent.isStreaming) {
       return existing;
     }
     const agent = new Agent({
@@ -11164,7 +11750,7 @@ class AgentOrchestrator {
       streamOptions,
       maxTurns: 8
     });
-    const slot = { agent, providerId, modelId, systemPrompt, toolSignature };
+    const slot = { agent, providerId, modelId, systemPrompt, toolSignature, turnSignature };
     this.agentSlots.set(agentId, slot);
     return slot;
   }
@@ -11183,7 +11769,7 @@ class AgentOrchestrator {
       streamOptions,
       maxTurns: 4
     });
-    return { agent, providerId, modelId, systemPrompt, toolSignature };
+    return { agent, providerId, modelId, systemPrompt, toolSignature, turnSignature: "" };
   }
   createToolSignature(tools) {
     return tools.map((tool) => tool.name).sort().join("|");
@@ -11215,7 +11801,7 @@ class AgentOrchestrator {
     }
     return { definitions, toolMap };
   }
-  createToolExecutor(agentId, toolAllowlist, stage, sessionId) {
+  createToolExecutor(agentId, toolAllowlist, stage, sessionId, runtimeContext) {
     const tools = this.resolveRuntimeTools(agentId, toolAllowlist, stage, sessionId).toolMap;
     return {
       execute: async (toolCall, signal, onUpdate) => {
@@ -11227,12 +11813,58 @@ class AgentOrchestrator {
         if (!tool) {
           return this.createPolicyDeniedToolResult(toolCall, agentId);
         }
-        const approvalRequired = tool.permissionHint === "mutation" || tool.permissionHint === "destructive";
-        if (approvalRequired) {
-          return this.createApprovalRequiredToolResult(toolCall, agentId, tool.permissionHint);
+        if (normalizedName === "ask_user") {
+          return this.executeAskUserTool(toolCall, agentId, runtimeContext, signal);
+        }
+        const permissionDecision = agentPermissionPolicyService.evaluate({ agentId, tool, toolCall });
+        if (permissionDecision.action === "deny") {
+          return this.createPolicyDeniedToolResult(toolCall, agentId, permissionDecision.reason);
+        }
+        if (permissionDecision.action === "ask_user") {
+          if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
+            return this.createApprovalRequiredToolResult(toolCall, agentId, permissionDecision.reason ?? "Tool approval requires an active conversation turn.");
+          }
+          const approved = await agentToolApprovalRequestService.request({
+            agentId,
+            sessionId: runtimeContext.sessionId ?? null,
+            turnId: runtimeContext.turnId,
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            reason: permissionDecision.reason ?? `Tool "${toolCall.name}" requires approval.`,
+            risk: permissionDecision.risk,
+            context: runtimeContext.eventContext,
+            onEvent: runtimeContext.onEvent,
+            signal
+          });
+          if (!approved) {
+            return this.createPolicyDeniedToolResult(toolCall, agentId, "User denied this tool call.");
+          }
+        }
+        if (permissionDecision.action === "auto_review") {
+          if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
+            return this.createPolicyDeniedToolResult(toolCall, agentId, "Auto-review requires an active conversation turn.");
+          }
+          const approved = agentToolApprovalRequestService.autoReview({
+            agentId,
+            sessionId: runtimeContext.sessionId ?? null,
+            turnId: runtimeContext.turnId,
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            reason: permissionDecision.reason ?? `Tool "${toolCall.name}" requires review.`,
+            risk: permissionDecision.risk,
+            context: runtimeContext.eventContext,
+            onEvent: runtimeContext.onEvent,
+            signal
+          });
+          if (!approved) {
+            return this.createPolicyDeniedToolResult(toolCall, agentId, "Auto-review denied this tool call.");
+          }
         }
         try {
-          const result = await tool.execute(toolCall.id, toolCall.arguments, signal, onUpdate);
+          const result = await withTemporaryPathAccess(
+            permissionDecision.temporaryPathRoots,
+            () => tool.execute(toolCall.id, toolCall.arguments, signal, onUpdate)
+          );
           return this.agentToolResultToMessage(toolCall, result);
         } catch (error) {
           return {
@@ -11251,28 +11883,67 @@ class AgentOrchestrator {
     const workflowStage = stage === "report" ? void 0 : stage;
     return isToolAllowedForAgent(toolName, agentId, workflowStage);
   }
-  createPolicyDeniedToolResult(toolCall, agentId) {
+  async executeAskUserTool(toolCall, agentId, runtimeContext, signal) {
+    try {
+      const args = toolCall.arguments ?? {};
+      const question = typeof args.question === "string" && args.question.trim() ? args.question.trim() : "The agent needs user input before continuing.";
+      const optionArgs = args.options;
+      const rawChoices = Array.isArray(args.choices) ? args.choices : Array.isArray(optionArgs) ? optionArgs : [];
+      const options = rawChoices.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim());
+      if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
+        throw new Error("ask_user requires an active conversation interaction bridge.");
+      }
+      const answer = await agentUserInputRequestService.request({
+        agentId,
+        sessionId: runtimeContext.sessionId ?? null,
+        turnId: runtimeContext.turnId,
+        toolCallId: toolCall.id,
+        question,
+        options,
+        context: runtimeContext.eventContext,
+        onEvent: runtimeContext.onEvent,
+        signal
+      });
+      return {
+        role: "toolResult",
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        content: [{ type: "text", text: `User answered: ${answer}` }],
+        isError: false,
+        timestamp: Date.now()
+      };
+    } catch (error) {
+      return {
+        role: "toolResult",
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }],
+        isError: true,
+        timestamp: Date.now()
+      };
+    }
+  }
+  createPolicyDeniedToolResult(toolCall, agentId, reason) {
     return {
       role: "toolResult",
       toolCallId: toolCall.id,
       toolName: toolCall.name,
       content: [{
         type: "text",
-        text: `Policy denied tool "${toolCall.name}" for ${agentId}. Ask mode only allows read-only tools.`
+        text: reason || `Policy denied tool "${toolCall.name}" for ${agentId}.`
       }],
       isError: true,
       timestamp: Date.now()
     };
   }
-  createApprovalRequiredToolResult(toolCall, agentId, permissionHint) {
-    const operation = permissionHint === "destructive" ? "destructive operation" : "workspace mutation";
+  createApprovalRequiredToolResult(toolCall, agentId, reason) {
     return {
       role: "toolResult",
       toolCallId: toolCall.id,
       toolName: toolCall.name,
       content: [{
         type: "text",
-        text: `Approval required for tool "${toolCall.name}" before ${operation} can run for ${agentId}. No changes were made.`
+        text: `Approval required for tool "${toolCall.name}" before it can run for ${agentId}. ${reason} No changes were made.`
       }],
       isError: true,
       timestamp: Date.now()
@@ -11348,9 +12019,9 @@ class AgentOrchestrator {
       async execute(_toolCallId, args) {
         const question = typeof args.question === "string" && args.question.trim() ? args.question.trim() : "The agent needs user input before continuing.";
         const choices = Array.isArray(args.choices) ? args.choices.filter((entry) => typeof entry === "string" && entry.trim().length > 0) : [];
-        const suffix = choices.length > 0 ? ` Choices: ${choices.join(" | ")}` : "";
         return {
-          content: [{ type: "text", text: `User input requested by ${agentId}: ${question}${suffix}` }],
+          content: [{ type: "text", text: "ask_user requires the conversation interaction bridge." }],
+          isError: true,
           details: { agentId, question, choices }
         };
       }
@@ -11523,13 +12194,6 @@ ${body}
     const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
     const activeToolDefinitions = routeCapability.toolCallingMode === "native-structured" ? runtimeTools.definitions : [];
     const activeToolAllowlist = activeToolDefinitions.map((tool) => tool.name);
-    const toolExecutor = this.createToolExecutor(input.agentId, activeToolAllowlist, input.stage, input.sessionId);
-    const streamOptions = {
-      maxTokens: input.maxTokens,
-      temperature: input.temperature,
-      reasoningBudget: input.options?.reasoningBudget,
-      signal: input.options?.signal
-    };
     const sharedEventContext = {
       agentId: input.agentId,
       runId: input.runId,
@@ -11542,6 +12206,18 @@ ${body}
       modelId: input.modelId,
       toolAllowlist: activeToolAllowlist,
       routeCapability
+    };
+    const toolExecutor = this.createToolExecutor(input.agentId, activeToolAllowlist, input.stage, input.sessionId, {
+      sessionId: input.sessionId ?? null,
+      turnId: input.turnId,
+      eventContext: sharedEventContext,
+      onEvent: input.options?.onEvent
+    });
+    const streamOptions = {
+      maxTokens: input.maxTokens,
+      temperature: input.temperature,
+      reasoningBudget: input.options?.reasoningBudget,
+      signal: input.options?.signal
     };
     const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
     if (routeDiagnostic) {
@@ -11566,7 +12242,8 @@ ${body}
       input.systemPrompt,
       activeToolDefinitions,
       toolExecutor,
-      streamOptions
+      streamOptions,
+      input.turnId ?? ""
     );
     const userMessage = {
       role: "user",
@@ -11624,6 +12301,8 @@ ${body}
       if (abortListener && input.options?.signal) {
         input.options.signal.removeEventListener("abort", abortListener);
       }
+      agentUserInputRequestService.cancelTurn(input.turnId);
+      agentToolApprovalRequestService.cancelTurn(input.turnId);
     }
   }
   async streamTestModeStub(stub, options) {
@@ -12236,7 +12915,7 @@ class TraceStateStore {
   }
   ensureRunRequest(input) {
     const state2 = this.read(input.sessionId);
-    if (state2.userRequests.some((request2) => request2.revisions.some((revision2) => revision2.resultingTraceLaneIds.includes(input.traceLaneId)))) {
+    if (state2.userRequests.some((request22) => request22.revisions.some((revision2) => revision2.resultingTraceLaneIds.includes(input.traceLaneId)))) {
       return state2;
     }
     const requestId = `request-${input.runId}`;
@@ -12251,7 +12930,7 @@ class TraceStateStore {
       createdAt,
       resultingTraceLaneIds: [input.traceLaneId]
     };
-    const request = {
+    const request2 = {
       id: requestId,
       sessionId: input.sessionId,
       rootRevisionId: revisionId,
@@ -12273,7 +12952,7 @@ class TraceStateStore {
     return this.write({
       ...state2,
       activeBranchId: branchId,
-      userRequests: [...state2.userRequests, request],
+      userRequests: [...state2.userRequests, request2],
       branches: [...state2.branches, group],
       plans: input.planId ? this.upsertPlan(state2.plans, {
         planId: input.planId,
@@ -12363,7 +13042,7 @@ class TraceStateStore {
       ...state2,
       activeBranchId: branchId,
       latestDisplayedPlanId: void 0,
-      userRequests: rootRequest ? state2.userRequests.map((request) => request.id === rootRequest.id ? nextRequest : request) : [...state2.userRequests, nextRequest],
+      userRequests: rootRequest ? state2.userRequests.map((request2) => request2.id === rootRequest.id ? nextRequest : request2) : [...state2.userRequests, nextRequest],
       branches: branchGroup ? state2.branches.map((group) => group.id === branchGroup.id ? nextBranchGroup : group) : [...state2.branches, nextBranchGroup],
       plans: state2.plans.map((plan) => plan.planId === input.previousPlanId ? { ...plan, status: "needs_revision", updatedAt: createdAt } : plan)
     });
@@ -13911,49 +14590,49 @@ class RdxCliInvokerService {
       this.traceListeners.delete(listener);
     };
   }
-  emitInvocationTrace(request, result) {
+  emitInvocationTrace(request2, result) {
     const trace = {
       traceId: result.trace_id || generateEventId("tool-trace"),
-      turnId: request.turnId,
-      toolName: request.toolName,
-      args: request.args,
+      turnId: request2.turnId,
+      toolName: request2.toolName,
+      args: request2.args,
       result,
       timestamp: nowMs(),
-      contextId: request.contextId ?? "",
-      runtimeOwner: request.runtimeOwner ?? "",
-      ownerLeaseId: request.ownerLeaseId
+      contextId: request2.contextId ?? "",
+      runtimeOwner: request2.runtimeOwner ?? "",
+      ownerLeaseId: request2.ownerLeaseId
     };
     for (const listener of this.traceListeners) {
       listener(trace);
     }
   }
-  async call(request) {
+  async call(request2) {
     const startTime = nowMs();
     let response;
     try {
-      const cliArgs = [request.toolName];
+      const cliArgs = [request2.toolName];
       const effectiveArgs = {
-        ...request.args || {}
+        ...request2.args || {}
       };
-      if (request.contextId && effectiveArgs["context_id"] === void 0) {
-        effectiveArgs["context_id"] = request.contextId;
+      if (request2.contextId && effectiveArgs["context_id"] === void 0) {
+        effectiveArgs["context_id"] = request2.contextId;
       }
-      if (request.runtimeOwner && effectiveArgs["runtime_owner"] === void 0) {
-        effectiveArgs["runtime_owner"] = request.runtimeOwner;
+      if (request2.runtimeOwner && effectiveArgs["runtime_owner"] === void 0) {
+        effectiveArgs["runtime_owner"] = request2.runtimeOwner;
       }
-      if (request.ownerLeaseId && effectiveArgs["owner_lease_id"] === void 0) {
-        effectiveArgs["owner_lease_id"] = request.ownerLeaseId;
+      if (request2.ownerLeaseId && effectiveArgs["owner_lease_id"] === void 0) {
+        effectiveArgs["owner_lease_id"] = request2.ownerLeaseId;
       }
       if (Object.keys(effectiveArgs).length > 0) {
         cliArgs.push("--args-json", JSON.stringify(effectiveArgs));
       }
-      if (request.contextId) {
-        cliArgs.push("--daemon-context", request.contextId);
+      if (request2.contextId) {
+        cliArgs.push("--daemon-context", request2.contextId);
       }
       const result = await this.executeCLI("call", cliArgs, {
         timeout: this.getSettings().timeoutMs,
-        runId: request.runId,
-        abortSignal: request.abortSignal
+        runId: request2.runId,
+        abortSignal: request2.abortSignal
       });
       if (result.stdout.trim()) {
         let parsed = null;
@@ -13967,7 +14646,7 @@ class RdxCliInvokerService {
               duration_ms: nowMs() - startTime,
               trace_id: generateEventId("tool")
             };
-            this.emitInvocationTrace(request, response);
+            this.emitInvocationTrace(request2, response);
             return response;
           }
         }
@@ -13987,7 +14666,7 @@ class RdxCliInvokerService {
               duration_ms: nowMs() - startTime,
               trace_id: generateEventId("tool")
             };
-            this.emitInvocationTrace(request, response);
+            this.emitInvocationTrace(request2, response);
             return response;
           }
           response = {
@@ -13997,7 +14676,7 @@ class RdxCliInvokerService {
             duration_ms: nowMs() - startTime,
             trace_id: generateEventId("tool")
           };
-          this.emitInvocationTrace(request, response);
+          this.emitInvocationTrace(request2, response);
           return response;
         }
       }
@@ -14018,7 +14697,7 @@ class RdxCliInvokerService {
         duration_ms: nowMs() - startTime,
         trace_id: generateEventId("tool")
       };
-      this.emitInvocationTrace(request, response);
+      this.emitInvocationTrace(request2, response);
       return response;
     } catch (error) {
       response = {
@@ -14033,7 +14712,7 @@ class RdxCliInvokerService {
         duration_ms: nowMs() - startTime,
         trace_id: generateEventId("tool")
       };
-      this.emitInvocationTrace(request, response);
+      this.emitInvocationTrace(request2, response);
       return response;
     }
   }
@@ -14094,9 +14773,9 @@ function registerCaptureDeviceHandlers(context2) {
   electron.ipcMain.handle("context:get", async () => {
     return rdxSessionService.snapshotContext();
   });
-  electron.ipcMain.handle("context:openHumanPreview", async (_event, request) => {
+  electron.ipcMain.handle("context:openHumanPreview", async (_event, request2) => {
     try {
-      const contextSnapshot = await rdxSessionService.openHumanPreviewWindow(request);
+      const contextSnapshot = await rdxSessionService.openHumanPreviewWindow(request2);
       context2.broadcastToRenderer("context:changed", contextSnapshot);
       const preview = contextSnapshot.humanPreview;
       return {
@@ -14136,34 +14815,34 @@ function registerCaptureDeviceHandlers(context2) {
   });
   electron.ipcMain.handle(
     "capture:openProjectInput",
-    async (_event, request) => {
+    async (_event, request2) => {
       try {
         runtimeLogService.log({
           scope: state2.currentSessionId ? "session" : "app",
           namespace: "capture",
           severity: "info",
           title: "Open project input",
-          summary: `开始打开 ${request.inputId}。`,
-          detail: request.filePath,
+          summary: `开始打开 ${request2.inputId}。`,
+          detail: request2.filePath,
           sessionId: state2.currentSessionId,
-          projectId: request.projectId,
+          projectId: request2.projectId,
           runId: state2.currentRunId,
           raw: {
-            inputId: request.inputId,
-            replayDeviceId: request.replayDeviceId,
-            filePath: request.filePath
+            inputId: request2.inputId,
+            replayDeviceId: request2.replayDeviceId,
+            filePath: request2.filePath
           }
         });
-        const input = storageAdapter.listProjectInputs(request.projectId).find((entry) => entry.inputId === request.inputId && entry.filePath === request.filePath);
+        const input = storageAdapter.listProjectInputs(request2.projectId).find((entry) => entry.inputId === request2.inputId && entry.filePath === request2.filePath);
         if (!input) {
-          return { success: false, error: `Project input not found: ${request.inputId}` };
+          return { success: false, error: `Project input not found: ${request2.inputId}` };
         }
-        const replayDevice = replayDeviceService.getDeviceById(request.replayDeviceId);
+        const replayDevice = replayDeviceService.getDeviceById(request2.replayDeviceId);
         if (!replayDevice) {
-          return { success: false, error: `Replay device not found: ${request.replayDeviceId}` };
+          return { success: false, error: `Replay device not found: ${request2.replayDeviceId}` };
         }
         const openedCapture = await rdxSessionService.openProjectInput({
-          projectId: request.projectId,
+          projectId: request2.projectId,
           inputId: input.inputId,
           filePath: input.filePath,
           replayDevice
@@ -14179,7 +14858,7 @@ function registerCaptureDeviceHandlers(context2) {
           summary: `${input.fileName} 已打开。`,
           detail: openedCapture.preview?.source === "framebuffer_screenshot" ? "预览来源：framebuffer" : openedCapture.preview?.source === "capture_thumbnail" ? "预览来源：thumbnail" : openedCapture.previewError?.code ? `当前无可用预览：${openedCapture.previewError.code}` : "当前无可用预览",
           sessionId: state2.currentSessionId,
-          projectId: request.projectId,
+          projectId: request2.projectId,
           runId: state2.currentRunId,
           raw: {
             openedCapture,
@@ -14195,12 +14874,12 @@ function registerCaptureDeviceHandlers(context2) {
           title: "Project input open failed",
           summary: err instanceof Error ? err.message : String(err),
           sessionId: state2.currentSessionId,
-          projectId: request.projectId,
+          projectId: request2.projectId,
           runId: state2.currentRunId,
           raw: {
-            inputId: request.inputId,
-            replayDeviceId: request.replayDeviceId,
-            filePath: request.filePath
+            inputId: request2.inputId,
+            replayDeviceId: request2.replayDeviceId,
+            filePath: request2.filePath
           }
         });
         return { success: false, error: err instanceof Error ? err.message : String(err) };
@@ -14532,15 +15211,31 @@ function composeProfileSystemPrompt(input) {
   const basePrompt = input.definition.baseInstructions?.trim() || `You are ${input.definition.agentLabel}. ${input.definition.agentDescription}`;
   const globalInstructions = input.definition.globalInstructions?.trim();
   const routeInstructions = composeRouteCapabilityPrompt(input.routeCapability, input.allowedToolNames);
+  const permissionInstructions = composePermissionPrompt(input.permissionSettings);
   return [
     basePrompt,
     "",
     "Show concise visible work summaries and tool results only. Do not reveal hidden chain-of-thought.",
     routeInstructions,
+    permissionInstructions,
     input.routeCapability.toolCallingMode === "native-structured" ? composeRuntimeCatalogPrompt(input.allowedToolNames) : "",
     globalInstructions ? `Global Instructions:
 ${globalInstructions}` : ""
   ].filter(Boolean).join("\n\n").trim();
+}
+function composePermissionPrompt(permissionSettings) {
+  const modeLabel = permissionSettings.mode;
+  const readableRoots = permissionSettings.readableRoots.length > 0 ? permissionSettings.readableRoots.join(", ") : "workspace only unless user approves";
+  const writableRoots = permissionSettings.writableRoots.length > 0 ? permissionSettings.writableRoots.join(", ") : "workspace only unless user approves";
+  return [
+    "# Runtime Permission Policy",
+    `Current permission mode: ${modeLabel}.`,
+    `Readable roots: ${readableRoots}.`,
+    `Writable roots: ${writableRoots}.`,
+    "Routine local inspection commands can run when the runtime policy allows them.",
+    "External files, network access, file mutation, destructive shell commands, and unrecognized commands may pause for user approval or auto-review.",
+    "If the runtime denies or requests approval, do not route around the decision with guessed paths or textual tool calls."
+  ].join("\n");
 }
 function composeRouteCapabilityPrompt(routeCapability, allowedToolNames) {
   if (routeCapability.toolCallingMode === "native-structured") {
@@ -14583,7 +15278,6 @@ function resolveConversationAgentId(requestedMode, requestedAgentId) {
   }
   return "ask";
 }
-const TASK_FILE_PATTERN = /([A-Za-z]:[\\/][^\r\n"]+\.(txt|md))/i;
 const ACTIVE_RUN_STATUSES = [
   "planning",
   "awaiting_input",
@@ -14774,23 +15468,6 @@ function makeConversationMessage(role, content, options) {
     createdAt
   };
 }
-function resolveTaskFileContext(message) {
-  const match = message.match(TASK_FILE_PATTERN);
-  const taskFilePath = match?.[1] ? path.resolve(match[1]) : null;
-  if (!taskFilePath || !fs.existsSync(taskFilePath) || !fs.statSync(taskFilePath).isFile()) {
-    return {
-      taskFilePath: null,
-      taskFileContent: null,
-      effectiveMessage: message
-    };
-  }
-  const taskFileContent = fs.readFileSync(taskFilePath, "utf-8").trim();
-  return {
-    taskFilePath,
-    taskFileContent,
-    effectiveMessage: [message, taskFileContent].filter(Boolean).join("\n\n")
-  };
-}
 function resolveEnabledAgentDefinition(agentId) {
   return settingsService.getAll().agents.definitions.find((entry) => entry.id === agentId && entry.enabled) ?? null;
 }
@@ -14925,8 +15602,8 @@ class ConversationService {
   async getHistory(sessionId) {
     return storageAdapter.readConversationHistory(sessionId);
   }
-  async cancelActiveTurn(request = {}) {
-    const candidates = Array.from(this.activeTurns.values()).filter((turn) => !request.turnId || turn.turnId === request.turnId).filter((turn) => !request.sessionId || turn.sessionId === request.sessionId).sort((left, right) => right.startedAt - left.startedAt);
+  async cancelActiveTurn(request2 = {}) {
+    const candidates = Array.from(this.activeTurns.values()).filter((turn) => !request2.turnId || turn.turnId === request2.turnId).filter((turn) => !request2.sessionId || turn.sessionId === request2.sessionId).sort((left, right) => right.startedAt - left.startedAt);
     const target = candidates[0];
     if (!target) {
       return { success: false, error: "No active conversation turn." };
@@ -14936,6 +15613,12 @@ class ConversationService {
       success: true,
       cancelledTurnId: target.turnId
     };
+  }
+  answerUserInput(request2) {
+    return agentUserInputRequestService.answer(request2);
+  }
+  answerToolApproval(request2) {
+    return agentToolApprovalRequestService.answer(request2);
   }
   registerActiveTurn(turn) {
     this.activeTurns.set(turn.turnId, turn);
@@ -15121,7 +15804,11 @@ class ConversationService {
       });
     } else {
       try {
-        const taskContext = resolveTaskFileContext(input.rawMessage);
+        const taskContext = {
+          taskFilePath: null,
+          taskFileContent: null,
+          effectiveMessage: input.rawMessage
+        };
         const definition = resolveEnabledAgentDefinition(conversationAgentId);
         const promptDefinition = {
           agentId: conversationAgentId,
@@ -15159,7 +15846,8 @@ class ConversationService {
             systemPrompt: composeProfileSystemPrompt({
               definition: promptDefinition,
               routeCapability: routePreflight.routeCapability,
-              allowedToolNames
+              allowedToolNames,
+              permissionSettings: settingsService.getAll().agentRuntime.permissions
             }),
             maxTokens: 1200,
             temperature: 0.35,
@@ -15268,29 +15956,63 @@ class ConversationService {
                 const approvalId = payload.approvalId ?? `approval-${payload.toolCallId ?? "runtime"}`;
                 const toolCallId = String(payload.toolCallId ?? approvalId);
                 const toolName = String(payload.toolName ?? "approval");
+                if (payload.kind === "ask_user" || normalizeToolName(toolName) === "ask_user") {
+                  const question = typeof payload.question === "string" && payload.question ? payload.question : typeof payload.reason === "string" && payload.reason ? payload.reason : "The agent needs user input before continuing.";
+                  commitAssistantMessage("message_patched", {
+                    workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
+                      id: toolCallId,
+                      toolName: "ask_user",
+                      status: "running",
+                      argsPreview: JSON.stringify({
+                        question,
+                        choices: Array.isArray(payload.options) ? payload.options : []
+                      }).slice(0, 600),
+                      startedAt: nowMs()
+                    })
+                  });
+                  return;
+                }
                 const reason = typeof payload.reason === "string" && payload.reason ? payload.reason : "This action requires user approval before it can run.";
                 const traceWithTool = upsertRuntimeToolCall(assistantMessage.workTrace, {
                   id: toolCallId,
                   toolName,
-                  status: "complete",
-                  resultPreview: reason,
-                  completedAt: nowMs()
+                  status: "running",
+                  resultPreview: reason
                 });
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(traceWithTool, `runtime-approval-${approvalId}`, {
                     kind: "approval",
                     title: "请求批准",
                     stage: "decision",
-                    status: "complete",
+                    status: "running",
                     summary: reason,
-                    detail: `Tool: ${toolName}`,
-                    completedAt: nowMs()
+                    detail: JSON.stringify({
+                      approvalId,
+                      toolCallId,
+                      toolName,
+                      risk: payload.risk,
+                      reviewer: payload.reviewer
+                    }, null, 2)
                   })
                 });
               }
               if (event.type === "approval.answered") {
                 const payload = event.payload;
                 const approvalId = payload.approvalId ?? "runtime";
+                if (payload.kind === "ask_user" || normalizeToolName(String(payload.toolName ?? "")) === "ask_user") {
+                  const failed = payload.status === "rejected" || payload.status === "cancelled";
+                  commitAssistantMessage("message_patched", {
+                    workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
+                      id: String(payload.toolCallId ?? approvalId),
+                      toolName: "ask_user",
+                      status: failed ? "error" : "running",
+                      resultPreview: failed ? String(payload.answer ?? "User input request was cancelled.") : "User answered.",
+                      error: failed ? String(payload.answer ?? "User input request was cancelled.") : void 0,
+                      completedAt: failed ? nowMs() : void 0
+                    })
+                  });
+                  return;
+                }
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `runtime-approval-${approvalId}`, {
                     kind: "approval",
@@ -15305,12 +16027,13 @@ class ConversationService {
               }
               if (event.type === "tool.completed") {
                 const result = event.payload.result;
+                const isAskUserTool = normalizeToolName(String(event.payload.toolName)) === "ask_user";
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                     id: String(event.payload.toolCallId),
                     toolName: String(event.payload.toolName),
                     status: result?.ok ? "complete" : "error",
-                    resultPreview: JSON.stringify(event.payload.result ?? {}).slice(0, 800),
+                    resultPreview: isAskUserTool && result?.ok ? "User answered." : JSON.stringify(event.payload.result ?? {}).slice(0, 800),
                     error: result?.ok ? void 0 : result?.error?.message,
                     completedAt: nowMs()
                   })
@@ -15453,9 +16176,9 @@ class ConversationService {
 const conversationService = new ConversationService();
 function registerConversationHandlers(context2) {
   const { state: state2 } = context2;
-  electron.ipcMain.handle("conversation:sendMessage", async (_event, request) => {
+  electron.ipcMain.handle("conversation:sendMessage", async (_event, request2) => {
     const result = await conversationService.sendMessage({
-      ...request,
+      ...request2,
       fallbackProjectId: state2.currentProjectId,
       fallbackSessionId: state2.currentSessionId,
       fallbackRunId: state2.currentRunId
@@ -15480,8 +16203,14 @@ function registerConversationHandlers(context2) {
       messages: await conversationService.getHistory(sessionId)
     };
   });
-  electron.ipcMain.handle("conversation:cancelActiveTurn", async (_event, request) => {
-    return conversationService.cancelActiveTurn(request);
+  electron.ipcMain.handle("conversation:cancelActiveTurn", async (_event, request2) => {
+    return conversationService.cancelActiveTurn(request2);
+  });
+  electron.ipcMain.handle("conversation:answerUserInput", async (_event, request2) => {
+    return conversationService.answerUserInput(request2);
+  });
+  electron.ipcMain.handle("conversation:answerToolApproval", async (_event, request2) => {
+    return conversationService.answerToolApproval(request2);
   });
 }
 const STALE_RECOVERABLE_RUN_STATUSES = [
@@ -15882,9 +16611,9 @@ class TerminalSessionService {
 }
 const terminalSessionService = new TerminalSessionService();
 function registerRuntimeTerminalHandlers() {
-  electron.ipcMain.handle("runtimeLog:list", async (_event, request) => {
+  electron.ipcMain.handle("runtimeLog:list", async (_event, request2) => {
     return {
-      entries: runtimeLogService.list(request.scope, request.sessionId)
+      entries: runtimeLogService.list(request2.scope, request2.sessionId)
     };
   });
   electron.ipcMain.handle("terminal:listTabs", async () => {
@@ -15892,9 +16621,9 @@ function registerRuntimeTerminalHandlers() {
       tabs: terminalSessionService.listTabs()
     };
   });
-  electron.ipcMain.handle("terminal:createTab", async (_event, request) => {
+  electron.ipcMain.handle("terminal:createTab", async (_event, request2) => {
     try {
-      const tab = terminalSessionService.createTab(request);
+      const tab = terminalSessionService.createTab(request2);
       return {
         success: true,
         tab,
@@ -16071,13 +16800,13 @@ const createTinyOpenAiProbeBody = (modelId) => JSON.stringify({
   messages: [{ role: "user", content: "ping" }]
 });
 class ProviderConnectionService {
-  async testProviderDraft(request) {
+  async testProviderDraft(request2) {
     try {
-      const provider = this.getProvider(request.providerId);
+      const provider = this.getProvider(request2.providerId);
       const models = await this.discoverModels(
         provider,
-        request.apiKey?.trim() ?? "",
-        request.baseUrl?.trim() ?? ""
+        request2.apiKey?.trim() ?? "",
+        request2.baseUrl?.trim() ?? ""
       );
       return {
         success: true,
@@ -16092,11 +16821,11 @@ class ProviderConnectionService {
       };
     }
   }
-  async connectProvider(request) {
+  async connectProvider(request2) {
     try {
-      const provider = this.getProvider(request.providerId);
-      const apiKey = request.apiKey?.trim() ?? "";
-      const baseUrl = request.baseUrl?.trim() ?? "";
+      const provider = this.getProvider(request2.providerId);
+      const apiKey = request2.apiKey?.trim() ?? "";
+      const baseUrl = request2.baseUrl?.trim() ?? "";
       const models = await this.discoverModels(provider, apiKey, baseUrl);
       const nextSettings = settingsService.saveProviderConnection(provider.id, apiKey, models, baseUrl);
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
@@ -16164,8 +16893,8 @@ class ProviderConnectionService {
   startProviderAccountLogin(providerId) {
     return providerAccountAuthService.startLogin(providerId);
   }
-  finishProviderAccountLogin(request) {
-    return providerAccountAuthService.finishLogin(request);
+  finishProviderAccountLogin(request2) {
+    return providerAccountAuthService.finishLogin(request2);
   }
   getProviderAccountStatus(providerId) {
     return providerAccountAuthService.status(providerId);
@@ -16317,11 +17046,11 @@ function registerSettingsLlmHandlers(context2) {
   electron.ipcMain.handle("llm:getAvailableModels", async (_event, provider) => {
     return llmAdapter.getAvailableModels(provider);
   });
-  electron.ipcMain.handle("llm:testProviderDraft", async (_event, request) => {
-    return providerConnectionService.testProviderDraft(request);
+  electron.ipcMain.handle("llm:testProviderDraft", async (_event, request2) => {
+    return providerConnectionService.testProviderDraft(request2);
   });
-  electron.ipcMain.handle("llm:connectProvider", async (_event, request) => {
-    const result = await providerConnectionService.connectProvider(request);
+  electron.ipcMain.handle("llm:connectProvider", async (_event, request2) => {
+    const result = await providerConnectionService.connectProvider(request2);
     if (result.success) {
       context2.applyCurrentLlmConfig();
     }
@@ -16351,8 +17080,8 @@ function registerSettingsLlmHandlers(context2) {
     }
     return result;
   });
-  electron.ipcMain.handle("llm:finishProviderAccountLogin", async (_event, request) => {
-    const result = await providerConnectionService.finishProviderAccountLogin(request);
+  electron.ipcMain.handle("llm:finishProviderAccountLogin", async (_event, request2) => {
+    const result = await providerConnectionService.finishProviderAccountLogin(request2);
     if (result.connected) {
       context2.applyCurrentLlmConfig();
     }
@@ -17016,7 +17745,7 @@ class DebuggerLlmService {
       remapReason: resolution.remapReason
     };
   }
-  async call(context2, request) {
+  async call(context2, request2) {
     const settings = settingsService.getAll();
     const route = this.resolveRoute(context2.agentId, context2.stage, settings);
     if (process.env.RDC_AGENT_TEST_MODE === "1") {
@@ -17042,7 +17771,7 @@ class DebuggerLlmService {
     llmAdapter.configure(settingsService.getLlmConfig());
     try {
       const response = await llmAdapter.chat({
-        ...request,
+        ...request2,
         model: route.modelId
       }, route.providerId);
       const text = extractTextContent(response.content);
@@ -17606,17 +18335,17 @@ class RdxSessionService {
     status: "closed",
     updatedAt: Date.now()
   };
-  async openProjectInput(request) {
+  async openProjectInput(request2) {
     await this.closeOrReplaceOpenedCapture();
-    let replayDevice = request.replayDevice;
+    let replayDevice = request2.replayDevice;
     const isRemoteReplay = replayDevice.type === "android";
     if (isRemoteReplay) {
       replayDevice = await this.ensureReplayDeviceReady(replayDevice);
     }
     const preparedRemote = isRemoteReplay ? replayDeviceService.peekPreparedRemote(replayDevice.id) : null;
     const capture = {
-      id: request.inputId,
-      filePath: request.filePath,
+      id: request2.inputId,
+      filePath: request2.filePath,
       role: "primary",
       backendHint: isRemoteReplay ? "remote" : "local",
       status: "pending"
@@ -17634,13 +18363,13 @@ class RdxSessionService {
         this.remoteStatus = "error";
         throw new Error("Remote replay requires a prepared remote context and remoteId.");
       }
-      resultData = await this.openRemoteProjectInput(request, replayDevice, preparedRemote);
+      resultData = await this.openRemoteProjectInput(request2, replayDevice, preparedRemote);
     } else {
       const result = await rdxShellActionService.runAction("openCapture", {
-        projectId: request.projectId,
-        inputId: request.inputId,
-        filePath: request.filePath,
-        capturePath: request.filePath,
+        projectId: request2.projectId,
+        inputId: request2.inputId,
+        filePath: request2.filePath,
+        capturePath: request2.filePath,
         deviceId: replayDevice.id,
         deviceLabel: replayDevice.label,
         deviceType: replayDevice.type,
@@ -17677,9 +18406,9 @@ class RdxSessionService {
     };
     const previewResult = this.previewFromActionData(resultData);
     const openedCapture = this.createOpenedCaptureState(
-      request.projectId,
-      request.inputId,
-      request.filePath,
+      request2.projectId,
+      request2.inputId,
+      request2.filePath,
       replayDevice,
       previewResult
     );
@@ -17687,12 +18416,12 @@ class RdxSessionService {
     this.broadcastContextChanged();
     return openedCapture;
   }
-  async openRemoteProjectInput(request, replayDevice, preparedRemote) {
-    const runIdBase = `remote-open-${request.inputId}-${Date.now()}`;
+  async openRemoteProjectInput(request2, replayDevice, preparedRemote) {
+    const runIdBase = `remote-open-${request2.inputId}-${Date.now()}`;
     const openFile = await rdxCliInvokerService.call({
       toolName: "rd.capture.open_file",
       args: {
-        file_path: request.filePath,
+        file_path: request2.filePath,
         read_only: true
       },
       contextId: preparedRemote.contextId,
@@ -17750,7 +18479,7 @@ class RdxSessionService {
     return {
       context_id: preparedRemote.contextId,
       capture_file_id: captureFileId,
-      capture_path: request.filePath,
+      capture_path: request2.filePath,
       session_id: replaySessionId,
       replay_session_id: replaySessionId,
       active_event_id: activeEventId,
@@ -17784,8 +18513,8 @@ class RdxSessionService {
       });
     }
   }
-  async openHumanPreviewWindow(request = {}) {
-    const replaySessionId = request.sessionId || this.snapshotContext().sessionId;
+  async openHumanPreviewWindow(request2 = {}) {
+    const replaySessionId = request2.sessionId || this.snapshotContext().sessionId;
     if (!this.contextId || !this.runtimeOwner || !this.ownerLeaseId || !replaySessionId) {
       this.setHumanPreview({
         status: "unavailable",
@@ -18216,7 +18945,7 @@ async function checkDevRenderer(url$1) {
   return new Promise((resolveCheck) => {
     const target = new url.URL(url$1);
     const requestImpl = target.protocol === "https:" ? https.request : http.request;
-    const request = requestImpl(
+    const request2 = requestImpl(
       {
         method: "GET",
         hostname: target.hostname,
@@ -18234,18 +18963,18 @@ async function checkDevRenderer(url$1) {
         });
       }
     );
-    request.on("timeout", () => {
-      request.destroy(new Error("Timed out while connecting to the dev renderer"));
+    request2.on("timeout", () => {
+      request2.destroy(new Error("Timed out while connecting to the dev renderer"));
     });
-    request.on("error", (error) => {
+    request2.on("error", (error) => {
       resolveCheck({ ok: false, url: url$1, error: error.message });
     });
-    request.end();
+    request2.end();
   });
 }
-async function readJsonBody(request) {
+async function readJsonBody(request2) {
   const chunks = [];
-  for await (const chunk of request) {
+  for await (const chunk of request2) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
   const text = Buffer.concat(chunks).toString("utf-8").trim();
@@ -18276,20 +19005,20 @@ function serveStatic(response, rendererRoot, requestPath) {
   });
   fs.createReadStream(filePath).pipe(response);
 }
-async function handleRequest(options, request, response) {
-  if (!request.url) {
+async function handleRequest(options, request2, response) {
+  if (!request2.url) {
     sendJson(response, 400, { success: false, error: "Missing URL" });
     return;
   }
-  if (request.method === "OPTIONS") {
+  if (request2.method === "OPTIONS") {
     setCors(response);
     response.writeHead(204);
     response.end();
     return;
   }
   const bridgeOrigin = bridgeUrl ?? "http://127.0.0.1";
-  const url$1 = new url.URL(request.url, bridgeOrigin);
-  if (url$1.pathname === "/health" && request.method === "GET") {
+  const url$1 = new url.URL(request2.url, bridgeOrigin);
+  if (url$1.pathname === "/health" && request2.method === "GET") {
     const renderer = options.devRendererUrl ? await checkDevRenderer(options.devRendererUrl) : { ok: fs.existsSync(path.join(options.rendererRoot, "index.html")), url: null };
     sendJson(response, 200, {
       ok: renderer.ok,
@@ -18300,8 +19029,8 @@ async function handleRequest(options, request, response) {
     });
     return;
   }
-  if (url$1.pathname === "/invoke" && request.method === "POST") {
-    void readJsonBody(request).then(async (body) => {
+  if (url$1.pathname === "/invoke" && request2.method === "POST") {
+    void readJsonBody(request2).then(async (body) => {
       const payload = body;
       if (typeof payload.channel !== "string") {
         sendJson(response, 400, { success: false, error: "channel must be a string" });
@@ -18318,7 +19047,7 @@ async function handleRequest(options, request, response) {
     });
     return;
   }
-  if (url$1.pathname === "/events" && request.method === "GET") {
+  if (url$1.pathname === "/events" && request2.method === "GET") {
     rendererEventHub.connect(response);
     return;
   }
@@ -18350,8 +19079,8 @@ async function startBrowserAppBridge(options) {
     return bridgeUrl;
   }
   const preferredPort = options.preferredPort ?? Number(process.env.RDC_AGENT_BROWSER_BRIDGE_PORT || 5127);
-  server = http.createServer((request, response) => {
-    void handleRequest(options, request, response).catch((error) => {
+  server = http.createServer((request2, response) => {
+    void handleRequest(options, request2, response).catch((error) => {
       sendJson(response, 500, {
         success: false,
         error: error instanceof Error ? error.message : String(error)

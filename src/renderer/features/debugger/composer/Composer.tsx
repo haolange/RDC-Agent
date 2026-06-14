@@ -8,6 +8,9 @@ import { useI18n } from '../../../i18n';
 import { useLayoutStore } from '../../../stores/layoutStore';
 import { useConversationStore } from '../../../stores/conversationStore';
 import type { ComposerController } from './useComposer';
+import { PermissionModeSelector } from './PermissionModeSelector';
+import { ToolApprovalRequestPanel, usePendingToolApprovalRequest } from './ToolApprovalRequestPanel';
+import { UserInputRequestPanel, usePendingUserInputRequest } from './UserInputRequestPanel';
 
 export interface ComposerProps {
   composer: ComposerController;
@@ -30,6 +33,8 @@ export const Composer: React.FC<ComposerProps> = ({
     return activeMsg?.agentId ?? null;
   });
   const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
+  const pendingToolApproval = usePendingToolApprovalRequest();
+  const pendingUserInput = usePendingUserInputRequest();
 
   const {
     promptValue,
@@ -59,6 +64,29 @@ export const Composer: React.FC<ComposerProps> = ({
     handlePromptSend,
     handlePromptKeyDown,
   } = composer;
+  const selectedAgentCapability = getAgentCapability(selectedAgentId, userInvocableAgents);
+
+  if (pendingToolApproval) {
+    return (
+      <div
+        className="composer-shell composer-shell-tool-approval"
+        style={{ ['--composer-mode-accent' as string]: currentModeConfig.accentColor }}
+      >
+        <ToolApprovalRequestPanel request={pendingToolApproval} />
+      </div>
+    );
+  }
+
+  if (pendingUserInput) {
+    return (
+      <div
+        className="composer-shell composer-shell-user-input"
+        style={{ ['--composer-mode-accent' as string]: currentModeConfig.accentColor }}
+      >
+        <UserInputRequestPanel request={pendingUserInput} />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -125,22 +153,12 @@ export const Composer: React.FC<ComposerProps> = ({
               onClick={() => setModeMenuOpen((current) => !current)}
               aria-haspopup="menu"
               aria-expanded={modeMenuOpen}
+              title={selectedAgentCapability || currentModeLabel}
             >
               <span className="composer-agent-pill-icon" aria-hidden="true">
                 <ModeGlyph mode={currentMode} size={15} strokeWidth={1.9} />
               </span>
               <span className="composer-agent-pill-label">{currentModeLabel}</span>
-              {(() => {
-                const capability = getAgentCapability(selectedAgentId, userInvocableAgents);
-                return capability ? (
-                  <span
-                    className="composer-agent-pill-capability"
-                    data-testid="composer-mode-pill-capability"
-                  >
-                    {capability}
-                  </span>
-                ) : null;
-              })()}
               <span className="composer-agent-pill-caret" aria-hidden="true">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="6 9 12 15 18 9" />
@@ -204,6 +222,7 @@ export const Composer: React.FC<ComposerProps> = ({
           </div>
         </div>
         <div className="composer-toolbar-group composer-toolbar-group-right">
+          <PermissionModeSelector disabled={isComposerBusy} />
           <ContextUsageIndicator usage={hasActiveDebugRun ? currentRunUsage : null} language={language} />
           <button
             type="button"

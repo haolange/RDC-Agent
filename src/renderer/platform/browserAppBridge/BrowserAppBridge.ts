@@ -45,6 +45,8 @@ class BrowserAppBridgeClient {
     conversation: {
       sendMessage: (request) => this.invoke('conversation:sendMessage', request),
       cancelActiveTurn: (request) => this.invoke('conversation:cancelActiveTurn', request),
+      answerUserInput: (request) => this.invoke('conversation:answerUserInput', request),
+      answerToolApproval: (request) => this.invoke('conversation:answerToolApproval', request),
       getHistory: (sessionId) => this.invoke('conversation:getHistory', sessionId),
       onEvent: (callback) => { this.addListener('conversation:event', callback as EventCallback); },
       offEvent: (callback) => { this.removeListener('conversation:event', callback as EventCallback); },

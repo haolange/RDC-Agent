@@ -8,6 +8,7 @@ export { editFileTool } from './EditFileTool';
 export { globTool } from './GlobTool';
 export { grepTool } from './GrepTool';
 export { webFetchTool, webSearchTool } from './WebTools';
+export { withTemporaryPathAccess } from './_shared';
 
 import type { AgentTool } from '../../agent/AgentTool';
 import { bashTool } from './BashTool';

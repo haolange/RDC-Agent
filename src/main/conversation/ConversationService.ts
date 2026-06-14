@@ -1,7 +1,9 @@
-import fs from 'fs';
-import path from 'path';
 import type {
   ConversationAttachmentInput,
+  ConversationAnswerToolApprovalRequest,
+  ConversationAnswerToolApprovalResult,
+  ConversationAnswerUserInputRequest,
+  ConversationAnswerUserInputResult,
   ConversationCancelActiveTurnRequest,
   ConversationCancelActiveTurnResult,
   ConversationMessage,
@@ -32,6 +34,8 @@ import {
   composeProfileSystemPrompt,
   composeProfileTurnPrompt,
 } from '../agent-runtime/prompt';
+import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
+import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
 import { traceService } from '../agent-trace/TraceService';
 import { replayDeviceService } from '../captures/ReplayDeviceService';
@@ -76,8 +80,6 @@ function resolveConversationAgentId(requestedMode: AppMode, requestedAgentId?: s
   }
   return 'ask';
 }
-
-const TASK_FILE_PATTERN = /([A-Za-z]:[\\/][^\r\n"]+\.(txt|md))/i;
 
 const ACTIVE_RUN_STATUSES: Array<RunSummary['status']> = [
   'planning',
@@ -326,29 +328,6 @@ function makeConversationMessage(
   };
 }
 
-function resolveTaskFileContext(message: string): {
-  taskFilePath: string | null;
-  taskFileContent: string | null;
-  effectiveMessage: string;
-} {
-  const match = message.match(TASK_FILE_PATTERN);
-  const taskFilePath = match?.[1] ? path.resolve(match[1]) : null;
-  if (!taskFilePath || !fs.existsSync(taskFilePath) || !fs.statSync(taskFilePath).isFile()) {
-    return {
-      taskFilePath: null,
-      taskFileContent: null,
-      effectiveMessage: message,
-    };
-  }
-
-  const taskFileContent = fs.readFileSync(taskFilePath, 'utf-8').trim();
-  return {
-    taskFilePath,
-    taskFileContent,
-    effectiveMessage: [message, taskFileContent].filter(Boolean).join('\n\n'),
-  };
-}
-
 function resolveEnabledAgentDefinition(agentId: string) {
   return settingsService.getAll().agents.definitions.find((entry) => entry.id === agentId && entry.enabled) ?? null;
 }
@@ -547,6 +526,14 @@ export class ConversationService {
       success: true,
       cancelledTurnId: target.turnId,
     };
+  }
+
+  answerUserInput(request: ConversationAnswerUserInputRequest): ConversationAnswerUserInputResult {
+    return agentUserInputRequestService.answer(request);
+  }
+
+  answerToolApproval(request: ConversationAnswerToolApprovalRequest): ConversationAnswerToolApprovalResult {
+    return agentToolApprovalRequestService.answer(request);
   }
 
   private registerActiveTurn(turn: ActiveConversationTurn): void {
@@ -777,7 +764,11 @@ export class ConversationService {
       });
     } else {
       try {
-        const taskContext = resolveTaskFileContext(input.rawMessage);
+        const taskContext = {
+          taskFilePath: null,
+          taskFileContent: null,
+          effectiveMessage: input.rawMessage,
+        };
         const definition = resolveEnabledAgentDefinition(conversationAgentId);
         const promptDefinition = {
           agentId: conversationAgentId,
@@ -817,6 +808,7 @@ export class ConversationService {
               definition: promptDefinition,
               routeCapability: routePreflight.routeCapability,
               allowedToolNames,
+              permissionSettings: settingsService.getAll().agentRuntime.permissions,
             }),
             maxTokens: 1200,
             temperature: 0.35,
@@ -938,29 +930,58 @@ export class ConversationService {
                   reason?: string;
                   toolCallId?: string;
                   toolName?: string;
+                  kind?: string;
+                  question?: string;
+                  options?: string[];
+                  risk?: unknown;
+                  reviewer?: unknown;
                 };
                 const approvalId = payload.approvalId ?? `approval-${payload.toolCallId ?? 'runtime'}`;
                 const toolCallId = String(payload.toolCallId ?? approvalId);
                 const toolName = String(payload.toolName ?? 'approval');
+                if (payload.kind === 'ask_user' || normalizeToolName(toolName) === 'ask_user') {
+                  const question = typeof payload.question === 'string' && payload.question
+                    ? payload.question
+                    : typeof payload.reason === 'string' && payload.reason
+                      ? payload.reason
+                      : 'The agent needs user input before continuing.';
+                  commitAssistantMessage('message_patched', {
+                    workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
+                      id: toolCallId,
+                      toolName: 'ask_user',
+                      status: 'running',
+                      argsPreview: JSON.stringify({
+                        question,
+                        choices: Array.isArray(payload.options) ? payload.options : [],
+                      }).slice(0, 600),
+                      startedAt: nowMs(),
+                    }),
+                  });
+                  return;
+                }
                 const reason = typeof payload.reason === 'string' && payload.reason
                   ? payload.reason
                   : 'This action requires user approval before it can run.';
                 const traceWithTool = upsertRuntimeToolCall(assistantMessage.workTrace, {
                   id: toolCallId,
                   toolName,
-                  status: 'complete',
+                  status: 'running',
                   resultPreview: reason,
-                  completedAt: nowMs(),
                 });
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(traceWithTool, `runtime-approval-${approvalId}`, {
                     kind: 'approval',
                     title: '请求批准',
                     stage: 'decision',
-                    status: 'complete',
+                    status: 'running',
                     summary: reason,
-                    detail: `Tool: ${toolName}`,
-                    completedAt: nowMs(),
+                    detail: JSON.stringify({
+                      approvalId,
+                      toolCallId,
+                      toolName,
+                      risk: payload.risk,
+                      reviewer: payload.reviewer,
+                    }, null, 2),
                   }),
                 });
               }
@@ -969,8 +990,26 @@ export class ConversationService {
                   approvalId?: string;
                   status?: string;
                   answer?: unknown;
+                  kind?: string;
+                  toolCallId?: string;
+                  toolName?: string;
+                  question?: string;
                 };
                 const approvalId = payload.approvalId ?? 'runtime';
+                if (payload.kind === 'ask_user' || normalizeToolName(String(payload.toolName ?? '')) === 'ask_user') {
+                  const failed = payload.status === 'rejected' || payload.status === 'cancelled';
+                  commitAssistantMessage('message_patched', {
+                    workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
+                      id: String(payload.toolCallId ?? approvalId),
+                      toolName: 'ask_user',
+                      status: failed ? 'error' : 'running',
+                      resultPreview: failed ? String(payload.answer ?? 'User input request was cancelled.') : 'User answered.',
+                      error: failed ? String(payload.answer ?? 'User input request was cancelled.') : undefined,
+                      completedAt: failed ? nowMs() : undefined,
+                    }),
+                  });
+                  return;
+                }
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `runtime-approval-${approvalId}`, {
                     kind: 'approval',
@@ -985,12 +1024,15 @@ export class ConversationService {
               }
               if (event.type === 'tool.completed') {
                 const result = event.payload.result as { ok?: boolean; error?: { message?: string } } | undefined;
+                const isAskUserTool = normalizeToolName(String(event.payload.toolName)) === 'ask_user';
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                     id: String(event.payload.toolCallId),
                     toolName: String(event.payload.toolName),
                     status: result?.ok ? 'complete' : 'error',
-                    resultPreview: JSON.stringify(event.payload.result ?? {}).slice(0, 800),
+                    resultPreview: isAskUserTool && result?.ok
+                      ? 'User answered.'
+                      : JSON.stringify(event.payload.result ?? {}).slice(0, 800),
                     error: result?.ok ? undefined : result?.error?.message,
                     completedAt: nowMs(),
                   }),

@@ -6,7 +6,26 @@
  * - safeResolvePath：解析路径并确保位于 workspace 内。
  */
 
+import * as os from 'os';
 import * as path from 'path';
+
+let temporaryAllowedPathRoots: string[] = [];
+
+export async function withTemporaryPathAccess<T>(
+  roots: string[],
+  run: () => Promise<T>,
+): Promise<T> {
+  const previous = temporaryAllowedPathRoots;
+  temporaryAllowedPathRoots = [
+    ...previous,
+    ...roots.map((root) => normalizeInputPath(root)),
+  ];
+  try {
+    return await run();
+  } finally {
+    temporaryAllowedPathRoots = previous;
+  }
+}
 
 /** 获取 workspace 根目录（绝对路径）。 */
 export function getWorkspaceRoot(): string {
@@ -15,6 +34,22 @@ export function getWorkspaceRoot(): string {
     return path.resolve(fromEnv);
   }
   return path.resolve(process.cwd());
+}
+
+function normalizeInputPath(input: string): string {
+  const trimmed = input.trim();
+  if (trimmed === '~') return os.homedir();
+  if (trimmed.startsWith('~/') || trimmed.startsWith('~\\')) {
+    return path.resolve(os.homedir(), trimmed.slice(2));
+  }
+  return trimmed.replace(/^%USERPROFILE%/i, os.homedir());
+}
+
+function isWithinRoot(target: string, root: string): boolean {
+  if (root === '*') return true;
+  const resolvedRoot = path.resolve(root);
+  const rel = path.relative(resolvedRoot, target);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 }
 
 /**
@@ -26,11 +61,12 @@ export function safeResolvePath(input: string, root?: string): string {
     throw new Error('路径不能为空');
   }
   const workspaceRoot = root ?? getWorkspaceRoot();
-  const target = path.isAbsolute(input)
-    ? path.resolve(input)
-    : path.resolve(workspaceRoot, input);
+  const expandedInput = normalizeInputPath(input);
+  const target = path.isAbsolute(expandedInput)
+    ? path.resolve(expandedInput)
+    : path.resolve(workspaceRoot, expandedInput);
   const rel = path.relative(workspaceRoot, target);
-  if (rel.startsWith('..') || path.isAbsolute(rel)) {
+  if ((rel.startsWith('..') || path.isAbsolute(rel)) && !temporaryAllowedPathRoots.some((root) => isWithinRoot(target, root))) {
     throw new Error(`路径 "${input}" 超出 workspace (${workspaceRoot})`);
   }
   return target;

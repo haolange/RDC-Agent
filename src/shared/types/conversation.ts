@@ -134,6 +134,30 @@ export interface ConversationCancelActiveTurnResult {
   error?: string;
 }
 
+export interface ConversationAnswerUserInputRequest {
+  sessionId?: string | null;
+  turnId: string;
+  toolCallId: string;
+  answer: string;
+}
+
+export interface ConversationAnswerUserInputResult {
+  success: boolean;
+  error?: string;
+}
+
+export interface ConversationAnswerToolApprovalRequest {
+  sessionId?: string | null;
+  turnId: string;
+  approvalId: string;
+  approved: boolean;
+}
+
+export interface ConversationAnswerToolApprovalResult {
+  success: boolean;
+  error?: string;
+}
+
 export interface ConversationTurnResult {
   session: SessionRecord | null;
   mode: ConversationMode;

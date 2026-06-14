@@ -8,6 +8,10 @@ export const createConversationApi = (): ConversationApi => ({
     ipcRenderer.invoke('conversation:sendMessage', request),
   cancelActiveTurn: (request): ReturnType<ConversationApi['cancelActiveTurn']> =>
     ipcRenderer.invoke('conversation:cancelActiveTurn', request),
+  answerUserInput: (request): ReturnType<ConversationApi['answerUserInput']> =>
+    ipcRenderer.invoke('conversation:answerUserInput', request),
+  answerToolApproval: (request): ReturnType<ConversationApi['answerToolApproval']> =>
+    ipcRenderer.invoke('conversation:answerToolApproval', request),
   getHistory: (sessionId): ReturnType<ConversationApi['getHistory']> =>
     ipcRenderer.invoke('conversation:getHistory', sessionId),
   onEvent: (callback): void => {
