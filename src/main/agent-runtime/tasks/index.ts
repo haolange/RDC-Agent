@@ -20,4 +20,5 @@ export {
   createTaskUpdateTool,
   createTaskGetTool,
   createTaskListTool,
+  createTaskStopTool,
 } from './TaskTools';

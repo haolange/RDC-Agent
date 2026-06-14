@@ -99,6 +99,10 @@
     'agent:getAllStates',
     'agent:configure',
   ],
+  command: [
+    'command:list',
+    'command:execute',
+  ],
   trace: [
     'trace:getRun',
     'trace:getEvents',

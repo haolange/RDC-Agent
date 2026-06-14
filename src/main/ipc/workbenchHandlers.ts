@@ -14,8 +14,10 @@ import { settingsService } from '../settings/SettingsService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
+import { sessionResumeService } from '../sessions/SessionResumeService';
 import { registerAgentHandlers } from './agentHandlers';
 import { registerCaptureDeviceHandlers } from './captureDeviceHandlers';
+import { registerCommandHandlers } from './commandHandlers';
 import { registerConversationHandlers } from './conversationHandlers';
 import { registerProjectSessionHandlers } from './projectSessionHandlers';
 import { registerRuntimeTerminalHandlers } from './runtimeTerminalHandlers';
@@ -58,6 +60,16 @@ export async function initializeIpcState(): Promise<void> {
   }
 
   await debuggerRuntime.recoverInterruptedRuns();
+
+  // 检测可恢复的会话
+  try {
+    const resumable = await sessionResumeService.getResumableSession();
+    if (resumable && resumable.sessionId) {
+      state.currentSessionId = resumable.sessionId;
+      state.currentProjectId = resumable.projectId;
+      state.currentRunId = resumable.runId;
+    }
+  } catch { /* resume detection is best-effort */ }
 }
 
 function broadcastToRenderer(channel: string, ...args: unknown[]): void {
@@ -259,6 +271,7 @@ export function registerIPCHandlers(): void {
   registerRuntimeTerminalHandlers();
   registerCaptureDeviceHandlers(context);
   registerAgentHandlers(context);
+  registerCommandHandlers();
   registerToolEvidenceHandlers(context);
   registerSettingsLlmHandlers(context);
   registerTraceHandlers(context);

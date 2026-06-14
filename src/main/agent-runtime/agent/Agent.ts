@@ -16,6 +16,7 @@
  */
 
 import { EventStream } from '../core/EventStream';
+import { ErrorRecovery } from './ErrorRecovery';
 import type {
   AgentEvent,
   AgentMessage,
@@ -76,6 +77,8 @@ export interface AgentOptions {
   followUpMode?: 'all' | 'one-at-a-time';
   /** 最大工具执行轮数（防御性上限）。 */
   maxTurns?: number;
+  /** 错误恢复管理器（可选）。用于 LLM 错误的自动重试/模型切换/压缩。 */
+  errorRecovery?: ErrorRecovery;
 }
 
 // =====================================================================
@@ -336,6 +339,7 @@ export class Agent {
       getSteeringMessages: () => this.getSteeringMessages(),
       getFollowUpMessages: () => this.getFollowUpMessages(),
       signal: opts.streamOptions?.signal,
+      errorRecovery: opts.errorRecovery,
     };
   }
 }

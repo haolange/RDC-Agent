@@ -1,0 +1,62 @@
+.slash-command-popover {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--surface-primary);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  z-index: 100;
+  margin-bottom: 4px;
+}
+
+.slash-command-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.slash-command-item:hover,
+.slash-command-item.selected {
+  background: var(--surface-hover);
+}
+
+.slash-command-name {
+  font-weight: 600;
+  color: var(--text-accent);
+  min-width: 80px;
+}
+
+.slash-command-desc {
+  flex: 1;
+  font-size: 0.85em;
+  color: var(--text-secondary);
+}
+
+.slash-command-cat {
+  font-size: 0.75em;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+
+.slash-command-footer {
+  padding: 4px 12px;
+  font-size: 0.7em;
+  color: var(--text-tertiary);
+  border-top: 1px solid var(--border-default);
+  text-align: right;
+}
+
+.slash-command-footer kbd {
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-family: monospace;
+}

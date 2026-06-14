@@ -34,7 +34,7 @@ const ALLOWED_STATUS: TaskStatus[] = [
  * 基于一个 `TaskRegistry` 实例创建 4 个工具。
  *
  * @param registry 任务注册表实例。
- * @returns 工具数组：`[task_create, task_update, task_get, task_list]`。
+ * @returns 工具数组：`[task_create, task_update, task_get, task_list, task_stop]`。
  */
 export function createTaskTools(registry: TaskRegistry): AgentTool[] {
   return [
@@ -42,6 +42,7 @@ export function createTaskTools(registry: TaskRegistry): AgentTool[] {
     createTaskUpdateTool(registry) as unknown as AgentTool,
     createTaskGetTool(registry) as unknown as AgentTool,
     createTaskListTool(registry) as unknown as AgentTool,
+    createTaskStopTool(registry) as unknown as AgentTool,
   ];
 }
 
@@ -291,6 +292,48 @@ export function createTaskListTool(
         content: [{ type: 'text', text: lines.join('\n') }],
         details: { count: tasks.length },
       } satisfies AgentToolResult<{ count: number }>;
+    },
+  };
+}
+
+// ── task_stop ──────────────────────────────────────────────────
+
+interface TaskStopParams {
+  taskId: string;
+}
+
+/** 构造 `task_stop` 工具 — 停止/取消一个进行中的任务。 */
+export function createTaskStopTool(
+  registry: TaskRegistry,
+): AgentTool<TaskStopParams, { id: string }> {
+  return {
+    name: 'task_stop',
+    label: 'Stop Task',
+    description: 'Stop a running task (set status to deleted)',
+    parameters: {
+      type: 'object',
+      properties: {
+        taskId: { type: 'string', description: 'ID of the task to stop' },
+      },
+      required: ['taskId'],
+    },
+    permissionHint: 'readonly',
+
+    async execute(_toolCallId, params, signal) {
+      throwIfAborted(signal);
+      const taskId = readString(params, 'taskId', true);
+      const task = await registry.getTask(taskId);
+      if (!task) {
+        return {
+          content: [{ type: 'text', text: `Task not found: ${taskId}` }],
+          details: { id: taskId },
+        } satisfies AgentToolResult<{ id: string }>;
+      }
+      await registry.updateTask(taskId, { status: 'deleted' });
+      return {
+        content: [{ type: 'text', text: `Stopped ${taskId}: ${task.subject}` }],
+        details: { id: taskId },
+      } satisfies AgentToolResult<{ id: string }>;
     },
   };
 }

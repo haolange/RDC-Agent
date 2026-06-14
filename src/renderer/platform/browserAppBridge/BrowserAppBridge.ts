@@ -68,6 +68,10 @@ class BrowserAppBridgeClient {
       getAllStates: () => this.invoke('agent:getAllStates'),
       configure: (agentId, config) => this.invoke('agent:configure', agentId, config),
     },
+    command: {
+      list: (category?) => this.invoke('command:list', category),
+      execute: (request) => this.invoke('command:execute', request),
+    },
     tool: {
       getCatalog: () => this.invoke('tool:getCatalog'),
       getRuntimeSummary: () => this.invoke('tool:getRuntimeSummary'),
