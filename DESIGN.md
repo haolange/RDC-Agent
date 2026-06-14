@@ -75,7 +75,7 @@ Agent messages are structured as:
 2. Work Process block;
 3. final answer.
 
-The Work Process block is expanded while running and collapsed after success. Errors, approvals, long-running tools, and diagnostics may auto-expand. Tool cards show tool name, status, duration, argument summary, result summary, and lazily loaded details.
+The Work Process block is a real runtime transcript, not a stage status log. It is expanded while running and keeps its latest expanded/collapsed state after terminal states; users collapse or expand it manually. Errors, approvals, long-running tools, and diagnostics may auto-expand. Tool rows show tool name, status, duration, argument summary, readable result preview, and lazily loaded raw details.
 
 Composer profile menus show profile name and status. Long descriptions belong in hover tooltips, not inline list clutter.
 

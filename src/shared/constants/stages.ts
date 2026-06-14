@@ -60,26 +60,8 @@ export const SIMPLIFIED_STAGES: Array<{ id: string; name: string; stages: Workfl
   { id: 'evaluator', name: 'Evaluator', stages: STAGE_GROUPS.evaluator },
 ];
 
-export const LEGACY_STAGE_MIGRATION: Record<string, WorkflowStage> = {
-  preflight_pending: 'preflight',
-  intent_gate_passed: 'speclist',
-  entry_gate_passed: 'entry_gate',
-  waiting_for_specialist_brief: 'dispatch',
-  specialist_briefs_collected: 'dispatch',
-  expert_investigation_complete: 'investigate',
-  fix_verification_complete: 'fix_verify',
-  skeptic_ready: 'skepti',
-  curator_ready: 'curate',
-  finalized: 'finalize',
-  validation_blocked: 'blocked',
-};
-
 export const normalizeWorkflowStage = (stage: string | undefined | null): WorkflowStage => {
-  if (!stage) {
-    return 'preflight';
-  }
-  if (ALL_STAGES.includes(stage as WorkflowStage)) {
-    return stage as WorkflowStage;
-  }
-  return LEGACY_STAGE_MIGRATION[stage] || 'preflight';
+  if (!stage) return 'preflight';
+  if (ALL_STAGES.includes(stage as WorkflowStage)) return stage as WorkflowStage;
+  return 'preflight';
 };

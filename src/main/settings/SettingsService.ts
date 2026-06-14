@@ -25,7 +25,7 @@ import type {
   WorkspaceSettings,
 } from '@shared/types/settings';
 import type { LLMConfig, LLMProviderConfig } from '@shared/types/llm';
-import { DEFAULT_MODEL_ROUTING } from '@shared/types/agent';
+import { DEFAULT_MODEL_ROUTING, isSafeAgentProfileId } from '@shared/types/agent';
 import {
   LEFT_SIDEBAR_COLLAPSED_WIDTH,
   LEFT_SIDEBAR_DEFAULT_WIDTH,
@@ -112,7 +112,6 @@ const RIGHT_DEFAULTS = {
 const VALID_THEMES: AppTheme[] = ['dark', 'light', 'system'];
 const VALID_LANGUAGES: AppLanguage[] = ['zh-CN', 'en'];
 const VALID_FONT_SCALES: FontScale[] = ['small', 'medium', 'large'];
-const KNOWN_AGENT_IDS = new Set(Object.keys(DEFAULT_MODEL_ROUTING));
 const RETIRED_BUILTIN_MCP_SERVER_IDS = new Set(['builtin.rdc-toolbridge']);
 const EMPTY_PATHS: AppRuntimePaths = {
   workspaceRoot: '',
@@ -542,7 +541,7 @@ function sanitizeRoute(entry: unknown): LlmAgentRoute | null {
   }
 
   const route = entry as Partial<LlmAgentRoute>;
-  if (typeof route.agentId !== 'string' || !KNOWN_AGENT_IDS.has(route.agentId)) {
+  if (typeof route.agentId !== 'string' || !isSafeAgentProfileId(route.agentId)) {
     return null;
   }
 
@@ -664,6 +663,7 @@ function sanitizeUserProvider(
     oauthRefreshAvailable: typeof provider.oauthRefreshAvailable === 'boolean' ? provider.oauthRefreshAvailable : undefined,
     unavailableReason: definition?.unavailableReason,
     isConfigured: status === 'verified' && models.length > 0 && enabled,
+    capabilities: definition?.capabilities ? [...definition.capabilities] : undefined,
   };
 }
 
@@ -733,7 +733,9 @@ function normalizeUserRoutes(
   routes: unknown,
   providers: LlmProviderEntry[],
 ): LlmAgentRoute[] {
-  const routeMap = new Map<string, LlmAgentRoute>();
+  const routeMap = new Map<string, LlmAgentRoute>(
+    createEmptyAgentRoutes().map((route) => [route.agentId, route]),
+  );
   for (const route of Array.isArray(routes) ? routes.map(sanitizeRoute) : []) {
     if (!route) {
       continue;
@@ -741,10 +743,10 @@ function normalizeUserRoutes(
     routeMap.set(route.agentId, route);
   }
 
-  return createEmptyAgentRoutes().map((route) => {
-    const incoming = routeMap.get(route.agentId);
-    if (!incoming?.providerId || !incoming.modelId) {
-      return route;
+  for (const [agentId, incoming] of routeMap.entries()) {
+    if (!incoming.providerId || !incoming.modelId) {
+      routeMap.set(agentId, { agentId, providerId: '', modelId: '' });
+      continue;
     }
 
     const provider = providers.find((entry) => entry.id === incoming.providerId);
@@ -754,8 +756,12 @@ function normalizeUserRoutes(
       && provider.models.some((model) => model.id === incoming.modelId && model.enabled !== false),
     );
 
-    return isValid ? incoming : route;
-  });
+    if (!isValid) {
+      routeMap.set(agentId, { agentId, providerId: '', modelId: '' });
+    }
+  }
+
+  return Array.from(routeMap.values());
 }
 
 function parseMigrationSummary(reportPath?: string): string[] {

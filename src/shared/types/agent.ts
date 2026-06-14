@@ -70,6 +70,7 @@ export interface AgentConversation {
 }
 
 export const TOP_LEVEL_AGENT_IDS: AgentId[] = ['ask', 'plan', 'edit', 'debugger', 'analyzer', 'optimizer'];
+export const SAFE_AGENT_PROFILE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 
 export const DEFAULT_MODEL_ROUTING: Record<AgentId, { provider: LlmProviderId; model: string }> = {
   ask: { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
@@ -91,6 +92,10 @@ export const AGENT_CATEGORY_MAP: Record<AgentId, AgentCategory> = {
 
 export function isTopLevelAgentId(value: string): value is AgentId {
   return (TOP_LEVEL_AGENT_IDS as string[]).includes(value);
+}
+
+export function isSafeAgentProfileId(value: string): boolean {
+  return SAFE_AGENT_PROFILE_ID_PATTERN.test(value);
 }
 
 import type { ToolTraceEntry } from './tool';

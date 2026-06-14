@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
 import type { AgentId } from '@shared/types/agent';
-import { isTopLevelAgentId } from '@shared/types/agent';
+import { isSafeAgentProfileId } from '@shared/types/agent';
 import type {
   AgentHandoffDefinition,
   AgentManifestDefinition,
@@ -27,6 +27,20 @@ const toSlug = (value: string): string => {
 };
 
 const fileNameForId = (id: string): string => `${toSlug(id.replace(/_/g, '-'))}.agent.md`;
+
+const idFromFileName = (fileName: string): string => fileName.replace(/\.agent\.md$/u, '');
+
+const safeFileNameForDraft = (draft: Pick<AgentManifestDraft, 'id' | 'name' | 'fileName'>): string => {
+  const agentId = draft.id || toSlug(draft.name);
+  if (!isSafeAgentProfileId(agentId)) {
+    throw new Error(`Invalid agent profile id: ${agentId}`);
+  }
+  const candidate = draft.fileName && draft.fileName.endsWith('.agent.md')
+    ? path.basename(draft.fileName)
+    : fileNameForId(agentId);
+  const candidateId = idFromFileName(candidate);
+  return candidateId === agentId && isSafeAgentProfileId(candidateId) ? candidate : fileNameForId(agentId);
+};
 
 const readStringArray = (value: unknown): string[] => {
   if (Array.isArray(value)) {
@@ -204,10 +218,10 @@ export class AgentManifestService {
     const directoryPath = this.getAgentsDirectory(paths);
     const definitions = fs.readdirSync(directoryPath)
       .filter((entry) => entry.endsWith('.agent.md'))
-      .filter((entry) => isTopLevelAgentId(entry.replace(/\.agent\.md$/u, '')))
+      .filter((entry) => isSafeAgentProfileId(idFromFileName(entry)))
       .map((entry) => {
         const fullPath = path.join(directoryPath, entry);
-        const fallbackId = entry.replace(/\.agent\.md$/u, '');
+        const fallbackId = idFromFileName(entry);
         return parseAgentMarkdown(fullPath, fallbackId);
       })
       .sort((left, right) => Number(right.userInvocable) - Number(left.userInvocable) || left.name.localeCompare(right.name));
@@ -228,12 +242,11 @@ export class AgentManifestService {
     const directory = this.getAgentsDirectory(paths);
     fs.mkdirSync(directory, { recursive: true });
     for (const draft of drafts) {
-      if (!isTopLevelAgentId(draft.id)) {
-        continue;
+      const agentId = draft.id || toSlug(draft.name);
+      if (!isSafeAgentProfileId(agentId)) {
+        throw new Error(`Invalid agent profile id: ${agentId}`);
       }
-      const fileName = draft.fileName && draft.fileName.endsWith('.agent.md')
-        ? draft.fileName
-        : fileNameForId(draft.id || draft.name);
+      const fileName = safeFileNameForDraft(draft);
       const filePath = path.join(directory, fileName);
       if (draft.delete) {
         if (fs.existsSync(filePath)) {
@@ -243,7 +256,7 @@ export class AgentManifestService {
       }
       fs.writeFileSync(filePath, serializeAgentMarkdown({
         ...draft,
-        id: draft.id || toSlug(draft.name),
+        id: agentId,
         fileName,
       }), 'utf8');
     }
@@ -263,13 +276,13 @@ export class AgentManifestService {
     const directory = this.getAgentsDirectory(paths);
     fs.mkdirSync(directory, { recursive: true });
     const imported = parseAgentMarkdown(sourcePath, path.basename(sourcePath, '.agent.md'));
-    if (!isTopLevelAgentId(imported.id)) {
-      throw new Error(`Only top-level agent manifests can be imported: ${AGENT_ROLES.join(', ')}`);
+    if (!isSafeAgentProfileId(imported.id)) {
+      throw new Error(`Invalid agent profile id: ${imported.id}`);
     }
     const fileName = fileNameForId(imported.id || imported.name);
     const targetPath = path.join(directory, fileName);
     fs.copyFileSync(sourcePath, targetPath);
-    return parseAgentMarkdown(targetPath, fileName.replace(/\.agent\.md$/u, ''));
+    return parseAgentMarkdown(targetPath, idFromFileName(fileName));
   }
 
   routesFromDefinitions(
@@ -278,14 +291,12 @@ export class AgentManifestService {
     providers: LlmProviderEntry[],
   ): LlmAgentRoute[] {
     const routeMap = new Map(currentRoutes.map((route) => [route.agentId, route]));
-    const knownAgentIds = new Set<string>(AGENT_ROLES);
+    const routeAgentIds = new Set<string>(AGENT_ROLES);
     for (const definition of definitions) {
-      if (!knownAgentIds.has(definition.id) || definition.delete) {
+      if (definition.delete || !isSafeAgentProfileId(definition.id)) {
         continue;
       }
-      if (!isTopLevelAgentId(definition.id)) {
-        continue;
-      }
+      routeAgentIds.add(definition.id);
       const model = definition.models.map(splitCanonicalAgentModelId).find((entry) => entry !== null);
       if (!model) {
         routeMap.set(definition.id, {
@@ -313,7 +324,7 @@ export class AgentManifestService {
         modelId: model.modelId,
       });
     }
-    return AGENT_ROLES.map((agentId) => routeMap.get(agentId) ?? {
+    return Array.from(routeAgentIds).map((agentId) => routeMap.get(agentId) ?? {
       agentId,
       providerId: '',
       modelId: '',

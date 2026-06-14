@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useI18n } from '../../../i18n';
 import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
-import { AGENT_DISPLAY_NAMES, AGENT_ROLES } from '@shared/constants/agents';
 import { resolveAgentRouteStatus } from './agentRouteStatus';
 import { createSettingsModalActions } from './settingsModalActions';
 import { useProviderConnection } from './useProviderConnection';
@@ -58,19 +57,19 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     [modalState.providerDrafts],
   );
   const invalidAgentRoutes = useMemo(
-    () => AGENT_ROLES.map((agentId) => {
-      const route = modalState.agentRouteDrafts.find((entry) => entry.agentId === agentId);
+    () => modalState.agentManifestDrafts.filter((agent) => !agent.delete && agent.enabled).map((agent) => {
+      const route = modalState.agentRouteDrafts.find((entry) => entry.agentId === agent.id);
       const routeStatus = resolveAgentRouteStatus(route, modalState.providerDrafts);
-      return routeStatus.issue ? { agentId, issue: routeStatus.issue } : null;
+      return routeStatus.issue ? { agentId: agent.id, label: agent.name || agent.id, issue: routeStatus.issue } : null;
     }).filter((entry): entry is NonNullable<typeof entry> => entry !== null),
-    [modalState.agentRouteDrafts, modalState.providerDrafts],
+    [modalState.agentManifestDrafts, modalState.agentRouteDrafts, modalState.providerDrafts],
   );
   const invalidAgentRouteMessage = useMemo(() => {
     if (invalidAgentRoutes.length === 0) return '';
     return t('settings.agentRouteInvalidSummary', {
       count: invalidAgentRoutes.length,
       routes: invalidAgentRoutes
-        .map((entry) => `${AGENT_DISPLAY_NAMES[entry.agentId]}: ${t(entry.issue)}`)
+        .map((entry) => `${entry.label}: ${t(entry.issue)}`)
         .join('; '),
     });
   }, [invalidAgentRoutes, t]);

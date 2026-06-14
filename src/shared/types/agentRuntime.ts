@@ -12,6 +12,19 @@ import type { LlmProviderAuthMode, LlmProviderId, LlmProviderKind } from './sett
 import type { ToolCallResult } from './tool';
 import type { WorkflowPhase, WorkflowStage } from './workflow';
 
+export type ToolCallingMode = 'native-structured' | 'text-only' | 'disabled';
+
+export type ReasoningVisibility = 'summary-events' | 'hidden' | 'none';
+
+export interface AgentRouteCapability {
+  providerId: LlmProviderId;
+  modelId: string;
+  toolCallingMode: ToolCallingMode;
+  reasoningVisibility: ReasoningVisibility;
+  supportsStreaming: boolean;
+  supportsToolResults: boolean;
+}
+
 export type AgentEventType =
   | 'run.started'
   | 'assistant.delta'

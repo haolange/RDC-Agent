@@ -68,7 +68,10 @@ export type {
   AgentRuntimeMcpDescriptor,
   AgentRuntimePatternDescriptor,
   AgentRuntimeSkillDescriptor,
+  AgentRouteCapability,
   ModelProviderCapabilityMatrix,
+  ReasoningVisibility,
+  ToolCallingMode,
 } from './agentRuntime';
 export type {
   ConversationMessage,

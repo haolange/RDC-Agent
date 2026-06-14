@@ -5,10 +5,14 @@ import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
 import { useProjectStore } from '../../../stores/projectStore';
 
-const EXECUTABLE_CONVERSATION_MODES = new Set<AgentMode>(['edit', 'debugger', 'analyzer', 'optimizer']);
+const EXECUTABLE_APP_MODES = new Set<string>(['edit', 'debugger', 'analyzer', 'optimizer']);
 
-export const toConversationMode = (mode: AgentMode): AppMode =>
-  EXECUTABLE_CONVERSATION_MODES.has(mode) ? mode as AppMode : 'ask';
+export const toConversationMode = (mode: AgentMode): AppMode => {
+  if (mode === 'ask' || mode === 'plan') {
+    return 'ask';
+  }
+  return EXECUTABLE_APP_MODES.has(mode) ? mode as AppMode : 'edit';
+};
 
 export function buildLocalConversationErrorTurn(options: {
   trimmed: string;
@@ -19,6 +23,7 @@ export function buildLocalConversationErrorTurn(options: {
   pendingAttachments: PendingAttachmentDraft[];
   errorMessage: string;
   failedSummary: string;
+  selectedAgentId?: string;
 }): ConversationMessage[] {
   const {
     trimmed,
@@ -29,6 +34,7 @@ export function buildLocalConversationErrorTurn(options: {
     pendingAttachments,
     errorMessage,
     failedSummary,
+    selectedAgentId,
   } = options;
   const turnId = `local-turn-${Date.now()}`;
   const now = Date.now();
@@ -68,7 +74,7 @@ export function buildLocalConversationErrorTurn(options: {
       runId: currentRun?.runId ?? null,
       modeContext: conversationMode,
       role: 'assistant',
-      agentId: 'debugger',
+      agentId: selectedAgentId || currentMode,
       content: errorMessage,
       status: 'error',
       updatedAt: now,

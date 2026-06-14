@@ -150,6 +150,7 @@ class RuntimeLogService {
 }
 const runtimeLogService = new RuntimeLogService();
 const TOP_LEVEL_AGENT_IDS = ["ask", "plan", "edit", "debugger", "analyzer", "optimizer"];
+const SAFE_AGENT_PROFILE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
 const DEFAULT_MODEL_ROUTING = {
   ask: { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
   plan: { provider: "openrouter", model: "anthropic/claude-3-sonnet" },
@@ -160,6 +161,9 @@ const DEFAULT_MODEL_ROUTING = {
 };
 function isTopLevelAgentId(value) {
   return TOP_LEVEL_AGENT_IDS.includes(value);
+}
+function isSafeAgentProfileId(value) {
+  return SAFE_AGENT_PROFILE_ID_PATTERN.test(value);
 }
 const LEFT_SIDEBAR_DEFAULT_WIDTH = 256;
 const LEFT_SIDEBAR_MIN_WIDTH = 220;
@@ -1043,6 +1047,16 @@ const toSlug = (value) => {
   return slug || "agent";
 };
 const fileNameForId = (id) => `${toSlug(id.replace(/_/g, "-"))}.agent.md`;
+const idFromFileName = (fileName) => fileName.replace(/\.agent\.md$/u, "");
+const safeFileNameForDraft = (draft) => {
+  const agentId = draft.id || toSlug(draft.name);
+  if (!isSafeAgentProfileId(agentId)) {
+    throw new Error(`Invalid agent profile id: ${agentId}`);
+  }
+  const candidate = draft.fileName && draft.fileName.endsWith(".agent.md") ? path.basename(draft.fileName) : fileNameForId(agentId);
+  const candidateId = idFromFileName(candidate);
+  return candidateId === agentId && isSafeAgentProfileId(candidateId) ? candidate : fileNameForId(agentId);
+};
 const readStringArray$1 = (value) => {
   if (Array.isArray(value)) {
     return value.filter((entry) => typeof entry === "string").map((entry) => entry.trim()).filter(Boolean);
@@ -1191,9 +1205,9 @@ class AgentManifestService {
   getSettings(paths, providers, routes) {
     this.ensureSeedManifests(paths, routes);
     const directoryPath = this.getAgentsDirectory(paths);
-    const definitions = fs.readdirSync(directoryPath).filter((entry) => entry.endsWith(".agent.md")).filter((entry) => isTopLevelAgentId(entry.replace(/\.agent\.md$/u, ""))).map((entry) => {
+    const definitions = fs.readdirSync(directoryPath).filter((entry) => entry.endsWith(".agent.md")).filter((entry) => isSafeAgentProfileId(idFromFileName(entry))).map((entry) => {
       const fullPath = path.join(directoryPath, entry);
-      const fallbackId = entry.replace(/\.agent\.md$/u, "");
+      const fallbackId = idFromFileName(entry);
       return parseAgentMarkdown(fullPath, fallbackId);
     }).sort((left, right) => Number(right.userInvocable) - Number(left.userInvocable) || left.name.localeCompare(right.name));
     return {
@@ -1207,10 +1221,11 @@ class AgentManifestService {
     const directory = this.getAgentsDirectory(paths);
     fs.mkdirSync(directory, { recursive: true });
     for (const draft of drafts) {
-      if (!isTopLevelAgentId(draft.id)) {
-        continue;
+      const agentId = draft.id || toSlug(draft.name);
+      if (!isSafeAgentProfileId(agentId)) {
+        throw new Error(`Invalid agent profile id: ${agentId}`);
       }
-      const fileName = draft.fileName && draft.fileName.endsWith(".agent.md") ? draft.fileName : fileNameForId(draft.id || draft.name);
+      const fileName = safeFileNameForDraft(draft);
       const filePath = path.join(directory, fileName);
       if (draft.delete) {
         if (fs.existsSync(filePath)) {
@@ -1219,8 +1234,7 @@ class AgentManifestService {
         continue;
       }
       fs.writeFileSync(filePath, serializeAgentMarkdown({
-        ...draft,
-        id: draft.id || toSlug(draft.name)
+        ...draft
       }), "utf8");
     }
     if (typeof globalInstructions === "string") {
@@ -1237,24 +1251,22 @@ class AgentManifestService {
     const directory = this.getAgentsDirectory(paths);
     fs.mkdirSync(directory, { recursive: true });
     const imported = parseAgentMarkdown(sourcePath, path.basename(sourcePath, ".agent.md"));
-    if (!isTopLevelAgentId(imported.id)) {
-      throw new Error(`Only top-level agent manifests can be imported: ${AGENT_ROLES.join(", ")}`);
+    if (!isSafeAgentProfileId(imported.id)) {
+      throw new Error(`Invalid agent profile id: ${imported.id}`);
     }
     const fileName = fileNameForId(imported.id || imported.name);
     const targetPath = path.join(directory, fileName);
     fs.copyFileSync(sourcePath, targetPath);
-    return parseAgentMarkdown(targetPath, fileName.replace(/\.agent\.md$/u, ""));
+    return parseAgentMarkdown(targetPath, idFromFileName(fileName));
   }
   routesFromDefinitions(currentRoutes, definitions, providers) {
     const routeMap = new Map(currentRoutes.map((route) => [route.agentId, route]));
-    const knownAgentIds = new Set(AGENT_ROLES);
+    const routeAgentIds = new Set(AGENT_ROLES);
     for (const definition of definitions) {
-      if (!knownAgentIds.has(definition.id) || definition.delete) {
+      if (definition.delete || !isSafeAgentProfileId(definition.id)) {
         continue;
       }
-      if (!isTopLevelAgentId(definition.id)) {
-        continue;
-      }
+      routeAgentIds.add(definition.id);
       const model = definition.models.map(splitCanonicalAgentModelId).find((entry) => entry !== null);
       if (!model) {
         routeMap.set(definition.id, {
@@ -1280,7 +1292,7 @@ class AgentManifestService {
         modelId: model.modelId
       });
     }
-    return AGENT_ROLES.map((agentId) => routeMap.get(agentId) ?? {
+    return Array.from(routeAgentIds).map((agentId) => routeMap.get(agentId) ?? {
       agentId,
       providerId: "",
       modelId: ""
@@ -1333,27 +1345,10 @@ const STAGE_PHASES = {
   finalize: "evaluator",
   blocked: "evaluator"
 };
-const LEGACY_STAGE_MIGRATION = {
-  preflight_pending: "preflight",
-  intent_gate_passed: "speclist",
-  entry_gate_passed: "entry_gate",
-  waiting_for_specialist_brief: "dispatch",
-  specialist_briefs_collected: "dispatch",
-  expert_investigation_complete: "investigate",
-  fix_verification_complete: "fix_verify",
-  skeptic_ready: "skepti",
-  curator_ready: "curate",
-  finalized: "finalize",
-  validation_blocked: "blocked"
-};
 const normalizeWorkflowStage = (stage) => {
-  if (!stage) {
-    return "preflight";
-  }
-  if (ALL_STAGES.includes(stage)) {
-    return stage;
-  }
-  return LEGACY_STAGE_MIGRATION[stage] || "preflight";
+  if (!stage) return "preflight";
+  if (ALL_STAGES.includes(stage)) return stage;
+  return "preflight";
 };
 const RETIRED_BUILTIN_MCP_SERVER_IDS$1 = /* @__PURE__ */ new Set(["builtin.rdc-toolbridge"]);
 const TEMPLATE_COPIES = [
@@ -1831,7 +1826,6 @@ const RIGHT_DEFAULTS = {
 const VALID_THEMES = ["dark", "light", "system"];
 const VALID_LANGUAGES = ["zh-CN", "en"];
 const VALID_FONT_SCALES = ["small", "medium", "large"];
-const KNOWN_AGENT_IDS = new Set(Object.keys(DEFAULT_MODEL_ROUTING));
 const RETIRED_BUILTIN_MCP_SERVER_IDS = /* @__PURE__ */ new Set(["builtin.rdc-toolbridge"]);
 const EMPTY_PATHS = {
   workspaceRoot: "",
@@ -2188,7 +2182,7 @@ function sanitizeRoute(entry) {
     return null;
   }
   const route = entry;
-  if (typeof route.agentId !== "string" || !KNOWN_AGENT_IDS.has(route.agentId)) {
+  if (typeof route.agentId !== "string" || !isSafeAgentProfileId(route.agentId)) {
     return null;
   }
   return {
@@ -2268,7 +2262,8 @@ function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorksp
     oauthExpiresAt: typeof provider.oauthExpiresAt === "string" ? provider.oauthExpiresAt : void 0,
     oauthRefreshAvailable: typeof provider.oauthRefreshAvailable === "boolean" ? provider.oauthRefreshAvailable : void 0,
     unavailableReason: definition?.unavailableReason,
-    isConfigured: status === "verified" && models.length > 0 && enabled
+    isConfigured: status === "verified" && models.length > 0 && enabled,
+    capabilities: definition?.capabilities ? [...definition.capabilities] : void 0
   };
 }
 function normalizeUserProviders(providers, workspaceRoot) {
@@ -2305,24 +2300,29 @@ function hydrateProviderSecrets(providers, workspaceRoot) {
   });
 }
 function normalizeUserRoutes(routes, providers) {
-  const routeMap = /* @__PURE__ */ new Map();
+  const routeMap = new Map(
+    createEmptyAgentRoutes().map((route) => [route.agentId, route])
+  );
   for (const route of Array.isArray(routes) ? routes.map(sanitizeRoute) : []) {
     if (!route) {
       continue;
     }
     routeMap.set(route.agentId, route);
   }
-  return createEmptyAgentRoutes().map((route) => {
-    const incoming = routeMap.get(route.agentId);
-    if (!incoming?.providerId || !incoming.modelId) {
-      return route;
+  for (const [agentId, incoming] of routeMap.entries()) {
+    if (!incoming.providerId || !incoming.modelId) {
+      routeMap.set(agentId, { agentId, providerId: "", modelId: "" });
+      continue;
     }
     const provider = providers.find((entry) => entry.id === incoming.providerId);
     const isValid = Boolean(
       provider && provider.isConfigured && provider.models.some((model) => model.id === incoming.modelId && model.enabled !== false)
     );
-    return isValid ? incoming : route;
-  });
+    if (!isValid) {
+      routeMap.set(agentId, { agentId, providerId: "", modelId: "" });
+    }
+  }
+  return Array.from(routeMap.values());
 }
 function parseMigrationSummary(reportPath) {
   if (!reportPath || !fs.existsSync(reportPath)) {
@@ -7259,6 +7259,1719 @@ const STATUS_ICON = {
   completed: "✓",
   deleted: "✗"
 };
+const EMPTY_USAGE = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+class AssistantStreamBuilder {
+  stream;
+  blocks = [];
+  modelId;
+  providerId;
+  usage = { ...EMPTY_USAGE };
+  started = false;
+  finished = false;
+  constructor(stream, modelId, providerId) {
+    this.stream = stream;
+    this.modelId = modelId;
+    this.providerId = providerId;
+  }
+  /** 推送 `start` 事件并初始化 partial。 */
+  start() {
+    if (this.started) return;
+    this.started = true;
+    this.stream.push({ type: "start", partial: this.snapshot("stop") });
+  }
+  /** 累积一段文本到指定 contentIndex；首次出现会自动发 `text_start`。 */
+  appendText(index, delta) {
+    if (!delta) return;
+    let block = this.blocks[index];
+    if (!block || block.kind !== "text") {
+      block = { kind: "text", index, text: "", closed: false };
+      this.blocks[index] = block;
+      this.stream.push({
+        type: "text_start",
+        contentIndex: index,
+        partial: this.snapshot("stop")
+      });
+    }
+    block.text += delta;
+    this.stream.push({
+      type: "text_delta",
+      contentIndex: index,
+      delta,
+      partial: this.snapshot("stop")
+    });
+  }
+  /** 显式结束某个文本块，发 `text_end` 事件。 */
+  endText(index) {
+    const block = this.blocks[index];
+    if (!block || block.kind !== "text" || block.closed) return;
+    block.closed = true;
+    this.stream.push({
+      type: "text_end",
+      contentIndex: index,
+      content: block.text,
+      partial: this.snapshot("stop")
+    });
+  }
+  /** 累积一段 thinking。 */
+  appendThinking(index, delta) {
+    if (!delta) return;
+    let block = this.blocks[index];
+    if (!block || block.kind !== "thinking") {
+      block = { kind: "thinking", index, text: "", closed: false };
+      this.blocks[index] = block;
+      this.stream.push({
+        type: "thinking_start",
+        contentIndex: index,
+        partial: this.snapshot("stop")
+      });
+    }
+    block.text += delta;
+    this.stream.push({
+      type: "thinking_delta",
+      contentIndex: index,
+      delta,
+      partial: this.snapshot("stop")
+    });
+  }
+  endThinking(index) {
+    const block = this.blocks[index];
+    if (!block || block.kind !== "thinking" || block.closed) return;
+    block.closed = true;
+    this.stream.push({
+      type: "thinking_end",
+      contentIndex: index,
+      content: block.text,
+      partial: this.snapshot("stop")
+    });
+  }
+  /** 初始化或更新一个 tool_call 块（不发 delta）。 */
+  ensureToolCall(index, id, name) {
+    let block = this.blocks[index];
+    if (!block || block.kind !== "tool") {
+      block = {
+        kind: "tool",
+        index,
+        id: id || `call_${index}`,
+        name: name || "",
+        argsBuffer: "",
+        closed: false
+      };
+      this.blocks[index] = block;
+      this.stream.push({
+        type: "toolcall_start",
+        contentIndex: index,
+        partial: this.snapshot("stop")
+      });
+    } else {
+      if (id && !block.id.startsWith("call_")) ;
+      else if (id) {
+        block.id = id;
+      }
+      if (name && !block.name) {
+        block.name = name;
+      }
+    }
+  }
+  /** 累积一段 tool_call 参数（原始 JSON 字符串增量）。 */
+  appendToolCallArgs(index, delta) {
+    if (!delta) return;
+    const block = this.blocks[index];
+    if (!block || block.kind !== "tool") return;
+    block.argsBuffer += delta;
+    this.stream.push({
+      type: "toolcall_delta",
+      contentIndex: index,
+      delta,
+      partial: this.snapshot("stop")
+    });
+  }
+  /** 结束 tool_call，解析 args，发 `toolcall_end`。 */
+  endToolCall(index) {
+    const block = this.blocks[index];
+    if (!block || block.kind !== "tool" || block.closed) return;
+    block.closed = true;
+    const toolCall = {
+      type: "toolCall",
+      id: block.id,
+      name: block.name,
+      arguments: parseJsonSafely(block.argsBuffer)
+    };
+    this.stream.push({
+      type: "toolcall_end",
+      contentIndex: index,
+      toolCall,
+      partial: this.snapshot("stop")
+    });
+  }
+  /** 设置或合并 usage 信息。 */
+  setUsage(partial) {
+    this.usage = {
+      inputTokens: partial.inputTokens ?? this.usage.inputTokens,
+      outputTokens: partial.outputTokens ?? this.usage.outputTokens,
+      totalTokens: partial.totalTokens ?? (partial.inputTokens ?? this.usage.inputTokens) + (partial.outputTokens ?? this.usage.outputTokens),
+      cost: partial.cost ?? this.usage.cost
+    };
+  }
+  /** 完成流：关闭所有未关闭块，推 `done` 事件并 complete。 */
+  done(reason) {
+    if (this.finished) return;
+    this.finished = true;
+    for (let i = 0; i < this.blocks.length; i += 1) {
+      const block = this.blocks[i];
+      if (!block || block.closed) continue;
+      if (block.kind === "text") this.endText(i);
+      else if (block.kind === "thinking") this.endThinking(i);
+      else this.endToolCall(i);
+    }
+    const message = this.snapshot(reason);
+    this.stream.push({ type: "done", reason, message });
+  }
+  /** 标记错误：推 `error` 事件，并以错误结束 stream。 */
+  fail(error, reason = "error") {
+    if (this.finished) return;
+    this.finished = true;
+    const message = this.snapshot(reason);
+    this.stream.push({ type: "error", error, message });
+    this.stream.error(error);
+  }
+  /** 是否已经结束。 */
+  get isFinished() {
+    return this.finished;
+  }
+  // -----------------------------------------------------------------
+  // 内部
+  // -----------------------------------------------------------------
+  snapshot(reason) {
+    const content = [];
+    for (const block of this.blocks) {
+      if (!block) continue;
+      if (block.kind === "text") {
+        const item = { type: "text", text: block.text };
+        content.push(item);
+      } else if (block.kind === "thinking") {
+        const item = { type: "thinking", thinking: block.text };
+        content.push(item);
+      } else {
+        const item = {
+          type: "toolCall",
+          id: block.id,
+          name: block.name,
+          arguments: parseJsonSafely(block.argsBuffer)
+        };
+        content.push(item);
+      }
+    }
+    return {
+      role: "assistant",
+      content,
+      model: this.modelId,
+      provider: this.providerId,
+      usage: { ...this.usage },
+      stopReason: reason,
+      timestamp: Date.now()
+    };
+  }
+}
+function parseJsonSafely(raw) {
+  if (!raw || !raw.trim()) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed;
+    }
+    return { value: parsed };
+  } catch {
+    return { _raw: raw };
+  }
+}
+async function* parseSSE(response, signal) {
+  if (!response.body) {
+    throw new Error("parseSSE: response.body is null");
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    while (true) {
+      if (signal?.aborted) {
+        break;
+      }
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const rawLine of lines) {
+        const line = rawLine.replace(/\r$/, "");
+        if (!line.startsWith("data:")) {
+          continue;
+        }
+        const data = line.slice(5).trimStart();
+        if (data === "[DONE]") {
+          return;
+        }
+        if (data.length === 0) {
+          continue;
+        }
+        yield data;
+      }
+    }
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+    }
+  }
+}
+async function* parseJsonLines(response, signal) {
+  if (!response.body) {
+    throw new Error("parseJsonLines: response.body is null");
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    while (true) {
+      if (signal?.aborted) {
+        break;
+      }
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) {
+          continue;
+        }
+        yield line;
+      }
+    }
+    const tail = buffer.trim();
+    if (tail) {
+      yield tail;
+    }
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+    }
+  }
+}
+class ProviderHttpError extends Error {
+  status;
+  providerApi;
+  bodyText;
+  constructor(providerApi, status, message, bodyText) {
+    super(`[${providerApi}] HTTP ${status}: ${message}`);
+    this.name = "ProviderHttpError";
+    this.providerApi = providerApi;
+    this.status = status;
+    this.bodyText = bodyText;
+  }
+}
+async function ensureOk(response, providerApi) {
+  if (response.ok) {
+    return;
+  }
+  let bodyText;
+  try {
+    bodyText = await response.text();
+  } catch {
+    bodyText = void 0;
+  }
+  const snippet = bodyText ? bodyText.slice(0, 500) : response.statusText || "request failed";
+  throw new ProviderHttpError(providerApi, response.status, snippet, bodyText);
+}
+function composeAbortSignals(external, internal) {
+  const controller = new AbortController();
+  const onAbort = (reason) => {
+    if (!controller.signal.aborted) {
+      controller.abort(reason);
+    }
+  };
+  if (internal.aborted) {
+    onAbort(internal.reason);
+  } else {
+    internal.addEventListener("abort", () => onAbort(internal.reason), { once: true });
+  }
+  if (external) {
+    if (external.aborted) {
+      onAbort(external.reason);
+    } else {
+      external.addEventListener("abort", () => onAbort(external.reason), { once: true });
+    }
+  }
+  return {
+    signal: controller.signal,
+    dispose: () => {
+    }
+  };
+}
+function normalizeError(err) {
+  if (err instanceof Error) return err;
+  return new Error(String(err));
+}
+const DEFAULT_BASE_URL$3 = "https://api.anthropic.com/v1";
+const DEFAULT_ANTHROPIC_VERSION = "2023-06-01";
+const PROVIDER_API$3 = "anthropic-messages";
+let AnthropicProvider$1 = class AnthropicProvider {
+  api = PROVIDER_API$3;
+  defaultBaseUrl;
+  defaultApiKey;
+  anthropicVersion;
+  defaultHeaders;
+  capabilities;
+  constructor(options = {}) {
+    this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL$3).replace(/\/+$/, "");
+    this.defaultApiKey = options.apiKey;
+    this.anthropicVersion = options.anthropicVersion ?? DEFAULT_ANTHROPIC_VERSION;
+    this.defaultHeaders = { ...options.headers ?? {} };
+    this.capabilities = {
+      streaming: true,
+      nativeToolCalling: true,
+      structuredOutput: false,
+      vision: true,
+      reasoning: true,
+      parallelToolCalls: true,
+      ...options.capabilities ?? {}
+    };
+  }
+  getCapabilities() {
+    return { ...this.capabilities };
+  }
+  stream(model, context2, options = {}) {
+    const stream = new EventStream(
+      (event) => event.type === "done",
+      (event) => event.message
+    );
+    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
+    const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, "");
+    const apiKey = options.apiKey ?? this.defaultApiKey;
+    void this.run(stream, builder, model, context2, options, baseUrl, apiKey);
+    return stream;
+  }
+  async run(stream, builder, model, context2, options, baseUrl, apiKey) {
+    const composed = composeAbortSignals(options.signal, stream.signal);
+    try {
+      builder.start();
+      if (!apiKey) {
+        throw new ProviderHttpError(PROVIDER_API$3, 401, "missing apiKey for Anthropic provider");
+      }
+      const body = this.buildRequestBody(model, context2, options);
+      const url2 = `${baseUrl}/messages`;
+      const response = await fetch(url2, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": this.anthropicVersion,
+          ...this.defaultHeaders
+        },
+        body: JSON.stringify(body),
+        signal: composed.signal
+      });
+      await ensureOk(response, PROVIDER_API$3);
+      let stopReason = null;
+      let inputTokens = 0;
+      let outputTokens = 0;
+      for await (const data of parseSSE(response, composed.signal)) {
+        if (composed.signal.aborted) break;
+        let event;
+        try {
+          event = JSON.parse(data);
+        } catch {
+          continue;
+        }
+        switch (event.type) {
+          case "message_start": {
+            const evt = event;
+            inputTokens = evt.message.usage?.input_tokens ?? inputTokens;
+            outputTokens = evt.message.usage?.output_tokens ?? outputTokens;
+            builder.setUsage({ inputTokens, outputTokens });
+            break;
+          }
+          case "content_block_start": {
+            const evt = event;
+            const block = evt.content_block;
+            if (block.type === "text") {
+              if (block.text) builder.appendText(evt.index, block.text);
+            } else if (block.type === "thinking") {
+              if (block.thinking) builder.appendThinking(evt.index, block.thinking);
+            } else if (block.type === "tool_use") {
+              builder.ensureToolCall(evt.index, block.id, block.name);
+              if (block.input && typeof block.input === "object" && Object.keys(block.input).length > 0) {
+                builder.appendToolCallArgs(evt.index, JSON.stringify(block.input));
+              }
+            }
+            break;
+          }
+          case "content_block_delta": {
+            const evt = event;
+            if (evt.delta.type === "text_delta") {
+              builder.appendText(evt.index, evt.delta.text);
+            } else if (evt.delta.type === "thinking_delta") {
+              builder.appendThinking(evt.index, evt.delta.thinking);
+            } else if (evt.delta.type === "input_json_delta") {
+              builder.appendToolCallArgs(evt.index, evt.delta.partial_json);
+            }
+            break;
+          }
+          case "content_block_stop": {
+            const evt = event;
+            builder.endText(evt.index);
+            builder.endThinking(evt.index);
+            builder.endToolCall(evt.index);
+            break;
+          }
+          case "message_delta": {
+            const evt = event;
+            if (evt.delta.stop_reason) stopReason = evt.delta.stop_reason;
+            if (typeof evt.usage?.output_tokens === "number") {
+              outputTokens = evt.usage.output_tokens;
+              builder.setUsage({ inputTokens, outputTokens });
+            }
+            break;
+          }
+          case "message_stop": {
+            break;
+          }
+          case "error": {
+            const evt = event;
+            throw new Error(`anthropic ${evt.error.type}: ${evt.error.message}`);
+          }
+          default:
+            break;
+        }
+      }
+      builder.done(mapStopReason(stopReason));
+    } catch (err) {
+      const error = normalizeError(err);
+      builder.fail(error, error.name === "AbortError" ? "aborted" : "error");
+    } finally {
+    }
+  }
+  buildRequestBody(model, context2, options) {
+    const { system, messages } = toAnthropicMessages(context2);
+    const body = {
+      model: model.id,
+      messages,
+      stream: true,
+      max_tokens: options.maxTokens ?? model.maxTokens ?? 4096
+    };
+    if (system) body.system = system;
+    if (typeof options.temperature === "number") body.temperature = options.temperature;
+    if (typeof options.topP === "number") body.top_p = options.topP;
+    const thinking = toAnthropicThinking$1(options.reasoningBudget);
+    if (thinking) body.thinking = thinking;
+    if (context2.tools && context2.tools.length > 0) {
+      body.tools = context2.tools.map(toAnthropicTool);
+    }
+    return body;
+  }
+};
+function toAnthropicThinking$1(budget) {
+  if (!budget || budget === "auto") return void 0;
+  return {
+    type: "enabled",
+    budget_tokens: budget === "low" ? 1024 : budget === "medium" ? 4096 : 8192
+  };
+}
+function toAnthropicMessages(context2) {
+  const messages = [];
+  for (const message of context2.messages) {
+    messages.push(...convertMessage$3(message));
+  }
+  return {
+    system: context2.systemPrompt && context2.systemPrompt.trim() ? context2.systemPrompt : void 0,
+    messages
+  };
+}
+function convertMessage$3(message) {
+  if (message.role === "user") {
+    if (typeof message.content === "string") {
+      return [{ role: "user", content: [{ type: "text", text: message.content }] }];
+    }
+    const blocks = [];
+    for (const block of message.content) {
+      if (block.type === "text") {
+        blocks.push({ type: "text", text: block.text });
+      } else if (block.type === "image") {
+        blocks.push({
+          type: "image",
+          source: { type: "base64", media_type: block.mimeType, data: block.data }
+        });
+      }
+    }
+    return [{ role: "user", content: blocks }];
+  }
+  if (message.role === "assistant") {
+    const blocks = [];
+    for (const block of message.content) {
+      if (block.type === "text") {
+        blocks.push({ type: "text", text: block.text });
+      } else if (block.type === "toolCall") {
+        blocks.push({
+          type: "tool_use",
+          id: block.id,
+          name: block.name,
+          input: block.arguments ?? {}
+        });
+      }
+    }
+    return [{ role: "assistant", content: blocks }];
+  }
+  const textBlocks = [];
+  for (const block of message.content) {
+    if (block.type === "text") textBlocks.push({ type: "text", text: block.text });
+  }
+  return [
+    {
+      role: "user",
+      content: [
+        {
+          type: "tool_result",
+          tool_use_id: message.toolCallId,
+          content: textBlocks,
+          is_error: message.isError || void 0
+        }
+      ]
+    }
+  ];
+}
+function toAnthropicTool(tool) {
+  return {
+    name: tool.name,
+    description: tool.description,
+    input_schema: tool.parameters
+  };
+}
+function mapStopReason(reason) {
+  switch (reason) {
+    case "end_turn":
+      return "stop";
+    case "max_tokens":
+      return "length";
+    case "tool_use":
+      return "toolUse";
+    case "stop_sequence":
+      return "stop";
+    default:
+      return "stop";
+  }
+}
+const DEFAULT_BASE_URL$2 = "https://generativelanguage.googleapis.com";
+const PROVIDER_API$2 = "google-gemini";
+class GeminiProvider {
+  api = PROVIDER_API$2;
+  defaultBaseUrl;
+  defaultApiKey;
+  defaultHeaders;
+  capabilities;
+  constructor(options = {}) {
+    this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL$2).replace(/\/+$/, "");
+    this.defaultApiKey = options.apiKey;
+    this.defaultHeaders = { ...options.headers ?? {} };
+    this.capabilities = {
+      streaming: true,
+      nativeToolCalling: true,
+      structuredOutput: true,
+      vision: true,
+      reasoning: true,
+      parallelToolCalls: true,
+      ...options.capabilities ?? {}
+    };
+  }
+  getCapabilities() {
+    return { ...this.capabilities };
+  }
+  stream(model, context2, options = {}) {
+    const stream = new EventStream(
+      (event) => event.type === "done",
+      (event) => event.message
+    );
+    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
+    const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, "");
+    const apiKey = options.apiKey ?? this.defaultApiKey;
+    void this.run(stream, builder, model, context2, options, baseUrl, apiKey);
+    return stream;
+  }
+  async run(stream, builder, model, context2, options, baseUrl, apiKey) {
+    const composed = composeAbortSignals(options.signal, stream.signal);
+    try {
+      builder.start();
+      if (!apiKey) {
+        throw new ProviderHttpError(PROVIDER_API$2, 401, "missing apiKey for Gemini provider");
+      }
+      const body = this.buildRequestBody(context2, options);
+      const versionedBase = baseUrl.includes("/v1beta") || baseUrl.includes("/v1") ? baseUrl : `${baseUrl}/v1beta`;
+      const url2 = `${versionedBase}/models/${encodeURIComponent(model.id)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
+      const response = await fetch(url2, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.defaultHeaders
+        },
+        body: JSON.stringify(body),
+        signal: composed.signal
+      });
+      await ensureOk(response, PROVIDER_API$2);
+      const TEXT_INDEX = 0;
+      const THINKING_INDEX = 1;
+      let toolCallCounter = 0;
+      let finishReason = null;
+      for await (const data of parseSSE(response, composed.signal)) {
+        if (composed.signal.aborted) break;
+        let chunk;
+        try {
+          chunk = JSON.parse(data);
+        } catch {
+          continue;
+        }
+        if (chunk.usageMetadata) {
+          builder.setUsage({
+            inputTokens: chunk.usageMetadata.promptTokenCount ?? 0,
+            outputTokens: chunk.usageMetadata.candidatesTokenCount ?? 0,
+            totalTokens: chunk.usageMetadata.totalTokenCount ?? (chunk.usageMetadata.promptTokenCount ?? 0) + (chunk.usageMetadata.candidatesTokenCount ?? 0)
+          });
+        }
+        const candidate = chunk.candidates?.[0];
+        if (!candidate) continue;
+        const parts = candidate.content?.parts ?? [];
+        for (const part of parts) {
+          if ("text" in part && typeof part.text === "string") {
+            const textPart = part;
+            if (textPart.thought) {
+              builder.appendThinking(THINKING_INDEX, textPart.text);
+            } else {
+              builder.appendText(TEXT_INDEX, textPart.text);
+            }
+            continue;
+          }
+          if ("functionCall" in part) {
+            const fc = part.functionCall;
+            const slot = 2 + toolCallCounter;
+            toolCallCounter += 1;
+            const callId = `gemini-call-${Date.now()}-${slot}`;
+            builder.ensureToolCall(slot, callId, fc.name);
+            const args = JSON.stringify(fc.args ?? {});
+            builder.appendToolCallArgs(slot, args);
+            builder.endToolCall(slot);
+          }
+        }
+        if (candidate.finishReason) {
+          finishReason = candidate.finishReason;
+        }
+      }
+      builder.done(mapFinishReason$2(finishReason, toolCallCounter > 0));
+    } catch (err) {
+      const error = normalizeError(err);
+      builder.fail(error, error.name === "AbortError" ? "aborted" : "error");
+    } finally {
+    }
+  }
+  buildRequestBody(context2, options) {
+    const { systemInstruction, contents } = toGeminiContents(context2);
+    const body = { contents };
+    if (systemInstruction) {
+      body.systemInstruction = { parts: [{ text: systemInstruction }] };
+    }
+    const generationConfig = {};
+    if (typeof options.temperature === "number") generationConfig.temperature = options.temperature;
+    if (typeof options.topP === "number") generationConfig.topP = options.topP;
+    if (typeof options.maxTokens === "number") generationConfig.maxOutputTokens = options.maxTokens;
+    if (options.reasoningBudget && options.reasoningBudget !== "auto") {
+      generationConfig.thinkingConfig = {
+        thinkingBudget: options.reasoningBudget === "low" ? 1024 : options.reasoningBudget === "medium" ? 4096 : 8192
+      };
+    }
+    if (Object.keys(generationConfig).length > 0) body.generationConfig = generationConfig;
+    if (context2.tools && context2.tools.length > 0) {
+      body.tools = [
+        {
+          functionDeclarations: context2.tools.map(toGeminiTool)
+        }
+      ];
+    }
+    return body;
+  }
+}
+function toGeminiContents(context2) {
+  const contents = [];
+  for (const message of context2.messages) {
+    contents.push(...convertMessage$2(message));
+  }
+  return {
+    systemInstruction: context2.systemPrompt && context2.systemPrompt.trim() ? context2.systemPrompt : void 0,
+    contents
+  };
+}
+function convertMessage$2(message) {
+  if (message.role === "user") {
+    if (typeof message.content === "string") {
+      return [{ role: "user", parts: [{ text: message.content }] }];
+    }
+    const parts = [];
+    for (const block of message.content) {
+      if (block.type === "text") {
+        parts.push({ text: block.text });
+      } else if (block.type === "image") {
+        parts.push({
+          inlineData: { mimeType: block.mimeType, data: block.data }
+        });
+      }
+    }
+    return [{ role: "user", parts }];
+  }
+  if (message.role === "assistant") {
+    const parts = [];
+    for (const block of message.content) {
+      if (block.type === "text") {
+        parts.push({ text: block.text });
+      } else if (block.type === "toolCall") {
+        parts.push({
+          functionCall: { name: block.name, args: block.arguments ?? {} }
+        });
+      }
+    }
+    return [{ role: "model", parts }];
+  }
+  const textBlocks = [];
+  for (const block of message.content) {
+    if (block.type === "text") textBlocks.push(block.text);
+  }
+  return [
+    {
+      role: "user",
+      parts: [
+        {
+          functionResponse: {
+            name: message.toolName,
+            response: { content: textBlocks.join("\n"), isError: message.isError || void 0 }
+          }
+        }
+      ]
+    }
+  ];
+}
+function toGeminiTool(tool) {
+  return {
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters
+  };
+}
+function mapFinishReason$2(reason, hadToolCall) {
+  if (hadToolCall && (!reason || reason === "STOP")) return "toolUse";
+  switch (reason) {
+    case "STOP":
+      return "stop";
+    case "MAX_TOKENS":
+      return "length";
+    case "SAFETY":
+    case "RECITATION":
+    case "BLOCKLIST":
+    case "PROHIBITED_CONTENT":
+    case "SPII":
+      return "error";
+    default:
+      return "stop";
+  }
+}
+const DEFAULT_BASE_URL$1 = "http://localhost:11434";
+const PROVIDER_API$1 = "ollama";
+class OllamaProvider {
+  api = PROVIDER_API$1;
+  defaultBaseUrl;
+  defaultApiKey;
+  defaultHeaders;
+  capabilities;
+  constructor(options = {}) {
+    this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL$1).replace(/\/+$/, "");
+    this.defaultApiKey = options.apiKey;
+    this.defaultHeaders = { ...options.headers ?? {} };
+    this.capabilities = {
+      streaming: true,
+      nativeToolCalling: true,
+      structuredOutput: true,
+      vision: false,
+      reasoning: false,
+      parallelToolCalls: false,
+      ...options.capabilities ?? {}
+    };
+  }
+  getCapabilities() {
+    return { ...this.capabilities };
+  }
+  stream(model, context2, options = {}) {
+    const stream = new EventStream(
+      (event) => event.type === "done",
+      (event) => event.message
+    );
+    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
+    const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, "");
+    const apiKey = options.apiKey ?? this.defaultApiKey;
+    void this.run(stream, builder, model, context2, options, baseUrl, apiKey);
+    return stream;
+  }
+  async run(stream, builder, model, context2, options, baseUrl, apiKey) {
+    const composed = composeAbortSignals(options.signal, stream.signal);
+    try {
+      builder.start();
+      const body = this.buildRequestBody(model, context2, options);
+      const url2 = `${baseUrl}/api/chat`;
+      const headers = {
+        "Content-Type": "application/json",
+        ...this.defaultHeaders
+      };
+      if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+      const response = await fetch(url2, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal: composed.signal
+      });
+      await ensureOk(response, PROVIDER_API$1);
+      const TEXT_INDEX = 0;
+      const THINKING_INDEX = 1;
+      let toolCallCounter = 0;
+      let doneReason = null;
+      let lastChunk = null;
+      for await (const line of parseJsonLines(response, composed.signal)) {
+        if (composed.signal.aborted) break;
+        let chunk;
+        try {
+          chunk = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        lastChunk = chunk;
+        const message = chunk.message;
+        if (message) {
+          if (typeof message.thinking === "string" && message.thinking.length > 0) {
+            builder.appendThinking(THINKING_INDEX, message.thinking);
+          }
+          if (typeof message.content === "string" && message.content.length > 0) {
+            builder.appendText(TEXT_INDEX, message.content);
+          }
+          if (Array.isArray(message.tool_calls)) {
+            for (const tc of message.tool_calls) {
+              const fn = tc.function;
+              if (!fn || !fn.name) continue;
+              const slot = 2 + toolCallCounter;
+              toolCallCounter += 1;
+              const callId = `ollama-call-${Date.now()}-${slot}`;
+              builder.ensureToolCall(slot, callId, fn.name);
+              const argsRaw = typeof fn.arguments === "string" ? fn.arguments : JSON.stringify(fn.arguments ?? {});
+              builder.appendToolCallArgs(slot, argsRaw);
+              builder.endToolCall(slot);
+            }
+          }
+        }
+        if (chunk.done) {
+          doneReason = chunk.done_reason ?? "stop";
+          if (typeof chunk.prompt_eval_count === "number" || typeof chunk.eval_count === "number") {
+            builder.setUsage({
+              inputTokens: chunk.prompt_eval_count ?? 0,
+              outputTokens: chunk.eval_count ?? 0,
+              totalTokens: (chunk.prompt_eval_count ?? 0) + (chunk.eval_count ?? 0)
+            });
+          }
+          break;
+        }
+      }
+      if (!doneReason && lastChunk?.done_reason) {
+        doneReason = lastChunk.done_reason;
+      }
+      builder.done(mapDoneReason(doneReason, toolCallCounter > 0));
+    } catch (err) {
+      const error = normalizeError(err);
+      builder.fail(error, error.name === "AbortError" ? "aborted" : "error");
+    } finally {
+    }
+  }
+  buildRequestBody(model, context2, options) {
+    const messages = toOllamaMessages(context2);
+    const body = {
+      model: model.id,
+      messages,
+      stream: true
+    };
+    const optionsBlock = {};
+    if (typeof options.temperature === "number") optionsBlock.temperature = options.temperature;
+    if (typeof options.topP === "number") optionsBlock.top_p = options.topP;
+    if (typeof options.maxTokens === "number") optionsBlock.num_predict = options.maxTokens;
+    if (Object.keys(optionsBlock).length > 0) body.options = optionsBlock;
+    if (context2.tools && context2.tools.length > 0) {
+      body.tools = context2.tools.map(toOllamaTool);
+    }
+    return body;
+  }
+}
+function toOllamaMessages(context2) {
+  const out = [];
+  if (context2.systemPrompt && context2.systemPrompt.trim()) {
+    out.push({ role: "system", content: context2.systemPrompt });
+  }
+  for (const message of context2.messages) {
+    out.push(...convertMessage$1(message));
+  }
+  return out;
+}
+function convertMessage$1(message) {
+  if (message.role === "user") {
+    if (typeof message.content === "string") {
+      return [{ role: "user", content: message.content }];
+    }
+    const texts = [];
+    const images = [];
+    for (const block of message.content) {
+      if (block.type === "text") texts.push(block.text);
+      else if (block.type === "image") images.push(block.data);
+    }
+    const out = { role: "user", content: texts.join("\n") };
+    if (images.length > 0) out.images = images;
+    return [out];
+  }
+  if (message.role === "assistant") {
+    const texts = [];
+    const toolCalls = [];
+    for (const block of message.content) {
+      if (block.type === "text") texts.push(block.text);
+      else if (block.type === "toolCall") {
+        toolCalls.push({
+          function: { name: block.name, arguments: block.arguments ?? {} }
+        });
+      }
+    }
+    const out = { role: "assistant", content: texts.join("") };
+    if (toolCalls.length > 0) out.tool_calls = toolCalls;
+    return [out];
+  }
+  const textBlocks = [];
+  for (const block of message.content) {
+    if (block.type === "text") textBlocks.push(block.text);
+  }
+  return [
+    {
+      role: "tool",
+      content: textBlocks.join("\n"),
+      tool_name: message.toolName
+    }
+  ];
+}
+function toOllamaTool(tool) {
+  return {
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters
+    }
+  };
+}
+function mapDoneReason(reason, hadToolCall) {
+  if (hadToolCall && (!reason || reason === "stop")) return "toolUse";
+  switch (reason) {
+    case "stop":
+      return "stop";
+    case "length":
+      return "length";
+    case "load":
+    case null:
+    case void 0:
+      return "stop";
+    default:
+      return "stop";
+  }
+}
+const DEFAULT_BASE_URL = "https://api.openai.com/v1";
+const PROVIDER_API = "openai-compatible";
+let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
+  api = PROVIDER_API;
+  defaultBaseUrl;
+  defaultApiKey;
+  defaultHeaders;
+  capabilities;
+  constructor(options = {}) {
+    this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    this.defaultApiKey = options.apiKey;
+    this.defaultHeaders = { ...options.headers ?? {} };
+    this.capabilities = {
+      streaming: true,
+      nativeToolCalling: true,
+      structuredOutput: true,
+      vision: true,
+      reasoning: false,
+      parallelToolCalls: true,
+      ...options.capabilities ?? {}
+    };
+  }
+  getCapabilities() {
+    return { ...this.capabilities };
+  }
+  stream(model, context2, options = {}) {
+    const stream = new EventStream(
+      (event) => event.type === "done",
+      (event) => event.message
+    );
+    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
+    const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, "");
+    const apiKey = options.apiKey ?? this.defaultApiKey;
+    void this.run(stream, builder, model, context2, options, baseUrl, apiKey);
+    return stream;
+  }
+  async run(stream, builder, model, context2, options, baseUrl, apiKey) {
+    const externalSignal = options.signal;
+    const internalSignal = stream.signal;
+    const composed = composeAbortSignals(externalSignal, internalSignal);
+    try {
+      builder.start();
+      if (!apiKey) {
+        throw new ProviderHttpError(PROVIDER_API, 401, "missing apiKey for OpenAI-compatible provider");
+      }
+      const body = this.buildRequestBody(model, context2, options);
+      const url2 = `${baseUrl}/chat/completions`;
+      const response = await fetch(url2, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+          ...this.defaultHeaders
+        },
+        body: JSON.stringify(body),
+        signal: composed.signal
+      });
+      await ensureOk(response, PROVIDER_API);
+      let finishReason = null;
+      const TEXT_INDEX = 0;
+      const THINKING_INDEX = 1;
+      const TOOL_INDEX_BASE = 2;
+      for await (const data of parseSSE(response, composed.signal)) {
+        if (composed.signal.aborted) break;
+        let chunk;
+        try {
+          chunk = JSON.parse(data);
+        } catch {
+          continue;
+        }
+        if (chunk.usage) {
+          builder.setUsage({
+            inputTokens: chunk.usage.prompt_tokens ?? 0,
+            outputTokens: chunk.usage.completion_tokens ?? 0,
+            totalTokens: chunk.usage.total_tokens ?? (chunk.usage.prompt_tokens ?? 0) + (chunk.usage.completion_tokens ?? 0)
+          });
+        }
+        const choice = chunk.choices?.[0];
+        if (!choice) continue;
+        const delta = choice.delta ?? {};
+        const reasoningDelta = delta.reasoning_content ?? delta.reasoning;
+        if (typeof reasoningDelta === "string" && reasoningDelta.length > 0) {
+          builder.appendThinking(THINKING_INDEX, reasoningDelta);
+        }
+        if (typeof delta.content === "string" && delta.content.length > 0) {
+          builder.appendText(TEXT_INDEX, delta.content);
+        }
+        if (Array.isArray(delta.tool_calls)) {
+          for (const tc of delta.tool_calls) {
+            const callIndex = typeof tc.index === "number" ? tc.index : 0;
+            const slot = TOOL_INDEX_BASE + callIndex;
+            builder.ensureToolCall(slot, tc.id ?? "", tc.function?.name ?? "");
+            const args = tc.function?.arguments;
+            if (typeof args === "string" && args.length > 0) {
+              builder.appendToolCallArgs(slot, args);
+            }
+          }
+        }
+        if (choice.finish_reason) {
+          finishReason = choice.finish_reason;
+        }
+      }
+      builder.done(mapFinishReason$1(finishReason));
+    } catch (err) {
+      const error = normalizeError(err);
+      builder.fail(error, error.name === "AbortError" ? "aborted" : "error");
+    } finally {
+    }
+  }
+  buildRequestBody(model, context2, options) {
+    const messages = toOpenAIMessages(context2);
+    const body = {
+      model: model.id,
+      messages,
+      stream: true
+    };
+    if (typeof options.temperature === "number") body.temperature = options.temperature;
+    if (typeof options.topP === "number") body.top_p = options.topP;
+    if (options.reasoningBudget && options.reasoningBudget !== "auto") {
+      body.reasoning_effort = options.reasoningBudget;
+    }
+    const maxTokens = options.maxTokens ?? model.maxTokens;
+    if (typeof maxTokens === "number" && maxTokens > 0) body.max_tokens = maxTokens;
+    if (context2.tools && context2.tools.length > 0) {
+      body.tools = context2.tools.map(toOpenAITool);
+      body.tool_choice = "auto";
+    }
+    body.stream_options = { include_usage: true };
+    return body;
+  }
+};
+function toOpenAIMessages(context2) {
+  const out = [];
+  if (context2.systemPrompt && context2.systemPrompt.trim()) {
+    out.push({ role: "system", content: context2.systemPrompt });
+  }
+  for (const message of context2.messages) {
+    out.push(...convertMessage(message));
+  }
+  return out;
+}
+function convertMessage(message) {
+  if (message.role === "user") {
+    if (typeof message.content === "string") {
+      return [{ role: "user", content: message.content }];
+    }
+    const parts = [];
+    for (const block of message.content) {
+      if (block.type === "text") {
+        parts.push({ type: "text", text: block.text });
+      } else if (block.type === "image") {
+        parts.push({
+          type: "image_url",
+          image_url: { url: `data:${block.mimeType};base64,${block.data}` }
+        });
+      }
+    }
+    return [{ role: "user", content: parts }];
+  }
+  if (message.role === "assistant") {
+    const text = [];
+    const toolCalls = [];
+    for (const block of message.content) {
+      if (block.type === "text") text.push(block.text);
+      else if (block.type === "toolCall") {
+        toolCalls.push({
+          id: block.id,
+          type: "function",
+          function: {
+            name: block.name,
+            arguments: JSON.stringify(block.arguments ?? {})
+          }
+        });
+      }
+    }
+    const out = {
+      role: "assistant",
+      content: text.length > 0 ? text.join("") : null
+    };
+    if (toolCalls.length > 0) out.tool_calls = toolCalls;
+    return [out];
+  }
+  const textBlocks = [];
+  for (const block of message.content) {
+    if (block.type === "text") textBlocks.push(block.text);
+  }
+  return [
+    {
+      role: "tool",
+      tool_call_id: message.toolCallId,
+      content: textBlocks.join("\n")
+    }
+  ];
+}
+function toOpenAITool(tool) {
+  return {
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters
+    }
+  };
+}
+function mapFinishReason$1(reason) {
+  switch (reason) {
+    case "stop":
+      return "stop";
+    case "length":
+      return "length";
+    case "tool_calls":
+    case "function_call":
+      return "toolUse";
+    case "content_filter":
+      return "error";
+    default:
+      return "stop";
+  }
+}
+const CONFIGURED_PROVIDER_API = "rdc-agent-configured-provider";
+function encodeAgentModel(providerId, modelId) {
+  return {
+    id: `${providerId}::${modelId}`,
+    name: modelId,
+    provider: providerId,
+    api: CONFIGURED_PROVIDER_API,
+    contextWindow: 128e3,
+    maxTokens: 4096,
+    reasoning: false,
+    vision: false
+  };
+}
+function decodeAgentModel(model) {
+  const marker = "::";
+  const idx = model.id.indexOf(marker);
+  if (idx > 0) {
+    return {
+      providerId: model.id.slice(0, idx),
+      modelId: model.id.slice(idx + marker.length)
+    };
+  }
+  return {
+    providerId: model.provider,
+    modelId: model.id
+  };
+}
+function toRuntimeApi(kind) {
+  switch (kind) {
+    case "anthropic":
+      return "anthropic-messages";
+    case "google-ai-studio":
+      return "google-gemini";
+    case "ollama":
+      return "ollama";
+    case "openai-compatible":
+    case "openrouter":
+    case "azure-openai":
+      return "openai-compatible";
+    case "bedrock":
+    case "vertex":
+    default:
+      return kind;
+  }
+}
+function createProviderStrategy(provider) {
+  switch (provider.kind) {
+    case "anthropic":
+      return new AnthropicProvider$1({
+        apiKey: provider.apiKey,
+        baseUrl: provider.baseUrl
+      });
+    case "google-ai-studio":
+      return new GeminiProvider({
+        apiKey: provider.apiKey,
+        baseUrl: provider.baseUrl
+      });
+    case "ollama":
+      return new OllamaProvider({
+        apiKey: provider.apiKey || void 0,
+        baseUrl: provider.baseUrl
+      });
+    case "openrouter":
+      return new OpenAICompatibleProvider$1({
+        apiKey: provider.apiKey,
+        baseUrl: provider.baseUrl,
+        headers: {
+          "HTTP-Referer": "https://rdcagent.local",
+          "X-Title": "RDC-Agent"
+        }
+      });
+    case "openai-compatible":
+    case "azure-openai":
+      return new OpenAICompatibleProvider$1({
+        apiKey: provider.apiKey,
+        baseUrl: provider.baseUrl
+      });
+    case "bedrock":
+    case "vertex":
+    default:
+      throw new Error(`Provider kind "${provider.kind}" is not available in the agent runtime provider path.`);
+  }
+}
+function missingProviderStream(error) {
+  const stream = new EventStream(
+    (event) => event.type === "done",
+    (event) => event.message
+  );
+  queueMicrotask(() => {
+    stream.error(error);
+  });
+  return stream;
+}
+class ConfiguredRuntimeProvider {
+  api = CONFIGURED_PROVIDER_API;
+  getCapabilities() {
+    return {
+      streaming: true,
+      nativeToolCalling: true,
+      structuredOutput: true,
+      vision: true,
+      reasoning: true,
+      parallelToolCalls: true
+    };
+  }
+  stream(model, context2, options = {}) {
+    const decoded = decodeAgentModel(model);
+    const llmConfig = settingsService.getLlmConfig();
+    const provider = llmConfig.providers.find((entry) => entry.id === decoded.providerId);
+    if (!provider) {
+      return missingProviderStream(new Error(`No verified configured provider is available for ${decoded.providerId}.`));
+    }
+    if (!provider.models.includes(decoded.modelId)) {
+      return missingProviderStream(new Error(`Model ${decoded.providerId}/${decoded.modelId} is not enabled for agent runtime.`));
+    }
+    const runtimeModel = {
+      ...model,
+      id: decoded.modelId,
+      name: decoded.modelId,
+      provider: decoded.providerId,
+      api: toRuntimeApi(provider.kind)
+    };
+    const strategy = createProviderStrategy(provider);
+    return strategy.stream(runtimeModel, context2, {
+      ...options,
+      apiKey: provider.apiKey,
+      baseUrl: provider.baseUrl
+    });
+  }
+}
+const configuredRuntimeProvider = new ConfiguredRuntimeProvider();
+const NATIVE_TOOL_PROVIDER_KINDS = /* @__PURE__ */ new Set([
+  "anthropic",
+  "openai-compatible",
+  "openrouter",
+  "azure-openai",
+  "google-ai-studio",
+  "ollama"
+]);
+const STREAMING_PROVIDER_KINDS = /* @__PURE__ */ new Set([
+  "anthropic",
+  "openai-compatible",
+  "openrouter",
+  "azure-openai",
+  "google-ai-studio",
+  "ollama"
+]);
+function hasCapability(provider, capability) {
+  return Boolean(provider?.capabilities?.includes(capability));
+}
+function resolveReasoningVisibility(provider) {
+  if (!provider) return "none";
+  return hasCapability(provider, "reasoning") ? "summary-events" : "none";
+}
+function disabledCapability(providerId, modelId) {
+  return {
+    providerId,
+    modelId,
+    toolCallingMode: "disabled",
+    reasoningVisibility: "none",
+    supportsStreaming: false,
+    supportsToolResults: false
+  };
+}
+function resolveAgentRouteCapability(provider, modelId) {
+  const providerId = provider?.id ?? "";
+  if (!provider || !provider.enabled || !provider.isConfigured || provider.status !== "verified") {
+    return disabledCapability(providerId, modelId);
+  }
+  if (!hasCapability(provider, "chat")) {
+    return disabledCapability(provider.id, modelId);
+  }
+  const supportsStreaming = STREAMING_PROVIDER_KINDS.has(provider.kind);
+  const runtimeHasNativeTools = NATIVE_TOOL_PROVIDER_KINDS.has(provider.kind);
+  let toolCallingMode = "text-only";
+  if (hasCapability(provider, "tool-calling") && runtimeHasNativeTools) {
+    toolCallingMode = "native-structured";
+  } else if (!supportsStreaming) {
+    toolCallingMode = "disabled";
+  }
+  return {
+    providerId: provider.id,
+    modelId,
+    toolCallingMode,
+    reasoningVisibility: resolveReasoningVisibility(provider),
+    supportsStreaming,
+    supportsToolResults: toolCallingMode === "native-structured"
+  };
+}
+function describeRouteCapabilityDiagnostic(capability, availableToolCount) {
+  if (availableToolCount <= 0 || capability.toolCallingMode === "native-structured") {
+    return null;
+  }
+  if (capability.toolCallingMode === "disabled") {
+    return `Current route ${capability.providerId}/${capability.modelId} is not available for structured agent tools. Tools were not registered and no textual tool calls will be executed.`;
+  }
+  return `Current route ${capability.providerId}/${capability.modelId} is text-only for agent tools. Tools were not registered and textual tool calls will not be executed.`;
+}
+function buildSharedAgentEvent(type, payload, context2) {
+  return {
+    id: generateEventId("agent-event"),
+    type,
+    timestamp: nowMs(),
+    runId: context2.runId,
+    turnId: context2.turnId,
+    sessionId: context2.sessionId ?? null,
+    agentId: context2.agentId,
+    stage: context2.stage,
+    phase: context2.phase,
+    payload
+  };
+}
+function buildDiagnosticAgentEvent(context2, input) {
+  return buildSharedAgentEvent(
+    "diagnostic",
+    {
+      code: input.code,
+      severity: input.severity,
+      message: input.message,
+      technicalMessage: input.technicalMessage
+    },
+    context2
+  );
+}
+function mentionsTextualToolCall(text) {
+  return /(?:tool\s*call|function\s*call|工具调用|调用工具)\s*[:：]\s*[\w.-]+\s*\(/i.test(text);
+}
+function translateCoreToSharedAgentEvent(event, context2) {
+  switch (event.type) {
+    case "agent_start": {
+      return buildSharedAgentEvent(
+        "run.started",
+        {
+          mode: context2.mode ?? "debugger",
+          patternId: context2.patternId,
+          providerId: context2.providerId ?? "",
+          modelId: context2.modelId ?? "",
+          toolAllowlist: context2.toolAllowlist ?? [],
+          routeCapability: context2.routeCapability
+        },
+        context2
+      );
+    }
+    case "agent_end": {
+      const text = extractAssistantText(event.messages);
+      return buildSharedAgentEvent(
+        "run.completed",
+        {
+          status: "complete",
+          text
+        },
+        context2
+      );
+    }
+    case "message_update": {
+      const ev = event.assistantMessageEvent;
+      if (ev.type === "text_delta") {
+        return buildSharedAgentEvent("assistant.delta", { text: ev.delta }, context2);
+      }
+      if (ev.type === "thinking_start") {
+        return buildSharedAgentEvent(
+          "diagnostic",
+          {
+            code: "MODEL_THINKING_STARTED",
+            severity: "info",
+            message: "模型已进入 provider reasoning / thinking 阶段；仅展示可见工作轨迹，不展示隐藏思维链。"
+          },
+          context2
+        );
+      }
+      if (ev.type === "thinking_end") {
+        return buildSharedAgentEvent(
+          "diagnostic",
+          {
+            code: "MODEL_THINKING_COMPLETED",
+            severity: "info",
+            message: "模型 reasoning / thinking 阶段已结束。"
+          },
+          context2
+        );
+      }
+      if (ev.type === "toolcall_end") {
+        return buildSharedAgentEvent(
+          "tool.requested",
+          {
+            toolCall: {
+              id: ev.toolCall.id,
+              name: ev.toolCall.name,
+              arguments: ev.toolCall.arguments
+            }
+          },
+          context2
+        );
+      }
+      return null;
+    }
+    case "message_end": {
+      if (event.message.role === "assistant") {
+        const text = event.message.content.filter((block) => block.type === "text").map((block) => block.text).join("");
+        return buildSharedAgentEvent(
+          "assistant.completed",
+          {
+            text,
+            usage: event.message.usage ? {
+              inputTokens: event.message.usage.inputTokens,
+              outputTokens: event.message.usage.outputTokens
+            } : void 0
+          },
+          context2
+        );
+      }
+      return null;
+    }
+    case "tool_execution_start": {
+      return buildSharedAgentEvent(
+        "tool.started",
+        {
+          toolCallId: event.toolCallId,
+          toolName: event.toolName,
+          args: event.args
+        },
+        context2
+      );
+    }
+    case "tool_execution_end": {
+      const sharedResult = toolResultToSharedResult(event.result, event.durationMs);
+      const approvalReason = getApprovalRequiredReason(event.result);
+      if (approvalReason) {
+        return buildSharedAgentEvent(
+          "approval.requested",
+          {
+            approvalId: `approval-${event.toolCallId}`,
+            title: `Approve ${event.toolName}`,
+            status: "pending",
+            reason: approvalReason,
+            kind: "tool",
+            toolCallId: event.toolCallId,
+            toolName: event.toolName
+          },
+          context2
+        );
+      }
+      const denialReason = getPolicyDenialReason(event.result);
+      if (denialReason) {
+        return buildSharedAgentEvent(
+          "tool.denied",
+          {
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            reason: denialReason,
+            result: sharedResult
+          },
+          context2
+        );
+      }
+      return buildSharedAgentEvent(
+        "tool.completed",
+        {
+          toolCallId: event.toolCallId,
+          toolName: event.toolName,
+          result: sharedResult
+        },
+        context2
+      );
+    }
+    case "approval_requested": {
+      return buildSharedAgentEvent(
+        "approval.requested",
+        {
+          approvalId: `approval-${event.toolCallId}`,
+          title: `Approve ${event.toolName}`,
+          status: "pending",
+          reason: `Approval required before ${event.toolName} can run.`,
+          kind: "tool",
+          toolCallId: event.toolCallId,
+          toolName: event.toolName
+        },
+        context2
+      );
+    }
+    case "approval_resolved": {
+      return buildSharedAgentEvent(
+        "approval.answered",
+        {
+          approvalId: `approval-${event.toolCallId}`,
+          title: `Approve ${event.toolCallId}`,
+          status: event.approved ? "approved" : "rejected",
+          kind: "tool",
+          toolCallId: event.toolCallId
+        },
+        context2
+      );
+    }
+    case "error": {
+      return buildSharedAgentEvent(
+        "run.failed",
+        {
+          status: "failed",
+          error: event.error.message || String(event.error)
+        },
+        context2
+      );
+    }
+    default:
+      return null;
+  }
+}
+function getApprovalRequiredReason(result) {
+  if (!result.isError) return null;
+  const message = extractToolResultText(result);
+  return message.toLowerCase().includes("approval required") ? message : null;
+}
+function getPolicyDenialReason(result) {
+  if (!result.isError) return null;
+  const message = extractToolResultText(result);
+  return message.toLowerCase().includes("policy denied") ? message : null;
+}
+function extractToolResultText(result) {
+  return result.content.filter((block) => block.type === "text").map((block) => block.text).join("");
+}
+function extractAssistantText(messages) {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const msg = messages[i];
+    if (msg.role === "assistant") {
+      return msg.content.filter((block) => block.type === "text").map((block) => block.text).join("");
+    }
+  }
+  return "";
+}
+function toolResultToSharedResult(result, durationMs) {
+  if (result.isError) {
+    return {
+      ok: false,
+      data: {},
+      artifacts: [],
+      error: {
+        code: "AGENT_TOOL_FAILED",
+        message: extractToolResultText(result) || "Tool execution failed.",
+        category: "execution"
+      },
+      duration_ms: durationMs,
+      trace_id: result.toolCallId
+    };
+  }
+  return {
+    ok: true,
+    data: {
+      content: result.content
+    },
+    artifacts: [],
+    duration_ms: durationMs,
+    trace_id: result.toolCallId
+  };
+}
+let currentRuntimeContext = null;
+function setRdxRuntimeContext(runtimeContext) {
+  currentRuntimeContext = runtimeContext ? { ...runtimeContext, raw: { ...runtimeContext.raw } } : null;
+}
+function getRdxRuntimeContext() {
+  return currentRuntimeContext ? { ...currentRuntimeContext, raw: { ...currentRuntimeContext.raw } } : null;
+}
 const COPILOT_EDITOR_HEADERS = {
   "Editor-Version": "vscode/1.107.0",
   "Editor-Plugin-Version": "copilot-chat/0.35.0"
@@ -7703,7 +9416,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
     return this.models;
   }
 }
-class OpenAICompatibleProvider extends BaseStreamingProvider {
+class OpenAICompatibleProvider2 extends BaseStreamingProvider {
   apiKey = "";
   baseUrl = "https://api.openai.com/v1";
   models = [];
@@ -7965,7 +9678,7 @@ class ChatGptAccountProvider extends BaseStreamingProvider {
     return this.models;
   }
 }
-class GitHubCopilotProvider extends OpenAICompatibleProvider {
+class GitHubCopilotProvider extends OpenAICompatibleProvider2 {
   constructor(name) {
     super(name, true);
   }
@@ -7985,7 +9698,7 @@ class GitHubCopilotProvider extends OpenAICompatibleProvider {
     return `GitHub Copilot API error: ${status} - ${text}`;
   }
 }
-class AzureOpenAIProvider extends OpenAICompatibleProvider {
+class AzureOpenAIProvider extends OpenAICompatibleProvider2 {
   createHeaders() {
     return {
       "api-key": this.apiKey,
@@ -8074,7 +9787,7 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
     return this.models;
   }
 }
-class AnthropicProvider extends BaseStreamingProvider {
+class AnthropicProvider2 extends BaseStreamingProvider {
   apiKey = "";
   baseUrl = "https://api.anthropic.com/v1";
   models = [];
@@ -8210,10 +9923,10 @@ const createProviderByKind = (providerId, kind) => {
     return new OpenRouterProvider(providerId);
   }
   if (kind === "anthropic") {
-    return new AnthropicProvider(providerId);
+    return new AnthropicProvider2(providerId);
   }
   if (kind === "ollama") {
-    return new OpenAICompatibleProvider(providerId, false);
+    return new OpenAICompatibleProvider2(providerId, false);
   }
   if (kind === "google-ai-studio") {
     return new GoogleAiStudioProvider(providerId);
@@ -8221,7 +9934,7 @@ const createProviderByKind = (providerId, kind) => {
   if (kind === "azure-openai") {
     return new AzureOpenAIProvider(providerId);
   }
-  return new OpenAICompatibleProvider(providerId, true);
+  return new OpenAICompatibleProvider2(providerId, true);
 };
 class LLMAdapter {
   providers = /* @__PURE__ */ new Map();
@@ -8292,653 +10005,6 @@ class LLMAdapter {
   }
 }
 const llmAdapter = new LLMAdapter();
-const EMPTY_USAGE = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
-class AssistantStreamBuilder {
-  stream;
-  blocks = [];
-  modelId;
-  providerId;
-  usage = { ...EMPTY_USAGE };
-  started = false;
-  finished = false;
-  constructor(stream, modelId, providerId) {
-    this.stream = stream;
-    this.modelId = modelId;
-    this.providerId = providerId;
-  }
-  /** 推送 `start` 事件并初始化 partial。 */
-  start() {
-    if (this.started) return;
-    this.started = true;
-    this.stream.push({ type: "start", partial: this.snapshot("stop") });
-  }
-  /** 累积一段文本到指定 contentIndex；首次出现会自动发 `text_start`。 */
-  appendText(index, delta) {
-    if (!delta) return;
-    let block = this.blocks[index];
-    if (!block || block.kind !== "text") {
-      block = { kind: "text", index, text: "", closed: false };
-      this.blocks[index] = block;
-      this.stream.push({
-        type: "text_start",
-        contentIndex: index,
-        partial: this.snapshot("stop")
-      });
-    }
-    block.text += delta;
-    this.stream.push({
-      type: "text_delta",
-      contentIndex: index,
-      delta,
-      partial: this.snapshot("stop")
-    });
-  }
-  /** 显式结束某个文本块，发 `text_end` 事件。 */
-  endText(index) {
-    const block = this.blocks[index];
-    if (!block || block.kind !== "text" || block.closed) return;
-    block.closed = true;
-    this.stream.push({
-      type: "text_end",
-      contentIndex: index,
-      content: block.text,
-      partial: this.snapshot("stop")
-    });
-  }
-  /** 累积一段 thinking。 */
-  appendThinking(index, delta) {
-    if (!delta) return;
-    let block = this.blocks[index];
-    if (!block || block.kind !== "thinking") {
-      block = { kind: "thinking", index, text: "", closed: false };
-      this.blocks[index] = block;
-      this.stream.push({
-        type: "thinking_start",
-        contentIndex: index,
-        partial: this.snapshot("stop")
-      });
-    }
-    block.text += delta;
-    this.stream.push({
-      type: "thinking_delta",
-      contentIndex: index,
-      delta,
-      partial: this.snapshot("stop")
-    });
-  }
-  endThinking(index) {
-    const block = this.blocks[index];
-    if (!block || block.kind !== "thinking" || block.closed) return;
-    block.closed = true;
-    this.stream.push({
-      type: "thinking_end",
-      contentIndex: index,
-      content: block.text,
-      partial: this.snapshot("stop")
-    });
-  }
-  /** 初始化或更新一个 tool_call 块（不发 delta）。 */
-  ensureToolCall(index, id, name) {
-    let block = this.blocks[index];
-    if (!block || block.kind !== "tool") {
-      block = {
-        kind: "tool",
-        index,
-        id: id || `call_${index}`,
-        name: name || "",
-        argsBuffer: "",
-        closed: false
-      };
-      this.blocks[index] = block;
-      this.stream.push({
-        type: "toolcall_start",
-        contentIndex: index,
-        partial: this.snapshot("stop")
-      });
-    } else {
-      if (id && !block.id.startsWith("call_")) ;
-      else if (id) {
-        block.id = id;
-      }
-      if (name && !block.name) {
-        block.name = name;
-      }
-    }
-  }
-  /** 累积一段 tool_call 参数（原始 JSON 字符串增量）。 */
-  appendToolCallArgs(index, delta) {
-    if (!delta) return;
-    const block = this.blocks[index];
-    if (!block || block.kind !== "tool") return;
-    block.argsBuffer += delta;
-    this.stream.push({
-      type: "toolcall_delta",
-      contentIndex: index,
-      delta,
-      partial: this.snapshot("stop")
-    });
-  }
-  /** 结束 tool_call，解析 args，发 `toolcall_end`。 */
-  endToolCall(index) {
-    const block = this.blocks[index];
-    if (!block || block.kind !== "tool" || block.closed) return;
-    block.closed = true;
-    const toolCall = {
-      type: "toolCall",
-      id: block.id,
-      name: block.name,
-      arguments: parseJsonSafely(block.argsBuffer)
-    };
-    this.stream.push({
-      type: "toolcall_end",
-      contentIndex: index,
-      toolCall,
-      partial: this.snapshot("stop")
-    });
-  }
-  /** 设置或合并 usage 信息。 */
-  setUsage(partial) {
-    this.usage = {
-      inputTokens: partial.inputTokens ?? this.usage.inputTokens,
-      outputTokens: partial.outputTokens ?? this.usage.outputTokens,
-      totalTokens: partial.totalTokens ?? (partial.inputTokens ?? this.usage.inputTokens) + (partial.outputTokens ?? this.usage.outputTokens),
-      cost: partial.cost ?? this.usage.cost
-    };
-  }
-  /** 完成流：关闭所有未关闭块，推 `done` 事件并 complete。 */
-  done(reason) {
-    if (this.finished) return;
-    this.finished = true;
-    for (let i = 0; i < this.blocks.length; i += 1) {
-      const block = this.blocks[i];
-      if (!block || block.closed) continue;
-      if (block.kind === "text") this.endText(i);
-      else if (block.kind === "thinking") this.endThinking(i);
-      else this.endToolCall(i);
-    }
-    const message = this.snapshot(reason);
-    this.stream.push({ type: "done", reason, message });
-  }
-  /** 标记错误：推 `error` 事件，并以错误结束 stream。 */
-  fail(error, reason = "error") {
-    if (this.finished) return;
-    this.finished = true;
-    const message = this.snapshot(reason);
-    this.stream.push({ type: "error", error, message });
-    this.stream.error(error);
-  }
-  /** 是否已经结束。 */
-  get isFinished() {
-    return this.finished;
-  }
-  // -----------------------------------------------------------------
-  // 内部
-  // -----------------------------------------------------------------
-  snapshot(reason) {
-    const content = [];
-    for (const block of this.blocks) {
-      if (!block) continue;
-      if (block.kind === "text") {
-        const item = { type: "text", text: block.text };
-        content.push(item);
-      } else if (block.kind === "thinking") {
-        const item = { type: "thinking", thinking: block.text };
-        content.push(item);
-      } else {
-        const item = {
-          type: "toolCall",
-          id: block.id,
-          name: block.name,
-          arguments: parseJsonSafely(block.argsBuffer)
-        };
-        content.push(item);
-      }
-    }
-    return {
-      role: "assistant",
-      content,
-      model: this.modelId,
-      provider: this.providerId,
-      usage: { ...this.usage },
-      stopReason: reason,
-      timestamp: Date.now()
-    };
-  }
-}
-function parseJsonSafely(raw) {
-  if (!raw || !raw.trim()) {
-    return {};
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-      return parsed;
-    }
-    return { value: parsed };
-  } catch {
-    return { _raw: raw };
-  }
-}
-function encodeAgentModel(providerId, modelId) {
-  return {
-    id: `${providerId}::${modelId}`,
-    name: modelId,
-    provider: providerId,
-    api: "rdc-agent-llm-adapter",
-    contextWindow: 0,
-    maxTokens: 0,
-    reasoning: false,
-    vision: false
-  };
-}
-function decodeAgentModel(model) {
-  const [providerPart, ...modelParts] = model.id.split("::");
-  if (modelParts.length === 0) {
-    return { providerId: model.provider, modelId: model.id };
-  }
-  return { providerId: providerPart || model.provider, modelId: modelParts.join("::") };
-}
-function messagesToLlm(systemPrompt, messages) {
-  const result = [];
-  if (systemPrompt && systemPrompt.trim()) {
-    result.push({ role: "system", content: systemPrompt });
-  }
-  for (const msg of messages) {
-    if (msg.role === "user") {
-      result.push({ role: "user", content: typeof msg.content === "string" ? msg.content : userContentToText(msg.content) });
-    } else if (msg.role === "assistant") {
-      result.push({ role: "assistant", content: assistantContentToText(msg.content) });
-    } else if (msg.role === "toolResult") {
-      result.push({
-        role: "tool",
-        content: msg.content.map((block) => block.type === "text" ? block.text : "").join("\n")
-      });
-    }
-  }
-  return result;
-}
-function toolsToLlm(tools) {
-  if (!tools?.length) return void 0;
-  return tools.map((tool) => ({
-    name: tool.name,
-    description: tool.description,
-    input_schema: normalizeToolInputSchema(tool.parameters)
-  }));
-}
-function normalizeToolInputSchema(schema) {
-  const properties = {};
-  for (const [key, value] of Object.entries(schema.properties ?? {})) {
-    properties[key] = {
-      type: typeof value.type === "string" ? value.type : "string",
-      description: typeof value.description === "string" ? value.description : "",
-      enum: Array.isArray(value.enum) ? value.enum.map(String) : void 0
-    };
-  }
-  return {
-    type: "object",
-    properties,
-    required: schema.required
-  };
-}
-function userContentToText(content) {
-  return content.map((block) => block.type === "text" && typeof block.text === "string" ? block.text : "").join("");
-}
-function assistantContentToText(content) {
-  const parts = [];
-  for (const block of content) {
-    if (block.type === "text") {
-      parts.push(block.text);
-    } else if (block.type === "thinking") {
-      continue;
-    } else if (block.type === "toolCall") {
-      parts.push(`[tool ${block.name} requested]`);
-    }
-  }
-  return parts.join("");
-}
-class LLMAdapterProvider {
-  api = "rdc-agent-llm-adapter";
-  getCapabilities() {
-    return {
-      streaming: true,
-      nativeToolCalling: false,
-      structuredOutput: false,
-      vision: false,
-      reasoning: false,
-      parallelToolCalls: false
-    };
-  }
-  stream(model, context2, options) {
-    const { providerId, modelId } = decodeAgentModel(model);
-    const stream = new EventStream(
-      (event) => event.type === "done" || event.type === "error",
-      (event) => event.message
-    );
-    const builder = new AssistantStreamBuilder(stream, model.id, providerId);
-    const toolIndexes = /* @__PURE__ */ new Map();
-    let sawTextDelta = false;
-    builder.start();
-    const llmRequest = {
-      messages: messagesToLlm(context2.systemPrompt, context2.messages),
-      model: modelId,
-      maxTokens: options?.maxTokens,
-      temperature: options?.temperature,
-      tools: toolsToLlm(context2.tools),
-      reasoningBudget: options?.reasoningBudget,
-      signal: options?.signal
-    };
-    const onChunk = (chunk) => {
-      if (stream.isDone) return;
-      if (chunk.type === "text-delta") {
-        sawTextDelta = true;
-        builder.appendText(0, chunk.text);
-      } else if (chunk.type === "tool-call-delta") {
-        const toolCall = chunk.toolCall;
-        const id = toolCall.id || `tool-call-${toolIndexes.size}`;
-        let entry = toolIndexes.get(id);
-        if (!entry) {
-          entry = { index: toolIndexes.size + 1, argumentsText: "" };
-          toolIndexes.set(id, entry);
-        }
-        builder.ensureToolCall(entry.index, id, toolCall.name ?? "");
-        if (typeof toolCall.argumentsText === "string") {
-          const delta = toolCall.argumentsText.startsWith(entry.argumentsText) ? toolCall.argumentsText.slice(entry.argumentsText.length) : toolCall.argumentsText;
-          entry.argumentsText = toolCall.argumentsText;
-          builder.appendToolCallArgs(entry.index, delta);
-        }
-      }
-    };
-    void this.runStream(llmRequest, providerId, builder, stream, onChunk, () => sawTextDelta, toolIndexes);
-    return stream;
-  }
-  async runStream(request, providerId, builder, stream, onChunk, hasStreamedText, streamedToolIndexes) {
-    try {
-      const response = await llmAdapter.streamChat(request, onChunk, providerId);
-      if (stream.isDone) return;
-      if (!hasStreamedText() && typeof response.content === "string" && response.content) {
-        builder.appendText(0, response.content);
-      }
-      appendFinalToolCalls(builder, response.toolCalls, streamedToolIndexes);
-      builder.setUsage({
-        inputTokens: response.usage.inputTokens,
-        outputTokens: response.usage.outputTokens,
-        totalTokens: response.usage.inputTokens + response.usage.outputTokens
-      });
-      builder.done(mapStopReason(response.stopReason));
-    } catch (error) {
-      if (stream.isDone) return;
-      const err = error instanceof Error ? error : new Error(String(error));
-      builder.fail(err);
-    }
-  }
-}
-function appendFinalToolCalls(builder, toolCalls, streamedToolIndexes) {
-  if (!toolCalls?.length) return;
-  toolCalls.forEach((toolCall, index) => {
-    const existing = streamedToolIndexes.get(toolCall.id);
-    const contentIndex = existing?.index ?? index + 1;
-    if (existing) {
-      builder.endToolCall(contentIndex);
-      return;
-    }
-    builder.ensureToolCall(contentIndex, toolCall.id, toolCall.name);
-    builder.appendToolCallArgs(contentIndex, JSON.stringify(toolCall.arguments ?? {}));
-    builder.endToolCall(contentIndex);
-  });
-}
-function mapStopReason(reason) {
-  if (reason === "tool_use") return "toolUse";
-  if (reason === "max_tokens") return "length";
-  return "stop";
-}
-const llmAdapterProvider = new LLMAdapterProvider();
-function buildSharedAgentEvent(type, payload, context2) {
-  return {
-    id: generateEventId("agent-event"),
-    type,
-    timestamp: nowMs(),
-    runId: context2.runId,
-    turnId: context2.turnId,
-    sessionId: context2.sessionId ?? null,
-    agentId: context2.agentId,
-    stage: context2.stage,
-    phase: context2.phase,
-    payload
-  };
-}
-function translateCoreToSharedAgentEvent(event, context2) {
-  switch (event.type) {
-    case "agent_start": {
-      return buildSharedAgentEvent(
-        "run.started",
-        {
-          mode: context2.mode ?? "debugger",
-          patternId: context2.patternId,
-          providerId: context2.providerId ?? "",
-          modelId: context2.modelId ?? "",
-          toolAllowlist: context2.toolAllowlist ?? []
-        },
-        context2
-      );
-    }
-    case "agent_end": {
-      const text = extractAssistantText(event.messages);
-      return buildSharedAgentEvent(
-        "run.completed",
-        {
-          status: "complete",
-          text
-        },
-        context2
-      );
-    }
-    case "message_update": {
-      const ev = event.assistantMessageEvent;
-      if (ev.type === "text_delta") {
-        return buildSharedAgentEvent("assistant.delta", { text: ev.delta }, context2);
-      }
-      if (ev.type === "thinking_start") {
-        return buildSharedAgentEvent(
-          "diagnostic",
-          {
-            code: "MODEL_THINKING_STARTED",
-            severity: "info",
-            message: "模型已进入 provider reasoning / thinking 阶段；仅展示可见工作轨迹，不展示隐藏思维链。"
-          },
-          context2
-        );
-      }
-      if (ev.type === "thinking_end") {
-        return buildSharedAgentEvent(
-          "diagnostic",
-          {
-            code: "MODEL_THINKING_COMPLETED",
-            severity: "info",
-            message: "模型 reasoning / thinking 阶段已结束。"
-          },
-          context2
-        );
-      }
-      if (ev.type === "toolcall_end") {
-        return buildSharedAgentEvent(
-          "tool.requested",
-          {
-            toolCall: {
-              id: ev.toolCall.id,
-              name: ev.toolCall.name,
-              arguments: ev.toolCall.arguments
-            }
-          },
-          context2
-        );
-      }
-      return null;
-    }
-    case "message_end": {
-      if (event.message.role === "assistant") {
-        const text = event.message.content.filter((block) => block.type === "text").map((block) => block.text).join("");
-        return buildSharedAgentEvent(
-          "assistant.completed",
-          {
-            text,
-            usage: event.message.usage ? {
-              inputTokens: event.message.usage.inputTokens,
-              outputTokens: event.message.usage.outputTokens
-            } : void 0
-          },
-          context2
-        );
-      }
-      return null;
-    }
-    case "tool_execution_start": {
-      return buildSharedAgentEvent(
-        "tool.started",
-        {
-          toolCallId: event.toolCallId,
-          toolName: event.toolName,
-          args: event.args
-        },
-        context2
-      );
-    }
-    case "tool_execution_end": {
-      const sharedResult = toolResultToSharedResult(event.result, event.durationMs);
-      const approvalReason = getApprovalRequiredReason(event.result);
-      if (approvalReason) {
-        return buildSharedAgentEvent(
-          "approval.requested",
-          {
-            approvalId: `approval-${event.toolCallId}`,
-            title: `Approve ${event.toolName}`,
-            status: "pending",
-            reason: approvalReason,
-            kind: "tool",
-            toolCallId: event.toolCallId,
-            toolName: event.toolName
-          },
-          context2
-        );
-      }
-      const denialReason = getPolicyDenialReason(event.result);
-      if (denialReason) {
-        return buildSharedAgentEvent(
-          "tool.denied",
-          {
-            toolCallId: event.toolCallId,
-            toolName: event.toolName,
-            reason: denialReason,
-            result: sharedResult
-          },
-          context2
-        );
-      }
-      return buildSharedAgentEvent(
-        "tool.completed",
-        {
-          toolCallId: event.toolCallId,
-          toolName: event.toolName,
-          result: sharedResult
-        },
-        context2
-      );
-    }
-    case "approval_requested": {
-      return buildSharedAgentEvent(
-        "approval.requested",
-        {
-          approvalId: `approval-${event.toolCallId}`,
-          title: `Approve ${event.toolName}`,
-          status: "pending",
-          reason: `Approval required before ${event.toolName} can run.`,
-          kind: "tool",
-          toolCallId: event.toolCallId,
-          toolName: event.toolName
-        },
-        context2
-      );
-    }
-    case "approval_resolved": {
-      return buildSharedAgentEvent(
-        "approval.answered",
-        {
-          approvalId: `approval-${event.toolCallId}`,
-          title: `Approve ${event.toolCallId}`,
-          status: event.approved ? "approved" : "rejected",
-          kind: "tool",
-          toolCallId: event.toolCallId
-        },
-        context2
-      );
-    }
-    case "error": {
-      return buildSharedAgentEvent(
-        "run.failed",
-        {
-          status: "failed",
-          error: event.error.message || String(event.error)
-        },
-        context2
-      );
-    }
-    default:
-      return null;
-  }
-}
-function getApprovalRequiredReason(result) {
-  if (!result.isError) return null;
-  const message = extractToolResultText(result);
-  return message.toLowerCase().includes("approval required") ? message : null;
-}
-function getPolicyDenialReason(result) {
-  if (!result.isError) return null;
-  const message = extractToolResultText(result);
-  return message.toLowerCase().includes("policy denied") ? message : null;
-}
-function extractToolResultText(result) {
-  return result.content.filter((block) => block.type === "text").map((block) => block.text).join("");
-}
-function extractAssistantText(messages) {
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const msg = messages[i];
-    if (msg.role === "assistant") {
-      return msg.content.filter((block) => block.type === "text").map((block) => block.text).join("");
-    }
-  }
-  return "";
-}
-function toolResultToSharedResult(result, durationMs) {
-  if (result.isError) {
-    return {
-      ok: false,
-      data: {},
-      artifacts: [],
-      error: {
-        code: "AGENT_TOOL_FAILED",
-        message: extractToolResultText(result) || "Tool execution failed.",
-        category: "execution"
-      },
-      duration_ms: durationMs,
-      trace_id: result.toolCallId
-    };
-  }
-  return {
-    ok: true,
-    data: {
-      content: result.content
-    },
-    artifacts: [],
-    duration_ms: durationMs,
-    trace_id: result.toolCallId
-  };
-}
-let currentRuntimeContext = null;
-function setRdxRuntimeContext(runtimeContext) {
-  currentRuntimeContext = runtimeContext ? { ...runtimeContext, raw: { ...runtimeContext.raw } } : null;
-}
-function getRdxRuntimeContext() {
-  return currentRuntimeContext ? { ...currentRuntimeContext, raw: { ...currentRuntimeContext.raw } } : null;
-}
 const REQUEST_TIMEOUT_MS$1 = 2e4;
 const CHATGPT_CALLBACK_PORT = 1455;
 const CHATGPT_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
@@ -9830,8 +10896,7 @@ function resolveAgentToolAllowlist(agentId, stage) {
   const settings = settingsService.getAll();
   const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, stage || "investigate", agentId);
   const manifest = settings.agents.definitions.find((definition) => definition.id === agentId && definition.enabled);
-  const manifestTools = manifest?.tools?.length ? manifest.tools : [];
-  const profileTools = manifestTools.length ? manifestTools.flatMap(expandCanonicalToolToken) : runtimeProfile.toolAllowlist?.length ? runtimeProfile.toolAllowlist.flatMap(expandCanonicalToolToken) : agentId === "ask" ? ASK_READONLY_TOOL_ALLOWLIST : EXECUTABLE_AGENT_TOOL_ALLOWLIST;
+  const profileTools = manifest ? manifest.tools.flatMap(expandCanonicalToolToken) : runtimeProfile.toolAllowlist?.length ? runtimeProfile.toolAllowlist.flatMap(expandCanonicalToolToken) : agentId === "ask" ? ASK_READONLY_TOOL_ALLOWLIST : isTopLevelAgentId(agentId) ? EXECUTABLE_AGENT_TOOL_ALLOWLIST : [];
   if (agentId === "ask") {
     return Array.from(new Set(profileTools.filter((toolName) => !isDeniedAskTool(toolName, normalizeToolName(toolName)))));
   }
@@ -9880,23 +10945,46 @@ class AgentOrchestrator {
   }
   initializeAgents() {
     for (const role of AGENT_ROLES) {
-      this.agentStates.set(role, {
-        agentId: role,
-        status: "idle",
-        lastActivity: nowIso$1()
-      });
-      const defaultRouting = DEFAULT_MODEL_ROUTING[role];
-      this.agentConfigs.set(role, {
-        agentId: role,
-        systemPrompt: "",
-        modelProvider: defaultRouting.provider,
-        modelName: defaultRouting.model,
-        temperature: 0.7,
-        maxTokens: 4096,
-        category: this.getAgentCategory(role),
-        writeScope: this.getAgentWriteScopes(role)
-      });
+      this.ensureAgentState(role);
+      this.agentConfigs.set(role, this.createDefaultAgentConfig(role));
     }
+  }
+  ensureAgentState(agentId) {
+    const existing = this.agentStates.get(agentId);
+    if (existing) {
+      return existing;
+    }
+    const state2 = {
+      agentId,
+      status: "idle",
+      lastActivity: nowIso$1()
+    };
+    this.agentStates.set(agentId, state2);
+    return state2;
+  }
+  createDefaultAgentConfig(agentId) {
+    const fallbackAgentId = isTopLevelAgentId(agentId) ? agentId : "edit";
+    const defaultRouting = DEFAULT_MODEL_ROUTING[fallbackAgentId];
+    return {
+      agentId,
+      systemPrompt: "",
+      modelProvider: defaultRouting.provider,
+      modelName: defaultRouting.model,
+      temperature: 0.7,
+      maxTokens: 4096,
+      category: this.getAgentCategory(agentId),
+      writeScope: this.getAgentWriteScopes(agentId)
+    };
+  }
+  getOrCreateAgentConfig(agentId) {
+    this.ensureAgentState(agentId);
+    const existing = this.agentConfigs.get(agentId);
+    if (existing) {
+      return existing;
+    }
+    const config = this.createDefaultAgentConfig(agentId);
+    this.agentConfigs.set(agentId, config);
+    return config;
   }
   getAgentCategory(role) {
     return isTopLevelAgentId(role) ? AGENT_CATEGORIES[role] : "general";
@@ -9911,10 +10999,8 @@ class AgentOrchestrator {
     return Array.from(this.agentStates.values());
   }
   configureAgent(agentId, config) {
-    const existing = this.agentConfigs.get(agentId);
-    if (existing) {
-      this.agentConfigs.set(agentId, { ...existing, ...config });
-    }
+    const existing = this.getOrCreateAgentConfig(agentId);
+    this.agentConfigs.set(agentId, { ...existing, ...config });
   }
   getAgentConfig(agentId) {
     return this.agentConfigs.get(agentId) || null;
@@ -9922,7 +11008,7 @@ class AgentOrchestrator {
   applyLlmConfig(config) {
     const routeMap = new Map(config.agentRoutes.map((route) => [route.agentId, route]));
     for (const [agentId, agentConfig] of this.agentConfigs.entries()) {
-      const fallbackAgentId = isTopLevelAgentId(agentId) ? agentId : "debugger";
+      const fallbackAgentId = isTopLevelAgentId(agentId) ? agentId : "edit";
       const fallback = DEFAULT_MODEL_ROUTING[fallbackAgentId];
       const route = routeMap.get(agentId);
       this.agentConfigs.set(agentId, {
@@ -9942,10 +11028,7 @@ class AgentOrchestrator {
   // Main entry points: workflow run turn / profile turn.
   // -------------------------------------------------------------------
   async sendMessage(agentId, content, context2, options) {
-    const fallbackConfig = this.agentConfigs.get(agentId);
-    if (!fallbackConfig) {
-      throw new Error(`Agent not found: ${agentId}`);
-    }
+    const fallbackConfig = this.getOrCreateAgentConfig(agentId);
     this.updateAgentStatus(agentId, "thinking");
     try {
       let runtimeProfile = this.resolveRuntimeProfile(agentId, context2?.stageId);
@@ -9993,10 +11076,7 @@ class AgentOrchestrator {
     }
   }
   async sendProfileMessage(agentId, content, options) {
-    const fallbackConfig = this.agentConfigs.get(agentId);
-    if (!fallbackConfig) {
-      throw new Error(`Agent not found: ${agentId}`);
-    }
+    const fallbackConfig = this.getOrCreateAgentConfig(agentId);
     this.updateAgentStatus(agentId, "thinking");
     try {
       let settings = settingsService.getAll();
@@ -10047,7 +11127,7 @@ class AgentOrchestrator {
         scope: options?.sessionId ? "session" : "app",
         namespace: "agent",
         severity: "info",
-        title: `${AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : "debugger"]} profile turn`,
+        title: `${this.getAgentDisplayName(agentId)} profile turn`,
         summary: responseText.slice(0, 160) || "Empty message.",
         sessionId: options?.sessionId,
         raw: {
@@ -10067,8 +11147,9 @@ class AgentOrchestrator {
   // Agent 实例池
   // -------------------------------------------------------------------
   getOrCreateAgentSlot(agentId, providerId, modelId, systemPrompt, tools = [], toolExecutor = this.createToolExecutor(agentId, [], void 0), streamOptions) {
+    const toolSignature = this.createToolSignature(tools);
     const existing = this.agentSlots.get(agentId);
-    if (existing && existing.providerId === providerId && existing.modelId === modelId && existing.systemPrompt === systemPrompt && !existing.agent.isStreaming) {
+    if (existing && existing.providerId === providerId && existing.modelId === modelId && existing.systemPrompt === systemPrompt && existing.toolSignature === toolSignature && !existing.agent.isStreaming) {
       return existing;
     }
     const agent = new Agent({
@@ -10078,17 +11159,18 @@ class AgentOrchestrator {
         tools,
         messages: []
       },
-      provider: llmAdapterProvider,
+      provider: configuredRuntimeProvider,
       toolExecutor,
       streamOptions,
       maxTurns: 8
     });
-    const slot = { agent, providerId, modelId, systemPrompt };
+    const slot = { agent, providerId, modelId, systemPrompt, toolSignature };
     this.agentSlots.set(agentId, slot);
     return slot;
   }
   /** Create a fresh one-shot agent slot for an isolated profile turn. */
   createFreshAgentSlot(providerId, modelId, systemPrompt, tools = [], toolExecutor = this.createToolExecutor("ask", [], void 0), streamOptions) {
+    const toolSignature = this.createToolSignature(tools);
     const agent = new Agent({
       initialState: {
         model: encodeAgentModel(providerId, modelId),
@@ -10096,12 +11178,15 @@ class AgentOrchestrator {
         tools,
         messages: []
       },
-      provider: llmAdapterProvider,
+      provider: configuredRuntimeProvider,
       toolExecutor,
       streamOptions,
       maxTurns: 4
     });
-    return { agent, providerId, modelId, systemPrompt };
+    return { agent, providerId, modelId, systemPrompt, toolSignature };
+  }
+  createToolSignature(tools) {
+    return tools.map((tool) => tool.name).sort().join("|");
   }
   resolveRuntimeTools(agentId, toolAllowlist, stage, sessionId) {
     const availableTools = /* @__PURE__ */ new Map();
@@ -10432,34 +11517,18 @@ ${body}
     if (!input.providerId || !input.modelId) {
       throw new Error("No provider/model route is configured for this agent.");
     }
+    const settings = settingsService.getAll();
+    const routeProvider = settings.llm.providers.find((entry) => entry.id === input.providerId);
+    const routeCapability = resolveAgentRouteCapability(routeProvider, input.modelId);
     const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
-    const toolExecutor = this.createToolExecutor(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
+    const activeToolDefinitions = routeCapability.toolCallingMode === "native-structured" ? runtimeTools.definitions : [];
+    const activeToolAllowlist = activeToolDefinitions.map((tool) => tool.name);
+    const toolExecutor = this.createToolExecutor(input.agentId, activeToolAllowlist, input.stage, input.sessionId);
     const streamOptions = {
       maxTokens: input.maxTokens,
       temperature: input.temperature,
       reasoningBudget: input.options?.reasoningBudget,
       signal: input.options?.signal
-    };
-    const slot = input.useFreshAgent ? this.createFreshAgentSlot(
-      input.providerId,
-      input.modelId,
-      input.systemPrompt,
-      runtimeTools.definitions,
-      toolExecutor,
-      streamOptions
-    ) : this.getOrCreateAgentSlot(
-      input.agentId,
-      input.providerId,
-      input.modelId,
-      input.systemPrompt,
-      runtimeTools.definitions,
-      toolExecutor,
-      streamOptions
-    );
-    const userMessage = {
-      role: "user",
-      content: input.content,
-      timestamp: nowMs()
     };
     const sharedEventContext = {
       agentId: input.agentId,
@@ -10471,18 +11540,67 @@ ${body}
       patternId: input.patternId,
       providerId: input.providerId,
       modelId: input.modelId,
-      toolAllowlist: input.toolAllowlist
+      toolAllowlist: activeToolAllowlist,
+      routeCapability
+    };
+    const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
+    if (routeDiagnostic) {
+      input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
+        code: "route_tool_calling_unsupported",
+        severity: routeCapability.toolCallingMode === "disabled" ? "error" : "warning",
+        message: routeDiagnostic,
+        technicalMessage: JSON.stringify(routeCapability)
+      }));
+    }
+    const slot = input.useFreshAgent ? this.createFreshAgentSlot(
+      input.providerId,
+      input.modelId,
+      input.systemPrompt,
+      activeToolDefinitions,
+      toolExecutor,
+      streamOptions
+    ) : this.getOrCreateAgentSlot(
+      input.agentId,
+      input.providerId,
+      input.modelId,
+      input.systemPrompt,
+      activeToolDefinitions,
+      toolExecutor,
+      streamOptions
+    );
+    const userMessage = {
+      role: "user",
+      content: input.content,
+      timestamp: nowMs()
     };
     let responseText = "";
+    let sawStructuredToolCall = false;
     const unsubscribe = slot.agent.subscribe((event) => {
       if (event.type === "message_update") {
         const ev = event.assistantMessageEvent;
         if (ev.type === "text_delta" && typeof ev.delta === "string") {
           input.options?.onChunk?.(ev.delta);
         }
+        if (ev.type === "toolcall_end") {
+          sawStructuredToolCall = true;
+        }
       }
       if (event.type === "message_end" && event.message.role === "assistant") {
         responseText = event.message.content.filter((block) => block.type === "text").map((block) => block.text).join("");
+        if (!sawStructuredToolCall && !responseText.trim()) {
+          input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
+            code: "empty_response_without_tool_call",
+            severity: "warning",
+            message: "Provider returned an empty assistant message without a structured tool call."
+          }));
+        } else if (!sawStructuredToolCall && mentionsTextualToolCall(responseText)) {
+          input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
+            code: "textual_tool_call_not_executed",
+            severity: "warning",
+            message: "The model wrote a textual tool call, but no structured provider tool call was returned. No tool was executed.",
+            technicalMessage: responseText.slice(0, 1200)
+          }));
+        }
       }
       const sharedEvent = translateCoreToSharedAgentEvent(event, sharedEventContext);
       if (sharedEvent) {
@@ -10543,14 +11661,21 @@ ${body}
     if (agentId === "plan") {
       return "ask";
     }
-    return isTopLevelAgentId(agentId) ? agentId : "debugger";
+    return isTopLevelAgentId(agentId) ? agentId : "edit";
   }
   patternForAgent(_agentId) {
     return "free-agent";
   }
   systemPromptForAgent(agentId, prompt) {
-    const topLevelAgentId = isTopLevelAgentId(agentId) ? agentId : "debugger";
-    return prompt || `You are the ${AGENT_DISPLAY_NAMES[topLevelAgentId]}. ${AGENT_DESCRIPTIONS[topLevelAgentId]}`;
+    if (prompt) {
+      return prompt;
+    }
+    const topLevelAgentId = isTopLevelAgentId(agentId) ? agentId : null;
+    return topLevelAgentId ? `You are the ${AGENT_DISPLAY_NAMES[topLevelAgentId]}. ${AGENT_DESCRIPTIONS[topLevelAgentId]}` : `You are ${agentId}. Follow the active .agent.md profile and report evidence clearly.`;
+  }
+  getAgentDisplayName(agentId) {
+    const definition = settingsService.getAll().agents.definitions.find((entry) => entry.id === agentId);
+    return definition?.name || (isTopLevelAgentId(agentId) ? AGENT_DISPLAY_NAMES[agentId] : agentId);
   }
   async finalizeRecordedAssistantMessage(agentId, streamedContent, fallbackContent, context2) {
     const finalContent = streamedContent || fallbackContent;
@@ -10558,7 +11683,7 @@ ${body}
     return finalContent;
   }
   updateAgentStatus(agentId, status) {
-    const state2 = this.agentStates.get(agentId);
+    const state2 = this.ensureAgentState(agentId);
     if (state2) {
       state2.status = status;
       state2.lastActivity = nowIso$1();
@@ -10566,7 +11691,7 @@ ${body}
         scope: "app",
         namespace: "agent",
         severity: status === "error" ? "error" : status === "complete" ? "success" : "info",
-        title: AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : "debugger"] || agentId,
+        title: this.getAgentDisplayName(agentId),
         summary: `Status changed to ${status}.`,
         raw: {
           agentId,
@@ -10610,7 +11735,7 @@ ${body}
       scope: sessionId ? "session" : "app",
       namespace: "agent",
       severity: message.role === "system" ? "warning" : "info",
-      title: AGENT_DISPLAY_NAMES[isTopLevelAgentId(message.agentId) ? message.agentId : "debugger"] || message.agentId,
+      title: this.getAgentDisplayName(message.agentId),
       summary: message.content.slice(0, 120) || "Empty message.",
       sessionId,
       raw: {
@@ -10641,7 +11766,7 @@ ${body}
       throw new Error("E2E forced profile LLM request failure");
     }
     const lower = userMessage.toLowerCase();
-    let stub = agentId === "ask" ? "Ask is ready. I can inspect readonly context, search files or public pages, and explain next steps without starting a Debugger run." : `${AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : "debugger"]} is ready. Describe the goal and I can use the configured tools for this turn.`;
+    let stub = agentId === "ask" ? "Ask is ready. I can inspect readonly context, search files or public pages, and explain next steps without starting a Debugger run." : `${this.getAgentDisplayName(agentId)} is ready. Describe the goal and I can use the configured tools for this turn.`;
     if (/ue4|unreal/i.test(userMessage)) {
       stub = "UE4 is Unreal Engine 4, commonly involved in graphics debugging around materials, post-processing, shaders, and render passes.";
     } else if (/hello|hi/i.test(userMessage)) {
@@ -13376,12 +14501,87 @@ const AGENT_WORKBENCH_COMMAND_CATALOG = [
     permission: "readonly"
   }
 ];
-const KNOWN_CONVERSATION_AGENTS = new Set(AGENT_ROLES);
+function composeProfileTurnPrompt(input) {
+  const recentHistory = input.history.slice(-6).map((entry) => ({
+    role: entry.role,
+    content: entry.content
+  }));
+  return JSON.stringify({
+    agent_id: input.definition.agentId,
+    agent_label: input.definition.agentLabel,
+    requested_mode: input.requestedMode,
+    requested_mode_label: input.definition.agentLabel,
+    user_message: input.rawMessage,
+    effective_user_message: input.effectiveMessage,
+    task_file_path: input.taskFilePath,
+    task_file_content: input.taskFileContent,
+    current_project_id: input.context.projectId,
+    current_session_id: input.context.sessionId,
+    active_run_id: input.context.activeRunId,
+    opened_capture: input.context.openedCapturePath,
+    project_inputs: input.context.projectInputs.slice(0, 8).map((entry) => entry.fileName),
+    incoming_attachments: input.context.importedAttachments.map((entry) => ({
+      file_name: entry.fileName,
+      kind: entry.kind,
+      mime_type: entry.mimeType
+    })),
+    recent_history: recentHistory
+  }, null, 2);
+}
+function composeProfileSystemPrompt(input) {
+  const basePrompt = input.definition.baseInstructions?.trim() || `You are ${input.definition.agentLabel}. ${input.definition.agentDescription}`;
+  const globalInstructions = input.definition.globalInstructions?.trim();
+  const routeInstructions = composeRouteCapabilityPrompt(input.routeCapability, input.allowedToolNames);
+  return [
+    basePrompt,
+    "",
+    "Show concise visible work summaries and tool results only. Do not reveal hidden chain-of-thought.",
+    routeInstructions,
+    input.routeCapability.toolCallingMode === "native-structured" ? composeRuntimeCatalogPrompt(input.allowedToolNames) : "",
+    globalInstructions ? `Global Instructions:
+${globalInstructions}` : ""
+  ].filter(Boolean).join("\n\n").trim();
+}
+function composeRouteCapabilityPrompt(routeCapability, allowedToolNames) {
+  if (routeCapability.toolCallingMode === "native-structured") {
+    const toolCount = allowedToolNames.length;
+    return [
+      `Route Capability: native structured tool calling is enabled for ${routeCapability.providerId}/${routeCapability.modelId}.`,
+      `The runtime registers ${toolCount} tool schema${toolCount === 1 ? "" : "s"} through the provider tool/function-call channel.`,
+      "When a tool is needed, use only the provider structured tool/function-call channel.",
+      "Do not write textual tool-call syntax in the assistant message."
+    ].join("\n");
+  }
+  return [
+    `Route Capability: ${routeCapability.toolCallingMode} for ${routeCapability.providerId}/${routeCapability.modelId}.`,
+    "This route cannot execute runtime tools in the current agent loop.",
+    "Do not invent tool calls, tool results, file reads, searches, or command output.",
+    "If you need runtime information, explain what information is missing and why."
+  ].join("\n");
+}
+function composeRuntimeCatalogPrompt(allowedToolNames) {
+  const allowed = new Set(allowedToolNames);
+  const toolLines = AGENT_WORKBENCH_TOOL_CATALOG.filter((tool) => allowed.has(tool.id)).map((tool) => `- ${tool.id}: ${tool.label}; permission=${tool.permission}; approval=${tool.approvalRequired ? "required" : "not required"}; result=${tool.resultSummary}`);
+  const commandLines = AGENT_WORKBENCH_COMMAND_CATALOG.map((command) => `- ${command.command}: ${command.description}${command.relatedTools.length ? ` Uses: ${command.relatedTools.join(", ")}` : ""}.`);
+  return [
+    "# Runtime Catalog",
+    "Only use tools exposed to this profile by the runtime. Slash commands are intent hints and never bypass profile permissions.",
+    "",
+    "Allowed tools:",
+    ...toolLines.length > 0 ? toolLines : ["- None."],
+    "",
+    "Slash commands:",
+    ...commandLines
+  ].join("\n");
+}
 function resolveConversationAgentId(requestedMode, requestedAgentId) {
-  if (requestedAgentId && KNOWN_CONVERSATION_AGENTS.has(requestedAgentId)) {
+  if (requestedAgentId && resolveEnabledAgentDefinition(requestedAgentId)) {
     return requestedAgentId;
   }
-  return requestedMode === "ask" ? "ask" : requestedMode;
+  if (requestedMode !== "ask" && resolveEnabledAgentDefinition(requestedMode)) {
+    return requestedMode;
+  }
+  return "ask";
 }
 const TASK_FILE_PATTERN = /([A-Za-z]:[\\/][^\r\n"]+\.(txt|md))/i;
 const ACTIVE_RUN_STATUSES = [
@@ -13449,6 +14649,30 @@ function upsertWorkBlock(trace, blockId, patch) {
 }
 function finalizeTrace(trace, status, summary) {
   const nextTrace = cloneTrace(trace);
+  const terminalBlockStatus = status === "complete" ? "complete" : status === "error" || status === "stopped" ? "error" : null;
+  if (terminalBlockStatus) {
+    const terminalAt = nowMs();
+    nextTrace.blocks = nextTrace.blocks.map((block) => {
+      const blockStatus = block.status === "pending" || block.status === "running" ? terminalBlockStatus : block.status;
+      const blockCompletedAt = block.completedAt ?? terminalAt;
+      return {
+        ...block,
+        status: blockStatus,
+        completedAt: blockCompletedAt,
+        toolCalls: block.toolCalls.map((toolCall) => {
+          if (toolCall.status !== "pending" && toolCall.status !== "running") {
+            return { ...toolCall };
+          }
+          return {
+            ...toolCall,
+            status: terminalBlockStatus,
+            completedAt: toolCall.completedAt ?? terminalAt,
+            error: terminalBlockStatus === "error" ? toolCall.error ?? "Run ended before this tool call completed." : toolCall.error
+          };
+        })
+      };
+    });
+  }
   nextTrace.status = status;
   nextTrace.summary = summary ?? nextTrace.summary;
   nextTrace.updatedAt = nowMs();
@@ -13567,68 +14791,16 @@ function resolveTaskFileContext(message) {
     effectiveMessage: [message, taskFileContent].filter(Boolean).join("\n\n")
   };
 }
+function resolveEnabledAgentDefinition(agentId) {
+  return settingsService.getAll().agents.definitions.find((entry) => entry.id === agentId && entry.enabled) ?? null;
+}
 function getAgentLabel(agentId) {
-  return isTopLevelAgentId(agentId) ? AGENT_DISPLAY_NAMES[agentId] : agentId;
+  const definition = resolveEnabledAgentDefinition(agentId);
+  return definition?.name || (isTopLevelAgentId(agentId) ? AGENT_DISPLAY_NAMES[agentId] : agentId);
 }
 function getAgentDescription(agentId) {
-  return isTopLevelAgentId(agentId) ? AGENT_DESCRIPTIONS[agentId] : "Workspace agent profile.";
-}
-function buildProfileTurnPrompt(context2, history, agentId, mode, message, attachments) {
-  const resolvedTaskFile = resolveTaskFileContext(message);
-  const recentHistory = history.slice(-6).map((entry) => ({
-    role: entry.role,
-    content: entry.content
-  }));
-  return JSON.stringify({
-    agent_id: agentId,
-    agent_label: getAgentLabel(agentId),
-    requested_mode: mode,
-    requested_mode_label: getAgentLabel(agentId),
-    user_message: message,
-    effective_user_message: resolvedTaskFile.effectiveMessage,
-    task_file_path: resolvedTaskFile.taskFilePath,
-    task_file_content: resolvedTaskFile.taskFileContent,
-    current_project_id: context2.projectId,
-    current_session_id: context2.session?.sessionId ?? null,
-    active_run_id: isActiveRun(context2.currentRun) ? context2.currentRun.runId : null,
-    opened_capture: context2.openedCapturePath,
-    project_inputs: context2.projectInputs.slice(0, 8).map((entry) => entry.fileName),
-    incoming_attachments: attachments.map((entry) => ({
-      file_name: entry.fileName,
-      kind: entry.kind,
-      mime_type: entry.mimeType
-    })),
-    recent_history: recentHistory
-  }, null, 2);
-}
-function buildProfileSystemPrompt(agentId) {
-  const settings = settingsService.getAll();
-  const definition = settings.agents.definitions.find((entry) => entry.id === agentId && entry.enabled);
-  const basePrompt = definition?.instructions.trim() || `You are ${getAgentLabel(agentId)}. ${getAgentDescription(agentId)}`;
-  const globalInstructions = settings.agents.globalInstructions.trim();
-  return [
-    basePrompt,
-    "",
-    "Show concise visible work summaries and tool results only. Do not reveal hidden chain-of-thought.",
-    buildProfileCatalogPrompt(agentId),
-    globalInstructions ? `Global Instructions:
-${globalInstructions}` : ""
-  ].filter(Boolean).join("\n\n").trim();
-}
-function buildProfileCatalogPrompt(agentId) {
-  const allowedTools = new Set(resolveAgentToolAllowlist(agentId).map((toolName) => normalizeToolName(toolName)));
-  const toolLines = AGENT_WORKBENCH_TOOL_CATALOG.filter((tool) => allowedTools.has(tool.id)).map((tool) => `- ${tool.id}: ${tool.label}; permission=${tool.permission}; approval=${tool.approvalRequired ? "required" : "not required"}; result=${tool.resultSummary}`);
-  const commandLines = AGENT_WORKBENCH_COMMAND_CATALOG.map((command) => `- ${command.command}: ${command.description}${command.relatedTools.length ? ` Uses: ${command.relatedTools.join(", ")}` : ""}.`);
-  return [
-    "# Runtime Catalog",
-    "Only use tools exposed to this profile by the runtime. Slash commands are intent hints and never bypass profile permissions.",
-    "",
-    "Allowed tools:",
-    ...toolLines.length > 0 ? toolLines : ["- None."],
-    "",
-    "Slash commands:",
-    ...commandLines
-  ].join("\n");
+  const definition = resolveEnabledAgentDefinition(agentId);
+  return definition?.description || (isTopLevelAgentId(agentId) ? AGENT_DESCRIPTIONS[agentId] : "Workspace agent profile.");
 }
 function redactTechnicalMessage(error) {
   const raw = error instanceof Error ? error.message : String(error);
@@ -13679,6 +14851,20 @@ function resolveAgentRoutePreflight(agentId, fallbackAgentId) {
       })
     };
   }
+  if (provider.status !== "verified") {
+    return {
+      ok: false,
+      diagnostic: createConversationDiagnostic({
+        agentId,
+        code: "CONVERSATION_LLM_PROVIDER_UNAVAILABLE",
+        severity: "error",
+        userMessage: `Current ${label} route provider is not verified: ${route.providerId}. Verify the provider in Settings before running agent tools.`,
+        providerId: route.providerId,
+        modelId: route.modelId,
+        technicalMessage: provider.lastError ?? provider.unavailableReason
+      })
+    };
+  }
   const model = provider.models.find((entry) => entry.id === route.modelId);
   if (!model?.enabled) {
     return {
@@ -13698,7 +14884,8 @@ function resolveAgentRoutePreflight(agentId, fallbackAgentId) {
     agentId,
     routeAgentId,
     providerId: route.providerId,
-    modelId: route.modelId
+    modelId: route.modelId,
+    routeCapability: resolveAgentRouteCapability(provider, route.modelId)
   };
 }
 function recordLlmDiagnostic(context2, diagnostic) {
@@ -13934,14 +15121,33 @@ class ConversationService {
       });
     } else {
       try {
-        const profilePrompt = buildProfileTurnPrompt(
-          input.context,
+        const taskContext = resolveTaskFileContext(input.rawMessage);
+        const definition = resolveEnabledAgentDefinition(conversationAgentId);
+        const promptDefinition = {
+          agentId: conversationAgentId,
+          agentLabel,
+          agentDescription: getAgentDescription(conversationAgentId),
+          baseInstructions: definition?.instructions,
+          globalInstructions: settingsService.getAll().agents.globalInstructions
+        };
+        const allowedToolNames = resolveAgentToolAllowlist(conversationAgentId, "investigate").map((toolName) => normalizeToolName(toolName));
+        const profilePrompt = composeProfileTurnPrompt({
+          context: {
+            projectId: input.context.projectId,
+            sessionId: input.context.session?.sessionId ?? null,
+            activeRunId: isActiveRun(input.context.currentRun) ? input.context.currentRun.runId : null,
+            openedCapturePath: input.context.openedCapturePath,
+            projectInputs: input.context.projectInputs,
+            importedAttachments: input.importedAttachments
+          },
           history,
-          conversationAgentId,
-          input.requestedMode,
-          input.rawMessage,
-          input.importedAttachments
-        );
+          definition: promptDefinition,
+          requestedMode: input.requestedMode,
+          rawMessage: input.rawMessage,
+          effectiveMessage: taskContext.effectiveMessage,
+          taskFilePath: taskContext.taskFilePath,
+          taskFileContent: taskContext.taskFileContent
+        });
         const responseText = await agentOrchestrator.sendProfileMessage(
           conversationAgentId,
           input.rawMessage,
@@ -13950,7 +15156,11 @@ class ConversationService {
             turnId: assistantMessage.turnId,
             stage: "investigate",
             patternId: "free-agent",
-            systemPrompt: buildProfileSystemPrompt(conversationAgentId),
+            systemPrompt: composeProfileSystemPrompt({
+              definition: promptDefinition,
+              routeCapability: routePreflight.routeCapability,
+              allowedToolNames
+            }),
             maxTokens: 1200,
             temperature: 0.35,
             signal: abortController.signal,
@@ -14126,7 +15336,7 @@ class ConversationService {
                     title: "生成最终回答",
                     stage: "respond",
                     status: "complete",
-                    summary: summarizeRuntimePayload(event.payload) || "模型已完成可见回复。",
+                    summary: "最终回答已生成。",
                     completedAt: nowMs()
                   })
                 });
@@ -14138,7 +15348,7 @@ class ConversationService {
                     title: "Agent Loop 完成",
                     stage: "respond",
                     status: "complete",
-                    summary: summarizeRuntimePayload(event.payload) || "模型与工具循环已完成。",
+                    summary: "模型与工具循环已完成。",
                     completedAt: nowMs()
                   })
                 });

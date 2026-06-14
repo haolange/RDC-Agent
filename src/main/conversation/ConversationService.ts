@@ -14,11 +14,7 @@ import type {
   ConversationTurnResult,
 } from '@shared/types/conversation';
 import type { AgentRole } from '@shared/types/agent';
-import { AGENT_ROLES } from '@shared/constants/agents';
-import {
-  AGENT_WORKBENCH_COMMAND_CATALOG,
-  AGENT_WORKBENCH_TOOL_CATALOG,
-} from '@shared/constants/agentWorkbenchCatalog';
+import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type {
   AppMode,
   OpenedCaptureState,
@@ -32,6 +28,11 @@ import { isTopLevelAgentId } from '@shared/types/agent';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
+import {
+  composeProfileSystemPrompt,
+  composeProfileTurnPrompt,
+} from '../agent-runtime/prompt';
+import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
 import { traceService } from '../agent-trace/TraceService';
 import { replayDeviceService } from '../captures/ReplayDeviceService';
 import { rdxSessionService } from '../index';
@@ -66,13 +67,14 @@ interface ActiveConversationTurn {
   stop: () => void;
 }
 
-const KNOWN_CONVERSATION_AGENTS = new Set<string>(AGENT_ROLES);
-
 function resolveConversationAgentId(requestedMode: AppMode, requestedAgentId?: string | null): AgentRole {
-  if (requestedAgentId && KNOWN_CONVERSATION_AGENTS.has(requestedAgentId)) {
+  if (requestedAgentId && resolveEnabledAgentDefinition(requestedAgentId)) {
     return requestedAgentId as AgentRole;
   }
-  return requestedMode === 'ask' ? 'ask' : requestedMode;
+  if (requestedMode !== 'ask' && resolveEnabledAgentDefinition(requestedMode)) {
+    return requestedMode as AgentRole;
+  }
+  return 'ask';
 }
 
 const TASK_FILE_PATTERN = /([A-Za-z]:[\\/][^\r\n"]+\.(txt|md))/i;
@@ -165,6 +167,41 @@ function finalizeTrace(
   summary?: string,
 ): ConversationWorkTrace {
   const nextTrace = cloneTrace(trace);
+  const terminalBlockStatus: ConversationWorkBlock['status'] | null =
+    status === 'complete'
+      ? 'complete'
+      : status === 'error' || status === 'stopped'
+        ? 'error'
+        : null;
+
+  if (terminalBlockStatus) {
+    const terminalAt = nowMs();
+    nextTrace.blocks = nextTrace.blocks.map((block) => {
+      const blockStatus = block.status === 'pending' || block.status === 'running'
+        ? terminalBlockStatus
+        : block.status;
+      const blockCompletedAt = block.completedAt ?? terminalAt;
+      return {
+        ...block,
+        status: blockStatus,
+        completedAt: blockCompletedAt,
+        toolCalls: block.toolCalls.map((toolCall) => {
+          if (toolCall.status !== 'pending' && toolCall.status !== 'running') {
+            return { ...toolCall };
+          }
+          return {
+            ...toolCall,
+            status: terminalBlockStatus,
+            completedAt: toolCall.completedAt ?? terminalAt,
+            error: terminalBlockStatus === 'error'
+              ? (toolCall.error ?? 'Run ended before this tool call completed.')
+              : toolCall.error,
+          };
+        }),
+      };
+    });
+  }
+
   nextTrace.status = status;
   nextTrace.summary = summary ?? nextTrace.summary;
   nextTrace.updatedAt = nowMs();
@@ -312,86 +349,18 @@ function resolveTaskFileContext(message: string): {
   };
 }
 
+function resolveEnabledAgentDefinition(agentId: string) {
+  return settingsService.getAll().agents.definitions.find((entry) => entry.id === agentId && entry.enabled) ?? null;
+}
+
 function getAgentLabel(agentId: AgentRole): string {
-  return isTopLevelAgentId(agentId) ? AGENT_DISPLAY_NAMES[agentId] : agentId;
+  const definition = resolveEnabledAgentDefinition(agentId);
+  return definition?.name || (isTopLevelAgentId(agentId) ? AGENT_DISPLAY_NAMES[agentId] : agentId);
 }
 
 function getAgentDescription(agentId: AgentRole): string {
-  return isTopLevelAgentId(agentId) ? AGENT_DESCRIPTIONS[agentId] : 'Workspace agent profile.';
-}
-
-function buildProfileTurnPrompt(
-  context: ResolvedConversationContext,
-  history: ConversationMessage[],
-  agentId: AgentRole,
-  mode: AppMode,
-  message: string,
-  attachments: SessionAttachmentRecord[],
-): string {
-  const resolvedTaskFile = resolveTaskFileContext(message);
-  const recentHistory = history.slice(-6).map((entry) => ({
-    role: entry.role,
-    content: entry.content,
-  }));
-
-  return JSON.stringify({
-    agent_id: agentId,
-    agent_label: getAgentLabel(agentId),
-    requested_mode: mode,
-    requested_mode_label: getAgentLabel(agentId),
-    user_message: message,
-    effective_user_message: resolvedTaskFile.effectiveMessage,
-    task_file_path: resolvedTaskFile.taskFilePath,
-    task_file_content: resolvedTaskFile.taskFileContent,
-    current_project_id: context.projectId,
-    current_session_id: context.session?.sessionId ?? null,
-    active_run_id: isActiveRun(context.currentRun) ? context.currentRun.runId : null,
-    opened_capture: context.openedCapturePath,
-    project_inputs: context.projectInputs.slice(0, 8).map((entry) => entry.fileName),
-    incoming_attachments: attachments.map((entry) => ({
-      file_name: entry.fileName,
-      kind: entry.kind,
-      mime_type: entry.mimeType,
-    })),
-    recent_history: recentHistory,
-  }, null, 2);
-}
-
-function buildProfileSystemPrompt(agentId: AgentRole): string {
-  const settings = settingsService.getAll();
-  const definition = settings.agents.definitions.find((entry) => entry.id === agentId && entry.enabled);
-  const basePrompt = definition?.instructions.trim()
-    || `You are ${getAgentLabel(agentId)}. ${getAgentDescription(agentId)}`;
-  const globalInstructions = settings.agents.globalInstructions.trim();
-  return [
-    basePrompt,
-    '',
-    'Show concise visible work summaries and tool results only. Do not reveal hidden chain-of-thought.',
-    buildProfileCatalogPrompt(agentId),
-    globalInstructions ? `Global Instructions:\n${globalInstructions}` : '',
-  ].filter(Boolean).join('\n\n').trim();
-}
-
-function buildProfileCatalogPrompt(agentId: AgentRole): string {
-  const allowedTools = new Set(resolveAgentToolAllowlist(agentId).map((toolName) => normalizeToolName(toolName)));
-  const toolLines = AGENT_WORKBENCH_TOOL_CATALOG
-    .filter((tool) => allowedTools.has(tool.id))
-    .map((tool) => (
-      `- ${tool.id}: ${tool.label}; permission=${tool.permission}; approval=${tool.approvalRequired ? 'required' : 'not required'}; result=${tool.resultSummary}`
-    ));
-  const commandLines = AGENT_WORKBENCH_COMMAND_CATALOG.map((command) => (
-    `- ${command.command}: ${command.description}${command.relatedTools.length ? ` Uses: ${command.relatedTools.join(', ')}` : ''}.`
-  ));
-  return [
-    '# Runtime Catalog',
-    'Only use tools exposed to this profile by the runtime. Slash commands are intent hints and never bypass profile permissions.',
-    '',
-    'Allowed tools:',
-    ...(toolLines.length > 0 ? toolLines : ['- None.']),
-    '',
-    'Slash commands:',
-    ...commandLines,
-  ].join('\n');
+  const definition = resolveEnabledAgentDefinition(agentId);
+  return definition?.description || (isTopLevelAgentId(agentId) ? AGENT_DESCRIPTIONS[agentId] : 'Workspace agent profile.');
 }
 
 interface AgentRoutePreflightOk {
@@ -400,6 +369,7 @@ interface AgentRoutePreflightOk {
   routeAgentId: AgentRole;
   providerId: string;
   modelId: string;
+  routeCapability: AgentRouteCapability;
 }
 
 interface AgentRoutePreflightBlocked {
@@ -476,6 +446,21 @@ function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?: AgentR
     };
   }
 
+  if (provider.status !== 'verified') {
+    return {
+      ok: false,
+      diagnostic: createConversationDiagnostic({
+        agentId,
+        code: 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE',
+        severity: 'error',
+        userMessage: `Current ${label} route provider is not verified: ${route.providerId}. Verify the provider in Settings before running agent tools.`,
+        providerId: route.providerId,
+        modelId: route.modelId,
+        technicalMessage: provider.lastError ?? provider.unavailableReason,
+      }),
+    };
+  }
+
   const model = provider.models.find((entry) => entry.id === route.modelId);
   if (!model?.enabled) {
     return {
@@ -497,6 +482,7 @@ function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?: AgentR
     routeAgentId,
     providerId: route.providerId,
     modelId: route.modelId,
+    routeCapability: resolveAgentRouteCapability(provider, route.modelId),
   };
 }
 
@@ -791,14 +777,34 @@ export class ConversationService {
       });
     } else {
       try {
-        const profilePrompt = buildProfileTurnPrompt(
-          input.context,
+        const taskContext = resolveTaskFileContext(input.rawMessage);
+        const definition = resolveEnabledAgentDefinition(conversationAgentId);
+        const promptDefinition = {
+          agentId: conversationAgentId,
+          agentLabel,
+          agentDescription: getAgentDescription(conversationAgentId),
+          baseInstructions: definition?.instructions,
+          globalInstructions: settingsService.getAll().agents.globalInstructions,
+        };
+        const allowedToolNames = resolveAgentToolAllowlist(conversationAgentId, 'investigate')
+          .map((toolName) => normalizeToolName(toolName));
+        const profilePrompt = composeProfileTurnPrompt({
+          context: {
+            projectId: input.context.projectId,
+            sessionId: input.context.session?.sessionId ?? null,
+            activeRunId: isActiveRun(input.context.currentRun) ? input.context.currentRun.runId : null,
+            openedCapturePath: input.context.openedCapturePath,
+            projectInputs: input.context.projectInputs,
+            importedAttachments: input.importedAttachments,
+          },
           history,
-          conversationAgentId,
-          input.requestedMode,
-          input.rawMessage,
-          input.importedAttachments,
-        );
+          definition: promptDefinition,
+          requestedMode: input.requestedMode,
+          rawMessage: input.rawMessage,
+          effectiveMessage: taskContext.effectiveMessage,
+          taskFilePath: taskContext.taskFilePath,
+          taskFileContent: taskContext.taskFileContent,
+        });
         const responseText = await agentOrchestrator.sendProfileMessage(
           conversationAgentId,
           input.rawMessage,
@@ -807,7 +813,11 @@ export class ConversationService {
             turnId: assistantMessage.turnId,
             stage: 'investigate',
             patternId: 'free-agent',
-            systemPrompt: buildProfileSystemPrompt(conversationAgentId),
+            systemPrompt: composeProfileSystemPrompt({
+              definition: promptDefinition,
+              routeCapability: routePreflight.routeCapability,
+              allowedToolNames,
+            }),
             maxTokens: 1200,
             temperature: 0.35,
             signal: abortController.signal,
@@ -1010,7 +1020,7 @@ export class ConversationService {
                     title: '生成最终回答',
                     stage: 'respond',
                     status: 'complete',
-                    summary: summarizeRuntimePayload(event.payload) || '模型已完成可见回复。',
+                    summary: '最终回答已生成。',
                     completedAt: nowMs(),
                   }),
                 });
@@ -1022,7 +1032,7 @@ export class ConversationService {
                     title: 'Agent Loop 完成',
                     stage: 'respond',
                     status: 'complete',
-                    summary: summarizeRuntimePayload(event.payload) || '模型与工具循环已完成。',
+                    summary: '模型与工具循环已完成。',
                     completedAt: nowMs(),
                   }),
                 });

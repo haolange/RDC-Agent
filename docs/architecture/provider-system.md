@@ -2,104 +2,90 @@
 
 ## 概览
 
-RDC-Agent 的 Provider 体系把“身份、认证方式、协议形态、产品分组、能力声明”拆成互相正交的维度：
+RDC-Agent 的 Provider 体系把身份、认证方式、wire protocol、产品分组和能力声明拆成相互正交的维度：
 
 - `LlmProviderEntry`：Provider 的稳定身份与运行时元数据。
-- `LlmProviderKind`：HTTP wire protocol，例如 `openai-compatible`、`anthropic`、`bedrock`。
+- `LlmProviderKind`：HTTP wire protocol，例如 `openai-compatible`、`anthropic`、`google-ai-studio`、`ollama`。
 - `LlmProviderAuthMode`：认证方式，例如 `api-key`、`account`、`environment`、`local`。
 - `LlmProviderCatalogGroup`：Settings UI 的产品展示分组。
-- `LlmProviderCapability`：能力声明，用于运行时和 UI 的 fail-closed 判断。
+- `LlmProviderCapability`：运行时可用能力事实，例如 `chat`、`tool-calling`、`reasoning`。
 
-这些类型只在 `src/shared/types/settings.ts` 定义，内置 Provider 清单只在 `src/shared/constants/llm.ts` 维护。跨层代码不得复制这些 union 或从某个维度反推另一个维度。
+这些跨层类型定义在 `src/shared/types/settings.ts`，内置 Provider 清单维护在 `src/shared/constants/llm.ts`。调用方不能从 provider id、model name 或 UI 分组反推能力，必须读取 capability。
 
-## 正交维度
+## Agent Runtime 路由
 
-### Protocol Kind
+Agent turn 的结构化工具调用路径是：
 
-`LlmProviderKind` 表示请求/响应协议差异，只决定 adapter 或 strategy 的 wire 行为，不决定 Settings 分组或认证流程。
+```text
+Agent Route Capability
+  -> Prompt Composer
+  -> Configured Runtime Provider
+  -> Provider Strategy
+  -> Normalized Agent Event Stream
+  -> Work Process UI
+```
 
-当前协议类型：
+关键规则：
 
-- `openrouter`
-- `openai-compatible`
-- `anthropic`
-- `google-ai-studio`
-- `azure-openai`
-- `bedrock`
-- `vertex`
-- `ollama`
+- `src/main/agent-runtime/capabilities/RouteCapabilityResolver.ts` 是 agent route capability 的事实来源。
+- Provider 未启用、未配置、未验证、未声明 `chat`，一律 `disabled`。
+- Provider 声明 `chat` 但未声明 `tool-calling`，一律 `text-only`。
+- Provider 声明 `tool-calling` 且 runtime strategy 支持 native tools，才是 `native-structured`。
+- 当前 `kimi-code / kimi-for-coding` 是 Anthropic-style native structured route。
+- 当前 `openrouter` 未声明 `tool-calling`，因此在 agent runtime 中保持 text-only/fail-closed，除非后续逐 route 真实 smoke 后提升 capability。
 
-### Auth Mode
+## Provider Strategy
 
-`LlmProviderAuthMode` 表示用户如何授权：
+Agent Loop 不再通过 settings 层 `LLMAdapterProvider` 发起 agent turn。它使用 `ConfiguredRuntimeProvider` 从 Settings 中读取已验证 provider 的真实 `apiKey/baseUrl/model`，再映射到现有 runtime provider strategy：
 
-- `api-key`：用户提供 API Key，明文只进入 `SecretStorageService`。
-- `account`：OAuth / Device Flow 账号登录，token 由账号授权服务维护。
-- `environment`：运行环境凭据，例如 AWS/GCP credential chain。
-- `local`：本地运行时，不需要远程凭据。
+- `anthropic` -> `AnthropicProvider`
+- `openai-compatible` / `openrouter` / `azure-openai` -> `OpenAICompatibleProvider`
+- `google-ai-studio` -> `GeminiProvider`
+- `ollama` -> `OllamaProvider`
 
-### Catalog Group
+Settings 层 `LLMAdapter` 仍可用于连接测试、模型刷新和非 agent 专用调用；它不是 Work Process 的 agent tool-call 数据源。
 
-`LlmProviderCatalogGroup` 只决定 Settings UI 位置：
+## Prompt Composer
 
-- `account`
-- `openai-compatible`
-- `anthropic-compatible`
-- `cloud-platform`
-- `local`
-- `image`
+Profile conversation 的 system/turn prompt 由 `src/main/agent-runtime/prompt/PromptComposer.ts` 组合。
 
-`catalogGroup` 不等于 `authMode`。旧 settings 中的 `api-key`、`environment` 等认证导向旧值只允许作为迁移输入，加载后必须归一到新的产品导向分组。
+- `native-structured` route 才注入工具使用说明和 runtime catalog，并向 provider 注册 tool schema。
+- `text-only` / `disabled` route 不注册 tools，并明确告知模型不能执行 runtime tools，只能说明缺少哪些信息。
+- 禁止在 ConversationService 主流程中硬编码工具提示片段或“不要写文本工具调用”规则。
 
-### Capability
+## Event Contract
 
-`LlmProviderCapability` 是 Provider 能力事实来源。调用方在使用 `tool-calling`、`structured-output`、`reasoning`、`vision-input`、`image-generation`、`video-generation` 等能力前必须显式检查；未声明能力按 fail-closed 处理。
+Work Process 只消费 normalized agent runtime events：
 
-## 分层职责
+- `assistant.delta`
+- `tool.requested`
+- `tool.started`
+- `tool.completed`
+- `tool.denied`
+- `diagnostic`
+- `assistant.completed`
+- `run.completed` / `run.failed` / `run.cancelled`
 
-### Shared
-
-`src/shared/types/settings.ts` 和 `src/shared/constants/llm.ts` 是跨层契约来源。Renderer、preload、main 和 Agent Runtime 只能导入这些定义，不得在本层重新声明 provider kind/group/capability。
-
-### Settings
-
-`src/main/settings` 负责 Provider 配置生命周期、凭据保管、连接测试、模型发现和配置迁移：
-
-- `SettingsService`：加载、归一化和持久化 settings。
-- `providerCatalogGroup.ts`：把旧 `catalogGroup` 输入归一到新产品分组。
-- `ProviderConnectionService`：处理 API key/local/environment Provider 的连接和测试。
-- `ProviderAccountAuthService`：处理 account Provider 的授权状态。
-- `SecretStorageService`：保存 API key 和 account token。
-- `MediaRuntimeService`：media generation fail-closed skeleton。
-
-### Agent Runtime
-
-Agent Runtime 以 `providerId + modelId` 路由，不依赖模型名前缀或字符串猜测。Provider strategy 只负责协议适配、stream 编解码、tool request 编解码和错误归一化，不决定 mode、stage、approval 或 tool policy。
+Provider 私有协议只在 provider strategy 中解析。模型正文里的 `tool call: ...` 或“工具调用：...”不会被转换成可执行工具调用；runtime 只会发出 `textual_tool_call_not_executed` diagnostic。
 
 ## Fail-Closed 规则
 
-- Provider 不存在、禁用或未配置时，运行时必须返回明确错误，不自动降级到任意 Provider。
-- Secret 缺失时，上层把诊断同步到 conversation / Activity，不暴露 secret。
-- 未声明 capability 时，调用方不得尝试对应能力。
-- Media request 当前统一由 `MediaRuntimeService` 返回 `adapter-not-implemented`，不得进入 chat runtime。
-
-## Settings UI
-
-Settings > Providers 使用 `catalogGroup` 展示产品分组，同时保留 `authMode` 驱动的连接方式：
-
-- Account Provider 单独展示。
-- API key/local/environment Provider 留在同一 Provider catalog 中，以产品分组标签区分。
-- `unavailableReason` 非空的 Provider 仍显示，但以不可用视觉状态标记，不静默删除。
-- Connect dialog 根据 `authMode` 切换 API key、local、environment 或 account flow。
+- 未声明 capability 的 route 不得假设支持工具。
+- 不支持 structured tools 的 route 不注册 tool schema，不执行文本工具调用。
+- 空助手消息且无结构化 tool call 时，runtime 发出 `empty_response_without_tool_call` diagnostic。
+- Provider 请求失败时，ConversationService 显示真实 diagnostic，不生成假 Work Process tool card。
 
 ## 验证
 
-Provider 体系的最小验证集合：
+最小门禁：
 
 - `npm run typecheck`
+- `npm run check:agent-runtime`
 - `npm run check:provider-system`
-- `npm run check:shared-exports`
-- `npm run check:fidelity`
+- `npm run check:settings-agents`
 - `npm run check:architecture`
+- `npm run check:fidelity`
+- `npm run check:shared-exports`
 
-涉及 Settings UI 结构、样式或状态展示时，补充 `npm run start:agent-browser` 并用 Codex 内置浏览器打开 `/app` 做真实会话检查。
+涉及 Work Process 或 Agent Chat UI 时，还必须启动真实 browser-app session，用 Codex in-app Browser 打开 `/app` 验证真实事件流、console、布局和水平溢出。
+

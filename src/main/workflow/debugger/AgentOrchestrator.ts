@@ -55,10 +55,16 @@ import type {
 import { getPrimitiveTools } from '../../agent-runtime/tools';
 import {
   encodeAgentModel,
-  llmAdapterProvider,
-} from '../../agent-runtime/LLMAdapterProvider';
+  configuredRuntimeProvider,
+} from '../../agent-runtime/providers/ConfiguredRuntimeProvider';
+import {
+  describeRouteCapabilityDiagnostic,
+  resolveAgentRouteCapability,
+} from '../../agent-runtime/capabilities/RouteCapabilityResolver';
 import { createTaskTools, TaskRegistry } from '../../agent-runtime/tasks';
 import {
+  buildDiagnosticAgentEvent,
+  mentionsTextualToolCall,
   translateCoreToSharedAgentEvent,
   type AgentEventBridgeContext,
 } from '../../agent-runtime/AgentEventBridge';
@@ -108,6 +114,7 @@ interface AgentSlot {
   providerId: string;
   modelId: string;
   systemPrompt: string;
+  toolSignature: string;
 }
 
 interface ResolvedRuntimeTools {
@@ -130,24 +137,49 @@ export class AgentOrchestrator {
 
   private initializeAgents(): void {
     for (const role of AGENT_ROLES) {
-      this.agentStates.set(role, {
-        agentId: role,
-        status: 'idle',
-        lastActivity: nowIso(),
-      });
-
-      const defaultRouting = DEFAULT_MODEL_ROUTING[role];
-      this.agentConfigs.set(role, {
-        agentId: role,
-        systemPrompt: '',
-        modelProvider: defaultRouting.provider,
-        modelName: defaultRouting.model,
-        temperature: 0.7,
-        maxTokens: 4096,
-        category: this.getAgentCategory(role),
-        writeScope: this.getAgentWriteScopes(role),
-      });
+      this.ensureAgentState(role);
+      this.agentConfigs.set(role, this.createDefaultAgentConfig(role));
     }
+  }
+
+  private ensureAgentState(agentId: AgentRole): AgentState {
+    const existing = this.agentStates.get(agentId);
+    if (existing) {
+      return existing;
+    }
+    const state: AgentState = {
+      agentId,
+      status: 'idle',
+      lastActivity: nowIso(),
+    };
+    this.agentStates.set(agentId, state);
+    return state;
+  }
+
+  private createDefaultAgentConfig(agentId: AgentRole): AgentConfig {
+    const fallbackAgentId: AgentId = isTopLevelAgentId(agentId) ? agentId : 'edit';
+    const defaultRouting = DEFAULT_MODEL_ROUTING[fallbackAgentId];
+    return {
+      agentId,
+      systemPrompt: '',
+      modelProvider: defaultRouting.provider,
+      modelName: defaultRouting.model,
+      temperature: 0.7,
+      maxTokens: 4096,
+      category: this.getAgentCategory(agentId),
+      writeScope: this.getAgentWriteScopes(agentId),
+    };
+  }
+
+  private getOrCreateAgentConfig(agentId: AgentRole): AgentConfig {
+    this.ensureAgentState(agentId);
+    const existing = this.agentConfigs.get(agentId);
+    if (existing) {
+      return existing;
+    }
+    const config = this.createDefaultAgentConfig(agentId);
+    this.agentConfigs.set(agentId, config);
+    return config;
   }
 
   private getAgentCategory(role: AgentRole): AgentCategory {
@@ -167,10 +199,8 @@ export class AgentOrchestrator {
   }
 
   configureAgent(agentId: AgentRole, config: Partial<AgentConfig>): void {
-    const existing = this.agentConfigs.get(agentId);
-    if (existing) {
-      this.agentConfigs.set(agentId, { ...existing, ...config });
-    }
+    const existing = this.getOrCreateAgentConfig(agentId);
+    this.agentConfigs.set(agentId, { ...existing, ...config });
   }
 
   getAgentConfig(agentId: AgentRole): AgentConfig | null {
@@ -180,7 +210,7 @@ export class AgentOrchestrator {
   applyLlmConfig(config: LLMConfig): void {
     const routeMap = new Map(config.agentRoutes.map((route) => [route.agentId, route]));
     for (const [agentId, agentConfig] of this.agentConfigs.entries()) {
-      const fallbackAgentId: AgentId = isTopLevelAgentId(agentId) ? agentId : 'debugger';
+      const fallbackAgentId: AgentId = isTopLevelAgentId(agentId) ? agentId : 'edit';
       const fallback = DEFAULT_MODEL_ROUTING[fallbackAgentId];
       const route = routeMap.get(agentId);
       this.agentConfigs.set(agentId, {
@@ -209,10 +239,7 @@ export class AgentOrchestrator {
     context?: AgentTurnContext,
     options?: AgentTurnOptions,
   ): Promise<string> {
-    const fallbackConfig = this.agentConfigs.get(agentId);
-    if (!fallbackConfig) {
-      throw new Error(`Agent not found: ${agentId}`);
-    }
+    const fallbackConfig = this.getOrCreateAgentConfig(agentId);
 
     this.updateAgentStatus(agentId, 'thinking');
 
@@ -273,10 +300,7 @@ export class AgentOrchestrator {
     content: string,
     options?: AgentProfileTurnOptions,
   ): Promise<string> {
-    const fallbackConfig = this.agentConfigs.get(agentId);
-    if (!fallbackConfig) {
-      throw new Error(`Agent not found: ${agentId}`);
-    }
+    const fallbackConfig = this.getOrCreateAgentConfig(agentId);
 
     this.updateAgentStatus(agentId, 'thinking');
 
@@ -332,7 +356,7 @@ export class AgentOrchestrator {
         scope: options?.sessionId ? 'session' : 'app',
         namespace: 'agent',
         severity: 'info',
-        title: `${AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : 'debugger']} profile turn`,
+        title: `${this.getAgentDisplayName(agentId)} profile turn`,
         summary: responseText.slice(0, 160) || 'Empty message.',
         sessionId: options?.sessionId,
         raw: {
@@ -363,12 +387,14 @@ export class AgentOrchestrator {
     toolExecutor = this.createToolExecutor(agentId, [], undefined),
     streamOptions?: StreamOptions,
   ): AgentSlot {
+    const toolSignature = this.createToolSignature(tools);
     const existing = this.agentSlots.get(agentId);
     if (
       existing
       && existing.providerId === providerId
       && existing.modelId === modelId
       && existing.systemPrompt === systemPrompt
+      && existing.toolSignature === toolSignature
       && !existing.agent.isStreaming
     ) {
       return existing;
@@ -381,13 +407,13 @@ export class AgentOrchestrator {
         tools,
         messages: [],
       },
-      provider: llmAdapterProvider,
+      provider: configuredRuntimeProvider,
       toolExecutor,
       streamOptions,
       maxTurns: 8,
     });
 
-    const slot: AgentSlot = { agent, providerId, modelId, systemPrompt };
+    const slot: AgentSlot = { agent, providerId, modelId, systemPrompt, toolSignature };
     this.agentSlots.set(agentId, slot);
     return slot;
   }
@@ -401,6 +427,7 @@ export class AgentOrchestrator {
     toolExecutor = this.createToolExecutor('ask', [], undefined),
     streamOptions?: StreamOptions,
   ): AgentSlot {
+    const toolSignature = this.createToolSignature(tools);
     const agent = new Agent({
       initialState: {
         model: encodeAgentModel(providerId, modelId),
@@ -408,12 +435,16 @@ export class AgentOrchestrator {
         tools,
         messages: [],
       },
-      provider: llmAdapterProvider,
+      provider: configuredRuntimeProvider,
       toolExecutor,
       streamOptions,
       maxTurns: 4,
     });
-    return { agent, providerId, modelId, systemPrompt };
+    return { agent, providerId, modelId, systemPrompt, toolSignature };
+  }
+
+  private createToolSignature(tools: ToolDefinition[]): string {
+    return tools.map((tool) => tool.name).sort().join('|');
   }
 
   private resolveRuntimeTools(
@@ -831,39 +862,21 @@ export class AgentOrchestrator {
       throw new Error('No provider/model route is configured for this agent.');
     }
 
+    const settings = settingsService.getAll();
+    const routeProvider = settings.llm.providers.find((entry) => entry.id === input.providerId);
+    const routeCapability = resolveAgentRouteCapability(routeProvider, input.modelId);
     const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
-    const toolExecutor = this.createToolExecutor(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
+    const activeToolDefinitions = routeCapability.toolCallingMode === 'native-structured'
+      ? runtimeTools.definitions
+      : [];
+    const activeToolAllowlist = activeToolDefinitions.map((tool) => tool.name);
+    const toolExecutor = this.createToolExecutor(input.agentId, activeToolAllowlist, input.stage, input.sessionId);
     const streamOptions: StreamOptions = {
       maxTokens: input.maxTokens,
       temperature: input.temperature,
       reasoningBudget: input.options?.reasoningBudget,
       signal: input.options?.signal,
     };
-    const slot = input.useFreshAgent
-      ? this.createFreshAgentSlot(
-          input.providerId,
-          input.modelId,
-          input.systemPrompt,
-          runtimeTools.definitions,
-          toolExecutor,
-          streamOptions,
-        )
-      : this.getOrCreateAgentSlot(
-          input.agentId,
-          input.providerId,
-          input.modelId,
-          input.systemPrompt,
-          runtimeTools.definitions,
-          toolExecutor,
-          streamOptions,
-        );
-
-    const userMessage: UserMessage = {
-      role: 'user',
-      content: input.content,
-      timestamp: nowMs(),
-    };
-
     const sharedEventContext: AgentEventBridgeContext = {
       agentId: input.agentId,
       runId: input.runId,
@@ -874,15 +887,53 @@ export class AgentOrchestrator {
       patternId: input.patternId,
       providerId: input.providerId,
       modelId: input.modelId,
-      toolAllowlist: input.toolAllowlist,
+      toolAllowlist: activeToolAllowlist,
+      routeCapability,
+    };
+    const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
+    if (routeDiagnostic) {
+      input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
+        code: 'route_tool_calling_unsupported',
+        severity: routeCapability.toolCallingMode === 'disabled' ? 'error' : 'warning',
+        message: routeDiagnostic,
+        technicalMessage: JSON.stringify(routeCapability),
+      }));
+    }
+    const slot = input.useFreshAgent
+      ? this.createFreshAgentSlot(
+          input.providerId,
+          input.modelId,
+          input.systemPrompt,
+          activeToolDefinitions,
+          toolExecutor,
+          streamOptions,
+        )
+      : this.getOrCreateAgentSlot(
+          input.agentId,
+          input.providerId,
+          input.modelId,
+          input.systemPrompt,
+          activeToolDefinitions,
+          toolExecutor,
+          streamOptions,
+        );
+
+    const userMessage: UserMessage = {
+      role: 'user',
+      content: input.content,
+      timestamp: nowMs(),
     };
 
     let responseText = '';
+    let sawStructuredToolCall = false;
     const unsubscribe = slot.agent.subscribe((event: CoreAgentEvent) => {
       if (event.type === 'message_update') {
         const ev = event.assistantMessageEvent;
         if (ev.type === 'text_delta' && typeof ev.delta === 'string') {
           input.options?.onChunk?.(ev.delta);
+        }
+        if (ev.type === 'toolcall_end') {
+          sawStructuredToolCall = true;
         }
       }
       if (event.type === 'message_end' && event.message.role === 'assistant') {
@@ -890,6 +941,20 @@ export class AgentOrchestrator {
           .filter((block) => block.type === 'text')
           .map((block) => (block as { text: string }).text)
           .join('');
+        if (!sawStructuredToolCall && !responseText.trim()) {
+          input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
+            code: 'empty_response_without_tool_call',
+            severity: 'warning',
+            message: 'Provider returned an empty assistant message without a structured tool call.',
+          }));
+        } else if (!sawStructuredToolCall && mentionsTextualToolCall(responseText)) {
+          input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
+            code: 'textual_tool_call_not_executed',
+            severity: 'warning',
+            message: 'The model wrote a textual tool call, but no structured provider tool call was returned. No tool was executed.',
+            technicalMessage: responseText.slice(0, 1200),
+          }));
+        }
       }
       const sharedEvent = translateCoreToSharedAgentEvent(event, sharedEventContext);
       if (sharedEvent) {
@@ -964,7 +1029,7 @@ export class AgentOrchestrator {
     if (agentId === 'plan') {
       return 'ask';
     }
-    return isTopLevelAgentId(agentId) ? agentId as AppMode : 'debugger';
+    return isTopLevelAgentId(agentId) ? agentId as AppMode : 'edit';
   }
 
   private patternForAgent(_agentId: AgentRole): string {
@@ -972,8 +1037,18 @@ export class AgentOrchestrator {
   }
 
   private systemPromptForAgent(agentId: AgentRole, prompt?: string): string {
-    const topLevelAgentId: AgentId = isTopLevelAgentId(agentId) ? agentId : 'debugger';
-    return prompt || `You are the ${AGENT_DISPLAY_NAMES[topLevelAgentId]}. ${AGENT_DESCRIPTIONS[topLevelAgentId]}`;
+    if (prompt) {
+      return prompt;
+    }
+    const topLevelAgentId: AgentId | null = isTopLevelAgentId(agentId) ? agentId : null;
+    return topLevelAgentId
+      ? `You are the ${AGENT_DISPLAY_NAMES[topLevelAgentId]}. ${AGENT_DESCRIPTIONS[topLevelAgentId]}`
+      : `You are ${agentId}. Follow the active .agent.md profile and report evidence clearly.`;
+  }
+
+  private getAgentDisplayName(agentId: AgentRole): string {
+    const definition = settingsService.getAll().agents.definitions.find((entry) => entry.id === agentId);
+    return definition?.name || (isTopLevelAgentId(agentId) ? AGENT_DISPLAY_NAMES[agentId] : agentId);
   }
 
   private async finalizeRecordedAssistantMessage(
@@ -988,7 +1063,7 @@ export class AgentOrchestrator {
   }
 
   private updateAgentStatus(agentId: AgentRole, status: AgentState['status']): void {
-    const state = this.agentStates.get(agentId);
+    const state = this.ensureAgentState(agentId);
     if (state) {
       state.status = status;
       state.lastActivity = nowIso();
@@ -996,7 +1071,7 @@ export class AgentOrchestrator {
         scope: 'app',
         namespace: 'agent',
         severity: status === 'error' ? 'error' : status === 'complete' ? 'success' : 'info',
-        title: AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : 'debugger'] || agentId,
+        title: this.getAgentDisplayName(agentId),
         summary: `Status changed to ${status}.`,
         raw: {
           agentId,
@@ -1051,7 +1126,7 @@ export class AgentOrchestrator {
       scope: sessionId ? 'session' : 'app',
       namespace: 'agent',
       severity: message.role === 'system' ? 'warning' : 'info',
-      title: AGENT_DISPLAY_NAMES[isTopLevelAgentId(message.agentId) ? message.agentId : 'debugger'] || message.agentId,
+      title: this.getAgentDisplayName(message.agentId),
       summary: message.content.slice(0, 120) || 'Empty message.',
       sessionId,
       raw: {
@@ -1086,7 +1161,7 @@ export class AgentOrchestrator {
     const lower = userMessage.toLowerCase();
     let stub = agentId === 'ask'
       ? 'Ask is ready. I can inspect readonly context, search files or public pages, and explain next steps without starting a Debugger run.'
-      : `${AGENT_DISPLAY_NAMES[isTopLevelAgentId(agentId) ? agentId : 'debugger']} is ready. Describe the goal and I can use the configured tools for this turn.`;
+      : `${this.getAgentDisplayName(agentId)} is ready. Describe the goal and I can use the configured tools for this turn.`;
     if (/ue4|unreal/i.test(userMessage)) {
       stub = 'UE4 is Unreal Engine 4, commonly involved in graphics debugging around materials, post-processing, shaders, and render passes.';
     } else if (/hello|hi/i.test(userMessage)) {

@@ -1,4 +1,5 @@
 import type { AgentCategory, AgentId, AgentRole, WriteScope } from '../types/agent';
+import type { AgentManifestDefinition } from '../types/agentManifest';
 import type { ModeConfig } from '../types/layout';
 import { DEFAULT_MODEL_ROUTING, TOP_LEVEL_AGENT_IDS, isTopLevelAgentId } from '../types/agent';
 
@@ -117,14 +118,30 @@ export const AGENT_MODES: ModeConfig[] = [
   },
 ];
 
-export const AGENT_MODE_MAP: Record<ModeConfig['id'], ModeConfig> = AGENT_MODES.reduce(
+export const AGENT_MODE_MAP: Partial<Record<string, ModeConfig>> = AGENT_MODES.reduce(
   (accumulator, mode) => {
     accumulator[mode.id] = mode;
     return accumulator;
   },
-  {} as Record<ModeConfig['id'], ModeConfig>,
+  {} as Partial<Record<string, ModeConfig>>,
 );
 
-export function getAgentModeConfig(modeId: ModeConfig['id']): ModeConfig {
-  return AGENT_MODE_MAP[modeId];
+export function getAgentModeConfig(modeId: ModeConfig['id']): ModeConfig | null {
+  return AGENT_MODE_MAP[modeId] ?? null;
+}
+
+export interface AgentDisplayInfo {
+  name: string;
+  glyph: string;
+  accent: string;
+}
+
+export function resolveAgentDisplay(agentId: string, definitions: AgentManifestDefinition[]): AgentDisplayInfo {
+  const manifest = definitions.find((d) => d.id === agentId);
+  const builtinColor = AGENT_COLORS[agentId as AgentId];
+  return {
+    name: manifest?.name ?? AGENT_DISPLAY_NAMES[agentId as AgentId] ?? agentId,
+    glyph: (manifest?.name ?? AGENT_DISPLAY_NAMES[agentId as AgentId] ?? agentId).slice(0, 2).toUpperCase(),
+    accent: builtinColor ?? '#33d1ff',
+  };
 }

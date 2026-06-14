@@ -11,7 +11,9 @@ const {
   canonicalAgentModelId,
   splitCanonicalAgentModelId,
 } = require('../src/shared/utils/agentModelRoute.ts');
+const { AgentManifestService } = require('../src/main/settings/AgentManifestService.ts');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
 function assert(condition, message) {
@@ -41,9 +43,73 @@ function route(agentId, providerId, modelId) {
   return { agentId, providerId, modelId };
 }
 
+function agentDraft(overrides) {
+  return {
+    id: overrides.id,
+    fileName: overrides.fileName ?? `${overrides.id}.agent.md`,
+    name: overrides.name ?? overrides.id,
+    description: overrides.description ?? 'Custom profile used by settings regression checks.',
+    argumentHint: overrides.argumentHint ?? 'Describe the task for this custom profile',
+    target: 'rdc-agent',
+    models: overrides.models ?? [],
+    disableModelInvocation: false,
+    userInvocable: overrides.userInvocable ?? true,
+    tools: overrides.tools ?? ['read'],
+    skills: [],
+    mcpServers: [],
+    agents: overrides.agents ?? ['edit'],
+    handoffs: overrides.handoffs ?? [],
+    metadata: {},
+    instructions: overrides.instructions ?? 'Use the custom profile instructions.',
+    enabled: overrides.enabled ?? true,
+  };
+}
+
+function writeCustomManifest(filePath, options = {}) {
+  const modelLine = options.model ? `model:\n  - ${options.model}\n` : 'model: []\n';
+  fs.writeFileSync(filePath, `---
+name: ${options.name ?? 'Custom Browser Use Agent'}
+description: ${options.description ?? 'A custom user-invocable profile for regression checks.'}
+argument-hint: Describe the custom browser-use task
+target: rdc-agent
+${modelLine}disable-model-invocation: false
+user-invocable: true
+enabled: true
+tools:
+  - read
+  - search
+agents:
+  - edit
+handoffs:
+  - label: Continue in Edit
+    agent: edit
+    prompt: Continue with the implementation evidence.
+---
+
+Follow the custom profile instructions and report runtime evidence.
+`, 'utf8');
+}
+
+function walkSourceFiles(directory) {
+  const entries = fs.readdirSync(directory, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const fullPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...walkSourceFiles(fullPath));
+      continue;
+    }
+    if (/\.(cjs|mjs|ts|tsx)$/u.test(entry.name)) {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+
 function main() {
   const ollama = configuredProvider('ollama', ['llama3']);
   const validRoutes = AGENT_ROLES.map((agentId) => route(agentId, 'ollama', 'llama3'));
+  const customAgentId = 'custom-browser-use-agent';
 
   for (const agentRoute of validRoutes) {
     const status = resolveAgentRouteStatus(agentRoute, [ollama]);
@@ -132,6 +198,119 @@ function main() {
   const composer = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/debugger/composer/Composer.tsx'), 'utf8');
   assert(composer.includes('userInvocableAgents.map'), 'Composer should list user-invocable Agent manifests.');
   assert(!composer.includes('AGENT_MODES.map'), 'Composer should not hardcode mode entries as Agent choices.');
+  assert(composer.includes('composer-agent-menu-item-tooltip'), 'Composer should keep Agent descriptions in hover tooltip UI.');
+
+  const modeGlyph = fs.readFileSync(path.join(repoRoot, 'src/renderer/ui/ModeGlyph.tsx'), 'utf8');
+  assert(modeGlyph.includes('FALLBACK_MODE_CONFIG'), 'ModeGlyph should provide a safe fallback for custom Agent profiles.');
+
+  const composerSendHelpers = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/debugger/composer/composerSendHelpers.ts'), 'utf8');
+  assert(composerSendHelpers.includes("return EXECUTABLE_APP_MODES.has(mode) ? mode as AppMode : 'edit';"), 'Composer send should not map custom profiles to Ask mode.');
+  assert(composerSendHelpers.includes('selectedAgentId || currentMode'), 'Local send failures should preserve the selected Agent id.');
+
+  const handoffActions = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/debugger/AgentChat/useAgentHandoffActions.ts'), 'utf8');
+  assert(handoffActions.includes(": 'edit';"), 'Handoff to a custom Agent should keep the custom agentId with a generic executable mode.');
+
+  const useSettingsModal = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/useSettingsModal.ts'), 'utf8');
+  assert(!useSettingsModal.includes('AGENT_ROLES'), 'Settings route validation should derive agents from manifest drafts.');
+  assert(useSettingsModal.includes('agentManifestDrafts.filter'), 'Settings route validation should inspect manifest drafts.');
+
+  const settingsModalActions = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/settingsModalActions.ts'), 'utf8');
+  assert(!settingsModalActions.includes('AGENT_ROLES'), 'Settings route save should not be limited to built-in Agent roles.');
+  assert(settingsModalActions.includes('agentManifestDrafts'), 'Settings route save should include custom manifest drafts.');
+
+  const agentManifestServiceSource = fs.readFileSync(path.join(repoRoot, 'src/main/settings/AgentManifestService.ts'), 'utf8');
+  assert(!agentManifestServiceSource.includes('Only top-level agent manifests'), 'Agent manifest import should not reject safe custom profiles.');
+  assert(agentManifestServiceSource.includes('isSafeAgentProfileId(idFromFileName(entry))'), 'Agent manifest load should accept safe custom profile file ids.');
+  assert(agentManifestServiceSource.includes('const routeAgentIds = new Set<string>(AGENT_ROLES)'), 'Agent manifest routes should seed built-ins before adding custom profiles.');
+  assert(agentManifestServiceSource.includes('routeAgentIds.add(definition.id)'), 'Agent manifest routes should add custom profile ids.');
+
+  const settingsServiceSource = fs.readFileSync(path.join(repoRoot, 'src/main/settings/SettingsService.ts'), 'utf8');
+  assert(!settingsServiceSource.includes('KNOWN_AGENT_IDS'), 'Settings route normalization should not use a built-in Agent allowlist.');
+  assert(settingsServiceSource.includes('isSafeAgentProfileId(route.agentId)'), 'Settings route normalization should validate safe custom profile ids.');
+  assert(settingsServiceSource.includes('routeMap.set(route.agentId, route)'), 'Settings route normalization should preserve custom route ids.');
+
+  const conversationServiceSource = fs.readFileSync(path.join(repoRoot, 'src/main/conversation/ConversationService.ts'), 'utf8');
+  assert(conversationServiceSource.includes('resolveEnabledAgentDefinition'), 'Conversation routing should resolve enabled manifest definitions.');
+  assert(!conversationServiceSource.includes('KNOWN_CONVERSATION_AGENTS'), 'Conversation routing should not be limited to built-in Agent roles.');
+
+  const orchestratorSource = fs.readFileSync(path.join(repoRoot, 'src/main/workflow/debugger/AgentOrchestrator.ts'), 'utf8');
+  assert(orchestratorSource.includes('getOrCreateAgentConfig'), 'Agent orchestrator should lazily initialize custom Agent config.');
+  assert(orchestratorSource.includes("isTopLevelAgentId(agentId) ? agentId : 'edit'"), 'Custom Agent fallback config should use a generic profile default.');
+
+  const runtimePolicySource = fs.readFileSync(path.join(repoRoot, 'src/main/workflow/debugger/DebuggerRuntimePolicy.ts'), 'utf8');
+  assert(runtimePolicySource.includes('manifest.tools.flatMap'), 'Runtime tool policy should derive manifest tool allowlists directly.');
+  assert(runtimePolicySource.includes('isTopLevelAgentId(agentId)'), 'Runtime tool policy should only grant executable defaults to built-in Agents.');
+
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-agent-settings-agents-'));
+  try {
+    const profilesPath = path.join(tempRoot, 'profiles');
+    const agentsPath = path.join(profilesPath, 'agents');
+    fs.mkdirSync(agentsPath, { recursive: true });
+    const customManifestPath = path.join(agentsPath, `${customAgentId}.agent.md`);
+    writeCustomManifest(customManifestPath, {
+      model: canonicalAgentModelId('ollama', 'llama3'),
+    });
+
+    const manifestService = new AgentManifestService();
+    const manifestSettings = manifestService.getSettings({ profilesPath }, [ollama], validRoutes);
+    const customDefinition = manifestSettings.definitions.find((definition) => definition.id === customAgentId);
+    assert(customDefinition, 'Agent manifest settings should load a safe custom .agent.md profile.');
+    assert(customDefinition.userInvocable === true, 'Custom profile should preserve user-invocable status.');
+    assert(customDefinition.tools.includes('read') && customDefinition.tools.includes('search'), 'Custom profile should preserve declared tools.');
+    assert(customDefinition.handoffs.some((handoff) => handoff.agent === 'edit'), 'Custom profile should preserve handoff definitions.');
+
+    const routeSettings = manifestService.routesFromDefinitions(validRoutes, manifestSettings.definitions, [ollama]);
+    const customRoute = routeSettings.find((entry) => entry.agentId === customAgentId);
+    assert(customRoute?.providerId === 'ollama' && customRoute.modelId === 'llama3', 'Custom manifest model should derive a valid route.');
+    for (const agentId of AGENT_ROLES) {
+      assert(routeSettings.some((entry) => entry.agentId === agentId), `Routes should retain built-in Agent route ${agentId}.`);
+    }
+
+    const savedAgentId = 'custom-saved-agent';
+    manifestService.save({ profilesPath }, [
+      agentDraft({
+        id: savedAgentId,
+        fileName: 'wrong-file-name.agent.md',
+        models: [canonicalAgentModelId('ollama', 'llama3')],
+      }),
+    ], 'global custom instructions');
+    assert(fs.existsSync(path.join(agentsPath, `${savedAgentId}.agent.md`)), 'Saving a custom profile should write a safe id-based file name.');
+    const savedSettings = manifestService.getSettings({ profilesPath }, [ollama], validRoutes);
+    assert(savedSettings.definitions.some((definition) => definition.id === savedAgentId), 'Saved custom profile should reload by custom id.');
+
+    const invalidRouteSettings = manifestService.routesFromDefinitions([], [
+      agentDraft({
+        id: 'custom-invalid-route-agent',
+        models: [canonicalAgentModelId('ollama', 'missing-model')],
+      }),
+    ], [ollama]);
+    const invalidRoute = invalidRouteSettings.find((entry) => entry.agentId === 'custom-invalid-route-agent');
+    assert(invalidRoute?.providerId === '' && invalidRoute.modelId === '', 'Invalid custom route should fail closed without dropping agent id.');
+
+    const importPath = path.join(tempRoot, 'custom-imported-agent.agent.md');
+    writeCustomManifest(importPath, {
+      name: 'Custom Imported Agent',
+      model: canonicalAgentModelId('ollama', 'llama3'),
+    });
+    const imported = manifestService.importFile({ profilesPath }, importPath);
+    assert(imported.id === 'custom-imported-agent', 'Import should accept safe non-built-in .agent.md profiles.');
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+
+  const forbiddenLegacyTokens = [
+    'reasoningTrace',
+    'LegacyTraceStep',
+    'LegacyTrace',
+    'migrateLegacyTrace',
+    'LEGACY_STAGE_MIGRATION',
+  ];
+  for (const filePath of walkSourceFiles(path.join(repoRoot, 'src'))) {
+    const content = fs.readFileSync(filePath, 'utf8');
+    for (const token of forbiddenLegacyTokens) {
+      assert(!content.includes(token), `${path.relative(repoRoot, filePath)} should not write or expose ${token}.`);
+    }
+  }
 
   console.log('[settings-agents] OK');
 }

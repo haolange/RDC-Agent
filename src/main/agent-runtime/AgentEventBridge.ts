@@ -7,6 +7,7 @@ import type {
   AgentEvent as SharedAgentEvent,
   AgentEventPayload,
   AgentEventType,
+  AgentRouteCapability,
 } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
 import type { AppMode } from '@shared/types/session';
@@ -32,10 +33,11 @@ export interface AgentEventBridgeContext {
   providerId?: string;
   modelId?: string;
   toolAllowlist?: string[];
+  routeCapability?: AgentRouteCapability;
 }
 
 /** Creates a shared AgentEvent with normalized runtime context. */
-function buildSharedAgentEvent(
+export function buildSharedAgentEvent(
   type: AgentEventType,
   payload: AgentEventPayload,
   context: AgentEventBridgeContext,
@@ -52,6 +54,31 @@ function buildSharedAgentEvent(
     phase: context.phase,
     payload,
   };
+}
+
+export function buildDiagnosticAgentEvent(
+  context: AgentEventBridgeContext,
+  input: {
+    code: string;
+    severity: 'info' | 'warning' | 'error';
+    message: string;
+    technicalMessage?: string;
+  },
+): SharedAgentEvent {
+  return buildSharedAgentEvent(
+    'diagnostic',
+    {
+      code: input.code,
+      severity: input.severity,
+      message: input.message,
+      technicalMessage: input.technicalMessage,
+    },
+    context,
+  );
+}
+
+export function mentionsTextualToolCall(text: string): boolean {
+  return /(?:tool\s*call|function\s*call|工具调用|调用工具)\s*[:：]\s*[\w.-]+\s*\(/i.test(text);
 }
 
 /**
@@ -81,6 +108,7 @@ export function translateCoreToSharedAgentEvent(
           providerId: context.providerId ?? '',
           modelId: context.modelId ?? '',
           toolAllowlist: context.toolAllowlist ?? [],
+          routeCapability: context.routeCapability,
         },
         context,
       );

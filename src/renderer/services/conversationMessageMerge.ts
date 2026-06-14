@@ -23,26 +23,6 @@ const cloneWorkTrace = (trace: ConversationWorkTrace | null | undefined): Conver
       }
 );
 
-const migrateLegacyTrace = (message: ConversationMessage): ConversationWorkTrace | null => {
-  if (message.workTrace) {
-    return message.workTrace;
-  }
-  // Historical session compatibility boundary. Remove after persisted sessions are migrated to workTrace.
-  const legacyTrace = message.reasoningTrace;
-  if (!legacyTrace) {
-    return null;
-  }
-  return {
-    status: legacyTrace.status,
-    summary: legacyTrace.summary,
-    blocks: legacyTrace.steps.map((step) => ({
-      kind: step.kind ?? (step.toolCalls.length > 0 ? 'tool' : 'reasoning'),
-      ...step,
-    })),
-    updatedAt: legacyTrace.updatedAt,
-  };
-};
-
 const upsertWorkBlock = (
   trace: ConversationWorkTrace | null | undefined,
   blockId: string,
@@ -84,7 +64,7 @@ const upsertWorkBlock = (
 };
 
 export const applyToolTraceToMessage = (message: ConversationMessage, trace: ToolTraceEntry): ConversationMessage => {
-  const nextTrace = upsertWorkBlock(migrateLegacyTrace(message), 'tool-execution', {
+  const nextTrace = upsertWorkBlock(message.workTrace ?? null, 'tool-execution', {
     kind: 'tool',
     title: '工具调用',
     stage: 'runtime',
@@ -133,7 +113,7 @@ export const applyActionEventToMessage = (message: ConversationMessage, event: A
     return message;
   }
 
-  const nextTrace = cloneWorkTrace(migrateLegacyTrace(message));
+  const nextTrace = cloneWorkTrace(message.workTrace ?? null);
   const eventTime = event.ts_ms;
 
   const toolMerged = mergeToolExecutionActionEvent(message, event, nextTrace, upsertWorkBlock);
