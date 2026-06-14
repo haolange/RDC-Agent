@@ -44,6 +44,7 @@ import type {
 } from './session';
 import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from './terminal';
 import type { ToolCatalog, ToolRuntimeSummary } from './tool';
+import type { CommandExecuteRequest, CommandListResult } from './command';
 import type { AgentRun, AgentRunPresentation, TraceEvent } from './agenticTrace';
 import type {
   TraceBranchSwitchResult,
@@ -122,6 +123,16 @@ export interface ElectronAPI {
     configure: (agentId: AgentRole, config: Partial<AgentConfig>) => Promise<{
       success: boolean;
       error?: string;
+    }>;
+  };
+
+  command: {
+    list: (category?: string) => Promise<CommandListResult>;
+    execute: (request: CommandExecuteRequest) => Promise<{
+      success: boolean;
+      message: string;
+      data?: unknown;
+      sideEffect?: string;
     }>;
   };
 

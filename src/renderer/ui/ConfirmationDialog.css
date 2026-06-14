@@ -1,0 +1,85 @@
+.confirmation-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+
+.confirmation-dialog {
+  background: var(--surface-primary);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.confirmation-title {
+  margin: 0 0 8px;
+  font-size: 1.1em;
+  color: var(--text-primary);
+}
+
+.confirmation-message {
+  margin: 0 0 16px;
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.risk-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75em;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.risk-badge.risk-low { background: var(--color-green-100); color: var(--color-green-700); }
+.risk-badge.risk-medium { background: var(--color-yellow-100); color: var(--color-yellow-700); }
+.risk-badge.risk-high { background: var(--color-red-100); color: var(--color-red-700); }
+
+.confirmation-dialog.risk-high {
+  border-color: var(--color-red-400);
+}
+
+.confirmation-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.confirmation-actions button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  cursor: pointer;
+  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-confirm {
+  background: var(--color-blue-600);
+  color: white;
+  border-color: var(--color-blue-600) !important;
+}
+
+.btn-cancel {
+  background: var(--surface-secondary);
+  color: var(--text-primary);
+}
+
+.confirmation-actions kbd {
+  font-size: 0.75em;
+  opacity: 0.6;
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 3px;
+  padding: 0 4px;
+}

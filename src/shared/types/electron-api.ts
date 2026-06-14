@@ -4,6 +4,7 @@ export type {
   AppMetaApi,
   AppShellApi,
   CaptureApi,
+  CommandApi,
   ContextApi,
   ConversationApi,
   DeviceApi,

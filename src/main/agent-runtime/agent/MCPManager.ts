@@ -34,12 +34,12 @@ export interface MCPServerConfig {
   /** 服务器名称标识。 */
   name: string;
   /** 连接类型。 */
-  type: 'stdio' | 'http';
+  type: 'stdio' | 'http' | 'sse' | 'streamable-http';
   /** stdio: 命令。 */
   command?: string;
   /** stdio: 命令参数。 */
   args?: string[];
-  /** http: 端点 URL。 */
+  /** http/sse/streamable-http: 端点 URL。 */
   url?: string;
   /** 调用超时（毫秒），默认 30s。 */
   timeoutMs?: number;
@@ -63,6 +63,8 @@ interface MCPConnection {
   process?: ChildProcess;
   /** stdio 模式下的 RPC 客户端。 */
   rpc?: StdioRpcClient;
+  /** sse 模式下的 RPC 客户端。 */
+  rpcSse?: SseRpcClient;
 }
 
 // =====================================================================
@@ -187,6 +189,173 @@ class StdioRpcClient {
 
   close(): void {
     this.onClose(new Error('MCP client closed'));
+  }
+}
+
+// =====================================================================
+// SSE RPC 客户端
+// =====================================================================
+
+/**
+ * SSE 传输的 JSON-RPC 客户端。
+ *
+ * - 通过 HTTP GET 建立 SSE 长连接接收服务器推送的事件；
+ * - 客户端→服务器的请求通过 HTTP POST 发送到同样的 URL。
+ */
+class SseRpcClient {
+  private nextId = 1;
+  private pending = new Map<
+    number,
+    { resolve: (v: unknown) => void; reject: (e: Error) => void }
+  >();
+  private closed = false;
+  private abortController = new AbortController();
+
+  constructor(private readonly baseUrl: string) {}
+
+  /** 启动 SSE 连接。 */
+  async connect(_timeoutMs: number): Promise<void> {
+    const response = await fetch(this.baseUrl, {
+      method: 'GET',
+      headers: { Accept: 'text/event-stream' },
+      signal: this.abortController.signal,
+    });
+
+    if (!response.ok || !response.body) {
+      throw new Error(`SSE connect failed: ${response.status} ${response.statusText}`);
+    }
+
+    // 异步读取 SSE 流
+    void this.readSseStream(response.body);
+  }
+
+  private async readSseStream(body: ReadableStream<Uint8Array>): Promise<void> {
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let currentEvent = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? ''; // 保留未完成行
+
+        for (const rawLine of lines) {
+          const line = rawLine.trimEnd();
+          if (line === '') {
+            // 空行 = 事件结束
+            if (currentEvent) {
+              this.processEvent(currentEvent);
+              currentEvent = '';
+            }
+            continue;
+          }
+          if (line.startsWith('data: ')) {
+            currentEvent += line.slice(6);
+          }
+          // 其他字段 (event:, id:, retry:) 暂时忽略
+        }
+      }
+    } catch (err) {
+      if (!this.closed) {
+        this.onClose(
+          err instanceof Error ? err : new Error(String(err)),
+        );
+      }
+    } finally {
+      try { reader.releaseLock(); } catch { /* ignore */ }
+    }
+
+    // 处理最后可能未完成的事件
+    if (currentEvent) {
+      this.processEvent(currentEvent);
+    }
+  }
+
+  private processEvent(data: string): void {
+    let msg: JsonRpcResponse;
+    try {
+      msg = JSON.parse(data) as JsonRpcResponse;
+    } catch {
+      return; // 非 JSON 事件，跳过
+    }
+    if (typeof msg.id === 'number' && this.pending.has(msg.id)) {
+      const entry = this.pending.get(msg.id)!;
+      this.pending.delete(msg.id);
+      if (msg.error) {
+        entry.reject(
+          new Error(`MCP error ${msg.error.code}: ${msg.error.message}`),
+        );
+      } else {
+        entry.resolve(msg.result);
+      }
+    }
+  }
+
+  private onClose(err: Error): void {
+    if (this.closed) return;
+    this.closed = true;
+    for (const entry of this.pending.values()) {
+      entry.reject(err);
+    }
+    this.pending.clear();
+  }
+
+  /** 通过 HTTP POST 发送 JSON-RPC 请求。 */
+  async request(
+    method: string,
+    params: unknown,
+    timeoutMs: number,
+  ): Promise<unknown> {
+    if (this.closed) {
+      return Promise.reject(new Error('SSE connection is closed'));
+    }
+    const id = this.nextId++;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const res = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        throw new Error(`SSE POST ${res.status} ${res.statusText}`);
+      }
+      // SSE 模式下，响应也可能通过 POST 返回（或通过事件流）
+      const body = (await res.json()) as JsonRpcResponse;
+      if (body.error) {
+        throw new Error(
+          `MCP error ${body.error.code}: ${body.error.message}`,
+        );
+      }
+      return body.result;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /** 发送通知（fire-and-forget POST）。 */
+  notify(method: string, params: unknown): void {
+    if (this.closed) return;
+    fetch(this.baseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', method, params }),
+    }).catch(() => {
+      /* 通知失败忽略 */
+    });
+  }
+
+  close(): void {
+    this.abortController.abort();
+    this.onClose(new Error('SSE client closed'));
   }
 }
 
@@ -340,6 +509,83 @@ export class MCPManager {
       return conn.tools.map((t) => t.prefixedName);
     }
 
+    if (config.type === 'sse') {
+      if (!config.url) {
+        throw new Error(`MCP sse server "${config.name}" missing url`);
+      }
+      const sseRpc = new SseRpcClient(config.url);
+      const conn: MCPConnection = { config, tools: [], rpcSse: sseRpc };
+
+      try {
+        await sseRpc.connect(timeoutMs);
+        // SSE 模式：initialization 也通过 POST 发送
+        await sseRpc.request(
+          'initialize',
+          {
+            protocolVersion: '2024-11-05',
+            capabilities: {},
+            clientInfo: { name: 'rdc-agent', version: '0.1.0' },
+          },
+          timeoutMs,
+        );
+        sseRpc.notify('notifications/initialized', {});
+
+        const listResult = (await sseRpc.request(
+          'tools/list',
+          {},
+          timeoutMs,
+        )) as { tools?: Array<Record<string, unknown>> } | undefined;
+        const rawTools = Array.isArray(listResult?.tools)
+          ? listResult!.tools!
+          : [];
+        conn.tools = rawTools.map((t) =>
+          this.toDiscoveredTool(config.name, t),
+        );
+      } catch (err) {
+        sseRpc.close();
+        throw err;
+      }
+
+      this.connections.set(config.name, conn);
+      this.registerTools(conn.tools);
+      return conn.tools.map((t) => t.prefixedName);
+    }
+
+    if (config.type === 'streamable-http') {
+      if (!config.url) {
+        throw new Error(`MCP streamable-http server "${config.name}" missing url`);
+      }
+      // streamable-http: 使用 POST + streaming response (NDJSON)
+      const conn: MCPConnection = { config, tools: [] };
+      await this.streamableHttpRpc(
+        config.url,
+        'initialize',
+        {
+          protocolVersion: '2024-11-05',
+          capabilities: {},
+          clientInfo: { name: 'rdc-agent', version: '0.1.0' },
+        },
+        timeoutMs,
+      );
+
+      const listResult = (await this.streamableHttpRpc(
+        config.url,
+        'tools/list',
+        {},
+        timeoutMs,
+      )) as { tools?: Array<Record<string, unknown>> } | undefined;
+      const rawTools = Array.isArray(listResult?.tools)
+        ? listResult!.tools!
+        : [];
+      conn.tools = rawTools.map((t) =>
+        this.toDiscoveredTool(config.name, t),
+      );
+
+      this.connections.set(config.name, conn);
+      this.registerTools(conn.tools);
+      return conn.tools.map((t) => t.prefixedName);
+    }
+
     throw new Error(`Unsupported MCP transport type: ${String(config.type)}`);
   }
 
@@ -353,6 +599,9 @@ export class MCPManager {
     }
     if (conn.rpc) {
       conn.rpc.close();
+    }
+    if (conn.rpcSse) {
+      conn.rpcSse.close();
     }
     if (conn.process) {
       try {
@@ -449,9 +698,18 @@ export class MCPManager {
           { name: tool.originalName, arguments: args },
           timeoutMs,
         );
+      } else if (conn.config.type === 'sse') {
+        if (!conn.rpcSse) {
+          throw new Error('sse rpc client not initialized');
+        }
+        result = await conn.rpcSse.request(
+          'tools/call',
+          { name: tool.originalName, arguments: args },
+          timeoutMs,
+        );
       } else {
         if (!conn.config.url) {
-          throw new Error('http server url missing');
+          throw new Error('server url missing');
         }
         result = await this.httpRpc(
           conn.config.url,
@@ -597,6 +855,69 @@ export class MCPManager {
         throw new Error(
           `MCP error ${body.error.code}: ${body.error.message}`,
         );
+      }
+      return body.result;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /** streamable-http 模式：POST + 流式 NDJSON 响应。 */
+  private async streamableHttpRpc(
+    url: string,
+    method: string,
+    params: unknown,
+    timeoutMs: number,
+  ): Promise<unknown> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const id = Date.now() + Math.floor(Math.random() * 1000);
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/x-ndjson',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        throw new Error(`MCP streamable-http ${res.status} ${res.statusText}`);
+      }
+      // 读取流式 NDJSON 响应
+      if (res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            const msg = JSON.parse(trimmed) as JsonRpcResponse;
+            if (msg.error) {
+              throw new Error(`MCP error ${msg.error.code}: ${msg.error.message}`);
+            }
+            if (typeof msg.id === 'number' || typeof msg.id === 'string') {
+              return msg.result;
+            }
+          }
+        }
+        // 处理最后剩余的
+        if (buffer.trim()) {
+          const msg = JSON.parse(buffer.trim()) as JsonRpcResponse;
+          return msg.result;
+        }
+      }
+      // fallback: 非流式 JSON 响应
+      const body = (await res.json()) as JsonRpcResponse;
+      if (body.error) {
+        throw new Error(`MCP error ${body.error.code}: ${body.error.message}`);
       }
       return body.result;
     } finally {

@@ -23,6 +23,7 @@ import type {
   ToolResultMessage,
   UserMessage,
 } from '../core/types';
+import { TokenizerService } from '../core/TokenizerService';
 
 /** 上下文压缩配置。 */
 export interface ContextManagerConfig {
@@ -34,6 +35,10 @@ export interface ContextManagerConfig {
   keepRecentToolResults?: number;
   /** 上下文最大 token 估计值；未设置时由 model.contextWindow * 0.75 决定。 */
   contextTokenLimit?: number;
+  /** 真实 tokenizer 服务（用于精确计数）。 */
+  tokenizer?: TokenizerService;
+  /** 当前模型 ID（用于选择正确的编码器）。 */
+  modelId?: string;
 }
 
 const DEFAULT_TOOL_RESULT_BUDGET = 200 * 1024;
@@ -95,8 +100,23 @@ export class ContextManager {
     return result;
   }
 
-  /** 估算消息 token 数（粗略：4 字符 ≈ 1 token）。 */
+  /** 估算消息 token 数（优先使用真实 tokenizer）。 */
   estimateTokens(messages: AgentMessage[]): number {
+    const tokenizer = this.config.tokenizer;
+    const modelId = this.config.modelId;
+
+    if (tokenizer) {
+      // 转换为 LLM Message 格式后使用真实 tokenizer 计数
+      const llmMessages = messages
+        .filter((m) => m.role === 'user' || m.role === 'assistant' || m.role === 'toolResult')
+        .map((m) => ({
+          role: m.role,
+          content: 'content' in m ? (m as { content: unknown }).content : undefined,
+        }));
+      return tokenizer.countMessagesTokens(llmMessages, modelId);
+    }
+
+    // 回退：字符估算
     let chars = 0;
     for (const msg of messages) {
       chars += this.estimateMessageChars(msg);

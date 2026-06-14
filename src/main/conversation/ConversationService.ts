@@ -548,8 +548,9 @@ export class ConversationService {
   }
 
   async sendMessage(input: ConversationContextInput): Promise<ConversationTurnResult> {
+    const trimmed = input.message.trim();
     const context = await this.resolveContext(input);
-    return this.startProfileTurn(context, input.mode, input.agentId ?? null, input.message.trim(), input.attachments ?? []);
+    return this.startProfileTurn(context, input.mode, input.agentId ?? null, trimmed, input.attachments ?? []);
   }
 
   private async resolveContext(input: ConversationContextInput): Promise<ResolvedConversationContext> {

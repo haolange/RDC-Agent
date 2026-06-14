@@ -8,6 +8,7 @@ import { isPreloadEventChannel } from './api/channels';
 import { createAgentApi } from './api/agent';
 import { createCaptureApi, createContextApi, createDeviceApi } from './api/captureContext';
 import { createConversationApi } from './api/conversation';
+import { createCommandApi } from './api/command';
 import { createEventSubscriptionApi } from './api/events';
 import { registerTrackedListener, removeTrackedListener } from './api/listeners';
 import { createProjectApi, createRunApi, createSessionApi } from './api/projectSession';
@@ -29,6 +30,7 @@ const electronAPI = {
   appMeta: createAppMetaApi(),
   appShell: createAppShellApi(),
   conversation: createConversationApi(),
+  command: createCommandApi(),
 
   selectFiles: dialogApi.selectFiles,
   selectRdcFiles: dialogApi.selectRdcFiles,
