@@ -21,8 +21,8 @@ composer-attach-button
 composer-attachments
 composer-footer-bar
 composer-mode-pill
-composer-mode-pill-capability
 composer-usage-indicator
+composer-user-input-panel
 control-panel-scroll
 conversation-handoff-${handoff.agent}
 conversation-handoff-actions
@@ -130,3 +130,4 @@ trace-tool-action
 work-process
 work-process-block
 work-process-tool-call
+work-process-user-input

@@ -17,6 +17,8 @@
     'conversation:sendMessage',
     'conversation:getHistory',
     'conversation:cancelActiveTurn',
+    'conversation:answerUserInput',
+    'conversation:answerToolApproval',
   ],
   workflow: [
     'workflow:getState',

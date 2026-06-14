@@ -75,6 +75,8 @@ const removeAllTrackedListeners = (channel) => {
 const createConversationApi = () => ({
   sendMessage: (request) => electron.ipcRenderer.invoke("conversation:sendMessage", request),
   cancelActiveTurn: (request) => electron.ipcRenderer.invoke("conversation:cancelActiveTurn", request),
+  answerUserInput: (request) => electron.ipcRenderer.invoke("conversation:answerUserInput", request),
+  answerToolApproval: (request) => electron.ipcRenderer.invoke("conversation:answerToolApproval", request),
   getHistory: (sessionId) => electron.ipcRenderer.invoke("conversation:getHistory", sessionId),
   onEvent: (callback) => {
     registerTrackedListener("conversation:event", (payload) => callback(payload));

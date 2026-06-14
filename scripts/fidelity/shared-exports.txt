@@ -95,6 +95,7 @@ RdxCliJsonMode
 readJsonl
 readYaml
 ReasoningConfidence
+ReasoningVisibility
 RendererElectronApi
 ReplayBackendHint
 ReplayDeviceStatus
@@ -120,6 +121,7 @@ TerminalTabKind
 TerminalTabStatus
 TimelineImportance
 ToolApi
+ToolCallingMode
 ToolCategory
 ToolLayer
 ToolNamespace

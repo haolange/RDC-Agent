@@ -68,6 +68,10 @@ import {
   translateCoreToSharedAgentEvent,
   type AgentEventBridgeContext,
 } from '../../agent-runtime/AgentEventBridge';
+import { agentUserInputRequestService } from '../../agent-runtime/interactions/AgentUserInputRequestService';
+import { agentPermissionPolicyService } from '../../agent-runtime/permissions/AgentPermissionPolicy';
+import { agentToolApprovalRequestService } from '../../agent-runtime/permissions/AgentToolApprovalRequestService';
+import { withTemporaryPathAccess } from '../../agent-runtime/tools';
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import { getRdxRuntimeContext } from '../../sessions/RdxRuntimeContextRegistry';
@@ -115,11 +119,19 @@ interface AgentSlot {
   modelId: string;
   systemPrompt: string;
   toolSignature: string;
+  turnSignature: string;
 }
 
 interface ResolvedRuntimeTools {
   definitions: ToolDefinition[];
   toolMap: Map<string, AgentTool>;
+}
+
+interface ToolExecutorRuntimeContext {
+  sessionId?: string | null;
+  turnId?: string;
+  eventContext?: AgentEventBridgeContext;
+  onEvent?: (event: SharedAgentEvent) => void;
 }
 
 export class AgentOrchestrator {
@@ -386,6 +398,7 @@ export class AgentOrchestrator {
     tools: ToolDefinition[] = [],
     toolExecutor = this.createToolExecutor(agentId, [], undefined),
     streamOptions?: StreamOptions,
+    turnSignature = '',
   ): AgentSlot {
     const toolSignature = this.createToolSignature(tools);
     const existing = this.agentSlots.get(agentId);
@@ -395,6 +408,7 @@ export class AgentOrchestrator {
       && existing.modelId === modelId
       && existing.systemPrompt === systemPrompt
       && existing.toolSignature === toolSignature
+      && existing.turnSignature === turnSignature
       && !existing.agent.isStreaming
     ) {
       return existing;
@@ -413,7 +427,7 @@ export class AgentOrchestrator {
       maxTurns: 8,
     });
 
-    const slot: AgentSlot = { agent, providerId, modelId, systemPrompt, toolSignature };
+    const slot: AgentSlot = { agent, providerId, modelId, systemPrompt, toolSignature, turnSignature };
     this.agentSlots.set(agentId, slot);
     return slot;
   }
@@ -440,7 +454,7 @@ export class AgentOrchestrator {
       streamOptions,
       maxTurns: 4,
     });
-    return { agent, providerId, modelId, systemPrompt, toolSignature };
+    return { agent, providerId, modelId, systemPrompt, toolSignature, turnSignature: '' };
   }
 
   private createToolSignature(tools: ToolDefinition[]): string {
@@ -486,6 +500,7 @@ export class AgentOrchestrator {
     toolAllowlist: string[],
     stage?: WorkflowStage | 'report',
     sessionId?: string | null,
+    runtimeContext?: ToolExecutorRuntimeContext,
   ): ToolExecutor {
     const tools = this.resolveRuntimeTools(agentId, toolAllowlist, stage, sessionId).toolMap;
     return {
@@ -498,12 +513,58 @@ export class AgentOrchestrator {
         if (!tool) {
           return this.createPolicyDeniedToolResult(toolCall, agentId);
         }
-        const approvalRequired = tool.permissionHint === 'mutation' || tool.permissionHint === 'destructive';
-        if (approvalRequired) {
-          return this.createApprovalRequiredToolResult(toolCall, agentId, tool.permissionHint);
+        if (normalizedName === 'ask_user') {
+          return this.executeAskUserTool(toolCall, agentId, runtimeContext, signal);
+        }
+        const permissionDecision = agentPermissionPolicyService.evaluate({ agentId, tool, toolCall });
+        if (permissionDecision.action === 'deny') {
+          return this.createPolicyDeniedToolResult(toolCall, agentId, permissionDecision.reason);
+        }
+        if (permissionDecision.action === 'ask_user') {
+          if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
+            return this.createApprovalRequiredToolResult(toolCall, agentId, permissionDecision.reason ?? 'Tool approval requires an active conversation turn.');
+          }
+          const approved = await agentToolApprovalRequestService.request({
+            agentId,
+            sessionId: runtimeContext.sessionId ?? null,
+            turnId: runtimeContext.turnId,
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            reason: permissionDecision.reason ?? `Tool "${toolCall.name}" requires approval.`,
+            risk: permissionDecision.risk,
+            context: runtimeContext.eventContext,
+            onEvent: runtimeContext.onEvent,
+            signal,
+          });
+          if (!approved) {
+            return this.createPolicyDeniedToolResult(toolCall, agentId, 'User denied this tool call.');
+          }
+        }
+        if (permissionDecision.action === 'auto_review') {
+          if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
+            return this.createPolicyDeniedToolResult(toolCall, agentId, 'Auto-review requires an active conversation turn.');
+          }
+          const approved = agentToolApprovalRequestService.autoReview({
+            agentId,
+            sessionId: runtimeContext.sessionId ?? null,
+            turnId: runtimeContext.turnId,
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            reason: permissionDecision.reason ?? `Tool "${toolCall.name}" requires review.`,
+            risk: permissionDecision.risk,
+            context: runtimeContext.eventContext,
+            onEvent: runtimeContext.onEvent,
+            signal,
+          });
+          if (!approved) {
+            return this.createPolicyDeniedToolResult(toolCall, agentId, 'Auto-review denied this tool call.');
+          }
         }
         try {
-          const result = await tool.execute(toolCall.id, toolCall.arguments, signal, onUpdate);
+          const result = await withTemporaryPathAccess(
+            permissionDecision.temporaryPathRoots,
+            () => tool.execute(toolCall.id, toolCall.arguments, signal, onUpdate),
+          );
           return this.agentToolResultToMessage(toolCall, result);
         } catch (error) {
           return {
@@ -528,14 +589,71 @@ export class AgentOrchestrator {
     return isToolAllowedForAgent(toolName, agentId, workflowStage);
   }
 
-  private createPolicyDeniedToolResult(toolCall: ToolCall, agentId: AgentRole): ToolResultMessage {
+  private async executeAskUserTool(
+    toolCall: ToolCall,
+    agentId: AgentRole,
+    runtimeContext: ToolExecutorRuntimeContext | undefined,
+    signal?: AbortSignal,
+  ): Promise<ToolResultMessage> {
+    try {
+      const args = toolCall.arguments ?? {};
+      const question = typeof args.question === 'string' && args.question.trim()
+        ? args.question.trim()
+        : 'The agent needs user input before continuing.';
+      const optionArgs = (args as { options?: unknown }).options;
+      const rawChoices: unknown[] = Array.isArray(args.choices)
+        ? args.choices
+        : Array.isArray(optionArgs)
+          ? optionArgs
+          : [];
+      const options = rawChoices
+        .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+        .map((entry) => entry.trim());
+
+      if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
+        throw new Error('ask_user requires an active conversation interaction bridge.');
+      }
+
+      const answer = await agentUserInputRequestService.request({
+        agentId,
+        sessionId: runtimeContext.sessionId ?? null,
+        turnId: runtimeContext.turnId,
+        toolCallId: toolCall.id,
+        question,
+        options,
+        context: runtimeContext.eventContext,
+        onEvent: runtimeContext.onEvent,
+        signal,
+      });
+
+      return {
+        role: 'toolResult',
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        content: [{ type: 'text', text: `User answered: ${answer}` }],
+        isError: false,
+        timestamp: Date.now(),
+      };
+    } catch (error) {
+      return {
+        role: 'toolResult',
+        toolCallId: toolCall.id,
+        toolName: toolCall.name,
+        content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
+        isError: true,
+        timestamp: Date.now(),
+      };
+    }
+  }
+
+  private createPolicyDeniedToolResult(toolCall: ToolCall, agentId: AgentRole, reason?: string): ToolResultMessage {
     return {
       role: 'toolResult',
       toolCallId: toolCall.id,
       toolName: toolCall.name,
       content: [{
         type: 'text',
-        text: `Policy denied tool "${toolCall.name}" for ${agentId}. Ask mode only allows read-only tools.`,
+        text: reason || `Policy denied tool "${toolCall.name}" for ${agentId}.`,
       }],
       isError: true,
       timestamp: Date.now(),
@@ -545,16 +663,15 @@ export class AgentOrchestrator {
   private createApprovalRequiredToolResult(
     toolCall: ToolCall,
     agentId: AgentRole,
-    permissionHint: 'mutation' | 'destructive',
+    reason: string,
   ): ToolResultMessage {
-    const operation = permissionHint === 'destructive' ? 'destructive operation' : 'workspace mutation';
     return {
       role: 'toolResult',
       toolCallId: toolCall.id,
       toolName: toolCall.name,
       content: [{
         type: 'text',
-        text: `Approval required for tool "${toolCall.name}" before ${operation} can run for ${agentId}. No changes were made.`,
+        text: `Approval required for tool "${toolCall.name}" before it can run for ${agentId}. ${reason} No changes were made.`,
       }],
       isError: true,
       timestamp: Date.now(),
@@ -642,9 +759,9 @@ export class AgentOrchestrator {
         const choices = Array.isArray(args.choices)
           ? args.choices.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
           : [];
-        const suffix = choices.length > 0 ? ` Choices: ${choices.join(' | ')}` : '';
         return {
-          content: [{ type: 'text', text: `User input requested by ${agentId}: ${question}${suffix}` }],
+          content: [{ type: 'text', text: 'ask_user requires the conversation interaction bridge.' }],
+          isError: true,
           details: { agentId, question, choices },
         };
       },
@@ -870,13 +987,6 @@ export class AgentOrchestrator {
       ? runtimeTools.definitions
       : [];
     const activeToolAllowlist = activeToolDefinitions.map((tool) => tool.name);
-    const toolExecutor = this.createToolExecutor(input.agentId, activeToolAllowlist, input.stage, input.sessionId);
-    const streamOptions: StreamOptions = {
-      maxTokens: input.maxTokens,
-      temperature: input.temperature,
-      reasoningBudget: input.options?.reasoningBudget,
-      signal: input.options?.signal,
-    };
     const sharedEventContext: AgentEventBridgeContext = {
       agentId: input.agentId,
       runId: input.runId,
@@ -889,6 +999,18 @@ export class AgentOrchestrator {
       modelId: input.modelId,
       toolAllowlist: activeToolAllowlist,
       routeCapability,
+    };
+    const toolExecutor = this.createToolExecutor(input.agentId, activeToolAllowlist, input.stage, input.sessionId, {
+      sessionId: input.sessionId ?? null,
+      turnId: input.turnId,
+      eventContext: sharedEventContext,
+      onEvent: input.options?.onEvent,
+    });
+    const streamOptions: StreamOptions = {
+      maxTokens: input.maxTokens,
+      temperature: input.temperature,
+      reasoningBudget: input.options?.reasoningBudget,
+      signal: input.options?.signal,
     };
     const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
     if (routeDiagnostic) {
@@ -916,6 +1038,7 @@ export class AgentOrchestrator {
           activeToolDefinitions,
           toolExecutor,
           streamOptions,
+          input.turnId ?? '',
         );
 
     const userMessage: UserMessage = {
@@ -983,6 +1106,8 @@ export class AgentOrchestrator {
       if (abortListener && input.options?.signal) {
         input.options.signal.removeEventListener('abort', abortListener);
       }
+      agentUserInputRequestService.cancelTurn(input.turnId);
+      agentToolApprovalRequestService.cancelTurn(input.turnId);
     }
   }
 

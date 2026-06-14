@@ -1,5 +1,9 @@
 import { ipcMain } from 'electron';
-import type { ConversationSendRequest } from '@shared/types/conversation';
+import type {
+  ConversationAnswerToolApprovalRequest,
+  ConversationAnswerUserInputRequest,
+  ConversationSendRequest,
+} from '@shared/types/conversation';
 import { conversationService } from '../conversation/ConversationService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';
@@ -40,5 +44,13 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
 
   ipcMain.handle('conversation:cancelActiveTurn', async (_event, request?: { sessionId?: string; turnId?: string }) => {
     return conversationService.cancelActiveTurn(request);
+  });
+
+  ipcMain.handle('conversation:answerUserInput', async (_event, request: ConversationAnswerUserInputRequest) => {
+    return conversationService.answerUserInput(request);
+  });
+
+  ipcMain.handle('conversation:answerToolApproval', async (_event, request: ConversationAnswerToolApprovalRequest) => {
+    return conversationService.answerToolApproval(request);
   });
 }

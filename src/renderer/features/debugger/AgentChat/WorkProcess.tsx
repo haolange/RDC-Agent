@@ -44,44 +44,111 @@ const DiagnosticRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'diagnostic
 );
 
 const ToolRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'tool' }> }> = ({ row }) => {
-  const detailOpen = row.status === 'running' || row.status === 'error';
+  const statusLabel = row.status === 'complete' ? '' : getRowStatusLabel(row.status);
+  const hasDebugDetails = row.argsLines.length > 0 || row.rawLines.length > 0;
 
   return (
     <li className={`work-process-step status-${row.status} kind-tool`} data-testid="work-process-tool-call">
       <span className="work-process-step-rail" aria-hidden="true" />
       <div className="work-process-step-content">
-        <details className={`work-process-tool status-${row.status}`} open={detailOpen}>
-          <summary className="work-process-tool-summary">
+        <div className={`work-process-tool status-${row.status}`}>
+          <div className="work-process-tool-summary">
             <span className="work-process-tool-line">
               <span className="work-process-tool-verb">{row.verb}</span>
-              <code className="work-process-tool-name">{row.toolName}</code>
               {row.target ? <span className="work-process-tool-target">{row.target}</span> : null}
             </span>
             <span className="work-process-tool-meta">
-              <span>{row.category}</span>
+              <code className="work-process-tool-name">{row.toolName}</code>
               {row.duration ? <span>{row.duration}</span> : null}
-              <span>{getRowStatusLabel(row.status)}</span>
+              {statusLabel ? <span>{statusLabel}</span> : null}
             </span>
-          </summary>
-
+          </div>
           <div className="work-process-tool-body">
             {row.previewLines.length > 0 ? (
               <pre className="work-process-tool-result">{row.previewLines.join('\n')}</pre>
             ) : null}
-            {row.argsLines.length > 0 ? (
+            {hasDebugDetails ? (
               <details className="work-process-row-detail">
-                <summary>Args</summary>
-                <pre>{row.argsLines.join('\n')}</pre>
-              </details>
-            ) : null}
-            {row.rawLines.length > 0 ? (
-              <details className="work-process-row-detail">
-                <summary>Raw result</summary>
-                <pre>{row.rawLines.join('\n')}</pre>
+                <summary>Details</summary>
+                <div className="work-process-debug-body">
+                  {row.argsLines.length > 0 ? (
+                    <div className="work-process-debug-section">
+                      <span className="work-process-debug-label">Args</span>
+                      <pre>{row.argsLines.join('\n')}</pre>
+                    </div>
+                  ) : null}
+                  {row.rawLines.length > 0 ? (
+                    <div className="work-process-debug-section">
+                      <span className="work-process-debug-label">Raw result</span>
+                      <pre>{row.rawLines.join('\n')}</pre>
+                    </div>
+                  ) : null}
+                </div>
               </details>
             ) : null}
           </div>
-        </details>
+        </div>
+      </div>
+    </li>
+  );
+};
+
+const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'userInput' }> }> = ({ row }) => {
+  const statusLabel = row.status === 'complete' ? '' : getRowStatusLabel(row.status);
+
+  return (
+    <li className={`work-process-step status-${row.status} kind-user-input`} data-testid="work-process-user-input">
+      <span className="work-process-step-rail" aria-hidden="true" />
+      <div className="work-process-step-content">
+        <div className="work-process-user-input">
+          <div className="work-process-tool-summary">
+            <span className="work-process-tool-line">
+              <span className="work-process-tool-verb">{row.verb}</span>
+              <span className="work-process-user-input-question">{row.question}</span>
+            </span>
+            <span className="work-process-tool-meta">
+              {row.duration ? <span>{row.duration}</span> : null}
+              {statusLabel ? <span>{statusLabel}</span> : null}
+            </span>
+          </div>
+          {row.detailLines.length > 0 ? (
+            <details className="work-process-row-detail">
+              <summary>Details</summary>
+              <pre>{row.detailLines.join('\n')}</pre>
+            </details>
+          ) : null}
+        </div>
+      </div>
+    </li>
+  );
+};
+
+const ApprovalRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'approval' }> }> = ({ row }) => {
+  const statusLabel = row.status === 'complete' ? '' : getRowStatusLabel(row.status);
+
+  return (
+    <li className={`work-process-step status-${row.status} kind-approval`} data-testid="work-process-approval">
+      <span className="work-process-step-rail" aria-hidden="true" />
+      <div className="work-process-step-content">
+        <div className="work-process-approval">
+          <div className="work-process-tool-summary">
+            <span className="work-process-tool-line">
+              <span className="work-process-tool-verb">{row.verb}</span>
+              <span className="work-process-approval-message">{row.message}</span>
+            </span>
+            <span className="work-process-tool-meta">
+              {row.metaLines.map((line) => <span key={line}>{line}</span>)}
+              {row.duration ? <span>{row.duration}</span> : null}
+              {statusLabel ? <span>{statusLabel}</span> : null}
+            </span>
+          </div>
+          {row.detailLines.length > 0 ? (
+            <details className="work-process-row-detail">
+              <summary>Details</summary>
+              <pre>{row.detailLines.join('\n')}</pre>
+            </details>
+          ) : null}
+        </div>
       </div>
     </li>
   );
@@ -89,6 +156,8 @@ const ToolRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'tool' }> }> = ({
 
 const renderRow = (row: WorkProcessRow): React.ReactNode => {
   if (row.type === 'tool') return <ToolRow key={row.id} row={row} />;
+  if (row.type === 'userInput') return <UserInputRow key={row.id} row={row} />;
+  if (row.type === 'approval') return <ApprovalRow key={row.id} row={row} />;
   if (row.type === 'diagnostic') return <DiagnosticRow key={row.id} row={row} />;
   return <SummaryRow key={row.id} row={row} />;
 };
@@ -106,6 +175,7 @@ export const WorkProcess: React.FC<WorkProcessProps> = ({ trace }) => {
   const stepCopy = presentation.stepCount === 1 ? '1 step' : `${presentation.stepCount} steps`;
   const toolCopy = presentation.toolCount === 1 ? '1 tool' : `${presentation.toolCount} tools`;
   const summaryCopy = presentation.toolCount > 0 ? `${stepCopy} · ${toolCopy}` : stepCopy;
+  const statusCopy = `· ${presentation.statusLabel}`;
 
   return (
     <section
@@ -122,7 +192,7 @@ export const WorkProcess: React.FC<WorkProcessProps> = ({ trace }) => {
         <span className={`work-process-caret ${expanded ? 'is-open' : ''}`} aria-hidden="true" />
         <span className="work-process-label">工作过程</span>
         <span className="work-process-header-summary">{summaryCopy}</span>
-        <span className={`work-process-count status-${trace.status}`}>{presentation.statusLabel}</span>
+        <span className={`work-process-count status-${trace.status}`}>{statusCopy}</span>
       </button>
 
       {expanded ? (

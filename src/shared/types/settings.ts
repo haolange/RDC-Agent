@@ -200,6 +200,25 @@ export interface ToolingSettings {
   rdxActions: RdxActionSettingsMap;
 }
 
+export type AgentPermissionMode =
+  | 'default'
+  | 'auto-review'
+  | 'full-access'
+  | 'custom';
+
+export interface AgentPermissionSettings {
+  mode: AgentPermissionMode;
+  readableRoots: string[];
+  writableRoots: string[];
+  allowedCommandPrefixes: string[];
+  deniedCommandPrefixes: string[];
+  configPath?: string;
+}
+
+export interface AgentRuntimeSettings {
+  permissions: AgentPermissionSettings;
+}
+
 export interface AppRuntimePaths {
   workspaceRoot: string;
   defaultWorkspaceRoot: string;
@@ -293,6 +312,7 @@ export interface AppSettings {
   profile: ProfileSettings;
   workspace: WorkspaceSettings;
   tooling: ToolingSettings;
+  agentRuntime: AgentRuntimeSettings;
   llm: LlmSettings;
   agents: AgentManifestSettings;
   configuration: ConfigurationSettings;
@@ -311,6 +331,9 @@ export type AppSettingsPatch = Partial<{
   tooling: Partial<{
     rdxCli: Partial<RdxCliInvokerSettings>;
     rdxActions: Partial<Record<RdxActionId, Partial<RdxShellActionSettings>>>;
+  }>;
+  agentRuntime: Partial<{
+    permissions: Partial<AgentPermissionSettings>;
   }>;
   llm: Partial<{
     providers: LlmProviderEntry[];
