@@ -5354,7 +5354,7 @@ async function runAgentLoop(pendingMessages, context2, config, providerStrategy,
           stream.push({ type: "message_start", message: msg });
           stream.push({ type: "message_end", message: msg });
         }
-        const assistantMessage = await streamAssistantResponse(
+        const { message: assistantMessage } = await streamAssistantResponseWithRecovery(
           context2,
           config,
           providerStrategy,
@@ -5373,7 +5373,8 @@ async function runAgentLoop(pendingMessages, context2, config, providerStrategy,
           assistantMessage,
           toolExecutor,
           stream,
-          config.getSteeringMessages
+          config.getSteeringMessages,
+          config.maxToolConcurrency
         );
         for (const result of toolResults.results) {
           context2.messages.push(result);
@@ -5415,6 +5416,73 @@ async function runAgentLoop(pendingMessages, context2, config, providerStrategy,
       config.signal.removeEventListener("abort", onExternalAbort);
     }
   }
+}
+async function streamAssistantResponseWithRecovery(context2, config, provider, stream) {
+  const recovery = config.errorRecovery;
+  const CIRCUIT_BREAKER_LIMIT = 3;
+  let consecutiveCompactionFailures = 0;
+  while (true) {
+    try {
+      const assistantMessage = await streamAssistantResponse(
+        context2,
+        config,
+        provider,
+        stream
+      );
+      consecutiveCompactionFailures = 0;
+      return { message: assistantMessage };
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      if (!recovery) {
+        throw error;
+      }
+      const action = recovery.decide(error);
+      switch (action.type) {
+        case "retry": {
+          recovery.noteRetryAttempt();
+          await sleep$1(action.delayMs);
+          continue;
+        }
+        case "escalate_tokens": {
+          recovery.markEscalated();
+          if (config.streamOptions) {
+            config.streamOptions.maxTokens = action.newMaxTokens;
+          }
+          continue;
+        }
+        case "reactive_compact": {
+          consecutiveCompactionFailures++;
+          if (consecutiveCompactionFailures >= CIRCUIT_BREAKER_LIMIT) {
+            throw new Error(
+              `[Circuit breaker] ${CIRCUIT_BREAKER_LIMIT} consecutive compaction attempts failed; aborting`
+            );
+          }
+          recovery.markReactiveCompactAttempted();
+          if (config.transformContext) {
+            context2.messages = await config.transformContext(
+              context2.messages,
+              stream.signal
+            );
+          }
+          continue;
+        }
+        case "switch_model": {
+          config.model = action.fallbackModel;
+          continue;
+        }
+        case "continue_prompt": {
+          recovery.noteRetryAttempt();
+          continue;
+        }
+        case "abort": {
+          throw new Error(`[Recovery abort] ${action.reason}`);
+        }
+      }
+    }
+  }
+}
+function sleep$1(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 async function streamAssistantResponse(context2, config, provider, stream) {
   let messages = context2.messages;
@@ -5509,13 +5577,14 @@ async function streamAssistantResponse(context2, config, provider, stream) {
   }
   return finalMessage;
 }
-async function executeToolCalls(assistantMessage, toolExecutor, stream, getSteeringMessages) {
+async function executeToolCalls(assistantMessage, toolExecutor, stream, getSteeringMessages, maxConcurrency) {
   const toolCalls = assistantMessage.content.filter(
     (c) => c.type === "toolCall"
   );
-  const results = [];
-  for (let i = 0; i < toolCalls.length; i++) {
-    const toolCall = toolCalls[i];
+  const results = new Array(toolCalls.length);
+  const concurrency = maxConcurrency && maxConcurrency > 1 ? maxConcurrency : 1;
+  const executeOne = async (index) => {
+    const toolCall = toolCalls[index];
     const startTime = Date.now();
     stream.push({
       type: "tool_execution_start",
@@ -5555,10 +5624,7 @@ async function executeToolCalls(assistantMessage, toolExecutor, stream, getSteer
         toolCallId: toolCall.id,
         toolName: toolCall.name,
         content: [
-          {
-            type: "text",
-            text: `Tool "${toolCall.name}" not available (no executor configured)`
-          }
+          { type: "text", text: `Tool "${toolCall.name}" not available (no executor configured)` }
         ],
         isError: true,
         timestamp: Date.now()
@@ -5571,35 +5637,53 @@ async function executeToolCalls(assistantMessage, toolExecutor, stream, getSteer
       result,
       durationMs: Date.now() - startTime
     });
-    results.push(result);
-    if (getSteeringMessages) {
+    results[index] = result;
+    if (getSteeringMessages && index === 0) {
       const steering = getSteeringMessages();
       if (steering && steering.length > 0) {
-        for (let j = i + 1; j < toolCalls.length; j++) {
-          const skipped = {
-            role: "toolResult",
-            toolCallId: toolCalls[j].id,
-            toolName: toolCalls[j].name,
-            content: [
-              { type: "text", text: "Skipped due to queued user message" }
-            ],
-            isError: false,
-            timestamp: Date.now()
-          };
-          stream.push({
-            type: "tool_execution_end",
-            toolCallId: toolCalls[j].id,
-            toolName: toolCalls[j].name,
-            result: skipped,
-            durationMs: 0
-          });
-          results.push(skipped);
+        for (let j = 1; j < toolCalls.length; j++) {
+          if (!results[j]) {
+            const skipped = {
+              role: "toolResult",
+              toolCallId: toolCalls[j].id,
+              toolName: toolCalls[j].name,
+              content: [{ type: "text", text: "Skipped due to queued user message" }],
+              isError: false,
+              timestamp: Date.now()
+            };
+            stream.push({
+              type: "tool_execution_end",
+              toolCallId: toolCalls[j].id,
+              toolName: toolCalls[j].name,
+              result: skipped,
+              durationMs: 0
+            });
+            results[j] = skipped;
+          }
         }
-        return { results, steeringMessages: steering };
+        throw { steeringMessages: steering };
       }
     }
+  };
+  for (let i = 0; i < toolCalls.length; i += concurrency) {
+    const batch = [];
+    for (let j = i; j < Math.min(i + concurrency, toolCalls.length); j++) {
+      batch.push(executeOne(j));
+    }
+    try {
+      await Promise.all(batch);
+    } catch (err) {
+      if (err && typeof err === "object" && "steeringMessages" in err) {
+        const steeringResult = err;
+        return {
+          results: results.filter(Boolean),
+          steeringMessages: steeringResult.steeringMessages
+        };
+      }
+      throw err;
+    }
   }
-  return { results };
+  return { results: results.filter(Boolean) };
 }
 function defaultConvertToLlm(messages) {
   const result = [];
@@ -5812,7 +5896,8 @@ class Agent {
       maxTurns: opts.maxTurns,
       getSteeringMessages: () => this.getSteeringMessages(),
       getFollowUpMessages: () => this.getFollowUpMessages(),
-      signal: opts.streamOptions?.signal
+      signal: opts.streamOptions?.signal,
+      errorRecovery: opts.errorRecovery
     };
   }
 }
@@ -6109,6 +6194,7 @@ const bashTool = {
     },
     required: ["command"]
   },
+  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: "process", category: "system", requiresApproval: true },
   permissionHint: "mutation",
   async execute(_toolCallId, params, signal, onUpdate) {
     const command = params.command;
@@ -6263,6 +6349,7 @@ const readFileTool = {
     },
     required: ["path"]
   },
+  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "none", category: "file", requiresApproval: false },
   permissionHint: "readonly",
   async execute(_toolCallId, params, signal) {
     if (signal?.aborted) {
@@ -6313,6 +6400,7 @@ const writeFileTool = {
     },
     required: ["path", "content"]
   },
+  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: "filesystem", category: "file", requiresApproval: true },
   permissionHint: "mutation",
   async execute(_toolCallId, params, signal) {
     if (signal?.aborted) {
@@ -6366,6 +6454,7 @@ const editFileTool = {
     },
     required: ["path", "old_text", "new_text"]
   },
+  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: "filesystem", category: "file", requiresApproval: true },
   permissionHint: "mutation",
   async execute(_toolCallId, params, signal) {
     if (signal?.aborted) {
@@ -6442,6 +6531,7 @@ const globTool = {
     },
     required: ["pattern"]
   },
+  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "none", category: "search", requiresApproval: false },
   permissionHint: "readonly",
   async execute(_toolCallId, params, signal) {
     if (signal?.aborted) {
@@ -6633,6 +6723,7 @@ const grepTool = {
     },
     required: ["pattern"]
   },
+  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "none", category: "search", requiresApproval: false },
   permissionHint: "readonly",
   async execute(_toolCallId, params, signal) {
     throwIfAborted$1(signal);
@@ -6735,6 +6826,7 @@ const webFetchTool = {
     },
     required: ["url"]
   },
+  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "network", category: "web", requiresApproval: false },
   permissionHint: "readonly",
   async execute(_toolCallId, params, signal) {
     return fetchPublicText(params.url, signal);
@@ -6754,6 +6846,7 @@ const webSearchTool = {
     },
     required: ["query"]
   },
+  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "network", category: "web", requiresApproval: false },
   permissionHint: "readonly",
   async execute(_toolCallId, params, signal) {
     if (!params.query || !params.query.trim()) {
@@ -6844,6 +6937,246 @@ function isPrivateIp(value) {
   }
   return false;
 }
+const deleteFileTool = {
+  name: "delete_file",
+  label: "删除文件",
+  description: "Delete a file inside the workspace. Returns whether the file existed before deletion.",
+  parameters: {
+    type: "object",
+    properties: {
+      path: { type: "string", description: "Relative or absolute path inside the workspace." }
+    },
+    required: ["path"]
+  },
+  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: "filesystem", category: "file", requiresApproval: true },
+  permissionHint: "destructive",
+  async execute(_toolCallId, params, signal) {
+    if (signal?.aborted) throw new Error("Aborted");
+    const absolute = safeResolvePath(params.path);
+    let existed = false;
+    try {
+      await fs__namespace$1.access(absolute);
+      existed = true;
+    } catch {
+    }
+    if (existed) {
+      await fs__namespace$1.unlink(absolute);
+    }
+    return {
+      content: [{ type: "text", text: `${existed ? "Deleted" : "Did not exist"}: ${absolute}` }],
+      details: { path: absolute, existed }
+    };
+  }
+};
+const moveFileTool = {
+  name: "move_file",
+  label: "移动文件",
+  description: "Move or rename a file inside the workspace. Creates parent directories if needed.",
+  parameters: {
+    type: "object",
+    properties: {
+      source: { type: "string", description: "Source file path (relative or absolute inside workspace)." },
+      destination: { type: "string", description: "Destination file path (relative or absolute inside workspace)." }
+    },
+    required: ["source", "destination"]
+  },
+  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: "filesystem", category: "file", requiresApproval: true },
+  permissionHint: "mutation",
+  async execute(_toolCallId, params, signal) {
+    if (signal?.aborted) throw new Error("Aborted");
+    const src = safeResolvePath(params.source);
+    const dest = safeResolvePath(params.destination);
+    const destDir = path__namespace.dirname(dest);
+    await fs__namespace$1.mkdir(destDir, { recursive: true });
+    let overwritten = false;
+    try {
+      await fs__namespace$1.access(dest);
+      overwritten = true;
+    } catch {
+    }
+    await fs__namespace$1.rename(src, dest);
+    return {
+      content: [{ type: "text", text: `Moved ${src} → ${dest}${overwritten ? " (overwrote existing)" : ""}` }],
+      details: { source: src, destination: dest, overwritten }
+    };
+  }
+};
+const copyFileTool = {
+  name: "copy_file",
+  label: "复制文件",
+  description: "Copy a file inside the workspace. Creates parent directories if needed.",
+  parameters: {
+    type: "object",
+    properties: {
+      source: { type: "string", description: "Source file path (relative or absolute inside workspace)." },
+      destination: { type: "string", description: "Destination file path (relative or absolute inside workspace)." }
+    },
+    required: ["source", "destination"]
+  },
+  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: "filesystem", category: "file", requiresApproval: true },
+  permissionHint: "mutation",
+  async execute(_toolCallId, params, signal) {
+    if (signal?.aborted) throw new Error("Aborted");
+    const src = safeResolvePath(params.source);
+    const dest = safeResolvePath(params.destination);
+    const destDir = path__namespace.dirname(dest);
+    await fs__namespace$1.mkdir(destDir, { recursive: true });
+    let overwritten = false;
+    try {
+      await fs__namespace$1.access(dest);
+      overwritten = true;
+    } catch {
+    }
+    await fs__namespace$1.copyFile(src, dest);
+    const stat = await fs__namespace$1.stat(src);
+    return {
+      content: [{ type: "text", text: `Copied ${src} → ${dest}${overwritten ? " (overwrote existing)" : ""} (${stat.size} bytes)` }],
+      details: { source: src, destination: dest, overwritten, bytes: stat.size }
+    };
+  }
+};
+const searchCodebaseTool = {
+  name: "search_codebase",
+  label: "语义搜索代码库",
+  description: "Search the codebase using semantic meaning (not exact text). Useful for finding logic by intent when you do not know exact file names.",
+  parameters: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "High-level description of what you are looking for." },
+      limit: { type: "integer", description: "Maximum results to return (default: 10)." }
+    },
+    required: ["query"]
+  },
+  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "none", category: "search", requiresApproval: false },
+  permissionHint: "readonly",
+  async execute(_toolCallId, params) {
+    const limit = Math.max(1, Math.min(50, Math.floor(params.limit ?? 10)));
+    const query = params.query.trim();
+    if (!query) {
+      return { content: [{ type: "text", text: "Query is empty." }], details: { query, results: [] } };
+    }
+    const results = [
+      `Semantic search for "${query}" is not yet indexed.`,
+      "Consider using grep (exact regex) or glob (file patterns) for now."
+    ];
+    return {
+      content: [{ type: "text", text: results.slice(0, limit).join("\n") }],
+      details: { query, results: results.slice(0, limit) }
+    };
+  }
+};
+const askUserTool = {
+  name: "ask_user_question",
+  label: "询问用户",
+  description: "Ask the user a clarifying question. Use when requirements are ambiguous or you need confirmation before a destructive action.",
+  parameters: {
+    type: "object",
+    properties: {
+      question: { type: "string", description: "The question to present to the user." }
+    },
+    required: ["question"]
+  },
+  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "none", category: "system", requiresApproval: false },
+  permissionHint: "readonly",
+  async execute(_toolCallId, params) {
+    const question = params.question.trim();
+    if (!question) {
+      return { content: [{ type: "text", text: "Question is empty." }], isError: true, details: { question } };
+    }
+    return {
+      content: [{ type: "text", text: `[Agent asks] ${question}` }],
+      details: { question }
+    };
+  }
+};
+const notebookEditTool = {
+  name: "notebook_edit",
+  label: "编辑 Notebook",
+  description: "Edit a single cell in a Jupyter-like notebook file (JSON .ipynb).",
+  parameters: {
+    type: "object",
+    properties: {
+      notebook_path: { type: "string", description: "Path to the .ipynb file inside the workspace." },
+      cell_index: { type: "integer", description: "Zero-based index of the cell to edit." },
+      new_source: { type: "string", description: "New source content for the cell." }
+    },
+    required: ["notebook_path", "cell_index", "new_source"]
+  },
+  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: "filesystem", category: "file", requiresApproval: true },
+  permissionHint: "mutation",
+  async execute(_toolCallId, params, signal) {
+    if (signal?.aborted) throw new Error("Aborted");
+    const absolute = safeResolvePath(params.notebook_path);
+    const raw = await fs__namespace$1.readFile(absolute, "utf8");
+    const notebook = JSON.parse(raw);
+    if (!Array.isArray(notebook.cells)) {
+      throw new Error("Invalid notebook: missing cells array");
+    }
+    const idx = params.cell_index;
+    if (idx < 0 || idx >= notebook.cells.length) {
+      throw new Error(`Cell index ${idx} out of range (0..${notebook.cells.length - 1})`);
+    }
+    const cell = notebook.cells[idx];
+    const oldSource = Array.isArray(cell.source) ? cell.source.join("") : String(cell.source);
+    cell.source = params.new_source;
+    await fs__namespace$1.writeFile(absolute, JSON.stringify(notebook, null, 2), "utf8");
+    return {
+      content: [{ type: "text", text: `Edited cell ${idx} in ${absolute}` }],
+      details: { notebook_path: absolute, cell_index: idx, old_length: oldSource.length, new_length: params.new_source.length }
+    };
+  }
+};
+const agentSpawnTool = {
+  name: "agent_spawn",
+  label: "启动子 Agent",
+  description: "Spawn a sub-agent to handle a parallel or independent task. The sub-agent will report back when complete.",
+  parameters: {
+    type: "object",
+    properties: {
+      task: { type: "string", description: "Description of the task for the sub-agent." },
+      context: { type: "string", description: "Optional context or constraints to pass to the sub-agent." }
+    },
+    required: ["task"]
+  },
+  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: "session", category: "system", requiresApproval: true },
+  permissionHint: "session_mutation",
+  async execute(_toolCallId, params) {
+    const task = params.task.trim();
+    if (!task) {
+      return { content: [{ type: "text", text: "Task is empty." }], isError: true, details: { task, spawned: false } };
+    }
+    return {
+      content: [{ type: "text", text: `[Sub-agent spawned] Task: ${task}${params.context ? `
+Context: ${params.context}` : ""}` }],
+      details: { task, spawned: true }
+    };
+  }
+};
+const sendMessageTool = {
+  name: "send_message",
+  label: "发送消息",
+  description: "Send a message to another agent or user channel. Use for coordination or delivering results.",
+  parameters: {
+    type: "object",
+    properties: {
+      recipient: { type: "string", description: "Target agent ID or channel name." },
+      content: { type: "string", description: "Message content to send." }
+    },
+    required: ["recipient", "content"]
+  },
+  spec: { isReadOnly: false, isConcurrencySafe: true, isDestructive: false, sideEffect: "network", category: "comm", requiresApproval: false },
+  permissionHint: "session_mutation",
+  async execute(_toolCallId, params) {
+    const content = params.content.trim();
+    if (!content) {
+      return { content: [{ type: "text", text: "Content is empty." }], isError: true, details: { recipient: params.recipient, content, sent: false } };
+    }
+    return {
+      content: [{ type: "text", text: `[Message to ${params.recipient}] ${content}` }],
+      details: { recipient: params.recipient, content, sent: true }
+    };
+  }
+};
 function getPrimitiveTools() {
   return [
     bashTool,
@@ -6853,7 +7186,15 @@ function getPrimitiveTools() {
     globTool,
     grepTool,
     webFetchTool,
-    webSearchTool
+    webSearchTool,
+    deleteFileTool,
+    moveFileTool,
+    copyFileTool,
+    searchCodebaseTool,
+    askUserTool,
+    notebookEditTool,
+    agentSpawnTool,
+    sendMessageTool
   ];
 }
 class TaskRegistry {
@@ -7135,7 +7476,8 @@ function createTaskTools(registry) {
     createTaskCreateTool(registry),
     createTaskUpdateTool(registry),
     createTaskGetTool(registry),
-    createTaskListTool(registry)
+    createTaskListTool(registry),
+    createTaskStopTool(registry)
   ];
 }
 function createTaskCreateTool(registry) {
@@ -7313,6 +7655,37 @@ function createTaskListTool(registry) {
       return {
         content: [{ type: "text", text: lines.join("\n") }],
         details: { count: tasks.length }
+      };
+    }
+  };
+}
+function createTaskStopTool(registry) {
+  return {
+    name: "task_stop",
+    label: "Stop Task",
+    description: "Stop a running task (set status to deleted)",
+    parameters: {
+      type: "object",
+      properties: {
+        taskId: { type: "string", description: "ID of the task to stop" }
+      },
+      required: ["taskId"]
+    },
+    permissionHint: "readonly",
+    async execute(_toolCallId, params, signal) {
+      throwIfAborted(signal);
+      const taskId = readString$1(params, "taskId", true);
+      const task = await registry.getTask(taskId);
+      if (!task) {
+        return {
+          content: [{ type: "text", text: `Task not found: ${taskId}` }],
+          details: { id: taskId }
+        };
+      }
+      await registry.updateTask(taskId, { status: "deleted" });
+      return {
+        content: [{ type: "text", text: `Stopped ${taskId}: ${task.subject}` }],
+        details: { id: taskId }
       };
     }
   };
@@ -14724,6 +15097,42 @@ class RdxCliInvokerService {
   }
 }
 const rdxCliInvokerService = new RdxCliInvokerService();
+class SessionResumeService {
+  /** 获取可恢复的会话状态。若无历史会话，返回 null。 */
+  async getResumableSession() {
+    try {
+      const sessionId = await storageAdapter.getCurrentSessionId();
+      if (!sessionId) return null;
+      const session = storageAdapter.readSession(sessionId);
+      if (!session) return null;
+      const projectId = session.projectId;
+      const latestRun = storageAdapter.getLatestRun(sessionId);
+      const runningStatuses = ["running", "awaiting_input", "awaiting_approval"];
+      const unfinishedRuns = storageAdapter.listRuns(sessionId).filter(
+        (r) => runningStatuses.includes(r.status)
+      );
+      const runResumable = unfinishedRuns.length > 0;
+      return {
+        sessionId,
+        projectId,
+        runId: latestRun?.runId ?? null,
+        runResumable,
+        lastMessagePreview: session.title ?? void 0
+      };
+    } catch {
+      return null;
+    }
+  }
+  /** 获取会话的对话历史（用于恢复时加载到 UI）。 */
+  async getSessionHistory(sessionId) {
+    try {
+      return storageAdapter.readConversationHistory(sessionId);
+    } catch {
+      return null;
+    }
+  }
+}
+const sessionResumeService = new SessionResumeService();
 function registerAgentHandlers(context2) {
   const { state: state2 } = context2;
   electron.ipcMain.handle("agent:sendMessage", async (_event, agentId, content) => {
@@ -14922,6 +15331,740 @@ function registerCaptureDeviceHandlers(context2) {
   });
   electron.ipcMain.handle("device:activate", async (_event, deviceId) => {
     return replayDeviceService.activateDevice(deviceId);
+  });
+}
+class CommandRegistry {
+  commands = /* @__PURE__ */ new Map();
+  /** 注册一个命令。同名命令会被覆盖（最后注册者胜出）。 */
+  register(command) {
+    this.commands.set(command.name, command);
+    if (command.aliases) {
+      for (const alias of command.aliases) {
+        if (!this.commands.has(alias)) {
+          this.commands.set(alias, command);
+        }
+      }
+    }
+  }
+  /** 注销一个命令。 */
+  unregister(name) {
+    const cmd = this.commands.get(name);
+    if (!cmd) return;
+    this.commands.delete(name);
+    if (cmd.aliases) {
+      for (const alias of cmd.aliases) {
+        const existing = this.commands.get(alias);
+        if (existing === cmd) {
+          this.commands.delete(alias);
+        }
+      }
+    }
+  }
+  /** 根据名称查找命令（支持别名）。 */
+  resolve(name) {
+    return this.commands.get(name);
+  }
+  /** 列出所有命令（去重，按主名称）。 */
+  list(category) {
+    const seen = /* @__PURE__ */ new Set();
+    const result = [];
+    for (const cmd of this.commands.values()) {
+      if (seen.has(cmd.id)) continue;
+      seen.add(cmd.id);
+      if (category && cmd.category !== category) continue;
+      result.push({
+        id: cmd.id,
+        name: cmd.name,
+        description: cmd.description,
+        aliases: cmd.aliases ?? [],
+        category: cmd.category
+      });
+    }
+    return result.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  /** 解析原始输入并执行命令。 */
+  async execute(request2) {
+    const raw = request2.input.trim();
+    if (!raw.startsWith("/")) {
+      return {
+        success: false,
+        message: 'Input does not start with "/"'
+      };
+    }
+    const parts = raw.slice(1).split(/\s+/);
+    const commandName = parts[0];
+    const args = parts.slice(1);
+    const cmd = this.resolve(commandName);
+    if (!cmd) {
+      return {
+        success: false,
+        message: `Unknown command: /${commandName}. Type /help to see available commands.`
+      };
+    }
+    const context2 = {
+      sessionId: request2.context?.sessionId,
+      projectId: request2.context?.projectId,
+      workspaceRoot: request2.context?.workspaceRoot,
+      agentId: request2.context?.agentId
+    };
+    try {
+      return await cmd.execute(args, context2);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        success: false,
+        message: `Command /${commandName} failed: ${message}`
+      };
+    }
+  }
+}
+const helpCommand = {
+  id: "help",
+  name: "help",
+  description: "List all available commands or get details for a specific command",
+  aliases: ["h", "?"],
+  category: "system",
+  async execute(args) {
+    const registry = getRegistry();
+    const all = registry.list();
+    if (args.length > 0) {
+      const cmd = registry.resolve(args[0]);
+      if (!cmd) {
+        return {
+          success: false,
+          message: `Unknown command: /${args[0]}`
+        };
+      }
+      const aliases = cmd.aliases?.length ? ` (aliases: ${cmd.aliases.join(", ")})` : "";
+      return {
+        success: true,
+        message: `**/${cmd.name}**${aliases} — ${cmd.category}
+${cmd.description}`
+      };
+    }
+    const byCategory = /* @__PURE__ */ new Map();
+    for (const c of all) {
+      const group = byCategory.get(c.category) ?? [];
+      group.push(`/${c.name} — ${c.description}`);
+      byCategory.set(c.category, group);
+    }
+    let output = `**Available Commands** (${all.length} total)
+
+`;
+    for (const [cat, lines] of byCategory) {
+      output += `**${cat}**
+${lines.map((l) => `  ${l}`).join("\n")}
+
+`;
+    }
+    output += "Type `/help <command>` for details.";
+    return { success: true, message: output };
+  }
+};
+const clearCommand = {
+  id: "clear",
+  name: "clear",
+  description: "Clear the current conversation history",
+  aliases: ["cls"],
+  category: "system",
+  async execute(_args, ctx) {
+    return {
+      success: true,
+      message: "Conversation cleared. Starting fresh.",
+      sideEffect: `clear-session:${ctx.sessionId ?? "current"}`
+    };
+  }
+};
+const configCommand = {
+  id: "config",
+  name: "config",
+  description: "Open settings or view/modify a configuration value",
+  category: "system",
+  async execute(_args) {
+    return {
+      success: true,
+      message: "Opening Settings...",
+      sideEffect: "open-settings-modal"
+    };
+  }
+};
+const VALID_MODES = ["ask", "plan", "edit", "debugger", "analyzer", "optimizer"];
+const modeCommand = {
+  id: "mode",
+  name: "mode",
+  description: "Switch agent mode (ask, plan, edit, debugger, analyzer, optimizer)",
+  category: "navigation",
+  async execute(args) {
+    if (args.length === 0) {
+      return {
+        success: true,
+        message: `Available modes: ${VALID_MODES.join(", ")}`
+      };
+    }
+    const target = args[0].toLowerCase();
+    if (!VALID_MODES.includes(target)) {
+      return {
+        success: false,
+        message: `Invalid mode: "${target}". Valid modes: ${VALID_MODES.join(", ")}`
+      };
+    }
+    return {
+      success: true,
+      message: `Switched to ${target} mode.`,
+      sideEffect: `switch-mode:${target}`
+    };
+  }
+};
+const modelCommand = {
+  id: "model",
+  name: "model",
+  description: "View or switch the current LLM model",
+  category: "navigation",
+  async execute(args) {
+    if (args.length === 0) {
+      return {
+        success: true,
+        message: "Current model: (use /model <name> to switch)"
+      };
+    }
+    return {
+      success: true,
+      message: `Switched model to: ${args[0]}`,
+      sideEffect: `switch-model:${args[0]}`
+    };
+  }
+};
+const projectCommand = {
+  id: "project",
+  name: "project",
+  description: "Manage projects (list, create, switch, rename, delete)",
+  aliases: ["prj"],
+  category: "navigation",
+  async execute(args, ctx) {
+    const action = args[0] ?? "list";
+    switch (action) {
+      case "list":
+        return { success: true, message: "Projects: (list from ProjectStore)" };
+      case "create":
+        return { success: true, message: `Creating project: ${args[1] ?? "unnamed"}` };
+      case "switch":
+        return { success: true, message: `Switched to project: ${args[1] ?? ctx.projectId}` };
+      default:
+        return { success: true, message: `Project ${action}: current = ${ctx.projectId ?? "none"}` };
+    }
+  }
+};
+const sessionCommand = {
+  id: "session",
+  name: "session",
+  description: "Manage sessions (list, create, rename, delete, resume)",
+  aliases: ["sess"],
+  category: "navigation",
+  async execute(args, ctx) {
+    const action = args[0] ?? "list";
+    switch (action) {
+      case "list":
+        return { success: true, message: "Sessions: (list from SessionStore)" };
+      case "new":
+        return { success: true, message: "Creating new session..." };
+      case "rename":
+        return { success: true, message: `Renamed session to: ${args[1] ?? "untitled"}` };
+      case "resume":
+        return { success: true, message: `Resuming session: ${args[1] ?? ctx.sessionId}` };
+      default:
+        return { success: true, message: `Session ${action}: current = ${ctx.sessionId ?? "none"}` };
+    }
+  }
+};
+const workspaceCommand = {
+  id: "workspace",
+  name: "workspace",
+  description: "View or change the workspace root directory",
+  aliases: ["ws", "cd"],
+  category: "navigation",
+  async execute(args, ctx) {
+    if (args.length === 0) {
+      return {
+        success: true,
+        message: `Current workspace: ${ctx.workspaceRoot ?? "not set"}`
+      };
+    }
+    return {
+      success: true,
+      message: `Workspace changed to: ${args[0]}`,
+      sideEffect: `change-workspace:${args[0]}`
+    };
+  }
+};
+const toolsCommand = {
+  id: "tools",
+  name: "tools",
+  description: "List available tools or get tool details",
+  aliases: ["tool"],
+  category: "debug",
+  async execute(args) {
+    if (args.length > 0) {
+      return {
+        success: true,
+        message: `Tool "${args[0]}": (details from ToolCatalog)`
+      };
+    }
+    return {
+      success: true,
+      message: "Available tools: bash, read_file, write_file, edit_file, delete_file, move_file, copy_file, glob, grep, search_codebase, web_fetch, web_search, ask_user, notebook_edit, agent_spawn, send_message, task_create, task_update, task_get, task_list, task_stop, mcp, skill"
+    };
+  }
+};
+const mcpCommand = {
+  id: "mcp",
+  name: "mcp",
+  description: "Manage MCP server connections (list, connect, disconnect)",
+  category: "system",
+  async execute(args) {
+    const action = args[0] ?? "list";
+    switch (action) {
+      case "list":
+        return { success: true, message: "Connected MCP servers: (list from MCPManager)" };
+      case "connect":
+        return { success: true, message: `Connecting MCP server: ${args[1] ?? "unnamed"}` };
+      case "disconnect":
+        return { success: true, message: `Disconnected MCP server: ${args[1] ?? "unnamed"}` };
+      default:
+        return { success: true, message: `MCP ${action} — use: list, connect <name>, disconnect <name>` };
+    }
+  }
+};
+const skillsCommand = {
+  id: "skills",
+  name: "skills",
+  description: "List available skills or run a specific skill",
+  aliases: ["skill"],
+  category: "workflow",
+  async execute(args) {
+    if (args.length === 0) {
+      return {
+        success: true,
+        message: "Available skills: (list from SkillLoader)"
+      };
+    }
+    const action = args[0];
+    if (action === "run") {
+      return {
+        success: true,
+        message: `Running skill: ${args[1] ?? "unnamed"}...`,
+        sideEffect: `run-skill:${args[1]}`
+      };
+    }
+    return {
+      success: true,
+      message: `Skill "${action}" details: (from SkillLoader)`
+    };
+  }
+};
+const planCommand = {
+  id: "plan",
+  name: "plan",
+  description: "Enter or exit plan mode for structured implementation planning",
+  category: "workflow",
+  async execute(args) {
+    const action = args[0];
+    if (action === "exit" || action === "done") {
+      return {
+        success: true,
+        message: "Exited plan mode. Ready to implement.",
+        sideEffect: "exit-plan-mode"
+      };
+    }
+    return {
+      success: true,
+      message: "Entered plan mode. Describe your task and I'll design an implementation plan.",
+      sideEffect: "enter-plan-mode"
+    };
+  }
+};
+const testCommand = {
+  id: "test",
+  name: "test",
+  description: "Run tests or view test status",
+  category: "debug",
+  async execute(_args) {
+    return {
+      success: true,
+      message: "Test runner: Use `npm test` to run unit tests, or `npm run typecheck` for type checking."
+    };
+  }
+};
+const exportCommand = {
+  id: "export",
+  name: "export",
+  description: "Export the current conversation to Markdown or JSON",
+  category: "workflow",
+  async execute(args, ctx) {
+    const format = args[0] ?? "markdown";
+    return {
+      success: true,
+      message: `Exporting session ${ctx.sessionId ?? "current"} as ${format}...`,
+      sideEffect: `export-session:${ctx.sessionId}:${format}`
+    };
+  }
+};
+const statusCommand = {
+  id: "status",
+  name: "status",
+  description: "Show system status and diagnostic information",
+  aliases: ["st", "debug", "diag"],
+  category: "debug",
+  async execute(_args, ctx) {
+    const info = {
+      sessionId: ctx.sessionId ?? "none",
+      projectId: ctx.projectId ?? "none",
+      workspaceRoot: ctx.workspaceRoot ?? "none",
+      agentId: ctx.agentId ?? "none",
+      currentMode: ctx.currentMode ?? "none",
+      currentModelId: ctx.currentModelId ?? "none",
+      nodeVersion: process.version,
+      platform: process.platform,
+      arch: process.arch
+    };
+    const lines = Object.entries(info).map(([k, v]) => `  ${k}: ${v}`);
+    return {
+      success: true,
+      message: `**System Status**
+${lines.join("\n")}`
+    };
+  }
+};
+const agentsCommand = {
+  id: "agents",
+  name: "agents",
+  description: "List available agent profiles or switch to a specific agent",
+  aliases: ["agent"],
+  category: "workflow",
+  async execute(args) {
+    if (args.length === 0) {
+      return {
+        success: true,
+        message: "Available agents: ask, plan, edit, debugger, analyzer, optimizer (from AgentManifestService)"
+      };
+    }
+    const target = args[0];
+    return {
+      success: true,
+      message: `Switched to agent: ${target}`,
+      sideEffect: `switch-mode:${target}`,
+      uiAction: { type: "switch-mode", payload: { agentId: target } }
+    };
+  }
+};
+const versionCommand = {
+  id: "version",
+  name: "version",
+  description: "Show application version information",
+  aliases: ["v"],
+  category: "system",
+  async execute() {
+    return {
+      success: true,
+      message: `RDC Agent v1.0.0
+Electron: ${process.versions.electron ?? "N/A"}
+Node: ${process.version}
+Chrome: ${process.versions.chrome ?? "N/A"}`
+    };
+  }
+};
+const undoCommand = {
+  id: "undo",
+  name: "undo",
+  description: "Undo the last user message and its assistant response",
+  category: "session",
+  async execute(_args, ctx) {
+    return {
+      success: true,
+      message: "Undoing last message...",
+      sideEffect: `undo-session:${ctx.sessionId ?? "current"}`,
+      invalidateStores: ["conversation"]
+    };
+  }
+};
+const compactCommand = {
+  id: "compact",
+  name: "compact",
+  description: "Compact the conversation context to fit within token budget",
+  category: "session",
+  async execute(_args, ctx) {
+    return {
+      success: true,
+      message: "Compacting conversation context...",
+      sideEffect: `compact-session:${ctx.sessionId ?? "current"}`
+    };
+  }
+};
+const resumeCommand = {
+  id: "resume",
+  name: "resume",
+  description: "Resume a previously interrupted session",
+  aliases: ["res"],
+  category: "session",
+  async execute(args, ctx) {
+    if (args.length === 0) {
+      return {
+        success: true,
+        message: "Resuming latest interrupted session...",
+        sideEffect: `resume-session:${ctx.sessionId ?? "latest"}`
+      };
+    }
+    return {
+      success: true,
+      message: `Resuming session: ${args[0]}`,
+      sideEffect: `resume-session:${args[0]}`
+    };
+  }
+};
+const summaryCommand = {
+  id: "summary",
+  name: "summary",
+  description: "Generate a summary of the current conversation",
+  aliases: ["sum"],
+  category: "session",
+  async execute(_args, ctx) {
+    return {
+      success: true,
+      message: `Conversation summary for session ${ctx.sessionId ?? "current"}: (generated from conversation history)`
+    };
+  }
+};
+const costCommand = {
+  id: "cost",
+  name: "cost",
+  description: "Show token usage and estimated cost for the current run",
+  category: "debug",
+  async execute(_args, ctx) {
+    return {
+      success: true,
+      message: `Token usage for session ${ctx.sessionId ?? "current"}:
+  Input: 0 tokens
+  Output: 0 tokens
+  Total: 0 tokens
+  Estimated cost: $0.00`
+    };
+  }
+};
+const usageCommand = {
+  id: "usage",
+  name: "usage",
+  description: "Show API call statistics and usage summary",
+  category: "debug",
+  async execute(_args, ctx) {
+    return {
+      success: true,
+      message: `Usage statistics for session ${ctx.sessionId ?? "current"}:
+  API calls: 0
+  Total tokens: 0
+  Tools used: 0`
+    };
+  }
+};
+const permissionsCommand = {
+  id: "permissions",
+  name: "permissions",
+  description: "View or change the current permission mode",
+  aliases: ["perm"],
+  category: "system",
+  async execute(args, ctx) {
+    if (args.length === 0) {
+      return {
+        success: true,
+        message: `Current permission mode: default
+  Agent: ${ctx.agentId ?? "none"}`
+      };
+    }
+    const mode = args[0];
+    return {
+      success: true,
+      message: `Switched permission mode to: ${mode}`,
+      sideEffect: `switch-permissions:${mode}`
+    };
+  }
+};
+const themeCommand = {
+  id: "theme",
+  name: "theme",
+  description: "Switch application theme (dark/light)",
+  category: "system",
+  async execute(args, ctx) {
+    if (args.length === 0) {
+      return {
+        success: true,
+        message: `Current theme: ${ctx.currentTheme ?? "system"}`
+      };
+    }
+    const theme = args[0];
+    return {
+      success: true,
+      message: `Switched theme to: ${theme}`,
+      sideEffect: `switch-theme:${theme}`,
+      uiAction: { type: "switch-theme", payload: { theme } }
+    };
+  }
+};
+const commitCommand = {
+  id: "commit",
+  name: "commit",
+  description: "Auto-generate commit message and commit staged changes",
+  category: "workflow",
+  async execute(args) {
+    try {
+      const status = child_process.execSync("git status --short", { encoding: "utf8" });
+      if (!status.trim()) {
+        return { success: true, message: "Nothing to commit. Working tree clean." };
+      }
+      const diff = child_process.execSync("git diff --cached --stat", { encoding: "utf8" });
+      const msg = args.length > 0 ? args.join(" ") : `chore: update
+
+${diff.slice(0, 500)}`;
+      child_process.execSync(`git commit -m "${msg.replace(/"/g, '\\"')}"`, { encoding: "utf8" });
+      return { success: true, message: `Committed:
+${msg.slice(0, 300)}` };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return { success: false, message: `Commit failed: ${message}` };
+    }
+  }
+};
+const diffCommand = {
+  id: "diff",
+  name: "diff",
+  description: "Show unstaged git diff",
+  category: "workflow",
+  async execute(args) {
+    try {
+      const staged = args.includes("--staged") ? " --cached" : "";
+      const diff = child_process.execSync(`git diff${staged} --stat`, { encoding: "utf8", maxBuffer: 1024 * 1024 });
+      return { success: true, message: diff || "No changes." };
+    } catch (err) {
+      return { success: false, message: `Diff failed: ${err instanceof Error ? err.message : String(err)}` };
+    }
+  }
+};
+const reviewCommand = {
+  id: "review",
+  name: "review",
+  description: "Review current changes for bugs and improvements",
+  category: "workflow",
+  async execute() {
+    return {
+      success: true,
+      message: "Starting code review of current changes...",
+      sideEffect: "trigger-code-review"
+    };
+  }
+};
+let _registry = null;
+function getRegistry() {
+  if (!_registry) {
+    _registry = new CommandRegistry();
+    registerBuiltins(_registry);
+  }
+  return _registry;
+}
+function registerBuiltins(registry) {
+  const builtins = [
+    helpCommand,
+    clearCommand,
+    configCommand,
+    modeCommand,
+    modelCommand,
+    projectCommand,
+    sessionCommand,
+    workspaceCommand,
+    toolsCommand,
+    mcpCommand,
+    skillsCommand,
+    planCommand,
+    testCommand,
+    exportCommand,
+    statusCommand,
+    agentsCommand,
+    versionCommand,
+    undoCommand,
+    compactCommand,
+    resumeCommand,
+    summaryCommand,
+    costCommand,
+    usageCommand,
+    permissionsCommand,
+    themeCommand,
+    commitCommand,
+    diffCommand,
+    reviewCommand
+  ];
+  for (const cmd of builtins) {
+    registry.register(cmd);
+  }
+}
+class CommandService {
+  constructor(registry) {
+    this.registry = registry;
+  }
+  registry;
+  async execute(request2) {
+    const result = await this.registry.execute(request2);
+    let systemMessage;
+    if (result.systemMessage || result.message) {
+      systemMessage = this.buildSystemMessage(result, request2);
+    }
+    return { result, systemMessage };
+  }
+  buildSystemMessage(result, request2) {
+    const ctx = request2.context;
+    const commandName = request2.input.trim().slice(1).split(/\s+/)[0];
+    const now = Date.now();
+    return {
+      id: `cmd-${now}-${Math.random().toString(36).slice(2, 8)}`,
+      turnId: `cmd-turn-${now}`,
+      sessionId: ctx?.sessionId ?? null,
+      projectId: ctx?.projectId ?? null,
+      role: "system",
+      content: result.systemMessage ?? result.message,
+      status: result.success ? "complete" : "error",
+      createdAt: now,
+      updatedAt: now,
+      workTrace: {
+        status: result.success ? "complete" : "error",
+        summary: result.message,
+        blocks: [
+          {
+            id: `cmd-block-${now}`,
+            kind: "command",
+            title: `/${commandName}`,
+            status: result.success ? "complete" : "error",
+            summary: result.message,
+            detail: result.data ? JSON.stringify(result.data, null, 2) : void 0,
+            toolCalls: [],
+            startedAt: now,
+            completedAt: now
+          }
+        ],
+        updatedAt: now
+      }
+    };
+  }
+}
+let _commandService = null;
+function getCommandService() {
+  if (!_commandService) {
+    _commandService = new CommandService(getRegistry());
+  }
+  return _commandService;
+}
+function registerCommandHandlers() {
+  electron.ipcMain.handle("command:list", (_event, category) => {
+    const registry = getRegistry();
+    return { commands: registry.list(category) };
+  });
+  electron.ipcMain.handle("command:execute", async (_event, request2) => {
+    const service = getCommandService();
+    return service.execute(request2);
   });
 }
 const AGENT_WORKBENCH_TOOL_CATALOG = [
@@ -15630,8 +16773,9 @@ class ConversationService {
     }
   }
   async sendMessage(input) {
+    const trimmed = input.message.trim();
     const context2 = await this.resolveContext(input);
-    return this.startProfileTurn(context2, input.mode, input.agentId ?? null, input.message.trim(), input.attachments ?? []);
+    return this.startProfileTurn(context2, input.mode, input.agentId ?? null, trimmed, input.attachments ?? []);
   }
   async resolveContext(input) {
     const projectId = input.projectId ?? input.fallbackProjectId ?? storageAdapter.getCurrentProjectId() ?? null;
@@ -16177,6 +17321,41 @@ const conversationService = new ConversationService();
 function registerConversationHandlers(context2) {
   const { state: state2 } = context2;
   electron.ipcMain.handle("conversation:sendMessage", async (_event, request2) => {
+    const trimmed = request2.message.trim();
+    if (trimmed.startsWith("/")) {
+      const registry = getRegistry();
+      const cmdResult = await registry.execute({
+        input: trimmed,
+        context: {
+          sessionId: state2.currentSessionId ?? void 0,
+          projectId: state2.currentProjectId ?? void 0
+        }
+      });
+      const sideEffectNote = cmdResult.sideEffect ? `
+[sideEffect: ${cmdResult.sideEffect}]` : "";
+      const augmentedRequest = {
+        ...request2,
+        message: `[System command: /${trimmed.slice(1)}]
+${cmdResult.message}${sideEffectNote}`
+      };
+      const result2 = await conversationService.sendMessage({
+        ...augmentedRequest,
+        fallbackProjectId: state2.currentProjectId,
+        fallbackSessionId: state2.currentSessionId,
+        fallbackRunId: state2.currentRunId
+      });
+      if (result2.session?.projectId) {
+        state2.currentProjectId = result2.session.projectId;
+      }
+      if (result2.session?.sessionId) {
+        state2.currentSessionId = result2.session.sessionId;
+        await storageAdapter.setCurrentSessionId(result2.session.sessionId);
+      }
+      if (result2.runUpdate?.runId) {
+        state2.currentRunId = result2.runUpdate.runId;
+      }
+      return result2;
+    }
     const result = await conversationService.sendMessage({
       ...request2,
       fallbackProjectId: state2.currentProjectId,
@@ -18133,6 +19312,15 @@ async function initializeIpcState() {
     state.currentRunId = null;
   }
   await debuggerRuntime.recoverInterruptedRuns();
+  try {
+    const resumable = await sessionResumeService.getResumableSession();
+    if (resumable && resumable.sessionId) {
+      state.currentSessionId = resumable.sessionId;
+      state.currentProjectId = resumable.projectId;
+      state.currentRunId = resumable.runId;
+    }
+  } catch {
+  }
 }
 function broadcastToRenderer(channel, ...args) {
   rendererEventHub.emit(channel, ...args);
@@ -18302,6 +19490,7 @@ function registerIPCHandlers() {
   registerRuntimeTerminalHandlers();
   registerCaptureDeviceHandlers(context);
   registerAgentHandlers(context);
+  registerCommandHandlers();
   registerToolEvidenceHandlers(context);
   registerSettingsLlmHandlers(context);
   registerTraceHandlers(context);

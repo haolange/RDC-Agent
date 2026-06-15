@@ -9,6 +9,8 @@ import { resolveAgentDisplay } from '@shared/constants/agents';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { WorkProcess } from './WorkProcess';
 import { useAgentHandoffActions } from './useAgentHandoffActions';
+import { MessageActions } from './MessageActions';
+import { useMessageActions } from '../../../hooks/useMessageActions';
 
 interface MessageBubbleProps {
   message: ConversationMessage;
@@ -80,6 +82,7 @@ const renderContentWithCursor = (
 
 const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => {
   const time = formatClockTime(message.createdAt);
+  const { handleCopy, handleEditResend, handleShare } = useMessageActions();
   return (
     <article
       className="conversation-message conversation-message-user"
@@ -93,6 +96,12 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
             {time ? (
               <span className="conversation-message-time">{time}</span>
             ) : null}
+            <MessageActions
+              message={message}
+              onCopy={handleCopy}
+              onEditResend={handleEditResend}
+              onShare={handleShare}
+            />
           </header>
           {message.attachments && message.attachments.length > 0 ? (
             <AttachmentList attachments={message.attachments} />
@@ -170,6 +179,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
             {time ? (
               <span className="conversation-message-time">{time}</span>
             ) : null}
+            <MessageActions message={message} />
           </header>
           {trace && (trace.blocks.length > 0 || trace.summary || trace.status === 'running') ? (
             <WorkProcess trace={trace} />
