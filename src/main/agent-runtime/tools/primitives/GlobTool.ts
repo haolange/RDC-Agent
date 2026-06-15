@@ -65,6 +65,7 @@ export const globTool: AgentTool<GlobParams, GlobDetails> = {
     },
     required: ['pattern'],
   },
+  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'search', requiresApproval: false },
   permissionHint: 'readonly',
 
   async execute(_toolCallId, params, signal) {

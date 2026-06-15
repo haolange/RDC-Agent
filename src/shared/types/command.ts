@@ -12,6 +12,12 @@ export interface CommandContext {
   workspaceRoot?: string;
   /** Agent ID that invoked the command, if applicable. */
   agentId?: string;
+  /** Current mode/agent context. */
+  currentMode?: string;
+  /** Current model ID. */
+  currentModelId?: string;
+  /** Current theme. */
+  currentTheme?: string;
 }
 
 /** Result of executing a command. */
@@ -24,6 +30,15 @@ export interface CommandResult {
   data?: unknown;
   /** If the command caused a side effect, describe what happened. */
   sideEffect?: string;
+  /** Optional system message content to insert into the conversation. */
+  systemMessage?: string;
+  /** UI action to trigger after command execution. */
+  uiAction?: {
+    type: 'open-settings' | 'switch-mode' | 'switch-model' | 'switch-theme' | 'open-panel' | 'none';
+    payload?: unknown;
+  };
+  /** Stores that need to be invalidated after command execution. */
+  invalidateStores?: Array<'session' | 'project' | 'settings' | 'conversation'>;
 }
 
 /** Definition of a slash command. */
@@ -37,7 +52,7 @@ export interface CommandDefinition {
   /** Alternative names that trigger this command. */
   aliases?: string[];
   /** Category for grouping in the UI. */
-  category: 'workflow' | 'navigation' | 'system' | 'debug' | 'edit';
+  category: 'workflow' | 'navigation' | 'system' | 'debug' | 'edit' | 'session';
   /** Execute the command. Receives parsed arguments and context. */
   execute: (args: string[], context: CommandContext) => Promise<CommandResult>;
 }

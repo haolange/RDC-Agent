@@ -15,6 +15,7 @@ import {
   toConversationAttachmentInputs,
 } from './composerSendHelpers';
 import { useComposerStop } from './useComposerStop';
+import { executeSlashCommand } from './slashCommandExecutor';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -38,22 +39,11 @@ export function useComposerSend(options: {
   setPendingAttachments: Dispatch<SetStateAction<PendingAttachmentDraft[]>>;
 }) {
   const {
-    showNotice,
-    t,
-    currentMode,
-    selectedAgentId,
-    currentProject,
-    currentSession,
-    currentRun,
-    selectedDeviceEntry,
-    hasActiveDebugRun,
-    hasActiveConversationTurn,
-    promptValue,
-    setPromptValue,
-    pendingAttachments,
-    setPendingAttachments,
+    showNotice, t, currentMode, selectedAgentId, currentProject,
+    currentSession, currentRun, selectedDeviceEntry,
+    hasActiveDebugRun, hasActiveConversationTurn, promptValue,
+    setPromptValue, pendingAttachments, setPendingAttachments,
   } = options;
-
   const [isPromptSending, setIsPromptSending] = useState(false);
 
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
@@ -82,6 +72,28 @@ export function useComposerSend(options: {
 
     const electronAPI = window.electronAPI;
     if (!electronAPI) return;
+
+    // === 斜杠命令拦截 ===
+    if (trimmed.startsWith('/')) {
+      setIsPromptSending(true);
+      try {
+        const handled = await executeSlashCommand(trimmed, {
+          currentSession,
+          currentProject,
+          selectedAgentId,
+          setCurrentMode: options.setCurrentMode,
+          setConversationMessages,
+          upsertConversationMessages,
+          showNotice,
+        });
+        if (handled) {
+          setPromptValue('');
+          return;
+        }
+      } finally {
+        setIsPromptSending(false);
+      }
+    }
 
     setIsPromptSending(true);
     try {
