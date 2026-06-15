@@ -10,46 +10,33 @@
  * - PostToolUse / Stop / ContextCompression 钩子返回 void。
  */
 
-import type { ToolCall, ToolResultMessage, UserMessage } from '../core/types';
+import type { HookCallbacks } from './HookCallbacks';
 
 // =====================================================================
 // 类型
 // =====================================================================
 
-/** 钩子事件类型。 */
+/** 钩子事件类型（17 种）。 */
 export type HookEvent =
+  | 'SessionStart'
+  | 'SessionEnd'
   | 'UserPromptSubmit'
+  | 'AssistantResponseStart'
+  | 'AssistantResponseEnd'
   | 'PreToolUse'
   | 'PostToolUse'
+  | 'PostToolUseFailure'
+  | 'PermissionRequest'
+  | 'PermissionDenied'
+  | 'SubagentStart'
+  | 'SubagentEnd'
+  | 'ContextCompression'
+  | 'ContextCompacted'
   | 'Stop'
-  | 'ContextCompression';
+  | 'Error'
+  | 'ModelSwitch';
 
-/** 各钩子的回调签名。 */
-export interface HookCallbacks {
-  UserPromptSubmit: (
-    prompt: string | UserMessage,
-  ) => Promise<void | string>;
-  /** 返回非空 string 则阻止该工具执行（作为错误消息）。 */
-  PreToolUse: (context: {
-    toolName: string;
-    toolCall: ToolCall;
-    turn: number;
-  }) => Promise<void | string>;
-  PostToolUse: (context: {
-    toolName: string;
-    toolCall: ToolCall;
-    result: ToolResultMessage;
-    turn: number;
-  }) => Promise<void>;
-  Stop: (context: {
-    reason: 'completed' | 'max_turns' | 'aborted' | 'error';
-    totalTurns: number;
-  }) => Promise<void>;
-  ContextCompression: (context: {
-    currentTokens: number;
-    maxTokens: number;
-  }) => Promise<void>;
-}
+export type { HookCallbacks };
 
 type AnyHookCallback = (...args: unknown[]) => Promise<unknown>;
 

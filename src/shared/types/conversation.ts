@@ -18,7 +18,8 @@ export type ConversationWorkBlockKind =
   | 'subagent'
   | 'handoff'
   | 'diagnostic'
-  | 'output';
+  | 'output'
+  | 'command';
 
 export type ConversationToolCallStatus = 'pending' | 'running' | 'complete' | 'error';
 
