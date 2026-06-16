@@ -85,6 +85,10 @@ const createConversationApi = () => ({
     removeTrackedListener("conversation:event", callback);
   }
 });
+const createCommandApi = () => ({
+  list: (category) => electron.ipcRenderer.invoke("command:list", category),
+  execute: (request) => electron.ipcRenderer.invoke("command:execute", request)
+});
 const createEventSubscriptionApi = () => ({
   onWorkflowStateChanged: (callback) => registerTrackedListener("workflow:stateChanged", (state) => callback(state)),
   onWorkflowStageChanged: (callback) => registerTrackedListener("workflow:stageChanged", (data) => callback(data)),
@@ -228,6 +232,7 @@ const electronAPI = {
   appMeta: createAppMetaApi(),
   appShell: createAppShellApi(),
   conversation: createConversationApi(),
+  command: createCommandApi(),
   selectFiles: dialogApi.selectFiles,
   selectRdcFiles: dialogApi.selectRdcFiles,
   selectDirectory: dialogApi.selectDirectory,

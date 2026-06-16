@@ -4,6 +4,8 @@ import { UserMenu } from '../shell/UserMenu';
 import { TitleBar } from '../shell/TitleBar';
 import { SettingsModal } from '../features/settings/SettingsModal';
 import { useComposer } from '../features/debugger/composer/useComposer';
+import { CommandPalette } from '../patterns/CommandPalette';
+import { NotificationToast } from '../features/notifications/NotificationToast';
 import { AppProviders } from './AppProviders';
 import { WorkbenchShell } from './WorkbenchShell';
 import { useWorkbenchLayout } from './useWorkbenchLayout';
@@ -204,6 +206,16 @@ const App: React.FC = () => {
           settings={settings}
           onClose={() => setSettingsModalOpen(false)}
         />
+
+        <CommandPalette
+          onExecute={(cmd) => {
+            if (cmd === '/config') {
+              setSettingsModalOpen(true);
+            }
+          }}
+        />
+
+        <NotificationToast />
       </div>
     </AppProviders>
   );
