@@ -12,13 +12,23 @@ import { modelCommand } from './builtins/model';
 import { projectCommand } from './builtins/project';
 import { sessionCommand } from './builtins/session';
 import { workspaceCommand } from './builtins/workspace';
-import { toolCommand } from './builtins/tool';
+import { toolsCommand } from './builtins/tools';
 import { mcpCommand } from './builtins/mcp';
-import { skillCommand } from './builtins/skill';
+import { skillsCommand } from './builtins/skills';
 import { planCommand } from './builtins/plan';
 import { testCommand } from './builtins/test';
 import { exportCommand } from './builtins/export';
-import { debugCommand } from './builtins/debug';
+import { statusCommand } from './builtins/status';
+import { agentsCommand } from './builtins/agents';
+import { versionCommand } from './builtins/version';
+import { undoCommand } from './builtins/undo';
+import { compactCommand } from './builtins/compact';
+import { resumeCommand } from './builtins/resume';
+import { summaryCommand } from './builtins/summary';
+import { costCommand } from './builtins/cost';
+import { usageCommand } from './builtins/usage';
+import { permissionsCommand } from './builtins/permissions';
+import { themeCommand } from './builtins/theme';
 import { commitCommand, diffCommand, reviewCommand } from './builtins/commit';
 
 let _registry: CommandRegistry | null = null;
@@ -43,13 +53,23 @@ function registerBuiltins(registry: CommandRegistry): void {
     projectCommand,
     sessionCommand,
     workspaceCommand,
-    toolCommand,
+    toolsCommand,
     mcpCommand,
-    skillCommand,
+    skillsCommand,
     planCommand,
     testCommand,
     exportCommand,
-    debugCommand,
+    statusCommand,
+    agentsCommand,
+    versionCommand,
+    undoCommand,
+    compactCommand,
+    resumeCommand,
+    summaryCommand,
+    costCommand,
+    usageCommand,
+    permissionsCommand,
+    themeCommand,
     commitCommand,
     diffCommand,
     reviewCommand,

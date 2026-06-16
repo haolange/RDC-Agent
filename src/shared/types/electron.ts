@@ -129,10 +129,16 @@ export interface ElectronAPI {
   command: {
     list: (category?: string) => Promise<CommandListResult>;
     execute: (request: CommandExecuteRequest) => Promise<{
-      success: boolean;
-      message: string;
-      data?: unknown;
-      sideEffect?: string;
+      result: {
+        success: boolean;
+        message: string;
+        data?: unknown;
+        sideEffect?: string;
+        systemMessage?: string;
+        uiAction?: { type: string; payload?: unknown };
+        invalidateStores?: Array<string>;
+      };
+      systemMessage?: import('./conversation').ConversationMessage;
     }>;
   };
 

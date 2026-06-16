@@ -57,6 +57,7 @@ export const bashTool: AgentTool<BashParams, BashDetails> = {
     },
     required: ['command'],
   },
+  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'process', category: 'system', requiresApproval: true },
   permissionHint: 'mutation',
 
   async execute(_toolCallId, params, signal, onUpdate) {
