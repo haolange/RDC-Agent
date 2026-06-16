@@ -1,13 +1,13 @@
 /**
- * /status — 系统状态与诊断信息。
+ * /debug — 调试信息与诊断。
  */
 import type { CommandDefinition } from '@shared/types/command';
 
-export const statusCommand: CommandDefinition = {
-  id: 'status',
-  name: 'status',
-  description: 'Show system status and diagnostic information',
-  aliases: ['st', 'debug', 'diag'],
+export const debugCommand: CommandDefinition = {
+  id: 'debug',
+  name: 'debug',
+  description: 'Show debug/diagnostic information',
+  aliases: ['diag', 'status'],
   category: 'debug',
 
   async execute(_args, ctx) {
@@ -16,8 +16,6 @@ export const statusCommand: CommandDefinition = {
       projectId: ctx.projectId ?? 'none',
       workspaceRoot: ctx.workspaceRoot ?? 'none',
       agentId: ctx.agentId ?? 'none',
-      currentMode: ctx.currentMode ?? 'none',
-      currentModelId: ctx.currentModelId ?? 'none',
       nodeVersion: process.version,
       platform: process.platform,
       arch: process.arch,
@@ -25,7 +23,7 @@ export const statusCommand: CommandDefinition = {
     const lines = Object.entries(info).map(([k, v]) => `  ${k}: ${v}`);
     return {
       success: true,
-      message: `**System Status**\n${lines.join('\n')}`,
+      message: `**Debug Info**\n${lines.join('\n')}`,
     };
   },
 };
