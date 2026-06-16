@@ -49,7 +49,6 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails> = {
     },
     required: ['path'],
   },
-  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'file', requiresApproval: false },
   permissionHint: 'readonly',
 
   async execute(_toolCallId, params, signal) {

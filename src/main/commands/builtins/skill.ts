@@ -1,13 +1,13 @@
 /**
- * /skills — 列出或执行可用技能。
+ * /skill — 列出或执行技能。
  */
 import type { CommandDefinition } from '@shared/types/command';
 
-export const skillsCommand: CommandDefinition = {
-  id: 'skills',
-  name: 'skills',
+export const skillCommand: CommandDefinition = {
+  id: 'skill',
+  name: 'skill',
   description: 'List available skills or run a specific skill',
-  aliases: ['skill'],
+  aliases: ['skills'],
   category: 'workflow',
 
   async execute(args) {

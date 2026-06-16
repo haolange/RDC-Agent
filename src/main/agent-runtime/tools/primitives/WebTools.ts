@@ -36,7 +36,6 @@ export const webFetchTool: AgentTool<WebFetchParams, WebResultDetails> = {
     },
     required: ['url'],
   },
-  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
   permissionHint: 'readonly',
 
   async execute(_toolCallId, params, signal) {
@@ -58,7 +57,6 @@ export const webSearchTool: AgentTool<WebSearchParams, WebResultDetails> = {
     },
     required: ['query'],
   },
-  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
   permissionHint: 'readonly',
 
   async execute(_toolCallId, params, signal) {

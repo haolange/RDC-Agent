@@ -7,15 +7,6 @@ import type {
 
 export type AgentToolPermissionHint = 'readonly' | 'session_mutation' | 'mutation' | 'destructive';
 
-export interface AgentToolSpec {
-  readonly isReadOnly: boolean;
-  readonly isConcurrencySafe: boolean;
-  readonly isDestructive: boolean;
-  readonly sideEffect?: 'none' | 'process' | 'filesystem' | 'network' | 'session';
-  readonly category: 'file' | 'search' | 'system' | 'comm' | 'web' | 'task';
-  readonly requiresApproval: boolean;
-}
-
 export interface AgentToolResult<TDetails = unknown> {
   content: (TextContent | ImageContent)[];
   isError?: boolean;
@@ -31,7 +22,6 @@ export interface AgentTool<
   readonly description: string;
   readonly parameters: JsonSchema;
   readonly permissionHint?: AgentToolPermissionHint;
-  readonly spec?: AgentToolSpec;
 
   execute(
     toolCallId: string,

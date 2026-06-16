@@ -18,10 +18,6 @@ import { editFileTool } from './EditFileTool';
 import { globTool } from './GlobTool';
 import { grepTool } from './GrepTool';
 import { webFetchTool, webSearchTool } from './WebTools';
-import { deleteFileTool, moveFileTool, copyFileTool } from '../file';
-import { searchCodebaseTool } from '../search';
-import { askUserTool, notebookEditTool, agentSpawnTool } from '../system';
-import { sendMessageTool } from '../comm';
 
 /** 获取所有内置 primitive 工具。 */
 export function getPrimitiveTools(): AgentTool[] {
@@ -34,13 +30,5 @@ export function getPrimitiveTools(): AgentTool[] {
     grepTool as unknown as AgentTool,
     webFetchTool as unknown as AgentTool,
     webSearchTool as unknown as AgentTool,
-    deleteFileTool as unknown as AgentTool,
-    moveFileTool as unknown as AgentTool,
-    copyFileTool as unknown as AgentTool,
-    searchCodebaseTool as unknown as AgentTool,
-    askUserTool as unknown as AgentTool,
-    notebookEditTool as unknown as AgentTool,
-    agentSpawnTool as unknown as AgentTool,
-    sendMessageTool as unknown as AgentTool,
   ];
 }
