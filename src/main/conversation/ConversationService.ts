@@ -257,7 +257,7 @@ function getRuntimeToolBlockMeta(toolName: string): Pick<ConversationWorkBlock, 
       id: 'runtime-user-input',
       title: '请求用户决策',
       stage: 'decision',
-      kind: 'approval',
+      kind: 'user_input',
     };
   }
   if (normalizedToolName === 'agent_handoff') {
@@ -1061,12 +1061,19 @@ export class ConversationService {
                 const approvalId = payload.approvalId ?? 'runtime';
                 if (payload.kind === 'ask_user' || normalizeToolName(String(payload.toolName ?? '')) === 'ask_user') {
                   const failed = payload.status === 'rejected' || payload.status === 'cancelled';
+                  const answerText = payload.answer === undefined || payload.answer === null
+                    ? ''
+                    : typeof payload.answer === 'string'
+                      ? payload.answer.trim()
+                      : String(payload.answer).trim();
                   commitAssistantMessage('message_patched', {
                     workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                       id: String(payload.toolCallId ?? approvalId),
                       toolName: 'ask_user',
                       status: failed ? 'error' : 'running',
-                      resultPreview: failed ? String(payload.answer ?? 'User input request was cancelled.') : 'User answered.',
+                      resultPreview: failed
+                        ? String(payload.answer ?? 'User input request was cancelled.')
+                        : answerText || 'User answered.',
                       error: failed ? String(payload.answer ?? 'User input request was cancelled.') : undefined,
                       completedAt: failed ? nowMs() : undefined,
                     }),
@@ -1088,17 +1095,18 @@ export class ConversationService {
               if (event.type === 'tool.completed') {
                 const result = event.payload.result as { ok?: boolean; error?: { message?: string } } | undefined;
                 const isAskUserTool = normalizeToolName(String(event.payload.toolName)) === 'ask_user';
+                const toolCallPatch: Partial<ConversationToolCall> & { id: string; toolName: string } = {
+                  id: String(event.payload.toolCallId),
+                  toolName: String(event.payload.toolName),
+                  status: result?.ok ? 'complete' : 'error',
+                  error: result?.ok ? undefined : result?.error?.message,
+                  completedAt: nowMs(),
+                };
+                if (!(isAskUserTool && result?.ok)) {
+                  toolCallPatch.resultPreview = JSON.stringify(event.payload.result ?? {}).slice(0, 800);
+                }
                 commitAssistantMessage('message_patched', {
-                  workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
-                    id: String(event.payload.toolCallId),
-                    toolName: String(event.payload.toolName),
-                    status: result?.ok ? 'complete' : 'error',
-                    resultPreview: isAskUserTool && result?.ok
-                      ? 'User answered.'
-                      : JSON.stringify(event.payload.result ?? {}).slice(0, 800),
-                    error: result?.ok ? undefined : result?.error?.message,
-                    completedAt: nowMs(),
-                  }),
+                  workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, toolCallPatch),
                 });
               }
               if (event.type === 'task.created' || event.type === 'task.updated') {

@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ConversationMessage, ConversationToolCall } from '@shared/types/conversation';
 import { useConversationStore } from '../../../stores/conversationStore';
+import { Button } from '../../../ui/Button';
 import { useUserInputRequestSubmit } from './useUserInputRequestSubmit';
 
 export interface PendingUserInputRequest {
@@ -11,6 +12,8 @@ export interface PendingUserInputRequest {
   choices: string[];
   agentId?: string;
 }
+
+type Selection = number | 'custom';
 
 const normalizeToolName = (toolName: string): string => toolName.trim().toLowerCase().replace(/[.\-]/g, '_');
 
@@ -84,26 +87,66 @@ export const usePendingUserInputRequest = (): PendingUserInputRequest | null => 
 export const UserInputRequestPanel: React.FC<{
   request: PendingUserInputRequest;
 }> = ({ request }) => {
-  const [answer, setAnswer] = useState('');
+  const hasChoices = request.choices.length > 0;
+  const [selection, setSelection] = useState<Selection>(hasChoices ? 0 : 'custom');
+  const [customAnswer, setCustomAnswer] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const customInputRef = useRef<HTMLInputElement>(null);
   const submitUserInput = useUserInputRequestSubmit();
 
-  const submitAnswer = async (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed || isSubmitting) return;
+  const resolvedAnswer = useMemo(() => {
+    if (selection === 'custom') {
+      return customAnswer.trim();
+    }
+    return request.choices[selection]?.trim() ?? '';
+  }, [customAnswer, request.choices, selection]);
+
+  const canSubmit = resolvedAnswer.length > 0 && !isSubmitting;
+
+  const submitAnswer = useCallback(async () => {
+    if (!canSubmit) return;
 
     setIsSubmitting(true);
     setError(null);
     try {
-      await submitUserInput(request, trimmed);
-      setAnswer('');
+      await submitUserInput(request, resolvedAnswer);
+      setCustomAnswer('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to submit the answer.');
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [canSubmit, request, resolvedAnswer, submitUserInput]);
+
+  useEffect(() => {
+    if (selection === 'custom') {
+      customInputRef.current?.focus();
+    }
+  }, [selection]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (isSubmitting) return;
+
+      if (event.ctrlKey && event.key === 'Enter') {
+        event.preventDefault();
+        void submitAnswer();
+        return;
+      }
+
+      if (hasChoices && !event.ctrlKey && !event.altKey && !event.metaKey && /^[1-9]$/.test(event.key)) {
+        const index = Number(event.key) - 1;
+        if (index < request.choices.length) {
+          event.preventDefault();
+          setSelection(index);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hasChoices, isSubmitting, request.choices.length, submitAnswer]);
 
   return (
     <section className="composer-user-input-panel" data-testid="composer-user-input-panel">
@@ -111,45 +154,94 @@ export const UserInputRequestPanel: React.FC<{
         <span className="composer-user-input-kicker">Input requested</span>
         <p>{request.question}</p>
       </div>
-      {request.choices.length > 0 ? (
-        <div className="composer-user-input-choices" aria-label="Suggested answers">
-          {request.choices.map((choice) => (
-            <button
-              key={choice}
-              type="button"
-              className="composer-user-input-choice"
-              disabled={isSubmitting}
-              onClick={() => void submitAnswer(choice)}
-            >
-              {choice}
-            </button>
-          ))}
+
+      {hasChoices ? (
+        <div className="composer-user-input-options" role="radiogroup" aria-label="Answer choices">
+          {request.choices.map((choice, index) => {
+            const isSelected = selection === index;
+            return (
+              <button
+                key={`${index}-${choice}`}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                className={`composer-user-input-option${isSelected ? ' is-selected' : ''}`}
+                disabled={isSubmitting}
+                onClick={() => setSelection(index)}
+              >
+                <span className="composer-user-input-option-index" aria-hidden="true">
+                  {index + 1}
+                </span>
+                <span className="composer-user-input-option-label">{choice}</span>
+                {isSelected ? (
+                  <span className="composer-user-input-option-check" aria-hidden="true">
+                    ✓
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
       ) : null}
-      <div className="composer-user-input-freeform">
-        <textarea
-          className="composer-user-input-textarea"
-          value={answer}
-          onChange={(event) => setAnswer(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault();
-              void submitAnswer(answer);
+
+      <div
+        className={`composer-user-input-custom${selection === 'custom' ? ' is-selected' : ''}`}
+        role={hasChoices ? 'radio' : undefined}
+        aria-checked={hasChoices ? selection === 'custom' : undefined}
+      >
+        {hasChoices ? (
+          <button
+            type="button"
+            className="composer-user-input-custom-select"
+            disabled={isSubmitting}
+            onClick={() => setSelection('custom')}
+          >
+            <span className="composer-user-input-option-index" aria-hidden="true">
+              {request.choices.length + 1}
+            </span>
+            <span className="composer-user-input-custom-label">Enter custom answer</span>
+            {selection === 'custom' ? (
+              <span className="composer-user-input-option-check" aria-hidden="true">
+                ✓
+              </span>
+            ) : null}
+          </button>
+        ) : null}
+        <input
+          ref={customInputRef}
+          type="text"
+          className="composer-user-input-custom-field"
+          value={customAnswer}
+          onChange={(event) => {
+            setCustomAnswer(event.target.value);
+            if (hasChoices) {
+              setSelection('custom');
+            }
+          }}
+          onFocus={() => {
+            if (hasChoices) {
+              setSelection('custom');
             }
           }}
           placeholder="Type your answer..."
-          rows={2}
           disabled={isSubmitting}
+          aria-label="Custom answer"
         />
-        <button
-          type="button"
-          className="composer-user-input-submit"
-          disabled={isSubmitting || !answer.trim()}
-          onClick={() => void submitAnswer(answer)}
-        >
-          Send
-        </button>
       </div>
+
+      <div className="composer-user-input-footer">
+        <span className="composer-user-input-hint">Ctrl+Enter to submit</span>
+        <Button
+          variant="primary"
+          size="sm"
+          className="composer-user-input-submit"
+          disabled={!canSubmit}
+          onClick={() => void submitAnswer()}
+        >
+          Submit
+        </Button>
+      </div>
+
       {error ? (
         <p className="composer-user-input-error" role="alert">
           {error}

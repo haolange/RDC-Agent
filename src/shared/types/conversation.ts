@@ -14,6 +14,7 @@ export type ConversationWorkBlockKind =
   | 'reasoning'
   | 'tool'
   | 'approval'
+  | 'user_input'
   | 'compaction'
   | 'subagent'
   | 'handoff'

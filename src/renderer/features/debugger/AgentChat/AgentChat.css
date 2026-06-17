@@ -755,6 +755,39 @@
   overflow-wrap: anywhere;
 }
 
+.work-process-user-input-qa {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--token-bg-muted) 72%, transparent);
+}
+
+.work-process-user-input-qa-question,
+.work-process-user-input-qa-answer {
+  margin: 0;
+  min-width: 0;
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.work-process-user-input-qa-label {
+  margin-right: var(--space-2);
+  color: var(--token-text-caption);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+}
+
+.work-process-user-input-qa-answer {
+  color: var(--token-text-heading);
+}
+
 .work-process-tool-meta {
   display: flex;
   align-items: baseline;
