@@ -7,12 +7,13 @@ const child_process = require("child_process");
 const fs = require("fs");
 const uuid = require("uuid");
 const YAML = require("yaml");
+const os = require("os");
 const crypto = require("crypto");
 require("node:fs");
 const path$1 = require("node:path");
 require("node:crypto");
-const os = require("os");
 const fs$1 = require("fs/promises");
+const util = require("util");
 const promises = require("dns/promises");
 const net = require("net");
 const http = require("http");
@@ -35,8 +36,8 @@ function _interopNamespaceDefault(e) {
 }
 const path__namespace = /* @__PURE__ */ _interopNamespaceDefault(path);
 const fs__namespace = /* @__PURE__ */ _interopNamespaceDefault(fs);
-const crypto__namespace = /* @__PURE__ */ _interopNamespaceDefault(crypto);
 const os__namespace = /* @__PURE__ */ _interopNamespaceDefault(os);
+const crypto__namespace = /* @__PURE__ */ _interopNamespaceDefault(crypto);
 const fs__namespace$1 = /* @__PURE__ */ _interopNamespaceDefault(fs$1);
 const net__namespace = /* @__PURE__ */ _interopNamespaceDefault(net);
 function generateShortId() {
@@ -3368,7 +3369,14 @@ class StorageAdapter {
       selection.sessionId = null;
       this.writeSelection(selection);
     }
-    this.touchProject(location.project.projectId);
+    const projectId = location.project.projectId;
+    const wasLastSession = location.project.lastSessionId === sessionId;
+    if (wasLastSession) {
+      const remaining = this.listSessions(projectId);
+      this.touchProject(projectId, remaining[0]?.sessionId ?? null);
+    } else {
+      this.touchProject(projectId);
+    }
   }
   getProjectById(projectId) {
     return this.readRegistry().projects.find((project) => project.projectId === projectId) || null;
@@ -3730,6 +3738,10 @@ class StorageAdapter {
   appendConversationMessage(sessionId, message) {
     appendJsonl(this.getConversationPath(sessionId), message);
   }
+  writeConversationHistory(sessionId, messages) {
+    writeJsonl(this.getConversationPath(sessionId), messages);
+    this.updateSession(sessionId, {});
+  }
   listSessionAttachments(sessionId) {
     return this.readSessionAttachments(sessionId).slice().sort((left, right) => left.createdAt - right.createdAt);
   }
@@ -4006,10 +4018,11 @@ class StorageAdapter {
     const registry = this.readRegistry();
     const nextProjects = registry.projects.map((project2) => {
       if (project2.projectId !== projectId) return project2;
+      const nextLastSessionId = lastSessionId === void 0 ? project2.lastSessionId : lastSessionId || void 0;
       return {
         ...project2,
         updatedAt,
-        lastSessionId: lastSessionId || project2.lastSessionId
+        lastSessionId: nextLastSessionId
       };
     });
     registry.projects = nextProjects;
@@ -5918,6 +5931,67 @@ function toolToDefinition(tool) {
     parameters: tool.parameters
   };
 }
+let temporaryAllowedPathRoots = [];
+async function withTemporaryPathAccess(roots, run) {
+  const previous = temporaryAllowedPathRoots;
+  temporaryAllowedPathRoots = [
+    ...previous,
+    ...roots.map((root) => normalizeInputPath(root))
+  ];
+  try {
+    return await run();
+  } finally {
+    temporaryAllowedPathRoots = previous;
+  }
+}
+function getWorkspaceRoot(context2) {
+  if (context2?.projectRootPath) {
+    return path__namespace.resolve(context2.projectRootPath);
+  }
+  const fromEnv = process.env.RDC_WORKSPACE_ROOT?.trim();
+  if (fromEnv && fromEnv.length > 0) {
+    return path__namespace.resolve(fromEnv);
+  }
+  return path__namespace.resolve(process.cwd());
+}
+function normalizeInputPath(input) {
+  const trimmed = input.trim();
+  if (trimmed === "~") return os__namespace.homedir();
+  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
+    return path__namespace.resolve(os__namespace.homedir(), trimmed.slice(2));
+  }
+  return trimmed.replace(/^%USERPROFILE%/i, os__namespace.homedir());
+}
+function isWithinRoot$1(target, root) {
+  if (root === "*") return true;
+  const resolvedRoot = path__namespace.resolve(root);
+  const rel = path__namespace.relative(resolvedRoot, target);
+  return rel === "" || !rel.startsWith("..") && !path__namespace.isAbsolute(rel);
+}
+function safeResolvePath(input, root, context2) {
+  if (typeof input !== "string" || input.length === 0) {
+    throw new Error("路径不能为空");
+  }
+  const workspaceRoot = root ?? getWorkspaceRoot(context2);
+  const expandedInput = normalizeInputPath(input);
+  const target = path__namespace.isAbsolute(expandedInput) ? path__namespace.resolve(expandedInput) : path__namespace.resolve(workspaceRoot, expandedInput);
+  const rel = path__namespace.relative(workspaceRoot, target);
+  if ((rel.startsWith("..") || path__namespace.isAbsolute(rel)) && !temporaryAllowedPathRoots.some((root2) => isWithinRoot$1(target, root2))) {
+    throw new Error(`路径 "${input}" 超出 workspace (${workspaceRoot})`);
+  }
+  return target;
+}
+function truncateOutput(text, maxBytes = 50 * 1024) {
+  if (Buffer.byteLength(text, "utf8") <= maxBytes) {
+    return text;
+  }
+  const head = Math.floor(maxBytes * 0.7);
+  const tail = Math.floor(maxBytes * 0.2);
+  const omitted = Buffer.byteLength(text, "utf8") - head - tail;
+  return text.slice(0, head) + `
+... [truncated ${omitted} bytes] ...
+` + text.slice(text.length - tail);
+}
 const MAX_OUTPUT_CHARS = 1e4;
 const NOTIFICATION_TAIL_CHARS = 500;
 class BackgroundTaskRunner {
@@ -6112,66 +6186,8 @@ function formatNotificationBlock(task) {
   ].join("\n");
 }
 path$1.join(".rdc-agent", "cron");
-let temporaryAllowedPathRoots = [];
-async function withTemporaryPathAccess(roots, run) {
-  const previous = temporaryAllowedPathRoots;
-  temporaryAllowedPathRoots = [
-    ...previous,
-    ...roots.map((root) => normalizeInputPath(root))
-  ];
-  try {
-    return await run();
-  } finally {
-    temporaryAllowedPathRoots = previous;
-  }
-}
-function getWorkspaceRoot() {
-  const fromEnv = process.env.RDC_WORKSPACE_ROOT?.trim();
-  if (fromEnv && fromEnv.length > 0) {
-    return path__namespace.resolve(fromEnv);
-  }
-  return path__namespace.resolve(process.cwd());
-}
-function normalizeInputPath(input) {
-  const trimmed = input.trim();
-  if (trimmed === "~") return os__namespace.homedir();
-  if (trimmed.startsWith("~/") || trimmed.startsWith("~\\")) {
-    return path__namespace.resolve(os__namespace.homedir(), trimmed.slice(2));
-  }
-  return trimmed.replace(/^%USERPROFILE%/i, os__namespace.homedir());
-}
-function isWithinRoot$1(target, root) {
-  if (root === "*") return true;
-  const resolvedRoot = path__namespace.resolve(root);
-  const rel = path__namespace.relative(resolvedRoot, target);
-  return rel === "" || !rel.startsWith("..") && !path__namespace.isAbsolute(rel);
-}
-function safeResolvePath(input, root) {
-  if (typeof input !== "string" || input.length === 0) {
-    throw new Error("路径不能为空");
-  }
-  const workspaceRoot = root ?? getWorkspaceRoot();
-  const expandedInput = normalizeInputPath(input);
-  const target = path__namespace.isAbsolute(expandedInput) ? path__namespace.resolve(expandedInput) : path__namespace.resolve(workspaceRoot, expandedInput);
-  const rel = path__namespace.relative(workspaceRoot, target);
-  if ((rel.startsWith("..") || path__namespace.isAbsolute(rel)) && !temporaryAllowedPathRoots.some((root2) => isWithinRoot$1(target, root2))) {
-    throw new Error(`路径 "${input}" 超出 workspace (${workspaceRoot})`);
-  }
-  return target;
-}
-function truncateOutput(text, maxBytes = 50 * 1024) {
-  if (Buffer.byteLength(text, "utf8") <= maxBytes) {
-    return text;
-  }
-  const head = Math.floor(maxBytes * 0.7);
-  const tail = Math.floor(maxBytes * 0.2);
-  const omitted = Buffer.byteLength(text, "utf8") - head - tail;
-  return text.slice(0, head) + `
-... [truncated ${omitted} bytes] ...
-` + text.slice(text.length - tail);
-}
-const DEFAULT_TIMEOUT_MS = 12e4;
-const MAX_OUTPUT_BYTES$2 = 50 * 1024;
+const DEFAULT_TIMEOUT_MS$1 = 12e4;
+const MAX_OUTPUT_BYTES$3 = 50 * 1024;
 const bashTool = {
   name: "bash",
   label: "终端命令",
@@ -6196,10 +6212,10 @@ const bashTool = {
   },
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: "process", category: "system", requiresApproval: true },
   permissionHint: "mutation",
-  async execute(_toolCallId, params, signal, onUpdate) {
+  async execute(_toolCallId, params, signal, onUpdate, context2) {
     const command = params.command;
-    const timeoutMs = params.timeout ?? DEFAULT_TIMEOUT_MS;
-    const cwd = getWorkspaceRoot();
+    const timeoutMs = params.timeout ?? DEFAULT_TIMEOUT_MS$1;
+    const cwd = getWorkspaceRoot(context2);
     const startedAt = Date.now();
     if (params.run_in_background === true) {
       const runner = getBackgroundTaskRunner();
@@ -6258,7 +6274,7 @@ Result will be delivered via background task notification when complete.`;
         if (!onUpdate) return;
         const text = combineOutput(stdout, stderr);
         onUpdate({
-          content: [{ type: "text", text: truncateOutput(text, MAX_OUTPUT_BYTES$2) }]
+          content: [{ type: "text", text: truncateOutput(text, MAX_OUTPUT_BYTES$3) }]
         });
       };
       child.stdout?.on("data", (chunk) => {
@@ -6274,10 +6290,10 @@ Result will be delivered via background task notification when complete.`;
         if (signal) signal.removeEventListener("abort", onAbort);
         const text = combineOutput(stdout, stderr) + `
 [spawn error] ${err.message}`;
-        const truncated = Buffer.byteLength(text, "utf8") > MAX_OUTPUT_BYTES$2;
+        const truncated = Buffer.byteLength(text, "utf8") > MAX_OUTPUT_BYTES$3;
         resolve({
           content: [
-            { type: "text", text: truncateOutput(text, MAX_OUTPUT_BYTES$2) }
+            { type: "text", text: truncateOutput(text, MAX_OUTPUT_BYTES$3) }
           ],
           details: {
             command,
@@ -6301,10 +6317,10 @@ Result will be delivered via background task notification when complete.`;
           combined += `
 [aborted]`;
         }
-        const truncated = Buffer.byteLength(combined, "utf8") > MAX_OUTPUT_BYTES$2;
+        const truncated = Buffer.byteLength(combined, "utf8") > MAX_OUTPUT_BYTES$3;
         resolve({
           content: [
-            { type: "text", text: truncateOutput(combined, MAX_OUTPUT_BYTES$2) }
+            { type: "text", text: truncateOutput(combined, MAX_OUTPUT_BYTES$3) }
           ],
           details: {
             command,
@@ -6326,7 +6342,7 @@ function combineOutput(stdout, stderr) {
 ${stderr}`;
 }
 const DEFAULT_LIMIT = 2e3;
-const MAX_OUTPUT_BYTES$1 = 200 * 1024;
+const MAX_OUTPUT_BYTES$2 = 200 * 1024;
 const readFileTool = {
   name: "read_file",
   label: "读取文件",
@@ -6351,11 +6367,11 @@ const readFileTool = {
   },
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "none", category: "file", requiresApproval: false },
   permissionHint: "readonly",
-  async execute(_toolCallId, params, signal) {
+  async execute(_toolCallId, params, signal, _onUpdate, context2) {
     if (signal?.aborted) {
       throw new Error("Aborted");
     }
-    const absolute = safeResolvePath(params.path);
+    const absolute = safeResolvePath(params.path, void 0, context2);
     const offset = Math.max(1, Math.floor(params.offset ?? 1));
     const limit = Math.max(1, Math.floor(params.limit ?? DEFAULT_LIMIT));
     const raw = await fs__namespace$1.readFile(absolute, "utf8");
@@ -6368,8 +6384,8 @@ const readFileTool = {
     const endIdx = Math.min(totalLines, startIdx + limit);
     const slice = lines.slice(startIdx, endIdx);
     const numbered = slice.map((line, i) => `${String(startIdx + i + 1).padStart(6, " ")}→${line}`).join("\n");
-    const text = truncateOutput(numbered, MAX_OUTPUT_BYTES$1);
-    const truncated = Buffer.byteLength(numbered, "utf8") > MAX_OUTPUT_BYTES$1 || endIdx < totalLines;
+    const text = truncateOutput(numbered, MAX_OUTPUT_BYTES$2);
+    const truncated = Buffer.byteLength(numbered, "utf8") > MAX_OUTPUT_BYTES$2 || endIdx < totalLines;
     return {
       content: [{ type: "text", text }],
       details: {
@@ -6402,11 +6418,11 @@ const writeFileTool = {
   },
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: "filesystem", category: "file", requiresApproval: true },
   permissionHint: "mutation",
-  async execute(_toolCallId, params, signal) {
+  async execute(_toolCallId, params, signal, _onUpdate, context2) {
     if (signal?.aborted) {
       throw new Error("Aborted");
     }
-    const absolute = safeResolvePath(params.path);
+    const absolute = safeResolvePath(params.path, void 0, context2);
     const dir = path__namespace.dirname(absolute);
     let created = true;
     try {
@@ -6456,7 +6472,7 @@ const editFileTool = {
   },
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: "filesystem", category: "file", requiresApproval: true },
   permissionHint: "mutation",
-  async execute(_toolCallId, params, signal) {
+  async execute(_toolCallId, params, signal, _onUpdate, context2) {
     if (signal?.aborted) {
       throw new Error("Aborted");
     }
@@ -6466,7 +6482,7 @@ const editFileTool = {
     if (params.old_text === params.new_text) {
       throw new Error("old_text 与 new_text 相同，无需编辑");
     }
-    const absolute = safeResolvePath(params.path);
+    const absolute = safeResolvePath(params.path, void 0, context2);
     const original = await fs__namespace$1.readFile(absolute, "utf8");
     if (signal?.aborted) {
       throw new Error("Aborted");
@@ -6533,13 +6549,13 @@ const globTool = {
   },
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "none", category: "search", requiresApproval: false },
   permissionHint: "readonly",
-  async execute(_toolCallId, params, signal) {
+  async execute(_toolCallId, params, signal, _onUpdate, context2) {
     if (signal?.aborted) {
       throw new Error("Aborted");
     }
-    const workspaceRoot = getWorkspaceRoot();
+    const workspaceRoot = getWorkspaceRoot(context2);
     const externalPattern = params.cwd ? null : splitExternalPattern(params.pattern);
-    const baseDir = params.cwd ? safeResolvePath(params.cwd, workspaceRoot) : externalPattern ? safeResolvePath(externalPattern.baseDir, workspaceRoot) : workspaceRoot;
+    const baseDir = params.cwd ? safeResolvePath(params.cwd, workspaceRoot, context2) : externalPattern ? safeResolvePath(externalPattern.baseDir, workspaceRoot, context2) : workspaceRoot;
     const pattern = externalPattern?.pattern ?? params.pattern;
     const regex = compileGlob(pattern);
     const matches = [];
@@ -6685,7 +6701,7 @@ async function walk(root, current, visit) {
   return true;
 }
 const DEFAULT_MAX_MATCHES = 200;
-const MAX_OUTPUT_BYTES = 120 * 1024;
+const MAX_OUTPUT_BYTES$1 = 120 * 1024;
 const DEFAULT_IGNORED_DIRS = /* @__PURE__ */ new Set([
   "node_modules",
   ".git",
@@ -6725,10 +6741,10 @@ const grepTool = {
   },
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "none", category: "search", requiresApproval: false },
   permissionHint: "readonly",
-  async execute(_toolCallId, params, signal) {
+  async execute(_toolCallId, params, signal, _onUpdate, context2) {
     throwIfAborted$1(signal);
-    const workspaceRoot = getWorkspaceRoot();
-    const root = params.path ? safeResolvePath(params.path, workspaceRoot) : workspaceRoot;
+    const workspaceRoot = getWorkspaceRoot(context2);
+    const root = params.path ? safeResolvePath(params.path, workspaceRoot, context2) : workspaceRoot;
     const maxMatches = Math.max(1, Math.min(1e3, Math.floor(params.maxMatches ?? DEFAULT_MAX_MATCHES)));
     const regex = compilePattern(params.pattern, params.caseSensitive === true);
     const matches = [];
@@ -6746,8 +6762,8 @@ const grepTool = {
       truncated = true;
     }
     const rawText = matches.length > 0 ? matches.join("\n") : `(no matches for pattern "${params.pattern}")`;
-    const text = truncateOutput(rawText, MAX_OUTPUT_BYTES);
-    truncated = truncated || Buffer.byteLength(rawText, "utf8") > MAX_OUTPUT_BYTES;
+    const text = truncateOutput(rawText, MAX_OUTPUT_BYTES$1);
+    truncated = truncated || Buffer.byteLength(rawText, "utf8") > MAX_OUTPUT_BYTES$1;
     return {
       content: [{ type: "text", text }],
       details: {
@@ -6809,6 +6825,169 @@ function throwIfAborted$1(signal) {
     throw new Error("Aborted");
   }
 }
+const execFileAsync$1 = util.promisify(child_process.execFile);
+const MAX_OUTPUT_BYTES = 64 * 1024;
+async function runGit$1(cwd, args) {
+  try {
+    const result = await execFileAsync$1("git", ["-c", "core.quotepath=false", ...args], {
+      cwd,
+      encoding: "utf8",
+      maxBuffer: MAX_OUTPUT_BYTES * 2,
+      windowsHide: true
+    });
+    return {
+      stdout: String(result.stdout ?? ""),
+      stderr: String(result.stderr ?? "")
+    };
+  } catch (error) {
+    const err = error;
+    const output = [String(err.stdout ?? "").trim(), String(err.stderr ?? "").trim(), err.message].filter(Boolean).join("\n");
+    throw new Error(output);
+  }
+}
+async function resolveGitRoot(workspaceRoot) {
+  const output = await runGit$1(workspaceRoot, ["rev-parse", "--show-toplevel"]);
+  return path.resolve(output.stdout.trim());
+}
+function validateGitPath$1(input) {
+  const value = String(input ?? "").trim().replace(/\\/g, "/");
+  if (!value || value.includes("\0") || value.startsWith("/") || /^[A-Za-z]:/.test(value)) {
+    throw new Error(`Invalid git path: ${input}`);
+  }
+  if (value.split("/").includes("..")) {
+    throw new Error(`Invalid git path: ${input}`);
+  }
+  return value;
+}
+function createResult(cwd, args, output) {
+  return {
+    content: [{ type: "text", text: truncateOutput(output || "No output.", MAX_OUTPUT_BYTES) }],
+    details: { cwd, args }
+  };
+}
+async function executeGit(args, contextRoot) {
+  const gitRoot = await resolveGitRoot(contextRoot);
+  const output = await runGit$1(gitRoot, args);
+  const text = [output.stdout.trim(), output.stderr.trim()].filter(Boolean).join("\n");
+  return createResult(gitRoot, args, text);
+}
+const gitStatusTool = {
+  name: "git_status",
+  label: "Git status",
+  description: "Show git status for the current project repository.",
+  parameters: {
+    type: "object",
+    properties: {
+      short: { type: "boolean", description: "Use concise porcelain output. Defaults to true." }
+    }
+  },
+  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "none", category: "system", requiresApproval: false },
+  permissionHint: "readonly",
+  async execute(_toolCallId, params, _signal, _onUpdate, context2) {
+    const root = getWorkspaceRoot(context2);
+    const args = params.short === false ? ["status", "-sb"] : ["status", "--porcelain=v1", "-b", "-uall"];
+    return executeGit(args, root);
+  }
+};
+const gitDiffTool = {
+  name: "git_diff",
+  label: "Git diff",
+  description: "Show git diff for the current project repository.",
+  parameters: {
+    type: "object",
+    properties: {
+      path: { type: "string", description: "Optional repository-relative path." },
+      staged: { type: "boolean", description: "Show staged diff." },
+      stat: { type: "boolean", description: "Show diff stat instead of patch." }
+    }
+  },
+  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "none", category: "system", requiresApproval: false },
+  permissionHint: "readonly",
+  async execute(_toolCallId, params, _signal, _onUpdate, context2) {
+    const root = getWorkspaceRoot(context2);
+    const args = ["diff"];
+    if (params.stat) args.push("--stat");
+    if (params.staged) args.push("--cached");
+    if (params.path) args.push("--", validateGitPath$1(params.path));
+    return executeGit(args, root);
+  }
+};
+const gitLogTool = {
+  name: "git_log",
+  label: "Git log",
+  description: "Show recent git commits for the current project repository.",
+  parameters: {
+    type: "object",
+    properties: {
+      limit: { type: "integer", description: "Maximum commits to show, 1-50. Defaults to 10." }
+    }
+  },
+  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "none", category: "system", requiresApproval: false },
+  permissionHint: "readonly",
+  async execute(_toolCallId, params, _signal, _onUpdate, context2) {
+    const root = getWorkspaceRoot(context2);
+    const limit = Math.max(1, Math.min(50, Math.floor(params.limit ?? 10)));
+    return executeGit(["log", "--oneline", `-${limit}`], root);
+  }
+};
+const gitAddTool = {
+  name: "git_add",
+  label: "Git add",
+  description: "Stage a repository-relative path in the current project repository.",
+  parameters: {
+    type: "object",
+    properties: {
+      path: { type: "string", description: "Repository-relative file or directory path to stage." }
+    },
+    required: ["path"]
+  },
+  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: "filesystem", category: "system", requiresApproval: true },
+  permissionHint: "mutation",
+  async execute(_toolCallId, params, _signal, _onUpdate, context2) {
+    const root = getWorkspaceRoot(context2);
+    return executeGit(["add", "--", validateGitPath$1(params.path)], root);
+  }
+};
+const gitUnstageTool = {
+  name: "git_unstage",
+  label: "Git unstage",
+  description: "Unstage a repository-relative path in the current project repository.",
+  parameters: {
+    type: "object",
+    properties: {
+      path: { type: "string", description: "Repository-relative file or directory path to unstage." }
+    },
+    required: ["path"]
+  },
+  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: "filesystem", category: "system", requiresApproval: true },
+  permissionHint: "mutation",
+  async execute(_toolCallId, params, _signal, _onUpdate, context2) {
+    const root = getWorkspaceRoot(context2);
+    return executeGit(["restore", "--staged", "--", validateGitPath$1(params.path)], root);
+  }
+};
+const gitCommitTool = {
+  name: "git_commit",
+  label: "Git commit",
+  description: "Create a git commit from staged changes in the current project repository.",
+  parameters: {
+    type: "object",
+    properties: {
+      message: { type: "string", description: "Commit message." }
+    },
+    required: ["message"]
+  },
+  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: "filesystem", category: "system", requiresApproval: true },
+  permissionHint: "mutation",
+  async execute(_toolCallId, params, _signal, _onUpdate, context2) {
+    const message = String(params.message ?? "").trim();
+    if (!message) {
+      throw new Error("Commit message is required.");
+    }
+    const root = getWorkspaceRoot(context2);
+    return executeGit(["commit", "-m", message], root);
+  }
+};
 const MAX_RESPONSE_BYTES = 160 * 1024;
 const REQUEST_TIMEOUT_MS$2 = 12e3;
 const SEARCH_BASE_URL = process.env.RDC_AGENT_WEB_SEARCH_URL || "https://s.jina.ai/";
@@ -6950,9 +7129,9 @@ const deleteFileTool = {
   },
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: "filesystem", category: "file", requiresApproval: true },
   permissionHint: "destructive",
-  async execute(_toolCallId, params, signal) {
+  async execute(_toolCallId, params, signal, _onUpdate, context2) {
     if (signal?.aborted) throw new Error("Aborted");
-    const absolute = safeResolvePath(params.path);
+    const absolute = safeResolvePath(params.path, void 0, context2);
     let existed = false;
     try {
       await fs__namespace$1.access(absolute);
@@ -6982,10 +7161,10 @@ const moveFileTool = {
   },
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: "filesystem", category: "file", requiresApproval: true },
   permissionHint: "mutation",
-  async execute(_toolCallId, params, signal) {
+  async execute(_toolCallId, params, signal, _onUpdate, context2) {
     if (signal?.aborted) throw new Error("Aborted");
-    const src = safeResolvePath(params.source);
-    const dest = safeResolvePath(params.destination);
+    const src = safeResolvePath(params.source, void 0, context2);
+    const dest = safeResolvePath(params.destination, void 0, context2);
     const destDir = path__namespace.dirname(dest);
     await fs__namespace$1.mkdir(destDir, { recursive: true });
     let overwritten = false;
@@ -7015,10 +7194,10 @@ const copyFileTool = {
   },
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: "filesystem", category: "file", requiresApproval: true },
   permissionHint: "mutation",
-  async execute(_toolCallId, params, signal) {
+  async execute(_toolCallId, params, signal, _onUpdate, context2) {
     if (signal?.aborted) throw new Error("Aborted");
-    const src = safeResolvePath(params.source);
-    const dest = safeResolvePath(params.destination);
+    const src = safeResolvePath(params.source, void 0, context2);
+    const dest = safeResolvePath(params.destination, void 0, context2);
     const destDir = path__namespace.dirname(dest);
     await fs__namespace$1.mkdir(destDir, { recursive: true });
     let overwritten = false;
@@ -7104,9 +7283,9 @@ const notebookEditTool = {
   },
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: "filesystem", category: "file", requiresApproval: true },
   permissionHint: "mutation",
-  async execute(_toolCallId, params, signal) {
+  async execute(_toolCallId, params, signal, _onUpdate, context2) {
     if (signal?.aborted) throw new Error("Aborted");
-    const absolute = safeResolvePath(params.notebook_path);
+    const absolute = safeResolvePath(params.notebook_path, void 0, context2);
     const raw = await fs__namespace$1.readFile(absolute, "utf8");
     const notebook = JSON.parse(raw);
     if (!Array.isArray(notebook.cells)) {
@@ -7185,6 +7364,12 @@ function getPrimitiveTools() {
     editFileTool,
     globTool,
     grepTool,
+    gitStatusTool,
+    gitDiffTool,
+    gitLogTool,
+    gitAddTool,
+    gitUnstageTool,
+    gitCommitTool,
     webFetchTool,
     webSearchTool,
     deleteFileTool,
@@ -7196,6 +7381,49 @@ function getPrimitiveTools() {
     agentSpawnTool,
     sendMessageTool
   ];
+}
+function createToolSearchTool(getAllTools) {
+  return {
+    name: "tool_search",
+    label: "Search Tools",
+    description: "Search for available tools by name, description, category, or permission. Returns matching tools with their schemas.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search query (partial name or description match)" },
+        category: { type: "string", description: "Filter by category (file, search, system, comm, web, task)" },
+        requires_approval: { type: "boolean", description: "Filter by whether the tool requires approval" }
+      },
+      required: []
+    },
+    spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "none", category: "search", requiresApproval: false },
+    permissionHint: "readonly",
+    async execute(_id, params) {
+      const p = params;
+      const query = p.query?.toLowerCase() ?? "";
+      const category = p.category?.toLowerCase() ?? "";
+      const requiresApproval = p.requires_approval;
+      const all = getAllTools();
+      let matches = all;
+      if (query) {
+        matches = matches.filter(
+          (t) => t.name.toLowerCase().includes(query) || t.description.toLowerCase().includes(query)
+        );
+      }
+      if (category) {
+        matches = matches.filter((t) => t.spec?.category === category);
+      }
+      if (requiresApproval !== void 0) {
+        matches = matches.filter((t) => (t.spec?.requiresApproval ?? false) === requiresApproval);
+      }
+      const text = matches.length > 0 ? `Found ${matches.length} tools:
+${matches.map((m) => `  - ${m.name}${m.spec ? ` [${m.spec.category}]` : ""}`).join("\n")}` : "No matching tools found.";
+      return {
+        content: [{ type: "text", text }],
+        isError: false
+      };
+    }
+  };
 }
 class TaskRegistry {
   /** 任务 JSON 文件存放目录（绝对路径）。 */
@@ -7743,6 +7971,755 @@ const STATUS_ICON = {
   completed: "✓",
   deleted: "✗"
 };
+class StdioRpcClient {
+  constructor(proc) {
+    this.proc = proc;
+    proc.stdout?.setEncoding("utf8");
+    proc.stdout?.on("data", (chunk) => this.onData(chunk));
+    proc.on("exit", () => this.onClose(new Error("MCP process exited")));
+    proc.on("error", (err) => this.onClose(err));
+  }
+  proc;
+  nextId = 1;
+  buffer = "";
+  pending = /* @__PURE__ */ new Map();
+  closed = false;
+  onData(chunk) {
+    this.buffer += chunk;
+    let idx;
+    while ((idx = this.buffer.indexOf("\n")) >= 0) {
+      const line = this.buffer.slice(0, idx).trim();
+      this.buffer = this.buffer.slice(idx + 1);
+      if (!line) continue;
+      let msg;
+      try {
+        msg = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (typeof msg.id === "number" && this.pending.has(msg.id)) {
+        const entry = this.pending.get(msg.id);
+        this.pending.delete(msg.id);
+        if (msg.error) {
+          entry.reject(
+            new Error(`MCP error ${msg.error.code}: ${msg.error.message}`)
+          );
+        } else {
+          entry.resolve(msg.result);
+        }
+      }
+    }
+  }
+  onClose(err) {
+    if (this.closed) return;
+    this.closed = true;
+    for (const entry of this.pending.values()) {
+      entry.reject(err);
+    }
+    this.pending.clear();
+  }
+  /** 发送 JSON-RPC 请求并等待响应。 */
+  request(method, params, timeoutMs) {
+    if (this.closed) {
+      return Promise.reject(new Error("MCP connection is closed"));
+    }
+    const id = this.nextId++;
+    const payload = JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n";
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        if (this.pending.has(id)) {
+          this.pending.delete(id);
+          reject(new Error(`MCP request "${method}" timed out`));
+        }
+      }, timeoutMs);
+      this.pending.set(id, {
+        resolve: (v) => {
+          clearTimeout(timer);
+          resolve(v);
+        },
+        reject: (e) => {
+          clearTimeout(timer);
+          reject(e);
+        }
+      });
+      try {
+        this.proc.stdin?.write(payload);
+      } catch (err) {
+        clearTimeout(timer);
+        this.pending.delete(id);
+        reject(err instanceof Error ? err : new Error(String(err)));
+      }
+    });
+  }
+  /** 发送 JSON-RPC 通知（无响应）。 */
+  notify(method, params) {
+    if (this.closed) return;
+    const payload = JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n";
+    try {
+      this.proc.stdin?.write(payload);
+    } catch {
+    }
+  }
+  close() {
+    this.onClose(new Error("MCP client closed"));
+  }
+}
+class SseRpcClient {
+  constructor(baseUrl) {
+    this.baseUrl = baseUrl;
+  }
+  baseUrl;
+  nextId = 1;
+  pending = /* @__PURE__ */ new Map();
+  closed = false;
+  abortController = new AbortController();
+  /** 启动 SSE 连接。 */
+  async connect(_timeoutMs) {
+    const response = await fetch(this.baseUrl, {
+      method: "GET",
+      headers: { Accept: "text/event-stream" },
+      signal: this.abortController.signal
+    });
+    if (!response.ok || !response.body) {
+      throw new Error(`SSE connect failed: ${response.status} ${response.statusText}`);
+    }
+    void this.readSseStream(response.body);
+  }
+  async readSseStream(body) {
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let currentEvent = "";
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const rawLine of lines) {
+          const line = rawLine.trimEnd();
+          if (line === "") {
+            if (currentEvent) {
+              this.processEvent(currentEvent);
+              currentEvent = "";
+            }
+            continue;
+          }
+          if (line.startsWith("data: ")) {
+            currentEvent += line.slice(6);
+          }
+        }
+      }
+    } catch (err) {
+      if (!this.closed) {
+        this.onClose(
+          err instanceof Error ? err : new Error(String(err))
+        );
+      }
+    } finally {
+      try {
+        reader.releaseLock();
+      } catch {
+      }
+    }
+    if (currentEvent) {
+      this.processEvent(currentEvent);
+    }
+  }
+  processEvent(data) {
+    let msg;
+    try {
+      msg = JSON.parse(data);
+    } catch {
+      return;
+    }
+    if (typeof msg.id === "number" && this.pending.has(msg.id)) {
+      const entry = this.pending.get(msg.id);
+      this.pending.delete(msg.id);
+      if (msg.error) {
+        entry.reject(
+          new Error(`MCP error ${msg.error.code}: ${msg.error.message}`)
+        );
+      } else {
+        entry.resolve(msg.result);
+      }
+    }
+  }
+  onClose(err) {
+    if (this.closed) return;
+    this.closed = true;
+    for (const entry of this.pending.values()) {
+      entry.reject(err);
+    }
+    this.pending.clear();
+  }
+  /** 通过 HTTP POST 发送 JSON-RPC 请求。 */
+  async request(method, params, timeoutMs) {
+    if (this.closed) {
+      return Promise.reject(new Error("SSE connection is closed"));
+    }
+    const id = this.nextId++;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(this.baseUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+        signal: controller.signal
+      });
+      if (!res.ok) {
+        throw new Error(`SSE POST ${res.status} ${res.statusText}`);
+      }
+      const body = await res.json();
+      if (body.error) {
+        throw new Error(
+          `MCP error ${body.error.code}: ${body.error.message}`
+        );
+      }
+      return body.result;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  /** 发送通知（fire-and-forget POST）。 */
+  notify(method, params) {
+    if (this.closed) return;
+    fetch(this.baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method, params })
+    }).catch(() => {
+    });
+  }
+  close() {
+    this.abortController.abort();
+    this.onClose(new Error("SSE client closed"));
+  }
+}
+class MCPAgentTool {
+  constructor(manager, tool) {
+    this.manager = manager;
+    this.name = tool.prefixedName;
+    this.description = tool.description;
+    this.parameters = tool.inputSchema;
+  }
+  manager;
+  name;
+  description;
+  parameters;
+  permissionHint = "mutation";
+  async execute(_toolCallId, args) {
+    return this.manager.executeTool(this.name, args);
+  }
+}
+const DEFAULT_TIMEOUT_MS = 3e4;
+function sanitizeName(name) {
+  return name.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+function buildPrefixedName(serverName, toolName) {
+  return `mcp__${sanitizeName(serverName)}__${sanitizeName(toolName)}`;
+}
+class MCPManager {
+  connections = /* @__PURE__ */ new Map();
+  discoveredTools = /* @__PURE__ */ new Map();
+  /** 连接到 MCP 服务器，返回该服务器发现的 prefixedName 列表。 */
+  async connect(config) {
+    if (this.connections.has(config.name)) {
+      throw new Error(`MCP server "${config.name}" already connected`);
+    }
+    const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    if (config.type === "stdio") {
+      if (!config.command) {
+        throw new Error(
+          `MCP stdio server "${config.name}" missing command`
+        );
+      }
+      const proc = child_process.spawn(config.command, config.args ?? [], {
+        stdio: ["pipe", "pipe", "pipe"],
+        env: { ...process.env, ...config.env ?? {} }
+      });
+      proc.stderr?.setEncoding("utf8");
+      proc.stderr?.on("data", (chunk) => {
+        console.warn(`[MCP:${config.name}] ${chunk.trimEnd()}`);
+      });
+      const rpc = new StdioRpcClient(proc);
+      const conn = {
+        config,
+        tools: [],
+        process: proc,
+        rpc
+      };
+      try {
+        await rpc.request(
+          "initialize",
+          {
+            protocolVersion: "2024-11-05",
+            capabilities: {},
+            clientInfo: { name: "rdc-agent", version: "0.1.0" }
+          },
+          timeoutMs
+        );
+        rpc.notify("notifications/initialized", {});
+        const listResult = await rpc.request(
+          "tools/list",
+          {},
+          timeoutMs
+        );
+        const rawTools = Array.isArray(listResult?.tools) ? listResult.tools : [];
+        conn.tools = rawTools.map(
+          (t) => this.toDiscoveredTool(config.name, t)
+        );
+      } catch (err) {
+        rpc.close();
+        try {
+          proc.kill();
+        } catch {
+        }
+        throw err;
+      }
+      this.connections.set(config.name, conn);
+      this.registerTools(conn.tools);
+      return conn.tools.map((t) => t.prefixedName);
+    }
+    if (config.type === "http") {
+      if (!config.url) {
+        throw new Error(`MCP http server "${config.name}" missing url`);
+      }
+      const conn = { config, tools: [] };
+      await this.httpRpc(
+        config.url,
+        "initialize",
+        {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "rdc-agent", version: "0.1.0" }
+        },
+        timeoutMs
+      );
+      const listResult = await this.httpRpc(
+        config.url,
+        "tools/list",
+        {},
+        timeoutMs
+      );
+      const rawTools = Array.isArray(listResult?.tools) ? listResult.tools : [];
+      conn.tools = rawTools.map(
+        (t) => this.toDiscoveredTool(config.name, t)
+      );
+      this.connections.set(config.name, conn);
+      this.registerTools(conn.tools);
+      return conn.tools.map((t) => t.prefixedName);
+    }
+    if (config.type === "sse") {
+      if (!config.url) {
+        throw new Error(`MCP sse server "${config.name}" missing url`);
+      }
+      const sseRpc = new SseRpcClient(config.url);
+      const conn = { config, tools: [], rpcSse: sseRpc };
+      try {
+        await sseRpc.connect(timeoutMs);
+        await sseRpc.request(
+          "initialize",
+          {
+            protocolVersion: "2024-11-05",
+            capabilities: {},
+            clientInfo: { name: "rdc-agent", version: "0.1.0" }
+          },
+          timeoutMs
+        );
+        sseRpc.notify("notifications/initialized", {});
+        const listResult = await sseRpc.request(
+          "tools/list",
+          {},
+          timeoutMs
+        );
+        const rawTools = Array.isArray(listResult?.tools) ? listResult.tools : [];
+        conn.tools = rawTools.map(
+          (t) => this.toDiscoveredTool(config.name, t)
+        );
+      } catch (err) {
+        sseRpc.close();
+        throw err;
+      }
+      this.connections.set(config.name, conn);
+      this.registerTools(conn.tools);
+      return conn.tools.map((t) => t.prefixedName);
+    }
+    if (config.type === "streamable-http") {
+      if (!config.url) {
+        throw new Error(`MCP streamable-http server "${config.name}" missing url`);
+      }
+      const conn = { config, tools: [] };
+      await this.streamableHttpRpc(
+        config.url,
+        "initialize",
+        {
+          protocolVersion: "2024-11-05",
+          capabilities: {},
+          clientInfo: { name: "rdc-agent", version: "0.1.0" }
+        },
+        timeoutMs
+      );
+      const listResult = await this.streamableHttpRpc(
+        config.url,
+        "tools/list",
+        {},
+        timeoutMs
+      );
+      const rawTools = Array.isArray(listResult?.tools) ? listResult.tools : [];
+      conn.tools = rawTools.map(
+        (t) => this.toDiscoveredTool(config.name, t)
+      );
+      this.connections.set(config.name, conn);
+      this.registerTools(conn.tools);
+      return conn.tools.map((t) => t.prefixedName);
+    }
+    throw new Error(`Unsupported MCP transport type: ${String(config.type)}`);
+  }
+  /** 断开 MCP 服务器。 */
+  async disconnect(serverName) {
+    const conn = this.connections.get(serverName);
+    if (!conn) return;
+    this.connections.delete(serverName);
+    for (const t of conn.tools) {
+      this.discoveredTools.delete(t.prefixedName);
+    }
+    if (conn.rpc) {
+      conn.rpc.close();
+    }
+    if (conn.rpcSse) {
+      conn.rpcSse.close();
+    }
+    if (conn.process) {
+      try {
+        conn.process.kill();
+      } catch {
+      }
+    }
+  }
+  /** 断开所有服务器。 */
+  async disconnectAll() {
+    const names = Array.from(this.connections.keys());
+    await Promise.all(names.map((n) => this.disconnect(n)));
+  }
+  /** 列出已连接的服务器。 */
+  listServers() {
+    return Array.from(this.connections.keys());
+  }
+  /** 获取所有发现的工具（带 mcp__ 前缀）。 */
+  getDiscoveredTools() {
+    return Array.from(this.discoveredTools.values());
+  }
+  /** 获取工具定义列表（用于发给 LLM）。 */
+  getToolDefinitions() {
+    return this.getDiscoveredTools().map((t) => ({
+      name: t.prefixedName,
+      description: t.description,
+      parameters: t.inputSchema
+    }));
+  }
+  /** 将发现的工具转换为 AgentTool 实例。 */
+  getAgentTools() {
+    return this.getDiscoveredTools().map(
+      (t) => new MCPAgentTool(this, t)
+    );
+  }
+  /** 执行 MCP 工具。 */
+  async executeTool(prefixedName, args) {
+    const parsed = this.parsePrefixedName(prefixedName);
+    if (!parsed) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Invalid MCP tool name: ${prefixedName}`
+          }
+        ],
+        isError: true
+      };
+    }
+    const conn = this.findConnectionByServer(parsed.serverName);
+    if (!conn) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `MCP server "${parsed.serverName}" not connected`
+          }
+        ],
+        isError: true
+      };
+    }
+    const tool = conn.tools.find((t) => t.prefixedName === prefixedName);
+    if (!tool) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `MCP tool "${prefixedName}" not found on server "${parsed.serverName}"`
+          }
+        ],
+        isError: true
+      };
+    }
+    const timeoutMs = conn.config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    try {
+      let result;
+      if (conn.config.type === "stdio") {
+        if (!conn.rpc) {
+          throw new Error("stdio rpc client not initialized");
+        }
+        result = await conn.rpc.request(
+          "tools/call",
+          { name: tool.originalName, arguments: args },
+          timeoutMs
+        );
+      } else if (conn.config.type === "sse") {
+        if (!conn.rpcSse) {
+          throw new Error("sse rpc client not initialized");
+        }
+        result = await conn.rpcSse.request(
+          "tools/call",
+          { name: tool.originalName, arguments: args },
+          timeoutMs
+        );
+      } else {
+        if (!conn.config.url) {
+          throw new Error("server url missing");
+        }
+        result = await this.httpRpc(
+          conn.config.url,
+          "tools/call",
+          { name: tool.originalName, arguments: args },
+          timeoutMs
+        );
+      }
+      return this.normalizeToolResult(result);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        content: [{ type: "text", text: `MCP execute error: ${message}` }],
+        isError: true
+      };
+    }
+  }
+  /** 检查是否为 MCP 工具（按前缀判断）。 */
+  isMCPTool(toolName) {
+    return toolName.startsWith("mcp__");
+  }
+  /** 从前缀名称解析服务器和工具名。 */
+  parsePrefixedName(prefixedName) {
+    if (!prefixedName.startsWith("mcp__")) return null;
+    const rest = prefixedName.slice("mcp__".length);
+    const sepIdx = rest.indexOf("__");
+    if (sepIdx <= 0 || sepIdx === rest.length - 2) return null;
+    const serverName = rest.slice(0, sepIdx);
+    const toolName = rest.slice(sepIdx + 2);
+    if (!serverName || !toolName) return null;
+    return { serverName, toolName };
+  }
+  // -------------------------------------------------------------------
+  // 内部
+  // -------------------------------------------------------------------
+  toDiscoveredTool(serverName, raw) {
+    const originalName = typeof raw.name === "string" ? raw.name : "unnamed_tool";
+    const description = typeof raw.description === "string" ? raw.description : "";
+    const inputSchema = raw.inputSchema && typeof raw.inputSchema === "object" ? raw.inputSchema : { type: "object", properties: {} };
+    return {
+      serverName,
+      originalName,
+      prefixedName: buildPrefixedName(serverName, originalName),
+      description,
+      inputSchema
+    };
+  }
+  registerTools(tools) {
+    for (const t of tools) {
+      this.discoveredTools.set(t.prefixedName, t);
+    }
+  }
+  /** 从 sanitized server name 反查连接。 */
+  findConnectionByServer(sanitizedServerName) {
+    for (const conn of this.connections.values()) {
+      if (sanitizeName(conn.config.name) === sanitizedServerName) {
+        return conn;
+      }
+    }
+    return void 0;
+  }
+  /** 把 MCP tools/call 返回结果归一化为 AgentToolResult。 */
+  normalizeToolResult(raw) {
+    if (!raw || typeof raw !== "object") {
+      return {
+        content: [{ type: "text", text: String(raw ?? "") }],
+        isError: false
+      };
+    }
+    const obj = raw;
+    const isError = obj.isError === true;
+    const content = [];
+    if (Array.isArray(obj.content)) {
+      for (const block of obj.content) {
+        if (!block || typeof block !== "object") continue;
+        const b = block;
+        if (b.type === "text" && typeof b.text === "string") {
+          content.push({ type: "text", text: b.text });
+        } else if (b.type === "image" && typeof b.data === "string" && typeof b.mimeType === "string") {
+          content.push({
+            type: "image",
+            data: b.data,
+            mimeType: b.mimeType
+          });
+        } else {
+          content.push({ type: "text", text: JSON.stringify(b) });
+        }
+      }
+    }
+    if (content.length === 0) {
+      content.push({ type: "text", text: JSON.stringify(obj) });
+    }
+    return { content, isError };
+  }
+  /** http 模式下发送 JSON-RPC 请求。 */
+  async httpRpc(url2, method, params, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const id = Date.now() + Math.floor(Math.random() * 1e3);
+      const res = await fetch(url2, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+        signal: controller.signal
+      });
+      if (!res.ok) {
+        throw new Error(`MCP HTTP ${res.status} ${res.statusText}`);
+      }
+      const body = await res.json();
+      if (body.error) {
+        throw new Error(
+          `MCP error ${body.error.code}: ${body.error.message}`
+        );
+      }
+      return body.result;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  /** streamable-http 模式：POST + 流式 NDJSON 响应。 */
+  async streamableHttpRpc(url2, method, params, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const id = Date.now() + Math.floor(Math.random() * 1e3);
+      const res = await fetch(url2, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/x-ndjson"
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+        signal: controller.signal
+      });
+      if (!res.ok) {
+        throw new Error(`MCP streamable-http ${res.status} ${res.statusText}`);
+      }
+      if (res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            const msg = JSON.parse(trimmed);
+            if (msg.error) {
+              throw new Error(`MCP error ${msg.error.code}: ${msg.error.message}`);
+            }
+            if (typeof msg.id === "number" || typeof msg.id === "string") {
+              return msg.result;
+            }
+          }
+        }
+        if (buffer.trim()) {
+          const msg = JSON.parse(buffer.trim());
+          return msg.result;
+        }
+      }
+      const body = await res.json();
+      if (body.error) {
+        throw new Error(`MCP error ${body.error.code}: ${body.error.message}`);
+      }
+      return body.result;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+}
+class SkillEngine {
+  /**
+   * 执行技能。
+   *
+   * - prompt 技能：将展开后的提示作为系统消息注入 agent；
+   * - tool 技能：返回工具定义供外部注册；
+   * - workflow 技能：依次执行每个 step。
+   */
+  async execute(manifest, params, _context) {
+    switch (manifest.type) {
+      case "prompt": {
+        const expanded = this.expandTemplate(
+          manifest.promptTemplate ?? manifest.description,
+          params
+        );
+        return {
+          success: true,
+          message: expanded,
+          data: { prompt: expanded }
+        };
+      }
+      case "tool": {
+        const toolNames = (manifest.tools ?? []).map((t) => t.name);
+        return {
+          success: true,
+          message: `Skill "${manifest.name}" provides tools: ${toolNames.join(", ")}`,
+          data: { tools: manifest.tools }
+        };
+      }
+      case "workflow": {
+        const steps = manifest.steps ?? [];
+        const outputs = [];
+        for (let i = 0; i < steps.length; i++) {
+          const step = steps[i];
+          const expanded = this.expandTemplate(step.prompt, params);
+          outputs.push(`[Step ${i + 1}] ${expanded}`);
+        }
+        return {
+          success: true,
+          message: `Workflow "${manifest.name}" completed ${steps.length} steps.`,
+          data: { steps: outputs }
+        };
+      }
+      default:
+        return {
+          success: false,
+          message: `Unknown skill type: ${manifest.type}`
+        };
+    }
+  }
+  /** 简单的模板展开：将 {{key}} 替换为 params[key]。 */
+  expandTemplate(template, params) {
+    return template.replace(/\{\{(\w+)\}\}/g, (_match, key) => {
+      return params[key] ?? `{{${key}}}`;
+    });
+  }
+}
 const EMPTY_USAGE = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
 class AssistantStreamBuilder {
   stream;
@@ -9718,7 +10695,9 @@ class AgentPermissionPolicyService {
     const permissions = settings.agentRuntime.permissions;
     const mode = permissions.mode;
     const toolName = normalizeToolName$1(input.toolCall.name);
-    const workspaceRoot = path__namespace.resolve(settings.workspace.rootPath || process.cwd());
+    const workspaceRoot = path__namespace.resolve(
+      input.projectRootPath || settings.workspace.rootPath || process.cwd()
+    );
     if (mode === "full-access") {
       return { action: "allow", risk: "low", temporaryPathRoots: ["*"] };
     }
@@ -11754,12 +12733,17 @@ const ASK_READONLY_TOOL_ALLOWLIST = [
   "grep",
   "task_list",
   "web_fetch",
-  "web_search"
+  "web_search",
+  "git_status",
+  "git_diff",
+  "git_log",
+  "tool_search"
 ];
 const CANONICAL_TOOL_EXPANSIONS = {
   read: ["read_file"],
   search: ["glob", "grep"],
   web: ["web_fetch", "web_search"],
+  git: ["git_status", "git_diff", "git_log", "git_add", "git_unstage", "git_commit"],
   bash: ["bash"],
   write: ["write_file"],
   edit: ["edit_file"],
@@ -11773,10 +12757,11 @@ const CANONICAL_TOOL_EXPANSIONS = {
   planArtifact: ["plan_artifact"],
   artifact: ["plan_artifact"],
   "vscode/memory": ["memory_read"],
-  skill: ["skills"],
-  skills: ["skills"],
-  mcp: ["mcp"],
-  MCP: ["mcp"],
+  skill: ["skills", "skill_run"],
+  skills: ["skills", "skill_run"],
+  mcp: ["mcp", "mcp__*"],
+  MCP: ["mcp", "mcp__*"],
+  tool_search: ["tool_search"],
   rdxContext: ["rdx_context"],
   rdx: ["rdx_context"]
 };
@@ -11789,6 +12774,13 @@ const RUNTIME_TOOL_ALIASES = {
   web: "web_fetch",
   web_fetch: "web_fetch",
   web_search: "web_search",
+  git: "git_status",
+  git_status: "git_status",
+  git_diff: "git_diff",
+  git_log: "git_log",
+  git_add: "git_add",
+  git_unstage: "git_unstage",
+  git_commit: "git_commit",
   bash: "bash",
   write: "write_file",
   write_file: "write_file",
@@ -11814,13 +12806,14 @@ const RUNTIME_TOOL_ALIASES = {
   "vscode/memory": "memory_read",
   skill: "skills",
   skills: "skills",
+  skill_run: "skill_run",
   mcp: "mcp",
   MCP: "mcp",
   rdxContext: "rdx_context",
   rdx: "rdx_context",
   rdx_context: "rdx_context"
 };
-const ASK_DENIED_TOOL_PREFIXES = ["rd.", "mcp."];
+const ASK_DENIED_TOOL_PREFIXES = ["rd.", "mcp.", "mcp__"];
 const ASK_DENIED_TOOLS = /* @__PURE__ */ new Set([
   "bash",
   "write",
@@ -11829,6 +12822,9 @@ const ASK_DENIED_TOOLS = /* @__PURE__ */ new Set([
   "edit_file",
   "remove",
   "delete",
+  "git_add",
+  "git_unstage",
+  "git_commit",
   "task_create",
   "task_update",
   "rdx_context"
@@ -11847,8 +12843,14 @@ const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
   "memory_read",
   "plan_artifact",
   "skills",
+  "skill_run",
   "mcp",
-  "rdx_context"
+  "mcp__*",
+  "rdx_context",
+  "git_add",
+  "git_unstage",
+  "git_commit",
+  "tool_search"
 ];
 const SHADER_EDIT_TOOLS = ["rd.shader.edit_and_replace", "rd.macro.shader_hotfix_validate"];
 function resolveAgentToolAllowlist(agentId, stage) {
@@ -11878,6 +12880,9 @@ function isToolAllowedForAgent(toolName, agentId, stage) {
     if (normalizedPattern.endsWith(".*") && normalizedToolName.startsWith(normalizedPattern.slice(0, -1))) {
       return true;
     }
+    if (normalizedPattern.endsWith("*") && normalizedToolName.startsWith(normalizedPattern.slice(0, -1))) {
+      return true;
+    }
   }
   return false;
 }
@@ -11897,6 +12902,10 @@ class AgentOrchestrator {
   agentStates = /* @__PURE__ */ new Map();
   agentConfigs = /* @__PURE__ */ new Map();
   agentSlots = /* @__PURE__ */ new Map();
+  mcpManager = new MCPManager();
+  connectedMcpServerIds = /* @__PURE__ */ new Set();
+  failedMcpServers = /* @__PURE__ */ new Map();
+  skillEngine = new SkillEngine();
   constructor() {
     this.initializeAgents();
   }
@@ -12019,7 +13028,9 @@ class AgentOrchestrator {
         sessionId: context2?.sessionId ?? null,
         turnId: context2?.turnId,
         toolAllowlist: resolveAgentToolAllowlist(agentId, context2?.stageId),
-        options
+        options,
+        projectRootPath: context2?.projectRootPath ?? null,
+        projectId: context2?.projectId ?? null
       });
       const finalContent = await this.finalizeRecordedAssistantMessage(
         agentId,
@@ -12080,7 +13091,9 @@ class AgentOrchestrator {
         toolAllowlist,
         options,
         // A profile turn is isolated so previous cached chat state cannot leak into this user turn.
-        useFreshAgent: true
+        useFreshAgent: true,
+        projectRootPath: options?.projectRootPath ?? null,
+        projectId: options?.projectId ?? null
       });
       runtimeLogService.log({
         scope: options?.sessionId ? "session" : "app",
@@ -12160,19 +13173,39 @@ class AgentOrchestrator {
     for (const tool of this.createWorkbenchTools(agentId, sessionId)) {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
+    for (const tool of this.mcpManager.getAgentTools()) {
+      availableTools.set(normalizeToolName(tool.name), tool);
+    }
+    const toolSearchTool = createToolSearchTool(() => Array.from(availableTools.values()));
+    availableTools.set(normalizeToolName(toolSearchTool.name), toolSearchTool);
     const definitions = [];
     const toolMap = /* @__PURE__ */ new Map();
-    for (const name of toolAllowlist) {
-      const normalized = normalizeToolName(name);
-      const tool = availableTools.get(normalized);
-      if (!tool) continue;
+    for (const tool of availableTools.values()) {
+      if (!this.matchesToolAllowlist(tool.name, toolAllowlist)) continue;
       if (!this.isAllowedForRuntime(agentId, tool.name, stage)) continue;
-      if (!toolMap.has(tool.name)) {
-        toolMap.set(tool.name, tool);
+      const normalized = normalizeToolName(tool.name);
+      if (!toolMap.has(normalized)) {
+        toolMap.set(normalized, tool);
         definitions.push(toolToDefinition(tool));
       }
     }
     return { definitions, toolMap };
+  }
+  matchesToolAllowlist(toolName, toolAllowlist) {
+    const normalizedToolName = normalizeToolName(toolName);
+    return toolAllowlist.some((entry) => {
+      const normalizedEntry = normalizeToolName(entry);
+      if (normalizedEntry === "*" || normalizedEntry === normalizedToolName) {
+        return true;
+      }
+      if (normalizedEntry.endsWith(".*") && normalizedToolName.startsWith(normalizedEntry.slice(0, -1))) {
+        return true;
+      }
+      if (normalizedEntry.endsWith("*") && normalizedToolName.startsWith(normalizedEntry.slice(0, -1))) {
+        return true;
+      }
+      return false;
+    });
   }
   createToolExecutor(agentId, toolAllowlist, stage, sessionId, runtimeContext) {
     const tools = this.resolveRuntimeTools(agentId, toolAllowlist, stage, sessionId).toolMap;
@@ -12189,7 +13222,7 @@ class AgentOrchestrator {
         if (normalizedName === "ask_user") {
           return this.executeAskUserTool(toolCall, agentId, runtimeContext, signal);
         }
-        const permissionDecision = agentPermissionPolicyService.evaluate({ agentId, tool, toolCall });
+        const permissionDecision = agentPermissionPolicyService.evaluate({ agentId, tool, toolCall, projectRootPath: runtimeContext?.projectRootPath ?? null });
         if (permissionDecision.action === "deny") {
           return this.createPolicyDeniedToolResult(toolCall, agentId, permissionDecision.reason);
         }
@@ -12234,9 +13267,16 @@ class AgentOrchestrator {
           }
         }
         try {
+          const projectRootPath = runtimeContext?.projectRootPath ?? null;
+          const toolContext = {
+            workspaceRoot: projectRootPath ?? getWorkspaceRoot(),
+            projectRootPath,
+            projectId: runtimeContext?.projectId ?? null,
+            sessionId: runtimeContext?.sessionId ?? null
+          };
           const result = await withTemporaryPathAccess(
             permissionDecision.temporaryPathRoots,
-            () => tool.execute(toolCall.id, toolCall.arguments, signal, onUpdate)
+            () => tool.execute(toolCall.id, toolCall.arguments, signal, onUpdate, toolContext)
           );
           return this.agentToolResultToMessage(toolCall, result);
         } catch (error) {
@@ -12368,6 +13408,7 @@ class AgentOrchestrator {
       this.createMemoryReadTool(sessionId),
       this.createPlanArtifactTool(sessionId),
       this.createSkillsCatalogTool(),
+      this.createSkillRunTool(agentId, sessionId),
       this.createMcpCatalogTool()
     ];
   }
@@ -12531,6 +13572,81 @@ ${body}
       }
     };
   }
+  createSkillRunTool(agentId, sessionId) {
+    const orchestrator = this;
+    return {
+      name: "skill_run",
+      label: "Run Skill",
+      description: "Execute a configured reusable skill by id or name. Builtin context skills return live workspace/session context.",
+      parameters: {
+        type: "object",
+        required: ["skill_id"],
+        properties: {
+          skill_id: { type: "string", description: "Skill id or name, for example builtin.rdc-context." },
+          params: {
+            type: "object",
+            description: "Skill parameters. Values are converted to strings for prompt skills.",
+            additionalProperties: true
+          }
+        }
+      },
+      permissionHint: "readonly",
+      async execute(_toolCallId, args) {
+        const skillKey = typeof args.skill_id === "string" ? args.skill_id.trim() : "";
+        if (!skillKey) {
+          return {
+            content: [{ type: "text", text: "skill_id is required." }],
+            isError: true,
+            details: { skillId: "", agentId }
+          };
+        }
+        const skills = orchestrator.getEnabledSkillDescriptors(agentId);
+        const skill = skills.find((entry) => entry.id === skillKey || entry.name === skillKey);
+        if (!skill) {
+          return {
+            content: [{ type: "text", text: `Skill is not enabled or configured: ${skillKey}` }],
+            isError: true,
+            details: { skillId: skillKey, agentId }
+          };
+        }
+        if (skill.id === "builtin.rdc-context" || skill.name === "rdc-context") {
+          const session = sessionId ? storageAdapter.readSession(sessionId) : null;
+          const project = session?.projectId ? storageAdapter.getProjectById(session.projectId) : null;
+          const runtimeContext = getRdxRuntimeContext();
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                skill: skill.id,
+                agentId,
+                session,
+                project,
+                rdxRuntimeContext: runtimeContext
+              }, null, 2)
+            }],
+            details: { skillId: skill.id, agentId }
+          };
+        }
+        const params = orchestrator.stringifySkillParams(args.params);
+        const manifest = {
+          name: skill.name,
+          description: skill.description,
+          type: "prompt",
+          promptTemplate: skill.description
+        };
+        const result = await orchestrator.skillEngine.execute(manifest, params, {
+          agentOrchestrator: orchestrator,
+          workspaceRoot: storageAdapter.getWorkspacePath(),
+          sessionId: sessionId ?? void 0
+        });
+        return {
+          content: [{ type: "text", text: result.message }],
+          isError: !result.success,
+          details: { skillId: skill.id, agentId }
+        };
+      }
+    };
+  }
   createMcpCatalogTool() {
     return {
       name: "mcp",
@@ -12554,6 +13670,69 @@ ${body}
       }
     };
   }
+  getEnabledSkillDescriptors(agentId) {
+    const settings = settingsService.getAll();
+    const manifest = settings.agents.definitions.find((entry) => entry.id === agentId && entry.enabled);
+    const enabledIds = /* @__PURE__ */ new Set([
+      ...settings.configuration.enabledSkillIds ?? [],
+      ...manifest?.skills ?? []
+    ]);
+    return agentRuntimeConfigService.listSkills().filter((skill) => skill.enabledByDefault || enabledIds.has(skill.id) || enabledIds.has(skill.name));
+  }
+  stringifySkillParams(params) {
+    if (!params) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(params).map(([key, value]) => [
+        key,
+        typeof value === "string" ? value : JSON.stringify(value)
+      ])
+    );
+  }
+  getEnabledMcpDescriptors(agentId) {
+    const settings = settingsService.getAll();
+    const manifest = settings.agents.definitions.find((entry) => entry.id === agentId && entry.enabled);
+    const enabledIds = /* @__PURE__ */ new Set([
+      ...settings.configuration.enabledMcpServerIds ?? [],
+      ...manifest?.mcpServers ?? []
+    ]);
+    if (enabledIds.size === 0) {
+      return [];
+    }
+    return agentRuntimeConfigService.listMcpServers().filter((server2) => enabledIds.has(server2.id) || enabledIds.has(server2.name));
+  }
+  async ensureMcpConnections(agentId) {
+    const errors = [];
+    for (const descriptor of this.getEnabledMcpDescriptors(agentId)) {
+      if (this.connectedMcpServerIds.has(descriptor.id)) {
+        continue;
+      }
+      if (this.failedMcpServers.has(descriptor.id)) {
+        errors.push(`${descriptor.id}: ${this.failedMcpServers.get(descriptor.id)}`);
+        continue;
+      }
+      try {
+        await this.mcpManager.connect(this.toMcpServerConfig(descriptor));
+        this.connectedMcpServerIds.add(descriptor.id);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.failedMcpServers.set(descriptor.id, message);
+        errors.push(`${descriptor.id}: ${message}`);
+      }
+    }
+    return errors;
+  }
+  toMcpServerConfig(descriptor) {
+    return {
+      name: descriptor.id,
+      type: descriptor.transport,
+      command: descriptor.command,
+      args: descriptor.args,
+      url: descriptor.url,
+      env: descriptor.env
+    };
+  }
   // -------------------------------------------------------------------
   // 单轮 Agent 执行
   // -------------------------------------------------------------------
@@ -12564,6 +13743,7 @@ ${body}
     const settings = settingsService.getAll();
     const routeProvider = settings.llm.providers.find((entry) => entry.id === input.providerId);
     const routeCapability = resolveAgentRouteCapability(routeProvider, input.modelId);
+    const mcpConnectionErrors = await this.ensureMcpConnections(input.agentId);
     const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
     const activeToolDefinitions = routeCapability.toolCallingMode === "native-structured" ? runtimeTools.definitions : [];
     const activeToolAllowlist = activeToolDefinitions.map((tool) => tool.name);
@@ -12584,7 +13764,9 @@ ${body}
       sessionId: input.sessionId ?? null,
       turnId: input.turnId,
       eventContext: sharedEventContext,
-      onEvent: input.options?.onEvent
+      onEvent: input.options?.onEvent,
+      projectRootPath: input.projectRootPath ?? null,
+      projectId: input.projectId ?? null
     });
     const streamOptions = {
       maxTokens: input.maxTokens,
@@ -12593,6 +13775,14 @@ ${body}
       signal: input.options?.signal
     };
     const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
+    if (mcpConnectionErrors.length > 0) {
+      input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
+        code: "mcp_connection_failed",
+        severity: "warning",
+        message: "One or more configured MCP servers could not be connected. MCP tools are unavailable for this turn.",
+        technicalMessage: mcpConnectionErrors.join("\n")
+      }));
+    }
     if (routeDiagnostic) {
       input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
         code: "route_tool_calling_unsupported",
@@ -15148,6 +16338,14 @@ function registerAgentHandlers(context2) {
           };
         }
       }
+      const currentProjectId = storageAdapter.getCurrentProjectId();
+      if (currentProjectId) {
+        runContext = {
+          ...runContext,
+          projectId: currentProjectId,
+          projectRootPath: storageAdapter.getProjectById(currentProjectId)?.rootPath ?? null
+        };
+      }
       const response = await agentOrchestrator.sendMessage(agentId, content, runContext, {
         signal: (runContext?.runId ? runExecutionService.getAbortSignal(runContext.runId) : null) ?? void 0
       });
@@ -15405,7 +16603,10 @@ class CommandRegistry {
       sessionId: request2.context?.sessionId,
       projectId: request2.context?.projectId,
       workspaceRoot: request2.context?.workspaceRoot,
-      agentId: request2.context?.agentId
+      agentId: request2.context?.agentId,
+      currentMode: request2.context?.currentMode,
+      currentModelId: request2.context?.currentModelId,
+      currentTheme: request2.context?.currentTheme
     };
     try {
       return await cmd.execute(args, context2);
@@ -15468,10 +16669,11 @@ const clearCommand = {
   aliases: ["cls"],
   category: "system",
   async execute(_args, ctx) {
+    const sessionId = ctx.sessionId ?? "";
     return {
-      success: true,
-      message: "Conversation cleared. Starting fresh.",
-      sideEffect: `clear-session:${ctx.sessionId ?? "current"}`
+      success: Boolean(sessionId),
+      message: sessionId ? "Clearing conversation history..." : "No active session. Open or create a session before clearing history.",
+      uiAction: { type: "clear-session", payload: { sessionId } }
     };
   }
 };
@@ -15480,38 +16682,11 @@ const configCommand = {
   name: "config",
   description: "Open settings or view/modify a configuration value",
   category: "system",
-  async execute(_args) {
+  async execute(args) {
     return {
       success: true,
       message: "Opening Settings...",
-      sideEffect: "open-settings-modal"
-    };
-  }
-};
-const VALID_MODES = ["ask", "plan", "edit", "debugger", "analyzer", "optimizer"];
-const modeCommand = {
-  id: "mode",
-  name: "mode",
-  description: "Switch agent mode (ask, plan, edit, debugger, analyzer, optimizer)",
-  category: "navigation",
-  async execute(args) {
-    if (args.length === 0) {
-      return {
-        success: true,
-        message: `Available modes: ${VALID_MODES.join(", ")}`
-      };
-    }
-    const target = args[0].toLowerCase();
-    if (!VALID_MODES.includes(target)) {
-      return {
-        success: false,
-        message: `Invalid mode: "${target}". Valid modes: ${VALID_MODES.join(", ")}`
-      };
-    }
-    return {
-      success: true,
-      message: `Switched to ${target} mode.`,
-      sideEffect: `switch-mode:${target}`
+      uiAction: { type: "open-settings", payload: args[0] ? { section: args[0] } : void 0 }
     };
   }
 };
@@ -15520,17 +16695,17 @@ const modelCommand = {
   name: "model",
   description: "View or switch the current LLM model",
   category: "navigation",
-  async execute(args) {
+  async execute(args, ctx) {
     if (args.length === 0) {
       return {
         success: true,
-        message: "Current model: (use /model <name> to switch)"
+        message: `Current model: ${ctx.currentModelId ?? "not configured"}`
       };
     }
     return {
       success: true,
-      message: `Switched model to: ${args[0]}`,
-      sideEffect: `switch-model:${args[0]}`
+      message: `Switching model to: ${args[0]}`,
+      uiAction: { type: "switch-model", payload: { modelId: args[0] } }
     };
   }
 };
@@ -15592,7 +16767,7 @@ const workspaceCommand = {
     return {
       success: true,
       message: `Workspace changed to: ${args[0]}`,
-      sideEffect: `change-workspace:${args[0]}`
+      uiAction: { type: "change-workspace", payload: { path: args[0] } }
     };
   }
 };
@@ -15649,10 +16824,11 @@ const skillsCommand = {
     }
     const action = args[0];
     if (action === "run") {
+      const skillId = args[1] ?? "";
       return {
         success: true,
-        message: `Running skill: ${args[1] ?? "unnamed"}...`,
-        sideEffect: `run-skill:${args[1]}`
+        message: `Running skill: ${skillId || "unnamed"}...`,
+        uiAction: { type: "run-skill", payload: { skillId } }
       };
     }
     return {
@@ -15664,21 +16840,13 @@ const skillsCommand = {
 const planCommand = {
   id: "plan",
   name: "plan",
-  description: "Enter or exit plan mode for structured implementation planning",
+  description: "Switch to the Plan profile to research and design an implementation plan before editing",
   category: "workflow",
-  async execute(args) {
-    const action = args[0];
-    if (action === "exit" || action === "done") {
-      return {
-        success: true,
-        message: "Exited plan mode. Ready to implement.",
-        sideEffect: "exit-plan-mode"
-      };
-    }
+  async execute() {
     return {
       success: true,
-      message: "Entered plan mode. Describe your task and I'll design an implementation plan.",
-      sideEffect: "enter-plan-mode"
+      message: "Switched to the Plan profile. Describe your task and I will research, ask questions, and write a plan before handing off to implementation.",
+      uiAction: { type: "switch-mode", payload: { agentId: "plan" } }
     };
   }
 };
@@ -15700,11 +16868,13 @@ const exportCommand = {
   description: "Export the current conversation to Markdown or JSON",
   category: "workflow",
   async execute(args, ctx) {
-    const format = args[0] ?? "markdown";
+    const sessionId = ctx.sessionId ?? "";
+    const formatArg = args[0] ?? "markdown";
+    const format = formatArg === "json" ? "json" : "markdown";
     return {
-      success: true,
-      message: `Exporting session ${ctx.sessionId ?? "current"} as ${format}...`,
-      sideEffect: `export-session:${ctx.sessionId}:${format}`
+      success: Boolean(sessionId),
+      message: sessionId ? `Exporting session ${sessionId} as ${format}...` : "No active session. Open or create a session before exporting history.",
+      uiAction: { type: "export-session", payload: { sessionId, format } }
     };
   }
 };
@@ -15751,7 +16921,6 @@ const agentsCommand = {
     return {
       success: true,
       message: `Switched to agent: ${target}`,
-      sideEffect: `switch-mode:${target}`,
       uiAction: { type: "switch-mode", payload: { agentId: target } }
     };
   }
@@ -15778,10 +16947,11 @@ const undoCommand = {
   description: "Undo the last user message and its assistant response",
   category: "session",
   async execute(_args, ctx) {
+    const sessionId = ctx.sessionId ?? "";
     return {
-      success: true,
-      message: "Undoing last message...",
-      sideEffect: `undo-session:${ctx.sessionId ?? "current"}`,
+      success: Boolean(sessionId),
+      message: sessionId ? "Undoing last conversation turn..." : "No active session. Open or create a session before undoing history.",
+      uiAction: { type: "undo-session", payload: { sessionId } },
       invalidateStores: ["conversation"]
     };
   }
@@ -15792,10 +16962,11 @@ const compactCommand = {
   description: "Compact the conversation context to fit within token budget",
   category: "session",
   async execute(_args, ctx) {
+    const sessionId = ctx.sessionId ?? "";
     return {
-      success: true,
-      message: "Compacting conversation context...",
-      sideEffect: `compact-session:${ctx.sessionId ?? "current"}`
+      success: Boolean(sessionId),
+      message: sessionId ? "Compacting conversation context..." : "No active session. Open or create a session before compacting history.",
+      uiAction: { type: "compact-session", payload: { sessionId } }
     };
   }
 };
@@ -15806,64 +16977,102 @@ const resumeCommand = {
   aliases: ["res"],
   category: "session",
   async execute(args, ctx) {
-    if (args.length === 0) {
-      return {
-        success: true,
-        message: "Resuming latest interrupted session...",
-        sideEffect: `resume-session:${ctx.sessionId ?? "latest"}`
-      };
-    }
+    const sessionId = args[0] ?? ctx.sessionId ?? "";
     return {
       success: true,
-      message: `Resuming session: ${args[0]}`,
-      sideEffect: `resume-session:${args[0]}`
+      message: args.length === 0 ? "Resuming latest interrupted session..." : `Resuming session: ${args[0]}`,
+      uiAction: { type: "resume-session", payload: { sessionId } }
     };
   }
 };
 const summaryCommand = {
   id: "summary",
   name: "summary",
-  description: "Generate a summary of the current conversation",
+  description: "Summarize and compact the current conversation history",
   aliases: ["sum"],
   category: "session",
   async execute(_args, ctx) {
+    const sessionId = ctx.sessionId ?? "";
     return {
-      success: true,
-      message: `Conversation summary for session ${ctx.sessionId ?? "current"}: (generated from conversation history)`
+      success: Boolean(sessionId),
+      message: sessionId ? "Summarizing conversation history..." : "No active session. Open or create a session before summarizing.",
+      uiAction: { type: "compact-session", payload: { sessionId } }
     };
   }
 };
 const costCommand = {
   id: "cost",
   name: "cost",
-  description: "Show token usage and estimated cost for the current run",
+  description: "Show persisted run statistics and cost availability for the current session",
   category: "debug",
   async execute(_args, ctx) {
-    return {
-      success: true,
-      message: `Token usage for session ${ctx.sessionId ?? "current"}:
-  Input: 0 tokens
-  Output: 0 tokens
-  Total: 0 tokens
-  Estimated cost: $0.00`
-    };
+    const sessionId = ctx.sessionId;
+    if (!sessionId) {
+      return {
+        success: true,
+        message: "No active session. Open or create a session to track cost."
+      };
+    }
+    const runs = storageAdapter.listRuns(sessionId);
+    if (runs.length === 0) {
+      return {
+        success: true,
+        message: `Session ${sessionId} has no runs yet.`
+      };
+    }
+    const completed = runs.filter((run) => run.status === "completed").length;
+    const failed = runs.filter((run) => run.status === "failed").length;
+    const active = runs.filter((run) => ["queued", "planning", "awaiting_input", "awaiting_approval", "running", "stopping"].includes(run.status)).length;
+    const lastRun = runs[0];
+    const lines = [
+      `Session: ${sessionId}`,
+      `Runs: ${runs.length} total, ${completed} completed, ${failed} failed, ${active} active`,
+      `Last run: ${lastRun.runId} (${lastRun.status}) started ${new Date(lastRun.startedAt).toISOString()}`,
+      "",
+      "Token totals and estimated cost are projected live during active runs.",
+      "Historical per-run token cost is not persisted yet, so this command does not fabricate a total."
+    ];
+    return { success: true, message: lines.join("\n") };
   }
 };
 const usageCommand = {
   id: "usage",
   name: "usage",
-  description: "Show API call statistics and usage summary",
+  description: "Show persisted run and live usage availability for the current session",
   category: "debug",
   async execute(_args, ctx) {
-    return {
-      success: true,
-      message: `Usage statistics for session ${ctx.sessionId ?? "current"}:
-  API calls: 0
-  Total tokens: 0
-  Tools used: 0`
-    };
+    const sessionId = ctx.sessionId;
+    if (!sessionId) {
+      return {
+        success: true,
+        message: "No active session. Open or create a session to track usage."
+      };
+    }
+    const runs = storageAdapter.listRuns(sessionId);
+    if (runs.length === 0) {
+      return {
+        success: true,
+        message: `Session ${sessionId} has no runs yet.`
+      };
+    }
+    const byStatus = /* @__PURE__ */ new Map();
+    for (const run of runs) {
+      byStatus.set(run.status, (byStatus.get(run.status) ?? 0) + 1);
+    }
+    const statusLines = [...byStatus.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([status, count]) => `  ${status}: ${count}`);
+    const lines = [
+      `Session: ${sessionId}`,
+      `Runs: ${runs.length}`,
+      "By status:",
+      ...statusLines,
+      "",
+      "Current-run token usage is available through workflow:getRunUsage while a run is active.",
+      "Historical token and API-call counts are not persisted per run yet."
+    ];
+    return { success: true, message: lines.join("\n") };
   }
 };
+const PERMISSION_MODES = /* @__PURE__ */ new Set(["default", "auto-review", "full-access", "custom"]);
 const permissionsCommand = {
   id: "permissions",
   name: "permissions",
@@ -15875,21 +17084,28 @@ const permissionsCommand = {
       return {
         success: true,
         message: `Current permission mode: default
-  Agent: ${ctx.agentId ?? "none"}`
+Agent: ${ctx.agentId ?? "none"}`
       };
     }
     const mode = args[0];
+    if (!PERMISSION_MODES.has(mode)) {
+      return {
+        success: false,
+        message: "Permission mode must be default, auto-review, full-access, or custom."
+      };
+    }
     return {
       success: true,
-      message: `Switched permission mode to: ${mode}`,
-      sideEffect: `switch-permissions:${mode}`
+      message: `Switching permission mode to: ${mode}`,
+      uiAction: { type: "switch-permissions", payload: { mode } }
     };
   }
 };
+const THEMES = /* @__PURE__ */ new Set(["dark", "light", "system"]);
 const themeCommand = {
   id: "theme",
   name: "theme",
-  description: "Switch application theme (dark/light)",
+  description: "Switch application theme (dark/light/system)",
   category: "system",
   async execute(args, ctx) {
     if (args.length === 0) {
@@ -15899,64 +17115,51 @@ const themeCommand = {
       };
     }
     const theme = args[0];
+    if (!THEMES.has(theme)) {
+      return {
+        success: false,
+        message: "Theme must be dark, light, or system."
+      };
+    }
     return {
       success: true,
-      message: `Switched theme to: ${theme}`,
-      sideEffect: `switch-theme:${theme}`,
+      message: `Switching theme to: ${theme}`,
       uiAction: { type: "switch-theme", payload: { theme } }
     };
   }
 };
+function openSourceControl(message) {
+  return {
+    success: true,
+    message,
+    uiAction: { type: "open-panel", payload: { panel: "source-control" } }
+  };
+}
 const commitCommand = {
   id: "commit",
   name: "commit",
-  description: "Auto-generate commit message and commit staged changes",
+  description: "Open Source Control to stage and commit changes",
   category: "workflow",
-  async execute(args) {
-    try {
-      const status = child_process.execSync("git status --short", { encoding: "utf8" });
-      if (!status.trim()) {
-        return { success: true, message: "Nothing to commit. Working tree clean." };
-      }
-      const diff = child_process.execSync("git diff --cached --stat", { encoding: "utf8" });
-      const msg = args.length > 0 ? args.join(" ") : `chore: update
-
-${diff.slice(0, 500)}`;
-      child_process.execSync(`git commit -m "${msg.replace(/"/g, '\\"')}"`, { encoding: "utf8" });
-      return { success: true, message: `Committed:
-${msg.slice(0, 300)}` };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { success: false, message: `Commit failed: ${message}` };
-    }
+  async execute() {
+    return openSourceControl("Opened Source Control. Stage changes and commit from the panel.");
   }
 };
 const diffCommand = {
   id: "diff",
   name: "diff",
-  description: "Show unstaged git diff",
+  description: "Open Source Control to inspect current git diff",
   category: "workflow",
-  async execute(args) {
-    try {
-      const staged = args.includes("--staged") ? " --cached" : "";
-      const diff = child_process.execSync(`git diff${staged} --stat`, { encoding: "utf8", maxBuffer: 1024 * 1024 });
-      return { success: true, message: diff || "No changes." };
-    } catch (err) {
-      return { success: false, message: `Diff failed: ${err instanceof Error ? err.message : String(err)}` };
-    }
+  async execute() {
+    return openSourceControl("Opened Source Control for the current diff.");
   }
 };
 const reviewCommand = {
   id: "review",
   name: "review",
-  description: "Review current changes for bugs and improvements",
+  description: "Open Source Control for code review context",
   category: "workflow",
   async execute() {
-    return {
-      success: true,
-      message: "Starting code review of current changes...",
-      sideEffect: "trigger-code-review"
-    };
+    return openSourceControl("Opened Source Control for review.");
   }
 };
 let _registry = null;
@@ -15972,7 +17175,6 @@ function registerBuiltins(registry) {
     helpCommand,
     clearCommand,
     configCommand,
-    modeCommand,
     modelCommand,
     projectCommand,
     sessionCommand,
@@ -16050,12 +17252,12 @@ class CommandService {
     };
   }
 }
-let _commandService = null;
+let commandService = null;
 function getCommandService() {
-  if (!_commandService) {
-    _commandService = new CommandService(getRegistry());
+  if (!commandService) {
+    commandService = new CommandService(getRegistry());
   }
-  return _commandService;
+  return commandService;
 }
 function registerCommandHandlers() {
   electron.ipcMain.handle("command:list", (_event, category) => {
@@ -16338,6 +17540,7 @@ function composeProfileTurnPrompt(input) {
     task_file_path: input.taskFilePath,
     task_file_content: input.taskFileContent,
     current_project_id: input.context.projectId,
+    current_project_root: input.context.projectRootPath,
     current_session_id: input.context.sessionId,
     active_run_id: input.context.activeRunId,
     opened_capture: input.context.openedCapturePath,
@@ -16355,10 +17558,15 @@ function composeProfileSystemPrompt(input) {
   const globalInstructions = input.definition.globalInstructions?.trim();
   const routeInstructions = composeRouteCapabilityPrompt(input.routeCapability, input.allowedToolNames);
   const permissionInstructions = composePermissionPrompt(input.permissionSettings);
+  const workspaceInstructions = composeWorkspacePrompt(
+    input.workspaceRoot,
+    input.permissionSettings.mode
+  );
   return [
     basePrompt,
     "",
     "Show concise visible work summaries and tool results only. Do not reveal hidden chain-of-thought.",
+    workspaceInstructions,
     routeInstructions,
     permissionInstructions,
     input.routeCapability.toolCallingMode === "native-structured" ? composeRuntimeCatalogPrompt(input.allowedToolNames) : "",
@@ -16366,19 +17574,83 @@ function composeProfileSystemPrompt(input) {
 ${globalInstructions}` : ""
   ].filter(Boolean).join("\n\n").trim();
 }
+function composeWorkspacePrompt(workspaceRoot, permissionMode) {
+  if (!workspaceRoot) return "";
+  const lines = [
+    "# Working Directory",
+    `The current project root is ${workspaceRoot}. Use it as the default base for relative file paths, search roots, and shell working directory.`
+  ];
+  if (permissionMode === "full-access") {
+    lines.push(
+      "You may also access files outside this project root using absolute paths when calling read_file, glob, grep, or shell commands."
+    );
+  } else {
+    lines.push(
+      "Files outside this project root may still be accessible when the runtime permission policy allows it; use absolute paths for those locations."
+    );
+  }
+  lines.push(
+    "When you report a file path, use the absolute path that the tool actually resolved. Do not claim a path that differs from the tool result."
+  );
+  return lines.join("\n");
+}
+function formatConfiguredRoots(roots, fallback) {
+  return roots.length > 0 ? roots.join(", ") : fallback;
+}
 function composePermissionPrompt(permissionSettings) {
-  const modeLabel = permissionSettings.mode;
-  const readableRoots = permissionSettings.readableRoots.length > 0 ? permissionSettings.readableRoots.join(", ") : "workspace only unless user approves";
-  const writableRoots = permissionSettings.writableRoots.length > 0 ? permissionSettings.writableRoots.join(", ") : "workspace only unless user approves";
-  return [
+  const mode = permissionSettings.mode;
+  const lines = [
     "# Runtime Permission Policy",
-    `Current permission mode: ${modeLabel}.`,
-    `Readable roots: ${readableRoots}.`,
-    `Writable roots: ${writableRoots}.`,
+    `Current permission mode: ${mode}.`
+  ];
+  switch (mode) {
+    case "full-access":
+      lines.push(
+        "Readable roots: entire local machine.",
+        "Writable roots: entire local machine.",
+        "Use read_file with absolute paths for files outside the current project root.",
+        "Do not claim inability to read or write a local path without attempting the tool first."
+      );
+      break;
+    case "auto-review":
+      lines.push(
+        "Readable roots: current project workspace; external read paths are auto-reviewed and usually denied at medium risk.",
+        "Writable roots: current project workspace; external write paths are auto-reviewed and usually denied at medium or high risk.",
+        "When external access is needed, ask the user to switch to Default or Full access, or add readableRoots in Custom mode settings.",
+        "If policy may deny the path, still attempt read_file with an absolute path so the runtime can record the review outcome."
+      );
+      break;
+    case "custom":
+      lines.push(
+        `Readable roots: current project workspace plus ${formatConfiguredRoots(
+          permissionSettings.readableRoots,
+          "no extra configured paths"
+        )}.`,
+        `Writable roots: current project workspace plus ${formatConfiguredRoots(
+          permissionSettings.writableRoots,
+          "no extra configured paths"
+        )}.`,
+        "Configured readableRoots and writableRoots in settings are allowed without extra approval.",
+        "For other external paths, runtime approval rules still apply based on the closest matching policy.",
+        "When policy allows access, use read_file with absolute paths and do not refuse without attempting the tool."
+      );
+      break;
+    default:
+      lines.push(
+        "Readable roots: current project workspace; external paths require one-time user approval.",
+        "Writable roots: current project workspace; external paths require one-time user approval.",
+        "When the user asks for a file outside the project, call read_file with its absolute path and wait for runtime approval if prompted.",
+        "Do not refuse or guess file contents without attempting the tool first.",
+        "External files, network access, file mutation, destructive shell commands, and unrecognized commands may pause for user approval."
+      );
+      break;
+  }
+  lines.push(
     "Routine local inspection commands can run when the runtime policy allows them.",
-    "External files, network access, file mutation, destructive shell commands, and unrecognized commands may pause for user approval or auto-review.",
+    "When policy allows external access, use read_file with absolute paths instead of claiming the file is unreachable.",
     "If the runtime denies or requests approval, do not route around the decision with guessed paths or textual tool calls."
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
 function composeRouteCapabilityPrompt(routeCapability, allowedToolNames) {
   if (routeCapability.toolCallingMode === "native-structured") {
@@ -16558,7 +17830,7 @@ function getRuntimeToolBlockMeta(toolName) {
       id: "runtime-user-input",
       title: "请求用户决策",
       stage: "decision",
-      kind: "approval"
+      kind: "user_input"
     };
   }
   if (normalizedToolName === "agent_handoff") {
@@ -16744,6 +18016,53 @@ class ConversationService {
   activeTurns = /* @__PURE__ */ new Map();
   async getHistory(sessionId) {
     return storageAdapter.readConversationHistory(sessionId);
+  }
+  async clearHistory(sessionId) {
+    storageAdapter.writeConversationHistory(sessionId, []);
+    this.publishConversationTrace(sessionId, [], sessionId);
+    return [];
+  }
+  async undoLastTurn(sessionId) {
+    const history = storageAdapter.readConversationHistory(sessionId);
+    const lastUserMessage = history.slice().reverse().find((message) => message.role === "user");
+    if (!lastUserMessage) {
+      return history;
+    }
+    const nextHistory = history.filter((message) => message.turnId !== lastUserMessage.turnId);
+    storageAdapter.writeConversationHistory(sessionId, nextHistory);
+    this.publishConversationTrace(sessionId, nextHistory, sessionId);
+    return nextHistory;
+  }
+  async compactHistory(sessionId) {
+    const history = storageAdapter.readConversationHistory(sessionId);
+    const keepCount = 6;
+    if (history.length <= keepCount + 1) {
+      return history;
+    }
+    const head = history.slice(0, -keepCount);
+    const tail = history.slice(-keepCount);
+    const compactedAt = nowMs();
+    const summaryMessage = {
+      id: `compact-${compactedAt}`,
+      turnId: `compact-turn-${compactedAt}`,
+      sessionId,
+      projectId: tail[0]?.projectId ?? head[0]?.projectId ?? null,
+      role: "system",
+      content: `Context compacted: ${head.length} earlier messages summarized. User messages: ${head.filter((message) => message.role === "user").length}; assistant messages: ${head.filter((message) => message.role === "assistant").length}; system messages: ${head.filter((message) => message.role === "system").length}.`,
+      status: "complete",
+      createdAt: compactedAt,
+      updatedAt: compactedAt,
+      workTrace: {
+        status: "complete",
+        summary: `Compacted ${head.length} earlier messages.`,
+        blocks: [],
+        updatedAt: compactedAt
+      }
+    };
+    const nextHistory = [summaryMessage, ...tail];
+    storageAdapter.writeConversationHistory(sessionId, nextHistory);
+    this.publishConversationTrace(sessionId, nextHistory, sessionId);
+    return nextHistory;
   }
   async cancelActiveTurn(request2 = {}) {
     const candidates = Array.from(this.activeTurns.values()).filter((turn) => !request2.turnId || turn.turnId === request2.turnId).filter((turn) => !request2.sessionId || turn.sessionId === request2.sessionId).sort((left, right) => right.startedAt - left.startedAt);
@@ -16962,9 +18281,11 @@ class ConversationService {
           globalInstructions: settingsService.getAll().agents.globalInstructions
         };
         const allowedToolNames = resolveAgentToolAllowlist(conversationAgentId, "investigate").map((toolName) => normalizeToolName(toolName));
+        const projectRootPath = input.context.projectId ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null : null;
         const profilePrompt = composeProfileTurnPrompt({
           context: {
             projectId: input.context.projectId,
+            projectRootPath,
             sessionId: input.context.session?.sessionId ?? null,
             activeRunId: isActiveRun(input.context.currentRun) ? input.context.currentRun.runId : null,
             openedCapturePath: input.context.openedCapturePath,
@@ -16987,11 +18308,14 @@ class ConversationService {
             turnId: assistantMessage.turnId,
             stage: "investigate",
             patternId: "free-agent",
+            projectRootPath,
+            projectId: input.context.projectId,
             systemPrompt: composeProfileSystemPrompt({
               definition: promptDefinition,
               routeCapability: routePreflight.routeCapability,
               allowedToolNames,
-              permissionSettings: settingsService.getAll().agentRuntime.permissions
+              permissionSettings: settingsService.getAll().agentRuntime.permissions,
+              workspaceRoot: projectRootPath
             }),
             maxTokens: 1200,
             temperature: 0.35,
@@ -17145,12 +18469,13 @@ class ConversationService {
                 const approvalId = payload.approvalId ?? "runtime";
                 if (payload.kind === "ask_user" || normalizeToolName(String(payload.toolName ?? "")) === "ask_user") {
                   const failed = payload.status === "rejected" || payload.status === "cancelled";
+                  const answerText = payload.answer === void 0 || payload.answer === null ? "" : typeof payload.answer === "string" ? payload.answer.trim() : String(payload.answer).trim();
                   commitAssistantMessage("message_patched", {
                     workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                       id: String(payload.toolCallId ?? approvalId),
                       toolName: "ask_user",
                       status: failed ? "error" : "running",
-                      resultPreview: failed ? String(payload.answer ?? "User input request was cancelled.") : "User answered.",
+                      resultPreview: failed ? String(payload.answer ?? "User input request was cancelled.") : answerText || "User answered.",
                       error: failed ? String(payload.answer ?? "User input request was cancelled.") : void 0,
                       completedAt: failed ? nowMs() : void 0
                     })
@@ -17172,15 +18497,18 @@ class ConversationService {
               if (event.type === "tool.completed") {
                 const result = event.payload.result;
                 const isAskUserTool = normalizeToolName(String(event.payload.toolName)) === "ask_user";
+                const toolCallPatch = {
+                  id: String(event.payload.toolCallId),
+                  toolName: String(event.payload.toolName),
+                  status: result?.ok ? "complete" : "error",
+                  error: result?.ok ? void 0 : result?.error?.message,
+                  completedAt: nowMs()
+                };
+                if (!(isAskUserTool && result?.ok)) {
+                  toolCallPatch.resultPreview = JSON.stringify(event.payload.result ?? {}).slice(0, 800);
+                }
                 commitAssistantMessage("message_patched", {
-                  workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
-                    id: String(event.payload.toolCallId),
-                    toolName: String(event.payload.toolName),
-                    status: result?.ok ? "complete" : "error",
-                    resultPreview: isAskUserTool && result?.ok ? "User answered." : JSON.stringify(event.payload.result ?? {}).slice(0, 800),
-                    error: result?.ok ? void 0 : result?.error?.message,
-                    completedAt: nowMs()
-                  })
+                  workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, toolCallPatch)
                 });
               }
               if (event.type === "task.created" || event.type === "task.updated") {
@@ -17321,41 +18649,6 @@ const conversationService = new ConversationService();
 function registerConversationHandlers(context2) {
   const { state: state2 } = context2;
   electron.ipcMain.handle("conversation:sendMessage", async (_event, request2) => {
-    const trimmed = request2.message.trim();
-    if (trimmed.startsWith("/")) {
-      const registry = getRegistry();
-      const cmdResult = await registry.execute({
-        input: trimmed,
-        context: {
-          sessionId: state2.currentSessionId ?? void 0,
-          projectId: state2.currentProjectId ?? void 0
-        }
-      });
-      const sideEffectNote = cmdResult.sideEffect ? `
-[sideEffect: ${cmdResult.sideEffect}]` : "";
-      const augmentedRequest = {
-        ...request2,
-        message: `[System command: /${trimmed.slice(1)}]
-${cmdResult.message}${sideEffectNote}`
-      };
-      const result2 = await conversationService.sendMessage({
-        ...augmentedRequest,
-        fallbackProjectId: state2.currentProjectId,
-        fallbackSessionId: state2.currentSessionId,
-        fallbackRunId: state2.currentRunId
-      });
-      if (result2.session?.projectId) {
-        state2.currentProjectId = result2.session.projectId;
-      }
-      if (result2.session?.sessionId) {
-        state2.currentSessionId = result2.session.sessionId;
-        await storageAdapter.setCurrentSessionId(result2.session.sessionId);
-      }
-      if (result2.runUpdate?.runId) {
-        state2.currentRunId = result2.runUpdate.runId;
-      }
-      return result2;
-    }
     const result = await conversationService.sendMessage({
       ...request2,
       fallbackProjectId: state2.currentProjectId,
@@ -17382,6 +18675,36 @@ ${cmdResult.message}${sideEffectNote}`
       messages: await conversationService.getHistory(sessionId)
     };
   });
+  electron.ipcMain.handle("conversation:clearHistory", async (_event, sessionId) => {
+    if (!sessionId) {
+      return { success: false, messages: [], error: "No session selected." };
+    }
+    try {
+      return { success: true, messages: await conversationService.clearHistory(sessionId) };
+    } catch (error) {
+      return { success: false, messages: [], error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  electron.ipcMain.handle("conversation:undoLastTurn", async (_event, sessionId) => {
+    if (!sessionId) {
+      return { success: false, messages: [], error: "No session selected." };
+    }
+    try {
+      return { success: true, messages: await conversationService.undoLastTurn(sessionId) };
+    } catch (error) {
+      return { success: false, messages: [], error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  electron.ipcMain.handle("conversation:compactHistory", async (_event, sessionId) => {
+    if (!sessionId) {
+      return { success: false, messages: [], error: "No session selected." };
+    }
+    try {
+      return { success: true, messages: await conversationService.compactHistory(sessionId) };
+    } catch (error) {
+      return { success: false, messages: [], error: error instanceof Error ? error.message : String(error) };
+    }
+  });
   electron.ipcMain.handle("conversation:cancelActiveTurn", async (_event, request2) => {
     return conversationService.cancelActiveTurn(request2);
   });
@@ -17390,6 +18713,242 @@ ${cmdResult.message}${sideEffectNote}`
   });
   electron.ipcMain.handle("conversation:answerToolApproval", async (_event, request2) => {
     return conversationService.answerToolApproval(request2);
+  });
+}
+const execFileAsync = util.promisify(child_process.execFile);
+const DEFAULT_MAX_BUFFER = 2 * 1024 * 1024;
+const DEFAULT_DIFF_BYTES = 128 * 1024;
+async function runGit(cwd, args, maxBuffer = DEFAULT_MAX_BUFFER) {
+  try {
+    const result = await execFileAsync("git", ["-c", "core.quotepath=false", ...args], {
+      cwd,
+      encoding: "utf8",
+      maxBuffer,
+      windowsHide: true
+    });
+    return {
+      stdout: String(result.stdout ?? ""),
+      stderr: String(result.stderr ?? "")
+    };
+  } catch (error) {
+    const err = error;
+    const stderr = String(err.stderr ?? "");
+    const stdout = String(err.stdout ?? "");
+    throw new Error((stderr || stdout || err.message).trim());
+  }
+}
+async function resolveCurrentGitProject(context2) {
+  const projectId = context2.state.currentProjectId;
+  if (!projectId) {
+    throw new Error("No project is selected.");
+  }
+  const project = storageAdapter.getProjectById(projectId);
+  if (!project) {
+    throw new Error(`Project not found: ${projectId}`);
+  }
+  const projectRoot = path.resolve(project.rootPath);
+  const { stdout } = await runGit(projectRoot, ["rev-parse", "--show-toplevel"]);
+  const gitRoot = path.resolve(stdout.trim());
+  if (!gitRoot) {
+    throw new Error("Current project is not a git repository.");
+  }
+  return {
+    projectId,
+    projectRoot,
+    gitRoot
+  };
+}
+function validateGitPath(input) {
+  const value = String(input ?? "").trim().replace(/\\/g, "/");
+  if (!value) {
+    throw new Error("Path is required.");
+  }
+  if (value.includes("\0") || value.startsWith("/") || /^[A-Za-z]:/.test(value)) {
+    throw new Error(`Invalid git path: ${input}`);
+  }
+  const segments = value.split("/");
+  if (segments.includes("..")) {
+    throw new Error(`Invalid git path: ${input}`);
+  }
+  return value;
+}
+function parseBranchLine(line) {
+  const content = line.replace(/^##\s*/, "").trim();
+  let branch = content;
+  let upstream;
+  let ahead = 0;
+  let behind = 0;
+  const trackingMatch = content.match(/\s+\[([^\]]+)\]$/);
+  const tracking = trackingMatch?.[1];
+  const withoutTracking = trackingMatch ? content.slice(0, trackingMatch.index).trim() : content;
+  const upstreamParts = withoutTracking.split("...");
+  branch = upstreamParts[0]?.trim() || "HEAD";
+  upstream = upstreamParts[1]?.trim() || void 0;
+  if (branch.startsWith("No commits yet on ")) {
+    branch = branch.replace("No commits yet on ", "").trim();
+  }
+  if (tracking) {
+    const aheadMatch = tracking.match(/ahead\s+(\d+)/);
+    const behindMatch = tracking.match(/behind\s+(\d+)/);
+    ahead = aheadMatch ? Number(aheadMatch[1]) : 0;
+    behind = behindMatch ? Number(behindMatch[1]) : 0;
+  }
+  return { branch, upstream, ahead, behind };
+}
+function resolveChangeKind(indexStatus, workingTreeStatus) {
+  const joined = `${indexStatus}${workingTreeStatus}`;
+  if (joined.includes("?")) return "untracked";
+  if (joined.includes("U")) return "unmerged";
+  if (joined.includes("R")) return "renamed";
+  if (joined.includes("C")) return "copied";
+  if (joined.includes("A")) return "added";
+  if (joined.includes("D")) return "deleted";
+  if (joined.includes("T")) return "typechange";
+  if (joined.includes("M")) return "modified";
+  return "unknown";
+}
+function parseStatusFile(line) {
+  if (line.length < 4) {
+    return null;
+  }
+  const indexStatus = line[0] === " " ? "" : line[0];
+  const workingTreeStatus = line[1] === " " ? "" : line[1];
+  const rawPath = line.slice(3).trim();
+  if (!rawPath) {
+    return null;
+  }
+  const renameParts = rawPath.split(" -> ");
+  const isRename = renameParts.length === 2;
+  const filePath = isRename ? renameParts[1] : rawPath;
+  const originalPath = isRename ? renameParts[0] : void 0;
+  return {
+    path: filePath,
+    originalPath,
+    indexStatus,
+    workingTreeStatus,
+    kind: resolveChangeKind(indexStatus, workingTreeStatus),
+    staged: Boolean(indexStatus && indexStatus !== "?"),
+    unstaged: Boolean(workingTreeStatus || indexStatus === "?")
+  };
+}
+function parseStatus(project, output) {
+  const lines = output.split(/\r?\n/).filter((line) => line.length > 0);
+  const branchLine = lines.find((line) => line.startsWith("## ")) ?? "## HEAD";
+  const branch = parseBranchLine(branchLine);
+  const files = lines.filter((line) => !line.startsWith("## ")).map(parseStatusFile).filter((file) => Boolean(file));
+  return {
+    projectId: project.projectId,
+    rootPath: project.gitRoot,
+    ...branch,
+    clean: files.length === 0,
+    files,
+    stagedCount: files.filter((file) => file.staged).length,
+    unstagedCount: files.filter((file) => file.unstaged).length,
+    untrackedCount: files.filter((file) => file.kind === "untracked").length
+  };
+}
+async function getStatus(context2) {
+  const project = await resolveCurrentGitProject(context2);
+  const { stdout } = await runGit(project.gitRoot, ["status", "--porcelain=v1", "-b", "-uall"]);
+  return parseStatus(project, stdout);
+}
+function truncate(text, maxBytes) {
+  if (Buffer.byteLength(text, "utf8") <= maxBytes) {
+    return { text, truncated: false };
+  }
+  const headBytes = Math.floor(maxBytes * 0.75);
+  const tailBytes = Math.floor(maxBytes * 0.15);
+  return {
+    text: `${text.slice(0, headBytes)}
+... [truncated] ...
+${text.slice(text.length - tailBytes)}`,
+    truncated: true
+  };
+}
+async function getDiff(context2, request2) {
+  try {
+    const project = await resolveCurrentGitProject(context2);
+    const pathspec = request2?.path ? ["--", validateGitPath(request2.path)] : [];
+    const scope = request2?.staged ? ["--cached"] : [];
+    const [{ stdout: stat }, { stdout: patch }] = await Promise.all([
+      runGit(project.gitRoot, ["diff", "--stat", ...scope, ...pathspec]),
+      runGit(project.gitRoot, ["diff", ...scope, ...pathspec], DEFAULT_MAX_BUFFER)
+    ]);
+    const maxBytes = Math.max(1024, Math.min(request2?.maxBytes ?? DEFAULT_DIFF_BYTES, DEFAULT_MAX_BUFFER));
+    const truncated = truncate(patch || stat || "No diff.", maxBytes);
+    return {
+      success: true,
+      rootPath: project.gitRoot,
+      stat: stat || "No diff.",
+      patch: truncated.text,
+      truncated: truncated.truncated
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+async function runGitAction(context2, args) {
+  try {
+    const project = await resolveCurrentGitProject(context2);
+    const { stdout, stderr } = await runGit(project.gitRoot, args);
+    return {
+      success: true,
+      status: await getStatus(context2),
+      output: [stdout.trim(), stderr.trim()].filter(Boolean).join("\n")
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error)
+    };
+  }
+}
+function failGitAction(error) {
+  return {
+    success: false,
+    error: error instanceof Error ? error.message : String(error)
+  };
+}
+function registerGitHandlers(context2) {
+  electron.ipcMain.handle("git:getStatus", async () => {
+    try {
+      return {
+        success: true,
+        status: await getStatus(context2)
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error)
+      };
+    }
+  });
+  electron.ipcMain.handle("git:getDiff", async (_event, request2) => getDiff(context2, request2));
+  electron.ipcMain.handle("git:stage", async (_event, request2) => {
+    try {
+      return await runGitAction(context2, ["add", "--", validateGitPath(request2.path)]);
+    } catch (error) {
+      return failGitAction(error);
+    }
+  });
+  electron.ipcMain.handle("git:stageAll", async () => runGitAction(context2, ["add", "--all"]));
+  electron.ipcMain.handle("git:unstage", async (_event, request2) => {
+    try {
+      return await runGitAction(context2, ["restore", "--staged", "--", validateGitPath(request2.path)]);
+    } catch (error) {
+      return failGitAction(error);
+    }
+  });
+  electron.ipcMain.handle("git:unstageAll", async () => runGitAction(context2, ["restore", "--staged", "--", "."]));
+  electron.ipcMain.handle("git:commit", async (_event, request2) => {
+    const message = String(request2?.message ?? "").trim();
+    if (!message) {
+      return { success: false, error: "Commit message is required." };
+    }
+    return runGitAction(context2, ["commit", "-m", message]);
   });
 }
 const STALE_RECOVERABLE_RUN_STATUSES = [
@@ -19485,6 +21044,7 @@ function registerIPCHandlers() {
   preloadLlmConfig();
   registerShellHandlers();
   registerConversationHandlers(context);
+  registerGitHandlers(context);
   registerWorkflowHandlers(context);
   registerProjectSessionHandlers(context);
   registerRuntimeTerminalHandlers();

@@ -5,6 +5,7 @@ import type {
   LlmProviderEntry,
 } from '@shared/types/settings';
 import type { TranslationKey, useI18n } from '../../../i18n';
+import { splitPathLines } from './sections/AgentPermissionsSettings';
 import type { useProviderConnection } from './useProviderConnection';
 import type { useSettingsModalState } from './useSettingsModalState';
 import { cloneRoute, getErrorMessage } from './utils';
@@ -240,6 +241,21 @@ export function createSettingsModalActions({
     modalState.setGlobalInstructionsDraft(nextSettings.agents.globalInstructions);
   };
 
+  const handleSaveAgentPermissions = async () => {
+    const nextSettings = await patchSettings({
+      agentRuntime: {
+        permissions: {
+          mode: modalState.permissionModeDraft,
+          readableRoots: splitPathLines(modalState.readableRootsDraft),
+          writableRoots: splitPathLines(modalState.writableRootsDraft),
+        },
+      },
+    });
+    modalState.setPermissionModeDraft(nextSettings.agentRuntime.permissions.mode);
+    modalState.setReadableRootsDraft(nextSettings.agentRuntime.permissions.readableRoots.join('\n'));
+    modalState.setWritableRootsDraft(nextSettings.agentRuntime.permissions.writableRoots.join('\n'));
+  };
+
   const toggleRuntimeId = (values: string[], id: string): string[] =>
     values.includes(id) ? values.filter((value) => value !== id) : [...values, id];
 
@@ -257,6 +273,7 @@ export function createSettingsModalActions({
     handleImportAgentManifest,
     handleSaveAgentRuntimeConfig,
     handleSaveSkillsAndTools,
+    handleSaveAgentPermissions,
     toggleRuntimeId,
   };
 }

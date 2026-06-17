@@ -24,8 +24,8 @@ const PERMISSION_MODES: Array<{
   },
   {
     id: 'custom',
-    label: 'Custom(config.toml)',
-    description: 'Use configured roots and command allow or deny lists.',
+    label: 'Custom',
+    description: 'Use readable/writable roots configured in Settings > Agents.',
   },
 ];
 

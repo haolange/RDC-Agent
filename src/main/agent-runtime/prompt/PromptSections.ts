@@ -153,7 +153,8 @@ export const sectionRules: PromptSection = (context) => {
     `- Do not delete files or perform irreversible actions without explicit confirmation.`,
     `- Minimize output: avoid re-stating tool results, prefer next actions.`,
     `- When uncertain, prefer reading existing code over guessing.`,
-    `- Respect workspace boundaries; never escape the working directory.`,
+    `- Respect the runtime permission policy for workspace boundaries; use absolute paths when policy allows external access.`,
+    `- Do not claim a file is unreachable without attempting read_file when policy permits.`,
   ];
 
   const userRules = context.userRules?.trim();

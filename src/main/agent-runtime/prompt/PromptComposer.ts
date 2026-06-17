@@ -1,6 +1,6 @@
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { AgentPermissionSettings } from '@shared/types/settings';
+import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types/settings';
 import type { AppMode, ProjectInputRecord, SessionAttachmentRecord } from '@shared/types/session';
 import type { ConversationMessage } from '@shared/types/conversation';
 import {
@@ -83,7 +83,10 @@ export function composeProfileSystemPrompt(input: ProfileSystemPromptInput): str
   const globalInstructions = input.definition.globalInstructions?.trim();
   const routeInstructions = composeRouteCapabilityPrompt(input.routeCapability, input.allowedToolNames);
   const permissionInstructions = composePermissionPrompt(input.permissionSettings);
-  const workspaceInstructions = composeWorkspacePrompt(input.workspaceRoot);
+  const workspaceInstructions = composeWorkspacePrompt(
+    input.workspaceRoot,
+    input.permissionSettings.mode,
+  );
 
   return [
     basePrompt,
@@ -99,33 +102,94 @@ export function composeProfileSystemPrompt(input: ProfileSystemPromptInput): str
   ].filter(Boolean).join('\n\n').trim();
 }
 
-function composeWorkspacePrompt(workspaceRoot: string | null): string {
+function composeWorkspacePrompt(
+  workspaceRoot: string | null,
+  permissionMode: AgentPermissionMode,
+): string {
   if (!workspaceRoot) return '';
-  return [
+  const lines = [
     '# Working Directory',
-    `All relative file paths, search roots, and shell commands run against the current project root: ${workspaceRoot}.`,
+    `The current project root is ${workspaceRoot}. Use it as the default base for relative file paths, search roots, and shell working directory.`,
+  ];
+  if (permissionMode === 'full-access') {
+    lines.push(
+      'You may also access files outside this project root using absolute paths when calling read_file, glob, grep, or shell commands.',
+    );
+  } else {
+    lines.push(
+      'Files outside this project root may still be accessible when the runtime permission policy allows it; use absolute paths for those locations.',
+    );
+  }
+  lines.push(
     'When you report a file path, use the absolute path that the tool actually resolved. Do not claim a path that differs from the tool result.',
-  ].join('\n');
+  );
+  return lines.join('\n');
+}
+
+function formatConfiguredRoots(
+  roots: string[],
+  fallback: string,
+): string {
+  return roots.length > 0 ? roots.join(', ') : fallback;
 }
 
 function composePermissionPrompt(permissionSettings: AgentPermissionSettings): string {
-  const modeLabel = permissionSettings.mode;
-  const readableRoots = permissionSettings.readableRoots.length > 0
-    ? permissionSettings.readableRoots.join(', ')
-    : 'workspace only unless user approves';
-  const writableRoots = permissionSettings.writableRoots.length > 0
-    ? permissionSettings.writableRoots.join(', ')
-    : 'workspace only unless user approves';
-
-  return [
+  const mode = permissionSettings.mode;
+  const lines = [
     '# Runtime Permission Policy',
-    `Current permission mode: ${modeLabel}.`,
-    `Readable roots: ${readableRoots}.`,
-    `Writable roots: ${writableRoots}.`,
+    `Current permission mode: ${mode}.`,
+  ];
+
+  switch (mode) {
+    case 'full-access':
+      lines.push(
+        'Readable roots: entire local machine.',
+        'Writable roots: entire local machine.',
+        'Use read_file with absolute paths for files outside the current project root.',
+        'Do not claim inability to read or write a local path without attempting the tool first.',
+      );
+      break;
+    case 'auto-review':
+      lines.push(
+        'Readable roots: current project workspace; external read paths are auto-reviewed and usually denied at medium risk.',
+        'Writable roots: current project workspace; external write paths are auto-reviewed and usually denied at medium or high risk.',
+        'When external access is needed, ask the user to switch to Default or Full access, or add readableRoots in Custom mode settings.',
+        'If policy may deny the path, still attempt read_file with an absolute path so the runtime can record the review outcome.',
+      );
+      break;
+    case 'custom':
+      lines.push(
+        `Readable roots: current project workspace plus ${formatConfiguredRoots(
+          permissionSettings.readableRoots,
+          'no extra configured paths',
+        )}.`,
+        `Writable roots: current project workspace plus ${formatConfiguredRoots(
+          permissionSettings.writableRoots,
+          'no extra configured paths',
+        )}.`,
+        'Configured readableRoots and writableRoots in settings are allowed without extra approval.',
+        'For other external paths, runtime approval rules still apply based on the closest matching policy.',
+        'When policy allows access, use read_file with absolute paths and do not refuse without attempting the tool.',
+      );
+      break;
+    default:
+      lines.push(
+        'Readable roots: current project workspace; external paths require one-time user approval.',
+        'Writable roots: current project workspace; external paths require one-time user approval.',
+        'When the user asks for a file outside the project, call read_file with its absolute path and wait for runtime approval if prompted.',
+        'Do not refuse or guess file contents without attempting the tool first.',
+        'External files, network access, file mutation, destructive shell commands, and unrecognized commands may pause for user approval.',
+      );
+      break;
+  }
+
+  lines.push(
     'Routine local inspection commands can run when the runtime policy allows them.',
-    'External files, network access, file mutation, destructive shell commands, and unrecognized commands may pause for user approval or auto-review.',
+    'When policy allows external access, use read_file with absolute paths instead of claiming the file is unreachable.',
     'If the runtime denies or requests approval, do not route around the decision with guessed paths or textual tool calls.',
-  ].join('\n');
+  );
+
+  return lines.join('\n');
 }
 
 function composeRouteCapabilityPrompt(

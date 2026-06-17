@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type {
+  AgentPermissionMode,
   AppSettings,
   LlmAgentRoute,
   LlmProviderEntry,
@@ -26,6 +27,15 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     settings.agents.definitions.map((definition) => ({ ...definition })),
   );
   const [globalInstructionsDraft, setGlobalInstructionsDraft] = useState(settings.agents.globalInstructions);
+  const [permissionModeDraft, setPermissionModeDraft] = useState<AgentPermissionMode>(
+    settings.agentRuntime?.permissions?.mode ?? 'default',
+  );
+  const [readableRootsDraft, setReadableRootsDraft] = useState(
+    (settings.agentRuntime?.permissions?.readableRoots ?? []).join('\n'),
+  );
+  const [writableRootsDraft, setWritableRootsDraft] = useState(
+    (settings.agentRuntime?.permissions?.writableRoots ?? []).join('\n'),
+  );
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(settings.llm.providers[0]?.id ?? null);
   const [connectionDraft, setConnectionDraft] = useState<ProviderConnectionDraft | null>(null);
   const [agentRouteSaveState, setAgentRouteSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -54,6 +64,9 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setRdxActionsDraft(cloneRdxActions(settings.tooling.rdxActions));
     setAgentManifestDrafts(settings.agents.definitions.map((definition) => ({ ...definition })));
     setGlobalInstructionsDraft(settings.agents.globalInstructions);
+    setPermissionModeDraft(settings.agentRuntime?.permissions?.mode ?? 'default');
+    setReadableRootsDraft((settings.agentRuntime?.permissions?.readableRoots ?? []).join('\n'));
+    setWritableRootsDraft((settings.agentRuntime?.permissions?.writableRoots ?? []).join('\n'));
     setSelectedProviderId(providers[0]?.id ?? null);
     setConnectionDraft(null);
     setAgentRouteSaveState('idle');
@@ -87,6 +100,12 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setAgentManifestDrafts,
     globalInstructionsDraft,
     setGlobalInstructionsDraft,
+    permissionModeDraft,
+    setPermissionModeDraft,
+    readableRootsDraft,
+    setReadableRootsDraft,
+    writableRootsDraft,
+    setWritableRootsDraft,
     selectedProviderId,
     setSelectedProviderId,
     connectionDraft,
