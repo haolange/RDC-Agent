@@ -34,6 +34,7 @@ export type WorkProcessRow =
     status: WorkProcessRowStatus;
     verb: string;
     question: string;
+    answer?: string;
     duration: string;
     detailLines: string[];
   }
@@ -249,9 +250,13 @@ const createUserInputRow = (call: ConversationToolCall): WorkProcessRow => {
     : call.status === 'error' || call.error
       ? 'error'
       : 'running';
+  const answer = status === 'complete' && call.resultPreview?.trim()
+    ? call.resultPreview.trim()
+    : undefined;
   const detailLines = [
     question ? `Question: ${question}` : '',
     ...choices.map((choice, index) => `Choice ${index + 1}: ${choice}`),
+    answer ? `Answer: ${answer}` : '',
     call.error ? `Error: ${call.error}` : '',
   ].filter(Boolean);
 
@@ -261,6 +266,7 @@ const createUserInputRow = (call: ConversationToolCall): WorkProcessRow => {
     status,
     verb: status === 'complete' ? 'Answered user' : status === 'error' ? 'User input stopped' : 'Asked user',
     question: compactText(question || 'The agent is waiting for user input.', 280),
+    answer,
     duration: formatDurationMs(call.startedAt, call.completedAt),
     detailLines,
   };
@@ -336,6 +342,7 @@ const createDiagnosticRow = (block: ConversationWorkBlock): WorkProcessRow => ({
 
 const shouldSkipBlock = (block: ConversationWorkBlock): boolean => {
   if (INTERNAL_BLOCK_IDS.has(block.id) || block.kind === 'output') return true;
+  if (block.kind === 'user_input') return true;
   if (block.kind === 'tool' && block.toolCalls.length > 0) return true;
   if (block.kind === 'approval' && block.status === 'complete' && !block.detail && !isMeaningfulText(block.summary)) return true;
   if (!block.summary && isNoisyText(block.title)) return true;

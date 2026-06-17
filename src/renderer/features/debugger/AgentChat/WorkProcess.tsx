@@ -101,16 +101,29 @@ const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'userInput' 
       <span className="work-process-step-rail" aria-hidden="true" />
       <div className="work-process-step-content">
         <div className="work-process-user-input">
-          <div className="work-process-tool-summary">
-            <span className="work-process-tool-line">
-              <span className="work-process-tool-verb">{row.verb}</span>
-              <span className="work-process-user-input-question">{row.question}</span>
-            </span>
-            <span className="work-process-tool-meta">
-              {row.duration ? <span>{row.duration}</span> : null}
-              {statusLabel ? <span>{statusLabel}</span> : null}
-            </span>
-          </div>
+          {row.status === 'complete' && row.answer ? (
+            <div className="work-process-user-input-qa" data-testid="work-process-user-input-qa">
+              <p className="work-process-user-input-qa-question">
+                <span className="work-process-user-input-qa-label">Q:</span>
+                {row.question}
+              </p>
+              <p className="work-process-user-input-qa-answer">
+                <span className="work-process-user-input-qa-label">A:</span>
+                {row.answer}
+              </p>
+            </div>
+          ) : (
+            <div className="work-process-tool-summary">
+              <span className="work-process-tool-line">
+                <span className="work-process-tool-verb">{row.verb}</span>
+                <span className="work-process-user-input-question">{row.question}</span>
+              </span>
+              <span className="work-process-tool-meta">
+                {row.duration ? <span>{row.duration}</span> : null}
+                {statusLabel ? <span>{statusLabel}</span> : null}
+              </span>
+            </div>
+          )}
           {row.detailLines.length > 0 ? (
             <details className="work-process-row-detail">
               <summary>Details</summary>
