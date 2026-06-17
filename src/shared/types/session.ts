@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Session Types - Session 控制面板相关类型定义
  */
 

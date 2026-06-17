@@ -24,7 +24,9 @@ export function useComposerSend(options: {
   t: Translate;
   currentMode: AgentMode;
   selectedAgentId: string;
+  setSelectedAgentId: (agentId: string) => void;
   setCurrentMode: (mode: AgentMode) => void;
+  openSettings: (section?: string) => void;
   currentProject: ProjectRecord | null;
   currentSession: SessionRecord | null;
   currentRun: RunSummary | null;
@@ -39,7 +41,7 @@ export function useComposerSend(options: {
   setPendingAttachments: Dispatch<SetStateAction<PendingAttachmentDraft[]>>;
 }) {
   const {
-    showNotice, t, currentMode, selectedAgentId, currentProject,
+    showNotice, t, currentMode, selectedAgentId, setSelectedAgentId, setCurrentMode, openSettings, currentProject,
     currentSession, currentRun, selectedDeviceEntry,
     hasActiveDebugRun, hasActiveConversationTurn, promptValue,
     setPromptValue, pendingAttachments, setPendingAttachments,
@@ -81,9 +83,11 @@ export function useComposerSend(options: {
           currentSession,
           currentProject,
           selectedAgentId,
-          setCurrentMode: options.setCurrentMode,
+          setSelectedAgentId,
+          setCurrentMode,
           setConversationMessages,
           upsertConversationMessages,
+          openSettings,
           showNotice,
         });
         if (handled) {
@@ -160,6 +164,9 @@ export function useComposerSend(options: {
     promptValue,
     selectedDeviceEntry,
     selectedAgentId,
+    setSelectedAgentId,
+    setCurrentMode,
+    openSettings,
     setConversationMessages,
     setCurrentRun,
     setCurrentSession,

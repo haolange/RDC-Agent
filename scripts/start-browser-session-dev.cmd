@@ -24,6 +24,8 @@ if not exist "%NODE_EXE%" (
 )
 
 echo [RDC-Agent] Starting headless browser session in development mode...
+if "%RDC_AGENT_USER_DATA%"=="" set "RDC_AGENT_USER_DATA=%CD%\browser-session-tmp\user-data-dev"
+if not exist "%RDC_AGENT_USER_DATA%" mkdir "%RDC_AGENT_USER_DATA%"
 set "RDC_AGENT_HEADLESS=1"
 if "%NODE_ENV%"=="" set "NODE_ENV=development"
 

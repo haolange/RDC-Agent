@@ -48,6 +48,9 @@ class BrowserAppBridgeClient {
       answerUserInput: (request) => this.invoke('conversation:answerUserInput', request),
       answerToolApproval: (request) => this.invoke('conversation:answerToolApproval', request),
       getHistory: (sessionId) => this.invoke('conversation:getHistory', sessionId),
+      clearHistory: (sessionId) => this.invoke('conversation:clearHistory', sessionId),
+      undoLastTurn: (sessionId) => this.invoke('conversation:undoLastTurn', sessionId),
+      compactHistory: (sessionId) => this.invoke('conversation:compactHistory', sessionId),
       onEvent: (callback) => { this.addListener('conversation:event', callback as EventCallback); },
       offEvent: (callback) => { this.removeListener('conversation:event', callback as EventCallback); },
     },
@@ -71,6 +74,15 @@ class BrowserAppBridgeClient {
     command: {
       list: (category?) => this.invoke('command:list', category),
       execute: (request) => this.invoke('command:execute', request),
+    },
+    git: {
+      getStatus: () => this.invoke('git:getStatus'),
+      getDiff: (request) => this.invoke('git:getDiff', request),
+      stage: (request) => this.invoke('git:stage', request),
+      stageAll: () => this.invoke('git:stageAll'),
+      unstage: (request) => this.invoke('git:unstage', request),
+      unstageAll: () => this.invoke('git:unstageAll'),
+      commit: (request) => this.invoke('git:commit', request),
     },
     tool: {
       getCatalog: () => this.invoke('tool:getCatalog'),

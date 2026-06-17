@@ -29,10 +29,10 @@ export const moveFileTool: AgentTool<MoveFileParams, MoveFileDetails> = {
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'mutation',
 
-  async execute(_toolCallId, params, signal) {
+  async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');
-    const src = safeResolvePath(params.source);
-    const dest = safeResolvePath(params.destination);
+    const src = safeResolvePath(params.source, undefined, context);
+    const dest = safeResolvePath(params.destination, undefined, context);
     const destDir = path.dirname(dest);
     await fs.mkdir(destDir, { recursive: true });
     let overwritten = false;

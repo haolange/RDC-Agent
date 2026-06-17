@@ -60,10 +60,10 @@ export const bashTool: AgentTool<BashParams, BashDetails> = {
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'process', category: 'system', requiresApproval: true },
   permissionHint: 'mutation',
 
-  async execute(_toolCallId, params, signal, onUpdate) {
+  async execute(_toolCallId, params, signal, onUpdate, context) {
     const command = params.command;
     const timeoutMs = params.timeout ?? DEFAULT_TIMEOUT_MS;
-    const cwd = getWorkspaceRoot();
+    const cwd = getWorkspaceRoot(context);
     const startedAt = Date.now();
 
     // 后台模式：交给 BackgroundTaskRunner，立即返回 bgTaskId。

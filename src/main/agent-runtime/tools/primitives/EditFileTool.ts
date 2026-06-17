@@ -51,7 +51,7 @@ export const editFileTool: AgentTool<EditFileParams, EditFileDetails> = {
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'mutation',
 
-  async execute(_toolCallId, params, signal) {
+  async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) {
       throw new Error('Aborted');
     }
@@ -63,7 +63,7 @@ export const editFileTool: AgentTool<EditFileParams, EditFileDetails> = {
       throw new Error('old_text 与 new_text 相同，无需编辑');
     }
 
-    const absolute = safeResolvePath(params.path);
+    const absolute = safeResolvePath(params.path, undefined, context);
     const original = await fs.readFile(absolute, 'utf8');
     if (signal?.aborted) {
       throw new Error('Aborted');

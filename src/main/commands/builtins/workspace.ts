@@ -20,7 +20,7 @@ export const workspaceCommand: CommandDefinition = {
     return {
       success: true,
       message: `Workspace changed to: ${args[0]}`,
-      sideEffect: `change-workspace:${args[0]}`,
+      uiAction: { type: 'change-workspace', payload: { path: args[0] } },
     };
   },
 };

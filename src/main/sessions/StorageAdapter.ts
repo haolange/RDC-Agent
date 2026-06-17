@@ -6,7 +6,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
-import { appendJsonl, readJsonl } from '@shared/utils/jsonl';
+import { appendJsonl, readJsonl, writeJsonl } from '@shared/utils/jsonl';
 import { readYaml, writeYaml } from '@shared/utils/yaml';
 import {
   generateEventId,
@@ -179,7 +179,16 @@ export class StorageAdapter {
       this.writeSelection(selection);
     }
 
-    this.touchProject(location.project.projectId);
+    // 删除会话后，若 lastSessionId 仍指向被删会话，收敛到剩余会话之首或置空，
+    // 避免 registry.lastSessionId 与实际会话列表脱节导致 sidebar 显示 stale。
+    const projectId = location.project.projectId;
+    const wasLastSession = location.project.lastSessionId === sessionId;
+    if (wasLastSession) {
+      const remaining = this.listSessions(projectId);
+      this.touchProject(projectId, remaining[0]?.sessionId ?? null);
+    } else {
+      this.touchProject(projectId);
+    }
   }
 
   getProjectById(projectId: string): ProjectRecord | null {
@@ -629,6 +638,11 @@ export class StorageAdapter {
     appendJsonl(this.getConversationPath(sessionId), message);
   }
 
+  writeConversationHistory(sessionId: string, messages: ConversationMessage[]): void {
+    writeJsonl(this.getConversationPath(sessionId), messages);
+    this.updateSession(sessionId, {});
+  }
+
   listSessionAttachments(sessionId: string): SessionAttachmentRecord[] {
     return this.readSessionAttachments(sessionId)
       .slice()
@@ -964,14 +978,17 @@ export class StorageAdapter {
     });
   }
 
-  private touchProject(projectId: string, lastSessionId?: string, updatedAt: number = nowMs()): void {
+  private touchProject(projectId: string, lastSessionId?: string | null, updatedAt: number = nowMs()): void {
     const registry = this.readRegistry();
     const nextProjects = registry.projects.map((project) => {
       if (project.projectId !== projectId) return project;
+      const nextLastSessionId = lastSessionId === undefined
+        ? project.lastSessionId
+        : lastSessionId || undefined;
       return {
         ...project,
         updatedAt,
-        lastSessionId: lastSessionId || project.lastSessionId,
+        lastSessionId: nextLastSessionId,
       };
     });
 

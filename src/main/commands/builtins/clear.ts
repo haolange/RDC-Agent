@@ -1,6 +1,3 @@
-/**
- * /clear — 清除当前会话历史。
- */
 import type { CommandDefinition } from '@shared/types/command';
 
 export const clearCommand: CommandDefinition = {
@@ -11,10 +8,13 @@ export const clearCommand: CommandDefinition = {
   category: 'system',
 
   async execute(_args, ctx) {
+    const sessionId = ctx.sessionId ?? '';
     return {
-      success: true,
-      message: 'Conversation cleared. Starting fresh.',
-      sideEffect: `clear-session:${ctx.sessionId ?? 'current'}`,
+      success: Boolean(sessionId),
+      message: sessionId
+        ? 'Clearing conversation history...'
+        : 'No active session. Open or create a session before clearing history.',
+      uiAction: { type: 'clear-session', payload: { sessionId } },
     };
   },
 };

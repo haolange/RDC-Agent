@@ -26,6 +26,10 @@ build/
 .vscode/
 .vs/
 
+# Runtime local app data and scratch directories
+tmp/
+browser-session-tmp/
+
 # Python local environment
 .venv
 .pytest_cache

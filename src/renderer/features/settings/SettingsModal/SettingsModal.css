@@ -2476,18 +2476,6 @@
   grid-column: 1 / -1;
 }
 
-.settings-modal .button-primary:not(:disabled) {
-  border-color: var(--token-border-focus);
-  background: var(--token-border-focus);
-  color: var(--token-text-inverse);
-}
-
-.settings-modal .button-primary:hover:not(:disabled) {
-  border-color: var(--token-border-focus);
-  background: color-mix(in srgb, var(--token-border-focus) 88%, var(--token-bg-raised));
-  color: var(--token-text-inverse);
-}
-
 .settings-modal .button:disabled {
   opacity: 1;
   border-color: var(--token-border-muted);

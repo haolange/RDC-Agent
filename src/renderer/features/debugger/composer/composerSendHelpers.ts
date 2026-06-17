@@ -1,4 +1,4 @@
-﻿import type { ConversationAttachmentInput, ConversationMessage, ConversationTurnResult } from '@shared/types/conversation';
+import type { ConversationAttachmentInput, ConversationMessage, ConversationTurnResult } from '@shared/types/conversation';
 import type { AgentMode } from '@shared/types/layout';
 import type { AppMode, ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';

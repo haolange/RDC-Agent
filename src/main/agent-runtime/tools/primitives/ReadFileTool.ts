@@ -52,12 +52,12 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails> = {
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'file', requiresApproval: false },
   permissionHint: 'readonly',
 
-  async execute(_toolCallId, params, signal) {
+  async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) {
       throw new Error('Aborted');
     }
 
-    const absolute = safeResolvePath(params.path);
+    const absolute = safeResolvePath(params.path, undefined, context);
     const offset = Math.max(1, Math.floor(params.offset ?? 1));
     const limit = Math.max(1, Math.floor(params.limit ?? DEFAULT_LIMIT));
 

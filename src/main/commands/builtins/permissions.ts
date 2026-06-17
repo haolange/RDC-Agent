@@ -1,7 +1,6 @@
-/**
- * /permissions — 查看或切换权限模式。
- */
 import type { CommandDefinition } from '@shared/types/command';
+
+const PERMISSION_MODES = new Set(['default', 'auto-review', 'full-access', 'custom']);
 
 export const permissionsCommand: CommandDefinition = {
   id: 'permissions',
@@ -14,14 +13,20 @@ export const permissionsCommand: CommandDefinition = {
     if (args.length === 0) {
       return {
         success: true,
-        message: `Current permission mode: default\n  Agent: ${ctx.agentId ?? 'none'}`,
+        message: `Current permission mode: default\nAgent: ${ctx.agentId ?? 'none'}`,
       };
     }
     const mode = args[0];
+    if (!PERMISSION_MODES.has(mode)) {
+      return {
+        success: false,
+        message: 'Permission mode must be default, auto-review, full-access, or custom.',
+      };
+    }
     return {
       success: true,
-      message: `Switched permission mode to: ${mode}`,
-      sideEffect: `switch-permissions:${mode}`,
+      message: `Switching permission mode to: ${mode}`,
+      uiAction: { type: 'switch-permissions', payload: { mode } },
     };
   },
 };

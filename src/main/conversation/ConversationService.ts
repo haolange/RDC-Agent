@@ -509,6 +509,61 @@ export class ConversationService {
     return storageAdapter.readConversationHistory(sessionId);
   }
 
+  async clearHistory(sessionId: string): Promise<ConversationMessage[]> {
+    storageAdapter.writeConversationHistory(sessionId, []);
+    this.publishConversationTrace(sessionId, [], sessionId);
+    return [];
+  }
+
+  async undoLastTurn(sessionId: string): Promise<ConversationMessage[]> {
+    const history = storageAdapter.readConversationHistory(sessionId);
+    const lastUserMessage = history
+      .slice()
+      .reverse()
+      .find((message) => message.role === 'user');
+    if (!lastUserMessage) {
+      return history;
+    }
+
+    const nextHistory = history.filter((message) => message.turnId !== lastUserMessage.turnId);
+    storageAdapter.writeConversationHistory(sessionId, nextHistory);
+    this.publishConversationTrace(sessionId, nextHistory, sessionId);
+    return nextHistory;
+  }
+
+  async compactHistory(sessionId: string): Promise<ConversationMessage[]> {
+    const history = storageAdapter.readConversationHistory(sessionId);
+    const keepCount = 6;
+    if (history.length <= keepCount + 1) {
+      return history;
+    }
+
+    const head = history.slice(0, -keepCount);
+    const tail = history.slice(-keepCount);
+    const compactedAt = nowMs();
+    const summaryMessage: ConversationMessage = {
+      id: `compact-${compactedAt}`,
+      turnId: `compact-turn-${compactedAt}`,
+      sessionId,
+      projectId: tail[0]?.projectId ?? head[0]?.projectId ?? null,
+      role: 'system',
+      content: `Context compacted: ${head.length} earlier messages summarized. User messages: ${head.filter((message) => message.role === 'user').length}; assistant messages: ${head.filter((message) => message.role === 'assistant').length}; system messages: ${head.filter((message) => message.role === 'system').length}.`,
+      status: 'complete',
+      createdAt: compactedAt,
+      updatedAt: compactedAt,
+      workTrace: {
+        status: 'complete',
+        summary: `Compacted ${head.length} earlier messages.`,
+        blocks: [],
+        updatedAt: compactedAt,
+      },
+    };
+    const nextHistory = [summaryMessage, ...tail];
+    storageAdapter.writeConversationHistory(sessionId, nextHistory);
+    this.publishConversationTrace(sessionId, nextHistory, sessionId);
+    return nextHistory;
+  }
+
   async cancelActiveTurn(
     request: ConversationCancelActiveTurnRequest = {},
   ): Promise<ConversationCancelActiveTurnResult> {
@@ -780,9 +835,13 @@ export class ConversationService {
         };
         const allowedToolNames = resolveAgentToolAllowlist(conversationAgentId, 'investigate')
           .map((toolName) => normalizeToolName(toolName));
+        const projectRootPath = input.context.projectId
+          ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null
+          : null;
         const profilePrompt = composeProfileTurnPrompt({
           context: {
             projectId: input.context.projectId,
+            projectRootPath,
             sessionId: input.context.session?.sessionId ?? null,
             activeRunId: isActiveRun(input.context.currentRun) ? input.context.currentRun.runId : null,
             openedCapturePath: input.context.openedCapturePath,
@@ -805,11 +864,14 @@ export class ConversationService {
             turnId: assistantMessage.turnId,
             stage: 'investigate',
             patternId: 'free-agent',
+            projectRootPath,
+            projectId: input.context.projectId,
             systemPrompt: composeProfileSystemPrompt({
               definition: promptDefinition,
               routeCapability: routePreflight.routeCapability,
               allowedToolNames,
               permissionSettings: settingsService.getAll().agentRuntime.permissions,
+              workspaceRoot: projectRootPath,
             }),
             maxTokens: 1200,
             temperature: 0.35,

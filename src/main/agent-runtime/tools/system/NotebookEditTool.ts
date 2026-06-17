@@ -31,9 +31,9 @@ export const notebookEditTool: AgentTool<NotebookEditParams, NotebookEditDetails
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'mutation',
 
-  async execute(_toolCallId, params, signal) {
+  async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');
-    const absolute = safeResolvePath(params.notebook_path);
+    const absolute = safeResolvePath(params.notebook_path, undefined, context);
     const raw = await fs.readFile(absolute, 'utf8');
     const notebook = JSON.parse(raw) as { cells?: Array<{ source: string | string[] }> };
     if (!Array.isArray(notebook.cells)) {

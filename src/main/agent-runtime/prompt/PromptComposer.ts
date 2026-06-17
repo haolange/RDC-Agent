@@ -10,6 +10,8 @@ import {
 
 export interface ProfilePromptContext {
   projectId: string | null;
+  /** 当前激活项目根目录；工具执行 base 与之一致，LLM 应据此生成相对路径。 */
+  projectRootPath: string | null;
   sessionId: string | null;
   activeRunId: string | null;
   openedCapturePath: string | null;
@@ -41,6 +43,8 @@ export interface ProfileSystemPromptInput {
   routeCapability: AgentRouteCapability;
   allowedToolNames: string[];
   permissionSettings: AgentPermissionSettings;
+  /** 当前激活项目根目录，注入到 system prompt 的 Working Directory 段落。 */
+  workspaceRoot: string | null;
 }
 
 export function composeProfileTurnPrompt(input: ProfileTurnPromptInput): string {
@@ -59,6 +63,7 @@ export function composeProfileTurnPrompt(input: ProfileTurnPromptInput): string 
     task_file_path: input.taskFilePath,
     task_file_content: input.taskFileContent,
     current_project_id: input.context.projectId,
+    current_project_root: input.context.projectRootPath,
     current_session_id: input.context.sessionId,
     active_run_id: input.context.activeRunId,
     opened_capture: input.context.openedCapturePath,
@@ -78,11 +83,13 @@ export function composeProfileSystemPrompt(input: ProfileSystemPromptInput): str
   const globalInstructions = input.definition.globalInstructions?.trim();
   const routeInstructions = composeRouteCapabilityPrompt(input.routeCapability, input.allowedToolNames);
   const permissionInstructions = composePermissionPrompt(input.permissionSettings);
+  const workspaceInstructions = composeWorkspacePrompt(input.workspaceRoot);
 
   return [
     basePrompt,
     '',
     'Show concise visible work summaries and tool results only. Do not reveal hidden chain-of-thought.',
+    workspaceInstructions,
     routeInstructions,
     permissionInstructions,
     input.routeCapability.toolCallingMode === 'native-structured'
@@ -90,6 +97,15 @@ export function composeProfileSystemPrompt(input: ProfileSystemPromptInput): str
       : '',
     globalInstructions ? `Global Instructions:\n${globalInstructions}` : '',
   ].filter(Boolean).join('\n\n').trim();
+}
+
+function composeWorkspacePrompt(workspaceRoot: string | null): string {
+  if (!workspaceRoot) return '';
+  return [
+    '# Working Directory',
+    `All relative file paths, search roots, and shell commands run against the current project root: ${workspaceRoot}.`,
+    'When you report a file path, use the absolute path that the tool actually resolved. Do not claim a path that differs from the tool result.',
+  ].join('\n');
 }
 
 function composePermissionPrompt(permissionSettings: AgentPermissionSettings): string {

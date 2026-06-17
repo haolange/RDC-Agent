@@ -19,10 +19,11 @@ export const skillsCommand: CommandDefinition = {
     }
     const action = args[0];
     if (action === 'run') {
+      const skillId = args[1] ?? '';
       return {
         success: true,
-        message: `Running skill: ${args[1] ?? 'unnamed'}...`,
-        sideEffect: `run-skill:${args[1]}`,
+        message: `Running skill: ${skillId || 'unnamed'}...`,
+        uiAction: { type: 'run-skill', payload: { skillId } },
       };
     }
     return {

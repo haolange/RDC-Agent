@@ -8,6 +8,7 @@ export type {
 } from './platform';
 export type { ConversationApi } from './conversation';
 export type { CommandApi } from './command';
+export type { GitApi } from './git';
 export type { AgentApi, WorkflowApi } from './workflow';
 export type { EvidenceApi, ToolApi } from './tools';
 export type { LlmApi, SettingsApi } from './settings';

@@ -1,6 +1,3 @@
-/**
- * /compact — 请求上下文压缩。
- */
 import type { CommandDefinition } from '@shared/types/command';
 
 export const compactCommand: CommandDefinition = {
@@ -10,10 +7,13 @@ export const compactCommand: CommandDefinition = {
   category: 'session',
 
   async execute(_args, ctx) {
+    const sessionId = ctx.sessionId ?? '';
     return {
-      success: true,
-      message: 'Compacting conversation context...',
-      sideEffect: `compact-session:${ctx.sessionId ?? 'current'}`,
+      success: Boolean(sessionId),
+      message: sessionId
+        ? 'Compacting conversation context...'
+        : 'No active session. Open or create a session before compacting history.',
+      uiAction: { type: 'compact-session', payload: { sessionId } },
     };
   },
 };

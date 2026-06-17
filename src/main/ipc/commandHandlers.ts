@@ -1,18 +1,15 @@
-/**
- * Command IPC handlers。
- */
 import { ipcMain } from 'electron';
 import type { CommandExecuteRequest, CommandListResult } from '@shared/types/command';
 import { getRegistry } from '../commands/index';
 import { CommandService } from '../commands/CommandService';
 
-let _commandService: CommandService | null = null;
+let commandService: CommandService | null = null;
 
 function getCommandService(): CommandService {
-  if (!_commandService) {
-    _commandService = new CommandService(getRegistry());
+  if (!commandService) {
+    commandService = new CommandService(getRegistry());
   }
-  return _commandService;
+  return commandService;
 }
 
 export function registerCommandHandlers(): void {

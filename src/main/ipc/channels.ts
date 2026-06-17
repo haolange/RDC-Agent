@@ -16,6 +16,9 @@
   conversation: [
     'conversation:sendMessage',
     'conversation:getHistory',
+    'conversation:clearHistory',
+    'conversation:undoLastTurn',
+    'conversation:compactHistory',
     'conversation:cancelActiveTurn',
     'conversation:answerUserInput',
     'conversation:answerToolApproval',
@@ -102,6 +105,15 @@
   command: [
     'command:list',
     'command:execute',
+  ],
+  git: [
+    'git:getStatus',
+    'git:getDiff',
+    'git:stage',
+    'git:stageAll',
+    'git:unstage',
+    'git:unstageAll',
+    'git:commit',
   ],
   trace: [
     'trace:getRun',

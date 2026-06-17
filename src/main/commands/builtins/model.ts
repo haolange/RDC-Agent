@@ -1,6 +1,3 @@
-/**
- * /model — 查看或切换 LLM 模型。
- */
 import type { CommandDefinition } from '@shared/types/command';
 
 export const modelCommand: CommandDefinition = {
@@ -9,17 +6,17 @@ export const modelCommand: CommandDefinition = {
   description: 'View or switch the current LLM model',
   category: 'navigation',
 
-  async execute(args) {
+  async execute(args, ctx) {
     if (args.length === 0) {
       return {
         success: true,
-        message: 'Current model: (use /model <name> to switch)',
+        message: `Current model: ${ctx.currentModelId ?? 'not configured'}`,
       };
     }
     return {
       success: true,
-      message: `Switched model to: ${args[0]}`,
-      sideEffect: `switch-model:${args[0]}`,
+      message: `Switching model to: ${args[0]}`,
+      uiAction: { type: 'switch-model', payload: { modelId: args[0] } },
     };
   },
 };

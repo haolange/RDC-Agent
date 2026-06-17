@@ -68,17 +68,17 @@ export const globTool: AgentTool<GlobParams, GlobDetails> = {
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'search', requiresApproval: false },
   permissionHint: 'readonly',
 
-  async execute(_toolCallId, params, signal) {
+  async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) {
       throw new Error('Aborted');
     }
 
-    const workspaceRoot = getWorkspaceRoot();
+    const workspaceRoot = getWorkspaceRoot(context);
     const externalPattern = params.cwd ? null : splitExternalPattern(params.pattern);
     const baseDir = params.cwd
-      ? safeResolvePath(params.cwd, workspaceRoot)
+      ? safeResolvePath(params.cwd, workspaceRoot, context)
       : externalPattern
-        ? safeResolvePath(externalPattern.baseDir, workspaceRoot)
+        ? safeResolvePath(externalPattern.baseDir, workspaceRoot, context)
         : workspaceRoot;
     const pattern = externalPattern?.pattern ?? params.pattern;
 

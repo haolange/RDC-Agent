@@ -44,7 +44,14 @@ import type {
 } from './session';
 import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from './terminal';
 import type { ToolCatalog, ToolRuntimeSummary } from './tool';
-import type { CommandExecuteRequest, CommandListResult } from './command';
+import type { CommandExecuteRequest, CommandListResult, CommandResult } from './command';
+import type {
+  GitActionResult,
+  GitCommitRequest,
+  GitDiffRequest,
+  GitDiffResult,
+  GitPathRequest,
+} from './git';
 import type { AgentRun, AgentRunPresentation, TraceEvent } from './agenticTrace';
 import type {
   TraceBranchSwitchResult,
@@ -88,6 +95,21 @@ export interface ElectronAPI {
     getHistory: (sessionId: string) => Promise<{
       messages: ConversationMessage[];
     }>;
+    clearHistory: (sessionId: string) => Promise<{
+      success: boolean;
+      messages: ConversationMessage[];
+      error?: string;
+    }>;
+    undoLastTurn: (sessionId: string) => Promise<{
+      success: boolean;
+      messages: ConversationMessage[];
+      error?: string;
+    }>;
+    compactHistory: (sessionId: string) => Promise<{
+      success: boolean;
+      messages: ConversationMessage[];
+      error?: string;
+    }>;
     onEvent: (callback: (event: ConversationStreamEvent) => void) => void;
     offEvent: (callback: (event: ConversationStreamEvent) => void) => void;
   };
@@ -129,17 +151,19 @@ export interface ElectronAPI {
   command: {
     list: (category?: string) => Promise<CommandListResult>;
     execute: (request: CommandExecuteRequest) => Promise<{
-      result: {
-        success: boolean;
-        message: string;
-        data?: unknown;
-        sideEffect?: string;
-        systemMessage?: string;
-        uiAction?: { type: string; payload?: unknown };
-        invalidateStores?: Array<string>;
-      };
+      result: CommandResult;
       systemMessage?: import('./conversation').ConversationMessage;
     }>;
+  };
+
+  git: {
+    getStatus: () => Promise<GitActionResult>;
+    getDiff: (request?: GitDiffRequest) => Promise<GitDiffResult>;
+    stage: (request: GitPathRequest) => Promise<GitActionResult>;
+    stageAll: () => Promise<GitActionResult>;
+    unstage: (request: GitPathRequest) => Promise<GitActionResult>;
+    unstageAll: () => Promise<GitActionResult>;
+    commit: (request: GitCommitRequest) => Promise<GitActionResult>;
   };
 
   tool: {

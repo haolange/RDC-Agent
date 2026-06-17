@@ -1,13 +1,14 @@
 /**
  * Primitive 工具共享工具函数。
  *
- * - workspace 根目录解析：优先使用 `RDC_WORKSPACE_ROOT` 环境变量，
- *   否则回退到 `process.cwd()`。
+ * - workspace 根目录解析：优先使用工具执行上下文中的 project root，
+ *   其次 `RDC_WORKSPACE_ROOT` 环境变量，最后回退到 `process.cwd()`。
  * - safeResolvePath：解析路径并确保位于 workspace 内。
  */
 
 import * as os from 'os';
 import * as path from 'path';
+import type { ToolExecutionContext } from '../../agent/AgentTool';
 
 let temporaryAllowedPathRoots: string[] = [];
 
@@ -27,8 +28,14 @@ export async function withTemporaryPathAccess<T>(
   }
 }
 
-/** 获取 workspace 根目录（绝对路径）。 */
-export function getWorkspaceRoot(): string {
+/**
+ * 获取 workspace 根目录（绝对路径）。
+ * 优先使用执行上下文中的 project root，使工具相对当前激活项目解析路径。
+ */
+export function getWorkspaceRoot(context?: ToolExecutionContext): string {
+  if (context?.projectRootPath) {
+    return path.resolve(context.projectRootPath);
+  }
   const fromEnv = process.env.RDC_WORKSPACE_ROOT?.trim();
   if (fromEnv && fromEnv.length > 0) {
     return path.resolve(fromEnv);
@@ -56,11 +63,11 @@ function isWithinRoot(target: string, root: string): boolean {
  * 解析输入路径并确保结果位于 workspace 内。
  * 越界时抛出 Error，由调用方转为工具错误结果。
  */
-export function safeResolvePath(input: string, root?: string): string {
+export function safeResolvePath(input: string, root?: string, context?: ToolExecutionContext): string {
   if (typeof input !== 'string' || input.length === 0) {
     throw new Error('路径不能为空');
   }
-  const workspaceRoot = root ?? getWorkspaceRoot();
+  const workspaceRoot = root ?? getWorkspaceRoot(context);
   const expandedInput = normalizeInputPath(input);
   const target = path.isAbsolute(expandedInput)
     ? path.resolve(expandedInput)

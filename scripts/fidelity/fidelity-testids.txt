@@ -21,6 +21,8 @@ composer-attach-button
 composer-attachments
 composer-footer-bar
 composer-mode-pill
+composer-permission-pill
+composer-tool-approval-panel
 composer-usage-indicator
 composer-user-input-panel
 control-panel-scroll
@@ -31,6 +33,7 @@ cp-section-${id}
 cp-section-trace-lane-${id}
 empty-workbench-prompt
 empty-workbench-tool-${toolMode.id}
+message-actions
 message-attachments
 message-bubble-assistant
 message-bubble-system
@@ -128,6 +131,7 @@ trace-thought-summary
 trace-timeline
 trace-tool-action
 work-process
+work-process-approval
 work-process-block
 work-process-tool-call
 work-process-user-input

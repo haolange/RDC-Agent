@@ -19,6 +19,8 @@ export interface AgentPermissionDecisionInput {
   agentId: AgentRole;
   tool: AgentTool;
   toolCall: ToolCall;
+  /** 当前激活项目根目录；权限边界以它为准，回退全局 settings.workspace.rootPath。 */
+  projectRootPath?: string | null;
 }
 
 const READ_ONLY_FILE_TOOLS = new Set(['read_file', 'glob', 'grep']);
@@ -191,7 +193,11 @@ export class AgentPermissionPolicyService {
     const permissions = settings.agentRuntime.permissions;
     const mode = permissions.mode;
     const toolName = normalizeToolName(input.toolCall.name);
-    const workspaceRoot = path.resolve(settings.workspace.rootPath || process.cwd());
+    const workspaceRoot = path.resolve(
+      input.projectRootPath
+      || settings.workspace.rootPath
+      || process.cwd(),
+    );
 
     if (mode === 'full-access') {
       return { action: 'allow', risk: 'low', temporaryPathRoots: ['*'] };

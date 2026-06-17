@@ -1,6 +1,3 @@
-/**
- * /undo — 回退上一条用户消息。
- */
 import type { CommandDefinition } from '@shared/types/command';
 
 export const undoCommand: CommandDefinition = {
@@ -10,10 +7,13 @@ export const undoCommand: CommandDefinition = {
   category: 'session',
 
   async execute(_args, ctx) {
+    const sessionId = ctx.sessionId ?? '';
     return {
-      success: true,
-      message: 'Undoing last message...',
-      sideEffect: `undo-session:${ctx.sessionId ?? 'current'}`,
+      success: Boolean(sessionId),
+      message: sessionId
+        ? 'Undoing last conversation turn...'
+        : 'No active session. Open or create a session before undoing history.',
+      uiAction: { type: 'undo-session', payload: { sessionId } },
       invalidateStores: ['conversation'],
     };
   },

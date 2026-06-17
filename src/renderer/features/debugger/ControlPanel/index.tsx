@@ -7,17 +7,21 @@ import { useWorkflowStore } from '../../../stores/workflowStore';
 import { CaptureLibrary } from './CaptureLibrary';
 import { CollapsibleSection } from './CollapsibleSection';
 import { ClassicSessionControlPanel } from './SessionControlPanel';
+import { SourceControlPanel } from './SourceControlPanel';
 import { TraceRightPanel } from './TraceRightPanel';
 import { shouldShowTraceRightRail } from './traceRail';
+import { Button } from '../../../ui/Button';
 import './ControlPanel.css';
 
-type RightRailMode = 'hidden' | 'project' | 'session';
+type RightRailMode = 'hidden' | 'project' | 'session' | 'source-control';
 
 const ProjectControlPanel: React.FC = () => {
   const { t } = useI18n();
   const projectInputs = useProjectStore((state) => state.projectInputs);
+  const setRightRailTarget = useProjectStore((state) => state.setRightRailTarget);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     captureLibrary: true,
+    sourceControl: false,
   });
 
   const toggleSection = (sectionId: string) => {
@@ -44,6 +48,30 @@ const ProjectControlPanel: React.FC = () => {
         >
           <CaptureLibrary />
         </CollapsibleSection>
+        <CollapsibleSection
+          id="sourceControl"
+          title={t('control.sourceControl')}
+          icon={(
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="6" cy="6" r="3" />
+              <circle cx="18" cy="18" r="3" />
+              <path d="M8.5 8.5 15.5 15.5" />
+              <path d="M6 9v7a2 2 0 0 0 2 2h7" />
+            </svg>
+          )}
+          isExpanded={expandedSections.sourceControl}
+          onToggle={() => toggleSection('sourceControl')}
+        >
+          <div className="source-control-entry">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setRightRailTarget('source-control')}
+            >
+              {t('control.sourceControlOpen')}
+            </Button>
+          </div>
+        </CollapsibleSection>
       </div>
     </div>
   );
@@ -66,7 +94,9 @@ export const ControlPanel: React.FC = () => {
 
   const rightRailMode: RightRailMode = !currentProject
     ? 'hidden'
-    : rightRailTarget === 'session' && currentSession
+    : rightRailTarget === 'source-control'
+      ? 'source-control'
+      : rightRailTarget === 'session' && currentSession
       ? 'session'
       : 'project';
 
@@ -83,9 +113,12 @@ export const ControlPanel: React.FC = () => {
     return <SessionControlPanel key={sessionRailKey} />;
   }
 
+  if (rightRailMode === 'source-control') {
+    return <SourceControlPanel />;
+  }
+
   return <ProjectControlPanel />;
 };
 
 export default ControlPanel;
-
 

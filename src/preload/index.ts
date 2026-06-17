@@ -10,6 +10,7 @@ import { createCaptureApi, createContextApi, createDeviceApi } from './api/captu
 import { createConversationApi } from './api/conversation';
 import { createCommandApi } from './api/command';
 import { createEventSubscriptionApi } from './api/events';
+import { createGitApi } from './api/git';
 import { registerTrackedListener, removeTrackedListener } from './api/listeners';
 import { createProjectApi, createRunApi, createSessionApi } from './api/projectSession';
 import { createRuntimeLogApi, createTerminalApi } from './api/runtime';
@@ -31,6 +32,7 @@ const electronAPI = {
   appShell: createAppShellApi(),
   conversation: createConversationApi(),
   command: createCommandApi(),
+  git: createGitApi(),
 
   selectFiles: dialogApi.selectFiles,
   selectRdcFiles: dialogApi.selectRdcFiles,

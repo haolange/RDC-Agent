@@ -11,17 +11,11 @@ export const resumeCommand: CommandDefinition = {
   category: 'session',
 
   async execute(args, ctx) {
-    if (args.length === 0) {
-      return {
-        success: true,
-        message: 'Resuming latest interrupted session...',
-        sideEffect: `resume-session:${ctx.sessionId ?? 'latest'}`,
-      };
-    }
+    const sessionId = args[0] ?? ctx.sessionId ?? '';
     return {
       success: true,
-      message: `Resuming session: ${args[0]}`,
-      sideEffect: `resume-session:${args[0]}`,
+      message: args.length === 0 ? 'Resuming latest interrupted session...' : `Resuming session: ${args[0]}`,
+      uiAction: { type: 'resume-session', payload: { sessionId } },
     };
   },
 };
