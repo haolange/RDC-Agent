@@ -40,6 +40,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     setAgentManifestDrafts,
     globalInstructionsDraft,
     setGlobalInstructionsDraft,
+    permissionModeDraft,
+    setPermissionModeDraft,
+    readableRootsDraft,
+    setReadableRootsDraft,
+    writableRootsDraft,
+    setWritableRootsDraft,
     connectionDraft,
     setConnectionDraft,
     agentRouteSaveState,
@@ -57,6 +63,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     handleDisconnectProvider,
     handleSaveAgentManifests,
     handleImportAgentManifest,
+    handleSaveAgentPermissions,
     handleSaveSkillsAndTools,
     setTheme,
     setLanguage,
@@ -206,6 +213,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
               {activeSection === 'agents' && (
                 <AgentsSettings
                   settings={settings}
+                  permissionModeDraft={permissionModeDraft}
+                  readableRootsDraft={readableRootsDraft}
+                  writableRootsDraft={writableRootsDraft}
+                  onPermissionModeDraftChange={setPermissionModeDraft}
+                  onReadableRootsDraftChange={setReadableRootsDraft}
+                  onWritableRootsDraftChange={setWritableRootsDraft}
+                  onSaveAgentPermissions={handleSaveAgentPermissions}
                   agentManifestDrafts={agentManifestDrafts}
                   onAgentManifestDraftsChange={setAgentManifestDrafts}
                   onSaveAgentManifests={handleSaveAgentManifests}

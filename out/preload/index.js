@@ -78,6 +78,9 @@ const createConversationApi = () => ({
   answerUserInput: (request) => electron.ipcRenderer.invoke("conversation:answerUserInput", request),
   answerToolApproval: (request) => electron.ipcRenderer.invoke("conversation:answerToolApproval", request),
   getHistory: (sessionId) => electron.ipcRenderer.invoke("conversation:getHistory", sessionId),
+  clearHistory: (sessionId) => electron.ipcRenderer.invoke("conversation:clearHistory", sessionId),
+  undoLastTurn: (sessionId) => electron.ipcRenderer.invoke("conversation:undoLastTurn", sessionId),
+  compactHistory: (sessionId) => electron.ipcRenderer.invoke("conversation:compactHistory", sessionId),
   onEvent: (callback) => {
     registerTrackedListener("conversation:event", (payload) => callback(payload));
   },
@@ -118,6 +121,15 @@ const createEventSubscriptionApi = () => ({
   removeAllListeners: (channel) => {
     removeAllTrackedListeners(channel);
   }
+});
+const createGitApi = () => ({
+  getStatus: () => electron.ipcRenderer.invoke("git:getStatus"),
+  getDiff: (request) => electron.ipcRenderer.invoke("git:getDiff", request),
+  stage: (request) => electron.ipcRenderer.invoke("git:stage", request),
+  stageAll: () => electron.ipcRenderer.invoke("git:stageAll"),
+  unstage: (request) => electron.ipcRenderer.invoke("git:unstage", request),
+  unstageAll: () => electron.ipcRenderer.invoke("git:unstageAll"),
+  commit: (request) => electron.ipcRenderer.invoke("git:commit", request)
 });
 const createProjectApi = () => ({
   list: () => electron.ipcRenderer.invoke("project:list"),
@@ -233,6 +245,7 @@ const electronAPI = {
   appShell: createAppShellApi(),
   conversation: createConversationApi(),
   command: createCommandApi(),
+  git: createGitApi(),
   selectFiles: dialogApi.selectFiles,
   selectRdcFiles: dialogApi.selectRdcFiles,
   selectDirectory: dialogApi.selectDirectory,

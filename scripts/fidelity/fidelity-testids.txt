@@ -67,10 +67,15 @@ settings-agent-card-${agentId}
 settings-agent-list
 settings-agent-manifest-editor
 settings-agent-no-enabled-models
+settings-agent-permission-mode-${mode}
+settings-agent-permissions
+settings-agent-permissions-save
+settings-agent-readable-roots
 settings-agent-route-save-status
 settings-agent-runtime-config
 settings-agent-runtime-save
 settings-agent-save
+settings-agent-writable-roots
 settings-center-panel
 settings-mcp-${server.id}
 settings-modal

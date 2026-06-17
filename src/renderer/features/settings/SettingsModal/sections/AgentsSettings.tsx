@@ -1,8 +1,9 @@
 import React, { type Dispatch, type SetStateAction, useState } from 'react';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
-import type { AppSettings } from '@shared/types/settings';
+import type { AgentPermissionMode, AppSettings } from '@shared/types/settings';
 import type { TranslationKey, useI18n } from '../../../../i18n';
 import { AgentManifestEditor } from './AgentManifestEditor';
+import { AgentPermissionsSettings } from './AgentPermissionsSettings';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -15,6 +16,13 @@ const AGENT_DESCRIPTION_KEYS: Partial<Record<string, TranslationKey>> = {
 
 interface AgentsSettingsProps {
   settings: AppSettings;
+  permissionModeDraft: AgentPermissionMode;
+  readableRootsDraft: string;
+  writableRootsDraft: string;
+  onPermissionModeDraftChange: (mode: AgentPermissionMode) => void;
+  onReadableRootsDraftChange: (value: string) => void;
+  onWritableRootsDraftChange: (value: string) => void;
+  onSaveAgentPermissions: () => void | Promise<void>;
   agentManifestDrafts: AgentManifestDraft[];
   onAgentManifestDraftsChange: Dispatch<SetStateAction<AgentManifestDraft[]>>;
   onSaveAgentManifests: () => void | Promise<void>;
@@ -67,6 +75,13 @@ const createNewAgent = (existing: AgentManifestDraft[]): AgentManifestDraft => {
 
 export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   settings,
+  permissionModeDraft,
+  readableRootsDraft,
+  writableRootsDraft,
+  onPermissionModeDraftChange,
+  onReadableRootsDraftChange,
+  onWritableRootsDraftChange,
+  onSaveAgentPermissions,
   agentManifestDrafts,
   onAgentManifestDraftsChange,
   onSaveAgentManifests,
@@ -121,6 +136,16 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
 
   return (
     <section className="settings-page settings-page-agents">
+      <AgentPermissionsSettings
+        permissionModeDraft={permissionModeDraft}
+        readableRootsDraft={readableRootsDraft}
+        writableRootsDraft={writableRootsDraft}
+        onPermissionModeDraftChange={onPermissionModeDraftChange}
+        onReadableRootsDraftChange={onReadableRootsDraftChange}
+        onWritableRootsDraftChange={onWritableRootsDraftChange}
+        onSave={onSaveAgentPermissions}
+        t={t}
+      />
       <div className="settings-manifest-page">
         <div className="settings-agent-page settings-agent-structure-anchor" data-testid="settings-agent-runtime-config">
           <span className="settings-help-text-warning" data-testid="settings-agent-no-enabled-models" />
