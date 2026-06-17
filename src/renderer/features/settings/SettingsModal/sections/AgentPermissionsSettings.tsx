@@ -43,6 +43,7 @@ export const AgentPermissionsSettings: React.FC<AgentPermissionsSettingsProps> =
   const [busy, setBusy] = useState(false);
   const readableCount = useMemo(() => splitPathLines(readableRootsDraft).length, [readableRootsDraft]);
   const writableCount = useMemo(() => splitPathLines(writableRootsDraft).length, [writableRootsDraft]);
+  const rootsOpen = permissionModeDraft === 'custom' || readableCount > 0 || writableCount > 0;
 
   const handleSave = async () => {
     if (busy) return;
@@ -93,35 +94,48 @@ export const AgentPermissionsSettings: React.FC<AgentPermissionsSettingsProps> =
           </div>
         </div>
 
-        <div className="settings-field-block">
-          <div className="settings-field-label">{t('settings.readableRoots')}</div>
-          <div className="settings-help-text">{t('settings.readableRootsHint')}</div>
-          <textarea
-            className="settings-agent-textarea-compact"
-            data-testid="settings-agent-readable-roots"
-            rows={4}
-            value={readableRootsDraft}
-            placeholder={t('settings.pathRootsPlaceholder')}
-            onChange={(event) => onReadableRootsDraftChange(event.target.value)}
-          />
-          <div className="settings-help-text">{t('settings.pathRootsCount', { count: String(readableCount) })}</div>
-        </div>
+        <details className="settings-agent-permission-roots" open={rootsOpen}>
+          <summary>
+            <span>{t('settings.agentPermissionRootsTitle')}</span>
+            <small>
+              {t('settings.agentPermissionRootsSummary', {
+                readable: String(readableCount),
+                writable: String(writableCount),
+              })}
+            </small>
+          </summary>
+          <div className="settings-agent-permission-roots-grid">
+            <div className="settings-field-block">
+              <div className="settings-field-label">{t('settings.readableRoots')}</div>
+              <div className="settings-help-text">{t('settings.readableRootsHint')}</div>
+              <textarea
+                className="input settings-agent-textarea-compact"
+                data-testid="settings-agent-readable-roots"
+                rows={3}
+                value={readableRootsDraft}
+                placeholder={t('settings.pathRootsPlaceholder')}
+                onChange={(event) => onReadableRootsDraftChange(event.target.value)}
+              />
+              <div className="settings-help-text">{t('settings.pathRootsCount', { count: String(readableCount) })}</div>
+            </div>
 
-        <div className="settings-field-block">
-          <div className="settings-field-label">{t('settings.writableRoots')}</div>
-          <div className="settings-help-text">{t('settings.writableRootsHint')}</div>
-          <textarea
-            className="settings-agent-textarea-compact"
-            data-testid="settings-agent-writable-roots"
-            rows={4}
-            value={writableRootsDraft}
-            placeholder={t('settings.pathRootsPlaceholder')}
-            onChange={(event) => onWritableRootsDraftChange(event.target.value)}
-          />
-          <div className="settings-help-text">{t('settings.pathRootsCount', { count: String(writableCount) })}</div>
-        </div>
+            <div className="settings-field-block">
+              <div className="settings-field-label">{t('settings.writableRoots')}</div>
+              <div className="settings-help-text">{t('settings.writableRootsHint')}</div>
+              <textarea
+                className="input settings-agent-textarea-compact"
+                data-testid="settings-agent-writable-roots"
+                rows={3}
+                value={writableRootsDraft}
+                placeholder={t('settings.pathRootsPlaceholder')}
+                onChange={(event) => onWritableRootsDraftChange(event.target.value)}
+              />
+              <div className="settings-help-text">{t('settings.pathRootsCount', { count: String(writableCount) })}</div>
+            </div>
 
-        <p className="settings-help-text">{t('settings.agentPermissionsCustomNote')}</p>
+            <p className="settings-help-text">{t('settings.agentPermissionsCustomNote')}</p>
+          </div>
+        </details>
       </div>
     </section>
   );
