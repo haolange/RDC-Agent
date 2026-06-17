@@ -17,8 +17,9 @@ export function useComposer(options: {
   effectiveLeftCollapsed: boolean;
   leftToggleDisabled: boolean;
   toggleLeftSidebar: () => void | Promise<void>;
+  openSettings: (section?: string) => void;
 }) {
-  const { showNotice, hasOpenedCaptureForCurrentProject, effectiveLeftCollapsed, leftToggleDisabled, toggleLeftSidebar } = options;
+  const { showNotice, hasOpenedCaptureForCurrentProject, effectiveLeftCollapsed, leftToggleDisabled, toggleLeftSidebar, openSettings } = options;
   const { t, language } = useI18n();
 
   const [promptValue, setPromptValue] = useState('');
@@ -44,9 +45,8 @@ export function useComposer(options: {
   const selectedDeviceEntry = devices.find((device) => device.id === selectedDevice);
 
   const hasActiveDebugRun = Boolean(currentRun && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status));
-  const hasActiveConversationTurn = conversationMessages.some(
-    (message) => message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming'),
-  );
+  const hasActiveConversationTurn = conversationMessages.some((message) =>
+    message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming'));
 
   const attachments = useComposerAttachments({
     showNotice,
@@ -75,7 +75,9 @@ export function useComposer(options: {
     t,
     currentMode,
     selectedAgentId,
+    setSelectedAgentId,
     setCurrentMode,
+    openSettings,
     currentProject,
     currentSession,
     currentRun,
@@ -129,9 +131,7 @@ export function useComposer(options: {
   }, [selectedAgentId, setCurrentMode, userInvocableAgents]);
 
   useEffect(() => {
-    if (!modeMenuOpen) {
-      return;
-    }
+    if (!modeMenuOpen) return;
 
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node | null;
@@ -156,9 +156,7 @@ export function useComposer(options: {
 
   useEffect(() => {
     const textarea = promptInputRef.current;
-    if (!textarea) {
-      return;
-    }
+    if (!textarea) return;
 
     textarea.style.height = '0px';
     textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;

@@ -39,6 +39,7 @@ export interface MCPServerConfig {
   command?: string;
   /** stdio: 命令参数。 */
   args?: string[];
+  env?: Record<string, string>;
   /** http/sse/streamable-http: 端点 URL。 */
   url?: string;
   /** 调用超时（毫秒），默认 30s。 */
@@ -367,6 +368,7 @@ class MCPAgentTool implements AgentTool {
   readonly name: string;
   readonly description: string;
   readonly parameters: JsonSchema;
+  readonly permissionHint = 'mutation' as const;
 
   constructor(
     private readonly manager: MCPManager,
@@ -422,6 +424,7 @@ export class MCPManager {
       }
       const proc = spawn(config.command, config.args ?? [], {
         stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, ...(config.env ?? {}) },
       });
       proc.stderr?.setEncoding('utf8');
       proc.stderr?.on('data', (chunk: string) => {

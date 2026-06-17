@@ -11,6 +11,7 @@ export type {
   DialogApi,
   EventSubscriptionApi,
   EvidenceApi,
+  GitApi,
   LlmApi,
   PlatformApi,
   ProjectApi,

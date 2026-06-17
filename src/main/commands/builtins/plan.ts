@@ -1,27 +1,22 @@
 /**
- * /plan — 进入或退出计划模式。
+ * /plan — 切换到 Plan agent profile。
+ *
+ * Plan 不是独立 AppMode，而是可调用的 agent profile（research/ask/plan artifact/handoff）。
+ * 该命令等价于 `/agents plan`，仅作意图快捷入口。
  */
 import type { CommandDefinition } from '@shared/types/command';
 
 export const planCommand: CommandDefinition = {
   id: 'plan',
   name: 'plan',
-  description: 'Enter or exit plan mode for structured implementation planning',
+  description: 'Switch to the Plan profile to research and design an implementation plan before editing',
   category: 'workflow',
 
-  async execute(args) {
-    const action = args[0];
-    if (action === 'exit' || action === 'done') {
-      return {
-        success: true,
-        message: 'Exited plan mode. Ready to implement.',
-        sideEffect: 'exit-plan-mode',
-      };
-    }
+  async execute() {
     return {
       success: true,
-      message: 'Entered plan mode. Describe your task and I\'ll design an implementation plan.',
-      sideEffect: 'enter-plan-mode',
+      message: 'Switched to the Plan profile. Describe your task and I will research, ask questions, and write a plan before handing off to implementation.',
+      uiAction: { type: 'switch-mode', payload: { agentId: 'plan' } },
     };
   },
 };

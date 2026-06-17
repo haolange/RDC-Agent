@@ -76,6 +76,7 @@ const App: React.FC = () => {
     effectiveLeftCollapsed: layout.effectiveLeftCollapsed,
     leftToggleDisabled: layout.leftToggleDisabled,
     toggleLeftSidebar,
+    openSettings: () => setSettingsModalOpen(true),
   });
 
   useAppBootstrap({

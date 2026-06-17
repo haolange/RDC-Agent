@@ -34,16 +34,21 @@ import {
   AGENT_WRITE_SCOPES,
   DEFAULT_MODEL_ROUTING,
 } from '@shared/constants/agents';
-import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
+import type {
+  AgentEvent as SharedAgentEvent,
+  AgentRuntimeMcpDescriptor,
+  AgentRuntimeSkillDescriptor,
+} from '@shared/types/agentRuntime';
 import type { LLMConfig, LLMStreamEvent } from '@shared/types/llm';
 import type { AppMode } from '@shared/types/session';
 import type { LlmProviderId } from '@shared/types/settings';
 import type { WorkflowStage } from '@shared/types/workflow';
 import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
 import { Agent } from '../../agent-runtime/agent/Agent';
-import type { AgentTool, AgentToolResult } from '../../agent-runtime/agent/AgentTool';
+import type { AgentTool, AgentToolResult, ToolExecutionContext } from '../../agent-runtime/agent/AgentTool';
 import { toolToDefinition } from '../../agent-runtime/agent/AgentTool';
 import type { ToolExecutor } from '../../agent-runtime/agent/AgentLoop';
+import { getWorkspaceRoot } from '../../agent-runtime/tools/primitives/_shared';
 import type {
   AgentEvent as CoreAgentEvent,
   StreamOptions,
@@ -52,7 +57,9 @@ import type {
   ToolResultMessage,
   UserMessage,
 } from '../../agent-runtime/core/types';
-import { getPrimitiveTools } from '../../agent-runtime/tools';
+import { createToolSearchTool, getPrimitiveTools } from '../../agent-runtime/tools';
+import { MCPManager, type MCPServerConfig } from '../../agent-runtime/agent/MCPManager';
+import { SkillEngine, type SkillManifest } from '../../skills/SkillEngine';
 import {
   encodeAgentModel,
   configuredRuntimeProvider,
@@ -89,6 +96,8 @@ interface AgentTurnContext {
   sessionId?: string;
   stageId?: WorkflowStage;
   turnId?: string;
+  projectRootPath?: string | null;
+  projectId?: string | null;
 }
 
 interface AgentTurnOptions {
@@ -110,6 +119,10 @@ interface AgentProfileTurnOptions extends AgentTurnOptions {
   stage?: WorkflowStage | 'report';
   /** Profile turn prompt that replaces the raw user message for this runtime call. */
   promptOverride?: string;
+  /** 当前激活项目根目录，透传到工具执行上下文。 */
+  projectRootPath?: string | null;
+  /** 当前激活项目 id。 */
+  projectId?: string | null;
 }
 
 /** 单个 AgentRole 在内部维护的运行态。 */
@@ -132,12 +145,20 @@ interface ToolExecutorRuntimeContext {
   turnId?: string;
   eventContext?: AgentEventBridgeContext;
   onEvent?: (event: SharedAgentEvent) => void;
+  /** 当前激活项目根目录，用于把工具执行 base 对齐到 project root 而非 process.cwd()。 */
+  projectRootPath?: string | null;
+  /** 当前激活项目 id（审计/事件关联）。 */
+  projectId?: string | null;
 }
 
 export class AgentOrchestrator {
   private agentStates: Map<AgentRole, AgentState> = new Map();
   private agentConfigs: Map<AgentRole, AgentConfig> = new Map();
   private agentSlots: Map<AgentRole, AgentSlot> = new Map();
+  private readonly mcpManager = new MCPManager();
+  private readonly connectedMcpServerIds = new Set<string>();
+  private readonly failedMcpServers = new Map<string, string>();
+  private readonly skillEngine = new SkillEngine();
 
   constructor() {
     this.initializeAgents();
@@ -290,6 +311,8 @@ export class AgentOrchestrator {
           turnId: context?.turnId,
           toolAllowlist: resolveAgentToolAllowlist(agentId, context?.stageId),
           options,
+          projectRootPath: context?.projectRootPath ?? null,
+          projectId: context?.projectId ?? null,
         });
 
       const finalContent = await this.finalizeRecordedAssistantMessage(
@@ -362,6 +385,8 @@ export class AgentOrchestrator {
         options,
         // A profile turn is isolated so previous cached chat state cannot leak into this user turn.
         useFreshAgent: true,
+        projectRootPath: options?.projectRootPath ?? null,
+        projectId: options?.projectId ?? null,
       });
 
       runtimeLogService.log({
@@ -479,20 +504,41 @@ export class AgentOrchestrator {
     for (const tool of this.createWorkbenchTools(agentId, sessionId)) {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
+    for (const tool of this.mcpManager.getAgentTools()) {
+      availableTools.set(normalizeToolName(tool.name), tool);
+    }
+    const toolSearchTool = createToolSearchTool(() => Array.from(availableTools.values()));
+    availableTools.set(normalizeToolName(toolSearchTool.name), toolSearchTool);
 
     const definitions: ToolDefinition[] = [];
     const toolMap = new Map<string, AgentTool>();
-    for (const name of toolAllowlist) {
-      const normalized = normalizeToolName(name);
-      const tool = availableTools.get(normalized);
-      if (!tool) continue;
+    for (const tool of availableTools.values()) {
+      if (!this.matchesToolAllowlist(tool.name, toolAllowlist)) continue;
       if (!this.isAllowedForRuntime(agentId, tool.name, stage)) continue;
-      if (!toolMap.has(tool.name)) {
-        toolMap.set(tool.name, tool);
+      const normalized = normalizeToolName(tool.name);
+      if (!toolMap.has(normalized)) {
+        toolMap.set(normalized, tool);
         definitions.push(toolToDefinition(tool));
       }
     }
     return { definitions, toolMap };
+  }
+
+  private matchesToolAllowlist(toolName: string, toolAllowlist: string[]): boolean {
+    const normalizedToolName = normalizeToolName(toolName);
+    return toolAllowlist.some((entry) => {
+      const normalizedEntry = normalizeToolName(entry);
+      if (normalizedEntry === '*' || normalizedEntry === normalizedToolName) {
+        return true;
+      }
+      if (normalizedEntry.endsWith('.*') && normalizedToolName.startsWith(normalizedEntry.slice(0, -1))) {
+        return true;
+      }
+      if (normalizedEntry.endsWith('*') && normalizedToolName.startsWith(normalizedEntry.slice(0, -1))) {
+        return true;
+      }
+      return false;
+    });
   }
 
   private createToolExecutor(
@@ -516,7 +562,7 @@ export class AgentOrchestrator {
         if (normalizedName === 'ask_user') {
           return this.executeAskUserTool(toolCall, agentId, runtimeContext, signal);
         }
-        const permissionDecision = agentPermissionPolicyService.evaluate({ agentId, tool, toolCall });
+        const permissionDecision = agentPermissionPolicyService.evaluate({ agentId, tool, toolCall, projectRootPath: runtimeContext?.projectRootPath ?? null });
         if (permissionDecision.action === 'deny') {
           return this.createPolicyDeniedToolResult(toolCall, agentId, permissionDecision.reason);
         }
@@ -561,9 +607,16 @@ export class AgentOrchestrator {
           }
         }
         try {
+          const projectRootPath = runtimeContext?.projectRootPath ?? null;
+          const toolContext: ToolExecutionContext = {
+            workspaceRoot: projectRootPath ?? getWorkspaceRoot(),
+            projectRootPath,
+            projectId: runtimeContext?.projectId ?? null,
+            sessionId: runtimeContext?.sessionId ?? null,
+          };
           const result = await withTemporaryPathAccess(
             permissionDecision.temporaryPathRoots,
-            () => tool.execute(toolCall.id, toolCall.arguments, signal, onUpdate),
+            () => tool.execute(toolCall.id, toolCall.arguments, signal, onUpdate, toolContext),
           );
           return this.agentToolResultToMessage(toolCall, result);
         } catch (error) {
@@ -727,6 +780,7 @@ export class AgentOrchestrator {
       this.createMemoryReadTool(sessionId),
       this.createPlanArtifactTool(sessionId),
       this.createSkillsCatalogTool(),
+      this.createSkillRunTool(agentId, sessionId),
       this.createMcpCatalogTool(),
     ];
   }
@@ -922,6 +976,88 @@ export class AgentOrchestrator {
     };
   }
 
+  private createSkillRunTool(agentId: AgentRole, sessionId?: string | null): AgentTool<
+    { skill_id?: string; params?: Record<string, unknown> },
+    { skillId: string; agentId: AgentRole }
+  > {
+    const orchestrator = this;
+    return {
+      name: 'skill_run',
+      label: 'Run Skill',
+      description: 'Execute a configured reusable skill by id or name. Builtin context skills return live workspace/session context.',
+      parameters: {
+        type: 'object',
+        required: ['skill_id'],
+        properties: {
+          skill_id: { type: 'string', description: 'Skill id or name, for example builtin.rdc-context.' },
+          params: {
+            type: 'object',
+            description: 'Skill parameters. Values are converted to strings for prompt skills.',
+            additionalProperties: true,
+          },
+        },
+      },
+      permissionHint: 'readonly',
+      async execute(_toolCallId, args) {
+        const skillKey = typeof args.skill_id === 'string' ? args.skill_id.trim() : '';
+        if (!skillKey) {
+          return {
+            content: [{ type: 'text', text: 'skill_id is required.' }],
+            isError: true,
+            details: { skillId: '', agentId },
+          };
+        }
+
+        const skills = orchestrator.getEnabledSkillDescriptors(agentId);
+        const skill = skills.find((entry) => entry.id === skillKey || entry.name === skillKey);
+        if (!skill) {
+          return {
+            content: [{ type: 'text', text: `Skill is not enabled or configured: ${skillKey}` }],
+            isError: true,
+            details: { skillId: skillKey, agentId },
+          };
+        }
+
+        if (skill.id === 'builtin.rdc-context' || skill.name === 'rdc-context') {
+          const session = sessionId ? storageAdapter.readSession(sessionId) : null;
+          const project = session?.projectId ? storageAdapter.getProjectById(session.projectId) : null;
+          const runtimeContext = getRdxRuntimeContext();
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                skill: skill.id,
+                agentId,
+                session,
+                project,
+                rdxRuntimeContext: runtimeContext,
+              }, null, 2),
+            }],
+            details: { skillId: skill.id, agentId },
+          };
+        }
+
+        const params = orchestrator.stringifySkillParams(args.params);
+        const manifest: SkillManifest = {
+          name: skill.name,
+          description: skill.description,
+          type: 'prompt',
+          promptTemplate: skill.description,
+        };
+        const result = await orchestrator.skillEngine.execute(manifest, params, {
+          agentOrchestrator: orchestrator,
+          workspaceRoot: storageAdapter.getWorkspacePath(),
+          sessionId: sessionId ?? undefined,
+        });
+        return {
+          content: [{ type: 'text', text: result.message }],
+          isError: !result.success,
+          details: { skillId: skill.id, agentId },
+        };
+      },
+    };
+  }
+
   private createMcpCatalogTool(): AgentTool<
     { query?: string },
     { count: number }
@@ -952,6 +1088,76 @@ export class AgentOrchestrator {
     };
   }
 
+  private getEnabledSkillDescriptors(agentId: AgentRole): AgentRuntimeSkillDescriptor[] {
+    const settings = settingsService.getAll();
+    const manifest = settings.agents.definitions.find((entry) => entry.id === agentId && entry.enabled);
+    const enabledIds = new Set([
+      ...(settings.configuration.enabledSkillIds ?? []),
+      ...(manifest?.skills ?? []),
+    ]);
+    return agentRuntimeConfigService.listSkills()
+      .filter((skill) => skill.enabledByDefault || enabledIds.has(skill.id) || enabledIds.has(skill.name));
+  }
+
+  private stringifySkillParams(params: Record<string, unknown> | undefined): Record<string, string> {
+    if (!params) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(params).map(([key, value]) => [
+        key,
+        typeof value === 'string' ? value : JSON.stringify(value),
+      ]),
+    );
+  }
+
+  private getEnabledMcpDescriptors(agentId: AgentRole): AgentRuntimeMcpDescriptor[] {
+    const settings = settingsService.getAll();
+    const manifest = settings.agents.definitions.find((entry) => entry.id === agentId && entry.enabled);
+    const enabledIds = new Set([
+      ...(settings.configuration.enabledMcpServerIds ?? []),
+      ...(manifest?.mcpServers ?? []),
+    ]);
+    if (enabledIds.size === 0) {
+      return [];
+    }
+    return agentRuntimeConfigService.listMcpServers()
+      .filter((server) => enabledIds.has(server.id) || enabledIds.has(server.name));
+  }
+
+  private async ensureMcpConnections(agentId: AgentRole): Promise<string[]> {
+    const errors: string[] = [];
+    for (const descriptor of this.getEnabledMcpDescriptors(agentId)) {
+      if (this.connectedMcpServerIds.has(descriptor.id)) {
+        continue;
+      }
+      if (this.failedMcpServers.has(descriptor.id)) {
+        errors.push(`${descriptor.id}: ${this.failedMcpServers.get(descriptor.id)}`);
+        continue;
+      }
+      try {
+        await this.mcpManager.connect(this.toMcpServerConfig(descriptor));
+        this.connectedMcpServerIds.add(descriptor.id);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.failedMcpServers.set(descriptor.id, message);
+        errors.push(`${descriptor.id}: ${message}`);
+      }
+    }
+    return errors;
+  }
+
+  private toMcpServerConfig(descriptor: AgentRuntimeMcpDescriptor): MCPServerConfig {
+    return {
+      name: descriptor.id,
+      type: descriptor.transport,
+      command: descriptor.command,
+      args: descriptor.args,
+      url: descriptor.url,
+      env: descriptor.env,
+    };
+  }
+
   // -------------------------------------------------------------------
   // 单轮 Agent 执行
   // -------------------------------------------------------------------
@@ -972,6 +1178,8 @@ export class AgentOrchestrator {
     turnId?: string;
     toolAllowlist: string[];
     options?: AgentTurnOptions;
+    projectRootPath?: string | null;
+    projectId?: string | null;
     /** Creates a one-shot agent instance instead of reusing the cached slot. */
     useFreshAgent?: boolean;
   }): Promise<string> {
@@ -982,6 +1190,7 @@ export class AgentOrchestrator {
     const settings = settingsService.getAll();
     const routeProvider = settings.llm.providers.find((entry) => entry.id === input.providerId);
     const routeCapability = resolveAgentRouteCapability(routeProvider, input.modelId);
+    const mcpConnectionErrors = await this.ensureMcpConnections(input.agentId);
     const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
     const activeToolDefinitions = routeCapability.toolCallingMode === 'native-structured'
       ? runtimeTools.definitions
@@ -1005,6 +1214,8 @@ export class AgentOrchestrator {
       turnId: input.turnId,
       eventContext: sharedEventContext,
       onEvent: input.options?.onEvent,
+      projectRootPath: input.projectRootPath ?? null,
+      projectId: input.projectId ?? null,
     });
     const streamOptions: StreamOptions = {
       maxTokens: input.maxTokens,
@@ -1013,6 +1224,14 @@ export class AgentOrchestrator {
       signal: input.options?.signal,
     };
     const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
+    if (mcpConnectionErrors.length > 0) {
+      input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
+        code: 'mcp_connection_failed',
+        severity: 'warning',
+        message: 'One or more configured MCP servers could not be connected. MCP tools are unavailable for this turn.',
+        technicalMessage: mcpConnectionErrors.join('\n'),
+      }));
+    }
     if (routeDiagnostic) {
       input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
         code: 'route_tool_calling_unsupported',

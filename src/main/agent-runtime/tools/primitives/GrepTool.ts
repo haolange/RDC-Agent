@@ -61,10 +61,10 @@ export const grepTool: AgentTool<GrepParams, GrepDetails> = {
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'search', requiresApproval: false },
   permissionHint: 'readonly',
 
-  async execute(_toolCallId, params, signal) {
+  async execute(_toolCallId, params, signal, _onUpdate, context) {
     throwIfAborted(signal);
-    const workspaceRoot = getWorkspaceRoot();
-    const root = params.path ? safeResolvePath(params.path, workspaceRoot) : workspaceRoot;
+    const workspaceRoot = getWorkspaceRoot(context);
+    const root = params.path ? safeResolvePath(params.path, workspaceRoot, context) : workspaceRoot;
     const maxMatches = Math.max(1, Math.min(1000, Math.floor(params.maxMatches ?? DEFAULT_MAX_MATCHES)));
     const regex = compilePattern(params.pattern, params.caseSensitive === true);
     const matches: string[] = [];

@@ -34,6 +34,8 @@ if not exist "out\renderer\index.html" (
 )
 
 echo [RDC-Agent] Starting headless main process for Codex in-app browser verification...
+if "%RDC_AGENT_USER_DATA%"=="" set "RDC_AGENT_USER_DATA=%CD%\browser-session-tmp\user-data"
+if not exist "%RDC_AGENT_USER_DATA%" mkdir "%RDC_AGENT_USER_DATA%"
 set "RDC_AGENT_HEADLESS=1"
 if "%NODE_ENV%"=="" set "NODE_ENV=production"
 call "node_modules\electron\dist\electron.exe" "out\main\index.js"

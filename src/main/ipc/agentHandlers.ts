@@ -9,7 +9,7 @@ export function registerAgentHandlers(context: WorkbenchIpcContext): void {
 
   ipcMain.handle('agent:sendMessage', async (_event, agentId: string, content: string) => {
     try {
-      let runContext: { caseId?: string; runId?: string; sessionId?: string } | undefined;
+      let runContext: { caseId?: string; runId?: string; sessionId?: string; projectId?: string; projectRootPath?: string | null } | undefined;
 
       if (state.currentSessionId) {
         const currentRun = state.currentRunId
@@ -22,6 +22,15 @@ export function registerAgentHandlers(context: WorkbenchIpcContext): void {
             sessionId: currentRun.sessionId,
           };
         }
+      }
+
+      const currentProjectId = storageAdapter.getCurrentProjectId();
+      if (currentProjectId) {
+        runContext = {
+          ...runContext,
+          projectId: currentProjectId,
+          projectRootPath: storageAdapter.getProjectById(currentProjectId)?.rootPath ?? null,
+        };
       }
 
       const response = await agentOrchestrator.sendMessage(agentId as any, content, runContext, {

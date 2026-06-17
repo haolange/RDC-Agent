@@ -19,6 +19,7 @@ import { registerAgentHandlers } from './agentHandlers';
 import { registerCaptureDeviceHandlers } from './captureDeviceHandlers';
 import { registerCommandHandlers } from './commandHandlers';
 import { registerConversationHandlers } from './conversationHandlers';
+import { registerGitHandlers } from './gitHandlers';
 import { registerProjectSessionHandlers } from './projectSessionHandlers';
 import { registerRuntimeTerminalHandlers } from './runtimeTerminalHandlers';
 import { registerSettingsLlmHandlers } from './settingsLlmHandlers';
@@ -266,6 +267,7 @@ export function registerIPCHandlers(): void {
   preloadLlmConfig();
   registerShellHandlers();
   registerConversationHandlers(context);
+  registerGitHandlers(context);
   registerWorkflowHandlers(context);
   registerProjectSessionHandlers(context);
   registerRuntimeTerminalHandlers();

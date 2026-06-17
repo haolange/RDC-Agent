@@ -21,7 +21,6 @@ export const agentsCommand: CommandDefinition = {
     return {
       success: true,
       message: `Switched to agent: ${target}`,
-      sideEffect: `switch-mode:${target}`,
       uiAction: { type: 'switch-mode', payload: { agentId: target } },
     };
   },

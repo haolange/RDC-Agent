@@ -304,12 +304,11 @@ body {
 .composer-attach-button,
 .composer-agent-pill,
 .composer-usage-indicator {
-  border-color: rgb(var(--color-border-secondary));
-  background: rgb(var(--color-bg-2));
+  border-color: rgb(var(--token-border-default));
+  background: rgb(var(--token-bg-panel));
 }
 
 .chat-send-button.primary,
-.button-primary,
 .user-menu-settings-button {
   background: rgb(var(--color-accent-600));
   border-color: rgb(var(--color-accent-600));
@@ -318,34 +317,13 @@ body {
 }
 
 .chat-send-button.primary:hover:not(:disabled),
-.button-primary:hover:not(:disabled),
 .user-menu-settings-button:hover {
   background: rgb(var(--color-accent-500));
   box-shadow: none;
 }
 
-.button,
-.input,
-.panel {
-  border-color: rgb(var(--color-border-secondary));
-  background: rgb(var(--color-bg-2));
-}
-
-.button {
-  min-height: 40px;
-  border-radius: 8px;
-}
-
 .button-sm {
   min-height: 34px;
-}
-
-.input {
-  border-radius: 7px;
-}
-
-.panel {
-  border-radius: 10px;
 }
 
 .footer-entry,

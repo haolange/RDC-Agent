@@ -150,10 +150,17 @@ export async function loadSessionsOp(
     return;
   }
 
-  const targetSessionId = options.preferredSessionId
-    || selectedProject.lastSessionId
-    || nextSessions[0]?.sessionId
-    || null;
+  // 选择目标会话的优先级：当前活跃会话（来自 selection.json / currentSession）
+  // 优先于 registry.lastSessionId（持久化、可能 stale）。任何候选 id 都必须仍存在于
+  // nextSessions 中，否则回退到剩余会话之首，避免选中已删除的会话导致 "Session not found"。
+  const existingSessionIds = new Set(nextSessions.map((session) => session.sessionId));
+  const candidateChain = [
+    options.preferredSessionId,
+    currentSession?.sessionId,
+    selectedProject.lastSessionId,
+    nextSessions[0]?.sessionId,
+  ];
+  const targetSessionId = candidateChain.find((id) => id && existingSessionIds.has(id)) ?? null;
 
   if (!targetSessionId) {
     ctx.setRightRailTarget(options.rightRailTarget ?? 'project');

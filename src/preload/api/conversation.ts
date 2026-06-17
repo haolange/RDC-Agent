@@ -14,6 +14,12 @@ export const createConversationApi = (): ConversationApi => ({
     ipcRenderer.invoke('conversation:answerToolApproval', request),
   getHistory: (sessionId): ReturnType<ConversationApi['getHistory']> =>
     ipcRenderer.invoke('conversation:getHistory', sessionId),
+  clearHistory: (sessionId): ReturnType<ConversationApi['clearHistory']> =>
+    ipcRenderer.invoke('conversation:clearHistory', sessionId),
+  undoLastTurn: (sessionId): ReturnType<ConversationApi['undoLastTurn']> =>
+    ipcRenderer.invoke('conversation:undoLastTurn', sessionId),
+  compactHistory: (sessionId): ReturnType<ConversationApi['compactHistory']> =>
+    ipcRenderer.invoke('conversation:compactHistory', sessionId),
   onEvent: (callback): void => {
     registerTrackedListener('conversation:event', (payload) => callback(payload as ConversationStreamEvent));
   },

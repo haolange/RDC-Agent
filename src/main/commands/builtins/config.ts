@@ -9,11 +9,11 @@ export const configCommand: CommandDefinition = {
   description: 'Open settings or view/modify a configuration value',
   category: 'system',
 
-  async execute(_args) {
+  async execute(args) {
     return {
       success: true,
       message: 'Opening Settings...',
-      sideEffect: 'open-settings-modal',
+      uiAction: { type: 'open-settings', payload: args[0] ? { section: args[0] } : undefined },
     };
   },
 };

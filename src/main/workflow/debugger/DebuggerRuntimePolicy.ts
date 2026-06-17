@@ -11,12 +11,17 @@ export const ASK_READONLY_TOOL_ALLOWLIST = [
   'task_list',
   'web_fetch',
   'web_search',
+  'git_status',
+  'git_diff',
+  'git_log',
+  'tool_search',
 ];
 
 const CANONICAL_TOOL_EXPANSIONS: Record<string, string[]> = {
   read: ['read_file'],
   search: ['glob', 'grep'],
   web: ['web_fetch', 'web_search'],
+  git: ['git_status', 'git_diff', 'git_log', 'git_add', 'git_unstage', 'git_commit'],
   bash: ['bash'],
   write: ['write_file'],
   edit: ['edit_file'],
@@ -30,10 +35,11 @@ const CANONICAL_TOOL_EXPANSIONS: Record<string, string[]> = {
   planArtifact: ['plan_artifact'],
   artifact: ['plan_artifact'],
   'vscode/memory': ['memory_read'],
-  skill: ['skills'],
-  skills: ['skills'],
-  mcp: ['mcp'],
-  MCP: ['mcp'],
+  skill: ['skills', 'skill_run'],
+  skills: ['skills', 'skill_run'],
+  mcp: ['mcp', 'mcp__*'],
+  MCP: ['mcp', 'mcp__*'],
+  tool_search: ['tool_search'],
   rdxContext: ['rdx_context'],
   rdx: ['rdx_context'],
 };
@@ -47,6 +53,13 @@ const RUNTIME_TOOL_ALIASES: Record<string, string> = {
   web: 'web_fetch',
   web_fetch: 'web_fetch',
   web_search: 'web_search',
+  git: 'git_status',
+  git_status: 'git_status',
+  git_diff: 'git_diff',
+  git_log: 'git_log',
+  git_add: 'git_add',
+  git_unstage: 'git_unstage',
+  git_commit: 'git_commit',
   bash: 'bash',
   write: 'write_file',
   write_file: 'write_file',
@@ -72,6 +85,7 @@ const RUNTIME_TOOL_ALIASES: Record<string, string> = {
   'vscode/memory': 'memory_read',
   skill: 'skills',
   skills: 'skills',
+  skill_run: 'skill_run',
   mcp: 'mcp',
   MCP: 'mcp',
   rdxContext: 'rdx_context',
@@ -79,7 +93,7 @@ const RUNTIME_TOOL_ALIASES: Record<string, string> = {
   rdx_context: 'rdx_context',
 };
 
-const ASK_DENIED_TOOL_PREFIXES = ['rd.', 'mcp.'];
+const ASK_DENIED_TOOL_PREFIXES = ['rd.', 'mcp.', 'mcp__'];
 const ASK_DENIED_TOOLS = new Set([
   'bash',
   'write',
@@ -88,6 +102,9 @@ const ASK_DENIED_TOOLS = new Set([
   'edit_file',
   'remove',
   'delete',
+  'git_add',
+  'git_unstage',
+  'git_commit',
   'task_create',
   'task_update',
   'rdx_context',
@@ -107,8 +124,14 @@ const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
   'memory_read',
   'plan_artifact',
   'skills',
+  'skill_run',
   'mcp',
+  'mcp__*',
   'rdx_context',
+  'git_add',
+  'git_unstage',
+  'git_commit',
+  'tool_search',
 ];
 
 const SHADER_EDIT_TOOLS = ['rd.shader.edit_and_replace', 'rd.macro.shader_hotfix_validate'];
@@ -149,6 +172,9 @@ export function isToolAllowedForAgent(toolName: string, agentId: AgentRole, stag
       return true;
     }
     if (normalizedPattern.endsWith('.*') && normalizedToolName.startsWith(normalizedPattern.slice(0, -1))) {
+      return true;
+    }
+    if (normalizedPattern.endsWith('*') && normalizedToolName.startsWith(normalizedPattern.slice(0, -1))) {
       return true;
     }
   }

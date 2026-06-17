@@ -97,6 +97,9 @@ export class CommandRegistry {
       projectId: request.context?.projectId,
       workspaceRoot: request.context?.workspaceRoot,
       agentId: request.context?.agentId,
+      currentMode: request.context?.currentMode,
+      currentModelId: request.context?.currentModelId,
+      currentTheme: request.context?.currentTheme,
     };
 
     try {

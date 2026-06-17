@@ -7,7 +7,6 @@ import { CommandRegistry } from './CommandRegistry';
 import { helpCommand } from './builtins/help';
 import { clearCommand } from './builtins/clear';
 import { configCommand } from './builtins/config';
-import { modeCommand } from './builtins/mode';
 import { modelCommand } from './builtins/model';
 import { projectCommand } from './builtins/project';
 import { sessionCommand } from './builtins/session';
@@ -48,7 +47,6 @@ function registerBuiltins(registry: CommandRegistry): void {
     helpCommand,
     clearCommand,
     configCommand,
-    modeCommand,
     modelCommand,
     projectCommand,
     sessionCommand,

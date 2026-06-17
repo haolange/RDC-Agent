@@ -1,6 +1,3 @@
-/**
- * /export — 导出当前会话。
- */
 import type { CommandDefinition } from '@shared/types/command';
 
 export const exportCommand: CommandDefinition = {
@@ -10,11 +7,15 @@ export const exportCommand: CommandDefinition = {
   category: 'workflow',
 
   async execute(args, ctx) {
-    const format = args[0] ?? 'markdown';
+    const sessionId = ctx.sessionId ?? '';
+    const formatArg = args[0] ?? 'markdown';
+    const format = formatArg === 'json' ? 'json' : 'markdown';
     return {
-      success: true,
-      message: `Exporting session ${ctx.sessionId ?? 'current'} as ${format}...`,
-      sideEffect: `export-session:${ctx.sessionId}:${format}`,
+      success: Boolean(sessionId),
+      message: sessionId
+        ? `Exporting session ${sessionId} as ${format}...`
+        : 'No active session. Open or create a session before exporting history.',
+      uiAction: { type: 'export-session', payload: { sessionId, format } },
     };
   },
 };

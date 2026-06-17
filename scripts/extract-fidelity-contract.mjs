@@ -46,6 +46,8 @@ const classNamePatterns = [
   /className\s*=\s*"([^"$]+)"/g,
   /className\s*=\s*'([^'$]+)'/g,
   /className\s*=\s*\{\s*['"]([^'"]+)['"]\s*\}/g,
+  // 模板字符串首段：className={`app-main ${cond ? 'x' : ''}`} → 取反引号内到首个 ${ 之前的字面量。
+  /className\s*=\s*\{`([^`$]+)/g,
 ];
 
 const testIdPatterns = [

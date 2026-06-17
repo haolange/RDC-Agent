@@ -1,12 +1,11 @@
-/**
- * /theme — 切换应用主题。
- */
 import type { CommandDefinition } from '@shared/types/command';
+
+const THEMES = new Set(['dark', 'light', 'system']);
 
 export const themeCommand: CommandDefinition = {
   id: 'theme',
   name: 'theme',
-  description: 'Switch application theme (dark/light)',
+  description: 'Switch application theme (dark/light/system)',
   category: 'system',
 
   async execute(args, ctx) {
@@ -17,10 +16,15 @@ export const themeCommand: CommandDefinition = {
       };
     }
     const theme = args[0];
+    if (!THEMES.has(theme)) {
+      return {
+        success: false,
+        message: 'Theme must be dark, light, or system.',
+      };
+    }
     return {
       success: true,
-      message: `Switched theme to: ${theme}`,
-      sideEffect: `switch-theme:${theme}`,
+      message: `Switching theme to: ${theme}`,
       uiAction: { type: 'switch-theme', payload: { theme } },
     };
   },

@@ -28,18 +28,34 @@ export interface CommandResult {
   message: string;
   /** Optional structured data payload. */
   data?: unknown;
-  /** If the command caused a side effect, describe what happened. */
-  sideEffect?: string;
   /** Optional system message content to insert into the conversation. */
   systemMessage?: string;
   /** UI action to trigger after command execution. */
-  uiAction?: {
-    type: 'open-settings' | 'switch-mode' | 'switch-model' | 'switch-theme' | 'open-panel' | 'none';
-    payload?: unknown;
-  };
+  uiAction?: CommandUiAction;
   /** Stores that need to be invalidated after command execution. */
   invalidateStores?: Array<'session' | 'project' | 'settings' | 'conversation'>;
 }
+
+/**
+ * Structured UI actions emitted by slash commands.
+ * Commands no longer use the removed string side-effect channel.
+ */
+export type CommandUiAction =
+  | { type: 'none' }
+  | { type: 'open-settings'; payload?: { section?: string } }
+  | { type: 'switch-mode'; payload: { agentId: string } }
+  | { type: 'switch-model'; payload: { modelId: string } }
+  | { type: 'switch-theme'; payload: { theme: string } }
+  | { type: 'switch-permissions'; payload: { mode: string } }
+  | { type: 'change-workspace'; payload: { path: string } }
+  | { type: 'open-panel'; payload?: { panel: string } }
+  | { type: 'resume-session'; payload: { sessionId: string } }
+  | { type: 'export-session'; payload: { sessionId: string; format?: 'markdown' | 'json' } }
+  | { type: 'compact-session'; payload: { sessionId: string } }
+  | { type: 'undo-session'; payload: { sessionId: string } }
+  | { type: 'clear-session'; payload: { sessionId: string } }
+  | { type: 'run-skill'; payload: { skillId: string } }
+  | { type: 'trigger-code-review'; payload?: { sessionId?: string } };
 
 /** Definition of a slash command. */
 export interface CommandDefinition {
