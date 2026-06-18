@@ -1,4 +1,5 @@
 import type { LlmProviderId } from './settings';
+import type { ModeIconKey } from './layout';
 
 export interface AgentHandoffDefinition {
   label: string;
@@ -18,6 +19,7 @@ export interface AgentManifestDefinition {
   argumentHint: string;
   target: string;
   models: string[];
+  icon: ModeIconKey;
   disableModelInvocation: boolean;
   userInvocable: boolean;
   tools: string[];

@@ -6,6 +6,8 @@ import { registerTrackedListener, removeTrackedListener } from './listeners';
 export const createConversationApi = (): ConversationApi => ({
   sendMessage: (request): ReturnType<ConversationApi['sendMessage']> =>
     ipcRenderer.invoke('conversation:sendMessage', request),
+  rewriteFromMessage: (request): ReturnType<ConversationApi['rewriteFromMessage']> =>
+    ipcRenderer.invoke('conversation:rewriteFromMessage', request),
   cancelActiveTurn: (request): ReturnType<ConversationApi['cancelActiveTurn']> =>
     ipcRenderer.invoke('conversation:cancelActiveTurn', request),
   answerUserInput: (request): ReturnType<ConversationApi['answerUserInput']> =>

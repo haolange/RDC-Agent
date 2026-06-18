@@ -33,12 +33,13 @@ export const SettingsNavIcon: React.FC<SettingsNavIconProps> = ({ section }) => 
             <path d="M8.5 9h7M8.5 12h7M8.5 15h4" />
           </>
         );
-      case 'agents':
+      case 'skillsAgents':
         return (
           <>
             <circle cx="12" cy="8" r="3" />
             <path d="M6.5 19a5.5 5.5 0 0 1 11 0" />
-            <path d="M18.5 7.5h2.5M19.75 6.25v2.5" />
+            <path d="M18 5.5h2.5M19.25 4.25v2.5" />
+            <path d="M4.5 5.5h3" />
           </>
         );
       case 'tools':

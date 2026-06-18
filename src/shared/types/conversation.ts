@@ -125,6 +125,10 @@ export interface ConversationSendRequest {
   attachments?: ConversationAttachmentInput[];
 }
 
+export interface ConversationRewriteFromMessageRequest extends ConversationSendRequest {
+  messageId: string;
+}
+
 export interface ConversationCancelActiveTurnRequest {
   sessionId?: string;
   turnId?: string;

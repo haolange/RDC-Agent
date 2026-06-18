@@ -12,6 +12,7 @@ import type {
   ConversationAnswerToolApprovalRequest,
   ConversationAnswerToolApprovalResult,
   ConversationMessage,
+  ConversationRewriteFromMessageRequest,
   ConversationSendRequest,
   ConversationStreamEvent,
   ConversationTurnResult,
@@ -19,6 +20,10 @@ import type {
 import type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from './device';
 import type { LLMConfig } from './llm';
 import type { RuntimeLogEntry, RuntimeLogScope } from './runtimeLog';
+import type {
+  AgentRuntimeMcpWriteRequest,
+  AgentRuntimeSkillWriteRequest,
+} from './agentRuntime';
 import type {
   AppSettings,
   AppSettingsPatch,
@@ -89,6 +94,7 @@ export interface ElectronAPI {
 
   conversation: {
     sendMessage: (request: ConversationSendRequest) => Promise<ConversationTurnResult>;
+    rewriteFromMessage: (request: ConversationRewriteFromMessageRequest) => Promise<ConversationTurnResult>;
     cancelActiveTurn: (request?: ConversationCancelActiveTurnRequest) => Promise<ConversationCancelActiveTurnResult>;
     answerUserInput: (request: ConversationAnswerUserInputRequest) => Promise<ConversationAnswerUserInputResult>;
     answerToolApproval: (request: ConversationAnswerToolApprovalRequest) => Promise<ConversationAnswerToolApprovalResult>;
@@ -202,6 +208,12 @@ export interface ElectronAPI {
     get: () => Promise<AppSettings>;
     getProviderSecret: (providerId: string) => Promise<string>;
     importAgentManifest: (filePath: string) => Promise<AppSettings>;
+    upsertSkill: (request: AgentRuntimeSkillWriteRequest) => Promise<AppSettings>;
+    deleteSkill: (skillId: string) => Promise<AppSettings>;
+    importSkill: (filePath: string) => Promise<AppSettings>;
+    upsertMcpServer: (request: AgentRuntimeMcpWriteRequest) => Promise<AppSettings>;
+    deleteMcpServer: (serverId: string) => Promise<AppSettings>;
+    importMcpServer: (filePath: string) => Promise<AppSettings>;
     set: (settings: AppSettingsPatch) => Promise<AppSettings>;
   };
 

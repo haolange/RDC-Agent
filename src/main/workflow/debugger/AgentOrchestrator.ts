@@ -966,7 +966,7 @@ export class AgentOrchestrator {
         const skills = agentRuntimeConfigService.listSkills()
           .filter((skill) => !query || `${skill.id} ${skill.name} ${skill.label} ${skill.description}`.toLowerCase().includes(query));
         const lines = skills.map((skill) => (
-          `${skill.id}: ${skill.label || skill.name} (${skill.source})${skill.enabledByDefault ? '' : ' - disabled by default'}`
+          `${skill.id}: ${skill.label || skill.name} (${skill.source})`
         ));
         return {
           content: [{ type: 'text', text: lines.length > 0 ? lines.join('\n') : 'No configured skills matched the query.' }],
@@ -984,12 +984,12 @@ export class AgentOrchestrator {
     return {
       name: 'skill_run',
       label: 'Run Skill',
-      description: 'Execute a configured reusable skill by id or name. Builtin context skills return live workspace/session context.',
+      description: 'Execute a configured reusable skill by id or name. Context skills return live workspace/session context.',
       parameters: {
         type: 'object',
         required: ['skill_id'],
         properties: {
-          skill_id: { type: 'string', description: 'Skill id or name, for example builtin.rdc-context.' },
+          skill_id: { type: 'string', description: 'Skill id or name, for example rdc-context.' },
           params: {
             type: 'object',
             description: 'Skill parameters. Values are converted to strings for prompt skills.',
@@ -1008,17 +1008,17 @@ export class AgentOrchestrator {
           };
         }
 
-        const skills = orchestrator.getEnabledSkillDescriptors(agentId);
+        const skills = orchestrator.getAvailableSkillDescriptors();
         const skill = skills.find((entry) => entry.id === skillKey || entry.name === skillKey);
         if (!skill) {
           return {
-            content: [{ type: 'text', text: `Skill is not enabled or configured: ${skillKey}` }],
+            content: [{ type: 'text', text: `Skill is not configured: ${skillKey}` }],
             isError: true,
             details: { skillId: skillKey, agentId },
           };
         }
 
-        if (skill.id === 'builtin.rdc-context' || skill.name === 'rdc-context') {
+        if (skill.id === 'rdc-context' || skill.name === 'rdc-context') {
           const session = sessionId ? storageAdapter.readSession(sessionId) : null;
           const project = session?.projectId ? storageAdapter.getProjectById(session.projectId) : null;
           const runtimeContext = getRdxRuntimeContext();
@@ -1088,15 +1088,8 @@ export class AgentOrchestrator {
     };
   }
 
-  private getEnabledSkillDescriptors(agentId: AgentRole): AgentRuntimeSkillDescriptor[] {
-    const settings = settingsService.getAll();
-    const manifest = settings.agents.definitions.find((entry) => entry.id === agentId && entry.enabled);
-    const enabledIds = new Set([
-      ...(settings.configuration.enabledSkillIds ?? []),
-      ...(manifest?.skills ?? []),
-    ]);
-    return agentRuntimeConfigService.listSkills()
-      .filter((skill) => skill.enabledByDefault || enabledIds.has(skill.id) || enabledIds.has(skill.name));
+  private getAvailableSkillDescriptors(): AgentRuntimeSkillDescriptor[] {
+    return agentRuntimeConfigService.listSkills();
   }
 
   private stringifySkillParams(params: Record<string, unknown> | undefined): Record<string, string> {

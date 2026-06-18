@@ -1,6 +1,7 @@
 import React from 'react';
 import type { AppSettings, AppTheme, FontScale } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { PersonalizationSettings } from './PersonalizationSettings';
 import { ProfileSettings } from './ProfileSettings';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -14,6 +15,9 @@ interface GeneralSettingsProps {
   onThemeChange: (theme: AppTheme) => void | Promise<void>;
   onLanguageChange: (language: AppSettings['appearance']['language']) => void | Promise<void>;
   onFontScaleChange: (fontScale: FontScale) => void | Promise<void>;
+  globalInstructionsDraft: string;
+  onGlobalInstructionsDraftChange: (value: string) => void;
+  onSavePersonalization: () => void | Promise<void>;
   t: Translate;
 }
 
@@ -26,17 +30,11 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
   onThemeChange,
   onLanguageChange,
   onFontScaleChange,
+  globalInstructionsDraft,
+  onGlobalInstructionsDraftChange,
+  onSavePersonalization,
   t,
 }) => {
-  const configuredProviderCount = settings.llm.providers.filter(
-    (provider) => provider.enabled && provider.isConfigured,
-  ).length;
-  const enabledModelCount = settings.llm.providers.reduce(
-    (count, provider) => count + provider.models.filter((model) => model.enabled).length,
-    0,
-  );
-  const workspaceRoot = settings.workspace.rootPath || settings.paths.defaultWorkspaceRoot;
-
   return (
     <section className="settings-page settings-page-general">
       <div className="settings-general-grid settings-general-grid--rows">
@@ -120,32 +118,13 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
             </div>
           </div>
         </div>
-
-        <div className="settings-section settings-environment-overview settings-environment-overview--compact">
-          <div className="settings-section-header">
-            <div>
-              <div className="settings-section-title">{t('settings.localEnvironment')}</div>
-              <div className="settings-section-subtitle">{t('settings.localEnvironmentHint')}</div>
-            </div>
-          </div>
-          <div className="settings-overview-grid">
-            <div className="settings-overview-item">
-              <span>{t('settings.workspaceRoot')}</span>
-              <strong title={workspaceRoot}>{workspaceRoot || t('settings.unset')}</strong>
-            </div>
-            <div className="settings-overview-item">
-              <span>{t('settings.connectedProviders')}</span>
-              <strong>{t('settings.providerModelSummary', {
-                providers: String(configuredProviderCount),
-                models: String(enabledModelCount),
-              })}</strong>
-            </div>
-            <div className="settings-overview-item">
-              <span>{t('settings.rdxCliInvoker')}</span>
-              <strong>{settings.tooling.rdxCli.enabled ? t('settings.enabled') : t('settings.disabled')}</strong>
-            </div>
-          </div>
-        </div>
+        <PersonalizationSettings
+          embedded
+          globalInstructionsDraft={globalInstructionsDraft}
+          onGlobalInstructionsDraftChange={onGlobalInstructionsDraftChange}
+          onSavePersonalization={onSavePersonalization}
+          t={t}
+        />
       </div>
     </section>
   );

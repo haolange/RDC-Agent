@@ -114,7 +114,6 @@ export class ExecutionProfileService {
       availablePatterns,
       availableSkills,
       availableMcpServers,
-      enabledSkillIds: configuration.enabledSkillIds ?? [],
       enabledMcpServerIds: configuration.enabledMcpServerIds ?? [],
       modePatternBindings: {
         debugger: patternIds.has(modePatternBindings.debugger) ? modePatternBindings.debugger : 'free-agent',
@@ -176,7 +175,6 @@ export class ExecutionProfileService {
       patternId: modeProfile.patternId ?? settings.configuration.modePatternBindings[modeProfile.mode],
       skillIds: Array.from(new Set([
         ...(modeProfile.skillIds ?? []),
-        ...(settings.configuration.enabledSkillIds ?? []),
       ])),
       mcpServerIds: Array.from(new Set([
         ...(modeProfile.mcpServerIds ?? []),

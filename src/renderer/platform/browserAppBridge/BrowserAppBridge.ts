@@ -44,6 +44,7 @@ class BrowserAppBridgeClient {
     },
     conversation: {
       sendMessage: (request) => this.invoke('conversation:sendMessage', request),
+      rewriteFromMessage: (request) => this.invoke('conversation:rewriteFromMessage', request),
       cancelActiveTurn: (request) => this.invoke('conversation:cancelActiveTurn', request),
       answerUserInput: (request) => this.invoke('conversation:answerUserInput', request),
       answerToolApproval: (request) => this.invoke('conversation:answerToolApproval', request),
@@ -109,6 +110,12 @@ class BrowserAppBridgeClient {
       get: () => this.invoke('settings:get'),
       getProviderSecret: (providerId) => this.invoke('settings:getProviderSecret', providerId),
       importAgentManifest: (filePath) => this.invoke('settings:importAgentManifest', filePath),
+      upsertSkill: (request) => this.invoke('settings:upsertSkill', request),
+      deleteSkill: (skillId) => this.invoke('settings:deleteSkill', skillId),
+      importSkill: (filePath) => this.invoke('settings:importSkill', filePath),
+      upsertMcpServer: (request) => this.invoke('settings:upsertMcpServer', request),
+      deleteMcpServer: (serverId) => this.invoke('settings:deleteMcpServer', serverId),
+      importMcpServer: (filePath) => this.invoke('settings:importMcpServer', filePath),
       set: (settings) => this.invoke('settings:set', settings),
     },
     project: {

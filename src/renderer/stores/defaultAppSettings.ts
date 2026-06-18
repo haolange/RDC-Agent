@@ -63,7 +63,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   configuration: {
     activeModeProfileId: 'debugger.default',
     availableModeProfiles: [],
-    enabledSkillIds: [],
     enabledMcpServerIds: [],
     modePatternBindings: { debugger: 'free-agent', analyzer: 'free-agent', optimizer: 'free-agent' },
     availablePatterns: [],

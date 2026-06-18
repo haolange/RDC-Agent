@@ -3,14 +3,15 @@ import type {
   ConversationMessage,
   ConversationMessageStatus,
 } from '@shared/types/conversation';
-import type { SessionAttachmentRecord } from '@shared/types/session';
-import { formatBytes } from '../../../services/attachmentHelpers';
 import { resolveAgentDisplay } from '@shared/constants/agents';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { WorkProcess } from './WorkProcess';
 import { useAgentHandoffActions } from './useAgentHandoffActions';
 import { MessageActions } from './MessageActions';
-import { useMessageActions } from '../../../hooks/useMessageActions';
+import { ModeGlyph } from '../../../ui/ModeGlyph';
+import { UserMessageEditForm } from './UserMessageEditForm';
+import { useUserMessageRewrite } from './useUserMessageRewrite';
+import { MessageAttachments } from './MessageAttachments';
 
 interface MessageBubbleProps {
   message: ConversationMessage;
@@ -21,40 +22,9 @@ const formatClockTime = (epoch: number): string => {
   return new Date(epoch).toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
   });
 };
-
-const isImageAttachment = (attachment: SessionAttachmentRecord): boolean =>
-  attachment.kind === 'image' || /^image\//i.test(attachment.mimeType ?? '');
-
-const AttachmentList: React.FC<{ attachments: SessionAttachmentRecord[] }> = ({
-  attachments,
-}) => (
-  <div className="message-attachments" data-testid="message-attachments">
-    {attachments.map((attachment) => {
-      const image = isImageAttachment(attachment);
-      const ext = attachment.fileName.includes('.')
-        ? attachment.fileName.slice(attachment.fileName.lastIndexOf('.') + 1).toUpperCase()
-        : 'FILE';
-      return (
-        <div
-          key={attachment.attachmentId}
-          className={`message-attachment-pill ${image ? 'image' : ''}`.trim()}
-        >
-          <span className="message-attachment-pill-icon" aria-hidden="true">
-            {image ? '◫' : ext.slice(0, 4)}
-          </span>
-          <span className="message-attachment-pill-copy">
-            <span className="message-attachment-pill-name">{attachment.fileName}</span>
-            <span className="message-attachment-pill-meta">
-              {formatBytes(attachment.size)}
-            </span>
-          </span>
-        </div>
-      );
-    })}
-  </div>
-);
 
 const StreamingCursor: React.FC = () => (
   <span className="conversation-streaming-cursor" aria-hidden="true" />
@@ -80,38 +50,102 @@ const renderContentWithCursor = (
   );
 };
 
+const MessageMetaBar: React.FC<{
+  message: ConversationMessage;
+  time: string;
+  status?: ConversationMessageStatus;
+  onEditResend?: (content: string) => void;
+}> = ({
+  message,
+  time,
+  status,
+  onEditResend,
+}) => (
+  <footer className="conversation-message-footer">
+    {time ? (
+      <span className="conversation-message-time">{time}</span>
+    ) : null}
+    {status === 'streaming' ? (
+      <span className="conversation-message-streaming-tag">streaming</span>
+    ) : null}
+    {status === 'error' ? (
+      <span className="conversation-message-status-tag is-error">error</span>
+    ) : null}
+    {status === 'stopped' ? (
+      <span className="conversation-message-status-tag is-stopped">stopped</span>
+    ) : null}
+    <MessageActions message={message} onEditResend={onEditResend} />
+  </footer>
+);
+
 const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => {
   const time = formatClockTime(message.createdAt);
-  const { handleCopy, handleEditResend, handleShare } = useMessageActions();
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState(message.content);
+  const [editError, setEditError] = useState('');
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const rewriteMessage = useUserMessageRewrite(message);
+
+  const beginEdit = () => {
+    setDraft(message.content);
+    setEditError('');
+    setIsEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setDraft(message.content);
+    setEditError('');
+    setIsEditing(false);
+  };
+
+  const submitEdit = async () => {
+    const nextContent = draft.trim();
+    if (!nextContent || isSubmittingEdit) return;
+    setIsSubmittingEdit(true);
+    setEditError('');
+
+    try {
+      await rewriteMessage(nextContent);
+      setIsEditing(false);
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
   return (
     <article
-      className="conversation-message conversation-message-user"
+      className={`conversation-message conversation-message-user ${isEditing ? 'conversation-message-editing' : ''}`}
       data-testid="message-bubble-user"
       data-message-id={message.id}
     >
       <div className="conversation-message-row">
         <div className="conversation-message-stack">
-          <header className="conversation-message-header">
-            <span className="conversation-message-author">You</span>
-            {time ? (
-              <span className="conversation-message-time">{time}</span>
-            ) : null}
-            <MessageActions
-              message={message}
-              onCopy={handleCopy}
-              onEditResend={handleEditResend}
-              onShare={handleShare}
-            />
-          </header>
           {message.attachments && message.attachments.length > 0 ? (
-            <AttachmentList attachments={message.attachments} />
+            <MessageAttachments attachments={message.attachments} />
           ) : null}
-          <div className="conversation-bubble conversation-bubble-user">
-            <span className="conversation-bubble-text">{message.content}</span>
-          </div>
-        </div>
-        <div className="conversation-avatar conversation-avatar-user" aria-hidden="true">
-          U
+          {isEditing ? (
+            <UserMessageEditForm
+              value={draft}
+              error={editError}
+              submitting={isSubmittingEdit}
+              onChange={setDraft}
+              onCancel={cancelEdit}
+              onSubmit={() => void submitEdit()}
+            />
+          ) : (
+            <>
+              <div className="conversation-bubble conversation-bubble-user">
+                <span className="conversation-bubble-text">{message.content}</span>
+              </div>
+              <MessageMetaBar
+                message={message}
+                time={time}
+                onEditResend={beginEdit}
+              />
+            </>
+          )}
         </div>
       </div>
     </article>
@@ -123,8 +157,6 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
   const definitions = useAppSettingsStore((state) => state.settings.agents.definitions);
   const display = resolveAgentDisplay(agentId ?? 'assistant', definitions);
   const accent = display.accent;
-  const displayName = display.name;
-  const glyph = display.glyph;
   const time = formatClockTime(message.createdAt);
   const trace = message.workTrace ?? null;
   const status: ConversationMessageStatus = message.status ?? 'complete';
@@ -161,31 +193,12 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
       style={styleVar}
     >
       <div className="conversation-message-row">
-        <div className="conversation-avatar conversation-avatar-assistant" aria-hidden="true">
-          <span className="conversation-avatar-glyph">{glyph}</span>
-        </div>
         <div className="conversation-message-stack">
-          <header className="conversation-message-header">
-            <span className="conversation-message-author">{displayName}</span>
-            {status === 'streaming' ? (
-              <span className="conversation-message-streaming-tag">streaming</span>
-            ) : null}
-            {status === 'error' ? (
-              <span className="conversation-message-status-tag is-error">error</span>
-            ) : null}
-            {status === 'stopped' ? (
-              <span className="conversation-message-status-tag is-stopped">stopped</span>
-            ) : null}
-            {time ? (
-              <span className="conversation-message-time">{time}</span>
-            ) : null}
-            <MessageActions message={message} />
-          </header>
           {trace && (trace.blocks.length > 0 || trace.summary || trace.status === 'running') ? (
             <WorkProcess trace={trace} />
           ) : null}
           {message.attachments && message.attachments.length > 0 ? (
-            <AttachmentList attachments={message.attachments} />
+            <MessageAttachments attachments={message.attachments} />
           ) : null}
           {hasContent || status === 'streaming' || status === 'draft' ? (
             <div className="conversation-bubble conversation-bubble-assistant">
@@ -202,6 +215,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
               </span>
             </div>
           ) : null}
+          <MessageMetaBar message={message} time={time} status={status} />
           {handoffs.length > 0 ? (
             <div className="conversation-handoff-actions" data-testid="conversation-handoff-actions">
               <span className="conversation-handoff-actions-label">Next actions</span>
@@ -222,7 +236,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
                       aria-label={`${handoff.label} (${target.name})`}
                     >
                       <span className="conversation-handoff-button-icon" aria-hidden="true">
-                        {target.glyph}
+                        <ModeGlyph mode={handoff.agent} icon={target.icon} accentColor={target.accent} size={14} strokeWidth={1.9} />
                       </span>
                       <span>{handoff.label}</span>
                     </button>

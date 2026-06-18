@@ -73,7 +73,7 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
         <div className="settings-help-text">{t('settings.localRenderDocToolchainHint')}</div>
         <div className={`settings-toolchain-status ${rdxCliDraft.enabled ? 'enabled' : 'disabled'}`}>
           <strong>{rdxCliDraft.enabled ? t('settings.toolchainAvailable') : t('settings.toolchainNotEnabled')}</strong>
-          <span>{rdxCliDraft.command || t('settings.toolchainCommandMissing')}</span>
+          {rdxCliDraft.command ? <code>{rdxCliDraft.command}</code> : null}
         </div>
         <label className="settings-checkbox-row">
           <input

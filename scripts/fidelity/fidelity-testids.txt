@@ -73,11 +73,12 @@ settings-agent-permissions-save
 settings-agent-readable-roots
 settings-agent-route-save-status
 settings-agent-runtime-config
-settings-agent-runtime-save
 settings-agent-save
 settings-agent-writable-roots
 settings-center-panel
 settings-mcp-${server.id}
+settings-mcp-block
+settings-mcp-editor
 settings-modal
 settings-model-cascade-trigger
 settings-nav-${section.id}
@@ -100,7 +101,10 @@ settings-provider-oauth-summary
 settings-provider-test-${provider.id}
 settings-rdx-action-${entry.id}
 settings-rdx-actions
+settings-rdx-block
 settings-skill-${skill.id}
+settings-skill-editor
+settings-skills-block
 settings-workspace-body
 sidebar-footer
 sidebar-scroll

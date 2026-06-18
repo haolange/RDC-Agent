@@ -1027,7 +1027,26 @@ const AGENT_MODES = [
     disabled: false
   }
 ];
-AGENT_MODES.reduce(
+const AGENT_ICON_PRESETS = [
+  { id: "message-orbit", label: "Ask" },
+  { id: "route-plan", label: "Plan" },
+  { id: "pencil-edit", label: "Edit" },
+  { id: "crosshair-bug", label: "Debug" },
+  { id: "waveform-gauge", label: "Analyze" },
+  { id: "spark-tuning", label: "Optimize" },
+  { id: "compass", label: "Explore" },
+  { id: "terminal", label: "Shell" },
+  { id: "shield", label: "Review" },
+  { id: "wrench", label: "Build" },
+  { id: "search-lens", label: "Search" },
+  { id: "nodes", label: "Orchestrate" },
+  { id: "memory", label: "Memory" },
+  { id: "spark", label: "Create" }
+];
+function isAgentIconPreset(value) {
+  return typeof value === "string" && AGENT_ICON_PRESETS.some((preset) => preset.id === value);
+}
+const AGENT_MODE_MAP = AGENT_MODES.reduce(
   (accumulator, mode) => {
     accumulator[mode.id] = mode;
     return accumulator;
@@ -1119,6 +1138,7 @@ const parseAgentMarkdown = (filePath, fallbackId) => {
     argumentHint: typeof frontmatter["argument-hint"] === "string" ? frontmatter["argument-hint"].trim() : "",
     target: typeof frontmatter.target === "string" ? frontmatter.target.trim() : "rdc-agent",
     models: readStringArray$1(frontmatter.model),
+    icon: isAgentIconPreset(frontmatter.icon) ? frontmatter.icon : AGENT_MODE_MAP[fallbackId]?.icon ?? "message-orbit",
     disableModelInvocation: readBoolean(frontmatter["disable-model-invocation"], false),
     userInvocable: readBoolean(frontmatter["user-invocable"], true),
     tools: readStringArray$1(frontmatter.tools),
@@ -1140,6 +1160,7 @@ const serializeAgentMarkdown = (definition) => {
     "argument-hint": definition.argumentHint,
     target: definition.target || "rdc-agent",
     model: definition.models,
+    icon: isAgentIconPreset(definition.icon) ? definition.icon : "message-orbit",
     "disable-model-invocation": definition.disableModelInvocation,
     "user-invocable": definition.userInvocable,
     enabled: definition.enabled,
@@ -1169,6 +1190,7 @@ const createSeedDefinition = (agentId, routes) => {
     argumentHint: agentId === "ask" ? "Ask about the current project, capture, or workflow" : "Describe the RenderDoc/RDC investigation goal",
     target: "rdc-agent",
     models: model ? [model] : [],
+    icon: AGENT_MODE_MAP[agentId]?.icon ?? "message-orbit",
     disableModelInvocation: false,
     userInvocable: true,
     tools,
@@ -1354,6 +1376,8 @@ const normalizeWorkflowStage = (stage) => {
   return "preflight";
 };
 const RETIRED_BUILTIN_MCP_SERVER_IDS$1 = /* @__PURE__ */ new Set(["builtin.rdc-toolbridge"]);
+const RETIRED_SKILL_JSON_IDS = /* @__PURE__ */ new Set(["builtin.rdc-context", "builtin.renderdoc-glossary"]);
+const MCP_TRANSPORTS = /* @__PURE__ */ new Set(["stdio", "sse", "streamable-http"]);
 const TEMPLATE_COPIES = [
   {
     source: ["profiles", "agents"],
@@ -1409,6 +1433,59 @@ function copyDirContentsIfMissing(sourceDir, targetDir) {
     fs.copyFileSync(sourcePath, targetPath);
   }
 }
+function toRuntimeId(value, fallback = "custom") {
+  const id = value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  return id || fallback;
+}
+function titleFromId(id) {
+  return id.split(/[-_.]+/).filter(Boolean).map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`).join(" ") || id;
+}
+function parseSkillMarkdown(filePath) {
+  const raw = fs.readFileSync(filePath, "utf8");
+  const id = toRuntimeId(path.basename(filePath, ".md"), "skill");
+  const heading = raw.match(/^#\s+(.+)$/m)?.[1]?.trim();
+  const description = raw.match(/^description:\s*(.+)$/m)?.[1]?.trim() ?? "";
+  const type = raw.match(/^type:\s*(.+)$/m)?.[1]?.trim();
+  return {
+    id,
+    name: id,
+    label: heading || titleFromId(id),
+    description,
+    source: "workspace",
+    enabledByDefault: true,
+    path: filePath,
+    parameters: {
+      markdown: raw,
+      ...type ? { type } : {}
+    }
+  };
+}
+function normalizeSkillMarkdown(request2, id) {
+  const label = request2.label.trim() || titleFromId(id);
+  const description = request2.description.trim();
+  const input = request2.markdown.trim();
+  const withoutHeading = input.replace(/^#\s+.*(?:\r?\n)?/, "");
+  const withoutDescription = withoutHeading.replace(/^description:\s*.*(?:\r?\n)?/m, "");
+  const body = withoutDescription.trim() || "type: prompt\npromptTemplate: |\n  Describe the reusable workflow or instruction here.";
+  return `# ${label}
+description: ${description}
+${body}
+`;
+}
+function validateWithinDir(filePath, dir) {
+  const resolvedDir = path.resolve(dir);
+  const resolvedFile = path.resolve(filePath);
+  const relative = path.relative(resolvedDir, resolvedFile);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error("Runtime file path escaped the workspace directory.");
+  }
+  return resolvedFile;
+}
+function readEnvLines(env) {
+  if (!env) return void 0;
+  const entries = Object.entries(env).map(([key, value]) => [key.trim(), String(value)]).filter(([key]) => Boolean(key));
+  return entries.length > 0 ? Object.fromEntries(entries) : void 0;
+}
 class AgentRuntimeConfigService {
   resolveTemplateRoot() {
     const candidates = [
@@ -1431,24 +1508,132 @@ class AgentRuntimeConfigService {
     for (const copy of TEMPLATE_COPIES) {
       copyDirContentsIfMissing(path.join(templateRoot, ...copy.source), copy.target(workspaceRoot));
     }
+    this.removeRetiredSkillJsonFiles(workspaceRoot);
   }
   listPatterns(workspaceRoot = appPathService.getWorkspaceRoot()) {
     return this.readDescriptors("patterns", workspaceRoot);
   }
   listSkills(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return this.readDescriptors("skills", workspaceRoot);
+    this.ensureScaffold(workspaceRoot);
+    const dir = appPathService.getWorkspacePaths(workspaceRoot).skillsPath;
+    if (!fs.existsSync(dir)) {
+      return [];
+    }
+    return fs.readdirSync(dir).filter((entry) => entry.endsWith(".md")).map((entry) => parseSkillMarkdown(path.join(dir, entry))).filter((entry) => Boolean(entry?.id)).sort((left, right) => left.id.localeCompare(right.id));
   }
   listMcpServers(workspaceRoot = appPathService.getWorkspaceRoot()) {
     return this.readDescriptors("mcp", workspaceRoot).filter((descriptor) => !RETIRED_BUILTIN_MCP_SERVER_IDS$1.has(descriptor.id));
   }
+  upsertSkill(request2, workspaceRoot = appPathService.getWorkspaceRoot()) {
+    this.ensureScaffold(workspaceRoot);
+    const paths = appPathService.getWorkspacePaths(workspaceRoot);
+    const nextId = toRuntimeId(request2.id, "skill");
+    const targetPath = validateWithinDir(path.join(paths.skillsPath, `${nextId}.md`), paths.skillsPath);
+    const previousId = request2.previousId ? toRuntimeId(request2.previousId, nextId) : nextId;
+    const previousPath = validateWithinDir(path.join(paths.skillsPath, `${previousId}.md`), paths.skillsPath);
+    fs.mkdirSync(paths.skillsPath, { recursive: true });
+    fs.writeFileSync(targetPath, normalizeSkillMarkdown(request2, nextId), "utf8");
+    if (previousId !== nextId && fs.existsSync(previousPath)) {
+      fs.unlinkSync(previousPath);
+    }
+  }
+  deleteSkill(id, workspaceRoot = appPathService.getWorkspaceRoot()) {
+    const paths = appPathService.getWorkspacePaths(workspaceRoot);
+    const targetPath = validateWithinDir(path.join(paths.skillsPath, `${toRuntimeId(id, "skill")}.md`), paths.skillsPath);
+    if (fs.existsSync(targetPath)) {
+      fs.unlinkSync(targetPath);
+    }
+  }
+  importSkill(filePath, workspaceRoot = appPathService.getWorkspaceRoot()) {
+    if (!filePath.endsWith(".md")) {
+      throw new Error("Skill import requires a .md file.");
+    }
+    this.ensureScaffold(workspaceRoot);
+    const paths = appPathService.getWorkspacePaths(workspaceRoot);
+    const baseId = toRuntimeId(path.basename(filePath, ".md"), "skill");
+    const targetPath = this.nextAvailableDescriptorPath(paths.skillsPath, baseId, ".md");
+    fs.copyFileSync(filePath, targetPath);
+  }
+  upsertMcpServer(request2, workspaceRoot = appPathService.getWorkspaceRoot()) {
+    this.ensureScaffold(workspaceRoot);
+    const paths = appPathService.getWorkspacePaths(workspaceRoot);
+    const id = toRuntimeId(request2.id, "mcp-server");
+    const transport = MCP_TRANSPORTS.has(request2.transport) ? request2.transport : "stdio";
+    const descriptor = {
+      id,
+      name: request2.name.trim() || titleFromId(id),
+      description: request2.description.trim(),
+      transport,
+      enabledByDefault: request2.enabledByDefault ?? true,
+      ...request2.command?.trim() ? { command: request2.command.trim() } : {},
+      ...request2.args && request2.args.length > 0 ? { args: request2.args.map((arg) => arg.trim()).filter(Boolean) } : {},
+      ...request2.url?.trim() ? { url: request2.url.trim() } : {},
+      ...readEnvLines(request2.env) ? { env: readEnvLines(request2.env) } : {}
+    };
+    const targetPath = validateWithinDir(path.join(paths.mcpPath, `${id}.json`), paths.mcpPath);
+    const previousId = request2.previousId ? toRuntimeId(request2.previousId, id) : id;
+    const previousPath = validateWithinDir(path.join(paths.mcpPath, `${previousId}.json`), paths.mcpPath);
+    fs.mkdirSync(paths.mcpPath, { recursive: true });
+    fs.writeFileSync(targetPath, `${JSON.stringify(descriptor, null, 2)}
+`, "utf8");
+    if (previousId !== id && fs.existsSync(previousPath)) {
+      fs.unlinkSync(previousPath);
+    }
+  }
+  deleteMcpServer(id, workspaceRoot = appPathService.getWorkspaceRoot()) {
+    const paths = appPathService.getWorkspacePaths(workspaceRoot);
+    const targetPath = validateWithinDir(path.join(paths.mcpPath, `${toRuntimeId(id, "mcp-server")}.json`), paths.mcpPath);
+    if (fs.existsSync(targetPath)) {
+      fs.unlinkSync(targetPath);
+    }
+  }
+  importMcpServer(filePath, workspaceRoot = appPathService.getWorkspaceRoot()) {
+    if (!filePath.endsWith(".json")) {
+      throw new Error("MCP import requires a .json file.");
+    }
+    this.ensureScaffold(workspaceRoot);
+    const parsed = readJsonFile$1(filePath);
+    if (!parsed?.id || !MCP_TRANSPORTS.has(parsed.transport)) {
+      throw new Error("MCP config is missing id or transport.");
+    }
+    const paths = appPathService.getWorkspacePaths(workspaceRoot);
+    const targetPath = this.nextAvailableDescriptorPath(paths.mcpPath, toRuntimeId(parsed.id, "mcp-server"), ".json");
+    fs.copyFileSync(filePath, targetPath);
+  }
   readDescriptors(kind, workspaceRoot) {
     this.ensureScaffold(workspaceRoot);
     const paths = appPathService.getWorkspacePaths(workspaceRoot);
-    const dir = kind === "patterns" ? paths.patternsPath : kind === "skills" ? paths.skillsPath : paths.mcpPath;
+    const dir = kind === "patterns" ? paths.patternsPath : paths.mcpPath;
     if (!fs.existsSync(dir)) {
       return [];
     }
     return fs.readdirSync(dir).filter((entry) => entry.endsWith(".json")).map((entry) => readJsonFile$1(path.join(dir, entry))).filter((entry) => Boolean(entry?.id)).sort((left, right) => left.id.localeCompare(right.id));
+  }
+  nextAvailableDescriptorPath(dir, baseId, extension) {
+    fs.mkdirSync(dir, { recursive: true });
+    let index = 1;
+    let candidate = validateWithinDir(path.join(dir, `${baseId}${extension}`), dir);
+    while (fs.existsSync(candidate)) {
+      index += 1;
+      candidate = validateWithinDir(path.join(dir, `${baseId}-${index}${extension}`), dir);
+    }
+    return candidate;
+  }
+  removeRetiredSkillJsonFiles(workspaceRoot) {
+    const dir = appPathService.getWorkspacePaths(workspaceRoot).skillsPath;
+    if (!fs.existsSync(dir)) {
+      return;
+    }
+    for (const entry of fs.readdirSync(dir)) {
+      if (!entry.endsWith(".json")) {
+        continue;
+      }
+      const filePath = path.join(dir, entry);
+      const descriptor = readJsonFile$1(filePath);
+      if (descriptor?.id && RETIRED_SKILL_JSON_IDS.has(descriptor.id)) {
+        fs.unlinkSync(filePath);
+      }
+    }
   }
 }
 const agentRuntimeConfigService = new AgentRuntimeConfigService();
@@ -1588,7 +1773,6 @@ class ExecutionProfileService {
       availablePatterns,
       availableSkills,
       availableMcpServers,
-      enabledSkillIds: configuration.enabledSkillIds ?? [],
       enabledMcpServerIds: configuration.enabledMcpServerIds ?? [],
       modePatternBindings: {
         debugger: patternIds.has(modePatternBindings.debugger) ? modePatternBindings.debugger : "free-agent",
@@ -1640,8 +1824,7 @@ ${stagePolicy.systemPrompt}` : ""
       ])),
       patternId: modeProfile.patternId ?? settings.configuration.modePatternBindings[modeProfile.mode],
       skillIds: Array.from(/* @__PURE__ */ new Set([
-        ...modeProfile.skillIds ?? [],
-        ...settings.configuration.enabledSkillIds ?? []
+        ...modeProfile.skillIds ?? []
       ])),
       mcpServerIds: Array.from(/* @__PURE__ */ new Set([
         ...modeProfile.mcpServerIds ?? [],
@@ -1874,7 +2057,6 @@ const DEFAULT_PROFILE = {
 };
 const DEFAULT_CONFIGURATION = {
   activeModeProfileId: "debugger.default",
-  enabledSkillIds: [],
   enabledMcpServerIds: [],
   modePatternBindings: {
     debugger: "free-agent",
@@ -2191,7 +2373,6 @@ function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspac
   const configuration = executionProfileService.normalizeConfiguration({
     activeModeProfileId: DEFAULT_CONFIGURATION.activeModeProfileId || "debugger.default",
     availableModeProfiles: [],
-    enabledSkillIds: DEFAULT_CONFIGURATION.enabledSkillIds ?? [],
     enabledMcpServerIds: DEFAULT_CONFIGURATION.enabledMcpServerIds ?? [],
     modePatternBindings: DEFAULT_CONFIGURATION.modePatternBindings ?? {},
     availablePatterns: [],
@@ -2504,7 +2685,6 @@ class SettingsService {
       },
       configuration: {
         activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
-        enabledSkillIds: sanitizeRuntimeIds(candidate.configuration?.enabledSkillIds),
         enabledMcpServerIds: sanitizeRuntimeIds(candidate.configuration?.enabledMcpServerIds),
         modePatternBindings: sanitizePatternBindings(candidate.configuration?.modePatternBindings),
         lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath
@@ -2551,7 +2731,6 @@ class SettingsService {
       },
       configuration: {
         activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
-        enabledSkillIds: sanitizeRuntimeIds(candidate.configuration?.enabledSkillIds),
         enabledMcpServerIds: sanitizeRuntimeIds(candidate.configuration?.enabledMcpServerIds),
         modePatternBindings: sanitizePatternBindings(candidate.configuration?.modePatternBindings),
         lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath
@@ -2596,7 +2775,6 @@ class SettingsService {
     const configuration = executionProfileService.normalizeConfiguration({
       activeModeProfileId: normalized.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId || "debugger.default",
       availableModeProfiles: [],
-      enabledSkillIds: normalized.configuration?.enabledSkillIds ?? [],
       enabledMcpServerIds: normalized.configuration?.enabledMcpServerIds ?? [],
       modePatternBindings: normalized.configuration?.modePatternBindings ?? DEFAULT_CONFIGURATION.modePatternBindings ?? {},
       availablePatterns: [],
@@ -2764,7 +2942,6 @@ class SettingsService {
       },
       configuration: {
         activeModeProfileId: patch.configuration?.activeModeProfileId || currentPersisted.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId,
-        enabledSkillIds: patch.configuration?.enabledSkillIds ? sanitizeRuntimeIds(patch.configuration.enabledSkillIds) : sanitizeRuntimeIds(currentPersisted.configuration?.enabledSkillIds),
         enabledMcpServerIds: patch.configuration?.enabledMcpServerIds ? sanitizeRuntimeIds(patch.configuration.enabledMcpServerIds) : sanitizeRuntimeIds(currentPersisted.configuration?.enabledMcpServerIds),
         modePatternBindings: patch.configuration?.modePatternBindings ? sanitizePatternBindings(patch.configuration.modePatternBindings) : sanitizePatternBindings(currentPersisted.configuration?.modePatternBindings),
         lastMigrationReportPath: currentPersisted.configuration?.lastMigrationReportPath
@@ -13564,7 +13741,7 @@ ${body}
       async execute(_toolCallId, args) {
         const query = typeof args.query === "string" ? args.query.trim().toLowerCase() : "";
         const skills = agentRuntimeConfigService.listSkills().filter((skill) => !query || `${skill.id} ${skill.name} ${skill.label} ${skill.description}`.toLowerCase().includes(query));
-        const lines = skills.map((skill) => `${skill.id}: ${skill.label || skill.name} (${skill.source})${skill.enabledByDefault ? "" : " - disabled by default"}`);
+        const lines = skills.map((skill) => `${skill.id}: ${skill.label || skill.name} (${skill.source})`);
         return {
           content: [{ type: "text", text: lines.length > 0 ? lines.join("\n") : "No configured skills matched the query." }],
           details: { count: skills.length }
@@ -13577,12 +13754,12 @@ ${body}
     return {
       name: "skill_run",
       label: "Run Skill",
-      description: "Execute a configured reusable skill by id or name. Builtin context skills return live workspace/session context.",
+      description: "Execute a configured reusable skill by id or name. Context skills return live workspace/session context.",
       parameters: {
         type: "object",
         required: ["skill_id"],
         properties: {
-          skill_id: { type: "string", description: "Skill id or name, for example builtin.rdc-context." },
+          skill_id: { type: "string", description: "Skill id or name, for example rdc-context." },
           params: {
             type: "object",
             description: "Skill parameters. Values are converted to strings for prompt skills.",
@@ -13600,16 +13777,16 @@ ${body}
             details: { skillId: "", agentId }
           };
         }
-        const skills = orchestrator.getEnabledSkillDescriptors(agentId);
+        const skills = orchestrator.getAvailableSkillDescriptors();
         const skill = skills.find((entry) => entry.id === skillKey || entry.name === skillKey);
         if (!skill) {
           return {
-            content: [{ type: "text", text: `Skill is not enabled or configured: ${skillKey}` }],
+            content: [{ type: "text", text: `Skill is not configured: ${skillKey}` }],
             isError: true,
             details: { skillId: skillKey, agentId }
           };
         }
-        if (skill.id === "builtin.rdc-context" || skill.name === "rdc-context") {
+        if (skill.id === "rdc-context" || skill.name === "rdc-context") {
           const session = sessionId ? storageAdapter.readSession(sessionId) : null;
           const project = session?.projectId ? storageAdapter.getProjectById(session.projectId) : null;
           const runtimeContext = getRdxRuntimeContext();
@@ -13670,14 +13847,8 @@ ${body}
       }
     };
   }
-  getEnabledSkillDescriptors(agentId) {
-    const settings = settingsService.getAll();
-    const manifest = settings.agents.definitions.find((entry) => entry.id === agentId && entry.enabled);
-    const enabledIds = /* @__PURE__ */ new Set([
-      ...settings.configuration.enabledSkillIds ?? [],
-      ...manifest?.skills ?? []
-    ]);
-    return agentRuntimeConfigService.listSkills().filter((skill) => skill.enabledByDefault || enabledIds.has(skill.id) || enabledIds.has(skill.name));
+  getAvailableSkillDescriptors() {
+    return agentRuntimeConfigService.listSkills();
   }
   stringifySkillParams(params) {
     if (!params) {
@@ -16812,14 +16983,20 @@ const mcpCommand = {
 const skillsCommand = {
   id: "skills",
   name: "skills",
-  description: "List available skills or run a specific skill",
+  description: "List available Markdown Skills or run one by id",
   aliases: ["skill"],
   category: "workflow",
-  async execute(args) {
+  async execute(args, context2) {
+    const skills = agentRuntimeConfigService.listSkills(context2.workspaceRoot);
     if (args.length === 0) {
+      const lines = skills.map((skill2) => {
+        const summary = skill2.description ? ` - ${skill2.description}` : "";
+        return `- ${skill2.id}: ${skill2.label || skill2.name}${summary}`;
+      });
       return {
         success: true,
-        message: "Available skills: (list from SkillLoader)"
+        message: lines.length > 0 ? lines.join("\n") : "No Markdown Skills are available in this workspace.",
+        data: { skills }
       };
     }
     const action = args[0];
@@ -16831,9 +17008,18 @@ const skillsCommand = {
         uiAction: { type: "run-skill", payload: { skillId } }
       };
     }
+    const skill = skills.find((entry) => entry.id === action || entry.name === action || entry.label === action);
+    if (!skill) {
+      return {
+        success: false,
+        message: `Skill is not configured: ${action}`
+      };
+    }
     return {
       success: true,
-      message: `Skill "${action}" details: (from SkillLoader)`
+      message: `${skill.id}: ${skill.label || skill.name}
+${skill.description || "No description."}`,
+      data: { skill }
     };
   }
 };
@@ -18096,6 +18282,34 @@ class ConversationService {
     const context2 = await this.resolveContext(input);
     return this.startProfileTurn(context2, input.mode, input.agentId ?? null, trimmed, input.attachments ?? []);
   }
+  async rewriteFromMessage(input) {
+    const trimmed = input.message.trim();
+    const context2 = await this.resolveContext(input);
+    const sessionId = input.sessionId ?? context2.session?.sessionId ?? null;
+    if (!sessionId) {
+      return this.startProfileTurn(context2, input.mode, input.agentId ?? null, trimmed, input.attachments ?? []);
+    }
+    const history = storageAdapter.readConversationHistory(sessionId);
+    const targetIndex = history.findIndex((message) => message.id === input.messageId);
+    const targetMessage = targetIndex >= 0 ? history[targetIndex] : null;
+    if (!targetMessage || targetMessage.role !== "user") {
+      throw new Error("Can only edit and resend an existing user message.");
+    }
+    const removedTurnIds = new Set(history.slice(targetIndex).map((message) => message.turnId));
+    for (const activeTurn of Array.from(this.activeTurns.values())) {
+      if (activeTurn.sessionId === sessionId && removedTurnIds.has(activeTurn.turnId)) {
+        activeTurn.stop();
+      }
+    }
+    const nextHistory = history.slice(0, targetIndex);
+    storageAdapter.writeConversationHistory(sessionId, nextHistory);
+    this.publishConversationTrace(sessionId, nextHistory, sessionId);
+    const updatedContext = {
+      ...context2,
+      session: storageAdapter.readSession(sessionId) ?? context2.session
+    };
+    return this.startProfileTurn(updatedContext, input.mode, input.agentId ?? null, trimmed, input.attachments ?? []);
+  }
   async resolveContext(input) {
     const projectId = input.projectId ?? input.fallbackProjectId ?? storageAdapter.getCurrentProjectId() ?? null;
     const persistedSessionId = await storageAdapter.getCurrentSessionId();
@@ -18650,6 +18864,25 @@ function registerConversationHandlers(context2) {
   const { state: state2 } = context2;
   electron.ipcMain.handle("conversation:sendMessage", async (_event, request2) => {
     const result = await conversationService.sendMessage({
+      ...request2,
+      fallbackProjectId: state2.currentProjectId,
+      fallbackSessionId: state2.currentSessionId,
+      fallbackRunId: state2.currentRunId
+    });
+    if (result.session?.projectId) {
+      state2.currentProjectId = result.session.projectId;
+    }
+    if (result.session?.sessionId) {
+      state2.currentSessionId = result.session.sessionId;
+      await storageAdapter.setCurrentSessionId(result.session.sessionId);
+    }
+    if (result.runUpdate?.runId) {
+      state2.currentRunId = result.runUpdate.runId;
+    }
+    return result;
+  });
+  electron.ipcMain.handle("conversation:rewriteFromMessage", async (_event, request2) => {
+    const result = await conversationService.rewriteFromMessage({
       ...request2,
       fallbackProjectId: state2.currentProjectId,
       fallbackSessionId: state2.currentSessionId,
@@ -19854,6 +20087,36 @@ function registerSettingsLlmHandlers(context2) {
   electron.ipcMain.handle("settings:importAgentManifest", async (_event, filePath) => {
     const paths = appPathService.getWorkspacePaths();
     agentManifestService.importFile(paths, filePath);
+    return settingsService.getAll(paths);
+  });
+  electron.ipcMain.handle("settings:upsertSkill", async (_event, request2) => {
+    const paths = appPathService.getWorkspacePaths();
+    agentRuntimeConfigService.upsertSkill(request2, paths.workspaceRoot);
+    return settingsService.getAll(paths);
+  });
+  electron.ipcMain.handle("settings:deleteSkill", async (_event, skillId) => {
+    const paths = appPathService.getWorkspacePaths();
+    agentRuntimeConfigService.deleteSkill(skillId, paths.workspaceRoot);
+    return settingsService.getAll(paths);
+  });
+  electron.ipcMain.handle("settings:importSkill", async (_event, filePath) => {
+    const paths = appPathService.getWorkspacePaths();
+    agentRuntimeConfigService.importSkill(filePath, paths.workspaceRoot);
+    return settingsService.getAll(paths);
+  });
+  electron.ipcMain.handle("settings:upsertMcpServer", async (_event, request2) => {
+    const paths = appPathService.getWorkspacePaths();
+    agentRuntimeConfigService.upsertMcpServer(request2, paths.workspaceRoot);
+    return settingsService.getAll(paths);
+  });
+  electron.ipcMain.handle("settings:deleteMcpServer", async (_event, serverId) => {
+    const paths = appPathService.getWorkspacePaths();
+    agentRuntimeConfigService.deleteMcpServer(serverId, paths.workspaceRoot);
+    return settingsService.getAll(paths);
+  });
+  electron.ipcMain.handle("settings:importMcpServer", async (_event, filePath) => {
+    const paths = appPathService.getWorkspacePaths();
+    agentRuntimeConfigService.importMcpServer(filePath, paths.workspaceRoot);
     return settingsService.getAll(paths);
   });
   electron.ipcMain.handle("settings:set", async (_event, settings) => {

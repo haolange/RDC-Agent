@@ -182,6 +182,15 @@ export interface AgentRuntimeSkillDescriptor {
   parameters?: Record<string, unknown>;
 }
 
+export interface AgentRuntimeSkillWriteRequest {
+  id: string;
+  previousId?: string;
+  label: string;
+  description: string;
+  markdown: string;
+  enabledByDefault?: boolean;
+}
+
 export type ModelProviderBackendKind =
   | 'native'
   | 'openai-compatible'
@@ -253,6 +262,19 @@ export interface AgentRuntimeMcpDescriptor {
   description: string;
   transport: MCPTransport;
   enabledByDefault: boolean;
+  command?: string;
+  args?: string[];
+  url?: string;
+  env?: Record<string, string>;
+}
+
+export interface AgentRuntimeMcpWriteRequest {
+  id: string;
+  previousId?: string;
+  name: string;
+  description: string;
+  transport: MCPTransport;
+  enabledByDefault?: boolean;
   command?: string;
   args?: string[];
   url?: string;

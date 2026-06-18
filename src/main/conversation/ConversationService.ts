@@ -8,6 +8,7 @@ import type {
   ConversationCancelActiveTurnResult,
   ConversationMessage,
   ConversationMessageDiagnostic,
+  ConversationRewriteFromMessageRequest,
   ConversationToolCall,
   ConversationWorkBlock,
   ConversationWorkTrace,
@@ -48,6 +49,12 @@ import { AGENT_DESCRIPTIONS, AGENT_DISPLAY_NAMES } from '@shared/constants/agent
 import { normalizeToolName, resolveAgentToolAllowlist } from '../workflow/debugger/DebuggerRuntimePolicy';
 
 interface ConversationContextInput extends ConversationSendRequest {
+  fallbackProjectId?: string | null;
+  fallbackSessionId?: string | null;
+  fallbackRunId?: string | null;
+}
+
+interface ConversationRewriteContextInput extends ConversationRewriteFromMessageRequest {
   fallbackProjectId?: string | null;
   fallbackSessionId?: string | null;
   fallbackRunId?: string | null;
@@ -606,6 +613,39 @@ export class ConversationService {
     const trimmed = input.message.trim();
     const context = await this.resolveContext(input);
     return this.startProfileTurn(context, input.mode, input.agentId ?? null, trimmed, input.attachments ?? []);
+  }
+
+  async rewriteFromMessage(input: ConversationRewriteContextInput): Promise<ConversationTurnResult> {
+    const trimmed = input.message.trim();
+    const context = await this.resolveContext(input);
+    const sessionId = input.sessionId ?? context.session?.sessionId ?? null;
+    if (!sessionId) {
+      return this.startProfileTurn(context, input.mode, input.agentId ?? null, trimmed, input.attachments ?? []);
+    }
+
+    const history = storageAdapter.readConversationHistory(sessionId);
+    const targetIndex = history.findIndex((message) => message.id === input.messageId);
+    const targetMessage = targetIndex >= 0 ? history[targetIndex] : null;
+    if (!targetMessage || targetMessage.role !== 'user') {
+      throw new Error('Can only edit and resend an existing user message.');
+    }
+
+    const removedTurnIds = new Set(history.slice(targetIndex).map((message) => message.turnId));
+    for (const activeTurn of Array.from(this.activeTurns.values())) {
+      if (activeTurn.sessionId === sessionId && removedTurnIds.has(activeTurn.turnId)) {
+        activeTurn.stop();
+      }
+    }
+
+    const nextHistory = history.slice(0, targetIndex);
+    storageAdapter.writeConversationHistory(sessionId, nextHistory);
+    this.publishConversationTrace(sessionId, nextHistory, sessionId);
+
+    const updatedContext: ResolvedConversationContext = {
+      ...context,
+      session: storageAdapter.readSession(sessionId) ?? context.session,
+    };
+    return this.startProfileTurn(updatedContext, input.mode, input.agentId ?? null, trimmed, input.attachments ?? []);
   }
 
   private async resolveContext(input: ConversationContextInput): Promise<ResolvedConversationContext> {

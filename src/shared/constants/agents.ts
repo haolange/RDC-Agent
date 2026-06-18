@@ -118,6 +118,30 @@ export const AGENT_MODES: ModeConfig[] = [
   },
 ];
 
+export const AGENT_ICON_PRESETS: Array<{
+  id: ModeConfig['icon'];
+  label: string;
+}> = [
+  { id: 'message-orbit', label: 'Ask' },
+  { id: 'route-plan', label: 'Plan' },
+  { id: 'pencil-edit', label: 'Edit' },
+  { id: 'crosshair-bug', label: 'Debug' },
+  { id: 'waveform-gauge', label: 'Analyze' },
+  { id: 'spark-tuning', label: 'Optimize' },
+  { id: 'compass', label: 'Explore' },
+  { id: 'terminal', label: 'Shell' },
+  { id: 'shield', label: 'Review' },
+  { id: 'wrench', label: 'Build' },
+  { id: 'search-lens', label: 'Search' },
+  { id: 'nodes', label: 'Orchestrate' },
+  { id: 'memory', label: 'Memory' },
+  { id: 'spark', label: 'Create' },
+];
+
+export function isAgentIconPreset(value: unknown): value is ModeConfig['icon'] {
+  return typeof value === 'string' && AGENT_ICON_PRESETS.some((preset) => preset.id === value);
+}
+
 export const AGENT_MODE_MAP: Partial<Record<string, ModeConfig>> = AGENT_MODES.reduce(
   (accumulator, mode) => {
     accumulator[mode.id] = mode;
@@ -133,6 +157,7 @@ export function getAgentModeConfig(modeId: ModeConfig['id']): ModeConfig | null 
 export interface AgentDisplayInfo {
   name: string;
   glyph: string;
+  icon: ModeConfig['icon'];
   accent: string;
 }
 
@@ -142,6 +167,7 @@ export function resolveAgentDisplay(agentId: string, definitions: AgentManifestD
   return {
     name: manifest?.name ?? AGENT_DISPLAY_NAMES[agentId as AgentId] ?? agentId,
     glyph: (manifest?.name ?? AGENT_DISPLAY_NAMES[agentId as AgentId] ?? agentId).slice(0, 2).toUpperCase(),
+    icon: manifest?.icon ?? AGENT_MODE_MAP[agentId]?.icon ?? 'message-orbit',
     accent: builtinColor ?? '#33d1ff',
   };
 }

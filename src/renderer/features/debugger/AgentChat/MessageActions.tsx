@@ -1,24 +1,57 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { ConversationMessage } from '@shared/types/conversation';
+import { getElectronApi } from '../../../platform/getElectronApi';
+import { useI18n } from '../../../i18n';
 
 interface MessageActionsProps {
   message: ConversationMessage;
-  onCopy?: (content: string) => void;
+  onCopy?: (content: string) => void | Promise<void>;
   onEditResend?: (content: string) => void;
-  onShare?: (message: ConversationMessage) => void;
 }
 
 export const MessageActions: React.FC<MessageActionsProps> = ({
   message,
   onCopy,
   onEditResend,
-  onShare,
 }) => {
-  const handleCopy = useCallback(() => {
-    if (onCopy && message.content) {
-      onCopy(message.content);
+  const { language } = useI18n();
+  const [copied, setCopied] = useState(false);
+  const resetTimerRef = useRef<number | null>(null);
+  const copyLabel = language === 'zh-CN' ? '复制' : 'Copy';
+  const copiedLabel = language === 'zh-CN' ? '已复制' : 'Copied';
+  const copyMessageLabel = language === 'zh-CN' ? '复制消息' : 'Copy message';
+  const editResendLabel = language === 'zh-CN' ? '编辑并重新发送' : 'Edit and resend';
+
+  useEffect(() => () => {
+    if (resetTimerRef.current !== null) {
+      window.clearTimeout(resetTimerRef.current);
     }
-    navigator.clipboard.writeText(message.content).catch(() => { /* ignore */ });
+  }, []);
+
+  const handleCopy = useCallback(async () => {
+    if (!message.content) return;
+    let didCopy = false;
+    try {
+      await getElectronApi()?.appShell.copyText(message.content);
+      didCopy = true;
+    } catch {
+      didCopy = false;
+    }
+    if (!didCopy) {
+      try {
+        await navigator.clipboard.writeText(message.content);
+        didCopy = true;
+      } catch {
+        didCopy = false;
+      }
+    }
+    await onCopy?.(message.content);
+    if (!didCopy) return;
+    setCopied(true);
+    if (resetTimerRef.current !== null) {
+      window.clearTimeout(resetTimerRef.current);
+    }
+    resetTimerRef.current = window.setTimeout(() => setCopied(false), 1200);
   }, [message.content, onCopy]);
 
   const handleEditResend = useCallback(() => {
@@ -27,19 +60,14 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
     }
   }, [message.content, onEditResend]);
 
-  const handleShare = useCallback(() => {
-    if (onShare) {
-      onShare(message);
-    }
-  }, [message, onShare]);
-
   return (
     <div className="message-actions" data-testid="message-actions">
       <button
         type="button"
         className="message-action-btn"
-        title="Copy"
-        aria-label="Copy message"
+        data-copied={copied ? 'true' : 'false'}
+        title={copied ? copiedLabel : copyLabel}
+        aria-label={copied ? copiedLabel : copyMessageLabel}
         onClick={handleCopy}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -51,8 +79,8 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
         <button
           type="button"
           className="message-action-btn"
-          title="Edit and resend"
-          aria-label="Edit and resend"
+          title={editResendLabel}
+          aria-label={editResendLabel}
           onClick={handleEditResend}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -61,21 +89,6 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
           </svg>
         </button>
       )}
-      <button
-        type="button"
-        className="message-action-btn"
-        title="Share"
-        aria-label="Share message"
-        onClick={handleShare}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="18" cy="5" r="3" />
-          <circle cx="6" cy="12" r="3" />
-          <circle cx="18" cy="19" r="3" />
-          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-        </svg>
-      </button>
     </div>
   );
 };

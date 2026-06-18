@@ -64,6 +64,7 @@ export const Composer: React.FC<ComposerProps> = ({
     handlePromptSend,
     handlePromptKeyDown,
   } = composer;
+  const selectedAgentDefinition = userInvocableAgents.find((agent) => agent.id === selectedAgentId);
   const selectedAgentCapability = getAgentCapability(selectedAgentId, userInvocableAgents);
 
   if (pendingToolApproval) {
@@ -90,7 +91,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
   return (
     <div
-      className="composer-shell"
+      className={`composer-shell ${isComposerBusy ? 'is-running' : ''}`}
       style={{ ['--composer-mode-accent' as string]: currentModeConfig.accentColor }}
     >
       {pendingAttachments.length > 0 && (
@@ -156,7 +157,7 @@ export const Composer: React.FC<ComposerProps> = ({
               title={selectedAgentCapability || currentModeLabel}
             >
               <span className="composer-agent-pill-icon" aria-hidden="true">
-                <ModeGlyph mode={currentMode} size={15} strokeWidth={1.9} />
+                <ModeGlyph mode={currentMode} icon={selectedAgentDefinition?.icon ?? currentModeConfig.icon} size={15} strokeWidth={1.9} />
               </span>
               <span className="composer-agent-pill-label">{currentModeLabel}</span>
               <span className="composer-agent-pill-caret" aria-hidden="true">
@@ -195,7 +196,7 @@ export const Composer: React.FC<ComposerProps> = ({
                     >
                       <span className="composer-agent-menu-item-copy">
                         <span className="composer-agent-menu-item-icon" aria-hidden="true">
-                          <ModeGlyph mode={agentMode} size={15} strokeWidth={1.9} />
+                          <ModeGlyph mode={agentMode} icon={agent.icon ?? undefined} size={15} strokeWidth={1.9} />
                         </span>
                         <span className="composer-agent-menu-item-label">{agent.name}</span>
                         {activeAgentId === agent.id ? (

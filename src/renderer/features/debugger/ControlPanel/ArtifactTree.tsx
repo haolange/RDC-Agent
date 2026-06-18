@@ -3,6 +3,7 @@ import type { ToolCatalog } from '@shared/types/tool';
 import type { Artifact } from '@shared/types/evidence';
 import { getElectronApi } from '../../../platform/getElectronApi';
 import { useEvidenceStore } from '../../../stores/evidenceStore';
+import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import {
   ArtifactsSection,
   SkillsSection,
@@ -12,23 +13,11 @@ import {
   type SkillEntry,
 } from './ArtifactTreeSections';
 
-const BUILTIN_SKILLS: SkillEntry[] = [
-  {
-    id: 'builtin.rdc-context',
-    label: 'RDC Context',
-    description: 'Capture and replay context aggregation',
-  },
-  {
-    id: 'builtin.renderdoc-glossary',
-    label: 'RenderDoc Glossary',
-    description: 'RenderDoc terminology reference',
-  },
-];
-
 type SectionKey = 'tools' | 'skills' | 'artifacts';
 
 export const ArtifactTree: React.FC = () => {
   const actionEvents = useEvidenceStore((state) => state.actionEvents);
+  const availableSkills = useAppSettingsStore((state) => state.settings.configuration.availableSkills);
   const [catalog, setCatalog] = useState<ToolCatalog | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(true);
@@ -78,6 +67,13 @@ export const ArtifactTree: React.FC = () => {
     [catalog],
   );
   const totalToolCount = catalog?.tools.length ?? 0;
+  const skills = useMemo<SkillEntry[]>(() => (
+    availableSkills.map((skill) => ({
+      id: skill.id,
+      label: skill.label || skill.name || skill.id,
+      description: skill.description || skill.id,
+    }))
+  ), [availableSkills]);
 
   const artifacts = useMemo<ArtifactEntry[]>(() => {
     const out: ArtifactEntry[] = [];
@@ -125,7 +121,7 @@ export const ArtifactTree: React.FC = () => {
       <SkillsSection
         open={openSections.skills}
         onToggle={() => toggleSection('skills')}
-        skills={BUILTIN_SKILLS}
+        skills={skills}
       />
       <ArtifactsSection
         open={openSections.artifacts}

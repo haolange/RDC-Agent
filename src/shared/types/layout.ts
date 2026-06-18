@@ -9,7 +9,21 @@ export type ExecutableAgentMode = ExecutableAppMode;
 export type BuiltinAgentMode = 'ask' | 'plan' | 'edit' | ExecutableAgentMode;
 export type AgentMode = BuiltinAgentMode | (string & {});
 
-export type ModeIconKey = 'message-orbit' | 'route-plan' | 'pencil-edit' | 'crosshair-bug' | 'waveform-gauge' | 'spark-tuning';
+export type ModeIconKey =
+  | 'message-orbit'
+  | 'route-plan'
+  | 'pencil-edit'
+  | 'crosshair-bug'
+  | 'waveform-gauge'
+  | 'spark-tuning'
+  | 'compass'
+  | 'terminal'
+  | 'shield'
+  | 'wrench'
+  | 'search-lens'
+  | 'nodes'
+  | 'memory'
+  | 'spark';
 
 // Mode configuration
 export interface ModeConfig {

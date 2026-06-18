@@ -1081,3 +1081,39 @@
   background: rgb(var(--color-bg-2) / 0.9);
   box-shadow: inset 0 0 0 1px rgb(var(--color-border-subtle));
 }
+
+@keyframes composerEnergyFlow {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+.composer-shell.is-running {
+  border-color: color-mix(in srgb, var(--composer-mode-accent) 40%, rgb(var(--color-border-strong)));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.03),
+    0 0 0 1px color-mix(in srgb, var(--composer-mode-accent) 18%, transparent),
+    0 18px 36px rgb(0 0 0 / 0.24);
+}
+
+.composer-shell.is-running::before {
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  padding: 1px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0turn,
+    transparent,
+    color-mix(in srgb, var(--composer-mode-accent) 16%, transparent),
+    color-mix(in srgb, var(--composer-mode-accent) 72%, transparent),
+    transparent 34%
+  );
+  content: "";
+  animation: composerEnergyFlow 2.4s linear infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
