@@ -6,7 +6,6 @@ export * from './Agent';
 export * from './AgentTool';
 export * from './ToolPermission';
 export * from './AgentHooks';
-export * from './SkillLoader';
 export * from './MCPManager';
 export * from './ContextManager';
 export * from './ErrorRecovery';

@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import type {
   ConversationAnswerToolApprovalRequest,
   ConversationAnswerUserInputRequest,
+  ConversationRewriteFromMessageRequest,
   ConversationSendRequest,
 } from '@shared/types/conversation';
 import { conversationService } from '../conversation/ConversationService';
@@ -13,6 +14,28 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
 
   ipcMain.handle('conversation:sendMessage', async (_event, request: ConversationSendRequest) => {
     const result = await conversationService.sendMessage({
+      ...request,
+      fallbackProjectId: state.currentProjectId,
+      fallbackSessionId: state.currentSessionId,
+      fallbackRunId: state.currentRunId,
+    });
+
+    if (result.session?.projectId) {
+      state.currentProjectId = result.session.projectId;
+    }
+    if (result.session?.sessionId) {
+      state.currentSessionId = result.session.sessionId;
+      await storageAdapter.setCurrentSessionId(result.session.sessionId);
+    }
+    if (result.runUpdate?.runId) {
+      state.currentRunId = result.runUpdate.runId;
+    }
+
+    return result;
+  });
+
+  ipcMain.handle('conversation:rewriteFromMessage', async (_event, request: ConversationRewriteFromMessageRequest) => {
+    const result = await conversationService.rewriteFromMessage({
       ...request,
       fallbackProjectId: state.currentProjectId,
       fallbackSessionId: state.currentSessionId,

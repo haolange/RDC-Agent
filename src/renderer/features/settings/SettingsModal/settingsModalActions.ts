@@ -1,4 +1,8 @@
 import type {
+  AgentRuntimeMcpWriteRequest,
+  AgentRuntimeSkillWriteRequest,
+} from '@shared/types/agentRuntime';
+import type {
   AppSettings,
   AppSettingsPatch,
   LlmAgentRoute,
@@ -212,33 +216,85 @@ export function createSettingsModalActions({
       },
       configuration: {
         activeModeProfileId: modalState.activeModeProfileDraft,
-        enabledSkillIds: modalState.enabledSkillDrafts,
         enabledMcpServerIds: modalState.enabledMcpDrafts,
         modePatternBindings: modalState.patternBindingDrafts,
       },
     });
   };
 
-  const handleSaveSkillsAndTools = async () => {
-    await patchSettings({
+  const handleSaveToolsConfig = async () => {
+    const nextSettings = await patchSettings({
       tooling: {
         rdxCli: modalState.rdxCliDraft,
         rdxActions: modalState.rdxActionsDraft,
       },
-      agents: {
-        globalInstructions: modalState.globalInstructionsDraft,
-      },
       configuration: {
-        enabledSkillIds: modalState.enabledSkillDrafts,
         enabledMcpServerIds: modalState.enabledMcpDrafts,
       },
     });
-    const nextSettings = await reloadSettings();
     modalState.setRdxCliDraft(nextSettings.tooling.rdxCli);
     modalState.setRdxActionsDraft(nextSettings.tooling.rdxActions);
-    modalState.setEnabledSkillDrafts(nextSettings.configuration.enabledSkillIds);
     modalState.setEnabledMcpDrafts(nextSettings.configuration.enabledMcpServerIds);
+  };
+
+  const handleSavePersonalization = async () => {
+    const nextSettings = await patchSettings({
+      agents: {
+        globalInstructions: modalState.globalInstructionsDraft,
+      },
+    });
     modalState.setGlobalInstructionsDraft(nextSettings.agents.globalInstructions);
+  };
+
+  const refreshRuntimeCatalog = async () => {
+    const nextSettings = await reloadSettings();
+    modalState.setEnabledMcpDrafts(nextSettings.configuration.enabledMcpServerIds);
+    return nextSettings;
+  };
+
+  const handleUpsertSkill = async (request: AgentRuntimeSkillWriteRequest) => {
+    await window.electronAPI.settings.upsertSkill(request);
+    return refreshRuntimeCatalog();
+  };
+
+  const handleDeleteSkill = async (skillId: string) => {
+    await window.electronAPI.settings.deleteSkill(skillId);
+    return refreshRuntimeCatalog();
+  };
+
+  const handleImportSkill = async () => {
+    const filePaths = await window.electronAPI?.selectFiles();
+    const filePath = filePaths?.find((entry) => entry.endsWith('.md'));
+    if (!filePath) {
+      throw new Error(t('settings.skillImportRequiresMarkdown'));
+    }
+    await window.electronAPI.settings.importSkill(filePath);
+    return refreshRuntimeCatalog();
+  };
+
+  const handleUpsertMcpServer = async (request: AgentRuntimeMcpWriteRequest) => {
+    await window.electronAPI.settings.upsertMcpServer(request);
+    return refreshRuntimeCatalog();
+  };
+
+  const handleDeleteMcpServer = async (serverId: string) => {
+    await window.electronAPI.settings.deleteMcpServer(serverId);
+    await patchSettings({
+      configuration: {
+        enabledMcpServerIds: modalState.enabledMcpDrafts.filter((id) => id !== serverId),
+      },
+    });
+    return refreshRuntimeCatalog();
+  };
+
+  const handleImportMcpServer = async () => {
+    const filePaths = await window.electronAPI?.selectFiles();
+    const filePath = filePaths?.find((entry) => entry.endsWith('.json'));
+    if (!filePath) {
+      throw new Error(t('settings.mcpImportRequiresJson'));
+    }
+    await window.electronAPI.settings.importMcpServer(filePath);
+    return refreshRuntimeCatalog();
   };
 
   const handleSaveAgentPermissions = async () => {
@@ -272,7 +328,14 @@ export function createSettingsModalActions({
     handleSaveAgentManifests,
     handleImportAgentManifest,
     handleSaveAgentRuntimeConfig,
-    handleSaveSkillsAndTools,
+    handleSaveToolsConfig,
+    handleSavePersonalization,
+    handleUpsertSkill,
+    handleDeleteSkill,
+    handleImportSkill,
+    handleUpsertMcpServer,
+    handleDeleteMcpServer,
+    handleImportMcpServer,
     handleSaveAgentPermissions,
     toggleRuntimeId,
   };

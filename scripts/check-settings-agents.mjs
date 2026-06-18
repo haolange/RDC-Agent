@@ -182,11 +182,23 @@ function main() {
   assert(modelCascade.includes('data-canonical-id={option.canonicalId}'), 'Model options should expose stable canonical ids.');
   assert(!modelCascade.includes('閫'), 'Model cascade must not hardcode mojibake text.');
 
-  const toolsSettings = fs.readFileSync(
-    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/SkillsToolsSettings.tsx'),
+  const personalizationSettings = fs.readFileSync(
+    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/PersonalizationSettings.tsx'),
     'utf8',
   );
-  assert(toolsSettings.includes('settings.globalInstructions'), 'Skills & Tools should expose global instructions.');
+  assert(personalizationSettings.includes('settings.globalInstructions'), 'Personalization settings should expose global instructions.');
+  const skillLibrarySettings = fs.readFileSync(
+    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/SkillLibrarySettings.tsx'),
+    'utf8',
+  );
+  assert(skillLibrarySettings.includes('markdown') && skillLibrarySettings.includes('Markdown'), 'Skill settings should use Markdown Skill files.');
+  assert(skillLibrarySettings.includes('onUpsertSkill'), 'Skill settings should expose real Skill edit operations.');
+  const toolsSettings = fs.readFileSync(
+    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/ToolsSettings.tsx'),
+    'utf8',
+  );
+  assert(toolsSettings.includes('RdxCliInvokerSettingsFields'), 'Tools settings should render the local RenderDoc toolchain.');
+  assert(toolsSettings.includes('onUpsertMcpServer'), 'Tools settings should expose real MCP edit operations.');
   const renderDocToolchain = fs.readFileSync(
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RdxCliInvokerSettingsFields.tsx'),
     'utf8',

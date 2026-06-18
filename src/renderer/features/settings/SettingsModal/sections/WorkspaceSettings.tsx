@@ -28,71 +28,65 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({
   onWorkspaceSave,
   onWorkspaceReset,
   t,
-}) => (
-  <section className="settings-page settings-page-workspace">
-    <div className="settings-workspace-page scrollbar-thin" data-testid="settings-workspace-body">
-      <div className="settings-workspace-hero">
-        <div className="settings-workspace-hero-copy">
-          <div className="settings-field-label">{t('settings.workspaceRoot')}</div>
-          <div className="settings-help-text">{t('settings.workspaceRootHint')}</div>
-        </div>
-        <div className="settings-path-value settings-workspace-root-value">{workspaceDraft || settings.paths.defaultWorkspaceRoot}</div>
-        <div className="settings-path-actions settings-workspace-root-actions">
-          <button type="button" className="button button-secondary" onClick={() => void onWorkspacePick()}>
-            {t('settings.chooseDirectory')}
-          </button>
-          <button
-            type="button"
-            className="button button-secondary"
-            onClick={() => void getElectronApi()?.appShell.openPath(workspaceDraft || settings.workspace.rootPath)}
-          >
-            {t('settings.reveal')}
-          </button>
-          <button
-            type="button"
-            className="button button-secondary"
-            onClick={() => void getElectronApi()?.appShell.copyText(workspaceDraft || settings.workspace.rootPath)}
-          >
-            {t('settings.copy')}
-          </button>
-        </div>
-      </div>
+}) => {
+  const rootPath = workspaceDraft || settings.paths.defaultWorkspaceRoot;
+  const userSpaceEntries = derivedPathEntries.filter((_, index) => [0, 4, 5, 6, 7].includes(index));
+  const projectSpaceEntries = derivedPathEntries.filter((_, index) => [2, 3].includes(index));
 
-      <div className="settings-path-card settings-derived-paths-card">
-        <div className="settings-derived-paths-header">
-          <div className="settings-field-label">{t('settings.derivedPathsTitle')}</div>
-          <div className="settings-help-text">{t('settings.derivedPathsHint')}</div>
-        </div>
-        <div className="settings-derived-path-list">
-          {derivedPathEntries.map((entry) => (
-            <div key={entry.label} className="settings-derived-path-row">
-              <div className="settings-derived-path-copy">
-                <div className="settings-derived-path-label">{entry.label}</div>
-                <div className="settings-derived-path-value">{entry.value}</div>
-              </div>
-              <div className="settings-derived-path-actions">
-                <button
-                  type="button"
-                  className="button button-secondary settings-derived-path-button"
-                  onClick={() => void getElectronApi()?.appShell.openPath(entry.value)}
-                >
-                  {t('settings.reveal')}
-                </button>
-                <button
-                  type="button"
-                  className="button button-secondary settings-derived-path-button"
-                  onClick={() => void getElectronApi()?.appShell.copyText(entry.value)}
-                >
-                  {t('settings.copy')}
-                </button>
-              </div>
+  const renderSpaceCard = (title: string, entries: DerivedPathEntry[]) => (
+    <div className="settings-space-card">
+      <div className="settings-space-card-head">
+        <strong>{title}</strong>
+      </div>
+      <div className="settings-space-list">
+        {entries.map((entry) => (
+          <div key={entry.label} className="settings-space-row">
+            <div className="settings-space-row-copy">
+              <span>{entry.label}</span>
+              <code title={entry.value}>{entry.value}</code>
             </div>
-          ))}
-        </div>
+            <div className="settings-space-row-actions">
+              <button type="button" className="button button-secondary" onClick={() => void getElectronApi()?.appShell.openPath(entry.value)}>
+                {t('settings.reveal')}
+              </button>
+              <button type="button" className="button button-secondary" onClick={() => void getElectronApi()?.appShell.copyText(entry.value)}>
+                {t('settings.copy')}
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
+    </div>
+  );
 
-      {settings.configuration.diagnostics.length > 0 && (
-        <div className="settings-workspace-meta-grid">
+  return (
+    <section className="settings-page settings-page-workspace">
+      <div className="settings-workspace-page scrollbar-thin" data-testid="settings-workspace-body">
+        <div className="settings-workspace-hero settings-workspace-root-card">
+          <div className="settings-workspace-hero-copy">
+            <div className="settings-field-label">{t('settings.workspaceRoot')}</div>
+            <div className="settings-help-text">{t('settings.workspaceRootHint')}</div>
+          </div>
+          <div className="settings-path-value settings-workspace-root-value">{rootPath}</div>
+          <div className="settings-path-actions settings-workspace-root-actions">
+            <button type="button" className="button button-secondary" onClick={() => void onWorkspacePick()}>
+              {t('settings.chooseDirectory')}
+            </button>
+            <button type="button" className="button button-secondary" onClick={() => void getElectronApi()?.appShell.openPath(rootPath)}>
+              {t('settings.reveal')}
+            </button>
+            <button type="button" className="button button-secondary" onClick={() => void getElectronApi()?.appShell.copyText(rootPath)}>
+              {t('settings.copy')}
+            </button>
+          </div>
+        </div>
+
+        <div className="settings-space-stack">
+          {renderSpaceCard(t('settings.userSpaceTitle'), userSpaceEntries)}
+          {renderSpaceCard(t('settings.projectSpaceTitle'), projectSpaceEntries)}
+        </div>
+
+        {settings.configuration.diagnostics.length > 0 && (
           <div className="settings-path-card settings-workspace-note-card">
             <div className="settings-field-label">{t('settings.diagnostics')}</div>
             <div className="settings-workspace-note-list">
@@ -103,16 +97,16 @@ export const WorkspaceSettings: React.FC<WorkspaceSettingsProps> = ({
               ))}
             </div>
           </div>
+        )}
+        <div className="settings-actions settings-workspace-footer-actions">
+          <button type="button" className="button button-secondary" onClick={() => void onWorkspaceReset()}>
+            {t('settings.resetWorkspace')}
+          </button>
+          <button type="button" className="button button-primary" onClick={() => void onWorkspaceSave()}>
+            {t('settings.save')}
+          </button>
         </div>
-      )}
-      <div className="settings-actions settings-workspace-footer-actions">
-        <button type="button" className="button button-secondary" onClick={() => void onWorkspaceReset()}>
-          {t('settings.resetWorkspace')}
-        </button>
-        <button type="button" className="button button-primary" onClick={() => void onWorkspaceSave()}>
-          {t('settings.save')}
-        </button>
       </div>
-    </div>
-  </section>
-);
+    </section>
+  );
+};

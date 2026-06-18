@@ -5,8 +5,8 @@ import { useSettingsModal } from './useSettingsModal';
 import { GeneralSettings } from './sections/GeneralSettings';
 import { WorkspaceSettings } from './sections/WorkspaceSettings';
 import { ModelsSettings } from './sections/ModelsSettings';
-import { AgentsSettings } from './sections/AgentsSettings';
-import { SkillsToolsSettings } from './sections/SkillsToolsSettings';
+import { SkillsAgentsSettings } from './sections/SkillsAgentsSettings';
+import { ToolsSettings } from './sections/ToolsSettings';
 import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
 import { SettingsNavIcon } from './SettingsNavIcon';
 import './SettingsModal.css';
@@ -28,8 +28,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     accountDraft,
     setAccountDraft,
     workspaceDraft,
-    enabledSkillDrafts,
-    setEnabledSkillDrafts,
     enabledMcpDrafts,
     setEnabledMcpDrafts,
     rdxCliDraft,
@@ -64,7 +62,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     handleSaveAgentManifests,
     handleImportAgentManifest,
     handleSaveAgentPermissions,
-    handleSaveSkillsAndTools,
+    handleSaveToolsConfig,
+    handleSavePersonalization,
+    handleUpsertSkill,
+    handleDeleteSkill,
+    handleImportSkill,
+    handleUpsertMcpServer,
+    handleDeleteMcpServer,
+    handleImportMcpServer,
     setTheme,
     setLanguage,
     setFontScale,
@@ -106,10 +111,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
         return t('settings.workspaceSubtitle');
       case 'models':
         return t('settings.modelsSubtitle');
-      case 'agents':
-        return t('settings.agentsSubtitle');
+      case 'skillsAgents':
+        return '';
       case 'tools':
-        return t('settings.skillsAndToolsSubtitle');
+        return '';
       default:
         return '';
     }
@@ -124,7 +129,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
           role="dialog"
           aria-modal="true"
           aria-labelledby="settings-modal-title"
-          aria-describedby="settings-modal-subtitle"
+          aria-describedby={subtitle ? 'settings-modal-subtitle' : undefined}
           onClick={(event) => event.stopPropagation()}
         >
           <div className="settings-center-sidebar">
@@ -159,9 +164,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 <div className="settings-modal-title" id="settings-modal-title">
                   {sections.find((section) => section.id === activeSection)?.label}
                 </div>
-                <div className="settings-modal-subtitle" id="settings-modal-subtitle">
-                  {subtitle}
-                </div>
+                {subtitle ? (
+                  <div className="settings-modal-subtitle" id="settings-modal-subtitle">
+                    {subtitle}
+                  </div>
+                ) : null}
               </div>
               <button type="button" className="settings-modal-close" onClick={onClose} aria-label={t('settings.close')}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -182,6 +189,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                   onThemeChange={setTheme}
                   onLanguageChange={setLanguage}
                   onFontScaleChange={setFontScale}
+                  globalInstructionsDraft={globalInstructionsDraft}
+                  onGlobalInstructionsDraftChange={setGlobalInstructionsDraft}
+                  onSavePersonalization={handleSavePersonalization}
                   t={t}
                 />
               )}
@@ -210,9 +220,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 />
               )}
 
-              {activeSection === 'agents' && (
-                <AgentsSettings
+              {activeSection === 'skillsAgents' && (
+                <SkillsAgentsSettings
                   settings={settings}
+                  onUpsertSkill={handleUpsertSkill}
+                  onDeleteSkill={handleDeleteSkill}
+                  onImportSkill={handleImportSkill}
                   permissionModeDraft={permissionModeDraft}
                   readableRootsDraft={readableRootsDraft}
                   writableRootsDraft={writableRootsDraft}
@@ -231,19 +244,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
               )}
 
               {activeSection === 'tools' && (
-                <SkillsToolsSettings
+                <ToolsSettings
                   settings={settings}
-                  enabledSkillDrafts={enabledSkillDrafts}
                   enabledMcpDrafts={enabledMcpDrafts}
                   rdxCliDraft={rdxCliDraft}
                   rdxActionsDraft={rdxActionsDraft}
-                  globalInstructionsDraft={globalInstructionsDraft}
-                  onEnabledSkillDraftsChange={setEnabledSkillDrafts}
                   onEnabledMcpDraftsChange={setEnabledMcpDrafts}
                   onRdxCliDraftChange={setRdxCliDraft}
                   onRdxActionsDraftChange={setRdxActionsDraft}
-                  onGlobalInstructionsDraftChange={setGlobalInstructionsDraft}
-                  onSave={handleSaveSkillsAndTools}
+                  onSaveToolsConfig={handleSaveToolsConfig}
+                  onUpsertMcpServer={handleUpsertMcpServer}
+                  onDeleteMcpServer={handleDeleteMcpServer}
+                  onImportMcpServer={handleImportMcpServer}
                   toggleRuntimeId={toggleRuntimeId}
                   t={t}
                 />

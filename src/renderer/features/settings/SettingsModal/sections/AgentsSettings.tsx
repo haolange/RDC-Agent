@@ -2,8 +2,8 @@ import React, { type Dispatch, type SetStateAction, useState } from 'react';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AgentPermissionMode, AppSettings } from '@shared/types/settings';
 import type { TranslationKey, useI18n } from '../../../../i18n';
+import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { AgentManifestEditor } from './AgentManifestEditor';
-import { AgentPermissionsSettings } from './AgentPermissionsSettings';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -60,6 +60,7 @@ const createNewAgent = (existing: AgentManifestDraft[]): AgentManifestDraft => {
     argumentHint: 'Describe the task for this Agent',
     target: 'rdc-agent',
     models: [],
+    icon: 'spark',
     disableModelInvocation: false,
     userInvocable: false,
     tools: [],
@@ -136,16 +137,6 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
 
   return (
     <section className="settings-page settings-page-agents">
-      <AgentPermissionsSettings
-        permissionModeDraft={permissionModeDraft}
-        readableRootsDraft={readableRootsDraft}
-        writableRootsDraft={writableRootsDraft}
-        onPermissionModeDraftChange={onPermissionModeDraftChange}
-        onReadableRootsDraftChange={onReadableRootsDraftChange}
-        onWritableRootsDraftChange={onWritableRootsDraftChange}
-        onSave={onSaveAgentPermissions}
-        t={t}
-      />
       <div className="settings-manifest-page">
         <div className="settings-agent-page settings-agent-structure-anchor" data-testid="settings-agent-runtime-config">
           <span className="settings-help-text-warning" data-testid="settings-agent-no-enabled-models" />
@@ -178,12 +169,12 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
                   className={`settings-manifest-card ${agent.id === selectedId ? 'active' : ''}`}
                   onClick={() => setSelectedAgentId(agent.id)}
                 >
+                  <span className="settings-manifest-card-icon" aria-hidden="true">
+                    <ModeGlyph mode={agent.id} icon={agent.icon ?? 'message-orbit'} size={17} strokeWidth={1.9} />
+                  </span>
                   <span>
                     <strong>{agent.name}</strong>
                     <small>{getAgentCardDescription(agent, t)}</small>
-                  </span>
-                  <span className="settings-manifest-card-meta">
-                    {agent.userInvocable ? t('settings.userInvocable') : t('settings.subAgent')}
                   </span>
                 </button>
               ))}
@@ -198,6 +189,13 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
               onDuplicateAgent={duplicateAgent}
               onDeleteAgent={deleteAgent}
               onSaveAgentManifests={onSaveAgentManifests}
+              permissionModeDraft={permissionModeDraft}
+              readableRootsDraft={readableRootsDraft}
+              writableRootsDraft={writableRootsDraft}
+              onPermissionModeDraftChange={onPermissionModeDraftChange}
+              onReadableRootsDraftChange={onReadableRootsDraftChange}
+              onWritableRootsDraftChange={onWritableRootsDraftChange}
+              onSaveAgentPermissions={onSaveAgentPermissions}
               agentRouteSaveState={agentRouteSaveState}
               agentRouteSaveMessage={agentRouteSaveMessage}
               t={t}

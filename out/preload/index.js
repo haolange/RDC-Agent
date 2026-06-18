@@ -74,6 +74,7 @@ const removeAllTrackedListeners = (channel) => {
 };
 const createConversationApi = () => ({
   sendMessage: (request) => electron.ipcRenderer.invoke("conversation:sendMessage", request),
+  rewriteFromMessage: (request) => electron.ipcRenderer.invoke("conversation:rewriteFromMessage", request),
   cancelActiveTurn: (request) => electron.ipcRenderer.invoke("conversation:cancelActiveTurn", request),
   answerUserInput: (request) => electron.ipcRenderer.invoke("conversation:answerUserInput", request),
   answerToolApproval: (request) => electron.ipcRenderer.invoke("conversation:answerToolApproval", request),
@@ -189,6 +190,12 @@ const createSettingsApi = () => ({
   get: () => electron.ipcRenderer.invoke("settings:get"),
   getProviderSecret: (providerId) => electron.ipcRenderer.invoke("settings:getProviderSecret", providerId),
   importAgentManifest: (filePath) => electron.ipcRenderer.invoke("settings:importAgentManifest", filePath),
+  upsertSkill: (request) => electron.ipcRenderer.invoke("settings:upsertSkill", request),
+  deleteSkill: (skillId) => electron.ipcRenderer.invoke("settings:deleteSkill", skillId),
+  importSkill: (filePath) => electron.ipcRenderer.invoke("settings:importSkill", filePath),
+  upsertMcpServer: (request) => electron.ipcRenderer.invoke("settings:upsertMcpServer", request),
+  deleteMcpServer: (serverId) => electron.ipcRenderer.invoke("settings:deleteMcpServer", serverId),
+  importMcpServer: (filePath) => electron.ipcRenderer.invoke("settings:importMcpServer", filePath),
   set: (settings) => electron.ipcRenderer.invoke("settings:set", settings)
 });
 const createAppMetaApi = () => ({

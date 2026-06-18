@@ -4,6 +4,8 @@ import { getAgentModeConfig } from '@shared/constants/agents';
 
 interface ModeGlyphProps {
   mode: AgentMode;
+  icon?: ModeIconKey;
+  accentColor?: string;
   className?: string;
   size?: number;
   strokeWidth?: number;
@@ -76,6 +78,67 @@ const glyphByIcon = (
           <path d="M18.8 3.2 20 2l1.2 1.2L22.4 4.4l-1.2 1.2L20 6.8l-1.2-1.2-1.2-1.2z" />
         </>
       );
+    case 'compass':
+      return (
+        <>
+          <circle cx="12" cy="12" r="8" />
+          <path d="m15 9-2 5-5 2 2-5z" />
+        </>
+      );
+    case 'terminal':
+      return (
+        <>
+          <path d="m5 7 5 5-5 5" />
+          <path d="M12 17h7" />
+        </>
+      );
+    case 'shield':
+      return (
+        <>
+          <path d="M12 3 5 6v5c0 4.5 2.8 7.7 7 10 4.2-2.3 7-5.5 7-10V6z" />
+          <path d="m9 12 2 2 4-5" />
+        </>
+      );
+    case 'wrench':
+      return (
+        <>
+          <path d="M14.7 6.3a4 4 0 0 0-5 5L4 17l3 3 5.7-5.7a4 4 0 0 0 5-5l-3 3-3-3z" />
+        </>
+      );
+    case 'search-lens':
+      return (
+        <>
+          <circle cx="10.5" cy="10.5" r="5.5" />
+          <path d="m15 15 5 5" />
+          <path d="M8.5 10.5h4" />
+        </>
+      );
+    case 'nodes':
+      return (
+        <>
+          <circle cx="6" cy="7" r="2" />
+          <circle cx="18" cy="7" r="2" />
+          <circle cx="12" cy="18" r="2" />
+          <path d="M8 8.5 11 16" />
+          <path d="m16 8.5-3 7.5" />
+          <path d="M8 7h8" />
+        </>
+      );
+    case 'memory':
+      return (
+        <>
+          <rect x="5" y="6" width="14" height="12" rx="2" />
+          <path d="M9 3v3M15 3v3M9 18v3M15 18v3M2 10h3M2 14h3M19 10h3M19 14h3" />
+          <path d="M9 10h6v4H9z" />
+        </>
+      );
+    case 'spark':
+      return (
+        <>
+          <path d="M12 3 14 9l6 3-6 3-2 6-2-6-6-3 6-3z" />
+          <path d="M19 4v4M17 6h4" />
+        </>
+      );
     default:
       return null;
   }
@@ -88,16 +151,20 @@ const FALLBACK_MODE_CONFIG = {
 
 export const ModeGlyph: React.FC<ModeGlyphProps> = ({
   mode,
+  icon,
+  accentColor,
   className,
   size = 16,
   strokeWidth = 1.85,
 }) => {
   const modeConfig = getAgentModeConfig(mode) ?? FALLBACK_MODE_CONFIG;
+  const resolvedIcon = icon ?? modeConfig.icon;
+  const resolvedAccent = accentColor ?? modeConfig.accentColor;
 
   return (
     <span
       className={className}
-      style={{ color: modeConfig.accentColor }}
+      style={{ color: resolvedAccent }}
       aria-hidden="true"
     >
       <svg
@@ -110,7 +177,7 @@ export const ModeGlyph: React.FC<ModeGlyphProps> = ({
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        {glyphByIcon(modeConfig.icon)}
+        {glyphByIcon(resolvedIcon)}
       </svg>
     </span>
   );

@@ -306,7 +306,6 @@ export interface SettingsDiagnostic {
 export interface ConfigurationSettings {
   activeModeProfileId: string;
   availableModeProfiles: ExecutionModeProfileDescriptor[];
-  enabledSkillIds: string[];
   enabledMcpServerIds: string[];
   modePatternBindings: Record<string, string>;
   availablePatterns: AgentRuntimePatternDescriptor[];

@@ -31,5 +31,17 @@ export const createSettingsApi = (): SettingsApi => ({
     ipcRenderer.invoke('settings:getProviderSecret', providerId),
   importAgentManifest: (filePath): ReturnType<SettingsApi['importAgentManifest']> =>
     ipcRenderer.invoke('settings:importAgentManifest', filePath),
+  upsertSkill: (request): ReturnType<SettingsApi['upsertSkill']> =>
+    ipcRenderer.invoke('settings:upsertSkill', request),
+  deleteSkill: (skillId): ReturnType<SettingsApi['deleteSkill']> =>
+    ipcRenderer.invoke('settings:deleteSkill', skillId),
+  importSkill: (filePath): ReturnType<SettingsApi['importSkill']> =>
+    ipcRenderer.invoke('settings:importSkill', filePath),
+  upsertMcpServer: (request): ReturnType<SettingsApi['upsertMcpServer']> =>
+    ipcRenderer.invoke('settings:upsertMcpServer', request),
+  deleteMcpServer: (serverId): ReturnType<SettingsApi['deleteMcpServer']> =>
+    ipcRenderer.invoke('settings:deleteMcpServer', serverId),
+  importMcpServer: (filePath): ReturnType<SettingsApi['importMcpServer']> =>
+    ipcRenderer.invoke('settings:importMcpServer', filePath),
   set: (settings): ReturnType<SettingsApi['set']> => ipcRenderer.invoke('settings:set', settings),
 });

@@ -56,6 +56,7 @@ import { secretStorageService } from './SecretStorageService';
 
 interface PersistedConfigurationSettings {
   activeModeProfileId?: string;
+  // Legacy persisted field only. Markdown Skills are available by file presence.
   enabledSkillIds?: string[];
   enabledMcpServerIds?: string[];
   modePatternBindings?: Record<string, string>;
@@ -168,7 +169,6 @@ const DEFAULT_PROFILE: ProfileSettings = {
 
 const DEFAULT_CONFIGURATION: PersistedConfigurationSettings = {
   activeModeProfileId: 'debugger.default',
-  enabledSkillIds: [],
   enabledMcpServerIds: [],
   modePatternBindings: {
     debugger: 'free-agent',
@@ -561,7 +561,6 @@ function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspac
   const configuration = executionProfileService.normalizeConfiguration({
     activeModeProfileId: DEFAULT_CONFIGURATION.activeModeProfileId || 'debugger.default',
     availableModeProfiles: [],
-    enabledSkillIds: DEFAULT_CONFIGURATION.enabledSkillIds ?? [],
     enabledMcpServerIds: DEFAULT_CONFIGURATION.enabledMcpServerIds ?? [],
     modePatternBindings: DEFAULT_CONFIGURATION.modePatternBindings ?? {},
     availablePatterns: [],
@@ -985,7 +984,6 @@ export class SettingsService {
       },
       configuration: {
         activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
-        enabledSkillIds: sanitizeRuntimeIds(candidate.configuration?.enabledSkillIds),
         enabledMcpServerIds: sanitizeRuntimeIds(candidate.configuration?.enabledMcpServerIds),
         modePatternBindings: sanitizePatternBindings(candidate.configuration?.modePatternBindings),
         lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath,
@@ -1040,7 +1038,6 @@ export class SettingsService {
       },
       configuration: {
         activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
-        enabledSkillIds: sanitizeRuntimeIds(candidate.configuration?.enabledSkillIds),
         enabledMcpServerIds: sanitizeRuntimeIds(candidate.configuration?.enabledMcpServerIds),
         modePatternBindings: sanitizePatternBindings(candidate.configuration?.modePatternBindings),
         lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath,
@@ -1098,7 +1095,6 @@ export class SettingsService {
     const configuration: ConfigurationSettings = executionProfileService.normalizeConfiguration({
       activeModeProfileId: normalized.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId || 'debugger.default',
       availableModeProfiles: [],
-      enabledSkillIds: normalized.configuration?.enabledSkillIds ?? [],
       enabledMcpServerIds: normalized.configuration?.enabledMcpServerIds ?? [],
       modePatternBindings: normalized.configuration?.modePatternBindings ?? DEFAULT_CONFIGURATION.modePatternBindings ?? {},
       availablePatterns: [],
@@ -1289,9 +1285,6 @@ export class SettingsService {
         activeModeProfileId: patch.configuration?.activeModeProfileId
           || currentPersisted.configuration?.activeModeProfileId
           || DEFAULT_CONFIGURATION.activeModeProfileId,
-        enabledSkillIds: patch.configuration?.enabledSkillIds
-          ? sanitizeRuntimeIds(patch.configuration.enabledSkillIds)
-          : sanitizeRuntimeIds(currentPersisted.configuration?.enabledSkillIds),
         enabledMcpServerIds: patch.configuration?.enabledMcpServerIds
           ? sanitizeRuntimeIds(patch.configuration.enabledMcpServerIds)
           : sanitizeRuntimeIds(currentPersisted.configuration?.enabledMcpServerIds),

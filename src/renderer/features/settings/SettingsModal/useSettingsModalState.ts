@@ -18,7 +18,6 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
   const [providerDrafts, setProviderDrafts] = useState<LlmProviderEntry[]>(settings.llm.providers.map(cloneProvider));
   const [agentRouteDrafts, setAgentRouteDrafts] = useState<LlmAgentRoute[]>(settings.llm.agentRoutes.map(cloneRoute));
   const [activeModeProfileDraft, setActiveModeProfileDraft] = useState(settings.configuration.activeModeProfileId);
-  const [enabledSkillDrafts, setEnabledSkillDrafts] = useState<string[]>(settings.configuration.enabledSkillIds);
   const [enabledMcpDrafts, setEnabledMcpDrafts] = useState<string[]>(settings.configuration.enabledMcpServerIds);
   const [patternBindingDrafts, setPatternBindingDrafts] = useState<Record<string, string>>(settings.configuration.modePatternBindings);
   const [rdxCliDraft, setRdxCliDraft] = useState<RdxCliInvokerSettings>(settings.tooling.rdxCli);
@@ -57,7 +56,6 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setProviderDrafts(providers);
     setAgentRouteDrafts(settings.llm.agentRoutes.map(cloneRoute));
     setActiveModeProfileDraft(settings.configuration.activeModeProfileId);
-    setEnabledSkillDrafts(settings.configuration.enabledSkillIds);
     setEnabledMcpDrafts(settings.configuration.enabledMcpServerIds);
     setPatternBindingDrafts(settings.configuration.modePatternBindings);
     setRdxCliDraft(settings.tooling.rdxCli);
@@ -86,8 +84,6 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setAgentRouteDrafts,
     activeModeProfileDraft,
     setActiveModeProfileDraft,
-    enabledSkillDrafts,
-    setEnabledSkillDrafts,
     enabledMcpDrafts,
     setEnabledMcpDrafts,
     patternBindingDrafts,

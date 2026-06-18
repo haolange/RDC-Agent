@@ -1,5 +1,9 @@
 import { ipcMain } from 'electron';
 import type {
+  AgentRuntimeMcpWriteRequest,
+  AgentRuntimeSkillWriteRequest,
+} from '@shared/types/agentRuntime';
+import type {
   AppSettingsPatch,
   LlmProviderAccountLoginFinishRequest,
   LlmProviderDraftRequest,
@@ -7,6 +11,7 @@ import type {
 } from '@shared/types/settings';
 import { appPathService } from '../runtime/AppPathService';
 import { agentManifestService } from '../settings/AgentManifestService';
+import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService';
 import { llmAdapter } from '../settings/LLMAdapter';
 import { providerConnectionService } from '../settings/ProviderConnectionService';
 import { settingsService } from '../settings/SettingsService';
@@ -107,6 +112,42 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   ipcMain.handle('settings:importAgentManifest', async (_event, filePath: string) => {
     const paths = appPathService.getWorkspacePaths();
     agentManifestService.importFile(paths, filePath);
+    return settingsService.getAll(paths);
+  });
+
+  ipcMain.handle('settings:upsertSkill', async (_event, request: AgentRuntimeSkillWriteRequest) => {
+    const paths = appPathService.getWorkspacePaths();
+    agentRuntimeConfigService.upsertSkill(request, paths.workspaceRoot);
+    return settingsService.getAll(paths);
+  });
+
+  ipcMain.handle('settings:deleteSkill', async (_event, skillId: string) => {
+    const paths = appPathService.getWorkspacePaths();
+    agentRuntimeConfigService.deleteSkill(skillId, paths.workspaceRoot);
+    return settingsService.getAll(paths);
+  });
+
+  ipcMain.handle('settings:importSkill', async (_event, filePath: string) => {
+    const paths = appPathService.getWorkspacePaths();
+    agentRuntimeConfigService.importSkill(filePath, paths.workspaceRoot);
+    return settingsService.getAll(paths);
+  });
+
+  ipcMain.handle('settings:upsertMcpServer', async (_event, request: AgentRuntimeMcpWriteRequest) => {
+    const paths = appPathService.getWorkspacePaths();
+    agentRuntimeConfigService.upsertMcpServer(request, paths.workspaceRoot);
+    return settingsService.getAll(paths);
+  });
+
+  ipcMain.handle('settings:deleteMcpServer', async (_event, serverId: string) => {
+    const paths = appPathService.getWorkspacePaths();
+    agentRuntimeConfigService.deleteMcpServer(serverId, paths.workspaceRoot);
+    return settingsService.getAll(paths);
+  });
+
+  ipcMain.handle('settings:importMcpServer', async (_event, filePath: string) => {
+    const paths = appPathService.getWorkspacePaths();
+    agentRuntimeConfigService.importMcpServer(filePath, paths.workspaceRoot);
     return settingsService.getAll(paths);
   });
 

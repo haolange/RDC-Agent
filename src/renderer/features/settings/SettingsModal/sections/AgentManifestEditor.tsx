@@ -1,10 +1,12 @@
 import React from 'react';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
-import type { AppSettings } from '@shared/types/settings';
+import type { AgentPermissionMode, AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import { AutosizeTextarea } from '../AutosizeTextarea';
 import { AgentCapabilityPicker, type AgentCapabilityGroup } from './AgentCapabilityPicker';
+import { AgentIconPresetPicker } from './AgentIconPresetPicker';
 import { AgentModelCascadeSelect } from './AgentModelCascadeSelect';
+import { AgentPermissionsSettings } from './AgentPermissionsSettings';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -15,6 +17,13 @@ interface AgentManifestEditorProps {
   onDuplicateAgent: () => void;
   onDeleteAgent: () => void;
   onSaveAgentManifests: () => void | Promise<void>;
+  permissionModeDraft: AgentPermissionMode;
+  readableRootsDraft: string;
+  writableRootsDraft: string;
+  onPermissionModeDraftChange: (mode: AgentPermissionMode) => void;
+  onReadableRootsDraftChange: (value: string) => void;
+  onWritableRootsDraftChange: (value: string) => void;
+  onSaveAgentPermissions: () => void | Promise<void>;
   agentRouteSaveState: 'idle' | 'saving' | 'saved' | 'error';
   agentRouteSaveMessage: string;
   t: Translate;
@@ -75,14 +84,18 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   onDuplicateAgent,
   onDeleteAgent,
   onSaveAgentManifests,
+  permissionModeDraft,
+  readableRootsDraft,
+  writableRootsDraft,
+  onPermissionModeDraftChange,
+  onReadableRootsDraftChange,
+  onWritableRootsDraftChange,
+  onSaveAgentPermissions,
   agentRouteSaveState,
   agentRouteSaveMessage,
   t,
 }) => {
   const selectedModel = selectedAgent.models[0] ?? '';
-  const selectedCapabilityCount =
-    selectedAgent.tools.length + selectedAgent.agents.length + selectedAgent.skills.length + selectedAgent.mcpServers.length;
-  const selectedInstructionLength = selectedAgent.instructions.trim().length;
   const capabilityGroups = buildCapabilityGroups(settings, selectedAgent, onUpdateAgent, t);
   const selectedAgentSummary = [
     selectedAgent.enabled ? t('settings.enabled') : t('settings.disabled'),
@@ -106,35 +119,17 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
         </div>
       </div>
 
-      <div className="settings-agent-overview-strip" aria-label={t('settings.configurationSummary')}>
-        <div className="settings-agent-overview-item">
-          <span>{t('settings.agentStatus')}</span>
-          <strong>{selectedAgent.enabled ? t('settings.enabled') : t('settings.disabled')}</strong>
-        </div>
-        <div className="settings-agent-overview-item">
-          <span>{t('settings.agentModel')}</span>
-          <strong>{selectedModel || t('settings.noModelSelected')}</strong>
-        </div>
-        <div className="settings-agent-overview-item">
-          <span>{t('settings.agentCapabilityScope')}</span>
-          <strong>{t('settings.capabilityCount', { count: selectedCapabilityCount })}</strong>
-        </div>
-        <div className="settings-agent-overview-item">
-          <span>{t('settings.agentInstructionScope')}</span>
-          <strong>{selectedInstructionLength > 0 ? t('settings.configured') : t('settings.unset')}</strong>
-        </div>
-      </div>
+      <AgentIconPresetPicker
+        value={selectedAgent.icon ?? 'message-orbit'}
+        onChange={(icon) => onUpdateAgent({ icon })}
+        t={t}
+      />
 
       <section className="settings-agent-route-panel">
-        <div className="settings-section-header">
-          <div>
-            <div className="settings-section-title">{t('settings.agentPrimaryRoute')}</div>
-            <div className="settings-section-subtitle">{t('settings.agentPrimaryRouteHint')}</div>
-          </div>
-        </div>
+        <div className="settings-section-title">{t('settings.agentPrimaryRoute')}</div>
         <div className="settings-manifest-form-grid">
-          <div className="settings-input-row">
-            <span className="settings-help-text">{t('settings.modelFieldLabel')}</span>
+          <div className="settings-input-row settings-model-route-row">
+            <span className="settings-field-label">{t('settings.modelFieldLabel')}</span>
             <AgentModelCascadeSelect
               value={selectedModel}
               options={settings.agents.modelOptions}
@@ -202,6 +197,25 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
             <span className="settings-help-text">{t('settings.agentInstructions')}</span>
             <AutosizeTextarea maxHeight={520} className="input settings-agent-instructions settings-agent-handoff-textarea" value={selectedAgent.instructions} onChange={(event) => onUpdateAgent({ instructions: event.currentTarget.value })} />
           </label>
+        </div>
+      </details>
+
+      <details className="settings-advanced-panel settings-agent-permissions-panel">
+        <summary>
+          <span>{t('settings.agentPermissionsTitle')}</span>
+          <small>{t('settings.agentPermissionsHint')}</small>
+        </summary>
+        <div className="settings-advanced-content">
+          <AgentPermissionsSettings
+            permissionModeDraft={permissionModeDraft}
+            readableRootsDraft={readableRootsDraft}
+            writableRootsDraft={writableRootsDraft}
+            onPermissionModeDraftChange={onPermissionModeDraftChange}
+            onReadableRootsDraftChange={onReadableRootsDraftChange}
+            onWritableRootsDraftChange={onWritableRootsDraftChange}
+            onSave={onSaveAgentPermissions}
+            t={t}
+          />
         </div>
       </details>
 
