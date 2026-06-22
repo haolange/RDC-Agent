@@ -51,7 +51,8 @@ import {
 import { appPathService } from '../runtime/AppPathService';
 import { agentManifestService } from './AgentManifestService';
 import { executionProfileService } from './ExecutionProfileService';
-import { normalizeProviderCatalogGroup } from './providerCatalogGroup';
+import { providerCatalogService } from './ProviderCatalogService';
+import { normalizeProviderCategory, normalizeProviderProtocol } from './providerCatalogNormalize';
 import { secretStorageService } from './SecretStorageService';
 
 interface PersistedConfigurationSettings {
@@ -63,13 +64,18 @@ interface PersistedConfigurationSettings {
   lastMigrationReportPath?: string;
 }
 
+type PersistedLlmProviderEntry = Partial<LlmProviderEntry> & {
+  kind?: unknown;
+  catalogGroup?: unknown;
+};
+
 interface PersistedSettingsPayload {
   appearance?: Partial<UiPreferences>;
   layout?: Partial<LayoutPreferences>;
   profile?: Partial<ProfileSettings>;
   workspace?: Partial<WorkspaceSettings>;
   llm?: {
-    providers?: LlmProviderEntry[];
+    providers?: PersistedLlmProviderEntry[];
     agentRoutes?: LlmAgentRoute[];
   };
   tooling?: {
@@ -646,8 +652,8 @@ function isFixtureProvider(provider: Partial<LlmProviderEntry>): boolean {
 
 const RETIRED_PROVIDER_ID_IMPORTS: Record<string, LlmProviderId> = {
   gemini: 'vertex',
-  kimi: 'kimi-code',
-  'kimi-coding-plan': 'kimi-code',
+  kimi: 'kimi-coding-plan',
+  'kimi-code': 'kimi-coding-plan',
   minimax: 'minimax-global',
   zai: 'glm-global',
 };
@@ -657,7 +663,7 @@ function normalizeRetiredProviderId(providerId: string): string {
 }
 
 function sanitizeUserProvider(
-  provider: Partial<LlmProviderEntry>,
+  provider: PersistedLlmProviderEntry,
   workspaceRoot = appPathService.getWorkspaceRoot(),
 ): LlmProviderEntry | null {
   const incomingId = typeof provider.id === 'string' ? provider.id.trim() : '';
@@ -674,7 +680,7 @@ function sanitizeUserProvider(
   const secretRef = incomingId && incomingId !== rawId
     ? secretStorageService.createProviderSecretRef(rawId)
     : incomingSecretRef || secretStorageService.createProviderSecretRef(rawId);
-  const kind = builtinFallback.kind;
+  const protocol = normalizeProviderProtocol({ ...provider, id: rawId });
   const models = sanitizeModels(provider.models ?? []);
   const oauthSecretRef = secretStorageService.createProviderOAuthSecretRef(rawId);
   const resolvedSecret = builtinFallback.authMode === 'api-key'
@@ -682,12 +688,10 @@ function sanitizeUserProvider(
     : builtinFallback.authMode === 'account'
       ? secretStorageService.getSecret(oauthSecretRef, workspaceRoot)
       : '';
-  const hasStoredSecret = builtinFallback.authMode === 'local' || builtinFallback.authMode === 'environment' || Boolean(resolvedSecret);
-  const canUseProvider = builtinFallback.authMode === 'local' || builtinFallback.authMode === 'environment'
+  const hasStoredSecret = builtinFallback.hasStoredSecret || Boolean(resolvedSecret);
+  const canUseProvider = builtinFallback.status !== 'unavailable' && (builtinFallback.authMode === 'local' || builtinFallback.authMode === 'environment'
     ? true
-    : builtinFallback.authMode === 'api-key'
-      ? Boolean(resolvedSecret)
-      : Boolean(resolvedSecret);
+    : Boolean(resolvedSecret));
   const status = pickProviderStatus(provider, builtinFallback, canUseProvider, models);
   const enabled = status === 'verified' && models.length > 0;
   const label = builtinFallback.label;
@@ -696,9 +700,9 @@ function sanitizeUserProvider(
 
   return {
     id: rawId,
-    kind,
+    protocol,
     authMode: builtinFallback.authMode,
-    catalogGroup: normalizeProviderCatalogGroup({ ...provider, id: rawId, authMode: builtinFallback.authMode }),
+    category: normalizeProviderCategory({ ...provider, id: rawId, authMode: builtinFallback.authMode }),
     modelDiscovery: builtinFallback.modelDiscovery,
     label,
     enabled,
@@ -709,6 +713,8 @@ function sanitizeUserProvider(
       ? (typeof provider.baseUrl === 'string' ? provider.baseUrl.trim() : definition.baseUrl)
       : definition?.baseUrl,
     baseUrlEditable: definition?.baseUrlEditable,
+    protocolEditable: definition?.protocolEditable,
+    protocolOptions: builtinFallback.protocolOptions,
     models,
     recommendedModels,
     docsUrl,
@@ -1302,7 +1308,13 @@ export class SettingsService {
     });
   }
 
-  saveProviderConnection(providerId: LlmProviderId, apiKey: string, models: LlmProviderModel[], baseUrl = ''): AppSettings {
+  saveProviderConnection(
+    providerId: LlmProviderId,
+    apiKey: string,
+    models: LlmProviderModel[],
+    baseUrl = '',
+    protocolDraft?: unknown,
+  ): AppSettings {
     const current = this.getAll();
     const provider = current.llm.providers.find((entry) => entry.id === providerId);
     if (!provider || !isBuiltinProviderId(provider.id)) {
@@ -1314,10 +1326,12 @@ export class SettingsService {
       throw new Error('该 Provider 暂未返回可用模型');
     }
 
+    const protocol = normalizeProviderProtocol({ id: provider.id, protocol: protocolDraft ?? provider.protocol });
     const timestamp = nowIso();
     const nextProvider: LlmProviderEntry = {
       ...provider,
       apiKey: apiKey.trim(),
+      protocol,
       enabled: true,
       hasStoredSecret: provider.authMode === 'api-key'
         ? Boolean(apiKey.trim() || provider.hasStoredSecret)
@@ -1434,7 +1448,7 @@ export class SettingsService {
           : { apiKey: '', baseUrl: undefined };
         return {
           id: provider.id,
-          kind: provider.kind,
+          protocol: provider.protocol,
           label: provider.label,
           enabled: provider.enabled,
           apiKey: provider.authMode === 'api-key'
@@ -1455,6 +1469,10 @@ export class SettingsService {
       providers,
       agentRoutes: settings.llm.agentRoutes,
     };
+  }
+
+  getProviderCatalog() {
+    return providerCatalogService.getProviderCatalog();
   }
 
   hasConfiguredProvider(): boolean {

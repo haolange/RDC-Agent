@@ -27,6 +27,8 @@ export const createLlmApi = (): LlmApi => ({
 
 export const createSettingsApi = (): SettingsApi => ({
   get: (): ReturnType<SettingsApi['get']> => ipcRenderer.invoke('settings:get'),
+  getProviderCatalog: (): ReturnType<SettingsApi['getProviderCatalog']> =>
+    ipcRenderer.invoke('settings:getProviderCatalog'),
   getProviderSecret: (providerId): ReturnType<SettingsApi['getProviderSecret']> =>
     ipcRenderer.invoke('settings:getProviderSecret', providerId),
   importAgentManifest: (filePath): ReturnType<SettingsApi['importAgentManifest']> =>

@@ -1,4 +1,4 @@
-﻿export const IPC_HANDLER_DOMAINS = {
+export const IPC_HANDLER_DOMAINS = {
   shell: [
     'dialog:selectRdcFiles',
     'dialog:selectFiles',
@@ -64,6 +64,7 @@
   ],
   settingsProfile: [
     'settings:get',
+    'settings:getProviderCatalog',
     'settings:getProviderSecret',
     'settings:importAgentManifest',
     'settings:upsertSkill',

@@ -23,6 +23,11 @@ const parseNamedExports = (line) => {
   if (typeStar) return ['*'];
   const star = line.match(/export\s+\*\s+from/);
   if (star) return ['*'];
+  const declaration = line.match(/export\s+(?:type|interface|class|const|let|var|function|enum)\s+([\w$]+)/);
+  if (declaration && !line.includes(' from ')) {
+    names.push(declaration[1]);
+    return names;
+  }
   const single = line.match(/export\s+(?:type\s+)?([\w$]+)/);
   if (single && !line.includes(' from ')) {
     names.push(single[1]);

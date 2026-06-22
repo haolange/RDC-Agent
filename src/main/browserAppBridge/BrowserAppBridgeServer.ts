@@ -129,6 +129,12 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
   const bridgeOrigin = bridgeUrl ?? 'http://127.0.0.1';
   const url = new URL(request.url, bridgeOrigin);
 
+  if (url.pathname === '/api/settings/providers/catalog' && request.method === 'GET') {
+    const catalog = await invokeRegisteredIpcChannel('settings:getProviderCatalog');
+    sendJson(response, 200, catalog);
+    return;
+  }
+
   if (url.pathname === '/health' && request.method === 'GET') {
     const renderer = options.devRendererUrl
       ? await checkDevRenderer(options.devRendererUrl)

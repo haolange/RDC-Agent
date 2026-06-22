@@ -7,26 +7,33 @@ import type {
   LlmProviderCapability,
   LlmProviderEntry,
   LlmProviderId,
-  LlmProviderKind,
+  LlmProviderProtocol,
 } from '@shared/types/settings';
 
-const NATIVE_TOOL_PROVIDER_KINDS = new Set<LlmProviderKind>([
-  'anthropic',
-  'openai-compatible',
-  'openrouter',
-  'azure-openai',
-  'google-ai-studio',
-  'ollama',
+const NATIVE_TOOL_PROTOCOLS = new Set<LlmProviderProtocol>([
+  'AnthropicMessages',
+  'OpenAIResponses',
+  'OpenAICompatibleChatCompletions',
+  'OpenRouterChatCompletions',
+  'GoogleGemini',
+  'OllamaOpenAICompatibleChatCompletions',
 ]);
 
-const STREAMING_PROVIDER_KINDS = new Set<LlmProviderKind>([
-  'anthropic',
-  'openai-compatible',
-  'openrouter',
-  'azure-openai',
-  'google-ai-studio',
-  'ollama',
+const STREAMING_PROTOCOLS = new Set<LlmProviderProtocol>([
+  'AnthropicMessages',
+  'OpenAIResponses',
+  'OpenAICompatibleChatCompletions',
+  'OpenRouterChatCompletions',
+  'GoogleGemini',
+  'OllamaOpenAICompatibleChatCompletions',
 ]);
+
+function readProviderProtocol(provider: LlmProviderEntry | undefined): LlmProviderProtocol | null {
+  if (!provider) {
+    return null;
+  }
+  return provider.protocol ?? null;
+}
 
 function hasCapability(
   provider: LlmProviderEntry | undefined,
@@ -64,8 +71,13 @@ export function resolveAgentRouteCapability(
     return disabledCapability(provider.id, modelId);
   }
 
-  const supportsStreaming = STREAMING_PROVIDER_KINDS.has(provider.kind);
-  const runtimeHasNativeTools = NATIVE_TOOL_PROVIDER_KINDS.has(provider.kind);
+  const protocol = readProviderProtocol(provider);
+  if (!protocol) {
+    return disabledCapability(provider.id, modelId);
+  }
+
+  const supportsStreaming = STREAMING_PROTOCOLS.has(protocol);
+  const runtimeHasNativeTools = NATIVE_TOOL_PROTOCOLS.has(protocol);
   let toolCallingMode: ToolCallingMode = 'text-only';
   if (hasCapability(provider, 'tool-calling') && runtimeHasNativeTools) {
     toolCallingMode = 'native-structured';
@@ -97,4 +109,3 @@ export function describeRouteCapabilityDiagnostic(
 
   return `Current route ${capability.providerId}/${capability.modelId} is text-only for agent tools. Tools were not registered and textual tool calls will not be executed.`;
 }
-

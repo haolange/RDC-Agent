@@ -9,7 +9,7 @@
 - `data-flow.md`：Project、Session、Capture、Agent、Trace 与 RDX shell actions 的端到端数据流。
 - `agent-runtime-kernel.md`：Agent Runtime kernel、provider/account abstraction、tool mediation、Ask readonly profile、Debugger serial multi-agent workflow 与 SDK backend boundary。
 - `agentic-trace-protocol.md`：Agentic Trace 权威追踪契约。
-- `provider-system.md`：Provider 体系架构，覆盖 `LlmProviderEntry` / `LlmProviderKind` / `LlmProviderAuthMode` / `LlmProviderCatalogGroup` / `LlmProviderCapability` 的正交维度与 Settings、Agent Runtime 路由契约。
+- `provider-system.md`?Provider ??????? `LlmProviderEntry` / `LlmProviderProtocol` / `LlmProviderCategory` / `LlmProviderAuthMode` / `LlmProviderCapability` ?????? Settings?Agent Runtime ?????
 - `spec-driven-development.md`：跨层规范与执行约束。
 
 ## 对照参考

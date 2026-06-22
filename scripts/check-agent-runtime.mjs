@@ -35,17 +35,45 @@ function configuredProvider(id, modelIds) {
   };
 }
 
+function extractStringLiterals(source) {
+  return Array.from(source.matchAll(/'([^']+)'/g), (match) => match[1]);
+}
+
+function extractPlanTools(agentManifestServiceSource) {
+  const match = /agentId === 'plan'\s*\?\s*\[([\s\S]*?)\]\s*:\s*agentId === 'edit'/m.exec(agentManifestServiceSource);
+  assert(match, 'AgentManifestService must keep Plan seed tools split from Edit and executable agents.');
+  return extractStringLiterals(match[1]);
+}
+
+function assertIncludesAll(values, required, label) {
+  for (const value of required) {
+    assert(values.includes(value), `${label} must include ${value}.`);
+  }
+}
+
+function assertIncludesNone(values, forbidden, label) {
+  for (const value of forbidden) {
+    assert(!values.includes(value), `${label} must not include ${value}.`);
+  }
+}
+
 function main() {
+  const routeResolverSource = read('src/main/agent-runtime/capabilities/RouteCapabilityResolver.ts');
+  assert(routeResolverSource.includes('LlmProviderProtocol'), 'RouteCapabilityResolver must use the new LlmProviderProtocol enum.');
+  assert(!routeResolverSource.includes('LlmProviderKind'), 'RouteCapabilityResolver must not keep legacy LlmProviderKind.');
+  assert(routeResolverSource.includes('provider.protocol'), 'RouteCapabilityResolver must route on provider.protocol.');
+  assert(!routeResolverSource.includes('provider.kind'), 'RouteCapabilityResolver must not route on legacy provider.kind.');
+
   const {
     resolveAgentRouteCapability,
     describeRouteCapabilityDiagnostic,
   } = require('../src/main/agent-runtime/capabilities/RouteCapabilityResolver.ts');
 
   const kimiCapability = resolveAgentRouteCapability(
-    configuredProvider('kimi-code', ['kimi-for-coding']),
+    configuredProvider('kimi-coding-plan', ['kimi-for-coding']),
     'kimi-for-coding',
   );
-  assert(kimiCapability.toolCallingMode === 'native-structured', 'kimi-code must resolve to native structured tool calling.');
+  assert(kimiCapability.toolCallingMode === 'native-structured', 'kimi-coding-plan must resolve to native structured tool calling.');
   assert(kimiCapability.supportsToolResults === true, 'native structured routes must support tool results.');
 
   const openRouterCapability = resolveAgentRouteCapability(
@@ -65,6 +93,35 @@ function main() {
   for (const token of ['ToolCallingMode', 'ReasoningVisibility', 'AgentRouteCapability', 'native-structured', 'text-only', 'disabled']) {
     assert(sharedTypes.includes(token), `shared agent runtime types must expose ${token}.`);
   }
+
+  const agentTypes = read('src/shared/types/agent.ts');
+  assert(agentTypes.includes("export type AgentId = 'ask' | 'plan' | 'edit'"), 'Plan must remain a first-class top-level agent id.');
+  assert(agentTypes.includes("TOP_LEVEL_AGENT_IDS: AgentId[] = ['ask', 'plan', 'edit'"), 'Plan must stay split in TOP_LEVEL_AGENT_IDS.');
+
+  const layoutTypes = read('src/shared/types/layout.ts');
+  assert(layoutTypes.includes("BuiltinAgentMode = 'ask' | 'plan' | 'edit'"), 'Plan must be a built-in agent mode, split from executable app modes.');
+
+  const agentConstants = read('src/shared/constants/agents.ts');
+  assert(agentConstants.includes("plan: 'Planning agent"), 'Plan must keep its own agent description.');
+  assert(agentConstants.includes('without direct changes'), 'Plan description must state that it does not directly change files.');
+  assert(agentConstants.includes("plan: ['workspace_notes']"), 'Plan write scope must stay limited to workspace notes.');
+
+  const agentManifestService = read('src/main/settings/AgentManifestService.ts');
+  const planTools = extractPlanTools(agentManifestService);
+  assertIncludesAll(
+    planTools,
+    ['read', 'search', 'web', 'askUser', 'agent', 'todo', 'memory', 'planArtifact', 'handoff'],
+    'Plan seed tools',
+  );
+  assertIncludesNone(
+    planTools,
+    ['bash', 'write', 'edit', 'rdxContext'],
+    'Plan seed tools',
+  );
+  assert(agentManifestService.includes("handoffs: agentId === 'plan'"), 'Plan must own a dedicated handoff entry.');
+  assert(agentManifestService.includes("agent: 'edit'"), 'Plan handoff must target Edit for implementation.');
+  assert(agentManifestService.includes("providerId: ''") && agentManifestService.includes("modelId: ''"), 'Invalid or missing Plan routes must persist as empty fail-closed routes.');
+  assert(agentManifestService.includes('modelEnabled') && agentManifestService.includes('!modelEnabled'), 'AgentManifestService must fail closed when a selected model is not enabled/configured.');
 
   const orchestrator = read('src/main/workflow/debugger/AgentOrchestrator.ts');
   assert(orchestrator.includes('configuredRuntimeProvider'), 'AgentOrchestrator must use the configured runtime provider path.');

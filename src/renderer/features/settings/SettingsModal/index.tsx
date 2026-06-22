@@ -51,6 +51,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     derivedPathEntries,
     accountProviders,
     providerCatalog,
+    providerCatalogCategories,
     getResolvedProviderLabel,
     handleAvatarSelect,
     handleAccountSave,
@@ -212,6 +213,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 <ModelsSettings
                   accountProviders={accountProviders}
                   providerCatalog={providerCatalog}
+                  providerCatalogCategories={providerCatalogCategories}
                   getResolvedProviderLabel={getResolvedProviderLabel}
                   onRefreshProviderModels={handleRefreshProviderModels}
                   onDisconnectProvider={handleDisconnectProvider}
@@ -270,6 +272,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
           connectionDraft={connectionDraft}
           connectionProvider={connectionProvider}
           getResolvedProviderLabel={getResolvedProviderLabel}
+          providerCatalogCategories={providerCatalogCategories}
           connectionAccountConnected={connectionAccountConnected}
           connectionDevicePending={connectionDevicePending}
           connectionNeedsApiKey={connectionNeedsApiKey}

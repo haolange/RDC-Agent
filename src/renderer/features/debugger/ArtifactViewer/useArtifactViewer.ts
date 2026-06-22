@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ActionEvent } from '@shared/types/evidence';
 import {
-  type ArtifactRecord,
+  type ViewerArtifactRecord,
   getArtifactName,
   getArtifactPath,
   inferFileType,
@@ -50,12 +50,12 @@ export function useArtifactViewer() {
     };
   }, [electronAPI]);
 
-  const artifacts = useMemo<ArtifactRecord[]>(() => {
-    const byPath = new Map<string, ArtifactRecord>();
+  const artifacts = useMemo<ViewerArtifactRecord[]>(() => {
+    const byPath = new Map<string, ViewerArtifactRecord>();
 
     artifactEvents.forEach((event) => {
       const path = getArtifactPath(event);
-      const nextArtifact: ArtifactRecord = {
+      const nextArtifact: ViewerArtifactRecord = {
         id: event.event_id,
         name: getArtifactName(path),
         path,

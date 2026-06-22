@@ -28,17 +28,23 @@ export type BuiltinLlmProviderId =
   | 'huggingface'
   | 'glm-cn'
   | 'glm-global'
-  | 'kimi-code'
+  | 'glm-cn-coding-plan'
+  | 'glm-global-coding-plan'
+  | 'kimi-coding-plan'
   | 'moonshot'
   | 'minimax-cn'
   | 'minimax-global'
+  | 'minimax-cn-coding-plan'
+  | 'minimax-global-coding-plan'
   | 'xiaomi-mimo'
   | 'xiaomi-mimo-token-plan'
   | 'bailian'
+  | 'bailian-coding-plan'
   | 'bedrock'
   | 'vertex'
   | 'qwen'
   | 'volcengine'
+  | 'volcengine-coding-plan'
   | 'vercel-ai-gateway'
   | 'manifest'
   | 'custom-endpoint'
@@ -55,34 +61,24 @@ export type BuiltinLlmProviderId =
 export type LlmProviderId = BuiltinLlmProviderId | (string & {});
 
 /**
- * Wire-protocol kind — describes the underlying request/response protocol that the
- * provider speaks at the HTTP layer. This is independent of how a user authenticates
- * (see `LlmProviderAuthMode`) and where the provider is shown in the catalog UI
- * (see `LlmProviderCatalogGroup`).
- *
- * Values:
- * - `openrouter`           : OpenRouter's hosted gateway (OpenAI-style chat completions with provider routing).
- * - `openai-compatible`    : OpenAI Chat Completions / Responses API contract.
- * - `anthropic`            : Anthropic Messages API contract.
- * - `google-ai-studio`     : Google Generative Language (AI Studio / Gemini) API contract.
- * - `azure-openai`         : Azure-hosted OpenAI deployments (path/version/auth quirks vs raw OpenAI).
- * - `bedrock`              : AWS Bedrock invocation API (signed via AWS credential chain).
- * - `vertex`               : Google Cloud Vertex AI (signed via GCP credential chain).
- * - `ollama`               : Local Ollama runtime (OpenAI-style endpoint exposed by ollama serve).
+ * Wire protocol for the actual API request shape. This is independent of
+ * authentication (`LlmProviderAuthMode`) and product catalog category
+ * (`LlmProviderCategory`).
  */
-export type LlmProviderKind =
-  | 'openrouter'
-  | 'openai-compatible'
-  | 'anthropic'
-  | 'google-ai-studio'
-  | 'azure-openai'
-  | 'bedrock'
-  | 'vertex'
-  | 'ollama';
+export type LlmProviderProtocol =
+  | 'OpenAICompatibleChatCompletions'
+  | 'OpenAIResponses'
+  | 'AnthropicMessages'
+  | 'OpenRouterChatCompletions'
+  | 'AzureOpenAIChatCompletions'
+  | 'GoogleGemini'
+  | 'AwsBedrock'
+  | 'GoogleVertexAI'
+  | 'OllamaOpenAICompatibleChatCompletions';
 
 /**
- * Authentication mode — describes HOW the user authenticates to the provider.
- * Orthogonal to `LlmProviderKind` (wire protocol) and `LlmProviderCatalogGroup`
+ * Authentication mode - describes HOW the user authenticates to the provider.
+ * Orthogonal to `LlmProviderProtocol` (wire protocol) and `LlmProviderCategory`
  * (UI grouping).
  *
  * - `api-key`     : User-supplied API key sent as a bearer/header.
@@ -93,27 +89,21 @@ export type LlmProviderKind =
 export type LlmProviderAuthMode = 'api-key' | 'local' | 'account' | 'environment';
 
 /**
- * Product-oriented catalog grouping — decides WHERE a provider is shown in the
- * Settings UI. Independent of `authMode` (HOW to authenticate) and `kind`
- * (wire protocol).
- *
- * - `account`              : Login-authorized providers (OAuth / Device Flow).
- * - `openai-compatible`    : Endpoints speaking the OpenAI Chat Completions contract.
- * - `anthropic-compatible` : Endpoints speaking the Anthropic Messages contract.
- * - `cloud-platform`       : Cloud-platform managed offerings (Azure / Bedrock / Vertex).
- * - `local`                : Local runtimes (Ollama and similar).
- * - `image`                : Image-generation skeleton group (no concrete providers in this iteration).
+ * User-visible product category. Categories describe provider source and
+ * commercial shape; they must not be used to infer runtime protocol.
  */
-export type LlmProviderCatalogGroup =
-  | 'account'
-  | 'openai-compatible'
-  | 'anthropic-compatible'
+export type LlmProviderCategory =
+  | 'login-authorization'
+  | 'official-direct'
   | 'cloud-platform'
+  | 'official-compatible'
+  | 'coding-token-plan'
+  | 'third-party-compatible'
   | 'local'
   | 'image';
 
 /**
- * Provider capability declaration — feature flags that downstream code can
+ * Provider capability declaration - feature flags that downstream code can
  * consult before attempting capability-gated behaviour (e.g. requesting tool
  * calls, structured outputs, image generation, etc.).
  */
@@ -257,9 +247,9 @@ export interface LlmProviderModel {
 
 export interface LlmProviderEntry {
   id: LlmProviderId;
-  kind: LlmProviderKind;
+  protocol: LlmProviderProtocol;
   authMode: LlmProviderAuthMode;
-  catalogGroup: LlmProviderCatalogGroup;
+  category: LlmProviderCategory;
   modelDiscovery: LlmProviderModelDiscoveryStrategy | null;
   label: string;
   enabled: boolean;
@@ -268,6 +258,8 @@ export interface LlmProviderEntry {
   hasStoredSecret: boolean;
   baseUrl?: string;
   baseUrlEditable?: boolean;
+  protocolEditable?: boolean;
+  protocolOptions?: LlmProviderProtocol[];
   models: LlmProviderModel[];
   recommendedModels: string[];
   docsUrl?: string;
@@ -283,6 +275,41 @@ export interface LlmProviderEntry {
   unavailableReason?: string;
   isConfigured: boolean;
   capabilities?: LlmProviderCapability[];
+}
+
+export interface LlmProviderCategoryDescriptor {
+  id: LlmProviderCategory;
+  label: string;
+  description: string;
+}
+
+export interface LlmProviderProtocolDescriptor {
+  id: LlmProviderProtocol;
+  label: string;
+  description: string;
+  responseEndpointHint?: string;
+}
+
+export interface LlmProviderCatalogEntry {
+  id: LlmProviderId;
+  protocol: LlmProviderProtocol;
+  authMode: LlmProviderAuthMode;
+  category: LlmProviderCategory;
+  label: string;
+  baseUrlEditable?: boolean;
+  protocolEditable?: boolean;
+  protocolOptions?: LlmProviderProtocol[];
+  recommendedModels: string[];
+  docsUrl?: string;
+  accountLoginConfigured?: boolean;
+  unavailableReason?: string;
+  capabilities?: LlmProviderCapability[];
+}
+
+export interface LlmProviderCatalogResponse {
+  categories: LlmProviderCategoryDescriptor[];
+  protocols: LlmProviderProtocolDescriptor[];
+  providers: LlmProviderCatalogEntry[];
 }
 
 export interface LlmAgentRoute {
@@ -360,6 +387,7 @@ export interface LlmProviderDraftRequest {
   providerId: LlmProviderId;
   apiKey?: string;
   baseUrl?: string;
+  protocol?: LlmProviderProtocol;
 }
 
 export interface LlmProviderAccountLoginFinishRequest {

@@ -1,26 +1,21 @@
 import React from 'react';
-import type { LlmProviderCatalogGroup, LlmProviderEntry } from '@shared/types/settings';
+import type { LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import type { ProviderCatalogCategory } from '../types';
 import {
   getEnabledModels,
   getModelSummary,
-  getProviderGroupLabel,
+  getProviderCategoryLabel,
+  getProviderProtocolLabel,
   getProviderStatusLabel,
 } from '../utils';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
-const CATALOG_GROUP_ORDER: LlmProviderCatalogGroup[] = [
-  'openai-compatible',
-  'anthropic-compatible',
-  'cloud-platform',
-  'local',
-  'image',
-];
-
 interface ProvidersSettingsProps {
   accountProviders: LlmProviderEntry[];
   providerCatalog: LlmProviderEntry[];
+  providerCatalogCategories: ProviderCatalogCategory[];
   getResolvedProviderLabel: (provider: Pick<LlmProviderEntry, 'label'>) => string;
   onRefreshProviderModels: (provider: LlmProviderEntry) => void | Promise<void>;
   onDisconnectProvider: (provider: LlmProviderEntry) => void | Promise<void>;
@@ -31,6 +26,7 @@ interface ProvidersSettingsProps {
 export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
   accountProviders,
   providerCatalog,
+  providerCatalogCategories,
   getResolvedProviderLabel,
   onRefreshProviderModels,
   onDisconnectProvider,
@@ -46,7 +42,7 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
     const primaryLabel = provider.isConfigured
       ? t('settings.edit')
       : primaryDisabled
-        ? t('settings.providerUnavailable')
+        ? t('settings.providerUnavailableAction')
         : t('settings.connect');
     const rowClassName = [
       'settings-provider-row',
@@ -55,7 +51,22 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
     ]
       .filter(Boolean)
       .join(' ');
-    const unavailableLabel = unavailable ? t('settings.providerUnavailable') : '';
+    const statusClassName = unavailable ? 'unavailable' : connected ? 'configured' : 'pending';
+    const protocolLabel = getProviderProtocolLabel(provider.protocol);
+    const showProtocolMeta = provider.authMode !== 'account';
+    const statusSummary = unavailable
+      ? t('settings.providerUnavailable')
+      : provider.authMode === 'account'
+        ? [
+          t(getProviderStatusLabel(provider)),
+          provider.accountLabel,
+          provider.planLabel,
+          getModelSummary(models, ''),
+        ].filter(Boolean).join(' / ')
+        : [
+          connected ? t('settings.providerConnected') : t('settings.providerUnconfigured'),
+          getModelSummary(models, t('settings.noEnabledModels')),
+        ].filter(Boolean).join(' / ');
 
     return (
       <div
@@ -65,26 +76,21 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
         title={unavailable ? provider.unavailableReason : undefined}
       >
         <div className="settings-provider-row-main">
-          <span className={`settings-provider-status ${connected ? 'configured' : 'pending'}`} />
-          <span className="settings-provider-icon">{getResolvedProviderLabel(provider).slice(0, 1).toUpperCase()}</span>
+          <span className="settings-provider-icon-shell">
+            <span className="settings-provider-icon">{getResolvedProviderLabel(provider).slice(0, 1).toUpperCase()}</span>
+            <span className={`settings-provider-status ${statusClassName}`} aria-label={t(getProviderStatusLabel(provider))} title={t(getProviderStatusLabel(provider))} />
+          </span>
           <span className="settings-provider-row-copy">
-            <span className="settings-provider-item-label">{getResolvedProviderLabel(provider)}</span>
-            <span className="settings-provider-item-meta">
-              {provider.authMode === 'account'
-                ? [
-                  t(getProviderStatusLabel(provider)),
-                  provider.accountLabel,
-                  provider.planLabel,
-                  getModelSummary(models, ''),
-                  unavailableLabel,
-                ].filter(Boolean).join(' / ')
-                : [
-                  getProviderGroupLabel(provider),
-                  connected ? t('settings.providerConnected') : t('settings.providerUnconfigured'),
-                  getModelSummary(models, t('settings.noEnabledModels')),
-                  unavailableLabel,
-                ].filter(Boolean).join(' / ')}
+            <span className="settings-provider-row-titleline">
+              <span className="settings-provider-item-label">{getResolvedProviderLabel(provider)}</span>
             </span>
+            {statusSummary ? <span className="settings-provider-item-meta">{statusSummary}</span> : null}
+            {showProtocolMeta ? (
+              <span className="settings-provider-protocol-meta" title={protocolLabel}>
+                <span className="settings-provider-protocol-meta-label">{t('settings.providerProtocol')}</span>
+                <span className="settings-provider-protocol-meta-value">{protocolLabel}</span>
+              </span>
+            ) : null}
           </span>
         </div>
         {showConfiguredActions ? (
@@ -100,7 +106,7 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
             </button>
             <button
               type="button"
-              className="button button-secondary settings-provider-row-button"
+              className="button button-ghost settings-provider-row-button"
               data-testid={`settings-provider-disconnect-${provider.id}`}
               onClick={() => void onDisconnectProvider(provider)}
             >
@@ -108,7 +114,7 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
             </button>
             <button
               type="button"
-              className="button button-primary settings-provider-row-button"
+              className="button button-primary settings-provider-row-button settings-provider-row-button--primary"
               data-testid={`settings-provider-connect-${provider.id}`}
               onClick={() => onOpenProviderConnection(provider)}
               disabled={primaryDisabled}
@@ -120,7 +126,7 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
           <div className="settings-provider-row-actions">
             <button
               type="button"
-              className="button button-primary settings-provider-row-button"
+              className="button button-secondary settings-provider-row-button"
               data-testid={`settings-provider-connect-${provider.id}`}
               onClick={() => onOpenProviderConnection(provider)}
               disabled={primaryDisabled}
@@ -153,9 +159,22 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
     </div>
   );
 
-  const catalogGroups = CATALOG_GROUP_ORDER.map((group) => ({
-    group,
-    providers: providerCatalog.filter((provider) => provider.catalogGroup === group),
+  const categoryIds = new Set(providerCatalogCategories.map((category) => category.id));
+  const uncategorizedGroups = Array.from(new Set(
+    providerCatalog
+      .map((provider) => provider.category)
+      .filter((group) => !categoryIds.has(group)),
+  ));
+  const catalogSections = [
+    ...providerCatalogCategories,
+    ...uncategorizedGroups.map((group) => ({
+      id: group,
+      label: getProviderCategoryLabel({ category: group }),
+      description: '',
+    })),
+  ].filter((category) => category.id !== 'login-authorization').map((category) => ({
+    category,
+    providers: providerCatalog.filter((provider) => provider.category === category.id),
   }));
 
   return (
@@ -168,13 +187,13 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
         'account',
       )}
       <div className="settings-provider-catalog-groups" data-testid="settings-add-provider">
-        {catalogGroups.map(({ group, providers }) => (
-          <React.Fragment key={group}>
+        {catalogSections.map(({ category, providers }) => (
+          <React.Fragment key={category.id}>
             {renderProviderGroup(
-              getProviderGroupLabel({ catalogGroup: group }),
-              t('settings.addProviderHint'),
+              category.label,
+              category.description || t('settings.addProviderHint'),
               providers,
-              `settings-provider-group-${group}`,
+              `settings-provider-group-${category.id}`,
               'add',
             )}
           </React.Fragment>

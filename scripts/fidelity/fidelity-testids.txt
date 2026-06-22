@@ -90,6 +90,8 @@ settings-provider-connect-dialog
 settings-provider-connect-error
 settings-provider-connect-layer
 settings-provider-connect-models
+settings-provider-connect-protocol
+settings-provider-connect-protocol-badge
 settings-provider-connect-save
 settings-provider-connect-test
 settings-provider-disconnect-${provider.id}
@@ -98,6 +100,7 @@ settings-provider-oauth-code
 settings-provider-oauth-device-code
 settings-provider-oauth-start
 settings-provider-oauth-summary
+settings-provider-responses-hint
 settings-provider-test-${provider.id}
 settings-rdx-action-${entry.id}
 settings-rdx-actions

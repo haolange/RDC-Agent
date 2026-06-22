@@ -2,7 +2,7 @@ import type { ActionEvent } from '@shared/types/evidence';
 
 export type FileType = 'yaml' | 'json' | 'md' | 'image' | 'other';
 
-export interface ArtifactRecord {
+export interface ViewerArtifactRecord {
   id: string;
   name: string;
   path: string;

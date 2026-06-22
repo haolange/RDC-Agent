@@ -13,8 +13,12 @@ import type {
   StreamCallback,
   ToolCall,
 } from '@shared/types/llm';
-import type { LlmProviderKind } from '@shared/types/settings';
 import { COPILOT_WIRE_HEADERS } from './CopilotWire';
+
+const describeUnsupportedProtocol = (providerId: string, protocol: unknown): string => {
+  const value = typeof protocol === 'string' && protocol.trim() ? protocol.trim() : 'missing';
+  return `Provider ${providerId} uses unsupported protocol "${value}".`;
+};
 
 const toContentBlocks = (
   messages: LLMMessage[],
@@ -111,6 +115,18 @@ const toOpenAiTools = (tools?: LLMRequest['tools']) => {
       description: tool.description,
       parameters: tool.input_schema,
     },
+  }));
+};
+
+const toResponsesTools = (tools?: LLMRequest['tools']) => {
+  if (!tools?.length) {
+    return undefined;
+  }
+  return tools.map((tool) => ({
+    type: 'function',
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.input_schema,
   }));
 };
 
@@ -779,13 +795,26 @@ class ChatGptAccountProvider extends BaseStreamingProvider {
   }
 
   private createBody(request: LLMRequest, model: string, stream: boolean): Record<string, unknown> {
-    return {
+    const body: Record<string, unknown> = {
       model,
       input: toResponsesInput(request.messages),
       max_output_tokens: request.maxTokens || 4096,
       temperature: request.temperature ?? 0.7,
       stream,
     };
+    const reasoningEffort = toOpenAiReasoningEffort(request.reasoningBudget);
+    if (reasoningEffort) {
+      body.reasoning = { effort: reasoningEffort };
+    }
+    if (request.responseFormat) {
+      body.text = { format: { type: request.responseFormat } };
+    }
+    const tools = toResponsesTools(request.tools);
+    if (tools) {
+      body.tools = tools;
+      body.tool_choice = 'auto';
+    }
+    return body;
   }
 
   async chat(request: LLMRequest): Promise<LLMResponse> {
@@ -1183,29 +1212,60 @@ interface RuntimeProviderEntry {
   provider: LLMProvider;
 }
 
-const createProviderByKind = (providerId: string, kind: LlmProviderKind): LLMProvider => {
-  if (providerId === 'chatgpt-account') {
-    return new ChatGptAccountProvider(providerId);
+class UnsupportedProtocolProvider implements LLMProvider {
+  readonly name: string;
+  private readonly error: Error;
+
+  constructor(providerId: string, protocol: unknown) {
+    this.name = providerId;
+    this.error = new Error(describeUnsupportedProtocol(providerId, protocol));
   }
-  if (providerId === 'github-copilot') {
-    return new GitHubCopilotProvider(providerId);
+
+  async chat(): Promise<LLMResponse> {
+    throw this.error;
   }
-  if (kind === 'openrouter') {
-    return new OpenRouterProvider(providerId);
+
+  async streamChat(): Promise<LLMResponse> {
+    throw this.error;
   }
-  if (kind === 'anthropic') {
-    return new AnthropicProvider(providerId);
+
+  async isAvailable(): Promise<boolean> {
+    return true;
   }
-  if (kind === 'ollama') {
-    return new OpenAICompatibleProvider(providerId, false);
+
+  getModels(): string[] {
+    return [];
   }
-  if (kind === 'google-ai-studio') {
-    return new GoogleAiStudioProvider(providerId);
+}
+
+const createProviderByProtocol = (providerConfig: LLMProviderConfig): LLMProvider => {
+  const protocol = providerConfig.protocol;
+  if (providerConfig.id === 'github-copilot') {
+    return protocol === 'OpenAICompatibleChatCompletions'
+      ? new GitHubCopilotProvider(providerConfig.id)
+      : new UnsupportedProtocolProvider(providerConfig.id, protocol);
   }
-  if (kind === 'azure-openai') {
-    return new AzureOpenAIProvider(providerId);
+
+  switch (protocol) {
+    case 'OpenRouterChatCompletions':
+      return new OpenRouterProvider(providerConfig.id);
+    case 'AnthropicMessages':
+      return new AnthropicProvider(providerConfig.id);
+    case 'OpenAIResponses':
+      return new ChatGptAccountProvider(providerConfig.id);
+    case 'OpenAICompatibleChatCompletions':
+      return new OpenAICompatibleProvider(providerConfig.id, true);
+    case 'OllamaOpenAICompatibleChatCompletions':
+      return new OpenAICompatibleProvider(providerConfig.id, false);
+    case 'GoogleGemini':
+      return new GoogleAiStudioProvider(providerConfig.id);
+    case 'AzureOpenAIChatCompletions':
+      return new AzureOpenAIProvider(providerConfig.id);
+    case 'AwsBedrock':
+    case 'GoogleVertexAI':
+    default:
+      return new UnsupportedProtocolProvider(providerConfig.id, protocol);
   }
-  return new OpenAICompatibleProvider(providerId, true);
 };
 
 export class LLMAdapter {
@@ -1215,7 +1275,7 @@ export class LLMAdapter {
     this.providers.clear();
 
     for (const providerConfig of config.providers) {
-      const provider = createProviderByKind(providerConfig.id, providerConfig.kind);
+      const provider = createProviderByProtocol(providerConfig);
       if ('configure' in provider && typeof (provider as { configure?: (next: LLMProviderConfig) => void }).configure === 'function') {
         (provider as { configure: (next: LLMProviderConfig) => void }).configure(providerConfig);
       }
