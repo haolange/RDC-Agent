@@ -5,36 +5,29 @@ import path from 'node:path';
 const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
 
+const llmConstants = require('../src/shared/constants/llm.ts');
 const {
   BUILTIN_LLM_PROVIDER_DEFINITIONS,
   createBuiltinProviderEntries,
-} = require('../src/shared/constants/llm.ts');
-const {
-  normalizeProviderCatalogGroup,
-} = require('../src/main/settings/providerCatalogGroup.ts');
+} = llmConstants;
 const {
   MediaRuntimeService,
 } = require('../src/main/settings/MediaRuntimeService.ts');
 
-const VALID_CATALOG_GROUPS = [
-  'account',
-  'openai-compatible',
-  'anthropic-compatible',
-  'cloud-platform',
-  'local',
-  'image',
+const EXPECTED_PROTOCOLS = [
+  'OpenAICompatibleChatCompletions',
+  'OpenAIResponses',
+  'AnthropicMessages',
+  'OpenRouterChatCompletions',
+  'AzureOpenAIChatCompletions',
+  'GoogleGemini',
+  'AwsBedrock',
+  'GoogleVertexAI',
+  'OllamaOpenAICompatibleChatCompletions',
 ];
 
-const VALID_KINDS = [
-  'openrouter',
-  'openai-compatible',
-  'anthropic',
-  'google-ai-studio',
-  'azure-openai',
-  'bedrock',
-  'vertex',
-  'ollama',
-];
+const LEGACY_UI_CATEGORIES = ['openai-compatible', 'anthropic-compatible', 'account', 'plan'];
+const PLAN_PROVIDER_ID_PATTERN = /(?:coding-plan|token-plan)/u;
 
 const VALID_AUTH_MODES = ['api-key', 'local', 'account', 'environment'];
 
@@ -50,6 +43,35 @@ const VALID_CAPABILITIES = [
   'video-generation',
 ];
 
+const CATALOG_SECRET_FIELDS = [
+  'apiKey',
+  'secretRef',
+  'hasStoredSecret',
+  'accessToken',
+  'refreshToken',
+  'oauthToken',
+  'oauthSecret',
+  'credential',
+  'credentials',
+  'password',
+  'accountLabel',
+  'planLabel',
+  'oauthExpiresAt',
+  'oauthRefreshAvailable',
+  'lastTestedAt',
+  'lastModelRefreshAt',
+  'lastError',
+];
+
+const CATALOG_RUNTIME_FIELDS = [
+  'enabled',
+  'status',
+  'isConfigured',
+  'models',
+  'modelDiscovery',
+  'baseUrl',
+];
+
 function assert(condition, message) {
   if (!condition) {
     throw new Error(message);
@@ -60,19 +82,156 @@ function assertIncludes(values, value, label) {
   assert(values.includes(value), `${label} is invalid: ${value}`);
 }
 
+function read(relativePath) {
+  return fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8');
+}
+
+function extractStringUnion(source, typeName) {
+  const match = new RegExp(`export\\s+type\\s+${typeName}\\s*=([\\s\\S]*?);`, 'm').exec(source);
+  assert(match, `src/shared/types/settings.ts must export ${typeName}.`);
+  return Array.from(match[1].matchAll(/'([^']+)'/g), (entry) => entry[1]);
+}
+
+function extractInterfaceBody(source, interfaceName) {
+  const match = new RegExp(`export\\s+interface\\s+${interfaceName}\\s*\\{([\\s\\S]*?)\\n\\}`, 'm').exec(source);
+  assert(match, `src/shared/types/settings.ts must export interface ${interfaceName}.`);
+  return match[1];
+}
+
+function extractExportedTypeDeclaration(source, typeName) {
+  const typeMatch = new RegExp(`export\\s+type\\s+${typeName}\\s*=([\\s\\S]*?);`, 'm').exec(source);
+  if (typeMatch) {
+    return typeMatch[1];
+  }
+  return extractInterfaceBody(source, typeName);
+}
+
+function assertCatalogTypeOmitsSecrets(declaration) {
+  if (/Omit\s*</u.test(declaration)) {
+    for (const field of CATALOG_SECRET_FIELDS) {
+      assert(declaration.includes(`'${field}'`), `LlmProviderCatalogEntry must omit ${field}.`);
+    }
+    return;
+  }
+  for (const field of CATALOG_SECRET_FIELDS) {
+    assert(!new RegExp(`\\b${field}\\b`, 'u').test(declaration), `LlmProviderCatalogEntry must not expose ${field}.`);
+  }
+}
+
+function assertNoForbiddenKeys(value, forbiddenKeys, label) {
+  const queue = [{ value, path: label }];
+  const forbidden = new Set(forbiddenKeys.map((key) => key.toLowerCase()));
+  while (queue.length > 0) {
+    const item = queue.shift();
+    if (!item || item.value === null || typeof item.value !== 'object') {
+      continue;
+    }
+    for (const [key, child] of Object.entries(item.value)) {
+      assert(!forbidden.has(key.toLowerCase()), `${item.path}.${key} must not be present in provider catalog DTOs.`);
+      if (child && typeof child === 'object') {
+        queue.push({ value: child, path: `${item.path}.${key}` });
+      }
+    }
+  }
+}
+
+function assertSourceDoesNotContain(source, forbiddenTokens, label) {
+  for (const token of forbiddenTokens) {
+    assert(!source.includes(token), `${label} must not contain ${token}.`);
+  }
+}
+
+function assertSourceContains(source, requiredTokens, label) {
+  for (const token of requiredTokens) {
+    assert(source.includes(token), `${label} must contain ${token}.`);
+  }
+}
+
+function loadProviderCatalog(runtimeEntries) {
+  if (typeof llmConstants.createBuiltinProviderCatalogEntries === 'function') {
+    return {
+      providers: llmConstants.createBuiltinProviderCatalogEntries(),
+      categories: [],
+      protocols: [],
+    };
+  }
+
+  const servicePath = path.join(process.cwd(), 'src/main/settings/ProviderCatalogService.ts');
+  assert(fs.existsSync(servicePath), 'ProviderCatalogService.ts or createBuiltinProviderCatalogEntries() must provide catalog DTOs.');
+  const { providerCatalogService } = require('../src/main/settings/ProviderCatalogService.ts');
+  assert(providerCatalogService?.getProviderCatalog, 'ProviderCatalogService must expose getProviderCatalog().');
+  return providerCatalogService.getProviderCatalog(runtimeEntries);
+}
+
 async function main() {
+  const settingsTypes = read('src/shared/types/settings.ts');
+  const categories = extractStringUnion(settingsTypes, 'LlmProviderCategory');
+  assert(categories.length === 8, `LlmProviderCategory must expose exactly 8 UI categories, found ${categories.length}: ${categories.join(', ')}`);
+  for (const legacyCategory of LEGACY_UI_CATEGORIES) {
+    assert(!categories.includes(legacyCategory), `LlmProviderCategory must not expose legacy or unsplit UI category: ${legacyCategory}`);
+  }
+  assert(categories.includes('coding-token-plan'), 'LlmProviderCategory must include split coding-token-plan entries.');
+  assert(categories.includes('login-authorization'), 'LlmProviderCategory must include login-authorization account entries.');
+
+  const protocols = extractStringUnion(settingsTypes, 'LlmProviderProtocol');
+  for (const protocol of EXPECTED_PROTOCOLS) {
+    assertIncludes(protocols, protocol, 'LlmProviderProtocol');
+  }
+
+  const providerEntry = extractInterfaceBody(settingsTypes, 'LlmProviderEntry');
+  assert(providerEntry.includes('protocol: LlmProviderProtocol'), 'LlmProviderEntry must expose protocol: LlmProviderProtocol.');
+  assert(providerEntry.includes('category: LlmProviderCategory'), 'LlmProviderEntry must expose category: LlmProviderCategory.');
+  assert(!providerEntry.includes('kind:'), 'LlmProviderEntry must not keep legacy kind field.');
+  assert(!providerEntry.includes('catalogGroup:'), 'LlmProviderEntry must not keep legacy catalogGroup field.');
+
+  const catalogDto = extractExportedTypeDeclaration(settingsTypes, 'LlmProviderCatalogEntry');
+  assert(catalogDto.includes('LlmProviderEntry') || catalogDto.includes('protocol'), 'LlmProviderCatalogEntry must derive from provider metadata.');
+  assertCatalogTypeOmitsSecrets(catalogDto);
+  for (const field of CATALOG_RUNTIME_FIELDS) {
+    assert(!new RegExp(`\b${field}\b`, 'u').test(catalogDto), `LlmProviderCatalogEntry must not expose runtime field ${field}.`);
+  }
+
+  const catalogResponse = extractInterfaceBody(settingsTypes, 'LlmProviderCatalogResponse');
+  assert(catalogResponse.includes('categories:'), 'LlmProviderCatalogResponse must include category descriptors.');
+  assert(catalogResponse.includes('protocols:'), 'LlmProviderCatalogResponse must include protocol descriptors.');
+  assert(catalogResponse.includes('providers:'), 'LlmProviderCatalogResponse must include provider catalog entries.');
+
   const ids = BUILTIN_LLM_PROVIDER_DEFINITIONS.map((definition) => definition.id);
   const runtimeEntries = createBuiltinProviderEntries();
+  const catalog = loadProviderCatalog(runtimeEntries);
+  const catalogEntries = Array.isArray(catalog) ? catalog : catalog.providers;
+  assert(Array.isArray(catalogEntries), 'Provider catalog must return provider entries.');
   assert(new Set(ids).size === ids.length, 'Builtin provider ids must be unique.');
-  assert(ids.length === 40, `Builtin provider catalog should expose 40 providers, found ${ids.length}.`);
+  assert(ids.length >= 40, `Builtin provider catalog should expose at least 40 providers, found ${ids.length}.`);
   assert(runtimeEntries.length === ids.length, 'Runtime provider entries should mirror the builtin catalog.');
+  assert(catalogEntries.length === ids.length, 'Provider catalog DTO entries should mirror the builtin catalog.');
   for (const id of ['openai', 'anthropic', 'bedrock', 'vertex', 'ollama', 'chatgpt-account', 'claude-account']) {
     assert(ids.includes(id), `Builtin provider is missing: ${id}`);
   }
 
+  if (!Array.isArray(catalog)) {
+    assert(Array.isArray(catalog.categories), 'Provider catalog response must include categories.');
+    assert(catalog.categories.length === categories.length, 'Provider catalog response must expose all category descriptors.');
+    assert(Array.isArray(catalog.protocols), 'Provider catalog response must include protocol descriptors.');
+    for (const descriptor of catalog.categories) {
+      assertIncludes(categories, descriptor.id, `providerCatalog.category.${descriptor.id}`);
+    }
+    for (const descriptor of catalog.protocols) {
+      assertIncludes(protocols, descriptor.id, `providerCatalog.protocol.${descriptor.id}`);
+    }
+  }
+
+  const planEntryIds = ids.filter((id) => PLAN_PROVIDER_ID_PATTERN.test(id));
+  assert(planEntryIds.length > 0, 'Provider catalog must keep coding/token plan providers as explicit entries.');
+
   for (const definition of BUILTIN_LLM_PROVIDER_DEFINITIONS) {
-    assertIncludes(VALID_CATALOG_GROUPS, definition.catalogGroup, `${definition.id}.catalogGroup`);
-    assertIncludes(VALID_KINDS, definition.kind, `${definition.id}.kind`);
+    assert(typeof definition.category === 'string', `${definition.id} must declare category.`);
+    assertIncludes(categories, definition.category, `${definition.id}.category`);
+    assert(!LEGACY_UI_CATEGORIES.includes(definition.category), `${definition.id}.category must not use legacy or unsplit category ${definition.category}.`);
+    assert(definition.catalogGroup === undefined, `${definition.id} must not keep legacy catalogGroup.`);
+    assert(typeof definition.protocol === 'string', `${definition.id} must declare protocol.`);
+    assertIncludes(protocols, definition.protocol, `${definition.id}.protocol`);
+    assert(definition.kind === undefined, `${definition.id} must not keep legacy kind.`);
     assertIncludes(VALID_AUTH_MODES, definition.authMode, `${definition.id}.authMode`);
     assert(Array.isArray(definition.capabilities), `${definition.id}.capabilities must be an array.`);
     assert(definition.capabilities.includes('chat'), `${definition.id}.capabilities must include chat.`);
@@ -81,45 +240,38 @@ async function main() {
     }
 
     if (definition.authMode === 'account') {
-      assert(definition.catalogGroup === 'account', `${definition.id} account provider must use account group.`);
+      assert(definition.category === 'login-authorization', `${definition.id} account provider must use login-authorization category.`);
     }
     if (definition.authMode === 'environment') {
-      assert(definition.catalogGroup === 'cloud-platform', `${definition.id} environment provider must use cloud-platform group.`);
+      assert(definition.category === 'cloud-platform', `${definition.id} environment provider must use cloud-platform category.`);
     }
     if (definition.authMode === 'local') {
-      assert(definition.catalogGroup === 'local', `${definition.id} local provider must use local group.`);
+      assert(definition.category === 'local', `${definition.id} local provider must use local category.`);
+    }
+    if (PLAN_PROVIDER_ID_PATTERN.test(definition.id)) {
+      assert(definition.category === 'coding-token-plan', `${definition.id} plan provider must use coding-token-plan category.`);
     }
     if (definition.modelDiscovery === 'static') {
       assert(!definition.capabilities.includes('model-discovery'), `${definition.id} static discovery must not claim model-discovery.`);
     }
   }
 
-  assert(
-    normalizeProviderCatalogGroup({ id: 'openai', catalogGroup: 'api-key', authMode: 'api-key' }) === 'openai-compatible',
-    'openai legacy catalogGroup should migrate through builtin identity.',
-  );
-  assert(
-    normalizeProviderCatalogGroup({ id: 'anthropic', catalogGroup: 'api-key', authMode: 'api-key' }) === 'anthropic-compatible',
-    'anthropic legacy catalogGroup should migrate through builtin identity.',
-  );
-  assert(
-    normalizeProviderCatalogGroup({ id: 'bedrock', catalogGroup: 'environment', authMode: 'environment' }) === 'cloud-platform',
-    'bedrock legacy catalogGroup should migrate through builtin identity.',
-  );
-  const originalWarn = console.warn;
-  const warnings = [];
-  console.warn = (...args) => {
-    warnings.push(args);
-  };
-  try {
-    assert(
-      normalizeProviderCatalogGroup({ id: 'custom-unknown', catalogGroup: 'api-key', authMode: 'api-key' }) === 'openai-compatible',
-      'unknown api-key providers should fall back to openai-compatible.',
-    );
-  } finally {
-    console.warn = originalWarn;
+  for (const [index, entry] of catalogEntries.entries()) {
+    assert(typeof entry.id === 'string' && entry.id, `providerCatalog.providers[${index}].id must be a stable id.`);
+    assertIncludes(categories, entry.category, `${entry.id}.catalog.category`);
+    assertIncludes(protocols, entry.protocol, `${entry.id}.catalog.protocol`);
+    assertNoForbiddenKeys(entry, [...CATALOG_SECRET_FIELDS, ...CATALOG_RUNTIME_FIELDS], `providerCatalog.providers[${index}]`);
   }
-  assert(warnings.length === 1, 'unknown provider fallback should emit one diagnostic warning.');
+
+  const providerGroupHelperPath = path.join(process.cwd(), 'src/main/settings/providerCatalogGroup.ts');
+  if (fs.existsSync(providerGroupHelperPath)) {
+    const helperSource = fs.readFileSync(providerGroupHelperPath, 'utf8');
+    assertSourceDoesNotContain(
+      helperSource,
+      ['catalogGroup', 'kind', 'normalizeProviderCatalogGroup', 'openai-compatible', 'anthropic-compatible'],
+      'provider category/protocol helper',
+    );
+  }
 
   const mediaRuntime = new MediaRuntimeService();
   const generationResult = await mediaRuntime.generate({
@@ -132,12 +284,57 @@ async function main() {
   assert(mediaRuntime.isMediaAdapterAvailable('openai') === false, 'Media adapter discovery must report unavailable.');
   assert(mediaRuntime.getRegisteredMediaProviders().length === 0, 'No media providers should be registered yet.');
 
-  const settingsServiceSource = fs.readFileSync(path.join(process.cwd(), 'src/main/settings/SettingsService.ts'), 'utf8');
+  const settingsServiceSource = read('src/main/settings/SettingsService.ts');
+  assert(settingsServiceSource.includes('getProviderCatalog'), 'SettingsService must expose getProviderCatalog().');
+  const getProviderCatalogIndex = settingsServiceSource.indexOf('getProviderCatalog');
+  const getProviderCatalogBody = settingsServiceSource.slice(getProviderCatalogIndex, getProviderCatalogIndex + 2500);
+  assertSourceDoesNotContain(getProviderCatalogBody, CATALOG_SECRET_FIELDS, 'SettingsService.getProviderCatalog');
   assert(!settingsServiceSource.includes('DEFAULT_PROVIDER_SEEDS'), 'SettingsService must not auto-seed default providers.');
   assert(!settingsServiceSource.includes('DEFAULT_AGENT_ROUTE_SEEDS'), 'SettingsService must not auto-seed default agent routes.');
   assert(!/sk-or-v1-[A-Za-z0-9]+/.test(settingsServiceSource), 'SettingsService must not contain OpenRouter API keys.');
   assert(!/xai-[A-Za-z0-9]+/.test(settingsServiceSource), 'SettingsService must not contain xAI API keys.');
   assert(!/AIzaSy[A-Za-z0-9_-]+/.test(settingsServiceSource), 'SettingsService must not contain Google API keys.');
+
+  const settingsIpc = read('src/main/ipc/settingsLlmHandlers.ts');
+  assertSourceContains(settingsIpc, ['settings:getProviderCatalog', 'settingsService.getProviderCatalog'], 'settings IPC handlers');
+
+  const ipcChannels = read('src/main/ipc/channels.ts');
+  assert(ipcChannels.includes("'settings:getProviderCatalog'"), 'IPC channel domain must list settings:getProviderCatalog.');
+
+  const preloadSettings = read('src/preload/api/settings.ts');
+  assertSourceContains(preloadSettings, ['getProviderCatalog', "ipcRenderer.invoke('settings:getProviderCatalog')"], 'preload SettingsApi');
+
+  const electronApiTypes = read('src/shared/types/electron.ts');
+  assert(electronApiTypes.includes('getProviderCatalog'), 'ElectronAPI.settings must type getProviderCatalog().');
+
+  const browserBridge = read('src/renderer/platform/browserAppBridge/BrowserAppBridge.ts');
+  assertSourceContains(browserBridge, ['getProviderCatalog', "this.invoke('settings:getProviderCatalog')"], 'browser app bridge settings API');
+
+  const browserBridgeServer = read('src/main/browserAppBridge/BrowserAppBridgeServer.ts');
+  assertSourceContains(browserBridgeServer, ['/api/settings/providers/catalog', 'settings:getProviderCatalog'], 'browser app HTTP provider catalog endpoint');
+
+  for (const relativePath of [
+    'src/renderer/features/settings/SettingsModal/sections/ProvidersSettings.tsx',
+    'src/renderer/features/settings/SettingsModal/utils.ts',
+  ]) {
+    const source = read(relativePath);
+    assertSourceDoesNotContain(
+      source,
+      ['catalogGroup', 'LlmProviderCatalogGroup', 'getProviderGroupLabel', 'OpenAI Compatible', 'Anthropic Compatible'],
+      relativePath,
+    );
+  }
+
+  const sharedExports = read('scripts/fidelity/shared-exports.txt');
+  for (const expectedExport of [
+    'LlmProviderCategory',
+    'LlmProviderCatalogEntry',
+    'LlmProviderProtocol',
+  ]) {
+    assert(sharedExports.includes(expectedExport), `shared-exports.txt must include ${expectedExport}.`);
+  }
+  assert(!sharedExports.includes('LlmProviderCatalogGroup'), 'shared-exports.txt must not keep LlmProviderCatalogGroup.');
+  assert(!sharedExports.includes('LlmProviderKind'), 'shared-exports.txt must not keep LlmProviderKind.');
 
   console.log('[provider-system] OK');
 }

@@ -104,6 +104,10 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     });
   });
 
+  ipcMain.handle('settings:getProviderCatalog', async () => {
+    return settingsService.getProviderCatalog();
+  });
+
   ipcMain.handle('settings:getProviderSecret', async (_event, providerId: string) => {
     const paths = appPathService.getWorkspacePaths();
     return settingsService.getProviderSecret(providerId, paths.workspaceRoot);

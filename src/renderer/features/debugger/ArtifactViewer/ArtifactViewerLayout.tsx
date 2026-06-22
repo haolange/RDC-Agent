@@ -1,14 +1,14 @@
 import React from 'react';
 import { FILE_ICONS } from './artifactViewerIcons';
-import { formatDate, formatFileSize, type ArtifactRecord } from './artifactViewerModel';
+import { formatDate, formatFileSize, type ViewerArtifactRecord } from './artifactViewerModel';
 
 interface ArtifactViewerLayoutProps {
   viewMode: 'grid' | 'list';
   setViewMode: (mode: 'grid' | 'list') => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
-  filteredArtifacts: ArtifactRecord[];
-  selectedArtifact: ArtifactRecord | null;
+  filteredArtifacts: ViewerArtifactRecord[];
+  selectedArtifact: ViewerArtifactRecord | null;
   setSelectedArtifactId: (id: string | null) => void;
 }
 

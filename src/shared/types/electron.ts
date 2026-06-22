@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   WorkflowStage,
   WorkflowState,
 } from './workflow';
@@ -29,6 +29,7 @@ import type {
   AppSettingsPatch,
   LlmProviderAccountStatus,
   LlmProviderAccountLoginFinishRequest,
+  LlmProviderCatalogResponse,
   LlmProviderConnectionResult,
   LlmProviderDraftRequest,
   LlmProviderId,
@@ -206,6 +207,7 @@ export interface ElectronAPI {
 
   settings: {
     get: () => Promise<AppSettings>;
+    getProviderCatalog: () => Promise<LlmProviderCatalogResponse>;
     getProviderSecret: (providerId: string) => Promise<string>;
     importAgentManifest: (filePath: string) => Promise<AppSettings>;
     upsertSkill: (request: AgentRuntimeSkillWriteRequest) => Promise<AppSettings>;

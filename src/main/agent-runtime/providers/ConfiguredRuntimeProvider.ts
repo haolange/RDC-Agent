@@ -1,5 +1,5 @@
 import type { LLMProviderConfig } from '@shared/types/llm';
-import type { LlmProviderKind } from '@shared/types/settings';
+import type { LlmProviderProtocol } from '@shared/types/settings';
 import { EventStream } from '../core/EventStream';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type {
@@ -15,8 +15,11 @@ import { AnthropicProvider } from './AnthropicProvider';
 import { GeminiProvider } from './GeminiProvider';
 import { OllamaProvider } from './OllamaProvider';
 import { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
+import { OpenAIResponsesProvider } from './OpenAIResponsesProvider';
 
 const CONFIGURED_PROVIDER_API = 'rdc-agent-configured-provider';
+
+type ConfiguredProvider = LLMProviderConfig;
 
 interface EncodedAgentModel {
   providerId: string;
@@ -51,43 +54,59 @@ function decodeAgentModel(model: Model): EncodedAgentModel {
   };
 }
 
-function toRuntimeApi(kind: LlmProviderKind): Model['api'] {
-  switch (kind) {
-    case 'anthropic':
+function requireProviderProtocol(provider: ConfiguredProvider): LlmProviderProtocol {
+  if (!provider.protocol) {
+    throw new Error(`Provider ${provider.id} has no configured protocol.`);
+  }
+  return provider.protocol;
+}
+
+function normalizeLocalBaseUrl(baseUrl: string | undefined): string | undefined {
+  return baseUrl?.replace(/\/v1\/?$/i, '');
+}
+
+function toRuntimeApi(protocol: LlmProviderProtocol): Model['api'] {
+  switch (protocol) {
+    case 'AnthropicMessages':
       return 'anthropic-messages';
-    case 'google-ai-studio':
+    case 'GoogleGemini':
       return 'google-gemini';
-    case 'ollama':
+    case 'OllamaOpenAICompatibleChatCompletions':
       return 'ollama';
-    case 'openai-compatible':
-    case 'openrouter':
-    case 'azure-openai':
+    case 'OpenAIResponses':
+      return 'openai-responses';
+    case 'OpenAICompatibleChatCompletions':
+    case 'OpenRouterChatCompletions':
       return 'openai-compatible';
-    case 'bedrock':
-    case 'vertex':
+    case 'AzureOpenAIChatCompletions':
+      return 'azure-openai';
+    case 'AwsBedrock':
+      return 'bedrock';
+    case 'GoogleVertexAI':
+      return 'vertex';
     default:
-      return kind;
+      return protocol;
   }
 }
 
-function createProviderStrategy(provider: LLMProviderConfig): ProviderStrategy {
-  switch (provider.kind) {
-    case 'anthropic':
+function createProviderStrategy(provider: ConfiguredProvider, protocol: LlmProviderProtocol): ProviderStrategy {
+  switch (protocol) {
+    case 'AnthropicMessages':
       return new AnthropicProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
       });
-    case 'google-ai-studio':
+    case 'GoogleGemini':
       return new GeminiProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
       });
-    case 'ollama':
+    case 'OllamaOpenAICompatibleChatCompletions':
       return new OllamaProvider({
         apiKey: provider.apiKey || undefined,
-        baseUrl: provider.baseUrl,
+        baseUrl: normalizeLocalBaseUrl(provider.baseUrl),
       });
-    case 'openrouter':
+    case 'OpenRouterChatCompletions':
       return new OpenAICompatibleProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
@@ -96,16 +115,22 @@ function createProviderStrategy(provider: LLMProviderConfig): ProviderStrategy {
           'X-Title': 'RDC-Agent',
         },
       });
-    case 'openai-compatible':
-    case 'azure-openai':
+    case 'OpenAICompatibleChatCompletions':
       return new OpenAICompatibleProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
       });
-    case 'bedrock':
-    case 'vertex':
+    case 'OpenAIResponses':
+      return new OpenAIResponsesProvider({
+        apiKey: provider.apiKey,
+        baseUrl: provider.baseUrl,
+        accountId: provider.accountId,
+      });
+    case 'AzureOpenAIChatCompletions':
+    case 'AwsBedrock':
+    case 'GoogleVertexAI':
     default:
-      throw new Error(`Provider kind "${provider.kind}" is not available in the agent runtime provider path.`);
+      throw new Error(`Provider protocol "${protocol}" is not available in the agent runtime provider path.`);
   }
 }
 
@@ -141,7 +166,7 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
   ): EventStream<AssistantMessageEvent, AssistantMessage> {
     const decoded = decodeAgentModel(model);
     const llmConfig = settingsService.getLlmConfig();
-    const provider = llmConfig.providers.find((entry) => entry.id === decoded.providerId);
+    const provider = llmConfig.providers.find((entry) => entry.id === decoded.providerId) as ConfiguredProvider | undefined;
     if (!provider) {
       return missingProviderStream(new Error(`No verified configured provider is available for ${decoded.providerId}.`));
     }
@@ -149,21 +174,36 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
       return missingProviderStream(new Error(`Model ${decoded.providerId}/${decoded.modelId} is not enabled for agent runtime.`));
     }
 
+    let protocol: LlmProviderProtocol;
+    try {
+      protocol = requireProviderProtocol(provider);
+    } catch (error) {
+      return missingProviderStream(error instanceof Error ? error : new Error(String(error)));
+    }
+
+    const runtimeBaseUrl = protocol === 'OllamaOpenAICompatibleChatCompletions'
+      ? normalizeLocalBaseUrl(provider.baseUrl)
+      : provider.baseUrl;
     const runtimeModel: Model = {
       ...model,
       id: decoded.modelId,
       name: decoded.modelId,
       provider: decoded.providerId,
-      api: toRuntimeApi(provider.kind),
+      api: toRuntimeApi(protocol),
     };
-    const strategy = createProviderStrategy(provider);
+
+    let strategy: ProviderStrategy;
+    try {
+      strategy = createProviderStrategy(provider, protocol);
+    } catch (error) {
+      return missingProviderStream(error instanceof Error ? error : new Error(String(error)));
+    }
     return strategy.stream(runtimeModel, context, {
       ...options,
       apiKey: provider.apiKey,
-      baseUrl: provider.baseUrl,
+      baseUrl: runtimeBaseUrl,
     });
   }
 }
 
 export const configuredRuntimeProvider = new ConfiguredRuntimeProvider();
-

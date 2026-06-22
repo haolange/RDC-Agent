@@ -122,6 +122,7 @@ export const useProviderConnectionDraft = ({
     const models = getEnabledModels(provider);
     setConnectionDraft({
       providerId: provider.id,
+      protocol: provider.protocol,
       apiKey: '',
       baseUrl: provider.baseUrl ?? '',
       showApiKey: false,
@@ -129,6 +130,8 @@ export const useProviderConnectionDraft = ({
       busy: 'idle',
       error: '',
       testedApiKey: '',
+      testedBaseUrl: '',
+      testedProtocol: provider.protocol,
       models,
       accountStatus: provider.authMode === 'account' && provider.isConfigured
         ? {
@@ -164,7 +167,9 @@ export const useProviderConnectionDraft = ({
   const connectionHasFreshTest = Boolean(
     connectionDraft
     && connectionDraft.models.length > 0
-    && connectionDraft.testedApiKey === connectionDraft.apiKey,
+    && connectionDraft.testedApiKey === connectionDraft.apiKey
+    && connectionDraft.testedBaseUrl === connectionDraft.baseUrl
+    && connectionDraft.testedProtocol === connectionDraft.protocol,
   );
   const connectionAccountConnected = Boolean(
     connectionDraft

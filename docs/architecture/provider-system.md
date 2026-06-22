@@ -2,19 +2,53 @@
 
 ## 概览
 
-RDC-Agent 的 Provider 体系把身份、认证方式、wire protocol、产品分组和能力声明拆成相互正交的维度：
+RDC-Agent 的 Provider 体系把“供应商身份、wire protocol、认证方式、Settings UI category、运行时能力、renderer-safe catalog DTO”拆成独立维度。调用方不得再从 UI category 反推协议或能力，也不得把 runtime settings 当成公共 catalog 输出。
 
-- `LlmProviderEntry`：Provider 的稳定身份与运行时元数据。
-- `LlmProviderKind`：HTTP wire protocol，例如 `openai-compatible`、`anthropic`、`google-ai-studio`、`ollama`。
+权威类型位于 `src/shared/types/settings.ts`，内置供应商清单位于 `src/shared/constants/llm.ts`：
+
+- `LlmProviderEntry`：用户 settings 中的 runtime provider entry，进入主进程后可被 secret hydration 补齐。
+- `LlmProviderCatalogEntry`：只面向 renderer / HTTP 的 catalog DTO，不包含 secret、token、account label、plan label 或连接状态私有字段。
+- `LlmProviderCatalogResponse`：catalog response，包含 `categories`、`protocols` 和 `providers` 三段。
+- `LlmProviderProtocol`：HTTP wire protocol 枚举，例如 `OpenAICompatibleChatCompletions`、`OpenAIResponses`、`AnthropicMessages`、`OpenRouterChatCompletions`、`AzureOpenAIChatCompletions`、`GoogleGemini`、`AwsBedrock`、`GoogleVertexAI`、`OllamaOpenAICompatibleChatCompletions`。
 - `LlmProviderAuthMode`：认证方式，例如 `api-key`、`account`、`environment`、`local`。
-- `LlmProviderCatalogGroup`：Settings UI 的产品展示分组。
-- `LlmProviderCapability`：运行时可用能力事实，例如 `chat`、`tool-calling`、`reasoning`。
+- `LlmProviderCategory`：Settings UI 的产品展示 category，固定为八类：`login-authorization`、`official-direct`、`cloud-platform`、`official-compatible`、`coding-token-plan`、`third-party-compatible`、`local`、`image`。
+- `LlmProviderCapability`：运行时能力事实，例如 `chat`、`tool-calling`、`structured-output`、`reasoning`、`model-discovery`。
 
-这些跨层类型定义在 `src/shared/types/settings.ts`，内置 Provider 清单维护在 `src/shared/constants/llm.ts`。调用方不能从 provider id、model name 或 UI 分组反推能力，必须读取 capability。
+## Category 与 Protocol
+
+`category` 只回答“Settings UI 应该把 provider 放在哪个产品分组”。它不是协议、不是认证方式，也不是能力声明。
+
+硬性约束：
+
+- `LlmProviderCategory` 正好包含八个 UI category。
+- `openai-compatible` 和 `anthropic-compatible` 只能作为历史迁移输入或底层 wire 语义出现，不能作为 UI category 输出。
+- renderer 的 Provider Catalog 分组、分组 label 和 `data-testid` 不得再输出旧 category 名。
+- 内置 provider definition 使用 `category` + `protocol`，不得保留 `catalogGroup` + `kind` 双轨。
+- coding / token plan provider 必须作为独立 provider entry 保留，并归入 `coding-token-plan`。
+
+`protocol` 只回答“主进程用哪种 wire adapter 发请求”。Agent Runtime、Settings 连接测试和模型刷新必须读取 `protocol`，不能从 `category` 或 provider label 猜测。
+
+## Catalog DTO
+
+`settings:getProviderCatalog` 是 Provider Catalog 的主入口，返回 `LlmProviderCatalogResponse`。它只来自内置 provider definition 的公开元数据，不能携带：
+
+- `apiKey`、`secretRef`、`hasStoredSecret`；
+- `accessToken`、`refreshToken`、OAuth token；
+- `accountLabel`、`planLabel`、`oauthExpiresAt`、`oauthRefreshAvailable`；
+- `lastTestedAt`、`lastModelRefreshAt`、`lastError`；
+- 任何 credential / password / secret 字段。
+
+`settings:get` 仍返回当前 workspace settings，并继续对 `LlmProviderEntry.apiKey` 做空值清洗；但 renderer 默认展示 catalog 时应使用 `settings:getProviderCatalog`，而不是从 settings provider list 重新拼 catalog。
+
+浏览器真实会话必须与 Electron preload 共享同一主进程能力：
+
+- Electron preload: `window.electronAPI.settings.getProviderCatalog()` -> `settings:getProviderCatalog`。
+- Browser app bridge: `window.electronAPI.settings.getProviderCatalog()` -> `/invoke` -> `settings:getProviderCatalog`。
+- HTTP catalog endpoint: `/api/settings/providers/catalog` 返回同一份 secret-free catalog response。
 
 ## Agent Runtime 路由
 
-Agent turn 的结构化工具调用路径是：
+Agent turn 的结构化工具调用路径仍然是：
 
 ```text
 Agent Route Capability
@@ -31,61 +65,34 @@ Agent Route Capability
 - Provider 未启用、未配置、未验证、未声明 `chat`，一律 `disabled`。
 - Provider 声明 `chat` 但未声明 `tool-calling`，一律 `text-only`。
 - Provider 声明 `tool-calling` 且 runtime strategy 支持 native tools，才是 `native-structured`。
-- 当前 `kimi-code / kimi-for-coding` 是 Anthropic-style native structured route。
-- 当前 `openrouter` 未声明 `tool-calling`，因此在 agent runtime 中保持 text-only/fail-closed，除非后续逐 route 真实 smoke 后提升 capability。
+- 当前 `openrouter` 仍保持 text-only/fail-closed，除非后续 route 真实 smoke 后提升 capability。
+
+## Plan Entries 与 Fail-Closed
+
+Plan 有两层含义，必须拆开：
+
+- Provider catalog 中的 coding / token plan entries 是具体 provider endpoint，必须独立列出并归入 `coding-token-plan`。
+- Agent profile 中的 Plan 是规划 agent，不是硬编码 AppMode，也不是可直接改文件的实现入口。
+
+Plan agent 约束：
+
+- Plan seed tools 只允许研究、提问、任务整理、记忆、`planArtifact` 和 `handoff` 等规划/交接工具。
+- Plan seed tools 不得包含 `bash`、`write`、`edit` 或 `rdxContext`。
+- Plan 的默认 handoff 指向 Edit，由 Edit 执行获批后的实现。
+- Plan route 缺失、provider 未启用、model 不可用时，必须保存为空 route 并 fail-closed，不得静默回退到默认 provider/model。
 
 ## Provider Strategy
 
-Agent Loop 不再通过 settings 层 `LLMAdapterProvider` 发起 agent turn。它使用 `ConfiguredRuntimeProvider` 从 Settings 中读取已验证 provider 的真实 `apiKey/baseUrl/model`，再映射到现有 runtime provider strategy：
-
-- `anthropic` -> `AnthropicProvider`
-- `openai-compatible` / `openrouter` / `azure-openai` -> `OpenAICompatibleProvider`
-- `google-ai-studio` -> `GeminiProvider`
-- `ollama` -> `OllamaProvider`
-
-Settings 层 `LLMAdapter` 仍可用于连接测试、模型刷新和非 agent 专用调用；它不是 Work Process 的 agent tool-call 数据源。
-
-## Prompt Composer
-
-Profile conversation 的 system/turn prompt 由 `src/main/agent-runtime/prompt/PromptComposer.ts` 组合。
-
-- `native-structured` route 才注入工具使用说明和 runtime catalog，并向 provider 注册 tool schema。
-- `text-only` / `disabled` route 不注册 tools，并明确告知模型不能执行 runtime tools，只能说明缺少哪些信息。
-- 禁止在 ConversationService 主流程中硬编码工具提示片段或“不要写文本工具调用”规则。
-
-## Event Contract
-
-Work Process 只消费 normalized agent runtime events：
-
-- `assistant.delta`
-- `tool.requested`
-- `tool.started`
-- `tool.completed`
-- `tool.denied`
-- `diagnostic`
-- `assistant.completed`
-- `run.completed` / `run.failed` / `run.cancelled`
-
-Provider 私有协议只在 provider strategy 中解析。模型正文里的 `tool call: ...` 或“工具调用：...”不会被转换成可执行工具调用；runtime 只会发出 `textual_tool_call_not_executed` diagnostic。
-
-## Fail-Closed 规则
-
-- 未声明 capability 的 route 不得假设支持工具。
-- 不支持 structured tools 的 route 不注册 tool schema，不执行文本工具调用。
-- 空助手消息且无结构化 tool call 时，runtime 发出 `empty_response_without_tool_call` diagnostic。
-- Provider 请求失败时，ConversationService 显示真实 diagnostic，不生成假 Work Process tool card。
+Agent Loop 不通过 Settings 层 `LLMAdapterProvider` 发起 agent turn。它使用 `ConfiguredRuntimeProvider` 从 Settings 中读取已验证 provider 的真实 credential/baseUrl/model，再映射到 runtime provider strategy。Settings 层 `LLMAdapter` 仍可用于连接测试、模型刷新和非 agent 专用调用；它不是 Work Process 的 agent tool-call 数据源。
 
 ## 验证
 
 最小门禁：
 
-- `npm run typecheck`
-- `npm run check:agent-runtime`
 - `npm run check:provider-system`
+- `npm run check:agent-runtime`
 - `npm run check:settings-agents`
-- `npm run check:architecture`
-- `npm run check:fidelity`
 - `npm run check:shared-exports`
+- `npm run typecheck`
 
-涉及 Work Process 或 Agent Chat UI 时，还必须启动真实 browser-app session，用 Codex in-app Browser 打开 `/app` 验证真实事件流、console、布局和水平溢出。
-
+涉及 renderer category 输出、Settings modal 或浏览器 endpoint 时，还要启动真实 browser-app session，确认 `settings:getProviderCatalog` 与 `/api/settings/providers/catalog` 返回一致、无 secrets，且 Settings Provider Catalog 不再渲染旧 category。

@@ -174,6 +174,7 @@ export interface JsonSchema {
 /** Provider 适配的 API 协议族。 */
 export type ModelApi =
   | 'openai-compatible'
+  | 'openai-responses'
   | 'anthropic-messages'
   | 'google-gemini'
   | 'ollama'

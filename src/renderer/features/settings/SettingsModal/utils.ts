@@ -1,5 +1,7 @@
 import type { TranslationKey } from '../../../i18n';
+import { LLM_PROVIDER_PROTOCOL_DEFINITIONS } from '@shared/constants/llm';
 import type { LlmAgentRoute, LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
+import type { ProviderCatalogCategory, ProviderProtocol } from './types';
 
 export const STORED_SECRET_MASK = '************************';
 
@@ -12,6 +14,7 @@ export const joinPath = (root: string, ...segments: string[]): string => {
 
 export const cloneProvider = (provider: LlmProviderEntry): LlmProviderEntry => ({
   ...provider,
+  protocolOptions: provider.protocolOptions ? [...provider.protocolOptions] : undefined,
   models: provider.models.map((model) => ({ ...model })),
   recommendedModels: [...provider.recommendedModels],
   capabilities: provider.capabilities ? [...provider.capabilities] : undefined,
@@ -27,24 +30,28 @@ export const getProviderDisplayLabel = (
   fallbackLabel: string,
 ): string => provider.label.trim() || fallbackLabel;
 
-export const getProviderGroupLabel = (provider: Pick<LlmProviderEntry, 'catalogGroup'>): string => {
-  switch (provider.catalogGroup) {
-    case 'account':
-      return 'Account';
-    case 'openai-compatible':
-      return 'OpenAI Compatible';
-    case 'anthropic-compatible':
-      return 'Anthropic Compatible';
-    case 'cloud-platform':
-      return 'Cloud Platform';
-    case 'local':
-      return 'Local';
-    case 'image':
-      return 'Image';
-    default:
-      return 'Other';
-  }
+export const getProviderCategoryLabel = (
+  provider: Pick<LlmProviderEntry, 'category'>,
+  categories: ProviderCatalogCategory[] = [],
+): string => categories.find((category) => category.id === provider.category)?.label ?? provider.category;
+
+export const getProviderProtocolLabel = (protocol: ProviderProtocol): string => {
+  const definition = LLM_PROVIDER_PROTOCOL_DEFINITIONS.find((entry) => entry.id === protocol);
+  return definition?.label ?? protocol;
 };
+
+export const providerSupportsProtocolSelection = (
+  provider: Pick<LlmProviderEntry, 'protocolEditable' | 'protocolOptions'>,
+): boolean => Boolean(provider.protocolEditable && provider.protocolOptions?.length);
+
+export const getProviderProtocolOptions = (
+  provider: Pick<LlmProviderEntry, 'protocol' | 'protocolEditable' | 'protocolOptions'>,
+): ProviderProtocol[] => providerSupportsProtocolSelection(provider)
+  ? provider.protocolOptions ?? [provider.protocol]
+  : [provider.protocol];
+
+export const providerShowsResponsesHint = (protocol: ProviderProtocol): boolean =>
+  protocol === 'OpenAIResponses';
 
 export const getProviderStatusLabel = (provider: Pick<LlmProviderEntry, 'status' | 'isConfigured'>): TranslationKey => {
   if (provider.status === 'verified' && provider.isConfigured) return 'settings.providerConnected';

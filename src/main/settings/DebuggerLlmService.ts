@@ -4,7 +4,7 @@ import type { LLMMessage, LLMRequest, LLMResponse } from '@shared/types/llm';
 import type { RunContextUsageSummary } from '@shared/types/session';
 import type { Blocker, WorkflowStage } from '@shared/types/workflow';
 import { BLOCKER_CODES } from '@shared/constants/blockers';
-import type { LlmProviderEntry, LlmProviderId } from '@shared/types/settings';
+import type { LlmProviderProtocol, LlmProviderEntry, LlmProviderId } from '@shared/types/settings';
 import { llmAdapter } from '../settings/LLMAdapter';
 import { providerAccountAuthService } from '../settings/ProviderAccountAuthService';
 import { settingsService } from '../settings/SettingsService';
@@ -209,11 +209,15 @@ function shouldRetryStructuredLlmError(error: unknown): boolean {
   return /LLM response was empty|did not contain valid JSON|Unexpected non-whitespace character after JSON|OpenRouter API error: 5\d\d|timed out|timeout/i.test(message);
 }
 
+function readRouteProtocol(route: ResolvedDebuggerRoute): LlmProviderProtocol | null {
+  return route.provider.protocol ?? null;
+}
+
 function shouldUseNativeJsonObject(route: ResolvedDebuggerRoute): boolean {
-  const providerKind = route.provider.kind;
+  const protocol = readRouteProtocol(route);
   const modelId = route.modelId.toLowerCase();
 
-  if (providerKind === 'anthropic') {
+  if (!protocol || protocol === 'AnthropicMessages') {
     return false;
   }
 

@@ -8,7 +8,7 @@ import type { LLMStreamEvent, ToolCall } from './llm';
 import type { MCPTransport } from './mcp';
 import type { AgentPromptProfile, AgentToolPolicy } from './profile';
 import type { AppMode, ExecutableAppMode } from './session';
-import type { LlmProviderAuthMode, LlmProviderId, LlmProviderKind } from './settings';
+import type { LlmProviderAuthMode, LlmProviderId, LlmProviderProtocol } from './settings';
 import type { ToolCallResult } from './tool';
 import type { WorkflowPhase, WorkflowStage } from './workflow';
 
@@ -199,7 +199,7 @@ export type ModelProviderBackendKind =
 
 export interface ModelProviderCapabilityMatrix {
   providerId: LlmProviderId;
-  kind: LlmProviderKind;
+  protocol: LlmProviderProtocol;
   authMode: LlmProviderAuthMode;
   backendKind: ModelProviderBackendKind;
   streaming: boolean;

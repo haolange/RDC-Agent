@@ -1,4 +1,4 @@
-import { getBuiltinProviderDefinition, isBuiltinProviderId } from '@shared/constants/llm';
+import { getBuiltinProviderDefinition, isBuiltinProviderId, resolveBuiltinProviderProtocol } from '@shared/constants/llm';
 import type {
   LlmProviderAccountLoginFinishRequest,
   LlmProviderAccountStatus,
@@ -186,7 +186,7 @@ const createTinyOpenAiProbeBody = (modelId: string): string => JSON.stringify({
 export class ProviderConnectionService {
   async testProviderDraft(request: LlmProviderDraftRequest): Promise<LlmProviderConnectionResult> {
     try {
-      const provider = this.getProvider(request.providerId);
+      const provider = this.resolveProviderProtocol(this.getProvider(request.providerId), request.protocol);
       const models = await this.discoverModels(
         provider,
         request.apiKey?.trim() ?? '',
@@ -208,11 +208,11 @@ export class ProviderConnectionService {
 
   async connectProvider(request: LlmProviderDraftRequest): Promise<LlmProviderConnectionResult> {
     try {
-      const provider = this.getProvider(request.providerId);
+      const provider = this.resolveProviderProtocol(this.getProvider(request.providerId), request.protocol);
       const apiKey = request.apiKey?.trim() ?? '';
       const baseUrl = request.baseUrl?.trim() ?? '';
       const models = await this.discoverModels(provider, apiKey, baseUrl);
-      const nextSettings = settingsService.saveProviderConnection(provider.id, apiKey, models, baseUrl);
+      const nextSettings = settingsService.saveProviderConnection(provider.id, apiKey, models, baseUrl, provider.protocol);
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
       return {
         success: true,
@@ -244,7 +244,7 @@ export class ProviderConnectionService {
         };
       }
       const models = await this.discoverModels(provider, '', '');
-      const nextSettings = settingsService.saveProviderConnection(provider.id, '', models, '');
+      const nextSettings = settingsService.saveProviderConnection(provider.id, '', models, '', provider.protocol);
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
       return {
         success: true,
@@ -302,11 +302,22 @@ export class ProviderConnectionService {
     return provider;
   }
 
+  private resolveProviderProtocol(provider: LlmProviderEntry, protocolDraft: unknown): LlmProviderEntry {
+    const protocol = resolveBuiltinProviderProtocol(provider.id, protocolDraft ?? provider.protocol);
+    if (!protocol) {
+      throw new ProviderConnectionError(`Provider ${provider.id} is not in the built-in catalog.`);
+    }
+    return protocol === provider.protocol ? provider : { ...provider, protocol };
+  }
+
   private async discoverModels(provider: LlmProviderEntry, apiKeyDraft: string, baseUrlDraft: string): Promise<LlmProviderModel[]> {
     if (provider.authMode === 'account') {
       throw new ProviderConnectionError('Account providers must be tested through the account login flow.');
     }
     const definition = getBuiltinProviderDefinition(provider.id);
+    if (provider.unavailableReason) {
+      throw new ProviderConnectionError(provider.unavailableReason);
+    }
     if (!definition?.modelDiscovery) {
       throw new ProviderConnectionError('Provider 缺少模型发现配置');
     }
@@ -325,8 +336,8 @@ export class ProviderConnectionService {
     if (!baseUrl) {
       throw new ProviderConnectionError('请填写 Provider Base URL');
     }
-    if (provider.id === 'kimi-code') {
-      return this.validateKimiCodeModels(apiKey, baseUrl, definition.recommendedModels);
+    if (provider.id === 'kimi-coding-plan') {
+      return this.validateCodingPlanModels(apiKey, baseUrl, definition.recommendedModels);
     }
     if (strategy === 'anthropic-candidate-validation') {
       return this.validateAnthropicCandidateModels(provider, apiKey, baseUrl, definition.recommendedModels);
@@ -384,7 +395,7 @@ export class ProviderConnectionService {
     return toStaticModels(validModels);
   }
 
-  private async validateKimiCodeModels(apiKey: string, baseUrl: string, modelIds: string[]): Promise<LlmProviderModel[]> {
+  private async validateCodingPlanModels(apiKey: string, baseUrl: string, modelIds: string[]): Promise<LlmProviderModel[]> {
     const payload = await getJson(appendPath(baseUrl, '/models'), {
       method: 'GET',
       headers: {
@@ -432,7 +443,7 @@ export class ProviderConnectionService {
     if (provider.authMode === 'local') {
       return {};
     }
-    if (provider.kind === 'anthropic') {
+    if (provider.protocol === 'AnthropicMessages') {
       return {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',

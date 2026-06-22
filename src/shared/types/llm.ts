@@ -3,7 +3,7 @@
  */
 
 import type { AgentRole } from './agent';
-import type { LlmProviderAuthMode, LlmProviderId, LlmProviderKind } from './settings';
+import type { LlmProviderAuthMode, LlmProviderId, LlmProviderProtocol } from './settings';
 
 // 内容块类型
 export type ContentBlockType = 'text' | 'image' | 'tool_use' | 'tool_result';
@@ -64,6 +64,7 @@ export interface LLMRequest {
   model?: string;
   maxTokens?: number;
   temperature?: number;
+  topP?: number;
   reasoningBudget?: 'auto' | 'low' | 'medium' | 'high';
   tools?: ToolDefinition[];
   responseFormat?: 'json_object';
@@ -116,7 +117,7 @@ export interface LLMProvider {
 // LLM配置
 export interface LLMProviderConfig {
   id: LlmProviderId;
-  kind: LlmProviderKind;
+  protocol: LlmProviderProtocol;
   authMode?: LlmProviderAuthMode;
   label: string;
   enabled: boolean;

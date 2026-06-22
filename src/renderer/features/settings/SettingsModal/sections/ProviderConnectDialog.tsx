@@ -1,8 +1,14 @@
 import React from 'react';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
-import type { ProviderConnectionDraft } from '../types';
-import { getProviderGroupLabel, STORED_SECRET_MASK } from '../utils';
+import type { ProviderCatalogCategory, ProviderConnectionDraft } from '../types';
+import {
+  getProviderCategoryLabel,
+  getProviderProtocolOptions,
+  providerSupportsProtocolSelection,
+} from '../utils';
+import { ProviderApiKeyFields } from './ProviderApiKeyFields';
+import { ProviderProtocolField } from './ProviderProtocolField';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -10,6 +16,7 @@ interface ProviderConnectDialogProps {
   connectionDraft: ProviderConnectionDraft;
   connectionProvider: LlmProviderEntry;
   getResolvedProviderLabel: (provider: Pick<LlmProviderEntry, 'label'>) => string;
+  providerCatalogCategories: ProviderCatalogCategory[];
   connectionAccountConnected: boolean;
   connectionDevicePending: boolean;
   connectionNeedsApiKey: boolean;
@@ -27,6 +34,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   connectionDraft,
   connectionProvider,
   getResolvedProviderLabel,
+  providerCatalogCategories,
   connectionAccountConnected,
   connectionDevicePending,
   connectionNeedsApiKey,
@@ -57,6 +65,9 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
     || connectionNeedsBaseUrl
     || connectionDevicePending;
   const modelListSize = connectionDraft.models.length >= 24 ? 'long' : connectionDraft.models.length >= 8 ? 'medium' : 'short';
+  const showProtocolField = connectionProvider.authMode !== 'account';
+  const showProtocolSelector = showProtocolField && providerSupportsProtocolSelection(connectionProvider);
+  const protocolOptions = showProtocolField ? getProviderProtocolOptions(connectionProvider) : [];
 
   return (
   <div
@@ -78,7 +89,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
     >
       <div className="settings-provider-connect-header">
         <div>
-          <div className="settings-provider-connect-kicker">{getProviderGroupLabel(connectionProvider)}</div>
+          <div className="settings-provider-connect-kicker">{getProviderCategoryLabel(connectionProvider, providerCatalogCategories)}</div>
           <div className="settings-provider-connect-title" id="settings-provider-connect-title">
             {getResolvedProviderLabel(connectionProvider)}
           </div>
@@ -96,72 +107,49 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         </button>
       </div>
 
-      {connectionProvider.authMode === 'api-key' && (
-        <>
-          {connectionProvider.baseUrlEditable && (
-            <label className="settings-field">
-              <span className="settings-field-label">{t('settings.providerBaseUrl')}</span>
-              <input
-                className="input"
-                data-testid="settings-provider-connect-base-url"
-                value={connectionDraft.baseUrl}
-                onChange={(event) => onUpdateConnectionDraft({
-                  baseUrl: event.target.value,
-                  error: '',
-                  testedApiKey: '',
-                  models: [],
-                })}
-              />
-            </label>
-          )}
-          <label className="settings-field">
-            <span className="settings-field-label">{t('settings.apiKey')}</span>
-            <div className="settings-secret-field">
-              <input
-                className="input settings-secret-input"
-                data-testid="settings-provider-connect-api-key"
-                type={connectionDraft.showApiKey && !connectionDraft.usingStoredSecret ? 'text' : 'password'}
-                value={connectionDraft.usingStoredSecret ? STORED_SECRET_MASK : connectionDraft.apiKey}
-                placeholder=""
-                onFocus={() => {
-                  if (connectionDraft.usingStoredSecret) {
-                    onUpdateConnectionDraft({ usingStoredSecret: false, apiKey: '', showApiKey: false });
-                  }
-                }}
-                onChange={(event) => onUpdateConnectionDraft({
-                  apiKey: event.target.value,
-                  usingStoredSecret: false,
-                  error: '',
-                  testedApiKey: '',
-                  models: [],
-                })}
-              />
-              <button
-                type="button"
-                className="settings-secret-toggle"
-                data-testid="settings-provider-connect-api-key-toggle"
-                onClick={() => {
-                  if (connectionDraft.usingStoredSecret) {
-                    onUpdateConnectionDraft({ usingStoredSecret: false, apiKey: '', showApiKey: false });
-                    return;
-                  }
-                  onUpdateConnectionDraft({ showApiKey: !connectionDraft.showApiKey });
-                }}
-                aria-label={connectionDraft.usingStoredSecret ? t('settings.replaceSecret') : connectionDraft.showApiKey ? t('settings.hideSecret') : t('settings.showSecret')}
-                disabled={!connectionDraft.usingStoredSecret && !connectionDraft.apiKey}
-              >
-                {connectionDraft.usingStoredSecret
-                  ? t('settings.replaceSecret')
-                  : connectionDraft.showApiKey ? t('settings.hideSecret') : t('settings.showSecret')}
-              </button>
-            </div>
-            <span className="settings-help-text">
-              {connectionProvider.hasStoredSecret ? t('settings.apiKeyStoredHint') : t('settings.apiKeyConnectHint')}
-            </span>
-          </label>
-        </>
+      {showProtocolField && (
+        <ProviderProtocolField
+          value={connectionDraft.protocol}
+          options={protocolOptions}
+          disabled={connectionDraft.busy !== 'idle'}
+          readOnly={!showProtocolSelector}
+          onChange={(protocol) => onUpdateConnectionDraft({
+            protocol,
+            error: '',
+            testedApiKey: '',
+            testedBaseUrl: '',
+            testedProtocol: protocol,
+            models: [],
+          })}
+          t={t}
+        />
       )}
 
+      {connectionProvider.authMode === 'api-key' && (
+        <ProviderApiKeyFields
+          connectionDraft={connectionDraft}
+          connectionProvider={connectionProvider}
+          onUpdateConnectionDraft={onUpdateConnectionDraft}
+          t={t}
+        />
+      )}
+      {connectionProvider.authMode === 'local' && connectionProvider.baseUrlEditable && (
+        <label className="settings-field">
+          <span className="settings-field-label">{t('settings.providerBaseUrl')}</span>
+          <input
+            className="input"
+            data-testid="settings-provider-connect-base-url"
+            value={connectionDraft.baseUrl}
+            onChange={(event) => onUpdateConnectionDraft({
+              baseUrl: event.target.value,
+              error: '',
+              testedApiKey: '',
+              testedBaseUrl: '',
+              models: [],
+            })}
+          />
+        </label>
+      )}
       {connectionProvider.authMode === 'local' && (
         <div className="settings-provider-notice">
           {t('settings.localProviderConnectHint')}

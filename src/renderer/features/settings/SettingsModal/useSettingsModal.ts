@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useI18n } from '../../../i18n';
 import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
+import type { ProviderCatalogSnapshot } from './types';
 import { resolveAgentRouteStatus } from './agentRouteStatus';
 import { createSettingsModalActions } from './settingsModalActions';
 import { useProviderConnection } from './useProviderConnection';
@@ -13,6 +14,19 @@ import {
   sortProvidersByLabel,
 } from './utils';
 
+
+
+const EMPTY_PROVIDER_CATALOG_SNAPSHOT: ProviderCatalogSnapshot = {
+  categories: [],
+  protocols: [],
+  providers: [],
+};
+
+const normalizeProviderCatalogSnapshot = (snapshot: ProviderCatalogSnapshot | null | undefined): ProviderCatalogSnapshot => ({
+  categories: Array.isArray(snapshot?.categories) ? snapshot.categories : [],
+  protocols: Array.isArray(snapshot?.protocols) ? snapshot.protocols : [],
+  providers: Array.isArray(snapshot?.providers) ? snapshot.providers : [],
+});
 export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const { t } = useI18n();
   const setTheme = useAppSettingsStore((state) => state.setTheme);
@@ -25,6 +39,26 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const reloadSettings = useAppSettingsStore((state) => state.reloadSettings);
 
   const modalState = useSettingsModalState(open, settings);
+  const [providerCatalogSnapshot, setProviderCatalogSnapshot] = useState<ProviderCatalogSnapshot>(EMPTY_PROVIDER_CATALOG_SNAPSHOT);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    void window.electronAPI.settings.getProviderCatalog()
+      .then((snapshot) => {
+        if (!cancelled) {
+          setProviderCatalogSnapshot(normalizeProviderCatalogSnapshot(snapshot));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProviderCatalogSnapshot(EMPTY_PROVIDER_CATALOG_SNAPSHOT);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   const providerConnection = useProviderConnection({
     open,
@@ -45,11 +79,11 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     [modalState.providerDrafts],
   );
   const accountProviders = useMemo(
-    () => sortProvidersByLabel(modalState.providerDrafts.filter((provider) => provider.authMode === 'account')),
+    () => sortProvidersByLabel(modalState.providerDrafts.filter((provider) => provider.category === 'login-authorization')),
     [modalState.providerDrafts],
   );
   const providerCatalog = useMemo(
-    () => sortProvidersByLabel(modalState.providerDrafts.filter((provider) => provider.authMode !== 'account')),
+    () => sortProvidersByLabel(modalState.providerDrafts.filter((provider) => provider.category !== 'login-authorization')),
     [modalState.providerDrafts],
   );
   const configuredProvidersWithoutEnabledModels = useMemo(
@@ -133,6 +167,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     routableProviders,
     accountProviders,
     providerCatalog,
+    providerCatalogCategories: providerCatalogSnapshot.categories,
     configuredProvidersWithoutEnabledModels,
     invalidAgentRoutes,
     invalidAgentRouteMessage,
