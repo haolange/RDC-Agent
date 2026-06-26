@@ -28,6 +28,7 @@ import type {
   AppSettings,
   AppSettingsPatch,
   LlmProviderAccountStatus,
+  LlmProviderAccountLoginStartRequest,
   LlmProviderAccountLoginFinishRequest,
   LlmProviderCatalogResponse,
   LlmProviderConnectionResult,
@@ -199,7 +200,7 @@ export interface ElectronAPI {
     connectProvider: (request: LlmProviderDraftRequest) => Promise<LlmProviderConnectionResult>;
     refreshProviderModels: (providerId: LlmProviderId) => Promise<LlmProviderConnectionResult>;
     disconnectProvider: (providerId: LlmProviderId) => Promise<LlmProviderConnectionResult>;
-    startProviderAccountLogin: (providerId: LlmProviderId) => Promise<LlmProviderAccountStatus>;
+    startProviderAccountLogin: (request: LlmProviderAccountLoginStartRequest) => Promise<LlmProviderAccountStatus>;
     getProviderAccountStatus: (providerId: LlmProviderId) => Promise<LlmProviderAccountStatus>;
     finishProviderAccountLogin: (request: LlmProviderAccountLoginFinishRequest) => Promise<LlmProviderAccountStatus>;
     logoutProviderAccount: (providerId: LlmProviderId) => Promise<LlmProviderAccountStatus>;

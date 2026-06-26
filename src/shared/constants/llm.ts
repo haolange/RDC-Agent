@@ -158,6 +158,7 @@ export const GITHUB_COPILOT_ACCOUNT_MODELS = [
 ];
 export const GROK_ACCOUNT_MODELS = [
   'grok-4.3',
+  'grok-build-0.1',
   'grok-4',
   'grok-code-fast-1',
 ];
@@ -235,7 +236,6 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     recommendedModels: GROK_ACCOUNT_MODELS,
     docsUrl: 'https://grok.com/',
     accountLoginConfigured: true,
-    unavailableReason: 'Live Grok account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured.',
     capabilities: CAPS_OPENAI_COMPATIBLE,
   },
   {
@@ -249,7 +249,7 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     recommendedModels: GEMINI_ACCOUNT_MODELS,
     docsUrl: 'https://gemini.google.com/',
     accountLoginConfigured: true,
-    unavailableReason: 'Live Gemini account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured.',
+    unavailableReason: 'Live Gemini account OAuth requires a stable public account authorization contract; this adapter is unavailable outside automated test mode.',
     capabilities: CAPS_GOOGLE_AI_STUDIO,
   },
   {
@@ -263,7 +263,7 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     recommendedModels: QWEN_ACCOUNT_MODELS,
     docsUrl: 'https://chat.qwen.ai/',
     accountLoginConfigured: true,
-    unavailableReason: 'Live Qwen account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured.',
+    unavailableReason: 'Live Qwen account OAuth requires a stable public account authorization contract; this adapter is unavailable outside automated test mode.',
     capabilities: CAPS_OPENAI_COMPATIBLE,
   },
   {
@@ -489,7 +489,7 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     modelDiscovery: 'openai-compatible',
     label: 'xAI (Grok)',
     baseUrl: 'https://api.x.ai/v1',
-    recommendedModels: ['grok-4.3', 'grok-4'],
+    recommendedModels: GROK_ACCOUNT_MODELS,
     docsUrl: 'https://docs.x.ai/',
     capabilities: CAPS_XAI,
   },

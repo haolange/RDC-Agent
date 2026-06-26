@@ -5,6 +5,7 @@ import type {
 } from '@shared/types/agentRuntime';
 import type {
   AppSettingsPatch,
+  LlmProviderAccountLoginStartRequest,
   LlmProviderAccountLoginFinishRequest,
   LlmProviderDraftRequest,
   LlmProviderId,
@@ -60,8 +61,8 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return result;
   });
 
-  ipcMain.handle('llm:startProviderAccountLogin', async (_event, providerId: LlmProviderId) => {
-    return providerConnectionService.startProviderAccountLogin(providerId);
+  ipcMain.handle('llm:startProviderAccountLogin', async (_event, request: LlmProviderAccountLoginStartRequest) => {
+    return providerConnectionService.startProviderAccountLogin(request);
   });
 
   ipcMain.handle('llm:getProviderAccountStatus', async (_event, providerId: LlmProviderId) => {

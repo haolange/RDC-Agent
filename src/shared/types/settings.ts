@@ -390,6 +390,11 @@ export interface LlmProviderDraftRequest {
   protocol?: LlmProviderProtocol;
 }
 
+export interface LlmProviderAccountLoginStartRequest {
+  providerId: LlmProviderId;
+  oauthClientId?: string;
+}
+
 export interface LlmProviderAccountLoginFinishRequest {
   providerId: LlmProviderId;
   code?: string;
@@ -418,5 +423,7 @@ export interface LlmProviderAccountStatus {
   verificationUri?: string;
   userCode?: string;
   requiresCodeInput?: boolean;
+  requiresClientId?: boolean;
+  clientIdSource?: 'draft' | 'env' | 'stored';
   models?: LlmProviderModel[];
 }

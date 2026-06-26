@@ -205,9 +205,22 @@ async function main() {
   assert(ids.length >= 40, `Builtin provider catalog should expose at least 40 providers, found ${ids.length}.`);
   assert(runtimeEntries.length === ids.length, 'Runtime provider entries should mirror the builtin catalog.');
   assert(catalogEntries.length === ids.length, 'Provider catalog DTO entries should mirror the builtin catalog.');
-  for (const id of ['openai', 'anthropic', 'bedrock', 'vertex', 'ollama', 'chatgpt-account', 'claude-account']) {
+  for (const id of ['openai', 'anthropic', 'bedrock', 'vertex', 'ollama', 'chatgpt-account', 'claude-account', 'grok-account', 'xai']) {
     assert(ids.includes(id), `Builtin provider is missing: ${id}`);
   }
+
+  const definitionById = new Map(BUILTIN_LLM_PROVIDER_DEFINITIONS.map((definition) => [definition.id, definition]));
+  const grokAccount = definitionById.get('grok-account');
+  assert(grokAccount?.authMode === 'account', 'grok-account must be an account provider.');
+  assert(grokAccount?.category === 'login-authorization', 'grok-account must stay in login authorization.');
+  assert(grokAccount?.protocol === 'OpenAICompatibleChatCompletions', 'grok-account must use the OpenAI-compatible chat adapter.');
+  assert(grokAccount?.accountLoginConfigured === true, 'grok-account must expose a configured account login path.');
+  assert(grokAccount?.unavailableReason === undefined, 'grok-account must not be marked unavailable.');
+  for (const modelId of ['grok-4.3', 'grok-4', 'grok-code-fast-1']) {
+    assert(grokAccount?.recommendedModels.includes(modelId), `grok-account recommended models must include ${modelId}.`);
+  }
+  const xai = definitionById.get('xai');
+  assert(xai?.recommendedModels.includes('grok-code-fast-1'), 'xAI API-key provider must include grok-code-fast-1.');
 
   if (!Array.isArray(catalog)) {
     assert(Array.isArray(catalog.categories), 'Provider catalog response must include categories.');
@@ -295,8 +308,17 @@ async function main() {
   assert(!/xai-[A-Za-z0-9]+/.test(settingsServiceSource), 'SettingsService must not contain xAI API keys.');
   assert(!/AIzaSy[A-Za-z0-9_-]+/.test(settingsServiceSource), 'SettingsService must not contain Google API keys.');
 
+  const providerAccountAuthService = read('src/main/settings/ProviderAccountAuthService.ts');
+  assertSourceContains(
+    providerAccountAuthService,
+    ['GROK_AUTH_DEVICE_ENDPOINT', 'GROK_AUTH_TOKEN_ENDPOINT', 'resolveGrokOAuthClientId', 'pollGrokDevice', 'GROK_API_BASE_URL'],
+    'ProviderAccountAuthService Grok OAuth flow',
+  );
+  assert(!providerAccountAuthService.includes("providerId === 'grok-account' || providerId === 'gemini-account'"), 'grok-account must not remain in the test-only account branch.');
+  assert(!providerAccountAuthService.includes('mockable'), 'ProviderAccountAuthService must not keep mockable account terminology.');
+
   const settingsIpc = read('src/main/ipc/settingsLlmHandlers.ts');
-  assertSourceContains(settingsIpc, ['settings:getProviderCatalog', 'settingsService.getProviderCatalog'], 'settings IPC handlers');
+  assertSourceContains(settingsIpc, ['settings:getProviderCatalog', 'settingsService.getProviderCatalog', 'LlmProviderAccountLoginStartRequest'], 'settings IPC handlers');
 
   const ipcChannels = read('src/main/ipc/channels.ts');
   assert(ipcChannels.includes("'settings:getProviderCatalog'"), 'IPC channel domain must list settings:getProviderCatalog.');
@@ -306,6 +328,7 @@ async function main() {
 
   const electronApiTypes = read('src/shared/types/electron.ts');
   assert(electronApiTypes.includes('getProviderCatalog'), 'ElectronAPI.settings must type getProviderCatalog().');
+  assert(electronApiTypes.includes('LlmProviderAccountLoginStartRequest'), 'ElectronAPI.llm must type provider account login start requests.');
 
   const browserBridge = read('src/renderer/platform/browserAppBridge/BrowserAppBridge.ts');
   assertSourceContains(browserBridge, ['getProviderCatalog', "this.invoke('settings:getProviderCatalog')"], 'browser app bridge settings API');

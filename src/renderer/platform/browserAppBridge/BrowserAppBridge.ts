@@ -102,7 +102,7 @@ class BrowserAppBridgeClient {
       connectProvider: (request) => this.invoke('llm:connectProvider', request),
       refreshProviderModels: (providerId) => this.invoke('llm:refreshProviderModels', providerId),
       disconnectProvider: (providerId) => this.invoke('llm:disconnectProvider', providerId),
-      startProviderAccountLogin: (providerId) => this.invoke('llm:startProviderAccountLogin', providerId),
+      startProviderAccountLogin: (request) => this.invoke('llm:startProviderAccountLogin', request),
       getProviderAccountStatus: (providerId) => this.invoke('llm:getProviderAccountStatus', providerId),
       finishProviderAccountLogin: (request) => this.invoke('llm:finishProviderAccountLogin', request),
       logoutProviderAccount: (providerId) => this.invoke('llm:logoutProviderAccount', providerId),

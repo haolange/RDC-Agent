@@ -24,6 +24,7 @@ export interface ProviderConnectionDraft {
   models: LlmProviderModel[];
   accountStatus?: LlmProviderAccountStatus;
   authCode: string;
+  oauthClientId: string;
 }
 
 export type ProviderProtocol = LlmProviderProtocol;
