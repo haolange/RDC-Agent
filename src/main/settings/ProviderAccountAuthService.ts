@@ -3,6 +3,7 @@ import { createServer, type Server } from 'http';
 import { shell } from 'electron';
 import type {
   LlmProviderAccountLoginFinishRequest,
+  LlmProviderAccountLoginStartRequest,
   LlmProviderAccountStatus,
   LlmProviderId,
   LlmProviderModel,
@@ -16,6 +17,17 @@ const CHATGPT_CALLBACK_PORT = 1455;
 const CHATGPT_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const CLAUDE_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
 const GITHUB_COPILOT_CLIENT_ID = 'Iv1.b507a08c87ecfe98';
+const GROK_AUTH_DEVICE_ENDPOINT = 'https://auth.x.ai/oauth2/device/code';
+const GROK_AUTH_TOKEN_ENDPOINT = 'https://auth.x.ai/oauth2/token';
+const GROK_AUTH_USERINFO_ENDPOINT = 'https://auth.x.ai/oauth2/userinfo';
+const GROK_AUTH_REVOKE_ENDPOINT = 'https://auth.x.ai/oauth2/revoke';
+const GROK_API_BASE_URL = 'https://api.x.ai/v1';
+const GROK_OAUTH_SCOPE = 'openid profile email offline_access api:access';
+const GROK_OAUTH_CLIENT_ID_ENV_KEYS = [
+  'RDC_AGENT_GROK_OAUTH_CLIENT_ID',
+  'GROK_OAUTH_CLIENT_ID',
+  'XAI_OAUTH_CLIENT_ID',
+] as const;
 
 type AccountProviderId =
   | 'claude-account'
@@ -35,6 +47,7 @@ interface OAuthFlowState {
   userCode?: string;
   deviceCode?: string;
   intervalSeconds?: number;
+  clientId?: string;
   expiresAt: number;
   server?: Server;
   error?: string;
@@ -48,6 +61,7 @@ interface OAuthSecretBundle {
   copilotToken?: string;
   copilotApiBaseUrl?: string;
   idToken?: string;
+  clientId?: string;
   accountId?: string;
   expiresAt?: string;
   accountLabel?: string;
@@ -64,8 +78,22 @@ const isAccountProviderId = (providerId: LlmProviderId): providerId is AccountPr
   || providerId === 'gemini-account'
   || providerId === 'qwen-account';
 
-const isMockableAccountProviderId = (providerId: AccountProviderId): boolean =>
-  providerId === 'grok-account' || providerId === 'gemini-account' || providerId === 'qwen-account';
+const isUnimplementedAccountProviderId = (providerId: AccountProviderId): boolean =>
+  providerId === 'gemini-account' || providerId === 'qwen-account';
+
+const resolveGrokOAuthClientId = (draft?: string): { clientId?: string; source?: 'draft' | 'env' } => {
+  const cleanDraft = draft?.trim();
+  if (cleanDraft) {
+    return { clientId: cleanDraft, source: 'draft' };
+  }
+  for (const key of GROK_OAUTH_CLIENT_ID_ENV_KEYS) {
+    const value = process.env[key]?.trim();
+    if (value) {
+      return { clientId: value, source: 'env' };
+    }
+  }
+  return {};
+};
 
 const isTestMode = (): boolean => process.env.RDC_AGENT_TEST_MODE === '1';
 
@@ -220,8 +248,12 @@ const isExpiringSoon = (expiresAt?: string): boolean => {
 const wait = (milliseconds: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-const canRefreshBundle = (bundle: OAuthSecretBundle): boolean =>
-  Boolean(bundle.refreshToken || (bundle.providerId === 'github-copilot' && bundle.accessToken));
+const canRefreshBundle = (bundle: OAuthSecretBundle): boolean => {
+  if (bundle.providerId === 'grok-account') {
+    return Boolean(bundle.refreshToken && bundle.clientId);
+  }
+  return Boolean(bundle.refreshToken || (bundle.providerId === 'github-copilot' && bundle.accessToken));
+};
 
 const fetchJson = async (url: string, init: RequestInit): Promise<unknown> => {
   const controller = new AbortController();
@@ -244,6 +276,27 @@ const fetchJson = async (url: string, init: RequestInit): Promise<unknown> => {
     clearTimeout(timeout);
   }
 };
+
+const fetchOAuthJson = async (url: string, init: RequestInit): Promise<unknown> => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) as unknown : {};
+    if (!response.ok && !(payload && typeof payload === 'object' && typeof (payload as { error?: unknown }).error === 'string')) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return payload;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const createFormBody = (params: Record<string, string>): string => new URLSearchParams(params).toString();
 
 const parseModels = (payload: unknown): LlmProviderModel[] => {
   if (!payload || typeof payload !== 'object') {
@@ -272,7 +325,8 @@ const parseCopilotModels = (payload: unknown): LlmProviderModel[] => {
 };
 
 export class ProviderAccountAuthService {
-  async startLogin(providerId: LlmProviderId): Promise<LlmProviderAccountStatus> {
+  async startLogin(request: LlmProviderAccountLoginStartRequest): Promise<LlmProviderAccountStatus> {
+    const providerId = request.providerId;
     if (!isAccountProviderId(providerId)) {
       return this.status(providerId, 'Provider does not support account login.');
     }
@@ -282,10 +336,13 @@ export class ProviderAccountAuthService {
     if (providerId === 'chatgpt-account') {
       return this.startChatGptLogin();
     }
-    if (isMockableAccountProviderId(providerId)) {
-      return this.startMockableAccountLogin(providerId);
+    if (providerId === 'github-copilot') {
+      return this.startGitHubCopilotLogin();
     }
-    return this.startGitHubCopilotLogin();
+    if (providerId === 'grok-account') {
+      return this.startGrokLogin(request.oauthClientId);
+    }
+    return this.startUnimplementedAccountLogin(providerId);
   }
 
   async finishLogin(request: LlmProviderAccountLoginFinishRequest): Promise<LlmProviderAccountStatus> {
@@ -306,12 +363,19 @@ export class ProviderAccountAuthService {
         const bundle = await this.exchangeChatGptCode(flow, request.code?.trim() ?? '');
         return await this.persistAccount(request.providerId, bundle);
       }
-      if (isMockableAccountProviderId(request.providerId)) {
-        const bundle = this.exchangeMockableAccountCode(flow, request.code?.trim() ?? '');
+      if (isUnimplementedAccountProviderId(request.providerId)) {
+        const bundle = this.exchangeUnimplementedAccountCode(flow, request.code?.trim() ?? '');
         return await this.persistAccount(request.providerId, bundle);
       }
-      const bundle = await this.pollGitHubDevice(flow);
-      return await this.persistAccount(request.providerId, bundle);
+      if (request.providerId === 'github-copilot') {
+        const bundle = await this.pollGitHubDevice(flow);
+        return await this.persistAccount(request.providerId, bundle);
+      }
+      if (request.providerId === 'grok-account') {
+        const bundle = await this.pollGrokDevice(flow);
+        return await this.persistAccount(request.providerId, bundle);
+      }
+      return this.status(request.providerId, 'Provider does not support account login.', 'failed');
     } catch (error) {
       flow.error = parseProviderError(error);
       return this.status(request.providerId, flow.error, 'failed');
@@ -385,12 +449,19 @@ export class ProviderAccountAuthService {
     const isAccount = isAccountProviderId(providerId);
     const flow = isAccount ? this.findFlow(providerId) : null;
     const connected = Boolean(provider?.isConfigured && provider.status === 'verified');
+    const grokClientIdSource = providerId === 'grok-account'
+      ? flow?.clientId
+        ? 'draft'
+        : connected && this.readBundle('grok-account')?.clientId
+          ? 'stored'
+          : resolveGrokOAuthClientId().source
+      : undefined;
     const state: LlmProviderAccountStatus['state'] = forcedState
-      ?? (flow?.error ? 'failed' : flow ? 'pending' : connected ? 'connected' : isAccount ? 'signed-out' : 'unavailable');
+      ?? (connected ? 'connected' : flow?.error ? 'failed' : flow ? 'pending' : isAccount ? 'signed-out' : 'unavailable');
     const pendingMessage = providerId === 'github-copilot'
       ? 'Waiting for GitHub authorization.'
-      : isAccount && flow && isMockableAccountProviderId(providerId)
-        ? 'Waiting for mockable account authorization.'
+      : providerId === 'grok-account'
+        ? 'Waiting for xAI authorization.'
         : 'Waiting for authorization.';
     return {
       providerId,
@@ -405,14 +476,20 @@ export class ProviderAccountAuthService {
       authUrl: flow?.authUrl,
       verificationUri: flow?.verificationUri,
       userCode: flow?.userCode,
-      requiresCodeInput: Boolean(flow?.providerId === 'claude-account' || (flow && isMockableAccountProviderId(flow.providerId))),
+      requiresCodeInput: Boolean(flow?.providerId === 'claude-account' || (flow && isUnimplementedAccountProviderId(flow.providerId))),
+      requiresClientId: providerId === 'grok-account' && !connected && !grokClientIdSource,
+      clientIdSource: grokClientIdSource,
       models: provider?.models ?? [],
     };
   }
 
   logout(providerId: LlmProviderId): LlmProviderAccountStatus {
     if (isAccountProviderId(providerId)) {
+      const bundle = providerId === 'grok-account' ? this.readBundle('grok-account') : null;
       this.clearFlows(providerId);
+      if (bundle) {
+        void this.revokeGrokBundle(bundle);
+      }
       settingsService.disconnectProvider(providerId);
     }
     return this.status(providerId);
@@ -510,7 +587,63 @@ export class ProviderAccountAuthService {
     return this.status(flow.providerId);
   }
 
-  private startMockableAccountLogin(providerId: AccountProviderId): LlmProviderAccountStatus {
+  private async startGrokLogin(oauthClientId?: string): Promise<LlmProviderAccountStatus> {
+    const resolved = resolveGrokOAuthClientId(oauthClientId);
+    if (!resolved.clientId) {
+      return this.status(
+        'grok-account',
+        'Grok OAuth client id is required. Enter an OAuth client id or set RDC_AGENT_GROK_OAUTH_CLIENT_ID.',
+        'failed',
+      );
+    }
+
+    try {
+      const payload = await fetchJson(GROK_AUTH_DEVICE_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: createFormBody({
+          client_id: resolved.clientId,
+          scope: GROK_OAUTH_SCOPE,
+        }),
+      }) as {
+        device_code?: string;
+        user_code?: string;
+        verification_uri?: string;
+        verification_uri_complete?: string;
+        expires_in?: number;
+        interval?: number;
+      };
+      if (!payload.device_code || !payload.user_code || !payload.verification_uri) {
+        throw new Error('xAI OAuth did not return a complete device authorization payload.');
+      }
+      const flow: OAuthFlowState = {
+        providerId: 'grok-account',
+        flowId: randomUUID(),
+        state: randomUUID(),
+        deviceCode: payload.device_code,
+        userCode: payload.user_code,
+        verificationUri: payload.verification_uri,
+        authUrl: payload.verification_uri_complete ?? payload.verification_uri,
+        intervalSeconds: payload.interval ?? 5,
+        clientId: resolved.clientId,
+        expiresAt: Date.now() + (payload.expires_in ?? 900) * 1000,
+      };
+      this.setFlow(flow);
+      void this.openExternal(flow.authUrl);
+      void this.pollGrokDevice(flow)
+        .then((bundle) => this.persistAccount('grok-account', bundle))
+        .catch((error) => {
+          flow.error = parseProviderError(error);
+        });
+      return this.status(flow.providerId);
+    } catch (error) {
+      return this.status('grok-account', parseProviderError(error), 'failed');
+    }
+  }
+
+  private startUnimplementedAccountLogin(providerId: AccountProviderId): LlmProviderAccountStatus {
     const definition = getBuiltinProviderDefinition(providerId);
     const flow: OAuthFlowState = {
       providerId,
@@ -524,8 +657,8 @@ export class ProviderAccountAuthService {
     return this.status(
       flow.providerId,
       isTestMode()
-        ? 'Mockable account authorization flow started.'
-        : 'Live account OAuth is not yet configured for this provider; mock verification is available in test mode.',
+        ? 'Test-only account authorization flow started.'
+        : 'Live account OAuth is not configured for this provider; automated test-mode verification is the only available path.',
     );
   }
 
@@ -656,9 +789,92 @@ export class ProviderAccountAuthService {
     }
   }
 
-  private exchangeMockableAccountCode(flow: OAuthFlowState, code: string): OAuthSecretBundle {
-    if (!isMockableAccountProviderId(flow.providerId)) {
-      throw new Error('Provider is not a mockable account adapter.');
+  private async pollGrokDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle> {
+    if (!flow.deviceCode || !flow.clientId) {
+      throw new Error('Grok device authorization is missing client or device code.');
+    }
+    let intervalSeconds = flow.intervalSeconds ?? 5;
+    let delayBeforePoll = !isTestMode();
+    for (;;) {
+      if (Date.now() > flow.expiresAt) {
+        throw new Error('Grok authorization code expired.');
+      }
+      if (delayBeforePoll) {
+        await wait(intervalSeconds * 1000);
+      }
+      delayBeforePoll = true;
+      const payload = await fetchOAuthJson(GROK_AUTH_TOKEN_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: createFormBody({
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+          client_id: flow.clientId,
+          device_code: flow.deviceCode,
+        }),
+      }) as {
+        access_token?: string;
+        refresh_token?: string;
+        id_token?: string;
+        expires_in?: number;
+        error?: string;
+        error_description?: string;
+      };
+      if (payload.error === 'authorization_pending') {
+        delete flow.error;
+        continue;
+      }
+      if (payload.error === 'slow_down') {
+        delete flow.error;
+        intervalSeconds += 5;
+        continue;
+      }
+      if (payload.error) {
+        throw new Error(payload.error_description ?? payload.error);
+      }
+      if (!payload.access_token) {
+        throw new Error('xAI OAuth did not return an access token.');
+      }
+      const account = await this.fetchGrokUserInfo(payload.access_token);
+      return {
+        providerId: 'grok-account',
+        accessToken: payload.access_token,
+        apiKey: payload.access_token,
+        refreshToken: payload.refresh_token,
+        idToken: payload.id_token,
+        clientId: flow.clientId,
+        accountId: account.accountId,
+        expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
+        accountLabel: account.accountLabel ?? 'Grok Account',
+        planLabel: 'xAI OAuth',
+      };
+    }
+  }
+
+  private async fetchGrokUserInfo(accessToken: string): Promise<{ accountId?: string; accountLabel?: string }> {
+    try {
+      const payload = await fetchJson(GROK_AUTH_USERINFO_ENDPOINT, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const record = payload && typeof payload === 'object' && !Array.isArray(payload)
+        ? payload as Record<string, unknown>
+        : {};
+      return {
+        accountId: readString(record.sub),
+        accountLabel: readString(record.email) ?? readString(record.name) ?? readString(record.preferred_username) ?? readString(record.sub),
+      };
+    } catch {
+      return {};
+    }
+  }
+
+  private exchangeUnimplementedAccountCode(flow: OAuthFlowState, code: string): OAuthSecretBundle {
+    if (!isUnimplementedAccountProviderId(flow.providerId)) {
+      throw new Error('Provider is not an unimplemented account adapter.');
     }
     if (!isTestMode()) {
       const definition = getBuiltinProviderDefinition(flow.providerId);
@@ -669,11 +885,11 @@ export class ProviderAccountAuthService {
     }
     return {
       providerId: flow.providerId,
-      accessToken: `mock-${flow.providerId}-${flow.state}`,
-      apiKey: `mock-${flow.providerId}-${flow.state}`,
+      accessToken: `test-${flow.providerId}-${flow.state}`,
+      apiKey: `test-${flow.providerId}-${flow.state}`,
       expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
       accountLabel: getBuiltinProviderDefinition(flow.providerId)?.label ?? flow.providerId,
-      planLabel: 'Mock account',
+      planLabel: 'Test account',
     };
   }
 
@@ -725,7 +941,38 @@ export class ProviderAccountAuthService {
       };
     }
 
-    if (isMockableAccountProviderId(bundle.providerId)) {
+    if (bundle.providerId === 'grok-account') {
+      if (!bundle.refreshToken || !bundle.clientId) {
+        return bundle;
+      }
+      const payload = await fetchOAuthJson(GROK_AUTH_TOKEN_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: createFormBody({
+          grant_type: 'refresh_token',
+          client_id: bundle.clientId,
+          refresh_token: bundle.refreshToken,
+        }),
+      }) as { access_token?: string; refresh_token?: string; id_token?: string; expires_in?: number; error?: string; error_description?: string };
+      if (payload.error) {
+        throw new Error(payload.error_description ?? payload.error);
+      }
+      if (!payload.access_token) {
+        throw new Error('xAI OAuth refresh did not return an access token.');
+      }
+      return {
+        ...bundle,
+        accessToken: payload.access_token,
+        apiKey: payload.access_token,
+        idToken: payload.id_token ?? bundle.idToken,
+        refreshToken: payload.refresh_token ?? bundle.refreshToken,
+        expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
+      };
+    }
+
+    if (isUnimplementedAccountProviderId(bundle.providerId)) {
       return bundle;
     }
 
@@ -787,9 +1034,22 @@ export class ProviderAccountAuthService {
     if (
       bundle.providerId === 'chatgpt-account'
       || bundle.providerId === 'claude-account'
-      || isMockableAccountProviderId(bundle.providerId)
+      || isUnimplementedAccountProviderId(bundle.providerId)
     ) {
       return createAccountCatalogModels(bundle.providerId);
+    }
+    if (bundle.providerId === 'grok-account') {
+      const token = bundle.accessToken ?? bundle.apiKey;
+      if (!token) {
+        throw new Error('Grok account access token is missing. Sign in again.');
+      }
+      const payload = await fetchJson(`${GROK_API_BASE_URL}/models`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return parseModels(payload);
     }
     if (bundle.providerId === 'github-copilot') {
       const catalogModels = createAccountCatalogModels(bundle.providerId);
@@ -815,6 +1075,31 @@ export class ProviderAccountAuthService {
       },
     });
     return parseModels(payload);
+  }
+
+  private async revokeGrokBundle(bundle: OAuthSecretBundle): Promise<void> {
+    if (bundle.providerId !== 'grok-account' || !bundle.clientId) {
+      return;
+    }
+    const token = bundle.refreshToken ?? bundle.accessToken ?? bundle.apiKey;
+    if (!token) {
+      return;
+    }
+    try {
+      await fetchOAuthJson(GROK_AUTH_REVOKE_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: createFormBody({
+          client_id: bundle.clientId,
+          token,
+          token_type_hint: bundle.refreshToken ? 'refresh_token' : 'access_token',
+        }),
+      });
+    } catch {
+      // Local sign-out must still complete even if remote revocation is unavailable.
+    }
   }
 
   private readBundle(providerId: AccountProviderId): OAuthSecretBundle | null {

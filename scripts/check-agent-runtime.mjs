@@ -76,6 +76,13 @@ function main() {
   assert(kimiCapability.toolCallingMode === 'native-structured', 'kimi-coding-plan must resolve to native structured tool calling.');
   assert(kimiCapability.supportsToolResults === true, 'native structured routes must support tool results.');
 
+  const grokCapability = resolveAgentRouteCapability(
+    configuredProvider('grok-account', ['grok-code-fast-1']),
+    'grok-code-fast-1',
+  );
+  assert(grokCapability.toolCallingMode === 'native-structured', 'grok-account must resolve to native structured tool calling.');
+  assert(grokCapability.supportsToolResults === true, 'grok-account native structured routes must support tool results.');
+
   const openRouterCapability = resolveAgentRouteCapability(
     configuredProvider('openrouter', ['anthropic/claude-haiku-latest']),
     'anthropic/claude-haiku-latest',
@@ -90,7 +97,7 @@ function main() {
   assert(disabledCapability.toolCallingMode === 'disabled', 'missing providers must fail closed.');
 
   const sharedTypes = read('src/shared/types/agentRuntime.ts');
-  for (const token of ['ToolCallingMode', 'ReasoningVisibility', 'AgentRouteCapability', 'native-structured', 'text-only', 'disabled']) {
+  for (const token of ['ToolCallingMode', 'ReasoningVisibility', 'AgentRouteCapability', 'native-structured', 'text-only', 'disabled', 'account-oauth']) {
     assert(sharedTypes.includes(token), `shared agent runtime types must expose ${token}.`);
   }
 

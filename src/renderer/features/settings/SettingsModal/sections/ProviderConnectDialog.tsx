@@ -168,9 +168,22 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             {connectionAccountConnected
               ? t('settings.oauthConnectedHint')
               : connectionDevicePending
-                ? t('settings.githubAuthorizationPending')
+                ? connectionProvider.id === 'github-copilot'
+                  ? t('settings.githubAuthorizationPending')
+                  : t('settings.oauthDeviceAuthorizationPending')
                 : connectionDraft.accountStatus?.message || t('settings.oauthConnectHint')}
           </div>
+          {!connectionAccountConnected && connectionProvider.id === 'grok-account' && (
+            <label className="settings-field">
+              <span className="settings-field-label">{t('settings.oauthClientId')}</span>
+              <input className="input" data-testid="settings-provider-oauth-client-id" value={connectionDraft.oauthClientId} placeholder={t('settings.oauthClientIdPlaceholder')} disabled={connectionDraft.busy !== 'idle' || connectionDevicePending} onChange={(event) => onUpdateConnectionDraft({
+                oauthClientId: event.target.value,
+                error: '',
+                accountStatus: connectionDraft.accountStatus?.requiresClientId ? undefined : connectionDraft.accountStatus,
+              })} />
+              <span className="settings-help-text">{t('settings.oauthClientIdHint')}</span>
+            </label>
+          )}
           {connectionAccountConnected && (connectionDraft.accountStatus?.accountLabel || connectionDraft.accountStatus?.planLabel) && (
             <div className="settings-secret-status" data-testid="settings-provider-oauth-summary">
               <span>{[connectionDraft.accountStatus.accountLabel, connectionDraft.accountStatus.planLabel].filter(Boolean).join(t('settings.accountSummarySeparator'))}</span>

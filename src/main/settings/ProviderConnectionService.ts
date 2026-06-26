@@ -1,6 +1,7 @@
 import { getBuiltinProviderDefinition, isBuiltinProviderId, resolveBuiltinProviderProtocol } from '@shared/constants/llm';
 import type {
   LlmProviderAccountLoginFinishRequest,
+  LlmProviderAccountLoginStartRequest,
   LlmProviderAccountStatus,
   LlmProviderConnectionResult,
   LlmProviderDraftRequest,
@@ -278,8 +279,8 @@ export class ProviderConnectionService {
     }
   }
 
-  startProviderAccountLogin(providerId: LlmProviderId): Promise<LlmProviderAccountStatus> {
-    return providerAccountAuthService.startLogin(providerId);
+  startProviderAccountLogin(request: LlmProviderAccountLoginStartRequest): Promise<LlmProviderAccountStatus> {
+    return providerAccountAuthService.startLogin(request);
   }
 
   finishProviderAccountLogin(request: LlmProviderAccountLoginFinishRequest): Promise<LlmProviderAccountStatus> {

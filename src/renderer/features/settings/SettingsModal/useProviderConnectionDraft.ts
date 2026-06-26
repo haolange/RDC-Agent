@@ -146,6 +146,7 @@ export const useProviderConnectionDraft = ({
         }
         : undefined,
       authCode: '',
+      oauthClientId: '',
     });
   };
 
@@ -180,8 +181,8 @@ export const useProviderConnectionDraft = ({
   const connectionDevicePending = Boolean(
     connectionDraft
     && connectionProvider?.authMode === 'account'
-    && connectionDraft.providerId === 'github-copilot'
-    && connectionDraft.accountStatus?.state === 'pending',
+    && connectionDraft.accountStatus?.state === 'pending'
+    && !connectionDraft.accountStatus.requiresCodeInput,
   );
 
   return {

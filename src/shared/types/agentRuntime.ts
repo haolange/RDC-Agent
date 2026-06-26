@@ -195,7 +195,7 @@ export type ModelProviderBackendKind =
   | 'native'
   | 'openai-compatible'
   | 'local'
-  | 'mockable-account';
+  | 'account-oauth';
 
 export interface ModelProviderCapabilityMatrix {
   providerId: LlmProviderId;
