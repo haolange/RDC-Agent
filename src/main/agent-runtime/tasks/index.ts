@@ -15,6 +15,12 @@ export {
 } from './TaskRegistry';
 
 export {
+  type TaskStore,
+  FileTaskStore,
+  MemoryTaskStore,
+} from './TaskStore';
+
+export {
   createTaskTools,
   createTaskCreateTool,
   createTaskUpdateTool,

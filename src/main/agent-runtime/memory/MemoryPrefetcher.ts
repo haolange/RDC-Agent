@@ -16,8 +16,7 @@ export class MemoryPrefetcher {
   startPrefetch(context: { sessionTitle?: string; projectId?: string }): void {
     this.prefetchPromise = (async () => {
       try {
-        const storeAny = this.store as unknown as { getAll?: () => Promise<Array<{ content: string; description: string; slug: string }>> };
-        const all = await storeAny.getAll?.() ?? [];
+        const all = await this.store.listMemories();
         const keywords = [
           context.sessionTitle?.toLowerCase() ?? '',
           context.projectId?.toLowerCase() ?? '',
@@ -26,7 +25,7 @@ export class MemoryPrefetcher {
         for (const mem of all) {
           const text = (mem.content + mem.description).toLowerCase();
           if (keywords.some((kw) => text.includes(kw))) {
-            this.prefetched.push(mem.slug);
+            this.prefetched.push(mem.name);
           }
         }
       } catch { /* pre-fetch failure is non-blocking */ }

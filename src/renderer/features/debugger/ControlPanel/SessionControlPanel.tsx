@@ -12,6 +12,7 @@ import { SessionCapabilitiesPanel } from './SessionCapabilitiesPanel';
 import { SessionWorkingFolderPanel } from './SessionWorkingFolderPanel';
 import { hasApprovedTaskBoardState, TaskBoard } from './TaskBoard';
 import { ArtifactTree } from './ArtifactTree';
+import { MemoryPanel } from './MemoryPanel';
 import { CollapsibleSection } from './CollapsibleSection';
 
 export const ClassicSessionControlPanel: React.FC = () => {
@@ -39,6 +40,7 @@ export const ClassicSessionControlPanel: React.FC = () => {
     sessionContext: true,
     taskBoard: true,
     artifactTree: true,
+    memory: false,
   }));
   const lastSessionIdRef = useRef<string | null>(null);
 
@@ -188,6 +190,23 @@ export const ClassicSessionControlPanel: React.FC = () => {
           summary={<span className="cp-section-summary-main">{contextSummary}</span>}
         >
           <SessionContextPanel />
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          id="memory"
+          title={t('memory.panelTitle')}
+          icon={(
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="6" width="18" height="12" rx="2" />
+              <line x1="7" y1="6" x2="7" y2="18" />
+              <line x1="17" y1="6" x2="17" y2="18" />
+            </svg>
+          )}
+          variant="session"
+          isExpanded={expandedSections.memory}
+          onToggle={() => toggleSection('memory')}
+        >
+          <MemoryPanel />
         </CollapsibleSection>
       </div>
     </div>

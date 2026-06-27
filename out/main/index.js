@@ -9,9 +9,9 @@ const uuid = require("uuid");
 const YAML = require("yaml");
 const os = require("os");
 const crypto = require("crypto");
-require("node:fs");
+const node_fs = require("node:fs");
 const path$1 = require("node:path");
-require("node:crypto");
+const node_crypto = require("node:crypto");
 const fs$1 = require("fs/promises");
 const util = require("util");
 const promises = require("dns/promises");
@@ -38,6 +38,7 @@ const path__namespace = /* @__PURE__ */ _interopNamespaceDefault(path);
 const fs__namespace = /* @__PURE__ */ _interopNamespaceDefault(fs);
 const os__namespace = /* @__PURE__ */ _interopNamespaceDefault(os);
 const crypto__namespace = /* @__PURE__ */ _interopNamespaceDefault(crypto);
+const path__namespace$1 = /* @__PURE__ */ _interopNamespaceDefault(path$1);
 const fs__namespace$1 = /* @__PURE__ */ _interopNamespaceDefault(fs$1);
 const net__namespace = /* @__PURE__ */ _interopNamespaceDefault(net);
 function generateShortId() {
@@ -179,6 +180,96 @@ const RIGHT_PANEL_COLLAPSED_WIDTH = 0;
 const TERMINAL_DEFAULT_HEIGHT = 328;
 const TERMINAL_MIN_HEIGHT = 180;
 const TERMINAL_MAX_HEIGHT = 720;
+const LLM_PROVIDER_CATEGORY_DEFINITIONS = [
+  {
+    id: "login-authorization",
+    label: "Login Authorization",
+    description: "Official account login, OAuth, device flow, or account authorization providers."
+  },
+  {
+    id: "official-direct",
+    label: "Official Direct API",
+    description: "First-party native APIs operated directly by the model vendor."
+  },
+  {
+    id: "cloud-platform",
+    label: "Cloud Platform",
+    description: "Enterprise cloud platforms that host model APIs through cloud credentials or deployments."
+  },
+  {
+    id: "official-compatible",
+    label: "Official Compatible API",
+    description: "Vendor-official APIs reached through OpenAI, Anthropic, or similar compatibility protocols."
+  },
+  {
+    id: "coding-token-plan",
+    label: "Coding / Token Plan",
+    description: "Separate coding plan or token plan products with their own provider entry."
+  },
+  {
+    id: "third-party-compatible",
+    label: "Third-party Compatible Endpoint",
+    description: "Gateways, routers, relays, and user-provided API endpoints."
+  },
+  {
+    id: "local",
+    label: "Local Model Service",
+    description: "Local runtimes and localhost services with selectable chat or Responses protocols."
+  },
+  {
+    id: "image",
+    label: "Image Capability",
+    description: "Image-generation capability entries. This catalog currently keeps them fail-closed."
+  }
+];
+const LLM_PROVIDER_PROTOCOL_DEFINITIONS = [
+  {
+    id: "OpenAICompatibleChatCompletions",
+    label: "OpenAI Chat Completions",
+    description: "OpenAI-compatible /v1/chat/completions request and streaming shape."
+  },
+  {
+    id: "OpenAIResponses",
+    label: "OpenAI Responses",
+    description: "OpenAI Responses API request and streaming shape.",
+    responseEndpointHint: "Only choose this when the endpoint explicitly supports /v1/responses."
+  },
+  {
+    id: "AnthropicMessages",
+    label: "Anthropic Messages",
+    description: "Anthropic-compatible /v1/messages request and streaming shape."
+  },
+  {
+    id: "OpenRouterChatCompletions",
+    label: "OpenRouter Chat Completions",
+    description: "OpenRouter gateway using OpenAI-style chat completions plus routing headers."
+  },
+  {
+    id: "AzureOpenAIChatCompletions",
+    label: "Azure OpenAI Chat Completions",
+    description: "Azure OpenAI deployment endpoint with Azure API version and api-key header."
+  },
+  {
+    id: "GoogleGemini",
+    label: "Google Gemini",
+    description: "Google Generative Language / Gemini generateContent protocol."
+  },
+  {
+    id: "AwsBedrock",
+    label: "AWS Bedrock",
+    description: "AWS Bedrock model invocation through cloud credentials."
+  },
+  {
+    id: "GoogleVertexAI",
+    label: "Google Vertex AI",
+    description: "Google Vertex AI model invocation through cloud credentials."
+  },
+  {
+    id: "OllamaOpenAICompatibleChatCompletions",
+    label: "Ollama OpenAI Chat Completions",
+    description: "Local Ollama OpenAI-compatible chat completions endpoint."
+  }
+];
 const ANTHROPIC_ALIAS_MODELS = ["sonnet", "opus", "haiku"];
 const ANTHROPIC_FIRST_PARTY_MODELS = ["sonnet", "opus"];
 const CLAUDE_ACCOUNT_MODELS = [
@@ -216,6 +307,7 @@ const GITHUB_COPILOT_ACCOUNT_MODELS = [
 ];
 const GROK_ACCOUNT_MODELS = [
   "grok-4.3",
+  "grok-build-0.1",
   "grok-4",
   "grok-code-fast-1"
 ];
@@ -240,110 +332,14 @@ const CAPS_OPENAI_FIRST_PARTY = ["chat", "tool-calling", "structured-output", "v
 const CAPS_ANTHROPIC_FIRST_PARTY = ["chat", "tool-calling", "reasoning", "prompt-cache", "vision-input", "model-discovery"];
 const CAPS_XAI = ["chat", "tool-calling", "vision-input", "model-discovery"];
 const CAPS_STATIC_CLOUD = ["chat"];
+const OPENAI_RESPONSES_OPTIONS = ["OpenAICompatibleChatCompletions", "OpenAIResponses"];
+const LOCAL_PROTOCOL_OPTIONS = ["OllamaOpenAICompatibleChatCompletions", "OpenAIResponses"];
 const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
   {
-    id: "302ai",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "openai-compatible",
-    modelDiscovery: "openai-compatible",
-    label: "302.AI",
-    baseUrl: "https://api.302.ai/v1",
-    recommendedModels: ["gpt-4o", "claude-3-7-sonnet"],
-    docsUrl: "https://302.ai/",
-    capabilities: CAPS_OPENAI_COMPATIBLE
-  },
-  {
-    id: "azure-openai",
-    kind: "azure-openai",
-    authMode: "api-key",
-    catalogGroup: "cloud-platform",
-    modelDiscovery: "azure-openai",
-    label: "Azure OpenAI",
-    baseUrl: "",
-    baseUrlEditable: true,
-    recommendedModels: ["gpt-4.1", "gpt-5-mini"],
-    docsUrl: "https://learn.microsoft.com/azure/ai-services/openai/",
-    capabilities: CAPS_AZURE_OPENAI
-  },
-  {
-    id: "bailian",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "anthropic-compatible",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "Alibaba Cloud Bailian",
-    baseUrl: "https://coding.dashscope.aliyuncs.com/apps/anthropic",
-    recommendedModels: ["qwen3.6-plus", "qwen3-coder-next", "qwen3-coder-plus", "kimi-k2.5", "glm-5", "glm-4.7"],
-    docsUrl: "https://bailian.console.aliyun.com/",
-    capabilities: CAPS_ANTHROPIC
-  },
-  {
-    id: "anthropic",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "anthropic-compatible",
-    modelDiscovery: "anthropic",
-    label: "Anthropic",
-    baseUrl: "https://api.anthropic.com/v1",
-    recommendedModels: ANTHROPIC_FIRST_PARTY_MODELS,
-    docsUrl: "https://platform.claude.com/settings/keys",
-    capabilities: CAPS_ANTHROPIC_FIRST_PARTY
-  },
-  {
-    id: "anthropic-thirdparty",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "anthropic-compatible",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "Anthropic-compatible Endpoint",
-    baseUrl: "",
-    baseUrlEditable: true,
-    recommendedModels: ANTHROPIC_ALIAS_MODELS,
-    docsUrl: "https://platform.claude.com/docs/en/api/overview",
-    capabilities: CAPS_ANTHROPIC
-  },
-  {
-    id: "cerebras",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "openai-compatible",
-    modelDiscovery: "openai-compatible",
-    label: "Cerebras",
-    baseUrl: "https://api.cerebras.ai/v1",
-    recommendedModels: ["llama-4-scout-17b-16e-instruct", "qwen-3-coder-480b"],
-    docsUrl: "https://cloud.cerebras.ai/",
-    capabilities: CAPS_OPENAI_COMPATIBLE
-  },
-  {
-    id: "bedrock",
-    kind: "bedrock",
-    authMode: "environment",
-    catalogGroup: "cloud-platform",
-    modelDiscovery: "static",
-    label: "Amazon Bedrock",
-    recommendedModels: ANTHROPIC_ALIAS_MODELS,
-    docsUrl: "https://docs.anthropic.com/en/docs/claude-code/amazon-bedrock",
-    capabilities: CAPS_STATIC_CLOUD
-  },
-  {
-    id: "custom-endpoint",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "openai-compatible",
-    modelDiscovery: "openai-compatible",
-    label: "OpenAI-compatible Endpoint",
-    baseUrl: "",
-    baseUrlEditable: true,
-    recommendedModels: ["gpt-4.1"],
-    docsUrl: "https://platform.openai.com/docs/api-reference",
-    capabilities: CAPS_OPENAI_COMPATIBLE
-  },
-  {
     id: "claude-account",
-    kind: "anthropic",
+    protocol: "AnthropicMessages",
     authMode: "account",
-    catalogGroup: "account",
+    category: "login-authorization",
     modelDiscovery: "account-catalog",
     label: "Claude Account",
     recommendedModels: CLAUDE_ACCOUNT_MODELS,
@@ -353,9 +349,9 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
   },
   {
     id: "chatgpt-account",
-    kind: "openai-compatible",
+    protocol: "OpenAIResponses",
     authMode: "account",
-    catalogGroup: "account",
+    category: "login-authorization",
     modelDiscovery: "account-catalog",
     label: "ChatGPT Account",
     recommendedModels: CHATGPT_ACCOUNT_MODELS,
@@ -364,22 +360,10 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     capabilities: CAPS_OPENAI_COMPATIBLE
   },
   {
-    id: "deepseek",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "anthropic-compatible",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "DeepSeek",
-    baseUrl: "https://api.deepseek.com/anthropic",
-    recommendedModels: ["deepseek-v4-pro", "deepseek-v4-flash"],
-    docsUrl: "https://platform.deepseek.com/api_keys",
-    capabilities: CAPS_ANTHROPIC
-  },
-  {
     id: "github-copilot",
-    kind: "openai-compatible",
+    protocol: "OpenAICompatibleChatCompletions",
     authMode: "account",
-    catalogGroup: "account",
+    category: "login-authorization",
     modelDiscovery: "account-catalog",
     label: "GitHub Copilot",
     recommendedModels: GITHUB_COPILOT_ACCOUNT_MODELS,
@@ -389,218 +373,50 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
   },
   {
     id: "grok-account",
-    kind: "openai-compatible",
+    protocol: "OpenAICompatibleChatCompletions",
     authMode: "account",
-    catalogGroup: "account",
+    category: "login-authorization",
     modelDiscovery: "account-catalog",
     label: "Grok Account",
     baseUrl: "https://api.x.ai/v1",
     recommendedModels: GROK_ACCOUNT_MODELS,
     docsUrl: "https://grok.com/",
     accountLoginConfigured: true,
-    unavailableReason: "Live Grok account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured.",
     capabilities: CAPS_OPENAI_COMPATIBLE
   },
   {
     id: "gemini-account",
-    kind: "google-ai-studio",
+    protocol: "GoogleGemini",
     authMode: "account",
-    catalogGroup: "account",
+    category: "login-authorization",
     modelDiscovery: "account-catalog",
     label: "Gemini Account",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta",
     recommendedModels: GEMINI_ACCOUNT_MODELS,
     docsUrl: "https://gemini.google.com/",
     accountLoginConfigured: true,
-    unavailableReason: "Live Gemini account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured.",
+    unavailableReason: "Live Gemini account OAuth requires a stable public account authorization contract; this adapter is unavailable outside automated test mode.",
     capabilities: CAPS_GOOGLE_AI_STUDIO
   },
   {
     id: "qwen-account",
-    kind: "openai-compatible",
+    protocol: "OpenAICompatibleChatCompletions",
     authMode: "account",
-    catalogGroup: "account",
+    category: "login-authorization",
     modelDiscovery: "account-catalog",
     label: "Qwen Account",
     baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     recommendedModels: QWEN_ACCOUNT_MODELS,
     docsUrl: "https://chat.qwen.ai/",
     accountLoginConfigured: true,
-    unavailableReason: "Live Qwen account OAuth requires a stable public account authorization contract; this adapter is mock-verifiable until that contract is configured.",
+    unavailableReason: "Live Qwen account OAuth requires a stable public account authorization contract; this adapter is unavailable outside automated test mode.",
     capabilities: CAPS_OPENAI_COMPATIBLE
-  },
-  {
-    id: "google-ai-studio",
-    kind: "google-ai-studio",
-    authMode: "api-key",
-    catalogGroup: "openai-compatible",
-    modelDiscovery: "google-ai-studio",
-    label: "Google AI Studio",
-    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
-    recommendedModels: ["gemini-2.5-pro", "gemini-2.5-flash"],
-    docsUrl: "https://aistudio.google.com/app/apikey",
-    capabilities: CAPS_GOOGLE_AI_STUDIO
-  },
-  {
-    id: "groq",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "openai-compatible",
-    modelDiscovery: "openai-compatible",
-    label: "Groq",
-    baseUrl: "https://api.groq.com/openai/v1",
-    recommendedModels: ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"],
-    docsUrl: "https://console.groq.com/keys",
-    capabilities: CAPS_OPENAI_COMPATIBLE
-  },
-  {
-    id: "glm-cn",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "anthropic-compatible",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "Zhipu AI GLM (CN)",
-    baseUrl: "https://open.bigmodel.cn/api/anthropic",
-    recommendedModels: ["sonnet", "opus", "haiku"],
-    docsUrl: "https://open.bigmodel.cn/",
-    capabilities: CAPS_ANTHROPIC
-  },
-  {
-    id: "glm-global",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "anthropic-compatible",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "Z.ai GLM (Global)",
-    baseUrl: "https://api.z.ai/api/anthropic",
-    recommendedModels: ["sonnet", "opus", "haiku"],
-    docsUrl: "https://platform.z.ai/",
-    capabilities: CAPS_ANTHROPIC
-  },
-  {
-    id: "huggingface",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "openai-compatible",
-    modelDiscovery: "openai-compatible",
-    label: "Hugging Face",
-    baseUrl: "https://router.huggingface.co/v1",
-    recommendedModels: ["openai/gpt-oss-120b", "Qwen/Qwen3-Coder-480B-A35B-Instruct"],
-    docsUrl: "https://huggingface.co/settings/tokens",
-    capabilities: CAPS_OPENAI_COMPATIBLE
-  },
-  {
-    id: "vertex",
-    kind: "vertex",
-    authMode: "environment",
-    catalogGroup: "cloud-platform",
-    modelDiscovery: "static",
-    label: "Google Vertex AI",
-    recommendedModels: ANTHROPIC_ALIAS_MODELS,
-    docsUrl: "https://docs.anthropic.com/en/docs/claude-code/google-vertex-ai",
-    capabilities: CAPS_STATIC_CLOUD
-  },
-  {
-    id: "kimi-code",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "anthropic-compatible",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "Kimi Code",
-    baseUrl: "https://api.kimi.com/coding/v1",
-    recommendedModels: ["kimi-for-coding"],
-    docsUrl: "https://www.kimi.com/code/docs/en/",
-    capabilities: CAPS_ANTHROPIC
-  },
-  {
-    id: "litellm",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "anthropic-compatible",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "LiteLLM",
-    baseUrl: "http://localhost:4000",
-    recommendedModels: ANTHROPIC_ALIAS_MODELS,
-    docsUrl: "https://docs.litellm.ai/docs/",
-    capabilities: CAPS_ANTHROPIC
-  },
-  {
-    id: "manifest",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "openai-compatible",
-    modelDiscovery: "openai-compatible",
-    label: "Manifest",
-    baseUrl: "https://app.manifest.build/v1",
-    recommendedModels: ["gpt-4.1"],
-    docsUrl: "https://app.manifest.build/",
-    capabilities: CAPS_OPENAI_COMPATIBLE
-  },
-  {
-    id: "minimax-cn",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "anthropic-compatible",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "MiniMax (CN)",
-    baseUrl: "https://api.minimaxi.com/anthropic",
-    recommendedModels: ["MiniMax-M2.7"],
-    docsUrl: "https://platform.minimaxi.com/",
-    capabilities: CAPS_ANTHROPIC
-  },
-  {
-    id: "minimax-global",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "anthropic-compatible",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "MiniMax (Global)",
-    baseUrl: "https://api.minimax.io/anthropic",
-    recommendedModels: ["MiniMax-M2.7"],
-    docsUrl: "https://platform.minimaxi.com/",
-    capabilities: CAPS_ANTHROPIC
-  },
-  {
-    id: "mistral",
-    kind: "openai-compatible",
-    authMode: "api-key",
-    catalogGroup: "openai-compatible",
-    modelDiscovery: "openai-compatible",
-    label: "Mistral",
-    baseUrl: "https://api.mistral.ai/v1",
-    recommendedModels: ["mistral-large-latest", "codestral-latest"],
-    docsUrl: "https://console.mistral.ai/api-keys/",
-    capabilities: CAPS_OPENAI_COMPATIBLE
-  },
-  {
-    id: "moonshot",
-    kind: "anthropic",
-    authMode: "api-key",
-    catalogGroup: "anthropic-compatible",
-    modelDiscovery: "anthropic-candidate-validation",
-    label: "Kimi / Moonshot AI",
-    baseUrl: "https://api.moonshot.cn/anthropic",
-    recommendedModels: ["sonnet"],
-    docsUrl: "https://platform.moonshot.cn/console/api-keys",
-    capabilities: CAPS_ANTHROPIC
-  },
-  {
-    id: "openrouter",
-    kind: "openrouter",
-    authMode: "api-key",
-    catalogGroup: "openai-compatible",
-    modelDiscovery: "openai-compatible",
-    label: "OpenRouter",
-    baseUrl: "https://openrouter.ai/api/v1",
-    recommendedModels: ["anthropic/claude-haiku-latest", "anthropic/claude-sonnet-4.5", "openai/gpt-5.2"],
-    docsUrl: "https://openrouter.ai/keys",
-    capabilities: CAPS_OPENROUTER
   },
   {
     id: "openai",
-    kind: "openai-compatible",
+    protocol: "OpenAIResponses",
     authMode: "api-key",
-    catalogGroup: "openai-compatible",
+    category: "official-direct",
     modelDiscovery: "openai-compatible",
     label: "OpenAI",
     baseUrl: "https://api.openai.com/v1",
@@ -610,9 +426,9 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
   },
   {
     id: "openai-eu",
-    kind: "openai-compatible",
+    protocol: "OpenAIResponses",
     authMode: "api-key",
-    catalogGroup: "openai-compatible",
+    category: "official-direct",
     modelDiscovery: "openai-compatible",
     label: "OpenAI (EU)",
     baseUrl: "https://eu.api.openai.com/v1",
@@ -622,9 +438,9 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
   },
   {
     id: "openai-us",
-    kind: "openai-compatible",
+    protocol: "OpenAIResponses",
     authMode: "api-key",
-    catalogGroup: "openai-compatible",
+    category: "official-direct",
     modelDiscovery: "openai-compatible",
     label: "OpenAI (US)",
     baseUrl: "https://us.api.openai.com/v1",
@@ -633,10 +449,93 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     capabilities: CAPS_OPENAI_FIRST_PARTY
   },
   {
-    id: "qwen",
-    kind: "openai-compatible",
+    id: "anthropic",
+    protocol: "AnthropicMessages",
     authMode: "api-key",
-    catalogGroup: "openai-compatible",
+    category: "official-direct",
+    modelDiscovery: "anthropic",
+    label: "Anthropic",
+    baseUrl: "https://api.anthropic.com/v1",
+    recommendedModels: ANTHROPIC_FIRST_PARTY_MODELS,
+    docsUrl: "https://platform.claude.com/settings/keys",
+    capabilities: CAPS_ANTHROPIC_FIRST_PARTY
+  },
+  {
+    id: "google-ai-studio",
+    protocol: "GoogleGemini",
+    authMode: "api-key",
+    category: "official-direct",
+    modelDiscovery: "google-ai-studio",
+    label: "Google AI Studio",
+    baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+    recommendedModels: ["gemini-2.5-pro", "gemini-2.5-flash"],
+    docsUrl: "https://aistudio.google.com/app/apikey",
+    capabilities: CAPS_GOOGLE_AI_STUDIO
+  },
+  {
+    id: "azure-openai",
+    protocol: "AzureOpenAIChatCompletions",
+    authMode: "api-key",
+    category: "cloud-platform",
+    modelDiscovery: "azure-openai",
+    label: "Azure OpenAI",
+    baseUrl: "",
+    baseUrlEditable: true,
+    recommendedModels: ["gpt-4.1", "gpt-5-mini"],
+    docsUrl: "https://learn.microsoft.com/azure/ai-services/openai/",
+    capabilities: CAPS_AZURE_OPENAI
+  },
+  {
+    id: "bedrock",
+    protocol: "AwsBedrock",
+    authMode: "environment",
+    category: "cloud-platform",
+    modelDiscovery: "static",
+    label: "Amazon Bedrock",
+    recommendedModels: ANTHROPIC_ALIAS_MODELS,
+    docsUrl: "https://docs.anthropic.com/en/docs/claude-code/amazon-bedrock",
+    capabilities: CAPS_STATIC_CLOUD
+  },
+  {
+    id: "vertex",
+    protocol: "GoogleVertexAI",
+    authMode: "environment",
+    category: "cloud-platform",
+    modelDiscovery: "static",
+    label: "Google Vertex AI",
+    recommendedModels: ANTHROPIC_ALIAS_MODELS,
+    docsUrl: "https://docs.anthropic.com/en/docs/claude-code/google-vertex-ai",
+    capabilities: CAPS_STATIC_CLOUD
+  },
+  {
+    id: "deepseek",
+    protocol: "AnthropicMessages",
+    authMode: "api-key",
+    category: "official-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "DeepSeek",
+    baseUrl: "https://api.deepseek.com/anthropic",
+    recommendedModels: ["deepseek-v4-pro", "deepseek-v4-flash"],
+    docsUrl: "https://platform.deepseek.com/api_keys",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "bailian",
+    protocol: "AnthropicMessages",
+    authMode: "api-key",
+    category: "official-compatible",
+    modelDiscovery: null,
+    label: "Alibaba Cloud Bailian",
+    recommendedModels: ["qwen3.6-plus", "qwen3-coder-next", "qwen3-coder-plus"],
+    docsUrl: "https://bailian.console.aliyun.com/",
+    unavailableReason: "The general Bailian API endpoint is not pinned in this catalog. Use Qwen / DashScope or Bailian Coding Plan until a stable official endpoint is configured.",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "qwen",
+    protocol: "OpenAICompatibleChatCompletions",
+    authMode: "api-key",
+    category: "official-compatible",
     modelDiscovery: "openai-compatible",
     label: "Qwen / DashScope",
     baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
@@ -645,58 +544,70 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     capabilities: CAPS_OPENAI_COMPATIBLE
   },
   {
-    id: "siliconflow",
-    kind: "openai-compatible",
+    id: "volcengine",
+    protocol: "OpenAICompatibleChatCompletions",
     authMode: "api-key",
-    catalogGroup: "openai-compatible",
-    modelDiscovery: "openai-compatible",
-    label: "SiliconFlow",
-    baseUrl: "https://api.siliconflow.cn/v1",
-    recommendedModels: ["Qwen/Qwen3-32B", "deepseek-ai/DeepSeek-V3"],
-    docsUrl: "https://siliconflow.cn/",
+    category: "official-compatible",
+    modelDiscovery: null,
+    label: "Volcengine Ark (Doubao)",
+    recommendedModels: ["doubao-seed-1-6", "glm-4.6", "deepseek-v4-pro", "kimi-k2.5"],
+    docsUrl: "https://www.volcengine.com/docs/82379/1928262",
+    unavailableReason: "The general Volcengine Ark API endpoint is not pinned in this catalog. Use Volcengine Ark Coding Plan until a stable official endpoint is configured.",
     capabilities: CAPS_OPENAI_COMPATIBLE
   },
   {
-    id: "volcengine",
-    kind: "anthropic",
+    id: "glm-cn",
+    protocol: "AnthropicMessages",
     authMode: "api-key",
-    catalogGroup: "anthropic-compatible",
+    category: "official-compatible",
     modelDiscovery: "anthropic-candidate-validation",
-    label: "Volcengine Ark (Doubao)",
-    baseUrl: "https://ark.cn-beijing.volces.com/api/coding",
-    recommendedModels: ["doubao-seed-1-6", "glm-4.6", "deepseek-v4-pro", "kimi-k2.5"],
-    docsUrl: "https://www.volcengine.com/docs/82379/1928262",
+    label: "Zhipu AI GLM (CN)",
+    baseUrl: "https://open.bigmodel.cn/api/anthropic",
+    recommendedModels: ANTHROPIC_ALIAS_MODELS,
+    docsUrl: "https://open.bigmodel.cn/",
     capabilities: CAPS_ANTHROPIC
   },
   {
-    id: "vercel-ai-gateway",
-    kind: "openai-compatible",
+    id: "glm-global",
+    protocol: "AnthropicMessages",
     authMode: "api-key",
-    catalogGroup: "openai-compatible",
-    modelDiscovery: "openai-compatible",
-    label: "Vercel AI Gateway",
-    baseUrl: "https://ai-gateway.vercel.sh/v1",
-    recommendedModels: ["openai/gpt-5.2", "anthropic/claude-sonnet-4.5"],
-    docsUrl: "https://vercel.com/docs/ai-gateway",
-    capabilities: CAPS_OPENAI_COMPATIBLE
+    category: "official-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Z.ai GLM (Global)",
+    baseUrl: "https://api.z.ai/api/anthropic",
+    recommendedModels: ANTHROPIC_ALIAS_MODELS,
+    docsUrl: "https://platform.z.ai/",
+    capabilities: CAPS_ANTHROPIC
   },
   {
-    id: "xai",
-    kind: "openai-compatible",
+    id: "minimax-cn",
+    protocol: "AnthropicMessages",
     authMode: "api-key",
-    catalogGroup: "openai-compatible",
-    modelDiscovery: "openai-compatible",
-    label: "xAI (Grok)",
-    baseUrl: "https://api.x.ai/v1",
-    recommendedModels: ["grok-4.3", "grok-4"],
-    docsUrl: "https://docs.x.ai/",
-    capabilities: CAPS_XAI
+    category: "official-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "MiniMax (CN)",
+    baseUrl: "https://api.minimaxi.com/anthropic",
+    recommendedModels: ["MiniMax-M2.7"],
+    docsUrl: "https://platform.minimaxi.com/",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "minimax-global",
+    protocol: "AnthropicMessages",
+    authMode: "api-key",
+    category: "official-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "MiniMax (Global)",
+    baseUrl: "https://api.minimax.io/anthropic",
+    recommendedModels: ["MiniMax-M2.7"],
+    docsUrl: "https://platform.minimaxi.com/",
+    capabilities: CAPS_ANTHROPIC
   },
   {
     id: "xiaomi-mimo",
-    kind: "anthropic",
+    protocol: "AnthropicMessages",
     authMode: "api-key",
-    catalogGroup: "anthropic-compatible",
+    category: "official-compatible",
     modelDiscovery: "anthropic-candidate-validation",
     label: "Xiaomi MiMo",
     baseUrl: "https://api.xiaomimimo.com/anthropic",
@@ -705,10 +616,154 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     capabilities: CAPS_ANTHROPIC
   },
   {
-    id: "xiaomi-mimo-token-plan",
-    kind: "anthropic",
+    id: "moonshot",
+    protocol: "AnthropicMessages",
     authMode: "api-key",
-    catalogGroup: "anthropic-compatible",
+    category: "official-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Kimi / Moonshot AI",
+    baseUrl: "https://api.moonshot.cn/anthropic",
+    recommendedModels: ["sonnet"],
+    docsUrl: "https://platform.moonshot.cn/console/api-keys",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "xai",
+    protocol: "OpenAICompatibleChatCompletions",
+    authMode: "api-key",
+    category: "official-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "xAI (Grok)",
+    baseUrl: "https://api.x.ai/v1",
+    recommendedModels: GROK_ACCOUNT_MODELS,
+    docsUrl: "https://docs.x.ai/",
+    capabilities: CAPS_XAI
+  },
+  {
+    id: "groq",
+    protocol: "OpenAICompatibleChatCompletions",
+    authMode: "api-key",
+    category: "official-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "Groq",
+    baseUrl: "https://api.groq.com/openai/v1",
+    recommendedModels: ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"],
+    docsUrl: "https://console.groq.com/keys",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "mistral",
+    protocol: "OpenAICompatibleChatCompletions",
+    authMode: "api-key",
+    category: "official-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "Mistral",
+    baseUrl: "https://api.mistral.ai/v1",
+    recommendedModels: ["mistral-large-latest", "codestral-latest"],
+    docsUrl: "https://console.mistral.ai/api-keys/",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "cerebras",
+    protocol: "OpenAICompatibleChatCompletions",
+    authMode: "api-key",
+    category: "official-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "Cerebras",
+    baseUrl: "https://api.cerebras.ai/v1",
+    recommendedModels: ["llama-4-scout-17b-16e-instruct", "qwen-3-coder-480b"],
+    docsUrl: "https://cloud.cerebras.ai/",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "kimi-coding-plan",
+    protocol: "AnthropicMessages",
+    authMode: "api-key",
+    category: "coding-token-plan",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Kimi Coding Plan",
+    baseUrl: "https://api.kimi.com/coding/v1",
+    recommendedModels: ["kimi-for-coding"],
+    docsUrl: "https://www.kimi.com/code/docs/en/",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "bailian-coding-plan",
+    protocol: "AnthropicMessages",
+    authMode: "api-key",
+    category: "coding-token-plan",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Alibaba Cloud Bailian Coding Plan",
+    baseUrl: "https://coding.dashscope.aliyuncs.com/apps/anthropic",
+    recommendedModels: ["qwen3.6-plus", "qwen3-coder-next", "qwen3-coder-plus", "kimi-k2.5", "glm-5", "glm-4.7"],
+    docsUrl: "https://bailian.console.aliyun.com/",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "volcengine-coding-plan",
+    protocol: "AnthropicMessages",
+    authMode: "api-key",
+    category: "coding-token-plan",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Volcengine Ark Coding Plan",
+    baseUrl: "https://ark.cn-beijing.volces.com/api/coding",
+    recommendedModels: ["doubao-seed-1-6", "glm-4.6", "deepseek-v4-pro", "kimi-k2.5"],
+    docsUrl: "https://www.volcengine.com/docs/82379/1928262",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "glm-cn-coding-plan",
+    protocol: "AnthropicMessages",
+    authMode: "api-key",
+    category: "coding-token-plan",
+    modelDiscovery: null,
+    label: "Zhipu AI GLM Coding Plan (CN)",
+    recommendedModels: ["sonnet", "opus", "haiku"],
+    docsUrl: "https://open.bigmodel.cn/",
+    unavailableReason: "The official GLM CN Coding Plan endpoint is not pinned in this catalog.",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "glm-global-coding-plan",
+    protocol: "AnthropicMessages",
+    authMode: "api-key",
+    category: "coding-token-plan",
+    modelDiscovery: null,
+    label: "Z.ai GLM Coding Plan (Global)",
+    recommendedModels: ["sonnet", "opus", "haiku"],
+    docsUrl: "https://platform.z.ai/",
+    unavailableReason: "The official GLM Global Coding Plan endpoint is not pinned in this catalog.",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "minimax-cn-coding-plan",
+    protocol: "AnthropicMessages",
+    authMode: "api-key",
+    category: "coding-token-plan",
+    modelDiscovery: null,
+    label: "MiniMax Coding Plan (CN)",
+    recommendedModels: ["MiniMax-M2.7"],
+    docsUrl: "https://platform.minimaxi.com/",
+    unavailableReason: "The official MiniMax CN Coding Plan endpoint is not pinned in this catalog.",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "minimax-global-coding-plan",
+    protocol: "AnthropicMessages",
+    authMode: "api-key",
+    category: "coding-token-plan",
+    modelDiscovery: null,
+    label: "MiniMax Coding Plan (Global)",
+    recommendedModels: ["MiniMax-M2.7"],
+    docsUrl: "https://platform.minimaxi.com/",
+    unavailableReason: "The official MiniMax Global Coding Plan endpoint is not pinned in this catalog.",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "xiaomi-mimo-token-plan",
+    protocol: "AnthropicMessages",
+    authMode: "api-key",
+    category: "coding-token-plan",
     modelDiscovery: "anthropic-candidate-validation",
     label: "Xiaomi MiMo Token Plan",
     baseUrl: "https://token-plan-cn.xiaomimimo.com/anthropic",
@@ -717,13 +772,129 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     capabilities: CAPS_ANTHROPIC
   },
   {
+    id: "openrouter",
+    protocol: "OpenRouterChatCompletions",
+    authMode: "api-key",
+    category: "third-party-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "OpenRouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    recommendedModels: ["anthropic/claude-haiku-latest", "anthropic/claude-sonnet-4.5", "openai/gpt-5.2"],
+    docsUrl: "https://openrouter.ai/keys",
+    capabilities: CAPS_OPENROUTER
+  },
+  {
+    id: "custom-endpoint",
+    protocol: "OpenAICompatibleChatCompletions",
+    authMode: "api-key",
+    category: "third-party-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "Custom OpenAI Endpoint",
+    baseUrl: "",
+    baseUrlEditable: true,
+    protocolEditable: true,
+    protocolOptions: OPENAI_RESPONSES_OPTIONS,
+    recommendedModels: ["gpt-4.1"],
+    docsUrl: "https://platform.openai.com/docs/api-reference",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "anthropic-thirdparty",
+    protocol: "AnthropicMessages",
+    authMode: "api-key",
+    category: "third-party-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "Custom Anthropic Endpoint",
+    baseUrl: "",
+    baseUrlEditable: true,
+    recommendedModels: ANTHROPIC_ALIAS_MODELS,
+    docsUrl: "https://platform.claude.com/docs/en/api/overview",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "302ai",
+    protocol: "OpenAICompatibleChatCompletions",
+    authMode: "api-key",
+    category: "third-party-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "302.AI",
+    baseUrl: "https://api.302.ai/v1",
+    recommendedModels: ["gpt-4o", "claude-3-7-sonnet"],
+    docsUrl: "https://302.ai/",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "siliconflow",
+    protocol: "OpenAICompatibleChatCompletions",
+    authMode: "api-key",
+    category: "third-party-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "SiliconFlow",
+    baseUrl: "https://api.siliconflow.cn/v1",
+    recommendedModels: ["Qwen/Qwen3-32B", "deepseek-ai/DeepSeek-V3"],
+    docsUrl: "https://siliconflow.cn/",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "litellm",
+    protocol: "AnthropicMessages",
+    authMode: "api-key",
+    category: "third-party-compatible",
+    modelDiscovery: "anthropic-candidate-validation",
+    label: "LiteLLM",
+    baseUrl: "http://localhost:4000",
+    baseUrlEditable: true,
+    recommendedModels: ANTHROPIC_ALIAS_MODELS,
+    docsUrl: "https://docs.litellm.ai/docs/",
+    capabilities: CAPS_ANTHROPIC
+  },
+  {
+    id: "vercel-ai-gateway",
+    protocol: "OpenAICompatibleChatCompletions",
+    authMode: "api-key",
+    category: "third-party-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "Vercel AI Gateway",
+    baseUrl: "https://ai-gateway.vercel.sh/v1",
+    recommendedModels: ["openai/gpt-5.2", "anthropic/claude-sonnet-4.5"],
+    docsUrl: "https://vercel.com/docs/ai-gateway",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "huggingface",
+    protocol: "OpenAICompatibleChatCompletions",
+    authMode: "api-key",
+    category: "third-party-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "Hugging Face Router",
+    baseUrl: "https://router.huggingface.co/v1",
+    recommendedModels: ["openai/gpt-oss-120b", "Qwen/Qwen3-Coder-480B-A35B-Instruct"],
+    docsUrl: "https://huggingface.co/settings/tokens",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
+    id: "manifest",
+    protocol: "OpenAICompatibleChatCompletions",
+    authMode: "api-key",
+    category: "third-party-compatible",
+    modelDiscovery: "openai-compatible",
+    label: "Manifest",
+    baseUrl: "https://app.manifest.build/v1",
+    recommendedModels: ["gpt-4.1"],
+    docsUrl: "https://app.manifest.build/",
+    capabilities: CAPS_OPENAI_COMPATIBLE
+  },
+  {
     id: "ollama",
-    kind: "ollama",
+    protocol: "OllamaOpenAICompatibleChatCompletions",
     authMode: "local",
-    catalogGroup: "local",
+    category: "local",
     modelDiscovery: "ollama-tags",
     label: "Ollama",
     baseUrl: "http://127.0.0.1:11434/v1",
+    baseUrlEditable: true,
+    protocolEditable: true,
+    protocolOptions: LOCAL_PROTOCOL_OPTIONS,
     recommendedModels: ["qwen2.5-coder:14b", "llama3.1:8b"],
     docsUrl: "https://ollama.com/download",
     capabilities: CAPS_OLLAMA
@@ -735,6 +906,27 @@ function isBuiltinProviderId(id) {
 function getBuiltinProviderDefinition(id) {
   return BUILTIN_LLM_PROVIDER_DEFINITIONS.find((entry) => entry.id === id) ?? null;
 }
+function isLlmProviderProtocol(value) {
+  return typeof value === "string" && LLM_PROVIDER_PROTOCOL_DEFINITIONS.some((entry) => entry.id === value);
+}
+function getBuiltinProviderProtocolOptions(id) {
+  const definition = getBuiltinProviderDefinition(id);
+  if (!definition) {
+    return [];
+  }
+  return definition.protocolOptions?.length ? [...definition.protocolOptions] : [definition.protocol];
+}
+function resolveBuiltinProviderProtocol(id, candidate) {
+  const definition = getBuiltinProviderDefinition(id);
+  if (!definition) {
+    return null;
+  }
+  const options = getBuiltinProviderProtocolOptions(id);
+  if (definition.protocolEditable && isLlmProviderProtocol(candidate) && options.includes(candidate)) {
+    return candidate;
+  }
+  return definition.protocol;
+}
 const toModels = (modelIds) => Array.from(new Set(modelIds)).map((modelId) => ({
   id: modelId,
   label: modelId,
@@ -745,22 +937,25 @@ const createBuiltinProviderEntry = (id) => {
   if (!definition) {
     throw new Error(`Unknown builtin provider: ${id}`);
   }
+  const status = definition.unavailableReason ? "unavailable" : "unconfigured";
   return {
     id: definition.id,
-    kind: definition.kind,
+    protocol: definition.protocol,
     authMode: definition.authMode,
-    catalogGroup: definition.catalogGroup,
+    category: definition.category,
     modelDiscovery: definition.modelDiscovery,
     label: definition.label,
     enabled: false,
     apiKey: "",
-    hasStoredSecret: definition.authMode === "local" || definition.authMode === "environment",
+    hasStoredSecret: !definition.unavailableReason && (definition.authMode === "local" || definition.authMode === "environment"),
     baseUrl: definition.baseUrl,
     baseUrlEditable: definition.baseUrlEditable,
+    protocolEditable: definition.protocolEditable,
+    protocolOptions: getBuiltinProviderProtocolOptions(definition.id),
     models: definition.modelDiscovery === "static" && definition.authMode === "environment" ? toModels(definition.recommendedModels) : toModels([]),
     recommendedModels: definition.recommendedModels,
     docsUrl: definition.docsUrl,
-    status: "unconfigured",
+    status,
     accountLoginConfigured: definition.accountLoginConfigured,
     unavailableReason: definition.unavailableReason,
     isConfigured: false,
@@ -1150,6 +1345,7 @@ const parseAgentMarkdown = (filePath, fallbackId) => {
     instructions,
     builtin: false,
     enabled: readBoolean(frontmatter.enabled, true),
+    maxTurns: typeof frontmatter["max-turns"] === "number" && frontmatter["max-turns"] > 0 ? frontmatter["max-turns"] : void 0,
     updatedAt: fs.statSync(filePath).mtime.toISOString()
   };
 };
@@ -1164,6 +1360,7 @@ const serializeAgentMarkdown = (definition) => {
     "disable-model-invocation": definition.disableModelInvocation,
     "user-invocable": definition.userInvocable,
     enabled: definition.enabled,
+    ...definition.maxTurns ? { "max-turns": definition.maxTurns } : {},
     tools: definition.tools,
     skills: definition.skills,
     "mcp-servers": definition.mcpServers,
@@ -1876,40 +2073,129 @@ ${stagePolicy.systemPrompt}` : ""
   }
 }
 const executionProfileService = new ExecutionProfileService();
-const CATALOG_GROUPS = [
-  "account",
-  "openai-compatible",
-  "anthropic-compatible",
-  "cloud-platform",
-  "local",
-  "image"
-];
-function normalizeProviderCatalogGroup(provider) {
-  const current = provider.catalogGroup;
-  if (typeof current === "string" && CATALOG_GROUPS.includes(current)) {
-    return current;
+const categoryRank = new Map(LLM_PROVIDER_CATEGORY_DEFINITIONS.map((entry, index) => [entry.id, index]));
+function toCatalogEntry(provider) {
+  return {
+    id: provider.id,
+    protocol: provider.protocol,
+    authMode: provider.authMode,
+    category: provider.category,
+    label: provider.label,
+    baseUrlEditable: provider.baseUrlEditable,
+    protocolEditable: provider.protocolEditable,
+    protocolOptions: provider.protocolOptions ? [...provider.protocolOptions] : void 0,
+    recommendedModels: [...provider.recommendedModels],
+    docsUrl: provider.docsUrl,
+    accountLoginConfigured: provider.accountLoginConfigured,
+    unavailableReason: provider.unavailableReason,
+    capabilities: provider.capabilities ? [...provider.capabilities] : void 0
+  };
+}
+function compareProvider(left, right) {
+  const leftRank = categoryRank.get(left.category) ?? Number.MAX_SAFE_INTEGER;
+  const rightRank = categoryRank.get(right.category) ?? Number.MAX_SAFE_INTEGER;
+  const categoryDelta = leftRank - rightRank;
+  if (categoryDelta !== 0) {
+    return categoryDelta;
   }
+  return left.label.localeCompare(right.label, "en", { sensitivity: "base" });
+}
+class ProviderCatalogService {
+  getProviderCatalog() {
+    const catalogProviders = BUILTIN_LLM_PROVIDER_DEFINITIONS.map(toCatalogEntry).sort(compareProvider);
+    return {
+      categories: LLM_PROVIDER_CATEGORY_DEFINITIONS.map((category) => ({ ...category })),
+      protocols: LLM_PROVIDER_PROTOCOL_DEFINITIONS.map((protocol) => ({ ...protocol })),
+      providers: catalogProviders
+    };
+  }
+}
+const providerCatalogService = new ProviderCatalogService();
+const PROVIDER_CATEGORIES = LLM_PROVIDER_CATEGORY_DEFINITIONS.map((entry) => entry.id);
+const LEGACY_CATEGORY_MAP = {
+  account: "login-authorization",
+  "openai-compatible": "third-party-compatible",
+  "anthropic-compatible": "third-party-compatible",
+  "cloud-platform": "cloud-platform",
+  local: "local",
+  plan: "coding-token-plan",
+  image: "image"
+};
+const LEGACY_PROTOCOL_MAP = {
+  openrouter: "OpenRouterChatCompletions",
+  "openai-compatible": "OpenAICompatibleChatCompletions",
+  anthropic: "AnthropicMessages",
+  "google-ai-studio": "GoogleGemini",
+  "azure-openai": "AzureOpenAIChatCompletions",
+  bedrock: "AwsBedrock",
+  vertex: "GoogleVertexAI",
+  ollama: "OllamaOpenAICompatibleChatCompletions"
+};
+function isProviderCategory(value) {
+  return typeof value === "string" && PROVIDER_CATEGORIES.includes(value);
+}
+function legacyCategory(value) {
+  return typeof value === "string" ? LEGACY_CATEGORY_MAP[value] ?? null : null;
+}
+function legacyProtocol(value) {
+  return typeof value === "string" ? LEGACY_PROTOCOL_MAP[value] ?? null : null;
+}
+function normalizeProviderCategory(provider) {
   const id = typeof provider.id === "string" ? provider.id.trim() : "";
-  if (id) {
-    const builtinDef = BUILTIN_LLM_PROVIDER_DEFINITIONS.find((def) => def.id === id);
-    if (builtinDef) {
-      return builtinDef.catalogGroup;
-    }
+  const builtin = id ? BUILTIN_LLM_PROVIDER_DEFINITIONS.find((definition) => definition.id === id) : null;
+  if (builtin) {
+    return builtin.category;
+  }
+  if (isProviderCategory(provider.category)) {
+    return provider.category;
+  }
+  const migratedCategory = legacyCategory(provider.category) ?? legacyCategory(provider.catalogGroup);
+  if (migratedCategory) {
+    return migratedCategory;
   }
   switch (provider.authMode) {
     case "account":
-      return "account";
+      return "login-authorization";
     case "local":
       return "local";
     case "environment":
       return "cloud-platform";
     default:
       console.warn(
-        "[SettingsService] Unable to infer catalogGroup for provider; defaulting to openai-compatible.",
-        { id, authMode: provider.authMode, catalogGroup: current }
+        "[SettingsService] Unable to infer provider category; defaulting to third-party-compatible.",
+        { id: provider.id, authMode: provider.authMode, category: provider.category, catalogGroup: provider.catalogGroup }
       );
-      return "openai-compatible";
+      return "third-party-compatible";
   }
+}
+function normalizeProviderProtocol(provider) {
+  const id = typeof provider.id === "string" ? provider.id.trim() : "";
+  const builtin = id ? getBuiltinProviderDefinition(id) : null;
+  if (builtin) {
+    const options = getBuiltinProviderProtocolOptions(id);
+    if (builtin.protocolEditable && isLlmProviderProtocol(provider.protocol) && options.includes(provider.protocol)) {
+      return provider.protocol;
+    }
+    if (builtin.protocolEditable) {
+      const migrated = legacyProtocol(provider.kind);
+      if (migrated && options.includes(migrated)) {
+        return migrated;
+      }
+    }
+    return builtin.protocol;
+  }
+  if (isLlmProviderProtocol(provider.protocol)) {
+    return provider.protocol;
+  }
+  const migratedProtocol = legacyProtocol(provider.protocol) ?? legacyProtocol(provider.kind);
+  if (migratedProtocol) {
+    return migratedProtocol;
+  }
+  console.warn(
+    "[SettingsService] Unable to infer provider protocol; defaulting to OpenAICompatibleChatCompletions.",
+    { id: provider.id, protocol: provider.protocol, kind: provider.kind }
+  );
+  return "OpenAICompatibleChatCompletions";
 }
 const SECRET_FILE_NAME = "provider-secrets.json";
 class SecretStorageService {
@@ -2420,6 +2706,9 @@ function sanitizeRoute(entry) {
   };
 }
 function pickProviderStatus(provider, fallback, canUseProvider, models) {
+  if (fallback.status === "unavailable") {
+    return "unavailable";
+  }
   if (provider.status === "failed") {
     return "failed";
   }
@@ -2435,8 +2724,8 @@ function isFixtureProvider(provider) {
 }
 const RETIRED_PROVIDER_ID_IMPORTS = {
   gemini: "vertex",
-  kimi: "kimi-code",
-  "kimi-coding-plan": "kimi-code",
+  kimi: "kimi-coding-plan",
+  "kimi-code": "kimi-coding-plan",
   minimax: "minimax-global",
   zai: "glm-global"
 };
@@ -2453,12 +2742,12 @@ function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorksp
   const definition = getBuiltinProviderDefinition(rawId);
   const incomingSecretRef = typeof provider.secretRef === "string" && provider.secretRef.trim() ? provider.secretRef.trim() : void 0;
   const secretRef = incomingId && incomingId !== rawId ? secretStorageService.createProviderSecretRef(rawId) : incomingSecretRef || secretStorageService.createProviderSecretRef(rawId);
-  const kind = builtinFallback.kind;
+  const protocol = normalizeProviderProtocol({ ...provider, id: rawId });
   const models = sanitizeModels(provider.models ?? []);
   const oauthSecretRef = secretStorageService.createProviderOAuthSecretRef(rawId);
   const resolvedSecret = builtinFallback.authMode === "api-key" ? getResolvedProviderSecret(rawId, secretRef, workspaceRoot) : builtinFallback.authMode === "account" ? secretStorageService.getSecret(oauthSecretRef, workspaceRoot) : "";
-  const hasStoredSecret = builtinFallback.authMode === "local" || builtinFallback.authMode === "environment" || Boolean(resolvedSecret);
-  const canUseProvider = builtinFallback.authMode === "local" || builtinFallback.authMode === "environment" ? true : builtinFallback.authMode === "api-key" ? Boolean(resolvedSecret) : Boolean(resolvedSecret);
+  const hasStoredSecret = builtinFallback.hasStoredSecret || Boolean(resolvedSecret);
+  const canUseProvider = builtinFallback.status !== "unavailable" && (builtinFallback.authMode === "local" || builtinFallback.authMode === "environment" ? true : Boolean(resolvedSecret));
   const status = pickProviderStatus(provider, builtinFallback, canUseProvider, models);
   const enabled = status === "verified" && models.length > 0;
   const label = builtinFallback.label;
@@ -2466,9 +2755,9 @@ function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorksp
   const docsUrl = builtinFallback.docsUrl;
   return {
     id: rawId,
-    kind,
+    protocol,
     authMode: builtinFallback.authMode,
-    catalogGroup: normalizeProviderCatalogGroup({ ...provider, id: rawId, authMode: builtinFallback.authMode }),
+    category: normalizeProviderCategory({ ...provider, id: rawId, authMode: builtinFallback.authMode }),
     modelDiscovery: builtinFallback.modelDiscovery,
     label,
     enabled,
@@ -2477,6 +2766,8 @@ function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorksp
     hasStoredSecret,
     baseUrl: definition?.baseUrlEditable ? typeof provider.baseUrl === "string" ? provider.baseUrl.trim() : definition.baseUrl : definition?.baseUrl,
     baseUrlEditable: definition?.baseUrlEditable,
+    protocolEditable: definition?.protocolEditable,
+    protocolOptions: builtinFallback.protocolOptions,
     models,
     recommendedModels,
     docsUrl,
@@ -2953,7 +3244,7 @@ class SettingsService {
       ...runtimePaths ?? {}
     });
   }
-  saveProviderConnection(providerId, apiKey, models, baseUrl = "") {
+  saveProviderConnection(providerId, apiKey, models, baseUrl = "", protocolDraft) {
     const current = this.getAll();
     const provider = current.llm.providers.find((entry) => entry.id === providerId);
     if (!provider || !isBuiltinProviderId(provider.id)) {
@@ -2963,10 +3254,12 @@ class SettingsService {
     if (discoveredModels.length === 0) {
       throw new Error("该 Provider 暂未返回可用模型");
     }
+    const protocol = normalizeProviderProtocol({ id: provider.id, protocol: protocolDraft ?? provider.protocol });
     const timestamp = nowIso();
     const nextProvider = {
       ...provider,
       apiKey: apiKey.trim(),
+      protocol,
       enabled: true,
       hasStoredSecret: provider.authMode === "api-key" ? Boolean(apiKey.trim() || provider.hasStoredSecret) : provider.authMode === "local" || provider.authMode === "environment" || provider.hasStoredSecret,
       baseUrl: provider.baseUrlEditable ? baseUrl.trim() || provider.baseUrl : provider.baseUrl,
@@ -3061,7 +3354,7 @@ class SettingsService {
       const accountCredential = provider.authMode === "account" ? resolveAccountRuntimeCredential(provider.id, settings.workspace.rootPath) : { apiKey: "", baseUrl: void 0 };
       return {
         id: provider.id,
-        kind: provider.kind,
+        protocol: provider.protocol,
         label: provider.label,
         enabled: provider.enabled,
         apiKey: provider.authMode === "api-key" ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.workspace.rootPath) : provider.authMode === "account" ? accountCredential.apiKey : "",
@@ -3076,6 +3369,9 @@ class SettingsService {
       providers,
       agentRoutes: settings.llm.agentRoutes
     };
+  }
+  getProviderCatalog() {
+    return providerCatalogService.getProviderCatalog();
   }
   hasConfiguredProvider() {
     return this.getAll().llm.providers.some((provider) => provider.isConfigured);
@@ -3898,6 +4194,56 @@ class StorageAdapter {
     const artifactPath = path__namespace.join(artifactsDir, "plan.md");
     fs__namespace.writeFileSync(artifactPath, content, "utf8");
     return artifactPath;
+  }
+  /**
+   * Agent 线程持久化目录：`{sessionPath}/agent-threads/`。
+   *
+   * Agent 线程保存完整 AgentMessage（含 toolCall/toolResult/usage/stopReason），
+   * 作为长生命周期 Agent 跨轮记忆与 session 续接的真实上下文来源。
+   * 与 conversation.jsonl（UI 投影源）并存，互不替代。
+   */
+  getAgentThreadPath(sessionId, agentId) {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) {
+      throw new Error(`Session not found for agent thread: ${sessionId}`);
+    }
+    const threadsDir = path__namespace.join(location.sessionPath, "agent-threads");
+    this.ensureDir(threadsDir);
+    const safeAgentId = agentId.replace(/[^a-zA-Z0-9_-]/g, "_");
+    return path__namespace.join(threadsDir, `${safeAgentId}.jsonl`);
+  }
+  readAgentThread(sessionId, agentId) {
+    const threadPath = this.getAgentThreadPath(sessionId, agentId);
+    if (!fs__namespace.existsSync(threadPath)) {
+      return [];
+    }
+    return readJsonl(threadPath);
+  }
+  writeAgentThread(sessionId, agentId, messages) {
+    writeJsonl(this.getAgentThreadPath(sessionId, agentId), messages);
+  }
+  clearAgentThread(sessionId, agentId) {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) {
+      return;
+    }
+    const threadsDir = path__namespace.join(location.sessionPath, "agent-threads");
+    if (!fs__namespace.existsSync(threadsDir)) {
+      return;
+    }
+    if (agentId) {
+      const safeAgentId = agentId.replace(/[^a-zA-Z0-9_-]/g, "_");
+      const threadPath = path__namespace.join(threadsDir, `${safeAgentId}.jsonl`);
+      if (fs__namespace.existsSync(threadPath)) {
+        fs__namespace.unlinkSync(threadPath);
+      }
+      return;
+    }
+    for (const entry of fs__namespace.readdirSync(threadsDir)) {
+      if (entry.endsWith(".jsonl")) {
+        fs__namespace.unlinkSync(path__namespace.join(threadsDir, entry));
+      }
+    }
   }
   readConversationHistory(sessionId) {
     const snapshots = readJsonl(this.getConversationPath(sessionId));
@@ -5492,106 +5838,100 @@ async function runAgentLoop(pendingMessages, context2, config, providerStrategy,
     }
     config.signal.addEventListener("abort", onExternalAbort, { once: true });
   }
+  const injectPending = (messages) => {
+    for (const msg of messages) {
+      context2.messages.push(msg);
+      newMessages.push(msg);
+      stream.push({ type: "message_start", message: msg });
+      stream.push({ type: "message_end", message: msg });
+    }
+  };
+  const injectScheduled = () => {
+    const injected = [];
+    if (config.backgroundTaskRunner) {
+      const notification = config.backgroundTaskRunner.buildNotificationMessage();
+      if (notification) {
+        injected.push({
+          role: "user",
+          content: [{ type: "text", text: notification }],
+          timestamp: Date.now()
+        });
+      }
+    }
+    if (config.cronScheduler) {
+      for (const prompt of config.cronScheduler.getPendingPrompts()) {
+        injected.push({
+          role: "user",
+          content: [{ type: "text", text: `<cron_triggered>${prompt}</cron_triggered>` }],
+          timestamp: Date.now()
+        });
+      }
+    }
+    injectPending(injected);
+  };
   try {
     stream.push({ type: "agent_start" });
-    let turn = 0;
-    let pending = pendingMessages;
-    outer: while (true) {
-      for (const msg of pending) {
-        context2.messages.push(msg);
-        newMessages.push(msg);
-        stream.push({ type: "message_start", message: msg });
-        stream.push({ type: "message_end", message: msg });
+    let state2 = {
+      pending: [...pendingMessages],
+      turn: 0,
+      transition: "init"
+    };
+    while (true) {
+      if (state2.pending.length > 0) {
+        injectPending(state2.pending);
+        state2 = { ...state2, pending: [] };
       }
-      pending = [];
-      while (true) {
-        if (stream.isDone) {
-          return;
-        }
-        turn++;
-        if (turn > maxTurns) {
-          break outer;
-        }
-        stream.push({ type: "turn_start", turn });
-        const injected = [];
-        if (config.backgroundTaskRunner) {
-          const notification = config.backgroundTaskRunner.buildNotificationMessage();
-          if (notification) {
-            injected.push({
-              role: "user",
-              content: [{ type: "text", text: notification }],
-              timestamp: Date.now()
-            });
-          }
-        }
-        if (config.cronScheduler) {
-          for (const prompt of config.cronScheduler.getPendingPrompts()) {
-            injected.push({
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: `<cron_triggered>${prompt}</cron_triggered>`
-                }
-              ],
-              timestamp: Date.now()
-            });
-          }
-        }
-        for (const msg of injected) {
-          context2.messages.push(msg);
-          newMessages.push(msg);
-          stream.push({ type: "message_start", message: msg });
-          stream.push({ type: "message_end", message: msg });
-        }
-        const { message: assistantMessage } = await streamAssistantResponseWithRecovery(
-          context2,
-          config,
-          providerStrategy,
-          stream
-        );
-        newMessages.push(assistantMessage);
-        if (assistantMessage.stopReason !== "toolUse") {
-          stream.push({
-            type: "turn_end",
-            turn,
-            message: assistantMessage
-          });
-          break;
-        }
-        const toolResults = await executeToolCalls(
-          assistantMessage,
-          toolExecutor,
-          stream,
-          config.getSteeringMessages,
-          config.maxToolConcurrency
-        );
-        for (const result of toolResults.results) {
-          context2.messages.push(result);
-          newMessages.push(result);
-        }
-        stream.push({
-          type: "turn_end",
-          turn,
-          message: assistantMessage,
-          toolResults: toolResults.results
-        });
-        if (toolResults.steeringMessages && toolResults.steeringMessages.length > 0) {
-          pending = toolResults.steeringMessages;
-          for (const msg of pending) {
-            context2.messages.push(msg);
-            newMessages.push(msg);
-            stream.push({ type: "message_start", message: msg });
-            stream.push({ type: "message_end", message: msg });
-          }
-          pending = [];
-        }
+      if (stream.isDone) {
+        return;
       }
-      const followUps = config.getFollowUpMessages ? config.getFollowUpMessages() : [];
-      if (!followUps || followUps.length === 0) {
+      state2 = { ...state2, turn: state2.turn + 1 };
+      if (state2.turn > maxTurns) {
         break;
       }
-      pending = followUps;
+      stream.push({ type: "turn_start", turn: state2.turn });
+      injectScheduled();
+      const { message: assistantMessage } = await streamAssistantResponseWithRecovery(
+        context2,
+        config,
+        providerStrategy,
+        stream
+      );
+      newMessages.push(assistantMessage);
+      if (assistantMessage.stopReason !== "toolUse") {
+        stream.push({ type: "turn_end", turn: state2.turn, message: assistantMessage });
+        const followUps = config.getFollowUpMessages ? config.getFollowUpMessages() : [];
+        if (followUps && followUps.length > 0) {
+          state2 = { pending: followUps, turn: state2.turn, transition: "follow_up" };
+          continue;
+        }
+        break;
+      }
+      const toolResults = await executeToolCalls(
+        assistantMessage,
+        toolExecutor,
+        stream,
+        config.getSteeringMessages,
+        config.maxToolConcurrency
+      );
+      for (const result of toolResults.results) {
+        context2.messages.push(result);
+        newMessages.push(result);
+      }
+      stream.push({
+        type: "turn_end",
+        turn: state2.turn,
+        message: assistantMessage,
+        toolResults: toolResults.results
+      });
+      if (toolResults.steeringMessages && toolResults.steeringMessages.length > 0) {
+        state2 = {
+          pending: toolResults.steeringMessages,
+          turn: state2.turn,
+          transition: "steering"
+        };
+        continue;
+      }
+      state2 = { pending: [], turn: state2.turn, transition: "next_turn" };
     }
     stream.push({ type: "agent_end", messages: newMessages });
     stream.complete(newMessages);
@@ -5620,6 +5960,33 @@ async function streamAssistantResponseWithRecovery(context2, config, provider, s
         stream
       );
       consecutiveCompactionFailures = 0;
+      if (recovery && assistantMessage.stopReason === "length") {
+        const lengthAction = recovery.decide(null, "length");
+        switch (lengthAction.type) {
+          case "escalate_tokens": {
+            recovery.markEscalated();
+            if (config.streamOptions) {
+              config.streamOptions.maxTokens = lengthAction.newMaxTokens;
+            }
+            continue;
+          }
+          case "continue_prompt": {
+            recovery.noteRetryAttempt();
+            context2.messages.push({
+              role: "user",
+              content: [{ type: "text", text: "Continue." }],
+              timestamp: Date.now()
+            });
+            continue;
+          }
+          case "abort": {
+            throw new Error(`[Recovery abort] ${lengthAction.reason}`);
+          }
+          default: {
+            return { message: assistantMessage };
+          }
+        }
+      }
       return { message: assistantMessage };
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -6101,6 +6468,603 @@ function normalizeUserMessage(input) {
   }
   return input;
 }
+const DEFAULT_TOOL_RESULT_BUDGET = 200 * 1024;
+const DEFAULT_MAX_MESSAGES = 50;
+const DEFAULT_KEEP_RECENT_TOOL_RESULTS = 3;
+const DEFAULT_CONTEXT_RATIO = 0.75;
+const DEFAULT_CONTEXT_LIMIT = 1e5;
+const SNIP_HEAD = 3;
+const TOOL_RESULT_TRUNCATE_HEAD = 2e3;
+class ContextManager {
+  constructor(config = {}) {
+    this.config = config;
+  }
+  config;
+  /**
+   * 默认的 convertToLlm 实现：保留三种标准消息。
+   */
+  convertToLlm(messages) {
+    const result = [];
+    for (const msg of messages) {
+      if (msg.role === "user" || msg.role === "assistant" || msg.role === "toolResult") {
+        result.push(msg);
+      }
+    }
+    return result;
+  }
+  /**
+   * 上下文压缩管道（transformContext 实现）。
+   * 压缩链路按 budget → snip → micro → full 递进，
+   * 每一级都返回新数组，不修改原始数组。
+   */
+  async compress(messages, model) {
+    const tokenLimit = this.resolveTokenLimit(model);
+    let result = this.toolResultBudget(messages);
+    result = this.snipCompact(result);
+    if (this.estimateTokens(result) > tokenLimit) {
+      result = this.microCompact(result);
+    }
+    if (this.estimateTokens(result) > tokenLimit) {
+      result = await this.fullCompact(result);
+    }
+    return result;
+  }
+  /** 估算消息 token 数（优先使用真实 tokenizer）。 */
+  estimateTokens(messages) {
+    const tokenizer = this.config.tokenizer;
+    const modelId = this.config.modelId;
+    if (tokenizer) {
+      const llmMessages = messages.filter((m) => m.role === "user" || m.role === "assistant" || m.role === "toolResult").map((m) => ({
+        role: m.role,
+        content: "content" in m ? m.content : void 0
+      }));
+      return tokenizer.countMessagesTokens(llmMessages, modelId);
+    }
+    let chars = 0;
+    for (const msg of messages) {
+      chars += this.estimateMessageChars(msg);
+    }
+    return Math.ceil(chars / 4);
+  }
+  // =====================================================================
+  // 各级压缩策略
+  // =====================================================================
+  /** Level 1: 工具结果预算控制。 */
+  toolResultBudget(messages) {
+    const budget = this.config.toolResultBudget ?? DEFAULT_TOOL_RESULT_BUDGET;
+    const entries = [];
+    let totalSize = 0;
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      if (msg.role === "toolResult") {
+        const size = this.toolResultSize(msg);
+        entries.push({ index: i, size });
+        totalSize += size;
+      }
+    }
+    if (totalSize <= budget) {
+      return [...messages];
+    }
+    const result = messages.slice();
+    const sorted = [...entries].sort((a, b) => b.size - a.size);
+    for (const entry of sorted) {
+      if (totalSize <= budget) break;
+      const original = result[entry.index];
+      const truncated = this.truncateToolResult(original);
+      const newSize = this.toolResultSize(truncated);
+      totalSize -= entry.size - newSize;
+      result[entry.index] = truncated;
+    }
+    return result;
+  }
+  /**
+   * Level 2: Snip 压缩（保留头尾，中间替换为占位符）。
+   *
+   * 不能在 tool_use ↔ tool_result 对中间切断：
+   * 如果切口左侧的 assistant 消息含 toolCall，
+   * 则把切口往右推一格直到对应的 toolResult 之后。
+   */
+  snipCompact(messages) {
+    const max = this.config.maxMessages ?? DEFAULT_MAX_MESSAGES;
+    if (messages.length <= max) {
+      return [...messages];
+    }
+    const head = SNIP_HEAD;
+    const tailCount = max - head - 1;
+    if (tailCount <= 0) {
+      return [...messages];
+    }
+    let snipStart = head;
+    let snipEnd = messages.length - tailCount;
+    snipStart = this.adjustSnipStart(messages, snipStart);
+    snipEnd = this.adjustSnipEnd(messages, snipEnd);
+    if (snipStart >= snipEnd) {
+      return [...messages];
+    }
+    const snippedCount = snipEnd - snipStart;
+    if (snippedCount <= 0) {
+      return [...messages];
+    }
+    const placeholder = {
+      role: "user",
+      content: `[snipped ${snippedCount} messages]`,
+      timestamp: Date.now()
+    };
+    return [
+      ...messages.slice(0, snipStart),
+      placeholder,
+      ...messages.slice(snipEnd)
+    ];
+  }
+  /** Level 3: Micro 压缩（早期工具结果 → 占位符）。 */
+  microCompact(messages) {
+    const keep = this.config.keepRecentToolResults ?? DEFAULT_KEEP_RECENT_TOOL_RESULTS;
+    const toolResultIndices = [];
+    for (let i = 0; i < messages.length; i++) {
+      if (messages[i].role === "toolResult") {
+        toolResultIndices.push(i);
+      }
+    }
+    if (toolResultIndices.length <= keep) {
+      return [...messages];
+    }
+    const keepFrom = toolResultIndices.length - keep;
+    const compactSet = new Set(toolResultIndices.slice(0, keepFrom));
+    const result = messages.slice();
+    for (const idx of compactSet) {
+      const original = result[idx];
+      result[idx] = {
+        role: "toolResult",
+        toolCallId: original.toolCallId,
+        toolName: original.toolName,
+        content: [
+          { type: "text", text: "[Earlier tool result compacted]" }
+        ],
+        isError: false,
+        timestamp: original.timestamp
+      };
+    }
+    return result;
+  }
+  /** Level 4: Full 压缩（生成摘要替换全部）。 */
+  async fullCompact(messages) {
+    const tail = messages.slice(-5);
+    const summary = this.buildSummary(messages.slice(0, -5));
+    if (!summary) {
+      return [...tail];
+    }
+    const summaryMsg = {
+      role: "user",
+      content: summary,
+      timestamp: Date.now()
+    };
+    return [summaryMsg, ...tail];
+  }
+  // =====================================================================
+  // 辅助
+  // =====================================================================
+  resolveTokenLimit(model) {
+    if (this.config.contextTokenLimit !== void 0) {
+      return this.config.contextTokenLimit;
+    }
+    if (model && model.contextWindow > 0) {
+      return Math.floor(model.contextWindow * DEFAULT_CONTEXT_RATIO);
+    }
+    return DEFAULT_CONTEXT_LIMIT;
+  }
+  estimateMessageChars(msg) {
+    if (msg.role === "user") {
+      return this.userContentChars(msg.content);
+    }
+    if (msg.role === "assistant") {
+      return this.assistantContentChars(msg);
+    }
+    if (msg.role === "toolResult") {
+      return this.toolResultSize(msg);
+    }
+    try {
+      return JSON.stringify(msg).length;
+    } catch {
+      return 0;
+    }
+  }
+  userContentChars(content) {
+    if (typeof content === "string") {
+      return content.length;
+    }
+    let total = 0;
+    for (const block of content) {
+      if (block.type === "text") {
+        total += block.text.length;
+      } else if (block.type === "image") {
+        total += block.data.length;
+      }
+    }
+    return total;
+  }
+  assistantContentChars(msg) {
+    let total = 0;
+    for (const block of msg.content) {
+      if (block.type === "text") {
+        total += block.text.length;
+      } else if (block.type === "thinking") {
+        total += block.thinking.length;
+      } else if (block.type === "toolCall") {
+        const tc = block;
+        try {
+          total += JSON.stringify(tc.arguments).length + tc.name.length;
+        } catch {
+          total += tc.name.length;
+        }
+      }
+    }
+    return total;
+  }
+  toolResultSize(msg) {
+    let total = 0;
+    for (const block of msg.content) {
+      if (block.type === "text") {
+        total += block.text.length;
+      } else if (block.type === "image") {
+        total += block.data.length;
+      }
+    }
+    return total;
+  }
+  truncateToolResult(msg) {
+    const newContent = [];
+    let remaining = TOOL_RESULT_TRUNCATE_HEAD;
+    let truncated = false;
+    for (const block of msg.content) {
+      if (remaining <= 0) {
+        truncated = true;
+        break;
+      }
+      if (block.type === "text") {
+        if (block.text.length <= remaining) {
+          newContent.push({ type: "text", text: block.text });
+          remaining -= block.text.length;
+        } else {
+          newContent.push({
+            type: "text",
+            text: block.text.slice(0, remaining)
+          });
+          remaining = 0;
+          truncated = true;
+        }
+      } else {
+        truncated = true;
+      }
+    }
+    if (truncated) {
+      newContent.push({ type: "text", text: "... truncated" });
+    }
+    return {
+      role: "toolResult",
+      toolCallId: msg.toolCallId,
+      toolName: msg.toolName,
+      content: newContent,
+      isError: msg.isError,
+      timestamp: msg.timestamp
+    };
+  }
+  /**
+   * 调整 snipStart：如果该位置正好是某个 toolResult 但其匹配的
+   * assistant.toolCall 在 head 之内，则后移到工具对结束之后。
+   */
+  adjustSnipStart(messages, start) {
+    let s = start;
+    while (s < messages.length) {
+      const msg = messages[s];
+      if (msg.role === "toolResult") {
+        s++;
+        continue;
+      }
+      const prev = messages[s - 1];
+      if (prev && prev.role === "assistant") {
+        const hasToolCall = prev.content.some(
+          (c) => c.type === "toolCall"
+        );
+        if (hasToolCall) {
+          s++;
+          continue;
+        }
+      }
+      break;
+    }
+    return s;
+  }
+  /**
+   * 调整 snipEnd：保证不在工具调用对中间切断。
+   * 如果 snipEnd 指向 toolResult，则前移到对应 assistant.toolCall 之前。
+   */
+  adjustSnipEnd(messages, end) {
+    let e = end;
+    while (e > 0 && e < messages.length) {
+      const msg = messages[e];
+      if (msg.role === "toolResult") {
+        e--;
+        continue;
+      }
+      break;
+    }
+    return e;
+  }
+  buildSummary(messages) {
+    if (messages.length === 0) return "";
+    const userCount = messages.filter((m) => m.role === "user").length;
+    const assistantCount = messages.filter(
+      (m) => m.role === "assistant"
+    ).length;
+    const toolResultCount = messages.filter(
+      (m) => m.role === "toolResult"
+    ).length;
+    return `[Conversation summary: ${messages.length} earlier messages compacted (user=${userCount}, assistant=${assistantCount}, toolResult=${toolResultCount}). Earlier context omitted to fit window.]`;
+  }
+}
+const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_MAX_RECOVERY_RETRIES = 2;
+const DEFAULT_MAX_TOKENS = 4096;
+const DEFAULT_ESCALATED_MAX_TOKENS = 16384;
+const OVERLOAD_SWITCH_THRESHOLD = 3;
+const RETRY_BASE_MS = 1e3;
+const RETRY_JITTER_MS = 500;
+class ErrorRecovery {
+  state;
+  maxRetries;
+  maxRecoveryRetries;
+  defaultMaxTokens;
+  escalatedMaxTokens;
+  fallbackModel;
+  constructor(options) {
+    this.maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
+    this.maxRecoveryRetries = options.maxRecoveryRetries ?? DEFAULT_MAX_RECOVERY_RETRIES;
+    this.defaultMaxTokens = options.defaultMaxTokens ?? DEFAULT_MAX_TOKENS;
+    this.escalatedMaxTokens = options.escalatedMaxTokens ?? DEFAULT_ESCALATED_MAX_TOKENS;
+    this.fallbackModel = options.fallbackModel;
+    this.state = {
+      hasEscalated: false,
+      recoveryCount: 0,
+      consecutiveOverloads: 0,
+      hasAttemptedReactiveCompact: false,
+      currentModel: options.primaryModel
+    };
+  }
+  /** 分类错误。 */
+  classifyError(error) {
+    const raw = `${error.message ?? ""} ${error.name ?? ""}`.toLowerCase();
+    const status = this.extractStatusCode(error);
+    if (raw.includes("context_length_exceeded") || raw.includes("context length") || raw.includes("maximum context length") || raw.includes("prompt") && raw.includes("long") || raw.includes("input") && raw.includes("too") && raw.includes("long")) {
+      return "prompt_too_long";
+    }
+    if (status === 429 || raw.includes("rate") && raw.includes("limit")) {
+      return "rate_limit";
+    }
+    if (status === 529 || status === 503 || raw.includes("overloaded") || raw.includes("service unavailable")) {
+      return "overloaded";
+    }
+    if (status === 401 || status === 403 || raw.includes("unauthorized") || raw.includes("forbidden") || raw.includes("invalid api key") || raw.includes("authentication")) {
+      return "auth_error";
+    }
+    if (raw.includes("econnrefused") || raw.includes("econnreset") || raw.includes("etimedout") || raw.includes("enotfound") || raw.includes("network") || raw.includes("timeout") || raw.includes("aborterror") || raw.includes("socket")) {
+      return "network_error";
+    }
+    if (status !== void 0 && status >= 500 || raw.includes("internal server")) {
+      return "server_error";
+    }
+    return "unknown";
+  }
+  /** 判断是否为 prompt too long 错误。 */
+  isPromptTooLong(error) {
+    return this.classifyError(error) === "prompt_too_long";
+  }
+  /**
+   * 决定恢复动作。
+   *
+   * 优先级见类型声明处的列表（rate → overload → prompt → tokens → auth → network → server）。
+   */
+  decide(error, stopReason) {
+    if (stopReason === "length") {
+      if (!this.state.hasEscalated) {
+        return {
+          type: "escalate_tokens",
+          newMaxTokens: this.escalatedMaxTokens
+        };
+      }
+      if (this.state.recoveryCount < this.maxRecoveryRetries) {
+        return { type: "continue_prompt" };
+      }
+      return {
+        type: "abort",
+        reason: "max_tokens reached and recovery limit exhausted; aborting"
+      };
+    }
+    if (!error) {
+      return { type: "abort", reason: "no error and no recoverable stop_reason" };
+    }
+    const category = this.classifyError(error);
+    switch (category) {
+      case "rate_limit": {
+        if (this.state.recoveryCount >= this.maxRetries) {
+          return {
+            type: "abort",
+            reason: "rate limit retries exhausted"
+          };
+        }
+        return {
+          type: "retry",
+          delayMs: this.getRetryDelay(this.state.recoveryCount)
+        };
+      }
+      case "overloaded": {
+        this.state.consecutiveOverloads += 1;
+        if (this.state.consecutiveOverloads >= OVERLOAD_SWITCH_THRESHOLD && this.fallbackModel && this.fallbackModel.id !== this.state.currentModel.id) {
+          const fallback = this.fallbackModel;
+          this.state.currentModel = fallback;
+          this.state.consecutiveOverloads = 0;
+          return { type: "switch_model", fallbackModel: fallback };
+        }
+        if (this.state.recoveryCount >= this.maxRetries) {
+          return {
+            type: "abort",
+            reason: "overloaded retries exhausted and no fallback available"
+          };
+        }
+        return {
+          type: "retry",
+          delayMs: this.getRetryDelay(this.state.recoveryCount)
+        };
+      }
+      case "prompt_too_long": {
+        if (!this.state.hasAttemptedReactiveCompact) {
+          return { type: "reactive_compact" };
+        }
+        return {
+          type: "abort",
+          reason: "prompt too long even after reactive compact"
+        };
+      }
+      case "max_tokens": {
+        if (!this.state.hasEscalated) {
+          return {
+            type: "escalate_tokens",
+            newMaxTokens: this.escalatedMaxTokens
+          };
+        }
+        if (this.state.recoveryCount < this.maxRecoveryRetries) {
+          return { type: "continue_prompt" };
+        }
+        return {
+          type: "abort",
+          reason: "max_tokens reached and recovery limit exhausted"
+        };
+      }
+      case "auth_error": {
+        return {
+          type: "abort",
+          reason: "authentication failed; check API key"
+        };
+      }
+      case "network_error":
+      case "server_error": {
+        if (this.state.recoveryCount >= this.maxRetries) {
+          return {
+            type: "abort",
+            reason: `${category} retries exhausted`
+          };
+        }
+        return {
+          type: "retry",
+          delayMs: this.getRetryDelay(this.state.recoveryCount)
+        };
+      }
+      case "unknown":
+      default: {
+        return { type: "abort", reason: `unrecoverable error: ${error.message}` };
+      }
+    }
+  }
+  /** 计算指数退避（含 0–500ms 抖动）。 */
+  getRetryDelay(attempt) {
+    const exp = Math.pow(2, Math.max(0, attempt));
+    const base = RETRY_BASE_MS * exp;
+    const jitter = Math.floor(Math.random() * RETRY_JITTER_MS);
+    return base + jitter;
+  }
+  /** 重置状态（保留 currentModel）。 */
+  reset() {
+    this.state = {
+      hasEscalated: false,
+      recoveryCount: 0,
+      consecutiveOverloads: 0,
+      hasAttemptedReactiveCompact: false,
+      currentModel: this.state.currentModel
+    };
+  }
+  /** 获取当前模型。 */
+  getCurrentModel() {
+    return this.state.currentModel;
+  }
+  /** 标记升级完成。 */
+  markEscalated() {
+    this.state.hasEscalated = true;
+    this.state.recoveryCount += 1;
+  }
+  /** 标记 reactive compact 已尝试。 */
+  markReactiveCompactAttempted() {
+    this.state.hasAttemptedReactiveCompact = true;
+    this.state.recoveryCount += 1;
+  }
+  /** 用于上层在执行重试后递增计数。 */
+  noteRetryAttempt() {
+    this.state.recoveryCount += 1;
+  }
+  /** 配置中读取的默认 max_tokens（首次未升级时使用）。 */
+  getDefaultMaxTokens() {
+    return this.defaultMaxTokens;
+  }
+  /** 暴露状态快照，便于上层观察 / 测试。 */
+  getState() {
+    return { ...this.state };
+  }
+  // -------------------------------------------------------------------
+  // 内部
+  // -------------------------------------------------------------------
+  extractStatusCode(error) {
+    const e = error;
+    const direct = e.status ?? e.statusCode;
+    if (typeof direct === "number") return direct;
+    const response = e.response;
+    if (response && typeof response.status === "number") {
+      return response.status;
+    }
+    const match = error.message?.match(/\b(4\d{2}|5\d{2})\b/);
+    if (match) {
+      const code = Number(match[1]);
+      if (!Number.isNaN(code)) return code;
+    }
+    return void 0;
+  }
+}
+class HandoffController {
+  /**
+   * 解析并校验 handoff 请求。
+   *
+   * @param fromAgentId 源 profile（当前活跃 agent）
+   * @param toProfile 目标 profile id（agent_handoff 工具的 agent 参数）
+   * @param promptOverride 调用方提供的 prompt（缺省时从目标 profile handoffs 定义取）
+   * @param labelOverride 调用方提供的 label
+   */
+  resolve(fromAgentId, toProfile, promptOverride, labelOverride) {
+    const target = toProfile.trim();
+    if (!target) {
+      return { valid: false, reason: "Handoff target profile is empty." };
+    }
+    const definitions = settingsService.getAll().agents.definitions;
+    const targetDef = definitions.find((d) => d.id === target && d.enabled);
+    if (!targetDef) {
+      return { valid: false, reason: `Target profile "${target}" is not enabled or does not exist.` };
+    }
+    const sourceDef = definitions.find((d) => d.id === fromAgentId && d.enabled);
+    if (sourceDef && sourceDef.handoffs.length > 0) {
+      const allowed = sourceDef.handoffs.some((h) => h.agent === target);
+      if (!allowed) {
+        return {
+          valid: false,
+          reason: `Profile "${fromAgentId}" does not declare a handoff to "${target}".`
+        };
+      }
+    }
+    const declared = sourceDef?.handoffs.find((h) => h.agent === target);
+    const prompt = (promptOverride?.trim() || declared?.prompt || `Continue from ${fromAgentId} as ${target}.`).trim();
+    const label = (labelOverride?.trim() || declared?.label || `Hand off to ${target}`).trim();
+    return {
+      valid: true,
+      request: { fromAgentId, toProfile: target, prompt, label }
+    };
+  }
+}
+const handoffController = new HandoffController();
 function toolToDefinition(tool) {
   return {
     name: tool.name,
@@ -7482,57 +8446,6 @@ const notebookEditTool = {
     };
   }
 };
-const agentSpawnTool = {
-  name: "agent_spawn",
-  label: "启动子 Agent",
-  description: "Spawn a sub-agent to handle a parallel or independent task. The sub-agent will report back when complete.",
-  parameters: {
-    type: "object",
-    properties: {
-      task: { type: "string", description: "Description of the task for the sub-agent." },
-      context: { type: "string", description: "Optional context or constraints to pass to the sub-agent." }
-    },
-    required: ["task"]
-  },
-  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: "session", category: "system", requiresApproval: true },
-  permissionHint: "session_mutation",
-  async execute(_toolCallId, params) {
-    const task = params.task.trim();
-    if (!task) {
-      return { content: [{ type: "text", text: "Task is empty." }], isError: true, details: { task, spawned: false } };
-    }
-    return {
-      content: [{ type: "text", text: `[Sub-agent spawned] Task: ${task}${params.context ? `
-Context: ${params.context}` : ""}` }],
-      details: { task, spawned: true }
-    };
-  }
-};
-const sendMessageTool = {
-  name: "send_message",
-  label: "发送消息",
-  description: "Send a message to another agent or user channel. Use for coordination or delivering results.",
-  parameters: {
-    type: "object",
-    properties: {
-      recipient: { type: "string", description: "Target agent ID or channel name." },
-      content: { type: "string", description: "Message content to send." }
-    },
-    required: ["recipient", "content"]
-  },
-  spec: { isReadOnly: false, isConcurrencySafe: true, isDestructive: false, sideEffect: "network", category: "comm", requiresApproval: false },
-  permissionHint: "session_mutation",
-  async execute(_toolCallId, params) {
-    const content = params.content.trim();
-    if (!content) {
-      return { content: [{ type: "text", text: "Content is empty." }], isError: true, details: { recipient: params.recipient, content, sent: false } };
-    }
-    return {
-      content: [{ type: "text", text: `[Message to ${params.recipient}] ${content}` }],
-      details: { recipient: params.recipient, content, sent: true }
-    };
-  }
-};
 function getPrimitiveTools() {
   return [
     bashTool,
@@ -7554,9 +8467,7 @@ function getPrimitiveTools() {
     copyFileTool,
     searchCodebaseTool,
     askUserTool,
-    notebookEditTool,
-    agentSpawnTool,
-    sendMessageTool
+    notebookEditTool
   ];
 }
 function createToolSearchTool(getAllTools) {
@@ -7602,19 +8513,105 @@ ${matches.map((m) => `  - ${m.name}${m.spec ? ` [${m.spec.category}]` : ""}`).jo
     }
   };
 }
-class TaskRegistry {
-  /** 任务 JSON 文件存放目录（绝对路径）。 */
+class FileTaskStore {
   tasksDir;
-  /** 是否已确保目录存在（避免每次 IO 都调用 mkdir）。 */
   dirEnsured = false;
+  constructor(tasksDir) {
+    this.tasksDir = path__namespace.resolve(tasksDir);
+  }
+  taskPath(taskId) {
+    return path__namespace.join(this.tasksDir, `${taskId}.json`);
+  }
+  async ensureDir() {
+    if (this.dirEnsured) return;
+    await fs__namespace$1.mkdir(this.tasksDir, { recursive: true });
+    this.dirEnsured = true;
+  }
+  async loadTask(taskId) {
+    try {
+      const raw = await fs__namespace$1.readFile(this.taskPath(taskId), "utf8");
+      const parsed = JSON.parse(raw);
+      return normalizeTaskRecord(parsed);
+    } catch (err) {
+      if (err.code === "ENOENT") return null;
+      return null;
+    }
+  }
+  async saveTask(task) {
+    await this.ensureDir();
+    await fs__namespace$1.writeFile(this.taskPath(task.id), JSON.stringify(task, null, 2), "utf8");
+  }
+  async listTasks() {
+    await this.ensureDir();
+    let entries;
+    try {
+      entries = await fs__namespace$1.readdir(this.tasksDir);
+    } catch (err) {
+      if (err.code === "ENOENT") return [];
+      throw err;
+    }
+    const files = entries.filter((name) => name.startsWith("task_") && name.endsWith(".json")).sort();
+    const tasks = [];
+    for (const file of files) {
+      const id = file.slice(0, -".json".length);
+      const task = await this.loadTask(id);
+      if (task) tasks.push(task);
+    }
+    return tasks;
+  }
+  async deleteTask(taskId) {
+    try {
+      await fs__namespace$1.unlink(this.taskPath(taskId));
+    } catch (err) {
+      if (err.code !== "ENOENT") throw err;
+    }
+  }
+}
+class MemoryTaskStore {
+  store = /* @__PURE__ */ new Map();
+  async loadTask(taskId) {
+    return this.store.get(taskId) ?? null;
+  }
+  async saveTask(task) {
+    this.store.set(task.id, { ...task });
+  }
+  async listTasks() {
+    return Array.from(this.store.values()).map((t) => ({ ...t }));
+  }
+  async deleteTask(taskId) {
+    this.store.delete(taskId);
+  }
+}
+function normalizeTaskRecord(parsed) {
+  if (!parsed || typeof parsed.id !== "string" || typeof parsed.subject !== "string") {
+    return null;
+  }
+  return {
+    id: parsed.id,
+    subject: parsed.subject,
+    description: typeof parsed.description === "string" ? parsed.description : "",
+    status: parsed.status === "in_progress" || parsed.status === "completed" || parsed.status === "deleted" ? parsed.status : "pending",
+    owner: typeof parsed.owner === "string" ? parsed.owner : void 0,
+    blockedBy: Array.isArray(parsed.blockedBy) ? parsed.blockedBy.filter((x) => typeof x === "string") : [],
+    blocks: Array.isArray(parsed.blocks) ? parsed.blocks.filter((x) => typeof x === "string") : [],
+    activeForm: typeof parsed.activeForm === "string" ? parsed.activeForm : void 0,
+    metadata: parsed.metadata && typeof parsed.metadata === "object" ? parsed.metadata : void 0,
+    createdAt: typeof parsed.createdAt === "number" ? parsed.createdAt : Date.now(),
+    updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : Date.now()
+  };
+}
+class TaskRegistry {
+  /** 存储后端（FileTaskStore 落盘 / MemoryTaskStore 内存）。 */
+  store;
+  /** 任务变更回调（create/update 后触发，用于 emit task.created/updated 事件）。 */
+  onTaskChange;
   /**
    * 构造一个任务注册表。
    *
-   * @param tasksDir 任务文件目录。如果是相对路径，相对当前进程 cwd 解析；
-   *                 默认 `.tasks/`（即 workspace 根下的 `.tasks/`）。
+   * @param storeOrDir TaskStore 实例，或任务文件目录（兼容旧签名，内部建 FileTaskStore）。
    */
-  constructor(tasksDir = ".tasks") {
-    this.tasksDir = path__namespace.resolve(tasksDir);
+  constructor(storeOrDir = ".tasks") {
+    this.store = typeof storeOrDir === "string" ? new FileTaskStore(storeOrDir) : storeOrDir;
   }
   // ── 公共接口 ──────────────────────────────────────────────
   /**
@@ -7632,7 +8629,6 @@ class TaskRegistry {
     if (typeof subject !== "string" || subject.trim().length === 0) {
       throw new Error("subject 不能为空");
     }
-    await this.ensureDir();
     const now = Date.now();
     const id = this.generateId();
     const blockedBy = dedupe(options.blockedBy ?? []);
@@ -7653,6 +8649,7 @@ class TaskRegistry {
     for (const upstreamId of blockedBy) {
       await this.linkBlocks(upstreamId, id);
     }
+    this.onTaskChange?.({ type: "created", task });
     return task;
   }
   /**
@@ -7700,6 +8697,7 @@ class TaskRegistry {
     }
     task.updatedAt = Date.now();
     await this.saveTask(task);
+    this.onTaskChange?.({ type: "updated", task });
     return task;
   }
   /**
@@ -7712,28 +8710,17 @@ class TaskRegistry {
     return this.loadTask(taskId);
   }
   /**
-   * 列出所有任务（按 ID 升序，与文件名字典序一致）。
-   *
-   * - 单个文件解析失败时会被跳过，不影响整体列表；
-   * - 目录不存在时返回空数组。
+   * 列出所有任务（按 ID 升序）。
    */
   async listTasks() {
-    await this.ensureDir();
-    let entries;
-    try {
-      entries = await fs__namespace$1.readdir(this.tasksDir);
-    } catch (err) {
-      if (err.code === "ENOENT") return [];
-      throw err;
-    }
-    const files = entries.filter((name) => name.startsWith("task_") && name.endsWith(".json")).sort();
-    const tasks = [];
-    for (const file of files) {
-      const id = file.slice(0, -".json".length);
-      const task = await this.loadTask(id);
-      if (task) tasks.push(task);
-    }
-    return tasks;
+    return this.store.listTasks();
+  }
+  /**
+   * 物理删除任务（不同于 updateTask status='deleted' 的软删除）。
+   * 主要用于 subagent 结束后清理内存 task。
+   */
+  async deleteTask(taskId) {
+    await this.store.deleteTask(taskId);
   }
   /**
    * 判断任务是否可以开始。
@@ -7781,32 +8768,13 @@ class TaskRegistry {
   generateId() {
     return `task_${Date.now()}_${crypto__namespace.randomBytes(3).toString("hex")}`;
   }
-  /** 任务对应的 JSON 文件绝对路径。 */
-  taskPath(taskId) {
-    return path__namespace.join(this.tasksDir, `${taskId}.json`);
-  }
-  /** 确保任务目录存在（懒执行 + 缓存）。 */
-  async ensureDir() {
-    if (this.dirEnsured) return;
-    await fs__namespace$1.mkdir(this.tasksDir, { recursive: true });
-    this.dirEnsured = true;
-  }
-  /** 把任务序列化写入文件。 */
+  /** 把任务写入存储（委托 TaskStore）。 */
   async saveTask(task) {
-    await this.ensureDir();
-    const payload = JSON.stringify(task, null, 2);
-    await fs__namespace$1.writeFile(this.taskPath(task.id), payload, "utf8");
+    await this.store.saveTask(task);
   }
-  /** 从文件读取任务；缺失或解析失败时返回 `null`。 */
+  /** 从存储读取任务；缺失返回 `null`（委托 TaskStore）。 */
   async loadTask(taskId) {
-    try {
-      const raw = await fs__namespace$1.readFile(this.taskPath(taskId), "utf8");
-      const parsed = JSON.parse(raw);
-      return normalizeTask(parsed);
-    } catch (err) {
-      if (err.code === "ENOENT") return null;
-      return null;
-    }
+    return this.store.loadTask(taskId);
   }
   /** 在上游任务的 `blocks` 中追加 `downstreamId`（若上游存在）。 */
   async linkBlocks(upstreamId, downstreamId) {
@@ -7849,26 +8817,6 @@ function appendUnique(target, incoming) {
     added.push(item);
   }
   return added;
-}
-function normalizeTask(raw) {
-  if (!raw || typeof raw.id !== "string" || typeof raw.subject !== "string") {
-    return null;
-  }
-  const status = raw.status === "in_progress" || raw.status === "completed" || raw.status === "deleted" ? raw.status : "pending";
-  const now = Date.now();
-  return {
-    id: raw.id,
-    subject: raw.subject,
-    description: typeof raw.description === "string" ? raw.description : "",
-    status,
-    owner: typeof raw.owner === "string" ? raw.owner : void 0,
-    blockedBy: Array.isArray(raw.blockedBy) ? raw.blockedBy.filter((x) => typeof x === "string") : [],
-    blocks: Array.isArray(raw.blocks) ? raw.blocks.filter((x) => typeof x === "string") : [],
-    activeForm: typeof raw.activeForm === "string" ? raw.activeForm : void 0,
-    metadata: raw.metadata && typeof raw.metadata === "object" ? raw.metadata : void 0,
-    createdAt: typeof raw.createdAt === "number" ? raw.createdAt : now,
-    updatedAt: typeof raw.updatedAt === "number" ? raw.updatedAt : now
-  };
 }
 const ALLOWED_STATUS = [
   "pending",
@@ -7916,9 +8864,9 @@ function createTaskCreateTool(registry) {
     permissionHint: "readonly",
     async execute(_toolCallId, params, signal) {
       throwIfAborted(signal);
-      const subject = readString$1(params, "subject", true);
-      const description = readString$1(params, "description", false);
-      const activeForm = readString$1(params, "activeForm", false);
+      const subject = readString$2(params, "subject", true);
+      const description = readString$2(params, "description", false);
+      const activeForm = readString$2(params, "activeForm", false);
       const blockedBy = readStringArray(params, "blockedBy");
       const task = await registry.createTask(subject, {
         description,
@@ -7960,12 +8908,12 @@ function createTaskUpdateTool(registry) {
     permissionHint: "readonly",
     async execute(_toolCallId, params, signal) {
       throwIfAborted(signal);
-      const taskId = readString$1(params, "taskId", true);
+      const taskId = readString$2(params, "taskId", true);
       const status = readEnum(params, "status", ALLOWED_STATUS);
-      const subject = readString$1(params, "subject", false);
-      const description = readString$1(params, "description", false);
-      const activeForm = readString$1(params, "activeForm", false);
-      const owner = readString$1(params, "owner", false);
+      const subject = readString$2(params, "subject", false);
+      const description = readString$2(params, "description", false);
+      const activeForm = readString$2(params, "activeForm", false);
+      const owner = readString$2(params, "owner", false);
       const addBlockedBy = readStringArray(params, "addBlockedBy");
       const addBlocks = readStringArray(params, "addBlocks");
       const metadata = params.metadata && typeof params.metadata === "object" ? params.metadata : void 0;
@@ -8017,7 +8965,7 @@ function createTaskGetTool(registry) {
     permissionHint: "readonly",
     async execute(_toolCallId, params, signal) {
       throwIfAborted(signal);
-      const taskId = readString$1(params, "taskId", true);
+      const taskId = readString$2(params, "taskId", true);
       const task = await registry.getTask(taskId);
       if (!task) {
         return {
@@ -8079,7 +9027,7 @@ function createTaskStopTool(registry) {
     permissionHint: "readonly",
     async execute(_toolCallId, params, signal) {
       throwIfAborted(signal);
-      const taskId = readString$1(params, "taskId", true);
+      const taskId = readString$2(params, "taskId", true);
       const task = await registry.getTask(taskId);
       if (!task) {
         return {
@@ -8100,7 +9048,7 @@ function throwIfAborted(signal) {
     throw new Error("Aborted");
   }
 }
-function readString$1(params, key, required) {
+function readString$2(params, key, required) {
   const value = params[key];
   if (value === void 0 || value === null || value === "") {
     if (required) throw new Error(`参数 "${key}" 不能为空`);
@@ -9257,18 +10205,18 @@ function normalizeError(err) {
   if (err instanceof Error) return err;
   return new Error(String(err));
 }
-const DEFAULT_BASE_URL$3 = "https://api.anthropic.com/v1";
+const DEFAULT_BASE_URL$4 = "https://api.anthropic.com/v1";
 const DEFAULT_ANTHROPIC_VERSION = "2023-06-01";
-const PROVIDER_API$3 = "anthropic-messages";
+const PROVIDER_API$4 = "anthropic-messages";
 let AnthropicProvider$1 = class AnthropicProvider {
-  api = PROVIDER_API$3;
+  api = PROVIDER_API$4;
   defaultBaseUrl;
   defaultApiKey;
   anthropicVersion;
   defaultHeaders;
   capabilities;
   constructor(options = {}) {
-    this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL$3).replace(/\/+$/, "");
+    this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL$4).replace(/\/+$/, "");
     this.defaultApiKey = options.apiKey;
     this.anthropicVersion = options.anthropicVersion ?? DEFAULT_ANTHROPIC_VERSION;
     this.defaultHeaders = { ...options.headers ?? {} };
@@ -9301,7 +10249,7 @@ let AnthropicProvider$1 = class AnthropicProvider {
     try {
       builder.start();
       if (!apiKey) {
-        throw new ProviderHttpError(PROVIDER_API$3, 401, "missing apiKey for Anthropic provider");
+        throw new ProviderHttpError(PROVIDER_API$4, 401, "missing apiKey for Anthropic provider");
       }
       const body = this.buildRequestBody(model, context2, options);
       const url2 = `${baseUrl}/messages`;
@@ -9316,7 +10264,7 @@ let AnthropicProvider$1 = class AnthropicProvider {
         body: JSON.stringify(body),
         signal: composed.signal
       });
-      await ensureOk(response, PROVIDER_API$3);
+      await ensureOk(response, PROVIDER_API$4);
       let stopReason = null;
       let inputTokens = 0;
       let outputTokens = 0;
@@ -9425,14 +10373,14 @@ function toAnthropicThinking$1(budget) {
 function toAnthropicMessages(context2) {
   const messages = [];
   for (const message of context2.messages) {
-    messages.push(...convertMessage$3(message));
+    messages.push(...convertMessage$4(message));
   }
   return {
     system: context2.systemPrompt && context2.systemPrompt.trim() ? context2.systemPrompt : void 0,
     messages
   };
 }
-function convertMessage$3(message) {
+function convertMessage$4(message) {
   if (message.role === "user") {
     if (typeof message.content === "string") {
       return [{ role: "user", content: [{ type: "text", text: message.content }] }];
@@ -9505,16 +10453,16 @@ function mapStopReason(reason) {
       return "stop";
   }
 }
-const DEFAULT_BASE_URL$2 = "https://generativelanguage.googleapis.com";
-const PROVIDER_API$2 = "google-gemini";
+const DEFAULT_BASE_URL$3 = "https://generativelanguage.googleapis.com";
+const PROVIDER_API$3 = "google-gemini";
 class GeminiProvider {
-  api = PROVIDER_API$2;
+  api = PROVIDER_API$3;
   defaultBaseUrl;
   defaultApiKey;
   defaultHeaders;
   capabilities;
   constructor(options = {}) {
-    this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL$2).replace(/\/+$/, "");
+    this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL$3).replace(/\/+$/, "");
     this.defaultApiKey = options.apiKey;
     this.defaultHeaders = { ...options.headers ?? {} };
     this.capabilities = {
@@ -9546,7 +10494,7 @@ class GeminiProvider {
     try {
       builder.start();
       if (!apiKey) {
-        throw new ProviderHttpError(PROVIDER_API$2, 401, "missing apiKey for Gemini provider");
+        throw new ProviderHttpError(PROVIDER_API$3, 401, "missing apiKey for Gemini provider");
       }
       const body = this.buildRequestBody(context2, options);
       const versionedBase = baseUrl.includes("/v1beta") || baseUrl.includes("/v1") ? baseUrl : `${baseUrl}/v1beta`;
@@ -9560,8 +10508,8 @@ class GeminiProvider {
         body: JSON.stringify(body),
         signal: composed.signal
       });
-      await ensureOk(response, PROVIDER_API$2);
-      const TEXT_INDEX = 0;
+      await ensureOk(response, PROVIDER_API$3);
+      const TEXT_INDEX2 = 0;
       const THINKING_INDEX = 1;
       let toolCallCounter = 0;
       let finishReason = null;
@@ -9589,7 +10537,7 @@ class GeminiProvider {
             if (textPart.thought) {
               builder.appendThinking(THINKING_INDEX, textPart.text);
             } else {
-              builder.appendText(TEXT_INDEX, textPart.text);
+              builder.appendText(TEXT_INDEX2, textPart.text);
             }
             continue;
           }
@@ -9644,14 +10592,14 @@ class GeminiProvider {
 function toGeminiContents(context2) {
   const contents = [];
   for (const message of context2.messages) {
-    contents.push(...convertMessage$2(message));
+    contents.push(...convertMessage$3(message));
   }
   return {
     systemInstruction: context2.systemPrompt && context2.systemPrompt.trim() ? context2.systemPrompt : void 0,
     contents
   };
 }
-function convertMessage$2(message) {
+function convertMessage$3(message) {
   if (message.role === "user") {
     if (typeof message.content === "string") {
       return [{ role: "user", parts: [{ text: message.content }] }];
@@ -9723,16 +10671,16 @@ function mapFinishReason$2(reason, hadToolCall) {
       return "stop";
   }
 }
-const DEFAULT_BASE_URL$1 = "http://localhost:11434";
-const PROVIDER_API$1 = "ollama";
+const DEFAULT_BASE_URL$2 = "http://localhost:11434";
+const PROVIDER_API$2 = "ollama";
 class OllamaProvider {
-  api = PROVIDER_API$1;
+  api = PROVIDER_API$2;
   defaultBaseUrl;
   defaultApiKey;
   defaultHeaders;
   capabilities;
   constructor(options = {}) {
-    this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL$1).replace(/\/+$/, "");
+    this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL$2).replace(/\/+$/, "");
     this.defaultApiKey = options.apiKey;
     this.defaultHeaders = { ...options.headers ?? {} };
     this.capabilities = {
@@ -9776,8 +10724,8 @@ class OllamaProvider {
         body: JSON.stringify(body),
         signal: composed.signal
       });
-      await ensureOk(response, PROVIDER_API$1);
-      const TEXT_INDEX = 0;
+      await ensureOk(response, PROVIDER_API$2);
+      const TEXT_INDEX2 = 0;
       const THINKING_INDEX = 1;
       let toolCallCounter = 0;
       let doneReason = null;
@@ -9797,7 +10745,7 @@ class OllamaProvider {
             builder.appendThinking(THINKING_INDEX, message.thinking);
           }
           if (typeof message.content === "string" && message.content.length > 0) {
-            builder.appendText(TEXT_INDEX, message.content);
+            builder.appendText(TEXT_INDEX2, message.content);
           }
           if (Array.isArray(message.tool_calls)) {
             for (const tc of message.tool_calls) {
@@ -9859,11 +10807,11 @@ function toOllamaMessages(context2) {
     out.push({ role: "system", content: context2.systemPrompt });
   }
   for (const message of context2.messages) {
-    out.push(...convertMessage$1(message));
+    out.push(...convertMessage$2(message));
   }
   return out;
 }
-function convertMessage$1(message) {
+function convertMessage$2(message) {
   if (message.role === "user") {
     if (typeof message.content === "string") {
       return [{ role: "user", content: message.content }];
@@ -9930,16 +10878,16 @@ function mapDoneReason(reason, hadToolCall) {
       return "stop";
   }
 }
-const DEFAULT_BASE_URL = "https://api.openai.com/v1";
-const PROVIDER_API = "openai-compatible";
+const DEFAULT_BASE_URL$1 = "https://api.openai.com/v1";
+const PROVIDER_API$1 = "openai-compatible";
 let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
-  api = PROVIDER_API;
+  api = PROVIDER_API$1;
   defaultBaseUrl;
   defaultApiKey;
   defaultHeaders;
   capabilities;
   constructor(options = {}) {
-    this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL$1).replace(/\/+$/, "");
     this.defaultApiKey = options.apiKey;
     this.defaultHeaders = { ...options.headers ?? {} };
     this.capabilities = {
@@ -9973,7 +10921,7 @@ let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
     try {
       builder.start();
       if (!apiKey) {
-        throw new ProviderHttpError(PROVIDER_API, 401, "missing apiKey for OpenAI-compatible provider");
+        throw new ProviderHttpError(PROVIDER_API$1, 401, "missing apiKey for OpenAI-compatible provider");
       }
       const body = this.buildRequestBody(model, context2, options);
       const url2 = `${baseUrl}/chat/completions`;
@@ -9987,11 +10935,11 @@ let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
         body: JSON.stringify(body),
         signal: composed.signal
       });
-      await ensureOk(response, PROVIDER_API);
+      await ensureOk(response, PROVIDER_API$1);
       let finishReason = null;
-      const TEXT_INDEX = 0;
+      const TEXT_INDEX2 = 0;
       const THINKING_INDEX = 1;
-      const TOOL_INDEX_BASE = 2;
+      const TOOL_INDEX_BASE2 = 2;
       for await (const data of parseSSE(response, composed.signal)) {
         if (composed.signal.aborted) break;
         let chunk;
@@ -10015,12 +10963,12 @@ let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
           builder.appendThinking(THINKING_INDEX, reasoningDelta);
         }
         if (typeof delta.content === "string" && delta.content.length > 0) {
-          builder.appendText(TEXT_INDEX, delta.content);
+          builder.appendText(TEXT_INDEX2, delta.content);
         }
         if (Array.isArray(delta.tool_calls)) {
           for (const tc of delta.tool_calls) {
             const callIndex = typeof tc.index === "number" ? tc.index : 0;
-            const slot = TOOL_INDEX_BASE + callIndex;
+            const slot = TOOL_INDEX_BASE2 + callIndex;
             builder.ensureToolCall(slot, tc.id ?? "", tc.function?.name ?? "");
             const args = tc.function?.arguments;
             if (typeof args === "string" && args.length > 0) {
@@ -10067,11 +11015,11 @@ function toOpenAIMessages(context2) {
     out.push({ role: "system", content: context2.systemPrompt });
   }
   for (const message of context2.messages) {
-    out.push(...convertMessage(message));
+    out.push(...convertMessage$1(message));
   }
   return out;
 }
-function convertMessage(message) {
+function convertMessage$1(message) {
   if (message.role === "user") {
     if (typeof message.content === "string") {
       return [{ role: "user", content: message.content }];
@@ -10149,6 +11097,312 @@ function mapFinishReason$1(reason) {
       return "stop";
   }
 }
+const DEFAULT_BASE_URL = "https://api.openai.com/v1";
+const PROVIDER_API = "openai-responses";
+const TEXT_INDEX = 0;
+const REASONING_INDEX = 1;
+const TOOL_INDEX_BASE = 2;
+class OpenAIResponsesProvider {
+  api = PROVIDER_API;
+  defaultBaseUrl;
+  defaultApiKey;
+  accountId;
+  defaultHeaders;
+  capabilities;
+  constructor(options = {}) {
+    this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    this.defaultApiKey = options.apiKey;
+    this.accountId = options.accountId?.trim() || void 0;
+    this.defaultHeaders = { ...options.headers ?? {} };
+    this.capabilities = {
+      streaming: true,
+      nativeToolCalling: true,
+      structuredOutput: true,
+      vision: true,
+      reasoning: true,
+      parallelToolCalls: true,
+      ...options.capabilities ?? {}
+    };
+  }
+  getCapabilities() {
+    return { ...this.capabilities };
+  }
+  stream(model, context2, options = {}) {
+    const stream = new EventStream(
+      (event) => event.type === "done",
+      (event) => event.message
+    );
+    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
+    const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, "");
+    const apiKey = options.apiKey ?? this.defaultApiKey;
+    void this.run(stream, builder, model, context2, options, baseUrl, apiKey);
+    return stream;
+  }
+  async run(stream, builder, model, context2, options, baseUrl, apiKey) {
+    const composed = composeAbortSignals(options.signal, stream.signal);
+    try {
+      builder.start();
+      if (!apiKey) {
+        throw new ProviderHttpError(PROVIDER_API, 401, "missing apiKey for OpenAI Responses provider");
+      }
+      const response = await fetch(createResponsesUrl(baseUrl), {
+        method: "POST",
+        headers: this.createHeaders(apiKey),
+        body: JSON.stringify(buildRequestBody(model, context2, options)),
+        signal: composed.signal
+      });
+      await ensureOk(response, PROVIDER_API);
+      const toolSlotsByItemId = /* @__PURE__ */ new Map();
+      const toolArgBuffers = /* @__PURE__ */ new Map();
+      let sawToolCall = false;
+      let finishReason = "stop";
+      for await (const data of parseSSE(response, composed.signal)) {
+        if (composed.signal.aborted) break;
+        const event = parseJsonObject(data);
+        if (!event) continue;
+        const eventType = readString$1(event.type);
+        switch (eventType) {
+          case "response.output_text.delta": {
+            const delta = readString$1(event.delta) || readString$1(event.text);
+            if (delta) builder.appendText(TEXT_INDEX, delta);
+            break;
+          }
+          case "response.output_text.done":
+            builder.endText(TEXT_INDEX);
+            break;
+          case "response.reasoning_summary_text.delta": {
+            const delta = readString$1(event.delta) || readString$1(event.text);
+            if (delta) builder.appendThinking(REASONING_INDEX, delta);
+            break;
+          }
+          case "response.reasoning_summary_text.done":
+            builder.endThinking(REASONING_INDEX);
+            break;
+          case "response.output_item.added": {
+            const outputIndex = readNumber(event.output_index) ?? 0;
+            const item = readRecord(event.item);
+            if (readString$1(item?.type) === "function_call") {
+              const slot = TOOL_INDEX_BASE + outputIndex;
+              const itemId = readString$1(item?.id);
+              if (itemId) toolSlotsByItemId.set(itemId, slot);
+              sawToolCall = true;
+              builder.ensureToolCall(
+                slot,
+                readString$1(item?.call_id) || readString$1(item?.id) || "",
+                readString$1(item?.name) || ""
+              );
+            }
+            break;
+          }
+          case "response.function_call_arguments.delta": {
+            const slot = resolveToolSlot(event, toolSlotsByItemId);
+            const delta = readString$1(event.delta);
+            if (slot !== null && delta) {
+              toolArgBuffers.set(slot, `${toolArgBuffers.get(slot) ?? ""}${delta}`);
+              builder.appendToolCallArgs(slot, delta);
+            }
+            break;
+          }
+          case "response.function_call_arguments.done": {
+            const slot = resolveToolSlot(event, toolSlotsByItemId);
+            const args = readString$1(event.arguments);
+            if (slot !== null && args && !toolArgBuffers.get(slot)) {
+              toolArgBuffers.set(slot, args);
+              builder.appendToolCallArgs(slot, args);
+            }
+            if (slot !== null) builder.endToolCall(slot);
+            break;
+          }
+          case "response.output_item.done": {
+            const outputIndex = readNumber(event.output_index) ?? 0;
+            const item = readRecord(event.item);
+            if (readString$1(item?.type) === "function_call") {
+              const slot = TOOL_INDEX_BASE + outputIndex;
+              const itemId = readString$1(item?.id);
+              if (itemId) toolSlotsByItemId.set(itemId, slot);
+              sawToolCall = true;
+              builder.ensureToolCall(
+                slot,
+                readString$1(item?.call_id) || readString$1(item?.id) || "",
+                readString$1(item?.name) || ""
+              );
+              const args = readString$1(item?.arguments);
+              if (args && !toolArgBuffers.get(slot)) {
+                toolArgBuffers.set(slot, args);
+                builder.appendToolCallArgs(slot, args);
+              }
+              builder.endToolCall(slot);
+            }
+            break;
+          }
+          case "response.completed": {
+            const completed = readRecord(event.response);
+            if (completed) {
+              applyCompletedResponse(builder, completed);
+              finishReason = completed.status === "incomplete" ? "length" : sawToolCall ? "toolUse" : "stop";
+            }
+            break;
+          }
+          case "response.incomplete":
+            finishReason = "length";
+            break;
+          case "response.failed": {
+            const failed = readRecord(event.response);
+            const error = readRecord(failed?.error);
+            throw new ProviderHttpError(
+              PROVIDER_API,
+              502,
+              readString$1(error?.message) || "OpenAI Responses request failed"
+            );
+          }
+          case "error":
+            throw new ProviderHttpError(PROVIDER_API, 502, readString$1(event.message) || "OpenAI Responses stream error");
+          default:
+            break;
+        }
+      }
+      builder.done(finishReason);
+    } catch (err) {
+      const error = normalizeError(err);
+      builder.fail(error, error.name === "AbortError" ? "aborted" : "error");
+    } finally {
+    }
+  }
+  createHeaders(apiKey) {
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      ...this.defaultHeaders
+    };
+    if (this.accountId) {
+      headers["chatgpt-account-id"] = this.accountId;
+    }
+    return headers;
+  }
+}
+function createResponsesUrl(baseUrl) {
+  return baseUrl.endsWith("/responses") ? baseUrl : `${baseUrl}/responses`;
+}
+function buildRequestBody(model, context2, options) {
+  const body = {
+    model: model.id,
+    input: toResponsesInput$1(context2),
+    stream: true,
+    store: false,
+    parallel_tool_calls: true
+  };
+  if (context2.systemPrompt?.trim()) {
+    body.instructions = context2.systemPrompt.trim();
+  }
+  if (typeof options.temperature === "number") body.temperature = options.temperature;
+  if (typeof options.topP === "number") body.top_p = options.topP;
+  if (options.reasoningBudget && options.reasoningBudget !== "auto") {
+    body.reasoning = { effort: options.reasoningBudget };
+  }
+  const maxTokens = options.maxTokens ?? model.maxTokens;
+  if (typeof maxTokens === "number" && maxTokens > 0) {
+    body.max_output_tokens = maxTokens;
+  }
+  if (context2.tools && context2.tools.length > 0) {
+    body.tools = context2.tools.map(toResponsesTool);
+    body.tool_choice = "auto";
+  }
+  return body;
+}
+function toResponsesInput$1(context2) {
+  const items = [];
+  for (const message of context2.messages) {
+    items.push(...convertMessage(message));
+  }
+  return items;
+}
+function convertMessage(message) {
+  if (message.role === "user") {
+    return [toInputMessage("user", message.content)];
+  }
+  if (message.role === "assistant") {
+    const items = [];
+    const text = message.content.filter((block) => block.type === "text").map((block) => block.text).join("");
+    if (text) {
+      items.push({ role: "assistant", content: text, type: "message" });
+    }
+    for (const block of message.content) {
+      if (block.type === "toolCall") {
+        items.push({
+          type: "function_call",
+          call_id: block.id,
+          name: block.name,
+          arguments: JSON.stringify(block.arguments ?? {}),
+          status: "completed"
+        });
+      }
+    }
+    return items;
+  }
+  const output = message.content.filter((block) => block.type === "text").map((block) => block.text).join("\n");
+  return [{
+    type: "function_call_output",
+    call_id: message.toolCallId,
+    output
+  }];
+}
+function toInputMessage(role, content) {
+  if (typeof content === "string") {
+    return { role, content, type: "message" };
+  }
+  const parts = content.flatMap((block) => {
+    if (block.type === "text") {
+      return [{ type: "input_text", text: block.text ?? "" }];
+    }
+    if (block.type === "image" && block.data && block.mimeType) {
+      return [{ type: "input_image", image_url: `data:${block.mimeType};base64,${block.data}` }];
+    }
+    return [];
+  });
+  return { role, content: parts.length > 0 ? parts : [{ type: "input_text", text: "" }], type: "message" };
+}
+function toResponsesTool(tool) {
+  return {
+    type: "function",
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.parameters
+  };
+}
+function applyCompletedResponse(builder, payload) {
+  if (payload.usage) {
+    builder.setUsage({
+      inputTokens: payload.usage.input_tokens ?? 0,
+      outputTokens: payload.usage.output_tokens ?? 0,
+      totalTokens: payload.usage.total_tokens ?? (payload.usage.input_tokens ?? 0) + (payload.usage.output_tokens ?? 0)
+    });
+  }
+}
+function resolveToolSlot(event, toolSlotsByItemId) {
+  const itemId = readString$1(event.item_id);
+  if (itemId && toolSlotsByItemId.has(itemId)) {
+    return toolSlotsByItemId.get(itemId) ?? null;
+  }
+  const outputIndex = readNumber(event.output_index);
+  return outputIndex === null ? null : TOOL_INDEX_BASE + outputIndex;
+}
+function parseJsonObject(raw) {
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+function readRecord(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : null;
+}
+function readString$1(value) {
+  return typeof value === "string" ? value : "";
+}
+function readNumber(value) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
 const CONFIGURED_PROVIDER_API = "rdc-agent-configured-provider";
 function encodeAgentModel(providerId, modelId) {
   return {
@@ -10176,42 +11430,56 @@ function decodeAgentModel(model) {
     modelId: model.id
   };
 }
-function toRuntimeApi(kind) {
-  switch (kind) {
-    case "anthropic":
+function requireProviderProtocol(provider) {
+  if (!provider.protocol) {
+    throw new Error(`Provider ${provider.id} has no configured protocol.`);
+  }
+  return provider.protocol;
+}
+function normalizeLocalBaseUrl(baseUrl) {
+  return baseUrl?.replace(/\/v1\/?$/i, "");
+}
+function toRuntimeApi(protocol) {
+  switch (protocol) {
+    case "AnthropicMessages":
       return "anthropic-messages";
-    case "google-ai-studio":
+    case "GoogleGemini":
       return "google-gemini";
-    case "ollama":
+    case "OllamaOpenAICompatibleChatCompletions":
       return "ollama";
-    case "openai-compatible":
-    case "openrouter":
-    case "azure-openai":
+    case "OpenAIResponses":
+      return "openai-responses";
+    case "OpenAICompatibleChatCompletions":
+    case "OpenRouterChatCompletions":
       return "openai-compatible";
-    case "bedrock":
-    case "vertex":
+    case "AzureOpenAIChatCompletions":
+      return "azure-openai";
+    case "AwsBedrock":
+      return "bedrock";
+    case "GoogleVertexAI":
+      return "vertex";
     default:
-      return kind;
+      return protocol;
   }
 }
-function createProviderStrategy(provider) {
-  switch (provider.kind) {
-    case "anthropic":
+function createProviderStrategy(provider, protocol) {
+  switch (protocol) {
+    case "AnthropicMessages":
       return new AnthropicProvider$1({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl
       });
-    case "google-ai-studio":
+    case "GoogleGemini":
       return new GeminiProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl
       });
-    case "ollama":
+    case "OllamaOpenAICompatibleChatCompletions":
       return new OllamaProvider({
         apiKey: provider.apiKey || void 0,
-        baseUrl: provider.baseUrl
+        baseUrl: normalizeLocalBaseUrl(provider.baseUrl)
       });
-    case "openrouter":
+    case "OpenRouterChatCompletions":
       return new OpenAICompatibleProvider$1({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
@@ -10220,16 +11488,22 @@ function createProviderStrategy(provider) {
           "X-Title": "RDC-Agent"
         }
       });
-    case "openai-compatible":
-    case "azure-openai":
+    case "OpenAICompatibleChatCompletions":
       return new OpenAICompatibleProvider$1({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl
       });
-    case "bedrock":
-    case "vertex":
+    case "OpenAIResponses":
+      return new OpenAIResponsesProvider({
+        apiKey: provider.apiKey,
+        baseUrl: provider.baseUrl,
+        accountId: provider.accountId
+      });
+    case "AzureOpenAIChatCompletions":
+    case "AwsBedrock":
+    case "GoogleVertexAI":
     default:
-      throw new Error(`Provider kind "${provider.kind}" is not available in the agent runtime provider path.`);
+      throw new Error(`Provider protocol "${protocol}" is not available in the agent runtime provider path.`);
   }
 }
 function missingProviderStream(error) {
@@ -10264,38 +11538,475 @@ class ConfiguredRuntimeProvider {
     if (!provider.models.includes(decoded.modelId)) {
       return missingProviderStream(new Error(`Model ${decoded.providerId}/${decoded.modelId} is not enabled for agent runtime.`));
     }
+    let protocol;
+    try {
+      protocol = requireProviderProtocol(provider);
+    } catch (error) {
+      return missingProviderStream(error instanceof Error ? error : new Error(String(error)));
+    }
+    const runtimeBaseUrl = protocol === "OllamaOpenAICompatibleChatCompletions" ? normalizeLocalBaseUrl(provider.baseUrl) : provider.baseUrl;
     const runtimeModel = {
       ...model,
       id: decoded.modelId,
       name: decoded.modelId,
       provider: decoded.providerId,
-      api: toRuntimeApi(provider.kind)
+      api: toRuntimeApi(protocol)
     };
-    const strategy = createProviderStrategy(provider);
+    let strategy;
+    try {
+      strategy = createProviderStrategy(provider, protocol);
+    } catch (error) {
+      return missingProviderStream(error instanceof Error ? error : new Error(String(error)));
+    }
     return strategy.stream(runtimeModel, context2, {
       ...options,
       apiKey: provider.apiKey,
-      baseUrl: provider.baseUrl
+      baseUrl: runtimeBaseUrl
     });
   }
 }
 const configuredRuntimeProvider = new ConfiguredRuntimeProvider();
-const NATIVE_TOOL_PROVIDER_KINDS = /* @__PURE__ */ new Set([
-  "anthropic",
-  "openai-compatible",
-  "openrouter",
-  "azure-openai",
-  "google-ai-studio",
-  "ollama"
+const INDEX_FILENAME = "MEMORY.md";
+function slugify(name) {
+  return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
+}
+function parseFrontmatter(content) {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!match) return { meta: {}, body: content };
+  const meta = {};
+  for (const rawLine of match[1].split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const colonIdx = line.indexOf(":");
+    if (colonIdx <= 0) continue;
+    const key = line.slice(0, colonIdx).trim();
+    const value = line.slice(colonIdx + 1).trim();
+    try {
+      meta[key] = JSON.parse(value);
+    } catch {
+      meta[key] = value.replace(/^['"]|['"]$/g, "");
+    }
+  }
+  return { meta, body: match[2].trim() };
+}
+function serializeFrontmatterValue(value) {
+  if (typeof value === "string") return value;
+  return JSON.stringify(value);
+}
+function buildMemoryFile(record) {
+  const lines = ["---"];
+  lines.push(`id: ${serializeFrontmatterValue(record.id)}`);
+  lines.push(`name: ${serializeFrontmatterValue(record.name)}`);
+  lines.push(`description: ${serializeFrontmatterValue(record.description)}`);
+  lines.push(`type: ${serializeFrontmatterValue(record.type)}`);
+  if (record.tags && record.tags.length > 0) {
+    lines.push(`tags: ${JSON.stringify(record.tags)}`);
+  }
+  lines.push(`createdAt: ${record.createdAt}`);
+  lines.push(`updatedAt: ${record.updatedAt}`);
+  lines.push("---");
+  lines.push("");
+  lines.push(record.content.trim());
+  lines.push("");
+  return lines.join("\n");
+}
+class MemoryStore {
+  memoryDir;
+  /**
+   * @param memoryDir 记忆文件所在目录。建议传入绝对路径（例如
+   *                  `path.join(workspaceRoot, '.rdc-agent', 'memory')`）。
+   */
+  constructor(memoryDir) {
+    this.memoryDir = memoryDir;
+  }
+  /**
+   * 获取存储目录路径。
+   */
+  getMemoryDir() {
+    return this.memoryDir;
+  }
+  /**
+   * 写入一条新的记忆，并重建索引。
+   *
+   * - ID 由 `mem_${Date.now()}_${hex}` 生成；
+   * - 文件名采用 slug 化的 `name`，重复写入会覆盖同名文件并保留原始 `createdAt`。
+   */
+  async writeMemory(input) {
+    await this.ensureDir();
+    const slug = slugify(input.name);
+    if (!slug) {
+      throw new Error(`MemoryStore.writeMemory: 无法将 name="${input.name}" 转为有效 slug`);
+    }
+    const filePath = path__namespace$1.join(this.memoryDir, `${slug}.md`);
+    const now = Date.now();
+    let existing = null;
+    try {
+      existing = await this.parseMemoryFile(filePath);
+    } catch {
+      existing = null;
+    }
+    const record = {
+      id: existing?.id ?? `mem_${now}_${node_crypto.randomBytes(4).toString("hex")}`,
+      name: slug,
+      description: input.description,
+      type: input.type,
+      content: input.content,
+      tags: input.tags,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now
+    };
+    await node_fs.promises.writeFile(filePath, buildMemoryFile(record), "utf8");
+    await this.rebuildIndex();
+    return record;
+  }
+  /**
+   * 删除指定 slug 名称的记忆文件，并重建索引。
+   * @returns 是否真的删除成功（文件不存在时返回 false）。
+   */
+  async deleteMemory(name) {
+    const slug = slugify(name);
+    if (!slug) return false;
+    const filePath = path__namespace$1.join(this.memoryDir, `${slug}.md`);
+    try {
+      await node_fs.promises.unlink(filePath);
+    } catch (err) {
+      const code = err.code;
+      if (code === "ENOENT") return false;
+      throw err;
+    }
+    await this.rebuildIndex();
+    return true;
+  }
+  /**
+   * 按 slug 名称读取单条记忆。
+   * @returns 不存在或无法解析时返回 `null`。
+   */
+  async getMemory(name) {
+    const slug = slugify(name);
+    if (!slug) return null;
+    const filePath = path__namespace$1.join(this.memoryDir, `${slug}.md`);
+    try {
+      return await this.parseMemoryFile(filePath);
+    } catch (err) {
+      const code = err.code;
+      if (code === "ENOENT") return null;
+      return null;
+    }
+  }
+  /**
+   * 列出全部记忆（不含 `MEMORY.md` 索引文件），按 name 排序返回。
+   */
+  async listMemories() {
+    await this.ensureDir();
+    let entries = [];
+    try {
+      entries = await node_fs.promises.readdir(this.memoryDir);
+    } catch {
+      return [];
+    }
+    const records = [];
+    for (const entry of entries) {
+      if (!entry.endsWith(".md")) continue;
+      if (entry === INDEX_FILENAME) continue;
+      const filePath = path__namespace$1.join(this.memoryDir, entry);
+      try {
+        const record = await this.parseMemoryFile(filePath);
+        records.push(record);
+      } catch {
+      }
+    }
+    records.sort((a, b) => a.name.localeCompare(b.name));
+    return records;
+  }
+  /**
+   * 根据当前目录下所有记忆文件重建 `MEMORY.md` 索引。
+   */
+  async rebuildIndex() {
+    await this.ensureDir();
+    const records = await this.listMemories();
+    const lines = records.map(
+      (record) => `- [${record.name}](${record.name}.md) — ${record.description}`
+    );
+    const indexPath = path__namespace$1.join(this.memoryDir, INDEX_FILENAME);
+    const content = lines.length > 0 ? `${lines.join("\n")}
+` : "";
+    await node_fs.promises.writeFile(indexPath, content, "utf8");
+  }
+  /**
+   * 返回 `MEMORY.md` 当前内容，便于注入 system prompt。
+   * 文件缺失时返回空字符串。
+   */
+  async getIndexContent() {
+    const indexPath = path__namespace$1.join(this.memoryDir, INDEX_FILENAME);
+    try {
+      const text = await node_fs.promises.readFile(indexPath, "utf8");
+      return text.trim();
+    } catch {
+      return "";
+    }
+  }
+  /**
+   * 解析单个记忆文件为 `MemoryRecord`。
+   * 缺失字段会被赋予合理默认值（保证向前兼容）。
+   */
+  async parseMemoryFile(filePath) {
+    const raw = await node_fs.promises.readFile(filePath, "utf8");
+    const { meta, body } = parseFrontmatter(raw);
+    const fallbackName = path__namespace$1.basename(filePath, ".md");
+    const name = typeof meta.name === "string" && meta.name ? meta.name : fallbackName;
+    const description = typeof meta.description === "string" ? meta.description : body.split(/\r?\n/)[0] ?? "";
+    const rawType = typeof meta.type === "string" ? meta.type : "user";
+    const type = ["user", "feedback", "project", "reference"].includes(rawType) ? rawType : "user";
+    const tags = Array.isArray(meta.tags) ? meta.tags.filter((item) => typeof item === "string") : void 0;
+    const createdAt = typeof meta.createdAt === "number" ? meta.createdAt : Number(meta.createdAt) || Date.now();
+    const updatedAt = typeof meta.updatedAt === "number" ? meta.updatedAt : Number(meta.updatedAt) || createdAt;
+    const id = typeof meta.id === "string" && meta.id ? meta.id : `mem_${createdAt}_${node_crypto.randomBytes(4).toString("hex")}`;
+    return {
+      id,
+      name,
+      description,
+      type,
+      content: body,
+      tags,
+      createdAt,
+      updatedAt
+    };
+  }
+  /**
+   * 确保记忆目录存在。
+   */
+  async ensureDir() {
+    await node_fs.promises.mkdir(this.memoryDir, { recursive: true });
+  }
+}
+const MAX_DIALOGUE_CHARS = 4e3;
+function extractJsonArray(text) {
+  const match = text.match(/\[[\s\S]*\]/);
+  if (!match) return null;
+  try {
+    const parsed = JSON.parse(match[0]);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+function isValidType(value) {
+  return value === "user" || value === "feedback" || value === "project" || value === "reference";
+}
+function normalizeExtracted(item) {
+  if (!item || typeof item !== "object") return null;
+  const record = item;
+  const name = typeof record.name === "string" ? record.name.trim() : "";
+  const description = typeof record.description === "string" ? record.description.trim() : "";
+  const rawType = record.type;
+  const content = typeof record.content === "string" ? record.content : typeof record.body === "string" ? record.body : "";
+  if (!name || !description || !content.trim()) return null;
+  const type = isValidType(rawType) ? rawType : "user";
+  return { name, description, type, content: content.trim() };
+}
+class MemoryExtractor {
+  memoryStore;
+  queryLlm;
+  constructor(options) {
+    this.memoryStore = options.memoryStore;
+    this.queryLlm = options.queryLlm;
+  }
+  /**
+   * 从对话中抽取候选记忆。
+   *
+   * @param messages       原始对话（不含已压缩过的摘要），仅取最近若干条；
+   * @param existingMemories  已存在的记忆，用于去重 + 提供 LLM 上下文。
+   *                          若调用方未传入，会自动从 store 读取。
+   */
+  async extractFromConversation(messages, existingMemories) {
+    const recent = messages.slice(-10);
+    const dialogue = recent.map((msg) => {
+      const content = typeof msg.content === "string" ? msg.content.trim() : "";
+      if (!content) return "";
+      return `${msg.role}: ${content}`;
+    }).filter((line) => line.length > 0).join("\n");
+    if (!dialogue.trim()) return [];
+    const existing = existingMemories ?? await this.memoryStore.listMemories();
+    const existingDesc = existing.length > 0 ? existing.map((m) => `- ${m.name}: ${m.description}`).join("\n") : "(none)";
+    const prompt = `Extract user preferences, constraints, or project facts from this dialogue.
+Return a JSON array. Each item: {name, type, description, content}.
+- name: short kebab-case identifier (e.g. 'user-preference-tabs')
+- type: one of 'user' (user preference), 'feedback' (guidance), 'project' (project fact), 'reference' (external pointer)
+- description: one-line summary for index lookup
+- content: full detail in markdown
+If nothing new or already covered by existing memories, return [].
+
+Existing memories:
+${existingDesc}
+
+Dialogue:
+${dialogue.slice(0, MAX_DIALOGUE_CHARS)}`;
+    let response;
+    try {
+      response = await this.queryLlm(prompt);
+    } catch {
+      return [];
+    }
+    const items = extractJsonArray(response);
+    if (!items) return [];
+    const existingNames = new Set(existing.map((m) => m.name));
+    const seenNames = /* @__PURE__ */ new Set();
+    const results = [];
+    for (const raw of items) {
+      const normalized = normalizeExtracted(raw);
+      if (!normalized) continue;
+      if (existingNames.has(normalized.name)) continue;
+      if (seenNames.has(normalized.name)) continue;
+      seenNames.add(normalized.name);
+      results.push(normalized);
+    }
+    return results;
+  }
+}
+const MAX_CATALOG_CHARS = 16e3;
+const DEFAULT_THRESHOLD = 10;
+function parseConsolidatePlan(text) {
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return { merge: [], delete: [] };
+  let parsed;
+  try {
+    parsed = JSON.parse(match[0]);
+  } catch {
+    return { merge: [], delete: [] };
+  }
+  if (!parsed || typeof parsed !== "object") return { merge: [], delete: [] };
+  const obj = parsed;
+  const merge = [];
+  if (Array.isArray(obj.merge)) {
+    for (const group of obj.merge) {
+      if (!Array.isArray(group)) continue;
+      const names = group.filter((n) => typeof n === "string" && n.trim().length > 0);
+      if (names.length < 2) continue;
+      merge.push(names);
+    }
+  }
+  const deleteList = Array.isArray(obj.delete) ? obj.delete.filter((n) => typeof n === "string" && n.trim().length > 0) : [];
+  return { merge, delete: deleteList };
+}
+class MemoryConsolidator {
+  memoryStore;
+  queryLlm;
+  threshold;
+  constructor(options) {
+    this.memoryStore = options.memoryStore;
+    this.queryLlm = options.queryLlm;
+    this.threshold = options.threshold ?? DEFAULT_THRESHOLD;
+  }
+  /**
+   * 是否需要触发整理：当前记忆条数 ≥ 阈值。
+   */
+  async shouldConsolidate() {
+    const all = await this.memoryStore.listMemories();
+    return all.length >= this.threshold;
+  }
+  /**
+   * 执行整理流程。整理失败或 LLM 不返回有效计划时，原样返回空操作结果。
+   */
+  async consolidate() {
+    const all = await this.memoryStore.listMemories();
+    const empty = {
+      merged: [],
+      deleted: [],
+      kept: all.map((m) => m.name)
+    };
+    if (all.length === 0) return empty;
+    const catalog = all.map(
+      (record) => `## ${record.name}
+description: ${record.description}
+type: ${record.type}
+${record.content}`
+    ).join("\n\n").slice(0, MAX_CATALOG_CHARS);
+    const prompt = `Consolidate the following memory entries. Rules:
+1. Merge duplicates or strongly overlapping entries into one.
+2. Remove outdated or contradicted entries.
+3. Preserve important user preferences above all.
+Return ONLY a JSON object of the shape:
+{ "merge": [["nameA", "nameB"]], "delete": ["nameC"] }
+Each merge group lists the names to combine; the first name will be reused as the merged record name.
+If no change is needed, return { "merge": [], "delete": [] }.
+
+Memories:
+${catalog}`;
+    let response;
+    try {
+      response = await this.queryLlm(prompt);
+    } catch {
+      return empty;
+    }
+    const plan = parseConsolidatePlan(response);
+    const byName = new Map(all.map((m) => [m.name, m]));
+    const merged = [];
+    const deleted = [];
+    for (const group of plan.merge) {
+      const sources = group.map((name) => byName.get(name)).filter((m) => Boolean(m));
+      if (sources.length < 2) continue;
+      const target = sources[0];
+      const mergedContent = sources.map((m) => `### ${m.name}
+${m.description}
+
+${m.content}`).join("\n\n---\n\n");
+      const mergedTags = Array.from(
+        new Set(sources.flatMap((m) => m.tags ?? []).filter((t) => t))
+      );
+      await this.memoryStore.writeMemory({
+        name: target.name,
+        description: target.description,
+        type: target.type,
+        content: mergedContent,
+        tags: mergedTags.length > 0 ? mergedTags : void 0
+      });
+      for (const source of sources.slice(1)) {
+        const ok = await this.memoryStore.deleteMemory(source.name);
+        if (ok) {
+          merged.push(source.name);
+          byName.delete(source.name);
+        }
+      }
+    }
+    for (const name of plan.delete) {
+      if (!byName.has(name)) continue;
+      const ok = await this.memoryStore.deleteMemory(name);
+      if (ok) {
+        deleted.push(name);
+        byName.delete(name);
+      }
+    }
+    await this.memoryStore.rebuildIndex();
+    const final = await this.memoryStore.listMemories();
+    return {
+      merged,
+      deleted,
+      kept: final.map((m) => m.name)
+    };
+  }
+}
+const NATIVE_TOOL_PROTOCOLS = /* @__PURE__ */ new Set([
+  "AnthropicMessages",
+  "OpenAIResponses",
+  "OpenAICompatibleChatCompletions",
+  "OpenRouterChatCompletions",
+  "GoogleGemini",
+  "OllamaOpenAICompatibleChatCompletions"
 ]);
-const STREAMING_PROVIDER_KINDS = /* @__PURE__ */ new Set([
-  "anthropic",
-  "openai-compatible",
-  "openrouter",
-  "azure-openai",
-  "google-ai-studio",
-  "ollama"
+const STREAMING_PROTOCOLS = /* @__PURE__ */ new Set([
+  "AnthropicMessages",
+  "OpenAIResponses",
+  "OpenAICompatibleChatCompletions",
+  "OpenRouterChatCompletions",
+  "GoogleGemini",
+  "OllamaOpenAICompatibleChatCompletions"
 ]);
+function readProviderProtocol(provider) {
+  if (!provider) {
+    return null;
+  }
+  return provider.protocol ?? null;
+}
 function hasCapability(provider, capability) {
   return Boolean(provider?.capabilities?.includes(capability));
 }
@@ -10321,8 +12032,12 @@ function resolveAgentRouteCapability(provider, modelId) {
   if (!hasCapability(provider, "chat")) {
     return disabledCapability(provider.id, modelId);
   }
-  const supportsStreaming = STREAMING_PROVIDER_KINDS.has(provider.kind);
-  const runtimeHasNativeTools = NATIVE_TOOL_PROVIDER_KINDS.has(provider.kind);
+  const protocol = readProviderProtocol(provider);
+  if (!protocol) {
+    return disabledCapability(provider.id, modelId);
+  }
+  const supportsStreaming = STREAMING_PROTOCOLS.has(protocol);
+  const runtimeHasNativeTools = NATIVE_TOOL_PROTOCOLS.has(protocol);
   let toolCallingMode = "text-only";
   if (hasCapability(provider, "tool-calling") && runtimeHasNativeTools) {
     toolCallingMode = "native-structured";
@@ -11095,6 +12810,10 @@ const COPILOT_WIRE_HEADERS = {
   ...COPILOT_EDITOR_HEADERS,
   "Copilot-Integration-Id": "vscode-chat"
 };
+const describeUnsupportedProtocol = (providerId, protocol) => {
+  const value = typeof protocol === "string" && protocol.trim() ? protocol.trim() : "missing";
+  return `Provider ${providerId} uses unsupported protocol "${value}".`;
+};
 const toContentBlocks = (messages) => messages.map((message) => {
   if (typeof message.content === "string") {
     return { role: message.role, content: message.content };
@@ -11171,6 +12890,17 @@ const toOpenAiTools = (tools) => {
       description: tool.description,
       parameters: tool.input_schema
     }
+  }));
+};
+const toResponsesTools = (tools) => {
+  if (!tools?.length) {
+    return void 0;
+  }
+  return tools.map((tool) => ({
+    type: "function",
+    name: tool.name,
+    description: tool.description,
+    parameters: tool.input_schema
   }));
 };
 const toOpenAiReasoningEffort = (budget) => {
@@ -11700,13 +13430,26 @@ class ChatGptAccountProvider extends BaseStreamingProvider {
     return this.baseUrl.endsWith("/responses") ? this.baseUrl : `${this.baseUrl}/responses`;
   }
   createBody(request2, model, stream) {
-    return {
+    const body = {
       model,
       input: toResponsesInput(request2.messages),
       max_output_tokens: request2.maxTokens || 4096,
       temperature: request2.temperature ?? 0.7,
       stream
     };
+    const reasoningEffort = toOpenAiReasoningEffort(request2.reasoningBudget);
+    if (reasoningEffort) {
+      body.reasoning = { effort: reasoningEffort };
+    }
+    if (request2.responseFormat) {
+      body.text = { format: { type: request2.responseFormat } };
+    }
+    const tools = toResponsesTools(request2.tools);
+    if (tools) {
+      body.tools = tools;
+      body.tool_choice = "auto";
+    }
+    return body;
   }
   async chat(request2) {
     const model = request2.model?.trim();
@@ -12027,36 +13770,58 @@ class AnthropicProvider2 extends BaseStreamingProvider {
     return this.models;
   }
 }
-const createProviderByKind = (providerId, kind) => {
-  if (providerId === "chatgpt-account") {
-    return new ChatGptAccountProvider(providerId);
+class UnsupportedProtocolProvider {
+  name;
+  error;
+  constructor(providerId, protocol) {
+    this.name = providerId;
+    this.error = new Error(describeUnsupportedProtocol(providerId, protocol));
   }
-  if (providerId === "github-copilot") {
-    return new GitHubCopilotProvider(providerId);
+  async chat() {
+    throw this.error;
   }
-  if (kind === "openrouter") {
-    return new OpenRouterProvider(providerId);
+  async streamChat() {
+    throw this.error;
   }
-  if (kind === "anthropic") {
-    return new AnthropicProvider2(providerId);
+  async isAvailable() {
+    return true;
   }
-  if (kind === "ollama") {
-    return new OpenAICompatibleProvider2(providerId, false);
+  getModels() {
+    return [];
   }
-  if (kind === "google-ai-studio") {
-    return new GoogleAiStudioProvider(providerId);
+}
+const createProviderByProtocol = (providerConfig) => {
+  const protocol = providerConfig.protocol;
+  if (providerConfig.id === "github-copilot") {
+    return protocol === "OpenAICompatibleChatCompletions" ? new GitHubCopilotProvider(providerConfig.id) : new UnsupportedProtocolProvider(providerConfig.id, protocol);
   }
-  if (kind === "azure-openai") {
-    return new AzureOpenAIProvider(providerId);
+  switch (protocol) {
+    case "OpenRouterChatCompletions":
+      return new OpenRouterProvider(providerConfig.id);
+    case "AnthropicMessages":
+      return new AnthropicProvider2(providerConfig.id);
+    case "OpenAIResponses":
+      return new ChatGptAccountProvider(providerConfig.id);
+    case "OpenAICompatibleChatCompletions":
+      return new OpenAICompatibleProvider2(providerConfig.id, true);
+    case "OllamaOpenAICompatibleChatCompletions":
+      return new OpenAICompatibleProvider2(providerConfig.id, false);
+    case "GoogleGemini":
+      return new GoogleAiStudioProvider(providerConfig.id);
+    case "AzureOpenAIChatCompletions":
+      return new AzureOpenAIProvider(providerConfig.id);
+    case "AwsBedrock":
+    case "GoogleVertexAI":
+    default:
+      return new UnsupportedProtocolProvider(providerConfig.id, protocol);
   }
-  return new OpenAICompatibleProvider2(providerId, true);
 };
 class LLMAdapter {
   providers = /* @__PURE__ */ new Map();
   configure(config) {
     this.providers.clear();
     for (const providerConfig of config.providers) {
-      const provider = createProviderByKind(providerConfig.id, providerConfig.kind);
+      const provider = createProviderByProtocol(providerConfig);
       if ("configure" in provider && typeof provider.configure === "function") {
         provider.configure(providerConfig);
       }
@@ -12125,9 +13890,33 @@ const CHATGPT_CALLBACK_PORT = 1455;
 const CHATGPT_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 const CLAUDE_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const GITHUB_COPILOT_CLIENT_ID = "Iv1.b507a08c87ecfe98";
+const GROK_AUTH_DEVICE_ENDPOINT = "https://auth.x.ai/oauth2/device/code";
+const GROK_AUTH_TOKEN_ENDPOINT = "https://auth.x.ai/oauth2/token";
+const GROK_AUTH_USERINFO_ENDPOINT = "https://auth.x.ai/oauth2/userinfo";
+const GROK_AUTH_REVOKE_ENDPOINT = "https://auth.x.ai/oauth2/revoke";
+const GROK_API_BASE_URL = "https://api.x.ai/v1";
+const GROK_OAUTH_SCOPE = "openid profile email offline_access api:access";
+const GROK_OAUTH_CLIENT_ID_ENV_KEYS = [
+  "RDC_AGENT_GROK_OAUTH_CLIENT_ID",
+  "GROK_OAUTH_CLIENT_ID",
+  "XAI_OAUTH_CLIENT_ID"
+];
 const pendingFlows = /* @__PURE__ */ new Map();
 const isAccountProviderId = (providerId) => providerId === "claude-account" || providerId === "chatgpt-account" || providerId === "github-copilot" || providerId === "grok-account" || providerId === "gemini-account" || providerId === "qwen-account";
-const isMockableAccountProviderId = (providerId) => providerId === "grok-account" || providerId === "gemini-account" || providerId === "qwen-account";
+const isUnimplementedAccountProviderId = (providerId) => providerId === "gemini-account" || providerId === "qwen-account";
+const resolveGrokOAuthClientId = (draft) => {
+  const cleanDraft = draft?.trim();
+  if (cleanDraft) {
+    return { clientId: cleanDraft, source: "draft" };
+  }
+  for (const key of GROK_OAUTH_CLIENT_ID_ENV_KEYS) {
+    const value = process.env[key]?.trim();
+    if (value) {
+      return { clientId: value, source: "env" };
+    }
+  }
+  return {};
+};
 const isTestMode$1 = () => process.env.RDC_AGENT_TEST_MODE === "1";
 const base64Url = (buffer) => buffer.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const createPkce = () => {
@@ -12231,7 +14020,12 @@ const isExpiringSoon = (expiresAt) => {
   return Number.isFinite(timestamp) && timestamp <= Date.now() + 6e4;
 };
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
-const canRefreshBundle = (bundle) => Boolean(bundle.refreshToken || bundle.providerId === "github-copilot" && bundle.accessToken);
+const canRefreshBundle = (bundle) => {
+  if (bundle.providerId === "grok-account") {
+    return Boolean(bundle.refreshToken && bundle.clientId);
+  }
+  return Boolean(bundle.refreshToken || bundle.providerId === "github-copilot" && bundle.accessToken);
+};
 const fetchJson = async (url2, init) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS$1);
@@ -12251,6 +14045,25 @@ const fetchJson = async (url2, init) => {
     clearTimeout(timeout);
   }
 };
+const fetchOAuthJson = async (url2, init) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS$1);
+  try {
+    const response = await fetch(url2, {
+      ...init,
+      signal: controller.signal
+    });
+    const text = await response.text();
+    const payload = text ? JSON.parse(text) : {};
+    if (!response.ok && !(payload && typeof payload === "object" && typeof payload.error === "string")) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return payload;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+const createFormBody = (params) => new URLSearchParams(params).toString();
 const parseModels = (payload) => {
   if (!payload || typeof payload !== "object") {
     return [];
@@ -12274,7 +14087,8 @@ const parseCopilotModels = (payload) => {
   }));
 };
 class ProviderAccountAuthService {
-  async startLogin(providerId) {
+  async startLogin(request2) {
+    const providerId = request2.providerId;
     if (!isAccountProviderId(providerId)) {
       return this.status(providerId, "Provider does not support account login.");
     }
@@ -12284,10 +14098,13 @@ class ProviderAccountAuthService {
     if (providerId === "chatgpt-account") {
       return this.startChatGptLogin();
     }
-    if (isMockableAccountProviderId(providerId)) {
-      return this.startMockableAccountLogin(providerId);
+    if (providerId === "github-copilot") {
+      return this.startGitHubCopilotLogin();
     }
-    return this.startGitHubCopilotLogin();
+    if (providerId === "grok-account") {
+      return this.startGrokLogin(request2.oauthClientId);
+    }
+    return this.startUnimplementedAccountLogin(providerId);
   }
   async finishLogin(request2) {
     if (!isAccountProviderId(request2.providerId)) {
@@ -12299,19 +14116,26 @@ class ProviderAccountAuthService {
     }
     try {
       if (request2.providerId === "claude-account") {
-        const bundle2 = await this.exchangeClaudeCode(flow, request2.code?.trim() ?? "");
-        return await this.persistAccount(request2.providerId, bundle2);
+        const bundle = await this.exchangeClaudeCode(flow, request2.code?.trim() ?? "");
+        return await this.persistAccount(request2.providerId, bundle);
       }
       if (request2.providerId === "chatgpt-account") {
-        const bundle2 = await this.exchangeChatGptCode(flow, request2.code?.trim() ?? "");
-        return await this.persistAccount(request2.providerId, bundle2);
+        const bundle = await this.exchangeChatGptCode(flow, request2.code?.trim() ?? "");
+        return await this.persistAccount(request2.providerId, bundle);
       }
-      if (isMockableAccountProviderId(request2.providerId)) {
-        const bundle2 = this.exchangeMockableAccountCode(flow, request2.code?.trim() ?? "");
-        return await this.persistAccount(request2.providerId, bundle2);
+      if (isUnimplementedAccountProviderId(request2.providerId)) {
+        const bundle = this.exchangeUnimplementedAccountCode(flow, request2.code?.trim() ?? "");
+        return await this.persistAccount(request2.providerId, bundle);
       }
-      const bundle = await this.pollGitHubDevice(flow);
-      return await this.persistAccount(request2.providerId, bundle);
+      if (request2.providerId === "github-copilot") {
+        const bundle = await this.pollGitHubDevice(flow);
+        return await this.persistAccount(request2.providerId, bundle);
+      }
+      if (request2.providerId === "grok-account") {
+        const bundle = await this.pollGrokDevice(flow);
+        return await this.persistAccount(request2.providerId, bundle);
+      }
+      return this.status(request2.providerId, "Provider does not support account login.", "failed");
     } catch (error) {
       flow.error = parseProviderError$1(error);
       return this.status(request2.providerId, flow.error, "failed");
@@ -12380,8 +14204,9 @@ class ProviderAccountAuthService {
     const isAccount = isAccountProviderId(providerId);
     const flow = isAccount ? this.findFlow(providerId) : null;
     const connected = Boolean(provider?.isConfigured && provider.status === "verified");
-    const state2 = forcedState ?? (flow?.error ? "failed" : flow ? "pending" : connected ? "connected" : isAccount ? "signed-out" : "unavailable");
-    const pendingMessage = providerId === "github-copilot" ? "Waiting for GitHub authorization." : isAccount && flow && isMockableAccountProviderId(providerId) ? "Waiting for mockable account authorization." : "Waiting for authorization.";
+    const grokClientIdSource = providerId === "grok-account" ? flow?.clientId ? "draft" : connected && this.readBundle("grok-account")?.clientId ? "stored" : resolveGrokOAuthClientId().source : void 0;
+    const state2 = forcedState ?? (connected ? "connected" : flow?.error ? "failed" : flow ? "pending" : isAccount ? "signed-out" : "unavailable");
+    const pendingMessage = providerId === "github-copilot" ? "Waiting for GitHub authorization." : providerId === "grok-account" ? "Waiting for xAI authorization." : "Waiting for authorization.";
     return {
       providerId,
       state: state2,
@@ -12395,13 +14220,19 @@ class ProviderAccountAuthService {
       authUrl: flow?.authUrl,
       verificationUri: flow?.verificationUri,
       userCode: flow?.userCode,
-      requiresCodeInput: Boolean(flow?.providerId === "claude-account" || flow && isMockableAccountProviderId(flow.providerId)),
+      requiresCodeInput: Boolean(flow?.providerId === "claude-account" || flow && isUnimplementedAccountProviderId(flow.providerId)),
+      requiresClientId: providerId === "grok-account" && !connected && !grokClientIdSource,
+      clientIdSource: grokClientIdSource,
       models: provider?.models ?? []
     };
   }
   logout(providerId) {
     if (isAccountProviderId(providerId)) {
+      const bundle = providerId === "grok-account" ? this.readBundle("grok-account") : null;
       this.clearFlows(providerId);
+      if (bundle) {
+        void this.revokeGrokBundle(bundle);
+      }
       settingsService.disconnectProvider(providerId);
     }
     return this.status(providerId);
@@ -12487,7 +14318,52 @@ class ProviderAccountAuthService {
     });
     return this.status(flow.providerId);
   }
-  startMockableAccountLogin(providerId) {
+  async startGrokLogin(oauthClientId) {
+    const resolved = resolveGrokOAuthClientId(oauthClientId);
+    if (!resolved.clientId) {
+      return this.status(
+        "grok-account",
+        "Grok OAuth client id is required. Enter an OAuth client id or set RDC_AGENT_GROK_OAUTH_CLIENT_ID.",
+        "failed"
+      );
+    }
+    try {
+      const payload = await fetchJson(GROK_AUTH_DEVICE_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: createFormBody({
+          client_id: resolved.clientId,
+          scope: GROK_OAUTH_SCOPE
+        })
+      });
+      if (!payload.device_code || !payload.user_code || !payload.verification_uri) {
+        throw new Error("xAI OAuth did not return a complete device authorization payload.");
+      }
+      const flow = {
+        providerId: "grok-account",
+        flowId: crypto.randomUUID(),
+        state: crypto.randomUUID(),
+        deviceCode: payload.device_code,
+        userCode: payload.user_code,
+        verificationUri: payload.verification_uri,
+        authUrl: payload.verification_uri_complete ?? payload.verification_uri,
+        intervalSeconds: payload.interval ?? 5,
+        clientId: resolved.clientId,
+        expiresAt: Date.now() + (payload.expires_in ?? 900) * 1e3
+      };
+      this.setFlow(flow);
+      void this.openExternal(flow.authUrl);
+      void this.pollGrokDevice(flow).then((bundle) => this.persistAccount("grok-account", bundle)).catch((error) => {
+        flow.error = parseProviderError$1(error);
+      });
+      return this.status(flow.providerId);
+    } catch (error) {
+      return this.status("grok-account", parseProviderError$1(error), "failed");
+    }
+  }
+  startUnimplementedAccountLogin(providerId) {
     const definition = getBuiltinProviderDefinition(providerId);
     const flow = {
       providerId,
@@ -12500,7 +14376,7 @@ class ProviderAccountAuthService {
     void this.openExternal(flow.authUrl);
     return this.status(
       flow.providerId,
-      isTestMode$1() ? "Mockable account authorization flow started." : "Live account OAuth is not yet configured for this provider; mock verification is available in test mode."
+      isTestMode$1() ? "Test-only account authorization flow started." : "Live account OAuth is not configured for this provider; automated test-mode verification is the only available path."
     );
   }
   async exchangeClaudeCode(flow, code) {
@@ -12627,9 +14503,81 @@ class ProviderAccountAuthService {
       };
     }
   }
-  exchangeMockableAccountCode(flow, code) {
-    if (!isMockableAccountProviderId(flow.providerId)) {
-      throw new Error("Provider is not a mockable account adapter.");
+  async pollGrokDevice(flow) {
+    if (!flow.deviceCode || !flow.clientId) {
+      throw new Error("Grok device authorization is missing client or device code.");
+    }
+    let intervalSeconds = flow.intervalSeconds ?? 5;
+    let delayBeforePoll = !isTestMode$1();
+    for (; ; ) {
+      if (Date.now() > flow.expiresAt) {
+        throw new Error("Grok authorization code expired.");
+      }
+      if (delayBeforePoll) {
+        await wait(intervalSeconds * 1e3);
+      }
+      delayBeforePoll = true;
+      const payload = await fetchOAuthJson(GROK_AUTH_TOKEN_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: createFormBody({
+          grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+          client_id: flow.clientId,
+          device_code: flow.deviceCode
+        })
+      });
+      if (payload.error === "authorization_pending") {
+        delete flow.error;
+        continue;
+      }
+      if (payload.error === "slow_down") {
+        delete flow.error;
+        intervalSeconds += 5;
+        continue;
+      }
+      if (payload.error) {
+        throw new Error(payload.error_description ?? payload.error);
+      }
+      if (!payload.access_token) {
+        throw new Error("xAI OAuth did not return an access token.");
+      }
+      const account = await this.fetchGrokUserInfo(payload.access_token);
+      return {
+        providerId: "grok-account",
+        accessToken: payload.access_token,
+        apiKey: payload.access_token,
+        refreshToken: payload.refresh_token,
+        idToken: payload.id_token,
+        clientId: flow.clientId,
+        accountId: account.accountId,
+        expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1e3).toISOString(),
+        accountLabel: account.accountLabel ?? "Grok Account",
+        planLabel: "xAI OAuth"
+      };
+    }
+  }
+  async fetchGrokUserInfo(accessToken) {
+    try {
+      const payload = await fetchJson(GROK_AUTH_USERINFO_ENDPOINT, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      });
+      const record = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+      return {
+        accountId: readString(record.sub),
+        accountLabel: readString(record.email) ?? readString(record.name) ?? readString(record.preferred_username) ?? readString(record.sub)
+      };
+    } catch {
+      return {};
+    }
+  }
+  exchangeUnimplementedAccountCode(flow, code) {
+    if (!isUnimplementedAccountProviderId(flow.providerId)) {
+      throw new Error("Provider is not an unimplemented account adapter.");
     }
     if (!isTestMode$1()) {
       const definition = getBuiltinProviderDefinition(flow.providerId);
@@ -12640,11 +14588,11 @@ class ProviderAccountAuthService {
     }
     return {
       providerId: flow.providerId,
-      accessToken: `mock-${flow.providerId}-${flow.state}`,
-      apiKey: `mock-${flow.providerId}-${flow.state}`,
+      accessToken: `test-${flow.providerId}-${flow.state}`,
+      apiKey: `test-${flow.providerId}-${flow.state}`,
       expiresAt: new Date(Date.now() + 3600 * 1e3).toISOString(),
       accountLabel: getBuiltinProviderDefinition(flow.providerId)?.label ?? flow.providerId,
-      planLabel: "Mock account"
+      planLabel: "Test account"
     };
   }
   async persistAccount(providerId, bundle) {
@@ -12692,7 +14640,37 @@ class ProviderAccountAuthService {
         expiresAt: copilot.expires_at ? new Date(copilot.expires_at * 1e3).toISOString() : bundle.expiresAt
       };
     }
-    if (isMockableAccountProviderId(bundle.providerId)) {
+    if (bundle.providerId === "grok-account") {
+      if (!bundle.refreshToken || !bundle.clientId) {
+        return bundle;
+      }
+      const payload2 = await fetchOAuthJson(GROK_AUTH_TOKEN_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: createFormBody({
+          grant_type: "refresh_token",
+          client_id: bundle.clientId,
+          refresh_token: bundle.refreshToken
+        })
+      });
+      if (payload2.error) {
+        throw new Error(payload2.error_description ?? payload2.error);
+      }
+      if (!payload2.access_token) {
+        throw new Error("xAI OAuth refresh did not return an access token.");
+      }
+      return {
+        ...bundle,
+        accessToken: payload2.access_token,
+        apiKey: payload2.access_token,
+        idToken: payload2.id_token ?? bundle.idToken,
+        refreshToken: payload2.refresh_token ?? bundle.refreshToken,
+        expiresAt: new Date(Date.now() + (payload2.expires_in ?? 3600) * 1e3).toISOString()
+      };
+    }
+    if (isUnimplementedAccountProviderId(bundle.providerId)) {
       return bundle;
     }
     if (!bundle.refreshToken) {
@@ -12747,8 +14725,21 @@ class ProviderAccountAuthService {
     };
   }
   async discoverModels(bundle) {
-    if (bundle.providerId === "chatgpt-account" || bundle.providerId === "claude-account" || isMockableAccountProviderId(bundle.providerId)) {
+    if (bundle.providerId === "chatgpt-account" || bundle.providerId === "claude-account" || isUnimplementedAccountProviderId(bundle.providerId)) {
       return createAccountCatalogModels(bundle.providerId);
+    }
+    if (bundle.providerId === "grok-account") {
+      const token = bundle.accessToken ?? bundle.apiKey;
+      if (!token) {
+        throw new Error("Grok account access token is missing. Sign in again.");
+      }
+      const payload2 = await fetchJson(`${GROK_API_BASE_URL}/models`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      return parseModels(payload2);
     }
     if (bundle.providerId === "github-copilot") {
       const catalogModels = createAccountCatalogModels(bundle.providerId);
@@ -12774,6 +14765,29 @@ class ProviderAccountAuthService {
       }
     });
     return parseModels(payload);
+  }
+  async revokeGrokBundle(bundle) {
+    if (bundle.providerId !== "grok-account" || !bundle.clientId) {
+      return;
+    }
+    const token = bundle.refreshToken ?? bundle.accessToken ?? bundle.apiKey;
+    if (!token) {
+      return;
+    }
+    try {
+      await fetchOAuthJson(GROK_AUTH_REVOKE_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: createFormBody({
+          client_id: bundle.clientId,
+          token,
+          token_type_hint: bundle.refreshToken ? "refresh_token" : "access_token"
+        })
+      });
+    } catch {
+    }
   }
   readBundle(providerId) {
     const raw = settingsService.getProviderOAuthSecret(providerId);
@@ -12914,7 +14928,8 @@ const ASK_READONLY_TOOL_ALLOWLIST = [
   "git_status",
   "git_diff",
   "git_log",
-  "tool_search"
+  "tool_search",
+  "memory_read"
 ];
 const CANONICAL_TOOL_EXPANSIONS = {
   read: ["read_file"],
@@ -12963,8 +14978,6 @@ const RUNTIME_TOOL_ALIASES = {
   write_file: "write_file",
   edit: "edit_file",
   edit_file: "edit_file",
-  todo: "task_list",
-  task: "task_list",
   task_create: "task_create",
   task_update: "task_update",
   task_get: "task_get",
@@ -12975,8 +14988,11 @@ const RUNTIME_TOOL_ALIASES = {
   agent: "agent_handoff",
   handoff: "agent_handoff",
   agent_handoff: "agent_handoff",
+  subagent: "subagent",
   memory: "memory_read",
   memory_read: "memory_read",
+  memory_write: "memory_write",
+  memory_delete: "memory_delete",
   planArtifact: "plan_artifact",
   artifact: "plan_artifact",
   plan_artifact: "plan_artifact",
@@ -13013,11 +15029,14 @@ const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
   "edit_file",
   "ask_user",
   "agent_handoff",
+  "subagent",
   "task_create",
   "task_update",
   "task_get",
   "task_list",
   "memory_read",
+  "memory_write",
+  "memory_delete",
   "plan_artifact",
   "skills",
   "skill_run",
@@ -13083,6 +15102,22 @@ class AgentOrchestrator {
   connectedMcpServerIds = /* @__PURE__ */ new Set();
   failedMcpServers = /* @__PURE__ */ new Map();
   skillEngine = new SkillEngine();
+  memoryStoreInstance = null;
+  memoryExtractorInstance = null;
+  memoryConsolidatorInstance = null;
+  /** 内联提取频率控制：每 N 轮触发一次，避免每轮 LLM 调用开销。 */
+  memoryExtractTurnCounter = 0;
+  static MEMORY_EXTRACT_INTERVAL = 3;
+  /**
+   * 当前 turn 的事件下沉（subagent 工具执行时读取，把子 agent 事件桥接到父 trace）。
+   * 单进程串行，无并发问题；runAgentTurn 设置，turn 结束清理。
+   */
+  currentTurnEventSink = null;
+  /**
+   * 待处理的 handoff 请求（agent_handoff 工具成功时设置，
+   * ConversationService turn 结束后 consume，实现 session 级 profile 切换）。
+   */
+  pendingHandoff = null;
   constructor() {
     this.initializeAgents();
   }
@@ -13249,11 +15284,10 @@ class AgentOrchestrator {
         this.updateAgentStatus(agentId, "complete");
         return finalStub;
       }
-      const userPrompt = options?.promptOverride ?? content;
       const toolAllowlist = resolveAgentToolAllowlist(agentId, options?.stage && options.stage !== "report" ? options.stage : void 0);
       const responseText = await this.runAgentTurn({
         agentId,
-        content: userPrompt,
+        content,
         systemPrompt: this.systemPromptForAgent(agentId, config.systemPrompt),
         providerId: config.modelProvider,
         modelId: config.modelName,
@@ -13267,8 +15301,6 @@ class AgentOrchestrator {
         turnId: options?.turnId,
         toolAllowlist,
         options,
-        // A profile turn is isolated so previous cached chat state cannot leak into this user turn.
-        useFreshAgent: true,
         projectRootPath: options?.projectRootPath ?? null,
         projectId: options?.projectId ?? null
       });
@@ -13293,46 +15325,305 @@ class AgentOrchestrator {
     }
   }
   // -------------------------------------------------------------------
-  // Agent 实例池
+  // Subagent（串行派生隔离 Context）
   // -------------------------------------------------------------------
-  getOrCreateAgentSlot(agentId, providerId, modelId, systemPrompt, tools = [], toolExecutor = this.createToolExecutor(agentId, [], void 0), streamOptions, turnSignature = "") {
+  /**
+   * 派生子 agent 执行任务（串行，父阻塞等待）。
+   *
+   * 对标 claude-code AgentTool：独立 context/message thread、filtered tools、
+   * 独立 permission context。子 agent 事件桥接为 `subagent.*` 事件上抛父 trace。
+   * 结果回传 = 函数返回值（不用 mailbox/队列）。
+   *
+   * @returns 子 agent 最终 assistant 文本。
+   */
+  async runSubagent(input) {
+    const subagentId = generateEventId("subagent");
+    const subagentSessionId = input.parentSessionId ? `${input.parentSessionId}::subagent::${subagentId}` : null;
+    input.parentOnEvent?.({
+      id: generateEventId("agent-event"),
+      type: "subagent.started",
+      timestamp: nowMs(),
+      sessionId: input.parentSessionId ?? null,
+      agentId: input.parentAgentId,
+      payload: {
+        subagentId,
+        profile: input.targetProfile,
+        parentToolCallId: input.parentToolCallId,
+        text: input.task
+      }
+    });
+    const definition = settingsService.getAll().agents.definitions.find((d) => d.id === input.targetProfile && d.enabled);
+    const systemPrompt = definition?.instructions?.trim() || this.systemPromptForAgent(input.targetProfile);
+    let resultText = "";
+    let resultStatus = "complete";
+    try {
+      resultText = await this.sendProfileMessage(
+        input.targetProfile,
+        input.task,
+        {
+          sessionId: subagentSessionId ?? void 0,
+          stage: "investigate",
+          patternId: "subagent",
+          projectRootPath: input.projectRootPath,
+          projectId: input.projectId,
+          systemPrompt,
+          onEvent: (event) => {
+            if (event.type === "assistant.delta") {
+              const delta = event.payload;
+              if (delta.text) {
+                input.parentOnEvent?.({
+                  id: generateEventId("agent-event"),
+                  type: "subagent.delta",
+                  timestamp: nowMs(),
+                  sessionId: input.parentSessionId ?? null,
+                  agentId: input.parentAgentId,
+                  payload: {
+                    subagentId,
+                    profile: input.targetProfile,
+                    parentToolCallId: input.parentToolCallId,
+                    text: delta.text
+                  }
+                });
+              }
+            }
+          }
+        }
+      );
+    } catch (error) {
+      resultStatus = "failed";
+      resultText = error instanceof Error ? error.message : String(error);
+    }
+    input.parentOnEvent?.({
+      id: generateEventId("agent-event"),
+      type: "subagent.completed",
+      timestamp: nowMs(),
+      sessionId: input.parentSessionId ?? null,
+      agentId: input.parentAgentId,
+      payload: {
+        subagentId,
+        profile: input.targetProfile,
+        parentToolCallId: input.parentToolCallId,
+        text: resultText,
+        status: resultStatus
+      }
+    });
+    return resultText;
+  }
+  /**
+   * 创建 subagent 工具（task / agent），注入父 agent 工具集。
+   *
+   * - `task`：派生通用 explore 子 agent（对标 claude-code Task 工具）。
+   * - `agent`：按指定 profile 派生子 agent。
+   */
+  createSubagentTools(parentAgentId, sessionId) {
+    const orchestrator = this;
+    const runSubagentTool = {
+      name: "subagent",
+      label: "Subagent",
+      description: 'Delegate a sub-task to an isolated sub-agent. The sub-agent runs to completion (serial, not parallel) and returns its final answer. Use profile to target a specific agent profile (defaults to "ask" read-only).',
+      parameters: {
+        type: "object",
+        required: ["task"],
+        properties: {
+          task: { type: "string", description: "The task description for the sub-agent." },
+          profile: { type: "string", description: 'Target profile id. Defaults to "ask" (read-only).' }
+        }
+      },
+      permissionHint: "readonly",
+      async execute(toolCallId, args, _signal) {
+        const targetProfile = typeof args.profile === "string" && args.profile.trim() ? args.profile.trim() : "ask";
+        const result = await orchestrator.runSubagent({
+          parentAgentId,
+          parentToolCallId: toolCallId,
+          targetProfile,
+          task: args.task,
+          parentSessionId: sessionId ?? null,
+          parentOnEvent: orchestrator.currentTurnEventSink?.onEvent,
+          projectRootPath: orchestrator.currentTurnEventSink?.projectRootPath ?? null,
+          projectId: orchestrator.currentTurnEventSink?.projectId ?? null
+        });
+        return {
+          content: [{ type: "text", text: result || "(sub-agent returned empty output)" }],
+          details: { subagentId: toolCallId, profile: targetProfile, status: "complete" }
+        };
+      }
+    };
+    return [runSubagentTool];
+  }
+  getOrCreateAgentSlot(agentId, providerId, modelId, systemPrompt, tools = [], toolExecutor = this.createToolExecutor(agentId, [], void 0), streamOptions, turnSignature = "", sessionId) {
+    const slotKey = this.agentSlotKey(sessionId, agentId);
     const toolSignature = this.createToolSignature(tools);
-    const existing = this.agentSlots.get(agentId);
+    const existing = this.agentSlots.get(slotKey);
     if (existing && existing.providerId === providerId && existing.modelId === modelId && existing.systemPrompt === systemPrompt && existing.toolSignature === toolSignature && existing.turnSignature === turnSignature && !existing.agent.isStreaming) {
       return existing;
     }
+    const persistedMessages = sessionId ? storageAdapter.readAgentThread(sessionId, agentId) : [];
+    const agentModel = encodeAgentModel(providerId, modelId);
+    const contextManager = new ContextManager({
+      modelId,
+      contextTokenLimit: Math.floor(agentModel.contextWindow * 0.75),
+      toolResultBudget: 200 * 1024,
+      keepRecentToolResults: 3
+    });
+    const errorRecovery = new ErrorRecovery({ primaryModel: agentModel });
     const agent = new Agent({
       initialState: {
-        model: encodeAgentModel(providerId, modelId),
+        model: agentModel,
         systemPrompt,
         tools,
-        messages: []
+        messages: persistedMessages
       },
       provider: configuredRuntimeProvider,
       toolExecutor,
       streamOptions,
-      maxTurns: 8
+      maxTurns: this.resolveMaxTurns(agentId),
+      // transformContext：长对话接近窗口上限时自动压缩历史。
+      transformContext: (messages) => contextManager.compress(messages, agentModel),
+      // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
+      errorRecovery
     });
     const slot = { agent, providerId, modelId, systemPrompt, toolSignature, turnSignature };
-    this.agentSlots.set(agentId, slot);
+    this.agentSlots.set(slotKey, slot);
     return slot;
   }
-  /** Create a fresh one-shot agent slot for an isolated profile turn. */
-  createFreshAgentSlot(providerId, modelId, systemPrompt, tools = [], toolExecutor = this.createToolExecutor("ask", [], void 0), streamOptions) {
-    const toolSignature = this.createToolSignature(tools);
-    const agent = new Agent({
-      initialState: {
-        model: encodeAgentModel(providerId, modelId),
-        systemPrompt,
-        tools,
-        messages: []
-      },
-      provider: configuredRuntimeProvider,
-      toolExecutor,
-      streamOptions,
-      maxTurns: 4
+  /** 复合 slot key：`${sessionId}::${agentId}`，使 Agent 按 session+profile 隔离。 */
+  agentSlotKey(sessionId, agentId) {
+    return sessionId ? `${sessionId}::${agentId}` : `__no_session__::${agentId}`;
+  }
+  /**
+   * 解析 Agent 的工具执行轮数上限。
+   *
+   * 优先用 `.agent.md` frontmatter 的 `max-turns`；
+   * 未配置时按 profile 默认：edit/debugger/optimizer=50，ask/plan/analyzer=25。
+   */
+  resolveMaxTurns(agentId) {
+    const manifest = settingsService.getAll().agents.definitions.find((definition) => definition.id === agentId && definition.enabled);
+    if (manifest?.maxTurns && manifest.maxTurns > 0) {
+      return manifest.maxTurns;
+    }
+    if (agentId === "edit" || agentId === "debugger" || agentId === "optimizer") {
+      return 50;
+    }
+    return 25;
+  }
+  // =====================================================================
+  // Memory 引擎（持久记忆 + 内联提取 + consolidation）
+  // =====================================================================
+  /** 共享 MemoryStore 单例（懒构造，workspacePath 就绪后实例化）。 */
+  get memoryStore() {
+    if (!this.memoryStoreInstance) {
+      const memoryDir = path__namespace.join(storageAdapter.getWorkspacePath(), ".rdc-agent", "memory");
+      this.memoryStoreInstance = new MemoryStore(memoryDir);
+    }
+    return this.memoryStoreInstance;
+  }
+  /**
+   * 读取 memory 索引内容（MEMORY.md），供 system prompt 注入。
+   * 失败时返回空串，不阻塞 prompt 组装。
+   */
+  async getMemoryIndex() {
+    try {
+      return await this.memoryStore.getIndexContent();
+    } catch {
+      return "";
+    }
+  }
+  /** Memory 面板用：列出全部记忆摘要。 */
+  async listMemoriesForUi() {
+    try {
+      const all = await this.memoryStore.listMemories();
+      return all.map((m) => ({ name: m.name, description: m.description, type: m.type, updatedAt: m.updatedAt }));
+    } catch {
+      return [];
+    }
+  }
+  /** Memory 面板用：读取单条记忆详情。 */
+  async getMemoryForUi(name) {
+    try {
+      const record = await this.memoryStore.getMemory(name);
+      if (!record) return null;
+      return {
+        name: record.name,
+        description: record.description,
+        type: record.type,
+        content: record.content,
+        tags: record.tags,
+        createdAt: record.createdAt,
+        updatedAt: record.updatedAt
+      };
+    } catch {
+      return null;
+    }
+  }
+  /** Memory 面板用：写入记忆。 */
+  async writeMemoryForUi(request2) {
+    try {
+      const record = await this.memoryStore.writeMemory(request2);
+      return { success: true, name: record.name };
+    } catch (error) {
+      return { success: false, name: request2.name, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+  /** Memory 面板用：删除记忆。 */
+  async deleteMemoryForUi(name) {
+    try {
+      const deleted = await this.memoryStore.deleteMemory(name);
+      return { success: deleted };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+  /**
+   * 消费待处理的 handoff 请求（agent_handoff 工具成功时设置）。
+   *
+   * ConversationService 在 profile turn 完成后调用：若有 pendingHandoff，
+   * emit handoff.requested 事件 + 持久化到 session，下次消息自动用新 profile。
+   * 读取后清除（一次性消费）。
+   */
+  consumePendingHandoff() {
+    const handoff = this.pendingHandoff;
+    this.pendingHandoff = null;
+    return handoff;
+  }
+  /** 共享 MemoryExtractor（依赖 queryLlm 适配器）。 */
+  get memoryExtractor() {
+    if (!this.memoryExtractorInstance) {
+      this.memoryExtractorInstance = new MemoryExtractor({
+        memoryStore: this.memoryStore,
+        queryLlm: (prompt) => this.queryLlmForMemory(prompt)
+      });
+    }
+    return this.memoryExtractorInstance;
+  }
+  /** 共享 MemoryConsolidator（阈值默认 10）。 */
+  get memoryConsolidator() {
+    if (!this.memoryConsolidatorInstance) {
+      this.memoryConsolidatorInstance = new MemoryConsolidator({
+        memoryStore: this.memoryStore,
+        queryLlm: (prompt) => this.queryLlmForMemory(prompt)
+      });
+    }
+    return this.memoryConsolidatorInstance;
+  }
+  /**
+   * Memory 提取/整合用的 LLM 适配器。
+   *
+   * 取 ask agent 的 route（或首个 agentRoute）作主模型，
+   * 通过 configuredRuntimeProvider.stream 发起单轮非流式调用。
+   * 失败时抛错，由 MemoryExtractor/MemoryConsolidator 的 try/catch 兜底返回空结果。
+   */
+  async queryLlmForMemory(prompt) {
+    const settings = settingsService.getAll();
+    const route = settings.llm.agentRoutes.find((entry) => entry.agentId === "ask") ?? settings.llm.agentRoutes[0];
+    if (!route) {
+      throw new Error("No agent route available for memory LLM adapter.");
+    }
+    const model = encodeAgentModel(route.providerId, route.modelId);
+    const stream = configuredRuntimeProvider.stream(model, {
+      messages: [{ role: "user", content: prompt, timestamp: Date.now() }]
     });
-    return { agent, providerId, modelId, systemPrompt, toolSignature, turnSignature: "" };
+    const assistant = await stream.result();
+    return assistant.content.filter((block) => block.type === "text").map((block) => block.text).join("");
   }
   createToolSignature(tools) {
     return tools.map((tool) => tool.name).sort().join("|");
@@ -13550,8 +15841,26 @@ class AgentOrchestrator {
     };
   }
   createTaskRuntimeTools() {
-    const tasksDir = path__namespace.join(storageAdapter.getWorkspacePath(), ".tasks");
-    return createTaskTools(new TaskRegistry(tasksDir));
+    const isSubagent = this.currentTurnEventSink?.sessionId?.includes("::subagent::") ?? false;
+    const store = isSubagent ? new MemoryTaskStore() : new FileTaskStore(path__namespace.join(storageAdapter.getWorkspacePath(), ".tasks"));
+    const registry = new TaskRegistry(store);
+    registry.onTaskChange = ({ type, task }) => {
+      const sink = this.currentTurnEventSink;
+      if (!sink?.onEvent) return;
+      sink.onEvent({
+        id: generateEventId("agent-event"),
+        type: type === "created" ? "task.created" : "task.updated",
+        timestamp: nowMs(),
+        sessionId: sink.sessionId ?? null,
+        agentId: sink.agentId,
+        payload: {
+          taskId: task.id,
+          title: task.subject,
+          status: task.status
+        }
+      });
+    };
+    return createTaskTools(registry);
   }
   createRdxContextTool() {
     return {
@@ -13583,10 +15892,13 @@ class AgentOrchestrator {
       this.createAskUserTool(agentId),
       this.createAgentHandoffTool(agentId),
       this.createMemoryReadTool(sessionId),
+      this.createMemoryWriteTool(),
+      this.createMemoryDeleteTool(),
       this.createPlanArtifactTool(sessionId),
       this.createSkillsCatalogTool(),
       this.createSkillRunTool(agentId, sessionId),
-      this.createMcpCatalogTool()
+      this.createMcpCatalogTool(),
+      ...this.createSubagentTools(agentId, sessionId)
     ];
   }
   createAskUserTool(agentId) {
@@ -13619,31 +15931,54 @@ class AgentOrchestrator {
     };
   }
   createAgentHandoffTool(agentId) {
+    const orchestrator = this;
     return {
       name: "agent_handoff",
       label: "Agent Handoff",
-      description: "Prepare a handoff to another agent profile without executing it directly.",
+      description: "Request a handoff to another agent profile. The runtime validates the target against the current profile handoffs and prepares the receiving prompt. The actual profile switch is applied by the orchestrator after this turn.",
       parameters: {
         type: "object",
-        required: ["prompt"],
+        required: ["agent"],
         properties: {
           agent: { type: "string", description: "Target agent profile id, such as edit, debugger, analyzer, or optimizer." },
-          label: { type: "string", description: "Short handoff label." },
-          prompt: { type: "string", description: "Implementation or specialist prompt for the receiving agent." }
+          label: { type: "string", description: "Short handoff label. Defaults to the declared handoff label." },
+          prompt: { type: "string", description: "Implementation or specialist prompt for the receiving agent. Defaults to the declared handoff prompt." }
         }
       },
       permissionHint: "readonly",
       async execute(_toolCallId, args) {
-        const toAgentId = typeof args.agent === "string" && args.agent.trim() ? args.agent.trim() : "edit";
-        const label = typeof args.label === "string" && args.label.trim() ? args.label.trim() : `Hand off to ${toAgentId}`;
-        const prompt = typeof args.prompt === "string" && args.prompt.trim() ? args.prompt.trim() : "Continue from the current plan and ask for missing context before making changes.";
+        const toProfile = typeof args.agent === "string" ? args.agent.trim() : "";
+        const resolved = handoffController.resolve(
+          agentId,
+          toProfile,
+          typeof args.prompt === "string" ? args.prompt : void 0,
+          typeof args.label === "string" ? args.label : void 0
+        );
+        if (!resolved.valid || !resolved.request) {
+          return {
+            content: [{
+              type: "text",
+              text: `Handoff rejected: ${resolved.reason ?? "unknown reason"}`
+            }],
+            isError: true,
+            details: { fromAgentId: agentId, toAgentId: toProfile, label: "", prompt: "", valid: false }
+          };
+        }
+        const { toProfile: target, label, prompt } = resolved.request;
+        orchestrator.pendingHandoff = {
+          fromAgentId: agentId,
+          toProfile: target,
+          prompt,
+          label,
+          sessionId: orchestrator.currentTurnEventSink?.sessionId ?? null
+        };
         return {
           content: [{
             type: "text",
-            text: `Handoff prepared from ${agentId} to ${toAgentId}: ${label}
+            text: `Handoff prepared from ${agentId} to ${target}: ${label}
 ${prompt}`
           }],
-          details: { fromAgentId: agentId, toAgentId, label, prompt }
+          details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: true }
         };
       }
     };
@@ -13691,37 +16026,115 @@ ${body}
     };
   }
   createMemoryReadTool(sessionId) {
+    const store = this.memoryStore;
     return {
       name: "memory_read",
       label: "Read Memory",
-      description: "Read recent session memory and conversation context without mutating persisted data.",
+      description: "Read persisted memories from the workspace memory store. Supports optional name lookup or keyword filter.",
       parameters: {
         type: "object",
         properties: {
-          query: { type: "string", description: "Optional case-insensitive filter." },
-          limit: { type: "number", description: "Maximum recent entries to return, default 8." }
+          name: { type: "string", description: "Optional exact memory name to read in full." },
+          query: { type: "string", description: "Optional case-insensitive filter over name/description/content." },
+          limit: { type: "number", description: "Maximum entries to return, default 8." }
         }
       },
       permissionHint: "readonly",
       async execute(_toolCallId, args) {
-        if (!sessionId) {
-          return {
-            content: [{ type: "text", text: "No active session memory is available for this turn." }],
-            details: { sessionId: null, count: 0 }
-          };
-        }
         const rawLimit = typeof args.limit === "number" && Number.isFinite(args.limit) ? args.limit : 8;
         const limit = Math.max(1, Math.min(20, Math.floor(rawLimit)));
+        if (typeof args.name === "string" && args.name.trim()) {
+          const record = await store.getMemory(args.name.trim());
+          if (!record) {
+            return {
+              content: [{ type: "text", text: `No memory named "${args.name}" was found.` }],
+              details: { sessionId: sessionId ?? null, count: 0 }
+            };
+          }
+          return {
+            content: [{
+              type: "text",
+              text: `# ${record.name}
+
+${record.description}
+
+${record.content}`
+            }],
+            details: { sessionId: sessionId ?? null, count: 1 }
+          };
+        }
+        const all = await store.listMemories();
         const query = typeof args.query === "string" ? args.query.trim().toLowerCase() : "";
-        const history = storageAdapter.readConversationHistory(sessionId);
-        const candidates = query ? history.filter((entry) => entry.content.toLowerCase().includes(query)) : history;
-        const entries = candidates.slice(-limit).map((entry) => `${entry.role}${entry.agentId ? `/${entry.agentId}` : ""}: ${entry.content.slice(0, 240)}`);
+        const candidates = query ? all.filter((entry) => entry.name.toLowerCase().includes(query) || entry.description.toLowerCase().includes(query) || entry.content.toLowerCase().includes(query)) : all;
+        const entries = candidates.slice(0, limit).map((entry) => `- ${entry.name} (${entry.type}): ${entry.description}`);
         return {
           content: [{
             type: "text",
-            text: entries.length > 0 ? entries.join("\n") : "No matching session memory entries were found."
+            text: entries.length > 0 ? `Memory index (${candidates.length} total):
+${entries.join("\n")}` : "No matching memories were found."
           }],
-          details: { sessionId, count: entries.length }
+          details: { sessionId: sessionId ?? null, count: entries.length }
+        };
+      }
+    };
+  }
+  createMemoryWriteTool() {
+    const store = this.memoryStore;
+    const validTypes = /* @__PURE__ */ new Set(["user", "feedback", "project", "reference"]);
+    return {
+      name: "memory_write",
+      label: "Write Memory",
+      description: "Persist a new memory to the workspace memory store. type must be one of: user, feedback, project, reference.",
+      parameters: {
+        type: "object",
+        required: ["name", "description", "type", "content"],
+        properties: {
+          name: { type: "string", description: "Kebab-case memory name (unique key)." },
+          description: { type: "string", description: "One-line summary." },
+          type: { type: "string", description: "user | feedback | project | reference" },
+          content: { type: "string", description: "Full Markdown body." },
+          tags: { type: "array", items: { type: "string" } }
+        }
+      },
+      permissionHint: "mutation",
+      async execute(_toolCallId, args) {
+        const type = validTypes.has(args.type) ? args.type : "project";
+        const record = await store.writeMemory({
+          name: args.name.trim(),
+          description: args.description.trim(),
+          type,
+          content: args.content,
+          tags: Array.isArray(args.tags) ? args.tags : void 0
+        });
+        return {
+          content: [{ type: "text", text: `Memory saved: ${record.name} (${record.type})` }],
+          details: { name: record.name, created: true }
+        };
+      }
+    };
+  }
+  createMemoryDeleteTool() {
+    const store = this.memoryStore;
+    return {
+      name: "memory_delete",
+      label: "Delete Memory",
+      description: "Delete a memory by name from the workspace memory store.",
+      parameters: {
+        type: "object",
+        required: ["name"],
+        properties: {
+          name: { type: "string", description: "Memory name to delete." }
+        }
+      },
+      permissionHint: "mutation",
+      async execute(_toolCallId, args) {
+        const deleted = await store.deleteMemory(args.name.trim());
+        return {
+          content: [{
+            type: "text",
+            text: deleted ? `Memory deleted: ${args.name}` : `No memory named "${args.name}" was found.`
+          }],
+          details: { name: args.name, deleted }
         };
       }
     };
@@ -13931,6 +16344,13 @@ ${body}
       toolAllowlist: activeToolAllowlist,
       routeCapability
     };
+    this.currentTurnEventSink = {
+      onEvent: input.options?.onEvent,
+      sessionId: input.sessionId ?? null,
+      projectRootPath: input.projectRootPath ?? null,
+      projectId: input.projectId ?? null,
+      agentId: input.agentId
+    };
     const toolExecutor = this.createToolExecutor(input.agentId, activeToolAllowlist, input.stage, input.sessionId, {
       sessionId: input.sessionId ?? null,
       turnId: input.turnId,
@@ -13962,14 +16382,7 @@ ${body}
         technicalMessage: JSON.stringify(routeCapability)
       }));
     }
-    const slot = input.useFreshAgent ? this.createFreshAgentSlot(
-      input.providerId,
-      input.modelId,
-      input.systemPrompt,
-      activeToolDefinitions,
-      toolExecutor,
-      streamOptions
-    ) : this.getOrCreateAgentSlot(
+    const slot = this.getOrCreateAgentSlot(
       input.agentId,
       input.providerId,
       input.modelId,
@@ -13977,7 +16390,8 @@ ${body}
       activeToolDefinitions,
       toolExecutor,
       streamOptions,
-      input.turnId ?? ""
+      input.turnId ?? "",
+      input.sessionId
     );
     const userMessage = {
       role: "user",
@@ -14037,6 +16451,47 @@ ${body}
       }
       agentUserInputRequestService.cancelTurn(input.turnId);
       agentToolApprovalRequestService.cancelTurn(input.turnId);
+      this.currentTurnEventSink = null;
+      if (input.sessionId) {
+        try {
+          storageAdapter.writeAgentThread(input.sessionId, input.agentId, [...slot.agent.messages]);
+        } catch (error) {
+          console.error(`[AgentOrchestrator] writeAgentThread failed for ${input.sessionId}::${input.agentId}:`, error);
+        }
+      }
+      this.memoryExtractTurnCounter += 1;
+      if (this.memoryExtractTurnCounter % AgentOrchestrator.MEMORY_EXTRACT_INTERVAL === 0 && slot.agent.messages.length > 0) {
+        void this.extractMemoriesFromTurn(slot.agent.messages).catch((error) => {
+          console.error("[AgentOrchestrator] memory extraction failed:", error);
+        });
+      }
+    }
+  }
+  /**
+   * 内联提取：将 turn 的消息转为宽松消息类型喂给 MemoryExtractor，
+   * 候选经 dedup 后 writeMemory，再按需触发 consolidation。
+   *
+   * messages 接收 core AgentMessage（Agent.messages 产物），仅提取 role/content。
+   */
+  async extractMemoriesFromTurn(messages) {
+    const recent = messages.slice(-10).map((msg) => ({
+      role: msg.role,
+      content: typeof msg.content === "string" ? msg.content : Array.isArray(msg.content) ? msg.content.filter((block) => block.type === "text" && typeof block.text === "string").map((block) => block.text).join("") : ""
+    }));
+    const candidates = await this.memoryExtractor.extractFromConversation(recent);
+    for (const candidate of candidates) {
+      try {
+        await this.memoryStore.writeMemory(candidate);
+      } catch (error) {
+        console.error("[AgentOrchestrator] writeMemory failed for", candidate.name, error);
+      }
+    }
+    try {
+      if (await this.memoryConsolidator.shouldConsolidate()) {
+        await this.memoryConsolidator.consolidate();
+      }
+    } catch (error) {
+      console.error("[AgentOrchestrator] memory consolidation failed:", error);
     }
   }
   async streamTestModeStub(stub, options) {
@@ -16546,6 +19001,22 @@ function registerAgentHandlers(context2) {
     }
   });
 }
+function registerMemoryHandlers(_context) {
+  electron.ipcMain.handle("memory:list", async () => {
+    const memories = await agentOrchestrator.listMemoriesForUi();
+    return { memories };
+  });
+  electron.ipcMain.handle("memory:get", async (_event, name) => {
+    const memory = await agentOrchestrator.getMemoryForUi(name);
+    return { memory };
+  });
+  electron.ipcMain.handle("memory:write", async (_event, request2) => {
+    return agentOrchestrator.writeMemoryForUi(request2);
+  });
+  electron.ipcMain.handle("memory:delete", async (_event, name) => {
+    return agentOrchestrator.deleteMemoryForUi(name);
+  });
+}
 function registerCaptureDeviceHandlers(context2) {
   const { state: state2 } = context2;
   electron.ipcMain.handle("context:get", async () => {
@@ -16957,7 +19428,7 @@ const toolsCommand = {
     }
     return {
       success: true,
-      message: "Available tools: bash, read_file, write_file, edit_file, delete_file, move_file, copy_file, glob, grep, search_codebase, web_fetch, web_search, ask_user, notebook_edit, agent_spawn, send_message, task_create, task_update, task_get, task_list, task_stop, mcp, skill"
+      message: "Available tools: bash, read_file, write_file, edit_file, delete_file, move_file, copy_file, glob, grep, search_codebase, web_fetch, web_search, ask_user, notebook_edit, task_create, task_update, task_get, task_list, task_stop, mcp, skill"
     };
   }
 };
@@ -17604,10 +20075,38 @@ const AGENT_WORKBENCH_TOOL_CATALOG = [
     id: "memory_read",
     label: "Memory",
     permission: "readonly",
-    inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "number" } } },
-    resultSummary: "Reads recent session/workspace memory summaries.",
+    inputSchema: { type: "object", properties: { name: { type: "string" }, query: { type: "string" }, limit: { type: "number" } } },
+    resultSummary: "Reads persisted workspace memories by name or keyword filter.",
     icon: "brain",
     approvalRequired: false
+  },
+  {
+    id: "memory_write",
+    label: "Write Memory",
+    permission: "mutation",
+    inputSchema: {
+      type: "object",
+      required: ["name", "description", "type", "content"],
+      properties: {
+        name: { type: "string" },
+        description: { type: "string" },
+        type: { type: "string" },
+        content: { type: "string" },
+        tags: { type: "array", items: { type: "string" } }
+      }
+    },
+    resultSummary: "Persists a new memory (user/feedback/project/reference) to the workspace store.",
+    icon: "brain",
+    approvalRequired: false
+  },
+  {
+    id: "memory_delete",
+    label: "Delete Memory",
+    permission: "mutation",
+    inputSchema: { type: "object", required: ["name"], properties: { name: { type: "string" } } },
+    resultSummary: "Deletes a memory by name from the workspace store.",
+    icon: "brain",
+    approvalRequired: true
   },
   {
     id: "plan_artifact",
@@ -17711,82 +20210,85 @@ const AGENT_WORKBENCH_COMMAND_CATALOG = [
     permission: "readonly"
   }
 ];
-function composeProfileTurnPrompt(input) {
-  const recentHistory = input.history.slice(-6).map((entry) => ({
-    role: entry.role,
-    content: entry.content
-  }));
-  return JSON.stringify({
-    agent_id: input.definition.agentId,
-    agent_label: input.definition.agentLabel,
-    requested_mode: input.requestedMode,
-    requested_mode_label: input.definition.agentLabel,
-    user_message: input.rawMessage,
-    effective_user_message: input.effectiveMessage,
-    task_file_path: input.taskFilePath,
-    task_file_content: input.taskFileContent,
-    current_project_id: input.context.projectId,
-    current_project_root: input.context.projectRootPath,
-    current_session_id: input.context.sessionId,
-    active_run_id: input.context.activeRunId,
-    opened_capture: input.context.openedCapturePath,
-    project_inputs: input.context.projectInputs.slice(0, 8).map((entry) => entry.fileName),
-    incoming_attachments: input.context.importedAttachments.map((entry) => ({
-      file_name: entry.fileName,
-      kind: entry.kind,
-      mime_type: entry.mimeType
-    })),
-    recent_history: recentHistory
-  }, null, 2);
-}
-function composeProfileSystemPrompt(input) {
-  const basePrompt = input.definition.baseInstructions?.trim() || `You are ${input.definition.agentLabel}. ${input.definition.agentDescription}`;
-  const globalInstructions = input.definition.globalInstructions?.trim();
-  const routeInstructions = composeRouteCapabilityPrompt(input.routeCapability, input.allowedToolNames);
-  const permissionInstructions = composePermissionPrompt(input.permissionSettings);
-  const workspaceInstructions = composeWorkspacePrompt(
-    input.workspaceRoot,
-    input.permissionSettings.mode
-  );
+const sectionIdentity = (context2) => {
+  const { agentLabel, agentDescription } = context2.profile;
   return [
-    basePrompt,
-    "",
-    "Show concise visible work summaries and tool results only. Do not reveal hidden chain-of-thought.",
-    workspaceInstructions,
-    routeInstructions,
-    permissionInstructions,
-    input.routeCapability.toolCallingMode === "native-structured" ? composeRuntimeCatalogPrompt(input.allowedToolNames) : "",
-    globalInstructions ? `Global Instructions:
-${globalInstructions}` : ""
-  ].filter(Boolean).join("\n\n").trim();
-}
-function composeWorkspacePrompt(workspaceRoot, permissionMode) {
-  if (!workspaceRoot) return "";
-  const lines = [
-    "# Working Directory",
-    `The current project root is ${workspaceRoot}. Use it as the default base for relative file paths, search roots, and shell working directory.`
-  ];
-  if (permissionMode === "full-access") {
-    lines.push(
-      "You may also access files outside this project root using absolute paths when calling read_file, glob, grep, or shell commands."
-    );
-  } else {
-    lines.push(
-      "Files outside this project root may still be accessible when the runtime permission policy allows it; use absolute paths for those locations."
-    );
+    `# Identity`,
+    `You are ${agentLabel}. ${agentDescription}`,
+    ``,
+    `Core directives:`,
+    `- Act, don't explain. Prefer tool invocations over narration.`,
+    `- Show concise visible work summaries and tool results only. Do not reveal hidden chain-of-thought.`,
+    `- Keep output minimal. Surface only what the user needs.`,
+    `- Use tools to read, write, and verify; never guess when a tool can confirm.`
+  ].join("\n");
+};
+const sectionProfileInstructions = (context2) => {
+  const base = context2.profile.baseInstructions?.trim();
+  const global = context2.profile.globalInstructions?.trim();
+  if (!base && !global) {
+    return null;
   }
-  lines.push(
-    "When you report a file path, use the absolute path that the tool actually resolved. Do not claim a path that differs from the tool result."
-  );
-  return lines.join("\n");
-}
-function formatConfiguredRoots(roots, fallback) {
-  return roots.length > 0 ? roots.join(", ") : fallback;
-}
-function composePermissionPrompt(permissionSettings) {
-  const mode = permissionSettings.mode;
+  const parts = [`# Profile Instructions`];
+  if (base) {
+    parts.push(``, base);
+  }
+  if (global) {
+    parts.push(``, `## Global Instructions`, global);
+  }
+  return parts.join("\n");
+};
+const sectionCapabilities = () => {
+  return [
+    `# Capabilities`,
+    `- Read and write files in the workspace.`,
+    `- Execute commands via the available shell tooling.`,
+    `- Search code semantically and by exact pattern.`,
+    `- Manage tasks, plans, and intermediate artifacts.`
+  ].join("\n");
+};
+const sectionTools = (context2) => {
+  if (!context2.tools || context2.tools.length === 0) {
+    return null;
+  }
+  const lines = context2.tools.map((name) => `- ${name}`);
+  return [`# Available Tools`, ...lines].join("\n");
+};
+const sectionWorkspace = (context2) => {
+  const platform = process.platform ?? "unknown";
+  const shell = process.env.SHELL ?? process.env.ComSpec ?? "unknown";
+  return [
+    `# Working Directory`,
+    `The current project root is ${context2.workDir}. Use it as the default base for relative file paths, search roots, and shell working directory.`,
+    `Platform: ${platform}`,
+    `Shell: ${shell}`,
+    `Model: ${context2.model.provider}/${context2.model.name}`,
+    `Mode: ${context2.mode}`
+  ].join("\n");
+};
+const sectionRouteCapability = (context2) => {
+  const cap = context2.routeCapability;
+  if (cap.toolCallingMode === "native-structured") {
+    return [
+      `# Route Capability`,
+      `Route Capability: native structured tool calling is enabled for ${cap.providerId}/${cap.modelId}.`,
+      `When a tool is needed, use only the provider structured tool/function-call channel.`,
+      `Do not write textual tool-call syntax in the assistant message.`
+    ].join("\n");
+  }
+  return [
+    `# Route Capability`,
+    `Route Capability: ${cap.toolCallingMode} for ${cap.providerId}/${cap.modelId}.`,
+    `This route cannot execute runtime tools in the current agent loop.`,
+    `Do not invent tool calls, tool results, file reads, searches, or command output.`,
+    `If you need runtime information, explain what information is missing and why.`
+  ].join("\n");
+};
+const sectionPermission = (context2) => {
+  const ps = context2.permissionSettings;
+  const mode = ps.mode;
   const lines = [
-    "# Runtime Permission Policy",
+    `# Runtime Permission Policy`,
     `Current permission mode: ${mode}.`
   ];
   switch (mode) {
@@ -17795,7 +20297,8 @@ function composePermissionPrompt(permissionSettings) {
         "Readable roots: entire local machine.",
         "Writable roots: entire local machine.",
         "Use read_file with absolute paths for files outside the current project root.",
-        "Do not claim inability to read or write a local path without attempting the tool first."
+        "Do not claim inability to read or write a local path without attempting the tool first.",
+        "You may also access files outside this project root using absolute paths when calling read_file, glob, grep, or shell commands."
       );
       break;
     case "auto-review":
@@ -17809,11 +20312,11 @@ function composePermissionPrompt(permissionSettings) {
     case "custom":
       lines.push(
         `Readable roots: current project workspace plus ${formatConfiguredRoots(
-          permissionSettings.readableRoots,
+          ps.readableRoots,
           "no extra configured paths"
         )}.`,
         `Writable roots: current project workspace plus ${formatConfiguredRoots(
-          permissionSettings.writableRoots,
+          ps.writableRoots,
           "no extra configured paths"
         )}.`,
         "Configured readableRoots and writableRoots in settings are allowed without extra approval.",
@@ -17834,29 +20337,20 @@ function composePermissionPrompt(permissionSettings) {
   lines.push(
     "Routine local inspection commands can run when the runtime policy allows them.",
     "When policy allows external access, use read_file with absolute paths instead of claiming the file is unreachable.",
-    "If the runtime denies or requests approval, do not route around the decision with guessed paths or textual tool calls."
+    "If the runtime denies or requests approval, do not route around the decision with guessed paths or textual tool calls.",
+    "When you report a file path, use the absolute path that the tool actually resolved. Do not claim a path that differs from the tool result."
   );
   return lines.join("\n");
+};
+function formatConfiguredRoots(roots, fallback) {
+  return roots.length > 0 ? roots.join(", ") : fallback;
 }
-function composeRouteCapabilityPrompt(routeCapability, allowedToolNames) {
-  if (routeCapability.toolCallingMode === "native-structured") {
-    const toolCount = allowedToolNames.length;
-    return [
-      `Route Capability: native structured tool calling is enabled for ${routeCapability.providerId}/${routeCapability.modelId}.`,
-      `The runtime registers ${toolCount} tool schema${toolCount === 1 ? "" : "s"} through the provider tool/function-call channel.`,
-      "When a tool is needed, use only the provider structured tool/function-call channel.",
-      "Do not write textual tool-call syntax in the assistant message."
-    ].join("\n");
+const sectionCatalog = (context2) => {
+  if (context2.routeCapability.toolCallingMode !== "native-structured") {
+    return null;
   }
-  return [
-    `Route Capability: ${routeCapability.toolCallingMode} for ${routeCapability.providerId}/${routeCapability.modelId}.`,
-    "This route cannot execute runtime tools in the current agent loop.",
-    "Do not invent tool calls, tool results, file reads, searches, or command output.",
-    "If you need runtime information, explain what information is missing and why."
-  ].join("\n");
-}
-function composeRuntimeCatalogPrompt(allowedToolNames) {
-  const allowed = new Set(allowedToolNames);
+  const allowedNames = context2.allowedToolNames ?? context2.tools ?? [];
+  const allowed = new Set(allowedNames);
   const toolLines = AGENT_WORKBENCH_TOOL_CATALOG.filter((tool) => allowed.has(tool.id)).map((tool) => `- ${tool.id}: ${tool.label}; permission=${tool.permission}; approval=${tool.approvalRequired ? "required" : "not required"}; result=${tool.resultSummary}`);
   const commandLines = AGENT_WORKBENCH_COMMAND_CATALOG.map((command) => `- ${command.command}: ${command.description}${command.relatedTools.length ? ` Uses: ${command.relatedTools.join(", ")}` : ""}.`);
   return [
@@ -17869,6 +20363,218 @@ function composeRuntimeCatalogPrompt(allowedToolNames) {
     "Slash commands:",
     ...commandLines
   ].join("\n");
+};
+const sectionMemory = (context2) => {
+  const hasIndex = typeof context2.memoryIndex === "string" && context2.memoryIndex.trim().length > 0;
+  const hasRelevant = Array.isArray(context2.relevantMemories) && context2.relevantMemories.length > 0;
+  if (!hasIndex && !hasRelevant) {
+    return null;
+  }
+  const parts = [`# Memory`];
+  if (hasIndex) {
+    parts.push(``, `Available memories:`, context2.memoryIndex.trim());
+  }
+  if (hasRelevant) {
+    parts.push(``, `Relevant memories:`);
+    for (const mem of context2.relevantMemories) {
+      parts.push(``, mem.trim());
+    }
+  }
+  return parts.join("\n");
+};
+const sectionRules = (context2) => {
+  const lines = [
+    `# Rules`,
+    `- Do not modify files unrelated to the current task.`,
+    `- Do not delete files or perform irreversible actions without explicit confirmation.`,
+    `- Minimize output: avoid re-stating tool results, prefer next actions.`,
+    `- When uncertain, prefer reading existing code over guessing.`,
+    `- Respect the runtime permission policy for workspace boundaries; use absolute paths when policy allows external access.`,
+    `- Do not claim a file is unreachable without attempting read_file when policy permits.`
+  ];
+  const userRules = context2.userRules?.trim();
+  if (userRules && userRules.length > 0) {
+    lines.push(``, `## User Rules`, userRules);
+  }
+  return lines.join("\n");
+};
+const sectionContext = (context2) => {
+  const hasSkills = Array.isArray(context2.skills) && context2.skills.length > 0;
+  const hasCustom = Array.isArray(context2.customSections) && context2.customSections.length > 0;
+  if (!hasSkills && !hasCustom) {
+    return null;
+  }
+  const parts = [`# Context`];
+  if (hasSkills) {
+    parts.push(``, `Loaded skills:`);
+    for (const name of context2.skills) {
+      parts.push(`- ${name}`);
+    }
+  }
+  if (hasCustom) {
+    for (const section of context2.customSections) {
+      const title = section.title?.trim() || "Custom";
+      const content = section.content?.trim() ?? "";
+      parts.push(``, `## ${title}`, content);
+    }
+  }
+  return parts.join("\n");
+};
+const DEFAULT_SECTIONS = [
+  sectionIdentity,
+  sectionProfileInstructions,
+  sectionCapabilities,
+  sectionTools,
+  sectionWorkspace,
+  sectionRouteCapability,
+  sectionPermission,
+  sectionCatalog,
+  sectionMemory,
+  sectionRules,
+  sectionContext
+];
+const DEFAULT_STATIC_SECTION_COUNT = 8;
+const DYNAMIC_BOUNDARY = "\n<!-- DYNAMIC_CONTENT_BELOW -->\n";
+const MAX_CACHE_ENTRIES = 10;
+class PromptAssembler {
+  sections;
+  staticSectionCount;
+  enableCache;
+  cache;
+  constructor(options = {}) {
+    this.sections = options.sections ?? DEFAULT_SECTIONS;
+    this.staticSectionCount = Math.max(
+      0,
+      Math.min(
+        options.staticSectionCount ?? DEFAULT_STATIC_SECTION_COUNT,
+        this.sections.length
+      )
+    );
+    this.enableCache = options.enableCache ?? true;
+    this.cache = /* @__PURE__ */ new Map();
+  }
+  /**
+   * 组装完整的 system prompt。
+   *
+   * @param context 段落函数所需的运行期上下文。
+   * @returns 拼装好的 system prompt 字符串。
+   */
+  assembleSystemPrompt(context2) {
+    if (this.enableCache) {
+      const key = this.computeCacheKey(context2, "full");
+      const cached = this.cache.get(key);
+      if (cached !== void 0) {
+        return cached;
+      }
+      const prompt = this.renderFull(context2);
+      this.storeInCache(key, prompt);
+      return prompt;
+    }
+    return this.renderFull(context2);
+  }
+  /**
+   * 仅返回静态前缀（包含末尾的 {@link DYNAMIC_BOUNDARY}）。
+   *
+   * 用于上层提前发起 prompt cache warm-up：
+   * 即便后续动态段落变化，前缀依然命中缓存。
+   */
+  getStaticPrefix(context2) {
+    if (this.enableCache) {
+      const key = this.computeCacheKey(context2, "prefix");
+      const cached = this.cache.get(key);
+      if (cached !== void 0) {
+        return cached;
+      }
+      const prefix = this.renderStaticPrefix(context2);
+      this.storeInCache(key, prefix);
+      return prefix;
+    }
+    return this.renderStaticPrefix(context2);
+  }
+  /**
+   * 主动清除全部缓存。
+   *
+   * 当外部依赖（如可用工具集合、规则集）发生变化但 context 字段未变时，
+   * 调用方应显式调用本方法以避免命中过期缓存。
+   */
+  invalidateCache() {
+    this.cache.clear();
+  }
+  /** 渲染完整 prompt（不使用缓存）。 */
+  renderFull(context2) {
+    const groups = this.collectGroups(context2);
+    const parts = [];
+    if (groups.staticParts.length > 0) {
+      parts.push(groups.staticParts.join("\n\n"));
+    }
+    if (groups.dynamicParts.length > 0) {
+      const dynamic = groups.dynamicParts.join("\n\n");
+      if (parts.length > 0) {
+        return parts[0] + DYNAMIC_BOUNDARY + dynamic;
+      }
+      return dynamic;
+    }
+    return parts.join("");
+  }
+  /** 渲染静态前缀（不使用缓存），始终以 {@link DYNAMIC_BOUNDARY} 结尾。 */
+  renderStaticPrefix(context2) {
+    const groups = this.collectGroups(context2);
+    const staticText = groups.staticParts.join("\n\n");
+    return staticText + DYNAMIC_BOUNDARY;
+  }
+  /** 调用所有段落函数并按静态/动态分组，跳过返回 null 或空白的段落。 */
+  collectGroups(context2) {
+    const staticParts = [];
+    const dynamicParts = [];
+    for (let i = 0; i < this.sections.length; i += 1) {
+      const section = this.sections[i];
+      const text = section(context2);
+      if (text === null || text === void 0) {
+        continue;
+      }
+      const trimmed = text.trim();
+      if (trimmed.length === 0) {
+        continue;
+      }
+      if (i < this.staticSectionCount) {
+        staticParts.push(trimmed);
+      } else {
+        dynamicParts.push(trimmed);
+      }
+    }
+    return { staticParts, dynamicParts };
+  }
+  /** 计算缓存 key：context 序列化后的 SHA-256，附带类型后缀。 */
+  computeCacheKey(context2, kind) {
+    const serialized = JSON.stringify(context2, replacerForStableKeys);
+    const hash = node_crypto.createHash("sha256").update(serialized ?? "").digest("hex");
+    return `${kind}:${hash}`;
+  }
+  /** 写入缓存，超出上限时按插入序淘汰最旧条目。 */
+  storeInCache(key, value) {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    }
+    this.cache.set(key, value);
+    while (this.cache.size > MAX_CACHE_ENTRIES) {
+      const oldest = this.cache.keys().next();
+      if (oldest.done) {
+        break;
+      }
+      this.cache.delete(oldest.value);
+    }
+  }
+}
+function replacerForStableKeys(_key, value) {
+  if (value && typeof value === "object" && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype) {
+    const record = value;
+    const sorted = {};
+    for (const k of Object.keys(record).sort()) {
+      sorted[k] = record[k];
+    }
+    return sorted;
+  }
+  return value;
 }
 function resolveConversationAgentId(requestedMode, requestedAgentId) {
   if (requestedAgentId && resolveEnabledAgentDefinition(requestedAgentId)) {
@@ -18200,6 +20906,15 @@ function createRequestFailedDiagnostic(route, error) {
 }
 class ConversationService {
   activeTurns = /* @__PURE__ */ new Map();
+  promptAssembler = new PromptAssembler();
+  /**
+   * 待处理的 handoff（sessionId → {toProfile, prompt}）。
+   *
+   * agent_handoff 工具成功后由 AgentOrchestrator.consumePendingHandoff 消费并存入此 map，
+   * 下次该 session 消息时优先用 toProfile 并把 prompt 前置到用户消息。
+   * 内存维护（不持久化），session 重启后丢失（handoff 是即时意图）。
+   */
+  pendingHandoffs = /* @__PURE__ */ new Map();
   async getHistory(sessionId) {
     return storageAdapter.readConversationHistory(sessionId);
   }
@@ -18331,11 +21046,24 @@ class ConversationService {
     };
   }
   async startProfileTurn(context2, requestedMode, requestedAgentId, rawMessage, pendingAttachments) {
-    const conversationAgentId = resolveConversationAgentId(requestedMode, requestedAgentId);
     let workingSession = context2.session;
     if (!workingSession && context2.projectId) {
       workingSession = storageAdapter.createSession(context2.projectId, rawMessage.slice(0, 80));
     }
+    let effectiveMessage = rawMessage;
+    let handoffProfile = null;
+    if (workingSession) {
+      const pending = this.pendingHandoffs.get(workingSession.sessionId);
+      if (pending && resolveEnabledAgentDefinition(pending.toProfile)) {
+        handoffProfile = pending.toProfile;
+        this.pendingHandoffs.delete(workingSession.sessionId);
+        effectiveMessage = `${pending.prompt}
+
+---
+用户消息：${rawMessage}`;
+      }
+    }
+    const conversationAgentId = handoffProfile ?? resolveConversationAgentId(requestedMode, requestedAgentId);
     const turnId = generateEventId("turn");
     const importedAttachments = workingSession ? storageAdapter.importSessionAttachments(
       workingSession.sessionId,
@@ -18376,7 +21104,7 @@ class ConversationService {
       },
       requestedMode,
       requestedAgentId: conversationAgentId,
-      rawMessage,
+      rawMessage: effectiveMessage,
       importedAttachments,
       userMessage,
       assistantDraftMessage
@@ -18451,7 +21179,6 @@ class ConversationService {
       });
     };
     const withWorkTrace = (workTrace) => ({ workTrace });
-    const history = input.context.session ? storageAdapter.readConversationHistory(input.context.session.sessionId).filter((entry) => entry.id !== assistantMessage.id) : [];
     let rawResponse = "";
     let visibleResponse = "";
     let errorViewModel = null;
@@ -18481,11 +21208,6 @@ class ConversationService {
       });
     } else {
       try {
-        const taskContext = {
-          taskFilePath: null,
-          taskFileContent: null,
-          effectiveMessage: input.rawMessage
-        };
         const definition = resolveEnabledAgentDefinition(conversationAgentId);
         const promptDefinition = {
           agentId: conversationAgentId,
@@ -18496,23 +21218,20 @@ class ConversationService {
         };
         const allowedToolNames = resolveAgentToolAllowlist(conversationAgentId, "investigate").map((toolName) => normalizeToolName(toolName));
         const projectRootPath = input.context.projectId ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null : null;
-        const profilePrompt = composeProfileTurnPrompt({
-          context: {
-            projectId: input.context.projectId,
-            projectRootPath,
-            sessionId: input.context.session?.sessionId ?? null,
-            activeRunId: isActiveRun(input.context.currentRun) ? input.context.currentRun.runId : null,
-            openedCapturePath: input.context.openedCapturePath,
-            projectInputs: input.context.projectInputs,
-            importedAttachments: input.importedAttachments
+        const memoryIndex = await agentOrchestrator.getMemoryIndex();
+        const systemPrompt = this.promptAssembler.assembleSystemPrompt({
+          workDir: projectRootPath ?? "",
+          tools: allowedToolNames,
+          memoryIndex: memoryIndex || void 0,
+          model: {
+            provider: routePreflight.routeCapability.providerId,
+            name: routePreflight.routeCapability.modelId
           },
-          history,
-          definition: promptDefinition,
-          requestedMode: input.requestedMode,
-          rawMessage: input.rawMessage,
-          effectiveMessage: taskContext.effectiveMessage,
-          taskFilePath: taskContext.taskFilePath,
-          taskFileContent: taskContext.taskFileContent
+          mode: this.modeForProfile(conversationAgentId),
+          profile: promptDefinition,
+          routeCapability: routePreflight.routeCapability,
+          permissionSettings: settingsService.getAll().agentRuntime.permissions,
+          allowedToolNames
         });
         const responseText = await agentOrchestrator.sendProfileMessage(
           conversationAgentId,
@@ -18524,17 +21243,10 @@ class ConversationService {
             patternId: "free-agent",
             projectRootPath,
             projectId: input.context.projectId,
-            systemPrompt: composeProfileSystemPrompt({
-              definition: promptDefinition,
-              routeCapability: routePreflight.routeCapability,
-              allowedToolNames,
-              permissionSettings: settingsService.getAll().agentRuntime.permissions,
-              workspaceRoot: projectRootPath
-            }),
+            systemPrompt,
             maxTokens: 1200,
             temperature: 0.35,
             signal: abortController.signal,
-            promptOverride: profilePrompt,
             onEvent: (event) => {
               this.emitConversationEvent({
                 type: "agent_event",
@@ -18738,6 +21450,44 @@ class ConversationService {
                   })
                 });
               }
+              if (event.type === "subagent.started") {
+                const payload = event.payload;
+                commitAssistantMessage("message_patched", {
+                  workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
+                    kind: "subagent",
+                    title: `子 Agent：${payload.profile}`,
+                    stage: "tool",
+                    status: "running",
+                    summary: payload.text?.slice(0, 200) ?? ""
+                  })
+                });
+              }
+              if (event.type === "subagent.delta") {
+                const payload = event.payload;
+                commitAssistantMessage("message_patched", {
+                  workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
+                    kind: "subagent",
+                    title: `子 Agent`,
+                    stage: "tool",
+                    status: "running",
+                    summary: payload.text ? payload.text.slice(-200) : void 0
+                  })
+                });
+              }
+              if (event.type === "subagent.completed") {
+                const payload = event.payload;
+                commitAssistantMessage("message_patched", {
+                  workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
+                    kind: "subagent",
+                    title: `子 Agent：${payload.profile}`,
+                    stage: "tool",
+                    status: payload.status === "failed" ? "error" : "complete",
+                    summary: payload.text?.slice(0, 500) ?? "",
+                    detail: payload.text,
+                    completedAt: nowMs()
+                  })
+                });
+              }
               if (event.type === "assistant.completed") {
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, "assistant-output", {
@@ -18824,6 +21574,33 @@ class ConversationService {
         llmDiagnostic ? finalStatus === "error" ? "回复失败" : "等待模型配置" : "回复已完成"
       ))
     });
+    if (finalStatus !== "error" && input.context.session) {
+      const handoff = agentOrchestrator.consumePendingHandoff();
+      if (handoff && handoff.toProfile && resolveEnabledAgentDefinition(handoff.toProfile)) {
+        this.pendingHandoffs.set(input.context.session.sessionId, {
+          toProfile: handoff.toProfile,
+          prompt: handoff.prompt
+        });
+        this.emitConversationEvent({
+          type: "agent_event",
+          sessionId: input.context.session.sessionId,
+          turnId: assistantMessage.turnId,
+          event: {
+            id: generateEventId("agent-event"),
+            type: "handoff.requested",
+            timestamp: nowMs(),
+            sessionId: input.context.session.sessionId,
+            agentId: handoff.fromAgentId,
+            payload: {
+              fromAgentId: handoff.fromAgentId,
+              toProfile: handoff.toProfile,
+              prompt: handoff.prompt,
+              label: handoff.label
+            }
+          }
+        });
+      }
+    }
     this.clearActiveTurn(assistantMessage.turnId, abortController);
   }
   persistConversationSnapshot(sessionId, message) {
@@ -18857,6 +21634,30 @@ class ConversationService {
   }
   ephemeralTraceSessionId(turnId) {
     return `conversation-${turnId}`;
+  }
+  /**
+   * 将 agentId 映射为 PromptContext.mode。
+   *
+   * Plan 归入 ask（ReadOnly 变体），非顶层 agent 归入 edit；
+   * 与 AgentOrchestrator.modeForAgent 保持一致语义。
+   */
+  modeForProfile(agentId) {
+    if (agentId === "plan" || agentId === "ask") {
+      return "ask";
+    }
+    if (agentId === "debugger") {
+      return "debugger";
+    }
+    if (agentId === "analyzer") {
+      return "analyzer";
+    }
+    if (agentId === "optimizer") {
+      return "optimizer";
+    }
+    if (agentId === "edit") {
+      return "edit";
+    }
+    return "edit";
   }
 }
 const conversationService = new ConversationService();
@@ -19773,7 +22574,7 @@ const createTinyOpenAiProbeBody = (modelId) => JSON.stringify({
 class ProviderConnectionService {
   async testProviderDraft(request2) {
     try {
-      const provider = this.getProvider(request2.providerId);
+      const provider = this.resolveProviderProtocol(this.getProvider(request2.providerId), request2.protocol);
       const models = await this.discoverModels(
         provider,
         request2.apiKey?.trim() ?? "",
@@ -19794,11 +22595,11 @@ class ProviderConnectionService {
   }
   async connectProvider(request2) {
     try {
-      const provider = this.getProvider(request2.providerId);
+      const provider = this.resolveProviderProtocol(this.getProvider(request2.providerId), request2.protocol);
       const apiKey = request2.apiKey?.trim() ?? "";
       const baseUrl = request2.baseUrl?.trim() ?? "";
       const models = await this.discoverModels(provider, apiKey, baseUrl);
-      const nextSettings = settingsService.saveProviderConnection(provider.id, apiKey, models, baseUrl);
+      const nextSettings = settingsService.saveProviderConnection(provider.id, apiKey, models, baseUrl, provider.protocol);
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
       return {
         success: true,
@@ -19829,7 +22630,7 @@ class ProviderConnectionService {
         };
       }
       const models = await this.discoverModels(provider, "", "");
-      const nextSettings = settingsService.saveProviderConnection(provider.id, "", models, "");
+      const nextSettings = settingsService.saveProviderConnection(provider.id, "", models, "", provider.protocol);
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
       return {
         success: true,
@@ -19861,8 +22662,8 @@ class ProviderConnectionService {
       };
     }
   }
-  startProviderAccountLogin(providerId) {
-    return providerAccountAuthService.startLogin(providerId);
+  startProviderAccountLogin(request2) {
+    return providerAccountAuthService.startLogin(request2);
   }
   finishProviderAccountLogin(request2) {
     return providerAccountAuthService.finishLogin(request2);
@@ -19880,11 +22681,21 @@ class ProviderConnectionService {
     }
     return provider;
   }
+  resolveProviderProtocol(provider, protocolDraft) {
+    const protocol = resolveBuiltinProviderProtocol(provider.id, protocolDraft ?? provider.protocol);
+    if (!protocol) {
+      throw new ProviderConnectionError(`Provider ${provider.id} is not in the built-in catalog.`);
+    }
+    return protocol === provider.protocol ? provider : { ...provider, protocol };
+  }
   async discoverModels(provider, apiKeyDraft, baseUrlDraft) {
     if (provider.authMode === "account") {
       throw new ProviderConnectionError("Account providers must be tested through the account login flow.");
     }
     const definition = getBuiltinProviderDefinition(provider.id);
+    if (provider.unavailableReason) {
+      throw new ProviderConnectionError(provider.unavailableReason);
+    }
     if (!definition?.modelDiscovery) {
       throw new ProviderConnectionError("Provider 缺少模型发现配置");
     }
@@ -19900,8 +22711,8 @@ class ProviderConnectionService {
     if (!baseUrl) {
       throw new ProviderConnectionError("请填写 Provider Base URL");
     }
-    if (provider.id === "kimi-code") {
-      return this.validateKimiCodeModels(apiKey, baseUrl, definition.recommendedModels);
+    if (provider.id === "kimi-coding-plan") {
+      return this.validateCodingPlanModels(apiKey, baseUrl, definition.recommendedModels);
     }
     if (strategy === "anthropic-candidate-validation") {
       return this.validateAnthropicCandidateModels(provider, apiKey, baseUrl, definition.recommendedModels);
@@ -19949,7 +22760,7 @@ class ProviderConnectionService {
     }
     return toStaticModels(validModels);
   }
-  async validateKimiCodeModels(apiKey, baseUrl, modelIds) {
+  async validateCodingPlanModels(apiKey, baseUrl, modelIds) {
     const payload = await getJson(appendPath(baseUrl, "/models"), {
       method: "GET",
       headers: {
@@ -19994,7 +22805,7 @@ class ProviderConnectionService {
     if (provider.authMode === "local") {
       return {};
     }
-    if (provider.kind === "anthropic") {
+    if (provider.protocol === "AnthropicMessages") {
       return {
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01"
@@ -20041,8 +22852,8 @@ function registerSettingsLlmHandlers(context2) {
     }
     return result;
   });
-  electron.ipcMain.handle("llm:startProviderAccountLogin", async (_event, providerId) => {
-    return providerConnectionService.startProviderAccountLogin(providerId);
+  electron.ipcMain.handle("llm:startProviderAccountLogin", async (_event, request2) => {
+    return providerConnectionService.startProviderAccountLogin(request2);
   });
   electron.ipcMain.handle("llm:getProviderAccountStatus", async (_event, providerId) => {
     const result = providerConnectionService.getProviderAccountStatus(providerId);
@@ -20079,6 +22890,9 @@ function registerSettingsLlmHandlers(context2) {
       secretsPath: paths.secretsPath,
       migrationReportsPath: paths.migrationReportsPath
     });
+  });
+  electron.ipcMain.handle("settings:getProviderCatalog", async () => {
+    return settingsService.getProviderCatalog();
   });
   electron.ipcMain.handle("settings:getProviderSecret", async (_event, providerId) => {
     const paths = appPathService.getWorkspacePaths();
@@ -20623,10 +23437,13 @@ function shouldRetryStructuredLlmError(error) {
   const message = error instanceof Error ? error.message : String(error);
   return /LLM response was empty|did not contain valid JSON|Unexpected non-whitespace character after JSON|OpenRouter API error: 5\d\d|timed out|timeout/i.test(message);
 }
+function readRouteProtocol(route) {
+  return route.provider.protocol ?? null;
+}
 function shouldUseNativeJsonObject(route) {
-  const providerKind = route.provider.kind;
+  const protocol = readRouteProtocol(route);
   const modelId = route.modelId.toLowerCase();
-  if (providerKind === "anthropic") {
+  if (!protocol || protocol === "AnthropicMessages") {
     return false;
   }
   if (/moonshot|kimi/.test(modelId)) {
@@ -21313,6 +24130,7 @@ function registerIPCHandlers() {
   registerRuntimeTerminalHandlers();
   registerCaptureDeviceHandlers(context);
   registerAgentHandlers(context);
+  registerMemoryHandlers();
   registerCommandHandlers();
   registerToolEvidenceHandlers(context);
   registerSettingsLlmHandlers(context);
@@ -22030,6 +24848,11 @@ async function handleRequest(options, request2, response) {
   }
   const bridgeOrigin = bridgeUrl ?? "http://127.0.0.1";
   const url$1 = new url.URL(request2.url, bridgeOrigin);
+  if (url$1.pathname === "/api/settings/providers/catalog" && request2.method === "GET") {
+    const catalog = await invokeRegisteredIpcChannel("settings:getProviderCatalog");
+    sendJson(response, 200, catalog);
+    return;
+  }
   if (url$1.pathname === "/health" && request2.method === "GET") {
     const renderer = options.devRendererUrl ? await checkDevRenderer(options.devRendererUrl) : { ok: fs.existsSync(path.join(options.rendererRoot, "index.html")), url: null };
     sendJson(response, 200, {

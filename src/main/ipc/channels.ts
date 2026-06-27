@@ -110,6 +110,12 @@ export const IPC_HANDLER_DOMAINS = {
     'agent:getAllStates',
     'agent:configure',
   ],
+  memory: [
+    'memory:list',
+    'memory:get',
+    'memory:write',
+    'memory:delete',
+  ],
   command: [
     'command:list',
     'command:execute',

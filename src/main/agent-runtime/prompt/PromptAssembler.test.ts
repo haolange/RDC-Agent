@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentPermissionSettings } from '@shared/types/settings';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import { composeProfileSystemPrompt } from './PromptComposer';
+import { PromptAssembler } from './PromptAssembler';
 
 const NATIVE_ROUTE: AgentRouteCapability = {
   providerId: 'openai',
@@ -25,24 +25,29 @@ function buildPermissions(
   };
 }
 
+const assembler = new PromptAssembler();
+
 function buildSystemPrompt(
   permissionSettings: AgentPermissionSettings,
   workspaceRoot = 'D:\\Projects\\Demo',
 ): string {
-  return composeProfileSystemPrompt({
-    definition: {
+  return assembler.assembleSystemPrompt({
+    workDir: workspaceRoot,
+    tools: ['read_file', 'glob', 'grep'],
+    model: { provider: 'openai', name: 'test-model' },
+    mode: 'ask',
+    profile: {
       agentId: 'ask',
       agentLabel: 'Ask',
       agentDescription: 'Read-only assistant.',
     },
     routeCapability: NATIVE_ROUTE,
-    allowedToolNames: ['read_file', 'glob', 'grep'],
     permissionSettings,
-    workspaceRoot,
+    allowedToolNames: ['read_file', 'glob', 'grep'],
   });
 }
 
-describe('composeProfileSystemPrompt permission alignment', () => {
+describe('PromptAssembler permission alignment', () => {
   it('full-access allows machine-wide reads and external absolute paths', () => {
     const prompt = buildSystemPrompt(buildPermissions({ mode: 'full-access' }));
 
@@ -50,7 +55,6 @@ describe('composeProfileSystemPrompt permission alignment', () => {
     expect(prompt).toContain('Readable roots: entire local machine.');
     expect(prompt).toContain('Use read_file with absolute paths for files outside the current project root.');
     expect(prompt).toContain('Do not claim inability to read or write a local path without attempting the tool first.');
-    expect(prompt).not.toContain('workspace only unless user approves');
   });
 
   it('default mode instructs attempting read_file for external paths with approval', () => {

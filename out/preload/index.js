@@ -132,6 +132,12 @@ const createGitApi = () => ({
   unstageAll: () => electron.ipcRenderer.invoke("git:unstageAll"),
   commit: (request) => electron.ipcRenderer.invoke("git:commit", request)
 });
+const createMemoryApi = () => ({
+  list: () => electron.ipcRenderer.invoke("memory:list"),
+  get: (name) => electron.ipcRenderer.invoke("memory:get", name),
+  write: (request) => electron.ipcRenderer.invoke("memory:write", request),
+  delete: (name) => electron.ipcRenderer.invoke("memory:delete", name)
+});
 const createProjectApi = () => ({
   list: () => electron.ipcRenderer.invoke("project:list"),
   add: (rootPath) => electron.ipcRenderer.invoke("project:add", rootPath),
@@ -181,13 +187,14 @@ const createLlmApi = () => ({
   connectProvider: (request) => electron.ipcRenderer.invoke("llm:connectProvider", request),
   refreshProviderModels: (providerId) => electron.ipcRenderer.invoke("llm:refreshProviderModels", providerId),
   disconnectProvider: (providerId) => electron.ipcRenderer.invoke("llm:disconnectProvider", providerId),
-  startProviderAccountLogin: (providerId) => electron.ipcRenderer.invoke("llm:startProviderAccountLogin", providerId),
+  startProviderAccountLogin: (request) => electron.ipcRenderer.invoke("llm:startProviderAccountLogin", request),
   getProviderAccountStatus: (providerId) => electron.ipcRenderer.invoke("llm:getProviderAccountStatus", providerId),
   finishProviderAccountLogin: (request) => electron.ipcRenderer.invoke("llm:finishProviderAccountLogin", request),
   logoutProviderAccount: (providerId) => electron.ipcRenderer.invoke("llm:logoutProviderAccount", providerId)
 });
 const createSettingsApi = () => ({
   get: () => electron.ipcRenderer.invoke("settings:get"),
+  getProviderCatalog: () => electron.ipcRenderer.invoke("settings:getProviderCatalog"),
   getProviderSecret: (providerId) => electron.ipcRenderer.invoke("settings:getProviderSecret", providerId),
   importAgentManifest: (filePath) => electron.ipcRenderer.invoke("settings:importAgentManifest", filePath),
   upsertSkill: (request) => electron.ipcRenderer.invoke("settings:upsertSkill", request),
@@ -259,6 +266,7 @@ const electronAPI = {
   workflow: createWorkflowApi(),
   trace: createTraceApi(),
   agent: createAgentApi(),
+  memory: createMemoryApi(),
   tool: createToolApi(),
   evidence: createEvidenceApi(),
   llm: createLlmApi(),

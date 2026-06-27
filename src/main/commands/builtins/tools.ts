@@ -19,7 +19,7 @@ export const toolsCommand: CommandDefinition = {
     }
     return {
       success: true,
-      message: 'Available tools: bash, read_file, write_file, edit_file, delete_file, move_file, copy_file, glob, grep, search_codebase, web_fetch, web_search, ask_user, notebook_edit, agent_spawn, send_message, task_create, task_update, task_get, task_list, task_stop, mcp, skill',
+      message: 'Available tools: bash, read_file, write_file, edit_file, delete_file, move_file, copy_file, glob, grep, search_codebase, web_fetch, web_search, ask_user, notebook_edit, task_create, task_update, task_get, task_list, task_stop, mcp, skill',
     };
   },
 };

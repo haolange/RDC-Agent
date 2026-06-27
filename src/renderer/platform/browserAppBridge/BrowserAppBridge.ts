@@ -73,6 +73,12 @@ class BrowserAppBridgeClient {
       getAllStates: () => this.invoke('agent:getAllStates'),
       configure: (agentId, config) => this.invoke('agent:configure', agentId, config),
     },
+    memory: {
+      list: () => this.invoke('memory:list'),
+      get: (name) => this.invoke('memory:get', name),
+      write: (request) => this.invoke('memory:write', request),
+      delete: (name) => this.invoke('memory:delete', name),
+    },
     command: {
       list: (category?) => this.invoke('command:list', category),
       execute: (request) => this.invoke('command:execute', request),

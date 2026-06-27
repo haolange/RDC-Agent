@@ -1,11 +1,15 @@
 /**
- * AgentLoop — Pi Agent 风格的双重循环。
+ * AgentLoop — transition 状态机式 Agent 主循环。
  *
- * 设计目标：
- * - 外层循环：处理 followUp 消息队列，串联多轮用户对话。
- * - 内层循环：LLM 调用 → 工具执行 → 再次调用，直到 stopReason !== 'toolUse'。
- * - Steering 机制：每个工具执行后检查 steering 队列；存在新指令时
- *   终止剩余工具，并把 steering 消息转化为下一轮的 pending 消息。
+ * 设计对标 Claude Code `query.ts`：用显式 `LoopState` + 「State 重写 + continue」
+ * 表达所有恢复/继续路径，单层 `while(true)` 直线流水线，线性可读可断言。
+ *
+ * transition 站点（每轮顶部快照 state，按 reason 分发）：
+ * - `init`          注入初始 pending（用户消息），进入首轮。
+ * - `next_turn`     正常工具循环：调 LLM → 执行工具 → 若有 toolUse 继续。
+ * - `steering`      工具执行后 steering 命中：把 steering 消息作下一轮 pending。
+ * - `follow_up`     内层停止后检查 followUp 队列：有则作下一轮 pending。
+ * - `terminal`      终止（max_turns / 无 toolUse 且无 followUp / abort）。
  *
  * 该模块只负责低层调度，不持有状态机或事件订阅；
  * 高层组合（队列、订阅、abort 协调）由 `Agent` 类负责。
@@ -160,6 +164,19 @@ export function agentLoopContinue(
 // 主循环实现
 // =====================================================================
 
+/** transition reason：标记「本轮为何继续」，便于测试断言走了哪条路径。 */
+type TransitionReason = 'init' | 'next_turn' | 'steering' | 'follow_up';
+
+/** 显式循环状态。每轮顶部快照，恢复/继续路径用「重写 state + continue」表达。 */
+interface LoopState {
+  /** 待注入上下文的 pending 消息（用户/steering/followUp）。 */
+  pending: UserMessage[];
+  /** 当前工具执行轮数。 */
+  turn: number;
+  /** 本轮 transition 原因。 */
+  transition: TransitionReason;
+}
+
 async function runAgentLoop(
   pendingMessages: UserMessage[],
   context: AgentContext,
@@ -185,138 +202,129 @@ async function runAgentLoop(
     config.signal.addEventListener('abort', onExternalAbort, { once: true });
   }
 
+  // 注入 pending 消息到上下文 + 事件流的公共逻辑。
+  const injectPending = (messages: UserMessage[]): void => {
+    for (const msg of messages) {
+      context.messages.push(msg);
+      newMessages.push(msg);
+      stream.push({ type: 'message_start', message: msg });
+      stream.push({ type: 'message_end', message: msg });
+    }
+  };
+
+  // Background Task & Cron 注入点：每轮 LLM 调用前注入已完成后台任务通知 + 到期 cron。
+  const injectScheduled = (): void => {
+    const injected: UserMessage[] = [];
+    if (config.backgroundTaskRunner) {
+      const notification = config.backgroundTaskRunner.buildNotificationMessage();
+      if (notification) {
+        injected.push({
+          role: 'user',
+          content: [{ type: 'text', text: notification }],
+          timestamp: Date.now(),
+        });
+      }
+    }
+    if (config.cronScheduler) {
+      for (const prompt of config.cronScheduler.getPendingPrompts()) {
+        injected.push({
+          role: 'user',
+          content: [{ type: 'text', text: `<cron_triggered>${prompt}</cron_triggered>` }],
+          timestamp: Date.now(),
+        });
+      }
+    }
+    injectPending(injected);
+  };
+
   try {
     stream.push({ type: 'agent_start' });
 
-    let turn = 0;
-    let pending = pendingMessages;
+    // 初始 state：pending = 用户消息，transition = init。
+    let state: LoopState = {
+      pending: [...pendingMessages],
+      turn: 0,
+      transition: 'init',
+    };
 
-    // ---- 外层循环：followUp 队列 -----------------------------------
-    outer: while (true) {
-      // 注入 pending（用户/steering）消息到上下文
-      for (const msg of pending) {
-        context.messages.push(msg);
-        newMessages.push(msg);
-        stream.push({ type: 'message_start', message: msg });
-        stream.push({ type: 'message_end', message: msg });
-      }
-      pending = [];
-
-      // ---- 内层循环：LLM ↔ 工具 -----------------------------------
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        if (stream.isDone) {
-          return;
-        }
-        turn++;
-        if (turn > maxTurns) {
-          break outer;
-        }
-        stream.push({ type: 'turn_start', turn });
-
-        // --- Background Task & Cron 注入点 ---
-        // 在调用 provider.stream() 之前，将已完成的后台任务通知与到期的
-        // cron 任务提示作为 user 消息注入上下文，从而让 LLM 在本轮可见。
-        const injected: UserMessage[] = [];
-        if (config.backgroundTaskRunner) {
-          const notification =
-            config.backgroundTaskRunner.buildNotificationMessage();
-          if (notification) {
-            injected.push({
-              role: 'user',
-              content: [{ type: 'text', text: notification }],
-              timestamp: Date.now(),
-            });
-          }
-        }
-        if (config.cronScheduler) {
-          for (const prompt of config.cronScheduler.getPendingPrompts()) {
-            injected.push({
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: `<cron_triggered>${prompt}</cron_triggered>`,
-                },
-              ],
-              timestamp: Date.now(),
-            });
-          }
-        }
-        for (const msg of injected) {
-          context.messages.push(msg);
-          newMessages.push(msg);
-          stream.push({ type: 'message_start', message: msg });
-          stream.push({ type: 'message_end', message: msg });
-        }
-
-        // 1. 调用 LLM 生成助手消息（带错误恢复）
-        const { message: assistantMessage } =
-          await streamAssistantResponseWithRecovery(
-            context,
-            config,
-            providerStrategy,
-            stream,
-          );
-        newMessages.push(assistantMessage);
-
-        // 2. 非 toolUse 停止 → 结束内层
-        if (assistantMessage.stopReason !== 'toolUse') {
-          stream.push({
-            type: 'turn_end',
-            turn,
-            message: assistantMessage,
-          });
-          break;
-        }
-
-        // 3. 执行工具调用
-        const toolResults = await executeToolCalls(
-          assistantMessage,
-          toolExecutor,
-          stream,
-          config.getSteeringMessages,
-          config.maxToolConcurrency,
-        );
-        for (const result of toolResults.results) {
-          context.messages.push(result);
-          newMessages.push(result);
-        }
-
-        stream.push({
-          type: 'turn_end',
-          turn,
-          message: assistantMessage,
-          toolResults: toolResults.results,
-        });
-
-        // 4. steering 命中 → 把 steering 消息作为下一轮 pending，
-        //    继续内层循环（让 agent 立即对新指令做出反应）。
-        if (
-          toolResults.steeringMessages &&
-          toolResults.steeringMessages.length > 0
-        ) {
-          pending = toolResults.steeringMessages;
-          // 注入 steering 消息
-          for (const msg of pending) {
-            context.messages.push(msg);
-            newMessages.push(msg);
-            stream.push({ type: 'message_start', message: msg });
-            stream.push({ type: 'message_end', message: msg });
-          }
-          pending = [];
-          // 不 break，直接进入下一轮内层
-        }
+    // ---- 单层主循环：transition 状态机 ----
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      // 1. 快照 state（transition 字段标记本轮来源，供测试断言）
+      // 2. 注入 pending（init / steering / follow_up 站点携带 pending）
+      if (state.pending.length > 0) {
+        injectPending(state.pending);
+        state = { ...state, pending: [] };
       }
 
-      // 内层结束后检查 followUp 队列
-      const followUps = config.getFollowUpMessages
-        ? config.getFollowUpMessages()
-        : [];
-      if (!followUps || followUps.length === 0) {
+      // 3. abort 检查
+      if (stream.isDone) {
+        return;
+      }
+
+      // 4. turn 计数 + max_turns 终止
+      state = { ...state, turn: state.turn + 1 };
+      if (state.turn > maxTurns) {
         break;
       }
-      pending = followUps;
+      stream.push({ type: 'turn_start', turn: state.turn });
+
+      // 5. 注入 scheduled（background/cron）
+      injectScheduled();
+
+      // 6. 调用 LLM 生成助手消息（带错误恢复，内部是独立 transition 子状态机）
+      const { message: assistantMessage } = await streamAssistantResponseWithRecovery(
+        context,
+        config,
+        providerStrategy,
+        stream,
+      );
+      newMessages.push(assistantMessage);
+
+      // 7. 非 toolUse 停止 → 检查 followUp，决定 follow_up 还是 terminal
+      if (assistantMessage.stopReason !== 'toolUse') {
+        stream.push({ type: 'turn_end', turn: state.turn, message: assistantMessage });
+        const followUps = config.getFollowUpMessages ? config.getFollowUpMessages() : [];
+        if (followUps && followUps.length > 0) {
+          // follow_up 站点：重写 state，携带 followUp 作为下一轮 pending
+          state = { pending: followUps, turn: state.turn, transition: 'follow_up' };
+          continue;
+        }
+        // terminal：无 toolUse 且无 followUp
+        break;
+      }
+
+      // 8. 执行工具调用
+      const toolResults = await executeToolCalls(
+        assistantMessage,
+        toolExecutor,
+        stream,
+        config.getSteeringMessages,
+        config.maxToolConcurrency,
+      );
+      for (const result of toolResults.results) {
+        context.messages.push(result);
+        newMessages.push(result);
+      }
+      stream.push({
+        type: 'turn_end',
+        turn: state.turn,
+        message: assistantMessage,
+        toolResults: toolResults.results,
+      });
+
+      // 9. steering 命中 → steering 站点：重写 state，携带 steering 消息作下一轮 pending
+      if (toolResults.steeringMessages && toolResults.steeringMessages.length > 0) {
+        state = {
+          pending: toolResults.steeringMessages,
+          turn: state.turn,
+          transition: 'steering',
+        };
+        continue;
+      }
+
+      // 10. next_turn 站点：正常工具循环继续
+      state = { pending: [], turn: state.turn, transition: 'next_turn' };
     }
 
     stream.push({ type: 'agent_end', messages: newMessages });
@@ -364,6 +372,39 @@ async function streamAssistantResponseWithRecovery(
       );
       // 成功时重置断路器
       consecutiveCompactionFailures = 0;
+
+      // stopReason === 'length'：输出被 max_tokens 截断，走恢复策略
+      // （escalate_tokens 提额 / continue_prompt 续写 / abort）。
+      if (recovery && assistantMessage.stopReason === 'length') {
+        const lengthAction = recovery.decide(null, 'length');
+        switch (lengthAction.type) {
+          case 'escalate_tokens': {
+            recovery.markEscalated();
+            if (config.streamOptions) {
+              config.streamOptions.maxTokens = lengthAction.newMaxTokens;
+            }
+            continue;
+          }
+          case 'continue_prompt': {
+            recovery.noteRetryAttempt();
+            // 续写：注入一条 user nudge 让模型继续未完成的输出。
+            context.messages.push({
+              role: 'user',
+              content: [{ type: 'text', text: 'Continue.' }],
+              timestamp: Date.now(),
+            });
+            continue;
+          }
+          case 'abort': {
+            throw new Error(`[Recovery abort] ${lengthAction.reason}`);
+          }
+          default: {
+            // retry/reactive_compact/switch_model 不适用于 length，直接返回。
+            return { message: assistantMessage };
+          }
+        }
+      }
+
       return { message: assistantMessage };
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));

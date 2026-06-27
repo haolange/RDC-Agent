@@ -16,8 +16,7 @@
  */
 
 import * as crypto from 'crypto';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import { FileTaskStore, type TaskStore } from './TaskStore';
 
 /** 任务状态。 */
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'deleted';
@@ -84,19 +83,20 @@ export interface UpdateTaskOptions {
 
 /** 任务注册表。 */
 export class TaskRegistry {
-  /** 任务 JSON 文件存放目录（绝对路径）。 */
-  private readonly tasksDir: string;
-  /** 是否已确保目录存在（避免每次 IO 都调用 mkdir）。 */
-  private dirEnsured = false;
+  /** 存储后端（FileTaskStore 落盘 / MemoryTaskStore 内存）。 */
+  private readonly store: TaskStore;
+  /** 任务变更回调（create/update 后触发，用于 emit task.created/updated 事件）。 */
+  onTaskChange?: (event: { type: 'created' | 'updated'; task: TaskRecord }) => void;
 
   /**
    * 构造一个任务注册表。
    *
-   * @param tasksDir 任务文件目录。如果是相对路径，相对当前进程 cwd 解析；
-   *                 默认 `.tasks/`（即 workspace 根下的 `.tasks/`）。
+   * @param storeOrDir TaskStore 实例，或任务文件目录（兼容旧签名，内部建 FileTaskStore）。
    */
-  constructor(tasksDir: string = '.tasks') {
-    this.tasksDir = path.resolve(tasksDir);
+  constructor(storeOrDir: TaskStore | string = '.tasks') {
+    this.store = typeof storeOrDir === 'string'
+      ? new FileTaskStore(storeOrDir)
+      : storeOrDir;
   }
 
   // ── 公共接口 ──────────────────────────────────────────────
@@ -119,7 +119,6 @@ export class TaskRegistry {
     if (typeof subject !== 'string' || subject.trim().length === 0) {
       throw new Error('subject 不能为空');
     }
-    await this.ensureDir();
 
     const now = Date.now();
     const id = this.generateId();
@@ -146,6 +145,7 @@ export class TaskRegistry {
       await this.linkBlocks(upstreamId, id);
     }
 
+    this.onTaskChange?.({ type: 'created', task });
     return task;
   }
 
@@ -202,6 +202,7 @@ export class TaskRegistry {
 
     task.updatedAt = Date.now();
     await this.saveTask(task);
+    this.onTaskChange?.({ type: 'updated', task });
     return task;
   }
 
@@ -216,31 +217,18 @@ export class TaskRegistry {
   }
 
   /**
-   * 列出所有任务（按 ID 升序，与文件名字典序一致）。
-   *
-   * - 单个文件解析失败时会被跳过，不影响整体列表；
-   * - 目录不存在时返回空数组。
+   * 列出所有任务（按 ID 升序）。
    */
   async listTasks(): Promise<TaskRecord[]> {
-    await this.ensureDir();
-    let entries: string[];
-    try {
-      entries = await fs.readdir(this.tasksDir);
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
-      throw err;
-    }
-    const files = entries
-      .filter((name) => name.startsWith('task_') && name.endsWith('.json'))
-      .sort();
+    return this.store.listTasks();
+  }
 
-    const tasks: TaskRecord[] = [];
-    for (const file of files) {
-      const id = file.slice(0, -'.json'.length);
-      const task = await this.loadTask(id);
-      if (task) tasks.push(task);
-    }
-    return tasks;
+  /**
+   * 物理删除任务（不同于 updateTask status='deleted' 的软删除）。
+   * 主要用于 subagent 结束后清理内存 task。
+   */
+  async deleteTask(taskId: string): Promise<void> {
+    await this.store.deleteTask(taskId);
   }
 
   /**
@@ -293,36 +281,14 @@ export class TaskRegistry {
     return `task_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
   }
 
-  /** 任务对应的 JSON 文件绝对路径。 */
-  private taskPath(taskId: string): string {
-    return path.join(this.tasksDir, `${taskId}.json`);
-  }
-
-  /** 确保任务目录存在（懒执行 + 缓存）。 */
-  private async ensureDir(): Promise<void> {
-    if (this.dirEnsured) return;
-    await fs.mkdir(this.tasksDir, { recursive: true });
-    this.dirEnsured = true;
-  }
-
-  /** 把任务序列化写入文件。 */
+  /** 把任务写入存储（委托 TaskStore）。 */
   private async saveTask(task: TaskRecord): Promise<void> {
-    await this.ensureDir();
-    const payload = JSON.stringify(task, null, 2);
-    await fs.writeFile(this.taskPath(task.id), payload, 'utf8');
+    await this.store.saveTask(task);
   }
 
-  /** 从文件读取任务；缺失或解析失败时返回 `null`。 */
+  /** 从存储读取任务；缺失返回 `null`（委托 TaskStore）。 */
   private async loadTask(taskId: string): Promise<TaskRecord | null> {
-    try {
-      const raw = await fs.readFile(this.taskPath(taskId), 'utf8');
-      const parsed = JSON.parse(raw) as Partial<TaskRecord>;
-      return normalizeTask(parsed);
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
-      // 解析失败时返回 null，避免单个坏文件污染整个列表。
-      return null;
-    }
+    return this.store.loadTask(taskId);
   }
 
   /** 在上游任务的 `blocks` 中追加 `downstreamId`（若上游存在）。 */
@@ -386,36 +352,6 @@ function appendUnique(target: string[], incoming: readonly string[]): string[] {
 }
 
 /** 把磁盘读取的对象规整为 `TaskRecord`，对缺省字段填默认值。 */
-function normalizeTask(raw: Partial<TaskRecord>): TaskRecord | null {
-  if (!raw || typeof raw.id !== 'string' || typeof raw.subject !== 'string') {
-    return null;
-  }
-  const status: TaskStatus =
-    raw.status === 'in_progress' ||
-    raw.status === 'completed' ||
-    raw.status === 'deleted'
-      ? raw.status
-      : 'pending';
-  const now = Date.now();
-  return {
-    id: raw.id,
-    subject: raw.subject,
-    description: typeof raw.description === 'string' ? raw.description : '',
-    status,
-    owner: typeof raw.owner === 'string' ? raw.owner : undefined,
-    blockedBy: Array.isArray(raw.blockedBy)
-      ? raw.blockedBy.filter((x): x is string => typeof x === 'string')
-      : [],
-    blocks: Array.isArray(raw.blocks)
-      ? raw.blocks.filter((x): x is string => typeof x === 'string')
-      : [],
-    activeForm:
-      typeof raw.activeForm === 'string' ? raw.activeForm : undefined,
-    metadata:
-      raw.metadata && typeof raw.metadata === 'object'
-        ? (raw.metadata as Record<string, unknown>)
-        : undefined,
-    createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : now,
-    updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : now,
-  };
-}
+// normalizeTask 已移至 TaskStore（FileTaskStore.normalizeTaskRecord），
+// TaskRegistry 的 loadTask 现委托 store，不再直接规整。
+

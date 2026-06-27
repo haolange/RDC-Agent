@@ -22,8 +22,7 @@ import { gitAddTool, gitCommitTool, gitDiffTool, gitLogTool, gitStatusTool, gitU
 import { webFetchTool, webSearchTool } from './WebTools';
 import { deleteFileTool, moveFileTool, copyFileTool } from '../file';
 import { searchCodebaseTool } from '../search';
-import { askUserTool, notebookEditTool, agentSpawnTool } from '../system';
-import { sendMessageTool } from '../comm';
+import { askUserTool, notebookEditTool } from '../system';
 
 /** 获取所有内置 primitive 工具。 */
 export function getPrimitiveTools(): AgentTool[] {
@@ -48,7 +47,5 @@ export function getPrimitiveTools(): AgentTool[] {
     searchCodebaseTool as unknown as AgentTool,
     askUserTool as unknown as AgentTool,
     notebookEditTool as unknown as AgentTool,
-    agentSpawnTool as unknown as AgentTool,
-    sendMessageTool as unknown as AgentTool,
   ];
 }

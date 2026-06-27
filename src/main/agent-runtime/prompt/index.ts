@@ -9,9 +9,13 @@ export {
   DEFAULT_SECTIONS,
   DEFAULT_STATIC_SECTION_COUNT,
   sectionCapabilities,
+  sectionCatalog,
   sectionContext,
   sectionIdentity,
   sectionMemory,
+  sectionPermission,
+  sectionProfileInstructions,
+  sectionRouteCapability,
   sectionRules,
   sectionTools,
   sectionWorkspace,
@@ -20,14 +24,3 @@ export type { PromptContext, PromptSection } from './PromptSections';
 
 export { DYNAMIC_BOUNDARY, PromptAssembler } from './PromptAssembler';
 export type { PromptAssemblerOptions } from './PromptAssembler';
-
-export {
-  composeProfileSystemPrompt,
-  composeProfileTurnPrompt,
-} from './PromptComposer';
-export type {
-  ProfilePromptContext,
-  ProfilePromptDefinition,
-  ProfileSystemPromptInput,
-  ProfileTurnPromptInput,
-} from './PromptComposer';

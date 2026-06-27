@@ -616,6 +616,17 @@ const englishTranslations = {
   'terminal.emptyRun': 'No activity is available for the current run yet.',
   'terminal.emptyRunHint': 'Start or select a run before using Current Run scope.',
   'terminal.emptyAllSessions': 'No runtime activity is available yet.',
+  'memory.panelTitle': 'Memory',
+  'memory.empty': 'No memories yet.',
+  'memory.new': 'New memory',
+  'memory.save': 'Save',
+  'memory.cancel': 'Cancel',
+  'memory.edit': 'Edit',
+  'memory.delete': 'Delete',
+  'memory.back': 'Back',
+  'memory.namePlaceholder': 'name (kebab-case)',
+  'memory.descriptionPlaceholder': 'description',
+  'memory.contentPlaceholder': 'content (markdown)',
 } satisfies Record<string, string>;
 
 export type TranslationKey = keyof typeof englishTranslations;
@@ -1187,6 +1198,17 @@ const zhCnOverrides: Partial<Record<TranslationKey, string>> = {
   'terminal.emptyApp': '当前还没有可显示的应用运行日志。',
   'terminal.emptySession': '当前会话还没有日志。',
   'terminal.emptySessionHint': '切到应用级范围后，可以查看设备、工具和系统活动。',
+  'memory.panelTitle': '记忆',
+  'memory.empty': '暂无记忆。',
+  'memory.new': '新建记忆',
+  'memory.save': '保存',
+  'memory.cancel': '取消',
+  'memory.edit': '编辑',
+  'memory.delete': '删除',
+  'memory.back': '返回',
+  'memory.namePlaceholder': '名称（kebab-case）',
+  'memory.descriptionPlaceholder': '描述',
+  'memory.contentPlaceholder': '内容（markdown）',
 };
 
 const terminalZhOverrides: Partial<Record<TranslationKey, string>> = {

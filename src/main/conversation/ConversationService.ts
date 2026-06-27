@@ -31,10 +31,7 @@ import { isTopLevelAgentId } from '@shared/types/agent';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
-import {
-  composeProfileSystemPrompt,
-  composeProfileTurnPrompt,
-} from '../agent-runtime/prompt';
+import { PromptAssembler } from '../agent-runtime/prompt';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
@@ -511,6 +508,15 @@ function createRequestFailedDiagnostic(route: AgentRoutePreflightOk, error: unkn
 
 export class ConversationService {
   private activeTurns = new Map<string, ActiveConversationTurn>();
+  private readonly promptAssembler = new PromptAssembler();
+  /**
+   * 待处理的 handoff（sessionId → {toProfile, prompt}）。
+   *
+   * agent_handoff 工具成功后由 AgentOrchestrator.consumePendingHandoff 消费并存入此 map，
+   * 下次该 session 消息时优先用 toProfile 并把 prompt 前置到用户消息。
+   * 内存维护（不持久化），session 重启后丢失（handoff 是即时意图）。
+   */
+  private readonly pendingHandoffs = new Map<string, { toProfile: AgentRole; prompt: string }>();
 
   async getHistory(sessionId: string): Promise<ConversationMessage[]> {
     return storageAdapter.readConversationHistory(sessionId);
@@ -682,11 +688,27 @@ export class ConversationService {
     rawMessage: string,
     pendingAttachments: ConversationAttachmentInput[],
   ): Promise<ConversationTurnResult> {
-    const conversationAgentId = resolveConversationAgentId(requestedMode, requestedAgentId);
     let workingSession = context.session;
     if (!workingSession && context.projectId) {
       workingSession = storageAdapter.createSession(context.projectId, rawMessage.slice(0, 80));
     }
+
+    // 检查待处理 handoff：若有，优先用 handoff 的 toProfile，并把 prompt 前置到用户消息。
+    let effectiveMessage = rawMessage;
+    let handoffProfile: AgentRole | null = null;
+    if (workingSession) {
+      const pending = this.pendingHandoffs.get(workingSession.sessionId);
+      if (pending && resolveEnabledAgentDefinition(pending.toProfile)) {
+        handoffProfile = pending.toProfile;
+        this.pendingHandoffs.delete(workingSession.sessionId);
+        // handoff prompt 前置为上下文引导，保留用户原始消息。
+        effectiveMessage = `${pending.prompt}\n\n---\n用户消息：${rawMessage}`;
+      }
+    }
+
+    // 优先级：handoff > 显式 requestedAgentId > requestedMode > ask
+    const conversationAgentId = handoffProfile
+      ?? resolveConversationAgentId(requestedMode, requestedAgentId);
 
     const turnId = generateEventId('turn');
     const importedAttachments = workingSession
@@ -732,7 +754,7 @@ export class ConversationService {
       },
       requestedMode,
       requestedAgentId: conversationAgentId,
-      rawMessage,
+      rawMessage: effectiveMessage,
       importedAttachments,
       userMessage,
       assistantDraftMessage,
@@ -826,10 +848,6 @@ export class ConversationService {
       showWorkTrace ? { workTrace } : {}
     );
 
-    const history = input.context.session
-      ? storageAdapter.readConversationHistory(input.context.session.sessionId).filter((entry) => entry.id !== assistantMessage.id)
-      : [];
-
     let rawResponse = '';
     let visibleResponse = '';
     let errorViewModel: ConversationTurnResult['errorViewModel'] = null;
@@ -860,11 +878,6 @@ export class ConversationService {
       });
     } else {
       try {
-        const taskContext = {
-          taskFilePath: null,
-          taskFileContent: null,
-          effectiveMessage: input.rawMessage,
-        };
         const definition = resolveEnabledAgentDefinition(conversationAgentId);
         const promptDefinition = {
           agentId: conversationAgentId,
@@ -878,23 +891,20 @@ export class ConversationService {
         const projectRootPath = input.context.projectId
           ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null
           : null;
-        const profilePrompt = composeProfileTurnPrompt({
-          context: {
-            projectId: input.context.projectId,
-            projectRootPath,
-            sessionId: input.context.session?.sessionId ?? null,
-            activeRunId: isActiveRun(input.context.currentRun) ? input.context.currentRun.runId : null,
-            openedCapturePath: input.context.openedCapturePath,
-            projectInputs: input.context.projectInputs,
-            importedAttachments: input.importedAttachments,
+        const memoryIndex = await agentOrchestrator.getMemoryIndex();
+        const systemPrompt = this.promptAssembler.assembleSystemPrompt({
+          workDir: projectRootPath ?? '',
+          tools: allowedToolNames,
+          memoryIndex: memoryIndex || undefined,
+          model: {
+            provider: routePreflight.routeCapability.providerId,
+            name: routePreflight.routeCapability.modelId,
           },
-          history,
-          definition: promptDefinition,
-          requestedMode: input.requestedMode,
-          rawMessage: input.rawMessage,
-          effectiveMessage: taskContext.effectiveMessage,
-          taskFilePath: taskContext.taskFilePath,
-          taskFileContent: taskContext.taskFileContent,
+          mode: this.modeForProfile(conversationAgentId),
+          profile: promptDefinition,
+          routeCapability: routePreflight.routeCapability,
+          permissionSettings: settingsService.getAll().agentRuntime.permissions,
+          allowedToolNames,
         });
         const responseText = await agentOrchestrator.sendProfileMessage(
           conversationAgentId,
@@ -906,17 +916,10 @@ export class ConversationService {
             patternId: 'free-agent',
             projectRootPath,
             projectId: input.context.projectId,
-            systemPrompt: composeProfileSystemPrompt({
-              definition: promptDefinition,
-              routeCapability: routePreflight.routeCapability,
-              allowedToolNames,
-              permissionSettings: settingsService.getAll().agentRuntime.permissions,
-              workspaceRoot: projectRootPath,
-            }),
+            systemPrompt,
             maxTokens: 1200,
             temperature: 0.35,
             signal: abortController.signal,
-            promptOverride: profilePrompt,
             onEvent: (event: AgentEvent) => {
               this.emitConversationEvent({
                 type: 'agent_event',
@@ -1166,6 +1169,44 @@ export class ConversationService {
                   }),
                 });
               }
+              if (event.type === 'subagent.started') {
+                const payload = event.payload as { subagentId: string; profile: string; parentToolCallId: string; text?: string };
+                commitAssistantMessage('message_patched', {
+                  workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
+                    kind: 'subagent',
+                    title: `子 Agent：${payload.profile}`,
+                    stage: 'tool',
+                    status: 'running',
+                    summary: payload.text?.slice(0, 200) ?? '',
+                  }),
+                });
+              }
+              if (event.type === 'subagent.delta') {
+                const payload = event.payload as { subagentId: string; text?: string };
+                commitAssistantMessage('message_patched', {
+                  workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
+                    kind: 'subagent',
+                    title: `子 Agent`,
+                    stage: 'tool',
+                    status: 'running',
+                    summary: payload.text ? payload.text.slice(-200) : undefined,
+                  }),
+                });
+              }
+              if (event.type === 'subagent.completed') {
+                const payload = event.payload as { subagentId: string; profile: string; text?: string; status?: string };
+                commitAssistantMessage('message_patched', {
+                  workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
+                    kind: 'subagent',
+                    title: `子 Agent：${payload.profile}`,
+                    stage: 'tool',
+                    status: payload.status === 'failed' ? 'error' : 'complete',
+                    summary: payload.text?.slice(0, 500) ?? '',
+                    detail: payload.text,
+                    completedAt: nowMs(),
+                  }),
+                });
+              }
               if (event.type === 'assistant.completed') {
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, 'assistant-output', {
@@ -1266,6 +1307,37 @@ export class ConversationService {
           : '回复已完成',
       )),
     });
+    // handoff 消费：agent_handoff 工具成功时设置 pendingHandoff，
+    // turn 完成后 consume → emit handoff.requested 事件 + 存入 pendingHandoffs map，
+    // 下次该 session 消息自动用新 profile 并前置 handoff prompt。
+    if (finalStatus !== 'error' && input.context.session) {
+      const handoff = agentOrchestrator.consumePendingHandoff();
+      if (handoff && handoff.toProfile && resolveEnabledAgentDefinition(handoff.toProfile)) {
+        this.pendingHandoffs.set(input.context.session.sessionId, {
+          toProfile: handoff.toProfile,
+          prompt: handoff.prompt,
+        });
+        this.emitConversationEvent({
+          type: 'agent_event',
+          sessionId: input.context.session.sessionId,
+          turnId: assistantMessage.turnId,
+          event: {
+            id: generateEventId('agent-event'),
+            type: 'handoff.requested',
+            timestamp: nowMs(),
+            sessionId: input.context.session.sessionId,
+            agentId: handoff.fromAgentId,
+            payload: {
+              fromAgentId: handoff.fromAgentId,
+              toProfile: handoff.toProfile,
+              prompt: handoff.prompt,
+              label: handoff.label,
+            },
+          },
+        });
+      }
+    }
+
     this.clearActiveTurn(assistantMessage.turnId, abortController);
   }
 
@@ -1314,6 +1386,32 @@ export class ConversationService {
   private ephemeralTraceSessionId(turnId: string): string {
     return `conversation-${turnId}`;
   }
+
+  /**
+   * 将 agentId 映射为 PromptContext.mode。
+   *
+   * Plan 归入 ask（ReadOnly 变体），非顶层 agent 归入 edit；
+   * 与 AgentOrchestrator.modeForAgent 保持一致语义。
+   */
+  private modeForProfile(agentId: AgentRole): 'ask' | 'debugger' | 'edit' | 'analyzer' | 'optimizer' {
+    if (agentId === 'plan' || agentId === 'ask') {
+      return 'ask';
+    }
+    if (agentId === 'debugger') {
+      return 'debugger';
+    }
+    if (agentId === 'analyzer') {
+      return 'analyzer';
+    }
+    if (agentId === 'optimizer') {
+      return 'optimizer';
+    }
+    if (agentId === 'edit') {
+      return 'edit';
+    }
+    return 'edit';
+  }
+
 }
 
 export const conversationService = new ConversationService();

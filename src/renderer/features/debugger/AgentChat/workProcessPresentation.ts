@@ -55,6 +55,25 @@ export type WorkProcessRow =
     message: string;
     detailLines: string[];
     duration: string;
+  }
+  | {
+    type: 'subagent';
+    id: string;
+    status: WorkProcessRowStatus;
+    profile: string;
+    summary: string;
+    detail: string;
+    duration: string;
+    /** 嵌套子 trace 的 row（递归构建）。 */
+    children: WorkProcessRow[];
+  }
+  | {
+    type: 'task';
+    id: string;
+    status: WorkProcessRowStatus;
+    title: string;
+    taskStatus: string;
+    duration: string;
   };
 
 export interface WorkProcessPresentation {
@@ -178,6 +197,48 @@ export const buildWorkProcessPresentation = (
       continue;
     }
 
+    // subagent block：递归消费 children，渲染嵌套子 trace（优先于 diagnostic，保留 subagent 视觉）
+    if (block.kind === 'subagent') {
+      const childRows = block.children
+        ? buildChildRows(block.children)
+        : [];
+      rows.push({
+        type: 'subagent',
+        id: block.id,
+        status: block.status,
+        profile: block.title.replace(/^子 Agent[:：]\s*/, '').trim() || 'sub-agent',
+        summary: getMeaningfulBlockSummary(block) || block.summary || '',
+        detail: block.detail ?? '',
+        duration: formatDurationMs(block.startedAt, block.completedAt),
+        children: childRows,
+      });
+      if (block.status === 'error' || block.status === 'running') important = true;
+      continue;
+    }
+
+    // task block（runtime-tasks）：渲染为 task 卡片（优先于 diagnostic，保留 task 视觉）
+    if (block.kind === 'command' || block.id === 'runtime-tasks') {
+      const summaryText = getMeaningfulBlockSummary(block);
+      if (summaryText) {
+        const taskStatus = block.status === 'error'
+          ? 'failed'
+          : block.status === 'running'
+            ? 'in_progress'
+            : block.status === 'pending'
+              ? 'pending'
+              : 'completed';
+        rows.push({
+          type: 'task',
+          id: block.id,
+          status: block.status,
+          title: summaryText,
+          taskStatus,
+          duration: formatDurationMs(block.startedAt, block.completedAt),
+        });
+      }
+      continue;
+    }
+
     if (block.kind === 'diagnostic' || block.status === 'error') {
       rows.push(createDiagnosticRow(block));
       important = true;
@@ -207,6 +268,55 @@ export const buildWorkProcessPresentation = (
     defaultExpanded: trace.status !== 'idle' || rows.length > 0,
     important,
   };
+};
+
+/**
+ * 递归构建子 block 的 rows（用于 subagent 嵌套 trace）。
+ *
+ * 复用主循环的 block→row 逻辑，但不返回 Presentation 包装。
+ */
+const buildChildRows = (blocks: ConversationWorkBlock[]): WorkProcessRow[] => {
+  const childRows: WorkProcessRow[] = [];
+  for (const block of blocks) {
+    for (const call of block.toolCalls) {
+      childRows.push(createToolRow(call));
+    }
+    if (shouldSkipBlock(block)) continue;
+    if (block.kind === 'approval') {
+      childRows.push(createApprovalRow(block));
+      continue;
+    }
+    if (block.kind === 'diagnostic' || block.status === 'error') {
+      childRows.push(createDiagnosticRow(block));
+      continue;
+    }
+    if (block.kind === 'subagent') {
+      const grandChildren = block.children ? buildChildRows(block.children) : [];
+      childRows.push({
+        type: 'subagent',
+        id: block.id,
+        status: block.status,
+        profile: block.title.replace(/^子 Agent[:：]\s*/, '').trim() || 'sub-agent',
+        summary: getMeaningfulBlockSummary(block) || block.summary || '',
+        detail: block.detail ?? '',
+        duration: formatDurationMs(block.startedAt, block.completedAt),
+        children: grandChildren,
+      });
+      continue;
+    }
+    const summaryText = getMeaningfulBlockSummary(block);
+    if (summaryText) {
+      childRows.push({
+        type: 'summary',
+        id: block.id,
+        status: block.status,
+        text: summaryText,
+        detailLines: createDetailLines(block.detail, 10),
+        duration: formatDurationMs(block.startedAt, block.completedAt),
+      });
+    }
+  }
+  return childRows;
 };
 
 const createToolRow = (call: ConversationToolCall): WorkProcessRow => {
