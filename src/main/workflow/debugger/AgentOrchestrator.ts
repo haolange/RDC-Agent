@@ -36,8 +36,10 @@ import {
 } from '@shared/constants/agents';
 import type {
   AgentEvent as SharedAgentEvent,
+  AgentAssistantDeltaPayload,
   AgentRuntimeMcpDescriptor,
   AgentRuntimeSkillDescriptor,
+  AgentSubagentEventPayload,
 } from '@shared/types/agentRuntime';
 import type { LLMConfig, LLMStreamEvent } from '@shared/types/llm';
 import type { AppMode } from '@shared/types/session';
@@ -45,6 +47,9 @@ import type { LlmProviderId } from '@shared/types/settings';
 import type { WorkflowStage } from '@shared/types/workflow';
 import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
 import { Agent } from '../../agent-runtime/agent/Agent';
+import { ContextManager } from '../../agent-runtime/agent/ContextManager';
+import { ErrorRecovery } from '../../agent-runtime/agent/ErrorRecovery';
+import { handoffController } from '../../agent-runtime/agent/HandoffController';
 import type { AgentTool, AgentToolResult, ToolExecutionContext } from '../../agent-runtime/agent/AgentTool';
 import { toolToDefinition } from '../../agent-runtime/agent/AgentTool';
 import type { ToolExecutor } from '../../agent-runtime/agent/AgentLoop';
@@ -64,11 +69,15 @@ import {
   encodeAgentModel,
   configuredRuntimeProvider,
 } from '../../agent-runtime/providers/ConfiguredRuntimeProvider';
+import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
+import { MemoryExtractor } from '../../agent-runtime/memory/MemoryExtractor';
+import { MemoryConsolidator } from '../../agent-runtime/memory/MemoryConsolidator';
+import type { TextContent } from '../../agent-runtime/core/types';
 import {
   describeRouteCapabilityDiagnostic,
   resolveAgentRouteCapability,
 } from '../../agent-runtime/capabilities/RouteCapabilityResolver';
-import { createTaskTools, TaskRegistry } from '../../agent-runtime/tasks';
+import { createTaskTools, TaskRegistry, FileTaskStore, MemoryTaskStore } from '../../agent-runtime/tasks';
 import {
   buildDiagnosticAgentEvent,
   mentionsTextualToolCall,
@@ -117,8 +126,6 @@ interface AgentProfileTurnOptions extends AgentTurnOptions {
   routeAgentId?: AgentRole;
   patternId?: string;
   stage?: WorkflowStage | 'report';
-  /** Profile turn prompt that replaces the raw user message for this runtime call. */
-  promptOverride?: string;
   /** 当前激活项目根目录，透传到工具执行上下文。 */
   projectRootPath?: string | null;
   /** 当前激活项目 id。 */
@@ -154,11 +161,39 @@ interface ToolExecutorRuntimeContext {
 export class AgentOrchestrator {
   private agentStates: Map<AgentRole, AgentState> = new Map();
   private agentConfigs: Map<AgentRole, AgentConfig> = new Map();
-  private agentSlots: Map<AgentRole, AgentSlot> = new Map();
+  private agentSlots: Map<string, AgentSlot> = new Map();
   private readonly mcpManager = new MCPManager();
   private readonly connectedMcpServerIds = new Set<string>();
   private readonly failedMcpServers = new Map<string, string>();
   private readonly skillEngine = new SkillEngine();
+  private memoryStoreInstance: MemoryStore | null = null;
+  private memoryExtractorInstance: MemoryExtractor | null = null;
+  private memoryConsolidatorInstance: MemoryConsolidator | null = null;
+  /** 内联提取频率控制：每 N 轮触发一次，避免每轮 LLM 调用开销。 */
+  private memoryExtractTurnCounter = 0;
+  private static readonly MEMORY_EXTRACT_INTERVAL = 3;
+  /**
+   * 当前 turn 的事件下沉（subagent 工具执行时读取，把子 agent 事件桥接到父 trace）。
+   * 单进程串行，无并发问题；runAgentTurn 设置，turn 结束清理。
+   */
+  private currentTurnEventSink: {
+    onEvent?: (event: SharedAgentEvent) => void;
+    sessionId?: string | null;
+    projectRootPath?: string | null;
+    projectId?: string | null;
+    agentId?: AgentRole;
+  } | null = null;
+  /**
+   * 待处理的 handoff 请求（agent_handoff 工具成功时设置，
+   * ConversationService turn 结束后 consume，实现 session 级 profile 切换）。
+   */
+  private pendingHandoff: {
+    fromAgentId: AgentRole;
+    toProfile: AgentRole;
+    prompt: string;
+    label: string;
+    sessionId?: string | null;
+  } | null = null;
 
   constructor() {
     this.initializeAgents();
@@ -365,11 +400,10 @@ export class AgentOrchestrator {
         return finalStub;
       }
 
-      const userPrompt = options?.promptOverride ?? content;
       const toolAllowlist = resolveAgentToolAllowlist(agentId, options?.stage && options.stage !== 'report' ? options.stage : undefined);
       const responseText = await this.runAgentTurn({
         agentId,
-        content: userPrompt,
+        content,
         systemPrompt: this.systemPromptForAgent(agentId, config.systemPrompt),
         providerId: config.modelProvider,
         modelId: config.modelName,
@@ -383,8 +417,6 @@ export class AgentOrchestrator {
         turnId: options?.turnId,
         toolAllowlist,
         options,
-        // A profile turn is isolated so previous cached chat state cannot leak into this user turn.
-        useFreshAgent: true,
         projectRootPath: options?.projectRootPath ?? null,
         projectId: options?.projectId ?? null,
       });
@@ -412,8 +444,162 @@ export class AgentOrchestrator {
   }
 
   // -------------------------------------------------------------------
-  // Agent 实例池
+  // Subagent（串行派生隔离 Context）
   // -------------------------------------------------------------------
+
+  /**
+   * 派生子 agent 执行任务（串行，父阻塞等待）。
+   *
+   * 对标 claude-code AgentTool：独立 context/message thread、filtered tools、
+   * 独立 permission context。子 agent 事件桥接为 `subagent.*` 事件上抛父 trace。
+   * 结果回传 = 函数返回值（不用 mailbox/队列）。
+   *
+   * @returns 子 agent 最终 assistant 文本。
+   */
+  async runSubagent(input: {
+    parentAgentId: AgentRole;
+    parentToolCallId: string;
+    targetProfile: AgentRole;
+    task: string;
+    parentSessionId?: string | null;
+    parentOnEvent?: (event: SharedAgentEvent) => void;
+    projectRootPath?: string | null;
+    projectId?: string | null;
+  }): Promise<string> {
+    const subagentId = generateEventId('subagent');
+    // 子 agent 用独立 sessionId 段隔离 context/messages（不污染父线程持久化）。
+    const subagentSessionId = input.parentSessionId
+      ? `${input.parentSessionId}::subagent::${subagentId}`
+      : null;
+
+    // 通知父 trace：子 agent 启动
+    input.parentOnEvent?.({
+      id: generateEventId('agent-event'),
+      type: 'subagent.started',
+      timestamp: nowMs(),
+      sessionId: input.parentSessionId ?? null,
+      agentId: input.parentAgentId,
+      payload: {
+        subagentId,
+        profile: input.targetProfile,
+        parentToolCallId: input.parentToolCallId,
+        text: input.task,
+      } satisfies AgentSubagentEventPayload,
+    });
+
+    // 组装子 agent system prompt（目标 profile instructions）
+    const definition = settingsService.getAll().agents.definitions
+      .find((d) => d.id === input.targetProfile && d.enabled);
+    const systemPrompt = definition?.instructions?.trim()
+      || this.systemPromptForAgent(input.targetProfile);
+
+    let resultText = '';
+    let resultStatus: 'complete' | 'failed' | 'cancelled' = 'complete';
+
+    try {
+      resultText = await this.sendProfileMessage(
+        input.targetProfile,
+        input.task,
+        {
+          sessionId: subagentSessionId ?? undefined,
+          stage: 'investigate',
+          patternId: 'subagent',
+          projectRootPath: input.projectRootPath,
+          projectId: input.projectId,
+          systemPrompt,
+          onEvent: (event: SharedAgentEvent) => {
+            // 子事件聚合为 subagent.delta 上抛父 trace（不逐事件投影子 tool，
+            // 避免父 trace 噪音；嵌套细节由 subagent.completed summary 承载）。
+            if (event.type === 'assistant.delta') {
+              const delta = event.payload as AgentAssistantDeltaPayload;
+              if (delta.text) {
+                input.parentOnEvent?.({
+                  id: generateEventId('agent-event'),
+                  type: 'subagent.delta',
+                  timestamp: nowMs(),
+                  sessionId: input.parentSessionId ?? null,
+                  agentId: input.parentAgentId,
+                  payload: {
+                    subagentId,
+                    profile: input.targetProfile,
+                    parentToolCallId: input.parentToolCallId,
+                    text: delta.text,
+                  } satisfies AgentSubagentEventPayload,
+                });
+              }
+            }
+          },
+        },
+      );
+    } catch (error) {
+      resultStatus = 'failed';
+      resultText = error instanceof Error ? error.message : String(error);
+    }
+
+    // 通知父 trace：子 agent 完成
+    input.parentOnEvent?.({
+      id: generateEventId('agent-event'),
+      type: 'subagent.completed',
+      timestamp: nowMs(),
+      sessionId: input.parentSessionId ?? null,
+      agentId: input.parentAgentId,
+      payload: {
+        subagentId,
+        profile: input.targetProfile,
+        parentToolCallId: input.parentToolCallId,
+        text: resultText,
+        status: resultStatus,
+      } satisfies AgentSubagentEventPayload,
+    });
+
+    return resultText;
+  }
+
+  /**
+   * 创建 subagent 工具（task / agent），注入父 agent 工具集。
+   *
+   * - `task`：派生通用 explore 子 agent（对标 claude-code Task 工具）。
+   * - `agent`：按指定 profile 派生子 agent。
+   */
+  createSubagentTools(parentAgentId: AgentRole, sessionId?: string | null): AgentTool[] {
+    const orchestrator = this;
+    const runSubagentTool: AgentTool<
+      { task: string; profile?: string },
+      { subagentId: string; profile: string; status: string }
+    > = {
+      name: 'subagent',
+      label: 'Subagent',
+      description: 'Delegate a sub-task to an isolated sub-agent. The sub-agent runs to completion (serial, not parallel) and returns its final answer. Use profile to target a specific agent profile (defaults to "ask" read-only).',
+      parameters: {
+        type: 'object',
+        required: ['task'],
+        properties: {
+          task: { type: 'string', description: 'The task description for the sub-agent.' },
+          profile: { type: 'string', description: 'Target profile id. Defaults to "ask" (read-only).' },
+        },
+      },
+      permissionHint: 'readonly',
+      async execute(toolCallId, args, _signal) {
+        const targetProfile = (typeof args.profile === 'string' && args.profile.trim() ? args.profile.trim() : 'ask') as AgentRole;
+        const result = await orchestrator.runSubagent({
+          parentAgentId,
+          parentToolCallId: toolCallId,
+          targetProfile,
+          task: args.task,
+          parentSessionId: sessionId ?? null,
+          parentOnEvent: orchestrator.currentTurnEventSink?.onEvent,
+          projectRootPath: orchestrator.currentTurnEventSink?.projectRootPath ?? null,
+          projectId: orchestrator.currentTurnEventSink?.projectId ?? null,
+        });
+        return {
+          content: [{ type: 'text', text: result || '(sub-agent returned empty output)' }],
+          details: { subagentId: toolCallId, profile: targetProfile, status: 'complete' },
+        };
+      },
+    };
+
+    return [runSubagentTool];
+  }
 
   private getOrCreateAgentSlot(
     agentId: AgentRole,
@@ -424,9 +610,11 @@ export class AgentOrchestrator {
     toolExecutor = this.createToolExecutor(agentId, [], undefined),
     streamOptions?: StreamOptions,
     turnSignature = '',
+    sessionId?: string | null,
   ): AgentSlot {
+    const slotKey = this.agentSlotKey(sessionId, agentId);
     const toolSignature = this.createToolSignature(tools);
-    const existing = this.agentSlots.get(agentId);
+    const existing = this.agentSlots.get(slotKey);
     if (
       existing
       && existing.providerId === providerId
@@ -439,47 +627,212 @@ export class AgentOrchestrator {
       return existing;
     }
 
+    // 长生命周期 Agent：首次创建时从持久化线程回填历史 messages，
+    // 使 Agent 跨轮记忆真实工具调用，重开 session 可完整续接。
+    const persistedMessages = sessionId
+      ? storageAdapter.readAgentThread(sessionId, agentId)
+      : [];
+
+    const agentModel = encodeAgentModel(providerId, modelId);
+
+    // ContextManager：自动 compaction 管道（toolResultBudget → snip → micro → full），
+    // 按 provider context window 动态取 token 上限。
+    const contextManager = new ContextManager({
+      modelId,
+      contextTokenLimit: Math.floor(agentModel.contextWindow * 0.75),
+      toolResultBudget: 200 * 1024,
+      keepRecentToolResults: 3,
+    });
+
+    // ErrorRecovery：错误分类与恢复策略（retry/escalate_tokens/reactive_compact/continue/abort）。
+    // fallbackModel 暂省略（无 settings route fallback 配置时只做非 switch 恢复）。
+    const errorRecovery = new ErrorRecovery({ primaryModel: agentModel });
+
     const agent = new Agent({
       initialState: {
-        model: encodeAgentModel(providerId, modelId),
+        model: agentModel,
         systemPrompt,
         tools,
-        messages: [],
+        messages: persistedMessages,
       },
       provider: configuredRuntimeProvider,
       toolExecutor,
       streamOptions,
-      maxTurns: 8,
+      maxTurns: this.resolveMaxTurns(agentId),
+      // transformContext：长对话接近窗口上限时自动压缩历史。
+      transformContext: (messages) => contextManager.compress(messages, agentModel),
+      // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
+      errorRecovery,
     });
 
     const slot: AgentSlot = { agent, providerId, modelId, systemPrompt, toolSignature, turnSignature };
-    this.agentSlots.set(agentId, slot);
+    this.agentSlots.set(slotKey, slot);
     return slot;
   }
 
-  /** Create a fresh one-shot agent slot for an isolated profile turn. */
-  private createFreshAgentSlot(
-    providerId: string,
-    modelId: string,
-    systemPrompt: string,
-    tools: ToolDefinition[] = [],
-    toolExecutor = this.createToolExecutor('ask', [], undefined),
-    streamOptions?: StreamOptions,
-  ): AgentSlot {
-    const toolSignature = this.createToolSignature(tools);
-    const agent = new Agent({
-      initialState: {
-        model: encodeAgentModel(providerId, modelId),
-        systemPrompt,
-        tools,
-        messages: [],
-      },
-      provider: configuredRuntimeProvider,
-      toolExecutor,
-      streamOptions,
-      maxTurns: 4,
+  /** 复合 slot key：`${sessionId}::${agentId}`，使 Agent 按 session+profile 隔离。 */
+  private agentSlotKey(sessionId: string | null | undefined, agentId: AgentRole): string {
+    return sessionId ? `${sessionId}::${agentId}` : `__no_session__::${agentId}`;
+  }
+
+  /**
+   * 解析 Agent 的工具执行轮数上限。
+   *
+   * 优先用 `.agent.md` frontmatter 的 `max-turns`；
+   * 未配置时按 profile 默认：edit/debugger/optimizer=50，ask/plan/analyzer=25。
+   */
+  private resolveMaxTurns(agentId: AgentRole): number {
+    const manifest = settingsService.getAll().agents.definitions
+      .find((definition) => definition.id === agentId && definition.enabled);
+    if (manifest?.maxTurns && manifest.maxTurns > 0) {
+      return manifest.maxTurns;
+    }
+    if (agentId === 'edit' || agentId === 'debugger' || agentId === 'optimizer') {
+      return 50;
+    }
+    return 25;
+  }
+
+  // =====================================================================
+  // Memory 引擎（持久记忆 + 内联提取 + consolidation）
+  // =====================================================================
+
+  /** 共享 MemoryStore 单例（懒构造，workspacePath 就绪后实例化）。 */
+  private get memoryStore(): MemoryStore {
+    if (!this.memoryStoreInstance) {
+      const memoryDir = path.join(storageAdapter.getWorkspacePath(), '.rdc-agent', 'memory');
+      this.memoryStoreInstance = new MemoryStore(memoryDir);
+    }
+    return this.memoryStoreInstance;
+  }
+
+  /**
+   * 读取 memory 索引内容（MEMORY.md），供 system prompt 注入。
+   * 失败时返回空串，不阻塞 prompt 组装。
+   */
+  async getMemoryIndex(): Promise<string> {
+    try {
+      return await this.memoryStore.getIndexContent();
+    } catch {
+      return '';
+    }
+  }
+
+  /** Memory 面板用：列出全部记忆摘要。 */
+  async listMemoriesForUi(): Promise<Array<{ name: string; description: string; type: string; updatedAt: number }>> {
+    try {
+      const all = await this.memoryStore.listMemories();
+      return all.map((m) => ({ name: m.name, description: m.description, type: m.type, updatedAt: m.updatedAt }));
+    } catch {
+      return [];
+    }
+  }
+
+  /** Memory 面板用：读取单条记忆详情。 */
+  async getMemoryForUi(name: string): Promise<{
+    name: string; description: string; type: string; content: string; tags?: string[]; createdAt: number; updatedAt: number;
+  } | null> {
+    try {
+      const record = await this.memoryStore.getMemory(name);
+      if (!record) return null;
+      return {
+        name: record.name,
+        description: record.description,
+        type: record.type,
+        content: record.content,
+        tags: record.tags,
+        createdAt: record.createdAt,
+        updatedAt: record.updatedAt,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /** Memory 面板用：写入记忆。 */
+  async writeMemoryForUi(request: { name: string; description: string; type: 'user' | 'feedback' | 'project' | 'reference'; content: string; tags?: string[] }): Promise<{ success: boolean; name: string; error?: string }> {
+    try {
+      const record = await this.memoryStore.writeMemory(request);
+      return { success: true, name: record.name };
+    } catch (error) {
+      return { success: false, name: request.name, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /** Memory 面板用：删除记忆。 */
+  async deleteMemoryForUi(name: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const deleted = await this.memoryStore.deleteMemory(name);
+      return { success: deleted };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /**
+   * 消费待处理的 handoff 请求（agent_handoff 工具成功时设置）。
+   *
+   * ConversationService 在 profile turn 完成后调用：若有 pendingHandoff，
+   * emit handoff.requested 事件 + 持久化到 session，下次消息自动用新 profile。
+   * 读取后清除（一次性消费）。
+   */
+  consumePendingHandoff(): {
+    fromAgentId: AgentRole;
+    toProfile: AgentRole;
+    prompt: string;
+    label: string;
+    sessionId?: string | null;
+  } | null {
+    const handoff = this.pendingHandoff;
+    this.pendingHandoff = null;
+    return handoff;
+  }
+
+  /** 共享 MemoryExtractor（依赖 queryLlm 适配器）。 */
+  private get memoryExtractor(): MemoryExtractor {
+    if (!this.memoryExtractorInstance) {
+      this.memoryExtractorInstance = new MemoryExtractor({
+        memoryStore: this.memoryStore,
+        queryLlm: (prompt) => this.queryLlmForMemory(prompt),
+      });
+    }
+    return this.memoryExtractorInstance;
+  }
+
+  /** 共享 MemoryConsolidator（阈值默认 10）。 */
+  private get memoryConsolidator(): MemoryConsolidator {
+    if (!this.memoryConsolidatorInstance) {
+      this.memoryConsolidatorInstance = new MemoryConsolidator({
+        memoryStore: this.memoryStore,
+        queryLlm: (prompt) => this.queryLlmForMemory(prompt),
+      });
+    }
+    return this.memoryConsolidatorInstance;
+  }
+
+  /**
+   * Memory 提取/整合用的 LLM 适配器。
+   *
+   * 取 ask agent 的 route（或首个 agentRoute）作主模型，
+   * 通过 configuredRuntimeProvider.stream 发起单轮非流式调用。
+   * 失败时抛错，由 MemoryExtractor/MemoryConsolidator 的 try/catch 兜底返回空结果。
+   */
+  private async queryLlmForMemory(prompt: string): Promise<string> {
+    const settings = settingsService.getAll();
+    const route = settings.llm.agentRoutes.find((entry) => entry.agentId === 'ask')
+      ?? settings.llm.agentRoutes[0];
+    if (!route) {
+      throw new Error('No agent route available for memory LLM adapter.');
+    }
+    const model = encodeAgentModel(route.providerId, route.modelId);
+    const stream = configuredRuntimeProvider.stream(model, {
+      messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
     });
-    return { agent, providerId, modelId, systemPrompt, toolSignature, turnSignature: '' };
+    const assistant = await stream.result();
+    return assistant.content
+      .filter((block): block is TextContent => block.type === 'text')
+      .map((block) => block.text)
+      .join('');
   }
 
   private createToolSignature(tools: ToolDefinition[]): string {
@@ -743,8 +1096,31 @@ export class AgentOrchestrator {
   }
 
   private createTaskRuntimeTools(): AgentTool[] {
-    const tasksDir = path.join(storageAdapter.getWorkspacePath(), '.tasks');
-    return createTaskTools(new TaskRegistry(tasksDir));
+    // subagent（sessionId 含 ::subagent:: 段）用 MemoryTaskStore，随子 context 结束回收；
+    // 顶层 agent 用 FileTaskStore 落盘。
+    const isSubagent = this.currentTurnEventSink?.sessionId?.includes('::subagent::') ?? false;
+    const store = isSubagent
+      ? new MemoryTaskStore()
+      : new FileTaskStore(path.join(storageAdapter.getWorkspacePath(), '.tasks'));
+    const registry = new TaskRegistry(store);
+    // 桥接 task 变更为 AgentEvent，激活 ConversationService 的 task.* 投影。
+    registry.onTaskChange = ({ type, task }) => {
+      const sink = this.currentTurnEventSink;
+      if (!sink?.onEvent) return;
+      sink.onEvent({
+        id: generateEventId('agent-event'),
+        type: type === 'created' ? 'task.created' : 'task.updated',
+        timestamp: nowMs(),
+        sessionId: sink.sessionId ?? null,
+        agentId: sink.agentId,
+        payload: {
+          taskId: task.id,
+          title: task.subject,
+          status: task.status,
+        },
+      });
+    };
+    return createTaskTools(registry);
   }
 
   private createRdxContextTool(): AgentTool<Record<string, never>, { available: boolean }> {
@@ -778,10 +1154,13 @@ export class AgentOrchestrator {
       this.createAskUserTool(agentId),
       this.createAgentHandoffTool(agentId),
       this.createMemoryReadTool(sessionId),
+      this.createMemoryWriteTool(),
+      this.createMemoryDeleteTool(),
       this.createPlanArtifactTool(sessionId),
       this.createSkillsCatalogTool(),
       this.createSkillRunTool(agentId, sessionId),
       this.createMcpCatalogTool(),
+      ...this.createSubagentTools(agentId, sessionId),
     ];
   }
 
@@ -824,34 +1203,56 @@ export class AgentOrchestrator {
 
   private createAgentHandoffTool(agentId: AgentRole): AgentTool<
     { agent?: string; label?: string; prompt?: string },
-    { fromAgentId: AgentRole; toAgentId: string; label: string; prompt: string }
+    { fromAgentId: AgentRole; toAgentId: string; label: string; prompt: string; valid: boolean }
   > {
+    const orchestrator = this;
     return {
       name: 'agent_handoff',
       label: 'Agent Handoff',
-      description: 'Prepare a handoff to another agent profile without executing it directly.',
+      description: 'Request a handoff to another agent profile. The runtime validates the target against the current profile handoffs and prepares the receiving prompt. The actual profile switch is applied by the orchestrator after this turn.',
       parameters: {
         type: 'object',
-        required: ['prompt'],
+        required: ['agent'],
         properties: {
           agent: { type: 'string', description: 'Target agent profile id, such as edit, debugger, analyzer, or optimizer.' },
-          label: { type: 'string', description: 'Short handoff label.' },
-          prompt: { type: 'string', description: 'Implementation or specialist prompt for the receiving agent.' },
+          label: { type: 'string', description: 'Short handoff label. Defaults to the declared handoff label.' },
+          prompt: { type: 'string', description: 'Implementation or specialist prompt for the receiving agent. Defaults to the declared handoff prompt.' },
         },
       },
       permissionHint: 'readonly',
       async execute(_toolCallId, args) {
-        const toAgentId = typeof args.agent === 'string' && args.agent.trim() ? args.agent.trim() : 'edit';
-        const label = typeof args.label === 'string' && args.label.trim() ? args.label.trim() : `Hand off to ${toAgentId}`;
-        const prompt = typeof args.prompt === 'string' && args.prompt.trim()
-          ? args.prompt.trim()
-          : 'Continue from the current plan and ask for missing context before making changes.';
+        const toProfile = typeof args.agent === 'string' ? args.agent.trim() : '';
+        const resolved = handoffController.resolve(
+          agentId,
+          toProfile,
+          typeof args.prompt === 'string' ? args.prompt : undefined,
+          typeof args.label === 'string' ? args.label : undefined,
+        );
+        if (!resolved.valid || !resolved.request) {
+          return {
+            content: [{
+              type: 'text',
+              text: `Handoff rejected: ${resolved.reason ?? 'unknown reason'}`,
+            }],
+            isError: true,
+            details: { fromAgentId: agentId, toAgentId: toProfile, label: '', prompt: '', valid: false },
+          };
+        }
+        const { toProfile: target, label, prompt } = resolved.request;
+        // 记录待处理 handoff，供 ConversationService turn 结束后 consume 实现 profile 切换。
+        orchestrator.pendingHandoff = {
+          fromAgentId: agentId,
+          toProfile: target as AgentRole,
+          prompt,
+          label,
+          sessionId: orchestrator.currentTurnEventSink?.sessionId ?? null,
+        };
         return {
           content: [{
             type: 'text',
-            text: `Handoff prepared from ${agentId} to ${toAgentId}: ${label}\n${prompt}`,
+            text: `Handoff prepared from ${agentId} to ${target}: ${label}\n${prompt}`,
           }],
-          details: { fromAgentId: agentId, toAgentId, label, prompt },
+          details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: true },
         };
       },
     };
@@ -903,44 +1304,135 @@ export class AgentOrchestrator {
   }
 
   private createMemoryReadTool(sessionId?: string | null): AgentTool<
-    { query?: string; limit?: number },
+    { name?: string; query?: string; limit?: number },
     { sessionId: string | null; count: number }
   > {
+    const store = this.memoryStore;
     return {
       name: 'memory_read',
       label: 'Read Memory',
-      description: 'Read recent session memory and conversation context without mutating persisted data.',
+      description: 'Read persisted memories from the workspace memory store. Supports optional name lookup or keyword filter.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Optional case-insensitive filter.' },
-          limit: { type: 'number', description: 'Maximum recent entries to return, default 8.' },
+          name: { type: 'string', description: 'Optional exact memory name to read in full.' },
+          query: { type: 'string', description: 'Optional case-insensitive filter over name/description/content.' },
+          limit: { type: 'number', description: 'Maximum entries to return, default 8.' },
         },
       },
       permissionHint: 'readonly',
       async execute(_toolCallId, args) {
-        if (!sessionId) {
-          return {
-            content: [{ type: 'text', text: 'No active session memory is available for this turn.' }],
-            details: { sessionId: null, count: 0 },
-          };
-        }
         const rawLimit = typeof args.limit === 'number' && Number.isFinite(args.limit) ? args.limit : 8;
         const limit = Math.max(1, Math.min(20, Math.floor(rawLimit)));
+
+        // 精确读取单条
+        if (typeof args.name === 'string' && args.name.trim()) {
+          const record = await store.getMemory(args.name.trim());
+          if (!record) {
+            return {
+              content: [{ type: 'text', text: `No memory named "${args.name}" was found.` }],
+              details: { sessionId: sessionId ?? null, count: 0 },
+            };
+          }
+          return {
+            content: [{
+              type: 'text',
+              text: `# ${record.name}\n\n${record.description}\n\n${record.content}`,
+            }],
+            details: { sessionId: sessionId ?? null, count: 1 },
+          };
+        }
+
+        // 列表 + 过滤
+        const all = await store.listMemories();
         const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
-        const history = storageAdapter.readConversationHistory(sessionId);
         const candidates = query
-          ? history.filter((entry) => entry.content.toLowerCase().includes(query))
-          : history;
-        const entries = candidates.slice(-limit).map((entry) => (
-          `${entry.role}${entry.agentId ? `/${entry.agentId}` : ''}: ${entry.content.slice(0, 240)}`
+          ? all.filter((entry) => (
+              entry.name.toLowerCase().includes(query)
+              || entry.description.toLowerCase().includes(query)
+              || entry.content.toLowerCase().includes(query)
+            ))
+          : all;
+        const entries = candidates.slice(0, limit).map((entry) => (
+          `- ${entry.name} (${entry.type}): ${entry.description}`
         ));
         return {
           content: [{
             type: 'text',
-            text: entries.length > 0 ? entries.join('\n') : 'No matching session memory entries were found.',
+            text: entries.length > 0
+              ? `Memory index (${candidates.length} total):\n${entries.join('\n')}`
+              : 'No matching memories were found.',
           }],
-          details: { sessionId, count: entries.length },
+          details: { sessionId: sessionId ?? null, count: entries.length },
+        };
+      },
+    };
+  }
+
+  private createMemoryWriteTool(): AgentTool<
+    { name: string; description: string; type: string; content: string; tags?: string[] },
+    { name: string; created: boolean }
+  > {
+    const store = this.memoryStore;
+    const validTypes = new Set(['user', 'feedback', 'project', 'reference']);
+    return {
+      name: 'memory_write',
+      label: 'Write Memory',
+      description: 'Persist a new memory to the workspace memory store. type must be one of: user, feedback, project, reference.',
+      parameters: {
+        type: 'object',
+        required: ['name', 'description', 'type', 'content'],
+        properties: {
+          name: { type: 'string', description: 'Kebab-case memory name (unique key).' },
+          description: { type: 'string', description: 'One-line summary.' },
+          type: { type: 'string', description: 'user | feedback | project | reference' },
+          content: { type: 'string', description: 'Full Markdown body.' },
+          tags: { type: 'array', items: { type: 'string' } },
+        },
+      },
+      permissionHint: 'mutation',
+      async execute(_toolCallId, args) {
+        const type = validTypes.has(args.type) ? (args.type as 'user' | 'feedback' | 'project' | 'reference') : 'project';
+        const record = await store.writeMemory({
+          name: args.name.trim(),
+          description: args.description.trim(),
+          type,
+          content: args.content,
+          tags: Array.isArray(args.tags) ? args.tags : undefined,
+        });
+        return {
+          content: [{ type: 'text', text: `Memory saved: ${record.name} (${record.type})` }],
+          details: { name: record.name, created: true },
+        };
+      },
+    };
+  }
+
+  private createMemoryDeleteTool(): AgentTool<
+    { name: string },
+    { name: string; deleted: boolean }
+  > {
+    const store = this.memoryStore;
+    return {
+      name: 'memory_delete',
+      label: 'Delete Memory',
+      description: 'Delete a memory by name from the workspace memory store.',
+      parameters: {
+        type: 'object',
+        required: ['name'],
+        properties: {
+          name: { type: 'string', description: 'Memory name to delete.' },
+        },
+      },
+      permissionHint: 'mutation',
+      async execute(_toolCallId, args) {
+        const deleted = await store.deleteMemory(args.name.trim());
+        return {
+          content: [{
+            type: 'text',
+            text: deleted ? `Memory deleted: ${args.name}` : `No memory named "${args.name}" was found.`,
+          }],
+          details: { name: args.name, deleted },
         };
       },
     };
@@ -1173,8 +1665,6 @@ export class AgentOrchestrator {
     options?: AgentTurnOptions;
     projectRootPath?: string | null;
     projectId?: string | null;
-    /** Creates a one-shot agent instance instead of reusing the cached slot. */
-    useFreshAgent?: boolean;
   }): Promise<string> {
     if (!input.providerId || !input.modelId) {
       throw new Error('No provider/model route is configured for this agent.');
@@ -1201,6 +1691,14 @@ export class AgentOrchestrator {
       modelId: input.modelId,
       toolAllowlist: activeToolAllowlist,
       routeCapability,
+    };
+    // 设置当前 turn 事件下沉，供 subagent 工具桥接子事件到父 trace。
+    this.currentTurnEventSink = {
+      onEvent: input.options?.onEvent,
+      sessionId: input.sessionId ?? null,
+      projectRootPath: input.projectRootPath ?? null,
+      projectId: input.projectId ?? null,
+      agentId: input.agentId,
     };
     const toolExecutor = this.createToolExecutor(input.agentId, activeToolAllowlist, input.stage, input.sessionId, {
       sessionId: input.sessionId ?? null,
@@ -1233,25 +1731,17 @@ export class AgentOrchestrator {
         technicalMessage: JSON.stringify(routeCapability),
       }));
     }
-    const slot = input.useFreshAgent
-      ? this.createFreshAgentSlot(
-          input.providerId,
-          input.modelId,
-          input.systemPrompt,
-          activeToolDefinitions,
-          toolExecutor,
-          streamOptions,
-        )
-      : this.getOrCreateAgentSlot(
-          input.agentId,
-          input.providerId,
-          input.modelId,
-          input.systemPrompt,
-          activeToolDefinitions,
-          toolExecutor,
-          streamOptions,
-          input.turnId ?? '',
-        );
+    const slot = this.getOrCreateAgentSlot(
+      input.agentId,
+      input.providerId,
+      input.modelId,
+      input.systemPrompt,
+      activeToolDefinitions,
+      toolExecutor,
+      streamOptions,
+      input.turnId ?? '',
+      input.sessionId,
+    );
 
     const userMessage: UserMessage = {
       role: 'user',
@@ -1320,6 +1810,65 @@ export class AgentOrchestrator {
       }
       agentUserInputRequestService.cancelTurn(input.turnId);
       agentToolApprovalRequestService.cancelTurn(input.turnId);
+      this.currentTurnEventSink = null;
+      // 长生命周期 Agent：turn 结束后持久化完整 message 线程，
+      // 使重开 session 可从 StorageAdapter 回填并完整续接。
+      if (input.sessionId) {
+        try {
+          storageAdapter.writeAgentThread(input.sessionId, input.agentId, [...slot.agent.messages]);
+        } catch (error) {
+          console.error(`[AgentOrchestrator] writeAgentThread failed for ${input.sessionId}::${input.agentId}:`, error);
+        }
+      }
+      // Memory 内联提取：轮末从最新消息提取候选记忆并落盘。
+      // 频率控制每 N 轮触发一次；fire-and-forget 不阻塞主流程，失败 fail-safe。
+      this.memoryExtractTurnCounter += 1;
+      if (
+        this.memoryExtractTurnCounter % AgentOrchestrator.MEMORY_EXTRACT_INTERVAL === 0
+        && slot.agent.messages.length > 0
+      ) {
+        void this.extractMemoriesFromTurn(slot.agent.messages).catch((error) => {
+          console.error('[AgentOrchestrator] memory extraction failed:', error);
+        });
+      }
+    }
+  }
+
+  /**
+   * 内联提取：将 turn 的消息转为宽松消息类型喂给 MemoryExtractor，
+   * 候选经 dedup 后 writeMemory，再按需触发 consolidation。
+   *
+   * messages 接收 core AgentMessage（Agent.messages 产物），仅提取 role/content。
+   */
+  private async extractMemoriesFromTurn(
+    messages: ReadonlyArray<{ role: string; content?: unknown }>,
+  ): Promise<void> {
+    const recent = messages.slice(-10).map((msg) => ({
+      role: msg.role,
+      content: typeof msg.content === 'string'
+        ? msg.content
+        : Array.isArray(msg.content)
+          ? (msg.content as Array<{ type: string; text?: string }>)
+              .filter((block) => block.type === 'text' && typeof block.text === 'string')
+              .map((block) => block.text as string)
+              .join('')
+          : '',
+    }));
+    const candidates = await this.memoryExtractor.extractFromConversation(recent);
+    for (const candidate of candidates) {
+      try {
+        await this.memoryStore.writeMemory(candidate);
+      } catch (error) {
+        console.error('[AgentOrchestrator] writeMemory failed for', candidate.name, error);
+      }
+    }
+    // consolidation 检查：超阈值触发整合
+    try {
+      if (await this.memoryConsolidator.shouldConsolidate()) {
+        await this.memoryConsolidator.consolidate();
+      }
+    } catch (error) {
+      console.error('[AgentOrchestrator] memory consolidation failed:', error);
     }
   }
 

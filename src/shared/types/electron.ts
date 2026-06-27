@@ -67,6 +67,30 @@ import type {
   TraceSessionResult,
 } from './trace';
 
+/** Memory 面板列表项摘要（对应 MemoryRecord 的精简视图）。 */
+export interface MemorySummary {
+  name: string;
+  description: string;
+  type: 'user' | 'feedback' | 'project' | 'reference';
+  updatedAt: number;
+}
+
+/** Memory 面板详情（含完整正文）。 */
+export interface MemoryDetail extends MemorySummary {
+  content: string;
+  tags?: string[];
+  createdAt: number;
+}
+
+/** Memory 写入请求（对应 MemoryStore.writeMemory 入参）。 */
+export interface MemoryWriteRequest {
+  name: string;
+  description: string;
+  type: 'user' | 'feedback' | 'project' | 'reference';
+  content: string;
+  tags?: string[];
+}
+
 export interface ElectronAPI {
   platform: NodeJS.Platform;
   isMac: boolean;
@@ -154,6 +178,13 @@ export interface ElectronAPI {
       success: boolean;
       error?: string;
     }>;
+  };
+
+  memory: {
+    list: () => Promise<{ memories: MemorySummary[] }>;
+    get: (name: string) => Promise<{ memory: MemoryDetail | null }>;
+    write: (request: MemoryWriteRequest) => Promise<{ success: boolean; name: string; error?: string }>;
+    delete: (name: string) => Promise<{ success: boolean; error?: string }>;
   };
 
   command: {

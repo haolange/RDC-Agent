@@ -121,6 +121,9 @@ const parseAgentMarkdown = (filePath: string, fallbackId: string): AgentManifest
     instructions,
     builtin: false,
     enabled: readBoolean(frontmatter.enabled, true),
+    maxTurns: typeof frontmatter['max-turns'] === 'number' && frontmatter['max-turns'] > 0
+      ? frontmatter['max-turns']
+      : undefined,
     updatedAt: fs.statSync(filePath).mtime.toISOString(),
   };
 };
@@ -136,6 +139,7 @@ const serializeAgentMarkdown = (definition: AgentManifestDraft): string => {
     'disable-model-invocation': definition.disableModelInvocation,
     'user-invocable': definition.userInvocable,
     enabled: definition.enabled,
+    ...(definition.maxTurns ? { 'max-turns': definition.maxTurns } : {}),
     tools: definition.tools,
     skills: definition.skills,
     'mcp-servers': definition.mcpServers,

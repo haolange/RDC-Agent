@@ -11,6 +11,7 @@ import { createConversationApi } from './api/conversation';
 import { createCommandApi } from './api/command';
 import { createEventSubscriptionApi } from './api/events';
 import { createGitApi } from './api/git';
+import { createMemoryApi } from './api/memory';
 import { registerTrackedListener, removeTrackedListener } from './api/listeners';
 import { createProjectApi, createRunApi, createSessionApi } from './api/projectSession';
 import { createRuntimeLogApi, createTerminalApi } from './api/runtime';
@@ -41,6 +42,7 @@ const electronAPI = {
   workflow: createWorkflowApi(),
   trace: createTraceApi(),
   agent: createAgentApi(),
+  memory: createMemoryApi(),
   tool: createToolApi(),
   evidence: createEvidenceApi(),
   llm: createLlmApi(),

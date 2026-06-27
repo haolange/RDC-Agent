@@ -1034,3 +1034,183 @@
   font-size: var(--text-sm);
   line-height: 1.6;
 }
+
+/* ===== Subagent row（嵌套子 agent 工作过程）===== */
+.work-process-subagent {
+  list-style: none;
+  border-left: 2px solid rgb(var(--token-border-default));
+  padding-left: var(--space-3);
+  margin: var(--space-1) 0;
+}
+
+.work-process-subagent-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-1) var(--space-2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+}
+
+.work-process-subagent-header:hover {
+  background: rgb(var(--token-interactive-hover));
+}
+
+.work-process-subagent-caret {
+  display: inline-block;
+  width: 10px;
+  transition: transform 0.12s ease;
+  color: var(--token-text-caption);
+}
+
+.work-process-subagent-caret.is-open {
+  transform: rotate(90deg);
+}
+
+.work-process-subagent-profile {
+  font-weight: 600;
+  color: var(--token-text-heading);
+}
+
+.work-process-subagent-summary {
+  flex: 1;
+  color: var(--token-text-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-process-subagent-status {
+  font-size: var(--text-xs);
+  color: var(--token-text-caption);
+}
+
+.work-process-subagent-status.status-error {
+  color: var(--token-status-error);
+}
+
+.work-process-subagent-status.status-running {
+  color: var(--token-status-info);
+}
+
+.work-process-subagent-duration {
+  font-size: var(--text-xs);
+  color: var(--token-text-caption);
+}
+
+.work-process-subagent-children {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.work-process-child-tool,
+.work-process-child-summary,
+.work-process-child-diagnostic {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--token-text-body);
+}
+
+.work-process-child-verb {
+  color: var(--token-text-caption);
+  font-weight: 500;
+}
+
+.work-process-child-target {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-process-child-duration {
+  color: var(--token-text-caption);
+}
+
+.work-process-child-message,
+.work-process-child-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-process-child-diagnostic.status-error .work-process-child-message {
+  color: var(--token-status-error);
+}
+
+/* ===== Task row（任务状态卡片）===== */
+.work-process-task {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--token-text-body);
+  border-radius: var(--radius-sm);
+}
+
+.work-process-task-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: var(--text-sm);
+  line-height: 1;
+}
+
+.work-process-task-icon.task-pending {
+  color: var(--token-text-caption);
+}
+
+.work-process-task-icon.task-in_progress {
+  color: var(--token-status-info);
+}
+
+.work-process-task-icon.task-completed {
+  color: var(--token-status-success);
+}
+
+.work-process-task-icon.task-failed {
+  color: var(--token-status-error);
+}
+
+.work-process-task-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-process-task-status {
+  font-size: var(--text-xs);
+  color: var(--token-text-caption);
+}
+
+.work-process-task-status.status-error {
+  color: var(--token-status-error);
+}
+
+.work-process-task-status.status-running {
+  color: var(--token-status-info);
+}
+
+.work-process-task-duration {
+  font-size: var(--text-xs);
+  color: var(--token-text-caption);
+}

@@ -62,6 +62,8 @@ export interface ConversationWorkBlock {
   toolCalls: ConversationToolCall[];
   startedAt: number;
   completedAt?: number;
+  /** 嵌套子 block（subagent kind 专用，承载子 agent 的 WorkTrace）。 */
+  children?: ConversationWorkBlock[];
 }
 
 export interface ConversationWorkTrace {

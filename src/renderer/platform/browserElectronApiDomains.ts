@@ -8,6 +8,7 @@ export const BROWSER_ELECTRON_API_DOMAINS = {
   toolsEvidenceRuntime: ['tool', 'evidence', 'runtimeLog'],
   terminalContext: ['terminal', 'context'],
   agentEvents: ['agent', 'events', 'on', 'off'],
+  memory: ['memory'],
 } as const;
 
 export type BrowserElectronApiDomain = keyof typeof BROWSER_ELECTRON_API_DOMAINS;

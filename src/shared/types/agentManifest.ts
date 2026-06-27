@@ -31,6 +31,8 @@ export interface AgentManifestDefinition {
   instructions: string;
   builtin: boolean;
   enabled: boolean;
+  /** 工具执行轮数上限；未设置时由 runtime 按 profile 默认值决定。 */
+  maxTurns?: number;
   updatedAt?: string;
 }
 

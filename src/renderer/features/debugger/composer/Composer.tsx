@@ -11,6 +11,8 @@ import type { ComposerController } from './useComposer';
 import { PermissionModeSelector } from './PermissionModeSelector';
 import { ToolApprovalRequestPanel, usePendingToolApprovalRequest } from './ToolApprovalRequestPanel';
 import { UserInputRequestPanel, usePendingUserInputRequest } from './UserInputRequestPanel';
+import { SlashCommandPopover } from './SlashCommandPopover';
+import { useSlashCommand } from './useSlashCommand';
 
 export interface ComposerProps {
   composer: ComposerController;
@@ -35,6 +37,12 @@ export const Composer: React.FC<ComposerProps> = ({
   const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
   const pendingToolApproval = usePendingToolApprovalRequest();
   const pendingUserInput = usePendingUserInputRequest();
+
+  const slashCommand = useSlashCommand(
+    composer.promptValue,
+    composer.setPromptValueDirect,
+    (commandName) => composer.setPromptValueDirect(`/${commandName} `),
+  );
 
   const {
     promptValue,
@@ -129,6 +137,13 @@ export const Composer: React.FC<ComposerProps> = ({
           aria-label={promptPlaceholder}
           rows={1}
         />
+        {slashCommand.visible ? (
+          <SlashCommandPopover
+            filterText={slashCommand.filterText}
+            onSelect={slashCommand.onSelect}
+            onDismiss={slashCommand.onDismiss}
+          />
+        ) : null}
       </div>
       <div className="composer-footer-bar" data-testid="composer-footer-bar">
         <div className="composer-toolbar-group composer-toolbar-group-left">

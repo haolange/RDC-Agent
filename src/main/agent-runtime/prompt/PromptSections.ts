@@ -6,10 +6,17 @@
  *
  * 段落按 {@link DEFAULT_SECTIONS} 中的顺序拼接，形成完整的 system prompt。
  * 段落顺序遵循"静态在前、动态在后"的约定，
- * 静态段落（identity / capabilities / tools / workspace）
+ * 静态段落（identity / instructions / capabilities / tools / workspace / route / permission / catalog）
  * 用于享受 LLM 的 prompt cache，
  * 动态段落（memory / rules / context）随会话推进而变化。
  */
+
+import type { AgentRouteCapability } from '@shared/types/agentRuntime';
+import type { AgentPermissionSettings } from '@shared/types/settings';
+import {
+  AGENT_WORKBENCH_COMMAND_CATALOG,
+  AGENT_WORKBENCH_TOOL_CATALOG,
+} from '@shared/constants/agentWorkbenchCatalog';
 
 /**
  * 组装 system prompt 时使用的上下文。
@@ -35,33 +42,65 @@ export interface PromptContext {
   userRules?: string;
   /** 额外的自定义段落。 */
   customSections?: Array<{ title: string; content: string }>;
+
+  // ── Profile 契约段（替代旧 PromptComposer 的 composeProfileSystemPrompt 能力）──
+  /** 当前 profile 的身份与指令定义（来自 `.agent.md`）。 */
+  profile: {
+    agentId: string;
+    agentLabel: string;
+    agentDescription: string;
+    baseInstructions?: string;
+    globalInstructions?: string;
+  };
+  /** 当前路由能力（决定 tool calling 模式说明段）。 */
+  routeCapability: AgentRouteCapability;
+  /** 运行时权限设置（决定 readable/writable roots 说明段）。 */
+  permissionSettings: AgentPermissionSettings;
+  /** allowlist 展开后的工具名列表（用于 catalog 段）。 */
+  allowedToolNames?: string[];
 }
 
 /** 段落函数：接收上下文，返回文本片段；返回 `null` 表示跳过。 */
 export type PromptSection = (context: PromptContext) => string | null;
 
 /**
- * 根据运行模式返回 Agent 身份描述与核心指令。
+ * Profile 身份段：基于 `.agent.md` 的 label/description 定义 agent 角色。
  *
- * 始终注入，定义 agent 的角色与基本行为约束（act don't explain）。
+ * 始终注入。比通用 identity 更贴合 profile 契约。
  */
 export const sectionIdentity: PromptSection = (context) => {
-  const identity =
-    context.mode === 'debugger'
-      ? 'You are a GPU debugger agent specialized in analyzing RenderDoc `.rdc` captures.'
-      : context.mode === 'edit'
-        ? 'You are an implementation agent that can make approved workspace changes and verify them.'
-        : 'You are a coding agent. Answer questions accurately and concisely.';
-
+  const { agentLabel, agentDescription } = context.profile;
   return [
     `# Identity`,
-    identity,
+    `You are ${agentLabel}. ${agentDescription}`,
     ``,
     `Core directives:`,
     `- Act, don't explain. Prefer tool invocations over narration.`,
+    `- Show concise visible work summaries and tool results only. Do not reveal hidden chain-of-thought.`,
     `- Keep output minimal. Surface only what the user needs.`,
     `- Use tools to read, write, and verify; never guess when a tool can confirm.`,
   ].join('\n');
+};
+
+/**
+ * Profile 指令段：注入 `.agent.md` 的 baseInstructions 与全局 instructions。
+ *
+ * 两者均缺省时返回 `null`。
+ */
+export const sectionProfileInstructions: PromptSection = (context) => {
+  const base = context.profile.baseInstructions?.trim();
+  const global = context.profile.globalInstructions?.trim();
+  if (!base && !global) {
+    return null;
+  }
+  const parts: string[] = [`# Profile Instructions`];
+  if (base) {
+    parts.push(``, base);
+  }
+  if (global) {
+    parts.push(``, `## Global Instructions`, global);
+  }
+  return parts.join('\n');
 };
 
 /**
@@ -91,19 +130,145 @@ export const sectionTools: PromptSection = (context) => {
 };
 
 /**
- * 描述工作环境：工作目录、操作系统、模型等运行期信息。
+ * 工作环境段：工作目录、操作系统、模型、模式，以及 permission mode 相关的路径说明。
  */
 export const sectionWorkspace: PromptSection = (context) => {
   const platform = process.platform ?? 'unknown';
-  const shell =
-    process.env.SHELL ?? process.env.ComSpec ?? 'unknown';
+  const shell = process.env.SHELL ?? process.env.ComSpec ?? 'unknown';
   return [
-    `# Workspace`,
-    `Working directory: ${context.workDir}`,
+    `# Working Directory`,
+    `The current project root is ${context.workDir}. Use it as the default base for relative file paths, search roots, and shell working directory.`,
     `Platform: ${platform}`,
     `Shell: ${shell}`,
     `Model: ${context.model.provider}/${context.model.name}`,
     `Mode: ${context.mode}`,
+  ].join('\n');
+};
+
+/**
+ * 路由能力段：说明 tool calling 模式（native-structured vs 其它）。
+ *
+ * 决定模型是否应使用结构化 tool call 还是纯文本。
+ */
+export const sectionRouteCapability: PromptSection = (context) => {
+  const cap = context.routeCapability;
+  if (cap.toolCallingMode === 'native-structured') {
+    return [
+      `# Route Capability`,
+      `Route Capability: native structured tool calling is enabled for ${cap.providerId}/${cap.modelId}.`,
+      `When a tool is needed, use only the provider structured tool/function-call channel.`,
+      `Do not write textual tool-call syntax in the assistant message.`,
+    ].join('\n');
+  }
+  return [
+    `# Route Capability`,
+    `Route Capability: ${cap.toolCallingMode} for ${cap.providerId}/${cap.modelId}.`,
+    `This route cannot execute runtime tools in the current agent loop.`,
+    `Do not invent tool calls, tool results, file reads, searches, or command output.`,
+    `If you need runtime information, explain what information is missing and why.`,
+  ].join('\n');
+};
+
+/**
+ * 权限策略段：按四模式描述 readable/writable roots 与外部路径审批规则。
+ *
+ * 与 runtime permission policy 对齐，让模型理解路径访问边界。
+ */
+export const sectionPermission: PromptSection = (context) => {
+  const ps = context.permissionSettings;
+  const mode = ps.mode;
+  const lines = [
+    `# Runtime Permission Policy`,
+    `Current permission mode: ${mode}.`,
+  ];
+
+  switch (mode) {
+    case 'full-access':
+      lines.push(
+        'Readable roots: entire local machine.',
+        'Writable roots: entire local machine.',
+        'Use read_file with absolute paths for files outside the current project root.',
+        'Do not claim inability to read or write a local path without attempting the tool first.',
+        'You may also access files outside this project root using absolute paths when calling read_file, glob, grep, or shell commands.',
+      );
+      break;
+    case 'auto-review':
+      lines.push(
+        'Readable roots: current project workspace; external read paths are auto-reviewed and usually denied at medium risk.',
+        'Writable roots: current project workspace; external write paths are auto-reviewed and usually denied at medium or high risk.',
+        'When external access is needed, ask the user to switch to Default or Full access, or add readableRoots in Custom mode settings.',
+        'If policy may deny the path, still attempt read_file with an absolute path so the runtime can record the review outcome.',
+      );
+      break;
+    case 'custom':
+      lines.push(
+        `Readable roots: current project workspace plus ${formatConfiguredRoots(
+          ps.readableRoots,
+          'no extra configured paths',
+        )}.`,
+        `Writable roots: current project workspace plus ${formatConfiguredRoots(
+          ps.writableRoots,
+          'no extra configured paths',
+        )}.`,
+        'Configured readableRoots and writableRoots in settings are allowed without extra approval.',
+        'For other external paths, runtime approval rules still apply based on the closest matching policy.',
+        'When policy allows access, use read_file with absolute paths and do not refuse without attempting the tool.',
+      );
+      break;
+    default:
+      lines.push(
+        'Readable roots: current project workspace; external paths require one-time user approval.',
+        'Writable roots: current project workspace; external paths require one-time user approval.',
+        'When the user asks for a file outside the project, call read_file with its absolute path and wait for runtime approval if prompted.',
+        'Do not refuse or guess file contents without attempting the tool first.',
+        'External files, network access, file mutation, destructive shell commands, and unrecognized commands may pause for user approval.',
+      );
+      break;
+  }
+
+  lines.push(
+    'Routine local inspection commands can run when the runtime policy allows them.',
+    'When policy allows external access, use read_file with absolute paths instead of claiming the file is unreachable.',
+    'If the runtime denies or requests approval, do not route around the decision with guessed paths or textual tool calls.',
+    'When you report a file path, use the absolute path that the tool actually resolved. Do not claim a path that differs from the tool result.',
+  );
+
+  return lines.join('\n');
+};
+
+function formatConfiguredRoots(roots: string[], fallback: string): string {
+  return roots.length > 0 ? roots.join(', ') : fallback;
+}
+
+/**
+ * 运行时 catalog 段：列出 allowlist 工具的元数据与 slash commands。
+ *
+ * 仅在 native-structured 路由下注入，让模型了解工具与命令的语义。
+ */
+export const sectionCatalog: PromptSection = (context) => {
+  if (context.routeCapability.toolCallingMode !== 'native-structured') {
+    return null;
+  }
+  const allowedNames = context.allowedToolNames ?? context.tools ?? [];
+  const allowed = new Set(allowedNames);
+  const toolLines = AGENT_WORKBENCH_TOOL_CATALOG
+    .filter((tool) => allowed.has(tool.id))
+    .map((tool) => (
+      `- ${tool.id}: ${tool.label}; permission=${tool.permission}; approval=${tool.approvalRequired ? 'required' : 'not required'}; result=${tool.resultSummary}`
+    ));
+  const commandLines = AGENT_WORKBENCH_COMMAND_CATALOG.map((command) => (
+    `- ${command.command}: ${command.description}${command.relatedTools.length ? ` Uses: ${command.relatedTools.join(', ')}` : ''}.`
+  ));
+
+  return [
+    '# Runtime Catalog',
+    'Only use tools exposed to this profile by the runtime. Slash commands are intent hints and never bypass profile permissions.',
+    '',
+    'Allowed tools:',
+    ...(toolLines.length > 0 ? toolLines : ['- None.']),
+    '',
+    'Slash commands:',
+    ...commandLines,
   ].join('\n');
 };
 
@@ -205,16 +370,22 @@ export const sectionContext: PromptSection = (context) => {
  * 默认段落顺序。
  *
  * 顺序设计：
- * 1. 静态段落（命中 prompt cache）：identity → capabilities → tools → workspace
+ * 1. 静态段落（命中 prompt cache）：
+ *    identity → instructions → capabilities → tools → workspace
+ *    → route → permission → catalog
  * 2. 动态段落（随上下文变化）：memory → rules → context
  *
  * {@link PromptAssembler} 会在静态段与动态段之间插入 `DYNAMIC_BOUNDARY` 标记。
  */
 export const DEFAULT_SECTIONS: PromptSection[] = [
   sectionIdentity,
+  sectionProfileInstructions,
   sectionCapabilities,
   sectionTools,
   sectionWorkspace,
+  sectionRouteCapability,
+  sectionPermission,
+  sectionCatalog,
   sectionMemory,
   sectionRules,
   sectionContext,
@@ -223,6 +394,7 @@ export const DEFAULT_SECTIONS: PromptSection[] = [
 /**
  * 静态段落数量（前 N 个段落归入静态前缀）。
  *
- * 与 {@link DEFAULT_SECTIONS} 中静态段落的数量保持一致。
+ * 与 {@link DEFAULT_SECTIONS} 中静态段落的数量保持一致：
+ * identity/instructions/capabilities/tools/workspace/route/permission/catalog = 8。
  */
-export const DEFAULT_STATIC_SECTION_COUNT = 4;
+export const DEFAULT_STATIC_SECTION_COUNT = 8;

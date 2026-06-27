@@ -40,7 +40,11 @@ export type AgentEventType =
   | 'diagnostic'
   | 'run.completed'
   | 'run.failed'
-  | 'run.cancelled';
+  | 'run.cancelled'
+  | 'subagent.started'
+  | 'subagent.delta'
+  | 'subagent.completed'
+  | 'handoff.requested';
 
 export interface AgentEventBasePayload {
   [key: string]: unknown;
@@ -127,6 +131,42 @@ export interface AgentRunFinalPayload extends AgentEventBasePayload {
   };
 }
 
+/**
+ * Subagent 事件 payload。
+ *
+ * 父 agent 通过 task/agent 工具派生子 agent 时，子 agent 的生命周期
+ * 以 subagent.* 事件投影到父 trace（嵌套 block），不污染父 trace 的扁平 tool block。
+ */
+export interface AgentSubagentEventPayload extends AgentEventBasePayload {
+  /** 子 agent 标识（子 context id）。 */
+  subagentId: string;
+  /** 子 agent profile。 */
+  profile: string;
+  /** 触发该子 agent 的父 toolCallId。 */
+  parentToolCallId: string;
+  /** subagent.started: 任务描述；subagent.delta: 增量文本；subagent.completed: 最终摘要。 */
+  text?: string;
+  /** subagent.completed 时的状态。 */
+  status?: 'complete' | 'failed' | 'cancelled';
+}
+
+/**
+ * Handoff 事件 payload。
+ *
+ * agent_handoff 工具触发 session 级控制权转移时发出，
+ * ConversationService 据此切换活跃 profile 并注入 prompt。
+ */
+export interface AgentHandoffRequestedPayload extends AgentEventBasePayload {
+  /** 源 profile。 */
+  fromAgentId: string;
+  /** 目标 profile。 */
+  toProfile: string;
+  /** 移交后注入的 prompt（缺省时从目标 profile handoffs 定义取）。 */
+  prompt: string;
+  /** handoff 标签。 */
+  label?: string;
+}
+
 export type AgentEventPayload =
   | AgentRunStartedPayload
   | AgentAssistantDeltaPayload
@@ -138,7 +178,9 @@ export type AgentEventPayload =
   | AgentTaskEventPayload
   | AgentApprovalEventPayload
   | AgentDiagnosticPayload
-  | AgentRunFinalPayload;
+  | AgentRunFinalPayload
+  | AgentSubagentEventPayload
+  | AgentHandoffRequestedPayload;
 
 export interface AgentEvent {
   id: string;
