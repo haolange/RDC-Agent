@@ -1,6 +1,7 @@
 import React from 'react';
-import type { AgentMode, BuiltinAgentMode } from '@shared/types/layout';
-import { AGENT_MODES } from '@shared/constants/agents';
+import type { AgentMode } from '@shared/types/layout';
+import { AGENT_COLORS } from '@shared/constants/agents';
+import { useProjectStore } from '../../stores/projectStore';
 import { useI18n, type TranslationKey } from '../../i18n';
 import { ModeGlyph } from '../../ui/ModeGlyph';
 import './EmptyWorkbenchPrompt.css';
@@ -9,81 +10,70 @@ interface EmptyWorkbenchPromptProps {
   mode: AgentMode;
 }
 
-const CARD_COPY: Record<BuiltinAgentMode, { title: TranslationKey; subtitle: TranslationKey }> = {
-  ask: {
-    title: 'emptyWorkbench.askTitle',
-    subtitle: 'emptyWorkbench.askSubtitle',
+type EmptyVariant = 'no-project' | 'session-empty';
+
+const FOCUS_MODES = ['debugger', 'analyzer', 'optimizer'] as const;
+type FocusMode = (typeof FOCUS_MODES)[number];
+
+const CARD_LINE: Record<FocusMode, TranslationKey> = {
+  debugger: 'emptyWorkbench.debuggerLine',
+  analyzer: 'emptyWorkbench.analyzerLine',
+  optimizer: 'emptyWorkbench.optimizerLine',
+};
+
+const HERO_COPY: Record<EmptyVariant, { title: TranslationKey; subtitle: TranslationKey }> = {
+  'no-project': {
+    title: 'emptyWorkbench.noProjectTitle',
+    subtitle: 'emptyWorkbench.noProjectSubtitle',
   },
-  plan: {
-    title: 'emptyWorkbench.planTitle',
-    subtitle: 'emptyWorkbench.planSubtitle',
-  },
-  edit: {
-    title: 'emptyWorkbench.editTitle',
-    subtitle: 'emptyWorkbench.editSubtitle',
-  },
-  debugger: {
-    title: 'emptyWorkbench.debuggerTitle',
-    subtitle: 'emptyWorkbench.debuggerSubtitle',
-  },
-  analyzer: {
-    title: 'emptyWorkbench.analyzerTitle',
-    subtitle: 'emptyWorkbench.analyzerSubtitle',
-  },
-  optimizer: {
-    title: 'emptyWorkbench.optimizerTitle',
-    subtitle: 'emptyWorkbench.optimizerSubtitle',
+  'session-empty': {
+    title: 'emptyWorkbench.sessionTitle',
+    subtitle: 'emptyWorkbench.sessionSubtitle',
   },
 };
 
 export const EmptyWorkbenchPrompt: React.FC<EmptyWorkbenchPromptProps> = ({ mode }) => {
   const { t } = useI18n();
+  const currentProject = useProjectStore((state) => state.currentProject);
+
+  const variant: EmptyVariant = currentProject ? 'session-empty' : 'no-project';
+
+  const hero = HERO_COPY[variant];
+  const subtitle = t(hero.subtitle);
 
   return (
     <section
       className="empty-workbench-prompt"
       data-testid="empty-workbench-prompt"
       data-active-mode={mode}
+      data-variant={variant}
     >
-      <div className="empty-workbench-content">
+      <div className="empty-workbench-content" data-variant={variant}>
         <div className="empty-workbench-heading">
-          <h1 className="empty-workbench-title debugger-idle-simple-title">{t('emptyWorkbench.title')}</h1>
-          <p className="empty-workbench-subtitle debugger-idle-description">{t('emptyWorkbench.subtitle')}</p>
+          <h1 className="empty-workbench-title">{t(hero.title)}</h1>
+          <p className="empty-workbench-subtitle">{subtitle}</p>
         </div>
 
         <div className="empty-workbench-tool-grid" aria-label={t('emptyWorkbench.toolsLabel')}>
-          {AGENT_MODES.map((toolMode) => (
+          {FOCUS_MODES.map((toolMode: FocusMode) => (
             <article
-              key={toolMode.id}
-              className={`empty-workbench-tool-card mode-${toolMode.id}`}
-              data-testid={`empty-workbench-tool-${toolMode.id}`}
-              style={{ ['--empty-card-accent' as string]: toolMode.accentColor }}
+              key={toolMode}
+              className={`empty-workbench-tool-card mode-${toolMode}`}
+              data-testid={`empty-workbench-tool-${toolMode}`}
+              style={{ ['--empty-card-accent' as string]: AGENT_COLORS[toolMode] }}
             >
-              <div className="empty-workbench-tool-visual" aria-hidden="true">
-                <div className="empty-workbench-tool-rings" />
-                <div className="empty-workbench-tool-core">
-                  <ModeGlyph
-                    mode={toolMode.id}
-                    className="empty-workbench-tool-icon"
-                    size={30}
-                    strokeWidth={1.75}
-                  />
-                </div>
-              </div>
-              <div className="empty-workbench-tool-copy">
-                <div className="empty-workbench-tool-kicker">
-                  <ModeGlyph
-                    mode={toolMode.id}
-                    className="empty-workbench-tool-kicker-icon"
-                    size={13}
-                    strokeWidth={1.9}
-                  />
-                  <span>{t(`mode.${toolMode.id as BuiltinAgentMode}`)}</span>
-                </div>
-                <h2 className="empty-workbench-tool-title">{t(CARD_COPY[toolMode.id as BuiltinAgentMode].title)}</h2>
-                <p className="empty-workbench-tool-subtitle">{t(CARD_COPY[toolMode.id as BuiltinAgentMode].subtitle)}</p>
-              </div>
-              <div className="empty-workbench-tool-edge" aria-hidden="true" />
+              <span className="empty-workbench-tool-core" aria-hidden="true">
+                <ModeGlyph
+                  mode={toolMode}
+                  className="empty-workbench-tool-icon"
+                  size={22}
+                  strokeWidth={1.75}
+                />
+              </span>
+              <span className="empty-workbench-tool-copy">
+                <span className="empty-workbench-tool-title">{t(`mode.${toolMode}`)}</span>
+                <span className="empty-workbench-tool-subtitle">{t(CARD_LINE[toolMode])}</span>
+              </span>
             </article>
           ))}
         </div>

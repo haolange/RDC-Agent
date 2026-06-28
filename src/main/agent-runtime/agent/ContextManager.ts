@@ -23,6 +23,7 @@ import type {
   ToolResultMessage,
   UserMessage,
 } from '../core/types';
+import { charsToTokens } from '@shared/utils/tokens';
 import { TokenizerService } from '../core/TokenizerService';
 
 /** 上下文压缩配置。 */
@@ -48,6 +49,16 @@ const DEFAULT_CONTEXT_RATIO = 0.75;
 const DEFAULT_CONTEXT_LIMIT = 100_000;
 const SNIP_HEAD = 3;
 const TOOL_RESULT_TRUNCATE_HEAD = 2000;
+
+/**
+ * 各级压缩写入的占位符前缀，唯一来源。
+ * 写入点（snip / micro / full）与读取点（classifyMessages）共享，避免字符串漂移。
+ */
+export const COMPACTION_MARKERS = {
+  snip: '[snipped ',
+  toolResult: '[Earlier tool result compacted]',
+  summary: '[Conversation summary:',
+} as const;
 
 /** 上下文管理器。 */
 export class ContextManager {
@@ -100,6 +111,46 @@ export class ContextManager {
     return result;
   }
 
+  /**
+   * 将消息数组分为"压缩摘要"和"活跃对话"两组，返回各组的 token 估算与条数。
+   *
+   * 判断标准：消息内容包含已知的压缩占位符关键词（来自 snipCompact/microCompact/fullCompact）。
+   */
+  classifyMessages(messages: AgentMessage[]): {
+    summaryTokens: number;
+    conversationTokens: number;
+    conversationCount: number;
+  } {
+    const summaryPatterns = Object.values(COMPACTION_MARKERS);
+
+    const isSummaryMessage = (msg: AgentMessage): boolean => {
+      const content = (msg as { content?: unknown }).content;
+      const text = typeof content === 'string'
+        ? content
+        : Array.isArray(content)
+          ? content.map((b) => (typeof b === 'object' && b !== null && 'text' in b ? String((b as { text: unknown }).text) : '')).join('')
+          : '';
+      return summaryPatterns.some((p) => text.includes(p));
+    };
+
+    const summaryMessages: AgentMessage[] = [];
+    const conversationMessages: AgentMessage[] = [];
+    for (const msg of messages) {
+      if (isSummaryMessage(msg)) {
+        summaryMessages.push(msg);
+      } else {
+        conversationMessages.push(msg);
+      }
+    }
+    return {
+      summaryTokens:      this.estimateTokens(summaryMessages),
+      conversationTokens: this.estimateTokens(conversationMessages),
+      conversationCount:  conversationMessages.filter(
+        (m) => m.role === 'user' || m.role === 'assistant',
+      ).length,
+    };
+  }
+
   /** 估算消息 token 数（优先使用真实 tokenizer）。 */
   estimateTokens(messages: AgentMessage[]): number {
     const tokenizer = this.config.tokenizer;
@@ -121,7 +172,7 @@ export class ContextManager {
     for (const msg of messages) {
       chars += this.estimateMessageChars(msg);
     }
-    return Math.ceil(chars / 4);
+    return charsToTokens(chars);
   }
 
   // =====================================================================
@@ -201,7 +252,7 @@ export class ContextManager {
 
     const placeholder: UserMessage = {
       role: 'user',
-      content: `[snipped ${snippedCount} messages]`,
+      content: `${COMPACTION_MARKERS.snip}${snippedCount} messages]`,
       timestamp: Date.now(),
     };
 
@@ -238,7 +289,7 @@ export class ContextManager {
         toolCallId: original.toolCallId,
         toolName: original.toolName,
         content: [
-          { type: 'text', text: '[Earlier tool result compacted]' },
+          { type: 'text', text: COMPACTION_MARKERS.toolResult },
         ],
         isError: false,
         timestamp: original.timestamp,
@@ -442,7 +493,7 @@ export class ContextManager {
       (m) => m.role === 'toolResult',
     ).length;
     return (
-      `[Conversation summary: ${messages.length} earlier messages compacted ` +
+      `${COMPACTION_MARKERS.summary} ${messages.length} earlier messages compacted ` +
       `(user=${userCount}, assistant=${assistantCount}, ` +
       `toolResult=${toolResultCount}). Earlier context omitted to fit window.]`
     );

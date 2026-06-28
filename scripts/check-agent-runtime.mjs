@@ -61,7 +61,8 @@ function main() {
   const routeResolverSource = read('src/main/agent-runtime/capabilities/RouteCapabilityResolver.ts');
   assert(routeResolverSource.includes('LlmProviderProtocol'), 'RouteCapabilityResolver must use the new LlmProviderProtocol enum.');
   assert(!routeResolverSource.includes('LlmProviderKind'), 'RouteCapabilityResolver must not keep legacy LlmProviderKind.');
-  assert(routeResolverSource.includes('provider.protocol'), 'RouteCapabilityResolver must route on provider.protocol.');
+assert(routeResolverSource.includes('reasoningDelivery'), 'RouteCapabilityResolver must expose reasoningDelivery.');
+assert(routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'RouteCapabilityResolver must map reasoning delivery by protocol.');
   assert(!routeResolverSource.includes('provider.kind'), 'RouteCapabilityResolver must not route on legacy provider.kind.');
 
   const {
@@ -97,7 +98,7 @@ function main() {
   assert(disabledCapability.toolCallingMode === 'disabled', 'missing providers must fail closed.');
 
   const sharedTypes = read('src/shared/types/agentRuntime.ts');
-  for (const token of ['ToolCallingMode', 'ReasoningVisibility', 'AgentRouteCapability', 'native-structured', 'text-only', 'disabled', 'account-oauth']) {
+  for (const token of ['ToolCallingMode', 'ReasoningVisibility', 'ReasoningDelivery', 'AgentRouteCapability', 'native-structured', 'text-only', 'disabled', 'account-oauth']) {
     assert(sharedTypes.includes(token), `shared agent runtime types must expose ${token}.`);
   }
 

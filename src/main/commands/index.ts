@@ -28,7 +28,6 @@ import { costCommand } from './builtins/cost';
 import { usageCommand } from './builtins/usage';
 import { permissionsCommand } from './builtins/permissions';
 import { themeCommand } from './builtins/theme';
-import { commitCommand, diffCommand, reviewCommand } from './builtins/commit';
 
 let _registry: CommandRegistry | null = null;
 
@@ -68,9 +67,6 @@ function registerBuiltins(registry: CommandRegistry): void {
     usageCommand,
     permissionsCommand,
     themeCommand,
-    commitCommand,
-    diffCommand,
-    reviewCommand,
   ];
   for (const cmd of builtins) {
     registry.register(cmd);

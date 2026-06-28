@@ -16,6 +16,8 @@ export const createConversationApi = (): ConversationApi => ({
     ipcRenderer.invoke('conversation:answerToolApproval', request),
   getHistory: (sessionId): ReturnType<ConversationApi['getHistory']> =>
     ipcRenderer.invoke('conversation:getHistory', sessionId),
+  switchBranch: (request): ReturnType<ConversationApi['switchBranch']> =>
+    ipcRenderer.invoke('conversation:switchBranch', request),
   clearHistory: (sessionId): ReturnType<ConversationApi['clearHistory']> =>
     ipcRenderer.invoke('conversation:clearHistory', sessionId),
   undoLastTurn: (sessionId): ReturnType<ConversationApi['undoLastTurn']> =>

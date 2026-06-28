@@ -156,7 +156,6 @@ export const UserMenu: React.FC<UserMenuProps> = ({
           />
           <div className="user-menu-header-copy">
             <div className="user-menu-name">{settings.profile.nickname}</div>
-            <div className="user-menu-subtitle">{t('sidebar.userSubtitle')}</div>
           </div>
         </div>
 

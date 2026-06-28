@@ -58,14 +58,14 @@ export const Composer: React.FC<ComposerProps> = ({
     selectedAgentId,
     userInvocableAgents,
     setSelectedAgentId,
-    currentRunUsage,
+    lastKnownUsage,
+    usageStale,
     hasActiveDebugRun,
     isComposerBusy,
     promptPlaceholder,
     attachButtonLabel,
     primaryButtonDisabled,
     primaryButtonDescription,
-    openCaptureRequiredLabel,
     handlePrimaryStop,
     handleAttachmentSelect,
     handlePendingAttachmentRemove,
@@ -189,21 +189,15 @@ export const Composer: React.FC<ComposerProps> = ({
                 </span>
                 {userInvocableAgents.map((agent) => {
                   const agentMode: AgentMode = agent.id;
-                  const executionModeDisabled = false;
                   return (
                     <button
                       key={agent.id}
                       type="button"
-                      className={`composer-agent-menu-item ${selectedAgentId === agent.id ? 'active' : ''} ${executionModeDisabled ? 'disabled' : ''}`}
+                      className={`composer-agent-menu-item ${selectedAgentId === agent.id ? 'active' : ''}`}
                       data-testid={`mode-menu-item-${agent.id}`}
                       role="menuitemradio"
                       aria-checked={selectedAgentId === agent.id}
-                      aria-disabled={executionModeDisabled}
-                      disabled={executionModeDisabled}
                       onClick={() => {
-                        if (executionModeDisabled) {
-                          return;
-                        }
                         setSelectedAgentId(agent.id);
                         setCurrentMode(agentMode);
                         setModeMenuOpen(false);
@@ -217,16 +211,10 @@ export const Composer: React.FC<ComposerProps> = ({
                         {activeAgentId === agent.id ? (
                           <span className="composer-agent-status-dot is-active" aria-label="Active" />
                         ) : null}
-                        {agent.description ? (
-                          <span hidden className="composer-agent-menu-item-desc">{agent.description}</span>
-                        ) : null}
-                        {executionModeDisabled ? (
-                          <span hidden className="composer-agent-menu-item-hint">{openCaptureRequiredLabel}</span>
-                        ) : null}
                       </span>
-                      {agent.description || executionModeDisabled ? (
+                      {agent.description ? (
                         <span className="composer-agent-menu-item-tooltip" role="tooltip">
-                          {executionModeDisabled ? openCaptureRequiredLabel : agent.description}
+                          {agent.description}
                         </span>
                       ) : null}
                       {selectedAgentId === agent.id ? <span className="composer-agent-menu-item-check">✓</span> : null}
@@ -238,8 +226,8 @@ export const Composer: React.FC<ComposerProps> = ({
           </div>
         </div>
         <div className="composer-toolbar-group composer-toolbar-group-right">
-          <PermissionModeSelector disabled={isComposerBusy} />
-          <ContextUsageIndicator usage={hasActiveDebugRun ? currentRunUsage : null} language={language} />
+          <PermissionModeSelector />
+          <ContextUsageIndicator usage={lastKnownUsage} stale={usageStale && !hasActiveDebugRun} language={language} />
           <button
             type="button"
             className={`chat-send-button primary ${isComposerBusy ? 'is-stop' : ''}`}

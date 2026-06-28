@@ -6,19 +6,21 @@ import type {
   TraceContextRecord,
 } from '@shared/types/trace';
 import { getElectronApi } from '../../../platform/getElectronApi';
+import { useI18n, type TranslationKey } from '../../../i18n';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
+import { Button } from '../../../ui/Button';
 import { SessionContextPanel } from './SessionContextPanel';
 import { hasApprovedTaskBoardState, TaskBoard } from './TaskBoard';
 
 type SectionId = 'progress' | 'artifacts' | 'context';
 
-const kindLabel: Record<ContextKind, string> = {
-  capture: 'Captures',
-  file: 'Files',
-  source: 'Sources',
-  capability: 'Capabilities',
+const kindLabelKey: Record<ContextKind, TranslationKey> = {
+  capture: 'control.traceKindCapture',
+  file: 'control.traceKindFile',
+  source: 'control.traceKindSource',
+  capability: 'control.traceKindCapability',
 };
 
 const formatTime = (value?: string): string => {
@@ -55,8 +57,9 @@ const Section: React.FC<{
 );
 
 const ProgressList: React.FC<{ current: ProgressTask[]; history: ProgressTask[] }> = ({ current, history }) => {
+  const { t } = useI18n();
   if (current.length === 0 && history.length === 0) {
-    return <div className="trace-lane-empty">No progress yet</div>;
+    return <p className="trace-lane-empty">{t('control.traceEmptyProgress')}</p>;
   }
   const renderTask = (task: ProgressTask) => (
     <div key={`${task.traceLaneId}:${task.id}`} className={`trace-lane-progress-item status-${task.status}`}>
@@ -72,7 +75,7 @@ const ProgressList: React.FC<{ current: ProgressTask[]; history: ProgressTask[] 
       {current.map(renderTask)}
       {history.length > 0 ? (
         <details className="trace-lane-history" open={current.length === 0}>
-          <summary>Previous tasks / {history.length}</summary>
+          <summary>{t('control.tracePreviousTasks', { count: history.length })}</summary>
           {history.map(renderTask)}
         </details>
       ) : null}
@@ -81,19 +84,20 @@ const ProgressList: React.FC<{ current: ProgressTask[]; history: ProgressTask[] 
 };
 
 const ArtifactList: React.FC<{ current: TraceArtifactRecord[]; previous: TraceArtifactRecord[] }> = ({ current, previous }) => {
+  const { t } = useI18n();
   if (current.length === 0 && previous.length === 0) {
-    return <div className="trace-lane-empty">No artifacts yet</div>;
+    return <p className="trace-lane-empty">{t('control.traceEmptyArtifacts')}</p>;
   }
   const renderArtifact = (artifact: TraceArtifactRecord) => (
     <div key={artifact.id} className={`trace-lane-artifact-item status-${artifact.status}`}>
       <div className="trace-lane-artifact-main">
         <span className="trace-lane-artifact-name">{artifact.displayName}</span>
-        <span className="trace-lane-artifact-meta">{artifact.type} / {artifact.taskTitle || artifact.traceLaneId}</span>
+        <span className="trace-lane-artifact-meta">{artifact.type} · {artifact.taskTitle || artifact.traceLaneId}</span>
       </div>
       <div className="trace-lane-artifact-actions">
-        <button type="button" onClick={() => artifact.path && void getElectronApi()?.appShell.openPath(artifact.path)}>Open</button>
-        <button type="button" onClick={() => artifact.path && void getElectronApi()?.appShell.copyText(artifact.path)}>Copy path</button>
-        <button type="button" title={artifact.rawRef}>Raw</button>
+        <Button variant="ghost" size="sm" onClick={() => artifact.path && void getElectronApi()?.appShell.openPath(artifact.path)}>{t('control.traceArtifactOpen')}</Button>
+        <Button variant="ghost" size="sm" onClick={() => artifact.path && void getElectronApi()?.appShell.copyText(artifact.path)}>{t('control.traceArtifactCopyPath')}</Button>
+        <Button variant="ghost" size="sm" title={artifact.rawRef}>{t('control.traceArtifactRaw')}</Button>
       </div>
     </div>
   );
@@ -103,7 +107,7 @@ const ArtifactList: React.FC<{ current: TraceArtifactRecord[]; previous: TraceAr
       {current.map(renderArtifact)}
       {previous.length > 0 ? (
         <details className="trace-lane-history">
-          <summary>Previous tasks / {previous.length}</summary>
+          <summary>{t('control.tracePreviousTasks', { count: previous.length })}</summary>
           {previous.map(renderArtifact)}
         </details>
       ) : null}
@@ -111,24 +115,20 @@ const ArtifactList: React.FC<{ current: TraceArtifactRecord[]; previous: TraceAr
   );
 };
 
-const ContextList: React.FC<{ records: TraceContextRecord[]; emptyLabel: string }> = ({ records, emptyLabel }) => {
-  if (records.length === 0) {
-    return <div className="trace-lane-empty">{emptyLabel}</div>;
-  }
-  return (
-    <div className="trace-lane-context-list">
-      {records.map((record) => (
-        <div key={record.id} className={`trace-lane-context-item importance-${record.importance}`}>
-          <span className="trace-lane-context-label">{record.label}</span>
-          <span className="trace-lane-context-importance">{record.importance}</span>
-          {record.summary ? <p>{record.summary}</p> : null}
-        </div>
-      ))}
-    </div>
-  );
-};
+const ContextList: React.FC<{ records: TraceContextRecord[] }> = ({ records }) => (
+  <div className="trace-lane-context-list">
+    {records.map((record) => (
+      <div key={record.id} className={`trace-lane-context-item importance-${record.importance}`}>
+        <span className="trace-lane-context-label">{record.label}</span>
+        <span className="trace-lane-context-importance">{record.importance}</span>
+        {record.summary ? <p>{record.summary}</p> : null}
+      </div>
+    ))}
+  </div>
+);
 
 export const TraceRightPanel: React.FC = () => {
+  const { t } = useI18n();
   const currentSession = useProjectStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
   const workflowState = useWorkflowStore((state) => state.workflowState);
@@ -157,10 +157,17 @@ export const TraceRightPanel: React.FC = () => {
   const progressSummary = useMemo(() => {
     const currentCount = rightPanel?.progress.current.length ?? 0;
     const historyCount = rightPanel?.progress.history.length ?? 0;
-    if (currentCount > 0) return `${currentCount} active`;
-    if (historyCount > 0) return `${historyCount} done`;
+    if (currentCount > 0) return t('control.traceProgressActive', { count: currentCount });
+    if (historyCount > 0) return t('control.traceProgressDone', { count: historyCount });
     return undefined;
-  }, [rightPanel?.progress.current.length, rightPanel?.progress.history.length]);
+  }, [rightPanel?.progress.current.length, rightPanel?.progress.history.length, t]);
+  const visibleContextGroups = useMemo(
+    () =>
+      (rightPanel?.context.groups ?? [])
+        .map((group) => ({ kind: group.kind, records: showAllContext ? group.all : group.important }))
+        .filter((group) => group.records.length > 0),
+    [rightPanel?.context.groups, showAllContext],
+  );
   const toggle = (sectionId: SectionId) => {
     setExpanded((state) => ({ ...state, [sectionId]: !state[sectionId] }));
   };
@@ -178,13 +185,13 @@ export const TraceRightPanel: React.FC = () => {
     <div className="control-panel">
       <div className="cp-content scrollbar-thin">
         <div className="trace-lane-export-actions" data-testid="trace-lane-export-actions">
-          <button type="button" onClick={() => exportSession(false)}>Export summary</button>
-          <button type="button" onClick={() => exportSession(true)}>Export raw trace</button>
+          <Button variant="ghost" size="sm" onClick={() => exportSession(false)}>{t('control.traceExportSummary')}</Button>
+          <Button variant="ghost" size="sm" onClick={() => exportSession(true)}>{t('control.traceExportRawTrace')}</Button>
         </div>
         {showTaskBoard ? <TaskBoard /> : null}
         <Section
           id="progress"
-          title="Progress"
+          title={t('control.traceProgress')}
           expanded={expanded.progress}
           onToggle={() => toggle('progress')}
           summary={progressSummary ? <span className="cp-section-summary-main">{progressSummary}</span> : undefined}
@@ -193,31 +200,35 @@ export const TraceRightPanel: React.FC = () => {
         </Section>
         <Section
           id="artifacts"
-          title="Artifacts"
+          title={t('control.traceArtifacts')}
           expanded={expanded.artifacts}
           onToggle={() => toggle('artifacts')}
-          summary={rightPanel?.artifacts.current.length ? <span className="cp-section-summary-main">{rightPanel.artifacts.current.length} ready</span> : undefined}
+          summary={rightPanel?.artifacts.current.length ? <span className="cp-section-summary-main">{t('control.traceArtifactsReady', { count: rightPanel.artifacts.current.length })}</span> : undefined}
         >
           <ArtifactList current={rightPanel?.artifacts.current ?? []} previous={rightPanel?.artifacts.previous ?? []} />
         </Section>
         <Section
           id="context"
-          title="Context"
+          title={t('control.traceContext')}
           expanded={expanded.context}
           onToggle={() => toggle('context')}
-          summary={<span className="cp-section-summary-main">{showAllContext ? 'all' : 'important'}</span>}
+          summary={<span className="cp-section-summary-main">{showAllContext ? t('control.traceContextAll') : t('control.traceContextImportant')}</span>}
         >
           <div className="trace-lane-context-toggle">
-            <button type="button" onClick={() => setShowAllContext((value) => !value)}>
-              {showAllContext ? 'Important only' : 'Show all'}
-            </button>
+            <Button variant="ghost" size="sm" onClick={() => setShowAllContext((value) => !value)}>
+              {showAllContext ? t('control.traceImportantOnly') : t('control.traceShowAll')}
+            </Button>
           </div>
-          {(rightPanel?.context.groups ?? []).map((group) => (
-            <section key={group.kind} className="trace-lane-context-group">
-              <h3>{kindLabel[group.kind]}</h3>
-              <ContextList records={showAllContext ? group.all : group.important} emptyLabel={`No ${kindLabel[group.kind].toLowerCase()} yet`} />
-            </section>
-          ))}
+          {visibleContextGroups.length === 0 ? (
+            <p className="trace-lane-empty">{t('control.traceEmptyContext')}</p>
+          ) : (
+            visibleContextGroups.map((group) => (
+              <section key={group.kind} className="trace-lane-context-group">
+                <h3>{t(kindLabelKey[group.kind])}</h3>
+                <ContextList records={group.records} />
+              </section>
+            ))
+          )}
           <SessionContextPanel />
         </Section>
       </div>

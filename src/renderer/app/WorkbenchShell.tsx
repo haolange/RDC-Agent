@@ -99,7 +99,6 @@ export function WorkbenchShell({
                 />
                 <span className="footer-entry-copy">
                   <span className="footer-entry-title">{nickname}</span>
-                  <span className="footer-entry-subtitle">{t('sidebar.userSubtitle')}</span>
                 </span>
               </span>
               <span className="footer-entry-trailing">

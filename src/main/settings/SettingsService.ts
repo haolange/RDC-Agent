@@ -57,8 +57,6 @@ import { secretStorageService } from './SecretStorageService';
 
 interface PersistedConfigurationSettings {
   activeModeProfileId?: string;
-  // Legacy persisted field only. Markdown Skills are available by file presence.
-  enabledSkillIds?: string[];
   enabledMcpServerIds?: string[];
   modePatternBindings?: Record<string, string>;
   lastMigrationReportPath?: string;
@@ -367,9 +365,6 @@ function sanitizeAgentPermissionSettings(
     writableRoots: sanitizePathList(candidate.writableRoots ?? fallback.writableRoots),
     allowedCommandPrefixes: sanitizeStringArray(candidate.allowedCommandPrefixes ?? fallback.allowedCommandPrefixes),
     deniedCommandPrefixes: sanitizeStringArray(candidate.deniedCommandPrefixes ?? fallback.deniedCommandPrefixes),
-    configPath: typeof candidate.configPath === 'string' && candidate.configPath.trim()
-      ? path.resolve(expandHomePath(candidate.configPath.trim()))
-      : undefined,
   };
 }
 

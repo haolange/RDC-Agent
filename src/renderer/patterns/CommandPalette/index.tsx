@@ -51,13 +51,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ onExecute }) => 
               key={cmd.name}
               type="button"
               className="command-palette-item"
+              title={cmd.description}
               onClick={() => {
                 onExecute?.(cmd.name);
                 close();
               }}
             >
               <span className="command-palette-name">{cmd.name}</span>
-              <span className="command-palette-desc">{cmd.description}</span>
             </button>
           ))}
           {filtered.length === 0 && (

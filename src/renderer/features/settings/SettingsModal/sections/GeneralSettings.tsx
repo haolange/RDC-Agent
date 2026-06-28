@@ -51,14 +51,12 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
             <div className="settings-section-header">
               <div>
                 <div className="settings-section-title">{t('settings.appearance')}</div>
-                <div className="settings-section-subtitle">{t('settings.appearanceHint')}</div>
               </div>
             </div>
             <div className="settings-preference-list settings-appearance-list">
               <div className="settings-preference-row">
                 <div className="settings-preference-copy settings-option-block">
                   <div className="settings-field-label">{t('userMenu.theme')}</div>
-                  <div className="settings-help-text">{t('settings.themeHint')}</div>
                 </div>
                 <div className="user-menu-pill-group settings-inline-pills settings-choice-group">
                   {(['dark', 'light', 'system'] as AppTheme[]).map((theme) => (
@@ -77,7 +75,6 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
               <div className="settings-preference-row">
                 <div className="settings-preference-copy settings-option-block">
                   <div className="settings-field-label">{t('userMenu.language')}</div>
-                  <div className="settings-help-text">{t('settings.languageHint')}</div>
                 </div>
                 <div className="user-menu-pill-group settings-inline-pills settings-choice-group">
                   <button
@@ -100,7 +97,6 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
               <div className="settings-preference-row">
                 <div className="settings-preference-copy settings-option-block">
                   <div className="settings-field-label">{t('userMenu.fontScale')}</div>
-                  <div className="settings-help-text">{t('settings.fontScaleHint')}</div>
                 </div>
                 <div className="user-menu-pill-group settings-inline-pills settings-choice-group">
                   {(['small', 'medium', 'large'] as FontScale[]).map((fontScale) => (

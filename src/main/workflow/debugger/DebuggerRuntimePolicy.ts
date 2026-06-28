@@ -30,7 +30,6 @@ const CANONICAL_TOOL_EXPANSIONS: Record<string, string[]> = {
   'vscode/askQuestions': ['ask_user'],
   agent: ['agent_handoff'],
   handoff: ['agent_handoff'],
-  todo: ['task_create', 'task_update', 'task_get', 'task_list'],
   task: ['task_create', 'task_update', 'task_get', 'task_list'],
   memory: ['memory_read'],
   planArtifact: ['plan_artifact'],

@@ -129,27 +129,14 @@ export function translateCoreToSharedAgentEvent(
       if (ev.type === 'text_delta') {
         return buildSharedAgentEvent('assistant.delta', { text: ev.delta }, context);
       }
-      if (ev.type === 'thinking_start') {
-        return buildSharedAgentEvent(
-          'diagnostic',
-          {
-            code: 'MODEL_THINKING_STARTED',
-            severity: 'info',
-            message: '模型已进入 provider reasoning / thinking 阶段；仅展示可见工作轨迹，不展示隐藏思维链。',
-          },
-          context,
-        );
+      if (ev.type === 'thinking_delta') {
+        return buildSharedAgentEvent('assistant.thinking_delta', { text: ev.delta }, context);
       }
       if (ev.type === 'thinking_end') {
-        return buildSharedAgentEvent(
-          'diagnostic',
-          {
-            code: 'MODEL_THINKING_COMPLETED',
-            severity: 'info',
-            message: '模型 reasoning / thinking 阶段已结束。',
-          },
-          context,
-        );
+        return buildSharedAgentEvent('assistant.thinking_end', { text: ev.content }, context);
+      }
+      if (ev.type === 'thinking_start') {
+        return null;
       }
       if (ev.type === 'toolcall_end') {
         return buildSharedAgentEvent(
@@ -168,14 +155,13 @@ export function translateCoreToSharedAgentEvent(
     }
     case 'message_end': {
       if (event.message.role === 'assistant') {
-        const text = event.message.content
-          .filter((block) => block.type === 'text')
-          .map((block) => (block as { text: string }).text)
-          .join('');
+        const text = extractAssistantTextFromContent(event.message.content);
+        const thinkingText = extractAssistantThinkingFromContent(event.message.content);
         return buildSharedAgentEvent(
           'assistant.completed',
           {
             text,
+            thinkingText: thinkingText || undefined,
             usage: event.message.usage
               ? {
                   inputTokens: event.message.usage.inputTokens,
@@ -306,13 +292,28 @@ function extractAssistantText(messages: Message[]): string {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const msg = messages[i];
     if (msg.role === 'assistant') {
-      return msg.content
-        .filter((block) => block.type === 'text')
-        .map((block) => (block as { text: string }).text)
-        .join('');
+      return extractAssistantTextFromContent(msg.content);
     }
   }
   return '';
+}
+
+function extractAssistantTextFromContent(
+  content: Array<{ type: string; text?: string; thinking?: string }>,
+): string {
+  return content
+    .filter((block) => block.type === 'text')
+    .map((block) => block.text ?? '')
+    .join('');
+}
+
+function extractAssistantThinkingFromContent(
+  content: Array<{ type: string; text?: string; thinking?: string }>,
+): string {
+  return content
+    .filter((block) => block.type === 'thinking')
+    .map((block) => block.thinking ?? '')
+    .join('');
 }
 
 function toolResultToSharedResult(result: ToolResultMessage, durationMs: number): import('@shared/types/tool').ToolCallResult {

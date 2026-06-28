@@ -16,9 +16,21 @@ import { createHash } from 'node:crypto';
 import {
   DEFAULT_SECTIONS,
   DEFAULT_STATIC_SECTION_COUNT,
+  sectionMemory,
+  sectionRules,
   type PromptContext,
   type PromptSection,
 } from './PromptSections';
+
+/** 各语义分段的字符数量（用于 breakdown token 估算）。 */
+export interface PromptSectionMetrics {
+  /** 所有非 rules/memory 段落的字符合计（identity、instructions、capabilities 等）。 */
+  system_prompt: number;
+  /** sectionRules 输出的字符数。 */
+  rules: number;
+  /** sectionMemory 输出的字符数。 */
+  memory_files: number;
+}
 
 /**
  * 静态前缀与动态后缀的分隔标记。
@@ -126,6 +138,23 @@ export class PromptAssembler {
    */
   invalidateCache(): void {
     this.cache.clear();
+  }
+
+  /**
+   * 测量各语义分段的字符数，用于上下文窗口 breakdown 的 token 估算。
+   *
+   * 不触发缓存；调用时需保证 context 与 assembleSystemPrompt 所用的 context 一致。
+   */
+  measureSections(context: PromptContext): PromptSectionMetrics {
+    const rulesText   = sectionRules(context)  ?? '';
+    const memoryText  = sectionMemory(context) ?? '';
+    const fullPrompt  = this.assembleSystemPrompt(context);
+    const dynamicChars = rulesText.length + memoryText.length;
+    return {
+      system_prompt: Math.max(0, fullPrompt.length - dynamicChars),
+      rules:         rulesText.length,
+      memory_files:  memoryText.length,
+    };
   }
 
   /** 渲染完整 prompt（不使用缓存）。 */

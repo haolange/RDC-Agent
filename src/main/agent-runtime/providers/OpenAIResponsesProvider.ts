@@ -283,6 +283,14 @@ function buildRequestBody(model: Model, context: Context, options: StreamOptions
   if (typeof options.topP === 'number') body.top_p = options.topP;
   if (options.reasoningBudget && options.reasoningBudget !== 'auto') {
     body.reasoning = { effort: options.reasoningBudget };
+  } else if (options.reasoningVisibility === 'summary-events') {
+    body.reasoning = { effort: 'medium' };
+  }
+  if (options.reasoningVisibility === 'summary-events') {
+    const reasoning = (body.reasoning && typeof body.reasoning === 'object')
+      ? body.reasoning as Record<string, unknown>
+      : {};
+    body.reasoning = { ...reasoning, summary: 'auto' };
   }
   const maxTokens = options.maxTokens ?? model.maxTokens;
   if (typeof maxTokens === 'number' && maxTokens > 0) {

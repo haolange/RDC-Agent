@@ -1,5 +1,6 @@
 import type {
   AgentRouteCapability,
+  ReasoningDelivery,
   ReasoningVisibility,
   ToolCallingMode,
 } from '@shared/types/agentRuntime';
@@ -28,6 +29,16 @@ const STREAMING_PROTOCOLS = new Set<LlmProviderProtocol>([
   'OllamaOpenAICompatibleChatCompletions',
 ]);
 
+/** 各 wire protocol 默认 reasoning 交付语义（无 reasoning capability 时仍为 none）。 */
+const PROTOCOL_REASONING_DELIVERY: Partial<Record<LlmProviderProtocol, ReasoningDelivery>> = {
+  OpenAIResponses: 'summary-only',
+  AnthropicMessages: 'summary-only',
+  GoogleGemini: 'stream-full',
+  OllamaOpenAICompatibleChatCompletions: 'stream-full',
+  OpenAICompatibleChatCompletions: 'stream-full',
+  OpenRouterChatCompletions: 'stream-full',
+};
+
 function readProviderProtocol(provider: LlmProviderEntry | undefined): LlmProviderProtocol | null {
   if (!provider) {
     return null;
@@ -42,9 +53,21 @@ function hasCapability(
   return Boolean(provider?.capabilities?.includes(capability));
 }
 
-function resolveReasoningVisibility(provider: LlmProviderEntry | undefined): ReasoningVisibility {
-  if (!provider) return 'none';
-  return hasCapability(provider, 'reasoning') ? 'summary-events' : 'none';
+export function resolveReasoningDelivery(
+  provider: LlmProviderEntry | undefined,
+  protocol: LlmProviderProtocol | null,
+): ReasoningDelivery {
+  if (!provider || !protocol || !hasCapability(provider, 'reasoning')) {
+    return 'none';
+  }
+  return PROTOCOL_REASONING_DELIVERY[protocol] ?? 'stream-full';
+}
+
+/** 将产品层 reasoningDelivery 映射为 provider StreamOptions 使用的 visibility。 */
+export function reasoningDeliveryToStreamVisibility(delivery: ReasoningDelivery): ReasoningVisibility {
+  if (delivery === 'summary-only') return 'summary-events';
+  if (delivery === 'hidden') return 'hidden';
+  return 'none';
 }
 
 function disabledCapability(providerId: LlmProviderId, modelId: string): AgentRouteCapability {
@@ -53,6 +76,7 @@ function disabledCapability(providerId: LlmProviderId, modelId: string): AgentRo
     modelId,
     toolCallingMode: 'disabled',
     reasoningVisibility: 'none',
+    reasoningDelivery: 'none',
     supportsStreaming: false,
     supportsToolResults: false,
   };
@@ -85,11 +109,15 @@ export function resolveAgentRouteCapability(
     toolCallingMode = 'disabled';
   }
 
+  const reasoningDelivery = resolveReasoningDelivery(provider, protocol);
+  const reasoningVisibility = reasoningDeliveryToStreamVisibility(reasoningDelivery);
+
   return {
     providerId: provider.id,
     modelId,
     toolCallingMode,
-    reasoningVisibility: resolveReasoningVisibility(provider),
+    reasoningVisibility,
+    reasoningDelivery,
     supportsStreaming,
     supportsToolResults: toolCallingMode === 'native-structured',
   };

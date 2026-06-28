@@ -48,14 +48,12 @@ export type CommandUiAction =
   | { type: 'switch-theme'; payload: { theme: string } }
   | { type: 'switch-permissions'; payload: { mode: string } }
   | { type: 'change-workspace'; payload: { path: string } }
-  | { type: 'open-panel'; payload?: { panel: string } }
   | { type: 'resume-session'; payload: { sessionId: string } }
   | { type: 'export-session'; payload: { sessionId: string; format?: 'markdown' | 'json' } }
   | { type: 'compact-session'; payload: { sessionId: string } }
   | { type: 'undo-session'; payload: { sessionId: string } }
   | { type: 'clear-session'; payload: { sessionId: string } }
-  | { type: 'run-skill'; payload: { skillId: string } }
-  | { type: 'trigger-code-review'; payload?: { sessionId?: string } };
+  | { type: 'run-skill'; payload: { skillId: string } };
 
 /** Definition of a slash command. */
 export interface CommandDefinition {

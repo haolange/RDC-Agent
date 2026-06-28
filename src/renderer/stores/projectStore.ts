@@ -5,7 +5,7 @@ import type {
   SessionRecord,
 } from '@shared/types/session';
 
-export type RightRailTarget = 'project' | 'session' | 'source-control';
+export type RightRailTarget = 'project' | 'session';
 
 const areProjectInputsEqual = (
   leftInputs: ProjectInputRecord[],

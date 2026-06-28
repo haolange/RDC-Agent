@@ -88,11 +88,11 @@ export const SlashCommandPopover: React.FC<SlashCommandPopoverProps> = ({
           className={`slash-command-item${idx === selectedIndex ? ' selected' : ''}`}
           role="option"
           aria-selected={idx === selectedIndex}
+          title={cmd.description}
           onClick={() => onSelect(cmd.name)}
           onMouseEnter={() => setSelectedIndex(idx)}
         >
           <span className="slash-command-name">/{cmd.name}</span>
-          <span className="slash-command-desc">{cmd.description}</span>
           <span className="slash-command-cat">{cmd.category}</span>
         </div>
       ))}

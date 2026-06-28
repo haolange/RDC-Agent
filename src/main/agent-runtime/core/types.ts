@@ -295,12 +295,16 @@ export type AgentEvent =
 // Stream 选项
 // =====================================================================
 
+import type { ReasoningVisibility } from '@shared/types/agentRuntime';
+
 /** 调用 Provider 流式生成时的可选参数。 */
 export interface StreamOptions {
   temperature?: number;
   maxTokens?: number;
   topP?: number;
   reasoningBudget?: 'auto' | 'low' | 'medium' | 'high';
+  /** 路由能力解析出的 reasoning 可见性；summary-events 时请求 provider 侧摘要 thinking。 */
+  reasoningVisibility?: ReasoningVisibility;
   /** 用于中止本次生成的信号。 */
   signal?: AbortSignal;
   /** 覆盖 Provider 默认 API key。 */

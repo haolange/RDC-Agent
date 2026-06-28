@@ -97,17 +97,11 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
 }) => {
   const selectedModel = selectedAgent.models[0] ?? '';
   const capabilityGroups = buildCapabilityGroups(settings, selectedAgent, onUpdateAgent, t);
-  const selectedAgentSummary = [
-    selectedAgent.enabled ? t('settings.enabled') : t('settings.disabled'),
-    selectedAgent.userInvocable ? t('settings.userInvocable') : t('settings.subAgent'),
-  ].join(' · ');
-
   return (
     <div className="settings-manifest-editor" data-testid="settings-agent-manifest-editor">
       <div className="settings-manifest-editor-head">
         <div>
           <div className="settings-field-label">{selectedAgent.name}</div>
-          <div className="settings-help-text">{selectedAgentSummary}</div>
         </div>
         <div className="settings-manifest-editor-actions">
           <button type="button" className="button button-secondary" onClick={onDuplicateAgent}>
@@ -162,15 +156,15 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
         <div className="settings-advanced-content">
           <div className="settings-manifest-form-grid settings-agent-identity-grid">
             <label className="settings-input-row">
-              <span className="settings-help-text">{t('settings.agentName')}</span>
+              <span className="settings-field-label">{t('settings.agentName')}</span>
               <input className="input" value={selectedAgent.name} onChange={(event) => onUpdateAgent({ name: event.currentTarget.value })} />
             </label>
             <label className="settings-input-row">
-              <span className="settings-help-text">{t('settings.agentArgumentHint')}</span>
+              <span className="settings-field-label">{t('settings.agentArgumentHint')}</span>
               <AutosizeTextarea rows={1} maxHeight={132} className="input settings-agent-textarea-compact" value={selectedAgent.argumentHint} onChange={(event) => onUpdateAgent({ argumentHint: event.currentTarget.value })} />
             </label>
             <label className="settings-input-row">
-              <span className="settings-help-text">{t('settings.agentDescription')}</span>
+              <span className="settings-field-label">{t('settings.agentDescription')}</span>
               <AutosizeTextarea rows={1} maxHeight={132} className="input settings-agent-textarea-compact settings-agent-description-field" value={selectedAgent.description} onChange={(event) => onUpdateAgent({ description: event.currentTarget.value })} />
             </label>
           </div>
@@ -194,7 +188,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
         </summary>
         <div className="settings-advanced-content">
           <label className="settings-input-row">
-            <span className="settings-help-text">{t('settings.agentInstructions')}</span>
+            <span className="settings-field-label">{t('settings.agentInstructions')}</span>
             <AutosizeTextarea maxHeight={520} className="input settings-agent-instructions settings-agent-handoff-textarea" value={selectedAgent.instructions} onChange={(event) => onUpdateAgent({ instructions: event.currentTarget.value })} />
           </label>
         </div>

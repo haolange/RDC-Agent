@@ -16,11 +16,16 @@ export type ToolCallingMode = 'native-structured' | 'text-only' | 'disabled';
 
 export type ReasoningVisibility = 'summary-events' | 'hidden' | 'none';
 
+/** 协议级 reasoning 交付语义：驱动 provider 请求参数与 Work Process 展示模式。 */
+export type ReasoningDelivery = 'none' | 'summary-only' | 'stream-full' | 'hidden';
+
 export interface AgentRouteCapability {
   providerId: LlmProviderId;
   modelId: string;
   toolCallingMode: ToolCallingMode;
+  /** @deprecated 由 reasoningDelivery 推导；保留供 provider StreamOptions 兼容。 */
   reasoningVisibility: ReasoningVisibility;
+  reasoningDelivery: ReasoningDelivery;
   supportsStreaming: boolean;
   supportsToolResults: boolean;
 }
@@ -28,6 +33,8 @@ export interface AgentRouteCapability {
 export type AgentEventType =
   | 'run.started'
   | 'assistant.delta'
+  | 'assistant.thinking_delta'
+  | 'assistant.thinking_end'
   | 'assistant.completed'
   | 'tool.requested'
   | 'tool.started'
@@ -62,8 +69,14 @@ export interface AgentAssistantDeltaPayload extends AgentEventBasePayload {
   text: string;
 }
 
+export interface AgentAssistantThinkingPayload extends AgentEventBasePayload {
+  text: string;
+}
+
 export interface AgentAssistantCompletedPayload extends AgentEventBasePayload {
   text: string;
+  /** Provider thinking / reasoning 全文，来自 message content 中 thinking 块拼接。 */
+  thinkingText?: string;
   usage?: {
     inputTokens: number;
     outputTokens: number;
@@ -170,6 +183,7 @@ export interface AgentHandoffRequestedPayload extends AgentEventBasePayload {
 export type AgentEventPayload =
   | AgentRunStartedPayload
   | AgentAssistantDeltaPayload
+  | AgentAssistantThinkingPayload
   | AgentAssistantCompletedPayload
   | AgentToolRequestedPayload
   | AgentToolStartedPayload

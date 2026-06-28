@@ -52,13 +52,6 @@ import type {
 import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from './terminal';
 import type { ToolCatalog, ToolRuntimeSummary } from './tool';
 import type { CommandExecuteRequest, CommandListResult, CommandResult } from './command';
-import type {
-  GitActionResult,
-  GitCommitRequest,
-  GitDiffRequest,
-  GitDiffResult,
-  GitPathRequest,
-} from './git';
 import type { AgentRun, AgentRunPresentation, TraceEvent } from './agenticTrace';
 import type {
   TraceBranchSwitchResult,
@@ -126,7 +119,9 @@ export interface ElectronAPI {
     answerToolApproval: (request: ConversationAnswerToolApprovalRequest) => Promise<ConversationAnswerToolApprovalResult>;
     getHistory: (sessionId: string) => Promise<{
       messages: ConversationMessage[];
+      branchState?: import('./conversationBranch').ConversationBranchState | null;
     }>;
+    switchBranch: (request: import('./conversationBranch').ConversationSwitchBranchRequest) => Promise<import('./conversationBranch').ConversationSwitchBranchResult>;
     clearHistory: (sessionId: string) => Promise<{
       success: boolean;
       messages: ConversationMessage[];
@@ -160,7 +155,11 @@ export interface ElectronAPI {
       success: boolean;
       error?: string;
     }>;
-    getRunUsage: (runId?: string) => Promise<{
+    /**
+     * 读取上下文用量快照。key 优先级：runId > sessionId > handler 内部 currentRunId。
+     * sessionId 用于 Ask 模式（无 debug run，用量以 sessionId 为 store key）。
+     */
+    getRunUsage: (runId?: string, sessionId?: string) => Promise<{
       usage: RunContextUsageSummary | null;
     }>;
     listRuns: () => Promise<{ runs: RunSummary[] }>;
@@ -193,16 +192,6 @@ export interface ElectronAPI {
       result: CommandResult;
       systemMessage?: import('./conversation').ConversationMessage;
     }>;
-  };
-
-  git: {
-    getStatus: () => Promise<GitActionResult>;
-    getDiff: (request?: GitDiffRequest) => Promise<GitDiffResult>;
-    stage: (request: GitPathRequest) => Promise<GitActionResult>;
-    stageAll: () => Promise<GitActionResult>;
-    unstage: (request: GitPathRequest) => Promise<GitActionResult>;
-    unstageAll: () => Promise<GitActionResult>;
-    commit: (request: GitCommitRequest) => Promise<GitActionResult>;
   };
 
   tool: {

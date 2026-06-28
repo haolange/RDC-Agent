@@ -64,8 +64,12 @@ export function useIpcEventBridge(options: {
     if (!electronAPI) return;
 
     const unsubscribeRunUsageChanged = electronAPI.events.onRunUsageChanged((summary) => {
-      const activeRun = useSessionStore.getState().currentRun;
-      if (activeRun?.runId === summary.runId) {
+      const { currentRun } = useSessionStore.getState();
+      const isCurrentRun = currentRun?.runId === summary.runId;
+      // Ask 模式：summary.runId 承载 sessionId，与 debug run 并列判断（run 结束后仍需更新）。
+      const currentSession = useProjectStore.getState().currentSession;
+      const isCurrentSession = currentSession?.sessionId === summary.runId;
+      if (isCurrentRun || isCurrentSession) {
         useSessionStore.getState().setCurrentRunUsage(summary);
       }
     });
@@ -242,7 +246,7 @@ export function useIpcEventBridge(options: {
           stoppedAt: ['cancelled', 'interrupted'].includes(payload.status) ? Date.now() : current.stoppedAt,
         });
         if (!['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(payload.status)) {
-          session.setCurrentRunUsage(null);
+          session.markRunUsageStale();
         }
       }
     });

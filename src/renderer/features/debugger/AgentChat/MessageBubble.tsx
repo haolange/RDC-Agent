@@ -12,6 +12,8 @@ import { ModeGlyph } from '../../../ui/ModeGlyph';
 import { UserMessageEditForm } from './UserMessageEditForm';
 import { useUserMessageRewrite } from './useUserMessageRewrite';
 import { MessageAttachments } from './MessageAttachments';
+import { MessageMarkdown } from './MessageMarkdown';
+import { useConversationStore } from '../../../stores/conversationStore';
 
 interface MessageBubbleProps {
   message: ConversationMessage;
@@ -44,7 +46,7 @@ const renderContentWithCursor = (
   }
   return (
     <>
-      <span className="conversation-bubble-text">{content}</span>
+      <MessageMarkdown content={content} />
       {showCursor ? <StreamingCursor /> : null}
     </>
   );
@@ -60,7 +62,9 @@ const MessageMetaBar: React.FC<{
   time,
   status,
   onEditResend,
-}) => (
+}) => {
+  const branchState = useConversationStore((state) => state.branchState);
+  return (
   <footer className="conversation-message-footer">
     {time ? (
       <span className="conversation-message-time">{time}</span>
@@ -74,9 +78,10 @@ const MessageMetaBar: React.FC<{
     {status === 'stopped' ? (
       <span className="conversation-message-status-tag is-stopped">stopped</span>
     ) : null}
-    <MessageActions message={message} onEditResend={onEditResend} />
+    <MessageActions message={message} branchState={branchState} onEditResend={onEditResend} />
   </footer>
-);
+  );
+};
 
 const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => {
   const time = formatClockTime(message.createdAt);
@@ -160,7 +165,12 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
   const time = formatClockTime(message.createdAt);
   const trace = message.workTrace ?? null;
   const status: ConversationMessageStatus = message.status ?? 'complete';
+  const isInProgress = status === 'streaming' || status === 'draft';
   const hasContent = Boolean(message.content && message.content.length > 0);
+  const traceIsRunning = Boolean(trace && trace.status === 'running');
+  // workTrace 运行中只展示 Work Process，trace 结束后才显示最终回答气泡；
+  // 无 trace 时（Ask 模式）由 isInProgress 保证流式正文可见。
+  const showContentBubble = !traceIsRunning && (hasContent || isInProgress);
   const [sendingHandoff, setSendingHandoff] = useState<string | null>(null);
   const sendAgentHandoff = useAgentHandoffActions(message);
   const handoffs = useMemo(() => {
@@ -200,7 +210,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
           {message.attachments && message.attachments.length > 0 ? (
             <MessageAttachments attachments={message.attachments} />
           ) : null}
-          {hasContent || status === 'streaming' || status === 'draft' ? (
+          {showContentBubble ? (
             <div className="conversation-bubble conversation-bubble-assistant">
               {renderContentWithCursor(message.content, status)}
             </div>
@@ -215,7 +225,9 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
               </span>
             </div>
           ) : null}
-          <MessageMetaBar message={message} time={time} status={status} />
+          {!isInProgress ? (
+            <MessageMetaBar message={message} time={time} status={status} />
+          ) : null}
           {handoffs.length > 0 ? (
             <div className="conversation-handoff-actions" data-testid="conversation-handoff-actions">
               <span className="conversation-handoff-actions-label">Next actions</span>

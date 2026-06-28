@@ -8,6 +8,7 @@ const NATIVE_ROUTE: AgentRouteCapability = {
   modelId: 'test-model',
   toolCallingMode: 'native-structured',
   reasoningVisibility: 'hidden',
+  reasoningDelivery: 'hidden',
   supportsStreaming: true,
   supportsToolResults: true,
 };

@@ -22,6 +22,7 @@ import type {
   StreamOptions,
   ToolDefinition,
 } from '../core/types';
+import type { ReasoningVisibility } from '@shared/types/agentRuntime';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
@@ -275,7 +276,7 @@ export class AnthropicProvider implements ProviderStrategy {
     if (system) body.system = system;
     if (typeof options.temperature === 'number') body.temperature = options.temperature;
     if (typeof options.topP === 'number') body.top_p = options.topP;
-    const thinking = toAnthropicThinking(options.reasoningBudget);
+    const thinking = toAnthropicThinking(options.reasoningBudget, options.reasoningVisibility);
     if (thinking) body.thinking = thinking;
     if (context.tools && context.tools.length > 0) {
       body.tools = context.tools.map(toAnthropicTool);
@@ -286,12 +287,18 @@ export class AnthropicProvider implements ProviderStrategy {
 
 function toAnthropicThinking(
   budget?: StreamOptions['reasoningBudget'],
-): { type: 'enabled'; budget_tokens: number } | undefined {
-  if (!budget || budget === 'auto') return undefined;
-  return {
+  reasoningVisibility?: ReasoningVisibility,
+): { type: 'enabled'; budget_tokens: number; display?: 'summarized' } | undefined {
+  const wantsSummarized = reasoningVisibility === 'summary-events';
+  if (!wantsSummarized && (!budget || budget === 'auto')) return undefined;
+  const thinking: { type: 'enabled'; budget_tokens: number; display?: 'summarized' } = {
     type: 'enabled',
-    budget_tokens: budget === 'low' ? 1024 : budget === 'medium' ? 4096 : 8192,
+    budget_tokens: budget === 'low' ? 1024 : budget === 'medium' ? 4096 : budget === 'high' ? 8192 : 4096,
   };
+  if (wantsSummarized) {
+    thinking.display = 'summarized';
+  }
+  return thinking;
 }
 
 // =====================================================================

@@ -51,14 +51,20 @@ export interface ConversationToolCall {
   completedAt?: number;
 }
 
+export type ConversationThinkingPresentation = 'none' | 'summary' | 'full';
+
 export interface ConversationWorkBlock {
   id: string;
   kind: ConversationWorkBlockKind;
   title: string;
   stage?: string;
   status: ConversationWorkBlockStatus;
+  /** 轮次可见叙述（result text）。 */
   summary?: string;
+  /** 轮次 thinking 全文。 */
   detail?: string;
+  /** thinking 展示模式：provider summary 或完整 CoT。 */
+  thinkingPresentation?: ConversationThinkingPresentation;
   toolCalls: ConversationToolCall[];
   startedAt: number;
   completedAt?: number;
@@ -89,6 +95,12 @@ export interface ConversationMessage {
   diagnostic?: ConversationMessageDiagnostic | null;
   attachments?: SessionAttachmentRecord[];
   createdAt: number;
+  /** 对话分支 id；默认 root。 */
+  branchId?: string;
+  /** 分叉锚点 id（同一 fork 的各 variant 共享）。 */
+  forkId?: string;
+  /** 分叉点上的版本序号（0-based）。 */
+  variantIndex?: number;
 }
 
 export interface ConversationAttachmentInput {

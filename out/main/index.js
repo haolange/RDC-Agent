@@ -4161,6 +4161,23 @@ class StorageAdapter {
     }
     return path__namespace.join(location.sessionPath, "conversation.jsonl");
   }
+  getConversationBranchStatePath(sessionId) {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) {
+      throw new Error(`Session not found for conversation branches: ${sessionId}`);
+    }
+    return path__namespace.join(location.sessionPath, "conversation-branches.json");
+  }
+  readConversationBranchState(sessionId) {
+    const filePath = this.getConversationBranchStatePath(sessionId);
+    if (!fs__namespace.existsSync(filePath)) {
+      return null;
+    }
+    return this.readJson(filePath);
+  }
+  writeConversationBranchState(sessionId, state2) {
+    this.writeJson(this.getConversationBranchStatePath(sessionId), state2);
+  }
   getSessionAttachmentsDir(sessionId) {
     const location = this.findSessionLocation(sessionId);
     if (!location) {
@@ -6509,6 +6526,35 @@ class ContextManager {
     }
     return result;
   }
+  /**
+   * 将消息数组分为"压缩摘要"和"活跃对话"两组，返回各组的 token 估算与条数。
+   *
+   * 判断标准：消息内容包含已知的压缩占位符关键词（来自 snipCompact/microCompact/fullCompact）。
+   */
+  classifyMessages(messages) {
+    const SUMMARY_PATTERNS = ["[snipped ", "[Earlier tool result compacted]", "[Conversation summary:"];
+    const isSummaryMessage = (msg) => {
+      const content = msg.content;
+      const text = typeof content === "string" ? content : Array.isArray(content) ? content.map((b) => typeof b === "object" && b !== null && "text" in b ? String(b.text) : "").join("") : "";
+      return SUMMARY_PATTERNS.some((p) => text.includes(p));
+    };
+    const summaryMessages = [];
+    const conversationMessages = [];
+    for (const msg of messages) {
+      if (isSummaryMessage(msg)) {
+        summaryMessages.push(msg);
+      } else {
+        conversationMessages.push(msg);
+      }
+    }
+    return {
+      summaryTokens: this.estimateTokens(summaryMessages),
+      conversationTokens: this.estimateTokens(conversationMessages),
+      conversationCount: conversationMessages.filter(
+        (m) => m.role === "user" || m.role === "assistant"
+      ).length
+    };
+  }
   /** 估算消息 token 数（优先使用真实 tokenizer）。 */
   estimateTokens(messages) {
     const tokenizer = this.config.tokenizer;
@@ -7966,11 +8012,11 @@ function throwIfAborted$1(signal) {
     throw new Error("Aborted");
   }
 }
-const execFileAsync$1 = util.promisify(child_process.execFile);
+const execFileAsync = util.promisify(child_process.execFile);
 const MAX_OUTPUT_BYTES = 64 * 1024;
-async function runGit$1(cwd, args) {
+async function runGit(cwd, args) {
   try {
-    const result = await execFileAsync$1("git", ["-c", "core.quotepath=false", ...args], {
+    const result = await execFileAsync("git", ["-c", "core.quotepath=false", ...args], {
       cwd,
       encoding: "utf8",
       maxBuffer: MAX_OUTPUT_BYTES * 2,
@@ -7987,10 +8033,10 @@ async function runGit$1(cwd, args) {
   }
 }
 async function resolveGitRoot(workspaceRoot) {
-  const output = await runGit$1(workspaceRoot, ["rev-parse", "--show-toplevel"]);
+  const output = await runGit(workspaceRoot, ["rev-parse", "--show-toplevel"]);
   return path.resolve(output.stdout.trim());
 }
-function validateGitPath$1(input) {
+function validateGitPath(input) {
   const value = String(input ?? "").trim().replace(/\\/g, "/");
   if (!value || value.includes("\0") || value.startsWith("/") || /^[A-Za-z]:/.test(value)) {
     throw new Error(`Invalid git path: ${input}`);
@@ -8008,7 +8054,7 @@ function createResult(cwd, args, output) {
 }
 async function executeGit(args, contextRoot) {
   const gitRoot = await resolveGitRoot(contextRoot);
-  const output = await runGit$1(gitRoot, args);
+  const output = await runGit(gitRoot, args);
   const text = [output.stdout.trim(), output.stderr.trim()].filter(Boolean).join("\n");
   return createResult(gitRoot, args, text);
 }
@@ -8049,7 +8095,7 @@ const gitDiffTool = {
     const args = ["diff"];
     if (params.stat) args.push("--stat");
     if (params.staged) args.push("--cached");
-    if (params.path) args.push("--", validateGitPath$1(params.path));
+    if (params.path) args.push("--", validateGitPath(params.path));
     return executeGit(args, root);
   }
 };
@@ -8086,7 +8132,7 @@ const gitAddTool = {
   permissionHint: "mutation",
   async execute(_toolCallId, params, _signal, _onUpdate, context2) {
     const root = getWorkspaceRoot(context2);
-    return executeGit(["add", "--", validateGitPath$1(params.path)], root);
+    return executeGit(["add", "--", validateGitPath(params.path)], root);
   }
 };
 const gitUnstageTool = {
@@ -8104,7 +8150,7 @@ const gitUnstageTool = {
   permissionHint: "mutation",
   async execute(_toolCallId, params, _signal, _onUpdate, context2) {
     const root = getWorkspaceRoot(context2);
-    return executeGit(["restore", "--staged", "--", validateGitPath$1(params.path)], root);
+    return executeGit(["restore", "--staged", "--", validateGitPath(params.path)], root);
   }
 };
 const gitCommitTool = {
@@ -10355,7 +10401,7 @@ let AnthropicProvider$1 = class AnthropicProvider {
     if (system) body.system = system;
     if (typeof options.temperature === "number") body.temperature = options.temperature;
     if (typeof options.topP === "number") body.top_p = options.topP;
-    const thinking = toAnthropicThinking$1(options.reasoningBudget);
+    const thinking = toAnthropicThinking$1(options.reasoningBudget, options.reasoningVisibility);
     if (thinking) body.thinking = thinking;
     if (context2.tools && context2.tools.length > 0) {
       body.tools = context2.tools.map(toAnthropicTool);
@@ -10363,12 +10409,17 @@ let AnthropicProvider$1 = class AnthropicProvider {
     return body;
   }
 };
-function toAnthropicThinking$1(budget) {
-  if (!budget || budget === "auto") return void 0;
-  return {
+function toAnthropicThinking$1(budget, reasoningVisibility) {
+  const wantsSummarized = reasoningVisibility === "summary-events";
+  if (!wantsSummarized && (!budget || budget === "auto")) return void 0;
+  const thinking = {
     type: "enabled",
-    budget_tokens: budget === "low" ? 1024 : budget === "medium" ? 4096 : 8192
+    budget_tokens: budget === "low" ? 1024 : budget === "medium" ? 4096 : budget === "high" ? 8192 : 4096
   };
+  if (wantsSummarized) {
+    thinking.display = "summarized";
+  }
+  return thinking;
 }
 function toAnthropicMessages(context2) {
   const messages = [];
@@ -11298,6 +11349,12 @@ function buildRequestBody(model, context2, options) {
   if (typeof options.topP === "number") body.top_p = options.topP;
   if (options.reasoningBudget && options.reasoningBudget !== "auto") {
     body.reasoning = { effort: options.reasoningBudget };
+  } else if (options.reasoningVisibility === "summary-events") {
+    body.reasoning = { effort: "medium" };
+  }
+  if (options.reasoningVisibility === "summary-events") {
+    const reasoning = body.reasoning && typeof body.reasoning === "object" ? body.reasoning : {};
+    body.reasoning = { ...reasoning, summary: "auto" };
   }
   const maxTokens = options.maxTokens ?? model.maxTokens;
   if (typeof maxTokens === "number" && maxTokens > 0) {
@@ -12001,6 +12058,14 @@ const STREAMING_PROTOCOLS = /* @__PURE__ */ new Set([
   "GoogleGemini",
   "OllamaOpenAICompatibleChatCompletions"
 ]);
+const PROTOCOL_REASONING_DELIVERY = {
+  OpenAIResponses: "summary-only",
+  AnthropicMessages: "summary-only",
+  GoogleGemini: "stream-full",
+  OllamaOpenAICompatibleChatCompletions: "stream-full",
+  OpenAICompatibleChatCompletions: "stream-full",
+  OpenRouterChatCompletions: "stream-full"
+};
 function readProviderProtocol(provider) {
   if (!provider) {
     return null;
@@ -12010,9 +12075,16 @@ function readProviderProtocol(provider) {
 function hasCapability(provider, capability) {
   return Boolean(provider?.capabilities?.includes(capability));
 }
-function resolveReasoningVisibility(provider) {
-  if (!provider) return "none";
-  return hasCapability(provider, "reasoning") ? "summary-events" : "none";
+function resolveReasoningDelivery(provider, protocol) {
+  if (!provider || !protocol || !hasCapability(provider, "reasoning")) {
+    return "none";
+  }
+  return PROTOCOL_REASONING_DELIVERY[protocol] ?? "stream-full";
+}
+function reasoningDeliveryToStreamVisibility(delivery) {
+  if (delivery === "summary-only") return "summary-events";
+  if (delivery === "hidden") return "hidden";
+  return "none";
 }
 function disabledCapability(providerId, modelId) {
   return {
@@ -12020,6 +12092,7 @@ function disabledCapability(providerId, modelId) {
     modelId,
     toolCallingMode: "disabled",
     reasoningVisibility: "none",
+    reasoningDelivery: "none",
     supportsStreaming: false,
     supportsToolResults: false
   };
@@ -12044,11 +12117,14 @@ function resolveAgentRouteCapability(provider, modelId) {
   } else if (!supportsStreaming) {
     toolCallingMode = "disabled";
   }
+  const reasoningDelivery = resolveReasoningDelivery(provider, protocol);
+  const reasoningVisibility = reasoningDeliveryToStreamVisibility(reasoningDelivery);
   return {
     providerId: provider.id,
     modelId,
     toolCallingMode,
-    reasoningVisibility: resolveReasoningVisibility(provider),
+    reasoningVisibility,
+    reasoningDelivery,
     supportsStreaming,
     supportsToolResults: toolCallingMode === "native-structured"
   };
@@ -12123,27 +12199,14 @@ function translateCoreToSharedAgentEvent(event, context2) {
       if (ev.type === "text_delta") {
         return buildSharedAgentEvent("assistant.delta", { text: ev.delta }, context2);
       }
-      if (ev.type === "thinking_start") {
-        return buildSharedAgentEvent(
-          "diagnostic",
-          {
-            code: "MODEL_THINKING_STARTED",
-            severity: "info",
-            message: "模型已进入 provider reasoning / thinking 阶段；仅展示可见工作轨迹，不展示隐藏思维链。"
-          },
-          context2
-        );
+      if (ev.type === "thinking_delta") {
+        return buildSharedAgentEvent("assistant.thinking_delta", { text: ev.delta }, context2);
       }
       if (ev.type === "thinking_end") {
-        return buildSharedAgentEvent(
-          "diagnostic",
-          {
-            code: "MODEL_THINKING_COMPLETED",
-            severity: "info",
-            message: "模型 reasoning / thinking 阶段已结束。"
-          },
-          context2
-        );
+        return buildSharedAgentEvent("assistant.thinking_end", { text: ev.content }, context2);
+      }
+      if (ev.type === "thinking_start") {
+        return null;
       }
       if (ev.type === "toolcall_end") {
         return buildSharedAgentEvent(
@@ -12162,11 +12225,13 @@ function translateCoreToSharedAgentEvent(event, context2) {
     }
     case "message_end": {
       if (event.message.role === "assistant") {
-        const text = event.message.content.filter((block) => block.type === "text").map((block) => block.text).join("");
+        const text = extractAssistantTextFromContent(event.message.content);
+        const thinkingText = extractAssistantThinkingFromContent(event.message.content);
         return buildSharedAgentEvent(
           "assistant.completed",
           {
             text,
+            thinkingText: thinkingText || void 0,
             usage: event.message.usage ? {
               inputTokens: event.message.usage.inputTokens,
               outputTokens: event.message.usage.outputTokens
@@ -12288,10 +12353,16 @@ function extractAssistantText(messages) {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const msg = messages[i];
     if (msg.role === "assistant") {
-      return msg.content.filter((block) => block.type === "text").map((block) => block.text).join("");
+      return extractAssistantTextFromContent(msg.content);
     }
   }
   return "";
+}
+function extractAssistantTextFromContent(content) {
+  return content.filter((block) => block.type === "text").map((block) => block.text ?? "").join("");
+}
+function extractAssistantThinkingFromContent(content) {
+  return content.filter((block) => block.type === "thinking").map((block) => block.thinking ?? "").join("");
 }
 function toolResultToSharedResult(result, durationMs) {
   if (result.isError) {
@@ -12572,6 +12643,16 @@ function isRoutineCommand(command, permissions) {
 function isDangerousCommand(command) {
   return DANGEROUS_COMMAND_PATTERNS.some((pattern) => pattern.test(command));
 }
+function isRuleExpired(rule) {
+  return rule.expiresAt !== void 0 && rule.expiresAt < Date.now();
+}
+function matchPersistedRule(toolName, rules) {
+  return rules.find((rule) => {
+    if (isRuleExpired(rule)) return false;
+    const normalizedRule = normalizeToolName$1(rule.toolName);
+    return normalizedRule === toolName || normalizedRule === "*";
+  });
+}
 function denied(reason, risk = "high") {
   return { action: "deny", reason, risk, temporaryPathRoots: [] };
 }
@@ -12592,6 +12673,14 @@ class AgentPermissionPolicyService {
     );
     if (mode === "full-access") {
       return { action: "allow", risk: "low", temporaryPathRoots: ["*"] };
+    }
+    const persistedRules = permissions.persistedRules ?? [];
+    const matchedRule = matchPersistedRule(toolName, persistedRules);
+    if (matchedRule?.decision === "allow") {
+      return { action: "allow", risk: "low", temporaryPathRoots: [] };
+    }
+    if (matchedRule?.decision === "deny") {
+      return denied(`持久化规则拒绝了工具 "${input.toolCall.name}"。`);
     }
     if (isCommandDeniedByRule(extractStringArg(input.toolCall, "command"), permissions)) {
       return denied("Custom policy denied this command prefix.");
@@ -12753,7 +12842,7 @@ class AgentToolApprovalRequestService {
       kind: "tool",
       toolCallId: pending.toolCallId,
       toolName: pending.toolName,
-      answer: input.approved ? "Approved once." : "Denied by user.",
+      answer: input.approved ? "已批准一次" : "用户已拒绝",
       risk: pending.risk
     });
     pending.resolve(input.approved);
@@ -14876,6 +14965,26 @@ class ProviderAccountAuthService {
   }
 }
 const providerAccountAuthService = new ProviderAccountAuthService();
+const BLOCKER_CODES = {
+  BLOCKED_LLM_ROUTE_MISSING: {
+    code: "BLOCKED_LLM_ROUTE_MISSING"
+  },
+  BLOCKED_LLM_PROVIDER_MISSING: {
+    code: "BLOCKED_LLM_PROVIDER_MISSING"
+  },
+  BLOCKED_LLM_SECRET_MISSING: {
+    code: "BLOCKED_LLM_SECRET_MISSING"
+  },
+  BLOCKED_LLM_MODEL_MISSING: {
+    code: "BLOCKED_LLM_MODEL_MISSING"
+  },
+  BLOCKED_LLM_PROVIDER_UNAVAILABLE: {
+    code: "BLOCKED_LLM_PROVIDER_UNAVAILABLE"
+  },
+  BLOCKED_LLM_REQUEST_FAILED: {
+    code: "BLOCKED_LLM_REQUEST_FAILED"
+  }
+};
 class WorkflowProjectionPublisher {
   publish(channel, ...args) {
     rendererEventHub.emit(channel, ...args);
@@ -14918,6 +15027,580 @@ class WorkflowProjectionPublisher {
   }
 }
 const workflowProjectionPublisher = new WorkflowProjectionPublisher();
+class DebuggerLlmBlockerError extends Error {
+  blocker;
+  constructor(blocker) {
+    super(blocker.reason);
+    this.name = "DebuggerLlmBlockerError";
+    this.blocker = blocker;
+  }
+}
+function makeBlocker(code, reason, refs = []) {
+  return {
+    code,
+    reason,
+    refs,
+    detectedAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+}
+function extractTextContent(content) {
+  if (typeof content === "string") {
+    return content.trim();
+  }
+  return content.map((block) => {
+    if (block.type === "text") {
+      return block.text || "";
+    }
+    if (block.type === "tool_result") {
+      return block.content || "";
+    }
+    return "";
+  }).join("\n").trim();
+}
+const charsToTokens$1 = (chars) => Math.ceil(chars / 4);
+function buildScaledBreakdown(raw, occupiedTokens, contextWindowTokens) {
+  if (!raw || raw.length === 0) {
+    return null;
+  }
+  const estimateSum = raw.reduce((acc, entry) => acc + entry.tokens, 0);
+  const scaleFactor = estimateSum > 0 && occupiedTokens > 0 ? occupiedTokens / estimateSum : 1;
+  const scaled = raw.map((entry) => ({
+    id: entry.id,
+    tokens: Math.max(0, Math.round(entry.tokens * scaleFactor)),
+    ...entry.count !== void 0 ? { count: entry.count } : {}
+  }));
+  if (contextWindowTokens) {
+    scaled.push({ id: "free", tokens: Math.max(0, contextWindowTokens - occupiedTokens) });
+  }
+  return scaled;
+}
+function extractBalancedJsonFragment(text, opening) {
+  const start = text.indexOf(opening);
+  if (start < 0) {
+    return null;
+  }
+  const closing = opening === "{" ? "}" : "]";
+  let depth = 0;
+  let inString = false;
+  let escaping = false;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escaping) {
+        escaping = false;
+        continue;
+      }
+      if (char === "\\") {
+        escaping = true;
+        continue;
+      }
+      if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+    if (char === opening) {
+      depth += 1;
+      continue;
+    }
+    if (char === closing) {
+      depth -= 1;
+      if (depth === 0) {
+        return text.slice(start, index + 1);
+      }
+    }
+  }
+  return null;
+}
+function extractJsonCandidate(text) {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    throw new Error("LLM response was empty");
+  }
+  try {
+    JSON.parse(trimmed);
+    return trimmed;
+  } catch {
+  }
+  const fencedMatch = trimmed.match(/```json\s*([\s\S]*?)```/i) || trimmed.match(/```\s*([\s\S]*?)```/i);
+  if (fencedMatch?.[1]) {
+    const candidate = fencedMatch[1].trim();
+    JSON.parse(candidate);
+    return candidate;
+  }
+  const balancedObject = extractBalancedJsonFragment(trimmed, "{");
+  if (balancedObject) {
+    JSON.parse(balancedObject);
+    return balancedObject;
+  }
+  const balancedArray = extractBalancedJsonFragment(trimmed, "[");
+  if (balancedArray) {
+    JSON.parse(balancedArray);
+    return balancedArray;
+  }
+  const objectStart = trimmed.indexOf("{");
+  const objectEnd = trimmed.lastIndexOf("}");
+  if (objectStart >= 0 && objectEnd > objectStart) {
+    const candidate = trimmed.slice(objectStart, objectEnd + 1);
+    JSON.parse(candidate);
+    return candidate;
+  }
+  const arrayStart = trimmed.indexOf("[");
+  const arrayEnd = trimmed.lastIndexOf("]");
+  if (arrayStart >= 0 && arrayEnd > arrayStart) {
+    const candidate = trimmed.slice(arrayStart, arrayEnd + 1);
+    JSON.parse(candidate);
+    return candidate;
+  }
+  throw new Error("LLM response did not contain valid JSON");
+}
+function shouldRetryStructuredLlmError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /LLM response was empty|did not contain valid JSON|Unexpected non-whitespace character after JSON|OpenRouter API error: 5\d\d|timed out|timeout/i.test(message);
+}
+function readRouteProtocol(route) {
+  return route.provider.protocol ?? null;
+}
+function shouldUseNativeJsonObject(route) {
+  const protocol = readRouteProtocol(route);
+  const modelId = route.modelId.toLowerCase();
+  if (!protocol || protocol === "AnthropicMessages") {
+    return false;
+  }
+  if (/moonshot|kimi/.test(modelId)) {
+    return false;
+  }
+  return true;
+}
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+class DebuggerLlmService {
+  runSummaries = /* @__PURE__ */ new Map();
+  resetRunSummary(runId) {
+    this.runSummaries.delete(runId);
+    this.broadcastRunUsage(runId);
+  }
+  getRunSummary(runId) {
+    const summary = this.runSummaries.get(runId);
+    if (!summary) {
+      return null;
+    }
+    return {
+      ...summary,
+      routesUsed: summary.routesUsed.map((entry) => ({ ...entry }))
+    };
+  }
+  getRunContextUsage(runId) {
+    const summary = this.runSummaries.get(runId);
+    if (!summary) {
+      return null;
+    }
+    const settings = settingsService.getAll();
+    const provider = settings.llm.providers.find((entry) => entry.id === summary.providerId);
+    const model = provider?.models.find((entry) => entry.id === summary.modelId) ?? null;
+    const contextWindowTokens = typeof model?.contextWindowTokens === "number" && model.contextWindowTokens > 0 ? model.contextWindowTokens : null;
+    const totalTokens = summary.totalInputTokens + summary.totalOutputTokens;
+    const occupiedTokens = summary.lastOccupiedTokens ?? 0;
+    return {
+      runId,
+      providerId: summary.providerId,
+      modelId: summary.modelId,
+      inputTokens: summary.totalInputTokens,
+      outputTokens: summary.totalOutputTokens,
+      totalTokens,
+      contextWindowTokens,
+      usagePercent: contextWindowTokens ? Math.min(100, Math.max(0, Math.round(occupiedTokens / contextWindowTokens * 100))) : 0,
+      hasConfiguredContextWindow: Boolean(contextWindowTokens),
+      occupiedTokens,
+      breakdown: buildScaledBreakdown(summary.lastPromptBreakdown ?? null, occupiedTokens, contextWindowTokens),
+      snapshotAt: summary.lastSnapshotAt ?? null
+    };
+  }
+  /**
+   * 记录一次 agent loop turn 的真实窗口占用与分类快照，并广播给 UI。
+   *
+   * agent 主循环不经过 {@link call}，其用量由 provider 在 `message_end` 上报；
+   * 这里把它并入同一份 runSummaries，使上下文环 / 分类查看器拿到权威数据。
+   * `inputTokens` 为最近一次 prompt 的真实占用；分类中对话量取占用量减去
+   * 系统提示与工具定义的估算余量（字符/4 口径），保证各段之和锚定到权威占用。
+   */
+  recordAgentTurnUsage(params) {
+    const key = params.runId ?? params.sessionId;
+    if (!key) {
+      return;
+    }
+    const existing = this.runSummaries.get(key) ?? {
+      providerId: params.providerId,
+      modelId: params.modelId,
+      successfulCallCount: 0,
+      failedCallCount: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      firstRequestId: void 0,
+      routesUsed: []
+    };
+    existing.providerId = existing.providerId || params.providerId;
+    existing.modelId = existing.modelId || params.modelId;
+    existing.successfulCallCount += 1;
+    existing.totalInputTokens += params.inputTokens;
+    existing.totalOutputTokens += params.outputTokens;
+    existing.lastOccupiedTokens = params.inputTokens;
+    if (params.precomputedBreakdown && params.precomputedBreakdown.length > 0) {
+      existing.lastPromptBreakdown = params.precomputedBreakdown;
+    } else {
+      const systemTokens = charsToTokens$1((params.systemPrompt ?? "").length);
+      const toolChars = params.toolDefinitions ? JSON.stringify(params.toolDefinitions).length : 0;
+      const toolTokens = charsToTokens$1(toolChars);
+      const conversationTokens = Math.max(0, params.inputTokens - systemTokens - toolTokens);
+      existing.lastPromptBreakdown = [
+        { id: "system_prompt", tokens: systemTokens },
+        { id: "tool_definitions", tokens: toolTokens, count: params.toolCount },
+        { id: "conversation", tokens: conversationTokens }
+      ];
+    }
+    existing.lastSnapshotAt = Date.now();
+    this.runSummaries.set(key, existing);
+    this.broadcastRunUsage(key);
+  }
+  async refreshAccountRuntimeCredentials(route) {
+    if (route.provider.authMode !== "account") {
+      return;
+    }
+    await providerAccountAuthService.ensureRuntimeCredentials(route.providerId);
+  }
+  getRouteBlockers(agentIds, stage, settings = settingsService.getAll()) {
+    const blockers = [];
+    const seen = /* @__PURE__ */ new Set();
+    for (const agentId of agentIds) {
+      try {
+        this.resolveRoute(agentId, stage, settings);
+      } catch (error) {
+        if (!(error instanceof DebuggerLlmBlockerError)) {
+          throw error;
+        }
+        const key = `${error.blocker.code}:${agentId}`;
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        blockers.push(error.blocker);
+      }
+    }
+    return blockers;
+  }
+  resolveRoute(agentId, stage, settings = settingsService.getAll()) {
+    const requestedRoute = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
+    const resolution = resolveCompatibleAgentRoute(settings.llm.agentRoutes, settings.llm.providers, agentId);
+    const route = resolution.route;
+    if (!route?.providerId || !route.modelId) {
+      throw new DebuggerLlmBlockerError(makeBlocker(
+        BLOCKER_CODES.BLOCKED_LLM_ROUTE_MISSING.code,
+        `${agentId} is not bound to a provider/model route.`,
+        [`agent:${agentId}`]
+      ));
+    }
+    const provider = resolution.provider ?? settings.llm.providers.find((entry) => entry.id === route.providerId);
+    if (!provider || !provider.enabled) {
+      throw new DebuggerLlmBlockerError(makeBlocker(
+        BLOCKER_CODES.BLOCKED_LLM_PROVIDER_MISSING.code,
+        `${agentId} route points to an unavailable provider: ${route.providerId}.`,
+        [`agent:${agentId}`, `provider:${route.providerId}`]
+      ));
+    }
+    const model = provider.models.find((entry) => entry.enabled && entry.id === route.modelId);
+    if (!model) {
+      throw new DebuggerLlmBlockerError(makeBlocker(
+        BLOCKER_CODES.BLOCKED_LLM_MODEL_MISSING.code,
+        `${agentId} route points to a disabled or missing model: ${route.modelId}.`,
+        [`agent:${agentId}`, `provider:${provider.id}`, `model:${route.modelId}`]
+      ));
+    }
+    const secret = provider.authMode === "local" ? "local-provider" : provider.authMode === "environment" ? "environment-provider" : provider.authMode === "account" ? settingsService.getProviderOAuthSecret(provider.id, settings.workspace.rootPath) : settingsService.getProviderSecret(provider.id, settings.workspace.rootPath);
+    if (!secret.trim()) {
+      throw new DebuggerLlmBlockerError(makeBlocker(
+        BLOCKER_CODES.BLOCKED_LLM_SECRET_MISSING.code,
+        `${agentId} route provider is missing a usable secret: ${provider.id}.`,
+        [`agent:${agentId}`, `provider:${provider.id}`]
+      ));
+    }
+    return {
+      agentId,
+      stage,
+      provider,
+      providerId: provider.id,
+      modelId: route.modelId,
+      requestedModelId: resolution.requestedModelId ?? requestedRoute?.modelId,
+      remapReason: resolution.remapReason
+    };
+  }
+  async call(context2, request2) {
+    const settings = settingsService.getAll();
+    const route = this.resolveRoute(context2.agentId, context2.stage, settings);
+    if (process.env.RDC_AGENT_TEST_MODE === "1") {
+      const response = {
+        id: `test-llm-${Date.now()}`,
+        model: route.modelId,
+        content: "",
+        usage: {
+          inputTokens: 0,
+          outputTokens: 0
+        },
+        stopReason: "end_turn"
+      };
+      const text = "";
+      await this.recordCall(context2, route, response, "ok", "test-mode llm stub");
+      return {
+        route,
+        response,
+        text
+      };
+    }
+    await this.refreshAccountRuntimeCredentials(route);
+    llmAdapter.configure(settingsService.getLlmConfig());
+    try {
+      const response = await llmAdapter.chat({
+        ...request2,
+        model: route.modelId
+      }, route.providerId);
+      const text = extractTextContent(response.content);
+      await this.recordCall(context2, route, response, "ok", text || `${route.providerId}/${route.modelId}`);
+      return {
+        route,
+        response,
+        text
+      };
+    } catch (error) {
+      await this.recordFailure(context2, route, error instanceof Error ? error.message : String(error));
+      throw this.toRuntimeError(route, error);
+    }
+  }
+  async callStructured(input) {
+    if (process.env.RDC_AGENT_TEST_MODE === "1" && input.testValue !== void 0) {
+      const settings2 = settingsService.getAll();
+      const route2 = this.resolveRoute(input.agentId, input.stage, settings2);
+      const response = {
+        id: `test-llm-${Date.now()}`,
+        model: route2.modelId,
+        content: JSON.stringify(input.testValue),
+        usage: {
+          inputTokens: 0,
+          outputTokens: 0
+        },
+        stopReason: "end_turn"
+      };
+      const text = JSON.stringify(input.testValue);
+      const summary = input.auditSummary ? input.auditSummary(input.testValue, text) : text;
+      await this.recordCall(input, route2, response, "ok", summary);
+      return {
+        data: input.testValue,
+        call: {
+          route: route2,
+          response,
+          text
+        }
+      };
+    }
+    const settings = settingsService.getAll();
+    const route = this.resolveRoute(input.agentId, input.stage, settings);
+    await this.refreshAccountRuntimeCredentials(route);
+    llmAdapter.configure(settingsService.getLlmConfig());
+    const useNativeJsonObject = shouldUseNativeJsonObject(route);
+    let lastError;
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      try {
+        const response = await llmAdapter.chat({
+          messages: input.messages,
+          model: route.modelId,
+          maxTokens: input.maxTokens,
+          temperature: input.temperature,
+          responseFormat: useNativeJsonObject ? "json_object" : void 0
+        }, route.providerId);
+        const text = extractTextContent(response.content);
+        const data = input.parse(text);
+        const summary = input.auditSummary ? input.auditSummary(data, text) : text || `${route.providerId}/${route.modelId}`;
+        await this.recordCall(input, route, response, "ok", summary);
+        return {
+          data,
+          call: {
+            route,
+            response,
+            text
+          }
+        };
+      } catch (error) {
+        lastError = error;
+        if (attempt < 3 && shouldRetryStructuredLlmError(error)) {
+          await sleep(500 * (attempt + 1));
+          continue;
+        }
+        await this.recordFailure(
+          input,
+          route,
+          error instanceof Error ? error.message : String(error)
+        );
+        throw this.toRuntimeError(route, error);
+      }
+    }
+    await this.recordFailure(
+      input,
+      route,
+      lastError instanceof Error ? lastError.message : String(lastError)
+    );
+    throw this.toRuntimeError(route, lastError);
+  }
+  parseJson(text) {
+    return JSON.parse(extractJsonCandidate(text));
+  }
+  toRuntimeError(route, error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const providerUnavailable = /provider not found|provider disabled|provider not configured|no llm provider configured/i.test(message);
+    const code = providerUnavailable ? BLOCKER_CODES.BLOCKED_LLM_PROVIDER_UNAVAILABLE.code : BLOCKER_CODES.BLOCKED_LLM_REQUEST_FAILED.code;
+    return new DebuggerLlmBlockerError(makeBlocker(
+      code,
+      `${route.agentId} failed to call ${route.providerId}/${route.modelId}: ${message}`,
+      [`agent:${route.agentId}`, `provider:${route.providerId}`, `model:${route.modelId}`]
+    ));
+  }
+  async recordCall(context2, route, response, status, summary) {
+    this.updateRunSummary(context2, route, response, status);
+    runtimeLogService.log({
+      scope: context2.sessionId ? "session" : "app",
+      namespace: "llm",
+      severity: status === "ok" ? "success" : "error",
+      title: `${route.agentId} -> ${route.providerId}/${route.modelId}`,
+      summary,
+      detail: response.id ? `request=${response.id}` : void 0,
+      sessionId: context2.sessionId ?? null,
+      runId: context2.runId ?? null,
+      raw: {
+        agentId: route.agentId,
+        stage: route.stage,
+        providerId: route.providerId,
+        modelId: route.modelId,
+        requestedModelId: route.requestedModelId,
+        remapReason: route.remapReason,
+        requestId: response.id,
+        usage: response.usage
+      }
+    });
+    if (!context2.sessionId || !context2.runId) {
+      return;
+    }
+    const event = storageAdapter.createActionEvent({
+      runId: context2.runId,
+      sessionId: context2.sessionId,
+      agentId: route.agentId,
+      eventType: "llm_call",
+      status,
+      payload: {
+        agentId: route.agentId,
+        stage: route.stage,
+        providerId: route.providerId,
+        modelId: route.modelId,
+        requestedModelId: route.requestedModelId,
+        remapReason: route.remapReason,
+        requestId: response.id,
+        usage: response.usage,
+        summary
+      }
+    });
+    await this.appendBroadcastEvent(context2.sessionId, event);
+  }
+  async recordFailure(context2, route, errorMessage) {
+    this.updateRunSummary(context2, route, null, "error");
+    runtimeLogService.log({
+      scope: context2.sessionId ? "session" : "app",
+      namespace: "llm",
+      severity: "error",
+      title: `${route.agentId} -> ${route.providerId}/${route.modelId}`,
+      summary: errorMessage,
+      sessionId: context2.sessionId ?? null,
+      runId: context2.runId ?? null,
+      raw: {
+        agentId: route.agentId,
+        stage: route.stage,
+        providerId: route.providerId,
+        modelId: route.modelId,
+        requestedModelId: route.requestedModelId,
+        remapReason: route.remapReason
+      }
+    });
+    if (!context2.sessionId || !context2.runId) {
+      return;
+    }
+    const event = storageAdapter.createActionEvent({
+      runId: context2.runId,
+      sessionId: context2.sessionId,
+      agentId: route.agentId,
+      eventType: "llm_call",
+      status: "error",
+      payload: {
+        agentId: route.agentId,
+        stage: route.stage,
+        providerId: route.providerId,
+        modelId: route.modelId,
+        requestedModelId: route.requestedModelId,
+        remapReason: route.remapReason,
+        summary: errorMessage
+      }
+    });
+    await this.appendBroadcastEvent(context2.sessionId, event);
+  }
+  updateRunSummary(context2, route, response, status) {
+    if (!context2.runId) {
+      return;
+    }
+    const existing = this.runSummaries.get(context2.runId) ?? {
+      providerId: route.providerId,
+      modelId: route.modelId,
+      successfulCallCount: 0,
+      failedCallCount: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      firstRequestId: void 0,
+      routesUsed: []
+    };
+    existing.providerId = existing.providerId || route.providerId;
+    existing.modelId = existing.modelId || route.modelId;
+    if (status === "ok") {
+      existing.successfulCallCount += 1;
+      if (!existing.firstRequestId && response?.id) {
+        existing.firstRequestId = response.id;
+      }
+      existing.totalInputTokens += response?.usage.inputTokens ?? 0;
+      existing.totalOutputTokens += response?.usage.outputTokens ?? 0;
+    } else {
+      existing.failedCallCount += 1;
+    }
+    existing.routesUsed.push({
+      agentId: route.agentId,
+      stage: route.stage,
+      providerId: route.providerId,
+      modelId: route.modelId,
+      requestId: response?.id,
+      status
+    });
+    this.runSummaries.set(context2.runId, existing);
+    this.broadcastRunUsage(context2.runId);
+  }
+  broadcastRunUsage(runId) {
+    const usage = this.getRunContextUsage(runId);
+    if (!usage) {
+      return;
+    }
+    workflowProjectionPublisher.publishRunUsage(usage);
+  }
+  async appendBroadcastEvent(sessionId, event) {
+    await storageAdapter.appendActionEvent(sessionId, event);
+    workflowProjectionPublisher.publishEvidenceEvent(event);
+  }
+}
+const debuggerLlmService = new DebuggerLlmService();
 const ASK_READONLY_TOOL_ALLOWLIST = [
   "read_file",
   "glob",
@@ -14943,7 +15626,6 @@ const CANONICAL_TOOL_EXPANSIONS = {
   "vscode/askQuestions": ["ask_user"],
   agent: ["agent_handoff"],
   handoff: ["agent_handoff"],
-  todo: ["task_create", "task_update", "task_get", "task_list"],
   task: ["task_create", "task_update", "task_get", "task_list"],
   memory: ["memory_read"],
   planArtifact: ["plan_artifact"],
@@ -15094,6 +15776,7 @@ function isDeniedAskTool(originalToolName, normalizedToolName) {
   }
   return ASK_DENIED_TOOL_PREFIXES.some((prefix) => originalToolName.startsWith(prefix) || normalizedToolName.startsWith(prefix));
 }
+const charsToTokens = (chars) => Math.ceil(chars / 4);
 class AgentOrchestrator {
   agentStates = /* @__PURE__ */ new Map();
   agentConfigs = /* @__PURE__ */ new Map();
@@ -15302,7 +15985,8 @@ class AgentOrchestrator {
         toolAllowlist,
         options,
         projectRootPath: options?.projectRootPath ?? null,
-        projectId: options?.projectId ?? null
+        projectId: options?.projectId ?? null,
+        promptMetrics: options?.promptMetrics
       });
       runtimeLogService.log({
         scope: options?.sessionId ? "session" : "app",
@@ -15482,7 +16166,7 @@ class AgentOrchestrator {
       // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
       errorRecovery
     });
-    const slot = { agent, providerId, modelId, systemPrompt, toolSignature, turnSignature };
+    const slot = { agent, contextManager, providerId, modelId, systemPrompt, toolSignature, turnSignature };
     this.agentSlots.set(slotKey, slot);
     return slot;
   }
@@ -16363,6 +17047,7 @@ ${entries.join("\n")}` : "No matching memories were found."
       maxTokens: input.maxTokens,
       temperature: input.temperature,
       reasoningBudget: input.options?.reasoningBudget,
+      reasoningVisibility: routeCapability.reasoningVisibility,
       signal: input.options?.signal
     };
     const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
@@ -16412,6 +17097,39 @@ ${entries.join("\n")}` : "No matching memories were found."
       }
       if (event.type === "message_end" && event.message.role === "assistant") {
         responseText = event.message.content.filter((block) => block.type === "text").map((block) => block.text).join("");
+        if (event.message.usage) {
+          const isMcpDef = (d) => d.name.startsWith("mcp__");
+          const isSubagentDef = (d) => d.name === "subagent";
+          const mcpDefs = activeToolDefinitions.filter(isMcpDef);
+          const subagentDefs = activeToolDefinitions.filter(isSubagentDef);
+          const systemDefs = activeToolDefinitions.filter((d) => !isMcpDef(d) && !isSubagentDef(d));
+          const pm = input.promptMetrics;
+          const systemPromptChars = pm ? pm.system_prompt : input.systemPrompt.length;
+          const rulesChars = pm?.rules ?? 0;
+          const memoryChars = pm?.memory_files ?? 0;
+          const compressionStats = slot.contextManager.classifyMessages(
+            slot.agent.messages
+          );
+          const precomputedBreakdown = [
+            { id: "system_prompt", tokens: charsToTokens(systemPromptChars) },
+            ...rulesChars > 0 ? [{ id: "rules", tokens: charsToTokens(rulesChars) }] : [],
+            ...memoryChars > 0 ? [{ id: "memory_files", tokens: charsToTokens(memoryChars) }] : [],
+            { id: "system_tools", tokens: charsToTokens(JSON.stringify(systemDefs).length), count: systemDefs.length },
+            { id: "mcp_tools", tokens: charsToTokens(JSON.stringify(mcpDefs).length), count: mcpDefs.length },
+            { id: "subagent_definitions", tokens: charsToTokens(JSON.stringify(subagentDefs).length), count: subagentDefs.length },
+            ...compressionStats.summaryTokens > 0 ? [{ id: "summarized_conversation", tokens: compressionStats.summaryTokens }] : [],
+            { id: "conversation", tokens: compressionStats.conversationTokens, count: compressionStats.conversationCount }
+          ];
+          debuggerLlmService.recordAgentTurnUsage({
+            runId: input.runId,
+            sessionId: input.sessionId,
+            providerId: input.providerId,
+            modelId: input.modelId,
+            inputTokens: event.message.usage.inputTokens,
+            outputTokens: event.message.usage.outputTokens,
+            precomputedBreakdown
+          });
+        }
         if (!sawStructuredToolCall && !responseText.trim()) {
           input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
             code: "empty_response_without_tool_call",
@@ -19785,40 +20503,6 @@ const themeCommand = {
     };
   }
 };
-function openSourceControl(message) {
-  return {
-    success: true,
-    message,
-    uiAction: { type: "open-panel", payload: { panel: "source-control" } }
-  };
-}
-const commitCommand = {
-  id: "commit",
-  name: "commit",
-  description: "Open Source Control to stage and commit changes",
-  category: "workflow",
-  async execute() {
-    return openSourceControl("Opened Source Control. Stage changes and commit from the panel.");
-  }
-};
-const diffCommand = {
-  id: "diff",
-  name: "diff",
-  description: "Open Source Control to inspect current git diff",
-  category: "workflow",
-  async execute() {
-    return openSourceControl("Opened Source Control for the current diff.");
-  }
-};
-const reviewCommand = {
-  id: "review",
-  name: "review",
-  description: "Open Source Control for code review context",
-  category: "workflow",
-  async execute() {
-    return openSourceControl("Opened Source Control for review.");
-  }
-};
 let _registry = null;
 function getRegistry() {
   if (!_registry) {
@@ -19852,10 +20536,7 @@ function registerBuiltins(registry) {
     costCommand,
     usageCommand,
     permissionsCommand,
-    themeCommand,
-    commitCommand,
-    diffCommand,
-    reviewCommand
+    themeCommand
   ];
   for (const cmd of builtins) {
     registry.register(cmd);
@@ -19926,6 +20607,7 @@ function registerCommandHandlers() {
     return service.execute(request2);
   });
 }
+const ROOT_BRANCH_ID = "branch-root";
 const AGENT_WORKBENCH_TOOL_CATALOG = [
   {
     id: "read_file",
@@ -20500,6 +21182,22 @@ class PromptAssembler {
   invalidateCache() {
     this.cache.clear();
   }
+  /**
+   * 测量各语义分段的字符数，用于上下文窗口 breakdown 的 token 估算。
+   *
+   * 不触发缓存；调用时需保证 context 与 assembleSystemPrompt 所用的 context 一致。
+   */
+  measureSections(context2) {
+    const rulesText = sectionRules(context2) ?? "";
+    const memoryText = sectionMemory(context2) ?? "";
+    const fullPrompt = this.assembleSystemPrompt(context2);
+    const dynamicChars = rulesText.length + memoryText.length;
+    return {
+      system_prompt: Math.max(0, fullPrompt.length - dynamicChars),
+      rules: rulesText.length,
+      memory_files: memoryText.length
+    };
+  }
   /** 渲染完整 prompt（不使用缓存）。 */
   renderFull(context2) {
     const groups = this.collectGroups(context2);
@@ -20575,6 +21273,71 @@ function replacerForStableKeys(_key, value) {
     return sorted;
   }
   return value;
+}
+const sortByCreatedAt = (left, right) => {
+  if (left.createdAt !== right.createdAt) return left.createdAt - right.createdAt;
+  const leftUpdated = left.updatedAt ?? left.createdAt;
+  const rightUpdated = right.updatedAt ?? right.createdAt;
+  return leftUpdated - rightUpdated;
+};
+function createDefaultBranchState(sessionId) {
+  return {
+    sessionId,
+    rootBranchId: ROOT_BRANCH_ID,
+    activeLeafBranchId: ROOT_BRANCH_ID,
+    forks: []
+  };
+}
+function normalizeBranchId(branchId) {
+  return branchId?.trim() || ROOT_BRANCH_ID;
+}
+function resolveVisibleConversationMessages(allMessages, branchState) {
+  if (!branchState || branchState.forks.length === 0) {
+    return allMessages.filter((message) => normalizeBranchId(message.branchId) === ROOT_BRANCH_ID).sort(sortByCreatedAt);
+  }
+  return collectBranchPath(
+    branchState.rootBranchId,
+    allMessages,
+    branchState.forks,
+    0
+  );
+}
+function collectBranchPath(branchId, allMessages, forks, minCreatedAt) {
+  const branchMessages = allMessages.filter((message) => normalizeBranchId(message.branchId) === branchId && message.createdAt > minCreatedAt).sort(sortByCreatedAt);
+  const forkCandidates = forks.map((fork2) => {
+    const anchor2 = allMessages.find((message) => message.id === fork2.anchorMessageId);
+    if (!anchor2 || normalizeBranchId(anchor2.branchId) !== branchId) return null;
+    if (anchor2.createdAt <= minCreatedAt) return null;
+    return { fork: fork2, anchor: anchor2 };
+  }).filter((entry) => entry !== null).sort((left, right) => left.anchor.createdAt - right.anchor.createdAt);
+  const nextFork = forkCandidates[0];
+  if (!nextFork) {
+    return branchMessages;
+  }
+  const { fork, anchor } = nextFork;
+  const beforeFork = branchMessages.filter((message) => message.createdAt < anchor.createdAt);
+  const activeBranch = fork.branches.find((entry) => entry.branchId === fork.activeBranchId);
+  if (!activeBranch) {
+    return beforeFork;
+  }
+  const activeAnchor = allMessages.find((message) => message.id === activeBranch.anchorUserMessageId);
+  if (!activeAnchor) {
+    return beforeFork;
+  }
+  const turnMessages = allMessages.filter((message) => message.turnId === activeAnchor.turnId && normalizeBranchId(message.branchId) === activeBranch.branchId).sort(sortByCreatedAt);
+  if (turnMessages.length === 0) {
+    return beforeFork;
+  }
+  const turnEnd = Math.max(...turnMessages.map((message) => message.updatedAt ?? message.createdAt));
+  const suffix = collectBranchPath(activeBranch.branchId, allMessages, forks, turnEnd);
+  return [...beforeFork, ...turnMessages, ...suffix];
+}
+function resolveThinkingPresentation(reasoningDelivery, hasThinking) {
+  if (!hasThinking || !reasoningDelivery || reasoningDelivery === "none" || reasoningDelivery === "hidden") {
+    return "none";
+  }
+  if (reasoningDelivery === "summary-only") return "summary";
+  return "full";
 }
 function resolveConversationAgentId(requestedMode, requestedAgentId) {
   if (requestedAgentId && resolveEnabledAgentDefinition(requestedAgentId)) {
@@ -20679,15 +21442,23 @@ function finalizeTrace(trace, status, summary) {
   nextTrace.updatedAt = nowMs();
   return nextTrace;
 }
-function upsertRuntimeToolCall(trace, patch) {
+function upsertRuntimeToolCall(trace, patch, options) {
   const nextTrace = cloneTrace(trace);
-  const blockMeta = getRuntimeToolBlockMeta(patch.toolName);
+  const blockMeta = getRuntimeToolBlockMeta(patch.toolName, options?.segmentId);
   const blockId = blockMeta.id;
   let block = nextTrace.blocks.find((entry) => entry.id === blockId);
   if (!block) {
     block = createWorkBlock(blockId, blockMeta.title, blockMeta.stage, blockMeta.kind);
     block.status = "running";
     nextTrace.blocks.push(block);
+  }
+  if (options?.segmentId && blockId === options.segmentId) {
+    applySegmentNarrationFields(
+      block,
+      options.segmentSummary,
+      options.segmentThinking,
+      options.segmentThinkingPresentation
+    );
   }
   const toolIndex = block.toolCalls.findIndex((toolCall) => toolCall.id === patch.id);
   if (toolIndex >= 0) {
@@ -20715,7 +21486,34 @@ function upsertRuntimeToolCall(trace, patch) {
   nextTrace.updatedAt = nowMs();
   return nextTrace;
 }
-function getRuntimeToolBlockMeta(toolName) {
+function applySegmentNarrationFields(block, narration, thinking, thinkingPresentation) {
+  const nextNarration = narration?.trim();
+  const nextThinking = thinking?.trim();
+  if (nextNarration && (!block.summary || nextNarration.length >= block.summary.length)) {
+    block.summary = nextNarration;
+  }
+  if (nextThinking && (!block.detail || nextThinking.length >= block.detail.length)) {
+    block.detail = nextThinking;
+    const presentation = thinkingPresentation ?? resolveThinkingPresentation(void 0, true);
+    if (presentation !== "none") {
+      block.thinkingPresentation = presentation;
+    }
+  }
+}
+function upsertSegmentNarration(trace, segmentId, narration, thinking, thinkingPresentation) {
+  const nextTrace = cloneTrace(trace);
+  let block = nextTrace.blocks.find((entry) => entry.id === segmentId);
+  if (!block) {
+    block = createWorkBlock(segmentId, "工具调用", "tool", "tool");
+    block.status = "running";
+    nextTrace.blocks.push(block);
+  }
+  applySegmentNarrationFields(block, narration, thinking, thinkingPresentation);
+  nextTrace.status = "running";
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+function getRuntimeToolBlockMeta(toolName, segmentId) {
   const normalizedToolName = normalizeToolName(toolName);
   if (normalizedToolName === "ask_user") {
     return {
@@ -20734,12 +21532,16 @@ function getRuntimeToolBlockMeta(toolName) {
     };
   }
   return {
-    id: "runtime-tools",
+    id: segmentId ?? "runtime-tools",
     title: "工具调用",
     stage: "tool",
     kind: "tool"
   };
 }
+const isSegmentTool = (toolName) => {
+  const normalized = normalizeToolName(toolName);
+  return normalized !== "ask_user" && normalized !== "agent_handoff";
+};
 function summarizeRuntimePayload(payload) {
   if ("message" in payload && typeof payload.message === "string" && payload.message.trim()) {
     return payload.message.trim();
@@ -20772,6 +21574,9 @@ function makeConversationMessage(role, content, options) {
     workTrace: options.workTrace ?? null,
     diagnostic: options.diagnostic ?? null,
     attachments: options.attachments,
+    branchId: options.branchId ?? ROOT_BRANCH_ID,
+    forkId: options.forkId,
+    variantIndex: options.variantIndex,
     createdAt
   };
 }
@@ -20916,7 +21721,12 @@ class ConversationService {
    */
   pendingHandoffs = /* @__PURE__ */ new Map();
   async getHistory(sessionId) {
-    return storageAdapter.readConversationHistory(sessionId);
+    const allMessages = storageAdapter.readConversationHistory(sessionId);
+    const branchState = storageAdapter.readConversationBranchState(sessionId);
+    return {
+      messages: resolveVisibleConversationMessages(allMessages, branchState),
+      branchState
+    };
   }
   async clearHistory(sessionId) {
     storageAdapter.writeConversationHistory(sessionId, []);
@@ -21010,20 +21820,107 @@ class ConversationService {
     if (!targetMessage || targetMessage.role !== "user") {
       throw new Error("Can only edit and resend an existing user message.");
     }
-    const removedTurnIds = new Set(history.slice(targetIndex).map((message) => message.turnId));
+    const downstreamTurnIds = new Set(
+      history.slice(targetIndex + 1).map((message) => message.turnId)
+    );
     for (const activeTurn of Array.from(this.activeTurns.values())) {
-      if (activeTurn.sessionId === sessionId && removedTurnIds.has(activeTurn.turnId)) {
+      if (activeTurn.sessionId === sessionId && downstreamTurnIds.has(activeTurn.turnId)) {
         activeTurn.stop();
       }
     }
-    const nextHistory = history.slice(0, targetIndex);
-    storageAdapter.writeConversationHistory(sessionId, nextHistory);
-    this.publishConversationTrace(sessionId, nextHistory, sessionId);
+    let branchState = storageAdapter.readConversationBranchState(sessionId) ?? createDefaultBranchState(sessionId);
+    const targetBranchId = normalizeBranchId(targetMessage.branchId);
+    const forkId = targetMessage.forkId ?? targetMessage.id;
+    const anchorMessageId = branchState.forks.find((fork2) => fork2.forkId === forkId)?.anchorMessageId ?? targetMessage.id;
+    let fork = branchState.forks.find((entry) => entry.forkId === forkId);
+    if (!fork) {
+      fork = {
+        forkId,
+        anchorMessageId,
+        activeBranchId: targetBranchId,
+        branches: [{
+          branchId: targetBranchId,
+          parentBranchId: null,
+          variantIndex: targetMessage.variantIndex ?? 0,
+          anchorUserMessageId: targetMessage.id,
+          rootTurnId: targetMessage.turnId
+        }]
+      };
+      branchState.forks.push(fork);
+      if (!targetMessage.forkId) {
+        targetMessage.forkId = forkId;
+        targetMessage.variantIndex = targetMessage.variantIndex ?? 0;
+        storageAdapter.appendConversationMessage(sessionId, {
+          ...targetMessage,
+          updatedAt: nowMs()
+        });
+      }
+    } else if (!fork.branches.some((branch) => branch.anchorUserMessageId === targetMessage.id)) {
+      const variantIndex2 = targetMessage.variantIndex ?? fork.branches.length;
+      if (!fork.branches.some((branch) => branch.variantIndex === variantIndex2)) {
+        fork.branches.push({
+          branchId: targetBranchId,
+          parentBranchId: fork.branches[0]?.parentBranchId ?? null,
+          variantIndex: variantIndex2,
+          anchorUserMessageId: targetMessage.id,
+          rootTurnId: targetMessage.turnId
+        });
+      }
+    }
+    const newBranchId = generateEventId("branch");
+    const variantIndex = fork.branches.length;
+    fork.branches.push({
+      branchId: newBranchId,
+      parentBranchId: targetBranchId,
+      variantIndex,
+      anchorUserMessageId: "",
+      rootTurnId: ""
+    });
+    fork.activeBranchId = newBranchId;
+    branchState.activeLeafBranchId = newBranchId;
+    storageAdapter.writeConversationBranchState(sessionId, branchState);
     const updatedContext = {
       ...context2,
       session: storageAdapter.readSession(sessionId) ?? context2.session
     };
-    return this.startProfileTurn(updatedContext, input.mode, input.agentId ?? null, trimmed, input.attachments ?? []);
+    return this.startProfileTurn(
+      updatedContext,
+      input.mode,
+      input.agentId ?? null,
+      trimmed,
+      input.attachments ?? [],
+      {
+        branchId: newBranchId,
+        forkId,
+        variantIndex
+      },
+      fork
+    );
+  }
+  async switchConversationBranch(input) {
+    const branchState = storageAdapter.readConversationBranchState(input.sessionId);
+    if (!branchState) {
+      return { success: false, messages: [], error: "No conversation branch state found." };
+    }
+    const fork = branchState.forks.find((entry) => entry.forkId === input.forkId);
+    const branch = fork?.branches.find((entry) => entry.branchId === input.branchId);
+    if (!fork || !branch) {
+      return { success: false, messages: [], error: "Invalid conversation branch selection." };
+    }
+    fork.activeBranchId = input.branchId;
+    branchState.activeLeafBranchId = input.branchId;
+    storageAdapter.writeConversationBranchState(input.sessionId, branchState);
+    const allMessages = storageAdapter.readConversationHistory(input.sessionId);
+    const visibleMessages = resolveVisibleConversationMessages(allMessages, branchState);
+    const tracePresentation = await traceService.buildConversationPresentation(input.sessionId, visibleMessages);
+    workflowProjectionPublisher.publishTraceProjectionChanged(input.sessionId, tracePresentation);
+    this.publishConversationTrace(input.sessionId, visibleMessages, input.sessionId);
+    return {
+      success: true,
+      messages: visibleMessages,
+      branchState,
+      tracePresentation
+    };
   }
   async resolveContext(input) {
     const projectId = input.projectId ?? input.fallbackProjectId ?? storageAdapter.getCurrentProjectId() ?? null;
@@ -21045,7 +21942,7 @@ class ConversationService {
       replayDevice
     };
   }
-  async startProfileTurn(context2, requestedMode, requestedAgentId, rawMessage, pendingAttachments) {
+  async startProfileTurn(context2, requestedMode, requestedAgentId, rawMessage, pendingAttachments, branchContext, forkToUpdate) {
     let workingSession = context2.session;
     if (!workingSession && context2.projectId) {
       workingSession = storageAdapter.createSession(context2.projectId, rawMessage.slice(0, 80));
@@ -21065,6 +21962,13 @@ class ConversationService {
     }
     const conversationAgentId = handoffProfile ?? resolveConversationAgentId(requestedMode, requestedAgentId);
     const turnId = generateEventId("turn");
+    const sessionIdForBranch = workingSession?.sessionId ?? null;
+    let branchState = sessionIdForBranch ? storageAdapter.readConversationBranchState(sessionIdForBranch) : null;
+    if (sessionIdForBranch && !branchState) {
+      branchState = createDefaultBranchState(sessionIdForBranch);
+      storageAdapter.writeConversationBranchState(sessionIdForBranch, branchState);
+    }
+    const branchId = branchContext?.branchId ?? branchState?.activeLeafBranchId ?? ROOT_BRANCH_ID;
     const importedAttachments = workingSession ? storageAdapter.importSessionAttachments(
       workingSession.sessionId,
       pendingAttachments.map((entry) => entry.sourcePath)
@@ -21076,8 +21980,24 @@ class ConversationService {
       runId: isActiveRun(context2.currentRun) ? context2.currentRun.runId : null,
       modeContext: requestedMode,
       attachments: importedAttachments,
-      status: "complete"
+      status: "complete",
+      branchId,
+      forkId: branchContext?.forkId,
+      variantIndex: branchContext?.variantIndex
     });
+    if (forkToUpdate && sessionIdForBranch && branchState) {
+      const pendingBranch = forkToUpdate.branches.find((entry) => entry.branchId === branchId);
+      if (pendingBranch) {
+        pendingBranch.anchorUserMessageId = userMessage.id;
+        pendingBranch.rootTurnId = turnId;
+      }
+      forkToUpdate.activeBranchId = branchId;
+      branchState.activeLeafBranchId = branchId;
+      storageAdapter.writeConversationBranchState(sessionIdForBranch, branchState);
+    } else if (sessionIdForBranch && branchState && branchContext?.branchId) {
+      branchState.activeLeafBranchId = branchContext.branchId;
+      storageAdapter.writeConversationBranchState(sessionIdForBranch, branchState);
+    }
     const assistantDraftMessage = makeConversationMessage("assistant", "", {
       turnId,
       sessionId: workingSession?.sessionId ?? null,
@@ -21086,7 +22006,8 @@ class ConversationService {
       modeContext: requestedMode,
       agentId: conversationAgentId,
       status: "streaming",
-      workTrace: createDraftWorkTrace()
+      workTrace: createDraftWorkTrace(),
+      branchId
     });
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, userMessage);
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
@@ -21181,9 +22102,22 @@ class ConversationService {
     const withWorkTrace = (workTrace) => ({ workTrace });
     let rawResponse = "";
     let visibleResponse = "";
+    let currentSegmentText = "";
+    let currentSegmentThinking = "";
+    let segmentSeq = 1;
+    let segmentHasTools = false;
+    let pendingNewSegment = false;
+    const currentSegmentId = () => `runtime-segment-${segmentSeq}`;
     let errorViewModel = null;
     let llmDiagnostic = null;
     const routePreflight = resolveAgentRoutePreflight(conversationAgentId);
+    const segmentThinkingPresentation = () => routePreflight.ok ? resolveThinkingPresentation(routePreflight.routeCapability.reasoningDelivery, Boolean(currentSegmentThinking.trim())) : "none";
+    const currentSegmentOptions = () => ({
+      segmentId: currentSegmentId(),
+      segmentSummary: currentSegmentText.trim() || void 0,
+      segmentThinking: currentSegmentThinking.trim() || void 0,
+      segmentThinkingPresentation: segmentThinkingPresentation()
+    });
     if (!routePreflight.ok) {
       llmDiagnostic = routePreflight.diagnostic;
       errorViewModel = {
@@ -21219,7 +22153,7 @@ class ConversationService {
         const allowedToolNames = resolveAgentToolAllowlist(conversationAgentId, "investigate").map((toolName) => normalizeToolName(toolName));
         const projectRootPath = input.context.projectId ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null : null;
         const memoryIndex = await agentOrchestrator.getMemoryIndex();
-        const systemPrompt = this.promptAssembler.assembleSystemPrompt({
+        const promptContext = {
           workDir: projectRootPath ?? "",
           tools: allowedToolNames,
           memoryIndex: memoryIndex || void 0,
@@ -21232,7 +22166,9 @@ class ConversationService {
           routeCapability: routePreflight.routeCapability,
           permissionSettings: settingsService.getAll().agentRuntime.permissions,
           allowedToolNames
-        });
+        };
+        const systemPrompt = this.promptAssembler.assembleSystemPrompt(promptContext);
+        const promptMetrics = this.promptAssembler.measureSections(promptContext);
         const responseText = await agentOrchestrator.sendProfileMessage(
           conversationAgentId,
           input.rawMessage,
@@ -21244,6 +22180,7 @@ class ConversationService {
             projectRootPath,
             projectId: input.context.projectId,
             systemPrompt,
+            promptMetrics,
             maxTokens: 1200,
             temperature: 0.35,
             signal: abortController.signal,
@@ -21274,27 +22211,55 @@ class ConversationService {
               }
               if (event.type === "assistant.delta") {
                 const chunk = typeof event.payload.text === "string" ? event.payload.text : "";
-                rawResponse += chunk;
-                const nextVisible = rawResponse;
-                if (nextVisible.length > visibleResponse.length) {
-                  visibleResponse = nextVisible;
+                if (chunk) {
+                  if (pendingNewSegment) {
+                    segmentSeq += 1;
+                    currentSegmentText = "";
+                    currentSegmentThinking = "";
+                    segmentHasTools = false;
+                    pendingNewSegment = false;
+                    visibleResponse = "";
+                  }
+                  rawResponse += chunk;
+                  currentSegmentText += chunk;
+                  visibleResponse = currentSegmentText;
                   commitVisibleAssistantText();
+                }
+              }
+              if (event.type === "assistant.thinking_delta") {
+                const chunk = typeof event.payload.text === "string" ? event.payload.text : "";
+                if (chunk) {
+                  currentSegmentThinking += chunk;
+                  commitAssistantMessage("message_patched", {
+                    workTrace: upsertSegmentNarration(
+                      assistantMessage.workTrace,
+                      currentSegmentId(),
+                      void 0,
+                      currentSegmentThinking,
+                      segmentThinkingPresentation()
+                    )
+                  });
+                }
+              }
+              if (event.type === "assistant.thinking_end") {
+                const text = typeof event.payload.text === "string" ? event.payload.text.trim() : "";
+                if (text && text.length >= currentSegmentThinking.length) {
+                  currentSegmentThinking = text;
+                  commitAssistantMessage("message_patched", {
+                    workTrace: upsertSegmentNarration(
+                      assistantMessage.workTrace,
+                      currentSegmentId(),
+                      void 0,
+                      currentSegmentThinking,
+                      segmentThinkingPresentation()
+                    )
+                  });
                 }
               }
               if (event.type === "diagnostic") {
                 const payload = event.payload;
                 const summary = typeof payload.message === "string" && payload.message ? payload.message : "Received runtime diagnostic.";
                 if (payload.code === "MODEL_THINKING_STARTED" || payload.code === "MODEL_THINKING_COMPLETED") {
-                  commitAssistantMessage("message_patched", {
-                    workTrace: upsertWorkBlock(assistantMessage.workTrace, "runtime-reasoning", {
-                      kind: "reasoning",
-                      stage: "respond",
-                      status: payload.code === "MODEL_THINKING_STARTED" ? "running" : "complete",
-                      title: "整理思路",
-                      summary,
-                      completedAt: payload.code === "MODEL_THINKING_COMPLETED" ? nowMs() : void 0
-                    })
-                  });
                   return;
                 }
                 commitAssistantMessage("message_patched", {
@@ -21310,6 +22275,8 @@ class ConversationService {
               if (event.type === "tool.requested") {
                 const payload = event.payload;
                 if (payload.toolCall?.id && payload.toolCall.name) {
+                  const segmented = isSegmentTool(String(payload.toolCall.name));
+                  if (segmented) segmentHasTools = true;
                   commitAssistantMessage("message_patched", {
                     workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                       id: String(payload.toolCall.id),
@@ -21317,11 +22284,13 @@ class ConversationService {
                       status: "pending",
                       argsPreview: JSON.stringify(payload.toolCall.arguments ?? {}).slice(0, 600),
                       startedAt: nowMs()
-                    })
+                    }, segmented ? currentSegmentOptions() : void 0)
                   });
                 }
               }
               if (event.type === "tool.started") {
+                const segmented = isSegmentTool(String(event.payload.toolName));
+                if (segmented) segmentHasTools = true;
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                     id: String(event.payload.toolCallId),
@@ -21329,11 +22298,13 @@ class ConversationService {
                     status: "running",
                     argsPreview: JSON.stringify(event.payload.args ?? {}).slice(0, 600),
                     startedAt: nowMs()
-                  })
+                  }, segmented ? currentSegmentOptions() : void 0)
                 });
               }
               if (event.type === "tool.denied") {
                 const reason = typeof event.payload.reason === "string" ? event.payload.reason : "Profile policy denied this tool call.";
+                const segmentedDenied = isSegmentTool(String(event.payload.toolName));
+                if (segmentedDenied) segmentHasTools = true;
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                     id: String(event.payload.toolCallId),
@@ -21342,7 +22313,7 @@ class ConversationService {
                     resultPreview: JSON.stringify(event.payload.result ?? { reason }).slice(0, 800),
                     error: reason,
                     completedAt: nowMs()
-                  })
+                  }, segmentedDenied ? currentSegmentOptions() : void 0)
                 });
               }
               if (event.type === "approval.requested") {
@@ -21372,7 +22343,7 @@ class ConversationService {
                   toolName,
                   status: "running",
                   resultPreview: reason
-                });
+                }, currentSegmentOptions());
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(traceWithTool, `runtime-approval-${approvalId}`, {
                     kind: "approval",
@@ -21433,8 +22404,13 @@ class ConversationService {
                 if (!(isAskUserTool && result?.ok)) {
                   toolCallPatch.resultPreview = JSON.stringify(event.payload.result ?? {}).slice(0, 800);
                 }
+                const segmentedCompleted = isSegmentTool(String(event.payload.toolName));
                 commitAssistantMessage("message_patched", {
-                  workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, toolCallPatch)
+                  workTrace: upsertRuntimeToolCall(
+                    assistantMessage.workTrace,
+                    toolCallPatch,
+                    segmentedCompleted ? currentSegmentOptions() : void 0
+                  )
                 });
               }
               if (event.type === "task.created" || event.type === "task.updated") {
@@ -21489,6 +22465,26 @@ class ConversationService {
                 });
               }
               if (event.type === "assistant.completed") {
+                const payload = event.payload;
+                const narration = typeof payload.text === "string" ? payload.text.trim() : "";
+                const thinking = (typeof payload.thinkingText === "string" ? payload.thinkingText.trim() : "") || currentSegmentThinking.trim();
+                if (thinking) {
+                  currentSegmentThinking = thinking;
+                }
+                if (narration || thinking) {
+                  commitAssistantMessage("message_patched", {
+                    workTrace: upsertSegmentNarration(
+                      assistantMessage.workTrace,
+                      currentSegmentId(),
+                      narration || void 0,
+                      thinking || void 0,
+                      thinking ? segmentThinkingPresentation() : void 0
+                    )
+                  });
+                }
+                if (segmentHasTools) {
+                  pendingNewSegment = true;
+                }
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, "assistant-output", {
                     kind: "output",
@@ -21540,6 +22536,7 @@ class ConversationService {
         };
         rawResponse = llmDiagnostic.userMessage;
         visibleResponse = llmDiagnostic.userMessage;
+        currentSegmentText = llmDiagnostic.userMessage;
         recordLlmDiagnostic(input.context, llmDiagnostic);
         commitVisibleAssistantText();
       }
@@ -21548,7 +22545,7 @@ class ConversationService {
       this.clearActiveTurn(assistantMessage.turnId, abortController);
       return;
     }
-    const assistantContent = (rawResponse || visibleResponse).trim();
+    const assistantContent = (currentSegmentText.trim() || rawResponse || visibleResponse).trim();
     visibleResponse = assistantContent;
     const isRouteMissingDiagnostic = llmDiagnostic?.code === "CONVERSATION_LLM_ROUTE_MISSING";
     const finalStatus = errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete";
@@ -21703,11 +22700,12 @@ function registerConversationHandlers(context2) {
   });
   electron.ipcMain.handle("conversation:getHistory", async (_event, sessionId) => {
     if (!sessionId) {
-      return { messages: [] };
+      return { messages: [], branchState: null };
     }
-    return {
-      messages: await conversationService.getHistory(sessionId)
-    };
+    return conversationService.getHistory(sessionId);
+  });
+  electron.ipcMain.handle("conversation:switchBranch", async (_event, request2) => {
+    return conversationService.switchConversationBranch(request2);
   });
   electron.ipcMain.handle("conversation:clearHistory", async (_event, sessionId) => {
     if (!sessionId) {
@@ -21747,242 +22745,6 @@ function registerConversationHandlers(context2) {
   });
   electron.ipcMain.handle("conversation:answerToolApproval", async (_event, request2) => {
     return conversationService.answerToolApproval(request2);
-  });
-}
-const execFileAsync = util.promisify(child_process.execFile);
-const DEFAULT_MAX_BUFFER = 2 * 1024 * 1024;
-const DEFAULT_DIFF_BYTES = 128 * 1024;
-async function runGit(cwd, args, maxBuffer = DEFAULT_MAX_BUFFER) {
-  try {
-    const result = await execFileAsync("git", ["-c", "core.quotepath=false", ...args], {
-      cwd,
-      encoding: "utf8",
-      maxBuffer,
-      windowsHide: true
-    });
-    return {
-      stdout: String(result.stdout ?? ""),
-      stderr: String(result.stderr ?? "")
-    };
-  } catch (error) {
-    const err = error;
-    const stderr = String(err.stderr ?? "");
-    const stdout = String(err.stdout ?? "");
-    throw new Error((stderr || stdout || err.message).trim());
-  }
-}
-async function resolveCurrentGitProject(context2) {
-  const projectId = context2.state.currentProjectId;
-  if (!projectId) {
-    throw new Error("No project is selected.");
-  }
-  const project = storageAdapter.getProjectById(projectId);
-  if (!project) {
-    throw new Error(`Project not found: ${projectId}`);
-  }
-  const projectRoot = path.resolve(project.rootPath);
-  const { stdout } = await runGit(projectRoot, ["rev-parse", "--show-toplevel"]);
-  const gitRoot = path.resolve(stdout.trim());
-  if (!gitRoot) {
-    throw new Error("Current project is not a git repository.");
-  }
-  return {
-    projectId,
-    projectRoot,
-    gitRoot
-  };
-}
-function validateGitPath(input) {
-  const value = String(input ?? "").trim().replace(/\\/g, "/");
-  if (!value) {
-    throw new Error("Path is required.");
-  }
-  if (value.includes("\0") || value.startsWith("/") || /^[A-Za-z]:/.test(value)) {
-    throw new Error(`Invalid git path: ${input}`);
-  }
-  const segments = value.split("/");
-  if (segments.includes("..")) {
-    throw new Error(`Invalid git path: ${input}`);
-  }
-  return value;
-}
-function parseBranchLine(line) {
-  const content = line.replace(/^##\s*/, "").trim();
-  let branch = content;
-  let upstream;
-  let ahead = 0;
-  let behind = 0;
-  const trackingMatch = content.match(/\s+\[([^\]]+)\]$/);
-  const tracking = trackingMatch?.[1];
-  const withoutTracking = trackingMatch ? content.slice(0, trackingMatch.index).trim() : content;
-  const upstreamParts = withoutTracking.split("...");
-  branch = upstreamParts[0]?.trim() || "HEAD";
-  upstream = upstreamParts[1]?.trim() || void 0;
-  if (branch.startsWith("No commits yet on ")) {
-    branch = branch.replace("No commits yet on ", "").trim();
-  }
-  if (tracking) {
-    const aheadMatch = tracking.match(/ahead\s+(\d+)/);
-    const behindMatch = tracking.match(/behind\s+(\d+)/);
-    ahead = aheadMatch ? Number(aheadMatch[1]) : 0;
-    behind = behindMatch ? Number(behindMatch[1]) : 0;
-  }
-  return { branch, upstream, ahead, behind };
-}
-function resolveChangeKind(indexStatus, workingTreeStatus) {
-  const joined = `${indexStatus}${workingTreeStatus}`;
-  if (joined.includes("?")) return "untracked";
-  if (joined.includes("U")) return "unmerged";
-  if (joined.includes("R")) return "renamed";
-  if (joined.includes("C")) return "copied";
-  if (joined.includes("A")) return "added";
-  if (joined.includes("D")) return "deleted";
-  if (joined.includes("T")) return "typechange";
-  if (joined.includes("M")) return "modified";
-  return "unknown";
-}
-function parseStatusFile(line) {
-  if (line.length < 4) {
-    return null;
-  }
-  const indexStatus = line[0] === " " ? "" : line[0];
-  const workingTreeStatus = line[1] === " " ? "" : line[1];
-  const rawPath = line.slice(3).trim();
-  if (!rawPath) {
-    return null;
-  }
-  const renameParts = rawPath.split(" -> ");
-  const isRename = renameParts.length === 2;
-  const filePath = isRename ? renameParts[1] : rawPath;
-  const originalPath = isRename ? renameParts[0] : void 0;
-  return {
-    path: filePath,
-    originalPath,
-    indexStatus,
-    workingTreeStatus,
-    kind: resolveChangeKind(indexStatus, workingTreeStatus),
-    staged: Boolean(indexStatus && indexStatus !== "?"),
-    unstaged: Boolean(workingTreeStatus || indexStatus === "?")
-  };
-}
-function parseStatus(project, output) {
-  const lines = output.split(/\r?\n/).filter((line) => line.length > 0);
-  const branchLine = lines.find((line) => line.startsWith("## ")) ?? "## HEAD";
-  const branch = parseBranchLine(branchLine);
-  const files = lines.filter((line) => !line.startsWith("## ")).map(parseStatusFile).filter((file) => Boolean(file));
-  return {
-    projectId: project.projectId,
-    rootPath: project.gitRoot,
-    ...branch,
-    clean: files.length === 0,
-    files,
-    stagedCount: files.filter((file) => file.staged).length,
-    unstagedCount: files.filter((file) => file.unstaged).length,
-    untrackedCount: files.filter((file) => file.kind === "untracked").length
-  };
-}
-async function getStatus(context2) {
-  const project = await resolveCurrentGitProject(context2);
-  const { stdout } = await runGit(project.gitRoot, ["status", "--porcelain=v1", "-b", "-uall"]);
-  return parseStatus(project, stdout);
-}
-function truncate(text, maxBytes) {
-  if (Buffer.byteLength(text, "utf8") <= maxBytes) {
-    return { text, truncated: false };
-  }
-  const headBytes = Math.floor(maxBytes * 0.75);
-  const tailBytes = Math.floor(maxBytes * 0.15);
-  return {
-    text: `${text.slice(0, headBytes)}
-... [truncated] ...
-${text.slice(text.length - tailBytes)}`,
-    truncated: true
-  };
-}
-async function getDiff(context2, request2) {
-  try {
-    const project = await resolveCurrentGitProject(context2);
-    const pathspec = request2?.path ? ["--", validateGitPath(request2.path)] : [];
-    const scope = request2?.staged ? ["--cached"] : [];
-    const [{ stdout: stat }, { stdout: patch }] = await Promise.all([
-      runGit(project.gitRoot, ["diff", "--stat", ...scope, ...pathspec]),
-      runGit(project.gitRoot, ["diff", ...scope, ...pathspec], DEFAULT_MAX_BUFFER)
-    ]);
-    const maxBytes = Math.max(1024, Math.min(request2?.maxBytes ?? DEFAULT_DIFF_BYTES, DEFAULT_MAX_BUFFER));
-    const truncated = truncate(patch || stat || "No diff.", maxBytes);
-    return {
-      success: true,
-      rootPath: project.gitRoot,
-      stat: stat || "No diff.",
-      patch: truncated.text,
-      truncated: truncated.truncated
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error)
-    };
-  }
-}
-async function runGitAction(context2, args) {
-  try {
-    const project = await resolveCurrentGitProject(context2);
-    const { stdout, stderr } = await runGit(project.gitRoot, args);
-    return {
-      success: true,
-      status: await getStatus(context2),
-      output: [stdout.trim(), stderr.trim()].filter(Boolean).join("\n")
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error)
-    };
-  }
-}
-function failGitAction(error) {
-  return {
-    success: false,
-    error: error instanceof Error ? error.message : String(error)
-  };
-}
-function registerGitHandlers(context2) {
-  electron.ipcMain.handle("git:getStatus", async () => {
-    try {
-      return {
-        success: true,
-        status: await getStatus(context2)
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
-  electron.ipcMain.handle("git:getDiff", async (_event, request2) => getDiff(context2, request2));
-  electron.ipcMain.handle("git:stage", async (_event, request2) => {
-    try {
-      return await runGitAction(context2, ["add", "--", validateGitPath(request2.path)]);
-    } catch (error) {
-      return failGitAction(error);
-    }
-  });
-  electron.ipcMain.handle("git:stageAll", async () => runGitAction(context2, ["add", "--all"]));
-  electron.ipcMain.handle("git:unstage", async (_event, request2) => {
-    try {
-      return await runGitAction(context2, ["restore", "--staged", "--", validateGitPath(request2.path)]);
-    } catch (error) {
-      return failGitAction(error);
-    }
-  });
-  electron.ipcMain.handle("git:unstageAll", async () => runGitAction(context2, ["restore", "--staged", "--", "."]));
-  electron.ipcMain.handle("git:commit", async (_event, request2) => {
-    const message = String(request2?.message ?? "").trim();
-    if (!message) {
-      return { success: false, error: "Commit message is required." };
-    }
-    return runGitAction(context2, ["commit", "-m", message]);
   });
 }
 const STALE_RECOVERABLE_RUN_STATUSES = [
@@ -23299,533 +24061,6 @@ function registerToolEvidenceHandlers(context2) {
     return events;
   });
 }
-const BLOCKER_CODES = {
-  BLOCKED_LLM_ROUTE_MISSING: {
-    code: "BLOCKED_LLM_ROUTE_MISSING"
-  },
-  BLOCKED_LLM_PROVIDER_MISSING: {
-    code: "BLOCKED_LLM_PROVIDER_MISSING"
-  },
-  BLOCKED_LLM_SECRET_MISSING: {
-    code: "BLOCKED_LLM_SECRET_MISSING"
-  },
-  BLOCKED_LLM_MODEL_MISSING: {
-    code: "BLOCKED_LLM_MODEL_MISSING"
-  },
-  BLOCKED_LLM_PROVIDER_UNAVAILABLE: {
-    code: "BLOCKED_LLM_PROVIDER_UNAVAILABLE"
-  },
-  BLOCKED_LLM_REQUEST_FAILED: {
-    code: "BLOCKED_LLM_REQUEST_FAILED"
-  }
-};
-class DebuggerLlmBlockerError extends Error {
-  blocker;
-  constructor(blocker) {
-    super(blocker.reason);
-    this.name = "DebuggerLlmBlockerError";
-    this.blocker = blocker;
-  }
-}
-function makeBlocker(code, reason, refs = []) {
-  return {
-    code,
-    reason,
-    refs,
-    detectedAt: (/* @__PURE__ */ new Date()).toISOString()
-  };
-}
-function extractTextContent(content) {
-  if (typeof content === "string") {
-    return content.trim();
-  }
-  return content.map((block) => {
-    if (block.type === "text") {
-      return block.text || "";
-    }
-    if (block.type === "tool_result") {
-      return block.content || "";
-    }
-    return "";
-  }).join("\n").trim();
-}
-function extractBalancedJsonFragment(text, opening) {
-  const start = text.indexOf(opening);
-  if (start < 0) {
-    return null;
-  }
-  const closing = opening === "{" ? "}" : "]";
-  let depth = 0;
-  let inString = false;
-  let escaping = false;
-  for (let index = start; index < text.length; index += 1) {
-    const char = text[index];
-    if (inString) {
-      if (escaping) {
-        escaping = false;
-        continue;
-      }
-      if (char === "\\") {
-        escaping = true;
-        continue;
-      }
-      if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-    if (char === '"') {
-      inString = true;
-      continue;
-    }
-    if (char === opening) {
-      depth += 1;
-      continue;
-    }
-    if (char === closing) {
-      depth -= 1;
-      if (depth === 0) {
-        return text.slice(start, index + 1);
-      }
-    }
-  }
-  return null;
-}
-function extractJsonCandidate(text) {
-  const trimmed = text.trim();
-  if (!trimmed) {
-    throw new Error("LLM response was empty");
-  }
-  try {
-    JSON.parse(trimmed);
-    return trimmed;
-  } catch {
-  }
-  const fencedMatch = trimmed.match(/```json\s*([\s\S]*?)```/i) || trimmed.match(/```\s*([\s\S]*?)```/i);
-  if (fencedMatch?.[1]) {
-    const candidate = fencedMatch[1].trim();
-    JSON.parse(candidate);
-    return candidate;
-  }
-  const balancedObject = extractBalancedJsonFragment(trimmed, "{");
-  if (balancedObject) {
-    JSON.parse(balancedObject);
-    return balancedObject;
-  }
-  const balancedArray = extractBalancedJsonFragment(trimmed, "[");
-  if (balancedArray) {
-    JSON.parse(balancedArray);
-    return balancedArray;
-  }
-  const objectStart = trimmed.indexOf("{");
-  const objectEnd = trimmed.lastIndexOf("}");
-  if (objectStart >= 0 && objectEnd > objectStart) {
-    const candidate = trimmed.slice(objectStart, objectEnd + 1);
-    JSON.parse(candidate);
-    return candidate;
-  }
-  const arrayStart = trimmed.indexOf("[");
-  const arrayEnd = trimmed.lastIndexOf("]");
-  if (arrayStart >= 0 && arrayEnd > arrayStart) {
-    const candidate = trimmed.slice(arrayStart, arrayEnd + 1);
-    JSON.parse(candidate);
-    return candidate;
-  }
-  throw new Error("LLM response did not contain valid JSON");
-}
-function shouldRetryStructuredLlmError(error) {
-  const message = error instanceof Error ? error.message : String(error);
-  return /LLM response was empty|did not contain valid JSON|Unexpected non-whitespace character after JSON|OpenRouter API error: 5\d\d|timed out|timeout/i.test(message);
-}
-function readRouteProtocol(route) {
-  return route.provider.protocol ?? null;
-}
-function shouldUseNativeJsonObject(route) {
-  const protocol = readRouteProtocol(route);
-  const modelId = route.modelId.toLowerCase();
-  if (!protocol || protocol === "AnthropicMessages") {
-    return false;
-  }
-  if (/moonshot|kimi/.test(modelId)) {
-    return false;
-  }
-  return true;
-}
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-class DebuggerLlmService {
-  runSummaries = /* @__PURE__ */ new Map();
-  resetRunSummary(runId) {
-    this.runSummaries.delete(runId);
-    this.broadcastRunUsage(runId);
-  }
-  getRunSummary(runId) {
-    const summary = this.runSummaries.get(runId);
-    if (!summary) {
-      return null;
-    }
-    return {
-      ...summary,
-      routesUsed: summary.routesUsed.map((entry) => ({ ...entry }))
-    };
-  }
-  getRunContextUsage(runId) {
-    const summary = this.runSummaries.get(runId);
-    if (!summary) {
-      return null;
-    }
-    const settings = settingsService.getAll();
-    const provider = settings.llm.providers.find((entry) => entry.id === summary.providerId);
-    const model = provider?.models.find((entry) => entry.id === summary.modelId) ?? null;
-    const contextWindowTokens = typeof model?.contextWindowTokens === "number" && model.contextWindowTokens > 0 ? model.contextWindowTokens : null;
-    const totalTokens = summary.totalInputTokens + summary.totalOutputTokens;
-    return {
-      runId,
-      providerId: summary.providerId,
-      modelId: summary.modelId,
-      inputTokens: summary.totalInputTokens,
-      outputTokens: summary.totalOutputTokens,
-      totalTokens,
-      contextWindowTokens,
-      usagePercent: contextWindowTokens ? Math.min(100, Math.max(0, Math.round(totalTokens / contextWindowTokens * 100))) : 0,
-      hasConfiguredContextWindow: Boolean(contextWindowTokens)
-    };
-  }
-  async refreshAccountRuntimeCredentials(route) {
-    if (route.provider.authMode !== "account") {
-      return;
-    }
-    await providerAccountAuthService.ensureRuntimeCredentials(route.providerId);
-  }
-  getRouteBlockers(agentIds, stage, settings = settingsService.getAll()) {
-    const blockers = [];
-    const seen = /* @__PURE__ */ new Set();
-    for (const agentId of agentIds) {
-      try {
-        this.resolveRoute(agentId, stage, settings);
-      } catch (error) {
-        if (!(error instanceof DebuggerLlmBlockerError)) {
-          throw error;
-        }
-        const key = `${error.blocker.code}:${agentId}`;
-        if (seen.has(key)) {
-          continue;
-        }
-        seen.add(key);
-        blockers.push(error.blocker);
-      }
-    }
-    return blockers;
-  }
-  resolveRoute(agentId, stage, settings = settingsService.getAll()) {
-    const requestedRoute = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
-    const resolution = resolveCompatibleAgentRoute(settings.llm.agentRoutes, settings.llm.providers, agentId);
-    const route = resolution.route;
-    if (!route?.providerId || !route.modelId) {
-      throw new DebuggerLlmBlockerError(makeBlocker(
-        BLOCKER_CODES.BLOCKED_LLM_ROUTE_MISSING.code,
-        `${agentId} is not bound to a provider/model route.`,
-        [`agent:${agentId}`]
-      ));
-    }
-    const provider = resolution.provider ?? settings.llm.providers.find((entry) => entry.id === route.providerId);
-    if (!provider || !provider.enabled) {
-      throw new DebuggerLlmBlockerError(makeBlocker(
-        BLOCKER_CODES.BLOCKED_LLM_PROVIDER_MISSING.code,
-        `${agentId} route points to an unavailable provider: ${route.providerId}.`,
-        [`agent:${agentId}`, `provider:${route.providerId}`]
-      ));
-    }
-    const model = provider.models.find((entry) => entry.enabled && entry.id === route.modelId);
-    if (!model) {
-      throw new DebuggerLlmBlockerError(makeBlocker(
-        BLOCKER_CODES.BLOCKED_LLM_MODEL_MISSING.code,
-        `${agentId} route points to a disabled or missing model: ${route.modelId}.`,
-        [`agent:${agentId}`, `provider:${provider.id}`, `model:${route.modelId}`]
-      ));
-    }
-    const secret = provider.authMode === "local" ? "local-provider" : provider.authMode === "environment" ? "environment-provider" : provider.authMode === "account" ? settingsService.getProviderOAuthSecret(provider.id, settings.workspace.rootPath) : settingsService.getProviderSecret(provider.id, settings.workspace.rootPath);
-    if (!secret.trim()) {
-      throw new DebuggerLlmBlockerError(makeBlocker(
-        BLOCKER_CODES.BLOCKED_LLM_SECRET_MISSING.code,
-        `${agentId} route provider is missing a usable secret: ${provider.id}.`,
-        [`agent:${agentId}`, `provider:${provider.id}`]
-      ));
-    }
-    return {
-      agentId,
-      stage,
-      provider,
-      providerId: provider.id,
-      modelId: route.modelId,
-      requestedModelId: resolution.requestedModelId ?? requestedRoute?.modelId,
-      remapReason: resolution.remapReason
-    };
-  }
-  async call(context2, request2) {
-    const settings = settingsService.getAll();
-    const route = this.resolveRoute(context2.agentId, context2.stage, settings);
-    if (process.env.RDC_AGENT_TEST_MODE === "1") {
-      const response = {
-        id: `test-llm-${Date.now()}`,
-        model: route.modelId,
-        content: "",
-        usage: {
-          inputTokens: 0,
-          outputTokens: 0
-        },
-        stopReason: "end_turn"
-      };
-      const text = "";
-      await this.recordCall(context2, route, response, "ok", "test-mode llm stub");
-      return {
-        route,
-        response,
-        text
-      };
-    }
-    await this.refreshAccountRuntimeCredentials(route);
-    llmAdapter.configure(settingsService.getLlmConfig());
-    try {
-      const response = await llmAdapter.chat({
-        ...request2,
-        model: route.modelId
-      }, route.providerId);
-      const text = extractTextContent(response.content);
-      await this.recordCall(context2, route, response, "ok", text || `${route.providerId}/${route.modelId}`);
-      return {
-        route,
-        response,
-        text
-      };
-    } catch (error) {
-      await this.recordFailure(context2, route, error instanceof Error ? error.message : String(error));
-      throw this.toRuntimeError(route, error);
-    }
-  }
-  async callStructured(input) {
-    if (process.env.RDC_AGENT_TEST_MODE === "1" && input.testValue !== void 0) {
-      const settings2 = settingsService.getAll();
-      const route2 = this.resolveRoute(input.agentId, input.stage, settings2);
-      const response = {
-        id: `test-llm-${Date.now()}`,
-        model: route2.modelId,
-        content: JSON.stringify(input.testValue),
-        usage: {
-          inputTokens: 0,
-          outputTokens: 0
-        },
-        stopReason: "end_turn"
-      };
-      const text = JSON.stringify(input.testValue);
-      const summary = input.auditSummary ? input.auditSummary(input.testValue, text) : text;
-      await this.recordCall(input, route2, response, "ok", summary);
-      return {
-        data: input.testValue,
-        call: {
-          route: route2,
-          response,
-          text
-        }
-      };
-    }
-    const settings = settingsService.getAll();
-    const route = this.resolveRoute(input.agentId, input.stage, settings);
-    await this.refreshAccountRuntimeCredentials(route);
-    llmAdapter.configure(settingsService.getLlmConfig());
-    const useNativeJsonObject = shouldUseNativeJsonObject(route);
-    let lastError;
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      try {
-        const response = await llmAdapter.chat({
-          messages: input.messages,
-          model: route.modelId,
-          maxTokens: input.maxTokens,
-          temperature: input.temperature,
-          responseFormat: useNativeJsonObject ? "json_object" : void 0
-        }, route.providerId);
-        const text = extractTextContent(response.content);
-        const data = input.parse(text);
-        const summary = input.auditSummary ? input.auditSummary(data, text) : text || `${route.providerId}/${route.modelId}`;
-        await this.recordCall(input, route, response, "ok", summary);
-        return {
-          data,
-          call: {
-            route,
-            response,
-            text
-          }
-        };
-      } catch (error) {
-        lastError = error;
-        if (attempt < 3 && shouldRetryStructuredLlmError(error)) {
-          await sleep(500 * (attempt + 1));
-          continue;
-        }
-        await this.recordFailure(
-          input,
-          route,
-          error instanceof Error ? error.message : String(error)
-        );
-        throw this.toRuntimeError(route, error);
-      }
-    }
-    await this.recordFailure(
-      input,
-      route,
-      lastError instanceof Error ? lastError.message : String(lastError)
-    );
-    throw this.toRuntimeError(route, lastError);
-  }
-  parseJson(text) {
-    return JSON.parse(extractJsonCandidate(text));
-  }
-  toRuntimeError(route, error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const providerUnavailable = /provider not found|provider disabled|provider not configured|no llm provider configured/i.test(message);
-    const code = providerUnavailable ? BLOCKER_CODES.BLOCKED_LLM_PROVIDER_UNAVAILABLE.code : BLOCKER_CODES.BLOCKED_LLM_REQUEST_FAILED.code;
-    return new DebuggerLlmBlockerError(makeBlocker(
-      code,
-      `${route.agentId} failed to call ${route.providerId}/${route.modelId}: ${message}`,
-      [`agent:${route.agentId}`, `provider:${route.providerId}`, `model:${route.modelId}`]
-    ));
-  }
-  async recordCall(context2, route, response, status, summary) {
-    this.updateRunSummary(context2, route, response, status);
-    runtimeLogService.log({
-      scope: context2.sessionId ? "session" : "app",
-      namespace: "llm",
-      severity: status === "ok" ? "success" : "error",
-      title: `${route.agentId} -> ${route.providerId}/${route.modelId}`,
-      summary,
-      detail: response.id ? `request=${response.id}` : void 0,
-      sessionId: context2.sessionId ?? null,
-      runId: context2.runId ?? null,
-      raw: {
-        agentId: route.agentId,
-        stage: route.stage,
-        providerId: route.providerId,
-        modelId: route.modelId,
-        requestedModelId: route.requestedModelId,
-        remapReason: route.remapReason,
-        requestId: response.id,
-        usage: response.usage
-      }
-    });
-    if (!context2.sessionId || !context2.runId) {
-      return;
-    }
-    const event = storageAdapter.createActionEvent({
-      runId: context2.runId,
-      sessionId: context2.sessionId,
-      agentId: route.agentId,
-      eventType: "llm_call",
-      status,
-      payload: {
-        agentId: route.agentId,
-        stage: route.stage,
-        providerId: route.providerId,
-        modelId: route.modelId,
-        requestedModelId: route.requestedModelId,
-        remapReason: route.remapReason,
-        requestId: response.id,
-        usage: response.usage,
-        summary
-      }
-    });
-    await this.appendBroadcastEvent(context2.sessionId, event);
-  }
-  async recordFailure(context2, route, errorMessage) {
-    this.updateRunSummary(context2, route, null, "error");
-    runtimeLogService.log({
-      scope: context2.sessionId ? "session" : "app",
-      namespace: "llm",
-      severity: "error",
-      title: `${route.agentId} -> ${route.providerId}/${route.modelId}`,
-      summary: errorMessage,
-      sessionId: context2.sessionId ?? null,
-      runId: context2.runId ?? null,
-      raw: {
-        agentId: route.agentId,
-        stage: route.stage,
-        providerId: route.providerId,
-        modelId: route.modelId,
-        requestedModelId: route.requestedModelId,
-        remapReason: route.remapReason
-      }
-    });
-    if (!context2.sessionId || !context2.runId) {
-      return;
-    }
-    const event = storageAdapter.createActionEvent({
-      runId: context2.runId,
-      sessionId: context2.sessionId,
-      agentId: route.agentId,
-      eventType: "llm_call",
-      status: "error",
-      payload: {
-        agentId: route.agentId,
-        stage: route.stage,
-        providerId: route.providerId,
-        modelId: route.modelId,
-        requestedModelId: route.requestedModelId,
-        remapReason: route.remapReason,
-        summary: errorMessage
-      }
-    });
-    await this.appendBroadcastEvent(context2.sessionId, event);
-  }
-  updateRunSummary(context2, route, response, status) {
-    if (!context2.runId) {
-      return;
-    }
-    const existing = this.runSummaries.get(context2.runId) ?? {
-      providerId: route.providerId,
-      modelId: route.modelId,
-      successfulCallCount: 0,
-      failedCallCount: 0,
-      totalInputTokens: 0,
-      totalOutputTokens: 0,
-      firstRequestId: void 0,
-      routesUsed: []
-    };
-    existing.providerId = existing.providerId || route.providerId;
-    existing.modelId = existing.modelId || route.modelId;
-    if (status === "ok") {
-      existing.successfulCallCount += 1;
-      if (!existing.firstRequestId && response?.id) {
-        existing.firstRequestId = response.id;
-      }
-      existing.totalInputTokens += response?.usage.inputTokens ?? 0;
-      existing.totalOutputTokens += response?.usage.outputTokens ?? 0;
-    } else {
-      existing.failedCallCount += 1;
-    }
-    existing.routesUsed.push({
-      agentId: route.agentId,
-      stage: route.stage,
-      providerId: route.providerId,
-      modelId: route.modelId,
-      requestId: response?.id,
-      status
-    });
-    this.runSummaries.set(context2.runId, existing);
-    this.broadcastRunUsage(context2.runId);
-  }
-  broadcastRunUsage(runId) {
-    const usage = this.getRunContextUsage(runId);
-    if (!usage) {
-      return;
-    }
-    workflowProjectionPublisher.publishRunUsage(usage);
-  }
-  async appendBroadcastEvent(sessionId, event) {
-    await storageAdapter.appendActionEvent(sessionId, event);
-    workflowProjectionPublisher.publishEvidenceEvent(event);
-  }
-}
-const debuggerLlmService = new DebuggerLlmService();
 function registerWorkflowHandlers(context2) {
   const { state: state2 } = context2;
   electron.ipcMain.handle("workflow:getState", async () => {
@@ -23861,13 +24096,13 @@ function registerWorkflowHandlers(context2) {
     context2.broadcastToRenderer("context:changed", rdxSessionService.snapshotContext());
     return result;
   });
-  electron.ipcMain.handle("workflow:getRunUsage", async (_event, runId) => {
-    const targetRunId = runId || state2.currentRunId;
-    if (!targetRunId) {
+  electron.ipcMain.handle("workflow:getRunUsage", async (_event, runId, sessionId) => {
+    const targetKey = runId || state2.currentRunId || sessionId;
+    if (!targetKey) {
       return { usage: null };
     }
     return {
-      usage: debuggerLlmService.getRunContextUsage(targetRunId)
+      usage: debuggerLlmService.getRunContextUsage(targetKey)
     };
   });
   electron.ipcMain.handle("workflow:listRuns", async () => {
@@ -24124,7 +24359,6 @@ function registerIPCHandlers() {
   preloadLlmConfig();
   registerShellHandlers();
   registerConversationHandlers(context);
-  registerGitHandlers(context);
   registerWorkflowHandlers(context);
   registerProjectSessionHandlers(context);
   registerRuntimeTerminalHandlers();

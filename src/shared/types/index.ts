@@ -10,7 +10,6 @@ export type {
   DialogApi,
   EventSubscriptionApi,
   EvidenceApi,
-  GitApi,
   LlmApi,
   PlatformApi,
   ProjectApi,
@@ -72,6 +71,7 @@ export type {
   AgentRouteCapability,
   ModelProviderCapabilityMatrix,
   ReasoningVisibility,
+  ReasoningDelivery,
   ToolCallingMode,
 } from './agentRuntime';
 export type {
@@ -83,21 +83,13 @@ export type {
 export type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from './device';
 export type { ActionEvent, EventStatus, EventType } from './evidence';
 export type { ArtifactRecord, HarnessTask, RunCapsule, VerificationResult } from './harness';
-export type {
-  GitActionResult,
-  GitCommitRequest,
-  GitDiffRequest,
-  GitDiffResult,
-  GitFileChangeKind,
-  GitPathRequest,
-  GitStatusFile,
-  GitStatusSummary,
-} from './git';
 export type { LLMConfig, LLMMessage, LLMRequest, LLMResponse, LLMStreamEvent } from './llm';
 export type { RuntimeLogEntry, RuntimeLogScope, RuntimeLogSeverity } from './runtimeLog';
 export type {
   CaptureDescriptor,
   ContextSnapshot,
+  ContextUsageBreakdownEntry,
+  ContextUsageBreakdownId,
   DebugSessionStartRequest,
   OpenedCaptureState,
   ProjectInputRecord,

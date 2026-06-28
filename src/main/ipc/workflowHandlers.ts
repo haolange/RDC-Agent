@@ -47,14 +47,14 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
     return result;
   });
 
-  ipcMain.handle('workflow:getRunUsage', async (_event, runId?: string) => {
-    const targetRunId = runId || state.currentRunId;
-    if (!targetRunId) {
+  ipcMain.handle('workflow:getRunUsage', async (_event, runId?: string, sessionId?: string) => {
+    const targetKey = runId ?? sessionId ?? state.currentRunId;
+    if (!targetKey) {
       return { usage: null as RunContextUsageSummary | null };
     }
 
     return {
-      usage: debuggerLlmService.getRunContextUsage(targetRunId),
+      usage: debuggerLlmService.getRunContextUsage(targetKey),
     };
   });
 
