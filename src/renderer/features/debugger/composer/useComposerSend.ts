@@ -32,7 +32,6 @@ export function useComposerSend(options: {
   currentRun: RunSummary | null;
   selectedDeviceEntry: { id: string } | undefined;
   hasOpenedCaptureForCurrentProject: boolean;
-  openCaptureRequiredLabel: string;
   hasActiveDebugRun: boolean;
   hasActiveConversationTurn: boolean;
   promptValue: string;

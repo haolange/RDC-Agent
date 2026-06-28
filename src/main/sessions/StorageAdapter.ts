@@ -580,6 +580,29 @@ export class StorageAdapter {
     return path.join(location.sessionPath, 'conversation.jsonl');
   }
 
+  getConversationBranchStatePath(sessionId: string): string {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) {
+      throw new Error(`Session not found for conversation branches: ${sessionId}`);
+    }
+    return path.join(location.sessionPath, 'conversation-branches.json');
+  }
+
+  readConversationBranchState(sessionId: string): import('@shared/types/conversationBranch').ConversationBranchState | null {
+    const filePath = this.getConversationBranchStatePath(sessionId);
+    if (!fs.existsSync(filePath)) {
+      return null;
+    }
+    return this.readJson<import('@shared/types/conversationBranch').ConversationBranchState>(filePath);
+  }
+
+  writeConversationBranchState(
+    sessionId: string,
+    state: import('@shared/types/conversationBranch').ConversationBranchState,
+  ): void {
+    this.writeJson(this.getConversationBranchStatePath(sessionId), state);
+  }
+
   getSessionAttachmentsDir(sessionId: string): string {
     const location = this.findSessionLocation(sessionId);
     if (!location) {

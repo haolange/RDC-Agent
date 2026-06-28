@@ -79,6 +79,7 @@ const createConversationApi = () => ({
   answerUserInput: (request) => electron.ipcRenderer.invoke("conversation:answerUserInput", request),
   answerToolApproval: (request) => electron.ipcRenderer.invoke("conversation:answerToolApproval", request),
   getHistory: (sessionId) => electron.ipcRenderer.invoke("conversation:getHistory", sessionId),
+  switchBranch: (request) => electron.ipcRenderer.invoke("conversation:switchBranch", request),
   clearHistory: (sessionId) => electron.ipcRenderer.invoke("conversation:clearHistory", sessionId),
   undoLastTurn: (sessionId) => electron.ipcRenderer.invoke("conversation:undoLastTurn", sessionId),
   compactHistory: (sessionId) => electron.ipcRenderer.invoke("conversation:compactHistory", sessionId),
@@ -122,15 +123,6 @@ const createEventSubscriptionApi = () => ({
   removeAllListeners: (channel) => {
     removeAllTrackedListeners(channel);
   }
-});
-const createGitApi = () => ({
-  getStatus: () => electron.ipcRenderer.invoke("git:getStatus"),
-  getDiff: (request) => electron.ipcRenderer.invoke("git:getDiff", request),
-  stage: (request) => electron.ipcRenderer.invoke("git:stage", request),
-  stageAll: () => electron.ipcRenderer.invoke("git:stageAll"),
-  unstage: (request) => electron.ipcRenderer.invoke("git:unstage", request),
-  unstageAll: () => electron.ipcRenderer.invoke("git:unstageAll"),
-  commit: (request) => electron.ipcRenderer.invoke("git:commit", request)
 });
 const createMemoryApi = () => ({
   list: () => electron.ipcRenderer.invoke("memory:list"),
@@ -237,7 +229,7 @@ const createWorkflowApi = () => ({
   getState: () => electron.ipcRenderer.invoke("workflow:getState"),
   resume: (sessionId) => electron.ipcRenderer.invoke("workflow:resume", sessionId),
   stop: (runId) => electron.ipcRenderer.invoke("workflow:stop", runId),
-  getRunUsage: (runId) => electron.ipcRenderer.invoke("workflow:getRunUsage", runId),
+  getRunUsage: (runId, sessionId) => electron.ipcRenderer.invoke("workflow:getRunUsage", runId, sessionId),
   listRuns: () => electron.ipcRenderer.invoke("workflow:listRuns"),
   listActiveRuns: () => electron.ipcRenderer.invoke("workflow:listActiveRuns")
 });
@@ -259,7 +251,6 @@ const electronAPI = {
   appShell: createAppShellApi(),
   conversation: createConversationApi(),
   command: createCommandApi(),
-  git: createGitApi(),
   selectFiles: dialogApi.selectFiles,
   selectRdcFiles: dialogApi.selectRdcFiles,
   selectDirectory: dialogApi.selectDirectory,

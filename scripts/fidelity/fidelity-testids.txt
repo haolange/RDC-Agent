@@ -25,6 +25,7 @@ composer-permission-pill
 composer-tool-approval-panel
 composer-usage-indicator
 composer-user-input-panel
+context-breakdown
 control-panel-scroll
 conversation-handoff-${handoff.agent}
 conversation-handoff-actions
@@ -32,12 +33,17 @@ conversation-thread
 cp-section-${id}
 cp-section-trace-lane-${id}
 empty-workbench-prompt
-empty-workbench-tool-${toolMode.id}
+empty-workbench-tool-${toolMode}
+memory-detail
+memory-editor
+memory-list
+memory-panel
 message-actions
 message-attachments
 message-bubble-assistant
 message-bubble-system
 message-bubble-user
+message-variant-navigator
 mode-menu-item-${agent.id}
 mode-menu-item-${mode.id}
 open-settings-entry
@@ -96,6 +102,7 @@ settings-provider-connect-save
 settings-provider-connect-test
 settings-provider-disconnect-${provider.id}
 settings-provider-environment-notice
+settings-provider-oauth-client-id
 settings-provider-oauth-code
 settings-provider-oauth-device-code
 settings-provider-oauth-start
@@ -145,6 +152,10 @@ trace-tool-action
 work-process
 work-process-approval
 work-process-block
+work-process-console
+work-process-result-preview
+work-process-section
+work-process-task
 work-process-tool-call
 work-process-user-input
 work-process-user-input-qa

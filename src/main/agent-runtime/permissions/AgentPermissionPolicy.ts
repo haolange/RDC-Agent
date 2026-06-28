@@ -1,6 +1,5 @@
 import * as os from 'os';
 import * as path from 'path';
-import type { AgentRole } from '@shared/types/agent';
 import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types/settings';
 import type { AgentTool } from '../agent/AgentTool';
 import type { ToolCall } from '../core/types';
@@ -16,7 +15,6 @@ export interface AgentPermissionDecision {
 }
 
 export interface AgentPermissionDecisionInput {
-  agentId: AgentRole;
   tool: AgentTool;
   toolCall: ToolCall;
   /** 当前激活项目根目录；权限边界以它为准，回退全局 settings.workspace.rootPath。 */

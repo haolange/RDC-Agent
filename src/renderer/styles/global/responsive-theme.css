@@ -153,17 +153,6 @@
     padding-inline: 12px;
   }
 
-  .composer-usage-tooltip {
-    right: auto;
-    left: 50%;
-    transform: translateX(-50%) translateY(4px);
-    min-width: 210px;
-  }
-
-  .composer-usage-indicator:hover .composer-usage-tooltip,
-  .composer-usage-indicator:focus-visible .composer-usage-tooltip {
-    transform: translateX(-50%) translateY(0);
-  }
 }
 
 /* Professional workstation polish */
@@ -309,13 +298,6 @@ body {
 
 .composer-attach-button,
 .composer-agent-pill,
-.composer-usage-indicator,
-.chat-send-button {
-  border-radius: 9px;
-}
-
-.composer-attach-button,
-.composer-agent-pill,
 .composer-usage-indicator {
   border-color: rgb(var(--token-border-default));
   background: rgb(var(--token-bg-panel));
@@ -333,10 +315,6 @@ body {
 .user-menu-settings-button:hover {
   background: rgb(var(--color-accent-500));
   box-shadow: none;
-}
-
-.button-sm {
-  min-height: 34px;
 }
 
 .footer-entry,
@@ -361,7 +339,6 @@ body {
 }
 
 .tooltip::after,
-.composer-usage-tooltip,
 .composer-agent-menu-popup,
 .shell-notice {
   border-radius: 10px;

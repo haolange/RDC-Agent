@@ -9,6 +9,7 @@ import type {
   ConversationMessage,
   ConversationMessageDiagnostic,
   ConversationRewriteFromMessageRequest,
+  ConversationThinkingPresentation,
   ConversationToolCall,
   ConversationWorkBlock,
   ConversationWorkTrace,
@@ -16,8 +17,14 @@ import type {
   ConversationStreamEvent,
   ConversationTurnResult,
 } from '@shared/types/conversation';
+import type {
+  ConversationBranchState,
+  ConversationSwitchBranchRequest,
+  ConversationSwitchBranchResult,
+} from '@shared/types/conversationBranch';
+import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import type { AgentRole } from '@shared/types/agent';
-import type { AgentRouteCapability } from '@shared/types/agentRuntime';
+import type { AgentRouteCapability, ReasoningDelivery } from '@shared/types/agentRuntime';
 import type {
   AppMode,
   OpenedCaptureState,
@@ -44,6 +51,28 @@ import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjec
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { AGENT_DESCRIPTIONS, AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import { normalizeToolName, resolveAgentToolAllowlist } from '../workflow/debugger/DebuggerRuntimePolicy';
+import {
+  createDefaultBranchState,
+  normalizeBranchId,
+  resolveVisibleConversationMessages,
+} from './ConversationBranchResolver';
+
+interface ConversationBranchTurnContext {
+  branchId: string;
+  forkId?: string;
+  variantIndex?: number;
+}
+
+function resolveThinkingPresentation(
+  reasoningDelivery: ReasoningDelivery | undefined,
+  hasThinking: boolean,
+): ConversationThinkingPresentation {
+  if (!hasThinking || !reasoningDelivery || reasoningDelivery === 'none' || reasoningDelivery === 'hidden') {
+    return 'none';
+  }
+  if (reasoningDelivery === 'summary-only') return 'summary';
+  return 'full';
+}
 
 interface ConversationContextInput extends ConversationSendRequest {
   fallbackProjectId?: string | null;
@@ -217,15 +246,30 @@ function finalizeTrace(
 function upsertRuntimeToolCall(
   trace: ConversationWorkTrace | null | undefined,
   patch: Partial<ConversationToolCall> & { id: string; toolName: string },
+  options?: {
+    segmentId?: string;
+    segmentSummary?: string;
+    segmentThinking?: string;
+    segmentThinkingPresentation?: ConversationThinkingPresentation;
+  },
 ): ConversationWorkTrace {
   const nextTrace = cloneTrace(trace);
-  const blockMeta = getRuntimeToolBlockMeta(patch.toolName);
+  const blockMeta = getRuntimeToolBlockMeta(patch.toolName, options?.segmentId);
   const blockId = blockMeta.id;
   let block = nextTrace.blocks.find((entry) => entry.id === blockId);
   if (!block) {
     block = createWorkBlock(blockId, blockMeta.title, blockMeta.stage, blockMeta.kind);
     block.status = 'running';
     nextTrace.blocks.push(block);
+  }
+  // Segment 工具块：增量写入轮次可见叙述（summary）与 thinking 全文（detail）。
+  if (options?.segmentId && blockId === options.segmentId) {
+    applySegmentNarrationFields(
+      block,
+      options.segmentSummary,
+      options.segmentThinking,
+      options.segmentThinkingPresentation,
+    );
   }
   const toolIndex = block.toolCalls.findIndex((toolCall) => toolCall.id === patch.id);
   if (toolIndex >= 0) {
@@ -254,7 +298,52 @@ function upsertRuntimeToolCall(
   return nextTrace;
 }
 
-function getRuntimeToolBlockMeta(toolName: string): Pick<ConversationWorkBlock, 'id' | 'title' | 'stage' | 'kind'> {
+/** summary = 轮次可见叙述（result text）；detail = 轮次 thinking 全文。以 turn 结束回填为权威。 */
+function applySegmentNarrationFields(
+  block: ConversationWorkBlock,
+  narration?: string,
+  thinking?: string,
+  thinkingPresentation?: ConversationThinkingPresentation,
+): void {
+  const nextNarration = narration?.trim();
+  const nextThinking = thinking?.trim();
+  if (nextNarration && (!block.summary || nextNarration.length >= block.summary.length)) {
+    block.summary = nextNarration;
+  }
+  if (nextThinking && (!block.detail || nextThinking.length >= block.detail.length)) {
+    block.detail = nextThinking;
+    const presentation = thinkingPresentation
+      ?? resolveThinkingPresentation(undefined, true);
+    if (presentation !== 'none') {
+      block.thinkingPresentation = presentation;
+    }
+  }
+}
+
+function upsertSegmentNarration(
+  trace: ConversationWorkTrace | null | undefined,
+  segmentId: string,
+  narration?: string,
+  thinking?: string,
+  thinkingPresentation?: ConversationThinkingPresentation,
+): ConversationWorkTrace {
+  const nextTrace = cloneTrace(trace);
+  let block = nextTrace.blocks.find((entry) => entry.id === segmentId);
+  if (!block) {
+    block = createWorkBlock(segmentId, '工具调用', 'tool', 'tool');
+    block.status = 'running';
+    nextTrace.blocks.push(block);
+  }
+  applySegmentNarrationFields(block, narration, thinking, thinkingPresentation);
+  nextTrace.status = 'running';
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+
+function getRuntimeToolBlockMeta(
+  toolName: string,
+  segmentId?: string,
+): Pick<ConversationWorkBlock, 'id' | 'title' | 'stage' | 'kind'> {
   const normalizedToolName = normalizeToolName(toolName);
   if (normalizedToolName === 'ask_user') {
     return {
@@ -273,12 +362,17 @@ function getRuntimeToolBlockMeta(toolName: string): Pick<ConversationWorkBlock, 
     };
   }
   return {
-    id: 'runtime-tools',
+    id: segmentId ?? 'runtime-tools',
     title: '工具调用',
     stage: 'tool',
     kind: 'tool',
   };
 }
+
+const isSegmentTool = (toolName: string): boolean => {
+  const normalized = normalizeToolName(toolName);
+  return normalized !== 'ask_user' && normalized !== 'agent_handoff';
+};
 
 function summarizeRuntimePayload(payload: AgentEvent['payload']): string {
   if ('message' in payload && typeof payload.message === 'string' && payload.message.trim()) {
@@ -310,6 +404,9 @@ function makeConversationMessage(
     status?: ConversationMessage['status'];
     workTrace?: ConversationWorkTrace | null;
     diagnostic?: ConversationMessage['diagnostic'];
+    branchId?: string;
+    forkId?: string;
+    variantIndex?: number;
   },
 ): ConversationMessage {
   const createdAt = nowMs();
@@ -328,6 +425,9 @@ function makeConversationMessage(
     workTrace: options.workTrace ?? null,
     diagnostic: options.diagnostic ?? null,
     attachments: options.attachments,
+    branchId: options.branchId ?? ROOT_BRANCH_ID,
+    forkId: options.forkId,
+    variantIndex: options.variantIndex,
     createdAt,
   };
 }
@@ -518,8 +618,16 @@ export class ConversationService {
    */
   private readonly pendingHandoffs = new Map<string, { toProfile: AgentRole; prompt: string }>();
 
-  async getHistory(sessionId: string): Promise<ConversationMessage[]> {
-    return storageAdapter.readConversationHistory(sessionId);
+  async getHistory(sessionId: string): Promise<{
+    messages: ConversationMessage[];
+    branchState: ConversationBranchState | null;
+  }> {
+    const allMessages = storageAdapter.readConversationHistory(sessionId);
+    const branchState = storageAdapter.readConversationBranchState(sessionId);
+    return {
+      messages: resolveVisibleConversationMessages(allMessages, branchState),
+      branchState,
+    };
   }
 
   async clearHistory(sessionId: string): Promise<ConversationMessage[]> {
@@ -636,22 +744,115 @@ export class ConversationService {
       throw new Error('Can only edit and resend an existing user message.');
     }
 
-    const removedTurnIds = new Set(history.slice(targetIndex).map((message) => message.turnId));
+    const downstreamTurnIds = new Set(
+      history.slice(targetIndex + 1).map((message) => message.turnId),
+    );
     for (const activeTurn of Array.from(this.activeTurns.values())) {
-      if (activeTurn.sessionId === sessionId && removedTurnIds.has(activeTurn.turnId)) {
+      if (activeTurn.sessionId === sessionId && downstreamTurnIds.has(activeTurn.turnId)) {
         activeTurn.stop();
       }
     }
 
-    const nextHistory = history.slice(0, targetIndex);
-    storageAdapter.writeConversationHistory(sessionId, nextHistory);
-    this.publishConversationTrace(sessionId, nextHistory, sessionId);
+    let branchState = storageAdapter.readConversationBranchState(sessionId) ?? createDefaultBranchState(sessionId);
+    const targetBranchId = normalizeBranchId(targetMessage.branchId);
+    const forkId = targetMessage.forkId ?? targetMessage.id;
+    const anchorMessageId = branchState.forks.find((fork) => fork.forkId === forkId)?.anchorMessageId ?? targetMessage.id;
+
+    let fork = branchState.forks.find((entry) => entry.forkId === forkId);
+    if (!fork) {
+      fork = {
+        forkId,
+        anchorMessageId,
+        activeBranchId: targetBranchId,
+        branches: [{
+          branchId: targetBranchId,
+          parentBranchId: null,
+          variantIndex: targetMessage.variantIndex ?? 0,
+          anchorUserMessageId: targetMessage.id,
+          rootTurnId: targetMessage.turnId,
+        }],
+      };
+      branchState.forks.push(fork);
+      if (!targetMessage.forkId) {
+        targetMessage.forkId = forkId;
+        targetMessage.variantIndex = targetMessage.variantIndex ?? 0;
+        storageAdapter.appendConversationMessage(sessionId, {
+          ...targetMessage,
+          updatedAt: nowMs(),
+        });
+      }
+    } else if (!fork.branches.some((branch) => branch.anchorUserMessageId === targetMessage.id)) {
+      const variantIndex = targetMessage.variantIndex ?? fork.branches.length;
+      if (!fork.branches.some((branch) => branch.variantIndex === variantIndex)) {
+        fork.branches.push({
+          branchId: targetBranchId,
+          parentBranchId: fork.branches[0]?.parentBranchId ?? null,
+          variantIndex,
+          anchorUserMessageId: targetMessage.id,
+          rootTurnId: targetMessage.turnId,
+        });
+      }
+    }
+
+    const newBranchId = generateEventId('branch');
+    const variantIndex = fork.branches.length;
+    fork.branches.push({
+      branchId: newBranchId,
+      parentBranchId: targetBranchId,
+      variantIndex,
+      anchorUserMessageId: '',
+      rootTurnId: '',
+    });
+    fork.activeBranchId = newBranchId;
+    branchState.activeLeafBranchId = newBranchId;
+    storageAdapter.writeConversationBranchState(sessionId, branchState);
 
     const updatedContext: ResolvedConversationContext = {
       ...context,
       session: storageAdapter.readSession(sessionId) ?? context.session,
     };
-    return this.startProfileTurn(updatedContext, input.mode, input.agentId ?? null, trimmed, input.attachments ?? []);
+    return this.startProfileTurn(
+      updatedContext,
+      input.mode,
+      input.agentId ?? null,
+      trimmed,
+      input.attachments ?? [],
+      {
+        branchId: newBranchId,
+        forkId,
+        variantIndex,
+      },
+      fork,
+    );
+  }
+
+  async switchConversationBranch(input: ConversationSwitchBranchRequest): Promise<ConversationSwitchBranchResult> {
+    const branchState = storageAdapter.readConversationBranchState(input.sessionId);
+    if (!branchState) {
+      return { success: false, messages: [], error: 'No conversation branch state found.' };
+    }
+    const fork = branchState.forks.find((entry) => entry.forkId === input.forkId);
+    const branch = fork?.branches.find((entry) => entry.branchId === input.branchId);
+    if (!fork || !branch) {
+      return { success: false, messages: [], error: 'Invalid conversation branch selection.' };
+    }
+
+    fork.activeBranchId = input.branchId;
+    branchState.activeLeafBranchId = input.branchId;
+    storageAdapter.writeConversationBranchState(input.sessionId, branchState);
+
+    const allMessages = storageAdapter.readConversationHistory(input.sessionId);
+    const visibleMessages = resolveVisibleConversationMessages(allMessages, branchState);
+    const tracePresentation = await traceService.buildConversationPresentation(input.sessionId, visibleMessages);
+    workflowProjectionPublisher.publishTraceProjectionChanged(input.sessionId, tracePresentation);
+    this.publishConversationTrace(input.sessionId, visibleMessages, input.sessionId);
+
+    return {
+      success: true,
+      messages: visibleMessages,
+      branchState,
+      tracePresentation,
+    };
   }
 
   private async resolveContext(input: ConversationContextInput): Promise<ResolvedConversationContext> {
@@ -687,6 +888,8 @@ export class ConversationService {
     requestedAgentId: string | null,
     rawMessage: string,
     pendingAttachments: ConversationAttachmentInput[],
+    branchContext?: ConversationBranchTurnContext,
+    forkToUpdate?: import('@shared/types/conversationBranch').ConversationFork,
   ): Promise<ConversationTurnResult> {
     let workingSession = context.session;
     if (!workingSession && context.projectId) {
@@ -711,6 +914,17 @@ export class ConversationService {
       ?? resolveConversationAgentId(requestedMode, requestedAgentId);
 
     const turnId = generateEventId('turn');
+    const sessionIdForBranch = workingSession?.sessionId ?? null;
+    let branchState = sessionIdForBranch
+      ? storageAdapter.readConversationBranchState(sessionIdForBranch)
+      : null;
+    if (sessionIdForBranch && !branchState) {
+      branchState = createDefaultBranchState(sessionIdForBranch);
+      storageAdapter.writeConversationBranchState(sessionIdForBranch, branchState);
+    }
+    const branchId = branchContext?.branchId
+      ?? branchState?.activeLeafBranchId
+      ?? ROOT_BRANCH_ID;
     const importedAttachments = workingSession
       ? storageAdapter.importSessionAttachments(
           workingSession.sessionId,
@@ -725,7 +939,23 @@ export class ConversationService {
       modeContext: requestedMode,
       attachments: importedAttachments,
       status: 'complete',
+      branchId,
+      forkId: branchContext?.forkId,
+      variantIndex: branchContext?.variantIndex,
     });
+    if (forkToUpdate && sessionIdForBranch && branchState) {
+      const pendingBranch = forkToUpdate.branches.find((entry) => entry.branchId === branchId);
+      if (pendingBranch) {
+        pendingBranch.anchorUserMessageId = userMessage.id;
+        pendingBranch.rootTurnId = turnId;
+      }
+      forkToUpdate.activeBranchId = branchId;
+      branchState.activeLeafBranchId = branchId;
+      storageAdapter.writeConversationBranchState(sessionIdForBranch, branchState);
+    } else if (sessionIdForBranch && branchState && branchContext?.branchId) {
+      branchState.activeLeafBranchId = branchContext.branchId;
+      storageAdapter.writeConversationBranchState(sessionIdForBranch, branchState);
+    }
     const assistantDraftMessage = makeConversationMessage('assistant', '', {
       turnId,
       sessionId: workingSession?.sessionId ?? null,
@@ -735,6 +965,7 @@ export class ConversationService {
       agentId: conversationAgentId,
       status: 'streaming',
       workTrace: createDraftWorkTrace(),
+      branchId,
     });
 
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, userMessage);
@@ -850,9 +1081,29 @@ export class ConversationService {
 
     let rawResponse = '';
     let visibleResponse = '';
+    // 思维链按 assistant 轮次分段：每个含工具的轮次 = 一个小节（runtime-segment-<seq>），
+    // currentSegmentText = 轮次可见叙述（summary），currentSegmentThinking = 轮次 thinking 全文（detail）；
+    // 最终回答只取最后一轮文本，不再拼接中间叙述。
+    let currentSegmentText = '';
+    let currentSegmentThinking = '';
+    let segmentSeq = 1;
+    let segmentHasTools = false;
+    let pendingNewSegment = false;
+    const currentSegmentId = () => `runtime-segment-${segmentSeq}`;
     let errorViewModel: ConversationTurnResult['errorViewModel'] = null;
     let llmDiagnostic: ConversationMessageDiagnostic | null = null;
     const routePreflight = resolveAgentRoutePreflight(conversationAgentId);
+    const segmentThinkingPresentation = (): ConversationThinkingPresentation => (
+      routePreflight.ok
+        ? resolveThinkingPresentation(routePreflight.routeCapability.reasoningDelivery, Boolean(currentSegmentThinking.trim()))
+        : 'none'
+    );
+    const currentSegmentOptions = () => ({
+      segmentId: currentSegmentId(),
+      segmentSummary: currentSegmentText.trim() || undefined,
+      segmentThinking: currentSegmentThinking.trim() || undefined,
+      segmentThinkingPresentation: segmentThinkingPresentation(),
+    });
 
     if (!routePreflight.ok) {
       llmDiagnostic = routePreflight.diagnostic;
@@ -892,7 +1143,7 @@ export class ConversationService {
           ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null
           : null;
         const memoryIndex = await agentOrchestrator.getMemoryIndex();
-        const systemPrompt = this.promptAssembler.assembleSystemPrompt({
+        const promptContext = {
           workDir: projectRootPath ?? '',
           tools: allowedToolNames,
           memoryIndex: memoryIndex || undefined,
@@ -905,7 +1156,9 @@ export class ConversationService {
           routeCapability: routePreflight.routeCapability,
           permissionSettings: settingsService.getAll().agentRuntime.permissions,
           allowedToolNames,
-        });
+        };
+        const systemPrompt = this.promptAssembler.assembleSystemPrompt(promptContext);
+        const promptMetrics = this.promptAssembler.measureSections(promptContext);
         const responseText = await agentOrchestrator.sendProfileMessage(
           conversationAgentId,
           input.rawMessage,
@@ -917,6 +1170,7 @@ export class ConversationService {
             projectRootPath,
             projectId: input.context.projectId,
             systemPrompt,
+            promptMetrics,
             maxTokens: 1200,
             temperature: 0.35,
             signal: abortController.signal,
@@ -953,11 +1207,51 @@ export class ConversationService {
               }
               if (event.type === 'assistant.delta') {
                 const chunk = typeof event.payload.text === 'string' ? event.payload.text : '';
-                rawResponse += chunk;
-                const nextVisible = rawResponse;
-                if (nextVisible.length > visibleResponse.length) {
-                  visibleResponse = nextVisible;
+                if (chunk) {
+                  // 上一轮已含工具且现在又有新文本 → 进入新一轮：另起小节并清空可见缓冲，
+                  // 使最终气泡只跟随最后一轮文本。
+                  if (pendingNewSegment) {
+                    segmentSeq += 1;
+                    currentSegmentText = '';
+                    currentSegmentThinking = '';
+                    segmentHasTools = false;
+                    pendingNewSegment = false;
+                    visibleResponse = '';
+                  }
+                  rawResponse += chunk;
+                  currentSegmentText += chunk;
+                  visibleResponse = currentSegmentText;
                   commitVisibleAssistantText();
+                }
+              }
+              if (event.type === 'assistant.thinking_delta') {
+                const chunk = typeof event.payload.text === 'string' ? event.payload.text : '';
+                if (chunk) {
+                  currentSegmentThinking += chunk;
+                  commitAssistantMessage('message_patched', {
+                    workTrace: upsertSegmentNarration(
+                      assistantMessage.workTrace,
+                      currentSegmentId(),
+                      undefined,
+                      currentSegmentThinking,
+                      segmentThinkingPresentation(),
+                    ),
+                  });
+                }
+              }
+              if (event.type === 'assistant.thinking_end') {
+                const text = typeof event.payload.text === 'string' ? event.payload.text.trim() : '';
+                if (text && text.length >= currentSegmentThinking.length) {
+                  currentSegmentThinking = text;
+                  commitAssistantMessage('message_patched', {
+                    workTrace: upsertSegmentNarration(
+                      assistantMessage.workTrace,
+                      currentSegmentId(),
+                      undefined,
+                      currentSegmentThinking,
+                      segmentThinkingPresentation(),
+                    ),
+                  });
                 }
               }
               if (event.type === 'diagnostic') {
@@ -966,16 +1260,6 @@ export class ConversationService {
                   ? payload.message
                   : 'Received runtime diagnostic.';
                 if (payload.code === 'MODEL_THINKING_STARTED' || payload.code === 'MODEL_THINKING_COMPLETED') {
-                  commitAssistantMessage('message_patched', {
-                    workTrace: upsertWorkBlock(assistantMessage.workTrace, 'runtime-reasoning', {
-                      kind: 'reasoning',
-                      stage: 'respond',
-                      status: payload.code === 'MODEL_THINKING_STARTED' ? 'running' : 'complete',
-                      title: '整理思路',
-                      summary,
-                      completedAt: payload.code === 'MODEL_THINKING_COMPLETED' ? nowMs() : undefined,
-                    }),
-                  });
                   return;
                 }
                 commitAssistantMessage('message_patched', {
@@ -993,6 +1277,8 @@ export class ConversationService {
                   toolCall?: { id?: string; name?: string; arguments?: Record<string, unknown> };
                 };
                 if (payload.toolCall?.id && payload.toolCall.name) {
+                  const segmented = isSegmentTool(String(payload.toolCall.name));
+                  if (segmented) segmentHasTools = true;
                   commitAssistantMessage('message_patched', {
                     workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                       id: String(payload.toolCall.id),
@@ -1000,11 +1286,13 @@ export class ConversationService {
                       status: 'pending',
                       argsPreview: JSON.stringify(payload.toolCall.arguments ?? {}).slice(0, 600),
                       startedAt: nowMs(),
-                    }),
+                    }, segmented ? currentSegmentOptions() : undefined),
                   });
                 }
               }
               if (event.type === 'tool.started') {
+                const segmented = isSegmentTool(String(event.payload.toolName));
+                if (segmented) segmentHasTools = true;
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                     id: String(event.payload.toolCallId),
@@ -1012,13 +1300,15 @@ export class ConversationService {
                     status: 'running',
                     argsPreview: JSON.stringify(event.payload.args ?? {}).slice(0, 600),
                     startedAt: nowMs(),
-                  }),
+                  }, segmented ? currentSegmentOptions() : undefined),
                 });
               }
               if (event.type === 'tool.denied') {
                 const reason = typeof event.payload.reason === 'string'
                   ? event.payload.reason
                   : 'Profile policy denied this tool call.';
+                const segmentedDenied = isSegmentTool(String(event.payload.toolName));
+                if (segmentedDenied) segmentHasTools = true;
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                     id: String(event.payload.toolCallId),
@@ -1027,7 +1317,7 @@ export class ConversationService {
                     resultPreview: JSON.stringify(event.payload.result ?? { reason }).slice(0, 800),
                     error: reason,
                     completedAt: nowMs(),
-                  }),
+                  }, segmentedDenied ? currentSegmentOptions() : undefined),
                 });
               }
               if (event.type === 'approval.requested') {
@@ -1073,7 +1363,7 @@ export class ConversationService {
                   toolName,
                   status: 'running',
                   resultPreview: reason,
-                });
+                }, currentSegmentOptions());
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(traceWithTool, `runtime-approval-${approvalId}`, {
                     kind: 'approval',
@@ -1148,8 +1438,13 @@ export class ConversationService {
                 if (!(isAskUserTool && result?.ok)) {
                   toolCallPatch.resultPreview = JSON.stringify(event.payload.result ?? {}).slice(0, 800);
                 }
+                const segmentedCompleted = isSegmentTool(String(event.payload.toolName));
                 commitAssistantMessage('message_patched', {
-                  workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, toolCallPatch),
+                  workTrace: upsertRuntimeToolCall(
+                    assistantMessage.workTrace,
+                    toolCallPatch,
+                    segmentedCompleted ? currentSegmentOptions() : undefined,
+                  ),
                 });
               }
               if (event.type === 'task.created' || event.type === 'task.updated') {
@@ -1208,6 +1503,29 @@ export class ConversationService {
                 });
               }
               if (event.type === 'assistant.completed') {
+                const payload = event.payload as { text?: string; thinkingText?: string };
+                const narration = typeof payload.text === 'string' ? payload.text.trim() : '';
+                const thinking = (typeof payload.thinkingText === 'string' ? payload.thinkingText.trim() : '')
+                  || currentSegmentThinking.trim();
+                if (thinking) {
+                  currentSegmentThinking = thinking;
+                }
+                if (narration || thinking) {
+                  commitAssistantMessage('message_patched', {
+                    workTrace: upsertSegmentNarration(
+                      assistantMessage.workTrace,
+                      currentSegmentId(),
+                      narration || undefined,
+                      thinking || undefined,
+                      thinking ? segmentThinkingPresentation() : undefined,
+                    ),
+                  });
+                }
+                // 本轮含工具 → 它是中间叙述轮：标记下一轮文本应另起小节（工具的
+                // started/completed 在本事件之后到达，仍归属当前 segment，故延后切段）。
+                if (segmentHasTools) {
+                  pendingNewSegment = true;
+                }
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, 'assistant-output', {
                     kind: 'output',
@@ -1260,6 +1578,7 @@ export class ConversationService {
         };
         rawResponse = llmDiagnostic.userMessage;
         visibleResponse = llmDiagnostic.userMessage;
+        currentSegmentText = llmDiagnostic.userMessage;
         recordLlmDiagnostic(input.context, llmDiagnostic);
         commitVisibleAssistantText();
       }
@@ -1270,7 +1589,8 @@ export class ConversationService {
       return;
     }
 
-    const assistantContent = (rawResponse || visibleResponse).trim();
+    // 最终回答只取最后一轮文本（currentSegmentText）；中间叙述已分流到各思维链小节。
+    const assistantContent = (currentSegmentText.trim() || rawResponse || visibleResponse).trim();
     visibleResponse = assistantContent;
     const isRouteMissingDiagnostic = llmDiagnostic?.code === 'CONVERSATION_LLM_ROUTE_MISSING';
     const finalStatus: ConversationMessage['status'] = errorViewModel && !isRouteMissingDiagnostic ? 'error' : 'complete';

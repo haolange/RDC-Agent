@@ -41,13 +41,15 @@ import type {
   AgentRuntimeSkillDescriptor,
   AgentSubagentEventPayload,
 } from '@shared/types/agentRuntime';
-import type { LLMConfig, LLMStreamEvent } from '@shared/types/llm';
-import type { AppMode } from '@shared/types/session';
+import type { LLMConfig } from '@shared/types/llm';
+import type { AppMode, ContextUsageBreakdownEntry } from '@shared/types/session';
 import type { LlmProviderId } from '@shared/types/settings';
 import type { WorkflowStage } from '@shared/types/workflow';
 import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
+import { charsToTokens } from '@shared/utils/tokens';
 import { Agent } from '../../agent-runtime/agent/Agent';
 import { ContextManager } from '../../agent-runtime/agent/ContextManager';
+import type { PromptSectionMetrics } from '../../agent-runtime/prompt';
 import { ErrorRecovery } from '../../agent-runtime/agent/ErrorRecovery';
 import { handoffController } from '../../agent-runtime/agent/HandoffController';
 import type { AgentTool, AgentToolResult, ToolExecutionContext } from '../../agent-runtime/agent/AgentTool';
@@ -96,11 +98,11 @@ import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigServ
 import { llmAdapter } from '../../settings/LLMAdapter';
 import { providerAccountAuthService } from '../../settings/ProviderAccountAuthService';
 import { settingsService } from '../../settings/SettingsService';
+import { debuggerLlmService } from '../../settings/DebuggerLlmService';
 import { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
 import { isToolAllowedForAgent, normalizeToolName, resolveAgentToolAllowlist } from './DebuggerRuntimePolicy';
 
 interface AgentTurnContext {
-  caseId?: string;
   runId?: string;
   sessionId?: string;
   stageId?: WorkflowStage;
@@ -112,7 +114,6 @@ interface AgentTurnContext {
 interface AgentTurnOptions {
   signal?: AbortSignal;
   onChunk?: (text: string) => void;
-  onStreamEvent?: (event: LLMStreamEvent) => void;
   onEvent?: (event: SharedAgentEvent) => void;
   reasoningBudget?: 'auto' | 'low' | 'medium' | 'high';
 }
@@ -130,11 +131,14 @@ interface AgentProfileTurnOptions extends AgentTurnOptions {
   projectRootPath?: string | null;
   /** 当前激活项目 id。 */
   projectId?: string | null;
+  /** PromptAssembler 各段字符数，用于上下文窗口 breakdown 细化。 */
+  promptMetrics?: PromptSectionMetrics;
 }
 
 /** 单个 AgentRole 在内部维护的运行态。 */
 interface AgentSlot {
   agent: Agent;
+  contextManager: ContextManager;
   providerId: string;
   modelId: string;
   systemPrompt: string;
@@ -197,10 +201,6 @@ export class AgentOrchestrator {
 
   constructor() {
     this.initializeAgents();
-  }
-
-  setMainWindow(_window: unknown): void {
-    // Renderer projection 由 WorkflowProjectionPublisher 拥有。
   }
 
   private initializeAgents(): void {
@@ -419,6 +419,7 @@ export class AgentOrchestrator {
         options,
         projectRootPath: options?.projectRootPath ?? null,
         projectId: options?.projectId ?? null,
+        promptMetrics: options?.promptMetrics,
       });
 
       runtimeLogService.log({
@@ -665,7 +666,7 @@ export class AgentOrchestrator {
       errorRecovery,
     });
 
-    const slot: AgentSlot = { agent, providerId, modelId, systemPrompt, toolSignature, turnSignature };
+    const slot: AgentSlot = { agent, contextManager, providerId, modelId, systemPrompt, toolSignature, turnSignature };
     this.agentSlots.set(slotKey, slot);
     return slot;
   }
@@ -915,7 +916,7 @@ export class AgentOrchestrator {
         if (normalizedName === 'ask_user') {
           return this.executeAskUserTool(toolCall, agentId, runtimeContext, signal);
         }
-        const permissionDecision = agentPermissionPolicyService.evaluate({ agentId, tool, toolCall, projectRootPath: runtimeContext?.projectRootPath ?? null });
+        const permissionDecision = agentPermissionPolicyService.evaluate({ tool, toolCall, projectRootPath: runtimeContext?.projectRootPath ?? null });
         if (permissionDecision.action === 'deny') {
           return this.createPolicyDeniedToolResult(toolCall, agentId, permissionDecision.reason);
         }
@@ -1665,6 +1666,8 @@ export class AgentOrchestrator {
     options?: AgentTurnOptions;
     projectRootPath?: string | null;
     projectId?: string | null;
+    /** Ask 路径由 ConversationService 传入的 prompt 分段字符数，用于细化 breakdown。 */
+    promptMetrics?: PromptSectionMetrics;
   }): Promise<string> {
     if (!input.providerId || !input.modelId) {
       throw new Error('No provider/model route is configured for this agent.');
@@ -1712,6 +1715,7 @@ export class AgentOrchestrator {
       maxTokens: input.maxTokens,
       temperature: input.temperature,
       reasoningBudget: input.options?.reasoningBudget,
+      reasoningVisibility: routeCapability.reasoningVisibility,
       signal: input.options?.signal,
     };
     const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
@@ -1766,6 +1770,49 @@ export class AgentOrchestrator {
           .filter((block) => block.type === 'text')
           .map((block) => (block as { text: string }).text)
           .join('');
+        if (event.message.usage) {
+          // 将 activeToolDefinitions 按来源分组：mcp__* 前缀为 MCP 工具，subagent 为子 Agent，其余为系统工具。
+          const isMcpDef = (d: ToolDefinition) => d.name.startsWith('mcp__');
+          const isSubagentDef = (d: ToolDefinition) => d.name === 'subagent';
+          const mcpDefs      = activeToolDefinitions.filter(isMcpDef);
+          const subagentDefs = activeToolDefinitions.filter(isSubagentDef);
+          const systemDefs   = activeToolDefinitions.filter((d) => !isMcpDef(d) && !isSubagentDef(d));
+
+          const pm = input.promptMetrics;
+          const systemPromptChars = pm
+            ? pm.system_prompt
+            : input.systemPrompt.length;
+          const rulesChars    = pm?.rules        ?? 0;
+          const memoryChars   = pm?.memory_files ?? 0;
+
+          // 压缩统计：在 message_end 时对当前 agent 的消息历史分类。
+          const compressionStats = slot.contextManager.classifyMessages(
+            slot.agent.messages as import('../../agent-runtime/core/types').AgentMessage[],
+          );
+
+          const precomputedBreakdown: ContextUsageBreakdownEntry[] = [
+            { id: 'system_prompt', tokens: charsToTokens(systemPromptChars) },
+            ...(rulesChars   > 0 ? [{ id: 'rules'        as const, tokens: charsToTokens(rulesChars) }]   : []),
+            ...(memoryChars  > 0 ? [{ id: 'memory_files' as const, tokens: charsToTokens(memoryChars) }]  : []),
+            { id: 'system_tools',          tokens: charsToTokens(JSON.stringify(systemDefs).length),   count: systemDefs.length },
+            { id: 'mcp_tools',             tokens: charsToTokens(JSON.stringify(mcpDefs).length),      count: mcpDefs.length },
+            { id: 'subagent_definitions',  tokens: charsToTokens(JSON.stringify(subagentDefs).length), count: subagentDefs.length },
+            ...(compressionStats.summaryTokens > 0
+              ? [{ id: 'summarized_conversation' as const, tokens: compressionStats.summaryTokens }]
+              : []),
+            { id: 'conversation', tokens: compressionStats.conversationTokens, count: compressionStats.conversationCount },
+          ];
+
+          debuggerLlmService.recordAgentTurnUsage({
+            runId: input.runId,
+            sessionId: input.sessionId,
+            providerId: input.providerId,
+            modelId: input.modelId,
+            inputTokens: event.message.usage.inputTokens,
+            outputTokens: event.message.usage.outputTokens,
+            precomputedBreakdown,
+          });
+        }
         if (!sawStructuredToolCall && !responseText.trim()) {
           input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
             code: 'empty_response_without_tool_call',

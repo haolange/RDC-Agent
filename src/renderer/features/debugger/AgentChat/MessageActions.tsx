@@ -1,16 +1,20 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { ConversationMessage } from '@shared/types/conversation';
+import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import { getElectronApi } from '../../../platform/getElectronApi';
 import { useI18n } from '../../../i18n';
+import { MessageVariantNavigator } from './MessageVariantNavigator';
 
 interface MessageActionsProps {
   message: ConversationMessage;
+  branchState?: ConversationBranchState | null;
   onCopy?: (content: string) => void | Promise<void>;
   onEditResend?: (content: string) => void;
 }
 
 export const MessageActions: React.FC<MessageActionsProps> = ({
   message,
+  branchState = null,
   onCopy,
   onEditResend,
 }) => {
@@ -89,6 +93,9 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
           </svg>
         </button>
       )}
+      {message.role === 'user' ? (
+        <MessageVariantNavigator message={message} branchState={branchState} />
+      ) : null}
     </div>
   );
 };

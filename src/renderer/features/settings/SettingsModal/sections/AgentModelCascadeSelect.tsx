@@ -29,11 +29,13 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
       current.push(option);
       map.set(option.providerId, current);
     }
-    return Array.from(map.entries()).map(([providerId, providerOptions]) => ({
-      providerId,
-      label: providerOptions[0]?.providerLabel || providerId,
-      options: providerOptions,
-    }));
+    return Array.from(map.entries())
+      .map(([providerId, providerOptions]) => ({
+        providerId,
+        label: providerOptions[0]?.providerLabel || providerId,
+        options: providerOptions,
+      }))
+      .filter((group) => group.options.some((option) => option.configured));
   }, [options]);
   const selected = options.find((option) => option.canonicalId === value);
   const missingSelection = useMemo<AgentModelOption | null>(() => {

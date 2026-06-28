@@ -31,7 +31,8 @@ export function useComposer(options: {
   const currentProject = useProjectStore((state) => state.currentProject);
   const currentSession = useProjectStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
-  const currentRunUsage = useSessionStore((state) => state.currentRunUsage);
+  const lastKnownUsage = useSessionStore((state) => state.lastKnownUsage);
+  const usageStale = useSessionStore((state) => state.usageStale);
   const conversationMessages = useConversationStore((state) => state.conversationMessages);
   const currentMode = useLayoutStore((state) => state.currentMode);
   const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
@@ -66,9 +67,6 @@ export function useComposer(options: {
     disabled: false,
   };
   const currentModeLabel = selectedAgent?.name ?? currentModeConfig.label;
-  const openCaptureRequiredLabel = language === 'zh-CN'
-    ? '先在应用内 Open 一个 .rdc Capture 后才能选择执行模式'
-    : 'Open a .rdc capture in the app before selecting an execution mode';
 
   const send = useComposerSend({
     showNotice,
@@ -83,7 +81,6 @@ export function useComposer(options: {
     currentRun,
     selectedDeviceEntry,
     hasOpenedCaptureForCurrentProject,
-    openCaptureRequiredLabel,
     hasActiveDebugRun,
     hasActiveConversationTurn,
     promptValue,
@@ -177,14 +174,14 @@ export function useComposer(options: {
     selectedAgentId,
     userInvocableAgents,
     setSelectedAgentId,
-    currentRunUsage,
+    lastKnownUsage,
+    usageStale,
     hasActiveDebugRun,
     isComposerBusy: send.isComposerBusy,
     promptPlaceholder,
     attachButtonLabel,
     primaryButtonDisabled,
     primaryButtonDescription,
-    openCaptureRequiredLabel,
     handlePrimaryStop: send.handlePrimaryStop,
     handleAttachmentSelect: attachments.handleAttachmentSelect,
     handlePendingAttachmentRemove: attachments.handlePendingAttachmentRemove,

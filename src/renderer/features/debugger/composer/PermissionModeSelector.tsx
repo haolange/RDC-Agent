@@ -5,33 +5,41 @@ import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 const PERMISSION_MODES: Array<{
   id: AgentPermissionMode;
   label: string;
+  labelZh: string;
   description: string;
+  descriptionZh: string;
 }> = [
   {
     id: 'default',
     label: 'Default',
+    labelZh: '默认',
     description: 'Workspace routine actions run; external or risky actions ask first.',
+    descriptionZh: '工作区常规操作直接执行，外部或高风险操作先询问',
   },
   {
     id: 'auto-review',
     label: 'Auto-review',
+    labelZh: '自动审查',
     description: 'Risky actions are reviewed by policy before they continue.',
+    descriptionZh: '低风险操作自动通过，高风险操作自动拦截',
   },
   {
     id: 'full-access',
     label: 'Full access',
+    labelZh: '完全访问',
     description: 'Trusted mode for direct local file and command access.',
+    descriptionZh: '信任模式，所有操作直接放行（类 Yolo）',
   },
   {
     id: 'custom',
     label: 'Custom',
+    labelZh: '自定义',
     description: 'Use readable/writable roots configured in Settings > Agents.',
+    descriptionZh: '按 Settings › Agents 配置的路径规则执行',
   },
 ];
 
-export const PermissionModeSelector: React.FC<{
-  disabled?: boolean;
-}> = ({ disabled = false }) => {
+export const PermissionModeSelector: React.FC = () => {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const mode = useAppSettingsStore((state) => state.settings.agentRuntime?.permissions?.mode ?? 'default');
@@ -60,13 +68,10 @@ export const PermissionModeSelector: React.FC<{
         data-testid="composer-permission-pill"
         aria-haspopup="menu"
         aria-expanded={open}
-        disabled={disabled || busy}
-        title={current.description}
+        disabled={busy}
+        title={`当前模式：${current.labelZh}（${current.descriptionZh}）`}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="composer-permission-pill-icon" aria-hidden="true">
-          {mode === 'full-access' ? 'FA' : mode === 'auto-review' ? 'AR' : mode === 'custom' ? 'CU' : 'DF'}
-        </span>
         <span className="composer-permission-pill-label">{current.label}</span>
         <span className="composer-permission-pill-caret" aria-hidden="true">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -87,7 +92,7 @@ export const PermissionModeSelector: React.FC<{
               onClick={() => void selectMode(entry.id)}
             >
               <span className="composer-permission-menu-label">{entry.label}</span>
-              <span className="composer-permission-menu-desc">{entry.description}</span>
+              <span className="composer-permission-menu-desc">{entry.descriptionZh}</span>
             </button>
           ))}
         </div>

@@ -51,7 +51,6 @@ describe('AgentPermissionPolicyService external reads', () => {
 
   it('allows full-access reads outside the project root without asking', () => {
     const decision = service.evaluate({
-      agentId: 'ask',
       tool: readFileTool,
       toolCall: makeToolCall('D:\\OtherProject\\src\\main.ts'),
       projectRootPath: 'D:\\Projects\\Demo',
@@ -65,7 +64,6 @@ describe('AgentPermissionPolicyService external reads', () => {
     mockSettings.agentRuntime.permissions.mode = 'default';
 
     const decision = service.evaluate({
-      agentId: 'ask',
       tool: readFileTool,
       toolCall: makeToolCall('D:\\OtherProject\\src\\main.ts'),
       projectRootPath: 'D:\\Projects\\Demo',
@@ -79,7 +77,6 @@ describe('AgentPermissionPolicyService external reads', () => {
     mockSettings.agentRuntime.permissions.mode = 'auto-review';
 
     const decision = service.evaluate({
-      agentId: 'ask',
       tool: readFileTool,
       toolCall: makeToolCall('D:\\OtherProject\\src\\main.ts'),
       projectRootPath: 'D:\\Projects\\Demo',
@@ -94,7 +91,6 @@ describe('AgentPermissionPolicyService external reads', () => {
     mockSettings.agentRuntime.permissions.readableRoots = ['D:\\Shared'];
 
     const decision = service.evaluate({
-      agentId: 'ask',
       tool: readFileTool,
       toolCall: makeToolCall('D:\\Shared\\notes.txt'),
       projectRootPath: 'D:\\Projects\\Demo',

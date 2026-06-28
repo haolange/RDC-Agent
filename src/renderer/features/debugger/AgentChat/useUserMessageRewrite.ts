@@ -13,6 +13,7 @@ import {
 export function useUserMessageRewrite(message: ConversationMessage) {
   const conversationMessages = useConversationStore((state) => state.conversationMessages);
   const setConversationMessages = useConversationStore((state) => state.setConversationMessages);
+  const setBranchState = useConversationStore((state) => state.setBranchState);
   const upsertConversationMessages = useConversationStore((state) => state.upsertConversationMessages);
   const currentProject = useProjectStore((state) => state.currentProject);
   const setSessions = useProjectStore((state) => state.setSessions);
@@ -33,9 +34,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
     }
 
     const previousMessages = useConversationStore.getState().conversationMessages;
-    const targetIndex = previousMessages.findIndex((entry) => entry.id === message.id);
-    const visiblePrefix = targetIndex >= 0 ? previousMessages.slice(0, targetIndex) : previousMessages;
-    setConversationMessages(visiblePrefix);
+    const previousBranchState = useConversationStore.getState().branchState;
 
     try {
       const result = await electronAPI.conversation.rewriteFromMessage({
@@ -67,6 +66,12 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         upsertConversationMessages,
       });
 
+      if (message.sessionId) {
+        const historyResult = await electronAPI.conversation.getHistory(message.sessionId);
+        setConversationMessages(historyResult.messages ?? []);
+        setBranchState(historyResult.branchState ?? null);
+      }
+
       await syncE2EConversationState({
         electronAPI,
         sessionId: result.session?.sessionId ?? message.sessionId,
@@ -76,12 +81,14 @@ export function useUserMessageRewrite(message: ConversationMessage) {
       });
     } catch (error) {
       setConversationMessages(previousMessages);
+      setBranchState(previousBranchState);
       throw error;
     }
   }, [
     currentProject,
     message,
     pairedAssistant,
+    setBranchState,
     setConversationMessages,
     setCurrentRun,
     setCurrentSession,

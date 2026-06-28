@@ -232,9 +232,9 @@
 }
 
 .conversation-message-assistant .conversation-message-stack {
-  align-items: flex-start;
+  align-items: stretch;
   flex: 1 1 auto;
-  max-width: min(85%, 880px);
+  max-width: 100%;
 }
 
 /* System bubble: centred warning */
@@ -245,7 +245,6 @@
 .conversation-message-time {
   color: var(--token-text-caption);
   font-size: var(--text-xs);
-  font-family: var(--font-mono);
   letter-spacing: 0;
 }
 
@@ -258,9 +257,8 @@
   border-radius: 999px;
   font-size: 9px;
   font-weight: var(--font-bold);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  font-family: var(--font-mono);
 }
 
 .conversation-message-streaming-tag {
@@ -285,28 +283,33 @@
 .conversation-bubble {
   width: fit-content;
   max-width: 100%;
-  padding: 12px 14px;
-  border-radius: var(--radius-lg);
-  font-size: 13px;
-  line-height: 1.65;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-bubble);
+  font-size: var(--text-base);
+  line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
   position: relative;
 }
 
 .conversation-bubble-user {
-  background: rgb(var(--color-bg-2));
+  background: var(--token-surface-raised);
   color: rgb(var(--color-text-primary));
-  border: 1px solid rgb(var(--color-border-default));
-  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-bubble-tail) var(--radius-lg);
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.03);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble);
+  box-shadow: var(--token-shadow-card), var(--token-elevation-edge);
 }
 
+/* Assistant final answer reads as full-bleed prose, not a bubble */
 .conversation-bubble-assistant {
-  background: rgb(var(--color-bg-3));
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  background: transparent;
   color: rgb(var(--color-text-primary));
-  border: 1px solid rgb(var(--color-border-default));
-  border-radius: var(--radius-bubble-tail) var(--radius-lg) var(--radius-lg) var(--radius-lg);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .conversation-bubble-system {
@@ -321,6 +324,182 @@
 .conversation-bubble-text {
   display: inline;
   word-break: break-word;
+}
+
+/* ============================================================
+ * Markdown body — formal typography for assistant answers
+ * ============================================================ */
+.markdown-body {
+  color: rgb(var(--color-text-primary));
+  font-size: var(--text-base);
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.markdown-body > :first-child {
+  margin-top: 0;
+}
+
+.markdown-body > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body p {
+  margin: 0 0 var(--space-3);
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  margin: var(--space-5) 0 var(--space-2);
+  color: var(--token-text-heading);
+  font-weight: var(--font-semibold);
+  line-height: 1.35;
+}
+
+.markdown-body h1 { font-size: var(--text-xl); }
+.markdown-body h2 { font-size: var(--text-lg); }
+.markdown-body h3 { font-size: var(--text-md); }
+.markdown-body h4 { font-size: var(--text-base); }
+
+.markdown-body ul,
+.markdown-body ol {
+  margin: 0 0 var(--space-3);
+  padding-left: var(--space-5);
+}
+
+.markdown-body ul {
+  list-style-type: disc;
+}
+
+.markdown-body ol {
+  list-style-type: decimal;
+}
+
+.markdown-body li {
+  margin: var(--space-1) 0;
+}
+
+.markdown-body li::marker {
+  color: var(--token-text-caption);
+}
+
+.markdown-body li > p {
+  margin: 0;
+}
+
+.markdown-body li > ul,
+.markdown-body li > ol {
+  margin: var(--space-1) 0 0;
+}
+
+.markdown-body a {
+  color: var(--token-text-link);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown-body strong {
+  color: var(--token-text-heading);
+  font-weight: var(--font-semibold);
+}
+
+.markdown-body code {
+  padding: 1px var(--space-1);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--token-bg-raised) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--token-border-muted) 60%, transparent);
+  color: var(--token-text-heading);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+}
+
+.markdown-body pre {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--token-surface-sunken);
+  border: 1px solid color-mix(in srgb, var(--token-border-muted) 50%, transparent);
+  box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.16);
+  overflow: auto;
+}
+
+.markdown-body pre code {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--token-text-body);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.markdown-body blockquote {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  border-left: 2px solid color-mix(in srgb, var(--token-status-info) 55%, transparent);
+  color: var(--token-text-caption);
+}
+
+.markdown-body hr {
+  margin: var(--space-4) 0;
+  border: 0;
+  border-top: 1px solid var(--token-border-muted);
+}
+
+.markdown-body table {
+  width: 100%;
+  margin: 0 0 var(--space-3);
+  border-collapse: collapse;
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  font-size: var(--text-sm);
+}
+
+.markdown-body thead th {
+  background: color-mix(in srgb, var(--token-bg-raised) 70%, transparent);
+  color: var(--token-text-heading);
+  font-weight: var(--font-semibold);
+}
+
+.markdown-body th,
+.markdown-body td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--token-border-muted);
+  border-right: 1px solid var(--token-border-muted);
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-body th:last-child,
+.markdown-body td:last-child {
+  border-right: 0;
+}
+
+.markdown-body tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.conversation-bubble-assistant .markdown-body {
+  line-height: 1.6;
+}
+
+.conversation-bubble-assistant .markdown-body p {
+  margin: 0 0 var(--space-2);
+}
+
+.conversation-bubble-assistant .markdown-body ul,
+.conversation-bubble-assistant .markdown-body ol {
+  margin: 0 0 var(--space-2);
+}
+
+.conversation-bubble-assistant .markdown-body li {
+  margin: 0;
+}
+
+.conversation-bubble-assistant .markdown-body h3 {
+  margin: var(--space-3) 0 var(--space-1);
 }
 
 .conversation-bubble-streaming-empty {
@@ -388,7 +567,7 @@
 }
 
 .conversation-handoff-actions-label {
-  font-family: var(--font-mono);
+  font-weight: var(--font-medium);
 }
 
 .conversation-handoff-button-row {
@@ -444,7 +623,6 @@
   height: var(--space-5);
   flex: 0 0 auto;
   color: var(--token-text-caption);
-  font-family: var(--font-mono);
   font-size: var(--text-xs);
 }
 
@@ -459,84 +637,106 @@
 }
 
 .work-process-header {
-  width: 100%;
-  min-height: calc(var(--space-6) + var(--space-1));
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-start;
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
   gap: var(--space-2);
-  padding: 0 0 var(--space-1);
+  margin: 0 0 var(--space-1) calc(-1 * var(--space-2));
+  padding: var(--space-1) var(--space-2);
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-full);
   background: transparent;
   color: var(--token-text-body);
   text-align: left;
   cursor: pointer;
   font: inherit;
+  transition: background var(--transition-fast);
 }
 
-.work-process.is-expanded .work-process-header,
 .work-process-header:hover {
-  background: transparent;
+  background: var(--token-interactive-hover);
 }
 
 .work-process-header:focus-visible {
   outline: 0;
-  box-shadow: inset 0 -1px 0 var(--token-border-focus);
+  box-shadow: 0 0 0 2px var(--token-border-focus);
 }
 
+/* chevron disclosure icon */
 .work-process-caret {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--space-4);
-  height: var(--space-4);
-  color: var(--token-text-caption);
-  transform: translateY(calc(var(--space-1) / 4));
+  color: var(--token-text-placeholder);
   transition: transform var(--transition-fast);
 }
 
-.work-process-caret::before {
-  content: '>';
-  font-size: var(--text-xs);
+.work-process-caret.is-open {
+  transform: rotate(90deg);
 }
 
-.work-process-caret.is-open {
-  transform: translateY(calc(var(--space-1) / 4)) rotate(90deg);
+/* state dot：running 时呼吸脉冲，其余静态着色 */
+.work-process-status-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--token-text-placeholder);
+}
+
+.work-process-status-dot.status-running {
+  background: var(--token-status-info);
+  animation: work-process-dot-pulse 1.5s ease-in-out infinite;
+}
+
+.work-process-status-dot.status-complete {
+  background: var(--token-status-success);
+}
+
+.work-process-status-dot.status-error {
+  background: var(--token-status-error);
+}
+
+@keyframes work-process-dot-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--token-status-info) 45%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--token-status-info) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--token-status-info) 0%, transparent);
+  }
 }
 
 .work-process-label {
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+}
+
+.work-process-label.status-running {
   color: var(--token-text-heading);
-  font-size: var(--text-base);
-  font-weight: var(--font-semibold);
 }
 
-.work-process-header-summary,
-.work-process-count {
-  color: var(--token-text-caption);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  font-weight: var(--font-regular);
-}
-
-.work-process-count {
-  min-height: auto;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.work-process-count.status-running {
-  color: var(--token-status-info);
-}
-
-.work-process-count.status-complete {
-  color: var(--token-text-caption);
-}
-
-.work-process-count.status-error {
+.work-process-label.status-error {
   color: var(--token-status-error);
+}
+
+.work-process-meta {
+  display: inline-flex;
+  align-items: center;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+}
+
+.work-process-meta::before {
+  content: '·';
+  margin-right: var(--space-2);
+  color: var(--token-text-placeholder);
 }
 
 .work-process-body {
@@ -582,10 +782,11 @@
 .work-process-step-rail::before {
   content: '';
   position: absolute;
-  top: var(--space-5);
+  top: calc(var(--space-5) + var(--space-1));
   bottom: calc(var(--space-4) * -1);
-  left: calc(var(--space-2) / 2);
+  left: 50%;
   width: 1px;
+  transform: translateX(-50%);
   background: color-mix(in srgb, var(--token-border-muted) 56%, transparent);
 }
 
@@ -593,33 +794,37 @@
   display: none;
 }
 
-.work-process-step-rail::after {
-  content: '';
+.work-process-rail-marker {
   position: absolute;
-  top: var(--space-2);
-  left: calc(var(--space-1) / 2);
+  top: var(--space-3);
+  left: 50%;
+  display: block;
   width: var(--space-2);
   height: var(--space-2);
+  transform: translateX(-50%);
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--token-text-caption) 70%, transparent);
-  background: var(--token-bg-app);
-  box-shadow: none;
+  border: 0;
+  background: var(--token-text-caption);
 }
 
-.work-process-step.status-running .work-process-step-rail::after {
-  background: var(--token-bg-app);
-  border-color: var(--token-status-info);
+.work-process-step-rail.is-section .work-process-rail-marker {
+  background: var(--token-text-caption);
 }
 
-.work-process-step.status-complete .work-process-step-rail::after {
-  background: var(--token-bg-app);
-  border-color: color-mix(in srgb, var(--token-status-success) 72%, var(--token-border-muted));
+.work-process-step-rail.is-step .work-process-rail-marker {
+  background: var(--token-status-success);
 }
 
-.work-process-step.status-error .work-process-step-rail::after,
-.work-process-diagnostic .work-process-step-rail::after {
-  background: var(--token-bg-app);
-  border-color: var(--token-status-error);
+.work-process-step-rail.status-running .work-process-rail-marker {
+  background: var(--token-status-info);
+}
+
+.work-process-step-rail.status-error .work-process-rail-marker {
+  background: var(--token-status-error);
+}
+
+.work-process-step-rail.status-pending .work-process-rail-marker {
+  background: color-mix(in srgb, var(--token-text-caption) 45%, transparent);
 }
 
 .work-process-step-content {
@@ -667,6 +872,11 @@
   min-height: var(--space-6);
 }
 
+/* 无可展开 body 的工具/输入行：补齐与披露行一致的纵向节奏 */
+.work-process-tool-summary-static {
+  padding: var(--space-1) 0;
+}
+
 .work-process-tool-verb {
   font-weight: var(--font-semibold);
   color: var(--token-text-heading);
@@ -684,8 +894,7 @@
 .work-process-tool-target {
   min-width: 0;
   color: var(--token-text-caption);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   overflow-wrap: anywhere;
 }
 
@@ -721,7 +930,6 @@
 .work-process-user-input-qa-label {
   margin-right: var(--space-2);
   color: var(--token-text-caption);
-  font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: var(--font-semibold);
 }
@@ -737,23 +945,8 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   color: var(--token-text-caption);
-  font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: var(--font-regular);
-}
-
-.work-process-tool-name {
-  max-width: min(16rem, 100%);
-  padding: 0 var(--space-1);
-  border: 1px solid color-mix(in srgb, var(--token-border-muted) 78%, transparent);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--token-bg-raised) 54%, transparent);
-  color: var(--token-text-caption);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .work-process-tool-body {
@@ -764,41 +957,295 @@
   padding: var(--space-1) 0 0;
 }
 
-.work-process-tool-result,
-.work-process-row-detail pre {
-  margin: 0;
-  max-height: 14rem;
-  overflow: auto;
+.work-process-row-pre {
+  margin: 0 0 var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border: 1px solid color-mix(in srgb, var(--token-border-muted) 78%, transparent);
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--token-bg-shell) 70%, transparent);
+  border: 0;
+  border-left: 2px solid var(--token-border-subtle);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--token-bg-app);
+  color: var(--token-text-caption);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 9rem;
+  overflow-y: auto;
+}
+
+.work-process-step.kind-section {
+  padding-bottom: var(--space-2);
+}
+
+.work-process-step.kind-section .work-process-step-content {
+  gap: var(--space-1);
+}
+
+.work-process-section-list .work-process-step {
+  padding-bottom: var(--space-2);
+}
+
+/* 思维链小节：单一主文案 + Cursor 风格步骤折叠 */
+.work-process-segment-primary {
+  margin: 0;
+  max-width: 52rem;
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.work-process-segment-primary.is-thinking {
+  color: var(--token-text-caption);
+  line-height: 1.55;
+}
+
+.work-process-segment-primary.is-thinking.is-clamped {
+  white-space: normal;
+}
+
+.work-process-segment-primary.is-clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  white-space: normal;
+}
+
+.work-process-segment-primary.is-thinking-full {
+  max-height: 12rem;
+  overflow: auto;
+  padding-right: var(--space-1);
+}
+
+.work-process-section-steps {
+  width: min(100%, 54rem);
+  margin-top: var(--space-1);
+}
+
+.work-process-steps-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  line-height: 1.5;
+  cursor: pointer;
+  list-style: none;
+}
+
+.work-process-steps-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.work-process-steps-toggle:hover {
+  color: var(--token-text-body);
+}
+
+.work-process-steps-eye {
+  flex: 0 0 auto;
+  opacity: 0.72;
+}
+
+.work-process-steps-toggle-label {
+  color: inherit;
+}
+
+.work-process-steps-chevron {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  opacity: 0.55;
+  transition: transform 120ms ease;
+}
+
+.work-process-section-steps[open] .work-process-steps-chevron {
+  transform: rotate(45deg);
+}
+
+.work-process-step.kind-tool.is-compact .work-process-tool-target {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.work-process-step.kind-tool.is-compact .work-process-tool-summary {
+  cursor: pointer;
+}
+
+.work-process-step.kind-tool.is-compact .work-process-tool-summary-static {
+  padding: 0;
+}
+
+.work-process-result-preview {
+  position: relative;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-left: 2px solid var(--token-border-muted);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--token-bg-app);
   color: var(--token-text-body);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  max-height: 8rem;
+  overflow-y: auto;
 }
 
-.work-process-row-detail {
-  width: min(100%, 54rem);
+.work-process-debug-toggle-icon {
+  width: 0;
+  height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  transition: transform var(--transition-fast);
 }
 
-.work-process-row-detail summary {
-  width: fit-content;
+/* 工具行内的次级折叠：参数 + 原始结果，默认收起 */
+.work-process-debug-disclosure {
+  margin-top: var(--space-1);
+}
+
+.work-process-debug-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  color: var(--token-text-placeholder);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  transition: color var(--transition-fast);
+}
+
+.work-process-debug-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.work-process-debug-toggle:hover {
+  color: var(--token-text-caption);
+}
+
+.work-process-debug-disclosure[open] .work-process-debug-toggle-icon {
+  transform: rotate(90deg);
+}
+
+.work-process-section-list {
+  margin-top: var(--space-2);
+}
+
+/* 工具输出：终端式 CONSOLE 卡片（顶栏 + 等宽 body） */
+.work-process-console {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--token-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--token-surface-sunken);
+  box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.16);
+}
+
+.work-process-console-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--token-border-subtle);
+  background: var(--token-surface-raised);
   color: var(--token-text-caption);
   font-size: var(--text-xs);
   font-weight: var(--font-medium);
-  cursor: pointer;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.work-process-row-detail summary:hover {
+.work-process-console-prompt {
+  font-family: var(--font-mono);
   color: var(--token-text-body);
 }
 
-.work-process-row-detail:not([open]) > :not(summary) {
+.work-process-console-body {
+  margin: 0;
+  max-height: 9rem;
+  overflow: auto;
+  padding: var(--space-2) var(--space-3);
+  color: var(--token-text-caption);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 整行披露：summary 即行头，点击整行展开 body（控制台 / 参数 / 原始结果 / 详情） */
+.work-process-disclosure {
+  width: min(100%, 54rem);
+}
+
+.work-process-disclosure > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.work-process-disclosure > summary::-webkit-details-marker {
   display: none;
+}
+
+.work-process-disclosure > summary:hover {
+  background: var(--token-interactive-hover);
+}
+
+.work-process-disclosure > summary:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: -2px;
+}
+
+.work-process-disclosure:not([open]) > :not(summary) {
+  display: none;
+}
+
+/* 行头的展开 caret，随 details[open] 旋转 */
+.work-process-row-caret {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 0;
+  height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 3px solid transparent;
+  border-bottom: 3px solid transparent;
+  opacity: 0.55;
+  transition: transform var(--transition-fast);
+}
+
+.work-process-disclosure[open] .work-process-row-caret {
+  transform: rotate(90deg);
+}
+
+/* 文本类行（summary / diagnostic）的可点击行头布局 */
+.work-process-summary-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.work-process-summary-line > .work-process-step-summary,
+.work-process-summary-line > .work-process-diagnostic-message {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .work-process-debug-body {
@@ -815,9 +1262,17 @@
 }
 
 .work-process-debug-label {
-  color: var(--token-text-caption);
-  font-family: var(--font-mono);
+  display: inline-block;
+  padding: 1px var(--space-2);
+  margin-bottom: var(--space-1);
+  border: 1px solid var(--token-border-subtle);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--token-text-placeholder);
   font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 @media (max-width: 760px) {
@@ -949,13 +1404,53 @@
 
 .conversation-message-footer .conversation-message-time {
   color: var(--token-text-caption);
-  font-family: var(--font-mono);
   font-size: var(--text-xs);
   letter-spacing: 0;
 }
 
 .conversation-message-footer .message-actions {
   opacity: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.message-variant-navigator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+}
+
+.message-variant-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--space-6) + var(--space-1));
+  height: calc(var(--space-6) + var(--space-1));
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.message-variant-nav-btn:hover:not(:disabled) {
+  color: var(--token-text-body);
+  background: color-mix(in srgb, var(--token-bg-muted) 70%, transparent);
+}
+
+.message-variant-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.message-variant-nav-label {
+  min-width: 2.5rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .conversation-message-footer .message-action-btn {
@@ -1038,7 +1533,7 @@
 /* ===== Subagent row（嵌套子 agent 工作过程）===== */
 .work-process-subagent {
   list-style: none;
-  border-left: 2px solid rgb(var(--token-border-default));
+  border-left: 2px solid var(--token-border-default);
   padding-left: var(--space-3);
   margin: var(--space-1) 0;
 }
@@ -1059,7 +1554,7 @@
 }
 
 .work-process-subagent-header:hover {
-  background: rgb(var(--token-interactive-hover));
+  background: var(--token-interactive-hover);
 }
 
 .work-process-subagent-caret {

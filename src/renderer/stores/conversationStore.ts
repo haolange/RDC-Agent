@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ConversationMessage } from '@shared/types/conversation';
+import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ReasoningSummary } from '@shared/types/workflow';
 
 const sortConversationMessages = (messages: ConversationMessage[]): ConversationMessage[] =>
@@ -33,10 +34,12 @@ const mergeConversationMessages = (
 
 interface ConversationState {
   conversationMessages: ConversationMessage[];
+  branchState: ConversationBranchState | null;
   timeline: AgentTimelineEntry[];
   reasoningSummaries: ReasoningSummary[];
 
   setConversationMessages: (messages: ConversationMessage[]) => void;
+  setBranchState: (branchState: ConversationBranchState | null) => void;
   addConversationMessage: (message: ConversationMessage) => void;
   upsertConversationMessage: (message: ConversationMessage) => void;
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
@@ -53,10 +56,12 @@ interface ConversationState {
 
 export const useConversationStore = create<ConversationState>((set) => ({
   conversationMessages: [],
+  branchState: null,
   timeline: [],
   reasoningSummaries: [],
 
   setConversationMessages: (conversationMessages) => set({ conversationMessages: sortConversationMessages(conversationMessages) }),
+  setBranchState: (branchState) => set({ branchState }),
   addConversationMessage: (message) => set((state) => ({
     conversationMessages: mergeConversationMessages(state.conversationMessages, [message]),
   })),
@@ -89,6 +94,7 @@ export const useConversationStore = create<ConversationState>((set) => ({
   setReasoningSummaries: (reasoningSummaries) => set({ reasoningSummaries }),
   reset: () => set({
     conversationMessages: [],
+    branchState: null,
     timeline: [],
     reasoningSummaries: [],
   }),

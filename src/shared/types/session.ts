@@ -162,6 +162,24 @@ export interface RunRecord {
 
 export type RunSummary = RunRecord;
 
+export type ContextUsageBreakdownId =
+  | 'system_prompt'
+  | 'rules'
+  | 'memory_files'
+  | 'system_tools'
+  | 'mcp_tools'
+  | 'subagent_definitions'
+  | 'summarized_conversation'
+  | 'conversation'
+  | 'free';
+
+export interface ContextUsageBreakdownEntry {
+  id: ContextUsageBreakdownId;
+  tokens: number;
+  /** 可选附加计数，如工具数量、消息条数。 */
+  count?: number;
+}
+
 export interface RunContextUsageSummary {
   runId: string;
   providerId: string;
@@ -172,6 +190,12 @@ export interface RunContextUsageSummary {
   contextWindowTokens: number | null;
   usagePercent: number;
   hasConfiguredContextWindow: boolean;
+  /** 最近一次 LLM 请求的 prompt 占用量（=provider 上报的 inputTokens），用于窗口占用率。 */
+  occupiedTokens: number;
+  /** 最近一次 prompt 的分类 token 估算；无 run 数据时为 null。 */
+  breakdown: ContextUsageBreakdownEntry[] | null;
+  /** 最近一次用量快照时间戳。 */
+  snapshotAt: number | null;
 }
 
 export interface HumanPreviewSnapshot {

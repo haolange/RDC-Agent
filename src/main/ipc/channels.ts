@@ -17,6 +17,7 @@ export const IPC_HANDLER_DOMAINS = {
     'conversation:sendMessage',
     'conversation:rewriteFromMessage',
     'conversation:getHistory',
+    'conversation:switchBranch',
     'conversation:clearHistory',
     'conversation:undoLastTurn',
     'conversation:compactHistory',
@@ -119,15 +120,6 @@ export const IPC_HANDLER_DOMAINS = {
   command: [
     'command:list',
     'command:execute',
-  ],
-  git: [
-    'git:getStatus',
-    'git:getDiff',
-    'git:stage',
-    'git:stageAll',
-    'git:unstage',
-    'git:unstageAll',
-    'git:commit',
   ],
   trace: [
     'trace:getRun',

@@ -58,11 +58,13 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
 
   ipcMain.handle('conversation:getHistory', async (_event, sessionId: string) => {
     if (!sessionId) {
-      return { messages: [] };
+      return { messages: [], branchState: null };
     }
-    return {
-      messages: await conversationService.getHistory(sessionId),
-    };
+    return conversationService.getHistory(sessionId);
+  });
+
+  ipcMain.handle('conversation:switchBranch', async (_event, request: import('@shared/types/conversationBranch').ConversationSwitchBranchRequest) => {
+    return conversationService.switchConversationBranch(request);
   });
 
   ipcMain.handle('conversation:clearHistory', async (_event, sessionId: string) => {

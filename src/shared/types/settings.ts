@@ -196,24 +196,12 @@ export type AgentPermissionMode =
   | 'full-access'
   | 'custom';
 
-/** 持久化的单条权限规则。 */
-export interface PersistedPermissionRule {
-  toolName: string;
-  decision: 'allow' | 'deny';
-  scope: 'global' | 'project' | 'session';
-  createdAt: number;
-  expiresAt?: number;
-}
-
 export interface AgentPermissionSettings {
   mode: AgentPermissionMode;
   readableRoots: string[];
   writableRoots: string[];
   allowedCommandPrefixes: string[];
   deniedCommandPrefixes: string[];
-  configPath?: string;
-  /** 持久化的用户权限决定（"Always allow" / "Always deny"）。 */
-  persistedRules?: PersistedPermissionRule[];
 }
 
 export interface AgentRuntimeSettings {

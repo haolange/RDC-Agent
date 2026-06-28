@@ -44,9 +44,6 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
   const utilityLabel = selectedEntry?.type === 'local'
     ? 'Local'
     : (selectedEntry?.label ?? 'No Device');
-  const selectedSubtitle = selectedEntry?.type === 'local'
-    ? 'Replay Device'
-    : 'Android Replay';
   const selectedStatus = selectedEntry?.type === 'local'
     ? 'Local'
     : StatusText[selectedEntry?.status ?? 'offline'];
@@ -131,7 +128,6 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
                   {!collapsed && (
                     <span className="device-selector-copy footer-entry-copy">
                       <span className="device-selector-summary footer-entry-title">{selectedSummary}</span>
-                      <span className="device-selector-subtitle footer-entry-subtitle">{selectedSubtitle}</span>
                     </span>
                   )}
                 </span>

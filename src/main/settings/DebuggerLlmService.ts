@@ -1,7 +1,7 @@
 import type { AgentRole } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { LLMMessage, LLMRequest, LLMResponse } from '@shared/types/llm';
-import type { RunContextUsageSummary } from '@shared/types/session';
+import type { ContextUsageBreakdownEntry, RunContextUsageSummary } from '@shared/types/session';
 import type { Blocker, WorkflowStage } from '@shared/types/workflow';
 import { BLOCKER_CODES } from '@shared/constants/blockers';
 import type { LlmProviderProtocol, LlmProviderEntry, LlmProviderId } from '@shared/types/settings';
@@ -13,7 +13,7 @@ import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 
-export type LlmAuditStage = WorkflowStage | 'plan' | 'skeptic' | 'curate' | 'report' | 'dispatch';
+export type LlmAuditStage = WorkflowStage | 'plan' | 'report';
 
 export interface ResolvedDebuggerRoute {
   agentId: AgentRole;
@@ -46,6 +46,12 @@ export interface RunLlmExecutionSummary {
   firstRequestId?: string;
   totalInputTokens: number;
   totalOutputTokens: number;
+  /** 最近一次主对话请求的窗口占用量（=provider 上报的 inputTokens）。 */
+  lastOccupiedTokens?: number;
+  /** 最近一次主对话请求的分类 token 估算（系统提示 / 工具定义 / 对话）。 */
+  lastPromptBreakdown?: ContextUsageBreakdownEntry[] | null;
+  /** 最近一次用量快照时间戳。 */
+  lastSnapshotAt?: number | null;
   routesUsed: Array<{
     agentId: AgentRole;
     stage: LlmAuditStage;
@@ -101,6 +107,33 @@ function extractTextContent(content: LLMResponse['content']): string {
     })
     .join('\n')
     .trim();
+}
+
+/**
+ * 将分类估算缩放到 provider 权威占用量，并在已知窗口时追加“空闲”段。
+ *
+ * 分类估算为字符/4 近似，缩放后各段之和≈occupiedTokens，使堆叠条与
+ * 头部占用率一致；缺少数据时返回 null。
+ */
+function buildScaledBreakdown(
+  raw: ContextUsageBreakdownEntry[] | null,
+  occupiedTokens: number,
+  contextWindowTokens: number | null,
+): ContextUsageBreakdownEntry[] | null {
+  if (!raw || raw.length === 0) {
+    return null;
+  }
+  const estimateSum = raw.reduce((acc, entry) => acc + entry.tokens, 0);
+  const scaleFactor = estimateSum > 0 && occupiedTokens > 0 ? occupiedTokens / estimateSum : 1;
+  const scaled: ContextUsageBreakdownEntry[] = raw.map((entry) => ({
+    id: entry.id,
+    tokens: Math.max(0, Math.round(entry.tokens * scaleFactor)),
+    ...(entry.count !== undefined ? { count: entry.count } : {}),
+  }));
+  if (contextWindowTokens) {
+    scaled.push({ id: 'free', tokens: Math.max(0, contextWindowTokens - occupiedTokens) });
+  }
+  return scaled;
 }
 
 function extractBalancedJsonFragment(text: string, opening: '{' | '['): string | null {
@@ -265,6 +298,8 @@ export class DebuggerLlmService {
       ? model.contextWindowTokens
       : null;
     const totalTokens = summary.totalInputTokens + summary.totalOutputTokens;
+    // 窗口占用量 = 最近一次请求的 input tokens（而非累计 Σ）。
+    const occupiedTokens = summary.lastOccupiedTokens ?? 0;
 
     return {
       runId,
@@ -275,10 +310,60 @@ export class DebuggerLlmService {
       totalTokens,
       contextWindowTokens,
       usagePercent: contextWindowTokens
-        ? Math.min(100, Math.max(0, Math.round((totalTokens / contextWindowTokens) * 100)))
+        ? Math.min(100, Math.max(0, Math.round((occupiedTokens / contextWindowTokens) * 100)))
         : 0,
       hasConfiguredContextWindow: Boolean(contextWindowTokens),
+      occupiedTokens,
+      breakdown: buildScaledBreakdown(summary.lastPromptBreakdown ?? null, occupiedTokens, contextWindowTokens),
+      snapshotAt: summary.lastSnapshotAt ?? null,
     };
+  }
+
+  /**
+   * 记录一次 agent loop turn 的真实窗口占用与分类快照，并广播给 UI。
+   *
+   * agent 主循环不经过 {@link call}，其用量由 provider 在 `message_end` 上报；
+   * 这里把它并入同一份 runSummaries，使上下文环 / 分类查看器拿到权威数据。
+   * `inputTokens` 为最近一次 prompt 的真实占用；`precomputedBreakdown` 由 Orchestrator
+   * 在 message_end 处按权威占用组装好后传入，作为唯一的分段来源。
+   */
+  recordAgentTurnUsage(params: {
+    runId?: string;
+    /** Ask 模式下以 sessionId 作 store key，使 Ask 路径也能广播 usage。 */
+    sessionId?: string | null;
+    providerId: string;
+    modelId: string;
+    inputTokens: number;
+    outputTokens: number;
+    /** 预计算的完整分段 breakdown（由 Orchestrator 在 message_end 处组装）。 */
+    precomputedBreakdown: ContextUsageBreakdownEntry[];
+  }): void {
+    const key = params.runId ?? params.sessionId;
+    if (!key) {
+      return;
+    }
+
+    const existing = this.runSummaries.get(key) ?? {
+      providerId: params.providerId,
+      modelId: params.modelId,
+      successfulCallCount: 0,
+      failedCallCount: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      firstRequestId: undefined,
+      routesUsed: [],
+    };
+    existing.providerId = existing.providerId || params.providerId;
+    existing.modelId = existing.modelId || params.modelId;
+    existing.successfulCallCount += 1;
+    existing.totalInputTokens += params.inputTokens;
+    existing.totalOutputTokens += params.outputTokens;
+    existing.lastOccupiedTokens = params.inputTokens;
+    existing.lastPromptBreakdown = params.precomputedBreakdown;
+    existing.lastSnapshotAt = Date.now();
+
+    this.runSummaries.set(key, existing);
+    this.broadcastRunUsage(key);
   }
 
   private async refreshAccountRuntimeCredentials(route: ResolvedDebuggerRoute): Promise<void> {

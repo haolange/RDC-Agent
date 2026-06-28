@@ -20,3 +20,4 @@ export {
   splitCanonicalAgentModelId,
   type CanonicalAgentModelId,
 } from './agentModelRoute';
+export { charsToTokens } from './tokens';

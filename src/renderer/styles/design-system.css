@@ -93,13 +93,13 @@
   --space-20: 80px;
   --space-24: 96px;
 
-  /* Border Radius */
+  /* Border Radius — macOS-flavored soft scale */
   --radius-none: 0;
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 10px;
-  --radius-2xl: 12px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
   --radius-full: 9999px;
 
   /* Typography */
@@ -130,15 +130,18 @@
   --leading-normal: 1.5;
   --leading-relaxed: 1.625;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.16);
-  --shadow-md: 0 8px 18px rgb(0 0 0 / 0.18);
-  --shadow-lg: 0 16px 34px rgb(0 0 0 / 0.22);
-  --shadow-xl: 0 24px 48px rgb(0 0 0 / 0.26);
-  --shadow-panel: 0 10px 24px rgb(0 0 0 / 0.18);
-  --shadow-panel-hover: 0 12px 28px rgb(0 0 0 / 0.22);
+  /* Shadows — macOS-style layered soft elevation (ambient + key light) */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.10), 0 1px 1px rgb(0 0 0 / 0.06);
+  --shadow-md: 0 2px 4px rgb(0 0 0 / 0.10), 0 8px 20px rgb(0 0 0 / 0.16);
+  --shadow-lg: 0 4px 8px rgb(0 0 0 / 0.12), 0 18px 38px rgb(0 0 0 / 0.22);
+  --shadow-xl: 0 8px 16px rgb(0 0 0 / 0.16), 0 32px 64px rgb(0 0 0 / 0.30);
+  --shadow-panel: 0 2px 6px rgb(0 0 0 / 0.10), 0 14px 30px rgb(0 0 0 / 0.18);
+  --shadow-panel-hover: 0 4px 10px rgb(0 0 0 / 0.14), 0 18px 36px rgb(0 0 0 / 0.22);
   --shadow-glow: 0 0 0 1px rgb(var(--color-accent-500) / 0.12);
   --shadow-glow-strong: 0 0 0 1px rgb(var(--color-accent-500) / 0.2);
+  /* Top highlight that reads as a glassy raised edge on dark surfaces.
+   * On near-black canvases this — not the drop shadow — is what conveys depth. */
+  --highlight-edge: inset 0 1px 0 rgb(255 255 255 / 0.08);
 
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -175,8 +178,8 @@
   --radius-card: var(--radius-lg);        /* 8px - card */
   --radius-button: var(--radius-lg);      /* 8px - 按钮 */
   --radius-input: var(--radius-md);       /* 6px - 输入框 */
-  --radius-bubble: 12px;                  /* chat bubble */
-  --radius-bubble-tail: 4px;              /* 聊天气泡底角 */
+  --radius-bubble: 16px;                  /* chat bubble */
+  --radius-bubble-tail: 6px;              /* 聊天气泡底角 */
 
   /* Layout */
   --header-height: 52px;
@@ -221,11 +224,11 @@
   --color-text-muted: 132 143 157;
   --color-text-disabled: 164 173 185;
 
-  --color-border-subtle: 20 30 44 / 0.06;
-  --color-border-default: 20 30 44 / 0.11;
-  --color-border-strong: 20 30 44 / 0.18;
-  --color-border-primary: 20 30 44 / 0.15;
-  --color-border-secondary: 20 30 44 / 0.08;
+  --color-border-subtle: 20 30 44 / 0.1;
+  --color-border-default: 20 30 44 / 0.15;
+  --color-border-strong: 20 30 44 / 0.24;
+  --color-border-primary: 20 30 44 / 0.18;
+  --color-border-secondary: 20 30 44 / 0.12;
 
   --surface-shell: rgb(var(--color-bg-1));
   --surface-panel: rgb(var(--color-bg-1));
@@ -240,6 +243,19 @@
   --color-surface-raised: var(--color-bg-3);
   --color-surface-subtle: var(--color-bg-1);
   --color-surface-overlay: 242 245 249;
+
+  /* Light elevation: cooler, softer shadows + a crisp white top edge */
+  --shadow-sm: 0 1px 2px rgb(20 30 44 / 0.08), 0 1px 1px rgb(20 30 44 / 0.04);
+  --shadow-md: 0 2px 4px rgb(20 30 44 / 0.06), 0 8px 20px rgb(20 30 44 / 0.10);
+  --shadow-lg: 0 4px 8px rgb(20 30 44 / 0.08), 0 18px 38px rgb(20 30 44 / 0.12);
+  --shadow-xl: 0 8px 16px rgb(20 30 44 / 0.10), 0 32px 64px rgb(20 30 44 / 0.16);
+  --shadow-panel: 0 2px 6px rgb(20 30 44 / 0.06), 0 14px 30px rgb(20 30 44 / 0.10);
+  --shadow-panel-hover: 0 4px 10px rgb(20 30 44 / 0.10), 0 18px 36px rgb(20 30 44 / 0.14);
+  --highlight-edge: inset 0 1px 0 rgb(255 255 255 / 0.85);
+  /* Light code/console surfaces read as clearly recessed against white panels */
+  --token-surface-sunken: rgb(var(--color-bg-2));
+  /* Light raised cards are white, not gray */
+  --token-surface-raised: linear-gradient(180deg, rgb(255 255 255), rgb(var(--color-bg-1)));
 }
 
 :root[data-font-scale='small'] {
@@ -548,10 +564,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
   border: none;
-  border-radius: var(--radius-button);
+  border-radius: var(--control-radius);
   background: transparent;
   color: rgb(var(--color-text-secondary));
   cursor: pointer;
@@ -680,20 +696,50 @@
   --token-text-link:           rgb(var(--color-accent-400));
   --token-text-inverse:        rgb(var(--color-text-on-accent));
 
+  /* ── Accent ── */
+  --token-accent-primary:      rgb(var(--color-accent-400));
+
+  /* ── Muted/dim surfaces ── */
+  --token-bg-muted:            color-mix(in srgb, var(--token-bg-raised) 60%, transparent);
+  --token-border-subtle:       color-mix(in srgb, var(--token-border-muted) 50%, transparent);
+
   /* ── Status ── */
   --token-status-success:      rgb(var(--color-success));
   --token-status-warning:      rgb(var(--color-warning));
   --token-status-error:        rgb(var(--color-error));
   --token-status-info:         rgb(var(--color-info));
 
+  /* ── Elevation (macOS-style depth) ──
+   *  Components express depth through these tokens instead of hard 1px borders.
+   *  `*-edge` appends a glassy top highlight; pair it after the shadow. */
+  --token-shadow-raised:       var(--shadow-sm);
+  --token-shadow-card:         var(--shadow-md);
+  --token-shadow-popover:      var(--shadow-lg);
+  --token-elevation-edge:      var(--highlight-edge);
+  /* Raised surface fill: on dark, depth reads as a surface clearly lighter than
+   * the canvas (elevation overlay) plus the highlight edge — shadows barely show. */
+  --token-surface-raised:      linear-gradient(180deg, rgb(var(--color-bg-4)), rgb(var(--color-bg-3)));
+  --token-surface-sunken:      rgb(var(--color-bg-1) / 0.6);
+
+  /* ── Control sizing scale (shared by buttons, inputs, pills, selects) ──
+   *  Single source of truth for interactive control heights / radius / padding.
+   *  Default interactive control = md (36px). */
+  --control-height-xs:         28px;
+  --control-height-sm:         32px;
+  --control-height-md:         36px;
+  --control-height-lg:         44px;
+  --control-radius:            var(--radius-lg);   /* 8px rounded-rect controls */
+  --control-radius-pill:       var(--radius-full); /* fully-round pills / gauges */
+  --control-padding-x:         var(--space-3);     /* 12px */
+
   /* ── Component: Button ── */
-  --btn-height-sm:             32px;
-  --btn-height-md:             36px;
-  --btn-height-lg:             44px;
+  --btn-height-sm:             var(--control-height-sm);
+  --btn-height-md:             var(--control-height-md);
+  --btn-height-lg:             var(--control-height-lg);
   --btn-padding-sm:            0 10px;
   --btn-padding-md:            0 14px;
   --btn-padding-lg:            0 20px;
-  --btn-radius:                var(--radius-lg);
+  --btn-radius:                var(--control-radius);
   --btn-font-size:             var(--text-sm);
   --btn-font-weight:           var(--font-semibold);
   --btn-primary-bg:            linear-gradient(135deg, rgb(var(--color-accent-600)), rgb(var(--color-primary-600)));
@@ -706,9 +752,9 @@
   --btn-ghost-bg-hover:        rgb(var(--color-bg-3));
 
   /* ── Component: Input ── */
-  --input-height-sm:           32px;
-  --input-height-md:           36px;
-  --input-height-lg:           44px;
+  --input-height-sm:           var(--control-height-sm);
+  --input-height-md:           var(--control-height-md);
+  --input-height-lg:           var(--control-height-lg);
   --input-bg:                  rgb(var(--color-bg-3) / 0.52);
   --input-bg-hover:            rgb(var(--color-bg-3) / 0.72);
   --input-border:              var(--token-border-input);
@@ -722,18 +768,19 @@
   --card-bg:                   rgb(var(--color-bg-2) / 0.52);
   --card-bg-hover:             rgb(var(--color-bg-3) / 0.72);
   --card-border:               var(--token-border-card);
-  --card-radius:               var(--radius-lg);
-  --card-shadow:               var(--shadow-sm);
+  --card-radius:               var(--radius-xl);
+  --card-shadow:               var(--token-shadow-card);
 
   /* ── Component: Modal / Dialog ── */
   --modal-bg:                  rgb(var(--color-bg-1));
   --modal-border:              var(--token-border-default);
-  --modal-radius:              12px;
+  --modal-radius:              var(--radius-2xl);
   --modal-shadow:              var(--shadow-xl);
   --modal-backdrop:            rgb(0 0 0 / 0.4);
   --modal-backdrop-blur:       16px;
 
   /* ── Component: Badge ── */
+  --badge-height:              20px;
   --badge-radius:              var(--radius-full);
   --badge-font-size:           var(--text-xs);
   --badge-font-weight:         var(--font-semibold);

@@ -50,6 +50,7 @@ class BrowserAppBridgeClient {
       answerUserInput: (request) => this.invoke('conversation:answerUserInput', request),
       answerToolApproval: (request) => this.invoke('conversation:answerToolApproval', request),
       getHistory: (sessionId) => this.invoke('conversation:getHistory', sessionId),
+      switchBranch: (request) => this.invoke('conversation:switchBranch', request),
       clearHistory: (sessionId) => this.invoke('conversation:clearHistory', sessionId),
       undoLastTurn: (sessionId) => this.invoke('conversation:undoLastTurn', sessionId),
       compactHistory: (sessionId) => this.invoke('conversation:compactHistory', sessionId),
@@ -63,7 +64,7 @@ class BrowserAppBridgeClient {
       getState: () => this.invoke('workflow:getState'),
       resume: (sessionId) => this.invoke('workflow:resume', sessionId),
       stop: (runId) => this.invoke('workflow:stop', runId),
-      getRunUsage: (runId) => this.invoke('workflow:getRunUsage', runId),
+      getRunUsage: (runId, sessionId) => this.invoke('workflow:getRunUsage', runId, sessionId),
       listRuns: () => this.invoke('workflow:listRuns'),
       listActiveRuns: () => this.invoke('workflow:listActiveRuns'),
     },
@@ -82,15 +83,6 @@ class BrowserAppBridgeClient {
     command: {
       list: (category?) => this.invoke('command:list', category),
       execute: (request) => this.invoke('command:execute', request),
-    },
-    git: {
-      getStatus: () => this.invoke('git:getStatus'),
-      getDiff: (request) => this.invoke('git:getDiff', request),
-      stage: (request) => this.invoke('git:stage', request),
-      stageAll: () => this.invoke('git:stageAll'),
-      unstage: (request) => this.invoke('git:unstage', request),
-      unstageAll: () => this.invoke('git:unstageAll'),
-      commit: (request) => this.invoke('git:commit', request),
     },
     tool: {
       getCatalog: () => this.invoke('tool:getCatalog'),

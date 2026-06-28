@@ -16,6 +16,7 @@ AgentApi
 AgentApprovalEventPayload
 AgentAssistantCompletedPayload
 AgentAssistantDeltaPayload
+AgentAssistantThinkingPayload
 AgentCategory
 AgentConfig
 AgentConversation
@@ -26,6 +27,7 @@ AgentEventBasePayload
 AgentEventPayload
 AgentEventType
 AgentHandoffDefinition
+AgentHandoffRequestedPayload
 AgentId
 AgentManifestDefinition
 AgentManifestDraft
@@ -60,6 +62,7 @@ AgentRuntimeTaskGraphDescriptor
 AgentRunViewModel
 AgentState
 AgentStatus
+AgentSubagentEventPayload
 AgentTaskEventPayload
 AgentTimelineEntry
 AgentToolCompletedPayload
@@ -121,6 +124,7 @@ CaptureControl
 CaptureDescriptor
 CaptureInfo
 CaptureRole
+charsToTokens
 CHATGPT_ACCOUNT_MODELS
 CLAUDE_ACCOUNT_MODELS
 CLIResult
@@ -143,6 +147,8 @@ ContextPacketKind
 ContextPanelGroupViewModel
 ContextPanelViewModel
 ContextSnapshot
+ContextUsageBreakdownEntry
+ContextUsageBreakdownId
 ConversationAgentEvent
 ConversationAnswerToolApprovalRequest
 ConversationAnswerToolApprovalResult
@@ -150,10 +156,14 @@ ConversationAnswerUserInputRequest
 ConversationAnswerUserInputResult
 ConversationApi
 ConversationAttachmentInput
+ConversationBranch
+ConversationBranchState
 ConversationCancelActiveTurnRequest
 ConversationCancelActiveTurnResult
 ConversationErrorViewModel
 ConversationExecutionTransition
+ConversationFork
+ConversationHistoryResult
 ConversationMessage
 ConversationMessageCompletedEvent
 ConversationMessageDiagnostic
@@ -167,6 +177,9 @@ ConversationRole
 ConversationRunLinkedEvent
 ConversationSendRequest
 ConversationStreamEvent
+ConversationSwitchBranchRequest
+ConversationSwitchBranchResult
+ConversationThinkingPresentation
 ConversationToolCall
 ConversationToolCallStatus
 ConversationTurnResult
@@ -225,16 +238,7 @@ getBlockersBySeverity
 getBuiltinProviderDefinition
 getBuiltinProviderProtocolOptions
 GetRunEventsResponse
-GitActionResult
-GitApi
-GitCommitRequest
-GitDiffRequest
-GitDiffResult
-GitFileChangeKind
 GITHUB_COPILOT_ACCOUNT_MODELS
-GitPathRequest
-GitStatusFile
-GitStatusSummary
 GROK_ACCOUNT_MODELS
 HarnessSchemaVersion
 HarnessStatus
@@ -269,6 +273,7 @@ LLMConfig
 LLMMessage
 LLMProvider
 LlmProviderAccountLoginFinishRequest
+LlmProviderAccountLoginStartRequest
 LlmProviderAccountStatus
 LlmProviderAuthMode
 LlmProviderCapability
@@ -301,6 +306,10 @@ MCPToolCall
 MCPToolDefinition
 MCPToolResult
 MCPTransport
+MemoryApi
+MemoryDetail
+MemorySummary
+MemoryWriteRequest
 MODE_CAPABILITIES
 ModeCapabilities
 ModeConfig
@@ -322,7 +331,6 @@ OpenedCaptureState
 OpenProjectInputRequest
 PanelState
 parseYaml
-PersistedPermissionRule
 PhaseGroupNode
 PhaseKind
 PlanContract
@@ -350,6 +358,7 @@ RdxShellActionSettings
 readJsonl
 readYaml
 ReasoningConfidence
+ReasoningDelivery
 ReasoningSummary
 ReasoningVisibility
 RendererElectronApi
@@ -373,6 +382,7 @@ RIGHT_PANEL_DEFAULT_WIDTH
 RIGHT_PANEL_MAX_WIDTH
 RIGHT_PANEL_MIN_WIDTH
 RightPanelViewModel
+ROOT_BRANCH_ID
 RunApi
 RunCapsule
 RunContextUsageSummary

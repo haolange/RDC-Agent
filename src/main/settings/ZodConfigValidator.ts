@@ -15,13 +15,6 @@ const AgentPermissionSchema = z.object({
   writableRoots: z.array(z.string()).optional().default([]),
   allowedCommandPrefixes: z.array(z.string()).optional().default([]),
   deniedCommandPrefixes: z.array(z.string()).optional().default([]),
-  persistedRules: z.array(z.object({
-    toolName: z.string(),
-    decision: z.enum(['allow', 'deny']),
-    scope: z.enum(['global', 'project', 'session']),
-    createdAt: z.number(),
-    expiresAt: z.number().optional(),
-  })).optional(),
 }).passthrough();
 
 export const AppSettingsSchema = z.object({

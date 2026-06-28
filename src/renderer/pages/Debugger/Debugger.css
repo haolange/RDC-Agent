@@ -542,11 +542,11 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: var(--space-8);
+  min-height: var(--control-height-md);
   max-width: 13rem;
   padding: 0 var(--space-3);
   border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
+  border-radius: var(--control-radius);
   background: color-mix(in srgb, var(--token-bg-raised) 64%, transparent);
   color: var(--token-text-heading);
   cursor: pointer;
@@ -568,17 +568,6 @@
 .composer-permission-menu-item:focus-visible {
   outline: 2px solid var(--token-border-focus);
   outline-offset: 2px;
-}
-
-.composer-permission-pill-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: var(--space-6);
-  height: var(--space-6);
-  color: var(--token-text-caption);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
 }
 
 .composer-permission-pill-label {
@@ -621,7 +610,7 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--token-text-secondary);
+  color: var(--token-text-body);
   text-align: left;
   cursor: pointer;
 }
@@ -643,9 +632,10 @@
 }
 
 .composer-permission-menu-desc {
-  color: var(--token-text-caption);
   font-size: var(--text-xs);
+  color: var(--token-text-caption);
   line-height: 1.45;
+  font-weight: var(--font-normal);
 }
 
 .composer-user-input-options {
@@ -879,10 +869,4 @@
   font-size: var(--text-base);
   font-weight: var(--font-semibold);
   line-height: 1.35;
-}
-
-.composer-permission-menu-desc {
-  color: var(--token-text-body);
-  font-size: var(--text-sm);
-  line-height: 1.55;
 }

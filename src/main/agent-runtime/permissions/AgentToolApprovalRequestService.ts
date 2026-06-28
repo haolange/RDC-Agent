@@ -144,7 +144,7 @@ export class AgentToolApprovalRequestService {
       kind: 'tool',
       toolCallId: pending.toolCallId,
       toolName: pending.toolName,
-      answer: input.approved ? 'Approved once.' : 'Denied by user.',
+      answer: input.approved ? '已批准一次' : '用户已拒绝',
       risk: pending.risk,
     } as AgentApprovalEventPayload);
     pending.resolve(input.approved);

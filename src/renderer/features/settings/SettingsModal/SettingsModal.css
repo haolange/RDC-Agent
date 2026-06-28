@@ -2499,7 +2499,7 @@
   min-width: 0;
   flex: 1 1 auto;
   overflow: hidden;
-  color: var(--token-text-secondary);
+  color: var(--token-text-body);
   font-weight: var(--font-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2538,7 +2538,7 @@
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--token-bg-raised) 78%, var(--token-bg-panel));
-  color: var(--token-text-secondary);
+  color: var(--token-text-body);
   font-size: var(--text-sm);
   padding: 0 var(--space-3);
 }

@@ -218,19 +218,6 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
       context.showNotice(skillId ? `Skill execution is available to agent tools: ${skillId}` : 'No skill selected.');
       return;
     }
-    case 'trigger-code-review': {
-      useProjectStore.getState().setRightRailTarget('source-control');
-      return;
-    }
-    case 'open-panel': {
-      const panel = getPayloadString(action, 'panel');
-      if (panel === 'source-control') {
-        useProjectStore.getState().setRightRailTarget('source-control');
-        return;
-      }
-      context.showNotice(panel ? `Panel is not available: ${panel}` : 'No panel selected.');
-      return;
-    }
     default:
       return;
   }
