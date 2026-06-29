@@ -68,8 +68,15 @@ export function useUserMessageRewrite(message: ConversationMessage) {
 
       if (message.sessionId) {
         const historyResult = await electronAPI.conversation.getHistory(message.sessionId);
-        setConversationMessages(historyResult.messages ?? []);
-        setBranchState(historyResult.branchState ?? null);
+        const historyMessages = historyResult.messages ?? [];
+        const historyContainsRewriteTurn = historyMessages.some((entry) => (
+          entry.turnId === result.userMessage.turnId
+          && entry.role === 'user'
+        ));
+        if (historyContainsRewriteTurn) {
+          setConversationMessages(historyMessages);
+          setBranchState(historyResult.branchState ?? null);
+        }
       }
 
       await syncE2EConversationState({

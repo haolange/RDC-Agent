@@ -2,13 +2,15 @@ import { createHash, randomBytes, randomUUID } from 'crypto';
 import { createServer, type Server } from 'http';
 import { shell } from 'electron';
 import type {
+  LlmProviderAccountDiagnostic,
   LlmProviderAccountLoginFinishRequest,
+  LlmProviderAccountLoginMode,
   LlmProviderAccountLoginStartRequest,
   LlmProviderAccountStatus,
   LlmProviderId,
   LlmProviderModel,
 } from '@shared/types/settings';
-import { getBuiltinProviderDefinition } from '@shared/constants/llm';
+import { getBuiltinProviderDefinition, SUPER_GROK_OAUTH_CALLBACK_PORT, SUPER_GROK_OAUTH_REDIRECT_URI } from '@shared/constants/llm';
 import { COPILOT_EDITOR_HEADERS, COPILOT_WIRE_HEADERS } from './CopilotWire';
 import { settingsService } from './SettingsService';
 
@@ -17,12 +19,9 @@ const CHATGPT_CALLBACK_PORT = 1455;
 const CHATGPT_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const CLAUDE_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
 const GITHUB_COPILOT_CLIENT_ID = 'Iv1.b507a08c87ecfe98';
-const GROK_AUTH_DEVICE_ENDPOINT = 'https://auth.x.ai/oauth2/device/code';
-const GROK_AUTH_TOKEN_ENDPOINT = 'https://auth.x.ai/oauth2/token';
-const GROK_AUTH_USERINFO_ENDPOINT = 'https://auth.x.ai/oauth2/userinfo';
-const GROK_AUTH_REVOKE_ENDPOINT = 'https://auth.x.ai/oauth2/revoke';
+const GROK_OPENID_CONFIGURATION_URL = 'https://auth.x.ai/.well-known/openid-configuration';
 const GROK_API_BASE_URL = 'https://api.x.ai/v1';
-const GROK_OAUTH_SCOPE = 'openid profile email offline_access api:access';
+const GROK_OAUTH_REQUESTED_SCOPES = ['openid', 'profile', 'email', 'offline_access', 'api:access'] as const;
 const GROK_OAUTH_CLIENT_ID_ENV_KEYS = [
   'RDC_AGENT_GROK_OAUTH_CLIENT_ID',
   'GROK_OAUTH_CLIENT_ID',
@@ -48,9 +47,16 @@ interface OAuthFlowState {
   deviceCode?: string;
   intervalSeconds?: number;
   clientId?: string;
+  clientIdSource?: 'manual' | 'env';
+  authorizationMode?: LlmProviderAccountLoginMode;
+  requestedScopes?: string;
+  redirectUri?: string;
+  tokenEndpoint?: string;
+  userinfoEndpoint?: string;
   expiresAt: number;
   server?: Server;
   error?: string;
+  diagnostic?: LlmProviderAccountDiagnostic;
 }
 
 interface OAuthSecretBundle {
@@ -62,10 +68,25 @@ interface OAuthSecretBundle {
   copilotApiBaseUrl?: string;
   idToken?: string;
   clientId?: string;
+  authorizationMode?: LlmProviderAccountLoginMode;
+  requestedScopes?: string;
+  redirectUri?: string;
   accountId?: string;
   expiresAt?: string;
   accountLabel?: string;
   planLabel?: string;
+}
+
+interface GrokOAuthMetadata {
+  authorizationEndpoint: string;
+  deviceAuthorizationEndpoint: string;
+  tokenEndpoint: string;
+  userinfoEndpoint: string;
+  revocationEndpoint: string;
+  scopesSupported: string[];
+  grantTypesSupported: string[];
+  codeChallengeMethodsSupported: string[];
+  tokenEndpointAuthMethodsSupported: string[];
 }
 
 const pendingFlows = new Map<string, OAuthFlowState>();
@@ -81,10 +102,10 @@ const isAccountProviderId = (providerId: LlmProviderId): providerId is AccountPr
 const isUnimplementedAccountProviderId = (providerId: AccountProviderId): boolean =>
   providerId === 'gemini-account' || providerId === 'qwen-account';
 
-const resolveGrokOAuthClientId = (draft?: string): { clientId?: string; source?: 'draft' | 'env' } => {
+const resolveGrokOAuthClientId = (draft?: string): { clientId?: string; source?: 'manual' | 'env' } => {
   const cleanDraft = draft?.trim();
   if (cleanDraft) {
-    return { clientId: cleanDraft, source: 'draft' };
+    return { clientId: cleanDraft, source: 'manual' };
   }
   for (const key of GROK_OAUTH_CLIENT_ID_ENV_KEYS) {
     const value = process.env[key]?.trim();
@@ -139,6 +160,171 @@ const normalizeAccountModels = (values: unknown[]): LlmProviderModel[] => {
 
 const readString = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim() ? value.trim() : undefined;
+
+const readStringArray = (value: unknown): string[] => (
+  Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+    : []
+);
+
+const parseGrokOAuthMetadata = (payload: unknown): GrokOAuthMetadata => {
+  const record = payload && typeof payload === 'object' && !Array.isArray(payload)
+    ? payload as Record<string, unknown>
+    : {};
+  const metadata: GrokOAuthMetadata = {
+    authorizationEndpoint: readString(record.authorization_endpoint) ?? '',
+    deviceAuthorizationEndpoint: readString(record.device_authorization_endpoint) ?? '',
+    tokenEndpoint: readString(record.token_endpoint) ?? '',
+    userinfoEndpoint: readString(record.userinfo_endpoint) ?? '',
+    revocationEndpoint: readString(record.revocation_endpoint) ?? '',
+    scopesSupported: readStringArray(record.scopes_supported),
+    grantTypesSupported: readStringArray(record.grant_types_supported),
+    codeChallengeMethodsSupported: readStringArray(record.code_challenge_methods_supported),
+    tokenEndpointAuthMethodsSupported: readStringArray(record.token_endpoint_auth_methods_supported),
+  };
+  if (!metadata.authorizationEndpoint || !metadata.deviceAuthorizationEndpoint || !metadata.tokenEndpoint || !metadata.userinfoEndpoint || !metadata.revocationEndpoint) {
+    throw new Error('xAI OAuth metadata is missing required browser, device, token, userinfo, or revocation endpoints.');
+  }
+  if (metadata.grantTypesSupported.length > 0) {
+    if (!metadata.grantTypesSupported.includes('authorization_code')) {
+      throw new Error('xAI OAuth metadata does not advertise browser authorization-code support.');
+    }
+    if (!metadata.grantTypesSupported.includes('urn:ietf:params:oauth:grant-type:device_code')) {
+      throw new Error('xAI OAuth metadata does not advertise device authorization support.');
+    }
+  }
+  if (metadata.codeChallengeMethodsSupported.length > 0 && !metadata.codeChallengeMethodsSupported.includes('S256')) {
+    throw new Error('xAI OAuth metadata does not advertise PKCE S256 support.');
+  }
+  if (metadata.tokenEndpointAuthMethodsSupported.length > 0 && !metadata.tokenEndpointAuthMethodsSupported.includes('none')) {
+    throw new Error('xAI OAuth metadata does not advertise public-client token exchange support.');
+  }
+  return metadata;
+};
+
+const fetchGrokOAuthMetadata = async (): Promise<GrokOAuthMetadata> => {
+  const payload = await fetchJson(GROK_OPENID_CONFIGURATION_URL, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+  return parseGrokOAuthMetadata(payload);
+};
+
+const resolveGrokOAuthScope = (metadata: GrokOAuthMetadata): string => {
+  const supported = new Set(metadata.scopesSupported);
+  const requested = GROK_OAUTH_REQUESTED_SCOPES.filter((scope) => (
+    supported.size === 0 || supported.has(scope)
+  ));
+  const missing = GROK_OAUTH_REQUESTED_SCOPES.filter((scope) => (
+    supported.size > 0 && !supported.has(scope)
+  ));
+  if (requested.length === 0 || missing.includes('api:access')) {
+    throw new Error(
+      'xAI OAuth metadata does not support the required API scope. Missing scopes: '
+      + (missing.join(', ') || 'unknown')
+      + '.',
+    );
+  }
+  return requested.join(' ');
+};
+
+const readOAuthError = (payload: unknown): { error?: string; detail?: string } => {
+  const record = payload && typeof payload === 'object' && !Array.isArray(payload)
+    ? payload as Record<string, unknown>
+    : {};
+  return {
+    error: readString(record.error),
+    detail: readString(record.error_description) ?? readString(record.message),
+  };
+};
+
+const SUPER_GROK_OAUTH_CHECKLIST = [
+  'Use an xAI-issued public OAuth client id, not an xAI API key.',
+  'Register the RDC-Agent loopback redirect URI for browser login.',
+  'Allow the requested Super Grok scopes for this OAuth client.',
+  'Confirm the Super Grok or X Premium account has Grok API access.',
+];
+
+const createGrokOAuthDiagnostic = (
+  stage: LlmProviderAccountDiagnostic['stage'],
+  summary: string,
+  options: Partial<Omit<LlmProviderAccountDiagnostic, 'stage' | 'summary'>> = {},
+): LlmProviderAccountDiagnostic => ({
+  stage,
+  summary,
+  detail: options.detail,
+  providerError: options.providerError,
+  requestedScopes: options.requestedScopes,
+  redirectUri: options.redirectUri,
+  checklist: options.checklist ?? SUPER_GROK_OAUTH_CHECKLIST,
+});
+
+const renderGrokOAuthDiagnosticMessage = (diagnostic: LlmProviderAccountDiagnostic): string => [
+  diagnostic.summary,
+  diagnostic.requestedScopes ? 'Requested scopes: ' + diagnostic.requestedScopes + '.' : '',
+  diagnostic.redirectUri ? 'Redirect URI: ' + diagnostic.redirectUri + '.' : '',
+  diagnostic.providerError ? 'Provider error: ' + diagnostic.providerError + '.' : '',
+  diagnostic.detail ? 'Detail: ' + diagnostic.detail + '.' : '',
+].filter(Boolean).join(' ');
+
+const createGrokOAuthFailureDiagnostic = (
+  stage: LlmProviderAccountDiagnostic['stage'],
+  operation: string,
+  payload: unknown,
+  scope?: string,
+  redirectUri?: string,
+): LlmProviderAccountDiagnostic => {
+  const { error, detail } = readOAuthError(payload);
+  return createGrokOAuthDiagnostic(
+    stage,
+    'Super Grok OAuth ' + operation + ' failed. Check the xAI public OAuth Client ID, redirect URI, and allowed scopes.',
+    {
+      providerError: error || parseProviderError(payload),
+      detail,
+      requestedScopes: scope,
+      redirectUri,
+    },
+  );
+};
+
+
+class GrokOAuthDiagnosticError extends Error {
+  constructor(readonly diagnostic: LlmProviderAccountDiagnostic) {
+    super(renderGrokOAuthDiagnosticMessage(diagnostic));
+  }
+}
+
+const createGrokOAuthStartupDiagnostic = (
+  error: unknown,
+  mode: LlmProviderAccountLoginMode,
+  scope?: string,
+  redirectUri?: string,
+): LlmProviderAccountDiagnostic => {
+  const message = parseProviderError(error);
+  const stage: LlmProviderAccountDiagnostic['stage'] = message.startsWith('xAI OAuth metadata') ? 'metadata' : 'authorization';
+  if (message.startsWith('Super Grok OAuth ') || message.startsWith('xAI OAuth metadata')) {
+    return createGrokOAuthDiagnostic(stage, message, { requestedScopes: scope, redirectUri });
+  }
+  return createGrokOAuthDiagnostic(
+    stage,
+    'Super Grok OAuth ' + mode + ' authorization failed. Check the xAI public OAuth Client ID, xAI OAuth metadata network access, redirect URI, and allowed scopes.',
+    { detail: message, requestedScopes: scope, redirectUri },
+  );
+};
+
+const resolveGrokOAuthDiagnostic = (
+  error: unknown,
+  mode: LlmProviderAccountLoginMode,
+  scope?: string,
+  redirectUri?: string,
+): LlmProviderAccountDiagnostic => (
+  error instanceof GrokOAuthDiagnosticError
+    ? error.diagnostic
+    : createGrokOAuthStartupDiagnostic(error, mode, scope, redirectUri)
+);
+
 
 const parseJwtPayload = (token?: string): Record<string, unknown> | null => {
   const payload = token?.split('.')[1];
@@ -340,7 +526,7 @@ export class ProviderAccountAuthService {
       return this.startGitHubCopilotLogin();
     }
     if (providerId === 'grok-account') {
-      return this.startGrokLogin(request.oauthClientId);
+      return this.startGrokLogin(request.oauthClientId, request.accountLoginMode);
     }
     return this.startUnimplementedAccountLogin(providerId);
   }
@@ -372,11 +558,24 @@ export class ProviderAccountAuthService {
         return await this.persistAccount(request.providerId, bundle);
       }
       if (request.providerId === 'grok-account') {
-        const bundle = await this.pollGrokDevice(flow);
+        const bundle = flow.authorizationMode === 'browser'
+          ? await this.exchangeGrokCode(flow, request.code?.trim() ?? '')
+          : await this.pollGrokDevice(flow);
         return await this.persistAccount(request.providerId, bundle);
       }
       return this.status(request.providerId, 'Provider does not support account login.', 'failed');
     } catch (error) {
+      if (request.providerId === 'grok-account') {
+        const diagnostic = createGrokOAuthStartupDiagnostic(
+          error,
+          flow.authorizationMode === 'device' ? 'device' : 'browser',
+          flow.requestedScopes,
+          flow.redirectUri,
+        );
+        flow.error = renderGrokOAuthDiagnosticMessage(diagnostic);
+        flow.diagnostic = diagnostic;
+        return this.status(request.providerId, flow.error, 'failed', diagnostic);
+      }
       flow.error = parseProviderError(error);
       return this.status(request.providerId, flow.error, 'failed');
     }
@@ -444,25 +643,33 @@ export class ProviderAccountAuthService {
     );
   }
 
-  status(providerId: LlmProviderId, message?: string, forcedState?: LlmProviderAccountStatus['state']): LlmProviderAccountStatus {
+  status(
+    providerId: LlmProviderId,
+    message?: string,
+    forcedState?: LlmProviderAccountStatus['state'],
+    diagnostic?: LlmProviderAccountDiagnostic,
+  ): LlmProviderAccountStatus {
     const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
     const isAccount = isAccountProviderId(providerId);
     const flow = isAccount ? this.findFlow(providerId) : null;
     const connected = Boolean(provider?.isConfigured && provider.status === 'verified');
+    const grokBundle = providerId === 'grok-account' ? this.readBundle('grok-account') : null;
     const grokClientIdSource = providerId === 'grok-account'
-      ? flow?.clientId
-        ? 'draft'
-        : connected && this.readBundle('grok-account')?.clientId
+      ? flow?.clientIdSource
+        ?? (connected && grokBundle?.clientId
           ? 'stored'
-          : resolveGrokOAuthClientId().source
+          : resolveGrokOAuthClientId().source)
       : undefined;
     const state: LlmProviderAccountStatus['state'] = forcedState
       ?? (connected ? 'connected' : flow?.error ? 'failed' : flow ? 'pending' : isAccount ? 'signed-out' : 'unavailable');
     const pendingMessage = providerId === 'github-copilot'
       ? 'Waiting for GitHub authorization.'
       : providerId === 'grok-account'
-        ? 'Waiting for xAI authorization.'
+        ? flow?.authorizationMode === 'device'
+          ? 'Waiting for Super Grok device-code authorization.'
+          : 'Waiting for Super Grok browser authorization.'
         : 'Waiting for authorization.';
+    const activeDiagnostic = diagnostic ?? flow?.diagnostic;
     return {
       providerId,
       state,
@@ -473,12 +680,17 @@ export class ProviderAccountAuthService {
       accountLabel: provider?.accountLabel,
       planLabel: provider?.planLabel,
       expiresAt: provider?.oauthExpiresAt,
+      oauthRefreshAvailable: provider?.oauthRefreshAvailable,
       authUrl: flow?.authUrl,
       verificationUri: flow?.verificationUri,
       userCode: flow?.userCode,
       requiresCodeInput: Boolean(flow?.providerId === 'claude-account' || (flow && isUnimplementedAccountProviderId(flow.providerId))),
       requiresClientId: providerId === 'grok-account' && !connected && !grokClientIdSource,
       clientIdSource: grokClientIdSource,
+      authorizationMode: flow?.authorizationMode ?? grokBundle?.authorizationMode,
+      diagnostic: activeDiagnostic,
+      requestedScopes: flow?.requestedScopes ?? activeDiagnostic?.requestedScopes ?? grokBundle?.requestedScopes,
+      redirectUri: flow?.redirectUri ?? activeDiagnostic?.redirectUri ?? grokBundle?.redirectUri,
       models: provider?.models ?? [],
     };
   }
@@ -587,25 +799,78 @@ export class ProviderAccountAuthService {
     return this.status(flow.providerId);
   }
 
-  private async startGrokLogin(oauthClientId?: string): Promise<LlmProviderAccountStatus> {
+  private async startGrokLogin(
+    oauthClientId?: string,
+    accountLoginMode?: LlmProviderAccountLoginMode,
+  ): Promise<LlmProviderAccountStatus> {
+    const mode: LlmProviderAccountLoginMode = accountLoginMode === 'device' ? 'device' : 'browser';
     const resolved = resolveGrokOAuthClientId(oauthClientId);
     if (!resolved.clientId) {
-      return this.status(
-        'grok-account',
-        'Grok OAuth client id is required. Enter an OAuth client id or set RDC_AGENT_GROK_OAUTH_CLIENT_ID.',
-        'failed',
+      const diagnostic = createGrokOAuthDiagnostic(
+        'configuration',
+        'Super Grok OAuth requires an xAI-issued public OAuth Client ID. This is not an xAI API key.',
+        { redirectUri: mode === 'browser' ? SUPER_GROK_OAUTH_REDIRECT_URI : undefined },
       );
+      return this.status('grok-account', renderGrokOAuthDiagnosticMessage(diagnostic), 'failed', diagnostic);
     }
+    return mode === 'device'
+      ? this.startGrokDeviceLogin(resolved.clientId, resolved.source ?? 'manual')
+      : this.startGrokBrowserLogin(resolved.clientId, resolved.source ?? 'manual');
+  }
 
+  private async startGrokBrowserLogin(clientId: string, clientIdSource: 'manual' | 'env'): Promise<LlmProviderAccountStatus> {
+    let scope: string | undefined;
     try {
-      const payload = await fetchJson(GROK_AUTH_DEVICE_ENDPOINT, {
+      const metadata = await fetchGrokOAuthMetadata();
+      scope = resolveGrokOAuthScope(metadata);
+      const { verifier, challenge } = createPkce();
+      const flow: OAuthFlowState = {
+        providerId: 'grok-account',
+        flowId: randomUUID(),
+        state: randomUUID(),
+        codeVerifier: verifier,
+        authUrl: '',
+        clientId,
+        clientIdSource,
+        authorizationMode: 'browser',
+        requestedScopes: scope,
+        redirectUri: SUPER_GROK_OAUTH_REDIRECT_URI,
+        tokenEndpoint: metadata.tokenEndpoint,
+        userinfoEndpoint: metadata.userinfoEndpoint,
+        expiresAt: Date.now() + 10 * 60 * 1000,
+      };
+      flow.authUrl = appendParams(metadata.authorizationEndpoint, {
+        client_id: clientId,
+        response_type: 'code',
+        redirect_uri: SUPER_GROK_OAUTH_REDIRECT_URI,
+        scope,
+        code_challenge: challenge,
+        code_challenge_method: 'S256',
+        state: flow.state,
+      });
+      this.setFlow(flow);
+      await this.startGrokCallbackServer(flow);
+      void this.openExternal(flow.authUrl);
+      return this.status(flow.providerId);
+    } catch (error) {
+      const diagnostic = resolveGrokOAuthDiagnostic(error, 'browser', scope, SUPER_GROK_OAUTH_REDIRECT_URI);
+      return this.status('grok-account', renderGrokOAuthDiagnosticMessage(diagnostic), 'failed', diagnostic);
+    }
+  }
+
+  private async startGrokDeviceLogin(clientId: string, clientIdSource: 'manual' | 'env'): Promise<LlmProviderAccountStatus> {
+    let scope: string | undefined;
+    try {
+      const metadata = await fetchGrokOAuthMetadata();
+      scope = resolveGrokOAuthScope(metadata);
+      const payload = await fetchOAuthJson(metadata.deviceAuthorizationEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: createFormBody({
-          client_id: resolved.clientId,
-          scope: GROK_OAUTH_SCOPE,
+          client_id: clientId,
+          scope,
         }),
       }) as {
         device_code?: string;
@@ -614,7 +879,12 @@ export class ProviderAccountAuthService {
         verification_uri_complete?: string;
         expires_in?: number;
         interval?: number;
+        error?: string;
+        error_description?: string;
       };
+      if (payload.error) {
+        throw new GrokOAuthDiagnosticError(createGrokOAuthFailureDiagnostic('authorization', 'device authorization', payload, scope));
+      }
       if (!payload.device_code || !payload.user_code || !payload.verification_uri) {
         throw new Error('xAI OAuth did not return a complete device authorization payload.');
       }
@@ -627,7 +897,12 @@ export class ProviderAccountAuthService {
         verificationUri: payload.verification_uri,
         authUrl: payload.verification_uri_complete ?? payload.verification_uri,
         intervalSeconds: payload.interval ?? 5,
-        clientId: resolved.clientId,
+        clientId,
+        clientIdSource,
+        authorizationMode: 'device',
+        requestedScopes: scope,
+        tokenEndpoint: metadata.tokenEndpoint,
+        userinfoEndpoint: metadata.userinfoEndpoint,
         expiresAt: Date.now() + (payload.expires_in ?? 900) * 1000,
       };
       this.setFlow(flow);
@@ -635,11 +910,14 @@ export class ProviderAccountAuthService {
       void this.pollGrokDevice(flow)
         .then((bundle) => this.persistAccount('grok-account', bundle))
         .catch((error) => {
-          flow.error = parseProviderError(error);
+          const diagnostic = resolveGrokOAuthDiagnostic(error, 'device', flow.requestedScopes, flow.redirectUri);
+          flow.error = renderGrokOAuthDiagnosticMessage(diagnostic);
+          flow.diagnostic = diagnostic;
         });
       return this.status(flow.providerId);
     } catch (error) {
-      return this.status('grok-account', parseProviderError(error), 'failed');
+      const diagnostic = resolveGrokOAuthDiagnostic(error, 'device', scope);
+      return this.status('grok-account', renderGrokOAuthDiagnosticMessage(diagnostic), 'failed', diagnostic);
     }
   }
 
@@ -789,21 +1067,71 @@ export class ProviderAccountAuthService {
     }
   }
 
+  private async exchangeGrokCode(flow: OAuthFlowState, code: string): Promise<OAuthSecretBundle> {
+    if (!code || !flow.codeVerifier || !flow.clientId || !flow.redirectUri) {
+      throw new Error('Super Grok browser authorization callback is missing code, PKCE verifier, client id, or redirect URI.');
+    }
+    const tokenEndpoint = flow.tokenEndpoint ?? (await fetchGrokOAuthMetadata()).tokenEndpoint;
+    const payload = await fetchOAuthJson(tokenEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: createFormBody({
+        grant_type: 'authorization_code',
+        client_id: flow.clientId,
+        code,
+        redirect_uri: flow.redirectUri,
+        code_verifier: flow.codeVerifier,
+      }),
+    }) as {
+      access_token?: string;
+      refresh_token?: string;
+      id_token?: string;
+      expires_in?: number;
+      error?: string;
+      error_description?: string;
+    };
+    if (payload.error) {
+      throw new GrokOAuthDiagnosticError(createGrokOAuthFailureDiagnostic('token', 'browser token exchange', payload, flow.requestedScopes, flow.redirectUri));
+    }
+    if (!payload.access_token) {
+      throw new Error('xAI OAuth did not return an access token.');
+    }
+    const account = await this.fetchGrokUserInfo(payload.access_token, flow.userinfoEndpoint);
+    return {
+      providerId: 'grok-account',
+      accessToken: payload.access_token,
+      apiKey: payload.access_token,
+      refreshToken: payload.refresh_token,
+      idToken: payload.id_token,
+      clientId: flow.clientId,
+      authorizationMode: 'browser',
+      requestedScopes: flow.requestedScopes,
+      redirectUri: flow.redirectUri,
+      accountId: account.accountId,
+      expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
+      accountLabel: account.accountLabel ?? 'Super Grok Account',
+      planLabel: 'Super Grok OAuth',
+    };
+  }
+
   private async pollGrokDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle> {
     if (!flow.deviceCode || !flow.clientId) {
-      throw new Error('Grok device authorization is missing client or device code.');
+      throw new Error('Super Grok device authorization is missing client or device code.');
     }
     let intervalSeconds = flow.intervalSeconds ?? 5;
     let delayBeforePoll = !isTestMode();
     for (;;) {
       if (Date.now() > flow.expiresAt) {
-        throw new Error('Grok authorization code expired.');
+        throw new Error('Super Grok authorization code expired.');
       }
       if (delayBeforePoll) {
         await wait(intervalSeconds * 1000);
       }
       delayBeforePoll = true;
-      const payload = await fetchOAuthJson(GROK_AUTH_TOKEN_ENDPOINT, {
+      const tokenEndpoint = flow.tokenEndpoint ?? (await fetchGrokOAuthMetadata()).tokenEndpoint;
+      const payload = await fetchOAuthJson(tokenEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -831,12 +1159,12 @@ export class ProviderAccountAuthService {
         continue;
       }
       if (payload.error) {
-        throw new Error(payload.error_description ?? payload.error);
+        throw new GrokOAuthDiagnosticError(createGrokOAuthFailureDiagnostic('token', 'device token polling', payload, flow.requestedScopes));
       }
       if (!payload.access_token) {
         throw new Error('xAI OAuth did not return an access token.');
       }
-      const account = await this.fetchGrokUserInfo(payload.access_token);
+      const account = await this.fetchGrokUserInfo(payload.access_token, flow.userinfoEndpoint);
       return {
         providerId: 'grok-account',
         accessToken: payload.access_token,
@@ -844,17 +1172,20 @@ export class ProviderAccountAuthService {
         refreshToken: payload.refresh_token,
         idToken: payload.id_token,
         clientId: flow.clientId,
+        authorizationMode: 'device',
+        requestedScopes: flow.requestedScopes,
         accountId: account.accountId,
         expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
-        accountLabel: account.accountLabel ?? 'Grok Account',
-        planLabel: 'xAI OAuth',
+        accountLabel: account.accountLabel ?? 'Super Grok Account',
+        planLabel: 'Super Grok OAuth',
       };
     }
   }
 
-  private async fetchGrokUserInfo(accessToken: string): Promise<{ accountId?: string; accountLabel?: string }> {
+  private async fetchGrokUserInfo(accessToken: string, userinfoEndpoint?: string): Promise<{ accountId?: string; accountLabel?: string }> {
     try {
-      const payload = await fetchJson(GROK_AUTH_USERINFO_ENDPOINT, {
+      const endpoint = userinfoEndpoint ?? (await fetchGrokOAuthMetadata()).userinfoEndpoint;
+      const payload = await fetchJson(endpoint, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -945,7 +1276,8 @@ export class ProviderAccountAuthService {
       if (!bundle.refreshToken || !bundle.clientId) {
         return bundle;
       }
-      const payload = await fetchOAuthJson(GROK_AUTH_TOKEN_ENDPOINT, {
+      const metadata = await fetchGrokOAuthMetadata();
+      const payload = await fetchOAuthJson(metadata.tokenEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -957,7 +1289,7 @@ export class ProviderAccountAuthService {
         }),
       }) as { access_token?: string; refresh_token?: string; id_token?: string; expires_in?: number; error?: string; error_description?: string };
       if (payload.error) {
-        throw new Error(payload.error_description ?? payload.error);
+        throw new GrokOAuthDiagnosticError(createGrokOAuthFailureDiagnostic('refresh', 'token refresh', payload, bundle.requestedScopes, bundle.redirectUri));
       }
       if (!payload.access_token) {
         throw new Error('xAI OAuth refresh did not return an access token.');
@@ -1041,7 +1373,7 @@ export class ProviderAccountAuthService {
     if (bundle.providerId === 'grok-account') {
       const token = bundle.accessToken ?? bundle.apiKey;
       if (!token) {
-        throw new Error('Grok account access token is missing. Sign in again.');
+        throw new Error('Super Grok account access token is missing. Sign in again.');
       }
       const payload = await fetchJson(`${GROK_API_BASE_URL}/models`, {
         method: 'GET',
@@ -1086,7 +1418,8 @@ export class ProviderAccountAuthService {
       return;
     }
     try {
-      await fetchOAuthJson(GROK_AUTH_REVOKE_ENDPOINT, {
+      const metadata = await fetchGrokOAuthMetadata();
+      await fetchOAuthJson(metadata.revocationEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -1147,6 +1480,99 @@ export class ProviderAccountAuthService {
     if (server.listening) {
       server.close();
     }
+  }
+
+  private startGrokCallbackServer(flow: OAuthFlowState): Promise<void> {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const server = createServer((request, response) => {
+        const url = new URL(request.url ?? '/', `http://localhost:${SUPER_GROK_OAUTH_CALLBACK_PORT}`);
+        if (url.pathname !== '/oauth/grok/callback') {
+          response.writeHead(404, { 'Content-Type': 'text/plain' });
+          response.end('Not found.');
+          return;
+        }
+
+        const failCallback = (diagnostic: LlmProviderAccountDiagnostic, statusCode = 400) => {
+          flow.error = renderGrokOAuthDiagnosticMessage(diagnostic);
+          flow.diagnostic = diagnostic;
+          response.writeHead(statusCode, { 'Content-Type': 'text/plain' });
+          response.end(flow.error);
+          this.closeFlowServer(flow);
+        };
+
+        if (url.searchParams.get('state') !== flow.state) {
+          failCallback(createGrokOAuthDiagnostic(
+            'callback',
+            'Super Grok OAuth browser callback failed because the returned state did not match the active login flow.',
+            { requestedScopes: flow.requestedScopes, redirectUri: flow.redirectUri },
+          ));
+          return;
+        }
+
+        const providerError = url.searchParams.get('error') ?? '';
+        if (providerError) {
+          failCallback(createGrokOAuthDiagnostic(
+            'callback',
+            'Super Grok OAuth browser callback was rejected by xAI.',
+            {
+              providerError,
+              detail: url.searchParams.get('error_description') ?? undefined,
+              requestedScopes: flow.requestedScopes,
+              redirectUri: flow.redirectUri,
+            },
+          ));
+          return;
+        }
+
+        const code = url.searchParams.get('code') ?? '';
+        if (!code) {
+          failCallback(createGrokOAuthDiagnostic(
+            'callback',
+            'Super Grok OAuth browser callback did not include an authorization code.',
+            { requestedScopes: flow.requestedScopes, redirectUri: flow.redirectUri },
+          ));
+          return;
+        }
+
+        void this.finishLogin({ providerId: flow.providerId, flowId: flow.flowId, code })
+          .then((status) => {
+            if (!status.connected) {
+              response.writeHead(500, { 'Content-Type': 'text/plain' });
+              response.end(status.error ?? status.message ?? 'Super Grok OAuth failed.');
+              return;
+            }
+            response.writeHead(200, { 'Content-Type': 'text/html' });
+            response.end('<html><body>RDC Agent Super Grok sign-in complete. You can return to the app.</body></html>');
+          })
+          .catch((error) => {
+            const diagnostic = resolveGrokOAuthDiagnostic(error, 'browser', flow.requestedScopes, flow.redirectUri);
+            flow.error = renderGrokOAuthDiagnosticMessage(diagnostic);
+            flow.diagnostic = diagnostic;
+            response.writeHead(500, { 'Content-Type': 'text/plain' });
+            response.end(flow.error);
+          })
+          .finally(() => {
+            this.closeFlowServer(flow);
+          });
+      });
+      flow.server = server;
+      server.on('error', (error) => {
+        const diagnostic = resolveGrokOAuthDiagnostic(error, 'browser', flow.requestedScopes, flow.redirectUri);
+        flow.error = renderGrokOAuthDiagnosticMessage(diagnostic);
+        flow.diagnostic = diagnostic;
+        this.closeFlowServer(flow);
+        pendingFlows.delete(flow.flowId);
+        if (!settled) {
+          settled = true;
+          reject(error);
+        }
+      });
+      server.listen(SUPER_GROK_OAUTH_CALLBACK_PORT, '127.0.0.1', () => {
+        settled = true;
+        resolve();
+      });
+    });
   }
 
   private startChatGptCallbackServer(flow: OAuthFlowState): Promise<void> {

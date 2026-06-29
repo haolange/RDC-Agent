@@ -152,12 +152,14 @@ assert(routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'RouteCapabi
   assert(configuredProviderSource.includes('OpenAICompatibleProvider'), 'Configured runtime provider must map OpenAI-compatible routes.');
   assert(configuredProviderSource.includes('id: decoded.modelId'), 'Configured runtime provider must send the real model id to the provider.');
 
-  const promptComposer = read('src/main/agent-runtime/prompt/PromptComposer.ts');
-  assert(promptComposer.includes('native structured tool calling is enabled'), 'PromptComposer must include native structured route instructions.');
-  assert(promptComposer.includes('This route cannot execute runtime tools'), 'PromptComposer must include text-only/disabled route instructions.');
-  assert(promptComposer.includes('composeRuntimeCatalogPrompt'), 'PromptComposer must own runtime catalog prompt composition.');
-  assert(promptComposer.includes('Current permission mode'), 'PromptComposer must describe runtime permission mode to the model.');
-  assert(promptComposer.includes('If the runtime denies or requests approval'), 'PromptComposer must tell the model not to route around permission decisions.');
+  const promptSections = read('src/main/agent-runtime/prompt/PromptSections.ts');
+  const promptAssembler = read('src/main/agent-runtime/prompt/PromptAssembler.ts');
+  assert(promptSections.includes('native structured tool calling is enabled'), 'PromptSections must include native structured route instructions.');
+  assert(promptSections.includes('This route cannot execute runtime tools'), 'PromptSections must include text-only/disabled route instructions.');
+  assert(promptSections.includes('sectionCatalog'), 'PromptSections must own runtime catalog prompt composition.');
+  assert(promptSections.includes('Current permission mode'), 'PromptSections must describe runtime permission mode to the model.');
+  assert(promptSections.includes('If the runtime denies or requests approval'), 'PromptSections must tell the model not to route around permission decisions.');
+  assert(promptAssembler.includes('DEFAULT_SECTIONS'), 'PromptAssembler must assemble the canonical prompt sections.');
 
   const conversationService = read('src/main/conversation/ConversationService.ts');
   for (const forbidden of ['buildProfileSystemPrompt', 'buildProfileCatalogPrompt', 'buildProfileTurnPrompt', 'mentionsTextualToolCall', 'traceHasRuntimeToolCalls', 'AGENT_WORKBENCH_TOOL_CATALOG']) {
@@ -166,9 +168,9 @@ assert(routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'RouteCapabi
   for (const forbidden of ['TASK_FILE_PATTERN', 'readFileSync(taskFilePath', 'fs.existsSync(taskFilePath']) {
     assert(!conversationService.includes(forbidden), `ConversationService must not preload local files outside the tool permission policy: ${forbidden}.`);
   }
-  assert(conversationService.includes('composeProfileSystemPrompt'), 'ConversationService must call PromptComposer for system prompts.');
-  assert(conversationService.includes('routeCapability: routePreflight.routeCapability'), 'ConversationService must pass route capability into PromptComposer.');
-  assert(conversationService.includes('permissionSettings: settingsService.getAll().agentRuntime.permissions'), 'ConversationService must pass runtime permission settings into PromptComposer.');
+  assert(conversationService.includes('promptAssembler.assembleSystemPrompt'), 'ConversationService must call PromptAssembler for system prompts.');
+  assert(conversationService.includes('routeCapability: routePreflight.routeCapability'), 'ConversationService must pass route capability into PromptAssembler.');
+  assert(conversationService.includes('permissionSettings: settingsService.getAll().agentRuntime.permissions'), 'ConversationService must pass runtime permission settings into PromptAssembler.');
   assert(conversationService.includes('answerToolApproval'), 'ConversationService must expose tool approval resume.');
 
   const settingsService = read('src/main/settings/SettingsService.ts');

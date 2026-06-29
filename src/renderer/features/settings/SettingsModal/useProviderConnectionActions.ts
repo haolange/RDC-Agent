@@ -84,9 +84,10 @@ export const useProviderConnectionActions = (
           : await window.electronAPI.llm.startProviderAccountLogin({
             providerId: connectionDraft.providerId,
             oauthClientId: connectionDraft.oauthClientId,
+            accountLoginMode: connectionDraft.accountLoginMode,
           });
         if (!status.connected && status.state !== 'pending') {
-          updateConnectionDraft({ busy: 'idle', error: status.error ?? status.message ?? t('settings.providerSaveFailed'), accountStatus: status });
+          updateConnectionDraft({ busy: 'idle', error: '', accountStatus: status });
           return;
         }
         if (status.connected) {
@@ -118,17 +119,18 @@ export const useProviderConnectionActions = (
     }
   };
 
-  const handleStartAccountLogin = async () => {
+  const handleStartAccountLogin = async (accountLoginMode = connectionDraft?.accountLoginMode) => {
     if (!connectionDraft) return;
     updateConnectionDraft({ busy: 'saving', error: '' });
     try {
       const status = await window.electronAPI.llm.startProviderAccountLogin({
         providerId: connectionDraft.providerId,
         oauthClientId: connectionDraft.oauthClientId,
+        accountLoginMode,
       });
       updateConnectionDraft({
         busy: 'idle',
-        error: status.error ?? '',
+        error: '',
         accountStatus: status,
       });
       if (status.connected) {

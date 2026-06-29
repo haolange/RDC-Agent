@@ -302,9 +302,10 @@
 
 /* Assistant final answer reads as full-bleed prose, not a bubble */
 .conversation-bubble-assistant {
-  width: 100%;
+  width: min(100%, 58rem);
   max-width: 100%;
   padding: 0;
+  white-space: normal;
   background: transparent;
   color: rgb(var(--color-text-primary));
   border: 0;
@@ -482,7 +483,7 @@
 }
 
 .conversation-bubble-assistant .markdown-body {
-  line-height: 1.6;
+  line-height: 1.62;
 }
 
 .conversation-bubble-assistant .markdown-body p {
@@ -492,10 +493,17 @@
 .conversation-bubble-assistant .markdown-body ul,
 .conversation-bubble-assistant .markdown-body ol {
   margin: 0 0 var(--space-2);
+  padding-left: var(--space-5);
 }
 
 .conversation-bubble-assistant .markdown-body li {
-  margin: 0;
+  margin: var(--space-1) 0;
+}
+
+.conversation-bubble-assistant .markdown-body li > ul,
+.conversation-bubble-assistant .markdown-body li > ol {
+  margin-top: var(--space-1);
+  margin-bottom: 0;
 }
 
 .conversation-bubble-assistant .markdown-body h3 {
@@ -554,76 +562,6 @@
 .conversation-message-diagnostic-text {
   color: rgb(var(--color-text-primary));
   line-height: 1.55;
-}
-
-.conversation-handoff-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  max-width: 100%;
-  color: var(--token-text-caption);
-  font-size: var(--text-xs);
-}
-
-.conversation-handoff-actions-label {
-  font-weight: var(--font-medium);
-}
-
-.conversation-handoff-button-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.conversation-handoff-button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  max-width: 100%;
-  min-height: 34px;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--token-bg-raised) 46%, transparent);
-  color: var(--token-text-heading);
-  font: inherit;
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.conversation-handoff-button:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--message-mode-accent) 44%, var(--token-border-muted));
-  background: color-mix(in srgb, var(--token-bg-raised) 72%, transparent);
-}
-
-.conversation-handoff-button:focus-visible {
-  outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
-}
-
-.conversation-handoff-button:disabled {
-  cursor: default;
-  opacity: 0.58;
-}
-
-.conversation-handoff-button span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.conversation-handoff-button-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--space-5);
-  height: var(--space-5);
-  flex: 0 0 auto;
-  color: var(--token-text-caption);
-  font-size: var(--text-xs);
 }
 
 /* Work Process transcript presentation - canonical runtime view */
@@ -1375,11 +1313,6 @@
 .message-action-btn:focus-visible {
   outline: 2px solid var(--token-border-focus);
   outline-offset: 2px;
-}
-
-.conversation-handoff-button-icon {
-  width: var(--space-5);
-  height: var(--space-5);
 }
 
 /* Message footer tools */

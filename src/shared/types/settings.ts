@@ -381,6 +381,7 @@ export interface LlmProviderDraftRequest {
 export interface LlmProviderAccountLoginStartRequest {
   providerId: LlmProviderId;
   oauthClientId?: string;
+  accountLoginMode?: LlmProviderAccountLoginMode;
 }
 
 export interface LlmProviderAccountLoginFinishRequest {
@@ -397,6 +398,18 @@ export interface LlmProviderConnectionResult {
   error?: string;
 }
 
+export type LlmProviderAccountLoginMode = 'browser' | 'device';
+
+export interface LlmProviderAccountDiagnostic {
+  stage: 'configuration' | 'metadata' | 'authorization' | 'callback' | 'token' | 'models' | 'refresh' | 'revoke';
+  summary: string;
+  detail?: string;
+  providerError?: string;
+  requestedScopes?: string;
+  redirectUri?: string;
+  checklist?: string[];
+}
+
 export interface LlmProviderAccountStatus {
   providerId: LlmProviderId;
   state: 'signed-out' | 'pending' | 'connected' | 'failed' | 'unavailable';
@@ -407,11 +420,16 @@ export interface LlmProviderAccountStatus {
   accountLabel?: string;
   planLabel?: string;
   expiresAt?: string;
+  oauthRefreshAvailable?: boolean;
   authUrl?: string;
   verificationUri?: string;
   userCode?: string;
   requiresCodeInput?: boolean;
   requiresClientId?: boolean;
-  clientIdSource?: 'draft' | 'env' | 'stored';
+  clientIdSource?: 'manual' | 'env' | 'stored';
+  authorizationMode?: LlmProviderAccountLoginMode;
+  diagnostic?: LlmProviderAccountDiagnostic;
+  requestedScopes?: string;
+  redirectUri?: string;
   models?: LlmProviderModel[];
 }

@@ -215,6 +215,7 @@ async function main() {
   assert(grokAccount?.category === 'login-authorization', 'grok-account must stay in login authorization.');
   assert(grokAccount?.protocol === 'OpenAICompatibleChatCompletions', 'grok-account must use the OpenAI-compatible chat adapter.');
   assert(grokAccount?.accountLoginConfigured === true, 'grok-account must expose a configured account login path.');
+  assert(grokAccount?.label === 'Super Grok Account', 'grok-account must be labeled Super Grok Account in OAuth UI.');
   assert(grokAccount?.unavailableReason === undefined, 'grok-account must not be marked unavailable.');
   for (const modelId of ['grok-4.3', 'grok-4', 'grok-code-fast-1']) {
     assert(grokAccount?.recommendedModels.includes(modelId), `grok-account recommended models must include ${modelId}.`);
@@ -311,9 +312,31 @@ async function main() {
   const providerAccountAuthService = read('src/main/settings/ProviderAccountAuthService.ts');
   assertSourceContains(
     providerAccountAuthService,
-    ['GROK_AUTH_DEVICE_ENDPOINT', 'GROK_AUTH_TOKEN_ENDPOINT', 'resolveGrokOAuthClientId', 'pollGrokDevice', 'GROK_API_BASE_URL'],
-    'ProviderAccountAuthService Grok OAuth flow',
+    [
+      'GROK_OPENID_CONFIGURATION_URL',
+      'authorization_endpoint',
+      'device_authorization_endpoint',
+      'token_endpoint',
+      'userinfo_endpoint',
+      'revocation_endpoint',
+      'code_challenge_methods_supported',
+      'token_endpoint_auth_methods_supported',
+      'fetchGrokOAuthMetadata',
+      'resolveGrokOAuthClientId',
+      'startGrokBrowserLogin',
+      'startGrokDeviceLogin',
+      'startGrokCallbackServer',
+      'exchangeGrokCode',
+      'pollGrokDevice',
+      'SUPER_GROK_OAUTH_REDIRECT_URI',
+      'GROK_API_BASE_URL',
+    ],
+    'ProviderAccountAuthService Super Grok OAuth flow',
   );
+  assert(!providerAccountAuthService.includes('GROK_AUTH_DEVICE_ENDPOINT'), 'Super Grok OAuth device endpoint must come from xAI OIDC metadata.');
+  assert(!providerAccountAuthService.includes('GROK_AUTH_TOKEN_ENDPOINT'), 'Super Grok OAuth token endpoint must come from xAI OIDC metadata.');
+  assert(!providerAccountAuthService.includes("'Grok OAuth") && !providerAccountAuthService.includes("'Grok OAuth requires"), 'ProviderAccountAuthService must use Super Grok OAuth visible wording.');
+  assert(!read('src/renderer/i18n.ts').includes('Grok account login'), 'Settings OAuth copy must not describe Super Grok OAuth as generic Grok account login.');
   assert(!providerAccountAuthService.includes("providerId === 'grok-account' || providerId === 'gemini-account'"), 'grok-account must not remain in the test-only account branch.');
   assert(!providerAccountAuthService.includes('mockable'), 'ProviderAccountAuthService must not keep mockable account terminology.');
 

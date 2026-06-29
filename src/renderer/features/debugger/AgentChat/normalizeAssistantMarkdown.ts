@@ -1,101 +1,130 @@
-const PSEUDO_BULLET_PATTERN = /^(\s*)[◦•·▪▫‣⁃]\s+/u;
+const FENCE_MARKER = '\u0060\u0060\u0060';
+const PSEUDO_BULLET_PATTERN = /^(\s*)[\u25e6\u2022\u00b7\u25aa\u25ab\u2023\u2043]\s+/u;
 const ORDERED_PSEUDO_PATTERN = /^(\s*)\d+[.)]\s+/;
 const LIST_ITEM_PATTERN = /^(\s*)(?:[-*+]|\d+[.)])\s+/;
-const SECTION_HEADING_PATTERN = /^(总结|结论|Summary|Conclusion)[：:]\s*$/i;
+const SECTION_HEADING_PATTERN = /^(\u603b\u7ed3|\u7ed3\u8bba|Summary|Conclusion)[\uff1a:]\s*$/i;
 
-const isListItemLine = (line: string): boolean => LIST_ITEM_PATTERN.test(line);
+interface MarkdownLine {
+  text: string;
+  fenced: boolean;
+}
+
+interface ListInfo {
+  indent: number;
+}
+
+const getIndent = (line: string): number => line.match(/^\s*/)?.[0].length ?? 0;
+
+const getListInfo = (line: string): ListInfo | null => {
+  const match = line.match(LIST_ITEM_PATTERN);
+  return match ? { indent: match[1]?.length ?? 0 } : null;
+};
 
 const promoteSectionHeading = (line: string): string => {
   const trimmed = line.trim();
   const match = trimmed.match(SECTION_HEADING_PATTERN);
   if (!match) return line;
-  const label = match[1] ?? '总结';
-  return `### ${label}`;
+  return '### ' + (match[1] ?? 'Summary');
 };
 
-const collapseBlankLines = (lines: string[]): string[] => {
-  const output: string[] = [];
-  let blankRun = 0;
-  for (const line of lines) {
-    if (!line.trim()) {
-      blankRun += 1;
-      if (blankRun <= 1) output.push('');
-      continue;
-    }
-    blankRun = 0;
-    output.push(line);
+const transformNonFencedLine = (line: string): string => {
+  const pseudoMatch = line.match(PSEUDO_BULLET_PATTERN);
+  if (pseudoMatch) {
+    const indent = pseudoMatch[1] ?? '';
+    const body = line.replace(PSEUDO_BULLET_PATTERN, '').trimStart();
+    return indent + '- ' + body;
   }
-  return output;
+
+  const orderedMatch = line.match(ORDERED_PSEUDO_PATTERN);
+  if (orderedMatch && !line.trimStart().startsWith('-')) {
+    const indent = orderedMatch[1] ?? '';
+    const body = line.replace(ORDERED_PSEUDO_PATTERN, '').trimStart();
+    const number = line.trim().match(/^(\d+)/)?.[1] ?? '1';
+    return indent + number + '. ' + body;
+  }
+
+  return promoteSectionHeading(line);
 };
 
-const glueListItemBlanks = (lines: string[]): string[] => {
-  const output: string[] = [];
+const previousNonBlank = (lines: MarkdownLine[]): MarkdownLine | null => {
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (lines[index].text.trim()) return lines[index];
+  }
+  return null;
+};
+
+const nextNonBlank = (lines: MarkdownLine[], startIndex: number): MarkdownLine | null => {
+  for (let index = startIndex; index < lines.length; index += 1) {
+    if (lines[index].text.trim()) return lines[index];
+  }
+  return null;
+};
+
+const isListContinuation = (previous: string, next: string): boolean => {
+  const previousList = getListInfo(previous);
+  if (!previousList) return false;
+  const nextList = getListInfo(next);
+  if (nextList) return true;
+  return getIndent(next) > previousList.indent;
+};
+
+const normalizeSpacing = (lines: MarkdownLine[]): MarkdownLine[] => {
+  const output: MarkdownLine[] = [];
+
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    if (!line.trim()) {
-      const prev = output[output.length - 1];
-      let lookahead = index + 1;
-      while (lookahead < lines.length && !lines[lookahead].trim()) {
-        lookahead += 1;
-      }
-      const next = lines[lookahead];
-      if (prev && next && isListItemLine(prev) && isListItemLine(next)) {
-        continue;
-      }
+    if (line.fenced || line.text.trim()) {
+      output.push(line);
+      continue;
+    }
+
+    const previous = previousNonBlank(output);
+    const next = nextNonBlank(lines, index + 1);
+    if (
+      previous
+      && next
+      && !previous.fenced
+      && !next.fenced
+      && isListContinuation(previous.text, next.text)
+    ) {
+      continue;
+    }
+
+    const last = output[output.length - 1];
+    if (last && !last.fenced && !last.text.trim()) {
+      continue;
     }
     output.push(line);
   }
+
   return output;
 };
 
-/**
- * 将模型常见的伪列表行首符号规范为 GFM 列表，避免每条落成独立段落。
- * 不修改 fenced code block 内容。
- */
 export function normalizeAssistantMarkdown(content: string): string {
   if (!content.trim()) return content;
 
   const lines = content.split('\n');
-  const transformed: string[] = [];
+  const transformed: MarkdownLine[] = [];
   let inFence = false;
 
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
+  for (const line of lines) {
     const trimmed = line.trim();
-
-    if (trimmed.startsWith('```')) {
+    if (trimmed.startsWith(FENCE_MARKER)) {
+      transformed.push({ text: line, fenced: true });
       inFence = !inFence;
-      transformed.push(line);
       continue;
     }
 
     if (inFence) {
-      transformed.push(line);
+      transformed.push({ text: line, fenced: true });
       continue;
     }
 
-    const pseudoMatch = line.match(PSEUDO_BULLET_PATTERN);
-    if (pseudoMatch) {
-      const indent = pseudoMatch[1] ?? '';
-      const body = line.replace(PSEUDO_BULLET_PATTERN, '').trimStart();
-      transformed.push(`${indent}- ${body}`);
-      continue;
-    }
-
-    const orderedMatch = line.match(ORDERED_PSEUDO_PATTERN);
-    if (orderedMatch && !line.trimStart().startsWith('-')) {
-      const indent = orderedMatch[1] ?? '';
-      const body = line.replace(ORDERED_PSEUDO_PATTERN, '').trimStart();
-      const number = line.trim().match(/^(\d+)/)?.[1] ?? '1';
-      transformed.push(`${indent}${number}. ${body}`);
-      continue;
-    }
-
-    transformed.push(promoteSectionHeading(line));
+    transformed.push({ text: transformNonFencedLine(line), fenced: false });
   }
 
-  return glueListItemBlanks(collapseBlankLines(transformed))
+  return normalizeSpacing(transformed)
+    .map((line) => line.text)
     .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

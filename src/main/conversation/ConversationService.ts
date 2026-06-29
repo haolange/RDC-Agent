@@ -54,6 +54,7 @@ import { normalizeToolName, resolveAgentToolAllowlist } from '../workflow/debugg
 import {
   createDefaultBranchState,
   normalizeBranchId,
+  repairConversationBranchState,
   resolveVisibleConversationMessages,
 } from './ConversationBranchResolver';
 
@@ -623,7 +624,7 @@ export class ConversationService {
     branchState: ConversationBranchState | null;
   }> {
     const allMessages = storageAdapter.readConversationHistory(sessionId);
-    const branchState = storageAdapter.readConversationBranchState(sessionId);
+    const branchState = this.readRepairedBranchState(sessionId, allMessages);
     return {
       messages: resolveVisibleConversationMessages(allMessages, branchState),
       branchState,
@@ -822,12 +823,12 @@ export class ConversationService {
         forkId,
         variantIndex,
       },
-      fork,
     );
   }
 
   async switchConversationBranch(input: ConversationSwitchBranchRequest): Promise<ConversationSwitchBranchResult> {
-    const branchState = storageAdapter.readConversationBranchState(input.sessionId);
+    const allMessages = storageAdapter.readConversationHistory(input.sessionId);
+    const branchState = this.readRepairedBranchState(input.sessionId, allMessages);
     if (!branchState) {
       return { success: false, messages: [], error: 'No conversation branch state found.' };
     }
@@ -841,7 +842,6 @@ export class ConversationService {
     branchState.activeLeafBranchId = input.branchId;
     storageAdapter.writeConversationBranchState(input.sessionId, branchState);
 
-    const allMessages = storageAdapter.readConversationHistory(input.sessionId);
     const visibleMessages = resolveVisibleConversationMessages(allMessages, branchState);
     const tracePresentation = await traceService.buildConversationPresentation(input.sessionId, visibleMessages);
     workflowProjectionPublisher.publishTraceProjectionChanged(input.sessionId, tracePresentation);
@@ -853,6 +853,18 @@ export class ConversationService {
       branchState,
       tracePresentation,
     };
+  }
+
+  private readRepairedBranchState(
+    sessionId: string,
+    allMessages: ConversationMessage[],
+  ): ConversationBranchState | null {
+    const current = storageAdapter.readConversationBranchState(sessionId);
+    const { branchState, repaired } = repairConversationBranchState(allMessages, current);
+    if (branchState && repaired) {
+      storageAdapter.writeConversationBranchState(sessionId, branchState);
+    }
+    return branchState;
   }
 
   private async resolveContext(input: ConversationContextInput): Promise<ResolvedConversationContext> {
@@ -889,7 +901,6 @@ export class ConversationService {
     rawMessage: string,
     pendingAttachments: ConversationAttachmentInput[],
     branchContext?: ConversationBranchTurnContext,
-    forkToUpdate?: import('@shared/types/conversationBranch').ConversationFork,
   ): Promise<ConversationTurnResult> {
     let workingSession = context.session;
     if (!workingSession && context.projectId) {
@@ -943,18 +954,18 @@ export class ConversationService {
       forkId: branchContext?.forkId,
       variantIndex: branchContext?.variantIndex,
     });
-    if (forkToUpdate && sessionIdForBranch && branchState) {
-      const pendingBranch = forkToUpdate.branches.find((entry) => entry.branchId === branchId);
-      if (pendingBranch) {
+    if (sessionIdForBranch && branchState && branchContext?.branchId) {
+      const fork = branchContext.forkId
+        ? branchState.forks.find((entry) => entry.forkId === branchContext.forkId)
+        : null;
+      const pendingBranch = fork?.branches.find((entry) => entry.branchId === branchId);
+      if (fork && pendingBranch) {
         pendingBranch.anchorUserMessageId = userMessage.id;
         pendingBranch.rootTurnId = turnId;
+        fork.activeBranchId = branchId;
+        branchState.activeLeafBranchId = branchContext.branchId;
+        storageAdapter.writeConversationBranchState(sessionIdForBranch, branchState);
       }
-      forkToUpdate.activeBranchId = branchId;
-      branchState.activeLeafBranchId = branchId;
-      storageAdapter.writeConversationBranchState(sessionIdForBranch, branchState);
-    } else if (sessionIdForBranch && branchState && branchContext?.branchId) {
-      branchState.activeLeafBranchId = branchContext.branchId;
-      storageAdapter.writeConversationBranchState(sessionIdForBranch, branchState);
     }
     const assistantDraftMessage = makeConversationMessage('assistant', '', {
       turnId,
