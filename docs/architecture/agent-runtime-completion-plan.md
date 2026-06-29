@@ -90,7 +90,7 @@
 - HandoffController（Phase 3 新建）对接 `handoffs:` frontmatter（label/agent/prompt）：
   - `agent_handoff` 工具参数 `{ toProfile, prompt? }`，缺省 prompt 从目标 profile handoffs 定义取。
   - 实现「任意 Agent 到任意声明 handoff 的 profile」转移（不限 Plan→Edit）。
-  - handoff 是 session 级控制权转移（DESIGN.md 契约：渲染为 next-action，非 tool card）。
+  - handoff 是 session 级控制权转移；事件进入 Work Process/事件流，普通最终回答不自动追加 next-action 按钮。
 
 ### 已知 4：Team/Swarm —— 技术分析（用户纠结点）
 
@@ -274,7 +274,7 @@
 - `agent_handoff` 工具改真实执行：`HandoffController.request({fromAgentId, toProfile, prompt})` → emit `HandoffRequestedEvent` → `ConversationService.applyHandoff` 切换 session 活跃 profile + 注入 prompt → 新 profile Agent 接管。
 - 对接 `.agent.md` 的 `handoffs:` frontmatter（label/agent/prompt）：缺省 prompt 从目标 profile handoffs 取。
 - 实现「任意 Agent 到任意声明 handoff 的 profile」转移（不限 Plan→Edit）；Plan→Edit 是默认路径。
-- handoff 是 session 级控制权转移（DESIGN.md：渲染为 next-action，非 tool card）。
+- handoff 是 session 级控制权转移；事件进入 Work Process/事件流，普通最终回答不自动追加 next-action 按钮。
 
 ### 3.3 Subagent 事件桥接（shared 类型 + UI 投影）
 
@@ -325,7 +325,7 @@
 
 - 嵌套 subagent block（递归渲染子 WorkTrace，缩进 + 左侧色带区分层级）。
 - task 卡片实时状态（pending/in_progress/completed + 依赖关系）。
-- approval/handoff 渲染（DESIGN.md：handoff 是 next-action，非 tool card）。
+- approval/handoff 事件渲染（handoff 进入 Work Process/事件流，普通最终回答不显示自动建议按钮）。
 - compaction block（显示压缩摘要）—— 新增产生点 + 渲染。
 
 ### 5.2 新面板（保真现有布局节奏）
@@ -411,7 +411,7 @@ Phase 1 内部顺序：1.7 清孤儿（先扫干净地基）→ 1.6 PromptAssemb
   - allowlist：executable 加 subagent；RUNTIME_TOOL_ALIASES 加 subagent 自映射
   - ConversationService onEvent 加 subagent.started/delta/completed 投影（kind:'subagent' block，status 随子 agent 进度）
   - 验证：typecheck + 6check + build 全绿（+3 shared symbols）
-  - **遗留**：handoff 实际 profile 切换的 session 级状态管理（pendingHandoff 持久化 + 下次消息自动用新 profile）待后续完善；当前 agent_handoff 已真实校验+返回 valid details，UI 渲染为 next-action 留 Phase 5
+  - **遗留**：handoff 实际 profile 切换的 session 级状态管理（pendingHandoff 持久化 + 下次消息自动用新 profile）待后续完善；当前 agent_handoff 已真实校验+返回 valid details，UI 事件展示留 Phase 5，普通最终回答不默认渲染 next-action。
 - **Phase 4 — ✅ 完成**：
   - TaskStore 抽象（新建 `tasks/TaskStore.ts`）：TaskStore 接口（loadTask/saveTask/listTasks/deleteTask）+ FileTaskStore（现有 fs 逻辑）+ MemoryTaskStore（Map）
   - TaskRegistry 改持有 TaskStore（构造接受 TaskStore|string 兼容旧签名）；删私有 taskPath/ensureDir/normalizeTask（移至 FileTaskStore）；加 deleteTask 公共方法；加 onTaskChange 回调

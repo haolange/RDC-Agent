@@ -96,3 +96,10 @@ Agent Loop 不通过 Settings 层 `LLMAdapterProvider` 发起 agent turn。它�
 - `npm run typecheck`
 
 涉及 renderer category 输出、Settings modal 或浏览器 endpoint 时，还要启动真实 browser-app session，确认 `settings:getProviderCatalog` 与 `/api/settings/providers/catalog` 返回一致、无 secrets，且 Settings Provider Catalog 不再渲染旧 category。
+
+## Super Grok OAuth
+
+- `grok-account` is the account-login provider surfaced to users as `Super Grok Account`; the internal ID stays stable for settings, secrets, and agent routes.
+- Super Grok OAuth reads `https://auth.x.ai/.well-known/openid-configuration` for browser, device, token, userinfo, and revoke endpoints; code must not hardcode old device/token endpoints.
+- Browser login is the default path and uses PKCE S256 plus the fixed loopback redirect URI. Device-code login is the remote/headless fallback. Both are canonical login modes of the same account provider, not legacy dual paths.
+- `xAI (Grok)` remains the separate API-key provider. OAuth Client ID accepts only an xAI-issued public OAuth client id, never an xAI API key.

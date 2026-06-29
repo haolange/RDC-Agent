@@ -33,6 +33,10 @@ Renderer code must not create fake reasoning stages. Runtime events project into
 
 Historical `reasoningTrace` data may be read by a one-time migration or renderer compatibility adapter so old sessions remain viewable. New runtime code and visible UI must write and render `workTrace`.
 
+## Provider Account Boundary
+
+Account providers are login products, not API-key shortcuts. Super Grok Account is the xAI account-OAuth provider: it uses xAI OIDC metadata, browser OAuth by default, and device-code flow for headless or remote environments. xAI (Grok) remains the separate API-key provider for console keys. The Super Grok OAuth Client ID field accepts only an xAI-issued public OAuth client id; users must not paste xAI API keys into that field.
+
 ## Profiles
 
 Profiles are `.agent.md` files in workspace user space. Source defaults may seed missing profiles, but user-space profiles are the editable truth for the current device/workspace.
@@ -79,7 +83,7 @@ Agent messages are structured as:
 
 The Work Process block is a real runtime transcript, not a stage status log. It is expanded while running and keeps its latest expanded/collapsed state after terminal states; users collapse or expand it manually. Errors, approvals, long-running tools, and diagnostics may auto-expand. Tool rows show a readable transcript preview by default; arguments and raw tool results stay behind a user-opened details control and must not render as default visible noise.
 
-`ask_user` and tool approvals are human-in-the-loop interactions. The runtime pauses the active tool call, the composer area shows the pending question or approval controls, and the Work Process records only the real request/decision transcript. They must not render as raw tool result blocks with choices JSON, policy JSON, or fake assistant text responses. Profile handoffs render as low-noise next actions after a complete assistant message; they are not Work Process tool cards.
+`ask_user` and tool approvals are human-in-the-loop interactions. The runtime pauses the active tool call, the composer area shows the pending question or approval controls, and the Work Process records only the real request/decision transcript. They must not render as raw tool result blocks with choices JSON, policy JSON, or fake assistant text responses. Profile handoff events are recorded in Work Process and the agent event stream; ordinary completed assistant messages must not append automatic Next actions buttons.
 
 Composer profile menus show profile name and status. Long descriptions belong in hover tooltips, not inline list clutter.
 

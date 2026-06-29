@@ -11,6 +11,9 @@ import type {
   LlmProviderProtocolDescriptor,
 } from '@shared/types/settings';
 
+export const SUPER_GROK_OAUTH_CALLBACK_PORT = 1456;
+export const SUPER_GROK_OAUTH_REDIRECT_URI = `http://localhost:${SUPER_GROK_OAUTH_CALLBACK_PORT}/oauth/grok/callback`;
+
 export interface BuiltinProviderDefinition {
   id: BuiltinLlmProviderId;
   protocol: LlmProviderProtocol;
@@ -231,7 +234,7 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     authMode: 'account',
     category: 'login-authorization',
     modelDiscovery: 'account-catalog',
-    label: 'Grok Account',
+    label: 'Super Grok Account',
     baseUrl: 'https://api.x.ai/v1',
     recommendedModels: GROK_ACCOUNT_MODELS,
     docsUrl: 'https://grok.com/',

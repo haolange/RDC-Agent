@@ -272,7 +272,9 @@ LlmApi
 LLMConfig
 LLMMessage
 LLMProvider
+LlmProviderAccountDiagnostic
 LlmProviderAccountLoginFinishRequest
+LlmProviderAccountLoginMode
 LlmProviderAccountLoginStartRequest
 LlmProviderAccountStatus
 LlmProviderAuthMode
@@ -424,6 +426,8 @@ StagePolicy
 StreamCallback
 stringifyYaml
 SubAgentNode
+SUPER_GROK_OAUTH_CALLBACK_PORT
+SUPER_GROK_OAUTH_REDIRECT_URI
 SystemToolName
 TablePreview
 TaskFrameNode

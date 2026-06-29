@@ -145,6 +145,7 @@ export const useProviderConnectionDraft = ({
           models,
         }
         : undefined,
+      accountLoginMode: provider.id === 'grok-account' ? 'browser' : 'device',
       authCode: '',
       oauthClientId: '',
     });
@@ -160,11 +161,7 @@ export const useProviderConnectionDraft = ({
     && !connectionProvider.hasStoredSecret
     && !connectionDraft.apiKey.trim(),
   );
-  const connectionNeedsBaseUrl = Boolean(
-    connectionDraft
-    && connectionProvider?.baseUrlEditable
-    && !connectionDraft.baseUrl.trim(),
-  );
+  const connectionNeedsBaseUrl = Boolean(connectionDraft && connectionProvider?.baseUrlEditable && !connectionDraft.baseUrl.trim());
   const connectionHasFreshTest = Boolean(
     connectionDraft
     && connectionDraft.models.length > 0

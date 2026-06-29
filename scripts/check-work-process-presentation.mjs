@@ -599,7 +599,8 @@ assert(messageVariantNavigatorSource.includes('message-variant-navigator'), 'var
 assert(!cssSource.includes('.work-process-row-detail'), 'legacy row-detail CSS class should be removed');
 assert(!cssSource.includes('WorkProcess v2 - linear agent trace'), 'legacy Work Process CSS block should be removed');
 assert(!cssSource.includes('work-process-tool-raw'), 'legacy raw-result CSS class should be removed');
-assert(messageBubbleSource.includes('Next actions'), 'handoff actions should render with a low-noise Next actions label');
+assert(!messageBubbleSource.includes('Next actions'), 'assistant messages must not render default Next actions buttons');
+assert(!messageBubbleSource.includes('conversation-handoff-actions'), 'assistant messages must not render default handoff action chrome');
 assert(!messageBubbleSource.includes('<small>{resolveAgentDisplay'), 'handoff button should not render target agent as visible small text');
 assert(!userInputPanelSource.includes('window.electronAPI'), 'composer user input panel must not call Electron APIs directly');
 assert(userInputSubmitHookSource.includes('answerUserInput'), 'composer user input hook must submit through conversation.answerUserInput');
@@ -610,7 +611,7 @@ assert(!orchestratorSource.includes('User input requested by'), 'ask_user tool m
 const markdownSource = fs.readFileSync('src/renderer/features/debugger/AgentChat/MessageMarkdown.tsx', 'utf8');
 const normalizeMarkdownSource = fs.readFileSync('src/renderer/features/debugger/AgentChat/normalizeAssistantMarkdown.ts', 'utf8');
 assert(markdownSource.includes('normalizeAssistantMarkdown'), 'assistant markdown must normalize pseudo-list content');
-assert(normalizeMarkdownSource.includes('◦'), 'markdown normalizer must handle pseudo bullet characters');
+assert(normalizeMarkdownSource.includes('PSEUDO_BULLET_PATTERN'), 'assistant markdown must handle pseudo bullet characters');
 assert(cssSource.includes('list-style-type: disc'), 'markdown body must style unordered lists');
 
 console.log('[work-process] OK');

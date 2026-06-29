@@ -1,4 +1,5 @@
 import type {
+  LlmProviderAccountLoginMode,
   LlmProviderAccountStatus,
   LlmProviderCatalogResponse,
   LlmProviderModel,
@@ -23,6 +24,7 @@ export interface ProviderConnectionDraft {
   testedProtocol: ProviderProtocol;
   models: LlmProviderModel[];
   accountStatus?: LlmProviderAccountStatus;
+  accountLoginMode: LlmProviderAccountLoginMode;
   authCode: string;
   oauthClientId: string;
 }

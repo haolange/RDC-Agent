@@ -180,6 +180,8 @@ const RIGHT_PANEL_COLLAPSED_WIDTH = 0;
 const TERMINAL_DEFAULT_HEIGHT = 328;
 const TERMINAL_MIN_HEIGHT = 180;
 const TERMINAL_MAX_HEIGHT = 720;
+const SUPER_GROK_OAUTH_CALLBACK_PORT = 1456;
+const SUPER_GROK_OAUTH_REDIRECT_URI = `http://localhost:${SUPER_GROK_OAUTH_CALLBACK_PORT}/oauth/grok/callback`;
 const LLM_PROVIDER_CATEGORY_DEFINITIONS = [
   {
     id: "login-authorization",
@@ -377,7 +379,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     authMode: "account",
     category: "login-authorization",
     modelDiscovery: "account-catalog",
-    label: "Grok Account",
+    label: "Super Grok Account",
     baseUrl: "https://api.x.ai/v1",
     recommendedModels: GROK_ACCOUNT_MODELS,
     docsUrl: "https://grok.com/",
@@ -1274,7 +1276,7 @@ const safeFileNameForDraft = (draft) => {
   const candidateId = idFromFileName(candidate);
   return candidateId === agentId && isSafeAgentProfileId(candidateId) ? candidate : fileNameForId(agentId);
 };
-const readStringArray$1 = (value) => {
+const readStringArray$2 = (value) => {
   if (Array.isArray(value)) {
     return value.filter((entry) => typeof entry === "string").map((entry) => entry.trim()).filter(Boolean);
   }
@@ -1332,14 +1334,14 @@ const parseAgentMarkdown = (filePath, fallbackId) => {
     description: typeof frontmatter.description === "string" ? frontmatter.description.trim() : "",
     argumentHint: typeof frontmatter["argument-hint"] === "string" ? frontmatter["argument-hint"].trim() : "",
     target: typeof frontmatter.target === "string" ? frontmatter.target.trim() : "rdc-agent",
-    models: readStringArray$1(frontmatter.model),
+    models: readStringArray$2(frontmatter.model),
     icon: isAgentIconPreset(frontmatter.icon) ? frontmatter.icon : AGENT_MODE_MAP[fallbackId]?.icon ?? "message-orbit",
     disableModelInvocation: readBoolean(frontmatter["disable-model-invocation"], false),
     userInvocable: readBoolean(frontmatter["user-invocable"], true),
-    tools: readStringArray$1(frontmatter.tools),
-    skills: readStringArray$1(frontmatter.skills),
-    mcpServers: readStringArray$1(frontmatter["mcp-servers"]),
-    agents: readStringArray$1(frontmatter.agents),
+    tools: readStringArray$2(frontmatter.tools),
+    skills: readStringArray$2(frontmatter.skills),
+    mcpServers: readStringArray$2(frontmatter["mcp-servers"]),
+    agents: readStringArray$2(frontmatter.agents),
     handoffs: readHandoffs(frontmatter.handoffs),
     metadata: frontmatter.metadata && typeof frontmatter.metadata === "object" ? frontmatter.metadata : {},
     instructions,
@@ -2496,8 +2498,7 @@ function sanitizeAgentPermissionSettings(value, fallback = DEFAULT_AGENT_RUNTIME
     readableRoots: sanitizePathList(candidate.readableRoots ?? fallback.readableRoots),
     writableRoots: sanitizePathList(candidate.writableRoots ?? fallback.writableRoots),
     allowedCommandPrefixes: sanitizeStringArray(candidate.allowedCommandPrefixes ?? fallback.allowedCommandPrefixes),
-    deniedCommandPrefixes: sanitizeStringArray(candidate.deniedCommandPrefixes ?? fallback.deniedCommandPrefixes),
-    configPath: typeof candidate.configPath === "string" && candidate.configPath.trim() ? path.resolve(expandHomePath(candidate.configPath.trim())) : void 0
+    deniedCommandPrefixes: sanitizeStringArray(candidate.deniedCommandPrefixes ?? fallback.deniedCommandPrefixes)
   };
 }
 function sanitizeAgentRuntimeSettings(value) {
@@ -5615,6 +5616,7 @@ class ReplayDeviceService {
   }
 }
 const replayDeviceService = new ReplayDeviceService();
+const charsToTokens = (chars) => Math.ceil(chars / 4);
 class EventStream {
   /**
    * @param isComplete 可选：判断某个事件是否意味着流应当结束。
@@ -6492,6 +6494,11 @@ const DEFAULT_CONTEXT_RATIO = 0.75;
 const DEFAULT_CONTEXT_LIMIT = 1e5;
 const SNIP_HEAD = 3;
 const TOOL_RESULT_TRUNCATE_HEAD = 2e3;
+const COMPACTION_MARKERS = {
+  snip: "[snipped ",
+  toolResult: "[Earlier tool result compacted]",
+  summary: "[Conversation summary:"
+};
 class ContextManager {
   constructor(config = {}) {
     this.config = config;
@@ -6532,11 +6539,11 @@ class ContextManager {
    * 判断标准：消息内容包含已知的压缩占位符关键词（来自 snipCompact/microCompact/fullCompact）。
    */
   classifyMessages(messages) {
-    const SUMMARY_PATTERNS = ["[snipped ", "[Earlier tool result compacted]", "[Conversation summary:"];
+    const summaryPatterns = Object.values(COMPACTION_MARKERS);
     const isSummaryMessage = (msg) => {
       const content = msg.content;
       const text = typeof content === "string" ? content : Array.isArray(content) ? content.map((b) => typeof b === "object" && b !== null && "text" in b ? String(b.text) : "").join("") : "";
-      return SUMMARY_PATTERNS.some((p) => text.includes(p));
+      return summaryPatterns.some((p) => text.includes(p));
     };
     const summaryMessages = [];
     const conversationMessages = [];
@@ -6570,7 +6577,7 @@ class ContextManager {
     for (const msg of messages) {
       chars += this.estimateMessageChars(msg);
     }
-    return Math.ceil(chars / 4);
+    return charsToTokens(chars);
   }
   // =====================================================================
   // 各级压缩策略
@@ -6633,7 +6640,7 @@ class ContextManager {
     }
     const placeholder = {
       role: "user",
-      content: `[snipped ${snippedCount} messages]`,
+      content: `${COMPACTION_MARKERS.snip}${snippedCount} messages]`,
       timestamp: Date.now()
     };
     return [
@@ -6664,7 +6671,7 @@ class ContextManager {
         toolCallId: original.toolCallId,
         toolName: original.toolName,
         content: [
-          { type: "text", text: "[Earlier tool result compacted]" }
+          { type: "text", text: COMPACTION_MARKERS.toolResult }
         ],
         isError: false,
         timestamp: original.timestamp
@@ -6845,7 +6852,7 @@ class ContextManager {
     const toolResultCount = messages.filter(
       (m) => m.role === "toolResult"
     ).length;
-    return `[Conversation summary: ${messages.length} earlier messages compacted (user=${userCount}, assistant=${assistantCount}, toolResult=${toolResultCount}). Earlier context omitted to fit window.]`;
+    return `${COMPACTION_MARKERS.summary} ${messages.length} earlier messages compacted (user=${userCount}, assistant=${assistantCount}, toolResult=${toolResultCount}). Earlier context omitted to fit window.]`;
   }
 }
 const DEFAULT_MAX_RETRIES = 3;
@@ -8913,7 +8920,7 @@ function createTaskCreateTool(registry) {
       const subject = readString$2(params, "subject", true);
       const description = readString$2(params, "description", false);
       const activeForm = readString$2(params, "activeForm", false);
-      const blockedBy = readStringArray(params, "blockedBy");
+      const blockedBy = readStringArray$1(params, "blockedBy");
       const task = await registry.createTask(subject, {
         description,
         activeForm,
@@ -8960,8 +8967,8 @@ function createTaskUpdateTool(registry) {
       const description = readString$2(params, "description", false);
       const activeForm = readString$2(params, "activeForm", false);
       const owner = readString$2(params, "owner", false);
-      const addBlockedBy = readStringArray(params, "addBlockedBy");
-      const addBlocks = readStringArray(params, "addBlocks");
+      const addBlockedBy = readStringArray$1(params, "addBlockedBy");
+      const addBlocks = readStringArray$1(params, "addBlocks");
       const metadata = params.metadata && typeof params.metadata === "object" ? params.metadata : void 0;
       const updated = await registry.updateTask(taskId, {
         status,
@@ -9105,7 +9112,7 @@ function readString$2(params, key, required) {
   }
   return value;
 }
-function readStringArray(params, key) {
+function readStringArray$1(params, key) {
   const value = params[key];
   if (value === void 0 || value === null) return void 0;
   if (!Array.isArray(value)) {
@@ -12643,16 +12650,6 @@ function isRoutineCommand(command, permissions) {
 function isDangerousCommand(command) {
   return DANGEROUS_COMMAND_PATTERNS.some((pattern) => pattern.test(command));
 }
-function isRuleExpired(rule) {
-  return rule.expiresAt !== void 0 && rule.expiresAt < Date.now();
-}
-function matchPersistedRule(toolName, rules) {
-  return rules.find((rule) => {
-    if (isRuleExpired(rule)) return false;
-    const normalizedRule = normalizeToolName$1(rule.toolName);
-    return normalizedRule === toolName || normalizedRule === "*";
-  });
-}
 function denied(reason, risk = "high") {
   return { action: "deny", reason, risk, temporaryPathRoots: [] };
 }
@@ -12673,14 +12670,6 @@ class AgentPermissionPolicyService {
     );
     if (mode === "full-access") {
       return { action: "allow", risk: "low", temporaryPathRoots: ["*"] };
-    }
-    const persistedRules = permissions.persistedRules ?? [];
-    const matchedRule = matchPersistedRule(toolName, persistedRules);
-    if (matchedRule?.decision === "allow") {
-      return { action: "allow", risk: "low", temporaryPathRoots: [] };
-    }
-    if (matchedRule?.decision === "deny") {
-      return denied(`持久化规则拒绝了工具 "${input.toolCall.name}"。`);
     }
     if (isCommandDeniedByRule(extractStringArg(input.toolCall, "command"), permissions)) {
       return denied("Custom policy denied this command prefix.");
@@ -13979,12 +13968,9 @@ const CHATGPT_CALLBACK_PORT = 1455;
 const CHATGPT_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 const CLAUDE_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const GITHUB_COPILOT_CLIENT_ID = "Iv1.b507a08c87ecfe98";
-const GROK_AUTH_DEVICE_ENDPOINT = "https://auth.x.ai/oauth2/device/code";
-const GROK_AUTH_TOKEN_ENDPOINT = "https://auth.x.ai/oauth2/token";
-const GROK_AUTH_USERINFO_ENDPOINT = "https://auth.x.ai/oauth2/userinfo";
-const GROK_AUTH_REVOKE_ENDPOINT = "https://auth.x.ai/oauth2/revoke";
+const GROK_OPENID_CONFIGURATION_URL = "https://auth.x.ai/.well-known/openid-configuration";
 const GROK_API_BASE_URL = "https://api.x.ai/v1";
-const GROK_OAUTH_SCOPE = "openid profile email offline_access api:access";
+const GROK_OAUTH_REQUESTED_SCOPES = ["openid", "profile", "email", "offline_access", "api:access"];
 const GROK_OAUTH_CLIENT_ID_ENV_KEYS = [
   "RDC_AGENT_GROK_OAUTH_CLIENT_ID",
   "GROK_OAUTH_CLIENT_ID",
@@ -13996,7 +13982,7 @@ const isUnimplementedAccountProviderId = (providerId) => providerId === "gemini-
 const resolveGrokOAuthClientId = (draft) => {
   const cleanDraft = draft?.trim();
   if (cleanDraft) {
-    return { clientId: cleanDraft, source: "draft" };
+    return { clientId: cleanDraft, source: "manual" };
   }
   for (const key of GROK_OAUTH_CLIENT_ID_ENV_KEYS) {
     const value = process.env[key]?.trim();
@@ -14037,6 +14023,121 @@ const normalizeAccountModels = (values) => {
   return Array.from(models.values()).sort((left, right) => left.id.localeCompare(right.id));
 };
 const readString = (value) => typeof value === "string" && value.trim() ? value.trim() : void 0;
+const readStringArray = (value) => Array.isArray(value) ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0) : [];
+const parseGrokOAuthMetadata = (payload) => {
+  const record = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+  const metadata = {
+    authorizationEndpoint: readString(record.authorization_endpoint) ?? "",
+    deviceAuthorizationEndpoint: readString(record.device_authorization_endpoint) ?? "",
+    tokenEndpoint: readString(record.token_endpoint) ?? "",
+    userinfoEndpoint: readString(record.userinfo_endpoint) ?? "",
+    revocationEndpoint: readString(record.revocation_endpoint) ?? "",
+    scopesSupported: readStringArray(record.scopes_supported),
+    grantTypesSupported: readStringArray(record.grant_types_supported),
+    codeChallengeMethodsSupported: readStringArray(record.code_challenge_methods_supported),
+    tokenEndpointAuthMethodsSupported: readStringArray(record.token_endpoint_auth_methods_supported)
+  };
+  if (!metadata.authorizationEndpoint || !metadata.deviceAuthorizationEndpoint || !metadata.tokenEndpoint || !metadata.userinfoEndpoint || !metadata.revocationEndpoint) {
+    throw new Error("xAI OAuth metadata is missing required browser, device, token, userinfo, or revocation endpoints.");
+  }
+  if (metadata.grantTypesSupported.length > 0) {
+    if (!metadata.grantTypesSupported.includes("authorization_code")) {
+      throw new Error("xAI OAuth metadata does not advertise browser authorization-code support.");
+    }
+    if (!metadata.grantTypesSupported.includes("urn:ietf:params:oauth:grant-type:device_code")) {
+      throw new Error("xAI OAuth metadata does not advertise device authorization support.");
+    }
+  }
+  if (metadata.codeChallengeMethodsSupported.length > 0 && !metadata.codeChallengeMethodsSupported.includes("S256")) {
+    throw new Error("xAI OAuth metadata does not advertise PKCE S256 support.");
+  }
+  if (metadata.tokenEndpointAuthMethodsSupported.length > 0 && !metadata.tokenEndpointAuthMethodsSupported.includes("none")) {
+    throw new Error("xAI OAuth metadata does not advertise public-client token exchange support.");
+  }
+  return metadata;
+};
+const fetchGrokOAuthMetadata = async () => {
+  const payload = await fetchJson(GROK_OPENID_CONFIGURATION_URL, {
+    method: "GET",
+    headers: {
+      Accept: "application/json"
+    }
+  });
+  return parseGrokOAuthMetadata(payload);
+};
+const resolveGrokOAuthScope = (metadata) => {
+  const supported = new Set(metadata.scopesSupported);
+  const requested = GROK_OAUTH_REQUESTED_SCOPES.filter((scope) => supported.size === 0 || supported.has(scope));
+  const missing = GROK_OAUTH_REQUESTED_SCOPES.filter((scope) => supported.size > 0 && !supported.has(scope));
+  if (requested.length === 0 || missing.includes("api:access")) {
+    throw new Error(
+      "xAI OAuth metadata does not support the required API scope. Missing scopes: " + (missing.join(", ") || "unknown") + "."
+    );
+  }
+  return requested.join(" ");
+};
+const readOAuthError = (payload) => {
+  const record = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : {};
+  return {
+    error: readString(record.error),
+    detail: readString(record.error_description) ?? readString(record.message)
+  };
+};
+const SUPER_GROK_OAUTH_CHECKLIST = [
+  "Use an xAI-issued public OAuth client id, not an xAI API key.",
+  "Register the RDC-Agent loopback redirect URI for browser login.",
+  "Allow the requested Super Grok scopes for this OAuth client.",
+  "Confirm the Super Grok or X Premium account has Grok API access."
+];
+const createGrokOAuthDiagnostic = (stage, summary, options = {}) => ({
+  stage,
+  summary,
+  detail: options.detail,
+  providerError: options.providerError,
+  requestedScopes: options.requestedScopes,
+  redirectUri: options.redirectUri,
+  checklist: options.checklist ?? SUPER_GROK_OAUTH_CHECKLIST
+});
+const renderGrokOAuthDiagnosticMessage = (diagnostic) => [
+  diagnostic.summary,
+  diagnostic.requestedScopes ? "Requested scopes: " + diagnostic.requestedScopes + "." : "",
+  diagnostic.redirectUri ? "Redirect URI: " + diagnostic.redirectUri + "." : "",
+  diagnostic.providerError ? "Provider error: " + diagnostic.providerError + "." : "",
+  diagnostic.detail ? "Detail: " + diagnostic.detail + "." : ""
+].filter(Boolean).join(" ");
+const createGrokOAuthFailureDiagnostic = (stage, operation, payload, scope, redirectUri) => {
+  const { error, detail } = readOAuthError(payload);
+  return createGrokOAuthDiagnostic(
+    stage,
+    "Super Grok OAuth " + operation + " failed. Check the xAI public OAuth Client ID, redirect URI, and allowed scopes.",
+    {
+      providerError: error || parseProviderError$1(payload),
+      detail,
+      requestedScopes: scope,
+      redirectUri
+    }
+  );
+};
+class GrokOAuthDiagnosticError extends Error {
+  constructor(diagnostic) {
+    super(renderGrokOAuthDiagnosticMessage(diagnostic));
+    this.diagnostic = diagnostic;
+  }
+  diagnostic;
+}
+const createGrokOAuthStartupDiagnostic = (error, mode, scope, redirectUri) => {
+  const message = parseProviderError$1(error);
+  const stage = message.startsWith("xAI OAuth metadata") ? "metadata" : "authorization";
+  if (message.startsWith("Super Grok OAuth ") || message.startsWith("xAI OAuth metadata")) {
+    return createGrokOAuthDiagnostic(stage, message, { requestedScopes: scope, redirectUri });
+  }
+  return createGrokOAuthDiagnostic(
+    stage,
+    "Super Grok OAuth " + mode + " authorization failed. Check the xAI public OAuth Client ID, xAI OAuth metadata network access, redirect URI, and allowed scopes.",
+    { detail: message, requestedScopes: scope, redirectUri }
+  );
+};
+const resolveGrokOAuthDiagnostic = (error, mode, scope, redirectUri) => error instanceof GrokOAuthDiagnosticError ? error.diagnostic : createGrokOAuthStartupDiagnostic(error, mode, scope, redirectUri);
 const parseJwtPayload = (token) => {
   const payload = token?.split(".")[1];
   if (!payload) {
@@ -14191,7 +14292,7 @@ class ProviderAccountAuthService {
       return this.startGitHubCopilotLogin();
     }
     if (providerId === "grok-account") {
-      return this.startGrokLogin(request2.oauthClientId);
+      return this.startGrokLogin(request2.oauthClientId, request2.accountLoginMode);
     }
     return this.startUnimplementedAccountLogin(providerId);
   }
@@ -14221,11 +14322,22 @@ class ProviderAccountAuthService {
         return await this.persistAccount(request2.providerId, bundle);
       }
       if (request2.providerId === "grok-account") {
-        const bundle = await this.pollGrokDevice(flow);
+        const bundle = flow.authorizationMode === "browser" ? await this.exchangeGrokCode(flow, request2.code?.trim() ?? "") : await this.pollGrokDevice(flow);
         return await this.persistAccount(request2.providerId, bundle);
       }
       return this.status(request2.providerId, "Provider does not support account login.", "failed");
     } catch (error) {
+      if (request2.providerId === "grok-account") {
+        const diagnostic = createGrokOAuthStartupDiagnostic(
+          error,
+          flow.authorizationMode === "device" ? "device" : "browser",
+          flow.requestedScopes,
+          flow.redirectUri
+        );
+        flow.error = renderGrokOAuthDiagnosticMessage(diagnostic);
+        flow.diagnostic = diagnostic;
+        return this.status(request2.providerId, flow.error, "failed", diagnostic);
+      }
       flow.error = parseProviderError$1(error);
       return this.status(request2.providerId, flow.error, "failed");
     }
@@ -14288,14 +14400,16 @@ class ProviderAccountAuthService {
       }
     );
   }
-  status(providerId, message, forcedState) {
+  status(providerId, message, forcedState, diagnostic) {
     const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
     const isAccount = isAccountProviderId(providerId);
     const flow = isAccount ? this.findFlow(providerId) : null;
     const connected = Boolean(provider?.isConfigured && provider.status === "verified");
-    const grokClientIdSource = providerId === "grok-account" ? flow?.clientId ? "draft" : connected && this.readBundle("grok-account")?.clientId ? "stored" : resolveGrokOAuthClientId().source : void 0;
+    const grokBundle = providerId === "grok-account" ? this.readBundle("grok-account") : null;
+    const grokClientIdSource = providerId === "grok-account" ? flow?.clientIdSource ?? (connected && grokBundle?.clientId ? "stored" : resolveGrokOAuthClientId().source) : void 0;
     const state2 = forcedState ?? (connected ? "connected" : flow?.error ? "failed" : flow ? "pending" : isAccount ? "signed-out" : "unavailable");
-    const pendingMessage = providerId === "github-copilot" ? "Waiting for GitHub authorization." : providerId === "grok-account" ? "Waiting for xAI authorization." : "Waiting for authorization.";
+    const pendingMessage = providerId === "github-copilot" ? "Waiting for GitHub authorization." : providerId === "grok-account" ? flow?.authorizationMode === "device" ? "Waiting for Super Grok device-code authorization." : "Waiting for Super Grok browser authorization." : "Waiting for authorization.";
+    const activeDiagnostic = diagnostic ?? flow?.diagnostic;
     return {
       providerId,
       state: state2,
@@ -14306,12 +14420,17 @@ class ProviderAccountAuthService {
       accountLabel: provider?.accountLabel,
       planLabel: provider?.planLabel,
       expiresAt: provider?.oauthExpiresAt,
+      oauthRefreshAvailable: provider?.oauthRefreshAvailable,
       authUrl: flow?.authUrl,
       verificationUri: flow?.verificationUri,
       userCode: flow?.userCode,
       requiresCodeInput: Boolean(flow?.providerId === "claude-account" || flow && isUnimplementedAccountProviderId(flow.providerId)),
       requiresClientId: providerId === "grok-account" && !connected && !grokClientIdSource,
       clientIdSource: grokClientIdSource,
+      authorizationMode: flow?.authorizationMode ?? grokBundle?.authorizationMode,
+      diagnostic: activeDiagnostic,
+      requestedScopes: flow?.requestedScopes ?? activeDiagnostic?.requestedScopes ?? grokBundle?.requestedScopes,
+      redirectUri: flow?.redirectUri ?? activeDiagnostic?.redirectUri ?? grokBundle?.redirectUri,
       models: provider?.models ?? []
     };
   }
@@ -14407,26 +14526,76 @@ class ProviderAccountAuthService {
     });
     return this.status(flow.providerId);
   }
-  async startGrokLogin(oauthClientId) {
+  async startGrokLogin(oauthClientId, accountLoginMode) {
+    const mode = accountLoginMode === "device" ? "device" : "browser";
     const resolved = resolveGrokOAuthClientId(oauthClientId);
     if (!resolved.clientId) {
-      return this.status(
-        "grok-account",
-        "Grok OAuth client id is required. Enter an OAuth client id or set RDC_AGENT_GROK_OAUTH_CLIENT_ID.",
-        "failed"
+      const diagnostic = createGrokOAuthDiagnostic(
+        "configuration",
+        "Super Grok OAuth requires an xAI-issued public OAuth Client ID. This is not an xAI API key.",
+        { redirectUri: mode === "browser" ? SUPER_GROK_OAUTH_REDIRECT_URI : void 0 }
       );
+      return this.status("grok-account", renderGrokOAuthDiagnosticMessage(diagnostic), "failed", diagnostic);
     }
+    return mode === "device" ? this.startGrokDeviceLogin(resolved.clientId, resolved.source ?? "manual") : this.startGrokBrowserLogin(resolved.clientId, resolved.source ?? "manual");
+  }
+  async startGrokBrowserLogin(clientId, clientIdSource) {
+    let scope;
     try {
-      const payload = await fetchJson(GROK_AUTH_DEVICE_ENDPOINT, {
+      const metadata = await fetchGrokOAuthMetadata();
+      scope = resolveGrokOAuthScope(metadata);
+      const { verifier, challenge } = createPkce();
+      const flow = {
+        providerId: "grok-account",
+        flowId: crypto.randomUUID(),
+        state: crypto.randomUUID(),
+        codeVerifier: verifier,
+        authUrl: "",
+        clientId,
+        clientIdSource,
+        authorizationMode: "browser",
+        requestedScopes: scope,
+        redirectUri: SUPER_GROK_OAUTH_REDIRECT_URI,
+        tokenEndpoint: metadata.tokenEndpoint,
+        userinfoEndpoint: metadata.userinfoEndpoint,
+        expiresAt: Date.now() + 10 * 60 * 1e3
+      };
+      flow.authUrl = appendParams(metadata.authorizationEndpoint, {
+        client_id: clientId,
+        response_type: "code",
+        redirect_uri: SUPER_GROK_OAUTH_REDIRECT_URI,
+        scope,
+        code_challenge: challenge,
+        code_challenge_method: "S256",
+        state: flow.state
+      });
+      this.setFlow(flow);
+      await this.startGrokCallbackServer(flow);
+      void this.openExternal(flow.authUrl);
+      return this.status(flow.providerId);
+    } catch (error) {
+      const diagnostic = resolveGrokOAuthDiagnostic(error, "browser", scope, SUPER_GROK_OAUTH_REDIRECT_URI);
+      return this.status("grok-account", renderGrokOAuthDiagnosticMessage(diagnostic), "failed", diagnostic);
+    }
+  }
+  async startGrokDeviceLogin(clientId, clientIdSource) {
+    let scope;
+    try {
+      const metadata = await fetchGrokOAuthMetadata();
+      scope = resolveGrokOAuthScope(metadata);
+      const payload = await fetchOAuthJson(metadata.deviceAuthorizationEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded"
         },
         body: createFormBody({
-          client_id: resolved.clientId,
-          scope: GROK_OAUTH_SCOPE
+          client_id: clientId,
+          scope
         })
       });
+      if (payload.error) {
+        throw new GrokOAuthDiagnosticError(createGrokOAuthFailureDiagnostic("authorization", "device authorization", payload, scope));
+      }
       if (!payload.device_code || !payload.user_code || !payload.verification_uri) {
         throw new Error("xAI OAuth did not return a complete device authorization payload.");
       }
@@ -14439,17 +14608,25 @@ class ProviderAccountAuthService {
         verificationUri: payload.verification_uri,
         authUrl: payload.verification_uri_complete ?? payload.verification_uri,
         intervalSeconds: payload.interval ?? 5,
-        clientId: resolved.clientId,
+        clientId,
+        clientIdSource,
+        authorizationMode: "device",
+        requestedScopes: scope,
+        tokenEndpoint: metadata.tokenEndpoint,
+        userinfoEndpoint: metadata.userinfoEndpoint,
         expiresAt: Date.now() + (payload.expires_in ?? 900) * 1e3
       };
       this.setFlow(flow);
       void this.openExternal(flow.authUrl);
       void this.pollGrokDevice(flow).then((bundle) => this.persistAccount("grok-account", bundle)).catch((error) => {
-        flow.error = parseProviderError$1(error);
+        const diagnostic = resolveGrokOAuthDiagnostic(error, "device", flow.requestedScopes, flow.redirectUri);
+        flow.error = renderGrokOAuthDiagnosticMessage(diagnostic);
+        flow.diagnostic = diagnostic;
       });
       return this.status(flow.providerId);
     } catch (error) {
-      return this.status("grok-account", parseProviderError$1(error), "failed");
+      const diagnostic = resolveGrokOAuthDiagnostic(error, "device", scope);
+      return this.status("grok-account", renderGrokOAuthDiagnosticMessage(diagnostic), "failed", diagnostic);
     }
   }
   startUnimplementedAccountLogin(providerId) {
@@ -14592,21 +14769,63 @@ class ProviderAccountAuthService {
       };
     }
   }
+  async exchangeGrokCode(flow, code) {
+    if (!code || !flow.codeVerifier || !flow.clientId || !flow.redirectUri) {
+      throw new Error("Super Grok browser authorization callback is missing code, PKCE verifier, client id, or redirect URI.");
+    }
+    const tokenEndpoint = flow.tokenEndpoint ?? (await fetchGrokOAuthMetadata()).tokenEndpoint;
+    const payload = await fetchOAuthJson(tokenEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      body: createFormBody({
+        grant_type: "authorization_code",
+        client_id: flow.clientId,
+        code,
+        redirect_uri: flow.redirectUri,
+        code_verifier: flow.codeVerifier
+      })
+    });
+    if (payload.error) {
+      throw new GrokOAuthDiagnosticError(createGrokOAuthFailureDiagnostic("token", "browser token exchange", payload, flow.requestedScopes, flow.redirectUri));
+    }
+    if (!payload.access_token) {
+      throw new Error("xAI OAuth did not return an access token.");
+    }
+    const account = await this.fetchGrokUserInfo(payload.access_token, flow.userinfoEndpoint);
+    return {
+      providerId: "grok-account",
+      accessToken: payload.access_token,
+      apiKey: payload.access_token,
+      refreshToken: payload.refresh_token,
+      idToken: payload.id_token,
+      clientId: flow.clientId,
+      authorizationMode: "browser",
+      requestedScopes: flow.requestedScopes,
+      redirectUri: flow.redirectUri,
+      accountId: account.accountId,
+      expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1e3).toISOString(),
+      accountLabel: account.accountLabel ?? "Super Grok Account",
+      planLabel: "Super Grok OAuth"
+    };
+  }
   async pollGrokDevice(flow) {
     if (!flow.deviceCode || !flow.clientId) {
-      throw new Error("Grok device authorization is missing client or device code.");
+      throw new Error("Super Grok device authorization is missing client or device code.");
     }
     let intervalSeconds = flow.intervalSeconds ?? 5;
     let delayBeforePoll = !isTestMode$1();
     for (; ; ) {
       if (Date.now() > flow.expiresAt) {
-        throw new Error("Grok authorization code expired.");
+        throw new Error("Super Grok authorization code expired.");
       }
       if (delayBeforePoll) {
         await wait(intervalSeconds * 1e3);
       }
       delayBeforePoll = true;
-      const payload = await fetchOAuthJson(GROK_AUTH_TOKEN_ENDPOINT, {
+      const tokenEndpoint = flow.tokenEndpoint ?? (await fetchGrokOAuthMetadata()).tokenEndpoint;
+      const payload = await fetchOAuthJson(tokenEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded"
@@ -14627,12 +14846,12 @@ class ProviderAccountAuthService {
         continue;
       }
       if (payload.error) {
-        throw new Error(payload.error_description ?? payload.error);
+        throw new GrokOAuthDiagnosticError(createGrokOAuthFailureDiagnostic("token", "device token polling", payload, flow.requestedScopes));
       }
       if (!payload.access_token) {
         throw new Error("xAI OAuth did not return an access token.");
       }
-      const account = await this.fetchGrokUserInfo(payload.access_token);
+      const account = await this.fetchGrokUserInfo(payload.access_token, flow.userinfoEndpoint);
       return {
         providerId: "grok-account",
         accessToken: payload.access_token,
@@ -14640,16 +14859,19 @@ class ProviderAccountAuthService {
         refreshToken: payload.refresh_token,
         idToken: payload.id_token,
         clientId: flow.clientId,
+        authorizationMode: "device",
+        requestedScopes: flow.requestedScopes,
         accountId: account.accountId,
         expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1e3).toISOString(),
-        accountLabel: account.accountLabel ?? "Grok Account",
-        planLabel: "xAI OAuth"
+        accountLabel: account.accountLabel ?? "Super Grok Account",
+        planLabel: "Super Grok OAuth"
       };
     }
   }
-  async fetchGrokUserInfo(accessToken) {
+  async fetchGrokUserInfo(accessToken, userinfoEndpoint) {
     try {
-      const payload = await fetchJson(GROK_AUTH_USERINFO_ENDPOINT, {
+      const endpoint = userinfoEndpoint ?? (await fetchGrokOAuthMetadata()).userinfoEndpoint;
+      const payload = await fetchJson(endpoint, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${accessToken}`
@@ -14733,7 +14955,8 @@ class ProviderAccountAuthService {
       if (!bundle.refreshToken || !bundle.clientId) {
         return bundle;
       }
-      const payload2 = await fetchOAuthJson(GROK_AUTH_TOKEN_ENDPOINT, {
+      const metadata = await fetchGrokOAuthMetadata();
+      const payload2 = await fetchOAuthJson(metadata.tokenEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded"
@@ -14745,7 +14968,7 @@ class ProviderAccountAuthService {
         })
       });
       if (payload2.error) {
-        throw new Error(payload2.error_description ?? payload2.error);
+        throw new GrokOAuthDiagnosticError(createGrokOAuthFailureDiagnostic("refresh", "token refresh", payload2, bundle.requestedScopes, bundle.redirectUri));
       }
       if (!payload2.access_token) {
         throw new Error("xAI OAuth refresh did not return an access token.");
@@ -14820,7 +15043,7 @@ class ProviderAccountAuthService {
     if (bundle.providerId === "grok-account") {
       const token = bundle.accessToken ?? bundle.apiKey;
       if (!token) {
-        throw new Error("Grok account access token is missing. Sign in again.");
+        throw new Error("Super Grok account access token is missing. Sign in again.");
       }
       const payload2 = await fetchJson(`${GROK_API_BASE_URL}/models`, {
         method: "GET",
@@ -14864,7 +15087,8 @@ class ProviderAccountAuthService {
       return;
     }
     try {
-      await fetchOAuthJson(GROK_AUTH_REVOKE_ENDPOINT, {
+      const metadata = await fetchGrokOAuthMetadata();
+      await fetchOAuthJson(metadata.revocationEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded"
@@ -14919,6 +15143,90 @@ class ProviderAccountAuthService {
     if (server2.listening) {
       server2.close();
     }
+  }
+  startGrokCallbackServer(flow) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const server2 = http.createServer((request2, response) => {
+        const url2 = new URL(request2.url ?? "/", `http://localhost:${SUPER_GROK_OAUTH_CALLBACK_PORT}`);
+        if (url2.pathname !== "/oauth/grok/callback") {
+          response.writeHead(404, { "Content-Type": "text/plain" });
+          response.end("Not found.");
+          return;
+        }
+        const failCallback = (diagnostic, statusCode = 400) => {
+          flow.error = renderGrokOAuthDiagnosticMessage(diagnostic);
+          flow.diagnostic = diagnostic;
+          response.writeHead(statusCode, { "Content-Type": "text/plain" });
+          response.end(flow.error);
+          this.closeFlowServer(flow);
+        };
+        if (url2.searchParams.get("state") !== flow.state) {
+          failCallback(createGrokOAuthDiagnostic(
+            "callback",
+            "Super Grok OAuth browser callback failed because the returned state did not match the active login flow.",
+            { requestedScopes: flow.requestedScopes, redirectUri: flow.redirectUri }
+          ));
+          return;
+        }
+        const providerError = url2.searchParams.get("error") ?? "";
+        if (providerError) {
+          failCallback(createGrokOAuthDiagnostic(
+            "callback",
+            "Super Grok OAuth browser callback was rejected by xAI.",
+            {
+              providerError,
+              detail: url2.searchParams.get("error_description") ?? void 0,
+              requestedScopes: flow.requestedScopes,
+              redirectUri: flow.redirectUri
+            }
+          ));
+          return;
+        }
+        const code = url2.searchParams.get("code") ?? "";
+        if (!code) {
+          failCallback(createGrokOAuthDiagnostic(
+            "callback",
+            "Super Grok OAuth browser callback did not include an authorization code.",
+            { requestedScopes: flow.requestedScopes, redirectUri: flow.redirectUri }
+          ));
+          return;
+        }
+        void this.finishLogin({ providerId: flow.providerId, flowId: flow.flowId, code }).then((status) => {
+          if (!status.connected) {
+            response.writeHead(500, { "Content-Type": "text/plain" });
+            response.end(status.error ?? status.message ?? "Super Grok OAuth failed.");
+            return;
+          }
+          response.writeHead(200, { "Content-Type": "text/html" });
+          response.end("<html><body>RDC Agent Super Grok sign-in complete. You can return to the app.</body></html>");
+        }).catch((error) => {
+          const diagnostic = resolveGrokOAuthDiagnostic(error, "browser", flow.requestedScopes, flow.redirectUri);
+          flow.error = renderGrokOAuthDiagnosticMessage(diagnostic);
+          flow.diagnostic = diagnostic;
+          response.writeHead(500, { "Content-Type": "text/plain" });
+          response.end(flow.error);
+        }).finally(() => {
+          this.closeFlowServer(flow);
+        });
+      });
+      flow.server = server2;
+      server2.on("error", (error) => {
+        const diagnostic = resolveGrokOAuthDiagnostic(error, "browser", flow.requestedScopes, flow.redirectUri);
+        flow.error = renderGrokOAuthDiagnosticMessage(diagnostic);
+        flow.diagnostic = diagnostic;
+        this.closeFlowServer(flow);
+        pendingFlows.delete(flow.flowId);
+        if (!settled) {
+          settled = true;
+          reject(error);
+        }
+      });
+      server2.listen(SUPER_GROK_OAUTH_CALLBACK_PORT, "127.0.0.1", () => {
+        settled = true;
+        resolve();
+      });
+    });
   }
   startChatGptCallbackServer(flow) {
     return new Promise((resolve, reject) => {
@@ -15057,7 +15365,6 @@ function extractTextContent(content) {
     return "";
   }).join("\n").trim();
 }
-const charsToTokens$1 = (chars) => Math.ceil(chars / 4);
 function buildScaledBreakdown(raw, occupiedTokens, contextWindowTokens) {
   if (!raw || raw.length === 0) {
     return null;
@@ -15226,8 +15533,8 @@ class DebuggerLlmService {
    *
    * agent 主循环不经过 {@link call}，其用量由 provider 在 `message_end` 上报；
    * 这里把它并入同一份 runSummaries，使上下文环 / 分类查看器拿到权威数据。
-   * `inputTokens` 为最近一次 prompt 的真实占用；分类中对话量取占用量减去
-   * 系统提示与工具定义的估算余量（字符/4 口径），保证各段之和锚定到权威占用。
+   * `inputTokens` 为最近一次 prompt 的真实占用；`precomputedBreakdown` 由 Orchestrator
+   * 在 message_end 处按权威占用组装好后传入，作为唯一的分段来源。
    */
   recordAgentTurnUsage(params) {
     const key = params.runId ?? params.sessionId;
@@ -15250,19 +15557,7 @@ class DebuggerLlmService {
     existing.totalInputTokens += params.inputTokens;
     existing.totalOutputTokens += params.outputTokens;
     existing.lastOccupiedTokens = params.inputTokens;
-    if (params.precomputedBreakdown && params.precomputedBreakdown.length > 0) {
-      existing.lastPromptBreakdown = params.precomputedBreakdown;
-    } else {
-      const systemTokens = charsToTokens$1((params.systemPrompt ?? "").length);
-      const toolChars = params.toolDefinitions ? JSON.stringify(params.toolDefinitions).length : 0;
-      const toolTokens = charsToTokens$1(toolChars);
-      const conversationTokens = Math.max(0, params.inputTokens - systemTokens - toolTokens);
-      existing.lastPromptBreakdown = [
-        { id: "system_prompt", tokens: systemTokens },
-        { id: "tool_definitions", tokens: toolTokens, count: params.toolCount },
-        { id: "conversation", tokens: conversationTokens }
-      ];
-    }
+    existing.lastPromptBreakdown = params.precomputedBreakdown;
     existing.lastSnapshotAt = Date.now();
     this.runSummaries.set(key, existing);
     this.broadcastRunUsage(key);
@@ -15776,7 +16071,6 @@ function isDeniedAskTool(originalToolName, normalizedToolName) {
   }
   return ASK_DENIED_TOOL_PREFIXES.some((prefix) => originalToolName.startsWith(prefix) || normalizedToolName.startsWith(prefix));
 }
-const charsToTokens = (chars) => Math.ceil(chars / 4);
 class AgentOrchestrator {
   agentStates = /* @__PURE__ */ new Map();
   agentConfigs = /* @__PURE__ */ new Map();
@@ -15803,8 +16097,6 @@ class AgentOrchestrator {
   pendingHandoff = null;
   constructor() {
     this.initializeAgents();
-  }
-  setMainWindow(_window) {
   }
   initializeAgents() {
     for (const role of AGENT_ROLES) {
@@ -16374,7 +16666,7 @@ class AgentOrchestrator {
         if (normalizedName === "ask_user") {
           return this.executeAskUserTool(toolCall, agentId, runtimeContext, signal);
         }
-        const permissionDecision = agentPermissionPolicyService.evaluate({ agentId, tool, toolCall, projectRootPath: runtimeContext?.projectRootPath ?? null });
+        const permissionDecision = agentPermissionPolicyService.evaluate({ tool, toolCall, projectRootPath: runtimeContext?.projectRootPath ?? null });
         if (permissionDecision.action === "deny") {
           return this.createPolicyDeniedToolResult(toolCall, agentId, permissionDecision.reason);
         }
@@ -21291,6 +21583,38 @@ function createDefaultBranchState(sessionId) {
 function normalizeBranchId(branchId) {
   return branchId?.trim() || ROOT_BRANCH_ID;
 }
+function repairConversationBranchState(allMessages, branchState) {
+  if (!branchState || branchState.forks.length === 0) {
+    return { branchState, repaired: false };
+  }
+  let repaired = false;
+  const forks = branchState.forks.map((fork) => {
+    let forkRepaired = false;
+    const branches = fork.branches.map((branch) => {
+      if (branch.anchorUserMessageId && branch.rootTurnId) {
+        return branch;
+      }
+      const anchor = findRecoverableBranchAnchor(allMessages, fork, branch);
+      if (!anchor) {
+        return branch;
+      }
+      repaired = true;
+      forkRepaired = true;
+      return {
+        ...branch,
+        anchorUserMessageId: branch.anchorUserMessageId || anchor.id,
+        rootTurnId: branch.rootTurnId || anchor.turnId
+      };
+    });
+    return forkRepaired ? { ...fork, branches } : fork;
+  });
+  return repaired ? { branchState: { ...branchState, forks }, repaired: true } : { branchState, repaired: false };
+}
+function findRecoverableBranchAnchor(allMessages, fork, branch) {
+  const branchId = normalizeBranchId(branch.branchId);
+  const candidates = allMessages.filter((message) => message.role === "user" && normalizeBranchId(message.branchId) === branchId).sort(sortByCreatedAt);
+  return candidates.find((message) => message.forkId === fork.forkId && message.variantIndex === branch.variantIndex) ?? candidates.find((message) => message.forkId === fork.forkId) ?? candidates[0] ?? null;
+}
 function resolveVisibleConversationMessages(allMessages, branchState) {
   if (!branchState || branchState.forks.length === 0) {
     return allMessages.filter((message) => normalizeBranchId(message.branchId) === ROOT_BRANCH_ID).sort(sortByCreatedAt);
@@ -21722,7 +22046,7 @@ class ConversationService {
   pendingHandoffs = /* @__PURE__ */ new Map();
   async getHistory(sessionId) {
     const allMessages = storageAdapter.readConversationHistory(sessionId);
-    const branchState = storageAdapter.readConversationBranchState(sessionId);
+    const branchState = this.readRepairedBranchState(sessionId, allMessages);
     return {
       messages: resolveVisibleConversationMessages(allMessages, branchState),
       branchState
@@ -21893,12 +22217,12 @@ class ConversationService {
         branchId: newBranchId,
         forkId,
         variantIndex
-      },
-      fork
+      }
     );
   }
   async switchConversationBranch(input) {
-    const branchState = storageAdapter.readConversationBranchState(input.sessionId);
+    const allMessages = storageAdapter.readConversationHistory(input.sessionId);
+    const branchState = this.readRepairedBranchState(input.sessionId, allMessages);
     if (!branchState) {
       return { success: false, messages: [], error: "No conversation branch state found." };
     }
@@ -21910,7 +22234,6 @@ class ConversationService {
     fork.activeBranchId = input.branchId;
     branchState.activeLeafBranchId = input.branchId;
     storageAdapter.writeConversationBranchState(input.sessionId, branchState);
-    const allMessages = storageAdapter.readConversationHistory(input.sessionId);
     const visibleMessages = resolveVisibleConversationMessages(allMessages, branchState);
     const tracePresentation = await traceService.buildConversationPresentation(input.sessionId, visibleMessages);
     workflowProjectionPublisher.publishTraceProjectionChanged(input.sessionId, tracePresentation);
@@ -21921,6 +22244,14 @@ class ConversationService {
       branchState,
       tracePresentation
     };
+  }
+  readRepairedBranchState(sessionId, allMessages) {
+    const current = storageAdapter.readConversationBranchState(sessionId);
+    const { branchState, repaired } = repairConversationBranchState(allMessages, current);
+    if (branchState && repaired) {
+      storageAdapter.writeConversationBranchState(sessionId, branchState);
+    }
+    return branchState;
   }
   async resolveContext(input) {
     const projectId = input.projectId ?? input.fallbackProjectId ?? storageAdapter.getCurrentProjectId() ?? null;
@@ -21942,7 +22273,7 @@ class ConversationService {
       replayDevice
     };
   }
-  async startProfileTurn(context2, requestedMode, requestedAgentId, rawMessage, pendingAttachments, branchContext, forkToUpdate) {
+  async startProfileTurn(context2, requestedMode, requestedAgentId, rawMessage, pendingAttachments, branchContext) {
     let workingSession = context2.session;
     if (!workingSession && context2.projectId) {
       workingSession = storageAdapter.createSession(context2.projectId, rawMessage.slice(0, 80));
@@ -21985,18 +22316,16 @@ class ConversationService {
       forkId: branchContext?.forkId,
       variantIndex: branchContext?.variantIndex
     });
-    if (forkToUpdate && sessionIdForBranch && branchState) {
-      const pendingBranch = forkToUpdate.branches.find((entry) => entry.branchId === branchId);
-      if (pendingBranch) {
+    if (sessionIdForBranch && branchState && branchContext?.branchId) {
+      const fork = branchContext.forkId ? branchState.forks.find((entry) => entry.forkId === branchContext.forkId) : null;
+      const pendingBranch = fork?.branches.find((entry) => entry.branchId === branchId);
+      if (fork && pendingBranch) {
         pendingBranch.anchorUserMessageId = userMessage.id;
         pendingBranch.rootTurnId = turnId;
+        fork.activeBranchId = branchId;
+        branchState.activeLeafBranchId = branchContext.branchId;
+        storageAdapter.writeConversationBranchState(sessionIdForBranch, branchState);
       }
-      forkToUpdate.activeBranchId = branchId;
-      branchState.activeLeafBranchId = branchId;
-      storageAdapter.writeConversationBranchState(sessionIdForBranch, branchState);
-    } else if (sessionIdForBranch && branchState && branchContext?.branchId) {
-      branchState.activeLeafBranchId = branchContext.branchId;
-      storageAdapter.writeConversationBranchState(sessionIdForBranch, branchState);
     }
     const assistantDraftMessage = makeConversationMessage("assistant", "", {
       turnId,
@@ -24097,7 +24426,7 @@ function registerWorkflowHandlers(context2) {
     return result;
   });
   electron.ipcMain.handle("workflow:getRunUsage", async (_event, runId, sessionId) => {
-    const targetKey = runId || state2.currentRunId || sessionId;
+    const targetKey = runId ?? sessionId ?? state2.currentRunId;
     if (!targetKey) {
       return { usage: null };
     }
@@ -24373,7 +24702,6 @@ function registerIPCHandlers() {
 }
 function setMainWindow(window) {
   replayDeviceService.setMainWindow(window);
-  agentOrchestrator.setMainWindow(window);
 }
 async function stopAllActiveRuns() {
   await runExecutionService.stopAll();

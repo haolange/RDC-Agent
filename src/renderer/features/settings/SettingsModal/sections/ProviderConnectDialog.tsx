@@ -7,6 +7,7 @@ import {
   getProviderProtocolOptions,
   providerSupportsProtocolSelection,
 } from '../utils';
+import { ProviderAccountOAuthPanel } from './ProviderAccountOAuthPanel';
 import { ProviderApiKeyFields } from './ProviderApiKeyFields';
 import { ProviderProtocolField } from './ProviderProtocolField';
 
@@ -26,7 +27,7 @@ interface ProviderConnectDialogProps {
   onUpdateConnectionDraft: (patch: Partial<ProviderConnectionDraft>) => void;
   onTest: () => void | Promise<void>;
   onSave: () => void | Promise<void>;
-  onStartAccountLogin: () => void | Promise<void>;
+  onStartAccountLogin: (accountLoginMode?: ProviderConnectionDraft['accountLoginMode']) => void | Promise<void>;
   t: Translate;
 }
 
@@ -163,68 +164,15 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
       )}
 
       {connectionProvider.authMode === 'account' && (
-        <div className="settings-provider-oauth-panel">
-          <div className="settings-provider-notice">
-            {connectionAccountConnected
-              ? t('settings.oauthConnectedHint')
-              : connectionDevicePending
-                ? connectionProvider.id === 'github-copilot'
-                  ? t('settings.githubAuthorizationPending')
-                  : t('settings.oauthDeviceAuthorizationPending')
-                : connectionDraft.accountStatus?.message || t('settings.oauthConnectHint')}
-          </div>
-          {!connectionAccountConnected && connectionProvider.id === 'grok-account' && (
-            <label className="settings-field">
-              <span className="settings-field-label">{t('settings.oauthClientId')}</span>
-              <input className="input" data-testid="settings-provider-oauth-client-id" value={connectionDraft.oauthClientId} placeholder={t('settings.oauthClientIdPlaceholder')} disabled={connectionDraft.busy !== 'idle' || connectionDevicePending} onChange={(event) => onUpdateConnectionDraft({
-                oauthClientId: event.target.value,
-                error: '',
-                accountStatus: connectionDraft.accountStatus?.requiresClientId ? undefined : connectionDraft.accountStatus,
-              })} />
-              <span className="settings-help-text">{t('settings.oauthClientIdHint')}</span>
-            </label>
-          )}
-          {connectionAccountConnected && (connectionDraft.accountStatus?.accountLabel || connectionDraft.accountStatus?.planLabel) && (
-            <div className="settings-secret-status" data-testid="settings-provider-oauth-summary">
-              <span>{[connectionDraft.accountStatus.accountLabel, connectionDraft.accountStatus.planLabel].filter(Boolean).join(t('settings.accountSummarySeparator'))}</span>
-            </div>
-          )}
-          {!connectionAccountConnected && (
-            <button
-              type="button"
-              className="button button-secondary"
-              data-testid="settings-provider-oauth-start"
-              onClick={() => void onStartAccountLogin()}
-              disabled={connectionDraft.busy !== 'idle' || connectionDevicePending}
-            >
-              {t('settings.connect')}
-            </button>
-          )}
-          {!connectionAccountConnected && connectionDraft.accountStatus?.authUrl && (
-            <a className="settings-link" href={connectionDraft.accountStatus.authUrl} target="_blank" rel="noreferrer">
-              {t('settings.openAuthPage')}
-            </a>
-          )}
-          {!connectionAccountConnected && connectionDraft.accountStatus?.verificationUri && (
-            <div className="settings-secret-status">
-              <span>{connectionDraft.accountStatus.verificationUri}</span>
-              <strong data-testid="settings-provider-oauth-device-code">
-                {connectionDraft.accountStatus.userCode}
-              </strong>
-            </div>
-          )}
-          {!connectionAccountConnected && connectionDraft.accountStatus?.requiresCodeInput && (
-            <label className="settings-field">
-              <span className="settings-field-label">{t('settings.oauthCode')}</span>
-              <input
-                className="input"
-                data-testid="settings-provider-oauth-code"
-                value={connectionDraft.authCode}
-                onChange={(event) => onUpdateConnectionDraft({ authCode: event.target.value, error: '' })}
-              />
-            </label>
-          )}
-        </div>
+        <ProviderAccountOAuthPanel
+          connectionDraft={connectionDraft}
+          connectionProvider={connectionProvider}
+          connectionAccountConnected={connectionAccountConnected}
+          connectionDevicePending={connectionDevicePending}
+          onUpdateConnectionDraft={onUpdateConnectionDraft}
+          onStartAccountLogin={onStartAccountLogin}
+          t={t}
+        />
       )}
 
       {connectionProvider.docsUrl && (

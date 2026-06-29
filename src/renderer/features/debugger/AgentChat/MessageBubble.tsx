@@ -1,14 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import type {
   ConversationMessage,
   ConversationMessageStatus,
 } from '@shared/types/conversation';
-import { resolveAgentDisplay } from '@shared/constants/agents';
-import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { WorkProcess } from './WorkProcess';
-import { useAgentHandoffActions } from './useAgentHandoffActions';
 import { MessageActions } from './MessageActions';
-import { ModeGlyph } from '../../../ui/ModeGlyph';
 import { UserMessageEditForm } from './UserMessageEditForm';
 import { useUserMessageRewrite } from './useUserMessageRewrite';
 import { MessageAttachments } from './MessageAttachments';
@@ -159,48 +155,21 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
 
 const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => {
   const agentId = message.agentId;
-  const definitions = useAppSettingsStore((state) => state.settings.agents.definitions);
-  const display = resolveAgentDisplay(agentId ?? 'assistant', definitions);
-  const accent = display.accent;
   const time = formatClockTime(message.createdAt);
   const trace = message.workTrace ?? null;
   const status: ConversationMessageStatus = message.status ?? 'complete';
   const isInProgress = status === 'streaming' || status === 'draft';
   const hasContent = Boolean(message.content && message.content.length > 0);
   const traceIsRunning = Boolean(trace && trace.status === 'running');
-  // workTrace 运行中只展示 Work Process，trace 结束后才显示最终回答气泡；
-  // 无 trace 时（Ask 模式）由 isInProgress 保证流式正文可见。
+  // While workTrace is running, show Work Process first; final prose appears after the trace completes.
+  // Ask-mode turns without trace still stream body text through isInProgress.
   const showContentBubble = !traceIsRunning && (hasContent || isInProgress);
-  const [sendingHandoff, setSendingHandoff] = useState<string | null>(null);
-  const sendAgentHandoff = useAgentHandoffActions(message);
-  const handoffs = useMemo(() => {
-    if (!agentId || status !== 'complete') return [];
-    const definition = definitions.find((entry) => entry.id === agentId && entry.enabled);
-    return definition?.handoffs ?? [];
-  }, [agentId, definitions, status]);
-
-  const styleVar: React.CSSProperties = {
-    ['--message-mode-accent' as string]: accent,
-  };
-
-  const sendHandoff = async (handoffIndex: number) => {
-    const handoff = handoffs[handoffIndex];
-    if (!handoff || sendingHandoff) return;
-    setSendingHandoff(handoff.label);
-    try {
-      await sendAgentHandoff(handoff);
-    } finally {
-      setSendingHandoff(null);
-    }
-  };
-
   return (
     <article
       className={`conversation-message conversation-message-assistant status-${status}`}
       data-testid="message-bubble-assistant"
       data-message-id={message.id}
       data-agent-id={agentId ?? 'assistant'}
-      style={styleVar}
     >
       <div className="conversation-message-row">
         <div className="conversation-message-stack">
@@ -227,35 +196,6 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
           ) : null}
           {!isInProgress ? (
             <MessageMetaBar message={message} time={time} status={status} />
-          ) : null}
-          {handoffs.length > 0 ? (
-            <div className="conversation-handoff-actions" data-testid="conversation-handoff-actions">
-              <span className="conversation-handoff-actions-label">Next actions</span>
-              <div className="conversation-handoff-button-row">
-                {handoffs.map((handoff, index) => {
-                  const target = resolveAgentDisplay(handoff.agent, definitions);
-                  return (
-                    <button
-                      key={`${handoff.agent}-${handoff.label}-${index}`}
-                      type="button"
-                      className="conversation-handoff-button"
-                      disabled={Boolean(sendingHandoff)}
-                      data-testid={`conversation-handoff-${handoff.agent}`}
-                      onClick={() => {
-                        void sendHandoff(index);
-                      }}
-                      title={`${handoff.prompt}\nTarget: ${target.name}`}
-                      aria-label={`${handoff.label} (${target.name})`}
-                    >
-                      <span className="conversation-handoff-button-icon" aria-hidden="true">
-                        <ModeGlyph mode={handoff.agent} icon={target.icon} accentColor={target.accent} size={14} strokeWidth={1.9} />
-                      </span>
-                      <span>{handoff.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
           ) : null}
         </div>
       </div>

@@ -6,6 +6,7 @@ require('./register-ts-source.cjs');
 const {
   resolveVisibleConversationMessages,
   createDefaultBranchState,
+  repairConversationBranchState,
 } = require('../src/main/conversation/ConversationBranchResolver.ts');
 const { ROOT_BRANCH_ID } = require('../src/shared/types/conversationBranch.ts');
 
@@ -140,6 +141,43 @@ assert(activeVisible.map((message) => message.id).join(',') === [
   'msg-user-2b',
   'msg-assistant-2b',
 ].join(','), 'active branch path should exclude sibling downstream');
+
+const corruptedBranchState = JSON.parse(JSON.stringify(branchState));
+const corruptedBranch = corruptedBranchState.forks[0].branches.find((entry) => entry.branchId === 'branch-v2');
+corruptedBranch.anchorUserMessageId = '';
+corruptedBranch.rootTurnId = '';
+const repaired = repairConversationBranchState(allMessages, corruptedBranchState);
+assert(repaired.repaired, 'empty branch anchor/root should be repaired from the matching user turn');
+assert(
+  repaired.branchState.forks[0].branches.find((entry) => entry.branchId === 'branch-v2').anchorUserMessageId === 'msg-user-1b',
+  'branch repair should restore anchorUserMessageId from the matching variant user message',
+);
+assert(
+  repaired.branchState.forks[0].branches.find((entry) => entry.branchId === 'branch-v2').rootTurnId === 'turn-2',
+  'branch repair should restore rootTurnId from the matching variant user message',
+);
+const repairedVisible = resolveVisibleConversationMessages(allMessages, repaired.branchState);
+assert(repairedVisible.map((message) => message.id).join(',') === [
+  'msg-user-1b',
+  'msg-assistant-1b',
+  'msg-user-2b',
+  'msg-assistant-2b',
+].join(','), 'repaired branch path should keep the rewritten user and paired assistant visible');
+
+const unrecoverableBranchState = JSON.parse(JSON.stringify(branchState));
+unrecoverableBranchState.forks[0].activeBranchId = 'branch-empty';
+unrecoverableBranchState.activeLeafBranchId = 'branch-empty';
+unrecoverableBranchState.forks[0].branches.push({
+  branchId: 'branch-empty',
+  parentBranchId: ROOT_BRANCH_ID,
+  variantIndex: 2,
+  anchorUserMessageId: '',
+  rootTurnId: '',
+});
+const unrecoverable = repairConversationBranchState(allMessages, unrecoverableBranchState);
+assert(!unrecoverable.repaired, 'unrecoverable branch must fail closed instead of fabricating anchors');
+const unrecoverableVisible = resolveVisibleConversationMessages(allMessages, unrecoverable.branchState);
+assert(unrecoverableVisible.map((message) => message.id).join(',') === ''.trim(), 'unrecoverable branch should not fabricate visible messages');
 
 branchState.forks[0].activeBranchId = ROOT_BRANCH_ID;
 branchState.activeLeafBranchId = ROOT_BRANCH_ID;

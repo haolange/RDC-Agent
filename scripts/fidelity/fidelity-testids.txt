@@ -27,8 +27,6 @@ composer-usage-indicator
 composer-user-input-panel
 context-breakdown
 control-panel-scroll
-conversation-handoff-${handoff.agent}
-conversation-handoff-actions
 conversation-thread
 cp-section-${id}
 cp-section-trace-lane-${id}
@@ -103,8 +101,12 @@ settings-provider-connect-test
 settings-provider-disconnect-${provider.id}
 settings-provider-environment-notice
 settings-provider-oauth-client-id
+settings-provider-oauth-client-source
 settings-provider-oauth-code
+settings-provider-oauth-device-card
 settings-provider-oauth-device-code
+settings-provider-oauth-diagnostic
+settings-provider-oauth-mode-${mode}
 settings-provider-oauth-start
 settings-provider-oauth-summary
 settings-provider-responses-hint
