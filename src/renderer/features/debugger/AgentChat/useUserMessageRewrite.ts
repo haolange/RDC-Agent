@@ -10,6 +10,14 @@ import {
   syncE2EConversationState,
 } from '../composer/composerSendHelpers';
 
+export function isRewriteTurnStillCurrent(turnId: string, activeLeafBranchId?: string | null): boolean {
+  const state = useConversationStore.getState();
+  if (activeLeafBranchId && state.branchState?.activeLeafBranchId !== activeLeafBranchId) {
+    return false;
+  }
+  return state.conversationMessages.some((entry) => entry.turnId === turnId && entry.role === 'user');
+}
+
 export function useUserMessageRewrite(message: ConversationMessage) {
   const conversationMessages = useConversationStore((state) => state.conversationMessages);
   const setConversationMessages = useConversationStore((state) => state.setConversationMessages);
@@ -63,28 +71,24 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         setCurrentRun,
         setRuns,
         setTracePresentation,
+        setConversationMessages,
+        setBranchState,
         upsertConversationMessages,
       });
 
-      if (message.sessionId) {
-        const historyResult = await electronAPI.conversation.getHistory(message.sessionId);
-        const historyMessages = historyResult.messages ?? [];
-        const historyContainsRewriteTurn = historyMessages.some((entry) => (
-          entry.turnId === result.userMessage.turnId
-          && entry.role === 'user'
-        ));
-        if (historyContainsRewriteTurn) {
-          setConversationMessages(historyMessages);
-          setBranchState(historyResult.branchState ?? null);
-        }
-      }
-
-      await syncE2EConversationState({
+      void syncE2EConversationState({
         electronAPI,
         sessionId: result.session?.sessionId ?? message.sessionId,
         turnId: result.userMessage.turnId,
         setConversationMessages,
         setTracePresentation,
+        setBranchState,
+        shouldApply: () => isRewriteTurnStillCurrent(
+          result.userMessage.turnId,
+          result.branchState?.activeLeafBranchId,
+        ),
+      }).catch((error) => {
+        console.warn('[conversation] Rewrite terminal sync failed.', error);
       });
     } catch (error) {
       setConversationMessages(previousMessages);

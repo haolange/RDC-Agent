@@ -130,7 +130,7 @@ export class GeminiProvider implements ProviderStrategy {
     baseUrl: string,
     apiKey: string | undefined,
   ): Promise<void> {
-    const composed = composeAbortSignals(options.signal, stream.signal);
+    const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API, ...options });
 
     try {
       builder.start();
@@ -161,8 +161,9 @@ export class GeminiProvider implements ProviderStrategy {
       const THINKING_INDEX = 1;
       let toolCallCounter = 0;
       let finishReason: string | null = null;
+      let sawOutput = false;
 
-      for await (const data of parseSSE(response, composed.signal)) {
+      for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
         if (composed.signal.aborted) break;
         let chunk: GeminiStreamChunk;
         try {
@@ -190,8 +191,10 @@ export class GeminiProvider implements ProviderStrategy {
           if ('text' in part && typeof (part as GeminiTextPart).text === 'string') {
             const textPart = part as GeminiTextPart;
             if (textPart.thought) {
+              sawOutput = true;
               builder.appendThinking(THINKING_INDEX, textPart.text);
             } else {
+              sawOutput = true;
               builder.appendText(TEXT_INDEX, textPart.text);
             }
             continue;
@@ -201,6 +204,7 @@ export class GeminiProvider implements ProviderStrategy {
             const slot = 2 + toolCallCounter;
             toolCallCounter += 1;
             const callId = `gemini-call-${Date.now()}-${slot}`;
+            sawOutput = true;
             builder.ensureToolCall(slot, callId, fc.name);
             const args = JSON.stringify(fc.args ?? {});
             builder.appendToolCallArgs(slot, args);
@@ -214,9 +218,15 @@ export class GeminiProvider implements ProviderStrategy {
         }
       }
 
+      if (!sawOutput) {
+        throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
+      }
       builder.done(mapFinishReason(finishReason, toolCallCounter > 0));
     } catch (err) {
-      const error = normalizeError(err);
+      const thrown = normalizeError(err);
+      const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error
+        ? composed.signal.reason
+        : thrown;
       builder.fail(error, error.name === 'AbortError' ? 'aborted' : 'error');
     } finally {
       composed.dispose();

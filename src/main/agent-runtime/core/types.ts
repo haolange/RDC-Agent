@@ -307,6 +307,9 @@ export interface StreamOptions {
   reasoningVisibility?: ReasoningVisibility;
   /** 用于中止本次生成的信号。 */
   signal?: AbortSignal;
+  firstChunkTimeoutMs?: number;
+  streamIdleTimeoutMs?: number;
+  requestTimeoutMs?: number;
   /** 覆盖 Provider 默认 API key。 */
   apiKey?: string;
   /** 覆盖 Provider 默认 baseUrl。 */

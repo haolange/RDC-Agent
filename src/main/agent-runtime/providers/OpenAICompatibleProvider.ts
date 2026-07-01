@@ -129,7 +129,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
   ): Promise<void> {
     const externalSignal = options.signal;
     const internalSignal = stream.signal;
-    const composed = composeAbortSignals(externalSignal, internalSignal);
+    const composed = composeAbortSignals(externalSignal, internalSignal, { providerApi: PROVIDER_API, ...options });
 
     try {
       builder.start();
@@ -159,8 +159,9 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
       const TEXT_INDEX = 0;
       const THINKING_INDEX = 1;
       const TOOL_INDEX_BASE = 2;
+      let sawOutput = false;
 
-      for await (const data of parseSSE(response, composed.signal)) {
+      for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
         if (composed.signal.aborted) break;
         let chunk: OpenAIStreamChunk;
         try {
@@ -186,9 +187,11 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
         const delta = choice.delta ?? {};
         const reasoningDelta = delta.reasoning_content ?? delta.reasoning;
         if (typeof reasoningDelta === 'string' && reasoningDelta.length > 0) {
+          sawOutput = true;
           builder.appendThinking(THINKING_INDEX, reasoningDelta);
         }
         if (typeof delta.content === 'string' && delta.content.length > 0) {
+          sawOutput = true;
           builder.appendText(TEXT_INDEX, delta.content);
         }
 
@@ -196,6 +199,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
           for (const tc of delta.tool_calls) {
             const callIndex = typeof tc.index === 'number' ? tc.index : 0;
             const slot = TOOL_INDEX_BASE + callIndex;
+            sawOutput = true;
             builder.ensureToolCall(slot, tc.id ?? '', tc.function?.name ?? '');
             const args = tc.function?.arguments;
             if (typeof args === 'string' && args.length > 0) {
@@ -209,9 +213,15 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
         }
       }
 
+      if (!sawOutput) {
+        throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
+      }
       builder.done(mapFinishReason(finishReason));
     } catch (err) {
-      const error = normalizeError(err);
+      const thrown = normalizeError(err);
+      const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error
+        ? composed.signal.reason
+        : thrown;
       builder.fail(error, error.name === 'AbortError' ? 'aborted' : 'error');
     } finally {
       composed.dispose();

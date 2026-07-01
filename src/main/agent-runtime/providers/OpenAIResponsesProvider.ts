@@ -112,7 +112,7 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
     baseUrl: string,
     apiKey: string | undefined,
   ): Promise<void> {
-    const composed = composeAbortSignals(options.signal, stream.signal);
+    const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API, ...options });
 
     try {
       builder.start();
@@ -133,9 +133,10 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
       const toolSlotsByItemId = new Map<string, number>();
       const toolArgBuffers = new Map<number, string>();
       let sawToolCall = false;
+      let sawOutput = false;
       let finishReason: StopReason = 'stop';
 
-      for await (const data of parseSSE(response, composed.signal)) {
+      for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
         if (composed.signal.aborted) break;
         const event = parseJsonObject(data);
         if (!event) continue;
@@ -144,7 +145,10 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
         switch (eventType) {
           case 'response.output_text.delta': {
             const delta = readString(event.delta) || readString(event.text);
-            if (delta) builder.appendText(TEXT_INDEX, delta);
+            if (delta) {
+              sawOutput = true;
+              builder.appendText(TEXT_INDEX, delta);
+            }
             break;
           }
           case 'response.output_text.done':
@@ -152,7 +156,10 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
             break;
           case 'response.reasoning_summary_text.delta': {
             const delta = readString(event.delta) || readString(event.text);
-            if (delta) builder.appendThinking(REASONING_INDEX, delta);
+            if (delta) {
+              sawOutput = true;
+              builder.appendThinking(REASONING_INDEX, delta);
+            }
             break;
           }
           case 'response.reasoning_summary_text.done':
@@ -166,6 +173,7 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
               const itemId = readString(item?.id);
               if (itemId) toolSlotsByItemId.set(itemId, slot);
               sawToolCall = true;
+              sawOutput = true;
               builder.ensureToolCall(
                 slot,
                 readString(item?.call_id) || readString(item?.id) || '',
@@ -201,6 +209,7 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
               const itemId = readString(item?.id);
               if (itemId) toolSlotsByItemId.set(itemId, slot);
               sawToolCall = true;
+              sawOutput = true;
               builder.ensureToolCall(
                 slot,
                 readString(item?.call_id) || readString(item?.id) || '',
@@ -242,9 +251,15 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
         }
       }
 
+      if (!sawOutput) {
+        throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
+      }
       builder.done(finishReason);
     } catch (err) {
-      const error = normalizeError(err);
+      const thrown = normalizeError(err);
+      const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error
+        ? composed.signal.reason
+        : thrown;
       builder.fail(error, error.name === 'AbortError' ? 'aborted' : 'error');
     } finally {
       composed.dispose();

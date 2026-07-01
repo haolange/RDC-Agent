@@ -1,35 +1,91 @@
-/**
- * Provider 内部共用工具：SSE / NDJSON 解析、HTTP 错误归一化。
- *
- * 仅供 `src/main/agent-runtime/providers/**` 内部消费，
- * 不对外导出（`providers/index.ts` 不 re-export）。
- */
+export type ProviderTimeoutPhase = 'first-byte' | 'idle' | 'total';
 
-/**
- * 解析 SSE (Server-Sent Events) 流，按行 yield `data:` 后的 payload。
- *
- * - 自动剥离 `data: ` 前缀；
- * - 收到 `[DONE]` 立即结束；
- * - 支持 `signal.aborted` 中途退出；
- * - 多行（事件块）形式不在此处解析，仅做按行流式拆分。
- */
+export interface ProviderStreamTimeoutOptions {
+  firstChunkTimeoutMs?: number;
+  streamIdleTimeoutMs?: number;
+  requestTimeoutMs?: number;
+}
+
+export interface ProviderStreamReadOptions extends ProviderStreamTimeoutOptions {
+  providerApi: string;
+}
+
+export const DEFAULT_PROVIDER_FIRST_CHUNK_TIMEOUT_MS = 20_000;
+export const DEFAULT_PROVIDER_STREAM_IDLE_TIMEOUT_MS = 60_000;
+export const DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS = 300_000;
+
+interface ResolvedProviderTimeouts {
+  firstChunkTimeoutMs: number;
+  streamIdleTimeoutMs: number;
+  requestTimeoutMs: number;
+}
+
+export class ProviderTimeoutError extends Error {
+  readonly phase: ProviderTimeoutPhase;
+  readonly timeoutMs: number;
+  readonly providerApi: string;
+
+  constructor(providerApi: string, phase: ProviderTimeoutPhase, timeoutMs: number) {
+    super(`[${providerApi}] provider stream ${phase} timeout after ${timeoutMs}ms`);
+    this.name = 'ProviderTimeoutError';
+    this.providerApi = providerApi;
+    this.phase = phase;
+    this.timeoutMs = timeoutMs;
+  }
+}
+
+export class ProviderHttpError extends Error {
+  readonly status: number;
+  readonly providerApi: string;
+  readonly bodyText?: string;
+
+  constructor(providerApi: string, status: number, message: string, bodyText?: string) {
+    super(`[${providerApi}] HTTP ${status}: ${message}`);
+    this.name = 'ProviderHttpError';
+    this.providerApi = providerApi;
+    this.status = status;
+    this.bodyText = bodyText;
+  }
+}
+
+export interface ComposedSignal {
+  signal: AbortSignal;
+  dispose: () => void;
+}
+
+export function resolveProviderTimeouts(options: ProviderStreamTimeoutOptions = {}): ResolvedProviderTimeouts {
+  return {
+    firstChunkTimeoutMs: options.firstChunkTimeoutMs ?? DEFAULT_PROVIDER_FIRST_CHUNK_TIMEOUT_MS,
+    streamIdleTimeoutMs: options.streamIdleTimeoutMs ?? DEFAULT_PROVIDER_STREAM_IDLE_TIMEOUT_MS,
+    requestTimeoutMs: options.requestTimeoutMs ?? DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS,
+  };
+}
+
 export async function* parseSSE(
   response: Response,
-  signal?: AbortSignal,
+  signal: AbortSignal | undefined,
+  options: ProviderStreamReadOptions,
 ): AsyncGenerator<string> {
   if (!response.body) {
     throw new Error('parseSSE: response.body is null');
   }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
+  const timeouts = resolveProviderTimeouts(options);
   let buffer = '';
+  let hasReadChunk = false;
 
   try {
     while (true) {
-      if (signal?.aborted) {
-        break;
-      }
-      const { done, value } = await reader.read();
+      throwIfAborted(signal);
+      const { done, value } = await readWithTimeout(
+        reader,
+        signal,
+        options.providerApi,
+        hasReadChunk ? 'idle' : 'first-byte',
+        hasReadChunk ? timeouts.streamIdleTimeoutMs : timeouts.firstChunkTimeoutMs,
+      );
+      hasReadChunk = true;
       if (done) {
         break;
       }
@@ -56,33 +112,36 @@ export async function* parseSSE(
     try {
       reader.releaseLock();
     } catch {
-      /* ignore: stream already cancelled */
+      // ignore: stream already closed or cancelled
     }
   }
 }
 
-/**
- * 解析 NDJSON / JSON-lines 流（如 Ollama），按行 yield 每个 JSON 字符串。
- *
- * 仅做行拆分，不做 JSON parse；调用方再行解析以捕获单行错误。
- */
 export async function* parseJsonLines(
   response: Response,
-  signal?: AbortSignal,
+  signal: AbortSignal | undefined,
+  options: ProviderStreamReadOptions,
 ): AsyncGenerator<string> {
   if (!response.body) {
     throw new Error('parseJsonLines: response.body is null');
   }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
+  const timeouts = resolveProviderTimeouts(options);
   let buffer = '';
+  let hasReadChunk = false;
 
   try {
     while (true) {
-      if (signal?.aborted) {
-        break;
-      }
-      const { done, value } = await reader.read();
+      throwIfAborted(signal);
+      const { done, value } = await readWithTimeout(
+        reader,
+        signal,
+        options.providerApi,
+        hasReadChunk ? 'idle' : 'first-byte',
+        hasReadChunk ? timeouts.streamIdleTimeoutMs : timeouts.firstChunkTimeoutMs,
+      );
+      hasReadChunk = true;
       if (done) {
         break;
       }
@@ -106,32 +165,11 @@ export async function* parseJsonLines(
     try {
       reader.releaseLock();
     } catch {
-      /* ignore */
+      // ignore: stream already closed or cancelled
     }
   }
 }
 
-/**
- * Provider 网络 / API 错误的统一类型。
- *
- * 上层可以根据 `status` 识别 401/429/5xx 等情况，
- * 而不需要再对 fetch 的原始 Response 做 ad-hoc 判断。
- */
-export class ProviderHttpError extends Error {
-  readonly status: number;
-  readonly providerApi: string;
-  readonly bodyText?: string;
-
-  constructor(providerApi: string, status: number, message: string, bodyText?: string) {
-    super(`[${providerApi}] HTTP ${status}: ${message}`);
-    this.name = 'ProviderHttpError';
-    this.providerApi = providerApi;
-    this.status = status;
-    this.bodyText = bodyText;
-  }
-}
-
-/** 把非 2xx 响应转换为 `ProviderHttpError`，尽量带上响应体片段。 */
 export async function ensureOk(response: Response, providerApi: string): Promise<void> {
   if (response.ok) {
     return;
@@ -146,57 +184,125 @@ export async function ensureOk(response: Response, providerApi: string): Promise
   throw new ProviderHttpError(providerApi, response.status, snippet, bodyText);
 }
 
-/** 当前时间戳（毫秒），独立函数便于测试时打桩。 */
 export function nowMs(): number {
   return Date.now();
 }
 
-export interface ComposedSignal {
-  signal: AbortSignal;
-  dispose: () => void;
-}
-
-/**
- * 将外部 signal 与内部 stream signal 合成为单一 signal。
- *
- * 任意一方触发 abort 都会让合成 signal 立即 abort，
- * 便于把 stream.signal 与 options.signal 同时透传给 fetch。
- */
 export function composeAbortSignals(
   external: AbortSignal | undefined,
   internal: AbortSignal,
+  timeoutOptions: (ProviderStreamTimeoutOptions & { providerApi: string }) | undefined = undefined,
 ): ComposedSignal {
   const controller = new AbortController();
+  const providerApi = timeoutOptions?.providerApi ?? 'provider';
+  const requestTimeoutMs = resolveProviderTimeouts(timeoutOptions).requestTimeoutMs;
   const onAbort = (reason: unknown): void => {
     if (!controller.signal.aborted) {
       controller.abort(reason);
     }
   };
 
+  const internalAbort = (): void => onAbort(internal.reason);
+  const externalAbort = (): void => onAbort(external?.reason);
+
   if (internal.aborted) {
     onAbort(internal.reason);
   } else {
-    internal.addEventListener('abort', () => onAbort(internal.reason), { once: true });
+    internal.addEventListener('abort', internalAbort, { once: true });
   }
 
   if (external) {
     if (external.aborted) {
       onAbort(external.reason);
     } else {
-      external.addEventListener('abort', () => onAbort(external.reason), { once: true });
+      external.addEventListener('abort', externalAbort, { once: true });
     }
   }
+
+  const timeoutId = Number.isFinite(requestTimeoutMs) && requestTimeoutMs > 0
+    ? setTimeout(() => onAbort(new ProviderTimeoutError(providerApi, 'total', requestTimeoutMs)), requestTimeoutMs)
+    : null;
 
   return {
     signal: controller.signal,
     dispose: () => {
-      // listeners are { once: true }; nothing to clean up.
+      internal.removeEventListener('abort', internalAbort);
+      external?.removeEventListener('abort', externalAbort);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     },
   };
 }
 
-/** 标准化任意 thrown value 为 Error。 */
 export function normalizeError(err: unknown): Error {
   if (err instanceof Error) return err;
   return new Error(String(err));
+}
+
+async function readWithTimeout(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  signal: AbortSignal | undefined,
+  providerApi: string,
+  phase: ProviderTimeoutPhase,
+  timeoutMs: number,
+): Promise<ReadableStreamReadResult<Uint8Array>> {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return reader.read();
+  }
+
+  return new Promise<ReadableStreamReadResult<Uint8Array>>((resolve, reject) => {
+    let settled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const cleanup = (): void => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      signal?.removeEventListener('abort', onAbort);
+    };
+
+    const finish = (callback: () => void): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback();
+    };
+
+    const onAbort = (): void => {
+      finish(() => reject(abortErrorFromSignal(signal)));
+    };
+
+    if (signal?.aborted) {
+      reject(abortErrorFromSignal(signal));
+      return;
+    }
+
+    signal?.addEventListener('abort', onAbort, { once: true });
+    timeoutId = setTimeout(() => {
+      const error = new ProviderTimeoutError(providerApi, phase, timeoutMs);
+      void reader.cancel(error).catch(() => undefined);
+      finish(() => reject(error));
+    }, timeoutMs);
+
+    reader.read()
+      .then((result) => finish(() => resolve(result)))
+      .catch((error) => finish(() => reject(error)));
+  });
+}
+
+function throwIfAborted(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) {
+    throw abortErrorFromSignal(signal);
+  }
+}
+
+function abortErrorFromSignal(signal: AbortSignal | undefined): Error {
+  if (signal?.reason instanceof Error) {
+    return signal.reason;
+  }
+  const abortErr = new Error('Provider request aborted');
+  abortErr.name = 'AbortError';
+  return abortErr;
 }
