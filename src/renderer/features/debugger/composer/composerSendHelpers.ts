@@ -1,4 +1,5 @@
 import type { ConversationAttachmentInput, ConversationMessage, ConversationTurnResult } from '@shared/types/conversation';
+import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { AgentMode } from '@shared/types/layout';
 import type { AppMode, ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
@@ -107,6 +108,8 @@ export async function applyConversationTurnResult(options: {
   setCurrentRun: (run: RunSummary | null) => void;
   setRuns: (runs: RunSummary[]) => void;
   setTracePresentation: (presentation: AgentRunPresentation | null) => void;
+  setConversationMessages: (messages: ConversationMessage[]) => void;
+  setBranchState: (branchState: ConversationBranchState | null) => void;
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
 }) {
   const {
@@ -118,36 +121,56 @@ export async function applyConversationTurnResult(options: {
     setCurrentRun,
     setRuns,
     setTracePresentation,
+    setConversationMessages,
+    setBranchState,
     upsertConversationMessages,
   } = options;
+  const refreshTasks: Array<Promise<void>> = [];
 
   if (result.session?.projectId && currentProject?.projectId !== result.session.projectId) {
-    const projectsResult = await electronAPI.project.list();
-    const nextProjects = projectsResult.projects ?? [];
-    useProjectStore.getState().setProjects(nextProjects);
-    const matchedProject = nextProjects.find((project) => project.projectId === result.session?.projectId) ?? null;
-    useProjectStore.getState().setCurrentProject(matchedProject);
+    refreshTasks.push(electronAPI.project.list().then((projectsResult) => {
+      const nextProjects = projectsResult.projects ?? [];
+      useProjectStore.getState().setProjects(nextProjects);
+      const matchedProject = nextProjects.find((project) => project.projectId === result.session?.projectId) ?? null;
+      useProjectStore.getState().setCurrentProject(matchedProject);
+    }));
   }
 
   if (result.session?.sessionId) {
     setCurrentSession(result.session);
-    const sessionsResult = await electronAPI.session.list(result.session.projectId);
-    setSessions(sessionsResult.sessions ?? []);
+    refreshTasks.push(electronAPI.session.list(result.session.projectId).then((sessionsResult) => {
+      setSessions(sessionsResult.sessions ?? []);
+    }));
   }
 
-  upsertConversationMessages([
-    result.userMessage,
-    result.assistantDraftMessage,
-  ]);
+  if (result.messages) {
+    setConversationMessages(result.messages);
+  } else {
+    upsertConversationMessages([
+      result.userMessage,
+      result.assistantDraftMessage,
+    ]);
+  }
+
+  if (result.branchState !== undefined) {
+    setBranchState(result.branchState ?? null);
+  }
 
   if (result.runUpdate) {
     setCurrentRun(result.runUpdate);
-    const runsResult = await electronAPI.run.list(result.runUpdate.sessionId);
-    setRuns(runsResult.runs ?? []);
+    refreshTasks.push(electronAPI.run.list(result.runUpdate.sessionId).then((runsResult) => {
+      setRuns(runsResult.runs ?? []);
+    }));
   }
 
   if (result.tracePresentation) {
     setTracePresentation(result.tracePresentation);
+  }
+
+  if (refreshTasks.length > 0) {
+    void Promise.all(refreshTasks).catch((error) => {
+      console.warn('[conversation] Failed to refresh turn side data.', error);
+    });
   }
 }
 
@@ -157,6 +180,8 @@ export async function syncE2EConversationState(options: {
   turnId: string;
   setConversationMessages: (messages: ConversationMessage[]) => void;
   setTracePresentation: (presentation: AgentRunPresentation | null) => void;
+  setBranchState?: (branchState: ConversationBranchState | null) => void;
+  shouldApply?: () => boolean;
 }) {
   const {
     electronAPI,
@@ -164,9 +189,11 @@ export async function syncE2EConversationState(options: {
     turnId,
     setConversationMessages,
     setTracePresentation,
+    setBranchState,
+    shouldApply,
   } = options;
 
-  if (!navigator.webdriver || !sessionId) {
+  if (typeof navigator === 'undefined' || !navigator.webdriver || !sessionId) {
     return;
   }
 
@@ -177,7 +204,13 @@ export async function syncE2EConversationState(options: {
     const assistantForTurn = history.find((message) => message.turnId === turnId && message.role === 'assistant');
     const done = assistantForTurn && ['complete', 'error', 'stopped'].includes(assistantForTurn.status ?? 'draft');
     if (done) {
+      if (shouldApply && !shouldApply()) {
+        return;
+      }
       setConversationMessages(history);
+      if (setBranchState && 'branchState' in historyResult) {
+        setBranchState(historyResult.branchState ?? null);
+      }
       const workflowPresentation = await electronAPI.trace.getProjection(sessionId).catch(() => null);
       if (workflowPresentation?.presentation) {
         setTracePresentation(workflowPresentation.presentation);

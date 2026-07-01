@@ -1,5 +1,4 @@
 import { ipcRenderer } from 'electron';
-import type { ConversationStreamEvent } from '@shared/types/conversation';
 import type { ConversationApi } from '@shared/types/electron-api';
 import { registerTrackedListener, removeTrackedListener } from './listeners';
 
@@ -25,7 +24,7 @@ export const createConversationApi = (): ConversationApi => ({
   compactHistory: (sessionId): ReturnType<ConversationApi['compactHistory']> =>
     ipcRenderer.invoke('conversation:compactHistory', sessionId),
   onEvent: (callback): void => {
-    registerTrackedListener('conversation:event', (payload) => callback(payload as ConversationStreamEvent));
+    registerTrackedListener('conversation:event', callback as unknown as (...args: unknown[]) => void);
   },
   offEvent: (callback): void => {
     removeTrackedListener('conversation:event', callback as unknown as (...args: unknown[]) => void);

@@ -144,7 +144,7 @@ export class AnthropicProvider implements ProviderStrategy {
     baseUrl: string,
     apiKey: string | undefined,
   ): Promise<void> {
-    const composed = composeAbortSignals(options.signal, stream.signal);
+    const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API, ...options });
 
     try {
       builder.start();
@@ -175,8 +175,9 @@ export class AnthropicProvider implements ProviderStrategy {
       let stopReason: string | null = null;
       let inputTokens = 0;
       let outputTokens = 0;
+      let sawOutput = false;
 
-      for await (const data of parseSSE(response, composed.signal)) {
+      for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
         if (composed.signal.aborted) break;
         let event: AnthropicEventBase;
         try {
@@ -197,11 +198,18 @@ export class AnthropicProvider implements ProviderStrategy {
             const evt = event as AnthropicContentBlockStart;
             const block = evt.content_block;
             if (block.type === 'text') {
-              if (block.text) builder.appendText(evt.index, block.text);
+              if (block.text) {
+                sawOutput = true;
+                builder.appendText(evt.index, block.text);
+              }
               // 空 text 块在后续 delta 到达时会自动创建。
             } else if (block.type === 'thinking') {
-              if (block.thinking) builder.appendThinking(evt.index, block.thinking);
+              if (block.thinking) {
+                sawOutput = true;
+                builder.appendThinking(evt.index, block.thinking);
+              }
             } else if (block.type === 'tool_use') {
+              sawOutput = true;
               builder.ensureToolCall(evt.index, block.id, block.name);
               if (block.input && typeof block.input === 'object' && Object.keys(block.input as Record<string, unknown>).length > 0) {
                 builder.appendToolCallArgs(evt.index, JSON.stringify(block.input));
@@ -212,10 +220,13 @@ export class AnthropicProvider implements ProviderStrategy {
           case 'content_block_delta': {
             const evt = event as AnthropicContentBlockDelta;
             if (evt.delta.type === 'text_delta') {
+              sawOutput = true;
               builder.appendText(evt.index, evt.delta.text);
             } else if (evt.delta.type === 'thinking_delta') {
+              sawOutput = true;
               builder.appendThinking(evt.index, evt.delta.thinking);
             } else if (evt.delta.type === 'input_json_delta') {
+              sawOutput = true;
               builder.appendToolCallArgs(evt.index, evt.delta.partial_json);
             }
             break;
@@ -252,9 +263,15 @@ export class AnthropicProvider implements ProviderStrategy {
         }
       }
 
+      if (!sawOutput) {
+        throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
+      }
       builder.done(mapStopReason(stopReason));
     } catch (err) {
-      const error = normalizeError(err);
+      const thrown = normalizeError(err);
+      const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error
+        ? composed.signal.reason
+        : thrown;
       builder.fail(error, error.name === 'AbortError' ? 'aborted' : 'error');
     } finally {
       composed.dispose();

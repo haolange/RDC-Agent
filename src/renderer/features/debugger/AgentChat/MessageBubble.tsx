@@ -161,9 +161,8 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
   const isInProgress = status === 'streaming' || status === 'draft';
   const hasContent = Boolean(message.content && message.content.length > 0);
   const traceIsRunning = Boolean(trace && trace.status === 'running');
-  // While workTrace is running, show Work Process first; final prose appears after the trace completes.
-  // Ask-mode turns without trace still stream body text through isInProgress.
-  const showContentBubble = !traceIsRunning && (hasContent || isInProgress);
+  // Work Process remains first, while the assistant answer streams underneath it.
+  const showContentBubble = hasContent || isInProgress || traceIsRunning;
   return (
     <article
       className={`conversation-message conversation-message-assistant status-${status}`}

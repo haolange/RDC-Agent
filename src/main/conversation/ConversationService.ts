@@ -57,6 +57,7 @@ import {
   repairConversationBranchState,
   resolveVisibleConversationMessages,
 } from './ConversationBranchResolver';
+import { ConversationStreamPatchScheduler, type ConversationStreamPatchCommitOptions } from './ConversationStreamPatchScheduler';
 
 interface ConversationBranchTurnContext {
   branchId: string;
@@ -981,6 +982,12 @@ export class ConversationService {
 
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, userMessage);
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
+    const visibleMessages = workingSession?.sessionId && branchState
+      ? resolveVisibleConversationMessages(
+          storageAdapter.readConversationHistory(workingSession.sessionId),
+          branchState,
+        )
+      : [userMessage, assistantDraftMessage];
     const traceSessionId = workingSession?.sessionId ?? this.ephemeralTraceSessionId(turnId);
     const tracePresentation = await traceService.buildConversationPresentation(
       traceSessionId,
@@ -1007,6 +1014,8 @@ export class ConversationService {
       mode: 'talk',
       userMessage,
       assistantDraftMessage,
+      messages: visibleMessages,
+      branchState: branchState ?? null,
       executionTransition: { action: 'none' },
       runUpdate: null,
       tracePresentation,
@@ -1031,7 +1040,13 @@ export class ConversationService {
     const agentLabel = getAgentLabel(conversationAgentId);
     const showWorkTrace = true;
 
-    const commitAssistantMessage = (type: ConversationStreamEvent['type'], patch: Partial<ConversationMessage>) => {
+    let streamScheduler: ConversationStreamPatchScheduler | null = null;
+
+    const applyAssistantMessagePatch = (
+      type: ConversationStreamEvent['type'],
+      patch: Partial<ConversationMessage>,
+      options: ConversationStreamPatchCommitOptions = { persist: true, publishTrace: true },
+    ) => {
       if (abortController.signal.aborted && patch.status !== 'stopped') {
         return;
       }
@@ -1040,18 +1055,43 @@ export class ConversationService {
         ...patch,
         updatedAt: nowMs(),
       };
-      this.persistConversationSnapshot(sessionId, assistantMessage);
+      if (options.persist) {
+        this.persistConversationSnapshot(sessionId, assistantMessage);
+      }
       this.emitConversationEvent({
         type,
         sessionId: sessionId ?? '',
         turnId: assistantMessage.turnId,
         message: assistantMessage,
       } as ConversationStreamEvent);
-      this.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
+      if (options.publishTrace) {
+        this.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
+      }
+    };
+
+    streamScheduler = new ConversationStreamPatchScheduler({
+      commit: ({ type, patch, options }) => applyAssistantMessagePatch(type, patch, options),
+    });
+
+    const commitAssistantMessage = (
+      type: ConversationStreamEvent['type'],
+      patch: Partial<ConversationMessage>,
+      options: Partial<ConversationStreamPatchCommitOptions> = {},
+    ) => {
+      streamScheduler?.commitImmediate(type, patch, options);
+    };
+
+    const commitTerminalAssistantMessage = (
+      type: ConversationStreamEvent['type'],
+      patch: Partial<ConversationMessage>,
+    ) => {
+      streamScheduler?.commitTerminal(type, patch);
     };
 
     const commitStoppedMessage = () => {
-      commitAssistantMessage('message_completed', {
+      agentUserInputRequestService.cancelTurn(assistantMessage.turnId);
+      agentToolApprovalRequestService.cancelTurn(assistantMessage.turnId);
+      commitTerminalAssistantMessage('message_completed', {
         status: 'stopped',
         content: assistantMessage.content || '当前请求已停止。',
         workTrace: finalizeTrace(
@@ -1073,17 +1113,23 @@ export class ConversationService {
       abortController,
       stop: () => {
         if (!abortController.signal.aborted) {
+          streamScheduler?.flushPending({ forcePersist: true, publishTrace: true });
           abortController.abort();
           commitStoppedMessage();
+          this.clearActiveTurn(assistantMessage.turnId, abortController);
         }
       },
     });
 
     const commitVisibleAssistantText = () => {
-      commitAssistantMessage('message_patched', {
+      streamScheduler?.queueText({
         status: 'streaming',
         content: visibleResponse,
       });
+    };
+
+    const commitThinkingTrace = (workTrace: ConversationWorkTrace) => {
+      streamScheduler?.queueTrace({ workTrace });
     };
 
     const withWorkTrace = (workTrace: ConversationWorkTrace): Partial<ConversationMessage> => (
@@ -1239,30 +1285,26 @@ export class ConversationService {
                 const chunk = typeof event.payload.text === 'string' ? event.payload.text : '';
                 if (chunk) {
                   currentSegmentThinking += chunk;
-                  commitAssistantMessage('message_patched', {
-                    workTrace: upsertSegmentNarration(
-                      assistantMessage.workTrace,
-                      currentSegmentId(),
-                      undefined,
-                      currentSegmentThinking,
-                      segmentThinkingPresentation(),
-                    ),
-                  });
+                  commitThinkingTrace(upsertSegmentNarration(
+                    assistantMessage.workTrace,
+                    currentSegmentId(),
+                    undefined,
+                    currentSegmentThinking,
+                    segmentThinkingPresentation(),
+                  ));
                 }
               }
               if (event.type === 'assistant.thinking_end') {
                 const text = typeof event.payload.text === 'string' ? event.payload.text.trim() : '';
                 if (text && text.length >= currentSegmentThinking.length) {
                   currentSegmentThinking = text;
-                  commitAssistantMessage('message_patched', {
-                    workTrace: upsertSegmentNarration(
-                      assistantMessage.workTrace,
-                      currentSegmentId(),
-                      undefined,
-                      currentSegmentThinking,
-                      segmentThinkingPresentation(),
-                    ),
-                  });
+                  commitThinkingTrace(upsertSegmentNarration(
+                    assistantMessage.workTrace,
+                    currentSegmentId(),
+                    undefined,
+                    currentSegmentThinking,
+                    segmentThinkingPresentation(),
+                  ));
                 }
               }
               if (event.type === 'diagnostic') {
@@ -1618,7 +1660,7 @@ export class ConversationService {
         : '模型链路不可用，已给出配置诊断。'
       : '最终回答已生成。';
 
-    commitAssistantMessage(finalStatus === 'error' ? 'message_errored' : 'message_completed', {
+    commitTerminalAssistantMessage(finalStatus === 'error' ? 'message_errored' : 'message_completed', {
       status: finalStatus,
       content: assistantContent,
       diagnostic: llmDiagnostic,

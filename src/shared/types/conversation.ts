@@ -1,5 +1,6 @@
 import type { AgentRole } from './agent';
 import type { AgentEvent } from './agentRuntime';
+import type { ConversationBranchState } from './conversationBranch';
 import type { AppMode, RunSummary, SessionAttachmentRecord, SessionRecord } from './session';
 
 export type ConversationMode = 'talk';
@@ -183,6 +184,8 @@ export interface ConversationTurnResult {
   mode: ConversationMode;
   userMessage: ConversationMessage;
   assistantDraftMessage: ConversationMessage;
+  messages?: ConversationMessage[];
+  branchState?: ConversationBranchState | null;
   executionTransition: ConversationExecutionTransition;
   runUpdate?: RunSummary | null;
   tracePresentation?: import('./agenticTrace').AgentRunPresentation | null;

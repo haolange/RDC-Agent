@@ -29,6 +29,7 @@ import {
   ensureOk,
   normalizeError,
   parseJsonLines,
+  ProviderHttpError,
 } from './internal/http';
 
 const DEFAULT_BASE_URL = 'http://localhost:11434';
@@ -117,7 +118,7 @@ export class OllamaProvider implements ProviderStrategy {
     baseUrl: string,
     apiKey: string | undefined,
   ): Promise<void> {
-    const composed = composeAbortSignals(options.signal, stream.signal);
+    const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API, ...options });
 
     try {
       builder.start();
@@ -145,8 +146,9 @@ export class OllamaProvider implements ProviderStrategy {
       let toolCallCounter = 0;
       let doneReason: string | null = null;
       let lastChunk: OllamaChunk | null = null;
+      let sawOutput = false;
 
-      for await (const line of parseJsonLines(response, composed.signal)) {
+      for await (const line of parseJsonLines(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
         if (composed.signal.aborted) break;
         let chunk: OllamaChunk;
         try {
@@ -159,9 +161,11 @@ export class OllamaProvider implements ProviderStrategy {
         const message = chunk.message;
         if (message) {
           if (typeof message.thinking === 'string' && message.thinking.length > 0) {
+            sawOutput = true;
             builder.appendThinking(THINKING_INDEX, message.thinking);
           }
           if (typeof message.content === 'string' && message.content.length > 0) {
+            sawOutput = true;
             builder.appendText(TEXT_INDEX, message.content);
           }
           if (Array.isArray(message.tool_calls)) {
@@ -171,6 +175,7 @@ export class OllamaProvider implements ProviderStrategy {
               const slot = 2 + toolCallCounter;
               toolCallCounter += 1;
               const callId = `ollama-call-${Date.now()}-${slot}`;
+              sawOutput = true;
               builder.ensureToolCall(slot, callId, fn.name);
               const argsRaw =
                 typeof fn.arguments === 'string'
@@ -200,9 +205,15 @@ export class OllamaProvider implements ProviderStrategy {
         doneReason = lastChunk.done_reason;
       }
 
+      if (!sawOutput) {
+        throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
+      }
       builder.done(mapDoneReason(doneReason, toolCallCounter > 0));
     } catch (err) {
-      const error = normalizeError(err);
+      const thrown = normalizeError(err);
+      const error = thrown.name === 'AbortError' && composed.signal.reason instanceof Error
+        ? composed.signal.reason
+        : thrown;
       builder.fail(error, error.name === 'AbortError' ? 'aborted' : 'error');
     } finally {
       composed.dispose();
