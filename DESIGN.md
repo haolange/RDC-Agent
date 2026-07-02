@@ -18,20 +18,21 @@ The only agent runtime path is the agent loop:
 4. feed tool results back into the loop;
 5. produce a final answer.
 
-Renderer code must not create fake reasoning stages. Runtime events project into `ConversationWorkTrace`, not visible chain-of-thought. Hidden CoT is never displayed or persisted as UI content.
+Renderer code must not create fake reasoning stages. Runtime events project into `ConversationWorkTrace`, not visible chain-of-thought. Hidden CoT is never displayed or persisted as UI content; provider-visible thinking may appear only as an explicit `ThinkingArtifact` with controlled Work Process visibility.
 
 `ConversationWorkTrace` is the visible progress contract. Blocks may be:
 
+- `llm_turn`: one model loop, including optional thinking, loop result text, requested tool calls, and tool results;
 - `reasoning`: short visible summaries only;
-- `tool`: tool call and result summaries;
 - `approval`: permission requests and decisions;
+- `user_input`: explicit `ask_user` questions and answers;
 - `compaction`: context compaction summaries;
 - `subagent`: delegated agent activity;
 - `handoff`: next-agent or next-action handoffs;
 - `diagnostic`: provider, route, runtime, or RDX diagnostics;
 - `output`: final answer preparation.
 
-Historical `reasoningTrace` data may be read by a one-time migration or renderer compatibility adapter so old sessions remain viewable. New runtime code and visible UI must write and render `workTrace`.
+Historical `reasoningTrace` data and historical `workTrace` entries with obsolete `tool` kind may be read only at storage boundaries and normalized into canonical `workTrace` / `llm_turn` shape. New runtime code and visible UI must write and render the canonical contract only.
 
 ## Provider Account Boundary
 
@@ -82,6 +83,8 @@ Agent messages are structured as:
 3. final answer.
 
 The Work Process block is a real runtime transcript, not a stage status log. It is expanded while running and keeps its latest expanded/collapsed state after terminal states; users collapse or expand it manually. Errors, approvals, long-running tools, and diagnostics may auto-expand. Tool rows show a readable transcript preview by default; arguments and raw tool results stay behind a user-opened details control and must not render as default visible noise.
+
+Work Process section semantics are stable: each section represents one `llm_turn`. If the provider emits thinking, the section first shows a thinking disclosure: `Thinking` while streaming with motion, `Thought` after completion without motion. The loop result streams below that disclosure and remains the section's semantic result; tool-call rows are nested below as execution evidence for the same loop. Models without thinking support skip the thinking row and stream the loop result directly. Raw provider-visible thinking is collapsed by default and user-expandable; summary thinking may open while streaming and folds after completion; opaque provider continuation state renders only as a retained-state status line and never reveals plaintext.
 
 `ask_user` and tool approvals are human-in-the-loop interactions. The runtime pauses the active tool call, the composer area shows the pending question or approval controls, and the Work Process records only the real request/decision transcript. They must not render as raw tool result blocks with choices JSON, policy JSON, or fake assistant text responses. Profile handoff events are recorded in Work Process and the agent event stream; ordinary completed assistant messages must not append automatic Next actions buttons.
 

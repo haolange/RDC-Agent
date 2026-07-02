@@ -179,7 +179,8 @@ ConversationSendRequest
 ConversationStreamEvent
 ConversationSwitchBranchRequest
 ConversationSwitchBranchResult
-ConversationThinkingPresentation
+ConversationToolApproval
+ConversationToolApprovalStatus
 ConversationToolCall
 ConversationToolCallStatus
 ConversationTurnResult
@@ -348,6 +349,7 @@ ProgressTaskStatus
 ProjectApi
 ProjectInputRecord
 ProjectRecord
+ProviderReasoningArtifact
 QWEN_ACCOUNT_MODELS
 RawAuditRef
 RawChannelSubscriptionApi
@@ -444,6 +446,11 @@ TerminalTabKind
 TerminalTabRecord
 TerminalTabStatus
 TextPreview
+ThinkingArtifact
+ThinkingArtifactKind
+ThinkingArtifactReplayPolicy
+ThinkingArtifactSource
+ThinkingArtifactVisibility
 ThoughtSummaryNode
 TimelineImportance
 TimelineNode

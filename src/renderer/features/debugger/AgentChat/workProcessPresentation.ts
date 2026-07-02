@@ -1,13 +1,21 @@
 import type {
-  ConversationThinkingPresentation,
+  ConversationToolApproval,
+  ConversationToolApprovalStatus,
   ConversationToolCall,
   ConversationWorkBlock,
   ConversationWorkTrace,
 } from '@shared/types/conversation';
+import type { ThinkingArtifact } from '@shared/types/reasoning';
 
 export type WorkProcessRowStatus = 'pending' | 'running' | 'complete' | 'error';
 
-export type SectionPrimaryMode = 'result' | 'thinking-summary' | 'thinking-full' | 'none';
+
+export interface WorkProcessToolApproval {
+  status: ConversationToolApprovalStatus;
+  verb: string;
+  message: string;
+  metaLines: string[];
+}
 
 export type WorkProcessRow =
   | {
@@ -30,7 +38,7 @@ export type WorkProcessRow =
     argsLines: string[];
     previewLines: string[];
     rawLines: string[];
-    /** section 内紧凑展示：隐藏 meta/caret，仅 error 展开。 */
+    approval?: WorkProcessToolApproval;
     compact?: boolean;
   }
   | {
@@ -69,7 +77,6 @@ export type WorkProcessRow =
     summary: string;
     detail: string;
     duration: string;
-    /** 嵌套子 trace 的 row（递归构建）。 */
     children: WorkProcessRow[];
   }
   | {
@@ -84,12 +91,18 @@ export type WorkProcessRow =
     type: 'section';
     id: string;
     status: WorkProcessRowStatus;
-    /** 单一主文案（result / provider summary / 完整 CoT）。 */
-    primaryText: string;
-    primaryMode: SectionPrimaryMode;
-    clampPrimary: boolean;
-    narration: string;
-    thinking: string;
+    resultText: string;
+    resultToolSummary: string;
+    resultStreaming: boolean;
+    clampResult: boolean;
+    thinkingPreview: string;
+    thinkingLabel: string;
+    thinkingKind?: ThinkingArtifact['kind'];
+    thinkingSource?: ThinkingArtifact['source'];
+    thinkingVisibility?: ThinkingArtifact['visibility'];
+    thinkingStatus?: ConversationWorkBlock['thinkingStatus'];
+    thinkingExpandable: boolean;
+    thinkingOpenByDefault: boolean;
     stepCount: number;
     duration: string;
     defaultOpen: boolean;
@@ -101,68 +114,99 @@ export interface WorkProcessPresentation {
   stepCount: number;
   toolCount: number;
   summary: string;
+  duration: string;
   defaultExpanded: boolean;
   important: boolean;
 }
 
 const ROW_STATUS_LABEL: Record<WorkProcessRowStatus, string> = {
-  pending: '等待中',
-  running: '进行中',
+  pending: 'Waiting',
+  running: 'Running',
   complete: '',
-  error: '失败',
+  error: 'Failed',
 };
 
 const TOOL_CATEGORY_LABELS: Array<[RegExp, string]> = [
-  [/read_file|read|open|get|load/i, '读取'],
-  [/glob|grep|search_codebase|find|list|ls/i, '检索'],
-  [/write_file|write|save/i, '编辑'],
-  [/edit_file|edit|patch|notebook_edit/i, '编辑'],
-  [/delete_file|move_file|copy_file/i, '文件'],
-  [/artifact|plan_artifact/i, '编辑'],
-  [/bash|shell|exec|command|run/i, '命令'],
-  [/web_fetch|web_search|web|fetch|browser|http/i, '网络'],
-  [/git_/i, '版本控制'],
-  [/memory_/i, '记忆'],
-  [/task_/i, '任务'],
-  [/skills|mcp|rdx_context/i, '运行时'],
-  [/approval|ask/i, '询问'],
-  [/agent_handoff|handoff|agent|task/i, '协作'],
+  [/read_file|read|open|get|load/i, 'Read'],
+  [/glob|grep|search_codebase|find|list|ls/i, 'Search'],
+  [/write_file|write|save/i, 'Write'],
+  [/edit_file|edit|patch|notebook_edit/i, 'Edit'],
+  [/delete_file|move_file|copy_file/i, 'File'],
+  [/artifact|plan_artifact/i, 'Artifact'],
+  [/bash|shell|exec|command|run/i, 'Command'],
+  [/web_fetch|web_search|web|fetch|browser|http/i, 'Web'],
+  [/git_/i, 'Git'],
+  [/memory_/i, 'Memory'],
+  [/task_/i, 'Task'],
+  [/skills|mcp|rdx_context/i, 'Runtime'],
+  [/approval|ask/i, 'Question'],
+  [/agent_handoff|handoff|agent|task/i, 'Collaboration'],
 ];
 
 const TOOL_VERB_LABELS: Array<[RegExp, string]> = [
-  [/git_status/i, '已查看状态'],
-  [/git_diff/i, '已对比变更'],
-  [/git_log/i, '已查看历史'],
-  [/git_add/i, '已暂存'],
-  [/git_unstage/i, '已取消暂存'],
-  [/git_commit/i, '已提交'],
-  [/grep|search_codebase/i, '已搜索'],
-  [/glob|list|ls/i, '已列出'],
-  [/read_file|read|open|get|load/i, '已读取'],
-  [/write_file|write|save/i, '已写入'],
-  [/plan_artifact|artifact/i, '已写入'],
-  [/edit_file|edit|patch/i, '已编辑'],
-  [/notebook_edit/i, '已编辑笔记本'],
-  [/delete_file/i, '已删除'],
-  [/move_file/i, '已移动'],
-  [/copy_file/i, '已复制'],
-  [/bash|shell|exec|command|run/i, '已执行命令'],
-  [/web_fetch/i, '已抓取'],
-  [/web_search/i, '已搜索网络'],
-  [/web|fetch|browser|http/i, '已抓取'],
-  [/memory_read/i, '已读取记忆'],
-  [/memory_write/i, '已写入记忆'],
-  [/memory_delete/i, '已删除记忆'],
-  [/task_list/i, '已列出任务'],
-  [/task_create/i, '已创建任务'],
-  [/task_update/i, '已更新任务'],
-  [/task_get/i, '已读取任务'],
-  [/skills/i, '已列出技能'],
-  [/mcp/i, '已查询 MCP'],
-  [/rdx_context/i, '已读取上下文'],
-  [/agent_handoff|handoff/i, '准备交接'],
-  [/approval|ask/i, '已询问'],
-  [/agent|task/i, '已委派'],
+  [/git_status/i, 'Checked status'],
+  [/git_diff/i, 'Compared changes'],
+  [/git_log/i, 'Checked history'],
+  [/git_add/i, 'Staged changes'],
+  [/git_unstage/i, 'Unstaged changes'],
+  [/git_commit/i, 'Created commit'],
+  [/grep|search_codebase/i, 'Searched code'],
+  [/glob|list|ls/i, 'Listed files'],
+  [/read_file|read|open|get|load/i, 'Read file'],
+  [/write_file|write|save/i, 'Wrote file'],
+  [/plan_artifact|artifact/i, 'Wrote artifact'],
+  [/edit_file|edit|patch/i, 'Edited file'],
+  [/notebook_edit/i, 'Edited notebook'],
+  [/delete_file/i, 'Deleted file'],
+  [/move_file/i, 'Moved file'],
+  [/copy_file/i, 'Copied file'],
+  [/bash|shell|exec|command|run/i, 'Ran command'],
+  [/web_fetch/i, 'Fetched page'],
+  [/web_search/i, 'Searched web'],
+  [/web|fetch|browser|http/i, 'Fetched web'],
+  [/memory_read/i, 'Read memory'],
+  [/memory_write/i, 'Wrote memory'],
+  [/memory_delete/i, 'Deleted memory'],
+  [/task_list/i, 'Listed tasks'],
+  [/task_create/i, 'Created task'],
+  [/task_update/i, 'Updated task'],
+  [/task_get/i, 'Read task'],
+  [/skills/i, 'Listed skills'],
+  [/mcp/i, 'Queried MCP'],
+  [/rdx_context/i, 'Read context'],
+  [/agent_handoff|handoff/i, 'Prepared handoff'],
+  [/approval|ask/i, 'Asked user'],
+  [/agent|task/i, 'Delegated work'],
+];
+
+const TOOL_RUNNING_VERB_LABELS: Array<[RegExp, string]> = [
+  [/git_status/i, 'Checking status'],
+  [/git_diff/i, 'Comparing changes'],
+  [/git_log/i, 'Checking history'],
+  [/grep|search_codebase/i, 'Searching code'],
+  [/glob|list|ls/i, 'Listing files'],
+  [/read_file|read|open|get|load/i, 'Reading file'],
+  [/write_file|write|save|plan_artifact|artifact/i, 'Writing file'],
+  [/edit_file|edit|patch|notebook_edit/i, 'Editing file'],
+  [/delete_file/i, 'Deleting file'],
+  [/move_file/i, 'Moving file'],
+  [/copy_file/i, 'Copying file'],
+  [/bash|shell|exec|command|run/i, 'Running command'],
+  [/web_fetch/i, 'Fetching page'],
+  [/web_search/i, 'Searching web'],
+  [/web|fetch|browser|http/i, 'Accessing web'],
+  [/memory_read/i, 'Reading memory'],
+  [/memory_write/i, 'Writing memory'],
+  [/memory_delete/i, 'Deleting memory'],
+  [/task_list/i, 'Listing tasks'],
+  [/task_create/i, 'Creating task'],
+  [/task_update/i, 'Updating task'],
+  [/task_get/i, 'Reading task'],
+  [/skills/i, 'Listing skills'],
+  [/mcp/i, 'Querying MCP'],
+  [/rdx_context/i, 'Reading context'],
+  [/agent_handoff|handoff/i, 'Preparing handoff'],
+  [/agent|task/i, 'Delegating work'],
 ];
 
 const TARGET_KEYS = [
@@ -193,40 +237,81 @@ const TARGET_KEYS = [
 ];
 
 const RAW_PAYLOAD_TARGET_KEYS = new Set(['content', 'text', 'body', 'payload']);
-
 const INTERNAL_BLOCK_IDS = new Set(['runtime-run', 'assistant-output', 'runtime-reasoning']);
 
-const resolveSectionPrimary = (
-  narration: string,
-  thinking: string,
-  thinkingPresentation?: ConversationThinkingPresentation,
-): { primaryText: string; primaryMode: SectionPrimaryMode; clampPrimary: boolean } => {
-  const thinkingText = normalizeSegmentPrimaryText(thinking);
-  const narrationText = normalizeSegmentPrimaryText(narration);
-  if (thinkingText) {
-    const isSummary = thinkingPresentation === 'summary';
-    return {
-      primaryText: thinkingText,
-      primaryMode: isSummary ? 'thinking-summary' : 'thinking-full',
-      clampPrimary: isSummary,
-    };
-  }
-  if (narrationText && isMeaningfulText(narrationText)) {
-    return {
-      primaryText: narrationText,
-      primaryMode: 'result',
-      clampPrimary: true,
-    };
-  }
+const resolveSectionResult = (
+  block: ConversationWorkBlock,
+): { resultText: string; resultToolSummary: string; resultStreaming: boolean; clampResult: boolean } => {
+  const resultText = normalizeWorkProcessText(block.result?.text ?? '');
+  const resultStatus = block.result?.status ?? (block.status === 'running' || block.status === 'pending' ? 'streaming' : 'complete');
   return {
-    primaryText: '',
-    primaryMode: 'none',
-    clampPrimary: false,
+    resultText: isMeaningfulText(resultText) ? resultText : '',
+    resultToolSummary: formatToolRequestSummary(block),
+    resultStreaming: resultStatus === 'streaming',
+    clampResult: true,
   };
 };
 
-/** 压缩 section 主文案中的多余空白，避免思维链呈现为松散日志墙。 */
-export const normalizeSegmentPrimaryText = (value: string): string => {
+const formatToolRequestSummary = (block: ConversationWorkBlock): string => {
+  const ids = new Set(block.result?.toolCallIds ?? []);
+  const calls = ids.size > 0
+    ? block.toolCalls.filter((call) => ids.has(call.id))
+    : block.toolCalls;
+  if (calls.length === 0) return '';
+  const names = calls.map((call) => call.toolName).filter(Boolean);
+  const uniqueNames = Array.from(new Set(names));
+  const namePreview = uniqueNames.slice(0, 3).join(', ');
+  const suffix = uniqueNames.length > 3 ? ` +${uniqueNames.length - 3}` : '';
+  const count = calls.length;
+  return `Requested ${count} tool${count === 1 ? '' : 's'}${namePreview ? `: ${namePreview}${suffix}` : ''}.`;
+};
+const resolveSectionThinking = (
+  thinking: ThinkingArtifact | undefined,
+  thinkingStatus: ConversationWorkBlock['thinkingStatus'] | undefined,
+): {
+  preview: string;
+  label: string;
+  kind?: ThinkingArtifact['kind'];
+  source?: ThinkingArtifact['source'];
+  visibility?: ThinkingArtifact['visibility'];
+  status?: ConversationWorkBlock['thinkingStatus'];
+  expandable: boolean;
+  openByDefault: boolean;
+} => {
+  if (!thinking) {
+    return { preview: '', label: '', expandable: false, openByDefault: false };
+  }
+
+  const status = thinkingStatus ?? 'complete';
+  if (thinking.kind === 'opaque' || thinking.visibility === 'hidden') {
+    return {
+      preview: '',
+      label: 'Provider continuation state retained',
+      kind: thinking.kind,
+      source: thinking.source,
+      visibility: thinking.visibility,
+      status,
+      expandable: false,
+      openByDefault: false,
+    };
+  }
+
+  const preview = normalizeWorkProcessText(thinking.text ?? '');
+  const isSummary = thinking.kind === 'summary' && thinking.visibility === 'summary';
+  const isRaw = thinking.kind === 'raw' && thinking.visibility === 'raw-collapsed';
+  const expandable = Boolean(preview) && (isSummary || isRaw);
+  return {
+    preview,
+    label: status === 'streaming' ? 'Thinking' : 'Thought',
+    kind: thinking.kind,
+    source: thinking.source,
+    visibility: thinking.visibility,
+    status,
+    expandable,
+    openByDefault: isSummary && status === 'streaming',
+  };
+};
+export const normalizeWorkProcessText = (value: string): string => {
   const trimmed = value.trim();
   if (!trimmed) return '';
   return trimmed
@@ -244,13 +329,10 @@ const normalizeToolName = (toolName: string): string => toolName.trim().toLowerC
 const NOISY_TEXT_PATTERNS = [
   /agent loop/i,
   /model and tool loop/i,
-  /模型与工具循环已完成/,
-  /生成最终回答/,
-  /最终回答已生成/,
-  /请求用户决策/,
-  /回复已完成/,
   /final answer/i,
   /response complete/i,
+  /assistant output ready/i,
+  /start agent loop/i,
 ];
 
 export const formatDurationMs = (start?: number, end?: number): string => {
@@ -273,42 +355,44 @@ export const buildWorkProcessPresentation = (
   const toolCount = countToolSteps(rows);
   const stepCount = countSteps(rows);
   const important = trace.status === 'error' || rowsHaveAttention(rows);
+  const summary = isMeaningfulText(trace.summary) ? trace.summary?.trim() ?? '' : '';
 
   return {
     rows,
     stepCount,
     toolCount,
-    summary: isMeaningfulText(trace.summary) ? trace.summary?.trim() ?? '' : '',
-    defaultExpanded: trace.status !== 'idle' || rows.length > 0,
+    summary,
+    duration: formatTraceDuration(trace.blocks),
+    defaultExpanded: trace.status !== 'idle' || rows.length > 0 || Boolean(summary),
     important,
   };
 };
 
-/**
- * 把 block 列表转成展示行，并把工具块聚合成"思维链小节"（section）。
- *
- * 同时服务顶层 trace 与 subagent 的嵌套子 trace，保证两处分组一致。
- */
 const blocksToRows = (blocks: ConversationWorkBlock[]): WorkProcessRow[] => {
   const rows: WorkProcessRow[] = [];
 
   for (const block of blocks) {
-    // 工具块（runtime-segment-* / 旧 runtime-tools）→ 聚合为一个可折叠小节。
-    if (block.kind === 'tool') {
-      if (block.toolCalls.length === 0) continue;
+    if (block.kind === 'llm_turn') {
+      if (block.toolCalls.length === 0 && !block.result?.text && !block.thinking) continue;
       const steps = block.toolCalls.map((call) => createToolRow(call, true));
-      const narration = isMeaningfulText(block.summary) ? block.summary.trim() : '';
-      const thinking = block.detail?.trim() ?? '';
-      const primary = resolveSectionPrimary(narration, thinking, block.thinkingPresentation);
+      const sectionResult = resolveSectionResult(block);
+      const sectionThinking = resolveSectionThinking(block.thinking, block.thinkingStatus);
       rows.push({
         type: 'section',
         id: block.id,
         status: block.status,
-        primaryText: primary.primaryText,
-        primaryMode: primary.primaryMode,
-        clampPrimary: primary.clampPrimary,
-        narration,
-        thinking,
+        resultText: sectionResult.resultText,
+        resultToolSummary: sectionResult.resultToolSummary,
+        resultStreaming: sectionResult.resultStreaming,
+        clampResult: sectionResult.clampResult,
+        thinkingPreview: sectionThinking.preview,
+        thinkingLabel: sectionThinking.label,
+        thinkingKind: sectionThinking.kind,
+        thinkingSource: sectionThinking.source,
+        thinkingVisibility: sectionThinking.visibility,
+        thinkingStatus: sectionThinking.status,
+        thinkingExpandable: sectionThinking.expandable,
+        thinkingOpenByDefault: sectionThinking.openByDefault,
         stepCount: steps.length,
         duration: formatDurationMs(block.startedAt, block.completedAt),
         defaultOpen: false,
@@ -317,9 +401,11 @@ const blocksToRows = (blocks: ConversationWorkBlock[]): WorkProcessRow[] => {
       continue;
     }
 
-    // 非工具块仍可能携带工具调用（如 ask_user → user_input 块、handoff 块）：平铺为独立行。
-    for (const call of block.toolCalls) {
-      rows.push(createToolRow(call));
+    if (block.kind === 'user_input') {
+      for (const call of block.toolCalls) {
+        rows.push(createToolRow(call));
+      }
+      continue;
     }
 
     if (shouldSkipBlock(block)) {
@@ -331,14 +417,13 @@ const blocksToRows = (blocks: ConversationWorkBlock[]): WorkProcessRow[] => {
       continue;
     }
 
-    // subagent block：递归消费 children，渲染嵌套子 trace（优先于 diagnostic，保留 subagent 视觉）
     if (block.kind === 'subagent') {
       const childRows = block.children ? blocksToRows(block.children) : [];
       rows.push({
         type: 'subagent',
         id: block.id,
         status: block.status,
-        profile: block.title.replace(/^子 Agent[:：]\s*/, '').trim() || 'sub-agent',
+        profile: block.title.replace(/^Sub-agent[:?]\s*/, '').trim() || 'sub-agent',
         summary: getMeaningfulBlockSummary(block) || block.summary || '',
         detail: block.detail ?? '',
         duration: formatDurationMs(block.startedAt, block.completedAt),
@@ -347,7 +432,6 @@ const blocksToRows = (blocks: ConversationWorkBlock[]): WorkProcessRow[] => {
       continue;
     }
 
-    // command block：渲染为 task 卡片（优先于 diagnostic，保留 task 视觉）
     if (block.kind === 'command') {
       const summaryText = getMeaningfulBlockSummary(block);
       if (summaryText) {
@@ -388,13 +472,10 @@ const blocksToRows = (blocks: ConversationWorkBlock[]): WorkProcessRow[] => {
     }
   }
 
-  // hybrid 折叠：仅把最后一个小节默认展开（最新/运行轮），其余旧轮折叠回标题。
   markLastSectionOpen(rows);
-
   return rows;
 };
 
-/** 把 rows 中最后一个 section 标记为默认展开，其余 section 保持折叠。 */
 const markLastSectionOpen = (rows: WorkProcessRow[]): void => {
   let lastSectionIndex = -1;
   rows.forEach((row, index) => {
@@ -405,39 +486,51 @@ const markLastSectionOpen = (rows: WorkProcessRow[]): void => {
   if (lastSection.type === 'section') lastSection.defaultOpen = true;
 };
 
-/** 统计工具步骤总数（含 section 内的步骤）。 */
 const countToolSteps = (rows: WorkProcessRow[]): number => rows.reduce((total, row) => {
   if (row.type === 'section') return total + countToolSteps(row.steps);
   if (row.type === 'tool' || row.type === 'userInput') return total + 1;
   return total;
 }, 0);
 
-/** 统计动作步骤数：section 计为其内部步骤数，其余行各计 1。 */
 const countSteps = (rows: WorkProcessRow[]): number => rows.reduce((total, row) => {
-  if (row.type === 'section') return total + row.stepCount;
+  if (row.type === 'section') return total + 1 + row.stepCount;
   return total + 1;
 }, 0);
 
 const rowsHaveAttention = (rows: WorkProcessRow[]): boolean => rows.some((row) => {
-  if (row.type === 'section') return rowsHaveAttention(row.steps);
+  if (row.type === 'section') return row.status === 'running' || row.status === 'error' || rowsHaveAttention(row.steps);
   return row.status === 'error' || row.status === 'running';
 });
+
+const formatTraceDuration = (blocks: ConversationWorkBlock[]): string => {
+  const timestamps = blocks.flatMap((block) => [block.startedAt, block.completedAt].filter(isNumber));
+  if (timestamps.length === 0) return '';
+  return formatDurationMs(Math.min(...timestamps), blocks.some((block) => !block.completedAt) ? undefined : Math.max(...timestamps));
+};
+
+const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
 const createToolRow = (call: ConversationToolCall, compact = false): WorkProcessRow => {
   if (normalizeToolName(call.toolName) === 'ask_user') {
     return createUserInputRow(call);
   }
-  const parsedResult = parsePreview(call.error || call.resultPreview);
+  const approval = createToolApprovalPresentation(call.approval, call.toolName);
+  const rawResult = call.error || call.resultPreview;
+  const parsedResult = parsePreview(rawResult);
+  const suppressApprovalPreview = Boolean(approval) && isApprovalRequiredPreview(parsedResult, rawResult);
   const status = deriveToolStatus(call, parsedResult);
-  const rawPreviewLines = call.error
-    ? createDetailLines(call.error, 4)
-    : extractReadableResultLines(parsedResult, call.resultPreview, 3);
+  const previewLineLimit = /read_file|^read$/i.test(normalizeToolName(call.toolName)) ? 4 : 3;
+  const rawPreviewLines = suppressApprovalPreview
+    ? []
+    : call.error
+      ? createDetailLines(call.error, 4)
+      : extractReadableResultLines(parsedResult, call.resultPreview, previewLineLimit);
   const previewLines = enhanceToolPreviewLines(
     call.toolName,
     parsedResult,
-    call.resultPreview,
+    suppressApprovalPreview ? undefined : call.resultPreview,
     !call.error && isLikelyBinaryText(rawPreviewLines.join('\n'))
-      ? ['（二进制内容，预览已省略）']
+      ? ['Binary content omitted from preview.']
       : rawPreviewLines,
   );
 
@@ -445,19 +538,84 @@ const createToolRow = (call: ConversationToolCall, compact = false): WorkProcess
     type: 'tool',
     id: call.id,
     status,
-    verb: getToolVerb(call.toolName, status, call.error || call.resultPreview),
+    verb: getToolVerb(call.toolName, status, call.error || call.resultPreview, call.approval),
     category: matchToolLabel(call.toolName, TOOL_CATEGORY_LABELS, 'Tool'),
     toolName: call.toolName,
     target: getToolTarget(call.argsPreview),
     duration: formatDurationMs(call.startedAt, call.completedAt),
     argsLines: createDetailLines(prettyPrint(call.argsPreview), 10),
     previewLines,
-    rawLines: createDetailLines(prettyPrint(call.error || call.resultPreview), 16),
+    rawLines: suppressApprovalPreview ? [] : createDetailLines(prettyPrint(call.error || call.resultPreview), 16),
+    approval,
     compact,
   };
 };
 
-/** 供守卫脚本验证 catalog 工具展示覆盖。 */
+const createToolApprovalPresentation = (
+  approval: ConversationToolApproval | undefined,
+  toolName: string,
+): WorkProcessToolApproval | undefined => {
+  if (!approval) return undefined;
+  const isAutoReview = approval.reviewer === 'auto_review' || approval.approvalId.startsWith('auto-review-');
+  const reason = normalizeApprovalMessage(approval.reason, toolName);
+  const answer = normalizeApprovalMessage(approval.answer, toolName);
+  const messageSource = approval.status === 'approved'
+    ? (isGenericDecisionText(answer) ? '' : answer)
+    : (isGenericDecisionText(answer) ? reason : answer) || reason;
+  const message = compactText(messageSource || fallbackApprovalMessage(approval.status), 300);
+  const metaLines = [
+    approval.risk ? `Risk: ${approval.risk}` : '',
+    isAutoReview ? 'Auto-review' : 'Manual approval',
+  ].filter(Boolean);
+
+  return {
+    status: approval.status,
+    verb: getToolApprovalVerb(approval.status, isAutoReview),
+    message,
+    metaLines,
+  };
+};
+
+const getToolApprovalVerb = (status: ConversationToolApprovalStatus, isAutoReview: boolean): string => {
+  if (status === 'pending') return isAutoReview ? 'Auto-reviewing' : 'Waiting for approval';
+  if (status === 'approved') return isAutoReview ? 'Auto-review passed' : 'Approved';
+  if (status === 'rejected') return isAutoReview ? 'Auto-review denied' : 'Rejected';
+  return 'Cancelled';
+};
+
+const fallbackApprovalMessage = (status: ConversationToolApprovalStatus): string => {
+  if (status === 'pending') return 'Current permission mode requires approval before this tool can run.';
+  if (status === 'approved') return 'This tool call was approved to continue.';
+  if (status === 'rejected') return 'This tool call was rejected.';
+  return 'This tool call was cancelled.';
+};
+
+const normalizeApprovalMessage = (value: string | undefined, toolName: string): string => {
+  const text = value?.trim() ?? '';
+  if (!text) return '';
+  const networkMatch = text.match(/^Network tool "([^"]+)" requires approval in the current permission mode.?$/i);
+  if (networkMatch) return `Current permission mode requires approval before running ${networkMatch[1]}.`;
+  const toolMatch = text.match(/^Tool "([^"]+)" requires approval(?: before it can run)?.?$/i);
+  if (toolMatch) return `Current permission mode requires approval before running ${toolMatch[1]}.`;
+  if (/requires approval/i.test(text)) return `Current permission mode requires approval before running ${toolName}.`;
+  return text;
+};
+
+const isGenericDecisionText = (value: string): boolean => (
+  /^(approved once|user denied)$/i.test(value.trim())
+);
+
+const isToolApprovalRejected = (approval: ConversationToolApproval | undefined): boolean => (
+  approval?.status === 'rejected' || approval?.status === 'cancelled'
+);
+
+const isApprovalRequiredPreview = (parsedResult: unknown, raw?: string): boolean => {
+  const record = toRecord(parsedResult);
+  const errorMessage = record
+    ? readNestedString(record, ['error', 'message']) || readNestedString(record, ['message'])
+    : '';
+  return /approval required|requires approval/i.test(`${errorMessage} ${raw ?? ''}`);
+};
 export const createToolRowForPresentation = (
   call: ConversationToolCall,
   compact = false,
@@ -465,12 +623,9 @@ export const createToolRowForPresentation = (
 
 const createUserInputRow = (call: ConversationToolCall): WorkProcessRow => {
   const args = parsePreview(call.argsPreview);
-  const question = args && typeof args === 'object' && !Array.isArray(args)
-    ? stringifyPreview((args as Record<string, unknown>).question)
-    : '';
-  const rawChoices = args && typeof args === 'object' && !Array.isArray(args)
-    ? (args as Record<string, unknown>).choices
-    : undefined;
+  const record = toRecord(args) ?? {};
+  const question = stringifyPreview(record.question);
+  const rawChoices = record.choices;
   const choices = Array.isArray(rawChoices)
     ? rawChoices.map(stringifyPreview).filter(Boolean)
     : [];
@@ -483,18 +638,18 @@ const createUserInputRow = (call: ConversationToolCall): WorkProcessRow => {
     ? call.resultPreview.trim()
     : undefined;
   const detailLines = [
-    question ? `问题：${question}` : '',
-    ...choices.map((choice, index) => `选项 ${index + 1}：${choice}`),
-    answer ? `回答：${answer}` : '',
-    call.error ? `错误：${call.error}` : '',
+    question ? `Question: ${question}` : '',
+    ...choices.map((choice, index) => `Option ${index + 1}: ${choice}`),
+    answer ? `Answer: ${answer}` : '',
+    call.error ? `Error: ${call.error}` : '',
   ].filter(Boolean);
 
   return {
     type: 'userInput',
     id: call.id,
     status,
-    verb: status === 'complete' ? '已回答' : status === 'error' ? '用户输入已停止' : '询问用户',
-    question: compactText(question || '正在等待用户输入。', 280),
+    verb: status === 'complete' ? 'User answered' : status === 'error' ? 'User input stopped' : 'Asked user',
+    question: compactText(question || 'Waiting for user input.', 280),
     answer,
     duration: formatDurationMs(call.startedAt, call.completedAt),
     detailLines,
@@ -503,56 +658,64 @@ const createUserInputRow = (call: ConversationToolCall): WorkProcessRow => {
 
 const createApprovalRow = (block: ConversationWorkBlock): WorkProcessRow => {
   const parsed = parsePreview(block.detail);
-  const record = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-    ? parsed as Record<string, unknown>
-    : {};
+  const record = toRecord(parsed) ?? {};
   const detailAnswer = typeof parsed === 'string' ? parsed : stringifyPreview(record.answer);
   const reviewer = stringifyPreview(record.reviewer);
   const toolName = stringifyPreview(record.toolName);
   const risk = stringifyPreview(record.risk);
   const isAutoReview = reviewer === 'auto_review' || block.id.includes('auto-review');
-  const status = block.status;
-  // running / complete 审批均由 shouldSkipBlock 跳过（Composer 批准面板与工具行已覆盖），
-  // 到达此处仅为 error（拒绝 / 自动审查拒绝）：通用“已拒绝”用动词表达即可，
-  // 仅在带具体原因（如自动审查拒绝说明）时才作为 message 展示，且不回灌内部 JSON。
   const resolvedText = (detailAnswer || getMeaningfulBlockSummary(block) || '').trim();
-  const isGenericDecision = /^(已批准一次|用户已拒绝)$/.test(resolvedText);
+  const isGenericDecision = /^(approved once|user denied)$/i.test(resolvedText);
   const message = isGenericDecision ? '' : compactText(resolvedText, 300);
 
   return {
     type: 'approval',
     id: block.id,
-    status,
-    verb: status === 'error'
-      ? isAutoReview ? '自动审查已拒绝' : '已拒绝'
-      : isAutoReview ? '自动审查通过' : '已批准',
+    status: block.status,
+    verb: getApprovalVerb(block.status, isAutoReview),
     message,
     duration: formatDurationMs(block.startedAt, block.completedAt),
     detailLines: [],
     metaLines: [
-      toolName ? `工具：${toolName}` : '',
-      risk ? `风险：${risk}` : '',
+      toolName ? `Tool: ${toolName}` : '',
+      risk ? `Risk: ${risk}` : '',
     ].filter(Boolean),
   };
 };
 
+const getApprovalVerb = (status: WorkProcessRowStatus, isAutoReview: boolean): string => {
+  if (status === 'error') return isAutoReview ? 'Auto-review denied' : 'Rejected';
+  if (status === 'running' || status === 'pending') return isAutoReview ? 'Auto-reviewing' : 'Waiting for approval';
+  return isAutoReview ? 'Auto-review passed' : 'Approved';
+};
+
 const deriveToolStatus = (call: ConversationToolCall, parsedResult: unknown): WorkProcessRowStatus => {
+  if (call.approval?.status === 'pending') return 'running';
+  if (isToolApprovalRejected(call.approval)) return 'error';
   if (call.status === 'error' || call.error) return 'error';
   if (call.status !== 'complete') return call.status;
   if (resultIndicatesFailure(parsedResult, call.resultPreview)) return 'error';
   return call.status;
 };
 
-const getToolVerb = (toolName: string, status: WorkProcessRowStatus, resultPreview?: string): string => {
-  if (status !== 'error') return matchToolLabel(toolName, TOOL_VERB_LABELS, '已调用');
-  return /approval required|no changes were made/i.test(resultPreview ?? '') ? '已阻止' : '已失败';
+const getToolVerb = (
+  toolName: string,
+  status: WorkProcessRowStatus,
+  resultPreview?: string,
+  approval?: ConversationToolApproval,
+): string => {
+  if (approval?.status === 'pending') return 'Waiting for approval';
+  if (status === 'pending') return 'Waiting to run';
+  if (status === 'running') return matchToolLabel(toolName, TOOL_RUNNING_VERB_LABELS, 'Calling tool');
+  if (status !== 'error') return matchToolLabel(toolName, TOOL_VERB_LABELS, 'Called tool');
+  return isToolApprovalRejected(approval) || /approval required|no changes were made/i.test(resultPreview ?? '') ? 'Blocked' : 'Failed';
 };
 
 const resultIndicatesFailure = (parsedResult: unknown, raw?: string): boolean => {
-  if (parsedResult && typeof parsedResult === 'object' && !Array.isArray(parsedResult)) {
-    const record = parsedResult as Record<string, unknown>;
+  const record = toRecord(parsedResult);
+  if (record) {
     if (record.ok === false) return true;
-    const status = String(record.status ?? '').toLowerCase();
+    const status = String(record.status ?? readNestedValue(record, ['data', 'status']) ?? '').toLowerCase();
     if (status === 'error' || status === 'failed') return true;
     const errorMessage = readNestedString(record, ['error', 'message']) || readNestedString(record, ['message']);
     if (/approval required|no changes were made/i.test(errorMessage)) return true;
@@ -572,10 +735,6 @@ const createDiagnosticRow = (block: ConversationWorkBlock): WorkProcessRow => ({
 const shouldSkipBlock = (block: ConversationWorkBlock): boolean => {
   if (INTERNAL_BLOCK_IDS.has(block.id) || block.kind === 'output') return true;
   if (block.kind === 'user_input') return true;
-  if (block.kind === 'tool' && block.toolCalls.length > 0) return true;
-  // running 审批由 Composer 批准面板独占承担；complete 审批已隐含在工具行记录中，无需重复顶层行；
-  // error 态（拒绝/自动审查拒绝）保留，有重要信号意义。
-  if (block.kind === 'approval' && block.status === 'running') return true;
   if (block.kind === 'approval' && block.status === 'complete') return true;
   if (!block.summary && isNoisyText(block.title)) return true;
   return false;
@@ -602,17 +761,18 @@ const matchToolLabel = (
 
 const getToolTarget = (argsPreview?: string): string => {
   const parsed = parsePreview(argsPreview);
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+  const record = toRecord(parsed);
+  if (!record) {
     const text = stringifyPreview(parsed);
     return isRawPayloadPreview(text) ? '' : compactText(text, 180);
   }
 
   for (const key of TARGET_KEYS) {
-    const text = stringifyPreview((parsed as Record<string, unknown>)[key]);
+    const text = stringifyPreview(record[key]);
     if (text) return compactText(text, 180);
   }
 
-  const fallback = Object.entries(parsed as Record<string, unknown>)
+  const fallback = Object.entries(record)
     .filter(([key]) => !RAW_PAYLOAD_TARGET_KEYS.has(key))
     .map(([, value]) => stringifyPreview(value))
     .find((text) => text.length > 0 && text.length < 160);
@@ -636,9 +796,7 @@ const enhanceToolPreviewLines = (
   previewLines: string[],
 ): string[] => {
   const normalized = normalizeToolName(toolName);
-  const record = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-    ? parsed as Record<string, unknown>
-    : null;
+  const record = toRecord(parsed);
 
   if (normalized === 'bash' || normalized.includes('shell')) {
     const exitCode = record?.exitCode ?? record?.exit_code ?? readNestedValue(record ?? {}, ['result', 'exitCode']);
@@ -672,10 +830,40 @@ const enhanceToolPreviewLines = (
   }
 
   if (/web_fetch|web_search/.test(normalized)) {
-    const status = stringifyPreview(record?.status ?? record?.statusCode);
-    const title = stringifyPreview(record?.title ?? record?.pageTitle);
-    const lines = [status ? `HTTP ${status}` : '', title].filter(Boolean);
-    if (lines.length > 0) return [...lines, ...previewLines].slice(0, 3);
+    const details = getDetailsRecord(record);
+    if (details?.kind === 'search' || normalized === 'web_search') {
+      const resultRecords = getRecordArray(
+        details?.results
+        ?? record?.results
+        ?? readNestedValue(record ?? {}, ['data', 'details', 'results']),
+      );
+      const resultLines = resultRecords.slice(0, 3).flatMap((result, index) => {
+        const title = stringifyPreview(result.title);
+        const url = stringifyPreview(result.url);
+        const source = stringifyPreview(result.source ?? result.domain);
+        const publishedAt = stringifyPreview(result.publishedAt ?? result.date);
+        return [
+          title ? `${index + 1}. ${title}` : '',
+          url,
+          source || publishedAt ? [source ? `Source: ${source}` : '', publishedAt ? `Date: ${publishedAt}` : ''].filter(Boolean).join(' / ') : '',
+        ].filter(Boolean);
+      });
+      const lines = [
+        stringifyPreview(details?.provider) ? `Provider: ${stringifyPreview(details?.provider)}` : '',
+        stringifyPreview(details?.resultCount) ? `Results: ${stringifyPreview(details?.resultCount)}` : '',
+        ...resultLines,
+      ].filter(Boolean);
+      if (lines.length > 0) return lines.slice(0, 8);
+    }
+
+    const status = stringifyPreview(details?.status ?? record?.status ?? record?.statusCode);
+    const statusText = stringifyPreview(details?.statusText ?? record?.statusText);
+    const url = stringifyPreview(details?.url ?? record?.url ?? readNestedValue(record ?? {}, ['data', 'details', 'url']));
+    const lines = [
+      status ? `HTTP ${status}${statusText ? ` ${statusText}` : ''}` : '',
+      url,
+    ].filter(Boolean);
+    if (lines.length > 0) return [...lines, ...previewLines].slice(0, 4);
   }
 
   if (normalized.startsWith('task_') || normalized.startsWith('memory_')) {
@@ -690,6 +878,19 @@ const enhanceToolPreviewLines = (
   }
 
   return previewLines;
+};
+
+const getDetailsRecord = (record: Record<string, unknown> | null | undefined): Record<string, unknown> | null => {
+  if (!record) return null;
+  return toRecord(record.details)
+    ?? toRecord(readNestedValue(record, ['data', 'details']))
+    ?? toRecord(readNestedValue(record, ['result', 'details']));
+};
+
+
+const getRecordArray = (value: unknown): Array<Record<string, unknown>> => {
+  if (!Array.isArray(value)) return [];
+  return value.map(toRecord).filter((entry): entry is Record<string, unknown> => Boolean(entry));
 };
 
 const isRawPayloadPreview = (value: string): boolean => {
@@ -724,10 +925,13 @@ const collectReadableText = (value: unknown, maxLines = 6): string[] => {
     if (nested.length > 0) return nested;
   }
 
-  for (const key of ['entries', 'files', 'items', 'matches']) {
+  for (const key of ['results', 'entries', 'files', 'items', 'matches']) {
     const nested = collectReadableText(readNestedValue(record, ['data', key]) ?? record[key], maxLines);
     if (nested.length > 0) return nested;
   }
+
+  const detailsResults = collectReadableText(readNestedValue(record, ['data', 'details', 'results']), maxLines);
+  if (detailsResults.length > 0) return detailsResults;
 
   return [];
 };
@@ -746,6 +950,12 @@ const collectContentArray = (value: unknown, maxLines = 6): string[] => {
     return createDetailLines(stringifyPreview(item), maxLines);
   }).slice(0, maxLines);
 };
+
+const toRecord = (value: unknown): Record<string, unknown> | null => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+);
 
 const readNestedValue = (record: Record<string, unknown>, path: string[]): unknown => (
   path.reduce<unknown>((current, key) => (
@@ -792,8 +1002,7 @@ const stringifyPreview = (value: unknown): string => {
   return JSON.stringify(value);
 };
 
-/** 行首行号槽：`  1→`、`  1|`、`1->`、`1>` 等工具自带的行号前缀，渲染时剥掉以消除噪声。 */
-const LINE_NUMBER_GUTTER = /^\s*\d+\s*(?:->|→|\||>)\s?/;
+const LINE_NUMBER_GUTTER = /^\s*\d+\s*(?:->|\||>)\s?/;
 
 const stripLineNumberGutter = (line: string): string => line.replace(LINE_NUMBER_GUTTER, '');
 
@@ -806,17 +1015,11 @@ const createDetailLines = (value?: string, maxLines = 8): string[] => {
     .filter(Boolean);
   const visible = lines.slice(0, maxLines);
   if (lines.length > maxLines) {
-    visible.push(`… 还有 ${lines.length - maxLines} 行`);
+    visible.push(`... ${lines.length - maxLines} more lines`);
   }
   return visible;
 };
 
-/**
- * 检测预览文本是否为二进制 / 非文本内容。
- *
- * 真实场景：读取 `.rdc` 等二进制文件时，结果会退化成大量 `\uXXXX` 转义序列与
- * 替换字符，平铺成等宽乱码墙。命中后用一行说明替代，避免噪声。
- */
 const isLikelyBinaryText = (value: string): boolean => {
   const text = value.slice(0, 2000);
   if (text.length < 16) return false;

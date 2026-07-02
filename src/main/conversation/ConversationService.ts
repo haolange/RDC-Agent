@@ -9,9 +9,8 @@ import type {
   ConversationMessage,
   ConversationMessageDiagnostic,
   ConversationRewriteFromMessageRequest,
-  ConversationThinkingPresentation,
+  ConversationThinkingStatus,
   ConversationToolCall,
-  ConversationWorkBlock,
   ConversationWorkTrace,
   ConversationSendRequest,
   ConversationStreamEvent,
@@ -24,7 +23,8 @@ import type {
 } from '@shared/types/conversationBranch';
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import type { AgentRole } from '@shared/types/agent';
-import type { AgentRouteCapability, ReasoningDelivery } from '@shared/types/agentRuntime';
+import type { AgentRouteCapability } from '@shared/types/agentRuntime';
+import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type {
   AppMode,
   OpenedCaptureState,
@@ -58,6 +58,14 @@ import {
   resolveVisibleConversationMessages,
 } from './ConversationBranchResolver';
 import { ConversationStreamPatchScheduler, type ConversationStreamPatchCommitOptions } from './ConversationStreamPatchScheduler';
+import {
+  createDraftWorkTrace,
+  finalizeTrace,
+  upsertRuntimeToolApproval,
+  upsertRuntimeToolCall,
+  upsertLoopResult,
+  upsertWorkBlock,
+} from './ConversationWorkTrace';
 
 interface ConversationBranchTurnContext {
   branchId: string;
@@ -65,17 +73,71 @@ interface ConversationBranchTurnContext {
   variantIndex?: number;
 }
 
-function resolveThinkingPresentation(
-  reasoningDelivery: ReasoningDelivery | undefined,
-  hasThinking: boolean,
-): ConversationThinkingPresentation {
-  if (!hasThinking || !reasoningDelivery || reasoningDelivery === 'none' || reasoningDelivery === 'hidden') {
-    return 'none';
+function mergeThinkingPayload(
+  current: ThinkingArtifact | undefined,
+  incoming: ThinkingArtifact | undefined,
+  delta: string,
+): ThinkingArtifact | undefined {
+  if (incoming) {
+    const incomingText = incoming.text ?? (delta ? `${current?.text ?? ''}${delta}` : current?.text);
+    return cloneThinkingArtifact({
+      ...incoming,
+      ...(incomingText ? { text: incomingText } : {}),
+    });
   }
-  if (reasoningDelivery === 'summary-only') return 'summary';
-  return 'full';
+  if (!delta) return current;
+  return cloneThinkingArtifact({
+    ...(current ?? {
+      kind: 'raw',
+      source: 'unknown',
+      visibility: 'raw-collapsed',
+      replayPolicy: 'none',
+    }),
+    text: `${current?.text ?? ''}${delta}`,
+  });
 }
 
+function selectCompletedThinking(thinking: ThinkingArtifact[] | undefined): ThinkingArtifact | undefined {
+  if (!Array.isArray(thinking) || thinking.length === 0) return undefined;
+  for (let index = thinking.length - 1; index >= 0; index -= 1) {
+    const candidate = thinking[index];
+    if (candidate.artifact || candidate.text) return cloneThinkingArtifact(candidate);
+  }
+  return undefined;
+}
+
+function cloneThinkingArtifact(thinking: ThinkingArtifact): ThinkingArtifact {
+  return {
+    ...thinking,
+    artifact: thinking.artifact
+      ? {
+          ...thinking.artifact,
+          raw: thinking.artifact.raw ? { ...thinking.artifact.raw } : undefined,
+        }
+      : undefined,
+  };
+}
+function resolvePromptClock(): { currentDate: string; timeZone: string } {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'local';
+  return {
+    currentDate: formatPromptDate(new Date(), timeZone),
+    timeZone,
+  };
+}
+
+function formatPromptDate(date: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timeZone === 'local' ? undefined : timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const get = (type: string): string => parts.find((part) => part.type === type)?.value ?? '';
+  const year = get('year');
+  const month = get('month');
+  const day = get('day');
+  return year && month && day ? `${year}-${month}-${day}` : date.toISOString().slice(0, 10);
+}
 interface ConversationContextInput extends ConversationSendRequest {
   fallbackProjectId?: string | null;
   fallbackSessionId?: string | null;
@@ -129,249 +191,7 @@ function isActiveRun(run: RunSummary | null | undefined): run is RunSummary {
   return Boolean(run && ACTIVE_RUN_STATUSES.includes(run.status));
 }
 
-function createWorkBlock(
-  id: string,
-  title: string,
-  stage?: string,
-  kind: ConversationWorkBlock['kind'] = 'reasoning',
-): ConversationWorkBlock {
-  return {
-    id,
-    kind,
-    title,
-    stage,
-    status: 'pending',
-    toolCalls: [],
-    startedAt: nowMs(),
-  };
-}
-
-function createDraftWorkTrace(summary?: string, blocks: ConversationWorkBlock[] = []): ConversationWorkTrace {
-  return {
-    status: 'running',
-    summary,
-    blocks,
-    updatedAt: nowMs(),
-  };
-}
-
-function cloneTrace(trace: ConversationWorkTrace | null | undefined): ConversationWorkTrace {
-  return trace
-    ? {
-        ...trace,
-        blocks: trace.blocks.map((block) => ({
-          ...block,
-          toolCalls: block.toolCalls.map((toolCall) => ({ ...toolCall })),
-        })),
-      }
-    : {
-        status: 'idle',
-        blocks: [],
-        updatedAt: nowMs(),
-  };
-}
-
-function upsertWorkBlock(
-  trace: ConversationWorkTrace | null | undefined,
-  blockId: string,
-  patch: Partial<ConversationWorkBlock>,
-): ConversationWorkTrace {
-  const nextTrace = cloneTrace(trace);
-  const blockIndex = nextTrace.blocks.findIndex((block) => block.id === blockId);
-  if (blockIndex >= 0) {
-    nextTrace.blocks[blockIndex] = {
-      ...nextTrace.blocks[blockIndex],
-      ...patch,
-      toolCalls: patch.toolCalls
-        ? patch.toolCalls.map((toolCall) => ({ ...toolCall }))
-        : nextTrace.blocks[blockIndex].toolCalls.map((toolCall) => ({ ...toolCall })),
-    };
-  } else {
-    nextTrace.blocks.push({
-      ...createWorkBlock(blockId, patch.title || blockId, patch.stage, patch.kind),
-      ...patch,
-      kind: patch.kind ?? 'reasoning',
-      toolCalls: patch.toolCalls ? patch.toolCalls.map((toolCall) => ({ ...toolCall })) : [],
-    });
-  }
-  nextTrace.updatedAt = nowMs();
-  return nextTrace;
-}
-
-function finalizeTrace(
-  trace: ConversationWorkTrace | null | undefined,
-  status: ConversationWorkTrace['status'],
-  summary?: string,
-): ConversationWorkTrace {
-  const nextTrace = cloneTrace(trace);
-  const terminalBlockStatus: ConversationWorkBlock['status'] | null =
-    status === 'complete'
-      ? 'complete'
-      : status === 'error' || status === 'stopped'
-        ? 'error'
-        : null;
-
-  if (terminalBlockStatus) {
-    const terminalAt = nowMs();
-    nextTrace.blocks = nextTrace.blocks.map((block) => {
-      const blockStatus = block.status === 'pending' || block.status === 'running'
-        ? terminalBlockStatus
-        : block.status;
-      const blockCompletedAt = block.completedAt ?? terminalAt;
-      return {
-        ...block,
-        status: blockStatus,
-        completedAt: blockCompletedAt,
-        toolCalls: block.toolCalls.map((toolCall) => {
-          if (toolCall.status !== 'pending' && toolCall.status !== 'running') {
-            return { ...toolCall };
-          }
-          return {
-            ...toolCall,
-            status: terminalBlockStatus,
-            completedAt: toolCall.completedAt ?? terminalAt,
-            error: terminalBlockStatus === 'error'
-              ? (toolCall.error ?? 'Run ended before this tool call completed.')
-              : toolCall.error,
-          };
-        }),
-      };
-    });
-  }
-
-  nextTrace.status = status;
-  nextTrace.summary = summary ?? nextTrace.summary;
-  nextTrace.updatedAt = nowMs();
-  return nextTrace;
-}
-
-function upsertRuntimeToolCall(
-  trace: ConversationWorkTrace | null | undefined,
-  patch: Partial<ConversationToolCall> & { id: string; toolName: string },
-  options?: {
-    segmentId?: string;
-    segmentSummary?: string;
-    segmentThinking?: string;
-    segmentThinkingPresentation?: ConversationThinkingPresentation;
-  },
-): ConversationWorkTrace {
-  const nextTrace = cloneTrace(trace);
-  const blockMeta = getRuntimeToolBlockMeta(patch.toolName, options?.segmentId);
-  const blockId = blockMeta.id;
-  let block = nextTrace.blocks.find((entry) => entry.id === blockId);
-  if (!block) {
-    block = createWorkBlock(blockId, blockMeta.title, blockMeta.stage, blockMeta.kind);
-    block.status = 'running';
-    nextTrace.blocks.push(block);
-  }
-  // Segment 工具块：增量写入轮次可见叙述（summary）与 thinking 全文（detail）。
-  if (options?.segmentId && blockId === options.segmentId) {
-    applySegmentNarrationFields(
-      block,
-      options.segmentSummary,
-      options.segmentThinking,
-      options.segmentThinkingPresentation,
-    );
-  }
-  const toolIndex = block.toolCalls.findIndex((toolCall) => toolCall.id === patch.id);
-  if (toolIndex >= 0) {
-    block.toolCalls[toolIndex] = {
-      ...block.toolCalls[toolIndex],
-      ...patch,
-    };
-  } else {
-    block.toolCalls.push({
-      id: patch.id,
-      toolName: patch.toolName,
-      status: patch.status ?? 'pending',
-      argsPreview: patch.argsPreview,
-      resultPreview: patch.resultPreview,
-      error: patch.error,
-      startedAt: patch.startedAt ?? nowMs(),
-      completedAt: patch.completedAt,
-    });
-  }
-  if (block.toolCalls.length > 0 && block.toolCalls.every((toolCall) => toolCall.status === 'complete' || toolCall.status === 'error')) {
-    block.status = block.toolCalls.some((toolCall) => toolCall.status === 'error') ? 'error' : 'complete';
-    block.completedAt = nowMs();
-  }
-  nextTrace.status = 'running';
-  nextTrace.updatedAt = nowMs();
-  return nextTrace;
-}
-
-/** summary = 轮次可见叙述（result text）；detail = 轮次 thinking 全文。以 turn 结束回填为权威。 */
-function applySegmentNarrationFields(
-  block: ConversationWorkBlock,
-  narration?: string,
-  thinking?: string,
-  thinkingPresentation?: ConversationThinkingPresentation,
-): void {
-  const nextNarration = narration?.trim();
-  const nextThinking = thinking?.trim();
-  if (nextNarration && (!block.summary || nextNarration.length >= block.summary.length)) {
-    block.summary = nextNarration;
-  }
-  if (nextThinking && (!block.detail || nextThinking.length >= block.detail.length)) {
-    block.detail = nextThinking;
-    const presentation = thinkingPresentation
-      ?? resolveThinkingPresentation(undefined, true);
-    if (presentation !== 'none') {
-      block.thinkingPresentation = presentation;
-    }
-  }
-}
-
-function upsertSegmentNarration(
-  trace: ConversationWorkTrace | null | undefined,
-  segmentId: string,
-  narration?: string,
-  thinking?: string,
-  thinkingPresentation?: ConversationThinkingPresentation,
-): ConversationWorkTrace {
-  const nextTrace = cloneTrace(trace);
-  let block = nextTrace.blocks.find((entry) => entry.id === segmentId);
-  if (!block) {
-    block = createWorkBlock(segmentId, '工具调用', 'tool', 'tool');
-    block.status = 'running';
-    nextTrace.blocks.push(block);
-  }
-  applySegmentNarrationFields(block, narration, thinking, thinkingPresentation);
-  nextTrace.status = 'running';
-  nextTrace.updatedAt = nowMs();
-  return nextTrace;
-}
-
-function getRuntimeToolBlockMeta(
-  toolName: string,
-  segmentId?: string,
-): Pick<ConversationWorkBlock, 'id' | 'title' | 'stage' | 'kind'> {
-  const normalizedToolName = normalizeToolName(toolName);
-  if (normalizedToolName === 'ask_user') {
-    return {
-      id: 'runtime-user-input',
-      title: '请求用户决策',
-      stage: 'decision',
-      kind: 'user_input',
-    };
-  }
-  if (normalizedToolName === 'agent_handoff') {
-    return {
-      id: 'runtime-handoff',
-      title: '准备交接',
-      stage: 'handoff',
-      kind: 'handoff',
-    };
-  }
-  return {
-    id: segmentId ?? 'runtime-tools',
-    title: '工具调用',
-    stage: 'tool',
-    kind: 'tool',
-  };
-}
-
-const isSegmentTool = (toolName: string): boolean => {
+const isLoopTool = (toolName: string): boolean => {
   const normalized = normalizeToolName(toolName);
   return normalized !== 'ask_user' && normalized !== 'agent_handoff';
 };
@@ -1138,28 +958,22 @@ export class ConversationService {
 
     let rawResponse = '';
     let visibleResponse = '';
-    // 思维链按 assistant 轮次分段：每个含工具的轮次 = 一个小节（runtime-segment-<seq>），
-    // currentSegmentText = 轮次可见叙述（summary），currentSegmentThinking = 轮次 thinking 全文（detail）；
-    // 最终回答只取最后一轮文本，不再拼接中间叙述。
-    let currentSegmentText = '';
-    let currentSegmentThinking = '';
-    let segmentSeq = 1;
-    let segmentHasTools = false;
-    let pendingNewSegment = false;
-    const currentSegmentId = () => `runtime-segment-${segmentSeq}`;
+    // Assistant turns are split into LLM loop turns. The loop result is model output;
+    let currentLoopText = '';
+    let currentLoopThinking: ThinkingArtifact | undefined;
+    let currentLoopThinkingStatus: ConversationThinkingStatus | undefined;
+    let loopSeq = 1;
+    let loopHasTools = false;
+    let pendingNewLoop = false;
+    const currentLoopId = () => `runtime-loop-${loopSeq}`;
     let errorViewModel: ConversationTurnResult['errorViewModel'] = null;
     let llmDiagnostic: ConversationMessageDiagnostic | null = null;
     const routePreflight = resolveAgentRoutePreflight(conversationAgentId);
-    const segmentThinkingPresentation = (): ConversationThinkingPresentation => (
-      routePreflight.ok
-        ? resolveThinkingPresentation(routePreflight.routeCapability.reasoningDelivery, Boolean(currentSegmentThinking.trim()))
-        : 'none'
-    );
-    const currentSegmentOptions = () => ({
-      segmentId: currentSegmentId(),
-      segmentSummary: currentSegmentText.trim() || undefined,
-      segmentThinking: currentSegmentThinking.trim() || undefined,
-      segmentThinkingPresentation: segmentThinkingPresentation(),
+    const currentLoopOptions = () => ({
+      loopId: currentLoopId(),
+      loopResultText: currentLoopText.trim() || undefined,
+      loopThinking: currentLoopThinking,
+      loopThinkingStatus: currentLoopThinkingStatus,
     });
 
     if (!routePreflight.ok) {
@@ -1177,7 +991,7 @@ export class ConversationService {
         ...withWorkTrace(upsertWorkBlock(assistantMessage.workTrace, 'runtime-route-diagnostic', {
           kind: 'diagnostic',
           status: llmDiagnostic.severity === 'error' ? 'error' : 'complete',
-          title: '模型路由诊断',
+          title: 'Model route diagnostic',
           stage: 'preflight',
           summary: llmDiagnostic.userMessage,
           detail: llmDiagnostic.technicalMessage,
@@ -1200,6 +1014,7 @@ export class ConversationService {
           ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null
           : null;
         const memoryIndex = await agentOrchestrator.getMemoryIndex();
+        const promptClock = resolvePromptClock();
         const promptContext = {
           workDir: projectRootPath ?? '',
           tools: allowedToolNames,
@@ -1213,6 +1028,8 @@ export class ConversationService {
           routeCapability: routePreflight.routeCapability,
           permissionSettings: settingsService.getAll().agentRuntime.permissions,
           allowedToolNames,
+          currentDate: promptClock.currentDate,
+          timeZone: promptClock.timeZone,
         };
         const systemPrompt = this.promptAssembler.assembleSystemPrompt(promptContext);
         const promptMetrics = this.promptAssembler.measureSections(promptContext);
@@ -1253,10 +1070,10 @@ export class ConversationService {
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, 'runtime-run', {
                     kind: 'reasoning',
-                    title: '启动 Agent Loop',
+                    title: 'Start Agent Loop',
                     stage: 'preflight',
                     status: 'running',
-                    summary: `${agentLabel} 已进入模型与工具循环。`,
+                    summary: `${agentLabel} started the model and tool loop.`,
                     detail: details || undefined,
                     startedAt: nowMs(),
                   }),
@@ -1265,45 +1082,64 @@ export class ConversationService {
               if (event.type === 'assistant.delta') {
                 const chunk = typeof event.payload.text === 'string' ? event.payload.text : '';
                 if (chunk) {
-                  // 上一轮已含工具且现在又有新文本 → 进入新一轮：另起小节并清空可见缓冲，
-                  // 使最终气泡只跟随最后一轮文本。
-                  if (pendingNewSegment) {
-                    segmentSeq += 1;
-                    currentSegmentText = '';
-                    currentSegmentThinking = '';
-                    segmentHasTools = false;
-                    pendingNewSegment = false;
+                  if (pendingNewLoop) {
+                    loopSeq += 1;
+                    currentLoopText = '';
+                    currentLoopThinking = undefined;
+                    currentLoopThinkingStatus = undefined;
+                    loopHasTools = false;
+                    pendingNewLoop = false;
                     visibleResponse = '';
                   }
                   rawResponse += chunk;
-                  currentSegmentText += chunk;
-                  visibleResponse = currentSegmentText;
+                  currentLoopText += chunk;
+                  visibleResponse = currentLoopText;
                   commitVisibleAssistantText();
+                  commitThinkingTrace(upsertLoopResult(
+                    assistantMessage.workTrace,
+                    currentLoopId(),
+                    currentLoopText,
+                    currentLoopThinking,
+                    currentLoopThinkingStatus,
+                    'streaming',
+                  ));
                 }
               }
               if (event.type === 'assistant.thinking_delta') {
-                const chunk = typeof event.payload.text === 'string' ? event.payload.text : '';
-                if (chunk) {
-                  currentSegmentThinking += chunk;
-                  commitThinkingTrace(upsertSegmentNarration(
+                const payload = event.payload as { text?: string; thinking?: ThinkingArtifact };
+                currentLoopThinking = mergeThinkingPayload(
+                  currentLoopThinking,
+                  payload.thinking,
+                  typeof payload.text === 'string' ? payload.text : '',
+                );
+                if (currentLoopThinking) {
+                  currentLoopThinkingStatus = 'streaming';
+                  commitThinkingTrace(upsertLoopResult(
                     assistantMessage.workTrace,
-                    currentSegmentId(),
-                    undefined,
-                    currentSegmentThinking,
-                    segmentThinkingPresentation(),
+                    currentLoopId(),
+                    currentLoopText || undefined,
+                    currentLoopThinking,
+                    currentLoopThinkingStatus,
+                    'streaming',
                   ));
                 }
               }
               if (event.type === 'assistant.thinking_end') {
-                const text = typeof event.payload.text === 'string' ? event.payload.text.trim() : '';
-                if (text && text.length >= currentSegmentThinking.length) {
-                  currentSegmentThinking = text;
-                  commitThinkingTrace(upsertSegmentNarration(
+                const payload = event.payload as { text?: string; thinking?: ThinkingArtifact };
+                currentLoopThinking = mergeThinkingPayload(
+                  currentLoopThinking,
+                  payload.thinking,
+                  typeof payload.text === 'string' ? payload.text : '',
+                );
+                if (currentLoopThinking) {
+                  currentLoopThinkingStatus = 'complete';
+                  commitThinkingTrace(upsertLoopResult(
                     assistantMessage.workTrace,
-                    currentSegmentId(),
-                    undefined,
-                    currentSegmentThinking,
-                    segmentThinkingPresentation(),
+                    currentLoopId(),
+                    currentLoopText || undefined,
+                    currentLoopThinking,
+                    currentLoopThinkingStatus,
+                    'streaming',
                   ));
                 }
               }
@@ -1330,8 +1166,8 @@ export class ConversationService {
                   toolCall?: { id?: string; name?: string; arguments?: Record<string, unknown> };
                 };
                 if (payload.toolCall?.id && payload.toolCall.name) {
-                  const segmented = isSegmentTool(String(payload.toolCall.name));
-                  if (segmented) segmentHasTools = true;
+                  const loopScoped = isLoopTool(String(payload.toolCall.name));
+                  if (loopScoped) loopHasTools = true;
                   commitAssistantMessage('message_patched', {
                     workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                       id: String(payload.toolCall.id),
@@ -1339,13 +1175,13 @@ export class ConversationService {
                       status: 'pending',
                       argsPreview: JSON.stringify(payload.toolCall.arguments ?? {}).slice(0, 600),
                       startedAt: nowMs(),
-                    }, segmented ? currentSegmentOptions() : undefined),
+                    }, loopScoped ? currentLoopOptions() : undefined),
                   });
                 }
               }
               if (event.type === 'tool.started') {
-                const segmented = isSegmentTool(String(event.payload.toolName));
-                if (segmented) segmentHasTools = true;
+                const loopScoped = isLoopTool(String(event.payload.toolName));
+                if (loopScoped) loopHasTools = true;
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                     id: String(event.payload.toolCallId),
@@ -1353,15 +1189,15 @@ export class ConversationService {
                     status: 'running',
                     argsPreview: JSON.stringify(event.payload.args ?? {}).slice(0, 600),
                     startedAt: nowMs(),
-                  }, segmented ? currentSegmentOptions() : undefined),
+                  }, loopScoped ? currentLoopOptions() : undefined),
                 });
               }
               if (event.type === 'tool.denied') {
                 const reason = typeof event.payload.reason === 'string'
                   ? event.payload.reason
                   : 'Profile policy denied this tool call.';
-                const segmentedDenied = isSegmentTool(String(event.payload.toolName));
-                if (segmentedDenied) segmentHasTools = true;
+                const loopScopedDenied = isLoopTool(String(event.payload.toolName));
+                if (loopScopedDenied) loopHasTools = true;
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                     id: String(event.payload.toolCallId),
@@ -1370,7 +1206,7 @@ export class ConversationService {
                     resultPreview: JSON.stringify(event.payload.result ?? { reason }).slice(0, 800),
                     error: reason,
                     completedAt: nowMs(),
-                  }, segmentedDenied ? currentSegmentOptions() : undefined),
+                  }, loopScopedDenied ? currentLoopOptions() : undefined),
                 });
               }
               if (event.type === 'approval.requested') {
@@ -1411,27 +1247,16 @@ export class ConversationService {
                 const reason = typeof payload.reason === 'string' && payload.reason
                   ? payload.reason
                   : 'This action requires user approval before it can run.';
-                const traceWithTool = upsertRuntimeToolCall(assistantMessage.workTrace, {
-                  id: toolCallId,
-                  toolName,
-                  status: 'running',
-                  resultPreview: reason,
-                }, currentSegmentOptions());
                 commitAssistantMessage('message_patched', {
-                  workTrace: upsertWorkBlock(traceWithTool, `runtime-approval-${approvalId}`, {
-                    kind: 'approval',
-                    title: '请求批准',
-                    stage: 'decision',
-                    status: 'running',
-                    summary: reason,
-                    detail: JSON.stringify({
-                      approvalId,
-                      toolCallId,
-                      toolName,
-                      risk: payload.risk,
-                      reviewer: payload.reviewer,
-                    }, null, 2),
-                  }),
+                  workTrace: upsertRuntimeToolApproval(assistantMessage.workTrace, {
+                    approvalId,
+                    toolCallId,
+                    toolName,
+                    status: 'pending',
+                    reason,
+                    risk: payload.risk,
+                    reviewer: payload.reviewer,
+                  }, currentLoopOptions()),
                 });
               }
               if (event.type === 'approval.answered') {
@@ -1466,16 +1291,20 @@ export class ConversationService {
                   });
                   return;
                 }
+                const approvalStatus = typeof payload.status === 'string' ? payload.status : 'approved';
+                const answerText = payload.answer === undefined || payload.answer === null
+                  ? ''
+                  : typeof payload.answer === 'string'
+                    ? payload.answer.trim()
+                    : String(payload.answer).trim();
                 commitAssistantMessage('message_patched', {
-                  workTrace: upsertWorkBlock(assistantMessage.workTrace, `runtime-approval-${approvalId}`, {
-                    kind: 'approval',
-                    title: '审批结果',
-                    stage: 'decision',
-                    status: payload.status === 'rejected' || payload.status === 'cancelled' ? 'error' : 'complete',
-                    summary: `审批状态：${payload.status ?? 'answered'}`,
-                    detail: payload.answer === undefined ? undefined : JSON.stringify(payload.answer).slice(0, 800),
-                    completedAt: nowMs(),
-                  }),
+                  workTrace: upsertRuntimeToolApproval(assistantMessage.workTrace, {
+                    approvalId,
+                    toolCallId: String(payload.toolCallId ?? approvalId),
+                    toolName: String(payload.toolName ?? 'approval'),
+                    status: approvalStatus,
+                    answer: answerText,
+                  }, currentLoopOptions()),
                 });
               }
               if (event.type === 'tool.completed') {
@@ -1491,12 +1320,12 @@ export class ConversationService {
                 if (!(isAskUserTool && result?.ok)) {
                   toolCallPatch.resultPreview = JSON.stringify(event.payload.result ?? {}).slice(0, 800);
                 }
-                const segmentedCompleted = isSegmentTool(String(event.payload.toolName));
+                const loopScopedCompleted = isLoopTool(String(event.payload.toolName));
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertRuntimeToolCall(
                     assistantMessage.workTrace,
                     toolCallPatch,
-                    segmentedCompleted ? currentSegmentOptions() : undefined,
+                    loopScopedCompleted ? currentLoopOptions() : undefined,
                   ),
                 });
               }
@@ -1509,10 +1338,10 @@ export class ConversationService {
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, 'runtime-tasks', {
                     kind: 'subagent',
-                    title: '任务状态',
+                    title: 'Task status',
                     stage: 'tool',
                     status: payload.status === 'failed' ? 'error' : 'complete',
-                    summary: `${payload.title ?? payload.taskId ?? 'Task'}${payload.status ? `：${payload.status}` : ''}`,
+                    summary: `${payload.title ?? payload.taskId ?? 'Task'}${payload.status ? `: ${payload.status}` : ''}`,
                     completedAt: nowMs(),
                   }),
                 });
@@ -1522,7 +1351,7 @@ export class ConversationService {
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
                     kind: 'subagent',
-                    title: `子 Agent：${payload.profile}`,
+                    title: `Sub-agent: ${payload.profile}`,
                     stage: 'tool',
                     status: 'running',
                     summary: payload.text?.slice(0, 200) ?? '',
@@ -1534,7 +1363,7 @@ export class ConversationService {
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
                     kind: 'subagent',
-                    title: `子 Agent`,
+                    title: 'Sub-agent',
                     stage: 'tool',
                     status: 'running',
                     summary: payload.text ? payload.text.slice(-200) : undefined,
@@ -1546,7 +1375,7 @@ export class ConversationService {
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
                     kind: 'subagent',
-                    title: `子 Agent：${payload.profile}`,
+                    title: `Sub-agent: ${payload.profile}`,
                     stage: 'tool',
                     status: payload.status === 'failed' ? 'error' : 'complete',
                     summary: payload.text?.slice(0, 500) ?? '',
@@ -1556,36 +1385,35 @@ export class ConversationService {
                 });
               }
               if (event.type === 'assistant.completed') {
-                const payload = event.payload as { text?: string; thinkingText?: string };
-                const narration = typeof payload.text === 'string' ? payload.text.trim() : '';
-                const thinking = (typeof payload.thinkingText === 'string' ? payload.thinkingText.trim() : '')
-                  || currentSegmentThinking.trim();
-                if (thinking) {
-                  currentSegmentThinking = thinking;
+                const payload = event.payload as { text?: string; thinking?: ThinkingArtifact[] };
+                const loopResult = typeof payload.text === 'string' ? payload.text.trim() : '';
+                const completedThinking = selectCompletedThinking(payload.thinking) ?? currentLoopThinking;
+                if (completedThinking) {
+                  currentLoopThinking = completedThinking;
+                  currentLoopThinkingStatus = 'complete';
                 }
-                if (narration || thinking) {
+                if (loopResult || currentLoopThinking) {
                   commitAssistantMessage('message_patched', {
-                    workTrace: upsertSegmentNarration(
+                    workTrace: upsertLoopResult(
                       assistantMessage.workTrace,
-                      currentSegmentId(),
-                      narration || undefined,
-                      thinking || undefined,
-                      thinking ? segmentThinkingPresentation() : undefined,
+                      currentLoopId(),
+                      loopResult || undefined,
+                      currentLoopThinking,
+                      currentLoopThinkingStatus,
+                      'complete',
                     ),
                   });
                 }
-                // 本轮含工具 → 它是中间叙述轮：标记下一轮文本应另起小节（工具的
-                // started/completed 在本事件之后到达，仍归属当前 segment，故延后切段）。
-                if (segmentHasTools) {
-                  pendingNewSegment = true;
+                if (loopHasTools) {
+                  pendingNewLoop = true;
                 }
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, 'assistant-output', {
                     kind: 'output',
-                    title: '生成最终回答',
+                    title: 'Assistant output ready',
                     stage: 'respond',
                     status: 'complete',
-                    summary: '最终回答已生成。',
+                    summary: 'Final answer generated.',
                     completedAt: nowMs(),
                   }),
                 });
@@ -1594,10 +1422,10 @@ export class ConversationService {
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, 'runtime-run', {
                     kind: 'reasoning',
-                    title: 'Agent Loop 完成',
+                    title: 'Agent Loop completed',
                     stage: 'respond',
                     status: 'complete',
-                    summary: '模型与工具循环已完成。',
+                    summary: 'Model and tool loop completed.',
                     completedAt: nowMs(),
                   }),
                 });
@@ -1607,10 +1435,10 @@ export class ConversationService {
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `runtime-${event.type}`, {
                     kind: 'diagnostic',
-                    title: failed ? 'Agent Loop 失败' : 'Agent Loop 已取消',
+                    title: failed ? 'Agent Loop failed' : 'Agent Loop cancelled',
                     stage: 'respond',
                     status: failed ? 'error' : 'complete',
-                    summary: summarizeRuntimePayload(event.payload) || (failed ? 'Agent Loop 失败。' : 'Agent Loop 已取消。'),
+                    summary: summarizeRuntimePayload(event.payload) || (failed ? 'Agent Loop failed.' : 'Agent Loop cancelled.'),
                     completedAt: nowMs(),
                   }),
                 });
@@ -1631,7 +1459,7 @@ export class ConversationService {
         };
         rawResponse = llmDiagnostic.userMessage;
         visibleResponse = llmDiagnostic.userMessage;
-        currentSegmentText = llmDiagnostic.userMessage;
+        currentLoopText = llmDiagnostic.userMessage;
         recordLlmDiagnostic(input.context, llmDiagnostic);
         commitVisibleAssistantText();
       }
@@ -1641,9 +1469,7 @@ export class ConversationService {
       this.clearActiveTurn(assistantMessage.turnId, abortController);
       return;
     }
-
-    // 最终回答只取最后一轮文本（currentSegmentText）；中间叙述已分流到各思维链小节。
-    const assistantContent = (currentSegmentText.trim() || rawResponse || visibleResponse).trim();
+    const assistantContent = (currentLoopText.trim() || rawResponse || visibleResponse).trim();
     visibleResponse = assistantContent;
     const isRouteMissingDiagnostic = llmDiagnostic?.code === 'CONVERSATION_LLM_ROUTE_MISSING';
     const finalStatus: ConversationMessage['status'] = errorViewModel && !isRouteMissingDiagnostic ? 'error' : 'complete';
@@ -1656,9 +1482,9 @@ export class ConversationService {
 
     const outputSummary = llmDiagnostic
       ? llmDiagnostic.code === 'CONVERSATION_LLM_REQUEST_FAILED'
-        ? '模型请求失败，已记录诊断。'
-        : '模型链路不可用，已给出配置诊断。'
-      : '最终回答已生成。';
+        ? 'Model request failed; diagnostic recorded.'
+        : 'Model route unavailable; configuration diagnostic returned.'
+      : 'Final answer generated.';
 
     commitTerminalAssistantMessage(finalStatus === 'error' ? 'message_errored' : 'message_completed', {
       status: finalStatus,

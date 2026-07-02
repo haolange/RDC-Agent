@@ -36,6 +36,8 @@ export interface PromptContext {
   skills?: string[];
   /** 当前使用的模型信息。 */
   model: { provider: string; name: string };
+  currentDate?: string;
+  timeZone?: string;
   /** 运行模式。 */
   mode: 'ask' | 'debugger' | 'edit' | 'analyzer' | 'optimizer';
   /** 用户自定义规则（如有）。 */
@@ -142,6 +144,8 @@ export const sectionWorkspace: PromptSection = (context) => {
     `Shell: ${shell}`,
     `Model: ${context.model.provider}/${context.model.name}`,
     `Mode: ${context.mode}`,
+    `Current date: ${context.currentDate ?? 'unknown'}`,
+    `Time zone: ${context.timeZone ?? 'local'}`,
   ].join('\n');
 };
 
@@ -320,6 +324,8 @@ export const sectionRules: PromptSection = (context) => {
     `- When uncertain, prefer reading existing code over guessing.`,
     `- Respect the runtime permission policy for workspace boundaries; use absolute paths when policy allows external access.`,
     `- Do not claim a file is unreachable without attempting read_file when policy permits.`,
+    `- Treat latest, current, today, and recent requests as date-sensitive. Calibrate search terms and conclusions against the Current date and Time zone above.`,
+    `- Use web_search to discover candidate sources; before summarizing factual current/news claims, call web_fetch on selected source pages and ground the answer in fetched page text, not snippets alone.`,
   ];
 
   const userRules = context.userRules?.trim();

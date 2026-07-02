@@ -39,14 +39,15 @@ function configuredProvider(id, protocolOverride) {
   };
 }
 
-function resolveThinkingPresentation(reasoningDelivery, hasThinking) {
+function resolveThinkingArtifact(reasoningDelivery, hasThinking) {
   if (!hasThinking || !reasoningDelivery || reasoningDelivery === 'none' || reasoningDelivery === 'hidden') {
-    return 'none';
+    return undefined;
   }
-  if (reasoningDelivery === 'summary-only') return 'summary';
-  return 'full';
+  if (reasoningDelivery === 'summary-only') {
+    return { kind: 'summary', visibility: 'summary', replayPolicy: 'none' };
+  }
+  return { kind: 'raw', visibility: 'raw-collapsed', replayPolicy: 'none' };
 }
-
 const anthropic = configuredProvider('anthropic', 'AnthropicMessages');
 const openaiResponses = configuredProvider('openai', 'OpenAIResponses');
 const gemini = configuredProvider('gemini-account', 'GoogleGemini');
@@ -55,22 +56,38 @@ const ollama = configuredProvider('ollama', 'OllamaOpenAICompatibleChatCompletio
 const anthropicCap = resolveAgentRouteCapability(anthropic, 'test-model');
 assert(anthropicCap.reasoningDelivery === 'summary-only', 'Anthropic must use summary-only delivery');
 assert(reasoningDeliveryToStreamVisibility(anthropicCap.reasoningDelivery) === 'summary-events', 'summary-only must map to summary-events stream visibility');
-assert(resolveThinkingPresentation(anthropicCap.reasoningDelivery, true) === 'summary', 'summary-only thinking should clamp in UI');
+assert(resolveThinkingArtifact(anthropicCap.reasoningDelivery, true)?.kind === 'summary', 'summary-only thinking should become a visible summary artifact');
 
 const responsesCap = resolveAgentRouteCapability(openaiResponses, 'test-model');
 assert(responsesCap.reasoningDelivery === 'summary-only', 'OpenAI Responses must use summary-only delivery');
 
 const geminiCap = resolveAgentRouteCapability(gemini, 'test-model');
 assert(geminiCap.reasoningDelivery === 'stream-full', 'Gemini must use stream-full delivery');
-assert(resolveThinkingPresentation(geminiCap.reasoningDelivery, true) === 'full', 'stream-full thinking should not clamp in UI');
+assert(resolveThinkingArtifact(geminiCap.reasoningDelivery, true)?.visibility === 'raw-collapsed', 'stream-full thinking should become collapsed raw thinking');
 
 const ollamaCap = resolveAgentRouteCapability(ollama, 'test-model');
 assert(ollamaCap.reasoningDelivery === 'stream-full', 'Ollama must use stream-full delivery');
+assert(resolveThinkingArtifact(ollamaCap.reasoningDelivery, true)?.replayPolicy === 'none', 'raw local thinking must not be replayed as provider artifact');
 
 const noReasoningProvider = {
   ...configuredProvider('openai', 'OpenAICompatibleChatCompletions'),
   capabilities: ['chat', 'tool-calling'],
 };
 assert(resolveReasoningDelivery(noReasoningProvider, 'OpenAICompatibleChatCompletions') === 'none', 'providers without reasoning capability must be none');
+
+const fs = require('node:fs');
+const openaiCompatibleSource = fs.readFileSync('src/main/agent-runtime/providers/OpenAICompatibleProvider.ts', 'utf8');
+const openaiResponsesSource = fs.readFileSync('src/main/agent-runtime/providers/OpenAIResponsesProvider.ts', 'utf8');
+const anthropicSource = fs.readFileSync('src/main/agent-runtime/providers/AnthropicProvider.ts', 'utf8');
+const contextManagerSource = fs.readFileSync('src/main/agent-runtime/agent/ContextManager.ts', 'utf8');
+
+assert(openaiCompatibleSource.includes("source: isOpenRouterBaseUrl(baseUrl) ? 'openrouter-raw' : 'openai-compatible-raw'"), 'OpenAI-compatible raw reasoning must be tagged by source.');
+assert(openaiCompatibleSource.includes("replayPolicy: 'none'"), 'OpenAI-compatible raw reasoning must not be replayed.');
+assert(openaiResponsesSource.includes("'reasoning.encrypted_content'"), 'OpenAI Responses must request encrypted reasoning content for stateless continuation.');
+assert(openaiResponsesSource.includes('toResponsesReasoningReplayItem'), 'OpenAI Responses must replay only provider reasoning artifacts.');
+assert(anthropicSource.includes('signature_delta'), 'Anthropic provider must capture thinking signature deltas.');
+assert(anthropicSource.includes('redacted_thinking'), 'Anthropic provider must preserve redacted thinking blocks.');
+assert(anthropicSource.includes('toAnthropicThinkingReplayBlock'), 'Anthropic provider must replay provider thinking blocks as native blocks.');
+assert(contextManagerSource.includes("block.replayPolicy === 'provider-artifact'"), 'Context budget must separate readable thinking from provider artifact replay.');
 
 console.log('[reasoning-delivery] OK');

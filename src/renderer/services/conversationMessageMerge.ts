@@ -65,11 +65,11 @@ const upsertWorkBlock = (
 
 export const applyToolTraceToMessage = (message: ConversationMessage, trace: ToolTraceEntry): ConversationMessage => {
   const nextTrace = upsertWorkBlock(message.workTrace ?? null, 'tool-execution', {
-    kind: 'tool',
-    title: '工具调用',
+    kind: 'llm_turn',
+    title: 'LLM turn',
     stage: 'runtime',
     status: trace.result.ok ? 'running' : 'error',
-    summary: trace.result.ok ? '正在执行工具调用。' : '工具调用失败。',
+    summary: trace.result.ok ? 'Recording tool execution.' : 'Tool execution failed.',
   });
   const block = nextTrace.blocks.find((entry) => entry.id === 'tool-execution');
   if (block) {
@@ -93,9 +93,13 @@ export const applyToolTraceToMessage = (message: ConversationMessage, trace: Too
       block.toolCalls.push(nextToolCall);
     }
     block.status = block.toolCalls.some((toolCall) => toolCall.status === 'error') ? 'error' : 'complete';
-    block.summary = block.status === 'error'
-      ? '工具调用中出现错误。'
-      : `已记录 ${block.toolCalls.length} 个工具调用。`;
+    block.result = {
+      text: block.status === 'error'
+        ? 'Tool execution failed.'
+        : 'Requested ' + block.toolCalls.length + ' tool' + (block.toolCalls.length === 1 ? '' : 's') + '.',
+      status: 'complete',
+      toolCallIds: block.toolCalls.map((toolCall) => toolCall.id),
+    };
     block.completedAt = Date.now();
   }
 
@@ -140,7 +144,7 @@ export const applyActionEventToMessage = (message: ConversationMessage, event: A
     kind: event.status === 'error' || event.status === 'blocked' || event.status === 'fail'
       ? 'diagnostic'
       : 'output',
-    title: stage ? `阶段：${stage}` : event.event_type,
+    title: stage ? `Stage: ${stage}` : event.event_type,
     stage,
     status: event.status === 'error' || event.status === 'blocked' || event.status === 'fail'
       ? 'error'

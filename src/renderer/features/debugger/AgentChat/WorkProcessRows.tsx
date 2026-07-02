@@ -68,13 +68,30 @@ const ResultPreview: React.FC<{ lines: string[]; compact?: boolean }> = ({ lines
   return <ConsoleOutput lines={lines} />;
 };
 
-export const ToolRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'tool' }> }> = ({ row }) => {
+type ToolRowModel = Extract<WorkProcessRow, { type: 'tool' }>;
+
+const ToolApprovalCallout: React.FC<{ approval: NonNullable<ToolRowModel['approval']> }> = ({ approval }) => (
+  <div className={`work-process-tool-approval status-${approval.status}`} data-testid="work-process-tool-approval">
+    <div className="work-process-tool-approval-head">
+      <span className="work-process-tool-approval-verb">{approval.verb}</span>
+      {approval.metaLines.length > 0 ? (
+        <span className="work-process-tool-approval-meta">
+          {approval.metaLines.map((line) => <span key={line}>{line}</span>)}
+        </span>
+      ) : null}
+    </div>
+    {approval.message ? <p className="work-process-tool-approval-message">{approval.message}</p> : null}
+  </div>
+);
+
+export const ToolRow: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   const { t } = useI18n();
   const compact = row.compact === true;
   const statusLabel = row.status === 'complete' ? '' : getRowStatusLabel(row.status);
   const hasDebugDetails = row.argsLines.length > 0 || row.rawLines.length > 0;
   const hasPreview = row.previewLines.length > 0;
-  const hasExpandableContent = hasPreview || hasDebugDetails;
+  const hasApproval = Boolean(row.approval);
+  const hasExpandableContent = hasApproval || hasPreview || hasDebugDetails;
   const autoOpen = row.status === 'error' || row.status === 'running';
   const durationTitle = row.duration ? `${row.toolName} · ${row.duration}` : row.toolName;
 
@@ -107,6 +124,7 @@ export const ToolRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'tool' }> 
                 {summaryInner}
               </summary>
               <div className="work-process-tool-body">
+                {row.approval ? <ToolApprovalCallout approval={row.approval} /> : null}
                 {hasPreview ? <ResultPreview lines={row.previewLines} compact={compact} /> : null}
                 {hasDebugDetails ? (
                   <details className="work-process-debug-disclosure" open={row.status === 'error'}>
@@ -147,7 +165,7 @@ export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'user
   const statusLabel = row.status === 'complete' ? '' : getRowStatusLabel(row.status);
   const isQa = row.status === 'complete' && Boolean(row.answer);
 
-  // 已回答：Q/A 直接内联展示，不再叠加冗余详情。
+  // Answered requests render as compact Q/A, with details kept out of the main row.
   if (isQa) {
     return (
       <li className={`work-process-step status-${row.status} kind-user-input`} data-testid="work-process-user-input">

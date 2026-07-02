@@ -34,7 +34,7 @@ function buildSystemPrompt(
 ): string {
   return assembler.assembleSystemPrompt({
     workDir: workspaceRoot,
-    tools: ['read_file', 'glob', 'grep'],
+    tools: ['read_file', 'glob', 'grep', 'web_search', 'web_fetch'],
     model: { provider: 'openai', name: 'test-model' },
     mode: 'ask',
     profile: {
@@ -44,7 +44,9 @@ function buildSystemPrompt(
     },
     routeCapability: NATIVE_ROUTE,
     permissionSettings,
-    allowedToolNames: ['read_file', 'glob', 'grep'],
+    allowedToolNames: ['read_file', 'glob', 'grep', 'web_search', 'web_fetch'],
+    currentDate: '2026-07-02',
+    timeZone: 'Asia/Shanghai',
   });
 }
 
@@ -90,5 +92,13 @@ describe('PromptAssembler permission alignment', () => {
 
     expect(prompt).toContain('Use it as the default base for relative file paths');
     expect(prompt).toContain('You may also access files outside this project root using absolute paths');
+  });
+  it('injects current date and date-sensitive web work rules', () => {
+    const prompt = buildSystemPrompt(buildPermissions({ mode: 'default' }));
+
+    expect(prompt).toContain('Current date: 2026-07-02');
+    expect(prompt).toContain('Time zone: Asia/Shanghai');
+    expect(prompt).toContain('Treat latest, current, today, and recent requests as date-sensitive.');
+    expect(prompt).toContain('call web_fetch on selected source pages and ground the answer in fetched page text, not snippets alone.');
   });
 });

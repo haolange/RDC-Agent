@@ -18,6 +18,7 @@ import type {
   ImageContent,
   Message,
   Model,
+  ProviderReasoningArtifact,
   TextContent,
   ToolCall,
   ToolResultMessage,
@@ -370,7 +371,9 @@ export class ContextManager {
       if (block.type === 'text') {
         total += block.text.length;
       } else if (block.type === 'thinking') {
-        total += block.thinking.length;
+        if (block.replayPolicy === 'provider-artifact' && block.artifact) {
+          total += this.providerArtifactChars(block.artifact);
+        }
       } else if (block.type === 'toolCall') {
         const tc = block as ToolCall;
         try {
@@ -381,6 +384,14 @@ export class ContextManager {
       }
     }
     return total;
+  }
+
+  private providerArtifactChars(artifact: ProviderReasoningArtifact): number {
+    try {
+      return JSON.stringify(artifact).length;
+    } catch {
+      return 0;
+    }
   }
 
   private toolResultSize(msg: ToolResultMessage): number {

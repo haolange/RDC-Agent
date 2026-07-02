@@ -32,11 +32,11 @@ const FIXTURES = {
   },
   web_fetch: {
     argsPreview: JSON.stringify({ url: 'https://example.com' }),
-    resultPreview: JSON.stringify({ status: 200, title: 'Example' }),
+    resultPreview: JSON.stringify({ ok: true, data: { content: [{ type: 'text', text: 'Status: 200 OK' }], details: { kind: 'fetch', url: 'https://example.com/', status: 200, statusText: 'OK', bytes: 1256, truncated: false } } }),
   },
   web_search: {
     argsPreview: JSON.stringify({ query: 'renderdoc' }),
-    resultPreview: JSON.stringify({ results: [{ title: 'RenderDoc' }] }),
+    resultPreview: JSON.stringify({ ok: true, data: { content: [{ type: 'text', text: 'Search query: renderdoc' }], details: { kind: 'search', provider: 'DuckDuckGo HTML', resultCount: 1, results: [{ title: 'RenderDoc', url: 'https://renderdoc.org/', snippet: 'Graphics debugger.' }] } } }),
   },
   bash: {
     argsPreview: JSON.stringify({ command: 'npm run typecheck' }),
@@ -151,7 +151,7 @@ for (const toolName of ALL_TOOLS) {
   }, true);
 
   assert(row.type === 'tool', `${toolName} should render as tool row`);
-  assert(row.verb !== '已调用', `${toolName} should have a dedicated verb, got "${row.verb}"`);
+  assert(row.verb !== 'Called tool', `${toolName} should have a dedicated verb, got "${row.verb}"`);
   assert(row.target.length > 0 || row.previewLines.length > 0, `${toolName} should expose target or preview`);
 }
 

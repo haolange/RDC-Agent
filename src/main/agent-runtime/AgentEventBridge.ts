@@ -9,16 +9,20 @@ import type {
   AgentEventType,
   AgentRouteCapability,
 } from '@shared/types/agentRuntime';
+import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type { AgentRole } from '@shared/types/agent';
 import type { AppMode } from '@shared/types/session';
 import type { WorkflowPhase, WorkflowStage } from '@shared/types/workflow';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import type {
   AgentEvent as CoreAgentEvent,
+  AssistantMessage,
   AssistantMessageEvent,
   Message,
+  ThinkingContent,
   ToolResultMessage,
 } from './core/types';
+import { toSharedThinkingArtifact } from './reasoning/ReasoningArtifacts';
 
 /** Context fields copied into the shared AgentEvent. */
 export interface AgentEventBridgeContext {
@@ -81,19 +85,6 @@ export function mentionsTextualToolCall(text: string): boolean {
   return /(?:tool\s*call|function\s*call|工具调用|调用工具)\s*[:：]\s*[\w.-]+\s*\(/i.test(text);
 }
 
-/**
- * Translates one core AgentEvent into zero or one shared AgentEvent.
- *
- * 翻译规则：
- *  - `agent_start` → `run.started`
- *  - `agent_end`   → `run.completed`
- *  - `message_update`（text_delta） → `assistant.delta`
- *  - `message_end`（assistant 文本） → `assistant.completed`
- *  - `tool_execution_start` → `tool.started`
- *  - `tool_execution_end`   → `tool.completed`
- *  - `error`               → `run.failed`
- *  - 其它事件返回 null（不翻译）。
- */
 export function translateCoreToSharedAgentEvent(
   event: CoreAgentEvent,
   context: AgentEventBridgeContext,
@@ -130,10 +121,18 @@ export function translateCoreToSharedAgentEvent(
         return buildSharedAgentEvent('assistant.delta', { text: ev.delta }, context);
       }
       if (ev.type === 'thinking_delta') {
-        return buildSharedAgentEvent('assistant.thinking_delta', { text: ev.delta }, context);
+        return buildSharedAgentEvent(
+          'assistant.thinking_delta',
+          { text: ev.delta, thinking: toSharedThinkingArtifact(ev.thinking) },
+          context,
+        );
       }
       if (ev.type === 'thinking_end') {
-        return buildSharedAgentEvent('assistant.thinking_end', { text: ev.content }, context);
+        return buildSharedAgentEvent(
+          'assistant.thinking_end',
+          { text: ev.content, thinking: toSharedThinkingArtifact(ev.thinking) },
+          context,
+        );
       }
       if (ev.type === 'thinking_start') {
         return null;
@@ -156,12 +155,12 @@ export function translateCoreToSharedAgentEvent(
     case 'message_end': {
       if (event.message.role === 'assistant') {
         const text = extractAssistantTextFromContent(event.message.content);
-        const thinkingText = extractAssistantThinkingFromContent(event.message.content);
+        const thinking = extractAssistantThinkingFromContent(event.message.content);
         return buildSharedAgentEvent(
           'assistant.completed',
           {
             text,
-            thinkingText: thinkingText || undefined,
+            thinking: thinking.length > 0 ? thinking : undefined,
             usage: event.message.usage
               ? {
                   inputTokens: event.message.usage.inputTokens,
@@ -298,22 +297,27 @@ function extractAssistantText(messages: Message[]): string {
   return '';
 }
 
-function extractAssistantTextFromContent(
-  content: Array<{ type: string; text?: string; thinking?: string }>,
-): string {
+function extractAssistantTextFromContent(content: AssistantMessage['content']): string {
   return content
     .filter((block) => block.type === 'text')
-    .map((block) => block.text ?? '')
+    .map((block) => block.text)
     .join('');
 }
 
-function extractAssistantThinkingFromContent(
-  content: Array<{ type: string; text?: string; thinking?: string }>,
-): string {
+function extractAssistantThinkingFromContent(content: AssistantMessage['content']): ThinkingArtifact[] {
   return content
-    .filter((block) => block.type === 'thinking')
-    .map((block) => block.thinking ?? '')
-    .join('');
+    .filter(isThinkingContent)
+    .map((block) => toSharedThinkingArtifact(block));
+}
+
+function isThinkingContent(block: AssistantMessage['content'][number]): block is ThinkingContent {
+  return block.type === 'thinking';
+}
+
+function toRecordDetails(details: unknown): Record<string, unknown> | undefined {
+  return details && typeof details === 'object' && !Array.isArray(details)
+    ? details as Record<string, unknown>
+    : undefined;
 }
 
 function toolResultToSharedResult(result: ToolResultMessage, durationMs: number): import('@shared/types/tool').ToolCallResult {
@@ -326,6 +330,7 @@ function toolResultToSharedResult(result: ToolResultMessage, durationMs: number)
         code: 'AGENT_TOOL_FAILED',
         message: extractToolResultText(result) || 'Tool execution failed.',
         category: 'execution',
+        details: toRecordDetails(result.details),
       },
       duration_ms: durationMs,
       trace_id: result.toolCallId,
@@ -335,6 +340,7 @@ function toolResultToSharedResult(result: ToolResultMessage, durationMs: number)
     ok: true,
     data: {
       content: result.content,
+      details: result.details ?? null,
     },
     artifacts: [],
     duration_ms: durationMs,

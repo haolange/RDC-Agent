@@ -164,9 +164,7 @@
   }
 }
 
-/* ============================================================
- * ConversationThread — message stream rendering
- * ============================================================ */
+
 .conversation-thread {
   width: min(var(--chat-transcript-width), 100%);
   max-width: 100%;
@@ -327,9 +325,7 @@
   word-break: break-word;
 }
 
-/* ============================================================
- * Markdown body — formal typography for assistant answers
- * ============================================================ */
+
 .markdown-body {
   color: rgb(var(--color-text-primary));
   font-size: var(--text-base);
@@ -616,7 +612,7 @@
   transform: rotate(90deg);
 }
 
-/* state dot：running 时呼吸脉冲，其余静态着色 */
+
 .work-process-status-dot {
   flex: 0 0 auto;
   width: 9px;
@@ -672,7 +668,7 @@
 }
 
 .work-process-meta::before {
-  content: '·';
+  content: '/';
   margin-right: var(--space-2);
   color: var(--token-text-placeholder);
 }
@@ -681,8 +677,7 @@
   padding: var(--space-1) 0 0;
 }
 
-.work-process-summary,
-.work-process-empty {
+.work-process-summary {
   max-width: 52rem;
   margin: 0 0 var(--space-3);
   color: var(--token-text-caption);
@@ -810,7 +805,7 @@
   min-height: var(--space-6);
 }
 
-/* 无可展开 body 的工具/输入行：补齐与披露行一致的纵向节奏 */
+
 .work-process-tool-summary-static {
   padding: var(--space-1) 0;
 }
@@ -895,6 +890,45 @@
   padding: var(--space-1) 0 0;
 }
 
+.work-process-tool-approval {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--token-bg-muted) 72%, transparent);
+  color: var(--token-text-body);
+}
+
+.work-process-tool-approval-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.work-process-tool-approval-verb {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.work-process-tool-approval-meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--token-text-muted);
+  font-size: var(--text-xs);
+}
+
+.work-process-tool-approval-message {
+  margin: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
 .work-process-row-pre {
   margin: 0 0 var(--space-2);
   padding: var(--space-2) var(--space-3);
@@ -924,27 +958,29 @@
   padding-bottom: var(--space-2);
 }
 
-/* 思维链小节：单一主文案 + Cursor 风格步骤折叠 */
-.work-process-segment-primary {
+/* Work Process loop timeline: thinking evidence, result, then tool execution. */
+.work-process-loop-result {
+  width: min(100%, 54rem);
   margin: 0;
-  max-width: 52rem;
   color: var(--token-text-body);
   font-size: var(--text-sm);
   line-height: 1.65;
   overflow-wrap: anywhere;
+}
+
+.work-process-loop-result-text,
+.work-process-loop-tool-summary {
+  margin: 0;
   white-space: pre-wrap;
 }
 
-.work-process-segment-primary.is-thinking {
+.work-process-loop-tool-summary {
   color: var(--token-text-caption);
-  line-height: 1.55;
+  font-size: var(--text-xs);
+  line-height: 1.5;
 }
 
-.work-process-segment-primary.is-thinking.is-clamped {
-  white-space: normal;
-}
-
-.work-process-segment-primary.is-clamped {
+.work-process-loop-result.is-clamped .work-process-loop-result-text {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -952,10 +988,121 @@
   white-space: normal;
 }
 
-.work-process-segment-primary.is-thinking-full {
-  max-height: 12rem;
+.work-process-loop-result.is-streaming .work-process-loop-result-text::after,
+.work-process-loop-result.is-streaming:not(:has(.work-process-loop-result-text)) .work-process-loop-tool-summary::after {
+  content: '';
+  display: inline-block;
+  width: var(--space-1);
+  height: 1em;
+  margin-left: var(--space-1);
+  border-radius: var(--radius-sm);
+  background: currentColor;
+  opacity: 0.48;
+  vertical-align: -0.12em;
+  animation: work-process-result-pulse 1s ease-in-out infinite;
+}
+
+.work-process-thinking-state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: min(100%, 54rem);
+  margin: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.work-process-thinking-state.kind-opaque,
+.work-process-thinking-state.visibility-hidden {
+  color: var(--token-text-muted);
+}
+
+.work-process-thinking-summary {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: fit-content;
+  min-height: var(--space-7);
+  padding: var(--space-1) var(--space-2);
+  overflow: hidden;
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--token-bg-muted) 54%, transparent);
+  cursor: pointer;
+  list-style: none;
+}
+
+.work-process-thinking-summary::-webkit-details-marker {
+  display: none;
+}
+
+.work-process-thinking-state.status-streaming .work-process-thinking-summary {
+  border-color: var(--token-border-focus);
+}
+
+.work-process-thinking-state.status-streaming .work-process-thinking-summary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--token-border-focus) 22%, transparent),
+    transparent
+  );
+  transform: translateX(-120%);
+  animation: work-process-thinking-sweep 1.45s linear infinite;
+}
+
+.work-process-thinking-summary > * {
+  position: relative;
+  z-index: 1;
+}
+
+.work-process-thinking-source {
+  color: var(--token-text-muted);
+  font-size: var(--text-xs);
+}
+
+.work-process-thinking-preview {
+  width: min(100%, 54rem);
+  max-height: 14rem;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
   overflow: auto;
-  padding-right: var(--space-1);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-app);
+  color: var(--token-text-body);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.work-process-thinking-state[open] .work-process-row-caret {
+  transform: rotate(90deg);
+}
+
+@keyframes work-process-thinking-sweep {
+  from { transform: translateX(-120%); }
+  to { transform: translateX(120%); }
+}
+
+@keyframes work-process-result-pulse {
+  0%, 100% { opacity: 0.32; }
+  50% { opacity: 0.72; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .work-process-thinking-state.status-streaming .work-process-thinking-summary::after,
+  .work-process-loop-result.is-streaming .work-process-loop-result-text::after,
+  .work-process-loop-result.is-streaming:not(:has(.work-process-loop-result-text)) .work-process-loop-tool-summary::after {
+    animation: none;
+  }
 }
 
 .work-process-section-steps {
@@ -964,19 +1111,22 @@
 }
 
 .work-process-steps-toggle {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   width: fit-content;
-  padding: 0;
-  border: 0;
-  background: transparent;
+  min-height: var(--space-7);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--token-bg-muted) 54%, transparent);
   color: var(--token-text-caption);
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
   line-height: 1.5;
   cursor: pointer;
   list-style: none;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
 .work-process-steps-toggle::-webkit-details-marker {
@@ -984,12 +1134,18 @@
 }
 
 .work-process-steps-toggle:hover {
+  border-color: var(--token-border-default);
   color: var(--token-text-body);
 }
 
-.work-process-steps-eye {
+.work-process-steps-toggle:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+
+.work-process-steps-icon {
   flex: 0 0 auto;
-  opacity: 0.72;
+  opacity: 0.76;
 }
 
 .work-process-steps-toggle-label {
@@ -1050,7 +1206,7 @@
   transition: transform var(--transition-fast);
 }
 
-/* 工具行内的次级折叠：参数 + 原始结果，默认收起 */
+
 .work-process-debug-disclosure {
   margin-top: var(--space-1);
 }
@@ -1084,7 +1240,7 @@
   margin-top: var(--space-2);
 }
 
-/* 工具输出：终端式 CONSOLE 卡片（顶栏 + 等宽 body） */
+
 .work-process-console {
   width: 100%;
   overflow: hidden;
@@ -1126,7 +1282,7 @@
   overflow-wrap: anywhere;
 }
 
-/* 整行披露：summary 即行头，点击整行展开 body（控制台 / 参数 / 原始结果 / 详情） */
+
 .work-process-disclosure {
   width: min(100%, 54rem);
 }
@@ -1156,7 +1312,7 @@
   display: none;
 }
 
-/* 行头的展开 caret，随 details[open] 旋转 */
+
 .work-process-row-caret {
   flex: 0 0 auto;
   align-self: center;
@@ -1173,7 +1329,7 @@
   transform: rotate(90deg);
 }
 
-/* 文本类行（summary / diagnostic）的可点击行头布局 */
+
 .work-process-summary-line {
   display: flex;
   align-items: flex-start;
@@ -1463,7 +1619,7 @@
   line-height: 1.6;
 }
 
-/* ===== Subagent row（嵌套子 agent 工作过程）===== */
+
 .work-process-subagent {
   list-style: none;
   border-left: 2px solid var(--token-border-default);
@@ -1580,7 +1736,7 @@
   color: var(--token-status-error);
 }
 
-/* ===== Task row（任务状态卡片）===== */
+
 .work-process-task {
   list-style: none;
   display: flex;

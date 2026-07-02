@@ -1,14 +1,3 @@
-/**
- * Anthropic Messages API Provider。
- *
- * 协议要点：
- * - 端点：`POST {baseUrl}/messages`，`anthropic-version` header 必填。
- * - SSE 事件类型：`message_start` / `content_block_start` / `content_block_delta`
- *   / `content_block_stop` / `message_delta` / `message_stop` / `ping` / `error`。
- * - system 消息走顶层 `system` 字段，不放在 messages 数组里。
- * - 工具结果以 `tool_result` content block 形式作为 user 消息回传。
- */
-
 import { EventStream } from '../core/EventStream';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type {
@@ -18,8 +7,11 @@ import type {
   Message,
   Model,
   ProviderCapabilities,
+  ProviderReasoningArtifact,
   StopReason,
   StreamOptions,
+  ThinkingArtifactKind,
+  ThinkingArtifactVisibility,
   ToolDefinition,
 } from '../core/types';
 import type { ReasoningVisibility } from '@shared/types/agentRuntime';
@@ -45,7 +37,8 @@ interface AnthropicContentBlockStart extends AnthropicEventBase {
   index: number;
   content_block:
     | { type: 'text'; text?: string }
-    | { type: 'thinking'; thinking?: string }
+    | { type: 'thinking'; thinking?: string; signature?: string }
+    | { type: 'redacted_thinking'; data: string }
     | { type: 'tool_use'; id: string; name: string; input?: unknown };
 }
 
@@ -55,6 +48,7 @@ interface AnthropicContentBlockDelta extends AnthropicEventBase {
   delta:
     | { type: 'text_delta'; text: string }
     | { type: 'thinking_delta'; thinking: string }
+    | { type: 'signature_delta'; signature: string }
     | { type: 'input_json_delta'; partial_json: string };
 }
 
@@ -170,8 +164,9 @@ export class AnthropicProvider implements ProviderStrategy {
 
       await ensureOk(response, PROVIDER_API);
 
-      // Anthropic SSE 每个事件含 `event:` 与 `data:` 两行，parseSSE 只 yield data 行。
-      // 我们额外通过 type 字段识别事件类型。
+      const thinkingArtifactsByIndex = new Map<number, ProviderReasoningArtifact>();
+      const thinkingKind = resolveAnthropicThinkingKind(options.reasoningVisibility);
+      const thinkingVisibility = resolveAnthropicThinkingVisibility(options.reasoningVisibility);
       let stopReason: string | null = null;
       let inputTokens = 0;
       let outputTokens = 0;
@@ -202,12 +197,37 @@ export class AnthropicProvider implements ProviderStrategy {
                 sawOutput = true;
                 builder.appendText(evt.index, block.text);
               }
-              // 空 text 块在后续 delta 到达时会自动创建。
             } else if (block.type === 'thinking') {
+              const artifact = createAnthropicThinkingArtifact(model, block.signature);
+              thinkingArtifactsByIndex.set(evt.index, artifact);
+              builder.updateThinking(evt.index, {
+                kind: thinkingKind,
+                source: 'anthropic-thinking',
+                visibility: thinkingVisibility,
+                replayPolicy: 'provider-artifact',
+                artifact,
+              });
               if (block.thinking) {
                 sawOutput = true;
-                builder.appendThinking(evt.index, block.thinking);
+                builder.appendThinking(evt.index, block.thinking, {
+                  kind: thinkingKind,
+                  source: 'anthropic-thinking',
+                  visibility: thinkingVisibility,
+                  replayPolicy: 'provider-artifact',
+                  artifact,
+                });
               }
+            } else if (block.type === 'redacted_thinking') {
+              const artifact = createAnthropicRedactedArtifact(model, block.data);
+              thinkingArtifactsByIndex.set(evt.index, artifact);
+              sawOutput = true;
+              builder.updateThinking(evt.index, {
+                kind: 'opaque',
+                source: 'anthropic-redacted-thinking',
+                visibility: 'hidden',
+                replayPolicy: 'provider-artifact',
+                artifact,
+              });
             } else if (block.type === 'tool_use') {
               sawOutput = true;
               builder.ensureToolCall(evt.index, block.id, block.name);
@@ -224,7 +244,26 @@ export class AnthropicProvider implements ProviderStrategy {
               builder.appendText(evt.index, evt.delta.text);
             } else if (evt.delta.type === 'thinking_delta') {
               sawOutput = true;
-              builder.appendThinking(evt.index, evt.delta.thinking);
+              builder.appendThinking(evt.index, evt.delta.thinking, {
+                kind: thinkingKind,
+                source: 'anthropic-thinking',
+                visibility: thinkingVisibility,
+                replayPolicy: 'provider-artifact',
+                artifact: thinkingArtifactsByIndex.get(evt.index) ?? createAnthropicThinkingArtifact(model),
+              });
+            } else if (evt.delta.type === 'signature_delta') {
+              const artifact = mergeAnthropicSignature(
+                thinkingArtifactsByIndex.get(evt.index) ?? createAnthropicThinkingArtifact(model),
+                evt.delta.signature,
+              );
+              thinkingArtifactsByIndex.set(evt.index, artifact);
+              builder.updateThinking(evt.index, {
+                kind: thinkingKind,
+                source: 'anthropic-thinking',
+                visibility: thinkingVisibility,
+                replayPolicy: 'provider-artifact',
+                artifact,
+              });
             } else if (evt.delta.type === 'input_json_delta') {
               sawOutput = true;
               builder.appendToolCallArgs(evt.index, evt.delta.partial_json);
@@ -233,8 +272,6 @@ export class AnthropicProvider implements ProviderStrategy {
           }
           case 'content_block_stop': {
             const evt = event as AnthropicContentBlockStop;
-            // builder 会在 done() 时关闭未关闭的块；这里依赖 type 维度自我标记。
-            // 但若同一 index 有多个 content block 类型，需主动 end 当前。
             builder.endText(evt.index);
             builder.endThinking(evt.index);
             builder.endToolCall(evt.index);
@@ -249,16 +286,13 @@ export class AnthropicProvider implements ProviderStrategy {
             }
             break;
           }
-          case 'message_stop': {
-            // 流结束在循环外统一处理。
+          case 'message_stop':
             break;
-          }
           case 'error': {
             const evt = event as AnthropicErrorEvent;
             throw new Error(`anthropic ${evt.error.type}: ${evt.error.message}`);
           }
           default:
-            // ping 等其它事件忽略。
             break;
         }
       }
@@ -318,9 +352,13 @@ function toAnthropicThinking(
   return thinking;
 }
 
-// =====================================================================
-// 转换辅助
-// =====================================================================
+function resolveAnthropicThinkingKind(reasoningVisibility?: ReasoningVisibility): ThinkingArtifactKind {
+  return reasoningVisibility === 'summary-events' ? 'summary' : 'raw';
+}
+
+function resolveAnthropicThinkingVisibility(reasoningVisibility?: ReasoningVisibility): ThinkingArtifactVisibility {
+  return reasoningVisibility === 'summary-events' ? 'summary' : 'raw-collapsed';
+}
 
 interface AnthropicMessage {
   role: 'user' | 'assistant';
@@ -329,6 +367,8 @@ interface AnthropicMessage {
 
 type AnthropicContentBlock =
   | { type: 'text'; text: string }
+  | { type: 'thinking'; thinking: string; signature: string }
+  | { type: 'redacted_thinking'; data: string }
   | {
       type: 'image';
       source: { type: 'base64'; media_type: string; data: string };
@@ -379,6 +419,9 @@ function convertMessage(message: Message): AnthropicMessage[] {
     for (const block of message.content) {
       if (block.type === 'text') {
         blocks.push({ type: 'text', text: block.text });
+      } else if (block.type === 'thinking') {
+        const replayBlock = toAnthropicThinkingReplayBlock(block.text, block.artifact, block.replayPolicy);
+        if (replayBlock) blocks.push(replayBlock);
       } else if (block.type === 'toolCall') {
         blocks.push({
           type: 'tool_use',
@@ -387,12 +430,10 @@ function convertMessage(message: Message): AnthropicMessage[] {
           input: block.arguments ?? {},
         });
       }
-      // thinking 块不回放给 Anthropic（属于内部状态）。
     }
     return [{ role: 'assistant', content: blocks }];
   }
 
-  // toolResult -> 作为 user 消息中的 tool_result 块
   const textBlocks: Array<{ type: 'text'; text: string }> = [];
   for (const block of message.content) {
     if (block.type === 'text') textBlocks.push({ type: 'text', text: block.text });
@@ -410,6 +451,51 @@ function convertMessage(message: Message): AnthropicMessage[] {
       ],
     },
   ];
+}
+
+function createAnthropicThinkingArtifact(model: Model, signature?: string): ProviderReasoningArtifact {
+  return {
+    providerId: model.provider,
+    modelId: model.id,
+    protocol: PROVIDER_API,
+    type: 'thinking',
+    signature: signature || undefined,
+  };
+}
+
+function createAnthropicRedactedArtifact(model: Model, data: string): ProviderReasoningArtifact {
+  return {
+    providerId: model.provider,
+    modelId: model.id,
+    protocol: PROVIDER_API,
+    type: 'redacted_thinking',
+    data,
+  };
+}
+
+function mergeAnthropicSignature(
+  artifact: ProviderReasoningArtifact,
+  signatureDelta: string,
+): ProviderReasoningArtifact {
+  return {
+    ...artifact,
+    type: 'thinking',
+    signature: `${artifact.signature ?? ''}${signatureDelta}`,
+  };
+}
+
+function toAnthropicThinkingReplayBlock(
+  text: string | undefined,
+  artifact: ProviderReasoningArtifact | undefined,
+  replayPolicy: string,
+): Extract<AnthropicContentBlock, { type: 'thinking' | 'redacted_thinking' }> | null {
+  if (replayPolicy !== 'provider-artifact' || !artifact) return null;
+  if (artifact.protocol !== PROVIDER_API && artifact.protocol !== 'AnthropicMessages') return null;
+  if (artifact.type === 'redacted_thinking') {
+    return artifact.data ? { type: 'redacted_thinking', data: artifact.data } : null;
+  }
+  if (artifact.type !== 'thinking' || !text || !artifact.signature) return null;
+  return { type: 'thinking', thinking: text, signature: artifact.signature };
 }
 
 function toAnthropicTool(tool: ToolDefinition): Record<string, unknown> {

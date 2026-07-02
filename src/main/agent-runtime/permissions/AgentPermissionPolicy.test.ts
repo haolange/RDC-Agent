@@ -33,7 +33,16 @@ const readFileTool: AgentTool = {
   execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
 };
 
-function makeToolCall(path: string): ToolCall {
+const webSearchTool: AgentTool = {
+  name: 'web_search',
+  description: 'search web',
+  parameters: { type: 'object', properties: {} },
+  permissionHint: 'readonly',
+  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'network', category: 'web', requiresApproval: false },
+  execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+};
+
+function makeReadFileToolCall(path: string): ToolCall {
   return {
     type: 'toolCall',
     id: 'tc-1',
@@ -42,17 +51,30 @@ function makeToolCall(path: string): ToolCall {
   };
 }
 
+function makeWebSearchToolCall(query: string): ToolCall {
+  return {
+    type: 'toolCall',
+    id: 'tc-web',
+    name: 'web_search',
+    arguments: { query },
+  };
+}
+
 describe('AgentPermissionPolicyService external reads', () => {
   const service = new AgentPermissionPolicyService();
 
   beforeEach(() => {
     mockSettings.agentRuntime.permissions.mode = 'full-access';
+    mockSettings.agentRuntime.permissions.readableRoots = [];
+    mockSettings.agentRuntime.permissions.writableRoots = [];
+    mockSettings.agentRuntime.permissions.allowedCommandPrefixes = [];
+    mockSettings.agentRuntime.permissions.deniedCommandPrefixes = [];
   });
 
   it('allows full-access reads outside the project root without asking', () => {
     const decision = service.evaluate({
       tool: readFileTool,
-      toolCall: makeToolCall('D:\\OtherProject\\src\\main.ts'),
+      toolCall: makeReadFileToolCall('D:\\OtherProject\\src\\main.ts'),
       projectRootPath: 'D:\\Projects\\Demo',
     });
 
@@ -65,7 +87,7 @@ describe('AgentPermissionPolicyService external reads', () => {
 
     const decision = service.evaluate({
       tool: readFileTool,
-      toolCall: makeToolCall('D:\\OtherProject\\src\\main.ts'),
+      toolCall: makeReadFileToolCall('D:\\OtherProject\\src\\main.ts'),
       projectRootPath: 'D:\\Projects\\Demo',
     });
 
@@ -78,7 +100,7 @@ describe('AgentPermissionPolicyService external reads', () => {
 
     const decision = service.evaluate({
       tool: readFileTool,
-      toolCall: makeToolCall('D:\\OtherProject\\src\\main.ts'),
+      toolCall: makeReadFileToolCall('D:\\OtherProject\\src\\main.ts'),
       projectRootPath: 'D:\\Projects\\Demo',
     });
 
@@ -92,11 +114,72 @@ describe('AgentPermissionPolicyService external reads', () => {
 
     const decision = service.evaluate({
       tool: readFileTool,
-      toolCall: makeToolCall('D:\\Shared\\notes.txt'),
+      toolCall: makeReadFileToolCall('D:\\Shared\\notes.txt'),
       projectRootPath: 'D:\\Projects\\Demo',
     });
 
     expect(decision.action).toBe('allow');
     expect(decision.temporaryPathRoots.some((root) => root.includes('Shared'))).toBe(true);
+  });
+});
+
+describe('AgentPermissionPolicyService network tools', () => {
+  const service = new AgentPermissionPolicyService();
+
+  beforeEach(() => {
+    mockSettings.agentRuntime.permissions.mode = 'full-access';
+    mockSettings.agentRuntime.permissions.readableRoots = [];
+    mockSettings.agentRuntime.permissions.writableRoots = [];
+    mockSettings.agentRuntime.permissions.allowedCommandPrefixes = [];
+    mockSettings.agentRuntime.permissions.deniedCommandPrefixes = [];
+  });
+
+  it('allows network tools in full-access mode', () => {
+    const decision = service.evaluate({
+      tool: webSearchTool,
+      toolCall: makeWebSearchToolCall('RenderDoc'),
+      projectRootPath: 'D:\\Projects\\Demo',
+    });
+
+    expect(decision.action).toBe('allow');
+  });
+
+  it('requests approval for network tools in default mode', () => {
+    mockSettings.agentRuntime.permissions.mode = 'default';
+
+    const decision = service.evaluate({
+      tool: webSearchTool,
+      toolCall: makeWebSearchToolCall('RenderDoc'),
+      projectRootPath: 'D:\\Projects\\Demo',
+    });
+
+    expect(decision.action).toBe('ask_user');
+    expect(decision.reason).toContain('Network tool "web_search" requires approval');
+    expect(decision.risk).toBe('medium');
+  });
+
+  it('auto-reviews network tools in auto-review mode', () => {
+    mockSettings.agentRuntime.permissions.mode = 'auto-review';
+
+    const decision = service.evaluate({
+      tool: webSearchTool,
+      toolCall: makeWebSearchToolCall('RenderDoc'),
+      projectRootPath: 'D:\\Projects\\Demo',
+    });
+
+    expect(decision.action).toBe('auto_review');
+    expect(decision.risk).toBe('medium');
+  });
+
+  it('allows network tools in custom mode after explicit policy selection', () => {
+    mockSettings.agentRuntime.permissions.mode = 'custom';
+
+    const decision = service.evaluate({
+      tool: webSearchTool,
+      toolCall: makeWebSearchToolCall('RenderDoc'),
+      projectRootPath: 'D:\\Projects\\Demo',
+    });
+
+    expect(decision.action).toBe('allow');
   });
 });
