@@ -5515,3 +5515,22 @@
   width: auto;
   grid-template-columns: repeat(5, var(--space-10));
 }
+@media (max-width: 48rem) {
+  .settings-page-agents .settings-manifest-page,
+  .settings-page-agents .settings-manifest-layout,
+  .settings-page-agents .settings-manifest-list-column,
+  .settings-page-agents .settings-manifest-editor {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .settings-page-agents .settings-manifest-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-page-agents .settings-manifest-actions,
+  .settings-page-agents .settings-manifest-actions .button {
+    width: 100%;
+  }
+}

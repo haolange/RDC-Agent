@@ -84,7 +84,7 @@ const createConversationApi = () => ({
   undoLastTurn: (sessionId) => electron.ipcRenderer.invoke("conversation:undoLastTurn", sessionId),
   compactHistory: (sessionId) => electron.ipcRenderer.invoke("conversation:compactHistory", sessionId),
   onEvent: (callback) => {
-    registerTrackedListener("conversation:event", (payload) => callback(payload));
+    registerTrackedListener("conversation:event", callback);
   },
   offEvent: (callback) => {
     removeTrackedListener("conversation:event", callback);

@@ -1092,6 +1092,7 @@ export class AgentOrchestrator {
       toolName: toolCall.name,
       content: result.content,
       isError: result.isError === true,
+      details: result.details,
       timestamp: Date.now(),
     };
   }

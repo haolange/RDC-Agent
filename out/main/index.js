@@ -3732,6 +3732,99 @@ function writeYaml(filePath, data) {
     return false;
   }
 }
+const DEFAULT_KIND = "raw";
+const DEFAULT_SOURCE = "unknown";
+const DEFAULT_VISIBILITY = "raw-collapsed";
+const DEFAULT_REPLAY_POLICY = "none";
+function createThinkingContent(input = {}) {
+  const text = input.text?.trim();
+  const kind = input.kind ?? (input.artifact && !text ? "opaque" : DEFAULT_KIND);
+  return {
+    type: "thinking",
+    ...text ? { text } : {},
+    kind,
+    source: input.source ?? DEFAULT_SOURCE,
+    visibility: input.visibility ?? defaultVisibility(kind),
+    replayPolicy: input.replayPolicy ?? DEFAULT_REPLAY_POLICY,
+    ...input.artifact ? { artifact: input.artifact } : {}
+  };
+}
+function withThinkingText(thinking, text) {
+  const nextText = text.trim();
+  return {
+    ...thinking,
+    ...nextText ? { text: nextText } : { text: void 0 }
+  };
+}
+function appendThinkingText(thinking, delta) {
+  if (!delta) return thinking;
+  return withThinkingText(thinking, `${thinking.text ?? ""}${delta}`);
+}
+function mergeThinkingContent(thinking, patch) {
+  return {
+    ...thinking,
+    ...patch.text !== void 0 ? { text: patch.text.trim() || void 0 } : {},
+    ...patch.kind ? { kind: patch.kind } : {},
+    ...patch.source ? { source: patch.source } : {},
+    ...patch.visibility ? { visibility: patch.visibility } : {},
+    ...patch.replayPolicy ? { replayPolicy: patch.replayPolicy } : {},
+    ...patch.artifact ? { artifact: patch.artifact } : {}
+  };
+}
+function getThinkingText(thinking) {
+  return thinking?.text?.trim() ?? "";
+}
+function normalizeThinkingContent(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value;
+  if (record.type !== "thinking") return null;
+  const text = typeof record.text === "string" ? record.text : typeof record.thinking === "string" ? record.thinking : void 0;
+  return createThinkingContent({
+    text,
+    kind: isThinkingKind(record.kind) ? record.kind : void 0,
+    source: isThinkingSource(record.source) ? record.source : void 0,
+    visibility: isThinkingVisibility(record.visibility) ? record.visibility : void 0,
+    replayPolicy: isThinkingReplayPolicy(record.replayPolicy) ? record.replayPolicy : void 0,
+    artifact: normalizeProviderArtifact(record.artifact)
+  });
+}
+function toSharedThinkingArtifact(thinking) {
+  return {
+    text: thinking.text,
+    kind: thinking.kind,
+    source: thinking.source,
+    visibility: thinking.visibility,
+    replayPolicy: thinking.replayPolicy,
+    artifact: thinking.artifact
+  };
+}
+function defaultVisibility(kind) {
+  if (kind === "summary") return "summary";
+  if (kind === "opaque") return "hidden";
+  return DEFAULT_VISIBILITY;
+}
+function normalizeProviderArtifact(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return void 0;
+  const record = value;
+  const providerId = typeof record.providerId === "string" ? record.providerId : "";
+  const type = typeof record.type === "string" ? record.type : "";
+  if (!providerId || !type) return void 0;
+  return {
+    providerId,
+    modelId: typeof record.modelId === "string" ? record.modelId : void 0,
+    protocol: typeof record.protocol === "string" ? record.protocol : void 0,
+    type,
+    id: typeof record.id === "string" ? record.id : void 0,
+    encryptedContent: typeof record.encryptedContent === "string" ? record.encryptedContent : void 0,
+    signature: typeof record.signature === "string" ? record.signature : void 0,
+    data: typeof record.data === "string" ? record.data : void 0,
+    raw: record.raw && typeof record.raw === "object" && !Array.isArray(record.raw) ? record.raw : void 0
+  };
+}
+const isThinkingKind = (value) => value === "summary" || value === "raw" || value === "opaque";
+const isThinkingVisibility = (value) => value === "summary" || value === "raw-collapsed" || value === "hidden";
+const isThinkingReplayPolicy = (value) => value === "none" || value === "provider-artifact";
+const isThinkingSource = (value) => value === "openai-responses-summary" || value === "openai-responses-encrypted" || value === "anthropic-thinking" || value === "anthropic-redacted-thinking" || value === "openai-compatible-raw" || value === "openrouter-raw" || value === "gemini-raw" || value === "ollama-raw" || value === "unknown";
 class StorageAdapter {
   dataRootPath = "";
   projectsRootPath = "";
@@ -4235,10 +4328,10 @@ class StorageAdapter {
     if (!fs__namespace.existsSync(threadPath)) {
       return [];
     }
-    return readJsonl(threadPath);
+    return readJsonl(threadPath).map(normalizeAgentThreadMessage);
   }
   writeAgentThread(sessionId, agentId, messages) {
-    writeJsonl(this.getAgentThreadPath(sessionId, agentId), messages);
+    writeJsonl(this.getAgentThreadPath(sessionId, agentId), messages.map(normalizeAgentThreadMessage));
   }
   clearAgentThread(sessionId, agentId) {
     const location = this.findSessionLocation(sessionId);
@@ -4933,6 +5026,14 @@ class StorageAdapter {
     };
     return mimeByExtension[extension] || "application/octet-stream";
   }
+}
+function normalizeAgentThreadMessage(message) {
+  if (message.role !== "assistant") return message;
+  const assistant = message;
+  return {
+    ...assistant,
+    content: assistant.content.map((block) => normalizeThinkingContent(block) ?? block)
+  };
 }
 const storageAdapter = new StorageAdapter();
 const POLL_INTERVAL_MS = 5e3;
@@ -6741,7 +6842,9 @@ class ContextManager {
       if (block.type === "text") {
         total += block.text.length;
       } else if (block.type === "thinking") {
-        total += block.thinking.length;
+        if (block.replayPolicy === "provider-artifact" && block.artifact) {
+          total += this.providerArtifactChars(block.artifact);
+        }
       } else if (block.type === "toolCall") {
         const tc = block;
         try {
@@ -6752,6 +6855,13 @@ class ContextManager {
       }
     }
     return total;
+  }
+  providerArtifactChars(artifact) {
+    try {
+      return JSON.stringify(artifact).length;
+    } catch {
+      return 0;
+    }
   }
   toolResultSize(msg) {
     let total = 0;
@@ -7936,7 +8046,7 @@ const grepTool = {
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "none", category: "search", requiresApproval: false },
   permissionHint: "readonly",
   async execute(_toolCallId, params, signal, _onUpdate, context2) {
-    throwIfAborted$1(signal);
+    throwIfAborted$2(signal);
     const workspaceRoot = getWorkspaceRoot(context2);
     const root = params.path ? safeResolvePath(params.path, workspaceRoot, context2) : workspaceRoot;
     const maxMatches = Math.max(1, Math.min(1e3, Math.floor(params.maxMatches ?? DEFAULT_MAX_MATCHES)));
@@ -7984,7 +8094,7 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 async function walkAndSearch(current, workspaceRoot, regex, matches, matchedFiles, maxMatches, signal) {
-  throwIfAborted$1(signal);
+  throwIfAborted$2(signal);
   const entries = await fs__namespace$1.readdir(current, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
     if (matches.length >= maxMatches) return;
@@ -7999,7 +8109,7 @@ async function walkAndSearch(current, workspaceRoot, regex, matches, matchedFile
   }
 }
 async function searchFile(absolute, workspaceRoot, regex, matches, matchedFiles, maxMatches, signal) {
-  throwIfAborted$1(signal);
+  throwIfAborted$2(signal);
   if (matches.length >= maxMatches) return;
   const buffer = await fs__namespace$1.readFile(absolute).catch(() => null);
   if (!buffer || buffer.includes(0)) return;
@@ -8014,7 +8124,7 @@ async function searchFile(absolute, workspaceRoot, regex, matches, matchedFiles,
     }
   }
 }
-function throwIfAborted$1(signal) {
+function throwIfAborted$2(signal) {
   if (signal?.aborted) {
     throw new Error("Aborted");
   }
@@ -8184,7 +8294,19 @@ const gitCommitTool = {
 };
 const MAX_RESPONSE_BYTES = 160 * 1024;
 const REQUEST_TIMEOUT_MS$2 = 12e3;
-const SEARCH_BASE_URL = process.env.RDC_AGENT_WEB_SEARCH_URL || "https://s.jina.ai/";
+const SEARCH_RESULT_LIMIT = 6;
+const SEARCH_PROVIDERS = [
+  {
+    name: "DuckDuckGo HTML",
+    buildUrl: (query) => `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+    parse: parseDuckDuckGoResults
+  },
+  {
+    name: "Bing Web",
+    buildUrl: (query) => `https://www.bing.com/search?q=${encodeURIComponent(query)}`,
+    parse: parseBingResults
+  }
+];
 const webFetchTool = {
   name: "web_fetch",
   label: "Fetch Web Page",
@@ -8202,13 +8324,17 @@ const webFetchTool = {
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "network", category: "web", requiresApproval: false },
   permissionHint: "readonly",
   async execute(_toolCallId, params, signal) {
-    return fetchPublicText(params.url, signal);
+    const result = await fetchPublicText(params.url, signal);
+    return {
+      content: [{ type: "text", text: result.contentText }],
+      details: result.details
+    };
   }
 };
 const webSearchTool = {
   name: "web_search",
   label: "Search Web",
-  description: "Search the public web using the configured read-only search endpoint and return text results with source links.",
+  description: "Search the public web with a zero-configuration read-only provider and return discovery results. Use web_fetch on selected source pages before factual summaries, especially latest/current/today requests.",
   parameters: {
     type: "object",
     properties: {
@@ -8222,25 +8348,95 @@ const webSearchTool = {
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "network", category: "web", requiresApproval: false },
   permissionHint: "readonly",
   async execute(_toolCallId, params, signal) {
-    if (!params.query || !params.query.trim()) {
-      throw new Error("query cannot be empty");
+    const query = params.query?.trim();
+    if (!query) {
+      throw new Error("Search query cannot be empty.");
     }
-    const base = SEARCH_BASE_URL.endsWith("/") ? SEARCH_BASE_URL : `${SEARCH_BASE_URL}/`;
-    return fetchPublicText(`${base}${encodeURIComponent(params.query.trim())}`, signal);
+    return searchPublicWeb(query, signal);
   }
 };
 async function fetchPublicText(rawUrl, signal) {
+  const response = await requestPublicText(rawUrl, signal, "text/plain,text/markdown,text/html,application/json;q=0.9,*/*;q=0.5");
+  return {
+    contentText: [
+      `URL: ${response.finalUrl}`,
+      `Status: ${response.status} ${response.statusText}`,
+      response.truncated ? `[truncated at ${MAX_RESPONSE_BYTES} bytes]` : "",
+      "",
+      truncateOutput(response.text, MAX_RESPONSE_BYTES)
+    ].filter(Boolean).join("\n"),
+    details: {
+      kind: "fetch",
+      url: response.finalUrl,
+      status: response.status,
+      statusText: response.statusText,
+      bytes: response.bytes,
+      truncated: response.truncated
+    }
+  };
+}
+async function searchPublicWeb(query, signal) {
+  const failures = [];
+  for (const provider of SEARCH_PROVIDERS) {
+    const searchUrl = provider.buildUrl(query);
+    try {
+      const response = await requestPublicText(searchUrl, signal, "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5");
+      const results = provider.parse(response.text).slice(0, SEARCH_RESULT_LIMIT);
+      if (results.length === 0) {
+        failures.push(`${provider.name}: no parseable results`);
+        continue;
+      }
+      const output = [
+        `Search query: ${query}`,
+        `Provider: ${provider.name}`,
+        `Results: ${results.length}`,
+        "",
+        ...results.flatMap((result, index) => {
+          const meta = [
+            result.source ? `Source: ${result.source}` : "",
+            result.publishedAt ? `Date: ${result.publishedAt}` : ""
+          ].filter(Boolean).join(" | ");
+          return [
+            `${index + 1}. ${result.title}`,
+            `   ${result.url}`,
+            meta ? `   ${meta}` : "",
+            result.snippet ? `   ${result.snippet}` : ""
+          ].filter(Boolean);
+        })
+      ].join("\n");
+      return {
+        content: [{ type: "text", text: output }],
+        details: {
+          kind: "search",
+          query,
+          provider: provider.name,
+          url: response.finalUrl,
+          status: response.status,
+          statusText: response.statusText,
+          bytes: response.bytes,
+          truncated: response.truncated,
+          resultCount: results.length,
+          results
+        }
+      };
+    } catch (error) {
+      failures.push(`${provider.name}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  throw new Error(`Web search failed for "${query}". ${failures.join(" | ")}`);
+}
+async function requestPublicText(rawUrl, signal, accept = "*/*") {
   const url2 = await assertPublicHttpUrl(rawUrl);
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS$2);
-  const abort = () => controller.abort();
+  const timeoutId = setTimeout(() => controller.abort(new Error(`Timed out after ${REQUEST_TIMEOUT_MS$2}ms`)), REQUEST_TIMEOUT_MS$2);
+  const abort = () => controller.abort(signal?.reason ?? new Error("Request aborted"));
   signal?.addEventListener("abort", abort, { once: true });
   try {
     const response = await fetch(url2, {
       redirect: "follow",
       signal: controller.signal,
       headers: {
-        Accept: "text/plain,text/markdown,text/html,application/json;q=0.9,*/*;q=0.5",
+        Accept: accept,
         "User-Agent": "RDC-Agent/AskReadonlyWebTool"
       }
     });
@@ -8249,23 +8445,16 @@ async function fetchPublicText(rawUrl, signal) {
     const bytes = arrayBuffer.byteLength;
     const limited = arrayBuffer.slice(0, MAX_RESPONSE_BYTES);
     const text = new TextDecoder("utf-8", { fatal: false }).decode(limited);
-    const truncated = bytes > MAX_RESPONSE_BYTES;
-    const output = [
-      `URL: ${finalUrl}`,
-      `Status: ${response.status} ${response.statusText}`,
-      truncated ? `[truncated at ${MAX_RESPONSE_BYTES} bytes]` : "",
-      "",
-      truncateOutput(text, MAX_RESPONSE_BYTES)
-    ].filter(Boolean).join("\n");
     return {
-      content: [{ type: "text", text: output }],
-      details: {
-        url: finalUrl,
-        status: response.status,
-        bytes,
-        truncated
-      }
+      finalUrl,
+      status: response.status,
+      statusText: response.statusText,
+      bytes,
+      truncated: bytes > MAX_RESPONSE_BYTES,
+      text
     };
+  } catch (error) {
+    throw createNetworkError(url2, error);
   } finally {
     clearTimeout(timeoutId);
     signal?.removeEventListener("abort", abort);
@@ -8296,6 +8485,27 @@ async function assertPublicHttpUrl(rawUrl) {
   }
   return parsed.toString();
 }
+function createNetworkError(url2, error) {
+  const host = safeHost(url2);
+  const record = error && typeof error === "object" ? error : {};
+  const cause = record.cause && typeof record.cause === "object" ? record.cause : {};
+  const causeCode = typeof cause.code === "string" ? cause.code : "";
+  const causeMessage = typeof cause.message === "string" ? cause.message : "";
+  const errorName = typeof record.name === "string" ? record.name : "";
+  const errorMessage = typeof record.message === "string" ? record.message : String(error);
+  const isAbort = errorName === "AbortError" || /abort|timed out/i.test(`${causeMessage} ${errorMessage}`);
+  const reason = isAbort ? `request timed out after ${REQUEST_TIMEOUT_MS$2}ms or was aborted` : [causeCode, causeMessage || errorMessage].filter(Boolean).join(" - ");
+  const next = new Error(`Network request failed for ${host}: ${reason || "unknown network error"}`);
+  next.cause = error;
+  return next;
+}
+function safeHost(rawUrl) {
+  try {
+    return new URL(rawUrl).hostname || rawUrl;
+  } catch {
+    return rawUrl;
+  }
+}
 function isPrivateIp(value) {
   const ipVersion = net__namespace.isIP(value);
   if (ipVersion === 4) {
@@ -8309,6 +8519,143 @@ function isPrivateIp(value) {
     return normalized === "::1" || normalized === "::" || normalized.startsWith("fc") || normalized.startsWith("fd") || normalized.startsWith("fe80:");
   }
   return false;
+}
+function parseDuckDuckGoResults(html) {
+  const results = [];
+  const anchorPattern = /<a\b[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  let match;
+  while ((match = anchorPattern.exec(html)) && results.length < SEARCH_RESULT_LIMIT) {
+    const url2 = decodeDuckDuckGoUrl(decodeHtml(match[1]));
+    const title = cleanHtmlText(match[2]);
+    if (!url2 || !title) continue;
+    const nearby = html.slice(match.index + match[0].length, match.index + match[0].length + 1600);
+    const snippet = cleanHtmlText(
+      nearby.match(/<a\b[^>]*class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/i)?.[1] ?? nearby.match(/<div\b[^>]*class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/div>/i)?.[1] ?? ""
+    );
+    const source = getSourceDomain(url2);
+    const publishedAt = extractPublishedDate(`${title} ${snippet} ${cleanHtmlText(nearby)}`);
+    results.push({ title, url: url2, snippet, source, ...publishedAt ? { publishedAt } : {} });
+  }
+  return dedupeResults(results);
+}
+function parseBingResults(html) {
+  const results = [];
+  const blockPattern = /<li\b[^>]*class="[^"]*b_algo[^"]*"[^>]*>([\s\S]*?)<\/li>/gi;
+  let match;
+  while ((match = blockPattern.exec(html)) && results.length < SEARCH_RESULT_LIMIT) {
+    const block = match[1];
+    const anchor = block.match(/<h2[^>]*>\s*<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>\s*<\/h2>/i);
+    if (!anchor) continue;
+    const url2 = decodeHtml(anchor[1]);
+    const title = cleanHtmlText(anchor[2]);
+    const snippet = cleanHtmlText(block.match(/<p[^>]*>([\s\S]*?)<\/p>/i)?.[1] ?? "");
+    const source = getSourceDomain(url2);
+    const publishedAt = extractPublishedDate(cleanHtmlText(block));
+    if (url2 && title) results.push({ title, url: url2, snippet, source, ...publishedAt ? { publishedAt } : {} });
+  }
+  return dedupeResults(results);
+}
+const MONTHS = {
+  jan: "01",
+  january: "01",
+  feb: "02",
+  february: "02",
+  mar: "03",
+  march: "03",
+  apr: "04",
+  april: "04",
+  may: "05",
+  jun: "06",
+  june: "06",
+  jul: "07",
+  july: "07",
+  aug: "08",
+  august: "08",
+  sep: "09",
+  sept: "09",
+  september: "09",
+  oct: "10",
+  october: "10",
+  nov: "11",
+  november: "11",
+  dec: "12",
+  december: "12"
+};
+function getSourceDomain(rawUrl) {
+  try {
+    const hostname = new URL(rawUrl).hostname.toLowerCase();
+    return hostname.replace(/^www\./, "") || void 0;
+  } catch {
+    return void 0;
+  }
+}
+function extractPublishedDate(text) {
+  const source = text.replace(/\s+/g, " ");
+  const iso = source.match(/\b((?:19|20)\d{2})[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12]\d|3[01])\b/);
+  if (iso) return formatDateParts(iso[1], iso[2], iso[3]);
+  const monthDayYear = source.match(/\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+(0?[1-9]|[12]\d|3[01]),?\s+((?:19|20)\d{2})\b/i);
+  if (monthDayYear) {
+    const month = MONTHS[monthDayYear[1].replace(".", "").toLowerCase()];
+    if (month) return formatDateParts(monthDayYear[3], month, monthDayYear[2]);
+  }
+  const dayMonthYear = source.match(/\b(0?[1-9]|[12]\d|3[01])\s+(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t|tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+((?:19|20)\d{2})\b/i);
+  if (dayMonthYear) {
+    const month = MONTHS[dayMonthYear[2].replace(".", "").toLowerCase()];
+    if (month) return formatDateParts(dayMonthYear[3], month, dayMonthYear[1]);
+  }
+  return void 0;
+}
+function formatDateParts(year, month, day) {
+  const numericYear = Number(year);
+  const numericMonth = Number(month);
+  const numericDay = Number(day);
+  if (!Number.isInteger(numericYear) || !Number.isInteger(numericMonth) || !Number.isInteger(numericDay)) return void 0;
+  if (numericMonth < 1 || numericMonth > 12 || numericDay < 1 || numericDay > 31) return void 0;
+  return `${String(numericYear).padStart(4, "0")}-${String(numericMonth).padStart(2, "0")}-${String(numericDay).padStart(2, "0")}`;
+}
+function decodeDuckDuckGoUrl(rawUrl) {
+  const withProtocol = rawUrl.startsWith("//") ? `https:${rawUrl}` : rawUrl;
+  try {
+    const parsed = new URL(withProtocol);
+    const uddg = parsed.searchParams.get("uddg");
+    return uddg ? decodeURIComponent(uddg) : parsed.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+function dedupeResults(results) {
+  const seen = /* @__PURE__ */ new Set();
+  return results.filter((result) => {
+    const key = result.url.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+function cleanHtmlText(value) {
+  return decodeHtml(value.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+}
+function decodeHtml(value) {
+  const named = {
+    amp: "&",
+    lt: "<",
+    gt: ">",
+    quot: '"',
+    apos: "'",
+    nbsp: " "
+  };
+  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (_match, entity) => {
+    const lower = entity.toLowerCase();
+    if (lower.startsWith("#x")) {
+      const codePoint = Number.parseInt(lower.slice(2), 16);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : _match;
+    }
+    if (lower.startsWith("#")) {
+      const codePoint = Number.parseInt(lower.slice(1), 10);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : _match;
+    }
+    return named[lower] ?? _match;
+  });
 }
 const deleteFileTool = {
   name: "delete_file",
@@ -8916,7 +9263,7 @@ function createTaskCreateTool(registry) {
     },
     permissionHint: "readonly",
     async execute(_toolCallId, params, signal) {
-      throwIfAborted(signal);
+      throwIfAborted$1(signal);
       const subject = readString$2(params, "subject", true);
       const description = readString$2(params, "description", false);
       const activeForm = readString$2(params, "activeForm", false);
@@ -8960,7 +9307,7 @@ function createTaskUpdateTool(registry) {
     },
     permissionHint: "readonly",
     async execute(_toolCallId, params, signal) {
-      throwIfAborted(signal);
+      throwIfAborted$1(signal);
       const taskId = readString$2(params, "taskId", true);
       const status = readEnum(params, "status", ALLOWED_STATUS);
       const subject = readString$2(params, "subject", false);
@@ -9017,7 +9364,7 @@ function createTaskGetTool(registry) {
     },
     permissionHint: "readonly",
     async execute(_toolCallId, params, signal) {
-      throwIfAborted(signal);
+      throwIfAborted$1(signal);
       const taskId = readString$2(params, "taskId", true);
       const task = await registry.getTask(taskId);
       if (!task) {
@@ -9044,7 +9391,7 @@ function createTaskListTool(registry) {
     },
     permissionHint: "readonly",
     async execute(_toolCallId, _params, signal) {
-      throwIfAborted(signal);
+      throwIfAborted$1(signal);
       const tasks = await registry.listTasks();
       if (tasks.length === 0) {
         return {
@@ -9079,7 +9426,7 @@ function createTaskStopTool(registry) {
     },
     permissionHint: "readonly",
     async execute(_toolCallId, params, signal) {
-      throwIfAborted(signal);
+      throwIfAborted$1(signal);
       const taskId = readString$2(params, "taskId", true);
       const task = await registry.getTask(taskId);
       if (!task) {
@@ -9096,7 +9443,7 @@ function createTaskStopTool(registry) {
     }
   };
 }
-function throwIfAborted(signal) {
+function throwIfAborted$1(signal) {
   if (signal?.aborted) {
     throw new Error("Aborted");
   }
@@ -9912,13 +10259,11 @@ class AssistantStreamBuilder {
     this.modelId = modelId;
     this.providerId = providerId;
   }
-  /** 推送 `start` 事件并初始化 partial。 */
   start() {
     if (this.started) return;
     this.started = true;
     this.stream.push({ type: "start", partial: this.snapshot("stop") });
   }
-  /** 累积一段文本到指定 contentIndex；首次出现会自动发 `text_start`。 */
   appendText(index, delta) {
     if (!delta) return;
     let block = this.blocks[index];
@@ -9939,7 +10284,6 @@ class AssistantStreamBuilder {
       partial: this.snapshot("stop")
     });
   }
-  /** 显式结束某个文本块，发 `text_end` 事件。 */
   endText(index) {
     const block = this.blocks[index];
     if (!block || block.kind !== "text" || block.closed) return;
@@ -9951,39 +10295,58 @@ class AssistantStreamBuilder {
       partial: this.snapshot("stop")
     });
   }
-  /** 累积一段 thinking。 */
-  appendThinking(index, delta) {
-    if (!delta) return;
+  ensureThinking(index, input = {}) {
     let block = this.blocks[index];
     if (!block || block.kind !== "thinking") {
-      block = { kind: "thinking", index, text: "", closed: false };
+      const thinking = createThinkingContent(input);
+      block = { kind: "thinking", index, thinking, closed: false };
       this.blocks[index] = block;
       this.stream.push({
         type: "thinking_start",
         contentIndex: index,
+        thinking,
         partial: this.snapshot("stop")
       });
+      return thinking;
     }
-    block.text += delta;
+    if (Object.keys(input).length > 0) {
+      block.thinking = mergeThinkingContent(block.thinking, input);
+    }
+    return block.thinking;
+  }
+  appendThinking(index, delta, input = {}) {
+    if (!delta) return;
+    let thinking = this.ensureThinking(index, input);
+    const block = this.blocks[index];
+    if (!block || block.kind !== "thinking") return;
+    thinking = appendThinkingText(thinking, delta);
+    block.thinking = thinking;
     this.stream.push({
       type: "thinking_delta",
       contentIndex: index,
       delta,
+      thinking,
       partial: this.snapshot("stop")
     });
   }
-  endThinking(index) {
+  updateThinking(index, input) {
+    this.ensureThinking(index, input);
+  }
+  endThinking(index, input = {}) {
     const block = this.blocks[index];
     if (!block || block.kind !== "thinking" || block.closed) return;
+    if (Object.keys(input).length > 0) {
+      block.thinking = mergeThinkingContent(block.thinking, input);
+    }
     block.closed = true;
     this.stream.push({
       type: "thinking_end",
       contentIndex: index,
-      content: block.text,
+      content: getThinkingText(block.thinking),
+      thinking: block.thinking,
       partial: this.snapshot("stop")
     });
   }
-  /** 初始化或更新一个 tool_call 块（不发 delta）。 */
   ensureToolCall(index, id, name) {
     let block = this.blocks[index];
     if (!block || block.kind !== "tool") {
@@ -10002,8 +10365,7 @@ class AssistantStreamBuilder {
         partial: this.snapshot("stop")
       });
     } else {
-      if (id && !block.id.startsWith("call_")) ;
-      else if (id) {
+      if (id && block.id.startsWith("call_")) {
         block.id = id;
       }
       if (name && !block.name) {
@@ -10011,7 +10373,6 @@ class AssistantStreamBuilder {
       }
     }
   }
-  /** 累积一段 tool_call 参数（原始 JSON 字符串增量）。 */
   appendToolCallArgs(index, delta) {
     if (!delta) return;
     const block = this.blocks[index];
@@ -10024,7 +10385,6 @@ class AssistantStreamBuilder {
       partial: this.snapshot("stop")
     });
   }
-  /** 结束 tool_call，解析 args，发 `toolcall_end`。 */
   endToolCall(index) {
     const block = this.blocks[index];
     if (!block || block.kind !== "tool" || block.closed) return;
@@ -10042,7 +10402,6 @@ class AssistantStreamBuilder {
       partial: this.snapshot("stop")
     });
   }
-  /** 设置或合并 usage 信息。 */
   setUsage(partial) {
     this.usage = {
       inputTokens: partial.inputTokens ?? this.usage.inputTokens,
@@ -10051,7 +10410,6 @@ class AssistantStreamBuilder {
       cost: partial.cost ?? this.usage.cost
     };
   }
-  /** 完成流：关闭所有未关闭块，推 `done` 事件并 complete。 */
   done(reason) {
     if (this.finished) return;
     this.finished = true;
@@ -10065,7 +10423,6 @@ class AssistantStreamBuilder {
     const message = this.snapshot(reason);
     this.stream.push({ type: "done", reason, message });
   }
-  /** 标记错误：推 `error` 事件，并以错误结束 stream。 */
   fail(error, reason = "error") {
     if (this.finished) return;
     this.finished = true;
@@ -10073,13 +10430,9 @@ class AssistantStreamBuilder {
     this.stream.push({ type: "error", error, message });
     this.stream.error(error);
   }
-  /** 是否已经结束。 */
   get isFinished() {
     return this.finished;
   }
-  // -----------------------------------------------------------------
-  // 内部
-  // -----------------------------------------------------------------
   snapshot(reason) {
     const content = [];
     for (const block of this.blocks) {
@@ -10088,7 +10441,7 @@ class AssistantStreamBuilder {
         const item = { type: "text", text: block.text };
         content.push(item);
       } else if (block.kind === "thinking") {
-        const item = { type: "thinking", thinking: block.text };
+        const item = block.thinking;
         content.push(item);
       } else {
         const item = {
@@ -10125,19 +10478,60 @@ function parseJsonSafely(raw) {
     return { _raw: raw };
   }
 }
-async function* parseSSE(response, signal) {
+const DEFAULT_PROVIDER_FIRST_CHUNK_TIMEOUT_MS = 2e4;
+const DEFAULT_PROVIDER_STREAM_IDLE_TIMEOUT_MS = 6e4;
+const DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS = 3e5;
+class ProviderTimeoutError extends Error {
+  phase;
+  timeoutMs;
+  providerApi;
+  constructor(providerApi, phase, timeoutMs) {
+    super(`[${providerApi}] provider stream ${phase} timeout after ${timeoutMs}ms`);
+    this.name = "ProviderTimeoutError";
+    this.providerApi = providerApi;
+    this.phase = phase;
+    this.timeoutMs = timeoutMs;
+  }
+}
+class ProviderHttpError extends Error {
+  status;
+  providerApi;
+  bodyText;
+  constructor(providerApi, status, message, bodyText) {
+    super(`[${providerApi}] HTTP ${status}: ${message}`);
+    this.name = "ProviderHttpError";
+    this.providerApi = providerApi;
+    this.status = status;
+    this.bodyText = bodyText;
+  }
+}
+function resolveProviderTimeouts(options = {}) {
+  return {
+    firstChunkTimeoutMs: options.firstChunkTimeoutMs ?? DEFAULT_PROVIDER_FIRST_CHUNK_TIMEOUT_MS,
+    streamIdleTimeoutMs: options.streamIdleTimeoutMs ?? DEFAULT_PROVIDER_STREAM_IDLE_TIMEOUT_MS,
+    requestTimeoutMs: options.requestTimeoutMs ?? DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS
+  };
+}
+async function* parseSSE(response, signal, options) {
   if (!response.body) {
     throw new Error("parseSSE: response.body is null");
   }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
+  const timeouts = resolveProviderTimeouts(options);
   let buffer = "";
+  let hasReadChunk = false;
   try {
     while (true) {
-      if (signal?.aborted) {
-        break;
-      }
-      const { done, value } = await reader.read();
+      throwIfAborted(signal);
+      const { done, value } = await readWithTimeout(
+        reader,
+        signal,
+        options.providerApi,
+        hasReadChunk ? "idle" : "first-byte",
+        hasReadChunk ? timeouts.streamIdleTimeoutMs : timeouts.firstChunkTimeoutMs
+      );
+      hasReadChunk = true;
       if (done) {
         break;
       }
@@ -10166,19 +10560,26 @@ async function* parseSSE(response, signal) {
     }
   }
 }
-async function* parseJsonLines(response, signal) {
+async function* parseJsonLines(response, signal, options) {
   if (!response.body) {
     throw new Error("parseJsonLines: response.body is null");
   }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
+  const timeouts = resolveProviderTimeouts(options);
   let buffer = "";
+  let hasReadChunk = false;
   try {
     while (true) {
-      if (signal?.aborted) {
-        break;
-      }
-      const { done, value } = await reader.read();
+      throwIfAborted(signal);
+      const { done, value } = await readWithTimeout(
+        reader,
+        signal,
+        options.providerApi,
+        hasReadChunk ? "idle" : "first-byte",
+        hasReadChunk ? timeouts.streamIdleTimeoutMs : timeouts.firstChunkTimeoutMs
+      );
+      hasReadChunk = true;
       if (done) {
         break;
       }
@@ -10204,18 +10605,6 @@ async function* parseJsonLines(response, signal) {
     }
   }
 }
-class ProviderHttpError extends Error {
-  status;
-  providerApi;
-  bodyText;
-  constructor(providerApi, status, message, bodyText) {
-    super(`[${providerApi}] HTTP ${status}: ${message}`);
-    this.name = "ProviderHttpError";
-    this.providerApi = providerApi;
-    this.status = status;
-    this.bodyText = bodyText;
-  }
-}
 async function ensureOk(response, providerApi) {
   if (response.ok) {
     return;
@@ -10229,34 +10618,93 @@ async function ensureOk(response, providerApi) {
   const snippet = bodyText ? bodyText.slice(0, 500) : response.statusText || "request failed";
   throw new ProviderHttpError(providerApi, response.status, snippet, bodyText);
 }
-function composeAbortSignals(external, internal) {
+function composeAbortSignals(external, internal, timeoutOptions = void 0) {
   const controller = new AbortController();
+  const providerApi = timeoutOptions?.providerApi ?? "provider";
+  const requestTimeoutMs = resolveProviderTimeouts(timeoutOptions).requestTimeoutMs;
   const onAbort = (reason) => {
     if (!controller.signal.aborted) {
       controller.abort(reason);
     }
   };
+  const internalAbort = () => onAbort(internal.reason);
+  const externalAbort = () => onAbort(external?.reason);
   if (internal.aborted) {
     onAbort(internal.reason);
   } else {
-    internal.addEventListener("abort", () => onAbort(internal.reason), { once: true });
+    internal.addEventListener("abort", internalAbort, { once: true });
   }
   if (external) {
     if (external.aborted) {
       onAbort(external.reason);
     } else {
-      external.addEventListener("abort", () => onAbort(external.reason), { once: true });
+      external.addEventListener("abort", externalAbort, { once: true });
     }
   }
+  const timeoutId = Number.isFinite(requestTimeoutMs) && requestTimeoutMs > 0 ? setTimeout(() => onAbort(new ProviderTimeoutError(providerApi, "total", requestTimeoutMs)), requestTimeoutMs) : null;
   return {
     signal: controller.signal,
     dispose: () => {
+      internal.removeEventListener("abort", internalAbort);
+      external?.removeEventListener("abort", externalAbort);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     }
   };
 }
 function normalizeError(err) {
   if (err instanceof Error) return err;
   return new Error(String(err));
+}
+async function readWithTimeout(reader, signal, providerApi, phase, timeoutMs) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return reader.read();
+  }
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let timeoutId = null;
+    const cleanup = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const finish = (callback) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback();
+    };
+    const onAbort = () => {
+      finish(() => reject(abortErrorFromSignal(signal)));
+    };
+    if (signal?.aborted) {
+      reject(abortErrorFromSignal(signal));
+      return;
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
+    timeoutId = setTimeout(() => {
+      const error = new ProviderTimeoutError(providerApi, phase, timeoutMs);
+      void reader.cancel(error).catch(() => void 0);
+      finish(() => reject(error));
+    }, timeoutMs);
+    reader.read().then((result) => finish(() => resolve(result))).catch((error) => finish(() => reject(error)));
+  });
+}
+function throwIfAborted(signal) {
+  if (signal?.aborted) {
+    throw abortErrorFromSignal(signal);
+  }
+}
+function abortErrorFromSignal(signal) {
+  if (signal?.reason instanceof Error) {
+    return signal.reason;
+  }
+  const abortErr = new Error("Provider request aborted");
+  abortErr.name = "AbortError";
+  return abortErr;
 }
 const DEFAULT_BASE_URL$4 = "https://api.anthropic.com/v1";
 const DEFAULT_ANTHROPIC_VERSION = "2023-06-01";
@@ -10298,7 +10746,7 @@ let AnthropicProvider$1 = class AnthropicProvider {
     return stream;
   }
   async run(stream, builder, model, context2, options, baseUrl, apiKey) {
-    const composed = composeAbortSignals(options.signal, stream.signal);
+    const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API$4, ...options });
     try {
       builder.start();
       if (!apiKey) {
@@ -10318,10 +10766,14 @@ let AnthropicProvider$1 = class AnthropicProvider {
         signal: composed.signal
       });
       await ensureOk(response, PROVIDER_API$4);
+      const thinkingArtifactsByIndex = /* @__PURE__ */ new Map();
+      const thinkingKind = resolveAnthropicThinkingKind(options.reasoningVisibility);
+      const thinkingVisibility = resolveAnthropicThinkingVisibility(options.reasoningVisibility);
       let stopReason = null;
       let inputTokens = 0;
       let outputTokens = 0;
-      for await (const data of parseSSE(response, composed.signal)) {
+      let sawOutput = false;
+      for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API$4, ...options })) {
         if (composed.signal.aborted) break;
         let event;
         try {
@@ -10341,10 +10793,43 @@ let AnthropicProvider$1 = class AnthropicProvider {
             const evt = event;
             const block = evt.content_block;
             if (block.type === "text") {
-              if (block.text) builder.appendText(evt.index, block.text);
+              if (block.text) {
+                sawOutput = true;
+                builder.appendText(evt.index, block.text);
+              }
             } else if (block.type === "thinking") {
-              if (block.thinking) builder.appendThinking(evt.index, block.thinking);
+              const artifact = createAnthropicThinkingArtifact(model, block.signature);
+              thinkingArtifactsByIndex.set(evt.index, artifact);
+              builder.updateThinking(evt.index, {
+                kind: thinkingKind,
+                source: "anthropic-thinking",
+                visibility: thinkingVisibility,
+                replayPolicy: "provider-artifact",
+                artifact
+              });
+              if (block.thinking) {
+                sawOutput = true;
+                builder.appendThinking(evt.index, block.thinking, {
+                  kind: thinkingKind,
+                  source: "anthropic-thinking",
+                  visibility: thinkingVisibility,
+                  replayPolicy: "provider-artifact",
+                  artifact
+                });
+              }
+            } else if (block.type === "redacted_thinking") {
+              const artifact = createAnthropicRedactedArtifact(model, block.data);
+              thinkingArtifactsByIndex.set(evt.index, artifact);
+              sawOutput = true;
+              builder.updateThinking(evt.index, {
+                kind: "opaque",
+                source: "anthropic-redacted-thinking",
+                visibility: "hidden",
+                replayPolicy: "provider-artifact",
+                artifact
+              });
             } else if (block.type === "tool_use") {
+              sawOutput = true;
               builder.ensureToolCall(evt.index, block.id, block.name);
               if (block.input && typeof block.input === "object" && Object.keys(block.input).length > 0) {
                 builder.appendToolCallArgs(evt.index, JSON.stringify(block.input));
@@ -10355,10 +10840,32 @@ let AnthropicProvider$1 = class AnthropicProvider {
           case "content_block_delta": {
             const evt = event;
             if (evt.delta.type === "text_delta") {
+              sawOutput = true;
               builder.appendText(evt.index, evt.delta.text);
             } else if (evt.delta.type === "thinking_delta") {
-              builder.appendThinking(evt.index, evt.delta.thinking);
+              sawOutput = true;
+              builder.appendThinking(evt.index, evt.delta.thinking, {
+                kind: thinkingKind,
+                source: "anthropic-thinking",
+                visibility: thinkingVisibility,
+                replayPolicy: "provider-artifact",
+                artifact: thinkingArtifactsByIndex.get(evt.index) ?? createAnthropicThinkingArtifact(model)
+              });
+            } else if (evt.delta.type === "signature_delta") {
+              const artifact = mergeAnthropicSignature(
+                thinkingArtifactsByIndex.get(evt.index) ?? createAnthropicThinkingArtifact(model),
+                evt.delta.signature
+              );
+              thinkingArtifactsByIndex.set(evt.index, artifact);
+              builder.updateThinking(evt.index, {
+                kind: thinkingKind,
+                source: "anthropic-thinking",
+                visibility: thinkingVisibility,
+                replayPolicy: "provider-artifact",
+                artifact
+              });
             } else if (evt.delta.type === "input_json_delta") {
+              sawOutput = true;
               builder.appendToolCallArgs(evt.index, evt.delta.partial_json);
             }
             break;
@@ -10379,9 +10886,8 @@ let AnthropicProvider$1 = class AnthropicProvider {
             }
             break;
           }
-          case "message_stop": {
+          case "message_stop":
             break;
-          }
           case "error": {
             const evt = event;
             throw new Error(`anthropic ${evt.error.type}: ${evt.error.message}`);
@@ -10390,11 +10896,16 @@ let AnthropicProvider$1 = class AnthropicProvider {
             break;
         }
       }
+      if (!sawOutput) {
+        throw new ProviderHttpError(PROVIDER_API$4, 502, "Provider stream ended without assistant output or structured tool call.");
+      }
       builder.done(mapStopReason(stopReason));
     } catch (err) {
-      const error = normalizeError(err);
+      const thrown = normalizeError(err);
+      const error = thrown.name === "AbortError" && composed.signal.reason instanceof Error ? composed.signal.reason : thrown;
       builder.fail(error, error.name === "AbortError" ? "aborted" : "error");
     } finally {
+      composed.dispose();
     }
   }
   buildRequestBody(model, context2, options) {
@@ -10427,6 +10938,12 @@ function toAnthropicThinking$1(budget, reasoningVisibility) {
     thinking.display = "summarized";
   }
   return thinking;
+}
+function resolveAnthropicThinkingKind(reasoningVisibility) {
+  return reasoningVisibility === "summary-events" ? "summary" : "raw";
+}
+function resolveAnthropicThinkingVisibility(reasoningVisibility) {
+  return reasoningVisibility === "summary-events" ? "summary" : "raw-collapsed";
 }
 function toAnthropicMessages(context2) {
   const messages = [];
@@ -10461,6 +10978,9 @@ function convertMessage$4(message) {
     for (const block of message.content) {
       if (block.type === "text") {
         blocks.push({ type: "text", text: block.text });
+      } else if (block.type === "thinking") {
+        const replayBlock = toAnthropicThinkingReplayBlock(block.text, block.artifact, block.replayPolicy);
+        if (replayBlock) blocks.push(replayBlock);
       } else if (block.type === "toolCall") {
         blocks.push({
           type: "tool_use",
@@ -10489,6 +11009,40 @@ function convertMessage$4(message) {
       ]
     }
   ];
+}
+function createAnthropicThinkingArtifact(model, signature) {
+  return {
+    providerId: model.provider,
+    modelId: model.id,
+    protocol: PROVIDER_API$4,
+    type: "thinking",
+    signature: signature || void 0
+  };
+}
+function createAnthropicRedactedArtifact(model, data) {
+  return {
+    providerId: model.provider,
+    modelId: model.id,
+    protocol: PROVIDER_API$4,
+    type: "redacted_thinking",
+    data
+  };
+}
+function mergeAnthropicSignature(artifact, signatureDelta) {
+  return {
+    ...artifact,
+    type: "thinking",
+    signature: `${artifact.signature ?? ""}${signatureDelta}`
+  };
+}
+function toAnthropicThinkingReplayBlock(text, artifact, replayPolicy) {
+  if (replayPolicy !== "provider-artifact" || !artifact) return null;
+  if (artifact.protocol !== PROVIDER_API$4 && artifact.protocol !== "AnthropicMessages") return null;
+  if (artifact.type === "redacted_thinking") {
+    return artifact.data ? { type: "redacted_thinking", data: artifact.data } : null;
+  }
+  if (artifact.type !== "thinking" || !text || !artifact.signature) return null;
+  return { type: "thinking", thinking: text, signature: artifact.signature };
 }
 function toAnthropicTool(tool) {
   return {
@@ -10548,7 +11102,7 @@ class GeminiProvider {
     return stream;
   }
   async run(stream, builder, model, context2, options, baseUrl, apiKey) {
-    const composed = composeAbortSignals(options.signal, stream.signal);
+    const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API$3, ...options });
     try {
       builder.start();
       if (!apiKey) {
@@ -10571,7 +11125,8 @@ class GeminiProvider {
       const THINKING_INDEX = 1;
       let toolCallCounter = 0;
       let finishReason = null;
-      for await (const data of parseSSE(response, composed.signal)) {
+      let sawOutput = false;
+      for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API$3, ...options })) {
         if (composed.signal.aborted) break;
         let chunk;
         try {
@@ -10593,8 +11148,15 @@ class GeminiProvider {
           if ("text" in part && typeof part.text === "string") {
             const textPart = part;
             if (textPart.thought) {
-              builder.appendThinking(THINKING_INDEX, textPart.text);
+              sawOutput = true;
+              builder.appendThinking(THINKING_INDEX, textPart.text, {
+                kind: "raw",
+                source: "gemini-raw",
+                visibility: "raw-collapsed",
+                replayPolicy: "none"
+              });
             } else {
+              sawOutput = true;
               builder.appendText(TEXT_INDEX2, textPart.text);
             }
             continue;
@@ -10604,6 +11166,7 @@ class GeminiProvider {
             const slot = 2 + toolCallCounter;
             toolCallCounter += 1;
             const callId = `gemini-call-${Date.now()}-${slot}`;
+            sawOutput = true;
             builder.ensureToolCall(slot, callId, fc.name);
             const args = JSON.stringify(fc.args ?? {});
             builder.appendToolCallArgs(slot, args);
@@ -10614,11 +11177,16 @@ class GeminiProvider {
           finishReason = candidate.finishReason;
         }
       }
+      if (!sawOutput) {
+        throw new ProviderHttpError(PROVIDER_API$3, 502, "Provider stream ended without assistant output or structured tool call.");
+      }
       builder.done(mapFinishReason$2(finishReason, toolCallCounter > 0));
     } catch (err) {
-      const error = normalizeError(err);
+      const thrown = normalizeError(err);
+      const error = thrown.name === "AbortError" && composed.signal.reason instanceof Error ? composed.signal.reason : thrown;
       builder.fail(error, error.name === "AbortError" ? "aborted" : "error");
     } finally {
+      composed.dispose();
     }
   }
   buildRequestBody(context2, options) {
@@ -10766,7 +11334,7 @@ class OllamaProvider {
     return stream;
   }
   async run(stream, builder, model, context2, options, baseUrl, apiKey) {
-    const composed = composeAbortSignals(options.signal, stream.signal);
+    const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API$2, ...options });
     try {
       builder.start();
       const body = this.buildRequestBody(model, context2, options);
@@ -10788,7 +11356,8 @@ class OllamaProvider {
       let toolCallCounter = 0;
       let doneReason = null;
       let lastChunk = null;
-      for await (const line of parseJsonLines(response, composed.signal)) {
+      let sawOutput = false;
+      for await (const line of parseJsonLines(response, composed.signal, { providerApi: PROVIDER_API$2, ...options })) {
         if (composed.signal.aborted) break;
         let chunk;
         try {
@@ -10800,9 +11369,16 @@ class OllamaProvider {
         const message = chunk.message;
         if (message) {
           if (typeof message.thinking === "string" && message.thinking.length > 0) {
-            builder.appendThinking(THINKING_INDEX, message.thinking);
+            sawOutput = true;
+            builder.appendThinking(THINKING_INDEX, message.thinking, {
+              kind: "raw",
+              source: "ollama-raw",
+              visibility: "raw-collapsed",
+              replayPolicy: "none"
+            });
           }
           if (typeof message.content === "string" && message.content.length > 0) {
+            sawOutput = true;
             builder.appendText(TEXT_INDEX2, message.content);
           }
           if (Array.isArray(message.tool_calls)) {
@@ -10812,6 +11388,7 @@ class OllamaProvider {
               const slot = 2 + toolCallCounter;
               toolCallCounter += 1;
               const callId = `ollama-call-${Date.now()}-${slot}`;
+              sawOutput = true;
               builder.ensureToolCall(slot, callId, fn.name);
               const argsRaw = typeof fn.arguments === "string" ? fn.arguments : JSON.stringify(fn.arguments ?? {});
               builder.appendToolCallArgs(slot, argsRaw);
@@ -10834,11 +11411,16 @@ class OllamaProvider {
       if (!doneReason && lastChunk?.done_reason) {
         doneReason = lastChunk.done_reason;
       }
+      if (!sawOutput) {
+        throw new ProviderHttpError(PROVIDER_API$2, 502, "Provider stream ended without assistant output or structured tool call.");
+      }
       builder.done(mapDoneReason(doneReason, toolCallCounter > 0));
     } catch (err) {
-      const error = normalizeError(err);
+      const thrown = normalizeError(err);
+      const error = thrown.name === "AbortError" && composed.signal.reason instanceof Error ? composed.signal.reason : thrown;
       builder.fail(error, error.name === "AbortError" ? "aborted" : "error");
     } finally {
+      composed.dispose();
     }
   }
   buildRequestBody(model, context2, options) {
@@ -10975,7 +11557,7 @@ let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
   async run(stream, builder, model, context2, options, baseUrl, apiKey) {
     const externalSignal = options.signal;
     const internalSignal = stream.signal;
-    const composed = composeAbortSignals(externalSignal, internalSignal);
+    const composed = composeAbortSignals(externalSignal, internalSignal, { providerApi: PROVIDER_API$1, ...options });
     try {
       builder.start();
       if (!apiKey) {
@@ -10998,7 +11580,8 @@ let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
       const TEXT_INDEX2 = 0;
       const THINKING_INDEX = 1;
       const TOOL_INDEX_BASE2 = 2;
-      for await (const data of parseSSE(response, composed.signal)) {
+      let sawOutput = false;
+      for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API$1, ...options })) {
         if (composed.signal.aborted) break;
         let chunk;
         try {
@@ -11018,15 +11601,23 @@ let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
         const delta = choice.delta ?? {};
         const reasoningDelta = delta.reasoning_content ?? delta.reasoning;
         if (typeof reasoningDelta === "string" && reasoningDelta.length > 0) {
-          builder.appendThinking(THINKING_INDEX, reasoningDelta);
+          sawOutput = true;
+          builder.appendThinking(THINKING_INDEX, reasoningDelta, {
+            kind: "raw",
+            source: isOpenRouterBaseUrl(baseUrl) ? "openrouter-raw" : "openai-compatible-raw",
+            visibility: "raw-collapsed",
+            replayPolicy: "none"
+          });
         }
         if (typeof delta.content === "string" && delta.content.length > 0) {
+          sawOutput = true;
           builder.appendText(TEXT_INDEX2, delta.content);
         }
         if (Array.isArray(delta.tool_calls)) {
           for (const tc of delta.tool_calls) {
             const callIndex = typeof tc.index === "number" ? tc.index : 0;
             const slot = TOOL_INDEX_BASE2 + callIndex;
+            sawOutput = true;
             builder.ensureToolCall(slot, tc.id ?? "", tc.function?.name ?? "");
             const args = tc.function?.arguments;
             if (typeof args === "string" && args.length > 0) {
@@ -11038,11 +11629,16 @@ let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
           finishReason = choice.finish_reason;
         }
       }
+      if (!sawOutput) {
+        throw new ProviderHttpError(PROVIDER_API$1, 502, "Provider stream ended without assistant output or structured tool call.");
+      }
       builder.done(mapFinishReason$1(finishReason));
     } catch (err) {
-      const error = normalizeError(err);
+      const thrown = normalizeError(err);
+      const error = thrown.name === "AbortError" && composed.signal.reason instanceof Error ? composed.signal.reason : thrown;
       builder.fail(error, error.name === "AbortError" ? "aborted" : "error");
     } finally {
+      composed.dispose();
     }
   }
   buildRequestBody(model, context2, options) {
@@ -11140,6 +11736,9 @@ function toOpenAITool(tool) {
     }
   };
 }
+function isOpenRouterBaseUrl(baseUrl) {
+  return baseUrl.toLowerCase().includes("openrouter");
+}
 function mapFinishReason$1(reason) {
   switch (reason) {
     case "stop":
@@ -11197,7 +11796,7 @@ class OpenAIResponsesProvider {
     return stream;
   }
   async run(stream, builder, model, context2, options, baseUrl, apiKey) {
-    const composed = composeAbortSignals(options.signal, stream.signal);
+    const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API, ...options });
     try {
       builder.start();
       if (!apiKey) {
@@ -11212,9 +11811,11 @@ class OpenAIResponsesProvider {
       await ensureOk(response, PROVIDER_API);
       const toolSlotsByItemId = /* @__PURE__ */ new Map();
       const toolArgBuffers = /* @__PURE__ */ new Map();
+      let currentReasoningArtifact;
       let sawToolCall = false;
+      let sawOutput = false;
       let finishReason = "stop";
-      for await (const data of parseSSE(response, composed.signal)) {
+      for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
         if (composed.signal.aborted) break;
         const event = parseJsonObject(data);
         if (!event) continue;
@@ -11222,7 +11823,10 @@ class OpenAIResponsesProvider {
         switch (eventType) {
           case "response.output_text.delta": {
             const delta = readString$1(event.delta) || readString$1(event.text);
-            if (delta) builder.appendText(TEXT_INDEX, delta);
+            if (delta) {
+              sawOutput = true;
+              builder.appendText(TEXT_INDEX, delta);
+            }
             break;
           }
           case "response.output_text.done":
@@ -11230,20 +11834,47 @@ class OpenAIResponsesProvider {
             break;
           case "response.reasoning_summary_text.delta": {
             const delta = readString$1(event.delta) || readString$1(event.text);
-            if (delta) builder.appendThinking(REASONING_INDEX, delta);
+            if (delta) {
+              sawOutput = true;
+              builder.appendThinking(REASONING_INDEX, delta, {
+                kind: "summary",
+                source: "openai-responses-summary",
+                visibility: "summary",
+                replayPolicy: currentReasoningArtifact ? "provider-artifact" : "none",
+                artifact: currentReasoningArtifact
+              });
+            }
             break;
           }
           case "response.reasoning_summary_text.done":
-            builder.endThinking(REASONING_INDEX);
+            builder.endThinking(REASONING_INDEX, {
+              kind: "summary",
+              source: "openai-responses-summary",
+              visibility: "summary",
+              replayPolicy: currentReasoningArtifact ? "provider-artifact" : "none",
+              artifact: currentReasoningArtifact
+            });
             break;
           case "response.output_item.added": {
             const outputIndex = readNumber(event.output_index) ?? 0;
             const item = readRecord(event.item);
-            if (readString$1(item?.type) === "function_call") {
+            const reasoningArtifact = createResponsesReasoningArtifact(model, item);
+            if (reasoningArtifact) {
+              currentReasoningArtifact = reasoningArtifact;
+              sawOutput = true;
+              builder.updateThinking(REASONING_INDEX, {
+                kind: "opaque",
+                source: "openai-responses-encrypted",
+                visibility: "hidden",
+                replayPolicy: "provider-artifact",
+                artifact: currentReasoningArtifact
+              });
+            } else if (readString$1(item?.type) === "function_call") {
               const slot = TOOL_INDEX_BASE + outputIndex;
               const itemId = readString$1(item?.id);
               if (itemId) toolSlotsByItemId.set(itemId, slot);
               sawToolCall = true;
+              sawOutput = true;
               builder.ensureToolCall(
                 slot,
                 readString$1(item?.call_id) || readString$1(item?.id) || "",
@@ -11274,11 +11905,23 @@ class OpenAIResponsesProvider {
           case "response.output_item.done": {
             const outputIndex = readNumber(event.output_index) ?? 0;
             const item = readRecord(event.item);
-            if (readString$1(item?.type) === "function_call") {
+            const reasoningArtifact = createResponsesReasoningArtifact(model, item);
+            if (reasoningArtifact) {
+              currentReasoningArtifact = reasoningArtifact;
+              sawOutput = true;
+              builder.updateThinking(REASONING_INDEX, {
+                kind: "summary",
+                source: "openai-responses-summary",
+                visibility: "summary",
+                replayPolicy: "provider-artifact",
+                artifact: currentReasoningArtifact
+              });
+            } else if (readString$1(item?.type) === "function_call") {
               const slot = TOOL_INDEX_BASE + outputIndex;
               const itemId = readString$1(item?.id);
               if (itemId) toolSlotsByItemId.set(itemId, slot);
               sawToolCall = true;
+              sawOutput = true;
               builder.ensureToolCall(
                 slot,
                 readString$1(item?.call_id) || readString$1(item?.id) || "",
@@ -11297,6 +11940,17 @@ class OpenAIResponsesProvider {
             const completed = readRecord(event.response);
             if (completed) {
               applyCompletedResponse(builder, completed);
+              const completedArtifact = findResponsesReasoningArtifact(model, completed.output);
+              if (completedArtifact) {
+                currentReasoningArtifact = completedArtifact;
+                builder.updateThinking(REASONING_INDEX, {
+                  kind: "summary",
+                  source: "openai-responses-summary",
+                  visibility: "summary",
+                  replayPolicy: "provider-artifact",
+                  artifact: currentReasoningArtifact
+                });
+              }
               finishReason = completed.status === "incomplete" ? "length" : sawToolCall ? "toolUse" : "stop";
             }
             break;
@@ -11319,11 +11973,16 @@ class OpenAIResponsesProvider {
             break;
         }
       }
+      if (!sawOutput) {
+        throw new ProviderHttpError(PROVIDER_API, 502, "Provider stream ended without assistant output or structured tool call.");
+      }
       builder.done(finishReason);
     } catch (err) {
-      const error = normalizeError(err);
+      const thrown = normalizeError(err);
+      const error = thrown.name === "AbortError" && composed.signal.reason instanceof Error ? composed.signal.reason : thrown;
       builder.fail(error, error.name === "AbortError" ? "aborted" : "error");
     } finally {
+      composed.dispose();
     }
   }
   createHeaders(apiKey) {
@@ -11363,6 +12022,9 @@ function buildRequestBody(model, context2, options) {
     const reasoning = body.reasoning && typeof body.reasoning === "object" ? body.reasoning : {};
     body.reasoning = { ...reasoning, summary: "auto" };
   }
+  if (body.reasoning) {
+    body.include = ["reasoning.encrypted_content"];
+  }
   const maxTokens = options.maxTokens ?? model.maxTokens;
   if (typeof maxTokens === "number" && maxTokens > 0) {
     body.max_output_tokens = maxTokens;
@@ -11386,6 +12048,12 @@ function convertMessage(message) {
   }
   if (message.role === "assistant") {
     const items = [];
+    for (const block of message.content) {
+      if (block.type === "thinking") {
+        const replayItem = toResponsesReasoningReplayItem(block.artifact, block.replayPolicy);
+        if (replayItem) items.push(replayItem);
+      }
+    }
     const text = message.content.filter((block) => block.type === "text").map((block) => block.text).join("");
     if (text) {
       items.push({ role: "assistant", content: text, type: "message" });
@@ -11425,6 +12093,15 @@ function toInputMessage(role, content) {
   });
   return { role, content: parts.length > 0 ? parts : [{ type: "input_text", text: "" }], type: "message" };
 }
+function toResponsesReasoningReplayItem(artifact, replayPolicy) {
+  if (replayPolicy !== "provider-artifact" || !artifact) return null;
+  if (artifact.protocol !== PROVIDER_API && artifact.protocol !== "OpenAIResponses") return null;
+  if (artifact.raw) return artifact.raw;
+  const item = { type: artifact.type || "reasoning" };
+  if (artifact.id) item.id = artifact.id;
+  if (artifact.encryptedContent) item.encrypted_content = artifact.encryptedContent;
+  return item.id || item.encrypted_content ? item : null;
+}
 function toResponsesTool(tool) {
   return {
     type: "function",
@@ -11441,6 +12118,27 @@ function applyCompletedResponse(builder, payload) {
       totalTokens: payload.usage.total_tokens ?? (payload.usage.input_tokens ?? 0) + (payload.usage.output_tokens ?? 0)
     });
   }
+}
+function createResponsesReasoningArtifact(model, item) {
+  if (readString$1(item?.type) !== "reasoning") return void 0;
+  const encryptedContent = readString$1(item?.encrypted_content) || readString$1(item?.encryptedContent);
+  return {
+    providerId: model.provider,
+    modelId: model.id,
+    protocol: PROVIDER_API,
+    type: "reasoning",
+    id: readString$1(item?.id) || void 0,
+    encryptedContent: encryptedContent || void 0,
+    raw: item ?? void 0
+  };
+}
+function findResponsesReasoningArtifact(model, output) {
+  if (!Array.isArray(output)) return void 0;
+  for (const item of output) {
+    const artifact = createResponsesReasoningArtifact(model, readRecord(item));
+    if (artifact) return artifact;
+  }
+  return void 0;
 }
 function resolveToolSlot(event, toolSlotsByItemId) {
   const itemId = readString$1(event.item_id);
@@ -12207,10 +12905,18 @@ function translateCoreToSharedAgentEvent(event, context2) {
         return buildSharedAgentEvent("assistant.delta", { text: ev.delta }, context2);
       }
       if (ev.type === "thinking_delta") {
-        return buildSharedAgentEvent("assistant.thinking_delta", { text: ev.delta }, context2);
+        return buildSharedAgentEvent(
+          "assistant.thinking_delta",
+          { text: ev.delta, thinking: toSharedThinkingArtifact(ev.thinking) },
+          context2
+        );
       }
       if (ev.type === "thinking_end") {
-        return buildSharedAgentEvent("assistant.thinking_end", { text: ev.content }, context2);
+        return buildSharedAgentEvent(
+          "assistant.thinking_end",
+          { text: ev.content, thinking: toSharedThinkingArtifact(ev.thinking) },
+          context2
+        );
       }
       if (ev.type === "thinking_start") {
         return null;
@@ -12233,12 +12939,12 @@ function translateCoreToSharedAgentEvent(event, context2) {
     case "message_end": {
       if (event.message.role === "assistant") {
         const text = extractAssistantTextFromContent(event.message.content);
-        const thinkingText = extractAssistantThinkingFromContent(event.message.content);
+        const thinking = extractAssistantThinkingFromContent(event.message.content);
         return buildSharedAgentEvent(
           "assistant.completed",
           {
             text,
-            thinkingText: thinkingText || void 0,
+            thinking: thinking.length > 0 ? thinking : void 0,
             usage: event.message.usage ? {
               inputTokens: event.message.usage.inputTokens,
               outputTokens: event.message.usage.outputTokens
@@ -12366,10 +13072,16 @@ function extractAssistantText(messages) {
   return "";
 }
 function extractAssistantTextFromContent(content) {
-  return content.filter((block) => block.type === "text").map((block) => block.text ?? "").join("");
+  return content.filter((block) => block.type === "text").map((block) => block.text).join("");
 }
 function extractAssistantThinkingFromContent(content) {
-  return content.filter((block) => block.type === "thinking").map((block) => block.thinking ?? "").join("");
+  return content.filter(isThinkingContent).map((block) => toSharedThinkingArtifact(block));
+}
+function isThinkingContent(block) {
+  return block.type === "thinking";
+}
+function toRecordDetails(details) {
+  return details && typeof details === "object" && !Array.isArray(details) ? details : void 0;
 }
 function toolResultToSharedResult(result, durationMs) {
   if (result.isError) {
@@ -12380,7 +13092,8 @@ function toolResultToSharedResult(result, durationMs) {
       error: {
         code: "AGENT_TOOL_FAILED",
         message: extractToolResultText(result) || "Tool execution failed.",
-        category: "execution"
+        category: "execution",
+        details: toRecordDetails(result.details)
       },
       duration_ms: durationMs,
       trace_id: result.toolCallId
@@ -12389,7 +13102,8 @@ function toolResultToSharedResult(result, durationMs) {
   return {
     ok: true,
     data: {
-      content: result.content
+      content: result.content,
+      details: result.details ?? null
     },
     artifacts: [],
     duration_ms: durationMs,
@@ -16813,6 +17527,7 @@ class AgentOrchestrator {
       toolName: toolCall.name,
       content: result.content,
       isError: result.isError === true,
+      details: result.details,
       timestamp: Date.now()
     };
   }
@@ -21237,7 +21952,9 @@ const sectionWorkspace = (context2) => {
     `Platform: ${platform}`,
     `Shell: ${shell}`,
     `Model: ${context2.model.provider}/${context2.model.name}`,
-    `Mode: ${context2.mode}`
+    `Mode: ${context2.mode}`,
+    `Current date: ${context2.currentDate ?? "unknown"}`,
+    `Time zone: ${context2.timeZone ?? "local"}`
   ].join("\n");
 };
 const sectionRouteCapability = (context2) => {
@@ -21364,7 +22081,9 @@ const sectionRules = (context2) => {
     `- Minimize output: avoid re-stating tool results, prefer next actions.`,
     `- When uncertain, prefer reading existing code over guessing.`,
     `- Respect the runtime permission policy for workspace boundaries; use absolute paths when policy allows external access.`,
-    `- Do not claim a file is unreachable without attempting read_file when policy permits.`
+    `- Do not claim a file is unreachable without attempting read_file when policy permits.`,
+    `- Treat latest, current, today, and recent requests as date-sensitive. Calibrate search terms and conclusions against the Current date and Time zone above.`,
+    `- Use web_search to discover candidate sources; before summarizing factual current/news claims, call web_fetch on selected source pages and ground the answer in fetched page text, not snippets alone.`
   ];
   const userRules = context2.userRules?.trim();
   if (userRules && userRules.length > 0) {
@@ -21656,12 +22375,551 @@ function collectBranchPath(branchId, allMessages, forks, minCreatedAt) {
   const suffix = collectBranchPath(activeBranch.branchId, allMessages, forks, turnEnd);
   return [...beforeFork, ...turnMessages, ...suffix];
 }
-function resolveThinkingPresentation(reasoningDelivery, hasThinking) {
-  if (!hasThinking || !reasoningDelivery || reasoningDelivery === "none" || reasoningDelivery === "hidden") {
-    return "none";
+const DEFAULT_TEXT_FLUSH_MS = 80;
+const DEFAULT_TRACE_FLUSH_MS = 160;
+const DEFAULT_PERSIST_FLUSH_MS = 600;
+class ConversationStreamPatchScheduler {
+  commit;
+  textFlushMs;
+  traceFlushMs;
+  persistFlushMs;
+  now;
+  setTimer;
+  clearTimer;
+  pendingTextPatch = null;
+  pendingTracePatch = null;
+  textTimer = null;
+  traceTimer = null;
+  lastPersistedAt = 0;
+  closed = false;
+  constructor(options) {
+    this.commit = options.commit;
+    this.textFlushMs = options.textFlushMs ?? DEFAULT_TEXT_FLUSH_MS;
+    this.traceFlushMs = options.traceFlushMs ?? DEFAULT_TRACE_FLUSH_MS;
+    this.persistFlushMs = options.persistFlushMs ?? DEFAULT_PERSIST_FLUSH_MS;
+    this.now = options.now ?? Date.now;
+    this.setTimer = options.setTimer ?? ((callback, delayMs) => setTimeout(callback, delayMs));
+    this.clearTimer = options.clearTimer ?? ((timer) => clearTimeout(timer));
   }
-  if (reasoningDelivery === "summary-only") return "summary";
-  return "full";
+  queueText(patch) {
+    if (this.closed) return;
+    this.pendingTextPatch = {
+      ...this.pendingTextPatch,
+      ...patch
+    };
+    if (!this.textTimer) {
+      this.textTimer = this.setTimer(() => this.flushText(false), this.textFlushMs);
+    }
+  }
+  queueTrace(patch) {
+    if (this.closed) return;
+    this.pendingTracePatch = {
+      ...this.pendingTracePatch,
+      ...patch
+    };
+    if (!this.traceTimer) {
+      this.traceTimer = this.setTimer(() => this.flushTrace(false, true), this.traceFlushMs);
+    }
+  }
+  commitImmediate(type, patch, options = {}) {
+    if (this.closed) return;
+    this.flushPending({ forcePersist: false, publishTrace: options.publishTrace ?? true });
+    const persist = options.persist ?? true;
+    this.commit({
+      type,
+      patch,
+      options: {
+        persist,
+        publishTrace: options.publishTrace ?? true
+      }
+    });
+    if (persist) {
+      this.lastPersistedAt = this.now();
+    }
+  }
+  commitTerminal(type, patch) {
+    if (this.closed) return;
+    this.flushPending({ forcePersist: true, publishTrace: true });
+    this.commit({
+      type,
+      patch,
+      options: {
+        persist: true,
+        publishTrace: true
+      }
+    });
+    this.lastPersistedAt = this.now();
+    this.close();
+  }
+  flushPending(options = {}) {
+    if (this.closed) return;
+    this.flushText(Boolean(options.forcePersist));
+    this.flushTrace(Boolean(options.forcePersist), options.publishTrace ?? true);
+  }
+  close() {
+    if (this.textTimer) {
+      this.clearTimer(this.textTimer);
+      this.textTimer = null;
+    }
+    if (this.traceTimer) {
+      this.clearTimer(this.traceTimer);
+      this.traceTimer = null;
+    }
+    this.pendingTextPatch = null;
+    this.pendingTracePatch = null;
+    this.closed = true;
+  }
+  flushText(forcePersist) {
+    if (this.textTimer) {
+      this.clearTimer(this.textTimer);
+      this.textTimer = null;
+    }
+    if (!this.pendingTextPatch) {
+      return;
+    }
+    const patch = this.pendingTextPatch;
+    this.pendingTextPatch = null;
+    const persist = forcePersist || this.shouldPersist();
+    this.commit({
+      type: "message_patched",
+      patch,
+      options: {
+        persist,
+        publishTrace: false
+      }
+    });
+    if (persist) {
+      this.lastPersistedAt = this.now();
+    }
+  }
+  flushTrace(forcePersist, publishTrace) {
+    if (this.traceTimer) {
+      this.clearTimer(this.traceTimer);
+      this.traceTimer = null;
+    }
+    if (!this.pendingTracePatch) {
+      return;
+    }
+    const patch = this.pendingTracePatch;
+    this.pendingTracePatch = null;
+    const persist = forcePersist || this.shouldPersist();
+    this.commit({
+      type: "message_patched",
+      patch,
+      options: {
+        persist,
+        publishTrace
+      }
+    });
+    if (persist) {
+      this.lastPersistedAt = this.now();
+    }
+  }
+  shouldPersist() {
+    return this.now() - this.lastPersistedAt >= this.persistFlushMs;
+  }
+}
+const WORK_BLOCK_KINDS = /* @__PURE__ */ new Set([
+  "reasoning",
+  "llm_turn",
+  "approval",
+  "user_input",
+  "compaction",
+  "subagent",
+  "handoff",
+  "diagnostic",
+  "output",
+  "command"
+]);
+function normalizeWorkBlockKind(value) {
+  if (value === "tool") return "llm_turn";
+  return WORK_BLOCK_KINDS.has(value) ? value : "diagnostic";
+}
+function createWorkBlock(id, title, stage, kind = "reasoning") {
+  const block = {
+    id,
+    kind: normalizeWorkBlockKind(kind),
+    title,
+    stage,
+    status: "pending",
+    toolCalls: [],
+    startedAt: nowMs()
+  };
+  if (block.kind === "llm_turn") {
+    block.result = createLoopResult(void 0, block.status, []);
+  }
+  return block;
+}
+function createDraftWorkTrace(summary, blocks = []) {
+  return {
+    status: "running",
+    summary,
+    blocks: blocks.map(cloneWorkBlock),
+    updatedAt: nowMs()
+  };
+}
+function cloneToolCall(toolCall) {
+  return {
+    ...toolCall,
+    approval: toolCall.approval ? { ...toolCall.approval } : void 0
+  };
+}
+function cloneThinkingArtifact$1(thinking) {
+  return thinking ? {
+    ...thinking,
+    artifact: thinking.artifact ? {
+      ...thinking.artifact,
+      raw: thinking.artifact.raw ? { ...thinking.artifact.raw } : void 0
+    } : void 0
+  } : void 0;
+}
+function cloneLoopResult(result) {
+  return result ? {
+    ...result,
+    toolCallIds: result.toolCallIds.slice()
+  } : void 0;
+}
+function cloneWorkBlock(block) {
+  const legacyBlock = block;
+  const { thinkingPresentation: _legacyThinkingPresentation, ...knownBlock } = legacyBlock;
+  const toolCalls = block.toolCalls.map(cloneToolCall);
+  const normalizedKind = normalizeWorkBlockKind(knownBlock.kind);
+  const thinking = cloneThinkingArtifact$1(block.thinking) ?? normalizeLegacyThinkingArtifact(legacyBlock);
+  const thinkingStatus = knownBlock.thinkingStatus ?? (thinking ? "complete" : void 0);
+  const result = normalizedKind === "llm_turn" ? normalizeLoopResult(knownBlock.result, knownBlock.summary, knownBlock.status, toolCalls) : cloneLoopResult(knownBlock.result);
+  return {
+    ...knownBlock,
+    kind: normalizedKind,
+    ...thinking ? { thinking } : {},
+    ...thinkingStatus ? { thinkingStatus } : {},
+    ...result ? { result } : {},
+    toolCalls,
+    children: block.children?.map(cloneWorkBlock)
+  };
+}
+function cloneTrace(trace) {
+  return trace ? {
+    ...trace,
+    blocks: trace.blocks.map(cloneWorkBlock)
+  } : {
+    status: "idle",
+    blocks: [],
+    updatedAt: nowMs()
+  };
+}
+function upsertWorkBlock(trace, blockId, patch) {
+  const nextTrace = cloneTrace(trace);
+  const blockIndex = nextTrace.blocks.findIndex((block) => block.id === blockId);
+  if (blockIndex >= 0) {
+    nextTrace.blocks[blockIndex] = cloneWorkBlock({
+      ...nextTrace.blocks[blockIndex],
+      ...patch,
+      toolCalls: patch.toolCalls ? patch.toolCalls.map(cloneToolCall) : nextTrace.blocks[blockIndex].toolCalls.map(cloneToolCall)
+    });
+  } else {
+    nextTrace.blocks.push(cloneWorkBlock({
+      ...createWorkBlock(blockId, patch.title || blockId, patch.stage, patch.kind),
+      ...patch,
+      kind: normalizeWorkBlockKind(patch.kind ?? "reasoning"),
+      toolCalls: patch.toolCalls ? patch.toolCalls.map(cloneToolCall) : []
+    }));
+  }
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+function finalizeTrace(trace, status, summary) {
+  const nextTrace = cloneTrace(trace);
+  const terminalBlockStatus = status === "complete" ? "complete" : status === "error" || status === "stopped" ? "error" : null;
+  if (terminalBlockStatus) {
+    const terminalAt = nowMs();
+    nextTrace.blocks = nextTrace.blocks.map((block) => {
+      const blockStatus = block.status === "pending" || block.status === "running" ? terminalBlockStatus : block.status;
+      const blockCompletedAt = block.completedAt ?? terminalAt;
+      const toolCalls = block.toolCalls.map((toolCall) => {
+        if (toolCall.status !== "pending" && toolCall.status !== "running") {
+          return cloneToolCall(toolCall);
+        }
+        return {
+          ...cloneToolCall(toolCall),
+          status: terminalBlockStatus,
+          completedAt: toolCall.completedAt ?? terminalAt,
+          error: terminalBlockStatus === "error" ? toolCall.error ?? "Run ended before this tool call completed." : toolCall.error
+        };
+      });
+      const result = block.kind === "llm_turn" ? {
+        ...ensureLoopResult({ ...block, toolCalls }),
+        status: "complete",
+        toolCallIds: uniqueStrings([...block.result?.toolCallIds ?? [], ...toolCalls.map((toolCall) => toolCall.id)])
+      } : block.result;
+      return {
+        ...block,
+        status: blockStatus,
+        completedAt: blockCompletedAt,
+        ...result ? { result } : {},
+        toolCalls
+      };
+    });
+  }
+  nextTrace.status = status;
+  nextTrace.summary = summary ?? nextTrace.summary;
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+function upsertRuntimeToolCall(trace, patch, options) {
+  const nextTrace = cloneTrace(trace);
+  const blockMeta = getRuntimeToolBlockMeta(patch.toolName, options?.loopId);
+  const blockId = blockMeta.id;
+  let block = nextTrace.blocks.find((entry) => entry.id === blockId);
+  if (!block) {
+    block = createWorkBlock(blockId, blockMeta.title, blockMeta.stage, blockMeta.kind);
+    block.status = "running";
+    nextTrace.blocks.push(block);
+  }
+  if (options?.loopId && blockId === options.loopId) {
+    applyLoopFields(block, options);
+  }
+  const toolIndex = block.toolCalls.findIndex((toolCall) => toolCall.id === patch.id);
+  if (toolIndex >= 0) {
+    const existingToolCall = block.toolCalls[toolIndex];
+    const nextApproval = patch.approval ? { ...existingToolCall.approval ?? {}, ...patch.approval } : existingToolCall.approval ? { ...existingToolCall.approval } : void 0;
+    block.toolCalls[toolIndex] = {
+      ...existingToolCall,
+      ...patch,
+      approval: nextApproval
+    };
+  } else {
+    block.toolCalls.push({
+      id: patch.id,
+      toolName: patch.toolName,
+      status: patch.status ?? "pending",
+      argsPreview: patch.argsPreview,
+      resultPreview: patch.resultPreview,
+      error: patch.error,
+      approval: patch.approval ? { ...patch.approval } : void 0,
+      startedAt: patch.startedAt ?? nowMs(),
+      completedAt: patch.completedAt
+    });
+  }
+  syncLoopResultToolIds(block);
+  if (block.toolCalls.length > 0 && block.toolCalls.every((toolCall) => toolCall.status === "complete" || toolCall.status === "error")) {
+    block.status = block.toolCalls.some((toolCall) => toolCall.status === "error") ? "error" : "complete";
+    block.completedAt = nowMs();
+    if (block.kind === "llm_turn") {
+      block.result = { ...ensureLoopResult(block), status: "complete" };
+    }
+  }
+  nextTrace.status = "running";
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+function upsertRuntimeToolApproval(trace, input, options) {
+  const status = normalizeToolApprovalStatus(input.status);
+  const failed = status === "rejected" || status === "cancelled";
+  const existingToolCall = trace?.blocks.flatMap((block) => block.toolCalls).find((toolCall) => toolCall.id === input.toolCallId);
+  const now = nowMs();
+  const approval = {
+    approvalId: input.approvalId,
+    status
+  };
+  if (input.reason) approval.reason = input.reason;
+  const risk = stringifyApprovalField(input.risk);
+  if (risk) approval.risk = risk;
+  const reviewer = stringifyApprovalField(input.reviewer);
+  if (reviewer) approval.reviewer = reviewer;
+  const answer = stringifyApprovalField(input.answer);
+  if (answer) approval.answer = answer;
+  if (status === "pending") approval.requestedAt = now;
+  if (status !== "pending") approval.resolvedAt = now;
+  const toolPatch = {
+    id: input.toolCallId,
+    toolName: input.toolName,
+    status: failed ? "error" : existingToolCall?.status === "complete" ? "complete" : "running",
+    approval
+  };
+  if (failed) {
+    toolPatch.error = answer || input.reason || "Tool approval was denied.";
+    toolPatch.completedAt = now;
+  }
+  return upsertRuntimeToolCall(trace, toolPatch, options);
+}
+function normalizeToolApprovalStatus(status) {
+  if (status === "approved") return "approved";
+  if (status === "rejected") return "rejected";
+  if (status === "cancelled") return "cancelled";
+  return "pending";
+}
+function stringifyApprovalField(value) {
+  if (value === void 0 || value === null) return "";
+  return typeof value === "string" ? value.trim() : String(value).trim();
+}
+function applyLoopFields(block, options) {
+  if (block.kind === "llm_turn") {
+    const result = ensureLoopResult(block);
+    const nextText = options.loopResultText?.trim();
+    if (nextText && (!result.text || nextText.length >= result.text.length)) {
+      result.text = nextText;
+    }
+    if (options.loopResultStatus) {
+      result.status = options.loopResultStatus;
+    }
+    if (options.loopFinishReason) {
+      result.finishReason = options.loopFinishReason;
+    }
+    block.result = result;
+  }
+  const nextThinking = cloneThinkingArtifact$1(options.loopThinking);
+  if (nextThinking && shouldReplaceThinking(block.thinking, nextThinking)) {
+    block.thinking = nextThinking;
+  }
+  if (options.loopThinkingStatus && (nextThinking || block.thinking)) {
+    block.thinkingStatus = options.loopThinkingStatus;
+  }
+}
+function upsertLoopResult(trace, loopId, resultText, thinking, thinkingStatus, resultStatus = "streaming", finishReason) {
+  const nextTrace = cloneTrace(trace);
+  let block = nextTrace.blocks.find((entry) => entry.id === loopId);
+  if (!block) {
+    block = createWorkBlock(loopId, "LLM turn", "model", "llm_turn");
+    block.status = "running";
+    nextTrace.blocks.push(block);
+  }
+  applyLoopFields(block, {
+    loopResultText: resultText,
+    loopResultStatus: resultStatus,
+    loopFinishReason: finishReason,
+    loopThinking: thinking,
+    loopThinkingStatus: thinkingStatus
+  });
+  nextTrace.status = "running";
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+function ensureLoopResult(block) {
+  const status = block.status === "running" || block.status === "pending" ? "streaming" : "complete";
+  const result = normalizeLoopResult(block.result, block.summary, status, block.toolCalls);
+  block.result = result;
+  return result;
+}
+function createLoopResult(text, blockStatus, toolCalls) {
+  return normalizeLoopResult(void 0, text, blockStatus, toolCalls);
+}
+function normalizeLoopResult(result, fallbackText, blockStatus, toolCalls) {
+  const status = result?.status ?? (blockStatus === "running" || blockStatus === "pending" || blockStatus === "streaming" ? "streaming" : "complete");
+  const text = result?.text ?? fallbackText?.trim() ?? void 0;
+  return {
+    ...text ? { text } : {},
+    ...result?.finishReason ? { finishReason: result.finishReason } : {},
+    status,
+    toolCallIds: uniqueStrings([...result?.toolCallIds ?? [], ...toolCalls.map((toolCall) => toolCall.id)])
+  };
+}
+function syncLoopResultToolIds(block) {
+  if (block.kind !== "llm_turn") return;
+  const result = ensureLoopResult(block);
+  result.toolCallIds = uniqueStrings([...result.toolCallIds, ...block.toolCalls.map((toolCall) => toolCall.id)]);
+  block.result = result;
+}
+function uniqueStrings(values) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+function shouldReplaceThinking(current, next) {
+  if (!current) return true;
+  if (next.replayPolicy === "provider-artifact" && !current.artifact) return true;
+  if (next.artifact && JSON.stringify(next.artifact) !== JSON.stringify(current.artifact)) return true;
+  return (next.text?.length ?? 0) >= (current.text?.length ?? 0);
+}
+function normalizeLegacyThinkingArtifact(block) {
+  const detail = typeof block.detail === "string" ? block.detail.trim() : "";
+  const presentation = block.thinkingPresentation;
+  if (!detail || presentation !== "summary" && presentation !== "full") return void 0;
+  return {
+    text: detail,
+    kind: presentation === "summary" ? "summary" : "raw",
+    source: "unknown",
+    visibility: presentation === "summary" ? "summary" : "raw-collapsed",
+    replayPolicy: "none"
+  };
+}
+function getRuntimeToolBlockMeta(toolName, loopId) {
+  const normalizedToolName = normalizeToolName(toolName);
+  if (normalizedToolName === "ask_user") {
+    return {
+      id: "runtime-user-input",
+      title: "User input requested",
+      stage: "decision",
+      kind: "user_input"
+    };
+  }
+  if (normalizedToolName === "agent_handoff") {
+    return {
+      id: "runtime-handoff",
+      title: "Preparing handoff",
+      stage: "handoff",
+      kind: "handoff"
+    };
+  }
+  return {
+    id: loopId ?? "runtime-llm-turn",
+    title: "LLM turn",
+    stage: "model",
+    kind: "llm_turn"
+  };
+}
+function mergeThinkingPayload(current, incoming, delta) {
+  if (incoming) {
+    const incomingText = incoming.text ?? (delta ? `${current?.text ?? ""}${delta}` : current?.text);
+    return cloneThinkingArtifact({
+      ...incoming,
+      ...incomingText ? { text: incomingText } : {}
+    });
+  }
+  if (!delta) return current;
+  return cloneThinkingArtifact({
+    ...current ?? {
+      kind: "raw",
+      source: "unknown",
+      visibility: "raw-collapsed",
+      replayPolicy: "none"
+    },
+    text: `${current?.text ?? ""}${delta}`
+  });
+}
+function selectCompletedThinking(thinking) {
+  if (!Array.isArray(thinking) || thinking.length === 0) return void 0;
+  for (let index = thinking.length - 1; index >= 0; index -= 1) {
+    const candidate = thinking[index];
+    if (candidate.artifact || candidate.text) return cloneThinkingArtifact(candidate);
+  }
+  return void 0;
+}
+function cloneThinkingArtifact(thinking) {
+  return {
+    ...thinking,
+    artifact: thinking.artifact ? {
+      ...thinking.artifact,
+      raw: thinking.artifact.raw ? { ...thinking.artifact.raw } : void 0
+    } : void 0
+  };
+}
+function resolvePromptClock() {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "local";
+  return {
+    currentDate: formatPromptDate(/* @__PURE__ */ new Date(), timeZone),
+    timeZone
+  };
+}
+function formatPromptDate(date, timeZone) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timeZone === "local" ? void 0 : timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const get = (type) => parts.find((part) => part.type === type)?.value ?? "";
+  const year = get("year");
+  const month = get("month");
+  const day = get("day");
+  return year && month && day ? `${year}-${month}-${day}` : date.toISOString().slice(0, 10);
 }
 function resolveConversationAgentId(requestedMode, requestedAgentId) {
   if (requestedAgentId && resolveEnabledAgentDefinition(requestedAgentId)) {
@@ -21683,186 +22941,7 @@ const ACTIVE_RUN_STATUSES = [
 function isActiveRun(run) {
   return Boolean(run && ACTIVE_RUN_STATUSES.includes(run.status));
 }
-function createWorkBlock(id, title, stage, kind = "reasoning") {
-  return {
-    id,
-    kind,
-    title,
-    stage,
-    status: "pending",
-    toolCalls: [],
-    startedAt: nowMs()
-  };
-}
-function createDraftWorkTrace(summary, blocks = []) {
-  return {
-    status: "running",
-    summary,
-    blocks,
-    updatedAt: nowMs()
-  };
-}
-function cloneTrace(trace) {
-  return trace ? {
-    ...trace,
-    blocks: trace.blocks.map((block) => ({
-      ...block,
-      toolCalls: block.toolCalls.map((toolCall) => ({ ...toolCall }))
-    }))
-  } : {
-    status: "idle",
-    blocks: [],
-    updatedAt: nowMs()
-  };
-}
-function upsertWorkBlock(trace, blockId, patch) {
-  const nextTrace = cloneTrace(trace);
-  const blockIndex = nextTrace.blocks.findIndex((block) => block.id === blockId);
-  if (blockIndex >= 0) {
-    nextTrace.blocks[blockIndex] = {
-      ...nextTrace.blocks[blockIndex],
-      ...patch,
-      toolCalls: patch.toolCalls ? patch.toolCalls.map((toolCall) => ({ ...toolCall })) : nextTrace.blocks[blockIndex].toolCalls.map((toolCall) => ({ ...toolCall }))
-    };
-  } else {
-    nextTrace.blocks.push({
-      ...createWorkBlock(blockId, patch.title || blockId, patch.stage, patch.kind),
-      ...patch,
-      kind: patch.kind ?? "reasoning",
-      toolCalls: patch.toolCalls ? patch.toolCalls.map((toolCall) => ({ ...toolCall })) : []
-    });
-  }
-  nextTrace.updatedAt = nowMs();
-  return nextTrace;
-}
-function finalizeTrace(trace, status, summary) {
-  const nextTrace = cloneTrace(trace);
-  const terminalBlockStatus = status === "complete" ? "complete" : status === "error" || status === "stopped" ? "error" : null;
-  if (terminalBlockStatus) {
-    const terminalAt = nowMs();
-    nextTrace.blocks = nextTrace.blocks.map((block) => {
-      const blockStatus = block.status === "pending" || block.status === "running" ? terminalBlockStatus : block.status;
-      const blockCompletedAt = block.completedAt ?? terminalAt;
-      return {
-        ...block,
-        status: blockStatus,
-        completedAt: blockCompletedAt,
-        toolCalls: block.toolCalls.map((toolCall) => {
-          if (toolCall.status !== "pending" && toolCall.status !== "running") {
-            return { ...toolCall };
-          }
-          return {
-            ...toolCall,
-            status: terminalBlockStatus,
-            completedAt: toolCall.completedAt ?? terminalAt,
-            error: terminalBlockStatus === "error" ? toolCall.error ?? "Run ended before this tool call completed." : toolCall.error
-          };
-        })
-      };
-    });
-  }
-  nextTrace.status = status;
-  nextTrace.summary = summary ?? nextTrace.summary;
-  nextTrace.updatedAt = nowMs();
-  return nextTrace;
-}
-function upsertRuntimeToolCall(trace, patch, options) {
-  const nextTrace = cloneTrace(trace);
-  const blockMeta = getRuntimeToolBlockMeta(patch.toolName, options?.segmentId);
-  const blockId = blockMeta.id;
-  let block = nextTrace.blocks.find((entry) => entry.id === blockId);
-  if (!block) {
-    block = createWorkBlock(blockId, blockMeta.title, blockMeta.stage, blockMeta.kind);
-    block.status = "running";
-    nextTrace.blocks.push(block);
-  }
-  if (options?.segmentId && blockId === options.segmentId) {
-    applySegmentNarrationFields(
-      block,
-      options.segmentSummary,
-      options.segmentThinking,
-      options.segmentThinkingPresentation
-    );
-  }
-  const toolIndex = block.toolCalls.findIndex((toolCall) => toolCall.id === patch.id);
-  if (toolIndex >= 0) {
-    block.toolCalls[toolIndex] = {
-      ...block.toolCalls[toolIndex],
-      ...patch
-    };
-  } else {
-    block.toolCalls.push({
-      id: patch.id,
-      toolName: patch.toolName,
-      status: patch.status ?? "pending",
-      argsPreview: patch.argsPreview,
-      resultPreview: patch.resultPreview,
-      error: patch.error,
-      startedAt: patch.startedAt ?? nowMs(),
-      completedAt: patch.completedAt
-    });
-  }
-  if (block.toolCalls.length > 0 && block.toolCalls.every((toolCall) => toolCall.status === "complete" || toolCall.status === "error")) {
-    block.status = block.toolCalls.some((toolCall) => toolCall.status === "error") ? "error" : "complete";
-    block.completedAt = nowMs();
-  }
-  nextTrace.status = "running";
-  nextTrace.updatedAt = nowMs();
-  return nextTrace;
-}
-function applySegmentNarrationFields(block, narration, thinking, thinkingPresentation) {
-  const nextNarration = narration?.trim();
-  const nextThinking = thinking?.trim();
-  if (nextNarration && (!block.summary || nextNarration.length >= block.summary.length)) {
-    block.summary = nextNarration;
-  }
-  if (nextThinking && (!block.detail || nextThinking.length >= block.detail.length)) {
-    block.detail = nextThinking;
-    const presentation = thinkingPresentation ?? resolveThinkingPresentation(void 0, true);
-    if (presentation !== "none") {
-      block.thinkingPresentation = presentation;
-    }
-  }
-}
-function upsertSegmentNarration(trace, segmentId, narration, thinking, thinkingPresentation) {
-  const nextTrace = cloneTrace(trace);
-  let block = nextTrace.blocks.find((entry) => entry.id === segmentId);
-  if (!block) {
-    block = createWorkBlock(segmentId, "工具调用", "tool", "tool");
-    block.status = "running";
-    nextTrace.blocks.push(block);
-  }
-  applySegmentNarrationFields(block, narration, thinking, thinkingPresentation);
-  nextTrace.status = "running";
-  nextTrace.updatedAt = nowMs();
-  return nextTrace;
-}
-function getRuntimeToolBlockMeta(toolName, segmentId) {
-  const normalizedToolName = normalizeToolName(toolName);
-  if (normalizedToolName === "ask_user") {
-    return {
-      id: "runtime-user-input",
-      title: "请求用户决策",
-      stage: "decision",
-      kind: "user_input"
-    };
-  }
-  if (normalizedToolName === "agent_handoff") {
-    return {
-      id: "runtime-handoff",
-      title: "准备交接",
-      stage: "handoff",
-      kind: "handoff"
-    };
-  }
-  return {
-    id: segmentId ?? "runtime-tools",
-    title: "工具调用",
-    stage: "tool",
-    kind: "tool"
-  };
-}
-const isSegmentTool = (toolName) => {
+const isLoopTool = (toolName) => {
   const normalized = normalizeToolName(toolName);
   return normalized !== "ask_user" && normalized !== "agent_handoff";
 };
@@ -22340,6 +23419,10 @@ class ConversationService {
     });
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, userMessage);
     this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
+    const visibleMessages = workingSession?.sessionId && branchState ? resolveVisibleConversationMessages(
+      storageAdapter.readConversationHistory(workingSession.sessionId),
+      branchState
+    ) : [userMessage, assistantDraftMessage];
     const traceSessionId = workingSession?.sessionId ?? this.ephemeralTraceSessionId(turnId);
     const tracePresentation = await traceService.buildConversationPresentation(
       traceSessionId,
@@ -22364,6 +23447,8 @@ class ConversationService {
       mode: "talk",
       userMessage,
       assistantDraftMessage,
+      messages: visibleMessages,
+      branchState: branchState ?? null,
       executionTransition: { action: "none" },
       runUpdate: null,
       tracePresentation,
@@ -22377,7 +23462,8 @@ class ConversationService {
     const abortController = new AbortController();
     const conversationAgentId = input.requestedAgentId;
     const agentLabel = getAgentLabel(conversationAgentId);
-    const commitAssistantMessage = (type, patch) => {
+    let streamScheduler = null;
+    const applyAssistantMessagePatch = (type, patch, options = { persist: true, publishTrace: true }) => {
       if (abortController.signal.aborted && patch.status !== "stopped") {
         return;
       }
@@ -22386,17 +23472,32 @@ class ConversationService {
         ...patch,
         updatedAt: nowMs()
       };
-      this.persistConversationSnapshot(sessionId, assistantMessage);
+      if (options.persist) {
+        this.persistConversationSnapshot(sessionId, assistantMessage);
+      }
       this.emitConversationEvent({
         type,
         sessionId: sessionId ?? "",
         turnId: assistantMessage.turnId,
         message: assistantMessage
       });
-      this.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
+      if (options.publishTrace) {
+        this.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
+      }
+    };
+    streamScheduler = new ConversationStreamPatchScheduler({
+      commit: ({ type, patch, options }) => applyAssistantMessagePatch(type, patch, options)
+    });
+    const commitAssistantMessage = (type, patch, options = {}) => {
+      streamScheduler?.commitImmediate(type, patch, options);
+    };
+    const commitTerminalAssistantMessage = (type, patch) => {
+      streamScheduler?.commitTerminal(type, patch);
     };
     const commitStoppedMessage = () => {
-      commitAssistantMessage("message_completed", {
+      agentUserInputRequestService.cancelTurn(assistantMessage.turnId);
+      agentToolApprovalRequestService.cancelTurn(assistantMessage.turnId);
+      commitTerminalAssistantMessage("message_completed", {
         status: "stopped",
         content: assistantMessage.content || "当前请求已停止。",
         workTrace: finalizeTrace(
@@ -22417,35 +23518,40 @@ class ConversationService {
       abortController,
       stop: () => {
         if (!abortController.signal.aborted) {
+          streamScheduler?.flushPending({ forcePersist: true, publishTrace: true });
           abortController.abort();
           commitStoppedMessage();
+          this.clearActiveTurn(assistantMessage.turnId, abortController);
         }
       }
     });
     const commitVisibleAssistantText = () => {
-      commitAssistantMessage("message_patched", {
+      streamScheduler?.queueText({
         status: "streaming",
         content: visibleResponse
       });
     };
+    const commitThinkingTrace = (workTrace) => {
+      streamScheduler?.queueTrace({ workTrace });
+    };
     const withWorkTrace = (workTrace) => ({ workTrace });
     let rawResponse = "";
     let visibleResponse = "";
-    let currentSegmentText = "";
-    let currentSegmentThinking = "";
-    let segmentSeq = 1;
-    let segmentHasTools = false;
-    let pendingNewSegment = false;
-    const currentSegmentId = () => `runtime-segment-${segmentSeq}`;
+    let currentLoopText = "";
+    let currentLoopThinking;
+    let currentLoopThinkingStatus;
+    let loopSeq = 1;
+    let loopHasTools = false;
+    let pendingNewLoop = false;
+    const currentLoopId = () => `runtime-loop-${loopSeq}`;
     let errorViewModel = null;
     let llmDiagnostic = null;
     const routePreflight = resolveAgentRoutePreflight(conversationAgentId);
-    const segmentThinkingPresentation = () => routePreflight.ok ? resolveThinkingPresentation(routePreflight.routeCapability.reasoningDelivery, Boolean(currentSegmentThinking.trim())) : "none";
-    const currentSegmentOptions = () => ({
-      segmentId: currentSegmentId(),
-      segmentSummary: currentSegmentText.trim() || void 0,
-      segmentThinking: currentSegmentThinking.trim() || void 0,
-      segmentThinkingPresentation: segmentThinkingPresentation()
+    const currentLoopOptions = () => ({
+      loopId: currentLoopId(),
+      loopResultText: currentLoopText.trim() || void 0,
+      loopThinking: currentLoopThinking,
+      loopThinkingStatus: currentLoopThinkingStatus
     });
     if (!routePreflight.ok) {
       llmDiagnostic = routePreflight.diagnostic;
@@ -22462,7 +23568,7 @@ class ConversationService {
         ...withWorkTrace(upsertWorkBlock(assistantMessage.workTrace, "runtime-route-diagnostic", {
           kind: "diagnostic",
           status: llmDiagnostic.severity === "error" ? "error" : "complete",
-          title: "模型路由诊断",
+          title: "Model route diagnostic",
           stage: "preflight",
           summary: llmDiagnostic.userMessage,
           detail: llmDiagnostic.technicalMessage,
@@ -22482,6 +23588,7 @@ class ConversationService {
         const allowedToolNames = resolveAgentToolAllowlist(conversationAgentId, "investigate").map((toolName) => normalizeToolName(toolName));
         const projectRootPath = input.context.projectId ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null : null;
         const memoryIndex = await agentOrchestrator.getMemoryIndex();
+        const promptClock = resolvePromptClock();
         const promptContext = {
           workDir: projectRootPath ?? "",
           tools: allowedToolNames,
@@ -22494,7 +23601,9 @@ class ConversationService {
           profile: promptDefinition,
           routeCapability: routePreflight.routeCapability,
           permissionSettings: settingsService.getAll().agentRuntime.permissions,
-          allowedToolNames
+          allowedToolNames,
+          currentDate: promptClock.currentDate,
+          timeZone: promptClock.timeZone
         };
         const systemPrompt = this.promptAssembler.assembleSystemPrompt(promptContext);
         const promptMetrics = this.promptAssembler.measureSections(promptContext);
@@ -22529,10 +23638,10 @@ class ConversationService {
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, "runtime-run", {
                     kind: "reasoning",
-                    title: "启动 Agent Loop",
+                    title: "Start Agent Loop",
                     stage: "preflight",
                     status: "running",
-                    summary: `${agentLabel} 已进入模型与工具循环。`,
+                    summary: `${agentLabel} started the model and tool loop.`,
                     detail: details || void 0,
                     startedAt: nowMs()
                   })
@@ -22541,48 +23650,65 @@ class ConversationService {
               if (event.type === "assistant.delta") {
                 const chunk = typeof event.payload.text === "string" ? event.payload.text : "";
                 if (chunk) {
-                  if (pendingNewSegment) {
-                    segmentSeq += 1;
-                    currentSegmentText = "";
-                    currentSegmentThinking = "";
-                    segmentHasTools = false;
-                    pendingNewSegment = false;
+                  if (pendingNewLoop) {
+                    loopSeq += 1;
+                    currentLoopText = "";
+                    currentLoopThinking = void 0;
+                    currentLoopThinkingStatus = void 0;
+                    loopHasTools = false;
+                    pendingNewLoop = false;
                     visibleResponse = "";
                   }
                   rawResponse += chunk;
-                  currentSegmentText += chunk;
-                  visibleResponse = currentSegmentText;
+                  currentLoopText += chunk;
+                  visibleResponse = currentLoopText;
                   commitVisibleAssistantText();
+                  commitThinkingTrace(upsertLoopResult(
+                    assistantMessage.workTrace,
+                    currentLoopId(),
+                    currentLoopText,
+                    currentLoopThinking,
+                    currentLoopThinkingStatus,
+                    "streaming"
+                  ));
                 }
               }
               if (event.type === "assistant.thinking_delta") {
-                const chunk = typeof event.payload.text === "string" ? event.payload.text : "";
-                if (chunk) {
-                  currentSegmentThinking += chunk;
-                  commitAssistantMessage("message_patched", {
-                    workTrace: upsertSegmentNarration(
-                      assistantMessage.workTrace,
-                      currentSegmentId(),
-                      void 0,
-                      currentSegmentThinking,
-                      segmentThinkingPresentation()
-                    )
-                  });
+                const payload = event.payload;
+                currentLoopThinking = mergeThinkingPayload(
+                  currentLoopThinking,
+                  payload.thinking,
+                  typeof payload.text === "string" ? payload.text : ""
+                );
+                if (currentLoopThinking) {
+                  currentLoopThinkingStatus = "streaming";
+                  commitThinkingTrace(upsertLoopResult(
+                    assistantMessage.workTrace,
+                    currentLoopId(),
+                    currentLoopText || void 0,
+                    currentLoopThinking,
+                    currentLoopThinkingStatus,
+                    "streaming"
+                  ));
                 }
               }
               if (event.type === "assistant.thinking_end") {
-                const text = typeof event.payload.text === "string" ? event.payload.text.trim() : "";
-                if (text && text.length >= currentSegmentThinking.length) {
-                  currentSegmentThinking = text;
-                  commitAssistantMessage("message_patched", {
-                    workTrace: upsertSegmentNarration(
-                      assistantMessage.workTrace,
-                      currentSegmentId(),
-                      void 0,
-                      currentSegmentThinking,
-                      segmentThinkingPresentation()
-                    )
-                  });
+                const payload = event.payload;
+                currentLoopThinking = mergeThinkingPayload(
+                  currentLoopThinking,
+                  payload.thinking,
+                  typeof payload.text === "string" ? payload.text : ""
+                );
+                if (currentLoopThinking) {
+                  currentLoopThinkingStatus = "complete";
+                  commitThinkingTrace(upsertLoopResult(
+                    assistantMessage.workTrace,
+                    currentLoopId(),
+                    currentLoopText || void 0,
+                    currentLoopThinking,
+                    currentLoopThinkingStatus,
+                    "streaming"
+                  ));
                 }
               }
               if (event.type === "diagnostic") {
@@ -22604,8 +23730,8 @@ class ConversationService {
               if (event.type === "tool.requested") {
                 const payload = event.payload;
                 if (payload.toolCall?.id && payload.toolCall.name) {
-                  const segmented = isSegmentTool(String(payload.toolCall.name));
-                  if (segmented) segmentHasTools = true;
+                  const loopScoped = isLoopTool(String(payload.toolCall.name));
+                  if (loopScoped) loopHasTools = true;
                   commitAssistantMessage("message_patched", {
                     workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                       id: String(payload.toolCall.id),
@@ -22613,13 +23739,13 @@ class ConversationService {
                       status: "pending",
                       argsPreview: JSON.stringify(payload.toolCall.arguments ?? {}).slice(0, 600),
                       startedAt: nowMs()
-                    }, segmented ? currentSegmentOptions() : void 0)
+                    }, loopScoped ? currentLoopOptions() : void 0)
                   });
                 }
               }
               if (event.type === "tool.started") {
-                const segmented = isSegmentTool(String(event.payload.toolName));
-                if (segmented) segmentHasTools = true;
+                const loopScoped = isLoopTool(String(event.payload.toolName));
+                if (loopScoped) loopHasTools = true;
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                     id: String(event.payload.toolCallId),
@@ -22627,13 +23753,13 @@ class ConversationService {
                     status: "running",
                     argsPreview: JSON.stringify(event.payload.args ?? {}).slice(0, 600),
                     startedAt: nowMs()
-                  }, segmented ? currentSegmentOptions() : void 0)
+                  }, loopScoped ? currentLoopOptions() : void 0)
                 });
               }
               if (event.type === "tool.denied") {
                 const reason = typeof event.payload.reason === "string" ? event.payload.reason : "Profile policy denied this tool call.";
-                const segmentedDenied = isSegmentTool(String(event.payload.toolName));
-                if (segmentedDenied) segmentHasTools = true;
+                const loopScopedDenied = isLoopTool(String(event.payload.toolName));
+                if (loopScopedDenied) loopHasTools = true;
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                     id: String(event.payload.toolCallId),
@@ -22642,7 +23768,7 @@ class ConversationService {
                     resultPreview: JSON.stringify(event.payload.result ?? { reason }).slice(0, 800),
                     error: reason,
                     completedAt: nowMs()
-                  }, segmentedDenied ? currentSegmentOptions() : void 0)
+                  }, loopScopedDenied ? currentLoopOptions() : void 0)
                 });
               }
               if (event.type === "approval.requested") {
@@ -22667,27 +23793,16 @@ class ConversationService {
                   return;
                 }
                 const reason = typeof payload.reason === "string" && payload.reason ? payload.reason : "This action requires user approval before it can run.";
-                const traceWithTool = upsertRuntimeToolCall(assistantMessage.workTrace, {
-                  id: toolCallId,
-                  toolName,
-                  status: "running",
-                  resultPreview: reason
-                }, currentSegmentOptions());
                 commitAssistantMessage("message_patched", {
-                  workTrace: upsertWorkBlock(traceWithTool, `runtime-approval-${approvalId}`, {
-                    kind: "approval",
-                    title: "请求批准",
-                    stage: "decision",
-                    status: "running",
-                    summary: reason,
-                    detail: JSON.stringify({
-                      approvalId,
-                      toolCallId,
-                      toolName,
-                      risk: payload.risk,
-                      reviewer: payload.reviewer
-                    }, null, 2)
-                  })
+                  workTrace: upsertRuntimeToolApproval(assistantMessage.workTrace, {
+                    approvalId,
+                    toolCallId,
+                    toolName,
+                    status: "pending",
+                    reason,
+                    risk: payload.risk,
+                    reviewer: payload.reviewer
+                  }, currentLoopOptions())
                 });
               }
               if (event.type === "approval.answered") {
@@ -22695,29 +23810,29 @@ class ConversationService {
                 const approvalId = payload.approvalId ?? "runtime";
                 if (payload.kind === "ask_user" || normalizeToolName(String(payload.toolName ?? "")) === "ask_user") {
                   const failed = payload.status === "rejected" || payload.status === "cancelled";
-                  const answerText = payload.answer === void 0 || payload.answer === null ? "" : typeof payload.answer === "string" ? payload.answer.trim() : String(payload.answer).trim();
+                  const answerText2 = payload.answer === void 0 || payload.answer === null ? "" : typeof payload.answer === "string" ? payload.answer.trim() : String(payload.answer).trim();
                   commitAssistantMessage("message_patched", {
                     workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                       id: String(payload.toolCallId ?? approvalId),
                       toolName: "ask_user",
                       status: failed ? "error" : "running",
-                      resultPreview: failed ? String(payload.answer ?? "User input request was cancelled.") : answerText || "User answered.",
+                      resultPreview: failed ? String(payload.answer ?? "User input request was cancelled.") : answerText2 || "User answered.",
                       error: failed ? String(payload.answer ?? "User input request was cancelled.") : void 0,
                       completedAt: failed ? nowMs() : void 0
                     })
                   });
                   return;
                 }
+                const approvalStatus = typeof payload.status === "string" ? payload.status : "approved";
+                const answerText = payload.answer === void 0 || payload.answer === null ? "" : typeof payload.answer === "string" ? payload.answer.trim() : String(payload.answer).trim();
                 commitAssistantMessage("message_patched", {
-                  workTrace: upsertWorkBlock(assistantMessage.workTrace, `runtime-approval-${approvalId}`, {
-                    kind: "approval",
-                    title: "审批结果",
-                    stage: "decision",
-                    status: payload.status === "rejected" || payload.status === "cancelled" ? "error" : "complete",
-                    summary: `审批状态：${payload.status ?? "answered"}`,
-                    detail: payload.answer === void 0 ? void 0 : JSON.stringify(payload.answer).slice(0, 800),
-                    completedAt: nowMs()
-                  })
+                  workTrace: upsertRuntimeToolApproval(assistantMessage.workTrace, {
+                    approvalId,
+                    toolCallId: String(payload.toolCallId ?? approvalId),
+                    toolName: String(payload.toolName ?? "approval"),
+                    status: approvalStatus,
+                    answer: answerText
+                  }, currentLoopOptions())
                 });
               }
               if (event.type === "tool.completed") {
@@ -22733,12 +23848,12 @@ class ConversationService {
                 if (!(isAskUserTool && result?.ok)) {
                   toolCallPatch.resultPreview = JSON.stringify(event.payload.result ?? {}).slice(0, 800);
                 }
-                const segmentedCompleted = isSegmentTool(String(event.payload.toolName));
+                const loopScopedCompleted = isLoopTool(String(event.payload.toolName));
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertRuntimeToolCall(
                     assistantMessage.workTrace,
                     toolCallPatch,
-                    segmentedCompleted ? currentSegmentOptions() : void 0
+                    loopScopedCompleted ? currentLoopOptions() : void 0
                   )
                 });
               }
@@ -22747,10 +23862,10 @@ class ConversationService {
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, "runtime-tasks", {
                     kind: "subagent",
-                    title: "任务状态",
+                    title: "Task status",
                     stage: "tool",
                     status: payload.status === "failed" ? "error" : "complete",
-                    summary: `${payload.title ?? payload.taskId ?? "Task"}${payload.status ? `：${payload.status}` : ""}`,
+                    summary: `${payload.title ?? payload.taskId ?? "Task"}${payload.status ? `: ${payload.status}` : ""}`,
                     completedAt: nowMs()
                   })
                 });
@@ -22760,7 +23875,7 @@ class ConversationService {
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
                     kind: "subagent",
-                    title: `子 Agent：${payload.profile}`,
+                    title: `Sub-agent: ${payload.profile}`,
                     stage: "tool",
                     status: "running",
                     summary: payload.text?.slice(0, 200) ?? ""
@@ -22772,7 +23887,7 @@ class ConversationService {
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
                     kind: "subagent",
-                    title: `子 Agent`,
+                    title: "Sub-agent",
                     stage: "tool",
                     status: "running",
                     summary: payload.text ? payload.text.slice(-200) : void 0
@@ -22784,7 +23899,7 @@ class ConversationService {
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
                     kind: "subagent",
-                    title: `子 Agent：${payload.profile}`,
+                    title: `Sub-agent: ${payload.profile}`,
                     stage: "tool",
                     status: payload.status === "failed" ? "error" : "complete",
                     summary: payload.text?.slice(0, 500) ?? "",
@@ -22795,32 +23910,34 @@ class ConversationService {
               }
               if (event.type === "assistant.completed") {
                 const payload = event.payload;
-                const narration = typeof payload.text === "string" ? payload.text.trim() : "";
-                const thinking = (typeof payload.thinkingText === "string" ? payload.thinkingText.trim() : "") || currentSegmentThinking.trim();
-                if (thinking) {
-                  currentSegmentThinking = thinking;
+                const loopResult = typeof payload.text === "string" ? payload.text.trim() : "";
+                const completedThinking = selectCompletedThinking(payload.thinking) ?? currentLoopThinking;
+                if (completedThinking) {
+                  currentLoopThinking = completedThinking;
+                  currentLoopThinkingStatus = "complete";
                 }
-                if (narration || thinking) {
+                if (loopResult || currentLoopThinking) {
                   commitAssistantMessage("message_patched", {
-                    workTrace: upsertSegmentNarration(
+                    workTrace: upsertLoopResult(
                       assistantMessage.workTrace,
-                      currentSegmentId(),
-                      narration || void 0,
-                      thinking || void 0,
-                      thinking ? segmentThinkingPresentation() : void 0
+                      currentLoopId(),
+                      loopResult || void 0,
+                      currentLoopThinking,
+                      currentLoopThinkingStatus,
+                      "complete"
                     )
                   });
                 }
-                if (segmentHasTools) {
-                  pendingNewSegment = true;
+                if (loopHasTools) {
+                  pendingNewLoop = true;
                 }
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, "assistant-output", {
                     kind: "output",
-                    title: "生成最终回答",
+                    title: "Assistant output ready",
                     stage: "respond",
                     status: "complete",
-                    summary: "最终回答已生成。",
+                    summary: "Final answer generated.",
                     completedAt: nowMs()
                   })
                 });
@@ -22829,10 +23946,10 @@ class ConversationService {
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, "runtime-run", {
                     kind: "reasoning",
-                    title: "Agent Loop 完成",
+                    title: "Agent Loop completed",
                     stage: "respond",
                     status: "complete",
-                    summary: "模型与工具循环已完成。",
+                    summary: "Model and tool loop completed.",
                     completedAt: nowMs()
                   })
                 });
@@ -22842,10 +23959,10 @@ class ConversationService {
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `runtime-${event.type}`, {
                     kind: "diagnostic",
-                    title: failed ? "Agent Loop 失败" : "Agent Loop 已取消",
+                    title: failed ? "Agent Loop failed" : "Agent Loop cancelled",
                     stage: "respond",
                     status: failed ? "error" : "complete",
-                    summary: summarizeRuntimePayload(event.payload) || (failed ? "Agent Loop 失败。" : "Agent Loop 已取消。"),
+                    summary: summarizeRuntimePayload(event.payload) || (failed ? "Agent Loop failed." : "Agent Loop cancelled."),
                     completedAt: nowMs()
                   })
                 });
@@ -22865,7 +23982,7 @@ class ConversationService {
         };
         rawResponse = llmDiagnostic.userMessage;
         visibleResponse = llmDiagnostic.userMessage;
-        currentSegmentText = llmDiagnostic.userMessage;
+        currentLoopText = llmDiagnostic.userMessage;
         recordLlmDiagnostic(input.context, llmDiagnostic);
         commitVisibleAssistantText();
       }
@@ -22874,7 +23991,7 @@ class ConversationService {
       this.clearActiveTurn(assistantMessage.turnId, abortController);
       return;
     }
-    const assistantContent = (currentSegmentText.trim() || rawResponse || visibleResponse).trim();
+    const assistantContent = (currentLoopText.trim() || rawResponse || visibleResponse).trim();
     visibleResponse = assistantContent;
     const isRouteMissingDiagnostic = llmDiagnostic?.code === "CONVERSATION_LLM_ROUTE_MISSING";
     const finalStatus = errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete";
@@ -22883,8 +24000,8 @@ class ConversationService {
       this.clearActiveTurn(assistantMessage.turnId, abortController);
       return;
     }
-    const outputSummary = llmDiagnostic ? llmDiagnostic.code === "CONVERSATION_LLM_REQUEST_FAILED" ? "模型请求失败，已记录诊断。" : "模型链路不可用，已给出配置诊断。" : "最终回答已生成。";
-    commitAssistantMessage(finalStatus === "error" ? "message_errored" : "message_completed", {
+    const outputSummary = llmDiagnostic ? llmDiagnostic.code === "CONVERSATION_LLM_REQUEST_FAILED" ? "Model request failed; diagnostic recorded." : "Model route unavailable; configuration diagnostic returned." : "Final answer generated.";
+    commitTerminalAssistantMessage(finalStatus === "error" ? "message_errored" : "message_completed", {
       status: finalStatus,
       content: assistantContent,
       diagnostic: llmDiagnostic,

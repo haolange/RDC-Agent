@@ -1,6 +1,6 @@
 # Agent Runtime Kernel
 
-> 接线状态声明：本文档描述 agent runtime 的设计边界与契约，**不反映当前实际接线状态**。runtime 内核（长生命周期 Agent、ContextManager 压缩、ErrorRecovery、Memory 引擎、Subagent/Handoff 等）的真实接线进度、Phase 完成情况以 [`agent-runtime-completion-plan.md`](./agent-runtime-completion-plan.md) 为唯一权威来源。
+> 接线状态声明：本文档描述 agent runtime 的设计边界与契约，不把当前接线进度当成事实来源。长生命周期 Agent、ContextManager 压缩、ErrorRecovery、Memory、Subagent/Handoff 等真实接线进度，以 [`agent-runtime-completion-plan.md`](./agent-runtime-completion-plan.md) 为权威来源。
 
 The agent runtime owns agent turns, tool mediation policy, deterministic events, provider routing, approval events, and final run status.
 
@@ -18,7 +18,9 @@ The agent runtime owns agent turns, tool mediation policy, deterministic events,
 
 The execution path for RDX work is:
 
-`AgentRuntime or UI -> bash or Settings shell action -> ShellInvocationService -> system-installed RDX CLI -> RdxRuntimeContext`
+```text
+AgentRuntime or UI -> bash or Settings shell action -> ShellInvocationService -> system-installed RDX CLI -> RdxRuntimeContext
+```
 
 `ToolRegistry` continues to mediate runtime tool requests, but RDX CLI command configuration is not stored in the registry. Catalog/runtime summary configuration is stored in `settings.tooling.rdxCli`; open/connect/preview/close command recipes are stored in `settings.tooling.rdxActions`.
 
@@ -36,9 +38,22 @@ Provider-private protocols are normalized before reaching Conversation or Work P
 
 Work Process renders these normalized events only. It must not infer reasoning, tools, or results from the assistant body.
 
+## Reasoning Artifact Boundary
+
+Runtime thinking is normalized into three separate layers:
+
+- `Transcript`: ordinary user messages, assistant final text, tool calls, and tool results that may be replayed as normal model context.
+- `WorkTrace`: UI progress data in `ConversationWorkTrace`. Each `llm_turn` contains optional `ThinkingArtifact`, a `thinkingStatus` lifecycle flag, a canonical `result`, and nested tool calls. UI order is thinking disclosure first, loop result second, tool execution rows third. `assistant.thinking_delta` updates thinking only; `assistant.thinking_end` only marks thinking complete; `assistant.delta` streams the loop result.
+- `ProviderReasoningArtifact`: protocol-native continuation payloads such as OpenAI Responses encrypted reasoning items or Anthropic thinking/signature/redacted blocks. These artifacts are replayed only by the matching provider adapter and are never converted into ordinary assistant text.
+
+Readable `summary` or `raw` thinking is not inserted into ordinary composer context on later turns. Chat Completions compatible providers, Gemini, Ollama, DeepSeek/Qwen/Kimi/GLM-style `reasoning_content`, and other readable thinking streams use `replayPolicy: 'none'` unless the adapter has an explicit opaque continuation artifact. OpenAI Responses and Anthropic Messages may use `replayPolicy: 'provider-artifact'` only for their native replay item/block shape.
+
+Work Process visibility follows provider intent without leaking hidden state: summary thinking may open while streaming and folds after completion; raw provider-visible thinking is collapsed by default and user-expandable; opaque provider state renders only as retained-state status. Models without thinking support do not render a thinking row and stream the loop result directly.
+
 ## Validation
 
 - Static contract: `npm run typecheck`
 - Agent runtime contract: `npm run check:agent-runtime`
+- Work Process contract: `npm run check:work-process` and `npm run check:work-process-tool-coverage`
 - Architecture/fidelity/shared export checks after renderer or shared-contract changes
 - Shell smoke after window, preload, IPC, workspace permission, or RDX CLI invocation boundary changes

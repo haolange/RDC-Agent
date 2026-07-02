@@ -41,7 +41,8 @@ import type {
   SelectionState,
   SessionEvidenceRecord,
 } from './storageTypes';
-import type { AgentMessage } from '../agent-runtime/core/types';
+import type { AgentMessage, AssistantMessage } from '../agent-runtime/core/types';
+import { normalizeThinkingContent } from '../agent-runtime/reasoning/ReasoningArtifacts';
 
 export class StorageAdapter {
   private dataRootPath = '';
@@ -664,11 +665,11 @@ export class StorageAdapter {
     if (!fs.existsSync(threadPath)) {
       return [];
     }
-    return readJsonl<AgentMessage>(threadPath);
+    return readJsonl<AgentMessage>(threadPath).map(normalizeAgentThreadMessage);
   }
 
   writeAgentThread(sessionId: string, agentId: string, messages: AgentMessage[]): void {
-    writeJsonl(this.getAgentThreadPath(sessionId, agentId), messages);
+    writeJsonl(this.getAgentThreadPath(sessionId, agentId), messages.map(normalizeAgentThreadMessage));
   }
 
   clearAgentThread(sessionId: string, agentId?: string): void {
@@ -1517,6 +1518,16 @@ export class StorageAdapter {
     };
     return mimeByExtension[extension] || 'application/octet-stream';
   }
+}
+
+
+function normalizeAgentThreadMessage(message: AgentMessage): AgentMessage {
+  if (message.role !== 'assistant') return message;
+  const assistant = message as AssistantMessage;
+  return {
+    ...assistant,
+    content: assistant.content.map((block) => normalizeThinkingContent(block) ?? block),
+  };
 }
 
 export const storageAdapter = new StorageAdapter();

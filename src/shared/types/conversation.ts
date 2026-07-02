@@ -1,6 +1,7 @@
 import type { AgentRole } from './agent';
 import type { AgentEvent } from './agentRuntime';
 import type { ConversationBranchState } from './conversationBranch';
+import type { ThinkingArtifact } from './reasoning';
 import type { AppMode, RunSummary, SessionAttachmentRecord, SessionRecord } from './session';
 
 export type ConversationMode = 'talk';
@@ -13,7 +14,7 @@ export type ConversationWorkBlockStatus = 'pending' | 'running' | 'complete' | '
 
 export type ConversationWorkBlockKind =
   | 'reasoning'
-  | 'tool'
+  | 'llm_turn'
   | 'approval'
   | 'user_input'
   | 'compaction'
@@ -24,6 +25,10 @@ export type ConversationWorkBlockKind =
   | 'command';
 
 export type ConversationToolCallStatus = 'pending' | 'running' | 'complete' | 'error';
+
+export type ConversationThinkingStatus = 'streaming' | 'complete';
+
+export type ConversationLoopResultStatus = 'streaming' | 'complete';
 
 export type ConversationMessageDiagnosticCode =
   | 'CONVERSATION_LLM_ROUTE_MISSING'
@@ -48,11 +53,30 @@ export interface ConversationToolCall {
   argsPreview?: string;
   resultPreview?: string;
   error?: string;
+  approval?: ConversationToolApproval;
   startedAt: number;
   completedAt?: number;
 }
 
-export type ConversationThinkingPresentation = 'none' | 'summary' | 'full';
+export type ConversationToolApprovalStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export interface ConversationToolApproval {
+  approvalId: string;
+  status: ConversationToolApprovalStatus;
+  reason?: string;
+  risk?: 'low' | 'medium' | 'high' | (string & {});
+  reviewer?: 'auto_review' | (string & {});
+  answer?: string;
+  requestedAt?: number;
+  resolvedAt?: number;
+}
+
+export interface ConversationLoopResult {
+  text?: string;
+  status: ConversationLoopResultStatus;
+  finishReason?: string;
+  toolCallIds: string[];
+}
 
 export interface ConversationWorkBlock {
   id: string;
@@ -60,16 +84,17 @@ export interface ConversationWorkBlock {
   title: string;
   stage?: string;
   status: ConversationWorkBlockStatus;
-  /** 轮次可见叙述（result text）。 */
+  /** Non-loop summary text; LLM turn output lives in result and never contains provider thinking text. */
   summary?: string;
-  /** 轮次 thinking 全文。 */
+  /** Legacy storage input only; new runtime writes thinking instead. */
   detail?: string;
-  /** thinking 展示模式：provider summary 或完整 CoT。 */
-  thinkingPresentation?: ConversationThinkingPresentation;
+  thinking?: ThinkingArtifact;
+  thinkingStatus?: ConversationThinkingStatus;
+  result?: ConversationLoopResult;
   toolCalls: ConversationToolCall[];
   startedAt: number;
   completedAt?: number;
-  /** 嵌套子 block（subagent kind 专用，承载子 agent 的 WorkTrace）。 */
+  /** Nested blocks are used by sub-agent traces. */
   children?: ConversationWorkBlock[];
 }
 
@@ -96,11 +121,11 @@ export interface ConversationMessage {
   diagnostic?: ConversationMessageDiagnostic | null;
   attachments?: SessionAttachmentRecord[];
   createdAt: number;
-  /** 对话分支 id；默认 root。 */
+  /** Conversation branch id; defaults to root. */
   branchId?: string;
-  /** 分叉锚点 id（同一 fork 的各 variant 共享）。 */
+  /** Fork anchor shared by variants from the same fork. */
   forkId?: string;
-  /** 分叉点上的版本序号（0-based）。 */
+  /** Variant index at the fork point, 0-based. */
   variantIndex?: number;
 }
 

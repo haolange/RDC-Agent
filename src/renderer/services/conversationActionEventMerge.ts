@@ -25,11 +25,11 @@ export const mergeToolExecutionActionEvent = (
 
   const eventTime = event.ts_ms;
   const stepTrace = upsertWorkBlock(nextTrace, 'tool-execution', {
-    kind: 'tool',
-    title: '工具调用',
+    kind: 'llm_turn',
+    title: 'LLM turn',
     stage: 'runtime',
     status: event.status === 'error' ? 'error' : 'running',
-    summary: event.status === 'error' ? '工具调用失败。' : '正在记录工具调用。',
+    summary: event.status === 'error' ? 'Tool execution failed.' : 'Recording tool execution.',
   });
   const block = stepTrace.blocks.find((entry) => entry.id === 'tool-execution');
   if (block) {
@@ -55,9 +55,13 @@ export const mergeToolExecutionActionEvent = (
       block.toolCalls.push(nextToolCall);
     }
     block.status = block.toolCalls.some((toolCall) => toolCall.status === 'error') ? 'error' : 'complete';
-    block.summary = block.status === 'error'
-      ? '工具调用中出现错误。'
-      : `已记录 ${block.toolCalls.length} 个工具调用。`;
+    block.result = {
+      text: block.status === 'error'
+        ? 'Tool execution failed.'
+        : 'Requested ' + block.toolCalls.length + ' tool' + (block.toolCalls.length === 1 ? '' : 's') + '.',
+      status: 'complete',
+      toolCallIds: block.toolCalls.map((toolCall) => toolCall.id),
+    };
     block.completedAt = eventTime + event.duration_ms;
   }
   return {

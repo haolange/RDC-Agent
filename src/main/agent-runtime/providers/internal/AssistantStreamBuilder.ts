@@ -1,11 +1,4 @@
-/**
- * Provider 内部共用：流式 AssistantMessage 状态机。
- *
- * 多个 Provider 在解析 SSE/NDJSON 时，需要按 contentIndex 维护
- * 「文本 / 思考 / 工具调用」三种内容块的逐步累积状态。把这部分逻辑集中到
- * 一个小型状态机里，避免每个 Provider 重复实现。
- */
-
+import type { EventStream } from '../../core/EventStream';
 import type {
   AssistantMessage,
   AssistantMessageEvent,
@@ -15,11 +8,17 @@ import type {
   ToolCall,
   Usage,
 } from '../../core/types';
-import type { EventStream } from '../../core/EventStream';
+import {
+  appendThinkingText,
+  createThinkingContent,
+  getThinkingText,
+  mergeThinkingContent,
+  type ThinkingContentInput,
+} from '../../reasoning/ReasoningArtifacts';
 
 type Block =
   | { kind: 'text'; index: number; text: string; closed: boolean }
-  | { kind: 'thinking'; index: number; text: string; closed: boolean }
+  | { kind: 'thinking'; index: number; thinking: ThinkingContent; closed: boolean }
   | {
       kind: 'tool';
       index: number;
@@ -31,14 +30,6 @@ type Block =
 
 const EMPTY_USAGE: Usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
 
-/**
- * 累积助手消息流式事件，并维护 `partial` 快照。
- *
- * 用法：
- * 1. 在 Provider 收到第一个事件前调用 `start()`；
- * 2. 收到增量时调用对应的 `text/thinking/toolCall` 方法，会自动 push 事件到 stream；
- * 3. 流结束时调用 `done(stopReason)` 完成 stream。
- */
 export class AssistantStreamBuilder {
   private readonly stream: EventStream<AssistantMessageEvent, AssistantMessage>;
   private readonly blocks: Block[] = [];
@@ -58,14 +49,12 @@ export class AssistantStreamBuilder {
     this.providerId = providerId;
   }
 
-  /** 推送 `start` 事件并初始化 partial。 */
   start(): void {
     if (this.started) return;
     this.started = true;
     this.stream.push({ type: 'start', partial: this.snapshot('stop') });
   }
 
-  /** 累积一段文本到指定 contentIndex；首次出现会自动发 `text_start`。 */
   appendText(index: number, delta: string): void {
     if (!delta) return;
     let block = this.blocks[index] as Block | undefined;
@@ -87,7 +76,6 @@ export class AssistantStreamBuilder {
     });
   }
 
-  /** 显式结束某个文本块，发 `text_end` 事件。 */
   endText(index: number): void {
     const block = this.blocks[index];
     if (!block || block.kind !== 'text' || block.closed) return;
@@ -100,41 +88,62 @@ export class AssistantStreamBuilder {
     });
   }
 
-  /** 累积一段 thinking。 */
-  appendThinking(index: number, delta: string): void {
-    if (!delta) return;
+  ensureThinking(index: number, input: ThinkingContentInput = {}): ThinkingContent {
     let block = this.blocks[index] as Block | undefined;
     if (!block || block.kind !== 'thinking') {
-      block = { kind: 'thinking', index, text: '', closed: false };
+      const thinking = createThinkingContent(input);
+      block = { kind: 'thinking', index, thinking, closed: false };
       this.blocks[index] = block;
       this.stream.push({
         type: 'thinking_start',
         contentIndex: index,
+        thinking,
         partial: this.snapshot('stop'),
       });
+      return thinking;
     }
-    block.text += delta;
+    if (Object.keys(input).length > 0) {
+      block.thinking = mergeThinkingContent(block.thinking, input);
+    }
+    return block.thinking;
+  }
+
+  appendThinking(index: number, delta: string, input: ThinkingContentInput = {}): void {
+    if (!delta) return;
+    let thinking = this.ensureThinking(index, input);
+    const block = this.blocks[index];
+    if (!block || block.kind !== 'thinking') return;
+    thinking = appendThinkingText(thinking, delta);
+    block.thinking = thinking;
     this.stream.push({
       type: 'thinking_delta',
       contentIndex: index,
       delta,
+      thinking,
       partial: this.snapshot('stop'),
     });
   }
 
-  endThinking(index: number): void {
+  updateThinking(index: number, input: ThinkingContentInput): void {
+    this.ensureThinking(index, input);
+  }
+
+  endThinking(index: number, input: ThinkingContentInput = {}): void {
     const block = this.blocks[index];
     if (!block || block.kind !== 'thinking' || block.closed) return;
+    if (Object.keys(input).length > 0) {
+      block.thinking = mergeThinkingContent(block.thinking, input);
+    }
     block.closed = true;
     this.stream.push({
       type: 'thinking_end',
       contentIndex: index,
-      content: block.text,
+      content: getThinkingText(block.thinking),
+      thinking: block.thinking,
       partial: this.snapshot('stop'),
     });
   }
 
-  /** 初始化或更新一个 tool_call 块（不发 delta）。 */
   ensureToolCall(index: number, id: string, name: string): void {
     let block = this.blocks[index] as Block | undefined;
     if (!block || block.kind !== 'tool') {
@@ -153,9 +162,7 @@ export class AssistantStreamBuilder {
         partial: this.snapshot('stop'),
       });
     } else {
-      if (id && !block.id.startsWith('call_')) {
-        // 保留首个真实 id；否则覆盖为新提供的 id。
-      } else if (id) {
+      if (id && block.id.startsWith('call_')) {
         block.id = id;
       }
       if (name && !block.name) {
@@ -164,7 +171,6 @@ export class AssistantStreamBuilder {
     }
   }
 
-  /** 累积一段 tool_call 参数（原始 JSON 字符串增量）。 */
   appendToolCallArgs(index: number, delta: string): void {
     if (!delta) return;
     const block = this.blocks[index];
@@ -178,7 +184,6 @@ export class AssistantStreamBuilder {
     });
   }
 
-  /** 结束 tool_call，解析 args，发 `toolcall_end`。 */
   endToolCall(index: number): void {
     const block = this.blocks[index];
     if (!block || block.kind !== 'tool' || block.closed) return;
@@ -197,7 +202,6 @@ export class AssistantStreamBuilder {
     });
   }
 
-  /** 设置或合并 usage 信息。 */
   setUsage(partial: Partial<Usage>): void {
     this.usage = {
       inputTokens: partial.inputTokens ?? this.usage.inputTokens,
@@ -210,7 +214,6 @@ export class AssistantStreamBuilder {
     };
   }
 
-  /** 完成流：关闭所有未关闭块，推 `done` 事件并 complete。 */
   done(reason: StopReason): void {
     if (this.finished) return;
     this.finished = true;
@@ -225,7 +228,6 @@ export class AssistantStreamBuilder {
     this.stream.push({ type: 'done', reason, message });
   }
 
-  /** 标记错误：推 `error` 事件，并以错误结束 stream。 */
   fail(error: Error, reason: StopReason = 'error'): void {
     if (this.finished) return;
     this.finished = true;
@@ -234,14 +236,9 @@ export class AssistantStreamBuilder {
     this.stream.error(error);
   }
 
-  /** 是否已经结束。 */
   get isFinished(): boolean {
     return this.finished;
   }
-
-  // -----------------------------------------------------------------
-  // 内部
-  // -----------------------------------------------------------------
 
   private snapshot(reason: StopReason): AssistantMessage {
     const content: AssistantMessage['content'] = [];
@@ -251,7 +248,7 @@ export class AssistantStreamBuilder {
         const item: TextContent = { type: 'text', text: block.text };
         content.push(item);
       } else if (block.kind === 'thinking') {
-        const item: ThinkingContent = { type: 'thinking', thinking: block.text };
+        const item: ThinkingContent = block.thinking;
         content.push(item);
       } else {
         const item: ToolCall = {
@@ -286,7 +283,6 @@ function parseJsonSafely(raw: string): Record<string, unknown> {
     }
     return { value: parsed };
   } catch {
-    // 流式过程中 args 可能尚未拼成合法 JSON，对 partial 快照来说返回原始串即可。
     return { _raw: raw };
   }
 }

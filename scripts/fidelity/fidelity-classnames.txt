@@ -1029,7 +1029,6 @@ work-process-debug-toggle-icon
 work-process-diagnostic
 work-process-diagnostic-message
 work-process-disclosure
-work-process-empty
 work-process-header
 work-process-label
 work-process-meta
@@ -1046,7 +1045,7 @@ work-process-step-content
 work-process-step-summary
 work-process-steps
 work-process-steps-chevron
-work-process-steps-eye
+work-process-steps-icon
 work-process-steps-toggle
 work-process-steps-toggle-label
 work-process-subagent

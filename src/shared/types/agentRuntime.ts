@@ -7,6 +7,7 @@
 import type { LLMStreamEvent, ToolCall } from './llm';
 import type { MCPTransport } from './mcp';
 import type { AgentPromptProfile, AgentToolPolicy } from './profile';
+import type { ThinkingArtifact } from './reasoning';
 import type { AppMode, ExecutableAppMode } from './session';
 import type { LlmProviderAuthMode, LlmProviderId, LlmProviderProtocol } from './settings';
 import type { ToolCallResult } from './tool';
@@ -23,7 +24,7 @@ export interface AgentRouteCapability {
   providerId: LlmProviderId;
   modelId: string;
   toolCallingMode: ToolCallingMode;
-  /** @deprecated 由 reasoningDelivery 推导；保留供 provider StreamOptions 兼容。 */
+  /** Provider stream visibility derived from reasoningDelivery for route execution. */
   reasoningVisibility: ReasoningVisibility;
   reasoningDelivery: ReasoningDelivery;
   supportsStreaming: boolean;
@@ -71,12 +72,12 @@ export interface AgentAssistantDeltaPayload extends AgentEventBasePayload {
 
 export interface AgentAssistantThinkingPayload extends AgentEventBasePayload {
   text: string;
+  thinking?: ThinkingArtifact;
 }
 
 export interface AgentAssistantCompletedPayload extends AgentEventBasePayload {
   text: string;
-  /** Provider thinking / reasoning 全文，来自 message content 中 thinking 块拼接。 */
-  thinkingText?: string;
+  thinking?: ThinkingArtifact[];
   usage?: {
     inputTokens: number;
     outputTokens: number;

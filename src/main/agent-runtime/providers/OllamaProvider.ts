@@ -162,7 +162,12 @@ export class OllamaProvider implements ProviderStrategy {
         if (message) {
           if (typeof message.thinking === 'string' && message.thinking.length > 0) {
             sawOutput = true;
-            builder.appendThinking(THINKING_INDEX, message.thinking);
+            builder.appendThinking(THINKING_INDEX, message.thinking, {
+              kind: 'raw',
+              source: 'ollama-raw',
+              visibility: 'raw-collapsed',
+              replayPolicy: 'none',
+            });
           }
           if (typeof message.content === 'string' && message.content.length > 0) {
             sawOutput = true;

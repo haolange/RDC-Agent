@@ -20,10 +20,43 @@ export interface TextContent {
   text: string;
 }
 
-/** 思考（reasoning）内容块，对应支持 reasoning 的模型。 */
+export type ThinkingArtifactKind = 'summary' | 'raw' | 'opaque';
+
+export type ThinkingArtifactVisibility = 'summary' | 'raw-collapsed' | 'hidden';
+
+export type ThinkingArtifactReplayPolicy = 'none' | 'provider-artifact';
+
+export type ThinkingArtifactSource =
+  | 'openai-responses-summary'
+  | 'openai-responses-encrypted'
+  | 'anthropic-thinking'
+  | 'anthropic-redacted-thinking'
+  | 'openai-compatible-raw'
+  | 'openrouter-raw'
+  | 'gemini-raw'
+  | 'ollama-raw'
+  | 'unknown';
+
+export interface ProviderReasoningArtifact {
+  providerId: string;
+  modelId?: string;
+  protocol?: string;
+  type: string;
+  id?: string;
+  encryptedContent?: string;
+  signature?: string;
+  data?: string;
+  raw?: Record<string, unknown>;
+}
+
 export interface ThinkingContent {
   type: 'thinking';
-  thinking: string;
+  text?: string;
+  kind: ThinkingArtifactKind;
+  source: ThinkingArtifactSource;
+  visibility: ThinkingArtifactVisibility;
+  replayPolicy: ThinkingArtifactReplayPolicy;
+  artifact?: ProviderReasoningArtifact;
 }
 
 /** 图像内容块，使用 base64 编码。 */
@@ -93,6 +126,8 @@ export interface ToolResultMessage {
   content: (TextContent | ImageContent)[];
   /** 是否为错误结果。 */
   isError: boolean;
+  /** Tool-specific structured details for transcript summaries. */
+  details?: unknown;
   /** Unix 毫秒时间戳。 */
   timestamp: number;
 }
@@ -232,9 +267,9 @@ export type AssistantMessageEvent =
   | { type: 'text_start'; contentIndex: number; partial: AssistantMessage }
   | { type: 'text_delta'; contentIndex: number; delta: string; partial: AssistantMessage }
   | { type: 'text_end'; contentIndex: number; content: string; partial: AssistantMessage }
-  | { type: 'thinking_start'; contentIndex: number; partial: AssistantMessage }
-  | { type: 'thinking_delta'; contentIndex: number; delta: string; partial: AssistantMessage }
-  | { type: 'thinking_end'; contentIndex: number; content: string; partial: AssistantMessage }
+  | { type: 'thinking_start'; contentIndex: number; thinking: ThinkingContent; partial: AssistantMessage }
+  | { type: 'thinking_delta'; contentIndex: number; delta: string; thinking: ThinkingContent; partial: AssistantMessage }
+  | { type: 'thinking_end'; contentIndex: number; content: string; thinking: ThinkingContent; partial: AssistantMessage }
   | { type: 'toolcall_start'; contentIndex: number; partial: AssistantMessage }
   | { type: 'toolcall_delta'; contentIndex: number; delta: string; partial: AssistantMessage }
   | { type: 'toolcall_end'; contentIndex: number; toolCall: ToolCall; partial: AssistantMessage }

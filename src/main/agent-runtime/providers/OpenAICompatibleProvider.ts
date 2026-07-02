@@ -188,7 +188,12 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
         const reasoningDelta = delta.reasoning_content ?? delta.reasoning;
         if (typeof reasoningDelta === 'string' && reasoningDelta.length > 0) {
           sawOutput = true;
-          builder.appendThinking(THINKING_INDEX, reasoningDelta);
+          builder.appendThinking(THINKING_INDEX, reasoningDelta, {
+            kind: 'raw',
+            source: isOpenRouterBaseUrl(baseUrl) ? 'openrouter-raw' : 'openai-compatible-raw',
+            visibility: 'raw-collapsed',
+            replayPolicy: 'none',
+          });
         }
         if (typeof delta.content === 'string' && delta.content.length > 0) {
           sawOutput = true;
@@ -351,6 +356,10 @@ function toOpenAITool(tool: ToolDefinition): Record<string, unknown> {
       parameters: tool.parameters,
     },
   };
+}
+
+function isOpenRouterBaseUrl(baseUrl: string): boolean {
+  return baseUrl.toLowerCase().includes('openrouter');
 }
 
 function mapFinishReason(reason: string | null | undefined): StopReason {

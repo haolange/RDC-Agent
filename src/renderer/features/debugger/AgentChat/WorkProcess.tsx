@@ -28,10 +28,25 @@ const TRACE_HEADLINE_KEY: Record<ConversationWorkTrace['status'], TranslationKey
   stopped: 'chat.workProcessHeadlineStopped',
 };
 
-const StepsEyeIcon: React.FC = () => (
-  <svg className="work-process-steps-eye" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true">
-    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
-    <circle cx="12" cy="12" r="3" />
+const StepsListIcon: React.FC = () => (
+  <svg
+    className="work-process-steps-icon"
+    width="14"
+    height="14"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <line x1="9" y1="6" x2="20" y2="6" />
+    <line x1="9" y1="12" x2="20" y2="12" />
+    <line x1="9" y1="18" x2="20" y2="18" />
+    <circle cx="4.5" cy="6" r="1" />
+    <circle cx="4.5" cy="12" r="1" />
+    <circle cx="4.5" cy="18" r="1" />
   </svg>
 );
 
@@ -39,25 +54,48 @@ const SectionRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'section' }> }
   const { t } = useI18n();
   const hasAttention = row.steps.some((step) => step.status === 'error' || step.status === 'running');
   const showSteps = row.stepCount > 0;
-  const primaryClassName = [
-    'work-process-segment-primary',
-    row.primaryMode === 'thinking-summary' || row.primaryMode === 'thinking-full' ? 'is-thinking' : '',
-    row.primaryMode === 'result' ? 'is-result' : '',
-    row.clampPrimary ? 'is-clamped' : '',
-    row.primaryMode === 'thinking-full' ? 'is-thinking-full' : '',
+  const resultClassName = [
+    'work-process-loop-result',
+    row.resultStreaming ? 'is-streaming' : '',
+    row.clampResult ? 'is-clamped' : '',
+  ].filter(Boolean).join(' ');
+  const hasResult = Boolean(row.resultText || row.resultToolSummary);
+  const thinkingClassName = [
+    'work-process-thinking-state',
+    row.thinkingKind ? `kind-${row.thinkingKind}` : '',
+    row.thinkingVisibility ? `visibility-${row.thinkingVisibility}` : '',
+    row.thinkingStatus ? `status-${row.thinkingStatus}` : '',
   ].filter(Boolean).join(' ');
 
   return (
     <li className={`work-process-step work-process-section status-${row.status} kind-section`} data-testid="work-process-section">
       <WorkProcessRailIcon variant="section" status={row.status} />
       <div className="work-process-step-content">
-        {row.primaryText ? (
-          <p className={primaryClassName}>{row.primaryText}</p>
+        {row.thinkingExpandable ? (
+          <details className={thinkingClassName} open={row.thinkingOpenByDefault}>
+            <summary className="work-process-thinking-summary">
+              <span>{row.thinkingLabel}</span>
+              {row.thinkingSource ? <span className="work-process-thinking-source">{row.thinkingSource}</span> : null}
+              <span className="work-process-row-caret" aria-hidden="true" />
+            </summary>
+            <pre className="work-process-thinking-preview">{row.thinkingPreview}</pre>
+          </details>
+        ) : row.thinkingLabel ? (
+          <p className={thinkingClassName}>
+            <span>{row.thinkingLabel}</span>
+            {row.thinkingSource ? <span className="work-process-thinking-source">{row.thinkingSource}</span> : null}
+          </p>
+        ) : null}
+        {hasResult ? (
+          <div className={resultClassName}>
+            {row.resultText ? <p className="work-process-loop-result-text">{row.resultText}</p> : null}
+            {row.resultToolSummary ? <p className="work-process-loop-tool-summary">{row.resultToolSummary}</p> : null}
+          </div>
         ) : null}
         {showSteps ? (
           <details className="work-process-section-steps" open={row.defaultOpen || hasAttention}>
             <summary className="work-process-steps-toggle">
-              <StepsEyeIcon />
+              <StepsListIcon />
               <span className="work-process-steps-toggle-label">
                 {t('chat.workProcessViewSteps', { count: row.stepCount })}
               </span>
@@ -99,6 +137,8 @@ export const WorkProcess: React.FC<WorkProcessProps> = ({ trace }) => {
   const toolMeta = presentation.toolCount > 0
     ? t('chat.workProcessTools', { count: presentation.toolCount })
     : '';
+  const metaParts = [toolMeta, presentation.duration].filter(Boolean);
+  const hasBody = Boolean(presentation.summary) || presentation.rows.length > 0;
 
   return (
     <section
@@ -119,21 +159,19 @@ export const WorkProcess: React.FC<WorkProcessProps> = ({ trace }) => {
         </span>
         <span className={`work-process-status-dot status-${trace.status}`} aria-hidden="true" />
         <span className={`work-process-label status-${trace.status}`}>{headlineCopy}</span>
-        {toolMeta ? <span className="work-process-meta">{toolMeta}</span> : null}
+        {metaParts.length > 0 ? <span className="work-process-meta">{metaParts.join(' / ')}</span> : null}
       </button>
 
-      {expanded ? (
+      {expanded && hasBody ? (
         <div className="work-process-body">
           {presentation.summary ? (
             <p className="work-process-summary">{presentation.summary}</p>
           ) : null}
-          {presentation.rows.length === 0 ? (
-            <p className="work-process-empty">{t('chat.workProcessEmpty')}</p>
-          ) : (
+          {presentation.rows.length > 0 ? (
             <ol className="work-process-steps">
               {presentation.rows.map((row) => renderRow(row))}
             </ol>
-          )}
+          ) : null}
         </div>
       ) : null}
     </section>

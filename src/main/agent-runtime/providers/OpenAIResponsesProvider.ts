@@ -7,6 +7,7 @@ import type {
   Message,
   Model,
   ProviderCapabilities,
+  ProviderReasoningArtifact,
   StopReason,
   StreamOptions,
   ToolDefinition,
@@ -132,6 +133,7 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
 
       const toolSlotsByItemId = new Map<string, number>();
       const toolArgBuffers = new Map<number, string>();
+      let currentReasoningArtifact: ProviderReasoningArtifact | undefined;
       let sawToolCall = false;
       let sawOutput = false;
       let finishReason: StopReason = 'stop';
@@ -158,17 +160,40 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
             const delta = readString(event.delta) || readString(event.text);
             if (delta) {
               sawOutput = true;
-              builder.appendThinking(REASONING_INDEX, delta);
+              builder.appendThinking(REASONING_INDEX, delta, {
+                kind: 'summary',
+                source: 'openai-responses-summary',
+                visibility: 'summary',
+                replayPolicy: currentReasoningArtifact ? 'provider-artifact' : 'none',
+                artifact: currentReasoningArtifact,
+              });
             }
             break;
           }
           case 'response.reasoning_summary_text.done':
-            builder.endThinking(REASONING_INDEX);
+            builder.endThinking(REASONING_INDEX, {
+              kind: 'summary',
+              source: 'openai-responses-summary',
+              visibility: 'summary',
+              replayPolicy: currentReasoningArtifact ? 'provider-artifact' : 'none',
+              artifact: currentReasoningArtifact,
+            });
             break;
           case 'response.output_item.added': {
             const outputIndex = readNumber(event.output_index) ?? 0;
             const item = readRecord(event.item);
-            if (readString(item?.type) === 'function_call') {
+            const reasoningArtifact = createResponsesReasoningArtifact(model, item);
+            if (reasoningArtifact) {
+              currentReasoningArtifact = reasoningArtifact;
+              sawOutput = true;
+              builder.updateThinking(REASONING_INDEX, {
+                kind: 'opaque',
+                source: 'openai-responses-encrypted',
+                visibility: 'hidden',
+                replayPolicy: 'provider-artifact',
+                artifact: currentReasoningArtifact,
+              });
+            } else if (readString(item?.type) === 'function_call') {
               const slot = TOOL_INDEX_BASE + outputIndex;
               const itemId = readString(item?.id);
               if (itemId) toolSlotsByItemId.set(itemId, slot);
@@ -204,7 +229,18 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
           case 'response.output_item.done': {
             const outputIndex = readNumber(event.output_index) ?? 0;
             const item = readRecord(event.item);
-            if (readString(item?.type) === 'function_call') {
+            const reasoningArtifact = createResponsesReasoningArtifact(model, item);
+            if (reasoningArtifact) {
+              currentReasoningArtifact = reasoningArtifact;
+              sawOutput = true;
+              builder.updateThinking(REASONING_INDEX, {
+                kind: 'summary',
+                source: 'openai-responses-summary',
+                visibility: 'summary',
+                replayPolicy: 'provider-artifact',
+                artifact: currentReasoningArtifact,
+              });
+            } else if (readString(item?.type) === 'function_call') {
               const slot = TOOL_INDEX_BASE + outputIndex;
               const itemId = readString(item?.id);
               if (itemId) toolSlotsByItemId.set(itemId, slot);
@@ -228,6 +264,17 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
             const completed = readRecord(event.response) as ResponsesCompletedPayload | null;
             if (completed) {
               applyCompletedResponse(builder, completed);
+              const completedArtifact = findResponsesReasoningArtifact(model, completed.output);
+              if (completedArtifact) {
+                currentReasoningArtifact = completedArtifact;
+                builder.updateThinking(REASONING_INDEX, {
+                  kind: 'summary',
+                  source: 'openai-responses-summary',
+                  visibility: 'summary',
+                  replayPolicy: 'provider-artifact',
+                  artifact: currentReasoningArtifact,
+                });
+              }
               finishReason = completed.status === 'incomplete' ? 'length' : sawToolCall ? 'toolUse' : 'stop';
             }
             break;
@@ -307,6 +354,9 @@ function buildRequestBody(model: Model, context: Context, options: StreamOptions
       : {};
     body.reasoning = { ...reasoning, summary: 'auto' };
   }
+  if (body.reasoning) {
+    body.include = ['reasoning.encrypted_content'];
+  }
   const maxTokens = options.maxTokens ?? model.maxTokens;
   if (typeof maxTokens === 'number' && maxTokens > 0) {
     body.max_output_tokens = maxTokens;
@@ -333,6 +383,12 @@ function convertMessage(message: Message): unknown[] {
 
   if (message.role === 'assistant') {
     const items: unknown[] = [];
+    for (const block of message.content) {
+      if (block.type === 'thinking') {
+        const replayItem = toResponsesReasoningReplayItem(block.artifact, block.replayPolicy);
+        if (replayItem) items.push(replayItem);
+      }
+    }
     const text = message.content
       .filter((block) => block.type === 'text')
       .map((block) => block.text)
@@ -381,6 +437,19 @@ function toInputMessage(role: 'user' | 'assistant', content: InputMessageContent
   return { role, content: parts.length > 0 ? parts : [{ type: 'input_text', text: '' }], type: 'message' };
 }
 
+function toResponsesReasoningReplayItem(
+  artifact: ProviderReasoningArtifact | undefined,
+  replayPolicy: string,
+): Record<string, unknown> | null {
+  if (replayPolicy !== 'provider-artifact' || !artifact) return null;
+  if (artifact.protocol !== PROVIDER_API && artifact.protocol !== 'OpenAIResponses') return null;
+  if (artifact.raw) return artifact.raw;
+  const item: Record<string, unknown> = { type: artifact.type || 'reasoning' };
+  if (artifact.id) item.id = artifact.id;
+  if (artifact.encryptedContent) item.encrypted_content = artifact.encryptedContent;
+  return item.id || item.encrypted_content ? item : null;
+}
+
 function toResponsesTool(tool: ToolDefinition): Record<string, unknown> {
   return {
     type: 'function',
@@ -400,6 +469,35 @@ function applyCompletedResponse(builder: AssistantStreamBuilder, payload: Respon
         ?? (payload.usage.input_tokens ?? 0) + (payload.usage.output_tokens ?? 0),
     });
   }
+}
+
+function createResponsesReasoningArtifact(
+  model: Model,
+  item: Record<string, unknown> | null | undefined,
+): ProviderReasoningArtifact | undefined {
+  if (readString(item?.type) !== 'reasoning') return undefined;
+  const encryptedContent = readString(item?.encrypted_content) || readString(item?.encryptedContent);
+  return {
+    providerId: model.provider,
+    modelId: model.id,
+    protocol: PROVIDER_API,
+    type: 'reasoning',
+    id: readString(item?.id) || undefined,
+    encryptedContent: encryptedContent || undefined,
+    raw: item ?? undefined,
+  };
+}
+
+function findResponsesReasoningArtifact(
+  model: Model,
+  output: unknown[] | undefined,
+): ProviderReasoningArtifact | undefined {
+  if (!Array.isArray(output)) return undefined;
+  for (const item of output) {
+    const artifact = createResponsesReasoningArtifact(model, readRecord(item));
+    if (artifact) return artifact;
+  }
+  return undefined;
 }
 
 function resolveToolSlot(event: Record<string, unknown>, toolSlotsByItemId: Map<string, number>): number | null {
