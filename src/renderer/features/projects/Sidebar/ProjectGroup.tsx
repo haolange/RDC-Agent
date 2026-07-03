@@ -77,6 +77,9 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
             <button
               type="button"
               className={`project-item-chevron ${isExpanded ? 'expanded' : ''}`}
+              title={t('sidebar.toggleProjectSessions')}
+              aria-label={t('sidebar.toggleProjectSessions')}
+              aria-expanded={isExpanded}
               onClick={(event) => void onProjectChevronClick(event, project)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {

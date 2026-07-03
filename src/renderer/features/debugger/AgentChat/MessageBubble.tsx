@@ -163,6 +163,11 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
   const traceIsRunning = Boolean(trace && trace.status === 'running');
   // Work Process remains first, while the assistant answer streams underneath it.
   const showContentBubble = hasContent || isInProgress || traceIsRunning;
+  // 诊断文案已由气泡正文承载时不再重复渲染独立诊断块，避免同一信息三重显示。
+  const showDiagnosticBlock = Boolean(
+    message.diagnostic
+    && message.diagnostic.userMessage.trim() !== (message.content ?? '').trim(),
+  );
   return (
     <article
       className={`conversation-message conversation-message-assistant status-${status}`}
@@ -183,7 +188,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
               {renderContentWithCursor(message.content, status)}
             </div>
           ) : null}
-          {message.diagnostic ? (
+          {showDiagnosticBlock && message.diagnostic ? (
             <div className="conversation-message-diagnostic" role="alert">
               <span className="conversation-message-diagnostic-code">
                 {message.diagnostic.code}

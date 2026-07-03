@@ -6,7 +6,6 @@ agent-activity-name
 agent-activity-status
 agent-chat
 agent-run-view
-agent-tag
 animate-spin
 app-body
 app-container
@@ -104,7 +103,6 @@ compact
 completed
 composer-agent-menu
 composer-agent-menu-item
-composer-agent-menu-item-agents
 composer-agent-menu-item-check
 composer-agent-menu-item-copy
 composer-agent-menu-item-icon
@@ -601,10 +599,8 @@ settings-actions
 settings-actions-split
 settings-advanced-content
 settings-advanced-panel
-settings-agent-card-head
 settings-agent-description-field
 settings-agent-flags
-settings-agent-grid-header
 settings-agent-handoff-textarea
 settings-agent-icon-more
 settings-agent-icon-more-trigger
@@ -615,17 +611,12 @@ settings-agent-icon-popover
 settings-agent-icon-row
 settings-agent-identity-grid
 settings-agent-instructions
-settings-agent-list
-settings-agent-page
 settings-agent-permission-roots
 settings-agent-permission-roots-grid
 settings-agent-permissions
 settings-agent-permissions-panel
-settings-agent-route-control
 settings-agent-route-panel
-settings-agent-structure-anchor
 settings-agent-textarea-compact
-settings-agent-warning
 settings-appearance-list
 settings-appearance-section
 settings-appearance-section--compact
@@ -670,7 +661,6 @@ settings-general-grid
 settings-general-grid--rows
 settings-general-top-row
 settings-help-text
-settings-help-text-warning
 settings-icon-button
 settings-inline-pills
 settings-inline-status
