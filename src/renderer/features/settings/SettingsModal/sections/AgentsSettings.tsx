@@ -138,16 +138,6 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   return (
     <section className="settings-page settings-page-agents">
       <div className="settings-manifest-page">
-        <div className="settings-agent-page settings-agent-structure-anchor" data-testid="settings-agent-runtime-config">
-          <span className="settings-help-text-warning" data-testid="settings-agent-no-enabled-models" />
-          <span data-testid="settings-agent-route-save-status" />
-          <span hidden className="settings-agent-list" data-testid="settings-agent-list">
-            <span className="settings-agent-grid-header" />
-            <span className="settings-agent-card-head" data-testid="settings-agent-card-${agentId}" />
-            <span className="settings-agent-route-control" />
-            <span className="settings-agent-warning" />
-          </span>
-        </div>
         <div className="settings-manifest-layout">
           <div className="settings-manifest-list-column">
             <div className="settings-manifest-toolbar settings-manifest-list-toolbar">

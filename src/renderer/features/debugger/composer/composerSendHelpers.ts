@@ -4,6 +4,7 @@ import type { AgentMode } from '@shared/types/layout';
 import type { AppMode, ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
+import { useConversationStore } from '../../../stores/conversationStore';
 import { useProjectStore } from '../../../stores/projectStore';
 
 const EXECUTABLE_APP_MODES = new Set<string>(['edit', 'debugger', 'analyzer', 'optimizer']);
@@ -99,6 +100,27 @@ export const toConversationAttachmentInputs = (
   size: attachment.size,
 }));
 
+/**
+ * Turn 响应里的消息以“可见分支成员集”为准，但流事件（SSE/IPC）可能先于
+ * invoke 响应送达终态 patch；对账时按 updatedAt 保留 store 中更新的版本，
+ * 避免把已完成的 assistant 消息覆盖回 streaming draft。
+ */
+const reconcileTurnMessages = (
+  currentMessages: ConversationMessage[],
+  turnMessages: ConversationMessage[],
+): ConversationMessage[] => {
+  const currentById = new Map(currentMessages.map((message) => [message.id, message]));
+  return turnMessages.map((message) => {
+    const existing = currentById.get(message.id);
+    if (!existing) {
+      return message;
+    }
+    const existingUpdatedAt = existing.updatedAt ?? existing.createdAt;
+    const nextUpdatedAt = message.updatedAt ?? message.createdAt;
+    return existingUpdatedAt > nextUpdatedAt ? existing : message;
+  });
+};
+
 export async function applyConversationTurnResult(options: {
   electronAPI: NonNullable<Window['electronAPI']>;
   result: ConversationTurnResult;
@@ -144,7 +166,10 @@ export async function applyConversationTurnResult(options: {
   }
 
   if (result.messages) {
-    setConversationMessages(result.messages);
+    setConversationMessages(reconcileTurnMessages(
+      useConversationStore.getState().conversationMessages,
+      result.messages,
+    ));
   } else {
     upsertConversationMessages([
       result.userMessage,

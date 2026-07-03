@@ -183,10 +183,6 @@ export const Composer: React.FC<ComposerProps> = ({
             </button>
             {modeMenuOpen && (
               <div className="composer-agent-menu-popup" role="menu">
-                <span hidden data-testid="mode-menu-item-${mode.id}" />
-                <span hidden className="composer-agent-menu-item-agents">
-                  <span className="agent-tag" />
-                </span>
                 {userInvocableAgents.map((agent) => {
                   const agentMode: AgentMode = agent.id;
                   return (

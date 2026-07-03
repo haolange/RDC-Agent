@@ -31,7 +31,6 @@ const App: React.FC = () => {
   const [runtimeTestMode, setRuntimeTestMode] = useState<boolean | null>(null);
 
   const currentProject = useProjectStore((state) => state.currentProject);
-  const currentSession = useProjectStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
   const openedCapture = useCaptureStore((state) => state.openedCapture);
   const currentMode = useLayoutStore((state) => state.currentMode);
@@ -181,7 +180,7 @@ const App: React.FC = () => {
           avatarPath={avatarPath}
           composer={composer}
           hasOpenedCaptureForCurrentProject={hasOpenedCaptureForCurrentProject}
-          showMainPromptBar={Boolean(currentSession)}
+          showMainPromptBar={Boolean(currentProject)}
           mainPage={<DebuggerPage mode={currentMode} />}
           t={t}
           onUserMenuOpen={(event) => setUserMenuAnchor(event.currentTarget.getBoundingClientRect())}
