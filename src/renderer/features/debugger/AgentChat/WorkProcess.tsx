@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
-import { useI18n, type TranslationKey } from '../../../i18n';
+import { useI18n } from '../../../i18n';
 import {
   buildWorkProcessPresentation,
   type WorkProcessRow,
@@ -11,48 +11,19 @@ import {
   ApprovalRow,
   DiagnosticRow,
   SummaryRow,
+  ToolGroupRow,
   ToolRow,
   UserInputRow,
 } from './WorkProcessRows';
+import { ResponseRow } from './WorkProcessResponseRow';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 
 interface WorkProcessProps {
   trace: ConversationWorkTrace;
 }
 
-const TRACE_HEADLINE_KEY: Record<ConversationWorkTrace['status'], TranslationKey> = {
-  idle: 'chat.workProcessHeadlineIdle',
-  running: 'chat.workProcessHeadlineRunning',
-  complete: 'chat.workProcessHeadlineComplete',
-  error: 'chat.workProcessHeadlineError',
-  stopped: 'chat.workProcessHeadlineStopped',
-};
-
-const StepsListIcon: React.FC = () => (
-  <svg
-    className="work-process-steps-icon"
-    width="14"
-    height="14"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <line x1="9" y1="6" x2="20" y2="6" />
-    <line x1="9" y1="12" x2="20" y2="12" />
-    <line x1="9" y1="18" x2="20" y2="18" />
-    <circle cx="4.5" cy="6" r="1" />
-    <circle cx="4.5" cy="12" r="1" />
-    <circle cx="4.5" cy="18" r="1" />
-  </svg>
-);
-
 const SectionRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'section' }> }> = ({ row }) => {
-  const { t } = useI18n();
-  const hasAttention = row.steps.some((step) => step.status === 'error' || step.status === 'running');
+  const hasError = row.status === 'error' || row.steps.some((step) => step.status === 'error');
   const showSteps = row.stepCount > 0;
   const resultClassName = [
     'work-process-loop-result',
@@ -93,18 +64,9 @@ const SectionRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'section' }> }
           </div>
         ) : null}
         {showSteps ? (
-          <details className="work-process-section-steps" open={row.defaultOpen || hasAttention}>
-            <summary className="work-process-steps-toggle">
-              <StepsListIcon />
-              <span className="work-process-steps-toggle-label">
-                {t('chat.workProcessViewSteps', { count: row.stepCount })}
-              </span>
-              <span className="work-process-steps-chevron" aria-hidden="true" />
-            </summary>
-            <ol className="work-process-steps work-process-section-list">
-              {row.steps.map((step) => renderRow(step))}
-            </ol>
-          </details>
+          <ol className={`work-process-steps work-process-section-list ${hasError || row.defaultOpen ? 'is-open' : ''}`}>
+            {row.steps.map((step) => renderRow(step))}
+          </ol>
         ) : null}
       </div>
     </li>
@@ -112,12 +74,14 @@ const SectionRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'section' }> }
 };
 
 const renderRow = (row: WorkProcessRow): React.ReactNode => {
+  if (row.type === 'toolGroup') return <ToolGroupRow key={row.id} row={row} renderRow={renderRow} />;
   if (row.type === 'tool') return <ToolRow key={row.id} row={row} />;
   if (row.type === 'userInput') return <UserInputRow key={row.id} row={row} />;
   if (row.type === 'approval') return <ApprovalRow key={row.id} row={row} />;
   if (row.type === 'diagnostic') return <DiagnosticRow key={row.id} row={row} />;
   if (row.type === 'subagent') return <SubagentRow key={row.id} row={row} />;
   if (row.type === 'task') return <TaskRow key={row.id} row={row} />;
+  if (row.type === 'response') return <ResponseRow key={row.id} row={row} />;
   if (row.type === 'section') return <SectionRow key={row.id} row={row} />;
   return <SummaryRow key={row.id} row={row} />;
 };
@@ -133,18 +97,19 @@ export const WorkProcess: React.FC<WorkProcessProps> = ({ trace }) => {
     }
   }, [trace.status, presentation.important]);
 
-  const headlineCopy = t(TRACE_HEADLINE_KEY[trace.status]);
-  const toolMeta = presentation.toolCount > 0
-    ? t('chat.workProcessTools', { count: presentation.toolCount })
+  const headlineCopy = t('chat.workProcessTitle');
+  const actionMeta = presentation.actionCount > 0
+    ? t('chat.workProcessActions', { count: presentation.actionCount })
     : '';
-  const metaParts = [toolMeta, presentation.duration].filter(Boolean);
+  const durationMeta = presentation.duration ? t('chat.workProcessDuration', { duration: presentation.duration }) : '';
+  const metaParts = [durationMeta, actionMeta].filter(Boolean);
   const hasBody = Boolean(presentation.summary) || presentation.rows.length > 0;
 
   return (
     <section
       className={`work-process status-${trace.status} ${expanded ? 'is-expanded' : 'is-collapsed'}`}
       data-testid="work-process"
-      aria-label="Work Process"
+      aria-label={headlineCopy}
     >
       <button
         type="button"
@@ -159,7 +124,7 @@ export const WorkProcess: React.FC<WorkProcessProps> = ({ trace }) => {
         </span>
         <span className={`work-process-status-dot status-${trace.status}`} aria-hidden="true" />
         <span className={`work-process-label status-${trace.status}`}>{headlineCopy}</span>
-        {metaParts.length > 0 ? <span className="work-process-meta">{metaParts.join(' / ')}</span> : null}
+        {metaParts.length > 0 ? <span className="work-process-meta">{metaParts.join(' · ')}</span> : null}
       </button>
 
       {expanded && hasBody ? (

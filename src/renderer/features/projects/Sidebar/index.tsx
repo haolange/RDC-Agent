@@ -88,8 +88,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
                 const isCurrentProject = selection.currentProject?.projectId === project.projectId;
                 const isProjectRailActive = isCurrentProject && selection.rightRailTarget === 'project';
                 const isExpanded = tree.expandedProjectIds.includes(project.projectId);
-                const projectSessions = tree.projectSessionsByProject[project.projectId]
-                  ?? (isCurrentProject ? selection.sessions : []);
+                const projectSessions = isCurrentProject
+                  ? selection.sessions
+                  : (tree.projectSessionsByProject[project.projectId] ?? []);
                 return (
                   <ProjectGroup
                     key={project.projectId}

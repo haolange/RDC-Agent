@@ -586,7 +586,7 @@
 
 .composer-permission-popup {
   position: absolute;
-  right: 0;
+  left: 0;
   bottom: calc(100% + var(--space-2));
   z-index: var(--z-dropdown);
   width: min(22rem, 72vw);

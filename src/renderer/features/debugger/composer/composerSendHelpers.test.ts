@@ -5,6 +5,7 @@ import {
   applyConversationTurnResult,
   syncE2EConversationState,
 } from './composerSendHelpers';
+import { useConversationStore } from '../../../stores/conversationStore';
 
 const makeMessage = (
   id: string,
@@ -41,6 +42,7 @@ const makeElectronApi = () => ({
 describe('composerSendHelpers', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    useConversationStore.getState().reset();
     delete (globalThis as { navigator?: Navigator }).navigator;
   });
 
@@ -79,6 +81,48 @@ describe('composerSendHelpers', () => {
     expect(setConversationMessages).toHaveBeenCalledWith(visibleMessages);
     expect(setBranchState).toHaveBeenCalledWith(branchState);
     expect(upsertConversationMessages).not.toHaveBeenCalled();
+  });
+
+  it('keeps the newer SSE terminal message when invoke returns a stale draft snapshot', async () => {
+    const userMessage = makeMessage('user-1', 'turn-1', 'user', 'prompt');
+    const staleAssistantDraft = {
+      ...makeMessage('assistant-1', 'turn-1', 'assistant', ''),
+      status: 'streaming' as const,
+      updatedAt: 2,
+    };
+    const terminalAssistant = {
+      ...staleAssistantDraft,
+      content: 'done',
+      status: 'complete' as const,
+      updatedAt: 10,
+    };
+    useConversationStore.getState().setConversationMessages([userMessage, terminalAssistant]);
+
+    const result: ConversationTurnResult = {
+      session: null,
+      mode: 'talk',
+      userMessage,
+      assistantDraftMessage: staleAssistantDraft,
+      messages: [userMessage, staleAssistantDraft],
+      executionTransition: { action: 'none' },
+    };
+    const setConversationMessages = vi.fn();
+
+    await applyConversationTurnResult({
+      electronAPI: makeElectronApi(),
+      result,
+      currentProject: null,
+      setCurrentSession: vi.fn(),
+      setSessions: vi.fn(),
+      setCurrentRun: vi.fn(),
+      setRuns: vi.fn(),
+      setTracePresentation: vi.fn(),
+      setConversationMessages,
+      setBranchState: vi.fn(),
+      upsertConversationMessages: vi.fn(),
+    });
+
+    expect(setConversationMessages).toHaveBeenCalledWith([userMessage, terminalAssistant]);
   });
 
   it('uses direct upsert only for results without canonical messages', async () => {

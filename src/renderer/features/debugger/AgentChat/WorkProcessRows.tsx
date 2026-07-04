@@ -1,6 +1,7 @@
 import React from 'react';
 import { useI18n } from '../../../i18n';
 import { getRowStatusLabel, type WorkProcessRow } from './workProcessPresentation';
+import { WorkProcessIcon } from './WorkProcessIcons';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 
 const ConsoleOutput: React.FC<{ lines: string[] }> = ({ lines }) => {
@@ -69,6 +70,37 @@ const ResultPreview: React.FC<{ lines: string[]; compact?: boolean }> = ({ lines
 };
 
 type ToolRowModel = Extract<WorkProcessRow, { type: 'tool' }>;
+type ToolGroupRowModel = Extract<WorkProcessRow, { type: 'toolGroup' }>;
+
+export const ToolGroupRow: React.FC<{
+  row: ToolGroupRowModel;
+  renderRow: (row: WorkProcessRow) => React.ReactNode;
+}> = ({ row, renderRow }) => (
+  <li
+    className={`work-process-step work-process-tool-group status-${row.status} kind-${row.kind}`}
+    data-testid="work-process-tool-group"
+  >
+    <WorkProcessRailIcon variant="step" status={row.status} />
+    <div className="work-process-step-content">
+      <details className="work-process-tool-group-details" open={row.defaultOpen}>
+        <summary className="work-process-tool-group-summary">
+          <span className="work-process-tool-group-head">
+            <span className="work-process-tool-group-icon" aria-hidden="true">
+              <WorkProcessIcon icon={row.icon} />
+            </span>
+            <span className="work-process-tool-group-title">{row.title}</span>
+            <span className="work-process-tool-group-count">{row.countLabel}</span>
+          </span>
+          {row.summary ? <span className="work-process-tool-group-preview">{row.summary}</span> : null}
+          <span className="work-process-row-caret" aria-hidden="true" />
+        </summary>
+        <ol className="work-process-steps work-process-tool-group-list">
+          {row.rows.map((child) => renderRow(child))}
+        </ol>
+      </details>
+    </div>
+  </li>
+);
 
 const ToolApprovalCallout: React.FC<{ approval: NonNullable<ToolRowModel['approval']> }> = ({ approval }) => (
   <div className={`work-process-tool-approval status-${approval.status}`} data-testid="work-process-tool-approval">

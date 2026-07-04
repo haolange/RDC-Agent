@@ -118,19 +118,25 @@
   }
 
   .composer-footer-bar {
-    align-items: center;
-    flex-wrap: nowrap;
+    align-items: flex-end;
+    flex-wrap: wrap;
   }
 
   .composer-toolbar-group-left {
-    width: auto;
-    flex: 1 1 auto;
+    width: 100%;
+    flex: 1 1 100%;
   }
 
   .composer-toolbar-group-right {
     width: auto;
     flex: 0 0 auto;
+    margin-left: auto;
     justify-content: flex-end;
+  }
+
+  .composer-permission-popup {
+    left: auto;
+    right: 0;
   }
 }
 

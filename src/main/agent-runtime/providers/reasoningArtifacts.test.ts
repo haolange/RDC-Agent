@@ -151,4 +151,65 @@ describe('provider reasoning artifact replay policy', () => {
       input: { path: 'README.md' },
     });
   });
+
+  it('groups consecutive Anthropic tool results into the immediate next user message', () => {
+    const anthropicResult = anthropicTesting.toAnthropicMessages({
+      ...baseContext,
+      messages: [
+        assistant([
+          { type: 'toolCall', id: 'tool_1', name: 'memory_read', arguments: { name: 'project-identity' } },
+          { type: 'toolCall', id: 'tool_2', name: 'memory_read', arguments: { name: 'project-model' } },
+        ]),
+        {
+          role: 'toolResult',
+          toolCallId: 'tool_1',
+          toolName: 'memory_read',
+          content: [{ type: 'text', text: 'identity' }],
+          isError: false,
+          timestamp: 1,
+        },
+        {
+          role: 'toolResult',
+          toolCallId: 'tool_2',
+          toolName: 'memory_read',
+          content: [{ type: 'text', text: 'model' }],
+          isError: false,
+          timestamp: 1,
+        },
+      ],
+    });
+
+    expect(anthropicResult.messages).toHaveLength(2);
+    expect(anthropicResult.messages[1]).toMatchObject({ role: 'user' });
+    expect(anthropicResult.messages[1].content).toMatchObject([
+      { type: 'tool_result', tool_use_id: 'tool_1' },
+      { type: 'tool_result', tool_use_id: 'tool_2' },
+    ]);
+  });
+
+  it('does not send empty Anthropic message content', () => {
+    const anthropicResult = anthropicTesting.toAnthropicMessages({
+      ...baseContext,
+      messages: [
+        assistant([]),
+        {
+          role: 'toolResult',
+          toolCallId: 'tool_empty',
+          toolName: 'memory_read',
+          content: [],
+          isError: false,
+          timestamp: 1,
+        },
+      ],
+    });
+
+    expect(anthropicResult.messages).toHaveLength(1);
+    expect(anthropicResult.messages[0].content).toMatchObject([
+      {
+        type: 'tool_result',
+        tool_use_id: 'tool_empty',
+        content: [{ type: 'text', text: 'Tool returned no text.' }],
+      },
+    ]);
+  });
 });
