@@ -10947,8 +10947,21 @@ function resolveAnthropicThinkingVisibility(reasoningVisibility) {
 }
 function toAnthropicMessages(context2) {
   const messages = [];
-  for (const message of context2.messages) {
-    messages.push(...convertMessage$4(message));
+  for (let index = 0; index < context2.messages.length; index += 1) {
+    const message = context2.messages[index];
+    if (message.role === "toolResult") {
+      const toolResultBlocks = [];
+      while (index < context2.messages.length && context2.messages[index].role === "toolResult") {
+        const toolResultMessage = context2.messages[index];
+        if (toolResultMessage.role !== "toolResult") break;
+        toolResultBlocks.push(toAnthropicToolResultBlock(toolResultMessage));
+        index += 1;
+      }
+      index -= 1;
+      messages.push({ role: "user", content: toolResultBlocks });
+      continue;
+    }
+    messages.push(...convertMessage$4(message).filter((converted) => converted.content.length > 0));
   }
   return {
     system: context2.systemPrompt && context2.systemPrompt.trim() ? context2.systemPrompt : void 0,
@@ -10958,11 +10971,12 @@ function toAnthropicMessages(context2) {
 function convertMessage$4(message) {
   if (message.role === "user") {
     if (typeof message.content === "string") {
-      return [{ role: "user", content: [{ type: "text", text: message.content }] }];
+      const text = message.content.trim();
+      return text ? [{ role: "user", content: [{ type: "text", text }] }] : [];
     }
     const blocks = [];
     for (const block of message.content) {
-      if (block.type === "text") {
+      if (block.type === "text" && block.text.trim()) {
         blocks.push({ type: "text", text: block.text });
       } else if (block.type === "image") {
         blocks.push({
@@ -10976,7 +10990,7 @@ function convertMessage$4(message) {
   if (message.role === "assistant") {
     const blocks = [];
     for (const block of message.content) {
-      if (block.type === "text") {
+      if (block.type === "text" && block.text.trim()) {
         blocks.push({ type: "text", text: block.text });
       } else if (block.type === "thinking") {
         const replayBlock = toAnthropicThinkingReplayBlock(block.text, block.artifact, block.replayPolicy);
@@ -10992,23 +11006,24 @@ function convertMessage$4(message) {
     }
     return [{ role: "assistant", content: blocks }];
   }
-  const textBlocks = [];
-  for (const block of message.content) {
-    if (block.type === "text") textBlocks.push({ type: "text", text: block.text });
-  }
   return [
     {
       role: "user",
-      content: [
-        {
-          type: "tool_result",
-          tool_use_id: message.toolCallId,
-          content: textBlocks,
-          is_error: message.isError || void 0
-        }
-      ]
+      content: [toAnthropicToolResultBlock(message)]
     }
   ];
+}
+function toAnthropicToolResultBlock(message) {
+  const textBlocks = [];
+  for (const block of message.content) {
+    if (block.type === "text" && block.text.trim()) textBlocks.push({ type: "text", text: block.text });
+  }
+  return {
+    type: "tool_result",
+    tool_use_id: message.toolCallId,
+    content: textBlocks.length > 0 ? textBlocks : [{ type: "text", text: "Tool returned no text." }],
+    is_error: message.isError || void 0
+  };
 }
 function createAnthropicThinkingArtifact(model, signature) {
   return {

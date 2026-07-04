@@ -563,7 +563,7 @@
 /* Work Process transcript presentation - canonical runtime view */
 .work-process {
   position: relative;
-  width: min(100%, 58rem);
+  width: min(100%, 56rem);
   overflow: visible;
   border: 0;
   border-radius: 0;
@@ -571,12 +571,13 @@
 }
 
 .work-process-header {
-  display: inline-flex;
+  display: inline-grid;
   align-self: flex-start;
+  grid-template-columns: var(--space-4) auto auto auto;
   align-items: center;
   gap: var(--space-2);
-  margin: 0 0 var(--space-1) calc(-1 * var(--space-2));
-  padding: var(--space-1) var(--space-2);
+  margin: 0 0 var(--space-1);
+  padding: var(--space-1) 0;
   border: 0;
   border-radius: var(--radius-full);
   background: transparent;
@@ -598,6 +599,7 @@
 
 /* chevron disclosure icon */
 .work-process-caret {
+  order: 4;
   flex: 0 0 auto;
   width: 16px;
   height: 16px;
@@ -614,6 +616,8 @@
 
 
 .work-process-status-dot {
+  order: 1;
+  justify-self: center;
   flex: 0 0 auto;
   width: 9px;
   height: 9px;
@@ -647,6 +651,7 @@
 }
 
 .work-process-label {
+  order: 2;
   color: var(--token-text-body);
   font-size: var(--text-sm);
   font-weight: var(--font-medium);
@@ -661,6 +666,7 @@
 }
 
 .work-process-meta {
+  order: 3;
   display: inline-flex;
   align-items: center;
   color: var(--token-text-caption);
@@ -668,13 +674,11 @@
 }
 
 .work-process-meta::before {
-  content: '/';
-  margin-right: var(--space-2);
-  color: var(--token-text-placeholder);
+  content: none;
 }
 
 .work-process-body {
-  padding: var(--space-1) 0 0;
+  padding: var(--space-2) 0 0;
 }
 
 .work-process-summary {
@@ -697,9 +701,9 @@
 
 .work-process-step {
   display: grid;
-  grid-template-columns: var(--space-5) minmax(0, 1fr);
+  grid-template-columns: var(--space-4) minmax(0, 1fr);
   gap: var(--space-2);
-  padding: 0 0 var(--space-4);
+  padding: 0 0 var(--space-3);
 }
 
 .work-process-step:last-child {
@@ -715,12 +719,12 @@
 .work-process-step-rail::before {
   content: '';
   position: absolute;
-  top: calc(var(--space-5) + var(--space-1));
-  bottom: calc(var(--space-4) * -1);
+  top: calc(var(--space-4) + var(--space-1));
+  bottom: calc(var(--space-3) * -1);
   left: 50%;
   width: 1px;
   transform: translateX(-50%);
-  background: color-mix(in srgb, var(--token-border-muted) 56%, transparent);
+  background: color-mix(in srgb, var(--token-border-muted) 64%, transparent);
 }
 
 .work-process-step:last-child .work-process-step-rail::before {
@@ -729,7 +733,7 @@
 
 .work-process-rail-marker {
   position: absolute;
-  top: var(--space-3);
+  top: calc(var(--space-2) + 2px);
   left: 50%;
   display: block;
   width: var(--space-2);
@@ -740,11 +744,11 @@
   background: var(--token-text-caption);
 }
 
-.work-process-step-rail.is-section .work-process-rail-marker {
-  background: var(--token-text-caption);
+.work-process-step-rail.is-step .work-process-rail-marker {
+  background: var(--token-status-success);
 }
 
-.work-process-step-rail.is-step .work-process-rail-marker {
+.work-process-step-rail.status-complete .work-process-rail-marker {
   background: var(--token-status-success);
 }
 
@@ -764,7 +768,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
 .work-process-step-summary {
@@ -788,6 +792,108 @@
   min-width: 0;
   color: var(--token-text-body);
   font-size: var(--text-sm);
+}
+
+.work-process-icon {
+  display: block;
+  width: var(--space-4);
+  height: var(--space-4);
+}
+
+.work-process-tool-group-details {
+  width: min(100%, 54rem);
+}
+
+.work-process-tool-group-summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  min-width: 0;
+  padding: var(--space-1) 0;
+  color: var(--token-text-caption);
+  cursor: pointer;
+  list-style: none;
+}
+
+.work-process-tool-group-summary::-webkit-details-marker {
+  display: none;
+}
+
+.work-process-tool-group-summary:hover {
+  color: var(--token-text-body);
+}
+
+.work-process-tool-group-summary:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+
+.work-process-tool-group-head {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.work-process-tool-group-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-5);
+  height: var(--space-5);
+  color: var(--token-text-caption);
+}
+
+.work-process-tool-group-title {
+  color: var(--token-text-heading);
+}
+
+.work-process-tool-group-count {
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+}
+
+.work-process-tool-group-preview {
+  min-width: min(18rem, 100%);
+  flex: 1 1 16rem;
+  color: var(--token-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--font-regular);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-process-tool-group-details[open] .work-process-row-caret {
+  transform: rotate(90deg);
+}
+
+.work-process-tool-group-list {
+  gap: 0;
+  margin: var(--space-1) 0 0 var(--space-2);
+  padding: 0 0 0 var(--space-4);
+  border-left: 1px solid var(--token-border-muted);
+}
+
+.work-process-tool-group-list .work-process-step {
+  grid-template-columns: var(--space-3) minmax(0, 1fr);
+  gap: var(--space-1);
+  padding: var(--space-1) 0;
+}
+
+.work-process-tool-group-list .work-process-step-rail::before {
+  display: none;
+}
+
+.work-process-tool-group-list .work-process-rail-marker {
+  top: calc(var(--space-2) + 2px);
+  width: calc(var(--space-2) - 2px);
+  height: calc(var(--space-2) - 2px);
 }
 
 .work-process-user-input,
@@ -947,15 +1053,11 @@
 }
 
 .work-process-step.kind-section {
-  padding-bottom: var(--space-2);
+  padding-bottom: var(--space-4);
 }
 
 .work-process-step.kind-section .work-process-step-content {
-  gap: var(--space-1);
-}
-
-.work-process-section-list .work-process-step {
-  padding-bottom: var(--space-2);
+  gap: var(--space-2);
 }
 
 /* Work Process loop timeline: thinking evidence, result, then tool execution. */
@@ -963,8 +1065,8 @@
   width: min(100%, 54rem);
   margin: 0;
   color: var(--token-text-body);
-  font-size: var(--text-sm);
-  line-height: 1.65;
+  font-size: var(--text-base);
+  line-height: 1.78;
   overflow-wrap: anywhere;
 }
 
@@ -976,16 +1078,14 @@
 
 .work-process-loop-tool-summary {
   color: var(--token-text-caption);
-  font-size: var(--text-xs);
-  line-height: 1.5;
+  font-size: var(--text-sm);
+  line-height: 1.65;
 }
 
 .work-process-loop-result.is-clamped .work-process-loop-result-text {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  white-space: normal;
+  display: block;
+  overflow: visible;
+  white-space: pre-wrap;
 }
 
 .work-process-loop-result.is-streaming .work-process-loop-result-text::after,
@@ -1003,14 +1103,29 @@
 }
 
 .work-process-thinking-state {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+  display: block;
   width: min(100%, 54rem);
   margin: 0;
   color: var(--token-text-caption);
   font-size: var(--text-sm);
-  line-height: 1.5;
+  line-height: 1.65;
+}
+
+.work-process-thinking-state.kind-summary {
+  display: block;
+}
+
+.work-process-thinking-label {
+  flex: 0 0 auto;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+}
+
+.work-process-thinking-text {
+  min-width: 0;
+  color: var(--token-text-muted);
+  overflow-wrap: anywhere;
 }
 
 .work-process-thinking-state.kind-opaque,
@@ -1022,16 +1137,20 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   width: fit-content;
-  min-height: var(--space-7);
-  padding: var(--space-1) var(--space-2);
+  min-height: var(--space-5);
+  padding: 0;
   overflow: hidden;
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--token-bg-muted) 54%, transparent);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
   cursor: pointer;
   list-style: none;
+  transition: color var(--transition-fast);
 }
 
 .work-process-thinking-summary::-webkit-details-marker {
@@ -1039,22 +1158,20 @@
 }
 
 .work-process-thinking-state.status-streaming .work-process-thinking-summary {
-  border-color: var(--token-border-focus);
+  color: var(--token-text-body);
+}
+
+.work-process-thinking-summary:hover {
+  color: var(--token-text-body);
+}
+
+.work-process-thinking-summary:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
 }
 
 .work-process-thinking-state.status-streaming .work-process-thinking-summary::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--token-border-focus) 22%, transparent),
-    transparent
-  );
-  transform: translateX(-120%);
-  animation: work-process-thinking-sweep 1.45s linear infinite;
+  content: none;
 }
 
 .work-process-thinking-summary > * {
@@ -1068,17 +1185,18 @@
 }
 
 .work-process-thinking-preview {
-  width: min(100%, 54rem);
-  max-height: 14rem;
-  margin: var(--space-2) 0 0;
-  padding: var(--space-3);
-  overflow: auto;
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--token-bg-app);
+  width: 100%;
+  max-height: none;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--token-text-body);
-  font-size: var(--text-xs);
-  line-height: 1.55;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: 1.65;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -1087,9 +1205,84 @@
   transform: rotate(90deg);
 }
 
-@keyframes work-process-thinking-sweep {
-  from { transform: translateX(-120%); }
-  to { transform: translateX(120%); }
+.work-process-response {
+  padding-bottom: var(--space-2);
+}
+
+.work-process-response-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--space-7);
+  width: min(100%, 54rem);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  cursor: pointer;
+  list-style: none;
+}
+
+.work-process-response-summary-static {
+  cursor: default;
+}
+
+.work-process-response-details {
+  width: 100%;
+}
+
+.work-process-response-summary::-webkit-details-marker {
+  display: none;
+}
+
+.work-process-response-summary:hover {
+  color: var(--token-text-body);
+}
+
+.work-process-response-summary:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+
+.work-process-response-head {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.work-process-response-title {
+  color: var(--token-text-body);
+  font-weight: var(--font-semibold);
+}
+
+.work-process-response-summary-text {
+  min-width: 0;
+  color: var(--token-text-caption);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-process-response-details[open] .work-process-row-caret {
+  transform: rotate(90deg);
+}
+
+.work-process-response-thinking {
+  width: min(100%, 54rem);
+  margin-top: var(--space-1);
+  color: var(--token-text-caption);
+}
+
+.work-process-response-thinking-label {
+  display: inline-flex;
+  margin-bottom: var(--space-1);
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
 }
 
 @keyframes work-process-result-pulse {
@@ -1105,67 +1298,6 @@
   }
 }
 
-.work-process-section-steps {
-  width: min(100%, 54rem);
-  margin-top: var(--space-1);
-}
-
-.work-process-steps-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: fit-content;
-  min-height: var(--space-7);
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--token-bg-muted) 54%, transparent);
-  color: var(--token-text-caption);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  line-height: 1.5;
-  cursor: pointer;
-  list-style: none;
-  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
-}
-
-.work-process-steps-toggle::-webkit-details-marker {
-  display: none;
-}
-
-.work-process-steps-toggle:hover {
-  border-color: var(--token-border-default);
-  color: var(--token-text-body);
-}
-
-.work-process-steps-toggle:focus-visible {
-  outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
-}
-
-.work-process-steps-icon {
-  flex: 0 0 auto;
-  opacity: 0.76;
-}
-
-.work-process-steps-toggle-label {
-  color: inherit;
-}
-
-.work-process-steps-chevron {
-  width: 0.45rem;
-  height: 0.45rem;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: rotate(-45deg);
-  opacity: 0.55;
-  transition: transform 120ms ease;
-}
-
-.work-process-section-steps[open] .work-process-steps-chevron {
-  transform: rotate(45deg);
-}
-
 .work-process-step.kind-tool.is-compact .work-process-tool-target {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -1173,6 +1305,7 @@
 
 .work-process-step.kind-tool.is-compact .work-process-tool-summary {
   cursor: pointer;
+  min-height: var(--space-6);
 }
 
 .work-process-step.kind-tool.is-compact .work-process-tool-summary-static {
@@ -1237,7 +1370,42 @@
 }
 
 .work-process-section-list {
-  margin-top: var(--space-2);
+  gap: 0;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.work-process-section-list .work-process-step {
+  grid-template-columns: var(--space-4) minmax(0, 1fr);
+  padding: var(--space-1) 0;
+  border-bottom: 0;
+}
+
+.work-process-section-list .work-process-step:last-child {
+  border-bottom: 0;
+}
+
+.work-process-section-list .work-process-step-rail::before {
+  display: none;
+}
+
+.work-process-section-list .work-process-rail-marker {
+  top: calc(var(--space-2) + 2px);
+  width: calc(var(--space-2) - 2px);
+  height: calc(var(--space-2) - 2px);
+}
+
+.work-process-section-list .work-process-tool-summary {
+  min-height: var(--space-6);
+  padding: 0;
+}
+
+.work-process-section-list .work-process-tool-summary:hover {
+  background: transparent;
 }
 
 

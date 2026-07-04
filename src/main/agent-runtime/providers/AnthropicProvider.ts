@@ -386,8 +386,21 @@ function toAnthropicMessages(context: Context): {
   messages: AnthropicMessage[];
 } {
   const messages: AnthropicMessage[] = [];
-  for (const message of context.messages) {
-    messages.push(...convertMessage(message));
+  for (let index = 0; index < context.messages.length; index += 1) {
+    const message = context.messages[index];
+    if (message.role === 'toolResult') {
+      const toolResultBlocks: AnthropicContentBlock[] = [];
+      while (index < context.messages.length && context.messages[index].role === 'toolResult') {
+        const toolResultMessage = context.messages[index];
+        if (toolResultMessage.role !== 'toolResult') break;
+        toolResultBlocks.push(toAnthropicToolResultBlock(toolResultMessage));
+        index += 1;
+      }
+      index -= 1;
+      messages.push({ role: 'user', content: toolResultBlocks });
+      continue;
+    }
+    messages.push(...convertMessage(message).filter((converted) => converted.content.length > 0));
   }
   return {
     system: context.systemPrompt && context.systemPrompt.trim() ? context.systemPrompt : undefined,
@@ -398,11 +411,12 @@ function toAnthropicMessages(context: Context): {
 function convertMessage(message: Message): AnthropicMessage[] {
   if (message.role === 'user') {
     if (typeof message.content === 'string') {
-      return [{ role: 'user', content: [{ type: 'text', text: message.content }] }];
+      const text = message.content.trim();
+      return text ? [{ role: 'user', content: [{ type: 'text', text }] }] : [];
     }
     const blocks: AnthropicContentBlock[] = [];
     for (const block of message.content) {
-      if (block.type === 'text') {
+      if (block.type === 'text' && block.text.trim()) {
         blocks.push({ type: 'text', text: block.text });
       } else if (block.type === 'image') {
         blocks.push({
@@ -417,7 +431,7 @@ function convertMessage(message: Message): AnthropicMessage[] {
   if (message.role === 'assistant') {
     const blocks: AnthropicContentBlock[] = [];
     for (const block of message.content) {
-      if (block.type === 'text') {
+      if (block.type === 'text' && block.text.trim()) {
         blocks.push({ type: 'text', text: block.text });
       } else if (block.type === 'thinking') {
         const replayBlock = toAnthropicThinkingReplayBlock(block.text, block.artifact, block.replayPolicy);
@@ -434,23 +448,25 @@ function convertMessage(message: Message): AnthropicMessage[] {
     return [{ role: 'assistant', content: blocks }];
   }
 
-  const textBlocks: Array<{ type: 'text'; text: string }> = [];
-  for (const block of message.content) {
-    if (block.type === 'text') textBlocks.push({ type: 'text', text: block.text });
-  }
   return [
     {
       role: 'user',
-      content: [
-        {
-          type: 'tool_result',
-          tool_use_id: message.toolCallId,
-          content: textBlocks,
-          is_error: message.isError || undefined,
-        },
-      ],
+      content: [toAnthropicToolResultBlock(message)],
     },
   ];
+}
+
+function toAnthropicToolResultBlock(message: Extract<Message, { role: 'toolResult' }>): AnthropicContentBlock {
+  const textBlocks: Array<{ type: 'text'; text: string }> = [];
+  for (const block of message.content) {
+    if (block.type === 'text' && block.text.trim()) textBlocks.push({ type: 'text', text: block.text });
+  }
+  return {
+    type: 'tool_result',
+    tool_use_id: message.toolCallId,
+    content: textBlocks.length > 0 ? textBlocks : [{ type: 'text', text: 'Tool returned no text.' }],
+    is_error: message.isError || undefined,
+  };
 }
 
 function createAnthropicThinkingArtifact(model: Model, signature?: string): ProviderReasoningArtifact {

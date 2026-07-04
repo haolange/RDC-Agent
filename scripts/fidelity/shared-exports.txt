@@ -164,6 +164,8 @@ ConversationErrorViewModel
 ConversationExecutionTransition
 ConversationFork
 ConversationHistoryResult
+ConversationLoopResult
+ConversationLoopResultStatus
 ConversationMessage
 ConversationMessageCompletedEvent
 ConversationMessageDiagnostic
@@ -179,6 +181,7 @@ ConversationSendRequest
 ConversationStreamEvent
 ConversationSwitchBranchRequest
 ConversationSwitchBranchResult
+ConversationThinkingStatus
 ConversationToolApproval
 ConversationToolApprovalStatus
 ConversationToolCall

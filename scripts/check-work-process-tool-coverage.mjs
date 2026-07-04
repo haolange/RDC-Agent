@@ -4,7 +4,10 @@ const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
 
 const { AGENT_WORKBENCH_TOOL_CATALOG } = require('../src/shared/constants/agentWorkbenchCatalog.ts');
-const { createToolRowForPresentation } = require('../src/renderer/features/debugger/AgentChat/workProcessPresentation.ts');
+const {
+  WORK_PROCESS_TOOL_DISPLAY_CATALOG,
+  createToolRowForPresentation,
+} = require('../src/renderer/features/debugger/AgentChat/workProcessPresentation.ts');
 
 const fail = (message) => {
   console.error(`[work-process-tool-coverage] ${message}`);
@@ -44,11 +47,59 @@ const FIXTURES = {
   },
   write_file: {
     argsPreview: JSON.stringify({ path: 'notes.md', content: 'hello' }),
-    resultPreview: JSON.stringify({ ok: true }),
+    resultPreview: JSON.stringify({ ok: true, bytes: 5 }),
   },
   edit_file: {
     argsPreview: JSON.stringify({ path: 'src/foo.ts', patch: '...' }),
+    resultPreview: JSON.stringify({ ok: true, additions: 3, deletions: 1 }),
+  },
+  delete_file: {
+    argsPreview: JSON.stringify({ path: 'tmp.txt' }),
     resultPreview: JSON.stringify({ ok: true }),
+  },
+  move_file: {
+    argsPreview: JSON.stringify({ source: 'a.txt', destination: 'b.txt' }),
+    resultPreview: JSON.stringify({ ok: true }),
+  },
+  copy_file: {
+    argsPreview: JSON.stringify({ source: 'a.txt', destination: 'b.txt' }),
+    resultPreview: JSON.stringify({ ok: true }),
+  },
+  search_codebase: {
+    argsPreview: JSON.stringify({ query: 'ConversationService' }),
+    resultPreview: JSON.stringify({ matches: ['src/main/conversation/ConversationService.ts'] }),
+  },
+  notebook_edit: {
+    argsPreview: JSON.stringify({ path: 'notes.ipynb' }),
+    resultPreview: JSON.stringify({ ok: true }),
+  },
+  ask_user_question: {
+    argsPreview: JSON.stringify({ question: 'Which option?' }),
+    resultPreview: JSON.stringify({ ok: true }),
+  },
+  git_status: {
+    argsPreview: '{}',
+    resultPreview: JSON.stringify({ status: 'M README.md' }),
+  },
+  git_diff: {
+    argsPreview: JSON.stringify({ path: 'README.md' }),
+    resultPreview: JSON.stringify({ output: '+ added line' }),
+  },
+  git_log: {
+    argsPreview: JSON.stringify({ limit: 5 }),
+    resultPreview: JSON.stringify({ output: 'abc123 message' }),
+  },
+  git_add: {
+    argsPreview: JSON.stringify({ path: 'README.md' }),
+    resultPreview: JSON.stringify({ ok: true }),
+  },
+  git_unstage: {
+    argsPreview: JSON.stringify({ path: 'README.md' }),
+    resultPreview: JSON.stringify({ ok: true }),
+  },
+  git_commit: {
+    argsPreview: JSON.stringify({ message: 'Update work process' }),
+    resultPreview: JSON.stringify({ output: '[main abc123] Update work process' }),
   },
   task_list: {
     argsPreview: '{}',
@@ -66,9 +117,17 @@ const FIXTURES = {
     argsPreview: JSON.stringify({ taskId: 'task-1' }),
     resultPreview: JSON.stringify({ subject: 'New task' }),
   },
+  task_stop: {
+    argsPreview: JSON.stringify({ taskId: 'task-1' }),
+    resultPreview: JSON.stringify({ taskId: 'task-1', status: 'stopped' }),
+  },
   agent_handoff: {
     argsPreview: JSON.stringify({ agent: 'edit', prompt: 'Implement fix' }),
     resultPreview: JSON.stringify({ ok: true }),
+  },
+  subagent: {
+    argsPreview: JSON.stringify({ profile: 'reviewer', prompt: 'Review this' }),
+    resultPreview: JSON.stringify({ ok: true, summary: 'Reviewed' }),
   },
   memory_read: {
     argsPreview: JSON.stringify({ name: 'project-notes' }),
@@ -86,9 +145,17 @@ const FIXTURES = {
     argsPreview: JSON.stringify({ title: 'Plan', content: '# Plan' }),
     resultPreview: JSON.stringify({ ok: true }),
   },
+  tool_search: {
+    argsPreview: JSON.stringify({ query: 'node_repl' }),
+    resultPreview: JSON.stringify({ tools: ['node_repl.js'] }),
+  },
   skills: {
     argsPreview: JSON.stringify({ query: 'lint' }),
     resultPreview: JSON.stringify({ skills: ['eslint'] }),
+  },
+  skill_run: {
+    argsPreview: JSON.stringify({ skill: 'baoyu-design' }),
+    resultPreview: JSON.stringify({ ok: true }),
   },
   mcp: {
     argsPreview: JSON.stringify({ query: 'fs' }),
@@ -98,47 +165,67 @@ const FIXTURES = {
     argsPreview: '{}',
     resultPreview: JSON.stringify({ capturePath: 'demo.rdc' }),
   },
-};
-
-const PRIMITIVE_FIXTURES = {
-  git_status: {
-    argsPreview: '{}',
-    resultPreview: JSON.stringify({ status: 'M README.md' }),
+  ask_user: {
+    argsPreview: JSON.stringify({ question: 'Continue?', choices: ['Yes', 'No'] }),
+    resultPreview: 'Yes',
   },
-  git_diff: {
+  mcp__filesystem__read_file: {
     argsPreview: JSON.stringify({ path: 'README.md' }),
-    resultPreview: JSON.stringify({ output: '+ added line' }),
-  },
-  search_codebase: {
-    argsPreview: JSON.stringify({ query: 'ConversationService' }),
-    resultPreview: JSON.stringify({ matches: ['src/main/conversation/ConversationService.ts'] }),
-  },
-  notebook_edit: {
-    argsPreview: JSON.stringify({ path: 'notes.ipynb' }),
-    resultPreview: JSON.stringify({ ok: true }),
-  },
-  delete_file: {
-    argsPreview: JSON.stringify({ path: 'tmp.txt' }),
-    resultPreview: JSON.stringify({ ok: true }),
-  },
-  move_file: {
-    argsPreview: JSON.stringify({ source: 'a.txt', destination: 'b.txt' }),
-    resultPreview: JSON.stringify({ ok: true }),
-  },
-  copy_file: {
-    argsPreview: JSON.stringify({ source: 'a.txt', destination: 'b.txt' }),
-    resultPreview: JSON.stringify({ ok: true }),
+    resultPreview: JSON.stringify({ ok: true, content: 'hello' }),
   },
 };
 
-const ALL_TOOLS = [
-  ...AGENT_WORKBENCH_TOOL_CATALOG.map((tool) => tool.id),
-  ...Object.keys(PRIMITIVE_FIXTURES),
-].filter((id) => id !== 'ask_user');
+const PLAN_REQUIRED_TOOLS = [
+  'read_file',
+  'write_file',
+  'edit_file',
+  'bash',
+  'glob',
+  'grep',
+  'web_fetch',
+  'web_search',
+  'git_status',
+  'git_diff',
+  'git_log',
+  'git_add',
+  'git_unstage',
+  'git_commit',
+  'delete_file',
+  'move_file',
+  'copy_file',
+  'search_codebase',
+  'notebook_edit',
+  'ask_user_question',
+  'tool_search',
+  'ask_user',
+  'agent_handoff',
+  'plan_artifact',
+  'memory_read',
+  'memory_write',
+  'memory_delete',
+  'skills',
+  'skill_run',
+  'mcp',
+  'rdx_context',
+  'subagent',
+  'task_create',
+  'task_update',
+  'task_get',
+  'task_list',
+  'task_stop',
+  'mcp__filesystem__read_file',
+];
 
-for (const toolName of ALL_TOOLS) {
-  const fixture = FIXTURES[toolName] ?? PRIMITIVE_FIXTURES[toolName];
+const workbenchTools = AGENT_WORKBENCH_TOOL_CATALOG.map((tool) => tool.id);
+const allTools = [...new Set([...workbenchTools, ...PLAN_REQUIRED_TOOLS])];
+
+for (const toolName of allTools) {
+  const fixture = FIXTURES[toolName];
   assert(fixture, `missing fixture for ${toolName}`);
+
+  if (!toolName.startsWith('mcp__') && toolName !== 'ask_user') {
+    assert(WORK_PROCESS_TOOL_DISPLAY_CATALOG[toolName], `${toolName} missing display catalog entry`);
+  }
 
   const row = createToolRowForPresentation({
     id: `tool-${toolName}`,
@@ -150,9 +237,24 @@ for (const toolName of ALL_TOOLS) {
     completedAt: now + 50,
   }, true);
 
+  if (toolName === 'ask_user') {
+    assert(row.type === 'userInput', 'ask_user should render as userInput row');
+    assert(row.verb !== 'Asked user', 'ask_user should use localized semantic verb');
+    assert(row.question.length > 0, 'ask_user should expose the question');
+    continue;
+  }
+
   assert(row.type === 'tool', `${toolName} should render as tool row`);
-  assert(row.verb !== 'Called tool', `${toolName} should have a dedicated verb, got "${row.verb}"`);
+  assert(row.verb !== 'Called tool' && row.verb !== '已调用工具', `${toolName} should have a dedicated verb, got "${row.verb}"`);
+  assert(row.icon && row.icon !== 'tool', `${toolName} should have a semantic icon, got "${row.icon}"`);
+  assert(row.groupKind && row.groupKind !== 'diagnostic', `${toolName} should have a semantic group`);
+  assert(row.category.length > 0, `${toolName} should have a category`);
   assert(row.target.length > 0 || row.previewLines.length > 0, `${toolName} should expose target or preview`);
+
+  if (toolName.startsWith('mcp__')) {
+    assert(row.target === 'filesystem/read_file', `dynamic MCP target should be server/tool, got "${row.target}"`);
+    assert(row.groupKind === 'mcp', `dynamic MCP tool should be in mcp group, got "${row.groupKind}"`);
+  }
 }
 
-console.log(`[work-process-tool-coverage] OK (${ALL_TOOLS.length} tools)`);
+console.log(`[work-process-tool-coverage] OK (${allTools.length} tools)`);

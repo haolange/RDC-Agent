@@ -4,7 +4,10 @@ import fs from 'node:fs';
 const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
 
-const { buildWorkProcessPresentation, normalizeWorkProcessText } = require('../src/renderer/features/debugger/AgentChat/workProcessPresentation.ts');
+const {
+  buildWorkProcessPresentation,
+  normalizeWorkProcessText,
+} = require('../src/renderer/features/debugger/AgentChat/workProcessPresentation.ts');
 const { normalizeAssistantMarkdown } = require('../src/renderer/features/debugger/AgentChat/normalizeAssistantMarkdown.ts');
 
 const now = 1_700_000_000_000;
@@ -18,9 +21,11 @@ const assert = (condition, message) => {
   if (!condition) fail(message);
 };
 
-const flattenRows = (rows) => rows.flatMap((row) => (
-  row.type === 'section' ? [row, ...flattenRows(row.steps)] : [row]
-));
+const flattenRows = (rows) => rows.flatMap((row) => {
+  if (row.type === 'section') return [row, ...flattenRows(row.steps)];
+  if (row.type === 'toolGroup') return [row, ...flattenRows(row.rows)];
+  return [row];
+});
 
 const collectVisible = (rows) => rows.flatMap((row) => {
   if (row.type === 'section') return [
@@ -28,12 +33,27 @@ const collectVisible = (rows) => rows.flatMap((row) => {
     row.resultToolSummary,
     row.thinkingLabel,
     row.thinkingSource,
+    row.thinkingOpenByDefault ? row.thinkingPreview : '',
     ...collectVisible(row.steps),
+  ].filter(Boolean);
+  if (row.type === 'toolGroup') return [
+    row.title,
+    row.countLabel,
+    row.summary,
+    ...collectVisible(row.rows),
+  ].filter(Boolean);
+  if (row.type === 'response') return [
+    row.title,
+    row.summary,
+    row.thinkingLabel,
+    row.thinkingOpenByDefault ? row.thinkingPreview : '',
   ].filter(Boolean);
   if (row.type === 'tool') return [
     row.verb,
     row.toolName,
     row.target,
+    row.category,
+    row.groupKind,
     row.approval?.verb,
     row.approval?.message,
     ...(row.approval?.metaLines ?? []),
@@ -57,7 +77,7 @@ assert(!normalizedMarkdown.includes('\n\n\n'), 'markdown normalizer should remov
 
 const presentation = buildWorkProcessPresentation({
   status: 'complete',
-  summary: 'Reply completed.',
+  summary: '回复已完成',
   updatedAt: now + 4000,
   blocks: [
     {
@@ -122,24 +142,26 @@ const presentation = buildWorkProcessPresentation({
 
 const flatRows = flattenRows(presentation.rows);
 const visibleText = collectVisible(presentation.rows).join('\n');
-for (const forbidden of ['Agent Loop complete', 'Generate final answer', 'Final answer generated.', '"path": "package.json"']) {
+assert(presentation.summary === '', 'reply-complete trace summary should not render redundant body copy');
+for (const forbidden of ['Agent Loop complete', 'Generate final answer', 'Final answer generated.', '"path": "package.json"', 'Called tool']) {
   assert(!visibleText.includes(forbidden), `visible transcript leaked noisy label: ${forbidden}`);
 }
 const loopSection = presentation.rows.find((row) => row.type === 'section');
 assert(loopSection?.type === 'section', 'llm turn should render a work-process section');
-assert(loopSection.resultText === 'Read files before answering.', 'loop result must render model output');
-assert(loopSection.resultToolSummary === 'Requested 2 tools: read_file, glob.', 'loop result should summarize requested tools');
-assert(loopSection.resultStreaming === false, 'completed result should not be marked streaming');
-assert(loopSection.thinkingLabel === '', 'no-thinking model should not render thinking row');
-assert(loopSection.steps.length === 2, 'loop section should contain tool execution rows');
-assert(loopSection.defaultOpen === true, 'latest work-process section should default to expanded');
+assert(loopSection.resultText === 'Read files before answering.', 'tool-backed no-thinking loop should show its direct result');
+assert(loopSection.thinkingLabel === '', 'no-thinking loop should not render a fake reasoning label');
+assert(loopSection.stepCount === 2, `expected 2 tool actions in section, got ${loopSection.stepCount}`);
+assert(loopSection.steps.length === 1 && loopSection.steps[0].type === 'toolGroup', 'loop section should group adjacent file exploration actions');
+const explorationGroup = loopSection.steps[0];
+assert(explorationGroup.title === '探索', `expected exploration group, got ${explorationGroup.title}`);
+assert(explorationGroup.countLabel === '2 文件', `expected file count label, got ${explorationGroup.countLabel}`);
 const globRow = flatRows.find((row) => row.type === 'tool' && row.toolName === 'glob');
 const readRow = flatRows.find((row) => row.type === 'tool' && row.toolName === 'read_file');
+assert(readRow?.verb === '已读取', 'read_file row should use Chinese semantic verb');
+assert(globRow?.verb === '已列出', 'glob row should use Chinese semantic verb');
 assert(readRow?.previewLines.some((line) => line.includes('"name": "rdc-agent"')), 'read_file result was not unwrapped');
 assert(!readRow.previewLines.join('\n').includes('->'), 'read_file preview should strip line-number gutters');
-assert(globRow?.verb === 'Listed files', 'glob row should use compact transcript verb');
-assert(presentation.stepCount === 3, `expected 3 visible work steps, got ${presentation.stepCount}`);
-assert(presentation.toolCount === 2, `expected 2 tool steps, got ${presentation.toolCount}`);
+assert(presentation.actionCount === 2, `expected 2 actions, got ${presentation.actionCount}`);
 
 const rawThinkingPresentation = buildWorkProcessPresentation({
   status: 'complete',
@@ -152,7 +174,7 @@ const rawThinkingPresentation = buildWorkProcessPresentation({
       status: 'complete',
       result: { text: 'Tool result reviewed.', status: 'complete', toolCallIds: ['think-glob'] },
       thinking: {
-        text: 'hidden chain-of-thought that must not be visible',
+        text: 'provider-visible raw thinking',
         kind: 'raw',
         source: 'openai-compatible-raw',
         visibility: 'raw-collapsed',
@@ -167,71 +189,150 @@ const rawThinkingPresentation = buildWorkProcessPresentation({
 });
 const rawThinkingSection = rawThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(rawThinkingSection?.type === 'section', 'raw thinking loop should render a section');
-assert(rawThinkingSection.resultText === 'Tool result reviewed.', 'raw thinking must not replace loop result');
-assert(rawThinkingSection.thinkingLabel === 'Thought', 'completed raw thinking should be labeled thought');
-assert(rawThinkingSection.thinkingExpandable === true, 'raw thinking should be collapsed and expandable');
+assert(rawThinkingSection.thinkingLabel === '原始思考', 'raw thinking should expose a concrete disclosure label');
+assert(rawThinkingSection.thinkingPreview === 'provider-visible raw thinking', 'raw provider thinking should remain available behind disclosure');
 assert(rawThinkingSection.thinkingOpenByDefault === false, 'raw thinking should stay folded by default');
-assert(!collectVisible(rawThinkingPresentation.rows).join('\n').includes('hidden chain-of-thought'), 'visible transcript must not leak raw thinking');
 
-const streamingSummaryPresentation = buildWorkProcessPresentation({
-  status: 'running',
-  updatedAt: now + 9950,
-  blocks: [
-    {
-      id: 'runtime-loop-streaming-summary',
-      kind: 'llm_turn',
-      title: 'LLM turn',
-      status: 'running',
-      result: { text: 'I found the relevant files.', status: 'streaming', toolCallIds: [] },
-      thinking: {
-        text: 'Planning the next tool call.',
-        kind: 'summary',
-        source: 'openai-responses-summary',
-        visibility: 'summary',
-        replayPolicy: 'none',
-      },
-      thinkingStatus: 'streaming',
-      toolCalls: [],
-      startedAt: now + 330,
-    },
-  ],
-});
-const streamingSummarySection = streamingSummaryPresentation.rows.find((row) => row.type === 'section');
-assert(streamingSummarySection?.type === 'section', 'streaming summary section missing');
-assert(streamingSummarySection.thinkingLabel === 'Thinking', 'streaming thinking should use active label');
-assert(streamingSummarySection.thinkingOpenByDefault === true, 'streaming summary should open by default');
-assert(streamingSummarySection.resultText === 'I found the relevant files.', 'result should stream below thinking');
-assert(streamingSummarySection.resultStreaming === true, 'streaming loop result should be marked streaming');
-
-const completedSummaryPresentation = buildWorkProcessPresentation({
+const summaryThinkingPresentation = buildWorkProcessPresentation({
   status: 'complete',
-  updatedAt: now + 9960,
+  updatedAt: now + 9900,
   blocks: [
     {
-      id: 'runtime-loop-complete-summary',
+      id: 'runtime-loop-summary',
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'complete',
-      result: { text: 'Turn-end result.', status: 'complete', toolCallIds: [] },
+      result: { text: 'Turn result.', status: 'complete', toolCallIds: [] },
       thinking: {
-        text: 'Provider reasoning summary for this turn.',
+        text: 'The user asks in Chinese. Now answer in Chinese.',
         kind: 'summary',
-        source: 'openai-responses-summary',
+        source: 'anthropic-thinking',
         visibility: 'summary',
-        replayPolicy: 'none',
+        replayPolicy: 'provider-artifact',
       },
       thinkingStatus: 'complete',
       toolCalls: [],
-      startedAt: now + 340,
-      completedAt: now + 350,
+      startedAt: now + 225,
+      completedAt: now + 230,
     },
   ],
 });
-const completedSummarySection = completedSummaryPresentation.rows.find((row) => row.type === 'section');
-assert(completedSummarySection?.type === 'section', 'completed summary section missing');
-assert(completedSummarySection.thinkingLabel === 'Thought', 'completed summary should use complete label');
-assert(completedSummarySection.thinkingOpenByDefault === false, 'completed summary thinking should be folded');
-assert(completedSummarySection.resultText === 'Turn-end result.', 'completed summary thinking must not replace result');
+const summaryThinkingSection = summaryThinkingPresentation.rows.find((row) => row.type === 'section');
+assert(summaryThinkingSection?.type === 'section', 'summary thinking should render as process evidence');
+assert(summaryThinkingSection.resultText === '', 'answer-only thinking must not duplicate final answer text');
+assert(summaryThinkingSection.thinkingLabel === '思考', 'summary thinking should use a loop-level label distinct from the Work Process header');
+assert(summaryThinkingSection.thinkingOpenByDefault === true, 'summary thinking should be open by default');
+
+const duplicateSummary = 'I have all the answers from memory. Let me respond concisely in Chinese.';
+const duplicateSummaryPresentation = buildWorkProcessPresentation({
+  status: 'complete',
+  updatedAt: now + 9965,
+  blocks: [
+    {
+      id: 'runtime-loop-duplicate-before-tools',
+      kind: 'llm_turn',
+      title: 'LLM turn',
+      status: 'complete',
+      result: { text: '', status: 'complete', toolCallIds: ['duplicate-tool-read'] },
+      thinking: {
+        text: duplicateSummary,
+        kind: 'summary',
+        source: 'anthropic-thinking',
+        visibility: 'summary',
+        replayPolicy: 'provider-artifact',
+      },
+      thinkingStatus: 'complete',
+      toolCalls: [
+        { id: 'duplicate-tool-read', toolName: 'read_file', status: 'complete', argsPreview: JSON.stringify({ path: 'project-identity' }), startedAt: now + 352, completedAt: now + 356 },
+      ],
+      startedAt: now + 352,
+      completedAt: now + 356,
+    },
+    {
+      id: 'runtime-loop-duplicate-after-tools',
+      kind: 'llm_turn',
+      title: 'LLM turn',
+      status: 'complete',
+      result: { text: 'Final answer body only.', status: 'complete', toolCallIds: [] },
+      thinking: {
+        text: duplicateSummary,
+        kind: 'summary',
+        source: 'anthropic-thinking',
+        visibility: 'summary',
+        replayPolicy: 'provider-artifact',
+      },
+      thinkingStatus: 'complete',
+      toolCalls: [],
+      startedAt: now + 360,
+      completedAt: now + 365,
+    },
+  ],
+});
+const duplicateSummarySections = duplicateSummaryPresentation.rows.filter((row) => row.type === 'section');
+assert(duplicateSummarySections.length === 1, 'duplicate provider summary should not create repeated Work Process sections');
+const duplicateSummaryResponses = duplicateSummaryPresentation.rows.filter((row) => row.type === 'response');
+assert(duplicateSummaryResponses.length === 1, 'answer-only loop after tools should create one response boundary');
+assert(duplicateSummaryResponses[0].thinkingExpandable === false, 'duplicate response summary should be suppressed under the response boundary');
+assert(!JSON.stringify(duplicateSummaryResponses[0]).includes('Final answer body only.'), 'response boundary must not duplicate final answer body text');
+
+const streamingResponsePresentation = buildWorkProcessPresentation({
+  status: 'running',
+  updatedAt: now + 9967,
+  blocks: [
+    {
+      id: 'runtime-loop-response-before-tools',
+      kind: 'llm_turn',
+      title: 'LLM turn',
+      status: 'complete',
+      result: { text: 'Read memory before answer.', status: 'complete', toolCallIds: ['response-tool-memory'] },
+      thinking: {
+        text: 'Read project memory before answering.',
+        kind: 'summary',
+        source: 'anthropic-thinking',
+        visibility: 'summary',
+        replayPolicy: 'provider-artifact',
+      },
+      thinkingStatus: 'complete',
+      toolCalls: [
+        { id: 'response-tool-memory', toolName: 'memory_read', status: 'complete', argsPreview: JSON.stringify({ key: 'project-identity' }), startedAt: now + 370, completedAt: now + 375 },
+      ],
+      startedAt: now + 370,
+      completedAt: now + 375,
+    },
+    {
+      id: 'assistant-output',
+      kind: 'output',
+      title: 'Assistant output ready',
+      status: 'complete',
+      summary: 'Final answer generated.',
+      toolCalls: [],
+      startedAt: now + 376,
+      completedAt: now + 379,
+    },
+    {
+      id: 'runtime-loop-response-final',
+      kind: 'llm_turn',
+      title: 'LLM turn',
+      status: 'running',
+      result: { text: 'Streaming final answer tokens.', status: 'streaming', toolCallIds: [] },
+      thinking: {
+        text: 'Now produce the final answer.',
+        kind: 'summary',
+        source: 'anthropic-thinking',
+        visibility: 'summary',
+        replayPolicy: 'provider-artifact',
+      },
+      thinkingStatus: 'streaming',
+      toolCalls: [],
+      startedAt: now + 380,
+    },
+  ],
+});
+assert(streamingResponsePresentation.rows.map((row) => row.type).join(',') === 'section,response', 'final answer streaming should render one process section plus one response boundary');
+const streamingResponse = streamingResponsePresentation.rows.find((row) => row.type === 'response');
+assert(streamingResponse?.thinkingOpenByDefault === false, 'final response thinking should be folded by default');
+assert(streamingResponse?.thinkingPreview === 'Now produce the final answer.', 'final response summary should stay attached to the response boundary');
+assert(!JSON.stringify(streamingResponse).includes('Streaming final answer tokens.'), 'streaming final answer text should stay out of Work Process response rows');
 
 const opaquePresentation = buildWorkProcessPresentation({
   status: 'complete',
@@ -257,11 +358,7 @@ const opaquePresentation = buildWorkProcessPresentation({
     },
   ],
 });
-const opaqueSection = opaquePresentation.rows.find((row) => row.type === 'section');
-assert(opaqueSection?.type === 'section', 'opaque thinking section missing');
-assert(opaqueSection.thinkingLabel === 'Provider continuation state retained', 'opaque artifact should expose safe status only');
-assert(opaqueSection.thinkingExpandable === false, 'opaque artifact must not expand plaintext');
-assert(opaqueSection.thinkingPreview === '', 'opaque artifact must not render preview text');
+assert(!opaquePresentation.rows.find((row) => row.type === 'section'), 'opaque provider state should not occupy the normal Work Process UI');
 
 const approvalPresentation = buildWorkProcessPresentation({
   status: 'running',
@@ -297,7 +394,7 @@ const approvalPresentation = buildWorkProcessPresentation({
 const approvalRows = flattenRows(approvalPresentation.rows);
 const approvalRow = approvalRows.find((row) => row.type === 'tool' && row.toolName === 'web_search');
 assert(!approvalRows.some((row) => row.type === 'approval'), 'pending tool approval should not render as top-level approval row');
-assert(approvalRow?.approval?.verb === 'Auto-reviewing', 'pending auto-review should use reviewer semantics');
+assert(approvalRow?.approval?.verb === '自动检查中', 'pending auto-review should use reviewer semantics');
 assert(approvalRow.approval.message.includes('web_search'), 'pending approval reason should be visible inside tool row');
 assert(approvalRow.previewLines.length === 0, 'approval-required intermediate errors should not render as result previews');
 
@@ -323,11 +420,13 @@ const askUserPresentation = buildWorkProcessPresentation({
     },
   ],
 });
-const askUserRow = askUserPresentation.rows.find((row) => row.type === 'userInput');
-assert(askUserRow?.type === 'userInput', 'ask_user should render as a user input row');
-assert(askUserRow.verb === 'Asked user', 'pending ask_user should render asked-user verb');
+const askUserRows = flattenRows(askUserPresentation.rows);
+const askUserGroup = askUserRows.find((row) => row.type === 'toolGroup');
+const askUserRow = askUserRows.find((row) => row.type === 'userInput');
+assert(askUserGroup?.title === '询问', 'ask_user should render in a human interaction group');
+assert(askUserRow?.verb === '等待用户', 'pending ask_user should render waiting-user verb');
 assert(askUserRow.question.includes('Which smoke path'), 'ask_user question should be visible');
-assert(askUserRow.detailLines.some((line) => line.includes('Option 1: Read-only smoke')), 'ask_user choices should stay in details');
+assert(askUserRow.detailLines.some((line) => line.includes('选项 1：Read-only smoke')), 'ask_user choices should stay in details');
 
 const webSearchPresentation = buildWorkProcessPresentation({
   status: 'complete',
@@ -362,13 +461,47 @@ const webSearchPresentation = buildWorkProcessPresentation({
   ],
 });
 const webSearchRow = flattenRows(webSearchPresentation.rows).find((row) => row.type === 'tool' && row.toolName === 'web_search');
-assert(webSearchRow?.verb === 'Searched web', 'web_search should use dedicated web search verb');
+assert(webSearchRow?.verb === '已联网搜索', 'web_search should use dedicated web search verb');
 assert(webSearchRow.previewLines.includes('Provider: DuckDuckGo HTML'), 'web_search preview should include provider');
 assert(webSearchRow.previewLines.includes('https://renderdoc.org/'), 'web_search preview should include first result URL');
+
+const mcpPresentation = buildWorkProcessPresentation({
+  status: 'complete',
+  updatedAt: now + 9200,
+  blocks: [
+    {
+      id: 'runtime-loop-mcp',
+      kind: 'llm_turn',
+      title: 'LLM turn',
+      status: 'complete',
+      result: { status: 'complete', toolCallIds: ['tool-mcp'] },
+      toolCalls: [
+        {
+          id: 'tool-mcp',
+          toolName: 'mcp__filesystem__read_file',
+          status: 'complete',
+          argsPreview: JSON.stringify({ path: 'README.md' }),
+          resultPreview: JSON.stringify({ ok: true }),
+          startedAt: now + 7100,
+          completedAt: now + 7110,
+        },
+      ],
+      startedAt: now + 7100,
+      completedAt: now + 7110,
+    },
+  ],
+});
+const mcpRows = flattenRows(mcpPresentation.rows);
+const mcpGroup = mcpRows.find((row) => row.type === 'toolGroup');
+const mcpRow = mcpRows.find((row) => row.type === 'tool');
+assert(mcpGroup?.title === 'MCP · filesystem', 'dynamic MCP tools should group by server');
+assert(mcpRow?.target === 'filesystem/read_file', 'dynamic MCP target should show server/tool');
 
 const componentSource = [
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcess.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessRows.tsx', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessResponseRow.tsx', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessIcons.tsx', 'utf8'),
 ].join('\n');
 const cssSource = fs.readFileSync('src/renderer/features/debugger/AgentChat/AgentChat.css', 'utf8');
 const presentationSource = fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessPresentation.ts', 'utf8');
@@ -380,34 +513,49 @@ const toolApprovalSubmitHookSource = fs.readFileSync('src/renderer/features/debu
 const orchestratorSource = fs.readFileSync('src/main/workflow/debugger/AgentOrchestrator.ts', 'utf8');
 
 assert(presentationSource.includes("block.kind === 'llm_turn'"), 'Work Process sections should be sourced from LLM loop blocks');
-assert(!presentationSource.includes("block.kind === 'tool'"), 'renderer must not consume legacy tool blocks as sections');
-assert(componentSource.includes('<div className={resultClassName}>'), 'section should render loop result block');
-assert(componentSource.indexOf('{row.thinkingExpandable ?') < componentSource.indexOf('{hasResult ?'), 'thinking disclosure must render before result');
-assert(componentSource.includes('row.resultToolSummary'), 'loop result should expose requested-tool summary');
-assert(componentSource.includes('work-process-disclosure'), 'tool/detail rows should use the whole-row disclosure');
-assert(componentSource.includes('work-process-row-caret'), 'disclosure rows should expose an expand caret');
-assert(componentSource.includes('work-process-result-preview'), 'compact tool rows must use result preview');
-assert(componentSource.includes('open={autoOpen}'), 'tool rows should auto-expand while running or on error');
-assert(componentSource.includes('row.defaultOpen'), 'section rows should honor defaultOpen');
-assert(componentSource.includes('row.resultStreaming'), 'section rows should render result streaming state');
-assert(componentSource.includes('row.thinkingOpenByDefault'), 'section rows should render thinking open state');
-assert(componentSource.includes('work-process-section'), 'LLM loops should render grouped sections');
-assert(componentSource.includes("t('chat.workProcessViewSteps'"), 'section should expose localized tool-step disclosure');
-assert(componentSource.includes('work-process-steps-icon'), 'section steps toggle should use canonical list icon');
-assert(!componentSource.includes('work-process-steps-eye'), 'legacy eye icon must be removed');
-assert(!componentSource.includes('primaryMode'), 'result/thinking order must not depend on primaryMode');
+assert(presentationSource.includes('WORK_PROCESS_TOOL_DISPLAY_CATALOG'), 'tool display catalog should be canonical');
+assert(presentationSource.includes("type: 'toolGroup'"), 'presentation should expose semantic tool groups');
+assert(presentationSource.includes("type: 'response'"), 'presentation should expose a final response boundary row');
+assert(presentationSource.includes('createResponseRow'), 'presentation should route answer-only loops through response boundaries');
+assert(presentationSource.includes('actionCount'), 'presentation should expose actionCount for top-level transcript meta');
+assert(presentationSource.includes("normalized.startsWith('mcp__')"), 'dynamic MCP wildcard should have a semantic display path');
+assert(!presentationSource.includes("isSummary ? '思考过程'"), 'loop-level summary thinking label must not duplicate the Work Process header');
+for (const forbidden of ['Reasoning summary', 'Called tool']) {
+  assert(!presentationSource.includes(forbidden), `presentation source should not contain ${forbidden}`);
+}
+
+assert(componentSource.includes('ToolGroupRow'), 'component should render semantic tool groups');
+assert(componentSource.includes('ResponseRow'), 'component should render the final response boundary row');
+assert(componentSource.includes("t('chat.workProcessTitle')"), 'header should use the process title translation');
+assert(!componentSource.includes('TRACE_HEADLINE_KEY'), 'top Work Process header must not fall back to status-first copy');
+assert(!componentSource.includes('statusMeta'), 'top Work Process meta should be duration/action context, not completion-status copy');
+assert(componentSource.includes('work-process-tool-group'), 'group row class should exist in component source');
+assert(componentSource.includes('<details className={thinkingClassName}'), 'thinking should render as a user-collapsible top disclosure');
+assert(!componentSource.includes('isSummaryThinking'), 'summary thinking must not bypass the top disclosure hierarchy');
+assert(!componentSource.includes("t('chat.workProcessViewSteps'"), 'section should not expose the legacy tool-step disclosure');
+assert(!componentSource.includes('StepsListIcon'), 'legacy steps icon component should be removed');
 assert(!componentSource.includes('thinking-full'), 'component must not render full hidden CoT mode');
-assert(cssSource.includes('.work-process-thinking-state.status-streaming .work-process-thinking-summary::after'), 'streaming thinking shimmer should exist');
-assert(cssSource.includes('@keyframes work-process-thinking-sweep'), 'thinking shimmer keyframes should exist');
+
+assert(cssSource.includes('.work-process-tool-group'), 'tool group styling should exist');
+assert(cssSource.includes('.work-process-response'), 'response boundary styling should exist');
+assert(cssSource.includes('.work-process-icon'), 'local tool icon styling should exist');
+assert(cssSource.includes('.work-process-section-list'), 'section list styling should exist');
+assert(cssSource.includes('.work-process-step-rail.status-complete'), 'rail marker color should be status-driven, not section-driven');
 assert(cssSource.includes('.work-process-loop-result.is-streaming'), 'result streaming indicator should exist');
 assert(cssSource.includes('@media (prefers-reduced-motion: reduce)'), 'streaming motion should honor reduced motion');
 assert(cssSource.includes('.work-process-tool-approval'), 'tool approval styling should exist');
 assert(cssSource.includes('.work-process-disclosure:not([open]) > :not(summary)'), 'closed disclosure must not render expanded body content');
-assert(cssSource.includes('.work-process-console'), 'console card styling should exist');
+assert(!cssSource.includes('.work-process-section-steps'), 'legacy tool-step disclosure CSS should be removed');
+assert(!cssSource.includes('.work-process-step-rail.is-section .work-process-rail-marker'), 'section markers must not use a hierarchy-only color override');
+assert(!cssSource.includes('.work-process-steps-toggle'), 'legacy tool-step toggle CSS should be removed');
 assert(!cssSource.includes('.work-process-empty'), 'placeholder empty-state CSS should be removed');
-assert(!cssSource.includes('work-process-steps-eye'), 'legacy eye-icon CSS should be removed');
-assert(!cssSource.includes('is-thinking-full'), 'full hidden CoT styling should be removed');
-assert(i18nSource.includes("'chat.workProcessViewSteps': 'Tool steps {count}'"), 'English tool-step disclosure copy should be canonical');
+
+assert(i18nSource.includes("'chat.workProcessTitle': 'Process'"), 'English process title copy should exist');
+assert(i18nSource.includes("'chat.workProcessTitle': '思考过程'"), 'Chinese process title copy should exist');
+assert(!i18nSource.includes('Tool steps {count}'), 'English legacy tool-step copy should be removed');
+assert(!i18nSource.includes('工具步骤'), 'Chinese legacy tool-step copy should be removed');
+assert(!i18nSource.includes('Reasoning summary'), 'legacy reasoning label should not exist in i18n');
+
 assert(!userInputPanelSource.includes('window.electronAPI'), 'composer user input panel must not call Electron APIs directly');
 assert(userInputSubmitHookSource.includes('answerUserInput'), 'composer user input hook must submit through conversation.answerUserInput');
 assert(!toolApprovalPanelSource.includes('window.electronAPI'), 'composer tool approval panel must not call Electron APIs directly');

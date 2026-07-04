@@ -220,9 +220,9 @@ export const Composer: React.FC<ComposerProps> = ({
               </div>
             )}
           </div>
+          <PermissionModeSelector />
         </div>
         <div className="composer-toolbar-group composer-toolbar-group-right">
-          <PermissionModeSelector />
           <ContextUsageIndicator usage={lastKnownUsage} stale={usageStale && !hasActiveDebugRun} language={language} />
           <button
             type="button"

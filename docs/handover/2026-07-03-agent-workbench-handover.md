@@ -403,7 +403,7 @@ Renderer → `BrowserAppBridgeClient.invoke` → HTTP → `BrowserAppBridgeServe
 
 5. **UI 渲染**  
    `conversationStore` → `ConversationThread` → `MessageBubble` + `WorkProcess`  
-   Work Process 语义：每个 section = 一个 `llm_turn`；thinking 辅助，result 主语义；tool rows 是同一 loop 证据。
+   Work Process 语义：顶部标题使用 `思考过程 · 持续 ... · ... 个动作`，不能回退成 `执行完成` / `工具步骤` 这类状态日志文案；每个 section = 一个有过程证据的 `llm_turn`；thinking disclosure 是该 loop 的顶层 transcript 节点，但 label 使用 `思考` / `原始思考` 这类低一级文案，不能重复顶部 `思考过程`；result/narration 在其后；tool rows / approval / `ask_user` 是同一 loop 的下级证据；已有过程证据之后出现的 answer-only `llm_turn` 必须投影为 compact final-response boundary row，late summary thinking 只能折叠挂在该 row 下，最终回答正文只在 assistant body 显示。
 
 ---
 
