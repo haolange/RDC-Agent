@@ -366,7 +366,7 @@ function mapFinishReason(reason: string | null | undefined, hadToolCall: boolean
     case 'BLOCKLIST':
     case 'PROHIBITED_CONTENT':
     case 'SPII':
-      return 'error';
+      return 'refusal';
     default:
       return 'stop';
   }

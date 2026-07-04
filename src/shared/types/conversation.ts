@@ -30,6 +30,18 @@ export type ConversationThinkingStatus = 'streaming' | 'complete';
 
 export type ConversationLoopResultStatus = 'streaming' | 'complete';
 
+export type ConversationLoopStopReason =
+  | 'end_turn'
+  | 'tool_use'
+  | 'max_tokens'
+  | 'refusal'
+  | 'error'
+  | 'aborted';
+
+export type ConversationLoopOutputPhase = 'commentary' | 'final_answer';
+
+export type ConversationReasoningState = 'raw' | 'summary' | 'opaque' | 'hidden' | 'none';
+
 export type ConversationMessageDiagnosticCode =
   | 'CONVERSATION_LLM_ROUTE_MISSING'
   | 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
@@ -74,7 +86,8 @@ export interface ConversationToolApproval {
 export interface ConversationLoopResult {
   text?: string;
   status: ConversationLoopResultStatus;
-  finishReason?: string;
+  stopReason?: ConversationLoopStopReason;
+  outputPhase?: ConversationLoopOutputPhase;
   toolCallIds: string[];
 }
 
@@ -86,10 +99,10 @@ export interface ConversationWorkBlock {
   status: ConversationWorkBlockStatus;
   /** Non-loop summary text; LLM turn output lives in result and never contains provider thinking text. */
   summary?: string;
-  /** Legacy storage input only; new runtime writes thinking instead. */
-  detail?: string;
   thinking?: ThinkingArtifact;
   thinkingStatus?: ConversationThinkingStatus;
+  /** llm_turn only: how provider reasoning was delivered for this loop. */
+  reasoningState?: ConversationReasoningState;
   result?: ConversationLoopResult;
   toolCalls: ConversationToolCall[];
   startedAt: number;

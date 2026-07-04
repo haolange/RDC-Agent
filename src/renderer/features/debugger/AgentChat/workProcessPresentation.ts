@@ -1,4 +1,7 @@
 import type {
+  ConversationLoopOutputPhase,
+  ConversationLoopStopReason,
+  ConversationReasoningState,
   ConversationToolApproval,
   ConversationToolApprovalStatus,
   ConversationToolCall,
@@ -6,242 +9,55 @@ import type {
   ConversationWorkTrace,
 } from '@shared/types/conversation';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
+import {
+  compactText,
+  formatDurationMs,
+  isCommentaryClampable,
+  normalizeWorkProcessText,
+} from './workProcessFormat';
+import {
+  buildSemanticStepGroups,
+  flattenStepGroups,
+} from './workProcessGrouping';
+import {
+  formatMcpTarget,
+  getToolDisplay,
+  normalizeToolName,
+  WORK_PROCESS_TOOL_DISPLAY_CATALOG,
+} from './workProcessToolCatalog';
 
-export type WorkProcessRowStatus = 'pending' | 'running' | 'complete' | 'error';
+export type {
+  WorkProcessGroupThinking,
+  WorkProcessIconKey,
+  WorkProcessPresentationOptions,
+  WorkProcessRow,
+  WorkProcessRowStatus,
+  WorkProcessStepGroup,
+  WorkProcessToolApproval,
+  WorkProcessToolGroupKind,
+  WorkProcessPresentation,
+} from './workProcessTypes';
+export { WORK_PROCESS_TOOL_DISPLAY_CATALOG } from './workProcessToolCatalog';
+export { normalizeWorkProcessText, formatDurationMs } from './workProcessFormat';
 
-export type WorkProcessIconKey =
-  | 'brain'
-  | 'search'
-  | 'file'
-  | 'edit'
-  | 'terminal'
-  | 'globe'
-  | 'git'
-  | 'memory'
-  | 'task'
-  | 'question'
-  | 'handoff'
-  | 'spark'
-  | 'plug'
-  | 'monitor'
-  | 'tool'
-  | 'warning';
-
-export type WorkProcessToolGroupKind =
-  | 'explore'
-  | 'search'
-  | 'change'
-  | 'command'
-  | 'web'
-  | 'git'
-  | 'memory'
-  | 'task'
-  | 'interaction'
-  | 'collaboration'
-  | 'runtime'
-  | 'mcp'
-  | 'diagnostic';
-
-
-export interface WorkProcessToolApproval {
-  status: ConversationToolApprovalStatus;
-  verb: string;
-  message: string;
-  metaLines: string[];
-}
-
-export type WorkProcessRow =
-  | {
-    type: 'summary';
-    id: string;
-    status: WorkProcessRowStatus;
-    text: string;
-    detailLines: string[];
-    duration: string;
-  }
-  | {
-    type: 'tool';
-    id: string;
-    status: WorkProcessRowStatus;
-    verb: string;
-    category: string;
-    icon: WorkProcessIconKey;
-    groupKind: WorkProcessToolGroupKind;
-    toolName: string;
-    target: string;
-    duration: string;
-    argsLines: string[];
-    previewLines: string[];
-    rawLines: string[];
-    approval?: WorkProcessToolApproval;
-    compact?: boolean;
-  }
-  | {
-    type: 'userInput';
-    id: string;
-    status: WorkProcessRowStatus;
-    verb: string;
-    question: string;
-    answer?: string;
-    duration: string;
-    detailLines: string[];
-  }
-  | {
-    type: 'toolGroup';
-    id: string;
-    status: WorkProcessRowStatus;
-    kind: WorkProcessToolGroupKind;
-    icon: WorkProcessIconKey;
-    title: string;
-    countLabel: string;
-    summary: string;
-    duration: string;
-    defaultOpen: boolean;
-    rows: WorkProcessRow[];
-  }
-  | {
-    type: 'approval';
-    id: string;
-    status: WorkProcessRowStatus;
-    verb: string;
-    message: string;
-    duration: string;
-    detailLines: string[];
-    metaLines: string[];
-  }
-  | {
-    type: 'diagnostic';
-    id: string;
-    status: WorkProcessRowStatus;
-    message: string;
-    detailLines: string[];
-    duration: string;
-  }
-  | {
-    type: 'subagent';
-    id: string;
-    status: WorkProcessRowStatus;
-    profile: string;
-    summary: string;
-    detail: string;
-    duration: string;
-    children: WorkProcessRow[];
-  }
-  | {
-    type: 'task';
-    id: string;
-    status: WorkProcessRowStatus;
-    title: string;
-    taskStatus: string;
-    duration: string;
-  }
-  | {
-    type: 'response';
-    id: string;
-    status: WorkProcessRowStatus;
-    title: string;
-    summary: string;
-    duration: string;
-    thinkingPreview: string;
-    thinkingLabel: string;
-    thinkingKind?: ThinkingArtifact['kind'];
-    thinkingVisibility?: ThinkingArtifact['visibility'];
-    thinkingStatus?: ConversationWorkBlock['thinkingStatus'];
-    thinkingExpandable: boolean;
-    thinkingOpenByDefault: boolean;
-  }
-  | {
-    type: 'section';
-    id: string;
-    status: WorkProcessRowStatus;
-    resultText: string;
-    resultToolSummary: string;
-    resultStreaming: boolean;
-    clampResult: boolean;
-    thinkingPreview: string;
-    thinkingLabel: string;
-    thinkingKind?: ThinkingArtifact['kind'];
-    thinkingSource?: string;
-    thinkingVisibility?: ThinkingArtifact['visibility'];
-    thinkingStatus?: ConversationWorkBlock['thinkingStatus'];
-    thinkingExpandable: boolean;
-    thinkingOpenByDefault: boolean;
-    stepCount: number;
-    duration: string;
-    defaultOpen: boolean;
-    steps: WorkProcessRow[];
-  };
-
-export interface WorkProcessPresentation {
-  rows: WorkProcessRow[];
-  stepCount: number;
-  toolCount: number;
-  summary: string;
-  duration: string;
-  actionCount: number;
-  defaultExpanded: boolean;
-  important: boolean;
-}
-
-interface WorkProcessToolDisplay {
-  icon: WorkProcessIconKey;
-  groupKind: WorkProcessToolGroupKind;
-  category: string;
-  groupTitle: string;
-  groupUnit: string;
-  completeVerb: string;
-  runningVerb: string;
-  pendingVerb?: string;
-  mutation?: boolean;
-  approval?: boolean;
-  errorAccent?: boolean;
-}
+import type {
+  WorkProcessPresentation,
+  WorkProcessPresentationOptions,
+  WorkProcessRow,
+  WorkProcessRowStatus,
+  WorkProcessToolApproval,
+} from './workProcessTypes';
+import {
+  buildPresentationUnits,
+  markLastSectionOpen,
+  presentationUnitsToDetailRows,
+} from './workProcessBlockProjection';
 
 const ROW_STATUS_LABEL: Record<WorkProcessRowStatus, string> = {
   pending: '等待中',
   running: '进行中',
   complete: '',
   error: '失败',
-};
-
-export const WORK_PROCESS_TOOL_DISPLAY_CATALOG: Record<string, WorkProcessToolDisplay> = {
-  read_file: { icon: 'file', groupKind: 'explore', category: '文件', groupTitle: '探索', groupUnit: '文件', completeVerb: '已读取', runningVerb: '正在读取' },
-  glob: { icon: 'search', groupKind: 'explore', category: '文件', groupTitle: '探索', groupUnit: '文件', completeVerb: '已列出', runningVerb: '正在列出' },
-  grep: { icon: 'search', groupKind: 'search', category: '搜索', groupTitle: '搜索', groupUnit: '查询', completeVerb: '已搜索代码', runningVerb: '正在搜索代码' },
-  search_codebase: { icon: 'search', groupKind: 'search', category: '搜索', groupTitle: '搜索', groupUnit: '查询', completeVerb: '已搜索代码库', runningVerb: '正在搜索代码库' },
-  web_fetch: { icon: 'globe', groupKind: 'web', category: '联网', groupTitle: '联网', groupUnit: '页面', completeVerb: '已抓取网页', runningVerb: '正在抓取网页', approval: true },
-  web_search: { icon: 'globe', groupKind: 'search', category: '联网搜索', groupTitle: '搜索', groupUnit: '查询', completeVerb: '已联网搜索', runningVerb: '正在联网搜索', approval: true },
-  bash: { icon: 'terminal', groupKind: 'command', category: '命令', groupTitle: '命令', groupUnit: '命令', completeVerb: '已运行命令', runningVerb: '正在运行命令', approval: true, errorAccent: true },
-  write_file: { icon: 'edit', groupKind: 'change', category: '变更', groupTitle: '变更', groupUnit: '文件', completeVerb: '已写入', runningVerb: '正在写入', mutation: true, approval: true },
-  edit_file: { icon: 'edit', groupKind: 'change', category: '变更', groupTitle: '变更', groupUnit: '文件', completeVerb: '已编辑', runningVerb: '正在编辑', mutation: true, approval: true },
-  delete_file: { icon: 'edit', groupKind: 'change', category: '变更', groupTitle: '变更', groupUnit: '文件', completeVerb: '已删除', runningVerb: '正在删除', mutation: true, approval: true, errorAccent: true },
-  move_file: { icon: 'edit', groupKind: 'change', category: '变更', groupTitle: '变更', groupUnit: '文件', completeVerb: '已移动', runningVerb: '正在移动', mutation: true, approval: true },
-  copy_file: { icon: 'edit', groupKind: 'change', category: '变更', groupTitle: '变更', groupUnit: '文件', completeVerb: '已复制', runningVerb: '正在复制', mutation: true, approval: true },
-  notebook_edit: { icon: 'edit', groupKind: 'change', category: 'Notebook', groupTitle: '变更', groupUnit: 'Notebook', completeVerb: '已编辑 Notebook', runningVerb: '正在编辑 Notebook', mutation: true },
-  git_status: { icon: 'git', groupKind: 'git', category: 'Git', groupTitle: 'Git', groupUnit: '操作', completeVerb: '已检查状态', runningVerb: '正在检查状态' },
-  git_diff: { icon: 'git', groupKind: 'git', category: 'Git', groupTitle: 'Git', groupUnit: '操作', completeVerb: '已查看差异', runningVerb: '正在查看差异' },
-  git_log: { icon: 'git', groupKind: 'git', category: 'Git', groupTitle: 'Git', groupUnit: '操作', completeVerb: '已查看历史', runningVerb: '正在查看历史' },
-  git_add: { icon: 'git', groupKind: 'git', category: 'Git', groupTitle: 'Git', groupUnit: '操作', completeVerb: '已暂存', runningVerb: '正在暂存', mutation: true, approval: true },
-  git_unstage: { icon: 'git', groupKind: 'git', category: 'Git', groupTitle: 'Git', groupUnit: '操作', completeVerb: '已取消暂存', runningVerb: '正在取消暂存', mutation: true, approval: true },
-  git_commit: { icon: 'git', groupKind: 'git', category: 'Git', groupTitle: 'Git', groupUnit: '操作', completeVerb: '已提交', runningVerb: '正在提交', mutation: true, approval: true },
-  ask_user: { icon: 'question', groupKind: 'interaction', category: '人机交互', groupTitle: '询问', groupUnit: '问题', completeVerb: '已回答', runningVerb: '等待用户' },
-  ask_user_question: { icon: 'question', groupKind: 'interaction', category: '人机交互', groupTitle: '询问', groupUnit: '问题', completeVerb: '已询问', runningVerb: '正在询问' },
-  tool_search: { icon: 'search', groupKind: 'runtime', category: '工具', groupTitle: '工具发现', groupUnit: '查询', completeVerb: '已搜索工具', runningVerb: '正在搜索工具' },
-  agent_handoff: { icon: 'handoff', groupKind: 'collaboration', category: '协作', groupTitle: '协作', groupUnit: '交接', completeVerb: '已准备交接', runningVerb: '正在准备交接' },
-  plan_artifact: { icon: 'spark', groupKind: 'runtime', category: '计划', groupTitle: '产物', groupUnit: '产物', completeVerb: '已生成计划', runningVerb: '正在生成计划' },
-  memory_read: { icon: 'memory', groupKind: 'memory', category: '记忆', groupTitle: '记忆', groupUnit: '项', completeVerb: '已读取记忆', runningVerb: '正在读取记忆' },
-  memory_write: { icon: 'memory', groupKind: 'memory', category: '记忆', groupTitle: '记忆', groupUnit: '项', completeVerb: '已写入记忆', runningVerb: '正在写入记忆', mutation: true },
-  memory_delete: { icon: 'memory', groupKind: 'memory', category: '记忆', groupTitle: '记忆', groupUnit: '项', completeVerb: '已删除记忆', runningVerb: '正在删除记忆', mutation: true },
-  skills: { icon: 'spark', groupKind: 'runtime', category: '技能', groupTitle: '技能', groupUnit: '查询', completeVerb: '已列出技能', runningVerb: '正在列出技能' },
-  skill_run: { icon: 'spark', groupKind: 'runtime', category: '技能', groupTitle: '技能', groupUnit: '执行', completeVerb: '已运行技能', runningVerb: '正在运行技能' },
-  mcp: { icon: 'plug', groupKind: 'mcp', category: 'MCP', groupTitle: 'MCP', groupUnit: '调用', completeVerb: '已查询 MCP', runningVerb: '正在查询 MCP' },
-  rdx_context: { icon: 'monitor', groupKind: 'runtime', category: 'RDX', groupTitle: 'RDX 上下文', groupUnit: '读取', completeVerb: '已读取 RDX 上下文', runningVerb: '正在读取 RDX 上下文' },
-  subagent: { icon: 'handoff', groupKind: 'collaboration', category: '协作', groupTitle: '协作', groupUnit: '子任务', completeVerb: '已调用子代理', runningVerb: '正在调用子代理' },
-  task_create: { icon: 'task', groupKind: 'task', category: '任务', groupTitle: '任务', groupUnit: '项', completeVerb: '已创建任务', runningVerb: '正在创建任务', mutation: true },
-  task_update: { icon: 'task', groupKind: 'task', category: '任务', groupTitle: '任务', groupUnit: '项', completeVerb: '已更新任务', runningVerb: '正在更新任务', mutation: true },
-  task_get: { icon: 'task', groupKind: 'task', category: '任务', groupTitle: '任务', groupUnit: '项', completeVerb: '已读取任务', runningVerb: '正在读取任务' },
-  task_list: { icon: 'task', groupKind: 'task', category: '任务', groupTitle: '任务', groupUnit: '项', completeVerb: '已列出任务', runningVerb: '正在列出任务' },
-  task_stop: { icon: 'task', groupKind: 'task', category: '任务', groupTitle: '任务', groupUnit: '项', completeVerb: '已停止任务', runningVerb: '正在停止任务', mutation: true, errorAccent: true },
 };
 
 const TARGET_KEYS = [
@@ -276,16 +92,61 @@ const INTERNAL_BLOCK_IDS = new Set(['runtime-run', 'assistant-output', 'runtime-
 
 const normalizeThinkingDedupKey = (value: string): string => normalizeWorkProcessText(value).toLowerCase();
 
+const resolveReasoningState = (block: ConversationWorkBlock): ConversationReasoningState => {
+  if (block.reasoningState) return block.reasoningState;
+  if (!block.thinking) return 'none';
+  if (block.thinking.kind === 'raw') return 'raw';
+  if (block.thinking.kind === 'summary') return 'summary';
+  if (block.thinking.kind === 'opaque') return 'opaque';
+  return 'none';
+};
+
+const isNonFinalStopReason = (stopReason?: ConversationLoopStopReason): boolean => (
+  stopReason === 'max_tokens' || stopReason === 'refusal' || stopReason === 'aborted'
+);
+
+const resolveOutputPhase = (
+  block: ConversationWorkBlock,
+  hasVisibleProcessEvidence: boolean,
+): ConversationLoopOutputPhase => {
+  if (block.result?.outputPhase) return block.result.outputPhase;
+  if (block.status === 'running' || block.status === 'pending') {
+    if (block.toolCalls.length === 0 && hasVisibleProcessEvidence) {
+      return 'final_answer';
+    }
+    return 'commentary';
+  }
+  const stopReason = block.result?.stopReason;
+  if (isNonFinalStopReason(stopReason)) return 'commentary';
+  if (
+    block.toolCalls.length === 0
+    && (stopReason === 'end_turn' || stopReason === undefined)
+    && hasVisibleProcessEvidence
+    && (block.status === 'complete' || block.status === 'error')
+  ) {
+    return 'final_answer';
+  }
+  return 'commentary';
+};
+
 const resolveSectionResult = (
   block: ConversationWorkBlock,
-): { resultText: string; resultToolSummary: string; resultStreaming: boolean; clampResult: boolean } => {
-  const resultText = normalizeWorkProcessText(block.result?.text ?? '');
+  outputPhase: ConversationLoopOutputPhase,
+  hasVisibleProcessEvidence: boolean,
+): { resultText: string; resultToolSummary: string; resultStreaming: boolean; clampResult: boolean; clampable: boolean } => {
+  const rawText = normalizeWorkProcessText(block.result?.text ?? '');
   const resultStatus = block.result?.status ?? (block.status === 'running' || block.status === 'pending' ? 'streaming' : 'complete');
+  const showCommentary = outputPhase === 'commentary'
+    && isMeaningfulText(rawText)
+    && (block.toolCalls.length > 0 || hasVisibleProcessEvidence);
+  const resultText = showCommentary ? rawText : '';
+  const clampable = showCommentary ? isCommentaryClampable(rawText) : false;
   return {
-    resultText: block.toolCalls.length > 0 && isMeaningfulText(resultText) ? resultText : '',
+    resultText,
     resultToolSummary: '',
     resultStreaming: resultStatus === 'streaming',
-    clampResult: true,
+    clampResult: clampable,
+    clampable,
   };
 };
 
@@ -303,23 +164,9 @@ const resolveSectionThinking = (
   openByDefault: boolean;
 } => {
   const thinking = block.thinking;
-  if (!hasVisibleEvidence || !thinking) {
+  const reasoningState = resolveReasoningState(block);
+  if (!hasVisibleEvidence || !thinking || (reasoningState !== 'raw' && reasoningState !== 'summary')) {
     return { preview: '', label: '', expandable: false, openByDefault: false };
-  }
-
-  const isActiveBlock = block.status === 'running' || block.status === 'pending';
-  const status = isActiveBlock ? block.thinkingStatus ?? 'streaming' : 'complete';
-  if (thinking.kind === 'opaque' || thinking.visibility === 'hidden') {
-    return {
-      preview: '',
-      label: '',
-      kind: thinking.kind,
-      source: '',
-      visibility: thinking.visibility,
-      status,
-      expandable: false,
-      openByDefault: false,
-    };
   }
 
   const preview = normalizeWorkProcessText(thinking.text ?? '');
@@ -327,8 +174,10 @@ const resolveSectionThinking = (
     return { preview: '', label: '', expandable: false, openByDefault: false };
   }
 
-  const isSummary = thinking.kind === 'summary' && thinking.visibility === 'summary';
-  const isRaw = thinking.kind === 'raw' && thinking.visibility === 'raw-collapsed';
+  const isActiveBlock = block.status === 'running' || block.status === 'pending';
+  const status = isActiveBlock ? block.thinkingStatus ?? 'streaming' : 'complete';
+  const isSummary = reasoningState === 'summary' || (thinking.kind === 'summary' && thinking.visibility === 'summary');
+  const isRaw = reasoningState === 'raw' || (thinking.kind === 'raw' && thinking.visibility === 'raw-collapsed');
   if (!isSummary && !isRaw) {
     return { preview: '', label: '', expandable: false, openByDefault: false };
   }
@@ -371,66 +220,6 @@ const resolveResponseThinking = (
   };
 };
 
-export const normalizeWorkProcessText = (value: string): string => {
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  return trimmed
-    .replace(/\r\n/g, '\n')
-    .replace(/[ \t]+/g, ' ')
-    .replace(/\n{3,}/g, '\n\n')
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .join('\n')
-    .trim();
-};
-
-const normalizeToolName = (toolName: string): string => toolName.trim().toLowerCase().replace(/[.\-]/g, '_');
-
-const GENERIC_TOOL_DISPLAY: WorkProcessToolDisplay = {
-  icon: 'tool',
-  groupKind: 'runtime',
-  category: '工具',
-  groupTitle: '工具',
-  groupUnit: '调用',
-  completeVerb: '已调用工具',
-  runningVerb: '正在调用工具',
-  pendingVerb: '等待调用工具',
-};
-
-const getToolDisplay = (toolName: string): WorkProcessToolDisplay => {
-  const normalized = normalizeToolName(toolName);
-  if (normalized.startsWith('mcp__')) {
-    return {
-      icon: 'plug',
-      groupKind: 'mcp',
-      category: 'MCP',
-      groupTitle: formatMcpGroupTitle(normalized),
-      groupUnit: '调用',
-      completeVerb: '已调用 MCP',
-      runningVerb: '正在调用 MCP',
-    };
-  }
-  return WORK_PROCESS_TOOL_DISPLAY_CATALOG[normalized] ?? GENERIC_TOOL_DISPLAY;
-};
-
-const getMcpParts = (normalizedToolName: string): { server: string; tool: string } | null => {
-  if (!normalizedToolName.startsWith('mcp__')) return null;
-  const [, server = '', ...toolParts] = normalizedToolName.split('__');
-  const tool = toolParts.join('__');
-  if (!server || !tool) return null;
-  return { server, tool };
-};
-
-const formatMcpGroupTitle = (normalizedToolName: string): string => {
-  const parts = getMcpParts(normalizedToolName);
-  return parts ? `MCP · ${parts.server}` : 'MCP';
-};
-
-const formatMcpTarget = (toolName: string): string => {
-  const parts = getMcpParts(normalizeToolName(toolName));
-  return parts ? `${parts.server}/${parts.tool}` : '';
-};
-
 const NOISY_TEXT_PATTERNS = [
   /agent loop/i,
   /model and tool loop/i,
@@ -443,29 +232,73 @@ const NOISY_TEXT_PATTERNS = [
   /回答已完成/,
 ];
 
-export const formatDurationMs = (start?: number, end?: number): string => {
-  if (!start) return '';
-  const finish = end ?? Date.now();
-  const ms = Math.max(0, finish - start);
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  const minutes = Math.floor(ms / 60_000);
-  const seconds = Math.floor((ms % 60_000) / 1000);
-  return `${minutes}m ${seconds.toString().padStart(2, '0')}s`;
-};
-
 export const getRowStatusLabel = (status: WorkProcessRowStatus): string => ROW_STATUS_LABEL[status];
+
+const getLoopProjectionDeps = () => ({
+  resolveOutputPhase,
+  resolveReasoningState,
+  resolveSectionResult,
+  resolveSectionThinking,
+  resolveResponseThinking,
+  isNonFinalStopReason,
+  normalizeThinkingDedupKey,
+  createResponseRow,
+  createReasoningIndicatorRow,
+  appendRowsToLastSection,
+  createApprovalRow,
+  createDiagnosticRow,
+  shouldSkipBlock,
+  getMeaningfulBlockSummary,
+  countToolSteps,
+});
+
+const buildProjectionContext = (): {
+  visibleThinkingKeys: Set<string>;
+  hasVisibleProcessEvidence: boolean;
+  createToolRow: typeof createToolRow;
+  groupProcessRows: typeof groupProcessRows;
+  blocksToDetailRows: typeof blocksToDetailRows;
+} => ({
+  visibleThinkingKeys: new Set<string>(),
+  hasVisibleProcessEvidence: false,
+  createToolRow,
+  groupProcessRows,
+  blocksToDetailRows,
+});
+
+function blocksToDetailRows(blocks: ConversationWorkBlock[]): WorkProcessRow[] {
+  const ctx = buildProjectionContext();
+  const units = buildPresentationUnits(blocks, getLoopProjectionDeps(), ctx);
+  return presentationUnitsToDetailRows(units);
+}
+
+function blocksToGroupedRows(blocks: ConversationWorkBlock[]): {
+  groups: import('./workProcessTypes').WorkProcessStepGroup[];
+  rows: WorkProcessRow[];
+} {
+  const ctx = buildProjectionContext();
+  const units = buildPresentationUnits(blocks, getLoopProjectionDeps(), ctx);
+  const groups = buildSemanticStepGroups(units);
+  const rows = flattenStepGroups(groups);
+  markLastSectionOpen(rows);
+  return { groups, rows };
+}
 
 export const buildWorkProcessPresentation = (
   trace: ConversationWorkTrace,
+  options: WorkProcessPresentationOptions = {},
 ): WorkProcessPresentation => {
-  const rows = blocksToRows(trace.blocks);
+  const view = options.view ?? 'grouped';
+  const { groups, rows: groupedRows } = blocksToGroupedRows(trace.blocks);
+  const detailRows = view === 'detail' ? blocksToDetailRows(trace.blocks) : groupedRows;
+  const rows = view === 'detail' ? detailRows : groupedRows;
   const toolCount = countToolSteps(rows);
   const stepCount = countSteps(rows);
   const important = trace.status === 'error' || rowsHaveAttention(rows);
   const summary = isMeaningfulText(trace.summary) ? trace.summary?.trim() ?? '' : '';
 
   return {
+    groups: view === 'detail' ? [] : groups,
     rows,
     stepCount,
     toolCount,
@@ -477,198 +310,40 @@ export const buildWorkProcessPresentation = (
   };
 };
 
-const blocksToRows = (blocks: ConversationWorkBlock[]): WorkProcessRow[] => {
-  const rows: WorkProcessRow[] = [];
-  const visibleThinkingKeys = new Set<string>();
-  let hasVisibleProcessEvidence = false;
-
-  for (let blockIndex = 0; blockIndex < blocks.length; blockIndex += 1) {
-    const block = blocks[blockIndex];
-    if (block.kind === 'llm_turn') {
-      const steps = groupProcessRows(block.toolCalls.map((call) => createToolRow(call, true)));
-      if (steps.length === 0) {
-        const responseRow = createResponseRow(block, hasVisibleProcessEvidence);
-        if (responseRow) {
-          const responseHasResultText = Boolean(normalizeWorkProcessText(block.result?.text ?? ''));
-          if (responseRow.thinkingPreview && responseRow.thinkingKind !== 'raw') {
-            const thinkingKey = normalizeThinkingDedupKey(responseRow.thinkingPreview);
-            if (visibleThinkingKeys.has(thinkingKey)) {
-              responseRow.thinkingPreview = '';
-              responseRow.thinkingLabel = '';
-              responseRow.thinkingExpandable = false;
-              responseRow.thinkingOpenByDefault = false;
-            } else {
-              visibleThinkingKeys.add(thinkingKey);
-            }
-          }
-          if (!responseHasResultText && !responseRow.thinkingLabel) {
-            continue;
-          }
-          rows.push(responseRow);
-          hasVisibleProcessEvidence = true;
-          continue;
-        }
-      }
-      const sectionResult = resolveSectionResult(block);
-      const sectionThinking = resolveSectionThinking(block, steps.length > 0 || Boolean(block.thinking));
-      if (sectionThinking.preview && sectionThinking.kind !== 'raw') {
-        const thinkingKey = normalizeThinkingDedupKey(sectionThinking.preview);
-        if (visibleThinkingKeys.has(thinkingKey)) {
-          sectionThinking.preview = '';
-          sectionThinking.label = '';
-          sectionThinking.source = '';
-          sectionThinking.expandable = false;
-          sectionThinking.openByDefault = false;
-        } else {
-          visibleThinkingKeys.add(thinkingKey);
-        }
-      }
-      if (
-        steps.length === 0
-        && !sectionResult.resultText
-        && !sectionResult.resultToolSummary
-        && !sectionThinking.label
-      ) {
-        continue;
-      }
-      rows.push({
-        type: 'section',
-        id: block.id,
-        status: block.status,
-        resultText: sectionResult.resultText,
-        resultToolSummary: sectionResult.resultToolSummary,
-        resultStreaming: sectionResult.resultStreaming,
-        clampResult: sectionResult.clampResult,
-        thinkingPreview: sectionThinking.preview,
-        thinkingLabel: sectionThinking.label,
-        thinkingKind: sectionThinking.kind,
-        thinkingSource: sectionThinking.source,
-        thinkingVisibility: sectionThinking.visibility,
-        thinkingStatus: sectionThinking.status,
-        thinkingExpandable: sectionThinking.expandable,
-        thinkingOpenByDefault: sectionThinking.openByDefault,
-        stepCount: countToolSteps(steps),
-        duration: formatDurationMs(block.startedAt, block.completedAt),
-        defaultOpen: false,
-        steps,
-      });
-      hasVisibleProcessEvidence = true;
-      continue;
-    }
-
-    if (block.kind === 'user_input') {
-      const userInputRows = groupProcessRows(block.toolCalls.map((call) => createToolRow(call)));
-      if (!appendRowsToLastSection(rows, userInputRows)) {
-        rows.push(...userInputRows);
-      }
-      if (userInputRows.length > 0) hasVisibleProcessEvidence = true;
-      continue;
-    }
-
-    if (block.kind === 'output') {
-      if (
-        hasVisibleProcessEvidence
-        && !rows.some((row) => row.type === 'response')
-        && !hasLaterAnswerOnlyLoop(blocks, blockIndex)
-      ) {
-        rows.push(createOutputResponseRow(block));
-      }
-      continue;
-    }
-
-    if (shouldSkipBlock(block)) {
-      continue;
-    }
-
-    if (block.kind === 'approval') {
-      rows.push(createApprovalRow(block));
-      hasVisibleProcessEvidence = true;
-      continue;
-    }
-
-    if (block.kind === 'subagent') {
-      const childRows = block.children ? blocksToRows(block.children) : [];
-      rows.push({
-        type: 'subagent',
-        id: block.id,
-        status: block.status,
-        profile: block.title.replace(/^Sub-agent[:?]\s*/, '').trim() || 'sub-agent',
-        summary: getMeaningfulBlockSummary(block) || block.summary || '',
-        detail: block.detail ?? '',
-        duration: formatDurationMs(block.startedAt, block.completedAt),
-        children: childRows,
-      });
-      hasVisibleProcessEvidence = true;
-      continue;
-    }
-
-    if (block.kind === 'command') {
-      const summaryText = getMeaningfulBlockSummary(block);
-      if (summaryText) {
-        const taskStatus = block.status === 'error'
-          ? 'failed'
-          : block.status === 'running'
-            ? 'in_progress'
-            : block.status === 'pending'
-              ? 'pending'
-              : 'completed';
-        rows.push({
-          type: 'task',
-          id: block.id,
-          status: block.status,
-          title: summaryText,
-          taskStatus,
-          duration: formatDurationMs(block.startedAt, block.completedAt),
-        });
-        hasVisibleProcessEvidence = true;
-      }
-      continue;
-    }
-
-    if (block.kind === 'diagnostic' || block.status === 'error') {
-      rows.push(createDiagnosticRow(block));
-      hasVisibleProcessEvidence = true;
-      continue;
-    }
-
-    const summaryText = getMeaningfulBlockSummary(block);
-    if (summaryText) {
-      rows.push({
-        type: 'summary',
-        id: block.id,
-        status: block.status,
-        text: summaryText,
-        detailLines: createDetailLines(block.detail, 10),
-        duration: formatDurationMs(block.startedAt, block.completedAt),
-      });
-      hasVisibleProcessEvidence = true;
-    }
-  }
-
-  markLastSectionOpen(rows);
-  return rows;
+const getMcpParts = (normalizedToolName: string): { server: string; tool: string } | null => {
+  if (!normalizedToolName.startsWith('mcp__')) return null;
+  const [, server = '', ...toolParts] = normalizedToolName.split('__');
+  const tool = toolParts.join('__');
+  if (!server || !tool) return null;
+  return { server, tool };
 };
 
-const hasLaterAnswerOnlyLoop = (blocks: ConversationWorkBlock[], blockIndex: number): boolean => (
-  blocks.slice(blockIndex + 1).some((block) => (
-    block.kind === 'llm_turn'
-    && block.toolCalls.length === 0
-    && (
-      Boolean(normalizeWorkProcessText(block.result?.text ?? ''))
-      || Boolean(block.thinking)
-    )
-  ))
-);
+const createReasoningIndicatorRow = (
+  block: ConversationWorkBlock,
+  state: Extract<ConversationReasoningState, 'opaque' | 'hidden'>,
+): Extract<WorkProcessRow, { type: 'reasoningIndicator' }> => ({
+  type: 'reasoningIndicator',
+  id: `reasoning-indicator-${block.id}`,
+  status: block.status,
+  state,
+  duration: formatDurationMs(block.startedAt, block.completedAt),
+  loopId: block.id,
+});
 
 const createResponseRow = (
   block: ConversationWorkBlock,
   hasVisibleProcessEvidence: boolean,
+  outputPhase: ConversationLoopOutputPhase,
 ): Extract<WorkProcessRow, { type: 'response' }> | null => {
-  const resultText = normalizeWorkProcessText(block.result?.text ?? '');
+  if (outputPhase !== 'final_answer') return null;
+  const stopReason = block.result?.stopReason;
+  if (isNonFinalStopReason(stopReason)) return null;
+
   const thinking = resolveResponseThinking(block);
   const isTerminal = block.status === 'complete' || block.status === 'error';
   const hasFinalResponseBoundary = hasVisibleProcessEvidence
-    && (Boolean(resultText) || (isTerminal && Boolean(thinking.label)));
+    && (isTerminal || block.status === 'running' || block.status === 'pending')
+    && (Boolean(thinking.label) || Boolean(thinking.preview) || isTerminal);
   if (!hasFinalResponseBoundary) return null;
 
   return {
@@ -685,23 +360,10 @@ const createResponseRow = (
     thinkingStatus: thinking.status,
     thinkingExpandable: thinking.expandable,
     thinkingOpenByDefault: thinking.openByDefault,
+    outputPhase,
+    stopReason,
   };
 };
-
-const createOutputResponseRow = (
-  block: ConversationWorkBlock,
-): Extract<WorkProcessRow, { type: 'response' }> => ({
-  type: 'response',
-  id: `response-${block.id}`,
-  status: block.status,
-  title: '回复',
-  summary: getResponseSummary(block.status),
-  duration: formatDurationMs(block.startedAt, block.completedAt),
-  thinkingPreview: '',
-  thinkingLabel: '',
-  thinkingExpandable: false,
-  thinkingOpenByDefault: false,
-});
 
 const getResponseSummary = (status: WorkProcessRowStatus): string => {
   if (status === 'running' || status === 'pending') return '正在生成最终回复';
@@ -709,34 +371,7 @@ const getResponseSummary = (status: WorkProcessRowStatus): string => {
   return '回复已生成';
 };
 
-const appendRowsToLastSection = (rows: WorkProcessRow[], childRows: WorkProcessRow[]): boolean => {
-  if (childRows.length === 0) return true;
-  for (let index = rows.length - 1; index >= 0; index -= 1) {
-    const row = rows[index];
-    if (row.type !== 'section') continue;
-    row.steps.push(...childRows);
-    row.stepCount = countToolSteps(row.steps);
-    if (row.status === 'complete' && childRows.some((child) => child.status === 'running' || child.status === 'pending')) {
-      row.status = 'running';
-    }
-    if (childRows.some((child) => child.status === 'error')) {
-      row.status = 'error';
-      row.defaultOpen = true;
-    }
-    return true;
-  }
-  return false;
-};
-
-const markLastSectionOpen = (rows: WorkProcessRow[]): void => {
-  let lastSectionIndex = -1;
-  rows.forEach((row, index) => {
-    if (row.type === 'section') lastSectionIndex = index;
-  });
-  if (lastSectionIndex < 0) return;
-  const lastSection = rows[lastSectionIndex];
-  if (lastSection.type === 'section' && lastSection.status !== 'complete') lastSection.defaultOpen = true;
-};
+const appendRowsToLastSection = (_rows: WorkProcessRow[], _childRows: WorkProcessRow[]): boolean => false;
 
 type GroupableWorkProcessRow = Extract<WorkProcessRow, { type: 'tool' | 'userInput' }>;
 
@@ -1006,16 +641,10 @@ const createUserInputRow = (call: ConversationToolCall): WorkProcessRow => {
 };
 
 const createApprovalRow = (block: ConversationWorkBlock): WorkProcessRow => {
-  const parsed = parsePreview(block.detail);
-  const record = toRecord(parsed) ?? {};
-  const detailAnswer = typeof parsed === 'string' ? parsed : stringifyPreview(record.answer);
-  const reviewer = stringifyPreview(record.reviewer);
-  const toolName = stringifyPreview(record.toolName);
-  const risk = stringifyPreview(record.risk);
-  const isAutoReview = reviewer === 'auto_review' || block.id.includes('auto-review');
-  const resolvedText = (detailAnswer || getMeaningfulBlockSummary(block) || '').trim();
+  const resolvedText = (getMeaningfulBlockSummary(block) || '').trim();
   const isGenericDecision = /^(approved once|user denied)$/i.test(resolvedText);
   const message = isGenericDecision ? '' : compactText(resolvedText, 300);
+  const isAutoReview = block.id.includes('auto-review');
 
   return {
     type: 'approval',
@@ -1025,10 +654,7 @@ const createApprovalRow = (block: ConversationWorkBlock): WorkProcessRow => {
     message,
     duration: formatDurationMs(block.startedAt, block.completedAt),
     detailLines: [],
-    metaLines: [
-      toolName ? `工具：${toolName}` : '',
-      risk ? `风险：${risk}` : '',
-    ].filter(Boolean),
+    metaLines: [],
   };
 };
 
@@ -1078,7 +704,7 @@ const createDiagnosticRow = (block: ConversationWorkBlock): WorkProcessRow => ({
   id: block.id,
   status: block.status === 'error' ? 'error' : block.status,
   message: getMeaningfulBlockSummary(block) || block.title || 'Runtime diagnostic',
-  detailLines: createDetailLines(block.detail, 12),
+  detailLines: [],
   duration: formatDurationMs(block.startedAt, block.completedAt),
 });
 
@@ -1379,12 +1005,6 @@ const isLikelyBinaryText = (value: string): boolean => {
   if (escapeSeqs < 4 && replacementChars < 4) return false;
   const noisyChars = escapeSeqs * 6 + replacementChars;
   return noisyChars / text.length > 0.3;
-};
-
-const compactText = (value: string, maxLength: number): string => {
-  const text = value.trim().replace(/\s+/g, ' ');
-  if (text.length <= maxLength) return text;
-  return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
 };
 
 const extractContentTextFromJsonishString = (value: string): string => {

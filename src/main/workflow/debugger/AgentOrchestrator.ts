@@ -509,8 +509,12 @@ export class AgentOrchestrator {
           projectId: input.projectId,
           systemPrompt,
           onEvent: (event: SharedAgentEvent) => {
-            // 子事件聚合为 subagent.delta 上抛父 trace（不逐事件投影子 tool，
-            // 避免父 trace 噪音；嵌套细节由 subagent.completed summary 承载）。
+            const basePayload = {
+              subagentId,
+              profile: input.targetProfile,
+              parentToolCallId: input.parentToolCallId,
+            } satisfies Pick<AgentSubagentEventPayload, 'subagentId' | 'profile' | 'parentToolCallId'>;
+
             if (event.type === 'assistant.delta') {
               const delta = event.payload as AgentAssistantDeltaPayload;
               if (delta.text) {
@@ -521,13 +525,65 @@ export class AgentOrchestrator {
                   sessionId: input.parentSessionId ?? null,
                   agentId: input.parentAgentId,
                   payload: {
-                    subagentId,
-                    profile: input.targetProfile,
-                    parentToolCallId: input.parentToolCallId,
+                    ...basePayload,
                     text: delta.text,
                   } satisfies AgentSubagentEventPayload,
                 });
               }
+              return;
+            }
+
+            if (event.type === 'tool.started') {
+              const payload = event.payload as { toolCallId?: string; toolName?: string };
+              input.parentOnEvent?.({
+                id: generateEventId('agent-event'),
+                type: 'subagent.delta',
+                timestamp: nowMs(),
+                sessionId: input.parentSessionId ?? null,
+                agentId: input.parentAgentId,
+                payload: {
+                  ...basePayload,
+                  child: {
+                    id: String(payload.toolCallId ?? generateEventId('subagent-tool')),
+                    kind: 'tool',
+                    title: payload.toolName ? `Tool: ${payload.toolName}` : 'Tool',
+                    status: 'running',
+                    toolName: payload.toolName,
+                  },
+                } satisfies AgentSubagentEventPayload,
+              });
+              return;
+            }
+
+            if (event.type === 'tool.completed' || event.type === 'tool.denied') {
+              const payload = event.payload as {
+                toolCallId?: string;
+                toolName?: string;
+                result?: { ok?: boolean; error?: { message?: string } };
+                reason?: string;
+              };
+              const failed = event.type === 'tool.denied' || payload.result?.ok === false;
+              const summary = failed
+                ? (payload.reason || payload.result?.error?.message || 'Tool failed')
+                : 'Tool completed';
+              input.parentOnEvent?.({
+                id: generateEventId('agent-event'),
+                type: 'subagent.delta',
+                timestamp: nowMs(),
+                sessionId: input.parentSessionId ?? null,
+                agentId: input.parentAgentId,
+                payload: {
+                  ...basePayload,
+                  child: {
+                    id: String(payload.toolCallId ?? generateEventId('subagent-tool')),
+                    kind: 'tool',
+                    title: payload.toolName ? `Tool: ${payload.toolName}` : 'Tool',
+                    status: failed ? 'error' : 'complete',
+                    toolName: payload.toolName,
+                    summary,
+                  },
+                } satisfies AgentSubagentEventPayload,
+              });
             }
           },
         },

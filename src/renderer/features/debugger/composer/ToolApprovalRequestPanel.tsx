@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
+import type { ConversationMessage } from '@shared/types/conversation';
 import { useConversationStore } from '../../../stores/conversationStore';
+import { useI18n } from '../../../i18n';
 import { useToolApprovalSubmit } from './useToolApprovalSubmit';
 
 export interface PendingToolApprovalRequest {
@@ -14,34 +15,6 @@ export interface PendingToolApprovalRequest {
   reviewer?: string;
 }
 
-const safeParseJson = (value?: string): unknown => {
-  if (!value?.trim()) return undefined;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return undefined;
-  }
-};
-
-const parseApprovalDetail = (block: ConversationWorkBlock): Partial<PendingToolApprovalRequest> => {
-  const parsed = safeParseJson(block.detail);
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-  const record = parsed as Record<string, unknown>;
-  return {
-    approvalId: typeof record.approvalId === 'string' ? record.approvalId : undefined,
-    toolCallId: typeof record.toolCallId === 'string' ? record.toolCallId : undefined,
-    toolName: typeof record.toolName === 'string' ? record.toolName : undefined,
-    risk: record.risk === 'low' || record.risk === 'medium' || record.risk === 'high' ? record.risk : undefined,
-    reviewer: typeof record.reviewer === 'string' ? record.reviewer : undefined,
-  };
-};
-
-const fallbackApprovalId = (blockId: string): string => (
-  blockId.startsWith('runtime-approval-')
-    ? blockId.slice('runtime-approval-'.length)
-    : blockId
-);
-
 const findPendingToolApproval = (messages: ConversationMessage[]): PendingToolApprovalRequest | null => {
   const assistantMessages = messages
     .filter((message) => message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming'))
@@ -49,20 +22,23 @@ const findPendingToolApproval = (messages: ConversationMessage[]): PendingToolAp
 
   for (const message of assistantMessages) {
     for (const block of message.workTrace?.blocks ?? []) {
-      if (block.kind !== 'approval' || block.status !== 'running') continue;
-
-      const detail = parseApprovalDetail(block);
-      const approvalId = detail.approvalId || fallbackApprovalId(block.id);
-      return {
-        sessionId: message.sessionId,
-        turnId: message.turnId,
-        approvalId,
-        toolCallId: detail.toolCallId,
-        toolName: detail.toolName || 'tool',
-        question: block.summary?.trim() || 'The agent needs approval before continuing.',
-        risk: detail.risk || 'medium',
-        reviewer: detail.reviewer,
-      };
+      for (const toolCall of block.toolCalls) {
+        if (toolCall.approval?.status !== 'pending') continue;
+        return {
+          sessionId: message.sessionId,
+          turnId: message.turnId,
+          approvalId: toolCall.approval.approvalId,
+          toolCallId: toolCall.id,
+          toolName: toolCall.toolName,
+          question: toolCall.approval.reason?.trim()
+            || block.summary?.trim()
+            || 'The agent needs approval before continuing.',
+          risk: (toolCall.approval.risk === 'low' || toolCall.approval.risk === 'high'
+            ? toolCall.approval.risk
+            : 'medium') as PendingToolApprovalRequest['risk'],
+          reviewer: toolCall.approval.reviewer,
+        };
+      }
     }
   }
 
@@ -77,6 +53,7 @@ export const usePendingToolApprovalRequest = (): PendingToolApprovalRequest | nu
 export const ToolApprovalRequestPanel: React.FC<{
   request: PendingToolApprovalRequest;
 }> = ({ request }) => {
+  const { t } = useI18n();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submitApproval = useToolApprovalSubmit();
@@ -97,7 +74,7 @@ export const ToolApprovalRequestPanel: React.FC<{
   return (
     <section className="composer-tool-approval-panel" data-testid="composer-tool-approval-panel">
       <div className="composer-tool-approval-header">
-        <span className="composer-tool-approval-kicker">Approval requested</span>
+        <span className="composer-tool-approval-kicker">{t('composer.toolApprovalKicker')}</span>
         <p>{request.question}</p>
       </div>
       <div className="composer-tool-approval-meta" aria-label="Approval context">
@@ -112,7 +89,7 @@ export const ToolApprovalRequestPanel: React.FC<{
           disabled={isSubmitting}
           onClick={() => void submitDecision(false)}
         >
-          Deny
+          {t('composer.toolApprovalDeny')}
         </button>
         <button
           type="button"
@@ -120,7 +97,7 @@ export const ToolApprovalRequestPanel: React.FC<{
           disabled={isSubmitting}
           onClick={() => void submitDecision(true)}
         >
-          Approve once
+          {t('composer.toolApprovalApproveOnce')}
         </button>
       </div>
       {error ? (

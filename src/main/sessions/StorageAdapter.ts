@@ -18,6 +18,7 @@ import {
 } from '@shared/utils/id';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage } from '@shared/types/conversation';
+import { sanitizeStoredWorkTrace } from '../conversation/ConversationWorkTrace';
 import type {
   Blocker,
   ReasoningSummary,
@@ -710,7 +711,11 @@ export class StorageAdapter {
     }
 
     return Array.from(latestById.values())
-      .sort((left, right) => left.createdAt - right.createdAt);
+      .sort((left, right) => left.createdAt - right.createdAt)
+      .map((message) => ({
+        ...message,
+        workTrace: sanitizeStoredWorkTrace(message.workTrace ?? null),
+      }));
   }
 
   appendConversationMessage(sessionId: string, message: ConversationMessage): void {

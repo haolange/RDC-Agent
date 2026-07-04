@@ -3,14 +3,11 @@
  *
  * 状态机：idle → streaming → idle
  *  - prompt(): 在 idle 状态发起一次新的 agent 循环。
- *  - steer(): 在 streaming 状态注入「中断式」消息（每个工具执行后检查）。
- *  - followUp(): 在 streaming 状态排队后续消息（agent 停止前再处理）。
  *  - abort(): 中止当前流。
  *  - subscribe(): 订阅所有 AgentEvent。
  *
  * 该类是对 `agentLoop()` 的封装，负责：
  *  - 管理 messages / model / tools / systemPrompt 的可变状态；
- *  - 维护 steering / followUp 队列；
  *  - 把 EventStream 事件多播给所有订阅者；
  *  - 协调 abort 信号。
  */
@@ -36,6 +33,7 @@ import {
   type AgentContext,
   type AgentLoopConfig,
   type ToolExecutor,
+  type TransformContextResult,
 } from './AgentLoop';
 
 /** Agent 事件订阅者签名。 */
@@ -66,15 +64,11 @@ export interface AgentOptions {
   transformContext?: (
     messages: AgentMessage[],
     signal?: AbortSignal,
-  ) => Promise<AgentMessage[]>;
+  ) => Promise<TransformContextResult>;
   /** 动态 API key 获取（支持 OAuth token 刷新）。 */
   getApiKey?: (provider: string) => Promise<string | undefined>;
   /** Provider stream 调用选项。 */
   streamOptions?: StreamOptions;
-  /** steering 出队模式：一次出队全部或一条。默认 `all`。 */
-  steeringMode?: 'all' | 'one-at-a-time';
-  /** followUp 出队模式：一次出队全部或一条。默认 `all`。 */
-  followUpMode?: 'all' | 'one-at-a-time';
   /** 最大工具执行轮数（防御性上限）。 */
   maxTurns?: number;
   /** 错误恢复管理器（可选）。用于 LLM 错误的自动重试/模型切换/压缩。 */
@@ -107,8 +101,6 @@ export class Agent {
   private _state: AgentState;
   private _isStreaming = false;
   private _subscribers: AgentEventSubscriber[] = [];
-  private _steeringQueue: UserMessage[] = [];
-  private _followUpQueue: UserMessage[] = [];
   private _currentStream: EventStream<AgentEvent, Message[]> | null = null;
   private readonly _provider: ProviderStrategy;
   private readonly _toolExecutor?: ToolExecutor;
@@ -171,7 +163,7 @@ export class Agent {
   }
 
   // -------------------------------------------------------------------
-  // 主流程：prompt / steer / followUp / abort
+  // 主流程：prompt / abort
   // -------------------------------------------------------------------
 
   /**
@@ -190,28 +182,6 @@ export class Agent {
     const pending: UserMessage[] = [userMessage];
 
     return this.runLoop(pending);
-  }
-
-  /**
-   * 注入 steering 消息（中断当前工具执行序列）。
-   * 只能在 streaming 状态调用；非 streaming 状态会被静默丢弃，避免误注入。
-   */
-  steer(message: string | UserMessage): void {
-    if (!this._isStreaming) {
-      return;
-    }
-    this._steeringQueue.push(normalizeUserMessage(message));
-  }
-
-  /**
-   * 注入 followUp 消息（agent 内层停止前追加）。
-   * 只能在 streaming 状态调用；非 streaming 状态会被静默丢弃。
-   */
-  followUp(message: string | UserMessage): void {
-    if (!this._isStreaming) {
-      return;
-    }
-    this._followUpQueue.push(normalizeUserMessage(message));
   }
 
   /** 中止当前流；非 streaming 状态时是 no-op。 */
@@ -251,8 +221,6 @@ export class Agent {
 
   private async runLoop(pending: UserMessage[]): Promise<Message[]> {
     this._isStreaming = true;
-    this._steeringQueue = [];
-    this._followUpQueue = [];
 
     const context: AgentContext = {
       systemPrompt: this._state.systemPrompt,
@@ -276,19 +244,14 @@ export class Agent {
         this.emit(event);
       }
       const result = await stream.result();
-      // context.messages 已经是 this._state.messages 的同一引用，
-      // agentLoop 内部直接 push，故无需额外同步。
       return result;
     } finally {
       this._isStreaming = false;
       this._currentStream = null;
-      this._steeringQueue = [];
-      this._followUpQueue = [];
     }
   }
 
   private emit(event: AgentEvent): void {
-    // 拷贝订阅者列表，避免在迭代过程中被 unsubscribe 改动
     const subs = [...this._subscribers];
     for (const sub of subs) {
       try {
@@ -297,34 +260,6 @@ export class Agent {
         // 订阅者异常不应影响 agent 运行
       }
     }
-  }
-
-  private getSteeringMessages(): UserMessage[] {
-    if (this._steeringQueue.length === 0) {
-      return [];
-    }
-    const mode = this._options.steeringMode ?? 'all';
-    if (mode === 'one-at-a-time') {
-      const next = this._steeringQueue.shift();
-      return next ? [next] : [];
-    }
-    const all = this._steeringQueue;
-    this._steeringQueue = [];
-    return all;
-  }
-
-  private getFollowUpMessages(): UserMessage[] {
-    if (this._followUpQueue.length === 0) {
-      return [];
-    }
-    const mode = this._options.followUpMode ?? 'all';
-    if (mode === 'one-at-a-time') {
-      const next = this._followUpQueue.shift();
-      return next ? [next] : [];
-    }
-    const all = this._followUpQueue;
-    this._followUpQueue = [];
-    return all;
   }
 
   private createLoopConfig(): AgentLoopConfig {
@@ -336,8 +271,6 @@ export class Agent {
       streamOptions: opts.streamOptions,
       getApiKey: opts.getApiKey,
       maxTurns: opts.maxTurns,
-      getSteeringMessages: () => this.getSteeringMessages(),
-      getFollowUpMessages: () => this.getFollowUpMessages(),
       signal: opts.streamOptions?.signal,
       errorRecovery: opts.errorRecovery,
     };
@@ -360,7 +293,6 @@ function normalizeUserMessage(input: string | UserMessage): UserMessage {
   return input;
 }
 
-// 显式 re-export 减少使用方导入路径
 export type {
   AssistantMessage,
   Message,

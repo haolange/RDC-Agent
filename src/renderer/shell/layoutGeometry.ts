@@ -131,6 +131,10 @@ export const resolveResponsiveSidebarState = (
   let nextLeftCollapsed = leftCollapsed;
   let nextRightCollapsed = rightVisible ? rightCollapsed : true;
 
+  if (containerWidth <= 720 && rightVisible) {
+    nextRightCollapsed = true;
+  }
+
   if (!canFitLayout(containerWidth, leftWidth, rightWidth, nextLeftCollapsed, nextRightCollapsed, minMainWidth, rightVisible)) {
     nextRightCollapsed = true;
   }

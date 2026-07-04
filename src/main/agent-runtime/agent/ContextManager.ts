@@ -61,6 +61,12 @@ export const COMPACTION_MARKERS = {
   summary: '[Conversation summary:',
 } as const;
 
+export interface CompressResult {
+  messages: AgentMessage[];
+  /** 实际发生压缩时的人类可读摘要；no-op 时为 undefined。 */
+  summary?: string;
+}
+
 /** 上下文管理器。 */
 export class ContextManager {
   constructor(private config: ContextManagerConfig = {}) {}
@@ -90,26 +96,59 @@ export class ContextManager {
   async compress(
     messages: AgentMessage[],
     model?: Model,
-  ): Promise<AgentMessage[]> {
+  ): Promise<CompressResult> {
     const tokenLimit = this.resolveTokenLimit(model);
+    const beforeCount = messages.length;
+    const beforeTokens = this.estimateTokens(messages);
+    const stages: string[] = [];
 
     // Level 1: 工具结果预算控制
     let result = this.toolResultBudget(messages);
+    if (!messagesEqual(result, messages)) {
+      stages.push('toolResultBudget');
+    }
 
     // Level 2: 消息数过多 → snip 中间
+    const afterBudget = result;
     result = this.snipCompact(result);
+    if (!messagesEqual(result, afterBudget)) {
+      stages.push('snip');
+    }
 
     // Level 3: 早期工具结果 → 占位
     if (this.estimateTokens(result) > tokenLimit) {
+      const beforeMicro = result;
       result = this.microCompact(result);
+      if (!messagesEqual(result, beforeMicro)) {
+        stages.push('micro');
+      }
     }
 
     // Level 4: 仍超限 → 全量摘要
     if (this.estimateTokens(result) > tokenLimit) {
+      const beforeFull = result;
       result = await this.fullCompact(result);
+      if (!messagesEqual(result, beforeFull)) {
+        stages.push('full');
+      }
     }
 
-    return result;
+    const semanticStages = stages.filter(
+      (stage): stage is 'snip' | 'micro' | 'full' =>
+        stage === 'snip' || stage === 'micro' || stage === 'full',
+    );
+    if (semanticStages.length === 0) {
+      return { messages: result };
+    }
+
+    const afterCount = result.length;
+    const afterTokens = this.estimateTokens(result);
+    const removedMessages = Math.max(0, beforeCount - afterCount);
+    const summary = removedMessages > 0
+      ? `上下文压缩（${semanticStages.join('、')}）：${beforeCount} → ${afterCount} 条消息，约 ${beforeTokens} → ${afterTokens} token`
+      : `上下文压缩（${semanticStages.join('、')}）：约 ${beforeTokens} → ${afterTokens} token`;
+
+    return { messages: result, summary };
   }
 
   /**
@@ -509,4 +548,9 @@ export class ContextManager {
       `toolResult=${toolResultCount}). Earlier context omitted to fit window.]`
     );
   }
+}
+
+function messagesEqual(left: AgentMessage[], right: AgentMessage[]): boolean {
+  if (left.length !== right.length) return false;
+  return JSON.stringify(left) === JSON.stringify(right);
 }

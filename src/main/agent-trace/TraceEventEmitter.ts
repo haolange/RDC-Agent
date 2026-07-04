@@ -219,6 +219,22 @@ export class TraceEventEmitter {
       };
       return this.store.append(runId, 'run.failed', node);
     }
+    if (event.type === 'run.cancelled') {
+      const payload = event.payload as { error?: string };
+      const node: ErrorNode = {
+        id: generateEventId('error'),
+        runId,
+        kind: 'error',
+        title: '已取消',
+        message: payload.error || '用户已停止执行',
+        recoverable: false,
+        seq: 0,
+        createdAt: toIso(event.timestamp),
+        visibility: 'user',
+        status: 'failed',
+      };
+      return this.store.append(runId, 'run.cancelled', node);
+    }
     return null;
   }
 
@@ -259,15 +275,15 @@ export class TraceEventEmitter {
         id: generateEventId('error'),
         runId,
         kind: 'error',
-        title: '执行失败',
+        title: event.aborted ? '已取消' : '执行失败',
         message: event.error?.message || '未知错误',
-        recoverable: true,
+        recoverable: !event.aborted,
         seq: 0,
         createdAt: nowIso(),
         visibility: 'user',
         status: 'failed',
       };
-      return this.store.append(runId, 'run.failed', node);
+      return this.store.append(runId, event.aborted ? 'run.cancelled' : 'run.failed', node);
     }
     return null;
   }

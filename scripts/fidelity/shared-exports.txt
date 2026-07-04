@@ -19,6 +19,7 @@ AgentAssistantDeltaPayload
 AgentAssistantThinkingPayload
 AgentCategory
 AgentConfig
+AgentContextCompactedPayload
 AgentConversation
 AgentDiagnosticPayload
 AgentDisplayInfo
@@ -62,6 +63,7 @@ AgentRuntimeTaskGraphDescriptor
 AgentRunViewModel
 AgentState
 AgentStatus
+AgentSubagentChildPayload
 AgentSubagentEventPayload
 AgentTaskEventPayload
 AgentTimelineEntry
@@ -164,8 +166,11 @@ ConversationErrorViewModel
 ConversationExecutionTransition
 ConversationFork
 ConversationHistoryResult
+ConversationLoopContinuationState
+ConversationLoopOutputPhase
 ConversationLoopResult
 ConversationLoopResultStatus
+ConversationLoopStopReason
 ConversationMessage
 ConversationMessageCompletedEvent
 ConversationMessageDiagnostic
@@ -174,6 +179,7 @@ ConversationMessageErroredEvent
 ConversationMessagePatchedEvent
 ConversationMessageStatus
 ConversationMode
+ConversationReasoningState
 ConversationRewriteFromMessageRequest
 ConversationRole
 ConversationRunLinkedEvent
@@ -381,6 +387,9 @@ RequestBranchGroup
 RequestBranchStatus
 resolveAgentDisplay
 resolveBuiltinProviderProtocol
+resolveConversationLoopOutputPhase
+ResolveConversationLoopOutputPhaseInput
+resolveConversationReasoningState
 ResolvedAgentRuntimeProfile
 ResolvedTheme
 RetryRequest

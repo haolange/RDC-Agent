@@ -32,7 +32,6 @@ const upsertWorkBlock = (
     stage?: string;
     status: ConversationWorkBlock['status'];
     summary?: string;
-    detail?: string;
     completedAt?: number;
   },
 ): ConversationWorkTrace => {
@@ -52,7 +51,6 @@ const upsertWorkBlock = (
       stage: patch.stage,
       status: patch.status,
       summary: patch.summary,
-      detail: patch.detail,
       toolCalls: [],
       startedAt: Date.now(),
       completedAt: patch.completedAt,
@@ -150,7 +148,6 @@ export const applyActionEventToMessage = (message: ConversationMessage, event: A
       ? 'error'
       : 'complete',
     summary,
-    detail: JSON.stringify(event.payload, null, 2),
     completedAt: eventTime + event.duration_ms,
   });
   nextBlockTrace.status = event.status === 'error' || event.status === 'blocked' || event.status === 'fail'

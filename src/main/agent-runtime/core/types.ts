@@ -140,7 +140,7 @@ export type Message = UserMessage | AssistantMessage | ToolResultMessage;
 // =====================================================================
 
 /** 助手消息生成结束的原因。 */
-export type StopReason = 'stop' | 'length' | 'toolUse' | 'error' | 'aborted';
+export type StopReason = 'stop' | 'length' | 'toolUse' | 'error' | 'aborted' | 'refusal';
 
 // =====================================================================
 // Token / 成本
@@ -324,7 +324,16 @@ export type AgentEvent =
       args: Record<string, unknown>;
     }
   | { type: 'approval_resolved'; toolCallId: string; approved: boolean }
-  | { type: 'error'; error: Error };
+  | { type: 'compaction'; summary: string }
+  | {
+      type: 'diagnostic';
+      code: string;
+      severity: 'info' | 'warning' | 'error';
+      message: string;
+      technicalMessage?: string;
+      phase?: 'started' | 'completed';
+    }
+  | { type: 'error'; error: Error; aborted?: boolean };
 
 // =====================================================================
 // Stream 选项

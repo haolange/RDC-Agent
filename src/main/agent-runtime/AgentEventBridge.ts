@@ -10,6 +10,7 @@ import type {
   AgentRouteCapability,
 } from '@shared/types/agentRuntime';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
+import type { ConversationLoopStopReason } from '@shared/types/conversation';
 import type { AgentRole } from '@shared/types/agent';
 import type { AppMode } from '@shared/types/session';
 import type { WorkflowPhase, WorkflowStage } from '@shared/types/workflow';
@@ -21,6 +22,7 @@ import type {
   Message,
   ThinkingContent,
   ToolResultMessage,
+  StopReason,
 } from './core/types';
 import { toSharedThinkingArtifact } from './reasoning/ReasoningArtifacts';
 
@@ -161,6 +163,7 @@ export function translateCoreToSharedAgentEvent(
           {
             text,
             thinking: thinking.length > 0 ? thinking : undefined,
+            stopReason: mapCoreStopReasonToShared(event.message.stopReason),
             usage: event.message.usage
               ? {
                   inputTokens: event.message.usage.inputTokens,
@@ -254,6 +257,16 @@ export function translateCoreToSharedAgentEvent(
       );
     }
     case 'error': {
+      if (event.aborted) {
+        return buildSharedAgentEvent(
+          'run.cancelled',
+          {
+            status: 'cancelled',
+            error: event.error.message || String(event.error),
+          },
+          context,
+        );
+      }
       return buildSharedAgentEvent(
         'run.failed',
         {
@@ -263,8 +276,49 @@ export function translateCoreToSharedAgentEvent(
         context,
       );
     }
+    case 'compaction': {
+      return buildSharedAgentEvent(
+        'context.compacted',
+        {
+          summary: event.summary,
+        },
+        context,
+      );
+    }
+    case 'diagnostic': {
+      return buildSharedAgentEvent(
+        'diagnostic',
+        {
+          code: event.code,
+          severity: event.severity,
+          message: event.message,
+          technicalMessage: event.technicalMessage,
+          phase: event.phase,
+        },
+        context,
+      );
+    }
     default:
       return null;
+  }
+}
+
+function mapCoreStopReasonToShared(reason: StopReason): ConversationLoopStopReason {
+  switch (reason) {
+    case 'stop':
+      return 'end_turn';
+    case 'toolUse':
+      return 'tool_use';
+    case 'length':
+      return 'max_tokens';
+    case 'refusal':
+      return 'refusal';
+    case 'error':
+      return 'error';
+    case 'aborted':
+      return 'aborted';
+    default:
+      return 'error';
   }
 }
 

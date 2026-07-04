@@ -1,17 +1,19 @@
 import React from 'react';
 import { getRowStatusLabel, type WorkProcessRow } from './workProcessPresentation';
+import { useWorkProcessLabel } from './workProcessUseLabel';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 
 type ResponseRowModel = Extract<WorkProcessRow, { type: 'response' }>;
 
 export const ResponseRow: React.FC<{ row: ResponseRowModel }> = ({ row }) => {
-  const statusLabel = row.status === 'complete' ? '' : getRowStatusLabel(row.status);
+  const label = useWorkProcessLabel();
+  const statusLabel = row.status === 'complete' ? '' : label(getRowStatusLabel(row.status));
   const hasThinking = row.thinkingExpandable && Boolean(row.thinkingPreview);
   const summaryContent = (
     <>
       <span className="work-process-response-head">
-        <span className="work-process-response-title">{row.title}</span>
-        <span className="work-process-response-summary-text">{row.summary}</span>
+        <span className="work-process-response-title">{label(row.title)}</span>
+        <span className="work-process-response-summary-text">{label(row.summary)}</span>
       </span>
       <span className="work-process-tool-meta">
         {row.duration ? <span>{row.duration}</span> : null}
@@ -38,7 +40,7 @@ export const ResponseRow: React.FC<{ row: ResponseRowModel }> = ({ row }) => {
               {summaryContent}
             </summary>
             <div className="work-process-response-thinking">
-              <span className="work-process-response-thinking-label">{row.thinkingLabel}</span>
+              <span className="work-process-response-thinking-label">{label(row.thinkingLabel)}</span>
               <pre className="work-process-thinking-preview">{row.thinkingPreview}</pre>
             </div>
           </details>

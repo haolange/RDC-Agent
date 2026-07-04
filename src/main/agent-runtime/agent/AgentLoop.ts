@@ -7,9 +7,7 @@
  * transition 站点（每轮顶部快照 state，按 reason 分发）：
  * - `init`          注入初始 pending（用户消息），进入首轮。
  * - `next_turn`     正常工具循环：调 LLM → 执行工具 → 若有 toolUse 继续。
- * - `steering`      工具执行后 steering 命中：把 steering 消息作下一轮 pending。
- * - `follow_up`     内层停止后检查 followUp 队列：有则作下一轮 pending。
- * - `terminal`      终止（max_turns / 无 toolUse 且无 followUp / abort）。
+ * - `terminal`      终止（max_turns / 无 toolUse / abort）。
  *
  * 该模块只负责低层调度，不持有状态机或事件订阅；
  * 高层组合（队列、订阅、abort 协调）由 `Agent` 类负责。
@@ -30,7 +28,10 @@ import type {
   UserMessage,
 } from '../core/types';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
-import { ErrorRecovery } from './ErrorRecovery';
+import { ErrorRecovery, type RecoveryAction } from './ErrorRecovery';
+import type { CompressResult } from './ContextManager';
+
+export type TransformContextResult = AgentMessage[] | CompressResult;
 
 // =====================================================================
 // 配置 / 上下文 / 执行器接口
@@ -46,7 +47,7 @@ export interface AgentLoopConfig {
   transformContext?: (
     messages: AgentMessage[],
     signal?: AbortSignal,
-  ) => Promise<AgentMessage[]>;
+  ) => Promise<TransformContextResult>;
   /** LLM 调用选项（temperature/maxTokens 等）。 */
   streamOptions?: StreamOptions;
   /** 获取动态 API Key（支持 OAuth token 刷新）。 */
@@ -55,16 +56,6 @@ export interface AgentLoopConfig {
   maxTurns?: number;
   /** 工具并行执行的最大并发数。1 = 顺序（默认），0 或 >1 = 并发。 */
   maxToolConcurrency?: number;
-  /**
-   * 在每个工具执行结束后调用，返回当前 steering 队列中的消息（出队）。
-   * 返回空数组表示当前没有 steering，循环继续。
-   */
-  getSteeringMessages?: () => UserMessage[];
-  /**
-   * 在内层循环停止后调用，返回 followUp 队列中的消息（出队）。
-   * 返回空数组表示外层循环可以结束。
-   */
-  getFollowUpMessages?: () => UserMessage[];
   /** 外部 abort 信号；触发时会中止 provider 流并以 AbortError 终止。 */
   signal?: AbortSignal;
   /**
@@ -110,7 +101,6 @@ export interface ToolExecutor {
 /** 内层循环工具执行结果。 */
 interface ExecuteToolCallsResult {
   results: ToolResultMessage[];
-  steeringMessages?: UserMessage[];
 }
 
 // =====================================================================
@@ -165,11 +155,11 @@ export function agentLoopContinue(
 // =====================================================================
 
 /** transition reason：标记「本轮为何继续」，便于测试断言走了哪条路径。 */
-type TransitionReason = 'init' | 'next_turn' | 'steering' | 'follow_up';
+type TransitionReason = 'init' | 'next_turn';
 
 /** 显式循环状态。每轮顶部快照，恢复/继续路径用「重写 state + continue」表达。 */
 interface LoopState {
-  /** 待注入上下文的 pending 消息（用户/steering/followUp）。 */
+  /** 待注入上下文的 pending 消息（用户消息）。 */
   pending: UserMessage[];
   /** 当前工具执行轮数。 */
   turn: number;
@@ -251,7 +241,7 @@ async function runAgentLoop(
     // eslint-disable-next-line no-constant-condition
     while (true) {
       // 1. 快照 state（transition 字段标记本轮来源，供测试断言）
-      // 2. 注入 pending（init / steering / follow_up 站点携带 pending）
+      // 2. 注入 pending（init 站点携带 pending）
       if (state.pending.length > 0) {
         injectPending(state.pending);
         state = { ...state, pending: [] };
@@ -281,16 +271,9 @@ async function runAgentLoop(
       );
       newMessages.push(assistantMessage);
 
-      // 7. 非 toolUse 停止 → 检查 followUp，决定 follow_up 还是 terminal
+      // 7. 非 toolUse 停止 → terminal
       if (assistantMessage.stopReason !== 'toolUse') {
         stream.push({ type: 'turn_end', turn: state.turn, message: assistantMessage });
-        const followUps = config.getFollowUpMessages ? config.getFollowUpMessages() : [];
-        if (followUps && followUps.length > 0) {
-          // follow_up 站点：重写 state，携带 followUp 作为下一轮 pending
-          state = { pending: followUps, turn: state.turn, transition: 'follow_up' };
-          continue;
-        }
-        // terminal：无 toolUse 且无 followUp
         break;
       }
 
@@ -299,7 +282,6 @@ async function runAgentLoop(
         assistantMessage,
         toolExecutor,
         stream,
-        config.getSteeringMessages,
         config.maxToolConcurrency,
       );
       for (const result of toolResults.results) {
@@ -313,17 +295,7 @@ async function runAgentLoop(
         toolResults: toolResults.results,
       });
 
-      // 9. steering 命中 → steering 站点：重写 state，携带 steering 消息作下一轮 pending
-      if (toolResults.steeringMessages && toolResults.steeringMessages.length > 0) {
-        state = {
-          pending: toolResults.steeringMessages,
-          turn: state.turn,
-          transition: 'steering',
-        };
-        continue;
-      }
-
-      // 10. next_turn 站点：正常工具循环继续
+      // 9. next_turn 站点：正常工具循环继续
       state = { pending: [], turn: state.turn, transition: 'next_turn' };
     }
 
@@ -331,8 +303,9 @@ async function runAgentLoop(
     stream.complete(newMessages);
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
+    const aborted = stream.signal.aborted || error.name === 'AbortError';
     if (!stream.isDone) {
-      stream.push({ type: 'error', error });
+      stream.push({ type: 'error', error, aborted });
       stream.error(error);
     }
   } finally {
@@ -345,6 +318,49 @@ async function runAgentLoop(
 // =====================================================================
 // LLM 调用（含错误恢复）
 // =====================================================================
+
+function recoveryDiagnosticCode(action: RecoveryAction): string {
+  return `error_recovery_${action.type}`;
+}
+
+function recoveryStartMessage(action: RecoveryAction, attempt: number): string {
+  switch (action.type) {
+    case 'retry':
+      return `provider 错误，正在重试（第 ${attempt} 次）`;
+    case 'escalate_tokens':
+      return '上下文过长，已升级 token 上限';
+    case 'reactive_compact':
+      return '上下文过长，正在压缩历史消息';
+    case 'switch_model':
+      return '服务过载，正在切换备用模型';
+    case 'continue_prompt':
+      return '输出被截断，正在续写';
+    default:
+      return '';
+  }
+}
+
+function emitRecoveryDiagnostic(
+  stream: EventStream<AgentEvent, Message[]>,
+  action: RecoveryAction,
+  phase: 'started' | 'completed',
+  attempt = 1,
+): void {
+  const code = recoveryDiagnosticCode(action);
+  const message = phase === 'completed'
+    ? '错误恢复成功，继续生成回复'
+    : recoveryStartMessage(action, attempt);
+  if (!message) {
+    return;
+  }
+  stream.push({
+    type: 'diagnostic',
+    code,
+    severity: 'info',
+    message,
+    phase,
+  });
+}
 
 /**
  * 带 ErrorRecovery 的 LLM 调用包装。
@@ -361,6 +377,21 @@ async function streamAssistantResponseWithRecovery(
   const recovery = config.errorRecovery;
   const CIRCUIT_BREAKER_LIMIT = 3;
   let consecutiveCompactionFailures = 0;
+  let pendingRecoveryAction: RecoveryAction | null = null;
+
+  const completePendingRecovery = (): void => {
+    if (!pendingRecoveryAction) {
+      return;
+    }
+    emitRecoveryDiagnostic(stream, pendingRecoveryAction, 'completed');
+    pendingRecoveryAction = null;
+  };
+
+  const beginRecovery = (action: RecoveryAction): void => {
+    const attempt = (recovery?.getState().recoveryCount ?? 0) + 1;
+    pendingRecoveryAction = action;
+    emitRecoveryDiagnostic(stream, action, 'started', attempt);
+  };
 
   while (true) {
     try {
@@ -379,6 +410,7 @@ async function streamAssistantResponseWithRecovery(
         const lengthAction = recovery.decide(null, 'length');
         switch (lengthAction.type) {
           case 'escalate_tokens': {
+            beginRecovery(lengthAction);
             recovery.markEscalated();
             if (config.streamOptions) {
               config.streamOptions.maxTokens = lengthAction.newMaxTokens;
@@ -386,6 +418,7 @@ async function streamAssistantResponseWithRecovery(
             continue;
           }
           case 'continue_prompt': {
+            beginRecovery(lengthAction);
             recovery.noteRetryAttempt();
             // 续写：注入一条 user nudge 让模型继续未完成的输出。
             context.messages.push({
@@ -400,11 +433,13 @@ async function streamAssistantResponseWithRecovery(
           }
           default: {
             // retry/reactive_compact/switch_model 不适用于 length，直接返回。
+            completePendingRecovery();
             return { message: assistantMessage };
           }
         }
       }
 
+      completePendingRecovery();
       return { message: assistantMessage };
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -417,11 +452,13 @@ async function streamAssistantResponseWithRecovery(
 
       switch (action.type) {
         case 'retry': {
+          beginRecovery(action);
           recovery.noteRetryAttempt();
           await sleep(action.delayMs);
           continue;
         }
         case 'escalate_tokens': {
+          beginRecovery(action);
           recovery.markEscalated();
           if (config.streamOptions) {
             config.streamOptions.maxTokens = action.newMaxTokens;
@@ -429,6 +466,7 @@ async function streamAssistantResponseWithRecovery(
           continue;
         }
         case 'reactive_compact': {
+          beginRecovery(action);
           consecutiveCompactionFailures++;
           if (consecutiveCompactionFailures >= CIRCUIT_BREAKER_LIMIT) {
             throw new Error(
@@ -437,18 +475,21 @@ async function streamAssistantResponseWithRecovery(
           }
           recovery.markReactiveCompactAttempted();
           if (config.transformContext) {
-            context.messages = await config.transformContext(
+            context.messages = await applyTransformContext(
               context.messages,
-              stream.signal,
+              config,
+              stream,
             );
           }
           continue;
         }
         case 'switch_model': {
+          beginRecovery(action);
           config.model = action.fallbackModel;
           continue;
         }
         case 'continue_prompt': {
+          beginRecovery(action);
           recovery.noteRetryAttempt();
           continue;
         }
@@ -483,10 +524,7 @@ async function streamAssistantResponse(
   // 1. 可选的上下文变换（压缩 / 剪裁）
   let messages: AgentMessage[] = context.messages;
   if (config.transformContext) {
-    messages = await config.transformContext(
-      [...context.messages],
-      stream.signal,
-    );
+    messages = await applyTransformContext(context.messages, config, stream);
   }
 
   // 2. 转换为 LLM Message[]
@@ -597,13 +635,12 @@ async function streamAssistantResponse(
 // =====================================================================
 
 /**
- * 执行助手消息中的工具调用（支持并发），并在每次工具执行结束后检查 steering。
+ * 执行助手消息中的工具调用（支持并发）。
  */
 async function executeToolCalls(
   assistantMessage: AssistantMessage,
   toolExecutor: ToolExecutor | undefined,
   stream: EventStream<AgentEvent, Message[]>,
-  getSteeringMessages?: () => UserMessage[],
   maxConcurrency?: number,
 ): Promise<ExecuteToolCallsResult> {
   const toolCalls = assistantMessage.content.filter(
@@ -671,35 +708,6 @@ async function executeToolCalls(
       durationMs: Date.now() - startTime,
     });
     results[index] = result;
-
-    // 检查 steering（仅第一个完成的工具检查，避免重复）
-    if (getSteeringMessages && index === 0) {
-      const steering = getSteeringMessages();
-      if (steering && steering.length > 0) {
-        // 标记剩余未完成的工具调用为 Skipped
-        for (let j = 1; j < toolCalls.length; j++) {
-          if (!results[j]) {
-            const skipped: ToolResultMessage = {
-              role: 'toolResult',
-              toolCallId: toolCalls[j].id,
-              toolName: toolCalls[j].name,
-              content: [{ type: 'text', text: 'Skipped due to queued user message' }],
-              isError: false,
-              timestamp: Date.now(),
-            };
-            stream.push({
-              type: 'tool_execution_end',
-              toolCallId: toolCalls[j].id,
-              toolName: toolCalls[j].name,
-              result: skipped,
-              durationMs: 0,
-            });
-            results[j] = skipped;
-          }
-        }
-        throw { steeringMessages: steering };
-      }
-    }
   };
 
   // 并发执行
@@ -708,19 +716,26 @@ async function executeToolCalls(
     for (let j = i; j < Math.min(i + concurrency, toolCalls.length); j++) {
       batch.push(executeOne(j));
     }
-    try {
-      await Promise.all(batch);
-    } catch (err) {
-      if (err && typeof err === 'object' && 'steeringMessages' in err) {
-        const steeringResult = err as { steeringMessages: UserMessage[] };
-        return {
-          results: results.filter(Boolean) as ToolResultMessage[],
-          steeringMessages: steeringResult.steeringMessages,
-        };
-      }
-      throw err;
-    }
+    await Promise.all(batch);
   }
 
   return { results: results.filter(Boolean) as ToolResultMessage[] };
+}
+
+async function applyTransformContext(
+  currentMessages: AgentMessage[],
+  config: AgentLoopConfig,
+  stream: EventStream<AgentEvent, Message[]>,
+): Promise<AgentMessage[]> {
+  if (!config.transformContext) {
+    return currentMessages;
+  }
+  const result = await config.transformContext([...currentMessages], stream.signal);
+  if (Array.isArray(result)) {
+    return result;
+  }
+  if (result.summary) {
+    stream.push({ type: 'compaction', summary: result.summary });
+  }
+  return result.messages;
 }

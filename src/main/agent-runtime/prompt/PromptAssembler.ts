@@ -66,6 +66,12 @@ interface SectionGroups {
 /** 缓存条目上限。 */
 const MAX_CACHE_ENTRIES = 10;
 
+/** Intermediate vs final visible output constraints for multi-loop agent runs. */
+const LOOP_OUTPUT_GUIDANCE = `# Loop Output
+- During an agent run, keep intermediate visible commentary to one or two short sentences that explain the next action.
+- Do not emit long-form prose or final-answer body text until the run is finishing with no further tool calls.
+- Reserve detailed final answers for the closing turn when you are ready to respond to the user.`;
+
 /**
  * 系统提示词组装器。
  *
@@ -160,9 +166,11 @@ export class PromptAssembler {
   /** 渲染完整 prompt（不使用缓存）。 */
   private renderFull(context: PromptContext): string {
     const groups = this.collectGroups(context);
+    const staticParts = [...groups.staticParts];
+    staticParts.push(LOOP_OUTPUT_GUIDANCE);
     const parts: string[] = [];
-    if (groups.staticParts.length > 0) {
-      parts.push(groups.staticParts.join('\n\n'));
+    if (staticParts.length > 0) {
+      parts.push(staticParts.join('\n\n'));
     }
     if (groups.dynamicParts.length > 0) {
       // DYNAMIC_BOUNDARY 自带前后换行，不再额外补充 \n\n。
@@ -178,7 +186,7 @@ export class PromptAssembler {
   /** 渲染静态前缀（不使用缓存），始终以 {@link DYNAMIC_BOUNDARY} 结尾。 */
   private renderStaticPrefix(context: PromptContext): string {
     const groups = this.collectGroups(context);
-    const staticText = groups.staticParts.join('\n\n');
+    const staticText = [...groups.staticParts, LOOP_OUTPUT_GUIDANCE].join('\n\n');
     return staticText + DYNAMIC_BOUNDARY;
   }
 

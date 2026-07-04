@@ -73,13 +73,13 @@ const FIXTURES = {
     argsPreview: JSON.stringify({ path: 'notes.ipynb' }),
     resultPreview: JSON.stringify({ ok: true }),
   },
-  ask_user_question: {
-    argsPreview: JSON.stringify({ question: 'Which option?' }),
-    resultPreview: JSON.stringify({ ok: true }),
-  },
-  git_status: {
+  notebook_edit: {
     argsPreview: '{}',
     resultPreview: JSON.stringify({ status: 'M README.md' }),
+  },
+  git_status: {
+    argsPreview: JSON.stringify({ cwd: '.' }),
+    resultPreview: JSON.stringify({ summary: 'M README.md', status: 'dirty' }),
   },
   git_diff: {
     argsPreview: JSON.stringify({ path: 'README.md' }),
@@ -195,7 +195,6 @@ const PLAN_REQUIRED_TOOLS = [
   'copy_file',
   'search_codebase',
   'notebook_edit',
-  'ask_user_question',
   'tool_search',
   'ask_user',
   'agent_handoff',

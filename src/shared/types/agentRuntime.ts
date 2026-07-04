@@ -8,6 +8,7 @@ import type { LLMStreamEvent, ToolCall } from './llm';
 import type { MCPTransport } from './mcp';
 import type { AgentPromptProfile, AgentToolPolicy } from './profile';
 import type { ThinkingArtifact } from './reasoning';
+import type { ConversationLoopStopReason } from './conversation';
 import type { AppMode, ExecutableAppMode } from './session';
 import type { LlmProviderAuthMode, LlmProviderId, LlmProviderProtocol } from './settings';
 import type { ToolCallResult } from './tool';
@@ -49,6 +50,7 @@ export type AgentEventType =
   | 'run.completed'
   | 'run.failed'
   | 'run.cancelled'
+  | 'context.compacted'
   | 'subagent.started'
   | 'subagent.delta'
   | 'subagent.completed'
@@ -78,6 +80,7 @@ export interface AgentAssistantThinkingPayload extends AgentEventBasePayload {
 export interface AgentAssistantCompletedPayload extends AgentEventBasePayload {
   text: string;
   thinking?: ThinkingArtifact[];
+  stopReason?: ConversationLoopStopReason;
   usage?: {
     inputTokens: number;
     outputTokens: number;
@@ -133,6 +136,8 @@ export interface AgentDiagnosticPayload extends AgentEventBasePayload {
   severity: 'info' | 'warning' | 'error';
   message: string;
   technicalMessage?: string;
+  /** Recovery diagnostics: started while retrying, completed after success. */
+  phase?: 'started' | 'completed';
 }
 
 export interface AgentRunFinalPayload extends AgentEventBasePayload {
@@ -143,6 +148,10 @@ export interface AgentRunFinalPayload extends AgentEventBasePayload {
     inputTokens: number;
     outputTokens: number;
   };
+}
+
+export interface AgentContextCompactedPayload extends AgentEventBasePayload {
+  summary: string;
 }
 
 /**
@@ -162,6 +171,17 @@ export interface AgentSubagentEventPayload extends AgentEventBasePayload {
   text?: string;
   /** subagent.completed 时的状态。 */
   status?: 'complete' | 'failed' | 'cancelled';
+  /** 子 agent 内部 tool/loop 活动的结构化增量（subagent.delta 可选携带）。 */
+  child?: AgentSubagentChildPayload;
+}
+
+export interface AgentSubagentChildPayload extends AgentEventBasePayload {
+  id: string;
+  kind: 'llm_turn' | 'tool';
+  title: string;
+  summary?: string;
+  status: 'pending' | 'running' | 'complete' | 'error';
+  toolName?: string;
 }
 
 /**
@@ -194,6 +214,7 @@ export type AgentEventPayload =
   | AgentApprovalEventPayload
   | AgentDiagnosticPayload
   | AgentRunFinalPayload
+  | AgentContextCompactedPayload
   | AgentSubagentEventPayload
   | AgentHandoffRequestedPayload;
 

@@ -32,7 +32,7 @@ Renderer code must not create fake reasoning stages. Runtime events project into
 - `diagnostic`: provider, route, runtime, or RDX diagnostics;
 - `output`: final answer preparation.
 
-Historical `reasoningTrace` data and historical `workTrace` entries with obsolete `tool` kind may be read only at storage boundaries and normalized into canonical `workTrace` / `llm_turn` shape. New runtime code and visible UI must write and render the canonical contract only.
+Historical `workTrace` entries that do not match the current canonical schema are discarded at storage read boundaries (`workTrace: null`). Runtime code and visible UI use only the canonical contract; no legacy normalization or migration shims are applied.
 
 ## Provider Account Boundary
 

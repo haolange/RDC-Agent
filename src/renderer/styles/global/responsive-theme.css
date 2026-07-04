@@ -21,7 +21,7 @@
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 720px) {
   .app-body {
     grid-template-columns:
       3.5rem
