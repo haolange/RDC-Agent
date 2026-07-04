@@ -10,6 +10,7 @@ import { useUserMessageRewrite } from './useUserMessageRewrite';
 import { MessageAttachments } from './MessageAttachments';
 import { MessageMarkdown } from './MessageMarkdown';
 import { useConversationStore } from '../../../stores/conversationStore';
+import { useI18n } from '../../../i18n';
 
 interface MessageBubbleProps {
   message: ConversationMessage;
@@ -59,6 +60,7 @@ const MessageMetaBar: React.FC<{
   status,
   onEditResend,
 }) => {
+  const { t } = useI18n();
   const branchState = useConversationStore((state) => state.branchState);
   return (
   <footer className="conversation-message-footer">
@@ -66,13 +68,13 @@ const MessageMetaBar: React.FC<{
       <span className="conversation-message-time">{time}</span>
     ) : null}
     {status === 'streaming' ? (
-      <span className="conversation-message-streaming-tag">streaming</span>
+      <span className="conversation-message-streaming-tag">{t('chat.messageStreaming')}</span>
     ) : null}
     {status === 'error' ? (
-      <span className="conversation-message-status-tag is-error">error</span>
+      <span className="conversation-message-status-tag is-error">{t('chat.messageError')}</span>
     ) : null}
     {status === 'stopped' ? (
-      <span className="conversation-message-status-tag is-stopped">stopped</span>
+      <span className="conversation-message-status-tag is-stopped">{t('chat.messageStopped')}</span>
     ) : null}
     <MessageActions message={message} branchState={branchState} onEditResend={onEditResend} />
   </footer>

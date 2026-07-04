@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
 import { normalizeAssistantMarkdown } from './normalizeAssistantMarkdown';
+import './markdownHighlight';
 
 interface MessageMarkdownProps {
   content: string;
@@ -20,6 +22,7 @@ export const MessageMarkdown: React.FC<MessageMarkdownProps> = ({ content }) => 
     <div className="markdown-body">
       <Markdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
         components={{
           a: ({ href, children }) => (
             <a href={href} target="_blank" rel="noreferrer noopener">

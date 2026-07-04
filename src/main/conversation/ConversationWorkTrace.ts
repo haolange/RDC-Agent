@@ -1,6 +1,9 @@
 import type {
+  ConversationLoopOutputPhase,
   ConversationLoopResult,
   ConversationLoopResultStatus,
+  ConversationLoopStopReason,
+  ConversationReasoningState,
   ConversationToolCall,
   ConversationWorkBlock,
   ConversationWorkTrace,
@@ -26,16 +29,17 @@ interface LoopTraceOptions {
   loopId?: string;
   loopResultText?: string;
   loopResultStatus?: ConversationLoopResultStatus;
-  loopFinishReason?: string;
+  loopStopReason?: ConversationLoopStopReason;
+  loopOutputPhase?: ConversationLoopOutputPhase;
+  loopReasoningState?: ConversationReasoningState;
   loopThinking?: ThinkingArtifact;
   loopThinkingStatus?: ConversationWorkBlock['thinkingStatus'];
 }
 
-function normalizeWorkBlockKind(value: unknown): ConversationWorkBlock['kind'] {
-  if (value === 'tool') return 'llm_turn';
+function normalizeWorkBlockKind(value: unknown): ConversationWorkBlock['kind'] | null {
   return WORK_BLOCK_KINDS.has(value as ConversationWorkBlock['kind'])
     ? value as ConversationWorkBlock['kind']
-    : 'diagnostic';
+    : null;
 }
 function createWorkBlock(
   id: string,
@@ -45,7 +49,7 @@ function createWorkBlock(
 ): ConversationWorkBlock {
   const block: ConversationWorkBlock = {
     id,
-    kind: normalizeWorkBlockKind(kind),
+    kind,
     title,
     stage,
     status: 'pending',
@@ -98,17 +102,15 @@ function cloneLoopResult(result: ConversationLoopResult | undefined): Conversati
 }
 
 function cloneWorkBlock(block: ConversationWorkBlock): ConversationWorkBlock {
-  const legacyBlock = block as ConversationWorkBlock & { thinkingPresentation?: unknown };
-  const { thinkingPresentation: _legacyThinkingPresentation, ...knownBlock } = legacyBlock;
   const toolCalls = block.toolCalls.map(cloneToolCall);
-  const normalizedKind = normalizeWorkBlockKind((knownBlock as { kind?: unknown }).kind);
-  const thinking = cloneThinkingArtifact(block.thinking) ?? normalizeLegacyThinkingArtifact(legacyBlock);
-  const thinkingStatus = knownBlock.thinkingStatus ?? (thinking ? 'complete' : undefined);
+  const normalizedKind = block.kind;
+  const thinking = cloneThinkingArtifact(block.thinking);
+  const thinkingStatus = block.thinkingStatus ?? (thinking ? 'complete' : undefined);
   const result = normalizedKind === 'llm_turn'
-    ? normalizeLoopResult(knownBlock.result, knownBlock.summary, knownBlock.status, toolCalls)
-    : cloneLoopResult(knownBlock.result);
+    ? normalizeLoopResult(block.result, block.summary, block.status, toolCalls)
+    : cloneLoopResult(block.result);
   return {
-    ...knownBlock,
+    ...block,
     kind: normalizedKind,
     ...(thinking ? { thinking } : {}),
     ...(thinkingStatus ? { thinkingStatus } : {}),
@@ -147,10 +149,11 @@ export function upsertWorkBlock(
         : nextTrace.blocks[blockIndex].toolCalls.map(cloneToolCall),
     });
   } else {
+    const kind = patch.kind && normalizeWorkBlockKind(patch.kind) ? patch.kind : 'reasoning';
     nextTrace.blocks.push(cloneWorkBlock({
-      ...createWorkBlock(blockId, patch.title || blockId, patch.stage, patch.kind),
+      ...createWorkBlock(blockId, patch.title || blockId, patch.stage, kind),
       ...patch,
-      kind: normalizeWorkBlockKind(patch.kind ?? 'reasoning'),
+      kind,
       toolCalls: patch.toolCalls ? patch.toolCalls.map(cloneToolCall) : [],
     }));
   }
@@ -179,16 +182,29 @@ export function finalizeTrace(
         : block.status;
       const blockCompletedAt = block.completedAt ?? terminalAt;
       const toolCalls = block.toolCalls.map((toolCall) => {
+        const cloned = cloneToolCall(toolCall);
+        const cancelPendingApproval = status === 'stopped' && cloned.approval?.status === 'pending'
+          ? {
+              ...cloned.approval,
+              status: 'cancelled' as const,
+              resolvedAt: cloned.approval.resolvedAt ?? terminalAt,
+              answer: cloned.approval.answer ?? '请求已取消。',
+            }
+          : cloned.approval;
         if (toolCall.status !== 'pending' && toolCall.status !== 'running') {
-          return cloneToolCall(toolCall);
+          if (cancelPendingApproval !== cloned.approval) {
+            return { ...cloned, approval: cancelPendingApproval };
+          }
+          return cloned;
         }
         return {
-          ...cloneToolCall(toolCall),
+          ...cloned,
           status: terminalBlockStatus,
           completedAt: toolCall.completedAt ?? terminalAt,
           error: terminalBlockStatus === 'error'
             ? (toolCall.error ?? 'Run ended before this tool call completed.')
             : toolCall.error,
+          approval: cancelPendingApproval,
         };
       });
       const result = block.kind === 'llm_turn'
@@ -342,10 +358,16 @@ function applyLoopFields(block: ConversationWorkBlock, options: LoopTraceOptions
     if (options.loopResultStatus) {
       result.status = options.loopResultStatus;
     }
-    if (options.loopFinishReason) {
-      result.finishReason = options.loopFinishReason;
+    if (options.loopStopReason) {
+      result.stopReason = options.loopStopReason;
+    }
+    if (options.loopOutputPhase) {
+      result.outputPhase = options.loopOutputPhase;
     }
     block.result = result;
+  }
+  if (options.loopReasoningState) {
+    block.reasoningState = options.loopReasoningState;
   }
   const nextThinking = cloneThinkingArtifact(options.loopThinking);
   if (nextThinking && shouldReplaceThinking(block.thinking, nextThinking)) {
@@ -356,6 +378,48 @@ function applyLoopFields(block: ConversationWorkBlock, options: LoopTraceOptions
   }
 }
 
+export function upsertSubagentChild(
+  trace: ConversationWorkTrace | null | undefined,
+  subagentBlockId: string,
+  childPatch: Partial<ConversationWorkBlock> & { id: string },
+): ConversationWorkTrace {
+  const nextTrace = cloneTrace(trace);
+  const blockIndex = nextTrace.blocks.findIndex((block) => block.id === subagentBlockId);
+  if (blockIndex < 0) {
+    return nextTrace;
+  }
+
+  const parent = nextTrace.blocks[blockIndex];
+  const children = [...(parent.children ?? [])];
+  const childIndex = children.findIndex((child) => child.id === childPatch.id);
+  const childKind = childPatch.kind && normalizeWorkBlockKind(childPatch.kind)
+    ? childPatch.kind
+    : 'llm_turn';
+
+  if (childIndex >= 0) {
+    children[childIndex] = cloneWorkBlock({
+      ...children[childIndex],
+      ...childPatch,
+      kind: childKind,
+      toolCalls: childPatch.toolCalls ?? children[childIndex].toolCalls,
+    });
+  } else {
+    children.push(cloneWorkBlock({
+      ...createWorkBlock(childPatch.id, childPatch.title || childPatch.id, childPatch.stage, childKind),
+      ...childPatch,
+      kind: childKind,
+      toolCalls: childPatch.toolCalls ?? [],
+    }));
+  }
+
+  nextTrace.blocks[blockIndex] = {
+    ...parent,
+    children,
+  };
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+
 export function upsertLoopResult(
   trace: ConversationWorkTrace | null | undefined,
   loopId: string,
@@ -363,7 +427,9 @@ export function upsertLoopResult(
   thinking?: ThinkingArtifact,
   thinkingStatus?: ConversationWorkBlock['thinkingStatus'],
   resultStatus: ConversationLoopResultStatus = 'streaming',
-  finishReason?: string,
+  stopReason?: ConversationLoopStopReason,
+  outputPhase?: ConversationLoopOutputPhase,
+  reasoningState?: ConversationReasoningState,
 ): ConversationWorkTrace {
   const nextTrace = cloneTrace(trace);
   let block = nextTrace.blocks.find((entry) => entry.id === loopId);
@@ -376,7 +442,9 @@ export function upsertLoopResult(
     loopId,
     loopResultText: resultText,
     loopResultStatus: resultStatus,
-    loopFinishReason: finishReason,
+    loopStopReason: stopReason,
+    loopOutputPhase: outputPhase,
+    loopReasoningState: reasoningState,
     loopThinking: thinking,
     loopThinkingStatus: thinkingStatus,
   });
@@ -411,7 +479,8 @@ function normalizeLoopResult(
   const text = result?.text ?? fallbackText?.trim() ?? undefined;
   return {
     ...(text ? { text } : {}),
-    ...(result?.finishReason ? { finishReason: result.finishReason } : {}),
+    ...(result?.stopReason ? { stopReason: result.stopReason } : {}),
+    ...(result?.outputPhase ? { outputPhase: result.outputPhase } : {}),
     status,
     toolCallIds: uniqueStrings([...(result?.toolCallIds ?? []), ...toolCalls.map((toolCall) => toolCall.id)]),
   };
@@ -435,19 +504,28 @@ function shouldReplaceThinking(current: ThinkingArtifact | undefined, next: Thin
   return (next.text?.length ?? 0) >= (current.text?.length ?? 0);
 }
 
-function normalizeLegacyThinkingArtifact(
-  block: ConversationWorkBlock & { thinkingPresentation?: unknown },
-): ThinkingArtifact | undefined {
-  const detail = typeof block.detail === 'string' ? block.detail.trim() : '';
-  const presentation = block.thinkingPresentation;
-  if (!detail || (presentation !== 'summary' && presentation !== 'full')) return undefined;
-  return {
-    text: detail,
-    kind: presentation === 'summary' ? 'summary' : 'raw',
-    source: 'unknown',
-    visibility: presentation === 'summary' ? 'summary' : 'raw-collapsed',
-    replayPolicy: 'none',
-  };
+export function sanitizeStoredWorkTrace(
+  trace: ConversationWorkTrace | null | undefined,
+): ConversationWorkTrace | null {
+  if (!trace || typeof trace !== 'object') return null;
+  if (!['idle', 'running', 'complete', 'error', 'stopped'].includes(trace.status)) return null;
+  if (!Array.isArray(trace.blocks)) return null;
+
+  for (const block of trace.blocks) {
+    if (!block || typeof block !== 'object') return null;
+    if (!normalizeWorkBlockKind(block.kind)) return null;
+    if (typeof block.id !== 'string' || !block.id.trim()) return null;
+    if (!['pending', 'running', 'complete', 'error'].includes(block.status)) return null;
+    if (!Array.isArray(block.toolCalls)) return null;
+    if ('detail' in block && (block as { detail?: unknown }).detail !== undefined) return null;
+    if ('thinkingPresentation' in block) return null;
+    if (block.kind === 'llm_turn' && block.result && !Array.isArray(block.result.toolCallIds)) return null;
+    if (block.children && !block.children.every((child) => Boolean(normalizeWorkBlockKind(child.kind)))) {
+      return null;
+    }
+  }
+
+  return trace;
 }
 
 function getRuntimeToolBlockMeta(

@@ -358,7 +358,8 @@ const opaquePresentation = buildWorkProcessPresentation({
     },
   ],
 });
-assert(!opaquePresentation.rows.find((row) => row.type === 'section'), 'opaque provider state should not occupy the normal Work Process UI');
+assert(!opaquePresentation.rows.find((row) => row.type === 'section'), 'opaque provider state should not render a section row');
+assert(opaquePresentation.rows.some((row) => row.type === 'reasoningIndicator'), 'opaque provider state should render a reasoning indicator');
 
 const approvalPresentation = buildWorkProcessPresentation({
   status: 'running',
@@ -499,12 +500,22 @@ assert(mcpRow?.target === 'filesystem/read_file', 'dynamic MCP target should sho
 
 const componentSource = [
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcess.tsx', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessSectionRow.tsx', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessStepGroupRow.tsx', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessReasoningIndicatorRow.tsx', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessRowRenderer.tsx', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessViewToggle.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessRows.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessResponseRow.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessIcons.tsx', 'utf8'),
 ].join('\n');
 const cssSource = fs.readFileSync('src/renderer/features/debugger/AgentChat/AgentChat.css', 'utf8');
-const presentationSource = fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessPresentation.ts', 'utf8');
+const presentationSource = [
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessPresentation.ts', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessBlockProjection.ts', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessGrouping.ts', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessToolCatalog.ts', 'utf8'),
+].join('\n');
 const i18nSource = fs.readFileSync('src/renderer/i18n.ts', 'utf8');
 const userInputPanelSource = fs.readFileSync('src/renderer/features/debugger/composer/UserInputRequestPanel.tsx', 'utf8');
 const userInputSubmitHookSource = fs.readFileSync('src/renderer/features/debugger/composer/useUserInputRequestSubmit.ts', 'utf8');
@@ -530,6 +541,8 @@ assert(componentSource.includes("t('chat.workProcessTitle')"), 'header should us
 assert(!componentSource.includes('TRACE_HEADLINE_KEY'), 'top Work Process header must not fall back to status-first copy');
 assert(!componentSource.includes('statusMeta'), 'top Work Process meta should be duration/action context, not completion-status copy');
 assert(componentSource.includes('work-process-tool-group'), 'group row class should exist in component source');
+assert(componentSource.includes('work-process-step-group'), 'semantic step group row class should exist in component source');
+assert(componentSource.includes('WorkProcessViewToggle'), 'component should expose grouped/detail view toggle');
 assert(componentSource.includes('<details className={thinkingClassName}'), 'thinking should render as a user-collapsible top disclosure');
 assert(!componentSource.includes('isSummaryThinking'), 'summary thinking must not bypass the top disclosure hierarchy');
 assert(!componentSource.includes("t('chat.workProcessViewSteps'"), 'section should not expose the legacy tool-step disclosure');
@@ -537,6 +550,7 @@ assert(!componentSource.includes('StepsListIcon'), 'legacy steps icon component 
 assert(!componentSource.includes('thinking-full'), 'component must not render full hidden CoT mode');
 
 assert(cssSource.includes('.work-process-tool-group'), 'tool group styling should exist');
+assert(cssSource.includes('.work-process-step-group'), 'semantic step group styling should exist');
 assert(cssSource.includes('.work-process-response'), 'response boundary styling should exist');
 assert(cssSource.includes('.work-process-icon'), 'local tool icon styling should exist');
 assert(cssSource.includes('.work-process-section-list'), 'section list styling should exist');

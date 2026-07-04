@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { upsertRuntimeToolApproval, upsertRuntimeToolCall } from './ConversationWorkTrace';
+import { finalizeTrace, upsertRuntimeToolApproval, upsertRuntimeToolCall } from './ConversationWorkTrace';
 
 describe('ConversationService work trace tool approvals', () => {
   it('nests approval.requested and approval.answered under the matching tool call', () => {
@@ -76,6 +76,34 @@ describe('ConversationService work trace tool approvals', () => {
       error: 'User denied',
       approval: { status: 'rejected', answer: 'User denied' },
     });
+  });
+
+  it('cancels pending tool approvals when the work trace is stopped', () => {
+    let trace = upsertRuntimeToolCall(undefined, {
+      id: 'tool-bash',
+      toolName: 'bash',
+      status: 'running',
+      startedAt: 100,
+    });
+    trace = upsertRuntimeToolApproval(trace, {
+      approvalId: 'tool-approval-tool-bash',
+      toolCallId: 'tool-bash',
+      toolName: 'bash',
+      status: 'pending',
+      reason: 'Run command?',
+    });
+
+    const stopped = finalizeTrace(trace, 'stopped', '请求已停止');
+
+    expect(stopped.status).toBe('stopped');
+    expect(stopped.blocks[0].toolCalls[0]).toMatchObject({
+      status: 'error',
+      approval: {
+        status: 'cancelled',
+        answer: '请求已取消。',
+      },
+    });
+    expect(stopped.blocks[0].toolCalls[0].approval?.resolvedAt).toEqual(expect.any(Number));
   });
 
   it('does not regress a completed tool call when approval resolution arrives late', () => {

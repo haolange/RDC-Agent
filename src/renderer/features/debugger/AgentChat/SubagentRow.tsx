@@ -109,9 +109,17 @@ const renderChildRow = (row: WorkProcessRow): React.ReactNode => {
       </React.Fragment>
     );
   }
-  return (
-    <li key={row.id} className={`work-process-child-summary status-${row.status}`}>
-      <span className="work-process-child-text">{row.text}</span>
-    </li>
-  );
+  if (row.type === 'reasoningIndicator') {
+    return (
+      <li key={row.id} className={`work-process-child-reasoning-indicator status-${row.status} state-${row.state}`} />
+    );
+  }
+  if (row.type === 'summary') {
+    return (
+      <li key={row.id} className={`work-process-child-summary status-${row.status}`}>
+        <span className="work-process-child-text">{row.text}</span>
+      </li>
+    );
+  }
+  return null;
 };

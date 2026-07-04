@@ -1,6 +1,7 @@
 import React from 'react';
 import { useI18n } from '../../../i18n';
 import { getRowStatusLabel, type WorkProcessRow } from './workProcessPresentation';
+import { useWorkProcessLabel } from './workProcessUseLabel';
 import { WorkProcessIcon } from './WorkProcessIcons';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 
@@ -75,7 +76,9 @@ type ToolGroupRowModel = Extract<WorkProcessRow, { type: 'toolGroup' }>;
 export const ToolGroupRow: React.FC<{
   row: ToolGroupRowModel;
   renderRow: (row: WorkProcessRow) => React.ReactNode;
-}> = ({ row, renderRow }) => (
+}> = ({ row, renderRow }) => {
+  const label = useWorkProcessLabel();
+  return (
   <li
     className={`work-process-step work-process-tool-group status-${row.status} kind-${row.kind}`}
     data-testid="work-process-tool-group"
@@ -88,7 +91,7 @@ export const ToolGroupRow: React.FC<{
             <span className="work-process-tool-group-icon" aria-hidden="true">
               <WorkProcessIcon icon={row.icon} />
             </span>
-            <span className="work-process-tool-group-title">{row.title}</span>
+            <span className="work-process-tool-group-title">{label(row.title)}</span>
             <span className="work-process-tool-group-count">{row.countLabel}</span>
           </span>
           {row.summary ? <span className="work-process-tool-group-preview">{row.summary}</span> : null}
@@ -100,12 +103,15 @@ export const ToolGroupRow: React.FC<{
       </details>
     </div>
   </li>
-);
+  );
+};
 
-const ToolApprovalCallout: React.FC<{ approval: NonNullable<ToolRowModel['approval']> }> = ({ approval }) => (
+const ToolApprovalCallout: React.FC<{ approval: NonNullable<ToolRowModel['approval']> }> = ({ approval }) => {
+  const label = useWorkProcessLabel();
+  return (
   <div className={`work-process-tool-approval status-${approval.status}`} data-testid="work-process-tool-approval">
     <div className="work-process-tool-approval-head">
-      <span className="work-process-tool-approval-verb">{approval.verb}</span>
+      <span className="work-process-tool-approval-verb">{label(approval.verb)}</span>
       {approval.metaLines.length > 0 ? (
         <span className="work-process-tool-approval-meta">
           {approval.metaLines.map((line) => <span key={line}>{line}</span>)}
@@ -114,12 +120,14 @@ const ToolApprovalCallout: React.FC<{ approval: NonNullable<ToolRowModel['approv
     </div>
     {approval.message ? <p className="work-process-tool-approval-message">{approval.message}</p> : null}
   </div>
-);
+  );
+};
 
 export const ToolRow: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   const { t } = useI18n();
+  const label = useWorkProcessLabel();
   const compact = row.compact === true;
-  const statusLabel = row.status === 'complete' ? '' : getRowStatusLabel(row.status);
+  const statusLabel = row.status === 'complete' ? '' : label(getRowStatusLabel(row.status));
   const hasDebugDetails = row.argsLines.length > 0 || row.rawLines.length > 0;
   const hasPreview = row.previewLines.length > 0;
   const hasApproval = Boolean(row.approval);
@@ -130,7 +138,7 @@ export const ToolRow: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   const summaryInner = (
     <>
       <span className="work-process-tool-line">
-        <span className="work-process-tool-verb">{row.verb}</span>
+        <span className="work-process-tool-verb">{label(row.verb)}</span>
         {row.target ? <span className="work-process-tool-target">{row.target}</span> : null}
       </span>
       {compact ? (
@@ -194,7 +202,8 @@ export const ToolRow: React.FC<{ row: ToolRowModel }> = ({ row }) => {
 };
 
 export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'userInput' }> }> = ({ row }) => {
-  const statusLabel = row.status === 'complete' ? '' : getRowStatusLabel(row.status);
+  const label = useWorkProcessLabel();
+  const statusLabel = row.status === 'complete' ? '' : label(getRowStatusLabel(row.status));
   const isQa = row.status === 'complete' && Boolean(row.answer);
 
   // Answered requests render as compact Q/A, with details kept out of the main row.
@@ -254,11 +263,12 @@ export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'user
 };
 
 export const ApprovalRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'approval' }> }> = ({ row }) => {
-  const statusLabel = row.status === 'complete' ? '' : getRowStatusLabel(row.status);
+  const label = useWorkProcessLabel();
+  const statusLabel = row.status === 'complete' ? '' : label(getRowStatusLabel(row.status));
   const summaryLine = (
     <>
       <span className="work-process-tool-line">
-        <span className="work-process-tool-verb">{row.verb}</span>
+        <span className="work-process-tool-verb">{label(row.verb)}</span>
         <span className="work-process-approval-message">{row.message}</span>
       </span>
       <span className="work-process-tool-meta">

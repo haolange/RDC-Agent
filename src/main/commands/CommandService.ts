@@ -58,8 +58,9 @@ export class CommandService {
             kind: 'command',
             title: `/${commandName}`,
             status: result.success ? 'complete' : 'error',
-            summary: result.message,
-            detail: result.data ? JSON.stringify(result.data, null, 2) : undefined,
+            summary: result.data
+              ? `${result.message}\n${JSON.stringify(result.data, null, 2)}`
+              : result.message,
             toolCalls: [],
             startedAt: now,
             completedAt: now,

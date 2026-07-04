@@ -4,6 +4,7 @@ import { useConversationStore } from '../../../stores/conversationStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import { ConversationThread } from './ConversationThread';
 import './AgentChat.css';
+import './markdown-code.css';
 
 const STICKY_SCROLL_THRESHOLD = 96;
 

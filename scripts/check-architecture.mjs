@@ -213,7 +213,6 @@ const allowsElectronApi = (relativePath) => (
   || relativePath.startsWith('src/renderer/hooks/')
   || relativePath.startsWith('src/renderer/stores/')
   || relativePath.startsWith('src/renderer/app/')
-  || relativePath.startsWith('src/renderer/stream/')
   || /^src\/renderer\/features\/.*\/use[^/]+\.ts$/.test(relativePath)
   || /^src\/renderer\/features\/.*\.ts$/.test(relativePath)
   || relativePath.startsWith('src/renderer/pages/')

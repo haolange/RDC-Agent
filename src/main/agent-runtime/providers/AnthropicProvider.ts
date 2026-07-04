@@ -530,6 +530,8 @@ function mapStopReason(reason: string | null | undefined): StopReason {
       return 'length';
     case 'tool_use':
       return 'toolUse';
+    case 'refusal':
+      return 'refusal';
     case 'stop_sequence':
       return 'stop';
     default:

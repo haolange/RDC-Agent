@@ -88,8 +88,8 @@ describe('ContextManager', () => {
         toolResult('tc1', 'read', 'short output'),
       ];
       const result = await cm.compress(msgs);
-      expect(result).toHaveLength(2);
-      expect((result[1] as ToolResultMessage).content[0]).toMatchObject({
+      expect(result.messages).toHaveLength(2);
+      expect((result.messages[1] as ToolResultMessage).content[0]).toMatchObject({
         type: 'text',
         text: 'short output',
       });
@@ -103,10 +103,11 @@ describe('ContextManager', () => {
         toolResult('tc1', 'read', longText),
       ];
       const result = await cm.compress(msgs);
-      const tr = result[1] as ToolResultMessage;
+      const tr = result.messages[1] as ToolResultMessage;
       const text = tr.content.map((c) => (c as { text: string }).text).join('');
       expect(text.length).toBeLessThan(longText.length);
       expect(text).toContain('truncated');
+      expect(result.summary).toBeUndefined();
     });
   });
 
@@ -119,8 +120,8 @@ describe('ContextManager', () => {
       }
       const result = await cm.compress(msgs);
       // 保留头 3 + 占位符 + 尾 (5 - 3 - 1 = 1) = 5
-      expect(result.length).toBeLessThan(msgs.length);
-      const hasSnipPlaceholder = result.some(
+      expect(result.messages.length).toBeLessThan(msgs.length);
+      const hasSnipPlaceholder = result.messages.some(
         (m) => m.role === 'user' && typeof (m as UserMessage).content === 'string' && String((m as UserMessage).content).includes('snipped'),
       );
       expect(hasSnipPlaceholder).toBe(true);
@@ -133,7 +134,8 @@ describe('ContextManager', () => {
         msgs.push(user(`msg ${i}`));
       }
       const result = await cm.compress(msgs);
-      expect(result).toHaveLength(msgs.length);
+      expect(result.messages).toHaveLength(msgs.length);
+      expect(result.summary).toBeUndefined();
     });
   });
 
@@ -153,13 +155,13 @@ describe('ContextManager', () => {
       ];
       const result = await cm.compress(msgs);
       // 第一个工具结果应被 compacted
-      const firstTR = result[1] as ToolResultMessage;
+      const firstTR = result.messages[1] as ToolResultMessage;
       expect(firstTR.content[0]).toMatchObject({
         type: 'text',
         text: '[Earlier tool result compacted]',
       });
       // 最后一个工具结果应保留
-      const lastTR = result[3] as ToolResultMessage;
+      const lastTR = result.messages[3] as ToolResultMessage;
       expect(lastTR.content[0]).toMatchObject({
         type: 'text',
         text: 'output2',
@@ -181,7 +183,7 @@ describe('ContextManager', () => {
       }
       const result = await cm.compress(msgs);
       // 应包含摘要
-      const hasSummary = result.some(
+      const hasSummary = result.messages.some(
         (m) =>
           m.role === 'user' &&
           typeof (m as UserMessage).content === 'string' &&

@@ -372,7 +372,7 @@ function mapFinishReason(reason: string | null | undefined): StopReason {
     case 'function_call':
       return 'toolUse';
     case 'content_filter':
-      return 'error';
+      return 'refusal';
     default:
       return 'stop';
   }

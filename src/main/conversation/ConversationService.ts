@@ -6,11 +6,13 @@ import type {
   ConversationAnswerUserInputResult,
   ConversationCancelActiveTurnRequest,
   ConversationCancelActiveTurnResult,
+  ConversationLoopStopReason,
   ConversationMessage,
   ConversationMessageDiagnostic,
   ConversationRewriteFromMessageRequest,
   ConversationThinkingStatus,
   ConversationToolCall,
+  ConversationWorkBlock,
   ConversationWorkTrace,
   ConversationSendRequest,
   ConversationStreamEvent,
@@ -64,8 +66,14 @@ import {
   upsertRuntimeToolApproval,
   upsertRuntimeToolCall,
   upsertLoopResult,
+  upsertSubagentChild,
   upsertWorkBlock,
 } from './ConversationWorkTrace';
+import {
+  resolveConversationLoopOutputPhase,
+  resolveConversationReasoningState,
+  type ConversationLoopContinuationState,
+} from '@shared/conversation/loopOutputPhase';
 
 interface ConversationBranchTurnContext {
   branchId: string;
@@ -965,9 +973,17 @@ export class ConversationService {
     let loopSeq = 1;
     let loopHasTools = false;
     let pendingNewLoop = false;
+    const pendingContinuation: ConversationLoopContinuationState = {
+      approval: false,
+      userInput: false,
+      subagent: false,
+      handoff: false,
+    };
     const currentLoopId = () => `runtime-loop-${loopSeq}`;
     let errorViewModel: ConversationTurnResult['errorViewModel'] = null;
     let llmDiagnostic: ConversationMessageDiagnostic | null = null;
+    let runWasCancelled = false;
+    const seenCompactionSummaries = new Set<string>();
     const routePreflight = resolveAgentRoutePreflight(conversationAgentId);
     const currentLoopOptions = () => ({
       loopId: currentLoopId(),
@@ -993,8 +1009,7 @@ export class ConversationService {
           status: llmDiagnostic.severity === 'error' ? 'error' : 'complete',
           title: 'Model route diagnostic',
           stage: 'preflight',
-          summary: llmDiagnostic.userMessage,
-          detail: llmDiagnostic.technicalMessage,
+          summary: [llmDiagnostic.userMessage, llmDiagnostic.technicalMessage].filter(Boolean).join('\n'),
           completedAt: nowMs(),
         })),
       });
@@ -1073,11 +1088,30 @@ export class ConversationService {
                     title: 'Start Agent Loop',
                     stage: 'preflight',
                     status: 'running',
-                    summary: `${agentLabel} started the model and tool loop.`,
-                    detail: details || undefined,
+                    summary: [
+                      `${agentLabel} started the model and tool loop.`,
+                      details,
+                    ].filter(Boolean).join('\n'),
                     startedAt: nowMs(),
                   }),
                 });
+              }
+              if (event.type === 'context.compacted') {
+                const payload = event.payload as { summary?: string };
+                const summary = typeof payload.summary === 'string' ? payload.summary.trim() : '';
+                if (summary && !seenCompactionSummaries.has(summary)) {
+                  seenCompactionSummaries.add(summary);
+                  commitAssistantMessage('message_patched', {
+                    workTrace: upsertWorkBlock(assistantMessage.workTrace, `compaction-${event.id}`, {
+                      kind: 'compaction',
+                      title: '上下文压缩',
+                      stage: 'context',
+                      status: 'complete',
+                      summary,
+                      completedAt: nowMs(),
+                    }),
+                  });
+                }
               }
               if (event.type === 'assistant.delta') {
                 const chunk = typeof event.payload.text === 'string' ? event.payload.text : '';
@@ -1093,7 +1127,9 @@ export class ConversationService {
                   }
                   rawResponse += chunk;
                   currentLoopText += chunk;
-                  visibleResponse = currentLoopText;
+                  if (!loopHasTools) {
+                    visibleResponse = currentLoopText;
+                  }
                   commitVisibleAssistantText();
                   commitThinkingTrace(upsertLoopResult(
                     assistantMessage.workTrace,
@@ -1144,20 +1180,31 @@ export class ConversationService {
                 }
               }
               if (event.type === 'diagnostic') {
-                const payload = event.payload as { code?: string; message?: string; severity?: string };
+                const payload = event.payload as {
+                  code?: string;
+                  message?: string;
+                  severity?: string;
+                  phase?: 'started' | 'completed';
+                };
                 const summary = typeof payload.message === 'string' && payload.message
                   ? payload.message
                   : 'Received runtime diagnostic.';
                 if (payload.code === 'MODEL_THINKING_STARTED' || payload.code === 'MODEL_THINKING_COMPLETED') {
                   return;
                 }
+                const isRecovery = typeof payload.code === 'string' && payload.code.startsWith('error_recovery_');
+                const blockStatus = payload.phase === 'started'
+                  ? 'running'
+                  : payload.severity === 'error'
+                    ? 'error'
+                    : 'complete';
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `runtime-diagnostic-${payload.code ?? 'runtime'}`, {
                     kind: 'diagnostic',
-                    status: payload.severity === 'error' ? 'error' : 'complete',
-                    title: 'Runtime diagnostic',
+                    status: blockStatus,
+                    title: isRecovery ? '错误恢复' : 'Runtime diagnostic',
                     summary,
-                    completedAt: nowMs(),
+                    completedAt: blockStatus === 'running' ? undefined : nowMs(),
                   }),
                 });
               }
@@ -1225,6 +1272,7 @@ export class ConversationService {
                 const toolCallId = String(payload.toolCallId ?? approvalId);
                 const toolName = String(payload.toolName ?? 'approval');
                 if (payload.kind === 'ask_user' || normalizeToolName(toolName) === 'ask_user') {
+                  pendingContinuation.userInput = true;
                   const question = typeof payload.question === 'string' && payload.question
                     ? payload.question
                     : typeof payload.reason === 'string' && payload.reason
@@ -1247,6 +1295,7 @@ export class ConversationService {
                 const reason = typeof payload.reason === 'string' && payload.reason
                   ? payload.reason
                   : 'This action requires user approval before it can run.';
+                pendingContinuation.approval = true;
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertRuntimeToolApproval(assistantMessage.workTrace, {
                     approvalId,
@@ -1272,6 +1321,9 @@ export class ConversationService {
                 const approvalId = payload.approvalId ?? 'runtime';
                 if (payload.kind === 'ask_user' || normalizeToolName(String(payload.toolName ?? '')) === 'ask_user') {
                   const failed = payload.status === 'rejected' || payload.status === 'cancelled';
+                  if (!failed) {
+                    pendingContinuation.userInput = false;
+                  }
                   const answerText = payload.answer === undefined || payload.answer === null
                     ? ''
                     : typeof payload.answer === 'string'
@@ -1292,6 +1344,9 @@ export class ConversationService {
                   return;
                 }
                 const approvalStatus = typeof payload.status === 'string' ? payload.status : 'approved';
+                if (approvalStatus !== 'pending') {
+                  pendingContinuation.approval = false;
+                }
                 const answerText = payload.answer === undefined || payload.answer === null
                   ? ''
                   : typeof payload.answer === 'string'
@@ -1310,6 +1365,13 @@ export class ConversationService {
               if (event.type === 'tool.completed') {
                 const result = event.payload.result as { ok?: boolean; error?: { message?: string } } | undefined;
                 const isAskUserTool = normalizeToolName(String(event.payload.toolName)) === 'ask_user';
+                const isHandoffTool = normalizeToolName(String(event.payload.toolName)) === 'agent_handoff';
+                if (isAskUserTool && result?.ok) {
+                  pendingContinuation.userInput = false;
+                }
+                if (isHandoffTool && result?.ok) {
+                  pendingContinuation.handoff = true;
+                }
                 const toolCallPatch: Partial<ConversationToolCall> & { id: string; toolName: string } = {
                   id: String(event.payload.toolCallId),
                   toolName: String(event.payload.toolName),
@@ -1348,6 +1410,7 @@ export class ConversationService {
               }
               if (event.type === 'subagent.started') {
                 const payload = event.payload as { subagentId: string; profile: string; parentToolCallId: string; text?: string };
+                pendingContinuation.subagent = true;
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
                     kind: 'subagent',
@@ -1359,19 +1422,58 @@ export class ConversationService {
                 });
               }
               if (event.type === 'subagent.delta') {
-                const payload = event.payload as { subagentId: string; text?: string };
-                commitAssistantMessage('message_patched', {
-                  workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
-                    kind: 'subagent',
-                    title: 'Sub-agent',
-                    stage: 'tool',
-                    status: 'running',
-                    summary: payload.text ? payload.text.slice(-200) : undefined,
-                  }),
-                });
+                const payload = event.payload as {
+                  subagentId: string;
+                  text?: string;
+                  child?: {
+                    id: string;
+                    kind: 'llm_turn' | 'tool';
+                    title: string;
+                    summary?: string;
+                    status: ConversationWorkBlock['status'];
+                    toolName?: string;
+                  };
+                };
+                const blockId = `subagent-${payload.subagentId}`;
+                if (payload.child) {
+                  const child = payload.child;
+                  commitAssistantMessage('message_patched', {
+                    workTrace: upsertSubagentChild(assistantMessage.workTrace, blockId, {
+                      id: child.id,
+                      kind: 'llm_turn',
+                      title: child.title,
+                      status: child.status,
+                      summary: child.summary,
+                      toolCalls: child.toolName
+                        ? [{
+                            id: child.id,
+                            toolName: child.toolName,
+                            status: child.status === 'error' ? 'error' : child.status === 'complete' ? 'complete' : 'running',
+                            resultPreview: child.summary,
+                            startedAt: nowMs(),
+                            completedAt: child.status === 'complete' || child.status === 'error' ? nowMs() : undefined,
+                          }]
+                        : [],
+                      startedAt: nowMs(),
+                      completedAt: child.status === 'complete' || child.status === 'error' ? nowMs() : undefined,
+                    }),
+                  });
+                }
+                if (payload.text) {
+                  commitAssistantMessage('message_patched', {
+                    workTrace: upsertWorkBlock(assistantMessage.workTrace, blockId, {
+                      kind: 'subagent',
+                      title: 'Sub-agent',
+                      stage: 'tool',
+                      status: 'running',
+                      summary: payload.text.slice(-200),
+                    }),
+                  });
+                }
               }
               if (event.type === 'subagent.completed') {
                 const payload = event.payload as { subagentId: string; profile: string; text?: string; status?: string };
+                pendingContinuation.subagent = false;
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
                     kind: 'subagent',
@@ -1379,20 +1481,33 @@ export class ConversationService {
                     stage: 'tool',
                     status: payload.status === 'failed' ? 'error' : 'complete',
                     summary: payload.text?.slice(0, 500) ?? '',
-                    detail: payload.text,
                     completedAt: nowMs(),
                   }),
                 });
               }
               if (event.type === 'assistant.completed') {
-                const payload = event.payload as { text?: string; thinking?: ThinkingArtifact[] };
+                const payload = event.payload as {
+                  text?: string;
+                  thinking?: ThinkingArtifact[];
+                  stopReason?: ConversationLoopStopReason;
+                };
                 const loopResult = typeof payload.text === 'string' ? payload.text.trim() : '';
+                const stopReason = payload.stopReason;
                 const completedThinking = selectCompletedThinking(payload.thinking) ?? currentLoopThinking;
                 if (completedThinking) {
                   currentLoopThinking = completedThinking;
                   currentLoopThinkingStatus = 'complete';
                 }
-                if (loopResult || currentLoopThinking) {
+                const outputPhase = resolveConversationLoopOutputPhase({
+                  stopReason,
+                  loopHasTools,
+                  hasPendingContinuation: pendingContinuation,
+                });
+                const reasoningState = resolveConversationReasoningState(
+                  completedThinking,
+                  routePreflight.routeCapability.reasoningDelivery,
+                );
+                if (loopResult || currentLoopThinking || stopReason || outputPhase) {
                   commitAssistantMessage('message_patched', {
                     workTrace: upsertLoopResult(
                       assistantMessage.workTrace,
@@ -1401,9 +1516,18 @@ export class ConversationService {
                       currentLoopThinking,
                       currentLoopThinkingStatus,
                       'complete',
+                      stopReason,
+                      outputPhase,
+                      reasoningState,
                     ),
                   });
                 }
+                if (outputPhase === 'final_answer') {
+                  visibleResponse = loopResult;
+                } else if (!loopHasTools) {
+                  visibleResponse = '';
+                }
+                commitVisibleAssistantText();
                 if (loopHasTools) {
                   pendingNewLoop = true;
                 }
@@ -1430,18 +1554,20 @@ export class ConversationService {
                   }),
                 });
               }
-              if (event.type === 'run.failed' || event.type === 'run.cancelled') {
-                const failed = event.type === 'run.failed';
+              if (event.type === 'run.failed') {
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `runtime-${event.type}`, {
                     kind: 'diagnostic',
-                    title: failed ? 'Agent Loop failed' : 'Agent Loop cancelled',
+                    title: 'Agent Loop failed',
                     stage: 'respond',
-                    status: failed ? 'error' : 'complete',
-                    summary: summarizeRuntimePayload(event.payload) || (failed ? 'Agent Loop failed.' : 'Agent Loop cancelled.'),
+                    status: 'error',
+                    summary: summarizeRuntimePayload(event.payload) || 'Agent Loop failed.',
                     completedAt: nowMs(),
                   }),
                 });
+              }
+              if (event.type === 'run.cancelled') {
+                runWasCancelled = true;
               }
             },
           },
@@ -1465,17 +1591,25 @@ export class ConversationService {
       }
     }
 
-    if (abortController.signal.aborted) {
+    if (abortController.signal.aborted || runWasCancelled) {
       this.clearActiveTurn(assistantMessage.turnId, abortController);
       return;
     }
     const assistantContent = (currentLoopText.trim() || rawResponse || visibleResponse).trim();
     visibleResponse = assistantContent;
     const isRouteMissingDiagnostic = llmDiagnostic?.code === 'CONVERSATION_LLM_ROUTE_MISSING';
-    const finalStatus: ConversationMessage['status'] = errorViewModel && !isRouteMissingDiagnostic ? 'error' : 'complete';
-    const traceStatus: ConversationWorkTrace['status'] = errorViewModel && !isRouteMissingDiagnostic ? 'error' : 'complete';
+    const finalStatus: ConversationMessage['status'] = runWasCancelled
+      ? 'stopped'
+      : errorViewModel && !isRouteMissingDiagnostic
+        ? 'error'
+        : 'complete';
+    const traceStatus: ConversationWorkTrace['status'] = runWasCancelled
+      ? 'stopped'
+      : errorViewModel && !isRouteMissingDiagnostic
+        ? 'error'
+        : 'complete';
 
-    if (abortController.signal.aborted) {
+    if (abortController.signal.aborted || runWasCancelled) {
       this.clearActiveTurn(assistantMessage.turnId, abortController);
       return;
     }
@@ -1495,7 +1629,6 @@ export class ConversationService {
           kind: 'output',
           status: finalStatus === 'error' ? 'error' : 'complete',
           summary: outputSummary,
-          detail: llmDiagnostic?.technicalMessage,
           completedAt: nowMs(),
         }),
         traceStatus,
