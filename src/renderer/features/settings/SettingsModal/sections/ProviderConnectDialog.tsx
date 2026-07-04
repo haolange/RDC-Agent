@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
+import type { ModelCapabilityProfile } from '@shared/types/modelCapability';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import type { ProviderCatalogCategory, ProviderConnectionDraft } from '../types';
+import { normalizeCapabilityOverride } from '../modelCapabilityOverrideUtils';
 import {
   getProviderCategoryLabel,
   getProviderProtocolOptions,
@@ -9,6 +11,7 @@ import {
 } from '../utils';
 import { ProviderAccountOAuthPanel } from './ProviderAccountOAuthPanel';
 import { ProviderApiKeyFields } from './ProviderApiKeyFields';
+import { ProviderConnectModelRow } from './ProviderConnectModelRow';
 import { ProviderProtocolField } from './ProviderProtocolField';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -65,10 +68,32 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
     || connectionNeedsApiKey
     || connectionNeedsBaseUrl
     || connectionDevicePending;
+  const [expandedModelId, setExpandedModelId] = useState<string | null>(null);
   const modelListSize = connectionDraft.models.length >= 24 ? 'long' : connectionDraft.models.length >= 8 ? 'medium' : 'short';
   const showProtocolField = connectionProvider.authMode !== 'account';
   const showProtocolSelector = showProtocolField && providerSupportsProtocolSelection(connectionProvider);
   const protocolOptions = showProtocolField ? getProviderProtocolOptions(connectionProvider) : [];
+  const capabilityEditingDisabled = connectionDraft.busy !== 'idle';
+
+  const handleToggleModelCapability = (modelId: string) => {
+    setExpandedModelId((current) => (current === modelId ? null : modelId));
+  };
+
+  const handleModelCapabilityChange = (modelId: string, capabilityOverride: ModelCapabilityProfile | undefined) => {
+    onUpdateConnectionDraft({
+      models: connectionDraft.models.map((model) => {
+        if (model.id !== modelId) {
+          return model;
+        }
+        const normalized = normalizeCapabilityOverride(capabilityOverride);
+        if (normalized) {
+          return { ...model, capabilityOverride: normalized };
+        }
+        const { capabilityOverride: _removed, ...rest } = model;
+        return rest;
+      }),
+    });
+  };
 
   return (
   <div
@@ -202,10 +227,15 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         </div>
         <div className="settings-model-list" data-empty-label={t('settings.testBeforeSaveHint')}>
           {connectionDraft.models.map((model) => (
-            <div key={model.id} className="settings-model-row">
-              <span className="settings-model-row-check">OK</span>
-              <span className="settings-model-row-label">{model.label}</span>
-            </div>
+            <ProviderConnectModelRow
+              key={model.id}
+              model={model}
+              expanded={expandedModelId === model.id}
+              disabled={capabilityEditingDisabled}
+              onToggleExpanded={handleToggleModelCapability}
+              onCapabilityChange={handleModelCapabilityChange}
+              t={t}
+            />
           ))}
         </div>
       </div>

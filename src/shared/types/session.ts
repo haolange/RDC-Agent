@@ -2,6 +2,7 @@
  * Session Types - Session 控制面板相关类型定义
  */
 
+import type { ConversationTurnControls } from './modelCapability';
 import type { ReplayDeviceEntry } from './device';
 
 export type ExecutableAppMode = 'debugger' | 'analyzer' | 'optimizer';
@@ -41,6 +42,7 @@ export interface SessionRecord {
   createdAt: number;
   updatedAt: number;
   lastRunId?: string;
+  turnControls?: ConversationTurnControls;
 }
 
 export type SessionAttachmentKind = 'image' | 'file';
@@ -189,7 +191,6 @@ export interface RunContextUsageSummary {
   totalTokens: number;
   contextWindowTokens: number | null;
   usagePercent: number;
-  hasConfiguredContextWindow: boolean;
   /** 最近一次 LLM 请求的 prompt 占用量（=provider 上报的 inputTokens），用于窗口占用率。 */
   occupiedTokens: number;
   /** 最近一次 prompt 的分类 token 估算；无 run 数据时为 null。 */

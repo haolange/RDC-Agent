@@ -1,4 +1,5 @@
 import type { ElectronAPI } from '@shared/types/electron';
+import type { ResolvedModelCapability } from '@shared/types/modelCapability';
 import type { AppSettings, LlmProviderCatalogResponse } from '@shared/types/settings';
 
 const BRIDGE_MARKER = '__RDC_AGENT_BROWSER_APP_BRIDGE__';
@@ -108,6 +109,7 @@ class BrowserAppBridgeClient {
     settings: {
       get: () => this.invoke<AppSettings>('settings:get'),
       getProviderCatalog: () => this.invoke('settings:getProviderCatalog') as Promise<LlmProviderCatalogResponse>,
+      getModelCapability: (agentId) => this.invoke('settings:getModelCapability', agentId) as Promise<ResolvedModelCapability | null>,
       getProviderSecret: (providerId) => this.invoke('settings:getProviderSecret', providerId),
       importAgentManifest: (filePath) => this.invoke('settings:importAgentManifest', filePath),
       upsertSkill: (request) => this.invoke('settings:upsertSkill', request),

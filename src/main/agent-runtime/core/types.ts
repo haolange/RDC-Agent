@@ -340,13 +340,14 @@ export type AgentEvent =
 // =====================================================================
 
 import type { ReasoningVisibility } from '@shared/types/agentRuntime';
+import type { EffortLevel } from '@shared/types/modelCapability';
 
 /** 调用 Provider 流式生成时的可选参数。 */
 export interface StreamOptions {
   temperature?: number;
   maxTokens?: number;
   topP?: number;
-  reasoningBudget?: 'auto' | 'low' | 'medium' | 'high';
+  reasoningBudget?: 'auto' | EffortLevel;
   /** 路由能力解析出的 reasoning 可见性；summary-events 时请求 provider 侧摘要 thinking。 */
   reasoningVisibility?: ReasoningVisibility;
   /** 用于中止本次生成的信号。 */

@@ -1,5 +1,6 @@
 import type { LLMProviderConfig } from '@shared/types/llm';
 import type { LlmProviderProtocol } from '@shared/types/settings';
+import { DEFAULT_CONTEXT_WINDOW_TOKENS } from '@shared/types/modelCapability';
 import { EventStream } from '../core/EventStream';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type {
@@ -26,13 +27,17 @@ interface EncodedAgentModel {
   modelId: string;
 }
 
-export function encodeAgentModel(providerId: string, modelId: string): Model {
+export function encodeAgentModel(
+  providerId: string,
+  modelId: string,
+  options?: { contextWindow?: number },
+): Model {
   return {
     id: `${providerId}::${modelId}`,
     name: modelId,
     provider: providerId,
     api: CONFIGURED_PROVIDER_API,
-    contextWindow: 128000,
+    contextWindow: options?.contextWindow ?? DEFAULT_CONTEXT_WINDOW_TOKENS,
     maxTokens: 4096,
     reasoning: false,
     vision: false,
@@ -166,7 +171,7 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
   ): EventStream<AssistantMessageEvent, AssistantMessage> {
     const decoded = decodeAgentModel(model);
     const llmConfig = settingsService.getLlmConfig();
-    const provider = llmConfig.providers.find((entry) => entry.id === decoded.providerId) as ConfiguredProvider | undefined;
+    const provider = llmConfig.providers.find((entry: ConfiguredProvider) => entry.id === decoded.providerId);
     if (!provider) {
       return missingProviderStream(new Error(`No verified configured provider is available for ${decoded.providerId}.`));
     }

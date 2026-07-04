@@ -84,6 +84,12 @@ export type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from './devi
 export type { ActionEvent, EventStatus, EventType } from './evidence';
 export type { ArtifactRecord, HarnessTask, RunCapsule, VerificationResult } from './harness';
 export type { LLMConfig, LLMMessage, LLMRequest, LLMResponse, LLMStreamEvent } from './llm';
+export type {
+  ConversationTurnControls,
+  EffortLevel,
+  ModelCapabilityProfile,
+  ResolvedModelCapability,
+} from './modelCapability';
 export type { RuntimeLogEntry, RuntimeLogScope, RuntimeLogSeverity } from './runtimeLog';
 export type {
   CaptureDescriptor,

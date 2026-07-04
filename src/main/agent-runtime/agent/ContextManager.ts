@@ -25,6 +25,10 @@ import type {
   UserMessage,
 } from '../core/types';
 import { charsToTokens } from '@shared/utils/tokens';
+import {
+  CONTEXT_COMPACTION_RATIO,
+  DEFAULT_CONTEXT_WINDOW_TOKENS,
+} from '@shared/types/modelCapability';
 import { TokenizerService } from '../core/TokenizerService';
 
 /** 上下文压缩配置。 */
@@ -35,7 +39,7 @@ export interface ContextManagerConfig {
   maxMessages?: number;
   /** 保留最近的工具结果数量。默认 3。 */
   keepRecentToolResults?: number;
-  /** 上下文最大 token 估计值；未设置时由 model.contextWindow * 0.75 决定。 */
+  /** 上下文最大 token 估计值；未设置时由 model.contextWindow * CONTEXT_COMPACTION_RATIO 决定。 */
   contextTokenLimit?: number;
   /** 真实 tokenizer 服务（用于精确计数）。 */
   tokenizer?: TokenizerService;
@@ -46,8 +50,7 @@ export interface ContextManagerConfig {
 const DEFAULT_TOOL_RESULT_BUDGET = 200 * 1024;
 const DEFAULT_MAX_MESSAGES = 50;
 const DEFAULT_KEEP_RECENT_TOOL_RESULTS = 3;
-const DEFAULT_CONTEXT_RATIO = 0.75;
-const DEFAULT_CONTEXT_LIMIT = 100_000;
+const DEFAULT_CONTEXT_LIMIT = Math.floor(DEFAULT_CONTEXT_WINDOW_TOKENS * CONTEXT_COMPACTION_RATIO);
 const SNIP_HEAD = 3;
 const TOOL_RESULT_TRUNCATE_HEAD = 2000;
 
@@ -364,7 +367,7 @@ export class ContextManager {
       return this.config.contextTokenLimit;
     }
     if (model && model.contextWindow > 0) {
-      return Math.floor(model.contextWindow * DEFAULT_CONTEXT_RATIO);
+      return Math.floor(model.contextWindow * CONTEXT_COMPACTION_RATIO);
     }
     return DEFAULT_CONTEXT_LIMIT;
   }

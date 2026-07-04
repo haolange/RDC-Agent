@@ -1,4 +1,5 @@
 import type { AgentRole } from './agent';
+import type { ConversationTurnControls } from './modelCapability';
 import type { AgentEvent } from './agentRuntime';
 import type { ConversationBranchState } from './conversationBranch';
 import type { ThinkingArtifact } from './reasoning';
@@ -176,6 +177,7 @@ export interface ConversationSendRequest {
   agentId?: string | null;
   message: string;
   attachments?: ConversationAttachmentInput[];
+  turnControls?: ConversationTurnControls;
 }
 
 export interface ConversationRewriteFromMessageRequest extends ConversationSendRequest {

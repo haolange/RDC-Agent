@@ -13,6 +13,7 @@ import type {
   StreamCallback,
   ToolCall,
 } from '@shared/types/llm';
+import type { EffortLevel } from '@shared/types/modelCapability';
 import { COPILOT_WIRE_HEADERS } from './CopilotWire';
 
 const describeUnsupportedProtocol = (providerId: string, protocol: unknown): string => {
@@ -134,6 +135,9 @@ const toOpenAiReasoningEffort = (budget?: LLMRequest['reasoningBudget']): 'low' 
   if (budget === 'low' || budget === 'medium' || budget === 'high') {
     return budget;
   }
+  if (budget === 'extra' || budget === 'max') {
+    return 'high';
+  }
   return undefined;
 };
 
@@ -141,7 +145,15 @@ const toAnthropicThinking = (budget?: LLMRequest['reasoningBudget']): { type: 'e
   if (!budget || budget === 'auto') {
     return undefined;
   }
-  const budgetTokens = budget === 'low' ? 1024 : budget === 'medium' ? 4096 : 8192;
+  const budgetTokens = budget === 'low'
+    ? 4096
+    : budget === 'medium'
+      ? 8192
+      : budget === 'high'
+        ? 16384
+        : budget === 'extra'
+          ? 32768
+          : 63999;
   return { type: 'enabled', budget_tokens: budgetTokens };
 };
 
@@ -149,7 +161,23 @@ const toGoogleThinkingConfig = (budget?: LLMRequest['reasoningBudget']): { think
   if (!budget || budget === 'auto') {
     return undefined;
   }
-  return { thinkingBudget: budget === 'low' ? 1024 : budget === 'medium' ? 4096 : 8192 };
+  const thinkingBudget = ((): number => {
+    switch (budget as EffortLevel) {
+      case 'low':
+        return 1024;
+      case 'medium':
+        return 4096;
+      case 'high':
+        return 8192;
+      case 'extra':
+        return 16384;
+      case 'max':
+        return 24576;
+      default:
+        return 4096;
+    }
+  })();
+  return { thinkingBudget };
 };
 
 const extractResponsesText = (payload: unknown): string => {

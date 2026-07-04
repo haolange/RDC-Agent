@@ -16,6 +16,7 @@ import {
 } from './composerSendHelpers';
 import { useComposerStop } from './useComposerStop';
 import { executeSlashCommand } from './slashCommandExecutor';
+import { useTurnControlsStore } from './useTurnControls';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -56,13 +57,7 @@ export function useComposerSend(options: {
   const setBranchState = useConversationStore((state) => state.setBranchState);
   const upsertConversationMessages = useConversationStore((state) => state.upsertConversationMessages);
 
-  const { handlePrimaryStop } = useComposerStop({
-    showNotice,
-    t,
-    currentSession,
-    currentRun,
-    setIsPromptSending,
-  });
+  const { handlePrimaryStop } = useComposerStop({ showNotice, t, currentSession, currentRun, setIsPromptSending });
 
   const isComposerBusy = isPromptSending || hasActiveConversationTurn || hasActiveDebugRun;
 
@@ -102,6 +97,7 @@ export function useComposerSend(options: {
     setIsPromptSending(true);
     try {
       const conversationMode = toConversationMode(currentMode);
+      const turnControls = { ...useTurnControlsStore.getState().turnControls };
       const result = await electronAPI.conversation.sendMessage({
         projectId: currentProject?.projectId ?? null,
         sessionId: currentSession?.sessionId ?? null,
@@ -111,6 +107,7 @@ export function useComposerSend(options: {
         agentId: selectedAgentId || null,
         message: trimmed,
         attachments: toConversationAttachmentInputs(pendingAttachments),
+        turnControls,
       });
 
       setPromptValue('');

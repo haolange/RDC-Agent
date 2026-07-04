@@ -7,8 +7,10 @@ import { formatBytes } from '../../../services/attachmentHelpers';
 import { useI18n } from '../../../i18n';
 import { useLayoutStore } from '../../../stores/layoutStore';
 import { useConversationStore } from '../../../stores/conversationStore';
+import { useProjectStore } from '../../../stores/projectStore';
 import type { ComposerController } from './useComposer';
 import { PermissionModeSelector } from './PermissionModeSelector';
+import { EffortControl } from './EffortControl';
 import { ToolApprovalRequestPanel, usePendingToolApprovalRequest } from './ToolApprovalRequestPanel';
 import { UserInputRequestPanel, usePendingUserInputRequest } from './UserInputRequestPanel';
 import { SlashCommandPopover } from './SlashCommandPopover';
@@ -35,6 +37,7 @@ export const Composer: React.FC<ComposerProps> = ({
     return activeMsg?.agentId ?? null;
   });
   const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
+  const currentSession = useProjectStore((state) => state.currentSession);
   const pendingToolApproval = usePendingToolApprovalRequest();
   const pendingUserInput = usePendingUserInputRequest();
 
@@ -223,6 +226,11 @@ export const Composer: React.FC<ComposerProps> = ({
           <PermissionModeSelector />
         </div>
         <div className="composer-toolbar-group composer-toolbar-group-right">
+          <EffortControl
+            agentId={selectedAgentId}
+            currentSession={currentSession}
+            disabled={isComposerBusy}
+          />
           <ContextUsageIndicator usage={lastKnownUsage} stale={usageStale && !hasActiveDebugRun} language={language} />
           <button
             type="button"

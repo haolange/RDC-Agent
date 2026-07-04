@@ -1,5 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
+import type { AppSettings, AppSettingsPatch, LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../i18n';
+import { applyDraftCapabilityOverrides, mergeModelCapabilityOverrides } from './modelCapabilityOverrideUtils';
 import type { ProviderConnectionDraft } from './types';
 import { getErrorMessage } from './utils';
 import type { useProviderConnectionDraft } from './useProviderConnectionDraft';
@@ -13,10 +15,37 @@ type DraftApi = Pick<
 export const useProviderConnectionActions = (
   connectionDraft: ProviderConnectionDraft | null,
   setConnectionDraft: Dispatch<SetStateAction<ProviderConnectionDraft | null>>,
+  providerDrafts: LlmProviderEntry[],
+  patchSettings: (patch: AppSettingsPatch) => Promise<AppSettings>,
   draftApi: DraftApi,
   t: Translate,
 ) => {
   const { connectionProvider, refreshLocalSettings, updateConnectionDraft } = draftApi;
+
+  const persistCapabilityOverrides = async (freshProviders?: LlmProviderEntry[]) => {
+    if (!connectionDraft) {
+      return;
+    }
+    const providers = freshProviders ?? providerDrafts;
+    const currentProvider = providers.find((provider) => provider.id === connectionDraft.providerId);
+    if (!currentProvider) {
+      return;
+    }
+    const nextProvider = applyDraftCapabilityOverrides(currentProvider, connectionDraft.models);
+    const overridesChanged = JSON.stringify(nextProvider.models) !== JSON.stringify(currentProvider.models);
+    if (!overridesChanged) {
+      return;
+    }
+    const nextProviders = providers.map((provider) => (
+      provider.id === nextProvider.id ? nextProvider : provider
+    ));
+    await patchSettings({
+      llm: {
+        providers: nextProviders,
+      },
+    });
+    await refreshLocalSettings(connectionDraft.providerId);
+  };
 
   const handleTestProviderDraft = async () => {
     if (!connectionDraft) return;
@@ -34,7 +63,7 @@ export const useProviderConnectionActions = (
           testedApiKey: connectionDraft.apiKey,
           testedBaseUrl: connectionDraft.baseUrl,
           testedProtocol: connectionDraft.protocol,
-          models: result.models,
+          models: mergeModelCapabilityOverrides(connectionDraft.models, result.models),
         });
         await refreshLocalSettings(connectionDraft.providerId);
         return;
@@ -56,7 +85,7 @@ export const useProviderConnectionActions = (
         testedApiKey: connectionDraft.apiKey,
         testedBaseUrl: connectionDraft.baseUrl,
         testedProtocol: connectionDraft.protocol,
-        models: result.models,
+        models: mergeModelCapabilityOverrides(connectionDraft.models, result.models),
       });
     } catch (error) {
       updateConnectionDraft({
@@ -73,6 +102,7 @@ export const useProviderConnectionActions = (
     try {
       if (connectionProvider?.authMode === 'account') {
         if (connectionProvider.isConfigured && !connectionDraft.accountStatus?.requiresCodeInput) {
+          await persistCapabilityOverrides();
           setConnectionDraft(null);
           return;
         }
@@ -91,7 +121,8 @@ export const useProviderConnectionActions = (
           return;
         }
         if (status.connected) {
-          await refreshLocalSettings(connectionDraft.providerId);
+          const nextSettings = await refreshLocalSettings(connectionDraft.providerId);
+          await persistCapabilityOverrides(nextSettings.llm.providers);
           setConnectionDraft(null);
           return;
         }
@@ -109,7 +140,8 @@ export const useProviderConnectionActions = (
         updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerSaveFailed'), models: [] });
         return;
       }
-      await refreshLocalSettings(connectionDraft.providerId);
+      const nextSettings = await refreshLocalSettings(connectionDraft.providerId);
+      await persistCapabilityOverrides(nextSettings.llm.providers);
       setConnectionDraft(null);
     } catch (error) {
       updateConnectionDraft({

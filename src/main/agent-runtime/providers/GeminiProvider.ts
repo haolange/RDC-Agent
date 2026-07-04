@@ -24,6 +24,7 @@ import type {
   StreamOptions,
   ToolDefinition,
 } from '../core/types';
+import type { EffortLevel } from '@shared/types/modelCapability';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
@@ -254,7 +255,7 @@ export class GeminiProvider implements ProviderStrategy {
     if (typeof options.maxTokens === 'number') generationConfig.maxOutputTokens = options.maxTokens;
     if (options.reasoningBudget && options.reasoningBudget !== 'auto') {
       generationConfig.thinkingConfig = {
-        thinkingBudget: options.reasoningBudget === 'low' ? 1024 : options.reasoningBudget === 'medium' ? 4096 : 8192,
+        thinkingBudget: toGeminiThinkingBudget(options.reasoningBudget),
       };
     }
     if (Object.keys(generationConfig).length > 0) body.generationConfig = generationConfig;
@@ -273,6 +274,23 @@ export class GeminiProvider implements ProviderStrategy {
 // =====================================================================
 // 转换辅助
 // =====================================================================
+
+function toGeminiThinkingBudget(budget: EffortLevel): number {
+  switch (budget) {
+    case 'low':
+      return 1024;
+    case 'medium':
+      return 4096;
+    case 'high':
+      return 8192;
+    case 'extra':
+      return 16384;
+    case 'max':
+      return 24576;
+    default:
+      return 4096;
+  }
+}
 
 interface GeminiContent {
   role: 'user' | 'model';
