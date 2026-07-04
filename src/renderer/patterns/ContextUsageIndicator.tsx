@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { RunContextUsageSummary } from '@shared/types/session';
 import { ContextBreakdownPopover } from './ContextBreakdownPopover';
+import { formatTokenCount } from '../features/debugger/composer/turnControlsUtils';
 
 export const ContextUsageIndicator: React.FC<{
   usage: RunContextUsageSummary | null;
@@ -14,8 +15,8 @@ export const ContextUsageIndicator: React.FC<{
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - (normalizedPercent / 100));
 
-  const windowLabel = usage?.hasConfiguredContextWindow && usage.contextWindowTokens
-    ? `${normalizedPercent}% · ${formatCompact(usage.contextWindowTokens)}`
+  const windowLabel = usage?.contextWindowTokens
+    ? `${normalizedPercent}% · ${formatTokenCount(usage.contextWindowTokens)}`
     : `${normalizedPercent}%`;
   const ariaLabel = language === 'zh-CN'
     ? `上下文窗口已用 ${normalizedPercent}%`
@@ -25,7 +26,7 @@ export const ContextUsageIndicator: React.FC<{
     <div className="composer-usage">
       <button
         type="button"
-        className={`composer-usage-indicator ${usage?.hasConfiguredContextWindow ? 'is-configured' : 'is-unconfigured'}${stale ? ' is-stale' : ''}`}
+        className={`composer-usage-indicator${stale ? ' is-stale' : ''}`}
         data-testid="composer-usage-indicator"
         aria-label={ariaLabel}
         aria-haspopup="dialog"
@@ -49,14 +50,8 @@ export const ContextUsageIndicator: React.FC<{
         <span className="composer-usage-value">{normalizedPercent}%</span>
       </button>
       {open ? (
-        <ContextBreakdownPopover usage={usage} stale={stale} language={language} onClose={() => setOpen(false)} />
+        <ContextBreakdownPopover usage={usage} stale={stale} onClose={() => setOpen(false)} />
       ) : null}
     </div>
   );
 };
-
-function formatCompact(value: number): string {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
-  return `${value}`;
-}

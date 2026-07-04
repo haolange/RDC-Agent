@@ -344,12 +344,32 @@ function toAnthropicThinking(
   if (!wantsSummarized && (!budget || budget === 'auto')) return undefined;
   const thinking: { type: 'enabled'; budget_tokens: number; display?: 'summarized' } = {
     type: 'enabled',
-    budget_tokens: budget === 'low' ? 1024 : budget === 'medium' ? 4096 : budget === 'high' ? 8192 : 4096,
+    budget_tokens: toAnthropicThinkingBudget(budget),
   };
   if (wantsSummarized) {
     thinking.display = 'summarized';
   }
   return thinking;
+}
+
+function toAnthropicThinkingBudget(budget?: StreamOptions['reasoningBudget']): number {
+  if (!budget || budget === 'auto') {
+    return 4096;
+  }
+  switch (budget) {
+    case 'low':
+      return 4096;
+    case 'medium':
+      return 8192;
+    case 'high':
+      return 16384;
+    case 'extra':
+      return 32768;
+    case 'max':
+      return 63999;
+    default:
+      return 4096;
+  }
 }
 
 function resolveAnthropicThinkingKind(reasoningVisibility?: ReasoningVisibility): ThinkingArtifactKind {

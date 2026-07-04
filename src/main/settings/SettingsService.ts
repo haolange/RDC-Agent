@@ -28,6 +28,8 @@ import type {
   WorkspaceSettings,
 } from '@shared/types/settings';
 import type { LLMConfig, LLMProviderConfig } from '@shared/types/llm';
+import type { EffortLevel } from '@shared/types/modelCapability';
+import { EFFORT_LEVELS } from '@shared/types/modelCapability';
 import { DEFAULT_MODEL_ROUTING, isSafeAgentProfileId } from '@shared/types/agent';
 import {
   LEFT_SIDEBAR_COLLAPSED_WIDTH,
@@ -504,6 +506,32 @@ function sanitizeTerminal(input: unknown, fallback = DEFAULT_LAYOUT.terminal): L
   };
 }
 
+function sanitizeCapabilityOverride(value: unknown): LlmProviderModel['capabilityOverride'] | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const candidate = value as Record<string, unknown>;
+  const profile: NonNullable<LlmProviderModel['capabilityOverride']> = {};
+  if (
+    typeof candidate.nominalContextWindowTokens === 'number'
+    && Number.isFinite(candidate.nominalContextWindowTokens)
+    && candidate.nominalContextWindowTokens > 0
+  ) {
+    profile.nominalContextWindowTokens = Math.round(candidate.nominalContextWindowTokens);
+  }
+  if (Array.isArray(candidate.supportedEffortLevels)) {
+    const levels = candidate.supportedEffortLevels
+      .filter((entry): entry is EffortLevel => typeof entry === 'string' && (EFFORT_LEVELS as readonly string[]).includes(entry));
+    if (levels.length > 0) {
+      profile.supportedEffortLevels = levels;
+    }
+  }
+  if (typeof candidate.fastVariantModelId === 'string' && candidate.fastVariantModelId.trim()) {
+    profile.fastVariantModelId = candidate.fastVariantModelId.trim();
+  }
+  return Object.keys(profile).length > 0 ? profile : undefined;
+}
+
 function sanitizeModels(models: unknown): LlmProviderModel[] {
   const candidates = Array.isArray(models) ? models : [];
   const modelMap = new Map<string, LlmProviderModel>();
@@ -519,6 +547,7 @@ function sanitizeModels(models: unknown): LlmProviderModel[] {
       continue;
     }
 
+    const capabilityOverride = sanitizeCapabilityOverride(candidate.capabilityOverride);
     modelMap.set(modelId, {
       id: modelId,
       label: typeof candidate.label === 'string' && candidate.label.trim() ? candidate.label.trim() : modelId,
@@ -526,6 +555,7 @@ function sanitizeModels(models: unknown): LlmProviderModel[] {
       contextWindowTokens: typeof candidate.contextWindowTokens === 'number' && Number.isFinite(candidate.contextWindowTokens)
         ? Math.max(0, Math.round(candidate.contextWindowTokens))
         : null,
+      ...(capabilityOverride ? { capabilityOverride } : {}),
     });
   }
 

@@ -1,4 +1,4 @@
-import type { AppSettings, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
+import type { AppSettings, AppSettingsPatch, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
 import type { Dispatch, SetStateAction } from 'react';
 import type { useI18n } from '../../../i18n';
 import type { ProviderConnectionDraft } from './types';
@@ -18,6 +18,7 @@ interface UseProviderConnectionOptions {
   connectionDraft: ProviderConnectionDraft | null;
   setConnectionDraft: Dispatch<SetStateAction<ProviderConnectionDraft | null>>;
   reloadSettings: () => Promise<AppSettings>;
+  patchSettings: (patch: AppSettingsPatch) => Promise<AppSettings>;
   t: Translate;
 }
 
@@ -26,6 +27,8 @@ export const useProviderConnection = (options: UseProviderConnectionOptions) => 
   const actions = useProviderConnectionActions(
     options.connectionDraft,
     options.setConnectionDraft,
+    options.providerDrafts,
+    options.patchSettings,
     draft,
     options.t,
   );

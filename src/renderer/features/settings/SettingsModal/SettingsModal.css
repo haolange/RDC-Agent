@@ -1640,6 +1640,105 @@
   color: rgb(var(--color-error));
 }
 
+.settings-model-row--expanded {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.settings-model-row-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+}
+
+.settings-model-capability-toggle {
+  margin-left: auto;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.settings-model-capability-toggle-label {
+  font-size: var(--text-xs);
+}
+
+.settings-model-capability-chevron {
+  transition: transform 0.15s ease;
+}
+
+.settings-model-capability-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.settings-model-capability-badge {
+  flex-shrink: 0;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--token-border-focus) 16%, transparent);
+  color: var(--token-text-heading);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.settings-model-capability-panel {
+  display: grid;
+  gap: var(--space-3);
+  width: 100%;
+  padding-top: var(--space-3);
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--token-border-muted);
+}
+
+.settings-model-capability-field {
+  min-width: 0;
+}
+
+.settings-model-capability-effort-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.settings-model-capability-effort-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-sm);
+  background: var(--token-surface-sunken);
+  color: var(--token-text-body);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  user-select: none;
+}
+
+.settings-model-capability-effort-chip:hover {
+  background: var(--token-interactive-hover);
+  color: var(--token-text-heading);
+}
+
+.settings-model-capability-effort-chip.selected {
+  border-color: var(--token-border-focus);
+  background: color-mix(in srgb, var(--token-border-focus) 14%, var(--token-surface-raised));
+  color: var(--token-text-heading);
+}
+
+.settings-model-capability-effort-chip input[type='checkbox'] {
+  width: var(--space-3);
+  height: var(--space-3);
+  margin: 0;
+  accent-color: var(--token-border-focus);
+}
+
+.settings-model-capability-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .settings-model-recommend-row {
   border-style: dashed;
   color: rgb(var(--color-text-secondary));

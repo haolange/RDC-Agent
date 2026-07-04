@@ -12,6 +12,7 @@ import type {
   StreamOptions,
   ToolDefinition,
 } from '../core/types';
+import type { EffortLevel } from '@shared/types/modelCapability';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
@@ -330,6 +331,13 @@ function createResponsesUrl(baseUrl: string): string {
   return baseUrl.endsWith('/responses') ? baseUrl : `${baseUrl}/responses`;
 }
 
+function toOpenAiResponsesReasoningEffort(budget: EffortLevel): 'low' | 'medium' | 'high' {
+  if (budget === 'extra' || budget === 'max') {
+    return 'high';
+  }
+  return budget;
+}
+
 function buildRequestBody(model: Model, context: Context, options: StreamOptions): Record<string, unknown> {
   const body: Record<string, unknown> = {
     model: model.id,
@@ -344,7 +352,8 @@ function buildRequestBody(model: Model, context: Context, options: StreamOptions
   if (typeof options.temperature === 'number') body.temperature = options.temperature;
   if (typeof options.topP === 'number') body.top_p = options.topP;
   if (options.reasoningBudget && options.reasoningBudget !== 'auto') {
-    body.reasoning = { effort: options.reasoningBudget };
+    // OpenAI 官方 xhigh 尚未稳定公开，extra/max 保守映射到 high。
+    body.reasoning = { effort: toOpenAiResponsesReasoningEffort(options.reasoningBudget) };
   } else if (options.reasoningVisibility === 'summary-events') {
     body.reasoning = { effort: 'medium' };
   }

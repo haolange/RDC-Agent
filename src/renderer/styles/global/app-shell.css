@@ -617,15 +617,6 @@
   transition: stroke-dashoffset var(--transition-fast), stroke var(--transition-fast);
 }
 
-.composer-usage-indicator.is-unconfigured .composer-usage-ring-track {
-  stroke: rgb(var(--color-border-default));
-}
-
-.composer-usage-indicator.is-unconfigured .composer-usage-ring-progress {
-  stroke: rgb(var(--color-text-muted));
-  opacity: 0.72;
-}
-
 .composer-usage-value {
   position: absolute;
   inset: 0;
@@ -704,16 +695,6 @@
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-.context-breakdown-no-window-hint {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  color: var(--token-status-warning);
-  font-size: var(--text-xs);
-  white-space: nowrap;
-  cursor: default;
 }
 
 .context-breakdown-close {

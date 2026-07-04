@@ -2,12 +2,15 @@ import type { AgentRole } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { LLMMessage, LLMRequest, LLMResponse } from '@shared/types/llm';
 import type { ContextUsageBreakdownEntry, RunContextUsageSummary } from '@shared/types/session';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
+import { resolveActiveContextWindowTokens } from '@shared/types/modelCapability';
 import type { Blocker, WorkflowStage } from '@shared/types/workflow';
 import { BLOCKER_CODES } from '@shared/constants/blockers';
 import type { LlmProviderProtocol, LlmProviderEntry, LlmProviderId } from '@shared/types/settings';
 import { llmAdapter } from '../settings/LLMAdapter';
 import { providerAccountAuthService } from '../settings/ProviderAccountAuthService';
 import { settingsService } from '../settings/SettingsService';
+import { resolveModelCapability } from '../settings/ModelCapabilityResolver';
 import { resolveCompatibleAgentRoute } from './LlmRouteCompatibility';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { storageAdapter } from '../sessions/StorageAdapter';
@@ -41,6 +44,7 @@ export interface LlmCallResult {
 export interface RunLlmExecutionSummary {
   providerId: string;
   modelId: string;
+  sessionId?: string | null;
   successfulCallCount: number;
   failedCallCount: number;
   firstRequestId?: string;
@@ -292,13 +296,14 @@ export class DebuggerLlmService {
     }
 
     const settings = settingsService.getAll();
-    const provider = settings.llm.providers.find((entry) => entry.id === summary.providerId);
-    const model = provider?.models.find((entry) => entry.id === summary.modelId) ?? null;
-    const contextWindowTokens = typeof model?.contextWindowTokens === 'number' && model.contextWindowTokens > 0
-      ? model.contextWindowTokens
-      : null;
+    const turnControls = this.resolveSessionTurnControls(runId, summary);
+    const capability = resolveModelCapability(summary.providerId, summary.modelId, settings);
+    const contextWindowTokens = resolveActiveContextWindowTokens(capability, turnControls ?? {
+      effort: capability.defaultEffort,
+      maxContextMode: false,
+      fastModel: false,
+    });
     const totalTokens = summary.totalInputTokens + summary.totalOutputTokens;
-    // 窗口占用量 = 最近一次请求的 input tokens（而非累计 Σ）。
     const occupiedTokens = summary.lastOccupiedTokens ?? 0;
 
     return {
@@ -309,14 +314,21 @@ export class DebuggerLlmService {
       outputTokens: summary.totalOutputTokens,
       totalTokens,
       contextWindowTokens,
-      usagePercent: contextWindowTokens
-        ? Math.min(100, Math.max(0, Math.round((occupiedTokens / contextWindowTokens) * 100)))
-        : 0,
-      hasConfiguredContextWindow: Boolean(contextWindowTokens),
+      usagePercent: Math.min(100, Math.max(0, Math.round((occupiedTokens / contextWindowTokens) * 100))),
       occupiedTokens,
       breakdown: buildScaledBreakdown(summary.lastPromptBreakdown ?? null, occupiedTokens, contextWindowTokens),
       snapshotAt: summary.lastSnapshotAt ?? null,
     };
+  }
+
+  private resolveSessionTurnControls(key: string, summary: RunLlmExecutionSummary): ConversationTurnControls | null {
+    if (key.startsWith('sess_')) {
+      return storageAdapter.readSession(key)?.turnControls ?? null;
+    }
+    if (summary.sessionId) {
+      return storageAdapter.readSession(summary.sessionId)?.turnControls ?? null;
+    }
+    return null;
   }
 
   /**
@@ -346,6 +358,7 @@ export class DebuggerLlmService {
     const existing = this.runSummaries.get(key) ?? {
       providerId: params.providerId,
       modelId: params.modelId,
+      sessionId: params.sessionId ?? null,
       successfulCallCount: 0,
       failedCallCount: 0,
       totalInputTokens: 0,
@@ -355,6 +368,9 @@ export class DebuggerLlmService {
     };
     existing.providerId = existing.providerId || params.providerId;
     existing.modelId = existing.modelId || params.modelId;
+    if (params.sessionId) {
+      existing.sessionId = params.sessionId;
+    }
     existing.successfulCallCount += 1;
     existing.totalInputTokens += params.inputTokens;
     existing.totalOutputTokens += params.outputTokens;
@@ -718,6 +734,7 @@ export class DebuggerLlmService {
     const existing = this.runSummaries.get(context.runId) ?? {
       providerId: route.providerId,
       modelId: route.modelId,
+      sessionId: context.sessionId ?? null,
       successfulCallCount: 0,
       failedCallCount: 0,
       totalInputTokens: 0,
@@ -728,6 +745,9 @@ export class DebuggerLlmService {
 
     existing.providerId = existing.providerId || route.providerId;
     existing.modelId = existing.modelId || route.modelId;
+    if (context.sessionId) {
+      existing.sessionId = context.sessionId;
+    }
     if (status === 'ok') {
       existing.successfulCallCount += 1;
       if (!existing.firstRequestId && response?.id) {

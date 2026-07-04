@@ -128,6 +128,7 @@ CaptureInfo
 CaptureRole
 charsToTokens
 CHATGPT_ACCOUNT_MODELS
+clampEffortLevel
 CLAUDE_ACCOUNT_MODELS
 CLIResult
 CodePreview
@@ -141,6 +142,7 @@ CommandUiAction
 ConfigurationSettings
 ContentBlock
 ContentBlockType
+CONTEXT_COMPACTION_RATIO
 ContextApi
 ContextImportance
 ContextKind
@@ -192,6 +194,7 @@ ConversationToolApproval
 ConversationToolApprovalStatus
 ConversationToolCall
 ConversationToolCallStatus
+ConversationTurnControls
 ConversationTurnResult
 ConversationUiHints
 ConversationWorkBlock
@@ -203,12 +206,15 @@ createBuiltinProviderEntries
 createBuiltinProviderEntry
 CreateRunResponse
 DebugSessionStartRequest
+DEFAULT_CONTEXT_WINDOW_TOKENS
 DEFAULT_MODEL_ROUTING
 DEFAULT_TOKEN_TTL_SECONDS
 DeviceApi
 DialogApi
 DiffPreview
 EffectiveAgentRuntimeConfig
+EFFORT_LEVELS
+EffortLevel
 ElectronAPI
 ErrorNode
 EventStatus
@@ -309,6 +315,7 @@ LlmSettings
 LLMStreamEvent
 LLMToolCallDelta
 LogPreview
+lookupModelCapabilitySeed
 MAIN_STAGES
 MCPConnectionInfo
 MCPConnectionStatus
@@ -326,6 +333,7 @@ MODE_CAPABILITIES
 ModeCapabilities
 ModeConfig
 ModeIconKey
+ModelCapabilityProfile
 ModelProviderBackendKind
 ModelProviderCapabilityMatrix
 ModelTurnEvent
@@ -385,12 +393,14 @@ REPORTER_AGENTS
 RequestBranch
 RequestBranchGroup
 RequestBranchStatus
+resolveActiveContextWindowTokens
 resolveAgentDisplay
 resolveBuiltinProviderProtocol
 resolveConversationLoopOutputPhase
 ResolveConversationLoopOutputPhaseInput
 resolveConversationReasoningState
 ResolvedAgentRuntimeProfile
+ResolvedModelCapability
 ResolvedTheme
 RetryRequest
 RIGHT_PANEL_COLLAPSED_WIDTH

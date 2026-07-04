@@ -60,7 +60,7 @@ Tools must be declared with name, permission level, input schema, result summary
 - file and search: `read_file`, `glob`, `grep`;
 - web: `web_fetch`, `web_search`;
 - execution and mutation: `bash`, `write_file`, `edit_file`;
-- workflow: `askUser`, `todo`, `task_*`, `agent`, `handoff`;
+- workflow: `ask_user`, `todo`, `task_*`, `agent`, `handoff`;
 - context: `memory`, `skills`, `MCP`;
 - RDC/RDX: capture context, open/preview/close, remote connection, and RDX shell actions.
 
@@ -88,11 +88,23 @@ Work Process section semantics are stable: each section represents one `llm_turn
 
 When an answer-only `llm_turn` follows visible process evidence, the renderer projects it as a compact final-response boundary row, not as a second top-level process section. Its marker and text origin align with the top-level process rail; it must not visually nest under the preceding tool group. The boundary row may say that the final reply is being generated or has been generated, and provider-visible closing summary thinking may be folded under that row. The final answer body itself still renders only in the assistant message body and must not be copied into Work Process. Duplicate late summary thinking that was already shown in the preceding process section is suppressed rather than rendered as a new empty row.
 
+Each canonical `llm_turn` may carry provider/runtime metadata: `stopReason`, `outputPhase` (`commentary` vs `final_answer`), and `reasoningState` (`raw`, `summary`, `opaque`, `hidden`, `none`). `final_answer` must be inferred from stop metadata and pending-continuation state, not from fragile text heuristics. Visible loop text with `outputPhase: commentary` is ordinary model narration and must not be labeled as thinking.
+
+Work Process UI may aggregate multiple `llm_turn` blocks into semantic step groups (for example explore, edit, verify, web, memory, interaction, collaboration) for readability. Grouping is a pure presentation projection over canonical trace data; it must not rewrite loop order, drop tool evidence, or affect composer replay. The default view is grouped; users may toggle a loop-detail view to inspect exact `llm_turn` boundaries.
+
 `ask_user` and tool approvals are human-in-the-loop interactions. The runtime pauses the active tool call, the composer area shows the pending question or approval controls, and the Work Process records only the real request/decision transcript. They must not render as raw tool result blocks with choices JSON, policy JSON, or fake assistant text responses. Profile handoff events are recorded in Work Process and the agent event stream; ordinary completed assistant messages must not append automatic Next actions buttons.
 
 Composer profile menus show profile name and status. Long descriptions belong in hover tooltips, not inline list clutter.
 
-Composer footer controls are grouped by intent: left side is pre-send context and policy (`attach`, agent profile, permission mode); right side is execution telemetry and action (`context usage`, send/stop). Permission mode must not sit beside the send button as if it were an execution action.
+Composer footer controls are grouped by intent: left side is pre-send context and policy (`attach`, agent profile, permission mode); right side is execution telemetry and action (effort control, `context usage`, send/stop). Permission mode must not sit beside the send button as if it were an execution action.
+
+The effort control sits immediately left of the context usage ring. It is a pill that opens an upward popup containing a five-level effort slider (Low/Medium/High/Extra/Max) and two switches: Max mode (context window expansion) and Fast model (fast variant switch). Slider fill uses the dedicated `--token-effort-*` purple ramp that deepens with higher effort; that ramp is reserved for effort intensity indication and must not be reused as decoration. Levels a model does not support render as disabled stops; a model without reasoning support disables the whole slider; Max mode and Fast model rows gray out when the capability resolver reports them unavailable. Effort, Max mode, and Fast model are remembered per session and snapshotted into each send request as `turnControls`.
+
+## Model Capability and Context Window
+
+Model capability (nominal context window, supported effort levels, fast variant model id) resolves with the priority: per-model user override in Settings > Providers (`LlmProviderModel.capabilityOverride`) > built-in seed catalog matched by model id pattern (`src/shared/constants/modelCapabilityCatalog.ts`) > conservative defaults. A provider without the `reasoning` capability always resolves to an empty effort level set. Fast model is available only when the declared fast variant actually exists among the provider's enabled models.
+
+The context window is a single source of truth shared by the UI usage ring and runtime compaction. The default window is `min(256k, nominal)`; enabling Max mode uses the nominal window (for example 1M); the auto-compaction threshold is always 80% of the active window. Max mode is unavailable when the nominal window is unknown or does not exceed 256k. Runtime code must not hardcode context window sizes; the resolver is the only source.
 
 ## Design System
 
@@ -114,6 +126,8 @@ Code changes should run:
 - `npm run check:architecture`;
 - `npm run check:fidelity`;
 - `npm run check:shared-exports`;
+- `npm run check:work-process` and `npm run check:work-process-tool-coverage` when Work Process projection, tool catalog labels, or transcript UI changes;
+- `npm run check:reasoning-delivery` when provider thinking delivery or reasoning artifact projection changes;
 - `npm run check:settings-agents`;
 - `npm run build` when entry, runtime, renderer, or packaging behavior changes.
 

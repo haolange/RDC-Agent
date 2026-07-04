@@ -19,6 +19,7 @@ import type {
 } from './conversation';
 import type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from './device';
 import type { LLMConfig } from './llm';
+import type { ResolvedModelCapability } from './modelCapability';
 import type { RuntimeLogEntry, RuntimeLogScope } from './runtimeLog';
 import type {
   AgentRuntimeMcpWriteRequest,
@@ -229,6 +230,7 @@ export interface ElectronAPI {
   settings: {
     get: () => Promise<AppSettings>;
     getProviderCatalog: () => Promise<LlmProviderCatalogResponse>;
+    getModelCapability: (agentId: string) => Promise<ResolvedModelCapability | null>;
     getProviderSecret: (providerId: string) => Promise<string>;
     importAgentManifest: (filePath: string) => Promise<AppSettings>;
     upsertSkill: (request: AgentRuntimeSkillWriteRequest) => Promise<AppSettings>;

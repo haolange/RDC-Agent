@@ -42,6 +42,14 @@ import type {
   AgentSubagentEventPayload,
 } from '@shared/types/agentRuntime';
 import type { LLMConfig } from '@shared/types/llm';
+import type {
+  ConversationTurnControls,
+  EffortLevel,
+} from '@shared/types/modelCapability';
+import {
+  CONTEXT_COMPACTION_RATIO,
+  resolveActiveContextWindowTokens,
+} from '@shared/types/modelCapability';
 import type { AppMode, ContextUsageBreakdownEntry } from '@shared/types/session';
 import type { LlmProviderId } from '@shared/types/settings';
 import type { WorkflowStage } from '@shared/types/workflow';
@@ -98,6 +106,12 @@ import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigServ
 import { llmAdapter } from '../../settings/LLMAdapter';
 import { providerAccountAuthService } from '../../settings/ProviderAccountAuthService';
 import { settingsService } from '../../settings/SettingsService';
+import {
+  resolveEffectiveModelId,
+  resolveModelCapability,
+  resolveReasoningBudget,
+  resolveTurnControls,
+} from '../../settings/ModelCapabilityResolver';
 import { debuggerLlmService } from '../../settings/DebuggerLlmService';
 import { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
 import { isToolAllowedForAgent, normalizeToolName, resolveAgentToolAllowlist } from './DebuggerRuntimePolicy';
@@ -115,7 +129,8 @@ interface AgentTurnOptions {
   signal?: AbortSignal;
   onChunk?: (text: string) => void;
   onEvent?: (event: SharedAgentEvent) => void;
-  reasoningBudget?: 'auto' | 'low' | 'medium' | 'high';
+  reasoningBudget?: EffortLevel | 'auto';
+  turnControls?: ConversationTurnControls;
 }
 
 interface AgentProfileTurnOptions extends AgentTurnOptions {
@@ -144,6 +159,7 @@ interface AgentSlot {
   systemPrompt: string;
   toolSignature: string;
   turnSignature: string;
+  contextTokenLimit: number;
 }
 
 interface ResolvedRuntimeTools {
@@ -328,6 +344,18 @@ export class AgentOrchestrator {
       await this.recordMessage(agentId, 'user', content, context);
 
       const stub = this.createTestModeStub(agentId, content);
+      const settings = settingsService.getAll();
+      const capability = resolveModelCapability(config.modelProvider, config.modelName, settings);
+      const sessionRecord = context?.sessionId ? storageAdapter.readSession(context.sessionId) : null;
+      const turnControls = resolveTurnControls(
+        capability,
+        options?.turnControls,
+        sessionRecord?.turnControls,
+      );
+      const effectiveModelId = resolveEffectiveModelId(capability, turnControls);
+      const activeContextWindow = resolveActiveContextWindowTokens(capability, turnControls);
+      const contextTokenLimit = Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
+      const reasoningBudget = options?.reasoningBudget ?? resolveReasoningBudget(capability, turnControls);
       const responseText = stub
         ? await this.streamTestModeStub(stub, options)
         : await this.runAgentTurn({
@@ -335,7 +363,7 @@ export class AgentOrchestrator {
           content,
           systemPrompt,
           providerId: config.modelProvider,
-          modelId: config.modelName,
+          modelId: effectiveModelId,
           maxTokens: config.maxTokens,
           temperature: config.temperature,
           mode: this.modeForAgent(agentId),
@@ -345,9 +373,14 @@ export class AgentOrchestrator {
           sessionId: context?.sessionId ?? null,
           turnId: context?.turnId,
           toolAllowlist: resolveAgentToolAllowlist(agentId, context?.stageId),
-          options,
+          options: {
+            ...options,
+            reasoningBudget,
+          },
           projectRootPath: context?.projectRootPath ?? null,
           projectId: context?.projectId ?? null,
+          contextWindow: activeContextWindow,
+          contextTokenLimit,
         });
 
       const finalContent = await this.finalizeRecordedAssistantMessage(
@@ -401,12 +434,25 @@ export class AgentOrchestrator {
       }
 
       const toolAllowlist = resolveAgentToolAllowlist(agentId, options?.stage && options.stage !== 'report' ? options.stage : undefined);
+      const routeProviderId = config.modelProvider;
+      const routeModelId = config.modelName;
+      const capability = resolveModelCapability(routeProviderId, routeModelId, settings);
+      const turnControls = resolveTurnControls(
+        capability,
+        options?.turnControls,
+        options?.sessionId ? storageAdapter.readSession(options.sessionId)?.turnControls : undefined,
+      );
+      const effectiveModelId = resolveEffectiveModelId(capability, turnControls);
+      const activeContextWindow = resolveActiveContextWindowTokens(capability, turnControls);
+      const contextTokenLimit = Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
+      const reasoningBudget = options?.reasoningBudget ?? resolveReasoningBudget(capability, turnControls);
+
       const responseText = await this.runAgentTurn({
         agentId,
         content,
         systemPrompt: this.systemPromptForAgent(agentId, config.systemPrompt),
-        providerId: config.modelProvider,
-        modelId: config.modelName,
+        providerId: routeProviderId,
+        modelId: effectiveModelId,
         maxTokens: config.maxTokens,
         temperature: config.temperature,
         mode: this.modeForAgent(agentId),
@@ -416,10 +462,15 @@ export class AgentOrchestrator {
         sessionId: options?.sessionId ?? null,
         turnId: options?.turnId,
         toolAllowlist,
-        options,
+        options: {
+          ...options,
+          reasoningBudget,
+        },
         projectRootPath: options?.projectRootPath ?? null,
         projectId: options?.projectId ?? null,
         promptMetrics: options?.promptMetrics,
+        contextWindow: activeContextWindow,
+        contextTokenLimit,
       });
 
       runtimeLogService.log({
@@ -668,9 +719,13 @@ export class AgentOrchestrator {
     streamOptions?: StreamOptions,
     turnSignature = '',
     sessionId?: string | null,
+    contextWindow?: number,
+    contextTokenLimit?: number,
   ): AgentSlot {
     const slotKey = this.agentSlotKey(sessionId, agentId);
     const toolSignature = this.createToolSignature(tools);
+    const resolvedContextTokenLimit = contextTokenLimit
+      ?? Math.floor((contextWindow ?? 256_000) * CONTEXT_COMPACTION_RATIO);
     const existing = this.agentSlots.get(slotKey);
     if (
       existing
@@ -679,6 +734,7 @@ export class AgentOrchestrator {
       && existing.systemPrompt === systemPrompt
       && existing.toolSignature === toolSignature
       && existing.turnSignature === turnSignature
+      && existing.contextTokenLimit === resolvedContextTokenLimit
       && !existing.agent.isStreaming
     ) {
       return existing;
@@ -690,13 +746,11 @@ export class AgentOrchestrator {
       ? storageAdapter.readAgentThread(sessionId, agentId)
       : [];
 
-    const agentModel = encodeAgentModel(providerId, modelId);
+    const agentModel = encodeAgentModel(providerId, modelId, { contextWindow });
 
-    // ContextManager：自动 compaction 管道（toolResultBudget → snip → micro → full），
-    // 按 provider context window 动态取 token 上限。
     const contextManager = new ContextManager({
       modelId,
-      contextTokenLimit: Math.floor(agentModel.contextWindow * 0.75),
+      contextTokenLimit: resolvedContextTokenLimit,
       toolResultBudget: 200 * 1024,
       keepRecentToolResults: 3,
     });
@@ -722,7 +776,16 @@ export class AgentOrchestrator {
       errorRecovery,
     });
 
-    const slot: AgentSlot = { agent, contextManager, providerId, modelId, systemPrompt, toolSignature, turnSignature };
+    const slot: AgentSlot = {
+      agent,
+      contextManager,
+      providerId,
+      modelId,
+      systemPrompt,
+      toolSignature,
+      turnSignature,
+      contextTokenLimit: resolvedContextTokenLimit,
+    };
     this.agentSlots.set(slotKey, slot);
     return slot;
   }
@@ -1725,6 +1788,8 @@ export class AgentOrchestrator {
     projectId?: string | null;
     /** Ask 路径由 ConversationService 传入的 prompt 分段字符数，用于细化 breakdown。 */
     promptMetrics?: PromptSectionMetrics;
+    contextWindow?: number;
+    contextTokenLimit?: number;
   }): Promise<string> {
     if (!input.providerId || !input.modelId) {
       throw new Error('No provider/model route is configured for this agent.');
@@ -1771,7 +1836,9 @@ export class AgentOrchestrator {
     const streamOptions: StreamOptions = {
       maxTokens: input.maxTokens,
       temperature: input.temperature,
-      reasoningBudget: input.options?.reasoningBudget,
+      reasoningBudget: input.options?.reasoningBudget === 'auto'
+        ? undefined
+        : input.options?.reasoningBudget,
       reasoningVisibility: routeCapability.reasoningVisibility,
       signal: input.options?.signal,
     };
@@ -1802,6 +1869,8 @@ export class AgentOrchestrator {
       streamOptions,
       input.turnId ?? '',
       input.sessionId,
+      input.contextWindow,
+      input.contextTokenLimit,
     );
 
     const userMessage: UserMessage = {

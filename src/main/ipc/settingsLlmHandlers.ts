@@ -16,6 +16,7 @@ import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService
 import { llmAdapter } from '../settings/LLMAdapter';
 import { providerConnectionService } from '../settings/ProviderConnectionService';
 import { settingsService } from '../settings/SettingsService';
+import { resolveModelCapability } from '../settings/ModelCapabilityResolver';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
@@ -107,6 +108,15 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
 
   ipcMain.handle('settings:getProviderCatalog', async () => {
     return settingsService.getProviderCatalog();
+  });
+
+  ipcMain.handle('settings:getModelCapability', async (_event, agentId: string) => {
+    const settings = settingsService.getAll();
+    const route = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
+    if (!route?.providerId || !route.modelId) {
+      return null;
+    }
+    return resolveModelCapability(route.providerId, route.modelId, settings);
   });
 
   ipcMain.handle('settings:getProviderSecret', async (_event, providerId: string) => {

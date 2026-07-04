@@ -1,4 +1,5 @@
 import type { AgentRole } from './agent';
+import type { ModelCapabilityProfile } from './modelCapability';
 import type { AgentManifestDraft, AgentManifestSettings } from './agentManifest';
 import type {
   AgentRuntimeMcpDescriptor,
@@ -231,6 +232,7 @@ export interface LlmProviderModel {
   label: string;
   enabled: boolean;
   contextWindowTokens?: number | null;
+  capabilityOverride?: ModelCapabilityProfile;
 }
 
 export interface LlmProviderEntry {

@@ -25,6 +25,7 @@ import type {
 } from '@shared/types/conversationBranch';
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import type { AgentRole } from '@shared/types/agent';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type {
@@ -48,6 +49,10 @@ import { traceService } from '../agent-trace/TraceService';
 import { replayDeviceService } from '../captures/ReplayDeviceService';
 import { rdxSessionService } from '../index';
 import { settingsService } from '../settings/SettingsService';
+import {
+  resolveModelCapability,
+  resolveTurnControls,
+} from '../settings/ModelCapabilityResolver';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
@@ -556,7 +561,15 @@ export class ConversationService {
   async sendMessage(input: ConversationContextInput): Promise<ConversationTurnResult> {
     const trimmed = input.message.trim();
     const context = await this.resolveContext(input);
-    return this.startProfileTurn(context, input.mode, input.agentId ?? null, trimmed, input.attachments ?? []);
+    return this.startProfileTurn(
+      context,
+      input.mode,
+      input.agentId ?? null,
+      trimmed,
+      input.attachments ?? [],
+      undefined,
+      input.turnControls,
+    );
   }
 
   async rewriteFromMessage(input: ConversationRewriteContextInput): Promise<ConversationTurnResult> {
@@ -564,7 +577,15 @@ export class ConversationService {
     const context = await this.resolveContext(input);
     const sessionId = input.sessionId ?? context.session?.sessionId ?? null;
     if (!sessionId) {
-      return this.startProfileTurn(context, input.mode, input.agentId ?? null, trimmed, input.attachments ?? []);
+      return this.startProfileTurn(
+        context,
+        input.mode,
+        input.agentId ?? null,
+        trimmed,
+        input.attachments ?? [],
+        undefined,
+        input.turnControls,
+      );
     }
 
     const history = storageAdapter.readConversationHistory(sessionId);
@@ -652,6 +673,7 @@ export class ConversationService {
         forkId,
         variantIndex,
       },
+      input.turnControls,
     );
   }
 
@@ -730,6 +752,7 @@ export class ConversationService {
     rawMessage: string,
     pendingAttachments: ConversationAttachmentInput[],
     branchContext?: ConversationBranchTurnContext,
+    requestTurnControls?: ConversationTurnControls,
   ): Promise<ConversationTurnResult> {
     let workingSession = context.session;
     if (!workingSession && context.projectId) {
@@ -835,6 +858,7 @@ export class ConversationService {
       importedAttachments,
       userMessage,
       assistantDraftMessage,
+      requestTurnControls,
     });
 
     return {
@@ -859,6 +883,7 @@ export class ConversationService {
     importedAttachments: SessionAttachmentRecord[];
     userMessage: ConversationMessage;
     assistantDraftMessage: ConversationMessage;
+    requestTurnControls?: ConversationTurnControls;
   }) {
     let assistantMessage = input.assistantDraftMessage;
     const sessionId = input.context.session?.sessionId ?? null;
@@ -867,6 +892,18 @@ export class ConversationService {
     const conversationAgentId: AgentRole = input.requestedAgentId;
     const agentLabel = getAgentLabel(conversationAgentId);
     const showWorkTrace = true;
+
+    const settings = settingsService.getAll();
+    const route = settings.llm.agentRoutes.find((entry) => entry.agentId === conversationAgentId);
+    const capability = route?.providerId && route.modelId
+      ? resolveModelCapability(route.providerId, route.modelId, settings)
+      : null;
+    const turnControls = capability
+      ? resolveTurnControls(capability, input.requestTurnControls, input.context.session?.turnControls)
+      : undefined;
+    if (sessionId && turnControls) {
+      storageAdapter.updateSession(sessionId, { turnControls });
+    }
 
     let streamScheduler: ConversationStreamPatchScheduler | null = null;
 
@@ -1063,6 +1100,7 @@ export class ConversationService {
             maxTokens: 1200,
             temperature: 0.35,
             signal: abortController.signal,
+            turnControls,
             onEvent: (event: AgentEvent) => {
               this.emitConversationEvent({
                 type: 'agent_event',

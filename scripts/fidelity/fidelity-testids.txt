@@ -18,6 +18,11 @@ capture-library-toolbar
 chat-messages
 composer-attach-button
 composer-attachments
+composer-effort-fast-row
+composer-effort-max-row
+composer-effort-pill
+composer-effort-popup
+composer-effort-slider
 composer-footer-bar
 composer-mode-pill
 composer-permission-pill

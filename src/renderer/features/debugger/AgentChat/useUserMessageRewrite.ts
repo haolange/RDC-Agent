@@ -9,6 +9,7 @@ import {
   applyConversationTurnResult,
   syncE2EConversationState,
 } from '../composer/composerSendHelpers';
+import { useTurnControlsStore } from '../composer/useTurnControls';
 
 export function isRewriteTurnStillCurrent(turnId: string, activeLeafBranchId?: string | null): boolean {
   const state = useConversationStore.getState();
@@ -60,6 +61,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
           mimeType: attachment.mimeType,
           size: attachment.size,
         })) ?? [],
+        turnControls: { ...useTurnControlsStore.getState().turnControls },
       });
 
       await applyConversationTurnResult({
