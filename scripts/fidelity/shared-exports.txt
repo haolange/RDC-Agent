@@ -277,6 +277,7 @@ isAgentIconPreset
 isBuiltinProviderId
 isEffortReasoningLevel
 isLlmProviderProtocol
+isReasoningLevel
 isSafeAgentProfileId
 isTopLevelAgentId
 JsonPreview
@@ -328,6 +329,7 @@ lookupManagedModelCatalogEntry
 MAIN_STAGES
 MANAGED_PROVIDER_MODEL_CATALOG
 ManagedModelCatalogEntry
+MAX_CONTEXT_MODE_MIN_TOKENS
 MCPConnectionInfo
 MCPConnectionStatus
 MCPResponse
@@ -529,8 +531,6 @@ TraceContextRecord
 TraceEvent
 TraceEventAddedPayload
 TraceEventType
-TraceExportOptions
-TraceExportResult
 TraceNode
 TraceProjectionChangedPayload
 TraceRevisionResult

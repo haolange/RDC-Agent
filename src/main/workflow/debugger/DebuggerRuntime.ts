@@ -1,8 +1,6 @@
 import type { AgentRole } from '@shared/types/agent';
 import type { WorkflowStage, WorkflowState } from '@shared/types/workflow';
 import type {
-  TraceExportOptions,
-  TraceExportResult,
   TraceSessionResult,
   TraceBranchSwitchResult,
 } from '@shared/types/trace';
@@ -26,14 +24,6 @@ export class DebuggerRuntime {
     return {
       ...projection,
       activeBranchId: branchId,
-    };
-  }
-
-  async exportTraceSession(sessionId: string, _options?: TraceExportOptions): Promise<TraceExportResult> {
-    return {
-      success: false,
-      sessionId,
-      error: 'Trace session export is not available without an active workflow run.',
     };
   }
 

@@ -30,8 +30,4 @@ export function registerTraceHandlers(context: WorkbenchIpcContext): void {
   ipcMain.handle('trace:switchBranch', async (_event, sessionId: string, branchId: string) => {
     return debuggerRuntime.switchTraceBranch(sessionId, branchId);
   });
-
-  ipcMain.handle('trace:exportSession', async (_event, sessionId: string, options?: unknown) => {
-    return debuggerRuntime.exportTraceSession(sessionId, options as Parameters<typeof debuggerRuntime.exportTraceSession>[1]);
-  });
 }

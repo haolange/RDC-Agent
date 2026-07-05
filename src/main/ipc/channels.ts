@@ -128,7 +128,6 @@ export const IPC_HANDLER_DOMAINS = {
     'trace:getProjection',
     'trace:exportRun',
     'trace:switchBranch',
-    'trace:exportSession',
   ],
 } as const;
 

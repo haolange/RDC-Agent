@@ -87,7 +87,7 @@ import {
   describeRouteCapabilityDiagnostic,
   resolveAgentRouteCapability,
 } from '../../agent-runtime/capabilities/RouteCapabilityResolver';
-import { createTaskTools, TaskRegistry, FileTaskStore, MemoryTaskStore } from '../../agent-runtime/tasks';
+import { createTaskTools, TaskRegistry, MemoryTaskStore, createSessionTaskStore } from '../../agent-runtime/tasks';
 import {
   buildDiagnosticAgentEvent,
   mentionsTextualToolCall,
@@ -1218,11 +1218,12 @@ export class AgentOrchestrator {
 
   private createTaskRuntimeTools(): AgentTool[] {
     // subagent（sessionId 含 ::subagent:: 段）用 MemoryTaskStore，随子 context 结束回收；
-    // 顶层 agent 用 FileTaskStore 落盘。
-    const isSubagent = this.currentTurnEventSink?.sessionId?.includes('::subagent::') ?? false;
-    const store = isSubagent
+    // 顶层 agent 用会话级 FileTaskStore 落盘（workspace/.tasks/{sessionId}），供「进度」泳道按会话读取。
+    const sessionId = this.currentTurnEventSink?.sessionId ?? null;
+    const isSubagent = sessionId?.includes('::subagent::') ?? false;
+    const store = isSubagent || !sessionId
       ? new MemoryTaskStore()
-      : new FileTaskStore(path.join(storageAdapter.getWorkspacePath(), '.tasks'));
+      : createSessionTaskStore(sessionId);
     const registry = new TaskRegistry(store);
     // 桥接 task 变更为 AgentEvent，激活 ConversationService 的 task.* 投影。
     registry.onTaskChange = ({ type, task }) => {

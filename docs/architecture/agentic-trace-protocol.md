@@ -20,9 +20,20 @@ Primary contracts:
 - `RightPanelViewModel`
 - `TraceRevisionResult`
 - `TraceBranchSwitchResult`
-- `TraceExportResult`
 
 Right-panel records use `traceLaneId`.
+
+## Progress lane
+
+The right-panel Progress lane (`RightPanelViewModel.progress`) is projected from the
+session-scoped agent task registry at `workspace/.tasks/{sessionId}` (`TaskRegistry` with the
+`task_create` / `task_update` / `task_list` tools), mapped to `ProgressTask` by
+`TraceService.mapSessionProgress`. It is session-scoped rather than per-run, so it stays populated
+under the conversation-driven projection path (`buildConversationPresentation`). `current` holds
+pending / running / blocked steps; `history` holds completed steps. Agent task changes emit
+`task.created` / `task.updated`, which republish `trace:projectionChanged` and refresh the lane in
+place. Subagents keep their tasks in an in-memory store and never write to the session lane. The
+harness `task-board.json` no longer feeds this lane.
 
 ## IPC
 
@@ -33,7 +44,6 @@ Trace APIs:
 - `trace:getProjection`
 - `trace:exportRun`
 - `trace:switchBranch`
-- `trace:exportSession`
 - `trace:projectionChanged`
 
 Workflow APIs remain responsible for start/approval/revision/restart/stop actions.

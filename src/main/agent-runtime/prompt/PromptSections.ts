@@ -373,12 +373,30 @@ export const sectionContext: PromptSection = (context) => {
 };
 
 /**
+ * 任务计划段：当 task_create 可用时，指导模型用 task 工具维护结构化多步计划，
+ * 从而驱动右侧「进度」泳道实时呈现。仅在具备任务工具时输出，避免向无相关工具的 agent 描述无效指令。
+ */
+export const sectionTaskPlanning: PromptSection = (context) => {
+  if (!context.tools?.includes('task_create')) {
+    return null;
+  }
+  return [
+    `# Task Planning`,
+    `For any multi-step task, maintain a live plan with the task tools so the user can supervise progress in the Progress panel:`,
+    `- At the start, break the goal into ordered, actionable steps and create them with \`task_create\` (use \`activeForm\` for in-progress phrasing, and \`blockedBy\` for dependencies on earlier steps).`,
+    `- Keep exactly one step \`in_progress\` at a time: mark a step \`in_progress\` with \`task_update\` before starting it, and \`completed\` as soon as it is done.`,
+    `- When a step cannot proceed, leave it pending and record its blocking dependency so it surfaces as blocked.`,
+    `- Keep the plan honest and current — do not batch status changes or leave finished work unmarked. Skip this only for trivial single-step requests.`,
+  ].join('\n');
+};
+
+/**
  * 默认段落顺序。
  *
  * 顺序设计：
  * 1. 静态段落（命中 prompt cache）：
  *    identity → instructions → capabilities → tools → workspace
- *    → route → permission → catalog
+ *    → route → permission → catalog → taskPlanning
  * 2. 动态段落（随上下文变化）：memory → rules → context
  *
  * {@link PromptAssembler} 会在静态段与动态段之间插入 `DYNAMIC_BOUNDARY` 标记。
@@ -392,6 +410,7 @@ export const DEFAULT_SECTIONS: PromptSection[] = [
   sectionRouteCapability,
   sectionPermission,
   sectionCatalog,
+  sectionTaskPlanning,
   sectionMemory,
   sectionRules,
   sectionContext,

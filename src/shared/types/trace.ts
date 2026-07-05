@@ -38,6 +38,8 @@ export interface ProgressTask {
   source: 'plan' | 'runtime';
   linkedEventIds?: string[];
   blockerSummary?: string;
+  /** 进行中（running）时展示的动名词描述，用于「当前步骤」文案。 */
+  activeForm?: string;
 }
 
 export type TraceArtifactType =
@@ -170,19 +172,5 @@ export interface TraceRevisionResult extends TraceSessionResult {
 
 export interface TraceBranchSwitchResult extends TraceSessionResult {
   activeBranchId?: string;
-}
-
-export interface TraceExportOptions {
-  includeRawTrace?: boolean;
-  includeAllBranches?: boolean;
-}
-
-export interface TraceExportResult {
-  success: boolean;
-  sessionId?: string;
-  summaryPath?: string;
-  rawTracePath?: string;
-  bundlePath?: string;
-  error?: string;
 }
 

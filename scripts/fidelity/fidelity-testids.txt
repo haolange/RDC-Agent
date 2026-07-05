@@ -84,6 +84,7 @@ settings-mcp-editor
 settings-modal
 settings-model-cascade-trigger
 settings-nav-${section.id}
+settings-provider-app-managed-models
 settings-provider-connect-${provider.id}
 settings-provider-connect-api-key
 settings-provider-connect-api-key-toggle
@@ -98,6 +99,10 @@ settings-provider-connect-save
 settings-provider-connect-test
 settings-provider-disconnect-${provider.id}
 settings-provider-environment-notice
+settings-provider-model-capability-badge-${model.id}
+settings-provider-model-capability-panel-${model.id}
+settings-provider-model-capability-toggle-${model.id}
+settings-provider-model-row-${model.id}
 settings-provider-oauth-client-id
 settings-provider-oauth-client-source
 settings-provider-oauth-code
@@ -109,6 +114,7 @@ settings-provider-oauth-start
 settings-provider-oauth-summary
 settings-provider-responses-hint
 settings-provider-test-${provider.id}
+settings-provider-user-managed-models
 settings-rdx-action-${entry.id}
 settings-rdx-actions
 settings-rdx-block
@@ -120,17 +126,10 @@ sidebar-footer
 sidebar-scroll
 sidebar-user-menu
 sidebar-user-settings-trigger
-task-board
-task-board-list
-task-board-progress
-task-history
-task-history-body
-task-history-run
-task-history-toggle
 terminal-toggle
 titlebar-left-panel-toggle
 titlebar-right-panel-toggle
-trace-lane-export-actions
+trace-progress-item
 work-process
 work-process-approval
 work-process-block

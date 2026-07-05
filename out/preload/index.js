@@ -239,8 +239,7 @@ const createTraceApi = () => ({
   getEvents: (runId, afterSeq) => electron.ipcRenderer.invoke("trace:getEvents", runId, afterSeq),
   getProjection: (sessionId) => electron.ipcRenderer.invoke("trace:getProjection", sessionId),
   exportRun: (runId) => electron.ipcRenderer.invoke("trace:exportRun", runId),
-  switchBranch: (sessionId, branchId) => electron.ipcRenderer.invoke("trace:switchBranch", sessionId, branchId),
-  exportSession: (sessionId, options) => electron.ipcRenderer.invoke("trace:exportSession", sessionId, options)
+  switchBranch: (sessionId, branchId) => electron.ipcRenderer.invoke("trace:switchBranch", sessionId, branchId)
 });
 const dialogApi = createDialogApi();
 const electronAPI = {

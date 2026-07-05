@@ -28,3 +28,8 @@ export {
   createTaskListTool,
   createTaskStopTool,
 } from './TaskTools';
+
+export {
+  resolveSessionTasksDir,
+  createSessionTaskStore,
+} from './sessionTaskStore';

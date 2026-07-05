@@ -142,8 +142,6 @@ export type {
   RequestBranchGroup,
   RightPanelViewModel,
   TraceBranchSwitchResult,
-  TraceExportOptions,
-  TraceExportResult,
   TraceRevisionResult,
   TraceSessionResult,
   UserRequest,
