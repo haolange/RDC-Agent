@@ -1,44 +1,54 @@
 import React from 'react';
-import type { ModelCapabilityProfile } from '@shared/types/modelCapability';
-import type { LlmProviderModel } from '@shared/types/settings';
+import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
-import { hasActiveCapabilityOverride } from '../modelCapabilityOverrideUtils';
-import { ProviderModelCapabilityEditor } from './ProviderModelCapabilityEditor';
+import { ProviderModelCapabilitySummary } from './ProviderModelCapabilitySummary';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
 interface ProviderConnectModelRowProps {
+  provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership'>;
   model: LlmProviderModel;
   expanded: boolean;
   disabled?: boolean;
   onToggleExpanded: (modelId: string) => void;
-  onCapabilityChange: (modelId: string, capabilityOverride: ModelCapabilityProfile | undefined) => void;
   t: Translate;
 }
 
 export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = ({
+  provider,
   model,
   expanded,
   disabled = false,
   onToggleExpanded,
-  onCapabilityChange,
   t,
 }) => {
-  const overrideActive = hasActiveCapabilityOverride(model);
+  const isUnavailable = model.enabled === false;
+  const statusLabel = isUnavailable
+    ? t('settings.providers.modelUnavailable')
+    : t('settings.providers.modelAvailable');
+  const statusTitle = isUnavailable
+    ? (model.availabilityReason || t('settings.providers.modelUnavailableReason'))
+    : undefined;
 
   return (
     <div
-      className={`settings-model-row${expanded ? ' settings-model-row--expanded' : ''}`}
+      className={`settings-model-row${expanded ? ' settings-model-row--expanded' : ''}${isUnavailable ? ' settings-model-row--disabled' : ''}`}
       data-testid={`settings-provider-model-row-${model.id}`}
+      aria-disabled={isUnavailable}
     >
       <div className="settings-model-row-main">
-        <span className="settings-model-row-check">OK</span>
+        <span className="settings-model-row-check" title={statusTitle}>{statusLabel}</span>
         <span className="settings-model-row-label">{model.label}</span>
-        {overrideActive ? (
-          <span className="settings-model-capability-badge" data-testid={`settings-provider-model-capability-badge-${model.id}`}>
-            {t('settings.providers.capability.overrideActive')}
+        {isUnavailable ? (
+          <span className="settings-model-row-meta">
+            {model.availabilityReason || t('settings.providers.modelUnavailableReason')}
           </span>
         ) : null}
+        <span className="settings-model-capability-badge" data-testid={`settings-provider-model-capability-badge-${model.id}`}>
+          {provider.catalogOwnership === 'app-managed'
+            ? t('settings.providers.capability.appManagedBadge')
+            : t('settings.providers.capability.userManagedBadge')}
+        </span>
         <button
           type="button"
           className="button button-ghost button-sm settings-model-capability-toggle"
@@ -63,10 +73,9 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
         </button>
       </div>
       {expanded ? (
-        <ProviderModelCapabilityEditor
+        <ProviderModelCapabilitySummary
+          provider={provider}
           model={model}
-          disabled={disabled}
-          onChange={onCapabilityChange}
           t={t}
         />
       ) : null}

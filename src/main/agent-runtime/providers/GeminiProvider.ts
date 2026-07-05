@@ -253,7 +253,7 @@ export class GeminiProvider implements ProviderStrategy {
     if (typeof options.temperature === 'number') generationConfig.temperature = options.temperature;
     if (typeof options.topP === 'number') generationConfig.topP = options.topP;
     if (typeof options.maxTokens === 'number') generationConfig.maxOutputTokens = options.maxTokens;
-    if (options.reasoningBudget && options.reasoningBudget !== 'auto') {
+    if (options.reasoningBudget && options.reasoningBudget !== 'auto' && options.reasoningBudget !== 'off') {
       generationConfig.thinkingConfig = {
         thinkingBudget: toGeminiThinkingBudget(options.reasoningBudget),
       };
@@ -283,7 +283,7 @@ function toGeminiThinkingBudget(budget: EffortLevel): number {
       return 4096;
     case 'high':
       return 8192;
-    case 'extra':
+    case 'extHigh':
       return 16384;
     case 'max':
       return 24576;

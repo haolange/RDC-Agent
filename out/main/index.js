@@ -180,6 +180,467 @@ const RIGHT_PANEL_COLLAPSED_WIDTH = 0;
 const TERMINAL_DEFAULT_HEIGHT = 328;
 const TERMINAL_MIN_HEIGHT = 180;
 const TERMINAL_MAX_HEIGHT = 720;
+const CATALOG_UPDATED_AT = "2026-07-05";
+const EFFORT_3 = ["low", "medium", "high"];
+const EFFORT_4 = ["low", "medium", "high", "extHigh"];
+const EFFORT_5 = ["low", "medium", "high", "extHigh", "max"];
+const EFFORT_NO_EXTRA = ["low", "medium", "high", "max"];
+const REASONING_OFF = ["off"];
+const REASONING_AUTO_ONLY = ["off", "auto"];
+const OPENAI_API_SOURCE = {
+  kind: "official",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: [
+    "https://platform.openai.com/docs/models",
+    "https://platform.openai.com/docs/guides/reasoning",
+    "https://platform.openai.com/docs/guides/function-calling",
+    "https://platform.openai.com/docs/guides/structured-outputs"
+  ]
+};
+const CHATGPT_ACCOUNT_SOURCE = {
+  kind: "official",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: ["https://help.openai.com/en/articles/12003714-chatgpt-business-models-limits"]
+};
+const ANTHROPIC_SOURCE = {
+  kind: "official",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: [
+    "https://docs.anthropic.com/en/docs/about-claude/models/overview",
+    "https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking",
+    "https://docs.anthropic.com/en/docs/build-with-claude/tool-use/overview",
+    "https://docs.anthropic.com/en/docs/build-with-claude/vision"
+  ]
+};
+const GEMINI_SOURCE = {
+  kind: "official",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: [
+    "https://ai.google.dev/gemini-api/docs/models",
+    "https://ai.google.dev/gemini-api/docs/thinking",
+    "https://ai.google.dev/gemini-api/docs/function-calling",
+    "https://ai.google.dev/gemini-api/docs/structured-output"
+  ]
+};
+const XAI_SOURCE = {
+  kind: "official",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: [
+    "https://docs.x.ai/developers/models",
+    "https://docs.x.ai/developers/model-capabilities/text/reasoning",
+    "https://docs.x.ai/developers/model-capabilities/text/structured-outputs"
+  ]
+};
+const COPILOT_SOURCE = {
+  kind: "official",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: [
+    "https://docs.github.com/en/copilot/reference/ai-models/supported-models",
+    "https://docs.github.com/en/copilot/reference/ai-models/model-comparison"
+  ]
+};
+const AZURE_OPENAI_SOURCE = {
+  kind: "official",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: [
+    "https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure",
+    "https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/reasoning",
+    "https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structured-outputs"
+  ]
+};
+const BEDROCK_SOURCE = {
+  kind: "official",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: [
+    "https://docs.aws.amazon.com/bedrock/latest/userguide/model-cards-anthropic.html",
+    "https://docs.aws.amazon.com/bedrock/latest/userguide/claude-messages-extended-thinking.html",
+    "https://docs.aws.amazon.com/bedrock/latest/userguide/claude-messages-structured-outputs.html"
+  ]
+};
+const VERTEX_SOURCE = {
+  kind: "official",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: [
+    "https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models",
+    "https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference",
+    "https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/claude/structured_outputs"
+  ]
+};
+const DEEPSEEK_SOURCE = {
+  kind: "official",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: [
+    "https://api-docs.deepseek.com/guides/reasoning_model",
+    "https://api-docs.deepseek.com/quick_start/pricing"
+  ]
+};
+const QWEN_SOURCE = {
+  kind: "conservative",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: [
+    "https://help.aliyun.com/zh/model-studio/qwen-api-via-dashscope",
+    "https://help.aliyun.com/zh/model-studio/vision"
+  ],
+  note: "Public model pages do not expose a complete per-model context and effort table; profile is conservative."
+};
+const VOLCENGINE_SOURCE = {
+  kind: "conservative",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: ["https://www.volcengine.com/docs/82379/1928262"],
+  note: "Ark compatible endpoint catalog is product-specific; bundled entries are conservative coding-route candidates."
+};
+const GLM_SOURCE = {
+  kind: "conservative",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: ["https://open.bigmodel.cn/dev/api/normal-model/glm-4.5"],
+  note: "Official pages describe thinking mode, but do not provide a stable low/medium/high effort ladder."
+};
+const MINIMAX_SOURCE = {
+  kind: "conservative",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: ["https://platform.minimaxi.com/document/guides/chat-model/V2"],
+  note: "Public model catalog coverage is incomplete; profile is conservative."
+};
+const MIMO_SOURCE = {
+  kind: "official",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: [
+    "https://mimo.mi.com/docs/quick-start/summary/model",
+    "https://mimo.mi.com/models/mimo-v2.5",
+    "https://mimo.mi.com/token-plan"
+  ]
+};
+const KIMI_SOURCE = {
+  kind: "official",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: [
+    "https://platform.moonshot.ai/docs/api/chat",
+    "https://platform.moonshot.ai/docs/guide/use-kimi-k2-thinking-model"
+  ]
+};
+const KIMI_CODING_SOURCE = {
+  kind: "official",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: [
+    "https://www.kimi.com/code/docs/en/",
+    "https://www.kimi.com/code/docs/en/third-party-tools/other-coding-agents.html",
+    "https://www.kimi.com/code/docs/en/kimi-code/whats-new.html"
+  ],
+  note: "Kimi Coding Plan exposes kimi-for-coding. Thinking On routes to the current Kimi For Coding thinking model; no public Coding Plan highspeed model is exposed."
+};
+const GROQ_SOURCE = {
+  kind: "official",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: [
+    "https://console.groq.com/docs/models",
+    "https://console.groq.com/docs/structured-outputs",
+    "https://console.groq.com/docs/tool-use",
+    "https://console.groq.com/docs/vision"
+  ]
+};
+const MISTRAL_SOURCE = {
+  kind: "official",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: [
+    "https://docs.mistral.ai/models/overview",
+    "https://docs.mistral.ai/capabilities/function_calling/",
+    "https://docs.mistral.ai/capabilities/structured-output/",
+    "https://docs.mistral.ai/capabilities/vision/"
+  ]
+};
+const CEREBRAS_SOURCE = {
+  kind: "conservative",
+  updatedAt: CATALOG_UPDATED_AT,
+  urls: ["https://inference-docs.cerebras.ai/"],
+  note: "Official inference docs are latency-focused; model capability table is conservative."
+};
+const TOOLS_ONLY = {
+  toolCalling: true,
+  visionInput: false,
+  structuredOutput: true
+};
+const MULTIMODAL_TOOLS = {
+  toolCalling: true,
+  visionInput: true,
+  structuredOutput: true
+};
+function buildReasoningProfile(nominalContextWindowTokens, adjustableLevels, toolProfile) {
+  const reasoningMode = adjustableLevels.length > 0 ? "effort-levels" : "none";
+  const supportedReasoningLevels = adjustableLevels.length > 0 ? [...REASONING_AUTO_ONLY, ...adjustableLevels] : REASONING_OFF;
+  const defaultReasoningLevel = adjustableLevels.length > 0 ? "auto" : "off";
+  return {
+    ...nominalContextWindowTokens ? { nominalContextWindowTokens } : {},
+    reasoningMode,
+    supportedReasoningLevels,
+    defaultReasoningLevel,
+    ...toolProfile
+  };
+}
+const textOnly = (nominalContextWindowTokens, adjustableLevels = []) => buildReasoningProfile(nominalContextWindowTokens, adjustableLevels, TOOLS_ONLY);
+const multimodal = (nominalContextWindowTokens, adjustableLevels = []) => buildReasoningProfile(nominalContextWindowTokens, adjustableLevels, MULTIMODAL_TOOLS);
+function buildAutoOnlyProfile(nominalContextWindowTokens, toolProfile, supportedReasoningLevels = REASONING_AUTO_ONLY) {
+  return {
+    ...nominalContextWindowTokens ? { nominalContextWindowTokens } : {},
+    reasoningMode: "auto-only",
+    supportedReasoningLevels,
+    defaultReasoningLevel: "auto",
+    ...toolProfile
+  };
+}
+const autoOnlyText = (nominalContextWindowTokens, supportedReasoningLevels = REASONING_AUTO_ONLY) => buildAutoOnlyProfile(nominalContextWindowTokens, TOOLS_ONLY, supportedReasoningLevels);
+const autoOnlyMultimodal = (nominalContextWindowTokens, supportedReasoningLevels = REASONING_AUTO_ONLY) => buildAutoOnlyProfile(nominalContextWindowTokens, MULTIMODAL_TOOLS, supportedReasoningLevels);
+const openSourceText = (nominalContextWindowTokens) => ({
+  ...nominalContextWindowTokens ? { nominalContextWindowTokens } : {},
+  reasoningMode: "none",
+  supportedReasoningLevels: REASONING_OFF,
+  defaultReasoningLevel: "off",
+  toolCalling: true,
+  visionInput: false,
+  structuredOutput: true
+});
+const model = (id, profile, source, options = {}) => ({
+  id,
+  ...options,
+  profile,
+  source
+});
+const gpt55Api = multimodal(105e4, EFFORT_NO_EXTRA);
+const gpt54Api = multimodal(105e4, EFFORT_NO_EXTRA);
+const gptMiniApi = multimodal(4e5, EFFORT_3);
+const gptCodex = textOnly(4e5, EFFORT_4);
+const gpt41 = multimodal(1047576, []);
+const chatGptAccountModels = [
+  model("gpt-5.5-instant", { ...multimodal(128e3, []), fastVariantModelId: "gpt-5.5-instant" }, CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Instant" }),
+  model("gpt-5.5-thinking", multimodal(128e3, EFFORT_4), CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Thinking" }),
+  model("gpt-5.5-pro", multimodal(272e3, EFFORT_4), CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Pro" })
+];
+const openAiApiModels = [
+  model("gpt-5.5", gpt55Api, OPENAI_API_SOURCE),
+  model("gpt-5.4", gpt54Api, OPENAI_API_SOURCE),
+  model("gpt-5.4-mini", gptMiniApi, OPENAI_API_SOURCE),
+  model("gpt-5.4-nano", gptMiniApi, OPENAI_API_SOURCE),
+  model("gpt-5.3-codex", gptCodex, OPENAI_API_SOURCE),
+  model("gpt-5.2-codex", gptCodex, OPENAI_API_SOURCE),
+  model("gpt-4.1", gpt41, OPENAI_API_SOURCE)
+];
+const claudeApiModels = [
+  model("claude-fable-5", multimodal(1e6, EFFORT_3), ANTHROPIC_SOURCE),
+  model("claude-sonnet-5", multimodal(1e6, EFFORT_3), ANTHROPIC_SOURCE),
+  model("claude-opus-4-8", multimodal(1e6, EFFORT_3), ANTHROPIC_SOURCE),
+  model("claude-haiku-4-5-20251001", multimodal(2e5, EFFORT_3), ANTHROPIC_SOURCE, {
+    aliases: ["claude-haiku-4-5"]
+  })
+];
+const geminiModels = [
+  model("gemini-3.5-flash", multimodal(1048576, EFFORT_3), GEMINI_SOURCE),
+  model("gemini-3.1-pro-preview", multimodal(1048576, EFFORT_3), GEMINI_SOURCE),
+  model("gemini-2.5-pro", multimodal(1048576, EFFORT_3), GEMINI_SOURCE, {
+    aliases: ["gemini-pro"]
+  }),
+  model("gemini-2.5-flash", multimodal(1048576, EFFORT_3), GEMINI_SOURCE)
+];
+const grokModels = [
+  model("grok-4.3", multimodal(1e6, EFFORT_3), XAI_SOURCE),
+  model("grok-build-0.1", textOnly(256e3, EFFORT_3), XAI_SOURCE),
+  model("grok-code-fast-1", textOnly(256e3, []), XAI_SOURCE)
+];
+const copilotModels = [
+  model("gpt-5.5", gpt55Api, COPILOT_SOURCE),
+  model("gpt-5.3-codex", gptCodex, COPILOT_SOURCE),
+  model("claude-sonnet-5", multimodal(1e6, EFFORT_3), COPILOT_SOURCE),
+  model("claude-opus-4-8", {
+    ...multimodal(1e6, EFFORT_3),
+    fastVariantModelId: "claude-opus-4-8-fast"
+  }, COPILOT_SOURCE),
+  model("claude-opus-4-8-fast", multimodal(1e6, EFFORT_3), COPILOT_SOURCE),
+  model("gemini-3.1-pro-preview", multimodal(1048576, EFFORT_3), COPILOT_SOURCE),
+  model("gemini-3.5-flash", multimodal(1048576, EFFORT_3), COPILOT_SOURCE)
+];
+const qwenModels = [
+  model("qwen-turbo", autoOnlyText(131072), QWEN_SOURCE),
+  model("qwen-plus", autoOnlyText(131072), QWEN_SOURCE),
+  model("qwen-max", autoOnlyText(131072), QWEN_SOURCE),
+  model("qwen-flash", autoOnlyText(131072), QWEN_SOURCE),
+  model("qwen-vl-max", autoOnlyMultimodal(131072), QWEN_SOURCE)
+];
+const qwenCodingPlanModels = [
+  model("qwen3-coder-plus", autoOnlyText(131072), QWEN_SOURCE),
+  model("qwen3-coder-next", autoOnlyText(131072), QWEN_SOURCE),
+  model("qwen3.6-plus", autoOnlyText(131072), QWEN_SOURCE)
+];
+const deepSeekModels = [
+  model("deepseek-v4-pro", textOnly(1e6, EFFORT_NO_EXTRA), DEEPSEEK_SOURCE, {
+    aliases: ["deepseek-reasoner"]
+  }),
+  model("deepseek-v4-flash", textOnly(131072, []), DEEPSEEK_SOURCE, {
+    aliases: ["deepseek-chat"]
+  })
+];
+const kimiApiModels = [
+  model("kimi-k2.7-code", {
+    ...autoOnlyText(262144, ["auto"]),
+    fastVariantModelId: "kimi-k2.7-code-highspeed"
+  }, KIMI_SOURCE),
+  model("kimi-k2.7-code-highspeed", autoOnlyText(262144, ["auto"]), KIMI_SOURCE),
+  model("kimi-k2.6", autoOnlyMultimodal(262144), KIMI_SOURCE),
+  model("kimi-k2.5", textOnly(262144, []), KIMI_SOURCE)
+];
+const kimiCodingPlanModels = [
+  model("kimi-for-coding", {
+    ...textOnly(262144, []),
+    reasoningMode: "auto-only",
+    supportedReasoningLevels: REASONING_AUTO_ONLY,
+    defaultReasoningLevel: "auto"
+  }, KIMI_CODING_SOURCE)
+];
+const glmModels = [
+  model("glm-5", autoOnlyText(131072), GLM_SOURCE),
+  model("glm-4.7", autoOnlyText(131072), GLM_SOURCE),
+  model("glm-4.6", autoOnlyText(131072), GLM_SOURCE),
+  model("glm-4.5", autoOnlyText(131072), GLM_SOURCE)
+];
+const minimaxModels = [
+  model("MiniMax-M2.7", autoOnlyText(131072), MINIMAX_SOURCE)
+];
+const mimoModels = [
+  model("mimo-v2.5-pro", autoOnlyMultimodal(1e6), MIMO_SOURCE)
+];
+const doubaoModels = [
+  model("doubao-seed-2.1-pro", autoOnlyText(131072), VOLCENGINE_SOURCE),
+  model("doubao-seed-2.1-turbo", autoOnlyText(131072), VOLCENGINE_SOURCE)
+];
+const groqModels = [
+  model("moonshotai/kimi-k2-instruct-0905", openSourceText(262144), GROQ_SOURCE),
+  model("meta-llama/llama-4-maverick-17b-128e-instruct", {
+    ...openSourceText(131072),
+    visionInput: true
+  }, GROQ_SOURCE),
+  model("openai/gpt-oss-120b", openSourceText(131072), GROQ_SOURCE),
+  model("llama-3.3-70b-versatile", openSourceText(131072), GROQ_SOURCE)
+];
+const mistralModels = [
+  model("mistral-small-3.2-25-06", multimodal(131072, []), MISTRAL_SOURCE),
+  model("mistral-large-latest", multimodal(131072, []), MISTRAL_SOURCE),
+  model("codestral-latest", textOnly(262144, []), MISTRAL_SOURCE)
+];
+const cerebrasModels = [
+  model("llama-4-scout-17b-16e-instruct", openSourceText(131072), CEREBRAS_SOURCE),
+  model("qwen-3-coder-480b", openSourceText(131072), CEREBRAS_SOURCE),
+  model("gpt-oss-120b", openSourceText(131072), CEREBRAS_SOURCE)
+];
+const bedrockClaudeModels = [
+  model("anthropic.claude-fable-5", multimodal(1e6, EFFORT_5), BEDROCK_SOURCE),
+  model("anthropic.claude-sonnet-5", multimodal(1e6, EFFORT_5), BEDROCK_SOURCE),
+  model("anthropic.claude-opus-4-8", multimodal(1e6, EFFORT_5), BEDROCK_SOURCE),
+  model("anthropic.claude-haiku-4-5-20251001-v1:0", multimodal(2e5, EFFORT_3), BEDROCK_SOURCE)
+];
+const vertexModels = [
+  model("claude-fable-5", multimodal(1e6, EFFORT_5), VERTEX_SOURCE),
+  model("claude-sonnet-5", multimodal(1e6, EFFORT_5), VERTEX_SOURCE),
+  model("claude-opus-4-8", multimodal(1e6, EFFORT_5), VERTEX_SOURCE),
+  model("claude-haiku-4-5@20251001", multimodal(2e5, EFFORT_3), VERTEX_SOURCE),
+  model("gemini-3.1-pro-preview", multimodal(1048576, EFFORT_4), VERTEX_SOURCE),
+  model("gemini-2.5-flash", multimodal(1048576, EFFORT_3), VERTEX_SOURCE)
+];
+const MANAGED_PROVIDER_MODEL_CATALOG = {
+  "chatgpt-account": chatGptAccountModels,
+  "claude-account": claudeApiModels,
+  "github-copilot": copilotModels,
+  "grok-account": grokModels,
+  "gemini-account": geminiModels,
+  "qwen-account": qwenModels,
+  openai: openAiApiModels,
+  "openai-eu": openAiApiModels,
+  "openai-us": openAiApiModels,
+  anthropic: claudeApiModels,
+  "google-ai-studio": geminiModels,
+  "azure-openai": [
+    model("gpt-5.5", gpt55Api, AZURE_OPENAI_SOURCE),
+    model("gpt-5.4", gpt54Api, AZURE_OPENAI_SOURCE),
+    model("gpt-5.4-mini", gptMiniApi, AZURE_OPENAI_SOURCE),
+    model("gpt-4.1", gpt41, AZURE_OPENAI_SOURCE)
+  ],
+  bedrock: bedrockClaudeModels,
+  vertex: vertexModels,
+  deepseek: deepSeekModels,
+  bailian: qwenModels,
+  qwen: qwenModels,
+  volcengine: [
+    ...doubaoModels,
+    ...glmModels,
+    ...deepSeekModels.filter((entry) => entry.id === "deepseek-v4-pro"),
+    ...kimiApiModels.filter((entry) => entry.id === "kimi-k2.5")
+  ],
+  "glm-cn": glmModels,
+  "glm-global": glmModels,
+  "minimax-cn": minimaxModels,
+  "minimax-global": minimaxModels,
+  "xiaomi-mimo": mimoModels,
+  moonshot: kimiApiModels,
+  xai: grokModels,
+  groq: groqModels,
+  mistral: mistralModels,
+  cerebras: cerebrasModels,
+  "kimi-coding-plan": kimiCodingPlanModels,
+  "bailian-coding-plan": [
+    ...qwenCodingPlanModels,
+    ...kimiApiModels.filter((entry) => entry.id === "kimi-k2.5"),
+    ...glmModels.filter((entry) => entry.id === "glm-5" || entry.id === "glm-4.7")
+  ],
+  "volcengine-coding-plan": [
+    ...doubaoModels,
+    ...glmModels.filter((entry) => entry.id === "glm-4.6"),
+    ...deepSeekModels.filter((entry) => entry.id === "deepseek-v4-pro"),
+    ...kimiApiModels.filter((entry) => entry.id === "kimi-k2.5")
+  ],
+  "glm-cn-coding-plan": glmModels,
+  "glm-global-coding-plan": glmModels,
+  "minimax-cn-coding-plan": minimaxModels,
+  "minimax-global-coding-plan": minimaxModels,
+  "xiaomi-mimo-token-plan": mimoModels
+};
+const normalizeId = (value) => value.trim().toLowerCase();
+function getManagedProviderModelCatalog(providerId) {
+  const entries = MANAGED_PROVIDER_MODEL_CATALOG[providerId] ?? [];
+  return entries.map((entry) => ({
+    ...entry,
+    aliases: entry.aliases ? [...entry.aliases] : void 0,
+    profile: {
+      ...entry.profile,
+      supportedReasoningLevels: entry.profile.supportedReasoningLevels ? [...entry.profile.supportedReasoningLevels] : void 0
+    },
+    source: {
+      ...entry.source,
+      urls: [...entry.source.urls]
+    }
+  }));
+}
+function getManagedProviderModelIds(providerId) {
+  return getManagedProviderModelCatalog(providerId).map((entry) => entry.id);
+}
+function getManagedProviderModels(providerId) {
+  return getManagedProviderModelCatalog(providerId).map((entry) => ({
+    id: entry.id,
+    label: entry.label ?? entry.id,
+    enabled: true,
+    availability: "unknown"
+  }));
+}
+function lookupManagedModelCatalogEntry(providerId, modelId) {
+  const normalizedModelId = normalizeId(modelId);
+  for (const entry of getManagedProviderModelCatalog(providerId)) {
+    if (normalizeId(entry.id) === normalizedModelId) {
+      return entry;
+    }
+    if (entry.aliases?.some((alias) => normalizeId(alias) === normalizedModelId)) {
+      return entry;
+    }
+  }
+  return null;
+}
+function lookupManagedModelCapabilityProfile(providerId, modelId) {
+  return lookupManagedModelCatalogEntry(providerId, modelId)?.profile ?? null;
+}
 const SUPER_GROK_OAUTH_CALLBACK_PORT = 1456;
 const SUPER_GROK_OAUTH_REDIRECT_URI = `http://localhost:${SUPER_GROK_OAUTH_CALLBACK_PORT}/oauth/grok/callback`;
 const LLM_PROVIDER_CATEGORY_DEFINITIONS = [
@@ -319,9 +780,10 @@ const GEMINI_ACCOUNT_MODELS = [
   "gemini-2.0-flash"
 ];
 const QWEN_ACCOUNT_MODELS = [
+  "qwen-turbo",
   "qwen-plus",
   "qwen-max",
-  "qwen3-coder-plus"
+  "qwen-vl-max"
 ];
 const OPENAI_CODE_MODELS = ["gpt-5.2", "gpt-4.1", "gpt-5-mini"];
 const CAPS_OPENAI_COMPATIBLE = ["chat", "tool-calling", "model-discovery"];
@@ -336,6 +798,16 @@ const CAPS_XAI = ["chat", "tool-calling", "vision-input", "model-discovery"];
 const CAPS_STATIC_CLOUD = ["chat"];
 const OPENAI_RESPONSES_OPTIONS = ["OpenAICompatibleChatCompletions", "OpenAIResponses"];
 const LOCAL_PROTOCOL_OPTIONS = ["OllamaOpenAICompatibleChatCompletions", "OpenAIResponses"];
+const APP_MANAGED_PROVIDER_CATEGORIES = /* @__PURE__ */ new Set([
+  "login-authorization",
+  "official-direct",
+  "cloud-platform",
+  "official-compatible",
+  "coding-token-plan"
+]);
+function getProviderCatalogOwnership(category) {
+  return APP_MANAGED_PROVIDER_CATEGORIES.has(category) ? "app-managed" : "user-managed";
+}
 const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
   {
     id: "claude-account",
@@ -528,7 +1000,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     category: "official-compatible",
     modelDiscovery: null,
     label: "Alibaba Cloud Bailian",
-    recommendedModels: ["qwen3.6-plus", "qwen3-coder-next", "qwen3-coder-plus"],
+    recommendedModels: ["qwen-turbo", "qwen-plus", "qwen-max", "qwen-vl-max"],
     docsUrl: "https://bailian.console.aliyun.com/",
     unavailableReason: "The general Bailian API endpoint is not pinned in this catalog. Use Qwen / DashScope or Bailian Coding Plan until a stable official endpoint is configured.",
     capabilities: CAPS_ANTHROPIC
@@ -541,7 +1013,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     modelDiscovery: "openai-compatible",
     label: "Qwen / DashScope",
     baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-    recommendedModels: ["qwen-plus", "qwen-max"],
+    recommendedModels: ["qwen-turbo", "qwen-plus", "qwen-max", "qwen-flash", "qwen-vl-max"],
     docsUrl: "https://dashscope.console.aliyun.com/apiKey",
     capabilities: CAPS_OPENAI_COMPATIBLE
   },
@@ -552,7 +1024,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     category: "official-compatible",
     modelDiscovery: null,
     label: "Volcengine Ark (Doubao)",
-    recommendedModels: ["doubao-seed-1-6", "glm-4.6", "deepseek-v4-pro", "kimi-k2.5"],
+    recommendedModels: ["doubao-seed-2.1-pro", "doubao-seed-2.1-turbo", "glm-4.6", "deepseek-v4-pro", "kimi-k2.5"],
     docsUrl: "https://www.volcengine.com/docs/82379/1928262",
     unavailableReason: "The general Volcengine Ark API endpoint is not pinned in this catalog. Use Volcengine Ark Coding Plan until a stable official endpoint is configured.",
     capabilities: CAPS_OPENAI_COMPATIBLE
@@ -709,7 +1181,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     modelDiscovery: "anthropic-candidate-validation",
     label: "Volcengine Ark Coding Plan",
     baseUrl: "https://ark.cn-beijing.volces.com/api/coding",
-    recommendedModels: ["doubao-seed-1-6", "glm-4.6", "deepseek-v4-pro", "kimi-k2.5"],
+    recommendedModels: ["doubao-seed-2.1-pro", "doubao-seed-2.1-turbo", "glm-4.6", "deepseek-v4-pro", "kimi-k2.5"],
     docsUrl: "https://www.volcengine.com/docs/82379/1928262",
     capabilities: CAPS_ANTHROPIC
   },
@@ -908,6 +1380,13 @@ function isBuiltinProviderId(id) {
 function getBuiltinProviderDefinition(id) {
   return BUILTIN_LLM_PROVIDER_DEFINITIONS.find((entry) => entry.id === id) ?? null;
 }
+function getBuiltinProviderCatalogOwnership(id) {
+  const definition = getBuiltinProviderDefinition(id);
+  if (!definition) {
+    return "user-managed";
+  }
+  return definition.catalogOwnership ?? getProviderCatalogOwnership(definition.category);
+}
 function isLlmProviderProtocol(value) {
   return typeof value === "string" && LLM_PROVIDER_PROTOCOL_DEFINITIONS.some((entry) => entry.id === value);
 }
@@ -939,12 +1418,16 @@ const createBuiltinProviderEntry = (id) => {
   if (!definition) {
     throw new Error(`Unknown builtin provider: ${id}`);
   }
+  const catalogOwnership = getBuiltinProviderCatalogOwnership(definition.id);
+  const managedModels = catalogOwnership === "app-managed" ? getManagedProviderModels(definition.id) : [];
+  const recommendedModels = managedModels.length > 0 ? managedModels.map((entry) => entry.id) : [...definition.recommendedModels];
   const status = definition.unavailableReason ? "unavailable" : "unconfigured";
   return {
     id: definition.id,
     protocol: definition.protocol,
     authMode: definition.authMode,
     category: definition.category,
+    catalogOwnership,
     modelDiscovery: definition.modelDiscovery,
     label: definition.label,
     enabled: false,
@@ -954,8 +1437,8 @@ const createBuiltinProviderEntry = (id) => {
     baseUrlEditable: definition.baseUrlEditable,
     protocolEditable: definition.protocolEditable,
     protocolOptions: getBuiltinProviderProtocolOptions(definition.id),
-    models: definition.modelDiscovery === "static" && definition.authMode === "environment" ? toModels(definition.recommendedModels) : toModels([]),
-    recommendedModels: definition.recommendedModels,
+    models: managedModels.length > 0 ? managedModels : definition.modelDiscovery === "static" && definition.authMode === "environment" ? toModels(definition.recommendedModels) : toModels([]),
+    recommendedModels,
     docsUrl: definition.docsUrl,
     status,
     accountLoginConfigured: definition.accountLoginConfigured,
@@ -1378,7 +1861,7 @@ ${definition.instructions.trim()}
 };
 const createSeedDefinition = (agentId, routes) => {
   const route = routes.find((entry) => entry.agentId === agentId);
-  const model = canonicalAgentModelId(route?.providerId ?? "", route?.modelId ?? "");
+  const model2 = canonicalAgentModelId(route?.providerId ?? "", route?.modelId ?? "");
   const name = AGENT_DISPLAY_NAMES[agentId];
   const tools = agentId === "ask" ? ["read", "search", "web", "askUser"] : agentId === "plan" ? ["read", "search", "web", "askUser", "agent", "todo", "memory", "planArtifact", "handoff"] : agentId === "edit" ? ["read", "search", "web", "bash", "write", "edit", "askUser", "agent", "todo", "memory", "skill", "mcp"] : ["read", "search", "web", "bash", "askUser", "agent", "todo", "memory", "rdxContext"];
   return {
@@ -1388,7 +1871,7 @@ const createSeedDefinition = (agentId, routes) => {
     description: AGENT_DESCRIPTIONS[agentId],
     argumentHint: agentId === "ask" ? "Ask about the current project, capture, or workflow" : "Describe the RenderDoc/RDC investigation goal",
     target: "rdc-agent",
-    models: model ? [model] : [],
+    models: model2 ? [model2] : [],
     icon: AGENT_MODE_MAP[agentId]?.icon ?? "message-orbit",
     disableModelInvocation: false,
     userInvocable: true,
@@ -1491,8 +1974,8 @@ class AgentManifestService {
         continue;
       }
       routeAgentIds.add(definition.id);
-      const model = definition.models.map(splitCanonicalAgentModelId).find((entry) => entry !== null);
-      if (!model) {
+      const model2 = definition.models.map(splitCanonicalAgentModelId).find((entry) => entry !== null);
+      if (!model2) {
         routeMap.set(definition.id, {
           agentId: definition.id,
           providerId: "",
@@ -1500,8 +1983,8 @@ class AgentManifestService {
         });
         continue;
       }
-      const provider = providers.find((entry) => entry.id === model.providerId);
-      const modelEnabled = provider?.enabled && provider.isConfigured && provider.models.some((entry) => entry.id === model.modelId && entry.enabled !== false);
+      const provider = providers.find((entry) => entry.id === model2.providerId);
+      const modelEnabled = provider?.enabled && provider.isConfigured && provider.models.some((entry) => entry.id === model2.modelId && entry.enabled !== false);
       if (!modelEnabled) {
         routeMap.set(definition.id, {
           agentId: definition.id,
@@ -1512,8 +1995,8 @@ class AgentManifestService {
       }
       routeMap.set(definition.id, {
         agentId: definition.id,
-        providerId: model.providerId,
-        modelId: model.modelId
+        providerId: model2.providerId,
+        modelId: model2.modelId
       });
     }
     return Array.from(routeAgentIds).map((agentId) => routeMap.get(agentId) ?? {
@@ -1523,14 +2006,14 @@ class AgentManifestService {
     });
   }
   getModelOptions(providers) {
-    return providers.flatMap((provider) => provider.models.map((model) => ({
-      canonicalId: canonicalAgentModelId(provider.id, model.id),
+    return providers.flatMap((provider) => provider.models.map((model2) => ({
+      canonicalId: canonicalAgentModelId(provider.id, model2.id),
       providerId: provider.id,
       providerLabel: provider.label,
-      modelId: model.id,
-      modelLabel: model.label || model.id,
-      configured: provider.enabled && provider.isConfigured && model.enabled !== false,
-      status: !provider.enabled || !provider.isConfigured ? "provider-unavailable" : model.enabled === false ? "model-disabled" : "ready"
+      modelId: model2.id,
+      modelLabel: model2.label || model2.id,
+      configured: provider.enabled && provider.isConfigured && model2.enabled !== false,
+      status: !provider.enabled || !provider.isConfigured ? "provider-unavailable" : model2.enabled === false ? "model-disabled" : "ready"
     })));
   }
   readGlobalInstructions(paths) {
@@ -1850,14 +2333,14 @@ function isCopilotChatCompletionsUnsupportedModel(modelId) {
   return /^gpt-5\.[3-9](?:-|$)/.test(normalized) || /^gpt-5\.[0-9]+-codex(?:-|$)/.test(normalized);
 }
 function isEnabledModel(provider, modelId) {
-  return provider.models.some((model) => model.enabled !== false && model.id === modelId);
+  return provider.models.some((model2) => model2.enabled !== false && model2.id === modelId);
 }
 function resolveCopilotFallbackModel(routes, provider, agentId) {
   const debuggerRoute = routes.find((entry) => entry.agentId === "debugger");
   const candidates = [
     ...agentId !== "debugger" && debuggerRoute?.providerId === provider.id ? [debuggerRoute.modelId] : [],
     ...COPILOT_CHAT_COMPLETIONS_FALLBACK_MODELS,
-    ...provider.models.map((model) => model.id)
+    ...provider.models.map((model2) => model2.id)
   ];
   for (const modelId of candidates) {
     if (modelId && !isCopilotChatCompletionsUnsupportedModel(modelId) && isEnabledModel(provider, modelId)) {
@@ -2059,7 +2542,7 @@ ${stagePolicy.systemPrompt}` : ""
     if (!resolution.route || !resolution.provider) {
       return null;
     }
-    const modelExists = resolution.provider.models.some((model) => model.enabled && model.id === resolution.route?.modelId);
+    const modelExists = resolution.provider.models.some((model2) => model2.enabled && model2.id === resolution.route?.modelId);
     return modelExists ? resolution.route : null;
   }
   readJson(filePath) {
@@ -2077,16 +2560,19 @@ ${stagePolicy.systemPrompt}` : ""
 const executionProfileService = new ExecutionProfileService();
 const categoryRank = new Map(LLM_PROVIDER_CATEGORY_DEFINITIONS.map((entry, index) => [entry.id, index]));
 function toCatalogEntry(provider) {
+  const catalogOwnership = getBuiltinProviderCatalogOwnership(provider.id);
+  const managedModelIds = catalogOwnership === "app-managed" ? getManagedProviderModelIds(provider.id) : [];
   return {
     id: provider.id,
     protocol: provider.protocol,
     authMode: provider.authMode,
     category: provider.category,
+    catalogOwnership,
     label: provider.label,
     baseUrlEditable: provider.baseUrlEditable,
     protocolEditable: provider.protocolEditable,
     protocolOptions: provider.protocolOptions ? [...provider.protocolOptions] : void 0,
-    recommendedModels: [...provider.recommendedModels],
+    recommendedModels: managedModelIds.length > 0 ? managedModelIds : [...provider.recommendedModels],
     docsUrl: provider.docsUrl,
     accountLoginConfigured: provider.accountLoginConfigured,
     unavailableReason: provider.unavailableReason,
@@ -2623,14 +3109,33 @@ function sanitizeModels(models) {
     if (!modelId || modelMap.has(modelId)) {
       continue;
     }
+    const availability = candidate.availability === "available" || candidate.availability === "unavailable" || candidate.availability === "unknown" ? candidate.availability : void 0;
     modelMap.set(modelId, {
       id: modelId,
       label: typeof candidate.label === "string" && candidate.label.trim() ? candidate.label.trim() : modelId,
       enabled: candidate.enabled !== false,
-      contextWindowTokens: typeof candidate.contextWindowTokens === "number" && Number.isFinite(candidate.contextWindowTokens) ? Math.max(0, Math.round(candidate.contextWindowTokens)) : null
+      availability,
+      availabilityReason: typeof candidate.availabilityReason === "string" && candidate.availabilityReason.trim() ? candidate.availabilityReason.trim() : void 0
     });
   }
   return Array.from(modelMap.values());
+}
+function applyModelEnabledState(catalogModels, persistedModels) {
+  const persistedById = new Map(persistedModels.map((model2) => [model2.id, model2]));
+  return catalogModels.map((model2) => ({
+    ...model2,
+    enabled: persistedById.get(model2.id)?.enabled ?? true,
+    availability: persistedById.get(model2.id)?.availability ?? model2.availability,
+    availabilityReason: persistedById.get(model2.id)?.availabilityReason
+  }));
+}
+function resolveProviderModels(providerId, persistedModels) {
+  const sanitized = sanitizeModels(persistedModels);
+  if (getBuiltinProviderCatalogOwnership(providerId) !== "app-managed") {
+    return sanitized;
+  }
+  const catalogModels = getManagedProviderModels(providerId);
+  return catalogModels.length > 0 ? applyModelEnabledState(catalogModels, sanitized) : sanitized;
 }
 function createEmptyAgentRoutes() {
   return Object.keys(DEFAULT_MODEL_ROUTING).map((agentId) => ({
@@ -2707,13 +3212,14 @@ function sanitizeRoute(entry) {
   };
 }
 function pickProviderStatus(provider, fallback, canUseProvider, models) {
+  const hasEnabledModels = models.some((model2) => model2.enabled !== false);
   if (fallback.status === "unavailable") {
     return "unavailable";
   }
   if (provider.status === "failed") {
     return "failed";
   }
-  if ((provider.status === "verified" || provider.isConfigured === true) && canUseProvider && models.length > 0) {
+  if ((provider.status === "verified" || provider.isConfigured === true) && canUseProvider && hasEnabledModels) {
     return "verified";
   }
   return "unconfigured";
@@ -2744,13 +3250,15 @@ function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorksp
   const incomingSecretRef = typeof provider.secretRef === "string" && provider.secretRef.trim() ? provider.secretRef.trim() : void 0;
   const secretRef = incomingId && incomingId !== rawId ? secretStorageService.createProviderSecretRef(rawId) : incomingSecretRef || secretStorageService.createProviderSecretRef(rawId);
   const protocol = normalizeProviderProtocol({ ...provider, id: rawId });
-  const models = sanitizeModels(provider.models ?? []);
+  const catalogOwnership = getBuiltinProviderCatalogOwnership(rawId);
+  const models = resolveProviderModels(rawId, provider.models ?? []);
   const oauthSecretRef = secretStorageService.createProviderOAuthSecretRef(rawId);
   const resolvedSecret = builtinFallback.authMode === "api-key" ? getResolvedProviderSecret(rawId, secretRef, workspaceRoot) : builtinFallback.authMode === "account" ? secretStorageService.getSecret(oauthSecretRef, workspaceRoot) : "";
   const hasStoredSecret = builtinFallback.hasStoredSecret || Boolean(resolvedSecret);
   const canUseProvider = builtinFallback.status !== "unavailable" && (builtinFallback.authMode === "local" || builtinFallback.authMode === "environment" ? true : Boolean(resolvedSecret));
   const status = pickProviderStatus(provider, builtinFallback, canUseProvider, models);
-  const enabled = status === "verified" && models.length > 0;
+  const hasEnabledModels = models.some((model2) => model2.enabled !== false);
+  const enabled = status === "verified" && hasEnabledModels;
   const label = builtinFallback.label;
   const recommendedModels = builtinFallback.recommendedModels;
   const docsUrl = builtinFallback.docsUrl;
@@ -2759,6 +3267,7 @@ function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorksp
     protocol,
     authMode: builtinFallback.authMode,
     category: normalizeProviderCategory({ ...provider, id: rawId, authMode: builtinFallback.authMode }),
+    catalogOwnership,
     modelDiscovery: builtinFallback.modelDiscovery,
     label,
     enabled,
@@ -2782,7 +3291,7 @@ function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorksp
     oauthExpiresAt: typeof provider.oauthExpiresAt === "string" ? provider.oauthExpiresAt : void 0,
     oauthRefreshAvailable: typeof provider.oauthRefreshAvailable === "boolean" ? provider.oauthRefreshAvailable : void 0,
     unavailableReason: definition?.unavailableReason,
-    isConfigured: status === "verified" && models.length > 0 && enabled,
+    isConfigured: status === "verified" && hasEnabledModels && enabled,
     capabilities: definition?.capabilities ? [...definition.capabilities] : void 0
   };
 }
@@ -2805,8 +3314,9 @@ function hydrateProviderSecrets(providers, workspaceRoot) {
     const resolvedSecret = provider.authMode === "api-key" ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot) : provider.authMode === "account" ? secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(provider.id), workspaceRoot) : "";
     const hasStoredSecret = provider.authMode === "local" || provider.authMode === "environment" || Boolean(resolvedSecret);
     const canUseProvider = provider.authMode === "local" || provider.authMode === "environment" ? true : provider.authMode === "api-key" ? Boolean(resolvedSecret) : Boolean(resolvedSecret);
-    const status = provider.status === "unavailable" ? "unavailable" : provider.status === "verified" && canUseProvider && provider.models.length > 0 ? "verified" : provider.status === "failed" ? "failed" : "unconfigured";
-    const isConfigured = status === "verified" && provider.models.length > 0;
+    const hasEnabledModels = provider.models.some((model2) => model2.enabled !== false);
+    const status = provider.status === "unavailable" ? "unavailable" : provider.status === "verified" && canUseProvider && hasEnabledModels ? "verified" : provider.status === "failed" ? "failed" : "unconfigured";
+    const isConfigured = status === "verified" && hasEnabledModels;
     return {
       ...provider,
       // The renderer only needs to know whether a secret exists.
@@ -2836,7 +3346,7 @@ function normalizeUserRoutes(routes, providers) {
     }
     const provider = providers.find((entry) => entry.id === incoming.providerId);
     const isValid = Boolean(
-      provider && provider.isConfigured && provider.models.some((model) => model.id === incoming.modelId && model.enabled !== false)
+      provider && provider.isConfigured && provider.models.some((model2) => model2.id === incoming.modelId && model2.enabled !== false)
     );
     if (!isValid) {
       routeMap.set(agentId, { agentId, providerId: "", modelId: "" });
@@ -3251,25 +3761,26 @@ class SettingsService {
     if (!provider || !isBuiltinProviderId(provider.id)) {
       throw new Error(`Unknown provider: ${providerId}`);
     }
-    const discoveredModels = sanitizeModels(models);
+    const discoveredModels = resolveProviderModels(provider.id, models);
     if (discoveredModels.length === 0) {
       throw new Error("该 Provider 暂未返回可用模型");
     }
+    const hasEnabledModels = discoveredModels.some((model2) => model2.enabled !== false);
     const protocol = normalizeProviderProtocol({ id: provider.id, protocol: protocolDraft ?? provider.protocol });
     const timestamp = nowIso();
     const nextProvider = {
       ...provider,
       apiKey: apiKey.trim(),
       protocol,
-      enabled: true,
+      enabled: hasEnabledModels,
       hasStoredSecret: provider.authMode === "api-key" ? Boolean(apiKey.trim() || provider.hasStoredSecret) : provider.authMode === "local" || provider.authMode === "environment" || provider.hasStoredSecret,
       baseUrl: provider.baseUrlEditable ? baseUrl.trim() || provider.baseUrl : provider.baseUrl,
-      models: discoveredModels.map((model) => ({ ...model, enabled: true })),
+      models: discoveredModels.map((model2) => ({ ...model2 })),
       status: "verified",
       lastTestedAt: timestamp,
       lastModelRefreshAt: timestamp,
       lastError: void 0,
-      isConfigured: true
+      isConfigured: hasEnabledModels
     };
     return this.setAll({
       llm: {
@@ -3284,10 +3795,11 @@ class SettingsService {
     if (!provider || !isBuiltinProviderId(provider.id) || provider.authMode !== "account") {
       throw new Error(`Unknown account provider: ${providerId}`);
     }
-    const discoveredModels = sanitizeModels(models);
+    const discoveredModels = resolveProviderModels(provider.id, models);
     if (discoveredModels.length === 0) {
       throw new Error("Provider returned no usable models");
     }
+    const hasEnabledModels = discoveredModels.some((model2) => model2.enabled !== false);
     secretStorageService.setSecret(
       secretStorageService.createProviderOAuthSecretRef(provider.id),
       secretPayload,
@@ -3296,9 +3808,9 @@ class SettingsService {
     const timestamp = nowIso();
     const nextProvider = {
       ...provider,
-      enabled: true,
+      enabled: hasEnabledModels,
       hasStoredSecret: true,
-      models: discoveredModels.map((model) => ({ ...model, enabled: true })),
+      models: discoveredModels.map((model2) => ({ ...model2 })),
       status: "verified",
       lastTestedAt: timestamp,
       lastModelRefreshAt: timestamp,
@@ -3307,7 +3819,7 @@ class SettingsService {
       planLabel: accountSummary.planLabel,
       oauthExpiresAt: accountSummary.oauthExpiresAt,
       oauthRefreshAvailable: accountSummary.oauthRefreshAvailable,
-      isConfigured: true
+      isConfigured: hasEnabledModels
     };
     return this.setAll({
       llm: {
@@ -3332,7 +3844,7 @@ class SettingsService {
       ...provider,
       apiKey: "",
       hasStoredSecret: fallback.hasStoredSecret,
-      models: [],
+      models: fallback.models,
       enabled: false,
       status: fallback.status,
       lastError: void 0,
@@ -3362,7 +3874,7 @@ class SettingsService {
         baseUrl: accountCredential.baseUrl ?? provider.baseUrl,
         accountId: accountCredential.accountId,
         authMode: provider.authMode,
-        models: provider.models.filter((model) => model.enabled).map((model) => model.id),
+        models: provider.models.filter((model2) => model2.enabled).map((model2) => model2.id),
         docsUrl: provider.docsUrl
       };
     }).filter((provider) => provider.models.length > 0);
@@ -3731,6 +4243,584 @@ function writeYaml(filePath, data) {
     console.error(`Failed to write YAML file: ${filePath}`, error);
     return false;
   }
+}
+const ASK_READONLY_TOOL_ALLOWLIST = [
+  "read_file",
+  "glob",
+  "grep",
+  "task_list",
+  "web_fetch",
+  "web_search",
+  "git_status",
+  "git_diff",
+  "git_log",
+  "tool_search",
+  "memory_read"
+];
+const CANONICAL_TOOL_EXPANSIONS = {
+  read: ["read_file"],
+  search: ["glob", "grep"],
+  web: ["web_fetch", "web_search"],
+  git: ["git_status", "git_diff", "git_log", "git_add", "git_unstage", "git_commit"],
+  bash: ["bash"],
+  write: ["write_file"],
+  edit: ["edit_file"],
+  askUser: ["ask_user"],
+  "vscode/askQuestions": ["ask_user"],
+  agent: ["agent_handoff"],
+  handoff: ["agent_handoff"],
+  task: ["task_create", "task_update", "task_get", "task_list"],
+  memory: ["memory_read"],
+  planArtifact: ["plan_artifact"],
+  artifact: ["plan_artifact"],
+  "vscode/memory": ["memory_read"],
+  skill: ["skills", "skill_run"],
+  skills: ["skills", "skill_run"],
+  mcp: ["mcp", "mcp__*"],
+  MCP: ["mcp", "mcp__*"],
+  tool_search: ["tool_search"],
+  rdxContext: ["rdx_context"],
+  rdx: ["rdx_context"]
+};
+const RUNTIME_TOOL_ALIASES = {
+  read: "read_file",
+  read_file: "read_file",
+  search: "grep",
+  glob: "glob",
+  grep: "grep",
+  web: "web_fetch",
+  web_fetch: "web_fetch",
+  web_search: "web_search",
+  git: "git_status",
+  git_status: "git_status",
+  git_diff: "git_diff",
+  git_log: "git_log",
+  git_add: "git_add",
+  git_unstage: "git_unstage",
+  git_commit: "git_commit",
+  bash: "bash",
+  write: "write_file",
+  write_file: "write_file",
+  edit: "edit_file",
+  edit_file: "edit_file",
+  task_create: "task_create",
+  task_update: "task_update",
+  task_get: "task_get",
+  task_list: "task_list",
+  askUser: "ask_user",
+  ask_user: "ask_user",
+  "vscode/askQuestions": "ask_user",
+  agent: "agent_handoff",
+  handoff: "agent_handoff",
+  agent_handoff: "agent_handoff",
+  subagent: "subagent",
+  memory: "memory_read",
+  memory_read: "memory_read",
+  memory_write: "memory_write",
+  memory_delete: "memory_delete",
+  planArtifact: "plan_artifact",
+  artifact: "plan_artifact",
+  plan_artifact: "plan_artifact",
+  "vscode/memory": "memory_read",
+  skill: "skills",
+  skills: "skills",
+  skill_run: "skill_run",
+  mcp: "mcp",
+  MCP: "mcp",
+  rdxContext: "rdx_context",
+  rdx: "rdx_context",
+  rdx_context: "rdx_context"
+};
+const ASK_DENIED_TOOL_PREFIXES = ["rd.", "mcp.", "mcp__"];
+const ASK_DENIED_TOOLS = /* @__PURE__ */ new Set([
+  "bash",
+  "write",
+  "write_file",
+  "edit",
+  "edit_file",
+  "remove",
+  "delete",
+  "git_add",
+  "git_unstage",
+  "git_commit",
+  "task_create",
+  "task_update",
+  "rdx_context"
+]);
+const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
+  ...ASK_READONLY_TOOL_ALLOWLIST,
+  "bash",
+  "write_file",
+  "edit_file",
+  "ask_user",
+  "agent_handoff",
+  "subagent",
+  "task_create",
+  "task_update",
+  "task_get",
+  "task_list",
+  "memory_read",
+  "memory_write",
+  "memory_delete",
+  "plan_artifact",
+  "skills",
+  "skill_run",
+  "mcp",
+  "mcp__*",
+  "rdx_context",
+  "git_add",
+  "git_unstage",
+  "git_commit",
+  "tool_search"
+];
+const SHADER_EDIT_TOOLS = ["rd.shader.edit_and_replace", "rd.macro.shader_hotfix_validate"];
+function resolveAgentToolAllowlist(agentId, stage) {
+  const settings = settingsService.getAll();
+  const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, stage || "investigate", agentId);
+  const manifest = settings.agents.definitions.find((definition) => definition.id === agentId && definition.enabled);
+  const profileTools = manifest ? manifest.tools.flatMap(expandCanonicalToolToken) : runtimeProfile.toolAllowlist?.length ? runtimeProfile.toolAllowlist.flatMap(expandCanonicalToolToken) : agentId === "ask" ? ASK_READONLY_TOOL_ALLOWLIST : isTopLevelAgentId(agentId) ? EXECUTABLE_AGENT_TOOL_ALLOWLIST : [];
+  if (agentId === "ask") {
+    return Array.from(new Set(profileTools.filter((toolName) => !isDeniedAskTool(toolName, normalizeToolName$1(toolName)))));
+  }
+  return Array.from(new Set(profileTools));
+}
+function isToolAllowedForAgent(toolName, agentId, stage) {
+  const normalizedToolName = normalizeToolName$1(toolName);
+  if (SHADER_EDIT_TOOLS.includes(normalizedToolName)) {
+    return false;
+  }
+  if (agentId === "ask" && isDeniedAskTool(toolName, normalizedToolName)) {
+    return false;
+  }
+  const allowlist = resolveAgentToolAllowlist(agentId, stage);
+  for (const pattern of allowlist) {
+    const normalizedPattern = normalizeToolName$1(pattern);
+    if (normalizedPattern === "*" || normalizedPattern === normalizedToolName) {
+      return true;
+    }
+    if (normalizedPattern.endsWith(".*") && normalizedToolName.startsWith(normalizedPattern.slice(0, -1))) {
+      return true;
+    }
+    if (normalizedPattern.endsWith("*") && normalizedToolName.startsWith(normalizedPattern.slice(0, -1))) {
+      return true;
+    }
+  }
+  return false;
+}
+function normalizeToolName$1(toolName) {
+  return RUNTIME_TOOL_ALIASES[toolName] ?? toolName;
+}
+function expandCanonicalToolToken(toolName) {
+  return CANONICAL_TOOL_EXPANSIONS[toolName] ?? [normalizeToolName$1(toolName)];
+}
+function isDeniedAskTool(originalToolName, normalizedToolName) {
+  if (ASK_DENIED_TOOLS.has(originalToolName) || ASK_DENIED_TOOLS.has(normalizedToolName)) {
+    return true;
+  }
+  return ASK_DENIED_TOOL_PREFIXES.some((prefix) => originalToolName.startsWith(prefix) || normalizedToolName.startsWith(prefix));
+}
+const WORK_BLOCK_KINDS = /* @__PURE__ */ new Set([
+  "reasoning",
+  "llm_turn",
+  "approval",
+  "user_input",
+  "compaction",
+  "subagent",
+  "handoff",
+  "diagnostic",
+  "output",
+  "command"
+]);
+function normalizeWorkBlockKind(value) {
+  return WORK_BLOCK_KINDS.has(value) ? value : null;
+}
+function createWorkBlock(id, title, stage, kind = "reasoning") {
+  const block = {
+    id,
+    kind,
+    title,
+    stage,
+    status: "pending",
+    toolCalls: [],
+    startedAt: nowMs()
+  };
+  if (block.kind === "llm_turn") {
+    block.result = createLoopResult(void 0, block.status, []);
+  }
+  return block;
+}
+function createDraftWorkTrace(summary, blocks = []) {
+  return {
+    status: "running",
+    summary,
+    blocks: blocks.map(cloneWorkBlock),
+    updatedAt: nowMs()
+  };
+}
+function cloneToolCall(toolCall) {
+  return {
+    ...toolCall,
+    approval: toolCall.approval ? { ...toolCall.approval } : void 0
+  };
+}
+function cloneThinkingArtifact$1(thinking) {
+  return thinking ? {
+    ...thinking,
+    artifact: thinking.artifact ? {
+      ...thinking.artifact,
+      raw: thinking.artifact.raw ? { ...thinking.artifact.raw } : void 0
+    } : void 0
+  } : void 0;
+}
+function cloneLoopResult(result) {
+  return result ? {
+    ...result,
+    toolCallIds: result.toolCallIds.slice()
+  } : void 0;
+}
+function cloneWorkBlock(block) {
+  const toolCalls = block.toolCalls.map(cloneToolCall);
+  const normalizedKind = block.kind;
+  const thinking = cloneThinkingArtifact$1(block.thinking);
+  const thinkingStatus = block.thinkingStatus ?? (thinking ? "complete" : void 0);
+  const result = normalizedKind === "llm_turn" ? normalizeLoopResult(block.result, block.summary, block.status, toolCalls) : cloneLoopResult(block.result);
+  return {
+    ...block,
+    kind: normalizedKind,
+    ...thinking ? { thinking } : {},
+    ...thinkingStatus ? { thinkingStatus } : {},
+    ...result ? { result } : {},
+    toolCalls,
+    children: block.children?.map(cloneWorkBlock)
+  };
+}
+function cloneTrace(trace) {
+  return trace ? {
+    ...trace,
+    blocks: trace.blocks.map(cloneWorkBlock)
+  } : {
+    status: "idle",
+    blocks: [],
+    updatedAt: nowMs()
+  };
+}
+function upsertWorkBlock(trace, blockId, patch) {
+  const nextTrace = cloneTrace(trace);
+  const blockIndex = nextTrace.blocks.findIndex((block) => block.id === blockId);
+  if (blockIndex >= 0) {
+    nextTrace.blocks[blockIndex] = cloneWorkBlock({
+      ...nextTrace.blocks[blockIndex],
+      ...patch,
+      toolCalls: patch.toolCalls ? patch.toolCalls.map(cloneToolCall) : nextTrace.blocks[blockIndex].toolCalls.map(cloneToolCall)
+    });
+  } else {
+    const kind = patch.kind && normalizeWorkBlockKind(patch.kind) ? patch.kind : "reasoning";
+    nextTrace.blocks.push(cloneWorkBlock({
+      ...createWorkBlock(blockId, patch.title || blockId, patch.stage, kind),
+      ...patch,
+      kind,
+      toolCalls: patch.toolCalls ? patch.toolCalls.map(cloneToolCall) : []
+    }));
+  }
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+function finalizeTrace(trace, status, summary) {
+  const nextTrace = cloneTrace(trace);
+  const terminalBlockStatus = status === "complete" ? "complete" : status === "error" || status === "stopped" ? "error" : null;
+  if (terminalBlockStatus) {
+    const terminalAt = nowMs();
+    nextTrace.blocks = nextTrace.blocks.map((block) => {
+      const blockStatus = block.status === "pending" || block.status === "running" ? terminalBlockStatus : block.status;
+      const blockCompletedAt = block.completedAt ?? terminalAt;
+      const toolCalls = block.toolCalls.map((toolCall) => {
+        const cloned = cloneToolCall(toolCall);
+        const cancelPendingApproval = status === "stopped" && cloned.approval?.status === "pending" ? {
+          ...cloned.approval,
+          status: "cancelled",
+          resolvedAt: cloned.approval.resolvedAt ?? terminalAt,
+          answer: cloned.approval.answer ?? "请求已取消。"
+        } : cloned.approval;
+        if (toolCall.status !== "pending" && toolCall.status !== "running") {
+          if (cancelPendingApproval !== cloned.approval) {
+            return { ...cloned, approval: cancelPendingApproval };
+          }
+          return cloned;
+        }
+        return {
+          ...cloned,
+          status: terminalBlockStatus,
+          completedAt: toolCall.completedAt ?? terminalAt,
+          error: terminalBlockStatus === "error" ? toolCall.error ?? "Run ended before this tool call completed." : toolCall.error,
+          approval: cancelPendingApproval
+        };
+      });
+      const result = block.kind === "llm_turn" ? {
+        ...ensureLoopResult({ ...block, toolCalls }),
+        status: "complete",
+        toolCallIds: uniqueStrings([...block.result?.toolCallIds ?? [], ...toolCalls.map((toolCall) => toolCall.id)])
+      } : block.result;
+      return {
+        ...block,
+        status: blockStatus,
+        completedAt: blockCompletedAt,
+        ...result ? { result } : {},
+        toolCalls
+      };
+    });
+  }
+  nextTrace.status = status;
+  nextTrace.summary = summary ?? nextTrace.summary;
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+function upsertRuntimeToolCall(trace, patch, options) {
+  const nextTrace = cloneTrace(trace);
+  const blockMeta = getRuntimeToolBlockMeta(patch.toolName, options?.loopId);
+  const blockId = blockMeta.id;
+  let block = nextTrace.blocks.find((entry) => entry.id === blockId);
+  if (!block) {
+    block = createWorkBlock(blockId, blockMeta.title, blockMeta.stage, blockMeta.kind);
+    block.status = "running";
+    nextTrace.blocks.push(block);
+  }
+  if (options?.loopId && blockId === options.loopId) {
+    applyLoopFields(block, options);
+  }
+  const toolIndex = block.toolCalls.findIndex((toolCall) => toolCall.id === patch.id);
+  if (toolIndex >= 0) {
+    const existingToolCall = block.toolCalls[toolIndex];
+    const nextApproval = patch.approval ? { ...existingToolCall.approval ?? {}, ...patch.approval } : existingToolCall.approval ? { ...existingToolCall.approval } : void 0;
+    block.toolCalls[toolIndex] = {
+      ...existingToolCall,
+      ...patch,
+      approval: nextApproval
+    };
+  } else {
+    block.toolCalls.push({
+      id: patch.id,
+      toolName: patch.toolName,
+      status: patch.status ?? "pending",
+      argsPreview: patch.argsPreview,
+      resultPreview: patch.resultPreview,
+      error: patch.error,
+      approval: patch.approval ? { ...patch.approval } : void 0,
+      startedAt: patch.startedAt ?? nowMs(),
+      completedAt: patch.completedAt
+    });
+  }
+  syncLoopResultToolIds(block);
+  if (block.toolCalls.length > 0 && block.toolCalls.every((toolCall) => toolCall.status === "complete" || toolCall.status === "error")) {
+    block.status = block.toolCalls.some((toolCall) => toolCall.status === "error") ? "error" : "complete";
+    block.completedAt = nowMs();
+    if (block.kind === "llm_turn") {
+      block.result = { ...ensureLoopResult(block), status: "complete" };
+    }
+  }
+  nextTrace.status = "running";
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+function upsertRuntimeToolApproval(trace, input, options) {
+  const status = normalizeToolApprovalStatus(input.status);
+  const failed = status === "rejected" || status === "cancelled";
+  const existingToolCall = trace?.blocks.flatMap((block) => block.toolCalls).find((toolCall) => toolCall.id === input.toolCallId);
+  const now = nowMs();
+  const approval = {
+    approvalId: input.approvalId,
+    status
+  };
+  if (input.reason) approval.reason = input.reason;
+  const risk = stringifyApprovalField(input.risk);
+  if (risk) approval.risk = risk;
+  const reviewer = stringifyApprovalField(input.reviewer);
+  if (reviewer) approval.reviewer = reviewer;
+  const answer = stringifyApprovalField(input.answer);
+  if (answer) approval.answer = answer;
+  if (status === "pending") approval.requestedAt = now;
+  if (status !== "pending") approval.resolvedAt = now;
+  const toolPatch = {
+    id: input.toolCallId,
+    toolName: input.toolName,
+    status: failed ? "error" : existingToolCall?.status === "complete" ? "complete" : "running",
+    approval
+  };
+  if (failed) {
+    toolPatch.error = answer || input.reason || "Tool approval was denied.";
+    toolPatch.completedAt = now;
+  }
+  return upsertRuntimeToolCall(trace, toolPatch, options);
+}
+function normalizeToolApprovalStatus(status) {
+  if (status === "approved") return "approved";
+  if (status === "rejected") return "rejected";
+  if (status === "cancelled") return "cancelled";
+  return "pending";
+}
+function stringifyApprovalField(value) {
+  if (value === void 0 || value === null) return "";
+  return typeof value === "string" ? value.trim() : String(value).trim();
+}
+function applyLoopFields(block, options) {
+  if (block.kind === "llm_turn") {
+    const result = ensureLoopResult(block);
+    const nextText = options.loopResultText?.trim();
+    if (nextText && (!result.text || nextText.length >= result.text.length)) {
+      result.text = nextText;
+    }
+    if (options.loopResultStatus) {
+      result.status = options.loopResultStatus;
+    }
+    if (options.loopStopReason) {
+      result.stopReason = options.loopStopReason;
+    }
+    if (options.loopOutputPhase) {
+      result.outputPhase = options.loopOutputPhase;
+    }
+    block.result = result;
+  }
+  if (options.loopReasoningState) {
+    block.reasoningState = options.loopReasoningState;
+  }
+  const nextThinking = cloneThinkingArtifact$1(options.loopThinking);
+  if (nextThinking && shouldReplaceThinking(block.thinking, nextThinking)) {
+    block.thinking = nextThinking;
+  }
+  if (options.loopThinkingStatus && (nextThinking || block.thinking)) {
+    block.thinkingStatus = options.loopThinkingStatus;
+  }
+}
+function upsertSubagentChild(trace, subagentBlockId, childPatch) {
+  const nextTrace = cloneTrace(trace);
+  const blockIndex = nextTrace.blocks.findIndex((block) => block.id === subagentBlockId);
+  if (blockIndex < 0) {
+    return nextTrace;
+  }
+  const parent = nextTrace.blocks[blockIndex];
+  const children = [...parent.children ?? []];
+  const childIndex = children.findIndex((child) => child.id === childPatch.id);
+  const childKind = childPatch.kind && normalizeWorkBlockKind(childPatch.kind) ? childPatch.kind : "llm_turn";
+  if (childIndex >= 0) {
+    children[childIndex] = cloneWorkBlock({
+      ...children[childIndex],
+      ...childPatch,
+      kind: childKind,
+      toolCalls: childPatch.toolCalls ?? children[childIndex].toolCalls
+    });
+  } else {
+    children.push(cloneWorkBlock({
+      ...createWorkBlock(childPatch.id, childPatch.title || childPatch.id, childPatch.stage, childKind),
+      ...childPatch,
+      kind: childKind,
+      toolCalls: childPatch.toolCalls ?? []
+    }));
+  }
+  nextTrace.blocks[blockIndex] = {
+    ...parent,
+    children
+  };
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+function upsertLoopResult(trace, loopId, resultText, thinking, thinkingStatus, resultStatus = "streaming", stopReason, outputPhase, reasoningState) {
+  const nextTrace = cloneTrace(trace);
+  let block = nextTrace.blocks.find((entry) => entry.id === loopId);
+  if (!block) {
+    block = createWorkBlock(loopId, "LLM turn", "model", "llm_turn");
+    block.status = "running";
+    nextTrace.blocks.push(block);
+  }
+  applyLoopFields(block, {
+    loopResultText: resultText,
+    loopResultStatus: resultStatus,
+    loopStopReason: stopReason,
+    loopOutputPhase: outputPhase,
+    loopReasoningState: reasoningState,
+    loopThinking: thinking,
+    loopThinkingStatus: thinkingStatus
+  });
+  nextTrace.status = "running";
+  nextTrace.updatedAt = nowMs();
+  return nextTrace;
+}
+function ensureLoopResult(block) {
+  const status = block.status === "running" || block.status === "pending" ? "streaming" : "complete";
+  const result = normalizeLoopResult(block.result, block.summary, status, block.toolCalls);
+  block.result = result;
+  return result;
+}
+function createLoopResult(text, blockStatus, toolCalls) {
+  return normalizeLoopResult(void 0, text, blockStatus, toolCalls);
+}
+function normalizeLoopResult(result, fallbackText, blockStatus, toolCalls) {
+  const status = result?.status ?? (blockStatus === "running" || blockStatus === "pending" || blockStatus === "streaming" ? "streaming" : "complete");
+  const text = result?.text ?? fallbackText?.trim() ?? void 0;
+  return {
+    ...text ? { text } : {},
+    ...result?.stopReason ? { stopReason: result.stopReason } : {},
+    ...result?.outputPhase ? { outputPhase: result.outputPhase } : {},
+    status,
+    toolCallIds: uniqueStrings([...result?.toolCallIds ?? [], ...toolCalls.map((toolCall) => toolCall.id)])
+  };
+}
+function syncLoopResultToolIds(block) {
+  if (block.kind !== "llm_turn") return;
+  const result = ensureLoopResult(block);
+  result.toolCallIds = uniqueStrings([...result.toolCallIds, ...block.toolCalls.map((toolCall) => toolCall.id)]);
+  block.result = result;
+}
+function uniqueStrings(values) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+function shouldReplaceThinking(current, next) {
+  if (!current) return true;
+  if (next.replayPolicy === "provider-artifact" && !current.artifact) return true;
+  if (next.artifact && JSON.stringify(next.artifact) !== JSON.stringify(current.artifact)) return true;
+  return (next.text?.length ?? 0) >= (current.text?.length ?? 0);
+}
+function sanitizeStoredWorkTrace(trace) {
+  if (!trace || typeof trace !== "object") return null;
+  if (!["idle", "running", "complete", "error", "stopped"].includes(trace.status)) return null;
+  if (!Array.isArray(trace.blocks)) return null;
+  for (const block of trace.blocks) {
+    if (!block || typeof block !== "object") return null;
+    if (!normalizeWorkBlockKind(block.kind)) return null;
+    if (typeof block.id !== "string" || !block.id.trim()) return null;
+    if (!["pending", "running", "complete", "error"].includes(block.status)) return null;
+    if (!Array.isArray(block.toolCalls)) return null;
+    if ("detail" in block && block.detail !== void 0) return null;
+    if ("thinkingPresentation" in block) return null;
+    if (block.kind === "llm_turn" && block.result && !Array.isArray(block.result.toolCallIds)) return null;
+    if (block.children && !block.children.every((child) => Boolean(normalizeWorkBlockKind(child.kind)))) {
+      return null;
+    }
+  }
+  return trace;
+}
+function getRuntimeToolBlockMeta(toolName, loopId) {
+  const normalizedToolName = normalizeToolName$1(toolName);
+  if (normalizedToolName === "ask_user") {
+    return {
+      id: "runtime-user-input",
+      title: "User input requested",
+      stage: "decision",
+      kind: "user_input"
+    };
+  }
+  if (normalizedToolName === "agent_handoff") {
+    return {
+      id: "runtime-handoff",
+      title: "Preparing handoff",
+      stage: "handoff",
+      kind: "handoff"
+    };
+  }
+  return {
+    id: loopId ?? "runtime-llm-turn",
+    title: "LLM turn",
+    stage: "model",
+    kind: "llm_turn"
+  };
 }
 const DEFAULT_KIND = "raw";
 const DEFAULT_SOURCE = "unknown";
@@ -4367,7 +5457,10 @@ class StorageAdapter {
         latestById.set(snapshot.id, snapshot);
       }
     }
-    return Array.from(latestById.values()).sort((left, right) => left.createdAt - right.createdAt);
+    return Array.from(latestById.values()).sort((left, right) => left.createdAt - right.createdAt).map((message) => ({
+      ...message,
+      workTrace: sanitizeStoredWorkTrace(message.workTrace ?? null)
+    }));
   }
   appendConversationMessage(sessionId, message) {
     appendJsonl(this.getConversationPath(sessionId), message);
@@ -5245,10 +6338,10 @@ function parseAdbDeviceLine(line) {
       metadata.set(token.slice(0, separatorIndex), token.slice(separatorIndex + 1));
     }
   }
-  const model = metadata.get("model");
+  const model2 = metadata.get("model");
   const deviceName = metadata.get("device");
   const transportId = metadata.get("transport_id");
-  const label = model ?? deviceName ?? serial;
+  const label = model2 ?? deviceName ?? serial;
   let detailText = "Ready to connect to Android RenderDoc server";
   let lastError;
   let status = "offline";
@@ -5717,6 +6810,45 @@ class ReplayDeviceService {
   }
 }
 const replayDeviceService = new ReplayDeviceService();
+const EFFORT_LEVELS = ["low", "medium", "high", "extHigh", "max"];
+const REASONING_LEVELS = ["off", "auto", "low", "medium", "high", "extHigh", "max"];
+const DEFAULT_CONTEXT_WINDOW_TOKENS = 256e3;
+const MAX_CONTEXT_MODE_MIN_TOKENS = 1e6;
+const CONTEXT_COMPACTION_RATIO = 0.8;
+function isReasoningLevel(value) {
+  return typeof value === "string" && REASONING_LEVELS.includes(value);
+}
+function clampReasoningLevel(reasoningLevel, supported) {
+  if (!Array.isArray(supported) || supported.length === 0) {
+    return void 0;
+  }
+  if (!isReasoningLevel(reasoningLevel)) {
+    return void 0;
+  }
+  if (supported.includes(reasoningLevel)) {
+    return reasoningLevel;
+  }
+  const reasoningIndex = REASONING_LEVELS.indexOf(reasoningLevel);
+  let best = supported[0];
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const level of supported) {
+    const distance = Math.abs(REASONING_LEVELS.indexOf(level) - reasoningIndex);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = level;
+    }
+  }
+  return best;
+}
+function isEffortReasoningLevel(level) {
+  return EFFORT_LEVELS.includes(level);
+}
+function resolveActiveContextWindowTokens(capability, turnControls) {
+  if (turnControls.maxContextMode && capability.maxContextAvailable && capability.maxContextWindowTokens !== null) {
+    return capability.maxContextWindowTokens;
+  }
+  return capability.defaultContextWindowTokens;
+}
 const charsToTokens = (chars) => Math.ceil(chars / 4);
 class EventStream {
   /**
@@ -6019,18 +7151,12 @@ async function runAgentLoop(pendingMessages, context2, config, providerStrategy,
       newMessages.push(assistantMessage);
       if (assistantMessage.stopReason !== "toolUse") {
         stream.push({ type: "turn_end", turn: state2.turn, message: assistantMessage });
-        const followUps = config.getFollowUpMessages ? config.getFollowUpMessages() : [];
-        if (followUps && followUps.length > 0) {
-          state2 = { pending: followUps, turn: state2.turn, transition: "follow_up" };
-          continue;
-        }
         break;
       }
       const toolResults = await executeToolCalls(
         assistantMessage,
         toolExecutor,
         stream,
-        config.getSteeringMessages,
         config.maxToolConcurrency
       );
       for (const result of toolResults.results) {
@@ -6043,22 +7169,15 @@ async function runAgentLoop(pendingMessages, context2, config, providerStrategy,
         message: assistantMessage,
         toolResults: toolResults.results
       });
-      if (toolResults.steeringMessages && toolResults.steeringMessages.length > 0) {
-        state2 = {
-          pending: toolResults.steeringMessages,
-          turn: state2.turn,
-          transition: "steering"
-        };
-        continue;
-      }
       state2 = { pending: [], turn: state2.turn, transition: "next_turn" };
     }
     stream.push({ type: "agent_end", messages: newMessages });
     stream.complete(newMessages);
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
+    const aborted = stream.signal.aborted || error.name === "AbortError";
     if (!stream.isDone) {
-      stream.push({ type: "error", error });
+      stream.push({ type: "error", error, aborted });
       stream.error(error);
     }
   } finally {
@@ -6067,10 +7186,56 @@ async function runAgentLoop(pendingMessages, context2, config, providerStrategy,
     }
   }
 }
+function recoveryDiagnosticCode(action) {
+  return `error_recovery_${action.type}`;
+}
+function recoveryStartMessage(action, attempt) {
+  switch (action.type) {
+    case "retry":
+      return `provider 错误，正在重试（第 ${attempt} 次）`;
+    case "escalate_tokens":
+      return "上下文过长，已升级 token 上限";
+    case "reactive_compact":
+      return "上下文过长，正在压缩历史消息";
+    case "switch_model":
+      return "服务过载，正在切换备用模型";
+    case "continue_prompt":
+      return "输出被截断，正在续写";
+    default:
+      return "";
+  }
+}
+function emitRecoveryDiagnostic(stream, action, phase, attempt = 1) {
+  const code = recoveryDiagnosticCode(action);
+  const message = phase === "completed" ? "错误恢复成功，继续生成回复" : recoveryStartMessage(action, attempt);
+  if (!message) {
+    return;
+  }
+  stream.push({
+    type: "diagnostic",
+    code,
+    severity: "info",
+    message,
+    phase
+  });
+}
 async function streamAssistantResponseWithRecovery(context2, config, provider, stream) {
   const recovery = config.errorRecovery;
   const CIRCUIT_BREAKER_LIMIT = 3;
   let consecutiveCompactionFailures = 0;
+  let pendingRecoveryAction = null;
+  const completePendingRecovery = () => {
+    if (!pendingRecoveryAction) {
+      return;
+    }
+    emitRecoveryDiagnostic(stream, pendingRecoveryAction, "completed");
+    pendingRecoveryAction = null;
+  };
+  const beginRecovery = (action) => {
+    const attempt = (recovery?.getState().recoveryCount ?? 0) + 1;
+    pendingRecoveryAction = action;
+    emitRecoveryDiagnostic(stream, action, "started", attempt);
+  };
   while (true) {
     try {
       const assistantMessage = await streamAssistantResponse(
@@ -6084,6 +7249,7 @@ async function streamAssistantResponseWithRecovery(context2, config, provider, s
         const lengthAction = recovery.decide(null, "length");
         switch (lengthAction.type) {
           case "escalate_tokens": {
+            beginRecovery(lengthAction);
             recovery.markEscalated();
             if (config.streamOptions) {
               config.streamOptions.maxTokens = lengthAction.newMaxTokens;
@@ -6091,6 +7257,7 @@ async function streamAssistantResponseWithRecovery(context2, config, provider, s
             continue;
           }
           case "continue_prompt": {
+            beginRecovery(lengthAction);
             recovery.noteRetryAttempt();
             context2.messages.push({
               role: "user",
@@ -6103,10 +7270,12 @@ async function streamAssistantResponseWithRecovery(context2, config, provider, s
             throw new Error(`[Recovery abort] ${lengthAction.reason}`);
           }
           default: {
+            completePendingRecovery();
             return { message: assistantMessage };
           }
         }
       }
+      completePendingRecovery();
       return { message: assistantMessage };
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -6116,11 +7285,13 @@ async function streamAssistantResponseWithRecovery(context2, config, provider, s
       const action = recovery.decide(error);
       switch (action.type) {
         case "retry": {
+          beginRecovery(action);
           recovery.noteRetryAttempt();
           await sleep$1(action.delayMs);
           continue;
         }
         case "escalate_tokens": {
+          beginRecovery(action);
           recovery.markEscalated();
           if (config.streamOptions) {
             config.streamOptions.maxTokens = action.newMaxTokens;
@@ -6128,6 +7299,7 @@ async function streamAssistantResponseWithRecovery(context2, config, provider, s
           continue;
         }
         case "reactive_compact": {
+          beginRecovery(action);
           consecutiveCompactionFailures++;
           if (consecutiveCompactionFailures >= CIRCUIT_BREAKER_LIMIT) {
             throw new Error(
@@ -6136,18 +7308,21 @@ async function streamAssistantResponseWithRecovery(context2, config, provider, s
           }
           recovery.markReactiveCompactAttempted();
           if (config.transformContext) {
-            context2.messages = await config.transformContext(
+            context2.messages = await applyTransformContext(
               context2.messages,
-              stream.signal
+              config,
+              stream
             );
           }
           continue;
         }
         case "switch_model": {
+          beginRecovery(action);
           config.model = action.fallbackModel;
           continue;
         }
         case "continue_prompt": {
+          beginRecovery(action);
           recovery.noteRetryAttempt();
           continue;
         }
@@ -6164,10 +7339,7 @@ function sleep$1(ms) {
 async function streamAssistantResponse(context2, config, provider, stream) {
   let messages = context2.messages;
   if (config.transformContext) {
-    messages = await config.transformContext(
-      [...context2.messages],
-      stream.signal
-    );
+    messages = await applyTransformContext(context2.messages, config, stream);
   }
   const llmMessages = config.convertToLlm(messages);
   const llmContext = {
@@ -6254,7 +7426,7 @@ async function streamAssistantResponse(context2, config, provider, stream) {
   }
   return finalMessage;
 }
-async function executeToolCalls(assistantMessage, toolExecutor, stream, getSteeringMessages, maxConcurrency) {
+async function executeToolCalls(assistantMessage, toolExecutor, stream, maxConcurrency) {
   const toolCalls = assistantMessage.content.filter(
     (c) => c.type === "toolCall"
   );
@@ -6315,52 +7487,28 @@ async function executeToolCalls(assistantMessage, toolExecutor, stream, getSteer
       durationMs: Date.now() - startTime
     });
     results[index] = result;
-    if (getSteeringMessages && index === 0) {
-      const steering = getSteeringMessages();
-      if (steering && steering.length > 0) {
-        for (let j = 1; j < toolCalls.length; j++) {
-          if (!results[j]) {
-            const skipped = {
-              role: "toolResult",
-              toolCallId: toolCalls[j].id,
-              toolName: toolCalls[j].name,
-              content: [{ type: "text", text: "Skipped due to queued user message" }],
-              isError: false,
-              timestamp: Date.now()
-            };
-            stream.push({
-              type: "tool_execution_end",
-              toolCallId: toolCalls[j].id,
-              toolName: toolCalls[j].name,
-              result: skipped,
-              durationMs: 0
-            });
-            results[j] = skipped;
-          }
-        }
-        throw { steeringMessages: steering };
-      }
-    }
   };
   for (let i = 0; i < toolCalls.length; i += concurrency) {
     const batch = [];
     for (let j = i; j < Math.min(i + concurrency, toolCalls.length); j++) {
       batch.push(executeOne(j));
     }
-    try {
-      await Promise.all(batch);
-    } catch (err) {
-      if (err && typeof err === "object" && "steeringMessages" in err) {
-        const steeringResult = err;
-        return {
-          results: results.filter(Boolean),
-          steeringMessages: steeringResult.steeringMessages
-        };
-      }
-      throw err;
-    }
+    await Promise.all(batch);
   }
   return { results: results.filter(Boolean) };
+}
+async function applyTransformContext(currentMessages, config, stream) {
+  if (!config.transformContext) {
+    return currentMessages;
+  }
+  const result = await config.transformContext([...currentMessages], stream.signal);
+  if (Array.isArray(result)) {
+    return result;
+  }
+  if (result.summary) {
+    stream.push({ type: "compaction", summary: result.summary });
+  }
+  return result.messages;
 }
 function defaultConvertToLlm(messages) {
   const result = [];
@@ -6375,8 +7523,6 @@ class Agent {
   _state;
   _isStreaming = false;
   _subscribers = [];
-  _steeringQueue = [];
-  _followUpQueue = [];
   _currentStream = null;
   _provider;
   _toolExecutor;
@@ -6431,7 +7577,7 @@ class Agent {
     };
   }
   // -------------------------------------------------------------------
-  // 主流程：prompt / steer / followUp / abort
+  // 主流程：prompt / abort
   // -------------------------------------------------------------------
   /**
    * 发送消息并启动 agent 循环。
@@ -6448,26 +7594,6 @@ class Agent {
     const pending = [userMessage];
     return this.runLoop(pending);
   }
-  /**
-   * 注入 steering 消息（中断当前工具执行序列）。
-   * 只能在 streaming 状态调用；非 streaming 状态会被静默丢弃，避免误注入。
-   */
-  steer(message) {
-    if (!this._isStreaming) {
-      return;
-    }
-    this._steeringQueue.push(normalizeUserMessage(message));
-  }
-  /**
-   * 注入 followUp 消息（agent 内层停止前追加）。
-   * 只能在 streaming 状态调用；非 streaming 状态会被静默丢弃。
-   */
-  followUp(message) {
-    if (!this._isStreaming) {
-      return;
-    }
-    this._followUpQueue.push(normalizeUserMessage(message));
-  }
   /** 中止当前流；非 streaming 状态时是 no-op。 */
   abort() {
     if (this._currentStream && !this._currentStream.isDone) {
@@ -6478,8 +7604,8 @@ class Agent {
   // 状态变更
   // -------------------------------------------------------------------
   /** 动态更新模型（不影响正在进行的请求；下一轮生效）。 */
-  setModel(model) {
-    this._state.model = model;
+  setModel(model2) {
+    this._state.model = model2;
   }
   /** 动态更新工具列表。 */
   setTools(tools) {
@@ -6498,8 +7624,6 @@ class Agent {
   // -------------------------------------------------------------------
   async runLoop(pending) {
     this._isStreaming = true;
-    this._steeringQueue = [];
-    this._followUpQueue = [];
     const context2 = {
       systemPrompt: this._state.systemPrompt,
       messages: this._state.messages,
@@ -6523,8 +7647,6 @@ class Agent {
     } finally {
       this._isStreaming = false;
       this._currentStream = null;
-      this._steeringQueue = [];
-      this._followUpQueue = [];
     }
   }
   emit(event) {
@@ -6536,32 +7658,6 @@ class Agent {
       }
     }
   }
-  getSteeringMessages() {
-    if (this._steeringQueue.length === 0) {
-      return [];
-    }
-    const mode = this._options.steeringMode ?? "all";
-    if (mode === "one-at-a-time") {
-      const next = this._steeringQueue.shift();
-      return next ? [next] : [];
-    }
-    const all = this._steeringQueue;
-    this._steeringQueue = [];
-    return all;
-  }
-  getFollowUpMessages() {
-    if (this._followUpQueue.length === 0) {
-      return [];
-    }
-    const mode = this._options.followUpMode ?? "all";
-    if (mode === "one-at-a-time") {
-      const next = this._followUpQueue.shift();
-      return next ? [next] : [];
-    }
-    const all = this._followUpQueue;
-    this._followUpQueue = [];
-    return all;
-  }
   createLoopConfig() {
     const opts = this._options;
     return {
@@ -6571,8 +7667,6 @@ class Agent {
       streamOptions: opts.streamOptions,
       getApiKey: opts.getApiKey,
       maxTurns: opts.maxTurns,
-      getSteeringMessages: () => this.getSteeringMessages(),
-      getFollowUpMessages: () => this.getFollowUpMessages(),
       signal: opts.streamOptions?.signal,
       errorRecovery: opts.errorRecovery
     };
@@ -6591,8 +7685,7 @@ function normalizeUserMessage(input) {
 const DEFAULT_TOOL_RESULT_BUDGET = 200 * 1024;
 const DEFAULT_MAX_MESSAGES = 50;
 const DEFAULT_KEEP_RECENT_TOOL_RESULTS = 3;
-const DEFAULT_CONTEXT_RATIO = 0.75;
-const DEFAULT_CONTEXT_LIMIT = 1e5;
+const DEFAULT_CONTEXT_LIMIT = Math.floor(DEFAULT_CONTEXT_WINDOW_TOKENS * CONTEXT_COMPACTION_RATIO);
 const SNIP_HEAD = 3;
 const TOOL_RESULT_TRUNCATE_HEAD = 2e3;
 const COMPACTION_MARKERS = {
@@ -6622,17 +7715,45 @@ class ContextManager {
    * 压缩链路按 budget → snip → micro → full 递进，
    * 每一级都返回新数组，不修改原始数组。
    */
-  async compress(messages, model) {
-    const tokenLimit = this.resolveTokenLimit(model);
+  async compress(messages, model2) {
+    const tokenLimit = this.resolveTokenLimit(model2);
+    const beforeCount = messages.length;
+    const beforeTokens = this.estimateTokens(messages);
+    const stages = [];
     let result = this.toolResultBudget(messages);
+    if (!messagesEqual(result, messages)) {
+      stages.push("toolResultBudget");
+    }
+    const afterBudget = result;
     result = this.snipCompact(result);
+    if (!messagesEqual(result, afterBudget)) {
+      stages.push("snip");
+    }
     if (this.estimateTokens(result) > tokenLimit) {
+      const beforeMicro = result;
       result = this.microCompact(result);
+      if (!messagesEqual(result, beforeMicro)) {
+        stages.push("micro");
+      }
     }
     if (this.estimateTokens(result) > tokenLimit) {
+      const beforeFull = result;
       result = await this.fullCompact(result);
+      if (!messagesEqual(result, beforeFull)) {
+        stages.push("full");
+      }
     }
-    return result;
+    const semanticStages = stages.filter(
+      (stage) => stage === "snip" || stage === "micro" || stage === "full"
+    );
+    if (semanticStages.length === 0) {
+      return { messages: result };
+    }
+    const afterCount = result.length;
+    const afterTokens = this.estimateTokens(result);
+    const removedMessages = Math.max(0, beforeCount - afterCount);
+    const summary = removedMessages > 0 ? `上下文压缩（${semanticStages.join("、")}）：${beforeCount} → ${afterCount} 条消息，约 ${beforeTokens} → ${afterTokens} token` : `上下文压缩（${semanticStages.join("、")}）：约 ${beforeTokens} → ${afterTokens} token`;
+    return { messages: result, summary };
   }
   /**
    * 将消息数组分为"压缩摘要"和"活跃对话"两组，返回各组的 token 估算与条数。
@@ -6797,12 +7918,12 @@ class ContextManager {
   // =====================================================================
   // 辅助
   // =====================================================================
-  resolveTokenLimit(model) {
+  resolveTokenLimit(model2) {
     if (this.config.contextTokenLimit !== void 0) {
       return this.config.contextTokenLimit;
     }
-    if (model && model.contextWindow > 0) {
-      return Math.floor(model.contextWindow * DEFAULT_CONTEXT_RATIO);
+    if (model2 && model2.contextWindow > 0) {
+      return Math.floor(model2.contextWindow * CONTEXT_COMPACTION_RATIO);
     }
     return DEFAULT_CONTEXT_LIMIT;
   }
@@ -6964,6 +8085,10 @@ class ContextManager {
     ).length;
     return `${COMPACTION_MARKERS.summary} ${messages.length} earlier messages compacted (user=${userCount}, assistant=${assistantCount}, toolResult=${toolResultCount}). Earlier context omitted to fit window.]`;
   }
+}
+function messagesEqual(left, right) {
+  if (left.length !== right.length) return false;
+  return JSON.stringify(left) === JSON.stringify(right);
 }
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_MAX_RECOVERY_RETRIES = 2;
@@ -8785,30 +9910,6 @@ const searchCodebaseTool = {
     };
   }
 };
-const askUserTool = {
-  name: "ask_user_question",
-  label: "询问用户",
-  description: "Ask the user a clarifying question. Use when requirements are ambiguous or you need confirmation before a destructive action.",
-  parameters: {
-    type: "object",
-    properties: {
-      question: { type: "string", description: "The question to present to the user." }
-    },
-    required: ["question"]
-  },
-  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "none", category: "system", requiresApproval: false },
-  permissionHint: "readonly",
-  async execute(_toolCallId, params) {
-    const question = params.question.trim();
-    if (!question) {
-      return { content: [{ type: "text", text: "Question is empty." }], isError: true, details: { question } };
-    }
-    return {
-      content: [{ type: "text", text: `[Agent asks] ${question}` }],
-      details: { question }
-    };
-  }
-};
 const notebookEditTool = {
   name: "notebook_edit",
   label: "编辑 Notebook",
@@ -8866,7 +9967,6 @@ function getPrimitiveTools() {
     moveFileTool,
     copyFileTool,
     searchCodebaseTool,
-    askUserTool,
     notebookEditTool
   ];
 }
@@ -10734,25 +11834,25 @@ let AnthropicProvider$1 = class AnthropicProvider {
   getCapabilities() {
     return { ...this.capabilities };
   }
-  stream(model, context2, options = {}) {
+  stream(model2, context2, options = {}) {
     const stream = new EventStream(
       (event) => event.type === "done",
       (event) => event.message
     );
-    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
+    const builder = new AssistantStreamBuilder(stream, model2.id, model2.provider);
     const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, "");
     const apiKey = options.apiKey ?? this.defaultApiKey;
-    void this.run(stream, builder, model, context2, options, baseUrl, apiKey);
+    void this.run(stream, builder, model2, context2, options, baseUrl, apiKey);
     return stream;
   }
-  async run(stream, builder, model, context2, options, baseUrl, apiKey) {
+  async run(stream, builder, model2, context2, options, baseUrl, apiKey) {
     const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API$4, ...options });
     try {
       builder.start();
       if (!apiKey) {
         throw new ProviderHttpError(PROVIDER_API$4, 401, "missing apiKey for Anthropic provider");
       }
-      const body = this.buildRequestBody(model, context2, options);
+      const body = this.buildRequestBody(model2, context2, options);
       const url2 = `${baseUrl}/messages`;
       const response = await fetch(url2, {
         method: "POST",
@@ -10798,7 +11898,7 @@ let AnthropicProvider$1 = class AnthropicProvider {
                 builder.appendText(evt.index, block.text);
               }
             } else if (block.type === "thinking") {
-              const artifact = createAnthropicThinkingArtifact(model, block.signature);
+              const artifact = createAnthropicThinkingArtifact(model2, block.signature);
               thinkingArtifactsByIndex.set(evt.index, artifact);
               builder.updateThinking(evt.index, {
                 kind: thinkingKind,
@@ -10818,7 +11918,7 @@ let AnthropicProvider$1 = class AnthropicProvider {
                 });
               }
             } else if (block.type === "redacted_thinking") {
-              const artifact = createAnthropicRedactedArtifact(model, block.data);
+              const artifact = createAnthropicRedactedArtifact(model2, block.data);
               thinkingArtifactsByIndex.set(evt.index, artifact);
               sawOutput = true;
               builder.updateThinking(evt.index, {
@@ -10849,11 +11949,11 @@ let AnthropicProvider$1 = class AnthropicProvider {
                 source: "anthropic-thinking",
                 visibility: thinkingVisibility,
                 replayPolicy: "provider-artifact",
-                artifact: thinkingArtifactsByIndex.get(evt.index) ?? createAnthropicThinkingArtifact(model)
+                artifact: thinkingArtifactsByIndex.get(evt.index) ?? createAnthropicThinkingArtifact(model2)
               });
             } else if (evt.delta.type === "signature_delta") {
               const artifact = mergeAnthropicSignature(
-                thinkingArtifactsByIndex.get(evt.index) ?? createAnthropicThinkingArtifact(model),
+                thinkingArtifactsByIndex.get(evt.index) ?? createAnthropicThinkingArtifact(model2),
                 evt.delta.signature
               );
               thinkingArtifactsByIndex.set(evt.index, artifact);
@@ -10908,13 +12008,13 @@ let AnthropicProvider$1 = class AnthropicProvider {
       composed.dispose();
     }
   }
-  buildRequestBody(model, context2, options) {
+  buildRequestBody(model2, context2, options) {
     const { system, messages } = toAnthropicMessages(context2);
     const body = {
-      model: model.id,
+      model: model2.id,
       messages,
       stream: true,
-      max_tokens: options.maxTokens ?? model.maxTokens ?? 4096
+      max_tokens: options.maxTokens ?? model2.maxTokens ?? 4096
     };
     if (system) body.system = system;
     if (typeof options.temperature === "number") body.temperature = options.temperature;
@@ -10929,15 +12029,35 @@ let AnthropicProvider$1 = class AnthropicProvider {
 };
 function toAnthropicThinking$1(budget, reasoningVisibility) {
   const wantsSummarized = reasoningVisibility === "summary-events";
-  if (!wantsSummarized && (!budget || budget === "auto")) return void 0;
+  if (budget === "off") return void 0;
+  if (!wantsSummarized && !budget) return void 0;
   const thinking = {
     type: "enabled",
-    budget_tokens: budget === "low" ? 1024 : budget === "medium" ? 4096 : budget === "high" ? 8192 : 4096
+    budget_tokens: toAnthropicThinkingBudget(budget)
   };
   if (wantsSummarized) {
     thinking.display = "summarized";
   }
   return thinking;
+}
+function toAnthropicThinkingBudget(budget) {
+  if (!budget || budget === "auto" || budget === "off") {
+    return 4096;
+  }
+  switch (budget) {
+    case "low":
+      return 4096;
+    case "medium":
+      return 8192;
+    case "high":
+      return 16384;
+    case "extHigh":
+      return 32768;
+    case "max":
+      return 63999;
+    default:
+      return 4096;
+  }
 }
 function resolveAnthropicThinkingKind(reasoningVisibility) {
   return reasoningVisibility === "summary-events" ? "summary" : "raw";
@@ -11025,19 +12145,19 @@ function toAnthropicToolResultBlock(message) {
     is_error: message.isError || void 0
   };
 }
-function createAnthropicThinkingArtifact(model, signature) {
+function createAnthropicThinkingArtifact(model2, signature) {
   return {
-    providerId: model.provider,
-    modelId: model.id,
+    providerId: model2.provider,
+    modelId: model2.id,
     protocol: PROVIDER_API$4,
     type: "thinking",
     signature: signature || void 0
   };
 }
-function createAnthropicRedactedArtifact(model, data) {
+function createAnthropicRedactedArtifact(model2, data) {
   return {
-    providerId: model.provider,
-    modelId: model.id,
+    providerId: model2.provider,
+    modelId: model2.id,
     protocol: PROVIDER_API$4,
     type: "redacted_thinking",
     data
@@ -11074,6 +12194,8 @@ function mapStopReason(reason) {
       return "length";
     case "tool_use":
       return "toolUse";
+    case "refusal":
+      return "refusal";
     case "stop_sequence":
       return "stop";
     default:
@@ -11105,18 +12227,18 @@ class GeminiProvider {
   getCapabilities() {
     return { ...this.capabilities };
   }
-  stream(model, context2, options = {}) {
+  stream(model2, context2, options = {}) {
     const stream = new EventStream(
       (event) => event.type === "done",
       (event) => event.message
     );
-    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
+    const builder = new AssistantStreamBuilder(stream, model2.id, model2.provider);
     const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, "");
     const apiKey = options.apiKey ?? this.defaultApiKey;
-    void this.run(stream, builder, model, context2, options, baseUrl, apiKey);
+    void this.run(stream, builder, model2, context2, options, baseUrl, apiKey);
     return stream;
   }
-  async run(stream, builder, model, context2, options, baseUrl, apiKey) {
+  async run(stream, builder, model2, context2, options, baseUrl, apiKey) {
     const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API$3, ...options });
     try {
       builder.start();
@@ -11125,7 +12247,7 @@ class GeminiProvider {
       }
       const body = this.buildRequestBody(context2, options);
       const versionedBase = baseUrl.includes("/v1beta") || baseUrl.includes("/v1") ? baseUrl : `${baseUrl}/v1beta`;
-      const url2 = `${versionedBase}/models/${encodeURIComponent(model.id)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
+      const url2 = `${versionedBase}/models/${encodeURIComponent(model2.id)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
       const response = await fetch(url2, {
         method: "POST",
         headers: {
@@ -11214,9 +12336,9 @@ class GeminiProvider {
     if (typeof options.temperature === "number") generationConfig.temperature = options.temperature;
     if (typeof options.topP === "number") generationConfig.topP = options.topP;
     if (typeof options.maxTokens === "number") generationConfig.maxOutputTokens = options.maxTokens;
-    if (options.reasoningBudget && options.reasoningBudget !== "auto") {
+    if (options.reasoningBudget && options.reasoningBudget !== "auto" && options.reasoningBudget !== "off") {
       generationConfig.thinkingConfig = {
-        thinkingBudget: options.reasoningBudget === "low" ? 1024 : options.reasoningBudget === "medium" ? 4096 : 8192
+        thinkingBudget: toGeminiThinkingBudget(options.reasoningBudget)
       };
     }
     if (Object.keys(generationConfig).length > 0) body.generationConfig = generationConfig;
@@ -11228,6 +12350,22 @@ class GeminiProvider {
       ];
     }
     return body;
+  }
+}
+function toGeminiThinkingBudget(budget) {
+  switch (budget) {
+    case "low":
+      return 1024;
+    case "medium":
+      return 4096;
+    case "high":
+      return 8192;
+    case "extHigh":
+      return 16384;
+    case "max":
+      return 24576;
+    default:
+      return 4096;
   }
 }
 function toGeminiContents(context2) {
@@ -11307,7 +12445,7 @@ function mapFinishReason$2(reason, hadToolCall) {
     case "BLOCKLIST":
     case "PROHIBITED_CONTENT":
     case "SPII":
-      return "error";
+      return "refusal";
     default:
       return "stop";
   }
@@ -11337,22 +12475,22 @@ class OllamaProvider {
   getCapabilities() {
     return { ...this.capabilities };
   }
-  stream(model, context2, options = {}) {
+  stream(model2, context2, options = {}) {
     const stream = new EventStream(
       (event) => event.type === "done",
       (event) => event.message
     );
-    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
+    const builder = new AssistantStreamBuilder(stream, model2.id, model2.provider);
     const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, "");
     const apiKey = options.apiKey ?? this.defaultApiKey;
-    void this.run(stream, builder, model, context2, options, baseUrl, apiKey);
+    void this.run(stream, builder, model2, context2, options, baseUrl, apiKey);
     return stream;
   }
-  async run(stream, builder, model, context2, options, baseUrl, apiKey) {
+  async run(stream, builder, model2, context2, options, baseUrl, apiKey) {
     const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API$2, ...options });
     try {
       builder.start();
-      const body = this.buildRequestBody(model, context2, options);
+      const body = this.buildRequestBody(model2, context2, options);
       const url2 = `${baseUrl}/api/chat`;
       const headers = {
         "Content-Type": "application/json",
@@ -11438,10 +12576,10 @@ class OllamaProvider {
       composed.dispose();
     }
   }
-  buildRequestBody(model, context2, options) {
+  buildRequestBody(model2, context2, options) {
     const messages = toOllamaMessages(context2);
     const body = {
-      model: model.id,
+      model: model2.id,
       messages,
       stream: true
     };
@@ -11558,18 +12696,18 @@ let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
   getCapabilities() {
     return { ...this.capabilities };
   }
-  stream(model, context2, options = {}) {
+  stream(model2, context2, options = {}) {
     const stream = new EventStream(
       (event) => event.type === "done",
       (event) => event.message
     );
-    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
+    const builder = new AssistantStreamBuilder(stream, model2.id, model2.provider);
     const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, "");
     const apiKey = options.apiKey ?? this.defaultApiKey;
-    void this.run(stream, builder, model, context2, options, baseUrl, apiKey);
+    void this.run(stream, builder, model2, context2, options, baseUrl, apiKey);
     return stream;
   }
-  async run(stream, builder, model, context2, options, baseUrl, apiKey) {
+  async run(stream, builder, model2, context2, options, baseUrl, apiKey) {
     const externalSignal = options.signal;
     const internalSignal = stream.signal;
     const composed = composeAbortSignals(externalSignal, internalSignal, { providerApi: PROVIDER_API$1, ...options });
@@ -11578,7 +12716,7 @@ let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
       if (!apiKey) {
         throw new ProviderHttpError(PROVIDER_API$1, 401, "missing apiKey for OpenAI-compatible provider");
       }
-      const body = this.buildRequestBody(model, context2, options);
+      const body = this.buildRequestBody(model2, context2, options);
       const url2 = `${baseUrl}/chat/completions`;
       const response = await fetch(url2, {
         method: "POST",
@@ -11656,19 +12794,19 @@ let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
       composed.dispose();
     }
   }
-  buildRequestBody(model, context2, options) {
+  buildRequestBody(model2, context2, options) {
     const messages = toOpenAIMessages(context2);
     const body = {
-      model: model.id,
+      model: model2.id,
       messages,
       stream: true
     };
     if (typeof options.temperature === "number") body.temperature = options.temperature;
     if (typeof options.topP === "number") body.top_p = options.topP;
-    if (options.reasoningBudget && options.reasoningBudget !== "auto") {
-      body.reasoning_effort = options.reasoningBudget;
+    if (options.reasoningBudget && options.reasoningBudget !== "auto" && options.reasoningBudget !== "off") {
+      body.reasoning_effort = toOpenAiCompatibleReasoningEffort(options.reasoningBudget);
     }
-    const maxTokens = options.maxTokens ?? model.maxTokens;
+    const maxTokens = options.maxTokens ?? model2.maxTokens;
     if (typeof maxTokens === "number" && maxTokens > 0) body.max_tokens = maxTokens;
     if (context2.tools && context2.tools.length > 0) {
       body.tools = context2.tools.map(toOpenAITool);
@@ -11678,6 +12816,12 @@ let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
     return body;
   }
 };
+function toOpenAiCompatibleReasoningEffort(budget) {
+  if (budget === "extHigh" || budget === "max") {
+    return "high";
+  }
+  return budget;
+}
 function toOpenAIMessages(context2) {
   const out = [];
   if (context2.systemPrompt && context2.systemPrompt.trim()) {
@@ -11764,7 +12908,7 @@ function mapFinishReason$1(reason) {
     case "function_call":
       return "toolUse";
     case "content_filter":
-      return "error";
+      return "refusal";
     default:
       return "stop";
   }
@@ -11799,18 +12943,18 @@ class OpenAIResponsesProvider {
   getCapabilities() {
     return { ...this.capabilities };
   }
-  stream(model, context2, options = {}) {
+  stream(model2, context2, options = {}) {
     const stream = new EventStream(
       (event) => event.type === "done",
       (event) => event.message
     );
-    const builder = new AssistantStreamBuilder(stream, model.id, model.provider);
+    const builder = new AssistantStreamBuilder(stream, model2.id, model2.provider);
     const baseUrl = (options.baseUrl ?? this.defaultBaseUrl).replace(/\/+$/, "");
     const apiKey = options.apiKey ?? this.defaultApiKey;
-    void this.run(stream, builder, model, context2, options, baseUrl, apiKey);
+    void this.run(stream, builder, model2, context2, options, baseUrl, apiKey);
     return stream;
   }
-  async run(stream, builder, model, context2, options, baseUrl, apiKey) {
+  async run(stream, builder, model2, context2, options, baseUrl, apiKey) {
     const composed = composeAbortSignals(options.signal, stream.signal, { providerApi: PROVIDER_API, ...options });
     try {
       builder.start();
@@ -11820,7 +12964,7 @@ class OpenAIResponsesProvider {
       const response = await fetch(createResponsesUrl(baseUrl), {
         method: "POST",
         headers: this.createHeaders(apiKey),
-        body: JSON.stringify(buildRequestBody(model, context2, options)),
+        body: JSON.stringify(buildRequestBody(model2, context2, options)),
         signal: composed.signal
       });
       await ensureOk(response, PROVIDER_API);
@@ -11873,7 +13017,7 @@ class OpenAIResponsesProvider {
           case "response.output_item.added": {
             const outputIndex = readNumber(event.output_index) ?? 0;
             const item = readRecord(event.item);
-            const reasoningArtifact = createResponsesReasoningArtifact(model, item);
+            const reasoningArtifact = createResponsesReasoningArtifact(model2, item);
             if (reasoningArtifact) {
               currentReasoningArtifact = reasoningArtifact;
               sawOutput = true;
@@ -11920,7 +13064,7 @@ class OpenAIResponsesProvider {
           case "response.output_item.done": {
             const outputIndex = readNumber(event.output_index) ?? 0;
             const item = readRecord(event.item);
-            const reasoningArtifact = createResponsesReasoningArtifact(model, item);
+            const reasoningArtifact = createResponsesReasoningArtifact(model2, item);
             if (reasoningArtifact) {
               currentReasoningArtifact = reasoningArtifact;
               sawOutput = true;
@@ -11955,7 +13099,7 @@ class OpenAIResponsesProvider {
             const completed = readRecord(event.response);
             if (completed) {
               applyCompletedResponse(builder, completed);
-              const completedArtifact = findResponsesReasoningArtifact(model, completed.output);
+              const completedArtifact = findResponsesReasoningArtifact(model2, completed.output);
               if (completedArtifact) {
                 currentReasoningArtifact = completedArtifact;
                 builder.updateThinking(REASONING_INDEX, {
@@ -12015,9 +13159,15 @@ class OpenAIResponsesProvider {
 function createResponsesUrl(baseUrl) {
   return baseUrl.endsWith("/responses") ? baseUrl : `${baseUrl}/responses`;
 }
-function buildRequestBody(model, context2, options) {
+function toOpenAiResponsesReasoningEffort(budget) {
+  if (budget === "extHigh" || budget === "max") {
+    return "high";
+  }
+  return budget;
+}
+function buildRequestBody(model2, context2, options) {
   const body = {
-    model: model.id,
+    model: model2.id,
     input: toResponsesInput$1(context2),
     stream: true,
     store: false,
@@ -12028,19 +13178,19 @@ function buildRequestBody(model, context2, options) {
   }
   if (typeof options.temperature === "number") body.temperature = options.temperature;
   if (typeof options.topP === "number") body.top_p = options.topP;
-  if (options.reasoningBudget && options.reasoningBudget !== "auto") {
-    body.reasoning = { effort: options.reasoningBudget };
-  } else if (options.reasoningVisibility === "summary-events") {
+  if (options.reasoningBudget && options.reasoningBudget !== "auto" && options.reasoningBudget !== "off") {
+    body.reasoning = { effort: toOpenAiResponsesReasoningEffort(options.reasoningBudget) };
+  } else if (options.reasoningBudget !== "off" && options.reasoningVisibility === "summary-events") {
     body.reasoning = { effort: "medium" };
   }
-  if (options.reasoningVisibility === "summary-events") {
+  if (options.reasoningBudget !== "off" && options.reasoningVisibility === "summary-events") {
     const reasoning = body.reasoning && typeof body.reasoning === "object" ? body.reasoning : {};
     body.reasoning = { ...reasoning, summary: "auto" };
   }
   if (body.reasoning) {
     body.include = ["reasoning.encrypted_content"];
   }
-  const maxTokens = options.maxTokens ?? model.maxTokens;
+  const maxTokens = options.maxTokens ?? model2.maxTokens;
   if (typeof maxTokens === "number" && maxTokens > 0) {
     body.max_output_tokens = maxTokens;
   }
@@ -12134,12 +13284,12 @@ function applyCompletedResponse(builder, payload) {
     });
   }
 }
-function createResponsesReasoningArtifact(model, item) {
+function createResponsesReasoningArtifact(model2, item) {
   if (readString$1(item?.type) !== "reasoning") return void 0;
   const encryptedContent = readString$1(item?.encrypted_content) || readString$1(item?.encryptedContent);
   return {
-    providerId: model.provider,
-    modelId: model.id,
+    providerId: model2.provider,
+    modelId: model2.id,
     protocol: PROVIDER_API,
     type: "reasoning",
     id: readString$1(item?.id) || void 0,
@@ -12147,10 +13297,10 @@ function createResponsesReasoningArtifact(model, item) {
     raw: item ?? void 0
   };
 }
-function findResponsesReasoningArtifact(model, output) {
+function findResponsesReasoningArtifact(model2, output) {
   if (!Array.isArray(output)) return void 0;
   for (const item of output) {
-    const artifact = createResponsesReasoningArtifact(model, readRecord(item));
+    const artifact = createResponsesReasoningArtifact(model2, readRecord(item));
     if (artifact) return artifact;
   }
   return void 0;
@@ -12181,30 +13331,30 @@ function readNumber(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 const CONFIGURED_PROVIDER_API = "rdc-agent-configured-provider";
-function encodeAgentModel(providerId, modelId) {
+function encodeAgentModel(providerId, modelId, options) {
   return {
     id: `${providerId}::${modelId}`,
     name: modelId,
     provider: providerId,
     api: CONFIGURED_PROVIDER_API,
-    contextWindow: 128e3,
+    contextWindow: options?.contextWindow ?? DEFAULT_CONTEXT_WINDOW_TOKENS,
     maxTokens: 4096,
     reasoning: false,
     vision: false
   };
 }
-function decodeAgentModel(model) {
+function decodeAgentModel(model2) {
   const marker = "::";
-  const idx = model.id.indexOf(marker);
+  const idx = model2.id.indexOf(marker);
   if (idx > 0) {
     return {
-      providerId: model.id.slice(0, idx),
-      modelId: model.id.slice(idx + marker.length)
+      providerId: model2.id.slice(0, idx),
+      modelId: model2.id.slice(idx + marker.length)
     };
   }
   return {
-    providerId: model.provider,
-    modelId: model.id
+    providerId: model2.provider,
+    modelId: model2.id
   };
 }
 function requireProviderProtocol(provider) {
@@ -12305,8 +13455,8 @@ class ConfiguredRuntimeProvider {
       parallelToolCalls: true
     };
   }
-  stream(model, context2, options = {}) {
-    const decoded = decodeAgentModel(model);
+  stream(model2, context2, options = {}) {
+    const decoded = decodeAgentModel(model2);
     const llmConfig = settingsService.getLlmConfig();
     const provider = llmConfig.providers.find((entry) => entry.id === decoded.providerId);
     if (!provider) {
@@ -12323,7 +13473,7 @@ class ConfiguredRuntimeProvider {
     }
     const runtimeBaseUrl = protocol === "OllamaOpenAICompatibleChatCompletions" ? normalizeLocalBaseUrl(provider.baseUrl) : provider.baseUrl;
     const runtimeModel = {
-      ...model,
+      ...model2,
       id: decoded.modelId,
       name: decoded.modelId,
       provider: decoded.providerId,
@@ -12960,6 +14110,7 @@ function translateCoreToSharedAgentEvent(event, context2) {
           {
             text,
             thinking: thinking.length > 0 ? thinking : void 0,
+            stopReason: mapCoreStopReasonToShared(event.message.stopReason),
             usage: event.message.usage ? {
               inputTokens: event.message.usage.inputTokens,
               outputTokens: event.message.usage.outputTokens
@@ -13051,6 +14202,16 @@ function translateCoreToSharedAgentEvent(event, context2) {
       );
     }
     case "error": {
+      if (event.aborted) {
+        return buildSharedAgentEvent(
+          "run.cancelled",
+          {
+            status: "cancelled",
+            error: event.error.message || String(event.error)
+          },
+          context2
+        );
+      }
       return buildSharedAgentEvent(
         "run.failed",
         {
@@ -13060,8 +14221,48 @@ function translateCoreToSharedAgentEvent(event, context2) {
         context2
       );
     }
+    case "compaction": {
+      return buildSharedAgentEvent(
+        "context.compacted",
+        {
+          summary: event.summary
+        },
+        context2
+      );
+    }
+    case "diagnostic": {
+      return buildSharedAgentEvent(
+        "diagnostic",
+        {
+          code: event.code,
+          severity: event.severity,
+          message: event.message,
+          technicalMessage: event.technicalMessage,
+          phase: event.phase
+        },
+        context2
+      );
+    }
     default:
       return null;
+  }
+}
+function mapCoreStopReasonToShared(reason) {
+  switch (reason) {
+    case "stop":
+      return "end_turn";
+    case "toolUse":
+      return "tool_use";
+    case "length":
+      return "max_tokens";
+    case "refusal":
+      return "refusal";
+    case "error":
+      return "error";
+    case "aborted":
+      return "aborted";
+    default:
+      return "error";
   }
 }
 function getApprovalRequiredReason(result) {
@@ -13297,7 +14498,7 @@ const DANGEROUS_COMMAND_PATTERNS = [
   />\s*[^&|]/,
   />>/
 ];
-function normalizeToolName$1(name) {
+function normalizeToolName(name) {
   return name.trim().toLowerCase().replace(/[.-]/g, "_");
 }
 function expandPath(value) {
@@ -13393,7 +14594,7 @@ class AgentPermissionPolicyService {
     const settings = settingsService.getAll();
     const permissions = settings.agentRuntime.permissions;
     const mode = permissions.mode;
-    const toolName = normalizeToolName$1(input.toolCall.name);
+    const toolName = normalizeToolName(input.toolCall.name);
     const workspaceRoot = path__namespace.resolve(
       input.projectRootPath || settings.workspace.rootPath || process.cwd()
     );
@@ -13711,23 +14912,48 @@ const toResponsesTools = (tools) => {
   }));
 };
 const toOpenAiReasoningEffort = (budget) => {
+  if (budget === "off") {
+    return void 0;
+  }
   if (budget === "low" || budget === "medium" || budget === "high") {
     return budget;
+  }
+  if (budget === "extHigh" || budget === "max") {
+    return "high";
   }
   return void 0;
 };
 const toAnthropicThinking = (budget) => {
-  if (!budget || budget === "auto") {
+  if (!budget || budget === "off") {
     return void 0;
   }
-  const budgetTokens = budget === "low" ? 1024 : budget === "medium" ? 4096 : 8192;
+  if (budget === "auto") {
+    return { type: "enabled", budget_tokens: 4096 };
+  }
+  const budgetTokens = budget === "low" ? 4096 : budget === "medium" ? 8192 : budget === "high" ? 16384 : budget === "extHigh" ? 32768 : 63999;
   return { type: "enabled", budget_tokens: budgetTokens };
 };
 const toGoogleThinkingConfig = (budget) => {
-  if (!budget || budget === "auto") {
+  if (!budget || budget === "auto" || budget === "off") {
     return void 0;
   }
-  return { thinkingBudget: budget === "low" ? 1024 : budget === "medium" ? 4096 : 8192 };
+  const thinkingBudget = (() => {
+    switch (budget) {
+      case "low":
+        return 1024;
+      case "medium":
+        return 4096;
+      case "high":
+        return 8192;
+      case "extHigh":
+        return 16384;
+      case "max":
+        return 24576;
+      default:
+        return 4096;
+    }
+  })();
+  return { thinkingBudget };
 };
 const extractResponsesText = (payload) => {
   if (!payload || typeof payload !== "object") {
@@ -13766,9 +14992,9 @@ const extractResponsesUsage = (payload) => {
     outputTokens: typeof output === "number" ? output : 0
   };
 };
-const createAccumulator = (model) => ({
+const createAccumulator = (model2) => ({
   id: `stream-${Date.now()}`,
-  model,
+  model: model2,
   content: "",
   toolCalls: [],
   inputTokens: 0,
@@ -13946,8 +15172,8 @@ class OpenRouterProvider extends BaseStreamingProvider {
     this.models = config.models;
   }
   async chat(request2) {
-    const model = request2.model?.trim();
-    if (!model) {
+    const model2 = request2.model?.trim();
+    if (!model2) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
@@ -13960,7 +15186,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
       },
       signal: request2.signal,
       body: JSON.stringify({
-        model,
+        model: model2,
         messages: toContentBlocks(request2.messages),
         max_tokens: request2.maxTokens || 4096,
         temperature: request2.temperature ?? 0.7,
@@ -13978,7 +15204,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
     const content = extractMessageContent(choice);
     return {
       id: data.id || `or-${Date.now()}`,
-      model: data.model || model,
+      model: data.model || model2,
       content,
       toolCalls: choice?.message?.tool_calls,
       usage: {
@@ -13989,8 +15215,8 @@ class OpenRouterProvider extends BaseStreamingProvider {
     };
   }
   async performStreamingChat(request2, onChunk) {
-    const model = request2.model?.trim();
-    if (!model) {
+    const model2 = request2.model?.trim();
+    if (!model2) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
@@ -14003,7 +15229,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
       },
       signal: request2.signal,
       body: JSON.stringify({
-        model,
+        model: model2,
         messages: toContentBlocks(request2.messages),
         max_tokens: request2.maxTokens || 4096,
         temperature: request2.temperature ?? 0.7,
@@ -14016,7 +15242,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
     if (!response.ok) {
       throw new Error(`OpenRouter API error: ${response.status} - ${await response.text()}`);
     }
-    const accumulator = createAccumulator(model);
+    const accumulator = createAccumulator(model2);
     await readSseStream(response, (_eventName, data) => {
       if (!data || data === "[DONE]") {
         return;
@@ -14098,8 +15324,8 @@ class OpenAICompatibleProvider2 extends BaseStreamingProvider {
     return `${this.name} API error: ${status} - ${text}`;
   }
   async chat(request2) {
-    const model = request2.model?.trim();
-    if (!model) {
+    const model2 = request2.model?.trim();
+    if (!model2) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
     const response = await fetch(this.createChatCompletionsUrl(), {
@@ -14107,7 +15333,7 @@ class OpenAICompatibleProvider2 extends BaseStreamingProvider {
       headers: this.createHeaders(),
       signal: request2.signal,
       body: JSON.stringify({
-        model,
+        model: model2,
         messages: toContentBlocks(request2.messages),
         max_tokens: request2.maxTokens || 4096,
         temperature: request2.temperature ?? 0.7,
@@ -14124,7 +15350,7 @@ class OpenAICompatibleProvider2 extends BaseStreamingProvider {
     const content = extractMessageContent(choice);
     return {
       id: data.id || `${this.name}-${Date.now()}`,
-      model: data.model || model,
+      model: data.model || model2,
       content,
       toolCalls: choice?.message?.tool_calls,
       usage: {
@@ -14135,8 +15361,8 @@ class OpenAICompatibleProvider2 extends BaseStreamingProvider {
     };
   }
   async performStreamingChat(request2, onChunk) {
-    const model = request2.model?.trim();
-    if (!model) {
+    const model2 = request2.model?.trim();
+    if (!model2) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
     const response = await fetch(this.createChatCompletionsUrl(), {
@@ -14144,7 +15370,7 @@ class OpenAICompatibleProvider2 extends BaseStreamingProvider {
       headers: this.createHeaders(),
       signal: request2.signal,
       body: JSON.stringify({
-        model,
+        model: model2,
         messages: toContentBlocks(request2.messages),
         max_tokens: request2.maxTokens || 4096,
         temperature: request2.temperature ?? 0.7,
@@ -14157,7 +15383,7 @@ class OpenAICompatibleProvider2 extends BaseStreamingProvider {
     if (!response.ok) {
       throw new Error(this.describeApiError(response.status, await response.text()));
     }
-    const accumulator = createAccumulator(model);
+    const accumulator = createAccumulator(model2);
     await readSseStream(response, (_eventName, data) => {
       if (!data || data === "[DONE]") {
         return;
@@ -14236,9 +15462,9 @@ class ChatGptAccountProvider extends BaseStreamingProvider {
   createResponsesUrl() {
     return this.baseUrl.endsWith("/responses") ? this.baseUrl : `${this.baseUrl}/responses`;
   }
-  createBody(request2, model, stream) {
+  createBody(request2, model2, stream) {
     const body = {
-      model,
+      model: model2,
       input: toResponsesInput(request2.messages),
       max_output_tokens: request2.maxTokens || 4096,
       temperature: request2.temperature ?? 0.7,
@@ -14259,15 +15485,15 @@ class ChatGptAccountProvider extends BaseStreamingProvider {
     return body;
   }
   async chat(request2) {
-    const model = request2.model?.trim();
-    if (!model) {
+    const model2 = request2.model?.trim();
+    if (!model2) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
     const response = await fetch(this.createResponsesUrl(), {
       method: "POST",
       headers: this.createHeaders(),
       signal: request2.signal,
-      body: JSON.stringify(this.createBody(request2, model, false))
+      body: JSON.stringify(this.createBody(request2, model2, false))
     });
     if (!response.ok) {
       throw new Error(`ChatGPT Account API error: ${response.status} - ${await response.text()}`);
@@ -14275,27 +15501,27 @@ class ChatGptAccountProvider extends BaseStreamingProvider {
     const payload = await response.json();
     return {
       id: typeof payload.id === "string" ? payload.id : `${this.name}-${Date.now()}`,
-      model: typeof payload.model === "string" ? payload.model : model,
+      model: typeof payload.model === "string" ? payload.model : model2,
       content: extractResponsesText(payload),
       usage: extractResponsesUsage(payload),
       stopReason: mapFinishReason(typeof payload.status === "string" ? payload.status : void 0)
     };
   }
   async performStreamingChat(request2, onChunk) {
-    const model = request2.model?.trim();
-    if (!model) {
+    const model2 = request2.model?.trim();
+    if (!model2) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
     const response = await fetch(this.createResponsesUrl(), {
       method: "POST",
       headers: this.createHeaders(),
       signal: request2.signal,
-      body: JSON.stringify(this.createBody(request2, model, true))
+      body: JSON.stringify(this.createBody(request2, model2, true))
     });
     if (!response.ok) {
       throw new Error(`ChatGPT Account API error: ${response.status} - ${await response.text()}`);
     }
-    const accumulator = createAccumulator(model);
+    const accumulator = createAccumulator(model2);
     await readSseStream(response, (eventName, data) => {
       if (!data || data === "[DONE]") {
         return;
@@ -14389,8 +15615,8 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
     this.models = config.models;
     this.useBearerAuth = config.authMode === "account";
   }
-  createGenerateContentUrl(model) {
-    const base = `${this.baseUrl}/models/${model}:generateContent`;
+  createGenerateContentUrl(model2) {
+    const base = `${this.baseUrl}/models/${model2}:generateContent`;
     return this.useBearerAuth ? base : appendQueryParam$1(base, "key", this.apiKey);
   }
   createHeaders() {
@@ -14400,11 +15626,11 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
     };
   }
   async chat(request2) {
-    const model = request2.model?.trim();
-    if (!model) {
+    const model2 = request2.model?.trim();
+    if (!model2) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
-    const response = await fetch(this.createGenerateContentUrl(model), {
+    const response = await fetch(this.createGenerateContentUrl(model2), {
       method: "POST",
       headers: this.createHeaders(),
       signal: request2.signal,
@@ -14430,7 +15656,7 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
     const text = Array.isArray(data.candidates?.[0]?.content?.parts) ? data.candidates[0].content.parts.map((part) => typeof part.text === "string" ? part.text : "").join("") : "";
     return {
       id: data.responseId || `google-ai-studio-${Date.now()}`,
-      model,
+      model: model2,
       content: text,
       usage: {
         inputTokens: data.usageMetadata?.promptTokenCount || 0,
@@ -14474,8 +15700,8 @@ class AnthropicProvider2 extends BaseStreamingProvider {
     };
   }
   async chat(request2) {
-    const model = request2.model?.trim();
-    if (!model) {
+    const model2 = request2.model?.trim();
+    if (!model2) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
     const systemMessage = request2.messages.find((message) => message.role === "system");
@@ -14485,7 +15711,7 @@ class AnthropicProvider2 extends BaseStreamingProvider {
       headers: this.createHeaders(),
       signal: request2.signal,
       body: JSON.stringify({
-        model,
+        model: model2,
         max_tokens: request2.maxTokens || 4096,
         thinking: toAnthropicThinking(request2.reasoningBudget),
         system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
@@ -14501,7 +15727,7 @@ class AnthropicProvider2 extends BaseStreamingProvider {
     const data = await response.json();
     return {
       id: data.id || `anthropic-${Date.now()}`,
-      model: data.model || model,
+      model: data.model || model2,
       content: data.content?.[0]?.text || "",
       usage: {
         inputTokens: data.usage?.input_tokens || 0,
@@ -14511,8 +15737,8 @@ class AnthropicProvider2 extends BaseStreamingProvider {
     };
   }
   async performStreamingChat(request2, onChunk) {
-    const model = request2.model?.trim();
-    if (!model) {
+    const model2 = request2.model?.trim();
+    if (!model2) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
     const systemMessage = request2.messages.find((message) => message.role === "system");
@@ -14522,7 +15748,7 @@ class AnthropicProvider2 extends BaseStreamingProvider {
       headers: this.createHeaders(),
       signal: request2.signal,
       body: JSON.stringify({
-        model,
+        model: model2,
         max_tokens: request2.maxTokens || 4096,
         thinking: toAnthropicThinking(request2.reasoningBudget),
         stream: true,
@@ -14536,7 +15762,7 @@ class AnthropicProvider2 extends BaseStreamingProvider {
     if (!response.ok) {
       throw new Error(`Anthropic API error: ${response.status} - ${await response.text()}`);
     }
-    const accumulator = createAccumulator(model);
+    const accumulator = createAccumulator(model2);
     await readSseStream(response, (eventName, data) => {
       if (!data) {
         return;
@@ -14698,7 +15924,6 @@ const CHATGPT_CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";
 const CLAUDE_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 const GITHUB_COPILOT_CLIENT_ID = "Iv1.b507a08c87ecfe98";
 const GROK_OPENID_CONFIGURATION_URL = "https://auth.x.ai/.well-known/openid-configuration";
-const GROK_API_BASE_URL = "https://api.x.ai/v1";
 const GROK_OAUTH_REQUESTED_SCOPES = ["openid", "profile", "email", "offline_access", "api:access"];
 const GROK_OAUTH_CLIENT_ID_ENV_KEYS = [
   "RDC_AGENT_GROK_OAUTH_CLIENT_ID",
@@ -14734,22 +15959,6 @@ const appendParams = (baseUrl, params) => {
     url2.searchParams.set(key, value);
   }
   return url2.toString();
-};
-const normalizeAccountModels = (values) => {
-  const models = /* @__PURE__ */ new Map();
-  for (const value of values) {
-    const record = value && typeof value === "object" ? value : null;
-    const id = typeof value === "string" ? value.trim() : typeof record?.id === "string" ? record.id.trim() : typeof record?.name === "string" ? record.name.trim() : "";
-    if (!id || !isAgentRoutableAccountModel(id) || models.has(id)) {
-      continue;
-    }
-    models.set(id, {
-      id,
-      label: typeof record?.display_name === "string" && record.display_name.trim() ? record.display_name.trim() : id,
-      enabled: true
-    });
-  }
-  return Array.from(models.values()).sort((left, right) => left.id.localeCompare(right.id));
 };
 const readString = (value) => typeof value === "string" && value.trim() ? value.trim() : void 0;
 const readStringArray = (value) => Array.isArray(value) ? value.filter((entry) => typeof entry === "string" && entry.trim().length > 0) : [];
@@ -14893,30 +16102,14 @@ const extractChatGptAccountId = (idToken) => {
   return readString(authRecord.chatgpt_account_id) ?? readString(authRecord.account_id) ?? readString(claims["https://api.openai.com/auth.chatgpt_account_id"]) ?? readString(claims.chatgpt_account_id) ?? readString(claims.account_id) ?? readString(firstOrganization.id);
 };
 const createAccountCatalogModels = (providerId) => {
-  const definition = getBuiltinProviderDefinition(providerId);
   const seen = /* @__PURE__ */ new Set();
-  return (definition?.recommendedModels ?? []).map((modelId) => modelId.trim()).filter((modelId) => {
-    if (!modelId || seen.has(modelId) || !isAgentRoutableAccountModel(modelId)) {
+  return getManagedProviderModels(providerId).filter((model2) => {
+    if (!model2.id || seen.has(model2.id) || !isAgentRoutableAccountModel(model2.id)) {
       return false;
     }
-    seen.add(modelId);
+    seen.add(model2.id);
     return true;
-  }).map((modelId) => ({
-    id: modelId,
-    label: modelId,
-    enabled: true
-  }));
-};
-const mergeAccountModels = (...groups) => {
-  const models = /* @__PURE__ */ new Map();
-  for (const group of groups) {
-    for (const model of group) {
-      if (!models.has(model.id) && isAgentRoutableAccountModel(model.id)) {
-        models.set(model.id, model);
-      }
-    }
-  }
-  return Array.from(models.values());
+  });
 };
 const isAgentRoutableAccountModel = (modelId) => {
   const normalized = modelId.toLowerCase();
@@ -14983,28 +16176,6 @@ const fetchOAuthJson = async (url2, init) => {
   }
 };
 const createFormBody = (params) => new URLSearchParams(params).toString();
-const parseModels = (payload) => {
-  if (!payload || typeof payload !== "object") {
-    return [];
-  }
-  const data = payload.data ?? payload.models;
-  return Array.isArray(data) ? normalizeAccountModels(data) : [];
-};
-const parseCopilotModels = (payload) => {
-  if (!payload || typeof payload !== "object") {
-    return [];
-  }
-  const data = payload.data ?? payload.models;
-  if (!Array.isArray(data)) {
-    return [];
-  }
-  return normalizeAccountModels(data.filter((value) => {
-    const record = value && typeof value === "object" ? value : null;
-    const policy = record?.policy && typeof record.policy === "object" && !Array.isArray(record.policy) ? record.policy : null;
-    const state2 = typeof policy?.state === "string" ? policy.state.toLowerCase() : "";
-    return !state2 || state2 === "enabled";
-  }));
-};
 class ProviderAccountAuthService {
   async startLogin(request2) {
     const providerId = request2.providerId;
@@ -15766,46 +16937,11 @@ class ProviderAccountAuthService {
     };
   }
   async discoverModels(bundle) {
-    if (bundle.providerId === "chatgpt-account" || bundle.providerId === "claude-account" || isUnimplementedAccountProviderId(bundle.providerId)) {
-      return createAccountCatalogModels(bundle.providerId);
+    const models = createAccountCatalogModels(bundle.providerId);
+    if (models.length === 0) {
+      throw new Error(`Account provider ${bundle.providerId} is missing an app-managed model catalog.`);
     }
-    if (bundle.providerId === "grok-account") {
-      const token = bundle.accessToken ?? bundle.apiKey;
-      if (!token) {
-        throw new Error("Super Grok account access token is missing. Sign in again.");
-      }
-      const payload2 = await fetchJson(`${GROK_API_BASE_URL}/models`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      return parseModels(payload2);
-    }
-    if (bundle.providerId === "github-copilot") {
-      const catalogModels = createAccountCatalogModels(bundle.providerId);
-      const baseUrl = (bundle.copilotApiBaseUrl ?? "https://api.githubcopilot.com").replace(/\/+$/, "");
-      try {
-        const payload2 = await fetchJson(`${baseUrl}/models`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${bundle.copilotToken}`,
-            "Content-Type": "application/json",
-            ...COPILOT_WIRE_HEADERS
-          }
-        });
-        return mergeAccountModels(catalogModels, parseCopilotModels(payload2));
-      } catch {
-        return catalogModels;
-      }
-    }
-    const payload = await fetchJson("https://api.openai.com/v1/models", {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${bundle.apiKey ?? bundle.accessToken}`
-      }
-    });
-    return parseModels(payload);
+    return models;
   }
   async revokeGrokBundle(bundle) {
     if (bundle.providerId !== "grok-account" || !bundle.clientId) {
@@ -16002,6 +17138,113 @@ class ProviderAccountAuthService {
   }
 }
 const providerAccountAuthService = new ProviderAccountAuthService();
+function sanitizeReasoningLevels(levels) {
+  if (!levels || levels.length === 0) {
+    return ["off"];
+  }
+  return levels.filter((level) => REASONING_LEVELS.includes(level));
+}
+function normalizeTurnControls(controls, defaultReasoningLevel) {
+  const candidate = controls?.reasoningLevel ?? controls?.effort;
+  return {
+    reasoningLevel: isReasoningLevel(candidate) ? candidate : defaultReasoningLevel,
+    maxContextMode: controls?.maxContextMode === true,
+    fastModel: controls?.fastModel === true
+  };
+}
+function pickReasoningMode(profile, levels) {
+  if (profile?.reasoningMode) {
+    return profile.reasoningMode;
+  }
+  if (levels.some(isEffortReasoningLevel)) {
+    return "effort-levels";
+  }
+  if (levels.includes("auto")) {
+    return "auto-only";
+  }
+  return "none";
+}
+function pickDefaultReasoningLevel(levels, profileDefault) {
+  if (profileDefault && levels.includes(profileDefault)) {
+    return profileDefault;
+  }
+  if (levels.includes("medium")) {
+    return "medium";
+  }
+  if (levels.includes("auto")) {
+    return "auto";
+  }
+  return levels[0] ?? "off";
+}
+function resolveNominalContextWindow(profile) {
+  const value = profile?.nominalContextWindowTokens;
+  return typeof value === "number" && value > 0 ? value : null;
+}
+function isFastVariantAvailable(provider, fastVariantModelId) {
+  if (!fastVariantModelId || !provider) {
+    return false;
+  }
+  return provider.models.some((model2) => model2.id === fastVariantModelId && model2.enabled !== false);
+}
+function resolveModelCapability(providerId, modelId, settings) {
+  const provider = settings.llm.providers.find((entry) => entry.id === providerId);
+  const profile = provider?.catalogOwnership === "app-managed" ? lookupManagedModelCapabilityProfile(providerId, modelId) : null;
+  const nominalContextWindowTokens = resolveNominalContextWindow(profile);
+  const defaultContextWindowTokens = nominalContextWindowTokens !== null ? Math.min(DEFAULT_CONTEXT_WINDOW_TOKENS, nominalContextWindowTokens) : DEFAULT_CONTEXT_WINDOW_TOKENS;
+  const maxContextWindowTokens = nominalContextWindowTokens !== null && nominalContextWindowTokens >= MAX_CONTEXT_MODE_MIN_TOKENS ? nominalContextWindowTokens : null;
+  const maxContextAvailable = maxContextWindowTokens !== null;
+  const supportedReasoningLevels = sanitizeReasoningLevels(profile?.supportedReasoningLevels);
+  const reasoningMode = pickReasoningMode(profile, supportedReasoningLevels);
+  const defaultReasoningLevel = pickDefaultReasoningLevel(supportedReasoningLevels, profile?.defaultReasoningLevel);
+  const fastVariantModelId = profile?.fastVariantModelId ?? null;
+  return {
+    providerId,
+    modelId,
+    catalogSource: profile ? "managed-catalog" : "conservative-default",
+    nominalContextWindowTokens,
+    defaultContextWindowTokens,
+    maxContextWindowTokens,
+    reasoningMode,
+    supportedReasoningLevels,
+    defaultReasoningLevel,
+    maxContextAvailable,
+    fastVariantModelId,
+    fastModelAvailable: isFastVariantAvailable(provider, fastVariantModelId),
+    toolCalling: Boolean(profile?.toolCalling),
+    visionInput: Boolean(profile?.visionInput),
+    structuredOutput: Boolean(profile?.structuredOutput)
+  };
+}
+function resolveTurnControls(capability, requestControls, sessionControls) {
+  if (requestControls) {
+    return normalizeTurnControls(requestControls, capability.defaultReasoningLevel);
+  }
+  if (sessionControls) {
+    return normalizeTurnControls(sessionControls, capability.defaultReasoningLevel);
+  }
+  return {
+    reasoningLevel: capability.defaultReasoningLevel,
+    maxContextMode: false,
+    fastModel: false
+  };
+}
+function resolveEffectiveModelId(capability, turnControls) {
+  if (turnControls.fastModel && capability.fastModelAvailable && capability.fastVariantModelId) {
+    return capability.fastVariantModelId;
+  }
+  return capability.modelId;
+}
+function resolveReasoningBudget(capability, turnControls) {
+  if (capability.reasoningMode === "none") {
+    return "off";
+  }
+  const normalized = normalizeTurnControls(turnControls, capability.defaultReasoningLevel);
+  const clamped = clampReasoningLevel(normalized.reasoningLevel, capability.supportedReasoningLevels) ?? capability.defaultReasoningLevel;
+  if (clamped === "off" || clamped === "auto") {
+    return clamped;
+  }
+  return clamped;
+}
 const BLOCKER_CODES = {
   BLOCKED_LLM_ROUTE_MISSING: {
     code: "BLOCKED_LLM_ROUTE_MISSING"
@@ -16237,9 +17480,12 @@ class DebuggerLlmService {
       return null;
     }
     const settings = settingsService.getAll();
-    const provider = settings.llm.providers.find((entry) => entry.id === summary.providerId);
-    const model = provider?.models.find((entry) => entry.id === summary.modelId) ?? null;
-    const contextWindowTokens = typeof model?.contextWindowTokens === "number" && model.contextWindowTokens > 0 ? model.contextWindowTokens : null;
+    const turnControls = this.resolveSessionTurnControls(runId, summary);
+    const capability = resolveModelCapability(summary.providerId, summary.modelId, settings);
+    const contextWindowTokens = resolveActiveContextWindowTokens(capability, turnControls ?? {
+      reasoningLevel: capability.defaultReasoningLevel,
+      maxContextMode: false
+    });
     const totalTokens = summary.totalInputTokens + summary.totalOutputTokens;
     const occupiedTokens = summary.lastOccupiedTokens ?? 0;
     return {
@@ -16250,12 +17496,20 @@ class DebuggerLlmService {
       outputTokens: summary.totalOutputTokens,
       totalTokens,
       contextWindowTokens,
-      usagePercent: contextWindowTokens ? Math.min(100, Math.max(0, Math.round(occupiedTokens / contextWindowTokens * 100))) : 0,
-      hasConfiguredContextWindow: Boolean(contextWindowTokens),
+      usagePercent: Math.min(100, Math.max(0, Math.round(occupiedTokens / contextWindowTokens * 100))),
       occupiedTokens,
       breakdown: buildScaledBreakdown(summary.lastPromptBreakdown ?? null, occupiedTokens, contextWindowTokens),
       snapshotAt: summary.lastSnapshotAt ?? null
     };
+  }
+  resolveSessionTurnControls(key, summary) {
+    if (key.startsWith("sess_")) {
+      return storageAdapter.readSession(key)?.turnControls ?? null;
+    }
+    if (summary.sessionId) {
+      return storageAdapter.readSession(summary.sessionId)?.turnControls ?? null;
+    }
+    return null;
   }
   /**
    * 记录一次 agent loop turn 的真实窗口占用与分类快照，并广播给 UI。
@@ -16273,6 +17527,7 @@ class DebuggerLlmService {
     const existing = this.runSummaries.get(key) ?? {
       providerId: params.providerId,
       modelId: params.modelId,
+      sessionId: params.sessionId ?? null,
       successfulCallCount: 0,
       failedCallCount: 0,
       totalInputTokens: 0,
@@ -16282,6 +17537,9 @@ class DebuggerLlmService {
     };
     existing.providerId = existing.providerId || params.providerId;
     existing.modelId = existing.modelId || params.modelId;
+    if (params.sessionId) {
+      existing.sessionId = params.sessionId;
+    }
     existing.successfulCallCount += 1;
     existing.totalInputTokens += params.inputTokens;
     existing.totalOutputTokens += params.outputTokens;
@@ -16336,8 +17594,8 @@ class DebuggerLlmService {
         [`agent:${agentId}`, `provider:${route.providerId}`]
       ));
     }
-    const model = provider.models.find((entry) => entry.enabled && entry.id === route.modelId);
-    if (!model) {
+    const model2 = provider.models.find((entry) => entry.enabled && entry.id === route.modelId);
+    if (!model2) {
       throw new DebuggerLlmBlockerError(makeBlocker(
         BLOCKER_CODES.BLOCKED_LLM_MODEL_MISSING.code,
         `${agentId} route points to a disabled or missing model: ${route.modelId}.`,
@@ -16582,6 +17840,7 @@ class DebuggerLlmService {
     const existing = this.runSummaries.get(context2.runId) ?? {
       providerId: route.providerId,
       modelId: route.modelId,
+      sessionId: context2.sessionId ?? null,
       successfulCallCount: 0,
       failedCallCount: 0,
       totalInputTokens: 0,
@@ -16591,6 +17850,9 @@ class DebuggerLlmService {
     };
     existing.providerId = existing.providerId || route.providerId;
     existing.modelId = existing.modelId || route.modelId;
+    if (context2.sessionId) {
+      existing.sessionId = context2.sessionId;
+    }
     if (status === "ok") {
       existing.successfulCallCount += 1;
       if (!existing.firstRequestId && response?.id) {
@@ -16625,181 +17887,6 @@ class DebuggerLlmService {
   }
 }
 const debuggerLlmService = new DebuggerLlmService();
-const ASK_READONLY_TOOL_ALLOWLIST = [
-  "read_file",
-  "glob",
-  "grep",
-  "task_list",
-  "web_fetch",
-  "web_search",
-  "git_status",
-  "git_diff",
-  "git_log",
-  "tool_search",
-  "memory_read"
-];
-const CANONICAL_TOOL_EXPANSIONS = {
-  read: ["read_file"],
-  search: ["glob", "grep"],
-  web: ["web_fetch", "web_search"],
-  git: ["git_status", "git_diff", "git_log", "git_add", "git_unstage", "git_commit"],
-  bash: ["bash"],
-  write: ["write_file"],
-  edit: ["edit_file"],
-  askUser: ["ask_user"],
-  "vscode/askQuestions": ["ask_user"],
-  agent: ["agent_handoff"],
-  handoff: ["agent_handoff"],
-  task: ["task_create", "task_update", "task_get", "task_list"],
-  memory: ["memory_read"],
-  planArtifact: ["plan_artifact"],
-  artifact: ["plan_artifact"],
-  "vscode/memory": ["memory_read"],
-  skill: ["skills", "skill_run"],
-  skills: ["skills", "skill_run"],
-  mcp: ["mcp", "mcp__*"],
-  MCP: ["mcp", "mcp__*"],
-  tool_search: ["tool_search"],
-  rdxContext: ["rdx_context"],
-  rdx: ["rdx_context"]
-};
-const RUNTIME_TOOL_ALIASES = {
-  read: "read_file",
-  read_file: "read_file",
-  search: "grep",
-  glob: "glob",
-  grep: "grep",
-  web: "web_fetch",
-  web_fetch: "web_fetch",
-  web_search: "web_search",
-  git: "git_status",
-  git_status: "git_status",
-  git_diff: "git_diff",
-  git_log: "git_log",
-  git_add: "git_add",
-  git_unstage: "git_unstage",
-  git_commit: "git_commit",
-  bash: "bash",
-  write: "write_file",
-  write_file: "write_file",
-  edit: "edit_file",
-  edit_file: "edit_file",
-  task_create: "task_create",
-  task_update: "task_update",
-  task_get: "task_get",
-  task_list: "task_list",
-  askUser: "ask_user",
-  ask_user: "ask_user",
-  "vscode/askQuestions": "ask_user",
-  agent: "agent_handoff",
-  handoff: "agent_handoff",
-  agent_handoff: "agent_handoff",
-  subagent: "subagent",
-  memory: "memory_read",
-  memory_read: "memory_read",
-  memory_write: "memory_write",
-  memory_delete: "memory_delete",
-  planArtifact: "plan_artifact",
-  artifact: "plan_artifact",
-  plan_artifact: "plan_artifact",
-  "vscode/memory": "memory_read",
-  skill: "skills",
-  skills: "skills",
-  skill_run: "skill_run",
-  mcp: "mcp",
-  MCP: "mcp",
-  rdxContext: "rdx_context",
-  rdx: "rdx_context",
-  rdx_context: "rdx_context"
-};
-const ASK_DENIED_TOOL_PREFIXES = ["rd.", "mcp.", "mcp__"];
-const ASK_DENIED_TOOLS = /* @__PURE__ */ new Set([
-  "bash",
-  "write",
-  "write_file",
-  "edit",
-  "edit_file",
-  "remove",
-  "delete",
-  "git_add",
-  "git_unstage",
-  "git_commit",
-  "task_create",
-  "task_update",
-  "rdx_context"
-]);
-const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
-  ...ASK_READONLY_TOOL_ALLOWLIST,
-  "bash",
-  "write_file",
-  "edit_file",
-  "ask_user",
-  "agent_handoff",
-  "subagent",
-  "task_create",
-  "task_update",
-  "task_get",
-  "task_list",
-  "memory_read",
-  "memory_write",
-  "memory_delete",
-  "plan_artifact",
-  "skills",
-  "skill_run",
-  "mcp",
-  "mcp__*",
-  "rdx_context",
-  "git_add",
-  "git_unstage",
-  "git_commit",
-  "tool_search"
-];
-const SHADER_EDIT_TOOLS = ["rd.shader.edit_and_replace", "rd.macro.shader_hotfix_validate"];
-function resolveAgentToolAllowlist(agentId, stage) {
-  const settings = settingsService.getAll();
-  const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, stage || "investigate", agentId);
-  const manifest = settings.agents.definitions.find((definition) => definition.id === agentId && definition.enabled);
-  const profileTools = manifest ? manifest.tools.flatMap(expandCanonicalToolToken) : runtimeProfile.toolAllowlist?.length ? runtimeProfile.toolAllowlist.flatMap(expandCanonicalToolToken) : agentId === "ask" ? ASK_READONLY_TOOL_ALLOWLIST : isTopLevelAgentId(agentId) ? EXECUTABLE_AGENT_TOOL_ALLOWLIST : [];
-  if (agentId === "ask") {
-    return Array.from(new Set(profileTools.filter((toolName) => !isDeniedAskTool(toolName, normalizeToolName(toolName)))));
-  }
-  return Array.from(new Set(profileTools));
-}
-function isToolAllowedForAgent(toolName, agentId, stage) {
-  const normalizedToolName = normalizeToolName(toolName);
-  if (SHADER_EDIT_TOOLS.includes(normalizedToolName)) {
-    return false;
-  }
-  if (agentId === "ask" && isDeniedAskTool(toolName, normalizedToolName)) {
-    return false;
-  }
-  const allowlist = resolveAgentToolAllowlist(agentId, stage);
-  for (const pattern of allowlist) {
-    const normalizedPattern = normalizeToolName(pattern);
-    if (normalizedPattern === "*" || normalizedPattern === normalizedToolName) {
-      return true;
-    }
-    if (normalizedPattern.endsWith(".*") && normalizedToolName.startsWith(normalizedPattern.slice(0, -1))) {
-      return true;
-    }
-    if (normalizedPattern.endsWith("*") && normalizedToolName.startsWith(normalizedPattern.slice(0, -1))) {
-      return true;
-    }
-  }
-  return false;
-}
-function normalizeToolName(toolName) {
-  return RUNTIME_TOOL_ALIASES[toolName] ?? toolName;
-}
-function expandCanonicalToolToken(toolName) {
-  return CANONICAL_TOOL_EXPANSIONS[toolName] ?? [normalizeToolName(toolName)];
-}
-function isDeniedAskTool(originalToolName, normalizedToolName) {
-  if (ASK_DENIED_TOOLS.has(originalToolName) || ASK_DENIED_TOOLS.has(normalizedToolName)) {
-    return true;
-  }
-  return ASK_DENIED_TOOL_PREFIXES.some((prefix) => originalToolName.startsWith(prefix) || normalizedToolName.startsWith(prefix));
-}
 class AgentOrchestrator {
   agentStates = /* @__PURE__ */ new Map();
   agentConfigs = /* @__PURE__ */ new Map();
@@ -16929,12 +18016,24 @@ class AgentOrchestrator {
       const systemPrompt = this.systemPromptForAgent(agentId, config.systemPrompt);
       await this.recordMessage(agentId, "user", content, context2);
       const stub = this.createTestModeStub(agentId, content);
+      const settings = settingsService.getAll();
+      const capability = resolveModelCapability(config.modelProvider, config.modelName, settings);
+      const sessionRecord = context2?.sessionId ? storageAdapter.readSession(context2.sessionId) : null;
+      const turnControls = resolveTurnControls(
+        capability,
+        options?.turnControls,
+        sessionRecord?.turnControls
+      );
+      const effectiveModelId = resolveEffectiveModelId(capability, turnControls);
+      const activeContextWindow = resolveActiveContextWindowTokens(capability, turnControls);
+      const contextTokenLimit = Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
+      const reasoningBudget = options?.reasoningBudget ?? resolveReasoningBudget(capability, turnControls);
       const responseText = stub ? await this.streamTestModeStub(stub, options) : await this.runAgentTurn({
         agentId,
         content,
         systemPrompt,
         providerId: config.modelProvider,
-        modelId: config.modelName,
+        modelId: effectiveModelId,
         maxTokens: config.maxTokens,
         temperature: config.temperature,
         mode: this.modeForAgent(agentId),
@@ -16944,9 +18043,14 @@ class AgentOrchestrator {
         sessionId: context2?.sessionId ?? null,
         turnId: context2?.turnId,
         toolAllowlist: resolveAgentToolAllowlist(agentId, context2?.stageId),
-        options,
+        options: {
+          ...options,
+          reasoningBudget
+        },
         projectRootPath: context2?.projectRootPath ?? null,
-        projectId: context2?.projectId ?? null
+        projectId: context2?.projectId ?? null,
+        contextWindow: activeContextWindow,
+        contextTokenLimit
       });
       const finalContent = await this.finalizeRecordedAssistantMessage(
         agentId,
@@ -16989,12 +18093,24 @@ class AgentOrchestrator {
         return finalStub;
       }
       const toolAllowlist = resolveAgentToolAllowlist(agentId, options?.stage && options.stage !== "report" ? options.stage : void 0);
+      const routeProviderId = config.modelProvider;
+      const routeModelId = config.modelName;
+      const capability = resolveModelCapability(routeProviderId, routeModelId, settings);
+      const turnControls = resolveTurnControls(
+        capability,
+        options?.turnControls,
+        options?.sessionId ? storageAdapter.readSession(options.sessionId)?.turnControls : void 0
+      );
+      const effectiveModelId = resolveEffectiveModelId(capability, turnControls);
+      const activeContextWindow = resolveActiveContextWindowTokens(capability, turnControls);
+      const contextTokenLimit = Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
+      const reasoningBudget = options?.reasoningBudget ?? resolveReasoningBudget(capability, turnControls);
       const responseText = await this.runAgentTurn({
         agentId,
         content,
         systemPrompt: this.systemPromptForAgent(agentId, config.systemPrompt),
-        providerId: config.modelProvider,
-        modelId: config.modelName,
+        providerId: routeProviderId,
+        modelId: effectiveModelId,
         maxTokens: config.maxTokens,
         temperature: config.temperature,
         mode: this.modeForAgent(agentId),
@@ -17004,10 +18120,15 @@ class AgentOrchestrator {
         sessionId: options?.sessionId ?? null,
         turnId: options?.turnId,
         toolAllowlist,
-        options,
+        options: {
+          ...options,
+          reasoningBudget
+        },
         projectRootPath: options?.projectRootPath ?? null,
         projectId: options?.projectId ?? null,
-        promptMetrics: options?.promptMetrics
+        promptMetrics: options?.promptMetrics,
+        contextWindow: activeContextWindow,
+        contextTokenLimit
       });
       runtimeLogService.log({
         scope: options?.sessionId ? "session" : "app",
@@ -17073,6 +18194,11 @@ class AgentOrchestrator {
           projectId: input.projectId,
           systemPrompt,
           onEvent: (event) => {
+            const basePayload = {
+              subagentId,
+              profile: input.targetProfile,
+              parentToolCallId: input.parentToolCallId
+            };
             if (event.type === "assistant.delta") {
               const delta = event.payload;
               if (delta.text) {
@@ -17083,13 +18209,56 @@ class AgentOrchestrator {
                   sessionId: input.parentSessionId ?? null,
                   agentId: input.parentAgentId,
                   payload: {
-                    subagentId,
-                    profile: input.targetProfile,
-                    parentToolCallId: input.parentToolCallId,
+                    ...basePayload,
                     text: delta.text
                   }
                 });
               }
+              return;
+            }
+            if (event.type === "tool.started") {
+              const payload = event.payload;
+              input.parentOnEvent?.({
+                id: generateEventId("agent-event"),
+                type: "subagent.delta",
+                timestamp: nowMs(),
+                sessionId: input.parentSessionId ?? null,
+                agentId: input.parentAgentId,
+                payload: {
+                  ...basePayload,
+                  child: {
+                    id: String(payload.toolCallId ?? generateEventId("subagent-tool")),
+                    kind: "tool",
+                    title: payload.toolName ? `Tool: ${payload.toolName}` : "Tool",
+                    status: "running",
+                    toolName: payload.toolName
+                  }
+                }
+              });
+              return;
+            }
+            if (event.type === "tool.completed" || event.type === "tool.denied") {
+              const payload = event.payload;
+              const failed = event.type === "tool.denied" || payload.result?.ok === false;
+              const summary = failed ? payload.reason || payload.result?.error?.message || "Tool failed" : "Tool completed";
+              input.parentOnEvent?.({
+                id: generateEventId("agent-event"),
+                type: "subagent.delta",
+                timestamp: nowMs(),
+                sessionId: input.parentSessionId ?? null,
+                agentId: input.parentAgentId,
+                payload: {
+                  ...basePayload,
+                  child: {
+                    id: String(payload.toolCallId ?? generateEventId("subagent-tool")),
+                    kind: "tool",
+                    title: payload.toolName ? `Tool: ${payload.toolName}` : "Tool",
+                    status: failed ? "error" : "complete",
+                    toolName: payload.toolName,
+                    summary
+                  }
+                }
+              });
             }
           }
         }
@@ -17155,18 +18324,19 @@ class AgentOrchestrator {
     };
     return [runSubagentTool];
   }
-  getOrCreateAgentSlot(agentId, providerId, modelId, systemPrompt, tools = [], toolExecutor = this.createToolExecutor(agentId, [], void 0), streamOptions, turnSignature = "", sessionId) {
+  getOrCreateAgentSlot(agentId, providerId, modelId, systemPrompt, tools = [], toolExecutor = this.createToolExecutor(agentId, [], void 0), streamOptions, turnSignature = "", sessionId, contextWindow, contextTokenLimit) {
     const slotKey = this.agentSlotKey(sessionId, agentId);
     const toolSignature = this.createToolSignature(tools);
+    const resolvedContextTokenLimit = contextTokenLimit ?? Math.floor((contextWindow ?? 256e3) * CONTEXT_COMPACTION_RATIO);
     const existing = this.agentSlots.get(slotKey);
-    if (existing && existing.providerId === providerId && existing.modelId === modelId && existing.systemPrompt === systemPrompt && existing.toolSignature === toolSignature && existing.turnSignature === turnSignature && !existing.agent.isStreaming) {
+    if (existing && existing.providerId === providerId && existing.modelId === modelId && existing.systemPrompt === systemPrompt && existing.toolSignature === toolSignature && existing.turnSignature === turnSignature && existing.contextTokenLimit === resolvedContextTokenLimit && !existing.agent.isStreaming) {
       return existing;
     }
     const persistedMessages = sessionId ? storageAdapter.readAgentThread(sessionId, agentId) : [];
-    const agentModel = encodeAgentModel(providerId, modelId);
+    const agentModel = encodeAgentModel(providerId, modelId, { contextWindow });
     const contextManager = new ContextManager({
       modelId,
-      contextTokenLimit: Math.floor(agentModel.contextWindow * 0.75),
+      contextTokenLimit: resolvedContextTokenLimit,
       toolResultBudget: 200 * 1024,
       keepRecentToolResults: 3
     });
@@ -17187,7 +18357,16 @@ class AgentOrchestrator {
       // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
       errorRecovery
     });
-    const slot = { agent, contextManager, providerId, modelId, systemPrompt, toolSignature, turnSignature };
+    const slot = {
+      agent,
+      contextManager,
+      providerId,
+      modelId,
+      systemPrompt,
+      toolSignature,
+      turnSignature,
+      contextTokenLimit: resolvedContextTokenLimit
+    };
     this.agentSlots.set(slotKey, slot);
     return slot;
   }
@@ -17323,8 +18502,8 @@ class AgentOrchestrator {
     if (!route) {
       throw new Error("No agent route available for memory LLM adapter.");
     }
-    const model = encodeAgentModel(route.providerId, route.modelId);
-    const stream = configuredRuntimeProvider.stream(model, {
+    const model2 = encodeAgentModel(route.providerId, route.modelId);
+    const stream = configuredRuntimeProvider.stream(model2, {
       messages: [{ role: "user", content: prompt, timestamp: Date.now() }]
     });
     const assistant = await stream.result();
@@ -17336,27 +18515,27 @@ class AgentOrchestrator {
   resolveRuntimeTools(agentId, toolAllowlist, stage, sessionId) {
     const availableTools = /* @__PURE__ */ new Map();
     for (const tool of getPrimitiveTools()) {
-      availableTools.set(normalizeToolName(tool.name), tool);
+      availableTools.set(normalizeToolName$1(tool.name), tool);
     }
     for (const tool of this.createTaskRuntimeTools()) {
-      availableTools.set(normalizeToolName(tool.name), tool);
+      availableTools.set(normalizeToolName$1(tool.name), tool);
     }
     const rdxContextTool = this.createRdxContextTool();
     availableTools.set(rdxContextTool.name, rdxContextTool);
     for (const tool of this.createWorkbenchTools(agentId, sessionId)) {
-      availableTools.set(normalizeToolName(tool.name), tool);
+      availableTools.set(normalizeToolName$1(tool.name), tool);
     }
     for (const tool of this.mcpManager.getAgentTools()) {
-      availableTools.set(normalizeToolName(tool.name), tool);
+      availableTools.set(normalizeToolName$1(tool.name), tool);
     }
     const toolSearchTool = createToolSearchTool(() => Array.from(availableTools.values()));
-    availableTools.set(normalizeToolName(toolSearchTool.name), toolSearchTool);
+    availableTools.set(normalizeToolName$1(toolSearchTool.name), toolSearchTool);
     const definitions = [];
     const toolMap = /* @__PURE__ */ new Map();
     for (const tool of availableTools.values()) {
       if (!this.matchesToolAllowlist(tool.name, toolAllowlist)) continue;
       if (!this.isAllowedForRuntime(agentId, tool.name, stage)) continue;
-      const normalized = normalizeToolName(tool.name);
+      const normalized = normalizeToolName$1(tool.name);
       if (!toolMap.has(normalized)) {
         toolMap.set(normalized, tool);
         definitions.push(toolToDefinition(tool));
@@ -17365,9 +18544,9 @@ class AgentOrchestrator {
     return { definitions, toolMap };
   }
   matchesToolAllowlist(toolName, toolAllowlist) {
-    const normalizedToolName = normalizeToolName(toolName);
+    const normalizedToolName = normalizeToolName$1(toolName);
     return toolAllowlist.some((entry) => {
-      const normalizedEntry = normalizeToolName(entry);
+      const normalizedEntry = normalizeToolName$1(entry);
       if (normalizedEntry === "*" || normalizedEntry === normalizedToolName) {
         return true;
       }
@@ -17384,7 +18563,7 @@ class AgentOrchestrator {
     const tools = this.resolveRuntimeTools(agentId, toolAllowlist, stage, sessionId).toolMap;
     return {
       execute: async (toolCall, signal, onUpdate) => {
-        const normalizedName = normalizeToolName(toolCall.name);
+        const normalizedName = normalizeToolName$1(toolCall.name);
         if (!this.isAllowedForRuntime(agentId, toolCall.name, stage) || !tools.has(normalizedName)) {
           return this.createPolicyDeniedToolResult(toolCall, agentId);
         }
@@ -18069,7 +19248,7 @@ ${entries.join("\n")}` : "No matching memories were found."
       maxTokens: input.maxTokens,
       temperature: input.temperature,
       reasoningBudget: input.options?.reasoningBudget,
-      reasoningVisibility: routeCapability.reasoningVisibility,
+      reasoningVisibility: input.options?.reasoningBudget === "off" ? "none" : routeCapability.reasoningVisibility,
       signal: input.options?.signal
     };
     const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
@@ -18098,7 +19277,9 @@ ${entries.join("\n")}` : "No matching memories were found."
       toolExecutor,
       streamOptions,
       input.turnId ?? "",
-      input.sessionId
+      input.sessionId,
+      input.contextWindow,
+      input.contextTokenLimit
     );
     const userMessage = {
       role: "user",
@@ -19424,6 +20605,22 @@ class TraceEventEmitter {
       };
       return this.store.append(runId, "run.failed", node);
     }
+    if (event.type === "run.cancelled") {
+      const payload = event.payload;
+      const node = {
+        id: generateEventId("error"),
+        runId,
+        kind: "error",
+        title: "已取消",
+        message: payload.error || "用户已停止执行",
+        recoverable: false,
+        seq: 0,
+        createdAt: toIso$1(event.timestamp),
+        visibility: "user",
+        status: "failed"
+      };
+      return this.store.append(runId, "run.cancelled", node);
+    }
     return null;
   }
   /**
@@ -19463,15 +20660,15 @@ class TraceEventEmitter {
         id: generateEventId("error"),
         runId,
         kind: "error",
-        title: "执行失败",
+        title: event.aborted ? "已取消" : "执行失败",
         message: event.error?.message || "未知错误",
-        recoverable: true,
+        recoverable: !event.aborted,
         seq: 0,
         createdAt: nowIso$1(),
         visibility: "user",
         status: "failed"
       };
-      return this.store.append(runId, "run.failed", node);
+      return this.store.append(runId, event.aborted ? "run.cancelled" : "run.failed", node);
     }
     return null;
   }
@@ -21600,8 +22797,8 @@ class CommandService {
             kind: "command",
             title: `/${commandName}`,
             status: result.success ? "complete" : "error",
-            summary: result.message,
-            detail: result.data ? JSON.stringify(result.data, null, 2) : void 0,
+            summary: result.data ? `${result.message}
+${JSON.stringify(result.data, null, 2)}` : result.message,
             toolCalls: [],
             startedAt: now,
             completedAt: now
@@ -22144,6 +23341,10 @@ const DEFAULT_SECTIONS = [
 const DEFAULT_STATIC_SECTION_COUNT = 8;
 const DYNAMIC_BOUNDARY = "\n<!-- DYNAMIC_CONTENT_BELOW -->\n";
 const MAX_CACHE_ENTRIES = 10;
+const LOOP_OUTPUT_GUIDANCE = `# Loop Output
+- During an agent run, keep intermediate visible commentary to one or two short sentences that explain the next action.
+- Do not emit long-form prose or final-answer body text until the run is finishing with no further tool calls.
+- Reserve detailed final answers for the closing turn when you are ready to respond to the user.`;
 class PromptAssembler {
   sections;
   staticSectionCount;
@@ -22227,9 +23428,11 @@ class PromptAssembler {
   /** 渲染完整 prompt（不使用缓存）。 */
   renderFull(context2) {
     const groups = this.collectGroups(context2);
+    const staticParts = [...groups.staticParts];
+    staticParts.push(LOOP_OUTPUT_GUIDANCE);
     const parts = [];
-    if (groups.staticParts.length > 0) {
-      parts.push(groups.staticParts.join("\n\n"));
+    if (staticParts.length > 0) {
+      parts.push(staticParts.join("\n\n"));
     }
     if (groups.dynamicParts.length > 0) {
       const dynamic = groups.dynamicParts.join("\n\n");
@@ -22243,7 +23446,7 @@ class PromptAssembler {
   /** 渲染静态前缀（不使用缓存），始终以 {@link DYNAMIC_BOUNDARY} 结尾。 */
   renderStaticPrefix(context2) {
     const groups = this.collectGroups(context2);
-    const staticText = groups.staticParts.join("\n\n");
+    const staticText = [...groups.staticParts, LOOP_OUTPUT_GUIDANCE].join("\n\n");
     return staticText + DYNAMIC_BOUNDARY;
   }
   /** 调用所有段落函数并按静态/动态分组，跳过返回 null 或空白的段落。 */
@@ -22534,351 +23737,24 @@ class ConversationStreamPatchScheduler {
     return this.now() - this.lastPersistedAt >= this.persistFlushMs;
   }
 }
-const WORK_BLOCK_KINDS = /* @__PURE__ */ new Set([
-  "reasoning",
-  "llm_turn",
-  "approval",
-  "user_input",
-  "compaction",
-  "subagent",
-  "handoff",
-  "diagnostic",
-  "output",
-  "command"
-]);
-function normalizeWorkBlockKind(value) {
-  if (value === "tool") return "llm_turn";
-  return WORK_BLOCK_KINDS.has(value) ? value : "diagnostic";
-}
-function createWorkBlock(id, title, stage, kind = "reasoning") {
-  const block = {
-    id,
-    kind: normalizeWorkBlockKind(kind),
-    title,
-    stage,
-    status: "pending",
-    toolCalls: [],
-    startedAt: nowMs()
-  };
-  if (block.kind === "llm_turn") {
-    block.result = createLoopResult(void 0, block.status, []);
+function resolveConversationLoopOutputPhase(input) {
+  const pending = input.hasPendingContinuation;
+  const hasPendingContinuation = Boolean(
+    pending?.approval || pending?.userInput || pending?.subagent || pending?.handoff
+  );
+  if (input.stopReason === "end_turn" && !input.loopHasTools && !hasPendingContinuation) {
+    return "final_answer";
   }
-  return block;
+  return "commentary";
 }
-function createDraftWorkTrace(summary, blocks = []) {
-  return {
-    status: "running",
-    summary,
-    blocks: blocks.map(cloneWorkBlock),
-    updatedAt: nowMs()
-  };
-}
-function cloneToolCall(toolCall) {
-  return {
-    ...toolCall,
-    approval: toolCall.approval ? { ...toolCall.approval } : void 0
-  };
-}
-function cloneThinkingArtifact$1(thinking) {
-  return thinking ? {
-    ...thinking,
-    artifact: thinking.artifact ? {
-      ...thinking.artifact,
-      raw: thinking.artifact.raw ? { ...thinking.artifact.raw } : void 0
-    } : void 0
-  } : void 0;
-}
-function cloneLoopResult(result) {
-  return result ? {
-    ...result,
-    toolCallIds: result.toolCallIds.slice()
-  } : void 0;
-}
-function cloneWorkBlock(block) {
-  const legacyBlock = block;
-  const { thinkingPresentation: _legacyThinkingPresentation, ...knownBlock } = legacyBlock;
-  const toolCalls = block.toolCalls.map(cloneToolCall);
-  const normalizedKind = normalizeWorkBlockKind(knownBlock.kind);
-  const thinking = cloneThinkingArtifact$1(block.thinking) ?? normalizeLegacyThinkingArtifact(legacyBlock);
-  const thinkingStatus = knownBlock.thinkingStatus ?? (thinking ? "complete" : void 0);
-  const result = normalizedKind === "llm_turn" ? normalizeLoopResult(knownBlock.result, knownBlock.summary, knownBlock.status, toolCalls) : cloneLoopResult(knownBlock.result);
-  return {
-    ...knownBlock,
-    kind: normalizedKind,
-    ...thinking ? { thinking } : {},
-    ...thinkingStatus ? { thinkingStatus } : {},
-    ...result ? { result } : {},
-    toolCalls,
-    children: block.children?.map(cloneWorkBlock)
-  };
-}
-function cloneTrace(trace) {
-  return trace ? {
-    ...trace,
-    blocks: trace.blocks.map(cloneWorkBlock)
-  } : {
-    status: "idle",
-    blocks: [],
-    updatedAt: nowMs()
-  };
-}
-function upsertWorkBlock(trace, blockId, patch) {
-  const nextTrace = cloneTrace(trace);
-  const blockIndex = nextTrace.blocks.findIndex((block) => block.id === blockId);
-  if (blockIndex >= 0) {
-    nextTrace.blocks[blockIndex] = cloneWorkBlock({
-      ...nextTrace.blocks[blockIndex],
-      ...patch,
-      toolCalls: patch.toolCalls ? patch.toolCalls.map(cloneToolCall) : nextTrace.blocks[blockIndex].toolCalls.map(cloneToolCall)
-    });
-  } else {
-    nextTrace.blocks.push(cloneWorkBlock({
-      ...createWorkBlock(blockId, patch.title || blockId, patch.stage, patch.kind),
-      ...patch,
-      kind: normalizeWorkBlockKind(patch.kind ?? "reasoning"),
-      toolCalls: patch.toolCalls ? patch.toolCalls.map(cloneToolCall) : []
-    }));
+function resolveConversationReasoningState(thinking, reasoningDelivery) {
+  if (thinking?.kind === "raw") return "raw";
+  if (thinking?.kind === "summary") return "summary";
+  if (thinking?.kind === "opaque") return "opaque";
+  if (reasoningDelivery !== "none") {
+    return "hidden";
   }
-  nextTrace.updatedAt = nowMs();
-  return nextTrace;
-}
-function finalizeTrace(trace, status, summary) {
-  const nextTrace = cloneTrace(trace);
-  const terminalBlockStatus = status === "complete" ? "complete" : status === "error" || status === "stopped" ? "error" : null;
-  if (terminalBlockStatus) {
-    const terminalAt = nowMs();
-    nextTrace.blocks = nextTrace.blocks.map((block) => {
-      const blockStatus = block.status === "pending" || block.status === "running" ? terminalBlockStatus : block.status;
-      const blockCompletedAt = block.completedAt ?? terminalAt;
-      const toolCalls = block.toolCalls.map((toolCall) => {
-        if (toolCall.status !== "pending" && toolCall.status !== "running") {
-          return cloneToolCall(toolCall);
-        }
-        return {
-          ...cloneToolCall(toolCall),
-          status: terminalBlockStatus,
-          completedAt: toolCall.completedAt ?? terminalAt,
-          error: terminalBlockStatus === "error" ? toolCall.error ?? "Run ended before this tool call completed." : toolCall.error
-        };
-      });
-      const result = block.kind === "llm_turn" ? {
-        ...ensureLoopResult({ ...block, toolCalls }),
-        status: "complete",
-        toolCallIds: uniqueStrings([...block.result?.toolCallIds ?? [], ...toolCalls.map((toolCall) => toolCall.id)])
-      } : block.result;
-      return {
-        ...block,
-        status: blockStatus,
-        completedAt: blockCompletedAt,
-        ...result ? { result } : {},
-        toolCalls
-      };
-    });
-  }
-  nextTrace.status = status;
-  nextTrace.summary = summary ?? nextTrace.summary;
-  nextTrace.updatedAt = nowMs();
-  return nextTrace;
-}
-function upsertRuntimeToolCall(trace, patch, options) {
-  const nextTrace = cloneTrace(trace);
-  const blockMeta = getRuntimeToolBlockMeta(patch.toolName, options?.loopId);
-  const blockId = blockMeta.id;
-  let block = nextTrace.blocks.find((entry) => entry.id === blockId);
-  if (!block) {
-    block = createWorkBlock(blockId, blockMeta.title, blockMeta.stage, blockMeta.kind);
-    block.status = "running";
-    nextTrace.blocks.push(block);
-  }
-  if (options?.loopId && blockId === options.loopId) {
-    applyLoopFields(block, options);
-  }
-  const toolIndex = block.toolCalls.findIndex((toolCall) => toolCall.id === patch.id);
-  if (toolIndex >= 0) {
-    const existingToolCall = block.toolCalls[toolIndex];
-    const nextApproval = patch.approval ? { ...existingToolCall.approval ?? {}, ...patch.approval } : existingToolCall.approval ? { ...existingToolCall.approval } : void 0;
-    block.toolCalls[toolIndex] = {
-      ...existingToolCall,
-      ...patch,
-      approval: nextApproval
-    };
-  } else {
-    block.toolCalls.push({
-      id: patch.id,
-      toolName: patch.toolName,
-      status: patch.status ?? "pending",
-      argsPreview: patch.argsPreview,
-      resultPreview: patch.resultPreview,
-      error: patch.error,
-      approval: patch.approval ? { ...patch.approval } : void 0,
-      startedAt: patch.startedAt ?? nowMs(),
-      completedAt: patch.completedAt
-    });
-  }
-  syncLoopResultToolIds(block);
-  if (block.toolCalls.length > 0 && block.toolCalls.every((toolCall) => toolCall.status === "complete" || toolCall.status === "error")) {
-    block.status = block.toolCalls.some((toolCall) => toolCall.status === "error") ? "error" : "complete";
-    block.completedAt = nowMs();
-    if (block.kind === "llm_turn") {
-      block.result = { ...ensureLoopResult(block), status: "complete" };
-    }
-  }
-  nextTrace.status = "running";
-  nextTrace.updatedAt = nowMs();
-  return nextTrace;
-}
-function upsertRuntimeToolApproval(trace, input, options) {
-  const status = normalizeToolApprovalStatus(input.status);
-  const failed = status === "rejected" || status === "cancelled";
-  const existingToolCall = trace?.blocks.flatMap((block) => block.toolCalls).find((toolCall) => toolCall.id === input.toolCallId);
-  const now = nowMs();
-  const approval = {
-    approvalId: input.approvalId,
-    status
-  };
-  if (input.reason) approval.reason = input.reason;
-  const risk = stringifyApprovalField(input.risk);
-  if (risk) approval.risk = risk;
-  const reviewer = stringifyApprovalField(input.reviewer);
-  if (reviewer) approval.reviewer = reviewer;
-  const answer = stringifyApprovalField(input.answer);
-  if (answer) approval.answer = answer;
-  if (status === "pending") approval.requestedAt = now;
-  if (status !== "pending") approval.resolvedAt = now;
-  const toolPatch = {
-    id: input.toolCallId,
-    toolName: input.toolName,
-    status: failed ? "error" : existingToolCall?.status === "complete" ? "complete" : "running",
-    approval
-  };
-  if (failed) {
-    toolPatch.error = answer || input.reason || "Tool approval was denied.";
-    toolPatch.completedAt = now;
-  }
-  return upsertRuntimeToolCall(trace, toolPatch, options);
-}
-function normalizeToolApprovalStatus(status) {
-  if (status === "approved") return "approved";
-  if (status === "rejected") return "rejected";
-  if (status === "cancelled") return "cancelled";
-  return "pending";
-}
-function stringifyApprovalField(value) {
-  if (value === void 0 || value === null) return "";
-  return typeof value === "string" ? value.trim() : String(value).trim();
-}
-function applyLoopFields(block, options) {
-  if (block.kind === "llm_turn") {
-    const result = ensureLoopResult(block);
-    const nextText = options.loopResultText?.trim();
-    if (nextText && (!result.text || nextText.length >= result.text.length)) {
-      result.text = nextText;
-    }
-    if (options.loopResultStatus) {
-      result.status = options.loopResultStatus;
-    }
-    if (options.loopFinishReason) {
-      result.finishReason = options.loopFinishReason;
-    }
-    block.result = result;
-  }
-  const nextThinking = cloneThinkingArtifact$1(options.loopThinking);
-  if (nextThinking && shouldReplaceThinking(block.thinking, nextThinking)) {
-    block.thinking = nextThinking;
-  }
-  if (options.loopThinkingStatus && (nextThinking || block.thinking)) {
-    block.thinkingStatus = options.loopThinkingStatus;
-  }
-}
-function upsertLoopResult(trace, loopId, resultText, thinking, thinkingStatus, resultStatus = "streaming", finishReason) {
-  const nextTrace = cloneTrace(trace);
-  let block = nextTrace.blocks.find((entry) => entry.id === loopId);
-  if (!block) {
-    block = createWorkBlock(loopId, "LLM turn", "model", "llm_turn");
-    block.status = "running";
-    nextTrace.blocks.push(block);
-  }
-  applyLoopFields(block, {
-    loopResultText: resultText,
-    loopResultStatus: resultStatus,
-    loopFinishReason: finishReason,
-    loopThinking: thinking,
-    loopThinkingStatus: thinkingStatus
-  });
-  nextTrace.status = "running";
-  nextTrace.updatedAt = nowMs();
-  return nextTrace;
-}
-function ensureLoopResult(block) {
-  const status = block.status === "running" || block.status === "pending" ? "streaming" : "complete";
-  const result = normalizeLoopResult(block.result, block.summary, status, block.toolCalls);
-  block.result = result;
-  return result;
-}
-function createLoopResult(text, blockStatus, toolCalls) {
-  return normalizeLoopResult(void 0, text, blockStatus, toolCalls);
-}
-function normalizeLoopResult(result, fallbackText, blockStatus, toolCalls) {
-  const status = result?.status ?? (blockStatus === "running" || blockStatus === "pending" || blockStatus === "streaming" ? "streaming" : "complete");
-  const text = result?.text ?? fallbackText?.trim() ?? void 0;
-  return {
-    ...text ? { text } : {},
-    ...result?.finishReason ? { finishReason: result.finishReason } : {},
-    status,
-    toolCallIds: uniqueStrings([...result?.toolCallIds ?? [], ...toolCalls.map((toolCall) => toolCall.id)])
-  };
-}
-function syncLoopResultToolIds(block) {
-  if (block.kind !== "llm_turn") return;
-  const result = ensureLoopResult(block);
-  result.toolCallIds = uniqueStrings([...result.toolCallIds, ...block.toolCalls.map((toolCall) => toolCall.id)]);
-  block.result = result;
-}
-function uniqueStrings(values) {
-  return Array.from(new Set(values.filter(Boolean)));
-}
-function shouldReplaceThinking(current, next) {
-  if (!current) return true;
-  if (next.replayPolicy === "provider-artifact" && !current.artifact) return true;
-  if (next.artifact && JSON.stringify(next.artifact) !== JSON.stringify(current.artifact)) return true;
-  return (next.text?.length ?? 0) >= (current.text?.length ?? 0);
-}
-function normalizeLegacyThinkingArtifact(block) {
-  const detail = typeof block.detail === "string" ? block.detail.trim() : "";
-  const presentation = block.thinkingPresentation;
-  if (!detail || presentation !== "summary" && presentation !== "full") return void 0;
-  return {
-    text: detail,
-    kind: presentation === "summary" ? "summary" : "raw",
-    source: "unknown",
-    visibility: presentation === "summary" ? "summary" : "raw-collapsed",
-    replayPolicy: "none"
-  };
-}
-function getRuntimeToolBlockMeta(toolName, loopId) {
-  const normalizedToolName = normalizeToolName(toolName);
-  if (normalizedToolName === "ask_user") {
-    return {
-      id: "runtime-user-input",
-      title: "User input requested",
-      stage: "decision",
-      kind: "user_input"
-    };
-  }
-  if (normalizedToolName === "agent_handoff") {
-    return {
-      id: "runtime-handoff",
-      title: "Preparing handoff",
-      stage: "handoff",
-      kind: "handoff"
-    };
-  }
-  return {
-    id: loopId ?? "runtime-llm-turn",
-    title: "LLM turn",
-    stage: "model",
-    kind: "llm_turn"
-  };
+  return "none";
 }
 function mergeThinkingPayload(current, incoming, delta) {
   if (incoming) {
@@ -22957,7 +23833,7 @@ function isActiveRun(run) {
   return Boolean(run && ACTIVE_RUN_STATUSES.includes(run.status));
 }
 const isLoopTool = (toolName) => {
-  const normalized = normalizeToolName(toolName);
+  const normalized = normalizeToolName$1(toolName);
   return normalized !== "ask_user" && normalized !== "agent_handoff";
 };
 function summarizeRuntimePayload(payload) {
@@ -23072,8 +23948,8 @@ function resolveAgentRoutePreflight(agentId, fallbackAgentId) {
       })
     };
   }
-  const model = provider.models.find((entry) => entry.id === route.modelId);
-  if (!model?.enabled) {
+  const model2 = provider.models.find((entry) => entry.id === route.modelId);
+  if (!model2?.enabled) {
     return {
       ok: false,
       diagnostic: createConversationDiagnostic({
@@ -23223,14 +24099,30 @@ class ConversationService {
   async sendMessage(input) {
     const trimmed = input.message.trim();
     const context2 = await this.resolveContext(input);
-    return this.startProfileTurn(context2, input.mode, input.agentId ?? null, trimmed, input.attachments ?? []);
+    return this.startProfileTurn(
+      context2,
+      input.mode,
+      input.agentId ?? null,
+      trimmed,
+      input.attachments ?? [],
+      void 0,
+      input.turnControls
+    );
   }
   async rewriteFromMessage(input) {
     const trimmed = input.message.trim();
     const context2 = await this.resolveContext(input);
     const sessionId = input.sessionId ?? context2.session?.sessionId ?? null;
     if (!sessionId) {
-      return this.startProfileTurn(context2, input.mode, input.agentId ?? null, trimmed, input.attachments ?? []);
+      return this.startProfileTurn(
+        context2,
+        input.mode,
+        input.agentId ?? null,
+        trimmed,
+        input.attachments ?? [],
+        void 0,
+        input.turnControls
+      );
     }
     const history = storageAdapter.readConversationHistory(sessionId);
     const targetIndex = history.findIndex((message) => message.id === input.messageId);
@@ -23311,7 +24203,8 @@ class ConversationService {
         branchId: newBranchId,
         forkId,
         variantIndex
-      }
+      },
+      input.turnControls
     );
   }
   async switchConversationBranch(input) {
@@ -23367,7 +24260,7 @@ class ConversationService {
       replayDevice
     };
   }
-  async startProfileTurn(context2, requestedMode, requestedAgentId, rawMessage, pendingAttachments, branchContext) {
+  async startProfileTurn(context2, requestedMode, requestedAgentId, rawMessage, pendingAttachments, branchContext, requestTurnControls) {
     let workingSession = context2.session;
     if (!workingSession && context2.projectId) {
       workingSession = storageAdapter.createSession(context2.projectId, rawMessage.slice(0, 80));
@@ -23455,7 +24348,8 @@ class ConversationService {
       rawMessage: effectiveMessage,
       importedAttachments,
       userMessage,
-      assistantDraftMessage
+      assistantDraftMessage,
+      requestTurnControls
     });
     return {
       session: workingSession,
@@ -23477,6 +24371,13 @@ class ConversationService {
     const abortController = new AbortController();
     const conversationAgentId = input.requestedAgentId;
     const agentLabel = getAgentLabel(conversationAgentId);
+    const settings = settingsService.getAll();
+    const route = settings.llm.agentRoutes.find((entry) => entry.agentId === conversationAgentId);
+    const capability = route?.providerId && route.modelId ? resolveModelCapability(route.providerId, route.modelId, settings) : null;
+    const turnControls = capability ? resolveTurnControls(capability, input.requestTurnControls, input.context.session?.turnControls) : void 0;
+    if (sessionId && turnControls) {
+      storageAdapter.updateSession(sessionId, { turnControls });
+    }
     let streamScheduler = null;
     const applyAssistantMessagePatch = (type, patch, options = { persist: true, publishTrace: true }) => {
       if (abortController.signal.aborted && patch.status !== "stopped") {
@@ -23558,9 +24459,17 @@ class ConversationService {
     let loopSeq = 1;
     let loopHasTools = false;
     let pendingNewLoop = false;
+    const pendingContinuation = {
+      approval: false,
+      userInput: false,
+      subagent: false,
+      handoff: false
+    };
     const currentLoopId = () => `runtime-loop-${loopSeq}`;
     let errorViewModel = null;
     let llmDiagnostic = null;
+    let runWasCancelled = false;
+    const seenCompactionSummaries = /* @__PURE__ */ new Set();
     const routePreflight = resolveAgentRoutePreflight(conversationAgentId);
     const currentLoopOptions = () => ({
       loopId: currentLoopId(),
@@ -23585,8 +24494,7 @@ class ConversationService {
           status: llmDiagnostic.severity === "error" ? "error" : "complete",
           title: "Model route diagnostic",
           stage: "preflight",
-          summary: llmDiagnostic.userMessage,
-          detail: llmDiagnostic.technicalMessage,
+          summary: [llmDiagnostic.userMessage, llmDiagnostic.technicalMessage].filter(Boolean).join("\n"),
           completedAt: nowMs()
         }))
       });
@@ -23600,7 +24508,7 @@ class ConversationService {
           baseInstructions: definition?.instructions,
           globalInstructions: settingsService.getAll().agents.globalInstructions
         };
-        const allowedToolNames = resolveAgentToolAllowlist(conversationAgentId, "investigate").map((toolName) => normalizeToolName(toolName));
+        const allowedToolNames = resolveAgentToolAllowlist(conversationAgentId, "investigate").map((toolName) => normalizeToolName$1(toolName));
         const projectRootPath = input.context.projectId ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null : null;
         const memoryIndex = await agentOrchestrator.getMemoryIndex();
         const promptClock = resolvePromptClock();
@@ -23637,6 +24545,7 @@ class ConversationService {
             maxTokens: 1200,
             temperature: 0.35,
             signal: abortController.signal,
+            turnControls,
             onEvent: (event) => {
               this.emitConversationEvent({
                 type: "agent_event",
@@ -23656,11 +24565,30 @@ class ConversationService {
                     title: "Start Agent Loop",
                     stage: "preflight",
                     status: "running",
-                    summary: `${agentLabel} started the model and tool loop.`,
-                    detail: details || void 0,
+                    summary: [
+                      `${agentLabel} started the model and tool loop.`,
+                      details
+                    ].filter(Boolean).join("\n"),
                     startedAt: nowMs()
                   })
                 });
+              }
+              if (event.type === "context.compacted") {
+                const payload = event.payload;
+                const summary = typeof payload.summary === "string" ? payload.summary.trim() : "";
+                if (summary && !seenCompactionSummaries.has(summary)) {
+                  seenCompactionSummaries.add(summary);
+                  commitAssistantMessage("message_patched", {
+                    workTrace: upsertWorkBlock(assistantMessage.workTrace, `compaction-${event.id}`, {
+                      kind: "compaction",
+                      title: "上下文压缩",
+                      stage: "context",
+                      status: "complete",
+                      summary,
+                      completedAt: nowMs()
+                    })
+                  });
+                }
               }
               if (event.type === "assistant.delta") {
                 const chunk = typeof event.payload.text === "string" ? event.payload.text : "";
@@ -23676,7 +24604,9 @@ class ConversationService {
                   }
                   rawResponse += chunk;
                   currentLoopText += chunk;
-                  visibleResponse = currentLoopText;
+                  if (!loopHasTools) {
+                    visibleResponse = currentLoopText;
+                  }
                   commitVisibleAssistantText();
                   commitThinkingTrace(upsertLoopResult(
                     assistantMessage.workTrace,
@@ -23732,13 +24662,15 @@ class ConversationService {
                 if (payload.code === "MODEL_THINKING_STARTED" || payload.code === "MODEL_THINKING_COMPLETED") {
                   return;
                 }
+                const isRecovery = typeof payload.code === "string" && payload.code.startsWith("error_recovery_");
+                const blockStatus = payload.phase === "started" ? "running" : payload.severity === "error" ? "error" : "complete";
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `runtime-diagnostic-${payload.code ?? "runtime"}`, {
                     kind: "diagnostic",
-                    status: payload.severity === "error" ? "error" : "complete",
-                    title: "Runtime diagnostic",
+                    status: blockStatus,
+                    title: isRecovery ? "错误恢复" : "Runtime diagnostic",
                     summary,
-                    completedAt: nowMs()
+                    completedAt: blockStatus === "running" ? void 0 : nowMs()
                   })
                 });
               }
@@ -23791,7 +24723,8 @@ class ConversationService {
                 const approvalId = payload.approvalId ?? `approval-${payload.toolCallId ?? "runtime"}`;
                 const toolCallId = String(payload.toolCallId ?? approvalId);
                 const toolName = String(payload.toolName ?? "approval");
-                if (payload.kind === "ask_user" || normalizeToolName(toolName) === "ask_user") {
+                if (payload.kind === "ask_user" || normalizeToolName$1(toolName) === "ask_user") {
+                  pendingContinuation.userInput = true;
                   const question = typeof payload.question === "string" && payload.question ? payload.question : typeof payload.reason === "string" && payload.reason ? payload.reason : "The agent needs user input before continuing.";
                   commitAssistantMessage("message_patched", {
                     workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
@@ -23808,6 +24741,7 @@ class ConversationService {
                   return;
                 }
                 const reason = typeof payload.reason === "string" && payload.reason ? payload.reason : "This action requires user approval before it can run.";
+                pendingContinuation.approval = true;
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertRuntimeToolApproval(assistantMessage.workTrace, {
                     approvalId,
@@ -23823,8 +24757,11 @@ class ConversationService {
               if (event.type === "approval.answered") {
                 const payload = event.payload;
                 const approvalId = payload.approvalId ?? "runtime";
-                if (payload.kind === "ask_user" || normalizeToolName(String(payload.toolName ?? "")) === "ask_user") {
+                if (payload.kind === "ask_user" || normalizeToolName$1(String(payload.toolName ?? "")) === "ask_user") {
                   const failed = payload.status === "rejected" || payload.status === "cancelled";
+                  if (!failed) {
+                    pendingContinuation.userInput = false;
+                  }
                   const answerText2 = payload.answer === void 0 || payload.answer === null ? "" : typeof payload.answer === "string" ? payload.answer.trim() : String(payload.answer).trim();
                   commitAssistantMessage("message_patched", {
                     workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
@@ -23839,6 +24776,9 @@ class ConversationService {
                   return;
                 }
                 const approvalStatus = typeof payload.status === "string" ? payload.status : "approved";
+                if (approvalStatus !== "pending") {
+                  pendingContinuation.approval = false;
+                }
                 const answerText = payload.answer === void 0 || payload.answer === null ? "" : typeof payload.answer === "string" ? payload.answer.trim() : String(payload.answer).trim();
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertRuntimeToolApproval(assistantMessage.workTrace, {
@@ -23852,7 +24792,14 @@ class ConversationService {
               }
               if (event.type === "tool.completed") {
                 const result = event.payload.result;
-                const isAskUserTool = normalizeToolName(String(event.payload.toolName)) === "ask_user";
+                const isAskUserTool = normalizeToolName$1(String(event.payload.toolName)) === "ask_user";
+                const isHandoffTool = normalizeToolName$1(String(event.payload.toolName)) === "agent_handoff";
+                if (isAskUserTool && result?.ok) {
+                  pendingContinuation.userInput = false;
+                }
+                if (isHandoffTool && result?.ok) {
+                  pendingContinuation.handoff = true;
+                }
                 const toolCallPatch = {
                   id: String(event.payload.toolCallId),
                   toolName: String(event.payload.toolName),
@@ -23887,6 +24834,7 @@ class ConversationService {
               }
               if (event.type === "subagent.started") {
                 const payload = event.payload;
+                pendingContinuation.subagent = true;
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
                     kind: "subagent",
@@ -23899,18 +24847,44 @@ class ConversationService {
               }
               if (event.type === "subagent.delta") {
                 const payload = event.payload;
-                commitAssistantMessage("message_patched", {
-                  workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
-                    kind: "subagent",
-                    title: "Sub-agent",
-                    stage: "tool",
-                    status: "running",
-                    summary: payload.text ? payload.text.slice(-200) : void 0
-                  })
-                });
+                const blockId = `subagent-${payload.subagentId}`;
+                if (payload.child) {
+                  const child = payload.child;
+                  commitAssistantMessage("message_patched", {
+                    workTrace: upsertSubagentChild(assistantMessage.workTrace, blockId, {
+                      id: child.id,
+                      kind: "llm_turn",
+                      title: child.title,
+                      status: child.status,
+                      summary: child.summary,
+                      toolCalls: child.toolName ? [{
+                        id: child.id,
+                        toolName: child.toolName,
+                        status: child.status === "error" ? "error" : child.status === "complete" ? "complete" : "running",
+                        resultPreview: child.summary,
+                        startedAt: nowMs(),
+                        completedAt: child.status === "complete" || child.status === "error" ? nowMs() : void 0
+                      }] : [],
+                      startedAt: nowMs(),
+                      completedAt: child.status === "complete" || child.status === "error" ? nowMs() : void 0
+                    })
+                  });
+                }
+                if (payload.text) {
+                  commitAssistantMessage("message_patched", {
+                    workTrace: upsertWorkBlock(assistantMessage.workTrace, blockId, {
+                      kind: "subagent",
+                      title: "Sub-agent",
+                      stage: "tool",
+                      status: "running",
+                      summary: payload.text.slice(-200)
+                    })
+                  });
+                }
               }
               if (event.type === "subagent.completed") {
                 const payload = event.payload;
+                pendingContinuation.subagent = false;
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
                     kind: "subagent",
@@ -23918,7 +24892,6 @@ class ConversationService {
                     stage: "tool",
                     status: payload.status === "failed" ? "error" : "complete",
                     summary: payload.text?.slice(0, 500) ?? "",
-                    detail: payload.text,
                     completedAt: nowMs()
                   })
                 });
@@ -23926,12 +24899,22 @@ class ConversationService {
               if (event.type === "assistant.completed") {
                 const payload = event.payload;
                 const loopResult = typeof payload.text === "string" ? payload.text.trim() : "";
+                const stopReason = payload.stopReason;
                 const completedThinking = selectCompletedThinking(payload.thinking) ?? currentLoopThinking;
                 if (completedThinking) {
                   currentLoopThinking = completedThinking;
                   currentLoopThinkingStatus = "complete";
                 }
-                if (loopResult || currentLoopThinking) {
+                const outputPhase = resolveConversationLoopOutputPhase({
+                  stopReason,
+                  loopHasTools,
+                  hasPendingContinuation: pendingContinuation
+                });
+                const reasoningState = resolveConversationReasoningState(
+                  completedThinking,
+                  routePreflight.routeCapability.reasoningDelivery
+                );
+                if (loopResult || currentLoopThinking || stopReason || outputPhase) {
                   commitAssistantMessage("message_patched", {
                     workTrace: upsertLoopResult(
                       assistantMessage.workTrace,
@@ -23939,10 +24922,19 @@ class ConversationService {
                       loopResult || void 0,
                       currentLoopThinking,
                       currentLoopThinkingStatus,
-                      "complete"
+                      "complete",
+                      stopReason,
+                      outputPhase,
+                      reasoningState
                     )
                   });
                 }
+                if (outputPhase === "final_answer") {
+                  visibleResponse = loopResult;
+                } else if (!loopHasTools) {
+                  visibleResponse = "";
+                }
+                commitVisibleAssistantText();
                 if (loopHasTools) {
                   pendingNewLoop = true;
                 }
@@ -23969,18 +24961,20 @@ class ConversationService {
                   })
                 });
               }
-              if (event.type === "run.failed" || event.type === "run.cancelled") {
-                const failed = event.type === "run.failed";
+              if (event.type === "run.failed") {
                 commitAssistantMessage("message_patched", {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `runtime-${event.type}`, {
                     kind: "diagnostic",
-                    title: failed ? "Agent Loop failed" : "Agent Loop cancelled",
+                    title: "Agent Loop failed",
                     stage: "respond",
-                    status: failed ? "error" : "complete",
-                    summary: summarizeRuntimePayload(event.payload) || (failed ? "Agent Loop failed." : "Agent Loop cancelled."),
+                    status: "error",
+                    summary: summarizeRuntimePayload(event.payload) || "Agent Loop failed.",
                     completedAt: nowMs()
                   })
                 });
+              }
+              if (event.type === "run.cancelled") {
+                runWasCancelled = true;
               }
             }
           }
@@ -24002,16 +24996,16 @@ class ConversationService {
         commitVisibleAssistantText();
       }
     }
-    if (abortController.signal.aborted) {
+    if (abortController.signal.aborted || runWasCancelled) {
       this.clearActiveTurn(assistantMessage.turnId, abortController);
       return;
     }
     const assistantContent = (currentLoopText.trim() || rawResponse || visibleResponse).trim();
     visibleResponse = assistantContent;
     const isRouteMissingDiagnostic = llmDiagnostic?.code === "CONVERSATION_LLM_ROUTE_MISSING";
-    const finalStatus = errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete";
-    const traceStatus = errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete";
-    if (abortController.signal.aborted) {
+    const finalStatus = runWasCancelled ? "stopped" : errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete";
+    const traceStatus = runWasCancelled ? "stopped" : errorViewModel && !isRouteMissingDiagnostic ? "error" : "complete";
+    if (abortController.signal.aborted || runWasCancelled) {
       this.clearActiveTurn(assistantMessage.turnId, abortController);
       return;
     }
@@ -24025,7 +25019,6 @@ class ConversationService {
           kind: "output",
           status: finalStatus === "error" ? "error" : "complete",
           summary: outputSummary,
-          detail: llmDiagnostic?.technicalMessage,
           completedAt: nowMs()
         }),
         traceStatus,
@@ -24723,6 +25716,28 @@ const requireModels = (models) => {
 const toStaticModels = (modelIds) => requireModels(
   normalizeDiscoveredModels(modelIds)
 );
+const requireManagedModels = (providerId) => {
+  const models = getManagedProviderModels(providerId);
+  if (models.length === 0) {
+    throw new ProviderConnectionError("Provider is missing an app-managed model catalog.");
+  }
+  return models;
+};
+const mergeManagedModelAvailability = (managedModels, discoveredModels) => {
+  if (discoveredModels.length === 0) {
+    return managedModels;
+  }
+  const discoveredIds = new Set(discoveredModels.map((model2) => model2.id.toLowerCase()));
+  return managedModels.map((model2) => {
+    const available = discoveredIds.has(model2.id.toLowerCase());
+    return {
+      ...model2,
+      enabled: available,
+      availability: available ? "available" : "unavailable",
+      availabilityReason: available ? void 0 : "This catalog model was not returned by the current account or endpoint."
+    };
+  });
+};
 const getJson = async (url2, init) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -24875,7 +25890,7 @@ class ProviderConnectionService {
       return {
         success: true,
         provider,
-        models: []
+        models: provider?.models ?? []
       };
     } catch (error) {
       return {
@@ -24916,10 +25931,15 @@ class ProviderConnectionService {
       throw new ProviderConnectionError("Account providers must be tested through the account login flow.");
     }
     const definition = getBuiltinProviderDefinition(provider.id);
+    const catalogOwnership = getBuiltinProviderCatalogOwnership(provider.id);
+    const managedModels = catalogOwnership === "app-managed" ? requireManagedModels(provider.id) : [];
     if (provider.unavailableReason) {
       throw new ProviderConnectionError(provider.unavailableReason);
     }
     if (!definition?.modelDiscovery) {
+      if (catalogOwnership === "app-managed") {
+        return managedModels;
+      }
       throw new ProviderConnectionError("Provider 缺少模型发现配置");
     }
     const apiKey = provider.authMode === "api-key" ? apiKeyDraft || settingsService.getProviderSecret(provider.id) : "";
@@ -24928,26 +25948,28 @@ class ProviderConnectionService {
     }
     const strategy = definition.modelDiscovery;
     if (strategy === "static") {
-      return toStaticModels(definition.recommendedModels);
+      return catalogOwnership === "app-managed" ? managedModels : toStaticModels(definition.recommendedModels);
     }
     const baseUrl = (baseUrlDraft || provider.baseUrl || definition.baseUrl || "").trim().replace(/\/+$/, "");
     if (!baseUrl) {
       throw new ProviderConnectionError("请填写 Provider Base URL");
     }
+    const candidateModelIds = catalogOwnership === "app-managed" ? managedModels.map((model2) => model2.id) : definition.recommendedModels;
     if (provider.id === "kimi-coding-plan") {
-      return this.validateCodingPlanModels(apiKey, baseUrl, definition.recommendedModels);
+      return this.validateCodingPlanModels(apiKey, baseUrl, candidateModelIds, managedModels);
     }
     if (strategy === "anthropic-candidate-validation") {
-      return this.validateAnthropicCandidateModels(provider, apiKey, baseUrl, definition.recommendedModels);
+      return this.validateAnthropicCandidateModels(provider, apiKey, baseUrl, candidateModelIds, managedModels);
     }
     if (strategy === "azure-openai") {
-      return this.validateAzureCandidateModels(apiKey, baseUrl, definition.recommendedModels);
+      return this.validateAzureCandidateModels(apiKey, baseUrl, candidateModelIds, managedModels);
     }
     if (strategy === "google-ai-studio") {
       const payload2 = await getJson(appendQueryParam(appendPath(baseUrl, "/models"), "key", apiKey), {
         method: "GET"
       });
-      return requireModels(parseModelsPayload(strategy, payload2));
+      const discoveredModels2 = requireModels(parseModelsPayload(strategy, payload2));
+      return catalogOwnership === "app-managed" ? mergeManagedModelAvailability(managedModels, discoveredModels2) : discoveredModels2;
     }
     const url2 = strategy === "ollama-tags" ? appendPath(new URL(baseUrl).origin, "/api/tags") : appendPath(baseUrl, "/models");
     const headers = this.createHeaders(provider, apiKey);
@@ -24955,9 +25977,10 @@ class ProviderConnectionService {
       method: "GET",
       headers
     });
-    return requireModels(parseModelsPayload(strategy, payload));
+    const discoveredModels = requireModels(parseModelsPayload(strategy, payload));
+    return catalogOwnership === "app-managed" ? mergeManagedModelAvailability(managedModels, discoveredModels) : discoveredModels;
   }
-  async validateAnthropicCandidateModels(provider, apiKey, baseUrl, modelIds) {
+  async validateAnthropicCandidateModels(provider, apiKey, baseUrl, modelIds, managedModels = []) {
     const validModels = [];
     const url2 = appendPath(baseUrl, "/messages");
     const headers = this.createHeaders(provider, apiKey);
@@ -24981,9 +26004,10 @@ class ProviderConnectionService {
       } catch {
       }
     }
-    return toStaticModels(validModels);
+    const validatedModels = toStaticModels(validModels);
+    return managedModels.length > 0 ? mergeManagedModelAvailability(managedModels, validatedModels) : validatedModels;
   }
-  async validateCodingPlanModels(apiKey, baseUrl, modelIds) {
+  async validateCodingPlanModels(apiKey, baseUrl, modelIds, managedModels = []) {
     const payload = await getJson(appendPath(baseUrl, "/models"), {
       method: "GET",
       headers: {
@@ -24991,11 +26015,12 @@ class ProviderConnectionService {
       }
     });
     const availableModelIds = new Set(
-      parseModelsPayload("openai-compatible", payload).map((model) => model.id)
+      parseModelsPayload("openai-compatible", payload).map((model2) => model2.id)
     );
-    return toStaticModels(modelIds.filter((modelId) => availableModelIds.has(modelId)));
+    const validatedModels = toStaticModels(modelIds.filter((modelId) => availableModelIds.has(modelId)));
+    return managedModels.length > 0 ? mergeManagedModelAvailability(managedModels, validatedModels) : validatedModels;
   }
-  async validateAzureCandidateModels(apiKey, baseUrl, modelIds) {
+  async validateAzureCandidateModels(apiKey, baseUrl, modelIds, managedModels = []) {
     const validModels = [];
     const chatUrl = appendQueryParam(
       baseUrl.endsWith("/chat/completions") ? baseUrl : appendPath(baseUrl, "/chat/completions"),
@@ -25022,7 +26047,8 @@ class ProviderConnectionService {
       } catch {
       }
     }
-    return toStaticModels(validModels);
+    const validatedModels = toStaticModels(validModels);
+    return managedModels.length > 0 ? mergeManagedModelAvailability(managedModels, validatedModels) : validatedModels;
   }
   createHeaders(provider, apiKey) {
     if (provider.authMode === "local") {
@@ -25116,6 +26142,14 @@ function registerSettingsLlmHandlers(context2) {
   });
   electron.ipcMain.handle("settings:getProviderCatalog", async () => {
     return settingsService.getProviderCatalog();
+  });
+  electron.ipcMain.handle("settings:getModelCapability", async (_event, agentId) => {
+    const settings = settingsService.getAll();
+    const route = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
+    if (!route?.providerId || !route.modelId) {
+      return null;
+    }
+    return resolveModelCapability(route.providerId, route.modelId, settings);
   });
   electron.ipcMain.handle("settings:getProviderSecret", async (_event, providerId) => {
     const paths = appPathService.getWorkspacePaths();

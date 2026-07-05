@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import type { ModelCapabilityProfile } from '@shared/types/modelCapability';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import type { ProviderCatalogCategory, ProviderConnectionDraft } from '../types';
-import { normalizeCapabilityOverride } from '../modelCapabilityOverrideUtils';
 import {
   getProviderCategoryLabel,
   getProviderProtocolOptions,
@@ -73,26 +71,9 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   const showProtocolField = connectionProvider.authMode !== 'account';
   const showProtocolSelector = showProtocolField && providerSupportsProtocolSelection(connectionProvider);
   const protocolOptions = showProtocolField ? getProviderProtocolOptions(connectionProvider) : [];
-  const capabilityEditingDisabled = connectionDraft.busy !== 'idle';
 
   const handleToggleModelCapability = (modelId: string) => {
     setExpandedModelId((current) => (current === modelId ? null : modelId));
-  };
-
-  const handleModelCapabilityChange = (modelId: string, capabilityOverride: ModelCapabilityProfile | undefined) => {
-    onUpdateConnectionDraft({
-      models: connectionDraft.models.map((model) => {
-        if (model.id !== modelId) {
-          return model;
-        }
-        const normalized = normalizeCapabilityOverride(capabilityOverride);
-        if (normalized) {
-          return { ...model, capabilityOverride: normalized };
-        }
-        const { capabilityOverride: _removed, ...rest } = model;
-        return rest;
-      }),
-    });
   };
 
   return (
@@ -214,26 +195,31 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
 
       <div className="settings-model-section settings-provider-connect-models" data-testid="settings-provider-connect-models">
         <div className="settings-model-section-header">
-          <span>{connectionProvider.modelDiscovery === 'account-catalog'
-            ? t('settings.accountCatalogModels')
-            : connectionProvider.modelDiscovery === 'anthropic-candidate-validation' || connectionProvider.modelDiscovery === 'azure-openai'
-              ? t('settings.verifiedModels')
-              : connectionProvider.modelDiscovery === 'static'
-                ? t('settings.builtinModels')
-                : t('settings.discoveredModels')}</span>
+          <span>{connectionProvider.catalogOwnership === 'app-managed'
+            ? t('settings.providers.capability.appManagedModels')
+            : t('settings.providers.capability.userManagedModels')}</span>
           <span className="settings-help-text">
             {t('settings.providerModelCount', { count: connectionDraft.models.length })}
           </span>
         </div>
+        {connectionProvider.catalogOwnership === 'user-managed' ? (
+          <div className="settings-provider-notice" data-testid="settings-provider-user-managed-models">
+            {t('settings.providers.capability.userManagedProviderHint')}
+          </div>
+        ) : (
+          <div className="settings-provider-notice" data-testid="settings-provider-app-managed-models">
+            {t('settings.providers.capability.appManagedProviderHint')}
+          </div>
+        )}
         <div className="settings-model-list" data-empty-label={t('settings.testBeforeSaveHint')}>
           {connectionDraft.models.map((model) => (
             <ProviderConnectModelRow
               key={model.id}
+              provider={connectionProvider}
               model={model}
               expanded={expandedModelId === model.id}
-              disabled={capabilityEditingDisabled}
+              disabled={connectionDraft.busy !== 'idle'}
               onToggleExpanded={handleToggleModelCapability}
-              onCapabilityChange={handleModelCapabilityChange}
               t={t}
             />
           ))}

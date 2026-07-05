@@ -1,4 +1,10 @@
-import { getBuiltinProviderDefinition, isBuiltinProviderId, resolveBuiltinProviderProtocol } from '@shared/constants/llm';
+import {
+  getBuiltinProviderCatalogOwnership,
+  getBuiltinProviderDefinition,
+  isBuiltinProviderId,
+  resolveBuiltinProviderProtocol,
+} from '@shared/constants/llm';
+import { getManagedProviderModels } from '@shared/constants/modelCapabilityCatalog';
 import type {
   LlmProviderAccountLoginFinishRequest,
   LlmProviderAccountLoginStartRequest,
@@ -95,6 +101,35 @@ const requireModels = (models: LlmProviderModel[]): LlmProviderModel[] => {
 const toStaticModels = (modelIds: string[]): LlmProviderModel[] => requireModels(
   normalizeDiscoveredModels(modelIds),
 );
+
+const requireManagedModels = (providerId: string): LlmProviderModel[] => {
+  const models = getManagedProviderModels(providerId);
+  if (models.length === 0) {
+    throw new ProviderConnectionError('Provider is missing an app-managed model catalog.');
+  }
+  return models;
+};
+
+export const mergeManagedModelAvailability = (
+  managedModels: LlmProviderModel[],
+  discoveredModels: LlmProviderModel[],
+): LlmProviderModel[] => {
+  if (discoveredModels.length === 0) {
+    return managedModels;
+  }
+  const discoveredIds = new Set(discoveredModels.map((model) => model.id.toLowerCase()));
+  return managedModels.map((model) => {
+    const available = discoveredIds.has(model.id.toLowerCase());
+    return {
+      ...model,
+      enabled: available,
+      availability: available ? 'available' : 'unavailable',
+      availabilityReason: available
+        ? undefined
+        : 'This catalog model was not returned by the current account or endpoint.',
+    };
+  });
+};
 
 const getJson = async (url: string, init: RequestInit): Promise<unknown> => {
   const controller = new AbortController();
@@ -268,7 +303,7 @@ export class ProviderConnectionService {
       return {
         success: true,
         provider,
-        models: [],
+        models: provider?.models ?? [],
       };
     } catch (error) {
       return {
@@ -316,10 +351,17 @@ export class ProviderConnectionService {
       throw new ProviderConnectionError('Account providers must be tested through the account login flow.');
     }
     const definition = getBuiltinProviderDefinition(provider.id);
+    const catalogOwnership = getBuiltinProviderCatalogOwnership(provider.id);
+    const managedModels = catalogOwnership === 'app-managed'
+      ? requireManagedModels(provider.id)
+      : [];
     if (provider.unavailableReason) {
       throw new ProviderConnectionError(provider.unavailableReason);
     }
     if (!definition?.modelDiscovery) {
+      if (catalogOwnership === 'app-managed') {
+        return managedModels;
+      }
       throw new ProviderConnectionError('Provider 缺少模型发现配置');
     }
     const apiKey = provider.authMode === 'api-key'
@@ -331,26 +373,34 @@ export class ProviderConnectionService {
 
     const strategy = definition.modelDiscovery;
     if (strategy === 'static') {
-      return toStaticModels(definition.recommendedModels);
+      return catalogOwnership === 'app-managed'
+        ? managedModels
+        : toStaticModels(definition.recommendedModels);
     }
     const baseUrl = (baseUrlDraft || provider.baseUrl || definition.baseUrl || '').trim().replace(/\/+$/, '');
     if (!baseUrl) {
       throw new ProviderConnectionError('请填写 Provider Base URL');
     }
+    const candidateModelIds = catalogOwnership === 'app-managed'
+      ? managedModels.map((model) => model.id)
+      : definition.recommendedModels;
     if (provider.id === 'kimi-coding-plan') {
-      return this.validateCodingPlanModels(apiKey, baseUrl, definition.recommendedModels);
+      return this.validateCodingPlanModels(apiKey, baseUrl, candidateModelIds, managedModels);
     }
     if (strategy === 'anthropic-candidate-validation') {
-      return this.validateAnthropicCandidateModels(provider, apiKey, baseUrl, definition.recommendedModels);
+      return this.validateAnthropicCandidateModels(provider, apiKey, baseUrl, candidateModelIds, managedModels);
     }
     if (strategy === 'azure-openai') {
-      return this.validateAzureCandidateModels(apiKey, baseUrl, definition.recommendedModels);
+      return this.validateAzureCandidateModels(apiKey, baseUrl, candidateModelIds, managedModels);
     }
     if (strategy === 'google-ai-studio') {
       const payload = await getJson(appendQueryParam(appendPath(baseUrl, '/models'), 'key', apiKey), {
         method: 'GET',
       });
-      return requireModels(parseModelsPayload(strategy, payload));
+      const discoveredModels = requireModels(parseModelsPayload(strategy, payload));
+      return catalogOwnership === 'app-managed'
+        ? mergeManagedModelAvailability(managedModels, discoveredModels)
+        : discoveredModels;
     }
     const url = strategy === 'ollama-tags'
       ? appendPath(new URL(baseUrl).origin, '/api/tags')
@@ -360,7 +410,10 @@ export class ProviderConnectionService {
       method: 'GET',
       headers,
     });
-    return requireModels(parseModelsPayload(strategy, payload));
+    const discoveredModels = requireModels(parseModelsPayload(strategy, payload));
+    return catalogOwnership === 'app-managed'
+      ? mergeManagedModelAvailability(managedModels, discoveredModels)
+      : discoveredModels;
   }
 
   private async validateAnthropicCandidateModels(
@@ -368,6 +421,7 @@ export class ProviderConnectionService {
     apiKey: string,
     baseUrl: string,
     modelIds: string[],
+    managedModels: LlmProviderModel[] = [],
   ): Promise<LlmProviderModel[]> {
     const validModels: string[] = [];
     const url = appendPath(baseUrl, '/messages');
@@ -393,10 +447,16 @@ export class ProviderConnectionService {
         // Continue probing the remaining candidates.
       }
     }
-    return toStaticModels(validModels);
+    const validatedModels = toStaticModels(validModels);
+    return managedModels.length > 0 ? mergeManagedModelAvailability(managedModels, validatedModels) : validatedModels;
   }
 
-  private async validateCodingPlanModels(apiKey: string, baseUrl: string, modelIds: string[]): Promise<LlmProviderModel[]> {
+  private async validateCodingPlanModels(
+    apiKey: string,
+    baseUrl: string,
+    modelIds: string[],
+    managedModels: LlmProviderModel[] = [],
+  ): Promise<LlmProviderModel[]> {
     const payload = await getJson(appendPath(baseUrl, '/models'), {
       method: 'GET',
       headers: {
@@ -406,10 +466,16 @@ export class ProviderConnectionService {
     const availableModelIds = new Set(
       parseModelsPayload('openai-compatible', payload).map((model) => model.id),
     );
-    return toStaticModels(modelIds.filter((modelId) => availableModelIds.has(modelId)));
+    const validatedModels = toStaticModels(modelIds.filter((modelId) => availableModelIds.has(modelId)));
+    return managedModels.length > 0 ? mergeManagedModelAvailability(managedModels, validatedModels) : validatedModels;
   }
 
-  private async validateAzureCandidateModels(apiKey: string, baseUrl: string, modelIds: string[]): Promise<LlmProviderModel[]> {
+  private async validateAzureCandidateModels(
+    apiKey: string,
+    baseUrl: string,
+    modelIds: string[],
+    managedModels: LlmProviderModel[] = [],
+  ): Promise<LlmProviderModel[]> {
     const validModels: string[] = [];
     const chatUrl = appendQueryParam(
       baseUrl.endsWith('/chat/completions') ? baseUrl : appendPath(baseUrl, '/chat/completions'),
@@ -437,7 +503,8 @@ export class ProviderConnectionService {
         // Continue probing the remaining candidates.
       }
     }
-    return toStaticModels(validModels);
+    const validatedModels = toStaticModels(validModels);
+    return managedModels.length > 0 ? mergeManagedModelAvailability(managedModels, validatedModels) : validatedModels;
   }
 
   private createHeaders(provider: LlmProviderEntry, apiKey: string): HeadersInit {

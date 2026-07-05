@@ -258,11 +258,12 @@
   --token-surface-raised: linear-gradient(180deg, rgb(255 255 255), rgb(var(--color-bg-1)));
 
   /* Effort 强度渐进指示专用，不得挪作装饰 */
-  --token-effort-fill-1:       hsl(265 42% 82%);
-  --token-effort-fill-2:       hsl(265 46% 74%);
-  --token-effort-fill-3:       hsl(265 50% 64%);
-  --token-effort-fill-4:       hsl(265 54% 54%);
-  --token-effort-fill-5:       hsl(265 58% 44%);
+  --token-effort-fill-1:       hsl(265 40% 86%);
+  --token-effort-fill-2:       hsl(265 44% 78%);
+  --token-effort-fill-3:       hsl(265 48% 70%);
+  --token-effort-fill-4:       hsl(265 52% 60%);
+  --token-effort-fill-5:       hsl(265 56% 50%);
+  --token-effort-fill-6:       hsl(265 60% 40%);
   --token-effort-thumb:        hsl(265 52% 50%);
   --token-effort-track:        color-mix(in srgb, var(--token-border-muted) 80%, transparent);
 }
@@ -719,11 +720,12 @@
   --token-status-info:         rgb(var(--color-info));
 
   /* Effort 强度渐进指示专用，不得挪作装饰 */
-  --token-effort-fill-1:       hsl(265 48% 72%);
-  --token-effort-fill-2:       hsl(265 52% 64%);
-  --token-effort-fill-3:       hsl(265 56% 56%);
-  --token-effort-fill-4:       hsl(265 60% 48%);
-  --token-effort-fill-5:       hsl(265 64% 40%);
+  --token-effort-fill-1:       hsl(265 46% 76%);
+  --token-effort-fill-2:       hsl(265 50% 68%);
+  --token-effort-fill-3:       hsl(265 54% 60%);
+  --token-effort-fill-4:       hsl(265 58% 52%);
+  --token-effort-fill-5:       hsl(265 62% 44%);
+  --token-effort-fill-6:       hsl(265 66% 36%);
   --token-effort-thumb:        hsl(265 58% 54%);
   --token-effort-track:        color-mix(in srgb, var(--token-border-muted) 72%, transparent);
 

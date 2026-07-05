@@ -39,6 +39,7 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const settingsHydrated = useAppSettingsStore((state) => state.hydrated);
   const sessionId = currentSession?.sessionId ?? null;
   const lastSessionIdRef = useRef<string | null>(null);
+  const lastCapabilityKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -71,13 +72,23 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
     };
   }, [agentId, llmSettings, settingsHydrated, setCapability]);
 
+  const capabilityKey = capability
+    ? `${agentId}:${capability.providerId}:${capability.modelId}`
+    : `${agentId}:pending`;
+
   useEffect(() => {
-    if (sessionId === lastSessionIdRef.current) {
+    const sessionChanged = sessionId !== lastSessionIdRef.current;
+    const capabilityChanged = capabilityKey !== lastCapabilityKeyRef.current;
+    if (!sessionChanged && !capabilityChanged) {
       return;
     }
     lastSessionIdRef.current = sessionId;
-    setTurnControls(buildInitialTurnControls(capability, currentSession?.turnControls));
-  }, [sessionId, currentSession?.turnControls, capability, setTurnControls]);
+    lastCapabilityKeyRef.current = capabilityKey;
+    setTurnControls(buildInitialTurnControls(
+      capability,
+      sessionChanged ? currentSession?.turnControls : null,
+    ));
+  }, [sessionId, capabilityKey, currentSession?.turnControls, capability, setTurnControls]);
 
   useEffect(() => {
     if (!capability) {

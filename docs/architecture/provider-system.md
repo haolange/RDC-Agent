@@ -2,17 +2,18 @@
 
 ## 概览
 
-RDC-Agent 的 Provider 体系把“供应商身份、wire protocol、认证方式、Settings UI category、运行时能力、renderer-safe catalog DTO”拆成独立维度。调用方不得从 UI category 反推协议或能力，也不得把 runtime settings 当成公共 catalog 输出。
+RDC-Agent 的 Provider 体系把供应商身份、`wire protocol`、认证方式、Settings UI category、catalog ownership、模型能力表和 renderer-safe catalog DTO 拆成独立维度。调用方不得从 UI category 反推协议或能力，也不得把 runtime settings 当成公共 catalog 输出。
 
-权威类型位于 `src/shared/types/settings.ts`，内置 provider 清单位于 `src/shared/constants/llm.ts`：
+权威类型位于 `src/shared/types/settings.ts`，内置 provider 清单位于 `src/shared/constants/llm.ts`，模型能力 catalog 位于 `src/shared/constants/modelCapabilityCatalog.ts`：
 
 - `LlmProviderEntry`: 用户 settings 中的 runtime provider entry，进入主进程后可被 secret hydration 补齐。
-- `LlmProviderCatalogEntry`: 只面向 renderer / HTTP 的 catalog DTO，不包含 secret、token、account label、plan label 或连接状态私有字段。
+- `LlmProviderCatalogEntry`: 面向 renderer / HTTP 的 catalog DTO，不包含 secret、token、account label、plan label 或连接状态私有字段。
+- `LlmProviderCatalogOwnership`: provider model catalog 的归属，固定为 `app-managed` 或 `user-managed`。
 - `LlmProviderCatalogResponse`: catalog response，包含 `categories`、`protocols` 和 `providers` 三段。
-- `LlmProviderProtocol`: HTTP wire protocol 枚举，例如 `OpenAICompatibleChatCompletions`、`OpenAIResponses`、`AnthropicMessages`、`OpenRouterChatCompletions`、`AzureOpenAIChatCompletions`、`GoogleGemini`、`AwsBedrock`、`GoogleVertexAI`、`OllamaOpenAICompatibleChatCompletions`。
+- `LlmProviderProtocol`: HTTP wire protocol 枚举，例如 `OpenAIResponses`、`AnthropicMessages`、`GoogleGemini`、`AwsBedrock`、`GoogleVertexAI`、`OllamaOpenAICompatibleChatCompletions`。
 - `LlmProviderAuthMode`: 认证方式，例如 `api-key`、`account`、`environment`、`local`。
 - `LlmProviderCategory`: Settings UI 的产品展示 category，固定为 `login-authorization`、`official-direct`、`cloud-platform`、`official-compatible`、`coding-token-plan`、`third-party-compatible`、`local`、`image`。
-- `LlmProviderCapability`: 运行时能力事实，例如 `chat`、`tool-calling`、`structured-output`、`reasoning`、`model-discovery`。
+- `LlmProviderCapability`: provider 级运行时能力事实，例如 `chat`、`tool-calling`、`structured-output`、`reasoning`、`model-discovery`。
 
 ## Category 与 Protocol
 
@@ -28,15 +29,67 @@ RDC-Agent 的 Provider 体系把“供应商身份、wire protocol、认证方�
 
 `protocol` 只回答“主进程用哪种 wire adapter 发请求”。Agent Runtime、Settings 连接测试和模型刷新必须读取 `protocol`，不得从 `category` 或 provider label 猜测。
 
+## Catalog Ownership
+
+`catalogOwnership` 说明模型列表和能力表由谁维护：
+
+- `app-managed`: RDC-Agent 内置维护 provider 的 model list 与 capability table。覆盖 `login-authorization`、`official-direct`、`cloud-platform`、`official-compatible`、`coding-token-plan`。
+- `user-managed`: endpoint 或用户配置维护模型列表，RDC-Agent 不托管能力表。覆盖 `third-party-compatible`、`local`、`image`。
+
+`app-managed` provider 的 Settings 连接、测试和刷新可以调用远端接口验证账号/API 可用性，也可以用远端 model list 标记内置模型是否当前可用；远端返回值不得成为 capability 来源。不可用的内置模型保留在 Settings 列表中并显示 disabled 灰态和原因，不隐藏。普通用户不能在 Settings UI 中填写 context window、reasoning level 或 fast variant model id。
+
+`user-managed` provider 包括 OpenRouter、Custom endpoints、302.AI、SiliconFlow、LiteLLM、Vercel AI Gateway、Hugging Face Router、Manifest、Ollama 等。即使这些 endpoint 使用 OpenAI 或 Anthropic 协议，也不得套用 RDC-Agent 的主流服务能力表。
+
+## Model Capability Catalog
+
+`src/shared/constants/modelCapabilityCatalog.ts` 是模型能力的单一来源。Catalog entry 以 `providerId + modelId/alias` 管理：
+
+- `nominalContextWindowTokens`
+- `reasoningMode`: `none`、`auto-only` 或 `effort-levels`
+- `supportedReasoningLevels`: `off | auto | low | medium | high | extHigh | max` 的子集
+- `defaultReasoningLevel`
+- `fastVariantModelId`
+- `toolCalling`
+- `visionInput`
+- `structuredOutput`
+- `source.kind`: `official`、`observed`、`conservative`
+- `source.updatedAt`
+- `source.urls`
+- `source.note`
+
+能力解析顺序固定为：
+
+1. `app-managed` provider 的静态 catalog；
+2. conservative default。
+
+旧的 `LlmProviderModel.capabilityOverride`、per-model context override、regex-only seed fallback 不是产品路径。读取 settings 时必须丢弃旧字段，不新增兼容 shim，不把旧 override 写回 settings。
+
+Reasoning 控件的运行时映射固定为：
+
+- `off`：不发送 provider reasoning/thinking 参数，并关闭 provider summary-thinking 请求。
+- `auto`：发送 provider 默认 reasoning/thinking 请求，不指定强度。Anthropic/Kimi 走 `thinking` 开启语义；OpenAI/Gemini/OpenAI-compatible 走各自 adapter 的默认 reasoning 语义。
+- `low`、`medium`、`high`、`extHigh`、`max`：仅当 catalog 对具体 model row 明确支持时可选；adapter 按 provider 能力映射到预算或 effort，不支持的档位在 UI 中 disabled。
+
+Settings 与 Composer 必须使用同一套 `Off | Auto | Low | Medium | High | ExtHigh | Max` canonical 语义。内部字段使用 `auto` 并在 compact UI 展示为 `Auto`；内部字段使用 `extHigh` 并在 compact UI 展示为 `ExtHigh`。Composer slider 的可见档位来自当前模型的 `supportedReasoningLevels` 有序子集：例如只支持 `off | auto` 的模型只显示两个 stop，支持 effort levels 的模型显示其可选档位。这个变化必须由 capability 驱动，不能按 provider 写专属 UI。拖动必须是连续交互：拖动中 thumb 跟随指针，释放时按 `round(ratio * (visibleStops - 1))` 最近取整到当前可见档位集合，并吸附动画回档位点。Max mode 与 Fast mode 这类非 slider 能力仍保持可见灰态，不隐藏，但 compact popup 只显示 label 和 switch，不显示细节小字。
+
+维护第一版或后续版本 catalog 时：
+
+- 优先使用官方文档、官方 model card、官方 API reference；
+- 官方资料不完整时，用 `conservative` source kind 标记，并使用保守能力值；
+- 低成本实测只用于验证 endpoint/model 可用性，不把 runtime 探测结果当作永久 capability 来源；
+- 更新模型列表时同步 `llm.ts` 的 provider ownership 派生、相关测试和 Settings 只读展示。
+
+Composer compact controls are display-only consumers of resolved capability. They may render labels, values, and short disabled reasons, but must not render provider documentation excerpts, source claims, marketing notes, catalog research notes, or explanatory paragraphs. Long capability rationale belongs in Settings details, catalog source metadata, or this architecture document.
+
 ## Catalog DTO
 
 `settings:getProviderCatalog` 是 Provider Catalog 的主入口，返回 `LlmProviderCatalogResponse`。它只能来自内置 provider definition 的公开元数据，不能携带：
 
-- `apiKey`、`secretRef`、`hasStoredSecret`；
-- `accessToken`、`refreshToken`、OAuth token；
-- `accountLabel`、`planLabel`、`oauthExpiresAt`、`oauthRefreshAvailable`；
-- `lastTestedAt`、`lastModelRefreshAt`、`lastError`；
-- 任何 credential / password / secret 字段。
+- `apiKey`、`secretRef`、`hasStoredSecret`
+- `accessToken`、`refreshToken`、OAuth token
+- `accountLabel`、`planLabel`、`oauthExpiresAt`、`oauthRefreshAvailable`
+- `lastTestedAt`、`lastModelRefreshAt`、`lastError`
+- 任意 credential / password / secret 字段
 
 `settings:get` 仍返回当前 workspace settings，并继续对 `LlmProviderEntry.apiKey` 做空值清洗；renderer 默认展示 catalog 时应使用 `settings:getProviderCatalog`，而不是从 settings provider list 重新拼 catalog。
 
@@ -65,7 +118,7 @@ Agent Route Capability
 - Provider 未启用、未配置、未验证、未声明 `chat` 时，一律 `disabled`。
 - Provider 声明 `chat` 但未声明 `tool-calling` 时，一律 `text-only`。
 - Provider 声明 `tool-calling` 且 runtime strategy 支持 native tools 时，才是 `native-structured`。
-- 当前 `openrouter` 仍保持 text-only / fail-closed，除非后续 route 真实 smoke 后提升 capability。
+- `user-managed` provider 不因为 model id 命中主流服务名字就获得 app-managed capability。
 
 ## Plan Entries 与 Fail-Closed
 
@@ -90,9 +143,9 @@ Provider adapters must preserve the difference between UI-visible thinking and p
 - OpenAI-compatible Chat Completions, OpenRouter-style routes, Gemini, Ollama, and DeepSeek/Qwen/Kimi/GLM-style readable `reasoning_content` are raw thinking artifacts with `replayPolicy: 'none'` unless a provider-specific opaque replay artifact is explicitly captured.
 - Context compaction and token estimation count ordinary visible transcript separately from provider artifact replay payloads; raw readable thinking must not inflate the ordinary conversation budget.
 
-Work Process consumes provider thinking through `ConversationWorkTrace` only. Its visible header uses process-first copy (`思考过程 · 持续 ... · ... 个动作`) and must not regress to status-first labels such as `执行完成`. Each provider turn is projected as an `llm_turn` section with a fixed hierarchy: thinking disclosure first as the top transcript node when available, loop result/narration second, and nested tool-call / approval / `ask_user` evidence third. Loop-level thinking labels use lower-level copy such as `思考`, not the same `思考过程` header. `assistant.thinking_end` only changes `thinkingStatus` from `streaming` to `complete`; it never promotes thinking into result text. Models without thinking support skip the thinking row and stream result directly. Opaque provider continuation artifacts render as retained-state status without plaintext preview.
+Work Process consumes provider thinking through `ConversationWorkTrace` only. Its visible header uses process-first copy and must not regress to status-first labels. Each provider turn is projected as an `llm_turn` section with a fixed hierarchy: thinking disclosure first when available, loop result/narration second, and nested tool-call / approval / `ask_user` evidence third.
 
-Answer-only turns after visible tool/thinking evidence are final-response boundaries, not new reasoning sections. Their provider-visible closing summary can be exposed only as folded boundary detail, while the assistant answer tokens remain exclusively in the assistant message body. This prevents late `assistant.completed` summary artifacts from jumping into the transcript as an extra top-level thinking step.
+Answer-only turns after visible tool/thinking evidence are final-response boundaries, not new reasoning sections. Their provider-visible closing summary can be exposed only as folded boundary detail, while assistant answer tokens remain exclusively in the assistant message body.
 
 ## Provider Strategy
 
@@ -108,7 +161,7 @@ Agent Loop 不通过 Settings 层 `LLMAdapterProvider` 发起 agent turn。它�
 - `npm run check:shared-exports`
 - `npm run typecheck`
 
-涉及 renderer category 输出、Settings modal 或浏览器 endpoint 时，还要启动真实 browser-app session，确认 `settings:getProviderCatalog` 与 `/api/settings/providers/catalog` 返回一致、无 secrets，且 Settings Provider Catalog 不再渲染旧 category。
+涉及 renderer category 输出、Settings modal 或浏览器 endpoint 时，还要启动真实 browser-app session，确认 `settings:getProviderCatalog` 与 `/api/settings/providers/catalog` 返回一致、无 secrets，Settings Provider Catalog 不再渲染旧 category，Settings > Providers 中 app-managed provider 显示只读 capability，`third-party-compatible` / `local` 显示用户自管说明。
 
 ## Super Grok OAuth
 

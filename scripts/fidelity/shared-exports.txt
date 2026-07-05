@@ -128,7 +128,7 @@ CaptureInfo
 CaptureRole
 charsToTokens
 CHATGPT_ACCOUNT_MODELS
-clampEffortLevel
+clampReasoningLevel
 CLAUDE_ACCOUNT_MODELS
 CLIResult
 CodePreview
@@ -251,8 +251,13 @@ generateTokenId
 getAgentModeConfig
 getBlockersByCategory
 getBlockersBySeverity
+getBuiltinProviderCatalogOwnership
 getBuiltinProviderDefinition
 getBuiltinProviderProtocolOptions
+getManagedProviderModelCatalog
+getManagedProviderModelIds
+getManagedProviderModels
+getProviderCatalogOwnership
 GetRunEventsResponse
 GITHUB_COPILOT_ACCOUNT_MODELS
 GROK_ACCOUNT_MODELS
@@ -270,6 +275,7 @@ IntakeContext
 INVESTIGATOR_AGENTS
 isAgentIconPreset
 isBuiltinProviderId
+isEffortReasoningLevel
 isLlmProviderProtocol
 isSafeAgentProfileId
 isTopLevelAgentId
@@ -296,6 +302,7 @@ LlmProviderAccountStatus
 LlmProviderAuthMode
 LlmProviderCapability
 LlmProviderCatalogEntry
+LlmProviderCatalogOwnership
 LlmProviderCatalogResponse
 LlmProviderCategory
 LlmProviderCategoryDescriptor
@@ -306,6 +313,7 @@ LlmProviderDraftRequest
 LlmProviderEntry
 LlmProviderId
 LlmProviderModel
+LlmProviderModelAvailability
 LlmProviderModelDiscoveryStrategy
 LlmProviderProtocol
 LlmProviderProtocolDescriptor
@@ -315,8 +323,11 @@ LlmSettings
 LLMStreamEvent
 LLMToolCallDelta
 LogPreview
-lookupModelCapabilitySeed
+lookupManagedModelCapabilityProfile
+lookupManagedModelCatalogEntry
 MAIN_STAGES
+MANAGED_PROVIDER_MODEL_CATALOG
+ManagedModelCatalogEntry
 MCPConnectionInfo
 MCPConnectionStatus
 MCPResponse
@@ -334,6 +345,8 @@ ModeCapabilities
 ModeConfig
 ModeIconKey
 ModelCapabilityProfile
+ModelCapabilitySource
+ModelCapabilitySourceKind
 ModelProviderBackendKind
 ModelProviderCapabilityMatrix
 ModelTurnEvent
@@ -378,8 +391,11 @@ RdxRuntimeContext
 RdxShellActionSettings
 readJsonl
 readYaml
+REASONING_LEVELS
 ReasoningConfidence
 ReasoningDelivery
+ReasoningLevel
+ReasoningMode
 ReasoningSummary
 ReasoningVisibility
 RendererElectronApi

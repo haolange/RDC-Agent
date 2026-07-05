@@ -341,7 +341,8 @@ function toAnthropicThinking(
   reasoningVisibility?: ReasoningVisibility,
 ): { type: 'enabled'; budget_tokens: number; display?: 'summarized' } | undefined {
   const wantsSummarized = reasoningVisibility === 'summary-events';
-  if (!wantsSummarized && (!budget || budget === 'auto')) return undefined;
+  if (budget === 'off') return undefined;
+  if (!wantsSummarized && !budget) return undefined;
   const thinking: { type: 'enabled'; budget_tokens: number; display?: 'summarized' } = {
     type: 'enabled',
     budget_tokens: toAnthropicThinkingBudget(budget),
@@ -353,7 +354,7 @@ function toAnthropicThinking(
 }
 
 function toAnthropicThinkingBudget(budget?: StreamOptions['reasoningBudget']): number {
-  if (!budget || budget === 'auto') {
+  if (!budget || budget === 'auto' || budget === 'off') {
     return 4096;
   }
   switch (budget) {
@@ -363,7 +364,7 @@ function toAnthropicThinkingBudget(budget?: StreamOptions['reasoningBudget']): n
       return 8192;
     case 'high':
       return 16384;
-    case 'extra':
+    case 'extHigh':
       return 32768;
     case 'max':
       return 63999;
@@ -559,4 +560,4 @@ function mapStopReason(reason: string | null | undefined): StopReason {
   }
 }
 
-export const __testing = { mapStopReason, toAnthropicMessages };
+export const __testing = { mapStopReason, toAnthropicMessages, toAnthropicThinking };

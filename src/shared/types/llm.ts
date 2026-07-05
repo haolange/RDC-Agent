@@ -66,7 +66,7 @@ export interface LLMRequest {
   maxTokens?: number;
   temperature?: number;
   topP?: number;
-  reasoningBudget?: 'auto' | EffortLevel;
+  reasoningBudget?: 'off' | 'auto' | EffortLevel;
   tools?: ToolDefinition[];
   responseFormat?: 'json_object';
   stream?: boolean;

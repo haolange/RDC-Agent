@@ -41,7 +41,9 @@ export {
   BUILTIN_LLM_PROVIDER_DEFINITIONS,
   createBuiltinProviderEntries,
   createBuiltinProviderEntry,
+  getBuiltinProviderCatalogOwnership,
   getBuiltinProviderDefinition,
+  getProviderCatalogOwnership,
   isBuiltinProviderId,
 } from './llm';
 export { MODE_CAPABILITIES, assignDefaultCaptureRoles } from './modes';
@@ -55,9 +57,17 @@ export {
   STAGE_PHASES,
   normalizeWorkflowStage,
 } from './stages';
-export { lookupModelCapabilitySeed } from './modelCapabilityCatalog';
+export {
+  MANAGED_PROVIDER_MODEL_CATALOG,
+  getManagedProviderModelCatalog,
+  getManagedProviderModelIds,
+  getManagedProviderModels,
+  lookupManagedModelCapabilityProfile,
+  lookupManagedModelCatalogEntry,
+} from './modelCapabilityCatalog';
 export {
   CONTEXT_COMPACTION_RATIO,
   DEFAULT_CONTEXT_WINDOW_TOKENS,
   EFFORT_LEVELS,
+  isReasoningLevel,
 } from '../types/modelCapability';

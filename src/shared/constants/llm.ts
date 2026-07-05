@@ -4,12 +4,16 @@ import type {
   LlmProviderCapability,
   LlmProviderCategory,
   LlmProviderCategoryDescriptor,
+  LlmProviderCatalogOwnership,
   LlmProviderEntry,
   LlmProviderModel,
   LlmProviderModelDiscoveryStrategy,
   LlmProviderProtocol,
   LlmProviderProtocolDescriptor,
 } from '@shared/types/settings';
+import {
+  getManagedProviderModels,
+} from './modelCapabilityCatalog';
 
 export const SUPER_GROK_OAUTH_CALLBACK_PORT = 1456;
 export const SUPER_GROK_OAUTH_REDIRECT_URI = `http://localhost:${SUPER_GROK_OAUTH_CALLBACK_PORT}/oauth/grok/callback`;
@@ -19,6 +23,7 @@ export interface BuiltinProviderDefinition {
   protocol: LlmProviderProtocol;
   authMode: LlmProviderAuthMode;
   category: LlmProviderCategory;
+  catalogOwnership?: LlmProviderCatalogOwnership;
   modelDiscovery: LlmProviderModelDiscoveryStrategy | null;
   label: string;
   baseUrl?: string;
@@ -171,9 +176,10 @@ export const GEMINI_ACCOUNT_MODELS = [
   'gemini-2.0-flash',
 ];
 export const QWEN_ACCOUNT_MODELS = [
+  'qwen-turbo',
   'qwen-plus',
   'qwen-max',
-  'qwen3-coder-plus',
+  'qwen-vl-max',
 ];
 const OPENAI_CODE_MODELS = ['gpt-5.2', 'gpt-4.1', 'gpt-5-mini'];
 
@@ -190,6 +196,18 @@ const CAPS_STATIC_CLOUD: LlmProviderCapability[] = ['chat'];
 
 const OPENAI_RESPONSES_OPTIONS: LlmProviderProtocol[] = ['OpenAICompatibleChatCompletions', 'OpenAIResponses'];
 const LOCAL_PROTOCOL_OPTIONS: LlmProviderProtocol[] = ['OllamaOpenAICompatibleChatCompletions', 'OpenAIResponses'];
+
+const APP_MANAGED_PROVIDER_CATEGORIES = new Set<LlmProviderCategory>([
+  'login-authorization',
+  'official-direct',
+  'cloud-platform',
+  'official-compatible',
+  'coding-token-plan',
+]);
+
+export function getProviderCatalogOwnership(category: LlmProviderCategory): LlmProviderCatalogOwnership {
+  return APP_MANAGED_PROVIDER_CATEGORIES.has(category) ? 'app-managed' : 'user-managed';
+}
 
 export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
   {
@@ -383,7 +401,7 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     category: 'official-compatible',
     modelDiscovery: null,
     label: 'Alibaba Cloud Bailian',
-    recommendedModels: ['qwen3.6-plus', 'qwen3-coder-next', 'qwen3-coder-plus'],
+    recommendedModels: ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-vl-max'],
     docsUrl: 'https://bailian.console.aliyun.com/',
     unavailableReason: 'The general Bailian API endpoint is not pinned in this catalog. Use Qwen / DashScope or Bailian Coding Plan until a stable official endpoint is configured.',
     capabilities: CAPS_ANTHROPIC,
@@ -396,7 +414,7 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     modelDiscovery: 'openai-compatible',
     label: 'Qwen / DashScope',
     baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-    recommendedModels: ['qwen-plus', 'qwen-max'],
+    recommendedModels: ['qwen-turbo', 'qwen-plus', 'qwen-max', 'qwen-flash', 'qwen-vl-max'],
     docsUrl: 'https://dashscope.console.aliyun.com/apiKey',
     capabilities: CAPS_OPENAI_COMPATIBLE,
   },
@@ -407,7 +425,7 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     category: 'official-compatible',
     modelDiscovery: null,
     label: 'Volcengine Ark (Doubao)',
-    recommendedModels: ['doubao-seed-1-6', 'glm-4.6', 'deepseek-v4-pro', 'kimi-k2.5'],
+    recommendedModels: ['doubao-seed-2.1-pro', 'doubao-seed-2.1-turbo', 'glm-4.6', 'deepseek-v4-pro', 'kimi-k2.5'],
     docsUrl: 'https://www.volcengine.com/docs/82379/1928262',
     unavailableReason: 'The general Volcengine Ark API endpoint is not pinned in this catalog. Use Volcengine Ark Coding Plan until a stable official endpoint is configured.',
     capabilities: CAPS_OPENAI_COMPATIBLE,
@@ -564,7 +582,7 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     modelDiscovery: 'anthropic-candidate-validation',
     label: 'Volcengine Ark Coding Plan',
     baseUrl: 'https://ark.cn-beijing.volces.com/api/coding',
-    recommendedModels: ['doubao-seed-1-6', 'glm-4.6', 'deepseek-v4-pro', 'kimi-k2.5'],
+    recommendedModels: ['doubao-seed-2.1-pro', 'doubao-seed-2.1-turbo', 'glm-4.6', 'deepseek-v4-pro', 'kimi-k2.5'],
     docsUrl: 'https://www.volcengine.com/docs/82379/1928262',
     capabilities: CAPS_ANTHROPIC,
   },
@@ -766,6 +784,14 @@ export function getBuiltinProviderDefinition(id: string): BuiltinProviderDefinit
   return BUILTIN_LLM_PROVIDER_DEFINITIONS.find((entry) => entry.id === id) ?? null;
 }
 
+export function getBuiltinProviderCatalogOwnership(id: string): LlmProviderCatalogOwnership {
+  const definition = getBuiltinProviderDefinition(id);
+  if (!definition) {
+    return 'user-managed';
+  }
+  return definition.catalogOwnership ?? getProviderCatalogOwnership(definition.category);
+}
+
 export function isLlmProviderProtocol(value: unknown): value is LlmProviderProtocol {
   return typeof value === 'string'
     && LLM_PROVIDER_PROTOCOL_DEFINITIONS.some((entry) => entry.id === value);
@@ -804,6 +830,13 @@ export const createBuiltinProviderEntry = (id: BuiltinLlmProviderId): LlmProvide
     throw new Error(`Unknown builtin provider: ${id}`);
   }
 
+  const catalogOwnership = getBuiltinProviderCatalogOwnership(definition.id);
+  const managedModels = catalogOwnership === 'app-managed'
+    ? getManagedProviderModels(definition.id)
+    : [];
+  const recommendedModels = managedModels.length > 0
+    ? managedModels.map((entry) => entry.id)
+    : [...definition.recommendedModels];
   const status = definition.unavailableReason ? 'unavailable' : 'unconfigured';
 
   return {
@@ -811,6 +844,7 @@ export const createBuiltinProviderEntry = (id: BuiltinLlmProviderId): LlmProvide
     protocol: definition.protocol,
     authMode: definition.authMode,
     category: definition.category,
+    catalogOwnership,
     modelDiscovery: definition.modelDiscovery,
     label: definition.label,
     enabled: false,
@@ -820,8 +854,12 @@ export const createBuiltinProviderEntry = (id: BuiltinLlmProviderId): LlmProvide
     baseUrlEditable: definition.baseUrlEditable,
     protocolEditable: definition.protocolEditable,
     protocolOptions: getBuiltinProviderProtocolOptions(definition.id),
-    models: definition.modelDiscovery === 'static' && definition.authMode === 'environment' ? toModels(definition.recommendedModels) : toModels([]),
-    recommendedModels: definition.recommendedModels,
+    models: managedModels.length > 0
+      ? managedModels
+      : definition.modelDiscovery === 'static' && definition.authMode === 'environment'
+        ? toModels(definition.recommendedModels)
+        : toModels([]),
+    recommendedModels,
     docsUrl: definition.docsUrl,
     status,
     accountLoginConfigured: definition.accountLoginConfigured,

@@ -1,5 +1,4 @@
 import type { AgentRole } from './agent';
-import type { ModelCapabilityProfile } from './modelCapability';
 import type { AgentManifestDraft, AgentManifestSettings } from './agentManifest';
 import type {
   AgentRuntimeMcpDescriptor,
@@ -103,6 +102,8 @@ export type LlmProviderCategory =
   | 'local'
   | 'image';
 
+export type LlmProviderCatalogOwnership = 'app-managed' | 'user-managed';
+
 /**
  * Provider capability declaration - feature flags that downstream code can
  * consult before attempting capability-gated behaviour (e.g. requesting tool
@@ -119,6 +120,7 @@ export type LlmProviderCapability =
   | 'image-generation'
   | 'video-generation';
 export type LlmProviderConnectionStatus = 'unconfigured' | 'verified' | 'failed' | 'unavailable';
+export type LlmProviderModelAvailability = 'available' | 'unavailable' | 'unknown';
 export type LlmProviderModelDiscoveryStrategy =
   | 'openai-compatible'
   | 'anthropic'
@@ -231,8 +233,8 @@ export interface LlmProviderModel {
   id: string;
   label: string;
   enabled: boolean;
-  contextWindowTokens?: number | null;
-  capabilityOverride?: ModelCapabilityProfile;
+  availability?: LlmProviderModelAvailability;
+  availabilityReason?: string;
 }
 
 export interface LlmProviderEntry {
@@ -240,6 +242,7 @@ export interface LlmProviderEntry {
   protocol: LlmProviderProtocol;
   authMode: LlmProviderAuthMode;
   category: LlmProviderCategory;
+  catalogOwnership: LlmProviderCatalogOwnership;
   modelDiscovery: LlmProviderModelDiscoveryStrategy | null;
   label: string;
   enabled: boolean;
@@ -285,6 +288,7 @@ export interface LlmProviderCatalogEntry {
   protocol: LlmProviderProtocol;
   authMode: LlmProviderAuthMode;
   category: LlmProviderCategory;
+  catalogOwnership: LlmProviderCatalogOwnership;
   label: string;
   baseUrlEditable?: boolean;
   protocolEditable?: boolean;

@@ -329,10 +329,11 @@ async function main() {
       'exchangeGrokCode',
       'pollGrokDevice',
       'SUPER_GROK_OAUTH_REDIRECT_URI',
-      'GROK_API_BASE_URL',
+      'getManagedProviderModels',
     ],
     'ProviderAccountAuthService Super Grok OAuth flow',
   );
+  assert(!providerAccountAuthService.includes('GROK_API_BASE_URL'), 'Super Grok account models must come from the app-managed catalog, not /models discovery.');
   assert(!providerAccountAuthService.includes('GROK_AUTH_DEVICE_ENDPOINT'), 'Super Grok OAuth device endpoint must come from xAI OIDC metadata.');
   assert(!providerAccountAuthService.includes('GROK_AUTH_TOKEN_ENDPOINT'), 'Super Grok OAuth token endpoint must come from xAI OIDC metadata.');
   assert(!providerAccountAuthService.includes("'Grok OAuth") && !providerAccountAuthService.includes("'Grok OAuth requires"), 'ProviderAccountAuthService must use Super Grok OAuth visible wording.');

@@ -247,7 +247,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
     };
     if (typeof options.temperature === 'number') body.temperature = options.temperature;
     if (typeof options.topP === 'number') body.top_p = options.topP;
-    if (options.reasoningBudget && options.reasoningBudget !== 'auto') {
+    if (options.reasoningBudget && options.reasoningBudget !== 'auto' && options.reasoningBudget !== 'off') {
       body.reasoning_effort = toOpenAiCompatibleReasoningEffort(options.reasoningBudget);
     }
     const maxTokens = options.maxTokens ?? model.maxTokens;
@@ -267,7 +267,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
 // =====================================================================
 
 function toOpenAiCompatibleReasoningEffort(budget: EffortLevel): 'low' | 'medium' | 'high' {
-  if (budget === 'extra' || budget === 'max') {
+  if (budget === 'extHigh' || budget === 'max') {
     return 'high';
   }
   return budget;
