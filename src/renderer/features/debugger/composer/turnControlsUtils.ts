@@ -1,15 +1,32 @@
 import type {
   ConversationTurnControls,
-  EffortLevel,
+  ReasoningLevel,
   ResolvedModelCapability,
 } from '@shared/types/modelCapability';
-import { clampEffortLevel } from '@shared/types/modelCapability';
+import { clampReasoningLevel, isReasoningLevel } from '@shared/types/modelCapability';
 
 export const DEFAULT_TURN_CONTROLS: ConversationTurnControls = {
-  effort: 'medium',
+  reasoningLevel: 'off',
   maxContextMode: false,
   fastModel: false,
 };
+
+type TurnControlsInput = Partial<Omit<ConversationTurnControls, 'reasoningLevel'>> & {
+  reasoningLevel?: unknown;
+  effort?: unknown;
+};
+
+function normalizeTurnControls(
+  controls: TurnControlsInput,
+  defaultReasoningLevel: ReasoningLevel = DEFAULT_TURN_CONTROLS.reasoningLevel,
+): ConversationTurnControls {
+  const candidate = controls.reasoningLevel ?? controls.effort;
+  return {
+    reasoningLevel: isReasoningLevel(candidate) ? candidate : defaultReasoningLevel,
+    maxContextMode: controls.maxContextMode === true,
+    fastModel: controls.fastModel === true,
+  };
+}
 
 export function formatTokenCount(value: number): string {
   if (value >= 1_000_000) {
@@ -23,41 +40,39 @@ export function formatTokenCount(value: number): string {
   return `${value}`;
 }
 
-export function effortFillToken(level: EffortLevel): string {
-  const index = ['low', 'medium', 'high', 'extra', 'max'].indexOf(level);
-  const step = Math.max(1, Math.min(5, index + 1));
-  return `var(--token-effort-fill-${step})`;
-}
-
 export function sanitizeTurnControls(
-  controls: ConversationTurnControls,
+  controls: TurnControlsInput,
   capability: ResolvedModelCapability | null,
 ): ConversationTurnControls {
+  const defaultReasoningLevel = capability?.defaultReasoningLevel ?? DEFAULT_TURN_CONTROLS.reasoningLevel;
+  const normalized = normalizeTurnControls(controls, defaultReasoningLevel);
   if (!capability) {
-    return controls;
+    return normalized;
   }
 
-  const effort = capability.supportedEffortLevels.length === 0
-    ? capability.defaultEffort
-    : (clampEffortLevel(controls.effort, capability.supportedEffortLevels) ?? capability.defaultEffort);
+  const supportedReasoningLevels: ReasoningLevel[] = Array.isArray(capability.supportedReasoningLevels)
+    ? capability.supportedReasoningLevels
+    : ['off'];
+  const reasoningLevel = clampReasoningLevel(normalized.reasoningLevel, supportedReasoningLevels)
+    ?? defaultReasoningLevel;
 
   return {
-    effort,
-    maxContextMode: controls.maxContextMode && capability.maxContextAvailable,
-    fastModel: controls.fastModel && capability.fastModelAvailable,
+    reasoningLevel,
+    maxContextMode: normalized.maxContextMode && capability.maxContextAvailable,
+    fastModel: normalized.fastModel && capability.fastModelAvailable,
   };
 }
 
 export function buildInitialTurnControls(
   capability: ResolvedModelCapability | null,
-  sessionControls?: ConversationTurnControls,
+  sessionControls?: TurnControlsInput | null,
 ): ConversationTurnControls {
   if (sessionControls) {
     return sanitizeTurnControls(sessionControls, capability);
   }
   if (capability) {
     return {
-      effort: capability.defaultEffort,
+      reasoningLevel: capability.defaultReasoningLevel ?? 'off',
       maxContextMode: false,
       fastModel: false,
     };

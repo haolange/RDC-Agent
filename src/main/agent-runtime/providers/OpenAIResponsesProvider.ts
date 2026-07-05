@@ -332,7 +332,7 @@ function createResponsesUrl(baseUrl: string): string {
 }
 
 function toOpenAiResponsesReasoningEffort(budget: EffortLevel): 'low' | 'medium' | 'high' {
-  if (budget === 'extra' || budget === 'max') {
+  if (budget === 'extHigh' || budget === 'max') {
     return 'high';
   }
   return budget;
@@ -351,13 +351,13 @@ function buildRequestBody(model: Model, context: Context, options: StreamOptions
   }
   if (typeof options.temperature === 'number') body.temperature = options.temperature;
   if (typeof options.topP === 'number') body.top_p = options.topP;
-  if (options.reasoningBudget && options.reasoningBudget !== 'auto') {
-    // OpenAI 官方 xhigh 尚未稳定公开，extra/max 保守映射到 high。
+  if (options.reasoningBudget && options.reasoningBudget !== 'auto' && options.reasoningBudget !== 'off') {
+    // OpenAI xhigh is not stable in public docs; ExtHigh/Max map conservatively to high.
     body.reasoning = { effort: toOpenAiResponsesReasoningEffort(options.reasoningBudget) };
-  } else if (options.reasoningVisibility === 'summary-events') {
+  } else if (options.reasoningBudget !== 'off' && options.reasoningVisibility === 'summary-events') {
     body.reasoning = { effort: 'medium' };
   }
-  if (options.reasoningVisibility === 'summary-events') {
+  if (options.reasoningBudget !== 'off' && options.reasoningVisibility === 'summary-events') {
     const reasoning = (body.reasoning && typeof body.reasoning === 'object')
       ? body.reasoning as Record<string, unknown>
       : {};

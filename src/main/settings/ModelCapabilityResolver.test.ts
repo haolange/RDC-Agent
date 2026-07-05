@@ -1,14 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import { createBuiltinProviderEntry } from '@shared/constants/llm';
-import type { AppSettings } from '@shared/types/settings';
+import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
 import {
   resolveEffectiveModelId,
   resolveModelCapability,
   resolveReasoningBudget,
 } from './ModelCapabilityResolver';
 
-function makeSettings(overrides: Partial<AppSettings['llm']> = {}): AppSettings {
-  const anthropic = createBuiltinProviderEntry('anthropic');
+function makeProvider(provider: LlmProviderEntry): LlmProviderEntry {
+  return {
+    ...provider,
+    enabled: true,
+    hasStoredSecret: true,
+    isConfigured: true,
+    status: 'verified',
+    models: provider.models.map((model) => ({ ...model })),
+  };
+}
+
+function makeSettings(provider: LlmProviderEntry): AppSettings {
   return {
     appearance: { theme: 'dark', language: 'zh-CN', fontScale: 'medium' },
     layout: {
@@ -41,34 +51,12 @@ function makeSettings(overrides: Partial<AppSettings['llm']> = {}): AppSettings 
       },
     },
     llm: {
-      providers: [{
-        ...anthropic,
-        enabled: true,
-        hasStoredSecret: true,
-        isConfigured: true,
-        status: 'verified',
-        capabilities: ['chat', 'tool-calling', 'reasoning'],
-        models: [
-          {
-            id: 'claude-sonnet-4',
-            label: 'claude-sonnet-4',
-            enabled: true,
-            contextWindowTokens: null,
-          },
-          {
-            id: 'claude-sonnet-4-fast',
-            label: 'claude-sonnet-4-fast',
-            enabled: true,
-            contextWindowTokens: null,
-          },
-        ],
-      }],
+      providers: [provider],
       agentRoutes: [{
         agentId: 'ask',
-        providerId: 'anthropic',
-        modelId: 'claude-sonnet-4',
+        providerId: provider.id,
+        modelId: provider.models[0]?.id ?? '',
       }],
-      ...overrides,
     },
     configuration: {
       activeModeProfileId: 'debugger.default',
@@ -108,178 +96,164 @@ function makeSettings(overrides: Partial<AppSettings['llm']> = {}): AppSettings 
 }
 
 describe('resolveModelCapability', () => {
-  it('uses seed catalog when no override exists', () => {
-    const capability = resolveModelCapability('anthropic', 'claude-sonnet-4', makeSettings());
-    expect(capability.nominalContextWindowTokens).toBe(200_000);
-    expect(capability.supportedEffortLevels).toEqual(['low', 'medium', 'high', 'extra', 'max']);
-    expect(capability.defaultContextWindowTokens).toBe(200_000);
-    expect(capability.maxContextAvailable).toBe(false);
-    expect(capability.maxContextWindowTokens).toBeNull();
+  it('uses the provider-aware app-managed catalog', () => {
+    const provider = makeProvider(createBuiltinProviderEntry('anthropic'));
+    const capability = resolveModelCapability('anthropic', 'claude-sonnet-5', makeSettings(provider));
+
+    expect(capability.catalogSource).toBe('managed-catalog');
+    expect(capability.nominalContextWindowTokens).toBe(1_000_000);
+    expect(capability.reasoningMode).toBe('effort-levels');
+    expect(capability.supportedReasoningLevels).toEqual(['off', 'auto', 'low', 'medium', 'high']);
+    expect(capability.defaultReasoningLevel).toBe('auto');
+    expect(capability.defaultContextWindowTokens).toBe(256_000);
+    expect(capability.maxContextAvailable).toBe(true);
+    expect(capability.maxContextWindowTokens).toBe(1_000_000);
+    expect(capability.toolCalling).toBe(true);
+    expect(capability.visionInput).toBe(true);
+    expect(capability.structuredOutput).toBe(true);
   });
 
-  it('prefers user override over seed', () => {
-    const settings = makeSettings({
-      providers: [{
-        ...makeSettings().llm.providers[0],
-        models: [{
-          id: 'claude-sonnet-4',
-          label: 'claude-sonnet-4',
-          enabled: true,
-          contextWindowTokens: null,
-          capabilityOverride: {
-            nominalContextWindowTokens: 300_000,
-            supportedEffortLevels: ['low', 'high'],
-            fastVariantModelId: 'claude-sonnet-4-fast',
-          },
-        }, {
-          id: 'claude-sonnet-4-fast',
-          label: 'claude-sonnet-4-fast',
-          enabled: true,
-          contextWindowTokens: null,
-        }],
-      }],
+  it('returns conservative defaults for unknown app-managed models', () => {
+    const provider = makeProvider({
+      ...createBuiltinProviderEntry('anthropic'),
+      models: [{ id: 'unknown-model', label: 'unknown-model', enabled: true }],
     });
-    const capability = resolveModelCapability('anthropic', 'claude-sonnet-4', settings);
-    expect(capability.nominalContextWindowTokens).toBe(300_000);
-    expect(capability.supportedEffortLevels).toEqual(['low', 'high']);
-    expect(capability.fastVariantModelId).toBe('claude-sonnet-4-fast');
-    expect(capability.fastModelAvailable).toBe(true);
-  });
+    const capability = resolveModelCapability('anthropic', 'unknown-model', makeSettings(provider));
 
-  it('returns conservative defaults for unknown models', () => {
-    const settings = makeSettings({
-      providers: [{
-        ...makeSettings().llm.providers[0],
-        models: [{
-          id: 'unknown-model',
-          label: 'unknown-model',
-          enabled: true,
-          contextWindowTokens: null,
-        }],
-      }],
-    });
-    const capability = resolveModelCapability('anthropic', 'unknown-model', settings);
+    expect(capability.catalogSource).toBe('conservative-default');
     expect(capability.nominalContextWindowTokens).toBeNull();
     expect(capability.defaultContextWindowTokens).toBe(256_000);
-    expect(capability.supportedEffortLevels).toEqual(['low', 'medium', 'high']);
+    expect(capability.reasoningMode).toBe('none');
+    expect(capability.supportedReasoningLevels).toEqual(['off']);
+    expect(capability.defaultReasoningLevel).toBe('off');
     expect(capability.maxContextAvailable).toBe(false);
     expect(capability.fastModelAvailable).toBe(false);
   });
 
-  it('clears effort levels when provider lacks reasoning capability', () => {
-    const settings = makeSettings({
-      providers: [{
-        ...makeSettings().llm.providers[0],
-        capabilities: ['chat', 'tool-calling'],
-      }],
+  it('does not apply app-managed capabilities to user-managed providers', () => {
+    const provider = makeProvider({
+      ...createBuiltinProviderEntry('openrouter'),
+      models: [{ id: 'claude-sonnet-5', label: 'claude-sonnet-5', enabled: true }],
     });
-    const capability = resolveModelCapability('anthropic', 'claude-sonnet-4', settings);
-    expect(capability.supportedEffortLevels).toEqual([]);
-    expect(capability.defaultEffort).toBe('medium');
+    const capability = resolveModelCapability('openrouter', 'claude-sonnet-5', makeSettings(provider));
+
+    expect(provider.catalogOwnership).toBe('user-managed');
+    expect(capability.catalogSource).toBe('conservative-default');
+    expect(capability.nominalContextWindowTokens).toBeNull();
+    expect(capability.supportedReasoningLevels).toEqual(['off']);
   });
 
-  it('enables max context only when nominal exceeds 256k', () => {
-    const settings = makeSettings({
-      providers: [{
-        ...makeSettings().llm.providers[0],
-        models: [{
-          id: 'gpt-4.1',
-          label: 'gpt-4.1',
-          enabled: true,
-          contextWindowTokens: null,
-        }],
-      }],
-    });
-    const capability = resolveModelCapability('anthropic', 'gpt-4.1', settings);
-    expect(capability.nominalContextWindowTokens).toBe(1_047_576);
-    expect(capability.maxContextAvailable).toBe(true);
-    expect(capability.maxContextWindowTokens).toBe(1_047_576);
-    expect(capability.defaultContextWindowTokens).toBe(256_000);
+  it('drives non-Kimi provider shapes from the managed catalog', () => {
+    const openAiProvider = makeProvider(createBuiltinProviderEntry('openai'));
+    const openAi = resolveModelCapability('openai', 'gpt-5.5', makeSettings(openAiProvider));
+    expect(openAi.reasoningMode).toBe('effort-levels');
+    expect(openAi.supportedReasoningLevels).toEqual(['off', 'auto', 'low', 'medium', 'high', 'max']);
+    expect(openAi.maxContextAvailable).toBe(true);
+
+    const anthropicProvider = makeProvider(createBuiltinProviderEntry('anthropic'));
+    const anthropic = resolveModelCapability('anthropic', 'claude-sonnet-5', makeSettings(anthropicProvider));
+    expect(anthropic.reasoningMode).toBe('effort-levels');
+    expect(anthropic.supportedReasoningLevels).toEqual(['off', 'auto', 'low', 'medium', 'high']);
+    expect(anthropic.maxContextAvailable).toBe(true);
+
+    const qwenProvider = makeProvider(createBuiltinProviderEntry('qwen'));
+    const qwen = resolveModelCapability('qwen', 'qwen-plus', makeSettings(qwenProvider));
+    expect(qwen.reasoningMode).toBe('auto-only');
+    expect(qwen.supportedReasoningLevels).toEqual(['off', 'auto']);
+    expect(qwen.maxContextAvailable).toBe(false);
+
+    const deepSeekProvider = makeProvider(createBuiltinProviderEntry('deepseek'));
+    const deepSeek = resolveModelCapability('deepseek', 'deepseek-v4-pro', makeSettings(deepSeekProvider));
+    expect(deepSeek.reasoningMode).toBe('effort-levels');
+    expect(deepSeek.supportedReasoningLevels).toEqual(['off', 'auto', 'low', 'medium', 'high', 'max']);
+    expect(deepSeek.maxContextAvailable).toBe(true);
+
+    const codex = resolveModelCapability('openai', 'gpt-5.3-codex', makeSettings(openAiProvider));
+    expect(codex.supportedReasoningLevels).toEqual(['off', 'auto', 'low', 'medium', 'high', 'extHigh']);
   });
 
-  it('marks fast variant unavailable when not in enabled models', () => {
-    const settings = makeSettings({
-      providers: [{
-        ...makeSettings().llm.providers[0],
-        models: [{
-          id: 'claude-sonnet-4',
-          label: 'claude-sonnet-4',
-          enabled: true,
-          contextWindowTokens: null,
-          capabilityOverride: {
-            fastVariantModelId: 'missing-fast-model',
-          },
-        }],
-      }],
-    });
-    const capability = resolveModelCapability('anthropic', 'claude-sonnet-4', settings);
-    expect(capability.fastVariantModelId).toBe('missing-fast-model');
+  it('keeps Kimi Coding Plan as a single auto-only model without fast variant', () => {
+    const provider = makeProvider(createBuiltinProviderEntry('kimi-coding-plan'));
+    const capability = resolveModelCapability('kimi-coding-plan', 'kimi-for-coding', makeSettings(provider));
+
+    expect(provider.models.map((model) => model.id)).toEqual(['kimi-for-coding']);
+    expect(capability.reasoningMode).toBe('auto-only');
+    expect(capability.supportedReasoningLevels).toEqual(['off', 'auto']);
+    expect(capability.defaultReasoningLevel).toBe('auto');
+    expect(capability.maxContextAvailable).toBe(false);
+    expect(capability.maxContextWindowTokens).toBeNull();
+    expect(capability.fastVariantModelId).toBeNull();
     expect(capability.fastModelAvailable).toBe(false);
   });
-});
 
-describe('resolveEffectiveModelId', () => {
-  it('switches to fast variant when requested and available', () => {
-    const capability = resolveModelCapability('anthropic', 'claude-sonnet-4', makeSettings({
-      providers: [{
-        ...makeSettings().llm.providers[0],
-        models: [{
-          id: 'claude-sonnet-4',
-          label: 'claude-sonnet-4',
-          enabled: true,
-          contextWindowTokens: null,
-          capabilityOverride: { fastVariantModelId: 'claude-sonnet-4-fast' },
-        }, {
-          id: 'claude-sonnet-4-fast',
-          label: 'claude-sonnet-4-fast',
-          enabled: true,
-          contextWindowTokens: null,
-        }],
-      }],
-    }));
+  it('exposes fast variant only when the catalog variant is enabled', () => {
+    const provider = makeProvider(createBuiltinProviderEntry('moonshot'));
+    const capability = resolveModelCapability('moonshot', 'kimi-k2.7-code', makeSettings(provider));
+
+    expect(capability.fastVariantModelId).toBe('kimi-k2.7-code-highspeed');
+    expect(capability.fastModelAvailable).toBe(true);
     expect(resolveEffectiveModelId(capability, {
-      effort: 'medium',
+      reasoningLevel: 'medium',
       maxContextMode: false,
       fastModel: true,
-    })).toBe('claude-sonnet-4-fast');
+    })).toBe('kimi-k2.7-code-highspeed');
+  });
+
+  it('marks catalog fast variant unavailable when the variant is disabled', () => {
+    const provider = makeProvider({
+      ...createBuiltinProviderEntry('moonshot'),
+      models: createBuiltinProviderEntry('moonshot').models.map((model) => ({
+        ...model,
+        enabled: model.id !== 'kimi-k2.7-code-highspeed',
+      })),
+    });
+    const capability = resolveModelCapability('moonshot', 'kimi-k2.7-code', makeSettings(provider));
+
+    expect(capability.fastVariantModelId).toBe('kimi-k2.7-code-highspeed');
+    expect(capability.fastModelAvailable).toBe(false);
   });
 });
 
 describe('resolveReasoningBudget', () => {
-  it('clamps unsupported effort to nearest supported level', () => {
-    const capability = resolveModelCapability('anthropic', 'claude-sonnet-4', makeSettings({
-      providers: [{
-        ...makeSettings().llm.providers[0],
-        models: [{
-          id: 'claude-sonnet-4',
-          label: 'claude-sonnet-4',
-          enabled: true,
-          contextWindowTokens: null,
-          capabilityOverride: { supportedEffortLevels: ['low', 'high'] },
-        }],
-      }],
-    }));
+  it('clamps unsupported reasoning level to nearest catalog-supported level', () => {
+    const provider = makeProvider(createBuiltinProviderEntry('kimi-coding-plan'));
+    const capability = resolveModelCapability('kimi-coding-plan', 'kimi-for-coding', makeSettings(provider));
+
+    expect(resolveReasoningBudget(capability, {
+      reasoningLevel: 'max',
+      maxContextMode: false,
+      fastModel: false,
+    })).toBe('auto');
+  });
+
+  it('returns off when reasoning is disabled', () => {
+    const provider = makeProvider(createBuiltinProviderEntry('openai'));
+    const capability = resolveModelCapability('openai', 'gpt-5.5', makeSettings(provider));
+
+    expect(resolveReasoningBudget(capability, {
+      reasoningLevel: 'off',
+      maxContextMode: false,
+      fastModel: false,
+    })).toBe('off');
+  });
+
+  it('reads legacy effort input into canonical reasoningLevel without writing it back', () => {
+    const provider = makeProvider(createBuiltinProviderEntry('openai'));
+    const capability = resolveModelCapability('openai', 'gpt-5.5', makeSettings(provider));
+
     expect(resolveReasoningBudget(capability, {
       effort: 'max',
       maxContextMode: false,
       fastModel: false,
-    })).toBe('high');
+    })).toBe('max');
   });
 
-  it('returns auto when effort is unavailable', () => {
-    const capability = resolveModelCapability('anthropic', 'gpt-4.1', makeSettings({
-      providers: [{
-        ...makeSettings().llm.providers[0],
-        models: [{
-          id: 'gpt-4.1',
-          label: 'gpt-4.1',
-          enabled: true,
-          contextWindowTokens: null,
-        }],
-      }],
-    }));
+  it('fails closed from unknown reasoning values to the capability default', () => {
+    const provider = makeProvider(createBuiltinProviderEntry('openai'));
+    const capability = resolveModelCapability('openai', 'gpt-5.3-codex', makeSettings(provider));
+
     expect(resolveReasoningBudget(capability, {
-      effort: 'medium',
+      reasoningLevel: 'legacy-effort-level',
       maxContextMode: false,
       fastModel: false,
     })).toBe('auto');

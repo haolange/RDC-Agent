@@ -187,6 +187,7 @@ const createLlmApi = () => ({
 const createSettingsApi = () => ({
   get: () => electron.ipcRenderer.invoke("settings:get"),
   getProviderCatalog: () => electron.ipcRenderer.invoke("settings:getProviderCatalog"),
+  getModelCapability: (agentId) => electron.ipcRenderer.invoke("settings:getModelCapability", agentId),
   getProviderSecret: (providerId) => electron.ipcRenderer.invoke("settings:getProviderSecret", providerId),
   importAgentManifest: (filePath) => electron.ipcRenderer.invoke("settings:importAgentManifest", filePath),
   upsertSkill: (request) => electron.ipcRenderer.invoke("settings:upsertSkill", request),

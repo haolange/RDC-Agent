@@ -132,18 +132,24 @@ const toResponsesTools = (tools?: LLMRequest['tools']) => {
 };
 
 const toOpenAiReasoningEffort = (budget?: LLMRequest['reasoningBudget']): 'low' | 'medium' | 'high' | undefined => {
+  if (budget === 'off') {
+    return undefined;
+  }
   if (budget === 'low' || budget === 'medium' || budget === 'high') {
     return budget;
   }
-  if (budget === 'extra' || budget === 'max') {
+  if (budget === 'extHigh' || budget === 'max') {
     return 'high';
   }
   return undefined;
 };
 
 const toAnthropicThinking = (budget?: LLMRequest['reasoningBudget']): { type: 'enabled'; budget_tokens: number } | undefined => {
-  if (!budget || budget === 'auto') {
+  if (!budget || budget === 'off') {
     return undefined;
+  }
+  if (budget === 'auto') {
+    return { type: 'enabled', budget_tokens: 4096 };
   }
   const budgetTokens = budget === 'low'
     ? 4096
@@ -151,14 +157,14 @@ const toAnthropicThinking = (budget?: LLMRequest['reasoningBudget']): { type: 'e
       ? 8192
       : budget === 'high'
         ? 16384
-        : budget === 'extra'
+        : budget === 'extHigh'
           ? 32768
           : 63999;
   return { type: 'enabled', budget_tokens: budgetTokens };
 };
 
 const toGoogleThinkingConfig = (budget?: LLMRequest['reasoningBudget']): { thinkingBudget: number } | undefined => {
-  if (!budget || budget === 'auto') {
+  if (!budget || budget === 'auto' || budget === 'off') {
     return undefined;
   }
   const thinkingBudget = ((): number => {
@@ -169,7 +175,7 @@ const toGoogleThinkingConfig = (budget?: LLMRequest['reasoningBudget']): { think
         return 4096;
       case 'high':
         return 8192;
-      case 'extra':
+      case 'extHigh':
         return 16384;
       case 'max':
         return 24576;

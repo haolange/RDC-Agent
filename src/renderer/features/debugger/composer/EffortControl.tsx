@@ -1,37 +1,18 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { EFFORT_LEVELS, type EffortLevel } from '@shared/types/modelCapability';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { ReasoningLevel } from '@shared/types/modelCapability';
 import { useI18n } from '../../../i18n';
-import { formatTokenCount } from './turnControlsUtils';
 import { useTurnControls } from './useTurnControls';
 import type { SessionRecord } from '@shared/types/session';
-import { ChevronIcon, findAdjacentSupportedLevel, LightningIcon } from './effortControlParts';
-
-const EFFORT_LABEL_KEYS = {
-  low: 'composer.effort.levelLow',
-  medium: 'composer.effort.levelMedium',
-  high: 'composer.effort.levelHigh',
-  extra: 'composer.effort.levelExtra',
-  max: 'composer.effort.levelMax',
-} as const;
-
-const SNAP_RADIUS = 0.12;
-const STOP_POSITIONS = EFFORT_LEVELS.map((_, i) => i / (EFFORT_LEVELS.length - 1));
-
-function resolveSnappedLevel(ratio: number, supported: EffortLevel[]): EffortLevel | null {
-  for (const level of supported) {
-    const pos = STOP_POSITIONS[EFFORT_LEVELS.indexOf(level)];
-    if (Math.abs(ratio - pos) <= SNAP_RADIUS) return level;
-  }
-  return null;
-}
-
-function resolveNearestLevel(ratio: number, supported: EffortLevel[]): EffortLevel {
-  return supported.reduce((best, level) => {
-    const pos = STOP_POSITIONS[EFFORT_LEVELS.indexOf(level)];
-    const bestPos = STOP_POSITIONS[EFFORT_LEVELS.indexOf(best)];
-    return Math.abs(ratio - pos) < Math.abs(ratio - bestPos) ? level : best;
-  });
-}
+import {
+  ChevronIcon,
+  clampSliderRatio,
+  EFFORT_LABEL_KEYS,
+  findAdjacentSupportedLevel,
+  getStopPosition,
+  LightningIcon,
+  normalizeDisplayLevels,
+  resolveNearestSnapLevel,
+} from './effortControlParts';
 
 export const EffortControl: React.FC<{
   agentId: string;
@@ -42,38 +23,33 @@ export const EffortControl: React.FC<{
   const { turnControls, capability, updateTurnControls } = useTurnControls(agentId, currentSession);
   const [open, setOpen] = useState(false);
   const [dragRatio, setDragRatio] = useState<number | null>(null);
+  const [popupShift, setPopupShift] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
+  const dragActiveRef = useRef(false);
+  const popupShiftRef = useRef(0);
   const isDragging = dragRatio !== null;
 
-  const supportedLevels = capability?.supportedEffortLevels ?? [];
-  const hasReasoning = supportedLevels.length > 0;
-  const selectedIndex = EFFORT_LEVELS.indexOf(turnControls.effort);
-  const thumbPercent = isDragging
-    ? dragRatio * 100
-    : (selectedIndex / (EFFORT_LEVELS.length - 1)) * 100;
+  const displayLevels = useMemo(
+    () => normalizeDisplayLevels(capability?.supportedReasoningLevels),
+    [capability?.supportedReasoningLevels],
+  );
+  const hasAdjustableReasoning = displayLevels.length > 1;
+  const selectedIndex = Math.max(0, displayLevels.indexOf(turnControls.reasoningLevel));
+  const selectedLevel = displayLevels[selectedIndex] ?? 'off';
+  const visualLevel = isDragging
+    ? resolveNearestSnapLevel(dragRatio, displayLevels)
+    : selectedLevel;
+  const visualIndex = Math.max(0, displayLevels.indexOf(visualLevel));
+  const thumbRatio = isDragging
+    ? clampSliderRatio(dragRatio)
+    : getStopPosition(visualIndex, displayLevels.length);
+  const thumbPercent = thumbRatio * 100;
 
-  const effortLabel = t(EFFORT_LABEL_KEYS[turnControls.effort]);
-
-  // Tooltip text reflects the snapped level while dragging for live feedback
-  const tooltipLevel = isDragging
-    ? (resolveSnappedLevel(dragRatio, supportedLevels) ?? resolveNearestLevel(dragRatio, supportedLevels.length > 0 ? supportedLevels : [turnControls.effort]))
-    : turnControls.effort;
-  const tooltipLabel = t(EFFORT_LABEL_KEYS[tooltipLevel]);
-
-  const pillLabel = turnControls.maxContextMode ? `${effortLabel} · Max` : effortLabel;
-
-  const maxModeSubtitle = useMemo(() => {
-    if (!capability) return '';
-    const from = formatTokenCount(capability.defaultContextWindowTokens);
-    if (!capability.maxContextWindowTokens) return from;
-    return `${from} → ${formatTokenCount(capability.maxContextWindowTokens)}`;
-  }, [capability]);
-
-  const fastModelSubtitle = capability?.fastVariantModelId ? `→ ${capability.fastVariantModelId}` : '';
-  const maxModeTooltip = capability?.nominalContextWindowTokens === null
-    ? t('composer.effort.maxContextUnknown')
-    : t('composer.effort.maxContextUnavailable');
+  const effortLabel = t(EFFORT_LABEL_KEYS[selectedLevel]);
+  const tooltipLabel = t(EFFORT_LABEL_KEYS[visualLevel]);
+  const pillLabel = turnControls.maxContextMode ? `${effortLabel} / Max` : effortLabel;
 
   const closeMenu = useCallback(() => setOpen(false), []);
 
@@ -93,63 +69,98 @@ export const EffortControl: React.FC<{
     };
   }, [closeMenu, open]);
 
-  const selectEffort = useCallback((level: EffortLevel) => {
-    if (supportedLevels.includes(level)) updateTurnControls({ effort: level });
-  }, [supportedLevels, updateTurnControls]);
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    const syncPopupPosition = () => {
+      const popup = popupRef.current;
+      if (!popup) return;
+      const gutter = 8;
+      const currentShift = popupShiftRef.current;
+      const rect = popup.getBoundingClientRect();
+      const boundary = menuRef.current?.closest('.composer-shell')?.getBoundingClientRect();
+      const minLeft = Math.max(gutter, boundary ? boundary.left + gutter : gutter);
+      const maxRight = Math.min(window.innerWidth - gutter, boundary ? boundary.right - gutter : window.innerWidth - gutter);
+      const baseLeft = rect.left - currentShift;
+      const baseRight = rect.right - currentShift;
+      let nextShift = 0;
+      if (baseRight > maxRight) nextShift -= baseRight - maxRight;
+      if (baseLeft + nextShift < minLeft) nextShift += minLeft - (baseLeft + nextShift);
+      popupShiftRef.current = Math.round(nextShift);
+      setPopupShift(popupShiftRef.current);
+    };
+    syncPopupPosition();
+    window.addEventListener('resize', syncPopupPosition);
+    return () => window.removeEventListener('resize', syncPopupPosition);
+  }, [open]);
+
+  const selectEffort = useCallback((level: ReasoningLevel) => {
+    if (displayLevels.includes(level)) updateTurnControls({ reasoningLevel: level });
+  }, [displayLevels, updateTurnControls]);
 
   const getRatioFromClientX = (clientX: number): number => {
     const track = trackRef.current;
     if (!track) return 0;
     const rect = track.getBoundingClientRect();
-    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return clampSliderRatio((clientX - rect.left) / rect.width);
+  };
+
+  const resolveLevelFromClientX = (clientX: number): ReasoningLevel => {
+    const track = trackRef.current;
+    if (!track) return displayLevels[0] ?? 'off';
+    const rect = track.getBoundingClientRect();
+    return resolveNearestSnapLevel((clientX - rect.left) / rect.width, displayLevels);
   };
 
   const handleTrackPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!hasReasoning) return;
+    if (!hasAdjustableReasoning) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     const ratio = getRatioFromClientX(event.clientX);
+    dragActiveRef.current = true;
     setDragRatio(ratio);
-    const snapped = resolveSnappedLevel(ratio, supportedLevels);
-    if (snapped) selectEffort(snapped);
   };
 
   const handleTrackPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging || !hasReasoning) return;
+    if (!dragActiveRef.current || !hasAdjustableReasoning) return;
     const ratio = getRatioFromClientX(event.clientX);
     setDragRatio(ratio);
-    const snapped = resolveSnappedLevel(ratio, supportedLevels);
-    if (snapped) selectEffort(snapped);
   };
 
   const handleTrackPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-    event.currentTarget.releasePointerCapture(event.pointerId);
-    const ratio = dragRatio ?? getRatioFromClientX(event.clientX);
-    const snapped = resolveSnappedLevel(ratio, supportedLevels);
-    if (!snapped && supportedLevels.length > 0) {
-      selectEffort(resolveNearestLevel(ratio, supportedLevels));
+    if (!dragActiveRef.current) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    selectEffort(resolveLevelFromClientX(event.clientX));
+    dragActiveRef.current = false;
     setDragRatio(null);
   };
 
+  const handleTrackClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!hasAdjustableReasoning) return;
+    selectEffort(resolveLevelFromClientX(event.clientX));
+  };
+
   const handleThumbKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!hasReasoning) return;
+    if (!hasAdjustableReasoning) return;
     if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
       event.preventDefault();
-      const next = findAdjacentSupportedLevel(turnControls.effort, -1, supportedLevels);
+      const next = findAdjacentSupportedLevel(selectedLevel, -1, displayLevels);
       if (next) selectEffort(next);
     }
     if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
       event.preventDefault();
-      const next = findAdjacentSupportedLevel(turnControls.effort, 1, supportedLevels);
+      const next = findAdjacentSupportedLevel(selectedLevel, 1, displayLevels);
       if (next) selectEffort(next);
     }
   };
 
-  // Index of the highest supported level, used for the accent dot
-  const maxSupportedIndex = supportedLevels.length > 0
-    ? EFFORT_LEVELS.indexOf(supportedLevels[supportedLevels.length - 1])
-    : -1;
+  const popupStyle = { '--composer-effort-popup-shift-x': `${popupShift}px` } as React.CSSProperties;
+  const thumbStyle = { left: `${thumbPercent}%` } as React.CSSProperties;
+  const thumbEdgeClass = thumbPercent <= 0.01
+    ? ' is-start'
+    : thumbPercent >= 99.99
+      ? ' is-end'
+      : '';
 
   return (
     <div ref={menuRef} className="composer-effort-menu">
@@ -172,50 +183,48 @@ export const EffortControl: React.FC<{
       </button>
 
       {open ? (
-        <div className="composer-effort-popup" data-testid="composer-effort-popup" role="dialog" aria-label={t('composer.effort.popupTitle')}>
-          <div className={`composer-effort-slider-section ${hasReasoning ? '' : 'is-disabled'}`}>
+        <div ref={popupRef} className="composer-effort-popup" data-testid="composer-effort-popup" role="dialog" aria-label={t('composer.effort.popupTitle')} style={popupStyle}>
+          <div className={`composer-effort-slider-section ${hasAdjustableReasoning ? '' : 'is-disabled'}`}>
             <div
               ref={trackRef}
-              className={`composer-effort-slider${isDragging ? ' is-dragging' : ''}`}
+              className={`composer-effort-slider is-level-${visualLevel}${hasAdjustableReasoning ? '' : ' is-disabled'}${isDragging ? ' is-dragging' : ''}`}
               data-testid="composer-effort-slider"
               onPointerDown={handleTrackPointerDown}
               onPointerMove={handleTrackPointerMove}
               onPointerUp={handleTrackPointerUp}
               onPointerCancel={handleTrackPointerUp}
+              onClick={handleTrackClick}
             >
-              {/* Pure-visual stop markers — not interactive */}
-              <div className="composer-effort-slider-stops" aria-hidden="true">
-                {EFFORT_LEVELS.map((level, index) => {
-                  const isSupported = supportedLevels.includes(level);
-                  const isMaxSupported = index === maxSupportedIndex;
-                  const classes = [
-                    'composer-effort-slider-stop',
-                    !isSupported ? 'is-unsupported' : '',
-                    isMaxSupported ? 'is-max-supported' : '',
-                  ].filter(Boolean).join(' ');
-                  return (
-                    <div
-                      key={level}
-                      className={classes}
-                      style={{ left: `${STOP_POSITIONS[index] * 100}%` }}
-                    />
-                  );
-                })}
-              </div>
+              {hasAdjustableReasoning ? (
+                <div className="composer-effort-slider-stops" aria-hidden="true">
+                  {displayLevels.map((level, index) => {
+                    const classes = [
+                      'composer-effort-slider-stop',
+                      level === visualLevel ? 'is-current' : '',
+                    ].filter(Boolean).join(' ');
+                    return (
+                      <div
+                        key={level}
+                        className={classes}
+                        style={{ left: `${getStopPosition(index, displayLevels.length) * 100}%` }}
+                      />
+                    );
+                  })}
+                </div>
+              ) : null}
 
               <div className="composer-effort-slider-track" aria-hidden="true" />
 
-              {/* Accessible slider thumb */}
               <div
-                className={`composer-effort-slider-thumb${isDragging ? ' is-dragging' : ''}`}
+                className={`composer-effort-slider-thumb${isDragging ? ' is-dragging' : ''}${thumbEdgeClass}`}
+                style={thumbStyle}
                 role="slider"
-                tabIndex={hasReasoning ? 0 : -1}
+                tabIndex={hasAdjustableReasoning ? 0 : -1}
                 aria-valuemin={0}
-                aria-valuemax={EFFORT_LEVELS.length - 1}
+                aria-valuemax={displayLevels.length - 1}
                 aria-valuenow={selectedIndex}
                 aria-valuetext={effortLabel}
-                aria-disabled={!hasReasoning}
-                style={{ left: `${thumbPercent}%` }}
+                aria-disabled={!hasAdjustableReasoning}
                 onKeyDown={handleThumbKeyDown}
               >
                 {isDragging ? <span className="composer-effort-slider-tooltip">{tooltipLabel}</span> : null}
@@ -226,8 +235,6 @@ export const EffortControl: React.FC<{
               <span>{t('composer.effort.faster')}</span>
               <span>{t('composer.effort.smarter')}</span>
             </div>
-
-            {!hasReasoning ? <p className="composer-effort-slider-hint">{t('composer.effort.noReasoning')}</p> : null}
           </div>
 
           <div className="composer-effort-popup-divider" aria-hidden="true" />
@@ -235,11 +242,9 @@ export const EffortControl: React.FC<{
           <div
             className={`composer-effort-toggle-row ${capability?.maxContextAvailable ? '' : 'is-disabled'}`}
             data-testid="composer-effort-max-row"
-            title={capability?.maxContextAvailable ? undefined : maxModeTooltip}
           >
             <div className="composer-effort-toggle-copy">
               <span className="composer-effort-toggle-label">{t('composer.effort.maxMode')}</span>
-              <span className="composer-effort-toggle-desc">{maxModeSubtitle}</span>
             </div>
             <button
               type="button"
@@ -254,11 +259,9 @@ export const EffortControl: React.FC<{
           <div
             className={`composer-effort-toggle-row ${capability?.fastModelAvailable ? '' : 'is-disabled'}`}
             data-testid="composer-effort-fast-row"
-            title={capability?.fastModelAvailable ? undefined : t('composer.effort.fastModelUnavailable')}
           >
             <div className="composer-effort-toggle-copy">
               <span className="composer-effort-toggle-label">{t('composer.effort.fastModel')}</span>
-              <span className="composer-effort-toggle-desc">{fastModelSubtitle}</span>
             </div>
             <button
               type="button"

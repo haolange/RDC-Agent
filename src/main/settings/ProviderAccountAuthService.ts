@@ -11,7 +11,8 @@ import type {
   LlmProviderModel,
 } from '@shared/types/settings';
 import { getBuiltinProviderDefinition, SUPER_GROK_OAUTH_CALLBACK_PORT, SUPER_GROK_OAUTH_REDIRECT_URI } from '@shared/constants/llm';
-import { COPILOT_EDITOR_HEADERS, COPILOT_WIRE_HEADERS } from './CopilotWire';
+import { getManagedProviderModels } from '@shared/constants/modelCapabilityCatalog';
+import { COPILOT_EDITOR_HEADERS } from './CopilotWire';
 import { settingsService } from './SettingsService';
 
 const REQUEST_TIMEOUT_MS = 20000;
@@ -20,7 +21,6 @@ const CHATGPT_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const CLAUDE_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
 const GITHUB_COPILOT_CLIENT_ID = 'Iv1.b507a08c87ecfe98';
 const GROK_OPENID_CONFIGURATION_URL = 'https://auth.x.ai/.well-known/openid-configuration';
-const GROK_API_BASE_URL = 'https://api.x.ai/v1';
 const GROK_OAUTH_REQUESTED_SCOPES = ['openid', 'profile', 'email', 'offline_access', 'api:access'] as const;
 const GROK_OAUTH_CLIENT_ID_ENV_KEYS = [
   'RDC_AGENT_GROK_OAUTH_CLIENT_ID',
@@ -133,29 +133,6 @@ const appendParams = (baseUrl: string, params: Record<string, string>): string =
     url.searchParams.set(key, value);
   }
   return url.toString();
-};
-
-const normalizeAccountModels = (values: unknown[]): LlmProviderModel[] => {
-  const models = new Map<string, LlmProviderModel>();
-  for (const value of values) {
-    const record = value && typeof value === 'object' ? value as { id?: unknown; name?: unknown; display_name?: unknown } : null;
-    const id = typeof value === 'string'
-      ? value.trim()
-      : typeof record?.id === 'string'
-        ? record.id.trim()
-        : typeof record?.name === 'string'
-          ? record.name.trim()
-          : '';
-    if (!id || !isAgentRoutableAccountModel(id) || models.has(id)) {
-      continue;
-    }
-    models.set(id, {
-      id,
-      label: typeof record?.display_name === 'string' && record.display_name.trim() ? record.display_name.trim() : id,
-      enabled: true,
-    });
-  }
-  return Array.from(models.values()).sort((left, right) => left.id.localeCompare(right.id));
 };
 
 const readString = (value: unknown): string | undefined =>
@@ -367,34 +344,15 @@ const extractChatGptAccountId = (idToken?: string): string | undefined => {
 };
 
 const createAccountCatalogModels = (providerId: AccountProviderId): LlmProviderModel[] => {
-  const definition = getBuiltinProviderDefinition(providerId);
   const seen = new Set<string>();
-  return (definition?.recommendedModels ?? [])
-    .map((modelId) => modelId.trim())
-    .filter((modelId) => {
-      if (!modelId || seen.has(modelId) || !isAgentRoutableAccountModel(modelId)) {
+  return getManagedProviderModels(providerId)
+    .filter((model) => {
+      if (!model.id || seen.has(model.id) || !isAgentRoutableAccountModel(model.id)) {
         return false;
       }
-      seen.add(modelId);
+      seen.add(model.id);
       return true;
-    })
-    .map((modelId) => ({
-      id: modelId,
-      label: modelId,
-      enabled: true,
-    }));
-};
-
-const mergeAccountModels = (...groups: LlmProviderModel[][]): LlmProviderModel[] => {
-  const models = new Map<string, LlmProviderModel>();
-  for (const group of groups) {
-    for (const model of group) {
-      if (!models.has(model.id) && isAgentRoutableAccountModel(model.id)) {
-        models.set(model.id, model);
-      }
-    }
-  }
-  return Array.from(models.values());
+    });
 };
 
 const isAgentRoutableAccountModel = (modelId: string): boolean => {
@@ -483,32 +441,6 @@ const fetchOAuthJson = async (url: string, init: RequestInit): Promise<unknown> 
 };
 
 const createFormBody = (params: Record<string, string>): string => new URLSearchParams(params).toString();
-
-const parseModels = (payload: unknown): LlmProviderModel[] => {
-  if (!payload || typeof payload !== 'object') {
-    return [];
-  }
-  const data = (payload as { data?: unknown; models?: unknown }).data ?? (payload as { data?: unknown; models?: unknown }).models;
-  return Array.isArray(data) ? normalizeAccountModels(data) : [];
-};
-
-const parseCopilotModels = (payload: unknown): LlmProviderModel[] => {
-  if (!payload || typeof payload !== 'object') {
-    return [];
-  }
-  const data = (payload as { data?: unknown; models?: unknown }).data ?? (payload as { data?: unknown; models?: unknown }).models;
-  if (!Array.isArray(data)) {
-    return [];
-  }
-  return normalizeAccountModels(data.filter((value) => {
-    const record = value && typeof value === 'object' ? value as { policy?: unknown } : null;
-    const policy = record?.policy && typeof record.policy === 'object' && !Array.isArray(record.policy)
-      ? record.policy as { state?: unknown }
-      : null;
-    const state = typeof policy?.state === 'string' ? policy.state.toLowerCase() : '';
-    return !state || state === 'enabled';
-  }));
-};
 
 export class ProviderAccountAuthService {
   async startLogin(request: LlmProviderAccountLoginStartRequest): Promise<LlmProviderAccountStatus> {
@@ -1363,50 +1295,11 @@ export class ProviderAccountAuthService {
   }
 
   private async discoverModels(bundle: OAuthSecretBundle): Promise<LlmProviderModel[]> {
-    if (
-      bundle.providerId === 'chatgpt-account'
-      || bundle.providerId === 'claude-account'
-      || isUnimplementedAccountProviderId(bundle.providerId)
-    ) {
-      return createAccountCatalogModels(bundle.providerId);
+    const models = createAccountCatalogModels(bundle.providerId);
+    if (models.length === 0) {
+      throw new Error(`Account provider ${bundle.providerId} is missing an app-managed model catalog.`);
     }
-    if (bundle.providerId === 'grok-account') {
-      const token = bundle.accessToken ?? bundle.apiKey;
-      if (!token) {
-        throw new Error('Super Grok account access token is missing. Sign in again.');
-      }
-      const payload = await fetchJson(`${GROK_API_BASE_URL}/models`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      return parseModels(payload);
-    }
-    if (bundle.providerId === 'github-copilot') {
-      const catalogModels = createAccountCatalogModels(bundle.providerId);
-      const baseUrl = (bundle.copilotApiBaseUrl ?? 'https://api.githubcopilot.com').replace(/\/+$/, '');
-      try {
-        const payload = await fetchJson(`${baseUrl}/models`, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${bundle.copilotToken}`,
-            'Content-Type': 'application/json',
-            ...COPILOT_WIRE_HEADERS,
-          },
-        });
-        return mergeAccountModels(catalogModels, parseCopilotModels(payload));
-      } catch {
-        return catalogModels;
-      }
-    }
-    const payload = await fetchJson('https://api.openai.com/v1/models', {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${bundle.apiKey ?? bundle.accessToken}`,
-      },
-    });
-    return parseModels(payload);
+    return models;
   }
 
   private async revokeGrokBundle(bundle: OAuthSecretBundle): Promise<void> {

@@ -28,8 +28,6 @@ import type {
   WorkspaceSettings,
 } from '@shared/types/settings';
 import type { LLMConfig, LLMProviderConfig } from '@shared/types/llm';
-import type { EffortLevel } from '@shared/types/modelCapability';
-import { EFFORT_LEVELS } from '@shared/types/modelCapability';
 import { DEFAULT_MODEL_ROUTING, isSafeAgentProfileId } from '@shared/types/agent';
 import {
   LEFT_SIDEBAR_COLLAPSED_WIDTH,
@@ -48,8 +46,10 @@ import {
   createBuiltinProviderEntry,
   createBuiltinProviderEntries,
   getBuiltinProviderDefinition,
+  getBuiltinProviderCatalogOwnership,
   isBuiltinProviderId,
 } from '@shared/constants/llm';
+import { getManagedProviderModels } from '@shared/constants/modelCapabilityCatalog';
 import { appPathService } from '../runtime/AppPathService';
 import { agentManifestService } from './AgentManifestService';
 import { executionProfileService } from './ExecutionProfileService';
@@ -506,32 +506,6 @@ function sanitizeTerminal(input: unknown, fallback = DEFAULT_LAYOUT.terminal): L
   };
 }
 
-function sanitizeCapabilityOverride(value: unknown): LlmProviderModel['capabilityOverride'] | undefined {
-  if (!value || typeof value !== 'object') {
-    return undefined;
-  }
-  const candidate = value as Record<string, unknown>;
-  const profile: NonNullable<LlmProviderModel['capabilityOverride']> = {};
-  if (
-    typeof candidate.nominalContextWindowTokens === 'number'
-    && Number.isFinite(candidate.nominalContextWindowTokens)
-    && candidate.nominalContextWindowTokens > 0
-  ) {
-    profile.nominalContextWindowTokens = Math.round(candidate.nominalContextWindowTokens);
-  }
-  if (Array.isArray(candidate.supportedEffortLevels)) {
-    const levels = candidate.supportedEffortLevels
-      .filter((entry): entry is EffortLevel => typeof entry === 'string' && (EFFORT_LEVELS as readonly string[]).includes(entry));
-    if (levels.length > 0) {
-      profile.supportedEffortLevels = levels;
-    }
-  }
-  if (typeof candidate.fastVariantModelId === 'string' && candidate.fastVariantModelId.trim()) {
-    profile.fastVariantModelId = candidate.fastVariantModelId.trim();
-  }
-  return Object.keys(profile).length > 0 ? profile : undefined;
-}
-
 function sanitizeModels(models: unknown): LlmProviderModel[] {
   const candidates = Array.isArray(models) ? models : [];
   const modelMap = new Map<string, LlmProviderModel>();
@@ -546,20 +520,46 @@ function sanitizeModels(models: unknown): LlmProviderModel[] {
     if (!modelId || modelMap.has(modelId)) {
       continue;
     }
+    const availability = candidate.availability === 'available'
+      || candidate.availability === 'unavailable'
+      || candidate.availability === 'unknown'
+      ? candidate.availability
+      : undefined;
 
-    const capabilityOverride = sanitizeCapabilityOverride(candidate.capabilityOverride);
     modelMap.set(modelId, {
       id: modelId,
       label: typeof candidate.label === 'string' && candidate.label.trim() ? candidate.label.trim() : modelId,
       enabled: candidate.enabled !== false,
-      contextWindowTokens: typeof candidate.contextWindowTokens === 'number' && Number.isFinite(candidate.contextWindowTokens)
-        ? Math.max(0, Math.round(candidate.contextWindowTokens))
-        : null,
-      ...(capabilityOverride ? { capabilityOverride } : {}),
+      availability,
+      availabilityReason: typeof candidate.availabilityReason === 'string' && candidate.availabilityReason.trim()
+        ? candidate.availabilityReason.trim()
+        : undefined,
     });
   }
 
   return Array.from(modelMap.values());
+}
+
+function applyModelEnabledState(
+  catalogModels: LlmProviderModel[],
+  persistedModels: LlmProviderModel[],
+): LlmProviderModel[] {
+  const persistedById = new Map(persistedModels.map((model) => [model.id, model]));
+  return catalogModels.map((model) => ({
+    ...model,
+    enabled: persistedById.get(model.id)?.enabled ?? true,
+    availability: persistedById.get(model.id)?.availability ?? model.availability,
+    availabilityReason: persistedById.get(model.id)?.availabilityReason,
+  }));
+}
+
+function resolveProviderModels(providerId: string, persistedModels: unknown): LlmProviderModel[] {
+  const sanitized = sanitizeModels(persistedModels);
+  if (getBuiltinProviderCatalogOwnership(providerId) !== 'app-managed') {
+    return sanitized;
+  }
+  const catalogModels = getManagedProviderModels(providerId);
+  return catalogModels.length > 0 ? applyModelEnabledState(catalogModels, sanitized) : sanitized;
 }
 
 function createEmptyAgentRoutes(): LlmAgentRoute[] {
@@ -649,13 +649,14 @@ function pickProviderStatus(
   canUseProvider: boolean,
   models: LlmProviderModel[],
 ): LlmProviderConnectionStatus {
+  const hasEnabledModels = models.some((model) => model.enabled !== false);
   if (fallback.status === 'unavailable') {
     return 'unavailable';
   }
   if (provider.status === 'failed') {
     return 'failed';
   }
-  if ((provider.status === 'verified' || provider.isConfigured === true) && canUseProvider && models.length > 0) {
+  if ((provider.status === 'verified' || provider.isConfigured === true) && canUseProvider && hasEnabledModels) {
     return 'verified';
   }
   return 'unconfigured';
@@ -706,7 +707,8 @@ function sanitizeUserProvider(
     ? secretStorageService.createProviderSecretRef(rawId)
     : incomingSecretRef || secretStorageService.createProviderSecretRef(rawId);
   const protocol = normalizeProviderProtocol({ ...provider, id: rawId });
-  const models = sanitizeModels(provider.models ?? []);
+  const catalogOwnership = getBuiltinProviderCatalogOwnership(rawId);
+  const models = resolveProviderModels(rawId, provider.models ?? []);
   const oauthSecretRef = secretStorageService.createProviderOAuthSecretRef(rawId);
   const resolvedSecret = builtinFallback.authMode === 'api-key'
     ? getResolvedProviderSecret(rawId, secretRef, workspaceRoot)
@@ -718,7 +720,8 @@ function sanitizeUserProvider(
     ? true
     : Boolean(resolvedSecret));
   const status = pickProviderStatus(provider, builtinFallback, canUseProvider, models);
-  const enabled = status === 'verified' && models.length > 0;
+  const hasEnabledModels = models.some((model) => model.enabled !== false);
+  const enabled = status === 'verified' && hasEnabledModels;
   const label = builtinFallback.label;
   const recommendedModels = builtinFallback.recommendedModels;
   const docsUrl = builtinFallback.docsUrl;
@@ -728,6 +731,7 @@ function sanitizeUserProvider(
     protocol,
     authMode: builtinFallback.authMode,
     category: normalizeProviderCategory({ ...provider, id: rawId, authMode: builtinFallback.authMode }),
+    catalogOwnership,
     modelDiscovery: builtinFallback.modelDiscovery,
     label,
     enabled,
@@ -753,7 +757,7 @@ function sanitizeUserProvider(
     oauthExpiresAt: typeof provider.oauthExpiresAt === 'string' ? provider.oauthExpiresAt : undefined,
     oauthRefreshAvailable: typeof provider.oauthRefreshAvailable === 'boolean' ? provider.oauthRefreshAvailable : undefined,
     unavailableReason: definition?.unavailableReason,
-    isConfigured: status === 'verified' && models.length > 0 && enabled,
+    isConfigured: status === 'verified' && hasEnabledModels && enabled,
     capabilities: definition?.capabilities ? [...definition.capabilities] : undefined,
   };
 }
@@ -798,14 +802,15 @@ function hydrateProviderSecrets(
       : provider.authMode === 'api-key'
         ? Boolean(resolvedSecret)
         : Boolean(resolvedSecret);
+    const hasEnabledModels = provider.models.some((model) => model.enabled !== false);
     const status = provider.status === 'unavailable'
       ? 'unavailable'
-      : provider.status === 'verified' && canUseProvider && provider.models.length > 0
+      : provider.status === 'verified' && canUseProvider && hasEnabledModels
         ? 'verified'
         : provider.status === 'failed'
           ? 'failed'
           : 'unconfigured';
-    const isConfigured = status === 'verified' && provider.models.length > 0;
+    const isConfigured = status === 'verified' && hasEnabledModels;
 
     return {
       ...provider,
@@ -1346,28 +1351,29 @@ export class SettingsService {
       throw new Error(`Unknown provider: ${providerId}`);
     }
 
-    const discoveredModels = sanitizeModels(models);
+    const discoveredModels = resolveProviderModels(provider.id, models);
     if (discoveredModels.length === 0) {
       throw new Error('该 Provider 暂未返回可用模型');
     }
 
+    const hasEnabledModels = discoveredModels.some((model) => model.enabled !== false);
     const protocol = normalizeProviderProtocol({ id: provider.id, protocol: protocolDraft ?? provider.protocol });
     const timestamp = nowIso();
     const nextProvider: LlmProviderEntry = {
       ...provider,
       apiKey: apiKey.trim(),
       protocol,
-      enabled: true,
+      enabled: hasEnabledModels,
       hasStoredSecret: provider.authMode === 'api-key'
         ? Boolean(apiKey.trim() || provider.hasStoredSecret)
         : provider.authMode === 'local' || provider.authMode === 'environment' || provider.hasStoredSecret,
       baseUrl: provider.baseUrlEditable ? baseUrl.trim() || provider.baseUrl : provider.baseUrl,
-      models: discoveredModels.map((model) => ({ ...model, enabled: true })),
+      models: discoveredModels.map((model) => ({ ...model })),
       status: 'verified',
       lastTestedAt: timestamp,
       lastModelRefreshAt: timestamp,
       lastError: undefined,
-      isConfigured: true,
+      isConfigured: hasEnabledModels,
     };
 
     return this.setAll({
@@ -1390,10 +1396,12 @@ export class SettingsService {
       throw new Error(`Unknown account provider: ${providerId}`);
     }
 
-    const discoveredModels = sanitizeModels(models);
+    const discoveredModels = resolveProviderModels(provider.id, models);
     if (discoveredModels.length === 0) {
       throw new Error('Provider returned no usable models');
     }
+
+    const hasEnabledModels = discoveredModels.some((model) => model.enabled !== false);
 
     secretStorageService.setSecret(
       secretStorageService.createProviderOAuthSecretRef(provider.id),
@@ -1404,9 +1412,9 @@ export class SettingsService {
     const timestamp = nowIso();
     const nextProvider: LlmProviderEntry = {
       ...provider,
-      enabled: true,
+      enabled: hasEnabledModels,
       hasStoredSecret: true,
-      models: discoveredModels.map((model) => ({ ...model, enabled: true })),
+      models: discoveredModels.map((model) => ({ ...model })),
       status: 'verified',
       lastTestedAt: timestamp,
       lastModelRefreshAt: timestamp,
@@ -1415,7 +1423,7 @@ export class SettingsService {
       planLabel: accountSummary.planLabel,
       oauthExpiresAt: accountSummary.oauthExpiresAt,
       oauthRefreshAvailable: accountSummary.oauthRefreshAvailable,
-      isConfigured: true,
+      isConfigured: hasEnabledModels,
     };
 
     return this.setAll({
@@ -1444,7 +1452,7 @@ export class SettingsService {
       ...provider,
       apiKey: '',
       hasStoredSecret: fallback.hasStoredSecret,
-      models: [],
+      models: fallback.models,
       enabled: false,
       status: fallback.status,
       lastError: undefined,

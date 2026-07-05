@@ -1,5 +1,15 @@
-import type { EffortLevel } from '@shared/types/modelCapability';
-import { EFFORT_LEVELS } from '@shared/types/modelCapability';
+import type { ReasoningLevel } from '@shared/types/modelCapability';
+import { REASONING_LEVELS } from '@shared/types/modelCapability';
+
+export const EFFORT_LABEL_KEYS = {
+  off: 'composer.effort.levelOff',
+  auto: 'composer.effort.levelAuto',
+  low: 'composer.effort.levelLow',
+  medium: 'composer.effort.levelMedium',
+  high: 'composer.effort.levelHigh',
+  extHigh: 'composer.effort.levelExtHigh',
+  max: 'composer.effort.levelMax',
+} as const;
 
 export function LightningIcon() {
   return (
@@ -17,20 +27,39 @@ export function ChevronIcon() {
   );
 }
 
-export function findAdjacentSupportedLevel(
-  current: EffortLevel,
-  direction: -1 | 1,
-  supported: EffortLevel[],
-): EffortLevel | null {
-  const currentIndex = EFFORT_LEVELS.indexOf(current);
-  for (let offset = 1; offset < EFFORT_LEVELS.length; offset += 1) {
-    const candidate = EFFORT_LEVELS[currentIndex + direction * offset];
-    if (!candidate) {
-      return null;
-    }
-    if (supported.includes(candidate)) {
-      return candidate;
-    }
+export function normalizeDisplayLevels(levels: ReasoningLevel[] | undefined): ReasoningLevel[] {
+  if (!levels || levels.length === 0) {
+    return ['off'];
   }
-  return null;
+  const normalized = REASONING_LEVELS.filter((level) => levels.includes(level));
+  return normalized.length > 0 ? normalized : ['off'];
+}
+
+export function getStopPosition(index: number, total: number): number {
+  return total <= 1 ? 0 : index / (total - 1);
+}
+
+export function clampSliderRatio(ratio: number): number {
+  return Number.isFinite(ratio) ? Math.max(0, Math.min(1, ratio)) : 0;
+}
+
+export function resolveNearestSnapLevel(ratio: number, supported: ReasoningLevel[]): ReasoningLevel {
+  if (supported.length <= 1) {
+    return supported[0] ?? 'off';
+  }
+  const position = clampSliderRatio(ratio) * (supported.length - 1);
+  const selectedIndex = Math.max(0, Math.min(supported.length - 1, Math.round(position)));
+  return supported[selectedIndex] ?? supported[0] ?? 'off';
+}
+
+export function findAdjacentSupportedLevel(
+  current: ReasoningLevel,
+  direction: -1 | 1,
+  supported: ReasoningLevel[],
+): ReasoningLevel | null {
+  const currentIndex = supported.indexOf(current);
+  if (currentIndex < 0) {
+    return supported[0] ?? null;
+  }
+  return supported[currentIndex + direction] ?? null;
 }

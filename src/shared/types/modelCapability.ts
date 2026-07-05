@@ -1,57 +1,90 @@
-export type EffortLevel = 'low' | 'medium' | 'high' | 'extra' | 'max';
-export const EFFORT_LEVELS: readonly EffortLevel[] = ['low', 'medium', 'high', 'extra', 'max'];
+export type EffortLevel = 'low' | 'medium' | 'high' | 'extHigh' | 'max';
+export const EFFORT_LEVELS: readonly EffortLevel[] = ['low', 'medium', 'high', 'extHigh', 'max'];
+
+export type ReasoningLevel = 'off' | 'auto' | EffortLevel;
+export const REASONING_LEVELS: readonly ReasoningLevel[] = ['off', 'auto', 'low', 'medium', 'high', 'extHigh', 'max'];
+export type ReasoningMode = 'none' | 'auto-only' | 'effort-levels';
 
 export interface ConversationTurnControls {
-  effort: EffortLevel;
+  reasoningLevel: ReasoningLevel;
   maxContextMode: boolean;
   fastModel: boolean;
 }
 
-/** seed/override 声明形态 */
-export interface ModelCapabilityProfile {
-  nominalContextWindowTokens?: number;
-  supportedEffortLevels?: EffortLevel[];
-  fastVariantModelId?: string;
+export type ModelCapabilitySourceKind = 'official' | 'observed' | 'conservative';
+
+export interface ModelCapabilitySource {
+  kind: ModelCapabilitySourceKind;
+  updatedAt: string;
+  urls: string[];
+  note?: string;
 }
 
-/** 主进程 resolve 后给 renderer 的完整视图 */
+export interface ModelCapabilityProfile {
+  nominalContextWindowTokens?: number;
+  reasoningMode?: ReasoningMode;
+  supportedReasoningLevels?: ReasoningLevel[];
+  defaultReasoningLevel?: ReasoningLevel;
+  fastVariantModelId?: string;
+  toolCalling?: boolean;
+  visionInput?: boolean;
+  structuredOutput?: boolean;
+}
+
 export interface ResolvedModelCapability {
   providerId: string;
   modelId: string;
+  catalogSource: 'managed-catalog' | 'conservative-default';
   nominalContextWindowTokens: number | null;
   defaultContextWindowTokens: number;
   maxContextWindowTokens: number | null;
-  supportedEffortLevels: EffortLevel[];
-  defaultEffort: EffortLevel;
+  reasoningMode: ReasoningMode;
+  supportedReasoningLevels: ReasoningLevel[];
+  defaultReasoningLevel: ReasoningLevel;
   maxContextAvailable: boolean;
   fastVariantModelId: string | null;
   fastModelAvailable: boolean;
+  toolCalling: boolean;
+  visionInput: boolean;
+  structuredOutput: boolean;
 }
 
 export const DEFAULT_CONTEXT_WINDOW_TOKENS = 256_000;
+export const MAX_CONTEXT_MODE_MIN_TOKENS = 1_000_000;
 export const CONTEXT_COMPACTION_RATIO = 0.8;
 
-export function clampEffortLevel(
-  effort: EffortLevel,
-  supported: EffortLevel[],
-): EffortLevel | undefined {
-  if (supported.length === 0) {
+export function isReasoningLevel(value: unknown): value is ReasoningLevel {
+  return typeof value === 'string' && (REASONING_LEVELS as readonly string[]).includes(value);
+}
+
+export function clampReasoningLevel(
+  reasoningLevel: unknown,
+  supported: readonly ReasoningLevel[] | null | undefined,
+): ReasoningLevel | undefined {
+  if (!Array.isArray(supported) || supported.length === 0) {
     return undefined;
   }
-  if (supported.includes(effort)) {
-    return effort;
+  if (!isReasoningLevel(reasoningLevel)) {
+    return undefined;
   }
-  const effortIndex = EFFORT_LEVELS.indexOf(effort);
+  if (supported.includes(reasoningLevel)) {
+    return reasoningLevel;
+  }
+  const reasoningIndex = REASONING_LEVELS.indexOf(reasoningLevel);
   let best = supported[0];
   let bestDistance = Number.POSITIVE_INFINITY;
   for (const level of supported) {
-    const distance = Math.abs(EFFORT_LEVELS.indexOf(level) - effortIndex);
+    const distance = Math.abs(REASONING_LEVELS.indexOf(level) - reasoningIndex);
     if (distance < bestDistance) {
       bestDistance = distance;
       best = level;
     }
   }
   return best;
+}
+
+export function isEffortReasoningLevel(level: ReasoningLevel): level is EffortLevel {
+  return (EFFORT_LEVELS as readonly ReasoningLevel[]).includes(level);
 }
 
 export function resolveActiveContextWindowTokens(

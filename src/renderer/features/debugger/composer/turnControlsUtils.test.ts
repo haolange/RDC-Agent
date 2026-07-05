@@ -9,26 +9,31 @@ import {
 const capability: ResolvedModelCapability = {
   providerId: 'openai',
   modelId: 'gpt-5',
+  catalogSource: 'managed-catalog',
   nominalContextWindowTokens: 1_000_000,
   defaultContextWindowTokens: 256_000,
   maxContextWindowTokens: 1_000_000,
-  supportedEffortLevels: ['low', 'medium', 'high'],
-  defaultEffort: 'medium',
+  reasoningMode: 'effort-levels',
+  supportedReasoningLevels: ['off', 'auto', 'low', 'medium', 'high'],
+  defaultReasoningLevel: 'medium',
   maxContextAvailable: true,
   fastVariantModelId: 'gpt-5-fast',
   fastModelAvailable: true,
+  toolCalling: true,
+  visionInput: true,
+  structuredOutput: true,
 };
 
 describe('turnControlsUtils', () => {
-  it('clamps unsupported effort and disables unavailable toggles', () => {
+  it('clamps unsupported reasoning level and disables unavailable toggles', () => {
     const sanitized = sanitizeTurnControls({
-      effort: 'max',
+      reasoningLevel: 'max',
       maxContextMode: true,
       fastModel: true,
     }, capability);
 
     expect(sanitized).toEqual({
-      effort: 'high',
+      reasoningLevel: 'high',
       maxContextMode: true,
       fastModel: true,
     });
@@ -41,16 +46,17 @@ describe('turnControlsUtils', () => {
       maxContextWindowTokens: null,
       fastModelAvailable: false,
       fastVariantModelId: null,
-      supportedEffortLevels: [],
-      defaultEffort: 'medium',
+      reasoningMode: 'none',
+      supportedReasoningLevels: ['off'],
+      defaultReasoningLevel: 'off',
     };
 
     expect(sanitizeTurnControls({
-      effort: 'medium',
+      reasoningLevel: 'medium',
       maxContextMode: true,
       fastModel: true,
     }, limited)).toEqual({
-      effort: 'medium',
+      reasoningLevel: 'off',
       maxContextMode: false,
       fastModel: false,
     });
@@ -58,13 +64,56 @@ describe('turnControlsUtils', () => {
 
   it('restores session controls with sanitization', () => {
     expect(buildInitialTurnControls(capability, {
-      effort: 'extra',
+      reasoningLevel: 'extHigh',
       maxContextMode: true,
       fastModel: false,
     })).toEqual({
-      effort: 'high',
+      reasoningLevel: 'high',
       maxContextMode: true,
       fastModel: false,
+    });
+  });
+
+  it('uses the capability default for auto-only thinking models', () => {
+    const autoOnly: ResolvedModelCapability = {
+      ...capability,
+      reasoningMode: 'auto-only',
+      supportedReasoningLevels: ['off', 'auto'],
+      defaultReasoningLevel: 'auto',
+      maxContextAvailable: false,
+      maxContextWindowTokens: null,
+      fastModelAvailable: false,
+      fastVariantModelId: null,
+    };
+
+    expect(buildInitialTurnControls(autoOnly)).toEqual({
+      reasoningLevel: 'auto',
+      maxContextMode: false,
+      fastModel: false,
+    });
+  });
+
+  it('reads legacy effort controls into reasoningLevel only', () => {
+    expect(buildInitialTurnControls(capability, {
+      effort: 'extHigh',
+      maxContextMode: false,
+      fastModel: false,
+    })).toEqual({
+      reasoningLevel: 'high',
+      maxContextMode: false,
+      fastModel: false,
+    });
+  });
+
+  it('fails closed from unknown legacy reasoning values to the capability default', () => {
+    expect(buildInitialTurnControls(capability, {
+      reasoningLevel: 'legacy-effort-level',
+      maxContextMode: true,
+      fastModel: true,
+    })).toEqual({
+      reasoningLevel: 'medium',
+      maxContextMode: true,
+      fastModel: true,
     });
   });
 

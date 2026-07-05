@@ -31,6 +31,27 @@ const assistant = (content: AssistantMessage['content']): AssistantMessage => ({
 });
 
 describe('provider reasoning artifact replay policy', () => {
+  it('maps Off and Auto reasoning controls to provider request payloads', () => {
+    expect(anthropicTesting.toAnthropicThinking('off', 'summary-events')).toBeUndefined();
+    expect(anthropicTesting.toAnthropicThinking('auto')).toEqual({ type: 'enabled', budget_tokens: 4096 });
+
+    const offResponsesBody = openAIResponsesTesting.buildRequestBody(
+      { ...model('openai-responses'), id: 'gpt-5.5', provider: 'openai' },
+      baseContext,
+      { reasoningBudget: 'off', reasoningVisibility: 'summary-events' },
+    );
+    expect(offResponsesBody.reasoning).toBeUndefined();
+    expect(offResponsesBody.include).toBeUndefined();
+
+    const autoResponsesBody = openAIResponsesTesting.buildRequestBody(
+      { ...model('openai-responses'), id: 'gpt-5.5', provider: 'openai' },
+      baseContext,
+      { reasoningBudget: 'auto', reasoningVisibility: 'summary-events' },
+    );
+    expect(autoResponsesBody.reasoning).toMatchObject({ summary: 'auto' });
+    expect(autoResponsesBody.include).toEqual(['reasoning.encrypted_content']);
+  });
+
   it('does not replay raw Chat Completions thinking as ordinary assistant content', () => {
     const messages = openAICompatibleTesting.toOpenAIMessages({
       ...baseContext,

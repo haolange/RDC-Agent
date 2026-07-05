@@ -1,70 +1,75 @@
-import { lookupModelCapabilitySeed } from '@shared/constants/modelCapabilityCatalog';
+import { lookupManagedModelCapabilityProfile } from '@shared/constants/modelCapabilityCatalog';
 import type {
   ConversationTurnControls,
   EffortLevel,
   ModelCapabilityProfile,
+  ReasoningLevel,
+  ReasoningMode,
   ResolvedModelCapability,
 } from '@shared/types/modelCapability';
 import {
   DEFAULT_CONTEXT_WINDOW_TOKENS,
-  EFFORT_LEVELS,
-  clampEffortLevel,
+  MAX_CONTEXT_MODE_MIN_TOKENS,
+  REASONING_LEVELS,
+  clampReasoningLevel,
+  isEffortReasoningLevel,
+  isReasoningLevel,
 } from '@shared/types/modelCapability';
-import type { AppSettings, LlmProviderCapability, LlmProviderEntry } from '@shared/types/settings';
+import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
 
-const DEFAULT_REASONING_EFFORT_LEVELS: EffortLevel[] = ['low', 'medium', 'high'];
-
-function hasProviderCapability(
-  provider: LlmProviderEntry | undefined,
-  capability: LlmProviderCapability,
-): boolean {
-  return Boolean(provider?.capabilities?.includes(capability));
-}
-
-function sanitizeEffortLevels(levels: EffortLevel[] | undefined): EffortLevel[] {
+function sanitizeReasoningLevels(levels: ReasoningLevel[] | undefined): ReasoningLevel[] {
   if (!levels || levels.length === 0) {
-    return [];
+    return ['off'];
   }
-  return levels.filter((level) => (EFFORT_LEVELS as readonly string[]).includes(level));
+  return levels.filter((level) => (REASONING_LEVELS as readonly string[]).includes(level));
 }
 
-function pickDefaultEffort(levels: EffortLevel[]): EffortLevel {
+type TurnControlsInput = Partial<Omit<ConversationTurnControls, 'reasoningLevel'>> & {
+  reasoningLevel?: unknown;
+  effort?: unknown;
+};
+
+function normalizeTurnControls(
+  controls: TurnControlsInput | undefined,
+  defaultReasoningLevel: ReasoningLevel,
+): ConversationTurnControls {
+  const candidate = controls?.reasoningLevel ?? controls?.effort;
+  return {
+    reasoningLevel: isReasoningLevel(candidate) ? candidate : defaultReasoningLevel,
+    maxContextMode: controls?.maxContextMode === true,
+    fastModel: controls?.fastModel === true,
+  };
+}
+
+function pickReasoningMode(profile: ModelCapabilityProfile | null, levels: ReasoningLevel[]): ReasoningMode {
+  if (profile?.reasoningMode) {
+    return profile.reasoningMode;
+  }
+  if (levels.some(isEffortReasoningLevel)) {
+    return 'effort-levels';
+  }
+  if (levels.includes('auto')) {
+    return 'auto-only';
+  }
+  return 'none';
+}
+
+function pickDefaultReasoningLevel(levels: ReasoningLevel[], profileDefault?: ReasoningLevel): ReasoningLevel {
+  if (profileDefault && levels.includes(profileDefault)) {
+    return profileDefault;
+  }
   if (levels.includes('medium')) {
     return 'medium';
   }
-  if (levels.length === 0) {
-    return 'medium';
+  if (levels.includes('auto')) {
+    return 'auto';
   }
-  return levels[Math.floor(levels.length / 2)];
+  return levels[0] ?? 'off';
 }
 
-function mergeProfileField<T>(
-  override: T | undefined,
-  seed: T | undefined,
-  fallback: T,
-): T {
-  if (override !== undefined) {
-    return override;
-  }
-  if (seed !== undefined) {
-    return seed;
-  }
-  return fallback;
-}
-
-function resolveNominalContextWindow(
-  override: ModelCapabilityProfile | undefined,
-  seed: ModelCapabilityProfile | null,
-): number | null {
-  const overrideValue = override?.nominalContextWindowTokens;
-  if (typeof overrideValue === 'number' && overrideValue > 0) {
-    return overrideValue;
-  }
-  const seedValue = seed?.nominalContextWindowTokens;
-  if (typeof seedValue === 'number' && seedValue > 0) {
-    return seedValue;
-  }
-  return null;
+function resolveNominalContextWindow(profile: ModelCapabilityProfile | null): number | null {
+  const value = profile?.nominalContextWindowTokens;
+  return typeof value === 'number' && value > 0 ? value : null;
 }
 
 function isFastVariantAvailable(
@@ -83,67 +88,57 @@ export function resolveModelCapability(
   settings: AppSettings,
 ): ResolvedModelCapability {
   const provider = settings.llm.providers.find((entry) => entry.id === providerId);
-  const model = provider?.models.find((entry) => entry.id === modelId);
-  const override = model?.capabilityOverride;
-  const seed = lookupModelCapabilitySeed(modelId);
+  const profile = provider?.catalogOwnership === 'app-managed'
+    ? lookupManagedModelCapabilityProfile(providerId, modelId)
+    : null;
 
-  const nominalContextWindowTokens = resolveNominalContextWindow(override, seed);
+  const nominalContextWindowTokens = resolveNominalContextWindow(profile);
   const defaultContextWindowTokens = nominalContextWindowTokens !== null
     ? Math.min(DEFAULT_CONTEXT_WINDOW_TOKENS, nominalContextWindowTokens)
     : DEFAULT_CONTEXT_WINDOW_TOKENS;
   const maxContextWindowTokens = nominalContextWindowTokens !== null
-    && nominalContextWindowTokens > DEFAULT_CONTEXT_WINDOW_TOKENS
+    && nominalContextWindowTokens >= MAX_CONTEXT_MODE_MIN_TOKENS
     ? nominalContextWindowTokens
     : null;
   const maxContextAvailable = maxContextWindowTokens !== null;
 
-  const defaultEffortLevels = hasProviderCapability(provider, 'reasoning')
-    ? DEFAULT_REASONING_EFFORT_LEVELS
-    : [];
-  const mergedEffortLevels = sanitizeEffortLevels(
-    mergeProfileField(
-      override?.supportedEffortLevels,
-      seed?.supportedEffortLevels,
-      defaultEffortLevels,
-    ),
-  );
-  const supportedEffortLevels = hasProviderCapability(provider, 'reasoning')
-    ? mergedEffortLevels
-    : [];
-
-  const fastVariantModelId = mergeProfileField(
-    override?.fastVariantModelId,
-    seed?.fastVariantModelId,
-    undefined as string | undefined,
-  ) ?? null;
+  const supportedReasoningLevels = sanitizeReasoningLevels(profile?.supportedReasoningLevels);
+  const reasoningMode = pickReasoningMode(profile, supportedReasoningLevels);
+  const defaultReasoningLevel = pickDefaultReasoningLevel(supportedReasoningLevels, profile?.defaultReasoningLevel);
+  const fastVariantModelId = profile?.fastVariantModelId ?? null;
 
   return {
     providerId,
     modelId,
+    catalogSource: profile ? 'managed-catalog' : 'conservative-default',
     nominalContextWindowTokens,
     defaultContextWindowTokens,
     maxContextWindowTokens,
-    supportedEffortLevels,
-    defaultEffort: pickDefaultEffort(supportedEffortLevels),
+    reasoningMode,
+    supportedReasoningLevels,
+    defaultReasoningLevel,
     maxContextAvailable,
     fastVariantModelId,
     fastModelAvailable: isFastVariantAvailable(provider, fastVariantModelId),
+    toolCalling: Boolean(profile?.toolCalling),
+    visionInput: Boolean(profile?.visionInput),
+    structuredOutput: Boolean(profile?.structuredOutput),
   };
 }
 
 export function resolveTurnControls(
   capability: ResolvedModelCapability,
-  requestControls?: ConversationTurnControls,
-  sessionControls?: ConversationTurnControls,
+  requestControls?: TurnControlsInput,
+  sessionControls?: TurnControlsInput,
 ): ConversationTurnControls {
   if (requestControls) {
-    return requestControls;
+    return normalizeTurnControls(requestControls, capability.defaultReasoningLevel);
   }
   if (sessionControls) {
-    return sessionControls;
+    return normalizeTurnControls(sessionControls, capability.defaultReasoningLevel);
   }
   return {
-    effort: capability.defaultEffort,
+    reasoningLevel: capability.defaultReasoningLevel,
     maxContextMode: false,
     fastModel: false,
   };
@@ -161,11 +156,16 @@ export function resolveEffectiveModelId(
 
 export function resolveReasoningBudget(
   capability: ResolvedModelCapability,
-  turnControls: ConversationTurnControls,
-): EffortLevel | 'auto' {
-  if (capability.supportedEffortLevels.length === 0) {
-    return 'auto';
+  turnControls: TurnControlsInput,
+): EffortLevel | 'auto' | 'off' {
+  if (capability.reasoningMode === 'none') {
+    return 'off';
   }
-  const clamped = clampEffortLevel(turnControls.effort, capability.supportedEffortLevels);
-  return clamped ?? capability.defaultEffort;
+  const normalized = normalizeTurnControls(turnControls, capability.defaultReasoningLevel);
+  const clamped = clampReasoningLevel(normalized.reasoningLevel, capability.supportedReasoningLevels)
+    ?? capability.defaultReasoningLevel;
+  if (clamped === 'off' || clamped === 'auto') {
+    return clamped;
+  }
+  return clamped;
 }

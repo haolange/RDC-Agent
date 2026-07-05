@@ -122,7 +122,6 @@ composer-effort-pill-label
 composer-effort-popup
 composer-effort-popup-divider
 composer-effort-slider
-composer-effort-slider-hint
 composer-effort-slider-section
 composer-effort-slider-stops
 composer-effort-slider-thumb
@@ -130,7 +129,6 @@ composer-effort-slider-tooltip
 composer-effort-slider-track
 composer-effort-toggle
 composer-effort-toggle-copy
-composer-effort-toggle-desc
 composer-effort-toggle-label
 composer-effort-toggle-row
 composer-footer-bar

@@ -129,7 +129,7 @@ interface AgentTurnOptions {
   signal?: AbortSignal;
   onChunk?: (text: string) => void;
   onEvent?: (event: SharedAgentEvent) => void;
-  reasoningBudget?: EffortLevel | 'auto';
+  reasoningBudget?: EffortLevel | 'auto' | 'off';
   turnControls?: ConversationTurnControls;
 }
 
@@ -1836,10 +1836,8 @@ export class AgentOrchestrator {
     const streamOptions: StreamOptions = {
       maxTokens: input.maxTokens,
       temperature: input.temperature,
-      reasoningBudget: input.options?.reasoningBudget === 'auto'
-        ? undefined
-        : input.options?.reasoningBudget,
-      reasoningVisibility: routeCapability.reasoningVisibility,
+      reasoningBudget: input.options?.reasoningBudget,
+      reasoningVisibility: input.options?.reasoningBudget === 'off' ? 'none' : routeCapability.reasoningVisibility,
       signal: input.options?.signal,
     };
     const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
