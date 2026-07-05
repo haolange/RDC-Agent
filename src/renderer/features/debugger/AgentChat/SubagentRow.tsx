@@ -18,7 +18,7 @@ export const SubagentRow: React.FC<SubagentRowProps> = ({ row }) => {
   const hasChildren = row.children.length > 0;
 
   return (
-    <li className={`work-process-subagent status-${row.status}`}>
+    <li className={`work-process-subagent status-${row.status}`} data-work-process-block-id={row.id}>
       <button
         type="button"
         className="work-process-subagent-header"

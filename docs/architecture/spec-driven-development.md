@@ -39,7 +39,7 @@ Renderer code can display catalog/runtime status, but it cannot invoke arbitrary
 
 Debugger and conversation state are projected through Agentic Trace. The renderer-facing APIs are under `trace:*`, and right-panel records use `traceLaneId`.
 
-Trace export and branch switching belong to `trace:exportSession` and `trace:switchBranch`.
+Trace run export and branch switching belong to `trace:exportRun` and `trace:switchBranch`.
 
 ## Settings Contract
 

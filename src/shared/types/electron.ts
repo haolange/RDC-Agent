@@ -56,8 +56,6 @@ import type { CommandExecuteRequest, CommandListResult, CommandResult } from './
 import type { AgentRun, AgentRunPresentation, TraceEvent } from './agenticTrace';
 import type {
   TraceBranchSwitchResult,
-  TraceExportOptions,
-  TraceExportResult,
   TraceSessionResult,
 } from './trace';
 
@@ -387,7 +385,6 @@ export interface ElectronAPI {
     getProjection: (sessionId?: string) => Promise<TraceSessionResult>;
     exportRun: (runId: string) => Promise<{ run: AgentRun | null; events: TraceEvent[] }>;
     switchBranch: (sessionId: string, branchId: string) => Promise<TraceBranchSwitchResult>;
-    exportSession: (sessionId: string, options?: TraceExportOptions) => Promise<TraceExportResult>;
   };
 
   events: {

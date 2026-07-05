@@ -2030,6 +2030,17 @@
   margin: var(--space-1) 0;
 }
 
+/* 从「进度」泳道点击定位过来时的高亮闪烁。 */
+.is-trace-flash {
+  border-radius: var(--radius-md);
+  animation: work-process-trace-flash 1.6s ease-out;
+}
+
+@keyframes work-process-trace-flash {
+  0% { background: rgb(var(--color-accent-500) / 0.22); box-shadow: 0 0 0 2px rgb(var(--color-accent-500) / 0.4); }
+  100% { background: transparent; box-shadow: 0 0 0 0 rgb(var(--color-accent-500) / 0); }
+}
+
 .work-process-subagent-header {
   display: flex;
   align-items: center;

@@ -1,6 +1,6 @@
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage } from '@shared/types/conversation';
-import type { ArtifactRecord, HarnessTask } from '@shared/types/harness';
+import type { ArtifactRecord } from '@shared/types/harness';
 import type { RunSummary, AppMode } from '@shared/types/session';
 import type {
   AgentRun,
@@ -22,7 +22,8 @@ import { nowIso } from '@shared/utils/id';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { artifactStore } from '../reports/ArtifactStore';
 import { contextService } from '../captures/ContextService';
-import { taskBoard } from '../workflow/debugger/TaskBoard';
+import { createSessionTaskStore } from '../agent-runtime/tasks/sessionTaskStore';
+import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
 import { traceStateStore } from '../workflow/debugger/TraceStateStore';
 import { appPathService } from '../runtime/AppPathService';
 import path from 'path';
@@ -56,14 +57,6 @@ const mapRunPlanStatus = (run: RunSummary): PlanStatus => {
   if (run.status === 'completed') return 'executed';
   if (run.status === 'awaiting_approval') return 'awaiting_approval';
   return 'accepted';
-};
-
-const progressStatusFromTask = (task: HarnessTask): ProgressTaskStatus => {
-  if (task.status === 'in_progress') return 'running';
-  if (task.status === 'completed') return 'completed';
-  if (task.status === 'blocked' || task.status === 'rejected') return 'blocked';
-  if (task.status === 'cancelled') return 'cancelled';
-  return 'pending';
 };
 
 const artifactTypeFromRecord = (record: ArtifactRecord): TraceArtifactRecord['type'] => {
@@ -141,7 +134,6 @@ export class TraceService {
     state: ReturnType<typeof traceStateStore.read>,
   ): Promise<AgentRunPresentation> {
     const runViewModels: AgentRunViewModel[] = [];
-    const progress: ProgressTask[] = [];
     const artifacts: TraceArtifactRecord[] = [];
     const context: TraceContextRecord[] = [];
     const rawAuditRefs: RawAuditRef[] = events.slice(-20).map((event) => ({
@@ -272,7 +264,6 @@ export class TraceService {
       runViewModels.push({ run: agentRun, timeline });
 
       const traceExecutionId = `ws-${runId}-execution`;
-      progress.push(...this.mapProgress(sessionId, runId, branchId, traceExecutionId));
       artifacts.push(...this.mapArtifacts(sessionId, runId, branchId, traceExecutionId, runEvents));
       context.push(...this.mapContext(sessionId, runId, branchId, traceExecutionId, run));
     }
@@ -340,7 +331,8 @@ export class TraceService {
       });
     }
 
-    const rightPanel = this.buildRightPanel(progress, artifacts, context, runViewModels);
+    const progress = await this.mapSessionProgress(sessionId, state.activeBranchId || 'branch-main');
+    const rightPanel = this.buildRightPanel(progress, artifacts, context);
 
     return {
       sessionId,
@@ -401,22 +393,55 @@ export class TraceService {
     return null;
   }
 
-  private mapProgress(sessionId: string, runId: string, branchId: string, traceLaneId: string): ProgressTask[] {
-    return taskBoard.listTasks(sessionId, runId).map((task, index) => ({
-      id: task.taskId,
-      sessionId,
-      traceLaneId,
-      branchId,
-      title: task.title,
-      status: progressStatusFromTask(task),
-      order: index,
-      createdAt: task.createdAt,
-      updatedAt: task.updatedAt,
-      completedAt: task.completedAt,
-      source: task.source === 'plan' ? 'plan' : 'runtime',
-      linkedEventIds: task.evidenceRefs,
-      blockerSummary: task.blockerRefs.join(', ') || undefined,
-    }));
+  /**
+   * 会话级进度投影：读取当前会话的 TaskRegistry 任务（`workspace/.tasks/{sessionId}`），
+   * 映射为「进度」泳道所需的 ProgressTask。按创建时间排序生成计划序号；`pending` 且存在
+   * 未完成的上游依赖时判定为 `blocked`；`deleted` 任务不进入投影。
+   */
+  private async mapSessionProgress(sessionId: string, branchId: string): Promise<ProgressTask[]> {
+    let records: TaskRecord[];
+    try {
+      records = await createSessionTaskStore(sessionId).listTasks();
+    } catch {
+      return [];
+    }
+    const active = records.filter((record) => record.status !== 'deleted');
+    const byId = new Map(active.map((record) => [record.id, record] as const));
+    const completedIds = new Set(
+      active.filter((record) => record.status === 'completed').map((record) => record.id),
+    );
+    const ordered = [...active].sort(
+      (a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id),
+    );
+    return ordered.map((task, index) => {
+      const unresolvedBlockers = task.blockedBy
+        .map((id) => byId.get(id))
+        .filter((blocker): blocker is TaskRecord => Boolean(blocker) && !completedIds.has(blocker!.id));
+      const status: ProgressTaskStatus = task.status === 'completed'
+        ? 'completed'
+        : task.status === 'in_progress'
+          ? 'running'
+          : unresolvedBlockers.length > 0
+            ? 'blocked'
+            : 'pending';
+      return {
+        id: task.id,
+        sessionId,
+        traceLaneId: sessionId,
+        branchId,
+        title: task.subject,
+        status,
+        order: index,
+        createdAt: new Date(task.createdAt).toISOString(),
+        updatedAt: new Date(task.updatedAt).toISOString(),
+        completedAt: task.status === 'completed' ? new Date(task.updatedAt).toISOString() : undefined,
+        source: 'runtime',
+        activeForm: task.activeForm,
+        blockerSummary: unresolvedBlockers.length > 0
+          ? unresolvedBlockers.map((blocker) => blocker.subject).join('、')
+          : undefined,
+      };
+    });
   }
 
   private mapArtifacts(
@@ -511,14 +536,10 @@ export class TraceService {
     progress: ProgressTask[],
     artifacts: TraceArtifactRecord[],
     context: TraceContextRecord[],
-    runs: AgentRunViewModel[],
   ): RightPanelViewModel {
-    const activeRunIds = new Set(runs.filter((r) => r.run.status === 'running' || r.run.status === 'waiting_approval').map((r) => r.run.runId));
-    const activeTraceLaneIds = new Set([...activeRunIds].flatMap((id) => [`ws-${id}-plan`, `ws-${id}-execution`, id]));
-
     return {
       progress: {
-        current: progress.filter((t) => activeTraceLaneIds.has(t.traceLaneId) && ['running', 'blocked', 'pending', 'reopened'].includes(t.status)),
+        current: progress.filter((t) => ['running', 'blocked', 'pending', 'reopened'].includes(t.status)),
         history: progress.filter((t) => ['completed', 'cancelled'].includes(t.status)),
       },
       artifacts: {

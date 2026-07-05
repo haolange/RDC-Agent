@@ -7,5 +7,4 @@ export const createTraceApi = (): ElectronAPI['trace'] => ({
   getProjection: (sessionId) => ipcRenderer.invoke('trace:getProjection', sessionId),
   exportRun: (runId) => ipcRenderer.invoke('trace:exportRun', runId),
   switchBranch: (sessionId, branchId) => ipcRenderer.invoke('trace:switchBranch', sessionId, branchId),
-  exportSession: (sessionId, options) => ipcRenderer.invoke('trace:exportSession', sessionId, options),
 });

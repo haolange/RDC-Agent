@@ -1,18 +1,17 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   ContextKind,
   ProgressTask,
+  ProgressTaskStatus,
   TraceArtifactRecord,
   TraceContextRecord,
 } from '@shared/types/trace';
 import { getElectronApi } from '../../../platform/getElectronApi';
 import { useI18n, type TranslationKey } from '../../../i18n';
 import { useProjectStore } from '../../../stores/projectStore';
-import { useSessionStore } from '../../../stores/sessionStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import { Button } from '../../../ui/Button';
 import { SessionContextPanel } from './SessionContextPanel';
-import { hasApprovedTaskBoardState, TaskBoard } from './TaskBoard';
 
 type SectionId = 'progress' | 'artifacts' | 'context';
 
@@ -28,6 +27,46 @@ const formatTime = (value?: string): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+/** 将「进度」任务点击定位到聊天区 Work Process 中对应任务行（滚动 + 高亮闪烁）。 */
+const focusWorkProcessTask = (taskId: string): void => {
+  if (typeof document === 'undefined') return;
+  const escaped = window.CSS && typeof window.CSS.escape === 'function' ? window.CSS.escape(taskId) : taskId;
+  const target = document.querySelector<HTMLElement>(`[data-work-process-task-id="${escaped}"]`)
+    ?? document.querySelector<HTMLElement>('[data-work-process-block-id="runtime-tasks"]');
+  if (!target) return;
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  target.classList.add('is-trace-flash');
+  window.setTimeout(() => target.classList.remove('is-trace-flash'), 1600);
+};
+
+const ProgressMarker: React.FC<{ status: ProgressTaskStatus; index: number }> = ({ status, index }) => {
+  if (status === 'completed') {
+    return (
+      <span className="trace-progress-marker is-completed" aria-hidden="true">
+        <svg viewBox="0 0 16 16" width="11" height="11">
+          <path d="M3.5 8.4 L6.6 11.4 L12.6 4.6" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+    );
+  }
+  if (status === 'blocked') {
+    return (
+      <span className="trace-progress-marker is-blocked" aria-hidden="true">
+        <svg viewBox="0 0 16 16" width="12" height="12">
+          <path d="M8 2 L14.5 13 L1.5 13 Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+          <line x1="8" y1="6.4" x2="8" y2="9.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          <circle cx="8" cy="11.1" r="0.7" fill="currentColor" />
+        </svg>
+      </span>
+    );
+  }
+  return (
+    <span className={`trace-progress-marker ${status === 'running' ? 'is-running' : 'is-pending'}`} aria-hidden="true">
+      <span className="trace-progress-index">{index}</span>
+    </span>
+  );
 };
 
 const Section: React.FC<{
@@ -56,27 +95,58 @@ const Section: React.FC<{
   </div>
 );
 
-const ProgressList: React.FC<{ current: ProgressTask[]; history: ProgressTask[] }> = ({ current, history }) => {
+const ProgressList: React.FC<{
+  current: ProgressTask[];
+  history: ProgressTask[];
+  onFocusTask: (taskId: string) => void;
+}> = ({ current, history, onFocusTask }) => {
   const { t } = useI18n();
   if (current.length === 0 && history.length === 0) {
     return <p className="trace-lane-empty">{t('control.traceEmptyProgress')}</p>;
   }
-  const renderTask = (task: ProgressTask) => (
-    <div key={`${task.traceLaneId}:${task.id}`} className={`trace-lane-progress-item status-${task.status}`}>
-      <span className="trace-lane-progress-status">{task.status}</span>
-      <span className="trace-lane-progress-title">{task.title}</span>
-      <span className="trace-lane-progress-time">{formatTime(task.updatedAt)}</span>
-      {task.blockerSummary ? <p>{task.blockerSummary}</p> : null}
-    </div>
-  );
+
+  const renderRow = (task: ProgressTask, index: number) => {
+    const label = task.status === 'running' && task.activeForm ? task.activeForm : task.title;
+    return (
+      <li
+        key={`${task.traceLaneId}:${task.id}`}
+        className={`trace-progress-item status-${task.status}`}
+        data-testid="trace-progress-item"
+      >
+        <button
+          type="button"
+          className="trace-progress-row"
+          onClick={() => onFocusTask(task.id)}
+          title={t('control.traceProgressJump')}
+        >
+          <ProgressMarker status={task.status} index={index} />
+          <span className="trace-progress-body">
+            <span className="trace-progress-title">{label}</span>
+            {task.status === 'blocked' && task.blockerSummary ? (
+              <span className="trace-progress-blocker">
+                {t('control.traceBlockedBy', { titles: task.blockerSummary })}
+              </span>
+            ) : null}
+          </span>
+          <span className="trace-progress-time">{formatTime(task.updatedAt)}</span>
+        </button>
+      </li>
+    );
+  };
 
   return (
-    <div className="trace-lane-progress-list">
-      {current.map(renderTask)}
+    <div className="trace-progress">
+      {current.length > 0 ? (
+        <ol className="trace-progress-list">
+          {current.map((task, index) => renderRow(task, index + 1))}
+        </ol>
+      ) : null}
       {history.length > 0 ? (
-        <details className="trace-lane-history" open={current.length === 0}>
-          <summary>{t('control.tracePreviousTasks', { count: history.length })}</summary>
-          {history.map(renderTask)}
+        <details className="trace-progress-history" open={current.length === 0}>
+          <summary>{t('control.traceCompletedTasks', { count: history.length })}</summary>
+          <ol className="trace-progress-list is-history">
+            {history.map((task, index) => renderRow(task, index + 1))}
+          </ol>
         </details>
       ) : null}
     </div>
@@ -130,19 +200,12 @@ const ContextList: React.FC<{ records: TraceContextRecord[] }> = ({ records }) =
 export const TraceRightPanel: React.FC = () => {
   const { t } = useI18n();
   const currentSession = useProjectStore((state) => state.currentSession);
-  const currentRun = useSessionStore((state) => state.currentRun);
-  const workflowState = useWorkflowStore((state) => state.workflowState);
   const presentation = useWorkflowStore((state) => state.tracePresentation);
-  const showTaskBoard = hasApprovedTaskBoardState(
-    currentRun,
-    workflowState,
-  );
   const [expanded, setExpanded] = useState<Record<SectionId, boolean>>({
     progress: true,
     artifacts: true,
     context: true,
   });
-  const [showAllContext, setShowAllContext] = useState(false);
   const lastSessionId = useRef<string | null>(null);
 
   useEffect(() => {
@@ -150,53 +213,52 @@ export const TraceRightPanel: React.FC = () => {
     if (sessionId === lastSessionId.current) return;
     lastSessionId.current = sessionId;
     setExpanded({ progress: true, artifacts: true, context: true });
-    setShowAllContext(false);
   }, [currentSession?.sessionId]);
 
   const rightPanel = presentation?.rightPanel ?? null;
-  const progressSummary = useMemo(() => {
-    const currentCount = rightPanel?.progress.current.length ?? 0;
-    const historyCount = rightPanel?.progress.history.length ?? 0;
-    if (currentCount > 0) return t('control.traceProgressActive', { count: currentCount });
-    if (historyCount > 0) return t('control.traceProgressDone', { count: historyCount });
-    return undefined;
-  }, [rightPanel?.progress.current.length, rightPanel?.progress.history.length, t]);
+  const progressStats = useMemo(() => {
+    const currentTasks = rightPanel?.progress.current ?? [];
+    const historyTasks = rightPanel?.progress.history ?? [];
+    return {
+      total: currentTasks.length + historyTasks.length,
+      done: historyTasks.length,
+      blocked: currentTasks.filter((task) => task.status === 'blocked').length,
+    };
+  }, [rightPanel?.progress.current, rightPanel?.progress.history]);
+  const focusTask = useCallback((taskId: string) => focusWorkProcessTask(taskId), []);
   const visibleContextGroups = useMemo(
     () =>
       (rightPanel?.context.groups ?? [])
-        .map((group) => ({ kind: group.kind, records: showAllContext ? group.all : group.important }))
+        .map((group) => ({ kind: group.kind, records: group.important }))
         .filter((group) => group.records.length > 0),
-    [rightPanel?.context.groups, showAllContext],
+    [rightPanel?.context.groups],
   );
   const toggle = (sectionId: SectionId) => {
     setExpanded((state) => ({ ...state, [sectionId]: !state[sectionId] }));
   };
 
-  const exportSession = (includeRawTrace: boolean) => {
-    const sessionId = currentSession?.sessionId;
-    if (!sessionId) return;
-    void getElectronApi()?.trace.exportSession(sessionId, {
-      includeAllBranches: true,
-      includeRawTrace,
-    });
-  };
-
   return (
     <div className="control-panel">
       <div className="cp-content scrollbar-thin">
-        <div className="trace-lane-export-actions" data-testid="trace-lane-export-actions">
-          <Button variant="ghost" size="sm" onClick={() => exportSession(false)}>{t('control.traceExportSummary')}</Button>
-          <Button variant="ghost" size="sm" onClick={() => exportSession(true)}>{t('control.traceExportRawTrace')}</Button>
-        </div>
-        {showTaskBoard ? <TaskBoard /> : null}
         <Section
           id="progress"
           title={t('control.traceProgress')}
           expanded={expanded.progress}
           onToggle={() => toggle('progress')}
-          summary={progressSummary ? <span className="cp-section-summary-main">{progressSummary}</span> : undefined}
+          summary={progressStats.total > 0 ? (
+            <span className="trace-progress-summary">
+              {progressStats.blocked > 0 ? (
+                <span className="trace-progress-summary-blocked">{t('control.traceBlockedCount', { count: progressStats.blocked })}</span>
+              ) : null}
+              <span className="cp-section-summary-main trace-progress-summary-count">{t('control.traceProgressCount', { done: progressStats.done, total: progressStats.total })}</span>
+            </span>
+          ) : undefined}
         >
-          <ProgressList current={rightPanel?.progress.current ?? []} history={rightPanel?.progress.history ?? []} />
+          <ProgressList
+            current={rightPanel?.progress.current ?? []}
+            history={rightPanel?.progress.history ?? []}
+            onFocusTask={focusTask}
+          />
         </Section>
         <Section
           id="artifacts"
@@ -212,13 +274,7 @@ export const TraceRightPanel: React.FC = () => {
           title={t('control.traceContext')}
           expanded={expanded.context}
           onToggle={() => toggle('context')}
-          summary={<span className="cp-section-summary-main">{showAllContext ? t('control.traceContextAll') : t('control.traceContextImportant')}</span>}
         >
-          <div className="trace-lane-context-toggle">
-            <Button variant="ghost" size="sm" onClick={() => setShowAllContext((value) => !value)}>
-              {showAllContext ? t('control.traceImportantOnly') : t('control.traceShowAll')}
-            </Button>
-          </div>
           {visibleContextGroups.length === 0 ? (
             <p className="trace-lane-empty">{t('control.traceEmptyContext')}</p>
           ) : (

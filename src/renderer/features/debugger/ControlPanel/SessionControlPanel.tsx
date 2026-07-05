@@ -10,7 +10,6 @@ import { getSessionContextSummary, SessionContextPanel } from './SessionContextP
 import { getSessionProgressSnapshot, SessionProgressPanel } from './SessionProgressPanel';
 import { SessionCapabilitiesPanel } from './SessionCapabilitiesPanel';
 import { SessionWorkingFolderPanel } from './SessionWorkingFolderPanel';
-import { hasApprovedTaskBoardState, TaskBoard } from './TaskBoard';
 import { ArtifactTree } from './ArtifactTree';
 import { MemoryPanel } from './MemoryPanel';
 import { CollapsibleSection } from './CollapsibleSection';
@@ -31,14 +30,12 @@ export const ClassicSessionControlPanel: React.FC = () => {
   );
   const capabilitySummary = workflowState?.harnessTasks?.length ?? 0;
   const hasWorkingFolderActivity = Boolean(currentRun) || actionEvents.length > 0;
-  const showTaskBoard = hasApprovedTaskBoardState(currentRun, workflowState);
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => ({
     sessionProgress: true,
     sessionWorkingFolder: true,
     sessionCapabilities: true,
     sessionContext: true,
-    taskBoard: true,
     artifactTree: true,
     memory: false,
   }));
@@ -56,7 +53,6 @@ export const ClassicSessionControlPanel: React.FC = () => {
       sessionWorkingFolder: true,
       sessionCapabilities: true,
       sessionContext: true,
-      taskBoard: true,
       artifactTree: true,
     });
   }, [currentRun, currentSession?.sessionId]);
@@ -95,24 +91,6 @@ export const ClassicSessionControlPanel: React.FC = () => {
         >
           <SessionProgressPanel />
         </CollapsibleSection>
-
-        {showTaskBoard ? (
-          <CollapsibleSection
-            id="taskBoard"
-            title={t('control.taskBoard')}
-            icon={(
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="16" rx="2" />
-                <path d="M8 10h8M8 14h5" />
-              </svg>
-            )}
-            variant="session"
-            isExpanded={expandedSections.taskBoard}
-            onToggle={() => toggleSection('taskBoard')}
-          >
-            <TaskBoard />
-          </CollapsibleSection>
-        ) : null}
 
         <CollapsibleSection
           id="artifactTree"

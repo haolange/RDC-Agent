@@ -184,7 +184,6 @@ class BrowserAppBridgeClient {
       getProjection: (sessionId) => this.invoke('trace:getProjection', sessionId),
       exportRun: (runId) => this.invoke('trace:exportRun', runId),
       switchBranch: (sessionId, branchId) => this.invoke('trace:switchBranch', sessionId, branchId),
-      exportSession: (sessionId, options) => this.invoke('trace:exportSession', sessionId, options),
     },
     events: {
       onWorkflowStateChanged: (callback) => this.subscribe('workflow:stateChanged', callback as EventCallback),

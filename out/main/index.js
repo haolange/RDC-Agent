@@ -10596,6 +10596,15 @@ const STATUS_ICON = {
   completed: "✓",
   deleted: "✗"
 };
+function safeSegment(sessionId) {
+  return sessionId.replace(/[^\w.-]/g, "_");
+}
+function resolveSessionTasksDir(sessionId) {
+  return path__namespace.join(storageAdapter.getWorkspacePath(), ".tasks", safeSegment(sessionId));
+}
+function createSessionTaskStore(sessionId) {
+  return new FileTaskStore(resolveSessionTasksDir(sessionId));
+}
 class StdioRpcClient {
   constructor(proc) {
     this.proc = proc;
@@ -18726,8 +18735,9 @@ class AgentOrchestrator {
     };
   }
   createTaskRuntimeTools() {
-    const isSubagent = this.currentTurnEventSink?.sessionId?.includes("::subagent::") ?? false;
-    const store = isSubagent ? new MemoryTaskStore() : new FileTaskStore(path__namespace.join(storageAdapter.getWorkspacePath(), ".tasks"));
+    const sessionId = this.currentTurnEventSink?.sessionId ?? null;
+    const isSubagent = sessionId?.includes("::subagent::") ?? false;
+    const store = isSubagent || !sessionId ? new MemoryTaskStore() : createSessionTaskStore(sessionId);
     const registry = new TaskRegistry(store);
     registry.onTaskChange = ({ type, task }) => {
       const sink = this.currentTurnEventSink;
@@ -21007,13 +21017,6 @@ const mapRunPlanStatus = (run) => {
   if (run.status === "awaiting_approval") return "awaiting_approval";
   return "accepted";
 };
-const progressStatusFromTask = (task) => {
-  if (task.status === "in_progress") return "running";
-  if (task.status === "completed") return "completed";
-  if (task.status === "blocked" || task.status === "rejected") return "blocked";
-  if (task.status === "cancelled") return "cancelled";
-  return "pending";
-};
 const artifactTypeFromRecord = (record) => {
   if (record.kind === "report") return "report";
   if (record.kind === "screenshot") return "visual_report";
@@ -21066,7 +21069,6 @@ class TraceService {
   }
   async buildPresentationFromData(sessionId, runs, conversations, events, state2) {
     const runViewModels = [];
-    const progress = [];
     const artifacts = [];
     const context2 = [];
     const rawAuditRefs = events.slice(-20).map((event) => ({
@@ -21179,7 +21181,6 @@ class TraceService {
       const timeline = projectionBuilder.build(agentRun, nodes, profile);
       runViewModels.push({ run: agentRun, timeline });
       const traceExecutionId = `ws-${runId}-execution`;
-      progress.push(...this.mapProgress(sessionId, runId, branchId, traceExecutionId));
       artifacts.push(...this.mapArtifacts(sessionId, runId, branchId, traceExecutionId, runEvents));
       context2.push(...this.mapContext(sessionId, runId, branchId, traceExecutionId, run));
     }
@@ -21232,7 +21233,8 @@ class TraceService {
         timeline: projectionBuilder.build(agentRun, nodes, profile)
       });
     }
-    const rightPanel = this.buildRightPanel(progress, artifacts, context2, runViewModels);
+    const progress = await this.mapSessionProgress(sessionId, state2.activeBranchId || "branch-main");
+    const rightPanel = this.buildRightPanel(progress, artifacts, context2);
     return {
       sessionId,
       activeBranchId: state2.activeBranchId || "branch-main",
@@ -21278,22 +21280,45 @@ class TraceService {
     if (run.status === "cancelled") return "任务已取消。";
     return null;
   }
-  mapProgress(sessionId, runId, branchId, traceLaneId) {
-    return taskBoard.listTasks(sessionId, runId).map((task, index) => ({
-      id: task.taskId,
-      sessionId,
-      traceLaneId,
-      branchId,
-      title: task.title,
-      status: progressStatusFromTask(task),
-      order: index,
-      createdAt: task.createdAt,
-      updatedAt: task.updatedAt,
-      completedAt: task.completedAt,
-      source: task.source === "plan" ? "plan" : "runtime",
-      linkedEventIds: task.evidenceRefs,
-      blockerSummary: task.blockerRefs.join(", ") || void 0
-    }));
+  /**
+   * 会话级进度投影：读取当前会话的 TaskRegistry 任务（`workspace/.tasks/{sessionId}`），
+   * 映射为「进度」泳道所需的 ProgressTask。按创建时间排序生成计划序号；`pending` 且存在
+   * 未完成的上游依赖时判定为 `blocked`；`deleted` 任务不进入投影。
+   */
+  async mapSessionProgress(sessionId, branchId) {
+    let records;
+    try {
+      records = await createSessionTaskStore(sessionId).listTasks();
+    } catch {
+      return [];
+    }
+    const active = records.filter((record) => record.status !== "deleted");
+    const byId = new Map(active.map((record) => [record.id, record]));
+    const completedIds = new Set(
+      active.filter((record) => record.status === "completed").map((record) => record.id)
+    );
+    const ordered = [...active].sort(
+      (a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id)
+    );
+    return ordered.map((task, index) => {
+      const unresolvedBlockers = task.blockedBy.map((id) => byId.get(id)).filter((blocker) => Boolean(blocker) && !completedIds.has(blocker.id));
+      const status = task.status === "completed" ? "completed" : task.status === "in_progress" ? "running" : unresolvedBlockers.length > 0 ? "blocked" : "pending";
+      return {
+        id: task.id,
+        sessionId,
+        traceLaneId: sessionId,
+        branchId,
+        title: task.subject,
+        status,
+        order: index,
+        createdAt: new Date(task.createdAt).toISOString(),
+        updatedAt: new Date(task.updatedAt).toISOString(),
+        completedAt: task.status === "completed" ? new Date(task.updatedAt).toISOString() : void 0,
+        source: "runtime",
+        activeForm: task.activeForm,
+        blockerSummary: unresolvedBlockers.length > 0 ? unresolvedBlockers.map((blocker) => blocker.subject).join("、") : void 0
+      };
+    });
   }
   mapArtifacts(sessionId, runId, branchId, traceLaneId, runEvents) {
     const registered = artifactStore.list(sessionId, runId).map((record) => ({
@@ -21367,12 +21392,10 @@ class TraceService {
     }));
     return [...captureContext, ...packetContext];
   }
-  buildRightPanel(progress, artifacts, context2, runs) {
-    const activeRunIds = new Set(runs.filter((r) => r.run.status === "running" || r.run.status === "waiting_approval").map((r) => r.run.runId));
-    const activeTraceLaneIds = new Set([...activeRunIds].flatMap((id) => [`ws-${id}-plan`, `ws-${id}-execution`, id]));
+  buildRightPanel(progress, artifacts, context2) {
     return {
       progress: {
-        current: progress.filter((t) => activeTraceLaneIds.has(t.traceLaneId) && ["running", "blocked", "pending", "reopened"].includes(t.status)),
+        current: progress.filter((t) => ["running", "blocked", "pending", "reopened"].includes(t.status)),
         history: progress.filter((t) => ["completed", "cancelled"].includes(t.status))
       },
       artifacts: {
@@ -21484,13 +21507,6 @@ class DebuggerRuntime {
     return {
       ...projection,
       activeBranchId: branchId
-    };
-  }
-  async exportTraceSession(sessionId, _options) {
-    return {
-      success: false,
-      sessionId,
-      error: "Trace session export is not available without an active workflow run."
     };
   }
   stopRun(runId) {
@@ -23325,6 +23341,19 @@ const sectionContext = (context2) => {
   }
   return parts.join("\n");
 };
+const sectionTaskPlanning = (context2) => {
+  if (!context2.tools?.includes("task_create")) {
+    return null;
+  }
+  return [
+    `# Task Planning`,
+    `For any multi-step task, maintain a live plan with the task tools so the user can supervise progress in the Progress panel:`,
+    `- At the start, break the goal into ordered, actionable steps and create them with \`task_create\` (use \`activeForm\` for in-progress phrasing, and \`blockedBy\` for dependencies on earlier steps).`,
+    `- Keep exactly one step \`in_progress\` at a time: mark a step \`in_progress\` with \`task_update\` before starting it, and \`completed\` as soon as it is done.`,
+    `- When a step cannot proceed, leave it pending and record its blocking dependency so it surfaces as blocked.`,
+    `- Keep the plan honest and current — do not batch status changes or leave finished work unmarked. Skip this only for trivial single-step requests.`
+  ].join("\n");
+};
 const DEFAULT_SECTIONS = [
   sectionIdentity,
   sectionProfileInstructions,
@@ -23334,6 +23363,7 @@ const DEFAULT_SECTIONS = [
   sectionRouteCapability,
   sectionPermission,
   sectionCatalog,
+  sectionTaskPlanning,
   sectionMemory,
   sectionRules,
   sectionContext
@@ -26631,9 +26661,6 @@ function registerTraceHandlers(context2) {
   });
   electron.ipcMain.handle("trace:switchBranch", async (_event, sessionId, branchId) => {
     return debuggerRuntime.switchTraceBranch(sessionId, branchId);
-  });
-  electron.ipcMain.handle("trace:exportSession", async (_event, sessionId, options) => {
-    return debuggerRuntime.exportTraceSession(sessionId, options);
   });
 }
 const invokeHandlers = /* @__PURE__ */ new Map();
