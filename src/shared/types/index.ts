@@ -86,9 +86,13 @@ export type { ArtifactRecord, HarnessTask, RunCapsule, VerificationResult } from
 export type { LLMConfig, LLMMessage, LLMRequest, LLMResponse, LLMStreamEvent } from './llm';
 export type {
   ConversationTurnControls,
-  EffortLevel,
+  ModelCapabilitySource,
   ModelCapabilityProfile,
+  NamedReasoningLevel,
+  ReasoningControl,
+  ReasoningSelection,
   ResolvedModelCapability,
+  ResolvedReasoningSelection,
 } from './modelCapability';
 export type { RuntimeLogEntry, RuntimeLogScope, RuntimeLogSeverity } from './runtimeLog';
 export type {

@@ -114,12 +114,13 @@ composer-attachment-chip-meta
 composer-attachment-chip-name
 composer-attachment-chip-remove
 composer-attachments
-composer-effort-fast-badge
 composer-effort-menu
 composer-effort-pill
 composer-effort-pill-caret
 composer-effort-pill-icon
 composer-effort-pill-label
+composer-effort-pill-mode
+composer-effort-pill-modes
 composer-effort-popup
 composer-effort-popup-divider
 composer-effort-slider
@@ -133,6 +134,7 @@ composer-effort-toggle
 composer-effort-toggle-copy
 composer-effort-toggle-label
 composer-effort-toggle-row
+composer-effort-toggle-status
 composer-footer-bar
 composer-input-row
 composer-permission-menu

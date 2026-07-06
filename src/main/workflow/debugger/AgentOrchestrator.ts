@@ -44,7 +44,7 @@ import type {
 import type { LLMConfig } from '@shared/types/llm';
 import type {
   ConversationTurnControls,
-  EffortLevel,
+  ResolvedReasoningSelection,
 } from '@shared/types/modelCapability';
 import {
   CONTEXT_COMPACTION_RATIO,
@@ -109,7 +109,7 @@ import { settingsService } from '../../settings/SettingsService';
 import {
   resolveEffectiveModelId,
   resolveModelCapability,
-  resolveReasoningBudget,
+  resolveReasoningSelection,
   resolveTurnControls,
 } from '../../settings/ModelCapabilityResolver';
 import { debuggerLlmService } from '../../settings/DebuggerLlmService';
@@ -129,7 +129,7 @@ interface AgentTurnOptions {
   signal?: AbortSignal;
   onChunk?: (text: string) => void;
   onEvent?: (event: SharedAgentEvent) => void;
-  reasoningBudget?: EffortLevel | 'auto' | 'off';
+  reasoning?: ResolvedReasoningSelection;
   turnControls?: ConversationTurnControls;
 }
 
@@ -355,7 +355,7 @@ export class AgentOrchestrator {
       const effectiveModelId = resolveEffectiveModelId(capability, turnControls);
       const activeContextWindow = resolveActiveContextWindowTokens(capability, turnControls);
       const contextTokenLimit = Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
-      const reasoningBudget = options?.reasoningBudget ?? resolveReasoningBudget(capability, turnControls);
+      const reasoning = options?.reasoning ?? resolveReasoningSelection(capability, turnControls);
       const responseText = stub
         ? await this.streamTestModeStub(stub, options)
         : await this.runAgentTurn({
@@ -375,7 +375,7 @@ export class AgentOrchestrator {
           toolAllowlist: resolveAgentToolAllowlist(agentId, context?.stageId),
           options: {
             ...options,
-            reasoningBudget,
+            reasoning,
           },
           projectRootPath: context?.projectRootPath ?? null,
           projectId: context?.projectId ?? null,
@@ -445,7 +445,7 @@ export class AgentOrchestrator {
       const effectiveModelId = resolveEffectiveModelId(capability, turnControls);
       const activeContextWindow = resolveActiveContextWindowTokens(capability, turnControls);
       const contextTokenLimit = Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
-      const reasoningBudget = options?.reasoningBudget ?? resolveReasoningBudget(capability, turnControls);
+      const reasoning = options?.reasoning ?? resolveReasoningSelection(capability, turnControls);
 
       const responseText = await this.runAgentTurn({
         agentId,
@@ -464,7 +464,7 @@ export class AgentOrchestrator {
         toolAllowlist,
         options: {
           ...options,
-          reasoningBudget,
+          reasoning,
         },
         projectRootPath: options?.projectRootPath ?? null,
         projectId: options?.projectId ?? null,
@@ -1837,8 +1837,8 @@ export class AgentOrchestrator {
     const streamOptions: StreamOptions = {
       maxTokens: input.maxTokens,
       temperature: input.temperature,
-      reasoningBudget: input.options?.reasoningBudget,
-      reasoningVisibility: input.options?.reasoningBudget === 'off' ? 'none' : routeCapability.reasoningVisibility,
+      reasoning: input.options?.reasoning,
+      reasoningVisibility: input.options?.reasoning?.selection === 'off' ? 'none' : routeCapability.reasoningVisibility,
       signal: input.options?.signal,
     };
     const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);

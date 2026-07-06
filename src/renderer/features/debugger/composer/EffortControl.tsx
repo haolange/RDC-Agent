@@ -1,18 +1,22 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { ReasoningLevel } from '@shared/types/modelCapability';
+import type { ReasoningSelection } from '@shared/types/modelCapability';
 import { useI18n } from '../../../i18n';
 import { useTurnControls } from './useTurnControls';
 import type { SessionRecord } from '@shared/types/session';
 import {
+  buildEffortPillPresentation,
+  buildDisplaySelections,
   ChevronIcon,
   clampSliderRatio,
   EFFORT_LABEL_KEYS,
+  EffortFastModeSwitchRow,
+  EffortMaxContextSwitchRow,
   findAdjacentSupportedLevel,
   getStopPosition,
-  LightningIcon,
-  normalizeDisplayLevels,
+  ReasoningLevelIcon,
   resolveNearestSnapLevel,
 } from './effortControlParts';
+import { formatTokenCount } from './turnControlsUtils';
 
 export const EffortControl: React.FC<{
   agentId: string;
@@ -30,12 +34,13 @@ export const EffortControl: React.FC<{
   const dragActiveRef = useRef(false);
   const popupShiftRef = useRef(0);
   const isDragging = dragRatio !== null;
+  const reasoningControl = capability?.reasoningControl ?? null;
 
   const displayLevels = useMemo(
-    () => normalizeDisplayLevels(capability?.supportedReasoningLevels),
-    [capability?.supportedReasoningLevels],
+    () => buildDisplaySelections(reasoningControl),
+    [reasoningControl],
   );
-  const hasAdjustableReasoning = displayLevels.length > 1;
+  const hasAdjustableReasoning = displayLevels.length > 1 && reasoningControl?.kind !== 'always-on';
   const selectedIndex = Math.max(0, displayLevels.indexOf(turnControls.reasoningLevel));
   const selectedLevel = displayLevels[selectedIndex] ?? 'off';
   const visualLevel = isDragging
@@ -49,7 +54,24 @@ export const EffortControl: React.FC<{
 
   const effortLabel = t(EFFORT_LABEL_KEYS[selectedLevel]);
   const tooltipLabel = t(EFFORT_LABEL_KEYS[visualLevel]);
-  const pillLabel = turnControls.maxContextMode ? `${effortLabel} / Max` : effortLabel;
+  const maxContextBadgeLabel = capability?.maxContextWindowTokens
+    ? formatTokenCount(capability.maxContextWindowTokens)
+    : t('composer.effort.maxContextBadge');
+  const pillPresentation = buildEffortPillPresentation({
+    reasoningLabel: effortLabel,
+    maxContextMode: turnControls.maxContextMode,
+    maxContextLabel: t('composer.effort.maxContext'),
+    maxContextBadgeLabel,
+    fastModel: turnControls.fastModel,
+    fastModelLabel: t('composer.effort.fastModel'),
+    fastModelBadgeLabel: t('composer.effort.fastMultiplier'),
+  });
+  const maxContextStatus = capability?.maxContextAvailable
+    ? turnControls.maxContextMode ? maxContextBadgeLabel : t('composer.effort.stateOff')
+    : t('composer.effort.unavailable');
+  const fastModelStatus = capability?.fastModelAvailable
+    ? turnControls.fastModel ? t('composer.effort.fastMultiplier') : t('composer.effort.standardMultiplier')
+    : t('composer.effort.unavailable');
 
   const closeMenu = useCallback(() => setOpen(false), []);
 
@@ -93,7 +115,7 @@ export const EffortControl: React.FC<{
     return () => window.removeEventListener('resize', syncPopupPosition);
   }, [open]);
 
-  const selectEffort = useCallback((level: ReasoningLevel) => {
+  const selectEffort = useCallback((level: ReasoningSelection) => {
     if (displayLevels.includes(level)) updateTurnControls({ reasoningLevel: level });
   }, [displayLevels, updateTurnControls]);
 
@@ -104,7 +126,7 @@ export const EffortControl: React.FC<{
     return clampSliderRatio((clientX - rect.left) / rect.width);
   };
 
-  const resolveLevelFromClientX = (clientX: number): ReasoningLevel => {
+  const resolveLevelFromClientX = (clientX: number): ReasoningSelection => {
     const track = trackRef.current;
     if (!track) return displayLevels[0] ?? 'off';
     const rect = track.getBoundingClientRect();
@@ -171,14 +193,23 @@ export const EffortControl: React.FC<{
         aria-haspopup="dialog"
         aria-expanded={open}
         disabled={disabled}
-        title={pillLabel}
+        title={pillPresentation.title}
+        aria-label={pillPresentation.title}
         onClick={() => setOpen((v) => !v)}
       >
         <span className="composer-effort-pill-icon" aria-hidden="true">
-          <LightningIcon />
-          {turnControls.fastModel ? <span className="composer-effort-fast-badge" aria-hidden="true">2x</span> : null}
+          <ReasoningLevelIcon level={selectedLevel} />
         </span>
-        <span className="composer-effort-pill-label">{pillLabel}</span>
+        <span className="composer-effort-pill-label">{pillPresentation.label}</span>
+        {pillPresentation.badges.length > 0 ? (
+          <span className="composer-effort-pill-modes" aria-hidden="true">
+            {pillPresentation.badges.map((badge) => (
+              <span key={badge.mode} className="composer-effort-pill-mode" data-mode={badge.mode}>
+                {badge.label}
+              </span>
+            ))}
+          </span>
+        ) : null}
         <span className="composer-effort-pill-caret" aria-hidden="true"><ChevronIcon /></span>
       </button>
 
@@ -223,7 +254,7 @@ export const EffortControl: React.FC<{
                 aria-valuemin={0}
                 aria-valuemax={displayLevels.length - 1}
                 aria-valuenow={selectedIndex}
-                aria-valuetext={effortLabel}
+                aria-valuetext={t(EFFORT_LABEL_KEYS[selectedLevel])}
                 aria-disabled={!hasAdjustableReasoning}
                 onKeyDown={handleThumbKeyDown}
               >
@@ -239,39 +270,21 @@ export const EffortControl: React.FC<{
 
           <div className="composer-effort-popup-divider" aria-hidden="true" />
 
-          <div
-            className={`composer-effort-toggle-row ${capability?.maxContextAvailable ? '' : 'is-disabled'}`}
-            data-testid="composer-effort-max-row"
-          >
-            <div className="composer-effort-toggle-copy">
-              <span className="composer-effort-toggle-label">{t('composer.effort.maxMode')}</span>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              className={`composer-effort-toggle ${turnControls.maxContextMode ? 'active' : ''}`}
-              aria-checked={turnControls.maxContextMode}
-              disabled={!capability?.maxContextAvailable}
-              onClick={() => updateTurnControls({ maxContextMode: !turnControls.maxContextMode })}
-            />
-          </div>
+          <EffortMaxContextSwitchRow
+            label={t('composer.effort.maxContext')}
+            status={maxContextStatus}
+            available={Boolean(capability?.maxContextAvailable)}
+            active={turnControls.maxContextMode}
+            onToggle={() => updateTurnControls({ maxContextMode: !turnControls.maxContextMode })}
+          />
 
-          <div
-            className={`composer-effort-toggle-row ${capability?.fastModelAvailable ? '' : 'is-disabled'}`}
-            data-testid="composer-effort-fast-row"
-          >
-            <div className="composer-effort-toggle-copy">
-              <span className="composer-effort-toggle-label">{t('composer.effort.fastModel')}</span>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              className={`composer-effort-toggle ${turnControls.fastModel ? 'active' : ''}`}
-              aria-checked={turnControls.fastModel}
-              disabled={!capability?.fastModelAvailable}
-              onClick={() => updateTurnControls({ fastModel: !turnControls.fastModel })}
-            />
-          </div>
+          <EffortFastModeSwitchRow
+            label={t('composer.effort.fastModel')}
+            status={fastModelStatus}
+            available={Boolean(capability?.fastModelAvailable)}
+            active={turnControls.fastModel}
+            onToggle={() => updateTurnControls({ fastModel: !turnControls.fastModel })}
+          />
         </div>
       ) : null}
     </div>

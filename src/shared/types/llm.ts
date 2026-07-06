@@ -3,7 +3,7 @@
  */
 
 import type { AgentRole } from './agent';
-import type { EffortLevel } from './modelCapability';
+import type { ResolvedReasoningSelection } from './modelCapability';
 import type { LlmProviderAuthMode, LlmProviderId, LlmProviderProtocol } from './settings';
 
 // 内容块类型
@@ -66,7 +66,7 @@ export interface LLMRequest {
   maxTokens?: number;
   temperature?: number;
   topP?: number;
-  reasoningBudget?: 'off' | 'auto' | EffortLevel;
+  reasoning?: ResolvedReasoningSelection;
   tools?: ToolDefinition[];
   responseFormat?: 'json_object';
   stream?: boolean;

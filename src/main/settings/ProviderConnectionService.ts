@@ -515,6 +515,7 @@ export class ProviderConnectionService {
       return {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
+        ...(provider.id === 'kimi-coding-plan' ? { 'User-Agent': 'RDC-Agent' } : {}),
       };
     }
     return {

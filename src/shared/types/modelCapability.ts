@@ -1,12 +1,77 @@
-export type EffortLevel = 'low' | 'medium' | 'high' | 'extHigh' | 'max';
-export const EFFORT_LEVELS: readonly EffortLevel[] = ['low', 'medium', 'high', 'extHigh', 'max'];
+export type NamedReasoningLevel = 'minimal' | 'low' | 'medium' | 'high' | 'extra' | 'max' | 'ultra';
+export const NAMED_REASONING_LEVELS: readonly NamedReasoningLevel[] = [
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'extra',
+  'max',
+  'ultra',
+];
 
-export type ReasoningLevel = 'off' | 'auto' | EffortLevel;
-export const REASONING_LEVELS: readonly ReasoningLevel[] = ['off', 'auto', 'low', 'medium', 'high', 'extHigh', 'max'];
-export type ReasoningMode = 'none' | 'auto-only' | 'effort-levels';
+export type ReasoningSelection = 'off' | 'on' | NamedReasoningLevel;
+export const REASONING_SELECTIONS: readonly ReasoningSelection[] = [
+  'off',
+  'on',
+  ...NAMED_REASONING_LEVELS,
+];
+
+export type ReasoningControlKind = 'none' | 'toggle' | 'levels' | 'always-on';
+
+export type OpenAiWireEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
+export type AnthropicWireEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+export type GeminiWireThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
+
+export type ReasoningWireProfile =
+  | { kind: 'none' }
+  | {
+      kind: 'openai-responses';
+      on: NamedReasoningLevel;
+      levels: Partial<Record<NamedReasoningLevel, OpenAiWireEffort>>;
+    }
+  | {
+      kind: 'openai-compatible';
+      on: NamedReasoningLevel;
+      levels?: Partial<Record<NamedReasoningLevel, string>>;
+      onMode?: 'enable-thinking-true' | 'thinking-enabled';
+      offMode?: 'reasoning-none' | 'enable-thinking-false' | 'thinking-disabled';
+    }
+  | {
+      kind: 'anthropic';
+      on: NamedReasoningLevel;
+      levels?: Partial<Record<NamedReasoningLevel, AnthropicWireEffort>>;
+      onMode?: 'adaptive' | 'enabled';
+      onBudgetTokens?: number;
+      offMode?: 'disabled';
+    }
+  | {
+      kind: 'gemini-thinking-level';
+      on: NamedReasoningLevel;
+      levels: Partial<Record<NamedReasoningLevel, GeminiWireThinkingLevel>>;
+    }
+  | {
+      kind: 'gemini-thinking-budget';
+      on: NamedReasoningLevel;
+      levels: Partial<Record<NamedReasoningLevel, number>>;
+      offBudget?: 0;
+    }
+  | {
+      kind: 'moonshot-thinking';
+      onMode?: 'enabled';
+      offMode?: 'disabled';
+    };
+
+export interface ReasoningControl {
+  kind: ReasoningControlKind;
+  supportsOff: boolean;
+  levels: NamedReasoningLevel[];
+  defaultSelection: ReasoningSelection;
+  lockedSelection?: ReasoningSelection;
+  wireProfile: ReasoningWireProfile;
+}
 
 export interface ConversationTurnControls {
-  reasoningLevel: ReasoningLevel;
+  reasoningLevel: ReasoningSelection;
   maxContextMode: boolean;
   fastModel: boolean;
 }
@@ -22,9 +87,7 @@ export interface ModelCapabilitySource {
 
 export interface ModelCapabilityProfile {
   nominalContextWindowTokens?: number;
-  reasoningMode?: ReasoningMode;
-  supportedReasoningLevels?: ReasoningLevel[];
-  defaultReasoningLevel?: ReasoningLevel;
+  reasoningControl?: ReasoningControl;
   fastVariantModelId?: string;
   toolCalling?: boolean;
   visionInput?: boolean;
@@ -38,9 +101,7 @@ export interface ResolvedModelCapability {
   nominalContextWindowTokens: number | null;
   defaultContextWindowTokens: number;
   maxContextWindowTokens: number | null;
-  reasoningMode: ReasoningMode;
-  supportedReasoningLevels: ReasoningLevel[];
-  defaultReasoningLevel: ReasoningLevel;
+  reasoningControl: ReasoningControl;
   maxContextAvailable: boolean;
   fastVariantModelId: string | null;
   fastModelAvailable: boolean;
@@ -49,32 +110,132 @@ export interface ResolvedModelCapability {
   structuredOutput: boolean;
 }
 
+export interface ResolvedReasoningSelection {
+  selection: ReasoningSelection;
+  control: ReasoningControl;
+}
+
 export const DEFAULT_CONTEXT_WINDOW_TOKENS = 256_000;
 export const MAX_CONTEXT_MODE_MIN_TOKENS = 1_000_000;
 export const CONTEXT_COMPACTION_RATIO = 0.8;
 
-export function isReasoningLevel(value: unknown): value is ReasoningLevel {
-  return typeof value === 'string' && (REASONING_LEVELS as readonly string[]).includes(value);
+export function isNamedReasoningLevel(value: unknown): value is NamedReasoningLevel {
+  return typeof value === 'string' && (NAMED_REASONING_LEVELS as readonly string[]).includes(value);
 }
 
-export function clampReasoningLevel(
-  reasoningLevel: unknown,
-  supported: readonly ReasoningLevel[] | null | undefined,
-): ReasoningLevel | undefined {
-  if (!Array.isArray(supported) || supported.length === 0) {
+export function isReasoningSelection(value: unknown): value is ReasoningSelection {
+  return typeof value === 'string' && (REASONING_SELECTIONS as readonly string[]).includes(value);
+}
+
+export function createReasoningControl(control: ReasoningControl): ReasoningControl {
+  return {
+    ...control,
+    levels: [...control.levels],
+    wireProfile: cloneReasoningWireProfile(control.wireProfile),
+  };
+}
+
+function cloneReasoningWireProfile(profile: ReasoningWireProfile): ReasoningWireProfile {
+  switch (profile.kind) {
+    case 'openai-responses':
+      return {
+        ...profile,
+        levels: profile.levels ? { ...profile.levels } : profile.levels,
+      };
+    case 'openai-compatible':
+      return {
+        ...profile,
+        levels: profile.levels ? { ...profile.levels } : profile.levels,
+      };
+    case 'anthropic':
+      return {
+        ...profile,
+        levels: profile.levels ? { ...profile.levels } : profile.levels,
+      };
+    case 'gemini-thinking-level':
+      return {
+        ...profile,
+        levels: { ...profile.levels },
+      };
+    case 'gemini-thinking-budget':
+      return {
+        ...profile,
+        levels: { ...profile.levels },
+      };
+    case 'moonshot-thinking':
+    case 'none':
+    default:
+      return { ...profile };
+  }
+}
+
+export function getReasoningSelectionOrder(control: ReasoningControl | null | undefined): ReasoningSelection[] {
+  if (!control) {
+    return ['off'];
+  }
+  switch (control.kind) {
+    case 'toggle':
+      return ['off', 'on'];
+    case 'always-on':
+      return [control.lockedSelection ?? 'on'];
+    case 'levels':
+      return control.supportsOff ? ['off', ...control.levels] : [...control.levels];
+    case 'none':
+    default:
+      return ['off'];
+  }
+}
+
+export function resolveOnSelection(control: ReasoningControl): ReasoningSelection {
+  if (control.kind === 'always-on') {
+    return control.lockedSelection ?? 'on';
+  }
+  if (control.kind === 'levels') {
+    return control.defaultSelection === 'off'
+      ? control.levels[0] ?? 'off'
+      : control.defaultSelection;
+  }
+  return 'on';
+}
+
+export function clampReasoningSelection(
+  reasoningSelection: unknown,
+  control: ReasoningControl | null | undefined,
+): ReasoningSelection | undefined {
+  if (!control || !isReasoningSelection(reasoningSelection)) {
     return undefined;
   }
-  if (!isReasoningLevel(reasoningLevel)) {
-    return undefined;
+
+  const supported = getReasoningSelectionOrder(control);
+  if (supported.includes(reasoningSelection)) {
+    return reasoningSelection;
   }
-  if (supported.includes(reasoningLevel)) {
-    return reasoningLevel;
+
+  if (reasoningSelection === 'on') {
+    return resolveOnSelection(control);
   }
-  const reasoningIndex = REASONING_LEVELS.indexOf(reasoningLevel);
-  let best = supported[0];
+
+  if (control.kind === 'toggle') {
+    return reasoningSelection === 'off' ? 'off' : 'on';
+  }
+
+  if (control.kind === 'always-on') {
+    return control.lockedSelection ?? 'on';
+  }
+
+  if (control.kind !== 'levels' || control.levels.length === 0) {
+    return supported[0] ?? 'off';
+  }
+
+  if (reasoningSelection === 'off') {
+    return control.supportsOff ? 'off' : control.levels[0];
+  }
+
+  const selectionIndex = NAMED_REASONING_LEVELS.indexOf(reasoningSelection);
+  let best = control.levels[0];
   let bestDistance = Number.POSITIVE_INFINITY;
-  for (const level of supported) {
-    const distance = Math.abs(REASONING_LEVELS.indexOf(level) - reasoningIndex);
+  for (const level of control.levels) {
+    const distance = Math.abs(NAMED_REASONING_LEVELS.indexOf(level) - selectionIndex);
     if (distance < bestDistance) {
       bestDistance = distance;
       best = level;
@@ -83,8 +244,17 @@ export function clampReasoningLevel(
   return best;
 }
 
-export function isEffortReasoningLevel(level: ReasoningLevel): level is EffortLevel {
-  return (EFFORT_LEVELS as readonly ReasoningLevel[]).includes(level);
+export function coerceReasoningSelectionCandidate(
+  value: unknown,
+  control: ReasoningControl | null | undefined,
+): ReasoningSelection | undefined {
+  if (value === 'auto') {
+    return control ? resolveOnSelection(control) : undefined;
+  }
+  if (value === 'extHigh') {
+    return 'extra';
+  }
+  return clampReasoningSelection(value, control);
 }
 
 export function resolveActiveContextWindowTokens(

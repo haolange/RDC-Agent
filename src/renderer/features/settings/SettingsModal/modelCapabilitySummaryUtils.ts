@@ -2,22 +2,25 @@ import {
   lookupManagedModelCatalogEntry,
   type ManagedModelCatalogEntry,
 } from '@shared/constants/modelCapabilityCatalog';
-import type { ModelCapabilityProfile, ReasoningLevel } from '@shared/types/modelCapability';
+import type { ModelCapabilityProfile, ReasoningSelection } from '@shared/types/modelCapability';
 import type { LlmProviderCatalogOwnership } from '@shared/types/settings';
 import type { useI18n } from '../../../i18n';
+import { buildDisplaySelections } from '../../debugger/composer/effortControlParts';
 import { formatTokenCount } from '../../debugger/composer/turnControlsUtils';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
 const REASONING_LABEL_KEYS = {
   off: 'composer.effort.levelOff',
-  auto: 'composer.effort.levelAuto',
+  on: 'composer.effort.levelOn',
+  minimal: 'composer.effort.levelMinimal',
   low: 'composer.effort.levelLow',
   medium: 'composer.effort.levelMedium',
   high: 'composer.effort.levelHigh',
-  extHigh: 'composer.effort.levelExtHigh',
+  extra: 'composer.effort.levelExtra',
   max: 'composer.effort.levelMax',
-} as const satisfies Record<ReasoningLevel, Parameters<Translate>[0]>;
+  ultra: 'composer.effort.levelUltra',
+} as const satisfies Record<ReasoningSelection, Parameters<Translate>[0]>;
 
 export interface CapabilityChip {
   label: string;
@@ -25,7 +28,7 @@ export interface CapabilityChip {
   tone?: 'default' | 'muted' | 'positive';
 }
 
-export function getReasoningLabelKey(level: ReasoningLevel): typeof REASONING_LABEL_KEYS[ReasoningLevel] {
+export function getReasoningLabelKey(level: ReasoningSelection): typeof REASONING_LABEL_KEYS[ReasoningSelection] {
   return REASONING_LABEL_KEYS[level];
 }
 
@@ -53,10 +56,18 @@ export function formatReasoningCapability(
   profile: ModelCapabilityProfile | null,
   t: Translate,
 ): string {
-  const levels = profile?.supportedReasoningLevels ?? [];
-  return levels.length > 0
-    ? levels.map((level) => t(REASONING_LABEL_KEYS[level])).join(', ')
-    : t('settings.providers.capability.notAvailable');
+  const control = profile?.reasoningControl ?? null;
+  if (!control) {
+    return t('settings.providers.capability.notAvailable');
+  }
+  const levels = buildDisplaySelections(control);
+  if (levels.length === 0 || (levels.length === 1 && levels[0] === 'off' && control?.kind === 'none')) {
+    return t('settings.providers.capability.notAvailable');
+  }
+  const base = levels.map((level) => t(REASONING_LABEL_KEYS[level])).join(', ');
+  return control?.kind === 'always-on'
+    ? t('settings.providers.capability.lockedValue', { value: base })
+    : base;
 }
 
 export function formatFastCapability(
@@ -84,7 +95,7 @@ export function buildCapabilityChips(
     {
       label: t('settings.providers.capability.reasoning'),
       value: formatReasoningCapability(profile, t),
-      tone: profile?.supportedReasoningLevels?.some((level) => level !== 'off') ? 'positive' : 'muted',
+      tone: profile?.reasoningControl && profile.reasoningControl.kind !== 'none' ? 'positive' : 'muted',
     },
     {
       label: t('settings.providers.capability.fastMode'),
