@@ -299,7 +299,7 @@ export class DebuggerLlmService {
     const turnControls = this.resolveSessionTurnControls(runId, summary);
     const capability = resolveModelCapability(summary.providerId, summary.modelId, settings);
     const contextWindowTokens = resolveActiveContextWindowTokens(capability, turnControls ?? {
-      reasoningLevel: capability.defaultReasoningLevel,
+      reasoningLevel: capability.reasoningControl.defaultSelection,
       maxContextMode: false,
       fastModel: false,
     });

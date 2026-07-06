@@ -12,7 +12,6 @@ import type {
   StreamOptions,
   ToolDefinition,
 } from '../core/types';
-import type { EffortLevel } from '@shared/types/modelCapability';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
@@ -21,12 +20,14 @@ import {
   parseSSE,
   ProviderHttpError,
 } from './internal/http';
+import { buildOpenAiResponsesReasoning, isReasoningEnabled } from './reasoningWire';
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const PROVIDER_API = 'openai-responses';
 const TEXT_INDEX = 0;
 const REASONING_INDEX = 1;
 const TOOL_INDEX_BASE = 2;
+const RESPONSES_REASONING_INCLUDE = 'reasoning.encrypted_content';
 
 export interface OpenAIResponsesProviderOptions {
   baseUrl?: string;
@@ -331,13 +332,6 @@ function createResponsesUrl(baseUrl: string): string {
   return baseUrl.endsWith('/responses') ? baseUrl : `${baseUrl}/responses`;
 }
 
-function toOpenAiResponsesReasoningEffort(budget: EffortLevel): 'low' | 'medium' | 'high' {
-  if (budget === 'extHigh' || budget === 'max') {
-    return 'high';
-  }
-  return budget;
-}
-
 function buildRequestBody(model: Model, context: Context, options: StreamOptions): Record<string, unknown> {
   const body: Record<string, unknown> = {
     model: model.id,
@@ -351,20 +345,12 @@ function buildRequestBody(model: Model, context: Context, options: StreamOptions
   }
   if (typeof options.temperature === 'number') body.temperature = options.temperature;
   if (typeof options.topP === 'number') body.top_p = options.topP;
-  if (options.reasoningBudget && options.reasoningBudget !== 'auto' && options.reasoningBudget !== 'off') {
-    // OpenAI xhigh is not stable in public docs; ExtHigh/Max map conservatively to high.
-    body.reasoning = { effort: toOpenAiResponsesReasoningEffort(options.reasoningBudget) };
-  } else if (options.reasoningBudget !== 'off' && options.reasoningVisibility === 'summary-events') {
-    body.reasoning = { effort: 'medium' };
+  const reasoningPayload = buildOpenAiResponsesReasoning(options.reasoning, options.reasoningVisibility);
+  if (reasoningPayload.reasoning) {
+    body.reasoning = reasoningPayload.reasoning;
   }
-  if (options.reasoningBudget !== 'off' && options.reasoningVisibility === 'summary-events') {
-    const reasoning = (body.reasoning && typeof body.reasoning === 'object')
-      ? body.reasoning as Record<string, unknown>
-      : {};
-    body.reasoning = { ...reasoning, summary: 'auto' };
-  }
-  if (body.reasoning) {
-    body.include = ['reasoning.encrypted_content'];
+  if (reasoningPayload.include?.includes(RESPONSES_REASONING_INCLUDE)) {
+    body.include = [RESPONSES_REASONING_INCLUDE];
   }
   const maxTokens = options.maxTokens ?? model.maxTokens;
   if (typeof maxTokens === 'number' && maxTokens > 0) {
@@ -543,4 +529,4 @@ function readNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-export const __testing = { buildRequestBody, toResponsesInput };
+export const __testing = { buildRequestBody, isReasoningEnabled, toResponsesInput };

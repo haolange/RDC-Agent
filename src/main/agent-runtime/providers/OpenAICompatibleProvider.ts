@@ -23,9 +23,9 @@ import type {
   StreamOptions,
   ToolDefinition,
 } from '../core/types';
-import type { EffortLevel } from '@shared/types/modelCapability';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import { composeAbortSignals, ensureOk, normalizeError, parseSSE, ProviderHttpError } from './internal/http';
+import { applyOpenAiCompatibleReasoning } from './reasoningWire';
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const PROVIDER_API = 'openai-compatible';
@@ -247,9 +247,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
     };
     if (typeof options.temperature === 'number') body.temperature = options.temperature;
     if (typeof options.topP === 'number') body.top_p = options.topP;
-    if (options.reasoningBudget && options.reasoningBudget !== 'auto' && options.reasoningBudget !== 'off') {
-      body.reasoning_effort = toOpenAiCompatibleReasoningEffort(options.reasoningBudget);
-    }
+    applyOpenAiCompatibleReasoning(body, options.reasoning);
     const maxTokens = options.maxTokens ?? model.maxTokens;
     if (typeof maxTokens === 'number' && maxTokens > 0) body.max_tokens = maxTokens;
     if (context.tools && context.tools.length > 0) {
@@ -265,13 +263,6 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
 // =====================================================================
 // 转换辅助
 // =====================================================================
-
-function toOpenAiCompatibleReasoningEffort(budget: EffortLevel): 'low' | 'medium' | 'high' {
-  if (budget === 'extHigh' || budget === 'max') {
-    return 'high';
-  }
-  return budget;
-}
 
 interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';

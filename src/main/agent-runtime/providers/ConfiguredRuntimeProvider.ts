@@ -100,6 +100,7 @@ function createProviderStrategy(provider: ConfiguredProvider, protocol: LlmProvi
       return new AnthropicProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
+        headers: provider.id === 'kimi-coding-plan' ? { 'User-Agent': 'RDC-Agent' } : undefined,
       });
     case 'GoogleGemini':
       return new GeminiProvider({

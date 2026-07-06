@@ -17,12 +17,14 @@ const t = (key: string, params?: Record<string, string | number>): string => {
   if (key === 'settings.providers.capability.visionInput') return 'Vision';
   if (key === 'settings.providers.capability.structuredOutput') return 'Structured';
   if (key === 'settings.providers.capability.supported') return 'Supported';
-  if (key === 'composer.effort.levelLow') return 'Low';
+  if (key === 'settings.providers.capability.lockedValue') return `${params?.value} (Locked)`;
   if (key === 'composer.effort.levelOff') return 'Off';
-  if (key === 'composer.effort.levelAuto') return 'Auto';
+  if (key === 'composer.effort.levelOn') return 'On';
+  if (key === 'composer.effort.levelMinimal') return 'Minimal';
+  if (key === 'composer.effort.levelLow') return 'Low';
   if (key === 'composer.effort.levelMedium') return 'Medium';
   if (key === 'composer.effort.levelHigh') return 'High';
-  if (key === 'composer.effort.levelExtHigh') return 'ExtHigh';
+  if (key === 'composer.effort.levelExtra') return 'Extra';
   if (key === 'composer.effort.levelMax') return 'Max';
   return params ? `${key}:${JSON.stringify(params)}` : key;
 };
@@ -41,15 +43,21 @@ describe('modelCapabilitySummaryUtils', () => {
     expect(entry).toBeNull();
   });
 
-  it('formats first-version catalog capability chips', () => {
-    const entry = findManagedCapabilityEntry('kimi-coding-plan', 'app-managed', 'kimi-for-coding');
-    expect(entry).not.toBeNull();
+  it('formats toggle, locked, and multi-level summaries from the unified capability truth', () => {
+    const kimiEntry = findManagedCapabilityEntry('kimi-coding-plan', 'app-managed', 'kimi-for-coding');
+    expect(kimiEntry).not.toBeNull();
 
-    const chips = buildCapabilityChips(entry, t);
-    expect(chips).toContainEqual(expect.objectContaining({ label: 'Context', value: '262.1k' }));
-    expect(chips).toContainEqual(expect.objectContaining({ label: 'Reasoning', value: 'Off, Auto' }));
-    expect(chips).toContainEqual(expect.objectContaining({ label: 'Fast', value: 'None' }));
-    expect(chips).toContainEqual(expect.objectContaining({ label: 'Tools', value: 'Supported' }));
+    const kimiChips = buildCapabilityChips(kimiEntry, t);
+    expect(kimiChips).toContainEqual(expect.objectContaining({ label: 'Context', value: '262.1k' }));
+    expect(kimiChips).toContainEqual(expect.objectContaining({ label: 'Reasoning', value: 'Off, On' }));
+    expect(kimiChips).toContainEqual(expect.objectContaining({ label: 'Fast', value: 'None' }));
+    expect(kimiChips).toContainEqual(expect.objectContaining({ label: 'Tools', value: 'Supported' }));
+
+    const minimaxEntry = findManagedCapabilityEntry('minimax-cn', 'app-managed', 'MiniMax-M2.7');
+    expect(formatReasoningCapability(minimaxEntry?.profile ?? null, t)).toBe('On (Locked)');
+
+    const openaiEntry = findManagedCapabilityEntry('openai', 'app-managed', 'gpt-5.5');
+    expect(formatReasoningCapability(openaiEntry?.profile ?? null, t)).toBe('Off, Low, Medium, High, Extra');
   });
 
   it('formats conservative default values without override semantics', () => {

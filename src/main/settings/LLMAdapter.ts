@@ -13,8 +13,13 @@ import type {
   StreamCallback,
   ToolCall,
 } from '@shared/types/llm';
-import type { EffortLevel } from '@shared/types/modelCapability';
 import { COPILOT_WIRE_HEADERS } from './CopilotWire';
+import {
+  applyGeminiReasoning,
+  applyOpenAiCompatibleReasoning,
+  applyReasoningToAnthropicLikeBody,
+  buildOpenAiResponsesReasoning,
+} from '../agent-runtime/providers/reasoningWire';
 
 const describeUnsupportedProtocol = (providerId: string, protocol: unknown): string => {
   const value = typeof protocol === 'string' && protocol.trim() ? protocol.trim() : 'missing';
@@ -129,61 +134,6 @@ const toResponsesTools = (tools?: LLMRequest['tools']) => {
     description: tool.description,
     parameters: tool.input_schema,
   }));
-};
-
-const toOpenAiReasoningEffort = (budget?: LLMRequest['reasoningBudget']): 'low' | 'medium' | 'high' | undefined => {
-  if (budget === 'off') {
-    return undefined;
-  }
-  if (budget === 'low' || budget === 'medium' || budget === 'high') {
-    return budget;
-  }
-  if (budget === 'extHigh' || budget === 'max') {
-    return 'high';
-  }
-  return undefined;
-};
-
-const toAnthropicThinking = (budget?: LLMRequest['reasoningBudget']): { type: 'enabled'; budget_tokens: number } | undefined => {
-  if (!budget || budget === 'off') {
-    return undefined;
-  }
-  if (budget === 'auto') {
-    return { type: 'enabled', budget_tokens: 4096 };
-  }
-  const budgetTokens = budget === 'low'
-    ? 4096
-    : budget === 'medium'
-      ? 8192
-      : budget === 'high'
-        ? 16384
-        : budget === 'extHigh'
-          ? 32768
-          : 63999;
-  return { type: 'enabled', budget_tokens: budgetTokens };
-};
-
-const toGoogleThinkingConfig = (budget?: LLMRequest['reasoningBudget']): { thinkingBudget: number } | undefined => {
-  if (!budget || budget === 'auto' || budget === 'off') {
-    return undefined;
-  }
-  const thinkingBudget = ((): number => {
-    switch (budget as EffortLevel) {
-      case 'low':
-        return 1024;
-      case 'medium':
-        return 4096;
-      case 'high':
-        return 8192;
-      case 'extHigh':
-        return 16384;
-      case 'max':
-        return 24576;
-      default:
-        return 4096;
-    }
-  })();
-  return { thinkingBudget };
 };
 
 const extractResponsesText = (payload: unknown): string => {
@@ -491,6 +441,17 @@ class OpenRouterProvider extends BaseStreamingProvider {
     if (!model) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
+    const body: Record<string, unknown> = {
+      model,
+      messages: toContentBlocks(request.messages),
+      max_tokens: request.maxTokens || 4096,
+      temperature: request.temperature ?? 0.7,
+      tools: toOpenAiTools(request.tools),
+      response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
+      stream: false,
+    };
+    applyOpenAiCompatibleReasoning(body, request.reasoning);
+
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -500,16 +461,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
         'X-Title': 'RdcAgent',
       },
       signal: request.signal,
-      body: JSON.stringify({
-        model,
-        messages: toContentBlocks(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        reasoning_effort: toOpenAiReasoningEffort(request.reasoningBudget),
-        tools: toOpenAiTools(request.tools),
-        response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
-        stream: false,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -539,6 +491,17 @@ class OpenRouterProvider extends BaseStreamingProvider {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
 
+    const body: Record<string, unknown> = {
+      model,
+      messages: toContentBlocks(request.messages),
+      max_tokens: request.maxTokens || 4096,
+      temperature: request.temperature ?? 0.7,
+      tools: toOpenAiTools(request.tools),
+      response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
+      stream: true,
+    };
+    applyOpenAiCompatibleReasoning(body, request.reasoning);
+
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -548,16 +511,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
         'X-Title': 'RdcAgent',
       },
       signal: request.signal,
-      body: JSON.stringify({
-        model,
-        messages: toContentBlocks(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        reasoning_effort: toOpenAiReasoningEffort(request.reasoningBudget),
-        tools: toOpenAiTools(request.tools),
-        response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
-        stream: true,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -670,19 +624,21 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
 
+    const body: Record<string, unknown> = {
+      model,
+      messages: toContentBlocks(request.messages),
+      max_tokens: request.maxTokens || 4096,
+      temperature: request.temperature ?? 0.7,
+      tools: toOpenAiTools(request.tools),
+      response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
+    };
+    applyOpenAiCompatibleReasoning(body, request.reasoning);
+
     const response = await fetch(this.createChatCompletionsUrl(), {
       method: 'POST',
       headers: this.createHeaders(),
       signal: request.signal,
-      body: JSON.stringify({
-        model,
-        messages: toContentBlocks(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        reasoning_effort: toOpenAiReasoningEffort(request.reasoningBudget),
-        tools: toOpenAiTools(request.tools),
-        response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -712,20 +668,22 @@ class OpenAICompatibleProvider extends BaseStreamingProvider {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
 
+    const body: Record<string, unknown> = {
+      model,
+      messages: toContentBlocks(request.messages),
+      max_tokens: request.maxTokens || 4096,
+      temperature: request.temperature ?? 0.7,
+      tools: toOpenAiTools(request.tools),
+      response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
+      stream: true,
+    };
+    applyOpenAiCompatibleReasoning(body, request.reasoning);
+
     const response = await fetch(this.createChatCompletionsUrl(), {
       method: 'POST',
       headers: this.createHeaders(),
       signal: request.signal,
-      body: JSON.stringify({
-        model,
-        messages: toContentBlocks(request.messages),
-        max_tokens: request.maxTokens || 4096,
-        temperature: request.temperature ?? 0.7,
-        reasoning_effort: toOpenAiReasoningEffort(request.reasoningBudget),
-        tools: toOpenAiTools(request.tools),
-        response_format: request.responseFormat ? { type: request.responseFormat } : undefined,
-        stream: true,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -836,9 +794,12 @@ class ChatGptAccountProvider extends BaseStreamingProvider {
       temperature: request.temperature ?? 0.7,
       stream,
     };
-    const reasoningEffort = toOpenAiReasoningEffort(request.reasoningBudget);
-    if (reasoningEffort) {
-      body.reasoning = { effort: reasoningEffort };
+    const reasoningPayload = buildOpenAiResponsesReasoning(request.reasoning);
+    if (reasoningPayload.reasoning) {
+      body.reasoning = reasoningPayload.reasoning;
+    }
+    if (reasoningPayload.include) {
+      body.include = reasoningPayload.include;
     }
     if (request.responseFormat) {
       body.text = { format: { type: request.responseFormat } };
@@ -1030,6 +991,12 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
     if (!model) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
+    const generationConfig: Record<string, unknown> = {
+      maxOutputTokens: request.maxTokens || 4096,
+      temperature: request.temperature ?? 0.7,
+    };
+    applyGeminiReasoning(generationConfig, request.reasoning);
+
     const response = await fetch(this.createGenerateContentUrl(model), {
       method: 'POST',
       headers: this.createHeaders(),
@@ -1041,11 +1008,7 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
             role: message.role === 'assistant' ? 'model' : 'user',
             parts: [{ text: typeof message.content === 'string' ? message.content : JSON.stringify(message.content) }],
           })),
-        generationConfig: {
-          maxOutputTokens: request.maxTokens || 4096,
-          temperature: request.temperature ?? 0.7,
-          thinkingConfig: toGoogleThinkingConfig(request.reasoningBudget),
-        },
+        generationConfig,
         systemInstruction: request.messages.some((message) => message.role === 'system')
           ? {
               parts: request.messages
@@ -1113,11 +1076,15 @@ class AnthropicProvider extends BaseStreamingProvider {
   }
 
   private createHeaders(): Record<string, string> {
-    return {
+    const headers: Record<string, string> = {
       ...(this.useBearerAuth ? { Authorization: `Bearer ${this.apiKey}` } : { 'x-api-key': this.apiKey }),
       'anthropic-version': '2023-06-01',
       'Content-Type': 'application/json',
     };
+    if (this.name === 'kimi-coding-plan') {
+      headers['User-Agent'] = 'RDC-Agent';
+    }
+    return headers;
   }
 
   async chat(request: LLMRequest): Promise<LLMResponse> {
@@ -1128,20 +1095,22 @@ class AnthropicProvider extends BaseStreamingProvider {
     const systemMessage = request.messages.find((message) => message.role === 'system');
     const otherMessages = request.messages.filter((message) => message.role !== 'system');
 
+    const body: Record<string, unknown> = {
+      model,
+      max_tokens: request.maxTokens || 4096,
+      system: typeof systemMessage?.content === 'string' ? systemMessage.content : undefined,
+      messages: otherMessages.map((message) => ({
+        role: message.role === 'assistant' ? 'assistant' : 'user',
+        content: message.content,
+      })),
+    };
+    applyReasoningToAnthropicLikeBody(body, request.reasoning);
+
     const response = await fetch(`${this.baseUrl}/messages`, {
       method: 'POST',
       headers: this.createHeaders(),
       signal: request.signal,
-      body: JSON.stringify({
-        model,
-        max_tokens: request.maxTokens || 4096,
-        thinking: toAnthropicThinking(request.reasoningBudget),
-        system: typeof systemMessage?.content === 'string' ? systemMessage.content : undefined,
-        messages: otherMessages.map((message) => ({
-          role: message.role === 'assistant' ? 'assistant' : 'user',
-          content: message.content,
-        })),
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -1170,21 +1139,23 @@ class AnthropicProvider extends BaseStreamingProvider {
     const systemMessage = request.messages.find((message) => message.role === 'system');
     const otherMessages = request.messages.filter((message) => message.role !== 'system');
 
+    const body: Record<string, unknown> = {
+      model,
+      max_tokens: request.maxTokens || 4096,
+      stream: true,
+      system: typeof systemMessage?.content === 'string' ? systemMessage.content : undefined,
+      messages: otherMessages.map((message) => ({
+        role: message.role === 'assistant' ? 'assistant' : 'user',
+        content: message.content,
+      })),
+    };
+    applyReasoningToAnthropicLikeBody(body, request.reasoning);
+
     const response = await fetch(`${this.baseUrl}/messages`, {
       method: 'POST',
       headers: this.createHeaders(),
       signal: request.signal,
-      body: JSON.stringify({
-        model,
-        max_tokens: request.maxTokens || 4096,
-        thinking: toAnthropicThinking(request.reasoningBudget),
-        stream: true,
-        system: typeof systemMessage?.content === 'string' ? systemMessage.content : undefined,
-        messages: otherMessages.map((message) => ({
-          role: message.role === 'assistant' ? 'assistant' : 'user',
-          content: message.content,
-        })),
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {

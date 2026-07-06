@@ -1,9 +1,13 @@
 import type {
   ConversationTurnControls,
-  ReasoningLevel,
+  ReasoningControl,
+  ReasoningSelection,
   ResolvedModelCapability,
 } from '@shared/types/modelCapability';
-import { clampReasoningLevel, isReasoningLevel } from '@shared/types/modelCapability';
+import {
+  clampReasoningSelection,
+  coerceReasoningSelectionCandidate,
+} from '@shared/types/modelCapability';
 
 export const DEFAULT_TURN_CONTROLS: ConversationTurnControls = {
   reasoningLevel: 'off',
@@ -18,11 +22,11 @@ type TurnControlsInput = Partial<Omit<ConversationTurnControls, 'reasoningLevel'
 
 function normalizeTurnControls(
   controls: TurnControlsInput,
-  defaultReasoningLevel: ReasoningLevel = DEFAULT_TURN_CONTROLS.reasoningLevel,
+  reasoningControl: ReasoningControl,
 ): ConversationTurnControls {
-  const candidate = controls.reasoningLevel ?? controls.effort;
   return {
-    reasoningLevel: isReasoningLevel(candidate) ? candidate : defaultReasoningLevel,
+    reasoningLevel: coerceReasoningSelectionCandidate(controls.reasoningLevel ?? controls.effort, reasoningControl)
+      ?? reasoningControl.defaultSelection,
     maxContextMode: controls.maxContextMode === true,
     fastModel: controls.fastModel === true,
   };
@@ -44,22 +48,21 @@ export function sanitizeTurnControls(
   controls: TurnControlsInput,
   capability: ResolvedModelCapability | null,
 ): ConversationTurnControls {
-  const defaultReasoningLevel = capability?.defaultReasoningLevel ?? DEFAULT_TURN_CONTROLS.reasoningLevel;
-  const normalized = normalizeTurnControls(controls, defaultReasoningLevel);
-  if (!capability) {
-    return normalized;
-  }
-
-  const supportedReasoningLevels: ReasoningLevel[] = Array.isArray(capability.supportedReasoningLevels)
-    ? capability.supportedReasoningLevels
-    : ['off'];
-  const reasoningLevel = clampReasoningLevel(normalized.reasoningLevel, supportedReasoningLevels)
-    ?? defaultReasoningLevel;
+  const reasoningControl = capability?.reasoningControl ?? {
+    kind: 'none',
+    supportsOff: true,
+    levels: [],
+    defaultSelection: 'off' as ReasoningSelection,
+    wireProfile: { kind: 'none' as const },
+  };
+  const normalized = normalizeTurnControls(controls, reasoningControl);
+  const reasoningLevel = clampReasoningSelection(normalized.reasoningLevel, reasoningControl)
+    ?? reasoningControl.defaultSelection;
 
   return {
     reasoningLevel,
-    maxContextMode: normalized.maxContextMode && capability.maxContextAvailable,
-    fastModel: normalized.fastModel && capability.fastModelAvailable,
+    maxContextMode: normalized.maxContextMode && Boolean(capability?.maxContextAvailable),
+    fastModel: normalized.fastModel && Boolean(capability?.fastModelAvailable),
   };
 }
 
@@ -72,7 +75,7 @@ export function buildInitialTurnControls(
   }
   if (capability) {
     return {
-      reasoningLevel: capability.defaultReasoningLevel ?? 'off',
+      reasoningLevel: capability.reasoningControl.defaultSelection,
       maxContextMode: false,
       fastModel: false,
     };

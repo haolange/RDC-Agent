@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { lookupManagedModelCapabilityProfile } from '@shared/constants/modelCapabilityCatalog';
 import { __testing as anthropicTesting } from './AnthropicProvider';
 import { __testing as geminiTesting } from './GeminiProvider';
 import { __testing as ollamaTesting } from './OllamaProvider';
@@ -31,41 +32,41 @@ const assistant = (content: AssistantMessage['content']): AssistantMessage => ({
 });
 
 describe('provider reasoning artifact replay policy', () => {
-  it('maps Off and Auto reasoning controls to provider request payloads', () => {
-    expect(anthropicTesting.toAnthropicThinking('off', 'summary-events')).toBeUndefined();
-    expect(anthropicTesting.toAnthropicThinking('auto')).toEqual({ type: 'enabled', budget_tokens: 4096 });
+  it('maps Off and named reasoning controls to OpenAI Responses payloads', () => {
+    const reasoningControl = lookupManagedModelCapabilityProfile('openai', 'gpt-5.5')?.reasoningControl;
+    expect(reasoningControl).toBeTruthy();
 
     const offResponsesBody = openAIResponsesTesting.buildRequestBody(
       { ...model('openai-responses'), id: 'gpt-5.5', provider: 'openai' },
       baseContext,
-      { reasoningBudget: 'off', reasoningVisibility: 'summary-events' },
+      { reasoning: { selection: 'off', control: reasoningControl! }, reasoningVisibility: 'summary-events' },
     );
     expect(offResponsesBody.reasoning).toBeUndefined();
     expect(offResponsesBody.include).toBeUndefined();
 
-    const autoResponsesBody = openAIResponsesTesting.buildRequestBody(
+    const levelResponsesBody = openAIResponsesTesting.buildRequestBody(
       { ...model('openai-responses'), id: 'gpt-5.5', provider: 'openai' },
       baseContext,
-      { reasoningBudget: 'auto', reasoningVisibility: 'summary-events' },
+      { reasoning: { selection: 'extra', control: reasoningControl! }, reasoningVisibility: 'summary-events' },
     );
-    expect(autoResponsesBody.reasoning).toMatchObject({ summary: 'auto' });
-    expect(autoResponsesBody.include).toEqual(['reasoning.encrypted_content']);
+    expect(levelResponsesBody.reasoning).toMatchObject({ effort: 'xhigh', summary: 'auto' });
+    expect(levelResponsesBody.include).toEqual(['reasoning.encrypted_content']);
   });
 
   it('does not replay raw Chat Completions thinking as ordinary assistant content', () => {
     const messages = openAICompatibleTesting.toOpenAIMessages({
       ...baseContext,
       messages: [assistant([
-          {
-            type: 'thinking',
-            text: 'raw model thinking',
-            kind: 'raw',
-            source: 'openai-compatible-raw',
-            visibility: 'raw-collapsed',
-            replayPolicy: 'none',
-          },
-          { type: 'text', text: 'final answer' },
-        ])],
+        {
+          type: 'thinking',
+          text: 'raw model thinking',
+          kind: 'raw',
+          source: 'openai-compatible-raw',
+          visibility: 'raw-collapsed',
+          replayPolicy: 'none',
+        },
+        { type: 'text', text: 'final answer' },
+      ])],
     });
 
     expect(JSON.stringify(messages)).not.toContain('raw model thinking');
@@ -91,10 +92,13 @@ describe('provider reasoning artifact replay policy', () => {
   });
 
   it('requests and replays OpenAI Responses encrypted reasoning artifacts only as provider items', () => {
+    const reasoningControl = lookupManagedModelCapabilityProfile('openai', 'gpt-5.5')?.reasoningControl;
+    expect(reasoningControl).toBeTruthy();
+
     const requestBody = openAIResponsesTesting.buildRequestBody(
-      { ...model('openai-responses'), id: 'o3', provider: 'openai' },
+      { ...model('openai-responses'), id: 'gpt-5.5', provider: 'openai' },
       baseContext,
-      { reasoningVisibility: 'summary-events' },
+      { reasoning: { selection: 'medium', control: reasoningControl! }, reasoningVisibility: 'summary-events' },
     );
     expect(requestBody.reasoning).toMatchObject({ summary: 'auto' });
     expect(requestBody.include).toEqual(['reasoning.encrypted_content']);
@@ -102,24 +106,24 @@ describe('provider reasoning artifact replay policy', () => {
     const input = openAIResponsesTesting.toResponsesInput({
       ...baseContext,
       messages: [assistant([
-          {
-            type: 'thinking',
-            text: 'provider summary',
-            kind: 'summary',
-            source: 'openai-responses-summary',
-            visibility: 'summary',
-            replayPolicy: 'provider-artifact',
-            artifact: {
-              providerId: 'openai',
-              modelId: 'o3',
-              protocol: 'openai-responses',
-              type: 'reasoning',
-              id: 'rs_1',
-              encryptedContent: 'encrypted',
-            },
+        {
+          type: 'thinking',
+          text: 'provider summary',
+          kind: 'summary',
+          source: 'openai-responses-summary',
+          visibility: 'summary',
+          replayPolicy: 'provider-artifact',
+          artifact: {
+            providerId: 'openai',
+            modelId: 'o3',
+            protocol: 'openai-responses',
+            type: 'reasoning',
+            id: 'rs_1',
+            encryptedContent: 'encrypted',
           },
-          { type: 'text', text: 'answer' },
-        ])],
+        },
+        { type: 'text', text: 'answer' },
+      ])],
     });
 
     expect(input).toContainEqual({ type: 'reasoning', id: 'rs_1', encrypted_content: 'encrypted' });
@@ -130,37 +134,37 @@ describe('provider reasoning artifact replay policy', () => {
     const anthropicResult = anthropicTesting.toAnthropicMessages({
       ...baseContext,
       messages: [assistant([
-          {
+        {
+          type: 'thinking',
+          text: 'signed thinking',
+          kind: 'raw',
+          source: 'anthropic-thinking',
+          visibility: 'raw-collapsed',
+          replayPolicy: 'provider-artifact',
+          artifact: {
+            providerId: 'anthropic',
+            modelId: 'claude',
+            protocol: 'anthropic-messages',
             type: 'thinking',
-            text: 'signed thinking',
-            kind: 'raw',
-            source: 'anthropic-thinking',
-            visibility: 'raw-collapsed',
-            replayPolicy: 'provider-artifact',
-            artifact: {
-              providerId: 'anthropic',
-              modelId: 'claude',
-              protocol: 'anthropic-messages',
-              type: 'thinking',
-              signature: 'sig',
-            },
+            signature: 'sig',
           },
-          {
-            type: 'thinking',
-            kind: 'opaque',
-            source: 'anthropic-redacted-thinking',
-            visibility: 'hidden',
-            replayPolicy: 'provider-artifact',
-            artifact: {
-              providerId: 'anthropic',
-              modelId: 'claude',
-              protocol: 'anthropic-messages',
-              type: 'redacted_thinking',
-              data: 'redacted',
-            },
+        },
+        {
+          type: 'thinking',
+          kind: 'opaque',
+          source: 'anthropic-redacted-thinking',
+          visibility: 'hidden',
+          replayPolicy: 'provider-artifact',
+          artifact: {
+            providerId: 'anthropic',
+            modelId: 'claude',
+            protocol: 'anthropic-messages',
+            type: 'redacted_thinking',
+            data: 'redacted',
           },
-          { type: 'toolCall', id: 'tool_1', name: 'read_file', arguments: { path: 'README.md' } },
-        ])],
+        },
+        { type: 'toolCall', id: 'tool_1', name: 'read_file', arguments: { path: 'README.md' } },
+      ])],
     });
 
     expect(anthropicResult.messages[0].content).toContainEqual({ type: 'thinking', thinking: 'signed thinking', signature: 'sig' });

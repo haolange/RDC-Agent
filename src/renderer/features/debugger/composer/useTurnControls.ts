@@ -12,6 +12,35 @@ import {
   sanitizeTurnControls,
 } from './turnControlsUtils';
 
+type SessionTurnControlsInput = Parameters<typeof buildInitialTurnControls>[1];
+
+interface TurnControlsSyncFingerprint {
+  sessionId: string | null;
+  capabilityKey: string;
+  sessionControlsKey: string;
+}
+
+export function buildSessionTurnControlsKey(sessionControls: SessionTurnControlsInput): string {
+  if (!sessionControls) {
+    return 'none';
+  }
+  return JSON.stringify({
+    reasoningLevel: sessionControls.reasoningLevel ?? null,
+    effort: sessionControls.effort ?? null,
+    maxContextMode: sessionControls.maxContextMode === true,
+    fastModel: sessionControls.fastModel === true,
+  });
+}
+
+export function shouldResyncTurnControls(
+  previous: TurnControlsSyncFingerprint,
+  next: TurnControlsSyncFingerprint,
+): boolean {
+  return previous.sessionId !== next.sessionId
+    || previous.capabilityKey !== next.capabilityKey
+    || previous.sessionControlsKey !== next.sessionControlsKey;
+}
+
 interface TurnControlsState {
   turnControls: ConversationTurnControls;
   capability: ResolvedModelCapability | null;
@@ -38,8 +67,10 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const llmSettings = useAppSettingsStore((state) => state.settings.llm);
   const settingsHydrated = useAppSettingsStore((state) => state.hydrated);
   const sessionId = currentSession?.sessionId ?? null;
+  const sessionControls = currentSession?.turnControls ?? null;
   const lastSessionIdRef = useRef<string | null>(null);
   const lastCapabilityKeyRef = useRef<string | null>(null);
+  const lastSessionControlsKeyRef = useRef<string>('none');
 
   useEffect(() => {
     let cancelled = false;
@@ -75,20 +106,29 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const capabilityKey = capability
     ? `${agentId}:${capability.providerId}:${capability.modelId}`
     : `${agentId}:pending`;
+  const sessionControlsKey = buildSessionTurnControlsKey(sessionControls);
 
   useEffect(() => {
-    const sessionChanged = sessionId !== lastSessionIdRef.current;
-    const capabilityChanged = capabilityKey !== lastCapabilityKeyRef.current;
-    if (!sessionChanged && !capabilityChanged) {
+    const nextFingerprint: TurnControlsSyncFingerprint = {
+      sessionId,
+      capabilityKey,
+      sessionControlsKey,
+    };
+    const previousFingerprint: TurnControlsSyncFingerprint = {
+      sessionId: lastSessionIdRef.current,
+      capabilityKey: lastCapabilityKeyRef.current ?? '',
+      sessionControlsKey: lastSessionControlsKeyRef.current,
+    };
+    if (!shouldResyncTurnControls(previousFingerprint, nextFingerprint)) {
       return;
     }
     lastSessionIdRef.current = sessionId;
     lastCapabilityKeyRef.current = capabilityKey;
-    setTurnControls(buildInitialTurnControls(
-      capability,
-      sessionChanged ? currentSession?.turnControls : null,
-    ));
-  }, [sessionId, capabilityKey, currentSession?.turnControls, capability, setTurnControls]);
+    lastSessionControlsKeyRef.current = sessionControlsKey;
+    // Capability resolves asynchronously after session bootstrap. Always reapply
+    // persisted session controls on sync so reload does not fall back to model defaults.
+    setTurnControls(buildInitialTurnControls(capability, sessionControls));
+  }, [sessionId, capabilityKey, sessionControlsKey, sessionControls, capability, setTurnControls]);
 
   useEffect(() => {
     if (!capability) {

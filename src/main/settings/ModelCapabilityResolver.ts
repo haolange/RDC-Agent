@@ -1,27 +1,30 @@
 import { lookupManagedModelCapabilityProfile } from '@shared/constants/modelCapabilityCatalog';
 import type {
   ConversationTurnControls,
-  EffortLevel,
   ModelCapabilityProfile,
-  ReasoningLevel,
-  ReasoningMode,
+  ReasoningControl,
   ResolvedModelCapability,
+  ResolvedReasoningSelection,
 } from '@shared/types/modelCapability';
 import {
   DEFAULT_CONTEXT_WINDOW_TOKENS,
   MAX_CONTEXT_MODE_MIN_TOKENS,
-  REASONING_LEVELS,
-  clampReasoningLevel,
-  isEffortReasoningLevel,
-  isReasoningLevel,
+  clampReasoningSelection,
+  coerceReasoningSelectionCandidate,
+  createReasoningControl,
 } from '@shared/types/modelCapability';
 import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
 
-function sanitizeReasoningLevels(levels: ReasoningLevel[] | undefined): ReasoningLevel[] {
-  if (!levels || levels.length === 0) {
-    return ['off'];
-  }
-  return levels.filter((level) => (REASONING_LEVELS as readonly string[]).includes(level));
+const CONSERVATIVE_REASONING_CONTROL: ReasoningControl = {
+  kind: 'none',
+  supportsOff: true,
+  levels: [],
+  defaultSelection: 'off',
+  wireProfile: { kind: 'none' },
+};
+
+function sanitizeReasoningControl(control: ReasoningControl | undefined): ReasoningControl {
+  return createReasoningControl(control ?? CONSERVATIVE_REASONING_CONTROL);
 }
 
 type TurnControlsInput = Partial<Omit<ConversationTurnControls, 'reasoningLevel'>> & {
@@ -31,40 +34,16 @@ type TurnControlsInput = Partial<Omit<ConversationTurnControls, 'reasoningLevel'
 
 function normalizeTurnControls(
   controls: TurnControlsInput | undefined,
-  defaultReasoningLevel: ReasoningLevel,
+  reasoningControl: ReasoningControl,
 ): ConversationTurnControls {
   const candidate = controls?.reasoningLevel ?? controls?.effort;
+  const reasoningLevel = coerceReasoningSelectionCandidate(candidate, reasoningControl)
+    ?? reasoningControl.defaultSelection;
   return {
-    reasoningLevel: isReasoningLevel(candidate) ? candidate : defaultReasoningLevel,
+    reasoningLevel,
     maxContextMode: controls?.maxContextMode === true,
     fastModel: controls?.fastModel === true,
   };
-}
-
-function pickReasoningMode(profile: ModelCapabilityProfile | null, levels: ReasoningLevel[]): ReasoningMode {
-  if (profile?.reasoningMode) {
-    return profile.reasoningMode;
-  }
-  if (levels.some(isEffortReasoningLevel)) {
-    return 'effort-levels';
-  }
-  if (levels.includes('auto')) {
-    return 'auto-only';
-  }
-  return 'none';
-}
-
-function pickDefaultReasoningLevel(levels: ReasoningLevel[], profileDefault?: ReasoningLevel): ReasoningLevel {
-  if (profileDefault && levels.includes(profileDefault)) {
-    return profileDefault;
-  }
-  if (levels.includes('medium')) {
-    return 'medium';
-  }
-  if (levels.includes('auto')) {
-    return 'auto';
-  }
-  return levels[0] ?? 'off';
 }
 
 function resolveNominalContextWindow(profile: ModelCapabilityProfile | null): number | null {
@@ -101,10 +80,7 @@ export function resolveModelCapability(
     ? nominalContextWindowTokens
     : null;
   const maxContextAvailable = maxContextWindowTokens !== null;
-
-  const supportedReasoningLevels = sanitizeReasoningLevels(profile?.supportedReasoningLevels);
-  const reasoningMode = pickReasoningMode(profile, supportedReasoningLevels);
-  const defaultReasoningLevel = pickDefaultReasoningLevel(supportedReasoningLevels, profile?.defaultReasoningLevel);
+  const reasoningControl = sanitizeReasoningControl(profile?.reasoningControl);
   const fastVariantModelId = profile?.fastVariantModelId ?? null;
 
   return {
@@ -114,9 +90,7 @@ export function resolveModelCapability(
     nominalContextWindowTokens,
     defaultContextWindowTokens,
     maxContextWindowTokens,
-    reasoningMode,
-    supportedReasoningLevels,
-    defaultReasoningLevel,
+    reasoningControl,
     maxContextAvailable,
     fastVariantModelId,
     fastModelAvailable: isFastVariantAvailable(provider, fastVariantModelId),
@@ -132,13 +106,13 @@ export function resolveTurnControls(
   sessionControls?: TurnControlsInput,
 ): ConversationTurnControls {
   if (requestControls) {
-    return normalizeTurnControls(requestControls, capability.defaultReasoningLevel);
+    return normalizeTurnControls(requestControls, capability.reasoningControl);
   }
   if (sessionControls) {
-    return normalizeTurnControls(sessionControls, capability.defaultReasoningLevel);
+    return normalizeTurnControls(sessionControls, capability.reasoningControl);
   }
   return {
-    reasoningLevel: capability.defaultReasoningLevel,
+    reasoningLevel: capability.reasoningControl.defaultSelection,
     maxContextMode: false,
     fastModel: false,
   };
@@ -154,18 +128,15 @@ export function resolveEffectiveModelId(
   return capability.modelId;
 }
 
-export function resolveReasoningBudget(
+export function resolveReasoningSelection(
   capability: ResolvedModelCapability,
   turnControls: TurnControlsInput,
-): EffortLevel | 'auto' | 'off' {
-  if (capability.reasoningMode === 'none') {
-    return 'off';
-  }
-  const normalized = normalizeTurnControls(turnControls, capability.defaultReasoningLevel);
-  const clamped = clampReasoningLevel(normalized.reasoningLevel, capability.supportedReasoningLevels)
-    ?? capability.defaultReasoningLevel;
-  if (clamped === 'off' || clamped === 'auto') {
-    return clamped;
-  }
-  return clamped;
+): ResolvedReasoningSelection {
+  const normalized = normalizeTurnControls(turnControls, capability.reasoningControl);
+  const selection = clampReasoningSelection(normalized.reasoningLevel, capability.reasoningControl)
+    ?? capability.reasoningControl.defaultSelection;
+  return {
+    selection,
+    control: capability.reasoningControl,
+  };
 }

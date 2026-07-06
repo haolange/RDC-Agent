@@ -68,6 +68,7 @@ export {
 export {
   CONTEXT_COMPACTION_RATIO,
   DEFAULT_CONTEXT_WINDOW_TOKENS,
-  EFFORT_LEVELS,
-  isReasoningLevel,
+  NAMED_REASONING_LEVELS,
+  REASONING_SELECTIONS,
+  isReasoningSelection,
 } from '../types/modelCapability';

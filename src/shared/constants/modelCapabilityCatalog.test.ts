@@ -9,7 +9,7 @@ import {
   lookupManagedModelCatalogEntry,
   MANAGED_PROVIDER_MODEL_CATALOG,
 } from './modelCapabilityCatalog';
-import { EFFORT_LEVELS, REASONING_LEVELS } from '../types/modelCapability';
+import { NAMED_REASONING_LEVELS, REASONING_SELECTIONS } from '../types/modelCapability';
 
 describe('managed provider model catalog', () => {
   it('owns mainline official and coding plan providers', () => {
@@ -33,23 +33,46 @@ describe('managed provider model catalog', () => {
     expect(openai.models.length).toBeGreaterThan(0);
   });
 
-  it('uses ExtHigh as the canonical upper effort level', () => {
-    expect(REASONING_LEVELS).toEqual(['off', 'auto', 'low', 'medium', 'high', 'extHigh', 'max']);
-    expect(EFFORT_LEVELS).toEqual(['low', 'medium', 'high', 'extHigh', 'max']);
+  it('uses the no-Auto canonical reasoning selections', () => {
+    expect(REASONING_SELECTIONS).toEqual(['off', 'on', ...NAMED_REASONING_LEVELS]);
     const serializedCatalog = JSON.stringify(MANAGED_PROVIDER_MODEL_CATALOG);
-    const retiredLevelName = ['ex', 'tra'].join('');
-    expect(serializedCatalog).toContain('extHigh');
-    expect(serializedCatalog).not.toContain(JSON.stringify(retiredLevelName));
+    expect(serializedCatalog).not.toContain('"auto"');
+    expect(serializedCatalog).not.toContain('"extHigh"');
+    expect(serializedCatalog).toContain('"extra"');
   });
 
-  it('keeps Kimi Coding Plan on the single official coding model', () => {
+  it('keeps Kimi Coding Plan on a single official toggle model', () => {
     const kimi = createBuiltinProviderEntry('kimi-coding-plan');
     const entry = lookupManagedModelCatalogEntry('kimi-coding-plan', 'kimi-for-coding');
 
     expect(kimi.models.map((model) => model.id)).toEqual(['kimi-for-coding']);
-    expect(entry?.profile.reasoningMode).toBe('auto-only');
-    expect(entry?.profile.supportedReasoningLevels).toEqual(['off', 'auto']);
+    expect(entry?.profile.reasoningControl).toMatchObject({
+      kind: 'toggle',
+      defaultSelection: 'on',
+      supportsOff: true,
+    });
     expect(entry?.profile.fastVariantModelId).toBeUndefined();
+  });
+
+  it('captures multi-level and always-on variants without legacy fields', () => {
+    expect(lookupManagedModelCatalogEntry('openai', 'gpt-5.5')?.profile.reasoningControl).toMatchObject({
+      kind: 'levels',
+      supportsOff: true,
+      levels: ['low', 'medium', 'high', 'extra'],
+      defaultSelection: 'medium',
+    });
+
+    expect(lookupManagedModelCatalogEntry('anthropic', 'claude-fable-5')?.profile.reasoningControl).toMatchObject({
+      kind: 'levels',
+      supportsOff: false,
+      levels: ['low', 'medium', 'high', 'extra', 'max'],
+      defaultSelection: 'high',
+    });
+
+    expect(lookupManagedModelCatalogEntry('minimax-cn', 'MiniMax-M2.7')?.profile.reasoningControl).toMatchObject({
+      kind: 'always-on',
+      lockedSelection: 'on',
+    });
   });
 
   it('keeps user-managed provider entries free of managed models', () => {

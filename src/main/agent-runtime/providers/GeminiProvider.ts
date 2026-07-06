@@ -24,7 +24,6 @@ import type {
   StreamOptions,
   ToolDefinition,
 } from '../core/types';
-import type { EffortLevel } from '@shared/types/modelCapability';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
@@ -33,6 +32,7 @@ import {
   parseSSE,
   ProviderHttpError,
 } from './internal/http';
+import { applyGeminiReasoning } from './reasoningWire';
 
 const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com';
 const PROVIDER_API = 'google-gemini';
@@ -253,11 +253,7 @@ export class GeminiProvider implements ProviderStrategy {
     if (typeof options.temperature === 'number') generationConfig.temperature = options.temperature;
     if (typeof options.topP === 'number') generationConfig.topP = options.topP;
     if (typeof options.maxTokens === 'number') generationConfig.maxOutputTokens = options.maxTokens;
-    if (options.reasoningBudget && options.reasoningBudget !== 'auto' && options.reasoningBudget !== 'off') {
-      generationConfig.thinkingConfig = {
-        thinkingBudget: toGeminiThinkingBudget(options.reasoningBudget),
-      };
-    }
+    applyGeminiReasoning(generationConfig, options.reasoning);
     if (Object.keys(generationConfig).length > 0) body.generationConfig = generationConfig;
 
     if (context.tools && context.tools.length > 0) {
@@ -274,23 +270,6 @@ export class GeminiProvider implements ProviderStrategy {
 // =====================================================================
 // 转换辅助
 // =====================================================================
-
-function toGeminiThinkingBudget(budget: EffortLevel): number {
-  switch (budget) {
-    case 'low':
-      return 1024;
-    case 'medium':
-      return 4096;
-    case 'high':
-      return 8192;
-    case 'extHigh':
-      return 16384;
-    case 'max':
-      return 24576;
-    default:
-      return 4096;
-  }
-}
 
 interface GeminiContent {
   role: 'user' | 'model';

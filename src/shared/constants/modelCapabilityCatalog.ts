@@ -1,9 +1,12 @@
 import type {
-  EffortLevel,
+  GeminiWireThinkingLevel,
   ModelCapabilityProfile,
   ModelCapabilitySource,
-  ReasoningLevel,
-  ReasoningMode,
+  NamedReasoningLevel,
+  OpenAiWireEffort,
+  ReasoningControl,
+  ReasoningSelection,
+  ReasoningWireProfile,
 } from '../types/modelCapability';
 import type {
   BuiltinLlmProviderId,
@@ -18,38 +21,180 @@ export interface ManagedModelCatalogEntry {
   source: ModelCapabilitySource;
 }
 
-const CATALOG_UPDATED_AT = '2026-07-05';
+const CATALOG_UPDATED_AT = '2026-07-06';
 
-const EFFORT_3: EffortLevel[] = ['low', 'medium', 'high'];
-const EFFORT_4: EffortLevel[] = ['low', 'medium', 'high', 'extHigh'];
-const EFFORT_5: EffortLevel[] = ['low', 'medium', 'high', 'extHigh', 'max'];
-const EFFORT_NO_EXTRA: EffortLevel[] = ['low', 'medium', 'high', 'max'];
-const REASONING_OFF: ReasoningLevel[] = ['off'];
-const REASONING_AUTO_ONLY: ReasoningLevel[] = ['off', 'auto'];
+const OPENAI_LEVELS: NamedReasoningLevel[] = ['low', 'medium', 'high', 'extra'];
+const OPENAI_PRO_LEVELS: NamedReasoningLevel[] = ['medium', 'high', 'extra'];
+const ANTHROPIC_5_LEVELS: NamedReasoningLevel[] = ['low', 'medium', 'high', 'extra', 'max'];
+const GEMINI_35_LEVELS: NamedReasoningLevel[] = ['minimal', 'low', 'medium', 'high'];
+const GEMINI_31_LEVELS: NamedReasoningLevel[] = ['low', 'medium', 'high'];
+const DEEPSEEK_LEVELS: NamedReasoningLevel[] = ['high', 'max'];
+const XAI_LEVELS: NamedReasoningLevel[] = ['low', 'medium', 'high'];
+const QWEN_LEVELS: NamedReasoningLevel[] = ['minimal', 'low', 'medium', 'high'];
+
+const OPENAI_WIRE_LEVELS: Partial<Record<NamedReasoningLevel, OpenAiWireEffort>> = {
+  minimal: 'minimal',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  extra: 'xhigh',
+  max: 'max',
+  ultra: 'ultra',
+};
+
+const ANTHROPIC_WIRE_LEVELS: Partial<Record<NamedReasoningLevel, 'low' | 'medium' | 'high' | 'xhigh' | 'max'>> = {
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  extra: 'xhigh',
+  max: 'max',
+};
+
+const GEMINI_WIRE_LEVELS: Partial<Record<NamedReasoningLevel, GeminiWireThinkingLevel>> = {
+  minimal: 'minimal',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+};
+
+const GEMINI_BUDGET_LEVELS: Partial<Record<NamedReasoningLevel, number>> = {
+  low: 1_024,
+  medium: 4_096,
+  high: 8_192,
+};
+
+const OPENAI_RESPONSES_WIRE: ReasoningWireProfile = {
+  kind: 'openai-responses',
+  on: 'medium',
+  levels: OPENAI_WIRE_LEVELS,
+};
+
+const OPENAI_COMPATIBLE_WIRE: ReasoningWireProfile = {
+  kind: 'openai-compatible',
+  on: 'medium',
+  levels: OPENAI_WIRE_LEVELS,
+  offMode: 'reasoning-none',
+};
+
+const QWEN_OPENAI_WIRE: ReasoningWireProfile = {
+  kind: 'openai-compatible',
+  on: 'medium',
+  levels: {
+    minimal: 'minimal',
+    low: 'low',
+    medium: 'medium',
+    high: 'high',
+  },
+  onMode: 'enable-thinking-true',
+  offMode: 'enable-thinking-false',
+};
+
+const DEEPSEEK_ANTHROPIC_WIRE: ReasoningWireProfile = {
+  kind: 'anthropic',
+  on: 'high',
+  levels: {
+    high: 'high',
+    max: 'max',
+  },
+  onMode: 'enabled',
+  offMode: 'disabled',
+};
+
+const ANTHROPIC_ADAPTIVE_WIRE: ReasoningWireProfile = {
+  kind: 'anthropic',
+  on: 'high',
+  levels: ANTHROPIC_WIRE_LEVELS,
+  onMode: 'adaptive',
+  offMode: 'disabled',
+};
+
+const ANTHROPIC_ALWAYS_ON_WIRE: ReasoningWireProfile = {
+  kind: 'anthropic',
+  on: 'high',
+  levels: ANTHROPIC_WIRE_LEVELS,
+  onMode: 'adaptive',
+};
+
+const ANTHROPIC_TOGGLE_WIRE: ReasoningWireProfile = {
+  kind: 'anthropic',
+  on: 'high',
+  onMode: 'enabled',
+  offMode: 'disabled',
+};
+
+const KIMI_CODING_PLAN_WIRE: ReasoningWireProfile = {
+  kind: 'anthropic',
+  on: 'high',
+  onMode: 'enabled',
+  onBudgetTokens: 4_096,
+  offMode: 'disabled',
+};
+
+const ANTHROPIC_ALWAYS_ON_TOGGLE_WIRE: ReasoningWireProfile = {
+  kind: 'anthropic',
+  on: 'high',
+  onMode: 'enabled',
+};
+
+const GEMINI_3_WIRE: ReasoningWireProfile = {
+  kind: 'gemini-thinking-level',
+  on: 'medium',
+  levels: GEMINI_WIRE_LEVELS,
+};
+
+const GEMINI_25_WIRE: ReasoningWireProfile = {
+  kind: 'gemini-thinking-budget',
+  on: 'high',
+  levels: GEMINI_BUDGET_LEVELS,
+};
+
+const MOONSHOT_TOGGLE_WIRE: ReasoningWireProfile = {
+  kind: 'moonshot-thinking',
+  onMode: 'enabled',
+  offMode: 'disabled',
+};
+
+const MOONSHOT_ALWAYS_ON_WIRE: ReasoningWireProfile = {
+  kind: 'moonshot-thinking',
+  onMode: 'enabled',
+};
+
+const VOLCENGINE_TOGGLE_WIRE: ReasoningWireProfile = {
+  kind: 'openai-compatible',
+  on: 'high',
+  onMode: 'thinking-enabled',
+  offMode: 'thinking-disabled',
+};
+
+const NONE_WIRE: ReasoningWireProfile = { kind: 'none' };
 
 const OPENAI_API_SOURCE: ModelCapabilitySource = {
   kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    'https://platform.openai.com/docs/models',
-    'https://platform.openai.com/docs/guides/reasoning',
-    'https://platform.openai.com/docs/guides/function-calling',
-    'https://platform.openai.com/docs/guides/structured-outputs',
+    'https://developers.openai.com/api/docs/guides/reasoning',
+    'https://developers.openai.com/api/docs/guides/latest-model',
+    'https://developers.openai.com/api/docs/models',
+    'https://developers.openai.com/api/docs/guides/function-calling',
+    'https://developers.openai.com/api/docs/guides/structured-outputs',
   ],
 };
 
 const CHATGPT_ACCOUNT_SOURCE: ModelCapabilitySource = {
   kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
-  urls: ['https://help.openai.com/en/articles/12003714-chatgpt-business-models-limits'],
+  urls: [
+    'https://help.openai.com/en/articles/12003714-chatgpt-business-models-limits',
+    'https://developers.openai.com/api/docs/models/gpt-5.5-pro',
+  ],
 };
 
 const ANTHROPIC_SOURCE: ModelCapabilitySource = {
   kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    'https://docs.anthropic.com/en/docs/about-claude/models/overview',
-    'https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking',
+    'https://platform.claude.com/docs/en/build-with-claude/effort',
+    'https://docs.anthropic.com/en/api/messages',
     'https://docs.anthropic.com/en/docs/build-with-claude/tool-use/overview',
     'https://docs.anthropic.com/en/docs/build-with-claude/vision',
   ],
@@ -59,8 +204,8 @@ const GEMINI_SOURCE: ModelCapabilitySource = {
   kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    'https://ai.google.dev/gemini-api/docs/models',
     'https://ai.google.dev/gemini-api/docs/thinking',
+    'https://ai.google.dev/gemini-api/docs/generate-content/thinking',
     'https://ai.google.dev/gemini-api/docs/function-calling',
     'https://ai.google.dev/gemini-api/docs/structured-output',
   ],
@@ -70,26 +215,27 @@ const XAI_SOURCE: ModelCapabilitySource = {
   kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    'https://docs.x.ai/developers/models',
     'https://docs.x.ai/developers/model-capabilities/text/reasoning',
-    'https://docs.x.ai/developers/model-capabilities/text/structured-outputs',
+    'https://docs.x.ai/developers/models/grok-4.3',
+    'https://docs.x.ai/developers/models/grok-build-0.1',
+    'https://docs.x.ai/developers/migration/may-15-retirement',
   ],
 };
 
 const COPILOT_SOURCE: ModelCapabilitySource = {
-  kind: 'official',
+  kind: 'observed',
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
     'https://docs.github.com/en/copilot/reference/ai-models/supported-models',
     'https://docs.github.com/en/copilot/reference/ai-models/model-comparison',
   ],
+  note: 'GitHub Copilot exposes cross-vendor models behind a single compatible endpoint; capability rows mirror the curated product offer and stay conservative when the Copilot wire contract is not explicit.',
 };
 
 const AZURE_OPENAI_SOURCE: ModelCapabilitySource = {
   kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    'https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure',
     'https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/reasoning',
     'https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structured-outputs',
   ],
@@ -101,7 +247,6 @@ const BEDROCK_SOURCE: ModelCapabilitySource = {
   urls: [
     'https://docs.aws.amazon.com/bedrock/latest/userguide/model-cards-anthropic.html',
     'https://docs.aws.amazon.com/bedrock/latest/userguide/claude-messages-extended-thinking.html',
-    'https://docs.aws.amazon.com/bedrock/latest/userguide/claude-messages-structured-outputs.html',
   ],
 };
 
@@ -109,7 +254,6 @@ const VERTEX_SOURCE: ModelCapabilitySource = {
   kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    'https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models',
     'https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference',
     'https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/claude/structured_outputs',
   ],
@@ -119,49 +263,60 @@ const DEEPSEEK_SOURCE: ModelCapabilitySource = {
   kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    'https://api-docs.deepseek.com/guides/reasoning_model',
     'https://api-docs.deepseek.com/quick_start/pricing',
+    'https://api-docs.deepseek.com/guides/thinking_mode',
+    'https://api-docs.deepseek.com/guides/anthropic_api',
+    'https://api-docs.deepseek.com/api/create-chat-completion',
   ],
 };
 
 const QWEN_SOURCE: ModelCapabilitySource = {
-  kind: 'conservative',
+  kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    'https://help.aliyun.com/zh/model-studio/qwen-api-via-dashscope',
-    'https://help.aliyun.com/zh/model-studio/vision',
+    'https://help.aliyun.com/en/model-studio/text-generation-model/',
+    'https://help.aliyun.com/en/model-studio/compatibility-with-openai-responses-api',
+    'https://help.aliyun.com/en/model-studio/coding-plan-faq',
   ],
-  note: 'Public model pages do not expose a complete per-model context and effort table; profile is conservative.',
 };
 
 const VOLCENGINE_SOURCE: ModelCapabilitySource = {
   kind: 'conservative',
   updatedAt: CATALOG_UPDATED_AT,
-  urls: ['https://www.volcengine.com/docs/82379/1928262'],
-  note: 'Ark compatible endpoint catalog is product-specific; bundled entries are conservative coding-route candidates.',
+  urls: [
+    'https://www.volcengine.com/docs/82379/1519548',
+    'https://www.volcengine.com/docs/82379/1956279',
+  ],
+  note: 'Volcengine public docs confirm deep-thinking can be enabled and disabled, but the exact per-model effort ladder is not stable across entrypoints. Current rows fail closed to toggle unless the model family is explicit elsewhere.',
 };
 
 const GLM_SOURCE: ModelCapabilitySource = {
   kind: 'conservative',
   updatedAt: CATALOG_UPDATED_AT,
-  urls: ['https://open.bigmodel.cn/dev/api/normal-model/glm-4.5'],
-  note: 'Official pages describe thinking mode, but do not provide a stable low/medium/high effort ladder.',
+  urls: [
+    'https://open.bigmodel.cn/dev/api',
+    'https://help.aliyun.com/en/model-studio/glm-zhipu',
+    'https://help.aliyun.com/zh/model-studio/glm',
+  ],
+  note: 'The dedicated Anthropic-compatible GLM endpoints document thinking enable/disable, but do not publish a stable effort ladder. App-managed GLM direct providers therefore expose toggle-only reasoning; richer level variants remain covered by shared tests, not by these endpoint rows.',
 };
 
 const MINIMAX_SOURCE: ModelCapabilitySource = {
-  kind: 'conservative',
+  kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
-  urls: ['https://platform.minimaxi.com/document/guides/chat-model/V2'],
-  note: 'Public model catalog coverage is incomplete; profile is conservative.',
+  urls: [
+    'https://platform.minimaxi.com/docs/api-reference/text-openai-api',
+    'https://platform.minimaxi.com/docs/api-reference/text-anthropic-api',
+  ],
 };
 
 const MIMO_SOURCE: ModelCapabilitySource = {
   kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    'https://mimo.mi.com/docs/quick-start/summary/model',
-    'https://mimo.mi.com/models/mimo-v2.5',
-    'https://mimo.mi.com/token-plan',
+    'https://mimo.mi.com/docs/en-US/api/chat/responses',
+    'https://mimo.mi.com/docs/en-US/quick-start/usage-guide/text-generation/deep-thinking',
+    'https://mimo.mi.com/docs/en-US/tokenplan/integration/codex-configuration',
   ],
 };
 
@@ -169,8 +324,9 @@ const KIMI_SOURCE: ModelCapabilitySource = {
   kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    'https://platform.moonshot.ai/docs/api/chat',
     'https://platform.moonshot.ai/docs/guide/use-kimi-k2-thinking-model',
+    'https://platform.moonshot.ai/docs/api/chat',
+    'https://platform.moonshot.ai/docs/guide/kimi-k2-6-quickstart',
   ],
 };
 
@@ -178,11 +334,11 @@ const KIMI_CODING_SOURCE: ModelCapabilitySource = {
   kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    'https://www.kimi.com/code/docs/en/',
     'https://www.kimi.com/code/docs/en/third-party-tools/other-coding-agents.html',
     'https://www.kimi.com/code/docs/en/kimi-code/whats-new.html',
+    'https://www.kimi.com/code/docs/en/kimi-code-cli/configuration/config-files.html',
   ],
-  note: 'Kimi Coding Plan exposes kimi-for-coding. Thinking On routes to the current Kimi For Coding thinking model; no public Coding Plan highspeed model is exposed.',
+  note: 'Kimi Coding Plan only exposes kimi-for-coding. Thinking mode is a binary product switch; the coding model upgrade only takes effect when it is on.',
 };
 
 const GROQ_SOURCE: ModelCapabilitySource = {
@@ -211,7 +367,7 @@ const CEREBRAS_SOURCE: ModelCapabilitySource = {
   kind: 'conservative',
   updatedAt: CATALOG_UPDATED_AT,
   urls: ['https://inference-docs.cerebras.ai/'],
-  note: 'Official inference docs are latency-focused; model capability table is conservative.',
+  note: 'Cerebras public docs do not publish a stable reasoning control contract for the curated rows in this catalog, so reasoning fails closed to none.',
 };
 
 const TOOLS_ONLY: Pick<ModelCapabilityProfile, 'toolCalling' | 'visionInput' | 'structuredOutput'> = {
@@ -226,70 +382,123 @@ const MULTIMODAL_TOOLS: Pick<ModelCapabilityProfile, 'toolCalling' | 'visionInpu
   structuredOutput: true,
 };
 
-function buildReasoningProfile(
+function createReasoningControl(control: ReasoningControl): ReasoningControl {
+  return {
+    ...control,
+    levels: [...control.levels],
+    wireProfile: cloneWireProfile(control.wireProfile),
+  };
+}
+
+function cloneWireProfile(profile: ReasoningWireProfile): ReasoningWireProfile {
+  switch (profile.kind) {
+    case 'openai-responses':
+      return {
+        ...profile,
+        levels: profile.levels ? { ...profile.levels } : profile.levels,
+      };
+    case 'openai-compatible':
+      return {
+        ...profile,
+        levels: profile.levels ? { ...profile.levels } : profile.levels,
+      };
+    case 'anthropic':
+      return {
+        ...profile,
+        levels: profile.levels ? { ...profile.levels } : profile.levels,
+      };
+    case 'gemini-thinking-level':
+      return {
+        ...profile,
+        levels: { ...profile.levels },
+      };
+    case 'gemini-thinking-budget':
+      return {
+        ...profile,
+        levels: { ...profile.levels },
+      };
+    case 'moonshot-thinking':
+    case 'none':
+    default:
+      return { ...profile };
+  }
+}
+
+function noReasoningControl(): ReasoningControl {
+  return {
+    kind: 'none',
+    supportsOff: true,
+    levels: [],
+    defaultSelection: 'off',
+    wireProfile: NONE_WIRE,
+  };
+}
+
+function toggleReasoningControl(
+  defaultSelection: 'off' | 'on',
+  wireProfile: ReasoningWireProfile,
+): ReasoningControl {
+  return {
+    kind: 'toggle',
+    supportsOff: true,
+    levels: [],
+    defaultSelection,
+    wireProfile,
+  };
+}
+
+function alwaysOnReasoningControl(
+  lockedSelection: ReasoningSelection,
+  wireProfile: ReasoningWireProfile,
+): ReasoningControl {
+  return {
+    kind: 'always-on',
+    supportsOff: false,
+    levels: [],
+    defaultSelection: lockedSelection,
+    lockedSelection,
+    wireProfile,
+  };
+}
+
+function levelsReasoningControl(
+  levels: NamedReasoningLevel[],
+  options: {
+    supportsOff: boolean;
+    defaultSelection: ReasoningSelection;
+    wireProfile: ReasoningWireProfile;
+  },
+): ReasoningControl {
+  return {
+    kind: 'levels',
+    supportsOff: options.supportsOff,
+    levels: [...levels],
+    defaultSelection: options.defaultSelection,
+    wireProfile: options.wireProfile,
+  };
+}
+
+function buildProfile(
   nominalContextWindowTokens: number | undefined,
-  adjustableLevels: EffortLevel[],
+  reasoningControl: ReasoningControl,
   toolProfile: Pick<ModelCapabilityProfile, 'toolCalling' | 'visionInput' | 'structuredOutput'>,
 ): ModelCapabilityProfile {
-  const reasoningMode: ReasoningMode = adjustableLevels.length > 0 ? 'effort-levels' : 'none';
-  const supportedReasoningLevels: ReasoningLevel[] = adjustableLevels.length > 0
-    ? [...REASONING_AUTO_ONLY, ...adjustableLevels]
-    : REASONING_OFF;
-  const defaultReasoningLevel: ReasoningLevel = adjustableLevels.length > 0 ? 'auto' : 'off';
   return {
     ...(nominalContextWindowTokens ? { nominalContextWindowTokens } : {}),
-    reasoningMode,
-    supportedReasoningLevels,
-    defaultReasoningLevel,
+    reasoningControl: createReasoningControl(reasoningControl),
     ...toolProfile,
   };
 }
 
 const textOnly = (
   nominalContextWindowTokens: number | undefined,
-  adjustableLevels: EffortLevel[] = [],
-): ModelCapabilityProfile => buildReasoningProfile(nominalContextWindowTokens, adjustableLevels, TOOLS_ONLY);
+  reasoningControl: ReasoningControl = noReasoningControl(),
+): ModelCapabilityProfile => buildProfile(nominalContextWindowTokens, reasoningControl, TOOLS_ONLY);
 
 const multimodal = (
   nominalContextWindowTokens: number | undefined,
-  adjustableLevels: EffortLevel[] = [],
-): ModelCapabilityProfile => buildReasoningProfile(nominalContextWindowTokens, adjustableLevels, MULTIMODAL_TOOLS);
-
-function buildAutoOnlyProfile(
-  nominalContextWindowTokens: number | undefined,
-  toolProfile: Pick<ModelCapabilityProfile, 'toolCalling' | 'visionInput' | 'structuredOutput'>,
-  supportedReasoningLevels: ReasoningLevel[] = REASONING_AUTO_ONLY,
-): ModelCapabilityProfile {
-  return {
-    ...(nominalContextWindowTokens ? { nominalContextWindowTokens } : {}),
-    reasoningMode: 'auto-only',
-    supportedReasoningLevels,
-    defaultReasoningLevel: 'auto',
-    ...toolProfile,
-  };
-}
-
-const autoOnlyText = (
-  nominalContextWindowTokens: number | undefined,
-  supportedReasoningLevels: ReasoningLevel[] = REASONING_AUTO_ONLY,
-): ModelCapabilityProfile => buildAutoOnlyProfile(nominalContextWindowTokens, TOOLS_ONLY, supportedReasoningLevels);
-
-const autoOnlyMultimodal = (
-  nominalContextWindowTokens: number | undefined,
-  supportedReasoningLevels: ReasoningLevel[] = REASONING_AUTO_ONLY,
-): ModelCapabilityProfile => buildAutoOnlyProfile(nominalContextWindowTokens, MULTIMODAL_TOOLS, supportedReasoningLevels);
-
-const openSourceText = (
-  nominalContextWindowTokens: number | undefined,
-): ModelCapabilityProfile => ({
-  ...(nominalContextWindowTokens ? { nominalContextWindowTokens } : {}),
-  reasoningMode: 'none',
-  supportedReasoningLevels: REASONING_OFF,
-  defaultReasoningLevel: 'off',
-  toolCalling: true,
-  visionInput: false,
-  structuredOutput: true,
-});
+  reasoningControl: ReasoningControl = noReasoningControl(),
+): ModelCapabilityProfile => buildProfile(nominalContextWindowTokens, reasoningControl, MULTIMODAL_TOOLS);
 
 const model = (
   id: string,
@@ -303,16 +512,96 @@ const model = (
   source,
 });
 
-const gpt55Api = multimodal(1_050_000, EFFORT_NO_EXTRA);
-const gpt54Api = multimodal(1_050_000, EFFORT_NO_EXTRA);
-const gptMiniApi = multimodal(400_000, EFFORT_3);
-const gptCodex = textOnly(400_000, EFFORT_4);
-const gpt41 = multimodal(1_047_576, []);
+const openAiLevelsDefaultMedium = levelsReasoningControl(OPENAI_LEVELS, {
+  supportsOff: true,
+  defaultSelection: 'medium',
+  wireProfile: OPENAI_RESPONSES_WIRE,
+});
+
+const openAiLevelsDefaultOff = levelsReasoningControl(OPENAI_LEVELS, {
+  supportsOff: true,
+  defaultSelection: 'off',
+  wireProfile: OPENAI_RESPONSES_WIRE,
+});
+
+const openAiProLevelsDefaultHigh = levelsReasoningControl(OPENAI_PRO_LEVELS, {
+  supportsOff: false,
+  defaultSelection: 'high',
+  wireProfile: OPENAI_RESPONSES_WIRE,
+});
+
+const openAiCompatibleLevelsDefaultMedium = levelsReasoningControl(OPENAI_LEVELS, {
+  supportsOff: true,
+  defaultSelection: 'medium',
+  wireProfile: OPENAI_COMPATIBLE_WIRE,
+});
+
+const anthropicFiveLevelsDefaultHigh = levelsReasoningControl(ANTHROPIC_5_LEVELS, {
+  supportsOff: true,
+  defaultSelection: 'high',
+  wireProfile: ANTHROPIC_ADAPTIVE_WIRE,
+});
+
+const anthropicFiveLevelsAlwaysOn = levelsReasoningControl(ANTHROPIC_5_LEVELS, {
+  supportsOff: false,
+  defaultSelection: 'high',
+  wireProfile: ANTHROPIC_ALWAYS_ON_WIRE,
+});
+
+const gemini35Levels = levelsReasoningControl(GEMINI_35_LEVELS, {
+  supportsOff: false,
+  defaultSelection: 'medium',
+  wireProfile: GEMINI_3_WIRE,
+});
+
+const gemini31Levels = levelsReasoningControl(GEMINI_31_LEVELS, {
+  supportsOff: false,
+  defaultSelection: 'high',
+  wireProfile: GEMINI_3_WIRE,
+});
+
+const gemini25Levels = levelsReasoningControl(GEMINI_31_LEVELS, {
+  supportsOff: false,
+  defaultSelection: 'high',
+  wireProfile: GEMINI_25_WIRE,
+});
+
+const xaiLevels = levelsReasoningControl(XAI_LEVELS, {
+  supportsOff: true,
+  defaultSelection: 'low',
+  wireProfile: OPENAI_COMPATIBLE_WIRE,
+});
+
+const qwenLevelsDefaultOff = levelsReasoningControl(QWEN_LEVELS, {
+  supportsOff: true,
+  defaultSelection: 'off',
+  wireProfile: QWEN_OPENAI_WIRE,
+});
+
+const deepSeekLevelsDefaultHigh = levelsReasoningControl(DEEPSEEK_LEVELS, {
+  supportsOff: true,
+  defaultSelection: 'high',
+  wireProfile: DEEPSEEK_ANTHROPIC_WIRE,
+});
+
+const moonshotToggleDefaultOn = toggleReasoningControl('on', MOONSHOT_TOGGLE_WIRE);
+const moonshotAlwaysOn = alwaysOnReasoningControl('on', MOONSHOT_ALWAYS_ON_WIRE);
+const anthropicToggleDefaultOn = toggleReasoningControl('on', ANTHROPIC_TOGGLE_WIRE);
+const kimiCodingPlanToggleDefaultOn = toggleReasoningControl('on', KIMI_CODING_PLAN_WIRE);
+const anthropicAlwaysOnToggle = alwaysOnReasoningControl('on', ANTHROPIC_ALWAYS_ON_TOGGLE_WIRE);
+const volcengineToggleDefaultOn = toggleReasoningControl('on', VOLCENGINE_TOGGLE_WIRE);
+const xaiToggleDefaultOn = toggleReasoningControl('on', OPENAI_COMPATIBLE_WIRE);
+
+const gpt55Api = multimodal(1_050_000, openAiLevelsDefaultMedium);
+const gpt54Api = multimodal(1_050_000, openAiLevelsDefaultOff);
+const gptMiniApi = multimodal(400_000, openAiLevelsDefaultOff);
+const gptCodex = textOnly(400_000, openAiCompatibleLevelsDefaultMedium);
+const gpt41 = multimodal(1_047_576);
 
 const chatGptAccountModels = [
-  model('gpt-5.5-instant', { ...multimodal(128_000, []), fastVariantModelId: 'gpt-5.5-instant' }, CHATGPT_ACCOUNT_SOURCE, { label: 'GPT-5.5 Instant' }),
-  model('gpt-5.5-thinking', multimodal(128_000, EFFORT_4), CHATGPT_ACCOUNT_SOURCE, { label: 'GPT-5.5 Thinking' }),
-  model('gpt-5.5-pro', multimodal(272_000, EFFORT_4), CHATGPT_ACCOUNT_SOURCE, { label: 'GPT-5.5 Pro' }),
+  model('gpt-5.5-instant', { ...multimodal(128_000), fastVariantModelId: 'gpt-5.5-instant' }, CHATGPT_ACCOUNT_SOURCE, { label: 'GPT-5.5 Instant' }),
+  model('gpt-5.5-thinking', multimodal(128_000, openAiLevelsDefaultMedium), CHATGPT_ACCOUNT_SOURCE, { label: 'GPT-5.5 Thinking' }),
+  model('gpt-5.5-pro', multimodal(272_000, openAiProLevelsDefaultHigh), CHATGPT_ACCOUNT_SOURCE, { label: 'GPT-5.5 Pro' }),
 ];
 
 const openAiApiModels = [
@@ -326,140 +615,135 @@ const openAiApiModels = [
 ];
 
 const claudeApiModels = [
-  model('claude-fable-5', multimodal(1_000_000, EFFORT_3), ANTHROPIC_SOURCE),
-  model('claude-sonnet-5', multimodal(1_000_000, EFFORT_3), ANTHROPIC_SOURCE),
-  model('claude-opus-4-8', multimodal(1_000_000, EFFORT_3), ANTHROPIC_SOURCE),
-  model('claude-haiku-4-5-20251001', multimodal(200_000, EFFORT_3), ANTHROPIC_SOURCE, {
+  model('claude-fable-5', multimodal(1_000_000, anthropicFiveLevelsAlwaysOn), ANTHROPIC_SOURCE),
+  model('claude-sonnet-5', multimodal(1_000_000, anthropicFiveLevelsDefaultHigh), ANTHROPIC_SOURCE),
+  model('claude-opus-4-8', multimodal(1_000_000, anthropicFiveLevelsDefaultHigh), ANTHROPIC_SOURCE),
+  model('claude-haiku-4-5-20251001', multimodal(200_000), ANTHROPIC_SOURCE, {
     aliases: ['claude-haiku-4-5'],
   }),
 ];
 
 const geminiModels = [
-  model('gemini-3.5-flash', multimodal(1_048_576, EFFORT_3), GEMINI_SOURCE),
-  model('gemini-3.1-pro-preview', multimodal(1_048_576, EFFORT_3), GEMINI_SOURCE),
-  model('gemini-2.5-pro', multimodal(1_048_576, EFFORT_3), GEMINI_SOURCE, {
+  model('gemini-3.5-flash', multimodal(1_048_576, gemini35Levels), GEMINI_SOURCE),
+  model('gemini-3.1-pro-preview', multimodal(1_048_576, gemini31Levels), GEMINI_SOURCE),
+  model('gemini-2.5-pro', multimodal(1_048_576, gemini25Levels), GEMINI_SOURCE, {
     aliases: ['gemini-pro'],
   }),
-  model('gemini-2.5-flash', multimodal(1_048_576, EFFORT_3), GEMINI_SOURCE),
+  model('gemini-2.5-flash', multimodal(1_048_576, gemini25Levels), GEMINI_SOURCE),
 ];
 
 const grokModels = [
-  model('grok-4.3', multimodal(1_000_000, EFFORT_3), XAI_SOURCE),
-  model('grok-build-0.1', textOnly(256_000, EFFORT_3), XAI_SOURCE),
-  model('grok-code-fast-1', textOnly(256_000, []), XAI_SOURCE),
+  model('grok-4.3', multimodal(1_000_000, xaiLevels), XAI_SOURCE),
+  model('grok-build-0.1', textOnly(256_000, xaiToggleDefaultOn), XAI_SOURCE),
+  model('grok-code-fast-1', textOnly(256_000), XAI_SOURCE),
 ];
 
 const copilotModels = [
-  model('gpt-5.5', gpt55Api, COPILOT_SOURCE),
-  model('gpt-5.3-codex', gptCodex, COPILOT_SOURCE),
-  model('claude-sonnet-5', multimodal(1_000_000, EFFORT_3), COPILOT_SOURCE),
+  model('gpt-5.5', multimodal(1_050_000, openAiCompatibleLevelsDefaultMedium), COPILOT_SOURCE),
+  model('gpt-5.3-codex', textOnly(400_000, openAiCompatibleLevelsDefaultMedium), COPILOT_SOURCE),
+  model('claude-sonnet-5', multimodal(1_000_000, anthropicFiveLevelsDefaultHigh), COPILOT_SOURCE),
   model('claude-opus-4-8', {
-    ...multimodal(1_000_000, EFFORT_3),
+    ...multimodal(1_000_000, anthropicFiveLevelsDefaultHigh),
     fastVariantModelId: 'claude-opus-4-8-fast',
   }, COPILOT_SOURCE),
-  model('claude-opus-4-8-fast', multimodal(1_000_000, EFFORT_3), COPILOT_SOURCE),
-  model('gemini-3.1-pro-preview', multimodal(1_048_576, EFFORT_3), COPILOT_SOURCE),
-  model('gemini-3.5-flash', multimodal(1_048_576, EFFORT_3), COPILOT_SOURCE),
+  model('claude-opus-4-8-fast', multimodal(1_000_000, anthropicFiveLevelsDefaultHigh), COPILOT_SOURCE),
+  model('gemini-3.1-pro-preview', multimodal(1_048_576, gemini31Levels), COPILOT_SOURCE),
+  model('gemini-3.5-flash', multimodal(1_048_576, gemini35Levels), COPILOT_SOURCE),
 ];
 
 const qwenModels = [
-  model('qwen-turbo', autoOnlyText(131_072), QWEN_SOURCE),
-  model('qwen-plus', autoOnlyText(131_072), QWEN_SOURCE),
-  model('qwen-max', autoOnlyText(131_072), QWEN_SOURCE),
-  model('qwen-flash', autoOnlyText(131_072), QWEN_SOURCE),
-  model('qwen-vl-max', autoOnlyMultimodal(131_072), QWEN_SOURCE),
+  model('qwen-turbo', textOnly(131_072, qwenLevelsDefaultOff), QWEN_SOURCE),
+  model('qwen-plus', textOnly(131_072, qwenLevelsDefaultOff), QWEN_SOURCE),
+  model('qwen-max', textOnly(131_072, qwenLevelsDefaultOff), QWEN_SOURCE),
+  model('qwen-flash', textOnly(131_072, qwenLevelsDefaultOff), QWEN_SOURCE),
+  model('qwen-vl-max', multimodal(131_072, qwenLevelsDefaultOff), QWEN_SOURCE),
 ];
 
 const qwenCodingPlanModels = [
-  model('qwen3-coder-plus', autoOnlyText(131_072), QWEN_SOURCE),
-  model('qwen3-coder-next', autoOnlyText(131_072), QWEN_SOURCE),
-  model('qwen3.6-plus', autoOnlyText(131_072), QWEN_SOURCE),
+  model('qwen3-coder-plus', textOnly(131_072, anthropicToggleDefaultOn), QWEN_SOURCE),
+  model('qwen3-coder-next', textOnly(131_072, anthropicToggleDefaultOn), QWEN_SOURCE),
+  model('qwen3.6-plus', textOnly(131_072, anthropicToggleDefaultOn), QWEN_SOURCE),
 ];
 
 const deepSeekModels = [
-  model('deepseek-v4-pro', textOnly(1_000_000, EFFORT_NO_EXTRA), DEEPSEEK_SOURCE, {
+  model('deepseek-v4-pro', textOnly(1_000_000, deepSeekLevelsDefaultHigh), DEEPSEEK_SOURCE, {
     aliases: ['deepseek-reasoner'],
   }),
-  model('deepseek-v4-flash', textOnly(131_072, []), DEEPSEEK_SOURCE, {
+  model('deepseek-v4-flash', textOnly(1_000_000, deepSeekLevelsDefaultHigh), DEEPSEEK_SOURCE, {
     aliases: ['deepseek-chat'],
   }),
 ];
 
 const kimiApiModels = [
   model('kimi-k2.7-code', {
-    ...autoOnlyText(262_144, ['auto']),
+    ...multimodal(262_144, moonshotAlwaysOn),
     fastVariantModelId: 'kimi-k2.7-code-highspeed',
   }, KIMI_SOURCE),
-  model('kimi-k2.7-code-highspeed', autoOnlyText(262_144, ['auto']), KIMI_SOURCE),
-  model('kimi-k2.6', autoOnlyMultimodal(262_144), KIMI_SOURCE),
-  model('kimi-k2.5', textOnly(262_144, []), KIMI_SOURCE),
+  model('kimi-k2.7-code-highspeed', multimodal(262_144, moonshotAlwaysOn), KIMI_SOURCE),
+  model('kimi-k2.6', multimodal(262_144, moonshotToggleDefaultOn), KIMI_SOURCE),
+  model('kimi-k2.5', textOnly(262_144, moonshotToggleDefaultOn), KIMI_SOURCE),
 ];
 
 const kimiCodingPlanModels = [
-  model('kimi-for-coding', {
-    ...textOnly(262_144, []),
-    reasoningMode: 'auto-only',
-    supportedReasoningLevels: REASONING_AUTO_ONLY,
-    defaultReasoningLevel: 'auto',
-  }, KIMI_CODING_SOURCE),
+  model('kimi-for-coding', textOnly(262_144, kimiCodingPlanToggleDefaultOn), KIMI_CODING_SOURCE),
 ];
 
-const glmModels = [
-  model('glm-5', autoOnlyText(131_072), GLM_SOURCE),
-  model('glm-4.7', autoOnlyText(131_072), GLM_SOURCE),
-  model('glm-4.6', autoOnlyText(131_072), GLM_SOURCE),
-  model('glm-4.5', autoOnlyText(131_072), GLM_SOURCE),
+const glmAnthropicModels = [
+  model('glm-5', textOnly(131_072, anthropicToggleDefaultOn), GLM_SOURCE),
+  model('glm-4.7', textOnly(131_072, anthropicToggleDefaultOn), GLM_SOURCE),
+  model('glm-4.6', textOnly(131_072, anthropicToggleDefaultOn), GLM_SOURCE),
+  model('glm-4.5', textOnly(131_072, anthropicToggleDefaultOn), GLM_SOURCE),
 ];
 
 const minimaxModels = [
-  model('MiniMax-M2.7', autoOnlyText(131_072), MINIMAX_SOURCE),
+  model('MiniMax-M2.7', textOnly(204_800, anthropicAlwaysOnToggle), MINIMAX_SOURCE),
 ];
 
 const mimoModels = [
-  model('mimo-v2.5-pro', autoOnlyMultimodal(1_000_000), MIMO_SOURCE),
+  model('mimo-v2.5-pro', multimodal(1_000_000, anthropicToggleDefaultOn), MIMO_SOURCE),
 ];
 
 const doubaoModels = [
-  model('doubao-seed-2.1-pro', autoOnlyText(131_072), VOLCENGINE_SOURCE),
-  model('doubao-seed-2.1-turbo', autoOnlyText(131_072), VOLCENGINE_SOURCE),
+  model('doubao-seed-2.1-pro', textOnly(131_072, volcengineToggleDefaultOn), VOLCENGINE_SOURCE),
+  model('doubao-seed-2.1-turbo', textOnly(131_072, volcengineToggleDefaultOn), VOLCENGINE_SOURCE),
 ];
 
 const groqModels = [
-  model('moonshotai/kimi-k2-instruct-0905', openSourceText(262_144), GROQ_SOURCE),
+  model('moonshotai/kimi-k2-instruct-0905', textOnly(262_144), GROQ_SOURCE),
   model('meta-llama/llama-4-maverick-17b-128e-instruct', {
-    ...openSourceText(131_072),
+    ...textOnly(131_072),
     visionInput: true,
   }, GROQ_SOURCE),
-  model('openai/gpt-oss-120b', openSourceText(131_072), GROQ_SOURCE),
-  model('llama-3.3-70b-versatile', openSourceText(131_072), GROQ_SOURCE),
+  model('openai/gpt-oss-120b', textOnly(131_072), GROQ_SOURCE),
+  model('llama-3.3-70b-versatile', textOnly(131_072), GROQ_SOURCE),
 ];
 
 const mistralModels = [
-  model('mistral-small-3.2-25-06', multimodal(131_072, []), MISTRAL_SOURCE),
-  model('mistral-large-latest', multimodal(131_072, []), MISTRAL_SOURCE),
-  model('codestral-latest', textOnly(262_144, []), MISTRAL_SOURCE),
+  model('mistral-small-3.2-25-06', multimodal(131_072), MISTRAL_SOURCE),
+  model('mistral-large-latest', multimodal(131_072), MISTRAL_SOURCE),
+  model('codestral-latest', textOnly(262_144), MISTRAL_SOURCE),
 ];
 
 const cerebrasModels = [
-  model('llama-4-scout-17b-16e-instruct', openSourceText(131_072), CEREBRAS_SOURCE),
-  model('qwen-3-coder-480b', openSourceText(131_072), CEREBRAS_SOURCE),
-  model('gpt-oss-120b', openSourceText(131_072), CEREBRAS_SOURCE),
+  model('llama-4-scout-17b-16e-instruct', textOnly(131_072), CEREBRAS_SOURCE),
+  model('qwen-3-coder-480b', textOnly(131_072), CEREBRAS_SOURCE),
+  model('gpt-oss-120b', textOnly(131_072), CEREBRAS_SOURCE),
 ];
 
 const bedrockClaudeModels = [
-  model('anthropic.claude-fable-5', multimodal(1_000_000, EFFORT_5), BEDROCK_SOURCE),
-  model('anthropic.claude-sonnet-5', multimodal(1_000_000, EFFORT_5), BEDROCK_SOURCE),
-  model('anthropic.claude-opus-4-8', multimodal(1_000_000, EFFORT_5), BEDROCK_SOURCE),
-  model('anthropic.claude-haiku-4-5-20251001-v1:0', multimodal(200_000, EFFORT_3), BEDROCK_SOURCE),
+  model('anthropic.claude-fable-5', multimodal(1_000_000, anthropicFiveLevelsAlwaysOn), BEDROCK_SOURCE),
+  model('anthropic.claude-sonnet-5', multimodal(1_000_000, anthropicFiveLevelsDefaultHigh), BEDROCK_SOURCE),
+  model('anthropic.claude-opus-4-8', multimodal(1_000_000, anthropicFiveLevelsDefaultHigh), BEDROCK_SOURCE),
+  model('anthropic.claude-haiku-4-5-20251001-v1:0', multimodal(200_000), BEDROCK_SOURCE),
 ];
 
 const vertexModels = [
-  model('claude-fable-5', multimodal(1_000_000, EFFORT_5), VERTEX_SOURCE),
-  model('claude-sonnet-5', multimodal(1_000_000, EFFORT_5), VERTEX_SOURCE),
-  model('claude-opus-4-8', multimodal(1_000_000, EFFORT_5), VERTEX_SOURCE),
-  model('claude-haiku-4-5@20251001', multimodal(200_000, EFFORT_3), VERTEX_SOURCE),
-  model('gemini-3.1-pro-preview', multimodal(1_048_576, EFFORT_4), VERTEX_SOURCE),
-  model('gemini-2.5-flash', multimodal(1_048_576, EFFORT_3), VERTEX_SOURCE),
+  model('claude-fable-5', multimodal(1_000_000, anthropicFiveLevelsAlwaysOn), VERTEX_SOURCE),
+  model('claude-sonnet-5', multimodal(1_000_000, anthropicFiveLevelsDefaultHigh), VERTEX_SOURCE),
+  model('claude-opus-4-8', multimodal(1_000_000, anthropicFiveLevelsDefaultHigh), VERTEX_SOURCE),
+  model('claude-haiku-4-5@20251001', multimodal(200_000), VERTEX_SOURCE),
+  model('gemini-3.1-pro-preview', multimodal(1_048_576, gemini31Levels), VERTEX_SOURCE),
+  model('gemini-2.5-flash', multimodal(1_048_576, gemini25Levels), VERTEX_SOURCE),
 ];
 
 export const MANAGED_PROVIDER_MODEL_CATALOG: Partial<Record<BuiltinLlmProviderId, ManagedModelCatalogEntry[]>> = {
@@ -477,25 +761,46 @@ export const MANAGED_PROVIDER_MODEL_CATALOG: Partial<Record<BuiltinLlmProviderId
   'google-ai-studio': geminiModels,
 
   'azure-openai': [
-    model('gpt-5.5', gpt55Api, AZURE_OPENAI_SOURCE),
-    model('gpt-5.4', gpt54Api, AZURE_OPENAI_SOURCE),
-    model('gpt-5.4-mini', gptMiniApi, AZURE_OPENAI_SOURCE),
+    model('gpt-5.5', multimodal(1_050_000, levelsReasoningControl(OPENAI_LEVELS, {
+      supportsOff: true,
+      defaultSelection: 'medium',
+      wireProfile: OPENAI_COMPATIBLE_WIRE,
+    })), AZURE_OPENAI_SOURCE),
+    model('gpt-5.4', multimodal(1_050_000, levelsReasoningControl(OPENAI_LEVELS, {
+      supportsOff: true,
+      defaultSelection: 'off',
+      wireProfile: OPENAI_COMPATIBLE_WIRE,
+    })), AZURE_OPENAI_SOURCE),
+    model('gpt-5.4-mini', multimodal(400_000, levelsReasoningControl(OPENAI_LEVELS, {
+      supportsOff: true,
+      defaultSelection: 'off',
+      wireProfile: OPENAI_COMPATIBLE_WIRE,
+    })), AZURE_OPENAI_SOURCE),
     model('gpt-4.1', gpt41, AZURE_OPENAI_SOURCE),
   ],
   bedrock: bedrockClaudeModels,
   vertex: vertexModels,
 
   deepseek: deepSeekModels,
-  bailian: qwenModels,
+  bailian: qwenModels.map((entry) => ({
+    ...entry,
+    source: QWEN_SOURCE,
+  })),
   qwen: qwenModels,
   volcengine: [
     ...doubaoModels,
-    ...glmModels,
-    ...deepSeekModels.filter((entry) => entry.id === 'deepseek-v4-pro'),
-    ...kimiApiModels.filter((entry) => entry.id === 'kimi-k2.5'),
+    ...glmAnthropicModels.map((entry) => ({ ...entry, source: VOLCENGINE_SOURCE })),
+    ...deepSeekModels.filter((entry) => entry.id === 'deepseek-v4-pro').map((entry) => ({
+      ...entry,
+      source: VOLCENGINE_SOURCE,
+    })),
+    ...kimiApiModels.filter((entry) => entry.id === 'kimi-k2.5').map((entry) => ({
+      ...entry,
+      source: VOLCENGINE_SOURCE,
+    })),
   ],
-  'glm-cn': glmModels,
-  'glm-global': glmModels,
+  'glm-cn': glmAnthropicModels,
+  'glm-global': glmAnthropicModels,
   'minimax-cn': minimaxModels,
   'minimax-global': minimaxModels,
   'xiaomi-mimo': mimoModels,
@@ -508,17 +813,19 @@ export const MANAGED_PROVIDER_MODEL_CATALOG: Partial<Record<BuiltinLlmProviderId
   'kimi-coding-plan': kimiCodingPlanModels,
   'bailian-coding-plan': [
     ...qwenCodingPlanModels,
-    ...kimiApiModels.filter((entry) => entry.id === 'kimi-k2.5'),
-    ...glmModels.filter((entry) => entry.id === 'glm-5' || entry.id === 'glm-4.7'),
+    model('kimi-k2.5', textOnly(262_144, anthropicToggleDefaultOn), KIMI_SOURCE),
+    model('glm-5', textOnly(131_072, anthropicToggleDefaultOn), GLM_SOURCE),
+    model('glm-4.7', textOnly(131_072, anthropicToggleDefaultOn), GLM_SOURCE),
   ],
   'volcengine-coding-plan': [
-    ...doubaoModels,
-    ...glmModels.filter((entry) => entry.id === 'glm-4.6'),
-    ...deepSeekModels.filter((entry) => entry.id === 'deepseek-v4-pro'),
-    ...kimiApiModels.filter((entry) => entry.id === 'kimi-k2.5'),
+    model('doubao-seed-2.1-pro', textOnly(131_072, anthropicToggleDefaultOn), VOLCENGINE_SOURCE),
+    model('doubao-seed-2.1-turbo', textOnly(131_072, anthropicToggleDefaultOn), VOLCENGINE_SOURCE),
+    model('glm-4.6', textOnly(131_072, anthropicToggleDefaultOn), GLM_SOURCE),
+    model('deepseek-v4-pro', textOnly(1_000_000, deepSeekLevelsDefaultHigh), DEEPSEEK_SOURCE),
+    model('kimi-k2.5', textOnly(262_144, anthropicToggleDefaultOn), KIMI_SOURCE),
   ],
-  'glm-cn-coding-plan': glmModels,
-  'glm-global-coding-plan': glmModels,
+  'glm-cn-coding-plan': glmAnthropicModels,
+  'glm-global-coding-plan': glmAnthropicModels,
   'minimax-cn-coding-plan': minimaxModels,
   'minimax-global-coding-plan': minimaxModels,
   'xiaomi-mimo-token-plan': mimoModels,
@@ -526,17 +833,19 @@ export const MANAGED_PROVIDER_MODEL_CATALOG: Partial<Record<BuiltinLlmProviderId
 
 const normalizeId = (value: string): string => value.trim().toLowerCase();
 
+function cloneProfile(profile: ModelCapabilityProfile): ModelCapabilityProfile {
+  return {
+    ...profile,
+    reasoningControl: profile.reasoningControl ? createReasoningControl(profile.reasoningControl) : undefined,
+  };
+}
+
 export function getManagedProviderModelCatalog(providerId: string): ManagedModelCatalogEntry[] {
   const entries = MANAGED_PROVIDER_MODEL_CATALOG[providerId as BuiltinLlmProviderId] ?? [];
   return entries.map((entry) => ({
     ...entry,
     aliases: entry.aliases ? [...entry.aliases] : undefined,
-    profile: {
-      ...entry.profile,
-      supportedReasoningLevels: entry.profile.supportedReasoningLevels
-        ? [...entry.profile.supportedReasoningLevels]
-        : undefined,
-    },
+    profile: cloneProfile(entry.profile),
     source: {
       ...entry.source,
       urls: [...entry.source.urls],

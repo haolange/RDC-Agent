@@ -23,6 +23,7 @@ import {
   parseSSE,
   ProviderHttpError,
 } from './internal/http';
+import { applyReasoningToAnthropicLikeBody } from './reasoningWire';
 
 const DEFAULT_BASE_URL = 'https://api.anthropic.com/v1';
 const DEFAULT_ANTHROPIC_VERSION = '2023-06-01';
@@ -327,49 +328,11 @@ export class AnthropicProvider implements ProviderStrategy {
     if (system) body.system = system;
     if (typeof options.temperature === 'number') body.temperature = options.temperature;
     if (typeof options.topP === 'number') body.top_p = options.topP;
-    const thinking = toAnthropicThinking(options.reasoningBudget, options.reasoningVisibility);
-    if (thinking) body.thinking = thinking;
+    applyReasoningToAnthropicLikeBody(body, options.reasoning, options.reasoningVisibility);
     if (context.tools && context.tools.length > 0) {
       body.tools = context.tools.map(toAnthropicTool);
     }
     return body;
-  }
-}
-
-function toAnthropicThinking(
-  budget?: StreamOptions['reasoningBudget'],
-  reasoningVisibility?: ReasoningVisibility,
-): { type: 'enabled'; budget_tokens: number; display?: 'summarized' } | undefined {
-  const wantsSummarized = reasoningVisibility === 'summary-events';
-  if (budget === 'off') return undefined;
-  if (!wantsSummarized && !budget) return undefined;
-  const thinking: { type: 'enabled'; budget_tokens: number; display?: 'summarized' } = {
-    type: 'enabled',
-    budget_tokens: toAnthropicThinkingBudget(budget),
-  };
-  if (wantsSummarized) {
-    thinking.display = 'summarized';
-  }
-  return thinking;
-}
-
-function toAnthropicThinkingBudget(budget?: StreamOptions['reasoningBudget']): number {
-  if (!budget || budget === 'auto' || budget === 'off') {
-    return 4096;
-  }
-  switch (budget) {
-    case 'low':
-      return 4096;
-    case 'medium':
-      return 8192;
-    case 'high':
-      return 16384;
-    case 'extHigh':
-      return 32768;
-    case 'max':
-      return 63999;
-    default:
-      return 4096;
   }
 }
 
@@ -560,4 +523,4 @@ function mapStopReason(reason: string | null | undefined): StopReason {
   }
 }
 
-export const __testing = { mapStopReason, toAnthropicMessages, toAnthropicThinking };
+export const __testing = { mapStopReason, toAnthropicMessages };

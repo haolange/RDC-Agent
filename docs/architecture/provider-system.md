@@ -45,9 +45,11 @@ RDC-Agent 的 Provider 体系把供应商身份、`wire protocol`、认证方式
 `src/shared/constants/modelCapabilityCatalog.ts` 是模型能力的单一来源。Catalog entry 以 `providerId + modelId/alias` 管理：
 
 - `nominalContextWindowTokens`
-- `reasoningMode`: `none`、`auto-only` 或 `effort-levels`
-- `supportedReasoningLevels`: `off | auto | low | medium | high | extHigh | max` 的子集
-- `defaultReasoningLevel`
+- `reasoningControl.kind`: `none`、`toggle`、`levels` 或 `always-on`
+- `reasoningControl.supportsOff`: 当前 provider/model 是否真的支持关闭 reasoning
+- `reasoningControl.levels`: 官方具名档位子集，canonical naming 为 `minimal | low | medium | high | extra | max | ultra`
+- `reasoningControl.defaultSelection` / `lockedSelection?`
+- `reasoningControl.wireProfile`: provider request body 映射真相源
 - `fastVariantModelId`
 - `toolCalling`
 - `visionInput`
@@ -66,11 +68,11 @@ RDC-Agent 的 Provider 体系把供应商身份、`wire protocol`、认证方式
 
 Reasoning 控件的运行时映射固定为：
 
-- `off`：不发送 provider reasoning/thinking 参数，并关闭 provider summary-thinking 请求。
-- `auto`：发送 provider 默认 reasoning/thinking 请求，不指定强度。Anthropic/Kimi 走 `thinking` 开启语义；OpenAI/Gemini/OpenAI-compatible 走各自 adapter 的默认 reasoning 语义。
-- `low`、`medium`、`high`、`extHigh`、`max`：仅当 catalog 对具体 model row 明确支持时可选；adapter 按 provider 能力映射到预算或 effort，不支持的档位在 UI 中 disabled。
+- `off`：发送 provider 官方关闭语义，或在 wire profile 明确要求时不发送 reasoning/thinking 参数，并关闭 provider summary-thinking 请求。
+- `on`：仅用于 `toggle` / `always-on` 控件，发送该模型 wire profile 中声明的默认开启语义。
+- `minimal`、`low`、`medium`、`high`、`extra`、`max`、`ultra`：仅当 catalog 对具体 provider/model row 明确支持时可选；adapter 只能按照 `reasoningControl.wireProfile` 做显式映射，不能在 UI、settings adapter 或 runtime provider 里各自猜测或静默降级。
 
-Settings 与 Composer 必须使用同一套 `Off | Auto | Low | Medium | High | ExtHigh | Max` canonical 语义。内部字段使用 `auto` 并在 compact UI 展示为 `Auto`；内部字段使用 `extHigh` 并在 compact UI 展示为 `ExtHigh`。Composer slider 的可见档位来自当前模型的 `supportedReasoningLevels` 有序子集：例如只支持 `off | auto` 的模型只显示两个 stop，支持 effort levels 的模型显示其可选档位。这个变化必须由 capability 驱动，不能按 provider 写专属 UI。拖动必须是连续交互：拖动中 thumb 跟随指针，释放时按 `round(ratio * (visibleStops - 1))` 最近取整到当前可见档位集合，并吸附动画回档位点。Max mode 与 Fast mode 这类非 slider 能力仍保持可见灰态，不隐藏，但 compact popup 只显示 label 和 switch，不显示细节小字。
+Settings 与 Composer 必须使用同一套 capability-driven reasoning 语义，不再保留 `Auto`。`toggle` 只显示 `Off | On`；`always-on` 只显示锁定的 `On`；`levels` 只显示该模型官方支持的具名档位，并且只有在官方确认可关闭时才把 `Off` 插到最前面。产品层 canonical naming 为 `Off | On | Minimal | Low | Medium | High | Extra | Max | Ultra`；provider wire spellings 例如 `xhigh` 只允许存在于映射层。Composer rail 的 stop 集合来自 `reasoningControl` 的单一真相源，而不是 provider 专属 UI 分支。拖动必须是连续交互：拖动中 thumb 跟随指针，释放时按 `round(ratio * (visibleStops - 1))` 最近取整到当前可见档位集合，并吸附动画回档位点。`Max context` 与 `Fast mode` 这类非 slider 能力仍保持可见灰态，不隐藏，但 compact popup 只显示 label 和 switch，不显示细节小字。
 
 维护第一版或后续版本 catalog 时：
 
