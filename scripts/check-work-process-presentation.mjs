@@ -21,6 +21,30 @@ const assert = (condition, message) => {
   if (!condition) fail(message);
 };
 
+const readSource = (path) => fs.readFileSync(path, 'utf8');
+const activeSignalSource = readSource('src/renderer/ui/ActiveSignalText.tsx');
+const activeSignalStyles = readSource('src/renderer/styles/design-system.css');
+const activeSignalHelper = readSource('src/renderer/features/debugger/AgentChat/workProcessActiveSignal.ts');
+const activeSignalRenderSource = [
+  'src/renderer/features/debugger/AgentChat/WorkProcessSectionRow.tsx',
+  'src/renderer/features/debugger/AgentChat/WorkProcessStepGroupRow.tsx',
+  'src/renderer/features/debugger/AgentChat/WorkProcessRows.tsx',
+  'src/renderer/features/debugger/AgentChat/WorkProcessResponseRow.tsx',
+  'src/renderer/features/debugger/AgentChat/SubagentRow.tsx',
+  'src/renderer/features/debugger/AgentChat/TaskRow.tsx',
+  'src/renderer/features/debugger/composer/UserInputRequestPanel.tsx',
+  'src/renderer/features/debugger/composer/ToolApprovalRequestPanel.tsx',
+].map(readSource).join('\n');
+
+assert(activeSignalSource.includes('data-active-signal={active ? tone : undefined}'), 'ActiveSignalText should expose an active-state DOM contract');
+assert(activeSignalHelper.includes("status === 'running' || status === 'pending'"), 'active signal must be driven by running/pending Work Process status');
+assert(activeSignalHelper.includes("thinkingStatus === 'streaming'"), 'active signal must recognize streaming thinking lifecycle');
+assert(activeSignalStyles.includes('.active-signal-text.is-active'), 'active signal text CSS class is missing');
+assert(activeSignalStyles.includes('@media (prefers-reduced-motion: reduce)'), 'active signal must honor reduced-motion preferences');
+assert(activeSignalRenderSource.includes('ActiveSignalText active={active}'), 'Work Process rows should use shared ActiveSignalText for active labels');
+assert(activeSignalRenderSource.includes('tone="interaction"'), 'ask_user interaction surfaces should use the interaction active signal tone');
+assert(!activeSignalRenderSource.includes("row.status === 'complete' &&"), 'complete rows must not be a trigger for active signal text');
+
 const flattenRows = (rows) => rows.flatMap((row) => {
   if (row.type === 'section') return [row, ...flattenRows(row.steps)];
   if (row.type === 'toolGroup') return [row, ...flattenRows(row.rows)];
@@ -59,7 +83,10 @@ const collectVisible = (rows) => rows.flatMap((row) => {
     ...(row.approval?.metaLines ?? []),
     ...row.previewLines,
   ].filter(Boolean);
-  if (row.type === 'userInput') return [row.verb, row.question];
+  if (row.type === 'userInput') return [
+    row.verb,
+    ...row.items.flatMap((item) => [item.prompt, item.answer]).filter(Boolean),
+  ];
   if (row.type === 'approval') return [row.verb, row.message, ...row.metaLines];
   if (row.type === 'diagnostic') return [row.message];
   if (row.type === 'summary') return [row.text];
@@ -413,7 +440,20 @@ const askUserPresentation = buildWorkProcessPresentation({
           id: 'tool-ask',
           toolName: 'ask_user',
           status: 'running',
-          argsPreview: JSON.stringify({ question: 'Which smoke path should I use?', choices: ['Read-only smoke', 'Edit smoke'] }),
+          argsPreview: JSON.stringify({
+            questions: [{
+              questionId: 'smoke-path',
+              prompt: 'Which smoke path should I use?',
+              options: [
+                { optionId: 'read-only', label: 'Read-only smoke' },
+                { optionId: 'edit', label: 'Edit smoke' },
+              ],
+            }, {
+              questionId: 'smoke-name',
+              prompt: 'What should I call this smoke run?',
+              options: [],
+            }],
+          }),
           startedAt: now + 3000,
         },
       ],
@@ -424,10 +464,12 @@ const askUserPresentation = buildWorkProcessPresentation({
 const askUserRows = flattenRows(askUserPresentation.rows);
 const askUserGroup = askUserRows.find((row) => row.type === 'toolGroup');
 const askUserRow = askUserRows.find((row) => row.type === 'userInput');
-assert(askUserGroup?.title === '询问', 'ask_user should render in a human interaction group');
+assert(askUserGroup?.title === '正在询问', 'pending ask_user should render in an asking interaction group');
+assert(askUserGroup?.countLabel === '2 个问题', `batch ask_user should count real questions, got ${askUserGroup?.countLabel}`);
+assert(askUserGroup?.summary === '', 'ask_user group should not duplicate the first question in the header preview');
 assert(askUserRow?.verb === '等待用户', 'pending ask_user should render waiting-user verb');
-assert(askUserRow.question.includes('Which smoke path'), 'ask_user question should be visible');
-assert(askUserRow.detailLines.some((line) => line.includes('选项 1：Read-only smoke')), 'ask_user choices should stay in details');
+assert(askUserRow.items.length === 2, 'ask_user should expose each batch question as a transcript item');
+assert(askUserRow.items[0].prompt.includes('Which smoke path'), 'ask_user first question should be visible');
 
 const webSearchPresentation = buildWorkProcessPresentation({
   status: 'complete',

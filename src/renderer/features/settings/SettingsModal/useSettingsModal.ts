@@ -5,6 +5,7 @@ import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
 import type { ProviderCatalogSnapshot } from './types';
 import { resolveAgentRouteStatus } from './agentRouteStatus';
 import { createSettingsModalActions } from './settingsModalActions';
+import { useAgentManifestAutosave } from './useAgentManifestAutosave';
 import { useProviderConnection } from './useProviderConnection';
 import { useSettingsModalState } from './useSettingsModalState';
 import {
@@ -27,6 +28,7 @@ const normalizeProviderCatalogSnapshot = (snapshot: ProviderCatalogSnapshot | nu
   protocols: Array.isArray(snapshot?.protocols) ? snapshot.protocols : [],
   providers: Array.isArray(snapshot?.providers) ? snapshot.providers : [],
 });
+
 export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const { t } = useI18n();
   const setTheme = useAppSettingsStore((state) => state.setTheme);
@@ -157,6 +159,14 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     patchSettings,
     reloadSettings,
     t,
+  });
+  useAgentManifestAutosave({
+    open,
+    settings,
+    agentManifestDrafts: modalState.agentManifestDrafts,
+    onSave: actions.handleSaveAgentManifests,
+    onSaveStateChange: modalState.setAgentManifestSaveState,
+    onSaveMessageChange: modalState.setAgentManifestSaveMessage,
   });
 
   return {

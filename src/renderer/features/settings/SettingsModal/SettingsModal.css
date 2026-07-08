@@ -164,16 +164,9 @@
 }
 
 .settings-agent-instructions {
-  min-height: 180px;
+  min-height: var(--space-20);
   resize: vertical;
   line-height: 1.5;
-}
-
-.settings-agent-handoff-textarea {
-  min-height: 96px;
-  resize: vertical;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 13px;
 }
 
 .settings-model-cascade {
@@ -1904,19 +1897,6 @@
   padding: 0 11px;
 }
 
-.settings-inline-status {
-  min-width: 0;
-  overflow: hidden;
-  color: rgb(var(--color-error));
-  font-size: var(--text-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-inline-status.success {
-  color: rgb(var(--color-success));
-}
-
 .settings-runtime-panel {
   flex: 0 0 auto;
   border: 1px solid rgb(var(--color-border-secondary));
@@ -3068,20 +3048,6 @@
   min-height: calc(var(--space-10) + var(--space-10));
 }
 
-.settings-manifest-editor-savebar {
-  position: sticky;
-  z-index: 5;
-  bottom: calc(var(--space-4) * -1);
-  justify-content: flex-end;
-  margin: var(--space-1) calc(var(--space-4) * -1) calc(var(--space-4) * -1);
-  padding: var(--space-3) var(--space-4) var(--space-4);
-  border-top: 1px solid var(--token-border-muted);
-  background: color-mix(in srgb, var(--token-bg-panel) 94%, var(--token-bg-shell));
-  backdrop-filter: blur(var(--space-4)) saturate(1.2);
-  -webkit-backdrop-filter: blur(var(--space-4)) saturate(1.2);
-  box-shadow: 0 calc(var(--space-3) * -1) var(--space-6) color-mix(in srgb, var(--token-bg-shell) 72%, transparent);
-}
-
 .settings-scope-browser {
   display: flex;
   min-width: 0;
@@ -3246,7 +3212,6 @@
 }
 
 .settings-agent-instructions,
-.settings-agent-handoff-textarea,
 .settings-rdx-cli-textarea,
 .settings-agent-textarea-compact {
   line-height: 1.5;
@@ -3269,121 +3234,6 @@
   flex: 1 0 280px;
   height: auto;
   min-height: 280px;
-}
-
-.settings-agent-permissions {
-  display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.settings-agent-permissions .settings-section-header {
-  align-items: center;
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--token-border-muted);
-}
-
-.settings-agent-permissions .settings-preference-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin-top: 0;
-  border-top: 0;
-}
-
-.settings-agent-permissions .settings-preference-row {
-  grid-column: 1 / -1;
-  padding: 0 0 var(--space-3);
-  border-bottom-color: var(--token-border-muted);
-}
-
-.settings-agent-permissions .settings-field-block {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.settings-agent-permission-roots {
-  min-width: 0;
-  overflow: hidden;
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-lg);
-  background: var(--settings-subtle-bg);
-}
-
-.settings-agent-permission-roots > summary {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 46px;
-  padding: var(--space-3);
-  color: var(--token-text-heading);
-  cursor: pointer;
-  list-style: none;
-}
-
-.settings-agent-permission-roots > summary::-webkit-details-marker {
-  display: none;
-}
-
-.settings-agent-permission-roots > summary::after {
-  content: "+";
-  display: inline-flex;
-  width: var(--btn-height-sm);
-  height: var(--btn-height-sm);
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--token-bg-shell);
-  color: var(--token-text-caption);
-  font-size: var(--text-sm);
-}
-
-.settings-agent-permission-roots[open] > summary::after {
-  content: "-";
-}
-
-.settings-agent-permission-roots > summary:hover {
-  background: var(--token-interactive-hover);
-}
-
-.settings-agent-permission-roots > summary span {
-  min-width: 0;
-  color: var(--token-text-heading);
-  font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
-}
-
-.settings-agent-permission-roots > summary small {
-  color: var(--token-text-caption);
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-}
-
-.settings-agent-permission-roots-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3) var(--space-4);
-  padding: var(--space-3);
-  border-top: 1px solid var(--token-border-muted);
-}
-
-.settings-agent-permissions .settings-agent-textarea-compact {
-  width: 100%;
-  min-height: 86px;
-}
-
-.settings-agent-permission-roots-grid > .settings-help-text {
-  grid-column: 1 / -1;
-  margin: 0;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--token-border-muted);
-  border-radius: var(--radius-md);
-  background: var(--settings-subtle-bg);
 }
 
 .settings-agent-identity-grid {
@@ -3416,14 +3266,6 @@
     flex-wrap: wrap;
     justify-content: flex-start;
     justify-self: stretch;
-  }
-
-  .settings-agent-permissions .settings-preference-list {
-    display: flex;
-  }
-
-  .settings-agent-permission-roots-grid {
-    grid-template-columns: 1fr;
   }
 
   .settings-advanced-panel > summary,
@@ -3727,8 +3569,7 @@
   line-height: 1.65;
 }
 
-.settings-scope-browser--inline,
-.settings-browser-tabs {
+.settings-scope-browser--inline {
   margin-bottom: var(--space-5);
 }
 
@@ -4101,7 +3942,6 @@
   gap: var(--space-2);
 }
 
-.settings-subpage-tabs,
 .settings-agent-panel-tabs {
   margin-bottom: var(--space-4);
 }
@@ -4213,10 +4053,6 @@
   font-size: var(--text-base);
 }
 
-.settings-agent-permissions {
-  padding: var(--space-5);
-}
-
 .settings-tool-section {
   padding: var(--space-5);
 }
@@ -4252,7 +4088,6 @@
   gap: var(--space-4);
 }
 
-.settings-page-skills-agents > .settings-subpage-tabs--primary,
 .settings-agent-panel-tabs {
   display: inline-flex;
   width: fit-content;
@@ -4489,25 +4324,12 @@
   border-bottom: 1px solid var(--token-border-muted);
 }
 
-.settings-agent-icon-picker-label {
-  color: var(--token-text-heading);
-  font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
-}
-
-.settings-agent-icon-grid {
-  display: flex;
-  min-width: 0;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
 .settings-agent-icon-option {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--space-10);
-  height: var(--space-10);
+  width: var(--space-12);
+  height: var(--space-12);
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--token-bg-raised) 42%, transparent);
@@ -4741,10 +4563,6 @@
   gap: var(--space-4);
 }
 
-.settings-page-skills-agents > .settings-subpage-tabs--primary {
-  margin-bottom: 0;
-}
-
 .settings-page-skills-agents > .settings-page-agents {
   min-height: 0;
   margin-top: 0;
@@ -4821,11 +4639,6 @@
   padding: var(--space-3) 0 var(--space-4);
 }
 
-.settings-agent-icon-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(var(--space-10), var(--space-10)));
-}
-
 .settings-agent-route-panel .settings-manifest-form-grid {
   grid-template-columns: 1fr;
 }
@@ -4859,10 +4672,6 @@
   align-items: center;
   min-height: var(--space-12);
   background: color-mix(in srgb, var(--token-bg-raised) 36%, transparent);
-}
-
-.settings-manifest-editor-savebar {
-  margin-top: var(--space-2);
 }
 
 .settings-tools-card-stack {
@@ -5191,36 +5000,22 @@
   grid-template-columns: minmax(5rem, auto) minmax(0, 1fr);
 }
 
-.settings-agent-icon-row {
-  position: relative;
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: var(--space-2);
-  overflow: visible;
-}
-
-.settings-agent-icon-more {
-  position: relative;
-  flex: 0 0 auto;
-}
-
 .settings-agent-icon-popover {
   position: absolute;
   top: calc(100% + var(--space-2));
   right: 0;
   z-index: 5;
-  width: min(16rem, calc(100vw - var(--space-16)));
-  max-height: calc(var(--space-20) * 2);
+  width: min(22rem, calc(100vw - var(--space-16)));
+  max-height: min(24rem, calc(100vh - var(--space-16)));
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(4, var(--space-10));
+  grid-template-columns: repeat(auto-fit, minmax(var(--space-12), 1fr));
   gap: var(--space-2);
-  padding: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--token-border-card);
   border-radius: var(--radius-lg);
   background: var(--token-bg-overlay);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--token-shadow-popover);
 }
 
 .settings-capability-picker {
@@ -5246,7 +5041,7 @@
 
 .settings-capability-options {
   min-height: auto;
-  max-height: calc(var(--space-20) * 2);
+  max-height: min(24rem, 42vh);
   gap: var(--space-2);
 }
 
@@ -5293,14 +5088,8 @@
 }
 
 @media (max-width: 68rem) {
-  .settings-skill-editor-layout,
-  .settings-agent-icon-picker {
+  .settings-skill-editor-layout {
     grid-template-columns: 1fr;
-  }
-
-  .settings-agent-icon-row {
-    overflow-x: auto;
-    padding-bottom: var(--space-1);
   }
 }
 
@@ -5360,82 +5149,314 @@
   opacity: 1;
 }
 
-.settings-page-agents .settings-manifest-page,
-.settings-page-agents .settings-manifest-layout {
-  overflow: visible;
-}
-
-.settings-page-agents .settings-manifest-editor {
-  position: relative;
-  overflow: visible;
-}
-
-.settings-page-agents .settings-manifest-editor-savebar {
-  position: static;
-  z-index: auto;
-  margin: var(--space-4) 0 0;
-  padding: var(--space-4) 0 0;
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-.settings-page-agents .settings-agent-permissions-panel {
-  margin-top: 0;
-}
-
-.settings-page-agents .settings-agent-permissions-panel .settings-advanced-content {
-  padding: var(--space-4);
-}
-
-.settings-page-agents .settings-agent-permissions {
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.settings-page-agents .settings-agent-permissions-panel > summary:focus {
-  outline: none;
-}
-
-.settings-page-agents .settings-agent-permissions-panel > summary:focus-visible {
-  outline: 2px solid var(--token-border-focus);
-  outline-offset: 2px;
-}
-
-.settings-page-agents .settings-agent-permissions-panel .settings-section-title {
-  display: none;
-}
-
-.settings-page-agents .settings-agent-permissions-panel .settings-section-header {
-  gap: var(--space-4);
-  padding-bottom: var(--space-4);
-}
-
-.settings-page-agents .settings-agent-permissions-panel .settings-section-subtitle {
-  margin: 0;
-}
-
-.settings-page-agents .settings-agent-permissions .settings-preference-row {
+.settings-page-skills-agents {
   display: flex;
+  height: 100%;
+  min-height: 0;
   flex-direction: column;
-  align-items: stretch;
   gap: var(--space-3);
 }
 
-.settings-page-agents .settings-agent-permissions .settings-choice-group {
-  justify-content: flex-start;
+.settings-skills-agents-tabs {
+  flex: 0 0 auto;
+  width: min(28rem, 100%);
+  height: var(--space-12);
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-1);
+  overflow: hidden;
+  padding: var(--space-1);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-raised) 38%, transparent);
 }
 
-.settings-page-agents .settings-agent-permission-roots-grid {
+.settings-skills-agents-tabs .settings-library-tab {
+  height: 100%;
+  min-height: 0;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--token-text-caption);
+  transition: background var(--transition-fast), color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.settings-skills-agents-tabs .settings-library-tab.active {
+  background: var(--token-surface-raised);
+  color: var(--token-text-heading);
+  box-shadow: var(--token-shadow-raised), inset 0 0 0 1px var(--token-border-focus), var(--token-elevation-edge);
+}
+
+.settings-page-skills-agents > .settings-page-agents {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.settings-page-agents,
+.settings-page-agents .settings-manifest-page {
+  display: flex;
+  min-height: 0;
+}
+
+.settings-page-agents .settings-manifest-page {
+  flex: 1 1 auto;
+  flex-direction: column;
+}
+
+.settings-page-agents .settings-manifest-layout {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  align-items: stretch;
+  overflow: hidden;
+  grid-template-columns: minmax(20rem, 22rem) minmax(32rem, 1fr);
+}
+
+.settings-page-agents .settings-manifest-list-column,
+.settings-page-agents .settings-manifest-editor {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--token-border-card);
+  border-color: var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-panel) 82%, var(--token-bg-shell));
+}
+
+.settings-page-agents .settings-manifest-list-column {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+}
+
+.settings-page-agents .settings-manifest-list-toolbar {
+  flex: 0 0 auto;
+}
+
+.settings-page-agents .settings-manifest-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.settings-page-agents .settings-manifest-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+}
+
+.settings-page-agents .settings-manifest-editor-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--token-border-muted);
+}
+
+.settings-agent-editor-title {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings-agent-editor-icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  width: var(--space-10);
+  height: var(--space-10);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-raised) 52%, transparent);
+  color: var(--token-text-heading);
+}
+
+.settings-agent-editor-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.settings-agent-editor-name {
+  color: var(--token-text-heading);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.settings-page-agents .settings-manifest-editor-actions {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+
+.settings-page-agents .settings-agent-icon-picker {
+  position: relative;
+  display: inline-flex;
+  padding: 0;
+  border: 0;
+}
+
+.settings-agent-icon-trigger {
+  gap: var(--space-2);
+  min-height: var(--btn-height-sm);
+}
+
+.settings-page-agents .settings-agent-icon-popover {
+  top: calc(100% + var(--space-2));
+  right: 0;
+  z-index: 8;
+  width: min(22rem, calc(100vw - var(--space-16)));
+  max-height: min(24rem, calc(100vh - var(--space-16)));
+  grid-template-columns: repeat(auto-fit, minmax(var(--space-12), 1fr));
+}
+
+.settings-manifest-editor-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+
+.settings-manifest-editor-body > .settings-agent-route-panel,
+.settings-manifest-editor-body > .settings-advanced-panel {
+  flex: 0 0 auto;
+}
+
+.settings-page-agents .settings-agent-route-panel,
+.settings-page-agents .settings-advanced-panel {
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-panel) 72%, transparent);
+}
+
+.settings-page-agents .settings-agent-route-panel {
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.settings-page-agents .settings-agent-route-panel .settings-section-header {
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--token-border-muted);
+}
+
+.settings-page-agents .settings-agent-route-panel .settings-manifest-form-grid {
   grid-template-columns: 1fr;
 }
 
-.settings-agent-icon-popover {
-  width: auto;
-  grid-template-columns: repeat(5, var(--space-10));
+.settings-page-agents .settings-model-route-row {
+  grid-template-columns: minmax(5rem, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
+
+.settings-page-agents .settings-model-route-row > .settings-field-label {
+  font-size: var(--text-base);
+}
+
+.settings-page-agents .settings-agent-flags {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.settings-page-agents .settings-agent-flags .settings-checkbox-row {
+  min-height: var(--space-12);
+  border-radius: var(--radius-md);
+}
+
+.settings-agent-autosave-status {
+  flex: 0 0 auto;
+  min-height: var(--space-12);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--token-border-muted);
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+}
+
+.settings-agent-autosave-status.saved {
+  color: rgb(var(--color-success));
+}
+
+.settings-agent-autosave-status.error {
+  color: rgb(var(--color-error));
+}
+
+.settings-agent-autosave-status .button {
+  min-height: var(--btn-height-sm);
+}
+
+@media (max-width: 68rem) {
+  .settings-page-skills-agents {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .settings-page-skills-agents > .settings-page-agents,
+  .settings-page-agents,
+  .settings-page-agents .settings-manifest-page {
+    display: block;
+    flex: 0 0 auto;
+  }
+
+  .settings-page-agents .settings-manifest-layout {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-page-agents .settings-manifest-list-column,
+  .settings-page-agents .settings-manifest-editor {
+    height: auto;
+    min-height: 0;
+  }
+
+  .settings-page-agents .settings-manifest-editor {
+    overflow: visible;
+  }
+
+  .settings-page-agents .settings-manifest-editor-head {
+    flex-direction: column;
+  }
+
+  .settings-page-agents .settings-manifest-editor-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .settings-manifest-editor-body {
+    flex: 0 0 auto;
+    height: auto;
+    max-height: min(42rem, 72vh);
+  }
+
+  .settings-page-agents .settings-agent-flags {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 48rem) {
   .settings-page-agents .settings-manifest-page,
   .settings-page-agents .settings-manifest-layout,

@@ -19,6 +19,7 @@ interface SessionState {
   setRuns: (runs: RunSummary[]) => void;
   setCurrentRun: (run: RunSummary | null) => void;
   setCurrentRunUsage: (usage: RunContextUsageSummary | null) => void;
+  clearUsageSnapshot: () => void;
   markRunUsageStale: () => void;
   setLoading: (loading: boolean) => void;
   reset: () => void;
@@ -38,6 +39,11 @@ export const useSessionStore = create<SessionState>((set) => ({
     set(usage
       ? { currentRunUsage: usage, lastKnownUsage: usage, usageStale: false }
       : { currentRunUsage: null }),
+  clearUsageSnapshot: () => set({
+    currentRunUsage: null,
+    lastKnownUsage: null,
+    usageStale: false,
+  }),
   markRunUsageStale: () => set({ currentRunUsage: null, usageStale: true }),
   setLoading: (loading) => set({ isLoading: loading }),
   reset: () => {

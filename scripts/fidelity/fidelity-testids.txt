@@ -71,12 +71,6 @@ session-working-folder-panel
 settings-${mode
 settings-add-provider
 settings-agent-manifest-editor
-settings-agent-permission-mode-${mode}
-settings-agent-permissions
-settings-agent-permissions-save
-settings-agent-readable-roots
-settings-agent-save
-settings-agent-writable-roots
 settings-center-panel
 settings-mcp-${server.id}
 settings-mcp-block
@@ -144,5 +138,5 @@ work-process-tool-approval
 work-process-tool-call
 work-process-tool-group
 work-process-user-input
-work-process-user-input-qa
+work-process-user-input-transcript
 work-process-view-toggle

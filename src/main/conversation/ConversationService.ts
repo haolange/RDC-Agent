@@ -38,6 +38,7 @@ import type {
 } from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import { isTopLevelAgentId } from '@shared/types/agent';
+import { createFallbackAskUserQuestion, normalizeAskUserQuestions } from '@shared/utils/askUser';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
@@ -79,6 +80,7 @@ import {
   resolveConversationReasoningState,
   type ConversationLoopContinuationState,
 } from '@shared/conversation/loopOutputPhase';
+import { beginAssistantContentLoopIfPending } from './ConversationLoopRuntimeState';
 
 interface ConversationBranchTurnContext {
   branchId: string;
@@ -729,7 +731,9 @@ export class ConversationService {
       : null;
     const projectInputs = projectId ? storageAdapter.listProjectInputs(projectId) : [];
     const openedCapture = rdxSessionService.snapshotOpenedCapture();
-    const activeOpenedCapture = openedCapture?.projectId === projectId && openedCapture.status === 'open'
+    const activeOpenedCapture = openedCapture?.projectId === projectId
+      && openedCapture.status === 'open'
+      && openedCapture.ownerSessionId === resolvedSessionId
       ? openedCapture
       : null;
     const replayDevice = replayDeviceService.getDeviceById(input.replayDeviceId || 'local') ?? replayDeviceService.getDeviceById('local');
@@ -1028,6 +1032,24 @@ export class ConversationService {
       loopThinking: currentLoopThinking,
       loopThinkingStatus: currentLoopThinkingStatus,
     });
+    const beginAssistantContentLoop = () => {
+      const next = beginAssistantContentLoopIfPending({
+        loopSeq,
+        currentLoopText,
+        currentLoopThinking,
+        currentLoopThinkingStatus,
+        loopHasTools,
+        pendingNewLoop,
+        visibleResponse,
+      });
+      loopSeq = next.loopSeq;
+      currentLoopText = next.currentLoopText;
+      currentLoopThinking = next.currentLoopThinking;
+      currentLoopThinkingStatus = next.currentLoopThinkingStatus;
+      loopHasTools = next.loopHasTools;
+      pendingNewLoop = next.pendingNewLoop;
+      visibleResponse = next.visibleResponse;
+    };
 
     if (!routePreflight.ok) {
       llmDiagnostic = routePreflight.diagnostic;
@@ -1154,15 +1176,7 @@ export class ConversationService {
               if (event.type === 'assistant.delta') {
                 const chunk = typeof event.payload.text === 'string' ? event.payload.text : '';
                 if (chunk) {
-                  if (pendingNewLoop) {
-                    loopSeq += 1;
-                    currentLoopText = '';
-                    currentLoopThinking = undefined;
-                    currentLoopThinkingStatus = undefined;
-                    loopHasTools = false;
-                    pendingNewLoop = false;
-                    visibleResponse = '';
-                  }
+                  beginAssistantContentLoop();
                   rawResponse += chunk;
                   currentLoopText += chunk;
                   if (!loopHasTools) {
@@ -1181,6 +1195,7 @@ export class ConversationService {
               }
               if (event.type === 'assistant.thinking_delta') {
                 const payload = event.payload as { text?: string; thinking?: ThinkingArtifact };
+                beginAssistantContentLoop();
                 currentLoopThinking = mergeThinkingPayload(
                   currentLoopThinking,
                   payload.thinking,
@@ -1200,6 +1215,7 @@ export class ConversationService {
               }
               if (event.type === 'assistant.thinking_end') {
                 const payload = event.payload as { text?: string; thinking?: ThinkingArtifact };
+                beginAssistantContentLoop();
                 currentLoopThinking = mergeThinkingPayload(
                   currentLoopThinking,
                   payload.thinking,
@@ -1301,8 +1317,7 @@ export class ConversationService {
                   toolCallId?: string;
                   toolName?: string;
                   kind?: string;
-                  question?: string;
-                  options?: string[];
+                  questions?: unknown;
                   risk?: unknown;
                   reviewer?: unknown;
                 };
@@ -1311,20 +1326,14 @@ export class ConversationService {
                 const toolName = String(payload.toolName ?? 'approval');
                 if (payload.kind === 'ask_user' || normalizeToolName(toolName) === 'ask_user') {
                   pendingContinuation.userInput = true;
-                  const question = typeof payload.question === 'string' && payload.question
-                    ? payload.question
-                    : typeof payload.reason === 'string' && payload.reason
-                      ? payload.reason
-                      : 'The agent needs user input before continuing.';
+                  const questions = normalizeAskUserQuestions({ questions: payload.questions });
+                  const previewQuestions = questions.length > 0 ? questions : [createFallbackAskUserQuestion()];
                   commitAssistantMessage('message_patched', {
                     workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                       id: toolCallId,
                       toolName: 'ask_user',
                       status: 'running',
-                      argsPreview: JSON.stringify({
-                        question,
-                        choices: Array.isArray(payload.options) ? payload.options : [],
-                      }).slice(0, 600),
+                      argsPreview: JSON.stringify({ questions: previewQuestions }),
                       startedAt: nowMs(),
                     }),
                   });
@@ -1351,10 +1360,10 @@ export class ConversationService {
                   approvalId?: string;
                   status?: string;
                   answer?: unknown;
+                  answers?: unknown;
                   kind?: string;
                   toolCallId?: string;
                   toolName?: string;
-                  question?: string;
                 };
                 const approvalId = payload.approvalId ?? 'runtime';
                 if (payload.kind === 'ask_user' || normalizeToolName(String(payload.toolName ?? '')) === 'ask_user') {
@@ -1362,19 +1371,15 @@ export class ConversationService {
                   if (!failed) {
                     pendingContinuation.userInput = false;
                   }
-                  const answerText = payload.answer === undefined || payload.answer === null
-                    ? ''
-                    : typeof payload.answer === 'string'
-                      ? payload.answer.trim()
-                      : String(payload.answer).trim();
+                  const resultPreview = failed
+                    ? String(payload.answer ?? 'User input request was cancelled.')
+                    : JSON.stringify({ answers: Array.isArray(payload.answers) ? payload.answers : [] });
                   commitAssistantMessage('message_patched', {
                     workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                       id: String(payload.toolCallId ?? approvalId),
                       toolName: 'ask_user',
                       status: failed ? 'error' : 'running',
-                      resultPreview: failed
-                        ? String(payload.answer ?? 'User input request was cancelled.')
-                        : answerText || 'User answered.',
+                      resultPreview,
                       error: failed ? String(payload.answer ?? 'User input request was cancelled.') : undefined,
                       completedAt: failed ? nowMs() : undefined,
                     }),
@@ -1529,6 +1534,7 @@ export class ConversationService {
                   thinking?: ThinkingArtifact[];
                   stopReason?: ConversationLoopStopReason;
                 };
+                beginAssistantContentLoop();
                 const loopResult = typeof payload.text === 'string' ? payload.text.trim() : '';
                 const stopReason = payload.stopReason;
                 const completedThinking = selectCompletedThinking(payload.thinking) ?? currentLoopThinking;

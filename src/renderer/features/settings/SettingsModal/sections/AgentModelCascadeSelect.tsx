@@ -82,7 +82,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
     }
     const modalRect = root.closest('.settings-modal')?.getBoundingClientRect();
     const editorRect = root.closest('.settings-manifest-editor')?.getBoundingClientRect();
-    const savebarRect = root.closest('.settings-manifest-editor')?.querySelector('.settings-manifest-editor-savebar')?.getBoundingClientRect();
+    const statusRect = root.closest('.settings-manifest-editor')?.querySelector('.settings-agent-autosave-status')?.getBoundingClientRect();
     const viewportPadding = 16;
     const menuGap = 8;
     const boundaryLeft = Math.max(viewportPadding, modalRect?.left ?? viewportPadding);
@@ -92,7 +92,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
       window.innerHeight - viewportPadding,
       modalRect?.bottom ?? window.innerHeight - viewportPadding,
       editorRect?.bottom ?? window.innerHeight - viewportPadding,
-      savebarRect?.top ?? window.innerHeight - viewportPadding,
+      statusRect?.top ?? window.innerHeight - viewportPadding,
     );
     const boundaryWidth = Math.max(280, boundaryRight - boundaryLeft - viewportPadding * 2);
     const menuWidth = Math.min(544, boundaryWidth);

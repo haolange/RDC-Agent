@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useI18n } from '../../../i18n';
+import { ActiveSignalText } from '../../../ui/ActiveSignalText';
 import type { WorkProcessRow } from './workProcessPresentation';
 import { useWorkProcessLabel } from './workProcessUseLabel';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
+import { isActiveThinkingStatus } from './workProcessActiveSignal';
 
 interface WorkProcessSectionRowProps {
   row: Extract<WorkProcessRow, { type: 'section' }>;
@@ -19,7 +21,8 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
   const label = useWorkProcessLabel();
   const [commentaryExpanded, setCommentaryExpanded] = useState(false);
   const hasError = row.status === 'error' || row.steps.some((step) => step.status === 'error');
-  const showSteps = row.stepCount > 0;
+  const visibleSteps = row.visibleSteps;
+  const showSteps = visibleSteps.length > 0;
   const shouldClamp = row.clampable && row.clampResult && !commentaryExpanded;
   const resultClassName = [
     'work-process-loop-result',
@@ -29,6 +32,7 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
     row.clampable === false ? 'is-not-clampable' : '',
   ].filter(Boolean).join(' ');
   const hasResult = Boolean(row.resultText || row.resultToolSummary);
+  const thinkingActive = isActiveThinkingStatus(row.thinkingStatus, row.status);
   const thinkingClassName = [
     'work-process-thinking-state',
     row.thinkingKind ? `kind-${row.thinkingKind}` : '',
@@ -57,7 +61,7 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
         {row.thinkingExpandable ? (
           <details className={thinkingClassName} open={row.thinkingOpenByDefault}>
             <summary className="work-process-thinking-summary">
-              <span>{label(row.thinkingLabel)}</span>
+              <ActiveSignalText active={thinkingActive} tone="info">{label(row.thinkingLabel)}</ActiveSignalText>
               {row.thinkingSource ? <span className="work-process-thinking-source">{row.thinkingSource}</span> : null}
               <span className="work-process-row-caret" aria-hidden="true" />
             </summary>
@@ -65,7 +69,7 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
           </details>
         ) : row.thinkingLabel ? (
           <p className={thinkingClassName}>
-            <span>{label(row.thinkingLabel)}</span>
+            <ActiveSignalText active={thinkingActive} tone="info">{label(row.thinkingLabel)}</ActiveSignalText>
             {row.thinkingSource ? <span className="work-process-thinking-source">{row.thinkingSource}</span> : null}
           </p>
         ) : null}
@@ -85,8 +89,8 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
           </div>
         ) : null}
         {showSteps ? (
-          <ol className={`work-process-steps work-process-section-list ${hasError || row.defaultOpen ? 'is-open' : ''}`}>
-            {row.steps.map((step) => renderRow(step))}
+          <ol className={`work-process-steps work-process-section-list disclosure-${row.stepsDisclosure} ${hasError || row.defaultOpen ? 'is-open' : ''}`}>
+            {visibleSteps.map((step) => renderRow(step))}
           </ol>
         ) : null}
       </div>

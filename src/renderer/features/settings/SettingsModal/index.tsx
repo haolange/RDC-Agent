@@ -38,16 +38,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     setAgentManifestDrafts,
     globalInstructionsDraft,
     setGlobalInstructionsDraft,
-    permissionModeDraft,
-    setPermissionModeDraft,
-    readableRootsDraft,
-    setReadableRootsDraft,
-    writableRootsDraft,
-    setWritableRootsDraft,
     connectionDraft,
     setConnectionDraft,
-    agentRouteSaveState,
-    agentRouteSaveMessage,
+    agentManifestSaveState,
+    agentManifestSaveMessage,
     derivedPathEntries,
     accountProviders,
     providerCatalog,
@@ -62,7 +56,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     handleDisconnectProvider,
     handleSaveAgentManifests,
     handleImportAgentManifest,
-    handleSaveAgentPermissions,
     handleSaveToolsConfig,
     handleSavePersonalization,
     handleUpsertSkill,
@@ -228,19 +221,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                   onUpsertSkill={handleUpsertSkill}
                   onDeleteSkill={handleDeleteSkill}
                   onImportSkill={handleImportSkill}
-                  permissionModeDraft={permissionModeDraft}
-                  readableRootsDraft={readableRootsDraft}
-                  writableRootsDraft={writableRootsDraft}
-                  onPermissionModeDraftChange={setPermissionModeDraft}
-                  onReadableRootsDraftChange={setReadableRootsDraft}
-                  onWritableRootsDraftChange={setWritableRootsDraft}
-                  onSaveAgentPermissions={handleSaveAgentPermissions}
                   agentManifestDrafts={agentManifestDrafts}
                   onAgentManifestDraftsChange={setAgentManifestDrafts}
-                  onSaveAgentManifests={handleSaveAgentManifests}
+                  onRetrySaveAgentManifests={handleSaveAgentManifests}
                   onImportAgentManifest={handleImportAgentManifest}
-                  agentRouteSaveState={agentRouteSaveState}
-                  agentRouteSaveMessage={agentRouteSaveMessage}
+                  agentManifestSaveState={agentManifestSaveState}
+                  agentManifestSaveMessage={agentManifestSaveMessage}
                   t={t}
                 />
               )}

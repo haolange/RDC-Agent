@@ -72,6 +72,7 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
           runId: state.currentRunId,
           raw: {
             inputId: request.inputId,
+            ownerSessionId: request.ownerSessionId,
             replayDeviceId: request.replayDeviceId,
             filePath: request.filePath,
           },
@@ -89,6 +90,7 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
 
         const openedCapture = await rdxSessionService.openProjectInput({
           projectId: request.projectId,
+          ownerSessionId: request.ownerSessionId ?? null,
           inputId: input.inputId,
           filePath: input.filePath,
           replayDevice,
@@ -130,6 +132,7 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
           runId: state.currentRunId,
           raw: {
             inputId: request.inputId,
+            ownerSessionId: request.ownerSessionId,
             replayDeviceId: request.replayDeviceId,
             filePath: request.filePath,
           },

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Design System - RDC-Agent professional workstation theme
  * A restrained debugging interface system for long RenderDoc sessions.
  */
@@ -366,6 +366,11 @@
   to { background-position: 20px 0; }
 }
 
+@keyframes active-signal-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(0.86); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
@@ -382,6 +387,48 @@
 .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
 .animate-spin { animation: spin 1s linear infinite; }
 .animate-float { animation: float 3s ease-in-out infinite; }
+/* Active runtime signal text */
+.active-signal-text {
+  --active-signal-highlight: var(--token-text-heading);
+  color: inherit;
+}
+
+.active-signal-text.tone-info {
+  --active-signal-highlight: var(--token-status-info);
+}
+
+.active-signal-text.tone-interaction {
+  --active-signal-highlight: var(--token-accent-primary);
+}
+
+.active-signal-text.tone-response {
+  --active-signal-highlight: var(--token-text-body);
+}
+
+.active-signal-text.is-active {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.active-signal-text.is-active::after {
+  content: '';
+  width: var(--space-1);
+  height: var(--space-1);
+  border-radius: var(--radius-full);
+  flex: none;
+  background: var(--active-signal-highlight);
+  box-shadow: 0 0 0 var(--space-1) color-mix(in srgb, var(--active-signal-highlight) 14%, transparent);
+  animation: active-signal-pulse var(--animation-pulse) var(--ease-standard) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .active-signal-text.is-active::after {
+    animation: none;
+    opacity: 0.8;
+    transform: none;
+  }
+}
 
 /* Stagger delays */
 .stagger-1 { animation-delay: 50ms; }

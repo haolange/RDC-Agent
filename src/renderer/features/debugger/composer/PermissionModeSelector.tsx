@@ -34,8 +34,8 @@ const PERMISSION_MODES: Array<{
     id: 'custom',
     label: 'Custom',
     labelZh: '自定义',
-    description: 'Use readable/writable roots configured in Settings > Agents.',
-    descriptionZh: '按 Settings › Agents 配置的路径规则执行',
+    description: 'Use local access roots from the current app settings.',
+    descriptionZh: '按当前应用设置里的访问根目录执行',
   },
 ];
 

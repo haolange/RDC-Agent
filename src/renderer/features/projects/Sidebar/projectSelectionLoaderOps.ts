@@ -69,6 +69,7 @@ export async function selectSessionOp(
 ): Promise<boolean> {
   const rollbackState = options.rollbackState ?? captureSelectionSnapshot();
   if (options.optimisticSession) {
+    useSessionStore.getState().clearUsageSnapshot();
     ctx.setCurrentSession(options.optimisticSession);
     ctx.setRightRailTarget('session');
     ctx.setCurrentRun(null);
@@ -94,6 +95,7 @@ export async function selectSessionOp(
     return false;
   }
 
+  useSessionStore.getState().clearUsageSnapshot();
   ctx.setCurrentSession(result.session);
   ctx.setRightRailTarget('session');
   ctx.setCurrentRun(result.currentRun ?? null);
@@ -201,6 +203,7 @@ export async function loadProjectsOp(
 
   if (!targetProject) {
     ctx.setCurrentProject(null);
+    useSessionStore.getState().clearUsageSnapshot();
     ctx.setCurrentSession(null);
     ctx.setRightRailTarget('project');
     ctx.setCurrentRun(null);

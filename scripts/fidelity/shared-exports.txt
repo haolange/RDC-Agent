@@ -161,6 +161,9 @@ ConversationAnswerToolApprovalResult
 ConversationAnswerUserInputRequest
 ConversationAnswerUserInputResult
 ConversationApi
+ConversationAskUserAnswer
+ConversationAskUserOption
+ConversationAskUserQuestion
 ConversationAttachmentInput
 ConversationBranch
 ConversationBranchState
@@ -206,9 +209,11 @@ ConversationWorkTrace
 countJsonl
 createBuiltinProviderEntries
 createBuiltinProviderEntry
+createFallbackAskUserQuestion
 createReasoningControl
 CreateRunResponse
 DebugSessionStartRequest
+DEFAULT_ASK_USER_PROMPT
 DEFAULT_CONTEXT_WINDOW_TOKENS
 DEFAULT_MODEL_ROUTING
 DEFAULT_TOKEN_TTL_SECONDS
@@ -237,6 +242,7 @@ FinalResponseNode
 FindingNode
 FindingSeverity
 FontScale
+formatAskUserAnswersForToolResult
 GateResult
 GEMINI_ACCOUNT_MODELS
 GeminiWireThinkingLevel
@@ -358,6 +364,8 @@ ModelTurnEvent
 ModeProfile
 NAMED_REASONING_LEVELS
 NamedReasoningLevel
+normalizeAskUserAnswers
+normalizeAskUserQuestions
 NormalizedToolResult
 normalizeWorkflowStage
 nowIso

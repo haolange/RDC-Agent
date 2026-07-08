@@ -8,7 +8,11 @@ import type { LLMStreamEvent, ToolCall } from './llm';
 import type { MCPTransport } from './mcp';
 import type { AgentPromptProfile, AgentToolPolicy } from './profile';
 import type { ThinkingArtifact } from './reasoning';
-import type { ConversationLoopStopReason } from './conversation';
+import type {
+  ConversationAskUserAnswer,
+  ConversationAskUserQuestion,
+  ConversationLoopStopReason,
+} from './conversation';
 import type { AppMode, ExecutableAppMode } from './session';
 import type { LlmProviderAuthMode, LlmProviderId, LlmProviderProtocol } from './settings';
 import type { ToolCallResult } from './tool';
@@ -128,6 +132,8 @@ export interface AgentApprovalEventPayload extends AgentEventBasePayload {
   toolName?: string;
   question?: string;
   options?: string[];
+  questions?: ConversationAskUserQuestion[];
+  answers?: ConversationAskUserAnswer[];
   answer?: unknown;
 }
 

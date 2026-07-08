@@ -53,6 +53,8 @@ import {
 import type { AppMode, ContextUsageBreakdownEntry } from '@shared/types/session';
 import type { LlmProviderId } from '@shared/types/settings';
 import type { WorkflowStage } from '@shared/types/workflow';
+import type { ConversationAskUserQuestion } from '@shared/types/conversation';
+import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
 import { Agent } from '../../agent-runtime/agent/Agent';
@@ -1123,18 +1125,10 @@ export class AgentOrchestrator {
   ): Promise<ToolResultMessage> {
     try {
       const args = toolCall.arguments ?? {};
-      const question = typeof args.question === 'string' && args.question.trim()
-        ? args.question.trim()
-        : 'The agent needs user input before continuing.';
-      const optionArgs = (args as { options?: unknown }).options;
-      const rawChoices: unknown[] = Array.isArray(args.choices)
-        ? args.choices
-        : Array.isArray(optionArgs)
-          ? optionArgs
-          : [];
-      const options = rawChoices
-        .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
-        .map((entry) => entry.trim());
+      const questions = normalizeAskUserQuestions(args);
+      if (questions.length === 0) {
+        throw new Error('ask_user requires at least one canonical questions[] entry with a prompt.');
+      }
 
       if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
         throw new Error('ask_user requires an active conversation interaction bridge.');
@@ -1145,8 +1139,7 @@ export class AgentOrchestrator {
         sessionId: runtimeContext.sessionId ?? null,
         turnId: runtimeContext.turnId,
         toolCallId: toolCall.id,
-        question,
-        options,
+        questions,
         context: runtimeContext.eventContext,
         onEvent: runtimeContext.onEvent,
         signal,
@@ -1156,7 +1149,7 @@ export class AgentOrchestrator {
         role: 'toolResult',
         toolCallId: toolCall.id,
         toolName: toolCall.name,
-        content: [{ type: 'text', text: `User answered: ${answer}` }],
+        content: [{ type: 'text', text: answer }],
         isError: false,
         timestamp: Date.now(),
       };
@@ -1287,8 +1280,8 @@ export class AgentOrchestrator {
   }
 
   private createAskUserTool(agentId: AgentRole): AgentTool<
-    { question?: string; choices?: string[] },
-    { agentId: AgentRole; question: string; choices: string[] }
+    { questions?: unknown[] },
+    { agentId: AgentRole; questions: ConversationAskUserQuestion[] }
   > {
     return {
       name: 'ask_user',
@@ -1296,28 +1289,50 @@ export class AgentOrchestrator {
       description: 'Ask the user for a decision or missing information. Use this when progress depends on user input.',
       parameters: {
         type: 'object',
-        required: ['question'],
+        required: ['questions'],
         properties: {
-          question: { type: 'string', description: 'The concise question to ask the user.' },
-          choices: {
+          questions: {
             type: 'array',
-            items: { type: 'string' },
-            description: 'Optional short mutually exclusive choices.',
+            minItems: 1,
+            description: 'Batch of user questions. A single question is represented as an array with one item.',
+            items: {
+              type: 'object',
+              required: ['prompt'],
+              properties: {
+                questionId: { type: 'string', description: 'Optional stable question id. Runtime generates one when omitted.' },
+                prompt: { type: 'string', description: 'The concise question to ask the user.' },
+                description: { type: 'string', description: 'Optional supporting context shown below the question title.' },
+                allowFreeform: { type: 'boolean', description: 'Whether the user may type a custom answer. Defaults to true.' },
+                options: {
+                  type: 'array',
+                  description: 'Optional mutually exclusive choices.',
+                  items: {
+                    type: 'object',
+                    required: ['label'],
+                    properties: {
+                      optionId: { type: 'string', description: 'Optional stable option id. Runtime generates one when omitted.' },
+                      label: { type: 'string', description: 'Short option label.' },
+                      description: { type: 'string', description: 'Optional one-line option detail.' },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
       permissionHint: 'readonly',
       async execute(_toolCallId, args) {
-        const question = typeof args.question === 'string' && args.question.trim()
-          ? args.question.trim()
-          : 'The agent needs user input before continuing.';
-        const choices = Array.isArray(args.choices)
-          ? args.choices.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
-          : [];
+        const questions = normalizeAskUserQuestions(args);
         return {
-          content: [{ type: 'text', text: 'ask_user requires the conversation interaction bridge.' }],
+          content: [{
+            type: 'text',
+            text: questions.length > 0
+              ? 'ask_user requires the conversation interaction bridge.'
+              : 'ask_user requires at least one canonical questions[] entry with a prompt.',
+          }],
           isError: true,
-          details: { agentId, question, choices },
+          details: { agentId, questions },
         };
       },
     };

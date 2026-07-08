@@ -10,6 +10,7 @@ import { useDeviceStore } from '../../../stores/deviceStore';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useComposerAttachments } from './useComposerAttachments';
 import { useComposerSend } from './useComposerSend';
+import { useScopedPromptDraft } from './useScopedPromptDraft';
 
 export function useComposer(options: {
   showNotice: (message: string) => void;
@@ -22,7 +23,6 @@ export function useComposer(options: {
   const { showNotice, hasOpenedCaptureForCurrentProject, effectiveLeftCollapsed, leftToggleDisabled, toggleLeftSidebar, openSettings } = options;
   const { t, language } = useI18n();
 
-  const [promptValue, setPromptValue] = useState('');
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
 
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
@@ -44,6 +44,10 @@ export function useComposer(options: {
   const devices = useDeviceStore((state) => state.devices);
   const selectedDevice = useDeviceStore((state) => state.selectedDevice);
   const selectedDeviceEntry = devices.find((device) => device.id === selectedDevice);
+  const { promptValue, setPromptValue } = useScopedPromptDraft(
+    currentProject?.projectId,
+    currentSession?.sessionId,
+  );
 
   const hasActiveDebugRun = Boolean(currentRun && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status));
   const hasActiveConversationTurn = conversationMessages.some((message) =>
@@ -53,6 +57,7 @@ export function useComposer(options: {
     showNotice,
     t,
     currentProject,
+    currentSession,
     effectiveLeftCollapsed,
     leftToggleDisabled,
     toggleLeftSidebar,

@@ -57,6 +57,13 @@ export interface WorkProcessGroupThinking {
   status?: ConversationWorkBlock['thinkingStatus'];
 }
 
+export interface WorkProcessUserInputItem {
+  questionId: string;
+  prompt: string;
+  answer?: string;
+  selectedOptionId?: string;
+}
+
 export type WorkProcessRow =
   | {
     type: 'summary';
@@ -88,10 +95,10 @@ export type WorkProcessRow =
     id: string;
     status: WorkProcessRowStatus;
     verb: string;
-    question: string;
-    answer?: string;
+    questionCount: number;
+    items: WorkProcessUserInputItem[];
+    error?: string;
     duration: string;
-    detailLines: string[];
   }
   | {
     type: 'toolGroup';
@@ -176,9 +183,11 @@ export type WorkProcessRow =
     thinkingExpandable: boolean;
     thinkingOpenByDefault: boolean;
     stepCount: number;
+    stepsDisclosure: 'visible' | 'deferred';
     duration: string;
     defaultOpen: boolean;
     steps: WorkProcessRow[];
+    visibleSteps: WorkProcessRow[];
     outputPhase?: ConversationLoopOutputPhase;
     stopReason?: ConversationLoopStopReason;
     loopId: string;

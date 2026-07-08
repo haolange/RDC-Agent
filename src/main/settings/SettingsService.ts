@@ -109,6 +109,12 @@ interface NormalizedPersistedSettings {
   configuration: PersistedConfigurationSettings;
 }
 
+type ProviderCredentialPolicy = 'runtime' | 'persisted';
+
+interface ProviderSanitizeOptions {
+  credentialPolicy?: ProviderCredentialPolicy;
+}
+
 const LEFT_DEFAULTS = {
   width: LEFT_SIDEBAR_DEFAULT_WIDTH,
   min: LEFT_SIDEBAR_MIN_WIDTH,
@@ -691,6 +697,7 @@ function normalizeRetiredProviderId(providerId: string): string {
 function sanitizeUserProvider(
   provider: PersistedLlmProviderEntry,
   workspaceRoot = appPathService.getWorkspaceRoot(),
+  options: ProviderSanitizeOptions = {},
 ): LlmProviderEntry | null {
   const incomingId = typeof provider.id === 'string' ? provider.id.trim() : '';
   const rawId = normalizeRetiredProviderId(incomingId);
@@ -715,10 +722,12 @@ function sanitizeUserProvider(
     : builtinFallback.authMode === 'account'
       ? secretStorageService.getSecret(oauthSecretRef, workspaceRoot)
       : '';
-  const hasStoredSecret = builtinFallback.hasStoredSecret || Boolean(resolvedSecret);
+  const preservePersistedCredentialState = options.credentialPolicy === 'persisted';
+  const hasPersistedSecret = preservePersistedCredentialState && provider.hasStoredSecret === true;
+  const hasStoredSecret = builtinFallback.hasStoredSecret || Boolean(resolvedSecret) || hasPersistedSecret;
   const canUseProvider = builtinFallback.status !== 'unavailable' && (builtinFallback.authMode === 'local' || builtinFallback.authMode === 'environment'
     ? true
-    : Boolean(resolvedSecret));
+    : Boolean(resolvedSecret) || hasPersistedSecret);
   const status = pickProviderStatus(provider, builtinFallback, canUseProvider, models);
   const hasEnabledModels = models.some((model) => model.enabled !== false);
   const enabled = status === 'verified' && hasEnabledModels;
@@ -765,6 +774,7 @@ function sanitizeUserProvider(
 function normalizeUserProviders(
   providers: unknown,
   workspaceRoot: string,
+  options: ProviderSanitizeOptions = {},
 ): LlmProviderEntry[] {
   const persistedProviders = new Map<string, LlmProviderEntry>();
 
@@ -773,7 +783,7 @@ function normalizeUserProviders(
       continue;
     }
 
-    const provider = sanitizeUserProvider(entry as Partial<LlmProviderEntry>, workspaceRoot);
+    const provider = sanitizeUserProvider(entry as Partial<LlmProviderEntry>, workspaceRoot, options);
     if (!provider || persistedProviders.has(provider.id)) {
       continue;
     }
@@ -782,7 +792,11 @@ function normalizeUserProviders(
   }
 
   return createBuiltinProviderEntries()
-    .map((catalogProvider) => sanitizeUserProvider(persistedProviders.get(catalogProvider.id) ?? catalogProvider, workspaceRoot))
+    .map((catalogProvider) => sanitizeUserProvider(
+      persistedProviders.get(catalogProvider.id) ?? catalogProvider,
+      workspaceRoot,
+      options,
+    ))
     .filter((provider): provider is LlmProviderEntry => provider !== null);
 }
 
@@ -951,7 +965,9 @@ export class SettingsService {
         fixes.push(`Migrated plaintext secret for ${rawId}`);
       }
 
-      const sanitized = sanitizeUserProvider({ ...entry, secretRef }, workspaceRoot);
+      const sanitized = sanitizeUserProvider({ ...entry, secretRef }, workspaceRoot, {
+        credentialPolicy: 'persisted',
+      });
       if (!sanitized) {
         fixes.push(`Removed non-catalog provider ${rawId}`);
         continue;
@@ -964,7 +980,9 @@ export class SettingsService {
       }
     }
 
-    const catalogProviders = normalizeUserProviders(nextProviders, workspaceRoot);
+    const catalogProviders = normalizeUserProviders(nextProviders, workspaceRoot, {
+      credentialPolicy: 'persisted',
+    });
     const normalizedRoutes = normalizeUserRoutes(rawRoutes, catalogProviders);
     const nextRoutes = normalizedRoutes;
     const incomingRoutes = Array.isArray(rawRoutes) ? rawRoutes.map((entry) => {
@@ -1037,10 +1055,11 @@ export class SettingsService {
   private normalizePersistedSettings(
     raw: PersistedSettingsPayload | null,
     workspaceRoot: string,
+    options: ProviderSanitizeOptions = {},
   ): NormalizedPersistedSettings {
     const fallback = createDefaultPersistedSettings(workspaceRoot);
     const candidate = raw ?? fallback;
-    const nextProviders = normalizeUserProviders(candidate.llm?.providers, workspaceRoot).map((provider) => ({
+    const nextProviders = normalizeUserProviders(candidate.llm?.providers, workspaceRoot, options).map((provider) => ({
       ...provider,
       apiKey: '',
     }));
@@ -1213,8 +1232,11 @@ export class SettingsService {
     const currentPersisted = this.normalizePersistedSettings(
       readJsonFile<PersistedSettingsPayload>(nextPaths.settingsPath) ?? createDefaultPersistedSettings(nextPaths.workspaceRoot),
       nextPaths.workspaceRoot,
+      { credentialPolicy: 'persisted' },
     );
 
+    const hasProviderPatch = Boolean(patch.llm?.providers);
+    const providerCredentialPolicy: ProviderCredentialPolicy = hasProviderPatch ? 'runtime' : 'persisted';
     const providerDrafts = (patch.llm?.providers ?? currentPersisted.llm?.providers ?? []).map((provider) => {
       const secretRef = provider.secretRef || secretStorageService.createProviderSecretRef(provider.id);
       const apiKey = provider.apiKey?.trim() ?? '';
@@ -1226,9 +1248,11 @@ export class SettingsService {
       return sanitizeUserProvider({
         ...provider,
         secretRef,
-      }, nextPaths.workspaceRoot);
+      }, nextPaths.workspaceRoot, { credentialPolicy: providerCredentialPolicy });
     }).filter((provider): provider is LlmProviderEntry => provider !== null);
-    const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.workspaceRoot);
+    const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.workspaceRoot, {
+      credentialPolicy: providerCredentialPolicy,
+    });
     const currentRoutes = normalizeUserRoutes(patch.llm?.agentRoutes ?? currentPersisted.llm?.agentRoutes ?? [], nextProviders);
     if (patch.agents?.definitions) {
       agentManifestService.save(

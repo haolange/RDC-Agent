@@ -48,8 +48,15 @@ describe('cancel turn stability', () => {
       agentId: 'debugger',
       turnId,
       toolCallId: 'tool-ask-user',
-      question: 'Which option?',
-      options: ['A', 'B'],
+      questions: [{
+        questionId: 'choice',
+        prompt: 'Which option?',
+        options: [
+          { optionId: 'a', label: 'A' },
+          { optionId: 'b', label: 'B' },
+        ],
+        allowFreeform: true,
+      }],
       context: eventContext,
       onEvent: (event) => events.push(event),
     });

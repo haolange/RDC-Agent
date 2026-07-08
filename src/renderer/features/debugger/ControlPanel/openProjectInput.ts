@@ -14,6 +14,7 @@ interface OpenProjectInputOptions {
   input: ProjectInputRecord;
   currentProject: ProjectRecord | null;
   currentRun: RunSummary | null;
+  ownerSessionId: string | null;
   selectedDeviceEntry: ReplayDeviceEntry | null;
   setCaptures: (captures: CaptureDescriptor[]) => void;
   setContextSnapshot: (snapshot: ContextSnapshot | null) => void;
@@ -27,9 +28,11 @@ interface OpenProjectInputOptions {
 export const createOpeningState = (
   input: ProjectInputRecord,
   projectId: string,
+  ownerSessionId: string | null,
   device: ReplayDeviceEntry,
 ): OpenedCaptureState => ({
   projectId,
+  ownerSessionId,
   inputId: input.inputId,
   filePath: input.filePath,
   captureId: input.inputId,
@@ -49,6 +52,7 @@ export async function openProjectInput(options: OpenProjectInputOptions): Promis
     input,
     currentProject,
     currentRun,
+    ownerSessionId,
     selectedDeviceEntry,
     setCaptures,
     setContextSnapshot,
@@ -73,7 +77,7 @@ export async function openProjectInput(options: OpenProjectInputOptions): Promis
     await getElectronApi()?.capture.clearOpenedState();
     setContextSnapshot(null);
     setCaptures([]);
-    setOpenedCapture(createOpeningState(input, currentProject.projectId, selectedDeviceEntry));
+    setOpenedCapture(createOpeningState(input, currentProject.projectId, ownerSessionId, selectedDeviceEntry));
     setErrorMessage(null);
 
     if (
@@ -85,6 +89,7 @@ export async function openProjectInput(options: OpenProjectInputOptions): Promis
 
     const result = await getElectronApi()!.capture.openProjectInput({
       projectId: currentProject.projectId,
+      ownerSessionId,
       inputId: input.inputId,
       filePath: input.filePath,
       replayDeviceId: selectedDeviceEntry.id,

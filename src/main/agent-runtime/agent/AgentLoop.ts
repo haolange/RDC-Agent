@@ -393,7 +393,7 @@ async function streamAssistantResponseWithRecovery(
     emitRecoveryDiagnostic(stream, action, 'started', attempt);
   };
 
-  while (true) {
+  for (;;) {
     try {
       const assistantMessage = await streamAssistantResponse(
         context,

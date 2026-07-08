@@ -153,8 +153,39 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     id: 'ask_user',
     label: 'Ask User',
     permission: 'approval',
-    inputSchema: { type: 'object', required: ['question'], properties: { question: { type: 'string' }, choices: { type: 'array', items: { type: 'string' } } } },
-    resultSummary: 'Surfaces a decision or missing information request.',
+    inputSchema: {
+      type: 'object',
+      required: ['questions'],
+      properties: {
+        questions: {
+          type: 'array',
+          minItems: 1,
+          items: {
+            type: 'object',
+            required: ['prompt'],
+            properties: {
+              questionId: { type: 'string' },
+              prompt: { type: 'string' },
+              description: { type: 'string' },
+              allowFreeform: { type: 'boolean' },
+              options: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  required: ['label'],
+                  properties: {
+                    optionId: { type: 'string' },
+                    label: { type: 'string' },
+                    description: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    resultSummary: 'Surfaces one or more user questions and resolves them as structured answers.',
     icon: 'message-question',
     approvalRequired: false,
   },

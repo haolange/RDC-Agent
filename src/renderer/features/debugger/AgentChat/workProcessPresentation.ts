@@ -16,6 +16,11 @@ import {
   normalizeWorkProcessText,
 } from './workProcessFormat';
 import {
+  createFallbackAskUserQuestion,
+  normalizeAskUserAnswers,
+  normalizeAskUserQuestions,
+} from '@shared/utils/askUser';
+import {
   buildSemanticStepGroups,
   flattenStepGroups,
 } from './workProcessGrouping';
@@ -35,6 +40,7 @@ export type {
   WorkProcessStepGroup,
   WorkProcessToolApproval,
   WorkProcessToolGroupKind,
+  WorkProcessUserInputItem,
   WorkProcessPresentation,
 } from './workProcessTypes';
 export { WORK_PROCESS_TOOL_DISPLAY_CATALOG } from './workProcessToolCatalog';
@@ -46,6 +52,7 @@ import type {
   WorkProcessRow,
   WorkProcessRowStatus,
   WorkProcessToolApproval,
+  WorkProcessUserInputItem,
 } from './workProcessTypes';
 import {
   buildPresentationUnits,
@@ -418,8 +425,10 @@ const createToolGroupRow = (rows: GroupableWorkProcessRow[], index: number): Ext
   const first = rows[0];
   const display = first.type === 'tool' ? getToolDisplay(first.toolName) : WORK_PROCESS_TOOL_DISPLAY_CATALOG.ask_user;
   const status = deriveGroupStatus(rows);
+  const isUserInputGroup = rows.every((row) => row.type === 'userInput');
   const unit = resolveGroupUnit(rows);
-  const title = resolveGroupTitle(rows, display.groupTitle);
+  const title = isUserInputGroup ? resolveUserInputGroupTitle(status) : resolveGroupTitle(rows, display.groupTitle);
+  const count = resolveGroupCount(rows);
 
   return {
     type: 'toolGroup',
@@ -428,8 +437,8 @@ const createToolGroupRow = (rows: GroupableWorkProcessRow[], index: number): Ext
     kind: display.groupKind,
     icon: display.icon,
     title,
-    countLabel: `${rows.length} ${unit}`,
-    summary: rows.map(formatGroupRowSummary).filter(Boolean).slice(0, 3).join(' · '),
+    countLabel: isUserInputGroup ? `${count} 个${unit}` : `${count} ${unit}`,
+    summary: isUserInputGroup ? '' : rows.map(formatGroupRowSummary).filter(Boolean).slice(0, 3).join(' · '),
     duration: rows.length === 1 ? first.duration : '',
     defaultOpen: true,
     rows,
@@ -450,6 +459,13 @@ const resolveGroupUnit = (rows: GroupableWorkProcessRow[]): string => {
   return units.size === 1 ? [...units][0] : '动作';
 };
 
+const resolveGroupCount = (rows: GroupableWorkProcessRow[]): number => {
+  if (rows.every((row) => row.type === 'userInput')) {
+    return rows.reduce((total, row) => total + row.questionCount, 0);
+  }
+  return rows.length;
+};
+
 const resolveGroupTitle = (rows: GroupableWorkProcessRow[], fallback: string): string => {
   const mcpServers = rows
     .filter((row): row is Extract<WorkProcessRow, { type: 'tool' }> => row.type === 'tool')
@@ -459,8 +475,14 @@ const resolveGroupTitle = (rows: GroupableWorkProcessRow[], fallback: string): s
   return fallback;
 };
 
+const resolveUserInputGroupTitle = (status: WorkProcessRowStatus): string => {
+  if (status === 'complete') return '已询问';
+  if (status === 'error') return '询问已中断';
+  return '正在询问';
+};
+
 const formatGroupRowSummary = (row: GroupableWorkProcessRow): string => {
-  if (row.type === 'userInput') return `${row.verb} ${row.question}`;
+  if (row.type === 'userInput') return '';
   return [row.verb, row.target].filter(Boolean).join(' ');
 };
 
@@ -607,36 +629,37 @@ export const createToolRowForPresentation = (
 
 const createUserInputRow = (call: ConversationToolCall): WorkProcessRow => {
   const args = parsePreview(call.argsPreview);
-  const record = toRecord(args) ?? {};
-  const question = stringifyPreview(record.question);
-  const rawChoices = record.choices;
-  const choices = Array.isArray(rawChoices)
-    ? rawChoices.map(stringifyPreview).filter(Boolean)
-    : [];
+  const parsedQuestions = normalizeAskUserQuestions(args);
+  const questions = parsedQuestions.length > 0 ? parsedQuestions : [createFallbackAskUserQuestion()];
   const status = call.status === 'complete'
     ? 'complete'
     : call.status === 'error' || call.error
       ? 'error'
       : 'running';
-  const answer = status === 'complete' && call.resultPreview?.trim()
-    ? call.resultPreview.trim()
-    : undefined;
-  const detailLines = [
-    question ? `问题：${question}` : '',
-    ...choices.map((choice, index) => `选项 ${index + 1}：${choice}`),
-    answer ? `回答：${answer}` : '',
-    call.error ? `错误：${call.error}` : '',
-  ].filter(Boolean);
+  const result = parsePreview(call.resultPreview);
+  const answers = status === 'complete'
+    ? normalizeAskUserAnswers(questions, result)
+    : [];
+  const answerByQuestionId = new Map(answers.map((entry) => [entry.questionId, entry]));
+  const items: WorkProcessUserInputItem[] = questions.map((question) => {
+    const answer = answerByQuestionId.get(question.questionId);
+    return {
+      questionId: question.questionId,
+      prompt: question.prompt,
+      answer: answer?.answer,
+      selectedOptionId: answer?.selectedOptionId,
+    };
+  });
 
   return {
     type: 'userInput',
     id: call.id,
     status,
     verb: status === 'complete' ? '已回答' : status === 'error' ? '用户交互中断' : '等待用户',
-    question: compactText(question || '等待用户输入。', 280),
-    answer,
+    questionCount: questions.length,
+    items,
+    error: call.error || undefined,
     duration: formatDurationMs(call.startedAt, call.completedAt),
-    detailLines,
   };
 };
 

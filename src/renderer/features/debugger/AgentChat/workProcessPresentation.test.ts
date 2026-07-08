@@ -13,6 +13,14 @@ function flattenWorkRows(rows: ReturnType<typeof buildWorkProcessPresentation>['
   });
 }
 
+function flattenVisibleWorkRows(rows: ReturnType<typeof buildWorkProcessPresentation>['rows']): Array<(typeof rows)[number]> {
+  return rows.flatMap((row) => {
+    if (row.type === 'section') return [row, ...flattenVisibleWorkRows(row.visibleSteps)];
+    if (row.type === 'toolGroup') return [row, ...flattenVisibleWorkRows(row.rows)];
+    return [row];
+  });
+}
+
 describe('buildWorkProcessPresentation', () => {
   it('keeps assistant answer streaming out of Work Process when there is no process evidence', () => {
     const trace: ConversationWorkTrace = {
@@ -539,8 +547,18 @@ describe('buildWorkProcessPresentation', () => {
               toolName: 'ask_user',
               status: 'running',
               argsPreview: JSON.stringify({
-                question: 'Which smoke path should I use?',
-                choices: ['Read-only smoke', 'Edit smoke'],
+                questions: [{
+                  questionId: 'smoke-path',
+                  prompt: 'Which smoke path should I use?',
+                  options: [
+                    { optionId: 'read-only', label: 'Read-only smoke' },
+                    { optionId: 'edit', label: 'Edit smoke' },
+                  ],
+                }, {
+                  questionId: 'smoke-name',
+                  prompt: 'What should I call this smoke run?',
+                  options: [],
+                }],
               }),
               startedAt: now + 10,
             },
@@ -559,13 +577,98 @@ describe('buildWorkProcessPresentation', () => {
       thinkingPreview: 'I should ask the user which smoke path to run.',
     });
     const sectionSteps = section.type === 'section' ? section.steps : [];
-    expect(sectionSteps).toHaveLength(1);
-    expect(sectionSteps[0]).toMatchObject({
+    expect(section).toMatchObject({
+      type: 'section',
+      stepsDisclosure: 'deferred',
+    });
+    const askGroup = sectionSteps.find((row) => row.type === 'toolGroup' && row.kind === 'interaction');
+    expect(askGroup).toMatchObject({
       type: 'toolGroup',
       kind: 'interaction',
-      countLabel: '1 问题',
+      title: '正在询问',
+      countLabel: '2 个问题',
+      summary: '',
     });
-    expect(flattenWorkRows(presentation.rows).filter((row) => row.type === 'userInput')).toHaveLength(1);
+    const visibleAskGroup = flattenVisibleWorkRows(presentation.rows).find((row) => row.type === 'toolGroup' && row.kind === 'interaction');
+    expect(visibleAskGroup).toMatchObject({
+      type: 'toolGroup',
+      rows: [],
+      defaultOpen: false,
+    });
+    expect(flattenVisibleWorkRows(presentation.rows).filter((row) => row.type === 'userInput')).toHaveLength(0);
+    const userInputRows = flattenWorkRows(presentation.rows).filter((row) => row.type === 'userInput');
+    expect(userInputRows).toHaveLength(1);
+    expect(userInputRows[0]).toMatchObject({
+      items: [
+        { questionId: 'smoke-path', prompt: 'Which smoke path should I use?' },
+        { questionId: 'smoke-name', prompt: 'What should I call this smoke run?' },
+      ],
+    });
+  });
+
+  it('renders completed batch ask_user as ordered transcript items without header preview', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'complete',
+      updatedAt: now,
+      blocks: [
+        {
+          id: 'tool-ask-user-complete',
+          kind: 'user_input',
+          title: 'Called ask_user',
+          status: 'complete',
+          toolCalls: [
+            {
+              id: 'tool-ask-complete',
+              toolName: 'ask_user',
+              status: 'complete',
+              argsPreview: JSON.stringify({
+                questions: [{
+                  questionId: 'route',
+                  prompt: 'Which route should I use?',
+                  options: [
+                    { optionId: 'a', label: 'A route' },
+                    { optionId: 'b', label: 'B route' },
+                  ],
+                }, {
+                  questionId: 'width',
+                  prompt: 'Which viewport should I verify?',
+                  options: [],
+                }],
+              }),
+              resultPreview: JSON.stringify({
+                answers: [
+                  { questionId: 'route', answer: 'A route', selectedOptionId: 'a' },
+                  { questionId: 'width', answer: 'narrow\n390x844' },
+                ],
+              }),
+              startedAt: now + 10,
+              completedAt: now + 40,
+            },
+          ],
+          startedAt: now + 10,
+          completedAt: now + 40,
+        },
+      ],
+    });
+
+    const rows = flattenWorkRows(presentation.rows);
+    const askUserGroup = rows.find((row) => row.type === 'toolGroup');
+    expect(askUserGroup).toMatchObject({
+      type: 'toolGroup',
+      title: '已询问',
+      countLabel: '2 个问题',
+      summary: '',
+    });
+    const askUserRow = rows.find((row) => row.type === 'userInput');
+    expect(askUserRow).toMatchObject({
+      type: 'userInput',
+      status: 'complete',
+      questionCount: 2,
+      items: [
+        { questionId: 'route', prompt: 'Which route should I use?', answer: 'A route', selectedOptionId: 'a' },
+        { questionId: 'width', prompt: 'Which viewport should I verify?', answer: 'narrow\n390x844' },
+      ],
+    });
   });
 
   it('keeps failed tool-backed loop thinking as the section top while deduplicating later summary-only echoes', () => {
@@ -677,6 +780,111 @@ describe('buildWorkProcessPresentation', () => {
     expect(flatRows.filter((row) => row.type === 'tool')).toHaveLength(2);
   });
 
+  it('defers child tool evidence while visible thinking is streaming', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'running',
+      updatedAt: now,
+      blocks: [
+        {
+          id: 'runtime-loop-streaming-tools',
+          kind: 'llm_turn',
+          title: 'LLM turn',
+          status: 'running',
+          result: {
+            status: 'complete',
+            toolCallIds: ['tool-memory'],
+          },
+          thinking: {
+            text: 'Reading memory before I can answer.',
+            kind: 'summary',
+            source: 'anthropic-thinking',
+            visibility: 'summary',
+            replayPolicy: 'provider-artifact',
+          },
+          thinkingStatus: 'streaming',
+          toolCalls: [
+            {
+              id: 'tool-memory',
+              toolName: 'memory_read',
+              status: 'complete',
+              argsPreview: JSON.stringify({ key: 'project-identity' }),
+              resultPreview: JSON.stringify({ ok: true, value: 'RDC Agent' }),
+              startedAt: now,
+              completedAt: now + 10,
+            },
+          ],
+          startedAt: now,
+        },
+      ],
+    });
+
+    const section = presentation.rows.find((row) => row.type === 'section');
+    expect(section).toMatchObject({
+      type: 'section',
+      status: 'running',
+      thinkingStatus: 'streaming',
+      stepsDisclosure: 'deferred',
+      stepCount: 1,
+    });
+    expect(flattenWorkRows(presentation.rows).filter((row) => row.type === 'tool')).toHaveLength(1);
+    expect(flattenVisibleWorkRows(presentation.rows).filter((row) => row.type === 'tool')).toHaveLength(0);
+    const visibleGroup = flattenVisibleWorkRows(presentation.rows).find((row) => row.type === 'toolGroup');
+    expect(visibleGroup).toMatchObject({
+      type: 'toolGroup',
+      defaultOpen: false,
+      rows: [],
+    });
+  });
+
+  it('discloses child tool evidence after visible thinking completes', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'complete',
+      updatedAt: now,
+      blocks: [
+        {
+          id: 'runtime-loop-complete-tools',
+          kind: 'llm_turn',
+          title: 'LLM turn',
+          status: 'complete',
+          result: {
+            status: 'complete',
+            toolCallIds: ['tool-memory-complete'],
+          },
+          thinking: {
+            text: 'Read memory and now can answer.',
+            kind: 'summary',
+            source: 'anthropic-thinking',
+            visibility: 'summary',
+            replayPolicy: 'provider-artifact',
+          },
+          thinkingStatus: 'complete',
+          toolCalls: [
+            {
+              id: 'tool-memory-complete',
+              toolName: 'memory_read',
+              status: 'complete',
+              argsPreview: JSON.stringify({ key: 'project-model' }),
+              resultPreview: JSON.stringify({ ok: true, value: 'configured model' }),
+              startedAt: now,
+              completedAt: now + 10,
+            },
+          ],
+          startedAt: now,
+          completedAt: now + 10,
+        },
+      ],
+    });
+
+    const section = presentation.rows.find((row) => row.type === 'section');
+    expect(section).toMatchObject({
+      type: 'section',
+      status: 'complete',
+      thinkingStatus: 'complete',
+      stepsDisclosure: 'visible',
+      stepCount: 1,
+    });
+    expect(flattenVisibleWorkRows(presentation.rows).filter((row) => row.type === 'tool')).toHaveLength(1);
+  });
   it('nests tool approval requests under their tool call without leaking internal IDs', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'running',
@@ -1246,7 +1454,16 @@ describe('semantic step groups', () => {
             id: 'tool-ask',
             toolName: 'ask_user',
             status: 'running',
-            argsPreview: JSON.stringify({ question: 'Continue?', choices: ['Yes', 'No'] }),
+            argsPreview: JSON.stringify({
+              questions: [{
+                questionId: 'continue',
+                prompt: 'Continue?',
+                options: [
+                  { optionId: 'yes', label: 'Yes' },
+                  { optionId: 'no', label: 'No' },
+                ],
+              }],
+            }),
             startedAt: now + 30,
           }],
           startedAt: now + 30,

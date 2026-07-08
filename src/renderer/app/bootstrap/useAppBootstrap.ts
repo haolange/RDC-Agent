@@ -1,4 +1,4 @@
-﻿import { useEffect } from 'react';
+import { useEffect } from 'react';
 import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ResolvedTheme } from '@shared/types/settings';
@@ -48,6 +48,7 @@ export function useAppBootstrap(options: {
   const setBranchState = useConversationStore((state) => state.setBranchState);
   const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
   const setCurrentRunUsage = useSessionStore((state) => state.setCurrentRunUsage);
+  const clearUsageSnapshot = useSessionStore((state) => state.clearUsageSnapshot);
   const setActiveTerminalContext = useTerminalStore((state) => state.setActiveContext);
 
   useEffect(() => {
@@ -129,7 +130,7 @@ export function useAppBootstrap(options: {
   useEffect(() => {
     const electronAPI = window.electronAPI;
     if (!electronAPI) {
-      setCurrentRunUsage(null);
+      clearUsageSnapshot();
       return;
     }
 
@@ -138,6 +139,7 @@ export function useAppBootstrap(options: {
       if (navigator.webdriver && currentRunUsage?.runId === currentRun.runId) {
         return;
       }
+      clearUsageSnapshot();
       let cancelled = false;
       void electronAPI.workflow.getRunUsage(currentRun.runId)
         .then((result) => { if (!cancelled) setCurrentRunUsage(result.usage ?? null); })
@@ -147,6 +149,7 @@ export function useAppBootstrap(options: {
 
     // Ask mode (no active debug run): pull by sessionId if available.
     if (!hasActiveDebugRun && currentSession?.sessionId) {
+      clearUsageSnapshot();
       let cancelled = false;
       void electronAPI.workflow.getRunUsage(undefined, currentSession.sessionId)
         .then((result) => { if (!cancelled) setCurrentRunUsage(result.usage ?? null); })
@@ -154,9 +157,9 @@ export function useAppBootstrap(options: {
       return () => { cancelled = true; };
     }
 
-    setCurrentRunUsage(null);
+    clearUsageSnapshot();
     return undefined;
-  }, [currentRun?.runId, currentSession?.sessionId, hasActiveDebugRun, setCurrentRunUsage]);
+  }, [clearUsageSnapshot, currentRun?.runId, currentSession?.sessionId, hasActiveDebugRun, setCurrentRunUsage]);
 
   useProjectInputsBootstrap(runtimeTestMode);
   useSessionRestoreBootstrap(runtimeTestMode);

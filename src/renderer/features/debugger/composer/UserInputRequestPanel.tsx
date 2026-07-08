@@ -1,83 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { ConversationMessage, ConversationToolCall } from '@shared/types/conversation';
 import { useConversationStore } from '../../../stores/conversationStore';
+import { ActiveSignalText } from '../../../ui/ActiveSignalText';
 import { Button } from '../../../ui/Button';
+import { ChevronIcon } from './userInputRequestIcons';
+import { UserInputCustomAnswer, UserInputOptionList } from './UserInputRequestPanelParts';
 import { useUserInputRequestSubmit } from './useUserInputRequestSubmit';
+import {
+  applyCustomDraft,
+  applyOptionDraft,
+  areAllQuestionsAnswered,
+  buildAnswerPayload,
+  createRequestFingerprint,
+  findPendingUserInput,
+  isQuestionAnswered,
+  type PendingUserInputRequest,
+  type UserInputAnswerDrafts,
+} from './userInputRequestModel';
 
-export interface PendingUserInputRequest {
-  sessionId: string | null;
-  turnId: string;
-  toolCallId: string;
-  question: string;
-  choices: string[];
-  agentId?: string;
-}
-
-type Selection = number | 'custom';
-
-const normalizeToolName = (toolName: string): string => toolName.trim().toLowerCase().replace(/[.\-]/g, '_');
-
-const safeParseJson = (value?: string): unknown => {
-  if (!value?.trim()) return undefined;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return undefined;
-  }
-};
-
-const parseAskUserArgs = (call: ConversationToolCall): { question: string; choices: string[] } => {
-  const parsed = safeParseJson(call.argsPreview);
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    return {
-      question: 'The agent needs user input before continuing.',
-      choices: [],
-    };
-  }
-
-  const record = parsed as Record<string, unknown>;
-  const question = typeof record.question === 'string' && record.question.trim()
-    ? record.question.trim()
-    : 'The agent needs user input before continuing.';
-  const rawChoices = Array.isArray(record.choices)
-    ? record.choices
-    : Array.isArray(record.options)
-      ? record.options
-      : [];
-  const choices = rawChoices
-    .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
-    .map((entry) => entry.trim());
-
-  return { question, choices };
-};
-
-const findPendingUserInput = (messages: ConversationMessage[]): PendingUserInputRequest | null => {
-  const assistantMessages = messages
-    .filter((message) => message.role === 'assistant' && (message.status === 'draft' || message.status === 'streaming'))
-    .sort((left, right) => right.createdAt - left.createdAt);
-
-  for (const message of assistantMessages) {
-    for (const block of message.workTrace?.blocks ?? []) {
-      for (const call of block.toolCalls) {
-        if (normalizeToolName(call.toolName) !== 'ask_user') continue;
-        if (call.status !== 'pending' && call.status !== 'running') continue;
-        if (call.resultPreview) continue;
-
-        const args = parseAskUserArgs(call);
-        return {
-          sessionId: message.sessionId,
-          turnId: message.turnId,
-          toolCallId: call.id,
-          question: args.question,
-          choices: args.choices,
-          agentId: message.agentId,
-        };
-      }
-    }
-  }
-
-  return null;
-};
+export type { PendingUserInputRequest } from './userInputRequestModel';
 
 export const usePendingUserInputRequest = (): PendingUserInputRequest | null => {
   const messages = useConversationStore((state) => state.conversationMessages);
@@ -87,158 +27,234 @@ export const usePendingUserInputRequest = (): PendingUserInputRequest | null => 
 export const UserInputRequestPanel: React.FC<{
   request: PendingUserInputRequest;
 }> = ({ request }) => {
-  const hasChoices = request.choices.length > 0;
-  const [selection, setSelection] = useState<Selection>(hasChoices ? 0 : 'custom');
-  const [customAnswer, setCustomAnswer] = useState('');
+  const submitUserInput = useUserInputRequestSubmit();
+  const requestFingerprint = useMemo(() => createRequestFingerprint(request), [request]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [drafts, setDrafts] = useState<UserInputAnswerDrafts>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const customInputRef = useRef<HTMLInputElement>(null);
-  const submitUserInput = useUserInputRequestSubmit();
+  const panelRef = useRef<HTMLElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const resolvedAnswer = useMemo(() => {
-    if (selection === 'custom') {
-      return customAnswer.trim();
+  const questionCount = request.questions.length;
+  const currentQuestion = request.questions[Math.min(currentIndex, questionCount - 1)];
+  const currentDraft = currentQuestion ? drafts[currentQuestion.questionId] : undefined;
+  const selectedOptionId = currentDraft?.selectedOptionId;
+  const customAnswer = selectedOptionId ? '' : currentDraft?.answer ?? '';
+  const isBatch = questionCount > 1;
+  const isLastQuestion = currentIndex >= questionCount - 1;
+  const currentAnswered = currentQuestion ? isQuestionAnswered(currentQuestion, drafts) : false;
+  const allAnswered = areAllQuestionsAnswered(request.questions, drafts);
+  const footerActionLabel = !isLastQuestion ? 'Next' : 'Submit';
+  const footerHint = currentQuestion?.allowFreeform
+    ? (isLastQuestion ? 'Enter to submit · Shift+Enter for newline' : 'Enter to continue · Shift+Enter for newline')
+    : (isLastQuestion ? 'Enter to submit' : 'Enter to continue');
+
+  const resizeTextarea = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = 'auto';
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  }, []);
+
+  useEffect(() => {
+    setCurrentIndex(0);
+    setDrafts({});
+    setIsSubmitting(false);
+    setError(null);
+  }, [requestFingerprint]);
+
+  useEffect(() => {
+    resizeTextarea();
+  }, [customAnswer, currentIndex, resizeTextarea]);
+
+  useEffect(() => {
+    if (!currentQuestion?.allowFreeform || currentQuestion.options.length > 0) return;
+    textareaRef.current?.focus();
+  }, [currentQuestion]);
+
+  const goToQuestion = useCallback((index: number) => {
+    setCurrentIndex(Math.max(0, Math.min(index, questionCount - 1)));
+    setError(null);
+  }, [questionCount]);
+
+  const submitAnswers = useCallback(async () => {
+    const answers = buildAnswerPayload(request.questions, drafts);
+    if (answers.length !== request.questions.length || isSubmitting) {
+      setError('Answer every question before submitting.');
+      return;
     }
-    return request.choices[selection]?.trim() ?? '';
-  }, [customAnswer, request.choices, selection]);
-
-  const canSubmit = resolvedAnswer.length > 0 && !isSubmitting;
-
-  const submitAnswer = useCallback(async () => {
-    if (!canSubmit) return;
 
     setIsSubmitting(true);
     setError(null);
     try {
-      await submitUserInput(request, resolvedAnswer);
-      setCustomAnswer('');
+      await submitUserInput(request, answers);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to submit the answer.');
+      setError(err instanceof Error ? err.message : 'Unable to submit the answers.');
     } finally {
       setIsSubmitting(false);
     }
-  }, [canSubmit, request, resolvedAnswer, submitUserInput]);
+  }, [drafts, isSubmitting, request, submitUserInput]);
 
-  useEffect(() => {
-    if (selection === 'custom') {
-      customInputRef.current?.focus();
+  const advanceOrSubmit = useCallback(() => {
+    if (!currentQuestion || isSubmitting) return;
+    if (!currentAnswered) {
+      setError('Answer the current question before continuing.');
+      return;
     }
-  }, [selection]);
+    if (!isLastQuestion) {
+      goToQuestion(currentIndex + 1);
+      return;
+    }
+    if (!allAnswered) {
+      const firstMissing = request.questions.findIndex((question) => !isQuestionAnswered(question, drafts));
+      goToQuestion(firstMissing >= 0 ? firstMissing : currentIndex);
+      setError('Answer every question before submitting.');
+      return;
+    }
+    void submitAnswers();
+  }, [
+    allAnswered,
+    currentAnswered,
+    currentIndex,
+    currentQuestion,
+    drafts,
+    goToQuestion,
+    isLastQuestion,
+    isSubmitting,
+    request.questions,
+    submitAnswers,
+  ]);
+
+  const selectOption = useCallback((optionId: string) => {
+    if (!currentQuestion || isSubmitting) return;
+    const option = currentQuestion.options.find((entry) => entry.optionId === optionId);
+    if (!option) return;
+    setDrafts((previous) => applyOptionDraft(previous, currentQuestion, option));
+    setError(null);
+    if (isBatch && !isLastQuestion) {
+      setCurrentIndex((previous) => Math.min(previous + 1, questionCount - 1));
+    }
+  }, [currentQuestion, isBatch, isLastQuestion, isSubmitting, questionCount]);
+
+  const updateCustomAnswer = useCallback((answer: string) => {
+    if (!currentQuestion || isSubmitting) return;
+    setDrafts((previous) => applyCustomDraft(previous, currentQuestion, answer));
+    setError(null);
+  }, [currentQuestion, isSubmitting]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      const activeElement = document.activeElement;
+      if (activeElement && panelRef.current && !panelRef.current.contains(activeElement)) return;
       if (isSubmitting) return;
 
-      if (event.ctrlKey && event.key === 'Enter') {
+      const target = event.target as HTMLElement | null;
+      const isTextarea = target?.tagName === 'TEXTAREA';
+      if (isTextarea && event.key === 'Enter' && event.shiftKey) return;
+
+      if (event.key === 'Enter' && !event.ctrlKey && !event.altKey && !event.metaKey) {
+        const isCommandButton = target?.tagName === 'BUTTON'
+          && !target.classList.contains('composer-user-input-option');
+        if (isCommandButton) return;
         event.preventDefault();
-        void submitAnswer();
+        advanceOrSubmit();
         return;
       }
 
-      if (hasChoices && !event.ctrlKey && !event.altKey && !event.metaKey && /^[1-9]$/.test(event.key)) {
-        const index = Number(event.key) - 1;
-        if (index < request.choices.length) {
+      if (
+        !isTextarea
+        && currentQuestion
+        && !event.ctrlKey
+        && !event.altKey
+        && !event.metaKey
+        && /^[1-9]$/.test(event.key)
+      ) {
+        const option = currentQuestion.options[Number(event.key) - 1];
+        if (option) {
           event.preventDefault();
-          setSelection(index);
+          selectOption(option.optionId);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [hasChoices, isSubmitting, request.choices.length, submitAnswer]);
+  }, [advanceOrSubmit, currentQuestion, isSubmitting, selectOption]);
+
+  if (!currentQuestion) return null;
 
   return (
-    <section className="composer-user-input-panel" data-testid="composer-user-input-panel">
-      <div className="composer-user-input-header">
-        <span className="composer-user-input-kicker">Input requested</span>
-        <p>{request.question}</p>
+    <section
+      ref={panelRef}
+      className="composer-user-input-panel"
+      data-testid="composer-user-input-panel"
+    >
+      <div className="composer-user-input-question-bar">
+        <div className="composer-user-input-header">
+          <ActiveSignalText active tone="interaction" className="composer-user-input-kicker">Input requested</ActiveSignalText>
+          <p>{currentQuestion.prompt}</p>
+          {currentQuestion.description ? (
+            <span className="composer-user-input-question-description">{currentQuestion.description}</span>
+          ) : null}
+        </div>
+        {isBatch ? (
+          <div className="composer-user-input-progress" aria-label="Question navigation">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="composer-user-input-nav-button"
+              disabled={currentIndex === 0 || isSubmitting}
+              aria-label="Previous question"
+              onClick={() => goToQuestion(currentIndex - 1)}
+            >
+              <ChevronIcon direction="left" />
+            </Button>
+            <span>{currentIndex + 1} of {questionCount}</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="composer-user-input-nav-button"
+              disabled={currentIndex >= questionCount - 1 || !currentAnswered || isSubmitting}
+              aria-label="Next question"
+              onClick={() => goToQuestion(currentIndex + 1)}
+            >
+              <ChevronIcon direction="right" />
+            </Button>
+          </div>
+        ) : null}
       </div>
 
-      {hasChoices ? (
-        <div className="composer-user-input-options" role="radiogroup" aria-label="Answer choices">
-          {request.choices.map((choice, index) => {
-            const isSelected = selection === index;
-            return (
-              <button
-                key={`${index}-${choice}`}
-                type="button"
-                role="radio"
-                aria-checked={isSelected}
-                className={`composer-user-input-option${isSelected ? ' is-selected' : ''}`}
-                disabled={isSubmitting}
-                onClick={() => setSelection(index)}
-              >
-                <span className="composer-user-input-option-index" aria-hidden="true">
-                  {index + 1}
-                </span>
-                <span className="composer-user-input-option-label">{choice}</span>
-                {isSelected ? (
-                  <span className="composer-user-input-option-check" aria-hidden="true">
-                    ✓
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
-        </div>
+      {currentQuestion.options.length > 0 ? (
+        <UserInputOptionList
+          question={currentQuestion}
+          selectedOptionId={selectedOptionId}
+          isSubmitting={isSubmitting}
+          onSelect={selectOption}
+        />
       ) : null}
 
-      <div
-        className={`composer-user-input-custom${selection === 'custom' ? ' is-selected' : ''}`}
-        role={hasChoices ? 'radio' : undefined}
-        aria-checked={hasChoices ? selection === 'custom' : undefined}
-      >
-        {hasChoices ? (
-          <button
-            type="button"
-            className="composer-user-input-custom-select"
-            disabled={isSubmitting}
-            onClick={() => setSelection('custom')}
-          >
-            <span className="composer-user-input-option-index" aria-hidden="true">
-              {request.choices.length + 1}
-            </span>
-            <span className="composer-user-input-custom-label">Enter custom answer</span>
-            {selection === 'custom' ? (
-              <span className="composer-user-input-option-check" aria-hidden="true">
-                ✓
-              </span>
-            ) : null}
-          </button>
-        ) : null}
-        <input
-          ref={customInputRef}
-          type="text"
-          className="composer-user-input-custom-field"
-          value={customAnswer}
-          onChange={(event) => {
-            setCustomAnswer(event.target.value);
-            if (hasChoices) {
-              setSelection('custom');
-            }
-          }}
-          onFocus={() => {
-            if (hasChoices) {
-              setSelection('custom');
-            }
-          }}
-          placeholder="Type your answer..."
-          disabled={isSubmitting}
-          aria-label="Custom answer"
+      {currentQuestion.allowFreeform ? (
+        <UserInputCustomAnswer
+          question={currentQuestion}
+          selectedOptionId={selectedOptionId}
+          customAnswer={customAnswer}
+          isSubmitting={isSubmitting}
+          textareaRef={textareaRef}
+          onChange={updateCustomAnswer}
         />
-      </div>
+      ) : null}
 
       <div className="composer-user-input-footer">
-        <span className="composer-user-input-hint">Ctrl+Enter to submit</span>
+        <span className="composer-user-input-hint">{footerHint}</span>
         <Button
           variant="primary"
           size="sm"
           className="composer-user-input-submit"
-          disabled={!canSubmit}
-          onClick={() => void submitAnswer()}
+          disabled={isSubmitting || (isLastQuestion ? !allAnswered : !currentAnswered)}
+          onClick={advanceOrSubmit}
         >
-          Submit
+          {footerActionLabel}
         </Button>
       </div>
 

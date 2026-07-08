@@ -7,10 +7,15 @@ import { useProjectStore } from '../../../../stores/projectStore';
 import { useSessionStore } from '../../../../stores/sessionStore';
 import { getElectronApi } from '../../../../platform/getElectronApi';
 import { openProjectInput } from '../openProjectInput';
+import {
+  isContextSnapshotOwnedBySession,
+  isOpenedCaptureOwnedBySession,
+} from './sessionContextOwnership';
 
 export function useSessionContextPanel() {
   const { t } = useI18n();
   const currentProject = useProjectStore((state) => state.currentProject);
+  const currentSession = useProjectStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
   const projectInputs = useProjectStore((state) => state.projectInputs);
   const openedCapture = useCaptureStore((state) => state.openedCapture);
@@ -31,9 +36,15 @@ export function useSessionContextPanel() {
     [devices, selectedDevice],
   );
 
-  const activeOpenedCapture = currentProject && openedCapture?.projectId === currentProject.projectId
-    ? openedCapture
-    : null;
+  const activeOpenedCapture = isOpenedCaptureOwnedBySession(
+    openedCapture,
+    currentProject?.projectId,
+    currentSession?.sessionId,
+  ) ? openedCapture : null;
+  const sessionContextSnapshot = isContextSnapshotOwnedBySession(
+    contextSnapshot,
+    currentSession?.sessionId,
+  ) ? contextSnapshot : null;
   const isIdleSelectionState = !activeOpenedCapture && !currentRun;
   const captureOptions = useMemo<DropdownOption[]>(
     () => projectInputs.map((input) => ({
@@ -45,21 +56,24 @@ export function useSessionContextPanel() {
   );
 
   useEffect(() => {
+    setSelectedInputId('');
+    setErrorMessage(null);
+  }, [currentProject?.projectId, currentSession?.sessionId]);
+
+  useEffect(() => {
     if (activeOpenedCapture?.inputId && projectInputs.some((entry) => entry.inputId === activeOpenedCapture.inputId)) {
       setSelectedInputId(activeOpenedCapture.inputId);
       return;
     }
 
-    if (selectedInputId && projectInputs.some((entry) => entry.inputId === selectedInputId)) {
-      return;
+    if (selectedInputId && !projectInputs.some((entry) => entry.inputId === selectedInputId)) {
+      setSelectedInputId('');
     }
-
-    setSelectedInputId(projectInputs[0]?.inputId ?? '');
   }, [activeOpenedCapture?.inputId, projectInputs, selectedInputId]);
 
   const handleOpen = async (inputId: string) => {
     const input = projectInputs.find((entry) => entry.inputId === inputId);
-    if (!input) {
+    if (!input || !currentSession) {
       return;
     }
 
@@ -67,6 +81,7 @@ export function useSessionContextPanel() {
       input,
       currentProject,
       currentRun,
+      ownerSessionId: currentSession.sessionId,
       selectedDeviceEntry,
       setCaptures,
       setContextSnapshot,
@@ -104,7 +119,7 @@ export function useSessionContextPanel() {
     if (!electronAPI) return;
     setPreviewBusy(true);
     const result = await electronAPI.context.openHumanPreview({
-      sessionId: contextSnapshot?.sessionId ?? activeOpenedCapture?.replaySessionId,
+      sessionId: sessionContextSnapshot?.sessionId ?? activeOpenedCapture?.replaySessionId,
     }).catch((error) => ({
       success: false,
       contextSnapshot: undefined,
@@ -138,13 +153,13 @@ export function useSessionContextPanel() {
     setPreviewBusy(false);
   };
 
-  const humanPreview = contextSnapshot?.humanPreview;
-  const previewSessionId = contextSnapshot?.sessionId ?? activeOpenedCapture?.replaySessionId;
-  const previewDisabledReason = !contextSnapshot?.contextId
+  const humanPreview = sessionContextSnapshot?.humanPreview;
+  const previewSessionId = sessionContextSnapshot?.sessionId ?? activeOpenedCapture?.replaySessionId;
+  const previewDisabledReason = !sessionContextSnapshot?.contextId
     ? t('control.humanPreviewMissingContext')
     : !previewSessionId
       ? t('control.humanPreviewMissingSession')
-      : !contextSnapshot?.runtimeOwner || !contextSnapshot?.ownerLeaseId
+      : !sessionContextSnapshot?.runtimeOwner || !sessionContextSnapshot?.ownerLeaseId
         ? t('control.humanPreviewMissingOwner')
         : '';
   const canControlHumanPreview = !previewDisabledReason && !previewBusy;
@@ -154,7 +169,7 @@ export function useSessionContextPanel() {
     t,
     currentRun,
     projectInputs,
-    contextSnapshot,
+    contextSnapshot: sessionContextSnapshot,
     activeOpenedCapture,
     isIdleSelectionState,
     captureOptions,

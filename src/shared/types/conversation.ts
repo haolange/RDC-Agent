@@ -195,11 +195,31 @@ export interface ConversationCancelActiveTurnResult {
   error?: string;
 }
 
+export interface ConversationAskUserOption {
+  optionId: string;
+  label: string;
+  description?: string;
+}
+
+export interface ConversationAskUserQuestion {
+  questionId: string;
+  prompt: string;
+  description?: string;
+  options: ConversationAskUserOption[];
+  allowFreeform: boolean;
+}
+
+export interface ConversationAskUserAnswer {
+  questionId: string;
+  answer: string;
+  selectedOptionId?: string;
+}
+
 export interface ConversationAnswerUserInputRequest {
   sessionId?: string | null;
   turnId: string;
   toolCallId: string;
-  answer: string;
+  answers: ConversationAskUserAnswer[];
 }
 
 export interface ConversationAnswerUserInputResult {

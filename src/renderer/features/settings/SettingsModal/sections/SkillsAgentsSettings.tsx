@@ -1,7 +1,7 @@
 import React, { useState, type Dispatch, type SetStateAction } from 'react';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AgentRuntimeSkillWriteRequest } from '@shared/types/agentRuntime';
-import type { AgentPermissionMode, AppSettings } from '@shared/types/settings';
+import type { AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import { AgentsSettings } from './AgentsSettings';
 import { SkillLibrarySettings } from './SkillLibrarySettings';
@@ -14,19 +14,12 @@ interface SkillsAgentsSettingsProps {
   onUpsertSkill: (request: AgentRuntimeSkillWriteRequest) => Promise<AppSettings>;
   onDeleteSkill: (skillId: string) => Promise<AppSettings>;
   onImportSkill: () => Promise<AppSettings>;
-  permissionModeDraft: AgentPermissionMode;
-  readableRootsDraft: string;
-  writableRootsDraft: string;
-  onPermissionModeDraftChange: (mode: AgentPermissionMode) => void;
-  onReadableRootsDraftChange: (value: string) => void;
-  onWritableRootsDraftChange: (value: string) => void;
-  onSaveAgentPermissions: () => void | Promise<void>;
   agentManifestDrafts: AgentManifestDraft[];
   onAgentManifestDraftsChange: Dispatch<SetStateAction<AgentManifestDraft[]>>;
-  onSaveAgentManifests: () => void | Promise<void>;
+  onRetrySaveAgentManifests: () => void | Promise<unknown>;
   onImportAgentManifest: () => void | Promise<void>;
-  agentRouteSaveState: 'idle' | 'saving' | 'saved' | 'error';
-  agentRouteSaveMessage: string;
+  agentManifestSaveState: 'idle' | 'saving' | 'saved' | 'error';
+  agentManifestSaveMessage: string;
   t: Translate;
 }
 
@@ -35,19 +28,12 @@ export const SkillsAgentsSettings: React.FC<SkillsAgentsSettingsProps> = ({
   onUpsertSkill,
   onDeleteSkill,
   onImportSkill,
-  permissionModeDraft,
-  readableRootsDraft,
-  writableRootsDraft,
-  onPermissionModeDraftChange,
-  onReadableRootsDraftChange,
-  onWritableRootsDraftChange,
-  onSaveAgentPermissions,
   agentManifestDrafts,
   onAgentManifestDraftsChange,
-  onSaveAgentManifests,
+  onRetrySaveAgentManifests,
   onImportAgentManifest,
-  agentRouteSaveState,
-  agentRouteSaveMessage,
+  agentManifestSaveState,
+  agentManifestSaveMessage,
   t,
 }) => {
   const [capabilityTab, setCapabilityTab] = useState<CapabilityTab>('skills');
@@ -55,7 +41,7 @@ export const SkillsAgentsSettings: React.FC<SkillsAgentsSettingsProps> = ({
 
   return (
     <section className="settings-page settings-page-skills-agents">
-      <div className="settings-library-tabs settings-browser-tabs settings-subpage-tabs settings-subpage-tabs--primary" role="tablist" aria-label={t('settings.skillsAgentsTitle')}>
+      <div className="settings-library-tabs settings-skills-agents-tabs" role="tablist" aria-label={t('settings.skillsAgentsTitle')}>
             <button type="button" className={`settings-library-tab ${capabilityTab === 'skills' ? 'active' : ''}`} role="tab" aria-selected={capabilityTab === 'skills'} onClick={() => setCapabilityTab('skills')}>
               {t('settings.skills')}<span>{settings.configuration.availableSkills.length}</span>
             </button>
@@ -75,19 +61,12 @@ export const SkillsAgentsSettings: React.FC<SkillsAgentsSettingsProps> = ({
           ) : (
             <AgentsSettings
               settings={settings}
-              permissionModeDraft={permissionModeDraft}
-              readableRootsDraft={readableRootsDraft}
-              writableRootsDraft={writableRootsDraft}
-              onPermissionModeDraftChange={onPermissionModeDraftChange}
-              onReadableRootsDraftChange={onReadableRootsDraftChange}
-              onWritableRootsDraftChange={onWritableRootsDraftChange}
-              onSaveAgentPermissions={onSaveAgentPermissions}
               agentManifestDrafts={agentManifestDrafts}
               onAgentManifestDraftsChange={onAgentManifestDraftsChange}
-              onSaveAgentManifests={onSaveAgentManifests}
+              onRetrySaveAgentManifests={onRetrySaveAgentManifests}
               onImportAgentManifest={onImportAgentManifest}
-              agentRouteSaveState={agentRouteSaveState}
-              agentRouteSaveMessage={agentRouteSaveMessage}
+              agentManifestSaveState={agentManifestSaveState}
+              agentManifestSaveMessage={agentManifestSaveMessage}
               t={t}
             />
           )}
