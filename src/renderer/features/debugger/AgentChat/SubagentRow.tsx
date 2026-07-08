@@ -74,9 +74,10 @@ const renderChildRow = (row: WorkProcessRow): React.ReactNode => {
     );
   }
   if (row.type === 'userInput') {
+    const summary = row.items.map((item) => item.prompt).filter(Boolean).join(' · ');
     return (
       <li key={row.id} className={`work-process-child-summary status-${row.status}`}>
-        <span className="work-process-child-text">{row.question}</span>
+        <span className="work-process-child-text">{summary}</span>
       </li>
     );
   }
@@ -105,7 +106,7 @@ const renderChildRow = (row: WorkProcessRow): React.ReactNode => {
     // 子 agent 的简化扁平视图：把小节内步骤直接展开为子 row。
     return (
       <React.Fragment key={row.id}>
-        {row.steps.map((step) => renderChildRow(step))}
+        {row.visibleSteps.map((step) => renderChildRow(step))}
       </React.Fragment>
     );
   }

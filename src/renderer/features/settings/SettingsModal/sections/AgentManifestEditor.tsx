@@ -1,12 +1,12 @@
 import React from 'react';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
-import type { AgentPermissionMode, AppSettings } from '@shared/types/settings';
+import type { AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { AutosizeTextarea } from '../AutosizeTextarea';
 import { AgentCapabilityPicker, type AgentCapabilityGroup } from './AgentCapabilityPicker';
 import { AgentIconPresetPicker } from './AgentIconPresetPicker';
 import { AgentModelCascadeSelect } from './AgentModelCascadeSelect';
-import { AgentPermissionsSettings } from './AgentPermissionsSettings';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -16,16 +16,9 @@ interface AgentManifestEditorProps {
   onUpdateAgent: (patch: Partial<AgentManifestDraft>) => void;
   onDuplicateAgent: () => void;
   onDeleteAgent: () => void;
-  onSaveAgentManifests: () => void | Promise<void>;
-  permissionModeDraft: AgentPermissionMode;
-  readableRootsDraft: string;
-  writableRootsDraft: string;
-  onPermissionModeDraftChange: (mode: AgentPermissionMode) => void;
-  onReadableRootsDraftChange: (value: string) => void;
-  onWritableRootsDraftChange: (value: string) => void;
-  onSaveAgentPermissions: () => void | Promise<void>;
-  agentRouteSaveState: 'idle' | 'saving' | 'saved' | 'error';
-  agentRouteSaveMessage: string;
+  onRetrySaveAgentManifests: () => void | Promise<unknown>;
+  agentManifestSaveState: 'idle' | 'saving' | 'saved' | 'error';
+  agentManifestSaveMessage: string;
   t: Translate;
 }
 
@@ -83,152 +76,138 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   onUpdateAgent,
   onDuplicateAgent,
   onDeleteAgent,
-  onSaveAgentManifests,
-  permissionModeDraft,
-  readableRootsDraft,
-  writableRootsDraft,
-  onPermissionModeDraftChange,
-  onReadableRootsDraftChange,
-  onWritableRootsDraftChange,
-  onSaveAgentPermissions,
-  agentRouteSaveState,
-  agentRouteSaveMessage,
+  onRetrySaveAgentManifests,
+  agentManifestSaveState,
+  agentManifestSaveMessage,
   t,
 }) => {
   const selectedModel = selectedAgent.models[0] ?? '';
   const capabilityGroups = buildCapabilityGroups(settings, selectedAgent, onUpdateAgent, t);
+  const saveStatusMessage = agentManifestSaveState === 'saving'
+    ? t('settings.saving')
+    : agentManifestSaveMessage;
+  const showSaveStatus = agentManifestSaveState === 'saving' || Boolean(agentManifestSaveMessage);
+
   return (
     <div className="settings-manifest-editor" data-testid="settings-agent-manifest-editor">
       <div className="settings-manifest-editor-head">
-        <div>
-          <div className="settings-field-label">{selectedAgent.name}</div>
+        <div className="settings-agent-editor-title">
+          <span className="settings-agent-editor-icon" aria-hidden="true">
+            <ModeGlyph mode={selectedAgent.id} icon={selectedAgent.icon ?? 'message-orbit'} size={20} strokeWidth={1.9} />
+          </span>
+          <div className="settings-agent-editor-copy">
+            <div className="settings-agent-editor-name">{selectedAgent.name}</div>
+          </div>
         </div>
         <div className="settings-manifest-editor-actions">
-          <button type="button" className="button button-secondary" onClick={onDuplicateAgent}>
+          <AgentIconPresetPicker
+            value={selectedAgent.icon ?? 'message-orbit'}
+            onChange={(icon) => onUpdateAgent({ icon })}
+            t={t}
+          />
+          <button type="button" className="button button-ghost" onClick={onDuplicateAgent}>
             {t('settings.duplicateAgent')}
           </button>
-          <button type="button" className="button button-secondary" onClick={onDeleteAgent}>
+          <button type="button" className="button button-danger" onClick={onDeleteAgent}>
             {t('settings.deleteAgent')}
           </button>
         </div>
       </div>
 
-      <AgentIconPresetPicker
-        value={selectedAgent.icon ?? 'message-orbit'}
-        onChange={(icon) => onUpdateAgent({ icon })}
-        t={t}
-      />
+      <div className="settings-manifest-editor-body scrollbar-thin">
+        <section className="settings-agent-route-panel">
+          <div className="settings-section-header">
+            <div>
+              <div className="settings-section-title">{t('settings.agentRouteAvailability')}</div>
+            </div>
+          </div>
+          <div className="settings-manifest-form-grid">
+            <div className="settings-input-row settings-model-route-row">
+              <span className="settings-field-label">{t('settings.modelFieldLabel')}</span>
+              <AgentModelCascadeSelect
+                value={selectedModel}
+                options={settings.agents.modelOptions}
+                onChange={(model) => onUpdateAgent({ models: [model] })}
+                t={t}
+              />
+            </div>
+            <div className="settings-agent-flags">
+              <label className="settings-checkbox-row">
+                <input type="checkbox" checked={selectedAgent.enabled} onChange={(event) => onUpdateAgent({ enabled: event.currentTarget.checked })} />
+                <span>{t('settings.agentEnabled')}</span>
+              </label>
+              <label className="settings-checkbox-row">
+                <input type="checkbox" checked={selectedAgent.userInvocable} onChange={(event) => onUpdateAgent({ userInvocable: event.currentTarget.checked })} />
+                <span>{t('settings.userInvocable')}</span>
+              </label>
+              <label className="settings-checkbox-row">
+                <input type="checkbox" checked={selectedAgent.disableModelInvocation} onChange={(event) => onUpdateAgent({ disableModelInvocation: event.currentTarget.checked })} />
+                <span>{t('settings.disableModelInvocation')}</span>
+              </label>
+            </div>
+          </div>
+        </section>
 
-      <section className="settings-agent-route-panel">
-        <div className="settings-section-title">{t('settings.agentPrimaryRoute')}</div>
-        <div className="settings-manifest-form-grid">
-          <div className="settings-input-row settings-model-route-row">
-            <span className="settings-field-label">{t('settings.modelFieldLabel')}</span>
-            <AgentModelCascadeSelect
-              value={selectedModel}
-              options={settings.agents.modelOptions}
-              onChange={(model) => onUpdateAgent({ models: [model] })}
-              t={t}
+        <details className="settings-advanced-panel">
+          <summary>
+            <span>{t('settings.agentAdvancedIdentity')}</span>
+            <small>{t('settings.agentAdvancedIdentityHint')}</small>
+          </summary>
+          <div className="settings-advanced-content">
+            <div className="settings-manifest-form-grid settings-agent-identity-grid">
+              <label className="settings-input-row">
+                <span className="settings-field-label">{t('settings.agentName')}</span>
+                <input className="input" value={selectedAgent.name} onChange={(event) => onUpdateAgent({ name: event.currentTarget.value })} />
+              </label>
+              <label className="settings-input-row">
+                <span className="settings-field-label">{t('settings.agentArgumentHint')}</span>
+                <AutosizeTextarea rows={1} maxHeight={132} className="input settings-agent-textarea-compact" value={selectedAgent.argumentHint} onChange={(event) => onUpdateAgent({ argumentHint: event.currentTarget.value })} />
+              </label>
+              <label className="settings-input-row">
+                <span className="settings-field-label">{t('settings.agentDescription')}</span>
+                <AutosizeTextarea rows={1} maxHeight={132} className="input settings-agent-textarea-compact settings-agent-description-field" value={selectedAgent.description} onChange={(event) => onUpdateAgent({ description: event.currentTarget.value })} />
+              </label>
+            </div>
+          </div>
+        </details>
+
+        <details className="settings-advanced-panel">
+          <summary>
+            <span>{t('settings.agentAdvancedCapabilities')}</span>
+            <small>{t('settings.agentAdvancedCapabilitiesHint')}</small>
+          </summary>
+          <div className="settings-advanced-content">
+            <AgentCapabilityPicker groups={capabilityGroups} t={t} />
+          </div>
+        </details>
+
+        <details className="settings-advanced-panel">
+          <summary>
+            <span>{t('settings.agentAdvancedInstructions')}</span>
+          </summary>
+          <div className="settings-advanced-content">
+            <AutosizeTextarea
+              rows={2}
+              maxHeight={520}
+              aria-label={t('settings.agentInstructions')}
+              className="input settings-agent-instructions"
+              value={selectedAgent.instructions}
+              onChange={(event) => onUpdateAgent({ instructions: event.currentTarget.value })}
             />
           </div>
-          <div className="settings-agent-flags">
-            <label className="settings-checkbox-row">
-              <input type="checkbox" checked={selectedAgent.enabled} onChange={(event) => onUpdateAgent({ enabled: event.currentTarget.checked })} />
-              <span>{t('settings.agentEnabled')}</span>
-            </label>
-            <label className="settings-checkbox-row">
-              <input type="checkbox" checked={selectedAgent.userInvocable} onChange={(event) => onUpdateAgent({ userInvocable: event.currentTarget.checked })} />
-              <span>{t('settings.userInvocable')}</span>
-            </label>
-            <label className="settings-checkbox-row">
-              <input type="checkbox" checked={selectedAgent.disableModelInvocation} onChange={(event) => onUpdateAgent({ disableModelInvocation: event.currentTarget.checked })} />
-              <span>{t('settings.disableModelInvocation')}</span>
-            </label>
-          </div>
-        </div>
-      </section>
-
-      <details className="settings-advanced-panel">
-        <summary>
-          <span>{t('settings.agentAdvancedIdentity')}</span>
-          <small>{t('settings.agentAdvancedIdentityHint')}</small>
-        </summary>
-        <div className="settings-advanced-content">
-          <div className="settings-manifest-form-grid settings-agent-identity-grid">
-            <label className="settings-input-row">
-              <span className="settings-field-label">{t('settings.agentName')}</span>
-              <input className="input" value={selectedAgent.name} onChange={(event) => onUpdateAgent({ name: event.currentTarget.value })} />
-            </label>
-            <label className="settings-input-row">
-              <span className="settings-field-label">{t('settings.agentArgumentHint')}</span>
-              <AutosizeTextarea rows={1} maxHeight={132} className="input settings-agent-textarea-compact" value={selectedAgent.argumentHint} onChange={(event) => onUpdateAgent({ argumentHint: event.currentTarget.value })} />
-            </label>
-            <label className="settings-input-row">
-              <span className="settings-field-label">{t('settings.agentDescription')}</span>
-              <AutosizeTextarea rows={1} maxHeight={132} className="input settings-agent-textarea-compact settings-agent-description-field" value={selectedAgent.description} onChange={(event) => onUpdateAgent({ description: event.currentTarget.value })} />
-            </label>
-          </div>
-        </div>
-      </details>
-
-      <details className="settings-advanced-panel">
-        <summary>
-          <span>{t('settings.agentAdvancedCapabilities')}</span>
-          <small>{t('settings.agentAdvancedCapabilitiesHint')}</small>
-        </summary>
-        <div className="settings-advanced-content">
-          <AgentCapabilityPicker groups={capabilityGroups} t={t} />
-        </div>
-      </details>
-
-      <details className="settings-advanced-panel">
-        <summary>
-          <span>{t('settings.agentAdvancedInstructions')}</span>
-          <small>{t('settings.agentAdvancedInstructionsHint')}</small>
-        </summary>
-        <div className="settings-advanced-content">
-          <label className="settings-input-row">
-            <span className="settings-field-label">{t('settings.agentInstructions')}</span>
-            <AutosizeTextarea maxHeight={520} className="input settings-agent-instructions settings-agent-handoff-textarea" value={selectedAgent.instructions} onChange={(event) => onUpdateAgent({ instructions: event.currentTarget.value })} />
-          </label>
-        </div>
-      </details>
-
-      <details className="settings-advanced-panel settings-agent-permissions-panel">
-        <summary>
-          <span>{t('settings.agentPermissionsTitle')}</span>
-          <small>{t('settings.agentPermissionsHint')}</small>
-        </summary>
-        <div className="settings-advanced-content">
-          <AgentPermissionsSettings
-            permissionModeDraft={permissionModeDraft}
-            readableRootsDraft={readableRootsDraft}
-            writableRootsDraft={writableRootsDraft}
-            onPermissionModeDraftChange={onPermissionModeDraftChange}
-            onReadableRootsDraftChange={onReadableRootsDraftChange}
-            onWritableRootsDraftChange={onWritableRootsDraftChange}
-            onSave={onSaveAgentPermissions}
-            t={t}
-          />
-        </div>
-      </details>
-
-      <div className="settings-actions settings-manifest-editor-savebar">
-        {agentRouteSaveMessage && (
-          <div className={`settings-inline-status ${agentRouteSaveState === 'saved' ? 'success' : 'error'}`}>
-            {agentRouteSaveMessage}
-          </div>
-        )}
-        <button
-          type="button"
-          className="button button-primary"
-          data-testid="settings-agent-save"
-          onClick={() => void onSaveAgentManifests()}
-          disabled={agentRouteSaveState === 'saving'}
-        >
-          {agentRouteSaveState === 'saving' ? t('settings.saving') : t('settings.saveAgentManifests')}
-        </button>
+        </details>
       </div>
+
+      {showSaveStatus ? (
+        <div className={`settings-agent-autosave-status ${agentManifestSaveState}`}>
+          <span>{saveStatusMessage}</span>
+          {agentManifestSaveState === 'error' ? (
+            <button type="button" className="button button-secondary" onClick={() => void onRetrySaveAgentManifests()}>
+              {t('settings.retry')}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 };

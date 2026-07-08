@@ -64,7 +64,7 @@ const GENERIC_TOOL_DISPLAY: WorkProcessToolDisplay = {
   pendingVerb: '等待调用工具',
 };
 
-export const normalizeToolName = (toolName: string): string => toolName.trim().toLowerCase().replace(/[.\-]/g, '_');
+export const normalizeToolName = (toolName: string): string => toolName.trim().toLowerCase().replace(/[.-]/g, '_');
 
 const getMcpParts = (normalizedToolName: string): { server: string; tool: string } | null => {
   if (!normalizedToolName.startsWith('mcp__')) return null;

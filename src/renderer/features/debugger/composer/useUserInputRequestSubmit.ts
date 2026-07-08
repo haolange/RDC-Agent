@@ -1,12 +1,12 @@
 import { useCallback } from 'react';
-import type { PendingUserInputRequest } from './UserInputRequestPanel';
+import type { ConversationAskUserAnswer } from '@shared/types/conversation';
+import type { PendingUserInputRequest } from './userInputRequestModel';
 
 export const useUserInputRequestSubmit = () => useCallback(async (
   request: PendingUserInputRequest,
-  answer: string,
+  answers: ConversationAskUserAnswer[],
 ): Promise<void> => {
-  const trimmed = answer.trim();
-  if (!trimmed) return;
+  if (answers.length === 0) return;
 
   const electronAPI = window.electronAPI;
   if (!electronAPI) {
@@ -17,7 +17,7 @@ export const useUserInputRequestSubmit = () => useCallback(async (
     sessionId: request.sessionId,
     turnId: request.turnId,
     toolCallId: request.toolCallId,
-    answer: trimmed,
+    answers,
   });
   if (!result.success) {
     throw new Error(result.error || 'Unable to submit the answer.');

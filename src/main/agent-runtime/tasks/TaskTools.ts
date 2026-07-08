@@ -349,7 +349,9 @@ function throwIfAborted(signal?: AbortSignal): void {
 
 /** 从未知入参中读取字符串字段；`required` 时为空会抛错。 */
 function readString(params: object, key: string, required: true): string;
+// eslint-disable-next-line no-redeclare
 function readString(params: object, key: string, required: false): string | undefined;
+// eslint-disable-next-line no-redeclare
 function readString(
   params: object,
   key: string,

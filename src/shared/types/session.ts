@@ -117,6 +117,7 @@ export interface CaptureDescriptor {
   role: CaptureRole;
   backendHint: ReplayBackendHint;
   status: 'pending' | 'opening' | 'open' | 'error' | 'closed';
+  ownerSessionId?: string | null;
   sessionId?: string;
   replaySessionId?: string;
   contextId?: string;
@@ -226,6 +227,7 @@ export interface RdxRuntimeContext {
 export interface ContextSnapshot {
   contextId: string;
   sessionId: string;
+  ownerSessionId?: string | null;
   backend: 'local' | 'remote';
   remoteStatus?: 'connected' | 'online' | 'disconnected' | 'error';
   runtimeOwner: string;
@@ -277,6 +279,7 @@ export interface OpenedCapturePreviewError {
 
 export interface OpenedCaptureState {
   projectId: string;
+  ownerSessionId: string | null;
   inputId: string;
   filePath: string;
   captureId: string;
@@ -297,6 +300,7 @@ export interface OpenedCaptureState {
 
 export interface OpenProjectInputRequest {
   projectId: string;
+  ownerSessionId: string | null;
   inputId: string;
   filePath: string;
   replayDevice: ReplayDeviceEntry;

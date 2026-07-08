@@ -1,4 +1,5 @@
 import { useConversationStore } from '../../../stores/conversationStore';
+import { useSessionStore } from '../../../stores/sessionStore';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type { RightRailTarget } from './types';
 import type { ProjectSelectionLoaderOpsContext } from './projectSelectionLoaderOps';
@@ -126,6 +127,7 @@ export async function handleSessionCreateOp(
       return;
     }
 
+    useSessionStore.getState().clearUsageSnapshot();
     ctx.setCurrentProject(targetProject);
     ctx.setCurrentSession(result.session);
     ctx.setRightRailTarget('session');
@@ -276,6 +278,7 @@ export async function handleSessionActivateOp(
   const rollbackState = captureSelectionSnapshot();
   const priorProjectId = ctx.getCurrentProject()?.projectId;
   onCloseRename();
+  useSessionStore.getState().clearUsageSnapshot();
   ctx.setCurrentProject(project);
   ctx.setCurrentSession(session);
   ctx.setRightRailTarget('session');

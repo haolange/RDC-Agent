@@ -484,6 +484,14 @@
   min-width: 0;
 }
 
+.composer-user-input-question-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
 .composer-user-input-kicker,
 .composer-tool-approval-kicker {
   color: var(--token-text-caption);
@@ -498,6 +506,30 @@
   font-size: var(--text-sm);
   line-height: 1.6;
   overflow-wrap: anywhere;
+}
+
+.composer-user-input-question-description {
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.composer-user-input-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 0 0 auto;
+  color: var(--token-text-caption);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.composer-user-input-nav-button {
+  width: var(--space-8);
+  min-width: var(--space-8);
+  height: var(--space-8);
+  padding: 0;
 }
 
 .composer-tool-approval-meta {
@@ -1140,7 +1172,60 @@
   overflow-wrap: anywhere;
 }
 
+.composer-user-input-option-copy {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.composer-user-input-option-description {
+  position: relative;
+  min-width: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.composer-user-input-option-description-text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  mask-image: linear-gradient(90deg, black 0%, black 82%, transparent 100%);
+}
+
+.composer-user-input-option-tooltip {
+  position: absolute;
+  left: 0;
+  top: calc(100% + var(--space-2));
+  z-index: var(--z-tooltip);
+  display: none;
+  width: max-content;
+  max-width: min(calc(var(--space-24) * 5), calc(100vw - var(--space-8)));
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-panel);
+  box-shadow: var(--shadow-panel);
+  color: var(--token-text-heading);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  white-space: normal;
+  pointer-events: none;
+}
+
+.composer-user-input-option-description:hover .composer-user-input-option-tooltip,
+.composer-user-input-option:focus-visible .composer-user-input-option-tooltip {
+  display: block;
+}
+
 .composer-user-input-option-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--token-text-heading);
   font-size: var(--text-sm);
   font-weight: var(--font-semibold);
@@ -1169,6 +1254,7 @@
 .composer-user-input-custom-field {
   width: 100%;
   min-height: var(--space-8);
+  max-height: calc(var(--space-16) * 3);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--token-border-input);
   border-radius: var(--radius-md);
@@ -1177,6 +1263,8 @@
   font: inherit;
   font-size: var(--text-sm);
   line-height: 1.55;
+  resize: none;
+  overflow-y: auto;
 }
 
 .composer-user-input-custom-field::placeholder {
@@ -1215,9 +1303,19 @@
   .plan-document-header,
   .ask-user-question-header,
   .plan-actions,
+  .composer-user-input-question-bar,
   .composer-approval-header,
   .composer-revision-row {
     flex-direction: column;
+  }
+
+  .composer-user-input-progress {
+    align-self: flex-end;
+  }
+
+  .composer-user-input-option-copy {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
   }
 
   .composer-user-input-footer {

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import type { ConversationMessage } from '@shared/types/conversation';
 import { useConversationStore } from '../../../stores/conversationStore';
+import { ActiveSignalText } from '../../../ui/ActiveSignalText';
 import { useI18n } from '../../../i18n';
 import { useToolApprovalSubmit } from './useToolApprovalSubmit';
 
@@ -74,7 +75,7 @@ export const ToolApprovalRequestPanel: React.FC<{
   return (
     <section className="composer-tool-approval-panel" data-testid="composer-tool-approval-panel">
       <div className="composer-tool-approval-header">
-        <span className="composer-tool-approval-kicker">{t('composer.toolApprovalKicker')}</span>
+        <ActiveSignalText active tone="info" className="composer-tool-approval-kicker">{t('composer.toolApprovalKicker')}</ActiveSignalText>
         <p>{request.question}</p>
       </div>
       <div className="composer-tool-approval-meta" aria-label="Approval context">

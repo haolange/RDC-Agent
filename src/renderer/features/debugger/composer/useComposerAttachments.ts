@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   inferAttachmentKind,
   inferAttachmentMimeType,
 } from '../../../services/attachmentHelpers';
 import type { useI18n } from '../../../i18n';
 import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
-import type { ProjectRecord } from '@shared/types/session';
+import type { ProjectRecord, SessionRecord } from '@shared/types/session';
+import { buildComposerSessionScopeKey } from './composerSessionScope';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -13,6 +14,7 @@ export function useComposerAttachments(options: {
   showNotice: (message: string) => void;
   t: Translate;
   currentProject: ProjectRecord | null;
+  currentSession: SessionRecord | null;
   effectiveLeftCollapsed: boolean;
   leftToggleDisabled: boolean;
   toggleLeftSidebar: () => void | Promise<void>;
@@ -21,16 +23,31 @@ export function useComposerAttachments(options: {
     showNotice,
     t,
     currentProject,
+    currentSession,
     effectiveLeftCollapsed,
     leftToggleDisabled,
     toggleLeftSidebar,
   } = options;
 
-  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachmentDraft[]>([]);
-
-  useEffect(() => {
-    setPendingAttachments([]);
-  }, [currentProject?.projectId]);
+  const [pendingAttachmentsByScope, setPendingAttachmentsByScope] = useState<Record<string, PendingAttachmentDraft[]>>({});
+  const attachmentScopeKey = useMemo(
+    () => buildComposerSessionScopeKey(currentProject?.projectId, currentSession?.sessionId),
+    [currentProject?.projectId, currentSession?.sessionId],
+  );
+  const pendingAttachments = pendingAttachmentsByScope[attachmentScopeKey] ?? [];
+  const setPendingAttachments: Dispatch<SetStateAction<PendingAttachmentDraft[]>> = useCallback((next) => {
+    setPendingAttachmentsByScope((current) => {
+      const previous = current[attachmentScopeKey] ?? [];
+      const value = typeof next === 'function'
+        ? (next as (prev: PendingAttachmentDraft[]) => PendingAttachmentDraft[])(previous)
+        : next;
+      if (value.length === 0) {
+        const { [attachmentScopeKey]: _removed, ...rest } = current;
+        return rest;
+      }
+      return { ...current, [attachmentScopeKey]: value };
+    });
+  }, [attachmentScopeKey]);
 
   const handleAttachmentSelect = useCallback(async () => {
     const electronAPI = window.electronAPI;
@@ -81,11 +98,11 @@ export function useComposerAttachments(options: {
       });
       showNotice(t('app.stageFilesSuccess', { count: regularPaths.length }));
     }
-  }, [currentProject, effectiveLeftCollapsed, leftToggleDisabled, showNotice, t, toggleLeftSidebar]);
+  }, [currentProject, effectiveLeftCollapsed, leftToggleDisabled, setPendingAttachments, showNotice, t, toggleLeftSidebar]);
 
   const handlePendingAttachmentRemove = useCallback((attachmentId: string) => {
     setPendingAttachments((current) => current.filter((entry) => entry.id !== attachmentId));
-  }, []);
+  }, [setPendingAttachments]);
 
   return {
     pendingAttachments,

@@ -18,6 +18,7 @@ import { useSessionStore } from '../stores/sessionStore';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useI18n } from '../i18n';
+import { isOpenedCaptureOwnedBySession } from '../features/debugger/ControlPanel/SessionContextPanel/sessionContextOwnership';
 import type { ResolvedTheme } from '@shared/types/settings';
 
 const App: React.FC = () => {
@@ -31,6 +32,7 @@ const App: React.FC = () => {
   const [runtimeTestMode, setRuntimeTestMode] = useState<boolean | null>(null);
 
   const currentProject = useProjectStore((state) => state.currentProject);
+  const currentSession = useProjectStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
   const openedCapture = useCaptureStore((state) => state.openedCapture);
   const currentMode = useLayoutStore((state) => state.currentMode);
@@ -55,9 +57,8 @@ const App: React.FC = () => {
   const activityEntries = useTerminalStore((state) => state.entries);
 
   const hasOpenedCaptureForCurrentProject = Boolean(
-    currentProject
-    && openedCapture?.projectId === currentProject.projectId
-    && openedCapture.status === 'open',
+    openedCapture?.status === 'open'
+    && isOpenedCaptureOwnedBySession(openedCapture, currentProject?.projectId, currentSession?.sessionId),
   );
   const hasActiveDebugRun = Boolean(
     currentRun

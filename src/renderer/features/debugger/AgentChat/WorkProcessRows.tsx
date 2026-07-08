@@ -1,9 +1,11 @@
 import React from 'react';
 import { useI18n } from '../../../i18n';
+import { ActiveSignalText } from '../../../ui/ActiveSignalText';
 import { getRowStatusLabel, type WorkProcessRow } from './workProcessPresentation';
 import { useWorkProcessLabel } from './workProcessUseLabel';
 import { WorkProcessIcon } from './WorkProcessIcons';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
+import { isActiveWorkProcessStatus } from './workProcessActiveSignal';
 
 const ConsoleOutput: React.FC<{ lines: string[] }> = ({ lines }) => {
   const { t } = useI18n();
@@ -78,6 +80,9 @@ export const ToolGroupRow: React.FC<{
   renderRow: (row: WorkProcessRow) => React.ReactNode;
 }> = ({ row, renderRow }) => {
   const label = useWorkProcessLabel();
+  const active = isActiveWorkProcessStatus(row.status);
+  const title = label(row.title);
+  const activeInteractionTitle = active && row.kind === 'interaction';
   return (
   <li
     className={`work-process-step work-process-tool-group status-${row.status} kind-${row.kind}`}
@@ -91,8 +96,16 @@ export const ToolGroupRow: React.FC<{
             <span className="work-process-tool-group-icon" aria-hidden="true">
               <WorkProcessIcon icon={row.icon} />
             </span>
-            <span className="work-process-tool-group-title">{label(row.title)}</span>
-            <span className="work-process-tool-group-count">{row.countLabel}</span>
+            {activeInteractionTitle ? (
+              <ActiveSignalText active tone="interaction" className="work-process-tool-group-title">
+                {`${title} ${row.countLabel}`}
+              </ActiveSignalText>
+            ) : (
+              <>
+                <span className="work-process-tool-group-title">{title}</span>
+                <span className="work-process-tool-group-count">{row.countLabel}</span>
+              </>
+            )}
           </span>
           {row.summary ? <span className="work-process-tool-group-preview">{row.summary}</span> : null}
           <span className="work-process-row-caret" aria-hidden="true" />
@@ -202,60 +215,29 @@ export const ToolRow: React.FC<{ row: ToolRowModel }> = ({ row }) => {
 };
 
 export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'userInput' }> }> = ({ row }) => {
-  const label = useWorkProcessLabel();
-  const statusLabel = row.status === 'complete' ? '' : label(getRowStatusLabel(row.status));
-  const isQa = row.status === 'complete' && Boolean(row.answer);
-
-  // Answered requests render as compact Q/A, with details kept out of the main row.
-  if (isQa) {
-    return (
-      <li className={`work-process-step status-${row.status} kind-user-input`} data-testid="work-process-user-input">
-        <WorkProcessRailIcon variant="step" status={row.status} />
-        <div className="work-process-step-content">
-          <div className="work-process-user-input">
-            <div className="work-process-user-input-qa" data-testid="work-process-user-input-qa">
-              <p className="work-process-user-input-qa-question">
-                <span className="work-process-user-input-qa-label">Q:</span>
-                {row.question}
-              </p>
-              <p className="work-process-user-input-qa-answer">
-                <span className="work-process-user-input-qa-label">A:</span>
-                {row.answer}
-              </p>
-            </div>
-          </div>
-        </div>
-      </li>
-    );
-  }
-
-  const summaryLine = (
-    <>
-      <span className="work-process-tool-line">
-        <span className="work-process-tool-verb">{row.verb}</span>
-        <span className="work-process-user-input-question">{row.question}</span>
-      </span>
-      <span className="work-process-tool-meta">
-        {row.duration ? <span>{row.duration}</span> : null}
-        {statusLabel ? <span>{statusLabel}</span> : null}
-        {row.detailLines.length > 0 ? <span className="work-process-row-caret" aria-hidden="true" /> : null}
-      </span>
-    </>
-  );
+  const { t } = useI18n();
+  const pendingAnswerLabel = row.status === 'error'
+    ? t('chat.workProcessUserAnswerMissing')
+    : t('chat.workProcessUserAnswerPending');
 
   return (
     <li className={`work-process-step status-${row.status} kind-user-input`} data-testid="work-process-user-input">
       <WorkProcessRailIcon variant="step" status={row.status} />
       <div className="work-process-step-content">
-        <div className="work-process-user-input">
-          {row.detailLines.length > 0 ? (
-            <details className="work-process-disclosure" open={row.status === 'error'}>
-              <summary className="work-process-tool-summary">{summaryLine}</summary>
-              <pre className="work-process-row-pre">{row.detailLines.join('\n')}</pre>
-            </details>
-          ) : (
-            <div className="work-process-tool-summary work-process-tool-summary-static">{summaryLine}</div>
-          )}
+        <div className="work-process-user-input" data-testid="work-process-user-input-transcript">
+          <div className="work-process-user-input-transcript">
+            {row.items.map((item) => (
+              <div className="work-process-user-input-transcript-item" key={item.questionId}>
+                <p className="work-process-user-input-transcript-question">{item.prompt}</p>
+                {item.answer ? (
+                  <p className="work-process-user-input-transcript-answer">{item.answer}</p>
+                ) : (
+                  <p className="work-process-user-input-transcript-pending">{pendingAnswerLabel}</p>
+                )}
+              </div>
+            ))}
+            {row.error ? <p className="work-process-user-input-transcript-error">{row.error}</p> : null}
+          </div>
         </div>
       </div>
     </li>

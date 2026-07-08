@@ -1,5 +1,14 @@
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentApprovalEventPayload, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
+import type {
+  ConversationAskUserAnswer,
+  ConversationAskUserQuestion,
+} from '@shared/types/conversation';
+import {
+  formatAskUserAnswersForToolResult,
+  normalizeAskUserAnswers,
+  normalizeAskUserQuestions,
+} from '@shared/utils/askUser';
 import { buildSharedAgentEvent, type AgentEventBridgeContext } from '../AgentEventBridge';
 
 interface PendingUserInputRequest {
@@ -8,8 +17,7 @@ interface PendingUserInputRequest {
   turnId: string;
   toolCallId: string;
   approvalId: string;
-  question: string;
-  options: string[];
+  questions: ConversationAskUserQuestion[];
   context: AgentEventBridgeContext;
   onEvent?: (event: SharedAgentEvent) => void;
   resolve: (answer: string) => void;
@@ -23,8 +31,7 @@ export interface AgentUserInputRequestInput {
   sessionId?: string | null;
   turnId?: string;
   toolCallId: string;
-  question: string;
-  options?: string[];
+  questions: ConversationAskUserQuestion[];
   context: AgentEventBridgeContext;
   onEvent?: (event: SharedAgentEvent) => void;
   signal?: AbortSignal;
@@ -34,24 +41,13 @@ export interface AgentUserInputAnswerInput {
   sessionId?: string | null;
   turnId: string;
   toolCallId: string;
-  answer: string;
+  answers: ConversationAskUserAnswer[];
 }
 
 export interface AgentUserInputAnswerResult {
   success: boolean;
   error?: string;
 }
-
-const normalizeOption = (value: unknown): string | null => {
-  if (typeof value !== 'string') return null;
-  const text = value.trim();
-  return text ? text : null;
-};
-
-const normalizeQuestion = (value: string): string => {
-  const text = value.trim();
-  return text || 'The agent needs user input before continuing.';
-};
 
 const keyFor = (turnId: string, toolCallId: string): string => `${turnId}::${toolCallId}`;
 
@@ -71,10 +67,10 @@ export class AgentUserInputRequestService {
     const key = keyFor(turnId, toolCallId);
     this.cancelPending(key, 'Superseded by a new user input request.');
 
-    const question = normalizeQuestion(input.question);
-    const options = (input.options ?? [])
-      .map(normalizeOption)
-      .filter((entry): entry is string => Boolean(entry));
+    const questions = normalizeAskUserQuestions({ questions: input.questions });
+    if (questions.length === 0) {
+      throw new Error('ask_user requires at least one canonical question.');
+    }
     const approvalId = `ask-user-${toolCallId}`;
 
     return new Promise<string>((resolve, reject) => {
@@ -84,8 +80,7 @@ export class AgentUserInputRequestService {
         turnId,
         toolCallId,
         approvalId,
-        question,
-        options,
+        questions,
         context: input.context,
         onEvent: input.onEvent,
         resolve,
@@ -112,18 +107,12 @@ export class AgentUserInputRequestService {
         kind: 'ask_user',
         toolCallId,
         toolName: 'ask_user',
-        question,
-        options,
+        questions,
       });
     });
   }
 
   answer(input: AgentUserInputAnswerInput): AgentUserInputAnswerResult {
-    const answer = input.answer.trim();
-    if (!answer) {
-      return { success: false, error: 'Answer cannot be empty.' };
-    }
-
     const pending = this.pending.get(keyFor(input.turnId, input.toolCallId));
     if (!pending) {
       return { success: false, error: 'No pending user input request was found for this turn.' };
@@ -132,6 +121,29 @@ export class AgentUserInputRequestService {
       return { success: false, error: 'Pending user input request belongs to a different session.' };
     }
 
+    const answers = normalizeAskUserAnswers(pending.questions, { answers: input.answers });
+    const answerByQuestionId = new Map(answers.map((answer) => [answer.questionId, answer]));
+    const missingQuestion = pending.questions.find((question) => !answerByQuestionId.has(question.questionId));
+    if (missingQuestion) {
+      return { success: false, error: `Answer cannot be empty for question ${missingQuestion.questionId}.` };
+    }
+
+    for (const question of pending.questions) {
+      const answer = answerByQuestionId.get(question.questionId);
+      if (!answer) continue;
+      if (!question.allowFreeform && !answer.selectedOptionId) {
+        return { success: false, error: `Question ${question.questionId} requires one of the provided options.` };
+      }
+      if (
+        answer.selectedOptionId
+        && !question.options.some((option) => option.optionId === answer.selectedOptionId)
+      ) {
+        return { success: false, error: `Unknown option selected for question ${question.questionId}.` };
+      }
+    }
+
+    const orderedAnswers = pending.questions.map((question) => answerByQuestionId.get(question.questionId)!);
+    const formattedAnswer = formatAskUserAnswersForToolResult(pending.questions, orderedAnswers);
     this.deletePending(pending);
     this.emit(pending, 'approval.answered', {
       approvalId: pending.approvalId,
@@ -140,10 +152,10 @@ export class AgentUserInputRequestService {
       kind: 'ask_user',
       toolCallId: pending.toolCallId,
       toolName: 'ask_user',
-      question: pending.question,
-      answer,
+      questions: pending.questions,
+      answers: orderedAnswers,
     });
-    pending.resolve(answer);
+    pending.resolve(formattedAnswer);
     return { success: true };
   }
 
@@ -167,7 +179,7 @@ export class AgentUserInputRequestService {
       kind: 'ask_user',
       toolCallId: pending.toolCallId,
       toolName: 'ask_user',
-      question: pending.question,
+      questions: pending.questions,
       answer: reason,
     });
     pending.reject(new Error(reason));

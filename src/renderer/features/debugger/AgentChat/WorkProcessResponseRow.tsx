@@ -1,7 +1,9 @@
 import React from 'react';
+import { ActiveSignalText } from '../../../ui/ActiveSignalText';
 import { getRowStatusLabel, type WorkProcessRow } from './workProcessPresentation';
 import { useWorkProcessLabel } from './workProcessUseLabel';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
+import { isActiveThinkingStatus, isActiveWorkProcessStatus } from './workProcessActiveSignal';
 
 type ResponseRowModel = Extract<WorkProcessRow, { type: 'response' }>;
 
@@ -9,11 +11,13 @@ export const ResponseRow: React.FC<{ row: ResponseRowModel }> = ({ row }) => {
   const label = useWorkProcessLabel();
   const statusLabel = row.status === 'complete' ? '' : label(getRowStatusLabel(row.status));
   const hasThinking = row.thinkingExpandable && Boolean(row.thinkingPreview);
+  const active = isActiveWorkProcessStatus(row.status);
+  const thinkingActive = isActiveThinkingStatus(row.thinkingStatus, row.status);
   const summaryContent = (
     <>
       <span className="work-process-response-head">
         <span className="work-process-response-title">{label(row.title)}</span>
-        <span className="work-process-response-summary-text">{label(row.summary)}</span>
+        <ActiveSignalText active={active} tone="response" className="work-process-response-summary-text">{label(row.summary)}</ActiveSignalText>
       </span>
       <span className="work-process-tool-meta">
         {row.duration ? <span>{row.duration}</span> : null}
@@ -40,7 +44,7 @@ export const ResponseRow: React.FC<{ row: ResponseRowModel }> = ({ row }) => {
               {summaryContent}
             </summary>
             <div className="work-process-response-thinking">
-              <span className="work-process-response-thinking-label">{label(row.thinkingLabel)}</span>
+              <ActiveSignalText active={thinkingActive} tone="info" className="work-process-response-thinking-label">{label(row.thinkingLabel)}</ActiveSignalText>
               <pre className="work-process-thinking-preview">{row.thinkingPreview}</pre>
             </div>
           </details>

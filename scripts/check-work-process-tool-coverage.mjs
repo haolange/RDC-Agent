@@ -166,8 +166,19 @@ const FIXTURES = {
     resultPreview: JSON.stringify({ capturePath: 'demo.rdc' }),
   },
   ask_user: {
-    argsPreview: JSON.stringify({ question: 'Continue?', choices: ['Yes', 'No'] }),
-    resultPreview: 'Yes',
+    argsPreview: JSON.stringify({
+      questions: [{
+        questionId: 'continue',
+        prompt: 'Continue?',
+        options: [
+          { optionId: 'yes', label: 'Yes' },
+          { optionId: 'no', label: 'No' },
+        ],
+      }],
+    }),
+    resultPreview: JSON.stringify({
+      answers: [{ questionId: 'continue', answer: 'Yes', selectedOptionId: 'yes' }],
+    }),
   },
   mcp__filesystem__read_file: {
     argsPreview: JSON.stringify({ path: 'README.md' }),
@@ -239,7 +250,7 @@ for (const toolName of allTools) {
   if (toolName === 'ask_user') {
     assert(row.type === 'userInput', 'ask_user should render as userInput row');
     assert(row.verb !== 'Asked user', 'ask_user should use localized semantic verb');
-    assert(row.question.length > 0, 'ask_user should expose the question');
+    assert(row.items.length > 0 && row.items[0].prompt.length > 0, 'ask_user should expose transcript question items');
     continue;
   }
 

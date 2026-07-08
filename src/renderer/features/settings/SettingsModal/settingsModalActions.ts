@@ -9,7 +9,6 @@ import type {
   LlmProviderEntry,
 } from '@shared/types/settings';
 import type { TranslationKey, useI18n } from '../../../i18n';
-import { splitPathLines } from './sections/AgentPermissionsSettings';
 import type { useProviderConnection } from './useProviderConnection';
 import type { useSettingsModalState } from './useSettingsModalState';
 import { cloneRoute, getErrorMessage } from './utils';
@@ -166,9 +165,9 @@ export function createSettingsModalActions({
     }
   };
 
-  const handleSaveAgentManifests = async () => {
-    modalState.setAgentRouteSaveState('saving');
-    modalState.setAgentRouteSaveMessage('');
+  const handleSaveAgentManifests = async (): Promise<AppSettings | null> => {
+    modalState.setAgentManifestSaveState('saving');
+    modalState.setAgentManifestSaveMessage('');
     try {
       await patchSettings({
         agents: {
@@ -178,11 +177,13 @@ export function createSettingsModalActions({
       const nextSettings = await reloadSettings();
       modalState.setAgentManifestDrafts(nextSettings.agents.definitions.map((definition) => ({ ...definition })));
       modalState.setAgentRouteDrafts(nextSettings.llm.agentRoutes.map(cloneRoute));
-      modalState.setAgentRouteSaveState('saved');
-      modalState.setAgentRouteSaveMessage(t('settings.agentManifestSaved'));
+      modalState.setAgentManifestSaveState('saved');
+      modalState.setAgentManifestSaveMessage(t('settings.agentManifestSaved'));
+      return nextSettings;
     } catch (error) {
-      modalState.setAgentRouteSaveState('error');
-      modalState.setAgentRouteSaveMessage(getErrorMessage(error, t('settings.agentRouteSaveFailed')));
+      modalState.setAgentManifestSaveState('error');
+      modalState.setAgentManifestSaveMessage(getErrorMessage(error, t('settings.agentManifestSaveFailed')));
+      return null;
     }
   };
 
@@ -190,21 +191,21 @@ export function createSettingsModalActions({
     const filePaths = await window.electronAPI?.selectFiles();
     const filePath = filePaths?.find((entry) => entry.endsWith('.agent.md'));
     if (!filePath) {
-      modalState.setAgentRouteSaveState('error');
-      modalState.setAgentRouteSaveMessage(t('settings.agentImportRequiresManifest'));
+      modalState.setAgentManifestSaveState('error');
+      modalState.setAgentManifestSaveMessage(t('settings.agentImportRequiresManifest'));
       return;
     }
-    modalState.setAgentRouteSaveState('saving');
-    modalState.setAgentRouteSaveMessage('');
+    modalState.setAgentManifestSaveState('saving');
+    modalState.setAgentManifestSaveMessage('');
     try {
       const nextSettings = await window.electronAPI.settings.importAgentManifest(filePath);
       modalState.setAgentManifestDrafts(nextSettings.agents.definitions.map((definition) => ({ ...definition })));
       modalState.setAgentRouteDrafts(nextSettings.llm.agentRoutes.map(cloneRoute));
-      modalState.setAgentRouteSaveState('saved');
-      modalState.setAgentRouteSaveMessage(t('settings.agentManifestImported'));
+      modalState.setAgentManifestSaveState('saved');
+      modalState.setAgentManifestSaveMessage(t('settings.agentManifestImported'));
     } catch (error) {
-      modalState.setAgentRouteSaveState('error');
-      modalState.setAgentRouteSaveMessage(getErrorMessage(error, t('settings.agentRouteSaveFailed')));
+      modalState.setAgentManifestSaveState('error');
+      modalState.setAgentManifestSaveMessage(getErrorMessage(error, t('settings.agentManifestSaveFailed')));
     }
   };
 
@@ -297,21 +298,6 @@ export function createSettingsModalActions({
     return refreshRuntimeCatalog();
   };
 
-  const handleSaveAgentPermissions = async () => {
-    const nextSettings = await patchSettings({
-      agentRuntime: {
-        permissions: {
-          mode: modalState.permissionModeDraft,
-          readableRoots: splitPathLines(modalState.readableRootsDraft),
-          writableRoots: splitPathLines(modalState.writableRootsDraft),
-        },
-      },
-    });
-    modalState.setPermissionModeDraft(nextSettings.agentRuntime.permissions.mode);
-    modalState.setReadableRootsDraft(nextSettings.agentRuntime.permissions.readableRoots.join('\n'));
-    modalState.setWritableRootsDraft(nextSettings.agentRuntime.permissions.writableRoots.join('\n'));
-  };
-
   const toggleRuntimeId = (values: string[], id: string): string[] =>
     values.includes(id) ? values.filter((value) => value !== id) : [...values, id];
 
@@ -336,7 +322,6 @@ export function createSettingsModalActions({
     handleUpsertMcpServer,
     handleDeleteMcpServer,
     handleImportMcpServer,
-    handleSaveAgentPermissions,
     toggleRuntimeId,
   };
 }

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * RdxSessionService - RDX runtime context state and configured shell actions.
  */
 
@@ -73,6 +73,7 @@ export class RdxSessionService {
       role: 'primary',
       backendHint: isRemoteReplay ? 'remote' : 'local',
       status: 'pending',
+      ownerSessionId: request.ownerSessionId ?? null,
     };
 
     this.captures = [capture];
@@ -136,6 +137,7 @@ export class RdxSessionService {
 
     const openedCapture = this.createOpenedCaptureState(
       request.projectId,
+      request.ownerSessionId ?? null,
       request.inputId,
       request.filePath,
       replayDevice,
@@ -494,6 +496,7 @@ export class RdxSessionService {
     return {
       contextId: this.contextId ?? '',
       sessionId: activeCapture?.sessionId ?? '',
+      ownerSessionId: this.openedCapture?.ownerSessionId ?? activeCapture?.ownerSessionId ?? null,
       backend: activeCapture?.backendHint ?? 'local',
       remoteStatus: this.replayDevice?.type === 'android' ? this.remoteStatus : undefined,
       runtimeOwner: this.runtimeOwner ?? '',
@@ -630,6 +633,7 @@ export class RdxSessionService {
 
   private createOpenedCaptureState(
     projectId: string,
+    ownerSessionId: string | null,
     inputId: string,
     filePath: string,
     replayDevice: ReplayDeviceEntry,
@@ -638,6 +642,7 @@ export class RdxSessionService {
     const activeCapture = this.captures.find((capture) => capture.id === this.activeCaptureId) ?? this.captures[0];
     return {
       projectId,
+      ownerSessionId,
       inputId,
       filePath,
       captureId: activeCapture?.id ?? inputId,

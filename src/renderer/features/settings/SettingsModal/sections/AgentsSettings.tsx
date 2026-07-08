@@ -1,6 +1,6 @@
 import React, { type Dispatch, type SetStateAction, useState } from 'react';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
-import type { AgentPermissionMode, AppSettings } from '@shared/types/settings';
+import type { AppSettings } from '@shared/types/settings';
 import type { TranslationKey, useI18n } from '../../../../i18n';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { AgentManifestEditor } from './AgentManifestEditor';
@@ -16,19 +16,12 @@ const AGENT_DESCRIPTION_KEYS: Partial<Record<string, TranslationKey>> = {
 
 interface AgentsSettingsProps {
   settings: AppSettings;
-  permissionModeDraft: AgentPermissionMode;
-  readableRootsDraft: string;
-  writableRootsDraft: string;
-  onPermissionModeDraftChange: (mode: AgentPermissionMode) => void;
-  onReadableRootsDraftChange: (value: string) => void;
-  onWritableRootsDraftChange: (value: string) => void;
-  onSaveAgentPermissions: () => void | Promise<void>;
   agentManifestDrafts: AgentManifestDraft[];
   onAgentManifestDraftsChange: Dispatch<SetStateAction<AgentManifestDraft[]>>;
-  onSaveAgentManifests: () => void | Promise<void>;
+  onRetrySaveAgentManifests: () => void | Promise<unknown>;
   onImportAgentManifest: () => void | Promise<void>;
-  agentRouteSaveState: 'idle' | 'saving' | 'saved' | 'error';
-  agentRouteSaveMessage: string;
+  agentManifestSaveState: 'idle' | 'saving' | 'saved' | 'error';
+  agentManifestSaveMessage: string;
   t: Translate;
 }
 
@@ -76,19 +69,12 @@ const createNewAgent = (existing: AgentManifestDraft[]): AgentManifestDraft => {
 
 export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   settings,
-  permissionModeDraft,
-  readableRootsDraft,
-  writableRootsDraft,
-  onPermissionModeDraftChange,
-  onReadableRootsDraftChange,
-  onWritableRootsDraftChange,
-  onSaveAgentPermissions,
   agentManifestDrafts,
   onAgentManifestDraftsChange,
-  onSaveAgentManifests,
+  onRetrySaveAgentManifests,
   onImportAgentManifest,
-  agentRouteSaveState,
-  agentRouteSaveMessage,
+  agentManifestSaveState,
+  agentManifestSaveMessage,
   t,
 }) => {
   const activeDrafts = visibleDrafts(agentManifestDrafts);
@@ -128,6 +114,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
 
   const deleteAgent = () => {
     if (!selectedAgent) return;
+    if (!window.confirm(t('settings.deleteAgentConfirm', { name: selectedAgent.name || selectedAgent.id }))) return;
     onAgentManifestDraftsChange((current) => current.map((agent) => (
       agent.id === selectedAgent.id ? { ...agent, delete: true, enabled: false } : agent
     )));
@@ -178,16 +165,9 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
               onUpdateAgent={updateAgent}
               onDuplicateAgent={duplicateAgent}
               onDeleteAgent={deleteAgent}
-              onSaveAgentManifests={onSaveAgentManifests}
-              permissionModeDraft={permissionModeDraft}
-              readableRootsDraft={readableRootsDraft}
-              writableRootsDraft={writableRootsDraft}
-              onPermissionModeDraftChange={onPermissionModeDraftChange}
-              onReadableRootsDraftChange={onReadableRootsDraftChange}
-              onWritableRootsDraftChange={onWritableRootsDraftChange}
-              onSaveAgentPermissions={onSaveAgentPermissions}
-              agentRouteSaveState={agentRouteSaveState}
-              agentRouteSaveMessage={agentRouteSaveMessage}
+              onRetrySaveAgentManifests={onRetrySaveAgentManifests}
+              agentManifestSaveState={agentManifestSaveState}
+              agentManifestSaveMessage={agentManifestSaveMessage}
               t={t}
             />
           )}

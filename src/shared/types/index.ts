@@ -75,6 +75,11 @@ export type {
   ToolCallingMode,
 } from './agentRuntime';
 export type {
+  ConversationAnswerUserInputRequest,
+  ConversationAnswerUserInputResult,
+  ConversationAskUserAnswer,
+  ConversationAskUserOption,
+  ConversationAskUserQuestion,
   ConversationMessage,
   ConversationSendRequest,
   ConversationStreamEvent,

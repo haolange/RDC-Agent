@@ -105,6 +105,11 @@ export function buildPresentationUnits(
           const sectionRow = lastUnit.rows.find((row): row is Extract<WorkProcessRow, { type: 'section' }> => row.type === 'section');
           if (sectionRow) {
             sectionRow.steps.push(...userInputRows);
+            const shouldDeferMergedRows = shouldDeferMergedSectionSteps(sectionRow);
+            sectionRow.stepsDisclosure = shouldDeferMergedRows ? 'deferred' : 'visible';
+            sectionRow.visibleSteps.push(...(shouldDeferMergedRows
+              ? userInputRows.map(createDeferredVisibleStep)
+              : userInputRows));
             sectionRow.stepCount = deps.countToolSteps(sectionRow.steps);
             if (sectionRow.status === 'complete' && userInputRows.some((child) => child.status === 'running' || child.status === 'pending')) {
               sectionRow.status = 'running';
@@ -247,6 +252,64 @@ function shouldSkipStandalone(block: ConversationWorkBlock, deps: LoopProjection
   return deps.shouldSkipBlock(block);
 }
 
+function shouldDeferMergedSectionSteps(row: Extract<WorkProcessRow, { type: 'section' }>): boolean {
+  if (row.steps.length === 0) return false;
+  const hasStreamingThinking = row.thinkingStatus === 'streaming'
+    && Boolean(row.thinkingLabel || row.thinkingPreview);
+  const hasStreamingResult = row.resultStreaming
+    && Boolean(row.resultText || row.resultToolSummary);
+  return hasStreamingThinking || hasStreamingResult;
+}
+
+function shouldDeferSectionSteps(
+  steps: WorkProcessRow[],
+  sectionResult: ReturnType<LoopProjectionDeps['resolveSectionResult']>,
+  sectionThinking: ReturnType<LoopProjectionDeps['resolveSectionThinking']>,
+): boolean {
+  if (steps.length === 0) return false;
+  const hasStreamingThinking = sectionThinking.status === 'streaming'
+    && Boolean(sectionThinking.label || sectionThinking.preview);
+  const hasStreamingResult = sectionResult.resultStreaming
+    && Boolean(sectionResult.resultText || sectionResult.resultToolSummary);
+  return hasStreamingThinking || hasStreamingResult;
+}
+
+function createDeferredVisibleStep(row: WorkProcessRow): WorkProcessRow {
+  if (row.type === 'toolGroup') {
+    return {
+      ...row,
+      summary: '',
+      defaultOpen: false,
+      rows: [],
+    };
+  }
+  if (row.type === 'tool') {
+    return {
+      ...row,
+      argsLines: [],
+      previewLines: [],
+      rawLines: [],
+      approval: row.approval
+        ? { ...row.approval, message: '', metaLines: [] }
+        : undefined,
+    };
+  }
+  if (row.type === 'userInput') {
+    return {
+      ...row,
+      items: row.items.map((item) => ({
+        questionId: item.questionId,
+        prompt: item.prompt,
+        selectedOptionId: item.selectedOptionId,
+      })),
+    };
+  }
+  return row;
+}
+
+function createVisibleSectionSteps(steps: WorkProcessRow[], deferred: boolean): WorkProcessRow[] {
+  return deferred ? steps.map(createDeferredVisibleStep) : [...steps];
+}
 function projectLlmTurn(
   block: ConversationWorkBlock,
   deps: LoopProjectionDeps,
@@ -309,6 +372,8 @@ function projectLlmTurn(
   }
 
   if (shouldRenderSection) {
+    const deferSteps = shouldDeferSectionSteps(steps, sectionResult, sectionThinking);
+    const visibleSteps = createVisibleSectionSteps(steps, deferSteps);
     loopRows.push({
     type: 'section',
     id: block.id,
@@ -328,9 +393,11 @@ function projectLlmTurn(
     thinkingExpandable: sectionThinking.expandable,
     thinkingOpenByDefault: sectionThinking.openByDefault,
     stepCount: deps.countToolSteps(steps),
+    stepsDisclosure: deferSteps ? 'deferred' : 'visible',
     duration: formatDurationMs(block.startedAt, block.completedAt),
     defaultOpen: false,
     steps,
+    visibleSteps,
     outputPhase,
     stopReason,
     });
@@ -354,7 +421,7 @@ function projectLlmTurn(
 }
 
 function normalizeToolName(toolName: string): string {
-  return toolName.trim().toLowerCase().replace(/[.\-]/g, '_');
+  return toolName.trim().toLowerCase().replace(/[.-]/g, '_');
 }
 
 function dedupeSectionThinking(
