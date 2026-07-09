@@ -638,8 +638,6 @@ settings-help-text
 settings-icon-button
 settings-inline-pills
 settings-input-row
-settings-library-tab
-settings-library-tabs
 settings-link
 settings-managed-row
 settings-managed-row-main
@@ -699,7 +697,6 @@ settings-page-agents
 settings-page-general
 settings-page-models
 settings-page-personalization
-settings-page-skills-agents
 settings-page-tools
 settings-page-workspace
 settings-path-actions

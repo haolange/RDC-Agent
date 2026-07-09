@@ -5,7 +5,8 @@ import { useSettingsModal } from './useSettingsModal';
 import { GeneralSettings } from './sections/GeneralSettings';
 import { WorkspaceSettings } from './sections/WorkspaceSettings';
 import { ModelsSettings } from './sections/ModelsSettings';
-import { SkillsAgentsSettings } from './sections/SkillsAgentsSettings';
+import { AgentsSettings } from './sections/AgentsSettings';
+import { SkillLibrarySettings } from './sections/SkillLibrarySettings';
 import { ToolsSettings } from './sections/ToolsSettings';
 import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
 import { SettingsNavIcon } from './SettingsNavIcon';
@@ -105,7 +106,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
         return t('settings.workspaceSubtitle');
       case 'models':
         return t('settings.modelsSubtitle');
-      case 'skillsAgents':
+      case 'skills':
+      case 'agents':
         return '';
       case 'tools':
         return '';
@@ -215,12 +217,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 />
               )}
 
-              {activeSection === 'skillsAgents' && (
-                <SkillsAgentsSettings
+              {activeSection === 'skills' && (
+                <section className="settings-page settings-page-skills">
+                  <SkillLibrarySettings
+                    settings={settings}
+                    onUpsertSkill={handleUpsertSkill}
+                    onDeleteSkill={handleDeleteSkill}
+                    onImportSkill={handleImportSkill}
+                    t={t}
+                  />
+                </section>
+              )}
+
+              {activeSection === 'agents' && (
+                <AgentsSettings
                   settings={settings}
-                  onUpsertSkill={handleUpsertSkill}
-                  onDeleteSkill={handleDeleteSkill}
-                  onImportSkill={handleImportSkill}
                   agentManifestDrafts={agentManifestDrafts}
                   onAgentManifestDraftsChange={setAgentManifestDrafts}
                   onRetrySaveAgentManifests={handleSaveAgentManifests}
