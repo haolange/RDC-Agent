@@ -143,7 +143,8 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     { id: 'general', label: t('settings.general') },
     { id: 'workspace', label: t('settings.workspace') },
     { id: 'models', label: t('settings.models') },
-    { id: 'skillsAgents', label: t('settings.skillsAgents') },
+    { id: 'skills', label: t('settings.skills') },
+    { id: 'agents', label: t('settings.agentManifestTitle') },
     { id: 'tools', label: t('settings.toolsAndExtensions') },
   ], [t]);
 

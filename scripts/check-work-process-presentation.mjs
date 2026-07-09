@@ -552,6 +552,8 @@ const componentSource = [
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessIcons.tsx', 'utf8'),
 ].join('\n');
 const cssSource = fs.readFileSync('src/renderer/features/debugger/AgentChat/AgentChat.css', 'utf8');
+const appShellSource = fs.readFileSync('src/renderer/styles/global/app-shell.css', 'utf8');
+const responsiveThemeSource = fs.readFileSync('src/renderer/styles/global/responsive-theme.css', 'utf8');
 const presentationSource = [
   fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessPresentation.ts', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessBlockProjection.ts', 'utf8'),
@@ -605,6 +607,13 @@ assert(!cssSource.includes('.work-process-section-steps'), 'legacy tool-step dis
 assert(!cssSource.includes('.work-process-step-rail.is-section .work-process-rail-marker'), 'section markers must not use a hierarchy-only color override');
 assert(!cssSource.includes('.work-process-steps-toggle'), 'legacy tool-step toggle CSS should be removed');
 assert(!cssSource.includes('.work-process-empty'), 'placeholder empty-state CSS should be removed');
+assert(!appShellSource.includes('composerEnergyFlow'), 'composer running border must not use the legacy uniform sweep keyframe');
+assert(appShellSource.includes('@keyframes composerEnergyOrbit'), 'composer running border orbit keyframe should exist');
+assert(appShellSource.includes('.composer-shell.is-running::before'), 'composer running border core layer should exist');
+assert(appShellSource.includes('.composer-shell.is-running::after'), 'composer running border halo layer should exist');
+assert(appShellSource.includes('.composer-shell.is-running:focus-within'), 'composer running border must preserve the focus ring layer');
+assert(appShellSource.includes('@media (prefers-reduced-motion: reduce)'), 'composer running border should honor reduced motion');
+assert(responsiveThemeSource.includes('--composer-shell-radius: 12px'), 'composer responsive radius token should stay synchronized with the running border');
 
 assert(i18nSource.includes("'chat.workProcessTitle': 'Process'"), 'English process title copy should exist');
 assert(i18nSource.includes("'chat.workProcessTitle': '思考过程'"), 'Chinese process title copy should exist');
