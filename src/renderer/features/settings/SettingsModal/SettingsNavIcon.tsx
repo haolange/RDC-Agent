@@ -58,6 +58,8 @@ export const SettingsNavIcon: React.FC<SettingsNavIconProps> = ({ section }) => 
             <path d="M14.5 5.5l4 4" />
           </>
         );
+      case 'hooks':
+        return (<><path d="M8 4v6a4 4 0 0 0 8 0V4" /><path d="M6 4h4M14 4h4M12 14v6" /><path d="M9 20h6" /></>);
       default:
         return null;
     }

@@ -2234,3 +2234,22 @@
   font-size: var(--text-xs);
   color: var(--token-text-caption);
 }
+.request-inspector { margin-top: var(--space-3); border: 1px solid var(--token-border-muted); border-radius: var(--radius-md); background: var(--token-bg-panel); overflow: hidden; }
+.request-inspector-toggle { width: 100%; min-height: var(--control-height-sm); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 0 var(--space-3); border: 0; background: var(--token-interactive-rest); color: var(--token-text-body); font-size: var(--text-xs); text-align: left; }
+.request-inspector-toggle:hover { background: var(--token-interactive-hover); color: var(--token-text-heading); }
+.request-inspector-toggle:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: -2px; }
+.request-inspector-body { display: grid; gap: var(--space-3); padding: var(--space-3); border-top: 1px solid var(--token-border-muted); }
+.request-inspector-call { min-height: var(--control-height-sm); border: 1px solid var(--token-border-input); border-radius: var(--control-radius); background: var(--token-bg-raised); color: var(--token-text-body); padding: 0 var(--space-3); }
+.request-inspector-tabs { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.request-inspector-tabs button { min-height: var(--control-height-xs); padding: 0 var(--space-2); border: 0; border-radius: var(--control-radius); background: var(--token-interactive-rest); color: var(--token-text-caption); font-size: var(--text-xs); }
+.request-inspector-tabs button:hover { background: var(--token-interactive-hover); color: var(--token-text-body); }
+.request-inspector-tabs button.active { background: var(--token-interactive-active); color: var(--token-text-heading); }
+.request-inspector-tabs button:focus-visible { outline: 2px solid var(--token-border-focus); }
+.request-inspector-payload,
+.request-inspector-error { max-height: 360px; margin: 0; padding: var(--space-3); overflow: auto; border-radius: var(--radius-md); background: var(--token-bg-app); color: var(--token-text-body); font-size: var(--text-xs); white-space: pre-wrap; overflow-wrap: anywhere; }
+.request-inspector-error { color: var(--token-status-error); }
+
+@media (max-width: 760px) {
+  .request-inspector-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: var(--space-1); }
+  .request-inspector-tabs button { flex: 0 0 auto; }
+}

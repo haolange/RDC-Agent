@@ -180,7 +180,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
       <div className="conversation-message-row">
         <div className="conversation-message-stack">
           {trace && (trace.blocks.length > 0 || trace.summary || trace.status === 'running') ? (
-            <WorkProcess trace={trace} />
+              <WorkProcess trace={trace} sessionId={message.sessionId} turnId={message.turnId} />
           ) : null}
           {message.attachments && message.attachments.length > 0 ? (
             <MessageAttachments attachments={message.attachments} />

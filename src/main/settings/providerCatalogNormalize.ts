@@ -13,44 +13,14 @@ import type {
 
 export const PROVIDER_CATEGORIES: readonly LlmProviderCategory[] = LLM_PROVIDER_CATEGORY_DEFINITIONS.map((entry) => entry.id);
 
-const LEGACY_CATEGORY_MAP: Record<string, LlmProviderCategory> = {
-  account: 'login-authorization',
-  'openai-compatible': 'third-party-compatible',
-  'anthropic-compatible': 'third-party-compatible',
-  'cloud-platform': 'cloud-platform',
-  local: 'local',
-  plan: 'coding-token-plan',
-  image: 'image',
-};
-
-const LEGACY_PROTOCOL_MAP: Record<string, LlmProviderProtocol> = {
-  openrouter: 'OpenRouterChatCompletions',
-  'openai-compatible': 'OpenAICompatibleChatCompletions',
-  anthropic: 'AnthropicMessages',
-  'google-ai-studio': 'GoogleGemini',
-  'azure-openai': 'AzureOpenAIChatCompletions',
-  bedrock: 'AwsBedrock',
-  vertex: 'GoogleVertexAI',
-  ollama: 'OllamaOpenAICompatibleChatCompletions',
-};
-
 function isProviderCategory(value: unknown): value is LlmProviderCategory {
   return typeof value === 'string' && PROVIDER_CATEGORIES.includes(value as LlmProviderCategory);
-}
-
-function legacyCategory(value: unknown): LlmProviderCategory | null {
-  return typeof value === 'string' ? LEGACY_CATEGORY_MAP[value] ?? null : null;
-}
-
-function legacyProtocol(value: unknown): LlmProviderProtocol | null {
-  return typeof value === 'string' ? LEGACY_PROTOCOL_MAP[value] ?? null : null;
 }
 
 export function normalizeProviderCategory(
   provider: {
     id?: string;
     category?: unknown;
-    catalogGroup?: unknown;
     authMode?: LlmProviderAuthMode | string;
   },
 ): LlmProviderCategory {
@@ -64,11 +34,6 @@ export function normalizeProviderCategory(
     return provider.category;
   }
 
-  const migratedCategory = legacyCategory(provider.category) ?? legacyCategory(provider.catalogGroup);
-  if (migratedCategory) {
-    return migratedCategory;
-  }
-
   switch (provider.authMode) {
     case 'account':
       return 'login-authorization';
@@ -79,7 +44,7 @@ export function normalizeProviderCategory(
     default:
       console.warn(
         '[SettingsService] Unable to infer provider category; defaulting to third-party-compatible.',
-        { id: provider.id, authMode: provider.authMode, category: provider.category, catalogGroup: provider.catalogGroup },
+        { id: provider.id, authMode: provider.authMode, category: provider.category },
       );
       return 'third-party-compatible';
   }
@@ -89,7 +54,6 @@ export function normalizeProviderProtocol(
   provider: {
     id?: string;
     protocol?: unknown;
-    kind?: unknown;
   },
 ): LlmProviderProtocol {
   const id = typeof provider.id === 'string' ? provider.id.trim() : '';
@@ -99,12 +63,6 @@ export function normalizeProviderProtocol(
     if (builtin.protocolEditable && isLlmProviderProtocol(provider.protocol) && options.includes(provider.protocol)) {
       return provider.protocol;
     }
-    if (builtin.protocolEditable) {
-      const migrated = legacyProtocol(provider.kind);
-      if (migrated && options.includes(migrated)) {
-        return migrated;
-      }
-    }
     return builtin.protocol;
   }
 
@@ -112,14 +70,9 @@ export function normalizeProviderProtocol(
     return provider.protocol;
   }
 
-  const migratedProtocol = legacyProtocol(provider.protocol) ?? legacyProtocol(provider.kind);
-  if (migratedProtocol) {
-    return migratedProtocol;
-  }
-
   console.warn(
     '[SettingsService] Unable to infer provider protocol; defaulting to OpenAICompatibleChatCompletions.',
-    { id: provider.id, protocol: provider.protocol, kind: provider.kind },
+    { id: provider.id, protocol: provider.protocol },
   );
   return 'OpenAICompatibleChatCompletions';
 }

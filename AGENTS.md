@@ -106,6 +106,10 @@
 - 不要在仓库根目录留下临时脚本、一次性测试文件、零字节垃圾文件或含义不明的实验文件名。
 - 新增目录、脚本和文档时，命名应表达稳定职责，不使用临时性、讨论式或个人化命名。
 - 不允许提交 mojibake/乱码文案。若终端显示异常，先用文件搜索或十六进制/编辑器确认真实字节，再决定是否修复。
+- Agent Runtime 的用户资源根固定为 `~/.rdx`，项目资源根固定为 `<project-root>/.rdx`。不得新增可配置 workspace root、旧目录 fallback、双写或静默迁移。
+- Project Scope 必须覆盖 agents、skills、MCP、hooks、policies、knowledge 和 memory；RDX CLI action 与 secret 仍属于本机边界，不能由项目覆盖。
+- Prompt 调用链必须经 `PromptPlan -> RequestEnvelope -> provider adapter`。新增上下文来源时必须提供 scope、source、hash、precedence 和脱敏策略。
+- Memory 写入必须由明确用户意图或交互审批触发；禁止恢复轮次自动抽取、自动 consolidation 或全索引 prompt 注入。
 
 ## 修改时的检查项
 
@@ -123,6 +127,7 @@
 - renderer 结构或 UI 锚点改动后执行 `npm run check:architecture`、`npm run check:fidelity`、`npm run check:shared-exports`。
 - Work Process 投影、工具行文案/图标或 transcript UI 改动后执行 `npm run check:work-process`、`npm run check:work-process-tool-coverage`。
 - provider thinking 投递或 reasoning artifact 投影改动后执行 `npm run check:reasoning-delivery`。
+- scoped resource、project instruction、prompt snapshot、skill、hook 或 memory policy 改动后，必须执行相应专项 contract check；缺少时应在同一改动中补齐。
 - 入口、构建或窗口逻辑改动后，再补 `npm run build` 或等价打包检查。
 - 浏览器真实会话使用 `npm run start:agent-browser` 或 `scripts/start-browser-session.cmd`，然后用 Codex 内置浏览器打开主进程输出的 `/app`。
 - 人类开发入口使用 `scripts/start-rdc-agent-dev.cmd`；人类构建产物入口使用 `scripts/start-rdc-agent.cmd`；发布模式直接双击 exe / app 包。

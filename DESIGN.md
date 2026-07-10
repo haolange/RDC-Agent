@@ -40,7 +40,7 @@ Account providers are login products, not API-key shortcuts. Super Grok Account 
 
 ## Profiles
 
-Profiles are `.agent.md` files in workspace user space. Source defaults may seed missing profiles, but user-space profiles are the editable truth for the current device/workspace.
+Profiles are `.agent.md` files resolved by the RDX Runtime scope system. Bundled defaults may seed missing user resources, `~/.rdx/agents` is the editable user truth, and `<project-root>/.rdx/agents` may replace a same-id user profile for that project. Profile resources are replaced as a whole; runtime code must not field-merge two profile files or fall back to JSON mode profiles.
 
 Required baseline profiles:
 
@@ -52,6 +52,89 @@ Required baseline profiles:
 - Optimizer: bottleneck analysis, optimization ordering, and validation.
 
 Do not add mode-specific runtime branches when profile instructions, tool permissions, approval policy, or handoffs can express the behavior.
+
+## RDX Runtime Scope and Storage
+
+RDC-Agent has one canonical resource namespace. User resources live under `~/.rdx`; project resources live under `<project-root>/.rdx`. The application does not expose a configurable workspace root and does not resolve legacy resource directories.
+
+```text
+~/.rdx/
+  config.json
+  RDX.md
+  agents/
+  skills/<skill-id>/SKILL.md
+  mcp/
+  hooks/
+  policies/
+  knowledge/
+  memory/
+
+<project-root>/
+  RDX.md
+  <nested-dir>/RDX.md
+  .rdx/
+    project.yaml
+    agents/
+    skills/
+    mcp/
+    hooks/
+    policies/
+    knowledge/
+    memory/
+    inputs/
+    artifacts/
+```
+
+Application-owned session, task, trace, UI, log, cache, and secret state stays below the Electron OS data locations. It is not a scoped resource and must not be written into `~/.rdx` or a project repository. Project `.rdx/.gitignore` excludes `inputs`, `artifacts`, `memory`, and runtime state; declarative agents, skills, MCP, hooks, policies, knowledge structure, and project metadata may be committed.
+
+Resource precedence is `builtin < user < project`. Agents, skills, MCP servers, and hooks use stable ids and whole-resource replacement. A project disabled override may intentionally shadow an inherited resource. Every effective result carries scope, path, content hash, overridden source, and effective status. Policies are additive restrictions: deny sets are unioned, approval strength may only increase, and numeric limits may only decrease. Invalid or weaker project policy is rejected fail-closed.
+
+RDX CLI actions are device configuration. Project resources cannot replace their commands, environment, catalog, or executable path. Project MCP servers are reconciled only for the active project.
+
+## Project Instructions
+
+Prompt instructions resolve in deterministic order: `~/.rdx/RDX.md`, project-root `RDX.md`, then each `RDX.md` from the project root to every active target directory. Active targets include the session working directory, attachments, the opened capture, and path-bearing tool calls. Shell instructions follow the resolved command working directory.
+
+The resolver rejects traversal and symlink escape, records provenance and diagnostics, and enforces a visible byte budget. It never silently truncates or automatically imports `AGENTS.md` or `CLAUDE.md`. Instructions are model context; they do not expand filesystem, command, tool, or permission authority.
+
+## Skills
+
+Skills use the standard directory form `skills/<skill-id>/SKILL.md` with optional `scripts`, `references`, and `assets`. The runtime initially exposes a bounded metadata catalog. Skills named by `.agent.md` are preloaded before the first model call; other effective skills remain discoverable and are loaded through `skill_read`. An empty profile `skills` list means no preload, not no discovery. Explicit `$skill` invocation preloads the selected skill before the first call.
+
+Skill `allowed-tools` may narrow but never expand the effective profile tool set. Reference files are lazy and scripts execute only through normal tool and permission policy. The metadata catalog consumes at most two percent of the active context estimate, or 8000 characters when no estimate is available; overflow emits diagnostics without truncating selected full skill instructions.
+
+## Hooks
+
+Hooks are deterministic lifecycle commands stored as `.hook.yml`; they are not hidden prompt fragments. Definitions use structured `command` and `args`, explicit working directory, environment references, timeout, `block` or `warn` failure policy, and agent/tool matchers. Raw `shell: true` execution is forbidden. Project hooks require trust keyed by project identity and hook content hash; content changes revoke trust. Hook requests, bounded output, failures, and decisions are recorded in the canonical trace.
+
+## Memory and Knowledge
+
+Memory is explicit and scope-aware. The runtime exposes search, read, write, and delete operations for User and Project memory. Writes require explicit user intent or an interactive approval and deletes require confirmation. Conversation turns never trigger extraction or consolidation, and no memory index is automatically injected into a prompt.
+
+`knowledge/` is a top-level scoped resource location only in this architecture wave. It has no prescribed case, invariant, workflow, retrieval, ranking, or prompt-injection schema. A future Knowledge Engine must be designed as a separate runtime capability rather than reactivating automatic memory behavior.
+
+## Prompt and Request Contract
+
+Every model call follows one provider-neutral pipeline:
+
+```text
+Scoped Runtime Resolution
+  -> PromptPlanBuilder
+  -> Context and Message Transformation
+  -> RequestEnvelopeBuilder
+  -> Provider Adapter
+  -> Provider Wire Request
+```
+
+`PromptPlan` is the complete instruction plan. Each segment has an id, kind, scope, source path, source hash, precedence, content, and token estimate. It combines source-controlled core contracts, the effective agent, the active `RDX.md` chain, preloaded skills, the discovery catalog, effective tools and MCP schemas, policies, permissions, runtime facts, and context summaries. Capability prose is generated from actual effective tools; generic hardcoded capability claims are forbidden.
+
+`RequestEnvelopeBuilder` combines the plan, transformed messages, tool schemas, controls, route, and reasoning contract. Provider adapters only translate that envelope into provider wire shapes. Each call persists a sanitized provider-neutral snapshot under application session state. Snapshots retain provenance, route, protocol mapping, messages, tools, resources, and reported or explicitly estimated token usage, while credentials, capture binaries, protected continuation payloads, and opaque reasoning plaintext are removed and represented only by safe metadata or hashes.
+
+## Provider Reasoning Contract
+
+Reasoning semantics are model/provider facts, not protocol facts. The canonical semantic values are `raw`, `summary`, `opaque`, `none`, and `unknown`. Native providers may be classified only from maintained evidence. OpenAI- or Anthropic-compatible third-party routes default to `unknown` unless provider/model documentation establishes stronger semantics.
+
+Raw reasoning is collapsed and user-expandable; summary reasoning is labeled as a summary; readable unknown reasoning is labeled as unverified provider reasoning; opaque reasoning exposes metadata only; none produces no reasoning row. Ordinary assistant result content always belongs to the answer body or loop narration and is never reclassified as thinking.
 
 ## Tool and Command Catalog
 
@@ -127,7 +210,7 @@ Every new component must cover rest, hover, active, focus, disabled, and relevan
 
 ## Legacy Cleanup
 
-Legacy or deprecated compatibility may exist only at data migration boundaries. It must not appear in user-visible UI, runtime primary paths, duplicate schemas, or old-named wrappers. Removed visible terms and pseudo-stage ids are guarded by the architecture check; do not restate them in product copy or runtime identifiers.
+Legacy or deprecated compatibility is not retained. Cutover uses verified one-time operational staging and leaves no migration runtime, fallback, duplicate schema, old-named wrapper, or user-visible dual path. Removed terms and pseudo-stage ids are guarded by architecture checks.
 
 ## Verification Gate
 

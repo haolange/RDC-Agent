@@ -5,7 +5,7 @@ require('./register-ts-source.cjs');
 
 const {
   resolveAgentRouteCapability,
-  resolveReasoningDelivery,
+  resolveProviderReasoningContract,
   reasoningDeliveryToStreamVisibility,
 } = require('../src/main/agent-runtime/capabilities/RouteCapabilityResolver.ts');
 
@@ -39,41 +39,38 @@ function configuredProvider(id, protocolOverride) {
   };
 }
 
-function resolveThinkingArtifact(reasoningDelivery, hasThinking) {
-  if (!hasThinking || !reasoningDelivery || reasoningDelivery === 'none' || reasoningDelivery === 'hidden') {
-    return undefined;
-  }
-  if (reasoningDelivery === 'summary-only') {
-    return { kind: 'summary', visibility: 'summary', replayPolicy: 'none' };
-  }
-  return { kind: 'raw', visibility: 'raw-collapsed', replayPolicy: 'none' };
-}
 const anthropic = configuredProvider('anthropic', 'AnthropicMessages');
 const openaiResponses = configuredProvider('openai', 'OpenAIResponses');
 const gemini = configuredProvider('gemini-account', 'GoogleGemini');
 const ollama = configuredProvider('ollama', 'OllamaOpenAICompatibleChatCompletions');
+const deepseek = configuredProvider('deepseek', 'OpenAICompatibleChatCompletions');
+const kimi = configuredProvider('kimi-coding-plan', 'AnthropicMessages');
 
 const anthropicCap = resolveAgentRouteCapability(anthropic, 'test-model');
 assert(anthropicCap.reasoningDelivery === 'summary-only', 'Anthropic must use summary-only delivery');
+assert(anthropicCap.reasoningContract.semantic === 'summary', 'Native Anthropic summarized display must be explicit');
 assert(reasoningDeliveryToStreamVisibility(anthropicCap.reasoningDelivery) === 'summary-events', 'summary-only must map to summary-events stream visibility');
-assert(resolveThinkingArtifact(anthropicCap.reasoningDelivery, true)?.kind === 'summary', 'summary-only thinking should become a visible summary artifact');
 
 const responsesCap = resolveAgentRouteCapability(openaiResponses, 'test-model');
 assert(responsesCap.reasoningDelivery === 'summary-only', 'OpenAI Responses must use summary-only delivery');
+assert(responsesCap.reasoningContract.semantic === 'summary', 'Native OpenAI Responses summary events must be explicit');
 
 const geminiCap = resolveAgentRouteCapability(gemini, 'test-model');
 assert(geminiCap.reasoningDelivery === 'stream-full', 'Gemini must use stream-full delivery');
-assert(resolveThinkingArtifact(geminiCap.reasoningDelivery, true)?.visibility === 'raw-collapsed', 'stream-full thinking should become collapsed raw thinking');
+assert(geminiCap.reasoningContract.semantic === 'unknown', 'Gemini display semantics must remain unknown without model-specific evidence');
 
 const ollamaCap = resolveAgentRouteCapability(ollama, 'test-model');
 assert(ollamaCap.reasoningDelivery === 'stream-full', 'Ollama must use stream-full delivery');
-assert(resolveThinkingArtifact(ollamaCap.reasoningDelivery, true)?.replayPolicy === 'none', 'raw local thinking must not be replayed as provider artifact');
+assert(ollamaCap.reasoningContract.semantic === 'unknown', 'Ollama-compatible reasoning must not be inferred as raw');
+
+assert(resolveAgentRouteCapability(deepseek, 'deepseek-reasoner').reasoningContract.semantic === 'raw', 'Direct DeepSeek reasoning_content is documented raw reasoning');
+assert(resolveAgentRouteCapability(kimi, 'kimi-for-coding').reasoningContract.semantic === 'unknown', 'Kimi compatible routes must not inherit Anthropic summary semantics');
 
 const noReasoningProvider = {
   ...configuredProvider('openai', 'OpenAICompatibleChatCompletions'),
   capabilities: ['chat', 'tool-calling'],
 };
-assert(resolveReasoningDelivery(noReasoningProvider, 'OpenAICompatibleChatCompletions') === 'none', 'providers without reasoning capability must be none');
+assert(resolveProviderReasoningContract(noReasoningProvider, 'test-model').semantic === 'none', 'providers without reasoning capability must be none');
 
 const fs = require('node:fs');
 const openaiCompatibleSource = fs.readFileSync('src/main/agent-runtime/providers/OpenAICompatibleProvider.ts', 'utf8');
@@ -81,7 +78,7 @@ const openaiResponsesSource = fs.readFileSync('src/main/agent-runtime/providers/
 const anthropicSource = fs.readFileSync('src/main/agent-runtime/providers/AnthropicProvider.ts', 'utf8');
 const contextManagerSource = fs.readFileSync('src/main/agent-runtime/agent/ContextManager.ts', 'utf8');
 
-assert(openaiCompatibleSource.includes("source: isOpenRouterBaseUrl(baseUrl) ? 'openrouter-raw' : 'openai-compatible-raw'"), 'OpenAI-compatible raw reasoning must be tagged by source.');
+assert(openaiCompatibleSource.includes("model.provider === 'deepseek' ? 'raw' : 'unknown'"), 'Compatible reasoning must remain unknown except evidence-backed DeepSeek.');
 assert(openaiCompatibleSource.includes("replayPolicy: 'none'"), 'OpenAI-compatible raw reasoning must not be replayed.');
 assert(openaiResponsesSource.includes("'reasoning.encrypted_content'"), 'OpenAI Responses must request encrypted reasoning content for stateless continuation.');
 assert(openaiResponsesSource.includes('toResponsesReasoningReplayItem'), 'OpenAI Responses must replay only provider reasoning artifacts.');

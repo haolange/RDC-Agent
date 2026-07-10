@@ -1,173 +1,226 @@
-/**
- * HookEngine — 生命周期 Hook 系统。
- *
- * 支持的事件:
- *  - PreToolUse / PostToolUse / PostToolUseFailure
- *  - SessionStart / SessionEnd
- *  - PreCompact / PostCompact
- *  - Stop / Setup
- *
- * Hook 类型:
- *  - ShellHook: 执行 shell 命令，stdin 接收 JSON 事件，stdout 返回决策
- *  - PromptHook: 注入额外上下文到 LLM 提示
- */
-
 import { spawn } from 'child_process';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import * as yaml from 'yaml';
+import fs from 'fs';
+import path from 'path';
+import YAML from 'yaml';
+import type { HookDefinition, HookEvent, HookTrustState, ScopedResourceCandidate } from '@shared/types/rdxRuntime';
+import { appPathService } from '../runtime/AppPathService';
+import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
 
-// =====================================================================
-// 类型
-// =====================================================================
-
-export type HookEvent =
-  | 'PreToolUse'
-  | 'PostToolUse'
-  | 'PostToolUseFailure'
-  | 'SessionStart'
-  | 'SessionEnd'
-  | 'PreCompact'
-  | 'PostCompact'
-  | 'Stop'
-  | 'Setup'
-  | 'PermissionDenied'
-  | 'SubagentStart'
-  | 'SubagentStop';
-
-export interface HookDefinition {
-  name: string;
-  event: HookEvent;
-  type: 'shell' | 'prompt';
-  command?: string;
-  promptTemplate?: string;
-  timeoutMs?: number;
-  matcher?: string; // glob/regex match (e.g. tool name)
-}
+const DEFAULT_TIMEOUT_MS = 30_000;
+const MAX_OUTPUT_BYTES = 64 * 1024;
 
 export interface HookContext {
   event: HookEvent;
+  agentId?: string;
   toolName?: string;
-  toolArgs?: Record<string, unknown>;
   sessionId?: string;
-  workspaceRoot?: string;
-  [key: string]: unknown;
+  projectRoot?: string;
+  payload?: Record<string, unknown>;
 }
 
-export interface HookResult {
+export interface LoadedHook {
+  definition: HookDefinition;
+  scope: 'user' | 'project';
+  sourcePath: string;
+  sourceHash: string;
+  trust: HookTrustState;
+}
+
+export interface HookExecutionResult {
+  hookId: string;
   allowed: boolean;
+  status: 'completed' | 'failed' | 'timed-out' | 'untrusted' | 'skipped';
+  exitCode?: number | null;
+  stdout: string;
+  stderr: string;
   reason?: string;
-  modifiedArgs?: Record<string, unknown>;
-  injectedContext?: string;
 }
 
-// =====================================================================
-// HookEngine
-// =====================================================================
-
-const DEFAULT_HOOK_TIMEOUT = 30_000;
+const parseHookFile = (sourcePath: string): HookDefinition => {
+  const value = YAML.parse(fs.readFileSync(sourcePath, 'utf8')) as Partial<HookDefinition>;
+  if (!value || typeof value !== 'object') throw new Error(`Invalid hook file: ${sourcePath}`);
+  if (!value.id?.trim() || !value.event || !value.command?.trim()) throw new Error(`Hook requires id, event, and command: ${sourcePath}`);
+  if (!['block', 'warn'].includes(value.failurePolicy ?? '')) throw new Error(`Hook failurePolicy must be block or warn: ${sourcePath}`);
+  return {
+    id: value.id.trim(),
+    enabled: value.enabled !== false,
+    event: value.event,
+    command: value.command.trim(),
+    args: Array.isArray(value.args) ? value.args.map(String) : [],
+    ...(value.cwd?.trim() ? { cwd: value.cwd.trim() } : {}),
+    ...(value.env && typeof value.env === 'object' ? { env: value.env } : {}),
+    timeoutMs: Number.isFinite(value.timeoutMs) && Number(value.timeoutMs) > 0 ? Number(value.timeoutMs) : DEFAULT_TIMEOUT_MS,
+    failurePolicy: value.failurePolicy as 'block' | 'warn',
+    ...(value.matcher ? { matcher: value.matcher } : {}),
+  };
+};
 
 export class HookEngine {
-  private hooks: HookDefinition[] = [];
+  private loaded: LoadedHook[] = [];
 
-  /** 从目录加载 YAML hook 文件。 */
-  async loadFromDir(dir: string): Promise<void> {
-    let entries: string[];
-    try { entries = await fs.readdir(dir); } catch { return; }
-    for (const entry of entries) {
-      if (!entry.endsWith('.yml') && !entry.endsWith('.yaml')) continue;
-      try {
-        const raw = await fs.readFile(path.join(dir, entry), 'utf8');
-        const parsed = yaml.parse(raw) as HookDefinition | HookDefinition[];
-        const items = Array.isArray(parsed) ? parsed : [parsed];
-        for (const hook of items) {
-          if (hook.name && hook.event && hook.type) {
-            this.register(hook);
-          }
-        }
-      } catch { /* skip bad files */ }
-    }
+  constructor(private readonly trustStorePath = path.join(appPathService.getAppStatePaths().appStateRoot, 'hook-trust.json')) {}
+
+  load(userHooksPath: string, projectRoot?: string): LoadedHook[] {
+    const candidates: Array<ScopedResourceCandidate<HookDefinition>> = [];
+    const addDirectory = (root: string, scope: 'user' | 'project') => {
+      if (!fs.existsSync(root)) return;
+      fs.readdirSync(root)
+        .filter((entry) => entry.endsWith('.hook.yml'))
+        .sort()
+        .forEach((entry) => {
+          const sourcePath = path.join(root, entry);
+          const value = parseHookFile(sourcePath);
+          candidates.push({ id: value.id, kind: 'hook', scope, sourcePath, value, enabled: value.enabled });
+        });
+    };
+    addDirectory(userHooksPath, 'user');
+    if (projectRoot) addDirectory(appPathService.getProjectRdxPaths(projectRoot).hooksPath, 'project');
+
+    const trustStore = this.readTrustStore();
+    this.loaded = scopedResourceResolver.resolve(candidates).resources.map((resource) => {
+      const scope = resource.provenance.scope === 'project' ? 'project' : 'user';
+      const trustKey = scope === 'project' && projectRoot ? this.trustKey(projectRoot, resource.id) : '';
+      const trusted = scope === 'user' || trustStore[trustKey]?.sourceHash === resource.provenance.sourceHash;
+      return {
+        definition: resource.value,
+        scope,
+        sourcePath: resource.provenance.sourcePath,
+        sourceHash: resource.provenance.sourceHash,
+        trust: {
+          trusted,
+          ...(scope === 'project' && projectRoot ? { projectRoot: path.resolve(projectRoot) } : {}),
+          sourceHash: resource.provenance.sourceHash,
+          ...(trusted && trustStore[trustKey]?.trustedAt ? { trustedAt: trustStore[trustKey].trustedAt } : {}),
+        },
+      };
+    });
+    return this.list();
   }
 
-  /** 注册单个 hook。 */
-  register(hook: HookDefinition): void {
-    this.hooks.push(hook);
+  list(): LoadedHook[] {
+    return this.loaded.map((hook) => ({ ...hook, definition: { ...hook.definition } }));
   }
 
-  /** 触发指定事件的所有匹配 hook。 */
-  async trigger(event: HookEvent, context: HookContext): Promise<HookResult> {
-    const matching = this.hooks.filter((h) => h.event === event && this.matches(h, context));
-    let result: HookResult = { allowed: true };
+  trustProjectHook(projectRoot: string, hookId: string): HookTrustState {
+    const hook = this.loaded.find((entry) => entry.scope === 'project' && entry.definition.id === hookId && path.resolve(entry.trust.projectRoot ?? '') === path.resolve(projectRoot));
+    if (!hook) throw new Error(`Project hook not loaded: ${hookId}`);
+    const store = this.readTrustStore();
+    const trustedAt = new Date().toISOString();
+    store[this.trustKey(projectRoot, hookId)] = { sourceHash: hook.sourceHash, trustedAt };
+    this.writeTrustStore(store);
+    hook.trust = { trusted: true, projectRoot: path.resolve(projectRoot), sourceHash: hook.sourceHash, trustedAt };
+    return hook.trust;
+  }
 
-    for (const hook of matching) {
-      if (hook.type === 'shell' && hook.command) {
-        const shellResult = await this.runShellHook(hook, context);
-        if (!shellResult.allowed) return shellResult;
-        result = { ...result, ...shellResult, allowed: true };
-      } else if (hook.type === 'prompt' && hook.promptTemplate) {
-        result.injectedContext = (result.injectedContext ?? '') + '\n' + hook.promptTemplate;
+  revokeProjectHook(projectRoot: string, hookId: string): void {
+    const store = this.readTrustStore();
+    delete store[this.trustKey(projectRoot, hookId)];
+    this.writeTrustStore(store);
+    const hook = this.loaded.find((entry) => entry.scope === 'project' && entry.definition.id === hookId);
+    if (hook) hook.trust = { trusted: false, projectRoot: path.resolve(projectRoot), sourceHash: hook.sourceHash };
+  }
+
+  async trigger(event: HookEvent, context: HookContext): Promise<HookExecutionResult[]> {
+    const results: HookExecutionResult[] = [];
+    for (const hook of this.loaded.filter((entry) => entry.definition.enabled && entry.definition.event === event && this.matches(entry.definition, context))) {
+      if (hook.scope === 'project' && !hook.trust.trusted) {
+        results.push({ hookId: hook.definition.id, allowed: false, status: 'untrusted', stdout: '', stderr: '', reason: 'Project hook requires trust for its current content hash.' });
+        if (hook.definition.failurePolicy === 'block') break;
+        continue;
       }
+      const result = await this.run(hook, context);
+      results.push(result);
+      if (!result.allowed) break;
     }
-
-    return result;
+    return results;
   }
 
-  /** 重新加载所有 hook。 */
-  async reload(dir: string): Promise<void> {
-    this.hooks = [];
-    await this.loadFromDir(dir);
+  async test(hookId: string, context: HookContext): Promise<HookExecutionResult> {
+    const hook = this.loaded.find((entry) => entry.definition.id === hookId);
+    if (!hook) throw new Error(`Hook not loaded: ${hookId}`);
+    if (hook.scope === 'project' && !hook.trust.trusted) {
+      return { hookId, allowed: false, status: 'untrusted', stdout: '', stderr: '', reason: 'Project hook requires trust for its current content hash.' };
+    }
+    return this.run(hook, { ...context, event: hook.definition.event });
   }
 
-  /** 列出已注册的 hook。 */
-  listHooks(): HookDefinition[] {
-    return [...this.hooks];
+  private matches(hook: HookDefinition, context: HookContext): boolean {
+    const agentMatch = !hook.matcher?.agents?.length || (context.agentId ? hook.matcher.agents.includes(context.agentId) : false);
+    const toolMatch = !hook.matcher?.tools?.length || (context.toolName ? hook.matcher.tools.includes(context.toolName) : false);
+    return agentMatch && toolMatch;
   }
 
-  // ── 内部 ──
-
-  private matches(hook: HookDefinition, ctx: HookContext): boolean {
-    if (!hook.matcher) return true;
-    const target = ctx.toolName ?? '';
-    return target.includes(hook.matcher) || new RegExp(hook.matcher.replace(/\*/g, '.*')).test(target);
-  }
-
-  private async runShellHook(hook: HookDefinition, ctx: HookContext): Promise<HookResult> {
-    const timeout = hook.timeoutMs ?? DEFAULT_HOOK_TIMEOUT;
-    const input = JSON.stringify(ctx);
-
-    return new Promise<HookResult>((resolve) => {
-      const proc = spawn(hook.command!, [], {
-        shell: true,
+  private run(hook: LoadedHook, context: HookContext): Promise<HookExecutionResult> {
+    return new Promise((resolve) => {
+      const definition = hook.definition;
+      const env = { ...process.env } as Record<string, string | undefined>;
+      for (const [targetName, sourceName] of Object.entries(definition.env ?? {})) env[targetName] = process.env[sourceName];
+      const child = spawn(definition.command, definition.args, {
+        shell: false,
+        cwd: definition.cwd ? path.resolve(context.projectRoot ?? process.cwd(), definition.cwd) : context.projectRoot ?? process.cwd(),
+        env,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, RDC_HOOK_EVENT: hook.event },
+        windowsHide: true,
       });
-
-      const timer = setTimeout(() => {
-        proc.kill();
-        resolve({ allowed: true, reason: `hook "${hook.name}" timed out` });
-      }, timeout);
-
       let stdout = '';
-      proc.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
-      proc.stderr?.on('data', () => { /* ignore stderr */ });
-
-      proc.on('close', (code) => {
+      let stderr = '';
+      let settled = false;
+      const append = (current: string, chunk: Buffer): string => Buffer.from(`${current}${chunk.toString()}`, 'utf8').subarray(0, MAX_OUTPUT_BYTES).toString('utf8');
+      child.stdout.on('data', (chunk: Buffer) => { stdout = append(stdout, chunk); });
+      child.stderr.on('data', (chunk: Buffer) => { stderr = append(stderr, chunk); });
+      const finish = (result: HookExecutionResult) => {
+        if (settled) return;
+        settled = true;
+        resolve(result);
+      };
+      const timer = setTimeout(() => {
+        child.kill();
+        finish({
+          hookId: definition.id,
+          allowed: definition.failurePolicy === 'warn',
+          status: 'timed-out',
+          stdout,
+          stderr,
+          reason: `Hook timed out after ${definition.timeoutMs}ms.`,
+        });
+      }, definition.timeoutMs);
+      child.on('error', (error) => {
         clearTimeout(timer);
-        try {
-          const output = stdout.trim();
-          if (!output) {
-            resolve({ allowed: code === 0 });
-            return;
-          }
-          const parsed = JSON.parse(output) as HookResult;
-          resolve(parsed);
-        } catch {
-          resolve({ allowed: code === 0 });
-        }
+        finish({ hookId: definition.id, allowed: definition.failurePolicy === 'warn', status: 'failed', stdout, stderr, reason: error.message });
       });
-
-      proc.stdin?.write(input);
-      proc.stdin?.end();
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        const succeeded = code === 0;
+        finish({
+          hookId: definition.id,
+          allowed: succeeded || definition.failurePolicy === 'warn',
+          status: succeeded ? 'completed' : 'failed',
+          exitCode: code,
+          stdout,
+          stderr,
+          ...(!succeeded ? { reason: `Hook exited with code ${code}.` } : {}),
+        });
+      });
+      child.stdin.end(JSON.stringify(context));
     });
   }
+
+  private trustKey(projectRoot: string, hookId: string): string {
+    return `${path.resolve(projectRoot).toLowerCase()}::${hookId}`;
+  }
+
+  private readTrustStore(): Record<string, { sourceHash: string; trustedAt: string }> {
+    try {
+      return fs.existsSync(this.trustStorePath) ? JSON.parse(fs.readFileSync(this.trustStorePath, 'utf8')) as Record<string, { sourceHash: string; trustedAt: string }> : {};
+    } catch {
+      return {};
+    }
+  }
+
+  private writeTrustStore(store: Record<string, { sourceHash: string; trustedAt: string }>): void {
+    fs.mkdirSync(path.dirname(this.trustStorePath), { recursive: true });
+    fs.writeFileSync(this.trustStorePath, `${JSON.stringify(store, null, 2)}\n`, 'utf8');
+  }
 }
+
+export const hookEngine = new HookEngine();

@@ -1,4 +1,4 @@
-export type ThinkingArtifactKind = 'summary' | 'raw' | 'opaque';
+export type ThinkingArtifactKind = 'summary' | 'raw' | 'opaque' | 'unknown';
 
 export type ThinkingArtifactVisibility = 'summary' | 'raw-collapsed' | 'hidden';
 

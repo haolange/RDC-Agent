@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { AppSettings } from '@shared/types/settings';
 import { useSettingsModal } from './useSettingsModal';
@@ -6,10 +6,12 @@ import { GeneralSettings } from './sections/GeneralSettings';
 import { WorkspaceSettings } from './sections/WorkspaceSettings';
 import { ModelsSettings } from './sections/ModelsSettings';
 import { AgentsSettings } from './sections/AgentsSettings';
-import { SkillLibrarySettings } from './sections/SkillLibrarySettings';
 import { ToolsSettings } from './sections/ToolsSettings';
 import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
 import { SettingsNavIcon } from './SettingsNavIcon';
+import { useRdxRuntimeOverview } from './useRdxRuntimeOverview';
+import { RuntimeScopePanel } from './sections/RuntimeScopePanel';
+import { HooksSettings } from './sections/HooksSettings';
 import './SettingsModal.css';
 
 interface SettingsModalProps {
@@ -21,6 +23,8 @@ interface SettingsModalProps {
 export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, onClose }) => {
   const modal = useSettingsModal(open, settings);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const runtime = useRdxRuntimeOverview(open);
+  const [resourceScope, setResourceScope] = useState<'user' | 'project'>('user');
   const {
     t,
     activeSection,
@@ -28,9 +32,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     sections,
     accountDraft,
     setAccountDraft,
-    workspaceDraft,
-    enabledMcpDrafts,
-    setEnabledMcpDrafts,
     rdxCliDraft,
     setRdxCliDraft,
     rdxActionsDraft,
@@ -43,32 +44,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     setConnectionDraft,
     agentManifestSaveState,
     agentManifestSaveMessage,
-    derivedPathEntries,
     accountProviders,
     providerCatalog,
     providerCatalogCategories,
     getResolvedProviderLabel,
     handleAvatarSelect,
     handleAccountSave,
-    handleWorkspacePick,
-    handleWorkspaceSave,
-    handleWorkspaceReset,
     handleRefreshProviderModels,
     handleDisconnectProvider,
     handleSaveAgentManifests,
     handleImportAgentManifest,
     handleSaveToolsConfig,
     handleSavePersonalization,
-    handleUpsertSkill,
-    handleDeleteSkill,
-    handleImportSkill,
-    handleUpsertMcpServer,
-    handleDeleteMcpServer,
-    handleImportMcpServer,
     setTheme,
     setLanguage,
     setFontScale,
-    toggleRuntimeId,
     connectionProvider,
     openProviderConnection,
     updateConnectionDraft,
@@ -111,6 +101,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
         return '';
       case 'tools':
         return '';
+      case 'hooks':
+        return '结构化生命周期命令、Project Hash 授信与运行诊断';
       default:
         return '';
     }
@@ -194,12 +186,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
               {activeSection === 'workspace' && (
                 <WorkspaceSettings
-                  settings={settings}
-                  workspaceDraft={workspaceDraft}
-                  derivedPathEntries={derivedPathEntries}
-                  onWorkspacePick={handleWorkspacePick}
-                  onWorkspaceSave={handleWorkspaceSave}
-                  onWorkspaceReset={handleWorkspaceReset}
+                  overview={runtime.overview}
+                  loading={runtime.loading}
+                  error={runtime.error}
                   t={t}
                 />
               )}
@@ -219,17 +208,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
               {activeSection === 'skills' && (
                 <section className="settings-page settings-page-skills">
-                  <SkillLibrarySettings
-                    settings={settings}
-                    onUpsertSkill={handleUpsertSkill}
-                    onDeleteSkill={handleDeleteSkill}
-                    onImportSkill={handleImportSkill}
-                    t={t}
-                  />
+                  <RuntimeScopePanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} kinds={['skill']} onChanged={runtime.setOverview} />
                 </section>
               )}
 
               {activeSection === 'agents' && (
+                <section className="settings-page settings-page-agents">
+                <RuntimeScopePanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} kinds={['agent']} onChanged={runtime.setOverview} />
                 <AgentsSettings
                   settings={settings}
                   agentManifestDrafts={agentManifestDrafts}
@@ -239,25 +224,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                   agentManifestSaveState={agentManifestSaveState}
                   agentManifestSaveMessage={agentManifestSaveMessage}
                   t={t}
-                />
+                /></section>
               )}
 
               {activeSection === 'tools' && (
+                <section className="settings-page settings-page-tools">
+                <RuntimeScopePanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} kinds={['mcp']} onChanged={runtime.setOverview} />
                 <ToolsSettings
-                  settings={settings}
-                  enabledMcpDrafts={enabledMcpDrafts}
                   rdxCliDraft={rdxCliDraft}
                   rdxActionsDraft={rdxActionsDraft}
-                  onEnabledMcpDraftsChange={setEnabledMcpDrafts}
                   onRdxCliDraftChange={setRdxCliDraft}
                   onRdxActionsDraftChange={setRdxActionsDraft}
                   onSaveToolsConfig={handleSaveToolsConfig}
-                  onUpsertMcpServer={handleUpsertMcpServer}
-                  onDeleteMcpServer={handleDeleteMcpServer}
-                  onImportMcpServer={handleImportMcpServer}
-                  toggleRuntimeId={toggleRuntimeId}
                   t={t}
-                />
+                /></section>
+              )}
+
+              {activeSection === 'hooks' && (
+                <HooksSettings overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} onChanged={runtime.setOverview} />
               )}
             </div>
           </div>

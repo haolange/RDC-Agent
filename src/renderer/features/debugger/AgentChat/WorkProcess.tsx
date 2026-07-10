@@ -5,12 +5,15 @@ import { buildWorkProcessPresentation } from './workProcessPresentation';
 import { createWorkProcessRowRenderer } from './workProcessRowRenderer';
 import { getDefaultGroupOpen, WorkProcessStepGroupRow } from './WorkProcessStepGroupRow';
 import { WorkProcessViewToggle } from './WorkProcessViewToggle';
+import { RequestInspector } from './RequestInspector';
 
 interface WorkProcessProps {
   trace: ConversationWorkTrace;
+  sessionId?: string | null;
+  turnId?: string;
 }
 
-export const WorkProcess: React.FC<WorkProcessProps> = ({ trace }) => {
+export const WorkProcess: React.FC<WorkProcessProps> = ({ trace, sessionId, turnId }) => {
   const { t } = useI18n();
   const [detailView, setDetailView] = useState(false);
   const presentation = useMemo(
@@ -45,7 +48,8 @@ export const WorkProcess: React.FC<WorkProcessProps> = ({ trace }) => {
   const metaParts = [durationMeta, actionMeta].filter(Boolean);
   const hasBody = Boolean(presentation.summary)
     || presentation.groups.length > 0
-    || presentation.rows.length > 0;
+    || presentation.rows.length > 0
+    || Boolean(sessionId && turnId);
 
   return (
     <section
@@ -80,6 +84,7 @@ export const WorkProcess: React.FC<WorkProcessProps> = ({ trace }) => {
           {presentation.summary ? (
             <p className="work-process-summary">{presentation.summary}</p>
           ) : null}
+          {sessionId && turnId ? <RequestInspector sessionId={sessionId} turnId={turnId} active={trace.status === 'running'} /> : null}
           {detailView ? (
             presentation.rows.length > 0 ? (
               <ol className="work-process-steps">

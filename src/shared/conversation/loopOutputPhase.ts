@@ -45,6 +45,7 @@ export function resolveConversationReasoningState(
   if (thinking?.kind === 'raw') return 'raw';
   if (thinking?.kind === 'summary') return 'summary';
   if (thinking?.kind === 'opaque') return 'opaque';
+  if (thinking?.kind === 'unknown') return 'unknown';
 
   // Route declares reasoning delivery, but this loop produced no displayable artifact.
   if (reasoningDelivery !== 'none') {

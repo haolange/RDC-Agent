@@ -28,7 +28,6 @@ function makeSettings(provider: LlmProviderEntry): AppSettings {
       terminal: { height: 240 },
     },
     profile: { nickname: '' },
-    workspace: { rootPath: '' },
     tooling: {
       rdxCli: {
         enabled: false,
@@ -59,15 +58,9 @@ function makeSettings(provider: LlmProviderEntry): AppSettings {
         modelId: provider.models[0]?.id ?? '',
       }],
     },
-    configuration: {
-      activeModeProfileId: 'debugger.default',
-      availableModeProfiles: [],
-      enabledMcpServerIds: [],
-      modePatternBindings: {},
-      availablePatterns: [],
+    resourceCatalog: {
       availableSkills: [],
       availableMcpServers: [],
-      lastMigrationSummary: [],
       diagnostics: [],
     },
     agents: {
@@ -77,21 +70,19 @@ function makeSettings(provider: LlmProviderEntry): AppSettings {
       globalInstructions: '',
     },
     paths: {
-      workspaceRoot: '',
-      defaultWorkspaceRoot: '',
+      userRdxRoot: '',
       settingsPath: '',
+      instructionsPath: '',
+      agentsPath: '',
+      profileStatePath: '',
       logsPath: '',
       logPath: '',
       projectsPath: '',
       knowledgePath: '',
-      migrationOrphansPath: '',
-      profilesPath: '',
       policiesPath: '',
       skillsPath: '',
       mcpPath: '',
-      patternsPath: '',
       secretsPath: '',
-      migrationReportsPath: '',
     },
   };
 }
@@ -247,16 +238,7 @@ describe('resolveReasoningSelection', () => {
     }).selection).toBe('off');
   });
 
-  it('reads legacy effort and auto inputs into the canonical reasoning selection', () => {
-    const openAiProvider = makeProvider(createBuiltinProviderEntry('openai'));
-    const openAiCapability = resolveModelCapability('openai', 'gpt-5.5', makeSettings(openAiProvider));
-
-    expect(resolveReasoningSelection(openAiCapability, {
-      effort: 'extHigh',
-      maxContextMode: false,
-      fastModel: false,
-    }).selection).toBe('extra');
-
+  it('normalizes canonical auto reasoning through the provider capability', () => {
     const kimiProvider = makeProvider(createBuiltinProviderEntry('kimi-coding-plan'));
     const kimiCapability = resolveModelCapability('kimi-coding-plan', 'kimi-for-coding', makeSettings(kimiProvider));
     expect(resolveReasoningSelection(kimiCapability, {
@@ -271,7 +253,7 @@ describe('resolveReasoningSelection', () => {
     const capability = resolveModelCapability('openai', 'gpt-5.3-codex', makeSettings(provider));
 
     expect(resolveReasoningSelection(capability, {
-      reasoningLevel: 'legacy-effort-level',
+      reasoningLevel: 'unsupported-value',
       maxContextMode: false,
       fastModel: false,
     }).selection).toBe('medium');

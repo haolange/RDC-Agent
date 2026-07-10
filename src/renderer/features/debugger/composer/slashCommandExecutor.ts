@@ -135,12 +135,6 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
       await useAppSettingsStore.getState().setAgentPermissionMode(mode as AgentPermissionMode);
       return;
     }
-    case 'change-workspace': {
-      const workspacePath = getPayloadString(action, 'path');
-      if (!workspacePath) return;
-      await useAppSettingsStore.getState().updateWorkspaceRoot(workspacePath);
-      return;
-    }
     case 'resume-session': {
       const sessionId = getPayloadString(action, 'sessionId');
       if (sessionId) {

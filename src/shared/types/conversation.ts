@@ -41,7 +41,7 @@ export type ConversationLoopStopReason =
 
 export type ConversationLoopOutputPhase = 'commentary' | 'final_answer';
 
-export type ConversationReasoningState = 'raw' | 'summary' | 'opaque' | 'hidden' | 'none';
+export type ConversationReasoningState = 'raw' | 'summary' | 'unknown' | 'opaque' | 'hidden' | 'none';
 
 export type ConversationMessageDiagnosticCode =
   | 'CONVERSATION_LLM_ROUTE_MISSING'

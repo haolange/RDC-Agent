@@ -1,6 +1,6 @@
 # Agent Runtime Kernel
 
-> 接线状态声明：本文档描述 agent runtime 的设计边界与契约，不把当前接线进度当成事实来源。长生命周期 Agent、ContextManager 压缩、ErrorRecovery、Memory、Subagent/Handoff 等真实接线进度，以 [`agent-runtime-completion-plan.md`](./agent-runtime-completion-plan.md) 为权威来源。
+> 本文描述当前 Agent Runtime 的稳定设计边界与可验证契约。产品边界与验证门禁以根目录 `DESIGN.md` 为 SSOT。
 
 The agent runtime owns agent turns, tool mediation policy, deterministic events, provider routing, approval events, and final run status.
 

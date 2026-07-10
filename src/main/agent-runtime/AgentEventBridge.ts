@@ -35,7 +35,6 @@ export interface AgentEventBridgeContext {
   stage?: WorkflowStage | 'report';
   phase?: WorkflowPhase;
   mode?: AppMode;
-  patternId?: string;
   providerId?: string;
   modelId?: string;
   toolAllowlist?: string[];
@@ -97,7 +96,6 @@ export function translateCoreToSharedAgentEvent(
         'run.started',
         {
           mode: context.mode ?? 'debugger',
-          patternId: context.patternId,
           providerId: context.providerId ?? '',
           modelId: context.modelId ?? '',
           toolAllowlist: context.toolAllowlist ?? [],

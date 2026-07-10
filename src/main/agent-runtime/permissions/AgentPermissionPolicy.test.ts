@@ -6,7 +6,7 @@ import { AgentPermissionPolicyService } from './AgentPermissionPolicy';
 
 const { mockSettings } = vi.hoisted(() => ({
   mockSettings: {
-    workspace: { rootPath: 'D:\\AppWorkspace' },
+    paths: { userRdxRoot: 'D:\\AppWorkspace' },
     agentRuntime: {
       permissions: {
         mode: 'full-access' as AgentPermissionMode,

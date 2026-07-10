@@ -104,6 +104,7 @@ const resolveReasoningState = (block: ConversationWorkBlock): ConversationReason
   if (!block.thinking) return 'none';
   if (block.thinking.kind === 'raw') return 'raw';
   if (block.thinking.kind === 'summary') return 'summary';
+  if (block.thinking.kind === 'unknown') return 'unknown';
   if (block.thinking.kind === 'opaque') return 'opaque';
   return 'none';
 };
@@ -172,7 +173,7 @@ const resolveSectionThinking = (
 } => {
   const thinking = block.thinking;
   const reasoningState = resolveReasoningState(block);
-  if (!hasVisibleEvidence || !thinking || (reasoningState !== 'raw' && reasoningState !== 'summary')) {
+  if (!hasVisibleEvidence || !thinking || !['raw', 'summary', 'unknown'].includes(reasoningState)) {
     return { preview: '', label: '', expandable: false, openByDefault: false };
   }
 
@@ -185,15 +186,16 @@ const resolveSectionThinking = (
   const status = isActiveBlock ? block.thinkingStatus ?? 'streaming' : 'complete';
   const isSummary = reasoningState === 'summary' || (thinking.kind === 'summary' && thinking.visibility === 'summary');
   const isRaw = reasoningState === 'raw' || (thinking.kind === 'raw' && thinking.visibility === 'raw-collapsed');
-  if (!isSummary && !isRaw) {
+  const isUnknown = reasoningState === 'unknown' || thinking.kind === 'unknown';
+  if (!isSummary && !isRaw && !isUnknown) {
     return { preview: '', label: '', expandable: false, openByDefault: false };
   }
 
   return {
     preview,
     label: status === 'streaming' || block.status === 'running' || block.status === 'pending'
-      ? '正在思考'
-      : isSummary ? '思考' : '原始思考',
+      ? '推理中'
+      : isSummary ? 'Reasoning summary' : isRaw ? 'Raw reasoning' : 'Provider reasoning（语义未验证）',
     kind: thinking.kind,
     source: '',
     visibility: thinking.visibility,
@@ -218,7 +220,7 @@ const resolveResponseThinking = (
   if (!resolved.expandable) return { ...resolved, label: '', openByDefault: false };
   return {
     preview: resolved.preview,
-    label: resolved.kind === 'summary' ? '收束摘要' : resolved.label,
+    label: resolved.kind === 'summary' ? 'Reasoning summary' : resolved.label,
     kind: resolved.kind,
     visibility: resolved.visibility,
     status: resolved.status,

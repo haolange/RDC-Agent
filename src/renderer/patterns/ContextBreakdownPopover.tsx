@@ -8,8 +8,8 @@ import { formatTokenCount } from '../features/debugger/composer/turnControlsUtil
 
 const ORDER: ContextUsageBreakdownId[] = [
   'system_prompt',
-  'rules',
-  'memory_files',
+  'scoped_instructions',
+  'skills',
   'system_tools',
   'mcp_tools',
   'subagent_definitions',
@@ -20,8 +20,8 @@ const ORDER: ContextUsageBreakdownId[] = [
 
 const SEGMENT_COLOR_VAR: Record<ContextUsageBreakdownId, string> = {
   system_prompt:           'var(--token-text-placeholder)',
-  rules:                   'var(--token-status-warning)',
-  memory_files:            'var(--token-status-info)',
+  scoped_instructions:     'var(--token-status-warning)',
+  skills:                  'var(--token-status-info)',
   system_tools:            'var(--token-status-success)',
   mcp_tools:               'var(--token-accent-primary)',
   subagent_definitions:    'var(--token-status-info)',
@@ -31,7 +31,7 @@ const SEGMENT_COLOR_VAR: Record<ContextUsageBreakdownId, string> = {
 };
 
 const GROUPS: { id: string; labelKey: TranslationKey; ids: ContextUsageBreakdownId[] }[] = [
-  { id: 'prompt', labelKey: 'contextBreakdown.groupPrompt', ids: ['system_prompt', 'rules', 'memory_files'] },
+  { id: 'prompt', labelKey: 'contextBreakdown.groupPrompt', ids: ['system_prompt', 'scoped_instructions', 'skills'] },
   { id: 'tools', labelKey: 'contextBreakdown.groupTools', ids: ['system_tools', 'mcp_tools', 'subagent_definitions'] },
   { id: 'conversation', labelKey: 'contextBreakdown.groupConversation', ids: ['summarized_conversation', 'conversation'] },
   { id: 'space', labelKey: 'contextBreakdown.groupSpace', ids: ['free'] },
@@ -39,8 +39,8 @@ const GROUPS: { id: string; labelKey: TranslationKey; ids: ContextUsageBreakdown
 
 const SEGMENT_LABEL_KEYS: Record<ContextUsageBreakdownId, TranslationKey> = {
   system_prompt: 'contextBreakdown.segment.system_prompt',
-  rules: 'contextBreakdown.segment.rules',
-  memory_files: 'contextBreakdown.segment.memory_files',
+  scoped_instructions: 'contextBreakdown.segment.scopedInstructions',
+  skills: 'contextBreakdown.segment.skills',
   system_tools: 'contextBreakdown.segment.system_tools',
   mcp_tools: 'contextBreakdown.segment.mcp_tools',
   subagent_definitions: 'contextBreakdown.segment.subagent_definitions',

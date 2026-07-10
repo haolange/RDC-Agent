@@ -1,139 +1,64 @@
-import type {
-  AgentRouteCapability,
-  ReasoningDelivery,
-  ReasoningVisibility,
-  ToolCallingMode,
-} from '@shared/types/agentRuntime';
-import type {
-  LlmProviderCapability,
-  LlmProviderEntry,
-  LlmProviderId,
-  LlmProviderProtocol,
-} from '@shared/types/settings';
+import type { AgentRouteCapability, ReasoningDelivery, ReasoningVisibility, ToolCallingMode } from '@shared/types/agentRuntime';
+import type { ProviderReasoningContract } from '@shared/types/rdxRuntime';
+import type { LlmProviderCapability, LlmProviderEntry, LlmProviderId, LlmProviderProtocol } from '@shared/types/settings';
 
-const NATIVE_TOOL_PROTOCOLS = new Set<LlmProviderProtocol>([
-  'AnthropicMessages',
-  'OpenAIResponses',
-  'OpenAICompatibleChatCompletions',
-  'OpenRouterChatCompletions',
-  'GoogleGemini',
-  'OllamaOpenAICompatibleChatCompletions',
-]);
+const NATIVE_TOOL_PROTOCOLS = new Set<LlmProviderProtocol>(['AnthropicMessages', 'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'OpenRouterChatCompletions', 'GoogleGemini', 'OllamaOpenAICompatibleChatCompletions']);
+const STREAMING_PROTOCOLS = new Set<LlmProviderProtocol>(['AnthropicMessages', 'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'OpenRouterChatCompletions', 'GoogleGemini', 'OllamaOpenAICompatibleChatCompletions']);
+const OPENAI_NATIVE_IDS = new Set(['openai', 'openai-eu', 'openai-us', 'chatgpt-account']);
+const ANTHROPIC_NATIVE_IDS = new Set(['anthropic', 'claude-account']);
 
-const STREAMING_PROTOCOLS = new Set<LlmProviderProtocol>([
-  'AnthropicMessages',
-  'OpenAIResponses',
-  'OpenAICompatibleChatCompletions',
-  'OpenRouterChatCompletions',
-  'GoogleGemini',
-  'OllamaOpenAICompatibleChatCompletions',
-]);
+const hasCapability = (provider: LlmProviderEntry | undefined, capability: LlmProviderCapability): boolean => Boolean(provider?.capabilities?.includes(capability));
 
-/** 各 wire protocol 默认 reasoning 交付语义（无 reasoning capability 时仍为 none）。 */
-const PROTOCOL_REASONING_DELIVERY: Partial<Record<LlmProviderProtocol, ReasoningDelivery>> = {
-  OpenAIResponses: 'summary-only',
-  AnthropicMessages: 'summary-only',
-  GoogleGemini: 'stream-full',
-  OllamaOpenAICompatibleChatCompletions: 'stream-full',
-  OpenAICompatibleChatCompletions: 'stream-full',
-  OpenRouterChatCompletions: 'stream-full',
-};
-
-function readProviderProtocol(provider: LlmProviderEntry | undefined): LlmProviderProtocol | null {
-  if (!provider) {
-    return null;
+export function resolveProviderReasoningContract(provider: LlmProviderEntry | undefined, modelId: string): ProviderReasoningContract {
+  if (!provider || !hasCapability(provider, 'reasoning')) return { semantic: 'none', source: 'provider-capability', displayLabel: 'None' };
+  if (provider.protocol === 'OpenAIResponses' && OPENAI_NATIVE_IDS.has(provider.id)) {
+    return { semantic: 'summary', source: 'openai-responses-summary', evidence: 'https://platform.openai.com/docs/api-reference/responses-streaming/response/reasoning_summary_part/added', displayLabel: 'Reasoning summary' };
   }
-  return provider.protocol ?? null;
-}
-
-function hasCapability(
-  provider: LlmProviderEntry | undefined,
-  capability: LlmProviderCapability,
-): boolean {
-  return Boolean(provider?.capabilities?.includes(capability));
-}
-
-export function resolveReasoningDelivery(
-  provider: LlmProviderEntry | undefined,
-  protocol: LlmProviderProtocol | null,
-): ReasoningDelivery {
-  if (!provider || !protocol || !hasCapability(provider, 'reasoning')) {
-    return 'none';
+  if (provider.protocol === 'AnthropicMessages' && ANTHROPIC_NATIVE_IDS.has(provider.id)) {
+    return { semantic: 'summary', source: 'anthropic-thinking-display-summarized', evidence: 'https://platform.claude.com/docs/en/build-with-claude/extended-thinking', displayLabel: 'Reasoning summary' };
   }
-  return PROTOCOL_REASONING_DELIVERY[protocol] ?? 'stream-full';
+  if (provider.id === 'deepseek' && provider.protocol === 'OpenAICompatibleChatCompletions') {
+    return { semantic: 'raw', source: 'deepseek-reasoning-content', evidence: 'https://api-docs.deepseek.com/guides/thinking_mode', displayLabel: 'Raw reasoning' };
+  }
+  return { semantic: 'unknown', source: `${provider.id}/${modelId}:unverified-provider-semantics`, displayLabel: 'Provider reasoning' };
 }
 
-/** 将产品层 reasoningDelivery 映射为 provider StreamOptions 使用的 visibility。 */
+export function reasoningContractToDelivery(contract: ProviderReasoningContract): ReasoningDelivery {
+  if (contract.semantic === 'summary') return 'summary-only';
+  if (contract.semantic === 'opaque') return 'hidden';
+  if (contract.semantic === 'raw' || contract.semantic === 'unknown') return 'stream-full';
+  return 'none';
+}
+
 export function reasoningDeliveryToStreamVisibility(delivery: ReasoningDelivery): ReasoningVisibility {
   if (delivery === 'summary-only') return 'summary-events';
   if (delivery === 'hidden') return 'hidden';
   return 'none';
 }
 
-function disabledCapability(providerId: LlmProviderId, modelId: string): AgentRouteCapability {
-  return {
-    providerId,
-    modelId,
-    toolCallingMode: 'disabled',
-    reasoningVisibility: 'none',
-    reasoningDelivery: 'none',
-    supportsStreaming: false,
-    supportsToolResults: false,
-  };
+export function reasoningContractToStreamVisibility(contract: ProviderReasoningContract): ReasoningVisibility {
+  if (contract.semantic === 'summary') return 'summary-events';
+  if (contract.semantic === 'unknown') return 'unknown-events';
+  if (contract.semantic === 'opaque') return 'hidden';
+  return 'none';
 }
 
-export function resolveAgentRouteCapability(
-  provider: LlmProviderEntry | undefined,
-  modelId: string,
-): AgentRouteCapability {
+const disabledCapability = (providerId: LlmProviderId, modelId: string): AgentRouteCapability => ({ providerId, modelId, toolCallingMode: 'disabled', reasoningVisibility: 'none', reasoningDelivery: 'none', reasoningContract: { semantic: 'none', source: 'route-disabled', displayLabel: 'None' }, supportsStreaming: false, supportsToolResults: false });
+
+export function resolveAgentRouteCapability(provider: LlmProviderEntry | undefined, modelId: string): AgentRouteCapability {
   const providerId = provider?.id ?? '';
-  if (!provider || !provider.enabled || !provider.isConfigured || provider.status !== 'verified') {
-    return disabledCapability(providerId, modelId);
-  }
-
-  if (!hasCapability(provider, 'chat')) {
-    return disabledCapability(provider.id, modelId);
-  }
-
-  const protocol = readProviderProtocol(provider);
-  if (!protocol) {
-    return disabledCapability(provider.id, modelId);
-  }
-
-  const supportsStreaming = STREAMING_PROTOCOLS.has(protocol);
-  const runtimeHasNativeTools = NATIVE_TOOL_PROTOCOLS.has(protocol);
+  if (!provider || !provider.enabled || !provider.isConfigured || provider.status !== 'verified' || !hasCapability(provider, 'chat') || !provider.protocol) return disabledCapability(providerId, modelId);
+  const supportsStreaming = STREAMING_PROTOCOLS.has(provider.protocol);
   let toolCallingMode: ToolCallingMode = 'text-only';
-  if (hasCapability(provider, 'tool-calling') && runtimeHasNativeTools) {
-    toolCallingMode = 'native-structured';
-  } else if (!supportsStreaming) {
-    toolCallingMode = 'disabled';
-  }
-
-  const reasoningDelivery = resolveReasoningDelivery(provider, protocol);
-  const reasoningVisibility = reasoningDeliveryToStreamVisibility(reasoningDelivery);
-
-  return {
-    providerId: provider.id,
-    modelId,
-    toolCallingMode,
-    reasoningVisibility,
-    reasoningDelivery,
-    supportsStreaming,
-    supportsToolResults: toolCallingMode === 'native-structured',
-  };
+  if (hasCapability(provider, 'tool-calling') && NATIVE_TOOL_PROTOCOLS.has(provider.protocol)) toolCallingMode = 'native-structured';
+  else if (!supportsStreaming) toolCallingMode = 'disabled';
+  const reasoningContract = resolveProviderReasoningContract(provider, modelId);
+  const reasoningDelivery = reasoningContractToDelivery(reasoningContract);
+  return { providerId: provider.id, modelId, toolCallingMode, reasoningVisibility: reasoningContractToStreamVisibility(reasoningContract), reasoningDelivery, reasoningContract, supportsStreaming, supportsToolResults: toolCallingMode === 'native-structured' };
 }
 
-export function describeRouteCapabilityDiagnostic(
-  capability: AgentRouteCapability,
-  availableToolCount: number,
-): string | null {
-  if (availableToolCount <= 0 || capability.toolCallingMode === 'native-structured') {
-    return null;
-  }
-
-  if (capability.toolCallingMode === 'disabled') {
-    return `Current route ${capability.providerId}/${capability.modelId} is not available for structured agent tools. Tools were not registered and no textual tool calls will be executed.`;
-  }
-
+export function describeRouteCapabilityDiagnostic(capability: AgentRouteCapability, availableToolCount: number): string | null {
+  if (availableToolCount <= 0 || capability.toolCallingMode === 'native-structured') return null;
+  if (capability.toolCallingMode === 'disabled') return `Current route ${capability.providerId}/${capability.modelId} is not available for structured agent tools. Tools were not registered and no textual tool calls will be executed.`;
   return `Current route ${capability.providerId}/${capability.modelId} is text-only for agent tools. Tools were not registered and textual tool calls will not be executed.`;
 }

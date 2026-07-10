@@ -167,8 +167,8 @@ export type RunSummary = RunRecord;
 
 export type ContextUsageBreakdownId =
   | 'system_prompt'
-  | 'rules'
-  | 'memory_files'
+  | 'scoped_instructions'
+  | 'skills'
   | 'system_tools'
   | 'mcp_tools'
   | 'subagent_definitions'

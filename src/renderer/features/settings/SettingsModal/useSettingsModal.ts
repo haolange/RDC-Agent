@@ -11,7 +11,6 @@ import { useSettingsModalState } from './useSettingsModalState';
 import {
   getEnabledModels,
   getProviderDisplayLabel,
-  joinPath,
   sortProvidersByLabel,
 } from './utils';
 
@@ -35,8 +34,6 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const setLanguage = useAppSettingsStore((state) => state.setLanguage);
   const setFontScale = useAppSettingsStore((state) => state.setFontScale);
   const updateProfile = useAppSettingsStore((state) => state.updateProfile);
-  const updateWorkspaceRoot = useAppSettingsStore((state) => state.updateWorkspaceRoot);
-  const resetWorkspaceRoot = useAppSettingsStore((state) => state.resetWorkspaceRoot);
   const patchSettings = useAppSettingsStore((state) => state.patchSettings);
   const reloadSettings = useAppSettingsStore((state) => state.reloadSettings);
 
@@ -114,31 +111,6 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const getResolvedProviderLabel = (provider: Pick<LlmProviderEntry, 'label'>) =>
     getProviderDisplayLabel(provider, t('settings.unnamedProvider'));
 
-  const derivedRoot = modalState.workspaceDraft.trim() || settings.paths.defaultWorkspaceRoot || settings.workspace.rootPath;
-  const derivedPathEntries = useMemo(() => {
-    const derivedPaths = {
-      settingsPath: joinPath(derivedRoot, 'settings.json'),
-      logPath: joinPath(derivedRoot, 'logs', 'rdc-agent.log'),
-      projectsPath: joinPath(derivedRoot, 'projects'),
-      knowledgePath: joinPath(derivedRoot, 'knowledge'),
-      profilesPath: joinPath(derivedRoot, 'profiles'),
-      policiesPath: joinPath(derivedRoot, 'policies'),
-      skillsPath: joinPath(derivedRoot, 'skills'),
-      mcpPath: joinPath(derivedRoot, 'mcp'),
-      patternsPath: joinPath(derivedRoot, 'patterns'),
-    };
-    return [
-      { label: t('settings.settingsFile'), value: derivedPaths.settingsPath },
-      { label: t('settings.logFile'), value: derivedPaths.logPath },
-      { label: t('settings.projectsPath'), value: derivedPaths.projectsPath },
-      { label: t('settings.knowledgePath'), value: derivedPaths.knowledgePath },
-      { label: t('settings.profilesPath'), value: derivedPaths.profilesPath },
-      { label: t('settings.policiesPath'), value: derivedPaths.policiesPath },
-      { label: t('settings.skillsPath'), value: derivedPaths.skillsPath },
-      { label: t('settings.mcpPath'), value: derivedPaths.mcpPath },
-    ];
-  }, [derivedRoot, t]);
-
   const sections: Array<{ id: typeof modalState.activeSection; label: string }> = useMemo(() => [
     { id: 'general', label: t('settings.general') },
     { id: 'workspace', label: t('settings.workspace') },
@@ -146,17 +118,15 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     { id: 'skills', label: t('settings.skills') },
     { id: 'agents', label: t('settings.agentManifestTitle') },
     { id: 'tools', label: t('settings.toolsAndExtensions') },
+    { id: 'hooks', label: 'Hooks' },
   ], [t]);
 
   const actions = createSettingsModalActions({
-    settings,
     modalState,
     providerConnection,
     invalidAgentRoutes,
     invalidAgentRouteMessage,
     updateProfile,
-    updateWorkspaceRoot,
-    resetWorkspaceRoot,
     patchSettings,
     reloadSettings,
     t,
@@ -175,7 +145,6 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     settings,
     ...modalState,
     sections,
-    derivedPathEntries,
     routableProviders,
     accountProviders,
     providerCatalog,

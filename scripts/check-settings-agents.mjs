@@ -208,18 +208,19 @@ function main() {
     'utf8',
   );
   assert(personalizationSettings.includes('settings.globalInstructions'), 'Personalization settings should expose global instructions.');
-  const skillLibrarySettings = fs.readFileSync(
-    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/SkillLibrarySettings.tsx'),
+  const runtimeScopePanel = fs.readFileSync(
+    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RuntimeScopePanel.tsx'),
     'utf8',
   );
-  assert(skillLibrarySettings.includes('markdown') && skillLibrarySettings.includes('Markdown'), 'Skill settings should use Markdown Skill files.');
-  assert(skillLibrarySettings.includes('onUpsertSkill'), 'Skill settings should expose real Skill edit operations.');
+  assert(runtimeScopePanel.includes("kind === 'skill'") && runtimeScopePanel.includes('allowed-tools'), 'Skill settings should create standard scoped SKILL.md content.');
+  assert(runtimeScopePanel.includes('rdxRuntime.upsertResource') && runtimeScopePanel.includes('rdxRuntime.deleteResource'), 'Scoped resources should use the canonical RDX Runtime write API.');
   const toolsSettings = fs.readFileSync(
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/ToolsSettings.tsx'),
     'utf8',
   );
   assert(toolsSettings.includes('RdxCliInvokerSettingsFields'), 'Tools settings should render the local RenderDoc toolchain.');
-  assert(toolsSettings.includes('onUpsertMcpServer'), 'Tools settings should expose real MCP edit operations.');
+  assert(!toolsSettings.includes('onUpsertMcpServer'), 'Tools settings must not keep the removed Settings-owned MCP write path.');
+  assert(settingsModalSource.includes("kinds={['mcp']}"), 'Tools settings should expose Project-aware MCP resources through RuntimeScopePanel.');
   const renderDocToolchain = fs.readFileSync(
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RdxCliInvokerSettingsFields.tsx'),
     'utf8',
@@ -276,8 +277,8 @@ function main() {
 
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-agent-settings-agents-'));
   try {
-    const profilesPath = path.join(tempRoot, 'profiles');
-    const agentsPath = path.join(profilesPath, 'agents');
+    const agentsPath = path.join(tempRoot, 'agents');
+    const instructionsPath = path.join(tempRoot, 'RDX.md');
     fs.mkdirSync(agentsPath, { recursive: true });
     const customManifestPath = path.join(agentsPath, `${customAgentId}.agent.md`);
     writeCustomManifest(customManifestPath, {
@@ -285,7 +286,7 @@ function main() {
     });
 
     const manifestService = new AgentManifestService();
-    const manifestSettings = manifestService.getSettings({ profilesPath }, [ollama], validRoutes);
+    const manifestSettings = manifestService.getSettings({ agentsPath, instructionsPath }, [ollama], validRoutes);
     const customDefinition = manifestSettings.definitions.find((definition) => definition.id === customAgentId);
     assert(customDefinition, 'Agent manifest settings should load a safe custom .agent.md profile.');
     assert(customDefinition.userInvocable === true, 'Custom profile should preserve user-invocable status.');
@@ -300,7 +301,7 @@ function main() {
     }
 
     const savedAgentId = 'custom-saved-agent';
-    manifestService.save({ profilesPath }, [
+    manifestService.save({ agentsPath, instructionsPath }, [
       agentDraft({
         id: savedAgentId,
         fileName: 'wrong-file-name.agent.md',
@@ -308,7 +309,7 @@ function main() {
       }),
     ], 'global custom instructions');
     assert(fs.existsSync(path.join(agentsPath, `${savedAgentId}.agent.md`)), 'Saving a custom profile should write a safe id-based file name.');
-    const savedSettings = manifestService.getSettings({ profilesPath }, [ollama], validRoutes);
+    const savedSettings = manifestService.getSettings({ agentsPath, instructionsPath }, [ollama], validRoutes);
     assert(savedSettings.definitions.some((definition) => definition.id === savedAgentId), 'Saved custom profile should reload by custom id.');
 
     const invalidRouteSettings = manifestService.routesFromDefinitions([], [
@@ -325,7 +326,7 @@ function main() {
       name: 'Custom Imported Agent',
       model: canonicalAgentModelId('ollama', 'llama3'),
     });
-    const imported = manifestService.importFile({ profilesPath }, importPath);
+    const imported = manifestService.importFile({ agentsPath, instructionsPath }, importPath);
     assert(imported.id === 'custom-imported-agent', 'Import should accept safe non-built-in .agent.md profiles.');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });

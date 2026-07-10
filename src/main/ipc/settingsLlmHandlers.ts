@@ -1,9 +1,5 @@
 import { ipcMain } from 'electron';
 import type {
-  AgentRuntimeMcpWriteRequest,
-  AgentRuntimeSkillWriteRequest,
-} from '@shared/types/agentRuntime';
-import type {
   AppSettingsPatch,
   LlmProviderAccountLoginStartRequest,
   LlmProviderAccountLoginFinishRequest,
@@ -12,7 +8,6 @@ import type {
 } from '@shared/types/settings';
 import { appPathService } from '../runtime/AppPathService';
 import { agentManifestService } from '../settings/AgentManifestService';
-import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService';
 import { llmAdapter } from '../settings/LLMAdapter';
 import { providerConnectionService } from '../settings/ProviderConnectionService';
 import { settingsService } from '../settings/SettingsService';
@@ -89,20 +84,19 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   });
 
   ipcMain.handle('settings:get', async () => {
-    const paths = appPathService.getWorkspacePaths();
+    const paths = appPathService.getRuntimePaths();
     return settingsService.getAll({
-      workspaceRoot: paths.workspaceRoot,
-      defaultWorkspaceRoot: paths.defaultWorkspaceRoot,
+      userRdxRoot: paths.userRdxRoot,
       settingsPath: paths.settingsPath,
+      instructionsPath: paths.instructionsPath,
+      agentsPath: paths.agentsPath,
+      profileStatePath: paths.profileStatePath,
       logsPath: paths.logsPath,
       logPath: paths.logPath,
       projectsPath: paths.projectsPath,
       knowledgePath: paths.knowledgePath,
-      migrationOrphansPath: paths.migrationOrphansPath,
-      profilesPath: paths.profilesPath,
       policiesPath: paths.policiesPath,
       secretsPath: paths.secretsPath,
-      migrationReportsPath: paths.migrationReportsPath,
     });
   });
 
@@ -120,55 +114,18 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   });
 
   ipcMain.handle('settings:getProviderSecret', async (_event, providerId: string) => {
-    const paths = appPathService.getWorkspacePaths();
-    return settingsService.getProviderSecret(providerId, paths.workspaceRoot);
+    const paths = appPathService.getRuntimePaths();
+    return settingsService.getProviderSecret(providerId, paths.userRdxRoot);
   });
 
   ipcMain.handle('settings:importAgentManifest', async (_event, filePath: string) => {
-    const paths = appPathService.getWorkspacePaths();
+    const paths = appPathService.getRuntimePaths();
     agentManifestService.importFile(paths, filePath);
     return settingsService.getAll(paths);
   });
 
-  ipcMain.handle('settings:upsertSkill', async (_event, request: AgentRuntimeSkillWriteRequest) => {
-    const paths = appPathService.getWorkspacePaths();
-    agentRuntimeConfigService.upsertSkill(request, paths.workspaceRoot);
-    return settingsService.getAll(paths);
-  });
-
-  ipcMain.handle('settings:deleteSkill', async (_event, skillId: string) => {
-    const paths = appPathService.getWorkspacePaths();
-    agentRuntimeConfigService.deleteSkill(skillId, paths.workspaceRoot);
-    return settingsService.getAll(paths);
-  });
-
-  ipcMain.handle('settings:importSkill', async (_event, filePath: string) => {
-    const paths = appPathService.getWorkspacePaths();
-    agentRuntimeConfigService.importSkill(filePath, paths.workspaceRoot);
-    return settingsService.getAll(paths);
-  });
-
-  ipcMain.handle('settings:upsertMcpServer', async (_event, request: AgentRuntimeMcpWriteRequest) => {
-    const paths = appPathService.getWorkspacePaths();
-    agentRuntimeConfigService.upsertMcpServer(request, paths.workspaceRoot);
-    return settingsService.getAll(paths);
-  });
-
-  ipcMain.handle('settings:deleteMcpServer', async (_event, serverId: string) => {
-    const paths = appPathService.getWorkspacePaths();
-    agentRuntimeConfigService.deleteMcpServer(serverId, paths.workspaceRoot);
-    return settingsService.getAll(paths);
-  });
-
-  ipcMain.handle('settings:importMcpServer', async (_event, filePath: string) => {
-    const paths = appPathService.getWorkspacePaths();
-    agentRuntimeConfigService.importMcpServer(filePath, paths.workspaceRoot);
-    return settingsService.getAll(paths);
-  });
-
   ipcMain.handle('settings:set', async (_event, settings: unknown) => {
-    const nextSettings = settingsService.setAll(settings as AppSettingsPatch, appPathService.getWorkspacePaths());
-    storageAdapter.setWorkspaceRoot(nextSettings.workspace.rootPath);
+    const nextSettings = settingsService.setAll(settings as AppSettingsPatch, appPathService.getRuntimePaths());
     await storageAdapter.initializeWorkspace();
     await context.initializeIpcState();
     context.applyCurrentLlmConfig();

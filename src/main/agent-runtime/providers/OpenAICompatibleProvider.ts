@@ -190,7 +190,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
         if (typeof reasoningDelta === 'string' && reasoningDelta.length > 0) {
           sawOutput = true;
           builder.appendThinking(THINKING_INDEX, reasoningDelta, {
-            kind: 'raw',
+            kind: model.provider === 'deepseek' ? 'raw' : 'unknown',
             source: isOpenRouterBaseUrl(baseUrl) ? 'openrouter-raw' : 'openai-compatible-raw',
             visibility: 'raw-collapsed',
             replayPolicy: 'none',

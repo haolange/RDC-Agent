@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { MemoryDetail, MemorySummary, MemoryWriteRequest } from '@shared/types/electron';
+import { useProjectStore } from '../../../stores/projectStore';
 
 /**
  * Memory 面板数据 hook（IPC 调用集中在此，满足 R3：tsx 不直接调 window.electronAPI）。
@@ -11,6 +12,8 @@ export interface MemoryState {
   selected: MemoryDetail | null;
   loading: boolean;
   error: string | null;
+  scope: 'user' | 'project';
+  setScope: (scope: 'user' | 'project') => void;
   refresh: () => Promise<void>;
   select: (name: string | null) => Promise<void>;
   write: (request: MemoryWriteRequest) => Promise<{ success: boolean; error?: string }>;
@@ -18,6 +21,8 @@ export interface MemoryState {
 }
 
 export function useMemory(): MemoryState {
+  const projectRoot = useProjectStore((state) => state.currentProject?.rootPath);
+  const [scope, setScope] = useState<'user' | 'project'>(projectRoot ? 'project' : 'user');
   const [memories, setMemories] = useState<MemorySummary[]>([]);
   const [selected, setSelected] = useState<MemoryDetail | null>(null);
   const [loading, setLoading] = useState(false);
@@ -27,14 +32,14 @@ export function useMemory(): MemoryState {
     setLoading(true);
     setError(null);
     try {
-      const result = await window.electronAPI.memory.list();
+      const result = await window.electronAPI.memory.list(scope, projectRoot);
       setMemories(result.memories);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [projectRoot, scope]);
 
   const select = useCallback(async (name: string | null) => {
     if (!name) {
@@ -42,34 +47,34 @@ export function useMemory(): MemoryState {
       return;
     }
     try {
-      const result = await window.electronAPI.memory.get(name);
+      const result = await window.electronAPI.memory.get(scope, name, projectRoot);
       setSelected(result.memory);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setSelected(null);
     }
-  }, []);
+  }, [projectRoot, scope]);
 
   const write = useCallback(async (request: MemoryWriteRequest) => {
-    const result = await window.electronAPI.memory.write(request);
+    const result = await window.electronAPI.memory.write({ ...request, scope, projectRoot, approved: true });
     if (result.success) {
       await refresh();
     }
     return { success: result.success, error: result.error };
-  }, [refresh]);
+  }, [projectRoot, refresh, scope]);
 
   const remove = useCallback(async (name: string) => {
-    const result = await window.electronAPI.memory.delete(name);
+    const result = await window.electronAPI.memory.delete(scope, name, true, projectRoot);
     if (result.success) {
       setSelected(null);
       await refresh();
     }
     return { success: result.success, error: result.error };
-  }, [refresh]);
+  }, [projectRoot, refresh, scope]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  return { memories, selected, loading, error, refresh, select, write, remove };
+  return { memories, selected, loading, error, scope, setScope, refresh, select, write, remove };
 }

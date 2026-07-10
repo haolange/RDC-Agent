@@ -28,6 +28,7 @@ import { buildSessionOutputs } from './sessionOutputs';
 import { registerToolEvidenceHandlers } from './toolEvidenceHandlers';
 import { registerWorkflowHandlers } from './workflowHandlers';
 import { registerTraceHandlers } from './traceHandlers';
+import { registerRdxRuntimeHandlers } from './rdxRuntimeHandlers';
 import { installIpcInvokeRegistry } from './invokeRegistry';
 import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
 import type {
@@ -277,6 +278,7 @@ export function registerIPCHandlers(): void {
   registerToolEvidenceHandlers(context);
   registerSettingsLlmHandlers(context);
   registerTraceHandlers(context);
+  registerRdxRuntimeHandlers();
   registerNativeThemeBridge();
 }
 

@@ -62,7 +62,9 @@ function main() {
   assert(routeResolverSource.includes('LlmProviderProtocol'), 'RouteCapabilityResolver must use the new LlmProviderProtocol enum.');
   assert(!routeResolverSource.includes('LlmProviderKind'), 'RouteCapabilityResolver must not keep legacy LlmProviderKind.');
 assert(routeResolverSource.includes('reasoningDelivery'), 'RouteCapabilityResolver must expose reasoningDelivery.');
-assert(routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'RouteCapabilityResolver must map reasoning delivery by protocol.');
+assert(routeResolverSource.includes('ProviderReasoningContract'), 'RouteCapabilityResolver must expose a provider/model reasoning contract.');
+assert(routeResolverSource.includes("semantic: 'unknown'"), 'Compatible providers must retain unknown reasoning semantics without official evidence.');
+assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning semantics must not be inferred from compatibility protocol.');
   assert(!routeResolverSource.includes('provider.kind'), 'RouteCapabilityResolver must not route on legacy provider.kind.');
 
   const {
@@ -152,14 +154,14 @@ assert(routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'RouteCapabi
   assert(configuredProviderSource.includes('OpenAICompatibleProvider'), 'Configured runtime provider must map OpenAI-compatible routes.');
   assert(configuredProviderSource.includes('id: decoded.modelId'), 'Configured runtime provider must send the real model id to the provider.');
 
-  const promptSections = read('src/main/agent-runtime/prompt/PromptSections.ts');
-  const promptAssembler = read('src/main/agent-runtime/prompt/PromptAssembler.ts');
-  assert(promptSections.includes('native structured tool calling is enabled'), 'PromptSections must include native structured route instructions.');
-  assert(promptSections.includes('This route cannot execute runtime tools'), 'PromptSections must include text-only/disabled route instructions.');
-  assert(promptSections.includes('sectionCatalog'), 'PromptSections must own runtime catalog prompt composition.');
-  assert(promptSections.includes('Current permission mode'), 'PromptSections must describe runtime permission mode to the model.');
-  assert(promptSections.includes('If the runtime denies or requests approval'), 'PromptSections must tell the model not to route around permission decisions.');
-  assert(promptAssembler.includes('DEFAULT_SECTIONS'), 'PromptAssembler must assemble the canonical prompt sections.');
+  const promptPlanBuilder = read('src/main/agent-runtime/prompt/PromptPlanBuilder.ts');
+  const requestEnvelopeBuilder = read('src/main/agent-runtime/prompt/RequestEnvelopeBuilder.ts');
+  assert(promptPlanBuilder.includes('CORE_FILES'), 'PromptPlanBuilder must assemble source-controlled Core Prompt modules.');
+  assert(promptPlanBuilder.includes("kind: 'skill-catalog'"), 'PromptPlanBuilder must own progressive Skill catalog composition.');
+  assert(promptPlanBuilder.includes('Permission mode:'), 'PromptPlanBuilder must describe effective runtime permission mode.');
+  assert(promptPlanBuilder.includes('routeCapability'), 'PromptPlanBuilder must include effective route capabilities.');
+  assert(requestEnvelopeBuilder.includes('promptPlan'), 'RequestEnvelopeBuilder must produce provider-neutral snapshots from PromptPlan.');
+  assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/prompt/PromptAssembler.ts')), 'PromptAssembler must be removed after PromptPlan formalization.');
 
   const conversationService = read('src/main/conversation/ConversationService.ts');
   for (const forbidden of ['buildProfileSystemPrompt', 'buildProfileCatalogPrompt', 'buildProfileTurnPrompt', 'mentionsTextualToolCall', 'traceHasRuntimeToolCalls', 'AGENT_WORKBENCH_TOOL_CATALOG']) {
@@ -168,9 +170,9 @@ assert(routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'RouteCapabi
   for (const forbidden of ['TASK_FILE_PATTERN', 'readFileSync(taskFilePath', 'fs.existsSync(taskFilePath']) {
     assert(!conversationService.includes(forbidden), `ConversationService must not preload local files outside the tool permission policy: ${forbidden}.`);
   }
-  assert(conversationService.includes('promptAssembler.assembleSystemPrompt'), 'ConversationService must call PromptAssembler for system prompts.');
-  assert(conversationService.includes('routeCapability: routePreflight.routeCapability'), 'ConversationService must pass route capability into PromptAssembler.');
-  assert(conversationService.includes('permissionSettings: settingsService.getAll().agentRuntime.permissions'), 'ConversationService must pass runtime permission settings into PromptAssembler.');
+  assert(conversationService.includes('promptPlanBuilder.build'), 'ConversationService must build a PromptPlan for system instructions.');
+  assert(conversationService.includes('routeCapability: routePreflight.routeCapability'), 'ConversationService must pass route capability into PromptPlanBuilder.');
+  assert(conversationService.includes('permissionSettings: runtimeSettings.agentRuntime.permissions'), 'ConversationService must pass runtime permission settings into PromptPlanBuilder.');
   assert(conversationService.includes('answerToolApproval'), 'ConversationService must expose tool approval resume.');
 
   const settingsService = read('src/main/settings/SettingsService.ts');

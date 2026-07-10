@@ -17,7 +17,7 @@ type SectionKey = 'tools' | 'skills' | 'artifacts';
 
 export const ArtifactTree: React.FC = () => {
   const actionEvents = useEvidenceStore((state) => state.actionEvents);
-  const availableSkills = useAppSettingsStore((state) => state.settings.configuration.availableSkills);
+  const availableSkills = useAppSettingsStore((state) => state.settings.resourceCatalog.availableSkills);
   const [catalog, setCatalog] = useState<ToolCatalog | null>(null);
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [catalogLoading, setCatalogLoading] = useState(true);

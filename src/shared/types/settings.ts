@@ -2,10 +2,8 @@ import type { AgentRole } from './agent';
 import type { AgentManifestDraft, AgentManifestSettings } from './agentManifest';
 import type {
   AgentRuntimeMcpDescriptor,
-  AgentRuntimePatternDescriptor,
   AgentRuntimeSkillDescriptor,
 } from './agentRuntime';
-import type { ExecutionModeProfileDescriptor } from './profile';
 
 export type AppTheme = 'dark' | 'light' | 'system';
 export type ResolvedTheme = 'dark' | 'light';
@@ -158,10 +156,6 @@ export interface ProfileSettings {
   avatarPath?: string;
 }
 
-export interface WorkspaceSettings {
-  rootPath: string;
-}
-
 export type RdxCliJsonMode = 'auto' | 'always';
 
 export interface RdxCliInvokerSettings {
@@ -212,21 +206,19 @@ export interface AgentRuntimeSettings {
 }
 
 export interface AppRuntimePaths {
-  workspaceRoot: string;
-  defaultWorkspaceRoot: string;
+  userRdxRoot: string;
   settingsPath: string;
+  instructionsPath: string;
+  agentsPath: string;
+  profileStatePath: string;
   logsPath: string;
   logPath: string;
   projectsPath: string;
   knowledgePath: string;
-  migrationOrphansPath: string;
-  profilesPath: string;
   policiesPath: string;
   skillsPath: string;
   mcpPath: string;
-  patternsPath: string;
   secretsPath: string;
-  migrationReportsPath: string;
 }
 
 export interface LlmProviderModel {
@@ -324,16 +316,9 @@ export interface SettingsDiagnostic {
   path?: string;
 }
 
-export interface ConfigurationSettings {
-  activeModeProfileId: string;
-  availableModeProfiles: ExecutionModeProfileDescriptor[];
-  enabledMcpServerIds: string[];
-  modePatternBindings: Record<string, string>;
-  availablePatterns: AgentRuntimePatternDescriptor[];
+export interface RuntimeResourceCatalog {
   availableSkills: AgentRuntimeSkillDescriptor[];
   availableMcpServers: AgentRuntimeMcpDescriptor[];
-  lastMigrationReportPath?: string;
-  lastMigrationSummary: string[];
   diagnostics: SettingsDiagnostic[];
 }
 
@@ -341,12 +326,11 @@ export interface AppSettings {
   appearance: UiPreferences;
   layout: LayoutPreferences;
   profile: ProfileSettings;
-  workspace: WorkspaceSettings;
   tooling: ToolingSettings;
   agentRuntime: AgentRuntimeSettings;
   llm: LlmSettings;
   agents: AgentManifestSettings;
-  configuration: ConfigurationSettings;
+  resourceCatalog: RuntimeResourceCatalog;
   paths: AppRuntimePaths;
 }
 
@@ -358,7 +342,6 @@ export type AppSettingsPatch = Partial<{
     terminal: Partial<TerminalLayoutPreference>;
   }>;
   profile: Partial<ProfileSettings>;
-  workspace: Partial<WorkspaceSettings>;
   tooling: Partial<{
     rdxCli: Partial<RdxCliInvokerSettings>;
     rdxActions: Partial<Record<RdxActionId, Partial<RdxShellActionSettings>>>;
@@ -374,7 +357,6 @@ export type AppSettingsPatch = Partial<{
     definitions: AgentManifestDraft[];
     globalInstructions: string;
   }>;
-  configuration: Partial<ConfigurationSettings>;
 }>;
 
 export interface LlmProviderDraftRequest {

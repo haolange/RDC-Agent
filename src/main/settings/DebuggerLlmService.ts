@@ -455,8 +455,8 @@ export class DebuggerLlmService {
       : provider.authMode === 'environment'
         ? 'environment-provider'
         : provider.authMode === 'account'
-          ? settingsService.getProviderOAuthSecret(provider.id, settings.workspace.rootPath)
-          : settingsService.getProviderSecret(provider.id, settings.workspace.rootPath);
+          ? settingsService.getProviderOAuthSecret(provider.id, settings.paths.userRdxRoot)
+          : settingsService.getProviderSecret(provider.id, settings.paths.userRdxRoot);
     if (!secret.trim()) {
       throw new DebuggerLlmBlockerError(makeBlocker(
         BLOCKER_CODES.BLOCKED_LLM_SECRET_MISSING.code,

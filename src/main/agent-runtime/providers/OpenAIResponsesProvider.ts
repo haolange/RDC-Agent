@@ -236,9 +236,9 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
               currentReasoningArtifact = reasoningArtifact;
               sawOutput = true;
               builder.updateThinking(REASONING_INDEX, {
-                kind: 'summary',
-                source: 'openai-responses-summary',
-                visibility: 'summary',
+                kind: 'opaque',
+                source: 'openai-responses-encrypted',
+                visibility: 'hidden',
                 replayPolicy: 'provider-artifact',
                 artifact: currentReasoningArtifact,
               });
