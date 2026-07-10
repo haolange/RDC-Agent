@@ -120,7 +120,7 @@ describe('buildWorkProcessPresentation', () => {
       type: 'section',
       resultText: 'Read files before answering.',
       resultToolSummary: '',
-      thinkingLabel: '原始思考',
+      thinkingLabel: 'Raw reasoning',
       thinkingSource: '',
       thinkingPreview: 'raw chain-of-thought that must not be result text',
       thinkingExpandable: true,
@@ -164,7 +164,7 @@ describe('buildWorkProcessPresentation', () => {
     expect(section).toMatchObject({
       type: 'section',
       resultText: '',
-      thinkingLabel: '正在思考',
+      thinkingLabel: '推理中',
       thinkingPreview: 'The model is planning the next tool call.',
       thinkingExpandable: true,
       thinkingOpenByDefault: true,
@@ -207,7 +207,7 @@ describe('buildWorkProcessPresentation', () => {
     expect(section).toMatchObject({
       type: 'section',
       resultText: '',
-      thinkingLabel: '思考',
+      thinkingLabel: 'Reasoning summary',
       thinkingPreview: 'Provider summary for this turn.',
       thinkingExpandable: true,
       thinkingOpenByDefault: true,
@@ -266,7 +266,7 @@ describe('buildWorkProcessPresentation', () => {
     const sections = presentation.rows.filter((row) => row.type === 'section');
     expect(sections).toHaveLength(1);
     expect(sections[0]).toMatchObject({
-      thinkingLabel: '思考',
+      thinkingLabel: 'Reasoning summary',
       thinkingPreview: repeatedSummary,
       thinkingExpandable: true,
       stepCount: 1,
@@ -416,7 +416,7 @@ describe('buildWorkProcessPresentation', () => {
     expect(section).toMatchObject({
       type: 'section',
       resultText: '',
-      thinkingLabel: '原始思考',
+      thinkingLabel: 'Raw reasoning',
       thinkingPreview: 'Provider thought.',
       thinkingExpandable: true,
       thinkingOpenByDefault: false,
@@ -463,7 +463,7 @@ describe('buildWorkProcessPresentation', () => {
     expect(presentation.rows.find((row) => row.type === 'section')).toMatchObject({
       type: 'section',
       resultText: '',
-      thinkingLabel: '思考',
+      thinkingLabel: 'Reasoning summary',
       thinkingPreview: 'The user asks in Chinese. Now answer in Chinese.',
       thinkingExpandable: true,
       thinkingOpenByDefault: true,
@@ -506,7 +506,7 @@ describe('buildWorkProcessPresentation', () => {
     expect(section).toMatchObject({
       type: 'section',
       resultText: 'Turn result.',
-      thinkingLabel: '思考',
+      thinkingLabel: 'Reasoning summary',
       thinkingStatus: 'complete',
       thinkingPreview: 'Provider thought.',
       thinkingExpandable: true,
@@ -735,7 +735,7 @@ describe('buildWorkProcessPresentation', () => {
     expect(sections[0]).toMatchObject({
       type: 'section',
       status: 'error',
-      thinkingLabel: '思考',
+      thinkingLabel: 'Reasoning summary',
       thinkingPreview: staleSummary,
       thinkingExpandable: true,
       stepCount: 1,
@@ -1218,7 +1218,7 @@ describe('semantic step groups', () => {
     const rawSection = rawPresentation.rows.find((row) => row.type === 'section');
     expect(rawSection).toMatchObject({
       type: 'section',
-      thinkingLabel: '原始思考',
+      thinkingLabel: 'Raw reasoning',
       thinkingPreview: 'raw chain visible',
     });
     expect(rawPresentation.rows.some((row) => row.type === 'reasoningIndicator')).toBe(false);
@@ -1249,7 +1249,7 @@ describe('semantic step groups', () => {
     const summarySection = summaryPresentation.rows.find((row) => row.type === 'section');
     expect(summarySection).toMatchObject({
       type: 'section',
-      thinkingLabel: '思考',
+      thinkingLabel: 'Reasoning summary',
       thinkingPreview: 'summary visible',
     });
 
@@ -1754,11 +1754,11 @@ describe('semantic step groups', () => {
     const secondSection = notPromotedPresentation.groups[0].rows.find((row) => row.type === 'section' && row.loopId === 'loop-no-promote-2');
     expect(firstSection).toMatchObject({
       thinkingPreview: 'First loop summary.',
-      thinkingLabel: '思考',
+      thinkingLabel: 'Reasoning summary',
     });
     expect(secondSection).toMatchObject({
       thinkingPreview: 'Second loop still has visible thinking.',
-      thinkingLabel: '思考',
+      thinkingLabel: 'Reasoning summary',
     });
   });
 

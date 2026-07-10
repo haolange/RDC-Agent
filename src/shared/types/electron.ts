@@ -22,10 +22,6 @@ import type { LLMConfig } from './llm';
 import type { ResolvedModelCapability } from './modelCapability';
 import type { RuntimeLogEntry, RuntimeLogScope } from './runtimeLog';
 import type {
-  AgentRuntimeMcpWriteRequest,
-  AgentRuntimeSkillWriteRequest,
-} from './agentRuntime';
-import type {
   AppSettings,
   AppSettingsPatch,
   LlmProviderAccountStatus,
@@ -58,9 +54,11 @@ import type {
   TraceBranchSwitchResult,
   TraceSessionResult,
 } from './trace';
+import type { HookEvent, RdxRuntimeOverview, RequestEnvelopeSnapshot, ScopedResourceKind, ScopedResourceWriteRequest } from './rdxRuntime';
 
 /** Memory 面板列表项摘要（对应 MemoryRecord 的精简视图）。 */
 export interface MemorySummary {
+  scope: 'user' | 'project';
   name: string;
   description: string;
   type: 'user' | 'feedback' | 'project' | 'reference';
@@ -76,6 +74,9 @@ export interface MemoryDetail extends MemorySummary {
 
 /** Memory 写入请求（对应 MemoryStore.writeMemory 入参）。 */
 export interface MemoryWriteRequest {
+  scope: 'user' | 'project';
+  projectRoot?: string;
+  approved: boolean;
   name: string;
   description: string;
   type: 'user' | 'feedback' | 'project' | 'reference';
@@ -179,10 +180,23 @@ export interface ElectronAPI {
   };
 
   memory: {
-    list: () => Promise<{ memories: MemorySummary[] }>;
-    get: (name: string) => Promise<{ memory: MemoryDetail | null }>;
+    list: (scope: 'user' | 'project', projectRoot?: string) => Promise<{ memories: MemorySummary[] }>;
+    get: (scope: 'user' | 'project', name: string, projectRoot?: string) => Promise<{ memory: MemoryDetail | null }>;
     write: (request: MemoryWriteRequest) => Promise<{ success: boolean; name: string; error?: string }>;
-    delete: (name: string) => Promise<{ success: boolean; error?: string }>;
+    delete: (scope: 'user' | 'project', name: string, confirmed: boolean, projectRoot?: string) => Promise<{ success: boolean; error?: string }>;
+  };
+
+  rdxRuntime: {
+    getOverview: (projectRoot?: string) => Promise<RdxRuntimeOverview>;
+    validateResource: (request: ScopedResourceWriteRequest) => Promise<{ valid: boolean; diagnostics: string[] }>;
+    upsertResource: (request: ScopedResourceWriteRequest) => Promise<RdxRuntimeOverview>;
+    deleteResource: (kind: ScopedResourceKind, scope: 'user' | 'project', id: string, projectRoot?: string) => Promise<RdxRuntimeOverview>;
+    revealResource: (sourcePath: string) => Promise<{ success: boolean; error?: string }>;
+    trustHook: (projectRoot: string, hookId: string) => Promise<RdxRuntimeOverview>;
+    revokeHook: (projectRoot: string, hookId: string) => Promise<RdxRuntimeOverview>;
+    testHook: (event: HookEvent, projectRoot?: string, hookId?: string) => Promise<unknown>;
+    listRequestSnapshots: (sessionId: string, turnId?: string) => Promise<RequestEnvelopeSnapshot[]>;
+    getRequestSnapshot: (sessionId: string, turnId: string, snapshotId: string) => Promise<RequestEnvelopeSnapshot | null>;
   };
 
   command: {
@@ -231,12 +245,6 @@ export interface ElectronAPI {
     getModelCapability: (agentId: string) => Promise<ResolvedModelCapability | null>;
     getProviderSecret: (providerId: string) => Promise<string>;
     importAgentManifest: (filePath: string) => Promise<AppSettings>;
-    upsertSkill: (request: AgentRuntimeSkillWriteRequest) => Promise<AppSettings>;
-    deleteSkill: (skillId: string) => Promise<AppSettings>;
-    importSkill: (filePath: string) => Promise<AppSettings>;
-    upsertMcpServer: (request: AgentRuntimeMcpWriteRequest) => Promise<AppSettings>;
-    deleteMcpServer: (serverId: string) => Promise<AppSettings>;
-    importMcpServer: (filePath: string) => Promise<AppSettings>;
     set: (settings: AppSettingsPatch) => Promise<AppSettings>;
   };
 

@@ -26,7 +26,6 @@ import { createSessionTaskStore } from '../agent-runtime/tasks/sessionTaskStore'
 import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
 import { traceStateStore } from '../workflow/debugger/TraceStateStore';
 import { appPathService } from '../runtime/AppPathService';
-import path from 'path';
 import { TraceEventStore, TraceRunStore } from './TraceEventStore';
 import { TraceEventEmitter } from './TraceEventEmitter';
 import { traceTreeBuilder } from './TraceTreeBuilder';
@@ -82,7 +81,7 @@ export class TraceService {
   private emitter: TraceEventEmitter;
 
   constructor() {
-    this.traceRoot = path.join(appPathService.getWorkspaceRoot(), '.rdc-agent', 'trace');
+    this.traceRoot = appPathService.getAppStatePaths().tracesPath;
     this.runStore = new TraceRunStore(this.traceRoot);
     this.eventStore = new TraceEventStore(this.traceRoot);
     this.emitter = new TraceEventEmitter(this.eventStore);
@@ -394,7 +393,7 @@ export class TraceService {
   }
 
   /**
-   * 会话级进度投影：读取当前会话的 TaskRegistry 任务（`workspace/.tasks/{sessionId}`），
+   * 会话级进度投影：读取当前会话的 TaskRegistry 任务（`${userData}/state/tasks/{sessionId}`），
    * 映射为「进度」泳道所需的 ProgressTask。按创建时间排序生成计划序号；`pending` 且存在
    * 未完成的上游依赖时判定为 `blocked`；`deleted` 任务不进入投影。
    */

@@ -66,7 +66,6 @@ export type { AgentEvent, AgentEventPayload, AgentEventType } from './agentRunti
 export type {
   AgentRuntimeCatalog,
   AgentRuntimeMcpDescriptor,
-  AgentRuntimePatternDescriptor,
   AgentRuntimeSkillDescriptor,
   AgentRouteCapability,
   ModelProviderCapabilityMatrix,
@@ -100,6 +99,29 @@ export type {
   ResolvedReasoningSelection,
 } from './modelCapability';
 export type { RuntimeLogEntry, RuntimeLogScope, RuntimeLogSeverity } from './runtimeLog';
+export type {
+  EffectiveResourceStatus,
+  EffectiveAgentProfile,
+  HookDefinition,
+  HookEvent,
+  HookTrustState,
+  PromptPlan,
+  PromptPlanMetrics,
+  PromptSegment,
+  PromptSegmentKind,
+  RequestEnvelopeSnapshot,
+  ResolvedResource,
+  ResourceProvenance,
+  ResourceScope,
+  RestrictivePolicy,
+  ScopedResourceCandidate,
+  ScopedResourceCatalog,
+  ScopedResourceKind,
+  ScopedInstructionResolution,
+  ScopedInstructionSource,
+  SkillLoadResult,
+  SkillMetadata,
+} from './rdxRuntime';
 export type {
   CaptureDescriptor,
   ContextSnapshot,

@@ -25,11 +25,14 @@ vi.mock('electron', () => ({
 describe('SettingsService provider persistence', () => {
   let userDataRoot = '';
   let previousUserDataEnv: string | undefined;
+  let previousRdxHomeEnv: string | undefined;
 
   beforeEach(() => {
     previousUserDataEnv = process.env.RDC_AGENT_USER_DATA;
+    previousRdxHomeEnv = process.env.RDC_AGENT_HOME;
     userDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-settings-'));
     process.env.RDC_AGENT_USER_DATA = userDataRoot;
+    process.env.RDC_AGENT_HOME = path.join(userDataRoot, '.rdx');
     electronMock.userDataRoot = userDataRoot;
     electronMock.encryptionAvailable = false;
     vi.resetModules();
@@ -41,6 +44,11 @@ describe('SettingsService provider persistence', () => {
     } else {
       process.env.RDC_AGENT_USER_DATA = previousUserDataEnv;
     }
+    if (previousRdxHomeEnv === undefined) {
+      delete process.env.RDC_AGENT_HOME;
+    } else {
+      process.env.RDC_AGENT_HOME = previousRdxHomeEnv;
+    }
     fs.rmSync(userDataRoot, { recursive: true, force: true });
   });
 
@@ -49,8 +57,8 @@ describe('SettingsService provider persistence', () => {
     workspaceRoot: string;
   }> {
     const { createBuiltinProviderEntry } = await import('@shared/constants/llm');
-    const workspaceRoot = path.join(userDataRoot, 'workspace');
-    const settingsPath = path.join(workspaceRoot, 'settings.json');
+    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const settingsPath = path.join(workspaceRoot, 'config.json');
     const provider = {
       ...createBuiltinProviderEntry('deepseek'),
       enabled: true,
@@ -69,7 +77,6 @@ describe('SettingsService provider persistence', () => {
 
     fs.mkdirSync(workspaceRoot, { recursive: true });
     fs.writeFileSync(settingsPath, JSON.stringify({
-      workspace: { rootPath: workspaceRoot },
       llm: {
         providers: [provider],
         agentRoutes: [

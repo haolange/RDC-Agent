@@ -6,16 +6,16 @@ const url = require("url");
 const child_process = require("child_process");
 const fs = require("fs");
 const uuid = require("uuid");
-const YAML = require("yaml");
 const os = require("os");
+const YAML = require("yaml");
 const crypto = require("crypto");
-const node_fs = require("node:fs");
-const path$1 = require("node:path");
-const node_crypto = require("node:crypto");
 const fs$1 = require("fs/promises");
 const util = require("util");
 const promises = require("dns/promises");
 const net = require("net");
+const node_crypto = require("node:crypto");
+const node_fs = require("node:fs");
+const path$1 = require("node:path");
 const http = require("http");
 const https = require("https");
 function _interopNamespaceDefault(e) {
@@ -38,7 +38,6 @@ const path__namespace = /* @__PURE__ */ _interopNamespaceDefault(path);
 const fs__namespace = /* @__PURE__ */ _interopNamespaceDefault(fs);
 const os__namespace = /* @__PURE__ */ _interopNamespaceDefault(os);
 const crypto__namespace = /* @__PURE__ */ _interopNamespaceDefault(crypto);
-const path__namespace$1 = /* @__PURE__ */ _interopNamespaceDefault(path$1);
 const fs__namespace$1 = /* @__PURE__ */ _interopNamespaceDefault(fs$1);
 const net__namespace = /* @__PURE__ */ _interopNamespaceDefault(net);
 function generateShortId() {
@@ -180,34 +179,157 @@ const RIGHT_PANEL_COLLAPSED_WIDTH = 0;
 const TERMINAL_DEFAULT_HEIGHT = 328;
 const TERMINAL_MIN_HEIGHT = 180;
 const TERMINAL_MAX_HEIGHT = 720;
-const CATALOG_UPDATED_AT = "2026-07-05";
-const EFFORT_3 = ["low", "medium", "high"];
-const EFFORT_4 = ["low", "medium", "high", "extHigh"];
-const EFFORT_5 = ["low", "medium", "high", "extHigh", "max"];
-const EFFORT_NO_EXTRA = ["low", "medium", "high", "max"];
-const REASONING_OFF = ["off"];
-const REASONING_AUTO_ONLY = ["off", "auto"];
+const CATALOG_UPDATED_AT = "2026-07-06";
+const OPENAI_LEVELS = ["low", "medium", "high", "extra"];
+const OPENAI_PRO_LEVELS = ["medium", "high", "extra"];
+const ANTHROPIC_5_LEVELS = ["low", "medium", "high", "extra", "max"];
+const GEMINI_35_LEVELS = ["minimal", "low", "medium", "high"];
+const GEMINI_31_LEVELS = ["low", "medium", "high"];
+const DEEPSEEK_LEVELS = ["high", "max"];
+const XAI_LEVELS = ["low", "medium", "high"];
+const QWEN_LEVELS = ["minimal", "low", "medium", "high"];
+const OPENAI_WIRE_LEVELS = {
+  minimal: "minimal",
+  low: "low",
+  medium: "medium",
+  high: "high",
+  extra: "xhigh",
+  max: "max",
+  ultra: "ultra"
+};
+const ANTHROPIC_WIRE_LEVELS = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+  extra: "xhigh",
+  max: "max"
+};
+const GEMINI_WIRE_LEVELS = {
+  minimal: "minimal",
+  low: "low",
+  medium: "medium",
+  high: "high"
+};
+const GEMINI_BUDGET_LEVELS = {
+  low: 1024,
+  medium: 4096,
+  high: 8192
+};
+const OPENAI_RESPONSES_WIRE = {
+  kind: "openai-responses",
+  on: "medium",
+  levels: OPENAI_WIRE_LEVELS
+};
+const OPENAI_COMPATIBLE_WIRE = {
+  kind: "openai-compatible",
+  on: "medium",
+  levels: OPENAI_WIRE_LEVELS,
+  offMode: "reasoning-none"
+};
+const QWEN_OPENAI_WIRE = {
+  kind: "openai-compatible",
+  on: "medium",
+  levels: {
+    minimal: "minimal",
+    low: "low",
+    medium: "medium",
+    high: "high"
+  },
+  onMode: "enable-thinking-true",
+  offMode: "enable-thinking-false"
+};
+const DEEPSEEK_ANTHROPIC_WIRE = {
+  kind: "anthropic",
+  on: "high",
+  levels: {
+    high: "high",
+    max: "max"
+  },
+  onMode: "enabled",
+  offMode: "disabled"
+};
+const ANTHROPIC_ADAPTIVE_WIRE = {
+  kind: "anthropic",
+  on: "high",
+  levels: ANTHROPIC_WIRE_LEVELS,
+  onMode: "adaptive",
+  offMode: "disabled"
+};
+const ANTHROPIC_ALWAYS_ON_WIRE = {
+  kind: "anthropic",
+  on: "high",
+  levels: ANTHROPIC_WIRE_LEVELS,
+  onMode: "adaptive"
+};
+const ANTHROPIC_TOGGLE_WIRE = {
+  kind: "anthropic",
+  on: "high",
+  onMode: "enabled",
+  offMode: "disabled"
+};
+const KIMI_CODING_PLAN_WIRE = {
+  kind: "anthropic",
+  on: "high",
+  onMode: "enabled",
+  onBudgetTokens: 4096,
+  offMode: "disabled"
+};
+const ANTHROPIC_ALWAYS_ON_TOGGLE_WIRE = {
+  kind: "anthropic",
+  on: "high",
+  onMode: "enabled"
+};
+const GEMINI_3_WIRE = {
+  kind: "gemini-thinking-level",
+  on: "medium",
+  levels: GEMINI_WIRE_LEVELS
+};
+const GEMINI_25_WIRE = {
+  kind: "gemini-thinking-budget",
+  on: "high",
+  levels: GEMINI_BUDGET_LEVELS
+};
+const MOONSHOT_TOGGLE_WIRE = {
+  kind: "moonshot-thinking",
+  onMode: "enabled",
+  offMode: "disabled"
+};
+const MOONSHOT_ALWAYS_ON_WIRE = {
+  kind: "moonshot-thinking",
+  onMode: "enabled"
+};
+const VOLCENGINE_TOGGLE_WIRE = {
+  kind: "openai-compatible",
+  on: "high",
+  onMode: "thinking-enabled",
+  offMode: "thinking-disabled"
+};
+const NONE_WIRE = { kind: "none" };
 const OPENAI_API_SOURCE = {
   kind: "official",
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    "https://platform.openai.com/docs/models",
-    "https://platform.openai.com/docs/guides/reasoning",
-    "https://platform.openai.com/docs/guides/function-calling",
-    "https://platform.openai.com/docs/guides/structured-outputs"
+    "https://developers.openai.com/api/docs/guides/reasoning",
+    "https://developers.openai.com/api/docs/guides/latest-model",
+    "https://developers.openai.com/api/docs/models",
+    "https://developers.openai.com/api/docs/guides/function-calling",
+    "https://developers.openai.com/api/docs/guides/structured-outputs"
   ]
 };
 const CHATGPT_ACCOUNT_SOURCE = {
   kind: "official",
   updatedAt: CATALOG_UPDATED_AT,
-  urls: ["https://help.openai.com/en/articles/12003714-chatgpt-business-models-limits"]
+  urls: [
+    "https://help.openai.com/en/articles/12003714-chatgpt-business-models-limits",
+    "https://developers.openai.com/api/docs/models/gpt-5.5-pro"
+  ]
 };
 const ANTHROPIC_SOURCE = {
   kind: "official",
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    "https://docs.anthropic.com/en/docs/about-claude/models/overview",
-    "https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking",
+    "https://platform.claude.com/docs/en/build-with-claude/effort",
+    "https://docs.anthropic.com/en/api/messages",
     "https://docs.anthropic.com/en/docs/build-with-claude/tool-use/overview",
     "https://docs.anthropic.com/en/docs/build-with-claude/vision"
   ]
@@ -216,8 +338,8 @@ const GEMINI_SOURCE = {
   kind: "official",
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    "https://ai.google.dev/gemini-api/docs/models",
     "https://ai.google.dev/gemini-api/docs/thinking",
+    "https://ai.google.dev/gemini-api/docs/generate-content/thinking",
     "https://ai.google.dev/gemini-api/docs/function-calling",
     "https://ai.google.dev/gemini-api/docs/structured-output"
   ]
@@ -226,24 +348,25 @@ const XAI_SOURCE = {
   kind: "official",
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    "https://docs.x.ai/developers/models",
     "https://docs.x.ai/developers/model-capabilities/text/reasoning",
-    "https://docs.x.ai/developers/model-capabilities/text/structured-outputs"
+    "https://docs.x.ai/developers/models/grok-4.3",
+    "https://docs.x.ai/developers/models/grok-build-0.1",
+    "https://docs.x.ai/developers/migration/may-15-retirement"
   ]
 };
 const COPILOT_SOURCE = {
-  kind: "official",
+  kind: "observed",
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
     "https://docs.github.com/en/copilot/reference/ai-models/supported-models",
     "https://docs.github.com/en/copilot/reference/ai-models/model-comparison"
-  ]
+  ],
+  note: "GitHub Copilot exposes cross-vendor models behind a single compatible endpoint; capability rows mirror the curated product offer and stay conservative when the Copilot wire contract is not explicit."
 };
 const AZURE_OPENAI_SOURCE = {
   kind: "official",
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    "https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/models-sold-directly-by-azure",
     "https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/reasoning",
     "https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/structured-outputs"
   ]
@@ -253,15 +376,13 @@ const BEDROCK_SOURCE = {
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
     "https://docs.aws.amazon.com/bedrock/latest/userguide/model-cards-anthropic.html",
-    "https://docs.aws.amazon.com/bedrock/latest/userguide/claude-messages-extended-thinking.html",
-    "https://docs.aws.amazon.com/bedrock/latest/userguide/claude-messages-structured-outputs.html"
+    "https://docs.aws.amazon.com/bedrock/latest/userguide/claude-messages-extended-thinking.html"
   ]
 };
 const VERTEX_SOURCE = {
   kind: "official",
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    "https://cloud.google.com/vertex-ai/generative-ai/docs/learn/models",
     "https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/inference",
     "https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/claude/structured_outputs"
   ]
@@ -270,63 +391,75 @@ const DEEPSEEK_SOURCE = {
   kind: "official",
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    "https://api-docs.deepseek.com/guides/reasoning_model",
-    "https://api-docs.deepseek.com/quick_start/pricing"
+    "https://api-docs.deepseek.com/quick_start/pricing",
+    "https://api-docs.deepseek.com/guides/thinking_mode",
+    "https://api-docs.deepseek.com/guides/anthropic_api",
+    "https://api-docs.deepseek.com/api/create-chat-completion"
   ]
 };
 const QWEN_SOURCE = {
-  kind: "conservative",
+  kind: "official",
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    "https://help.aliyun.com/zh/model-studio/qwen-api-via-dashscope",
-    "https://help.aliyun.com/zh/model-studio/vision"
-  ],
-  note: "Public model pages do not expose a complete per-model context and effort table; profile is conservative."
+    "https://help.aliyun.com/en/model-studio/text-generation-model/",
+    "https://help.aliyun.com/en/model-studio/compatibility-with-openai-responses-api",
+    "https://help.aliyun.com/en/model-studio/coding-plan-faq"
+  ]
 };
 const VOLCENGINE_SOURCE = {
   kind: "conservative",
   updatedAt: CATALOG_UPDATED_AT,
-  urls: ["https://www.volcengine.com/docs/82379/1928262"],
-  note: "Ark compatible endpoint catalog is product-specific; bundled entries are conservative coding-route candidates."
+  urls: [
+    "https://www.volcengine.com/docs/82379/1519548",
+    "https://www.volcengine.com/docs/82379/1956279"
+  ],
+  note: "Volcengine public docs confirm deep-thinking can be enabled and disabled, but the exact per-model effort ladder is not stable across entrypoints. Current rows fail closed to toggle unless the model family is explicit elsewhere."
 };
 const GLM_SOURCE = {
   kind: "conservative",
   updatedAt: CATALOG_UPDATED_AT,
-  urls: ["https://open.bigmodel.cn/dev/api/normal-model/glm-4.5"],
-  note: "Official pages describe thinking mode, but do not provide a stable low/medium/high effort ladder."
+  urls: [
+    "https://open.bigmodel.cn/dev/api",
+    "https://help.aliyun.com/en/model-studio/glm-zhipu",
+    "https://help.aliyun.com/zh/model-studio/glm"
+  ],
+  note: "The dedicated Anthropic-compatible GLM endpoints document thinking enable/disable, but do not publish a stable effort ladder. App-managed GLM direct providers therefore expose toggle-only reasoning; richer level variants remain covered by shared tests, not by these endpoint rows."
 };
 const MINIMAX_SOURCE = {
-  kind: "conservative",
+  kind: "official",
   updatedAt: CATALOG_UPDATED_AT,
-  urls: ["https://platform.minimaxi.com/document/guides/chat-model/V2"],
-  note: "Public model catalog coverage is incomplete; profile is conservative."
+  urls: [
+    "https://platform.minimaxi.com/docs/api-reference/text-openai-api",
+    "https://platform.minimaxi.com/docs/api-reference/text-anthropic-api"
+  ]
 };
 const MIMO_SOURCE = {
   kind: "official",
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    "https://mimo.mi.com/docs/quick-start/summary/model",
-    "https://mimo.mi.com/models/mimo-v2.5",
-    "https://mimo.mi.com/token-plan"
+    "https://mimo.mi.com/docs/en-US/api/chat/responses",
+    "https://mimo.mi.com/docs/en-US/quick-start/usage-guide/text-generation/deep-thinking",
+    "https://mimo.mi.com/docs/en-US/tokenplan/integration/codex-configuration"
   ]
 };
 const KIMI_SOURCE = {
   kind: "official",
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
+    "https://platform.moonshot.ai/docs/guide/use-kimi-k2-thinking-model",
     "https://platform.moonshot.ai/docs/api/chat",
-    "https://platform.moonshot.ai/docs/guide/use-kimi-k2-thinking-model"
+    "https://platform.moonshot.ai/docs/guide/kimi-k2-6-quickstart"
   ]
 };
 const KIMI_CODING_SOURCE = {
   kind: "official",
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    "https://www.kimi.com/code/docs/en/",
     "https://www.kimi.com/code/docs/en/third-party-tools/other-coding-agents.html",
-    "https://www.kimi.com/code/docs/en/kimi-code/whats-new.html"
+    "https://www.kimi.com/code/docs/en/kimi-code/whats-new.html",
+    "https://www.kimi.com/code/docs/en/kimi-code-cli/configuration/config-files.html"
   ],
-  note: "Kimi Coding Plan exposes kimi-for-coding. Thinking On routes to the current Kimi For Coding thinking model; no public Coding Plan highspeed model is exposed."
+  note: "Kimi Coding Plan only exposes kimi-for-coding. Thinking mode is a binary product switch; the coding model upgrade only takes effect when it is on."
 };
 const GROQ_SOURCE = {
   kind: "official",
@@ -352,7 +485,7 @@ const CEREBRAS_SOURCE = {
   kind: "conservative",
   updatedAt: CATALOG_UPDATED_AT,
   urls: ["https://inference-docs.cerebras.ai/"],
-  note: "Official inference docs are latency-focused; model capability table is conservative."
+  note: "Cerebras public docs do not publish a stable reasoning control contract for the curated rows in this catalog, so reasoning fails closed to none."
 };
 const TOOLS_ONLY = {
   toolCalling: true,
@@ -364,55 +497,174 @@ const MULTIMODAL_TOOLS = {
   visionInput: true,
   structuredOutput: true
 };
-function buildReasoningProfile(nominalContextWindowTokens, adjustableLevels, toolProfile) {
-  const reasoningMode = adjustableLevels.length > 0 ? "effort-levels" : "none";
-  const supportedReasoningLevels = adjustableLevels.length > 0 ? [...REASONING_AUTO_ONLY, ...adjustableLevels] : REASONING_OFF;
-  const defaultReasoningLevel = adjustableLevels.length > 0 ? "auto" : "off";
+function createReasoningControl$1(control) {
+  return {
+    ...control,
+    levels: [...control.levels],
+    wireProfile: cloneWireProfile(control.wireProfile)
+  };
+}
+function cloneWireProfile(profile) {
+  switch (profile.kind) {
+    case "openai-responses":
+      return {
+        ...profile,
+        levels: profile.levels ? { ...profile.levels } : profile.levels
+      };
+    case "openai-compatible":
+      return {
+        ...profile,
+        levels: profile.levels ? { ...profile.levels } : profile.levels
+      };
+    case "anthropic":
+      return {
+        ...profile,
+        levels: profile.levels ? { ...profile.levels } : profile.levels
+      };
+    case "gemini-thinking-level":
+      return {
+        ...profile,
+        levels: { ...profile.levels }
+      };
+    case "gemini-thinking-budget":
+      return {
+        ...profile,
+        levels: { ...profile.levels }
+      };
+    case "moonshot-thinking":
+    case "none":
+    default:
+      return { ...profile };
+  }
+}
+function noReasoningControl() {
+  return {
+    kind: "none",
+    supportsOff: true,
+    levels: [],
+    defaultSelection: "off",
+    wireProfile: NONE_WIRE
+  };
+}
+function toggleReasoningControl(defaultSelection, wireProfile) {
+  return {
+    kind: "toggle",
+    supportsOff: true,
+    levels: [],
+    defaultSelection,
+    wireProfile
+  };
+}
+function alwaysOnReasoningControl(lockedSelection, wireProfile) {
+  return {
+    kind: "always-on",
+    supportsOff: false,
+    levels: [],
+    defaultSelection: lockedSelection,
+    lockedSelection,
+    wireProfile
+  };
+}
+function levelsReasoningControl(levels, options) {
+  return {
+    kind: "levels",
+    supportsOff: options.supportsOff,
+    levels: [...levels],
+    defaultSelection: options.defaultSelection,
+    wireProfile: options.wireProfile
+  };
+}
+function buildProfile(nominalContextWindowTokens, reasoningControl, toolProfile) {
   return {
     ...nominalContextWindowTokens ? { nominalContextWindowTokens } : {},
-    reasoningMode,
-    supportedReasoningLevels,
-    defaultReasoningLevel,
+    reasoningControl: createReasoningControl$1(reasoningControl),
     ...toolProfile
   };
 }
-const textOnly = (nominalContextWindowTokens, adjustableLevels = []) => buildReasoningProfile(nominalContextWindowTokens, adjustableLevels, TOOLS_ONLY);
-const multimodal = (nominalContextWindowTokens, adjustableLevels = []) => buildReasoningProfile(nominalContextWindowTokens, adjustableLevels, MULTIMODAL_TOOLS);
-function buildAutoOnlyProfile(nominalContextWindowTokens, toolProfile, supportedReasoningLevels = REASONING_AUTO_ONLY) {
-  return {
-    ...nominalContextWindowTokens ? { nominalContextWindowTokens } : {},
-    reasoningMode: "auto-only",
-    supportedReasoningLevels,
-    defaultReasoningLevel: "auto",
-    ...toolProfile
-  };
-}
-const autoOnlyText = (nominalContextWindowTokens, supportedReasoningLevels = REASONING_AUTO_ONLY) => buildAutoOnlyProfile(nominalContextWindowTokens, TOOLS_ONLY, supportedReasoningLevels);
-const autoOnlyMultimodal = (nominalContextWindowTokens, supportedReasoningLevels = REASONING_AUTO_ONLY) => buildAutoOnlyProfile(nominalContextWindowTokens, MULTIMODAL_TOOLS, supportedReasoningLevels);
-const openSourceText = (nominalContextWindowTokens) => ({
-  ...nominalContextWindowTokens ? { nominalContextWindowTokens } : {},
-  reasoningMode: "none",
-  supportedReasoningLevels: REASONING_OFF,
-  defaultReasoningLevel: "off",
-  toolCalling: true,
-  visionInput: false,
-  structuredOutput: true
-});
+const textOnly = (nominalContextWindowTokens, reasoningControl = noReasoningControl()) => buildProfile(nominalContextWindowTokens, reasoningControl, TOOLS_ONLY);
+const multimodal = (nominalContextWindowTokens, reasoningControl = noReasoningControl()) => buildProfile(nominalContextWindowTokens, reasoningControl, MULTIMODAL_TOOLS);
 const model = (id, profile, source, options = {}) => ({
   id,
   ...options,
   profile,
   source
 });
-const gpt55Api = multimodal(105e4, EFFORT_NO_EXTRA);
-const gpt54Api = multimodal(105e4, EFFORT_NO_EXTRA);
-const gptMiniApi = multimodal(4e5, EFFORT_3);
-const gptCodex = textOnly(4e5, EFFORT_4);
-const gpt41 = multimodal(1047576, []);
+const openAiLevelsDefaultMedium = levelsReasoningControl(OPENAI_LEVELS, {
+  supportsOff: true,
+  defaultSelection: "medium",
+  wireProfile: OPENAI_RESPONSES_WIRE
+});
+const openAiLevelsDefaultOff = levelsReasoningControl(OPENAI_LEVELS, {
+  supportsOff: true,
+  defaultSelection: "off",
+  wireProfile: OPENAI_RESPONSES_WIRE
+});
+const openAiProLevelsDefaultHigh = levelsReasoningControl(OPENAI_PRO_LEVELS, {
+  supportsOff: false,
+  defaultSelection: "high",
+  wireProfile: OPENAI_RESPONSES_WIRE
+});
+const openAiCompatibleLevelsDefaultMedium = levelsReasoningControl(OPENAI_LEVELS, {
+  supportsOff: true,
+  defaultSelection: "medium",
+  wireProfile: OPENAI_COMPATIBLE_WIRE
+});
+const anthropicFiveLevelsDefaultHigh = levelsReasoningControl(ANTHROPIC_5_LEVELS, {
+  supportsOff: true,
+  defaultSelection: "high",
+  wireProfile: ANTHROPIC_ADAPTIVE_WIRE
+});
+const anthropicFiveLevelsAlwaysOn = levelsReasoningControl(ANTHROPIC_5_LEVELS, {
+  supportsOff: false,
+  defaultSelection: "high",
+  wireProfile: ANTHROPIC_ALWAYS_ON_WIRE
+});
+const gemini35Levels = levelsReasoningControl(GEMINI_35_LEVELS, {
+  supportsOff: false,
+  defaultSelection: "medium",
+  wireProfile: GEMINI_3_WIRE
+});
+const gemini31Levels = levelsReasoningControl(GEMINI_31_LEVELS, {
+  supportsOff: false,
+  defaultSelection: "high",
+  wireProfile: GEMINI_3_WIRE
+});
+const gemini25Levels = levelsReasoningControl(GEMINI_31_LEVELS, {
+  supportsOff: false,
+  defaultSelection: "high",
+  wireProfile: GEMINI_25_WIRE
+});
+const xaiLevels = levelsReasoningControl(XAI_LEVELS, {
+  supportsOff: true,
+  defaultSelection: "low",
+  wireProfile: OPENAI_COMPATIBLE_WIRE
+});
+const qwenLevelsDefaultOff = levelsReasoningControl(QWEN_LEVELS, {
+  supportsOff: true,
+  defaultSelection: "off",
+  wireProfile: QWEN_OPENAI_WIRE
+});
+const deepSeekLevelsDefaultHigh = levelsReasoningControl(DEEPSEEK_LEVELS, {
+  supportsOff: true,
+  defaultSelection: "high",
+  wireProfile: DEEPSEEK_ANTHROPIC_WIRE
+});
+const moonshotToggleDefaultOn = toggleReasoningControl("on", MOONSHOT_TOGGLE_WIRE);
+const moonshotAlwaysOn = alwaysOnReasoningControl("on", MOONSHOT_ALWAYS_ON_WIRE);
+const anthropicToggleDefaultOn = toggleReasoningControl("on", ANTHROPIC_TOGGLE_WIRE);
+const kimiCodingPlanToggleDefaultOn = toggleReasoningControl("on", KIMI_CODING_PLAN_WIRE);
+const anthropicAlwaysOnToggle = alwaysOnReasoningControl("on", ANTHROPIC_ALWAYS_ON_TOGGLE_WIRE);
+const volcengineToggleDefaultOn = toggleReasoningControl("on", VOLCENGINE_TOGGLE_WIRE);
+const xaiToggleDefaultOn = toggleReasoningControl("on", OPENAI_COMPATIBLE_WIRE);
+const gpt55Api = multimodal(105e4, openAiLevelsDefaultMedium);
+const gpt54Api = multimodal(105e4, openAiLevelsDefaultOff);
+const gptMiniApi = multimodal(4e5, openAiLevelsDefaultOff);
+const gptCodex = textOnly(4e5, openAiCompatibleLevelsDefaultMedium);
+const gpt41 = multimodal(1047576);
 const chatGptAccountModels = [
-  model("gpt-5.5-instant", { ...multimodal(128e3, []), fastVariantModelId: "gpt-5.5-instant" }, CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Instant" }),
-  model("gpt-5.5-thinking", multimodal(128e3, EFFORT_4), CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Thinking" }),
-  model("gpt-5.5-pro", multimodal(272e3, EFFORT_4), CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Pro" })
+  model("gpt-5.5-instant", { ...multimodal(128e3), fastVariantModelId: "gpt-5.5-instant" }, CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Instant" }),
+  model("gpt-5.5-thinking", multimodal(128e3, openAiLevelsDefaultMedium), CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Thinking" }),
+  model("gpt-5.5-pro", multimodal(272e3, openAiProLevelsDefaultHigh), CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Pro" })
 ];
 const openAiApiModels = [
   model("gpt-5.5", gpt55Api, OPENAI_API_SOURCE),
@@ -424,123 +676,118 @@ const openAiApiModels = [
   model("gpt-4.1", gpt41, OPENAI_API_SOURCE)
 ];
 const claudeApiModels = [
-  model("claude-fable-5", multimodal(1e6, EFFORT_3), ANTHROPIC_SOURCE),
-  model("claude-sonnet-5", multimodal(1e6, EFFORT_3), ANTHROPIC_SOURCE),
-  model("claude-opus-4-8", multimodal(1e6, EFFORT_3), ANTHROPIC_SOURCE),
-  model("claude-haiku-4-5-20251001", multimodal(2e5, EFFORT_3), ANTHROPIC_SOURCE, {
+  model("claude-fable-5", multimodal(1e6, anthropicFiveLevelsAlwaysOn), ANTHROPIC_SOURCE),
+  model("claude-sonnet-5", multimodal(1e6, anthropicFiveLevelsDefaultHigh), ANTHROPIC_SOURCE),
+  model("claude-opus-4-8", multimodal(1e6, anthropicFiveLevelsDefaultHigh), ANTHROPIC_SOURCE),
+  model("claude-haiku-4-5-20251001", multimodal(2e5), ANTHROPIC_SOURCE, {
     aliases: ["claude-haiku-4-5"]
   })
 ];
 const geminiModels = [
-  model("gemini-3.5-flash", multimodal(1048576, EFFORT_3), GEMINI_SOURCE),
-  model("gemini-3.1-pro-preview", multimodal(1048576, EFFORT_3), GEMINI_SOURCE),
-  model("gemini-2.5-pro", multimodal(1048576, EFFORT_3), GEMINI_SOURCE, {
+  model("gemini-3.5-flash", multimodal(1048576, gemini35Levels), GEMINI_SOURCE),
+  model("gemini-3.1-pro-preview", multimodal(1048576, gemini31Levels), GEMINI_SOURCE),
+  model("gemini-2.5-pro", multimodal(1048576, gemini25Levels), GEMINI_SOURCE, {
     aliases: ["gemini-pro"]
   }),
-  model("gemini-2.5-flash", multimodal(1048576, EFFORT_3), GEMINI_SOURCE)
+  model("gemini-2.5-flash", multimodal(1048576, gemini25Levels), GEMINI_SOURCE)
 ];
 const grokModels = [
-  model("grok-4.3", multimodal(1e6, EFFORT_3), XAI_SOURCE),
-  model("grok-build-0.1", textOnly(256e3, EFFORT_3), XAI_SOURCE),
-  model("grok-code-fast-1", textOnly(256e3, []), XAI_SOURCE)
+  model("grok-4.3", multimodal(1e6, xaiLevels), XAI_SOURCE),
+  model("grok-build-0.1", textOnly(256e3, xaiToggleDefaultOn), XAI_SOURCE),
+  model("grok-code-fast-1", textOnly(256e3), XAI_SOURCE)
 ];
 const copilotModels = [
-  model("gpt-5.5", gpt55Api, COPILOT_SOURCE),
-  model("gpt-5.3-codex", gptCodex, COPILOT_SOURCE),
-  model("claude-sonnet-5", multimodal(1e6, EFFORT_3), COPILOT_SOURCE),
+  model("gpt-5.5", multimodal(105e4, openAiCompatibleLevelsDefaultMedium), COPILOT_SOURCE),
+  model("gpt-5.3-codex", textOnly(4e5, openAiCompatibleLevelsDefaultMedium), COPILOT_SOURCE),
+  model("claude-sonnet-5", multimodal(1e6, anthropicFiveLevelsDefaultHigh), COPILOT_SOURCE),
   model("claude-opus-4-8", {
-    ...multimodal(1e6, EFFORT_3),
+    ...multimodal(1e6, anthropicFiveLevelsDefaultHigh),
     fastVariantModelId: "claude-opus-4-8-fast"
   }, COPILOT_SOURCE),
-  model("claude-opus-4-8-fast", multimodal(1e6, EFFORT_3), COPILOT_SOURCE),
-  model("gemini-3.1-pro-preview", multimodal(1048576, EFFORT_3), COPILOT_SOURCE),
-  model("gemini-3.5-flash", multimodal(1048576, EFFORT_3), COPILOT_SOURCE)
+  model("claude-opus-4-8-fast", multimodal(1e6, anthropicFiveLevelsDefaultHigh), COPILOT_SOURCE),
+  model("gemini-3.1-pro-preview", multimodal(1048576, gemini31Levels), COPILOT_SOURCE),
+  model("gemini-3.5-flash", multimodal(1048576, gemini35Levels), COPILOT_SOURCE)
 ];
 const qwenModels = [
-  model("qwen-turbo", autoOnlyText(131072), QWEN_SOURCE),
-  model("qwen-plus", autoOnlyText(131072), QWEN_SOURCE),
-  model("qwen-max", autoOnlyText(131072), QWEN_SOURCE),
-  model("qwen-flash", autoOnlyText(131072), QWEN_SOURCE),
-  model("qwen-vl-max", autoOnlyMultimodal(131072), QWEN_SOURCE)
+  model("qwen-turbo", textOnly(131072, qwenLevelsDefaultOff), QWEN_SOURCE),
+  model("qwen-plus", textOnly(131072, qwenLevelsDefaultOff), QWEN_SOURCE),
+  model("qwen-max", textOnly(131072, qwenLevelsDefaultOff), QWEN_SOURCE),
+  model("qwen-flash", textOnly(131072, qwenLevelsDefaultOff), QWEN_SOURCE),
+  model("qwen-vl-max", multimodal(131072, qwenLevelsDefaultOff), QWEN_SOURCE)
 ];
 const qwenCodingPlanModels = [
-  model("qwen3-coder-plus", autoOnlyText(131072), QWEN_SOURCE),
-  model("qwen3-coder-next", autoOnlyText(131072), QWEN_SOURCE),
-  model("qwen3.6-plus", autoOnlyText(131072), QWEN_SOURCE)
+  model("qwen3-coder-plus", textOnly(131072, anthropicToggleDefaultOn), QWEN_SOURCE),
+  model("qwen3-coder-next", textOnly(131072, anthropicToggleDefaultOn), QWEN_SOURCE),
+  model("qwen3.6-plus", textOnly(131072, anthropicToggleDefaultOn), QWEN_SOURCE)
 ];
 const deepSeekModels = [
-  model("deepseek-v4-pro", textOnly(1e6, EFFORT_NO_EXTRA), DEEPSEEK_SOURCE, {
+  model("deepseek-v4-pro", textOnly(1e6, deepSeekLevelsDefaultHigh), DEEPSEEK_SOURCE, {
     aliases: ["deepseek-reasoner"]
   }),
-  model("deepseek-v4-flash", textOnly(131072, []), DEEPSEEK_SOURCE, {
+  model("deepseek-v4-flash", textOnly(1e6, deepSeekLevelsDefaultHigh), DEEPSEEK_SOURCE, {
     aliases: ["deepseek-chat"]
   })
 ];
 const kimiApiModels = [
   model("kimi-k2.7-code", {
-    ...autoOnlyText(262144, ["auto"]),
+    ...multimodal(262144, moonshotAlwaysOn),
     fastVariantModelId: "kimi-k2.7-code-highspeed"
   }, KIMI_SOURCE),
-  model("kimi-k2.7-code-highspeed", autoOnlyText(262144, ["auto"]), KIMI_SOURCE),
-  model("kimi-k2.6", autoOnlyMultimodal(262144), KIMI_SOURCE),
-  model("kimi-k2.5", textOnly(262144, []), KIMI_SOURCE)
+  model("kimi-k2.7-code-highspeed", multimodal(262144, moonshotAlwaysOn), KIMI_SOURCE),
+  model("kimi-k2.6", multimodal(262144, moonshotToggleDefaultOn), KIMI_SOURCE),
+  model("kimi-k2.5", textOnly(262144, moonshotToggleDefaultOn), KIMI_SOURCE)
 ];
 const kimiCodingPlanModels = [
-  model("kimi-for-coding", {
-    ...textOnly(262144, []),
-    reasoningMode: "auto-only",
-    supportedReasoningLevels: REASONING_AUTO_ONLY,
-    defaultReasoningLevel: "auto"
-  }, KIMI_CODING_SOURCE)
+  model("kimi-for-coding", textOnly(262144, kimiCodingPlanToggleDefaultOn), KIMI_CODING_SOURCE)
 ];
-const glmModels = [
-  model("glm-5", autoOnlyText(131072), GLM_SOURCE),
-  model("glm-4.7", autoOnlyText(131072), GLM_SOURCE),
-  model("glm-4.6", autoOnlyText(131072), GLM_SOURCE),
-  model("glm-4.5", autoOnlyText(131072), GLM_SOURCE)
+const glmAnthropicModels = [
+  model("glm-5", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE),
+  model("glm-4.7", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE),
+  model("glm-4.6", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE),
+  model("glm-4.5", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE)
 ];
 const minimaxModels = [
-  model("MiniMax-M2.7", autoOnlyText(131072), MINIMAX_SOURCE)
+  model("MiniMax-M2.7", textOnly(204800, anthropicAlwaysOnToggle), MINIMAX_SOURCE)
 ];
 const mimoModels = [
-  model("mimo-v2.5-pro", autoOnlyMultimodal(1e6), MIMO_SOURCE)
+  model("mimo-v2.5-pro", multimodal(1e6, anthropicToggleDefaultOn), MIMO_SOURCE)
 ];
 const doubaoModels = [
-  model("doubao-seed-2.1-pro", autoOnlyText(131072), VOLCENGINE_SOURCE),
-  model("doubao-seed-2.1-turbo", autoOnlyText(131072), VOLCENGINE_SOURCE)
+  model("doubao-seed-2.1-pro", textOnly(131072, volcengineToggleDefaultOn), VOLCENGINE_SOURCE),
+  model("doubao-seed-2.1-turbo", textOnly(131072, volcengineToggleDefaultOn), VOLCENGINE_SOURCE)
 ];
 const groqModels = [
-  model("moonshotai/kimi-k2-instruct-0905", openSourceText(262144), GROQ_SOURCE),
+  model("moonshotai/kimi-k2-instruct-0905", textOnly(262144), GROQ_SOURCE),
   model("meta-llama/llama-4-maverick-17b-128e-instruct", {
-    ...openSourceText(131072),
+    ...textOnly(131072),
     visionInput: true
   }, GROQ_SOURCE),
-  model("openai/gpt-oss-120b", openSourceText(131072), GROQ_SOURCE),
-  model("llama-3.3-70b-versatile", openSourceText(131072), GROQ_SOURCE)
+  model("openai/gpt-oss-120b", textOnly(131072), GROQ_SOURCE),
+  model("llama-3.3-70b-versatile", textOnly(131072), GROQ_SOURCE)
 ];
 const mistralModels = [
-  model("mistral-small-3.2-25-06", multimodal(131072, []), MISTRAL_SOURCE),
-  model("mistral-large-latest", multimodal(131072, []), MISTRAL_SOURCE),
-  model("codestral-latest", textOnly(262144, []), MISTRAL_SOURCE)
+  model("mistral-small-3.2-25-06", multimodal(131072), MISTRAL_SOURCE),
+  model("mistral-large-latest", multimodal(131072), MISTRAL_SOURCE),
+  model("codestral-latest", textOnly(262144), MISTRAL_SOURCE)
 ];
 const cerebrasModels = [
-  model("llama-4-scout-17b-16e-instruct", openSourceText(131072), CEREBRAS_SOURCE),
-  model("qwen-3-coder-480b", openSourceText(131072), CEREBRAS_SOURCE),
-  model("gpt-oss-120b", openSourceText(131072), CEREBRAS_SOURCE)
+  model("llama-4-scout-17b-16e-instruct", textOnly(131072), CEREBRAS_SOURCE),
+  model("qwen-3-coder-480b", textOnly(131072), CEREBRAS_SOURCE),
+  model("gpt-oss-120b", textOnly(131072), CEREBRAS_SOURCE)
 ];
 const bedrockClaudeModels = [
-  model("anthropic.claude-fable-5", multimodal(1e6, EFFORT_5), BEDROCK_SOURCE),
-  model("anthropic.claude-sonnet-5", multimodal(1e6, EFFORT_5), BEDROCK_SOURCE),
-  model("anthropic.claude-opus-4-8", multimodal(1e6, EFFORT_5), BEDROCK_SOURCE),
-  model("anthropic.claude-haiku-4-5-20251001-v1:0", multimodal(2e5, EFFORT_3), BEDROCK_SOURCE)
+  model("anthropic.claude-fable-5", multimodal(1e6, anthropicFiveLevelsAlwaysOn), BEDROCK_SOURCE),
+  model("anthropic.claude-sonnet-5", multimodal(1e6, anthropicFiveLevelsDefaultHigh), BEDROCK_SOURCE),
+  model("anthropic.claude-opus-4-8", multimodal(1e6, anthropicFiveLevelsDefaultHigh), BEDROCK_SOURCE),
+  model("anthropic.claude-haiku-4-5-20251001-v1:0", multimodal(2e5), BEDROCK_SOURCE)
 ];
 const vertexModels = [
-  model("claude-fable-5", multimodal(1e6, EFFORT_5), VERTEX_SOURCE),
-  model("claude-sonnet-5", multimodal(1e6, EFFORT_5), VERTEX_SOURCE),
-  model("claude-opus-4-8", multimodal(1e6, EFFORT_5), VERTEX_SOURCE),
-  model("claude-haiku-4-5@20251001", multimodal(2e5, EFFORT_3), VERTEX_SOURCE),
-  model("gemini-3.1-pro-preview", multimodal(1048576, EFFORT_4), VERTEX_SOURCE),
-  model("gemini-2.5-flash", multimodal(1048576, EFFORT_3), VERTEX_SOURCE)
+  model("claude-fable-5", multimodal(1e6, anthropicFiveLevelsAlwaysOn), VERTEX_SOURCE),
+  model("claude-sonnet-5", multimodal(1e6, anthropicFiveLevelsDefaultHigh), VERTEX_SOURCE),
+  model("claude-opus-4-8", multimodal(1e6, anthropicFiveLevelsDefaultHigh), VERTEX_SOURCE),
+  model("claude-haiku-4-5@20251001", multimodal(2e5), VERTEX_SOURCE),
+  model("gemini-3.1-pro-preview", multimodal(1048576, gemini31Levels), VERTEX_SOURCE),
+  model("gemini-2.5-flash", multimodal(1048576, gemini25Levels), VERTEX_SOURCE)
 ];
 const MANAGED_PROVIDER_MODEL_CATALOG = {
   "chatgpt-account": chatGptAccountModels,
@@ -555,24 +802,45 @@ const MANAGED_PROVIDER_MODEL_CATALOG = {
   anthropic: claudeApiModels,
   "google-ai-studio": geminiModels,
   "azure-openai": [
-    model("gpt-5.5", gpt55Api, AZURE_OPENAI_SOURCE),
-    model("gpt-5.4", gpt54Api, AZURE_OPENAI_SOURCE),
-    model("gpt-5.4-mini", gptMiniApi, AZURE_OPENAI_SOURCE),
+    model("gpt-5.5", multimodal(105e4, levelsReasoningControl(OPENAI_LEVELS, {
+      supportsOff: true,
+      defaultSelection: "medium",
+      wireProfile: OPENAI_COMPATIBLE_WIRE
+    })), AZURE_OPENAI_SOURCE),
+    model("gpt-5.4", multimodal(105e4, levelsReasoningControl(OPENAI_LEVELS, {
+      supportsOff: true,
+      defaultSelection: "off",
+      wireProfile: OPENAI_COMPATIBLE_WIRE
+    })), AZURE_OPENAI_SOURCE),
+    model("gpt-5.4-mini", multimodal(4e5, levelsReasoningControl(OPENAI_LEVELS, {
+      supportsOff: true,
+      defaultSelection: "off",
+      wireProfile: OPENAI_COMPATIBLE_WIRE
+    })), AZURE_OPENAI_SOURCE),
     model("gpt-4.1", gpt41, AZURE_OPENAI_SOURCE)
   ],
   bedrock: bedrockClaudeModels,
   vertex: vertexModels,
   deepseek: deepSeekModels,
-  bailian: qwenModels,
+  bailian: qwenModels.map((entry) => ({
+    ...entry,
+    source: QWEN_SOURCE
+  })),
   qwen: qwenModels,
   volcengine: [
     ...doubaoModels,
-    ...glmModels,
-    ...deepSeekModels.filter((entry) => entry.id === "deepseek-v4-pro"),
-    ...kimiApiModels.filter((entry) => entry.id === "kimi-k2.5")
+    ...glmAnthropicModels.map((entry) => ({ ...entry, source: VOLCENGINE_SOURCE })),
+    ...deepSeekModels.filter((entry) => entry.id === "deepseek-v4-pro").map((entry) => ({
+      ...entry,
+      source: VOLCENGINE_SOURCE
+    })),
+    ...kimiApiModels.filter((entry) => entry.id === "kimi-k2.5").map((entry) => ({
+      ...entry,
+      source: VOLCENGINE_SOURCE
+    }))
   ],
-  "glm-cn": glmModels,
-  "glm-global": glmModels,
+  "glm-cn": glmAnthropicModels,
+  "glm-global": glmAnthropicModels,
   "minimax-cn": minimaxModels,
   "minimax-global": minimaxModels,
   "xiaomi-mimo": mimoModels,
@@ -584,31 +852,36 @@ const MANAGED_PROVIDER_MODEL_CATALOG = {
   "kimi-coding-plan": kimiCodingPlanModels,
   "bailian-coding-plan": [
     ...qwenCodingPlanModels,
-    ...kimiApiModels.filter((entry) => entry.id === "kimi-k2.5"),
-    ...glmModels.filter((entry) => entry.id === "glm-5" || entry.id === "glm-4.7")
+    model("kimi-k2.5", textOnly(262144, anthropicToggleDefaultOn), KIMI_SOURCE),
+    model("glm-5", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE),
+    model("glm-4.7", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE)
   ],
   "volcengine-coding-plan": [
-    ...doubaoModels,
-    ...glmModels.filter((entry) => entry.id === "glm-4.6"),
-    ...deepSeekModels.filter((entry) => entry.id === "deepseek-v4-pro"),
-    ...kimiApiModels.filter((entry) => entry.id === "kimi-k2.5")
+    model("doubao-seed-2.1-pro", textOnly(131072, anthropicToggleDefaultOn), VOLCENGINE_SOURCE),
+    model("doubao-seed-2.1-turbo", textOnly(131072, anthropicToggleDefaultOn), VOLCENGINE_SOURCE),
+    model("glm-4.6", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE),
+    model("deepseek-v4-pro", textOnly(1e6, deepSeekLevelsDefaultHigh), DEEPSEEK_SOURCE),
+    model("kimi-k2.5", textOnly(262144, anthropicToggleDefaultOn), KIMI_SOURCE)
   ],
-  "glm-cn-coding-plan": glmModels,
-  "glm-global-coding-plan": glmModels,
+  "glm-cn-coding-plan": glmAnthropicModels,
+  "glm-global-coding-plan": glmAnthropicModels,
   "minimax-cn-coding-plan": minimaxModels,
   "minimax-global-coding-plan": minimaxModels,
   "xiaomi-mimo-token-plan": mimoModels
 };
 const normalizeId = (value) => value.trim().toLowerCase();
+function cloneProfile(profile) {
+  return {
+    ...profile,
+    reasoningControl: profile.reasoningControl ? createReasoningControl$1(profile.reasoningControl) : void 0
+  };
+}
 function getManagedProviderModelCatalog(providerId) {
   const entries = MANAGED_PROVIDER_MODEL_CATALOG[providerId] ?? [];
   return entries.map((entry) => ({
     ...entry,
     aliases: entry.aliases ? [...entry.aliases] : void 0,
-    profile: {
-      ...entry.profile,
-      supportedReasoningLevels: entry.profile.supportedReasoningLevels ? [...entry.profile.supportedReasoningLevels] : void 0
-    },
+    profile: cloneProfile(entry.profile),
     source: {
       ...entry.source,
       urls: [...entry.source.urls]
@@ -1448,171 +1721,129 @@ const createBuiltinProviderEntry = (id) => {
   };
 };
 const createBuiltinProviderEntries = () => BUILTIN_LLM_PROVIDER_DEFINITIONS.map((entry) => createBuiltinProviderEntry(entry.id));
-const SETTINGS_FILE_NAME = "settings.json";
+const CONFIG_FILE_NAME = "config.json";
 const LOG_FILE_NAME = "rdc-agent.log";
+const PROJECT_GITIGNORE = ["inputs/", "artifacts/", "memory/", "runtime/", ""].join("\n");
 const sanitizePathSegment = (value) => value.replace(/[^a-zA-Z0-9_-]/g, "-");
 const normalizePath = (targetPath) => path.resolve(targetPath);
-const isSamePath = (left, right) => {
-  const normalizedLeft = normalizePath(left);
-  const normalizedRight = normalizePath(right);
-  return process.platform === "win32" ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase() : normalizedLeft === normalizedRight;
-};
 class AppPathService {
-  workspaceRootCache = null;
   getUserDataRoot() {
-    return normalizePath(process.env.RDC_AGENT_USER_DATA?.trim() || electron.app.getPath("userData"));
+    const appDataRoot = electron.app?.getPath?.("appData") || (process.platform === "win32" ? path.join(os.homedir(), "AppData", "Roaming") : path.join(os.homedir(), ".config"));
+    return normalizePath(process.env.RDC_AGENT_USER_DATA?.trim() || path.join(appDataRoot, "RDC-Agent"));
   }
-  getBootstrapDir() {
-    return this.getUserDataRoot();
+  getUserRdxRoot() {
+    return normalizePath(process.env.RDC_AGENT_HOME?.trim() || path.join(os.homedir(), ".rdx"));
   }
-  getBootstrapPath() {
-    return path.join(this.getBootstrapDir(), "workspace-bootstrap.json");
-  }
-  getDefaultWorkspaceRoot() {
-    return normalizePath(process.env.RDC_AGENT_WORKSPACE?.trim() || path.join(this.getUserDataRoot(), "workspace"));
-  }
-  getWorkspaceRoot() {
-    if (this.workspaceRootCache) {
-      return this.workspaceRootCache;
-    }
-    const bootstrapState = this.readBootstrapState();
-    const workspaceRoot = normalizePath(bootstrapState.workspaceRoot || this.getDefaultWorkspaceRoot());
-    this.workspaceRootCache = workspaceRoot;
-    return workspaceRoot;
-  }
-  getWorkspacePaths(workspaceRoot = this.getWorkspaceRoot()) {
-    const root = normalizePath(workspaceRoot);
-    const logsPath = path.join(root, "logs");
+  getUserRdxPaths() {
+    const userRdxRoot = this.getUserRdxRoot();
     return {
-      workspaceRoot: root,
-      defaultWorkspaceRoot: this.getDefaultWorkspaceRoot(),
-      settingsPath: path.join(root, SETTINGS_FILE_NAME),
-      logsPath,
-      logPath: path.join(logsPath, LOG_FILE_NAME),
-      projectsPath: path.join(root, "projects"),
-      knowledgePath: path.join(root, "knowledge"),
-      migrationOrphansPath: path.join(root, "migration-orphans"),
-      profilesPath: path.join(root, "profiles"),
-      policiesPath: path.join(root, "policies"),
-      skillsPath: path.join(root, "skills"),
-      mcpPath: path.join(root, "mcp"),
-      patternsPath: path.join(root, "patterns"),
-      secretsPath: path.join(root, "secrets"),
-      migrationReportsPath: path.join(root, "migration-reports")
+      userRdxRoot,
+      configPath: path.join(userRdxRoot, CONFIG_FILE_NAME),
+      instructionsPath: path.join(userRdxRoot, "RDX.md"),
+      agentsPath: path.join(userRdxRoot, "agents"),
+      skillsPath: path.join(userRdxRoot, "skills"),
+      mcpPath: path.join(userRdxRoot, "mcp"),
+      hooksPath: path.join(userRdxRoot, "hooks"),
+      policiesPath: path.join(userRdxRoot, "policies"),
+      knowledgePath: path.join(userRdxRoot, "knowledge"),
+      memoryPath: path.join(userRdxRoot, "memory")
     };
   }
-  initializeWorkspaceRoot() {
-    const bootstrapState = this.readBootstrapState();
-    const workspaceRoot = normalizePath(bootstrapState.workspaceRoot || this.getDefaultWorkspaceRoot());
-    const paths = this.getWorkspacePaths(workspaceRoot);
-    this.ensureWorkspaceStructure(paths);
-    this.workspaceRootCache = paths.workspaceRoot;
-    this.writeBootstrapState({
-      workspaceRoot: paths.workspaceRoot
-    });
+  getAppStatePaths() {
+    const userDataRoot = this.getUserDataRoot();
+    const appStateRoot = path.join(userDataRoot, "state");
+    const logsPath = path.join(userDataRoot, "logs");
+    return {
+      appStateRoot,
+      projectsPath: path.join(appStateRoot, "projects"),
+      sessionsPath: path.join(appStateRoot, "sessions"),
+      tasksPath: path.join(appStateRoot, "tasks"),
+      tracesPath: path.join(appStateRoot, "traces"),
+      llmCallsPath: path.join(appStateRoot, "llm-calls"),
+      secretsPath: path.join(userDataRoot, "secrets"),
+      logsPath,
+      logPath: path.join(logsPath, LOG_FILE_NAME),
+      capturePreviewsPath: path.join(userDataRoot, "capture-previews"),
+      profileStatePath: path.join(appStateRoot, "profile")
+    };
+  }
+  getProjectRdxPaths(projectRoot) {
+    const resolvedProjectRoot = normalizePath(projectRoot);
+    const projectRdxRoot = path.join(resolvedProjectRoot, ".rdx");
+    return {
+      projectRoot: resolvedProjectRoot,
+      projectRdxRoot,
+      projectMetadataPath: path.join(projectRdxRoot, "project.yaml"),
+      gitignorePath: path.join(projectRdxRoot, ".gitignore"),
+      agentsPath: path.join(projectRdxRoot, "agents"),
+      skillsPath: path.join(projectRdxRoot, "skills"),
+      mcpPath: path.join(projectRdxRoot, "mcp"),
+      hooksPath: path.join(projectRdxRoot, "hooks"),
+      policiesPath: path.join(projectRdxRoot, "policies"),
+      knowledgePath: path.join(projectRdxRoot, "knowledge"),
+      memoryPath: path.join(projectRdxRoot, "memory"),
+      inputsPath: path.join(projectRdxRoot, "inputs"),
+      artifactsPath: path.join(projectRdxRoot, "artifacts")
+    };
+  }
+  initializeRuntime() {
+    const paths = this.getRuntimePaths();
+    const directories = [
+      paths.userRdxRoot,
+      paths.agentsPath,
+      paths.skillsPath,
+      paths.mcpPath,
+      paths.hooksPath,
+      paths.policiesPath,
+      paths.knowledgePath,
+      paths.memoryPath,
+      paths.appStateRoot,
+      paths.projectsPath,
+      paths.sessionsPath,
+      paths.tasksPath,
+      paths.tracesPath,
+      paths.llmCallsPath,
+      paths.secretsPath,
+      paths.logsPath,
+      paths.capturePreviewsPath,
+      paths.profileStatePath
+    ];
+    directories.forEach((directory) => fs.mkdirSync(directory, { recursive: true }));
     return paths;
   }
-  setWorkspaceRoot(nextRoot) {
-    const currentRoot = this.getWorkspaceRoot();
-    const resolvedRoot = normalizePath(nextRoot || this.getDefaultWorkspaceRoot());
-    const nextPaths = this.getWorkspacePaths(resolvedRoot);
-    this.ensureWorkspaceStructure(nextPaths);
-    if (!isSamePath(currentRoot, resolvedRoot)) {
-      this.copyWorkspaceData(currentRoot, resolvedRoot);
+  initializeProjectRdx(projectRoot) {
+    const paths = this.getProjectRdxPaths(projectRoot);
+    [
+      paths.projectRdxRoot,
+      paths.agentsPath,
+      paths.skillsPath,
+      paths.mcpPath,
+      paths.hooksPath,
+      paths.policiesPath,
+      paths.knowledgePath,
+      paths.memoryPath,
+      paths.inputsPath,
+      paths.artifactsPath
+    ].forEach((directory) => fs.mkdirSync(directory, { recursive: true }));
+    if (!fs.existsSync(paths.gitignorePath)) {
+      fs.writeFileSync(paths.gitignorePath, PROJECT_GITIGNORE, "utf8");
     }
-    this.workspaceRootCache = resolvedRoot;
-    this.writeBootstrapState({
-      workspaceRoot: resolvedRoot
-    });
-    return nextPaths;
+    return paths;
   }
-  resetWorkspaceRoot() {
-    return this.setWorkspaceRoot(this.getDefaultWorkspaceRoot());
+  getRuntimePaths() {
+    const user = this.getUserRdxPaths();
+    const state2 = this.getAppStatePaths();
+    return {
+      ...user,
+      ...state2,
+      settingsPath: user.configPath
+    };
   }
   getCapturePreviewDir(projectId) {
-    const paths = this.getWorkspacePaths();
-    return path.join(paths.logsPath, "capture-previews", sanitizePathSegment(projectId || "default"));
+    return path.join(this.getAppStatePaths().capturePreviewsPath, sanitizePathSegment(projectId || "default"));
   }
   getCapturePreviewPath(projectId, inputId) {
-    return path.join(
-      this.getCapturePreviewDir(projectId),
-      `${sanitizePathSegment(inputId || "capture")}-latest.png`
-    );
-  }
-  readBootstrapState() {
-    const bootstrapPath = this.getBootstrapPath();
-    try {
-      if (fs.existsSync(bootstrapPath)) {
-        return JSON.parse(fs.readFileSync(bootstrapPath, "utf8"));
-      }
-    } catch (error) {
-      console.warn("[AppPathService] Failed to read bootstrap state:", error);
-    }
-    return {};
-  }
-  writeBootstrapState(state2) {
-    const bootstrapPath = this.getBootstrapPath();
-    fs.mkdirSync(path.dirname(bootstrapPath), { recursive: true });
-    fs.writeFileSync(bootstrapPath, JSON.stringify(state2, null, 2), "utf8");
-  }
-  ensureWorkspaceStructure(paths) {
-    fs.mkdirSync(paths.workspaceRoot, { recursive: true });
-    fs.mkdirSync(paths.logsPath, { recursive: true });
-    fs.mkdirSync(paths.projectsPath, { recursive: true });
-    fs.mkdirSync(paths.knowledgePath, { recursive: true });
-    fs.mkdirSync(paths.migrationOrphansPath, { recursive: true });
-    fs.mkdirSync(paths.profilesPath, { recursive: true });
-    fs.mkdirSync(paths.policiesPath, { recursive: true });
-    fs.mkdirSync(paths.skillsPath, { recursive: true });
-    fs.mkdirSync(paths.mcpPath, { recursive: true });
-    fs.mkdirSync(paths.patternsPath, { recursive: true });
-    fs.mkdirSync(paths.secretsPath, { recursive: true });
-    fs.mkdirSync(paths.migrationReportsPath, { recursive: true });
-  }
-  copyWorkspaceData(sourceRoot, targetRoot) {
-    if (!sourceRoot || !fs.existsSync(sourceRoot) || isSamePath(sourceRoot, targetRoot)) {
-      return;
-    }
-    const targetPaths = this.getWorkspacePaths(targetRoot);
-    this.copyFileIfMissing(path.join(sourceRoot, SETTINGS_FILE_NAME), targetPaths.settingsPath);
-    this.copyDirContents(path.join(sourceRoot, "projects"), targetPaths.projectsPath);
-    this.copyDirContents(path.join(sourceRoot, "knowledge"), targetPaths.knowledgePath);
-    this.copyDirContents(path.join(sourceRoot, "migration-orphans"), targetPaths.migrationOrphansPath);
-    this.copyDirContents(path.join(sourceRoot, "profiles"), targetPaths.profilesPath);
-    this.copyDirContents(path.join(sourceRoot, "policies"), targetPaths.policiesPath);
-    this.copyDirContents(path.join(sourceRoot, "skills"), targetPaths.skillsPath);
-    this.copyDirContents(path.join(sourceRoot, "mcp"), targetPaths.mcpPath);
-    this.copyDirContents(path.join(sourceRoot, "patterns"), targetPaths.patternsPath);
-    this.copyDirContents(path.join(sourceRoot, "secrets"), targetPaths.secretsPath);
-    this.copyDirContents(path.join(sourceRoot, "migration-reports"), targetPaths.migrationReportsPath);
-    this.copyDirContents(path.join(sourceRoot, "logs"), targetPaths.logsPath);
-    this.copyLogFile(path.join(sourceRoot, LOG_FILE_NAME), targetPaths.logPath);
-    this.copyLogFile(path.join(sourceRoot, "dev-stdout.log"), targetPaths.logPath);
-  }
-  copyDirContents(sourceDir, targetDir) {
-    if (!fs.existsSync(sourceDir) || !fs.statSync(sourceDir).isDirectory()) {
-      return;
-    }
-    fs.mkdirSync(targetDir, { recursive: true });
-    for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
-      const sourcePath = path.join(sourceDir, entry.name);
-      const targetPath = path.join(targetDir, entry.name);
-      if (entry.isDirectory()) {
-        this.copyDirContents(sourcePath, targetPath);
-        continue;
-      }
-      this.copyFileIfMissing(sourcePath, targetPath);
-    }
-  }
-  copyLogFile(sourcePath, targetPath) {
-    this.copyFileIfMissing(sourcePath, targetPath);
-  }
-  copyFileIfMissing(sourcePath, targetPath) {
-    if (!fs.existsSync(sourcePath) || fs.existsSync(targetPath)) {
-      return;
-    }
-    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-    fs.copyFileSync(sourcePath, targetPath);
+    return path.join(this.getCapturePreviewDir(projectId), `${sanitizePathSegment(inputId || "capture")}-latest.png`);
   }
 }
 const appPathService = new AppPathService();
@@ -1743,7 +1974,96 @@ const splitCanonicalAgentModelId = (value) => {
   const modelId = value.slice(separator + 1).trim();
   return providerId && modelId ? { providerId, modelId } : null;
 };
-const GLOBAL_INSTRUCTIONS_FILE = "global-instructions.md";
+const SCOPE_PRECEDENCE = { builtin: 0, user: 1, project: 2 };
+const APPROVAL_STRENGTH = { none: 0, destructive: 1, mutation: 2, all: 3 };
+const stableSerialize = (value) => {
+  if (value === void 0) return "undefined";
+  if (typeof value === "bigint") return `${value.toString()}n`;
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(([key, entry]) => `${JSON.stringify(key)}:${stableSerialize(entry)}`).join(",")}}`;
+  }
+  return JSON.stringify(value) ?? String(value);
+};
+const hashScopedResource = (value) => crypto.createHash("sha256").update(stableSerialize(value)).digest("hex");
+class ScopedResourceResolver {
+  resolve(candidates) {
+    const diagnostics = [];
+    const grouped = /* @__PURE__ */ new Map();
+    for (const candidate of candidates) {
+      const id = candidate.id.trim();
+      if (!id) {
+        diagnostics.push({
+          code: "resource.id.empty",
+          severity: "error",
+          message: `Resource at ${candidate.sourcePath} has an empty id.`,
+          sourcePath: candidate.sourcePath
+        });
+        continue;
+      }
+      const groupKey = `${candidate.kind}:${id}`;
+      const group = grouped.get(groupKey) ?? [];
+      group.push({ ...candidate, id });
+      grouped.set(groupKey, group);
+    }
+    const resources = Array.from(grouped.values()).map((group) => {
+      const ordered = group.slice().sort((left, right) => {
+        const scopeDelta = SCOPE_PRECEDENCE[left.scope] - SCOPE_PRECEDENCE[right.scope];
+        return scopeDelta || left.sourcePath.localeCompare(right.sourcePath);
+      });
+      const winner = ordered[ordered.length - 1];
+      const previous = ordered[ordered.length - 2];
+      const provenance = {
+        scope: winner.scope,
+        sourcePath: winner.sourcePath,
+        sourceHash: hashScopedResource(winner.value),
+        ...previous ? {
+          overriddenSource: {
+            scope: previous.scope,
+            sourcePath: previous.sourcePath,
+            sourceHash: hashScopedResource(previous.value)
+          }
+        } : {}
+      };
+      const enabled = winner.enabled !== false;
+      return {
+        id: winner.id,
+        kind: winner.kind,
+        value: winner.value,
+        enabled,
+        effectiveStatus: enabled ? previous ? "overridden" : winner.scope === "builtin" ? "effective" : "inherited" : "disabled",
+        provenance
+      };
+    });
+    return {
+      resources: resources.sort((left, right) => left.kind.localeCompare(right.kind) || left.id.localeCompare(right.id)),
+      diagnostics
+    };
+  }
+  tightenPolicy(base, project) {
+    const baseApproval = base.approval ?? "none";
+    const projectApproval = project.approval ?? baseApproval;
+    if (APPROVAL_STRENGTH[projectApproval] < APPROVAL_STRENGTH[baseApproval]) {
+      throw new Error(`Project policy cannot lower approval from ${baseApproval} to ${projectApproval}.`);
+    }
+    const limits = { ...base.limits ?? {} };
+    for (const [key, value] of Object.entries(project.limits ?? {})) {
+      if (!Number.isFinite(value) || value < 0) {
+        throw new Error(`Project policy limit ${key} must be a non-negative finite number.`);
+      }
+      if (limits[key] !== void 0 && value > limits[key]) {
+        throw new Error(`Project policy cannot raise ${key} from ${limits[key]} to ${value}.`);
+      }
+      limits[key] = Math.min(limits[key] ?? value, value);
+    }
+    return {
+      deniedTools: Array.from(/* @__PURE__ */ new Set([...base.deniedTools ?? [], ...project.deniedTools ?? []])).sort(),
+      approval: projectApproval,
+      limits
+    };
+  }
+}
+const scopedResourceResolver = new ScopedResourceResolver();
 const toSlug = (value) => {
   const slug = value.trim().toLowerCase().replace(/['"]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   return slug || "agent";
@@ -1893,10 +2213,10 @@ const createSeedDefinition = (agentId, routes) => {
 };
 class AgentManifestService {
   getAgentsDirectory(paths) {
-    return path.join(paths.profilesPath, "agents");
+    return paths.agentsPath;
   }
   getGlobalInstructionsPath(paths) {
-    return path.join(paths.profilesPath, GLOBAL_INSTRUCTIONS_FILE);
+    return paths.instructionsPath;
   }
   ensureSeedManifests(paths, routes) {
     const directory = this.getAgentsDirectory(paths);
@@ -1923,6 +2243,39 @@ class AgentManifestService {
       modelOptions: this.getModelOptions(providers),
       globalInstructions: this.readGlobalInstructions(paths)
     };
+  }
+  getEffectiveProfiles(paths, providers, routes, projectRoot) {
+    const userSettings = this.getSettings(paths, providers, routes);
+    const candidates = userSettings.definitions.map((definition) => ({
+      id: definition.id,
+      kind: "agent",
+      scope: "user",
+      sourcePath: definition.filePath,
+      value: definition,
+      enabled: definition.enabled
+    }));
+    if (projectRoot) {
+      const projectAgentsPath = appPathService.getProjectRdxPaths(projectRoot).agentsPath;
+      if (fs.existsSync(projectAgentsPath)) {
+        fs.readdirSync(projectAgentsPath).filter((entry) => entry.endsWith(".agent.md")).filter((entry) => isSafeAgentProfileId(idFromFileName(entry))).forEach((entry) => {
+          const filePath = path.join(projectAgentsPath, entry);
+          const definition = parseAgentMarkdown(filePath, idFromFileName(entry));
+          candidates.push({
+            id: definition.id,
+            kind: "agent",
+            scope: "project",
+            sourcePath: filePath,
+            value: definition,
+            enabled: definition.enabled
+          });
+        });
+      }
+    }
+    return scopedResourceResolver.resolve(candidates).resources.map((resource) => ({
+      ...resource.value,
+      effectiveStatus: resource.effectiveStatus,
+      provenance: resource.provenance
+    }));
   }
   save(paths, drafts, globalInstructions) {
     const directory = this.getAgentsDirectory(paths);
@@ -2057,265 +2410,117 @@ const normalizeWorkflowStage = (stage) => {
   if (ALL_STAGES.includes(stage)) return stage;
   return "preflight";
 };
-const RETIRED_BUILTIN_MCP_SERVER_IDS$1 = /* @__PURE__ */ new Set(["builtin.rdc-toolbridge"]);
-const RETIRED_SKILL_JSON_IDS = /* @__PURE__ */ new Set(["builtin.rdc-context", "builtin.renderdoc-glossary"]);
 const MCP_TRANSPORTS = /* @__PURE__ */ new Set(["stdio", "sse", "streamable-http"]);
-const TEMPLATE_COPIES = [
-  {
-    source: ["profiles", "agents"],
-    target: (workspaceRoot) => path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "agents")
-  },
-  {
-    source: ["profiles", "modes"],
-    target: (workspaceRoot) => path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "modes")
-  },
-  {
-    source: ["policies", "stages"],
-    target: (workspaceRoot) => path.join(appPathService.getWorkspacePaths(workspaceRoot).policiesPath, "stages")
-  },
-  {
-    source: ["patterns"],
-    target: (workspaceRoot) => appPathService.getWorkspacePaths(workspaceRoot).patternsPath
-  },
-  {
-    source: ["skills"],
-    target: (workspaceRoot) => appPathService.getWorkspacePaths(workspaceRoot).skillsPath
-  },
-  {
-    source: ["mcp"],
-    target: (workspaceRoot) => appPathService.getWorkspacePaths(workspaceRoot).mcpPath
-  }
-];
-function readJsonFile$1(filePath) {
+const toRuntimeId = (value, fallback = "custom") => value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || fallback;
+const readJsonFile$1 = (filePath) => {
   try {
-    if (!fs.existsSync(filePath)) {
-      return null;
-    }
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch (error) {
-    console.warn("[AgentRuntimeConfigService] Failed to read JSON:", filePath, error);
+    return fs.existsSync(filePath) ? JSON.parse(fs.readFileSync(filePath, "utf8")) : null;
+  } catch {
     return null;
   }
-}
-function copyDirContentsIfMissing(sourceDir, targetDir) {
-  if (!fs.existsSync(sourceDir) || !fs.statSync(sourceDir).isDirectory()) {
-    return;
-  }
-  fs.mkdirSync(targetDir, { recursive: true });
-  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
-    const sourcePath = path.join(sourceDir, entry.name);
-    const targetPath = path.join(targetDir, entry.name);
-    if (entry.isDirectory()) {
-      copyDirContentsIfMissing(sourcePath, targetPath);
-      continue;
-    }
-    if (!entry.isFile() || fs.existsSync(targetPath)) {
-      continue;
-    }
-    fs.copyFileSync(sourcePath, targetPath);
-  }
-}
-function toRuntimeId(value, fallback = "custom") {
-  const id = value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
-  return id || fallback;
-}
-function titleFromId(id) {
-  return id.split(/[-_.]+/).filter(Boolean).map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`).join(" ") || id;
-}
-function parseSkillMarkdown(filePath) {
-  const raw = fs.readFileSync(filePath, "utf8");
-  const id = toRuntimeId(path.basename(filePath, ".md"), "skill");
-  const heading = raw.match(/^#\s+(.+)$/m)?.[1]?.trim();
-  const description = raw.match(/^description:\s*(.+)$/m)?.[1]?.trim() ?? "";
-  const type = raw.match(/^type:\s*(.+)$/m)?.[1]?.trim();
+};
+const parseSkill = (skillDir, scope) => {
+  const sourcePath = path.join(skillDir, "SKILL.md");
+  if (!fs.existsSync(sourcePath)) return null;
+  const raw = fs.readFileSync(sourcePath, "utf8").replace(/^\uFEFF/u, "");
+  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/u.exec(raw);
+  const frontmatter = match ? YAML.parse(match[1]) : {};
+  const id = toRuntimeId(path.basename(skillDir), "skill");
+  const name = typeof frontmatter.name === "string" && frontmatter.name.trim() ? frontmatter.name.trim() : id;
+  const description = typeof frontmatter.description === "string" ? frontmatter.description.trim() : "";
+  const allowedTools = Array.isArray(frontmatter["allowed-tools"]) ? frontmatter["allowed-tools"].filter((entry) => typeof entry === "string").map((entry) => entry.trim()).filter(Boolean) : [];
+  const instructions = (match ? match[2] : raw).trim();
   return {
     id,
-    name: id,
-    label: heading || titleFromId(id),
+    name,
     description,
-    source: "workspace",
-    enabledByDefault: true,
-    path: filePath,
-    parameters: {
-      markdown: raw,
-      ...type ? { type } : {}
-    }
+    allowedTools,
+    scope,
+    sourcePath,
+    sourceHash: "",
+    effectiveStatus: "effective",
+    instructions,
+    ...fs.existsSync(path.join(skillDir, "references")) ? { referencesPath: path.join(skillDir, "references") } : {},
+    ...fs.existsSync(path.join(skillDir, "scripts")) ? { scriptsPath: path.join(skillDir, "scripts") } : {},
+    ...fs.existsSync(path.join(skillDir, "assets")) ? { assetsPath: path.join(skillDir, "assets") } : {}
   };
-}
-function normalizeSkillMarkdown(request2, id) {
-  const label = request2.label.trim() || titleFromId(id);
-  const description = request2.description.trim();
-  const input = request2.markdown.trim();
-  const withoutHeading = input.replace(/^#\s+.*(?:\r?\n)?/, "");
-  const withoutDescription = withoutHeading.replace(/^description:\s*.*(?:\r?\n)?/m, "");
-  const body = withoutDescription.trim() || "type: prompt\npromptTemplate: |\n  Describe the reusable workflow or instruction here.";
-  return `# ${label}
-description: ${description}
-${body}
-`;
-}
-function validateWithinDir(filePath, dir) {
-  const resolvedDir = path.resolve(dir);
-  const resolvedFile = path.resolve(filePath);
-  const relative = path.relative(resolvedDir, resolvedFile);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    throw new Error("Runtime file path escaped the workspace directory.");
-  }
-  return resolvedFile;
-}
-function readEnvLines(env) {
-  if (!env) return void 0;
-  const entries = Object.entries(env).map(([key, value]) => [key.trim(), String(value)]).filter(([key]) => Boolean(key));
-  return entries.length > 0 ? Object.fromEntries(entries) : void 0;
-}
+};
 class AgentRuntimeConfigService {
-  resolveTemplateRoot() {
+  templateRoot() {
     const candidates = [
       path.join(electron.app.getAppPath(), "resources", "agent-runtime"),
-      path.join(electron.app.getAppPath(), "..", "resources", "agent-runtime"),
       path.join(process.cwd(), "resources", "agent-runtime"),
-      path.join(process.resourcesPath ?? "", "resources", "agent-runtime"),
       path.join(process.resourcesPath ?? "", "agent-runtime")
-    ].filter(Boolean);
-    for (const candidate of candidates) {
-      const resolved = path.resolve(candidate);
-      if (fs.existsSync(resolved)) {
-        return resolved;
+    ];
+    return candidates.map((candidate) => path.resolve(candidate)).find((candidate) => fs.existsSync(candidate)) ?? path.resolve(candidates[0]);
+  }
+  ensureScaffold() {
+    appPathService.initializeRuntime();
+  }
+  listSkills(projectRoot) {
+    return this.resolveSkills(projectRoot).map((skill) => ({
+      id: skill.id,
+      name: skill.name,
+      label: skill.name,
+      description: skill.description,
+      source: skill.scope,
+      enabledByDefault: true,
+      path: skill.sourcePath,
+      parameters: {
+        allowedTools: skill.allowedTools,
+        effectiveStatus: skill.effectiveStatus,
+        sourceHash: skill.sourceHash
       }
-    }
-    return path.resolve(candidates[0]);
+    }));
   }
-  ensureScaffold(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    const templateRoot = this.resolveTemplateRoot();
-    for (const copy of TEMPLATE_COPIES) {
-      copyDirContentsIfMissing(path.join(templateRoot, ...copy.source), copy.target(workspaceRoot));
-    }
-    this.removeRetiredSkillJsonFiles(workspaceRoot);
+  listSkillMetadata(projectRoot) {
+    return this.resolveSkills(projectRoot).map(({ instructions: _instructions, referencesPath: _references, scriptsPath: _scripts, assetsPath: _assets, ...metadata }) => metadata);
   }
-  listPatterns(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return this.readDescriptors("patterns", workspaceRoot);
+  loadSkill(id, projectRoot) {
+    return this.resolveSkills(projectRoot).find((skill) => skill.id === toRuntimeId(id, "skill")) ?? null;
   }
-  listSkills(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    this.ensureScaffold(workspaceRoot);
-    const dir = appPathService.getWorkspacePaths(workspaceRoot).skillsPath;
-    if (!fs.existsSync(dir)) {
-      return [];
-    }
-    return fs.readdirSync(dir).filter((entry) => entry.endsWith(".md")).map((entry) => parseSkillMarkdown(path.join(dir, entry))).filter((entry) => Boolean(entry?.id)).sort((left, right) => left.id.localeCompare(right.id));
-  }
-  listMcpServers(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return this.readDescriptors("mcp", workspaceRoot).filter((descriptor) => !RETIRED_BUILTIN_MCP_SERVER_IDS$1.has(descriptor.id));
-  }
-  upsertSkill(request2, workspaceRoot = appPathService.getWorkspaceRoot()) {
-    this.ensureScaffold(workspaceRoot);
-    const paths = appPathService.getWorkspacePaths(workspaceRoot);
-    const nextId = toRuntimeId(request2.id, "skill");
-    const targetPath = validateWithinDir(path.join(paths.skillsPath, `${nextId}.md`), paths.skillsPath);
-    const previousId = request2.previousId ? toRuntimeId(request2.previousId, nextId) : nextId;
-    const previousPath = validateWithinDir(path.join(paths.skillsPath, `${previousId}.md`), paths.skillsPath);
-    fs.mkdirSync(paths.skillsPath, { recursive: true });
-    fs.writeFileSync(targetPath, normalizeSkillMarkdown(request2, nextId), "utf8");
-    if (previousId !== nextId && fs.existsSync(previousPath)) {
-      fs.unlinkSync(previousPath);
-    }
-  }
-  deleteSkill(id, workspaceRoot = appPathService.getWorkspaceRoot()) {
-    const paths = appPathService.getWorkspacePaths(workspaceRoot);
-    const targetPath = validateWithinDir(path.join(paths.skillsPath, `${toRuntimeId(id, "skill")}.md`), paths.skillsPath);
-    if (fs.existsSync(targetPath)) {
-      fs.unlinkSync(targetPath);
-    }
-  }
-  importSkill(filePath, workspaceRoot = appPathService.getWorkspaceRoot()) {
-    if (!filePath.endsWith(".md")) {
-      throw new Error("Skill import requires a .md file.");
-    }
-    this.ensureScaffold(workspaceRoot);
-    const paths = appPathService.getWorkspacePaths(workspaceRoot);
-    const baseId = toRuntimeId(path.basename(filePath, ".md"), "skill");
-    const targetPath = this.nextAvailableDescriptorPath(paths.skillsPath, baseId, ".md");
-    fs.copyFileSync(filePath, targetPath);
-  }
-  upsertMcpServer(request2, workspaceRoot = appPathService.getWorkspaceRoot()) {
-    this.ensureScaffold(workspaceRoot);
-    const paths = appPathService.getWorkspacePaths(workspaceRoot);
-    const id = toRuntimeId(request2.id, "mcp-server");
-    const transport = MCP_TRANSPORTS.has(request2.transport) ? request2.transport : "stdio";
-    const descriptor = {
-      id,
-      name: request2.name.trim() || titleFromId(id),
-      description: request2.description.trim(),
-      transport,
-      enabledByDefault: request2.enabledByDefault ?? true,
-      ...request2.command?.trim() ? { command: request2.command.trim() } : {},
-      ...request2.args && request2.args.length > 0 ? { args: request2.args.map((arg) => arg.trim()).filter(Boolean) } : {},
-      ...request2.url?.trim() ? { url: request2.url.trim() } : {},
-      ...readEnvLines(request2.env) ? { env: readEnvLines(request2.env) } : {}
+  resolveSkills(projectRoot) {
+    this.ensureScaffold();
+    const user = appPathService.getUserRdxPaths();
+    const candidates = [];
+    const addDirectory = (root, scope) => {
+      if (!fs.existsSync(root)) return;
+      fs.readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory()).forEach((entry) => {
+        const loaded = parseSkill(path.join(root, entry.name), scope);
+        if (loaded) candidates.push({ id: loaded.id, kind: "skill", scope, sourcePath: loaded.sourcePath, value: loaded });
+      });
     };
-    const targetPath = validateWithinDir(path.join(paths.mcpPath, `${id}.json`), paths.mcpPath);
-    const previousId = request2.previousId ? toRuntimeId(request2.previousId, id) : id;
-    const previousPath = validateWithinDir(path.join(paths.mcpPath, `${previousId}.json`), paths.mcpPath);
-    fs.mkdirSync(paths.mcpPath, { recursive: true });
-    fs.writeFileSync(targetPath, `${JSON.stringify(descriptor, null, 2)}
-`, "utf8");
-    if (previousId !== id && fs.existsSync(previousPath)) {
-      fs.unlinkSync(previousPath);
-    }
+    addDirectory(path.join(this.templateRoot(), "skills"), "builtin");
+    addDirectory(user.skillsPath, "user");
+    if (projectRoot) addDirectory(appPathService.getProjectRdxPaths(projectRoot).skillsPath, "project");
+    return scopedResourceResolver.resolve(candidates).resources.filter((resource) => resource.enabled).map((resource) => ({
+      ...resource.value,
+      scope: resource.provenance.scope,
+      sourcePath: resource.provenance.sourcePath,
+      sourceHash: resource.provenance.sourceHash,
+      effectiveStatus: resource.effectiveStatus
+    }));
   }
-  deleteMcpServer(id, workspaceRoot = appPathService.getWorkspaceRoot()) {
-    const paths = appPathService.getWorkspacePaths(workspaceRoot);
-    const targetPath = validateWithinDir(path.join(paths.mcpPath, `${toRuntimeId(id, "mcp-server")}.json`), paths.mcpPath);
-    if (fs.existsSync(targetPath)) {
-      fs.unlinkSync(targetPath);
-    }
-  }
-  importMcpServer(filePath, workspaceRoot = appPathService.getWorkspaceRoot()) {
-    if (!filePath.endsWith(".json")) {
-      throw new Error("MCP import requires a .json file.");
-    }
-    this.ensureScaffold(workspaceRoot);
-    const parsed = readJsonFile$1(filePath);
-    if (!parsed?.id || !MCP_TRANSPORTS.has(parsed.transport)) {
-      throw new Error("MCP config is missing id or transport.");
-    }
-    const paths = appPathService.getWorkspacePaths(workspaceRoot);
-    const targetPath = this.nextAvailableDescriptorPath(paths.mcpPath, toRuntimeId(parsed.id, "mcp-server"), ".json");
-    fs.copyFileSync(filePath, targetPath);
-  }
-  readDescriptors(kind, workspaceRoot) {
-    this.ensureScaffold(workspaceRoot);
-    const paths = appPathService.getWorkspacePaths(workspaceRoot);
-    const dir = kind === "patterns" ? paths.patternsPath : paths.mcpPath;
-    if (!fs.existsSync(dir)) {
-      return [];
-    }
-    return fs.readdirSync(dir).filter((entry) => entry.endsWith(".json")).map((entry) => readJsonFile$1(path.join(dir, entry))).filter((entry) => Boolean(entry?.id)).sort((left, right) => left.id.localeCompare(right.id));
-  }
-  nextAvailableDescriptorPath(dir, baseId, extension) {
-    fs.mkdirSync(dir, { recursive: true });
-    let index = 1;
-    let candidate = validateWithinDir(path.join(dir, `${baseId}${extension}`), dir);
-    while (fs.existsSync(candidate)) {
-      index += 1;
-      candidate = validateWithinDir(path.join(dir, `${baseId}-${index}${extension}`), dir);
-    }
-    return candidate;
-  }
-  removeRetiredSkillJsonFiles(workspaceRoot) {
-    const dir = appPathService.getWorkspacePaths(workspaceRoot).skillsPath;
-    if (!fs.existsSync(dir)) {
-      return;
-    }
-    for (const entry of fs.readdirSync(dir)) {
-      if (!entry.endsWith(".json")) {
-        continue;
-      }
-      const filePath = path.join(dir, entry);
-      const descriptor = readJsonFile$1(filePath);
-      if (descriptor?.id && RETIRED_SKILL_JSON_IDS.has(descriptor.id)) {
-        fs.unlinkSync(filePath);
-      }
-    }
+  listMcpServers(projectRoot) {
+    this.ensureScaffold();
+    const candidates = [];
+    const addDirectory = (root, scope) => {
+      if (!fs.existsSync(root)) return;
+      fs.readdirSync(root).filter((entry) => entry.endsWith(".mcp.json")).forEach((entry) => {
+        const sourcePath = path.join(root, entry);
+        const value = readJsonFile$1(sourcePath);
+        if (value?.id && MCP_TRANSPORTS.has(value.transport)) candidates.push({ id: value.id, kind: "mcp", scope, sourcePath, value, enabled: value.enabledByDefault });
+      });
+    };
+    addDirectory(appPathService.getUserRdxPaths().mcpPath, "user");
+    if (projectRoot) addDirectory(appPathService.getProjectRdxPaths(projectRoot).mcpPath, "project");
+    return scopedResourceResolver.resolve(candidates).resources.map((resource) => ({
+      ...resource.value,
+      enabledByDefault: resource.enabled,
+      scope: resource.provenance.scope,
+      sourcePath: resource.provenance.sourcePath,
+      sourceHash: resource.provenance.sourceHash
+    }));
   }
 }
 const agentRuntimeConfigService = new AgentRuntimeConfigService();
@@ -2378,183 +2583,50 @@ function resolveCompatibleAgentRoute(routes, providers, agentId) {
     remapReason: `${route.modelId} is not available on GitHub Copilot chat completions; using ${fallbackModelId}.`
   };
 }
-const DEFAULT_MODE_PROFILE_ID = "debugger.default";
-const groupToAllowPattern = (group) => {
-  if (group === "*") return "*";
-  if (group === "primitive") return "primitive.*";
-  if (group === "ui") return "ui.*";
-  if (group.startsWith("rd.")) return group.endsWith(".*") ? group : `${group}.*`;
-  return `rd.${group}.*`;
-};
-const expandToolPolicy = (policy) => [
-  ...policy?.allowTools ?? [],
-  ...(policy?.allowGroups ?? []).map(groupToAllowPattern)
-].filter(Boolean);
-const createFallbackModeProfile = () => ({
-  id: DEFAULT_MODE_PROFILE_ID,
-  label: "Debugger Production",
-  mode: "debugger",
-  patternId: "free-agent",
-  skillIds: [],
-  mcpServerIds: [],
-  stagePolicies: {},
-  defaultAgentPrompts: {}
-});
-const createFallbackAgentProfile = (agentId) => {
-  const route = isTopLevelAgentId(agentId) ? DEFAULT_MODEL_ROUTING[agentId] : DEFAULT_MODEL_ROUTING.debugger;
-  return {
-    id: `agent.${agentId}`,
-    label: agentId,
-    agentId,
-    systemPrompt: `You are ${agentId}.`,
-    modelProvider: route.provider,
-    modelName: route.model,
-    temperature: 0.3,
-    maxTokens: 4096,
-    toolPolicy: { allowTools: [] }
-  };
-};
-const createFallbackStagePolicy = (stage) => ({
-  id: `stage.${stage}`,
-  label: stage,
-  stage,
-  phase: STAGE_PHASES[stage],
-  toolPolicy: { allowTools: [] }
-});
+const profileForAgent = (settings, agentId) => settings.agents.definitions.find((definition) => definition.id === agentId && definition.enabled);
 class ExecutionProfileService {
-  getModeProfilesPath(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "modes");
+  ensureScaffold() {
+    agentRuntimeConfigService.ensureScaffold();
   }
-  getAgentProfilesPath(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "agents");
-  }
-  getStagePoliciesPath(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return path.join(appPathService.getWorkspacePaths(workspaceRoot).policiesPath, "stages");
-  }
-  ensureScaffold(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    fs.mkdirSync(this.getModeProfilesPath(workspaceRoot), { recursive: true });
-    fs.mkdirSync(this.getAgentProfilesPath(workspaceRoot), { recursive: true });
-    fs.mkdirSync(this.getStagePoliciesPath(workspaceRoot), { recursive: true });
-    agentRuntimeConfigService.ensureScaffold(workspaceRoot);
-  }
-  normalizeConfiguration(configuration, workspaceRoot = appPathService.getWorkspaceRoot()) {
-    this.ensureScaffold(workspaceRoot);
-    const availableModeProfiles = this.listModeProfiles(workspaceRoot);
-    const hasActiveProfile = availableModeProfiles.some((profile) => profile.id === configuration.activeModeProfileId);
-    const availablePatterns = agentRuntimeConfigService.listPatterns(workspaceRoot);
-    const availableSkills = agentRuntimeConfigService.listSkills(workspaceRoot);
-    const availableMcpServers = agentRuntimeConfigService.listMcpServers(workspaceRoot);
-    const patternIds = new Set(availablePatterns.map((pattern) => pattern.id));
-    const modePatternBindings = Object.fromEntries(
-      Object.entries(configuration.modePatternBindings ?? {}).map(([mode, patternId]) => [mode, patternIds.has(patternId) ? patternId : "free-agent"])
-    );
+  normalizeResourceCatalog(catalog) {
+    this.ensureScaffold();
     return {
-      ...configuration,
-      activeModeProfileId: hasActiveProfile ? configuration.activeModeProfileId : DEFAULT_MODE_PROFILE_ID,
-      availableModeProfiles,
-      availablePatterns,
-      availableSkills,
-      availableMcpServers,
-      enabledMcpServerIds: configuration.enabledMcpServerIds ?? [],
-      modePatternBindings: {
-        debugger: patternIds.has(modePatternBindings.debugger) ? modePatternBindings.debugger : "free-agent",
-        analyzer: patternIds.has(modePatternBindings.analyzer) ? modePatternBindings.analyzer : "free-agent",
-        optimizer: patternIds.has(modePatternBindings.optimizer) ? modePatternBindings.optimizer : "free-agent",
-        ...modePatternBindings
-      }
+      ...catalog,
+      availableSkills: agentRuntimeConfigService.listSkills(),
+      availableMcpServers: agentRuntimeConfigService.listMcpServers()
     };
   }
-  listModeProfiles(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    this.ensureScaffold(workspaceRoot);
-    return fs.readdirSync(this.getModeProfilesPath(workspaceRoot)).filter((entry) => entry.endsWith(".json")).map((entry) => this.readJson(path.join(this.getModeProfilesPath(workspaceRoot), entry))).filter((profile) => profile !== null).map((profile) => ({ id: profile.id, label: profile.label }));
-  }
   resolveAgentRuntimeProfile(settings, stage, agentId) {
-    const workspaceRoot = settings.workspace.rootPath;
-    this.ensureScaffold(workspaceRoot);
-    const modeProfile = this.readJson(
-      path.join(this.getModeProfilesPath(workspaceRoot), `${settings.configuration.activeModeProfileId}.json`)
-    ) || createFallbackModeProfile();
-    const agentPromptId = modeProfile.defaultAgentPrompts[agentId] || `agent.${agentId}`;
-    const agentProfile = this.readJson(
-      path.join(this.getAgentProfilesPath(workspaceRoot), `${agentId}.json`)
-    ) || createFallbackAgentProfile(agentId);
-    const stagePolicyId = modeProfile.stagePolicies[stage] || `stage.${stage}`;
-    const stagePolicy = this.readJson(
-      path.join(this.getStagePoliciesPath(workspaceRoot), `${stage}.json`)
-    ) || createFallbackStagePolicy(stage);
+    const profile = profileForAgent(settings, agentId);
     const route = this.resolveAgentRoute(settings.llm.agentRoutes, settings.llm.providers, agentId);
     return {
       agentId,
-      systemPrompt: [
-        agentProfile.systemPrompt,
-        stagePolicy.systemPrompt ? `
-
-Stage Policy:
-${stagePolicy.systemPrompt}` : ""
-      ].join("").trim(),
-      providerId: route?.providerId || "",
-      modelId: route?.modelId || "",
-      temperature: agentProfile.temperature,
-      maxTokens: agentProfile.maxTokens,
+      systemPrompt: profile?.instructions ?? `You are ${agentId}.`,
+      providerId: route?.providerId ?? "",
+      modelId: route?.modelId ?? "",
+      temperature: 0.3,
+      maxTokens: 4096,
       category: isTopLevelAgentId(agentId) ? AGENT_CATEGORIES[agentId] : "general",
       writeScope: isTopLevelAgentId(agentId) ? AGENT_WRITE_SCOPES[agentId] : [],
       stage,
-      phase: stagePolicy.phase || STAGE_PHASES[stage],
-      toolAllowlist: Array.from(/* @__PURE__ */ new Set([
-        ...expandToolPolicy(stagePolicy.toolPolicy),
-        ...expandToolPolicy(agentProfile.toolPolicy)
-      ])),
-      patternId: modeProfile.patternId ?? settings.configuration.modePatternBindings[modeProfile.mode],
-      skillIds: Array.from(/* @__PURE__ */ new Set([
-        ...modeProfile.skillIds ?? []
-      ])),
-      mcpServerIds: Array.from(/* @__PURE__ */ new Set([
-        ...modeProfile.mcpServerIds ?? [],
-        ...settings.configuration.enabledMcpServerIds ?? []
-      ])),
-      source: {
-        modeProfileId: modeProfile.id,
-        stagePolicyId,
-        agentProfileId: agentPromptId
-      }
+      phase: STAGE_PHASES[stage],
+      toolAllowlist: profile?.tools ?? [],
+      skillIds: profile?.skills ?? [],
+      mcpServerIds: profile?.mcpServers ?? [],
+      source: { agentProfileId: profile?.id ?? agentId }
     };
   }
   getDiagnostics(settings) {
-    const diagnostics = [];
-    if (!settings.configuration.availableModeProfiles.length) {
-      diagnostics.push({
-        code: "missing_mode_profile",
-        severity: "warning",
-        message: "No execution mode profile found. Falling back to debugger.default."
-      });
-    }
-    if (!settings.llm.providers.some((provider) => provider.isConfigured)) {
-      diagnostics.push({
-        code: "missing_configured_provider",
-        severity: "warning",
-        message: "No configured provider available for Debugger mode."
-      });
-    }
-    return diagnostics;
+    return settings.llm.providers.some((provider) => provider.isConfigured) ? [] : [{
+      code: "missing_configured_provider",
+      severity: "warning",
+      message: "No configured provider is available for agent execution."
+    }];
   }
   resolveAgentRoute(routes, providers, agentId) {
     const resolution = resolveCompatibleAgentRoute(routes, providers, agentId);
-    if (!resolution.route || !resolution.provider) {
-      return null;
-    }
-    const modelExists = resolution.provider.models.some((model2) => model2.enabled && model2.id === resolution.route?.modelId);
-    return modelExists ? resolution.route : null;
-  }
-  readJson(filePath) {
-    try {
-      if (!fs.existsSync(filePath)) {
-        return null;
-      }
-      return JSON.parse(fs.readFileSync(filePath, "utf8"));
-    } catch (error) {
-      console.warn("[ExecutionProfileService] Failed to read JSON:", filePath, error);
-      return null;
-    }
+    if (!resolution.route || !resolution.provider) return null;
+    return resolution.provider.models.some((model2) => model2.enabled && model2.id === resolution.route?.modelId) ? resolution.route : null;
   }
 }
 const executionProfileService = new ExecutionProfileService();
@@ -2600,33 +2672,8 @@ class ProviderCatalogService {
 }
 const providerCatalogService = new ProviderCatalogService();
 const PROVIDER_CATEGORIES = LLM_PROVIDER_CATEGORY_DEFINITIONS.map((entry) => entry.id);
-const LEGACY_CATEGORY_MAP = {
-  account: "login-authorization",
-  "openai-compatible": "third-party-compatible",
-  "anthropic-compatible": "third-party-compatible",
-  "cloud-platform": "cloud-platform",
-  local: "local",
-  plan: "coding-token-plan",
-  image: "image"
-};
-const LEGACY_PROTOCOL_MAP = {
-  openrouter: "OpenRouterChatCompletions",
-  "openai-compatible": "OpenAICompatibleChatCompletions",
-  anthropic: "AnthropicMessages",
-  "google-ai-studio": "GoogleGemini",
-  "azure-openai": "AzureOpenAIChatCompletions",
-  bedrock: "AwsBedrock",
-  vertex: "GoogleVertexAI",
-  ollama: "OllamaOpenAICompatibleChatCompletions"
-};
 function isProviderCategory(value) {
   return typeof value === "string" && PROVIDER_CATEGORIES.includes(value);
-}
-function legacyCategory(value) {
-  return typeof value === "string" ? LEGACY_CATEGORY_MAP[value] ?? null : null;
-}
-function legacyProtocol(value) {
-  return typeof value === "string" ? LEGACY_PROTOCOL_MAP[value] ?? null : null;
 }
 function normalizeProviderCategory(provider) {
   const id = typeof provider.id === "string" ? provider.id.trim() : "";
@@ -2636,10 +2683,6 @@ function normalizeProviderCategory(provider) {
   }
   if (isProviderCategory(provider.category)) {
     return provider.category;
-  }
-  const migratedCategory = legacyCategory(provider.category) ?? legacyCategory(provider.catalogGroup);
-  if (migratedCategory) {
-    return migratedCategory;
   }
   switch (provider.authMode) {
     case "account":
@@ -2651,7 +2694,7 @@ function normalizeProviderCategory(provider) {
     default:
       console.warn(
         "[SettingsService] Unable to infer provider category; defaulting to third-party-compatible.",
-        { id: provider.id, authMode: provider.authMode, category: provider.category, catalogGroup: provider.catalogGroup }
+        { id: provider.id, authMode: provider.authMode, category: provider.category }
       );
       return "third-party-compatible";
   }
@@ -2664,31 +2707,21 @@ function normalizeProviderProtocol(provider) {
     if (builtin.protocolEditable && isLlmProviderProtocol(provider.protocol) && options.includes(provider.protocol)) {
       return provider.protocol;
     }
-    if (builtin.protocolEditable) {
-      const migrated = legacyProtocol(provider.kind);
-      if (migrated && options.includes(migrated)) {
-        return migrated;
-      }
-    }
     return builtin.protocol;
   }
   if (isLlmProviderProtocol(provider.protocol)) {
     return provider.protocol;
   }
-  const migratedProtocol = legacyProtocol(provider.protocol) ?? legacyProtocol(provider.kind);
-  if (migratedProtocol) {
-    return migratedProtocol;
-  }
   console.warn(
     "[SettingsService] Unable to infer provider protocol; defaulting to OpenAICompatibleChatCompletions.",
-    { id: provider.id, protocol: provider.protocol, kind: provider.kind }
+    { id: provider.id, protocol: provider.protocol }
   );
   return "OpenAICompatibleChatCompletions";
 }
 const SECRET_FILE_NAME = "provider-secrets.json";
 class SecretStorageService {
-  getSecretFilePath(workspaceRoot = appPathService.getWorkspaceRoot()) {
-    return path.join(appPathService.getWorkspacePaths(workspaceRoot).secretsPath, SECRET_FILE_NAME);
+  getSecretFilePath(_workspaceRoot = appPathService.getUserRdxRoot()) {
+    return path.join(appPathService.getRuntimePaths().secretsPath, SECRET_FILE_NAME);
   }
   readSecretMap(workspaceRoot) {
     const filePath = this.getSecretFilePath(workspaceRoot);
@@ -2787,23 +2820,20 @@ const VALID_THEMES = ["dark", "light", "system"];
 const VALID_LANGUAGES = ["zh-CN", "en"];
 const VALID_FONT_SCALES = ["small", "medium", "large"];
 const VALID_PERMISSION_MODES = ["default", "auto-review", "full-access", "custom"];
-const RETIRED_BUILTIN_MCP_SERVER_IDS = /* @__PURE__ */ new Set(["builtin.rdc-toolbridge"]);
 const EMPTY_PATHS = {
-  workspaceRoot: "",
-  defaultWorkspaceRoot: "",
+  userRdxRoot: "",
   settingsPath: "",
+  instructionsPath: "",
+  agentsPath: "",
+  profileStatePath: "",
   logsPath: "",
   logPath: "",
   projectsPath: "",
   knowledgePath: "",
-  migrationOrphansPath: "",
-  profilesPath: "",
   policiesPath: "",
   skillsPath: "",
   mcpPath: "",
-  patternsPath: "",
-  secretsPath: "",
-  migrationReportsPath: ""
+  secretsPath: ""
 };
 const DEFAULT_APPEARANCE = {
   theme: "dark",
@@ -2828,15 +2858,6 @@ const DEFAULT_LAYOUT = {
 const DEFAULT_PROFILE = {
   nickname: "RDC Operator",
   avatarPath: ""
-};
-const DEFAULT_CONFIGURATION = {
-  activeModeProfileId: "debugger.default",
-  enabledMcpServerIds: [],
-  modePatternBindings: {
-    debugger: "free-agent",
-    analyzer: "free-agent",
-    optimizer: "free-agent"
-  }
 };
 const DEFAULT_RDX_CLI_INVOKER = {
   enabled: false,
@@ -2886,24 +2907,6 @@ function pickEnum(value, allowed, fallback) {
 }
 function dedupeStrings(values) {
   return Array.from(new Set(values.filter(Boolean)));
-}
-function sanitizeRuntimeIds(values) {
-  return dedupeStrings(
-    Array.isArray(values) ? values.filter((value) => typeof value === "string").map((value) => value.trim()) : []
-  ).filter((value) => !RETIRED_BUILTIN_MCP_SERVER_IDS.has(value));
-}
-function sanitizePatternBindings(value) {
-  const candidate = value && typeof value === "object" ? value : {};
-  const bindings = {};
-  for (const [mode, patternId] of Object.entries(candidate)) {
-    if (typeof patternId === "string" && patternId.trim()) {
-      bindings[mode] = patternId.trim();
-    }
-  }
-  return {
-    ...DEFAULT_CONFIGURATION.modePatternBindings ?? {},
-    ...bindings
-  };
 }
 function sanitizeStringArray(value) {
   return Array.isArray(value) ? value.filter((entry) => typeof entry === "string").map((entry) => entry.trim()).filter(Boolean) : [];
@@ -3144,43 +3147,29 @@ function createEmptyAgentRoutes() {
     modelId: ""
   }));
 }
-function createDefaultPersistedSettings(workspaceRoot = appPathService.getWorkspaceRoot()) {
+function createDefaultPersistedSettings() {
   return {
     appearance: DEFAULT_APPEARANCE,
     layout: DEFAULT_LAYOUT,
     profile: DEFAULT_PROFILE,
-    workspace: {
-      rootPath: workspaceRoot
-    },
     tooling: DEFAULT_TOOLING,
     agentRuntime: DEFAULT_AGENT_RUNTIME,
     llm: {
       providers: [],
       agentRoutes: createEmptyAgentRoutes()
-    },
-    configuration: DEFAULT_CONFIGURATION
+    }
   };
 }
-function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspaceRoot()) {
-  const configuration = executionProfileService.normalizeConfiguration({
-    activeModeProfileId: DEFAULT_CONFIGURATION.activeModeProfileId || "debugger.default",
-    availableModeProfiles: [],
-    enabledMcpServerIds: DEFAULT_CONFIGURATION.enabledMcpServerIds ?? [],
-    modePatternBindings: DEFAULT_CONFIGURATION.modePatternBindings ?? {},
-    availablePatterns: [],
+function createDefaultRuntimeSettings() {
+  const resourceCatalog = executionProfileService.normalizeResourceCatalog({
     availableSkills: [],
     availableMcpServers: [],
-    lastMigrationReportPath: void 0,
-    lastMigrationSummary: [],
     diagnostics: []
-  }, workspaceRoot);
+  });
   return {
     appearance: DEFAULT_APPEARANCE,
     layout: DEFAULT_LAYOUT,
     profile: DEFAULT_PROFILE,
-    workspace: {
-      rootPath: workspaceRoot
-    },
     tooling: DEFAULT_TOOLING,
     agentRuntime: DEFAULT_AGENT_RUNTIME,
     llm: {
@@ -3188,12 +3177,12 @@ function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspac
       agentRoutes: createEmptyAgentRoutes()
     },
     agents: {
-      directoryPath: path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, "agents"),
+      directoryPath: appPathService.getRuntimePaths().agentsPath,
       definitions: [],
       modelOptions: [],
       globalInstructions: ""
     },
-    configuration,
+    resourceCatalog,
     paths: EMPTY_PATHS
   };
 }
@@ -3207,7 +3196,7 @@ function sanitizeRoute(entry) {
   }
   return {
     agentId: route.agentId,
-    providerId: typeof route.providerId === "string" ? normalizeRetiredProviderId(route.providerId.trim()) : "",
+    providerId: typeof route.providerId === "string" ? route.providerId.trim() : "",
     modelId: typeof route.modelId === "string" ? route.modelId.trim() : ""
   };
 }
@@ -3229,33 +3218,25 @@ function isFixtureProvider(provider) {
   const baseUrl = typeof provider.baseUrl === "string" ? provider.baseUrl.trim().toLowerCase() : "";
   return /^provider-\d+$/i.test(id) || id === "acme" || id === "vendorx" || baseUrl.includes("example.com") || baseUrl.includes("acme.local") || baseUrl.includes("vendorx.ai");
 }
-const RETIRED_PROVIDER_ID_IMPORTS = {
-  gemini: "vertex",
-  kimi: "kimi-coding-plan",
-  "kimi-code": "kimi-coding-plan",
-  minimax: "minimax-global",
-  zai: "glm-global"
-};
-function normalizeRetiredProviderId(providerId) {
-  return RETIRED_PROVIDER_ID_IMPORTS[providerId] ?? providerId;
-}
-function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorkspaceRoot()) {
+function sanitizeUserProvider(provider, workspaceRoot = appPathService.getUserRdxRoot(), options = {}) {
   const incomingId = typeof provider.id === "string" ? provider.id.trim() : "";
-  const rawId = normalizeRetiredProviderId(incomingId);
+  const rawId = incomingId;
   if (!rawId || !isBuiltinProviderId(rawId)) {
     return null;
   }
   const builtinFallback = createBuiltinProviderEntry(rawId);
   const definition = getBuiltinProviderDefinition(rawId);
   const incomingSecretRef = typeof provider.secretRef === "string" && provider.secretRef.trim() ? provider.secretRef.trim() : void 0;
-  const secretRef = incomingId && incomingId !== rawId ? secretStorageService.createProviderSecretRef(rawId) : incomingSecretRef || secretStorageService.createProviderSecretRef(rawId);
+  const secretRef = incomingSecretRef || secretStorageService.createProviderSecretRef(rawId);
   const protocol = normalizeProviderProtocol({ ...provider, id: rawId });
   const catalogOwnership = getBuiltinProviderCatalogOwnership(rawId);
   const models = resolveProviderModels(rawId, provider.models ?? []);
   const oauthSecretRef = secretStorageService.createProviderOAuthSecretRef(rawId);
   const resolvedSecret = builtinFallback.authMode === "api-key" ? getResolvedProviderSecret(rawId, secretRef, workspaceRoot) : builtinFallback.authMode === "account" ? secretStorageService.getSecret(oauthSecretRef, workspaceRoot) : "";
-  const hasStoredSecret = builtinFallback.hasStoredSecret || Boolean(resolvedSecret);
-  const canUseProvider = builtinFallback.status !== "unavailable" && (builtinFallback.authMode === "local" || builtinFallback.authMode === "environment" ? true : Boolean(resolvedSecret));
+  const preservePersistedCredentialState = options.credentialPolicy === "persisted";
+  const hasPersistedSecret = preservePersistedCredentialState && provider.hasStoredSecret === true;
+  const hasStoredSecret = builtinFallback.hasStoredSecret || Boolean(resolvedSecret) || hasPersistedSecret;
+  const canUseProvider = builtinFallback.status !== "unavailable" && (builtinFallback.authMode === "local" || builtinFallback.authMode === "environment" ? true : Boolean(resolvedSecret) || hasPersistedSecret);
   const status = pickProviderStatus(provider, builtinFallback, canUseProvider, models);
   const hasEnabledModels = models.some((model2) => model2.enabled !== false);
   const enabled = status === "verified" && hasEnabledModels;
@@ -3295,19 +3276,23 @@ function sanitizeUserProvider(provider, workspaceRoot = appPathService.getWorksp
     capabilities: definition?.capabilities ? [...definition.capabilities] : void 0
   };
 }
-function normalizeUserProviders(providers, workspaceRoot) {
+function normalizeUserProviders(providers, workspaceRoot, options = {}) {
   const persistedProviders = /* @__PURE__ */ new Map();
   for (const entry of Array.isArray(providers) ? providers : []) {
     if (!entry || typeof entry !== "object") {
       continue;
     }
-    const provider = sanitizeUserProvider(entry, workspaceRoot);
+    const provider = sanitizeUserProvider(entry, workspaceRoot, options);
     if (!provider || persistedProviders.has(provider.id)) {
       continue;
     }
     persistedProviders.set(provider.id, provider);
   }
-  return createBuiltinProviderEntries().map((catalogProvider) => sanitizeUserProvider(persistedProviders.get(catalogProvider.id) ?? catalogProvider, workspaceRoot)).filter((provider) => provider !== null);
+  return createBuiltinProviderEntries().map((catalogProvider) => sanitizeUserProvider(
+    persistedProviders.get(catalogProvider.id) ?? catalogProvider,
+    workspaceRoot,
+    options
+  )).filter((provider) => provider !== null);
 }
 function hydrateProviderSecrets(providers, workspaceRoot) {
   return providers.map((provider) => {
@@ -3354,28 +3339,14 @@ function normalizeUserRoutes(routes, providers) {
   }
   return Array.from(routeMap.values());
 }
-function parseMigrationSummary(reportPath) {
-  if (!reportPath || !fs.existsSync(reportPath)) {
-    return [];
-  }
-  try {
-    const content = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-    return [...content.fixes ?? [], ...content.warnings ?? []];
-  } catch (error) {
-    console.warn("[SettingsService] Failed to read migration report:", error);
-    return [];
-  }
-}
 class SettingsService {
   initialized = false;
   initialize() {
-    const runtimePaths = appPathService.initializeWorkspaceRoot();
-    executionProfileService.ensureScaffold(runtimePaths.workspaceRoot);
+    const runtimePaths = appPathService.initializeRuntime();
+    executionProfileService.ensureScaffold();
     const rawPersisted = readJsonFile(runtimePaths.settingsPath);
-    const rebuildResult = this.rebuildPersistedSettings(rawPersisted, runtimePaths.workspaceRoot);
-    if (rebuildResult.changed || !fs.existsSync(runtimePaths.settingsPath)) {
-      this.persistHardRebuild(runtimePaths, rawPersisted, rebuildResult);
-    }
+    const rebuildResult = this.rebuildPersistedSettings(rawPersisted, runtimePaths.userRdxRoot);
+    this.persistHardRebuild(runtimePaths, rawPersisted, rebuildResult);
     this.initialized = true;
     return this.getAll(runtimePaths);
   }
@@ -3385,7 +3356,7 @@ class SettingsService {
     }
   }
   rebuildPersistedSettings(raw, workspaceRoot) {
-    const fallback = createDefaultPersistedSettings(workspaceRoot);
+    const fallback = createDefaultPersistedSettings();
     const candidate = raw ?? fallback;
     const fixes = [];
     const warnings = [];
@@ -3401,30 +3372,21 @@ class SettingsService {
         continue;
       }
       const incomingId = typeof entry.id === "string" ? entry.id.trim() : "";
-      const rawId = normalizeRetiredProviderId(incomingId);
+      const rawId = incomingId;
       if (!rawId) {
         fixes.push("Removed provider with empty id");
         continue;
       }
-      if (incomingId && incomingId !== rawId) {
-        fixes.push(`Renamed retired provider id ${incomingId} to ${rawId}`);
-      }
       const canonicalSecretRef = secretStorageService.createProviderSecretRef(rawId);
       const incomingSecretRef = typeof entry.secretRef === "string" && entry.secretRef.trim() ? entry.secretRef.trim() : void 0;
-      const secretRef = incomingId && incomingId !== rawId ? canonicalSecretRef : incomingSecretRef || canonicalSecretRef;
-      if (incomingSecretRef && incomingSecretRef !== secretRef) {
-        const incomingSecret = secretStorageService.getSecret(incomingSecretRef, workspaceRoot);
-        if (incomingSecret.trim()) {
-          secretStorageService.setSecret(secretRef, incomingSecret, workspaceRoot);
-          secretStorageService.deleteSecret(incomingSecretRef, workspaceRoot);
-          fixes.push(`Moved retired provider secret ${incomingId} to ${rawId}`);
-        }
-      }
+      const secretRef = incomingSecretRef || canonicalSecretRef;
       if (entry.apiKey?.trim()) {
         secretStorageService.setSecret(secretRef, entry.apiKey.trim(), workspaceRoot);
         fixes.push(`Migrated plaintext secret for ${rawId}`);
       }
-      const sanitized = sanitizeUserProvider({ ...entry, secretRef }, workspaceRoot);
+      const sanitized = sanitizeUserProvider({ ...entry, secretRef }, workspaceRoot, {
+        credentialPolicy: "persisted"
+      });
       if (!sanitized) {
         fixes.push(`Removed non-catalog provider ${rawId}`);
         continue;
@@ -3435,14 +3397,16 @@ class SettingsService {
         fixes.push(`Removed duplicated provider ${sanitized.id}`);
       }
     }
-    const catalogProviders = normalizeUserProviders(nextProviders, workspaceRoot);
+    const catalogProviders = normalizeUserProviders(nextProviders, workspaceRoot, {
+      credentialPolicy: "persisted"
+    });
     const normalizedRoutes = normalizeUserRoutes(rawRoutes, catalogProviders);
     const nextRoutes = normalizedRoutes;
     const incomingRoutes = Array.isArray(rawRoutes) ? rawRoutes.map((entry) => {
       if (entry && typeof entry === "object") {
         const providerId = entry.providerId;
         const incomingProviderId = typeof providerId === "string" ? providerId.trim() : "";
-        const normalizedProviderId = normalizeRetiredProviderId(incomingProviderId);
+        const normalizedProviderId = incomingProviderId;
         if (incomingProviderId && incomingProviderId !== normalizedProviderId) {
           const agentId = entry.agentId;
           fixes.push(`Renamed retired route provider id ${incomingProviderId} to ${normalizedProviderId}${typeof agentId === "string" ? ` for ${agentId}` : ""}`);
@@ -3476,20 +3440,11 @@ class SettingsService {
         nickname: typeof candidate.profile?.nickname === "string" && candidate.profile.nickname.trim() ? candidate.profile.nickname.trim() : DEFAULT_PROFILE.nickname,
         avatarPath: typeof candidate.profile?.avatarPath === "string" ? candidate.profile.avatarPath : DEFAULT_PROFILE.avatarPath
       },
-      workspace: {
-        rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot
-      },
       tooling: sanitizeToolingSettings(candidate.tooling ?? fallback.tooling),
       agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
       llm: {
         providers: catalogProviders.map((provider) => ({ ...provider, apiKey: "" })),
         agentRoutes: nextRoutes
-      },
-      configuration: {
-        activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
-        enabledMcpServerIds: sanitizeRuntimeIds(candidate.configuration?.enabledMcpServerIds),
-        modePatternBindings: sanitizePatternBindings(candidate.configuration?.modePatternBindings),
-        lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath
       }
     };
     return {
@@ -3499,10 +3454,10 @@ class SettingsService {
       warnings
     };
   }
-  normalizePersistedSettings(raw, workspaceRoot) {
-    const fallback = createDefaultPersistedSettings(workspaceRoot);
+  normalizePersistedSettings(raw, workspaceRoot, options = {}) {
+    const fallback = createDefaultPersistedSettings();
     const candidate = raw ?? fallback;
-    const nextProviders = normalizeUserProviders(candidate.llm?.providers, workspaceRoot).map((provider) => ({
+    const nextProviders = normalizeUserProviders(candidate.llm?.providers, workspaceRoot, options).map((provider) => ({
       ...provider,
       apiKey: ""
     }));
@@ -3522,78 +3477,32 @@ class SettingsService {
         nickname: typeof candidate.profile?.nickname === "string" && candidate.profile.nickname.trim() ? candidate.profile.nickname.trim() : DEFAULT_PROFILE.nickname,
         avatarPath: typeof candidate.profile?.avatarPath === "string" ? candidate.profile.avatarPath : DEFAULT_PROFILE.avatarPath
       },
-      workspace: {
-        rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot
-      },
       tooling: sanitizeToolingSettings(candidate.tooling ?? fallback.tooling),
       agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
       llm: {
         providers: nextProviders,
         agentRoutes: nextRoutes
-      },
-      configuration: {
-        activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
-        enabledMcpServerIds: sanitizeRuntimeIds(candidate.configuration?.enabledMcpServerIds),
-        modePatternBindings: sanitizePatternBindings(candidate.configuration?.modePatternBindings),
-        lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath
       }
     };
   }
-  writeMigrationReport(paths, fixes, warnings) {
-    const reportPath = path.join(paths.migrationReportsPath, `settings-rebuild-${Date.now()}.json`);
-    fs.mkdirSync(paths.migrationReportsPath, { recursive: true });
-    fs.writeFileSync(reportPath, JSON.stringify({
-      generatedAt: nowIso(),
-      fixes,
-      warnings
-    }, null, 2), "utf8");
-    return reportPath;
-  }
-  persistHardRebuild(paths, previous, result) {
-    const nextSettings = {
-      ...result.settings,
-      configuration: {
-        ...result.settings.configuration
-      }
-    };
-    if (result.changed && previous && fs.existsSync(paths.settingsPath)) {
-      fs.mkdirSync(paths.migrationOrphansPath, { recursive: true });
-      const backupPath = path.join(paths.migrationOrphansPath, `settings.backup.${Date.now()}.json`);
-      fs.copyFileSync(paths.settingsPath, backupPath);
-    }
-    if (result.changed && (result.fixes.length > 0 || result.warnings.length > 0)) {
-      nextSettings.configuration = {
-        ...nextSettings.configuration,
-        lastMigrationReportPath: this.writeMigrationReport(paths, result.fixes, result.warnings)
-      };
-    }
-    this.writeSettings(nextSettings, paths.workspaceRoot);
+  persistHardRebuild(_paths, _previous, result) {
+    this.writeSettings(result.settings);
   }
   toRuntimeSettings(persisted, runtimePaths) {
-    const workspaceRoot = persisted.workspace?.rootPath?.trim() || appPathService.getWorkspaceRoot();
+    const workspaceRoot = appPathService.getUserRdxRoot();
     const normalized = this.normalizePersistedSettings(persisted, workspaceRoot);
     const hydratedProviders = hydrateProviderSecrets(normalized.llm.providers, workspaceRoot);
-    const paths = appPathService.getWorkspacePaths(workspaceRoot);
-    const configuration = executionProfileService.normalizeConfiguration({
-      activeModeProfileId: normalized.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId || "debugger.default",
-      availableModeProfiles: [],
-      enabledMcpServerIds: normalized.configuration?.enabledMcpServerIds ?? [],
-      modePatternBindings: normalized.configuration?.modePatternBindings ?? DEFAULT_CONFIGURATION.modePatternBindings ?? {},
-      availablePatterns: [],
+    const paths = appPathService.getRuntimePaths();
+    const resourceCatalog = executionProfileService.normalizeResourceCatalog({
       availableSkills: [],
       availableMcpServers: [],
-      lastMigrationReportPath: normalized.configuration?.lastMigrationReportPath,
-      lastMigrationSummary: parseMigrationSummary(normalized.configuration?.lastMigrationReportPath),
       diagnostics: []
-    }, workspaceRoot);
+    });
     const settings = {
-      ...createDefaultRuntimeSettings(workspaceRoot),
+      ...createDefaultRuntimeSettings(),
       appearance: normalized.appearance,
       layout: normalized.layout,
       profile: normalized.profile,
-      workspace: {
-        rootPath: workspaceRoot
-      },
       tooling: normalized.tooling,
       agentRuntime: normalized.agentRuntime,
       llm: {
@@ -3601,30 +3510,30 @@ class SettingsService {
         agentRoutes: normalizeUserRoutes(normalized.llm?.agentRoutes ?? createEmptyAgentRoutes(), hydratedProviders)
       },
       agents: agentManifestService.getSettings(paths, hydratedProviders, normalized.llm?.agentRoutes ?? createEmptyAgentRoutes()),
-      configuration,
+      resourceCatalog,
       paths: {
         ...paths,
         ...runtimePaths ?? {}
       }
     };
-    settings.configuration.diagnostics = executionProfileService.getDiagnostics(settings);
+    settings.resourceCatalog.diagnostics = executionProfileService.getDiagnostics(settings);
     return settings;
   }
-  writeSettings(settings, workspaceRoot = settings.workspace?.rootPath || appPathService.getWorkspaceRoot()) {
-    const filePath = appPathService.getWorkspacePaths(workspaceRoot).settingsPath;
+  writeSettings(settings) {
+    const filePath = appPathService.getRuntimePaths().settingsPath;
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), "utf8");
   }
   getAll(runtimePaths) {
     this.ensureInitialized();
-    const paths = appPathService.getWorkspacePaths();
-    const persisted = readJsonFile(paths.settingsPath) ?? createDefaultPersistedSettings(paths.workspaceRoot);
+    const paths = appPathService.getRuntimePaths();
+    const persisted = readJsonFile(paths.settingsPath) ?? createDefaultPersistedSettings();
     return this.toRuntimeSettings(persisted, runtimePaths);
   }
-  getProviderSecret(providerId, workspaceRoot = appPathService.getWorkspaceRoot()) {
+  getProviderSecret(providerId, workspaceRoot = appPathService.getUserRdxRoot()) {
     this.ensureInitialized();
     const persisted = this.normalizePersistedSettings(
-      readJsonFile(appPathService.getWorkspacePaths(workspaceRoot).settingsPath) ?? createDefaultPersistedSettings(workspaceRoot),
+      readJsonFile(appPathService.getRuntimePaths().settingsPath) ?? createDefaultPersistedSettings(),
       workspaceRoot
     );
     const provider = persisted.llm.providers.find((entry) => entry.id === providerId);
@@ -3633,34 +3542,37 @@ class SettingsService {
     }
     return getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot);
   }
-  getProviderOAuthSecret(providerId, workspaceRoot = appPathService.getWorkspaceRoot()) {
+  getProviderOAuthSecret(providerId, workspaceRoot = appPathService.getUserRdxRoot()) {
     this.ensureInitialized();
     return secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(providerId), workspaceRoot);
   }
   setAll(patch, runtimePaths) {
     this.ensureInitialized();
-    const currentRuntime = this.getAll();
-    const requestedRoot = patch.workspace?.rootPath?.trim() || currentRuntime.workspace.rootPath || appPathService.getWorkspacePaths().workspaceRoot;
-    const nextPaths = appPathService.setWorkspaceRoot(requestedRoot);
-    executionProfileService.ensureScaffold(nextPaths.workspaceRoot);
+    const nextPaths = appPathService.initializeRuntime();
+    executionProfileService.ensureScaffold();
     const currentPersisted = this.normalizePersistedSettings(
-      readJsonFile(nextPaths.settingsPath) ?? createDefaultPersistedSettings(nextPaths.workspaceRoot),
-      nextPaths.workspaceRoot
+      readJsonFile(nextPaths.settingsPath) ?? createDefaultPersistedSettings(),
+      nextPaths.userRdxRoot,
+      { credentialPolicy: "persisted" }
     );
+    const hasProviderPatch = Boolean(patch.llm?.providers);
+    const providerCredentialPolicy = hasProviderPatch ? "runtime" : "persisted";
     const providerDrafts = (patch.llm?.providers ?? currentPersisted.llm?.providers ?? []).map((provider) => {
       const secretRef = provider.secretRef || secretStorageService.createProviderSecretRef(provider.id);
       const apiKey = provider.apiKey?.trim() ?? "";
       if (provider.authMode === "api-key" && apiKey) {
-        secretStorageService.setSecret(secretRef, apiKey, nextPaths.workspaceRoot);
+        secretStorageService.setSecret(secretRef, apiKey, nextPaths.userRdxRoot);
       } else if (provider.authMode === "api-key" && !provider.hasStoredSecret) {
-        secretStorageService.deleteSecret(secretRef, nextPaths.workspaceRoot);
+        secretStorageService.deleteSecret(secretRef, nextPaths.userRdxRoot);
       }
       return sanitizeUserProvider({
         ...provider,
         secretRef
-      }, nextPaths.workspaceRoot);
+      }, nextPaths.userRdxRoot, { credentialPolicy: providerCredentialPolicy });
     }).filter((provider) => provider !== null);
-    const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.workspaceRoot);
+    const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.userRdxRoot, {
+      credentialPolicy: providerCredentialPolicy
+    });
     const currentRoutes = normalizeUserRoutes(patch.llm?.agentRoutes ?? currentPersisted.llm?.agentRoutes ?? [], nextProviders);
     if (patch.agents?.definitions) {
       agentManifestService.save(
@@ -3719,9 +3631,6 @@ class SettingsService {
         nickname: typeof patch.profile?.nickname === "string" && patch.profile.nickname.trim() ? patch.profile.nickname.trim() : currentPersisted.profile?.nickname || DEFAULT_PROFILE.nickname,
         avatarPath: typeof patch.profile?.avatarPath === "string" ? patch.profile.avatarPath : currentPersisted.profile?.avatarPath || DEFAULT_PROFILE.avatarPath
       },
-      workspace: {
-        rootPath: nextPaths.workspaceRoot
-      },
       tooling: {
         rdxCli: sanitizeRdxCliInvokerSettings({
           ...currentPersisted.tooling?.rdxCli ?? DEFAULT_RDX_CLI_INVOKER,
@@ -3741,15 +3650,9 @@ class SettingsService {
       llm: {
         providers: nextProviders.map((provider) => ({ ...provider, apiKey: "" })),
         agentRoutes: normalizeUserRoutes(manifestRoutes, nextProviders)
-      },
-      configuration: {
-        activeModeProfileId: patch.configuration?.activeModeProfileId || currentPersisted.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId,
-        enabledMcpServerIds: patch.configuration?.enabledMcpServerIds ? sanitizeRuntimeIds(patch.configuration.enabledMcpServerIds) : sanitizeRuntimeIds(currentPersisted.configuration?.enabledMcpServerIds),
-        modePatternBindings: patch.configuration?.modePatternBindings ? sanitizePatternBindings(patch.configuration.modePatternBindings) : sanitizePatternBindings(currentPersisted.configuration?.modePatternBindings),
-        lastMigrationReportPath: currentPersisted.configuration?.lastMigrationReportPath
       }
     };
-    this.writeSettings(nextPersisted, nextPaths.workspaceRoot);
+    this.writeSettings(nextPersisted);
     return this.getAll({
       ...nextPaths,
       ...runtimePaths ?? {}
@@ -3803,7 +3706,7 @@ class SettingsService {
     secretStorageService.setSecret(
       secretStorageService.createProviderOAuthSecretRef(provider.id),
       secretPayload,
-      current.workspace.rootPath
+      current.paths.userRdxRoot
     );
     const timestamp = nowIso();
     const nextProvider = {
@@ -3835,9 +3738,9 @@ class SettingsService {
       throw new Error(`Unknown provider: ${providerId}`);
     }
     if (provider.authMode === "api-key") {
-      secretStorageService.deleteSecret(provider.secretRef, current.workspace.rootPath);
+      secretStorageService.deleteSecret(provider.secretRef, current.paths.userRdxRoot);
     } else if (provider.authMode === "account") {
-      secretStorageService.deleteSecret(secretStorageService.createProviderOAuthSecretRef(provider.id), current.workspace.rootPath);
+      secretStorageService.deleteSecret(secretStorageService.createProviderOAuthSecretRef(provider.id), current.paths.userRdxRoot);
     }
     const fallback = createBuiltinProviderEntry(provider.id);
     const nextProvider = {
@@ -3864,13 +3767,13 @@ class SettingsService {
   getLlmConfig() {
     const settings = this.getAll();
     const providers = settings.llm.providers.filter((provider) => provider.enabled && provider.isConfigured && provider.status === "verified").map((provider) => {
-      const accountCredential = provider.authMode === "account" ? resolveAccountRuntimeCredential(provider.id, settings.workspace.rootPath) : { apiKey: "", baseUrl: void 0 };
+      const accountCredential = provider.authMode === "account" ? resolveAccountRuntimeCredential(provider.id, settings.paths.userRdxRoot) : { apiKey: "", baseUrl: void 0 };
       return {
         id: provider.id,
         protocol: provider.protocol,
         label: provider.label,
         enabled: provider.enabled,
-        apiKey: provider.authMode === "api-key" ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.workspace.rootPath) : provider.authMode === "account" ? accountCredential.apiKey : "",
+        apiKey: provider.authMode === "api-key" ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.paths.userRdxRoot) : provider.authMode === "account" ? accountCredential.apiKey : "",
         baseUrl: accountCredential.baseUrl ?? provider.baseUrl,
         accountId: accountCredential.accountId,
         authMode: provider.authMode,
@@ -3890,7 +3793,7 @@ class SettingsService {
     return this.getAll().llm.providers.some((provider) => provider.isConfigured);
   }
   getSettingsPath() {
-    return appPathService.getWorkspacePaths().settingsPath;
+    return appPathService.getRuntimePaths().settingsPath;
   }
 }
 const settingsService = new SettingsService();
@@ -4083,9 +3986,9 @@ class RdxShellActionService {
         error: message
       };
     }
-    const paths = appPathService.getWorkspacePaths();
+    const paths = appPathService.getRuntimePaths();
     const resolvedVariables = {
-      workspaceRoot: paths.workspaceRoot,
+      workspaceRoot: paths.userRdxRoot,
       logsPath: paths.logsPath,
       projectsPath: paths.projectsPath,
       knowledgePath: paths.knowledgePath,
@@ -4255,6 +4158,7 @@ const ASK_READONLY_TOOL_ALLOWLIST = [
   "git_diff",
   "git_log",
   "tool_search",
+  "memory_search",
   "memory_read"
 ];
 const CANONICAL_TOOL_EXPANSIONS = {
@@ -4270,12 +4174,12 @@ const CANONICAL_TOOL_EXPANSIONS = {
   agent: ["agent_handoff"],
   handoff: ["agent_handoff"],
   task: ["task_create", "task_update", "task_get", "task_list"],
-  memory: ["memory_read"],
+  memory: ["memory_search", "memory_read"],
   planArtifact: ["plan_artifact"],
   artifact: ["plan_artifact"],
   "vscode/memory": ["memory_read"],
-  skill: ["skills", "skill_run"],
-  skills: ["skills", "skill_run"],
+  skill: ["skills", "skill_read"],
+  skills: ["skills", "skill_read"],
   mcp: ["mcp", "mcp__*"],
   MCP: ["mcp", "mcp__*"],
   tool_search: ["tool_search"],
@@ -4315,6 +4219,7 @@ const RUNTIME_TOOL_ALIASES = {
   agent_handoff: "agent_handoff",
   subagent: "subagent",
   memory: "memory_read",
+  memory_search: "memory_search",
   memory_read: "memory_read",
   memory_write: "memory_write",
   memory_delete: "memory_delete",
@@ -4324,7 +4229,7 @@ const RUNTIME_TOOL_ALIASES = {
   "vscode/memory": "memory_read",
   skill: "skills",
   skills: "skills",
-  skill_run: "skill_run",
+  skill_read: "skill_read",
   mcp: "mcp",
   MCP: "mcp",
   rdxContext: "rdx_context",
@@ -4360,11 +4265,12 @@ const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
   "task_get",
   "task_list",
   "memory_read",
+  "memory_search",
   "memory_write",
   "memory_delete",
   "plan_artifact",
   "skills",
-  "skill_run",
+  "skill_read",
   "mcp",
   "mcp__*",
   "rdx_context",
@@ -4911,7 +4817,7 @@ function normalizeProviderArtifact(value) {
     raw: record.raw && typeof record.raw === "object" && !Array.isArray(record.raw) ? record.raw : void 0
   };
 }
-const isThinkingKind = (value) => value === "summary" || value === "raw" || value === "opaque";
+const isThinkingKind = (value) => value === "summary" || value === "raw" || value === "opaque" || value === "unknown";
 const isThinkingVisibility = (value) => value === "summary" || value === "raw-collapsed" || value === "hidden";
 const isThinkingReplayPolicy = (value) => value === "none" || value === "provider-artifact";
 const isThinkingSource = (value) => value === "openai-responses-summary" || value === "openai-responses-encrypted" || value === "anthropic-thinking" || value === "anthropic-redacted-thinking" || value === "openai-compatible-raw" || value === "openrouter-raw" || value === "gemini-raw" || value === "ollama-raw" || value === "unknown";
@@ -4919,32 +4825,26 @@ class StorageAdapter {
   dataRootPath = "";
   projectsRootPath = "";
   globalKnowledgePath = "";
-  migrationOrphansPath = "";
   registryPath = "";
   selectionPath = "";
   constructor() {
-    this.syncWorkspacePaths();
+    this.syncRuntimePaths();
   }
   getWorkspacePath() {
-    this.syncWorkspacePaths();
+    this.syncRuntimePaths();
     return this.dataRootPath;
   }
   getGlobalKnowledgePath() {
-    this.syncWorkspacePaths();
+    this.syncRuntimePaths();
     return this.globalKnowledgePath;
   }
   async initializeWorkspace() {
-    this.syncWorkspacePaths();
+    this.syncRuntimePaths();
     this.ensureDir(this.dataRootPath);
     this.ensureDir(this.projectsRootPath);
-    this.ensureDir(this.migrationOrphansPath);
     this.ensureRegistry();
     this.ensureSelection();
-    this.bootstrapGlobalKnowledge();
-  }
-  setWorkspaceRoot(workspaceRoot) {
-    appPathService.setWorkspaceRoot(workspaceRoot);
-    this.syncWorkspacePaths();
+    this.ensureDir(this.globalKnowledgePath);
   }
   listProjects() {
     return this.readRegistry().projects.slice().sort((a, b) => b.updatedAt - a.updatedAt);
@@ -5645,27 +5545,11 @@ class StorageAdapter {
     };
     writeYaml(this.getSessionEvidencePath(sessionId), record);
   }
-  bootstrapGlobalKnowledge() {
-    this.syncWorkspacePaths();
-    this.ensureDir(this.globalKnowledgePath);
-    this.ensureDir(path__namespace.join(this.globalKnowledgePath, "library"));
-    this.ensureDir(path__namespace.join(this.globalKnowledgePath, "spec"));
-    const seededMarker = path__namespace.join(this.globalKnowledgePath, ".seeded");
-    if (fs__namespace.existsSync(seededMarker)) {
-      return;
-    }
-    const seedPath = path__namespace.join(electron.app.getAppPath(), "resources", "knowledge", "seed");
-    if (fs__namespace.existsSync(seedPath)) {
-      this.copyDirectoryContents(seedPath, this.globalKnowledgePath, false);
-    }
-    fs__namespace.writeFileSync(seededMarker, nowIso$1(), "utf-8");
-  }
-  syncWorkspacePaths() {
-    const paths = appPathService.getWorkspacePaths();
-    this.dataRootPath = paths.workspaceRoot;
+  syncRuntimePaths() {
+    const paths = appPathService.getRuntimePaths();
+    this.dataRootPath = paths.appStateRoot;
     this.projectsRootPath = paths.projectsPath;
     this.globalKnowledgePath = paths.knowledgePath;
-    this.migrationOrphansPath = paths.migrationOrphansPath;
     this.registryPath = path__namespace.join(this.projectsRootPath, "registry.json");
     this.selectionPath = path__namespace.join(this.projectsRootPath, "selection.json");
   }
@@ -5718,6 +5602,11 @@ class StorageAdapter {
     const normalizedProject = this.normalizeProjectRecord(project);
     this.ensureDir(this.getProjectDataPath(normalizedProject));
     this.writeJson(path__namespace.join(this.getProjectDataPath(normalizedProject), "project.json"), normalizedProject);
+    const projectPaths = appPathService.initializeProjectRdx(normalizedProject.rootPath);
+    writeYaml(projectPaths.projectMetadataPath, {
+      schema_version: "1",
+      name: normalizedProject.name
+    });
   }
   writeRunFiles(run) {
     const runPath = this.getRunPath(run.sessionId, run.runId);
@@ -5771,7 +5660,7 @@ class StorageAdapter {
     if (!target) {
       throw new Error(`Project not found: ${project}`);
     }
-    return path__namespace.join(target.rootPath, "sessions");
+    return path__namespace.join(appPathService.getAppStatePaths().sessionsPath, target.projectId);
   }
   ensureProjectSessionsRoot(project) {
     const target = typeof project === "string" ? this.getProjectById(project) : project;
@@ -5947,23 +5836,6 @@ class StorageAdapter {
       fs__namespace.mkdirSync(dirPath, { recursive: true });
     }
   }
-  copyDirectoryContents(sourceDir, targetDir, overwrite) {
-    if (!fs__namespace.existsSync(sourceDir)) return;
-    this.ensureDir(targetDir);
-    for (const entry of fs__namespace.readdirSync(sourceDir, { withFileTypes: true })) {
-      const sourcePath = path__namespace.join(sourceDir, entry.name);
-      const targetPath = path__namespace.join(targetDir, entry.name);
-      if (entry.isDirectory()) {
-        this.copyDirectoryContents(sourcePath, targetPath, overwrite);
-        continue;
-      }
-      if (!overwrite && fs__namespace.existsSync(targetPath)) {
-        continue;
-      }
-      this.ensureDir(path__namespace.dirname(targetPath));
-      fs__namespace.copyFileSync(sourcePath, targetPath);
-    }
-  }
   readJson(filePath) {
     try {
       if (!fs__namespace.existsSync(filePath)) {
@@ -6004,20 +5876,13 @@ class StorageAdapter {
     this.writeRegistry(registry);
     this.writeProjectMetadata(project);
   }
-  buildProjectPaths(rootPath) {
-    const resourcePath = path__namespace.join(rootPath, ".resource");
-    return {
-      resourcePath,
-      knowledgePath: path__namespace.join(resourcePath, "knowledge"),
-      inputsPath: path__namespace.join(resourcePath, "inputs")
-    };
-  }
   ensureProjectResourceLayout(rootPath) {
-    const paths = this.buildProjectPaths(rootPath);
-    this.ensureDir(paths.resourcePath);
-    this.ensureDir(paths.knowledgePath);
-    this.ensureDir(paths.inputsPath);
-    return paths;
+    const projectPaths = appPathService.initializeProjectRdx(rootPath);
+    return {
+      resourcePath: projectPaths.projectRdxRoot,
+      knowledgePath: projectPaths.knowledgePath,
+      inputsPath: projectPaths.inputsPath
+    };
   }
   normalizeProjectRecord(project) {
     const rootPath = path__namespace.resolve(project.rootPath);
@@ -6810,29 +6675,119 @@ class ReplayDeviceService {
   }
 }
 const replayDeviceService = new ReplayDeviceService();
-const EFFORT_LEVELS = ["low", "medium", "high", "extHigh", "max"];
-const REASONING_LEVELS = ["off", "auto", "low", "medium", "high", "extHigh", "max"];
+const NAMED_REASONING_LEVELS = [
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "extra",
+  "max",
+  "ultra"
+];
+const REASONING_SELECTIONS = [
+  "off",
+  "on",
+  ...NAMED_REASONING_LEVELS
+];
 const DEFAULT_CONTEXT_WINDOW_TOKENS = 256e3;
 const MAX_CONTEXT_MODE_MIN_TOKENS = 1e6;
 const CONTEXT_COMPACTION_RATIO = 0.8;
-function isReasoningLevel(value) {
-  return typeof value === "string" && REASONING_LEVELS.includes(value);
+function isReasoningSelection(value) {
+  return typeof value === "string" && REASONING_SELECTIONS.includes(value);
 }
-function clampReasoningLevel(reasoningLevel, supported) {
-  if (!Array.isArray(supported) || supported.length === 0) {
+function createReasoningControl(control) {
+  return {
+    ...control,
+    levels: [...control.levels],
+    wireProfile: cloneReasoningWireProfile(control.wireProfile)
+  };
+}
+function cloneReasoningWireProfile(profile) {
+  switch (profile.kind) {
+    case "openai-responses":
+      return {
+        ...profile,
+        levels: profile.levels ? { ...profile.levels } : profile.levels
+      };
+    case "openai-compatible":
+      return {
+        ...profile,
+        levels: profile.levels ? { ...profile.levels } : profile.levels
+      };
+    case "anthropic":
+      return {
+        ...profile,
+        levels: profile.levels ? { ...profile.levels } : profile.levels
+      };
+    case "gemini-thinking-level":
+      return {
+        ...profile,
+        levels: { ...profile.levels }
+      };
+    case "gemini-thinking-budget":
+      return {
+        ...profile,
+        levels: { ...profile.levels }
+      };
+    case "moonshot-thinking":
+    case "none":
+    default:
+      return { ...profile };
+  }
+}
+function getReasoningSelectionOrder(control) {
+  if (!control) {
+    return ["off"];
+  }
+  switch (control.kind) {
+    case "toggle":
+      return ["off", "on"];
+    case "always-on":
+      return [control.lockedSelection ?? "on"];
+    case "levels":
+      return control.supportsOff ? ["off", ...control.levels] : [...control.levels];
+    case "none":
+    default:
+      return ["off"];
+  }
+}
+function resolveOnSelection(control) {
+  if (control.kind === "always-on") {
+    return control.lockedSelection ?? "on";
+  }
+  if (control.kind === "levels") {
+    return control.defaultSelection === "off" ? control.levels[0] ?? "off" : control.defaultSelection;
+  }
+  return "on";
+}
+function clampReasoningSelection(reasoningSelection, control) {
+  if (!control || !isReasoningSelection(reasoningSelection)) {
     return void 0;
   }
-  if (!isReasoningLevel(reasoningLevel)) {
-    return void 0;
+  const supported = getReasoningSelectionOrder(control);
+  if (supported.includes(reasoningSelection)) {
+    return reasoningSelection;
   }
-  if (supported.includes(reasoningLevel)) {
-    return reasoningLevel;
+  if (reasoningSelection === "on") {
+    return resolveOnSelection(control);
   }
-  const reasoningIndex = REASONING_LEVELS.indexOf(reasoningLevel);
-  let best = supported[0];
+  if (control.kind === "toggle") {
+    return reasoningSelection === "off" ? "off" : "on";
+  }
+  if (control.kind === "always-on") {
+    return control.lockedSelection ?? "on";
+  }
+  if (control.kind !== "levels" || control.levels.length === 0) {
+    return supported[0] ?? "off";
+  }
+  if (reasoningSelection === "off") {
+    return control.supportsOff ? "off" : control.levels[0];
+  }
+  const selectionIndex = NAMED_REASONING_LEVELS.indexOf(reasoningSelection);
+  let best = control.levels[0];
   let bestDistance = Number.POSITIVE_INFINITY;
-  for (const level of supported) {
-    const distance = Math.abs(REASONING_LEVELS.indexOf(level) - reasoningIndex);
+  for (const level of control.levels) {
+    const distance = Math.abs(NAMED_REASONING_LEVELS.indexOf(level) - selectionIndex);
     if (distance < bestDistance) {
       bestDistance = distance;
       best = level;
@@ -6840,8 +6795,14 @@ function clampReasoningLevel(reasoningLevel, supported) {
   }
   return best;
 }
-function isEffortReasoningLevel(level) {
-  return EFFORT_LEVELS.includes(level);
+function coerceReasoningSelectionCandidate(value, control) {
+  if (value === "auto") {
+    return control ? resolveOnSelection(control) : void 0;
+  }
+  if (value === "extHigh") {
+    return "extra";
+  }
+  return clampReasoningSelection(value, control);
 }
 function resolveActiveContextWindowTokens(capability, turnControls) {
   if (turnControls.maxContextMode && capability.maxContextAvailable && capability.maxContextWindowTokens !== null) {
@@ -6849,6 +6810,95 @@ function resolveActiveContextWindowTokens(capability, turnControls) {
   }
   return capability.defaultContextWindowTokens;
 }
+const DEFAULT_ASK_USER_PROMPT = "The agent needs user input before continuing.";
+const asRecord = (value) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value;
+};
+const readNonEmptyString = (value) => {
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  return text ? text : null;
+};
+const makeUniqueId = (base, used) => {
+  let candidate = base;
+  let suffix = 2;
+  while (used.has(candidate)) {
+    candidate = `${base}-${suffix}`;
+    suffix += 1;
+  }
+  used.add(candidate);
+  return candidate;
+};
+const normalizeOptions = (rawOptions, questionId) => {
+  if (!Array.isArray(rawOptions)) return [];
+  const used = /* @__PURE__ */ new Set();
+  return rawOptions.flatMap((entry, index) => {
+    const record = asRecord(entry);
+    if (!record) return [];
+    const label = readNonEmptyString(record.label);
+    if (!label) return [];
+    const optionId = makeUniqueId(
+      readNonEmptyString(record.optionId) ?? `${questionId}-option-${index + 1}`,
+      used
+    );
+    const description = readNonEmptyString(record.description) ?? void 0;
+    return [{ optionId, label, description }];
+  });
+};
+const normalizeAskUserQuestions = (value) => {
+  const record = asRecord(value);
+  const rawQuestions = Array.isArray(record?.questions) ? record.questions : [];
+  const used = /* @__PURE__ */ new Set();
+  return rawQuestions.flatMap((entry, index) => {
+    const questionRecord = asRecord(entry);
+    if (!questionRecord) return [];
+    const prompt = readNonEmptyString(questionRecord.prompt);
+    if (!prompt) return [];
+    const questionId = makeUniqueId(
+      readNonEmptyString(questionRecord.questionId) ?? `q${index + 1}`,
+      used
+    );
+    const options = normalizeOptions(questionRecord.options, questionId);
+    const allowFreeform = options.length === 0 || questionRecord.allowFreeform !== false;
+    const description = readNonEmptyString(questionRecord.description) ?? void 0;
+    return [{
+      questionId,
+      prompt,
+      description,
+      options,
+      allowFreeform
+    }];
+  });
+};
+const createFallbackAskUserQuestion = () => ({
+  questionId: "q1",
+  prompt: DEFAULT_ASK_USER_PROMPT,
+  options: [],
+  allowFreeform: true
+});
+const normalizeAskUserAnswers = (questions, value) => {
+  const record = asRecord(value);
+  const rawAnswers = Array.isArray(record?.answers) ? record.answers : Array.isArray(value) ? value : [];
+  const questionIds = new Set(questions.map((question) => question.questionId));
+  return rawAnswers.flatMap((entry) => {
+    const answerRecord = asRecord(entry);
+    if (!answerRecord) return [];
+    const questionId = readNonEmptyString(answerRecord.questionId);
+    const answer = readNonEmptyString(answerRecord.answer);
+    if (!questionId || !answer || !questionIds.has(questionId)) return [];
+    const selectedOptionId = readNonEmptyString(answerRecord.selectedOptionId) ?? void 0;
+    return [{ questionId, answer, selectedOptionId }];
+  });
+};
+const formatAskUserAnswersForToolResult = (questions, answers) => {
+  const answerByQuestionId = new Map(answers.map((answer) => [answer.questionId, answer.answer]));
+  return questions.map((question, index) => {
+    const answer = answerByQuestionId.get(question.questionId) ?? "";
+    return `Q${index + 1}: ${question.prompt}
+A${index + 1}: ${answer}`;
+  }).join("\n\n");
+};
 const charsToTokens = (chars) => Math.ceil(chars / 4);
 class EventStream {
   /**
@@ -7110,15 +7160,6 @@ async function runAgentLoop(pendingMessages, context2, config, providerStrategy,
         });
       }
     }
-    if (config.cronScheduler) {
-      for (const prompt of config.cronScheduler.getPendingPrompts()) {
-        injected.push({
-          role: "user",
-          content: [{ type: "text", text: `<cron_triggered>${prompt}</cron_triggered>` }],
-          timestamp: Date.now()
-        });
-      }
-    }
     injectPending(injected);
   };
   try {
@@ -7236,7 +7277,7 @@ async function streamAssistantResponseWithRecovery(context2, config, provider, s
     pendingRecoveryAction = action;
     emitRecoveryDiagnostic(stream, action, "started", attempt);
   };
-  while (true) {
+  for (; ; ) {
     try {
       const assistantMessage = await streamAssistantResponse(
         context2,
@@ -7354,6 +7395,7 @@ async function streamAssistantResponse(context2, config, provider, stream) {
     apiKey,
     signal: stream.signal
   };
+  const requestId = await config.onRequest?.({ model: config.model, context: llmContext, streamOptions });
   const response = provider.stream(config.model, llmContext, streamOptions);
   let partialIndex = -1;
   let finalMessage;
@@ -7424,6 +7466,7 @@ async function streamAssistantResponse(context2, config, provider, stream) {
       context2.messages.push(finalMessage);
     }
   }
+  await config.onResponse?.(requestId, finalMessage);
   return finalMessage;
 }
 async function executeToolCalls(assistantMessage, toolExecutor, stream, maxConcurrency) {
@@ -7668,7 +7711,9 @@ class Agent {
       getApiKey: opts.getApiKey,
       maxTurns: opts.maxTurns,
       signal: opts.streamOptions?.signal,
-      errorRecovery: opts.errorRecovery
+      errorRecovery: opts.errorRecovery,
+      onRequest: opts.onRequest,
+      onResponse: opts.onResponse
     };
   }
 }
@@ -8090,6 +8135,218 @@ function messagesEqual(left, right) {
   if (left.length !== right.length) return false;
   return JSON.stringify(left) === JSON.stringify(right);
 }
+const CORE_FILES = ["identity-collaboration.md", "agent-loop.md", "tool-evidence.md", "completion.md"];
+class PromptPlanBuilder {
+  coreRoot() {
+    const candidates = [
+      path.join(electron.app.getAppPath(), "resources", "agent-runtime", "prompts"),
+      path.join(process.cwd(), "resources", "agent-runtime", "prompts"),
+      path.join(process.resourcesPath ?? "", "agent-runtime", "prompts")
+    ];
+    return candidates.map((candidate) => path.resolve(candidate)).find((candidate) => fs.existsSync(candidate)) ?? path.resolve(candidates[0]);
+  }
+  build(input) {
+    const diagnostics = [...input.scopedInstructions.diagnostics];
+    const segments = [];
+    const push = (segment) => {
+      const content = segment.content.trim();
+      if (!content) return;
+      segments.push({ ...segment, content, precedence: segments.length, tokenEstimate: charsToTokens(content.length) });
+    };
+    for (const fileName of CORE_FILES) {
+      const sourcePath = path.join(this.coreRoot(), fileName);
+      const content = fs.readFileSync(sourcePath, "utf8");
+      push({ id: `core:${fileName}`, kind: "core-contract", scope: "builtin", sourcePath, sourceHash: hashScopedResource(content), content });
+    }
+    const profileContent = [
+      `# Effective Agent Profile`,
+      `Name: ${input.profile.name}`,
+      `Description: ${input.profile.description}`,
+      input.profile.instructions
+    ].filter(Boolean).join("\n\n");
+    push({ id: `agent:${input.profile.id}`, kind: "agent-profile", scope: "user", sourcePath: input.profile.filePath, sourceHash: hashScopedResource(input.profile), content: profileContent });
+    input.scopedInstructions.sources.forEach((source) => push({
+      id: source.id,
+      kind: "scoped-instruction",
+      scope: source.scope,
+      sourcePath: source.sourcePath,
+      sourceHash: source.sourceHash,
+      content: `# Scoped Instructions · ${source.scope}
+
+${source.content}`
+    }));
+    input.preloadedSkills.forEach((skill) => push({
+      id: `skill:${skill.id}`,
+      kind: "preloaded-skill",
+      scope: skill.scope,
+      sourcePath: skill.sourcePath,
+      sourceHash: skill.sourceHash,
+      content: `# Preloaded Skill · ${skill.name}
+
+${skill.instructions}`
+    }));
+    const catalogLimitChars = input.contextWindowTokens ? Math.max(1e3, Math.floor(input.contextWindowTokens * 0.02 * 4)) : 8e3;
+    const catalogLines = ["# Available Skills", "Use `skill_read` to load a skill not already preloaded."];
+    for (const skill of input.skillCatalog) {
+      const line = `- ${skill.id}: ${skill.description} [${skill.scope}]`;
+      if (catalogLines.join("\n").length + line.length + 1 > catalogLimitChars) {
+        diagnostics.push({ code: "skills.catalog.truncated", severity: "warning", message: `Skill metadata catalog exceeded ${catalogLimitChars} characters.` });
+        break;
+      }
+      catalogLines.push(line);
+    }
+    push({ id: "skills:catalog", kind: "skill-catalog", scope: "runtime", sourcePath: "runtime://skills/catalog", sourceHash: hashScopedResource(catalogLines), content: catalogLines.join("\n") });
+    push({
+      id: "runtime:tools",
+      kind: "tool-capability",
+      scope: "runtime",
+      sourcePath: "runtime://tools/effective",
+      sourceHash: hashScopedResource(input.tools),
+      content: input.tools.length ? ["# Effective Tools", ...input.tools.map((tool) => `- ${tool}`)].join("\n") : "# Effective Tools\nNo runtime tools are available for this turn."
+    });
+    const permission = input.permissionSettings;
+    push({
+      id: "runtime:facts",
+      kind: "runtime-fact",
+      scope: "runtime",
+      sourcePath: "runtime://facts",
+      sourceHash: hashScopedResource({ route: input.routeCapability, permission, workDir: input.workDir }),
+      content: [
+        "# Runtime Facts",
+        `Agent id: ${input.profile.id}`,
+        `Model route: ${input.routeCapability.providerId}/${input.routeCapability.modelId}`,
+        `Tool calling: ${input.routeCapability.toolCallingMode}`,
+        `Project root: ${input.workDir || "(none)"}`,
+        `Permission mode: ${permission.mode}`,
+        `Additional readable roots: ${permission.readableRoots.join(", ") || "(none)"}`,
+        `Additional writable roots: ${permission.writableRoots.join(", ") || "(none)"}`,
+        `Current date: ${input.currentDate}`,
+        `Time zone: ${input.timeZone}`
+      ].join("\n")
+    });
+    const systemPrompt = segments.map((segment) => segment.content).join("\n\n");
+    const scopedInstructions = segments.filter((segment) => segment.kind === "scoped-instruction").reduce((sum, segment) => sum + segment.content.length, 0);
+    const skills = segments.filter((segment) => segment.kind === "preloaded-skill" || segment.kind === "skill-catalog").reduce((sum, segment) => sum + segment.content.length, 0);
+    return {
+      id: generateEventId("prompt-plan"),
+      segments,
+      systemPrompt,
+      totalTokenEstimate: segments.reduce((sum, segment) => sum + segment.tokenEstimate, 0),
+      metrics: { systemPrompt: Math.max(0, systemPrompt.length - scopedInstructions - skills), scopedInstructions, skills },
+      diagnostics
+    };
+  }
+}
+const promptPlanBuilder = new PromptPlanBuilder();
+const SECRET_KEY = /(?:api[-_]?key|authorization|password|secret|access[-_]?token|refresh[-_]?token)/i;
+const PROTECTED_KEY = /^(?:encryptedContent|signature|raw)$/i;
+class RequestEnvelopeBuilder {
+  build(input) {
+    const redactions = [];
+    const sanitize = (value, currentPath, seen) => {
+      if (value === null || value === void 0 || typeof value === "number" || typeof value === "boolean") return value;
+      if (typeof value === "string") return value;
+      if (Array.isArray(value)) return value.map((entry, index) => sanitize(entry, `${currentPath}[${index}]`, seen));
+      if (typeof value !== "object") return String(value);
+      if (seen.has(value)) return "[Circular]";
+      seen.add(value);
+      const record = value;
+      if (record.type === "thinking" && (record.kind === "opaque" || record.visibility === "hidden")) {
+        redactions.push({ path: currentPath, reason: "protected opaque reasoning", hash: hashScopedResource(record) });
+        return { type: "thinking", kind: record.kind, visibility: record.visibility, redacted: true };
+      }
+      if (record.type === "image" || typeof record.mimeType === "string" && typeof record.data === "string") {
+        redactions.push({ path: currentPath, reason: "binary image payload", hash: hashScopedResource(record.data) });
+        return { type: record.type ?? "image", mimeType: record.mimeType, byteLength: typeof record.data === "string" ? record.data.length : void 0, redacted: true };
+      }
+      const output = {};
+      for (const [key, entry] of Object.entries(record)) {
+        const entryPath = `${currentPath}.${key}`;
+        if (SECRET_KEY.test(key) || PROTECTED_KEY.test(key)) {
+          redactions.push({ path: entryPath, reason: SECRET_KEY.test(key) ? "credential" : "provider protected payload", hash: hashScopedResource(entry) });
+          output[key] = "[REDACTED]";
+          continue;
+        }
+        if (key === "data" && typeof entry === "string" && entry.length > 256) {
+          redactions.push({ path: entryPath, reason: "large opaque payload", hash: hashScopedResource(entry) });
+          output[key] = `[REDACTED ${entry.length} chars]`;
+          continue;
+        }
+        output[key] = sanitize(entry, entryPath, seen);
+      }
+      return output;
+    };
+    return {
+      id: generateEventId("llm-call"),
+      createdAt: (/* @__PURE__ */ new Date()).toISOString(),
+      sessionId: input.sessionId,
+      turnId: input.turnId,
+      callIndex: input.callIndex,
+      route: input.route,
+      promptPlan: input.promptPlan,
+      messages: sanitize(input.messages, "messages", /* @__PURE__ */ new WeakSet()),
+      tools: sanitize(input.tools, "tools", /* @__PURE__ */ new WeakSet()),
+      controls: sanitize(input.controls, "controls", /* @__PURE__ */ new WeakSet()),
+      reasoning: input.reasoning,
+      redactions
+    };
+  }
+}
+const requestEnvelopeBuilder = new RequestEnvelopeBuilder();
+const safeSegment$1 = (value) => value.replace(/[^a-zA-Z0-9._-]/g, "-");
+class RequestSnapshotStore {
+  constructor(rootPath = appPathService.getAppStatePaths().llmCallsPath) {
+    this.rootPath = rootPath;
+  }
+  rootPath;
+  nextCallIndex(sessionId, turnId) {
+    const dir = this.turnPath(sessionId, turnId);
+    if (!fs.existsSync(dir)) return 1;
+    return fs.readdirSync(dir).filter((entry) => entry.endsWith(".json")).length + 1;
+  }
+  write(snapshot) {
+    const dir = this.turnPath(snapshot.sessionId, snapshot.turnId);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, `${String(snapshot.callIndex).padStart(3, "0")}-${safeSegment$1(snapshot.id)}.json`), `${JSON.stringify(snapshot, null, 2)}
+`, "utf8");
+  }
+  complete(snapshotId, sessionId, turnId, usage) {
+    const snapshotPath = this.findSnapshotPath(snapshotId, sessionId, turnId);
+    if (!snapshotPath) return;
+    const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8"));
+    snapshot.completedAt = (/* @__PURE__ */ new Date()).toISOString();
+    snapshot.usage = usage;
+    fs.writeFileSync(snapshotPath, `${JSON.stringify(snapshot, null, 2)}
+`, "utf8");
+  }
+  list(sessionId, turnId) {
+    const base = turnId ? this.turnPath(sessionId, turnId) : path.join(this.rootPath, safeSegment$1(sessionId));
+    if (!fs.existsSync(base)) return [];
+    const files = [];
+    const walk2 = (dir) => fs.readdirSync(dir, { withFileTypes: true }).forEach((entry) => {
+      const target = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk2(target);
+      else if (entry.isFile() && entry.name.endsWith(".json")) files.push(target);
+    });
+    walk2(base);
+    return files.map((file) => JSON.parse(fs.readFileSync(file, "utf8"))).sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.callIndex - right.callIndex);
+  }
+  get(sessionId, turnId, snapshotId) {
+    const snapshotPath = this.findSnapshotPath(snapshotId, sessionId, turnId);
+    return snapshotPath ? JSON.parse(fs.readFileSync(snapshotPath, "utf8")) : null;
+  }
+  turnPath(sessionId, turnId) {
+    return path.join(this.rootPath, safeSegment$1(sessionId || "no-session"), safeSegment$1(turnId || "no-turn"));
+  }
+  findSnapshotPath(snapshotId, sessionId, turnId) {
+    const dir = this.turnPath(sessionId, turnId);
+    if (!fs.existsSync(dir)) return null;
+    const suffix = `-${safeSegment$1(snapshotId)}.json`;
+    const fileName = fs.readdirSync(dir).find((entry) => entry.endsWith(suffix));
+    return fileName ? path.join(dir, fileName) : null;
+  }
+}
+const requestSnapshotStore = new RequestSnapshotStore();
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_MAX_RECOVERY_RETRIES = 2;
 const DEFAULT_MAX_TOKENS = 4096;
@@ -8391,7 +8648,7 @@ function normalizeInputPath(input) {
   }
   return trimmed.replace(/^%USERPROFILE%/i, os__namespace.homedir());
 }
-function isWithinRoot$1(target, root) {
+function isWithinRoot$2(target, root) {
   if (root === "*") return true;
   const resolvedRoot = path__namespace.resolve(root);
   const rel = path__namespace.relative(resolvedRoot, target);
@@ -8405,7 +8662,7 @@ function safeResolvePath(input, root, context2) {
   const expandedInput = normalizeInputPath(input);
   const target = path__namespace.isAbsolute(expandedInput) ? path__namespace.resolve(expandedInput) : path__namespace.resolve(workspaceRoot, expandedInput);
   const rel = path__namespace.relative(workspaceRoot, target);
-  if ((rel.startsWith("..") || path__namespace.isAbsolute(rel)) && !temporaryAllowedPathRoots.some((root2) => isWithinRoot$1(target, root2))) {
+  if ((rel.startsWith("..") || path__namespace.isAbsolute(rel)) && !temporaryAllowedPathRoots.some((root2) => isWithinRoot$2(target, root2))) {
     throw new Error(`路径 "${input}" 超出 workspace (${workspaceRoot})`);
   }
   return target;
@@ -8614,9 +8871,8 @@ function formatNotificationBlock(task) {
     `</bg_task_completed>`
   ].join("\n");
 }
-path$1.join(".rdc-agent", "cron");
-const DEFAULT_TIMEOUT_MS$1 = 12e4;
-const MAX_OUTPUT_BYTES$3 = 50 * 1024;
+const DEFAULT_TIMEOUT_MS$2 = 12e4;
+const MAX_OUTPUT_BYTES$4 = 50 * 1024;
 const bashTool = {
   name: "bash",
   label: "终端命令",
@@ -8643,7 +8899,7 @@ const bashTool = {
   permissionHint: "mutation",
   async execute(_toolCallId, params, signal, onUpdate, context2) {
     const command = params.command;
-    const timeoutMs = params.timeout ?? DEFAULT_TIMEOUT_MS$1;
+    const timeoutMs = params.timeout ?? DEFAULT_TIMEOUT_MS$2;
     const cwd = getWorkspaceRoot(context2);
     const startedAt = Date.now();
     if (params.run_in_background === true) {
@@ -8703,7 +8959,7 @@ Result will be delivered via background task notification when complete.`;
         if (!onUpdate) return;
         const text = combineOutput(stdout, stderr);
         onUpdate({
-          content: [{ type: "text", text: truncateOutput(text, MAX_OUTPUT_BYTES$3) }]
+          content: [{ type: "text", text: truncateOutput(text, MAX_OUTPUT_BYTES$4) }]
         });
       };
       child.stdout?.on("data", (chunk) => {
@@ -8719,10 +8975,10 @@ Result will be delivered via background task notification when complete.`;
         if (signal) signal.removeEventListener("abort", onAbort);
         const text = combineOutput(stdout, stderr) + `
 [spawn error] ${err.message}`;
-        const truncated = Buffer.byteLength(text, "utf8") > MAX_OUTPUT_BYTES$3;
+        const truncated = Buffer.byteLength(text, "utf8") > MAX_OUTPUT_BYTES$4;
         resolve({
           content: [
-            { type: "text", text: truncateOutput(text, MAX_OUTPUT_BYTES$3) }
+            { type: "text", text: truncateOutput(text, MAX_OUTPUT_BYTES$4) }
           ],
           details: {
             command,
@@ -8746,10 +9002,10 @@ Result will be delivered via background task notification when complete.`;
           combined += `
 [aborted]`;
         }
-        const truncated = Buffer.byteLength(combined, "utf8") > MAX_OUTPUT_BYTES$3;
+        const truncated = Buffer.byteLength(combined, "utf8") > MAX_OUTPUT_BYTES$4;
         resolve({
           content: [
-            { type: "text", text: truncateOutput(combined, MAX_OUTPUT_BYTES$3) }
+            { type: "text", text: truncateOutput(combined, MAX_OUTPUT_BYTES$4) }
           ],
           details: {
             command,
@@ -8771,7 +9027,7 @@ function combineOutput(stdout, stderr) {
 ${stderr}`;
 }
 const DEFAULT_LIMIT = 2e3;
-const MAX_OUTPUT_BYTES$2 = 200 * 1024;
+const MAX_OUTPUT_BYTES$3 = 200 * 1024;
 const readFileTool = {
   name: "read_file",
   label: "读取文件",
@@ -8813,8 +9069,8 @@ const readFileTool = {
     const endIdx = Math.min(totalLines, startIdx + limit);
     const slice = lines.slice(startIdx, endIdx);
     const numbered = slice.map((line, i) => `${String(startIdx + i + 1).padStart(6, " ")}→${line}`).join("\n");
-    const text = truncateOutput(numbered, MAX_OUTPUT_BYTES$2);
-    const truncated = Buffer.byteLength(numbered, "utf8") > MAX_OUTPUT_BYTES$2 || endIdx < totalLines;
+    const text = truncateOutput(numbered, MAX_OUTPUT_BYTES$3);
+    const truncated = Buffer.byteLength(numbered, "utf8") > MAX_OUTPUT_BYTES$3 || endIdx < totalLines;
     return {
       content: [{ type: "text", text }],
       details: {
@@ -9130,7 +9386,7 @@ async function walk(root, current, visit) {
   return true;
 }
 const DEFAULT_MAX_MATCHES = 200;
-const MAX_OUTPUT_BYTES$1 = 120 * 1024;
+const MAX_OUTPUT_BYTES$2 = 120 * 1024;
 const DEFAULT_IGNORED_DIRS = /* @__PURE__ */ new Set([
   "node_modules",
   ".git",
@@ -9191,8 +9447,8 @@ const grepTool = {
       truncated = true;
     }
     const rawText = matches.length > 0 ? matches.join("\n") : `(no matches for pattern "${params.pattern}")`;
-    const text = truncateOutput(rawText, MAX_OUTPUT_BYTES$1);
-    truncated = truncated || Buffer.byteLength(rawText, "utf8") > MAX_OUTPUT_BYTES$1;
+    const text = truncateOutput(rawText, MAX_OUTPUT_BYTES$2);
+    truncated = truncated || Buffer.byteLength(rawText, "utf8") > MAX_OUTPUT_BYTES$2;
     return {
       content: [{ type: "text", text }],
       details: {
@@ -9255,13 +9511,13 @@ function throwIfAborted$2(signal) {
   }
 }
 const execFileAsync = util.promisify(child_process.execFile);
-const MAX_OUTPUT_BYTES = 64 * 1024;
+const MAX_OUTPUT_BYTES$1 = 64 * 1024;
 async function runGit(cwd, args) {
   try {
     const result = await execFileAsync("git", ["-c", "core.quotepath=false", ...args], {
       cwd,
       encoding: "utf8",
-      maxBuffer: MAX_OUTPUT_BYTES * 2,
+      maxBuffer: MAX_OUTPUT_BYTES$1 * 2,
       windowsHide: true
     });
     return {
@@ -9290,7 +9546,7 @@ function validateGitPath(input) {
 }
 function createResult(cwd, args, output) {
   return {
-    content: [{ type: "text", text: truncateOutput(output || "No output.", MAX_OUTPUT_BYTES) }],
+    content: [{ type: "text", text: truncateOutput(output || "No output.", MAX_OUTPUT_BYTES$1) }],
     details: { cwd, args }
   };
 }
@@ -10110,7 +10366,7 @@ class TaskRegistry {
    *
    * @param storeOrDir TaskStore 实例，或任务文件目录（兼容旧签名，内部建 FileTaskStore）。
    */
-  constructor(storeOrDir = ".tasks") {
+  constructor(storeOrDir) {
     this.store = typeof storeOrDir === "string" ? new FileTaskStore(storeOrDir) : storeOrDir;
   }
   // ── 公共接口 ──────────────────────────────────────────────
@@ -10600,7 +10856,7 @@ function safeSegment(sessionId) {
   return sessionId.replace(/[^\w.-]/g, "_");
 }
 function resolveSessionTasksDir(sessionId) {
-  return path__namespace.join(storageAdapter.getWorkspacePath(), ".tasks", safeSegment(sessionId));
+  return path__namespace.join(appPathService.getAppStatePaths().tasksPath, safeSegment(sessionId));
 }
 function createSessionTaskStore(sessionId) {
   return new FileTaskStore(resolveSessionTasksDir(sessionId));
@@ -10725,7 +10981,7 @@ class SseRpcClient {
     let buffer = "";
     let currentEvent = "";
     try {
-      while (true) {
+      for (; ; ) {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
@@ -10848,7 +11104,7 @@ class MCPAgentTool {
     return this.manager.executeTool(this.name, args);
   }
 }
-const DEFAULT_TIMEOUT_MS = 3e4;
+const DEFAULT_TIMEOUT_MS$1 = 3e4;
 function sanitizeName(name) {
   return name.replace(/[^a-zA-Z0-9_-]/g, "_");
 }
@@ -10863,7 +11119,7 @@ class MCPManager {
     if (this.connections.has(config.name)) {
       throw new Error(`MCP server "${config.name}" already connected`);
     }
-    const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS$1;
     if (config.type === "stdio") {
       if (!config.command) {
         throw new Error(
@@ -11098,7 +11354,7 @@ class MCPManager {
         isError: true
       };
     }
-    const timeoutMs = conn.config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    const timeoutMs = conn.config.timeoutMs ?? DEFAULT_TIMEOUT_MS$1;
     try {
       let result;
       if (conn.config.type === "stdio") {
@@ -11264,7 +11520,7 @@ class MCPManager {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        while (true) {
+        for (; ; ) {
           const { done, value } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
@@ -11295,63 +11551,6 @@ class MCPManager {
     } finally {
       clearTimeout(timer);
     }
-  }
-}
-class SkillEngine {
-  /**
-   * 执行技能。
-   *
-   * - prompt 技能：将展开后的提示作为系统消息注入 agent；
-   * - tool 技能：返回工具定义供外部注册；
-   * - workflow 技能：依次执行每个 step。
-   */
-  async execute(manifest, params, _context) {
-    switch (manifest.type) {
-      case "prompt": {
-        const expanded = this.expandTemplate(
-          manifest.promptTemplate ?? manifest.description,
-          params
-        );
-        return {
-          success: true,
-          message: expanded,
-          data: { prompt: expanded }
-        };
-      }
-      case "tool": {
-        const toolNames = (manifest.tools ?? []).map((t) => t.name);
-        return {
-          success: true,
-          message: `Skill "${manifest.name}" provides tools: ${toolNames.join(", ")}`,
-          data: { tools: manifest.tools }
-        };
-      }
-      case "workflow": {
-        const steps = manifest.steps ?? [];
-        const outputs = [];
-        for (let i = 0; i < steps.length; i++) {
-          const step = steps[i];
-          const expanded = this.expandTemplate(step.prompt, params);
-          outputs.push(`[Step ${i + 1}] ${expanded}`);
-        }
-        return {
-          success: true,
-          message: `Workflow "${manifest.name}" completed ${steps.length} steps.`,
-          data: { steps: outputs }
-        };
-      }
-      default:
-        return {
-          success: false,
-          message: `Unknown skill type: ${manifest.type}`
-        };
-    }
-  }
-  /** 简单的模板展开：将 {{key}} 替换为 params[key]。 */
-  expandTemplate(template, params) {
-    return template.replace(/\{\{(\w+)\}\}/g, (_match, key) => {
-      return params[key] ?? `{{${key}}}`;
-    });
   }
 }
 const EMPTY_USAGE = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
@@ -11815,6 +12014,151 @@ function abortErrorFromSignal(signal) {
   abortErr.name = "AbortError";
   return abortErr;
 }
+function resolveWireLevel(reasoning) {
+  if (reasoning.selection === "off") {
+    return null;
+  }
+  if (reasoning.selection === "on") {
+    switch (reasoning.control.wireProfile.kind) {
+      case "openai-responses":
+      case "openai-compatible":
+      case "anthropic":
+      case "gemini-thinking-level":
+      case "gemini-thinking-budget":
+        return reasoning.control.wireProfile.on;
+      case "moonshot-thinking":
+      case "none":
+      default:
+        return null;
+    }
+  }
+  return reasoning.selection;
+}
+function buildOpenAiResponsesReasoning(reasoning, reasoningVisibility) {
+  if (!reasoning || reasoning.control.wireProfile.kind !== "openai-responses") {
+    return {};
+  }
+  const wireLevel = resolveWireLevel(reasoning);
+  if (!wireLevel) {
+    return {};
+  }
+  const effort = reasoning.control.wireProfile.levels[wireLevel];
+  if (!effort) {
+    return {};
+  }
+  const nextReasoning = { effort };
+  if (reasoningVisibility === "summary-events") {
+    nextReasoning.summary = "auto";
+    return {
+      reasoning: nextReasoning,
+      include: ["reasoning.encrypted_content"]
+    };
+  }
+  return { reasoning: nextReasoning };
+}
+function applyOpenAiCompatibleReasoning(body, reasoning) {
+  if (!reasoning || reasoning.control.wireProfile.kind !== "openai-compatible") {
+    return;
+  }
+  const profile = reasoning.control.wireProfile;
+  const wireLevel = resolveWireLevel(reasoning);
+  if (!wireLevel) {
+    if (profile.offMode === "reasoning-none") {
+      body.reasoning_effort = "none";
+    } else if (profile.offMode === "enable-thinking-false") {
+      body.enable_thinking = false;
+    } else if (profile.offMode === "thinking-disabled") {
+      body.thinking = { type: "disabled" };
+    }
+    return;
+  }
+  if (profile.onMode === "enable-thinking-true") {
+    body.enable_thinking = true;
+  } else if (profile.onMode === "thinking-enabled") {
+    body.thinking = { type: "enabled" };
+  }
+  const effort = profile.levels?.[wireLevel];
+  if (effort) {
+    body.reasoning_effort = effort;
+  }
+}
+function applyAnthropicReasoning(body, reasoning, reasoningVisibility) {
+  if (!reasoning || reasoning.control.wireProfile.kind !== "anthropic") {
+    return;
+  }
+  const profile = reasoning.control.wireProfile;
+  const wireLevel = resolveWireLevel(reasoning);
+  if (!wireLevel) {
+    if (profile.offMode === "disabled") {
+      body.thinking = { type: "disabled" };
+    }
+    return;
+  }
+  if (profile.onMode === "adaptive" || profile.onMode === "enabled") {
+    const thinking = { type: profile.onMode };
+    if (typeof profile.onBudgetTokens === "number") {
+      thinking.budget_tokens = profile.onBudgetTokens;
+    }
+    if (reasoningVisibility === "summary-events") {
+      thinking.display = "summarized";
+    }
+    body.thinking = thinking;
+  }
+  const effort = profile.levels?.[wireLevel];
+  if (effort) {
+    body.output_config = { effort };
+  }
+}
+function applyGeminiReasoning(generationConfig, reasoning) {
+  if (!reasoning) {
+    return;
+  }
+  const wireLevel = resolveWireLevel(reasoning);
+  if (reasoning.control.wireProfile.kind === "gemini-thinking-level") {
+    if (!wireLevel) {
+      return;
+    }
+    const thinkingLevel = reasoning.control.wireProfile.levels[wireLevel];
+    if (thinkingLevel) {
+      generationConfig.thinkingConfig = { thinkingLevel };
+    }
+    return;
+  }
+  if (reasoning.control.wireProfile.kind === "gemini-thinking-budget") {
+    if (!wireLevel) {
+      generationConfig.thinkingConfig = { thinkingBudget: reasoning.control.wireProfile.offBudget ?? 0 };
+      return;
+    }
+    const thinkingBudget = reasoning.control.wireProfile.levels[wireLevel];
+    if (typeof thinkingBudget === "number") {
+      generationConfig.thinkingConfig = { thinkingBudget };
+    }
+  }
+}
+function applyMoonshotReasoning(body, reasoning) {
+  if (!reasoning || reasoning.control.wireProfile.kind !== "moonshot-thinking") {
+    return;
+  }
+  if (reasoning.selection === "off") {
+    if (reasoning.control.wireProfile.offMode === "disabled") {
+      body.thinking = { type: "disabled" };
+    }
+    return;
+  }
+  if (reasoning.control.wireProfile.onMode === "enabled") {
+    body.thinking = { type: "enabled" };
+  }
+}
+function applyReasoningToAnthropicLikeBody(body, reasoning, reasoningVisibility) {
+  if (!reasoning) {
+    return;
+  }
+  if (reasoning.control.wireProfile.kind === "moonshot-thinking") {
+    applyMoonshotReasoning(body, reasoning);
+    return;
+  }
+  applyAnthropicReasoning(body, reasoning, reasoningVisibility);
+}
 const DEFAULT_BASE_URL$4 = "https://api.anthropic.com/v1";
 const DEFAULT_ANTHROPIC_VERSION = "2023-06-01";
 const PROVIDER_API$4 = "anthropic-messages";
@@ -12028,47 +12372,15 @@ let AnthropicProvider$1 = class AnthropicProvider {
     if (system) body.system = system;
     if (typeof options.temperature === "number") body.temperature = options.temperature;
     if (typeof options.topP === "number") body.top_p = options.topP;
-    const thinking = toAnthropicThinking$1(options.reasoningBudget, options.reasoningVisibility);
-    if (thinking) body.thinking = thinking;
+    applyReasoningToAnthropicLikeBody(body, options.reasoning, options.reasoningVisibility);
     if (context2.tools && context2.tools.length > 0) {
       body.tools = context2.tools.map(toAnthropicTool);
     }
     return body;
   }
 };
-function toAnthropicThinking$1(budget, reasoningVisibility) {
-  const wantsSummarized = reasoningVisibility === "summary-events";
-  if (budget === "off") return void 0;
-  if (!wantsSummarized && !budget) return void 0;
-  const thinking = {
-    type: "enabled",
-    budget_tokens: toAnthropicThinkingBudget(budget)
-  };
-  if (wantsSummarized) {
-    thinking.display = "summarized";
-  }
-  return thinking;
-}
-function toAnthropicThinkingBudget(budget) {
-  if (!budget || budget === "auto" || budget === "off") {
-    return 4096;
-  }
-  switch (budget) {
-    case "low":
-      return 4096;
-    case "medium":
-      return 8192;
-    case "high":
-      return 16384;
-    case "extHigh":
-      return 32768;
-    case "max":
-      return 63999;
-    default:
-      return 4096;
-  }
-}
 function resolveAnthropicThinkingKind(reasoningVisibility) {
+  if (reasoningVisibility === "unknown-events") return "unknown";
   return reasoningVisibility === "summary-events" ? "summary" : "raw";
 }
 function resolveAnthropicThinkingVisibility(reasoningVisibility) {
@@ -12296,7 +12608,7 @@ class GeminiProvider {
             if (textPart.thought) {
               sawOutput = true;
               builder.appendThinking(THINKING_INDEX, textPart.text, {
-                kind: "raw",
+                kind: "unknown",
                 source: "gemini-raw",
                 visibility: "raw-collapsed",
                 replayPolicy: "none"
@@ -12345,11 +12657,7 @@ class GeminiProvider {
     if (typeof options.temperature === "number") generationConfig.temperature = options.temperature;
     if (typeof options.topP === "number") generationConfig.topP = options.topP;
     if (typeof options.maxTokens === "number") generationConfig.maxOutputTokens = options.maxTokens;
-    if (options.reasoningBudget && options.reasoningBudget !== "auto" && options.reasoningBudget !== "off") {
-      generationConfig.thinkingConfig = {
-        thinkingBudget: toGeminiThinkingBudget(options.reasoningBudget)
-      };
-    }
+    applyGeminiReasoning(generationConfig, options.reasoning);
     if (Object.keys(generationConfig).length > 0) body.generationConfig = generationConfig;
     if (context2.tools && context2.tools.length > 0) {
       body.tools = [
@@ -12359,22 +12667,6 @@ class GeminiProvider {
       ];
     }
     return body;
-  }
-}
-function toGeminiThinkingBudget(budget) {
-  switch (budget) {
-    case "low":
-      return 1024;
-    case "medium":
-      return 4096;
-    case "high":
-      return 8192;
-    case "extHigh":
-      return 16384;
-    case "max":
-      return 24576;
-    default:
-      return 4096;
   }
 }
 function toGeminiContents(context2) {
@@ -12533,7 +12825,7 @@ class OllamaProvider {
           if (typeof message.thinking === "string" && message.thinking.length > 0) {
             sawOutput = true;
             builder.appendThinking(THINKING_INDEX, message.thinking, {
-              kind: "raw",
+              kind: "unknown",
               source: "ollama-raw",
               visibility: "raw-collapsed",
               replayPolicy: "none"
@@ -12765,7 +13057,7 @@ let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
         if (typeof reasoningDelta === "string" && reasoningDelta.length > 0) {
           sawOutput = true;
           builder.appendThinking(THINKING_INDEX, reasoningDelta, {
-            kind: "raw",
+            kind: model2.provider === "deepseek" ? "raw" : "unknown",
             source: isOpenRouterBaseUrl(baseUrl) ? "openrouter-raw" : "openai-compatible-raw",
             visibility: "raw-collapsed",
             replayPolicy: "none"
@@ -12812,9 +13104,7 @@ let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
     };
     if (typeof options.temperature === "number") body.temperature = options.temperature;
     if (typeof options.topP === "number") body.top_p = options.topP;
-    if (options.reasoningBudget && options.reasoningBudget !== "auto" && options.reasoningBudget !== "off") {
-      body.reasoning_effort = toOpenAiCompatibleReasoningEffort(options.reasoningBudget);
-    }
+    applyOpenAiCompatibleReasoning(body, options.reasoning);
     const maxTokens = options.maxTokens ?? model2.maxTokens;
     if (typeof maxTokens === "number" && maxTokens > 0) body.max_tokens = maxTokens;
     if (context2.tools && context2.tools.length > 0) {
@@ -12825,12 +13115,6 @@ let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
     return body;
   }
 };
-function toOpenAiCompatibleReasoningEffort(budget) {
-  if (budget === "extHigh" || budget === "max") {
-    return "high";
-  }
-  return budget;
-}
 function toOpenAIMessages(context2) {
   const out = [];
   if (context2.systemPrompt && context2.systemPrompt.trim()) {
@@ -12927,6 +13211,7 @@ const PROVIDER_API = "openai-responses";
 const TEXT_INDEX = 0;
 const REASONING_INDEX = 1;
 const TOOL_INDEX_BASE = 2;
+const RESPONSES_REASONING_INCLUDE = "reasoning.encrypted_content";
 class OpenAIResponsesProvider {
   api = PROVIDER_API;
   defaultBaseUrl;
@@ -13078,9 +13363,9 @@ class OpenAIResponsesProvider {
               currentReasoningArtifact = reasoningArtifact;
               sawOutput = true;
               builder.updateThinking(REASONING_INDEX, {
-                kind: "summary",
-                source: "openai-responses-summary",
-                visibility: "summary",
+                kind: "opaque",
+                source: "openai-responses-encrypted",
+                visibility: "hidden",
                 replayPolicy: "provider-artifact",
                 artifact: currentReasoningArtifact
               });
@@ -13168,12 +13453,6 @@ class OpenAIResponsesProvider {
 function createResponsesUrl(baseUrl) {
   return baseUrl.endsWith("/responses") ? baseUrl : `${baseUrl}/responses`;
 }
-function toOpenAiResponsesReasoningEffort(budget) {
-  if (budget === "extHigh" || budget === "max") {
-    return "high";
-  }
-  return budget;
-}
 function buildRequestBody(model2, context2, options) {
   const body = {
     model: model2.id,
@@ -13187,17 +13466,12 @@ function buildRequestBody(model2, context2, options) {
   }
   if (typeof options.temperature === "number") body.temperature = options.temperature;
   if (typeof options.topP === "number") body.top_p = options.topP;
-  if (options.reasoningBudget && options.reasoningBudget !== "auto" && options.reasoningBudget !== "off") {
-    body.reasoning = { effort: toOpenAiResponsesReasoningEffort(options.reasoningBudget) };
-  } else if (options.reasoningBudget !== "off" && options.reasoningVisibility === "summary-events") {
-    body.reasoning = { effort: "medium" };
+  const reasoningPayload = buildOpenAiResponsesReasoning(options.reasoning, options.reasoningVisibility);
+  if (reasoningPayload.reasoning) {
+    body.reasoning = reasoningPayload.reasoning;
   }
-  if (options.reasoningBudget !== "off" && options.reasoningVisibility === "summary-events") {
-    const reasoning = body.reasoning && typeof body.reasoning === "object" ? body.reasoning : {};
-    body.reasoning = { ...reasoning, summary: "auto" };
-  }
-  if (body.reasoning) {
-    body.include = ["reasoning.encrypted_content"];
+  if (reasoningPayload.include?.includes(RESPONSES_REASONING_INCLUDE)) {
+    body.include = [RESPONSES_REASONING_INCLUDE];
   }
   const maxTokens = options.maxTokens ?? model2.maxTokens;
   if (typeof maxTokens === "number" && maxTokens > 0) {
@@ -13403,7 +13677,8 @@ function createProviderStrategy(provider, protocol) {
     case "AnthropicMessages":
       return new AnthropicProvider$1({
         apiKey: provider.apiKey,
-        baseUrl: provider.baseUrl
+        baseUrl: provider.baseUrl,
+        headers: provider.id === "kimi-coding-plan" ? { "User-Agent": "RDC-Agent" } : void 0
       });
     case "GoogleGemini":
       return new GeminiProvider({
@@ -13502,519 +13777,129 @@ class ConfiguredRuntimeProvider {
   }
 }
 const configuredRuntimeProvider = new ConfiguredRuntimeProvider();
-const INDEX_FILENAME = "MEMORY.md";
-function slugify(name) {
-  return name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
-}
-function parseFrontmatter(content) {
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  if (!match) return { meta: {}, body: content };
+const slugify = (value) => value.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "");
+const parseFrontmatter = (source) => {
+  const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!match) return { meta: {}, body: source.trim() };
   const meta = {};
-  for (const rawLine of match[1].split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line) continue;
-    const colonIdx = line.indexOf(":");
-    if (colonIdx <= 0) continue;
-    const key = line.slice(0, colonIdx).trim();
-    const value = line.slice(colonIdx + 1).trim();
+  for (const line of match[1].split(/\r?\n/)) {
+    const separator = line.indexOf(":");
+    if (separator < 1) continue;
+    const key = line.slice(0, separator).trim();
+    const raw = line.slice(separator + 1).trim();
     try {
-      meta[key] = JSON.parse(value);
+      meta[key] = JSON.parse(raw);
     } catch {
-      meta[key] = value.replace(/^['"]|['"]$/g, "");
+      meta[key] = raw;
     }
   }
   return { meta, body: match[2].trim() };
-}
-function serializeFrontmatterValue(value) {
-  if (typeof value === "string") return value;
-  return JSON.stringify(value);
-}
-function buildMemoryFile(record) {
-  const lines = ["---"];
-  lines.push(`id: ${serializeFrontmatterValue(record.id)}`);
-  lines.push(`name: ${serializeFrontmatterValue(record.name)}`);
-  lines.push(`description: ${serializeFrontmatterValue(record.description)}`);
-  lines.push(`type: ${serializeFrontmatterValue(record.type)}`);
-  if (record.tags && record.tags.length > 0) {
-    lines.push(`tags: ${JSON.stringify(record.tags)}`);
-  }
-  lines.push(`createdAt: ${record.createdAt}`);
-  lines.push(`updatedAt: ${record.updatedAt}`);
-  lines.push("---");
-  lines.push("");
-  lines.push(record.content.trim());
-  lines.push("");
-  return lines.join("\n");
-}
+};
+const serialize = (record) => ["---", `id: ${JSON.stringify(record.id)}`, `name: ${JSON.stringify(record.name)}`, `description: ${JSON.stringify(record.description)}`, `type: ${JSON.stringify(record.type)}`, `tags: ${JSON.stringify(record.tags ?? [])}`, `createdAt: ${record.createdAt}`, `updatedAt: ${record.updatedAt}`, "---", "", record.content.trim(), ""].join("\n");
 class MemoryStore {
-  memoryDir;
-  /**
-   * @param memoryDir 记忆文件所在目录。建议传入绝对路径（例如
-   *                  `path.join(workspaceRoot, '.rdc-agent', 'memory')`）。
-   */
   constructor(memoryDir) {
     this.memoryDir = memoryDir;
   }
-  /**
-   * 获取存储目录路径。
-   */
+  memoryDir;
   getMemoryDir() {
     return this.memoryDir;
   }
-  /**
-   * 写入一条新的记忆，并重建索引。
-   *
-   * - ID 由 `mem_${Date.now()}_${hex}` 生成；
-   * - 文件名采用 slug 化的 `name`，重复写入会覆盖同名文件并保留原始 `createdAt`。
-   */
   async writeMemory(input) {
-    await this.ensureDir();
-    const slug = slugify(input.name);
-    if (!slug) {
-      throw new Error(`MemoryStore.writeMemory: 无法将 name="${input.name}" 转为有效 slug`);
-    }
-    const filePath = path__namespace$1.join(this.memoryDir, `${slug}.md`);
+    const name = slugify(input.name);
+    if (!name) throw new Error("Memory name must contain at least one ASCII letter or digit.");
+    if (!input.description.trim() || !input.content.trim()) throw new Error("Memory description and content are required.");
+    await node_fs.promises.mkdir(this.memoryDir, { recursive: true });
+    const existing = await this.getMemory(name);
     const now = Date.now();
-    let existing = null;
-    try {
-      existing = await this.parseMemoryFile(filePath);
-    } catch {
-      existing = null;
-    }
-    const record = {
-      id: existing?.id ?? `mem_${now}_${node_crypto.randomBytes(4).toString("hex")}`,
-      name: slug,
-      description: input.description,
-      type: input.type,
-      content: input.content,
-      tags: input.tags,
-      createdAt: existing?.createdAt ?? now,
-      updatedAt: now
-    };
-    await node_fs.promises.writeFile(filePath, buildMemoryFile(record), "utf8");
-    await this.rebuildIndex();
+    const record = { id: existing?.id ?? `mem_${now}_${node_crypto.randomBytes(4).toString("hex")}`, name, description: input.description.trim(), type: input.type, content: input.content.trim(), tags: input.tags?.map((tag) => tag.trim()).filter(Boolean), createdAt: existing?.createdAt ?? now, updatedAt: now };
+    await node_fs.promises.writeFile(path$1.join(this.memoryDir, `${name}.md`), serialize(record), "utf8");
     return record;
   }
-  /**
-   * 删除指定 slug 名称的记忆文件，并重建索引。
-   * @returns 是否真的删除成功（文件不存在时返回 false）。
-   */
   async deleteMemory(name) {
     const slug = slugify(name);
     if (!slug) return false;
-    const filePath = path__namespace$1.join(this.memoryDir, `${slug}.md`);
     try {
-      await node_fs.promises.unlink(filePath);
-    } catch (err) {
-      const code = err.code;
-      if (code === "ENOENT") return false;
-      throw err;
+      await node_fs.promises.unlink(path$1.join(this.memoryDir, `${slug}.md`));
+      return true;
+    } catch (error) {
+      if (error.code === "ENOENT") return false;
+      throw error;
     }
-    await this.rebuildIndex();
-    return true;
   }
-  /**
-   * 按 slug 名称读取单条记忆。
-   * @returns 不存在或无法解析时返回 `null`。
-   */
   async getMemory(name) {
     const slug = slugify(name);
     if (!slug) return null;
-    const filePath = path__namespace$1.join(this.memoryDir, `${slug}.md`);
     try {
-      return await this.parseMemoryFile(filePath);
-    } catch (err) {
-      const code = err.code;
-      if (code === "ENOENT") return null;
-      return null;
+      const { meta, body } = parseFrontmatter(await node_fs.promises.readFile(path$1.join(this.memoryDir, `${slug}.md`), "utf8"));
+      const candidateType = String(meta.type ?? "reference");
+      const type = ["user", "feedback", "project", "reference"].includes(candidateType) ? candidateType : "reference";
+      return { id: String(meta.id ?? slug), name: String(meta.name ?? slug), description: String(meta.description ?? ""), type, content: body, tags: Array.isArray(meta.tags) ? meta.tags.map(String) : void 0, createdAt: Number(meta.createdAt ?? 0), updatedAt: Number(meta.updatedAt ?? 0) };
+    } catch (error) {
+      if (error.code === "ENOENT") return null;
+      throw error;
     }
   }
-  /**
-   * 列出全部记忆（不含 `MEMORY.md` 索引文件），按 name 排序返回。
-   */
   async listMemories() {
-    await this.ensureDir();
-    let entries = [];
+    let entries;
     try {
       entries = await node_fs.promises.readdir(this.memoryDir);
-    } catch {
-      return [];
+    } catch (error) {
+      if (error.code === "ENOENT") return [];
+      throw error;
     }
-    const records = [];
-    for (const entry of entries) {
-      if (!entry.endsWith(".md")) continue;
-      if (entry === INDEX_FILENAME) continue;
-      const filePath = path__namespace$1.join(this.memoryDir, entry);
-      try {
-        const record = await this.parseMemoryFile(filePath);
-        records.push(record);
-      } catch {
-      }
-    }
-    records.sort((a, b) => a.name.localeCompare(b.name));
-    return records;
+    const records = await Promise.all(entries.filter((entry) => entry.endsWith(".md")).map((entry) => this.getMemory(entry.slice(0, -3))));
+    return records.filter((record) => Boolean(record)).sort((left, right) => right.updatedAt - left.updatedAt || left.name.localeCompare(right.name));
   }
-  /**
-   * 根据当前目录下所有记忆文件重建 `MEMORY.md` 索引。
-   */
-  async rebuildIndex() {
-    await this.ensureDir();
-    const records = await this.listMemories();
-    const lines = records.map(
-      (record) => `- [${record.name}](${record.name}.md) — ${record.description}`
-    );
-    const indexPath = path__namespace$1.join(this.memoryDir, INDEX_FILENAME);
-    const content = lines.length > 0 ? `${lines.join("\n")}
-` : "";
-    await node_fs.promises.writeFile(indexPath, content, "utf8");
-  }
-  /**
-   * 返回 `MEMORY.md` 当前内容，便于注入 system prompt。
-   * 文件缺失时返回空字符串。
-   */
-  async getIndexContent() {
-    const indexPath = path__namespace$1.join(this.memoryDir, INDEX_FILENAME);
-    try {
-      const text = await node_fs.promises.readFile(indexPath, "utf8");
-      return text.trim();
-    } catch {
-      return "";
-    }
-  }
-  /**
-   * 解析单个记忆文件为 `MemoryRecord`。
-   * 缺失字段会被赋予合理默认值（保证向前兼容）。
-   */
-  async parseMemoryFile(filePath) {
-    const raw = await node_fs.promises.readFile(filePath, "utf8");
-    const { meta, body } = parseFrontmatter(raw);
-    const fallbackName = path__namespace$1.basename(filePath, ".md");
-    const name = typeof meta.name === "string" && meta.name ? meta.name : fallbackName;
-    const description = typeof meta.description === "string" ? meta.description : body.split(/\r?\n/)[0] ?? "";
-    const rawType = typeof meta.type === "string" ? meta.type : "user";
-    const type = ["user", "feedback", "project", "reference"].includes(rawType) ? rawType : "user";
-    const tags = Array.isArray(meta.tags) ? meta.tags.filter((item) => typeof item === "string") : void 0;
-    const createdAt = typeof meta.createdAt === "number" ? meta.createdAt : Number(meta.createdAt) || Date.now();
-    const updatedAt = typeof meta.updatedAt === "number" ? meta.updatedAt : Number(meta.updatedAt) || createdAt;
-    const id = typeof meta.id === "string" && meta.id ? meta.id : `mem_${createdAt}_${node_crypto.randomBytes(4).toString("hex")}`;
-    return {
-      id,
-      name,
-      description,
-      type,
-      content: body,
-      tags,
-      createdAt,
-      updatedAt
-    };
-  }
-  /**
-   * 确保记忆目录存在。
-   */
-  async ensureDir() {
-    await node_fs.promises.mkdir(this.memoryDir, { recursive: true });
+  async searchMemories(query, limit = 20) {
+    const needle = query.trim().toLocaleLowerCase();
+    return (await this.listMemories()).filter((record) => !needle || [record.name, record.description, record.content, ...record.tags ?? []].some((value) => value.toLocaleLowerCase().includes(needle))).slice(0, Math.max(1, Math.min(limit, 100)));
   }
 }
-const MAX_DIALOGUE_CHARS = 4e3;
-function extractJsonArray(text) {
-  const match = text.match(/\[[\s\S]*\]/);
-  if (!match) return null;
-  try {
-    const parsed = JSON.parse(match[0]);
-    return Array.isArray(parsed) ? parsed : null;
-  } catch {
-    return null;
+const NATIVE_TOOL_PROTOCOLS = /* @__PURE__ */ new Set(["AnthropicMessages", "OpenAIResponses", "OpenAICompatibleChatCompletions", "OpenRouterChatCompletions", "GoogleGemini", "OllamaOpenAICompatibleChatCompletions"]);
+const STREAMING_PROTOCOLS = /* @__PURE__ */ new Set(["AnthropicMessages", "OpenAIResponses", "OpenAICompatibleChatCompletions", "OpenRouterChatCompletions", "GoogleGemini", "OllamaOpenAICompatibleChatCompletions"]);
+const OPENAI_NATIVE_IDS = /* @__PURE__ */ new Set(["openai", "openai-eu", "openai-us", "chatgpt-account"]);
+const ANTHROPIC_NATIVE_IDS = /* @__PURE__ */ new Set(["anthropic", "claude-account"]);
+const hasCapability = (provider, capability) => Boolean(provider?.capabilities?.includes(capability));
+function resolveProviderReasoningContract(provider, modelId) {
+  if (!provider || !hasCapability(provider, "reasoning")) return { semantic: "none", source: "provider-capability", displayLabel: "None" };
+  if (provider.protocol === "OpenAIResponses" && OPENAI_NATIVE_IDS.has(provider.id)) {
+    return { semantic: "summary", source: "openai-responses-summary", evidence: "https://platform.openai.com/docs/api-reference/responses-streaming/response/reasoning_summary_part/added", displayLabel: "Reasoning summary" };
   }
+  if (provider.protocol === "AnthropicMessages" && ANTHROPIC_NATIVE_IDS.has(provider.id)) {
+    return { semantic: "summary", source: "anthropic-thinking-display-summarized", evidence: "https://platform.claude.com/docs/en/build-with-claude/extended-thinking", displayLabel: "Reasoning summary" };
+  }
+  if (provider.id === "deepseek" && provider.protocol === "OpenAICompatibleChatCompletions") {
+    return { semantic: "raw", source: "deepseek-reasoning-content", evidence: "https://api-docs.deepseek.com/guides/thinking_mode", displayLabel: "Raw reasoning" };
+  }
+  return { semantic: "unknown", source: `${provider.id}/${modelId}:unverified-provider-semantics`, displayLabel: "Provider reasoning" };
 }
-function isValidType(value) {
-  return value === "user" || value === "feedback" || value === "project" || value === "reference";
-}
-function normalizeExtracted(item) {
-  if (!item || typeof item !== "object") return null;
-  const record = item;
-  const name = typeof record.name === "string" ? record.name.trim() : "";
-  const description = typeof record.description === "string" ? record.description.trim() : "";
-  const rawType = record.type;
-  const content = typeof record.content === "string" ? record.content : typeof record.body === "string" ? record.body : "";
-  if (!name || !description || !content.trim()) return null;
-  const type = isValidType(rawType) ? rawType : "user";
-  return { name, description, type, content: content.trim() };
-}
-class MemoryExtractor {
-  memoryStore;
-  queryLlm;
-  constructor(options) {
-    this.memoryStore = options.memoryStore;
-    this.queryLlm = options.queryLlm;
-  }
-  /**
-   * 从对话中抽取候选记忆。
-   *
-   * @param messages       原始对话（不含已压缩过的摘要），仅取最近若干条；
-   * @param existingMemories  已存在的记忆，用于去重 + 提供 LLM 上下文。
-   *                          若调用方未传入，会自动从 store 读取。
-   */
-  async extractFromConversation(messages, existingMemories) {
-    const recent = messages.slice(-10);
-    const dialogue = recent.map((msg) => {
-      const content = typeof msg.content === "string" ? msg.content.trim() : "";
-      if (!content) return "";
-      return `${msg.role}: ${content}`;
-    }).filter((line) => line.length > 0).join("\n");
-    if (!dialogue.trim()) return [];
-    const existing = existingMemories ?? await this.memoryStore.listMemories();
-    const existingDesc = existing.length > 0 ? existing.map((m) => `- ${m.name}: ${m.description}`).join("\n") : "(none)";
-    const prompt = `Extract user preferences, constraints, or project facts from this dialogue.
-Return a JSON array. Each item: {name, type, description, content}.
-- name: short kebab-case identifier (e.g. 'user-preference-tabs')
-- type: one of 'user' (user preference), 'feedback' (guidance), 'project' (project fact), 'reference' (external pointer)
-- description: one-line summary for index lookup
-- content: full detail in markdown
-If nothing new or already covered by existing memories, return [].
-
-Existing memories:
-${existingDesc}
-
-Dialogue:
-${dialogue.slice(0, MAX_DIALOGUE_CHARS)}`;
-    let response;
-    try {
-      response = await this.queryLlm(prompt);
-    } catch {
-      return [];
-    }
-    const items = extractJsonArray(response);
-    if (!items) return [];
-    const existingNames = new Set(existing.map((m) => m.name));
-    const seenNames = /* @__PURE__ */ new Set();
-    const results = [];
-    for (const raw of items) {
-      const normalized = normalizeExtracted(raw);
-      if (!normalized) continue;
-      if (existingNames.has(normalized.name)) continue;
-      if (seenNames.has(normalized.name)) continue;
-      seenNames.add(normalized.name);
-      results.push(normalized);
-    }
-    return results;
-  }
-}
-const MAX_CATALOG_CHARS = 16e3;
-const DEFAULT_THRESHOLD = 10;
-function parseConsolidatePlan(text) {
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) return { merge: [], delete: [] };
-  let parsed;
-  try {
-    parsed = JSON.parse(match[0]);
-  } catch {
-    return { merge: [], delete: [] };
-  }
-  if (!parsed || typeof parsed !== "object") return { merge: [], delete: [] };
-  const obj = parsed;
-  const merge = [];
-  if (Array.isArray(obj.merge)) {
-    for (const group of obj.merge) {
-      if (!Array.isArray(group)) continue;
-      const names = group.filter((n) => typeof n === "string" && n.trim().length > 0);
-      if (names.length < 2) continue;
-      merge.push(names);
-    }
-  }
-  const deleteList = Array.isArray(obj.delete) ? obj.delete.filter((n) => typeof n === "string" && n.trim().length > 0) : [];
-  return { merge, delete: deleteList };
-}
-class MemoryConsolidator {
-  memoryStore;
-  queryLlm;
-  threshold;
-  constructor(options) {
-    this.memoryStore = options.memoryStore;
-    this.queryLlm = options.queryLlm;
-    this.threshold = options.threshold ?? DEFAULT_THRESHOLD;
-  }
-  /**
-   * 是否需要触发整理：当前记忆条数 ≥ 阈值。
-   */
-  async shouldConsolidate() {
-    const all = await this.memoryStore.listMemories();
-    return all.length >= this.threshold;
-  }
-  /**
-   * 执行整理流程。整理失败或 LLM 不返回有效计划时，原样返回空操作结果。
-   */
-  async consolidate() {
-    const all = await this.memoryStore.listMemories();
-    const empty = {
-      merged: [],
-      deleted: [],
-      kept: all.map((m) => m.name)
-    };
-    if (all.length === 0) return empty;
-    const catalog = all.map(
-      (record) => `## ${record.name}
-description: ${record.description}
-type: ${record.type}
-${record.content}`
-    ).join("\n\n").slice(0, MAX_CATALOG_CHARS);
-    const prompt = `Consolidate the following memory entries. Rules:
-1. Merge duplicates or strongly overlapping entries into one.
-2. Remove outdated or contradicted entries.
-3. Preserve important user preferences above all.
-Return ONLY a JSON object of the shape:
-{ "merge": [["nameA", "nameB"]], "delete": ["nameC"] }
-Each merge group lists the names to combine; the first name will be reused as the merged record name.
-If no change is needed, return { "merge": [], "delete": [] }.
-
-Memories:
-${catalog}`;
-    let response;
-    try {
-      response = await this.queryLlm(prompt);
-    } catch {
-      return empty;
-    }
-    const plan = parseConsolidatePlan(response);
-    const byName = new Map(all.map((m) => [m.name, m]));
-    const merged = [];
-    const deleted = [];
-    for (const group of plan.merge) {
-      const sources = group.map((name) => byName.get(name)).filter((m) => Boolean(m));
-      if (sources.length < 2) continue;
-      const target = sources[0];
-      const mergedContent = sources.map((m) => `### ${m.name}
-${m.description}
-
-${m.content}`).join("\n\n---\n\n");
-      const mergedTags = Array.from(
-        new Set(sources.flatMap((m) => m.tags ?? []).filter((t) => t))
-      );
-      await this.memoryStore.writeMemory({
-        name: target.name,
-        description: target.description,
-        type: target.type,
-        content: mergedContent,
-        tags: mergedTags.length > 0 ? mergedTags : void 0
-      });
-      for (const source of sources.slice(1)) {
-        const ok = await this.memoryStore.deleteMemory(source.name);
-        if (ok) {
-          merged.push(source.name);
-          byName.delete(source.name);
-        }
-      }
-    }
-    for (const name of plan.delete) {
-      if (!byName.has(name)) continue;
-      const ok = await this.memoryStore.deleteMemory(name);
-      if (ok) {
-        deleted.push(name);
-        byName.delete(name);
-      }
-    }
-    await this.memoryStore.rebuildIndex();
-    const final = await this.memoryStore.listMemories();
-    return {
-      merged,
-      deleted,
-      kept: final.map((m) => m.name)
-    };
-  }
-}
-const NATIVE_TOOL_PROTOCOLS = /* @__PURE__ */ new Set([
-  "AnthropicMessages",
-  "OpenAIResponses",
-  "OpenAICompatibleChatCompletions",
-  "OpenRouterChatCompletions",
-  "GoogleGemini",
-  "OllamaOpenAICompatibleChatCompletions"
-]);
-const STREAMING_PROTOCOLS = /* @__PURE__ */ new Set([
-  "AnthropicMessages",
-  "OpenAIResponses",
-  "OpenAICompatibleChatCompletions",
-  "OpenRouterChatCompletions",
-  "GoogleGemini",
-  "OllamaOpenAICompatibleChatCompletions"
-]);
-const PROTOCOL_REASONING_DELIVERY = {
-  OpenAIResponses: "summary-only",
-  AnthropicMessages: "summary-only",
-  GoogleGemini: "stream-full",
-  OllamaOpenAICompatibleChatCompletions: "stream-full",
-  OpenAICompatibleChatCompletions: "stream-full",
-  OpenRouterChatCompletions: "stream-full"
-};
-function readProviderProtocol(provider) {
-  if (!provider) {
-    return null;
-  }
-  return provider.protocol ?? null;
-}
-function hasCapability(provider, capability) {
-  return Boolean(provider?.capabilities?.includes(capability));
-}
-function resolveReasoningDelivery(provider, protocol) {
-  if (!provider || !protocol || !hasCapability(provider, "reasoning")) {
-    return "none";
-  }
-  return PROTOCOL_REASONING_DELIVERY[protocol] ?? "stream-full";
-}
-function reasoningDeliveryToStreamVisibility(delivery) {
-  if (delivery === "summary-only") return "summary-events";
-  if (delivery === "hidden") return "hidden";
+function reasoningContractToDelivery(contract) {
+  if (contract.semantic === "summary") return "summary-only";
+  if (contract.semantic === "opaque") return "hidden";
+  if (contract.semantic === "raw" || contract.semantic === "unknown") return "stream-full";
   return "none";
 }
-function disabledCapability(providerId, modelId) {
-  return {
-    providerId,
-    modelId,
-    toolCallingMode: "disabled",
-    reasoningVisibility: "none",
-    reasoningDelivery: "none",
-    supportsStreaming: false,
-    supportsToolResults: false
-  };
+function reasoningContractToStreamVisibility(contract) {
+  if (contract.semantic === "summary") return "summary-events";
+  if (contract.semantic === "unknown") return "unknown-events";
+  if (contract.semantic === "opaque") return "hidden";
+  return "none";
 }
+const disabledCapability = (providerId, modelId) => ({ providerId, modelId, toolCallingMode: "disabled", reasoningVisibility: "none", reasoningDelivery: "none", reasoningContract: { semantic: "none", source: "route-disabled", displayLabel: "None" }, supportsStreaming: false, supportsToolResults: false });
 function resolveAgentRouteCapability(provider, modelId) {
   const providerId = provider?.id ?? "";
-  if (!provider || !provider.enabled || !provider.isConfigured || provider.status !== "verified") {
-    return disabledCapability(providerId, modelId);
-  }
-  if (!hasCapability(provider, "chat")) {
-    return disabledCapability(provider.id, modelId);
-  }
-  const protocol = readProviderProtocol(provider);
-  if (!protocol) {
-    return disabledCapability(provider.id, modelId);
-  }
-  const supportsStreaming = STREAMING_PROTOCOLS.has(protocol);
-  const runtimeHasNativeTools = NATIVE_TOOL_PROTOCOLS.has(protocol);
+  if (!provider || !provider.enabled || !provider.isConfigured || provider.status !== "verified" || !hasCapability(provider, "chat") || !provider.protocol) return disabledCapability(providerId, modelId);
+  const supportsStreaming = STREAMING_PROTOCOLS.has(provider.protocol);
   let toolCallingMode = "text-only";
-  if (hasCapability(provider, "tool-calling") && runtimeHasNativeTools) {
-    toolCallingMode = "native-structured";
-  } else if (!supportsStreaming) {
-    toolCallingMode = "disabled";
-  }
-  const reasoningDelivery = resolveReasoningDelivery(provider, protocol);
-  const reasoningVisibility = reasoningDeliveryToStreamVisibility(reasoningDelivery);
-  return {
-    providerId: provider.id,
-    modelId,
-    toolCallingMode,
-    reasoningVisibility,
-    reasoningDelivery,
-    supportsStreaming,
-    supportsToolResults: toolCallingMode === "native-structured"
-  };
+  if (hasCapability(provider, "tool-calling") && NATIVE_TOOL_PROTOCOLS.has(provider.protocol)) toolCallingMode = "native-structured";
+  else if (!supportsStreaming) toolCallingMode = "disabled";
+  const reasoningContract = resolveProviderReasoningContract(provider, modelId);
+  const reasoningDelivery = reasoningContractToDelivery(reasoningContract);
+  return { providerId: provider.id, modelId, toolCallingMode, reasoningVisibility: reasoningContractToStreamVisibility(reasoningContract), reasoningDelivery, reasoningContract, supportsStreaming, supportsToolResults: toolCallingMode === "native-structured" };
 }
 function describeRouteCapabilityDiagnostic(capability, availableToolCount) {
-  if (availableToolCount <= 0 || capability.toolCallingMode === "native-structured") {
-    return null;
-  }
-  if (capability.toolCallingMode === "disabled") {
-    return `Current route ${capability.providerId}/${capability.modelId} is not available for structured agent tools. Tools were not registered and no textual tool calls will be executed.`;
-  }
+  if (availableToolCount <= 0 || capability.toolCallingMode === "native-structured") return null;
+  if (capability.toolCallingMode === "disabled") return `Current route ${capability.providerId}/${capability.modelId} is not available for structured agent tools. Tools were not registered and no textual tool calls will be executed.`;
   return `Current route ${capability.providerId}/${capability.modelId} is text-only for agent tools. Tools were not registered and textual tool calls will not be executed.`;
 }
 function buildSharedAgentEvent(type, payload, context2) {
@@ -14053,7 +13938,6 @@ function translateCoreToSharedAgentEvent(event, context2) {
         "run.started",
         {
           mode: context2.mode ?? "debugger",
-          patternId: context2.patternId,
           providerId: context2.providerId ?? "",
           modelId: context2.modelId ?? "",
           toolAllowlist: context2.toolAllowlist ?? [],
@@ -14335,15 +14219,6 @@ function toolResultToSharedResult(result, durationMs) {
     trace_id: result.toolCallId
   };
 }
-const normalizeOption = (value) => {
-  if (typeof value !== "string") return null;
-  const text = value.trim();
-  return text ? text : null;
-};
-const normalizeQuestion = (value) => {
-  const text = value.trim();
-  return text || "The agent needs user input before continuing.";
-};
 const keyFor$1 = (turnId, toolCallId) => `${turnId}::${toolCallId}`;
 class AgentUserInputRequestService {
   pending = /* @__PURE__ */ new Map();
@@ -14358,8 +14233,10 @@ class AgentUserInputRequestService {
     }
     const key = keyFor$1(turnId, toolCallId);
     this.cancelPending(key, "Superseded by a new user input request.");
-    const question = normalizeQuestion(input.question);
-    const options = (input.options ?? []).map(normalizeOption).filter((entry) => Boolean(entry));
+    const questions = normalizeAskUserQuestions({ questions: input.questions });
+    if (questions.length === 0) {
+      throw new Error("ask_user requires at least one canonical question.");
+    }
     const approvalId = `ask-user-${toolCallId}`;
     return new Promise((resolve, reject) => {
       const pending = {
@@ -14368,8 +14245,7 @@ class AgentUserInputRequestService {
         turnId,
         toolCallId,
         approvalId,
-        question,
-        options,
+        questions,
         context: input.context,
         onEvent: input.onEvent,
         resolve,
@@ -14394,16 +14270,11 @@ class AgentUserInputRequestService {
         kind: "ask_user",
         toolCallId,
         toolName: "ask_user",
-        question,
-        options
+        questions
       });
     });
   }
   answer(input) {
-    const answer = input.answer.trim();
-    if (!answer) {
-      return { success: false, error: "Answer cannot be empty." };
-    }
     const pending = this.pending.get(keyFor$1(input.turnId, input.toolCallId));
     if (!pending) {
       return { success: false, error: "No pending user input request was found for this turn." };
@@ -14411,6 +14282,24 @@ class AgentUserInputRequestService {
     if (input.sessionId && pending.sessionId && input.sessionId !== pending.sessionId) {
       return { success: false, error: "Pending user input request belongs to a different session." };
     }
+    const answers = normalizeAskUserAnswers(pending.questions, { answers: input.answers });
+    const answerByQuestionId = new Map(answers.map((answer) => [answer.questionId, answer]));
+    const missingQuestion = pending.questions.find((question) => !answerByQuestionId.has(question.questionId));
+    if (missingQuestion) {
+      return { success: false, error: `Answer cannot be empty for question ${missingQuestion.questionId}.` };
+    }
+    for (const question of pending.questions) {
+      const answer = answerByQuestionId.get(question.questionId);
+      if (!answer) continue;
+      if (!question.allowFreeform && !answer.selectedOptionId) {
+        return { success: false, error: `Question ${question.questionId} requires one of the provided options.` };
+      }
+      if (answer.selectedOptionId && !question.options.some((option) => option.optionId === answer.selectedOptionId)) {
+        return { success: false, error: `Unknown option selected for question ${question.questionId}.` };
+      }
+    }
+    const orderedAnswers = pending.questions.map((question) => answerByQuestionId.get(question.questionId));
+    const formattedAnswer = formatAskUserAnswersForToolResult(pending.questions, orderedAnswers);
     this.deletePending(pending);
     this.emit(pending, "approval.answered", {
       approvalId: pending.approvalId,
@@ -14419,10 +14308,10 @@ class AgentUserInputRequestService {
       kind: "ask_user",
       toolCallId: pending.toolCallId,
       toolName: "ask_user",
-      question: pending.question,
-      answer
+      questions: pending.questions,
+      answers: orderedAnswers
     });
-    pending.resolve(answer);
+    pending.resolve(formattedAnswer);
     return { success: true };
   }
   cancelTurn(turnId) {
@@ -14444,7 +14333,7 @@ class AgentUserInputRequestService {
       kind: "ask_user",
       toolCallId: pending.toolCallId,
       toolName: "ask_user",
-      question: pending.question,
+      questions: pending.questions,
       answer: reason
     });
     pending.reject(new Error(reason));
@@ -14525,13 +14414,13 @@ function resolveToolTarget(value, workspaceRoot) {
   const expanded = expandPath(value);
   return path__namespace.isAbsolute(expanded) ? path__namespace.resolve(expanded) : path__namespace.resolve(workspaceRoot, expanded);
 }
-function isWithinRoot(target, root) {
+function isWithinRoot$1(target, root) {
   if (root === "*") return true;
   const rel = path__namespace.relative(path__namespace.resolve(root), path__namespace.resolve(target));
   return rel === "" || !rel.startsWith("..") && !path__namespace.isAbsolute(rel);
 }
 function isInsideWorkspace(target, workspaceRoot) {
-  return isWithinRoot(target, workspaceRoot);
+  return isWithinRoot$1(target, workspaceRoot);
 }
 function extractStringArg(toolCall, key) {
   const value = toolCall.arguments[key];
@@ -14605,7 +14494,7 @@ class AgentPermissionPolicyService {
     const mode = permissions.mode;
     const toolName = normalizeToolName(input.toolCall.name);
     const workspaceRoot = path__namespace.resolve(
-      input.projectRootPath || settings.workspace.rootPath || process.cwd()
+      input.projectRootPath || settings.paths.userRdxRoot || process.cwd()
     );
     if (mode === "full-access") {
       return { action: "allow", risk: "low", temporaryPathRoots: ["*"] };
@@ -14621,7 +14510,7 @@ class AgentPermissionPolicyService {
       if (externalTargets.length === 0) {
         return { action: "allow", risk: "low", temporaryPathRoots: [] };
       }
-      const allowedTargets = externalTargets.filter((target) => configuredReadableRoots.some((root) => isWithinRoot(target, root)));
+      const allowedTargets = externalTargets.filter((target) => configuredReadableRoots.some((root) => isWithinRoot$1(target, root)));
       if (allowedTargets.length === externalTargets.length) {
         return { action: "allow", risk: "low", temporaryPathRoots: allowedTargets };
       }
@@ -14653,7 +14542,7 @@ class AgentPermissionPolicyService {
       const targets = extractPathTargets(toolName, input.toolCall).map((target) => resolveToolTarget(target, workspaceRoot));
       const externalTargets = targets.filter((target) => !isInsideWorkspace(target, workspaceRoot));
       if (mode === "custom" && externalTargets.length > 0) {
-        const allowedTargets = externalTargets.filter((target) => configuredWritableRoots.some((root) => isWithinRoot(target, root)));
+        const allowedTargets = externalTargets.filter((target) => configuredWritableRoots.some((root) => isWithinRoot$1(target, root)));
         if (allowedTargets.length === externalTargets.length) {
           return { action: "allow", risk: "medium", temporaryPathRoots: allowedTargets };
         }
@@ -14812,6 +14701,186 @@ class AgentToolApprovalRequestService {
   }
 }
 const agentToolApprovalRequestService = new AgentToolApprovalRequestService();
+const DEFAULT_TIMEOUT_MS = 3e4;
+const MAX_OUTPUT_BYTES = 64 * 1024;
+const parseHookFile = (sourcePath) => {
+  const value = YAML.parse(fs.readFileSync(sourcePath, "utf8"));
+  if (!value || typeof value !== "object") throw new Error(`Invalid hook file: ${sourcePath}`);
+  if (!value.id?.trim() || !value.event || !value.command?.trim()) throw new Error(`Hook requires id, event, and command: ${sourcePath}`);
+  if (!["block", "warn"].includes(value.failurePolicy ?? "")) throw new Error(`Hook failurePolicy must be block or warn: ${sourcePath}`);
+  return {
+    id: value.id.trim(),
+    enabled: value.enabled !== false,
+    event: value.event,
+    command: value.command.trim(),
+    args: Array.isArray(value.args) ? value.args.map(String) : [],
+    ...value.cwd?.trim() ? { cwd: value.cwd.trim() } : {},
+    ...value.env && typeof value.env === "object" ? { env: value.env } : {},
+    timeoutMs: Number.isFinite(value.timeoutMs) && Number(value.timeoutMs) > 0 ? Number(value.timeoutMs) : DEFAULT_TIMEOUT_MS,
+    failurePolicy: value.failurePolicy,
+    ...value.matcher ? { matcher: value.matcher } : {}
+  };
+};
+class HookEngine {
+  constructor(trustStorePath = path.join(appPathService.getAppStatePaths().appStateRoot, "hook-trust.json")) {
+    this.trustStorePath = trustStorePath;
+  }
+  trustStorePath;
+  loaded = [];
+  load(userHooksPath, projectRoot) {
+    const candidates = [];
+    const addDirectory = (root, scope) => {
+      if (!fs.existsSync(root)) return;
+      fs.readdirSync(root).filter((entry) => entry.endsWith(".hook.yml")).sort().forEach((entry) => {
+        const sourcePath = path.join(root, entry);
+        const value = parseHookFile(sourcePath);
+        candidates.push({ id: value.id, kind: "hook", scope, sourcePath, value, enabled: value.enabled });
+      });
+    };
+    addDirectory(userHooksPath, "user");
+    if (projectRoot) addDirectory(appPathService.getProjectRdxPaths(projectRoot).hooksPath, "project");
+    const trustStore = this.readTrustStore();
+    this.loaded = scopedResourceResolver.resolve(candidates).resources.map((resource) => {
+      const scope = resource.provenance.scope === "project" ? "project" : "user";
+      const trustKey = scope === "project" && projectRoot ? this.trustKey(projectRoot, resource.id) : "";
+      const trusted = scope === "user" || trustStore[trustKey]?.sourceHash === resource.provenance.sourceHash;
+      return {
+        definition: resource.value,
+        scope,
+        sourcePath: resource.provenance.sourcePath,
+        sourceHash: resource.provenance.sourceHash,
+        trust: {
+          trusted,
+          ...scope === "project" && projectRoot ? { projectRoot: path.resolve(projectRoot) } : {},
+          sourceHash: resource.provenance.sourceHash,
+          ...trusted && trustStore[trustKey]?.trustedAt ? { trustedAt: trustStore[trustKey].trustedAt } : {}
+        }
+      };
+    });
+    return this.list();
+  }
+  list() {
+    return this.loaded.map((hook) => ({ ...hook, definition: { ...hook.definition } }));
+  }
+  trustProjectHook(projectRoot, hookId) {
+    const hook = this.loaded.find((entry) => entry.scope === "project" && entry.definition.id === hookId && path.resolve(entry.trust.projectRoot ?? "") === path.resolve(projectRoot));
+    if (!hook) throw new Error(`Project hook not loaded: ${hookId}`);
+    const store = this.readTrustStore();
+    const trustedAt = (/* @__PURE__ */ new Date()).toISOString();
+    store[this.trustKey(projectRoot, hookId)] = { sourceHash: hook.sourceHash, trustedAt };
+    this.writeTrustStore(store);
+    hook.trust = { trusted: true, projectRoot: path.resolve(projectRoot), sourceHash: hook.sourceHash, trustedAt };
+    return hook.trust;
+  }
+  revokeProjectHook(projectRoot, hookId) {
+    const store = this.readTrustStore();
+    delete store[this.trustKey(projectRoot, hookId)];
+    this.writeTrustStore(store);
+    const hook = this.loaded.find((entry) => entry.scope === "project" && entry.definition.id === hookId);
+    if (hook) hook.trust = { trusted: false, projectRoot: path.resolve(projectRoot), sourceHash: hook.sourceHash };
+  }
+  async trigger(event, context2) {
+    const results = [];
+    for (const hook of this.loaded.filter((entry) => entry.definition.enabled && entry.definition.event === event && this.matches(entry.definition, context2))) {
+      if (hook.scope === "project" && !hook.trust.trusted) {
+        results.push({ hookId: hook.definition.id, allowed: false, status: "untrusted", stdout: "", stderr: "", reason: "Project hook requires trust for its current content hash." });
+        if (hook.definition.failurePolicy === "block") break;
+        continue;
+      }
+      const result = await this.run(hook, context2);
+      results.push(result);
+      if (!result.allowed) break;
+    }
+    return results;
+  }
+  async test(hookId, context2) {
+    const hook = this.loaded.find((entry) => entry.definition.id === hookId);
+    if (!hook) throw new Error(`Hook not loaded: ${hookId}`);
+    if (hook.scope === "project" && !hook.trust.trusted) {
+      return { hookId, allowed: false, status: "untrusted", stdout: "", stderr: "", reason: "Project hook requires trust for its current content hash." };
+    }
+    return this.run(hook, { ...context2, event: hook.definition.event });
+  }
+  matches(hook, context2) {
+    const agentMatch = !hook.matcher?.agents?.length || (context2.agentId ? hook.matcher.agents.includes(context2.agentId) : false);
+    const toolMatch = !hook.matcher?.tools?.length || (context2.toolName ? hook.matcher.tools.includes(context2.toolName) : false);
+    return agentMatch && toolMatch;
+  }
+  run(hook, context2) {
+    return new Promise((resolve) => {
+      const definition = hook.definition;
+      const env = { ...process.env };
+      for (const [targetName, sourceName] of Object.entries(definition.env ?? {})) env[targetName] = process.env[sourceName];
+      const child = child_process.spawn(definition.command, definition.args, {
+        shell: false,
+        cwd: definition.cwd ? path.resolve(context2.projectRoot ?? process.cwd(), definition.cwd) : context2.projectRoot ?? process.cwd(),
+        env,
+        stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true
+      });
+      let stdout = "";
+      let stderr = "";
+      let settled = false;
+      const append = (current, chunk) => Buffer.from(`${current}${chunk.toString()}`, "utf8").subarray(0, MAX_OUTPUT_BYTES).toString("utf8");
+      child.stdout.on("data", (chunk) => {
+        stdout = append(stdout, chunk);
+      });
+      child.stderr.on("data", (chunk) => {
+        stderr = append(stderr, chunk);
+      });
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        resolve(result);
+      };
+      const timer = setTimeout(() => {
+        child.kill();
+        finish({
+          hookId: definition.id,
+          allowed: definition.failurePolicy === "warn",
+          status: "timed-out",
+          stdout,
+          stderr,
+          reason: `Hook timed out after ${definition.timeoutMs}ms.`
+        });
+      }, definition.timeoutMs);
+      child.on("error", (error) => {
+        clearTimeout(timer);
+        finish({ hookId: definition.id, allowed: definition.failurePolicy === "warn", status: "failed", stdout, stderr, reason: error.message });
+      });
+      child.on("close", (code) => {
+        clearTimeout(timer);
+        const succeeded = code === 0;
+        finish({
+          hookId: definition.id,
+          allowed: succeeded || definition.failurePolicy === "warn",
+          status: succeeded ? "completed" : "failed",
+          exitCode: code,
+          stdout,
+          stderr,
+          ...!succeeded ? { reason: `Hook exited with code ${code}.` } : {}
+        });
+      });
+      child.stdin.end(JSON.stringify(context2));
+    });
+  }
+  trustKey(projectRoot, hookId) {
+    return `${path.resolve(projectRoot).toLowerCase()}::${hookId}`;
+  }
+  readTrustStore() {
+    try {
+      return fs.existsSync(this.trustStorePath) ? JSON.parse(fs.readFileSync(this.trustStorePath, "utf8")) : {};
+    } catch {
+      return {};
+    }
+  }
+  writeTrustStore(store) {
+    fs.mkdirSync(path.dirname(this.trustStorePath), { recursive: true });
+    fs.writeFileSync(this.trustStorePath, `${JSON.stringify(store, null, 2)}
+`, "utf8");
+  }
+}
+const hookEngine = new HookEngine();
 let currentRuntimeContext = null;
 function setRdxRuntimeContext(runtimeContext) {
   currentRuntimeContext = runtimeContext ? { ...runtimeContext, raw: { ...runtimeContext.raw } } : null;
@@ -14919,50 +14988,6 @@ const toResponsesTools = (tools) => {
     description: tool.description,
     parameters: tool.input_schema
   }));
-};
-const toOpenAiReasoningEffort = (budget) => {
-  if (budget === "off") {
-    return void 0;
-  }
-  if (budget === "low" || budget === "medium" || budget === "high") {
-    return budget;
-  }
-  if (budget === "extHigh" || budget === "max") {
-    return "high";
-  }
-  return void 0;
-};
-const toAnthropicThinking = (budget) => {
-  if (!budget || budget === "off") {
-    return void 0;
-  }
-  if (budget === "auto") {
-    return { type: "enabled", budget_tokens: 4096 };
-  }
-  const budgetTokens = budget === "low" ? 4096 : budget === "medium" ? 8192 : budget === "high" ? 16384 : budget === "extHigh" ? 32768 : 63999;
-  return { type: "enabled", budget_tokens: budgetTokens };
-};
-const toGoogleThinkingConfig = (budget) => {
-  if (!budget || budget === "auto" || budget === "off") {
-    return void 0;
-  }
-  const thinkingBudget = (() => {
-    switch (budget) {
-      case "low":
-        return 1024;
-      case "medium":
-        return 4096;
-      case "high":
-        return 8192;
-      case "extHigh":
-        return 16384;
-      case "max":
-        return 24576;
-      default:
-        return 4096;
-    }
-  })();
-  return { thinkingBudget };
 };
 const extractResponsesText = (payload) => {
   if (!payload || typeof payload !== "object") {
@@ -15185,6 +15210,16 @@ class OpenRouterProvider extends BaseStreamingProvider {
     if (!model2) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
+    const body = {
+      model: model2,
+      messages: toContentBlocks(request2.messages),
+      max_tokens: request2.maxTokens || 4096,
+      temperature: request2.temperature ?? 0.7,
+      tools: toOpenAiTools(request2.tools),
+      response_format: request2.responseFormat ? { type: request2.responseFormat } : void 0,
+      stream: false
+    };
+    applyOpenAiCompatibleReasoning(body, request2.reasoning);
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
@@ -15194,16 +15229,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
         "X-Title": "RdcAgent"
       },
       signal: request2.signal,
-      body: JSON.stringify({
-        model: model2,
-        messages: toContentBlocks(request2.messages),
-        max_tokens: request2.maxTokens || 4096,
-        temperature: request2.temperature ?? 0.7,
-        reasoning_effort: toOpenAiReasoningEffort(request2.reasoningBudget),
-        tools: toOpenAiTools(request2.tools),
-        response_format: request2.responseFormat ? { type: request2.responseFormat } : void 0,
-        stream: false
-      })
+      body: JSON.stringify(body)
     });
     if (!response.ok) {
       throw new Error(`OpenRouter API error: ${response.status} - ${await response.text()}`);
@@ -15228,6 +15254,16 @@ class OpenRouterProvider extends BaseStreamingProvider {
     if (!model2) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
+    const body = {
+      model: model2,
+      messages: toContentBlocks(request2.messages),
+      max_tokens: request2.maxTokens || 4096,
+      temperature: request2.temperature ?? 0.7,
+      tools: toOpenAiTools(request2.tools),
+      response_format: request2.responseFormat ? { type: request2.responseFormat } : void 0,
+      stream: true
+    };
+    applyOpenAiCompatibleReasoning(body, request2.reasoning);
     const response = await fetch(`${this.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
@@ -15237,16 +15273,7 @@ class OpenRouterProvider extends BaseStreamingProvider {
         "X-Title": "RdcAgent"
       },
       signal: request2.signal,
-      body: JSON.stringify({
-        model: model2,
-        messages: toContentBlocks(request2.messages),
-        max_tokens: request2.maxTokens || 4096,
-        temperature: request2.temperature ?? 0.7,
-        reasoning_effort: toOpenAiReasoningEffort(request2.reasoningBudget),
-        tools: toOpenAiTools(request2.tools),
-        response_format: request2.responseFormat ? { type: request2.responseFormat } : void 0,
-        stream: true
-      })
+      body: JSON.stringify(body)
     });
     if (!response.ok) {
       throw new Error(`OpenRouter API error: ${response.status} - ${await response.text()}`);
@@ -15337,19 +15364,20 @@ class OpenAICompatibleProvider2 extends BaseStreamingProvider {
     if (!model2) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
+    const body = {
+      model: model2,
+      messages: toContentBlocks(request2.messages),
+      max_tokens: request2.maxTokens || 4096,
+      temperature: request2.temperature ?? 0.7,
+      tools: toOpenAiTools(request2.tools),
+      response_format: request2.responseFormat ? { type: request2.responseFormat } : void 0
+    };
+    applyOpenAiCompatibleReasoning(body, request2.reasoning);
     const response = await fetch(this.createChatCompletionsUrl(), {
       method: "POST",
       headers: this.createHeaders(),
       signal: request2.signal,
-      body: JSON.stringify({
-        model: model2,
-        messages: toContentBlocks(request2.messages),
-        max_tokens: request2.maxTokens || 4096,
-        temperature: request2.temperature ?? 0.7,
-        reasoning_effort: toOpenAiReasoningEffort(request2.reasoningBudget),
-        tools: toOpenAiTools(request2.tools),
-        response_format: request2.responseFormat ? { type: request2.responseFormat } : void 0
-      })
+      body: JSON.stringify(body)
     });
     if (!response.ok) {
       throw new Error(this.describeApiError(response.status, await response.text()));
@@ -15374,20 +15402,21 @@ class OpenAICompatibleProvider2 extends BaseStreamingProvider {
     if (!model2) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
+    const body = {
+      model: model2,
+      messages: toContentBlocks(request2.messages),
+      max_tokens: request2.maxTokens || 4096,
+      temperature: request2.temperature ?? 0.7,
+      tools: toOpenAiTools(request2.tools),
+      response_format: request2.responseFormat ? { type: request2.responseFormat } : void 0,
+      stream: true
+    };
+    applyOpenAiCompatibleReasoning(body, request2.reasoning);
     const response = await fetch(this.createChatCompletionsUrl(), {
       method: "POST",
       headers: this.createHeaders(),
       signal: request2.signal,
-      body: JSON.stringify({
-        model: model2,
-        messages: toContentBlocks(request2.messages),
-        max_tokens: request2.maxTokens || 4096,
-        temperature: request2.temperature ?? 0.7,
-        reasoning_effort: toOpenAiReasoningEffort(request2.reasoningBudget),
-        tools: toOpenAiTools(request2.tools),
-        response_format: request2.responseFormat ? { type: request2.responseFormat } : void 0,
-        stream: true
-      })
+      body: JSON.stringify(body)
     });
     if (!response.ok) {
       throw new Error(this.describeApiError(response.status, await response.text()));
@@ -15479,9 +15508,12 @@ class ChatGptAccountProvider extends BaseStreamingProvider {
       temperature: request2.temperature ?? 0.7,
       stream
     };
-    const reasoningEffort = toOpenAiReasoningEffort(request2.reasoningBudget);
-    if (reasoningEffort) {
-      body.reasoning = { effort: reasoningEffort };
+    const reasoningPayload = buildOpenAiResponsesReasoning(request2.reasoning);
+    if (reasoningPayload.reasoning) {
+      body.reasoning = reasoningPayload.reasoning;
+    }
+    if (reasoningPayload.include) {
+      body.include = reasoningPayload.include;
     }
     if (request2.responseFormat) {
       body.text = { format: { type: request2.responseFormat } };
@@ -15639,6 +15671,11 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
     if (!model2) {
       throw new Error(`${this.name} requires an explicit model selection.`);
     }
+    const generationConfig = {
+      maxOutputTokens: request2.maxTokens || 4096,
+      temperature: request2.temperature ?? 0.7
+    };
+    applyGeminiReasoning(generationConfig, request2.reasoning);
     const response = await fetch(this.createGenerateContentUrl(model2), {
       method: "POST",
       headers: this.createHeaders(),
@@ -15648,11 +15685,7 @@ class GoogleAiStudioProvider extends BaseStreamingProvider {
           role: message.role === "assistant" ? "model" : "user",
           parts: [{ text: typeof message.content === "string" ? message.content : JSON.stringify(message.content) }]
         })),
-        generationConfig: {
-          maxOutputTokens: request2.maxTokens || 4096,
-          temperature: request2.temperature ?? 0.7,
-          thinkingConfig: toGoogleThinkingConfig(request2.reasoningBudget)
-        },
+        generationConfig,
         systemInstruction: request2.messages.some((message) => message.role === "system") ? {
           parts: request2.messages.filter((message) => message.role === "system").map((message) => ({ text: typeof message.content === "string" ? message.content : JSON.stringify(message.content) }))
         } : void 0
@@ -15702,11 +15735,15 @@ class AnthropicProvider2 extends BaseStreamingProvider {
     this.useBearerAuth = config.authMode === "account";
   }
   createHeaders() {
-    return {
+    const headers = {
       ...this.useBearerAuth ? { Authorization: `Bearer ${this.apiKey}` } : { "x-api-key": this.apiKey },
       "anthropic-version": "2023-06-01",
       "Content-Type": "application/json"
     };
+    if (this.name === "kimi-coding-plan") {
+      headers["User-Agent"] = "RDC-Agent";
+    }
+    return headers;
   }
   async chat(request2) {
     const model2 = request2.model?.trim();
@@ -15715,20 +15752,21 @@ class AnthropicProvider2 extends BaseStreamingProvider {
     }
     const systemMessage = request2.messages.find((message) => message.role === "system");
     const otherMessages = request2.messages.filter((message) => message.role !== "system");
+    const body = {
+      model: model2,
+      max_tokens: request2.maxTokens || 4096,
+      system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
+      messages: otherMessages.map((message) => ({
+        role: message.role === "assistant" ? "assistant" : "user",
+        content: message.content
+      }))
+    };
+    applyReasoningToAnthropicLikeBody(body, request2.reasoning);
     const response = await fetch(`${this.baseUrl}/messages`, {
       method: "POST",
       headers: this.createHeaders(),
       signal: request2.signal,
-      body: JSON.stringify({
-        model: model2,
-        max_tokens: request2.maxTokens || 4096,
-        thinking: toAnthropicThinking(request2.reasoningBudget),
-        system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
-        messages: otherMessages.map((message) => ({
-          role: message.role === "assistant" ? "assistant" : "user",
-          content: message.content
-        }))
-      })
+      body: JSON.stringify(body)
     });
     if (!response.ok) {
       throw new Error(`Anthropic API error: ${response.status} - ${await response.text()}`);
@@ -15752,21 +15790,22 @@ class AnthropicProvider2 extends BaseStreamingProvider {
     }
     const systemMessage = request2.messages.find((message) => message.role === "system");
     const otherMessages = request2.messages.filter((message) => message.role !== "system");
+    const body = {
+      model: model2,
+      max_tokens: request2.maxTokens || 4096,
+      stream: true,
+      system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
+      messages: otherMessages.map((message) => ({
+        role: message.role === "assistant" ? "assistant" : "user",
+        content: message.content
+      }))
+    };
+    applyReasoningToAnthropicLikeBody(body, request2.reasoning);
     const response = await fetch(`${this.baseUrl}/messages`, {
       method: "POST",
       headers: this.createHeaders(),
       signal: request2.signal,
-      body: JSON.stringify({
-        model: model2,
-        max_tokens: request2.maxTokens || 4096,
-        thinking: toAnthropicThinking(request2.reasoningBudget),
-        stream: true,
-        system: typeof systemMessage?.content === "string" ? systemMessage.content : void 0,
-        messages: otherMessages.map((message) => ({
-          role: message.role === "assistant" ? "assistant" : "user",
-          content: message.content
-        }))
-      })
+      body: JSON.stringify(body)
     });
     if (!response.ok) {
       throw new Error(`Anthropic API error: ${response.status} - ${await response.text()}`);
@@ -17147,43 +17186,24 @@ class ProviderAccountAuthService {
   }
 }
 const providerAccountAuthService = new ProviderAccountAuthService();
-function sanitizeReasoningLevels(levels) {
-  if (!levels || levels.length === 0) {
-    return ["off"];
-  }
-  return levels.filter((level) => REASONING_LEVELS.includes(level));
+const CONSERVATIVE_REASONING_CONTROL = {
+  kind: "none",
+  supportsOff: true,
+  levels: [],
+  defaultSelection: "off",
+  wireProfile: { kind: "none" }
+};
+function sanitizeReasoningControl(control) {
+  return createReasoningControl(control ?? CONSERVATIVE_REASONING_CONTROL);
 }
-function normalizeTurnControls(controls, defaultReasoningLevel) {
-  const candidate = controls?.reasoningLevel ?? controls?.effort;
+function normalizeTurnControls(controls, reasoningControl) {
+  const candidate = controls?.reasoningLevel;
+  const reasoningLevel = coerceReasoningSelectionCandidate(candidate, reasoningControl) ?? reasoningControl.defaultSelection;
   return {
-    reasoningLevel: isReasoningLevel(candidate) ? candidate : defaultReasoningLevel,
+    reasoningLevel,
     maxContextMode: controls?.maxContextMode === true,
     fastModel: controls?.fastModel === true
   };
-}
-function pickReasoningMode(profile, levels) {
-  if (profile?.reasoningMode) {
-    return profile.reasoningMode;
-  }
-  if (levels.some(isEffortReasoningLevel)) {
-    return "effort-levels";
-  }
-  if (levels.includes("auto")) {
-    return "auto-only";
-  }
-  return "none";
-}
-function pickDefaultReasoningLevel(levels, profileDefault) {
-  if (profileDefault && levels.includes(profileDefault)) {
-    return profileDefault;
-  }
-  if (levels.includes("medium")) {
-    return "medium";
-  }
-  if (levels.includes("auto")) {
-    return "auto";
-  }
-  return levels[0] ?? "off";
 }
 function resolveNominalContextWindow(profile) {
   const value = profile?.nominalContextWindowTokens;
@@ -17202,9 +17222,7 @@ function resolveModelCapability(providerId, modelId, settings) {
   const defaultContextWindowTokens = nominalContextWindowTokens !== null ? Math.min(DEFAULT_CONTEXT_WINDOW_TOKENS, nominalContextWindowTokens) : DEFAULT_CONTEXT_WINDOW_TOKENS;
   const maxContextWindowTokens = nominalContextWindowTokens !== null && nominalContextWindowTokens >= MAX_CONTEXT_MODE_MIN_TOKENS ? nominalContextWindowTokens : null;
   const maxContextAvailable = maxContextWindowTokens !== null;
-  const supportedReasoningLevels = sanitizeReasoningLevels(profile?.supportedReasoningLevels);
-  const reasoningMode = pickReasoningMode(profile, supportedReasoningLevels);
-  const defaultReasoningLevel = pickDefaultReasoningLevel(supportedReasoningLevels, profile?.defaultReasoningLevel);
+  const reasoningControl = sanitizeReasoningControl(profile?.reasoningControl);
   const fastVariantModelId = profile?.fastVariantModelId ?? null;
   return {
     providerId,
@@ -17213,9 +17231,7 @@ function resolveModelCapability(providerId, modelId, settings) {
     nominalContextWindowTokens,
     defaultContextWindowTokens,
     maxContextWindowTokens,
-    reasoningMode,
-    supportedReasoningLevels,
-    defaultReasoningLevel,
+    reasoningControl,
     maxContextAvailable,
     fastVariantModelId,
     fastModelAvailable: isFastVariantAvailable(provider, fastVariantModelId),
@@ -17226,13 +17242,13 @@ function resolveModelCapability(providerId, modelId, settings) {
 }
 function resolveTurnControls(capability, requestControls, sessionControls) {
   if (requestControls) {
-    return normalizeTurnControls(requestControls, capability.defaultReasoningLevel);
+    return normalizeTurnControls(requestControls, capability.reasoningControl);
   }
   if (sessionControls) {
-    return normalizeTurnControls(sessionControls, capability.defaultReasoningLevel);
+    return normalizeTurnControls(sessionControls, capability.reasoningControl);
   }
   return {
-    reasoningLevel: capability.defaultReasoningLevel,
+    reasoningLevel: capability.reasoningControl.defaultSelection,
     maxContextMode: false,
     fastModel: false
   };
@@ -17243,16 +17259,13 @@ function resolveEffectiveModelId(capability, turnControls) {
   }
   return capability.modelId;
 }
-function resolveReasoningBudget(capability, turnControls) {
-  if (capability.reasoningMode === "none") {
-    return "off";
-  }
-  const normalized = normalizeTurnControls(turnControls, capability.defaultReasoningLevel);
-  const clamped = clampReasoningLevel(normalized.reasoningLevel, capability.supportedReasoningLevels) ?? capability.defaultReasoningLevel;
-  if (clamped === "off" || clamped === "auto") {
-    return clamped;
-  }
-  return clamped;
+function resolveReasoningSelection(capability, turnControls) {
+  const normalized = normalizeTurnControls(turnControls, capability.reasoningControl);
+  const selection = clampReasoningSelection(normalized.reasoningLevel, capability.reasoningControl) ?? capability.reasoningControl.defaultSelection;
+  return {
+    selection,
+    control: capability.reasoningControl
+  };
 }
 const BLOCKER_CODES = {
   BLOCKED_LLM_ROUTE_MISSING: {
@@ -17492,7 +17505,7 @@ class DebuggerLlmService {
     const turnControls = this.resolveSessionTurnControls(runId, summary);
     const capability = resolveModelCapability(summary.providerId, summary.modelId, settings);
     const contextWindowTokens = resolveActiveContextWindowTokens(capability, turnControls ?? {
-      reasoningLevel: capability.defaultReasoningLevel,
+      reasoningLevel: capability.reasoningControl.defaultSelection,
       maxContextMode: false
     });
     const totalTokens = summary.totalInputTokens + summary.totalOutputTokens;
@@ -17611,7 +17624,7 @@ class DebuggerLlmService {
         [`agent:${agentId}`, `provider:${provider.id}`, `model:${route.modelId}`]
       ));
     }
-    const secret = provider.authMode === "local" ? "local-provider" : provider.authMode === "environment" ? "environment-provider" : provider.authMode === "account" ? settingsService.getProviderOAuthSecret(provider.id, settings.workspace.rootPath) : settingsService.getProviderSecret(provider.id, settings.workspace.rootPath);
+    const secret = provider.authMode === "local" ? "local-provider" : provider.authMode === "environment" ? "environment-provider" : provider.authMode === "account" ? settingsService.getProviderOAuthSecret(provider.id, settings.paths.userRdxRoot) : settingsService.getProviderSecret(provider.id, settings.paths.userRdxRoot);
     if (!secret.trim()) {
       throw new DebuggerLlmBlockerError(makeBlocker(
         BLOCKER_CODES.BLOCKED_LLM_SECRET_MISSING.code,
@@ -17903,13 +17916,7 @@ class AgentOrchestrator {
   mcpManager = new MCPManager();
   connectedMcpServerIds = /* @__PURE__ */ new Set();
   failedMcpServers = /* @__PURE__ */ new Map();
-  skillEngine = new SkillEngine();
-  memoryStoreInstance = null;
-  memoryExtractorInstance = null;
-  memoryConsolidatorInstance = null;
-  /** 内联提取频率控制：每 N 轮触发一次，避免每轮 LLM 调用开销。 */
-  memoryExtractTurnCounter = 0;
-  static MEMORY_EXTRACT_INTERVAL = 3;
+  activeMcpProjectRoot = null;
   /**
    * 当前 turn 的事件下沉（subagent 工具执行时读取，把子 agent 事件桥接到父 trace）。
    * 单进程串行，无并发问题；runAgentTurn 设置，turn 结束清理。
@@ -18036,7 +18043,7 @@ class AgentOrchestrator {
       const effectiveModelId = resolveEffectiveModelId(capability, turnControls);
       const activeContextWindow = resolveActiveContextWindowTokens(capability, turnControls);
       const contextTokenLimit = Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
-      const reasoningBudget = options?.reasoningBudget ?? resolveReasoningBudget(capability, turnControls);
+      const reasoning = options?.reasoning ?? resolveReasoningSelection(capability, turnControls);
       const responseText = stub ? await this.streamTestModeStub(stub, options) : await this.runAgentTurn({
         agentId,
         content,
@@ -18046,7 +18053,6 @@ class AgentOrchestrator {
         maxTokens: config.maxTokens,
         temperature: config.temperature,
         mode: this.modeForAgent(agentId),
-        patternId: this.patternForAgent(agentId),
         stage: context2?.stageId,
         runId: context2?.runId,
         sessionId: context2?.sessionId ?? null,
@@ -18054,7 +18060,7 @@ class AgentOrchestrator {
         toolAllowlist: resolveAgentToolAllowlist(agentId, context2?.stageId),
         options: {
           ...options,
-          reasoningBudget
+          reasoning
         },
         projectRootPath: context2?.projectRootPath ?? null,
         projectId: context2?.projectId ?? null,
@@ -18113,7 +18119,7 @@ class AgentOrchestrator {
       const effectiveModelId = resolveEffectiveModelId(capability, turnControls);
       const activeContextWindow = resolveActiveContextWindowTokens(capability, turnControls);
       const contextTokenLimit = Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
-      const reasoningBudget = options?.reasoningBudget ?? resolveReasoningBudget(capability, turnControls);
+      const reasoning = options?.reasoning ?? resolveReasoningSelection(capability, turnControls);
       const responseText = await this.runAgentTurn({
         agentId,
         content,
@@ -18123,7 +18129,6 @@ class AgentOrchestrator {
         maxTokens: config.maxTokens,
         temperature: config.temperature,
         mode: this.modeForAgent(agentId),
-        patternId: options?.patternId ?? this.patternForAgent(agentId),
         stage: options?.stage ?? "investigate",
         runId: void 0,
         sessionId: options?.sessionId ?? null,
@@ -18131,11 +18136,11 @@ class AgentOrchestrator {
         toolAllowlist,
         options: {
           ...options,
-          reasoningBudget
+          reasoning
         },
         projectRootPath: options?.projectRootPath ?? null,
         projectId: options?.projectId ?? null,
-        promptMetrics: options?.promptMetrics,
+        promptPlan: options?.promptPlan,
         contextWindow: activeContextWindow,
         contextTokenLimit
       });
@@ -18198,7 +18203,6 @@ class AgentOrchestrator {
         {
           sessionId: subagentSessionId ?? void 0,
           stage: "investigate",
-          patternId: "subagent",
           projectRootPath: input.projectRootPath,
           projectId: input.projectId,
           systemPrompt,
@@ -18333,7 +18337,7 @@ class AgentOrchestrator {
     };
     return [runSubagentTool];
   }
-  getOrCreateAgentSlot(agentId, providerId, modelId, systemPrompt, tools = [], toolExecutor = this.createToolExecutor(agentId, [], void 0), streamOptions, turnSignature = "", sessionId, contextWindow, contextTokenLimit) {
+  getOrCreateAgentSlot(agentId, providerId, modelId, systemPrompt, tools = [], toolExecutor = this.createToolExecutor(agentId, [], void 0), streamOptions, turnSignature = "", sessionId, contextWindow, contextTokenLimit, promptPlan) {
     const slotKey = this.agentSlotKey(sessionId, agentId);
     const toolSignature = this.createToolSignature(tools);
     const resolvedContextTokenLimit = contextTokenLimit ?? Math.floor((contextWindow ?? 256e3) * CONTEXT_COMPACTION_RATIO);
@@ -18343,6 +18347,11 @@ class AgentOrchestrator {
     }
     const persistedMessages = sessionId ? storageAdapter.readAgentThread(sessionId, agentId) : [];
     const agentModel = encodeAgentModel(providerId, modelId, { contextWindow });
+    const routeProvider = settingsService.getAll().llm.providers.find((provider) => provider.id === providerId);
+    const reasoningContract = resolveAgentRouteCapability(
+      routeProvider,
+      modelId
+    ).reasoningContract;
     const contextManager = new ContextManager({
       modelId,
       contextTokenLimit: resolvedContextTokenLimit,
@@ -18364,7 +18373,36 @@ class AgentOrchestrator {
       // transformContext：长对话接近窗口上限时自动压缩历史。
       transformContext: (messages) => contextManager.compress(messages, agentModel),
       // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
-      errorRecovery
+      errorRecovery,
+      onRequest: promptPlan ? ({ model: model2, context: requestContext, streamOptions: requestOptions }) => {
+        const callIndex = requestSnapshotStore.nextCallIndex(sessionId ?? void 0, turnSignature || void 0);
+        const snapshot = requestEnvelopeBuilder.build({
+          promptPlan,
+          sessionId: sessionId ?? void 0,
+          turnId: turnSignature || void 0,
+          callIndex,
+          route: { providerId, modelId, protocol: routeProvider?.protocol ?? model2.api },
+          messages: requestContext.messages,
+          tools: requestContext.tools ?? [],
+          controls: {
+            temperature: requestOptions.temperature,
+            maxTokens: requestOptions.maxTokens,
+            topP: requestOptions.topP,
+            reasoningSelection: requestOptions.reasoning?.selection
+          },
+          reasoning: reasoningContract
+        });
+        requestSnapshotStore.write(snapshot);
+        return snapshot.id;
+      } : void 0,
+      onResponse: promptPlan ? (requestId, message) => {
+        if (!requestId) return;
+        requestSnapshotStore.complete(requestId, sessionId ?? void 0, turnSignature || void 0, {
+          inputTokens: message.usage.inputTokens,
+          outputTokens: message.usage.outputTokens,
+          estimated: false
+        });
+      } : void 0
     });
     const slot = {
       agent,
@@ -18399,32 +18437,17 @@ class AgentOrchestrator {
     }
     return 25;
   }
-  // =====================================================================
-  // Memory 引擎（持久记忆 + 内联提取 + consolidation）
-  // =====================================================================
-  /** 共享 MemoryStore 单例（懒构造，workspacePath 就绪后实例化）。 */
-  get memoryStore() {
-    if (!this.memoryStoreInstance) {
-      const memoryDir = path__namespace.join(storageAdapter.getWorkspacePath(), ".rdc-agent", "memory");
-      this.memoryStoreInstance = new MemoryStore(memoryDir);
+  getMemoryStore(scope, projectRootPath) {
+    if (scope === "project") {
+      if (!projectRootPath) throw new Error("Project scope memory requires an active project.");
+      return new MemoryStore(appPathService.getProjectRdxPaths(projectRootPath).memoryPath);
     }
-    return this.memoryStoreInstance;
-  }
-  /**
-   * 读取 memory 索引内容（MEMORY.md），供 system prompt 注入。
-   * 失败时返回空串，不阻塞 prompt 组装。
-   */
-  async getMemoryIndex() {
-    try {
-      return await this.memoryStore.getIndexContent();
-    } catch {
-      return "";
-    }
+    return new MemoryStore(appPathService.getUserRdxPaths().memoryPath);
   }
   /** Memory 面板用：列出全部记忆摘要。 */
   async listMemoriesForUi() {
     try {
-      const all = await this.memoryStore.listMemories();
+      const all = await this.getMemoryStore("user").listMemories();
       return all.map((m) => ({ name: m.name, description: m.description, type: m.type, updatedAt: m.updatedAt }));
     } catch {
       return [];
@@ -18433,7 +18456,7 @@ class AgentOrchestrator {
   /** Memory 面板用：读取单条记忆详情。 */
   async getMemoryForUi(name) {
     try {
-      const record = await this.memoryStore.getMemory(name);
+      const record = await this.getMemoryStore("user").getMemory(name);
       if (!record) return null;
       return {
         name: record.name,
@@ -18451,7 +18474,7 @@ class AgentOrchestrator {
   /** Memory 面板用：写入记忆。 */
   async writeMemoryForUi(request2) {
     try {
-      const record = await this.memoryStore.writeMemory(request2);
+      const record = await this.getMemoryStore("user").writeMemory(request2);
       return { success: true, name: record.name };
     } catch (error) {
       return { success: false, name: request2.name, error: error instanceof Error ? error.message : String(error) };
@@ -18460,7 +18483,7 @@ class AgentOrchestrator {
   /** Memory 面板用：删除记忆。 */
   async deleteMemoryForUi(name) {
     try {
-      const deleted = await this.memoryStore.deleteMemory(name);
+      const deleted = await this.getMemoryStore("user").deleteMemory(name);
       return { success: deleted };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -18477,46 +18500,6 @@ class AgentOrchestrator {
     const handoff = this.pendingHandoff;
     this.pendingHandoff = null;
     return handoff;
-  }
-  /** 共享 MemoryExtractor（依赖 queryLlm 适配器）。 */
-  get memoryExtractor() {
-    if (!this.memoryExtractorInstance) {
-      this.memoryExtractorInstance = new MemoryExtractor({
-        memoryStore: this.memoryStore,
-        queryLlm: (prompt) => this.queryLlmForMemory(prompt)
-      });
-    }
-    return this.memoryExtractorInstance;
-  }
-  /** 共享 MemoryConsolidator（阈值默认 10）。 */
-  get memoryConsolidator() {
-    if (!this.memoryConsolidatorInstance) {
-      this.memoryConsolidatorInstance = new MemoryConsolidator({
-        memoryStore: this.memoryStore,
-        queryLlm: (prompt) => this.queryLlmForMemory(prompt)
-      });
-    }
-    return this.memoryConsolidatorInstance;
-  }
-  /**
-   * Memory 提取/整合用的 LLM 适配器。
-   *
-   * 取 ask agent 的 route（或首个 agentRoute）作主模型，
-   * 通过 configuredRuntimeProvider.stream 发起单轮非流式调用。
-   * 失败时抛错，由 MemoryExtractor/MemoryConsolidator 的 try/catch 兜底返回空结果。
-   */
-  async queryLlmForMemory(prompt) {
-    const settings = settingsService.getAll();
-    const route = settings.llm.agentRoutes.find((entry) => entry.agentId === "ask") ?? settings.llm.agentRoutes[0];
-    if (!route) {
-      throw new Error("No agent route available for memory LLM adapter.");
-    }
-    const model2 = encodeAgentModel(route.providerId, route.modelId);
-    const stream = configuredRuntimeProvider.stream(model2, {
-      messages: [{ role: "user", content: prompt, timestamp: Date.now() }]
-    });
-    const assistant = await stream.result();
-    return assistant.content.filter((block) => block.type === "text").map((block) => block.text).join("");
   }
   createToolSignature(tools) {
     return tools.map((tool) => tool.name).sort().join("|");
@@ -18629,6 +18612,14 @@ class AgentOrchestrator {
         }
         try {
           const projectRootPath = runtimeContext?.projectRootPath ?? null;
+          const beforeHooksAllowed = await this.triggerRuntimeHooks("tool.before-call", agentId, runtimeContext, {
+            toolName: toolCall.name,
+            toolCallId: toolCall.id,
+            arguments: toolCall.arguments
+          });
+          if (!beforeHooksAllowed) {
+            return this.createPolicyDeniedToolResult(toolCall, agentId, "A blocking lifecycle hook denied this tool call.");
+          }
           const toolContext = {
             workspaceRoot: projectRootPath ?? getWorkspaceRoot(),
             projectRootPath,
@@ -18639,8 +18630,18 @@ class AgentOrchestrator {
             permissionDecision.temporaryPathRoots,
             () => tool.execute(toolCall.id, toolCall.arguments, signal, onUpdate, toolContext)
           );
+          await this.triggerRuntimeHooks("tool.after-call", agentId, runtimeContext, {
+            toolName: toolCall.name,
+            toolCallId: toolCall.id,
+            isError: result.isError === true
+          });
           return this.agentToolResultToMessage(toolCall, result);
         } catch (error) {
+          await this.triggerRuntimeHooks("tool.on-error", agentId, runtimeContext, {
+            toolName: toolCall.name,
+            toolCallId: toolCall.id,
+            error: error instanceof Error ? error.message : String(error)
+          });
           return {
             role: "toolResult",
             toolCallId: toolCall.id,
@@ -18653,6 +18654,33 @@ class AgentOrchestrator {
       }
     };
   }
+  async triggerRuntimeHooks(event, agentId, runtimeContext, payload) {
+    const projectRoot = runtimeContext?.projectRootPath ?? void 0;
+    hookEngine.load(appPathService.getUserRdxPaths().hooksPath, projectRoot ?? void 0);
+    const results = await hookEngine.trigger(event, {
+      event,
+      agentId,
+      toolName: typeof payload.toolName === "string" ? payload.toolName : void 0,
+      sessionId: runtimeContext?.sessionId ?? void 0,
+      projectRoot: projectRoot ?? void 0,
+      payload
+    });
+    for (const result of results) {
+      if (!runtimeContext?.eventContext || !runtimeContext.onEvent) continue;
+      runtimeContext.onEvent(buildDiagnosticAgentEvent(runtimeContext.eventContext, {
+        code: `hook.${result.status}`,
+        severity: result.status === "completed" ? "info" : result.allowed ? "warning" : "error",
+        message: `Hook ${result.hookId}: ${result.status}`,
+        technicalMessage: JSON.stringify({
+          exitCode: result.exitCode,
+          reason: result.reason,
+          stdout: result.stdout,
+          stderr: result.stderr
+        })
+      }));
+    }
+    return results.every((result) => result.allowed);
+  }
   isAllowedForRuntime(agentId, toolName, stage) {
     const workflowStage = stage === "report" ? void 0 : stage;
     return isToolAllowedForAgent(toolName, agentId, workflowStage);
@@ -18660,10 +18688,10 @@ class AgentOrchestrator {
   async executeAskUserTool(toolCall, agentId, runtimeContext, signal) {
     try {
       const args = toolCall.arguments ?? {};
-      const question = typeof args.question === "string" && args.question.trim() ? args.question.trim() : "The agent needs user input before continuing.";
-      const optionArgs = args.options;
-      const rawChoices = Array.isArray(args.choices) ? args.choices : Array.isArray(optionArgs) ? optionArgs : [];
-      const options = rawChoices.filter((entry) => typeof entry === "string" && entry.trim().length > 0).map((entry) => entry.trim());
+      const questions = normalizeAskUserQuestions(args);
+      if (questions.length === 0) {
+        throw new Error("ask_user requires at least one canonical questions[] entry with a prompt.");
+      }
       if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
         throw new Error("ask_user requires an active conversation interaction bridge.");
       }
@@ -18672,8 +18700,7 @@ class AgentOrchestrator {
         sessionId: runtimeContext.sessionId ?? null,
         turnId: runtimeContext.turnId,
         toolCallId: toolCall.id,
-        question,
-        options,
+        questions,
         context: runtimeContext.eventContext,
         onEvent: runtimeContext.onEvent,
         signal
@@ -18682,7 +18709,7 @@ class AgentOrchestrator {
         role: "toolResult",
         toolCallId: toolCall.id,
         toolName: toolCall.name,
-        content: [{ type: "text", text: `User answered: ${answer}` }],
+        content: [{ type: "text", text: answer }],
         isError: false,
         timestamp: Date.now()
       };
@@ -18786,12 +18813,13 @@ class AgentOrchestrator {
     return [
       this.createAskUserTool(agentId),
       this.createAgentHandoffTool(agentId),
+      this.createMemorySearchTool(sessionId),
       this.createMemoryReadTool(sessionId),
       this.createMemoryWriteTool(),
       this.createMemoryDeleteTool(),
       this.createPlanArtifactTool(sessionId),
       this.createSkillsCatalogTool(),
-      this.createSkillRunTool(agentId, sessionId),
+      this.createSkillReadTool(agentId),
       this.createMcpCatalogTool(),
       ...this.createSubagentTools(agentId, sessionId)
     ];
@@ -18803,24 +18831,48 @@ class AgentOrchestrator {
       description: "Ask the user for a decision or missing information. Use this when progress depends on user input.",
       parameters: {
         type: "object",
-        required: ["question"],
+        required: ["questions"],
         properties: {
-          question: { type: "string", description: "The concise question to ask the user." },
-          choices: {
+          questions: {
             type: "array",
-            items: { type: "string" },
-            description: "Optional short mutually exclusive choices."
+            minItems: 1,
+            description: "Batch of user questions. A single question is represented as an array with one item.",
+            items: {
+              type: "object",
+              required: ["prompt"],
+              properties: {
+                questionId: { type: "string", description: "Optional stable question id. Runtime generates one when omitted." },
+                prompt: { type: "string", description: "The concise question to ask the user." },
+                description: { type: "string", description: "Optional supporting context shown below the question title." },
+                allowFreeform: { type: "boolean", description: "Whether the user may type a custom answer. Defaults to true." },
+                options: {
+                  type: "array",
+                  description: "Optional mutually exclusive choices.",
+                  items: {
+                    type: "object",
+                    required: ["label"],
+                    properties: {
+                      optionId: { type: "string", description: "Optional stable option id. Runtime generates one when omitted." },
+                      label: { type: "string", description: "Short option label." },
+                      description: { type: "string", description: "Optional one-line option detail." }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
       permissionHint: "readonly",
       async execute(_toolCallId, args) {
-        const question = typeof args.question === "string" && args.question.trim() ? args.question.trim() : "The agent needs user input before continuing.";
-        const choices = Array.isArray(args.choices) ? args.choices.filter((entry) => typeof entry === "string" && entry.trim().length > 0) : [];
+        const questions = normalizeAskUserQuestions(args);
         return {
-          content: [{ type: "text", text: "ask_user requires the conversation interaction bridge." }],
+          content: [{
+            type: "text",
+            text: questions.length > 0 ? "ask_user requires the conversation interaction bridge." : "ask_user requires at least one canonical questions[] entry with a prompt."
+          }],
           isError: true,
-          details: { agentId, question, choices }
+          details: { agentId, questions }
         };
       }
     };
@@ -18920,81 +18972,72 @@ ${body}
       }
     };
   }
+  createMemorySearchTool(sessionId) {
+    const resolveStore = this.getMemoryStore.bind(this);
+    return {
+      name: "memory_search",
+      label: "Search Memory",
+      description: "Search explicitly saved memories in one declared scope. Memory is never injected automatically.",
+      parameters: { type: "object", required: ["scope"], properties: {
+        scope: { type: "string", enum: ["user", "project"] },
+        query: { type: "string" },
+        limit: { type: "number" }
+      } },
+      permissionHint: "readonly",
+      async execute(_id, args, _signal, _update, context2) {
+        const records = await resolveStore(args.scope, context2?.projectRootPath).searchMemories(args.query ?? "", args.limit ?? 20);
+        return { content: [{ type: "text", text: records.length ? records.map((record) => `- ${record.name}: ${record.description}`).join("\n") : "No matching memories were found." }], details: { sessionId: sessionId ?? null, scope: args.scope, count: records.length } };
+      }
+    };
+  }
   createMemoryReadTool(sessionId) {
-    const store = this.memoryStore;
+    const resolveStore = this.getMemoryStore.bind(this);
     return {
       name: "memory_read",
       label: "Read Memory",
-      description: "Read persisted memories from the workspace memory store. Supports optional name lookup or keyword filter.",
-      parameters: {
-        type: "object",
-        properties: {
-          name: { type: "string", description: "Optional exact memory name to read in full." },
-          query: { type: "string", description: "Optional case-insensitive filter over name/description/content." },
-          limit: { type: "number", description: "Maximum entries to return, default 8." }
-        }
-      },
+      description: "Read one explicitly saved memory by exact name and scope.",
+      parameters: { type: "object", required: ["scope", "name"], properties: {
+        scope: { type: "string", enum: ["user", "project"] },
+        name: { type: "string" }
+      } },
       permissionHint: "readonly",
-      async execute(_toolCallId, args) {
-        const rawLimit = typeof args.limit === "number" && Number.isFinite(args.limit) ? args.limit : 8;
-        const limit = Math.max(1, Math.min(20, Math.floor(rawLimit)));
-        if (typeof args.name === "string" && args.name.trim()) {
-          const record = await store.getMemory(args.name.trim());
-          if (!record) {
-            return {
-              content: [{ type: "text", text: `No memory named "${args.name}" was found.` }],
-              details: { sessionId: sessionId ?? null, count: 0 }
-            };
-          }
-          return {
-            content: [{
-              type: "text",
-              text: `# ${record.name}
+      async execute(_id, args, _signal, _update, context2) {
+        const record = await resolveStore(args.scope, context2?.projectRootPath).getMemory(args.name);
+        return { content: [{ type: "text", text: record ? `# ${record.name}
 
 ${record.description}
 
-${record.content}`
-            }],
-            details: { sessionId: sessionId ?? null, count: 1 }
-          };
-        }
-        const all = await store.listMemories();
-        const query = typeof args.query === "string" ? args.query.trim().toLowerCase() : "";
-        const candidates = query ? all.filter((entry) => entry.name.toLowerCase().includes(query) || entry.description.toLowerCase().includes(query) || entry.content.toLowerCase().includes(query)) : all;
-        const entries = candidates.slice(0, limit).map((entry) => `- ${entry.name} (${entry.type}): ${entry.description}`);
-        return {
-          content: [{
-            type: "text",
-            text: entries.length > 0 ? `Memory index (${candidates.length} total):
-${entries.join("\n")}` : "No matching memories were found."
-          }],
-          details: { sessionId: sessionId ?? null, count: entries.length }
-        };
+${record.content}` : `No memory named "${args.name}" was found.` }], details: { sessionId: sessionId ?? null, scope: args.scope, count: record ? 1 : 0 } };
       }
     };
   }
   createMemoryWriteTool() {
-    const store = this.memoryStore;
+    const resolveStore = this.getMemoryStore.bind(this);
     const validTypes = /* @__PURE__ */ new Set(["user", "feedback", "project", "reference"]);
     return {
       name: "memory_write",
       label: "Write Memory",
-      description: "Persist a new memory to the workspace memory store. type must be one of: user, feedback, project, reference.",
+      description: "Persist a memory only after explicit user intent or interactive approval. Scope must be declared.",
       parameters: {
         type: "object",
-        required: ["name", "description", "type", "content"],
+        required: ["scope", "name", "description", "type", "content", "approved"],
         properties: {
+          scope: { type: "string", enum: ["user", "project"] },
           name: { type: "string", description: "Kebab-case memory name (unique key)." },
           description: { type: "string", description: "One-line summary." },
           type: { type: "string", description: "user | feedback | project | reference" },
           content: { type: "string", description: "Full Markdown body." },
-          tags: { type: "array", items: { type: "string" } }
+          tags: { type: "array", items: { type: "string" } },
+          approved: { type: "boolean", description: "True only after the user explicitly requested or approved this write." }
         }
       },
       permissionHint: "mutation",
-      async execute(_toolCallId, args) {
+      async execute(_toolCallId, args, _signal, _update, context2) {
+        if (args.approved !== true) {
+          return { content: [{ type: "text", text: "Memory write requires explicit user approval." }], isError: true, details: { scope: args.scope, name: args.name, created: false } };
+        }
         const type = validTypes.has(args.type) ? args.type : "project";
-        const record = await store.writeMemory({
+        const record = await resolveStore(args.scope, context2?.projectRootPath).writeMemory({
           name: args.name.trim(),
           description: args.description.trim(),
           type,
@@ -19003,33 +19046,38 @@ ${entries.join("\n")}` : "No matching memories were found."
         });
         return {
           content: [{ type: "text", text: `Memory saved: ${record.name} (${record.type})` }],
-          details: { name: record.name, created: true }
+          details: { scope: args.scope, name: record.name, created: true }
         };
       }
     };
   }
   createMemoryDeleteTool() {
-    const store = this.memoryStore;
+    const resolveStore = this.getMemoryStore.bind(this);
     return {
       name: "memory_delete",
       label: "Delete Memory",
-      description: "Delete a memory by name from the workspace memory store.",
+      description: "Delete one scoped memory only after explicit confirmation.",
       parameters: {
         type: "object",
-        required: ["name"],
+        required: ["scope", "name", "confirmed"],
         properties: {
-          name: { type: "string", description: "Memory name to delete." }
+          scope: { type: "string", enum: ["user", "project"] },
+          name: { type: "string", description: "Memory name to delete." },
+          confirmed: { type: "boolean" }
         }
       },
       permissionHint: "mutation",
-      async execute(_toolCallId, args) {
-        const deleted = await store.deleteMemory(args.name.trim());
+      async execute(_toolCallId, args, _signal, _update, context2) {
+        if (args.confirmed !== true) {
+          return { content: [{ type: "text", text: "Memory deletion requires explicit confirmation." }], isError: true, details: { scope: args.scope, name: args.name, deleted: false } };
+        }
+        const deleted = await resolveStore(args.scope, context2?.projectRootPath).deleteMemory(args.name.trim());
         return {
           content: [{
             type: "text",
             text: deleted ? `Memory deleted: ${args.name}` : `No memory named "${args.name}" was found.`
           }],
-          details: { name: args.name, deleted }
+          details: { scope: args.scope, name: args.name, deleted }
         };
       }
     };
@@ -19046,9 +19094,9 @@ ${entries.join("\n")}` : "No matching memories were found."
         }
       },
       permissionHint: "readonly",
-      async execute(_toolCallId, args) {
+      async execute(_toolCallId, args, _signal, _onUpdate, context2) {
         const query = typeof args.query === "string" ? args.query.trim().toLowerCase() : "";
-        const skills = agentRuntimeConfigService.listSkills().filter((skill) => !query || `${skill.id} ${skill.name} ${skill.label} ${skill.description}`.toLowerCase().includes(query));
+        const skills = agentRuntimeConfigService.listSkills(context2?.projectRootPath ?? void 0).filter((skill) => !query || `${skill.id} ${skill.name} ${skill.label} ${skill.description}`.toLowerCase().includes(query));
         const lines = skills.map((skill) => `${skill.id}: ${skill.label || skill.name} (${skill.source})`);
         return {
           content: [{ type: "text", text: lines.length > 0 ? lines.join("\n") : "No configured skills matched the query." }],
@@ -19057,26 +19105,20 @@ ${entries.join("\n")}` : "No matching memories were found."
       }
     };
   }
-  createSkillRunTool(agentId, sessionId) {
-    const orchestrator = this;
+  createSkillReadTool(agentId) {
     return {
-      name: "skill_run",
-      label: "Run Skill",
-      description: "Execute a configured reusable skill by id or name. Context skills return live workspace/session context.",
+      name: "skill_read",
+      label: "Read Skill",
+      description: "Load the full SKILL.md instructions for one discovered effective skill.",
       parameters: {
         type: "object",
         required: ["skill_id"],
         properties: {
-          skill_id: { type: "string", description: "Skill id or name, for example rdc-context." },
-          params: {
-            type: "object",
-            description: "Skill parameters. Values are converted to strings for prompt skills.",
-            additionalProperties: true
-          }
+          skill_id: { type: "string", description: "Skill id, for example rdc-context." }
         }
       },
       permissionHint: "readonly",
-      async execute(_toolCallId, args) {
+      async execute(_toolCallId, args, _signal, _onUpdate, context2) {
         const skillKey = typeof args.skill_id === "string" ? args.skill_id.trim() : "";
         if (!skillKey) {
           return {
@@ -19085,8 +19127,7 @@ ${entries.join("\n")}` : "No matching memories were found."
             details: { skillId: "", agentId }
           };
         }
-        const skills = orchestrator.getAvailableSkillDescriptors();
-        const skill = skills.find((entry) => entry.id === skillKey || entry.name === skillKey);
+        const skill = agentRuntimeConfigService.loadSkill(skillKey, context2?.projectRootPath ?? void 0);
         if (!skill) {
           return {
             content: [{ type: "text", text: `Skill is not configured: ${skillKey}` }],
@@ -19094,39 +19135,8 @@ ${entries.join("\n")}` : "No matching memories were found."
             details: { skillId: skillKey, agentId }
           };
         }
-        if (skill.id === "rdc-context" || skill.name === "rdc-context") {
-          const session = sessionId ? storageAdapter.readSession(sessionId) : null;
-          const project = session?.projectId ? storageAdapter.getProjectById(session.projectId) : null;
-          const runtimeContext = getRdxRuntimeContext();
-          return {
-            content: [{
-              type: "text",
-              text: JSON.stringify({
-                skill: skill.id,
-                agentId,
-                session,
-                project,
-                rdxRuntimeContext: runtimeContext
-              }, null, 2)
-            }],
-            details: { skillId: skill.id, agentId }
-          };
-        }
-        const params = orchestrator.stringifySkillParams(args.params);
-        const manifest = {
-          name: skill.name,
-          description: skill.description,
-          type: "prompt",
-          promptTemplate: skill.description
-        };
-        const result = await orchestrator.skillEngine.execute(manifest, params, {
-          agentOrchestrator: orchestrator,
-          workspaceRoot: storageAdapter.getWorkspacePath(),
-          sessionId: sessionId ?? void 0
-        });
         return {
-          content: [{ type: "text", text: result.message }],
-          isError: !result.success,
+          content: [{ type: "text", text: skill.instructions }],
           details: { skillId: skill.id, agentId }
         };
       }
@@ -19144,9 +19154,9 @@ ${entries.join("\n")}` : "No matching memories were found."
         }
       },
       permissionHint: "readonly",
-      async execute(_toolCallId, args) {
+      async execute(_toolCallId, args, _signal, _onUpdate, context2) {
         const query = typeof args.query === "string" ? args.query.trim().toLowerCase() : "";
-        const servers = agentRuntimeConfigService.listMcpServers().filter((server2) => !query || `${server2.id} ${server2.name} ${server2.description}`.toLowerCase().includes(query));
+        const servers = agentRuntimeConfigService.listMcpServers(context2?.projectRootPath ?? void 0).filter((server2) => !query || `${server2.id} ${server2.name} ${server2.description}`.toLowerCase().includes(query));
         const lines = servers.map((server2) => `${server2.id}: ${server2.name} (${server2.transport})${server2.enabledByDefault ? "" : " - disabled by default"}`);
         return {
           content: [{ type: "text", text: lines.length > 0 ? lines.join("\n") : "No configured MCP services matched the query." }],
@@ -19155,35 +19165,25 @@ ${entries.join("\n")}` : "No matching memories were found."
       }
     };
   }
-  getAvailableSkillDescriptors() {
-    return agentRuntimeConfigService.listSkills();
-  }
-  stringifySkillParams(params) {
-    if (!params) {
-      return {};
-    }
-    return Object.fromEntries(
-      Object.entries(params).map(([key, value]) => [
-        key,
-        typeof value === "string" ? value : JSON.stringify(value)
-      ])
-    );
-  }
-  getEnabledMcpDescriptors(agentId) {
+  getEnabledMcpDescriptors(agentId, projectRootPath) {
     const settings = settingsService.getAll();
     const manifest = settings.agents.definitions.find((entry) => entry.id === agentId && entry.enabled);
-    const enabledIds = /* @__PURE__ */ new Set([
-      ...settings.configuration.enabledMcpServerIds ?? [],
-      ...manifest?.mcpServers ?? []
-    ]);
+    const enabledIds = new Set(manifest?.mcpServers ?? []);
     if (enabledIds.size === 0) {
       return [];
     }
-    return agentRuntimeConfigService.listMcpServers().filter((server2) => enabledIds.has(server2.id) || enabledIds.has(server2.name));
+    return agentRuntimeConfigService.listMcpServers(projectRootPath ?? void 0).filter((server2) => enabledIds.has(server2.id) || enabledIds.has(server2.name));
   }
-  async ensureMcpConnections(agentId) {
+  async ensureMcpConnections(agentId, projectRootPath) {
     const errors = [];
-    for (const descriptor of this.getEnabledMcpDescriptors(agentId)) {
+    const nextProjectRoot = projectRootPath ? path__namespace.resolve(projectRootPath) : null;
+    if (this.activeMcpProjectRoot !== nextProjectRoot) {
+      await this.mcpManager.disconnectAll();
+      this.connectedMcpServerIds.clear();
+      this.failedMcpServers.clear();
+      this.activeMcpProjectRoot = nextProjectRoot;
+    }
+    for (const descriptor of this.getEnabledMcpDescriptors(agentId, projectRootPath)) {
       if (this.connectedMcpServerIds.has(descriptor.id)) {
         continue;
       }
@@ -19222,7 +19222,7 @@ ${entries.join("\n")}` : "No matching memories were found."
     const settings = settingsService.getAll();
     const routeProvider = settings.llm.providers.find((entry) => entry.id === input.providerId);
     const routeCapability = resolveAgentRouteCapability(routeProvider, input.modelId);
-    const mcpConnectionErrors = await this.ensureMcpConnections(input.agentId);
+    const mcpConnectionErrors = await this.ensureMcpConnections(input.agentId, input.projectRootPath);
     const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
     const activeToolDefinitions = routeCapability.toolCallingMode === "native-structured" ? runtimeTools.definitions : [];
     const activeToolAllowlist = activeToolDefinitions.map((tool) => tool.name);
@@ -19233,7 +19233,6 @@ ${entries.join("\n")}` : "No matching memories were found."
       sessionId: input.sessionId ?? null,
       stage: input.stage,
       mode: input.mode,
-      patternId: input.patternId,
       providerId: input.providerId,
       modelId: input.modelId,
       toolAllowlist: activeToolAllowlist,
@@ -19257,8 +19256,8 @@ ${entries.join("\n")}` : "No matching memories were found."
     const streamOptions = {
       maxTokens: input.maxTokens,
       temperature: input.temperature,
-      reasoningBudget: input.options?.reasoningBudget,
-      reasoningVisibility: input.options?.reasoningBudget === "off" ? "none" : routeCapability.reasoningVisibility,
+      reasoning: input.options?.reasoning,
+      reasoningVisibility: input.options?.reasoning?.selection === "off" ? "none" : routeCapability.reasoningVisibility,
       signal: input.options?.signal
     };
     const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
@@ -19289,7 +19288,8 @@ ${entries.join("\n")}` : "No matching memories were found."
       input.turnId ?? "",
       input.sessionId,
       input.contextWindow,
-      input.contextTokenLimit
+      input.contextTokenLimit,
+      input.promptPlan
     );
     const userMessage = {
       role: "user",
@@ -19316,17 +19316,17 @@ ${entries.join("\n")}` : "No matching memories were found."
           const mcpDefs = activeToolDefinitions.filter(isMcpDef);
           const subagentDefs = activeToolDefinitions.filter(isSubagentDef);
           const systemDefs = activeToolDefinitions.filter((d) => !isMcpDef(d) && !isSubagentDef(d));
-          const pm = input.promptMetrics;
-          const systemPromptChars = pm ? pm.system_prompt : input.systemPrompt.length;
-          const rulesChars = pm?.rules ?? 0;
-          const memoryChars = pm?.memory_files ?? 0;
+          const pm = input.promptPlan?.metrics;
+          const systemPromptChars = pm ? pm.systemPrompt : input.systemPrompt.length;
+          const rulesChars = pm?.scopedInstructions ?? 0;
+          const skillsChars = pm?.skills ?? 0;
           const compressionStats = slot.contextManager.classifyMessages(
             slot.agent.messages
           );
           const precomputedBreakdown = [
             { id: "system_prompt", tokens: charsToTokens(systemPromptChars) },
-            ...rulesChars > 0 ? [{ id: "rules", tokens: charsToTokens(rulesChars) }] : [],
-            ...memoryChars > 0 ? [{ id: "memory_files", tokens: charsToTokens(memoryChars) }] : [],
+            ...rulesChars > 0 ? [{ id: "scoped_instructions", tokens: charsToTokens(rulesChars) }] : [],
+            ...skillsChars > 0 ? [{ id: "skills", tokens: charsToTokens(skillsChars) }] : [],
             { id: "system_tools", tokens: charsToTokens(JSON.stringify(systemDefs).length), count: systemDefs.length },
             { id: "mcp_tools", tokens: charsToTokens(JSON.stringify(mcpDefs).length), count: mcpDefs.length },
             { id: "subagent_definitions", tokens: charsToTokens(JSON.stringify(subagentDefs).length), count: subagentDefs.length },
@@ -19390,39 +19390,6 @@ ${entries.join("\n")}` : "No matching memories were found."
           console.error(`[AgentOrchestrator] writeAgentThread failed for ${input.sessionId}::${input.agentId}:`, error);
         }
       }
-      this.memoryExtractTurnCounter += 1;
-      if (this.memoryExtractTurnCounter % AgentOrchestrator.MEMORY_EXTRACT_INTERVAL === 0 && slot.agent.messages.length > 0) {
-        void this.extractMemoriesFromTurn(slot.agent.messages).catch((error) => {
-          console.error("[AgentOrchestrator] memory extraction failed:", error);
-        });
-      }
-    }
-  }
-  /**
-   * 内联提取：将 turn 的消息转为宽松消息类型喂给 MemoryExtractor，
-   * 候选经 dedup 后 writeMemory，再按需触发 consolidation。
-   *
-   * messages 接收 core AgentMessage（Agent.messages 产物），仅提取 role/content。
-   */
-  async extractMemoriesFromTurn(messages) {
-    const recent = messages.slice(-10).map((msg) => ({
-      role: msg.role,
-      content: typeof msg.content === "string" ? msg.content : Array.isArray(msg.content) ? msg.content.filter((block) => block.type === "text" && typeof block.text === "string").map((block) => block.text).join("") : ""
-    }));
-    const candidates = await this.memoryExtractor.extractFromConversation(recent);
-    for (const candidate of candidates) {
-      try {
-        await this.memoryStore.writeMemory(candidate);
-      } catch (error) {
-        console.error("[AgentOrchestrator] writeMemory failed for", candidate.name, error);
-      }
-    }
-    try {
-      if (await this.memoryConsolidator.shouldConsolidate()) {
-        await this.memoryConsolidator.consolidate();
-      }
-    } catch (error) {
-      console.error("[AgentOrchestrator] memory consolidation failed:", error);
     }
   }
   async streamTestModeStub(stub, options) {
@@ -19461,9 +19428,6 @@ ${entries.join("\n")}` : "No matching memories were found."
       return "ask";
     }
     return isTopLevelAgentId(agentId) ? agentId : "edit";
-  }
-  patternForAgent(_agentId) {
-    return "free-agent";
   }
   systemPromptForAgent(agentId, prompt) {
     if (prompt) {
@@ -21029,7 +20993,7 @@ class TraceService {
   eventStore;
   emitter;
   constructor() {
-    this.traceRoot = path.join(appPathService.getWorkspaceRoot(), ".rdc-agent", "trace");
+    this.traceRoot = appPathService.getAppStatePaths().tracesPath;
     this.runStore = new TraceRunStore(this.traceRoot);
     this.eventStore = new TraceEventStore(this.traceRoot);
     this.emitter = new TraceEventEmitter(this.eventStore);
@@ -21281,7 +21245,7 @@ class TraceService {
     return null;
   }
   /**
-   * 会话级进度投影：读取当前会话的 TaskRegistry 任务（`workspace/.tasks/{sessionId}`），
+   * 会话级进度投影：读取当前会话的 TaskRegistry 任务（`${userData}/state/tasks/{sessionId}`），
    * 映射为「进度」泳道所需的 ProgressTask。按创建时间排序生成计划序号；`pending` 且存在
    * 未完成的上游依赖时判定为 `blocked`；`deleted` 任务不进入投影。
    */
@@ -21954,20 +21918,35 @@ function registerAgentHandlers(context2) {
     }
   });
 }
+const storeFor = (scope, projectRoot) => {
+  if (scope === "project") {
+    if (!projectRoot) throw new Error("Project scope memory requires a project root.");
+    return new MemoryStore(appPathService.getProjectRdxPaths(projectRoot).memoryPath);
+  }
+  return new MemoryStore(appPathService.getUserRdxPaths().memoryPath);
+};
 function registerMemoryHandlers(_context) {
-  electron.ipcMain.handle("memory:list", async () => {
-    const memories = await agentOrchestrator.listMemoriesForUi();
-    return { memories };
-  });
-  electron.ipcMain.handle("memory:get", async (_event, name) => {
-    const memory = await agentOrchestrator.getMemoryForUi(name);
-    return { memory };
+  electron.ipcMain.handle("memory:list", async (_event, scope, projectRoot) => ({ memories: (await storeFor(scope, projectRoot).listMemories()).map((memory) => ({ ...memory, scope })) }));
+  electron.ipcMain.handle("memory:get", async (_event, scope, name, projectRoot) => {
+    const memory = await storeFor(scope, projectRoot).getMemory(name);
+    return { memory: memory ? { ...memory, scope } : null };
   });
   electron.ipcMain.handle("memory:write", async (_event, request2) => {
-    return agentOrchestrator.writeMemoryForUi(request2);
+    if (request2.approved !== true) return { success: false, name: request2.name, error: "Memory write requires explicit user approval." };
+    try {
+      const memory = await storeFor(request2.scope, request2.projectRoot).writeMemory(request2);
+      return { success: true, name: memory.name };
+    } catch (error) {
+      return { success: false, name: request2.name, error: error instanceof Error ? error.message : String(error) };
+    }
   });
-  electron.ipcMain.handle("memory:delete", async (_event, name) => {
-    return agentOrchestrator.deleteMemoryForUi(name);
+  electron.ipcMain.handle("memory:delete", async (_event, scope, name, confirmed, projectRoot) => {
+    if (!confirmed) return { success: false, error: "Memory deletion requires confirmation." };
+    try {
+      return { success: await storeFor(scope, projectRoot).deleteMemory(name) };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
   });
 }
 function registerCaptureDeviceHandlers(context2) {
@@ -22031,6 +22010,7 @@ function registerCaptureDeviceHandlers(context2) {
           runId: state2.currentRunId,
           raw: {
             inputId: request2.inputId,
+            ownerSessionId: request2.ownerSessionId,
             replayDeviceId: request2.replayDeviceId,
             filePath: request2.filePath
           }
@@ -22045,6 +22025,7 @@ function registerCaptureDeviceHandlers(context2) {
         }
         const openedCapture = await rdxSessionService.openProjectInput({
           projectId: request2.projectId,
+          ownerSessionId: request2.ownerSessionId ?? null,
           inputId: input.inputId,
           filePath: input.filePath,
           replayDevice
@@ -22080,6 +22061,7 @@ function registerCaptureDeviceHandlers(context2) {
           runId: state2.currentRunId,
           raw: {
             inputId: request2.inputId,
+            ownerSessionId: request2.ownerSessionId,
             replayDeviceId: request2.replayDeviceId,
             filePath: request2.filePath
           }
@@ -22344,26 +22326,6 @@ const sessionCommand = {
       default:
         return { success: true, message: `Session ${action}: current = ${ctx.sessionId ?? "none"}` };
     }
-  }
-};
-const workspaceCommand = {
-  id: "workspace",
-  name: "workspace",
-  description: "View or change the workspace root directory",
-  aliases: ["ws", "cd"],
-  category: "navigation",
-  async execute(args, ctx) {
-    if (args.length === 0) {
-      return {
-        success: true,
-        message: `Current workspace: ${ctx.workspaceRoot ?? "not set"}`
-      };
-    }
-    return {
-      success: true,
-      message: `Workspace changed to: ${args[0]}`,
-      uiAction: { type: "change-workspace", payload: { path: args[0] } }
-    };
   }
 };
 const toolsCommand = {
@@ -22754,7 +22716,6 @@ function registerBuiltins(registry) {
     modelCommand,
     projectCommand,
     sessionCommand,
-    workspaceCommand,
     toolsCommand,
     mcpCommand,
     skillsCommand,
@@ -22843,696 +22804,92 @@ function registerCommandHandlers() {
   });
 }
 const ROOT_BRANCH_ID = "branch-root";
-const AGENT_WORKBENCH_TOOL_CATALOG = [
-  {
-    id: "read_file",
-    label: "Read File",
-    permission: "readonly",
-    inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" } } },
-    resultSummary: "Returns text content from a workspace file.",
-    icon: "file-text",
-    approvalRequired: false
-  },
-  {
-    id: "glob",
-    label: "Glob",
-    permission: "readonly",
-    inputSchema: { type: "object", required: ["pattern"], properties: { pattern: { type: "string" } } },
-    resultSummary: "Lists workspace paths matching a glob pattern.",
-    icon: "folder-search",
-    approvalRequired: false
-  },
-  {
-    id: "grep",
-    label: "Grep",
-    permission: "readonly",
-    inputSchema: { type: "object", required: ["pattern"], properties: { pattern: { type: "string" }, path: { type: "string" } } },
-    resultSummary: "Returns matching text locations from workspace files.",
-    icon: "search",
-    approvalRequired: false
-  },
-  {
-    id: "web_fetch",
-    label: "Web Fetch",
-    permission: "readonly",
-    inputSchema: { type: "object", required: ["url"], properties: { url: { type: "string" } } },
-    resultSummary: "Fetches public HTTP(S) page text.",
-    icon: "globe",
-    approvalRequired: false
-  },
-  {
-    id: "web_search",
-    label: "Web Search",
-    permission: "readonly",
-    inputSchema: { type: "object", required: ["query"], properties: { query: { type: "string" } } },
-    resultSummary: "Searches public web results.",
-    icon: "search-check",
-    approvalRequired: false
-  },
-  {
-    id: "bash",
-    label: "Shell",
-    permission: "approval",
-    inputSchema: { type: "object", required: ["command"], properties: { command: { type: "string" } } },
-    resultSummary: "Runs an approved workspace command and returns stdout/stderr.",
-    icon: "terminal",
-    approvalRequired: true
-  },
-  {
-    id: "write_file",
-    label: "Write File",
-    permission: "mutation",
-    inputSchema: { type: "object", required: ["path", "content"], properties: { path: { type: "string" }, content: { type: "string" } } },
-    resultSummary: "Writes a workspace file after policy approval.",
-    icon: "file-plus",
-    approvalRequired: true
-  },
-  {
-    id: "edit_file",
-    label: "Edit File",
-    permission: "mutation",
-    inputSchema: { type: "object", required: ["path"], properties: { path: { type: "string" }, patch: { type: "string" } } },
-    resultSummary: "Edits a workspace file after policy approval.",
-    icon: "pencil",
-    approvalRequired: true
-  },
-  {
-    id: "task_list",
-    label: "Tasks",
-    permission: "readonly",
-    inputSchema: { type: "object", properties: {} },
-    resultSummary: "Summarizes current task or plan state.",
-    icon: "list-checks",
-    approvalRequired: false
-  },
-  {
-    id: "task_create",
-    label: "Create Task",
-    permission: "mutation",
-    inputSchema: {
-      type: "object",
-      required: ["subject"],
-      properties: {
-        subject: { type: "string" },
-        description: { type: "string" },
-        activeForm: { type: "string" },
-        blockedBy: { type: "array", items: { type: "string" } }
-      }
-    },
-    resultSummary: "Creates a private agent task record in workspace user space.",
-    icon: "list-plus",
-    approvalRequired: false
-  },
-  {
-    id: "task_update",
-    label: "Update Task",
-    permission: "mutation",
-    inputSchema: {
-      type: "object",
-      required: ["taskId"],
-      properties: {
-        taskId: { type: "string" },
-        status: { type: "string" },
-        subject: { type: "string" },
-        description: { type: "string" }
-      }
-    },
-    resultSummary: "Updates status or metadata for a private agent task record.",
-    icon: "list-todo",
-    approvalRequired: false
-  },
-  {
-    id: "task_get",
-    label: "Get Task",
-    permission: "readonly",
-    inputSchema: { type: "object", required: ["taskId"], properties: { taskId: { type: "string" } } },
-    resultSummary: "Reads a private agent task record by id.",
-    icon: "list",
-    approvalRequired: false
-  },
-  {
-    id: "ask_user",
-    label: "Ask User",
-    permission: "approval",
-    inputSchema: { type: "object", required: ["question"], properties: { question: { type: "string" }, choices: { type: "array", items: { type: "string" } } } },
-    resultSummary: "Surfaces a decision or missing information request.",
-    icon: "message-question",
-    approvalRequired: false
-  },
-  {
-    id: "agent_handoff",
-    label: "Agent Handoff",
-    permission: "readonly",
-    inputSchema: { type: "object", required: ["prompt"], properties: { agent: { type: "string" }, label: { type: "string" }, prompt: { type: "string" } } },
-    resultSummary: "Creates an implementation or specialist handoff summary.",
-    icon: "route",
-    approvalRequired: false
-  },
-  {
-    id: "memory_read",
-    label: "Memory",
-    permission: "readonly",
-    inputSchema: { type: "object", properties: { name: { type: "string" }, query: { type: "string" }, limit: { type: "number" } } },
-    resultSummary: "Reads persisted workspace memories by name or keyword filter.",
-    icon: "brain",
-    approvalRequired: false
-  },
-  {
-    id: "memory_write",
-    label: "Write Memory",
-    permission: "mutation",
-    inputSchema: {
-      type: "object",
-      required: ["name", "description", "type", "content"],
-      properties: {
-        name: { type: "string" },
-        description: { type: "string" },
-        type: { type: "string" },
-        content: { type: "string" },
-        tags: { type: "array", items: { type: "string" } }
-      }
-    },
-    resultSummary: "Persists a new memory (user/feedback/project/reference) to the workspace store.",
-    icon: "brain",
-    approvalRequired: false
-  },
-  {
-    id: "memory_delete",
-    label: "Delete Memory",
-    permission: "mutation",
-    inputSchema: { type: "object", required: ["name"], properties: { name: { type: "string" } } },
-    resultSummary: "Deletes a memory by name from the workspace store.",
-    icon: "brain",
-    approvalRequired: true
-  },
-  {
-    id: "plan_artifact",
-    label: "Plan Artifact",
-    permission: "mutation",
-    inputSchema: { type: "object", required: ["content"], properties: { title: { type: "string" }, content: { type: "string" } } },
-    resultSummary: "Writes the current plan to the active session artifact.",
-    icon: "file-check",
-    approvalRequired: false
-  },
-  {
-    id: "skills",
-    label: "Skills",
-    permission: "readonly",
-    inputSchema: { type: "object", properties: { query: { type: "string" } } },
-    resultSummary: "Lists configured reusable skills.",
-    icon: "sparkles",
-    approvalRequired: false
-  },
-  {
-    id: "mcp",
-    label: "MCP",
-    permission: "readonly",
-    inputSchema: { type: "object", properties: { query: { type: "string" } } },
-    resultSummary: "Lists configured MCP services.",
-    icon: "plug",
-    approvalRequired: false
-  },
-  {
-    id: "rdx_context",
-    label: "RDX Context",
-    permission: "readonly",
-    inputSchema: { type: "object", properties: {} },
-    resultSummary: "Reads current RDC/RDX runtime context.",
-    icon: "monitor-dot",
-    approvalRequired: false
-  }
-];
-const AGENT_WORKBENCH_COMMAND_CATALOG = [
-  {
-    command: "/help",
-    label: "Help",
-    description: "Show available profile commands and tool boundaries.",
-    relatedTools: [],
-    permission: "readonly"
-  },
-  {
-    command: "/compact",
-    label: "Compact",
-    description: "Request context compaction when the profile can manage context.",
-    relatedTools: ["memory_read"],
-    permission: "readonly"
-  },
-  {
-    command: "/context",
-    label: "Context",
-    description: "Summarize current project, session, captures, and available context.",
-    relatedTools: ["read_file", "memory_read", "rdx_context"],
-    permission: "readonly"
-  },
-  {
-    command: "/memory",
-    label: "Memory",
-    description: "Inspect profile-accessible memory.",
-    relatedTools: ["memory_read", "plan_artifact", "task_list"],
-    permission: "readonly"
-  },
-  {
-    command: "/agents",
-    label: "Agents",
-    description: "List profiles and handoff options visible to the current profile.",
-    relatedTools: ["agent_handoff"],
-    permission: "readonly"
-  },
-  {
-    command: "/skills",
-    label: "Skills",
-    description: "List configured skills visible to the current profile.",
-    relatedTools: ["skills"],
-    permission: "readonly"
-  },
-  {
-    command: "/mcp",
-    label: "MCP",
-    description: "List configured MCP services visible to the current profile.",
-    relatedTools: ["mcp"],
-    permission: "readonly"
-  },
-  {
-    command: "/status",
-    label: "Status",
-    description: "Summarize runtime, route, tool, and capture status.",
-    relatedTools: ["task_list", "task_get", "rdx_context"],
-    permission: "readonly"
-  },
-  {
-    command: "/model",
-    label: "Model",
-    description: "Show the active model route for this profile.",
-    relatedTools: [],
-    permission: "readonly"
-  }
-];
-const sectionIdentity = (context2) => {
-  const { agentLabel, agentDescription } = context2.profile;
-  return [
-    `# Identity`,
-    `You are ${agentLabel}. ${agentDescription}`,
-    ``,
-    `Core directives:`,
-    `- Act, don't explain. Prefer tool invocations over narration.`,
-    `- Show concise visible work summaries and tool results only. Do not reveal hidden chain-of-thought.`,
-    `- Keep output minimal. Surface only what the user needs.`,
-    `- Use tools to read, write, and verify; never guess when a tool can confirm.`
-  ].join("\n");
+const DEFAULT_INSTRUCTION_BUDGET = 64 * 1024;
+const isWithinRoot = (candidate, root) => {
+  const relative = path.relative(root, candidate);
+  return relative === "" || !relative.startsWith("..") && !path.isAbsolute(relative);
 };
-const sectionProfileInstructions = (context2) => {
-  const base = context2.profile.baseInstructions?.trim();
-  const global = context2.profile.globalInstructions?.trim();
-  if (!base && !global) {
-    return null;
-  }
-  const parts = [`# Profile Instructions`];
-  if (base) {
-    parts.push(``, base);
-  }
-  if (global) {
-    parts.push(``, `## Global Instructions`, global);
-  }
-  return parts.join("\n");
-};
-const sectionCapabilities = () => {
-  return [
-    `# Capabilities`,
-    `- Read and write files in the workspace.`,
-    `- Execute commands via the available shell tooling.`,
-    `- Search code semantically and by exact pattern.`,
-    `- Manage tasks, plans, and intermediate artifacts.`
-  ].join("\n");
-};
-const sectionTools = (context2) => {
-  if (!context2.tools || context2.tools.length === 0) {
-    return null;
-  }
-  const lines = context2.tools.map((name) => `- ${name}`);
-  return [`# Available Tools`, ...lines].join("\n");
-};
-const sectionWorkspace = (context2) => {
-  const platform = process.platform ?? "unknown";
-  const shell = process.env.SHELL ?? process.env.ComSpec ?? "unknown";
-  return [
-    `# Working Directory`,
-    `The current project root is ${context2.workDir}. Use it as the default base for relative file paths, search roots, and shell working directory.`,
-    `Platform: ${platform}`,
-    `Shell: ${shell}`,
-    `Model: ${context2.model.provider}/${context2.model.name}`,
-    `Mode: ${context2.mode}`,
-    `Current date: ${context2.currentDate ?? "unknown"}`,
-    `Time zone: ${context2.timeZone ?? "local"}`
-  ].join("\n");
-};
-const sectionRouteCapability = (context2) => {
-  const cap = context2.routeCapability;
-  if (cap.toolCallingMode === "native-structured") {
-    return [
-      `# Route Capability`,
-      `Route Capability: native structured tool calling is enabled for ${cap.providerId}/${cap.modelId}.`,
-      `When a tool is needed, use only the provider structured tool/function-call channel.`,
-      `Do not write textual tool-call syntax in the assistant message.`
-    ].join("\n");
-  }
-  return [
-    `# Route Capability`,
-    `Route Capability: ${cap.toolCallingMode} for ${cap.providerId}/${cap.modelId}.`,
-    `This route cannot execute runtime tools in the current agent loop.`,
-    `Do not invent tool calls, tool results, file reads, searches, or command output.`,
-    `If you need runtime information, explain what information is missing and why.`
-  ].join("\n");
-};
-const sectionPermission = (context2) => {
-  const ps = context2.permissionSettings;
-  const mode = ps.mode;
-  const lines = [
-    `# Runtime Permission Policy`,
-    `Current permission mode: ${mode}.`
-  ];
-  switch (mode) {
-    case "full-access":
-      lines.push(
-        "Readable roots: entire local machine.",
-        "Writable roots: entire local machine.",
-        "Use read_file with absolute paths for files outside the current project root.",
-        "Do not claim inability to read or write a local path without attempting the tool first.",
-        "You may also access files outside this project root using absolute paths when calling read_file, glob, grep, or shell commands."
-      );
-      break;
-    case "auto-review":
-      lines.push(
-        "Readable roots: current project workspace; external read paths are auto-reviewed and usually denied at medium risk.",
-        "Writable roots: current project workspace; external write paths are auto-reviewed and usually denied at medium or high risk.",
-        "When external access is needed, ask the user to switch to Default or Full access, or add readableRoots in Custom mode settings.",
-        "If policy may deny the path, still attempt read_file with an absolute path so the runtime can record the review outcome."
-      );
-      break;
-    case "custom":
-      lines.push(
-        `Readable roots: current project workspace plus ${formatConfiguredRoots(
-          ps.readableRoots,
-          "no extra configured paths"
-        )}.`,
-        `Writable roots: current project workspace plus ${formatConfiguredRoots(
-          ps.writableRoots,
-          "no extra configured paths"
-        )}.`,
-        "Configured readableRoots and writableRoots in settings are allowed without extra approval.",
-        "For other external paths, runtime approval rules still apply based on the closest matching policy.",
-        "When policy allows access, use read_file with absolute paths and do not refuse without attempting the tool."
-      );
-      break;
-    default:
-      lines.push(
-        "Readable roots: current project workspace; external paths require one-time user approval.",
-        "Writable roots: current project workspace; external paths require one-time user approval.",
-        "When the user asks for a file outside the project, call read_file with its absolute path and wait for runtime approval if prompted.",
-        "Do not refuse or guess file contents without attempting the tool first.",
-        "External files, network access, file mutation, destructive shell commands, and unrecognized commands may pause for user approval."
-      );
-      break;
-  }
-  lines.push(
-    "Routine local inspection commands can run when the runtime policy allows them.",
-    "When policy allows external access, use read_file with absolute paths instead of claiming the file is unreachable.",
-    "If the runtime denies or requests approval, do not route around the decision with guessed paths or textual tool calls.",
-    "When you report a file path, use the absolute path that the tool actually resolved. Do not claim a path that differs from the tool result."
-  );
-  return lines.join("\n");
-};
-function formatConfiguredRoots(roots, fallback) {
-  return roots.length > 0 ? roots.join(", ") : fallback;
-}
-const sectionCatalog = (context2) => {
-  if (context2.routeCapability.toolCallingMode !== "native-structured") {
-    return null;
-  }
-  const allowedNames = context2.allowedToolNames ?? context2.tools ?? [];
-  const allowed = new Set(allowedNames);
-  const toolLines = AGENT_WORKBENCH_TOOL_CATALOG.filter((tool) => allowed.has(tool.id)).map((tool) => `- ${tool.id}: ${tool.label}; permission=${tool.permission}; approval=${tool.approvalRequired ? "required" : "not required"}; result=${tool.resultSummary}`);
-  const commandLines = AGENT_WORKBENCH_COMMAND_CATALOG.map((command) => `- ${command.command}: ${command.description}${command.relatedTools.length ? ` Uses: ${command.relatedTools.join(", ")}` : ""}.`);
-  return [
-    "# Runtime Catalog",
-    "Only use tools exposed to this profile by the runtime. Slash commands are intent hints and never bypass profile permissions.",
-    "",
-    "Allowed tools:",
-    ...toolLines.length > 0 ? toolLines : ["- None."],
-    "",
-    "Slash commands:",
-    ...commandLines
-  ].join("\n");
-};
-const sectionMemory = (context2) => {
-  const hasIndex = typeof context2.memoryIndex === "string" && context2.memoryIndex.trim().length > 0;
-  const hasRelevant = Array.isArray(context2.relevantMemories) && context2.relevantMemories.length > 0;
-  if (!hasIndex && !hasRelevant) {
-    return null;
-  }
-  const parts = [`# Memory`];
-  if (hasIndex) {
-    parts.push(``, `Available memories:`, context2.memoryIndex.trim());
-  }
-  if (hasRelevant) {
-    parts.push(``, `Relevant memories:`);
-    for (const mem of context2.relevantMemories) {
-      parts.push(``, mem.trim());
+const realPathIfPresent = (candidate) => fs.existsSync(candidate) ? fs.realpathSync.native(candidate) : path.resolve(candidate);
+class ScopedInstructionResolver {
+  resolveForPaths(input) {
+    const diagnostics = [];
+    const sources = [];
+    const budget = input.byteBudget ?? DEFAULT_INSTRUCTION_BUDGET;
+    const projectRoot = path.resolve(input.projectRoot);
+    const realProjectRoot = realPathIfPresent(projectRoot);
+    const candidates = [];
+    if (fs.existsSync(input.userInstructionsPath)) {
+      candidates.push({ scope: "user", sourcePath: path.resolve(input.userInstructionsPath) });
     }
-  }
-  return parts.join("\n");
-};
-const sectionRules = (context2) => {
-  const lines = [
-    `# Rules`,
-    `- Do not modify files unrelated to the current task.`,
-    `- Do not delete files or perform irreversible actions without explicit confirmation.`,
-    `- Minimize output: avoid re-stating tool results, prefer next actions.`,
-    `- When uncertain, prefer reading existing code over guessing.`,
-    `- Respect the runtime permission policy for workspace boundaries; use absolute paths when policy allows external access.`,
-    `- Do not claim a file is unreachable without attempting read_file when policy permits.`,
-    `- Treat latest, current, today, and recent requests as date-sensitive. Calibrate search terms and conclusions against the Current date and Time zone above.`,
-    `- Use web_search to discover candidate sources; before summarizing factual current/news claims, call web_fetch on selected source pages and ground the answer in fetched page text, not snippets alone.`
-  ];
-  const userRules = context2.userRules?.trim();
-  if (userRules && userRules.length > 0) {
-    lines.push(``, `## User Rules`, userRules);
-  }
-  return lines.join("\n");
-};
-const sectionContext = (context2) => {
-  const hasSkills = Array.isArray(context2.skills) && context2.skills.length > 0;
-  const hasCustom = Array.isArray(context2.customSections) && context2.customSections.length > 0;
-  if (!hasSkills && !hasCustom) {
-    return null;
-  }
-  const parts = [`# Context`];
-  if (hasSkills) {
-    parts.push(``, `Loaded skills:`);
-    for (const name of context2.skills) {
-      parts.push(`- ${name}`);
-    }
-  }
-  if (hasCustom) {
-    for (const section of context2.customSections) {
-      const title = section.title?.trim() || "Custom";
-      const content = section.content?.trim() ?? "";
-      parts.push(``, `## ${title}`, content);
-    }
-  }
-  return parts.join("\n");
-};
-const sectionTaskPlanning = (context2) => {
-  if (!context2.tools?.includes("task_create")) {
-    return null;
-  }
-  return [
-    `# Task Planning`,
-    `For any multi-step task, maintain a live plan with the task tools so the user can supervise progress in the Progress panel:`,
-    `- At the start, break the goal into ordered, actionable steps and create them with \`task_create\` (use \`activeForm\` for in-progress phrasing, and \`blockedBy\` for dependencies on earlier steps).`,
-    `- Keep exactly one step \`in_progress\` at a time: mark a step \`in_progress\` with \`task_update\` before starting it, and \`completed\` as soon as it is done.`,
-    `- When a step cannot proceed, leave it pending and record its blocking dependency so it surfaces as blocked.`,
-    `- Keep the plan honest and current — do not batch status changes or leave finished work unmarked. Skip this only for trivial single-step requests.`
-  ].join("\n");
-};
-const DEFAULT_SECTIONS = [
-  sectionIdentity,
-  sectionProfileInstructions,
-  sectionCapabilities,
-  sectionTools,
-  sectionWorkspace,
-  sectionRouteCapability,
-  sectionPermission,
-  sectionCatalog,
-  sectionTaskPlanning,
-  sectionMemory,
-  sectionRules,
-  sectionContext
-];
-const DEFAULT_STATIC_SECTION_COUNT = 8;
-const DYNAMIC_BOUNDARY = "\n<!-- DYNAMIC_CONTENT_BELOW -->\n";
-const MAX_CACHE_ENTRIES = 10;
-const LOOP_OUTPUT_GUIDANCE = `# Loop Output
-- During an agent run, keep intermediate visible commentary to one or two short sentences that explain the next action.
-- Do not emit long-form prose or final-answer body text until the run is finishing with no further tool calls.
-- Reserve detailed final answers for the closing turn when you are ready to respond to the user.`;
-class PromptAssembler {
-  sections;
-  staticSectionCount;
-  enableCache;
-  cache;
-  constructor(options = {}) {
-    this.sections = options.sections ?? DEFAULT_SECTIONS;
-    this.staticSectionCount = Math.max(
-      0,
-      Math.min(
-        options.staticSectionCount ?? DEFAULT_STATIC_SECTION_COUNT,
-        this.sections.length
-      )
-    );
-    this.enableCache = options.enableCache ?? true;
-    this.cache = /* @__PURE__ */ new Map();
-  }
-  /**
-   * 组装完整的 system prompt。
-   *
-   * @param context 段落函数所需的运行期上下文。
-   * @returns 拼装好的 system prompt 字符串。
-   */
-  assembleSystemPrompt(context2) {
-    if (this.enableCache) {
-      const key = this.computeCacheKey(context2, "full");
-      const cached = this.cache.get(key);
-      if (cached !== void 0) {
-        return cached;
-      }
-      const prompt = this.renderFull(context2);
-      this.storeInCache(key, prompt);
-      return prompt;
-    }
-    return this.renderFull(context2);
-  }
-  /**
-   * 仅返回静态前缀（包含末尾的 {@link DYNAMIC_BOUNDARY}）。
-   *
-   * 用于上层提前发起 prompt cache warm-up：
-   * 即便后续动态段落变化，前缀依然命中缓存。
-   */
-  getStaticPrefix(context2) {
-    if (this.enableCache) {
-      const key = this.computeCacheKey(context2, "prefix");
-      const cached = this.cache.get(key);
-      if (cached !== void 0) {
-        return cached;
-      }
-      const prefix = this.renderStaticPrefix(context2);
-      this.storeInCache(key, prefix);
-      return prefix;
-    }
-    return this.renderStaticPrefix(context2);
-  }
-  /**
-   * 主动清除全部缓存。
-   *
-   * 当外部依赖（如可用工具集合、规则集）发生变化但 context 字段未变时，
-   * 调用方应显式调用本方法以避免命中过期缓存。
-   */
-  invalidateCache() {
-    this.cache.clear();
-  }
-  /**
-   * 测量各语义分段的字符数，用于上下文窗口 breakdown 的 token 估算。
-   *
-   * 不触发缓存；调用时需保证 context 与 assembleSystemPrompt 所用的 context 一致。
-   */
-  measureSections(context2) {
-    const rulesText = sectionRules(context2) ?? "";
-    const memoryText = sectionMemory(context2) ?? "";
-    const fullPrompt = this.assembleSystemPrompt(context2);
-    const dynamicChars = rulesText.length + memoryText.length;
-    return {
-      system_prompt: Math.max(0, fullPrompt.length - dynamicChars),
-      rules: rulesText.length,
-      memory_files: memoryText.length
-    };
-  }
-  /** 渲染完整 prompt（不使用缓存）。 */
-  renderFull(context2) {
-    const groups = this.collectGroups(context2);
-    const staticParts = [...groups.staticParts];
-    staticParts.push(LOOP_OUTPUT_GUIDANCE);
-    const parts = [];
-    if (staticParts.length > 0) {
-      parts.push(staticParts.join("\n\n"));
-    }
-    if (groups.dynamicParts.length > 0) {
-      const dynamic = groups.dynamicParts.join("\n\n");
-      if (parts.length > 0) {
-        return parts[0] + DYNAMIC_BOUNDARY + dynamic;
-      }
-      return dynamic;
-    }
-    return parts.join("");
-  }
-  /** 渲染静态前缀（不使用缓存），始终以 {@link DYNAMIC_BOUNDARY} 结尾。 */
-  renderStaticPrefix(context2) {
-    const groups = this.collectGroups(context2);
-    const staticText = [...groups.staticParts, LOOP_OUTPUT_GUIDANCE].join("\n\n");
-    return staticText + DYNAMIC_BOUNDARY;
-  }
-  /** 调用所有段落函数并按静态/动态分组，跳过返回 null 或空白的段落。 */
-  collectGroups(context2) {
-    const staticParts = [];
-    const dynamicParts = [];
-    for (let i = 0; i < this.sections.length; i += 1) {
-      const section = this.sections[i];
-      const text = section(context2);
-      if (text === null || text === void 0) {
+    const projectInstructionPaths = /* @__PURE__ */ new Set();
+    const rootInstruction = path.join(projectRoot, "RDX.md");
+    if (fs.existsSync(rootInstruction)) projectInstructionPaths.add(rootInstruction);
+    for (const activePath of input.activePaths) {
+      const resolved = path.resolve(activePath);
+      const lexicalTarget = fs.existsSync(resolved) && fs.statSync(resolved).isFile() ? path.dirname(resolved) : resolved;
+      const realTarget = realPathIfPresent(lexicalTarget);
+      if (!isWithinRoot(realTarget, realProjectRoot)) {
+        diagnostics.push({
+          code: "instructions.path.outside-project",
+          severity: "error",
+          message: `Instruction target is outside the project: ${activePath}`,
+          sourcePath: activePath
+        });
         continue;
       }
-      const trimmed = text.trim();
-      if (trimmed.length === 0) {
-        continue;
-      }
-      if (i < this.staticSectionCount) {
-        staticParts.push(trimmed);
-      } else {
-        dynamicParts.push(trimmed);
+      const relative = path.relative(projectRoot, lexicalTarget);
+      const parts = relative ? relative.split(path.sep).filter(Boolean) : [];
+      let current = projectRoot;
+      for (const part of parts) {
+        current = path.join(current, part);
+        const instructionPath = path.join(current, "RDX.md");
+        if (fs.existsSync(instructionPath)) projectInstructionPaths.add(instructionPath);
       }
     }
-    return { staticParts, dynamicParts };
-  }
-  /** 计算缓存 key：context 序列化后的 SHA-256，附带类型后缀。 */
-  computeCacheKey(context2, kind) {
-    const serialized = JSON.stringify(context2, replacerForStableKeys);
-    const hash = node_crypto.createHash("sha256").update(serialized ?? "").digest("hex");
-    return `${kind}:${hash}`;
-  }
-  /** 写入缓存，超出上限时按插入序淘汰最旧条目。 */
-  storeInCache(key, value) {
-    if (this.cache.has(key)) {
-      this.cache.delete(key);
-    }
-    this.cache.set(key, value);
-    while (this.cache.size > MAX_CACHE_ENTRIES) {
-      const oldest = this.cache.keys().next();
-      if (oldest.done) {
-        break;
+    Array.from(projectInstructionPaths).sort((left, right) => {
+      const leftDepth = path.relative(projectRoot, left).split(path.sep).length;
+      const rightDepth = path.relative(projectRoot, right).split(path.sep).length;
+      return leftDepth - rightDepth || left.localeCompare(right);
+    }).forEach((sourcePath) => candidates.push({ scope: "project", sourcePath }));
+    let totalBytes = 0;
+    candidates.forEach((candidate, index) => {
+      const realSourcePath = realPathIfPresent(candidate.sourcePath);
+      if (candidate.scope === "project" && !isWithinRoot(realSourcePath, realProjectRoot)) {
+        diagnostics.push({
+          code: "instructions.source.symlink-escape",
+          severity: "error",
+          message: `RDX.md resolves outside the project: ${candidate.sourcePath}`,
+          sourcePath: candidate.sourcePath
+        });
+        return;
       }
-      this.cache.delete(oldest.value);
-    }
+      const content = fs.readFileSync(candidate.sourcePath, "utf8").replace(/^\uFEFF/u, "").trim();
+      if (!content) return;
+      const byteLength = Buffer.byteLength(content, "utf8");
+      if (totalBytes + byteLength > budget) {
+        diagnostics.push({
+          code: "instructions.budget.exceeded",
+          severity: "error",
+          message: `Instruction budget ${budget} bytes would be exceeded by ${candidate.sourcePath}.`,
+          sourcePath: candidate.sourcePath
+        });
+        return;
+      }
+      totalBytes += byteLength;
+      sources.push({
+        id: `${candidate.scope}:${path.relative(candidate.scope === "project" ? projectRoot : path.dirname(candidate.sourcePath), candidate.sourcePath) || "RDX.md"}`,
+        scope: candidate.scope,
+        sourcePath: candidate.sourcePath,
+        sourceHash: hashScopedResource(content),
+        content,
+        byteLength,
+        precedence: index
+      });
+    });
+    return { sources, totalBytes, diagnostics };
   }
 }
-function replacerForStableKeys(_key, value) {
-  if (value && typeof value === "object" && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype) {
-    const record = value;
-    const sorted = {};
-    for (const k of Object.keys(record).sort()) {
-      sorted[k] = record[k];
-    }
-    return sorted;
-  }
-  return value;
-}
+const scopedInstructionResolver = new ScopedInstructionResolver();
 const sortByCreatedAt = (left, right) => {
   if (left.createdAt !== right.createdAt) return left.createdAt - right.createdAt;
   const leftUpdated = left.updatedAt ?? left.createdAt;
@@ -23781,10 +23138,23 @@ function resolveConversationReasoningState(thinking, reasoningDelivery) {
   if (thinking?.kind === "raw") return "raw";
   if (thinking?.kind === "summary") return "summary";
   if (thinking?.kind === "opaque") return "opaque";
+  if (thinking?.kind === "unknown") return "unknown";
   if (reasoningDelivery !== "none") {
     return "hidden";
   }
   return "none";
+}
+function beginAssistantContentLoopIfPending(state2) {
+  if (!state2.pendingNewLoop) return state2;
+  return {
+    loopSeq: state2.loopSeq + 1,
+    currentLoopText: "",
+    currentLoopThinking: void 0,
+    currentLoopThinkingStatus: void 0,
+    loopHasTools: false,
+    pendingNewLoop: false,
+    visibleResponse: ""
+  };
 }
 function mergeThinkingPayload(current, incoming, delta) {
   if (incoming) {
@@ -23911,10 +23281,6 @@ function getAgentLabel(agentId) {
   const definition = resolveEnabledAgentDefinition(agentId);
   return definition?.name || (isTopLevelAgentId(agentId) ? AGENT_DISPLAY_NAMES[agentId] : agentId);
 }
-function getAgentDescription(agentId) {
-  const definition = resolveEnabledAgentDefinition(agentId);
-  return definition?.description || (isTopLevelAgentId(agentId) ? AGENT_DESCRIPTIONS[agentId] : "Workspace agent profile.");
-}
 function redactTechnicalMessage(error) {
   const raw = error instanceof Error ? error.message : String(error);
   return raw.replace(/(Bearer\s+)[^\s"'`,;)}]+/gi, "$1[redacted]").replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|secret)["'\s:=]+)[^"',;\s)}]+/gi, "$1[redacted]").slice(0, 1200);
@@ -24035,7 +23401,6 @@ function createRequestFailedDiagnostic(route, error) {
 }
 class ConversationService {
   activeTurns = /* @__PURE__ */ new Map();
-  promptAssembler = new PromptAssembler();
   /**
    * 待处理的 handoff（sessionId → {toProfile, prompt}）。
    *
@@ -24278,7 +23643,7 @@ class ConversationService {
     const currentRun = resolvedSessionId ? storageAdapter.listRuns(resolvedSessionId).find((entry) => entry.runId === (input.currentRunId ?? input.fallbackRunId)) ?? storageAdapter.getLatestRun(resolvedSessionId) : null;
     const projectInputs = projectId ? storageAdapter.listProjectInputs(projectId) : [];
     const openedCapture = rdxSessionService.snapshotOpenedCapture();
-    const activeOpenedCapture = openedCapture?.projectId === projectId && openedCapture.status === "open" ? openedCapture : null;
+    const activeOpenedCapture = openedCapture?.projectId === projectId && openedCapture.status === "open" && openedCapture.ownerSessionId === resolvedSessionId ? openedCapture : null;
     const replayDevice = replayDeviceService.getDeviceById(input.replayDeviceId || "local") ?? replayDeviceService.getDeviceById("local");
     return {
       projectId,
@@ -24507,6 +23872,24 @@ class ConversationService {
       loopThinking: currentLoopThinking,
       loopThinkingStatus: currentLoopThinkingStatus
     });
+    const beginAssistantContentLoop = () => {
+      const next = beginAssistantContentLoopIfPending({
+        loopSeq,
+        currentLoopText,
+        currentLoopThinking,
+        currentLoopThinkingStatus,
+        loopHasTools,
+        pendingNewLoop,
+        visibleResponse
+      });
+      loopSeq = next.loopSeq;
+      currentLoopText = next.currentLoopText;
+      currentLoopThinking = next.currentLoopThinking;
+      currentLoopThinkingStatus = next.currentLoopThinkingStatus;
+      loopHasTools = next.loopHasTools;
+      pendingNewLoop = next.pendingNewLoop;
+      visibleResponse = next.visibleResponse;
+    };
     if (!routePreflight.ok) {
       llmDiagnostic = routePreflight.diagnostic;
       errorViewModel = {
@@ -24530,36 +23913,42 @@ class ConversationService {
       });
     } else {
       try {
-        const definition = resolveEnabledAgentDefinition(conversationAgentId);
-        const promptDefinition = {
-          agentId: conversationAgentId,
-          agentLabel,
-          agentDescription: getAgentDescription(conversationAgentId),
-          baseInstructions: definition?.instructions,
-          globalInstructions: settingsService.getAll().agents.globalInstructions
-        };
-        const allowedToolNames = resolveAgentToolAllowlist(conversationAgentId, "investigate").map((toolName) => normalizeToolName$1(toolName));
         const projectRootPath = input.context.projectId ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null : null;
-        const memoryIndex = await agentOrchestrator.getMemoryIndex();
+        const runtimeSettings = settingsService.getAll();
+        const definition = agentManifestService.getEffectiveProfiles(
+          runtimeSettings.paths,
+          runtimeSettings.llm.providers,
+          runtimeSettings.llm.agentRoutes,
+          projectRootPath ?? void 0
+        ).find((profile) => profile.id === conversationAgentId && profile.enabled) ?? resolveEnabledAgentDefinition(conversationAgentId);
+        if (!definition) throw new Error(`No effective agent profile is configured for ${conversationAgentId}.`);
+        const allowedToolNames = resolveAgentToolAllowlist(conversationAgentId, "investigate").map((toolName) => normalizeToolName$1(toolName));
+        const activePaths = [
+          projectRootPath,
+          input.context.openedCapturePath,
+          ...input.importedAttachments.map((attachment) => attachment.filePath)
+        ].filter((value) => Boolean(value));
+        const scopedInstructions = projectRootPath ? scopedInstructionResolver.resolveForPaths({
+          userInstructionsPath: appPathService.getUserRdxPaths().instructionsPath,
+          projectRoot: projectRootPath,
+          activePaths
+        }) : { sources: [], totalBytes: 0, diagnostics: [] };
+        const preloadedSkills = definition.skills.map((skillId) => agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? void 0)).filter((skill) => skill !== null);
         const promptClock = resolvePromptClock();
-        const promptContext = {
-          workDir: projectRootPath ?? "",
+        const promptPlan = promptPlanBuilder.build({
+          profile: definition,
+          scopedInstructions,
+          preloadedSkills,
+          skillCatalog: agentRuntimeConfigService.listSkillMetadata(projectRootPath ?? void 0),
           tools: allowedToolNames,
-          memoryIndex: memoryIndex || void 0,
-          model: {
-            provider: routePreflight.routeCapability.providerId,
-            name: routePreflight.routeCapability.modelId
-          },
-          mode: this.modeForProfile(conversationAgentId),
-          profile: promptDefinition,
+          workDir: projectRootPath ?? "",
           routeCapability: routePreflight.routeCapability,
-          permissionSettings: settingsService.getAll().agentRuntime.permissions,
-          allowedToolNames,
+          modelCapability: capability ?? void 0,
+          permissionSettings: runtimeSettings.agentRuntime.permissions,
           currentDate: promptClock.currentDate,
-          timeZone: promptClock.timeZone
-        };
-        const systemPrompt = this.promptAssembler.assembleSystemPrompt(promptContext);
-        const promptMetrics = this.promptAssembler.measureSections(promptContext);
+          timeZone: promptClock.timeZone,
+          contextWindowTokens: capability?.nominalContextWindowTokens ?? void 0
+        });
         const responseText = await agentOrchestrator.sendProfileMessage(
           conversationAgentId,
           input.rawMessage,
@@ -24567,11 +23956,10 @@ class ConversationService {
             sessionId: input.context.session?.sessionId,
             turnId: assistantMessage.turnId,
             stage: "investigate",
-            patternId: "free-agent",
             projectRootPath,
             projectId: input.context.projectId,
-            systemPrompt,
-            promptMetrics,
+            systemPrompt: promptPlan.systemPrompt,
+            promptPlan,
             maxTokens: 1200,
             temperature: 0.35,
             signal: abortController.signal,
@@ -24623,15 +24011,7 @@ class ConversationService {
               if (event.type === "assistant.delta") {
                 const chunk = typeof event.payload.text === "string" ? event.payload.text : "";
                 if (chunk) {
-                  if (pendingNewLoop) {
-                    loopSeq += 1;
-                    currentLoopText = "";
-                    currentLoopThinking = void 0;
-                    currentLoopThinkingStatus = void 0;
-                    loopHasTools = false;
-                    pendingNewLoop = false;
-                    visibleResponse = "";
-                  }
+                  beginAssistantContentLoop();
                   rawResponse += chunk;
                   currentLoopText += chunk;
                   if (!loopHasTools) {
@@ -24650,6 +24030,7 @@ class ConversationService {
               }
               if (event.type === "assistant.thinking_delta") {
                 const payload = event.payload;
+                beginAssistantContentLoop();
                 currentLoopThinking = mergeThinkingPayload(
                   currentLoopThinking,
                   payload.thinking,
@@ -24669,6 +24050,7 @@ class ConversationService {
               }
               if (event.type === "assistant.thinking_end") {
                 const payload = event.payload;
+                beginAssistantContentLoop();
                 currentLoopThinking = mergeThinkingPayload(
                   currentLoopThinking,
                   payload.thinking,
@@ -24755,16 +24137,14 @@ class ConversationService {
                 const toolName = String(payload.toolName ?? "approval");
                 if (payload.kind === "ask_user" || normalizeToolName$1(toolName) === "ask_user") {
                   pendingContinuation.userInput = true;
-                  const question = typeof payload.question === "string" && payload.question ? payload.question : typeof payload.reason === "string" && payload.reason ? payload.reason : "The agent needs user input before continuing.";
+                  const questions = normalizeAskUserQuestions({ questions: payload.questions });
+                  const previewQuestions = questions.length > 0 ? questions : [createFallbackAskUserQuestion()];
                   commitAssistantMessage("message_patched", {
                     workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                       id: toolCallId,
                       toolName: "ask_user",
                       status: "running",
-                      argsPreview: JSON.stringify({
-                        question,
-                        choices: Array.isArray(payload.options) ? payload.options : []
-                      }).slice(0, 600),
+                      argsPreview: JSON.stringify({ questions: previewQuestions }),
                       startedAt: nowMs()
                     })
                   });
@@ -24792,13 +24172,13 @@ class ConversationService {
                   if (!failed) {
                     pendingContinuation.userInput = false;
                   }
-                  const answerText2 = payload.answer === void 0 || payload.answer === null ? "" : typeof payload.answer === "string" ? payload.answer.trim() : String(payload.answer).trim();
+                  const resultPreview = failed ? String(payload.answer ?? "User input request was cancelled.") : JSON.stringify({ answers: Array.isArray(payload.answers) ? payload.answers : [] });
                   commitAssistantMessage("message_patched", {
                     workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                       id: String(payload.toolCallId ?? approvalId),
                       toolName: "ask_user",
                       status: failed ? "error" : "running",
-                      resultPreview: failed ? String(payload.answer ?? "User input request was cancelled.") : answerText2 || "User answered.",
+                      resultPreview,
                       error: failed ? String(payload.answer ?? "User input request was cancelled.") : void 0,
                       completedAt: failed ? nowMs() : void 0
                     })
@@ -24928,6 +24308,7 @@ class ConversationService {
               }
               if (event.type === "assistant.completed") {
                 const payload = event.payload;
+                beginAssistantContentLoop();
                 const loopResult = typeof payload.text === "string" ? payload.text.trim() : "";
                 const stopReason = payload.stopReason;
                 const completedThinking = selectCompletedThinking(payload.thinking) ?? currentLoopThinking;
@@ -25122,24 +24503,6 @@ class ConversationService {
    * Plan 归入 ask（ReadOnly 变体），非顶层 agent 归入 edit；
    * 与 AgentOrchestrator.modeForAgent 保持一致语义。
    */
-  modeForProfile(agentId) {
-    if (agentId === "plan" || agentId === "ask") {
-      return "ask";
-    }
-    if (agentId === "debugger") {
-      return "debugger";
-    }
-    if (agentId === "analyzer") {
-      return "analyzer";
-    }
-    if (agentId === "optimizer") {
-      return "optimizer";
-    }
-    if (agentId === "edit") {
-      return "edit";
-    }
-    return "edit";
-  }
 }
 const conversationService = new ConversationService();
 function registerConversationHandlers(context2) {
@@ -26087,7 +25450,8 @@ class ProviderConnectionService {
     if (provider.protocol === "AnthropicMessages") {
       return {
         "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01"
+        "anthropic-version": "2023-06-01",
+        ...provider.id === "kimi-coding-plan" ? { "User-Agent": "RDC-Agent" } : {}
       };
     }
     return {
@@ -26154,20 +25518,19 @@ function registerSettingsLlmHandlers(context2) {
     return result;
   });
   electron.ipcMain.handle("settings:get", async () => {
-    const paths = appPathService.getWorkspacePaths();
+    const paths = appPathService.getRuntimePaths();
     return settingsService.getAll({
-      workspaceRoot: paths.workspaceRoot,
-      defaultWorkspaceRoot: paths.defaultWorkspaceRoot,
+      userRdxRoot: paths.userRdxRoot,
       settingsPath: paths.settingsPath,
+      instructionsPath: paths.instructionsPath,
+      agentsPath: paths.agentsPath,
+      profileStatePath: paths.profileStatePath,
       logsPath: paths.logsPath,
       logPath: paths.logPath,
       projectsPath: paths.projectsPath,
       knowledgePath: paths.knowledgePath,
-      migrationOrphansPath: paths.migrationOrphansPath,
-      profilesPath: paths.profilesPath,
       policiesPath: paths.policiesPath,
-      secretsPath: paths.secretsPath,
-      migrationReportsPath: paths.migrationReportsPath
+      secretsPath: paths.secretsPath
     });
   });
   electron.ipcMain.handle("settings:getProviderCatalog", async () => {
@@ -26182,47 +25545,16 @@ function registerSettingsLlmHandlers(context2) {
     return resolveModelCapability(route.providerId, route.modelId, settings);
   });
   electron.ipcMain.handle("settings:getProviderSecret", async (_event, providerId) => {
-    const paths = appPathService.getWorkspacePaths();
-    return settingsService.getProviderSecret(providerId, paths.workspaceRoot);
+    const paths = appPathService.getRuntimePaths();
+    return settingsService.getProviderSecret(providerId, paths.userRdxRoot);
   });
   electron.ipcMain.handle("settings:importAgentManifest", async (_event, filePath) => {
-    const paths = appPathService.getWorkspacePaths();
+    const paths = appPathService.getRuntimePaths();
     agentManifestService.importFile(paths, filePath);
     return settingsService.getAll(paths);
   });
-  electron.ipcMain.handle("settings:upsertSkill", async (_event, request2) => {
-    const paths = appPathService.getWorkspacePaths();
-    agentRuntimeConfigService.upsertSkill(request2, paths.workspaceRoot);
-    return settingsService.getAll(paths);
-  });
-  electron.ipcMain.handle("settings:deleteSkill", async (_event, skillId) => {
-    const paths = appPathService.getWorkspacePaths();
-    agentRuntimeConfigService.deleteSkill(skillId, paths.workspaceRoot);
-    return settingsService.getAll(paths);
-  });
-  electron.ipcMain.handle("settings:importSkill", async (_event, filePath) => {
-    const paths = appPathService.getWorkspacePaths();
-    agentRuntimeConfigService.importSkill(filePath, paths.workspaceRoot);
-    return settingsService.getAll(paths);
-  });
-  electron.ipcMain.handle("settings:upsertMcpServer", async (_event, request2) => {
-    const paths = appPathService.getWorkspacePaths();
-    agentRuntimeConfigService.upsertMcpServer(request2, paths.workspaceRoot);
-    return settingsService.getAll(paths);
-  });
-  electron.ipcMain.handle("settings:deleteMcpServer", async (_event, serverId) => {
-    const paths = appPathService.getWorkspacePaths();
-    agentRuntimeConfigService.deleteMcpServer(serverId, paths.workspaceRoot);
-    return settingsService.getAll(paths);
-  });
-  electron.ipcMain.handle("settings:importMcpServer", async (_event, filePath) => {
-    const paths = appPathService.getWorkspacePaths();
-    agentRuntimeConfigService.importMcpServer(filePath, paths.workspaceRoot);
-    return settingsService.getAll(paths);
-  });
   electron.ipcMain.handle("settings:set", async (_event, settings) => {
-    const nextSettings = settingsService.setAll(settings, appPathService.getWorkspacePaths());
-    storageAdapter.setWorkspaceRoot(nextSettings.workspace.rootPath);
+    const nextSettings = settingsService.setAll(settings, appPathService.getRuntimePaths());
     await storageAdapter.initializeWorkspace();
     await context2.initializeIpcState();
     context2.applyCurrentLlmConfig();
@@ -26250,8 +25582,8 @@ function copyAvatarToWorkspace(sourcePath) {
   if (!mimeType || !fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
     return null;
   }
-  const paths = appPathService.getWorkspacePaths();
-  const avatarDir = path.join(paths.profilesPath, "avatar");
+  const paths = appPathService.getRuntimePaths();
+  const avatarDir = path.join(paths.profileStatePath, "avatar");
   const extension = path.extname(sourcePath).toLowerCase();
   const avatarPath = path.join(avatarDir, `profile-avatar${extension}`);
   fs.mkdirSync(avatarDir, { recursive: true });
@@ -26663,6 +25995,195 @@ function registerTraceHandlers(context2) {
     return debuggerRuntime.switchTraceBranch(sessionId, branchId);
   });
 }
+const EXTENSIONS = {
+  agent: ".agent.md",
+  mcp: ".mcp.json",
+  hook: ".hook.yml",
+  policy: ".policy.yml",
+  memory: ".md",
+  knowledge: ".md"
+};
+const safeId = (value) => {
+  const id = value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  if (!id) throw new Error("Resource id is required.");
+  return id;
+};
+const assertInside = (root, target) => {
+  const relative = path.relative(path.resolve(root), path.resolve(target));
+  if (relative.startsWith("..") || path.isAbsolute(relative)) throw new Error("Resource path escaped its scope root.");
+};
+class RdxRuntimeService {
+  constructor(hooks = hookEngine) {
+    this.hooks = hooks;
+  }
+  hooks;
+  rootFor(kind, scope, projectRoot) {
+    const user = appPathService.getUserRdxPaths();
+    const project = scope === "project" ? appPathService.getProjectRdxPaths(this.requireProject(projectRoot)) : void 0;
+    const paths = scope === "user" ? user : project;
+    const map = {
+      agent: paths.agentsPath,
+      skill: paths.skillsPath,
+      mcp: paths.mcpPath,
+      hook: paths.hooksPath,
+      policy: paths.policiesPath,
+      knowledge: paths.knowledgePath,
+      memory: paths.memoryPath
+    };
+    const root = map[kind];
+    if (!root) throw new Error(`Unsupported scoped resource kind: ${kind}`);
+    return root;
+  }
+  list(projectRoot) {
+    const documents = [];
+    for (const scope of ["user", ...projectRoot ? ["project"] : []]) {
+      for (const kind of ["agent", "skill", "mcp", "hook", "policy"]) {
+        const root = this.rootFor(kind, scope, projectRoot);
+        if (!fs.existsSync(root)) continue;
+        if (kind === "skill") {
+          for (const entry of fs.readdirSync(root, { withFileTypes: true }).filter((entry2) => entry2.isDirectory())) {
+            const sourcePath = path.join(root, entry.name, "SKILL.md");
+            if (fs.existsSync(sourcePath)) documents.push(this.readDocument(kind, scope, entry.name, sourcePath));
+          }
+          continue;
+        }
+        const extension = EXTENSIONS[kind];
+        for (const entry of fs.readdirSync(root).filter((entry2) => entry2.endsWith(extension)).sort()) {
+          documents.push(this.readDocument(kind, scope, entry.slice(0, -extension.length), path.join(root, entry)));
+        }
+      }
+    }
+    const byKey = /* @__PURE__ */ new Map();
+    for (const document of documents) {
+      const key = `${document.kind}:${document.id}`;
+      byKey.set(key, [...byKey.get(key) ?? [], document]);
+    }
+    for (const variants of byKey.values()) {
+      const project = variants.find((entry) => entry.scope === "project");
+      if (project) variants.filter((entry) => entry.scope === "user").forEach((entry) => {
+        entry.effectiveStatus = "overridden";
+      });
+    }
+    return documents;
+  }
+  overview(projectRoot) {
+    appPathService.initializeRuntime();
+    if (projectRoot) appPathService.initializeProjectRdx(projectRoot);
+    const user = appPathService.getUserRdxPaths();
+    const project = projectRoot ? appPathService.getProjectRdxPaths(projectRoot) : void 0;
+    const hooks = this.hooks.load(user.hooksPath, projectRoot).map((hook) => ({ id: hook.definition.id, scope: hook.scope, sourcePath: hook.sourcePath, sourceHash: hook.sourceHash, enabled: hook.definition.enabled, event: hook.definition.event, trusted: hook.trust.trusted, failurePolicy: hook.definition.failurePolicy }));
+    return {
+      userRoot: user.userRdxRoot,
+      ...projectRoot ? { projectRoot } : {},
+      userPaths: { ...user },
+      ...project ? { projectPaths: { ...project } } : {},
+      resources: this.list(projectRoot),
+      hooks,
+      knowledge: { userPath: user.knowledgePath, ...project ? { projectPath: project.knowledgePath } : {} },
+      memory: { userPath: user.memoryPath, ...project ? { projectPath: project.memoryPath } : {} },
+      diagnostics: []
+    };
+  }
+  validate(request2) {
+    const diagnostics = [];
+    try {
+      if (!request2.content.trim()) throw new Error("Resource content is empty.");
+      if (request2.kind === "mcp") JSON.parse(request2.content);
+      if (request2.kind === "agent") {
+        if (!/^---\r?\n[\s\S]*?\r?\n---/u.test(request2.content)) throw new Error("Agent requires YAML frontmatter.");
+        YAML.parse(request2.content.match(/^---\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? "");
+      }
+      if (request2.kind === "hook" || request2.kind === "policy") YAML.parse(request2.content);
+      if (request2.kind === "policy" && request2.scope === "project" && request2.projectRoot) {
+        const userPolicyPath = path.join(appPathService.getUserRdxPaths().policiesPath, `${safeId(request2.id)}.policy.yml`);
+        if (fs.existsSync(userPolicyPath)) {
+          const base = YAML.parse(fs.readFileSync(userPolicyPath, "utf8"));
+          scopedResourceResolver.tightenPolicy(base, YAML.parse(request2.content));
+        }
+      }
+    } catch (error) {
+      diagnostics.push(error instanceof Error ? error.message : String(error));
+    }
+    return diagnostics;
+  }
+  upsert(request2) {
+    const diagnostics = this.validate(request2);
+    if (diagnostics.length) throw new Error(diagnostics.join("\n"));
+    const id = safeId(request2.id);
+    const root = this.rootFor(request2.kind, request2.scope, request2.projectRoot);
+    const sourcePath = request2.kind === "skill" ? path.join(root, id, "SKILL.md") : path.join(root, `${id}${EXTENSIONS[request2.kind]}`);
+    assertInside(root, sourcePath);
+    fs.mkdirSync(path.dirname(sourcePath), { recursive: true });
+    fs.writeFileSync(sourcePath, `${request2.content.trim()}
+`, "utf8");
+    return this.readDocument(request2.kind, request2.scope, id, sourcePath);
+  }
+  delete(kind, scope, idValue, projectRoot) {
+    const id = safeId(idValue);
+    if (kind === "hook" && scope === "project") this.hooks.revokeProjectHook(this.requireProject(projectRoot), id);
+    const root = this.rootFor(kind, scope, projectRoot);
+    const target = kind === "skill" ? path.join(root, id) : path.join(root, `${id}${EXTENSIONS[kind]}`);
+    assertInside(root, target);
+    fs.rmSync(target, { recursive: kind === "skill", force: true });
+  }
+  readDocument(kind, scope, id, sourcePath) {
+    const content = fs.readFileSync(sourcePath, "utf8");
+    const diagnostics = this.validate({ kind, scope, id, content });
+    let enabled = true;
+    try {
+      if (kind === "agent") enabled = YAML.parse(content.match(/^---\r?\n([\s\S]*?)\r?\n---/u)?.[1] ?? "").enabled !== false;
+      else if (kind === "mcp") enabled = JSON.parse(content).enabledByDefault !== false;
+      else if (kind === "hook" || kind === "policy") enabled = YAML.parse(content).enabled !== false;
+    } catch {
+      enabled = false;
+    }
+    return { id, kind, scope, sourcePath, sourceHash: hashScopedResource(content), effectiveStatus: diagnostics.length ? "invalid" : enabled ? "effective" : "disabled", content, diagnostics };
+  }
+  requireProject(projectRoot) {
+    if (!projectRoot) throw new Error("Project scope requires an active project root.");
+    return projectRoot;
+  }
+}
+const rdxRuntimeService = new RdxRuntimeService();
+function registerRdxRuntimeHandlers() {
+  electron.ipcMain.handle("rdx-runtime:overview", (_event, projectRoot) => rdxRuntimeService.overview(projectRoot));
+  electron.ipcMain.handle("rdx-runtime:validate", (_event, request2) => {
+    const diagnostics = rdxRuntimeService.validate(request2);
+    return { valid: diagnostics.length === 0, diagnostics };
+  });
+  electron.ipcMain.handle("rdx-runtime:upsert", (_event, request2) => {
+    rdxRuntimeService.upsert(request2);
+    return rdxRuntimeService.overview(request2.projectRoot);
+  });
+  electron.ipcMain.handle("rdx-runtime:delete", (_event, kind, scope, id, projectRoot) => {
+    rdxRuntimeService.delete(kind, scope, id, projectRoot);
+    return rdxRuntimeService.overview(projectRoot);
+  });
+  electron.ipcMain.handle("rdx-runtime:reveal", async (_event, sourcePath) => {
+    try {
+      electron.shell.showItemInFolder(sourcePath);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+  electron.ipcMain.handle("rdx-runtime:trustHook", (_event, projectRoot, hookId) => {
+    hookEngine.load(rdxRuntimeService.overview(projectRoot).userPaths.hooksPath, projectRoot);
+    hookEngine.trustProjectHook(projectRoot, hookId);
+    return rdxRuntimeService.overview(projectRoot);
+  });
+  electron.ipcMain.handle("rdx-runtime:revokeHook", (_event, projectRoot, hookId) => {
+    hookEngine.revokeProjectHook(projectRoot, hookId);
+    return rdxRuntimeService.overview(projectRoot);
+  });
+  electron.ipcMain.handle("rdx-runtime:testHook", (_event, hookEvent, projectRoot, hookId) => {
+    const overview = rdxRuntimeService.overview(projectRoot);
+    const context2 = { event: hookEvent, projectRoot, payload: { test: true, hookId, overviewHash: overview.resources.length } };
+    return hookId ? hookEngine.test(hookId, context2) : hookEngine.trigger(hookEvent, context2);
+  });
+  electron.ipcMain.handle("rdx-runtime:listSnapshots", (_event, sessionId, turnId) => requestSnapshotStore.list(sessionId, turnId));
+  electron.ipcMain.handle("rdx-runtime:getSnapshot", (_event, sessionId, turnId, snapshotId) => requestSnapshotStore.get(sessionId, turnId, snapshotId));
+}
 const invokeHandlers = /* @__PURE__ */ new Map();
 let registryInstalled = false;
 function installIpcInvokeRegistry() {
@@ -26891,6 +26412,7 @@ function registerIPCHandlers() {
   registerToolEvidenceHandlers(context);
   registerSettingsLlmHandlers(context);
   registerTraceHandlers(context);
+  registerRdxRuntimeHandlers();
   registerNativeThemeBridge();
 }
 function setMainWindow(window) {
@@ -26933,7 +26455,8 @@ class RdxSessionService {
       filePath: request2.filePath,
       role: "primary",
       backendHint: isRemoteReplay ? "remote" : "local",
-      status: "pending"
+      status: "pending",
+      ownerSessionId: request2.ownerSessionId ?? null
     };
     this.captures = [capture];
     this.activeCaptureId = capture.id;
@@ -26992,6 +26515,7 @@ class RdxSessionService {
     const previewResult = this.previewFromActionData(resultData);
     const openedCapture = this.createOpenedCaptureState(
       request2.projectId,
+      request2.ownerSessionId ?? null,
       request2.inputId,
       request2.filePath,
       replayDevice,
@@ -27295,6 +26819,7 @@ class RdxSessionService {
     return {
       contextId: this.contextId ?? "",
       sessionId: activeCapture?.sessionId ?? "",
+      ownerSessionId: this.openedCapture?.ownerSessionId ?? activeCapture?.ownerSessionId ?? null,
       backend: activeCapture?.backendHint ?? "local",
       remoteStatus: this.replayDevice?.type === "android" ? this.remoteStatus : void 0,
       runtimeOwner: this.runtimeOwner ?? "",
@@ -27400,10 +26925,11 @@ class RdxSessionService {
     }
     return void 0;
   }
-  createOpenedCaptureState(projectId, inputId, filePath, replayDevice, previewResult) {
+  createOpenedCaptureState(projectId, ownerSessionId, inputId, filePath, replayDevice, previewResult) {
     const activeCapture = this.captures.find((capture) => capture.id === this.activeCaptureId) ?? this.captures[0];
     return {
       projectId,
+      ownerSessionId,
       inputId,
       filePath,
       captureId: activeCapture?.id ?? inputId,
@@ -27955,7 +27481,7 @@ electron.app.whenReady().then(async () => {
   const settings = settingsService.initialize();
   if (isSettingsRebuildOnly) {
     console.log("[SettingsRebuildOnly]", JSON.stringify({
-      workspaceRoot: settings.workspace.rootPath,
+      workspaceRoot: settings.paths.userRdxRoot,
       settingsPath: settings.paths.settingsPath,
       providerIds: settings.llm.providers.map((provider) => provider.id)
     }));

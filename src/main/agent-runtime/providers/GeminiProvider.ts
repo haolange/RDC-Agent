@@ -194,7 +194,7 @@ export class GeminiProvider implements ProviderStrategy {
             if (textPart.thought) {
               sawOutput = true;
               builder.appendThinking(THINKING_INDEX, textPart.text, {
-                kind: 'raw',
+                kind: 'unknown',
                 source: 'gemini-raw',
                 visibility: 'raw-collapsed',
                 replayPolicy: 'none',

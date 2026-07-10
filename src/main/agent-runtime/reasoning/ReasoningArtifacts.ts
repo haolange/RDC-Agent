@@ -126,7 +126,7 @@ function normalizeProviderArtifact(value: unknown): ProviderReasoningArtifact | 
 }
 
 const isThinkingKind = (value: unknown): value is ThinkingArtifactKind => (
-  value === 'summary' || value === 'raw' || value === 'opaque'
+  value === 'summary' || value === 'raw' || value === 'opaque' || value === 'unknown'
 );
 
 const isThinkingVisibility = (value: unknown): value is ThinkingArtifactVisibility => (

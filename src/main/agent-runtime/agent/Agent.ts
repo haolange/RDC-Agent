@@ -73,6 +73,8 @@ export interface AgentOptions {
   maxTurns?: number;
   /** 错误恢复管理器（可选）。用于 LLM 错误的自动重试/模型切换/压缩。 */
   errorRecovery?: ErrorRecovery;
+  onRequest?: AgentLoopConfig['onRequest'];
+  onResponse?: AgentLoopConfig['onResponse'];
 }
 
 // =====================================================================
@@ -273,6 +275,8 @@ export class Agent {
       maxTurns: opts.maxTurns,
       signal: opts.streamOptions?.signal,
       errorRecovery: opts.errorRecovery,
+      onRequest: opts.onRequest,
+      onResponse: opts.onResponse,
     };
   }
 }

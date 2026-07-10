@@ -5,7 +5,6 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { app } from 'electron';
 import { appendJsonl, readJsonl, writeJsonl } from '@shared/utils/jsonl';
 import { readYaml, writeYaml } from '@shared/utils/yaml';
 import {
@@ -49,37 +48,30 @@ export class StorageAdapter {
   private dataRootPath = '';
   private projectsRootPath = '';
   private globalKnowledgePath = '';
-  private migrationOrphansPath = '';
   private registryPath = '';
   private selectionPath = '';
 
   constructor() {
-    this.syncWorkspacePaths();
+    this.syncRuntimePaths();
   }
 
   getWorkspacePath(): string {
-    this.syncWorkspacePaths();
+    this.syncRuntimePaths();
     return this.dataRootPath;
   }
 
   getGlobalKnowledgePath(): string {
-    this.syncWorkspacePaths();
+    this.syncRuntimePaths();
     return this.globalKnowledgePath;
   }
 
   async initializeWorkspace(): Promise<void> {
-    this.syncWorkspacePaths();
+    this.syncRuntimePaths();
     this.ensureDir(this.dataRootPath);
     this.ensureDir(this.projectsRootPath);
-    this.ensureDir(this.migrationOrphansPath);
     this.ensureRegistry();
     this.ensureSelection();
-    this.bootstrapGlobalKnowledge();
-  }
-
-  setWorkspaceRoot(workspaceRoot: string): void {
-    appPathService.setWorkspaceRoot(workspaceRoot);
-    this.syncWorkspacePaths();
+    this.ensureDir(this.globalKnowledgePath);
   }
 
   listProjects(): ProjectRecord[] {
@@ -949,31 +941,11 @@ export class StorageAdapter {
     writeYaml(this.getSessionEvidencePath(sessionId), record);
   }
 
-  private bootstrapGlobalKnowledge(): void {
-    this.syncWorkspacePaths();
-    this.ensureDir(this.globalKnowledgePath);
-    this.ensureDir(path.join(this.globalKnowledgePath, 'library'));
-    this.ensureDir(path.join(this.globalKnowledgePath, 'spec'));
-
-    const seededMarker = path.join(this.globalKnowledgePath, '.seeded');
-    if (fs.existsSync(seededMarker)) {
-      return;
-    }
-
-    const seedPath = path.join(app.getAppPath(), 'resources', 'knowledge', 'seed');
-    if (fs.existsSync(seedPath)) {
-      this.copyDirectoryContents(seedPath, this.globalKnowledgePath, false);
-    }
-
-    fs.writeFileSync(seededMarker, nowIso(), 'utf-8');
-  }
-
-  private syncWorkspacePaths(): void {
-    const paths = appPathService.getWorkspacePaths();
-    this.dataRootPath = paths.workspaceRoot;
+  private syncRuntimePaths(): void {
+    const paths = appPathService.getRuntimePaths();
+    this.dataRootPath = paths.appStateRoot;
     this.projectsRootPath = paths.projectsPath;
     this.globalKnowledgePath = paths.knowledgePath;
-    this.migrationOrphansPath = paths.migrationOrphansPath;
     this.registryPath = path.join(this.projectsRootPath, 'registry.json');
     this.selectionPath = path.join(this.projectsRootPath, 'selection.json');
   }
@@ -1037,6 +1009,11 @@ export class StorageAdapter {
     const normalizedProject = this.normalizeProjectRecord(project);
     this.ensureDir(this.getProjectDataPath(normalizedProject));
     this.writeJson(path.join(this.getProjectDataPath(normalizedProject), 'project.json'), normalizedProject);
+    const projectPaths = appPathService.initializeProjectRdx(normalizedProject.rootPath);
+    writeYaml(projectPaths.projectMetadataPath, {
+      schema_version: '1',
+      name: normalizedProject.name,
+    });
   }
 
   private writeRunFiles(run: PersistedRunRecord): void {
@@ -1098,7 +1075,7 @@ export class StorageAdapter {
     if (!target) {
       throw new Error(`Project not found: ${project}`);
     }
-    return path.join(target.rootPath, 'sessions');
+    return path.join(appPathService.getAppStatePaths().sessionsPath, target.projectId);
   }
 
   private ensureProjectSessionsRoot(project: ProjectRecord | string): string {
@@ -1314,28 +1291,6 @@ export class StorageAdapter {
     }
   }
 
-  private copyDirectoryContents(sourceDir: string, targetDir: string, overwrite: boolean): void {
-    if (!fs.existsSync(sourceDir)) return;
-    this.ensureDir(targetDir);
-
-    for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
-      const sourcePath = path.join(sourceDir, entry.name);
-      const targetPath = path.join(targetDir, entry.name);
-
-      if (entry.isDirectory()) {
-        this.copyDirectoryContents(sourcePath, targetPath, overwrite);
-        continue;
-      }
-
-      if (!overwrite && fs.existsSync(targetPath)) {
-        continue;
-      }
-
-      this.ensureDir(path.dirname(targetPath));
-      fs.copyFileSync(sourcePath, targetPath);
-    }
-  }
-
   private readJson<T>(filePath: string): T | null {
     try {
       if (!fs.existsSync(filePath)) {
@@ -1386,30 +1341,17 @@ export class StorageAdapter {
     this.writeProjectMetadata(project);
   }
 
-  private buildProjectPaths(rootPath: string): {
-    resourcePath: string;
-    knowledgePath: string;
-    inputsPath: string;
-  } {
-    const resourcePath = path.join(rootPath, '.resource');
-    return {
-      resourcePath,
-      knowledgePath: path.join(resourcePath, 'knowledge'),
-      inputsPath: path.join(resourcePath, 'inputs'),
-    };
-  }
-
   private ensureProjectResourceLayout(rootPath: string): {
     resourcePath: string;
     knowledgePath: string;
     inputsPath: string;
   } {
-    const paths = this.buildProjectPaths(rootPath);
-    this.ensureDir(paths.resourcePath);
-    this.ensureDir(paths.knowledgePath);
-    this.ensureDir(paths.inputsPath);
-
-    return paths;
+    const projectPaths = appPathService.initializeProjectRdx(rootPath);
+    return {
+      resourcePath: projectPaths.projectRdxRoot,
+      knowledgePath: projectPaths.knowledgePath,
+      inputsPath: projectPaths.inputsPath,
+    };
   }
 
   private normalizeProjectRecord(project: ProjectRecord): ProjectRecord {

@@ -15,8 +15,8 @@ type SecretMap = Record<string, SecretRecord>;
 const SECRET_FILE_NAME = 'provider-secrets.json';
 
 export class SecretStorageService {
-  private getSecretFilePath(workspaceRoot = appPathService.getWorkspaceRoot()): string {
-    return path.join(appPathService.getWorkspacePaths(workspaceRoot).secretsPath, SECRET_FILE_NAME);
+  private getSecretFilePath(_workspaceRoot = appPathService.getUserRdxRoot()): string {
+    return path.join(appPathService.getRuntimePaths().secretsPath, SECRET_FILE_NAME);
   }
 
   private readSecretMap(workspaceRoot?: string): SecretMap {

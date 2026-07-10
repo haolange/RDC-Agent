@@ -216,7 +216,7 @@ const rawThinkingPresentation = buildWorkProcessPresentation({
 });
 const rawThinkingSection = rawThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(rawThinkingSection?.type === 'section', 'raw thinking loop should render a section');
-assert(rawThinkingSection.thinkingLabel === '原始思考', 'raw thinking should expose a concrete disclosure label');
+assert(rawThinkingSection.thinkingLabel === 'Raw reasoning', 'raw thinking should expose its verified semantic label');
 assert(rawThinkingSection.thinkingPreview === 'provider-visible raw thinking', 'raw provider thinking should remain available behind disclosure');
 assert(rawThinkingSection.thinkingOpenByDefault === false, 'raw thinking should stay folded by default');
 
@@ -247,7 +247,7 @@ const summaryThinkingPresentation = buildWorkProcessPresentation({
 const summaryThinkingSection = summaryThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(summaryThinkingSection?.type === 'section', 'summary thinking should render as process evidence');
 assert(summaryThinkingSection.resultText === '', 'answer-only thinking must not duplicate final answer text');
-assert(summaryThinkingSection.thinkingLabel === '思考', 'summary thinking should use a loop-level label distinct from the Work Process header');
+assert(summaryThinkingSection.thinkingLabel === 'Reasoning summary', 'summary thinking should expose its verified semantic label');
 assert(summaryThinkingSection.thinkingOpenByDefault === true, 'summary thinking should be open by default');
 
 const duplicateSummary = 'I have all the answers from memory. Let me respond concisely in Chinese.';
@@ -575,7 +575,7 @@ assert(presentationSource.includes('createResponseRow'), 'presentation should ro
 assert(presentationSource.includes('actionCount'), 'presentation should expose actionCount for top-level transcript meta');
 assert(presentationSource.includes("normalized.startsWith('mcp__')"), 'dynamic MCP wildcard should have a semantic display path');
 assert(!presentationSource.includes("isSummary ? '思考过程'"), 'loop-level summary thinking label must not duplicate the Work Process header');
-for (const forbidden of ['Reasoning summary', 'Called tool']) {
+for (const forbidden of ['Called tool']) {
   assert(!presentationSource.includes(forbidden), `presentation source should not contain ${forbidden}`);
 }
 

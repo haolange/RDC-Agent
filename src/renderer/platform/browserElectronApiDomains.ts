@@ -9,6 +9,7 @@ export const BROWSER_ELECTRON_API_DOMAINS = {
   terminalContext: ['terminal', 'context'],
   agentEvents: ['agent', 'events', 'on', 'off'],
   memory: ['memory'],
+  rdxRuntime: ['rdxRuntime'],
 } as const;
 
 export type BrowserElectronApiDomain = keyof typeof BROWSER_ELECTRON_API_DOMAINS;

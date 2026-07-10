@@ -31,8 +31,6 @@ interface AppSettingsState {
   setLanguage: (language: AppLanguage) => Promise<void>;
   setFontScale: (fontScale: FontScale) => Promise<void>;
   updateProfile: (profile: Partial<ProfileSettings>) => Promise<void>;
-  updateWorkspaceRoot: (rootPath: string) => Promise<void>;
-  resetWorkspaceRoot: () => Promise<void>;
   saveProvider: (provider: LlmProviderEntry) => Promise<AppSettings>;
   removeProvider: (providerId: string) => Promise<void>;
   setAgentPermissionMode: (mode: AgentPermissionMode) => Promise<void>;
@@ -65,12 +63,6 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   },
   updateProfile: async (profile) => {
     await get().patchSettings({ profile });
-  },
-  updateWorkspaceRoot: async (rootPath) => {
-    await get().patchSettings({ workspace: { rootPath } });
-  },
-  resetWorkspaceRoot: async () => {
-    await get().patchSettings({ workspace: { rootPath: '' } });
   },
   saveProvider: async (provider) => {
     return get().patchSettings({

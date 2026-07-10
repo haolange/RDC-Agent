@@ -7,7 +7,7 @@
  *  - 文件持久化：每个任务一个 JSON 文件，存放于 `tasksDir`；
  *  - 解锁查询：当某个任务完成后，查找因此被解锁的下游任务。
  *
- * 文件布局：`{tasksDir}/{id}.json`，默认 `tasksDir` 为 workspace 根下的 `.tasks/`。
+ * 文件布局：`{tasksDir}/{id}.json`，默认 `tasksDir` 为应用状态目录下的 `tasks/`。
  *
  * 注意：
  *  - 本类只描述任务存储与依赖关系，不绑定 LLM/Agent 调度；
@@ -93,7 +93,7 @@ export class TaskRegistry {
    *
    * @param storeOrDir TaskStore 实例，或任务文件目录（兼容旧签名，内部建 FileTaskStore）。
    */
-  constructor(storeOrDir: TaskStore | string = '.tasks') {
+  constructor(storeOrDir: TaskStore | string) {
     this.store = typeof storeOrDir === 'string'
       ? new FileTaskStore(storeOrDir)
       : storeOrDir;

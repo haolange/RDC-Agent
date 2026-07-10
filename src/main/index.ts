@@ -307,7 +307,7 @@ app.whenReady().then(async () => {
   const settings = settingsService.initialize();
   if (isSettingsRebuildOnly) {
     console.log('[SettingsRebuildOnly]', JSON.stringify({
-      workspaceRoot: settings.workspace.rootPath,
+      workspaceRoot: settings.paths.userRdxRoot,
       settingsPath: settings.paths.settingsPath,
       providerIds: settings.llm.providers.map((provider) => provider.id),
     }));

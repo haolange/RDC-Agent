@@ -17,7 +17,7 @@ export interface AgentPermissionDecision {
 export interface AgentPermissionDecisionInput {
   tool: AgentTool;
   toolCall: ToolCall;
-  /** 当前激活项目根目录；权限边界以它为准，回退全局 settings.workspace.rootPath。 */
+  /** 当前激活项目根目录；权限边界以它为准，回退固定 User Scope。 */
   projectRootPath?: string | null;
 }
 
@@ -193,7 +193,7 @@ export class AgentPermissionPolicyService {
     const toolName = normalizeToolName(input.toolCall.name);
     const workspaceRoot = path.resolve(
       input.projectRootPath
-      || settings.workspace.rootPath
+      || settings.paths.userRdxRoot
       || process.cwd(),
     );
 

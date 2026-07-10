@@ -42,7 +42,7 @@ import { createFallbackAskUserQuestion, normalizeAskUserQuestions } from '@share
 import { generateEventId, nowMs } from '@shared/utils/id';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
-import { PromptAssembler } from '../agent-runtime/prompt';
+import { promptPlanBuilder } from '../agent-runtime/prompt';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
@@ -50,6 +50,10 @@ import { traceService } from '../agent-trace/TraceService';
 import { replayDeviceService } from '../captures/ReplayDeviceService';
 import { rdxSessionService } from '../index';
 import { settingsService } from '../settings/SettingsService';
+import { agentManifestService } from '../settings/AgentManifestService';
+import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService';
+import { scopedInstructionResolver } from '../runtime/ScopedInstructionResolver';
+import { appPathService } from '../runtime/AppPathService';
 import {
   resolveModelCapability,
   resolveTurnControls,
@@ -57,7 +61,7 @@ import {
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
-import { AGENT_DESCRIPTIONS, AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
+import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import { normalizeToolName, resolveAgentToolAllowlist } from '../workflow/debugger/DebuggerRuntimePolicy';
 import {
   createDefaultBranchState,
@@ -278,11 +282,6 @@ function getAgentLabel(agentId: AgentRole): string {
   return definition?.name || (isTopLevelAgentId(agentId) ? AGENT_DISPLAY_NAMES[agentId] : agentId);
 }
 
-function getAgentDescription(agentId: AgentRole): string {
-  const definition = resolveEnabledAgentDefinition(agentId);
-  return definition?.description || (isTopLevelAgentId(agentId) ? AGENT_DESCRIPTIONS[agentId] : 'Workspace agent profile.');
-}
-
 interface AgentRoutePreflightOk {
   ok: true;
   agentId: AgentRole;
@@ -445,7 +444,6 @@ function createRequestFailedDiagnostic(route: AgentRoutePreflightOk, error: unkn
 
 export class ConversationService {
   private activeTurns = new Map<string, ActiveConversationTurn>();
-  private readonly promptAssembler = new PromptAssembler();
   /**
    * 待处理的 handoff（sessionId → {toProfile, prompt}）。
    *
@@ -1074,39 +1072,50 @@ export class ConversationService {
       });
     } else {
       try {
-        const definition = resolveEnabledAgentDefinition(conversationAgentId);
-        const promptDefinition = {
-          agentId: conversationAgentId,
-          agentLabel,
-          agentDescription: getAgentDescription(conversationAgentId),
-          baseInstructions: definition?.instructions,
-          globalInstructions: settingsService.getAll().agents.globalInstructions,
-        };
-        const allowedToolNames = resolveAgentToolAllowlist(conversationAgentId, 'investigate')
-          .map((toolName) => normalizeToolName(toolName));
         const projectRootPath = input.context.projectId
           ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null
           : null;
-        const memoryIndex = await agentOrchestrator.getMemoryIndex();
+        const runtimeSettings = settingsService.getAll();
+        const definition = agentManifestService.getEffectiveProfiles(
+          runtimeSettings.paths,
+          runtimeSettings.llm.providers,
+          runtimeSettings.llm.agentRoutes,
+          projectRootPath ?? undefined,
+        ).find((profile) => profile.id === conversationAgentId && profile.enabled)
+          ?? resolveEnabledAgentDefinition(conversationAgentId);
+        if (!definition) throw new Error(`No effective agent profile is configured for ${conversationAgentId}.`);
+        const allowedToolNames = resolveAgentToolAllowlist(conversationAgentId, 'investigate')
+          .map((toolName) => normalizeToolName(toolName));
+        const activePaths = [
+          projectRootPath,
+          input.context.openedCapturePath,
+          ...input.importedAttachments.map((attachment) => attachment.filePath),
+        ].filter((value): value is string => Boolean(value));
+        const scopedInstructions = projectRootPath
+          ? scopedInstructionResolver.resolveForPaths({
+              userInstructionsPath: appPathService.getUserRdxPaths().instructionsPath,
+              projectRoot: projectRootPath,
+              activePaths,
+            })
+          : { sources: [], totalBytes: 0, diagnostics: [] };
+        const preloadedSkills = definition.skills
+          .map((skillId) => agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined))
+          .filter((skill): skill is NonNullable<typeof skill> => skill !== null);
         const promptClock = resolvePromptClock();
-        const promptContext = {
-          workDir: projectRootPath ?? '',
+        const promptPlan = promptPlanBuilder.build({
+          profile: definition,
+          scopedInstructions,
+          preloadedSkills,
+          skillCatalog: agentRuntimeConfigService.listSkillMetadata(projectRootPath ?? undefined),
           tools: allowedToolNames,
-          memoryIndex: memoryIndex || undefined,
-          model: {
-            provider: routePreflight.routeCapability.providerId,
-            name: routePreflight.routeCapability.modelId,
-          },
-          mode: this.modeForProfile(conversationAgentId),
-          profile: promptDefinition,
+          workDir: projectRootPath ?? '',
           routeCapability: routePreflight.routeCapability,
-          permissionSettings: settingsService.getAll().agentRuntime.permissions,
-          allowedToolNames,
+          modelCapability: capability ?? undefined,
+          permissionSettings: runtimeSettings.agentRuntime.permissions,
           currentDate: promptClock.currentDate,
           timeZone: promptClock.timeZone,
-        };
-        const systemPrompt = this.promptAssembler.assembleSystemPrompt(promptContext);
-        const promptMetrics = this.promptAssembler.measureSections(promptContext);
+          contextWindowTokens: capability?.nominalContextWindowTokens ?? undefined,
+        });
         const responseText = await agentOrchestrator.sendProfileMessage(
           conversationAgentId,
           input.rawMessage,
@@ -1114,11 +1123,10 @@ export class ConversationService {
             sessionId: input.context.session?.sessionId,
             turnId: assistantMessage.turnId,
             stage: 'investigate',
-            patternId: 'free-agent',
             projectRootPath,
             projectId: input.context.projectId,
-            systemPrompt,
-            promptMetrics,
+            systemPrompt: promptPlan.systemPrompt,
+            promptPlan,
             maxTokens: 1200,
             temperature: 0.35,
             signal: abortController.signal,
@@ -1769,25 +1777,6 @@ export class ConversationService {
    * Plan 归入 ask（ReadOnly 变体），非顶层 agent 归入 edit；
    * 与 AgentOrchestrator.modeForAgent 保持一致语义。
    */
-  private modeForProfile(agentId: AgentRole): 'ask' | 'debugger' | 'edit' | 'analyzer' | 'optimizer' {
-    if (agentId === 'plan' || agentId === 'ask') {
-      return 'ask';
-    }
-    if (agentId === 'debugger') {
-      return 'debugger';
-    }
-    if (agentId === 'analyzer') {
-      return 'analyzer';
-    }
-    if (agentId === 'optimizer') {
-      return 'optimizer';
-    }
-    if (agentId === 'edit') {
-      return 'edit';
-    }
-    return 'edit';
-  }
-
 }
 
 export const conversationService = new ConversationService();

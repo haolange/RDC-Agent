@@ -163,7 +163,7 @@ export class OllamaProvider implements ProviderStrategy {
           if (typeof message.thinking === 'string' && message.thinking.length > 0) {
             sawOutput = true;
             builder.appendThinking(THINKING_INDEX, message.thinking, {
-              kind: 'raw',
+              kind: 'unknown',
               source: 'ollama-raw',
               visibility: 'raw-collapsed',
               replayPolicy: 'none',

@@ -337,6 +337,7 @@ export class AnthropicProvider implements ProviderStrategy {
 }
 
 function resolveAnthropicThinkingKind(reasoningVisibility?: ReasoningVisibility): ThinkingArtifactKind {
+  if (reasoningVisibility === 'unknown-events') return 'unknown';
   return reasoningVisibility === 'summary-events' ? 'summary' : 'raw';
 }
 

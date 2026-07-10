@@ -71,9 +71,14 @@ export interface AgentLoopConfig {
    * 每轮 LLM 调用前调用 `getPendingPrompts()`，将到期的 cron 任务以
    * `<cron_triggered>...</cron_triggered>` 形式注入为 user 消息。
    */
-  cronScheduler?: { getPendingPrompts(): string[] };
   /** 错误恢复管理器（可选）。集成后 LLM 错误会触发自动重试/模型切换/压缩。 */
   errorRecovery?: ErrorRecovery;
+  onRequest?: (input: {
+    model: Model;
+    context: Context;
+    streamOptions: StreamOptions;
+  }) => Promise<string | undefined> | string | undefined;
+  onResponse?: (requestId: string | undefined, message: AssistantMessage) => Promise<void> | void;
 }
 
 /** Agent 上下文（可变；agentLoop 会原地修改 messages）。 */
@@ -211,15 +216,6 @@ async function runAgentLoop(
         injected.push({
           role: 'user',
           content: [{ type: 'text', text: notification }],
-          timestamp: Date.now(),
-        });
-      }
-    }
-    if (config.cronScheduler) {
-      for (const prompt of config.cronScheduler.getPendingPrompts()) {
-        injected.push({
-          role: 'user',
-          content: [{ type: 'text', text: `<cron_triggered>${prompt}</cron_triggered>` }],
           timestamp: Date.now(),
         });
       }
@@ -550,6 +546,8 @@ async function streamAssistantResponse(
     signal: stream.signal,
   };
 
+  const requestId = await config.onRequest?.({ model: config.model, context: llmContext, streamOptions });
+
   // 6. 调用 provider，转发事件
   const response = provider.stream(config.model, llmContext, streamOptions);
 
@@ -626,6 +624,8 @@ async function streamAssistantResponse(
       context.messages.push(finalMessage);
     }
   }
+
+  await config.onResponse?.(requestId, finalMessage);
 
   return finalMessage;
 }

@@ -31,8 +31,8 @@ function copyAvatarToWorkspace(sourcePath: string): string | null {
     return null;
   }
 
-  const paths = appPathService.getWorkspacePaths();
-  const avatarDir = path.join(paths.profilesPath, 'avatar');
+  const paths = appPathService.getRuntimePaths();
+  const avatarDir = path.join(paths.profileStatePath, 'avatar');
   const extension = path.extname(sourcePath).toLowerCase();
   const avatarPath = path.join(avatarDir, `profile-avatar${extension}`);
 

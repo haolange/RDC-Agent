@@ -19,6 +19,7 @@ import { createAppMetaApi, createAppShellApi, createDialogApi, createWindowContr
 import { createEvidenceApi, createToolApi } from './api/toolEvidence';
 import { createWorkflowApi } from './api/workflow';
 import { createTraceApi } from './api/trace';
+import { createRdxRuntimeApi } from './api/rdxRuntime';
 
 const dialogApi = createDialogApi();
 
@@ -41,6 +42,7 @@ const electronAPI = {
   trace: createTraceApi(),
   agent: createAgentApi(),
   memory: createMemoryApi(),
+  rdxRuntime: createRdxRuntimeApi(),
   tool: createToolApi(),
   evidence: createEvidenceApi(),
   llm: createLlmApi(),

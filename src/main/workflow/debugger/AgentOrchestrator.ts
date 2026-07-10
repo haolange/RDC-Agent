@@ -38,7 +38,6 @@ import type {
   AgentEvent as SharedAgentEvent,
   AgentAssistantDeltaPayload,
   AgentRuntimeMcpDescriptor,
-  AgentRuntimeSkillDescriptor,
   AgentSubagentEventPayload,
 } from '@shared/types/agentRuntime';
 import type { LLMConfig } from '@shared/types/llm';
@@ -54,12 +53,14 @@ import type { AppMode, ContextUsageBreakdownEntry } from '@shared/types/session'
 import type { LlmProviderId } from '@shared/types/settings';
 import type { WorkflowStage } from '@shared/types/workflow';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
+import type { HookEvent } from '@shared/types/rdxRuntime';
+import type { PromptPlan } from '@shared/types/rdxRuntime';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
 import { Agent } from '../../agent-runtime/agent/Agent';
 import { ContextManager } from '../../agent-runtime/agent/ContextManager';
-import type { PromptSectionMetrics } from '../../agent-runtime/prompt';
+import { requestEnvelopeBuilder, requestSnapshotStore } from '../../agent-runtime/prompt';
 import { ErrorRecovery } from '../../agent-runtime/agent/ErrorRecovery';
 import { handoffController } from '../../agent-runtime/agent/HandoffController';
 import type { AgentTool, AgentToolResult, ToolExecutionContext } from '../../agent-runtime/agent/AgentTool';
@@ -76,15 +77,11 @@ import type {
 } from '../../agent-runtime/core/types';
 import { createToolSearchTool, getPrimitiveTools } from '../../agent-runtime/tools';
 import { MCPManager, type MCPServerConfig } from '../../agent-runtime/agent/MCPManager';
-import { SkillEngine, type SkillManifest } from '../../skills/SkillEngine';
 import {
   encodeAgentModel,
   configuredRuntimeProvider,
 } from '../../agent-runtime/providers/ConfiguredRuntimeProvider';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
-import { MemoryExtractor } from '../../agent-runtime/memory/MemoryExtractor';
-import { MemoryConsolidator } from '../../agent-runtime/memory/MemoryConsolidator';
-import type { TextContent } from '../../agent-runtime/core/types';
 import {
   describeRouteCapabilityDiagnostic,
   resolveAgentRouteCapability,
@@ -101,6 +98,8 @@ import { agentPermissionPolicyService } from '../../agent-runtime/permissions/Ag
 import { agentToolApprovalRequestService } from '../../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { withTemporaryPathAccess } from '../../agent-runtime/tools';
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
+import { appPathService } from '../../runtime/AppPathService';
+import { hookEngine } from '../../hooks/HookEngine';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import { getRdxRuntimeContext } from '../../sessions/RdxRuntimeContextRegistry';
 import { executionProfileService } from '../../settings/ExecutionProfileService';
@@ -142,14 +141,12 @@ interface AgentProfileTurnOptions extends AgentTurnOptions {
   temperature?: number;
   turnId?: string;
   routeAgentId?: AgentRole;
-  patternId?: string;
   stage?: WorkflowStage | 'report';
   /** 当前激活项目根目录，透传到工具执行上下文。 */
   projectRootPath?: string | null;
   /** 当前激活项目 id。 */
   projectId?: string | null;
-  /** PromptAssembler 各段字符数，用于上下文窗口 breakdown 细化。 */
-  promptMetrics?: PromptSectionMetrics;
+  promptPlan?: PromptPlan;
 }
 
 /** 单个 AgentRole 在内部维护的运行态。 */
@@ -187,13 +184,7 @@ export class AgentOrchestrator {
   private readonly mcpManager = new MCPManager();
   private readonly connectedMcpServerIds = new Set<string>();
   private readonly failedMcpServers = new Map<string, string>();
-  private readonly skillEngine = new SkillEngine();
-  private memoryStoreInstance: MemoryStore | null = null;
-  private memoryExtractorInstance: MemoryExtractor | null = null;
-  private memoryConsolidatorInstance: MemoryConsolidator | null = null;
-  /** 内联提取频率控制：每 N 轮触发一次，避免每轮 LLM 调用开销。 */
-  private memoryExtractTurnCounter = 0;
-  private static readonly MEMORY_EXTRACT_INTERVAL = 3;
+  private activeMcpProjectRoot: string | null = null;
   /**
    * 当前 turn 的事件下沉（subagent 工具执行时读取，把子 agent 事件桥接到父 trace）。
    * 单进程串行，无并发问题；runAgentTurn 设置，turn 结束清理。
@@ -369,7 +360,6 @@ export class AgentOrchestrator {
           maxTokens: config.maxTokens,
           temperature: config.temperature,
           mode: this.modeForAgent(agentId),
-          patternId: this.patternForAgent(agentId),
           stage: context?.stageId,
           runId: context?.runId,
           sessionId: context?.sessionId ?? null,
@@ -458,7 +448,6 @@ export class AgentOrchestrator {
         maxTokens: config.maxTokens,
         temperature: config.temperature,
         mode: this.modeForAgent(agentId),
-        patternId: options?.patternId ?? this.patternForAgent(agentId),
         stage: options?.stage ?? 'investigate',
         runId: undefined,
         sessionId: options?.sessionId ?? null,
@@ -470,7 +459,7 @@ export class AgentOrchestrator {
         },
         projectRootPath: options?.projectRootPath ?? null,
         projectId: options?.projectId ?? null,
-        promptMetrics: options?.promptMetrics,
+        promptPlan: options?.promptPlan,
         contextWindow: activeContextWindow,
         contextTokenLimit,
       });
@@ -557,7 +546,6 @@ export class AgentOrchestrator {
         {
           sessionId: subagentSessionId ?? undefined,
           stage: 'investigate',
-          patternId: 'subagent',
           projectRootPath: input.projectRootPath,
           projectId: input.projectId,
           systemPrompt,
@@ -723,6 +711,7 @@ export class AgentOrchestrator {
     sessionId?: string | null,
     contextWindow?: number,
     contextTokenLimit?: number,
+    promptPlan?: PromptPlan,
   ): AgentSlot {
     const slotKey = this.agentSlotKey(sessionId, agentId);
     const toolSignature = this.createToolSignature(tools);
@@ -749,6 +738,11 @@ export class AgentOrchestrator {
       : [];
 
     const agentModel = encodeAgentModel(providerId, modelId, { contextWindow });
+    const routeProvider = settingsService.getAll().llm.providers.find((provider) => provider.id === providerId);
+    const reasoningContract = resolveAgentRouteCapability(
+      routeProvider,
+      modelId,
+    ).reasoningContract;
 
     const contextManager = new ContextManager({
       modelId,
@@ -776,6 +770,35 @@ export class AgentOrchestrator {
       transformContext: (messages) => contextManager.compress(messages, agentModel),
       // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
       errorRecovery,
+      onRequest: promptPlan ? ({ model, context: requestContext, streamOptions: requestOptions }) => {
+        const callIndex = requestSnapshotStore.nextCallIndex(sessionId ?? undefined, turnSignature || undefined);
+        const snapshot = requestEnvelopeBuilder.build({
+          promptPlan,
+          sessionId: sessionId ?? undefined,
+          turnId: turnSignature || undefined,
+          callIndex,
+          route: { providerId, modelId, protocol: routeProvider?.protocol ?? model.api },
+          messages: requestContext.messages,
+          tools: requestContext.tools ?? [],
+          controls: {
+            temperature: requestOptions.temperature,
+            maxTokens: requestOptions.maxTokens,
+            topP: requestOptions.topP,
+            reasoningSelection: requestOptions.reasoning?.selection,
+          },
+          reasoning: reasoningContract,
+        });
+        requestSnapshotStore.write(snapshot);
+        return snapshot.id;
+      } : undefined,
+      onResponse: promptPlan ? (requestId, message) => {
+        if (!requestId) return;
+        requestSnapshotStore.complete(requestId, sessionId ?? undefined, turnSignature || undefined, {
+          inputTokens: message.usage.inputTokens,
+          outputTokens: message.usage.outputTokens,
+          estimated: false,
+        });
+      } : undefined,
     });
 
     const slot: AgentSlot = {
@@ -815,35 +838,18 @@ export class AgentOrchestrator {
     return 25;
   }
 
-  // =====================================================================
-  // Memory 引擎（持久记忆 + 内联提取 + consolidation）
-  // =====================================================================
-
-  /** 共享 MemoryStore 单例（懒构造，workspacePath 就绪后实例化）。 */
-  private get memoryStore(): MemoryStore {
-    if (!this.memoryStoreInstance) {
-      const memoryDir = path.join(storageAdapter.getWorkspacePath(), '.rdc-agent', 'memory');
-      this.memoryStoreInstance = new MemoryStore(memoryDir);
+  private getMemoryStore(scope: 'user' | 'project', projectRootPath?: string | null): MemoryStore {
+    if (scope === 'project') {
+      if (!projectRootPath) throw new Error('Project scope memory requires an active project.');
+      return new MemoryStore(appPathService.getProjectRdxPaths(projectRootPath).memoryPath);
     }
-    return this.memoryStoreInstance;
-  }
-
-  /**
-   * 读取 memory 索引内容（MEMORY.md），供 system prompt 注入。
-   * 失败时返回空串，不阻塞 prompt 组装。
-   */
-  async getMemoryIndex(): Promise<string> {
-    try {
-      return await this.memoryStore.getIndexContent();
-    } catch {
-      return '';
-    }
+    return new MemoryStore(appPathService.getUserRdxPaths().memoryPath);
   }
 
   /** Memory 面板用：列出全部记忆摘要。 */
   async listMemoriesForUi(): Promise<Array<{ name: string; description: string; type: string; updatedAt: number }>> {
     try {
-      const all = await this.memoryStore.listMemories();
+      const all = await this.getMemoryStore('user').listMemories();
       return all.map((m) => ({ name: m.name, description: m.description, type: m.type, updatedAt: m.updatedAt }));
     } catch {
       return [];
@@ -855,7 +861,7 @@ export class AgentOrchestrator {
     name: string; description: string; type: string; content: string; tags?: string[]; createdAt: number; updatedAt: number;
   } | null> {
     try {
-      const record = await this.memoryStore.getMemory(name);
+      const record = await this.getMemoryStore('user').getMemory(name);
       if (!record) return null;
       return {
         name: record.name,
@@ -874,7 +880,7 @@ export class AgentOrchestrator {
   /** Memory 面板用：写入记忆。 */
   async writeMemoryForUi(request: { name: string; description: string; type: 'user' | 'feedback' | 'project' | 'reference'; content: string; tags?: string[] }): Promise<{ success: boolean; name: string; error?: string }> {
     try {
-      const record = await this.memoryStore.writeMemory(request);
+      const record = await this.getMemoryStore('user').writeMemory(request);
       return { success: true, name: record.name };
     } catch (error) {
       return { success: false, name: request.name, error: error instanceof Error ? error.message : String(error) };
@@ -884,7 +890,7 @@ export class AgentOrchestrator {
   /** Memory 面板用：删除记忆。 */
   async deleteMemoryForUi(name: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const deleted = await this.memoryStore.deleteMemory(name);
+      const deleted = await this.getMemoryStore('user').deleteMemory(name);
       return { success: deleted };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -908,53 +914,6 @@ export class AgentOrchestrator {
     const handoff = this.pendingHandoff;
     this.pendingHandoff = null;
     return handoff;
-  }
-
-  /** 共享 MemoryExtractor（依赖 queryLlm 适配器）。 */
-  private get memoryExtractor(): MemoryExtractor {
-    if (!this.memoryExtractorInstance) {
-      this.memoryExtractorInstance = new MemoryExtractor({
-        memoryStore: this.memoryStore,
-        queryLlm: (prompt) => this.queryLlmForMemory(prompt),
-      });
-    }
-    return this.memoryExtractorInstance;
-  }
-
-  /** 共享 MemoryConsolidator（阈值默认 10）。 */
-  private get memoryConsolidator(): MemoryConsolidator {
-    if (!this.memoryConsolidatorInstance) {
-      this.memoryConsolidatorInstance = new MemoryConsolidator({
-        memoryStore: this.memoryStore,
-        queryLlm: (prompt) => this.queryLlmForMemory(prompt),
-      });
-    }
-    return this.memoryConsolidatorInstance;
-  }
-
-  /**
-   * Memory 提取/整合用的 LLM 适配器。
-   *
-   * 取 ask agent 的 route（或首个 agentRoute）作主模型，
-   * 通过 configuredRuntimeProvider.stream 发起单轮非流式调用。
-   * 失败时抛错，由 MemoryExtractor/MemoryConsolidator 的 try/catch 兜底返回空结果。
-   */
-  private async queryLlmForMemory(prompt: string): Promise<string> {
-    const settings = settingsService.getAll();
-    const route = settings.llm.agentRoutes.find((entry) => entry.agentId === 'ask')
-      ?? settings.llm.agentRoutes[0];
-    if (!route) {
-      throw new Error('No agent route available for memory LLM adapter.');
-    }
-    const model = encodeAgentModel(route.providerId, route.modelId);
-    const stream = configuredRuntimeProvider.stream(model, {
-      messages: [{ role: 'user', content: prompt, timestamp: Date.now() }],
-    });
-    const assistant = await stream.result();
-    return assistant.content
-      .filter((block): block is TextContent => block.type === 'text')
-      .map((block) => block.text)
-      .join('');
   }
 
   private createToolSignature(tools: ToolDefinition[]): string {
@@ -1083,6 +1042,14 @@ export class AgentOrchestrator {
         }
         try {
           const projectRootPath = runtimeContext?.projectRootPath ?? null;
+          const beforeHooksAllowed = await this.triggerRuntimeHooks('tool.before-call', agentId, runtimeContext, {
+            toolName: toolCall.name,
+            toolCallId: toolCall.id,
+            arguments: toolCall.arguments,
+          });
+          if (!beforeHooksAllowed) {
+            return this.createPolicyDeniedToolResult(toolCall, agentId, 'A blocking lifecycle hook denied this tool call.');
+          }
           const toolContext: ToolExecutionContext = {
             workspaceRoot: projectRootPath ?? getWorkspaceRoot(),
             projectRootPath,
@@ -1093,8 +1060,18 @@ export class AgentOrchestrator {
             permissionDecision.temporaryPathRoots,
             () => tool.execute(toolCall.id, toolCall.arguments, signal, onUpdate, toolContext),
           );
+          await this.triggerRuntimeHooks('tool.after-call', agentId, runtimeContext, {
+            toolName: toolCall.name,
+            toolCallId: toolCall.id,
+            isError: result.isError === true,
+          });
           return this.agentToolResultToMessage(toolCall, result);
         } catch (error) {
+          await this.triggerRuntimeHooks('tool.on-error', agentId, runtimeContext, {
+            toolName: toolCall.name,
+            toolCallId: toolCall.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
           return {
             role: 'toolResult',
             toolCallId: toolCall.id,
@@ -1106,6 +1083,39 @@ export class AgentOrchestrator {
         }
       },
     };
+  }
+
+  private async triggerRuntimeHooks(
+    event: HookEvent,
+    agentId: AgentRole,
+    runtimeContext: ToolExecutorRuntimeContext | undefined,
+    payload: Record<string, unknown>,
+  ): Promise<boolean> {
+    const projectRoot = runtimeContext?.projectRootPath ?? undefined;
+    hookEngine.load(appPathService.getUserRdxPaths().hooksPath, projectRoot ?? undefined);
+    const results = await hookEngine.trigger(event, {
+      event,
+      agentId,
+      toolName: typeof payload.toolName === 'string' ? payload.toolName : undefined,
+      sessionId: runtimeContext?.sessionId ?? undefined,
+      projectRoot: projectRoot ?? undefined,
+      payload,
+    });
+    for (const result of results) {
+      if (!runtimeContext?.eventContext || !runtimeContext.onEvent) continue;
+      runtimeContext.onEvent(buildDiagnosticAgentEvent(runtimeContext.eventContext, {
+        code: `hook.${result.status}`,
+        severity: result.status === 'completed' ? 'info' : result.allowed ? 'warning' : 'error',
+        message: `Hook ${result.hookId}: ${result.status}`,
+        technicalMessage: JSON.stringify({
+          exitCode: result.exitCode,
+          reason: result.reason,
+          stdout: result.stdout,
+          stderr: result.stderr,
+        }),
+      }));
+    }
+    return results.every((result) => result.allowed);
   }
 
   private isAllowedForRuntime(
@@ -1211,7 +1221,7 @@ export class AgentOrchestrator {
 
   private createTaskRuntimeTools(): AgentTool[] {
     // subagent（sessionId 含 ::subagent:: 段）用 MemoryTaskStore，随子 context 结束回收；
-    // 顶层 agent 用会话级 FileTaskStore 落盘（workspace/.tasks/{sessionId}），供「进度」泳道按会话读取。
+    // 顶层 agent 用会话级 FileTaskStore 落盘（${userData}/state/tasks/{sessionId}），供「进度」泳道按会话读取。
     const sessionId = this.currentTurnEventSink?.sessionId ?? null;
     const isSubagent = sessionId?.includes('::subagent::') ?? false;
     const store = isSubagent || !sessionId
@@ -1268,12 +1278,13 @@ export class AgentOrchestrator {
     return [
       this.createAskUserTool(agentId),
       this.createAgentHandoffTool(agentId),
+      this.createMemorySearchTool(sessionId),
       this.createMemoryReadTool(sessionId),
       this.createMemoryWriteTool(),
       this.createMemoryDeleteTool(),
       this.createPlanArtifactTool(sessionId),
       this.createSkillsCatalogTool(),
-      this.createSkillRunTool(agentId, sessionId),
+      this.createSkillReadTool(agentId),
       this.createMcpCatalogTool(),
       ...this.createSubagentTools(agentId, sessionId),
     ];
@@ -1440,97 +1451,79 @@ export class AgentOrchestrator {
     };
   }
 
-  private createMemoryReadTool(sessionId?: string | null): AgentTool<
-    { name?: string; query?: string; limit?: number },
-    { sessionId: string | null; count: number }
+  private createMemorySearchTool(sessionId?: string | null): AgentTool<
+    { scope: 'user' | 'project'; query?: string; limit?: number },
+    { sessionId: string | null; scope: 'user' | 'project'; count: number }
   > {
-    const store = this.memoryStore;
+    const resolveStore = this.getMemoryStore.bind(this);
+    return {
+      name: 'memory_search',
+      label: 'Search Memory',
+      description: 'Search explicitly saved memories in one declared scope. Memory is never injected automatically.',
+      parameters: { type: 'object', required: ['scope'], properties: {
+        scope: { type: 'string', enum: ['user', 'project'] },
+        query: { type: 'string' },
+        limit: { type: 'number' },
+      } },
+      permissionHint: 'readonly',
+      async execute(_id, args, _signal, _update, context) {
+        const records = await resolveStore(args.scope, context?.projectRootPath).searchMemories(args.query ?? '', args.limit ?? 20);
+        return { content: [{ type: 'text', text: records.length ? records.map((record) => `- ${record.name}: ${record.description}`).join('\n') : 'No matching memories were found.' }], details: { sessionId: sessionId ?? null, scope: args.scope, count: records.length } };
+      },
+    };
+  }
+
+  private createMemoryReadTool(sessionId?: string | null): AgentTool<
+    { scope: 'user' | 'project'; name: string },
+    { sessionId: string | null; scope: 'user' | 'project'; count: number }
+  > {
+    const resolveStore = this.getMemoryStore.bind(this);
     return {
       name: 'memory_read',
       label: 'Read Memory',
-      description: 'Read persisted memories from the workspace memory store. Supports optional name lookup or keyword filter.',
-      parameters: {
-        type: 'object',
-        properties: {
-          name: { type: 'string', description: 'Optional exact memory name to read in full.' },
-          query: { type: 'string', description: 'Optional case-insensitive filter over name/description/content.' },
-          limit: { type: 'number', description: 'Maximum entries to return, default 8.' },
-        },
-      },
+      description: 'Read one explicitly saved memory by exact name and scope.',
+      parameters: { type: 'object', required: ['scope', 'name'], properties: {
+        scope: { type: 'string', enum: ['user', 'project'] },
+        name: { type: 'string' },
+      } },
       permissionHint: 'readonly',
-      async execute(_toolCallId, args) {
-        const rawLimit = typeof args.limit === 'number' && Number.isFinite(args.limit) ? args.limit : 8;
-        const limit = Math.max(1, Math.min(20, Math.floor(rawLimit)));
-
-        // 精确读取单条
-        if (typeof args.name === 'string' && args.name.trim()) {
-          const record = await store.getMemory(args.name.trim());
-          if (!record) {
-            return {
-              content: [{ type: 'text', text: `No memory named "${args.name}" was found.` }],
-              details: { sessionId: sessionId ?? null, count: 0 },
-            };
-          }
-          return {
-            content: [{
-              type: 'text',
-              text: `# ${record.name}\n\n${record.description}\n\n${record.content}`,
-            }],
-            details: { sessionId: sessionId ?? null, count: 1 },
-          };
-        }
-
-        // 列表 + 过滤
-        const all = await store.listMemories();
-        const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
-        const candidates = query
-          ? all.filter((entry) => (
-              entry.name.toLowerCase().includes(query)
-              || entry.description.toLowerCase().includes(query)
-              || entry.content.toLowerCase().includes(query)
-            ))
-          : all;
-        const entries = candidates.slice(0, limit).map((entry) => (
-          `- ${entry.name} (${entry.type}): ${entry.description}`
-        ));
-        return {
-          content: [{
-            type: 'text',
-            text: entries.length > 0
-              ? `Memory index (${candidates.length} total):\n${entries.join('\n')}`
-              : 'No matching memories were found.',
-          }],
-          details: { sessionId: sessionId ?? null, count: entries.length },
-        };
+      async execute(_id, args, _signal, _update, context) {
+        const record = await resolveStore(args.scope, context?.projectRootPath).getMemory(args.name);
+        return { content: [{ type: 'text', text: record ? `# ${record.name}\n\n${record.description}\n\n${record.content}` : `No memory named "${args.name}" was found.` }], details: { sessionId: sessionId ?? null, scope: args.scope, count: record ? 1 : 0 } };
       },
     };
   }
 
   private createMemoryWriteTool(): AgentTool<
-    { name: string; description: string; type: string; content: string; tags?: string[] },
-    { name: string; created: boolean }
+    { scope: 'user' | 'project'; name: string; description: string; type: string; content: string; tags?: string[]; approved: boolean },
+    { scope: 'user' | 'project'; name: string; created: boolean }
   > {
-    const store = this.memoryStore;
+    const resolveStore = this.getMemoryStore.bind(this);
     const validTypes = new Set(['user', 'feedback', 'project', 'reference']);
     return {
       name: 'memory_write',
       label: 'Write Memory',
-      description: 'Persist a new memory to the workspace memory store. type must be one of: user, feedback, project, reference.',
+      description: 'Persist a memory only after explicit user intent or interactive approval. Scope must be declared.',
       parameters: {
         type: 'object',
-        required: ['name', 'description', 'type', 'content'],
+        required: ['scope', 'name', 'description', 'type', 'content', 'approved'],
         properties: {
+          scope: { type: 'string', enum: ['user', 'project'] },
           name: { type: 'string', description: 'Kebab-case memory name (unique key).' },
           description: { type: 'string', description: 'One-line summary.' },
           type: { type: 'string', description: 'user | feedback | project | reference' },
           content: { type: 'string', description: 'Full Markdown body.' },
           tags: { type: 'array', items: { type: 'string' } },
+          approved: { type: 'boolean', description: 'True only after the user explicitly requested or approved this write.' },
         },
       },
       permissionHint: 'mutation',
-      async execute(_toolCallId, args) {
+      async execute(_toolCallId, args, _signal, _update, context) {
+        if (args.approved !== true) {
+          return { content: [{ type: 'text', text: 'Memory write requires explicit user approval.' }], isError: true, details: { scope: args.scope, name: args.name, created: false } };
+        }
         const type = validTypes.has(args.type) ? (args.type as 'user' | 'feedback' | 'project' | 'reference') : 'project';
-        const record = await store.writeMemory({
+        const record = await resolveStore(args.scope, context?.projectRootPath).writeMemory({
           name: args.name.trim(),
           description: args.description.trim(),
           type,
@@ -1539,37 +1532,42 @@ export class AgentOrchestrator {
         });
         return {
           content: [{ type: 'text', text: `Memory saved: ${record.name} (${record.type})` }],
-          details: { name: record.name, created: true },
+          details: { scope: args.scope, name: record.name, created: true },
         };
       },
     };
   }
 
   private createMemoryDeleteTool(): AgentTool<
-    { name: string },
-    { name: string; deleted: boolean }
+    { scope: 'user' | 'project'; name: string; confirmed: boolean },
+    { scope: 'user' | 'project'; name: string; deleted: boolean }
   > {
-    const store = this.memoryStore;
+    const resolveStore = this.getMemoryStore.bind(this);
     return {
       name: 'memory_delete',
       label: 'Delete Memory',
-      description: 'Delete a memory by name from the workspace memory store.',
+      description: 'Delete one scoped memory only after explicit confirmation.',
       parameters: {
         type: 'object',
-        required: ['name'],
+        required: ['scope', 'name', 'confirmed'],
         properties: {
+          scope: { type: 'string', enum: ['user', 'project'] },
           name: { type: 'string', description: 'Memory name to delete.' },
+          confirmed: { type: 'boolean' },
         },
       },
       permissionHint: 'mutation',
-      async execute(_toolCallId, args) {
-        const deleted = await store.deleteMemory(args.name.trim());
+      async execute(_toolCallId, args, _signal, _update, context) {
+        if (args.confirmed !== true) {
+          return { content: [{ type: 'text', text: 'Memory deletion requires explicit confirmation.' }], isError: true, details: { scope: args.scope, name: args.name, deleted: false } };
+        }
+        const deleted = await resolveStore(args.scope, context?.projectRootPath).deleteMemory(args.name.trim());
         return {
           content: [{
             type: 'text',
             text: deleted ? `Memory deleted: ${args.name}` : `No memory named "${args.name}" was found.`,
           }],
-          details: { name: args.name, deleted },
+          details: { scope: args.scope, name: args.name, deleted },
         };
       },
     };
@@ -1590,9 +1588,9 @@ export class AgentOrchestrator {
         },
       },
       permissionHint: 'readonly',
-      async execute(_toolCallId, args) {
+      async execute(_toolCallId, args, _signal, _onUpdate, context) {
         const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
-        const skills = agentRuntimeConfigService.listSkills()
+        const skills = agentRuntimeConfigService.listSkills(context?.projectRootPath ?? undefined)
           .filter((skill) => !query || `${skill.id} ${skill.name} ${skill.label} ${skill.description}`.toLowerCase().includes(query));
         const lines = skills.map((skill) => (
           `${skill.id}: ${skill.label || skill.name} (${skill.source})`
@@ -1605,29 +1603,23 @@ export class AgentOrchestrator {
     };
   }
 
-  private createSkillRunTool(agentId: AgentRole, sessionId?: string | null): AgentTool<
-    { skill_id?: string; params?: Record<string, unknown> },
+  private createSkillReadTool(agentId: AgentRole): AgentTool<
+    { skill_id?: string },
     { skillId: string; agentId: AgentRole }
   > {
-    const orchestrator = this;
     return {
-      name: 'skill_run',
-      label: 'Run Skill',
-      description: 'Execute a configured reusable skill by id or name. Context skills return live workspace/session context.',
+      name: 'skill_read',
+      label: 'Read Skill',
+      description: 'Load the full SKILL.md instructions for one discovered effective skill.',
       parameters: {
         type: 'object',
         required: ['skill_id'],
         properties: {
-          skill_id: { type: 'string', description: 'Skill id or name, for example rdc-context.' },
-          params: {
-            type: 'object',
-            description: 'Skill parameters. Values are converted to strings for prompt skills.',
-            additionalProperties: true,
-          },
+          skill_id: { type: 'string', description: 'Skill id, for example rdc-context.' },
         },
       },
       permissionHint: 'readonly',
-      async execute(_toolCallId, args) {
+      async execute(_toolCallId, args, _signal, _onUpdate, context) {
         const skillKey = typeof args.skill_id === 'string' ? args.skill_id.trim() : '';
         if (!skillKey) {
           return {
@@ -1637,8 +1629,7 @@ export class AgentOrchestrator {
           };
         }
 
-        const skills = orchestrator.getAvailableSkillDescriptors();
-        const skill = skills.find((entry) => entry.id === skillKey || entry.name === skillKey);
+        const skill = agentRuntimeConfigService.loadSkill(skillKey, context?.projectRootPath ?? undefined);
         if (!skill) {
           return {
             content: [{ type: 'text', text: `Skill is not configured: ${skillKey}` }],
@@ -1647,40 +1638,8 @@ export class AgentOrchestrator {
           };
         }
 
-        if (skill.id === 'rdc-context' || skill.name === 'rdc-context') {
-          const session = sessionId ? storageAdapter.readSession(sessionId) : null;
-          const project = session?.projectId ? storageAdapter.getProjectById(session.projectId) : null;
-          const runtimeContext = getRdxRuntimeContext();
-          return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                skill: skill.id,
-                agentId,
-                session,
-                project,
-                rdxRuntimeContext: runtimeContext,
-              }, null, 2),
-            }],
-            details: { skillId: skill.id, agentId },
-          };
-        }
-
-        const params = orchestrator.stringifySkillParams(args.params);
-        const manifest: SkillManifest = {
-          name: skill.name,
-          description: skill.description,
-          type: 'prompt',
-          promptTemplate: skill.description,
-        };
-        const result = await orchestrator.skillEngine.execute(manifest, params, {
-          agentOrchestrator: orchestrator,
-          workspaceRoot: storageAdapter.getWorkspacePath(),
-          sessionId: sessionId ?? undefined,
-        });
         return {
-          content: [{ type: 'text', text: result.message }],
-          isError: !result.success,
+          content: [{ type: 'text', text: skill.instructions }],
           details: { skillId: skill.id, agentId },
         };
       },
@@ -1702,9 +1661,9 @@ export class AgentOrchestrator {
         },
       },
       permissionHint: 'readonly',
-      async execute(_toolCallId, args) {
+      async execute(_toolCallId, args, _signal, _onUpdate, context) {
         const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
-        const servers = agentRuntimeConfigService.listMcpServers()
+        const servers = agentRuntimeConfigService.listMcpServers(context?.projectRootPath ?? undefined)
           .filter((server) => !query || `${server.id} ${server.name} ${server.description}`.toLowerCase().includes(query));
         const lines = servers.map((server) => (
           `${server.id}: ${server.name} (${server.transport})${server.enabledByDefault ? '' : ' - disabled by default'}`
@@ -1717,39 +1676,27 @@ export class AgentOrchestrator {
     };
   }
 
-  private getAvailableSkillDescriptors(): AgentRuntimeSkillDescriptor[] {
-    return agentRuntimeConfigService.listSkills();
-  }
-
-  private stringifySkillParams(params: Record<string, unknown> | undefined): Record<string, string> {
-    if (!params) {
-      return {};
-    }
-    return Object.fromEntries(
-      Object.entries(params).map(([key, value]) => [
-        key,
-        typeof value === 'string' ? value : JSON.stringify(value),
-      ]),
-    );
-  }
-
-  private getEnabledMcpDescriptors(agentId: AgentRole): AgentRuntimeMcpDescriptor[] {
+  private getEnabledMcpDescriptors(agentId: AgentRole, projectRootPath?: string | null): AgentRuntimeMcpDescriptor[] {
     const settings = settingsService.getAll();
     const manifest = settings.agents.definitions.find((entry) => entry.id === agentId && entry.enabled);
-    const enabledIds = new Set([
-      ...(settings.configuration.enabledMcpServerIds ?? []),
-      ...(manifest?.mcpServers ?? []),
-    ]);
+    const enabledIds = new Set(manifest?.mcpServers ?? []);
     if (enabledIds.size === 0) {
       return [];
     }
-    return agentRuntimeConfigService.listMcpServers()
+    return agentRuntimeConfigService.listMcpServers(projectRootPath ?? undefined)
       .filter((server) => enabledIds.has(server.id) || enabledIds.has(server.name));
   }
 
-  private async ensureMcpConnections(agentId: AgentRole): Promise<string[]> {
+  private async ensureMcpConnections(agentId: AgentRole, projectRootPath?: string | null): Promise<string[]> {
     const errors: string[] = [];
-    for (const descriptor of this.getEnabledMcpDescriptors(agentId)) {
+    const nextProjectRoot = projectRootPath ? path.resolve(projectRootPath) : null;
+    if (this.activeMcpProjectRoot !== nextProjectRoot) {
+      await this.mcpManager.disconnectAll();
+      this.connectedMcpServerIds.clear();
+      this.failedMcpServers.clear();
+      this.activeMcpProjectRoot = nextProjectRoot;
+    }
+    for (const descriptor of this.getEnabledMcpDescriptors(agentId, projectRootPath)) {
       if (this.connectedMcpServerIds.has(descriptor.id)) {
         continue;
       }
@@ -1793,7 +1740,6 @@ export class AgentOrchestrator {
     maxTokens?: number;
     temperature?: number;
     mode: AppMode;
-    patternId: string;
     stage?: WorkflowStage | 'report';
     runId?: string;
     sessionId?: string | null;
@@ -1803,7 +1749,7 @@ export class AgentOrchestrator {
     projectRootPath?: string | null;
     projectId?: string | null;
     /** Ask 路径由 ConversationService 传入的 prompt 分段字符数，用于细化 breakdown。 */
-    promptMetrics?: PromptSectionMetrics;
+    promptPlan?: PromptPlan;
     contextWindow?: number;
     contextTokenLimit?: number;
   }): Promise<string> {
@@ -1814,7 +1760,7 @@ export class AgentOrchestrator {
     const settings = settingsService.getAll();
     const routeProvider = settings.llm.providers.find((entry) => entry.id === input.providerId);
     const routeCapability = resolveAgentRouteCapability(routeProvider, input.modelId);
-    const mcpConnectionErrors = await this.ensureMcpConnections(input.agentId);
+    const mcpConnectionErrors = await this.ensureMcpConnections(input.agentId, input.projectRootPath);
     const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
     const activeToolDefinitions = routeCapability.toolCallingMode === 'native-structured'
       ? runtimeTools.definitions
@@ -1827,7 +1773,6 @@ export class AgentOrchestrator {
       sessionId: input.sessionId ?? null,
       stage: input.stage,
       mode: input.mode,
-      patternId: input.patternId,
       providerId: input.providerId,
       modelId: input.modelId,
       toolAllowlist: activeToolAllowlist,
@@ -1885,6 +1830,7 @@ export class AgentOrchestrator {
       input.sessionId,
       input.contextWindow,
       input.contextTokenLimit,
+      input.promptPlan,
     );
 
     const userMessage: UserMessage = {
@@ -1918,12 +1864,12 @@ export class AgentOrchestrator {
           const subagentDefs = activeToolDefinitions.filter(isSubagentDef);
           const systemDefs   = activeToolDefinitions.filter((d) => !isMcpDef(d) && !isSubagentDef(d));
 
-          const pm = input.promptMetrics;
+          const pm = input.promptPlan?.metrics;
           const systemPromptChars = pm
-            ? pm.system_prompt
+            ? pm.systemPrompt
             : input.systemPrompt.length;
-          const rulesChars    = pm?.rules        ?? 0;
-          const memoryChars   = pm?.memory_files ?? 0;
+          const rulesChars    = pm?.scopedInstructions ?? 0;
+          const skillsChars   = pm?.skills ?? 0;
 
           // 压缩统计：在 message_end 时对当前 agent 的消息历史分类。
           const compressionStats = slot.contextManager.classifyMessages(
@@ -1932,8 +1878,8 @@ export class AgentOrchestrator {
 
           const precomputedBreakdown: ContextUsageBreakdownEntry[] = [
             { id: 'system_prompt', tokens: charsToTokens(systemPromptChars) },
-            ...(rulesChars   > 0 ? [{ id: 'rules'        as const, tokens: charsToTokens(rulesChars) }]   : []),
-            ...(memoryChars  > 0 ? [{ id: 'memory_files' as const, tokens: charsToTokens(memoryChars) }]  : []),
+            ...(rulesChars > 0 ? [{ id: 'scoped_instructions' as const, tokens: charsToTokens(rulesChars) }] : []),
+            ...(skillsChars > 0 ? [{ id: 'skills' as const, tokens: charsToTokens(skillsChars) }] : []),
             { id: 'system_tools',          tokens: charsToTokens(JSON.stringify(systemDefs).length),   count: systemDefs.length },
             { id: 'mcp_tools',             tokens: charsToTokens(JSON.stringify(mcpDefs).length),      count: mcpDefs.length },
             { id: 'subagent_definitions',  tokens: charsToTokens(JSON.stringify(subagentDefs).length), count: subagentDefs.length },
@@ -2007,55 +1953,6 @@ export class AgentOrchestrator {
           console.error(`[AgentOrchestrator] writeAgentThread failed for ${input.sessionId}::${input.agentId}:`, error);
         }
       }
-      // Memory 内联提取：轮末从最新消息提取候选记忆并落盘。
-      // 频率控制每 N 轮触发一次；fire-and-forget 不阻塞主流程，失败 fail-safe。
-      this.memoryExtractTurnCounter += 1;
-      if (
-        this.memoryExtractTurnCounter % AgentOrchestrator.MEMORY_EXTRACT_INTERVAL === 0
-        && slot.agent.messages.length > 0
-      ) {
-        void this.extractMemoriesFromTurn(slot.agent.messages).catch((error) => {
-          console.error('[AgentOrchestrator] memory extraction failed:', error);
-        });
-      }
-    }
-  }
-
-  /**
-   * 内联提取：将 turn 的消息转为宽松消息类型喂给 MemoryExtractor，
-   * 候选经 dedup 后 writeMemory，再按需触发 consolidation。
-   *
-   * messages 接收 core AgentMessage（Agent.messages 产物），仅提取 role/content。
-   */
-  private async extractMemoriesFromTurn(
-    messages: ReadonlyArray<{ role: string; content?: unknown }>,
-  ): Promise<void> {
-    const recent = messages.slice(-10).map((msg) => ({
-      role: msg.role,
-      content: typeof msg.content === 'string'
-        ? msg.content
-        : Array.isArray(msg.content)
-          ? (msg.content as Array<{ type: string; text?: string }>)
-              .filter((block) => block.type === 'text' && typeof block.text === 'string')
-              .map((block) => block.text as string)
-              .join('')
-          : '',
-    }));
-    const candidates = await this.memoryExtractor.extractFromConversation(recent);
-    for (const candidate of candidates) {
-      try {
-        await this.memoryStore.writeMemory(candidate);
-      } catch (error) {
-        console.error('[AgentOrchestrator] writeMemory failed for', candidate.name, error);
-      }
-    }
-    // consolidation 检查：超阈值触发整合
-    try {
-      if (await this.memoryConsolidator.shouldConsolidate()) {
-        await this.memoryConsolidator.consolidate();
-      }
-    } catch (error) {
-      console.error('[AgentOrchestrator] memory consolidation failed:', error);
     }
   }
 
@@ -2105,9 +2002,6 @@ export class AgentOrchestrator {
     return isTopLevelAgentId(agentId) ? agentId as AppMode : 'edit';
   }
 
-  private patternForAgent(_agentId: AgentRole): string {
-    return 'free-agent';
-  }
 
   private systemPromptForAgent(agentId: AgentRole, prompt?: string): string {
     if (prompt) {

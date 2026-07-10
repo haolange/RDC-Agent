@@ -14,9 +14,11 @@ const MEMORY_TYPES: Array<MemoryWriteRequest['type']> = ['user', 'feedback', 'pr
  */
 export const MemoryPanel: React.FC = () => {
   const { t } = useI18n();
-  const { memories, selected, loading, error, select, write, remove } = useMemory();
+  const { memories, selected, loading, error, scope, setScope, select, write, remove } = useMemory();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<MemoryWriteRequest>({
+    scope,
+    approved: true,
     name: '',
     description: '',
     type: 'project',
@@ -24,7 +26,7 @@ export const MemoryPanel: React.FC = () => {
   });
 
   const startNew = () => {
-    setDraft({ name: '', description: '', type: 'project', content: '' });
+    setDraft({ scope, approved: true, name: '', description: '', type: 'project', content: '' });
     setEditing(true);
   };
 
@@ -32,6 +34,8 @@ export const MemoryPanel: React.FC = () => {
     if (!selected) return;
     setDraft({
       name: selected.name,
+      scope,
+      approved: true,
       description: selected.description,
       type: selected.type,
       content: selected.content,
@@ -51,13 +55,14 @@ export const MemoryPanel: React.FC = () => {
 
   const handleDelete = async () => {
     if (!selected) return;
-    await remove(selected.name);
+    if (window.confirm('确认删除这条记忆？此操作不可撤销。')) await remove(selected.name);
   };
 
   return (
     <div className="memory-panel" data-testid="memory-panel">
       <div className="memory-panel-header">
         <span className="memory-panel-title">{t('memory.panelTitle')}</span>
+        <select className="memory-panel-select" value={scope} onChange={(event) => setScope(event.target.value as 'user' | 'project')} aria-label="Memory scope"><option value="user">User</option><option value="project">Project</option></select>
         {!editing && (
           <Button variant="ghost" size="sm" onClick={startNew} aria-label={t('memory.new')}>
             +

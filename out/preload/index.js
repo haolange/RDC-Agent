@@ -125,10 +125,10 @@ const createEventSubscriptionApi = () => ({
   }
 });
 const createMemoryApi = () => ({
-  list: () => electron.ipcRenderer.invoke("memory:list"),
-  get: (name) => electron.ipcRenderer.invoke("memory:get", name),
+  list: (scope, projectRoot) => electron.ipcRenderer.invoke("memory:list", scope, projectRoot),
+  get: (scope, name, projectRoot) => electron.ipcRenderer.invoke("memory:get", scope, name, projectRoot),
   write: (request) => electron.ipcRenderer.invoke("memory:write", request),
-  delete: (name) => electron.ipcRenderer.invoke("memory:delete", name)
+  delete: (scope, name, confirmed, projectRoot) => electron.ipcRenderer.invoke("memory:delete", scope, name, confirmed, projectRoot)
 });
 const createProjectApi = () => ({
   list: () => electron.ipcRenderer.invoke("project:list"),
@@ -190,12 +190,6 @@ const createSettingsApi = () => ({
   getModelCapability: (agentId) => electron.ipcRenderer.invoke("settings:getModelCapability", agentId),
   getProviderSecret: (providerId) => electron.ipcRenderer.invoke("settings:getProviderSecret", providerId),
   importAgentManifest: (filePath) => electron.ipcRenderer.invoke("settings:importAgentManifest", filePath),
-  upsertSkill: (request) => electron.ipcRenderer.invoke("settings:upsertSkill", request),
-  deleteSkill: (skillId) => electron.ipcRenderer.invoke("settings:deleteSkill", skillId),
-  importSkill: (filePath) => electron.ipcRenderer.invoke("settings:importSkill", filePath),
-  upsertMcpServer: (request) => electron.ipcRenderer.invoke("settings:upsertMcpServer", request),
-  deleteMcpServer: (serverId) => electron.ipcRenderer.invoke("settings:deleteMcpServer", serverId),
-  importMcpServer: (filePath) => electron.ipcRenderer.invoke("settings:importMcpServer", filePath),
   set: (settings) => electron.ipcRenderer.invoke("settings:set", settings)
 });
 const createAppMetaApi = () => ({
@@ -241,6 +235,18 @@ const createTraceApi = () => ({
   exportRun: (runId) => electron.ipcRenderer.invoke("trace:exportRun", runId),
   switchBranch: (sessionId, branchId) => electron.ipcRenderer.invoke("trace:switchBranch", sessionId, branchId)
 });
+const createRdxRuntimeApi = () => ({
+  getOverview: (projectRoot) => electron.ipcRenderer.invoke("rdx-runtime:overview", projectRoot),
+  validateResource: (request) => electron.ipcRenderer.invoke("rdx-runtime:validate", request),
+  upsertResource: (request) => electron.ipcRenderer.invoke("rdx-runtime:upsert", request),
+  deleteResource: (kind, scope, id, projectRoot) => electron.ipcRenderer.invoke("rdx-runtime:delete", kind, scope, id, projectRoot),
+  revealResource: (sourcePath) => electron.ipcRenderer.invoke("rdx-runtime:reveal", sourcePath),
+  trustHook: (projectRoot, hookId) => electron.ipcRenderer.invoke("rdx-runtime:trustHook", projectRoot, hookId),
+  revokeHook: (projectRoot, hookId) => electron.ipcRenderer.invoke("rdx-runtime:revokeHook", projectRoot, hookId),
+  testHook: (event, projectRoot, hookId) => electron.ipcRenderer.invoke("rdx-runtime:testHook", event, projectRoot, hookId),
+  listRequestSnapshots: (sessionId, turnId) => electron.ipcRenderer.invoke("rdx-runtime:listSnapshots", sessionId, turnId),
+  getRequestSnapshot: (sessionId, turnId, snapshotId) => electron.ipcRenderer.invoke("rdx-runtime:getSnapshot", sessionId, turnId, snapshotId)
+});
 const dialogApi = createDialogApi();
 const electronAPI = {
   platform: process.platform,
@@ -258,6 +264,7 @@ const electronAPI = {
   trace: createTraceApi(),
   agent: createAgentApi(),
   memory: createMemoryApi(),
+  rdxRuntime: createRdxRuntimeApi(),
   tool: createToolApi(),
   evidence: createEvidenceApi(),
   llm: createLlmApi(),

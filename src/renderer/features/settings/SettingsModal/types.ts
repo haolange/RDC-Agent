@@ -6,7 +6,7 @@ import type {
   LlmProviderProtocol,
 } from '@shared/types/settings';
 
-export type SettingsSection = 'general' | 'workspace' | 'models' | 'skills' | 'agents' | 'tools';
+export type SettingsSection = 'general' | 'workspace' | 'models' | 'skills' | 'agents' | 'tools' | 'hooks';
 
 export type ProviderConnectionBusyState = 'idle' | 'testing' | 'saving';
 

@@ -129,16 +129,20 @@ const FIXTURES = {
     argsPreview: JSON.stringify({ profile: 'reviewer', prompt: 'Review this' }),
     resultPreview: JSON.stringify({ ok: true, summary: 'Reviewed' }),
   },
+  memory_search: {
+    argsPreview: JSON.stringify({ scope: 'project', query: 'project-notes' }),
+    resultPreview: JSON.stringify({ count: 1 }),
+  },
   memory_read: {
-    argsPreview: JSON.stringify({ name: 'project-notes' }),
+    argsPreview: JSON.stringify({ scope: 'project', name: 'project-notes' }),
     resultPreview: JSON.stringify({ name: 'project-notes', content: '...' }),
   },
   memory_write: {
-    argsPreview: JSON.stringify({ name: 'project-notes', description: 'd', type: 'user', content: 'c' }),
+    argsPreview: JSON.stringify({ scope: 'project', name: 'project-notes', description: 'd', type: 'project', content: 'c', approved: true }),
     resultPreview: JSON.stringify({ name: 'project-notes' }),
   },
   memory_delete: {
-    argsPreview: JSON.stringify({ name: 'project-notes' }),
+    argsPreview: JSON.stringify({ scope: 'project', name: 'project-notes', confirmed: true }),
     resultPreview: JSON.stringify({ ok: true }),
   },
   plan_artifact: {
@@ -153,8 +157,8 @@ const FIXTURES = {
     argsPreview: JSON.stringify({ query: 'lint' }),
     resultPreview: JSON.stringify({ skills: ['eslint'] }),
   },
-  skill_run: {
-    argsPreview: JSON.stringify({ skill: 'baoyu-design' }),
+  skill_read: {
+    argsPreview: JSON.stringify({ skill_id: 'baoyu-design' }),
     resultPreview: JSON.stringify({ ok: true }),
   },
   mcp: {
@@ -210,11 +214,12 @@ const PLAN_REQUIRED_TOOLS = [
   'ask_user',
   'agent_handoff',
   'plan_artifact',
+  'memory_search',
   'memory_read',
   'memory_write',
   'memory_delete',
   'skills',
-  'skill_run',
+  'skill_read',
   'mcp',
   'rdx_context',
   'subagent',

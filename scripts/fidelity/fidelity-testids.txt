@@ -49,6 +49,7 @@ message-variant-navigator
 mode-menu-item-${agent.id}
 open-settings-entry
 opened-capture-preview-window
+request-inspector
 runtime-log-entry-${entry.id}
 runtime-terminal
 runtime-terminal-activity-pane
@@ -72,9 +73,6 @@ settings-${mode
 settings-add-provider
 settings-agent-manifest-editor
 settings-center-panel
-settings-mcp-${server.id}
-settings-mcp-block
-settings-mcp-editor
 settings-modal
 settings-model-cascade-trigger
 settings-nav-${section.id}
@@ -112,9 +110,7 @@ settings-provider-user-managed-models
 settings-rdx-action-${entry.id}
 settings-rdx-actions
 settings-rdx-block
-settings-skill-${skill.id}
-settings-skill-editor
-settings-skills-block
+settings-runtime-scope
 settings-workspace-body
 sidebar-footer
 sidebar-scroll

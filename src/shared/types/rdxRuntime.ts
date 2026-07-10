@@ -1,0 +1,241 @@
+import type { AgentManifestDefinition } from './agentManifest';
+
+export type ResourceScope = 'builtin' | 'user' | 'project';
+
+export type ScopedResourceKind =
+  | 'agent'
+  | 'skill'
+  | 'mcp'
+  | 'hook'
+  | 'policy'
+  | 'knowledge'
+  | 'memory';
+
+export type EffectiveResourceStatus = 'effective' | 'inherited' | 'overridden' | 'disabled' | 'invalid';
+
+export interface ResourceProvenance {
+  scope: ResourceScope;
+  sourcePath: string;
+  sourceHash: string;
+  overriddenSource?: Omit<ResourceProvenance, 'overriddenSource'>;
+}
+
+export interface ScopedResourceCandidate<T> {
+  id: string;
+  kind: ScopedResourceKind;
+  scope: ResourceScope;
+  sourcePath: string;
+  value: T;
+  enabled?: boolean;
+}
+
+export interface ResolvedResource<T> {
+  id: string;
+  kind: ScopedResourceKind;
+  value: T;
+  enabled: boolean;
+  effectiveStatus: EffectiveResourceStatus;
+  provenance: ResourceProvenance;
+}
+
+export interface ScopedResourceCatalog<T = unknown> {
+  resources: Array<ResolvedResource<T>>;
+  diagnostics: Array<{
+    code: string;
+    severity: 'warning' | 'error';
+    message: string;
+    sourcePath?: string;
+  }>;
+}
+
+export interface EffectiveAgentProfile extends AgentManifestDefinition {
+  effectiveStatus: EffectiveResourceStatus;
+  provenance: ResourceProvenance;
+}
+
+export interface ScopedInstructionSource {
+  id: string;
+  scope: 'user' | 'project';
+  sourcePath: string;
+  sourceHash: string;
+  content: string;
+  byteLength: number;
+  precedence: number;
+}
+
+export interface ScopedInstructionResolution {
+  sources: ScopedInstructionSource[];
+  totalBytes: number;
+  diagnostics: Array<{
+    code: string;
+    severity: 'warning' | 'error';
+    message: string;
+    sourcePath?: string;
+  }>;
+}
+
+export interface SkillMetadata {
+  id: string;
+  name: string;
+  description: string;
+  allowedTools: string[];
+  scope: ResourceScope;
+  sourcePath: string;
+  sourceHash: string;
+  effectiveStatus: EffectiveResourceStatus;
+}
+
+export interface SkillLoadResult extends SkillMetadata {
+  instructions: string;
+  referencesPath?: string;
+  scriptsPath?: string;
+  assetsPath?: string;
+}
+
+export type HookEvent =
+  | 'session.before-start'
+  | 'session.after-end'
+  | 'turn.before-start'
+  | 'turn.after-end'
+  | 'tool.before-call'
+  | 'tool.after-call'
+  | 'tool.on-error'
+  | 'context.before-compact'
+  | 'context.after-compact'
+  | 'agent.before-handoff'
+  | 'agent.after-handoff'
+  | 'permission.denied';
+
+export interface HookDefinition {
+  id: string;
+  enabled: boolean;
+  event: HookEvent;
+  command: string;
+  args: string[];
+  cwd?: string;
+  env?: Record<string, string>;
+  timeoutMs: number;
+  failurePolicy: 'block' | 'warn';
+  matcher?: { agents?: string[]; tools?: string[] };
+}
+
+export interface HookTrustState {
+  trusted: boolean;
+  projectRoot?: string;
+  sourceHash: string;
+  trustedAt?: string;
+}
+
+export type PromptSegmentKind =
+  | 'core-contract'
+  | 'agent-profile'
+  | 'scoped-instruction'
+  | 'preloaded-skill'
+  | 'skill-catalog'
+  | 'tool-capability'
+  | 'runtime-fact';
+
+export interface PromptSegment {
+  id: string;
+  kind: PromptSegmentKind;
+  scope: ResourceScope | 'runtime';
+  sourcePath: string;
+  sourceHash: string;
+  precedence: number;
+  content: string;
+  tokenEstimate: number;
+}
+
+export interface PromptPlanMetrics {
+  systemPrompt: number;
+  scopedInstructions: number;
+  skills: number;
+}
+
+export interface PromptPlan {
+  id: string;
+  segments: PromptSegment[];
+  systemPrompt: string;
+  totalTokenEstimate: number;
+  metrics: PromptPlanMetrics;
+  diagnostics: Array<{ code: string; severity: 'warning' | 'error'; message: string; sourcePath?: string }>;
+}
+
+export interface RequestEnvelopeSnapshot {
+  id: string;
+  createdAt: string;
+  completedAt?: string;
+  sessionId?: string;
+  turnId?: string;
+  callIndex: number;
+  route: { providerId: string; modelId: string; protocol: string };
+  promptPlan: PromptPlan;
+  messages: unknown[];
+  tools: unknown[];
+  controls: Record<string, unknown>;
+  reasoning: ProviderReasoningContract;
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    reasoningTokens?: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+    estimated?: boolean;
+  };
+  redactions: Array<{ path: string; reason: string; hash?: string }>;
+}
+
+export type ReasoningSemantic = 'raw' | 'summary' | 'opaque' | 'none' | 'unknown';
+
+export interface ProviderReasoningContract {
+  semantic: ReasoningSemantic;
+  source: string;
+  evidence?: string;
+  displayLabel: 'Raw reasoning' | 'Reasoning summary' | 'Provider reasoning' | 'Reasoning metadata' | 'None';
+}
+
+export interface ScopedResourceDocument {
+  id: string;
+  kind: ScopedResourceKind;
+  scope: Exclude<ResourceScope, 'builtin'>;
+  sourcePath: string;
+  sourceHash: string;
+  effectiveStatus: 'effective' | 'overridden' | 'disabled' | 'invalid';
+  content: string;
+  diagnostics: string[];
+}
+
+export interface RdxRuntimeOverview {
+  userRoot: string;
+  projectRoot?: string;
+  userPaths: Record<string, string>;
+  projectPaths?: Record<string, string>;
+  resources: ScopedResourceDocument[];
+  hooks: Array<{
+    id: string;
+    scope: 'user' | 'project';
+    sourcePath: string;
+    sourceHash: string;
+    enabled: boolean;
+    event: HookEvent;
+    trusted: boolean;
+    failurePolicy: 'block' | 'warn';
+  }>;
+  knowledge: { userPath: string; projectPath?: string };
+  memory: { userPath: string; projectPath?: string };
+  diagnostics: string[];
+}
+
+export interface ScopedResourceWriteRequest {
+  kind: ScopedResourceKind;
+  scope: 'user' | 'project';
+  id: string;
+  content: string;
+  projectRoot?: string;
+}
+
+export interface RestrictivePolicy {
+  deniedTools?: string[];
+  approval?: 'none' | 'destructive' | 'mutation' | 'all';
+  limits?: Record<string, number>;
+}

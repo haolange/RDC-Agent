@@ -114,9 +114,9 @@ class RdxShellActionService {
       };
     }
 
-    const paths = appPathService.getWorkspacePaths();
+    const paths = appPathService.getRuntimePaths();
     const resolvedVariables: RdxShellActionVariables = {
-      workspaceRoot: paths.workspaceRoot,
+      workspaceRoot: paths.userRdxRoot,
       logsPath: paths.logsPath,
       projectsPath: paths.projectsPath,
       knowledgePath: paths.knowledgePath,

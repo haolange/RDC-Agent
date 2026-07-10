@@ -8,6 +8,7 @@ import type { LLMStreamEvent, ToolCall } from './llm';
 import type { MCPTransport } from './mcp';
 import type { AgentPromptProfile, AgentToolPolicy } from './profile';
 import type { ThinkingArtifact } from './reasoning';
+import type { ProviderReasoningContract } from './rdxRuntime';
 import type {
   ConversationAskUserAnswer,
   ConversationAskUserQuestion,
@@ -20,7 +21,7 @@ import type { WorkflowPhase, WorkflowStage } from './workflow';
 
 export type ToolCallingMode = 'native-structured' | 'text-only' | 'disabled';
 
-export type ReasoningVisibility = 'summary-events' | 'hidden' | 'none';
+export type ReasoningVisibility = 'summary-events' | 'unknown-events' | 'hidden' | 'none';
 
 /** 协议级 reasoning 交付语义：驱动 provider 请求参数与 Work Process 展示模式。 */
 export type ReasoningDelivery = 'none' | 'summary-only' | 'stream-full' | 'hidden';
@@ -32,6 +33,7 @@ export interface AgentRouteCapability {
   /** Provider stream visibility derived from reasoningDelivery for route execution. */
   reasoningVisibility: ReasoningVisibility;
   reasoningDelivery: ReasoningDelivery;
+  reasoningContract: ProviderReasoningContract;
   supportsStreaming: boolean;
   supportsToolResults: boolean;
 }
@@ -66,7 +68,6 @@ export interface AgentEventBasePayload {
 
 export interface AgentRunStartedPayload extends AgentEventBasePayload {
   mode: AppMode;
-  patternId?: string;
   providerId: string;
   modelId: string;
   toolAllowlist: string[];
@@ -246,33 +247,15 @@ export interface AgentRuntimeStageDescriptor {
   verifierAgents?: AgentRole[];
 }
 
-export interface AgentRuntimePatternDescriptor {
-  id: string;
-  label: string;
-  description: string;
-  modeBindings: ExecutableAppMode[];
-  stages: AgentRuntimeStageDescriptor[];
-  finalStatusOwner: 'runtime';
-}
-
 export interface AgentRuntimeSkillDescriptor {
   id: string;
   name: string;
   label: string;
   description: string;
-  source: 'builtin' | 'plugin' | 'workspace';
+  source: 'builtin' | 'user' | 'project';
   enabledByDefault: boolean;
   path?: string;
   parameters?: Record<string, unknown>;
-}
-
-export interface AgentRuntimeSkillWriteRequest {
-  id: string;
-  previousId?: string;
-  label: string;
-  description: string;
-  markdown: string;
-  enabledByDefault?: boolean;
 }
 
 export type ModelProviderBackendKind =
@@ -350,23 +333,12 @@ export interface AgentRuntimeMcpDescriptor {
   args?: string[];
   url?: string;
   env?: Record<string, string>;
-}
-
-export interface AgentRuntimeMcpWriteRequest {
-  id: string;
-  previousId?: string;
-  name: string;
-  description: string;
-  transport: MCPTransport;
-  enabledByDefault?: boolean;
-  command?: string;
-  args?: string[];
-  url?: string;
-  env?: Record<string, string>;
+  scope?: 'builtin' | 'user' | 'project';
+  sourcePath?: string;
+  sourceHash?: string;
 }
 
 export interface AgentRuntimeCatalog {
-  patterns: AgentRuntimePatternDescriptor[];
   skills: AgentRuntimeSkillDescriptor[];
   mcpServers: AgentRuntimeMcpDescriptor[];
 }

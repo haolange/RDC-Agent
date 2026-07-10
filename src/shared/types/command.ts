@@ -47,7 +47,6 @@ export type CommandUiAction =
   | { type: 'switch-model'; payload: { modelId: string } }
   | { type: 'switch-theme'; payload: { theme: string } }
   | { type: 'switch-permissions'; payload: { mode: string } }
-  | { type: 'change-workspace'; payload: { path: string } }
   | { type: 'resume-session'; payload: { sessionId: string } }
   | { type: 'export-session'; payload: { sessionId: string; format?: 'markdown' | 'json' } }
   | { type: 'compact-session'; payload: { sessionId: string } }

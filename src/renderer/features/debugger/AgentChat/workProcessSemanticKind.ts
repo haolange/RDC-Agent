@@ -44,6 +44,7 @@ const TOOL_SEMANTIC_OVERRIDES: Record<string, WorkProcessSemanticStepKind> = {
   grep: 'explore',
   search_codebase: 'explore',
   tool_search: 'explore',
+  memory_search: 'explore',
   memory_read: 'explore',
   web_search: 'web',
   web_fetch: 'web',

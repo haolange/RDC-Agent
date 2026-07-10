@@ -10,7 +10,6 @@ import { configCommand } from './builtins/config';
 import { modelCommand } from './builtins/model';
 import { projectCommand } from './builtins/project';
 import { sessionCommand } from './builtins/session';
-import { workspaceCommand } from './builtins/workspace';
 import { toolsCommand } from './builtins/tools';
 import { mcpCommand } from './builtins/mcp';
 import { skillsCommand } from './builtins/skills';
@@ -49,7 +48,6 @@ function registerBuiltins(registry: CommandRegistry): void {
     modelCommand,
     projectCommand,
     sessionCommand,
-    workspaceCommand,
     toolsCommand,
     mcpCommand,
     skillsCommand,

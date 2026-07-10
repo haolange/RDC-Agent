@@ -9,7 +9,7 @@ import type {
   AgentPermissionMode,
   AgentPermissionSettings,
   AgentRuntimeSettings,
-  ConfigurationSettings,
+  RuntimeResourceCatalog,
   FontScale,
   LayoutPreferences,
   LlmAgentRoute,
@@ -25,7 +25,6 @@ import type {
   SidebarLayoutPreference,
   ToolingSettings,
   UiPreferences,
-  WorkspaceSettings,
 } from '@shared/types/settings';
 import type { LLMConfig, LLMProviderConfig } from '@shared/types/llm';
 import { DEFAULT_MODEL_ROUTING, isSafeAgentProfileId } from '@shared/types/agent';
@@ -57,23 +56,12 @@ import { providerCatalogService } from './ProviderCatalogService';
 import { normalizeProviderCategory, normalizeProviderProtocol } from './providerCatalogNormalize';
 import { secretStorageService } from './SecretStorageService';
 
-interface PersistedConfigurationSettings {
-  activeModeProfileId?: string;
-  enabledMcpServerIds?: string[];
-  modePatternBindings?: Record<string, string>;
-  lastMigrationReportPath?: string;
-}
-
-type PersistedLlmProviderEntry = Partial<LlmProviderEntry> & {
-  kind?: unknown;
-  catalogGroup?: unknown;
-};
+type PersistedLlmProviderEntry = Partial<LlmProviderEntry>;
 
 interface PersistedSettingsPayload {
   appearance?: Partial<UiPreferences>;
   layout?: Partial<LayoutPreferences>;
   profile?: Partial<ProfileSettings>;
-  workspace?: Partial<WorkspaceSettings>;
   llm?: {
     providers?: PersistedLlmProviderEntry[];
     agentRoutes?: LlmAgentRoute[];
@@ -85,7 +73,6 @@ interface PersistedSettingsPayload {
   agentRuntime?: {
     permissions?: Partial<AgentPermissionSettings>;
   };
-  configuration?: PersistedConfigurationSettings;
 }
 
 interface HardRebuildResult {
@@ -99,14 +86,12 @@ interface NormalizedPersistedSettings {
   appearance: UiPreferences;
   layout: LayoutPreferences;
   profile: ProfileSettings;
-  workspace: WorkspaceSettings;
   tooling: ToolingSettings;
   agentRuntime: AgentRuntimeSettings;
   llm: {
     providers: LlmProviderEntry[];
     agentRoutes: LlmAgentRoute[];
   };
-  configuration: PersistedConfigurationSettings;
 }
 
 type ProviderCredentialPolicy = 'runtime' | 'persisted';
@@ -133,23 +118,20 @@ const VALID_THEMES: AppTheme[] = ['dark', 'light', 'system'];
 const VALID_LANGUAGES: AppLanguage[] = ['zh-CN', 'en'];
 const VALID_FONT_SCALES: FontScale[] = ['small', 'medium', 'large'];
 const VALID_PERMISSION_MODES: AgentPermissionMode[] = ['default', 'auto-review', 'full-access', 'custom'];
-const RETIRED_BUILTIN_MCP_SERVER_IDS = new Set(['builtin.rdc-toolbridge']);
 const EMPTY_PATHS: AppRuntimePaths = {
-  workspaceRoot: '',
-  defaultWorkspaceRoot: '',
+  userRdxRoot: '',
   settingsPath: '',
+  instructionsPath: '',
+  agentsPath: '',
+  profileStatePath: '',
   logsPath: '',
   logPath: '',
   projectsPath: '',
   knowledgePath: '',
-  migrationOrphansPath: '',
-  profilesPath: '',
   policiesPath: '',
   skillsPath: '',
   mcpPath: '',
-  patternsPath: '',
   secretsPath: '',
-  migrationReportsPath: '',
 };
 
 const DEFAULT_APPEARANCE: UiPreferences = {
@@ -177,16 +159,6 @@ const DEFAULT_LAYOUT: LayoutPreferences = {
 const DEFAULT_PROFILE: ProfileSettings = {
   nickname: 'RDC Operator',
   avatarPath: '',
-};
-
-const DEFAULT_CONFIGURATION: PersistedConfigurationSettings = {
-  activeModeProfileId: 'debugger.default',
-  enabledMcpServerIds: [],
-  modePatternBindings: {
-    debugger: 'free-agent',
-    analyzer: 'free-agent',
-    optimizer: 'free-agent',
-  },
 };
 
 const DEFAULT_RDX_CLI_INVOKER: RdxCliInvokerSettings = {
@@ -245,28 +217,6 @@ function pickEnum<T extends string>(value: unknown, allowed: T[], fallback: T): 
 
 function dedupeStrings(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
-}
-
-function sanitizeRuntimeIds(values: unknown): string[] {
-  return dedupeStrings(
-    Array.isArray(values)
-      ? values.filter((value): value is string => typeof value === 'string').map((value) => value.trim())
-      : [],
-  ).filter((value) => !RETIRED_BUILTIN_MCP_SERVER_IDS.has(value));
-}
-
-function sanitizePatternBindings(value: unknown): Record<string, string> {
-  const candidate = value && typeof value === 'object' ? value as Record<string, unknown> : {};
-  const bindings: Record<string, string> = {};
-  for (const [mode, patternId] of Object.entries(candidate)) {
-    if (typeof patternId === 'string' && patternId.trim()) {
-      bindings[mode] = patternId.trim();
-    }
-  }
-  return {
-    ...(DEFAULT_CONFIGURATION.modePatternBindings ?? {}),
-    ...bindings,
-  };
 }
 
 function sanitizeStringArray(value: unknown): string[] {
@@ -576,45 +526,31 @@ function createEmptyAgentRoutes(): LlmAgentRoute[] {
   }));
 }
 
-function createDefaultPersistedSettings(workspaceRoot = appPathService.getWorkspaceRoot()): PersistedSettingsPayload {
+function createDefaultPersistedSettings(): PersistedSettingsPayload {
   return {
     appearance: DEFAULT_APPEARANCE,
     layout: DEFAULT_LAYOUT,
     profile: DEFAULT_PROFILE,
-    workspace: {
-      rootPath: workspaceRoot,
-    },
     tooling: DEFAULT_TOOLING,
     agentRuntime: DEFAULT_AGENT_RUNTIME,
     llm: {
       providers: [],
       agentRoutes: createEmptyAgentRoutes(),
     },
-    configuration: DEFAULT_CONFIGURATION,
   };
 }
 
-function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspaceRoot()): AppSettings {
-  const configuration = executionProfileService.normalizeConfiguration({
-    activeModeProfileId: DEFAULT_CONFIGURATION.activeModeProfileId || 'debugger.default',
-    availableModeProfiles: [],
-    enabledMcpServerIds: DEFAULT_CONFIGURATION.enabledMcpServerIds ?? [],
-    modePatternBindings: DEFAULT_CONFIGURATION.modePatternBindings ?? {},
-    availablePatterns: [],
+function createDefaultRuntimeSettings(): AppSettings {
+  const resourceCatalog = executionProfileService.normalizeResourceCatalog({
     availableSkills: [],
     availableMcpServers: [],
-    lastMigrationReportPath: undefined,
-    lastMigrationSummary: [],
     diagnostics: [],
-  }, workspaceRoot);
+  });
 
   return {
     appearance: DEFAULT_APPEARANCE,
     layout: DEFAULT_LAYOUT,
     profile: DEFAULT_PROFILE,
-    workspace: {
-      rootPath: workspaceRoot,
-    },
     tooling: DEFAULT_TOOLING,
     agentRuntime: DEFAULT_AGENT_RUNTIME,
     llm: {
@@ -622,12 +558,12 @@ function createDefaultRuntimeSettings(workspaceRoot = appPathService.getWorkspac
       agentRoutes: createEmptyAgentRoutes(),
     },
     agents: {
-      directoryPath: path.join(appPathService.getWorkspacePaths(workspaceRoot).profilesPath, 'agents'),
+      directoryPath: appPathService.getRuntimePaths().agentsPath,
       definitions: [],
       modelOptions: [],
       globalInstructions: '',
     },
-    configuration,
+    resourceCatalog,
     paths: EMPTY_PATHS,
   };
 }
@@ -644,7 +580,7 @@ function sanitizeRoute(entry: unknown): LlmAgentRoute | null {
 
   return {
     agentId: route.agentId as LlmAgentRoute['agentId'],
-    providerId: typeof route.providerId === 'string' ? normalizeRetiredProviderId(route.providerId.trim()) : '',
+    providerId: typeof route.providerId === 'string' ? route.providerId.trim() : '',
     modelId: typeof route.modelId === 'string' ? route.modelId.trim() : '',
   };
 }
@@ -682,25 +618,13 @@ function isFixtureProvider(provider: Partial<LlmProviderEntry>): boolean {
   );
 }
 
-const RETIRED_PROVIDER_ID_IMPORTS: Record<string, LlmProviderId> = {
-  gemini: 'vertex',
-  kimi: 'kimi-coding-plan',
-  'kimi-code': 'kimi-coding-plan',
-  minimax: 'minimax-global',
-  zai: 'glm-global',
-};
-
-function normalizeRetiredProviderId(providerId: string): string {
-  return RETIRED_PROVIDER_ID_IMPORTS[providerId] ?? providerId;
-}
-
 function sanitizeUserProvider(
   provider: PersistedLlmProviderEntry,
-  workspaceRoot = appPathService.getWorkspaceRoot(),
+  workspaceRoot = appPathService.getUserRdxRoot(),
   options: ProviderSanitizeOptions = {},
 ): LlmProviderEntry | null {
   const incomingId = typeof provider.id === 'string' ? provider.id.trim() : '';
-  const rawId = normalizeRetiredProviderId(incomingId);
+  const rawId = incomingId;
   if (!rawId || !isBuiltinProviderId(rawId)) {
     return null;
   }
@@ -710,9 +634,7 @@ function sanitizeUserProvider(
   const incomingSecretRef = typeof provider.secretRef === 'string' && provider.secretRef.trim()
     ? provider.secretRef.trim()
     : undefined;
-  const secretRef = incomingId && incomingId !== rawId
-    ? secretStorageService.createProviderSecretRef(rawId)
-    : incomingSecretRef || secretStorageService.createProviderSecretRef(rawId);
+  const secretRef = incomingSecretRef || secretStorageService.createProviderSecretRef(rawId);
   const protocol = normalizeProviderProtocol({ ...provider, id: rawId });
   const catalogOwnership = getBuiltinProviderCatalogOwnership(rawId);
   const models = resolveProviderModels(rawId, provider.models ?? []);
@@ -874,35 +796,16 @@ function normalizeUserRoutes(
   return Array.from(routeMap.values());
 }
 
-function parseMigrationSummary(reportPath?: string): string[] {
-  if (!reportPath || !fs.existsSync(reportPath)) {
-    return [];
-  }
-
-  try {
-    const content = JSON.parse(fs.readFileSync(reportPath, 'utf8')) as {
-      fixes?: string[];
-      warnings?: string[];
-    };
-    return [...(content.fixes ?? []), ...(content.warnings ?? [])];
-  } catch (error) {
-    console.warn('[SettingsService] Failed to read migration report:', error);
-    return [];
-  }
-}
-
 export class SettingsService {
   private initialized = false;
 
   initialize(): AppSettings {
-    const runtimePaths = appPathService.initializeWorkspaceRoot();
-    executionProfileService.ensureScaffold(runtimePaths.workspaceRoot);
+    const runtimePaths = appPathService.initializeRuntime();
+    executionProfileService.ensureScaffold();
 
     const rawPersisted = readJsonFile<PersistedSettingsPayload>(runtimePaths.settingsPath);
-    const rebuildResult = this.rebuildPersistedSettings(rawPersisted, runtimePaths.workspaceRoot);
-    if (rebuildResult.changed || !fs.existsSync(runtimePaths.settingsPath)) {
-      this.persistHardRebuild(runtimePaths, rawPersisted, rebuildResult);
-    }
+    const rebuildResult = this.rebuildPersistedSettings(rawPersisted, runtimePaths.userRdxRoot);
+    this.persistHardRebuild(runtimePaths, rawPersisted, rebuildResult);
 
     this.initialized = true;
     return this.getAll(runtimePaths);
@@ -918,7 +821,7 @@ export class SettingsService {
     raw: PersistedSettingsPayload | null,
     workspaceRoot: string,
   ): HardRebuildResult {
-    const fallback = createDefaultPersistedSettings(workspaceRoot);
+    const fallback = createDefaultPersistedSettings();
     const candidate = raw ?? fallback;
     const fixes: string[] = [];
     const warnings: string[] = [];
@@ -937,29 +840,17 @@ export class SettingsService {
       }
 
       const incomingId = typeof entry.id === 'string' ? entry.id.trim() : '';
-      const rawId = normalizeRetiredProviderId(incomingId);
+      const rawId = incomingId;
       if (!rawId) {
         fixes.push('Removed provider with empty id');
         continue;
-      }
-
-      if (incomingId && incomingId !== rawId) {
-        fixes.push(`Renamed retired provider id ${incomingId} to ${rawId}`);
       }
 
       const canonicalSecretRef = secretStorageService.createProviderSecretRef(rawId);
       const incomingSecretRef = typeof entry.secretRef === 'string' && entry.secretRef.trim()
         ? entry.secretRef.trim()
         : undefined;
-      const secretRef = incomingId && incomingId !== rawId ? canonicalSecretRef : incomingSecretRef || canonicalSecretRef;
-      if (incomingSecretRef && incomingSecretRef !== secretRef) {
-        const incomingSecret = secretStorageService.getSecret(incomingSecretRef, workspaceRoot);
-        if (incomingSecret.trim()) {
-          secretStorageService.setSecret(secretRef, incomingSecret, workspaceRoot);
-          secretStorageService.deleteSecret(incomingSecretRef, workspaceRoot);
-          fixes.push(`Moved retired provider secret ${incomingId} to ${rawId}`);
-        }
-      }
+      const secretRef = incomingSecretRef || canonicalSecretRef;
       if (entry.apiKey?.trim()) {
         secretStorageService.setSecret(secretRef, entry.apiKey.trim(), workspaceRoot);
         fixes.push(`Migrated plaintext secret for ${rawId}`);
@@ -989,7 +880,7 @@ export class SettingsService {
       if (entry && typeof entry === 'object') {
         const providerId = (entry as Partial<LlmAgentRoute>).providerId;
         const incomingProviderId = typeof providerId === 'string' ? providerId.trim() : '';
-        const normalizedProviderId = normalizeRetiredProviderId(incomingProviderId);
+        const normalizedProviderId = incomingProviderId;
         if (incomingProviderId && incomingProviderId !== normalizedProviderId) {
           const agentId = (entry as Partial<LlmAgentRoute>).agentId;
           fixes.push(`Renamed retired route provider id ${incomingProviderId} to ${normalizedProviderId}${typeof agentId === 'string' ? ` for ${agentId}` : ''}`);
@@ -1027,20 +918,11 @@ export class SettingsService {
           : DEFAULT_PROFILE.nickname,
         avatarPath: typeof candidate.profile?.avatarPath === 'string' ? candidate.profile.avatarPath : DEFAULT_PROFILE.avatarPath,
       },
-      workspace: {
-        rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot,
-      },
       tooling: sanitizeToolingSettings(candidate.tooling ?? fallback.tooling),
       agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
       llm: {
         providers: catalogProviders.map((provider) => ({ ...provider, apiKey: '' })),
         agentRoutes: nextRoutes,
-      },
-      configuration: {
-        activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
-        enabledMcpServerIds: sanitizeRuntimeIds(candidate.configuration?.enabledMcpServerIds),
-        modePatternBindings: sanitizePatternBindings(candidate.configuration?.modePatternBindings),
-        lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath,
       },
     };
 
@@ -1057,7 +939,7 @@ export class SettingsService {
     workspaceRoot: string,
     options: ProviderSanitizeOptions = {},
   ): NormalizedPersistedSettings {
-    const fallback = createDefaultPersistedSettings(workspaceRoot);
+    const fallback = createDefaultPersistedSettings();
     const candidate = raw ?? fallback;
     const nextProviders = normalizeUserProviders(candidate.llm?.providers, workspaceRoot, options).map((provider) => ({
       ...provider,
@@ -1082,92 +964,42 @@ export class SettingsService {
           : DEFAULT_PROFILE.nickname,
         avatarPath: typeof candidate.profile?.avatarPath === 'string' ? candidate.profile.avatarPath : DEFAULT_PROFILE.avatarPath,
       },
-      workspace: {
-        rootPath: candidate.workspace?.rootPath?.trim() || workspaceRoot,
-      },
       tooling: sanitizeToolingSettings(candidate.tooling ?? fallback.tooling),
       agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
       llm: {
         providers: nextProviders,
         agentRoutes: nextRoutes,
       },
-      configuration: {
-        activeModeProfileId: candidate.configuration?.activeModeProfileId?.trim() || DEFAULT_CONFIGURATION.activeModeProfileId,
-        enabledMcpServerIds: sanitizeRuntimeIds(candidate.configuration?.enabledMcpServerIds),
-        modePatternBindings: sanitizePatternBindings(candidate.configuration?.modePatternBindings),
-        lastMigrationReportPath: candidate.configuration?.lastMigrationReportPath,
-      },
     };
-  }
-
-  private writeMigrationReport(paths: AppRuntimePaths, fixes: string[], warnings: string[]): string {
-    const reportPath = path.join(paths.migrationReportsPath, `settings-rebuild-${Date.now()}.json`);
-    fs.mkdirSync(paths.migrationReportsPath, { recursive: true });
-    fs.writeFileSync(reportPath, JSON.stringify({
-      generatedAt: nowIso(),
-      fixes,
-      warnings,
-    }, null, 2), 'utf8');
-    return reportPath;
   }
 
   private persistHardRebuild(
-    paths: AppRuntimePaths,
-    previous: PersistedSettingsPayload | null,
+    _paths: AppRuntimePaths,
+    _previous: PersistedSettingsPayload | null,
     result: HardRebuildResult,
   ): void {
-    const nextSettings: PersistedSettingsPayload = {
-      ...result.settings,
-      configuration: {
-        ...result.settings.configuration,
-      },
-    };
-
-    if (result.changed && previous && fs.existsSync(paths.settingsPath)) {
-      fs.mkdirSync(paths.migrationOrphansPath, { recursive: true });
-      const backupPath = path.join(paths.migrationOrphansPath, `settings.backup.${Date.now()}.json`);
-      fs.copyFileSync(paths.settingsPath, backupPath);
-    }
-
-    if (result.changed && (result.fixes.length > 0 || result.warnings.length > 0)) {
-      nextSettings.configuration = {
-        ...nextSettings.configuration,
-        lastMigrationReportPath: this.writeMigrationReport(paths, result.fixes, result.warnings),
-      };
-    }
-
-    this.writeSettings(nextSettings, paths.workspaceRoot);
+    this.writeSettings(result.settings);
   }
 
   private toRuntimeSettings(
     persisted: PersistedSettingsPayload,
     runtimePaths?: Partial<AppRuntimePaths>,
   ): AppSettings {
-    const workspaceRoot = persisted.workspace?.rootPath?.trim() || appPathService.getWorkspaceRoot();
+    const workspaceRoot = appPathService.getUserRdxRoot();
     const normalized = this.normalizePersistedSettings(persisted, workspaceRoot);
     const hydratedProviders = hydrateProviderSecrets(normalized.llm.providers, workspaceRoot);
-    const paths = appPathService.getWorkspacePaths(workspaceRoot);
-    const configuration: ConfigurationSettings = executionProfileService.normalizeConfiguration({
-      activeModeProfileId: normalized.configuration?.activeModeProfileId || DEFAULT_CONFIGURATION.activeModeProfileId || 'debugger.default',
-      availableModeProfiles: [],
-      enabledMcpServerIds: normalized.configuration?.enabledMcpServerIds ?? [],
-      modePatternBindings: normalized.configuration?.modePatternBindings ?? DEFAULT_CONFIGURATION.modePatternBindings ?? {},
-      availablePatterns: [],
+    const paths = appPathService.getRuntimePaths();
+    const resourceCatalog: RuntimeResourceCatalog = executionProfileService.normalizeResourceCatalog({
       availableSkills: [],
       availableMcpServers: [],
-      lastMigrationReportPath: normalized.configuration?.lastMigrationReportPath,
-      lastMigrationSummary: parseMigrationSummary(normalized.configuration?.lastMigrationReportPath),
       diagnostics: [],
-    }, workspaceRoot);
+    });
 
     const settings: AppSettings = {
-      ...createDefaultRuntimeSettings(workspaceRoot),
+      ...createDefaultRuntimeSettings(),
       appearance: normalized.appearance,
       layout: normalized.layout,
       profile: normalized.profile,
-      workspace: {
-        rootPath: workspaceRoot,
-      },
       tooling: normalized.tooling,
       agentRuntime: normalized.agentRuntime,
       llm: {
@@ -1175,37 +1007,37 @@ export class SettingsService {
         agentRoutes: normalizeUserRoutes(normalized.llm?.agentRoutes ?? createEmptyAgentRoutes(), hydratedProviders),
       },
       agents: agentManifestService.getSettings(paths, hydratedProviders, normalized.llm?.agentRoutes ?? createEmptyAgentRoutes()),
-      configuration,
+      resourceCatalog,
       paths: {
         ...paths,
         ...(runtimePaths ?? {}),
       },
     };
 
-    settings.configuration.diagnostics = executionProfileService.getDiagnostics(settings);
+    settings.resourceCatalog.diagnostics = executionProfileService.getDiagnostics(settings);
     return settings;
   }
 
-  private writeSettings(settings: PersistedSettingsPayload, workspaceRoot = settings.workspace?.rootPath || appPathService.getWorkspaceRoot()): void {
-    const filePath = appPathService.getWorkspacePaths(workspaceRoot).settingsPath;
+  private writeSettings(settings: PersistedSettingsPayload): void {
+    const filePath = appPathService.getRuntimePaths().settingsPath;
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf8');
   }
 
   getAll(runtimePaths?: Partial<AppRuntimePaths>): AppSettings {
     this.ensureInitialized();
-    const paths = appPathService.getWorkspacePaths();
+    const paths = appPathService.getRuntimePaths();
     const persisted = readJsonFile<PersistedSettingsPayload>(paths.settingsPath)
-      ?? createDefaultPersistedSettings(paths.workspaceRoot);
+      ?? createDefaultPersistedSettings();
     return this.toRuntimeSettings(persisted, runtimePaths);
   }
 
-  getProviderSecret(providerId: string, workspaceRoot = appPathService.getWorkspaceRoot()): string {
+  getProviderSecret(providerId: string, workspaceRoot = appPathService.getUserRdxRoot()): string {
     this.ensureInitialized();
 
     const persisted = this.normalizePersistedSettings(
-      readJsonFile<PersistedSettingsPayload>(appPathService.getWorkspacePaths(workspaceRoot).settingsPath)
-        ?? createDefaultPersistedSettings(workspaceRoot),
+      readJsonFile<PersistedSettingsPayload>(appPathService.getRuntimePaths().settingsPath)
+        ?? createDefaultPersistedSettings(),
       workspaceRoot,
     );
     const provider = persisted.llm.providers.find((entry) => entry.id === providerId);
@@ -1216,7 +1048,7 @@ export class SettingsService {
     return getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot);
   }
 
-  getProviderOAuthSecret(providerId: string, workspaceRoot = appPathService.getWorkspaceRoot()): string {
+  getProviderOAuthSecret(providerId: string, workspaceRoot = appPathService.getUserRdxRoot()): string {
     this.ensureInitialized();
     return secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(providerId), workspaceRoot);
   }
@@ -1224,14 +1056,12 @@ export class SettingsService {
   setAll(patch: AppSettingsPatch, runtimePaths?: Partial<AppRuntimePaths>): AppSettings {
     this.ensureInitialized();
 
-    const currentRuntime = this.getAll();
-    const requestedRoot = patch.workspace?.rootPath?.trim() || currentRuntime.workspace.rootPath || appPathService.getWorkspacePaths().workspaceRoot;
-    const nextPaths = appPathService.setWorkspaceRoot(requestedRoot);
-    executionProfileService.ensureScaffold(nextPaths.workspaceRoot);
+    const nextPaths = appPathService.initializeRuntime();
+    executionProfileService.ensureScaffold();
 
     const currentPersisted = this.normalizePersistedSettings(
-      readJsonFile<PersistedSettingsPayload>(nextPaths.settingsPath) ?? createDefaultPersistedSettings(nextPaths.workspaceRoot),
-      nextPaths.workspaceRoot,
+      readJsonFile<PersistedSettingsPayload>(nextPaths.settingsPath) ?? createDefaultPersistedSettings(),
+      nextPaths.userRdxRoot,
       { credentialPolicy: 'persisted' },
     );
 
@@ -1241,16 +1071,16 @@ export class SettingsService {
       const secretRef = provider.secretRef || secretStorageService.createProviderSecretRef(provider.id);
       const apiKey = provider.apiKey?.trim() ?? '';
       if (provider.authMode === 'api-key' && apiKey) {
-        secretStorageService.setSecret(secretRef, apiKey, nextPaths.workspaceRoot);
+        secretStorageService.setSecret(secretRef, apiKey, nextPaths.userRdxRoot);
       } else if (provider.authMode === 'api-key' && !provider.hasStoredSecret) {
-        secretStorageService.deleteSecret(secretRef, nextPaths.workspaceRoot);
+        secretStorageService.deleteSecret(secretRef, nextPaths.userRdxRoot);
       }
       return sanitizeUserProvider({
         ...provider,
         secretRef,
-      }, nextPaths.workspaceRoot, { credentialPolicy: providerCredentialPolicy });
+      }, nextPaths.userRdxRoot, { credentialPolicy: providerCredentialPolicy });
     }).filter((provider): provider is LlmProviderEntry => provider !== null);
-    const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.workspaceRoot, {
+    const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.userRdxRoot, {
       credentialPolicy: providerCredentialPolicy,
     });
     const currentRoutes = normalizeUserRoutes(patch.llm?.agentRoutes ?? currentPersisted.llm?.agentRoutes ?? [], nextProviders);
@@ -1318,9 +1148,6 @@ export class SettingsService {
           ? patch.profile.avatarPath
           : currentPersisted.profile?.avatarPath || DEFAULT_PROFILE.avatarPath,
       },
-      workspace: {
-        rootPath: nextPaths.workspaceRoot,
-      },
       tooling: {
         rdxCli: sanitizeRdxCliInvokerSettings({
           ...(currentPersisted.tooling?.rdxCli ?? DEFAULT_RDX_CLI_INVOKER),
@@ -1341,21 +1168,9 @@ export class SettingsService {
         providers: nextProviders.map((provider) => ({ ...provider, apiKey: '' })),
         agentRoutes: normalizeUserRoutes(manifestRoutes, nextProviders),
       },
-      configuration: {
-        activeModeProfileId: patch.configuration?.activeModeProfileId
-          || currentPersisted.configuration?.activeModeProfileId
-          || DEFAULT_CONFIGURATION.activeModeProfileId,
-        enabledMcpServerIds: patch.configuration?.enabledMcpServerIds
-          ? sanitizeRuntimeIds(patch.configuration.enabledMcpServerIds)
-          : sanitizeRuntimeIds(currentPersisted.configuration?.enabledMcpServerIds),
-        modePatternBindings: patch.configuration?.modePatternBindings
-          ? sanitizePatternBindings(patch.configuration.modePatternBindings)
-          : sanitizePatternBindings(currentPersisted.configuration?.modePatternBindings),
-        lastMigrationReportPath: currentPersisted.configuration?.lastMigrationReportPath,
-      },
     };
 
-    this.writeSettings(nextPersisted, nextPaths.workspaceRoot);
+    this.writeSettings(nextPersisted);
     return this.getAll({
       ...nextPaths,
       ...(runtimePaths ?? {}),
@@ -1430,7 +1245,7 @@ export class SettingsService {
     secretStorageService.setSecret(
       secretStorageService.createProviderOAuthSecretRef(provider.id),
       secretPayload,
-      current.workspace.rootPath,
+      current.paths.userRdxRoot,
     );
 
     const timestamp = nowIso();
@@ -1466,9 +1281,9 @@ export class SettingsService {
     }
 
     if (provider.authMode === 'api-key') {
-      secretStorageService.deleteSecret(provider.secretRef, current.workspace.rootPath);
+      secretStorageService.deleteSecret(provider.secretRef, current.paths.userRdxRoot);
     } else if (provider.authMode === 'account') {
-      secretStorageService.deleteSecret(secretStorageService.createProviderOAuthSecretRef(provider.id), current.workspace.rootPath);
+      secretStorageService.deleteSecret(secretStorageService.createProviderOAuthSecretRef(provider.id), current.paths.userRdxRoot);
     }
 
     const fallback = createBuiltinProviderEntry(provider.id);
@@ -1501,7 +1316,7 @@ export class SettingsService {
       .filter((provider) => provider.enabled && provider.isConfigured && provider.status === 'verified')
       .map((provider) => {
         const accountCredential = provider.authMode === 'account'
-          ? resolveAccountRuntimeCredential(provider.id, settings.workspace.rootPath)
+          ? resolveAccountRuntimeCredential(provider.id, settings.paths.userRdxRoot)
           : { apiKey: '', baseUrl: undefined };
         return {
           id: provider.id,
@@ -1509,7 +1324,7 @@ export class SettingsService {
           label: provider.label,
           enabled: provider.enabled,
           apiKey: provider.authMode === 'api-key'
-            ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.workspace.rootPath)
+            ? getResolvedProviderSecret(provider.id, provider.secretRef, settings.paths.userRdxRoot)
             : provider.authMode === 'account'
               ? accountCredential.apiKey
               : '',
@@ -1537,7 +1352,7 @@ export class SettingsService {
   }
 
   getSettingsPath(): string {
-    return appPathService.getWorkspacePaths().settingsPath;
+    return appPathService.getRuntimePaths().settingsPath;
   }
 }
 

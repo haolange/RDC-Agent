@@ -4,7 +4,7 @@ Agentic Trace is the current message-flow and run-projection contract for RDC-Ag
 
 ## Storage
 
-Runtime trace events are append-only JSONL records under the workspace trace directory. Session-level right-panel state is projected through `TraceStateStore` and shared types in `src/shared/types/trace.ts`.
+Runtime trace events are append-only JSONL records under the application state trace directory. Session-level right-panel state is projected through `TraceStateStore` and shared types in `src/shared/types/trace.ts`.
 
 ## Shared Types
 
@@ -26,7 +26,7 @@ Right-panel records use `traceLaneId`.
 ## Progress lane
 
 The right-panel Progress lane (`RightPanelViewModel.progress`) is projected from the
-session-scoped agent task registry at `workspace/.tasks/{sessionId}` (`TaskRegistry` with the
+session-scoped agent task registry at `${userData}/state/tasks/{sessionId}` (`TaskRegistry` with the
 `task_create` / `task_update` / `task_list` tools), mapped to `ProgressTask` by
 `TraceService.mapSessionProgress`. It is session-scoped rather than per-run, so it stays populated
 under the conversation-driven projection path (`buildConversationPresentation`). `current` holds

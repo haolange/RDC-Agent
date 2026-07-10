@@ -353,7 +353,7 @@ function projectLlmTurn(
   const sectionResult = deps.resolveSectionResult(block, outputPhase, ctx.hasVisibleProcessEvidence);
   const sectionThinking = deps.resolveSectionThinking(
     block,
-    steps.length > 0 || reasoningState === 'raw' || reasoningState === 'summary',
+    steps.length > 0 || reasoningState === 'raw' || reasoningState === 'summary' || reasoningState === 'unknown',
   );
   dedupeSectionThinking(sectionThinking, ctx, deps);
 

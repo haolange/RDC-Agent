@@ -11,10 +11,11 @@ import type {
   AgentModelOption,
 } from '@shared/types/agentManifest';
 import type { AppRuntimePaths, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
+import type { EffectiveAgentProfile, ScopedResourceCandidate } from '@shared/types/rdxRuntime';
 import { AGENT_DESCRIPTIONS, AGENT_DISPLAY_NAMES, AGENT_MODE_MAP, AGENT_ROLES, isAgentIconPreset } from '@shared/constants/agents';
 import { canonicalAgentModelId, splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
-
-const GLOBAL_INSTRUCTIONS_FILE = 'global-instructions.md';
+import { appPathService } from '../runtime/AppPathService';
+import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
 
 const toSlug = (value: string): string => {
   const slug = value
@@ -196,15 +197,15 @@ const createSeedDefinition = (
 };
 
 export class AgentManifestService {
-  private getAgentsDirectory(paths: Pick<AppRuntimePaths, 'profilesPath'>): string {
-    return path.join(paths.profilesPath, 'agents');
+  private getAgentsDirectory(paths: Pick<AppRuntimePaths, 'agentsPath'>): string {
+    return paths.agentsPath;
   }
 
-  private getGlobalInstructionsPath(paths: Pick<AppRuntimePaths, 'profilesPath'>): string {
-    return path.join(paths.profilesPath, GLOBAL_INSTRUCTIONS_FILE);
+  private getGlobalInstructionsPath(paths: Pick<AppRuntimePaths, 'instructionsPath'>): string {
+    return paths.instructionsPath;
   }
 
-  ensureSeedManifests(paths: Pick<AppRuntimePaths, 'profilesPath'>, routes: LlmAgentRoute[]): void {
+  ensureSeedManifests(paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>, routes: LlmAgentRoute[]): void {
     const directory = this.getAgentsDirectory(paths);
     fs.mkdirSync(directory, { recursive: true });
     const existing = new Set(fs.readdirSync(directory));
@@ -217,7 +218,7 @@ export class AgentManifestService {
   }
 
   getSettings(
-    paths: Pick<AppRuntimePaths, 'profilesPath'>,
+    paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
     providers: LlmProviderEntry[],
     routes: LlmAgentRoute[],
   ): AgentManifestSettings {
@@ -241,8 +242,52 @@ export class AgentManifestService {
     };
   }
 
+  getEffectiveProfiles(
+    paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
+    providers: LlmProviderEntry[],
+    routes: LlmAgentRoute[],
+    projectRoot?: string,
+  ): EffectiveAgentProfile[] {
+    const userSettings = this.getSettings(paths, providers, routes);
+    const candidates: Array<ScopedResourceCandidate<AgentManifestDefinition>> = userSettings.definitions.map((definition) => ({
+      id: definition.id,
+      kind: 'agent',
+      scope: 'user',
+      sourcePath: definition.filePath,
+      value: definition,
+      enabled: definition.enabled,
+    }));
+
+    if (projectRoot) {
+      const projectAgentsPath = appPathService.getProjectRdxPaths(projectRoot).agentsPath;
+      if (fs.existsSync(projectAgentsPath)) {
+        fs.readdirSync(projectAgentsPath)
+          .filter((entry) => entry.endsWith('.agent.md'))
+          .filter((entry) => isSafeAgentProfileId(idFromFileName(entry)))
+          .forEach((entry) => {
+            const filePath = path.join(projectAgentsPath, entry);
+            const definition = parseAgentMarkdown(filePath, idFromFileName(entry));
+            candidates.push({
+              id: definition.id,
+              kind: 'agent',
+              scope: 'project',
+              sourcePath: filePath,
+              value: definition,
+              enabled: definition.enabled,
+            });
+          });
+      }
+    }
+
+    return scopedResourceResolver.resolve(candidates).resources.map((resource) => ({
+      ...resource.value,
+      effectiveStatus: resource.effectiveStatus,
+      provenance: resource.provenance,
+    }));
+  }
+
   save(
-    paths: Pick<AppRuntimePaths, 'profilesPath'>,
+    paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
     drafts: AgentManifestDraft[],
     globalInstructions?: string,
   ): void {
@@ -273,7 +318,7 @@ export class AgentManifestService {
     }
   }
 
-  importFile(paths: Pick<AppRuntimePaths, 'profilesPath'>, sourcePath: string): AgentManifestDefinition {
+  importFile(paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>, sourcePath: string): AgentManifestDefinition {
     if (!sourcePath.endsWith('.agent.md')) {
       throw new Error('Only .agent.md files can be imported.');
     }
@@ -354,7 +399,7 @@ export class AgentManifestService {
     })));
   }
 
-  private readGlobalInstructions(paths: Pick<AppRuntimePaths, 'profilesPath'>): string {
+  private readGlobalInstructions(paths: Pick<AppRuntimePaths, 'instructionsPath'>): string {
     const filePath = this.getGlobalInstructionsPath(paths);
     if (!fs.existsSync(filePath)) {
       return '';

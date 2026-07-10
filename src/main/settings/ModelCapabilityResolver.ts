@@ -29,14 +29,13 @@ function sanitizeReasoningControl(control: ReasoningControl | undefined): Reason
 
 type TurnControlsInput = Partial<Omit<ConversationTurnControls, 'reasoningLevel'>> & {
   reasoningLevel?: unknown;
-  effort?: unknown;
 };
 
 function normalizeTurnControls(
   controls: TurnControlsInput | undefined,
   reasoningControl: ReasoningControl,
 ): ConversationTurnControls {
-  const candidate = controls?.reasoningLevel ?? controls?.effort;
+  const candidate = controls?.reasoningLevel;
   const reasoningLevel = coerceReasoningSelectionCandidate(candidate, reasoningControl)
     ?? reasoningControl.defaultSelection;
   return {

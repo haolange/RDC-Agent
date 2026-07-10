@@ -1,8 +1,4 @@
 import type {
-  AgentRuntimeMcpWriteRequest,
-  AgentRuntimeSkillWriteRequest,
-} from '@shared/types/agentRuntime';
-import type {
   AppSettings,
   AppSettingsPatch,
   LlmAgentRoute,
@@ -18,28 +14,22 @@ type ModalState = ReturnType<typeof useSettingsModalState>;
 type ProviderConnection = ReturnType<typeof useProviderConnection>;
 
 interface SettingsModalActionsOptions {
-  settings: AppSettings;
   modalState: ModalState;
   providerConnection: ProviderConnection;
   invalidAgentRoutes: Array<{ agentId: LlmAgentRoute['agentId']; issue: TranslationKey }>;
   invalidAgentRouteMessage: string;
   updateProfile: (profile: Partial<AppSettings['profile']>) => Promise<void>;
-  updateWorkspaceRoot: (rootPath: string) => Promise<void>;
-  resetWorkspaceRoot: () => Promise<void>;
   patchSettings: (patch: AppSettingsPatch) => Promise<AppSettings>;
   reloadSettings: () => Promise<AppSettings>;
   t: Translate;
 }
 
 export function createSettingsModalActions({
-  settings,
   modalState,
   providerConnection,
   invalidAgentRoutes,
   invalidAgentRouteMessage,
   updateProfile,
-  updateWorkspaceRoot,
-  resetWorkspaceRoot,
   patchSettings,
   reloadSettings,
   t,
@@ -52,22 +42,6 @@ export function createSettingsModalActions({
 
   const handleAccountSave = async () => {
     await updateProfile(modalState.accountDraft);
-  };
-
-  const handleWorkspacePick = async () => {
-    const nextRoot = await window.electronAPI?.selectDirectory();
-    if (nextRoot) {
-      modalState.setWorkspaceDraft(nextRoot);
-    }
-  };
-
-  const handleWorkspaceSave = async () => {
-    await updateWorkspaceRoot(modalState.workspaceDraft.trim() || settings.paths.defaultWorkspaceRoot);
-  };
-
-  const handleWorkspaceReset = async () => {
-    modalState.setWorkspaceDraft(settings.paths.defaultWorkspaceRoot);
-    await resetWorkspaceRoot();
   };
 
   const handleRefreshProviderModels = async (provider: LlmProviderEntry) => {
@@ -209,33 +183,15 @@ export function createSettingsModalActions({
     }
   };
 
-  const handleSaveAgentRuntimeConfig = async () => {
-    await patchSettings({
-      tooling: {
-        rdxCli: modalState.rdxCliDraft,
-        rdxActions: modalState.rdxActionsDraft,
-      },
-      configuration: {
-        activeModeProfileId: modalState.activeModeProfileDraft,
-        enabledMcpServerIds: modalState.enabledMcpDrafts,
-        modePatternBindings: modalState.patternBindingDrafts,
-      },
-    });
-  };
-
   const handleSaveToolsConfig = async () => {
     const nextSettings = await patchSettings({
       tooling: {
         rdxCli: modalState.rdxCliDraft,
         rdxActions: modalState.rdxActionsDraft,
       },
-      configuration: {
-        enabledMcpServerIds: modalState.enabledMcpDrafts,
-      },
     });
     modalState.setRdxCliDraft(nextSettings.tooling.rdxCli);
     modalState.setRdxActionsDraft(nextSettings.tooling.rdxActions);
-    modalState.setEnabledMcpDrafts(nextSettings.configuration.enabledMcpServerIds);
   };
 
   const handleSavePersonalization = async () => {
@@ -247,81 +203,16 @@ export function createSettingsModalActions({
     modalState.setGlobalInstructionsDraft(nextSettings.agents.globalInstructions);
   };
 
-  const refreshRuntimeCatalog = async () => {
-    const nextSettings = await reloadSettings();
-    modalState.setEnabledMcpDrafts(nextSettings.configuration.enabledMcpServerIds);
-    return nextSettings;
-  };
-
-  const handleUpsertSkill = async (request: AgentRuntimeSkillWriteRequest) => {
-    await window.electronAPI.settings.upsertSkill(request);
-    return refreshRuntimeCatalog();
-  };
-
-  const handleDeleteSkill = async (skillId: string) => {
-    await window.electronAPI.settings.deleteSkill(skillId);
-    return refreshRuntimeCatalog();
-  };
-
-  const handleImportSkill = async () => {
-    const filePaths = await window.electronAPI?.selectFiles();
-    const filePath = filePaths?.find((entry) => entry.endsWith('.md'));
-    if (!filePath) {
-      throw new Error(t('settings.skillImportRequiresMarkdown'));
-    }
-    await window.electronAPI.settings.importSkill(filePath);
-    return refreshRuntimeCatalog();
-  };
-
-  const handleUpsertMcpServer = async (request: AgentRuntimeMcpWriteRequest) => {
-    await window.electronAPI.settings.upsertMcpServer(request);
-    return refreshRuntimeCatalog();
-  };
-
-  const handleDeleteMcpServer = async (serverId: string) => {
-    await window.electronAPI.settings.deleteMcpServer(serverId);
-    await patchSettings({
-      configuration: {
-        enabledMcpServerIds: modalState.enabledMcpDrafts.filter((id) => id !== serverId),
-      },
-    });
-    return refreshRuntimeCatalog();
-  };
-
-  const handleImportMcpServer = async () => {
-    const filePaths = await window.electronAPI?.selectFiles();
-    const filePath = filePaths?.find((entry) => entry.endsWith('.json'));
-    if (!filePath) {
-      throw new Error(t('settings.mcpImportRequiresJson'));
-    }
-    await window.electronAPI.settings.importMcpServer(filePath);
-    return refreshRuntimeCatalog();
-  };
-
-  const toggleRuntimeId = (values: string[], id: string): string[] =>
-    values.includes(id) ? values.filter((value) => value !== id) : [...values, id];
-
   return {
     handleAvatarSelect,
     handleAccountSave,
-    handleWorkspacePick,
-    handleWorkspaceSave,
-    handleWorkspaceReset,
     handleRefreshProviderModels,
     handleDisconnectProvider,
     handleRouteChange,
     handleSaveAgentRoutes,
     handleSaveAgentManifests,
     handleImportAgentManifest,
-    handleSaveAgentRuntimeConfig,
     handleSaveToolsConfig,
     handleSavePersonalization,
-    handleUpsertSkill,
-    handleDeleteSkill,
-    handleImportSkill,
-    handleUpsertMcpServer,
-    handleDeleteMcpServer,
-    handleImportMcpServer,
-    toggleRuntimeId,
   };
 }
